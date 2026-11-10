@@ -1,0 +1,119 @@
+import { describe, expect, it } from "vitest";
+import { BALANCE } from "../../config/balance.ts";
+import {
+  dailyLoginXp,
+  isUnlocked,
+  levelFromTotalXp,
+  levelProgress,
+  nextUnlocks,
+  profitableCloseXp,
+  totalXpForLevel,
+  unlockLevel,
+  unlocksAtLevel,
+  unlocksUpToLevel,
+  xpForNextLevel,
+} from "./progression.ts";
+
+describe("xp curve", () => {
+  it("matches the sample values of the spec", () => {
+    expect(xpForNextLevel(1)).toBe(100);
+    expect(xpForNextLevel(10)).toBe(3162); // spec: ca. 3160
+    expect(xpForNextLevel(20)).toBe(8944); // spec: ca. 8940
+    expect(xpForNextLevel(50)).toBe(35355); // spec: ca. 35360
+  });
+
+  it("is strictly increasing", () => {
+    for (let n = 1; n < 50; n++) expect(xpForNextLevel(n + 1)).toBeGreaterThan(xpForNextLevel(n));
+  });
+
+  it("rejects invalid levels", () => {
+    expect(() => xpForNextLevel(0)).toThrow(RangeError);
+    expect(() => xpForNextLevel(1.5)).toThrow(RangeError);
+  });
+
+  it("accumulates total xp", () => {
+    expect(totalXpForLevel(1)).toBe(0);
+    expect(totalXpForLevel(2)).toBe(100);
+    expect(totalXpForLevel(3)).toBe(100 + 283);
+    expect(totalXpForLevel(10)).toBe(11_106);
+  });
+
+  it("levelFromTotalXp is the inverse of totalXpForLevel", () => {
+    for (let level = 1; level <= 50; level++) {
+      const total = totalXpForLevel(level);
+      expect(levelFromTotalXp(total)).toBe(level);
+      if (level > 1) expect(levelFromTotalXp(total - 1)).toBe(level - 1);
+    }
+  });
+
+  it("caps at the max level and tolerates bad input", () => {
+    expect(levelFromTotalXp(1e12)).toBe(50);
+    expect(levelFromTotalXp(-5)).toBe(1);
+    expect(levelFromTotalXp(99.9)).toBe(1);
+  });
+
+  it("reports progress inside a level", () => {
+    const p = levelProgress(150);
+    expect(p).toMatchObject({ level: 2, xpIntoLevel: 50, xpForNext: 283, isMaxLevel: false });
+    expect(p.progress).toBeCloseTo(50 / 283);
+    expect(levelProgress(1e12)).toMatchObject({ level: 50, isMaxLevel: true, progress: 1, xpForNext: 0 });
+  });
+});
+
+describe("unlocks", () => {
+  it("covers every row of spec 9.3", () => {
+    const levels = [...new Set(BALANCE.progression.unlocks.map((u) => u.level))];
+    expect(levels).toEqual([1, 2, 3, 5, 7, 8, 10, 12, 15, 18, 20, 25, 30, 35, 40, 50]);
+  });
+
+  it("uses unique snake_case keys", () => {
+    const keys = BALANCE.progression.unlocks.map((u) => u.key);
+    expect(new Set(keys).size).toBe(keys.length);
+    for (const key of keys) expect(key).toMatch(/^[a-z][a-z0-9_]*$/);
+  });
+
+  it("returns the unlocks of a level", () => {
+    expect(unlocksAtLevel(1).map((u) => u.key)).toEqual(["market_orders", "basic_income"]);
+    expect(unlocksAtLevel(3).map((u) => u.key)).toEqual(["limit_orders", "watchlist"]);
+    expect(unlocksAtLevel(4)).toEqual([]);
+    expect(unlocksUpToLevel(3)).toHaveLength(5);
+  });
+
+  it("answers feature gates", () => {
+    expect(isUnlocked("short_selling", 7)).toBe(false);
+    expect(isUnlocked("short_selling", 8)).toBe(true);
+    expect(isUnlocked("unknown", 50)).toBe(false);
+    expect(unlockLevel("found_small_business")).toBe(10);
+    expect(unlockLevel("leverage_2x")).toBe(12);
+    expect(unlockLevel("nope")).toBeNull();
+  });
+
+  it("finds the next unlocks", () => {
+    expect(nextUnlocks(3).map((u) => u.key)).toEqual(["stop_loss", "bonds", "junior_jobs"]);
+    expect(nextUnlocks(50)).toEqual([]);
+  });
+
+  it("is consistent with the leverage tiers and job tiers", () => {
+    expect(unlockLevel("leverage_2x")).toBe(BALANCE.trading.leverageTiers[1]?.level);
+    expect(unlockLevel("leverage_5x")).toBe(BALANCE.trading.leverageTiers[2]?.level);
+    expect(unlockLevel("leverage_10x")).toBe(BALANCE.trading.leverageTiers[3]?.level);
+    expect(unlockLevel("short_selling")).toBe(BALANCE.trading.shortSellingMinLevel);
+    expect(unlockLevel("first_job")).toBe(BALANCE.careers.tiers[0]?.minLevel);
+    expect(unlockLevel("bonds")).toBe(BALANCE.bonds.minLevel);
+  });
+});
+
+describe("xp sources", () => {
+  it("grants 1 xp per 100 EUR profit, capped at 500", () => {
+    expect(profitableCloseXp(BigInt(-1))).toBe(0);
+    expect(profitableCloseXp(BigInt(9_999))).toBe(0);
+    expect(profitableCloseXp(BigInt(123_456))).toBe(12);
+    expect(profitableCloseXp(BigInt(100_000_000))).toBe(500);
+  });
+
+  it("adds a capped streak bonus to the login xp", () => {
+    expect(dailyLoginXp(1)).toBe(50);
+    expect(dailyLoginXp(4)).toBe(80);
+    expect(dailyLoginXp(1000)).toBe(250);
+  });
+});
