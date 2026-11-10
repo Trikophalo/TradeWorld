@@ -49,13 +49,18 @@ export function makeDepartment(headcount: number): DepartmentState {
   };
 }
 
-/** A listed AI company sized for `share` of its sector's baseline demand. */
+/**
+ * A listed AI company sized for `share` of its sector's baseline demand.
+ * `developmentRatio` is development staff relative to production staff before
+ * the sector's development intensity; it decides the quality the company can hold.
+ */
 export function makeAiCompany(
   id: string,
   sectorId: SectorId,
   share: number,
   quality: number,
   awareness: number,
+  developmentRatio = 0.1,
 ): CompanyState {
   const sector = BALANCE.sectors[sectorId];
   const revenue = sector.baseDemandCentsPerQuarter * share;
@@ -64,7 +69,7 @@ export function makeAiCompany(
       sector.costStructure.referencePriceCents /
       sector.costStructure.capacityUnitsPerSkillPoint /
       SKILL_5_POINTS) *
-    1.15;
+    1.1;
   return {
     id,
     sectorId,
@@ -82,15 +87,15 @@ export function makeAiCompany(
     quality,
     awareness,
     unitPriceCents: BigInt(sector.costStructure.referencePriceCents),
-    fixedCostCents: BigInt(Math.round(revenue * 0.04)),
+    fixedCostCents: BigInt(Math.round(revenue * 0.06 * sector.costStructure.fixedCostMultiplier)),
     departments: {
       production: makeDepartment(production),
-      development: makeDepartment(production * 0.12),
-      sales: makeDepartment(production * 0.08),
-      finance: makeDepartment(production * 0.03),
-      marketing: makeDepartment(production * 0.03),
+      development: makeDepartment(production * developmentRatio * sector.costStructure.developmentIntensity),
+      sales: makeDepartment(production * 0.05),
+      finance: makeDepartment(production * 0.02),
+      marketing: makeDepartment(production * 0.02),
     },
-    leadership: { cfo: 6, cto: 6, coo: 6, headOfSales: 6 },
+    leadership: { cfo: 6, cto: 6, coo: 0, headOfSales: 0 },
     projects: [],
     guidanceRevenueCents: null,
     uncoveredQuarters: 0,
@@ -139,8 +144,8 @@ export function makeMacro(overrides: Partial<MacroState> = {}): MacroState {
 /** The three AI companies of a sector: bluechip, mid cap, penny stock. */
 export function makeSectorCompanies(sectorId: SectorId): CompanyState[] {
   return [
-    makeAiCompany(`${sectorId}-blue`, sectorId, 0.6, 65, 0.25),
-    makeAiCompany(`${sectorId}-mid`, sectorId, 0.3, 55, 0.15),
-    makeAiCompany(`${sectorId}-penny`, sectorId, 0.1, 45, 0.06),
+    makeAiCompany(`${sectorId}-blue`, sectorId, 0.5, 64, 0.26, 0.175),
+    makeAiCompany(`${sectorId}-mid`, sectorId, 0.32, 53, 0.2, 0.1),
+    makeAiCompany(`${sectorId}-penny`, sectorId, 0.18, 41, 0.13, 0.05),
   ];
 }

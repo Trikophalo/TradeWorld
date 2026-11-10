@@ -7,6 +7,7 @@ import {
   levelProgress,
   nextUnlocks,
   profitableCloseXp,
+  scaledXp,
   totalXpForLevel,
   unlockLevel,
   unlocksAtLevel,
@@ -115,5 +116,16 @@ describe("xp sources", () => {
     expect(dailyLoginXp(1)).toBe(50);
     expect(dailyLoginXp(4)).toBe(80);
     expect(dailyLoginXp(1000)).toBe(250);
+  });
+
+  it("applies the alpha multiplier exactly once, when XP are granted", () => {
+    expect(BALANCE.progression.xpMultiplier).toBe(2);
+    expect(scaledXp(40)).toBe(80);
+    expect(scaledXp(500)).toBe(1000);
+    expect(scaledXp(-5)).toBe(0);
+    expect(scaledXp(33, { ...BALANCE.progression, xpMultiplier: 1.5 })).toBe(50);
+    // Base values and the level curve are not scaled.
+    expect(dailyLoginXp(1)).toBe(50);
+    expect(xpForNextLevel(1)).toBe(100);
   });
 });

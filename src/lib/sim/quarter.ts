@@ -483,12 +483,10 @@ function prepare(
   const band = priceBandCents(company.sectorId, cfg);
   const unitPriceCents = roundToBigInt(clamp(Math.round(requested), band.min, band.max));
 
-  // Marketing budget, limited by the available cash; the marketing department multiplies its effect.
+  // Marketing budget: spent as decided, like salaries (a budget the cash cannot carry leads into
+  // overdraft and the grace period). The marketing department multiplies its effect.
   const requestedBudget = decision?.marketingBudgetCents ?? ZERO;
-  const affordable =
-    company.cashCents > ZERO ? scaleByFloat(company.cashCents, cfg.company.maxMarketingBudgetShareOfCash) : ZERO;
-  const positiveBudget = requestedBudget > ZERO ? requestedBudget : ZERO;
-  const marketingCents = positiveBudget < affordable ? positiveBudget : affordable;
+  const marketingCents = requestedBudget > ZERO ? requestedBudget : ZERO;
   const referenceBudget =
     segmentBaseDemand(company.sectorId, segmentId, cfg) * cfg.company.marketing.referenceBudgetShareOfSegmentDemand;
   const awareness = nextAwareness(

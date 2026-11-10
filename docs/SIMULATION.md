@@ -377,14 +377,15 @@ sonst        → high/low anpassen, close = Tick-Kurs, volume addieren
 ```mermaid
 flowchart TD
     A[QuarterState<br/>Makro + alle Firmen] --> B[je Branche: Nachfrage<br/>Basis × Trend × Konjunktur × Öl × Zins × Events × Rauschen]
+    B --> S[je Markt der Branche<br/>lokal, regional, national, international<br/>Nachfrage = Branchennachfrage × Anteil]
     D[Entscheidungen<br/>Preis, Marketing, Dividende, Guidance] --> C
-    B --> C[je Firma vorbereiten<br/>Preis im Band, Marketing → Bekanntheit,<br/>Entwicklung → Qualität, Kapazität, Attraktivität]
-    C --> E[Marktanteile mit Kapazitätsgrenze<br/>allocateDemand]
+    S --> C[je Firma des Markts vorbereiten<br/>Preis, Marketing → Bekanntheit,<br/>Entwicklung → Qualität, Kapazität, Attraktivität]
+    C --> E[Marktanteile im Markt mit Kapazitätsgrenze<br/>Firmen + etablierte Anbieter<br/>allocateDemand]
     E --> F[Umsatz und Stückzahl]
     F --> G[Kosten: Produktion, Gehälter, Fixkosten,<br/>Marketing, Zinsen]
     G --> H[Steuer → Jahresüberschuss]
     H --> I[Dividende, falls gedeckt]
-    I --> J[Cash, Buchwert, Insolvenzzähler]
+    I --> J[Cash, Buchwert, Schonfrist und Insolvenz]
     J --> K[EPS, fairer Wert für börsennotierte Firmen]
     K --> L[Guidance-Prüfung, XP, Reputation]
     L --> M[Nachrichten + Sentiment-Schocks]
@@ -392,9 +393,10 @@ flowchart TD
     N --> O[QuarterResult<br/>neuer Zustand, Berichte, News, Events, Schocks]
 ```
 
-### 11.1 Branchennachfrage
+### 11.1 Branchennachfrage und Märkte
 
-`sectorDemand()` liefert die Kundenausgaben der Branche im Quartal in Cent:
+`sectorDemand()` liefert die Kundenausgaben der Branche im Quartal in Cent. Das ist zugleich die Nachfrage des
+internationalen Markts:
 
 ```
 demand = baseDemand
@@ -410,61 +412,108 @@ Die Branchenzusammenhänge aus Abschnitt 10.1 des Prompts stecken in den Elastiz
 Ölpreis (`oilDemand` 0,8), Logistik zahlt ihn (`oilCost` 0,5), Logistik hängt am stärksten an der Konjunktur
 (1,2), Pharma kaum (0,1), Tech reagiert am stärksten auf Zinsen.
 
+**Märkte (Segmente).** Jede Firmenstufe verkauft in genau einem Markt (`segmentForTier`):
+
+| Markt | Stufe | `demandShare` | wächst mit dem Trend | etablierte Anbieter |
+|---|---|---|---|---|
+| `local` | Kleinunternehmen | 0,0018 | nein | Qualität 40, Bekanntheit 0,5 |
+| `regional` | GmbH | 0,006 | nein | Qualität 50, Bekanntheit 0,5 |
+| `national` | AG vor IPO | 0,022 | nein | Qualität 55, Bekanntheit 0,5 |
+| `international` | börsennotiert (alle KI-Firmen) | 1 | ja | keine (die KI-Firmen sind die Etablierten) |
+
+```
+segmentDemand = sectorDemand(ohne Trend, falls growsWithSector = false) × demandShare
+```
+
+Die kleinen Märkte haben also eine feste Größe und spüren nur Konjunktur, Öl, Zins, Events und Rauschen.
+Begründung und Kalibrierung stehen in [BALANCING.md](./BALANCING.md#4-unternehmen), Abschnitt 4.1.
+
 ### 11.2 Vorbereitung je Firma
 
 ```
-price      = clamp(Entscheidung, priceBand.min, priceBand.max)
-marketing  = min(Entscheidung, 50 % des Cash)
-awareness  = nextAwareness(awareness, marketing, referenceBudget)
-quality    = nextQuality(quality, Entwicklungs-Skillpunkte, fertige Projekte)
+price      = clamp(Entscheidung, 25 % … 300 % des Referenzpreises)        # nur Eingabegrenze
+marketing  = Entscheidung (wird ausgegeben wie beschlossen)
+awareness  = nextAwareness(awareness, effectiveMarketingBudget(marketing, Marketing-Skillpunkte), referenceBudget)
+quality    = nextQuality(quality, Entwicklungs-Skillpunkte, Produktions-Skillpunkte, fertige Projekte)
 capacity   = Produktions-Skillpunkte × capacityUnitsPerSkillPoint × (1 + 1,5 % × COO-Skill)
-attract    = quality^1.2 × awareness^0.8 / price^1.5
+attract    = quality^1.2 × awareness^0.8 / price^e                        # e = sectors[x].priceExponent
            × (1 + min(50 %, 1 % × Vertriebs-Skillpunkte)) × (1 + 2 % × Vertriebsleitungs-Skill)
 ```
+
+**Preisexponent je Branche.** Die Formel aus dem Prompt bleibt, der Preisexponent ist je Branche verschieden:
+Einzelhandel 2,5, Logistik 2,0, Energie 1,5, Tech 1,2, Pharma 1,0 (Wert im Prompt: 1,5 für alle). Für eine Firma
+mit kleinem Marktanteil ist der gewinnmaximale Preis
+
+```
+p* = (e + 1) / e × (Stückkosten + Produktionslohn je Stück)
+```
+
+Die Kostenstruktur jeder Branche ist so gewählt, dass `p*` dem Referenzpreis entspricht. Ein Test prüft das.
+Damit regelt der Wettbewerb den Preis: Teurer als der Markt kostet mehr Kunden, als die Marge bringt, billiger
+verschenkt Marge. Ein Preisband als Balancing-Regel gibt es nicht mehr.
 
 **Marketing mit sinkendem Grenznutzen** (`market-share.ts`):
 
 ```
-gain       = min(maxGainPerQuarter, gainAtReferenceBudget × (budget / referenceBudget) ^ 0,4854)
+budget'    = budget × (1 + departmentMaxBoost × pts / (pts + 15))          # Marketing-Abteilung, bis ×2
+gain       = min(maxGainPerQuarter, gainAtReferenceBudget × (budget' / referenceBudget) ^ 0,4854)
 awareness' = awareness × (1 − decay) + (1 − awareness × (1 − decay)) × gain
 ```
 
 Der Exponent ist `log2(1,4) = 0,4854`: Doppeltes Budget bringt genau +40 % Bekanntheitsgewinn. Eine zweite Bremse
 ist die Sättigung, denn der Gewinn wirkt nur auf den Teil des Markts, der die Firma noch nicht kennt.
-`referenceBudget` ist 1 % der Basisnachfrage der Branche. Bekanntheit verfällt mit 2 % pro Quartal und baut sich
-entsprechend langsam auf: Geld allein reicht nicht, es braucht Zeit.
+`referenceBudget` ist 1,5 % der Basisnachfrage **des eigenen Markts** und bringt 5 Prozentpunkte. Bekanntheit ist
+der Anteil der Kunden des eigenen Markts, der die Firma kennt. Sie verfällt mit 10 % je Quartal: Wer nichts tut,
+wird vergessen. Das Budget wird nicht mehr auf die Hälfte der Kasse begrenzt. Ein Budget, das die Kasse nicht
+trägt, führt in die Überziehung und damit in die Schonfrist (Abschnitt 13).
 
-**Qualität:**
+**Qualität** (`qualityTarget`, `nextQuality`):
 
 ```
-gain     = maxGainPerQuarter × pts / (pts + halfSaturationSkillPoints) × (1 − quality / 100)
-quality' = clamp(quality − sector.qualityDecayPerQuarter + gain + Σ fertige Projekte, 1, 100)
+need     = sector.developmentIntensity × (halfSaturationSkillPoints + productionScale × Produktions-Skillpunkte)
+x        = Entwicklungs-Skillpunkte / need
+target   = 100 × (x / (1 + x)) ^ 0,5
+quality' = clamp(quality + sector.qualityAdjustmentRate × (target − quality) + Σ fertige Projekte, 1, 100)
 ```
 
-Tech-Produkte veralten schnell (3 Punkte pro Quartal), Einzelhandel und Energie kaum (0,5). Produktprojekte
-(`ProductProject`) sind das Zeit-Gate: Sie laufen `quartersRemaining` Quartale und liefern dann einen Sprung.
-
-**Preisband.** Der Stückpreis muss zwischen `referencePrice × 0,4` und
-`unitCost + (referencePrice − unitCost) × 1,5` liegen. Begründung in [BALANCING.md](./BALANCING.md)
-(„Boutique-Preise“).
+- Der **Zielwert** hängt an den Entwicklern relativ zur Firmengröße. Eine große Firma bekommt hohe Qualität
+  nicht geschenkt, und KI-Firmen mit unterschiedlichem Entwickleranteil behalten dauerhaft unterschiedliche
+  Qualität (vorher liefen alle Firmen einer Branche auf denselben Wert zu).
+- Der **Entwicklungsbedarf** unterscheidet die Branchen: Tech 2,0, Pharma 1,5, Logistik 0,7, Energie 0,6,
+  Einzelhandel 0,5.
+- Die **Anpassungsrate** sagt, wie schnell Produkte altern: Tech 10 % der Lücke je Quartal, Pharma 6 %,
+  Logistik 4 %, Energie und Einzelhandel 3 %. Ohne Entwickler ist der Zielwert 0.
+- Produktprojekte (`ProductProject`) sind das Zeit-Gate: Sie laufen `quartersRemaining` Quartale und liefern
+  dann einen Sprung, der danach wieder Richtung Zielwert abschmilzt.
 
 ### 11.3 Marktanteil und Kapazität
 
+Innerhalb eines Markts gilt die Formel aus dem Prompt:
+
 ```
-attractiveness = quality^1.2 × awareness^0.8 / price^1.5
-marketShare    = eigene attractiveness / Σ attractiveness der Branche
-revenue        = sectorDemand × marketShare, begrenzt durch capacityUnits × price
+attractiveness = quality^1.2 × awareness^0.8 / price^e
+marketShare    = eigene attractiveness / Σ attractiveness aller Anbieter des Markts
+revenue        = segmentDemand × marketShare, begrenzt durch capacityUnits × price
 ```
 
-Die Anteile nach Attraktivität summieren sich immer zu 1 (`attractivenessShare` im Bericht). Senkt eine Firma den
-Preis, steigt ihr Anteil und der aller Konkurrenten sinkt. Beides prüfen Tests.
+**Etablierte Anbieter.** In den Märkten `local`, `regional` und `national` nimmt ein namenloser Wettbewerber
+teil (`incumbentAttractiveness`): Qualität und Bekanntheit aus der Konfiguration, Preis = Marktpreis
+(`marketPriceCents` = Referenzpreis plus Weitergabe von Kostenänderungen), unbegrenzte Kapazität. Sein Umsatz
+ist kein Spielergeld und wird nur berichtet (`incumbentRevenueCents`). Er sorgt dafür, dass
+
+- eine einzelne Spielerfirma nie den ganzen Markt bekommt,
+- Preis, Qualität und Bekanntheit immer gegen einen Maßstab laufen,
+- Nachfrage, die eine ausgelastete Spielerfirma nicht bedient, zu ihm abfließt.
+
+Mehrere Spielerfirmen desselben Markts teilen sich die Nachfrage untereinander und mit ihm. Senkt eine Firma den
+Preis, steigt ihr Anteil und der aller anderen sinkt. Beides prüfen Tests.
 
 **Entscheidung zur unbedienten Nachfrage:** Kann eine Firma ihre Nachfrage nicht bedienen, geht diese **nicht
-verloren**. Die Kunden kaufen bei den übrigen Firmen, wieder im Verhältnis der Attraktivität
+verloren**. Die Kunden kaufen bei den übrigen Anbietern, wieder im Verhältnis der Attraktivität
 (`allocateDemand`, „Water-Filling“):
 
 ```
-remaining = demand; open = alle Firmen mit Attraktivität > 0
+remaining = demand; open = alle Anbieter mit Attraktivität > 0
 wiederhole:
   offered[i] = remaining × attract[i] / Σ attract(open)
   capped     = alle i mit offered[i] ≥ Kapazitätsumsatz[i]
@@ -472,13 +521,13 @@ wiederhole:
   für capped: revenue[i] = Kapazitätsumsatz[i]; remaining −= revenue[i]; aus open entfernen
 ```
 
-Erst wenn alle Firmen ausgelastet sind, bleibt Nachfrage unbedient (`unservedDemandCents`). Gründe:
+Unbediente Nachfrage (`unservedDemandCents`) kann nur im internationalen Markt entstehen, wenn alle Firmen
+ausgelastet sind. Der tatsächliche Anteil (`marketShare`) kann kleiner sein als der Attraktivitätsanteil
+(`attractivenessShare`); die Summe der tatsächlichen Anteile eines Markts ist höchstens 1.
 
-- Eine winzige Spielerfirma mit hoher Attraktivität vernichtet keine Branchennachfrage.
-- Wer nicht liefern kann, schenkt seinen Umsatz der Konkurrenz. Überexpansion beim Marketing ohne Kapazität
-  lohnt nicht.
-- Der tatsächliche Anteil (`marketShare`) kann kleiner sein als der Attraktivitätsanteil. Die Summe der
-  tatsächlichen Anteile ist höchstens 1.
+**Stufenwechsel.** Wandelt sich eine Firma in die nächste Stufe um, wechselt sie den Markt. Die Zahl der Kunden,
+die sie kennen, bleibt gleich; die Bekanntheit wird umgerechnet
+(`awarenessAfterTierChange`: `awareness × demandShare_alt / demandShare_neu`).
 
 ### 11.4 Gewinn- und Verlustrechnung
 
@@ -486,6 +535,7 @@ Erst wenn alle Firmen ausgelastet sind, bleibt Nachfrage unbedient (`unservedDem
 unitsSold      = revenue / price
 productionCost = unitsSold × unitCost × oilIndex ^ sensitivity.oilCost
 payroll        = Σ Gehälter aller Abteilungen
+fixedCost      = Fixkosten der Stufe × Branchenfaktor × (1 − 30 % × pts / (pts + 15))   # Finanz-Abteilung
 interest       = debt × loanRate / 4  +  Überziehung × (Leitzins + overdraftSpread) / 4
 preTax         = revenue − productionCost − payroll − fixedCost − marketing − interest
 tax            = preTax > 0 ? preTax × corporateTaxBps : 0
@@ -496,22 +546,35 @@ bookEquity    += netIncome − dividend
 ```
 
 Die Funktion liefert nur Zahlen. Die Datenbank bucht daraus Gehälter an Spieler-Mitarbeiter, Zinsen, Steuern und
-Dividenden (Dividende je Aktie × Bestand je Aktionär, Ex-Tag ist der Quartalsabschluss).
+Dividenden (Dividende je Aktie × Bestand je Aktionär, Ex-Tag ist der Quartalsabschluss). Der Bericht je Firma
+(`CompanyQuarterReport`) enthält zusätzlich Markt, Marktgröße, `uncoveredQuarters` und `graceQuartersLeft`.
 
 ### 11.5 Entscheidungen der KI-Firmen
 
 `aiCompanyDecision()` und `aiAdjustStaffing()` sind die einfache Geschäftspolitik der 15 KI-Firmen:
 
-- **Preis:** nähert sich pro Quartal um 25 % dem Referenzpreis plus Kostenweitergabe (Ölpreis) an, mit 1 % Rauschen.
+- **Preis:** nähert sich pro Quartal um 25 % dem Marktpreis an (Referenzpreis plus Kostenweitergabe), mit 1 %
+  Rauschen.
 - **Marketing:** 1,2 % des letzten Umsatzes.
 - **Dividende:** 60 % des Gewinns der letzten vier Quartale, verteilt auf vier Quartale.
 - **Personal:** Auslastung über 97 % → alle Abteilungen +6 %, unter 83 % → −3 %.
+
+In Testläufen über 40 Quartale (8 Seeds, mit und ohne Makro-Events) wird keine KI-Firma insolvent.
 
 ### 11.6 Nachrichten und Makro des nächsten Quartals
 
 Makro-Events, die beim Abschluss von Quartal `q` gewürfelt werden, erscheinen sofort als Nachricht, wirken auf die
 Nachfrage aber erst ab Quartal `q + 1`. **Öffentliche Information läuft den Fundamentaldaten voraus.** Wer
 Nachrichten liest und Branchenzusammenhänge kennt, kann sich positionieren, bevor die Zahlen kommen.
+
+### 11.7 Szenario-Werkzeug
+
+`company-scenarios.ts` lässt `closeQuarter` über viele Quartale für geskriptete Gründertypen laufen (passiv,
+gierig, Preisdrücker, solide, Überexpandierer, mittelmäßig, schlampig), allein oder zu mehreren im selben Markt.
+Es modelliert einzelne Mitarbeiter mit Einarbeitung und Gehalt über die echten Funktionen aus `employees.ts` und
+liefert je Firma Gewinnverlauf, Amortisationsquartal, erstes Quartal im Minus und Insolvenzquartal.
+`company-scenarios.test.ts` prüft damit die Balancing-Ziele als Trefferquoten über 5 Branchen × 12 Seeds.
+Die Ergebnistabellen stehen in BALANCING.md, Abschnitt 4.
 
 ## 12. Mitarbeiter, Kapazität, Einarbeitung
 
@@ -533,10 +596,10 @@ marketSalary         = 185 € × skill ^ 1,3 × trait.salaryMultiplier      # p
 | Abteilung | Wirkung in der Simulation |
 |---|---|
 | `production` | Kapazität in Stück |
-| `development` | Qualitätsgewinn pro Quartal |
+| `development` | Zielwert der Qualität (relativ zur Firmengröße, Abschnitt 11.2) |
 | `sales` | Aufschlag auf die Attraktivität (bis +50 %) |
-| `marketing` | noch ohne Wirkung (M4: Effizienz des Marketingbudgets) |
-| `finance` | noch ohne Wirkung (M4: Guidance-Spanne, Kreditkonditionen über den CFO) |
+| `marketing` | Marketingbudget zählt bis zu doppelt (halbe Wirkung bei 15 Skillpunkten) |
+| `finance` | senkt die Fixkosten um bis zu 30 % (halbe Wirkung bei 15 Skillpunkten) |
 
 Führungspositionen: COO +1,5 % Kapazität je Skill, Vertriebsleitung +2 % Attraktivität je Skill, CFO senkt den
 Kreditzins um 10 bp je Skill, CTO verkürzt Entwicklungszeiten um 3 % je Skill (wirkt beim Anlegen eines Projekts).
@@ -564,17 +627,35 @@ premium = clamp(premium, 50 bp, 1 500 bp)
 Der Kreditrahmen hängt am Level des Gründers (ab 15: 50 000 €, ab 20: 250 000 €, ab 25: 2 Mio. €) und wird mit
 der Reputation skaliert (`0,5 + Reputation / 100`, also 0,5- bis 1,5-fach).
 
-**Insolvenz.** Ein Quartal gilt als „nicht gedeckt“, wenn der Cash nach allen Zahlungen negativ ist. Das negative
-Guthaben ist eine Überziehung beim Systemkonto „Markt“ zum Strafzins (Leitzins + 1 000 bp). Nach
-`uncoveredQuartersToInsolvency` (2) solchen Quartalen in Folge:
+**Schonfrist und Insolvenz.** Der Prompt nennt „2 Quartale lang die laufenden Kosten nicht gedeckt“. Zwei
+Quartale sind 12 echte Stunden: Wer schläft, könnte morgens insolvent sein. Umgesetzt ist deshalb eine Schonfrist
+(`company.insolvency.graceQuarters` = 4):
+
+```
+Abschluss mit cashAfter < 0:  uncoveredQuarters += 1        # der erste solche Abschluss startet die Frist
+Abschluss mit cashAfter ≥ 0:  uncoveredQuarters = 0         # Frist beendet
+insolvent, wenn uncoveredQuarters > graceQuarters           # also beim 5. Abschluss im Minus in Folge
+graceQuartersLeft = graceQuarters + 1 − uncoveredQuarters   # Countdown für die Oberfläche
+```
+
+- Zwischen dem ersten Abschluss im Minus (Warnung) und der Insolvenz liegen damit immer mindestens 4 Quartale,
+  also 24 echte Stunden. Jeder Spieler ist in dieser Zeit mindestens einmal wach.
+- Die Kasse darf in der Schonfrist negativ sein. Das negative Guthaben ist eine Überziehung beim Systemkonto
+  „Markt“ zum Strafzins (Leitzins + 1 000 bp pro Spieljahr).
+- Der Gründer kann die Frist jederzeit beenden: Kosten senken, privates Geld einschießen (im Rahmen der
+  Kapitalobergrenze), Kredit aufnehmen. Ein einziger Abschluss mit positiver Kasse setzt den Zähler zurück.
+- Eine gesunde Firma kommt nie in die Frist: Im Szenario-Werkzeug hatte der solide Gründer in keinem von 180
+  Läufen je eine negative Kasse. Ein Gründer, der gar nichts tut, erreicht den ersten Abschluss im Minus
+  frühestens im 5. Quartal und die Insolvenz frühestens im 9.
+
+Bei Insolvenz:
 
 - `status = "insolvent"`, die Firma nimmt nicht mehr an der Simulation teil,
 - börsennotiert: Schock mit `priceReturn = −90 %`, Handel wird ausgesetzt,
 - Gründer: Reputation −30, Gründungssperre 3 Spieltage,
 - Gläubiger erhalten das Restvermögen (Verteilung bucht die Datenbank).
 
-Ein gedecktes Quartal setzt den Zähler zurück. Die Rettungsübernahme kurz vor der Pleite ist als Signatur
-`aiRescueOffer()` angelegt (M4).
+Die Rettungsübernahme während der Schonfrist ist als Signatur `aiRescueOffer()` angelegt (M4).
 
 ## 14. IPO und Bookbuilding
 
@@ -858,7 +939,9 @@ Ob das Verhältnis stimmt, muss der Freundestest zeigen (Kennzahlen in BALANCING
 | Orderausführung | `mergeOrderBook`, `walkBook`, `isLimitMarketable`, `isStopTriggered` | `orders.ts` |
 | Kerzen | `applyTickToCandle`, `aggregateCandles`, `mergeCandles`, `bucketStartMs` | `candles.ts` |
 | Marktanteil, Kapazität, Marketing | `attractiveness`, `marketShares`, `allocateDemand`, `marketingAwarenessGain`, `nextAwareness` | `market-share.ts` |
-| Quartalsabschluss | `closeQuarter`, `sectorDemand`, `nextQuality`, `priceBandCents`, `unitCostCents`, `tierFixedCostCents` | `quarter.ts` |
+| Quartalsabschluss | `closeQuarter`, `sectorDemand`, `nextQuality`, `qualityTarget`, `priceBandCents`, `marketPriceCents`, `unitCostCents`, `tierFixedCostCents`, `effectiveFixedCostCents`, `effectiveMarketingBudget` | `quarter.ts` |
+| Märkte je Firmenstufe | `segmentForTier`, `segmentDemand`, `segmentBaseDemand`, `incumbentAttractiveness`, `awarenessAfterTierChange`, `sectorAttractivenessConfig` | `quarter.ts` |
+| Szenarien für das Balancing | `runScenario`, `summarize` | `company-scenarios.ts` |
 | KI-Firmenpolitik | `aiCompanyDecision`, `aiAdjustStaffing` | `quarter.ts` |
 | Mitarbeiter | `effectiveSkillPoints`, `onboardingFactor`, `marketSalaryCents` | `employees.ts` |
 | Kredite | `loanRateBps`, `loanRiskPremiumBps`, `quarterlyInterestCents`, `creditLineCents` | `loans.ts` |
@@ -870,14 +953,15 @@ Ob das Verhältnis stimmt, muss der Freundestest zeigen (Kennzahlen in BALANCING
 | Steuer | `settleCapitalGainsTax`, `withholdingTaxCents` | `tax.ts` |
 | Hebel, Liquidation, Finanzierung | `liquidationPriceE4`, `checkMargin`, `initialMarginCents`, `maxLeverageForLevel`, `accruedFinancingCents` | `margin.ts` |
 | Tresor, Gehalt | `vaultStatus`, `vaultAccruedCents`, `salaryAccruedCents` | `vault.ts` |
-| Level und Freischaltungen | `xpForNextLevel`, `totalXpForLevel`, `levelFromTotalXp`, `levelProgress`, `unlocksAtLevel`, `isUnlocked`, `nextUnlocks`, `profitableCloseXp`, `dailyLoginXp` | `progression.ts` |
+| Level und Freischaltungen | `xpForNextLevel`, `totalXpForLevel`, `levelFromTotalXp`, `levelProgress`, `unlocksAtLevel`, `isUnlocked`, `nextUnlocks`, `profitableCloseXp`, `dailyLoginXp`, `scaledXp` | `progression.ts` |
 | Noch nicht umgesetzt | `generateApplicantPool`, `stepEmployeeLoyalty`, `aiRescueOffer`, `optionPremiumE4` | `stubs.ts` |
 
-`index.ts` exportiert alles. `test-fixtures.ts` enthält nur Hilfen für die Tests.
+`index.ts` exportiert die öffentliche API. `test-fixtures.ts` und `company-scenarios.ts` sind Werkzeuge für Tests
+und Balancing und werden nicht exportiert.
 
 ## 24. Umgesetzt und offen
 
-**Umgesetzt und mit Unit-Tests abgedeckt** (241 Tests in 16 Dateien, `pnpm vitest run src/lib/sim`):
+**Umgesetzt und mit Unit-Tests abgedeckt** (274 Tests in 17 Dateien, `pnpm vitest run src/lib/sim`):
 
 - PRNG mit Teilströmen, Geldhelfer mit Round-half-even
 - XP-Kurve, Level, Freischaltungen (Stichproben aus dem Prompt: 100 / 3 162 / 8 944 / 35 355)
@@ -889,6 +973,8 @@ Ob das Verhältnis stimmt, muss der Freundestest zeigen (Kennzahlen in BALANCING
 - Tresor, Gehaltsauflauf, Zinsentscheid, Kerzen
 - alle sechs Investortypen, `stepMarketTick` (deterministisch, Kurs nie ≤ 0, Rückkehr zum fairen Wert,
   Reaktion auf Orders, Nachrichten, Zins, Indexaufnahme, nachbörslich)
+- Märkte je Firmenstufe mit etablierten Anbietern, Preisexponent je Branche, Schonfrist vor der Insolvenz,
+  Wirkung aller fünf Abteilungen; Balancing-Ziele für Unternehmen als Szenario-Tests mit Trefferquoten
 - `closeQuarter` mit Nachfrage, Anteilen, Gewinn- und Verlustrechnung, Dividende, Insolvenz, Guidance, XP,
   Reputation, Nachrichten, Makro; Geschäftspolitik der KI-Firmen
 - IPO-Voraussetzungen, Preisspanne, KI-Nachfrage, Bookbuilding; NEXA 30 mit Divisor und Mitgliederprüfung
@@ -897,9 +983,9 @@ Ob das Verhältnis stimmt, muss der Freundestest zeigen (Kennzahlen in BALANCING
 **Erste Fassung, in späteren Meilensteinen zu kalibrieren** (rechnet, aber Werte sind Schätzungen):
 
 - Parameter der Investortypen und des Rauschens: nur an Testläufen von einem Spieltag geprüft (M1)
-- Kostenstruktur der Branchen, Qualitätsmodell, Marketingstärke, Preisband (M4)
+- Kostenstruktur der Branchen, Marktgrößen und Stärke der etablierten Anbieter: an den Szenarien aus
+  BALANCING.md Abschnitt 4 kalibriert, aber nur mit Skill-5-Mitarbeitern und ohne Kredite und Führungskräfte (M4)
 - KI-Nachfrage beim Bookbuilding (M6)
-- Abteilungen `marketing` und `finance` haben noch keine Wirkung in `closeQuarter` (M4)
 
 **Nur als Signatur vorhanden** (`stubs.ts`, werfen `not implemented: …`):
 

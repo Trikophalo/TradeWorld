@@ -291,7 +291,6 @@ export interface CompanyConfig {
     readonly overdraftSpreadBps: number;
     readonly priceCrashReturn: number;
   };
-  readonly maxMarketingBudgetShareOfCash: number;
   /** Range of the price slider as multiples of the sector reference price (sanity bounds, not a balancing cap). */
   readonly priceBand: { readonly minFactor: number; readonly maxFactor: number };
   readonly aiPolicy: {
@@ -746,10 +745,10 @@ export const BALANCE = {
   },
 
   // --------------------------------------------------------------- sectors (spec 6.1)
-  // Calibration rule (docs/BALANCING.md 4.1): with price exponent e the profit-maximising price of a
+  // Calibration rule (docs/BALANCING.md 4.2): with price exponent e the profit-maximising price of a
   // small company is (e + 1) / e x (unit cost + production salary per unit). Unit cost and capacity are
-  // chosen so that this optimum equals the reference price and one production skill point contributes
-  // about 480 EUR per quarter after its own salary in every sector.
+  // chosen so that this optimum equals the reference price, and so that a well-run small business earns
+  // about the same in every sector (sectors that need more developers get more margin per unit).
   sectors: {
     tech: {
       baseDemandCentsPerQuarter: 3_000_000_000,
@@ -760,8 +759,8 @@ export const BALANCE = {
       priceExponent: 1.2,
       costStructure: {
         referencePriceCents: 5_000,
-        unitCostCents: 1_520,
-        capacityUnitsPerSkillPoint: 21,
+        unitCostCents: 1_180,
+        capacityUnitsPerSkillPoint: 16.5,
         fixedCostMultiplier: 0.7,
         qualityAdjustmentRate: 0.1,
         developmentIntensity: 2.0,
@@ -777,9 +776,9 @@ export const BALANCE = {
       priceExponent: 2.5,
       costStructure: {
         referencePriceCents: 2_000,
-        unitCostCents: 1_125,
-        capacityUnitsPerSkillPoint: 84,
-        fixedCostMultiplier: 1.0,
+        unitCostCents: 892,
+        capacityUnitsPerSkillPoint: 47.6,
+        fixedCostMultiplier: 1,
         qualityAdjustmentRate: 0.03,
         developmentIntensity: 0.5,
       },
@@ -794,9 +793,9 @@ export const BALANCE = {
       priceExponent: 1.5,
       costStructure: {
         referencePriceCents: 8_000,
-        unitCostCents: 3_100,
-        capacityUnitsPerSkillPoint: 15,
-        fixedCostMultiplier: 1.6,
+        unitCostCents: 1_995,
+        capacityUnitsPerSkillPoint: 9.1,
+        fixedCostMultiplier: 1.4,
         qualityAdjustmentRate: 0.03,
         developmentIntensity: 0.6,
       },
@@ -811,9 +810,9 @@ export const BALANCE = {
       priceExponent: 1.0,
       costStructure: {
         referencePriceCents: 12_000,
-        unitCostCents: 2_810,
-        capacityUnitsPerSkillPoint: 8,
-        fixedCostMultiplier: 1.3,
+        unitCostCents: 2_685,
+        capacityUnitsPerSkillPoint: 7.7,
+        fixedCostMultiplier: 1.2,
         qualityAdjustmentRate: 0.06,
         developmentIntensity: 1.5,
       },
@@ -828,8 +827,8 @@ export const BALANCE = {
       priceExponent: 2.0,
       costStructure: {
         referencePriceCents: 3_000,
-        unitCostCents: 1_470,
-        capacityUnitsPerSkillPoint: 48,
+        unitCostCents: 1_048,
+        capacityUnitsPerSkillPoint: 26.8,
         fixedCostMultiplier: 1.1,
         qualityAdjustmentRate: 0.04,
         developmentIntensity: 0.7,
@@ -850,23 +849,23 @@ export const BALANCE = {
     segments: {
       local: {
         tier: "small_business",
-        demandShare: 0.0025,
+        demandShare: 0.0018,
         growsWithSector: false,
         incumbentQuality: 40,
         incumbentAwareness: 0.5,
       },
       regional: {
         tier: "gmbh",
-        demandShare: 0.011,
+        demandShare: 0.006,
         growsWithSector: false,
         incumbentQuality: 50,
         incumbentAwareness: 0.5,
       },
       national: {
         tier: "ag",
-        demandShare: 0.055,
+        demandShare: 0.022,
         growsWithSector: false,
-        incumbentQuality: 60,
+        incumbentQuality: 55,
         incumbentAwareness: 0.5,
       },
       international: {
@@ -884,7 +883,7 @@ export const BALANCE = {
       gainAtReferenceBudget: 0.05,
       maxGainPerQuarter: 0.15,
       awarenessDecayPerQuarter: 0.1,
-      initialAwareness: 0.15,
+      initialAwareness: 0.08,
       minAwareness: 0.005,
       departmentMaxBoost: 1,
       departmentHalfSaturationSkillPoints: 15,
@@ -893,8 +892,8 @@ export const BALANCE = {
       initial: 30,
       min: 1,
       max: 100,
-      halfSaturationSkillPoints: 15,
-      productionScale: 0.1,
+      halfSaturationSkillPoints: 10,
+      productionScale: 0.25,
       targetExponent: 0.5,
     },
     sales: {
@@ -955,7 +954,6 @@ export const BALANCE = {
       overdraftSpreadBps: 1000,
       priceCrashReturn: -0.9,
     },
-    maxMarketingBudgetShareOfCash: 0.5,
     // Range of the price slider. Prices are disciplined by competition, not by this band.
     priceBand: { minFactor: 0.25, maxFactor: 3 },
     // Decision policy of the AI companies (they run through the same quarter simulation).
@@ -1115,7 +1113,8 @@ export const BALANCE = {
     xpExponent: 1.5,
     maxLevel: 50,
     // Alpha bonus: all XP count double (owner decision). 1 = spec values.
-    xpMultiplier: 2,
+    // Typed as `number` (not the literal 2) so that code may compare it with 1.
+    xpMultiplier: 2 as number,
     xpSources: {
       trade: { xp: 10, maxTradesPerDay: 30 },
       profitableClose: { profitCentsPerXp: 10_000, maxXpPerTrade: 500 },

@@ -291,3 +291,34 @@ Vorgabe des Auftraggebers. Zielbild für das Balancing der Unternehmenssimulatio
 
 Die Ziele sind als Szenario-Tests in `src/lib/sim` festgeschrieben; Mechanik und Messwerte stehen in
 `SIMULATION.md` und `BALANCING.md`.
+
+## ADR-032: Unternehmensmärkte nach Firmenstufe — `akzeptiert` (ein Punkt `offen`)
+
+Umsetzung von ADR-031, damit Rivalität auch zwischen kleinen Firmen entsteht:
+
+- **Ein Markt je Stufe:** lokal (Kleinunternehmen), regional (GmbH), national (AG), international (börsennotiert).
+  Jeder Markt ist ein fester Anteil der Branchennachfrage (0,18 % / 0,6 % / 2,2 % / 100 %). Innerhalb eines
+  Markts gilt unverändert die Formel aus dem Prompt (Attraktivität → Marktanteil → Umsatz, begrenzt durch Kapazität).
+- **Etablierte Anbieter:** In den drei kleinen Märkten nimmt ein anonymer Wettbewerber mit fester Qualität und
+  Bekanntheit teil. Er braucht keine eigenen Firmenzeilen und kann nicht pleitegehen.
+- Die kleinen Märkte wachsen nicht mit der Branche. Wachstum heißt: in die nächste Stufe umwandeln.
+- **Preisband entfällt als Balancing-Regel.** Übrig ist nur der Reglerbereich (25 % bis 300 % des Marktpreises);
+  den Preis diszipliniert der Wettbewerb. Der Marktpreis ist so kalibriert, dass er der gewinnmaximale Preis ist.
+- **Schonfrist statt „2 Quartale“:** Nach dem ersten Quartalsabschluss mit negativer Kasse bleiben 4 Abschlüsse
+  (24 Stunden) zur Rettung. Niemand verliert eine gesunde Firma über Nacht. Abweichung vom Prompt (6.7).
+- Marketing-Budgets werden wie entschieden ausgegeben, auch ins Minus (führt in die Schonfrist). Die Oberfläche
+  warnt, wenn ein Budget die Kasse übersteigt.
+- Die Abteilungen Marketing (Werbung bis doppelt so wirksam) und Finanzen (Fixkosten bis −30 %) haben jetzt eine Wirkung.
+
+**Gemessen** (5 Branchen × 12 Seeds × 40 Quartale, Details in `BALANCING.md` Abschnitt 4):
+solide geführte Firmen verdienen die Gründung in 14 bis 29 Quartalen zurück und werden nie insolvent;
+passive, gierige, Dumping- und überexpandierende Firmen scheitern in praktisch allen Läufen; in einer vollen Nische
+gewinnt die am besten geführte Firma, die schwächste verliert.
+
+**Offen, vom Auftraggeber zu bestätigen:**
+
+1. **Preisempfindlichkeit je Branche** statt einheitlich 1,5 wie im Prompt (Handel 2,5, Logistik 2,0, Energie 1,5,
+   Tech 1,2, Pharma 1,0). Ohne das gewann im Handel weiterhin der Höchstpreis.
+2. **Eine gut geführte AG verdient das 4- bis 8-Fache eines C-Level-Gehalts**, mehr als das Ziel von 1 bis 2×.
+   Enger stellen ließe sich das nur, indem der nationale Markt für zwei Spieler-AGs zu klein wird.
+3. Die Szenarien rechnen nur mit Mitarbeitern von Skill 5, ohne Kredite und ohne Führungsrollen.

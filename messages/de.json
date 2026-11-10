@@ -328,6 +328,66 @@
       "text": "Solange die Alpha läuft, bringt jede Aktion {factor}-mal so viele XP wie normal. Die Tageslimits zählen Aktionen, nicht XP: Es bleiben {trades} Trades pro Tag, die XP geben.",
       "example": "Ein Trade bringt statt {base} XP jetzt {boosted} XP.",
       "where": "Bei jedem XP-Gewinn; der Bonus ist im Profil vermerkt."
+    },
+    "companyEarn": {
+      "title": "So verdient deine Firma Geld",
+      "summary": "Kunden, Preis, Qualität, Bekanntheit, Kapazität",
+      "text": "Deine Firma teilt sich die Kunden ihres Markts mit allen anderen Anbietern. Wie viele zu dir kommen, hängt an vier Dingen:",
+      "price": "Preis: Kunden vergleichen. Beim doppelten Marktpreis behältst du im Handel nur etwa {retailKeep} % deiner Anziehungskraft, in der Pharmabranche {pharmaKeep} %.",
+      "quality": "Qualität: Bessere Produkte ziehen mehr Kunden an. Sie kommt von deinen Entwicklern und veraltet ohne sie.",
+      "awareness": "Bekanntheit: Nur wer dich kennt, kauft bei dir. Ohne Werbung verlierst du jedes Quartal {decay} % davon. Doppeltes Budget bringt nur etwa 40 % mehr.",
+      "capacity": "Kapazität: Du verkaufst höchstens, was deine Produktion schafft. Neue Mitarbeiter leisten erst nach zwei Quartalen voll.",
+      "example": "Im lokalen Tech-Markt geben Kunden rund {market} im Quartal aus. Holst du ein Viertel davon, sind das {revenue} Umsatz.",
+      "where": "Im Firmen-Dashboard: Marktanteil, Qualität, Bekanntheit und Auslastung. Der Preisregler zeigt den erwarteten Marktanteil."
+    },
+    "companyFail": {
+      "title": "Warum eine Firma scheitern kann",
+      "summary": "Kosten laufen immer, Kunden nicht",
+      "text": "Gehälter und Fixkosten fallen jedes Quartal an, ob Kunden kommen oder nicht. Nicht jede Firma überlebt: In einem engen Markt verdient die am besten geführte, die schwächste verliert ihr Geld.",
+      "idle": "Nichts tun: Ohne Werbung und Entwicklung verlierst du jedes Quartal Kunden.",
+      "greedy": "Zu teuer: Ein hoher Preis trägt nur, wenn Qualität und Bekanntheit ihn rechtfertigen.",
+      "cheap": "Zu billig: Wer knapp über den eigenen Kosten verkauft, gewinnt Kunden, aber kein Geld für die Fixkosten.",
+      "fast": "Zu schnell wachsen: Neue Mitarbeiter kosten sofort das volle Gehalt, leisten aber erst später alles.",
+      "example": "Ein Kleinunternehmen zahlt {fixed} Fixkosten im Quartal, dazu die Gehälter. Bleiben die Kunden weg, ist ein Startkapital von {founding} schnell aufgebraucht.",
+      "where": "Im Firmen-Dashboard unter „Burn-Rate“: Kosten je Quartal und wie lange die Kasse noch reicht."
+    },
+    "markets": {
+      "title": "Lokal, regional, national",
+      "summary": "Jede Firmenstufe hat ihren eigenen Markt",
+      "text": "Kleinunternehmen verkaufen lokal, GmbHs regional, AGs national, börsennotierte Firmen international gegen die großen Konzerne. In jedem Markt gibt es schon etablierte Anbieter, und der Markt ist begrenzt: Zwei gut geführte Firmen haben Platz, bei vieren wird es für alle eng. Wer wachsen will, wandelt in die nächste Stufe um.",
+      "example": "Der regionale Tech-Markt ist mit {regional} im Quartal gut dreimal so groß wie der lokale ({local}).",
+      "where": "Im Firmen-Dashboard: Marktgröße und die Anteile von dir, anderen Spielern und den etablierten Anbietern."
+    },
+    "corporateTax": {
+      "title": "Unternehmenssteuer",
+      "summary": "{rate} auf den Quartalsgewinn der Firma",
+      "text": "Macht deine Firma in einem Quartal Gewinn, gehen davon {rate} an den Staat. In Verlustquartalen zahlt sie nichts. Schüttest du Gewinn an dich aus, fällt darauf zusätzlich die Dividendensteuer an.",
+      "example": "Bei {profit} Gewinn zahlt die Firma {tax} Steuer, {net} bleiben in der Kasse.",
+      "where": "Im Quartalsbericht als eigene Zeile zwischen „Gewinn vor Steuern“ und „Gewinn“."
+    },
+    "tiers": {
+      "title": "Firmenstufen",
+      "summary": "Mehr Mitarbeiter und größerer Markt, aber höhere Fixkosten",
+      "text": "Es gibt vier Stufen. Jede höhere erlaubt mehr Mitarbeiter und öffnet einen größeren Markt, kostet aber mehr Fixkosten. Die Fixkosten schwanken je Branche etwas. Umwandeln kostet {conversion} der Gründungskosten der neuen Stufe; Team, Qualität und Kunden behältst du.",
+      "colTier": "Stufe",
+      "colLevel": "Level",
+      "colFounding": "Gründung",
+      "colFixed": "Fixkosten/Quartal",
+      "colStaff": "Mitarbeiter",
+      "small_business": "Kleinunternehmen",
+      "gmbh": "GmbH",
+      "ag": "AG",
+      "listed": "Börsennotiert",
+      "afterIpo": "nach IPO",
+      "example": "Die Umwandlung in eine GmbH kostet {gmbhConversion}.",
+      "where": "Im Gründungsassistenten beim Schritt „Rechtsform“ und im Dashboard unter „Nächste Stufe“."
+    },
+    "insolvency": {
+      "title": "Insolvenz und Schonfrist",
+      "summary": "{quarters} Quartale Zeit, die Kasse zu retten",
+      "text": "Ist die Kasse deiner Firma am Quartalsende im Minus, beginnt eine Schonfrist von {quarters} Quartalen, also {hours} Stunden. Bringst du die Kasse in dieser Zeit ins Plus (Kosten senken, Geld einschießen, Kredit), ist alles gut. Sonst ist die Firma insolvent und du darfst {lockout} Tage keine neue gründen. Über Nacht verlierst du also keine gesunde Firma.",
+      "example": "Solange die Kasse im Minus ist, zahlst du Überziehungszinsen von {rate} im Spieljahr: {perQuarter} je Quartal auf 1.000 € Minus.",
+      "where": "Roter Balken im Firmen-Dashboard mit Countdown. Du bekommst eine Benachrichtigung beim ersten Minus und vor dem letzten Abschluss."
     }
   }
 }

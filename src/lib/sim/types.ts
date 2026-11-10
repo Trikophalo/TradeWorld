@@ -6,9 +6,23 @@
  * Model quantities without money character (quality, awareness, sentiment,
  * pressure, aggregated AI holdings) are `number`.
  */
-import type { CompanyTierId, DepartmentId, InvestorArchetypeId, SectorId, SegmentId, SizeClass } from "../../config/balance.ts";
+import type {
+  CompanyTierId,
+  DepartmentId,
+  InvestorArchetypeId,
+  SectorId,
+  SegmentId,
+  SizeClass,
+} from "../../config/balance.ts";
 
-export type { CompanyTierId, DepartmentId, InvestorArchetypeId, SectorId, SegmentId, SizeClass } from "../../config/balance.ts";
+export type {
+  CompanyTierId,
+  DepartmentId,
+  InvestorArchetypeId,
+  SectorId,
+  SegmentId,
+  SizeClass,
+} from "../../config/balance.ts";
 
 // --------------------------------------------------------------------------- PRNG
 

@@ -21,6 +21,7 @@ import {
   segmentBaseDemand,
   segmentForTier,
   tierFixedCostCents,
+  unitCostCents,
 } from "./quarter.ts";
 import { createRng } from "./rng.ts";
 import type {
@@ -336,6 +337,14 @@ function decide(firm: Firm, company: CompanyState, macro: MacroState, ctx: Polic
   const marketPrice = Math.round(marketPriceCents(company.sectorId, macro.oilIndex, cfg));
   const budget = (factor: number) => BigInt(Math.round(referenceBudget * factor));
   const price = (cents: number) => BigInt(Math.round(cents));
+  const perHead = effectiveSkillPoints(
+    { skill: SKILL, quartersEmployed: 9, traitKey: null, isPlayer: false },
+    cfg.employees,
+  );
+  const wagePerUnit =
+    Number(marketSalaryCents(SKILL, null, cfg.employees)) /
+    (perHead * cfg.sectors[company.sectorId].costStructure.capacityUnitsPerSkillPoint);
+  const variableUnitCost = unitCostCents(company.sectorId, macro.oilIndex, cfg) + wagePerUnit;
   const onboarding = firm.employees.some((e) => e.quartersEmployed < cfg.company.onboardingRamp.length);
 
   switch (firm.archetype) {
@@ -347,7 +356,8 @@ function decide(firm: Firm, company: CompanyState, macro: MacroState, ctx: Polic
 
     case "dumper":
       if (utilization !== null && utilization > 0.95 && !onboarding) hire(firm, "production", step, cap);
-      return { companyId: firm.id, unitPriceCents: price(marketPrice * 0.75), marketingBudgetCents: budget(1) };
+      // Sells 5 % above its own variable cost (materials plus production wages per unit).
+      return { companyId: firm.id, unitPriceCents: price(variableUnitCost * 1.05), marketingBudgetCents: budget(1) };
 
     case "over_expander":
       // Ten times the budget of a careful founder (the simulation limits it to half of the cash).
@@ -361,14 +371,14 @@ function decide(firm: Firm, company: CompanyState, macro: MacroState, ctx: Polic
       return { companyId: firm.id, unitPriceCents: price(referencePrice), marketingBudgetCents: budget(0.4) };
 
     case "solid": {
-      if (utilization !== null && !onboarding) {
+      if (utilization !== null) {
         if (utilization > 0.95) {
           // Grow production, and development with it so that quality keeps up with the size.
           const production = count(firm.employees, "production");
           const wanted = developersNeeded(company.sectorId, company.tier, production + step, cap, cfg);
           hire(firm, "development", wanted - count(firm.employees, "development"), cap);
           hire(firm, "production", step, cap);
-        } else if (utilization < 0.75) fire(firm, "production", step, 1);
+        } else if (utilization < 0.75 && !onboarding) fire(firm, "production", step, 1);
       }
       return { companyId: firm.id, unitPriceCents: price(marketPrice), marketingBudgetCents: budget(1) };
     }
