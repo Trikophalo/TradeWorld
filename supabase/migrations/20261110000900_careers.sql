@@ -51,7 +51,7 @@ create table public.player_jobs (
 alter table public.player_jobs enable row level security;
 create unique index player_jobs_active_uq on public.player_jobs (player_id) where status = 'active';
 create index player_jobs_player_idx on public.player_jobs (player_id, started_at desc);
-create index player_jobs_company_idx on public.player_jobs (company_id) where status = 'active';
+create index player_jobs_company_idx on public.player_jobs (company_id, status);
 create index player_jobs_definition_idx on public.player_jobs (job_definition_id);
 create index player_jobs_employee_idx on public.player_jobs (employee_id);
 comment on table public.player_jobs is 'Employment of a player (one active job). At player companies employee_id links the employees row.';

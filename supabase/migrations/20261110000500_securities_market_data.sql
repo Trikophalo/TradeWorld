@@ -121,6 +121,7 @@ create table public.index_memberships (
 );
 alter table public.index_memberships enable row level security;
 create unique index index_memberships_current_uq on public.index_memberships (index_security_id, member_security_id) where left_at is null;
+create index index_memberships_index_idx on public.index_memberships (index_security_id, joined_at);
 create index index_memberships_member_idx on public.index_memberships (member_security_id);
 comment on table public.index_memberships is 'Current and historic index members. Joining is a market event (index funds must buy).';
 

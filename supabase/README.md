@@ -1,0 +1,114 @@
+# Supabase
+
+Database schema, reference data and verification for NEXA.
+Design and table reference: [`docs/DATA_MODEL.md`](../docs/DATA_MODEL.md).
+
+```
+supabase/
+  migrations/   ordered SQL migrations (schema, RLS, views, cron)
+  seed.sql      reference data (sectors, 15 AI companies, bonds, index, catalogues, invite codes)
+  tests/        local verification on a throwaway PostgreSQL cluster
+  tools/        generator for the table/ER sections of docs/DATA_MODEL.md
+```
+
+## Link a project and push
+
+Requires the [Supabase CLI](https://supabase.com/docs/guides/cli) (`pnpm dlx supabase ...` works too).
+
+```bash
+supabase login
+supabase link --project-ref <project-ref>     # asks for the database password
+
+supabase db push                              # applies supabase/migrations/*.sql
+supabase db push --include-seed               # ... and runs supabase/seed.sql
+```
+
+`seed.sql` is idempotent, so running it again is safe. It does **not** contain `game_config`;
+generate and apply that from `src/config/balance.ts`:
+
+```bash
+pnpm db:config        # writes the config seed (see package.json)
+```
+
+Local Supabase stack instead of a hosted project (needs Docker):
+
+```bash
+supabase start
+supabase db reset     # migrations + seed.sql
+```
+
+## One-time setup after the first push
+
+1. **First admin** (there is no client-writable admin flag). In the SQL editor:
+
+   ```sql
+   insert into public.admin_users (user_id, note)
+   select id, 'owner' from auth.users where email = '<your email>';
+   ```
+
+2. **Edge function URL and secret for pg_cron** (Supabase Vault, never hard-coded):
+
+   ```sql
+   select vault.create_secret('https://<project-ref>.supabase.co/functions/v1', 'nexa_functions_base_url');
+   select vault.create_secret('<service role key or dedicated cron secret>', 'nexa_cron_secret');
+   ```
+
+   Until both exist, `public.invoke_edge_function()` does nothing, so the scheduled jobs are harmless.
+   `pg_cron` and `pg_net` are enabled by the last migration when the project offers them.
+
+3. **Invite codes**: `seed.sql` creates placeholder codes (`NEXA-...`). Replace them before inviting anyone.
+
+4. **Auth settings**: sign-up passes `invite_code`, `age_confirmed` and optionally `nickname` in
+   `options.data`. A missing or invalid code makes the sign-up fail (trigger `handle_new_user`).
+
+## Local verification (no Docker, no CLI)
+
+Needs only the PostgreSQL 16 server binaries.
+
+```bash
+supabase/tests/verify_local.sh
+```
+
+The script creates a temporary cluster, installs a minimal Supabase stub (roles `anon`, `authenticated`,
+`service_role`, schema `auth`, `auth.uid()`), applies all migrations and `seed.sql` (twice, to prove
+idempotency) with `ON_ERROR_STOP`, and runs the assertions in `tests/[1-9]*.sql`:
+
+| File                   | Checks                                                                                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `10_structure.sql`     | RLS on every table, no privileges for `anon`, write/execute allowlists for `authenticated`, FK indexes, unit conventions, game calendar incl. DST |
+| `20_signup_ledger.sql` | sign-up trigger (invite, age, profile, accounts, starting capital), ledger immutability and balance checks, rate limit, idempotency               |
+| `30_rls.sql`           | player A vs. player B vs. `anon` vs. `service_role`: private rows, forbidden writes, internal tables, public views, insider and friend rules      |
+| `40_seed.sql`          | seed counts and consistency (15 companies, 5 sectors, bonds, index, achievements, ...)                                                            |
+
+It exits non-zero on the first failed assertion and removes the cluster afterwards.
+
+| Variable       | Default                      | Purpose                                      |
+| -------------- | ---------------------------- | -------------------------------------------- |
+| `PG_BIN`       | `/usr/lib/postgresql/16/bin` | directory with `initdb`, `pg_ctl`, `psql`    |
+| `NEXA_PG_DIR`  | `mktemp -d`                  | work directory for the cluster               |
+| `NEXA_PG_PORT` | `54329`                      | port                                         |
+| `NEXA_KEEP`    | `0`                          | `1` keeps the cluster running for inspection |
+
+When started as root the script runs the server as the `postgres` OS user, or inside a user namespace
+(`unshare`) if that user cannot reach the work directory.
+
+## Regenerating docs/DATA_MODEL.md
+
+Sections 3 (tables) and 4 (ER diagrams) are generated from a live database:
+
+```bash
+NEXA_KEEP=1 supabase/tests/verify_local.sh
+python3 supabase/tools/gen_data_model.py "postgresql://postgres@127.0.0.1:54329/nexa_verify"
+# afterwards stop the cluster: pg_ctl -D <NEXA_PG_DIR>/data stop
+```
+
+New tables need a German one-line purpose in `PURPOSE` inside the tool and an RLS class in
+`migrations/20261110001400_triggers_rls_policies.sql` (that migration fails if a table is unclassified).
+For later schema changes add new migration files; do not edit applied ones.
+
+## Conventions in one glance
+
+- Money `bigint` cents (`*_cents`), prices `bigint` with 1 EUR = 10000 (`*_e4`), rates in basis points (`*_bps`).
+- RLS on every table. Clients read; all game writes go through `SECURITY DEFINER` functions.
+- New functions are not executable by anyone but the owner and `service_role` until a migration grants `EXECUTE`.
+- Every money movement goes through `public.ledger_post()`.

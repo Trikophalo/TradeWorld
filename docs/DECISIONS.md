@@ -60,11 +60,11 @@ Ein Lease in `sim_runtime` (Postgres Advisory Lock + Ablaufzeit) verhindert dopp
 
 Warum nicht die Alternativen:
 
-| Variante | Problem |
-|---|---|
-| `pg_cron` im Sekundenintervall + PL/pgSQL-Simulation | Simulation wäre in SQL statt TypeScript: nicht mit Vitest testbar, nicht mit der Client-Vorschau teilbar |
-| `pg_cron` alle 5 s → Edge Function | Etwa 520 000 Aufrufe pro Monat, das sprengt das Supabase-Free-Kontingent (500 000). Der Minuten-Loop braucht etwa 43 000 |
-| Eigener Worker (Fly, Railway) | Zusätzliche Infrastruktur. Sinnvoll, sobald viele Spieler da sind: Der Runner ist so gebaut, dass er unverändert als Node-Prozess laufen kann |
+| Variante                                             | Problem                                                                                                                                       |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pg_cron` im Sekundenintervall + PL/pgSQL-Simulation | Simulation wäre in SQL statt TypeScript: nicht mit Vitest testbar, nicht mit der Client-Vorschau teilbar                                      |
+| `pg_cron` alle 5 s → Edge Function                   | Etwa 520 000 Aufrufe pro Monat, das sprengt das Supabase-Free-Kontingent (500 000). Der Minuten-Loop braucht etwa 43 000                      |
+| Eigener Worker (Fly, Railway)                        | Zusätzliche Infrastruktur. Sinnvoll, sobald viele Spieler da sind: Der Runner ist so gebaut, dass er unverändert als Node-Prozess laufen kann |
 
 Geldkritische Logik (Order annehmen, ausführen, buchen) bleibt in **PL/pgSQL-Funktionen** in der Datenbank.
 Die TypeScript-Simulation bestimmt Kurse und KI-Verhalten, bucht aber selbst nie Spielergeld.
@@ -143,13 +143,13 @@ rendert höchstens einmal pro Animation-Frame.
 
 ## ADR-014: Die 15 KI-Unternehmen — `Annahme`
 
-| Branche | Bluechip | Mittelständler | Pennystock |
-|---|---|---|---|
-| Tech/Software | KlarSoft AG (`KLS`) | Pixelwerk Studios (`PXW`) | QuantenSprung Labs (`QSL`) |
-| Einzelhandel | Brotzeit Handel AG (`BRZ`) | Kaufrausch Märkte (`KFR`) | Fundgrube Discount (`FGD`) |
-| Energie | Volta Energie AG (`VLT`) | Rheinkraft Werke (`RKW`) | SolarFuchs (`SFX`) |
-| Pharma | NeuroPharm AG (`NPH`) | Alpenmed (`ALM`) | GenoVita Biotech (`GNV`) |
-| Logistik | Nordlicht Logistik AG (`NDL`) | Eilbote Express (`EBX`) | Frachtpilot (`FPT`) |
+| Branche       | Bluechip                      | Mittelständler            | Pennystock                 |
+| ------------- | ----------------------------- | ------------------------- | -------------------------- |
+| Tech/Software | KlarSoft AG (`KLS`)           | Pixelwerk Studios (`PXW`) | QuantenSprung Labs (`QSL`) |
+| Einzelhandel  | Brotzeit Handel AG (`BRZ`)    | Kaufrausch Märkte (`KFR`) | Fundgrube Discount (`FGD`) |
+| Energie       | Volta Energie AG (`VLT`)      | Rheinkraft Werke (`RKW`)  | SolarFuchs (`SFX`)         |
+| Pharma        | NeuroPharm AG (`NPH`)         | Alpenmed (`ALM`)          | GenoVita Biotech (`GNV`)   |
+| Logistik      | Nordlicht Logistik AG (`NDL`) | Eilbote Express (`EBX`)   | Frachtpilot (`FPT`)        |
 
 Alle Namen sind frei erfunden. Vor einem öffentlichen Release ist eine Markenrecherche nötig.
 
@@ -163,3 +163,54 @@ Mit gesetzten Variablen sind alle Spielseiten geschützt.
 ## ADR-016: Arbeitstitel „NEXA“ — `Annahme`
 
 Der Name steht nur an einer Stelle (`src/config/app.ts` und `messages/de.json`) und im Leitindex „NEXA 30“.
+
+## ADR-017: Zugriffsmodell: spaltenreine Tabellen und `security_invoker`-Views — `akzeptiert`
+
+Jede Tabelle hat genau eine Sichtbarkeitsklasse (`public_read`, `owner_read`, `custom`, `admin_read`, `internal`).
+Gemischte Konzepte sind in mehrere Tabellen geteilt (z. B. `profiles` / `player_private` / `player_settings`,
+`companies` / `company_state`). Öffentliche Sichten sind `security_invoker`-Views, es gibt keine Definer-Views.
+Die Migration bricht ab, wenn eine Tabelle keine Klasse hat. Details in [`DATA_MODEL.md`](./DATA_MODEL.md).
+
+## ADR-018: Standardmäßig geschlossen — `akzeptiert`
+
+Die erste Migration entzieht `anon` und `authenticated` die Standardrechte von Supabase und `PUBLIC` das
+Ausführungsrecht auf Funktionen. `anon` hat im Schema `public` keinerlei Rechte. Direkt schreibbar sind für
+Spieler nur sieben eng begrenzte Stellen (Einstellungen, Watchlist, Lesemarken, Benachrichtigungs-Einstellungen,
+Push-Abos). Admins lesen über RLS, schreiben aber nur über `admin_*`-RPCs; der erste Admin wird per SQL eingetragen.
+
+## ADR-019: Ledger-Erweiterungen — `akzeptiert`
+
+Zusätzlich zu ADR-007: je Spieler ein Reservekonto (`player_reserve`) für in Orders, IPO-Zeichnungen und Margin
+gebundenes Geld; Systemkonten `bank`, `fines`, `economy`; Buchungszeilen nur in derselben Transaktion wie ihr
+Kopf; `ledger_audit()` und `money_supply_cents()` für Prüfung und Zentralbank. Fachliche Fehler haben eigene
+SQLSTATE-Codes `NX001` bis `NX009`, die der Client auf Texte abbildet.
+
+## ADR-020: Spielkalender: Spieltag von 08:00 bis 08:00 Uhr — `Annahme`
+
+Ein Spieltag (= ein Spieljahr) beginnt mit der Eröffnungsglocke um 08:00 Uhr Berlin. Die Epoche wird beim ersten
+Aufruf von `ensure_game_quarters()` festgelegt. Davon getrennt wechseln **Tageslimits** (XP-Limits, Streak,
+Missionen) um 00:00 Uhr Berlin.
+
+## ADR-021: Kursdaten: Tagespartitionen und Aufbewahrungsfristen — `Annahme`
+
+`price_ticks` ist nach Tag partitioniert und wird 3 Tage aufbewahrt. Kerzen: 1 min 7 Tage, 5 min 30 Tage,
+1 h, Quartal und Jahr dauerhaft. `run_maintenance()` räumt täglich auf.
+
+## ADR-022: Quartalsabschluss als eigener, stündlicher Runner — `Annahme`
+
+Neben dem `tick-runner` (jede Minute) plant `pg_cron` einen `quarter-runner` (stündlich), der fällige Quartale
+abschließt. Die Trennung hält den Tick schlank und macht den Abschluss unabhängig wiederholbar. URL und Secret
+der Edge Functions liegen im Supabase Vault; ohne Konfiguration tun die Jobs nichts.
+
+## ADR-023: Feste IDs für KI-Firmen — `akzeptiert`
+
+Geseedete KI-Firmen und ihre Wertpapiere haben deterministische UUIDs (`md5('nexa:company:' || ticker)::uuid`),
+damit Seeds, Tests und Demo-Daten dieselben Schlüssel verwenden.
+
+## ADR-024: Registrierungsvertrag — `akzeptiert`
+
+`supabase.auth.signUp` sendet in `options.data`: `invite_code`, `age_confirmed: true` und optional `nickname`
+(3 bis 20 Zeichen, `A-Z a-z 0-9 _`). Der Trigger `handle_new_user()` prüft Code und Altersbestätigung, vergibt bei
+belegtem Namen ein Zahlensuffix und bucht das Startkapital aus `game_config` → `economy.startingCapitalCents`.
+Ein falscher Einladungscode kommt derzeit als allgemeiner Fehler zurück; eine genauere Meldung ist für M1 notiert.
+Die mitgelieferten Einladungscodes in `seed.sql` sind Platzhalter und müssen vor dem Freundestest ersetzt werden.

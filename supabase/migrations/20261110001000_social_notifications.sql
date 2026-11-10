@@ -165,7 +165,7 @@ create table public.push_subscriptions (
   updated_at   timestamptz not null default now()
 );
 alter table public.push_subscriptions enable row level security;
-create index push_subscriptions_player_idx on public.push_subscriptions (player_id) where revoked_at is null;
+create index push_subscriptions_player_idx on public.push_subscriptions (player_id);
 comment on table public.push_subscriptions is 'Web push subscriptions (PWA). Owner manages rows directly; the server sends via VAPID.';
 
 create table public.push_deliveries (

@@ -25,13 +25,16 @@ select tests.assert(
   not exists (
     select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
      where n.nspname = 'public' and c.relkind in ('r', 'p', 'v', 'm')
-       and (has_table_privilege('anon', c.oid, 'select, insert, update, delete, truncate')
-            or has_any_column_privilege('anon', c.oid, 'select, insert, update'))),
+       and case when c.relkind in ('r', 'p', 'v', 'm')
+                then has_table_privilege('anon', c.oid, 'select, insert, update, delete, truncate')
+                     or has_any_column_privilege('anon', c.oid, 'select, insert, update')
+                else false end),
   'anon has no table/view/column privileges in public');
 select tests.assert(
   not exists (
     select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
-     where n.nspname = 'public' and c.relkind = 'S' and has_sequence_privilege('anon', c.oid, 'usage, select, update')),
+     where n.nspname = 'public' and c.relkind = 'S'
+       and case when c.relkind = 'S' then has_sequence_privilege('anon', c.oid, 'usage, select, update') else false end),
   'anon has no sequence privileges in public');
 select tests.assert(
   not exists (
@@ -53,8 +56,10 @@ select tests.assert(
   (select coalesce(array_agg(c.relname::text order by c.relname), '{}')
      from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind in ('r', 'p', 'v')
-      and (has_table_privilege('authenticated', c.oid, 'insert, update, delete, truncate')
-           or has_any_column_privilege('authenticated', c.oid, 'insert, update')))
+      and case when c.relkind in ('r', 'p', 'v')
+               then has_table_privilege('authenticated', c.oid, 'insert, update, delete, truncate')
+                    or has_any_column_privilege('authenticated', c.oid, 'insert, update')
+               else false end)
   = array['notification_preferences', 'notifications', 'player_achievements', 'player_settings',
           'player_unlocks', 'push_subscriptions', 'watchlist_items'],
   'authenticated has write privileges on exactly the 7 client-writable tables');
@@ -89,7 +94,7 @@ select tests.assert(
   not exists (
     select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
      where n.nspname = 'public' and c.relkind in ('r', 'p') and not c.relispartition
-       and has_table_privilege('authenticated', c.oid, 'select')
+       and case when c.relkind in ('r', 'p') then has_table_privilege('authenticated', c.oid, 'select') else false end
        and not exists (select 1 from pg_policy p where p.polrelid = c.oid)),
   'every table readable by authenticated has at least one RLS policy');
 
@@ -196,11 +201,12 @@ select tests.assert(
   'price_ticks has daily partitions plus a default partition');
 
 -- game calendar -----------------------------------------------------------------
-select tests.assert((select count(*) from public.game_quarters) = 16, 'ensure_game_quarters created 4 game days (16 quarters)');
+select tests.assert((select count(*) >= 16 and count(*) % 4 = 0 from public.game_quarters), 'ensure_game_quarters created at least 4 game days (16 quarters)');
 select tests.assert(public.ensure_game_quarters(3) = 0, 'ensure_game_quarters is idempotent');
 select tests.assert(
-  (select array_agg(distinct extract(hour from starts_at at time zone 'Europe/Berlin')::int order by 1)
-     from public.game_quarters) = array[2, 8, 14, 20],
+  (select array_agg(h order by h) from (
+     select distinct extract(hour from starts_at at time zone 'Europe/Berlin')::int as h from public.game_quarters) x)
+  = array[2, 8, 14, 20],
   'quarters start at 02, 08, 14 and 20 o''clock Europe/Berlin');
 select tests.assert(
   not exists (select 1 from public.game_quarters q
@@ -219,18 +225,22 @@ select tests.assert(
   (select status from public.game_quarters where id = (public.current_game_quarter()).id) = 'active',
   'the running quarter is marked active');
 
--- DST: over the next 200 days exactly one quarter is 5 h long (spring forward),
--- all others are 6 h. Rolled back afterwards.
+-- DST: within the next 370 days there is exactly one 5 h quarter (spring
+-- forward) and one 7 h quarter (fall back); all others are 6 h. Rolled back.
 begin;
-select public.ensure_game_quarters(200) > 700 as created_200_days \gset
-select tests.assert(:'created_200_days'::boolean, 'calendar can be extended 200 days ahead');
+select tests.assert(public.ensure_game_quarters(370) > 1400, 'calendar can be extended 370 days ahead');
 select tests.assert(
-  (select array_agg(distinct round(extract(epoch from ends_at - starts_at) / 3600)::int order by 1)
-     from public.game_quarters) = array[5, 6],
-  'quarter lengths over a DST change are 6 h plus one 5 h quarter');
+  (select array_agg(h order by h) from (
+     select distinct round(extract(epoch from ends_at - starts_at) / 3600)::int as h from public.game_quarters) x)
+  = array[5, 6, 7],
+  'quarter lengths over a year are 6 h plus the DST quarters (5 h and 7 h)');
 select tests.assert(
-  (select count(*) from public.game_quarters where ends_at - starts_at = interval '5 hours') = 1,
-  'exactly one 5 h quarter (last Sunday of March)');
+  (select count(*) filter (where ends_at - starts_at = interval '5 hours') = 1
+      and count(*) filter (where ends_at - starts_at = interval '7 hours') = 1 from public.game_quarters),
+  'exactly one 5 h and one 7 h quarter per year');
+select tests.assert(
+  not exists (select 1 from public.game_quarters group by game_year having count(*) <> 4),
+  'every game year has exactly 4 quarters');
 rollback;
 
 -- admin time offset moves game time

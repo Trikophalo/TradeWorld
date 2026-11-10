@@ -250,8 +250,8 @@ declare
   v_rows    integer;
   v_created integer := 0;
 begin
-  if p_days_ahead is null or p_days_ahead < 0 or p_days_ahead > 366 then
-    raise exception 'p_days_ahead must be between 0 and 366' using errcode = 'NX007';
+  if p_days_ahead is null or p_days_ahead < 0 or p_days_ahead > 400 then
+    raise exception 'p_days_ahead must be between 0 and 400' using errcode = 'NX007';
   end if;
 
   v_today := public.game_day();

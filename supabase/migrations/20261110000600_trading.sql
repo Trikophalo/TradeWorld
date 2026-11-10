@@ -133,7 +133,7 @@ create table public.position_lots (
   check (quantity_open <= quantity_initial)
 );
 alter table public.position_lots enable row level security;
-create index position_lots_position_open_idx on public.position_lots (position_id, acquired_at) where quantity_open > 0;
+create index position_lots_position_idx on public.position_lots (position_id, acquired_at);
 create index position_lots_player_idx on public.position_lots (player_id, security_id);
 create index position_lots_security_idx on public.position_lots (security_id);
 create index position_lots_trade_idx on public.position_lots (trade_id);
