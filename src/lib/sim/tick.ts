@@ -31,15 +31,7 @@ import { computeAllPressures } from "./investors.ts";
 import { halfSpreadBps, quoteAround } from "./market-maker.ts";
 import { ZERO, absBig, roundToBigInt } from "./money.ts";
 import { depthShares, impactReturn } from "./price-impact.ts";
-import type {
-  ArchetypeStates,
-  MarketState,
-  Rng,
-  SecurityState,
-  TickInputs,
-  TickRecord,
-  TickResult,
-} from "./types.ts";
+import type { ArchetypeStates, MarketState, Rng, SecurityState, TickInputs, TickRecord, TickResult } from "./types.ts";
 import { INVESTOR_ARCHETYPES } from "./types.ts";
 
 export interface TickConfig {
@@ -94,7 +86,11 @@ function stepSecurity(
   for (const a of INVESTOR_ARCHETYPES) zeroPressures[a] = 0;
 
   if (security.halted) {
-    const quote = quoteAround(security.priceE4, halfSpreadBps(security.sizeClass, session, security.sentiment, trading, time.afterHours), trading);
+    const quote = quoteAround(
+      security.priceE4,
+      halfSpreadBps(security.sizeClass, session, security.sentiment, trading, time.afterHours),
+      trading,
+    );
     return {
       next: security,
       record: {
@@ -205,7 +201,11 @@ function stepSecurity(
     holdingShares: makerInventory * (1 - aiInvestors.archetypes.market_maker.reactionSpeed * liquidityFactor),
   };
 
-  const quote = quoteAround(priceE4, halfSpreadBps(security.sizeClass, session, sentiment, trading, time.afterHours), trading);
+  const quote = quoteAround(
+    priceE4,
+    halfSpreadBps(security.sizeClass, session, sentiment, trading, time.afterHours),
+    trading,
+  );
   const baselineVolume = depth * aiInvestors.baselineVolumeDepthFraction * (0.5 + rng.next());
   const volumeShares = playerVolume + roundToBigInt(Math.round(aiGross + baselineVolume));
 

@@ -13,12 +13,7 @@
  *   fraction `reactionSpeed` of the gap between target and current holding
  */
 import { BALANCE } from "../../config/balance.ts";
-import type {
-  AiInvestorsConfig,
-  CentralBankConfig,
-  InvestorArchetypeId,
-  TradingConfig,
-} from "../../config/balance.ts";
+import type { AiInvestorsConfig, CentralBankConfig, InvestorArchetypeId, TradingConfig } from "../../config/balance.ts";
 import type { ArchetypeStates, InvestorPressures } from "./types.ts";
 import { INVESTOR_ARCHETYPES } from "./types.ts";
 

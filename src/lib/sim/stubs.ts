@@ -13,6 +13,8 @@ export interface Applicant extends EmployeeInput {
 /** Generates the applicant pool of a company for one quarter (spec 7.1). */
 export function generateApplicantPool(_company: CompanyState, _rng: Rng): readonly Applicant[] {
   // M4: draw skill, trait and salary expectation; pool quality grows with company awareness.
+  void _company;
+  void _rng;
   throw new Error("not implemented: M4");
 }
 
@@ -25,8 +27,13 @@ export interface LoyaltyInput {
 }
 
 /** Loyalty of one employee after a quarter and whether the employee quits (spec 7.1). */
-export function stepEmployeeLoyalty(_input: LoyaltyInput, _rng: Rng): { readonly loyalty: number; readonly quits: boolean } {
+export function stepEmployeeLoyalty(
+  _input: LoyaltyInput,
+  _rng: Rng,
+): { readonly loyalty: number; readonly quits: boolean } {
   // M4: decay on salary freeze (trait multiplier), gain on raises, quit below the threshold.
+  void _input;
+  void _rng;
   throw new Error("not implemented: M4");
 }
 
@@ -38,6 +45,8 @@ export interface RescueOffer {
 /** Price an AI company would bid in a rescue takeover shortly before insolvency (spec 6.7). */
 export function aiRescueOffer(_company: CompanyState, _rng: Rng): RescueOffer | null {
   // M4: bid a discount to liquidation value if the sector is healthy.
+  void _company;
+  void _rng;
   throw new Error("not implemented: M4");
 }
 
@@ -54,5 +63,6 @@ export interface OptionQuoteInput {
 /** Fair premium of an option, unlocked at level 30 (spec 9.3, 10). */
 export function optionPremiumE4(_input: OptionQuoteInput): bigint {
   // Post-M8: Black-Scholes with the market-maker spread on top.
+  void _input;
   throw new Error("not implemented: post-M8");
 }

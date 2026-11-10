@@ -28,12 +28,19 @@ export function resolvePharmaTrial(
 }
 
 /** Whether a new trial gets announced for a pharma company this quarter. */
-export function rollPharmaTrialAnnouncement(rng: Rng, cfg: EventsConfig["pharmaTrial"] = BALANCE.events.pharmaTrial): boolean {
+export function rollPharmaTrialAnnouncement(
+  rng: Rng,
+  cfg: EventsConfig["pharmaTrial"] = BALANCE.events.pharmaTrial,
+): boolean {
   return rng.chance(cfg.probabilityPerQuarter);
 }
 
 /** Oil report: log-normal change with mean reversion to the baseline 1. */
-export function stepOilIndex(oilIndex: number, rng: Rng, cfg: EventsConfig["oilReport"] = BALANCE.events.oilReport): number {
+export function stepOilIndex(
+  oilIndex: number,
+  rng: Rng,
+  cfg: EventsConfig["oilReport"] = BALANCE.events.oilReport,
+): number {
   const reverted = oilIndex + cfg.meanReversion * (1 - oilIndex);
   return clamp(reverted * Math.exp(rng.normal(0, cfg.changeStdDev)), cfg.minIndex, cfg.maxIndex);
 }
@@ -77,7 +84,11 @@ export function rollMacroEvents(rng: Rng, cfg: EventsConfig["macro"] = BALANCE.e
       templateKey: "macro.sector_crisis",
       scope: "sector",
       sectorId,
-      vars: { sectorId, demandChangePct: cfg.sectorCrisis.magnitude * 100, quarters: cfg.sectorCrisis.durationQuarters },
+      vars: {
+        sectorId,
+        demandChangePct: cfg.sectorCrisis.magnitude * 100,
+        quarters: cfg.sectorCrisis.durationQuarters,
+      },
       sentimentDelta: cfg.sectorCrisis.sentimentShock,
       importance: 3,
     });
@@ -125,7 +136,11 @@ export function rollMacroEvents(rng: Rng, cfg: EventsConfig["macro"] = BALANCE.e
       templateKey: "macro.tech_boom",
       scope: "sector",
       sectorId: "tech",
-      vars: { sectorId: "tech", demandChangePct: cfg.techBoom.magnitude * 100, quarters: cfg.techBoom.durationQuarters },
+      vars: {
+        sectorId: "tech",
+        demandChangePct: cfg.techBoom.magnitude * 100,
+        quarters: cfg.techBoom.durationQuarters,
+      },
       sentimentDelta: cfg.techBoom.sentimentShock,
       importance: 3,
     });

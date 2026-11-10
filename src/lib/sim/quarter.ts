@@ -53,7 +53,10 @@ function clamp(value: number, min: number, max: number): number {
 export function tierFixedCostCents(tier: CompanyTierId, sectorId: SectorId, cfg: BalanceConfig = BALANCE): bigint {
   const tierCfg = cfg.company.tiers.find((t) => t.id === tier);
   if (!tierCfg) throw new RangeError(`unknown tier: ${tier}`);
-  return scaleByFloat(BigInt(tierCfg.fixedCostCentsPerQuarter), cfg.sectors[sectorId].costStructure.fixedCostMultiplier);
+  return scaleByFloat(
+    BigInt(tierCfg.fixedCostCentsPerQuarter),
+    cfg.sectors[sectorId].costStructure.fixedCostMultiplier,
+  );
 }
 
 /**
@@ -102,7 +105,10 @@ export function unitCostCents(sectorId: SectorId, oilIndex: number, cfg: Balance
 }
 
 /** Allowed unit price range of a sector in cents (inclusive). */
-export function priceBandCents(sectorId: SectorId, cfg: BalanceConfig = BALANCE): { readonly min: number; readonly max: number } {
+export function priceBandCents(
+  sectorId: SectorId,
+  cfg: BalanceConfig = BALANCE,
+): { readonly min: number; readonly max: number } {
   const cost = cfg.sectors[sectorId].costStructure;
   const min = Math.max(1, Math.ceil(cost.referencePriceCents * cfg.company.priceBand.minFactor));
   const max = Math.floor(
@@ -125,7 +131,8 @@ export function aiCompanyDecision(
   const policy = cfg.company.aiPolicy;
   const cost = cfg.sectors[company.sectorId].costStructure;
   // Keep the absolute unit margin of the reference price when costs move.
-  const reference = cost.referencePriceCents - cost.unitCostCents + unitCostCents(company.sectorId, macro.oilIndex, cfg);
+  const reference =
+    cost.referencePriceCents - cost.unitCostCents + unitCostCents(company.sectorId, macro.oilIndex, cfg);
   const current = Number(company.unitPriceCents);
   const reverted = current + policy.priceReversion * (reference - current);
   const unitPriceCents = roundToBigInt(Math.max(1, Math.round(reverted * Math.exp(rng.normal(0, policy.priceNoise)))));
@@ -138,7 +145,13 @@ export function aiCompanyDecision(
     trailing > ZERO && company.sharesOutstanding > ZERO
       ? scaleByFloat(trailing, policy.dividendPayoutRatio / 4) / company.sharesOutstanding
       : ZERO;
-  return { companyId: company.id, unitPriceCents, marketingBudgetCents, dividendPerShareCents, guidanceRevenueCents: null };
+  return {
+    companyId: company.id,
+    unitPriceCents,
+    marketingBudgetCents,
+    dividendPerShareCents,
+    guidanceRevenueCents: null,
+  };
 }
 
 /**
@@ -147,7 +160,11 @@ export function aiCompanyDecision(
  * AI companies keep aggregated departments, so this simply scales skill points
  * and payroll.
  */
-export function aiAdjustStaffing(company: CompanyState, utilization: number, cfg: BalanceConfig = BALANCE): CompanyState {
+export function aiAdjustStaffing(
+  company: CompanyState,
+  utilization: number,
+  cfg: BalanceConfig = BALANCE,
+): CompanyState {
   const policy = cfg.company.aiPolicy;
   let factor = 1;
   if (utilization > policy.targetUtilization + policy.utilizationBand) factor = 1 + policy.hiringRatePerQuarter;
@@ -305,10 +322,12 @@ function prepare(company: CompanyState, decision: QuarterDecision | undefined, c
 
   // Marketing budget, limited by the available cash.
   const requestedBudget = decision?.marketingBudgetCents ?? ZERO;
-  const affordable = company.cashCents > ZERO ? scaleByFloat(company.cashCents, cfg.company.maxMarketingBudgetShareOfCash) : ZERO;
+  const affordable =
+    company.cashCents > ZERO ? scaleByFloat(company.cashCents, cfg.company.maxMarketingBudgetShareOfCash) : ZERO;
   const positiveBudget = requestedBudget > ZERO ? requestedBudget : ZERO;
   const marketingCents = positiveBudget < affordable ? positiveBudget : affordable;
-  const referenceBudget = sectorCfg.baseDemandCentsPerQuarter * cfg.company.marketing.referenceBudgetShareOfSectorDemand;
+  const referenceBudget =
+    sectorCfg.baseDemandCentsPerQuarter * cfg.company.marketing.referenceBudgetShareOfSectorDemand;
   const awareness = nextAwareness(company.awareness, Number(marketingCents), referenceBudget, cfg.company.marketing);
 
   // Product projects (time gate) and continuous development.
@@ -333,12 +352,26 @@ function prepare(company: CompanyState, decision: QuarterDecision | undefined, c
     cost.capacityUnitsPerSkillPoint *
     (1 + lead.cooCapacityBonusPerSkill * company.leadership.coo);
   const salesBoost =
-    (1 + Math.min(cfg.company.sales.maxBoost, company.departments.sales.effectiveSkillPoints * cfg.company.sales.boostPerSkillPoint)) *
+    (1 +
+      Math.min(
+        cfg.company.sales.maxBoost,
+        company.departments.sales.effectiveSkillPoints * cfg.company.sales.boostPerSkillPoint,
+      )) *
     (1 + lead.headOfSalesBoostPerSkill * company.leadership.headOfSales);
   const value =
     attractiveness({ quality, awareness, price: Number(unitPriceCents) }, cfg.company.attractiveness) * salesBoost;
 
-  return { company, decision, unitPriceCents, marketingCents, awareness, quality, projects, capacityUnits, attractiveness: value };
+  return {
+    company,
+    decision,
+    unitPriceCents,
+    marketingCents,
+    awareness,
+    quality,
+    projects,
+    capacityUnits,
+    attractiveness: value,
+  };
 }
 
 interface Outcome {
@@ -381,7 +414,8 @@ function settleCompany(
       cfg.time.quartersPerGameYear,
     );
 
-  const preTaxCents = revenueCents - productionCostCents - payrollCents - fixedCostCents - p.marketingCents - interestCents;
+  const preTaxCents =
+    revenueCents - productionCostCents - payrollCents - fixedCostCents - p.marketingCents - interestCents;
   const taxCents = preTaxCents > ZERO ? applyBps(preTaxCents, cfg.company.corporateTaxBps) : ZERO;
   const netIncomeCents = preTaxCents - taxCents;
   const cashBeforeDividend = company.cashCents + netIncomeCents;
@@ -434,10 +468,7 @@ function settleCompany(
   if (company.guidanceRevenueCents !== null && company.guidanceRevenueCents > ZERO) {
     guidanceDeviation = Number(revenueCents) / Number(company.guidanceRevenueCents) - 1;
     if (company.founderId !== null) {
-      const band = Math.max(
-        0.02,
-        cfg.reputation.guidanceHitThreshold * (1 + cfg.employees.leadership.cfoGuidanceBandReductionPerSkill * company.leadership.cfo),
-      );
+      const band = cfg.reputation.guidanceHitThreshold;
       if (Math.abs(guidanceDeviation) <= band) {
         reputationEvents.push({
           playerId: company.founderId,

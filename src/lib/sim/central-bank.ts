@@ -73,7 +73,16 @@ export function decidePolicyRate(
   };
 }
 
-/** True if a rate decision is due at the close of `quarterIndex`. */
+/** True if a rate decision is due at the close of `quarterIndex` (never during the warm-up). */
 export function isRateDecisionQuarter(quarterIndex: number, cfg: CentralBankConfig = BALANCE.centralBank): boolean {
+  if (quarterIndex < cfg.warmupQuarters) return false;
   return quarterIndex % cfg.decisionEveryQuarters === cfg.decisionEveryQuarters - 1;
+}
+
+/** Quarter at whose close the announcement (countdown) for a decision in `decisionQuarterIndex` goes out. */
+export function rateDecisionAnnouncementQuarter(
+  decisionQuarterIndex: number,
+  cfg: CentralBankConfig = BALANCE.centralBank,
+): number {
+  return decisionQuarterIndex - cfg.announceLeadQuarters;
 }

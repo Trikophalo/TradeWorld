@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { BALANCE } from "../../config/balance.ts";
 import { bondCouponCents, bondPriceE4, bondValueCents, bondYieldBps } from "./bonds.ts";
-import { annualizeGrowthBps, decidePolicyRate, isRateDecisionQuarter, moneyGrowthBps } from "./central-bank.ts";
+import {
+  annualizeGrowthBps,
+  decidePolicyRate,
+  isRateDecisionQuarter,
+  moneyGrowthBps,
+  rateDecisionAnnouncementQuarter,
+} from "./central-bank.ts";
 import { creditLineCents, loanRateBps, loanRiskPremiumBps, quarterlyInterestCents } from "./loans.ts";
 import {
   accruedFinancingCents,
@@ -155,7 +161,7 @@ describe("capital gains tax", () => {
       pot = s.lossCarryForwardCents;
       tax += s.taxCents;
     }
-    // Net +700 EUR, but the last loss of 50 is not offset by a later gain of 250? It is: pot 50 -> taxable 200.
+    // Net gain +700 EUR, every loss was offset by a later gain -> 25 % of 700 EUR.
     expect(tax).toBe(b(17_500));
     expect(pot).toBe(b(0));
   });
@@ -303,15 +309,15 @@ describe("central bank", () => {
   });
 
   it("holds inside the tolerance band at the neutral rate", () => {
-    expect(decidePolicyRate(300, 400)).toMatchObject({ newRateBps: 300, direction: "hold" });
-    expect(decidePolicyRate(300, 599)).toMatchObject({ newRateBps: 300, direction: "hold" });
-    expect(decidePolicyRate(300, 201)).toMatchObject({ newRateBps: 300, direction: "hold" });
+    expect(decidePolicyRate(300, 800)).toMatchObject({ newRateBps: 300, direction: "hold" });
+    expect(decidePolicyRate(300, 1199)).toMatchObject({ newRateBps: 300, direction: "hold" });
+    expect(decidePolicyRate(300, 401)).toMatchObject({ newRateBps: 300, direction: "hold" });
   });
 
   it("hikes when money grows too fast and cuts when it shrinks", () => {
-    expect(decidePolicyRate(300, 600)).toMatchObject({ newRateBps: 325, direction: "hike", changeBps: 25 });
+    expect(decidePolicyRate(300, 1200)).toMatchObject({ newRateBps: 325, direction: "hike", changeBps: 25 });
     expect(decidePolicyRate(300, 5000)).toMatchObject({ newRateBps: 350, direction: "hike" });
-    expect(decidePolicyRate(300, 100)).toMatchObject({ newRateBps: 275, direction: "cut" });
+    expect(decidePolicyRate(300, 400)).toMatchObject({ newRateBps: 275, direction: "cut" });
     expect(decidePolicyRate(300, -5000)).toMatchObject({ newRateBps: 250, direction: "cut" });
   });
 
@@ -322,10 +328,10 @@ describe("central bank", () => {
   });
 
   it("drifts back to neutral inside the band without overshooting", () => {
-    expect(decidePolicyRate(400, 400).newRateBps).toBe(375);
-    expect(decidePolicyRate(200, 400).newRateBps).toBe(225);
-    expect(decidePolicyRate(310, 400).newRateBps).toBe(300);
-    expect(decidePolicyRate(290, 400).newRateBps).toBe(300);
+    expect(decidePolicyRate(400, 800).newRateBps).toBe(375);
+    expect(decidePolicyRate(200, 800).newRateBps).toBe(225);
+    expect(decidePolicyRate(310, 800).newRateBps).toBe(300);
+    expect(decidePolicyRate(290, 800).newRateBps).toBe(300);
   });
 
   it("is monotone in money growth", () => {
@@ -337,9 +343,12 @@ describe("central bank", () => {
     }
   });
 
-  it("schedules one decision per game year", () => {
-    const due = [0, 1, 2, 3, 4, 5, 6, 7].filter((q) => isRateDecisionQuarter(q));
-    expect(due).toEqual([3, 7]);
+  it("schedules one decision per game year after the warm-up", () => {
+    const warmup = BALANCE.centralBank.warmupQuarters;
+    expect([0, 1, 2, 3, 4, 5, 6, 7].filter((q) => isRateDecisionQuarter(q))).toEqual([]);
+    const due = Array.from({ length: 8 }, (_, i) => warmup + i).filter((q) => isRateDecisionQuarter(q));
+    expect(due).toEqual([warmup + 3, warmup + 7]);
+    expect(rateDecisionAnnouncementQuarter(warmup + 3)).toBe(warmup + 2);
   });
 });
 

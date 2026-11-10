@@ -64,7 +64,9 @@ export function reviewIndexMembership(
   const eligible = candidates
     .filter((c) => c.isMember || c.listedQuarters >= cfg.minListedQuarters)
     .map((c) => ({ candidate: c, cap: freeFloatMarketCapCents(c) }))
-    .sort((a, b) => (a.cap === b.cap ? (a.candidate.securityId < b.candidate.securityId ? -1 : 1) : a.cap > b.cap ? -1 : 1));
+    .sort((a, b) =>
+      a.cap === b.cap ? (a.candidate.securityId < b.candidate.securityId ? -1 : 1) : a.cap > b.cap ? -1 : 1,
+    );
 
   const chosen = new Set<string>();
   if (eligible.length <= cfg.size) {

@@ -120,6 +120,8 @@ export interface CentralBankConfig {
   /** One step is taken per full band of deviation from the target. */
   readonly toleranceBandBps: number;
   readonly decisionEveryQuarters: number;
+  /** Quarters after game start without rate decisions (see docs/BALANCING.md). */
+  readonly warmupQuarters: number;
   readonly announceLeadQuarters: number;
   /** Number of past quarters over which money growth is measured. */
   readonly measurementWindowQuarters: number;
@@ -353,6 +355,7 @@ export interface EmployeesConfig {
     readonly cooCapacityBonusPerSkill: number;
     readonly ctoDevelopmentTimeReductionPerSkill: number;
     readonly headOfSalesBoostPerSkill: number;
+    /** Narrows the forecast range shown to the founder when giving guidance (UI preview, M6). */
     readonly cfoGuidanceBandReductionPerSkill: number;
   };
   readonly applicantPoolSize: number;
@@ -659,9 +662,11 @@ export const BALANCE = {
     maxRateBps: 1000,
     stepBps: 25,
     maxStepsPerDecision: 2,
-    targetMoneyGrowthBps: 400,
-    toleranceBandBps: 200,
+    targetMoneyGrowthBps: 800,
+    toleranceBandBps: 400,
     decisionEveryQuarters: 4,
+    // No decisions in the first 14 real days: early money growth is high only because the base is tiny.
+    warmupQuarters: 56,
     announceLeadQuarters: 1,
     measurementWindowQuarters: 4,
     activePlayerWindowDays: 7,
