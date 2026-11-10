@@ -93,7 +93,10 @@ export function awarenessAfterTierChange(
 export function tierFixedCostCents(tier: CompanyTierId, sectorId: SectorId, cfg: BalanceConfig = BALANCE): bigint {
   const tierCfg = cfg.company.tiers.find((t) => t.id === tier);
   if (!tierCfg) throw new RangeError(`unknown tier: ${tier}`);
-  return scaleByFloat(BigInt(tierCfg.fixedCostCentsPerQuarter), cfg.sectors[sectorId].costStructure.fixedCostMultiplier);
+  return scaleByFloat(
+    BigInt(tierCfg.fixedCostCentsPerQuarter),
+    cfg.sectors[sectorId].costStructure.fixedCostMultiplier,
+  );
 }
 
 /** Unit cost of a sector in cents at the current oil price. */
@@ -113,7 +116,10 @@ export function marketPriceCents(sectorId: SectorId, oilIndex: number, cfg: Bala
 }
 
 /** Range of the price slider in cents (inclusive). Sanity bounds only. */
-export function priceBandCents(sectorId: SectorId, cfg: BalanceConfig = BALANCE): { readonly min: number; readonly max: number } {
+export function priceBandCents(
+  sectorId: SectorId,
+  cfg: BalanceConfig = BALANCE,
+): { readonly min: number; readonly max: number } {
   const reference = cfg.sectors[sectorId].costStructure.referencePriceCents;
   const min = Math.max(1, Math.ceil(reference * cfg.company.priceBand.minFactor));
   const max = Math.floor(reference * cfg.company.priceBand.maxFactor);
@@ -121,7 +127,10 @@ export function priceBandCents(sectorId: SectorId, cfg: BalanceConfig = BALANCE)
 }
 
 /** Attractiveness exponents of a sector (spec formula, sector-specific price exponent). */
-export function sectorAttractivenessConfig(sectorId: SectorId, cfg: BalanceConfig = BALANCE): BalanceConfig["company"]["attractiveness"] {
+export function sectorAttractivenessConfig(
+  sectorId: SectorId,
+  cfg: BalanceConfig = BALANCE,
+): BalanceConfig["company"]["attractiveness"] {
   return { ...cfg.company.attractiveness, priceExponent: cfg.sectors[sectorId].priceExponent };
 }
 
@@ -156,7 +165,11 @@ export function effectiveFixedCostCents(
 }
 
 /** Marketing budget as it counts for awareness: the marketing department makes every euro work harder. */
-export function effectiveMarketingBudget(budget: number, marketingSkillPoints: number, cfg: BalanceConfig = BALANCE): number {
+export function effectiveMarketingBudget(
+  budget: number,
+  marketingSkillPoints: number,
+  cfg: BalanceConfig = BALANCE,
+): number {
   const m = cfg.company.marketing;
   return budget * (1 + m.departmentMaxBoost * saturation(marketingSkillPoints, m.departmentHalfSaturationSkillPoints));
 }
@@ -185,6 +198,24 @@ export function sectorDemand(
   );
   const effects = effectDemandFactor(macro.activeEffects, sectorId);
   return sector.baseDemandCentsPerQuarter * growth * cycle * oil * rate * effects * Math.max(0, noiseFactor);
+}
+
+/**
+ * Demand of one market segment in cents (as number): the sector demand times
+ * the segment share. Segments that do not grow with the sector (local,
+ * regional, national) leave out the trend growth but feel cycle, oil, rates,
+ * macro events and noise exactly like the big market.
+ */
+export function segmentDemand(
+  sectorId: SectorId,
+  segmentId: SegmentId,
+  macro: MacroState,
+  noiseFactor = 1,
+  cfg: BalanceConfig = BALANCE,
+): number {
+  const segment = cfg.company.segments[segmentId];
+  const reference = segment.growsWithSector ? macro : { ...macro, quarterIndex: 0 };
+  return sectorDemand(sectorId, reference, noiseFactor, cfg) * segment.demandShare;
 }
 
 // ----------------------------------------------------------------- quality
@@ -253,7 +284,13 @@ export function aiCompanyDecision(
     trailing > ZERO && company.sharesOutstanding > ZERO
       ? scaleByFloat(trailing, policy.dividendPayoutRatio / 4) / company.sharesOutstanding
       : ZERO;
-  return { companyId: company.id, unitPriceCents, marketingBudgetCents, dividendPerShareCents, guidanceRevenueCents: null };
+  return {
+    companyId: company.id,
+    unitPriceCents,
+    marketingBudgetCents,
+    dividendPerShareCents,
+    guidanceRevenueCents: null,
+  };
 }
 
 /**
@@ -262,7 +299,11 @@ export function aiCompanyDecision(
  * AI companies keep aggregated departments, so this simply scales skill points
  * and payroll.
  */
-export function aiAdjustStaffing(company: CompanyState, utilization: number, cfg: BalanceConfig = BALANCE): CompanyState {
+export function aiAdjustStaffing(
+  company: CompanyState,
+  utilization: number,
+  cfg: BalanceConfig = BALANCE,
+): CompanyState {
   const policy = cfg.company.aiPolicy;
   let factor = 1;
   if (utilization > policy.targetUtilization + policy.utilizationBand) factor = 1 + policy.hiringRatePerQuarter;
@@ -322,7 +363,7 @@ export function closeQuarter(
     const segmentResults: SegmentQuarterResult[] = [];
 
     for (const segmentId of SEGMENT_IDS) {
-      const segmentDemand = demand * cfg.company.segments[segmentId].demandShare;
+      const demandOfSegment = segmentDemand(sectorId, segmentId, macro, noise, cfg);
       const prepared: Prepared[] = active
         .filter((c) => segmentForTier(c.tier, cfg) === segmentId)
         .map((company) => prepare(company, decisionById.get(company.id), segmentId, cfg));
@@ -335,11 +376,11 @@ export function closeQuarter(
         capacityRevenue: p.capacityUnits * Number(p.unitPriceCents),
       }));
       if (incumbent > 0) claims.push({ attractiveness: incumbent, capacityRevenue: Infinity });
-      const allocation = allocateDemand(segmentDemand, claims);
+      const allocation = allocateDemand(demandOfSegment, claims);
       let totalAttractiveness = incumbent;
       for (const p of prepared) totalAttractiveness += p.attractiveness;
 
-      const segmentDemandCents = roundToBigInt(Math.floor(segmentDemand));
+      const segmentDemandCents = roundToBigInt(Math.floor(demandOfSegment));
       segmentResults.push({
         segmentId,
         demandCents: segmentDemandCents,

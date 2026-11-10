@@ -204,6 +204,12 @@ export interface SegmentConfig {
   /** Segment demand as a share of the sector's (international) demand. */
   readonly demandShare: number;
   /**
+   * Whether the segment grows with the sector trend. Only the international
+   * market does; local, regional and national markets have a fixed size, so a
+   * company has to move up a tier to grow beyond them.
+   */
+  readonly growsWithSector: boolean;
+  /**
    * The established suppliers of the segment, modelled as one anonymous
    * competitor with unlimited capacity that prices at the reference price.
    * Awareness 0 = no anonymous incumbents (international: the AI companies are the incumbents).
@@ -842,10 +848,34 @@ export const BALANCE = {
     // One market per company tier. Demand is a share of the sector demand; the established
     // suppliers of the three small segments are one anonymous competitor (docs/SIMULATION.md 11.3).
     segments: {
-      local: { tier: "small_business", demandShare: 0.0025, incumbentQuality: 40, incumbentAwareness: 0.5 },
-      regional: { tier: "gmbh", demandShare: 0.011, incumbentQuality: 50, incumbentAwareness: 0.5 },
-      national: { tier: "ag", demandShare: 0.055, incumbentQuality: 60, incumbentAwareness: 0.5 },
-      international: { tier: "listed", demandShare: 1, incumbentQuality: 0, incumbentAwareness: 0 },
+      local: {
+        tier: "small_business",
+        demandShare: 0.0025,
+        growsWithSector: false,
+        incumbentQuality: 40,
+        incumbentAwareness: 0.5,
+      },
+      regional: {
+        tier: "gmbh",
+        demandShare: 0.011,
+        growsWithSector: false,
+        incumbentQuality: 50,
+        incumbentAwareness: 0.5,
+      },
+      national: {
+        tier: "ag",
+        demandShare: 0.055,
+        growsWithSector: false,
+        incumbentQuality: 60,
+        incumbentAwareness: 0.5,
+      },
+      international: {
+        tier: "listed",
+        demandShare: 1,
+        growsWithSector: true,
+        incumbentQuality: 0,
+        incumbentAwareness: 0,
+      },
     },
     marketing: {
       // 2 ^ x = 1.4  =>  x = log2(1.4) = 0.485426827...
