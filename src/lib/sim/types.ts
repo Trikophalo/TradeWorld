@@ -6,9 +6,9 @@
  * Model quantities without money character (quality, awareness, sentiment,
  * pressure, aggregated AI holdings) are `number`.
  */
-import type { CompanyTierId, DepartmentId, InvestorArchetypeId, SectorId, SizeClass } from "../../config/balance.ts";
+import type { CompanyTierId, DepartmentId, InvestorArchetypeId, SectorId, SegmentId, SizeClass } from "../../config/balance.ts";
 
-export type { CompanyTierId, DepartmentId, InvestorArchetypeId, SectorId, SizeClass } from "../../config/balance.ts";
+export type { CompanyTierId, DepartmentId, InvestorArchetypeId, SectorId, SegmentId, SizeClass } from "../../config/balance.ts";
 
 // --------------------------------------------------------------------------- PRNG
 
@@ -289,18 +289,33 @@ export interface QuarterState {
   readonly companies: readonly CompanyState[];
 }
 
+export interface SegmentQuarterResult {
+  readonly segmentId: SegmentId;
+  readonly demandCents: bigint;
+  /** Revenue that went to the anonymous established suppliers of the segment. */
+  readonly incumbentRevenueCents: bigint;
+  /** Demand nobody could serve because every supplier was at capacity. */
+  readonly unservedDemandCents: bigint;
+}
+
 export interface SectorQuarterResult {
   readonly sectorId: SectorId;
+  /** Demand of the international segment (the sector figure shown in news and charts). */
   readonly demandCents: bigint;
-  /** Demand nobody could serve because every interested company was at capacity. */
+  /** Unserved demand of the international segment. */
   readonly unservedDemandCents: bigint;
+  readonly segments: readonly SegmentQuarterResult[];
 }
 
 export interface CompanyQuarterReport {
   readonly companyId: string;
   readonly quarterIndex: number;
+  readonly segmentId: SegmentId;
+  /** Demand of the company's segment in this quarter. */
+  readonly segmentDemandCents: bigint;
+  /** Realised share of the segment demand. */
   readonly marketShare: number;
-  /** Share before the capacity cap (pure attractiveness share). */
+  /** Share before the capacity cap (pure attractiveness share, incumbents included in the total). */
   readonly attractivenessShare: number;
   readonly unitsSold: number;
   readonly capacityUnits: number;
@@ -321,6 +336,10 @@ export interface CompanyQuarterReport {
   readonly guidanceDeviation: number | null;
   /** New fair value for listed companies, `null` otherwise. */
   readonly fairValueE4: bigint | null;
+  /** Consecutive quarter closes with negative cash, including this one. */
+  readonly uncoveredQuarters: number;
+  /** Quarter closes left until insolvency if the cash stays negative; `null` while cash is positive. */
+  readonly graceQuartersLeft: number | null;
   readonly becameInsolvent: boolean;
 }
 

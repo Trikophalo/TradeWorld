@@ -2,17 +2,18 @@
  * Quarter close (spec 4, 6): the company simulation for AI and player companies.
  *
  * Pipeline (see docs/SIMULATION.md):
- *   sector demand -> decisions -> awareness / quality / capacity -> attractiveness
- *   -> market shares with capacity caps -> revenue -> costs -> tax -> net income
- *   -> dividend -> cash -> insolvency counter -> fair value -> guidance check
- *   -> news, reputation and XP events -> macro state of the next quarter
+ *   sector demand -> market segments -> decisions -> awareness / quality / capacity
+ *   -> attractiveness -> market shares inside the segment with capacity caps
+ *   -> revenue -> costs -> tax -> net income -> dividend -> cash -> grace period
+ *   and insolvency -> fair value -> guidance check -> news, reputation and XP
+ *   events -> macro state of the next quarter
  *
  * `closeQuarter` is pure. It returns everything as data (new state, reports,
  * news, events, tick shocks); booking payroll, interest, dividends and XP is the
  * job of the database functions (ADR-004, ADR-007).
  */
 import { BALANCE } from "../../config/balance.ts";
-import type { BalanceConfig, CompanyTierId, DepartmentId, SectorId } from "../../config/balance.ts";
+import type { BalanceConfig, CompanyTierId, DepartmentId, SectorId, SegmentId } from "../../config/balance.ts";
 import {
   SECTOR_IDS,
   ageEffects,
@@ -38,30 +39,134 @@ import type {
   ReputationEvent,
   Rng,
   SectorQuarterResult,
+  SegmentQuarterResult,
   TickShock,
   XpEvent,
 } from "./types.ts";
 
 const DEPARTMENTS: readonly DepartmentId[] = ["development", "sales", "production", "finance", "marketing"];
+export const SEGMENT_IDS: readonly SegmentId[] = ["local", "regional", "national", "international"];
 const HISTORY_LENGTH = 8;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+/** Saturating effect of a department: 0 without staff, 0.5 at `half` skill points, towards 1. */
+function saturation(skillPoints: number, half: number): number {
+  const points = Math.max(0, skillPoints);
+  return points / (points + half);
+}
+
+// ------------------------------------------------------------------ segments
+
+/** The market segment a company tier sells in (one segment per tier). */
+export function segmentForTier(tier: CompanyTierId, cfg: BalanceConfig = BALANCE): SegmentId {
+  for (const id of SEGMENT_IDS) if (cfg.company.segments[id].tier === tier) return id;
+  throw new RangeError(`no segment for tier: ${tier}`);
+}
+
+/** Baseline demand of a segment in cents (sector base demand x segment share). */
+export function segmentBaseDemand(sectorId: SectorId, segmentId: SegmentId, cfg: BalanceConfig = BALANCE): number {
+  return cfg.sectors[sectorId].baseDemandCentsPerQuarter * cfg.company.segments[segmentId].demandShare;
+}
+
+/**
+ * Awareness after a tier change. Awareness is the share of the segment's
+ * customers who know the company; the number of customers who know it stays
+ * the same, the market around it gets bigger (or smaller).
+ */
+export function awarenessAfterTierChange(
+  awareness: number,
+  fromTier: CompanyTierId,
+  toTier: CompanyTierId,
+  cfg: BalanceConfig = BALANCE,
+): number {
+  const from = cfg.company.segments[segmentForTier(fromTier, cfg)].demandShare;
+  const to = cfg.company.segments[segmentForTier(toTier, cfg)].demandShare;
+  return clamp((awareness * from) / to, cfg.company.marketing.minAwareness, 1);
+}
+
+// --------------------------------------------------------------- cost and price
+
 /** Fixed costs per quarter of a tier in a sector (tier value x capital intensity). */
 export function tierFixedCostCents(tier: CompanyTierId, sectorId: SectorId, cfg: BalanceConfig = BALANCE): bigint {
   const tierCfg = cfg.company.tiers.find((t) => t.id === tier);
   if (!tierCfg) throw new RangeError(`unknown tier: ${tier}`);
-  return scaleByFloat(
-    BigInt(tierCfg.fixedCostCentsPerQuarter),
-    cfg.sectors[sectorId].costStructure.fixedCostMultiplier,
-  );
+  return scaleByFloat(BigInt(tierCfg.fixedCostCentsPerQuarter), cfg.sectors[sectorId].costStructure.fixedCostMultiplier);
+}
+
+/** Unit cost of a sector in cents at the current oil price. */
+export function unitCostCents(sectorId: SectorId, oilIndex: number, cfg: BalanceConfig = BALANCE): number {
+  const sector = cfg.sectors[sectorId];
+  return sector.costStructure.unitCostCents * Math.pow(Math.max(0.01, oilIndex), sector.sensitivity.oilCost);
 }
 
 /**
- * Sector demand of one quarter in cents (as number):
+ * Price of the established suppliers: the reference price plus full pass-through
+ * of cost changes (oil). AI companies steer towards it, the anonymous incumbents
+ * of the small segments sell exactly at it.
+ */
+export function marketPriceCents(sectorId: SectorId, oilIndex: number, cfg: BalanceConfig = BALANCE): number {
+  const cost = cfg.sectors[sectorId].costStructure;
+  return cost.referencePriceCents - cost.unitCostCents + unitCostCents(sectorId, oilIndex, cfg);
+}
+
+/** Range of the price slider in cents (inclusive). Sanity bounds only. */
+export function priceBandCents(sectorId: SectorId, cfg: BalanceConfig = BALANCE): { readonly min: number; readonly max: number } {
+  const reference = cfg.sectors[sectorId].costStructure.referencePriceCents;
+  const min = Math.max(1, Math.ceil(reference * cfg.company.priceBand.minFactor));
+  const max = Math.floor(reference * cfg.company.priceBand.maxFactor);
+  return { min, max: Math.max(min, max) };
+}
+
+/** Attractiveness exponents of a sector (spec formula, sector-specific price exponent). */
+export function sectorAttractivenessConfig(sectorId: SectorId, cfg: BalanceConfig = BALANCE): BalanceConfig["company"]["attractiveness"] {
+  return { ...cfg.company.attractiveness, priceExponent: cfg.sectors[sectorId].priceExponent };
+}
+
+/** Attractiveness of the anonymous established suppliers of a segment (0 if there are none). */
+export function incumbentAttractiveness(
+  sectorId: SectorId,
+  segmentId: SegmentId,
+  oilIndex: number,
+  cfg: BalanceConfig = BALANCE,
+): number {
+  const segment = cfg.company.segments[segmentId];
+  if (segment.incumbentAwareness <= 0 || segment.incumbentQuality <= 0) return 0;
+  return attractiveness(
+    {
+      quality: segment.incumbentQuality,
+      awareness: segment.incumbentAwareness,
+      price: marketPriceCents(sectorId, oilIndex, cfg),
+    },
+    sectorAttractivenessConfig(sectorId, cfg),
+  );
+}
+
+/** Fixed costs after the saving of the finance department. */
+export function effectiveFixedCostCents(
+  fixedCostCents: bigint,
+  financeSkillPoints: number,
+  cfg: BalanceConfig = BALANCE,
+): bigint {
+  const f = cfg.company.finance;
+  const reduction = f.maxFixedCostReduction * saturation(financeSkillPoints, f.halfSaturationSkillPoints);
+  return scaleByFloat(fixedCostCents, 1 - reduction);
+}
+
+/** Marketing budget as it counts for awareness: the marketing department makes every euro work harder. */
+export function effectiveMarketingBudget(budget: number, marketingSkillPoints: number, cfg: BalanceConfig = BALANCE): number {
+  const m = cfg.company.marketing;
+  return budget * (1 + m.departmentMaxBoost * saturation(marketingSkillPoints, m.departmentHalfSaturationSkillPoints));
+}
+
+// ------------------------------------------------------------------ demand
+
+/**
+ * Demand of a sector's international segment for one quarter in cents (as number):
  * base x trend growth x cycle^e x oil^e x rate factor x running macro effects x noise.
+ * The smaller segments are this value times their `demandShare`.
  */
 export function sectorDemand(
   sectorId: SectorId,
@@ -82,45 +187,51 @@ export function sectorDemand(
   return sector.baseDemandCentsPerQuarter * growth * cycle * oil * rate * effects * Math.max(0, noiseFactor);
 }
 
-/** Quality after one quarter: decay, development work (less effective near the top), finished projects. */
+// ----------------------------------------------------------------- quality
+
+/**
+ * Quality the current development team can sustain. Depends on the developers
+ * relative to the size of the company (production) and the sector's need for
+ * development, so a large company does not get top quality for free.
+ */
+export function qualityTarget(
+  developmentSkillPoints: number,
+  productionSkillPoints: number,
+  sectorId: SectorId,
+  cfg: BalanceConfig = BALANCE,
+): number {
+  const q = cfg.company.quality;
+  const need =
+    cfg.sectors[sectorId].costStructure.developmentIntensity *
+    (q.halfSaturationSkillPoints + q.productionScale * Math.max(0, productionSkillPoints));
+  const x = Math.max(0, developmentSkillPoints) / need;
+  return q.max * Math.pow(x / (1 + x), q.targetExponent);
+}
+
+/**
+ * Quality after one quarter: moves a sector-specific share of the way to the
+ * target (tech ages fast, retail slowly), finished product projects add a jump.
+ */
 export function nextQuality(
   quality: number,
   developmentSkillPoints: number,
+  productionSkillPoints: number,
   completedProjectGain: number,
   sectorId: SectorId,
   cfg: BalanceConfig = BALANCE,
 ): number {
   const q = cfg.company.quality;
-  const saturation = developmentSkillPoints / (developmentSkillPoints + q.halfSaturationSkillPoints);
-  const headroom = Math.max(0, 1 - quality / q.max);
-  const gain = q.maxGainPerQuarter * saturation * headroom;
-  const decay = cfg.sectors[sectorId].costStructure.qualityDecayPerQuarter;
-  return clamp(quality - decay + gain + completedProjectGain, q.min, q.max);
+  const target = qualityTarget(developmentSkillPoints, productionSkillPoints, sectorId, cfg);
+  const rate = cfg.sectors[sectorId].costStructure.qualityAdjustmentRate;
+  return clamp(quality + rate * (target - quality) + completedProjectGain, q.min, q.max);
 }
 
-/** Unit cost of a sector in cents at the current oil price. */
-export function unitCostCents(sectorId: SectorId, oilIndex: number, cfg: BalanceConfig = BALANCE): number {
-  const sector = cfg.sectors[sectorId];
-  return sector.costStructure.unitCostCents * Math.pow(Math.max(0.01, oilIndex), sector.sensitivity.oilCost);
-}
-
-/** Allowed unit price range of a sector in cents (inclusive). */
-export function priceBandCents(
-  sectorId: SectorId,
-  cfg: BalanceConfig = BALANCE,
-): { readonly min: number; readonly max: number } {
-  const cost = cfg.sectors[sectorId].costStructure;
-  const min = Math.max(1, Math.ceil(cost.referencePriceCents * cfg.company.priceBand.minFactor));
-  const max = Math.floor(
-    cost.unitCostCents + (cost.referencePriceCents - cost.unitCostCents) * cfg.company.priceBand.maxMarginFactor,
-  );
-  return { min, max: Math.max(min, max) };
-}
+// ------------------------------------------------------------- AI companies
 
 /**
  * Decision policy of an AI company for the coming quarter: price follows the
- * reference price plus cost pass-through (oil), marketing is a fixed share of
- * revenue, a fixed share of trailing profit is paid out.
+ * market price (reference plus cost pass-through), marketing is a fixed share
+ * of revenue, a fixed share of trailing profit is paid out.
  */
 export function aiCompanyDecision(
   company: CompanyState,
@@ -129,12 +240,9 @@ export function aiCompanyDecision(
   cfg: BalanceConfig = BALANCE,
 ): QuarterDecision {
   const policy = cfg.company.aiPolicy;
-  const cost = cfg.sectors[company.sectorId].costStructure;
-  // Keep the absolute unit margin of the reference price when costs move.
-  const reference =
-    cost.referencePriceCents - cost.unitCostCents + unitCostCents(company.sectorId, macro.oilIndex, cfg);
+  const target = marketPriceCents(company.sectorId, macro.oilIndex, cfg);
   const current = Number(company.unitPriceCents);
-  const reverted = current + policy.priceReversion * (reference - current);
+  const reverted = current + policy.priceReversion * (target - current);
   const unitPriceCents = roundToBigInt(Math.max(1, Math.round(reverted * Math.exp(rng.normal(0, policy.priceNoise)))));
 
   const lastRevenue = company.revenueHistoryCents[company.revenueHistoryCents.length - 1] ?? ZERO;
@@ -145,13 +253,7 @@ export function aiCompanyDecision(
     trailing > ZERO && company.sharesOutstanding > ZERO
       ? scaleByFloat(trailing, policy.dividendPayoutRatio / 4) / company.sharesOutstanding
       : ZERO;
-  return {
-    companyId: company.id,
-    unitPriceCents,
-    marketingBudgetCents,
-    dividendPerShareCents,
-    guidanceRevenueCents: null,
-  };
+  return { companyId: company.id, unitPriceCents, marketingBudgetCents, dividendPerShareCents, guidanceRevenueCents: null };
 }
 
 /**
@@ -160,11 +262,7 @@ export function aiCompanyDecision(
  * AI companies keep aggregated departments, so this simply scales skill points
  * and payroll.
  */
-export function aiAdjustStaffing(
-  company: CompanyState,
-  utilization: number,
-  cfg: BalanceConfig = BALANCE,
-): CompanyState {
+export function aiAdjustStaffing(company: CompanyState, utilization: number, cfg: BalanceConfig = BALANCE): CompanyState {
   const policy = cfg.company.aiPolicy;
   let factor = 1;
   if (utilization > policy.targetUtilization + policy.utilizationBand) factor = 1 + policy.hiringRatePerQuarter;
@@ -181,9 +279,12 @@ export function aiAdjustStaffing(
   return { ...company, departments };
 }
 
+// ------------------------------------------------------------ quarter close
+
 interface Prepared {
   readonly company: CompanyState;
   readonly decision: QuarterDecision | undefined;
+  readonly segmentId: SegmentId;
   readonly unitPriceCents: bigint;
   readonly marketingCents: bigint;
   readonly awareness: number;
@@ -218,38 +319,55 @@ export function closeQuarter(
     const noise = 1 + rng.derive("sector", quarterIndex, sectorId).normal(0, sectorCfg.demandNoise);
     const demand = sectorDemand(sectorId, macro, noise, cfg);
     const active = state.companies.filter((c) => c.sectorId === sectorId && c.status === "active");
+    const segmentResults: SegmentQuarterResult[] = [];
 
-    // Decisions, awareness, quality, capacity, attractiveness.
-    const prepared: Prepared[] = active.map((company) => prepare(company, decisionById.get(company.id), cfg));
+    for (const segmentId of SEGMENT_IDS) {
+      const segmentDemand = demand * cfg.company.segments[segmentId].demandShare;
+      const prepared: Prepared[] = active
+        .filter((c) => segmentForTier(c.tier, cfg) === segmentId)
+        .map((company) => prepare(company, decisionById.get(company.id), segmentId, cfg));
 
-    // Market shares with capacity caps.
-    const allocation = allocateDemand(
-      demand,
-      prepared.map((p) => ({
+      // Spec 6.2 inside the segment. The established suppliers are one more
+      // competitor with unlimited capacity; what they sell is not player revenue.
+      const incumbent = incumbentAttractiveness(sectorId, segmentId, macro.oilIndex, cfg);
+      const claims = prepared.map((p) => ({
         attractiveness: p.attractiveness,
         capacityRevenue: p.capacityUnits * Number(p.unitPriceCents),
-      })),
-    );
-    let totalAttractiveness = 0;
-    for (const p of prepared) totalAttractiveness += p.attractiveness;
+      }));
+      if (incumbent > 0) claims.push({ attractiveness: incumbent, capacityRevenue: Infinity });
+      const allocation = allocateDemand(segmentDemand, claims);
+      let totalAttractiveness = incumbent;
+      for (const p of prepared) totalAttractiveness += p.attractiveness;
 
+      const segmentDemandCents = roundToBigInt(Math.floor(segmentDemand));
+      segmentResults.push({
+        segmentId,
+        demandCents: segmentDemandCents,
+        incumbentRevenueCents:
+          incumbent > 0 ? roundToBigInt(Math.floor(allocation.revenues[prepared.length] ?? 0)) : ZERO,
+        unservedDemandCents: roundToBigInt(Math.floor(allocation.unservedDemand)),
+      });
+
+      prepared.forEach((p, i) => {
+        const revenue = allocation.revenues[i] ?? 0;
+        const share = allocation.shares[i] ?? 0;
+        const attractivenessShare = totalAttractiveness > 0 ? p.attractiveness / totalAttractiveness : 0;
+        const outcome = settleCompany(p, revenue, share, attractivenessShare, segmentDemandCents, macro, cfg);
+        reports.push(outcome.report);
+        nextCompanies.set(p.company.id, outcome.company);
+        news.push(...outcome.news);
+        reputationEvents.push(...outcome.reputationEvents);
+        xpEvents.push(...outcome.xpEvents);
+        shocks.push(...outcome.shocks);
+      });
+    }
+
+    const international = segmentResults.find((s) => s.segmentId === "international");
     sectors.push({
       sectorId,
       demandCents: roundToBigInt(Math.floor(demand)),
-      unservedDemandCents: roundToBigInt(Math.floor(allocation.unservedDemand)),
-    });
-
-    prepared.forEach((p, i) => {
-      const revenue = allocation.revenues[i] ?? 0;
-      const share = allocation.shares[i] ?? 0;
-      const attractivenessShare = totalAttractiveness > 0 ? p.attractiveness / totalAttractiveness : 0;
-      const outcome = settleCompany(p, revenue, share, attractivenessShare, macro, cfg);
-      reports.push(outcome.report);
-      nextCompanies.set(p.company.id, outcome.company);
-      news.push(...outcome.news);
-      reputationEvents.push(...outcome.reputationEvents);
-      xpEvents.push(...outcome.xpEvents);
-      shocks.push(...outcome.shocks);
+      unservedDemandCents: international ? international.unservedDemandCents : ZERO,
+      segments: segmentResults,
     });
   }
 
@@ -311,24 +429,33 @@ export function closeQuarter(
   };
 }
 
-function prepare(company: CompanyState, decision: QuarterDecision | undefined, cfg: BalanceConfig): Prepared {
-  const sectorCfg = cfg.sectors[company.sectorId];
-  const cost = sectorCfg.costStructure;
+function prepare(
+  company: CompanyState,
+  decision: QuarterDecision | undefined,
+  segmentId: SegmentId,
+  cfg: BalanceConfig,
+): Prepared {
+  const cost = cfg.sectors[company.sectorId].costStructure;
 
-  // Price inside the allowed band around the sector reference price.
+  // Price inside the slider range.
   const requested = Number(decision?.unitPriceCents ?? company.unitPriceCents);
   const band = priceBandCents(company.sectorId, cfg);
   const unitPriceCents = roundToBigInt(clamp(Math.round(requested), band.min, band.max));
 
-  // Marketing budget, limited by the available cash.
+  // Marketing budget, limited by the available cash; the marketing department multiplies its effect.
   const requestedBudget = decision?.marketingBudgetCents ?? ZERO;
   const affordable =
     company.cashCents > ZERO ? scaleByFloat(company.cashCents, cfg.company.maxMarketingBudgetShareOfCash) : ZERO;
   const positiveBudget = requestedBudget > ZERO ? requestedBudget : ZERO;
   const marketingCents = positiveBudget < affordable ? positiveBudget : affordable;
   const referenceBudget =
-    sectorCfg.baseDemandCentsPerQuarter * cfg.company.marketing.referenceBudgetShareOfSectorDemand;
-  const awareness = nextAwareness(company.awareness, Number(marketingCents), referenceBudget, cfg.company.marketing);
+    segmentBaseDemand(company.sectorId, segmentId, cfg) * cfg.company.marketing.referenceBudgetShareOfSegmentDemand;
+  const awareness = nextAwareness(
+    company.awareness,
+    effectiveMarketingBudget(Number(marketingCents), company.departments.marketing.effectiveSkillPoints, cfg),
+    referenceBudget,
+    cfg.company.marketing,
+  );
 
   // Product projects (time gate) and continuous development.
   let completedGain = 0;
@@ -341,6 +468,7 @@ function prepare(company: CompanyState, decision: QuarterDecision | undefined, c
   const quality = nextQuality(
     company.quality,
     company.departments.development.effectiveSkillPoints,
+    company.departments.production.effectiveSkillPoints,
     completedGain,
     company.sectorId,
     cfg,
@@ -359,11 +487,15 @@ function prepare(company: CompanyState, decision: QuarterDecision | undefined, c
       )) *
     (1 + lead.headOfSalesBoostPerSkill * company.leadership.headOfSales);
   const value =
-    attractiveness({ quality, awareness, price: Number(unitPriceCents) }, cfg.company.attractiveness) * salesBoost;
+    attractiveness(
+      { quality, awareness, price: Number(unitPriceCents) },
+      sectorAttractivenessConfig(company.sectorId, cfg),
+    ) * salesBoost;
 
   return {
     company,
     decision,
+    segmentId,
     unitPriceCents,
     marketingCents,
     awareness,
@@ -388,6 +520,7 @@ function settleCompany(
   revenue: number,
   marketShare: number,
   attractivenessShare: number,
+  segmentDemandCents: bigint,
   macro: MacroState,
   cfg: BalanceConfig,
 ): Outcome {
@@ -404,7 +537,11 @@ function settleCompany(
   const unitCost = unitCostCents(company.sectorId, macro.oilIndex, cfg);
   const productionCostCents = roundToBigInt(Math.round(unitsSold * unitCost));
   const payrollCents = sumBig(DEPARTMENTS.map((d) => company.departments[d].payrollCents));
-  const fixedCostCents = company.fixedCostCents;
+  const fixedCostCents = effectiveFixedCostCents(
+    company.fixedCostCents,
+    company.departments.finance.effectiveSkillPoints,
+    cfg,
+  );
   const overdraftCents = company.cashCents < ZERO ? -company.cashCents : ZERO;
   const interestCents =
     quarterlyInterestCents(company.debtCents, company.loanRateBps, cfg.time.quartersPerGameYear) +
@@ -429,9 +566,12 @@ function settleCompany(
   const cashAfterCents = cashBeforeDividend - dividendTotalCents;
   const bookEquityCents = company.bookEquityCents + netIncomeCents - dividendTotalCents;
 
-  // Insolvency counter: a quarter is uncovered if the cash ends below zero.
+  // Grace period: the first close with negative cash starts the clock. The
+  // company is insolvent if the cash is still negative `graceQuarters` closes later.
+  const grace = cfg.company.insolvency.graceQuarters;
   const uncoveredQuarters = cashAfterCents < ZERO ? company.uncoveredQuarters + 1 : 0;
-  const becameInsolvent = uncoveredQuarters >= cfg.company.insolvency.uncoveredQuartersToInsolvency;
+  const becameInsolvent = uncoveredQuarters > grace;
+  const graceQuartersLeft = uncoveredQuarters === 0 ? null : Math.max(0, grace + 1 - uncoveredQuarters);
 
   // History and per-share figures.
   const previousNet = company.netIncomeHistoryCents.slice(-4);
@@ -468,8 +608,7 @@ function settleCompany(
   if (company.guidanceRevenueCents !== null && company.guidanceRevenueCents > ZERO) {
     guidanceDeviation = Number(revenueCents) / Number(company.guidanceRevenueCents) - 1;
     if (company.founderId !== null) {
-      const band = cfg.reputation.guidanceHitThreshold;
-      if (Math.abs(guidanceDeviation) <= band) {
+      if (Math.abs(guidanceDeviation) <= cfg.reputation.guidanceHitThreshold) {
         reputationEvents.push({
           playerId: company.founderId,
           companyId: company.id,
@@ -489,6 +628,7 @@ function settleCompany(
 
   if (company.founderId !== null) {
     if (netIncomeCents > ZERO) {
+      // Base XP; the alpha multiplier is applied when the XP are granted (`scaledXp`).
       xpEvents.push({
         playerId: company.founderId,
         kind: "profitable_company_quarter",
@@ -584,6 +724,8 @@ function settleCompany(
   const report: CompanyQuarterReport = {
     companyId: company.id,
     quarterIndex: macro.quarterIndex,
+    segmentId: p.segmentId,
+    segmentDemandCents,
     marketShare,
     attractivenessShare,
     unitsSold,
@@ -602,6 +744,8 @@ function settleCompany(
     epsTtmCents,
     guidanceDeviation,
     fairValueE4: fairValue,
+    uncoveredQuarters,
+    graceQuartersLeft,
     becameInsolvent,
   };
 

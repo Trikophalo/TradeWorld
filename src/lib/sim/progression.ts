@@ -93,3 +93,12 @@ export function dailyLoginXp(streakDays: number, cfg: ProgressionConfig = BALANC
   const bonus = Math.min(streakBonusCap, Math.max(0, streakDays - 1) * streakBonusPerDay);
   return xp + bonus;
 }
+
+/**
+ * XP actually credited for `baseXp`: the global `xpMultiplier` (alpha bonus) is
+ * applied here and only here. Every other function and config value is base XP;
+ * the level curve itself is never scaled.
+ */
+export function scaledXp(baseXp: number, cfg: ProgressionConfig = BALANCE.progression): number {
+  return Math.max(0, Math.round(baseXp * cfg.xpMultiplier));
+}
