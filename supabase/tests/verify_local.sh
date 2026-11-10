@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# =============================================================================
+# NEXA · local schema verification on a throwaway PostgreSQL cluster
+# =============================================================================
+# Needs only the PostgreSQL 16 server binaries (no Docker, no Supabase CLI).
+#   1. initdb into a temp directory and start a private server
+#   2. create a minimal Supabase stub (roles, auth schema, auth.uid())
+#   3. apply all migrations and seed.sql with ON_ERROR_STOP
+#   4. run the SQL assertions in supabase/tests/[1-9]*.sql
+#   5. stop and delete the cluster
+# Exits non-zero on the first failure.
+#
+# Environment:
+#   PG_BIN         directory with initdb/pg_ctl/psql (default /usr/lib/postgresql/16/bin)
+#   NEXA_PG_DIR    work directory (default: mktemp)
+#   NEXA_PG_PORT   port (default 54329)
+#   NEXA_KEEP=1    keep the cluster running for inspection
+# =============================================================================
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SUPABASE_DIR="$(dirname "$SCRIPT_DIR")"
+PG_BIN="${PG_BIN:-/usr/lib/postgresql/16/bin}"
+PORT="${NEXA_PG_PORT:-54329}"
+WORK_DIR="${NEXA_PG_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/nexa-pg.XXXXXX")}"
+DATA_DIR="$WORK_DIR/data"
+LOG_FILE="$WORK_DIR/postgres.log"
+DB=nexa_verify
+
+if [[ ! -x "$PG_BIN/initdb" ]]; then
+  PG_BIN="$(dirname "$(command -v initdb 2>/dev/null || true)")"
+  [[ -x "$PG_BIN/initdb" ]] || { echo "PostgreSQL binaries not found; set PG_BIN" >&2; exit 2; }
+fi
+
+mkdir -p "$WORK_DIR"
+
+# PostgreSQL refuses to run as root. As root we either delegate the server
+# commands to the "postgres" OS user (if it can reach the work directory) or
+# run them inside a user namespace that maps root to an unprivileged uid.
+RUNNER=direct
+if [[ "$(id -u)" -eq 0 ]]; then
+  if id postgres >/dev/null 2>&1 && chown postgres "$WORK_DIR" 2>/dev/null \
+     && runuser -u postgres -- test -w "$WORK_DIR" 2>/dev/null; then
+    RUNNER=runuser
+  elif unshare -U --map-user=1000 --map-group=1000 true 2>/dev/null; then
+    chown root "$WORK_DIR" 2>/dev/null || true
+    RUNNER=unshare
+  else
+    echo "cannot drop root privileges (need the postgres user or unshare)" >&2
+    exit 2
+  fi
+fi
+as_pg() {
+  case "$RUNNER" in
+    runuser) runuser -u postgres -- "$@" ;;
+    unshare) unshare -U --map-user=1000 --map-group=1000 -- "$@" ;;
+    *)       "$@" ;;
+  esac
+}
+
+cleanup() {
+  local code=$?
+  if [[ "${NEXA_KEEP:-0}" == "1" ]]; then
+    echo "cluster kept: psql -h 127.0.0.1 -p $PORT -U postgres $DB   (data: $DATA_DIR)"
+  else
+    as_pg "$PG_BIN/pg_ctl" -D "$DATA_DIR" -m immediate -w stop >/dev/null 2>&1 || true
+    rm -rf "$DATA_DIR" "$LOG_FILE" 2>/dev/null || true
+    rmdir "$WORK_DIR" 2>/dev/null || true
+  fi
+  if [[ $code -eq 0 ]]; then
+    echo "VERIFICATION PASSED"
+  else
+    echo "VERIFICATION FAILED (exit $code)" >&2
+    [[ -f "$LOG_FILE" ]] && tail -n 20 "$LOG_FILE" >&2 || true
+  fi
+  exit $code
+}
+trap cleanup EXIT
+
+echo "== initdb ($DATA_DIR)"
+rm -rf "$DATA_DIR"
+as_pg "$PG_BIN/initdb" -D "$DATA_DIR" -U postgres --auth=trust --encoding=UTF8 --locale=C >/dev/null
+as_pg "$PG_BIN/pg_ctl" -D "$DATA_DIR" -l "$LOG_FILE" -w \
+  -o "-p $PORT -c listen_addresses=127.0.0.1 -c unix_socket_directories='' -c timezone=UTC -c wal_level=logical" start >/dev/null
+
+PSQL=("$PG_BIN/psql" -X -q -v ON_ERROR_STOP=1 -h 127.0.0.1 -p "$PORT" -U postgres)
+"${PSQL[@]}" -d postgres -c "create database $DB"
+PSQL+=(-d "$DB")
+
+echo "== supabase stub"
+"${PSQL[@]}" -f "$SCRIPT_DIR/00_supabase_stub.sql"
+
+echo "== migrations"
+shopt -s nullglob
+for f in "$SUPABASE_DIR"/migrations/*.sql; do
+  echo "   $(basename "$f")"
+  # like the Supabase CLI: one transaction per migration file
+  "${PSQL[@]}" -1 -f "$f"
+done
+
+echo "== seed.sql"
+"${PSQL[@]}" -1 -f "$SUPABASE_DIR/seed.sql"
+echo "== seed.sql (second run: must be idempotent)"
+"${PSQL[@]}" -1 -f "$SUPABASE_DIR/seed.sql"
+
+echo "== assertions"
+for f in "$SCRIPT_DIR"/[1-9]*.sql; do
+  echo "-- $(basename "$f")"
+  "${PSQL[@]}" -f "$f" 2>&1 | sed -e 's/^psql:[^ ]* NOTICE:  /   /' -e '/^$/d'
+done
