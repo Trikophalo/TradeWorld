@@ -1,26 +1,379 @@
 @import "tailwindcss";
+@import "../styles/tokens.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+/*
+ * Tailwind 4 is configured here instead of in a JS config file.
+ * The default palette is removed on purpose: only token-backed utilities
+ * exist, so a hard-coded colour such as `bg-zinc-900` simply does not compile.
+ */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --color-bg: var(--bg-0);
+  --color-surface-1: var(--bg-1);
+  --color-surface-2: var(--bg-2);
+  --color-surface-3: var(--bg-3);
+  --color-inverse: var(--bg-inverse);
+  --color-scrim: var(--scrim);
+
+  --color-fg-1: var(--fg-1);
+  --color-fg-2: var(--fg-2);
+  --color-fg-3: var(--fg-3);
+  --color-fg-inverse: var(--fg-inverse);
+
+  --color-line-1: var(--line-1);
+  --color-line-2: var(--line-2);
+
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+
+  --color-gain: var(--gain);
+  --color-gain-soft: var(--gain-soft);
+  --color-loss: var(--loss);
+  --color-loss-soft: var(--loss-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-on-semantic: var(--on-semantic);
+  --color-gold: var(--gold);
+
+  --font-sans: var(--font-sans);
+  --font-pixel: var(--font-pixel);
+
+  /* Type scale (size / line-height) */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.125rem;
+  --text-base: 0.9375rem;
+  --text-base--line-height: 1.375rem;
+  --text-lg: 1.0625rem;
+  --text-lg--line-height: 1.5rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl: 2rem;
+  --text-3xl--line-height: 2.375rem;
+  --text-4xl: 2.5rem;
+  --text-4xl--line-height: 2.75rem;
+
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-pill: var(--radius-pill);
+
+  --shadow-1: var(--shadow-1);
+  --shadow-2: var(--shadow-2);
+  --shadow-3: var(--shadow-3);
+
+  --ease-standard: var(--ease-standard);
+  --ease-out: var(--ease-out);
+  --ease-in: var(--ease-in);
+  --ease-in-out: var(--ease-in-out);
+
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-flash-gain: flash-gain var(--duration-flash) var(--ease-out);
+  --animate-flash-loss: flash-loss var(--duration-flash) var(--ease-out);
+  --animate-pulse-danger: pulse-danger 1.2s var(--ease-in-out) infinite;
+  --animate-shake: shake 0.4s var(--ease-in-out);
+  --animate-pop: pop var(--duration-slow) var(--ease-out);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Token-backed duration and layer utilities */
+@utility duration-instant {
+  transition-duration: var(--duration-instant);
+}
+@utility duration-fast {
+  transition-duration: var(--duration-fast);
+}
+@utility duration-base {
+  transition-duration: var(--duration-base);
+}
+@utility duration-slow {
+  transition-duration: var(--duration-slow);
+}
+@utility duration-slower {
+  transition-duration: var(--duration-slower);
+}
+@utility z-sticky {
+  z-index: var(--z-sticky);
+}
+@utility z-nav {
+  z-index: var(--z-nav);
+}
+@utility z-overlay {
+  z-index: var(--z-overlay);
+}
+@utility z-sheet {
+  z-index: var(--z-sheet);
+}
+@utility z-toast {
+  z-index: var(--z-toast);
+}
+@utility z-celebration {
+  z-index: var(--z-celebration);
+}
+
+/* Numbers never jump sideways while they tick. */
+@utility nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "cv11", "ss01";
+}
+
+/* Small pixel-font label: section headings, badges, button text. */
+@utility label-pixel {
+  font-family: var(--font-pixel);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+@utility pixelated {
+  image-rendering: pixelated;
+  shape-rendering: crispEdges;
+}
+
+@utility focus-ring {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  &:focus-visible {
+    outline-color: var(--accent);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@utility pb-safe {
+  padding-bottom: var(--safe-bottom);
+}
+@utility pt-safe {
+  padding-top: var(--safe-top);
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer base {
+  html {
+    background: var(--bg-0);
+    color: var(--fg-1);
+    font-family: var(--font-sans);
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    min-height: 100dvh;
+    font-size: 0.9375rem;
+    line-height: 1.375rem;
+    overscroll-behavior-y: none;
+  }
+
+  ::selection {
+    background: var(--accent-soft);
+    color: var(--fg-1);
+  }
+
+  button,
+  [role="button"],
+  a {
+    touch-action: manipulation;
+  }
+
+  button:not(:disabled),
+  [role="tab"],
+  [role="switch"] {
+    cursor: pointer;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Keyframes: transform and opacity only, plus colour for flashes       */
+/* ------------------------------------------------------------------ */
+@keyframes shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes flash-gain {
+  0% {
+    color: var(--gain);
+    background-color: var(--gain-soft);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@keyframes flash-loss {
+  0% {
+    color: var(--loss);
+    background-color: var(--loss-soft);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@keyframes pulse-danger {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-4px);
+  }
+  40% {
+    transform: translateX(4px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(2px);
+  }
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Route and shared-element transitions (React <ViewTransition>)        */
+/* ------------------------------------------------------------------ */
+@keyframes vt-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes vt-slide {
+  from {
+    translate: var(--vt-offset-x, 0) var(--vt-offset-y, 0);
+  }
+  to {
+    translate: 0 0;
+  }
+}
+
+::view-transition-old(.page) {
+  animation: var(--duration-fast) var(--ease-in) both vt-fade reverse;
+}
+::view-transition-new(.page) {
+  --vt-offset-y: 8px;
+  animation:
+    var(--duration-base) var(--ease-out) var(--duration-instant) both vt-fade,
+    var(--duration-slow) var(--ease-out) both vt-slide;
+}
+
+::view-transition-old(.nav-forward) {
+  --vt-offset-x: -32px;
+  animation:
+    var(--duration-fast) var(--ease-in) both vt-fade reverse,
+    var(--duration-slow) var(--ease-in-out) both vt-slide reverse;
+}
+::view-transition-new(.nav-forward) {
+  --vt-offset-x: 32px;
+  animation:
+    var(--duration-base) var(--ease-out) var(--duration-instant) both vt-fade,
+    var(--duration-slow) var(--ease-out) both vt-slide;
+}
+::view-transition-old(.nav-back) {
+  --vt-offset-x: 32px;
+  animation:
+    var(--duration-fast) var(--ease-in) both vt-fade reverse,
+    var(--duration-slow) var(--ease-in-out) both vt-slide reverse;
+}
+::view-transition-new(.nav-back) {
+  --vt-offset-x: -32px;
+  animation:
+    var(--duration-base) var(--ease-out) var(--duration-instant) both vt-fade,
+    var(--duration-slow) var(--ease-out) both vt-slide;
+}
+
+::view-transition-group(.morph) {
+  animation-duration: var(--duration-slower);
+  animation-timing-function: var(--ease-out);
+}
+
+/* ------------------------------------------------------------------ */
+/* Reduced motion: system setting or the in-app switch                  */
+/* ------------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) {
+    --duration-instant: 0ms;
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
+    --duration-slower: 0ms;
+  }
+  :root:not([data-motion="full"]) *,
+  :root:not([data-motion="full"]) *::before,
+  :root:not([data-motion="full"]) *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+  :root:not([data-motion="full"])::view-transition-group(*),
+  :root:not([data-motion="full"])::view-transition-old(*),
+  :root:not([data-motion="full"])::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+:root[data-motion="reduced"] {
+  --duration-instant: 0ms;
+  --duration-fast: 0ms;
+  --duration-base: 0ms;
+  --duration-slow: 0ms;
+  --duration-slower: 0ms;
+}
+:root[data-motion="reduced"] *,
+:root[data-motion="reduced"] *::before,
+:root[data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+}
+:root[data-motion="reduced"]::view-transition-group(*),
+:root[data-motion="reduced"]::view-transition-old(*),
+:root[data-motion="reduced"]::view-transition-new(*) {
+  animation: none !important;
 }

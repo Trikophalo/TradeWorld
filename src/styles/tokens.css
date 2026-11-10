@@ -1,0 +1,198 @@
+/*
+ * Design tokens: the single source of truth for every visual value.
+ * Components must use these (through the Tailwind utilities generated in
+ * globals.css) and never hard-code colours, radii, shadows or durations.
+ *
+ * Structure:
+ *   1. theme-independent tokens (type, radius, motion, z-index)
+ *   2. dark theme (default)
+ *   3. light theme
+ *   4. accent colour choices
+ *
+ * Contrast of text tokens against surface tokens is asserted in
+ * src/styles/tokens.test.ts (WCAG AA).
+ */
+
+:root {
+  /* ---- Typography ---- */
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-pixel: "Silkscreen", ui-monospace, "SFMono-Regular", monospace;
+
+  /* ---- Radius ---- */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  /* ---- Motion: durations ---- */
+  --duration-instant: 80ms;
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 300ms;
+  --duration-slower: 450ms;
+  --duration-flash: 700ms;
+
+  /* ---- Motion: easing ---- */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.5, 0, 0.9, 0.3);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* ---- Layers ---- */
+  --z-base: 0;
+  --z-sticky: 10;
+  --z-nav: 20;
+  --z-overlay: 40;
+  --z-sheet: 50;
+  --z-toast: 60;
+  --z-celebration: 70;
+
+  /* ---- Layout ---- */
+  --sidebar-width: 248px;
+  --tabbar-height: 64px;
+  --topbar-height: 56px;
+  --content-max: 1280px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+/* ------------------------------------------------------------------ */
+/* Dark theme (default)                                                */
+/* ------------------------------------------------------------------ */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Surfaces, from the page background upwards */
+  --bg-0: #0a0c10;
+  --bg-1: #11141a;
+  --bg-2: #181c24;
+  --bg-3: #212631;
+  --bg-inverse: #f3f5f8;
+  --scrim: rgb(4 5 8 / 0.66);
+
+  /* Text */
+  --fg-1: #f3f5f8;
+  --fg-2: #a9b0be;
+  --fg-3: #818999;
+  --fg-inverse: #0a0c10;
+
+  /* Lines */
+  --line-1: #20252f;
+  --line-2: #323846;
+
+  /* Semantics */
+  --gain: #2fd98c;
+  --gain-soft: rgb(47 217 140 / 0.14);
+  --loss: #ff6170;
+  --loss-soft: rgb(255 97 112 / 0.14);
+  --warn: #ffb84d;
+  --warn-soft: rgb(255 184 77 / 0.14);
+  --info: #62b0ff;
+  --info-soft: rgb(98 176 255 / 0.14);
+  --on-semantic: #06110c;
+
+  /* Pixel-art accents that stay the same in both themes */
+  --gold: #ffd15c;
+
+  /* Elevation */
+  --shadow-1: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-2: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 8px 24px -8px rgb(0 0 0 / 0.6);
+  --shadow-3: 0 1px 0 rgb(255 255 255 / 0.05) inset, 0 24px 64px -16px rgb(0 0 0 / 0.75);
+
+  /* Accent (default: violet) */
+  --accent: #8f7bff;
+  --accent-strong: #6a54f0;
+  --accent-soft: rgb(143 123 255 / 0.16);
+  --on-accent: #ffffff;
+}
+
+/* ------------------------------------------------------------------ */
+/* Light theme                                                         */
+/* ------------------------------------------------------------------ */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg-0: #f4f5f7;
+  --bg-1: #ffffff;
+  --bg-2: #f0f1f4;
+  --bg-3: #e5e7ec;
+  --bg-inverse: #11141a;
+  --scrim: rgb(17 20 26 / 0.4);
+
+  --fg-1: #11141a;
+  --fg-2: #4a5160;
+  --fg-3: #636b7b;
+  --fg-inverse: #ffffff;
+
+  --line-1: #e4e6eb;
+  --line-2: #cfd3db;
+
+  --gain: #087f4f;
+  --gain-soft: rgb(8 127 79 / 0.1);
+  --loss: #cf2b41;
+  --loss-soft: rgb(207 43 65 / 0.1);
+  --warn: #9a5b00;
+  --warn-soft: rgb(154 91 0 / 0.12);
+  --info: #1766c2;
+  --info-soft: rgb(23 102 194 / 0.1);
+  --on-semantic: #ffffff;
+
+  --shadow-1: 0 1px 2px rgb(17 20 26 / 0.06);
+  --shadow-2: 0 8px 24px -8px rgb(17 20 26 / 0.14);
+  --shadow-3: 0 24px 64px -16px rgb(17 20 26 / 0.24);
+
+  --accent: #5b45e6;
+  --accent-strong: #4a35d1;
+  --accent-soft: rgb(91 69 230 / 0.1);
+  --on-accent: #ffffff;
+}
+
+/* ------------------------------------------------------------------ */
+/* Accent choices (profile setting "App-Akzentfarbe")                   */
+/* ------------------------------------------------------------------ */
+:root[data-accent="blue"] {
+  --accent: #5aa7ff;
+  --accent-strong: #2f7fe6;
+  --accent-soft: rgb(90 167 255 / 0.16);
+}
+:root[data-accent="pink"] {
+  --accent: #ff7ac3;
+  --accent-strong: #d9438f;
+  --accent-soft: rgb(255 122 195 / 0.16);
+}
+:root[data-accent="orange"] {
+  --accent: #ff9a52;
+  --accent-strong: #d4621a;
+  --accent-soft: rgb(255 154 82 / 0.16);
+}
+:root[data-accent="cyan"] {
+  --accent: #45d6e6;
+  --accent-strong: #0f8f9e;
+  --accent-soft: rgb(69 214 230 / 0.16);
+}
+
+:root[data-theme="light"][data-accent="blue"] {
+  --accent: #1766c2;
+  --accent-strong: #0f52a3;
+  --accent-soft: rgb(23 102 194 / 0.1);
+}
+:root[data-theme="light"][data-accent="pink"] {
+  --accent: #c2287a;
+  --accent-strong: #a31c64;
+  --accent-soft: rgb(194 40 122 / 0.1);
+}
+:root[data-theme="light"][data-accent="orange"] {
+  --accent: #b54a08;
+  --accent-strong: #963c04;
+  --accent-soft: rgb(181 74 8 / 0.1);
+}
+:root[data-theme="light"][data-accent="cyan"] {
+  --accent: #0b7a87;
+  --accent-strong: #07636e;
+  --accent-soft: rgb(11 122 135 / 0.1);
+}
