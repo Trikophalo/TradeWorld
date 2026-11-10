@@ -68,7 +68,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           email: raw.email,
           password: raw.password,
           // Read by the handle_new_user() trigger. The invite code is checked there, not here.
-          options: { data: { display_name: raw.displayName, invite_code: raw.inviteCode.trim(), age_confirmed: true } },
+          options: { data: { nickname: raw.displayName, invite_code: raw.inviteCode.trim(), age_confirmed: true } },
         })
       : await supabase.auth.signInWithPassword({ email: raw.email, password: raw.password });
 

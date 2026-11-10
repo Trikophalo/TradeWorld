@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { BALANCE } from "@/config/balance";
 import { DEMO_COMPANIES, DEMO_INDEX } from "./market";
 
 /**
@@ -14,7 +15,10 @@ export interface DemoQuote {
 }
 
 const HOUR_MS = 3_600_000;
-export const DEMO_VAULT = { ratePerHourCents: 10_000, capHours: 8 } as const;
+export const DEMO_VAULT = {
+  ratePerHourCents: BALANCE.economy.basicIncomeCentsPerHour,
+  capHours: BALANCE.economy.vaultCapHours,
+} as const;
 
 interface DemoState {
   quotes: Record<string, DemoQuote>;
@@ -45,7 +49,7 @@ export const useDemo = create<DemoState>((set, get) => ({
   quotes: initialQuotes,
   indexPoints: DEMO_INDEX.points,
   indexChangeBps: DEMO_INDEX.changeBps,
-  cashCents: 1_000_000,
+  cashCents: BALANCE.economy.startingCapitalCents,
   vaultClaimedAt: null,
   level: 4,
   xpInLevel: 520,

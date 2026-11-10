@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { BALANCE } from "@/config/balance";
+import { orderValueCents as simOrderValueCents } from "@/lib/sim/money";
 
 /**
  * Shared between the order form and (from M1) the `place_order` RPC wrapper.
@@ -15,13 +17,10 @@ export const orderDraftSchema = z.object({
 
 export type OrderDraft = z.infer<typeof orderDraftSchema>;
 
-/** Fixed order fee in cents. Placeholder for BALANCE.trading until the RPC returns the real quote. */
-export const DEMO_ORDER_FEE_CENTS = 100;
+/** Fixed order fee in cents (BALANCE.trading). The RPC returns the binding amount from M1 on. */
+export const ORDER_FEE_CENTS = BALANCE.trading.orderFeeCents;
 
-/** quantity × price (scaled by 10_000) -> cents, rounded half to even like the server. */
+/** quantity × price (scaled by 10_000) -> cents, with the same rounding as the server. */
 export function orderValueCents(quantity: number, priceE4: number): number {
-  const exact = (BigInt(quantity) * BigInt(priceE4)) / 100n;
-  const remainder = (BigInt(quantity) * BigInt(priceE4)) % 100n;
-  const roundUp = remainder > 50n || (remainder === 50n && exact % 2n === 1n);
-  return Number(roundUp ? exact + 1n : exact);
+  return Number(simOrderValueCents(BigInt(quantity), BigInt(priceE4)));
 }

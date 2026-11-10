@@ -11,7 +11,7 @@ import { toast } from "@/components/ui/toast";
 import type { DemoCompany } from "@/lib/demo/market";
 import { useDemo } from "@/lib/demo/store";
 import { formatMoney, formatPrice } from "@/lib/format";
-import { DEMO_ORDER_FEE_CENTS, orderDraftSchema, orderValueCents } from "../order-schema";
+import { ORDER_FEE_CENTS, orderDraftSchema, orderValueCents } from "../order-schema";
 
 export type OrderSide = "buy" | "sell";
 
@@ -41,7 +41,7 @@ export function OrderSheet({ company, side, priceE4, onClose }: OrderSheetProps)
   const parsed = orderDraftSchema.shape.quantity.safeParse(quantity);
   const valid = parsed.success && /^\d+$/.test(raw.trim());
   const value = valid ? orderValueCents(quantity, priceE4) : 0;
-  const total = shown === "buy" ? value + DEMO_ORDER_FEE_CENTS : value - DEMO_ORDER_FEE_CENTS;
+  const total = shown === "buy" ? value + ORDER_FEE_CENTS : value - ORDER_FEE_CENTS;
   const affordable = shown === "sell" || total <= cash;
 
   const confirm = () => {
@@ -56,7 +56,7 @@ export function OrderSheet({ company, side, priceE4, onClose }: OrderSheetProps)
   const rows = [
     { label: t("price"), node: <span className="nums">{formatPrice(priceE4)}</span> },
     { label: t("value"), node: <NumberTicker value={value} format={money} /> },
-    { label: t("fee"), node: <span className="nums">{formatMoney(DEMO_ORDER_FEE_CENTS)}</span> },
+    { label: t("fee"), node: <span className="nums">{formatMoney(ORDER_FEE_CENTS)}</span> },
   ];
 
   return (

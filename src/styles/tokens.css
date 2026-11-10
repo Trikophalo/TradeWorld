@@ -132,8 +132,8 @@
   --line-1: #e4e6eb;
   --line-2: #cfd3db;
 
-  --gain: #087f4f;
-  --gain-soft: rgb(8 127 79 / 0.1);
+  --gain: #06774a;
+  --gain-soft: rgb(6 119 74 / 0.1);
   --loss: #cf2b41;
   --loss-soft: rgb(207 43 65 / 0.1);
   --warn: #9a5b00;
