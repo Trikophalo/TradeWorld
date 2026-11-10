@@ -1,0 +1,8 @@
+.next
+node_modules
+pnpm-lock.yaml
+public
+supabase/migrations
+supabase/seed.sql
+docs/ORIGINAL_PROMPT.md
+next-env.d.ts
