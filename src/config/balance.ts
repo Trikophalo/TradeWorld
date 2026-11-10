@@ -22,6 +22,8 @@
 export type SectorId = "tech" | "retail" | "energy" | "pharma" | "logistics";
 export type SizeClass = "bluechip" | "midcap" | "penny";
 export type CompanyTierId = "small_business" | "gmbh" | "ag" | "listed";
+/** Market segment a company sells in. Every company tier has exactly one segment. */
+export type SegmentId = "local" | "regional" | "national" | "international";
 export type DepartmentId = "development" | "sales" | "production" | "finance" | "marketing";
 export type JobTierId = "intern" | "junior" | "senior" | "team_lead" | "c_level";
 export type InvestorArchetypeId =
@@ -143,7 +145,10 @@ export interface BondsConfig {
 }
 
 export interface SectorConfig {
-  /** Total customer spending per quarter at baseline (cycle = oil = 1, neutral rate). */
+  /**
+   * Customer spending per quarter in the international segment at baseline
+   * (cycle = oil = 1, neutral rate). The smaller segments are shares of this value.
+   */
   readonly baseDemandCentsPerQuarter: number;
   readonly demandGrowthBpsPerGameYear: number;
   /** Standard deviation of the random quarterly demand factor. */
@@ -151,15 +156,24 @@ export interface SectorConfig {
   readonly peRatio: number;
   /** Multiplier on the per-size-class tick volatility. */
   readonly volatilityMultiplier: number;
+  /**
+   * Price exponent of the attractiveness formula in this sector: how strongly
+   * customers punish a higher price. Spec start value is 1.5 for all sectors;
+   * see docs/BALANCING.md for why it differs by sector.
+   */
+  readonly priceExponent: number;
   readonly costStructure: {
+    /** Price of the established suppliers; the profit-maximising price of a small company at baseline costs. */
     readonly referencePriceCents: number;
     readonly unitCostCents: number;
     /** Units one effective production skill point can deliver per quarter. */
     readonly capacityUnitsPerSkillPoint: number;
     /** Multiplier on the fixed costs of the company tier (capital intensity). */
     readonly fixedCostMultiplier: number;
-    /** Quality points lost per quarter without development. */
-    readonly qualityDecayPerQuarter: number;
+    /** Share of the gap between quality and its target closed per quarter (how fast products age). */
+    readonly qualityAdjustmentRate: number;
+    /** Development effort needed for the same quality relative to other sectors. */
+    readonly developmentIntensity: number;
   };
   readonly sensitivity: {
     /** Elasticity of sector demand to the oil index. */
@@ -184,37 +198,65 @@ export interface CompanyTierConfig {
   readonly creditLineCents: number;
 }
 
+export interface SegmentConfig {
+  /** The company tier that sells in this segment. */
+  readonly tier: CompanyTierId;
+  /** Segment demand as a share of the sector's (international) demand. */
+  readonly demandShare: number;
+  /**
+   * The established suppliers of the segment, modelled as one anonymous
+   * competitor with unlimited capacity that prices at the reference price.
+   * Awareness 0 = no anonymous incumbents (international: the AI companies are the incumbents).
+   */
+  readonly incumbentQuality: number;
+  readonly incumbentAwareness: number;
+}
+
 export interface CompanyConfig {
   readonly attractiveness: {
     readonly qualityExponent: number;
     readonly awarenessExponent: number;
+    /** Spec start value. The value actually used is `sectors[x].priceExponent`. */
     readonly priceExponent: number;
   };
+  readonly segments: Readonly<Record<SegmentId, SegmentConfig>>;
   readonly marketing: {
     /** log2(1.4): doubling the budget multiplies the awareness gain by 1.4. */
     readonly diminishingReturnsExponent: number;
-    /** Reference budget as a share of baseline sector demand. */
-    readonly referenceBudgetShareOfSectorDemand: number;
+    /** Reference budget as a share of the baseline demand of the company's segment. */
+    readonly referenceBudgetShareOfSegmentDemand: number;
     /** Awareness gain (share of the not-yet-aware market) at the reference budget. */
     readonly gainAtReferenceBudget: number;
     readonly maxGainPerQuarter: number;
     readonly awarenessDecayPerQuarter: number;
     readonly initialAwareness: number;
     readonly minAwareness: number;
+    /** Marketing department: budget counts up to (1 + max) times, half of it at the given skill points. */
+    readonly departmentMaxBoost: number;
+    readonly departmentHalfSaturationSkillPoints: number;
   };
   readonly quality: {
     readonly initial: number;
     readonly min: number;
     readonly max: number;
-    /** Maximum quality gain per quarter from the development department (at quality 0, scaled by the headroom to `max`). */
-    readonly maxGainPerQuarter: number;
-    /** Development skill points at which half of the maximum gain is reached. */
+    /**
+     * Quality target = max x saturation ^ targetExponent with
+     * x = devPoints / (developmentIntensity x (halfSaturationSkillPoints + productionScale x productionPoints)),
+     * saturation = x / (1 + x). Larger companies need more developers for the same quality.
+     */
     readonly halfSaturationSkillPoints: number;
+    readonly productionScale: number;
+    readonly targetExponent: number;
   };
   readonly sales: {
     /** Attractiveness boost per effective sales skill point. */
     readonly boostPerSkillPoint: number;
     readonly maxBoost: number;
+  };
+  /** Finance department: lowers fixed costs by up to `maxFixedCostReduction`, half of it at the given skill points. */
+  readonly finance: {
+    readonly maxFixedCostReduction: number;
+    readonly halfSaturationSkillPoints: number;
   };
   /** Productivity in the first quarters after hiring; afterwards 1. */
   readonly onboardingRamp: readonly number[];
@@ -232,14 +274,20 @@ export interface CompanyConfig {
   };
   readonly corporateTaxBps: number;
   readonly insolvency: {
-    readonly uncoveredQuartersToInsolvency: number;
+    /**
+     * Grace period: a company is insolvent when its cash is still negative
+     * `graceQuarters` quarter closes after the first negative close
+     * (4 = one real day between the first warning and the insolvency).
+     */
+    readonly graceQuarters: number;
     readonly foundingLockoutGameDays: number;
     /** Overdraft rate = policy rate + this spread while cash is negative. */
     readonly overdraftSpreadBps: number;
     readonly priceCrashReturn: number;
   };
   readonly maxMarketingBudgetShareOfCash: number;
-  readonly priceBand: { readonly minFactor: number; readonly maxMarginFactor: number };
+  /** Range of the price slider as multiples of the sector reference price (sanity bounds, not a balancing cap). */
+  readonly priceBand: { readonly minFactor: number; readonly maxFactor: number };
   readonly aiPolicy: {
     readonly marketingShareOfRevenue: number;
     readonly dividendPayoutRatio: number;
@@ -406,7 +454,10 @@ export interface ProgressionConfig {
   readonly xpBase: number;
   readonly xpExponent: number;
   readonly maxLevel: number;
-  /** Global multiplier, 1 = spec values. Lever for the closed alpha. */
+  /**
+   * Global multiplier, 1 = spec values. Applied exactly once, when XP are granted
+   * (`scaledXp()` in src/lib/sim/progression.ts); all other values are base XP.
+   */
   readonly xpMultiplier: number;
   readonly xpSources: {
     readonly trade: { readonly xp: number; readonly maxTradesPerDay: number };
@@ -689,6 +740,10 @@ export const BALANCE = {
   },
 
   // --------------------------------------------------------------- sectors (spec 6.1)
+  // Calibration rule (docs/BALANCING.md 4.1): with price exponent e the profit-maximising price of a
+  // small company is (e + 1) / e x (unit cost + production salary per unit). Unit cost and capacity are
+  // chosen so that this optimum equals the reference price and one production skill point contributes
+  // about 480 EUR per quarter after its own salary in every sector.
   sectors: {
     tech: {
       baseDemandCentsPerQuarter: 3_000_000_000,
@@ -696,72 +751,82 @@ export const BALANCE = {
       demandNoise: 0.04,
       peRatio: 28,
       volatilityMultiplier: 1.2,
+      priceExponent: 1.2,
       costStructure: {
         referencePriceCents: 5_000,
-        unitCostCents: 1_500,
-        capacityUnitsPerSkillPoint: 17,
-        fixedCostMultiplier: 0.6,
-        qualityDecayPerQuarter: 3,
+        unitCostCents: 1_520,
+        capacityUnitsPerSkillPoint: 21,
+        fixedCostMultiplier: 0.7,
+        qualityAdjustmentRate: 0.1,
+        developmentIntensity: 2.0,
       },
       sensitivity: { oilDemand: 0, oilCost: 0, ratePer100Bps: -0.03, cycle: 0.8, valuationRate: 1.5 },
     },
     retail: {
-      baseDemandCentsPerQuarter: 6_000_000_000,
+      baseDemandCentsPerQuarter: 5_000_000_000,
       demandGrowthBpsPerGameYear: 200,
       demandNoise: 0.02,
       peRatio: 14,
       volatilityMultiplier: 0.8,
+      priceExponent: 2.5,
       costStructure: {
         referencePriceCents: 2_000,
-        unitCostCents: 1_400,
-        capacityUnitsPerSkillPoint: 100,
+        unitCostCents: 1_125,
+        capacityUnitsPerSkillPoint: 84,
         fixedCostMultiplier: 1.0,
-        qualityDecayPerQuarter: 0.5,
+        qualityAdjustmentRate: 0.03,
+        developmentIntensity: 0.5,
       },
       sensitivity: { oilDemand: -0.05, oilCost: 0.1, ratePer100Bps: -0.01, cycle: 0.5, valuationRate: 0.8 },
     },
     energy: {
-      baseDemandCentsPerQuarter: 5_000_000_000,
+      baseDemandCentsPerQuarter: 3_600_000_000,
       demandGrowthBpsPerGameYear: 150,
       demandNoise: 0.03,
       peRatio: 11,
       volatilityMultiplier: 1.0,
+      priceExponent: 1.5,
       costStructure: {
         referencePriceCents: 8_000,
-        unitCostCents: 4_800,
-        capacityUnitsPerSkillPoint: 22,
-        fixedCostMultiplier: 2.0,
-        qualityDecayPerQuarter: 0.5,
+        unitCostCents: 3_100,
+        capacityUnitsPerSkillPoint: 15,
+        fixedCostMultiplier: 1.6,
+        qualityAdjustmentRate: 0.03,
+        developmentIntensity: 0.6,
       },
       sensitivity: { oilDemand: 0.8, oilCost: 0.3, ratePer100Bps: -0.01, cycle: 0.6, valuationRate: 1.0 },
     },
     pharma: {
-      baseDemandCentsPerQuarter: 2_500_000_000,
+      baseDemandCentsPerQuarter: 2_800_000_000,
       demandGrowthBpsPerGameYear: 500,
       demandNoise: 0.03,
       peRatio: 22,
       volatilityMultiplier: 1.4,
+      priceExponent: 1.0,
       costStructure: {
         referencePriceCents: 12_000,
-        unitCostCents: 3_600,
+        unitCostCents: 2_810,
         capacityUnitsPerSkillPoint: 8,
-        fixedCostMultiplier: 1.5,
-        qualityDecayPerQuarter: 1.5,
+        fixedCostMultiplier: 1.3,
+        qualityAdjustmentRate: 0.06,
+        developmentIntensity: 1.5,
       },
       sensitivity: { oilDemand: 0, oilCost: 0, ratePer100Bps: -0.01, cycle: 0.1, valuationRate: 1.2 },
     },
     logistics: {
-      baseDemandCentsPerQuarter: 3_500_000_000,
+      baseDemandCentsPerQuarter: 4_200_000_000,
       demandGrowthBpsPerGameYear: 300,
       demandNoise: 0.03,
       peRatio: 15,
       volatilityMultiplier: 0.9,
+      priceExponent: 2.0,
       costStructure: {
         referencePriceCents: 3_000,
-        unitCostCents: 1_950,
-        capacityUnitsPerSkillPoint: 60,
-        fixedCostMultiplier: 1.2,
-        qualityDecayPerQuarter: 1,
+        unitCostCents: 1_470,
+        capacityUnitsPerSkillPoint: 48,
+        fixedCostMultiplier: 1.1,
+        qualityAdjustmentRate: 0.04,
+        developmentIntensity: 0.7,
       },
       sensitivity: { oilDemand: 0, oilCost: 0.5, ratePer100Bps: -0.02, cycle: 1.2, valuationRate: 1.0 },
     },
@@ -774,26 +839,41 @@ export const BALANCE = {
       awarenessExponent: 0.8,
       priceExponent: 1.5,
     },
+    // One market per company tier. Demand is a share of the sector demand; the established
+    // suppliers of the three small segments are one anonymous competitor (docs/SIMULATION.md 11.3).
+    segments: {
+      local: { tier: "small_business", demandShare: 0.0025, incumbentQuality: 40, incumbentAwareness: 0.5 },
+      regional: { tier: "gmbh", demandShare: 0.011, incumbentQuality: 50, incumbentAwareness: 0.5 },
+      national: { tier: "ag", demandShare: 0.055, incumbentQuality: 60, incumbentAwareness: 0.5 },
+      international: { tier: "listed", demandShare: 1, incumbentQuality: 0, incumbentAwareness: 0 },
+    },
     marketing: {
       // 2 ^ x = 1.4  =>  x = log2(1.4) = 0.485426827...
       diminishingReturnsExponent: 0.485427,
-      referenceBudgetShareOfSectorDemand: 0.01,
-      gainAtReferenceBudget: 0.005,
-      maxGainPerQuarter: 0.03,
-      awarenessDecayPerQuarter: 0.02,
-      initialAwareness: 0.0002,
-      minAwareness: 0.00005,
+      referenceBudgetShareOfSegmentDemand: 0.015,
+      gainAtReferenceBudget: 0.05,
+      maxGainPerQuarter: 0.15,
+      awarenessDecayPerQuarter: 0.1,
+      initialAwareness: 0.15,
+      minAwareness: 0.005,
+      departmentMaxBoost: 1,
+      departmentHalfSaturationSkillPoints: 15,
     },
     quality: {
       initial: 30,
       min: 1,
       max: 100,
-      maxGainPerQuarter: 10,
       halfSaturationSkillPoints: 15,
+      productionScale: 0.1,
+      targetExponent: 0.5,
     },
     sales: {
       boostPerSkillPoint: 0.01,
       maxBoost: 0.5,
+    },
+    finance: {
+      maxFixedCostReduction: 0.3,
+      halfSaturationSkillPoints: 15,
     },
     onboardingRamp: [0.4, 0.7],
     // Spec 6.4. "listed" is an assumption: the spec defines no caps after the IPO.
@@ -840,16 +920,14 @@ export const BALANCE = {
     },
     corporateTaxBps: 1500,
     insolvency: {
-      uncoveredQuartersToInsolvency: 2,
+      graceQuarters: 4,
       foundingLockoutGameDays: 3,
       overdraftSpreadBps: 1000,
       priceCrashReturn: -0.9,
     },
     maxMarketingBudgetShareOfCash: 0.5,
-    // Allowed unit price (see docs/BALANCING.md, "boutique pricing"):
-    //   min = referencePrice x minFactor
-    //   max = unitCost + (referencePrice - unitCost) x maxMarginFactor
-    priceBand: { minFactor: 0.4, maxMarginFactor: 1.5 },
+    // Range of the price slider. Prices are disciplined by competition, not by this band.
+    priceBand: { minFactor: 0.25, maxFactor: 3 },
     // Decision policy of the AI companies (they run through the same quarter simulation).
     aiPolicy: {
       marketingShareOfRevenue: 0.012,
@@ -1006,7 +1084,8 @@ export const BALANCE = {
     xpBase: 100,
     xpExponent: 1.5,
     maxLevel: 50,
-    xpMultiplier: 1,
+    // Alpha bonus: all XP count double (owner decision). 1 = spec values.
+    xpMultiplier: 2,
     xpSources: {
       trade: { xp: 10, maxTradesPerDay: 30 },
       profitableClose: { profitCentsPerXp: 10_000, maxXpPerTrade: 500 },
