@@ -237,7 +237,7 @@ Die mitgelieferten Einladungscodes in `seed.sql` sind Platzhalter und müssen vo
 - Der „Kleinkredit“ ab Level 15 ist eine Kreditlinie der Firma, abhängig vom Level des Gründers. Privatkredite
   gibt es nicht.
 
-## ADR-027: Ergänzungen gegenüber dem Prompt, zu bestätigen — `offen`
+## ADR-027: Ergänzungen gegenüber dem Prompt — `akzeptiert` (mit Auflage, siehe ADR-029)
 
 Die Simulation enthält Dinge, die der Prompt nicht nennt. Sie sind konfigurierbar und können entfallen:
 
@@ -249,10 +249,45 @@ Die Simulation enthält Dinge, die der Prompt nicht nennt. Sie sind konfigurierb
 | Stufe „börsennotiert“ (bis 1000 Mitarbeiter, 120 000 € Fixkosten) | Der Prompt definiert Größen nur bis zur AG vor dem IPO                                                             |
 | `progression.xpMultiplier` (Standard 1)                           | Stellschraube für das Lerntempo im Freundestest                                                                    |
 
-## ADR-028: Zinsniveau pro Spieljahr ist zu entscheiden — `offen`
+## ADR-028: Zinsniveau pro Spieljahr bleibt vorerst wie im Prompt — `akzeptiert`
 
 Ein Spieljahr dauert einen echten Tag. Die Vorgaben „Leitzins 3 %“ und „Anleihen 2 bis 4 %“ bedeuten damit
 risikolose 2 bis 4 % **pro echtem Tag**. Nach der ersten Geldflussrechnung (`BALANCING.md`, Abschnitt 6) wächst
 das Vermögen je Spieler damit um 7 bis 20 % pro Tag, und die Senken fangen nur einen kleinen Teil ab.
 Die Werte stehen unverändert wie im Prompt in `balance.ts`. **Vor M1 ist zu entscheiden**, ob das so gewollt ist
 oder ob Zinsen und Renditen skaliert werden (z. B. Obergrenze für Anleihen je Spieler oder ein niedrigeres Zinsniveau).
+
+**Entscheidung des Auftraggebers:** Die Werte bleiben vorerst. Die Geldmenge wird im Freundestest beobachtet
+(`money_supply_snapshots`); die Stellschrauben aus `BALANCING.md` bleiben als Reserve.
+
+## ADR-029: Jede Regel muss in Spielersprache erklärbar sein — `akzeptiert`
+
+Vorgabe des Auftraggebers zu ADR-027: Steuern, Preisregeln, Rechtsformen und ähnliche Regeln bleiben, müssen aber
+für Spieler verständlich sein. Daraus folgt:
+
+- Jede Regel hat einen Erklärtext aus ein bis zwei Sätzen ohne Formel, mit einem Zahlenbeispiel.
+  Die Texte stehen in `messages/de.json` unter `rules`, die Zahlen kommen zur Laufzeit aus `balance.ts`.
+- Die Seite **Spielregeln** (`/profile/rules`) zeigt alle Regeln gesammelt. Wo eine Regel wirkt, steht sie als
+  eigene Zeile (z. B. „Unternehmenssteuer“ im Quartalsbericht, „Steuer“ in der Order-Abrechnung).
+- Eine Regel, die sich so nicht erklären lässt, wird vereinfacht oder gestrichen. Versteckte Deckel sind keine
+  zulässige Balancing-Methode.
+
+## ADR-030: XP-Multiplikator 2 für die Alpha — `akzeptiert`
+
+`progression.xpMultiplier = 2`. Alle XP-Quellen zählen doppelt, die Tageslimits gelten für die Zahl der Aktionen,
+nicht für die XP. Im Spiel steht das als „Alpha-Bonus: doppelte XP“.
+
+## ADR-031: Unternehmen müssen sich lohnen, aber nicht jeder darf Erfolg haben — `akzeptiert`
+
+Vorgabe des Auftraggebers. Zielbild für das Balancing der Unternehmenssimulation:
+
+| Führung                                                                                                      | Erwartetes Ergebnis                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Solide (Personal passend zur Nachfrage, stetiges Marketing, Investition in Qualität, Preis folgt den Kosten) | Gründungskosten in etwa 4 bis 8 echten Tagen zurückverdient, danach Gewinn in der Größenordnung des ein- bis zweifachen Jobeinkommens der Stufe |
+| Passiv (nichts tun)                                                                                          | Verliert langsam Geld, nach etwa 2 bis 4 Tagen unrentabel oder insolvent, aber nie über eine einzige Nacht                                      |
+| Gierig (Höchstpreis ohne Qualität) oder Dumping                                                              | Unrentabel                                                                                                                                      |
+| Überexpansion                                                                                                | Fixkosten und Einarbeitung führen zur Pleite                                                                                                    |
+| Mehrere Spielerfirmen in derselben Nische                                                                    | Die am besten geführte verdient klar, die schwächste verliert                                                                                   |
+
+Die Ziele sind als Szenario-Tests in `src/lib/sim` festgeschrieben; Mechanik und Messwerte stehen in
+`SIMULATION.md` und `BALANCING.md`.

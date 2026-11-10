@@ -201,7 +201,9 @@
     "showcase": "Komponenten-Showcase öffnen",
     "career": "Karriere",
     "careerEmptyTitle": "Erster Job ab Level 2",
-    "careerEmptyText": "Jobs, Arbeitsaufgaben und Beförderungen kommen mit Meilenstein 3."
+    "careerEmptyText": "Jobs, Arbeitsaufgaben und Beförderungen kommen mit Meilenstein 3.",
+    "rules": "Spielregeln",
+    "rulesHint": "Steuern, Gebühren und wie Firmen Geld verdienen"
   },
   "unlocks": {
     "market_orders": "Aktien kaufen und verkaufen",
@@ -282,5 +284,50 @@
     "forms": "Formulare",
     "empty": "Leere Zustände",
     "motion": "Motion-Tokens"
+  },
+  "rules": {
+    "title": "Spielregeln",
+    "intro": "Alle Regeln in Kürze, mit Beispiel. Die Zahlen sind die Werte, die gerade im Spiel gelten.",
+    "example": "Beispiel",
+    "where": "Wo du es siehst",
+    "groupTrading": "Handel und Steuern",
+    "groupCompany": "Unternehmen",
+    "groupProgress": "Einkommen und Fortschritt",
+    "link": "Spielregeln ansehen",
+    "orderFee": {
+      "title": "Ordergebühr",
+      "summary": "{fee} pro ausgeführter Order",
+      "text": "Jede ausgeführte Order kostet fest {fee}, egal wie groß sie ist. Dazu kommt der Spread: Du kaufst etwas über und verkaufst etwas unter dem angezeigten Kurs.",
+      "example": "Du kaufst 10 Aktien zu je 50 €. Du zahlst {value} für die Aktien und {fee} Gebühr, zusammen {total}.",
+      "where": "In der Order-Maske vor dem Absenden und in der Handelshistorie."
+    },
+    "taxGains": {
+      "title": "Steuer auf Kursgewinne",
+      "summary": "{rate} auf jeden realisierten Gewinn",
+      "text": "Verkaufst du mit Gewinn, gehen {rate} des Gewinns als Steuer ab. Verluste wandern in deinen Verlusttopf und werden mit späteren Gewinnen verrechnet. Bar erstattet wird nichts.",
+      "example": "Du verkaufst mit {gain} Gewinn: {tax} Steuer, {net} bleiben dir. Liegen noch {loss} im Verlusttopf, zahlst du nur auf {taxable} Steuer, also {taxAfterLoss}.",
+      "where": "Als Zeile „Steuer“ in jeder Verkaufsabrechnung. Den Verlusttopf findest du im Portfolio."
+    },
+    "taxIncome": {
+      "title": "Steuer auf Dividenden und Zinsen",
+      "summary": "{rate} auf Dividenden und Anleihezinsen",
+      "text": "Dividenden und die Zinsen von Staatsanleihen werden wie Kursgewinne besteuert: {rate} gehen ab, bevor das Geld auf deinem Konto landet.",
+      "example": "Eine Firma schüttet dir {gross} Dividende aus. {tax} gehen an den Staat, {net} kommen an.",
+      "where": "In der Handelshistorie steht jede Ausschüttung mit Bruttobetrag und Steuer."
+    },
+    "vault": {
+      "title": "Grundeinkommen und Tresor",
+      "summary": "{rate} pro Stunde, höchstens {hours} Stunden",
+      "text": "Du bekommst {rate} pro Stunde, auch wenn du offline bist. Das Geld sammelt sich im Tresor, der höchstens {hours} Stunden fasst. Was darüber hinausgeht, verfällt.",
+      "example": "Nach einer Nacht ist der Tresor voll: Du holst {cap} ab. Wer zweimal am Tag leert, verschenkt trotzdem einen Teil.",
+      "where": "Auf der Startseite im Tresor, mit Countdown bis er voll ist."
+    },
+    "xpBonus": {
+      "title": "Alpha-Bonus: {factor}-fache XP",
+      "summary": "Alle XP zählen während der Alpha {factor}-fach",
+      "text": "Solange die Alpha läuft, bringt jede Aktion {factor}-mal so viele XP wie normal. Die Tageslimits zählen Aktionen, nicht XP: Es bleiben {trades} Trades pro Tag, die XP geben.",
+      "example": "Ein Trade bringt statt {base} XP jetzt {boosted} XP.",
+      "where": "Bei jedem XP-Gewinn; der Bonus ist im Profil vermerkt."
+    }
   }
 }

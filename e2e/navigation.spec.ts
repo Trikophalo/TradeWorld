@@ -71,3 +71,11 @@ test("the showcase renders every section", async ({ page }) => {
     await expect(page.locator(`#${id}`)).toBeVisible();
   }
 });
+
+test("the rules page explains taxes with numbers from the config", async ({ page }) => {
+  await page.goto("/profile");
+  await page.getByRole("link", { name: /Spielregeln/ }).click();
+  await expect(page).toHaveURL("/profile/rules");
+  await page.getByRole("button", { name: /Steuer auf Kursgewinne/ }).click();
+  await expect(page.getByText("250 € Steuer, 750 € bleiben dir", { exact: false })).toBeVisible();
+});
