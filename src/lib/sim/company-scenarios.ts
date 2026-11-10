@@ -13,6 +13,7 @@ import { BALANCE } from "../../config/balance.ts";
 import type { BalanceConfig, CompanyTierId, DepartmentId, SectorId } from "../../config/balance.ts";
 import { effectiveSkillPoints, marketSalaryCents } from "./employees.ts";
 import {
+  awarenessAfterTierChange,
   closeQuarter,
   marketPriceCents,
   priceBandCents,
@@ -89,7 +90,8 @@ export interface ScenarioOutcome {
 }
 
 const SKILL = 5;
-const STARTER_PRODUCTION_SHARE = 0.6;
+/** Awareness of a well-run company in its old segment at the moment it converts to the next tier. */
+const CONVERTED_AWARENESS = 0.34;
 
 interface Firm {
   readonly id: string;
@@ -166,8 +168,20 @@ export function runScenario(options: ScenarioOptions): ScenarioOutcome[] {
   const tierCfg = cfg.company.tiers.find((t) => t.id === tier);
   if (!tierCfg) throw new RangeError(`unknown tier: ${tier}`);
   const cap = tierCfg.maxEmployees;
-  const step = Math.max(1, Math.round(cap * 0.05));
-  const starter = Math.max(1, Math.round(cap * STARTER_PRODUCTION_SHARE));
+  const step = Math.max(1, Math.round(cap * 0.1));
+  // A small business starts with three trained production workers. Larger tiers start as a converted
+  // company of the tier below: its full team (20 % developers, the rest production), its quality and
+  // the customers who already know it.
+  const tierIndex = cfg.company.tiers.findIndex((t) => t.id === tier);
+  const previousTier = tierIndex > 0 ? cfg.company.tiers[tierIndex - 1] : undefined;
+  const starterDevelopers = previousTier ? Math.max(1, Math.round(previousTier.maxEmployees * 0.2)) : 0;
+  const starter = previousTier ? previousTier.maxEmployees - starterDevelopers : 3;
+  const startQuality = previousTier
+    ? cfg.company.segments[segmentForTier(previousTier.id, cfg)].incumbentQuality + 10
+    : cfg.company.quality.initial;
+  const startAwareness = previousTier
+    ? awarenessAfterTierChange(CONVERTED_AWARENESS, previousTier.id, tier, cfg)
+    : cfg.company.marketing.initialAwareness;
   const segmentId = segmentForTier(tier, cfg);
   const referenceBudget =
     segmentBaseDemand(sectorId, segmentId, cfg) * cfg.company.marketing.referenceBudgetShareOfSegmentDemand;
@@ -187,21 +201,20 @@ export function runScenario(options: ScenarioOptions): ScenarioOutcome[] {
       firstNegative: null,
     };
     hire(firm, "production", starter, cap);
+    hire(firm, "development", starterDevelopers, cap);
+    const starterSize = firm.employees.length;
+    for (const e of firm.employees) e.quartersEmployed = 9; // the starter team is already trained
     if (archetype === "solid") {
-      const devs = developersNeeded(sectorId, tier, starter, cap, cfg);
+      const devs = developersNeeded(sectorId, tier, starter, cap, cfg) - starterDevelopers;
       // Make room for the developers inside the head count cap.
-      fire(firm, "production", Math.max(0, starter + devs - cap), 1);
-      hire(firm, "development", devs, cap);
+      fire(firm, "production", Math.max(0, starterSize + devs - cap), 1);
+      hire(firm, "development", Math.max(0, devs), cap);
     }
     if (archetype === "over_expander") {
       hire(firm, "development", Math.round(cap * 0.2), cap);
       hire(firm, "production", cap, cap);
     }
     if (archetype === "sloppy") hire(firm, "production", cap, cap);
-    // The starter team is already trained; everybody hired on top starts onboarding.
-    firm.employees.forEach((e, index) => {
-      if (index < starter && e.department === "production") e.quartersEmployed = 9;
-    });
     return firm;
   });
 
@@ -227,8 +240,8 @@ export function runScenario(options: ScenarioOptions): ScenarioOutcome[] {
       loanRateBps: 0,
       bookEquityCents: startCash,
       sharesOutstanding: BigInt(1_000),
-      quality: cfg.company.quality.initial,
-      awareness: cfg.company.marketing.initialAwareness,
+      quality: startQuality,
+      awareness: startAwareness,
       unitPriceCents: BigInt(referencePrice),
       fixedCostCents: tierFixedCostCents(tier, sectorId, cfg),
       departments: departments(firm.employees, cfg),
@@ -349,8 +362,13 @@ function decide(firm: Firm, company: CompanyState, macro: MacroState, ctx: Polic
 
     case "solid": {
       if (utilization !== null && !onboarding) {
-        if (utilization > 0.95) hire(firm, "production", step, cap);
-        else if (utilization < 0.75) fire(firm, "production", step, 1);
+        if (utilization > 0.95) {
+          // Grow production, and development with it so that quality keeps up with the size.
+          const production = count(firm.employees, "production");
+          const wanted = developersNeeded(company.sectorId, company.tier, production + step, cap, cfg);
+          hire(firm, "development", wanted - count(firm.employees, "development"), cap);
+          hire(firm, "production", step, cap);
+        } else if (utilization < 0.75) fire(firm, "production", step, 1);
       }
       return { companyId: firm.id, unitPriceCents: price(marketPrice), marketingBudgetCents: budget(1) };
     }
