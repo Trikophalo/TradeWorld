@@ -367,7 +367,7 @@ Verlauf.
 1. **Die Senken sind schwach.** Auf Level 1 und 10 verschwinden 3 bis 6 % dessen, was hereinkommt. Erst mit
    großem Depot, Steuern und Statussymbolen werden es 12 bis 25 %. Das Vermögen je Spieler wächst mit den
    Startwerten um etwa 20 % am Tag (früh) bis 7 % am Tag (spät).
-2. **Das Grundeinkommen ist nur am Anfang wichtig:** 77 bis 100 % der Einnahmen auf Level 1, etwa 20 bis 25 % auf
+2. **Das Grundeinkommen ist nur am Anfang wichtig:** rund 77 % der Einnahmen auf Level 1, etwa 20 bis 25 % auf
    Level 10, 1 bis 2 % auf Level 25. Als Sicherheitsnetz passt das.
 3. **Ab etwa 100 000 € Vermögen dominiert der Kapitalertrag.** 7 % am Tag verzehnfachen ein Depot in gut einem
    Monat. Das ist die Folge von „realistische Jahresrenditen“ und „ein Jahr = ein Tag“ (Abschnitt 6, Punkt 1).
@@ -410,13 +410,13 @@ Daraus die Tage bis zum Level:
 | 5 | Anleihen, Stop-Loss | Tag 2 | – | Tag 1 | – |
 | 8 | Leerverkäufe | Tag 5 | – | Tag 3 | – |
 | 10 | Kleinunternehmen | Tag 8 | Tag 8 | Tag 5 | Tag 5 |
-| 12 | Hebel 2× | Tag 12 | Tag 10 | Tag 7 | Tag 6 |
-| 15 | Kleinkredit | Tag 22 | Tag 14 | Tag 13 | Tag 9 |
-| 18 | Hebel 5× | Tag 35 | Tag 20 | Tag 20 | Tag 13 |
+| 12 | Hebel 2× | Tag 12 | Tag 10 | Tag 7 | Tag 7 |
+| 15 | Kleinkredit | Tag 22 | Tag 14 | Tag 13 | Tag 10 |
+| 18 | Hebel 5× | Tag 35 | Tag 20 | Tag 20 | Tag 14 |
 | 20 | GmbH | Tag 45 | Tag 24 | Tag 26 | Tag 17 |
 | 25 | IPO | Tag 80 | Tag 39 | Tag 46 | Tag 28 |
-| 30 | Hebel 10×, Optionen | Tag 126 | Tag 59 | Tag 73 | Tag 42 |
-| 50 | Börsenlegende | über 1 Jahr | etwa Tag 200 | etwa Tag 265 | etwa Tag 120 bis 150 |
+| 30 | Hebel 10×, Optionen | Tag 126 | Tag 59 | Tag 73 | Tag 43 |
+| 50 | Börsenlegende | über 1 Jahr | etwa Tag 200 | etwa Tag 265 | etwa Tag 150 |
 
 **Bewertung:**
 
@@ -528,7 +528,7 @@ bedeutungslos werden (Gründungskosten, Statussymbole, Ordergebühr, Grundeinkom
 
 Die Anlaufphase der Zentralbank (14 Tage) ist deshalb nötig: In den ersten Tagen wächst die Geldmenge je Spieler
 um 20 % und mehr am Tag, nur weil die Basis 10 000 € beträgt. Ohne Anlaufphase stünde der Leitzins nach zwei
-Wochen bei 10 % und hätte die Tech-Werte um mehr als 40 % gedrückt, ohne dass etwas schiefläuft.
+Wochen bei 10 % und hätte die fairen Werte der Tech-Aktien um 40 % gedrückt, ohne dass etwas schiefläuft.
 
 **Vorschläge für stärkere Senken**, falls der Test zu viel Geld zeigt (keiner ist umgesetzt):
 

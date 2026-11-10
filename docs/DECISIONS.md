@@ -214,3 +214,45 @@ damit Seeds, Tests und Demo-Daten dieselben Schlüssel verwenden.
 belegtem Namen ein Zahlensuffix und bucht das Startkapital aus `game_config` → `economy.startingCapitalCents`.
 Ein falscher Einladungscode kommt derzeit als allgemeiner Fehler zurück; eine genauere Meldung ist für M1 notiert.
 Die mitgelieferten Einladungscodes in `seed.sql` sind Platzhalter und müssen vor dem Freundestest ersetzt werden.
+
+## ADR-025: Kursbildung: linearer Preis-Impact, Value-Fonds als Anker — `Annahme`
+
+- **Preis-Impact ist linear** in der Ordergröße: Eine „Markttiefe“ (0,2 % des Streubesitzes) bewegt den Kurs um 1 %.
+  Linear heißt: Eine Order in viele kleine zu zerlegen bringt keinen Vorteil.
+- Der Einfluss einer Spielerorder wirkt zur Hälfte sofort auf den Mittelkurs; die andere Hälfte baut der
+  Marktmacher über rund 200 Ticks ab.
+- Es gibt keinen eigenen Rückstellterm zum fairen Wert. Die Rückkehr entsteht durch den Value-Fonds. Die
+  Verstärkung der Trendfolger muss unter 1 bleiben (ein Test erzwingt das), sonst schaukeln sich Kurse auf.
+- KI-Aktivität skaliert mit der Liquidität der Handelsphase (nachbörslich weniger).
+- Kurse werden stochastisch gerundet, damit Pennystocks nicht am Mindestkurs kleben.
+
+## ADR-026: Unternehmenssimulation: Präzisierungen — `Annahme`
+
+- Nachfrage, die eine Firma wegen ihrer Kapazität nicht bedienen kann, geht nach Attraktivität an die übrigen
+  Firmen der Branche und verfällt erst, wenn alle ausgelastet sind.
+- Branchennachfrage wird in Euro geführt (Stück = Umsatz / Preis).
+- Makro-Events werden beim Quartalsabschluss angekündigt und wirken ab dem Folgequartal auf die Nachfrage.
+- Guidance wird in beide Richtungen geprüft (auch deutliches Übertreffen kostet, damit niemand tiefstapelt).
+- Finanzierungskosten für Hebel und Shorts laufen sekundengenau auf, es gibt keinen Stichzeitpunkt zum Umgehen.
+- Der „Kleinkredit“ ab Level 15 ist eine Kreditlinie der Firma, abhängig vom Level des Gründers. Privatkredite
+  gibt es nicht.
+
+## ADR-027: Ergänzungen gegenüber dem Prompt, zu bestätigen — `offen`
+
+Die Simulation enthält Dinge, die der Prompt nicht nennt. Sie sind konfigurierbar und können entfallen:
+
+| Ergänzung                                                         | Grund                                                                                                              |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Preisband für Stückpreise                                         | Die Attraktivitätsformel ist skalenfrei; ohne Band verdienen Kleinstfirmen mit Boutique-Preisen unrealistisch viel |
+| 15 % Unternehmenssteuer                                           | Zusätzliche Geldsenke                                                                                              |
+| 25 % Abgeltung auch auf Kupons und Dividenden                     | Gleichbehandlung mit Kursgewinnen, Geldsenke                                                                       |
+| Stufe „börsennotiert“ (bis 1000 Mitarbeiter, 120 000 € Fixkosten) | Der Prompt definiert Größen nur bis zur AG vor dem IPO                                                             |
+| `progression.xpMultiplier` (Standard 1)                           | Stellschraube für das Lerntempo im Freundestest                                                                    |
+
+## ADR-028: Zinsniveau pro Spieljahr ist zu entscheiden — `offen`
+
+Ein Spieljahr dauert einen echten Tag. Die Vorgaben „Leitzins 3 %“ und „Anleihen 2 bis 4 %“ bedeuten damit
+risikolose 2 bis 4 % **pro echtem Tag**. Nach der ersten Geldflussrechnung (`BALANCING.md`, Abschnitt 6) wächst
+das Vermögen je Spieler damit um 7 bis 20 % pro Tag, und die Senken fangen nur einen kleinen Teil ab.
+Die Werte stehen unverändert wie im Prompt in `balance.ts`. **Vor M1 ist zu entscheiden**, ob das so gewollt ist
+oder ob Zinsen und Renditen skaliert werden (z. B. Obergrenze für Anleihen je Spieler oder ein niedrigeres Zinsniveau).

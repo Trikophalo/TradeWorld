@@ -48,17 +48,17 @@ Diese drei Punkte stehen in jedem Meilenstein unter „Abschluss“.
 
 ## Übersicht
 
-| Meilenstein | Ergebnis | Baut auf |
-|---|---|---|
-| M0 Fundament | Leere, aber schöne und navigierbare App | – |
-| M1 Markt | Man kann live traden | M0 |
-| M2 Spieler-Kern | 4 Freunde können spielen und sich messen | M1 |
-| M3 Karriere | Einkommen wächst | M2 |
-| M4 Unternehmen | Firmen gründen und führen | M2 (M3 empfohlen) |
-| M5 Sozial | Kooperation und Drama | M3, M4 |
-| M6 Börsengang | Spielerfirmen an der Börse | M4, M5 |
-| M7 Risiko | Volles Zockgefühl | M2 (unabhängig von M3 bis M6) |
-| M8 Feinschliff | Release für Freundestest v1 | M0 bis M7 |
+| Meilenstein     | Ergebnis                                 | Baut auf                      |
+| --------------- | ---------------------------------------- | ----------------------------- |
+| M0 Fundament    | Leere, aber schöne und navigierbare App  | –                             |
+| M1 Markt        | Man kann live traden                     | M0                            |
+| M2 Spieler-Kern | 4 Freunde können spielen und sich messen | M1                            |
+| M3 Karriere     | Einkommen wächst                         | M2                            |
+| M4 Unternehmen  | Firmen gründen und führen                | M2 (M3 empfohlen)             |
+| M5 Sozial       | Kooperation und Drama                    | M3, M4                        |
+| M6 Börsengang   | Spielerfirmen an der Börse               | M4, M5                        |
+| M7 Risiko       | Volles Zockgefühl                        | M2 (unabhängig von M3 bis M6) |
+| M8 Feinschliff  | Release für Freundestest v1              | M0 bis M7                     |
 
 M7 hängt fachlich nur an M1 und M2. Es kann vorgezogen werden, wenn die Testgruppe früh Hebel und Shorts will.
 Die Standardreihenfolge bleibt die des Prompts.
@@ -76,52 +76,52 @@ den Simulationstypen und der Dokumentation, sodass M1 ohne Umbauten starten kann
 
 ### Daten/Backend
 
-- [ ] Projekt-Setup: Next.js (App Router), TypeScript strict, pnpm, ESLint, Prettier, Husky + lint-staged (ADR-002)
-- [ ] `.env.example` mit allen Variablen. `SUPABASE_SERVICE_ROLE_KEY` nur serverseitig.
-- [ ] Vollständiges DB-Schema als Migrationen unter `supabase/` für alle Meilensteine (Markt, Ledger, Spieler,
+- [x] Projekt-Setup: Next.js (App Router), TypeScript strict, pnpm, ESLint, Prettier, Husky + lint-staged (ADR-002)
+- [x] `.env.example` mit allen Variablen. `SUPABASE_SERVICE_ROLE_KEY` nur serverseitig.
+- [x] Vollständiges DB-Schema als Migrationen unter `supabase/` für alle Meilensteine (Markt, Ledger, Spieler,
       Karriere, Unternehmen, Soziales, Events, Konfiguration)
-- [ ] RLS auf allen Tabellen, öffentliche Views für Kurse, Firmenprofile und Ranglisten (ADR-008)
-- [ ] Ledger mit doppelter Buchführung und Systemkonten (ADR-007)
-- [ ] Seeds: 15 KI-Unternehmen mit Kürzeln (ADR-014), Branchen, Staatsanleihen, `game_quarters`, `game_config`,
+- [x] RLS auf allen Tabellen, öffentliche Views für Kurse, Firmenprofile und Ranglisten (ADR-008)
+- [x] Ledger mit doppelter Buchführung und Systemkonten (ADR-007)
+- [x] Seeds: 15 KI-Unternehmen mit Kürzeln (ADR-014), Branchen, Staatsanleihen, `game_quarters`, `game_config`,
       Einladungscodes
-- [ ] `src/config/balance.ts` mit allen Startwerten und `pnpm db:config` für den Seed von `game_config` (ADR-009)
+- [x] `src/config/balance.ts` mit allen Startwerten und `pnpm db:config` für den Seed von `game_config` (ADR-009)
 - [ ] Auth: Registrierung mit E-Mail, Passwort, Einladungscode und 18+-Bestätigung, Login, Logout,
-      geschützte Spielseiten (ADR-010)
-- [ ] Demo-Modus ohne Supabase-Zugangsdaten mit Beispieldaten aus `src/lib/demo` (ADR-015)
+      geschützte Spielseiten (ADR-010) _(umgesetzt, aber mangels Zugangsdaten noch nicht gegen ein echtes Supabase-Projekt getestet)_
+- [x] Demo-Modus ohne Supabase-Zugangsdaten mit Beispieldaten aus `src/lib/demo` (ADR-015)
 
 ### Simulation
 
-- [ ] Typdefinitionen in `src/lib/sim` für Markt-Tick, Quartalsabschluss, KI-Investoren, Unternehmen (ADR-012)
-- [ ] Reine Formelfunktionen: XP-Kurve, fairer Wert, Attraktivität und Marktanteil, Marketing-Grenznutzen,
+- [x] Typdefinitionen in `src/lib/sim` für Markt-Tick, Quartalsabschluss, KI-Investoren, Unternehmen (ADR-012)
+- [x] Reine Formelfunktionen: XP-Kurve, fairer Wert, Attraktivität und Marktanteil, Marketing-Grenznutzen,
       Geldumrechnung Cent/`e4` mit Rundung (ADR-003)
-- [ ] Seedbarer Zufallsgenerator (ADR-012)
-- [ ] `docs/SIMULATION.md` mit Pseudocode für Tick, Quartal, KI-Investoren, Zentralbank, Events
+- [x] Seedbarer Zufallsgenerator (ADR-012)
+- [x] `docs/SIMULATION.md` mit Pseudocode für Tick, Quartal, KI-Investoren, Zentralbank, Events
 
 ### UI
 
-- [ ] Design-Tokens als CSS-Variablen in `src/styles/tokens.css`, eingebunden über `@theme inline` (ADR-002):
+- [x] Design-Tokens als CSS-Variablen in `src/styles/tokens.css`, eingebunden über `@theme inline` (ADR-002):
       Farben, Typografie, Abstände, Radien, Schatten, Motion, z-Index
-- [ ] Dunkles Theme als Standard, helles Theme zusätzlich
-- [ ] Selbst gehostete Schriften Inter und Silkscreen, `tabular-nums` für Zahlen
-- [ ] Layout mit 5 Tabs: untere Tab-Leiste auf dem Handy, Seitenleiste auf dem PC, animierter Tab-Indikator
-- [ ] Fünf Tab-Seiten mit sinnvollen Platzhaltern (leere Zustände mit Pixel-Illustration)
-- [ ] Komponenten-Showcase unter `/dev/ui`: Buttons (alle Zustände), Karten, Number Ticker, Skeletons, Toasts,
+- [x] Dunkles Theme als Standard, helles Theme zusätzlich
+- [x] Selbst gehostete Schriften Inter und Silkscreen, `tabular-nums` für Zahlen
+- [x] Layout mit 5 Tabs: untere Tab-Leiste auf dem Handy, Seitenleiste auf dem PC, animierter Tab-Indikator
+- [x] Fünf Tab-Seiten mit sinnvollen Platzhaltern (leere Zustände mit Pixel-Illustration)
+- [x] Komponenten-Showcase unter `/dev/ui`: Buttons (alle Zustände), Karten, Number Ticker, Skeletons, Toasts,
       Bottom Sheet, Tab-Leiste
-- [ ] `PixelIcon`-Komponente und erstes Icon-Set: 5 Branchen-Icons, 3 Beispiel-Firmenlogos, Münze, Stier, Bär
-- [ ] `prefers-reduced-motion` wird respektiert
-- [ ] i18n mit `next-intl`, Texte in `messages/de.json`
-- [ ] PWA-Grundlage: Manifest und Icons
+- [x] `PixelIcon`-Komponente und erstes Icon-Set: 5 Branchen-Icons, 3 Beispiel-Firmenlogos, Münze, Stier, Bär
+- [x] `prefers-reduced-motion` wird respektiert
+- [x] i18n mit `next-intl`, Texte in `messages/de.json`
+- [x] PWA-Grundlage: Manifest und Icons
 
 ### Tests
 
-- [ ] Vitest für alle Formelfunktionen (XP-Kurve an den Stützstellen 1, 10, 20, Marktanteile summieren zu 1,
+- [x] Vitest für alle Formelfunktionen (XP-Kurve an den Stützstellen 1, 10, 20, Marktanteile summieren zu 1,
       Rundung half-even, Determinismus des Zufallsgenerators)
-- [ ] Playwright-Screenshots der 5 Tabs und von `/dev/ui` in Handy- und PC-Breite, Unschönheiten korrigiert
-- [ ] Lint und Typecheck laufen fehlerfrei
+- [x] Playwright-Screenshots der 5 Tabs und von `/dev/ui` in Handy- und PC-Breite, Unschönheiten korrigiert
+- [x] Lint und Typecheck laufen fehlerfrei
 
 ### Dokumentation
 
-- [ ] `CLAUDE.md`, `docs/GAME_DESIGN.md`, `docs/ARCHITECTURE.md`, `docs/DATA_MODEL.md`, `docs/SIMULATION.md`,
+- [x] `CLAUDE.md`, `docs/GAME_DESIGN.md`, `docs/ARCHITECTURE.md`, `docs/DATA_MODEL.md`, `docs/SIMULATION.md`,
       `docs/BALANCING.md`, `docs/DESIGN_SYSTEM.md`, `docs/ROADMAP.md`, `docs/DECISIONS.md`
 
 ### Abnahmekriterien
@@ -146,9 +146,9 @@ umgebaut werden.
 
 ### Abschluss
 
-- [ ] Deploy auf Vercel (im Demo-Modus, falls noch kein Supabase-Projekt existiert)
-- [ ] Tests der Formelfunktionen grün
-- [ ] Changelog-Notiz „M0“
+- [ ] Deploy auf Vercel (im Demo-Modus, falls noch kein Supabase-Projekt existiert) _(offen: braucht dein Vercel-Konto)_
+- [x] Tests der Formelfunktionen grün
+- [x] Changelog-Notiz „M0“
 
 ---
 
@@ -250,13 +250,13 @@ und gibt Kennzahlen aus (Tagesschwankung je Größenklasse), bevor die UI angebu
 M1 ist der technisch riskanteste Meilenstein. Er wird in fünf Schritten gebaut, die einzeln geprüft und
 freigegeben werden können.
 
-| Schritt | Inhalt | Prüfbar durch |
-|---|---|---|
-| **1. Markt lesen** | Supabase-Projekt anbinden, Migrationen und Seeds einspielen. Märkte-Liste und Aktien-Detail lesen echte Daten aus den öffentlichen Views. Noch keine Bewegung, Kurshistorie aus einem Seed-Skript. | Liste und Detailseite zeigen die 15 Firmen mit Chart. Der Demo-Modus funktioniert weiter. |
-| **2. Tick offline** | Tick-Funktion in `src/lib/sim` vollständig (fairer Wert, KI-Druck, Preis-Impact, Börsenzeiten), dazu das Tagessimulations-Skript und Tests. Noch keine Datenbank. | Testbericht und Kennzahlen eines simulierten Tages. Kurve je Größenklasse plausibel. |
-| **3. Tick live** | `tick-runner`, `apply_market_tick`, Kerzen, `pg_cron`, Lease, Broadcast. Client abonniert `market:ticks`. | Kurse und Live-Kerze bewegen sich im Browser. Über Nacht entstehen lückenlose Kerzen. |
-| **4. Handeln** | `place_order` und `cancel_order` für Market und Limit, Ledger, Gebühr, Steuer, Orderbuch, Order-Maske, Positionsliste. | Kaufen, verkaufen, Limit setzen und stornieren. Ledger-Summe 0. Doppelklick-Test. |
-| **5. Anleihen, Index, Quartal, Admin** | Staatsanleihen, NEXA 30 auf der Startseite, minimaler Quartalsabschluss mit Quartalszahlen und News, Admin-Minimum, Rate Limit, Playwright-Flow. | Alle Abnahmekriterien von M1. |
+| Schritt                                | Inhalt                                                                                                                                                                                             | Prüfbar durch                                                                             |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| **1. Markt lesen**                     | Supabase-Projekt anbinden, Migrationen und Seeds einspielen. Märkte-Liste und Aktien-Detail lesen echte Daten aus den öffentlichen Views. Noch keine Bewegung, Kurshistorie aus einem Seed-Skript. | Liste und Detailseite zeigen die 15 Firmen mit Chart. Der Demo-Modus funktioniert weiter. |
+| **2. Tick offline**                    | Tick-Funktion in `src/lib/sim` vollständig (fairer Wert, KI-Druck, Preis-Impact, Börsenzeiten), dazu das Tagessimulations-Skript und Tests. Noch keine Datenbank.                                  | Testbericht und Kennzahlen eines simulierten Tages. Kurve je Größenklasse plausibel.      |
+| **3. Tick live**                       | `tick-runner`, `apply_market_tick`, Kerzen, `pg_cron`, Lease, Broadcast. Client abonniert `market:ticks`.                                                                                          | Kurse und Live-Kerze bewegen sich im Browser. Über Nacht entstehen lückenlose Kerzen.     |
+| **4. Handeln**                         | `place_order` und `cancel_order` für Market und Limit, Ledger, Gebühr, Steuer, Orderbuch, Order-Maske, Positionsliste.                                                                             | Kaufen, verkaufen, Limit setzen und stornieren. Ledger-Summe 0. Doppelklick-Test.         |
+| **5. Anleihen, Index, Quartal, Admin** | Staatsanleihen, NEXA 30 auf der Startseite, minimaler Quartalsabschluss mit Quartalszahlen und News, Admin-Minimum, Rate Limit, Playwright-Flow.                                                   | Alle Abnahmekriterien von M1.                                                             |
 
 Schritt 2 vor Schritt 3 ist Absicht: Das Kursverhalten wird ohne Infrastruktur abgestimmt, wo ein Durchlauf
 Sekunden dauert statt einen Tag.
@@ -835,16 +835,16 @@ darf nicht davon abhängen. In-App-Benachrichtigungen bleiben der Standardweg.
 Funktionen aus dem Prompt, die zum Spiel gehören, aber in keinem Meilenstein M0 bis M8 stehen. Sie werden
 nach dem Freundestest v1 eingeplant (Frage 24).
 
-| Funktion | Freischaltung | Voraussetzung |
-|---|---|---|
-| Optionen (Calls/Puts) | Level 30 | M7 |
-| Übernahmen und feindliche Übernahmeangebote | Level 35 | M6 |
-| Holding: mehrere Firmen gleichzeitig | Level 40 | M4 |
-| Hall of Fame, Titel „Börsenlegende“, goldener Profilrahmen | Level 50 | M2 |
-| Pixel-Logo-Editor in 24×24 | – | M4 |
-| Automatische Multi-Account-Erkennung auf Basis des Protokolls | – | M8 |
-| Eigener Worker statt Edge Function für den Tick (ADR-004) | – | bei wachsender Spielerzahl |
-| OAuth-Anmeldung und offene Registrierung (ADR-010) | – | nach der Alpha |
+| Funktion                                                      | Freischaltung | Voraussetzung              |
+| ------------------------------------------------------------- | ------------- | -------------------------- |
+| Optionen (Calls/Puts)                                         | Level 30      | M7                         |
+| Übernahmen und feindliche Übernahmeangebote                   | Level 35      | M6                         |
+| Holding: mehrere Firmen gleichzeitig                          | Level 40      | M4                         |
+| Hall of Fame, Titel „Börsenlegende“, goldener Profilrahmen    | Level 50      | M2                         |
+| Pixel-Logo-Editor in 24×24                                    | –             | M4                         |
+| Automatische Multi-Account-Erkennung auf Basis des Protokolls | –             | M8                         |
+| Eigener Worker statt Edge Function für den Tick (ADR-004)     | –             | bei wachsender Spielerzahl |
+| OAuth-Anmeldung und offene Registrierung (ADR-010)            | –             | nach der Alpha             |
 
 ---
 
@@ -853,18 +853,18 @@ nach dem Freundestest v1 eingeplant (Frage 24).
 Bewusst ausgeschlossen. Nichts davon wird in M0 bis M8 gebaut. Die mit „nie“ markierten Punkte sind harte
 Rahmenbedingungen und auch später ausgeschlossen.
 
-| Thema | Status |
-|---|---|
-| Echtgeld, Auszahlung, Kauf von Spielgeld | **nie** |
-| In-App-Käufe mit Einfluss auf Geld, Aktien oder XP | **nie** |
-| Bezahlte Zufallsboxen, Countdown-Kaufangebote | **nie** |
-| Kosmetische Käufe | später denkbar, Architektur lässt es zu |
-| Chat (mit Moderation) | später |
-| Fiktive Staaten mit Ausfallrisiko (z. B. „Republik Valdorien, 9 %, Rating CCC“) | später |
-| Rohstoffe als handelbarer Markt | später. Im MVP ist der Ölpreis nur eine Simulationsgröße. |
-| Prestige-System nach Level 50 | später |
-| Zweite Sprache | später, i18n ist vorbereitet (ADR-002) |
-| Native Apps in den Stores | später, im MVP nur PWA |
-| Bruchstücke von Aktien | später (ADR-003) |
-| Öffentliche Registrierung ohne Einladungscode | nach der Alpha (ADR-010) |
-| Optionen, Übernahmen, Holding, Hall of Fame | nach M8, siehe oben |
+| Thema                                                                           | Status                                                    |
+| ------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Echtgeld, Auszahlung, Kauf von Spielgeld                                        | **nie**                                                   |
+| In-App-Käufe mit Einfluss auf Geld, Aktien oder XP                              | **nie**                                                   |
+| Bezahlte Zufallsboxen, Countdown-Kaufangebote                                   | **nie**                                                   |
+| Kosmetische Käufe                                                               | später denkbar, Architektur lässt es zu                   |
+| Chat (mit Moderation)                                                           | später                                                    |
+| Fiktive Staaten mit Ausfallrisiko (z. B. „Republik Valdorien, 9 %, Rating CCC“) | später                                                    |
+| Rohstoffe als handelbarer Markt                                                 | später. Im MVP ist der Ölpreis nur eine Simulationsgröße. |
+| Prestige-System nach Level 50                                                   | später                                                    |
+| Zweite Sprache                                                                  | später, i18n ist vorbereitet (ADR-002)                    |
+| Native Apps in den Stores                                                       | später, im MVP nur PWA                                    |
+| Bruchstücke von Aktien                                                          | später (ADR-003)                                          |
+| Öffentliche Registrierung ohne Einladungscode                                   | nach der Alpha (ADR-010)                                  |
+| Optionen, Übernahmen, Holding, Hall of Fame                                     | nach M8, siehe oben                                       |

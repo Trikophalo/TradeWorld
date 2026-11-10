@@ -299,10 +299,10 @@ Geldmenge je Quartal (`money_supply_snapshots`), Ledger-Prüfsumme (Summe aller 
 
 ## 13. Stand nach M0
 
-| Bereich                                           | Stand                                                                                                    |
-| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| App-Gerüst, Tokens, Komponenten, 5 Tabs, Showcase | Umgesetzt, läuft im Demo-Modus mit Beispieldaten                                                         |
-| Anmeldung                                         | Oberfläche, Supabase-Clients und `proxy.ts` umgesetzt; gegen ein echtes Projekt noch nicht getestet      |
-| Datenbankschema, RLS, Seeds                       | Als Migrationen vorhanden, lokal gegen Postgres 16 geprüft; noch auf kein Supabase-Projekt angewendet    |
-| Simulation                                        | Typen und Formeln mit Tests; Tick und Quartal als erste Fassung bzw. Platzhalter (siehe `SIMULATION.md`) |
-| Edge Functions, Realtime, Cron                    | Entworfen (dieses Dokument), Umsetzung in M1                                                             |
+| Bereich                                           | Stand                                                                                                                                                                                          |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| App-Gerüst, Tokens, Komponenten, 5 Tabs, Showcase | Umgesetzt, läuft im Demo-Modus mit Beispieldaten                                                                                                                                               |
+| Anmeldung                                         | Oberfläche, Supabase-Clients und `proxy.ts` umgesetzt; gegen ein echtes Projekt noch nicht getestet                                                                                            |
+| Datenbankschema, RLS, Seeds                       | Als Migrationen vorhanden, lokal gegen Postgres 16 geprüft; noch auf kein Supabase-Projekt angewendet                                                                                          |
+| Simulation                                        | Typen, Formeln, Tick (`stepMarketTick`) und Quartal (`closeQuarter`) als reine Funktionen mit Tests; Parameter nur grob kalibriert, noch an keine Datenbank angebunden (siehe `SIMULATION.md`) |
+| Edge Functions, Realtime, Cron                    | Entworfen (dieses Dokument), Umsetzung in M1                                                                                                                                                   |
