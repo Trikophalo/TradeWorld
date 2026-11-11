@@ -153,7 +153,11 @@ export function closeStartupQuarter(
 
   // Quality moves towards what the team can do; awareness grows by word of mouth and marketing.
   const stage = clamp(Math.floor(input.stage), 0, sc.stages.awarenessCaps.length - 1);
-  const target = Math.min(1, qualityTarget(input.teamSectorScore, sc) + sc.stages.qualityBonusPerStage * stage);
+  // AI workers do standard work: the more of the team they are, the lower the reachable quality (ADR-069).
+  const aiShare = input.productivityBps.length > 0 ? input.aiWorkers / input.productivityBps.length : 0;
+  const target =
+    Math.min(1, qualityTarget(input.teamSectorScore, sc) + sc.stages.qualityBonusPerStage * stage) *
+    (1 - sc.aiQualityPenalty * aiShare);
   const quality = clamp(state.quality + sc.quality.adjustPerQuarter * (target - state.quality), 0, 1);
   const marketing = Number(input.marketingCents);
   const awareness = clamp(

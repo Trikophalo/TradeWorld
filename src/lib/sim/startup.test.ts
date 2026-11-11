@@ -179,3 +179,23 @@ describe("growth stages (ADR-062)", () => {
     expect(trainingFor(9).costCents).toBe(trainingFor(5).costCents);
   });
 });
+
+describe("AI workers grow a company slower than players (ADR-069)", () => {
+  it("lower the quality the team can reach", () => {
+    const s = { ...initialStartup(1e9, b(1_000_000)), awareness: 0.5, quality: 0.5 };
+    const players = closeStartupQuarter(s, {
+      ...base,
+      productivityBps: [15_000, 15_000],
+      aiWorkers: 0,
+      teamSectorScore: 10,
+    });
+    const ai = closeStartupQuarter(s, {
+      ...base,
+      productivityBps: [15_000, 10_000],
+      aiWorkers: 1,
+      teamSectorScore: 10,
+    });
+    expect(ai.next.quality).toBeLessThan(players.next.quality);
+    expect(ai.capacityCents).toBeLessThan(players.capacityCents);
+  });
+});

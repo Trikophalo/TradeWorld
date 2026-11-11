@@ -936,6 +936,11 @@ export interface StartupsConfig {
    * with this factor; from `fullTimeFromEmployees` employees the founder works there full time.
    */
   readonly sideJobFounderFactor: number;
+  /**
+   * AI workers do standard work (ADR-069): the quality the team can reach falls with their share,
+   * target × (1 − aiQualityPenalty × AI workers / team size).
+   */
+  readonly aiQualityPenalty: number;
   readonly fullTimeFromEmployees: number;
   /** Company logos drawn in the pixel editor (ADR-065). */
   readonly logo: { readonly size: number; readonly maxColors: number; readonly reportsToHide: number };
@@ -1927,6 +1932,7 @@ export const BALANCE = {
       capitalIncreaseMaxPercent: 25,
     },
     sideJobFounderFactor: 0.5,
+    aiQualityPenalty: 0.3,
     fullTimeFromEmployees: 5,
     logo: { size: 16, maxColors: 6, reportsToHide: 3 },
     // P(> 50.000 €) ≈ 40 %, P(> 1 Mio. €) ≈ 7 %, P(> 50 Mio. €) ≈ 0.8 %, P(> 1 Mrd. €) ≈ 0.14 % (ECONOMY.md 6.2).

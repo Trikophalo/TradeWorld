@@ -126,3 +126,21 @@ test("the rules page explains taxes with numbers from the config", async ({ page
   await page.getByRole("button", { name: /Steuer auf Kursgewinne/ }).click();
   await expect(page.getByText("250 € Steuer, 750 € bleiben dir", { exact: false })).toBeVisible();
 });
+
+test("on desktop the company has its own tab in the sidebar", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  const sidebar = page.getByRole("navigation", { name: "Hauptnavigation" }).filter({ visible: true });
+  await sidebar.getByRole("link", { name: /Firma/ }).click();
+  await expect(page).toHaveURL("/company");
+  await expect(sidebar.getByRole("link", { name: /Firma/ })).toHaveAttribute("aria-current", "page");
+  await expect(sidebar.getByRole("link", { name: /Karriere/ })).not.toHaveAttribute("aria-current", "page");
+});
+
+test("on phones the bottom bar keeps six tabs and the company lives under Karriere", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/company");
+  const bar = page.getByRole("navigation", { name: "Hauptnavigation" }).filter({ visible: true });
+  await expect(bar.getByRole("link")).toHaveCount(6);
+  await expect(bar.getByRole("link", { name: /Karriere/ })).toHaveAttribute("aria-current", "page");
+});

@@ -647,3 +647,11 @@ Aktien zu 90 % des Kurses aus, mit derselben Zeichnungsphase.
 Vorgabe: Finn erklärt die wichtigsten Dinge, bei neuen Sachen kurz. Die Job-Tour (Level 2) zeigt Job-Tab und
 Skill-Karte, neue Touren bei der Gründungsfreischaltung (Level 3) und beim Börsengang. Beim ersten Besuch neuer
 Bereiche (Skill-Karte, Firma, Job-Tab) gibt es 1 bis 2 Sprechblasen. Mehrere fällige Touren laufen nacheinander.
+
+## ADR-069: Firma als eigener Tab, KI-Kräfte über die Stellenausschreibung — `akzeptiert`
+
+Vorgabe: Die Firma bekommt einen eigenen Tab in der Leiste links (Desktop; auf dem Handy bleibt es bei 6 Tabs, die
+Firma ist dort über Karriere erreichbar). KI-Kräfte stellt man über „Stelle ausschreiben“ ein, indem man statt Spielern
+die KI wählt. Sie kosten Lohn und lassen die Firma im Schnitt langsamer wachsen als echte Spieler: Leistung 1,0 statt
+mindestens 1,5, keine Skills für Wachstumsstufen, und die erreichbare Qualität sinkt mit ihrem Anteil am Team um bis
+zu 30 % (`startups.aiQualityPenalty`).

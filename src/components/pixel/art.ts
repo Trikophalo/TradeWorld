@@ -533,6 +533,23 @@ export const UI_ICONS = {
       "............",
     ],
   },
+  robot: {
+    palette: mono,
+    grid: [
+      ".....xx.....",
+      ".....xx.....",
+      "..xxxxxxxx..",
+      "..x......x..",
+      "..x.xx.xx.x.",
+      "xxx......xxx",
+      "..x.xxxx.x..",
+      "..xxxxxxxx..",
+      "...x....x...",
+      "..xxxxxxxx..",
+      "..x.x..x.x..",
+      "............",
+    ],
+  },
 } as const satisfies Record<string, PixelArt>;
 
 export type UiIconName = keyof typeof UI_ICONS;

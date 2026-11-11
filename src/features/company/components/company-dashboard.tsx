@@ -359,7 +359,6 @@ function Controls({ company }: { company: MyCompany }) {
   const maxMarketing = Math.max(100_000, Math.round(company.estimateHighCents / 4 / 5 / 1_000) * 1_000);
   const [marketing, setMarketing] = useState(company.marketingCentsPerQuarter);
   const [marketingState, setMarketingState] = useState<ButtonState>("idle");
-  const [aiBusy, setAiBusy] = useState(false);
   const [money, setMoney] = useState<"deposit" | "withdraw" | null>(null);
   const [upgradeState, setUpgradeState] = useState<ButtonState>("idle");
   const [closing, setClosing] = useState(false);
@@ -381,17 +380,6 @@ function Controls({ company }: { company: MyCompany }) {
     } catch (error) {
       setMarketingState("idle");
       toast.error(t("marketing"), errorText(error));
-    }
-  };
-
-  const setAi = async (count: number) => {
-    setAiBusy(true);
-    try {
-      await run(() => engine.setAiWorkers(crypto.randomUUID(), count), t("aiWorkersSaved"));
-    } catch (error) {
-      toast.error(t("aiWorkers"), errorText(error));
-    } finally {
-      setAiBusy(false);
     }
   };
 
@@ -438,33 +426,11 @@ function Controls({ company }: { company: MyCompany }) {
             <p className="text-sm text-fg-2">{t("aiWorkers")}</p>
             <p className="text-xs text-fg-3">{t("staffCount", { used: staff, max: company.maxEmployees })}</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              size="icon"
-              variant="secondary"
-              aria-label="−"
-              disabled={aiBusy || company.aiWorkers === 0}
-              onClick={() => void setAi(company.aiWorkers - 1)}
-            >
-              −
-            </Button>
-            <span className="w-6 text-center nums text-lg font-semibold text-fg-1" data-testid="ai-workers">
-              {company.aiWorkers}
-            </span>
-            <Button
-              size="icon"
-              variant="secondary"
-              aria-label="+"
-              disabled={aiBusy || staff >= company.maxEmployees}
-              onClick={() => void setAi(company.aiWorkers + 1)}
-            >
-              +
-            </Button>
-          </div>
+          <span className="nums text-lg font-semibold text-fg-1" data-testid="ai-workers">
+            {company.aiWorkers}
+          </span>
         </div>
-        <p className="text-xs text-pretty text-fg-3">
-          {t("aiWorkersHint", { amount: formatMoney(company.aiWorkerCostCents, { whole: true }) })}
-        </p>
+        <p className="text-xs text-pretty text-fg-3">{t("aiWorkersViaPosting")}</p>
         <p className="text-sm text-fg-2">
           {t("productivity")}:{" "}
           <span className="nums text-gain">

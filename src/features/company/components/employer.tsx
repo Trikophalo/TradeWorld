@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Avatar } from "@/components/ui/avatar";
@@ -146,11 +146,18 @@ function CreatePostingSheet({
   const [wage, setWage] = useState(baseWage("intern"));
   const [slots, setSlots] = useState(1);
   const [skills, setSkills] = useState<string[]>(initialSkills ?? []);
+  const [kind, setKind] = useState<"player" | "ai">("player");
+  const [aiCount, setAiCount] = useState(1);
   const [state, setState] = useState<ButtonState>("idle");
+  const freeSlots = Math.max(0, company.maxEmployees - company.employees - company.aiWorkers);
+  const hireCount = Math.max(1, Math.min(aiCount, freeSlots));
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (open) setState("idle");
+    if (open) {
+      setState("idle");
+      setAiCount(1);
+    }
   }
 
   const toggle = (branch: SkillBranch) => {
@@ -187,6 +194,22 @@ function CreatePostingSheet({
     }
   };
 
+  // AI workers are hired at once (ADR-069): no applications, standard work.
+  const hireAi = async () => {
+    setState("loading");
+    try {
+      await engine.setAiWorkers(crypto.randomUUID(), company.aiWorkers + hireCount);
+      setState("success");
+      void playSound("success");
+      toast.success(t("aiHired", { count: hireCount }), undefined, { silent: true });
+      await refresh();
+      window.setTimeout(onClose, 400);
+    } catch (error) {
+      setState("idle");
+      toast.error(t("aiWorkers"), errorText(error));
+    }
+  };
+
   const low = Math.round(baseWage(tier) / 2);
   const high = baseWage(tier) * 3;
 
@@ -196,101 +219,185 @@ function CreatePostingSheet({
       onOpenChange={(o) => !o && onClose()}
       title={t("newPosting")}
       footer={
-        <Button
-          block
-          size="lg"
-          state={state}
-          disabled={title.trim().length < 3 || required.length === 0}
-          onClick={() => void create()}
-        >
-          {t("postingCreate")}
-        </Button>
+        kind === "ai" ? (
+          <Button block size="lg" state={state} disabled={freeSlots === 0} onClick={() => void hireAi()}>
+            {t("aiHire", { count: hireCount })}
+          </Button>
+        ) : (
+          <Button
+            block
+            size="lg"
+            state={state}
+            disabled={title.trim().length < 3 || required.length === 0}
+            onClick={() => void create()}
+          >
+            {t("postingCreate")}
+          </Button>
+        )
       }
     >
       <div className="space-y-5">
-        <Field
-          label={t("postingTitle")}
-          value={title}
-          maxLength={40}
-          placeholder={t("postingTitlePlaceholder")}
-          onChange={(event) => setTitle(event.target.value)}
+        <Segmented<"player" | "ai">
+          value={kind}
+          onValueChange={setKind}
+          label={t("postingKind")}
+          block
+          options={[
+            { value: "player", label: t("postingKindPlayer") },
+            { value: "ai", label: t("postingKindAi") },
+          ]}
         />
-        <div>
-          <p className="mb-2 label-pixel text-fg-2">{t("postingTier")}</p>
-          <div className="flex flex-wrap gap-2">
-            {TIERS.map((id) => (
-              <button
-                key={id}
-                type="button"
-                aria-pressed={tier === id}
-                onClick={() => {
-                  setTier(id);
-                  setWage(baseWage(id));
-                  setRequired((list) => list.map((r) => ({ ...r, minScore: BALANCE.jobs.tierMinScore[id] ?? 0 })));
-                }}
-                className={cn(
-                  "rounded-sm border px-3 py-1.5 text-sm focus-ring transition-colors duration-fast",
-                  tier === id ? "border-accent bg-accent-soft text-fg-1" : "border-line-1 text-fg-2 hover:bg-surface-2",
-                )}
-              >
-                {tc(id)}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div>
-          <p className="label-pixel text-fg-2">{t("postingSkills")}</p>
-          <p className="mb-2 text-xs text-fg-3">{t("postingSkillsHint")}</p>
-          <div className="flex flex-wrap gap-2">
-            {SKILL_BRANCHES.map((branch) => {
-              const req = required.find((r) => r.branch === branch);
-              return (
-                <button
-                  key={branch}
-                  type="button"
-                  aria-pressed={Boolean(req)}
-                  onClick={() => toggle(branch)}
-                  className={cn(
-                    "rounded-sm border px-2.5 py-1.5 text-xs focus-ring transition-colors duration-fast",
-                    req ? "border-accent bg-accent-soft text-fg-1" : "border-line-1 text-fg-2 hover:bg-surface-2",
-                    sectorBranches.includes(branch) && !req && "border-dashed",
-                  )}
-                >
-                  {tb(`${branch}.name` as `${BranchKey}`)}
-                  {req && <span className="ml-1 nums text-accent">{t("postingMin", { score: req.minScore })}</span>}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <div className="space-y-2">
-          <div className="flex items-baseline justify-between">
-            <span className="label-pixel text-fg-2">{t("postingWage")}</span>
-            <span className="nums font-semibold text-fg-1">{formatMoney(wage)}/Std.</span>
-          </div>
-          <Slider
-            value={(wage - low) / (high - low)}
-            onValueChange={(v) => setWage(Math.round((low + v * (high - low)) / 100) * 100)}
-            label={t("postingWage")}
-            marks={[(baseWage(tier) - low) / (high - low)]}
-          />
-        </div>
-        <SkillPicker value={skills} onChange={setSkills} />
+        {kind === "ai" ? (
+          <AiHirePanel company={company} count={aiCount} freeSlots={freeSlots} onCount={setAiCount} />
+        ) : (
+          <PlayerPostingFields>
+            <Field
+              label={t("postingTitle")}
+              value={title}
+              maxLength={40}
+              placeholder={t("postingTitlePlaceholder")}
+              onChange={(event) => setTitle(event.target.value)}
+            />
+            <div>
+              <p className="mb-2 label-pixel text-fg-2">{t("postingTier")}</p>
+              <div className="flex flex-wrap gap-2">
+                {TIERS.map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-pressed={tier === id}
+                    onClick={() => {
+                      setTier(id);
+                      setWage(baseWage(id));
+                      setRequired((list) => list.map((r) => ({ ...r, minScore: BALANCE.jobs.tierMinScore[id] ?? 0 })));
+                    }}
+                    className={cn(
+                      "rounded-sm border px-3 py-1.5 text-sm focus-ring transition-colors duration-fast",
+                      tier === id
+                        ? "border-accent bg-accent-soft text-fg-1"
+                        : "border-line-1 text-fg-2 hover:bg-surface-2",
+                    )}
+                  >
+                    {tc(id)}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="label-pixel text-fg-2">{t("postingSkills")}</p>
+              <p className="mb-2 text-xs text-fg-3">{t("postingSkillsHint")}</p>
+              <div className="flex flex-wrap gap-2">
+                {SKILL_BRANCHES.map((branch) => {
+                  const req = required.find((r) => r.branch === branch);
+                  return (
+                    <button
+                      key={branch}
+                      type="button"
+                      aria-pressed={Boolean(req)}
+                      onClick={() => toggle(branch)}
+                      className={cn(
+                        "rounded-sm border px-2.5 py-1.5 text-xs focus-ring transition-colors duration-fast",
+                        req ? "border-accent bg-accent-soft text-fg-1" : "border-line-1 text-fg-2 hover:bg-surface-2",
+                        sectorBranches.includes(branch) && !req && "border-dashed",
+                      )}
+                    >
+                      {tb(`${branch}.name` as `${BranchKey}`)}
+                      {req && <span className="ml-1 nums text-accent">{t("postingMin", { score: req.minScore })}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-baseline justify-between">
+                <span className="label-pixel text-fg-2">{t("postingWage")}</span>
+                <span className="nums font-semibold text-fg-1">{formatMoney(wage)}/Std.</span>
+              </div>
+              <Slider
+                value={(wage - low) / (high - low)}
+                onValueChange={(v) => setWage(Math.round((low + v * (high - low)) / 100) * 100)}
+                label={t("postingWage")}
+                marks={[(baseWage(tier) - low) / (high - low)]}
+              />
+            </div>
+            <SkillPicker value={skills} onChange={setSkills} />
+            <div className="flex items-center justify-between">
+              <span className="label-pixel text-fg-2">{t("postingSlots")}</span>
+              <Segmented<string>
+                value={String(slots)}
+                onValueChange={(v) => setSlots(Number(v))}
+                label={t("postingSlots")}
+                size="sm"
+                options={Array.from({ length: Math.max(1, Math.min(3, company.maxEmployees)) }, (_, i) => ({
+                  value: String(i + 1),
+                  label: String(i + 1),
+                }))}
+              />
+            </div>
+          </PlayerPostingFields>
+        )}
+      </div>
+    </Sheet>
+  );
+}
+
+function PlayerPostingFields({ children }: { children: ReactNode }) {
+  return <div className="space-y-5">{children}</div>;
+}
+
+/** Hiring AI workers from the posting form (ADR-069): wage, count and what they cannot do. */
+function AiHirePanel({
+  company,
+  count,
+  freeSlots,
+  onCount,
+}: {
+  company: MyCompany;
+  count: number;
+  freeSlots: number;
+  onCount: (count: number) => void;
+}) {
+  const t = useTranslations("firm");
+  const penalty = BALANCE.startups.aiQualityPenalty;
+  return (
+    <div className="space-y-4" data-testid="ai-hire">
+      <Card padding="md" className="space-y-1.5 bg-surface-2">
+        <p className="text-sm text-fg-1">{t("aiIntro")}</p>
+        <ul className="list-disc space-y-1 pl-4 text-xs text-pretty text-fg-3">
+          <li>{t("aiPointProductivity")}</li>
+          <li>{t("aiPointSkills")}</li>
+          <li>{t("aiPointQuality", { percent: Math.round(penalty * 100) })}</li>
+        </ul>
+      </Card>
+      <div className="flex items-baseline justify-between">
+        <span className="label-pixel text-fg-2">{t("aiWage")}</span>
+        <span className="nums font-semibold text-fg-1">
+          {t("aiWageValue", { amount: formatMoney(company.aiWorkerCostCents, { whole: true }) })}
+        </span>
+      </div>
+      {freeSlots === 0 ? (
+        <p className="text-sm text-loss">{t("aiNoSlots", { max: company.maxEmployees })}</p>
+      ) : (
         <div className="flex items-center justify-between">
-          <span className="label-pixel text-fg-2">{t("postingSlots")}</span>
+          <span className="label-pixel text-fg-2">{t("aiCount")}</span>
           <Segmented<string>
-            value={String(slots)}
-            onValueChange={(v) => setSlots(Number(v))}
-            label={t("postingSlots")}
+            value={String(Math.min(count, freeSlots))}
+            onValueChange={(v) => onCount(Number(v))}
+            label={t("aiCount")}
             size="sm"
-            options={Array.from({ length: Math.max(1, Math.min(3, company.maxEmployees)) }, (_, i) => ({
+            options={Array.from({ length: Math.min(3, freeSlots) }, (_, i) => ({
               value: String(i + 1),
               label: String(i + 1),
             }))}
           />
         </div>
-      </div>
-    </Sheet>
+      )}
+      <p className="text-xs text-fg-3">
+        {t("aiTotal", {
+          amount: formatMoney(company.aiWorkerCostCents * Math.min(count, Math.max(1, freeSlots)), { whole: true }),
+        })}
+      </p>
+    </div>
   );
 }
 
@@ -462,7 +569,7 @@ export function Team({ company }: { company: MyCompany }) {
   const [firing, setFiring] = useState<TeamMember | null>(null);
   const [training, setTraining] = useState<TeamMember | null>(null);
   if (!team.data) return <Skeleton className="h-32 w-full rounded-lg" />;
-  if (team.data.length === 0) {
+  if (team.data.length === 0 && company.aiWorkers === 0) {
     return (
       <EmptyState
         art={<PixelIcon {...UI_ICONS.profile} scale={4} />}
@@ -479,10 +586,50 @@ export function Team({ company }: { company: MyCompany }) {
             <MemberRow member={m} onFire={() => setFiring(m)} onTrain={() => setTraining(m)} />
           </li>
         ))}
+        {Array.from({ length: company.aiWorkers }, (_, i) => (
+          <li key={`ai-${i}`}>
+            <AiWorkerRow company={company} />
+          </li>
+        ))}
       </ul>
       <FireSheet member={firing} onClose={() => setFiring(null)} />
       <TrainSheet company={company} member={training} onClose={() => setTraining(null)} />
     </>
+  );
+}
+
+/** One AI worker in the team list (ADR-069): fixed wage, no skills, can be let go at once. */
+function AiWorkerRow({ company }: { company: MyCompany }) {
+  const t = useTranslations("firm");
+  const errorText = useGameErrorText();
+  const refresh = useCompanyRefresh();
+  const [state, setState] = useState<ButtonState>("idle");
+  const dismiss = async () => {
+    setState("loading");
+    try {
+      await engine.setAiWorkers(crypto.randomUUID(), Math.max(0, company.aiWorkers - 1));
+      toast.success(t("aiDismissed"), undefined, { silent: true });
+      await refresh();
+    } catch (error) {
+      toast.error(t("aiWorkers"), errorText(error));
+    } finally {
+      setState("idle");
+    }
+  };
+  return (
+    <Card padding="md" className="flex items-center gap-3">
+      <PixelIcon {...UI_ICONS.robot} scale={3} />
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold text-fg-1">{t("aiWorkerName")}</p>
+        <p className="text-xs text-fg-3">
+          {t("aiWageValue", { amount: formatMoney(company.aiWorkerCostCents, { whole: true }) })} ·{" "}
+          {t("productivityValue", { value: factor.format(1) })}
+        </p>
+      </div>
+      <Button size="sm" variant="ghost" state={state} onClick={() => void dismiss()}>
+        {t("aiDismiss")}
+      </Button>
+    </Card>
   );
 }
 

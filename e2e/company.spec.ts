@@ -79,11 +79,6 @@ test("found a garage startup, run quarters, hire and post a job", async ({ page 
   await header.getByText("Demo: Quartal jetzt abschließen").click();
   await expect(page.getByText(/Letztes Quartal · Q2/i)).toBeVisible();
 
-  // Hire an AI worker: more capacity.
-  await page.getByRole("button", { name: "+" }).click();
-  await expect(page.getByTestId("ai-workers")).toHaveText("1");
-  await expect(page.getByText("1 von 2 Plätzen belegt")).toBeVisible();
-
   // Post a job.
   await page.getByText("Stellen", { exact: true }).click();
   await page.getByRole("button", { name: "Stelle ausschreiben" }).click();
@@ -92,6 +87,19 @@ test("found a garage startup, run quarters, hire and post a job", async ({ page 
   await posting.getByRole("button", { name: "Ausschreiben" }).click();
   await expect(page.getByText("Stelle ausgeschrieben")).toBeVisible();
   await expect(page.locator("#main").getByText("Backstube digital")).toBeVisible();
+
+  // Hire an AI worker through the posting form (ADR-069): at once, with a wage, listed in the team.
+  await page.getByRole("button", { name: "Stelle ausschreiben" }).click();
+  const hire = page.getByRole("dialog", { name: "Stelle ausschreiben" });
+  await hire.getByRole("radio", { name: "KI-Kraft" }).click();
+  await expect(hire.getByText("700 € pro Quartal", { exact: true })).toBeVisible();
+  await hire.getByRole("button", { name: "KI-Kraft einstellen" }).click();
+  await expect(page.getByText("KI-Kraft eingestellt")).toBeVisible();
+  await page.getByText("Team", { exact: true }).click();
+  await expect(page.locator("#main").getByRole("button", { name: "Entlassen" })).toHaveCount(1);
+  await page.getByText("Übersicht", { exact: true }).click();
+  await expect(page.getByTestId("ai-workers")).toHaveText("1");
+  await expect(page.getByText("1 von 2 Plätzen belegt")).toBeVisible();
 
   // The founder cannot take a job elsewhere; the career tab links to the company.
   await page.goto("/career");

@@ -37,7 +37,10 @@ Gewinn     = Umsatz − Wareneinsatz (Branchenmarge) − Fixkosten − KI-Kräft
 - **Leistung** (ADR-050): KI-Kraft 1,0; Spieler 1,5 + 0,08 × passende Skill-Punkte, höchstens 4,0. Der Gründer zählt
   mit seinen Skills in den Bereichen der Branche (`jobs.sectorBranches`). Ein guter Spieler ersetzt also mehrere
   KI-Kräfte, und Skills in der Branche heben zusätzlich die Qualität.
-- **KI-Kräfte** kosten fest 700 € pro Quartal und leisten 1,0, sofort verfügbar.
+- **KI-Kräfte** (ADR-069) stellt man über „Stelle ausschreiben“ → „KI-Kraft“ ein; entlassen wird im Team-Tab. Sie
+  kosten 700 € Lohn pro Quartal, leisten 1,0, bringen keine Skills für Wachstumsstufen und senken die erreichbare
+  Qualität: Zielqualität × (1 − 0,3 × KI-Kräfte / Teamgröße). Sie sind sofort da, lassen die Firma aber im Schnitt
+  langsamer wachsen als echte Spieler.
 - **Spieler-Löhne** laufen stündlich aus der Firmenkasse (M2b) und stehen im Quartalsbericht als Lohnkosten.
 - **Marketing** stellt der Gründer als Budget pro Quartal ein.
 - Geld bleibt im geschlossenen Kreislauf (ADR-041): Umsatz kommt aus dem Haushalts-Topf, Wareneinsatz, Fixkosten,
