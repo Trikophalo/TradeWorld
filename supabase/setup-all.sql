@@ -7883,6 +7883,3933 @@ begin
 end;
 $$;
 
+-- ===== supabase/migrations/20261112000100_m2_schema.sql =====
+-- =============================================================================
+-- NEXA · M2a · 0100 · Schema for fractional shares, endless levels, the closed
+--                     money system, names, the rich list and missions
+-- =============================================================================
+-- Idempotent (the identical copy in supabase/updates/ is pasted into existing
+-- projects any number of times).
+--   A. share quantities in millionths (*_e6, 1 share = 1 000 000); existing
+--      rows are scaled exactly once (rename + multiply in one guarded step)
+--   B. no upper bound on the player level
+--   C. system accounts of the closed money system and the ledger guards
+--      (world_genesis accepts exactly one transaction, the mint is closed
+--      after the genesis); the genesis itself is public.money_genesis()
+--   D. blocked name terms (internal), profiles.nickname_changed_at
+--   E. AI tycoons, their holdings and rich list snapshots (internal)
+--   F. mission templates and player missions for quick/daily/weekly/milestone
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- A. Fractional shares
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  r record;
+begin
+  for r in
+    select * from (values
+      ('orders',               'quantity',            'quantity_e6'),
+      ('orders',               'filled_quantity',     'filled_quantity_e6'),
+      ('orders',               'reserved_quantity',   'reserved_quantity_e6'),
+      ('positions',            'quantity',            'quantity_e6'),
+      ('positions',            'reserved_quantity',   'reserved_quantity_e6'),
+      ('position_lots',        'quantity_initial',    'quantity_initial_e6'),
+      ('position_lots',        'quantity_open',       'quantity_open_e6'),
+      ('trades',               'quantity',            'quantity_e6'),
+      ('distribution_payouts', 'quantity',            'quantity_e6'),
+      ('security_quotes',      'day_volume',          'day_volume_e6'),
+      ('candles',              'volume',              'volume_e6'),
+      ('price_ticks',          'volume',              'volume_e6'),
+      ('security_sim_state',   'pending_player_flow', 'pending_player_flow_e6'),
+      ('ai_investor_holdings', 'quantity',            'quantity_e6')
+    ) as t(tbl, old_col, new_col)
+  loop
+    if exists (select 1 from information_schema.columns
+                where table_schema = 'public' and table_name = r.tbl and column_name = r.old_col)
+       and not exists (select 1 from information_schema.columns
+                        where table_schema = 'public' and table_name = r.tbl and column_name = r.new_col) then
+      execute format('alter table public.%I rename column %I to %I', r.tbl, r.old_col, r.new_col);
+      if r.tbl = 'trades' then
+        execute 'alter table public.trades disable trigger trades_immutable';
+      end if;
+      execute format('update public.%I set %I = %I * 1000000 where %I <> 0', r.tbl, r.new_col, r.new_col, r.new_col);
+      if r.tbl = 'trades' then
+        execute 'alter table public.trades enable trigger trades_immutable';
+      end if;
+      raise notice 'NEXA: %.% -> % (x 1 000 000)', r.tbl, r.old_col, r.new_col;
+    end if;
+  end loop;
+end;
+$$;
+
+comment on column public.orders.quantity_e6 is 'Ordered quantity in millionths of a share (1 share = 1 000 000).';
+comment on column public.positions.quantity_e6 is 'Held quantity in millionths of a share.';
+comment on column public.trades.quantity_e6 is 'Executed quantity in millionths of a share. gross_cents = round_half_even(quantity_e6 x price_e4 / 1e8).';
+comment on column public.security_sim_state.pending_player_flow_e6 is 'Net player order flow (millionths of a share) since the last tick; feeds the price impact.';
+
+-- views that expose quantities: recreated with the new column names
+drop view if exists public.v_my_positions;
+create view public.v_my_positions with (security_invoker = true) as
+select
+  p.id as position_id, p.security_id, s.ticker, s.name, s.kind as security_kind, s.sector_key,
+  p.side, p.leverage, p.quantity_e6, p.reserved_quantity_e6, p.avg_entry_price_e4, p.cost_basis_cents,
+  p.margin_cents, p.borrowed_cents, p.liquidation_price_e4, p.realized_pnl_cents,
+  p.accrued_financing_cents, p.opened_at,
+  q.last_price_e4, q.change_bps,
+  round(p.quantity_e6::numeric * q.last_price_e4 / 100000000)::bigint as market_value_cents,
+  round(p.quantity_e6::numeric * q.last_price_e4 / 100000000)::bigint - p.cost_basis_cents as unrealized_pnl_cents
+from public.positions p
+join public.securities s on s.id = p.security_id
+left join public.security_quotes q on q.security_id = p.security_id
+where p.player_id = (select auth.uid()) and p.status = 'open';
+comment on view public.v_my_positions is 'Open positions with mark-to-market values (quantities in millionths of a share).';
+
+drop view if exists public.v_securities;
+create view public.v_securities with (security_invoker = true) as
+select
+  s.id, s.kind, s.ticker, s.name, s.status, s.sector_key, s.company_id,
+  s.tick_size_e4, s.is_tradable, s.is_shortable, s.max_leverage, s.listed_at,
+  c.is_ai        as company_is_ai,
+  c.tier         as company_tier,
+  c.logo_key, c.logo_pixels, c.brand_color,
+  q.last_price_e4, q.bid_e4, q.ask_e4, q.prev_close_e4, q.day_open_e4, q.day_high_e4, q.day_low_e4,
+  q.day_volume_e6, q.day_turnover_cents, q.change_bps, q.market_cap_cents, q.yield_bps,
+  q.updated_at   as quote_updated_at
+from public.securities s
+left join public.security_quotes q on q.security_id = s.id
+left join public.companies c on c.id = s.company_id;
+comment on view public.v_securities is 'Market list: security master data, issuer branding and the latest quote (volume in millionths).';
+
+grant select on public.v_my_positions, public.v_securities to authenticated;
+revoke all on public.v_my_positions, public.v_securities from anon, public;
+
+-- ---------------------------------------------------------------------------
+-- B. Endless levels
+-- ---------------------------------------------------------------------------
+alter table public.profiles drop constraint if exists profiles_level_check;
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'profiles_level_min' and conrelid = 'public.profiles'::regclass) then
+    alter table public.profiles add constraint profiles_level_min check (level >= 1);
+  end if;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- C. Closed money system: accounts and guards
+-- ---------------------------------------------------------------------------
+insert into public.ledger_accounts (kind, system_key, label, allow_negative) values
+  ('system', 'world_genesis', 'World genesis: the only source of money, exactly one posting', true),
+  ('system', 'treasury',      'State treasury: starting capital, basic income, bonds, fees and taxes', false),
+  ('system', 'households',    'Households: customers of all companies (from M4)', false),
+  ('system', 'tycoons',       'Cash of the AI tycoons on the rich list', false)
+on conflict do nothing;
+update public.ledger_accounts set label = 'Financial market: AI investors and market makers, counterparty of player trades'
+ where system_key = 'market' and label is distinct from 'Financial market: AI investors and market makers, counterparty of player trades';
+
+-- world_genesis: only the genesis transaction; mint: closed after the genesis
+-- (only the one-time re-sourcing transfers may still touch it).
+create or replace function public.ledger_money_guard()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_key text;
+  v_sys text;
+begin
+  select a.system_key into v_sys from public.ledger_accounts a where a.id = new.account_id;
+  if v_sys is null or v_sys not in ('world_genesis', 'mint') then
+    return new;
+  end if;
+  select t.idempotency_key into v_key from public.ledger_transactions t where t.id = new.transaction_id;
+  if v_sys = 'world_genesis' then
+    if v_key is distinct from 'money:genesis' then
+      raise exception 'world_genesis accepts exactly one transaction (the genesis)' using errcode = 'NX003';
+    end if;
+  elsif exists (select 1 from public.ledger_transactions g where g.idempotency_key = 'money:genesis')
+        and coalesce(v_key, '') not like 'money:resource:%' then
+    raise exception 'the mint is closed: money is only created once, at the world genesis' using errcode = 'NX003';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.ledger_money_guard() from public, anon, authenticated;
+
+drop trigger if exists ledger_money_guard on public.ledger_entries;
+create trigger ledger_money_guard
+  before insert on public.ledger_entries
+  for each row execute function public.ledger_money_guard();
+
+-- ---------------------------------------------------------------------------
+-- D. Names
+-- ---------------------------------------------------------------------------
+alter table public.profiles add column if not exists nickname_changed_at timestamptz;
+comment on column public.profiles.nickname_changed_at is 'Last nickname change; the next one is allowed names.nicknameChangeDays later (NULL = never changed).';
+
+create table if not exists public.blocked_name_terms (
+  term       text primary key check (term ~ '^[a-z0-9]+$'),
+  category   text not null check (category in ('profanity', 'sexual', 'slur', 'extremist', 'code', 'reserved')),
+  match_mode text not null check (match_mode in ('substring', 'token', 'code')),
+  note       text,
+  created_at timestamptz not null default now()
+);
+alter table public.blocked_name_terms enable row level security;
+revoke all on public.blocked_name_terms from public, anon, authenticated;
+grant all on public.blocked_name_terms to service_role;
+comment on table public.blocked_name_terms is 'Name filter (players, companies, later chat). Terms are stored normalised (see public.name_normalize). Internal.';
+
+-- ---------------------------------------------------------------------------
+-- E. Rich list
+-- ---------------------------------------------------------------------------
+create table if not exists public.rich_tycoons (
+  id                 uuid primary key default gen_random_uuid(),
+  seed_rank          integer not null unique check (seed_rank > 0),
+  name               text not null unique,
+  description        text not null,
+  cash_cents         bigint not null default 0 check (cash_cents >= 0),
+  founder_company_id uuid references public.companies (id) on delete set null,
+  created_at         timestamptz not null default now()
+);
+alter table public.rich_tycoons enable row level security;
+create index if not exists rich_tycoons_founder_company_idx on public.rich_tycoons (founder_company_id);
+comment on table public.rich_tycoons is 'Fictional AI tycoons of the rich list. cash_cents sums to the balance of the ledger account "tycoons". Internal (read via get_rich_list).';
+
+create table if not exists public.rich_tycoon_holdings (
+  tycoon_id   uuid not null references public.rich_tycoons (id) on delete cascade,
+  security_id uuid not null references public.securities (id) on delete cascade,
+  quantity_e6 bigint not null check (quantity_e6 > 0),
+  primary key (tycoon_id, security_id)
+);
+alter table public.rich_tycoon_holdings enable row level security;
+create index if not exists rich_tycoon_holdings_security_idx on public.rich_tycoon_holdings (security_id);
+comment on table public.rich_tycoon_holdings is 'Share holdings of the AI tycoons (millionths of a share), static for now. Internal.';
+
+create table if not exists public.rich_list_snapshots (
+  taken_at        timestamptz not null,
+  entity_kind     text not null check (entity_kind in ('player', 'tycoon')),
+  entity_id       uuid not null,
+  net_worth_cents bigint not null,
+  rank_all        integer not null,
+  rank_players    integer,
+  primary key (taken_at, entity_kind, entity_id)
+);
+alter table public.rich_list_snapshots enable row level security;
+create index if not exists rich_list_snapshots_entity_idx on public.rich_list_snapshots (entity_id, taken_at desc);
+comment on table public.rich_list_snapshots is 'Rich list every richList.snapshotMinutes (8 days kept) for 24 h changes and rank news. Internal.';
+
+revoke all on public.rich_tycoons, public.rich_tycoon_holdings, public.rich_list_snapshots from public, anon, authenticated;
+grant all on public.rich_tycoons, public.rich_tycoon_holdings, public.rich_list_snapshots to service_role;
+
+insert into public.news_templates (key, category, headline_template, body_template, sentiment, importance) values
+  ('rich_rank_entry',   'player', 'Neu in den Top {rank}: {name} springt auf Platz {position}', 'Mit einem Vermögen von {worth} steht {name} jetzt auf Platz {position} der NEXA-Reichenliste.', 0, 2),
+  ('rich_number_one',   'player', '{name} ist die reichste Person der NEXA',                   'Mit {worth} führt {name} die Reichenliste an.', 0, 3),
+  ('rich_players_one',  'player', 'Neue Nummer eins unter den Spielern: {name}',                '{name} ist mit {worth} jetzt der reichste Mensch aus Fleisch und Blut in der NEXA.', 0, 2),
+  ('rich_overtake',     'player', 'Machtwechsel: {name} überholt {other}',                      '{name} liegt mit {worth} jetzt auf Platz {position} der Reichenliste, vor {other}.', 0, 1),
+  ('rich_top_gainer',   'player', 'Aufsteiger des Tages: {name} mit {pct} in 24 Stunden',       'Das Vermögen von {name} wuchs auf {worth}.', 0, 1)
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- F. Missions: kind as text (new kinds without enum changes inside one
+--    transaction), mode/params/chain order on templates, per-mission state
+-- ---------------------------------------------------------------------------
+do $$
+begin
+  if (select data_type from information_schema.columns
+       where table_schema = 'public' and table_name = 'mission_templates' and column_name = 'kind') = 'USER-DEFINED' then
+    alter table public.mission_templates alter column kind type text using kind::text;
+  end if;
+  if (select data_type from information_schema.columns
+       where table_schema = 'public' and table_name = 'player_missions' and column_name = 'kind') = 'USER-DEFINED' then
+    alter table public.player_missions alter column kind type text using kind::text;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'mission_templates_kind_check2') then
+    alter table public.mission_templates add constraint mission_templates_kind_check2
+      check (kind in ('quick', 'daily', 'weekly', 'milestone', 'intro'));
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'player_missions_kind_check2') then
+    alter table public.player_missions add constraint player_missions_kind_check2
+      check (kind in ('quick', 'daily', 'weekly', 'milestone', 'intro'));
+  end if;
+end;
+$$;
+
+alter table public.mission_templates
+  add column if not exists mode             text check (mode in ('count', 'sum', 'max', 'distinct', 'state')),
+  add column if not exists params           jsonb not null default '{}'::jsonb,
+  add column if not exists chain_order      integer,
+  add column if not exists scale_with_level boolean not null default false;
+comment on column public.mission_templates.mode is 'How events advance the mission: count (+1), sum (+amount), max (largest single amount), distinct (distinct refs), state (current value, e.g. net worth). NULL = legacy template, never assigned.';
+comment on column public.mission_templates.params is 'Filters and options, e.g. {"sector": "energy"} or {"rank": 100}.';
+comment on column public.mission_templates.chain_order is 'Order of the milestone story chain.';
+
+alter table public.player_missions add column if not exists state jsonb not null default '{}'::jsonb;
+comment on column public.player_missions.state is 'Per-mission bookkeeping (seen refs of distinct missions, baselines).';
+create index if not exists player_missions_active_idx on public.player_missions (player_id, status) where status in ('active', 'completed');
+
+-- ===== supabase/migrations/20261112000200_m2_money_names.sql =====
+-- =============================================================================
+-- NEXA · M2a · 0200 · Closed money system, name filter, sign-up, levels
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- Money
+-- ---------------------------------------------------------------------------
+create or replace function public.money_genesis_done()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (select 1 from public.ledger_transactions t where t.idempotency_key = 'money:genesis');
+$$;
+
+create or replace function public.treasury_balance_cents()
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select a.balance_cents from public.ledger_accounts a where a.system_key = 'treasury'), 0);
+$$;
+
+-- Basic income factor in bps: clamp(treasury / target, minFactor, 1); 10000 before the genesis.
+create or replace function public.basic_income_factor_bps()
+returns integer
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_money  jsonb := coalesce(public.config_jsonb('money'), '{}'::jsonb);
+  v_target double precision := public.cfg_num(v_money, '{basicIncome,treasuryTargetCents}', 25000000000);
+  v_min    double precision := public.cfg_num(v_money, '{basicIncome,minFactor}', 0.25);
+begin
+  if not public.money_genesis_done() or v_target <= 0 then
+    return 10000;
+  end if;
+  return round(greatest(v_min, least(1, public.treasury_balance_cents()::double precision / v_target)) * 10000)::integer;
+end;
+$$;
+
+-- Pays money from the state to a player: treasury, else households (logged);
+-- before the genesis the (still open) mint. p_tax is withheld and stays with
+-- the state, the player receives p_gross - p_tax. Returns the transaction id.
+create or replace function public.state_payout(
+  p_player   uuid,
+  p_gross    bigint,
+  p_tax      bigint,
+  p_kind     public.ledger_tx_kind,
+  p_desc     text,
+  p_ref_type text,
+  p_ref_id   uuid,
+  p_key      text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_net    bigint := p_gross - coalesce(p_tax, 0);
+  v_source uuid;
+  v_bal    bigint;
+begin
+  if v_net <= 0 then
+    return null;
+  end if;
+  if not public.money_genesis_done() then
+    v_source := public.ledger_system_account('mint');
+  else
+    select a.id, a.balance_cents into v_source, v_bal from public.ledger_accounts a where a.system_key = 'treasury';
+    if v_bal < v_net then
+      select a.id, a.balance_cents into v_source, v_bal from public.ledger_accounts a where a.system_key = 'households';
+      if v_bal < v_net then
+        perform public.api_error('market_illiquid');
+      end if;
+      insert into public.admin_actions (action, target_type, target_id, payload)
+      values ('state_payout_from_households', 'player', p_player::text,
+              jsonb_build_object('kind', p_kind, 'amount_cents', v_net, 'key', p_key));
+    end if;
+  end if;
+  return public.ledger_transfer(v_source, public.ledger_player_account(p_player, 'player_cash'), v_net, p_kind,
+                                p_desc, p_ref_type, p_ref_id, p_key, p_player,
+                                jsonb_build_object('gross_cents', p_gross, 'tax_cents', coalesce(p_tax, 0)));
+end;
+$$;
+
+-- One-time world genesis (idempotent). Creates money.totalSupplyCents in
+-- world_genesis and distributes it to treasury, financial market (system
+-- account "market"), tycoons and households. Money that existed before (an
+-- existing database, or the seed) is re-sourced in the same step so that the
+-- mint and every other system account end non-negative and closed:
+--   * mint outflows to AI companies (opening_balance) <- financial market
+--     (paid-in capital from investors), fallback households
+--   * all other mint outflows (starting capital, basic income) <- treasury,
+--     fallback households, then financial market
+--   * other negative system accounts (interest: coupons, ...) <- treasury
+--   * positive sink accounts (fees, taxes, ...) -> treasury
+-- Afterwards only world_genesis may be negative.
+create or replace function public.money_genesis()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_money     jsonb := coalesce(public.config_jsonb('money'), '{}'::jsonb);
+  v_total     bigint := public.cfg_num(v_money, '{totalSupplyCents}', 1000000000000)::bigint;
+  v_treasury  bigint;
+  v_market    bigint;
+  v_tycoons   bigint;
+  v_house     bigint;
+  v_companies bigint;
+  v_mint      bigint;
+  v_details   jsonb := '{}'::jsonb;
+  r           record;
+begin
+  if public.money_genesis_done() then
+    return jsonb_build_object('skipped', 'genesis_done');
+  end if;
+  v_treasury := round(v_total * public.cfg_num(v_money, '{allocation,treasury}', 0.05))::bigint;
+  v_market   := round(v_total * public.cfg_num(v_money, '{allocation,financialMarket}', 0.6))::bigint;
+  v_tycoons  := round(v_total * public.cfg_num(v_money, '{allocation,tycoons}', 0.05))::bigint;
+  v_house    := v_total - v_treasury - v_market - v_tycoons;
+
+  perform public.ledger_post('opening_balance', jsonb_build_array(
+      jsonb_build_object('account_id', public.ledger_system_account('world_genesis'), 'amount_cents', -v_total),
+      jsonb_build_object('account_id', public.ledger_system_account('treasury'),      'amount_cents', v_treasury),
+      jsonb_build_object('account_id', public.ledger_system_account('market'),        'amount_cents', v_market),
+      jsonb_build_object('account_id', public.ledger_system_account('tycoons'),       'amount_cents', v_tycoons),
+      jsonb_build_object('account_id', public.ledger_system_account('households'),    'amount_cents', v_house)),
+    'World genesis: the entire money supply', 'money', null, 'money:genesis');
+
+  -- mint: split the money it created into company capital and the rest
+  select coalesce(-sum(e.amount_cents), 0)::bigint into v_companies
+    from public.ledger_entries e join public.ledger_transactions t on t.id = e.transaction_id
+   where e.account_id = public.ledger_system_account('mint') and t.kind = 'opening_balance';
+  v_mint := -(select a.balance_cents from public.ledger_accounts a where a.system_key = 'mint');
+  v_companies := least(greatest(v_companies, 0), greatest(v_mint, 0));
+  perform public.money_resource('mint', v_companies, array['market', 'households', 'treasury'], 'money:resource:mint:companies');
+  perform public.money_resource('mint', greatest(v_mint - v_companies, 0), array['treasury', 'households', 'market'], 'money:resource:mint:players');
+  v_details := v_details || jsonb_build_object('mint_companies_cents', v_companies, 'mint_players_cents', greatest(v_mint - v_companies, 0));
+
+  for r in
+    select a.system_key, a.balance_cents from public.ledger_accounts a
+     where a.kind = 'system' and a.balance_cents <> 0
+       and a.system_key not in ('world_genesis', 'treasury', 'market', 'tycoons', 'households', 'mint')
+     order by a.system_key
+  loop
+    if r.balance_cents < 0 then
+      perform public.money_resource(r.system_key, -r.balance_cents, array['treasury', 'households', 'market'],
+                                    'money:resource:' || r.system_key);
+    else
+      perform public.ledger_transfer(public.ledger_system_account(r.system_key), public.ledger_system_account('treasury'),
+                                     r.balance_cents, 'transfer', 'Closed money system: ' || r.system_key || ' to the treasury',
+                                     'money', null, 'money:resource:' || r.system_key);
+    end if;
+    v_details := v_details || jsonb_build_object(r.system_key || '_cents', r.balance_cents);
+  end loop;
+
+  update public.ledger_accounts set allow_negative = false
+   where kind = 'system' and system_key <> 'world_genesis' and allow_negative;
+
+  return jsonb_build_object('total_supply_cents', v_total, 'treasury_cents', v_treasury, 'financial_market_cents', v_market,
+                            'tycoons_cents', v_tycoons, 'households_cents', v_house) || v_details;
+end;
+$$;
+
+-- Moves p_amount into the system account p_target from the first source that can pay it (split if needed).
+create or replace function public.money_resource(p_target text, p_amount bigint, p_sources text[], p_key text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_left bigint := p_amount;
+  v_src  text;
+  v_bal  bigint;
+  v_take bigint;
+  v_n    integer := 0;
+begin
+  foreach v_src in array p_sources loop
+    exit when v_left <= 0;
+    select a.balance_cents into v_bal from public.ledger_accounts a where a.system_key = v_src;
+    v_take := least(v_left, greatest(coalesce(v_bal, 0), 0));
+    if v_take > 0 then
+      v_n := v_n + 1;
+      perform public.ledger_transfer(public.ledger_system_account(v_src), public.ledger_system_account(p_target), v_take,
+                                     'transfer', 'Closed money system: re-source ' || p_target || ' from ' || v_src,
+                                     'money', null, p_key || ':' || v_n);
+      v_left := v_left - v_take;
+    end if;
+  end loop;
+  if v_left > 0 then
+    raise exception 'money genesis: cannot re-source % cents for %', v_left, p_target using errcode = 'NX001';
+  end if;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Names
+-- ---------------------------------------------------------------------------
+-- lower case, umlauts/accents to ASCII, optionally leetspeak to letters
+create or replace function public.name_normalize(p_text text, p_leet boolean default true)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when p_leet then translate(x, '013457@$!8|', 'oieastasibi') else x end
+    from (select translate(
+                   replace(replace(replace(replace(lower(coalesce(p_text, '')), 'ä', 'ae'), 'ö', 'oe'), 'ü', 'ue'), 'ß', 'ss'),
+                   'áàâãåéèêëíìîïóòôõúùûçñ', 'aaaaaeeeeiiiiooooouuucn') as x) y;
+$$;
+
+-- normalised letters only, repeated letters collapsed ("H1tl3r" -> "hitler", "Matthias" -> "mathias")
+create or replace function public.name_letters(p_text text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select regexp_replace(regexp_replace(public.name_normalize(p_text, true), '[^a-z]', '', 'g'), '(.)\1+', '\1', 'g');
+$$;
+
+-- Returns NULL or the reason key why a name is not allowed.
+--   kind 'player': names.minLength..maxLength, [A-Za-z0-9_]
+--   kind 'company': 3..30, letters incl. umlauts, digits, space, - & . '
+-- Matching (docs/DATA_MODEL.md, Nachtrag M2): terms >= 5 letters match as
+-- substrings of the normalised name, shorter terms only as a whole token or
+-- the whole name; codes (88, 1488, hh ...) only as whole raw tokens.
+create or replace function public.name_violation(p_name text, p_kind text default 'player', p_exclude uuid default null)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_names  jsonb := coalesce(public.config_jsonb('names'), '{}'::jsonb);
+  v_min    integer;
+  v_max    integer;
+  v_full   text;
+  v_tokens text[];
+  v_raw    text[];
+  v_cat    text;
+begin
+  if p_kind = 'company' then
+    v_min := 3; v_max := 30;
+  else
+    v_min := public.cfg_num(v_names, '{minLength}', 3)::integer;
+    v_max := public.cfg_num(v_names, '{maxLength}', 20)::integer;
+  end if;
+  if p_name is null or char_length(p_name) < v_min then
+    return 'name_too_short';
+  end if;
+  if char_length(p_name) > v_max then
+    return 'name_too_long';
+  end if;
+  if p_kind = 'company' then
+    if p_name !~ '^[A-Za-zÄÖÜäöüßÀ-ÿ0-9 &.''-]+$' or p_name <> btrim(p_name) or p_name ~ '  ' then
+      return 'name_invalid_chars';
+    end if;
+  elsif p_name !~ '^[A-Za-z0-9_]+$' then
+    return 'name_invalid_chars';
+  end if;
+
+  v_full := public.name_letters(p_name);
+  select coalesce(array_agg(regexp_replace(t, '(.)\1+', '\1', 'g')), '{}') into v_tokens
+    from regexp_split_to_table(public.name_normalize(p_name, true), '[^a-z]+') t where t <> '';
+  select coalesce(array_agg(m[1]), '{}') into v_raw
+    from regexp_matches(public.name_normalize(p_name, false), '([a-z]+|[0-9]+)', 'g') m;
+  if v_full = '' then
+    return 'name_invalid_chars';
+  end if;
+
+  select t.category into v_cat
+    from public.blocked_name_terms t
+   where (t.match_mode = 'substring' and strpos(v_full, t.term) > 0)
+      or (t.match_mode = 'token' and (t.term = v_full or t.term = any (v_tokens) or t.term = any (v_raw)))
+      or (t.match_mode = 'code' and t.term = any (v_raw))
+   order by (t.category = 'reserved'), t.term
+   limit 1;
+  if v_cat is not null then
+    return case when v_cat = 'reserved' then 'name_reserved' else 'name_profanity' end;
+  end if;
+
+  -- dynamic reserved names: AI tycoons, AI companies (with and without legal form), tickers, index keys
+  if exists (select 1 from public.rich_tycoons ty where public.name_letters(ty.name) = v_full
+                or (char_length(public.name_letters(ty.name)) >= 5 and strpos(v_full, public.name_letters(ty.name)) > 0))
+     or exists (select 1 from public.companies c
+                 where c.is_ai and c.id is distinct from p_exclude
+                   and (public.name_letters(c.name) = v_full
+                        or (char_length(public.name_letters(regexp_replace(c.name, '\s+(AG|SE|GmbH|KG)$', '', 'i'))) >= 5
+                            and strpos(v_full, public.name_letters(regexp_replace(c.name, '\s+(AG|SE|GmbH|KG)$', '', 'i'))) > 0)))
+     or exists (select 1 from public.securities s
+                 where lower(s.ticker) = any (v_raw) or lower(s.ticker) = lower(p_name)
+                    or public.name_letters(s.ticker) = v_full)
+     or exists (select 1 from public.indices i where lower(i.key) = any (v_raw) or public.name_letters(i.key) = v_full) then
+    return 'name_reserved';
+  end if;
+
+  if p_kind = 'company' then
+    if exists (select 1 from public.companies c where lower(c.name) = lower(p_name) and c.id is distinct from p_exclude) then
+      return 'name_taken';
+    end if;
+  elsif exists (select 1 from public.profiles p where lower(p.nickname) = lower(p_name) and p.id is distinct from p_exclude) then
+    return 'name_taken';
+  end if;
+  return null;
+end;
+$$;
+comment on function public.name_violation(text, text, uuid) is 'Internal: NULL or name_too_short / name_too_long / name_invalid_chars / name_profanity / name_reserved / name_taken.';
+
+-- Registration form pre-check (anon and authenticated). Cheap: one indexed
+-- lookup plus a scan of ~300 terms; no writes, so it cannot be abused to
+-- change state (it only reveals whether a nickname is taken).
+create or replace function public.check_nickname(p_nickname text)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_reason text := public.name_violation(left(p_nickname, 64), 'player', (select auth.uid()));
+begin
+  return jsonb_build_object('allowed', v_reason is null, 'reason', v_reason);
+end;
+$$;
+
+create or replace function public.change_nickname(p_request_id uuid, p_nickname text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  v_days   double precision := public.config_double('names', '{nicknameChangeDays}', 60);
+  v_last   timestamptz;
+  v_reason text;
+  v_now    timestamptz := now();
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'change_nickname');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select p.nickname_changed_at into v_last from public.profiles p where p.id = v_player for update;
+  if v_last is not null and v_last + make_interval(secs => v_days * 86400) > v_now then
+    perform public.api_error('name_change_too_soon');
+  end if;
+  v_reason := public.name_violation(p_nickname, 'player', v_player);
+  if v_reason is not null then
+    perform public.api_error(v_reason);
+  end if;
+  update public.profiles set nickname = p_nickname, nickname_changed_at = v_now where id = v_player;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'nickname', p_nickname, 'changed_at', v_now, 'next_change_at', v_now + make_interval(secs => v_days * 86400)));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Levels: no upper bound except the technical progression.maxLevel
+-- ---------------------------------------------------------------------------
+create or replace function public.level_progress(p_xp bigint)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_prog  jsonb := coalesce(public.config_jsonb('progression'), '{}'::jsonb);
+  v_base  double precision := public.cfg_num(v_prog, '{xpBase}', 100);
+  v_exp   double precision := public.cfg_num(v_prog, '{xpExponent}', 1.5);
+  v_max   integer := public.cfg_num(v_prog, '{maxLevel}', 10000)::integer;
+  v_level integer := 1;
+  v_rem   bigint := greatest(coalesce(p_xp, 0), 0);
+  v_need  bigint;
+begin
+  -- O(level): level 1000 needs ~1.3e9 XP, far beyond reach; the loop stays cheap
+  loop
+    if v_level >= v_max then
+      return jsonb_build_object('level', v_level, 'xp_into_level', v_rem, 'xp_for_next', 0);
+    end if;
+    v_need := round(v_base * power(v_level, v_exp))::bigint;
+    if v_rem < v_need then
+      return jsonb_build_object('level', v_level, 'xp_into_level', v_rem, 'xp_for_next', v_need);
+    end if;
+    v_rem := v_rem - v_need;
+    v_level := v_level + 1;
+  end loop;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- API errors (adds the M2 keys)
+-- ---------------------------------------------------------------------------
+create or replace function public.api_error(p_key text)
+returns void
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_code text;
+begin
+  v_code := case p_key
+    when 'insufficient_funds'      then 'NX001'
+    when 'rate_limited'            then 'NX004'
+    when 'forbidden'               then 'NX006'
+    when 'invalid_quantity'        then 'NX007'
+    when 'invalid_price'           then 'NX007'
+    when 'invalid_argument'        then 'NX007'
+    when 'invalid_interval'        then 'NX007'
+    when 'not_authenticated'       then 'NX010'
+    when 'unknown_security'        then 'NX011'
+    when 'not_tradable'            then 'NX012'
+    when 'insufficient_position'   then 'NX013'
+    when 'order_not_found'         then 'NX014'
+    when 'order_not_open'          then 'NX015'
+    when 'market_paused'           then 'NX016'
+    when 'nothing_to_claim'        then 'NX017'
+    when 'locked'                  then 'NX018'
+    when 'name_too_short'          then 'NX019'
+    when 'name_too_long'           then 'NX019'
+    when 'name_invalid_chars'      then 'NX019'
+    when 'name_profanity'          then 'NX019'
+    when 'name_reserved'           then 'NX019'
+    when 'name_taken'              then 'NX019'
+    when 'name_change_too_soon'    then 'NX020'
+    when 'order_too_small'         then 'NX021'
+    when 'market_illiquid'         then 'NX022'
+    when 'mission_not_found'       then 'NX023'
+    when 'mission_not_completed'   then 'NX024'
+    when 'mission_already_claimed' then 'NX025'
+    else 'NX007'
+  end;
+  raise exception using errcode = v_code, message = p_key;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Sign-up: name filter, starting capital from the state (closed money system)
+-- ---------------------------------------------------------------------------
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_meta            jsonb := coalesce(new.raw_user_meta_data, '{}'::jsonb);
+  v_code            text  := nullif(upper(btrim(coalesce(v_meta ->> 'invite_code', ''))), '');
+  v_invite_required boolean := public.config_boolean('auth', '{inviteRequired}', true);
+  v_age_required    boolean := public.config_boolean('auth', '{ageConfirmationRequired}', true);
+  v_age_confirmed   boolean := lower(coalesce(v_meta ->> 'age_confirmed', 'false')) in ('true', '1', 'yes');
+  v_start_cents     bigint  := greatest(public.config_bigint('economy', '{startingCapitalCents}', 1000000), 0);
+  v_vault_hours     double precision := greatest(0, least(
+                        public.config_double('economy', '{vaultInitialHours}', 2),
+                        public.config_double('economy', '{vaultCapHours}', 8)));
+  v_max_len         integer := public.config_double('names', '{maxLength}', 20)::integer;
+  v_invite          public.invite_codes;
+  v_base            text;
+  v_nickname        text;
+  v_reason          text;
+  v_attempt         integer := 0;
+begin
+  -- 18+ confirmation ---------------------------------------------------------
+  if v_age_required and not v_age_confirmed then
+    raise exception 'age confirmation (18+) is required' using errcode = 'NX007';
+  end if;
+
+  -- invite code ---------------------------------------------------------------
+  if v_code is not null then
+    select i.* into v_invite from public.invite_codes i where i.code = v_code for update;
+    if not found
+       or not v_invite.is_active
+       or (v_invite.expires_at is not null and v_invite.expires_at <= now())
+       or v_invite.used_count >= v_invite.max_uses then
+      if v_invite_required then
+        raise exception 'invite code is invalid, expired or used up' using errcode = 'NX005';
+      end if;
+      v_code := null;
+    end if;
+  elsif v_invite_required then
+    raise exception 'an invite code is required' using errcode = 'NX005';
+  end if;
+
+  -- nickname: cleaned as before, forbidden names are rejected (the client
+  -- pre-checks with check_nickname), taken names get a numeric suffix
+  v_base := left(regexp_replace(coalesce(v_meta ->> 'nickname', ''), '[^A-Za-z0-9_]', '', 'g'), v_max_len);
+  if length(v_base) < 3 then
+    v_base := 'Trader';
+    v_nickname := v_base || (floor(random() * 90000) + 10000)::integer::text;
+  else
+    v_reason := public.name_violation(v_base, 'player');
+    if v_reason in ('name_profanity', 'name_reserved') then
+      perform public.api_error(v_reason);
+    end if;
+    v_nickname := v_base;
+  end if;
+  while exists (select 1 from public.profiles p where lower(p.nickname) = lower(v_nickname)) loop
+    v_attempt := v_attempt + 1;
+    if v_attempt > 20 then
+      raise exception 'could not generate a unique nickname' using errcode = 'NX007';
+    end if;
+    v_nickname := left(v_base, 15) || (floor(random() * 90000) + 10000)::integer::text;
+  end loop;
+
+  -- player rows ----------------------------------------------------------------
+  insert into public.profiles (id, nickname) values (new.id, v_nickname);
+  insert into public.player_private (player_id, age_confirmed_at)
+  values (new.id, case when v_age_confirmed then now() end);
+  insert into public.player_settings (player_id) values (new.id);
+  insert into public.vaults (player_id, accrual_started_at)
+  values (new.id, public.game_now() - make_interval(secs => v_vault_hours * 3600));
+  insert into public.login_streaks (player_id) values (new.id);
+
+  insert into public.player_unlocks (player_id, unlock_key)
+  select new.id, u.key from public.unlocks u where u.level <= 1;
+
+  insert into public.notification_preferences (player_id, type_key, in_app_enabled, push_enabled)
+  select new.id, t.key, t.default_in_app, t.default_push from public.notification_types t;
+
+  -- ledger: cash + reserve account, starting capital from the state -----------
+  insert into public.ledger_accounts (kind, owner_player_id, label) values ('player_cash', new.id, 'Cash');
+  insert into public.ledger_accounts (kind, owner_player_id, label)
+  values ('player_reserve', new.id, 'Reserved (orders, subscriptions, margin)');
+
+  if v_start_cents > 0 then
+    perform public.state_payout(new.id, v_start_cents, 0, 'starting_capital', 'Starting capital',
+                                'profile', new.id, 'starting_capital:' || new.id::text);
+  end if;
+
+  -- consume the invite ---------------------------------------------------------
+  if v_code is not null then
+    update public.invite_codes set used_count = used_count + 1 where code = v_code;
+    insert into public.invite_code_redemptions (code, player_id) values (v_code, new.id);
+  end if;
+
+  return new;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Blocked name terms (normalised: lower case ASCII letters, repeated letters
+-- collapsed). Default mode by length: >= 5 letters substring, else token.
+-- Deliberate exceptions are marked in the note column.
+-- ---------------------------------------------------------------------------
+insert into public.blocked_name_terms (term, category, match_mode, note)
+select case when t.mode = 'code' then lower(t.term) else public.name_letters(t.term) end, t.category,
+       coalesce(t.mode, case when char_length(public.name_letters(t.term)) >= 5 then 'substring' else 'token' end),
+       t.note
+  from (values
+    -- profanity, German
+    ('scheisse', 'profanity', null, null), ('scheiss', 'profanity', null, null), ('arschloch', 'profanity', null, null),
+    ('arsch', 'profanity', 'token', 'token only: Barsch, Marsch'), ('wichser', 'profanity', null, null), ('wichsen', 'profanity', null, null),
+    ('wixer', 'profanity', null, null), ('wixxer', 'profanity', null, null), ('hurensohn', 'profanity', null, null),
+    ('hure', 'profanity', null, null), ('fotze', 'profanity', null, null), ('schlampe', 'profanity', null, null),
+    ('missgeburt', 'profanity', null, null), ('drecksau', 'profanity', null, null), ('drecksack', 'profanity', null, null),
+    ('dreckskerl', 'profanity', null, null), ('vollidiot', 'profanity', null, null), ('volltrottel', 'profanity', null, null),
+    ('pisser', 'profanity', null, null), ('verpiss', 'profanity', null, null), ('leckmich', 'profanity', null, null),
+    ('fickdich', 'profanity', null, null), ('ficker', 'profanity', null, null), ('fick', 'profanity', 'substring', 'substring although short'),
+    ('kinderficker', 'profanity', null, null), ('mutterficker', 'profanity', null, null), ('nutte', 'profanity', null, null),
+    ('penner', 'profanity', null, null), ('spast', 'profanity', null, null), ('spasti', 'profanity', null, null),
+    ('mongo', 'profanity', 'token', 'token only: Mongolei'), ('behindert', 'profanity', null, null), ('opfer', 'profanity', 'token', null),
+    ('kackbratze', 'profanity', null, null), ('dummfick', 'profanity', null, null), ('bimbo', 'profanity', 'token', null),
+    ('schwachkopf', 'profanity', null, null), ('dreckig', 'profanity', 'token', null), ('kotzbrocken', 'profanity', null, null),
+    -- profanity, English
+    ('fuck', 'profanity', 'substring', 'substring although short'), ('fuk', 'profanity', 'token', null), ('fck', 'profanity', 'token', null),
+    ('shit', 'profanity', 'token', 'token only: Shitake'), ('bullshit', 'profanity', null, null), ('shithead', 'profanity', null, null),
+    ('bitch', 'profanity', null, null), ('bastard', 'profanity', null, null), ('asshole', 'profanity', null, null),
+    ('arsehole', 'profanity', null, null), ('ass', 'profanity', 'token', 'token only: Bass, Klassenbester'), ('dickhead', 'profanity', null, null),
+    ('wanker', 'profanity', null, null), ('twat', 'profanity', 'token', null), ('cunt', 'profanity', 'token', 'token only: Scunthorpe'),
+    ('motherfucker', 'profanity', null, null), ('jackass', 'profanity', null, null), ('dumbass', 'profanity', null, null),
+    ('retard', 'profanity', null, null), ('moron', 'profanity', 'token', null), ('douche', 'profanity', null, null),
+    ('crap', 'profanity', 'token', null), ('piss', 'profanity', 'token', null), ('prick', 'profanity', 'token', null),
+    -- sexual
+    ('porno', 'sexual', null, null), ('porn', 'sexual', 'token', null), ('sex', 'sexual', 'token', 'token only: Sexy, Essex'),
+    ('penis', 'sexual', null, null), ('vagina', 'sexual', null, null), ('dildo', 'sexual', null, null), ('vibrator', 'sexual', null, null),
+    ('blowjob', 'sexual', null, null), ('handjob', 'sexual', null, null), ('cumshot', 'sexual', null, null), ('cum', 'sexual', 'token', null),
+    ('milf', 'sexual', 'token', null), ('titten', 'sexual', null, null), ('tits', 'sexual', 'token', null), ('boobs', 'sexual', null, null),
+    ('muschi', 'sexual', null, null), ('pimmel', 'sexual', null, null), ('schwanz', 'sexual', null, 'Schwanstein stays allowed'),
+    ('orgasmus', 'sexual', null, null), ('orgasm', 'sexual', null, null), ('masturb', 'sexual', null, null), ('wichsvorlage', 'sexual', null, null),
+    ('vergewaltig', 'sexual', null, null), ('rape', 'sexual', 'token', 'token only: Grapefruit'), ('rapist', 'sexual', null, null),
+    ('pedo', 'sexual', 'token', null), ('paedo', 'sexual', null, null), ('pedophil', 'sexual', null, null), ('kinderporno', 'sexual', null, null),
+    ('loli', 'sexual', 'token', null), ('hentai', 'sexual', null, null), ('anal', 'sexual', 'token', 'token only: Analyst'),
+    ('anus', 'sexual', 'token', 'token only: Janus'), ('cock', 'sexual', 'token', 'token only: Hitchcock, Peacock'),
+    ('dick', 'sexual', 'token', 'token only: Dickmann'), ('pussy', 'sexual', 'token', 'token only: Pussycat stays allowed'),
+    ('slut', 'sexual', 'token', null), ('whore', 'sexual', null, null), ('horny', 'sexual', null, null), ('nackt', 'sexual', 'token', null),
+    ('bukkake', 'sexual', null, null), ('gangbang', 'sexual', null, null), ('deepthroat', 'sexual', null, null), ('fetisch', 'sexual', null, null),
+    ('xxx', 'code', 'code', null), ('69', 'code', 'code', null),
+    -- slurs
+    ('nigger', 'slur', null, null), ('nigga', 'slur', null, null), ('neger', 'slur', null, null), ('negro', 'slur', 'token', null),
+    ('kanake', 'slur', null, null), ('kanacke', 'slur', null, null), ('schwuchtel', 'slur', null, null), ('faggot', 'slur', null, null),
+    ('fag', 'slur', 'token', null), ('tranny', 'slur', null, null), ('kike', 'slur', 'token', null), ('chink', 'slur', 'token', null),
+    ('spic', 'slur', 'token', null), ('zigeuner', 'slur', null, null), ('judensau', 'slur', null, null), ('judenschwein', 'slur', null, null),
+    ('kuffnucke', 'slur', null, null), ('polacke', 'slur', null, null), ('kameltreiber', 'slur', null, null), ('schlitzauge', 'slur', null, null),
+    ('untermensch', 'slur', null, null), ('affenmensch', 'slur', null, null), ('mohrenkopf', 'slur', null, null),
+    -- extremist
+    ('hitler', 'extremist', null, null), ('adolfhitler', 'extremist', null, null), ('heilhitler', 'extremist', null, null),
+    ('siegheil', 'extremist', null, null), ('nazi', 'extremist', 'substring', 'substring although short; blocks Nazim/Ignazio (accepted)'),
+    ('nsdap', 'extremist', null, null), ('fuehrer', 'extremist', 'token', 'token only: Lokfuehrer'), ('reichsfuehrer', 'extremist', null, null),
+    ('holocaust', 'extremist', null, null), ('auschwitz', 'extremist', null, null), ('gaskammer', 'extremist', null, null),
+    ('zyklonb', 'extremist', null, null), ('endloesung', 'extremist', null, null), ('hakenkreuz', 'extremist', null, null),
+    ('swastika', 'extremist', null, null), ('whitepower', 'extremist', null, null), ('whitepride', 'extremist', null, null),
+    ('rassenkrieg', 'extremist', null, null), ('volkstod', 'extremist', null, null), ('judenhass', 'extremist', null, null),
+    ('kristallnacht', 'extremist', null, null), ('himmler', 'extremist', null, null), ('goebbels', 'extremist', null, null),
+    ('mengele', 'extremist', null, null), ('eichmann', 'extremist', null, null), ('waffenss', 'extremist', null, null),
+    ('isis', 'extremist', 'token', null), ('jihad', 'extremist', null, null), ('dschihad', 'extremist', null, null),
+    ('alqaida', 'extremist', null, null), ('taliban', 'extremist', null, null), ('terrorist', 'extremist', null, null),
+    ('kukluxklan', 'extremist', null, null), ('blutundehre', 'extremist', null, null), ('combat18', 'extremist', 'substring', null),
+    ('88', 'code', 'code', 'Heil Hitler; whole raw token only (Lisa88 is blocked, Max1988 is allowed)'),
+    ('1488', 'code', 'code', null), ('14', 'code', 'code', 'fourteen words, only as the token 14'), ('hh', 'code', 'code', null),
+    ('ss', 'code', 'code', null), ('kkk', 'code', 'code', null), ('acab', 'code', 'code', null),
+    -- reserved
+    ('admin', 'reserved', 'token', null), ('administrator', 'reserved', null, null), ('moderator', 'reserved', null, null),
+    ('mod', 'reserved', 'token', null), ('support', 'reserved', 'token', null), ('system', 'reserved', 'token', null),
+    ('sysadmin', 'reserved', null, null), ('staff', 'reserved', 'token', null), ('nexa', 'reserved', 'token', null),
+    ('nexateam', 'reserved', null, null), ('finn', 'reserved', 'token', null), ('staat', 'reserved', 'token', null),
+    ('staatskasse', 'reserved', null, null), ('zentralbank', 'reserved', null, null), ('bank', 'reserved', 'token', null),
+    ('official', 'reserved', 'token', null), ('offiziell', 'reserved', 'token', null), ('root', 'reserved', 'token', null),
+    ('null', 'reserved', 'token', null), ('undefined', 'reserved', 'token', null), ('anonymous', 'reserved', 'token', null),
+    ('anonym', 'reserved', 'token', null), ('deleted', 'reserved', 'token', null), ('geloescht', 'reserved', 'token', null),
+    ('gamemaster', 'reserved', null, null), ('owner', 'reserved', 'token', null), ('service', 'reserved', 'token', null)
+  ) as t(term, category, mode, note)
+on conflict (term) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Privileges
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.money_genesis_done()', 'public.treasury_balance_cents()', 'public.basic_income_factor_bps()',
+    'public.state_payout(uuid, bigint, bigint, public.ledger_tx_kind, text, text, uuid, text)',
+    'public.money_genesis()', 'public.money_resource(text, bigint, text[], text)',
+    'public.name_normalize(text, boolean)', 'public.name_letters(text)', 'public.name_violation(text, text, uuid)',
+    'public.check_nickname(text)', 'public.change_nickname(uuid, text)', 'public.level_progress(bigint)',
+    'public.api_error(text)', 'public.handle_new_user()'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+    execute format('grant execute on function %s to service_role', f);
+  end loop;
+  grant execute on function public.check_nickname(text) to anon, authenticated;
+  grant execute on function public.change_nickname(uuid, text) to authenticated;
+end;
+$$;
+
+-- ===== supabase/migrations/20261112000300_m2_trading.sql =====
+-- =============================================================================
+-- NEXA · M2a · 0300 · Trading with fractional shares (millionths), money from
+--                     and to the state, amount orders
+-- =============================================================================
+-- Quantities are bigint millionths of a share (1 share = 1 000 000).
+-- value_cents = round_half_even(quantity_e6 x price_e4 / 100 000 000).
+-- Counterparties (closed money system): stocks trade against the financial
+-- market (system account "market"), bonds against the treasury (the state
+-- issues and buys back); fees and taxes go to the treasury.
+-- =============================================================================
+
+create or replace function public.value_cents(p_quantity_e6 bigint, p_price_e4 bigint)
+returns bigint
+language sql
+immutable
+set search_path = ''
+as $$
+  select public.div_round_half_even(p_quantity_e6::numeric * p_price_e4, 100000000);
+$$;
+comment on function public.value_cents(bigint, bigint) is 'round_half_even(quantity_e6 x price_e4 / 1e8): the only place where a price and a (fractional) quantity turn into money.';
+
+-- ---------------------------------------------------------------------------
+-- execute_fill: books ONE fill of an order (quantity in millionths)
+-- ---------------------------------------------------------------------------
+create or replace function public.execute_fill(
+  p_order_id    uuid,
+  p_quantity bigint,
+  p_price_e4    bigint,
+  p_resting     boolean default false,
+  p_system      boolean default false
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  o            public.orders;
+  s            public.securities;
+  v_trading    jsonb := coalesce(public.config_jsonb('trading'), '{}'::jsonb);
+  v_prog       jsonb := coalesce(public.config_jsonb('progression'), '{}'::jsonb);
+  v_now        timestamptz := public.game_now();
+  v_cash       uuid;
+  v_reserve    uuid;
+  v_counter    uuid;
+  v_treasury   uuid;
+  v_counter_ok boolean;
+  v_counter_bal bigint;
+  v_gross      bigint;
+  v_fee        bigint := 0;
+  v_tax        bigint := 0;
+  v_pnl        bigint;
+  v_cost       bigint := 0;
+  v_release    bigint := 0;
+  v_cash_delta bigint;
+  v_balance    bigint;
+  v_pos        public.positions;
+  v_basis_new  bigint;
+  v_avg_new    bigint;
+  v_trade_id   uuid := gen_random_uuid();
+  v_tx         uuid;
+  v_xp         integer := 0;
+  v_wash       boolean := false;
+  v_first      boolean;
+  v_pot        bigint;
+  v_offset     bigint;
+  v_left       bigint;
+  v_take       bigint;
+  v_entries    jsonb;
+  v_tick_seq   bigint;
+  v_year       integer;
+  lot          record;
+begin
+  select * into o from public.orders where id = p_order_id for update;
+  if not found then
+    raise exception 'order % does not exist', p_order_id using errcode = 'NX007';
+  end if;
+  if p_quantity is null or p_quantity <= 0 or p_quantity > o.quantity_e6 - o.filled_quantity_e6 then
+    raise exception 'invalid fill quantity % for order %', p_quantity, p_order_id using errcode = 'NX007';
+  end if;
+  if p_price_e4 is null or p_price_e4 <= 0 then
+    raise exception 'invalid fill price %', p_price_e4 using errcode = 'NX007';
+  end if;
+  select * into s from public.securities where id = o.security_id;
+  v_first := o.filled_quantity_e6 = 0;
+
+  v_gross := public.value_cents(p_quantity, p_price_e4);
+  if o.fee_cents = 0 and not p_system then
+    v_fee := greatest(0, public.cfg_num(v_trading, '{orderFeeCents}', 100))::bigint;
+  end if;
+  v_cash     := public.ledger_player_account(o.player_id, 'player_cash');
+  v_reserve  := public.ledger_player_account(o.player_id, 'player_reserve');
+  v_treasury := public.ledger_system_account('treasury');
+  v_counter  := case when s.kind = 'bond' then v_treasury else public.ledger_system_account('market') end;
+  select a.balance_cents into v_balance from public.ledger_accounts a where a.id = v_cash;
+  select a.balance_cents, a.allow_negative into v_counter_bal, v_counter_ok from public.ledger_accounts a where a.id = v_counter;
+
+  select * into v_pos
+    from public.positions p
+   where p.player_id = o.player_id and p.security_id = o.security_id
+     and p.side = 'long' and p.leverage = 1 and p.status = 'open'
+     for update;
+
+  if o.side = 'buy' then
+    if p_resting then
+      v_release := o.reserved_cents;
+    end if;
+    v_cash_delta := v_release - v_gross - v_fee;
+    if v_balance + v_cash_delta < 0 then
+      perform public.api_error('insufficient_funds');
+    end if;
+    if v_pos.id is null then
+      insert into public.positions (player_id, security_id, quantity_e6, avg_entry_price_e4, cost_basis_cents, opened_at)
+      values (o.player_id, o.security_id, 0, p_price_e4, 0, v_now)
+      returning * into v_pos;
+    end if;
+  else
+    if v_pos.id is null
+       or v_pos.quantity_e6 < p_quantity
+       or (not p_resting and v_pos.quantity_e6 - v_pos.reserved_quantity_e6 < p_quantity)
+       or (p_resting and v_pos.reserved_quantity_e6 < p_quantity) then
+      perform public.api_error('insufficient_position');
+    end if;
+    -- the financial market (or the treasury for bonds) must be able to pay
+    if not v_counter_ok
+       and v_counter_bal - v_gross + case when v_counter = v_treasury then v_fee else 0 end < 0 then
+      perform public.api_error('market_illiquid');
+    end if;
+    v_left := p_quantity;
+    for lot in
+      select l.id, l.quantity_open_e6
+        from public.position_lots l
+       where l.position_id = v_pos.id and l.quantity_open_e6 > 0
+       order by l.acquired_at, l.id
+         for update
+    loop
+      exit when v_left = 0;
+      v_take := least(v_left, lot.quantity_open_e6);
+      update public.position_lots
+         set quantity_open_e6 = quantity_open_e6 - v_take,
+             closed_at = case when quantity_open_e6 - v_take = 0 then v_now else closed_at end
+       where id = lot.id;
+      v_left := v_left - v_take;
+    end loop;
+    select coalesce(sum(public.value_cents(l.quantity_open_e6, l.price_e4)), 0)::bigint
+      into v_basis_new
+      from public.position_lots l where l.position_id = v_pos.id and l.quantity_open_e6 > 0;
+    v_cost := v_pos.cost_basis_cents - v_basis_new;
+    if v_left > 0 then
+      v_cost := v_cost + public.value_cents(v_left, v_pos.avg_entry_price_e4);
+    end if;
+    v_cost := greatest(v_cost, 0);
+
+    v_pnl := v_gross - v_fee - v_cost;
+    select pp.tax_loss_pot_cents into v_pot
+      from public.player_private pp where pp.player_id = o.player_id for update;
+    v_pot := coalesce(v_pot, 0);
+    if v_pnl <= 0 then
+      v_pot := v_pot - v_pnl;
+    else
+      v_offset := least(v_pnl, v_pot);
+      v_tax := public.apply_bps(v_pnl - v_offset, public.cfg_num(v_trading, '{capitalGainsTaxBps}', 2500)::numeric);
+      v_pot := v_pot - v_offset;
+    end if;
+    update public.player_private set tax_loss_pot_cents = v_pot where player_id = o.player_id;
+
+    v_cash_delta := v_gross - v_fee - v_tax;
+    if v_balance + v_cash_delta < 0 then
+      perform public.api_error('insufficient_funds');
+    end if;
+    v_wash := exists (
+      select 1 from public.trades t
+       where t.player_id = o.player_id and t.security_id = o.security_id and t.side = 'buy'
+         and t.executed_at > v_now - make_interval(secs => public.cfg_num(v_trading, '{washTradeWindowSeconds}', 600)));
+  end if;
+
+  -- ledger: one balanced transaction per fill (entries on the same account merged)
+  select coalesce(jsonb_agg(jsonb_build_object('account_id', x.account_id, 'amount_cents', x.amount)), '[]'::jsonb)
+    into v_entries
+    from (select e.account_id, sum(e.amount)::bigint as amount
+            from (values
+              (v_cash,     v_cash_delta),
+              (v_reserve,  -v_release),
+              (v_counter,  case when o.side = 'buy' then v_gross else -v_gross end),
+              (v_treasury, v_fee + v_tax)
+            ) as e(account_id, amount)
+           group by e.account_id
+          having sum(e.amount) <> 0) x;
+  if jsonb_array_length(v_entries) >= 2 then
+    v_tx := public.ledger_post(
+      case when p_system then 'bond_redemption'::public.ledger_tx_kind
+           when o.side = 'buy' then 'trade_buy'::public.ledger_tx_kind
+           else 'trade_sell'::public.ledger_tx_kind end,
+      v_entries,
+      case when o.side = 'buy' then 'Kauf ' else 'Verkauf ' end || s.ticker,
+      'order', o.id, 'fill:' || v_trade_id::text, o.player_id,
+      jsonb_build_object('quantity_e6', p_quantity, 'price_e4', p_price_e4, 'trade_id', v_trade_id));
+  end if;
+
+  -- XP: one trade XP per order, not below progression.xpSources.trade.minOrderValueCents,
+  -- not for closing a position opened inside the wash-trade window
+  if not p_system and not v_wash
+     and v_gross >= public.cfg_num(v_prog, '{xpSources,trade,minOrderValueCents}', 10000) then
+    v_xp := public.grant_xp(o.player_id, 'trade', public.cfg_num(v_prog, '{xpSources,trade,xp}', 10)::integer,
+                            'trade:' || o.id::text, 'trade', v_trade_id);
+  end if;
+
+  select r.tick_seq into v_tick_seq from public.sim_runtime r where r.id;
+  insert into public.trades (
+    id, order_id, player_id, security_id, position_id, side, quantity_e6, price_e4, gross_cents, fee_cents,
+    tax_cents, realized_pnl_cents, counterparty, ledger_transaction_id, tick_seq, is_wash_trade, xp_awarded, executed_at)
+  values (
+    v_trade_id, o.id, o.player_id, o.security_id, v_pos.id, o.side, p_quantity, p_price_e4, v_gross, v_fee,
+    v_tax, case when o.side = 'sell' then v_pnl end,
+    case when p_system then 'issuer'::public.trade_counterparty else 'market_maker'::public.trade_counterparty end,
+    v_tx, v_tick_seq, v_wash, v_xp, v_now);
+
+  if o.side = 'buy' then
+    insert into public.position_lots (position_id, player_id, security_id, trade_id, quantity_initial_e6, quantity_open_e6, price_e4, acquired_at)
+    values (v_pos.id, o.player_id, o.security_id, v_trade_id, p_quantity, p_quantity, p_price_e4, v_now);
+    select coalesce(sum(public.value_cents(l.quantity_open_e6, l.price_e4)), 0)::bigint,
+           coalesce(public.div_round_half_even(sum(l.quantity_open_e6::numeric * l.price_e4), sum(l.quantity_open_e6)), p_price_e4)
+      into v_basis_new, v_avg_new
+      from public.position_lots l where l.position_id = v_pos.id and l.quantity_open_e6 > 0;
+    update public.positions
+       set quantity_e6 = quantity_e6 + p_quantity, cost_basis_cents = v_basis_new, avg_entry_price_e4 = v_avg_new
+     where id = v_pos.id;
+  else
+    select coalesce(public.div_round_half_even(sum(l.quantity_open_e6::numeric * l.price_e4), sum(l.quantity_open_e6)), 0)
+      into v_avg_new
+      from public.position_lots l where l.position_id = v_pos.id and l.quantity_open_e6 > 0;
+    update public.positions
+       set quantity_e6 = quantity_e6 - p_quantity,
+           reserved_quantity_e6 = case when p_resting then reserved_quantity_e6 - p_quantity else reserved_quantity_e6 end,
+           cost_basis_cents = v_basis_new,
+           avg_entry_price_e4 = case when quantity_e6 - p_quantity = 0 then avg_entry_price_e4 else v_avg_new end,
+           realized_pnl_cents = realized_pnl_cents + v_pnl,
+           status = case when quantity_e6 - p_quantity = 0 then 'closed'::public.position_status else status end,
+           closed_at = case when quantity_e6 - p_quantity = 0 then v_now else closed_at end
+     where id = v_pos.id;
+
+    v_year := coalesce((select q.game_year from public.current_game_quarter() q), 0);
+    insert into public.player_tax_years as t (player_id, game_year, realized_gains_cents, realized_losses_cents, tax_paid_cents)
+    values (o.player_id, v_year, greatest(v_pnl, 0), greatest(-v_pnl, 0), v_tax)
+    on conflict (player_id, game_year) do update
+      set realized_gains_cents  = t.realized_gains_cents + excluded.realized_gains_cents,
+          realized_losses_cents = t.realized_losses_cents + excluded.realized_losses_cents,
+          tax_paid_cents        = t.tax_paid_cents + excluded.tax_paid_cents,
+          updated_at            = now();
+  end if;
+
+  update public.orders
+     set filled_quantity_e6   = filled_quantity_e6 + p_quantity,
+         avg_fill_price_e4    = public.div_round_half_even(
+                                  coalesce(avg_fill_price_e4, 0)::numeric * filled_quantity_e6 + p_price_e4::numeric * p_quantity,
+                                  filled_quantity_e6 + p_quantity),
+         fee_cents            = fee_cents + v_fee,
+         reserved_cents       = case when p_resting and side = 'buy' then 0 else reserved_cents end,
+         reserved_quantity_e6 = case when p_resting and side = 'sell' then reserved_quantity_e6 - p_quantity else reserved_quantity_e6 end,
+         status               = case when filled_quantity_e6 + p_quantity >= quantity_e6 then 'filled'::public.order_status
+                                     else 'partially_filled'::public.order_status end,
+         filled_at            = case when filled_quantity_e6 + p_quantity >= quantity_e6 then v_now else filled_at end
+   where id = o.id;
+
+  update public.security_quotes
+     set day_volume_e6 = day_volume_e6 + p_quantity, day_turnover_cents = day_turnover_cents + v_gross
+   where security_id = o.security_id;
+  if not p_system then
+    update public.security_sim_state
+       set pending_player_flow_e6 = pending_player_flow_e6 + case when o.side = 'buy' then p_quantity else -p_quantity end
+     where security_id = o.security_id;
+
+    -- missions
+    if v_first then
+      perform public.mission_event(o.player_id, 'trade', 1, null);
+      perform public.mission_event(o.player_id, case when o.side = 'buy' then 'buy' else 'sell' end, 1, null);
+    end if;
+    perform public.mission_event(o.player_id, 'trade_value', v_gross, null);
+    perform public.mission_event(o.player_id, 'trading_day', 1, to_char(v_now at time zone 'Europe/Berlin', 'YYYY-MM-DD'));
+    perform public.mission_event(o.player_id, 'distinct_security', 1, s.ticker);
+    if o.side = 'buy' then
+      perform public.mission_event(o.player_id, 'buy_value', v_gross, null);
+      if s.kind = 'bond' then
+        perform public.mission_event(o.player_id, 'bond_bought', 1, null);
+      elsif s.sector_key is not null then
+        perform public.mission_event(o.player_id, 'buy_sector', 1, s.sector_key);
+        perform public.mission_event(o.player_id, 'sectors_bought', 1, s.sector_key);
+      end if;
+    elsif v_pnl > 0 then
+      perform public.mission_event(o.player_id, 'realized_profit', v_pnl, null);
+    end if;
+  end if;
+
+  return jsonb_build_object(
+    'trade_id', v_trade_id, 'quantity_e6', p_quantity, 'price_e4', p_price_e4, 'gross_cents', v_gross,
+    'fee_cents', v_fee, 'tax_cents', v_tax, 'realized_pnl_cents', case when o.side = 'sell' then v_pnl end,
+    'xp_awarded', v_xp, 'wash_trade', v_wash);
+end;
+$$;
+comment on function public.execute_fill(uuid, bigint, bigint, boolean, boolean) is 'Internal: books one fill in millionths (ledger against the financial market or, for bonds, the treasury; fee and tax to the treasury; FIFO lots; loss pot; trade XP; missions; player flow).';
+
+create or replace function public.cancel_order_internal(p_order_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  o public.orders;
+begin
+  select * into o from public.orders where id = p_order_id for update;
+  if not found then
+    perform public.api_error('order_not_found');
+  end if;
+  if o.status not in ('pending', 'open', 'partially_filled') then
+    perform public.api_error('order_not_open');
+  end if;
+  if o.side = 'buy' and o.reserved_cents > 0 then
+    perform public.ledger_transfer(
+      public.ledger_player_account(o.player_id, 'player_reserve'),
+      public.ledger_player_account(o.player_id, 'player_cash'),
+      o.reserved_cents, 'order_release', 'Freigabe Limit-Order', 'order', o.id,
+      'release:' || o.id::text, o.player_id);
+  end if;
+  if o.side = 'sell' and o.reserved_quantity_e6 > 0 then
+    update public.positions p
+       set reserved_quantity_e6 = greatest(0, p.reserved_quantity_e6 - o.reserved_quantity_e6)
+     where p.player_id = o.player_id and p.security_id = o.security_id
+       and p.side = 'long' and p.leverage = 1 and p.status = 'open';
+  end if;
+  update public.orders
+     set status = 'cancelled', cancelled_at = now(), reserved_cents = 0, reserved_quantity_e6 = 0
+   where id = o.id;
+  return jsonb_build_object('order_id', o.id, 'status', 'cancelled');
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- place_order (RPC): quantity in millionths OR an amount in cents
+-- ---------------------------------------------------------------------------
+drop function if exists public.place_order(uuid, text, text, text, bigint, bigint);
+
+create or replace function public.place_order(
+  p_request_id     uuid,
+  p_ticker         text,
+  p_side           text,
+  p_type           text,
+  p_quantity_e6    bigint default null,
+  p_limit_price_e4 bigint default null,
+  p_amount_cents   bigint default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player     uuid;
+  v_replay     jsonb;
+  v_trading    jsonb := coalesce(public.config_jsonb('trading'), '{}'::jsonb);
+  v_abuse      jsonb := coalesce(public.config_jsonb('abuse'), '{}'::jsonb);
+  v_scale      numeric := greatest(1, public.cfg_num(v_trading, '{quantityScale}', 1000000))::numeric;
+  v_side       public.order_side;
+  v_type       public.order_type;
+  v_limit      bigint;
+  s            public.securities;
+  v_level      integer;
+  v_cash       bigint;
+  v_bid        bigint;
+  v_ask        bigint;
+  v_pending    bigint;
+  v_regular    boolean;
+  v_depth      double precision;
+  v_a          double precision;
+  v_pos        double precision;
+  v_touch      bigint;
+  v_qty        bigint;
+  v_fill_qty   bigint := 0;
+  v_fill_price bigint;
+  v_rest       bigint;
+  v_fee        bigint;
+  v_min_value  bigint;
+  v_need       bigint;
+  v_reserve    bigint := 0;
+  v_avail      bigint;
+  v_net_amount bigint;
+  v_order_id   uuid := gen_random_uuid();
+  v_fill       jsonb;
+  o            public.orders;
+  v_prof       public.profiles;
+  v_min_price  bigint;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'place_order');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+
+  -- inputs -------------------------------------------------------------------
+  if lower(coalesce(p_side, '')) not in ('buy', 'sell') or lower(coalesce(p_type, '')) not in ('market', 'limit')
+     or (p_quantity_e6 is null) = (p_amount_cents is null) then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_side := lower(p_side)::public.order_side;
+  v_type := lower(p_type)::public.order_type;
+  if (p_quantity_e6 is not null and p_quantity_e6 < 1) or (p_amount_cents is not null and p_amount_cents < 1) then
+    perform public.api_error('invalid_quantity');
+  end if;
+  if v_type = 'limit' then
+    if p_limit_price_e4 is null or p_limit_price_e4 < 1 or p_limit_price_e4 > 100000000000 then
+      perform public.api_error('invalid_price');
+    end if;
+    v_limit := p_limit_price_e4;
+  end if;
+
+  select * into s from public.securities where id = public.resolve_security(p_ticker);
+  if s.id is null then
+    perform public.api_error('unknown_security');
+  end if;
+  if s.kind not in ('stock', 'bond') or s.status <> 'listed' or not s.is_tradable then
+    perform public.api_error('not_tradable');
+  end if;
+  if (select r.is_paused from public.sim_runtime r where r.id) then
+    perform public.api_error('market_paused');
+  end if;
+
+  select p.level into v_level from public.profiles p where p.id = v_player;
+  if v_type = 'limit' and v_level < public.unlock_level('limit_orders') then
+    perform public.api_error('locked');
+  end if;
+  if s.kind = 'bond' and v_level < public.unlock_level('bonds') then
+    perform public.api_error('locked');
+  end if;
+
+  if not public.rate_limit_hit(v_player, 'place_order',
+           greatest(1, public.cfg_num(v_abuse, '{rateLimits,ordersPerMinute}', 20))::integer, 60)
+     or not public.rate_limit_hit(v_player, 'place_order_day',
+           greatest(1, public.cfg_num(v_abuse, '{rateLimits,ordersPerDay}', 500))::integer, 86400) then
+    perform public.api_error('rate_limited');
+  end if;
+
+  -- locks, quote ---------------------------------------------------------------
+  v_cash := public.lock_player_accounts(v_player);
+  select q.bid_e4, q.ask_e4 into v_bid, v_ask from public.security_quotes q where q.security_id = s.id;
+  select st.pending_player_flow_e6 into v_pending from public.security_sim_state st where st.security_id = s.id;
+  if v_bid is null or v_ask is null then
+    perform public.api_error('not_tradable');
+  end if;
+  v_pending   := coalesce(v_pending, 0);
+  v_regular   := public.market_session_at(public.game_now()) = 'regular';
+  v_depth     := public.security_depth(s.id, v_regular);                 -- whole shares
+  v_a         := public.cfg_num(v_trading, '{priceImpact,impactBpsPerDepth}', 100) / 10000.0 / v_depth;
+  v_fee       := greatest(0, public.cfg_num(v_trading, '{orderFeeCents}', 100))::bigint;
+  v_min_value := greatest(1, public.cfg_num(v_trading, '{minOrderValueCents}', 100))::bigint;
+  v_min_price := greatest(1, public.cfg_num(v_trading, '{minPriceE4}', 1))::bigint;
+  if v_side = 'buy' then
+    v_touch := v_ask;
+    v_pos := greatest(v_pending, 0) / 1000000.0;
+  else
+    v_touch := v_bid;
+    v_pos := greatest(-v_pending, 0) / 1000000.0;
+  end if;
+
+  -- quantity from the amount (neo-broker semantics) ------------------------------
+  if p_amount_cents is not null then
+    if v_side = 'buy' then
+      -- the player pays at most the amount including the fee
+      v_net_amount := p_amount_cents - v_fee;
+      if v_net_amount < v_min_value then
+        perform public.api_error('order_too_small');
+      end if;
+      if v_type = 'limit' then
+        v_qty := floor(v_net_amount * 100000000.0 / v_limit)::bigint;
+      else
+        v_qty := floor(v_net_amount * 100000000.0 / v_touch)::bigint;
+        -- price of that quantity (>= the price of the final, slightly smaller quantity)
+        v_fill_price := round(v_touch * (1 + v_a * (v_pos + v_qty / v_scale / 2)))::bigint;
+        v_qty := floor(v_net_amount * 100000000.0 / v_fill_price)::bigint;
+      end if;
+    else
+      -- the amount is the gross proceeds before fee and tax
+      if p_amount_cents < v_min_value then
+        perform public.api_error('order_too_small');
+      end if;
+      if v_type = 'limit' then
+        v_qty := ceil(p_amount_cents * 100000000.0 / v_limit)::bigint;
+      else
+        v_qty := ceil(p_amount_cents * 100000000.0 / v_touch)::bigint;
+        v_fill_price := greatest(v_min_price, round(v_touch * (1 - v_a * (v_pos + v_qty / v_scale / 2)))::bigint);
+        v_qty := ceil(p_amount_cents * 100000000.0 / v_fill_price)::bigint;
+      end if;
+    end if;
+  else
+    v_qty := p_quantity_e6;
+  end if;
+
+  if v_qty < 1 then
+    perform public.api_error('order_too_small');
+  end if;
+  if v_qty > public.cfg_num(v_trading, '{maxOrderQuantity}', 100000) * v_scale then
+    perform public.api_error('invalid_quantity');
+  end if;
+
+  -- sells: free position; >= 99.9 % of it is rounded up to the whole position
+  if v_side = 'sell' then
+    select p.quantity_e6 - p.reserved_quantity_e6 into v_avail
+      from public.positions p
+     where p.player_id = v_player and p.security_id = s.id and p.side = 'long' and p.leverage = 1 and p.status = 'open'
+       for update;
+    v_avail := coalesce(v_avail, 0);
+    if v_qty < v_avail and v_qty * 1000 >= v_avail * 999 then
+      v_qty := v_avail;
+    end if;
+    if v_avail < v_qty then
+      perform public.api_error('insufficient_position');
+    end if;
+  end if;
+
+  -- minimum order value at the price it would execute or rest at
+  if public.value_cents(v_qty, coalesce(v_limit, v_touch)) < v_min_value
+     and not (v_side = 'sell' and v_qty = v_avail) then
+    perform public.api_error('order_too_small');
+  end if;
+
+  -- how much executes now ---------------------------------------------------------
+  if v_type = 'market' then
+    v_fill_qty := v_qty;
+  elsif v_side = 'buy' and v_touch <= v_limit then
+    if v_touch * (1 + v_a * (v_pos + v_qty / v_scale)) <= v_limit then
+      v_fill_qty := v_qty;
+    else
+      v_fill_qty := greatest(0, least(v_qty, floor(((v_limit::double precision / v_touch - 1) / v_a - v_pos) * v_scale)::bigint));
+    end if;
+  elsif v_side = 'sell' and v_touch >= v_limit then
+    if v_touch * (1 - v_a * (v_pos + v_qty / v_scale)) >= v_limit then
+      v_fill_qty := v_qty;
+    else
+      v_fill_qty := greatest(0, least(v_qty, floor(((1 - v_limit::double precision / v_touch) / v_a - v_pos) * v_scale)::bigint));
+    end if;
+  end if;
+
+  if v_fill_qty > 0 then
+    if v_side = 'buy' then
+      if not (p_amount_cents is not null and v_type = 'market') then
+        v_fill_price := round(v_touch * (1 + v_a * (v_pos + v_fill_qty / v_scale / 2)))::bigint;
+      end if;
+      if v_type = 'limit' then
+        v_fill_price := least(v_fill_price, v_limit);
+      end if;
+    else
+      if not (p_amount_cents is not null and v_type = 'market') then
+        v_fill_price := greatest(v_min_price, round(v_touch * (1 - v_a * (v_pos + v_fill_qty / v_scale / 2)))::bigint);
+      end if;
+      if v_type = 'limit' then
+        v_fill_price := greatest(v_fill_price, v_limit);
+      end if;
+    end if;
+  end if;
+  v_rest := v_qty - v_fill_qty;
+
+  if v_side = 'buy' then
+    v_need := 0;
+    if v_fill_qty > 0 then
+      v_need := public.value_cents(v_fill_qty, v_fill_price) + v_fee;
+    end if;
+    if v_rest > 0 then
+      v_need := v_need + public.value_cents(v_rest, v_limit) + case when v_fill_qty > 0 then 0 else v_fee end;
+    end if;
+    if v_need > v_cash then
+      perform public.api_error('insufficient_funds');
+    end if;
+  end if;
+
+  -- order, fill, reservation ---------------------------------------------------------
+  insert into public.orders (id, player_id, security_id, request_id, side, type, quantity_e6, limit_price_e4, status)
+  values (v_order_id, v_player, s.id, p_request_id, v_side, v_type, v_qty, v_limit, 'pending');
+
+  if v_fill_qty > 0 then
+    v_fill := public.execute_fill(v_order_id, v_fill_qty, v_fill_price, false, false);
+  end if;
+
+  if v_rest > 0 then
+    select * into o from public.orders where id = v_order_id;
+    if v_side = 'buy' then
+      v_reserve := public.value_cents(v_rest, v_limit) + case when o.fee_cents = 0 then v_fee else 0 end;
+      if v_reserve > 0 then
+        perform public.ledger_transfer(
+          public.ledger_player_account(v_player, 'player_cash'),
+          public.ledger_player_account(v_player, 'player_reserve'),
+          v_reserve, 'order_reserve', 'Reservierung Limit-Order', 'order', v_order_id,
+          'reserve:' || v_order_id::text, v_player);
+      end if;
+      update public.orders set reserved_cents = v_reserve where id = v_order_id;
+    else
+      update public.positions p
+         set reserved_quantity_e6 = p.reserved_quantity_e6 + v_rest
+       where p.player_id = v_player and p.security_id = s.id and p.side = 'long' and p.leverage = 1 and p.status = 'open';
+      update public.orders set reserved_quantity_e6 = v_rest where id = v_order_id;
+    end if;
+    update public.orders
+       set status = case when v_fill_qty > 0 then 'partially_filled'::public.order_status else 'open'::public.order_status end
+     where id = v_order_id;
+  end if;
+  if v_type = 'limit' then
+    perform public.mission_event(v_player, 'limit_order', 1, null);
+  end if;
+
+  select * into o from public.orders where id = v_order_id;
+  select * into v_prof from public.profiles where id = v_player;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'order_id',           o.id,
+    'status',             o.status,
+    'quantity_e6',        o.quantity_e6,
+    'filled_quantity_e6', o.filled_quantity_e6,
+    'avg_price_e4',       o.avg_fill_price_e4,
+    'gross_cents',        coalesce((v_fill ->> 'gross_cents')::bigint, 0),
+    'fee_cents',          o.fee_cents,
+    'tax_cents',          coalesce((v_fill ->> 'tax_cents')::bigint, 0),
+    'realized_pnl_cents', (v_fill ->> 'realized_pnl_cents')::bigint,
+    'cash_cents',         (select a.balance_cents from public.ledger_accounts a where a.owner_player_id = v_player and a.kind = 'player_cash'),
+    'reserved_cents',     o.reserved_cents,
+    'xp_awarded',         coalesce((v_fill ->> 'xp_awarded')::integer, 0),
+    'level',              v_prof.level,
+    'xp_total',           v_prof.xp_total,
+    'ticker',             s.ticker,
+    'side',               o.side,
+    'type',               o.type,
+    'limit_price_e4',     o.limit_price_e4,
+    'amount_cents',       p_amount_cents));
+end;
+$$;
+comment on function public.place_order(uuid, text, text, text, bigint, bigint, bigint) is 'RPC: market or limit order by quantity (millionths) or by amount (cents), idempotent per request_id. See docs/DATA_MODEL.md, Nachtrag M2.';
+
+-- ---------------------------------------------------------------------------
+-- Vault: basic income scaled by the treasury (closed money system)
+-- ---------------------------------------------------------------------------
+create or replace function public.vault_status(p_player uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_base    bigint := greatest(0, public.config_bigint('economy', '{basicIncomeCentsPerHour}', 10000));
+  v_hours   double precision := greatest(0, public.config_double('economy', '{vaultCapHours}', 8));
+  v_factor  integer := public.basic_income_factor_bps();
+  v_rate    bigint;
+  v_now     timestamptz := public.game_now();
+  v         public.vaults;
+  v_ms      double precision;
+begin
+  select * into v from public.vaults where player_id = p_player;
+  if not found then
+    return null;
+  end if;
+  v_rate := v_base * v_factor / 10000;
+  v_ms := least(greatest(0, extract(epoch from (v_now - v.accrual_started_at)) * 1000), v_hours * 3600000);
+  return jsonb_build_object(
+    'accrued_cents',       floor(v_rate * v_ms / 3600000)::bigint,
+    'cap_cents',           round(v_rate * v_hours)::bigint,
+    'rate_cents_per_hour', v_rate,
+    'base_rate_cents_per_hour', v_base,
+    'factor_bps',          v_factor,
+    'last_claimed_at',     v.last_claimed_at,
+    'full_at',             v.accrual_started_at + make_interval(secs => v_hours * 3600),
+    'server_time',         v_now,
+    'accrued_seconds',     floor(v_ms / 1000)::bigint);
+end;
+$$;
+
+create or replace function public.claim_vault(p_request_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid;
+  v_replay  jsonb;
+  v_status  jsonb;
+  v_amount  bigint;
+  v_now     timestamptz := public.game_now();
+  v_tx      uuid;
+  v_total   integer;
+  v_counted integer;
+  v_hours   double precision := greatest(0, public.config_double('economy', '{vaultCapHours}', 8));
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'claim_vault');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  if not public.rate_limit_hit(v_player, 'player_action',
+           greatest(1, public.config_double('abuse', '{rateLimits,actionsPerMinute}', 60))::integer, 60) then
+    perform public.api_error('rate_limited');
+  end if;
+  perform public.lock_player_accounts(v_player);
+  perform 1 from public.vaults where player_id = v_player for update;
+  v_status := public.vault_status(v_player);
+  v_amount := coalesce((v_status ->> 'accrued_cents')::bigint, 0);
+  if v_amount < greatest(1, public.config_bigint('economy', '{vaultMinClaimCents}', 100)) then
+    perform public.api_error('nothing_to_claim');
+  end if;
+
+  v_tx := public.state_payout(v_player, v_amount, 0, 'vault_claim', 'Grundeinkommen aus dem Tresor', 'vault', null,
+                              'vault:' || v_player::text || ':' || p_request_id::text);
+
+  select greatest(0, floor(extract(epoch from (v_now - v.accrual_started_at))))::integer into v_total
+    from public.vaults v where v.player_id = v_player;
+  v_counted := (v_status ->> 'accrued_seconds')::integer;
+  insert into public.vault_claims (player_id, request_id, amount_cents, accrued_seconds, forfeited_seconds, ledger_transaction_id)
+  values (v_player, p_request_id, v_amount, v_counted, greatest(0, v_total - v_counted), v_tx)
+  on conflict (player_id, request_id) do nothing;
+  update public.vaults
+     set accrual_started_at = v_now, last_claimed_at = v_now,
+         total_claimed_cents = total_claimed_cents + v_amount, full_notified_at = null
+   where player_id = v_player;
+  perform public.mission_event(v_player, 'vault_claim', 1, null);
+
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'claimed_cents', v_amount,
+    'cash_cents',    (select a.balance_cents from public.ledger_accounts a where a.owner_player_id = v_player and a.kind = 'player_cash'),
+    'full_at',       v_now + make_interval(secs => v_hours * 3600),
+    'factor_bps',    (v_status ->> 'factor_bps')::integer));
+end;
+$$;
+
+create or replace function public.complete_tutorial(p_request_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  v_done   timestamptz;
+  v_xp     integer := 0;
+  v_prof   public.profiles;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'complete_tutorial');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select pp.tutorial_completed_at into v_done from public.player_private pp where pp.player_id = v_player for update;
+  if v_done is null then
+    update public.player_private set tutorial_completed_at = now() where player_id = v_player;
+    v_xp := public.grant_xp(v_player, 'tutorial',
+              public.config_double('progression', '{xpSources,tutorial,xp}', 50)::integer, 'tutorial', 'tutorial', null);
+    perform public.mission_event(v_player, 'tutorial', 1, null);
+  end if;
+  select * into v_prof from public.profiles where id = v_player;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'xp_awarded', v_xp, 'level', v_prof.level, 'xp_total', v_prof.xp_total,
+    'already_completed', v_done is not null));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Bonds: coupons and redemptions come from the treasury
+-- ---------------------------------------------------------------------------
+create or replace function public.pay_bond_coupons(p_quarter_id bigint)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  q        public.game_quarters;
+  v_ppy    double precision := greatest(1, public.config_double('bonds', '{couponsPerGameYear}', 4));
+  v_taxbps numeric := public.config_double('trading', '{incomeTaxOnCouponsAndDividendsBps}', 2500)::numeric;
+  b        record;
+  h        record;
+  v_dist   uuid;
+  v_coupon numeric;
+  v_gross  bigint;
+  v_tax    bigint;
+  v_tx     uuid;
+  v_total  bigint;
+  v_n      integer := 0;
+begin
+  select * into q from public.game_quarters where id = p_quarter_id;
+  perform public.lock_bond_participants();
+  for b in
+    select bd.security_id, bd.coupon_bps, bd.face_value_cents, bd.issued_at, s.ticker
+      from public.bonds bd join public.securities s on s.id = bd.security_id
+     where s.status = 'listed' and bd.issued_at < q.ends_at and bd.matures_at >= q.ends_at
+  loop
+    v_coupon := b.face_value_cents::numeric * b.coupon_bps / 10000 / v_ppy::numeric;  -- cents per bond and quarter
+    insert into public.security_distributions (security_id, kind, game_quarter_id, amount_per_unit_e4, status, ex_at, pay_at, paid_at)
+    values (b.security_id, 'coupon', q.id, round(v_coupon * 100)::bigint, 'paid', q.ends_at, now(), now())
+    on conflict (security_id, kind, game_quarter_id) do nothing
+    returning id into v_dist;
+    continue when v_dist is null;
+    v_total := 0;
+    for h in
+      select l.player_id, sum(l.quantity_open_e6)::bigint as qty_e6,
+             sum(l.quantity_open_e6::numeric * greatest(0, least(1,
+                   extract(epoch from (q.ends_at - greatest(l.acquired_at, q.starts_at, b.issued_at)))::numeric
+                   / extract(epoch from (q.ends_at - q.starts_at))::numeric))) as units_e6
+        from public.position_lots l
+        join public.positions p on p.id = l.position_id and p.status = 'open'
+       where l.security_id = b.security_id and l.quantity_open_e6 > 0
+       group by l.player_id
+       order by l.player_id
+    loop
+      v_gross := public.div_round_half_even(h.units_e6 * v_coupon, 1000000);
+      continue when v_gross <= 0;
+      v_tax := public.apply_bps(v_gross, v_taxbps);
+      v_tx := public.state_payout(h.player_id, v_gross, v_tax, 'coupon', 'Kupon ' || b.ticker, 'distribution', v_dist,
+                                  'coupon:' || v_dist::text || ':' || h.player_id::text);
+      insert into public.distribution_payouts (distribution_id, player_id, quantity_e6, gross_cents, tax_cents, net_cents, ledger_transaction_id)
+      values (v_dist, h.player_id, h.qty_e6, v_gross, v_tax, v_gross - v_tax, v_tx)
+      on conflict (distribution_id, player_id) do nothing;
+      v_total := v_total + v_gross;
+      v_n := v_n + 1;
+    end loop;
+    update public.security_distributions set total_paid_cents = v_total where id = v_dist;
+  end loop;
+  return v_n;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Unchanged logic, quantities and volumes in millionths
+-- ---------------------------------------------------------------------------
+create or replace function public.fill_resting_orders()
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_players uuid[];
+  v_n       integer := 0;
+  r         record;
+  o         public.orders;
+begin
+  select array_agg(distinct o2.player_id) into v_players
+    from public.orders o2
+    join public.security_quotes q on q.security_id = o2.security_id
+    join public.securities s on s.id = o2.security_id
+   where o2.type = 'limit' and o2.status in ('open', 'partially_filled')
+     and s.status = 'listed' and s.is_tradable
+     and ((o2.side = 'buy' and q.ask_e4 <= o2.limit_price_e4) or (o2.side = 'sell' and q.bid_e4 >= o2.limit_price_e4));
+  if v_players is null then
+    return 0;
+  end if;
+
+  -- lock every affected player's accounts up front, in id order (deadlock free)
+  perform 1 from public.ledger_accounts a where a.owner_player_id = any (v_players) order by a.id for update;
+
+  for r in
+    select o2.id
+      from public.orders o2
+      join public.security_quotes q on q.security_id = o2.security_id
+      join public.securities s on s.id = o2.security_id
+     where o2.type = 'limit' and o2.status in ('open', 'partially_filled')
+       and s.status = 'listed' and s.is_tradable
+       and ((o2.side = 'buy' and q.ask_e4 <= o2.limit_price_e4) or (o2.side = 'sell' and q.bid_e4 >= o2.limit_price_e4))
+     order by o2.created_at, o2.id
+  loop
+    begin
+      select * into o from public.orders where id = r.id for update;
+      if o.status in ('open', 'partially_filled') and o.quantity_e6 > o.filled_quantity_e6 then
+        perform public.execute_fill(o.id, o.quantity_e6 - o.filled_quantity_e6, o.limit_price_e4, true, false);
+        v_n := v_n + 1;
+      end if;
+    exception when others then
+      raise warning 'NEXA: resting order % not filled: % (%)', r.id, sqlerrm, sqlstate;
+    end;
+  end loop;
+  return v_n;
+end;
+$$;
+
+create or replace function public.market_tick_at(p_now timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_started   timestamptz := clock_timestamp();
+  rt          public.sim_runtime;
+  v_seq       bigint;
+  v_time      jsonb := coalesce(public.config_jsonb('time'), '{}'::jsonb);
+  v_trading   jsonb := coalesce(public.config_jsonb('trading'), '{}'::jsonb);
+  v_ai        jsonb := coalesce(public.config_jsonb('aiInvestors'), '{}'::jsonb);
+  v_sectors   jsonb := coalesce(public.config_jsonb('sectors'), '{}'::jsonb);
+  v_bonds     jsonb := coalesce(public.config_jsonb('bonds'), '{}'::jsonb);
+  v_regular   boolean;
+  v_bell      timestamptz;
+  v_qstart    timestamptz;
+  v_ystart    timestamptz;
+  v_new_day   boolean;
+  v_filled    integer;
+  v_policy    integer;
+  v_epoch     constant timestamptz := '2000-01-01 00:00:00+00';
+  v_local     timestamp := p_now at time zone 'Europe/Berlin';
+  v_open_h    double precision;
+  v_close_h   double precision;
+  -- config scalars
+  c_liq       double precision;
+  c_noise     double precision;
+  c_spreadf   double precision;
+  c_depthfrac double precision;
+  c_impact    double precision;
+  c_exp       double precision;
+  c_imm       double precision;
+  c_hedge     double precision;
+  c_maxret    double precision;
+  c_minprice  bigint;
+  c_minhalf   bigint;
+  c_widen     double precision;
+  c_decay     double precision;
+  c_emaf      double precision;
+  c_emas      double precision;
+  c_vf_cap    double precision;
+  c_vf_gap    double precision;
+  c_vf_dead   double precision;
+  c_mo_cap    double precision;
+  c_mo_ts     double precision;
+  c_rh_cap    double precision;
+  c_rh_chase  double precision;
+  c_rh_ts     double precision;
+  c_mm_speed  double precision;
+  c_basevol   double precision;
+  c_nscale    double precision;
+  c_qpy       double precision;
+  c_qsec      double precision;
+  -- per security
+  r           record;
+  v_price     double precision;
+  v_depth     double precision;
+  v_sent      double precision;
+  v_flow      double precision;
+  v_mm        double precision;
+  v_ef        double precision;
+  v_es        double precision;
+  v_gap       double precision;
+  v_trend     double precision;
+  v_pv        double precision;
+  v_pm        double precision;
+  v_pr        double precision;
+  v_pmm       double precision;
+  v_ret       double precision;
+  v_sigma     double precision;
+  v_exact     double precision;
+  v_new       bigint;
+  v_half_bps  double precision;
+  v_half      bigint;
+  v_bid       bigint;
+  v_ask       bigint;
+  v_vol       bigint;
+  v_dev       double precision;
+  v_periods   double precision;
+  v_years     double precision;
+  v_yield     double precision;
+  v_yield_out integer;
+  v_mcap      bigint;
+  v_imp_flow  double precision;
+  -- bulk arrays
+  a_id   uuid[] := '{}';
+  a_p    bigint[] := '{}';
+  a_b    bigint[] := '{}';
+  a_a    bigint[] := '{}';
+  a_v    bigint[] := '{}';
+  a_s    double precision[] := '{}';
+  a_ef   double precision[] := '{}';
+  a_es   double precision[] := '{}';
+  a_mm   double precision[] := '{}';
+  a_dev  double precision[] := '{}';
+  a_flow bigint[] := '{}';
+  a_y    integer[] := '{}';
+  a_mc   bigint[] := '{}';
+  -- index
+  ix     record;
+  v_cap  numeric;
+  v_ixv  bigint;
+  v_n    integer := 0;
+begin
+  if not pg_try_advisory_xact_lock(7311001) then
+    return jsonb_build_object('skipped', 'busy');
+  end if;
+  select * into rt from public.sim_runtime where id;
+  if rt.is_paused then
+    return jsonb_build_object('skipped', 'paused', 'tick_seq', rt.tick_seq);
+  end if;
+  v_seq := rt.tick_seq + 1;
+
+  -- session and calendar ----------------------------------------------------
+  v_open_h  := public.cfg_num(v_time, '{marketOpenHour}', 8);
+  v_close_h := public.cfg_num(v_time, '{marketCloseHour}', 22);
+  v_regular := (extract(hour from v_local) + extract(minute from v_local) / 60.0) >= v_open_h
+           and (extract(hour from v_local) + extract(minute from v_local) / 60.0) < v_close_h;
+  v_bell    := public.trading_day_start(p_now);
+  v_qstart  := public.quarter_bucket_start(p_now);
+  v_ystart  := public.game_year_bucket_start(p_now);
+  v_new_day := coalesce((rt.state ->> 'day_start')::timestamptz, '-infinity'::timestamptz) < v_bell;
+  select cb.policy_rate_bps into v_policy from public.central_bank_state cb where cb.id;
+  v_policy := coalesce(v_policy, public.config_double('centralBank', '{startRateBps}', 300)::integer);
+
+  -- config ----------------------------------------------------------------------
+  c_liq       := case when v_regular then 1 else public.cfg_num(v_time, '{afterHours,liquidityMultiplier}', 0.25) end;
+  c_noise     := case when v_regular then 1 else public.cfg_num(v_time, '{afterHours,volatilityMultiplier}', 0.5) end;
+  c_spreadf   := case when v_regular then 1 else public.cfg_num(v_time, '{afterHours,spreadMultiplier}', 3) end;
+  c_depthfrac := public.cfg_num(v_trading, '{priceImpact,depthFreeFloatFraction}', 0.002);
+  c_impact    := public.cfg_num(v_trading, '{priceImpact,impactBpsPerDepth}', 100) / 10000.0;
+  c_exp       := public.cfg_num(v_trading, '{priceImpact,exponent}', 1);
+  c_imm       := public.cfg_num(v_trading, '{priceImpact,immediateShare}', 0.5);
+  c_hedge     := public.cfg_num(v_trading, '{priceImpact,marketMakerHedgeShare}', 0.5);
+  c_maxret    := public.cfg_num(v_trading, '{maxTickReturnBps}', 300) / 10000.0;
+  c_minprice  := greatest(1, public.cfg_num(v_trading, '{minPriceE4}', 1))::bigint;
+  c_minhalf   := greatest(1, public.cfg_num(v_trading, '{spread,minHalfSpreadE4}', 1))::bigint;
+  c_widen     := public.cfg_num(v_trading, '{spread,sentimentWideningBps}', 20);
+  c_decay     := public.cfg_num(v_ai, '{sentimentDecayPerTick}', 0.0019);
+  c_emaf      := public.cfg_num(v_ai, '{emaFastAlpha}', 0.15);
+  c_emas      := public.cfg_num(v_ai, '{emaSlowAlpha}', 0.0165);
+  c_vf_cap    := public.cfg_num(v_ai, '{archetypes,value_fund,capitalShare}', 0.3)
+               * public.cfg_num(v_ai, '{archetypes,value_fund,reactionSpeed}', 0.000167) * c_liq;
+  c_vf_gap    := public.cfg_num(v_ai, '{archetypes,value_fund,params,gapScale}', 0.5);
+  c_vf_dead   := public.cfg_num(v_ai, '{archetypes,value_fund,params,deadBand}', 0.01);
+  c_mo_cap    := public.cfg_num(v_ai, '{archetypes,momentum_trader,capitalShare}', 0.1)
+               * public.cfg_num(v_ai, '{archetypes,momentum_trader,reactionSpeed}', 0.0002) * c_liq;
+  c_mo_ts     := public.cfg_num(v_ai, '{archetypes,momentum_trader,params,trendScale}', 0.02);
+  c_rh_cap    := public.cfg_num(v_ai, '{archetypes,retail_herd,capitalShare}', 0.1)
+               * public.cfg_num(v_ai, '{archetypes,retail_herd,reactionSpeed}', 0.0012) * c_liq;
+  c_rh_chase  := public.cfg_num(v_ai, '{archetypes,retail_herd,params,chaseGain}', 0.1);
+  c_rh_ts     := public.cfg_num(v_ai, '{archetypes,retail_herd,params,trendScale}', 0.02);
+  c_mm_speed  := public.cfg_num(v_ai, '{archetypes,market_maker,reactionSpeed}', 0.005) * c_liq;
+  c_basevol   := public.cfg_num(v_ai, '{baselineVolumeDepthFraction}', 0.02);
+  -- Scale on tickNoiseBps for stocks. The TS values give daily ranges of about
+  -- 10 % (blue chips) to 90 % (penny stocks); 0.2 brings them to the M1 target
+  -- (1-4 %, 3-8 %, 10-30 %). Fallback until balance.ts has aiInvestors.tickNoiseScale.
+  c_nscale    := public.cfg_num(v_ai, '{tickNoiseScale}', 0.2);
+  c_qpy       := greatest(1, public.cfg_num(v_bonds, '{couponsPerGameYear}', 4));
+  c_qsec      := public.cfg_num(v_time, '{quarterHours}', 6) * 3600;
+
+  -- 1. resting limit orders against the quote players currently see ----------
+  v_filled := public.fill_resting_orders();
+
+  -- 2./3. stocks and bonds ---------------------------------------------------------
+  for r in
+    select s.id, s.kind, s.sector_key, c.tier::text as tier, c.shares_outstanding,
+           q.last_price_e4,
+           st.fair_value_e4, st.sentiment, st.ema_fast, st.ema_slow, st.maker_inventory,
+           st.pending_player_flow_e6, st.price_deviation, st.volatility, st.liquidity_shares, st.spread_bps,
+           b.coupon_bps, b.matures_at, b.face_value_cents
+      from public.securities s
+      join public.security_quotes q on q.security_id = s.id
+      join public.security_sim_state st on st.security_id = s.id
+      left join public.companies c on c.id = s.company_id
+      left join public.bonds b on b.security_id = s.id
+     where s.status = 'listed' and s.kind in ('stock', 'bond')
+  loop
+    v_price := r.last_price_e4;
+    v_flow  := r.pending_player_flow_e6 / 1000000.0;
+    v_sent  := greatest(-1, least(1, coalesce(r.sentiment, 0) * (1 - c_decay)));
+    v_ef    := coalesce(r.ema_fast, v_price);
+    v_es    := coalesce(r.ema_slow, v_price);
+    v_mm    := coalesce(r.maker_inventory, 0) - v_flow;
+    v_dev   := coalesce(r.price_deviation, 0);
+    v_yield_out := null;
+    v_mcap  := null;
+
+    if r.kind = 'stock' and r.shares_outstanding is not null then
+      v_depth := greatest(1, r.shares_outstanding * c_depthfrac * c_liq);
+      -- value fund: anchor to the fair value outside the dead band
+      v_gap := ln(r.fair_value_e4 / v_price);
+      if abs(v_gap) <= c_vf_dead then
+        v_pv := 0;
+      else
+        v_pv := r.shares_outstanding * c_vf_cap
+              * greatest(-1, least(1, (v_gap - sign(v_gap) * c_vf_dead) / c_vf_gap));
+      end if;
+      v_trend := case when v_es > 0 then v_ef / v_es - 1 else 0 end;
+      v_pm  := r.shares_outstanding * c_mo_cap * tanh(v_trend / c_mo_ts);
+      v_pr  := r.shares_outstanding * c_rh_cap * greatest(-1, least(1, v_sent + c_rh_chase * tanh(v_trend / c_rh_ts)));
+      v_pmm := -v_mm * c_mm_speed * c_hedge;
+      v_ret := sign(v_pv + v_pm + v_pr + v_pmm) * c_impact * power(abs(v_pv + v_pm + v_pr + v_pmm) / v_depth, c_exp)
+             + c_imm * sign(v_flow) * c_impact * power(abs(v_flow) / v_depth, c_exp);
+      v_sigma := public.cfg_num(v_ai, array['tickNoiseBps', coalesce(r.tier, 'midcap')], 15) / 10000.0
+               * public.cfg_num(v_sectors, array[coalesce(r.sector_key, ''), 'volatilityMultiplier'], 1)
+               * c_noise * c_nscale;
+      v_ret := greatest(-c_maxret, least(c_maxret, v_ret + v_sigma * public.gauss_random()));
+      v_exact := v_price * exp(v_ret);
+      v_new := floor(v_exact)::bigint + case when random() < v_exact - floor(v_exact) then 1 else 0 end;
+      v_new := greatest(c_minprice, v_new);
+      v_mm  := v_mm * (1 - c_mm_speed);
+      v_half_bps := (public.cfg_num(v_trading, array['spread', 'halfSpreadBps', coalesce(r.tier, 'midcap')], 15)
+                     + c_widen * least(1, abs(v_sent))) * c_spreadf;
+      v_vol := round((abs(v_pv) + abs(v_pm) + abs(v_pr) + abs(v_pmm) + v_depth * c_basevol * (0.5 + random())) * 1000000)::bigint;
+      v_mcap := public.div_round_half_even(r.shares_outstanding::numeric * v_new, 100);
+    elsif r.kind = 'bond' and r.matures_at is not null then
+      v_depth   := greatest(1, coalesce(r.liquidity_shares, 100000) * c_liq);
+      v_periods := extract(epoch from (r.matures_at - p_now)) / c_qsec;
+      v_years   := greatest(v_periods / c_qpy, 0);
+      v_yield   := public.bond_yield_bps(v_policy, v_years, v_bonds);
+      v_imp_flow := c_imm * sign(v_flow) * c_impact * power(abs(v_flow) / v_depth, c_exp);
+      v_dev := v_dev * (1 - c_decay) + coalesce(r.volatility, 0) * c_noise * public.gauss_random() + v_imp_flow;
+      if v_periods > 0 then
+        v_new := greatest(c_minprice, round(public.bond_clean_price(r.coupon_bps, v_yield, v_periods, c_qpy)
+                                            * exp(v_dev) * r.face_value_cents * 100)::bigint);
+        v_yield_out := round(v_yield - v_dev * 10000 / greatest(v_years, 0.25))::integer;
+      else
+        v_new := r.face_value_cents * 100;
+        v_yield_out := 0;
+      end if;
+      v_half_bps := coalesce(r.spread_bps, 10) / 2.0 * c_spreadf;
+      v_vol := round(v_depth * c_basevol * (0.5 + random()) * 1000000)::bigint;
+    else
+      continue;
+    end if;
+
+    v_ef := v_ef + c_emaf * (v_new - v_ef);
+    v_es := v_es + c_emas * (v_new - v_es);
+    v_half := greatest(c_minhalf, round(v_new * v_half_bps / 10000.0)::bigint);
+    v_bid := greatest(c_minprice, v_new - v_half);
+    v_ask := v_new + v_half;
+    if v_ask <= v_bid then
+      v_ask := v_bid + 1;
+    end if;
+
+    a_id := a_id || r.id;      a_p := a_p || v_new;        a_b := a_b || v_bid;     a_a := a_a || v_ask;
+    a_v := a_v || v_vol;       a_s := a_s || v_sent;       a_ef := a_ef || v_ef;    a_es := a_es || v_es;
+    a_mm := a_mm || v_mm;      a_dev := a_dev || v_dev;    a_flow := a_flow || r.pending_player_flow_e6;
+    a_y := a_y || v_yield_out; a_mc := a_mc || v_mcap;
+    v_n := v_n + 1;
+  end loop;
+
+  update public.security_sim_state st
+     set sentiment = u.s, ema_fast = u.ef, ema_slow = u.es, maker_inventory = u.mm,
+         price_deviation = u.dev, pending_player_flow_e6 = st.pending_player_flow_e6 - u.flow
+    from unnest(a_id, a_s, a_ef, a_es, a_mm, a_dev, a_flow) as u(id, s, ef, es, mm, dev, flow)
+   where st.security_id = u.id;
+
+  update public.security_quotes q
+     set last_price_e4 = u.p,
+         bid_e4 = u.b,
+         ask_e4 = u.a,
+         prev_close_e4 = case when v_new_day then q.last_price_e4 else coalesce(q.prev_close_e4, q.last_price_e4) end,
+         day_open_e4 = case when v_new_day then u.p else coalesce(q.day_open_e4, u.p) end,
+         day_high_e4 = case when v_new_day then u.p else greatest(coalesce(q.day_high_e4, u.p), u.p) end,
+         day_low_e4 = case when v_new_day then u.p else least(coalesce(q.day_low_e4, u.p), u.p) end,
+         day_volume_e6 = case when v_new_day then u.v else q.day_volume_e6 + u.v end,
+         day_turnover_cents = case when v_new_day then 0 else q.day_turnover_cents end,
+         change_bps = greatest(-1000000, least(1000000, round(
+                        (u.p - case when v_new_day then q.last_price_e4 else coalesce(q.prev_close_e4, q.last_price_e4) end) * 10000.0
+                        / greatest(1, case when v_new_day then q.last_price_e4 else coalesce(q.prev_close_e4, q.last_price_e4) end))))::integer,
+         market_cap_cents = coalesce(u.mc, q.market_cap_cents),
+         yield_bps = coalesce(u.y, q.yield_bps),
+         tick_seq = v_seq,
+         updated_at = p_now
+    from unnest(a_id, a_p, a_b, a_a, a_v, a_y, a_mc) as u(id, p, b, a, v, y, mc)
+   where q.security_id = u.id;
+
+  -- 4. indices ---------------------------------------------------------------------
+  for ix in
+    select i.security_id, i.divisor
+      from public.indices i join public.securities s on s.id = i.security_id
+     where s.status = 'listed'
+  loop
+    select sum(c.shares_outstanding::numeric * q.last_price_e4) / 100
+      into v_cap
+      from public.index_memberships m
+      join public.securities s on s.id = m.member_security_id
+      join public.companies c on c.id = s.company_id
+      join public.security_quotes q on q.security_id = s.id
+     where m.index_security_id = ix.security_id and m.left_at is null;
+    if v_cap is null or ix.divisor <= 0 then
+      continue;
+    end if;
+    v_ixv := greatest(1, round(v_cap / ix.divisor::numeric))::bigint;
+    update public.security_quotes q
+       set last_price_e4 = v_ixv,
+           prev_close_e4 = case when v_new_day then q.last_price_e4 else coalesce(q.prev_close_e4, q.last_price_e4) end,
+           day_open_e4 = case when v_new_day then v_ixv else coalesce(q.day_open_e4, v_ixv) end,
+           day_high_e4 = case when v_new_day then v_ixv else greatest(coalesce(q.day_high_e4, v_ixv), v_ixv) end,
+           day_low_e4 = case when v_new_day then v_ixv else least(coalesce(q.day_low_e4, v_ixv), v_ixv) end,
+           change_bps = round((v_ixv - case when v_new_day then q.last_price_e4 else coalesce(q.prev_close_e4, q.last_price_e4) end) * 10000.0
+                        / greatest(1, case when v_new_day then q.last_price_e4 else coalesce(q.prev_close_e4, q.last_price_e4) end))::integer,
+           market_cap_cents = round(v_cap)::bigint,
+           tick_seq = v_seq,
+           updated_at = p_now
+     where q.security_id = ix.security_id;
+    a_id := a_id || ix.security_id;
+    a_p  := a_p || v_ixv;
+    a_v  := a_v || 0::bigint;
+  end loop;
+
+  -- 5. ticks and candles --------------------------------------------------------------
+  insert into public.price_ticks (security_id, ts, tick_seq, price_e4, volume_e6)
+  select u.id, p_now, v_seq, u.p, u.v from unnest(a_id, a_p, a_v) as u(id, p, v)
+  on conflict do nothing;
+
+  insert into public.candles as c (security_id, interval, bucket_start, open_e4, high_e4, low_e4, close_e4, volume_e6, tick_count)
+  select u.id, iv.i, iv.b, u.p, u.p, u.p, u.p, u.v, 1
+    from unnest(a_id, a_p, a_v) as u(id, p, v)
+   cross join (values
+     ('1m'::public.candle_interval, date_bin('1 minute', p_now, v_epoch)),
+     ('5m'::public.candle_interval, date_bin('5 minutes', p_now, v_epoch)),
+     ('1h'::public.candle_interval, date_bin('1 hour', p_now, v_epoch)),
+     ('1q'::public.candle_interval, v_qstart),
+     ('1y'::public.candle_interval, v_ystart)) as iv(i, b)
+  on conflict (security_id, interval, bucket_start) do update
+     set high_e4 = greatest(c.high_e4, excluded.high_e4),
+         low_e4 = least(c.low_e4, excluded.low_e4),
+         close_e4 = excluded.close_e4,
+         volume_e6 = c.volume_e6 + excluded.volume_e6,
+         tick_count = c.tick_count + 1;
+
+  -- runtime, public market status, tick log
+  update public.sim_runtime
+     set tick_seq = v_seq, last_tick_at = p_now,
+         state = case when v_new_day then state || jsonb_build_object('day_start', v_bell) else state end
+   where id;
+  update public.market_status
+     set phase = case when v_regular then 'open'::public.market_phase else 'after_hours'::public.market_phase end,
+         phase_changed_at = case when phase is distinct from (case when v_regular then 'open'::public.market_phase
+                                                                   else 'after_hours'::public.market_phase end)
+                                 then p_now else phase_changed_at end,
+         next_open_at = case when v_local < v_local::date + make_interval(secs => v_open_h * 3600)
+                             then (v_local::date + make_interval(secs => v_open_h * 3600)) at time zone 'Europe/Berlin'
+                             else (v_local::date + 1 + make_interval(secs => v_open_h * 3600)) at time zone 'Europe/Berlin' end,
+         next_close_at = case when v_local < v_local::date + make_interval(secs => v_close_h * 3600)
+                              then (v_local::date + make_interval(secs => v_close_h * 3600)) at time zone 'Europe/Berlin'
+                              else (v_local::date + 1 + make_interval(secs => v_close_h * 3600)) at time zone 'Europe/Berlin' end,
+         tick_seq = v_seq, last_tick_at = p_now, is_halted = false, halt_reason = null
+   where id;
+  insert into public.sim_tick_log (tick_seq, started_at, duration_ms, securities_updated, orders_filled)
+  values (v_seq, v_started, round(extract(epoch from (clock_timestamp() - v_started)) * 1000)::integer, v_n, v_filled)
+  on conflict (tick_seq) do nothing;
+
+  return jsonb_build_object(
+    'tick_seq', v_seq, 'session', case when v_regular then 'regular' else 'after_hours' end,
+    'securities', v_n, 'orders_filled', v_filled, 'new_day', v_new_day,
+    'duration_ms', round(extract(epoch from (clock_timestamp() - v_started)) * 1000, 2));
+end;
+$$;
+comment on function public.market_tick_at(timestamptz) is 'Internal: one market tick at the given (simulated) time. Port of stepMarketTick() (src/lib/sim/tick.ts).';
+
+create or replace function public.backfill_price_history()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now          timestamptz := public.game_now();
+  v_epoch        constant timestamptz := '2000-01-01 00:00:00+00';
+  v_m1_end       timestamptz := date_bin('1 minute', public.game_now(), '2000-01-01 00:00:00+00'::timestamptz);
+  v_fine_start   timestamptz := date_bin('5 minutes', public.game_now() - interval '6 hours', '2000-01-01 00:00:00+00'::timestamptz);
+  v_today        date := public.game_day(public.game_now());
+  v_coarse_start timestamptz;
+  v_ai           jsonb := coalesce(public.config_jsonb('aiInvestors'), '{}'::jsonb);
+  v_sectors      jsonb := coalesce(public.config_jsonb('sectors'), '{}'::jsonb);
+  v_depthfrac    double precision := public.config_double('trading', '{priceImpact,depthFreeFloatFraction}', 0.002);
+  v_tick_s       double precision := greatest(1, public.config_double('time', '{tickSeconds}', 5));
+  v_horizon      constant double precision := 2000;   -- ticks; cosmetic, see above
+  v_band_mult    constant double precision := 3;      -- band = 3 x the noise over the horizon
+  v_counts       jsonb;
+begin
+  if exists (select 1 from public.candles limit 1) then
+    return jsonb_build_object('skipped', 'candles_exist');
+  end if;
+  v_coarse_start := ((v_today - 30)::timestamp + interval '8 hours') at time zone 'Europe/Berlin';
+
+  if to_regclass('pg_temp.nexa_bf') is not null then
+    drop table pg_temp.nexa_bf;
+  end if;
+  create temporary table nexa_bf (
+    security_id uuid, k integer, iv text, bucket_start timestamptz, ticks integer,
+    sigma double precision, band double precision, price double precision, base_vol double precision,
+    close_e4 bigint, open_e4 bigint, high_e4 bigint, low_e4 bigint, volume bigint
+  ) on commit drop;
+
+  insert into pg_temp.nexa_bf (security_id, k, iv, bucket_start, ticks, sigma, band, price, base_vol)
+  with sec as (
+    select s.id, q.last_price_e4::double precision as price,
+           greatest(1e-6, case when s.kind = 'stock'
+                then public.cfg_num(v_ai, array['tickNoiseBps', coalesce(c.tier::text, 'midcap')], 15) / 10000.0
+                     * public.cfg_num(v_sectors, array[coalesce(s.sector_key, ''), 'volatilityMultiplier'], 1)
+                     * public.cfg_num(v_ai, '{tickNoiseScale}', 0.2)
+                else coalesce(st.volatility, 0.0001) end) as sigma_tick,
+           case when s.kind = 'stock' then c.shares_outstanding * v_depthfrac else coalesce(st.liquidity_shares, 100000) end
+             * public.cfg_num(v_ai, '{baselineVolumeDepthFraction}', 0.02) * 1000000 as vol_per_tick
+      from public.securities s
+      join public.security_quotes q on q.security_id = s.id
+      left join public.security_sim_state st on st.security_id = s.id
+      left join public.companies c on c.id = s.company_id
+     where s.status = 'listed' and s.kind in ('stock', 'bond')
+  ), steps as (
+    select 'm'::text as iv, g as bucket_start, round(60 / v_tick_s)::integer as ticks
+      from generate_series(v_m1_end, v_fine_start, interval '-1 minute') g
+    union all
+    select '5', g, round(300 / v_tick_s)::integer
+      from generate_series(v_fine_start - interval '5 minutes', v_coarse_start, interval '-5 minutes') g
+    union all
+    select 'd', (d::date::timestamp + interval '8 hours') at time zone 'Europe/Berlin', round(86400 / v_tick_s)::integer
+      from generate_series((v_today - 31)::timestamp, (v_today - 364)::timestamp, interval '-1 day') d
+  )
+  select sec.id, (row_number() over (partition by sec.id order by st.bucket_start desc) - 1)::integer,
+         st.iv, st.bucket_start, st.ticks,
+         sec.sigma_tick * sqrt(least(st.ticks, v_horizon)),
+         sec.sigma_tick * sqrt(v_horizon) * v_band_mult,
+         sec.price, sec.vol_per_tick * st.ticks
+    from sec cross join steps st;
+
+  -- closes: bounded walk, exactly the current price at k = 0
+  update pg_temp.nexa_bf t
+     set close_e4 = x.c
+    from (select y.security_id, y.k,
+                 greatest(1, round(y.price * exp(y.band * tanh(y.s_cum / y.band))))::bigint as c
+            from (select b.security_id, b.k, b.price, b.band,
+                         sum(case when b.k = 0 then 0 else b.sigma * public.gauss_random() end)
+                           over (partition by b.security_id order by b.k) as s_cum
+                    from pg_temp.nexa_bf b) y) x
+   where t.security_id = x.security_id and t.k = x.k;
+
+  -- open = previous close, wicks, volume
+  update pg_temp.nexa_bf t
+     set open_e4 = x.o,
+         high_e4 = ceil(greatest(x.o, t.close_e4) * exp(abs(public.gauss_random()) * t.sigma * 0.5))::bigint,
+         low_e4  = greatest(1, floor(least(x.o, t.close_e4) * exp(-abs(public.gauss_random()) * t.sigma * 0.5)))::bigint,
+         volume  = round(t.base_vol * (0.5 + random()))::bigint
+    from (select b.security_id, b.k, coalesce(lead(b.close_e4) over (partition by b.security_id order by b.k), b.close_e4) as o
+            from pg_temp.nexa_bf b) x
+   where t.security_id = x.security_id and t.k = x.k;
+
+  -- 1m: last 6 hours
+  insert into public.candles (security_id, interval, bucket_start, open_e4, high_e4, low_e4, close_e4, volume_e6, tick_count)
+  select b.security_id, '1m', b.bucket_start, b.open_e4, b.high_e4, b.low_e4, b.close_e4, b.volume, b.ticks
+    from pg_temp.nexa_bf b where b.iv = 'm';
+
+  -- 5m: last 2 days, 1h: 30 days, 1q: 30 days, 1y: 365 game days
+  insert into public.candles (security_id, interval, bucket_start, open_e4, high_e4, low_e4, close_e4, volume_e6, tick_count)
+  select g.security_id, g.target_iv::public.candle_interval, g.bucket,
+         (array_agg(g.open_e4 order by g.bucket_start))[1], max(g.high_e4), min(g.low_e4),
+         (array_agg(g.close_e4 order by g.bucket_start desc))[1], sum(g.volume), sum(g.ticks)
+    from (
+      select b.*, '5m' as target_iv, date_bin('5 minutes', b.bucket_start, v_epoch) as bucket
+        from pg_temp.nexa_bf b where b.iv in ('m', '5') and b.bucket_start >= date_bin('5 minutes', v_now - interval '2 days', v_epoch)
+      union all
+      select b.*, '1h', date_bin('1 hour', b.bucket_start, v_epoch) from pg_temp.nexa_bf b where b.iv in ('m', '5')
+      union all
+      select b.*, '1q', public.quarter_bucket_start(b.bucket_start) from pg_temp.nexa_bf b where b.iv in ('m', '5')
+      union all
+      select b.*, '1y', public.game_year_bucket_start(b.bucket_start) from pg_temp.nexa_bf b
+    ) g
+   group by g.security_id, g.target_iv, g.bucket;
+
+  -- indices: aggregated from the members' candles (same buckets)
+  insert into public.candles (security_id, interval, bucket_start, open_e4, high_e4, low_e4, close_e4, volume_e6, tick_count)
+  select i.security_id, c.interval, c.bucket_start,
+         round(sum(co.shares_outstanding::numeric * c.open_e4) / 100 / i.divisor::numeric)::bigint,
+         round(sum(co.shares_outstanding::numeric * c.high_e4) / 100 / i.divisor::numeric)::bigint,
+         round(sum(co.shares_outstanding::numeric * c.low_e4) / 100 / i.divisor::numeric)::bigint,
+         round(sum(co.shares_outstanding::numeric * c.close_e4) / 100 / i.divisor::numeric)::bigint,
+         0, max(c.tick_count)
+    from public.indices i
+    join public.index_memberships m on m.index_security_id = i.security_id and m.left_at is null
+    join public.securities s on s.id = m.member_security_id
+    join public.companies co on co.id = s.company_id
+    join public.candles c on c.security_id = s.id
+   group by i.security_id, i.divisor, c.interval, c.bucket_start
+  having count(*) = (select count(*) from public.index_memberships m2 where m2.index_security_id = i.security_id and m2.left_at is null);
+
+  select jsonb_object_agg(x.interval, x.n) into v_counts
+    from (select c.interval::text as interval, count(*) as n from public.candles c group by c.interval) x;
+  drop table pg_temp.nexa_bf;
+  return jsonb_build_object('backfilled', true, 'candles', v_counts);
+end;
+$$;
+
+create or replace function public.redeem_matured_bonds(p_until timestamptz)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  b        record;
+  o        record;
+  p        record;
+  v_order  uuid;
+  v_n      integer := 0;
+begin
+  perform public.lock_bond_participants();
+  for b in
+    select bd.security_id, bd.face_value_cents, s.ticker, s.name
+      from public.bonds bd join public.securities s on s.id = bd.security_id
+     where s.status = 'listed' and bd.matures_at <= p_until
+     order by bd.matures_at
+  loop
+    for o in
+      select x.id from public.orders x
+       where x.security_id = b.security_id and x.status in ('pending', 'open', 'partially_filled')
+    loop
+      perform public.cancel_order_internal(o.id);
+    end loop;
+    for p in
+      select x.id, x.player_id, x.quantity_e6 from public.positions x
+       where x.security_id = b.security_id and x.status = 'open' and x.quantity_e6 > 0
+    loop
+      insert into public.orders (player_id, security_id, request_id, source, side, type, quantity_e6, status)
+      values (p.player_id, b.security_id, md5('nexa:redeem:' || p.id::text)::uuid, 'system', 'sell', 'market', p.quantity_e6, 'pending')
+      on conflict (player_id, request_id) do nothing
+      returning id into v_order;
+      continue when v_order is null;
+      perform public.execute_fill(v_order, p.quantity_e6, b.face_value_cents * 100, false, true);
+    end loop;
+    update public.securities set status = 'matured', is_tradable = false, delisted_at = now() where id = b.security_id;
+    insert into public.news_items (category, headline, body, importance, security_id, template_key, published_at)
+    select 'market', replace(t.headline_template, '{name}', b.name), t.body_template, 1, b.security_id, t.key, now()
+      from public.news_templates t where t.key = 'bond_matured';
+    v_n := v_n + 1;
+  end loop;
+  return v_n;
+end;
+$$;
+
+create or replace function public.get_candles(p_ticker text, p_interval text, p_limit integer default 300)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_id    uuid;
+  v_limit integer := least(greatest(coalesce(p_limit, 300), 1), 1000);
+  v_out   jsonb;
+begin
+  perform public.require_player();
+  v_id := public.resolve_security(p_ticker);
+  if v_id is null then
+    perform public.api_error('unknown_security');
+  end if;
+  if p_interval is null or p_interval not in ('1m', '5m', '1h', '1q', '1y') then
+    perform public.api_error('invalid_interval');
+  end if;
+  select coalesce(jsonb_agg(jsonb_build_object(
+           't', extract(epoch from x.bucket_start)::bigint, 'o', x.open_e4, 'h', x.high_e4,
+           'l', x.low_e4, 'c', x.close_e4, 'v', x.volume_e6) order by x.bucket_start), '[]'::jsonb)
+    into v_out
+    from (select c.* from public.candles c
+           where c.security_id = v_id and c.interval = p_interval::public.candle_interval
+           order by c.bucket_start desc limit v_limit) x;
+  return v_out;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Read RPCs with quantities in millionths
+-- ---------------------------------------------------------------------------
+create or replace function public.get_order_book(p_ticker text, p_levels integer default 8)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_id      uuid;
+  v_kind    public.security_kind;
+  v_trading jsonb := coalesce(public.config_jsonb('trading'), '{}'::jsonb);
+  v_levels  integer := least(greatest(coalesce(p_levels, 8), 1), 20);
+  v_step    double precision;
+  v_base    double precision;
+  v_jitter  double precision;
+  v_bid     bigint;
+  v_ask     bigint;
+  v_seq     bigint;
+  v_bids    jsonb;
+  v_asks    jsonb;
+begin
+  perform public.require_player();
+  v_id := public.resolve_security(p_ticker);
+  if v_id is null then
+    perform public.api_error('unknown_security');
+  end if;
+  select s.kind into v_kind from public.securities s where s.id = v_id;
+  select q.bid_e4, q.ask_e4, q.tick_seq into v_bid, v_ask, v_seq from public.security_quotes q where q.security_id = v_id;
+  if v_kind not in ('stock', 'bond') or v_bid is null or v_ask is null then
+    return jsonb_build_object('bids', '[]'::jsonb, 'asks', '[]'::jsonb);
+  end if;
+  v_step   := public.cfg_num(v_trading, '{orderBook,levelStepBps}', 10);
+  v_jitter := public.cfg_num(v_trading, '{orderBook,sizeJitter}', 0.2);
+  -- whole shares per level
+  v_base   := public.security_depth(v_id, public.market_session_at(public.game_now()) = 'regular')
+            * v_step / public.cfg_num(v_trading, '{priceImpact,impactBpsPerDepth}', 100);
+
+  with mm as (
+    select 'bid'::text as side,
+           least(floor(v_bid * (1 - i * v_step / 10000.0))::bigint, v_bid - i) as price_e4,
+           greatest(1, floor(v_base * (1 + v_jitter * (2 * ((abs(hashtext(v_id::text || 'b' || i || ':' || v_seq)) % 10000) / 10000.0) - 1))))::bigint * 1000000 as qty
+      from generate_series(0, v_levels - 1) i
+    union all
+    select 'ask',
+           greatest(ceil(v_ask * (1 + i * v_step / 10000.0))::bigint, v_ask + i),
+           greatest(1, floor(v_base * (1 + v_jitter * (2 * ((abs(hashtext(v_id::text || 'a' || i || ':' || v_seq)) % 10000) / 10000.0) - 1))))::bigint * 1000000
+      from generate_series(0, v_levels - 1) i
+  ), players as (
+    select case when o.side = 'buy' then 'bid' else 'ask' end as side, o.limit_price_e4 as price_e4,
+           sum(o.quantity_e6 - o.filled_quantity_e6)::bigint as qty, count(*)::integer as n
+      from public.orders o
+     where o.security_id = v_id and o.type = 'limit' and o.status in ('open', 'partially_filled')
+     group by 1, 2
+  ), merged as (
+    select coalesce(m.side, p.side) as side, coalesce(m.price_e4, p.price_e4) as price_e4,
+           coalesce(m.qty, 0) + coalesce(p.qty, 0) as quantity_e6, coalesce(p.n, 0) as players
+      from (select * from mm where price_e4 >= 1) m
+      full join players p on p.side = m.side and p.price_e4 = m.price_e4
+  )
+  select
+    coalesce((select jsonb_agg(jsonb_build_object('price_e4', x.price_e4, 'quantity_e6', x.quantity_e6, 'players', x.players) order by x.price_e4 desc)
+                from (select * from merged where side = 'bid' order by price_e4 desc limit v_levels) x), '[]'::jsonb),
+    coalesce((select jsonb_agg(jsonb_build_object('price_e4', x.price_e4, 'quantity_e6', x.quantity_e6, 'players', x.players) order by x.price_e4)
+                from (select * from merged where side = 'ask' order by price_e4 limit v_levels) x), '[]'::jsonb)
+    into v_bids, v_asks;
+
+  return jsonb_build_object('bids', v_bids, 'asks', v_asks);
+end;
+$$;
+
+create or replace function public.get_market_snapshot()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_now     timestamptz := public.game_now();
+  v_index   jsonb;
+  v_secs    jsonb;
+begin
+  perform public.require_player();
+
+  select jsonb_build_object(
+           'ticker', upper(i.key), 'name', s.name, 'value_e4', q.last_price_e4,
+           'prev_close_e4', coalesce(q.prev_close_e4, q.last_price_e4), 'change_bps', q.change_bps,
+           'day_high_e4', q.day_high_e4, 'day_low_e4', q.day_low_e4)
+    into v_index
+    from public.indices i
+    join public.securities s on s.id = i.security_id
+    join public.security_quotes q on q.security_id = s.id
+   order by i.created_at
+   limit 1;
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', s.id, 'ticker', s.ticker, 'name', s.name, 'kind', s.kind,
+           'sector_key', s.sector_key, 'size_class', c.tier,
+           'last_price_e4', q.last_price_e4, 'bid_e4', q.bid_e4, 'ask_e4', q.ask_e4,
+           'prev_close_e4', coalesce(q.prev_close_e4, q.last_price_e4), 'change_bps', q.change_bps,
+           'day_high_e4', coalesce(q.day_high_e4, q.last_price_e4), 'day_low_e4', coalesce(q.day_low_e4, q.last_price_e4),
+           'day_volume_e6', q.day_volume_e6, 'market_cap_cents', case when s.kind = 'stock' then q.market_cap_cents end,
+           'term_game_years', b.term_game_years, 'coupon_bps', b.coupon_bps,
+           'yield_bps', case when s.kind = 'bond' then q.yield_bps end,
+           'matures_at', b.matures_at, 'face_value_cents', b.face_value_cents,
+           'company_id', s.company_id, 'brand_color', c.brand_color)
+         order by case s.kind when 'stock' then 0 else 1 end, sec.sort_order, b.term_game_years, s.ticker), '[]'::jsonb)
+    into v_secs
+    from public.securities s
+    join public.security_quotes q on q.security_id = s.id
+    left join public.companies c on c.id = s.company_id
+    left join public.sectors sec on sec.key = s.sector_key
+    left join public.bonds b on b.security_id = s.id
+   where s.status = 'listed' and s.kind in ('stock', 'bond');
+
+  return jsonb_build_object(
+    'server_time',     v_now,
+    'tick_seq',        (select r.tick_seq from public.sim_runtime r where r.id),
+    'last_tick_at',    (select r.last_tick_at from public.sim_runtime r where r.id),
+    'session',         public.market_session_at(v_now),
+    'paused',          coalesce((select r.is_paused from public.sim_runtime r where r.id), false),
+    'policy_rate_bps', (select cb.policy_rate_bps from public.central_bank_state cb where cb.id),
+    'day_start',       public.trading_day_start(v_now),
+    'index',           v_index,
+    'securities',      v_secs,
+    'economy',         jsonb_build_object(
+                         'money_supply_cents',      public.money_supply_cents(),
+                         'treasury_cents',          public.treasury_balance_cents(),
+                         'basic_income_factor_bps', public.basic_income_factor_bps(),
+                         'total_supply_cents',      public.config_bigint('money', '{totalSupplyCents}', 1000000000000)));
+end;
+$$;
+
+-- Net worth of a player: cash + reserve + positions at the bid (+ company equity from M4: hook below).
+create or replace function public.player_net_worth_cents(p_player uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select sum(a.balance_cents) from public.ledger_accounts a where a.owner_player_id = p_player), 0)::bigint
+       + coalesce((select sum(public.value_cents(p.quantity_e6, coalesce(q.bid_e4, q.last_price_e4)))
+                     from public.positions p join public.security_quotes q on q.security_id = p.security_id
+                    where p.player_id = p_player and p.status = 'open' and p.quantity_e6 > 0), 0)::bigint
+       -- M4 hook: + company equity (listed at market, private at last round) - debts
+       ;
+$$;
+
+create or replace function public.get_my_portfolio()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player    uuid;
+  v_cash      bigint;
+  v_reserved  bigint;
+  v_positions jsonb;
+  v_value     bigint;
+  v_bid_value bigint;
+  v_orders    jsonb;
+  v_trades    jsonb;
+  v_prof      public.profiles;
+  v_priv      public.player_private;
+  v_level     jsonb;
+  v_days      double precision := public.config_double('names', '{nicknameChangeDays}', 60);
+  v_today     date := (public.game_now() at time zone 'Europe/Berlin')::date;
+  v_streak    integer;
+  ls          public.login_streaks;
+begin
+  v_player := public.require_player();
+  select coalesce(sum(a.balance_cents) filter (where a.kind = 'player_cash'), 0),
+         coalesce(sum(a.balance_cents) filter (where a.kind = 'player_reserve'), 0)
+    into v_cash, v_reserved
+    from public.ledger_accounts a where a.owner_player_id = v_player;
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'ticker', x.ticker, 'name', x.name, 'kind', x.kind, 'quantity_e6', x.quantity_e6,
+           'reserved_quantity_e6', x.reserved_quantity_e6, 'avg_price_e4', x.avg_entry_price_e4,
+           'last_price_e4', x.last_price_e4, 'market_value_cents', x.mv, 'cost_basis_cents', x.cost_basis_cents,
+           'unrealized_pnl_cents', x.mv - x.cost_basis_cents, 'realized_pnl_cents', x.realized_pnl_cents,
+           'change_bps', x.change_bps, 'opened_at', x.opened_at)
+           order by x.mv desc), '[]'::jsonb),
+         coalesce(sum(x.mv), 0)::bigint,
+         coalesce(sum(x.bv), 0)::bigint
+    into v_positions, v_value, v_bid_value
+    from (select s.ticker, s.name, s.kind, p.quantity_e6, p.reserved_quantity_e6, p.avg_entry_price_e4, p.cost_basis_cents,
+                 p.realized_pnl_cents, p.opened_at, q.last_price_e4, q.change_bps,
+                 public.value_cents(p.quantity_e6, q.last_price_e4) as mv,
+                 public.value_cents(p.quantity_e6, coalesce(q.bid_e4, q.last_price_e4)) as bv
+            from public.positions p
+            join public.securities s on s.id = p.security_id
+            join public.security_quotes q on q.security_id = p.security_id
+           where p.player_id = v_player and p.status = 'open' and p.quantity_e6 > 0) x;
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', o.id, 'ticker', s.ticker, 'side', o.side, 'type', o.type, 'quantity_e6', o.quantity_e6,
+           'filled_quantity_e6', o.filled_quantity_e6, 'limit_price_e4', o.limit_price_e4, 'status', o.status,
+           'reserved_cents', o.reserved_cents, 'created_at', o.created_at)
+           order by o.created_at desc), '[]'::jsonb)
+    into v_orders
+    from public.orders o join public.securities s on s.id = o.security_id
+   where o.player_id = v_player and o.status in ('open', 'partially_filled');
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', t.id, 'ticker', t.ticker, 'side', t.side, 'quantity_e6', t.quantity_e6, 'price_e4', t.price_e4,
+           'gross_cents', t.gross_cents, 'fee_cents', t.fee_cents, 'tax_cents', t.tax_cents,
+           'realized_pnl_cents', t.realized_pnl_cents, 'xp_awarded', t.xp_awarded, 'executed_at', t.executed_at)
+           order by t.executed_at desc), '[]'::jsonb)
+    into v_trades
+    from (select tr.*, s.ticker from public.trades tr join public.securities s on s.id = tr.security_id
+           where tr.player_id = v_player order by tr.executed_at desc limit 50) t;
+
+  select * into v_prof from public.profiles where id = v_player;
+  select * into v_priv from public.player_private where player_id = v_player;
+  select * into ls from public.login_streaks where player_id = v_player;
+  v_level := public.level_progress(v_prof.xp_total);
+  v_streak := case when ls.last_login_day >= v_today - 1 then ls.current_streak
+                   when ls.last_login_day = v_today - 2 and ls.freeze_tokens > 0 then ls.current_streak
+                   else 0 end;
+
+  return jsonb_build_object(
+    'cash_cents',            v_cash,
+    'reserved_cents',        v_reserved,
+    'positions_value_cents', v_value,
+    'total_cents',           v_cash + v_reserved + v_value,
+    'net_worth_cents',       v_cash + v_reserved + v_bid_value,
+    'loss_pot_cents',        coalesce(v_priv.tax_loss_pot_cents, 0),
+    'vault',                 public.vault_status(v_player) - 'accrued_seconds' - 'base_rate_cents_per_hour',
+    'positions',             v_positions,
+    'open_orders',           v_orders,
+    'recent_trades',         v_trades,
+    'level',                 v_prof.level,
+    'xp_total',              v_prof.xp_total,
+    'xp_into_level',         (v_level ->> 'xp_into_level')::bigint,
+    'xp_for_next',           (v_level ->> 'xp_for_next')::bigint,
+    'tutorial_completed',    v_priv.tutorial_completed_at is not null,
+    'nickname',              v_prof.nickname,
+    'nickname_change_available_at',
+                             case when v_prof.nickname_changed_at is null
+                                    or v_prof.nickname_changed_at + make_interval(secs => v_days * 86400) <= now() then null
+                                  else v_prof.nickname_changed_at + make_interval(secs => v_days * 86400) end,
+    'missions_claimable',    (select count(*) from public.player_missions m
+                               where m.player_id = v_player and m.status = 'completed'
+                                 and (m.expires_at is null or m.expires_at > public.game_now()))::integer,
+    'streak_days',           coalesce(v_streak, 0),
+    'server_time',           public.game_now());
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Privileges
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.value_cents(bigint, bigint)', 'public.execute_fill(uuid, bigint, bigint, boolean, boolean)',
+    'public.cancel_order_internal(uuid)', 'public.place_order(uuid, text, text, text, bigint, bigint, bigint)',
+    'public.vault_status(uuid)', 'public.claim_vault(uuid)', 'public.complete_tutorial(uuid)',
+    'public.pay_bond_coupons(bigint)', 'public.fill_resting_orders()', 'public.market_tick_at(timestamptz)',
+    'public.backfill_price_history()', 'public.redeem_matured_bonds(timestamptz)',
+    'public.get_candles(text, text, integer)', 'public.get_order_book(text, integer)', 'public.get_market_snapshot()',
+    'public.player_net_worth_cents(uuid)', 'public.get_my_portfolio()'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+    execute format('grant execute on function %s to service_role', f);
+  end loop;
+  grant execute on function public.place_order(uuid, text, text, text, bigint, bigint, bigint) to authenticated;
+  grant execute on function public.claim_vault(uuid) to authenticated;
+  grant execute on function public.complete_tutorial(uuid) to authenticated;
+  grant execute on function public.get_candles(text, text, integer) to authenticated;
+  grant execute on function public.get_order_book(text, integer) to authenticated;
+  grant execute on function public.get_market_snapshot() to authenticated;
+  grant execute on function public.get_my_portfolio() to authenticated;
+end;
+$$;
+
+-- ===== supabase/migrations/20261112000400_m2_rich_list.sql =====
+-- =============================================================================
+-- NEXA · M2a · 0400 · Rich list: AI tycoons, net worth ranking, snapshots,
+--                     rank news
+-- =============================================================================
+
+-- One-time seeding of richList.aiTycoons fictional tycoons (after the money
+-- genesis, so their cash comes from the "tycoons" allocation). Net worth
+-- follows a log-concave curve from tycoonMaxWealthCents (rank 1) to
+-- tycoonMinWealthCents (last rank):
+--   log W(r) = log max - (log max - log min) * ((r - 1) / (n - 1)) ^ 0.5
+-- Cash = W x (tycoon cash pool / sum W) (exactly the pool), the rest is held
+-- in AI company shares at the current bid. The 15 richest found the 15
+-- companies (largest fortune -> largest market cap) and hold at most 40 % of
+-- their company; all tycoons together hold at most 60 % of any company.
+create or replace function public.seed_rich_tycoons()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_rl      jsonb := coalesce(public.config_jsonb('richList'), '{}'::jsonb);
+  v_n       integer := greatest(1, public.cfg_num(v_rl, '{aiTycoons}', 120))::integer;
+  v_min     double precision := public.cfg_num(v_rl, '{tycoonMinWealthCents}', 1500000);
+  v_max     double precision := public.cfg_num(v_rl, '{tycoonMaxWealthCents}', 40000000000);
+  v_pool    bigint;
+  v_sum_w   double precision := 0;
+  v_cash_left bigint;
+  v_first   text[] := array[
+    'Henrike:f', 'Jonas:m', 'Clara:f', 'Matthis:m', 'Lena:f', 'Friedrich:m', 'Ida:f', 'Konstantin:m', 'Marlene:f', 'Vincent:m',
+    'Greta:f', 'Leopold:m', 'Theresa:f', 'Anton:m', 'Johanna:f', 'Benedikt:m', 'Frieda:f', 'Maximilian:m', 'Charlotte:f', 'Moritz:m',
+    'Helene:f', 'Valentin:m', 'Amelie:f', 'Julius:m', 'Sophia:f', 'Felix:m', 'Mathilda:f', 'Emil:m', 'Paulina:f', 'Carl:m',
+    'Luisa:f', 'Oskar:m', 'Antonia:f', 'Henri:m', 'Elisa:f', 'Ludwig:m', 'Viktoria:f', 'Jakob:m', 'Margarete:f', 'Philipp:m',
+    'Lucia:f', 'Elias:m', 'Nora:f', 'Gustav:m', 'Rosa:f', 'Aurelio:m', 'Chiara:f', 'Lars:m', 'Ingrid:f', 'Pierre:m',
+    'Camille:f', 'Marek:m', 'Zofia:f', 'Sven:m', 'Astrid:f', 'Bram:m', 'Femke:f', 'Mateo:m', 'Ines:f', 'Tomasz:m'];
+  v_last    text[] := array[
+    'Achterberg', 'Brandhorst', 'Clausing', 'Dreesmann', 'Eckhoff', 'Falkenrath', 'Gerdemann', 'Hartwigsen', 'Iversen', 'Jansing',
+    'Kesselring', 'Lindemeyer', 'Mertensen', 'Nolting', 'Ostendorp', 'Petermeier', 'Quast', 'Rademaker', 'Seidelmann', 'Thielking',
+    'Uhlenbrock', 'Vosskamp', 'Wendtland', 'Zanderhoff', 'Behrensen', 'Dornbusch', 'Ebelmann', 'Frankenberg', 'Grotefend', 'Hesselbarth',
+    'Imhoven', 'Juergensmeier', 'Kroegerath', 'Lorentzen', 'Moellenkamp', 'Nagelschmidt', 'Oswaldt', 'Pohlmeyer', 'Reuterhahn', 'Sandkuhl',
+    'Tewsdorf', 'Uhligmann', 'Vogtland', 'Winkelhaus', 'Zieglerhof', 'Ricciardi', 'Dubreuil', 'Lindqvist', 'Novakova', 'van Doorn',
+    'Moreaux', 'Rossetti', 'Svenning', 'Kowalczyk', 'Ferreirinha', 'Horvathy', 'de Vriesland', 'Brunsberg', 'Kalverkamp', 'Stoltenhoff'];
+  v_desc    text[] := array[
+    'Erbe einer Hamburger Reederei|Erbin einer Hamburger Reederei', 'Family Office aus Hamburg|Family Office aus Hamburg',
+    'Immobilienunternehmer aus München|Immobilienunternehmerin aus München', 'Vermögen aus dem Maschinenbau|Vermögen aus dem Maschinenbau',
+    'Erbe einer Brauereidynastie|Erbin einer Brauereidynastie', 'Private-Equity-Investor aus Frankfurt|Private-Equity-Investorin aus Frankfurt',
+    'Gründer einer Modekette|Gründerin einer Modekette', 'Hotelier am Bodensee|Hotelière am Bodensee',
+    'Vermögen aus Windparks in der Nordsee|Vermögen aus Windparks in der Nordsee', 'Business Angel aus Berlin|Business Angel aus Berlin',
+    'Erbe eines Süßwarenimperiums|Erbin eines Süßwarenimperiums', 'Pharma-Erbe aus Basel|Pharma-Erbin aus Basel',
+    'Logistikunternehmer aus Bremen|Logistikunternehmerin aus Bremen', 'Vermögen aus dem Autohandel|Vermögen aus dem Autohandel',
+    'Gründer eines Software-Start-ups (verkauft)|Gründerin eines Software-Start-ups (verkauft)', 'Weingut-Dynastie aus der Pfalz|Weingut-Dynastie aus der Pfalz',
+    'Bauunternehmer aus Köln|Bauunternehmerin aus Köln', 'Vermögen aus dem Rohstoffhandel|Vermögen aus dem Rohstoffhandel',
+    'Erbe einer Verlagsgruppe|Erbin einer Verlagsgruppe', 'Investor in Energiewerte|Investorin in Energiewerte',
+    'Gründer einer Supermarktkette|Gründerin einer Supermarktkette', 'Kunstsammler und Investor|Kunstsammlerin und Investorin',
+    'Vermögen aus der Chemieindustrie|Vermögen aus der Chemieindustrie', 'Daytrader der ersten Stunde|Daytraderin der ersten Stunde',
+    'Erbe eines Familienunternehmens aus Schwaben|Erbin eines Familienunternehmens aus Schwaben', 'Hedgefonds-Manager aus Zürich|Hedgefonds-Managerin aus Zürich',
+    'Vermögen aus Medizintechnik|Vermögen aus Medizintechnik', 'Gründer eines Online-Marktplatzes|Gründerin eines Online-Marktplatzes',
+    'Reederei-Erbe aus Rotterdam|Reederei-Erbin aus Rotterdam', 'Lottomillionär mit Börsenglück|Lottomillionärin mit Börsenglück'];
+  r         integer;
+  v_fn      text;
+  v_gender  text;
+  v_name    text;
+  v_w       double precision;
+  v_cash    bigint;
+  v_hold    double precision;
+  v_id      uuid;
+  v_co_id   uuid;
+  v_co_sec  uuid;
+  v_co_name text;
+  v_co_shares bigint;
+  v_co_price bigint;
+  v_co_cap  double precision;
+  v_desc_t  text;
+  v_pieces  integer;
+  v_piece   double precision;
+  v_take    double precision;
+  v_left    double precision;
+  v_sec     uuid;
+  j         integer;
+  c         record;
+begin
+  if exists (select 1 from public.rich_tycoons) then
+    return jsonb_build_object('skipped', 'tycoons_exist');
+  end if;
+  if not public.money_genesis_done() then
+    return jsonb_build_object('skipped', 'no_genesis');
+  end if;
+  select a.balance_cents into v_pool from public.ledger_accounts a where a.system_key = 'tycoons';
+
+  -- capacity per company: 60 % of the shares (all tycoons), founders 40 % of their own
+  drop table if exists pg_temp.nexa_ty_cap;
+  create temporary table nexa_ty_cap on commit drop as
+  select s.id as security_id, c2.id as company_id, c2.name as company_name, c2.shares_outstanding,
+         coalesce(q.bid_e4, q.last_price_e4) as price_e4,
+         c2.shares_outstanding::double precision * coalesce(q.bid_e4, q.last_price_e4) / 100 * 0.6 as cap_left,
+         row_number() over (order by c2.shares_outstanding::numeric * coalesce(q.bid_e4, q.last_price_e4) desc, c2.id) as cap_rank
+    from public.companies c2
+    join public.securities s on s.id = c2.security_id and s.status = 'listed'
+    join public.security_quotes q on q.security_id = s.id
+   where c2.is_ai;
+  drop table if exists pg_temp.nexa_ty_hold;
+  create temporary table nexa_ty_hold (tycoon_id uuid, security_id uuid, value_cents double precision) on commit drop;
+
+  for r in 1..v_n loop
+    v_sum_w := v_sum_w + exp(ln(v_max) - (ln(v_max) - ln(v_min)) * sqrt(case when v_n = 1 then 0 else (r - 1)::double precision / (v_n - 1) end));
+  end loop;
+  v_cash_left := v_pool;
+
+  for r in 1..v_n loop
+    v_w := exp(ln(v_max) - (ln(v_max) - ln(v_min)) * sqrt(case when v_n = 1 then 0 else (r - 1)::double precision / (v_n - 1) end));
+    v_fn := split_part(v_first[((r - 1) % 60) + 1], ':', 1);
+    v_gender := split_part(v_first[((r - 1) % 60) + 1], ':', 2);
+    v_name := case when r % 7 = 3 then 'Dr. ' else '' end || v_fn || ' ' || v_last[(((r - 1) * 7 + ((r - 1) / 60) * 13) % 60) + 1];
+    if r = v_n then
+      v_cash := v_cash_left;
+    else
+      v_cash := least(v_cash_left, floor(v_w * v_pool / v_sum_w)::bigint);
+    end if;
+    v_cash_left := v_cash_left - v_cash;
+    v_hold := greatest(0, v_w - v_cash);
+
+    v_co_id := null;
+    select t.company_id, t.security_id, t.company_name, t.shares_outstanding, t.price_e4, t.cap_left
+      into v_co_id, v_co_sec, v_co_name, v_co_shares, v_co_price, v_co_cap
+      from pg_temp.nexa_ty_cap t where t.cap_rank = r;
+    if v_co_id is not null then
+      v_desc_t := case when v_gender = 'f' then 'Gründerin von ' else 'Gründer von ' end
+                  || regexp_replace(v_co_name, '\s+(AG|SE|GmbH)$', '');
+    else
+      v_desc_t := split_part(v_desc[((r * 11) % array_length(v_desc, 1)) + 1], '|', case when v_gender = 'f' then 2 else 1 end);
+    end if;
+    insert into public.rich_tycoons (seed_rank, name, description, cash_cents, founder_company_id)
+    values (r, v_name, v_desc_t, v_cash, v_co_id)
+    returning id into v_id;
+
+    v_left := v_hold;
+    if v_co_id is not null then
+      -- founder: own company first, at most 40 % of its shares
+      v_take := least(v_left, v_co_cap, v_co_shares::double precision * v_co_price / 100 * 0.4);
+      if v_take > 0 then
+        insert into pg_temp.nexa_ty_hold values (v_id, v_co_sec, v_take);
+        update pg_temp.nexa_ty_cap set cap_left = cap_left - v_take where security_id = v_co_sec;
+        v_left := v_left - v_take;
+      end if;
+    else
+      -- others: 1 to 3 companies, picked deterministically
+      v_pieces := 1 + (r % 3);
+      v_piece := v_left / v_pieces;
+      for j in 0..v_pieces - 1 loop
+        select t.security_id, t.cap_left into c from pg_temp.nexa_ty_cap t
+         where t.cap_rank = ((r * 7 + j * 5) % (select count(*) from pg_temp.nexa_ty_cap)) + 1;
+        continue when not found;
+        v_take := least(v_piece, greatest(c.cap_left, 0));
+        if v_take > 0 then
+          insert into pg_temp.nexa_ty_hold values (v_id, c.security_id, v_take);
+          update pg_temp.nexa_ty_cap set cap_left = cap_left - v_take where security_id = c.security_id;
+          v_left := v_left - v_take;
+        end if;
+      end loop;
+    end if;
+    -- the rest goes to the companies with the most room left (founders: not their own)
+    while v_left > 1 loop
+      select t.security_id, t.cap_left into c from pg_temp.nexa_ty_cap t
+       where t.cap_left > 1 and t.company_id is distinct from v_co_id
+       order by t.cap_left desc limit 1;
+      exit when not found;
+      v_take := least(v_left, c.cap_left);
+      insert into pg_temp.nexa_ty_hold values (v_id, c.security_id, v_take);
+      update pg_temp.nexa_ty_cap set cap_left = cap_left - v_take where security_id = c.security_id;
+      v_left := v_left - v_take;
+    end loop;
+  end loop;
+
+  insert into public.rich_tycoon_holdings (tycoon_id, security_id, quantity_e6)
+  select h.tycoon_id, h.security_id, floor(sum(h.value_cents) * 100000000 / max(t.price_e4))::bigint
+    from pg_temp.nexa_ty_hold h join pg_temp.nexa_ty_cap t on t.security_id = h.security_id
+   group by h.tycoon_id, h.security_id
+  having floor(sum(h.value_cents) * 100000000 / max(t.price_e4)) > 0;
+
+  drop table pg_temp.nexa_ty_hold;
+  drop table pg_temp.nexa_ty_cap;
+  return jsonb_build_object('tycoons', v_n, 'cash_cents', v_pool,
+                            'holdings', (select count(*) from public.rich_tycoon_holdings));
+end;
+$$;
+
+-- Everyone on the list with net worth (players: cash + reserve + positions at
+-- the bid; tycoons: cash + holdings at the bid) and ranks (all / players only).
+create or replace function public.rich_list_entries()
+returns table (entity_kind text, entity_id uuid, name text, description text, net_worth_cents bigint, rank_all integer, rank_players integer)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with players as (
+    select p.id,
+           coalesce(a.cash, 0) + coalesce(v.val, 0) as nw,
+           p.nickname
+      from public.profiles p
+      left join (select owner_player_id, sum(balance_cents)::bigint as cash from public.ledger_accounts
+                  where owner_player_id is not null group by owner_player_id) a on a.owner_player_id = p.id
+      left join (select pos.player_id, sum(public.value_cents(pos.quantity_e6, coalesce(q.bid_e4, q.last_price_e4)))::bigint as val
+                   from public.positions pos join public.security_quotes q on q.security_id = pos.security_id
+                  where pos.status = 'open' and pos.quantity_e6 > 0 group by pos.player_id) v on v.player_id = p.id
+     where not p.is_deactivated
+  ), tycoons as (
+    select t.id, t.name, t.description,
+           t.cash_cents + coalesce(sum(public.value_cents(h.quantity_e6, coalesce(q.bid_e4, q.last_price_e4))), 0)::bigint as nw
+      from public.rich_tycoons t
+      left join public.rich_tycoon_holdings h on h.tycoon_id = t.id
+      left join public.security_quotes q on q.security_id = h.security_id
+     group by t.id
+  ), allx as (
+    select 'player'::text as entity_kind, id as entity_id, nickname as name, null::text as description, nw from players
+    union all
+    select 'tycoon', id, name, description, nw from tycoons
+  )
+  select x.entity_kind, x.entity_id, x.name, x.description, x.nw,
+         (row_number() over (order by x.nw desc, x.entity_kind, x.entity_id))::integer,
+         case when x.entity_kind = 'player'
+              then (row_number() over (partition by x.entity_kind order by x.nw desc, x.entity_id))::integer end
+    from allx x;
+$$;
+
+create or replace function public.player_rich_rank(p_player uuid)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select e.rank_all from public.rich_list_entries() e where e.entity_kind = 'player' and e.entity_id = p_player;
+$$;
+
+-- Snapshot every richList.snapshotMinutes (run_due_jobs), rank news, 8 days kept.
+create or replace function public.rich_list_snapshot(p_force boolean default false)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_rl     jsonb := coalesce(public.config_jsonb('richList'), '{}'::jsonb);
+  v_now    timestamptz := public.game_now();
+  v_prev   timestamptz;
+  v_day    date := (public.game_now() at time zone 'Europe/Berlin')::date;
+  v_ranks  integer[];
+  v_news   integer := 0;
+  v_rows   integer;
+  r        record;
+  v_r      integer;
+  v_q      record;
+  v_run    bigint;
+begin
+  select max(s.taken_at) into v_prev from public.rich_list_snapshots s;
+  if not p_force and v_prev is not null
+     and v_prev > v_now - make_interval(secs => public.cfg_num(v_rl, '{snapshotMinutes}', 5) * 60 - 5) then
+    return jsonb_build_object('skipped', 'recent');
+  end if;
+  select coalesce(array_agg((x #>> '{}')::integer order by (x #>> '{}')::integer), array[1, 3, 10, 25, 50, 100])
+    into v_ranks from jsonb_array_elements(coalesce(v_rl -> 'newsRanks', '[]'::jsonb)) x;
+
+  insert into public.rich_list_snapshots (taken_at, entity_kind, entity_id, net_worth_cents, rank_all, rank_players)
+  select v_now, e.entity_kind, e.entity_id, e.net_worth_cents, e.rank_all, e.rank_players from public.rich_list_entries() e
+  on conflict do nothing;
+  get diagnostics v_rows = row_count;
+
+  if v_prev is not null then
+    for r in
+      select n.entity_id, n.rank_all, n.rank_players, n.net_worth_cents, p.rank_all as prev_all, p.rank_players as prev_players,
+             pr.nickname
+        from public.rich_list_snapshots n
+        join public.rich_list_snapshots p on p.taken_at = v_prev and p.entity_kind = 'player' and p.entity_id = n.entity_id
+        join public.profiles pr on pr.id = n.entity_id
+       where n.taken_at = v_now and n.entity_kind = 'player'
+    loop
+      -- entering a news rank (the best threshold crossed), number one overall
+      select min(t) into v_r from unnest(v_ranks) t where r.rank_all <= t and r.prev_all > t;
+      if v_r = 1 then
+        perform public.rich_news('rich_number_one', r.entity_id, r.nickname, null, r.rank_all, 1, r.net_worth_cents, null);
+        v_news := v_news + 1;
+      elsif v_r is not null then
+        perform public.rich_news('rich_rank_entry', r.entity_id, r.nickname, null, r.rank_all, v_r, r.net_worth_cents, null);
+        v_news := v_news + 1;
+      end if;
+      -- number one among players
+      if r.rank_players = 1 and r.prev_players > 1 then
+        perform public.rich_news('rich_players_one', r.entity_id, r.nickname, null, r.rank_all, 1, r.net_worth_cents, null);
+        v_news := v_news + 1;
+      end if;
+      -- overtaking another player (the best ranked one overtaken, once per pair and day)
+      select o.entity_id, pr2.nickname into v_q
+        from public.rich_list_snapshots o
+        join public.rich_list_snapshots op on op.taken_at = v_prev and op.entity_kind = 'player' and op.entity_id = o.entity_id
+        join public.profiles pr2 on pr2.id = o.entity_id
+       where o.taken_at = v_now and o.entity_kind = 'player' and o.entity_id <> r.entity_id
+         and op.rank_players < r.prev_players and o.rank_players > r.rank_players
+       order by o.rank_players limit 1;
+      if v_q.entity_id is not null and not exists (
+           select 1 from public.news_items ni
+            where ni.template_key = 'rich_overtake' and ni.actor_player_id = r.entity_id
+              and ni.headline like '%' || v_q.nickname
+              and (ni.published_at at time zone 'Europe/Berlin')::date = v_day) then
+        perform public.rich_news('rich_overtake', r.entity_id, r.nickname, v_q.nickname, r.rank_all, r.rank_all, r.net_worth_cents, null);
+        v_news := v_news + 1;
+      end if;
+    end loop;
+  end if;
+
+  -- biggest 24 h gainer, once per Berlin day, from 22:00 on
+  if extract(hour from v_now at time zone 'Europe/Berlin') >= 22 then
+    insert into public.job_runs (job_name, run_key, status, finished_at) values ('rich_top_gainer', v_day::text, 'succeeded', now())
+    on conflict (job_name, run_key) do nothing
+    returning id into v_run;
+    if v_run is not null then
+      select n.entity_id, pr.nickname, n.net_worth_cents,
+             round((n.net_worth_cents - o.net_worth_cents) * 10000.0 / o.net_worth_cents)::integer as bps
+        into v_q
+        from public.rich_list_snapshots n
+        join public.profiles pr on pr.id = n.entity_id
+        join lateral (select s.net_worth_cents from public.rich_list_snapshots s
+                       where s.entity_id = n.entity_id and s.taken_at <= v_now - interval '24 hours'
+                       order by s.taken_at desc limit 1) o on true
+       where n.taken_at = v_now and n.entity_kind = 'player' and o.net_worth_cents > 0
+         and n.net_worth_cents > o.net_worth_cents
+       order by bps desc limit 1;
+      if v_q.entity_id is not null then
+        perform public.rich_news('rich_top_gainer', v_q.entity_id, v_q.nickname, null, null, null, v_q.net_worth_cents,
+                                 '+' || replace(to_char(v_q.bps / 100.0, 'FM999990.0'), '.', ',') || ' %');
+        v_news := v_news + 1;
+      end if;
+    end if;
+  end if;
+
+  -- missions that depend on net worth / rank
+  for r in select p.id from public.profiles p
+            where exists (select 1 from public.player_missions m join public.mission_templates t on t.key = m.template_key
+                           where m.player_id = p.id and m.status = 'active' and t.mode = 'state')
+  loop
+    perform public.mission_refresh_state(r.id);
+  end loop;
+
+  delete from public.rich_list_snapshots where taken_at < v_now - interval '8 days';
+  return jsonb_build_object('taken_at', v_now, 'rows', v_rows, 'news', v_news);
+end;
+$$;
+
+create or replace function public.rich_news(
+  p_key text, p_player uuid, p_name text, p_other text, p_position integer, p_rank integer, p_worth bigint, p_pct text
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_head text;
+  v_body text;
+  v_imp  smallint;
+begin
+  select t.headline_template, t.body_template, t.importance into v_head, v_body, v_imp from public.news_templates t where t.key = p_key;
+  v_head := replace(replace(replace(replace(replace(coalesce(v_head, '{name}'),
+              '{name}', p_name), '{other}', coalesce(p_other, '')), '{rank}', coalesce(p_rank::text, '')),
+              '{position}', coalesce(p_position::text, '')), '{pct}', coalesce(p_pct, ''));
+  v_body := replace(replace(replace(replace(replace(replace(coalesce(v_body, ''),
+              '{name}', p_name), '{other}', coalesce(p_other, '')), '{rank}', coalesce(p_rank::text, '')),
+              '{position}', coalesce(p_position::text, '')), '{pct}', coalesce(p_pct, '')),
+              '{worth}', public.format_eur_short(p_worth));
+  insert into public.news_items (category, headline, body, importance, actor_player_id, template_key, published_at)
+  values ('player', v_head, nullif(v_body, ''), coalesce(v_imp, 1), p_player, p_key, now());
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- RPCs
+-- ---------------------------------------------------------------------------
+create or replace function public.get_rich_list(p_limit integer default 100, p_offset integer default 0, p_scope text default 'all')
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid;
+  v_limit   integer := least(greatest(coalesce(p_limit, 100), 1), 500);
+  v_offset  integer := greatest(coalesce(p_offset, 0), 0);
+  v_scope   text := coalesce(p_scope, 'all');
+  v_now     timestamptz := public.game_now();
+  v_snap    timestamptz;
+  v_out     jsonb;
+begin
+  v_player := public.require_player();
+  if v_scope not in ('all', 'players') then
+    perform public.api_error('invalid_argument');
+  end if;
+  -- the latest snapshot that is at least 24 h old
+  select max(s.taken_at) into v_snap from public.rich_list_snapshots s where s.taken_at <= v_now - interval '24 hours';
+
+  with lst as materialized (
+    select e.entity_kind, e.entity_id, e.name, e.description, e.net_worth_cents,
+           case when v_scope = 'players' then e.rank_players else e.rank_all end as rnk,
+           case when s.net_worth_cents > 0 then round((e.net_worth_cents - s.net_worth_cents) * 10000.0 / s.net_worth_cents)::integer end as change_bps,
+           case when s.entity_id is not null
+                then (case when v_scope = 'players' then s.rank_players else s.rank_all end)
+                   - (case when v_scope = 'players' then e.rank_players else e.rank_all end) end as rank_change
+      from public.rich_list_entries() e
+      left join public.rich_list_snapshots s on s.taken_at = v_snap and s.entity_kind = e.entity_kind and s.entity_id = e.entity_id
+     where v_scope = 'all' or e.entity_kind = 'player'
+  ), me as (
+    select * from lst where entity_kind = 'player' and entity_id = v_player
+  )
+  select jsonb_build_object(
+           'server_time', v_now,
+           'total', (select count(*) from lst),
+           'entries', (select coalesce(jsonb_agg(jsonb_build_object(
+                          'rank', x.rnk, 'kind', x.entity_kind, 'id', x.entity_id, 'name', x.name, 'description', x.description,
+                          'net_worth_cents', x.net_worth_cents, 'change_24h_bps', x.change_bps, 'rank_change_24h', x.rank_change,
+                          'is_me', x.entity_kind = 'player' and x.entity_id = v_player) order by x.rnk), '[]'::jsonb)
+                         from (select * from lst order by rnk offset v_offset limit v_limit) x),
+           'me', (select jsonb_build_object(
+                           'rank', m.rnk, 'net_worth_cents', m.net_worth_cents,
+                           'next', (select jsonb_build_object('rank', n.rnk, 'name', n.name, 'gap_cents', n.net_worth_cents - m.net_worth_cents)
+                                      from lst n where n.rnk = m.rnk - 1))
+                    from me m))
+    into v_out;
+  return v_out;
+end;
+$$;
+
+create or replace function public.get_rich_list_news(p_limit integer default 20)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  perform public.require_player();
+  return (
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'published_at', n.published_at, 'headline', n.headline, 'body', n.body,
+             'kind', substr(n.template_key, 6), 'player_id', n.actor_player_id) order by n.published_at desc, n.id desc), '[]'::jsonb)
+      from (select x.* from public.news_items x
+             where x.template_key like 'rich\_%' and x.published_at <= now()
+             order by x.published_at desc, x.id desc
+             limit least(greatest(coalesce(p_limit, 20), 1), 100)) n);
+end;
+$$;
+
+do $$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.seed_rich_tycoons()', 'public.rich_list_entries()', 'public.player_rich_rank(uuid)',
+    'public.rich_list_snapshot(boolean)', 'public.rich_news(text, uuid, text, text, integer, integer, bigint, text)',
+    'public.get_rich_list(integer, integer, text)', 'public.get_rich_list_news(integer)'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+    execute format('grant execute on function %s to service_role', f);
+  end loop;
+  grant execute on function public.get_rich_list(integer, integer, text) to authenticated;
+  grant execute on function public.get_rich_list_news(integer) to authenticated;
+end;
+$$;
+
+-- ===== supabase/migrations/20261112000500_m2_missions.sql =====
+-- =============================================================================
+-- NEXA · M2a · 0500 · Missions (quick, daily, weekly, milestone), daily
+--                     check-in with streak, client events
+-- =============================================================================
+-- Templates live in mission_templates (mode IS NOT NULL = new system; the old
+-- seed templates have no mode and are never assigned). XP values in the
+-- templates are base XP; grant_xp applies progression.xpMultiplier once.
+-- params: {"sector": "<key>"} filters buy_sector events, {"unlock": "<key>"}
+-- offers the mission only once the feature is unlocked, {"rank": n} for rich
+-- list milestones. scale_with_level: money targets x min(5, 1 + 0.2 x (level - 1))
+-- (progression.missionTargetScalePerLevel / missionTargetScaleMax, fallbacks).
+-- =============================================================================
+
+insert into public.mission_templates
+  (key, kind, title, description, icon_key, metric, mode, params, target_min, target_max, xp_min, xp_max, min_level, chain_order, scale_with_level, weight)
+values
+  -- quick (base XP 20-60): a few minutes each
+  ('q_trade',          'quick', 'Mach einen Trade',                         'Kaufe oder verkaufe ein beliebiges Wertpapier.',              'mission_trade',   'trade',             'count',    '{}',                     1, 1, 20, 30, 1, null, false, 100),
+  ('q_buy',            'quick', 'Kaufe eine Aktie',                         'Ein Bruchstück reicht schon.',                                'mission_trade',   'buy',               'count',    '{}',                     1, 1, 20, 30, 1, null, false, 100),
+  ('q_sell',           'quick', 'Verkaufe eine Position',                   'Auch ein Teilverkauf zählt.',                                 'mission_trade',   'sell',              'count',    '{}',                     1, 1, 25, 35, 1, null, false, 60),
+  ('q_view',           'quick', 'Sieh dir {target} Aktien an',              'Öffne die Detailseiten verschiedener Aktien.',                'mission_trade',   'view_security',     'distinct', '{}',                     3, 3, 20, 20, 1, null, false, 80),
+  ('q_rich_list',      'quick', 'Wirf einen Blick auf die Reichenliste',    'Wer steht ganz oben, und wie weit ist der nächste Platz?',    'mission_growth',  'open_rich_list',    'count',    '{}',                     1, 1, 20, 20, 1, null, false, 60),
+  ('q_rules',          'quick', 'Lies die Spielregeln',                     'Ein Blick in die Hilfe lohnt sich.',                          'mission_growth',  'open_rules',        'count',    '{}',                     1, 1, 20, 20, 1, null, false, 30),
+  ('q_vault',          'quick', 'Leere deinen Tresor',                      'Hol dir dein Grundeinkommen ab.',                             'mission_vault',   'vault_claim',       'count',    '{}',                     1, 1, 30, 40, 1, null, false, 80),
+  ('q_check_in',       'quick', 'Hol dir deinen Tagesbonus',                'Einmal am Tag gibt es XP fürs Vorbeischauen.',                'mission_bell',    'check_in',          'count',    '{}',                     1, 1, 20, 20, 1, null, false, 60),
+  ('q_buy_energy',     'quick', 'Kaufe eine Aktie aus der Branche Energie', 'Strom, Gas, Sonne: Wähle einen Energiewert.',                 'mission_sectors', 'buy_sector',        'count',    '{"sector":"energy"}',    1, 1, 30, 50, 1, null, false, 40),
+  ('q_buy_tech',       'quick', 'Kaufe eine Aktie aus der Branche Tech',    'Software, Spiele oder Quantenchips.',                         'mission_sectors', 'buy_sector',        'count',    '{"sector":"tech"}',      1, 1, 30, 50, 1, null, false, 40),
+  ('q_buy_retail',     'quick', 'Kaufe eine Aktie aus dem Einzelhandel',    'Supermärkte, Mode oder Discounter.',                          'mission_sectors', 'buy_sector',        'count',    '{"sector":"retail"}',    1, 1, 30, 50, 1, null, false, 40),
+  ('q_buy_pharma',     'quick', 'Kaufe eine Aktie aus der Branche Pharma',  'Medikamente und Biotech.',                                    'mission_sectors', 'buy_sector',        'count',    '{"sector":"pharma"}',    1, 1, 30, 50, 1, null, false, 40),
+  ('q_buy_logistics',  'quick', 'Kaufe eine Aktie aus der Logistik',        'Schiffe, Pakete, Frachtbörsen.',                              'mission_sectors', 'buy_sector',        'count',    '{"sector":"logistics"}', 1, 1, 30, 50, 1, null, false, 40),
+  ('q_buy_value',      'quick', 'Kaufe für mindestens {target}',            'Eine einzelne Order zählt.',                                  'mission_volume',  'buy_value',         'max',      '{}',                 20000, 20000, 30, 50, 1, null, true, 70),
+  ('q_two_securities', 'quick', 'Handle {target} verschiedene Wertpapiere', 'Kauf oder Verkauf, egal welche.',                             'mission_trade',   'distinct_security', 'distinct', '{}',                     2, 2, 40, 60, 1, null, false, 50),
+  ('q_profit',         'quick', 'Verkaufe mit Gewinn',                      'Ein Verkauf über deinem Einstand reicht.',                    'mission_profit',  'realized_profit',   'max',      '{}',                     1, 1, 40, 60, 1, null, false, 40),
+  ('q_volume',         'quick', 'Bewege {target} am Markt',                 'Summe aus Käufen und Verkäufen.',                             'mission_volume',  'trade_value',       'sum',      '{}',                 50000, 50000, 30, 50, 1, null, true, 50),
+  ('q_limit',          'quick', 'Setze eine Limit-Order',                   'Lege selbst fest, zu welchem Preis du kaufst.',               'mission_limit',   'limit_order',       'count',    '{"unlock":"limit_orders"}', 1, 1, 40, 60, 3, null, false, 60),
+  ('q_bond',           'quick', 'Kaufe eine Staatsanleihe',                 'Sichere Zinsen vom Staat.',                                   'mission_bond',    'bond_bought',       'count',    '{"unlock":"bonds"}',     1, 1, 40, 60, 5, null, false, 60),
+  ('q_rank_up',        'quick', 'Verbessere dich um einen Platz auf der Reichenliste', 'Überhole irgendjemanden.',                         'mission_growth',  'rich_rank_improve', 'state',    '{}',                     1, 1, 40, 60, 1, null, false, 50),
+
+  -- daily (base XP 200-400): three per Berlin calendar day
+  ('d_trades',         'daily', 'Mach {target} Trades',                     'Jede ausgeführte Order zählt.',                               'mission_trade',   'trade',             'count',    '{}',                     3, 5, 200, 300, 1, null, false, 100),
+  ('d_buy_value',      'daily', 'Kaufe für mindestens {target}',            'In einer einzigen Order.',                                    'mission_volume',  'buy_value',         'max',      '{}',                 50000, 50000, 200, 300, 1, null, true, 90),
+  ('d_volume',         'daily', 'Handle Wertpapiere im Wert von {target}',  'Summe aller Käufe und Verkäufe heute.',                       'mission_volume',  'trade_value',       'sum',      '{}',                200000, 500000, 200, 350, 1, null, true, 90),
+  ('d_profit',         'daily', 'Erziele {target} Gewinn mit einem Verkauf','Gewinn nach Gebühren in einer Order.',                        'mission_profit',  'realized_profit',   'max',      '{}',                  5000, 5000, 250, 400, 1, null, true, 70),
+  ('d_profit_sum',     'daily', 'Erziele heute insgesamt {target} Gewinn',  'Summe deiner realisierten Gewinne.',                          'mission_profit',  'realized_profit',   'sum',      '{}',                 10000, 20000, 250, 400, 1, null, true, 50),
+  ('d_sectors',        'daily', 'Kaufe Aktien aus {target} Branchen',       'Streuen statt alles auf eine Karte.',                         'mission_sectors', 'sectors_bought',    'distinct', '{}',                     2, 3, 250, 350, 1, null, false, 80),
+  ('d_hold_sectors',   'daily', 'Halte Aktien aus {target} Branchen',       'Zum Zeitpunkt der Prüfung im Depot.',                         'mission_sectors', 'sectors_held',      'state',    '{}',                     3, 3, 250, 350, 1, null, false, 60),
+  ('d_vault',          'daily', 'Leere deinen Tresor {target}-mal',         'Über den Tag verteilt.',                                      'mission_vault',   'vault_claim',       'count',    '{}',                     2, 2, 200, 250, 1, null, false, 80),
+  ('d_securities',     'daily', 'Handle {target} verschiedene Wertpapiere', 'Jedes Wertpapier zählt einmal.',                              'mission_trade',   'distinct_security', 'distinct', '{}',                     3, 3, 250, 350, 1, null, false, 70),
+  ('d_sells',          'daily', 'Verkaufe {target}-mal',                    'Teilverkäufe zählen auch.',                                   'mission_trade',   'sell',              'count',    '{}',                     2, 2, 200, 300, 1, null, false, 60),
+  ('d_check_in',       'daily', 'Hol dir deinen Tagesbonus',                'Und schau, was sich am Markt bewegt.',                        'mission_bell',    'check_in',          'count',    '{}',                     1, 1, 200, 200, 1, null, false, 40),
+  ('d_buy_tech',       'daily', 'Kaufe {target} Aktien aus der Branche Tech','Zwei Käufe, auch derselben Aktie.',                          'mission_sectors', 'buy_sector',        'count',    '{"sector":"tech"}',      2, 2, 250, 300, 1, null, false, 30),
+  ('d_buy_energy',     'daily', 'Kaufe {target} Aktien aus der Branche Energie','Zwei Käufe, auch derselben Aktie.',                       'mission_sectors', 'buy_sector',        'count',    '{"sector":"energy"}',    2, 2, 250, 300, 1, null, false, 30),
+  ('d_limits',         'daily', 'Setze {target} Limit-Orders',              'Kaufen oder verkaufen zu deinem Preis.',                      'mission_limit',   'limit_order',       'count',    '{"unlock":"limit_orders"}', 2, 2, 250, 350, 3, null, false, 60),
+  ('d_bond',           'daily', 'Kaufe eine Staatsanleihe',                 'Rendite ohne Kursrisiko bis zur Fälligkeit.',                 'mission_bond',    'bond_bought',       'count',    '{"unlock":"bonds"}',     1, 1, 200, 300, 5, null, false, 50),
+
+  -- weekly (base XP 600-1200): three per week, Monday 00:00 Berlin
+  ('w_days',           'weekly', 'Handle an {target} verschiedenen Tagen',  'Mindestens ein Trade pro Tag.',                               'mission_growth',  'trading_day',       'distinct', '{}',                     5, 5, 900, 1200, 1, null, false, 100),
+  ('w_trades',         'weekly', 'Mach {target} Trades',                    'Diese Woche.',                                                'mission_trade',   'trade',             'count',    '{}',                    20, 30, 700, 1000, 1, null, false, 100),
+  ('w_volume',         'weekly', 'Handle für insgesamt {target}',           'Summe aller Käufe und Verkäufe der Woche.',                   'mission_volume',  'trade_value',       'sum',      '{}',               1000000, 2000000, 700, 1000, 1, null, true, 80),
+  ('w_profit',         'weekly', 'Erziele diese Woche {target} Gewinn',     'Summe deiner realisierten Gewinne.',                          'mission_profit',  'realized_profit',   'sum',      '{}',                 50000, 100000, 800, 1200, 1, null, true, 80),
+  ('w_vault',          'weekly', 'Leere deinen Tresor {target}-mal',        'Diese Woche.',                                                'mission_vault',   'vault_claim',       'count',    '{}',                    10, 10, 600, 800, 1, null, false, 60),
+  ('w_check_in',       'weekly', 'Hol dir an {target} Tagen den Tagesbonus','Tagesbonus an verschiedenen Tagen.',                          'mission_bell',    'check_in',          'count',    '{}',                     5, 5, 600, 800, 1, null, false, 60),
+  ('w_all_sectors',    'weekly', 'Kaufe Aktien aus allen {target} Branchen','Tech, Einzelhandel, Energie, Pharma und Logistik.',           'mission_sectors', 'sectors_bought',    'distinct', '{}',                     5, 5, 800, 1100, 1, null, false, 60),
+  ('w_limits',         'weekly', 'Setze {target} Limit-Orders',             'Diese Woche.',                                                'mission_limit',   'limit_order',       'count',    '{"unlock":"limit_orders"}', 5, 5, 700, 900, 3, null, false, 50),
+  ('w_bonds',          'weekly', 'Kaufe {target}-mal Staatsanleihen',       'Diese Woche.',                                                'mission_bond',    'bond_bought',       'count',    '{"unlock":"bonds"}',     3, 3, 700, 900, 5, null, false, 50),
+
+  -- milestones (base XP 100-2000): one story chain, three visible at a time
+  ('m_first_trade',    'milestone', 'Dein erster Trade',                    'Kaufe dein erstes Wertpapier.',                               'mission_trade',   'trade',             'count',    '{}',                       1, 1, 100, 100, 1,  1, false, 100),
+  ('m_first_vault',    'milestone', 'Erstes Grundeinkommen',                'Leere zum ersten Mal deinen Tresor.',                         'mission_vault',   'vault_claim',       'count',    '{}',                       1, 1, 100, 100, 1,  2, false, 100),
+  ('m_first_profit',   'milestone', 'Dein erster Gewinn',                   'Verkaufe etwas teurer, als du es gekauft hast.',              'mission_profit',  'realized_profit',   'max',      '{}',                       1, 1, 150, 150, 1,  3, false, 100),
+  ('m_three_sectors',  'milestone', 'Halte Aktien aus 3 Branchen',          'Ein gestreutes Depot schwankt weniger.',                      'mission_sectors', 'sectors_held',      'state',    '{}',                       3, 3, 200, 200, 1,  4, false, 100),
+  ('m_nw_11k',         'milestone', 'Erreiche {target} Vermögen',           'Bargeld plus Wertpapiere zum Verkaufskurs.',                  'mission_growth',  'net_worth',         'state',    '{}',                 1100000, 1100000, 200, 200, 1, 5, false, 100),
+  ('m_level_5',        'milestone', 'Erreiche Level {target}',              'Ab Level 5 gibt es Staatsanleihen.',                          'mission_growth',  'level',             'state',    '{}',                       5, 5, 300, 300, 1,  6, false, 100),
+  ('m_first_limit',    'milestone', 'Deine erste Limit-Order',              'Setze eine Order mit eigenem Preis.',                         'mission_limit',   'limit_order',       'count',    '{"unlock":"limit_orders"}', 1, 1, 200, 200, 3, 7, false, 100),
+  ('m_nw_12k',         'milestone', 'Erreiche {target} Vermögen',           'Bargeld plus Wertpapiere zum Verkaufskurs.',                  'mission_growth',  'net_worth',         'state',    '{}',                 1250000, 1250000, 300, 300, 1, 8, false, 100),
+  ('m_first_bond',     'milestone', 'Deine erste Staatsanleihe',            'Kaufe eine Anleihe des Staates.',                             'mission_bond',    'bond_bought',       'count',    '{"unlock":"bonds"}',       1, 1, 300, 300, 5,  9, false, 100),
+  ('m_trades_25',      'milestone', 'Mach {target} Trades',                 'Insgesamt, seit diese Mission sichtbar ist.',                 'mission_trade',   'trade',             'count',    '{}',                      25, 25, 300, 300, 1, 10, false, 100),
+  ('m_nw_15k',         'milestone', 'Erreiche {target} Vermögen',           'Bargeld plus Wertpapiere zum Verkaufskurs.',                  'mission_growth',  'net_worth',         'state',    '{}',                 1500000, 1500000, 400, 400, 1, 11, false, 100),
+  ('m_all_sectors',    'milestone', 'Halte Aktien aus allen 5 Branchen',    'Tech, Einzelhandel, Energie, Pharma und Logistik.',           'mission_sectors', 'sectors_held',      'state',    '{}',                       5, 5, 500, 500, 1, 12, false, 100),
+  ('m_level_10',       'milestone', 'Erreiche Level {target}',              'Ab Level 10 kannst du eine Firma gründen.',                   'mission_growth',  'level',             'state',    '{}',                      10, 10, 600, 600, 1, 13, false, 100),
+  ('m_nw_20k',         'milestone', 'Erreiche {target} Vermögen',           'Bargeld plus Wertpapiere zum Verkaufskurs.',                  'mission_growth',  'net_worth',         'state',    '{}',                 2000000, 2000000, 600, 600, 1, 14, false, 100),
+  ('m_rich_100',       'milestone', 'Erreiche Platz 100 der Reichenliste',  'Unter allen Spielern und KI-Tycoons.',                        'mission_growth',  'rich_rank',         'state',    '{"rank":100}',             1, 1, 500, 500, 1, 15, false, 100),
+  ('m_trades_100',     'milestone', 'Mach {target} Trades',                 'Insgesamt, seit diese Mission sichtbar ist.',                 'mission_trade',   'trade',             'count',    '{}',                     100, 100, 700, 700, 1, 16, false, 100),
+  ('m_nw_30k',         'milestone', 'Erreiche {target} Vermögen',           'Bargeld plus Wertpapiere zum Verkaufskurs.',                  'mission_growth',  'net_worth',         'state',    '{}',                 3000000, 3000000, 800, 800, 1, 17, false, 100),
+  ('m_rich_50',        'milestone', 'Erreiche Platz 50 der Reichenliste',   'Unter allen Spielern und KI-Tycoons.',                        'mission_growth',  'rich_rank',         'state',    '{"rank":50}',              1, 1, 900, 900, 1, 18, false, 100),
+  ('m_nw_50k',         'milestone', 'Erreiche {target} Vermögen',           'Bargeld plus Wertpapiere zum Verkaufskurs.',                  'mission_growth',  'net_worth',         'state',    '{}',                 5000000, 5000000, 1000, 1000, 1, 19, false, 100),
+  ('m_level_20',       'milestone', 'Erreiche Level {target}',              'Ab Level 20 wartet die GmbH.',                                'mission_growth',  'level',             'state',    '{}',                      20, 20, 1200, 1200, 1, 20, false, 100),
+  ('m_nw_100k',        'milestone', 'Erreiche {target} Vermögen',           'Sechsstellig.',                                               'mission_growth',  'net_worth',         'state',    '{}',                10000000, 10000000, 1400, 1400, 1, 21, false, 100),
+  ('m_rich_25',        'milestone', 'Erreiche Platz 25 der Reichenliste',   'Unter allen Spielern und KI-Tycoons.',                        'mission_growth',  'rich_rank',         'state',    '{"rank":25}',              1, 1, 1500, 1500, 1, 22, false, 100),
+  ('m_nw_250k',        'milestone', 'Erreiche {target} Vermögen',           'Eine Viertelmillion.',                                        'mission_growth',  'net_worth',         'state',    '{}',                25000000, 25000000, 1700, 1700, 1, 23, false, 100),
+  ('m_rich_10',        'milestone', 'Erreiche Platz 10 der Reichenliste',   'Die Top 10 der NEXA.',                                        'mission_growth',  'rich_rank',         'state',    '{"rank":10}',              1, 1, 1800, 1800, 1, 24, false, 100),
+  ('m_nw_1m',          'milestone', 'Werde Millionär',                      'Erreiche {target} Vermögen.',                                 'mission_growth',  'net_worth',         'state',    '{}',               100000000, 100000000, 2000, 2000, 1, 25, false, 100),
+  ('m_rich_1',         'milestone', 'Werde die reichste Person der NEXA',   'Platz 1 der Reichenliste.',                                   'mission_growth',  'rich_rank',         'state',    '{"rank":1}',               1, 1, 2000, 2000, 1, 26, false, 100)
+on conflict (key) do update
+   set kind = excluded.kind, title = excluded.title, description = excluded.description, icon_key = excluded.icon_key,
+       metric = excluded.metric, mode = excluded.mode, params = excluded.params, target_min = excluded.target_min,
+       target_max = excluded.target_max, xp_min = excluded.xp_min, xp_max = excluded.xp_max, min_level = excluded.min_level,
+       chain_order = excluded.chain_order, scale_with_level = excluded.scale_with_level, weight = excluded.weight, is_active = true;
+
+-- ---------------------------------------------------------------------------
+-- Helpers
+-- ---------------------------------------------------------------------------
+create or replace function public.mission_is_money_metric(p_metric text)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select p_metric in ('trade_value', 'buy_value', 'realized_profit', 'net_worth');
+$$;
+
+-- "{target}" in titles and descriptions: euros for money metrics ("2.000 €"), else the number
+create or replace function public.mission_text(p_text text, p_metric text, p_target bigint)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select replace(p_text, '{target}',
+           case when public.mission_is_money_metric(p_metric)
+                then replace(to_char(p_target / 100, 'FM999G999G999G990'), ',', '.') || ' €'
+                else p_target::text end);
+$$;
+
+-- Current value of a state metric for a player.
+create or replace function public.mission_state_value(p_player uuid, p_metric text, p_params jsonb, p_state jsonb)
+returns bigint
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_rank integer;
+begin
+  case p_metric
+    when 'net_worth' then
+      return public.player_net_worth_cents(p_player);
+    when 'level' then
+      return (select p.level from public.profiles p where p.id = p_player);
+    when 'sectors_held' then
+      return (select count(distinct s.sector_key) from public.positions pos join public.securities s on s.id = pos.security_id
+               where pos.player_id = p_player and pos.status = 'open' and pos.quantity_e6 > 0 and s.kind = 'stock');
+    when 'rich_rank' then
+      v_rank := public.player_rich_rank(p_player);
+      return case when v_rank is not null and v_rank <= coalesce((p_params ->> 'rank')::integer, 1) then 1 else 0 end;
+    when 'rich_rank_improve' then
+      v_rank := public.player_rich_rank(p_player);
+      return case when v_rank is not null and (p_state ->> 'baseline_rank') is not null
+                       and v_rank < (p_state ->> 'baseline_rank')::integer then 1 else 0 end;
+    else
+      return 0;
+  end case;
+end;
+$$;
+
+-- Advances the player's active missions for one event.
+create or replace function public.mission_event(p_player uuid, p_metric text, p_amount bigint default 1, p_ref text default null)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  m     record;
+  v_new bigint;
+  v_st  jsonb;
+  v_n   integer := 0;
+begin
+  if p_player is null then
+    return 0;
+  end if;
+  for m in
+    select pm.id, pm.progress, pm.target, pm.state, t.mode, t.params
+      from public.player_missions pm
+      join public.mission_templates t on t.key = pm.template_key
+     where pm.player_id = p_player and pm.status = 'active' and t.metric = p_metric and t.mode <> 'state'
+       and (pm.expires_at is null or pm.expires_at > public.game_now())
+       for update of pm
+  loop
+    continue when m.params ? 'sector' and (m.params ->> 'sector') is distinct from p_ref;
+    v_st := m.state;
+    v_new := case m.mode
+               when 'count' then m.progress + 1
+               when 'sum' then m.progress + greatest(coalesce(p_amount, 0), 0)
+               when 'max' then greatest(m.progress, coalesce(p_amount, 0))
+               when 'distinct' then m.progress
+               else m.progress end;
+    if m.mode = 'distinct' then
+      continue when p_ref is null or coalesce(v_st -> 'seen', '[]'::jsonb) ? p_ref;
+      v_st := jsonb_set(v_st, '{seen}', coalesce(v_st -> 'seen', '[]'::jsonb) || to_jsonb(p_ref));
+      v_new := m.progress + 1;
+    end if;
+    update public.player_missions
+       set progress = least(v_new, target), state = v_st,
+           status = case when v_new >= target then 'completed'::public.mission_status else status end,
+           completed_at = case when v_new >= target then now() else completed_at end
+     where id = m.id;
+    v_n := v_n + 1;
+  end loop;
+  return v_n;
+end;
+$$;
+
+-- Recomputes state missions (net worth, level, sectors held, rich list rank).
+create or replace function public.mission_refresh_state(p_player uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  m     record;
+  v_val bigint;
+  v_n   integer := 0;
+begin
+  for m in
+    select pm.id, pm.progress, pm.target, pm.state, t.metric, t.params
+      from public.player_missions pm
+      join public.mission_templates t on t.key = pm.template_key
+     where pm.player_id = p_player and pm.status = 'active' and t.mode = 'state'
+       and (pm.expires_at is null or pm.expires_at > public.game_now())
+       for update of pm
+  loop
+    v_val := public.mission_state_value(p_player, m.metric, m.params, m.state);
+    if least(v_val, m.target) <> m.progress or v_val >= m.target then
+      update public.player_missions
+         set progress = least(v_val, target),
+             status = case when v_val >= target then 'completed'::public.mission_status else status end,
+             completed_at = case when v_val >= target then now() else completed_at end
+       where id = m.id;
+      v_n := v_n + 1;
+    end if;
+  end loop;
+  return v_n;
+end;
+$$;
+
+-- Lazily assigns the missing missions of every kind (idempotent; serialised per player).
+create or replace function public.missions_assign(p_player uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_prog     jsonb := coalesce(public.config_jsonb('progression'), '{}'::jsonb);
+  v_now      timestamptz := public.game_now();
+  v_today    date := (public.game_now() at time zone 'Europe/Berlin')::date;
+  v_monday   date;
+  v_level    integer;
+  v_scale    double precision;
+  v_need     integer;
+  v_n        integer := 0;
+  v_kind     text;
+  v_period   date;
+  v_expires  timestamptz;
+  v_rank     integer;
+  t          record;
+begin
+  v_monday := v_today - (extract(isodow from v_today)::integer - 1);
+  select p.level into v_level from public.profiles p where p.id = p_player for update;
+  if v_level is null then
+    return 0;
+  end if;
+  v_scale := least(public.cfg_num(v_prog, '{missionTargetScaleMax}', 5),
+                   1 + public.cfg_num(v_prog, '{missionTargetScalePerLevel}', 0.2) * (v_level - 1));
+
+  -- expire what ran out
+  update public.player_missions set status = 'expired'
+   where player_id = p_player and status in ('active', 'completed') and expires_at is not null and expires_at <= v_now;
+
+  foreach v_kind in array array['quick', 'daily', 'weekly', 'milestone'] loop
+    if v_kind = 'quick' then
+      v_need := public.cfg_num(v_prog, '{xpSources,quickMission,active}', 3)::integer
+              - (select count(*) from public.player_missions m where m.player_id = p_player and m.kind = 'quick' and m.status in ('active', 'completed'));
+      v_period := v_today; v_expires := null;
+    elsif v_kind = 'daily' then
+      v_need := public.cfg_num(v_prog, '{xpSources,dailyMission,perDay}', 3)::integer
+              - (select count(*) from public.player_missions m where m.player_id = p_player and m.kind = 'daily' and m.period_start = v_today);
+      v_period := v_today; v_expires := ((v_today + 1)::timestamp) at time zone 'Europe/Berlin';
+    elsif v_kind = 'weekly' then
+      v_need := public.cfg_num(v_prog, '{xpSources,weeklyMission,perWeek}', 3)::integer
+              - (select count(*) from public.player_missions m where m.player_id = p_player and m.kind = 'weekly' and m.period_start = v_monday);
+      v_period := v_monday; v_expires := ((v_monday + 7)::timestamp) at time zone 'Europe/Berlin';
+    else
+      v_need := public.cfg_num(v_prog, '{xpSources,milestoneMission,visible}', 3)::integer
+              - (select count(*) from public.player_missions m where m.player_id = p_player and m.kind = 'milestone' and m.status in ('active', 'completed'));
+      v_period := date '2000-01-01'; v_expires := null;
+    end if;
+    continue when v_need <= 0;
+
+    for t in
+      select mt.*
+        from public.mission_templates mt
+       where mt.kind = v_kind and mt.mode is not null and mt.is_active
+         and mt.min_level <= v_level
+         and (not (mt.params ? 'unlock') or v_level >= public.unlock_level(mt.params ->> 'unlock'))
+         and not exists (select 1 from public.player_missions m
+                          where m.player_id = p_player and m.template_key = mt.key
+                            and (m.period_start = v_period
+                                 or (v_kind = 'quick' and (m.status in ('active', 'completed') or m.created_at > v_now - interval '24 hours'))
+                                 or v_kind = 'milestone'))
+       order by case when v_kind = 'milestone' then mt.chain_order end,
+                -ln(1 - random()) / greatest(mt.weight, 1)
+       limit v_need
+    loop
+      if t.metric = 'rich_rank_improve' then
+        v_rank := public.player_rich_rank(p_player);
+        continue when v_rank is null or v_rank <= 1;
+      end if;
+      insert into public.player_missions (player_id, template_key, kind, period_start, target, xp_reward, expires_at, state)
+      values (p_player, t.key, v_kind, v_period,
+              case when t.scale_with_level and public.mission_is_money_metric(t.metric)
+                   then round((t.target_min + floor(random() * (t.target_max - t.target_min + 1))) * v_scale / 100)::bigint * 100
+                   else t.target_min + floor(random() * (t.target_max - t.target_min + 1))::bigint end,
+              t.xp_min + floor(random() * (t.xp_max - t.xp_min + 1))::integer,
+              v_expires,
+              case when t.metric = 'rich_rank_improve' then jsonb_build_object('baseline_rank', v_rank) else '{}'::jsonb end)
+      on conflict (player_id, template_key, period_start) do nothing;
+      if found then
+        v_n := v_n + 1;
+      end if;
+    end loop;
+  end loop;
+  if v_n > 0 then
+    perform public.mission_refresh_state(p_player);
+  end if;
+  return v_n;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- RPCs
+-- ---------------------------------------------------------------------------
+create or replace function public.get_my_missions()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_mult   double precision := public.config_double('progression', '{xpMultiplier}', 2);
+  v_today  date := (public.game_now() at time zone 'Europe/Berlin')::date;
+  v_monday date;
+begin
+  v_player := public.require_player();
+  v_monday := v_today - (extract(isodow from v_today)::integer - 1);
+  perform public.missions_assign(v_player);
+  perform public.mission_refresh_state(v_player);
+  return jsonb_build_object(
+    'server_time', public.game_now(),
+    'groups', (
+      select jsonb_agg(jsonb_build_object(
+               'kind', g.kind,
+               'resets_at', case g.kind when 'daily' then ((v_today + 1)::timestamp) at time zone 'Europe/Berlin'
+                                        when 'weekly' then ((v_monday + 7)::timestamp) at time zone 'Europe/Berlin' end,
+               'missions', coalesce((
+                 select jsonb_agg(jsonb_build_object(
+                          'id', m.id, 'key', m.template_key,
+                          'title', public.mission_text(t.title, t.metric, m.target),
+                          'description', public.mission_text(t.description, t.metric, m.target),
+                          'progress', m.progress, 'target', m.target,
+                          'xp', greatest(0, round(m.xp_reward * v_mult))::integer,
+                          'status', m.status, 'expires_at', m.expires_at)
+                          order by t.chain_order nulls last, m.created_at, m.id)
+                   from public.player_missions m
+                   join public.mission_templates t on t.key = m.template_key
+                  where m.player_id = v_player and m.kind = g.kind
+                    and case g.kind
+                          when 'quick' then m.status in ('active', 'completed')
+                          when 'daily' then m.period_start = v_today and m.status <> 'expired'
+                          when 'weekly' then m.period_start = v_monday and m.status <> 'expired'
+                          else m.status in ('active', 'completed') end), '[]'::jsonb))
+               order by g.ord)
+        from (values ('quick', 1), ('daily', 2), ('weekly', 3), ('milestone', 4)) as g(kind, ord)));
+end;
+$$;
+
+create or replace function public.claim_mission(p_request_id uuid, p_mission_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  m        public.player_missions;
+  v_xp     integer;
+  v_prof   public.profiles;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'claim_mission');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  perform 1 from public.profiles p where p.id = v_player for update;
+  select * into m from public.player_missions pm where pm.id = p_mission_id and pm.player_id = v_player for update;
+  if m.id is null or m.status = 'expired' or (m.expires_at is not null and m.expires_at <= public.game_now()) then
+    perform public.api_error('mission_not_found');
+  end if;
+  if m.status = 'claimed' then
+    perform public.api_error('mission_already_claimed');
+  end if;
+  if m.status = 'active' then
+    perform public.mission_refresh_state(v_player);
+    select * into m from public.player_missions pm where pm.id = p_mission_id;
+    if m.status <> 'completed' then
+      perform public.api_error('mission_not_completed');
+    end if;
+  end if;
+  update public.player_missions set status = 'claimed', claimed_at = now() where id = m.id;
+  v_xp := public.grant_xp(v_player, 'mission', m.xp_reward, 'mission:' || m.id::text, 'mission', m.id);
+  if m.kind = 'quick' or m.kind = 'milestone' then
+    perform public.missions_assign(v_player);
+  end if;
+  select * into v_prof from public.profiles where id = v_player;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'xp_awarded', v_xp, 'level', v_prof.level, 'xp_total', v_prof.xp_total));
+end;
+$$;
+
+-- Once per Berlin calendar day: progression.xpSources.dailyLogin XP plus a
+-- streak bonus. One missed day is bridged by a streak freeze
+-- (streakFreezesPerWeek, refilled every Monday).
+create or replace function public.daily_check_in(p_request_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  v_login  jsonb := coalesce(public.config_jsonb('progression', '{xpSources,dailyLogin}'), '{}'::jsonb);
+  v_today  date := (public.game_now() at time zone 'Europe/Berlin')::date;
+  v_monday date;
+  ls       public.login_streaks;
+  v_streak integer;
+  v_freeze boolean := false;
+  v_xp     integer := 0;
+  v_already boolean := false;
+  v_prof   public.profiles;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'daily_check_in');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_monday := v_today - (extract(isodow from v_today)::integer - 1);
+  insert into public.login_streaks (player_id) values (v_player) on conflict do nothing;
+  select * into ls from public.login_streaks where player_id = v_player for update;
+  if ls.freeze_granted_week is null or ls.freeze_granted_week < v_monday then
+    ls.freeze_tokens := public.cfg_num(v_login, '{streakFreezesPerWeek}', 1)::smallint;
+    ls.freeze_granted_week := v_monday;
+  end if;
+
+  if ls.last_login_day = v_today then
+    v_already := true;
+    v_streak := ls.current_streak;
+  else
+    if ls.last_login_day = v_today - 1 then
+      v_streak := ls.current_streak + 1;
+    elsif ls.last_login_day = v_today - 2 and ls.freeze_tokens > 0 then
+      v_streak := ls.current_streak + 1;
+      v_freeze := true;
+      ls.freeze_tokens := ls.freeze_tokens - 1;
+    else
+      v_streak := 1;
+    end if;
+    v_xp := public.grant_xp(v_player, 'daily_login',
+              (public.cfg_num(v_login, '{xp}', 50)
+               + least(public.cfg_num(v_login, '{streakBonusCap}', 200),
+                       greatest(0, v_streak - 1) * public.cfg_num(v_login, '{streakBonusPerDay}', 10)))::integer,
+              'login:' || v_today::text, 'daily_login', null);
+    insert into public.daily_logins (player_id, login_day, streak_day, xp_awarded, freeze_used)
+    values (v_player, v_today, v_streak, v_xp, v_freeze)
+    on conflict do nothing;
+    perform public.mission_event(v_player, 'check_in', 1, v_today::text);
+  end if;
+  update public.login_streaks
+     set current_streak = v_streak, longest_streak = greatest(longest_streak, v_streak), last_login_day = v_today,
+         freeze_tokens = ls.freeze_tokens, freeze_granted_week = ls.freeze_granted_week
+   where player_id = v_player;
+  select * into v_prof from public.profiles where id = v_player;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'xp_awarded', v_xp, 'streak_days', v_streak, 'already_checked_in', v_already,
+    'freeze_used', v_freeze, 'level', v_prof.level, 'xp_total', v_prof.xp_total));
+end;
+$$;
+
+-- Client events for low-XP quick missions; whitelisted and capped per day.
+create or replace function public.track_event(p_kind text, p_ref text default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_cap    integer;
+  v_ref    text := null;
+begin
+  v_player := public.require_player();
+  v_cap := case p_kind when 'view_security' then 50 when 'open_rich_list' then 20 when 'open_rules' then 20 end;
+  if v_cap is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  if p_kind = 'view_security' then
+    select s.ticker into v_ref from public.securities s where s.id = public.resolve_security(p_ref);
+    if v_ref is null then
+      return jsonb_build_object('ok', true);
+    end if;
+  end if;
+  if public.rate_limit_hit(v_player, 'track:' || p_kind, v_cap, 86400) then
+    perform public.mission_event(v_player, p_kind, 1, v_ref);
+  end if;
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+do $$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.mission_is_money_metric(text)', 'public.mission_text(text, text, bigint)',
+    'public.mission_state_value(uuid, text, jsonb, jsonb)', 'public.mission_event(uuid, text, bigint, text)',
+    'public.mission_refresh_state(uuid)', 'public.missions_assign(uuid)', 'public.get_my_missions()',
+    'public.claim_mission(uuid, uuid)', 'public.daily_check_in(uuid)', 'public.track_event(text, text)'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+    execute format('grant execute on function %s to service_role', f);
+  end loop;
+  grant execute on function public.get_my_missions() to authenticated;
+  grant execute on function public.claim_mission(uuid, uuid) to authenticated;
+  grant execute on function public.daily_check_in(uuid) to authenticated;
+  grant execute on function public.track_event(text, text) to authenticated;
+end;
+$$;
+
+-- ===== supabase/migrations/20261112000600_m2_jobs.sql =====
+-- =============================================================================
+-- NEXA · M2a · 0600 · Bootstrap and scheduled jobs for the closed money
+--                     system and the rich list
+-- =============================================================================
+
+create or replace function public.market_bootstrap()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now      timestamptz := public.game_now();
+  v_bell     timestamptz := public.trading_day_start(public.game_now());
+  v_state    jsonb;
+  v_fv       integer;
+  v_backfill jsonb;
+  v_redeemed integer;
+  v_issued   integer;
+  v_policy   integer;
+  v_bonds    jsonb := coalesce(public.config_jsonb('bonds'), '{}'::jsonb);
+  v_qpy      double precision := greatest(1, public.config_double('bonds', '{couponsPerGameYear}', 4));
+  v_qsec     double precision := public.config_double('time', '{quarterHours}', 6) * 3600;
+  v_genesis  jsonb;
+  v_tycoons  jsonb;
+begin
+  perform pg_advisory_xact_lock(7311001);
+  perform public.ensure_game_quarters(3);
+  select r.state into v_state from public.sim_runtime r where r.id for update;
+
+  update public.security_sim_state st
+     set ema_fast = coalesce(st.ema_fast, q.last_price_e4),
+         ema_slow = coalesce(st.ema_slow, q.last_price_e4)
+    from public.security_quotes q
+   where q.security_id = st.security_id and (st.ema_fast is null or st.ema_slow is null);
+
+  if v_state ->> 'fair_values_at' is null then
+    v_fv := public.recompute_fair_values();
+    update public.sim_runtime set state = state || jsonb_build_object('fair_values_at', now()) where id;
+  end if;
+
+  -- closed money system: the one-time genesis (re-sources money that existed before)
+  v_genesis  := public.money_genesis();
+  v_redeemed := public.redeem_matured_bonds(v_now);
+  v_issued   := public.ensure_bond_series();
+
+  -- before the history is generated: bonds start at their yield-implied price
+  if not exists (select 1 from public.candles limit 1) then
+    v_policy := coalesce((select cb.policy_rate_bps from public.central_bank_state cb where cb.id),
+                         public.config_double('centralBank', '{startRateBps}', 300)::integer);
+    update public.security_quotes q
+       set last_price_e4 = x.p, bid_e4 = greatest(1, x.p - x.h), ask_e4 = x.p + greatest(1, x.h),
+           prev_close_e4 = x.p, day_open_e4 = x.p, day_high_e4 = x.p, day_low_e4 = x.p, yield_bps = x.y
+      from (select b.security_id,
+                   greatest(1, round(public.bond_clean_price(b.coupon_bps,
+                                 public.bond_yield_bps(v_policy, y.periods / v_qpy, v_bonds), y.periods, v_qpy)
+                               * b.face_value_cents * 100))::bigint as p,
+                   round(b.face_value_cents * 100 * coalesce(st.spread_bps, 10) / 20000.0)::bigint as h,
+                   public.bond_yield_bps(v_policy, y.periods / v_qpy, v_bonds) as y
+              from public.bonds b
+              join public.securities s on s.id = b.security_id and s.status = 'listed'
+              left join public.security_sim_state st on st.security_id = b.security_id
+             cross join lateral (select extract(epoch from (b.matures_at - v_now)) / v_qsec as periods) y
+             where b.matures_at > v_now) x
+     where q.security_id = x.security_id;
+
+    -- profitable stocks without any trade start at their fundamental fair value
+    -- (the seed prices used slightly different sector multiples), and the
+    -- NEXA 30 divisor is re-based so that the index starts at its base value
+    update public.security_quotes q
+       set last_price_e4 = st.fair_value_e4,
+           bid_e4 = greatest(1, st.fair_value_e4 - x.h), ask_e4 = st.fair_value_e4 + greatest(1, x.h),
+           prev_close_e4 = st.fair_value_e4, day_open_e4 = st.fair_value_e4,
+           day_high_e4 = st.fair_value_e4, day_low_e4 = st.fair_value_e4,
+           market_cap_cents = public.div_round_half_even(c.shares_outstanding::numeric * st.fair_value_e4, 100)
+      from public.security_sim_state st
+      join public.securities s on s.id = st.security_id and s.kind = 'stock' and s.status = 'listed'
+      join public.companies c on c.id = s.company_id and c.ttm_net_income_cents > 0
+     cross join lateral (select round(st.fair_value_e4
+                           * public.config_double('trading', array['spread', 'halfSpreadBps', c.tier::text], 15) / 10000.0)::bigint as h) x
+     where q.security_id = st.security_id and q.last_price_e4 <> st.fair_value_e4
+       and not exists (select 1 from public.trades t where t.security_id = st.security_id);
+    update public.security_sim_state st
+       set ema_fast = q.last_price_e4, ema_slow = q.last_price_e4
+      from public.security_quotes q where q.security_id = st.security_id;
+    update public.indices i
+       set divisor = x.cap / i.base_value_e4
+      from (select m.index_security_id, sum(c.shares_outstanding::numeric * q.last_price_e4)::double precision / 100 as cap
+              from public.index_memberships m
+              join public.securities s on s.id = m.member_security_id
+              join public.companies c on c.id = s.company_id
+              join public.security_quotes q on q.security_id = s.id
+             where m.left_at is null group by m.index_security_id) x
+     where i.security_id = x.index_security_id and x.cap > 0;
+    update public.security_quotes q
+       set last_price_e4 = i.base_value_e4, prev_close_e4 = i.base_value_e4, day_open_e4 = i.base_value_e4,
+           day_high_e4 = i.base_value_e4, day_low_e4 = i.base_value_e4, change_bps = 0
+      from public.indices i where q.security_id = i.security_id;
+  end if;
+  v_backfill := public.backfill_price_history();
+
+  -- day statistics since the last 22:00 bell, from the (backfilled) 5m candles
+  if v_state ->> 'day_start' is null or (v_backfill ->> 'backfilled')::boolean is true then
+    update public.security_quotes q
+       set prev_close_e4 = coalesce((select c.close_e4 from public.candles c
+                                      where c.security_id = q.security_id and c.interval = '5m' and c.bucket_start < v_bell
+                                      order by c.bucket_start desc limit 1), q.prev_close_e4, q.last_price_e4),
+           day_open_e4   = coalesce((select c.open_e4 from public.candles c
+                                      where c.security_id = q.security_id and c.interval = '5m' and c.bucket_start >= v_bell
+                                      order by c.bucket_start limit 1), q.last_price_e4),
+           day_high_e4   = greatest(q.last_price_e4, (select max(c.high_e4) from public.candles c
+                                      where c.security_id = q.security_id and c.interval = '5m' and c.bucket_start >= v_bell)),
+           day_low_e4    = least(q.last_price_e4, (select min(c.low_e4) from public.candles c
+                                      where c.security_id = q.security_id and c.interval = '5m' and c.bucket_start >= v_bell)),
+           day_volume_e6 = coalesce((select sum(c.volume_e6) from public.candles c
+                                      where c.security_id = q.security_id and c.interval = '5m' and c.bucket_start >= v_bell), 0);
+    update public.security_quotes q
+       set change_bps = round((q.last_price_e4 - q.prev_close_e4) * 10000.0 / greatest(1, q.prev_close_e4))::integer
+     where q.prev_close_e4 is not null;
+    update public.sim_runtime set state = state || jsonb_build_object('day_start', v_bell) where id;
+  end if;
+
+  -- rich list: AI tycoons (once, after the genesis and at current prices) and a first snapshot
+  v_tycoons := public.seed_rich_tycoons();
+  if not exists (select 1 from public.rich_list_snapshots) then
+    perform public.rich_list_snapshot(true);
+  end if;
+
+  return jsonb_build_object('fair_values', v_fv, 'bonds_redeemed', v_redeemed, 'bonds_issued', v_issued,
+                            'backfill', v_backfill, 'day_start', v_bell, 'genesis', v_genesis, 'tycoons', v_tycoons);
+end;
+$$;
+comment on function public.market_bootstrap() is 'Idempotent world setup: calendar, EMAs, fair values (once), money genesis (once), bond series, price history (only without candles), day statistics, AI tycoons (once), first rich list snapshot. Run by setup/update scripts and run_due_jobs().';
+
+
+create or replace function public.run_due_jobs()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now      timestamptz;
+  v_result   jsonb := '{}'::jsonb;
+  v_closed   jsonb := '[]'::jsonb;
+  v_latest   bigint;
+  q          record;
+  v_run      bigint;
+begin
+  -- waits for a running tick (ticks only try the lock and skip)
+  perform pg_advisory_xact_lock(7311001);
+  v_now := public.game_now();
+  perform public.ensure_game_quarters(3);
+
+  if not exists (select 1 from public.candles limit 1) or not public.money_genesis_done()
+     or not exists (select 1 from public.rich_tycoons) then
+    v_result := v_result || jsonb_build_object('bootstrap', public.market_bootstrap());
+  end if;
+
+  -- first run on a database: older quarters are skipped, only the latest ended one is closed
+  if not exists (select 1 from public.job_runs j where j.job_name = 'quarter_close') then
+    select gq.id into v_latest from public.game_quarters gq
+     where gq.ends_at <= v_now and gq.status <> 'closed' order by gq.ends_at desc limit 1;
+    for q in select gq.id from public.game_quarters gq
+              where gq.ends_at <= v_now and gq.status <> 'closed' and gq.id <> coalesce(v_latest, -1)
+    loop
+      update public.game_quarters set status = 'closed', closed_at = now() where id = q.id;
+      insert into public.job_runs (job_name, run_key, status, finished_at, details)
+      values ('quarter_close', q.id::text, 'succeeded', now(), '{"skipped": "before_first_run"}'::jsonb)
+      on conflict do nothing;
+    end loop;
+  end if;
+
+  for q in select gq.id from public.game_quarters gq
+            where gq.ends_at <= v_now and gq.status <> 'closed'
+            order by gq.ends_at limit 8
+  loop
+    v_closed := v_closed || public.close_game_quarter(q.id);
+  end loop;
+  v_result := v_result || jsonb_build_object('quarters', v_closed);
+
+  -- bonds that matured between quarter closes (or after a downtime)
+  if exists (select 1 from public.bonds bd join public.securities s on s.id = bd.security_id
+              where s.status = 'listed' and bd.matures_at <= v_now) then
+    v_result := v_result || jsonb_build_object('bonds_redeemed', public.redeem_matured_bonds(v_now));
+  end if;
+  v_result := v_result || jsonb_build_object('bonds_issued', public.ensure_bond_series());
+
+  -- rich list snapshot every richList.snapshotMinutes (rank news, 24 h changes, state missions)
+  v_result := v_result || jsonb_build_object('rich_list', public.rich_list_snapshot(false));
+
+  -- daily maintenance (first run per UTC day)
+  insert into public.job_runs (job_name, run_key) values ('maintenance', to_char(now() at time zone 'UTC', 'YYYY-MM-DD'))
+  on conflict (job_name, run_key) do nothing
+  returning id into v_run;
+  if v_run is not null then
+    v_result := v_result || jsonb_build_object('maintenance', public.run_maintenance());
+    -- price_ticks: keep about one day (candles hold the history), cron log: one day
+    perform public.maintain_price_tick_partitions(3, 1);
+    if to_regclass('cron.job_run_details') is not null then
+      begin
+        execute 'delete from cron.job_run_details where end_time < now() - interval ''1 day''';
+      exception when others then
+        raise warning 'NEXA: could not prune cron.job_run_details: %', sqlerrm;
+      end;
+    end if;
+    delete from public.job_runs j where j.job_name = 'maintenance' and j.started_at < now() - interval '30 days';
+    update public.job_runs set status = 'succeeded', finished_at = now() where id = v_run;
+  end if;
+  return v_result;
+end;
+$$;
+comment on function public.run_due_jobs() is 'pg_cron every minute: calendar, lazy bootstrap, due quarter closes, bond maturities and new series, rich list snapshots, daily maintenance.';
+
+do $$
+declare
+  f text;
+begin
+  foreach f in array array['public.market_bootstrap()', 'public.run_due_jobs()'] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+    execute format('grant execute on function %s to service_role', f);
+  end loop;
+end;
+$$;
+
 -- ===== supabase/seed.sql =====
 -- =============================================================================
 -- NEXA · seed.sql · reference data
@@ -8497,7 +12424,7 @@ on conflict (code) do nothing;
 insert into public.game_config (key, value, description) values
   ('time', '{"quarterHours":6,"quartersPerGameYear":4,"timezone":"Europe/Berlin","quarterBoundaryHours":[8,14,20,2],"marketOpenHour":8,"marketCloseHour":22,"tickSeconds":5,"ticksPerRunnerInvocation":12,"afterHours":{"spreadMultiplier":3,"liquidityMultiplier":0.25,"volatilityMultiplier":0.5},"candleIntervalsSeconds":[60,300,3600],"openingBonusMinutes":60,"openingBonusXpMultiplier":1.5}'::jsonb, 'Defaults from src/config/balance.ts, section "time"'),
   ('economy', '{"startingCapitalCents":1000000,"bankruptcyRestartCents":250000,"basicIncomeCentsPerHour":10000,"vaultCapHours":8,"vaultInitialHours":2,"vaultMinClaimCents":100,"bankruptcyStatusGameDays":3,"bankruptcyReputationPenalty":10}'::jsonb, 'Defaults from src/config/balance.ts, section "economy"'),
-  ('trading', '{"orderFeeCents":100,"maxOrderQuantity":100000,"capitalGainsTaxBps":2500,"incomeTaxOnCouponsAndDividendsBps":2500,"spread":{"halfSpreadBps":{"bluechip":5,"midcap":15,"penny":60},"sentimentWideningBps":20,"minHalfSpreadE4":1},"priceImpact":{"impactBpsPerDepth":100,"depthFreeFloatFraction":0.002,"exponent":1,"immediateShare":0.5,"marketMakerHedgeShare":0.5,"maxImpactBpsPerOrder":1500},"orderBook":{"levelsPerSide":10,"levelStepBps":10,"sizeJitter":0.2},"financingSpreadBps":400,"borrowFeeBps":{"bluechip":100,"midcap":300,"penny":1000},"leverageTiers":[{"level":1,"maxLeverage":1},{"level":12,"maxLeverage":2},{"level":18,"maxLeverage":5},{"level":30,"maxLeverage":10}],"shortSellingMinLevel":8,"maintenanceMarginBps":500,"marginCallWarningMarginBps":750,"liquidationFeeBps":50,"washTradeWindowSeconds":300,"minPriceE4":1,"maxTickReturnBps":300}'::jsonb, 'Defaults from src/config/balance.ts, section "trading"'),
+  ('trading', '{"orderFeeCents":100,"maxOrderQuantity":100000,"quantityScale":1000000,"minOrderValueCents":100,"capitalGainsTaxBps":2500,"incomeTaxOnCouponsAndDividendsBps":2500,"spread":{"halfSpreadBps":{"bluechip":5,"midcap":15,"penny":60},"sentimentWideningBps":20,"minHalfSpreadE4":1},"priceImpact":{"impactBpsPerDepth":100,"depthFreeFloatFraction":0.002,"exponent":1,"immediateShare":0.5,"marketMakerHedgeShare":0.5,"maxImpactBpsPerOrder":1500},"orderBook":{"levelsPerSide":10,"levelStepBps":10,"sizeJitter":0.2},"financingSpreadBps":400,"borrowFeeBps":{"bluechip":100,"midcap":300,"penny":1000},"leverageTiers":[{"level":1,"maxLeverage":1},{"level":12,"maxLeverage":2},{"level":18,"maxLeverage":5},{"level":30,"maxLeverage":10}],"shortSellingMinLevel":8,"maintenanceMarginBps":500,"marginCallWarningMarginBps":750,"liquidationFeeBps":50,"washTradeWindowSeconds":300,"minPriceE4":1,"maxTickReturnBps":300}'::jsonb, 'Defaults from src/config/balance.ts, section "trading"'),
   ('centralBank', '{"startRateBps":300,"neutralRateBps":300,"minRateBps":50,"maxRateBps":1000,"stepBps":25,"maxStepsPerDecision":2,"targetMoneyGrowthBps":800,"toleranceBandBps":400,"decisionEveryQuarters":4,"warmupQuarters":56,"announceLeadQuarters":1,"measurementWindowQuarters":4,"activePlayerWindowDays":7}'::jsonb, 'Defaults from src/config/balance.ts, section "centralBank"'),
   ('bonds', '{"faceValueCents":10000,"couponsPerGameYear":4,"maturities":[{"years":1,"spreadBps":-75},{"years":2,"spreadBps":-50},{"years":5,"spreadBps":-10},{"years":10,"spreadBps":25}],"minYieldBps":200,"maxYieldBps":400,"minLevel":5}'::jsonb, 'Defaults from src/config/balance.ts, section "bonds"'),
   ('sectors', '{"tech":{"baseDemandCentsPerQuarter":3000000000,"demandGrowthBpsPerGameYear":800,"demandNoise":0.04,"peRatio":28,"volatilityMultiplier":1.2,"priceExponent":1.2,"costStructure":{"referencePriceCents":5000,"unitCostCents":1180,"capacityUnitsPerSkillPoint":16.5,"fixedCostMultiplier":0.7,"qualityAdjustmentRate":0.1,"developmentIntensity":2},"sensitivity":{"oilDemand":0,"oilCost":0,"ratePer100Bps":-0.03,"cycle":0.8,"valuationRate":1.5}},"retail":{"baseDemandCentsPerQuarter":5000000000,"demandGrowthBpsPerGameYear":200,"demandNoise":0.02,"peRatio":14,"volatilityMultiplier":0.8,"priceExponent":2.5,"costStructure":{"referencePriceCents":2000,"unitCostCents":892,"capacityUnitsPerSkillPoint":47.6,"fixedCostMultiplier":1,"qualityAdjustmentRate":0.03,"developmentIntensity":0.5},"sensitivity":{"oilDemand":-0.05,"oilCost":0.1,"ratePer100Bps":-0.01,"cycle":0.5,"valuationRate":0.8}},"energy":{"baseDemandCentsPerQuarter":3600000000,"demandGrowthBpsPerGameYear":150,"demandNoise":0.03,"peRatio":11,"volatilityMultiplier":1,"priceExponent":1.5,"costStructure":{"referencePriceCents":8000,"unitCostCents":1995,"capacityUnitsPerSkillPoint":9.1,"fixedCostMultiplier":1.4,"qualityAdjustmentRate":0.03,"developmentIntensity":0.6},"sensitivity":{"oilDemand":0.8,"oilCost":0.3,"ratePer100Bps":-0.01,"cycle":0.6,"valuationRate":1}},"pharma":{"baseDemandCentsPerQuarter":2800000000,"demandGrowthBpsPerGameYear":500,"demandNoise":0.03,"peRatio":22,"volatilityMultiplier":1.4,"priceExponent":1,"costStructure":{"referencePriceCents":12000,"unitCostCents":2685,"capacityUnitsPerSkillPoint":7.7,"fixedCostMultiplier":1.2,"qualityAdjustmentRate":0.06,"developmentIntensity":1.5},"sensitivity":{"oilDemand":0,"oilCost":0,"ratePer100Bps":-0.01,"cycle":0.1,"valuationRate":1.2}},"logistics":{"baseDemandCentsPerQuarter":4200000000,"demandGrowthBpsPerGameYear":300,"demandNoise":0.03,"peRatio":15,"volatilityMultiplier":0.9,"priceExponent":2,"costStructure":{"referencePriceCents":3000,"unitCostCents":1048,"capacityUnitsPerSkillPoint":26.8,"fixedCostMultiplier":1.1,"qualityAdjustmentRate":0.04,"developmentIntensity":0.7},"sensitivity":{"oilDemand":0,"oilCost":0.5,"ratePer100Bps":-0.02,"cycle":1.2,"valuationRate":1}}}'::jsonb, 'Defaults from src/config/balance.ts, section "sectors"'),
@@ -8507,14 +12434,17 @@ insert into public.game_config (key, value, description) values
   ('loans', '{"basePremiumBps":150,"reputationBpsPerPoint":4,"leverageBpsPerDebtToEquity":150,"maxLeveragePremiumBps":600,"lossMakingPremiumBps":200,"coverageDiscountBpsPerTurn":10,"maxCoverageDiscountBps":100,"cfoDiscountBpsPerSkill":10,"minPremiumBps":50,"maxPremiumBps":1500,"creditLinesByLevel":[{"level":15,"limitCents":5000000},{"level":20,"limitCents":25000000},{"level":25,"limitCents":200000000}],"creditLineReputationFactorMin":0.5,"creditLineReputationFactorMax":1.5}'::jsonb, 'Defaults from src/config/balance.ts, section "loans"'),
   ('employees', '{"minSkill":1,"maxSkill":10,"skillCapacityExponent":1.1,"salaryBaseCentsPerQuarter":18500,"salarySkillExponent":1.3,"playerProductivityMultiplier":2,"traits":[{"key":"ambitious","performanceMultiplier":1.15,"salaryMultiplier":1,"loyaltyDecayMultiplier":2},{"key":"loyal","performanceMultiplier":1,"salaryMultiplier":1,"loyaltyDecayMultiplier":0.5},{"key":"frugal","performanceMultiplier":1,"salaryMultiplier":0.9,"loyaltyDecayMultiplier":1},{"key":"genius","performanceMultiplier":1.25,"salaryMultiplier":1.3,"loyaltyDecayMultiplier":1.2},{"key":"easygoing","performanceMultiplier":0.92,"salaryMultiplier":0.95,"loyaltyDecayMultiplier":0.7},{"key":"mentor","performanceMultiplier":1.05,"salaryMultiplier":1.1,"loyaltyDecayMultiplier":0.8}],"loyalty":{"start":70,"quitThreshold":25,"decayPerQuarterOnSalaryFreeze":3,"gainPerQuarterOnRaise":8,"poachingSalaryPremiumBps":2000},"leadership":{"cooCapacityBonusPerSkill":0.015,"ctoDevelopmentTimeReductionPerSkill":0.03,"headOfSalesBoostPerSkill":0.02,"cfoGuidanceBandReductionPerSkill":0.02},"applicantPoolSize":6,"insiderLockHours":2,"insiderDetectionProbability":0.6,"insiderFineBps":15000,"maxSideRoles":1,"optionVestingQuarters":4}'::jsonb, 'Defaults from src/config/balance.ts, section "employees"'),
   ('careers', '{"tiers":[{"id":"intern","minLevel":2,"salaryCentsPerHour":15000,"stockOptions":false},{"id":"junior","minLevel":5,"salaryCentsPerHour":30000,"stockOptions":false},{"id":"senior","minLevel":12,"salaryCentsPerHour":70000,"stockOptions":false},{"id":"team_lead","minLevel":20,"salaryCentsPerHour":130000,"stockOptions":false},{"id":"c_level","minLevel":25,"salaryCentsPerHour":250000,"stockOptions":true}],"paidHoursPerDayCap":12,"playerCompanyExperienceMultiplier":2,"promotionSteps":[{"experienceHours":24,"raiseBps":1000},{"experienceHours":72,"raiseBps":1250},{"experienceHours":168,"raiseBps":1500},{"experienceHours":336,"raiseBps":2000}],"negotiation":{"cooldownDays":7,"baseSuccessProbability":0.3,"successPerExperienceHour":0.002,"maxSuccessProbability":0.85,"raiseMinBps":500,"raiseMaxBps":1200},"jobSwitch":{"raiseMinBps":1500,"raiseMaxBps":3000},"workTask":{"intervalHours":3,"bonusSalaryHours":1}}'::jsonb, 'Defaults from src/config/balance.ts, section "careers"'),
-  ('progression', '{"xpBase":100,"xpExponent":1.5,"maxLevel":50,"xpMultiplier":2,"xpSources":{"trade":{"xp":10,"maxTradesPerDay":30,"minOrderValueCents":10000},"profitableClose":{"profitCentsPerXp":10000,"maxXpPerTrade":500},"workHour":{"xp":40,"playerCompanyMultiplier":1.5,"maxHoursPerDay":12},"workTask":{"minXp":50,"maxXp":150},"dailyMission":{"minXp":200,"maxXp":400,"perDay":3},"dailyLogin":{"xp":50,"streakBonusPerDay":10,"streakBonusCap":200,"streakFreezesPerWeek":1},"profitableCompanyQuarter":{"xp":500},"successfulIpo":{"xp":5000},"achievement":{"minXp":100,"maxXp":10000},"tutorial":{"xp":50}},"unlocks":[{"level":1,"key":"market_orders"},{"level":1,"key":"basic_income"},{"level":2,"key":"first_job"},{"level":3,"key":"limit_orders"},{"level":3,"key":"watchlist"},{"level":5,"key":"stop_loss"},{"level":5,"key":"bonds"},{"level":5,"key":"junior_jobs"},{"level":7,"key":"analyst_reports"},{"level":8,"key":"short_selling"},{"level":10,"key":"found_small_business"},{"level":12,"key":"leverage_2x"},{"level":12,"key":"senior_jobs"},{"level":15,"key":"small_loan"},{"level":15,"key":"business_angel"},{"level":18,"key":"leverage_5x"},{"level":18,"key":"expand_small_business"},{"level":20,"key":"found_gmbh"},{"level":20,"key":"loans_250k"},{"level":20,"key":"team_lead_jobs"},{"level":25,"key":"ipo"},{"level":25,"key":"c_level_jobs"},{"level":30,"key":"leverage_10x"},{"level":30,"key":"options"},{"level":35,"key":"takeovers"},{"level":35,"key":"hostile_takeovers"},{"level":40,"key":"holding"},{"level":50,"key":"title_market_legend"},{"level":50,"key":"golden_profile_frame"},{"level":50,"key":"hall_of_fame"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "progression"'),
+  ('progression', '{"xpBase":100,"xpExponent":1.5,"maxLevel":10000,"prestige":{"fromLevel":50,"titleEveryLevels":10},"xpMultiplier":2,"xpSources":{"trade":{"xp":10,"maxTradesPerDay":30,"minOrderValueCents":10000},"profitableClose":{"profitCentsPerXp":10000,"maxXpPerTrade":500},"workHour":{"xp":40,"playerCompanyMultiplier":1.5,"maxHoursPerDay":12},"workTask":{"minXp":50,"maxXp":150},"dailyMission":{"minXp":200,"maxXp":400,"perDay":3},"quickMission":{"minXp":20,"maxXp":60,"active":3},"weeklyMission":{"minXp":600,"maxXp":1200,"perWeek":3},"milestoneMission":{"minXp":100,"maxXp":2000,"visible":3},"dailyLogin":{"xp":50,"streakBonusPerDay":10,"streakBonusCap":200,"streakFreezesPerWeek":1},"profitableCompanyQuarter":{"xp":500},"successfulIpo":{"xp":5000},"achievement":{"minXp":100,"maxXp":10000},"tutorial":{"xp":50}},"unlocks":[{"level":1,"key":"market_orders"},{"level":1,"key":"basic_income"},{"level":2,"key":"first_job"},{"level":3,"key":"limit_orders"},{"level":3,"key":"watchlist"},{"level":5,"key":"stop_loss"},{"level":5,"key":"bonds"},{"level":5,"key":"junior_jobs"},{"level":7,"key":"analyst_reports"},{"level":8,"key":"short_selling"},{"level":10,"key":"found_small_business"},{"level":12,"key":"leverage_2x"},{"level":12,"key":"senior_jobs"},{"level":15,"key":"small_loan"},{"level":15,"key":"business_angel"},{"level":18,"key":"leverage_5x"},{"level":18,"key":"expand_small_business"},{"level":20,"key":"found_gmbh"},{"level":20,"key":"loans_250k"},{"level":20,"key":"team_lead_jobs"},{"level":25,"key":"ipo"},{"level":25,"key":"c_level_jobs"},{"level":30,"key":"leverage_10x"},{"level":30,"key":"options"},{"level":35,"key":"takeovers"},{"level":35,"key":"hostile_takeovers"},{"level":40,"key":"holding"},{"level":50,"key":"title_market_legend"},{"level":50,"key":"golden_profile_frame"},{"level":50,"key":"hall_of_fame"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "progression"'),
   ('valuation', '{"growthWeight":1,"growthFactorMin":0.6,"growthFactorMax":1.8,"macroSensitivityPer100Bps":0.04,"macroFactorMin":0.6,"macroFactorMax":1.3,"bookValueFloorShare":0.5,"lossMakerRevenueElasticity":0.5,"analystTargetNoise":0.08,"analystWrongProbability":0.25}'::jsonb, 'Defaults from src/config/balance.ts, section "valuation"'),
   ('aiInvestors', '{"tickNoiseBps":{"bluechip":6,"midcap":15,"penny":45},"tickNoiseScale":0.2,"emaFastAlpha":0.15,"emaSlowAlpha":0.0165,"sentimentDecayPerTick":0.0019,"baselineVolumeDepthFraction":0.02,"archetypes":{"market_maker":{"capitalShare":0.05,"reactionSpeed":0.005,"params":{}},"value_fund":{"capitalShare":0.3,"reactionSpeed":0.000167,"params":{"gapScale":0.5,"deadBand":0.01}},"momentum_trader":{"capitalShare":0.1,"reactionSpeed":0.0002,"params":{"trendScale":0.02}},"pension_fund":{"capitalShare":0.2,"reactionSpeed":0.002,"params":{"rateSensitivityPer100Bps":-0.05,"yieldTiltPer100Bps":0.03,"minWeight":0.2,"maxWeight":1.8}},"index_fund":{"capitalShare":0.04,"reactionSpeed":0.005,"params":{}},"retail_herd":{"capitalShare":0.1,"reactionSpeed":0.0012,"params":{"chaseGain":0.1,"trendScale":0.02}}}}'::jsonb, 'Defaults from src/config/balance.ts, section "aiInvestors"'),
   ('index', '{"size":30,"baseLevel":1000,"reviewEveryQuarters":4,"minListedQuarters":1,"entryBuffer":3}'::jsonb, 'Defaults from src/config/balance.ts, section "index"'),
   ('events', '{"pharmaTrial":{"probabilityPerQuarter":0.12,"announceLeadQuarters":2,"successProbability":{"bluechip":0.6,"midcap":0.5,"penny":0.4},"minMove":0.5,"maxMove":0.7},"oilReport":{"everyQuarters":2,"changeStdDev":0.06,"meanReversion":0.25,"minIndex":0.4,"maxIndex":2.5},"businessCycle":{"noiseStdDev":0.01,"meanReversion":0.1,"minIndex":0.8,"maxIndex":1.2},"earnings":{"sentimentPerSurprise":1.5,"maxSentimentShock":0.6},"macro":{"sectorCrisis":{"probabilityPerQuarter":0.03,"magnitude":-0.15,"durationQuarters":3,"sentimentShock":-0.5},"commodityShock":{"probabilityPerQuarter":0.04,"magnitude":0.25,"durationQuarters":1,"sentimentShock":0.3},"recession":{"probabilityPerQuarter":0.03,"magnitude":-0.08,"durationQuarters":4,"sentimentShock":-0.4},"techBoom":{"probabilityPerQuarter":0.03,"magnitude":0.2,"durationQuarters":4,"sentimentShock":0.5}},"rateDecisionSentimentPer25Bps":-0.1}'::jsonb, 'Defaults from src/config/balance.ts, section "events"'),
   ('lifestyle', '{"items":[{"key":"rolex","priceCents":2500000,"upkeepBpsPerGameYear":50,"reputationBonus":0},{"key":"porsche","priceCents":15000000,"upkeepBpsPerGameYear":100,"reputationBonus":0},{"key":"penthouse","priceCents":150000000,"upkeepBpsPerGameYear":100,"reputationBonus":5},{"key":"private_jet","priceCents":2000000000,"upkeepBpsPerGameYear":150,"reputationBonus":0},{"key":"private_island","priceCents":10000000000,"upkeepBpsPerGameYear":200,"reputationBonus":0}],"resaleValueBps":5000}'::jsonb, 'Defaults from src/config/balance.ts, section "lifestyle"'),
   ('randomEvents', '{"maxPerPlayerPerDay":1,"inheritance":{"probabilityPerDay":0.04,"amountCents":500000},"taxAudit":{"probabilityPerDay":0.04,"cashBps":300},"headhunter":{"probabilityPerDay":0.03,"salaryRaiseBps":3000},"golfClubTip":{"probabilityPerDay":0.06,"accuracy":0.6}}'::jsonb, 'Defaults from src/config/balance.ts, section "randomEvents"'),
-  ('abuse', '{"rateLimits":{"ordersPerMinute":20,"ordersPerDay":500,"actionsPerMinute":60},"newAccountIpo":{"accountAgeDays":7,"minLevel":5,"maxAllocationBps":500,"maxInvestmentCents":500000},"suspicious":{"mutualTradeShare":0.5,"offMarketValueCents":1000000,"offMarketDeviationBps":1000}}'::jsonb, 'Defaults from src/config/balance.ts, section "abuse"')
+  ('abuse', '{"rateLimits":{"ordersPerMinute":20,"ordersPerDay":500,"actionsPerMinute":60},"newAccountIpo":{"accountAgeDays":7,"minLevel":5,"maxAllocationBps":500,"maxInvestmentCents":500000},"suspicious":{"mutualTradeShare":0.5,"offMarketValueCents":1000000,"offMarketDeviationBps":1000}}'::jsonb, 'Defaults from src/config/balance.ts, section "abuse"'),
+  ('money', '{"totalSupplyCents":1000000000000,"allocation":{"treasury":0.05,"financialMarket":0.6,"tycoons":0.05,"households":0.3},"basicIncome":{"treasuryTargetCents":25000000000,"minFactor":0.25}}'::jsonb, 'Defaults from src/config/balance.ts, section "money"'),
+  ('richList', '{"aiTycoons":120,"tycoonMinWealthCents":1500000,"tycoonMaxWealthCents":40000000000,"snapshotMinutes":5,"newsRanks":[1,3,10,25,50,100]}'::jsonb, 'Defaults from src/config/balance.ts, section "richList"'),
+  ('names', '{"minLength":3,"maxLength":20,"nicknameChangeDays":60}'::jsonb, 'Defaults from src/config/balance.ts, section "names"')
 on conflict (key) do nothing;
 
 insert into public.game_config_public_keys (key) values
