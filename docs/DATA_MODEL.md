@@ -4481,3 +4481,89 @@ Spalte `correct_index` hat keine Spaltenfreigabe und ist für Spieler unlesbar.
 - Coupons, Rückzahlungen von Anleihen und Grundeinkommen außerhalb des Tresors sind vom Einbehalt nicht erfasst; die
   Liste folgt dem Vertrag.
 - Boni gehen nur an Mitarbeiter, die beim Abschluss noch aktiv sind; das Lohngewicht zählt nur ihre Grundlöhne.
+
+## Nachtrag: M3e (Skill-Karte, Kündigungsfrist, automatische Arbeit, Produkte und Stufen)
+
+Entscheidungen ADR-061 bis ADR-064. Formeln in `src/lib/sim/skills.ts` (`isReachable`) und `src/lib/sim/startup.ts`
+(`companyStage`, `trainingFor`, `closeStartupQuarter` mit Stufe). Getestet in sieben Ausgangslagen (leer, vor M1, M1,
+M2a, M2b, M3c, M3d).
+
+### Migrationen
+
+| Datei                           | Inhalt                                                                                                                    |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `20261116000100_m3e_schema.sql` | `player_jobs.notice_ends_at`, `job_postings.required_skills`, `player_companies.product_key`                              |
+| `20261116000200_m3e_logic.sql`  | Skill-Karte, Kündigung, automatische Arbeit, KI-Angebote, Skills in Stellen, Produkte, Stufen, Schulungen, `get_employer` |
+
+### A. Skill-Karte (ADR-061)
+
+`learn_skill` prüft statt `requires` die Hex-Karte (`skill_reachable`). Ein Feld ist offen, wenn es ein
+Einstiegsfeld (`entry`) ist oder ein gelernter Skill auf einem Nachbarfeld liegt: (q±1, r), (q, r±1), (q+1, r−1),
+(q−1, r+1). Sonst kommt `skill_locked`. Kosten, Punkte und Scores bleiben, gelernte Skills bleiben gültig.
+
+### B. Kündigung mit Frist (ADR-063)
+
+- `quit_job(p_request_id)` → `{ notice_ends_at }`. Es wird nichts bezahlt; die Frist ist `jobs.quitNoticeHours`.
+  Ein zweiter Aufruf liefert die bestehende Frist.
+- `cancel_quit(p_request_id)` → Form von `get_my_job`. Ohne Job kommt `no_active_job`, ohne Kündigung
+  `invalid_argument`.
+- `process_quit_notices()` läuft in `run_due_jobs()` vor der Lohnabrechnung. Der Lohn wird bis zum Fristende
+  abgerechnet, dann endet der Job (`end_reason 'quit'`, `ended_at` = Fristende) mit Chatzeile „… hat gekündigt.“.
+- Während der Frist darf man sich bewerben, `sign_contract` meldet weiter `job_active_exists`.
+- `get_my_job` liefert `notice_ends_at`, und `quit_cost_cents` ist immer 0. `get_company_team` zeigt je Mitglied
+  `notice_ends_at` und `skills`.
+
+### C. Automatische Arbeit (ADR-064)
+
+`get_work_task()` liefert immer `{ task: null, next_task_at: null }`, es entstehen keine Aufgaben mehr.
+`submit_work_task` beantwortet alte offene Aufgaben weiter. In `get_my_job` ist `work_task_open` false und
+`next_work_task_at` null.
+
+### D. KI-Angebote
+
+Bei KI-Stellen darf `p_salary_wish_cents_per_hour` null sein und wird ignoriert. Angebot und gespeicherter Wunsch sind
+die persönliche Lohndecke. `counter_offer` bei KI-Stellen meldet `invalid_argument`. Bei Spielerfirmen bleibt der
+Wunsch Pflicht.
+
+### E. Stellen mit konkreten Skills (ADR-062)
+
+- `job_postings.required_skills text[]` (Vorgabe leer).
+- `create_job_posting(…, p_slots, p_required_skills text[] = '{}')`: höchstens 4 bekannte Schlüssel, sonst
+  `invalid_argument`. Die alte Signatur ohne den Parameter ist entfernt.
+- Bewerben verlangt alle Skills (`job_skills_missing`), und `eligible` berücksichtigt sie.
+- `required_skills` steht in der Jobbörse, in `application.posting` und in `get_company_postings`.
+- `get_company_applications.applicant.skills` sind die gelernten Skills des Bewerbers, die die Stelle verlangt oder
+  eine Stufe des Firmenprodukts braucht.
+
+### F. Produkte, Wachstumsstufen, Schulungen (ADR-062)
+
+- `player_companies.product_key`; bestehende Firmen bekommen das erste Produkt ihrer Branche. Fehlt der Schlüssel
+  (älteres Config), rechnet `company_product` mit dem ersten Produkt.
+- `found_company(…, p_tier, p_product = null)`: null heißt erstes Produkt, ein unbekanntes Produkt `invalid_argument`.
+  Die alte Signatur ist entfernt.
+- **Stufe** (`company_stage`) ist die höchste Stufe, deren Skills (und die aller früheren) Gründer oder aktive
+  Mitarbeiter gelernt haben.
+- Quartalsabschluss mit Stufe s:
+  - Qualitätsziel + `qualityBonusPerStage` × s
+  - Bekanntheit höchstens `awarenessCaps[s]`
+  - Kapazität × (1 + `capacityBonusPerStage` × s)
+- COMPANY liefert zusätzlich `product_key`, `stage` und `stages: [{ stage, reached, skills: [{ key, covered_by }] }]`.
+  `covered_by` ist der Spielername, der Gründer zuerst. `capacity_cents` enthält den Stufenbonus.
+- `train_employee(p_request_id, p_player_job_id, p_skill_key)` → `{ skill_key, cost_cents, salary_cents_per_hour }`:
+  - nur für den Arbeitgeber (`employer_only`)
+  - Kosten `trainingFor(tier)` aus der Firmenkasse an die Haushalte (`insufficient_funds`)
+  - Der Skill ist sofort gelernt (ohne Punkte und Karte; `skill_learned`, `skill_unknown`).
+  - Der Vertragslohn steigt um `wageRaiseBps`. Chatzeile „… hat eine Schulung abgeschlossen.“
+
+### G. Arbeitgeber aus Sicht des Mitarbeiters
+
+`get_employer()` → `{ employer: null | { company, kind 'ai' | 'player', product_key, stage, tier, founder, team_size,
+last_quarter: null | { label, revenue_cents, profit_cents }, pay_factor_bps } }`.
+
+- Bei KI-Firmen: `product_key`, `stage`, `tier` und `founder` sind null. `team_size` = Spieler mit Job dort, und
+  `last_quarter` kommt aus `company_quarter_reports` (Gewinn = Jahresüberschuss).
+- Bei Spielerfirmen zählt `team_size` den Gründer mit.
+
+### Neue Fehlerschlüssel
+
+Keine.
