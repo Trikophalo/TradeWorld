@@ -4157,3 +4157,182 @@ Einen Lohn senken kann der Arbeitgeber nicht; dafür gibt es kein RPC.
 - `companies.employee_count` wird noch nicht mitgezählt; das kommt mit den Firmen in M4.
 - Fixtures der Arbeitgeber-RPCs liegen in `__fixtures__/employer/`. Sie gehören noch nicht zum Vertragstest.
 - Verfällt eine KI-Stelle zum Quartalsende, bleiben die offenen Angebote bis zu ihrem eigenen Ablauf unterschreibbar.
+
+## Nachtrag: M3c (langsamere Level, spielergetriebene Kurse, Spielerfirmen)
+
+Entscheidungen ADR-055 bis ADR-057, Formeln in `src/lib/sim/progression.ts`, `player-influence.ts`, `tick.ts`,
+`startup.ts` und `skills.ts`, Konzept in `docs/PLAYER_COMPANIES.md`. Wie zuvor kommt alles idempotent über
+`update-to-latest.sql` und ist in fünf Ausgangslagen getestet (leer, Stand vor M1, M1, M2a, M2b).
+
+### Migrationen
+
+| Datei                                     | Inhalt                                                                                 |
+| ----------------------------------------- | -------------------------------------------------------------------------------------- |
+| `20261114000100_m3c_levels.sql`           | Neue XP-Kurve, `xp_for_next_level`, `xp_total_for_level`, Bestandsschutz, `grant_xp`   |
+| `20261114000200_m3c_markets.sql`          | Spieleraktivität und -volumen je Wertpapier, `execute_fill`, `market_tick_at`          |
+| `20261114000300_m3c_companies_schema.sql` | Fehlerschlüssel, `player_companies`, `player_company_reports`, RLS                     |
+| `20261114000400_m3c_companies.sql`        | Firmenlogik, Quartalsabschluss, RPCs, Vertrag, Visitenkarte, Portfolio, Vermögen, Jobs |
+
+### A. Level (ADR-055)
+
+- Level 1 → 2 kostet `progression.firstLevelXp` (100), danach `round(xpBase × Level^xpExponent)` mit `xpBase` 250.
+  Beispiele: Level 3 ab 807 XP, Level 6 ab 6 901 XP, Level 10 ab 27 612 XP.
+- `xp_for_next_level(level)` und `xp_total_for_level(level)` sind interne Helfer; `level_progress` und `level_for_xp`
+  rechnen mit der neuen Kurve.
+- **Bestandsschutz:** `keep_levels_after_curve_change()` hebt `xp_total` jedes Spielers auf mindestens die neue
+  Schwelle seines Levels (idempotent, in der Migration aufgerufen). Level und freie Fähigkeitspunkte ändern sich nicht.
+  `grant_xp` senkt ein Level nie.
+- Eine ältere `game_config` ohne `firstLevelXp` bekommt in der Migration einmal `firstLevelXp` 100 und `xpBase` 250,
+  weil `update-to-latest.sql` die Konfiguration erst nach den Schemaschritten überschreibt.
+- Die Referenztabelle `levels` folgt der neuen Kurve (`seed.sql` und Migration).
+
+### B. Spielergetriebene Kurse (ADR-056, `SIMULATION.md` §6a)
+
+Neu in `security_sim_state`:
+
+- `player_activity` (`double precision`, Einheit Cent) ist der Spielerumsatz mit Halbwertszeit
+  `aiInvestors.playerWeight.activityHalfLifeHours`. Die Spalte heißt bewusst nicht `*_cents`: Geld steht nie in Floats,
+  und es ist eine Kennzahl, kein Geld.
+- `pending_player_volume_e6` ist das Bruttovolumen der Spieler seit dem letzten Tick. `execute_fill` füllt es neben
+  `pending_player_flow_e6`.
+
+`market_tick_at` je Aktie:
+
+1. Aktivität `A ← A × 0,5^(tickSeconds / (Halbwertszeit × 3600)) + Bruttovolumen × letzter Kurs`.
+2. KI-Gewicht `w = max(minAiWeight, R / (R + A))`, `R = referenceActivityCents[Klasse]`.
+3. Wertfonds-Anker: `fairer Wert × (1 + maxHoldingsPremium × tanh(Spielerbestand in Cent / (premiumScaleDepths × depthCentsPer100Bps[Klasse])))`.
+   Der Spielerbestand ist die Summe der offenen Long-Positionen, je Tick aggregiert.
+4. Trendfolger, Herde und Rauschen werden mit `w` gewichtet.
+5. Spielerrendite `0,01 × Nettokauf in Cent / depthCentsPer100Bps[Klasse] / Liquidität`. Sie wirkt sofort und
+   ersetzt den alten Anteil `immediateShare × impact(Spielerfluss)`. Der Marktmacher-Bestand zieht den Spielerfluss
+   weiter ab.
+6. Die Kappung `maxTickReturnBps` gilt wie bisher für die Summe.
+
+Anleihen: Das Rauschen der Kursabweichung wird mit `bonds.volatilityMultiplier` multipliziert. Spielerkäufe wirken mit
+`0,01 × Nettokauf / bondDepthCentsPer100Bps / Liquidität`. Index, Kerzen und Spreads bleiben unverändert.
+
+Gemessen in Test 61 (Rauschen aus):
+
+- 10.000 € Kauf einer Pennystock: +2,00 % im nächsten Tick.
+- Halten gegen Kontrolle ohne Halteprämie: +2,1 % gegen +0,7 % nach 200 Ticks.
+- Volatilität pro Tick: 2,5 bps bei viel Spielerumsatz, 17 bps ohne.
+
+### C. Spielerfirmen (ADR-057)
+
+**Tabellen**
+
+- `companies` bekommt eine Zeile mit `is_ai = false`, `legal_form 'small_business'`, `phase 'private'`, Gründer und CEO
+  = Spieler, `brand_color`, `description` = Idee und `shares_outstanding` 1. Dazu ein Konto `company_cash`.
+- `player_companies (company_id PK, founder_id unique, …)`:
+  - `idea`, `tier` (`garage` | `small_business`)
+  - `potential_annual_cents`: verborgen, Pareto-Zug bei der Gründung
+  - `awareness`, `quality` (0..1), `quarters_active`
+  - `marketing_cents_per_quarter`, `ai_workers`
+  - `unpaid_cents`, `distress`, `last_closed_quarter_id`
+- RLS: Der Gründer liest seine Zeile über Spaltenrechte **ohne** `potential_annual_cents`. Diese Spalte liest niemand.
+- `player_company_reports (company_id, game_quarter_id)`:
+  - `label` im Format `J<Spieljahr> Q<Quartal>`
+  - Nachfrage, Kapazität, Umsatz, Wareneinsatz, Fixkosten, KI-Kräfte, Marketing
+  - Löhne des Quartals aus `salary_payouts`, Betriebsergebnis, Auslastung
+  - bezahlte und offene Kosten, Bekanntheit, Qualität, Team-Leistung, Team-Score
+  - Der Gründer liest seine Berichte.
+
+**Regeln**
+
+- Eine Firma pro Spieler (`company_exists`). Gründen geht nicht mit aktivem Job (`job_active_exists`).
+- Mindestlevel:
+  - Garage: max(`startups.garage.minLevel`, Level von `found_garage`)
+  - Kleinunternehmen: max(`company.tiers` small_business `minLevel`, Level von `found_small_business`)
+  - Sonst `company_level_too_low`.
+- Name: Namensfilter für Firmen (`name_*`, eindeutig unter Firmen). Idee: 1–120 Zeichen mit Schimpfwortfilter
+  (`name_profanity`). Farbe `#rrggbb`. Die Branche muss in `startups.capacityCentsPerProductivity` stehen.
+- Gründungskosten fließen aus der Privatkasse in die Firmenkasse (`company_founding`).
+- Gründer können keinen Job unterschreiben (`owns_company`).
+- Spieler mit aktivem Job in der Firma plus KI-Kräfte ≤ `max_employees` der Stufe. Geprüft in `sign_contract` und
+  `set_ai_workers` (`employee_limit`).
+
+**Team und Kapazität** (`player_company_team`)
+
+- Gründerleistung: `productivityBps(matchScore([{Branche₀, 0}, {Branche₁, 0}], Gründer-Scores))`. Die Branchen kommen
+  aus `jobs.sectorBranches[Sektor]`.
+- Spieler-Mitarbeiter zählen mit ihrer Job-Leistung, KI-Kräfte mit 10 000 bps.
+- Kapazität = Leistung / 10 000 × `capacityCentsPerProductivity[Sektor]`.
+- Team-Score = Summe der Branchen-Scores von Gründer und Mitarbeitern in allen Branchen des Sektors.
+
+**Quartalsabschluss** (`player_company_close_quarter(company, quarter)`, idempotent je Quartal)
+
+- Rechnet `closeStartupQuarter` mit `gauss_random()` als Rauschen.
+- Der Umsatz kommt von den Haushalten (`company_revenue`).
+- Wareneinsatz, Fixkosten, KI-Kräfte und Marketing gehen an die Haushalte zurück (`company_costs`), soweit die Kasse
+  reicht. Der Rest wird zu `unpaid_cents`; dann gilt `distress`, und die KI-Kräfte werden auf 0 gesetzt.
+- Ohne neue offene Rechnungen werden alte aus der Kasse beglichen.
+- Bei positivem Betriebsergebnis bekommt der Gründer `xpSources.profitableCompanyQuarter.xp` (einmal je Quartal).
+- `run_due_jobs()` ruft danach `player_companies_close_due()` auf. Das schließt jedes geschlossene Spielquartal seit
+  der Gründung, das noch keinen Bericht hat, höchstens 8 je Firma und Lauf.
+- Löhne laufen weiter stündlich (M2b) und stehen nur im Bericht.
+
+**Wert** (`company_value_cents`) = max(0, Kasse − offene Rechnungen + round(4 × max(0, letztes Betriebsergebnis) ×
+KGV des Sektors × `valuationPeDiscount`)).
+
+- Er zählt zu `player_net_worth_cents` und `rich_list_entries` (Reichenliste, Visitenkarte).
+- `get_my_portfolio` liefert ihn getrennt als `company_value_cents`. `total_cents` und `net_worth_cents` bleiben
+  ohne Firma.
+
+**Schätzung der Marktgröße** (`potentialEstimate`)
+
+- Spanne `initialSpread × decayPerQuarter^quarters_active`.
+- `u1`, `u2` werden je Firma und Quartal aus einem Hash von Firmen-Id und `quarters_active` abgeleitet
+  (`uniform_from_text`). Die Spanne bleibt also im Quartal stabil und enthält die Wahrheit immer.
+
+### RPCs
+
+`COMPANY` = `{ id, name, idea, sector, color, tier, founded_at, cash_cents, value_cents, unpaid_cents, distress,
+awareness_bps, quality_bps, quarters_active, estimate_low_cents, estimate_high_cents, marketing_cents_per_quarter,
+ai_workers, ai_worker_cost_cents, max_employees, employees, open_postings, pending_applications,
+founder_productivity_bps, team_productivity_bps, capacity_cents, next_quarter_at, can_upgrade, upgrade_cost_cents,
+last_quarter, history }`.
+
+- `employees` zählt die aktiven Spieler-Mitarbeiter.
+- `capacity_cents` ist die Kapazität des aktuellen Teams.
+- `next_quarter_at` ist das Ende des laufenden Spielquartals.
+- `last_quarter` ist `null` oder `{ label, demand_cents, capacity_cents, revenue_cents, cogs_cents, fixed_cents,
+ai_worker_cents, marketing_cents, wages_cents, operating_profit_cents, utilization_bps }`.
+- `history` enthält `[{ label, revenue_cents, profit_cents }]`, die ältesten zuerst, höchstens 12.
+
+| RPC                                                                      | Antwort                                                                                                                                       |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `check_company_name(p_name)`                                             | `{ allowed, reason }`                                                                                                                         |
+| `found_company(p_request_id, p_name, p_idea, p_sector, p_color, p_tier)` | `{ company: COMPANY }`                                                                                                                        |
+| `get_my_company()`                                                       | `{ company: null \| COMPANY }`                                                                                                                |
+| `set_company_marketing(p_request_id, p_marketing_cents)`                 | `{ company }`; 0 bis 10 Mio. €                                                                                                                |
+| `set_ai_workers(p_request_id, p_count)`                                  | `{ company }`; `employee_limit`                                                                                                               |
+| `company_deposit(p_request_id, p_amount_cents)`                          | `{ company }`; begleicht zuerst offene Rechnungen                                                                                             |
+| `company_withdraw(p_request_id, p_amount_cents)`                         | `{ company }`; höchstens Kasse − offene Rechnungen (`insufficient_funds`)                                                                     |
+| `upgrade_company(p_request_id)`                                          | `{ company }`; Kosten in die Firmenkasse                                                                                                      |
+| `get_company_postings()`                                                 | `{ postings: [{ id, tier, title, title_key, required, salary_cents_per_hour, slots, slots_open, status, applications_pending, posted_at }] }` |
+
+- `upgrade_company`: Die Kosten sind Gründung Kleinunternehmen − Gründung Garage × `upgradeCreditShare`, also
+  12.500 €. Danach gelten 5 Plätze. Fehler: `company_upgrade_unavailable` (keine Garage), `company_level_too_low`.
+- `get_company_postings` gilt für die eigene Firma. Geschlossene Stellen bleiben 7 Tage in der Liste.
+- Alle Firmen-RPCs außer `check_company_name` und `found_company` melden ohne eigene Firma `company_not_found`.
+- Die Arbeitgeber-RPCs aus M2b behalten ihre Formen. `respond_application` akzeptiert
+  `p_salary_cents_per_hour = null` bei `accept` und `reject`.
+- `get_player_card.company` ist für Gründer `{ name, ticker: null }`.
+- `get_my_portfolio` liefert zusätzlich `company_value_cents`.
+
+### Neue Fehlerschlüssel
+
+| Schlüssel                     | Code    |
+| ----------------------------- | ------- |
+| `company_exists`              | `NX047` |
+| `company_not_found`           | `NX048` |
+| `company_level_too_low`       | `NX049` |
+| `owns_company`                | `NX050` |
+| `employee_limit`              | `NX051` |
+| `company_upgrade_unavailable` | `NX052` |
+
+### Bekannte Grenzen
+
+- Die Insolvenz mit Privathaftung fehlt noch. Eine Firma in Schieflage bleibt bestehen, bis der Gründer einzahlt.
+- Das Bruttovolumen für die Spieleraktivität kommt nur aus Spieler-Fills (`execute_fill` ohne `p_system`).
+- Eine Firma, die mitten im Quartal gegründet wird, wird am Ende dieses Quartals voll abgerechnet.

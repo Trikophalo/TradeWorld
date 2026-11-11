@@ -80,23 +80,25 @@ The script creates a temporary cluster, installs a minimal Supabase stub (roles 
 `service_role`, schema `auth`, `auth.uid()`), applies all migrations and `seed.sql` (twice, to prove
 idempotency) with `ON_ERROR_STOP`, and runs the assertions in `tests/[1-9]*.sql`:
 
-| File                    | Checks                                                                                                                                            |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `10_structure.sql`      | RLS on every table, no privileges for `anon`, write/execute allowlists for `authenticated`, FK indexes, unit conventions, game calendar incl. DST |
-| `20_signup_ledger.sql`  | sign-up trigger (invite, age, profile, accounts, starting capital), ledger immutability and balance checks, rate limit, idempotency               |
-| `30_rls.sql`            | player A vs. player B vs. `anon` vs. `service_role`: private rows, forbidden writes, internal tables, public views, insider and friend rules      |
-| `40_seed.sql`           | seed counts and consistency (15 companies, 5 sectors, bonds, index, achievements, ...)                                                            |
-| `50_m1_market.sql`      | M1: bootstrap and price history (counts, OHLC, contiguity), ticks, sessions and the 22:00 bell, read RPCs                                         |
-| `51_m1_day.sql`         | M1: one simulated day (17 280 ticks) on a throwaway copy of the database; prints daily range per size class and tick times                        |
-| `52_m1_trading.sql`     | M1: orders, idempotency, fee, tax and loss pot, limits and order book, cancel, fills by the tick, error keys, XP, unlocks, tutorial, rate limit   |
-| `53_m1_bonds_vault.sql` | M1: bond coupons and redemption over admin quarter closes, run_due_jobs, admin pause, vault                                                       |
-| `54_m2_fractional.sql`  | M2: fractional shares (millionths), orders by amount, minimum order value, 99.9 % rule, `*_e6` JSON shapes                                        |
-| `55_m1_security.sql`    | M1/M2: execute rights (authenticated/anon), internal functions, player isolation                                                                  |
-| `56_m2_money.sql`       | M2: closed money system (genesis, mint closed, invariant after trades, coupons, quarter closes), treasury flows, basic income factor              |
-| `57_m2_names.sql`       | M2: name filter with false-positive traps and leetspeak, reserved names, sign-up, `check_nickname`, `change_nickname`                             |
-| `58_m2_rich_list.sql`   | M2: AI tycoons, `get_rich_list` (scopes, me/next, 24 h changes), rank news                                                                        |
-| `59_m2_missions.sql`    | M2: mission assignment and idempotency, locked features, progress and claims, quick replacement, `track_event`, daily check-in and streaks        |
-| `60_m2b.sql`            | M2b: avatars, daily reward cycle and freezes, skills and points, AI job board determinism, applications, contracts, wages, raises, employer side  |
+| File                        | Checks                                                                                                                                            |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `10_structure.sql`          | RLS on every table, no privileges for `anon`, write/execute allowlists for `authenticated`, FK indexes, unit conventions, game calendar incl. DST |
+| `20_signup_ledger.sql`      | sign-up trigger (invite, age, profile, accounts, starting capital), ledger immutability and balance checks, rate limit, idempotency               |
+| `30_rls.sql`                | player A vs. player B vs. `anon` vs. `service_role`: private rows, forbidden writes, internal tables, public views, insider and friend rules      |
+| `40_seed.sql`               | seed counts and consistency (15 companies, 5 sectors, bonds, index, achievements, ...)                                                            |
+| `50_m1_market.sql`          | M1: bootstrap and price history (counts, OHLC, contiguity), ticks, sessions and the 22:00 bell, read RPCs                                         |
+| `51_m1_day.sql`             | M1: one simulated day (17 280 ticks) on a throwaway copy of the database; prints daily range per size class and tick times                        |
+| `52_m1_trading.sql`         | M1: orders, idempotency, fee, tax and loss pot, limits and order book, cancel, fills by the tick, error keys, XP, unlocks, tutorial, rate limit   |
+| `53_m1_bonds_vault.sql`     | M1: bond coupons and redemption over admin quarter closes, run_due_jobs, admin pause, vault                                                       |
+| `54_m2_fractional.sql`      | M2: fractional shares (millionths), orders by amount, minimum order value, 99.9 % rule, `*_e6` JSON shapes                                        |
+| `55_m1_security.sql`        | M1/M2: execute rights (authenticated/anon), internal functions, player isolation                                                                  |
+| `56_m2_money.sql`           | M2: closed money system (genesis, mint closed, invariant after trades, coupons, quarter closes), treasury flows, basic income factor              |
+| `57_m2_names.sql`           | M2: name filter with false-positive traps and leetspeak, reserved names, sign-up, `check_nickname`, `change_nickname`                             |
+| `58_m2_rich_list.sql`       | M2: AI tycoons, `get_rich_list` (scopes, me/next, 24 h changes), rank news                                                                        |
+| `59_m2_missions.sql`        | M2: mission assignment and idempotency, locked features, progress and claims, quick replacement, `track_event`, daily check-in and streaks        |
+| `60_m2b.sql`                | M2b: avatars, daily reward cycle and freezes, skills and points, AI job board determinism, applications, contracts, wages, raises, employer side  |
+| `61_m3c_levels_markets.sql` | M3c: new XP curve and level protection, player orders move prices in euros, holdings premium, AI weight, bond impact                              |
+| `62_m3c_companies.sql`      | M3c: founding rules, places, quarter close (money, quality, awareness, XP), distress, deposit/withdraw, upgrade, net worth, RLS                   |
 
 It exits non-zero on the first failed assertion and removes the cluster afterwards. A full run takes about
 1.5 minutes (most of it is the simulated day). `NEXA_MIGRATIONS_UPTO=20261110001600 supabase/tests/verify_local.sh`
