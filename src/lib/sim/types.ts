@@ -88,6 +88,10 @@ export interface SecurityState {
   /** Trading halted (insolvency, pending IPO); the tick leaves the price untouched. */
   readonly halted: boolean;
   readonly archetypes: ArchetypeStates;
+  /** Shares held by players (ADR-056); lifts the fair value the value funds accept. Default 0. */
+  readonly playerHeldShares?: number;
+  /** Player trading volume in cents with an exponential half-life; weakens the AI traders. Default 0. */
+  readonly playerActivityCents?: number;
 }
 
 export interface MarketState {

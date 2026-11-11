@@ -5,9 +5,13 @@
 import { BALANCE } from "../../config/balance.ts";
 import type { ProgressionConfig, UnlockConfig } from "../../config/balance.ts";
 
-/** XP needed to advance from level `level` to `level + 1`: `round(100 x level^1.5)`. */
+/**
+ * XP needed to advance from level `level` to `level + 1`: `firstLevelXp` for level 1,
+ * then `round(xpBase × level^1.5)` (ADR-055).
+ */
 export function xpForNextLevel(level: number, cfg: ProgressionConfig = BALANCE.progression): number {
   if (!Number.isInteger(level) || level < 1) throw new RangeError(`invalid level: ${level}`);
+  if (level === 1) return cfg.firstLevelXp;
   return Math.round(cfg.xpBase * Math.pow(level, cfg.xpExponent));
 }
 

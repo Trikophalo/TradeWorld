@@ -300,11 +300,13 @@ describe("closeQuarter", () => {
   });
 
   it("AI companies earn sector-typical margins", () => {
-    const result = closeQuarter(world(), [], createRng(4));
-    const margin = (id: string) => {
-      const r = reportOf(result, id);
-      return Number(r.netIncomeCents) / Number(r.revenueCents);
-    };
+    // Averaged over a few seeds: the sector demand noise is large on purpose (ADR-056).
+    const results = [4, 5, 6, 7, 8].map((seed) => closeQuarter(world(), [], createRng(seed)));
+    const margin = (id: string) =>
+      results.reduce((sum, result) => {
+        const r = reportOf(result, id);
+        return sum + Number(r.netIncomeCents) / Number(r.revenueCents);
+      }, 0) / results.length;
     for (const s of SECTOR_IDS) {
       expect(margin(`${s}-blue`)).toBeGreaterThan(0.05);
       expect(margin(`${s}-blue`)).toBeLessThan(0.4);

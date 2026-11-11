@@ -190,14 +190,47 @@ describe("stepMarketTick", () => {
     expect(sold).toBeLessThan(neutral);
   });
 
-  it("a player's price impact fades as value funds pull the price back", () => {
+  it("a round trip fades: players buy and sell again, value funds pull the price back", () => {
     const flow = (t: number): Partial<TickInputs> => ({
+      playerFlows:
+        t < 10
+          ? [{ securityId: "BLUE", netShares: b(10_000), volumeShares: b(10_000) }]
+          : t < 20
+            ? [{ securityId: "BLUE", netShares: b(-10_000), volumeShares: b(10_000) }]
+            : [],
+    });
+    const late = priceOf(run(market(), 6_000, 3, flow), "BLUE") - priceOf(run(market(), 6_000, 3), "BLUE");
+    const buyOnly = (t: number): Partial<TickInputs> => ({
       playerFlows: t < 10 ? [{ securityId: "BLUE", netShares: b(10_000), volumeShares: b(10_000) }] : [],
     });
-    const early = priceOf(run(market(), 200, 3, flow), "BLUE") - priceOf(run(market(), 200, 3), "BLUE");
-    const late = priceOf(run(market(), 6_000, 3, flow), "BLUE") - priceOf(run(market(), 6_000, 3), "BLUE");
+    const early = priceOf(run(market(), 10, 3, buyOnly), "BLUE") - priceOf(run(market(), 10, 3), "BLUE");
     expect(early).toBeGreaterThan(0);
     expect(Math.abs(late)).toBeLessThan(early * 0.5);
+  });
+
+  it("what players hold keeps lifting the price (ADR-056)", () => {
+    const buyAndHold = (t: number): Partial<TickInputs> => ({
+      playerFlows: t < 10 ? [{ securityId: "MID", netShares: b(20_000), volumeShares: b(20_000) }] : [],
+    });
+    const held = priceOf(run(market(), 6_000, 3, buyAndHold), "MID");
+    const control = priceOf(run(market(), 6_000, 3), "MID");
+    expect(held).toBeGreaterThan(control * 1.02);
+  });
+
+  it("many players outweigh the AI traders", () => {
+    const busy = makeSecurity({ id: "B", playerActivityCents: 1e12 });
+    const quiet = makeSecurity({ id: "B" });
+    const noiseOf = (security: typeof busy) => {
+      let sum = 0;
+      let state: MarketState = { tick: 0, securities: [security] };
+      for (let t = 0; t < 400; t++) {
+        const step = stepMarketTick(state, inputs(t), createRng(9));
+        sum += Math.abs(step.records[0]?.logReturn ?? 0);
+        state = step.state;
+      }
+      return sum;
+    };
+    expect(noiseOf(busy)).toBeLessThan(noiseOf(quiet) * 0.5);
   });
 
   it("positive news lifts the price, negative news hits it", () => {
@@ -260,7 +293,7 @@ describe("stepMarketTick", () => {
     const spread = (r: typeof open) => Number((r?.askE4 ?? b(0)) - (r?.bidE4 ?? b(0)));
     expect(spread(late)).toBeGreaterThan(spread(open) * 2);
 
-    const flow: PlayerFlow[] = [{ securityId: "BLUE", netShares: b(5_000), volumeShares: b(5_000) }];
+    const flow: PlayerFlow[] = [{ securityId: "BLUE", netShares: b(500), volumeShares: b(500) }];
     const impact = (session: "open" | "after_hours") => {
       const withFlow = stepMarketTick(state, inputs(0, { session, playerFlows: flow }), createRng(1)).records[0];
       const withoutFlow = stepMarketTick(state, inputs(0, { session }), createRng(1)).records[0];

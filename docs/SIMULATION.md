@@ -289,6 +289,21 @@ Beispiel: Streubesitz 10 Mio. Stück, Kurs 100 €. Eine Tiefe sind 20 000 Stüc
 1 000 Stück (100 000 €) bewegt den Kurs um 0,05 % und kostet im Mittel 0,025 % Slippage. Bei einem Pennystock
 mit 2 Mio. € Streubesitz-Wert sind dieselben 100 000 € bereits 25 Tiefen und werden bei 15 % gekappt.
 
+### 6a. Spielergetriebene Kurse (ADR-056)
+
+Vorgabe: Spieler bestimmen die Kurse, die KI tritt zurück, je mehr Spieler handeln. Drei Kräfte pro Tick:
+
+| Kraft                      | Formel                                                                         | Wirkung                                                                              |
+| -------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| Spieler-Orders             | `r = 0,01 × Nettokauf in Cent / depthCentsPer100Bps[Klasse] / Liquidität`      | 10.000 € bewegen Penny 2 %, Mittelstand 0,4 %, Bluechip 0,1 %                        |
+| Firmenerfolg + Halteprämie | Wertfonds-Anker `FV × (1 + 0,6 × tanh(Spielerbestand in Cent / (20 × depth)))` | Kaufen und Halten hebt den Kurs dauerhaft, Kaufen und Verkaufen verpufft             |
+| KI-Händler                 | Rauschen, Trendfolger und Herde × `w = max(0,15; R / (R + A))`                 | `A` = Spielerumsatz mit 6 h Halbwertszeit, `R` je Klasse 1 Mio. / 250.000 / 50.000 € |
+
+Weitere Werte: Rauschfaktor 0,45 (vorher 0,2), Wertfonds-Reaktion 0,0005 (vorher 0,000167), Herde 0,002,
+Branchennachfrage-Rauschen und Gewinnüberraschungen doppelt so stark, Zinsentscheid alle 2 Quartale, Anleihen-Rauschen
+× 3. Code: `src/lib/sim/player-influence.ts`, eingebunden in `tick.ts`; die Datenbank (`market_tick_at`) hält
+Spielerbestand und Aktivität je Wertpapier in `security_sim_state`.
+
 ## 7. Marktmacher, Spread und Orderbuch
 
 `market-maker.ts`.

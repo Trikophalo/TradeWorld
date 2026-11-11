@@ -524,3 +524,36 @@ Vorgabe: Profilbild aus einer Reihe von Artworks, Visitenkarte mit Skills, Name 
 20 prozedurale Pixel-Porträts (keine fremden Grafiken, nur ganzzahlig skaliert), einige ab bestimmten Leveln.
 Die Visitenkarte ist für alle Spieler sichtbar und von der Reichenliste aus erreichbar. Der Namensfilter bleibt
 bewusst streng (ADR-048 bestätigt).
+
+## ADR-055: Langsamere erste Level — `akzeptiert`
+
+Vorgabe: Am Anfang ging das Leveln zu schnell (nach einem Tag etwa Level 6 bis 7). Level 2 bleibt bei 100 XP, damit
+das Tutorial weiter direkt zum ersten Job führt. Danach braucht jedes Level `250 × Level^1,5` XP statt
+`100 × Level^1,5`, also das 2,5-Fache. Ein aktiver Spieler erreicht damit am ersten Tag etwa Level 4 und nach einer
+Woche etwa Level 10. Der Alpha-Bonus (XP × 2) bleibt.
+
+## ADR-056: Schnelle, starke und spielergetriebene Märkte — `akzeptiert`
+
+Vorgabe: Kurse sollen sich viel stärker und schneller bewegen als im echten Leben, und Spieler sollen sie bestimmen:
+Eine Aktie steigt, wenn viele in die Firma investieren und die Firma erfolgreich ist. Umsetzung:
+
+1. **Spieler-Orders wirken in Euro**, nicht im Verhältnis zur Firmengröße: 10.000 € Nettokauf bewegen eine
+   Pennystock um 2 %, einen Mittelständler um 0,4 %, einen Bluechip um 0,1 % (`trading.playerImpact`).
+2. **Was Spieler halten, stützt den Kurs:** Die Wertfonds akzeptieren den fairen Wert plus einen Aufschlag von bis zu
+   60 % für den Wert, den Spieler halten. Kaufen und wieder verkaufen verpufft, Kaufen und Halten bleibt.
+3. **KI-Händler werden schwächer, je mehr Spieler handeln:** Rauschen, Trendfolger und Herde werden mit
+   `Referenz / (Referenz + Spielerumsatz)` gewichtet, mindestens 15 %. Der Firmenerfolg (fairer Wert) bleibt der Anker.
+4. **Mehr Bewegung:** Rauschen × 2,25, Wertfonds folgen neuem fairem Wert dreimal so schnell, Branchennachfrage und
+   Überraschungen bei Quartalszahlen doppelt so stark, Zinsentscheid jedes halbe Spieljahr, Anleihen dreimal so
+   lebhaft.
+
+Details und Formeln: `SIMULATION.md`, Abschnitt „Spielergetriebene Kurse“; `src/lib/sim/player-influence.ts`.
+
+## ADR-057: Spielerfirmen mit Garagen-Startup, Leistung und KI-Kräften — `akzeptiert`
+
+Vorgabe: Firmen gründen, Arbeitgeber-Oberfläche, Mitarbeiterleistung erzeugt Umsatz und Gewinn. Umsetzung als
+kompaktes Startup-Modell statt der vollen Firmensimulation aus M4: S-Kurve der Bekanntheit bis zur verborgenen
+Marktgröße, Kapazität aus der Leistung des Teams, Qualität aus den Skills in der Branche, KI-Kräfte zum Festpreis.
+Abweichend von `ECONOMY.md` §6.1 darf das Garagen-Startup bis zu zwei Mitarbeiter haben, damit Spieler früh
+Arbeitgeber werden. Die Marktgrößen sind auf Spieljahre von einem echten Tag umgerechnet (Faktor 1/10). Details:
+`PLAYER_COMPANIES.md`.

@@ -30,6 +30,13 @@ import { bondYieldBps } from "./bonds.ts";
 import { computeAllPressures } from "./investors.ts";
 import { halfSpreadBps, quoteAround } from "./market-maker.ts";
 import { ZERO, absBig, roundToBigInt } from "./money.ts";
+import {
+  aiWeight,
+  anchoredFairValue,
+  nextActivityCents,
+  playerImpactReturn,
+  sharesValueCents,
+} from "./player-influence.ts";
 import { depthShares, impactReturn } from "./price-impact.ts";
 import type { ArchetypeStates, MarketState, Rng, SecurityState, TickInputs, TickRecord, TickResult } from "./types.ts";
 import { INVESTOR_ARCHETYPES } from "./types.ts";
@@ -132,16 +139,32 @@ function stepSecurity(
   }
   const playerNetShares = Number(playerNet);
   const makerInventory = security.archetypes.market_maker.holdingShares - playerNetShares;
+  const price = Number(security.priceE4);
+  // ADR-056: the more players trade, the weaker the AI traders.
+  const playerActivityCents = nextActivityCents(
+    security.playerActivityCents ?? 0,
+    sharesValueCents(Number(playerVolume), price),
+    time.tickSeconds,
+    aiInvestors.playerWeight,
+  );
+  const weight = aiWeight(playerActivityCents, security.sizeClass, aiInvestors.playerWeight);
+  const heldShares = security.playerHeldShares ?? 0;
 
   // 4. Archetype pressures.
   const holdings = {} as Record<InvestorArchetypeId, number>;
   for (const a of INVESTOR_ARCHETYPES) holdings[a] = security.archetypes[a].holdingShares;
   holdings.market_maker = makerInventory;
-  const price = Number(security.priceE4);
-  const pressures = computeAllPressures(
+  const computed = computeAllPressures(
     {
       price,
-      fairValue: Number(security.fairValueE4),
+      // Company success plus a premium for what players hold.
+      fairValue: anchoredFairValue(
+        Number(security.fairValueE4),
+        heldShares,
+        price,
+        security.sizeClass,
+        trading.playerImpact,
+      ),
       emaFast: security.emaFastE4,
       emaSlow: security.emaSlowE4,
       sentiment,
@@ -155,6 +178,11 @@ function stepSecurity(
     holdings,
     { ai: aiInvestors, centralBank: cfg.centralBank, priceImpact: trading.priceImpact },
   );
+  const pressures: Record<InvestorArchetypeId, number> = {
+    ...computed,
+    momentum_trader: computed.momentum_trader * weight,
+    retail_herd: computed.retail_herd * weight,
+  };
   let aiNet = 0;
   let aiGross = 0;
   for (const a of INVESTOR_ARCHETYPES) {
@@ -165,8 +193,10 @@ function stepSecurity(
   // 5. Return from order flow and noise, limited by the circuit breaker.
   const flowReturn =
     impactReturn(aiNet, depth, trading.priceImpact) +
-    trading.priceImpact.immediateShare * impactReturn(playerNetShares, depth, trading.priceImpact);
+    // Thin after-hours market: the same euros move the price more.
+    playerImpactReturn(playerNetShares, price, security.sizeClass, trading.playerImpact) / liquidityFactor;
   const sigma =
+    weight *
     (aiInvestors.tickNoiseBps[security.sizeClass] / 10_000) *
     aiInvestors.tickNoiseScale *
     cfg.sectors[security.sectorId].volatilityMultiplier *
@@ -217,6 +247,8 @@ function stepSecurity(
     emaFastE4,
     emaSlowE4,
     archetypes: archetypes as ArchetypeStates,
+    playerHeldShares: Math.max(0, heldShares + playerNetShares),
+    playerActivityCents,
   };
   const record: TickRecord = {
     securityId: security.id,

@@ -102,8 +102,9 @@ describe("earnings sentiment", () => {
     const beat = earningsSentiment(b(1_200), b(1_000), b(10_000));
     const miss = earningsSentiment(b(800), b(1_000), b(10_000));
     expect(beat.surprise).toBeCloseTo(0.2, 12);
-    expect(beat.sentimentDelta).toBeCloseTo(0.3, 12);
-    expect(miss.sentimentDelta).toBeCloseTo(-0.3, 12);
+    const k = BALANCE.events.earnings.sentimentPerSurprise;
+    expect(beat.sentimentDelta).toBeCloseTo(0.2 * k, 12);
+    expect(miss.sentimentDelta).toBeCloseTo(-0.2 * k, 12);
     expect(earningsSentiment(b(1_000_000), b(1_000), b(10_000)).sentimentDelta).toBe(
       BALANCE.events.earnings.maxSentimentShock,
     );

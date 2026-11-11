@@ -343,11 +343,11 @@ describe("central bank", () => {
     }
   });
 
-  it("schedules one decision per game year after the warm-up", () => {
+  it("schedules a decision every half game year after the warm-up", () => {
     const warmup = BALANCE.centralBank.warmupQuarters;
     expect([0, 1, 2, 3, 4, 5, 6, 7].filter((q) => isRateDecisionQuarter(q))).toEqual([]);
     const due = Array.from({ length: 8 }, (_, i) => warmup + i).filter((q) => isRateDecisionQuarter(q));
-    expect(due).toEqual([warmup + 3, warmup + 7]);
+    expect(due).toEqual([warmup + 1, warmup + 3, warmup + 5, warmup + 7]);
     expect(rateDecisionAnnouncementQuarter(warmup + 3)).toBe(warmup + 2);
   });
 });

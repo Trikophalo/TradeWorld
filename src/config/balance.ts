@@ -125,6 +125,22 @@ export interface TradingConfig {
   readonly minPriceE4: number;
   /** Circuit breaker for the non-event part of a tick return. */
   readonly maxTickReturnBps: number;
+  /**
+   * Players move prices (owner decision, ADR-056). Player orders are measured in euros, not
+   * against the company size, so a few players already move a stock and many players decide it.
+   */
+  readonly playerImpact: {
+    /** Net player buying (cents) that moves the price by 1 % (100 bps), per size class. */
+    readonly depthCentsPer100Bps: Readonly<Record<SizeClass, number>>;
+    /** The same for bonds. */
+    readonly bondDepthCentsPer100Bps: number;
+    /**
+     * Shares held by players lift the price the value funds accept:
+     * fair value × (1 + maxPremium × tanh(held value / (premiumScaleDepths × depth))).
+     */
+    readonly maxHoldingsPremium: number;
+    readonly premiumScaleDepths: number;
+  };
 }
 
 export interface CentralBankConfig {
@@ -149,6 +165,8 @@ export interface CentralBankConfig {
 }
 
 export interface BondsConfig {
+  /** Multiplier on the per-bond noise of the price deviation (livelier bond market, ADR-056). */
+  readonly volatilityMultiplier: number;
   readonly faceValueCents: number;
   readonly couponsPerGameYear: number;
   readonly maturities: readonly {
@@ -477,6 +495,9 @@ export interface UnlockConfig {
 }
 
 export interface ProgressionConfig {
+  /** XP from level 1 to 2 (the tutorial reward reaches it). */
+  readonly firstLevelXp: number;
+  /** From level 2 on: round(xpBase × level^xpExponent) XP per level. */
   readonly xpBase: number;
   readonly xpExponent: number;
   /**
@@ -570,6 +591,16 @@ export interface AiInvestorsConfig {
   /** Cosmetic AI-vs-AI turnover per tick as a fraction of one depth (volume bars only). */
   readonly baselineVolumeDepthFraction: number;
   readonly archetypes: Readonly<Record<InvestorArchetypeId, InvestorArchetypeConfig>>;
+  /**
+   * The more players trade a security, the weaker the AI traders (noise, momentum, herd):
+   * aiWeight = max(minAiWeight, reference / (reference + player activity)). Player activity is the
+   * traded player volume (cents) with an exponential half-life. Value funds (company success) stay.
+   */
+  readonly playerWeight: {
+    readonly activityHalfLifeHours: number;
+    readonly referenceActivityCents: Readonly<Record<SizeClass, number>>;
+    readonly minAiWeight: number;
+  };
 }
 
 export interface IndexConfig {
@@ -694,6 +725,59 @@ export interface BalanceConfig {
   readonly jobs: JobsConfig;
   readonly dailyRewards: DailyRewardsConfig;
   readonly avatars: AvatarsConfig;
+  readonly startups: StartupsConfig;
+}
+
+/**
+ * Player companies (ADR-057, docs/PLAYER_COMPANIES.md): garage startup and small business.
+ * One quarter = one game quarter (6 real hours). Money in cents.
+ */
+export interface StartupsConfig {
+  readonly garage: {
+    readonly minLevel: number;
+    readonly foundingCostCents: number;
+    readonly fixedCostCentsPerQuarter: number;
+    /** Employees (players and AI workers) besides the founder. */
+    readonly maxEmployees: number;
+  };
+  /** Small business values come from company.tiers (small_business); upgrading pays the difference. */
+  readonly upgradeCreditShare: number;
+  /** Hidden market size of the niche: Pareto, P(> x) = (min / x)^alpha. */
+  readonly potential: {
+    readonly minAnnualCents: number;
+    readonly maxAnnualCents: number;
+    readonly paretoAlpha: number;
+  };
+  readonly awareness: {
+    readonly initial: number;
+    readonly min: number;
+    /** Word of mouth: + growth × a × (1 − a) × (0.5 + quality) per quarter. */
+    readonly growthPerQuarter: number;
+    readonly decayPerQuarter: number;
+    /** Marketing: + maxGain × budget / (budget + halfSaturation), halfSaturation = share × quarterly potential. */
+    readonly marketingMaxGain: number;
+    readonly marketingHalfSaturationShare: number;
+    readonly marketingMinHalfSaturationCents: number;
+  };
+  readonly quality: {
+    /** Without any skills in the sector branches. */
+    readonly base: number;
+    /** Team skill score in the sector branches at which half of the rest is reached. */
+    readonly halfSaturationScore: number;
+    readonly adjustPerQuarter: number;
+  };
+  /** Standard deviation of the log demand noise per quarter. */
+  readonly demandNoise: number;
+  /** Revenue one unit of productivity (one AI worker) can serve per quarter, per sector. */
+  readonly capacityCentsPerProductivity: Readonly<Record<SectorId, number>>;
+  /** Share of revenue left after material and goods, per sector. */
+  readonly grossMargin: Readonly<Record<SectorId, number>>;
+  /** AI workers: fixed price per quarter, productivity 1 (players are always better, ADR-050). */
+  readonly aiWorkerCostCentsPerQuarter: number;
+  /** Value = cash + max(0, annualised profit) × sector P/E × this discount. */
+  readonly valuationPeDiscount: number;
+  /** Owner's estimate of the market size: ± spread (log), shrinking each quarter. */
+  readonly estimate: { readonly initialSpread: number; readonly decayPerQuarter: number };
 }
 
 /** Skill tree and skill points (ADR-050, docs/JOBS_AND_SKILLS.md). */
@@ -884,6 +968,13 @@ export const BALANCE = {
     washTradeWindowSeconds: 300,
     minPriceE4: 1,
     maxTickReturnBps: 300,
+    playerImpact: {
+      // 10.000 € net buying moves a penny stock by 2 %, a mid cap by 0.4 %, a blue chip by 0.1 %.
+      depthCentsPer100Bps: { bluechip: 10_000_000, midcap: 2_500_000, penny: 500_000 },
+      bondDepthCentsPer100Bps: 5_000_000,
+      maxHoldingsPremium: 0.6,
+      premiumScaleDepths: 20,
+    },
   },
 
   // ----------------------------------------------------------- centralBank (spec 5.1)
@@ -896,7 +987,7 @@ export const BALANCE = {
     maxStepsPerDecision: 2,
     targetMoneyGrowthBps: 800,
     toleranceBandBps: 400,
-    decisionEveryQuarters: 4,
+    decisionEveryQuarters: 2,
     // No decisions in the first 14 real days: early money growth is high only because the base is tiny.
     warmupQuarters: 56,
     announceLeadQuarters: 1,
@@ -906,6 +997,7 @@ export const BALANCE = {
 
   // ----------------------------------------------------------------- bonds (spec 5.1)
   bonds: {
+    volatilityMultiplier: 3,
     faceValueCents: 10_000,
     couponsPerGameYear: 4,
     // At the 3 % start rate: 2.25 %, 2.50 %, 2.90 %, 3.25 %.
@@ -929,7 +1021,7 @@ export const BALANCE = {
     tech: {
       baseDemandCentsPerQuarter: 3_000_000_000,
       demandGrowthBpsPerGameYear: 800,
-      demandNoise: 0.04,
+      demandNoise: 0.08,
       peRatio: 28,
       volatilityMultiplier: 1.2,
       priceExponent: 1.2,
@@ -946,7 +1038,7 @@ export const BALANCE = {
     retail: {
       baseDemandCentsPerQuarter: 5_000_000_000,
       demandGrowthBpsPerGameYear: 200,
-      demandNoise: 0.02,
+      demandNoise: 0.04,
       peRatio: 14,
       volatilityMultiplier: 0.8,
       priceExponent: 2.5,
@@ -963,7 +1055,7 @@ export const BALANCE = {
     energy: {
       baseDemandCentsPerQuarter: 3_600_000_000,
       demandGrowthBpsPerGameYear: 150,
-      demandNoise: 0.03,
+      demandNoise: 0.06,
       peRatio: 11,
       volatilityMultiplier: 1.0,
       priceExponent: 1.5,
@@ -980,7 +1072,7 @@ export const BALANCE = {
     pharma: {
       baseDemandCentsPerQuarter: 2_800_000_000,
       demandGrowthBpsPerGameYear: 500,
-      demandNoise: 0.03,
+      demandNoise: 0.06,
       peRatio: 22,
       volatilityMultiplier: 1.4,
       priceExponent: 1.0,
@@ -997,7 +1089,7 @@ export const BALANCE = {
     logistics: {
       baseDemandCentsPerQuarter: 4_200_000_000,
       demandGrowthBpsPerGameYear: 300,
-      demandNoise: 0.03,
+      demandNoise: 0.06,
       peRatio: 15,
       volatilityMultiplier: 0.9,
       priceExponent: 2.0,
@@ -1287,7 +1379,10 @@ export const BALANCE = {
 
   // ----------------------------------------------------------- progression (spec 9)
   progression: {
-    xpBase: 100,
+    // Owner feedback: the first levels were too fast. Level 2 stays at the tutorial reward,
+    // after that every level needs 2.5 times the XP of the old curve (ADR-055).
+    firstLevelXp: 100,
+    xpBase: 250,
     xpExponent: 1.5,
     maxLevel: 10_000,
     prestige: { fromLevel: 50, titleEveryLevels: 10 },
@@ -1363,11 +1458,18 @@ export const BALANCE = {
   // ---------------------------------------------------------- aiInvestors (spec 5.3)
   aiInvestors: {
     tickNoiseBps: { bluechip: 6, midcap: 15, penny: 45 },
-    tickNoiseScale: 0.2,
+    // ADR-056: markets move much faster and stronger than in real life (was 0.2).
+    tickNoiseScale: 0.45,
     emaFastAlpha: 0.15,
     emaSlowAlpha: 0.0165,
     sentimentDecayPerTick: 0.0019,
     baselineVolumeDepthFraction: 0.02,
+    playerWeight: {
+      activityHalfLifeHours: 6,
+      // Player volume (within about a quarter) at which players and AI weigh the same.
+      referenceActivityCents: { bluechip: 100_000_000, midcap: 25_000_000, penny: 5_000_000 },
+      minAiWeight: 0.15,
+    },
     archetypes: {
       market_maker: {
         capitalShare: 0.05,
@@ -1377,7 +1479,8 @@ export const BALANCE = {
       },
       value_fund: {
         capitalShare: 0.3,
-        reactionSpeed: 0.000167,
+        // ADR-056: follows a new fair value within hours instead of days (was 0.000167).
+        reactionSpeed: 0.0005,
         // Full signal at 50 % mispricing, no trading inside the dead band.
         params: { gapScale: 0.5, deadBand: 0.01 },
       },
@@ -1407,7 +1510,8 @@ export const BALANCE = {
       },
       retail_herd: {
         capitalShare: 0.1,
-        reactionSpeed: 0.0012,
+        // ADR-056: livelier herd, still faster than the value fund (was 0.0012).
+        reactionSpeed: 0.002,
         // signal = sentiment + chaseGain x tanh(trend / trendScale), clamped to [-1, 1].
         params: { chaseGain: 0.1, trendScale: 0.02 },
       },
@@ -1446,8 +1550,8 @@ export const BALANCE = {
       maxIndex: 1.2,
     },
     earnings: {
-      sentimentPerSurprise: 1.5,
-      maxSentimentShock: 0.6,
+      sentimentPerSurprise: 3,
+      maxSentimentShock: 0.9,
     },
     macro: {
       sectorCrisis: { probabilityPerQuarter: 0.03, magnitude: -0.15, durationQuarters: 3, sentimentShock: -0.5 },
@@ -1564,6 +1668,36 @@ export const BALANCE = {
       { xp: 300, cashCents: 100_000, skillPoints: 1 },
     ],
     freezesPerWeek: 1,
+  },
+
+  // ---------------------------------------------- player companies (ADR-057)
+  startups: {
+    garage: { minLevel: 3, foundingCostCents: 250_000, fixedCostCentsPerQuarter: 15_000, maxEmployees: 2 },
+    upgradeCreditShare: 1,
+    // P(> 50.000 €) ≈ 40 %, P(> 1 Mio. €) ≈ 7 %, P(> 50 Mio. €) ≈ 0.8 %, P(> 1 Mrd. €) ≈ 0.14 % (ECONOMY.md 6.2).
+    potential: { minAnnualCents: 100_000, maxAnnualCents: 200_000_000_000, paretoAlpha: 0.57 },
+    awareness: {
+      initial: 0.03,
+      min: 0.01,
+      growthPerQuarter: 0.3,
+      decayPerQuarter: 0.03,
+      marketingMaxGain: 0.12,
+      marketingHalfSaturationShare: 0.1,
+      marketingMinHalfSaturationCents: 50_000,
+    },
+    quality: { base: 0.25, halfSaturationScore: 20, adjustPerQuarter: 0.35 },
+    demandNoise: 0.1,
+    capacityCentsPerProductivity: {
+      tech: 300_000,
+      retail: 250_000,
+      energy: 250_000,
+      pharma: 300_000,
+      logistics: 250_000,
+    },
+    grossMargin: { tech: 0.75, retail: 0.35, energy: 0.45, pharma: 0.65, logistics: 0.35 },
+    aiWorkerCostCentsPerQuarter: 70_000,
+    valuationPeDiscount: 0.5,
+    estimate: { initialSpread: 2.3, decayPerQuarter: 0.85 },
   },
 
   // ------------------------------------------------------- avatars (ADR-053)
