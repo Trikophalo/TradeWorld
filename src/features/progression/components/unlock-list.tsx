@@ -6,8 +6,7 @@ import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { PixelCheck } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { BALANCE } from "@/config/balance";
-import { UNLOCK_PREVIEW_LEVELS } from "@/config/disclosure";
-import { useDemo } from "@/lib/demo/store";
+import { usePlayerLevel } from "@/features/game/store";
 import { cn } from "@/lib/utils";
 import type { UnlockKey } from "./level-card";
 
@@ -15,18 +14,15 @@ import type { UnlockKey } from "./level-card";
 export function UnlockList() {
   const t = useTranslations("profile");
   const tu = useTranslations("unlocks");
-  const level = useDemo((state) => state.level);
+  const level = usePlayerLevel();
 
   const groups = new Map<number, string[]>();
   for (const unlock of BALANCE.progression.unlocks) {
     groups.set(unlock.level, [...(groups.get(unlock.level) ?? []), unlock.key]);
   }
 
-  // Reached levels plus a short preview. The rest is discovered by playing.
-  const all = [...groups];
-  const upcoming = all.filter(([unlockLevel]) => unlockLevel > level);
-  const shown = [...all.filter(([unlockLevel]) => unlockLevel <= level), ...upcoming.slice(0, UNLOCK_PREVIEW_LEVELS)];
-  const hasMore = upcoming.length > UNLOCK_PREVIEW_LEVELS;
+  // Everything the game offers is listed from the start; locked levels are dimmed.
+  const shown = [...groups];
 
   return (
     <Card padding="lg">
@@ -58,7 +54,6 @@ export function UnlockList() {
           );
         })}
       </ol>
-      {hasMore && <p className="mt-4 pl-12 text-sm text-fg-3">{t("unlocksMore")}</p>}
     </Card>
   );
 }

@@ -1,22 +1,25 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { Page } from "@/components/layout/page";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StockDetail } from "@/features/market/components/stock-detail";
-import { DEMO_COMPANIES, findDemoCompany } from "@/lib/demo/market";
+import { DEMO_COMPANIES } from "@/lib/demo/market";
 
 type Params = PageProps<"/markets/[ticker]">["params"];
 
-/** Known tickers are prerendered, so list -> detail navigates instantly and the logo can morph. */
+/**
+ * The 15 AI companies are known at build time and prerendered, so list → detail
+ * navigates instantly and the logo can morph. Other tickers (bonds, later
+ * player companies) render on request. Names and prices load on the client.
+ */
 export async function generateStaticParams() {
   return DEMO_COMPANIES.map((company) => ({ ticker: company.ticker }));
 }
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { ticker } = await params;
-  const company = findDemoCompany(ticker);
+  const company = DEMO_COMPANIES.find((c) => c.ticker === ticker.toUpperCase());
   return { title: company ? `${company.name} (${company.ticker})` : ticker.toUpperCase() };
 }
 
@@ -32,9 +35,7 @@ export default function StockPage({ params }: { params: Params }) {
 
 async function Stock({ params }: { params: Params }) {
   const { ticker } = await params;
-  const company = findDemoCompany(ticker);
-  if (!company) notFound();
-  return <StockDetail company={company} />;
+  return <StockDetail ticker={ticker.toUpperCase()} />;
 }
 
 /** Same shape as the loaded page: header, chart card, side cards. */

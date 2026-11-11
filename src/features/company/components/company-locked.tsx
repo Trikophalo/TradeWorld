@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { BALANCE } from "@/config/balance";
-import { useDemo } from "@/lib/demo/store";
+import { usePlayerLevel } from "@/features/game/store";
 import { formatMoney } from "@/lib/format";
 import { fadeUp, staggerContainer } from "@/lib/motion";
 
@@ -18,7 +18,7 @@ const TIER_LABELS = { small_business: "tierSmall", gmbh: "tierGmbh", ag: "tierAg
 /** What the Company tab shows before the founding unlock. */
 export function CompanyLocked() {
   const t = useTranslations("company");
-  const level = useDemo((state) => state.level);
+  const level = usePlayerLevel();
   const tiers = BALANCE.company.tiers.filter((tier) => tier.id in TIER_LABELS);
   const unlockLevel = tiers[0]?.minLevel ?? 10;
   const remaining = Math.max(0, unlockLevel - level);

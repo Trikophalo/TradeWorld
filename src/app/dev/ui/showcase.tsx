@@ -25,10 +25,11 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/toast";
 import { SpeechBubble } from "@/features/tutorial/components/speech-bubble";
 import { useTutorial } from "@/features/tutorial/store";
+import { resetDemoPlayer } from "@/features/game/demo-engine";
 import { LevelCard } from "@/features/progression/components/level-card";
 import { formatMoney, formatPrice } from "@/lib/format";
 import { DURATION, SPRING, fadeUp, staggerContainer } from "@/lib/motion";
-import { playSound } from "@/lib/sound";
+import { SOUND_NAMES, playSound } from "@/lib/sound";
 import { useMountTime } from "@/lib/use-now";
 import { useSettings } from "@/stores/settings";
 import { cn } from "@/lib/utils";
@@ -520,6 +521,8 @@ export function Showcase() {
                 <Button
                   size="sm"
                   onClick={() => {
+                    // Demo: also forget the demo player, so the tutorial reward counts again.
+                    resetDemoPlayer();
                     useTutorial.getState().restart();
                     router.push("/");
                   }}
@@ -530,6 +533,16 @@ export function Showcase() {
             }
           />
         </Card>
+      </Section>
+
+      <Section id="sounds" title={t("sounds")}>
+        <Demo label="Alle Effekte (Ton in den Einstellungen an)">
+          {SOUND_NAMES.map((name) => (
+            <Button key={name} size="sm" variant="secondary" onClick={() => void playSound(name)}>
+              {name}
+            </Button>
+          ))}
+        </Demo>
       </Section>
 
       <Section id="pixel" title={t("pixel")}>

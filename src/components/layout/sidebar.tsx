@@ -8,11 +8,14 @@ import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { isActivePath, visibleNavItems } from "@/config/navigation";
-import { useDemo } from "@/lib/demo/store";
+import { NAV_ITEMS, isActivePath } from "@/config/navigation";
+import { useGame, usePlayerLevel } from "@/features/game/store";
+import { LockBadge } from "@/components/ui/lock-badge";
+import { isUnlocked, unlockLevel } from "@/lib/sim/progression";
 import { SPRING } from "@/lib/motion";
 import { xpForNextLevel } from "@/lib/sim/progression";
 import { isDemoMode } from "@/lib/supabase/env";
+import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { Wordmark } from "./wordmark";
 
@@ -20,8 +23,8 @@ import { Wordmark } from "./wordmark";
 export function Sidebar() {
   const pathname = usePathname();
   const t = useTranslations();
-  const level = useDemo((state) => state.level);
-  const xp = useDemo((state) => state.xpInLevel);
+  const level = usePlayerLevel();
+  const xp = useGame((state) => state.portfolio?.xpIntoLevel ?? 0);
   const needed = xpForNextLevel(level);
 
   return (
@@ -36,7 +39,7 @@ export function Sidebar() {
       </Link>
 
       <nav aria-label={t("nav.label")} className="mt-6 flex flex-col gap-1 px-3">
-        {visibleNavItems(level).map((item) => {
+        {NAV_ITEMS.map((item) => {
           const active = isActivePath(pathname, item.href);
           return (
             <Link
@@ -44,6 +47,7 @@ export function Sidebar() {
               href={item.href}
               aria-current={active ? "page" : undefined}
               data-tour={`nav-${item.key}`}
+              onClick={() => void playSound("tap")}
               className={cn(
                 "group relative flex h-11 items-center gap-3 rounded-md px-3 text-base font-medium focus-ring transition-colors duration-fast",
                 active ? "text-fg-1" : "text-fg-2 hover:text-fg-1",
@@ -64,6 +68,9 @@ export function Sidebar() {
                 className={cn("relative transition-colors duration-fast", active && "text-accent")}
               />
               <span className="relative">{t(`nav.${item.key}`)}</span>
+              {item.unlock && !isUnlocked(item.unlock, level) && (
+                <LockBadge level={unlockLevel(item.unlock) ?? 1} className="relative ml-auto" />
+              )}
             </Link>
           );
         })}

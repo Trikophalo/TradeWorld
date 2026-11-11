@@ -5,10 +5,9 @@ import { useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Segmented } from "@/components/ui/segmented";
-import { DEMO_COMPANIES } from "@/lib/demo/market";
-import { useDemo } from "@/lib/demo/store";
+import { useSecurities } from "@/features/game/hooks";
 import { SPRING } from "@/lib/motion";
-import { SecurityRow } from "./security-row";
+import { SecurityRow, SecurityRowSkeleton } from "./security-row";
 
 type Side = "gainers" | "losers";
 
@@ -16,14 +15,13 @@ type Side = "gainers" | "losers";
 export function MoversCard() {
   const t = useTranslations("home");
   const [side, setSide] = useState<Side>("gainers");
-  const quotes = useDemo((state) => state.quotes);
+  const stocks = useSecurities("stock");
 
   const rows = useMemo(() => {
-    const sorted = [...DEMO_COMPANIES].sort(
-      (a, b) => (quotes[b.ticker]?.changeBps ?? b.changeBps) - (quotes[a.ticker]?.changeBps ?? a.changeBps),
-    );
-    return (side === "gainers" ? sorted : sorted.reverse()).slice(0, 5);
-  }, [quotes, side]);
+    if (!stocks) return null;
+    const sorted = [...stocks].sort((a, b) => b.changeBps - a.changeBps);
+    return (side === "gainers" ? sorted : sorted.reverse()).slice(0, 5).map((s) => s.ticker);
+  }, [stocks, side]);
 
   return (
     <Card padding="lg">
@@ -42,16 +40,17 @@ export function MoversCard() {
       </CardHeader>
       <ul>
         <AnimatePresence mode="popLayout" initial={false}>
-          {rows.map((company) => (
+          {rows === null && Array.from({ length: 5 }, (_, i) => <SecurityRowSkeleton key={i} />)}
+          {rows?.map((ticker) => (
             <motion.li
-              key={company.ticker}
+              key={ticker}
               layout
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
               transition={SPRING.smooth}
             >
-              <SecurityRow company={company} shared={false} />
+              <SecurityRow ticker={ticker} shared={false} />
             </motion.li>
           ))}
         </AnimatePresence>

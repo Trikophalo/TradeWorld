@@ -6,9 +6,11 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
-import { isActivePath, visibleNavItems } from "@/config/navigation";
-import { useDemo } from "@/lib/demo/store";
+import { NAV_ITEMS, isActivePath } from "@/config/navigation";
+import { usePlayerLevel } from "@/features/game/store";
+import { isUnlocked } from "@/lib/sim/progression";
 import { haptic } from "@/lib/haptics";
+import { playSound } from "@/lib/sound";
 import { SPRING } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
@@ -16,8 +18,7 @@ import { cn } from "@/lib/utils";
 export function TabBar() {
   const pathname = usePathname();
   const t = useTranslations("nav");
-  const level = useDemo((state) => state.level);
-  const items = visibleNavItems(level);
+  const level = usePlayerLevel();
 
   return (
     <nav
@@ -25,7 +26,7 @@ export function TabBar() {
       className="fixed inset-x-0 bottom-0 z-nav border-t border-line-1 bg-surface-1/92 pb-safe backdrop-blur-lg lg:hidden"
     >
       <ul className="mx-auto flex h-(--tabbar-height) max-w-lg">
-        {items.map((item) => {
+        {NAV_ITEMS.map((item) => {
           const active = isActivePath(pathname, item.href);
           return (
             <li key={item.href} className="flex-1">
@@ -33,7 +34,10 @@ export function TabBar() {
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 data-tour={`nav-${item.key}`}
-                onClick={() => haptic("tap")}
+                onClick={() => {
+                  haptic("tap");
+                  void playSound("tap");
+                }}
                 className={cn(
                   "relative flex h-full flex-col items-center justify-center gap-1 rounded-md focus-ring transition-colors duration-fast",
                   active ? "text-fg-1" : "text-fg-3",
@@ -54,6 +58,11 @@ export function TabBar() {
                     transition={SPRING.snappy}
                   >
                     <PixelIcon {...UI_ICONS[item.icon]} scale={2} className={cn(active && "text-accent")} />
+                    {item.unlock && !isUnlocked(item.unlock, level) && (
+                      <span className="absolute -top-0.5 -right-0.5 grid size-3.5 place-items-center rounded-xs bg-surface-3 text-fg-2">
+                        <PixelIcon {...UI_ICONS.lock} scale={1} className="scale-75" />
+                      </span>
+                    )}
                   </motion.span>
                 </span>
                 <span className="label-pixel leading-none">{t(item.key)}</span>

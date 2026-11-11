@@ -6,7 +6,8 @@ import { Dialog } from "radix-ui";
 import { useEffect, useMemo, useState } from "react";
 import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
-import { DEMO_COMPANIES } from "@/lib/demo/market";
+import { useGame } from "@/features/game/store";
+import { brandColor } from "../brand";
 import { cn } from "@/lib/utils";
 import { isTutorialActive } from "@/features/tutorial/store";
 import { useSearch } from "../search-store";
@@ -39,13 +40,13 @@ export function SearchDialog() {
     return () => window.removeEventListener("keydown", onKey);
   }, [setOpen]);
 
+  const securities = useGame((state) => state.snapshot?.securities);
   const results = useMemo(() => {
+    const all = securities ?? [];
     const needle = query.trim().toLowerCase();
-    if (!needle) return DEMO_COMPANIES.slice(0, 6);
-    return DEMO_COMPANIES.filter(
-      (c) => c.name.toLowerCase().includes(needle) || c.ticker.toLowerCase().includes(needle),
-    );
-  }, [query]);
+    if (!needle) return all.filter((s) => s.kind === "stock").slice(0, 6);
+    return all.filter((c) => c.name.toLowerCase().includes(needle) || c.ticker.toLowerCase().includes(needle));
+  }, [query, securities]);
 
   const go = (ticker: string) => {
     setOpen(false);
@@ -120,7 +121,7 @@ export function SearchDialog() {
                       index === cursor && "bg-surface-3",
                     )}
                   >
-                    <CompanyLogo ticker={company.ticker} color={company.color} />
+                    <CompanyLogo ticker={company.ticker} color={brandColor(company.ticker)} />
                     <span className="min-w-0 flex-1 truncate font-medium text-fg-1">{company.name}</span>
                     <span className="label-pixel text-fg-3">{company.ticker}</span>
                   </button>

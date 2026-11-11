@@ -1,9 +1,10 @@
 import { expect, test } from "@playwright/test";
 
-// The company tab is hidden for new players (progressive disclosure), see tutorial.spec.ts.
+// Every tab is visible from the start; the company tab carries a lock until level 10.
 const TABS = [
   { name: "Portfolio", path: "/portfolio", heading: "Portfolio" },
   { name: "Märkte", path: "/markets", heading: "Märkte" },
+  { name: /Firma/, path: "/company", heading: "Unternehmen" },
   { name: "Profil", path: "/profile", heading: "Profil" },
 ];
 
@@ -43,30 +44,58 @@ test("emptying the vault moves the money to the cash balance", async ({ page }) 
   await expect(cash).toContainText("10.000,00 €");
   await page.getByRole("button", { name: "Tresor leeren" }).click();
   await expect(page.getByText("Tresor geleert")).toBeVisible();
-  await expect(cash).not.toContainText("10.000,00 €");
+  await expect(cash).toContainText("10.200");
 });
 
-test("a stock can be opened and the order preview confirmed by holding", async ({ page }) => {
+test("buying by euro amount, seeing the position and selling it again", async ({ page }) => {
   await page.goto("/markets");
   await page.getByRole("link", { name: /Volta Energie AG/ }).click();
   await expect(page).toHaveURL("/markets/VLT");
   await expect(page.getByRole("heading", { level: 1, name: "Volta Energie AG" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Kaufen", exact: true }).filter({ visible: true }).click();
+  // Buy for 500 € instead of a number of shares.
+  await page.locator('[data-tour="buy"]').filter({ visible: true }).first().click();
   const dialog = page.getByRole("dialog", { name: "VLT kaufen" });
   await expect(dialog).toBeVisible();
+  await dialog.getByRole("radio", { name: "Betrag" }).click();
+  await dialog.getByLabel("Betrag in Euro").fill("500");
+  await expect(dialog.getByText("Das sind 4 Stück")).toBeVisible();
 
-  await dialog.getByLabel("Stückzahl").fill("0");
-  await expect(dialog.getByRole("alert")).toBeVisible();
-  await expect(dialog.getByRole("button", { name: "Zum Kaufen halten" })).toBeDisabled();
+  // Limit orders are visible but locked for a new player.
+  await dialog.getByRole("radio", { name: /Limit/ }).click();
+  await expect(page.getByText("Ab Level 3")).toBeVisible();
 
-  await dialog.getByLabel("Stückzahl").fill("3");
-  const hold = dialog.getByRole("button", { name: "Zum Kaufen halten" });
+  const hold = dialog.locator('[data-tour="order-confirm"] button');
   await hold.hover();
   await page.mouse.down();
-  await expect(page.getByText("Order-Vorschau ausgeführt")).toBeVisible({ timeout: 5000 });
+  await expect(page.getByText("Gekauft")).toBeVisible({ timeout: 5000 });
   await page.mouse.up();
   await expect(dialog).toBeHidden();
+
+  // The position shows up on the stock page and in the portfolio.
+  await expect(page.getByText("Deine Position")).toBeVisible();
+  await page.locator('[data-tour="nav-portfolio"]').filter({ visible: true }).first().click();
+  await expect(page.getByText("4 Stück · Einstand", { exact: false })).toBeVisible();
+
+  // Sell everything again.
+  await page.getByRole("link", { name: /Volta Energie AG/ }).click();
+  await page.getByRole("button", { name: "Verkaufen", exact: true }).filter({ visible: true }).first().click();
+  const sell = page.getByRole("dialog", { name: "VLT verkaufen" });
+  await sell.getByRole("button", { name: "Alle" }).click();
+  await sell.locator('[data-tour="order-confirm"] button').hover();
+  await page.mouse.down();
+  await expect(page.getByText("Verkauft")).toBeVisible({ timeout: 5000 });
+  await page.mouse.up();
+  await expect(page.getByText("Deine Position")).toHaveCount(0);
+});
+
+test("later features are visible but locked", async ({ page }) => {
+  await page.goto("/markets");
+  await page.getByRole("radio", { name: /Anleihen/ }).click();
+  await expect(page.getByText("Staatsanleihe 10 Jahre")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Kaufen" })).toHaveCount(0);
+  await page.goto("/");
+  await expect(page.getByText("Später freischaltbar")).toBeVisible();
 });
 
 test("the sign-in page explains demo mode", async ({ page }) => {

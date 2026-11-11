@@ -3,12 +3,12 @@
 import { AnimatePresence, motion } from "motion/react";
 import type { ReactNode } from "react";
 import { isDisclosed, type DisclosureKey } from "@/config/disclosure";
-import { useDemo } from "@/lib/demo/store";
+import { usePlayerLevel } from "@/features/game/store";
 import { DURATION, EASE } from "@/lib/motion";
 
 /** True once the player's level has reached the disclosure level of `feature`. */
 export function useDisclosed(feature: DisclosureKey): boolean {
-  return useDemo((state) => isDisclosed(feature, state.level));
+  return isDisclosed(feature, usePlayerLevel());
 }
 
 /**

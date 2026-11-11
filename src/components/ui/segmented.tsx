@@ -2,13 +2,15 @@
 
 import { motion } from "motion/react";
 import { ToggleGroup } from "radix-ui";
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 import { SPRING } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 export interface SegmentedOption<T extends string> {
   value: T;
   label: string;
+  /** Small element after the label, e.g. a lock badge. */
+  adornment?: ReactNode;
 }
 
 export interface SegmentedProps<T extends string> {
@@ -64,7 +66,10 @@ export function Segmented<T extends string>({
                 transition={SPRING.snappy}
               />
             )}
-            <span className="relative">{option.label}</span>
+            <span className="relative inline-flex items-center gap-1.5">
+              {option.label}
+              {option.adornment}
+            </span>
           </ToggleGroup.Item>
         );
       })}

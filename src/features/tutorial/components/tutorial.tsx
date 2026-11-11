@@ -7,7 +7,7 @@ import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { burstConfetti } from "@/components/ui/effects";
 import { BALANCE } from "@/config/balance";
-import { useDemo } from "@/lib/demo/store";
+import { useGame } from "@/features/game/store";
 import { formatInteger, formatMoney } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
 import { DURATION, EASE, SPRING } from "@/lib/motion";
@@ -39,26 +39,24 @@ export function Tutorial() {
   const rect = useTargetRect(step?.target);
   const layer = useRef<HTMLDivElement>(null);
 
-  // Load progress for this account (demo mode: one shared slot).
+  // Load progress for this account once the portfolio is known. The server
+  // decides whether the tutorial is done; the browser only remembers the step.
+  const portfolioLoaded = useGame((state) => state.portfolio !== null);
+  const serverCompleted = useGame((state) => state.portfolio?.tutorialCompleted ?? false);
   useEffect(() => {
-    const { load } = useTutorial.getState();
-    const restoreDemoLevel = () => {
-      // Demo data lives in memory only: give a returning visitor the tutorial level back.
-      if (useTutorial.getState().status === "done" && useDemo.getState().totalXp === 0) {
-        useDemo.getState().addXp(TUTORIAL_XP);
-      }
+    if (!portfolioLoaded) return;
+    const { load, finish } = useTutorial.getState();
+    const apply = (accountId: string) => {
+      load(accountId);
+      if (serverCompleted) finish();
     };
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      load("demo");
-      restoreDemoLevel();
+      apply("demo");
       return;
     }
-    void supabase.auth.getUser().then(({ data }) => {
-      load(data.user?.id ?? "demo");
-      restoreDemoLevel();
-    });
-  }, []);
+    void supabase.auth.getUser().then(({ data }) => apply(data.user?.id ?? "demo"));
+  }, [portfolioLoaded, serverCompleted]);
 
   // Keep the player on the page the step belongs to, and advance route steps.
   useEffect(() => {
@@ -114,7 +112,10 @@ export function Tutorial() {
     }
     // Entering the final step pays the reward.
     if (TUTORIAL_STEPS[index + 1]?.id === "done") {
-      useDemo.getState().addXp(TUTORIAL_XP);
+      void useGame
+        .getState()
+        .completeTutorial()
+        .catch(() => undefined);
       void playSound("levelUp");
       haptic("success");
       if (layer.current) burstConfetti(layer.current, 40);

@@ -2,14 +2,14 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BULL } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { BALANCE } from "@/config/balance";
-import { useDemo } from "@/lib/demo/store";
+import { useGame, usePlayerLevel } from "@/features/game/store";
 import { formatInteger } from "@/lib/format";
 import { EASE } from "@/lib/motion";
 import { xpForNextLevel } from "@/lib/sim/progression";
@@ -17,24 +17,35 @@ import { xpForNextLevel } from "@/lib/sim/progression";
 /** Unlock keys have a translation each; see the test in src/features/progression. */
 export type UnlockKey = Parameters<ReturnType<typeof useTranslations<"unlocks">>>[0];
 
-/** Level, XP bar and the next unlock. `showcase` adds a button that demonstrates the XP animation. */
+/**
+ * Level, XP bar and the next unlock. Every XP gain flies in as "+N XP".
+ * `showcase` adds a button that plays the animation without changing anything.
+ */
 export function LevelCard({ showcase = false }: { showcase?: boolean }) {
   const t = useTranslations("profile");
   const tu = useTranslations("unlocks");
-  const level = useDemo((state) => state.level);
-  const xp = useDemo((state) => state.xpInLevel);
-  const addXp = useDemo((state) => state.addXp);
+  const level = usePlayerLevel();
+  const xp = useGame((state) => state.portfolio?.xpIntoLevel ?? 0);
+  const xpTotal = useGame((state) => state.portfolio?.xpTotal);
   const [gains, setGains] = useState<{ id: number; amount: number }[]>([]);
+  const lastTotal = useRef<number | undefined>(undefined);
   const needed = xpForNextLevel(level);
   const shownXp = Math.min(xp, needed);
   const next = BALANCE.progression.unlocks.find((unlock) => unlock.level > level);
 
   const gain = (amount: number) => {
-    const id = Date.now();
+    const id = Date.now() + Math.random();
     setGains((list) => [...list, { id, amount }]);
-    addXp(amount);
     window.setTimeout(() => setGains((list) => list.filter((g) => g.id !== id)), 900);
   };
+
+  // Show real XP gains as they arrive (not the initial load).
+  useEffect(() => {
+    if (xpTotal === undefined) return;
+    const previous = lastTotal.current;
+    lastTotal.current = xpTotal;
+    if (previous !== undefined && xpTotal > previous) gain(xpTotal - previous);
+  }, [xpTotal]);
 
   return (
     <Card padding="lg" data-tour="level-card">

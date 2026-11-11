@@ -12,9 +12,9 @@ test("a new player is guided through the first session and cannot skip it", asyn
   await page.goto("/");
   await expect(finn(page)).toContainText("Hi, ich bin Finn");
 
-  // A beginner sees a calm start page and no company tab.
+  // A beginner sees a calm start page; later features are there, but locked.
   const nav = page.getByRole("navigation", { name: "Hauptnavigation" }).filter({ visible: true });
-  await expect(nav.getByRole("link", { name: "Firma" })).toHaveCount(0);
+  await expect(nav.getByRole("link", { name: /Firma/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Tägliche Missionen" })).toHaveCount(0);
 
   // There is nothing to close, and Escape does nothing.

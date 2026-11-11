@@ -1,9 +1,9 @@
 import type { SectorKey } from "@/components/pixel/art";
 
 /**
- * Example data for demo mode and for the M0 screens. The 15 companies match
- * supabase/seed.sql (docs/DECISIONS.md, ADR-014). Prices are scaled by 10_000.
- * Everything in src/lib/demo disappears from the data path in M1.
+ * Starting values of the 15 AI companies for demo mode (src/features/game/demo-engine.ts)
+ * and their brand colours. They match supabase/seed.sql (docs/DECISIONS.md, ADR-014).
+ * Prices are scaled by 10_000.
  */
 export type CompanyTier = "bluechip" | "midcap" | "penny";
 
@@ -174,62 +174,3 @@ export const DEMO_COMPANIES: readonly DemoCompany[] = [
 ];
 
 export const DEMO_INDEX = { name: "NEXA 30", points: 12_486.4, changeBps: 47 } as const;
-
-export function findDemoCompany(ticker: string): DemoCompany | undefined {
-  return DEMO_COMPANIES.find((company) => company.ticker === ticker.toUpperCase());
-}
-
-/** Small deterministic generator so demo charts look the same on server and client. */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function hash(text: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
-  return h >>> 0;
-}
-
-export interface DemoPoint {
-  /** Unix seconds */
-  time: number;
-  value: number;
-}
-
-export const DEMO_RANGES = ["1T", "1W", "1M", "1J"] as const;
-export type DemoRange = (typeof DEMO_RANGES)[number];
-
-const RANGE_SHAPE: Record<DemoRange, { points: number; stepSeconds: number; volatility: number }> = {
-  "1T": { points: 168, stepSeconds: 300, volatility: 0.0022 },
-  "1W": { points: 168, stepSeconds: 3600, volatility: 0.005 },
-  "1M": { points: 180, stepSeconds: 14_400, volatility: 0.009 },
-  "1J": { points: 365, stepSeconds: 86_400, volatility: 0.016 },
-};
-
-/**
- * A random walk that ends exactly at `endValue`. `anchor` (unix seconds) is
- * passed in, so the function stays pure.
- */
-export function demoSeries(key: string, endValue: number, range: DemoRange, anchor: number): DemoPoint[] {
-  const shape = RANGE_SHAPE[range];
-  const random = mulberry32(hash(`${key}:${range}`));
-  const drift = (random() - 0.42) * shape.volatility * 0.35;
-  const raw: number[] = [1];
-  for (let i = 1; i < shape.points; i++) {
-    const shock = (random() + random() + random() - 1.5) * shape.volatility * 1.6;
-    raw.push(Math.max(0.05, raw[i - 1]! * (1 + drift + shock)));
-  }
-  const factor = endValue / raw[raw.length - 1]!;
-  const end = Math.floor(anchor / shape.stepSeconds) * shape.stepSeconds;
-  return raw.map((value, i) => ({
-    time: end - (shape.points - 1 - i) * shape.stepSeconds,
-    value: Math.round(value * factor * 100) / 100,
-  }));
-}

@@ -1,14 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { BULL, COIN } from "@/components/pixel/art";
-import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Page, PageHeader } from "@/components/layout/page";
-import { buttonVariants } from "@/components/ui/button-variants";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Reveal } from "@/features/progression/components/reveal";
+import { OrdersList } from "@/features/portfolio/components/orders-list";
 import { PortfolioSummary } from "@/features/portfolio/components/portfolio-summary";
+import { PositionsList } from "@/features/portfolio/components/positions-list";
+import { TradeHistory } from "@/features/portfolio/components/trade-history";
+import { Reveal } from "@/features/progression/components/reveal";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("portfolio");
@@ -21,34 +18,13 @@ export default async function PortfolioPage() {
     <Page>
       <PageHeader title={t("title")} />
       <PortfolioSummary />
-      <div className="grid gap-5 *:min-w-0 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6">
-        <Card padding="lg">
-          <CardHeader>
-            <CardTitle>{t("positions")}</CardTitle>
-          </CardHeader>
-          <EmptyState
-            art={<PixelIcon {...BULL} scale={4} />}
-            title={t("emptyTitle")}
-            description={t("emptyText")}
-            action={
-              <Link href="/markets" className={buttonVariants()}>
-                {t("emptyAction")}
-              </Link>
-            }
-          />
-        </Card>
+      <div className="grid gap-5 *:min-w-0 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-6">
+        <div className="space-y-5 lg:space-y-6">
+          <PositionsList />
+          <OrdersList />
+        </div>
         <Reveal feature="portfolioHistory">
-          <Card padding="lg">
-            <CardHeader>
-              <CardTitle>{t("history")}</CardTitle>
-            </CardHeader>
-            <EmptyState
-              className="py-4"
-              art={<PixelIcon {...COIN} scale={4} />}
-              title={t("historyEmptyTitle")}
-              description={t("historyEmptyText")}
-            />
-          </Card>
+          <TradeHistory />
         </Reveal>
       </div>
     </Page>
