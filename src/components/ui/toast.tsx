@@ -38,23 +38,27 @@ function ToastCard({ tone, title, description }: { tone: Tone; title: string; de
   );
 }
 
-function show(tone: Tone, title: string, description?: ReactNode) {
-  if (tone === "success") {
-    void playSound("success");
-    haptic("success");
-  } else if (tone === "error") {
-    void playSound("error");
-    haptic("error");
-  }
+export interface ToastOptions {
+  /** Skip the toast's own sound when the caller already plays a more specific one (buy, coin ...). */
+  silent?: boolean;
+}
+
+const TONE_SOUND = { success: "success", error: "error", info: "notify", warn: "warning" } as const;
+
+function show(tone: Tone, title: string, description?: ReactNode, options: ToastOptions = {}) {
+  if (!options.silent) void playSound(TONE_SOUND[tone]);
+  if (tone === "success") haptic("success");
+  else if (tone === "error") haptic("error");
   return sonner.custom(() => <ToastCard tone={tone} title={title} description={description} />);
 }
 
 /** Confirmations and errors. Stacked, swipeable, announced to screen readers. */
 export const toast = {
-  success: (title: string, description?: ReactNode) => show("success", title, description),
-  error: (title: string, description?: ReactNode) => show("error", title, description),
-  info: (title: string, description?: ReactNode) => show("info", title, description),
-  warn: (title: string, description?: ReactNode) => show("warn", title, description),
+  success: (title: string, description?: ReactNode, options?: ToastOptions) =>
+    show("success", title, description, options),
+  error: (title: string, description?: ReactNode, options?: ToastOptions) => show("error", title, description, options),
+  info: (title: string, description?: ReactNode, options?: ToastOptions) => show("info", title, description, options),
+  warn: (title: string, description?: ReactNode, options?: ToastOptions) => show("warn", title, description, options),
 };
 
 export function Toaster() {

@@ -3,6 +3,7 @@
 import { animate, motion, useMotionValue, useTransform, type MotionValue } from "motion/react";
 import { useRef, type ReactNode } from "react";
 import { haptic } from "@/lib/haptics";
+import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 
 export interface HoldButtonProps {
@@ -42,6 +43,7 @@ export function HoldButton({
     if (disabled || holding.current) return;
     holding.current = true;
     haptic("tap");
+    void playSound("tap");
     controls.current?.stop();
     controls.current = animate(progress, 1, {
       duration: duration * (1 - progress.get()),

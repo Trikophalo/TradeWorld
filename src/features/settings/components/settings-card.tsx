@@ -118,7 +118,7 @@ export function SettingsCard() {
             label={t("sound")}
             onCheckedChange={(checked) => {
               settings.set("sound", checked);
-              if (checked) void playSound("tap");
+              if (checked) void playSound("toggle");
             }}
           />
         </Row>

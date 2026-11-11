@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { Mascot } from "@/components/pixel/mascot";
+import { playSound } from "@/lib/sound";
 import { prefersReducedMotion } from "@/stores/settings";
 import { cn } from "@/lib/utils";
 
@@ -27,7 +28,12 @@ export function SpeechBubble({ name, text, mood, hero, footer }: SpeechBubblePro
 
   useEffect(() => {
     if (!typing) return;
-    const timer = window.setInterval(() => setShown((count) => Math.min(text.length, count + CHARS_PER_TICK)), TICK_MS);
+    let ticks = 0;
+    const timer = window.setInterval(() => {
+      setShown((count) => Math.min(text.length, count + CHARS_PER_TICK));
+      // A soft syllable every few characters; the sound module throttles it further.
+      if (ticks++ % 3 === 0) void playSound("blip");
+    }, TICK_MS);
     return () => window.clearInterval(timer);
   }, [typing, text.length]);
 

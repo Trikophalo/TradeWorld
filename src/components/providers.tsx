@@ -5,11 +5,8 @@ import { MotionConfig } from "motion/react";
 import { useEffect, useState, type ReactNode } from "react";
 import { EffectsLayer } from "@/components/ui/effects";
 import { Toaster } from "@/components/ui/toast";
-import { useDemo } from "@/lib/demo/store";
-import { isDemoMode } from "@/lib/supabase/env";
+import { preloadSounds } from "@/lib/sound";
 import { applySettingsToDocument, useSettings } from "@/stores/settings";
-
-const DEMO_TICK_MS = 3000;
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -26,15 +23,8 @@ export function Providers({ children }: { children: ReactNode }) {
     return useSettings.subscribe((state) => applySettingsToDocument(state));
   }, []);
 
-  // Demo mode: wiggle prices while the tab is visible.
-  useEffect(() => {
-    useDemo.getState().mount();
-    if (!isDemoMode) return;
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible") useDemo.getState().tick();
-    }, DEMO_TICK_MS);
-    return () => window.clearInterval(timer);
-  }, []);
+  // Load the sound effects after the first tap, so the first play has no delay.
+  useEffect(() => preloadSounds(), []);
 
   useEffect(() => {
     if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
