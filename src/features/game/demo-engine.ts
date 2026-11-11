@@ -937,6 +937,7 @@ const company = createCompanyEngine({
   addXp,
   hasJob: () => career.hasJob(),
   branchScores: () => career.branchScores(),
+  learnedSkills: () => career.learnedSkills(),
   nameViolation,
   idempotent,
   persist,

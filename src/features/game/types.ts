@@ -336,6 +336,8 @@ export interface JobPosting {
   postedAt: string;
   expiresAt: string | null;
   myApplication: { id: string; status: ApplicationStatus } | null;
+  /** Concrete skills the employer asks for (ADR-062). */
+  requiredSkills: string[];
 }
 
 export interface JobBoard {
@@ -349,7 +351,7 @@ export type ApplicationStatus =
 export interface JobApplication {
   id: string;
   status: ApplicationStatus;
-  posting: Pick<JobPosting, "id" | "company" | "tier" | "titleKey" | "title" | "required">;
+  posting: Pick<JobPosting, "id" | "company" | "tier" | "titleKey" | "title" | "required" | "requiredSkills">;
   salaryWishCentsPerHour: number;
   offerSalaryCentsPerHour: number | null;
   offerExpiresAt: string | null;
@@ -389,6 +391,21 @@ export interface MyJob {
   lastBonusCents: number;
   nextWorkTaskAt: string | null;
   workTaskOpen: boolean;
+  /** Quit with notice (ADR-063): the job ends at this time; null without notice. */
+  noticeEndsAt: string | null;
+}
+
+/** What an employee sees about the employer in the job tab (ADR-064). */
+export interface EmployerView {
+  company: Employer;
+  kind: "ai" | "player";
+  productKey: string | null;
+  stage: number | null;
+  tier: CompanyTier | null;
+  founder: string | null;
+  teamSize: number;
+  lastQuarter: { label: string; revenueCents: number; profitCents: number } | null;
+  payFactorBps: number;
 }
 
 // ------------------------------------------------------------------ player card (ADR-054)
@@ -435,6 +452,10 @@ export interface MyCompany {
   color: string;
   tier: CompanyTier;
   foundedAt: string;
+  /** Product and growth stages (ADR-062). */
+  productKey: string;
+  stage: number;
+  stages: { stage: number; reached: boolean; skills: { key: string; coveredBy: string | null }[] }[];
   cashCents: number;
   valueCents: number;
   unpaidCents: number;
@@ -543,6 +564,7 @@ export interface FoundCompanyInput {
   sector: SectorKey;
   color: string;
   tier: CompanyTier;
+  product: string;
 }
 
 export interface CompanyPosting {
@@ -557,6 +579,7 @@ export interface CompanyPosting {
   status: "open" | "closed";
   applicationsPending: number;
   postedAt: string;
+  requiredSkills: string[];
 }
 
 export interface CreatePostingInput {
@@ -567,6 +590,7 @@ export interface CreatePostingInput {
   required: JobRequirementInfo[];
   salaryCentsPerHour: number;
   slots: number;
+  requiredSkills: string[];
 }
 
 export interface Applicant {
@@ -575,6 +599,8 @@ export interface Applicant {
   level: number;
   matchScore: number;
   branchScores: Record<SkillBranch, number>;
+  /** The applicant's skills among those the posting or the product asks for. */
+  skills: string[];
 }
 
 export interface CompanyApplication extends JobApplication {
@@ -590,6 +616,8 @@ export interface TeamMember {
   productivityBps: number;
   startedAt: string;
   pendingRaise: { requestedBps: number; createdAt: string } | null;
+  skills: string[];
+  noticeEndsAt: string | null;
 }
 
 /** Error keys the server raises (message of the Postgres exception). Texts: messages/de.json "errors". */
@@ -695,7 +723,9 @@ export interface GameEngine {
   withdrawApplication(requestId: string, applicationId: string): Promise<JobApplication>;
   signContract(requestId: string, applicationId: string, signature: string): Promise<MyJob>;
   myJob(): Promise<MyJob | null>;
-  quitJob(requestId: string): Promise<{ paidCents: number; cashCents: number }>;
+  quitJob(requestId: string): Promise<{ noticeEndsAt: string }>;
+  cancelQuit(requestId: string): Promise<MyJob>;
+  employer(): Promise<EmployerView | null>;
   requestRaise(
     requestId: string,
     raiseBps: number,
@@ -727,4 +757,9 @@ export interface GameEngine {
   companyTeam(companyId: string): Promise<TeamMember[]>;
   fireEmployee(requestId: string, playerJobId: string): Promise<{ severanceCents: number }>;
   respondRaise(requestId: string, playerJobId: string, accept: boolean): Promise<void>;
+  trainEmployee(
+    requestId: string,
+    playerJobId: string,
+    skillKey: string,
+  ): Promise<{ costCents: number; salaryCentsPerHour: number }>;
 }

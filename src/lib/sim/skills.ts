@@ -42,6 +42,37 @@ export function branchScores(learned: Iterable<string>, cfg: SkillsConfig = BALA
 
 export type LearnCheck = "ok" | "unknown" | "learned" | "locked" | "points";
 
+const HEX_DIRECTIONS = [
+  [1, 0],
+  [1, -1],
+  [0, -1],
+  [-1, 0],
+  [-1, 1],
+  [0, 1],
+] as const;
+
+/** The (up to six) skills on neighbouring hex fields. */
+export function neighbours(node: SkillNodeConfig, cfg: SkillsConfig = BALANCE.skills): SkillNodeConfig[] {
+  const result: SkillNodeConfig[] = [];
+  for (const [dq, dr] of HEX_DIRECTIONS) {
+    const n = cfg.tree.find((other) => other.q === node.q + dq && other.r === node.r + dr);
+    if (n) result.push(n);
+  }
+  return result;
+}
+
+/**
+ * Whether the map lets the player reach a skill (ADR-061): entry fields near the
+ * centre are always open, every other field needs a learned neighbour.
+ */
+export function isReachable(
+  node: SkillNodeConfig,
+  learned: ReadonlySet<string>,
+  cfg: SkillsConfig = BALANCE.skills,
+): boolean {
+  return node.entry || neighbours(node, cfg).some((n) => learned.has(n.key));
+}
+
 /**
  * Whether a skill can be learned now. Payment: points of the skill's branches
  * first (for hybrids the larger pot first), then free points.
@@ -56,7 +87,7 @@ export function learnCheck(
   const node = skillNode(key, cfg);
   if (!node) return "unknown";
   if (learned.has(key)) return "learned";
-  if (!node.requires.every((req) => learned.has(req))) return "locked";
+  if (!isReachable(node, learned, cfg)) return "locked";
   return payForSkill(node, freePoints, branchPoints, cfg) ? "ok" : "points";
 }
 

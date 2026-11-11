@@ -33,6 +33,8 @@ export interface StartupQuarterInput {
   readonly aiWorkers: number;
   /** Sum of the team's branch scores in the sector's branches (quality). */
   readonly teamSectorScore: number;
+  /** Growth stage reached by the team's skills (ADR-062), 0..4. */
+  readonly stage: number;
   /** Standard normal draw for the demand noise (passed in: the sim never draws itself). */
   readonly noise: number;
 }
@@ -118,11 +120,9 @@ export function closeStartupQuarter(
   const quarterPotential = state.potentialAnnualCents / 4;
 
   // Quality moves towards what the team can do; awareness grows by word of mouth and marketing.
-  const quality = clamp(
-    state.quality + sc.quality.adjustPerQuarter * (qualityTarget(input.teamSectorScore, sc) - state.quality),
-    0,
-    1,
-  );
+  const stage = clamp(Math.floor(input.stage), 0, sc.stages.awarenessCaps.length - 1);
+  const target = Math.min(1, qualityTarget(input.teamSectorScore, sc) + sc.stages.qualityBonusPerStage * stage);
+  const quality = clamp(state.quality + sc.quality.adjustPerQuarter * (target - state.quality), 0, 1);
   const marketing = Number(input.marketingCents);
   const awareness = clamp(
     state.awareness +
@@ -130,11 +130,13 @@ export function closeStartupQuarter(
       marketingGain(marketing, state.potentialAnnualCents, sc) -
       sc.awareness.decayPerQuarter * state.awareness,
     sc.awareness.min,
-    1,
+    // Without the right specialists a company cannot grow beyond its stage (ADR-062).
+    Math.max(sc.awareness.min, sc.stages.awarenessCaps[stage] ?? 1),
   );
 
   const demand = quarterPotential * awareness * (0.5 + 0.5 * quality) * Math.exp(sc.demandNoise * input.noise);
-  const capacity = capacityCents(input.productivityBps, input.sector, sc);
+  const capacity =
+    capacityCents(input.productivityBps, input.sector, sc) * (1 + sc.stages.capacityBonusPerStage * stage);
   const revenue = Math.min(demand, capacity);
 
   const revenueCents = roundToBigInt(revenue);
@@ -192,4 +194,32 @@ export function potentialEstimate(
     lowCents: Math.round(potentialAnnualCents * Math.exp(-spread * (0.3 + 0.7 * u1))),
     highCents: Math.round(potentialAnnualCents * Math.exp(spread * (0.3 + 0.7 * u2))),
   };
+}
+
+// ------------------------------------------------------------------ products and stages (ADR-062)
+
+export function productOf(sector: SectorId, key: string, cfg: StartupsConfig = BALANCE.startups) {
+  return cfg.products[sector].find((p) => p.key === key) ?? cfg.products[sector][0]!;
+}
+
+/** Highest stage whose skills (and those of all earlier stages) the team knows. */
+export function companyStage(
+  sector: SectorId,
+  productKey: string,
+  teamSkills: ReadonlySet<string>,
+  cfg: StartupsConfig = BALANCE.startups,
+): number {
+  const product = productOf(sector, productKey, cfg);
+  let stage = 0;
+  for (const needed of product.stages) {
+    if (!needed.every((skill) => teamSkills.has(skill))) break;
+    stage += 1;
+  }
+  return stage;
+}
+
+/** Price of a training for a skill of this tier, and the wage raise it brings. */
+export function trainingFor(tier: number, cfg: StartupsConfig = BALANCE.startups) {
+  const i = Math.max(0, Math.min(cfg.training.costCentsByTier.length - 1, tier - 1));
+  return { costCents: cfg.training.costCentsByTier[i]!, raiseBps: cfg.training.wageRaiseBpsByTier[i]! };
 }

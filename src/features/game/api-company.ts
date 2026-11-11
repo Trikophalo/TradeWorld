@@ -73,6 +73,17 @@ const companySchema = z.object({
   pay_factor_bps: num.default(10_000),
   distress_quarters: num.default(0),
   grace_quarters: num.default(4),
+  product_key: z.string().default(""),
+  stage: num.default(0),
+  stages: z
+    .array(
+      z.object({
+        stage: num,
+        reached: z.boolean(),
+        skills: z.array(z.object({ key: z.string(), covered_by: z.string().nullable() })),
+      }),
+    )
+    .default([]),
 });
 
 const wrapped = z.object({ company: companySchema.nullable() });
@@ -153,6 +164,7 @@ const postingSchema = z.object({
   status: z.enum(["open", "closed"]),
   applications_pending: num,
   posted_at: iso,
+  required_skills: z.array(z.string()).default([]),
 });
 
 const applicantSchema = z.object({
@@ -161,6 +173,7 @@ const applicantSchema = z.object({
   level: num,
   match_score: num,
   branch_scores: z.record(z.string(), num),
+  skills: z.array(z.string()).default([]),
 });
 
 const memberSchema = z.object({
@@ -172,6 +185,8 @@ const memberSchema = z.object({
   productivity_bps: num,
   started_at: iso,
   pending_raise: z.object({ requested_bps: num, created_at: iso }).nullable(),
+  skills: z.array(z.string()).default([]),
+  notice_ends_at: iso.nullable().default(null),
 });
 
 export const COMPANY_RPC_SCHEMAS = {
@@ -215,6 +230,7 @@ export const COMPANY_RPC_SCHEMAS = {
   get_company_team: z.object({ members: z.array(memberSchema) }),
   fire_employee: z.object({ player_job_id: z.string(), status: z.literal("fired"), severance_cents: num }),
   respond_raise: z.object({ status: z.enum(["accepted", "rejected"]), salary_cents_per_hour: num }),
+  train_employee: z.object({ skill_key: z.string(), cost_cents: num, salary_cents_per_hour: num }),
 } as const;
 
 const S = COMPANY_RPC_SCHEMAS;
@@ -268,6 +284,13 @@ function toCompany(c: z.infer<typeof companySchema>): MyCompany {
       : null,
     history: c.history.map((h) => ({ label: h.label, revenueCents: h.revenue_cents, profitCents: h.profit_cents })),
     payFactorBps: c.pay_factor_bps,
+    productKey: c.product_key,
+    stage: c.stage,
+    stages: c.stages.map((st) => ({
+      stage: st.stage,
+      reached: st.reached,
+      skills: st.skills.map((k) => ({ key: k.key, coveredBy: k.covered_by })),
+    })),
     distressQuarters: c.distress_quarters,
     graceQuarters: c.grace_quarters,
   };
@@ -352,6 +375,7 @@ type CompanyEngine = Pick<
   | "companyTeam"
   | "fireEmployee"
   | "respondRaise"
+  | "trainEmployee"
 >;
 
 export const liveCompanyEngine: CompanyEngine = {
@@ -370,6 +394,7 @@ export const liveCompanyEngine: CompanyEngine = {
         p_sector: input.sector,
         p_color: input.color,
         p_tier: input.tier,
+        p_product: input.product,
       },
       S.found_company,
     );
@@ -481,6 +506,7 @@ export const liveCompanyEngine: CompanyEngine = {
       status: p.status,
       applicationsPending: p.applications_pending,
       postedAt: p.posted_at,
+      requiredSkills: p.required_skills,
     }));
   },
 
@@ -495,6 +521,7 @@ export const liveCompanyEngine: CompanyEngine = {
         p_required: input.required.map((r) => ({ branch: r.branch, min_score: r.minScore })),
         p_salary_cents_per_hour: input.salaryCentsPerHour,
         p_slots: input.slots,
+        p_required_skills: input.requiredSkills,
       },
       S.create_job_posting,
     );
@@ -514,6 +541,7 @@ export const liveCompanyEngine: CompanyEngine = {
         level: a.applicant.level,
         matchScore: a.applicant.match_score,
         branchScores: a.applicant.branch_scores as Record<SkillBranch, number>,
+        skills: a.applicant.skills,
       },
     }));
   },
@@ -544,12 +572,23 @@ export const liveCompanyEngine: CompanyEngine = {
       pendingRaise: m.pending_raise
         ? { requestedBps: m.pending_raise.requested_bps, createdAt: m.pending_raise.created_at }
         : null,
+      skills: m.skills,
+      noticeEndsAt: m.notice_ends_at,
     }));
   },
 
   async fireEmployee(requestId, playerJobId) {
     const r = await rpc("fire_employee", { p_request_id: requestId, p_player_job_id: playerJobId }, S.fire_employee);
     return { severanceCents: r.severance_cents };
+  },
+
+  async trainEmployee(requestId, playerJobId, skillKey) {
+    const r = await rpc(
+      "train_employee",
+      { p_request_id: requestId, p_player_job_id: playerJobId, p_skill_key: skillKey },
+      S.train_employee,
+    );
+    return { costCents: r.cost_cents, salaryCentsPerHour: r.salary_cents_per_hour };
   },
 
   async respondRaise(requestId, playerJobId, accept) {

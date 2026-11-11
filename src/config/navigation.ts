@@ -3,18 +3,19 @@ import type { UiIconName } from "@/components/pixel/art";
 export interface NavItem {
   href: string;
   /** Key in messages/*.json under "nav". */
-  key: "home" | "portfolio" | "markets" | "career" | "profile";
+  key: "home" | "portfolio" | "markets" | "job" | "career" | "profile";
   icon: UiIconName;
   /** Unlock key (BALANCE.progression.unlocks). The tab is always visible, with a lock until then. */
   unlock?: string;
 }
 
-/** The five main tabs: bottom bar on phones, sidebar on desktop. */
+/** The six main tabs: bottom bar on phones, sidebar on desktop. */
 export const NAV_ITEMS: readonly NavItem[] = [
   { href: "/", key: "home", icon: "home" },
   { href: "/portfolio", key: "portfolio", icon: "portfolio" },
   { href: "/markets", key: "markets", icon: "markets" },
-  { href: "/career", key: "career", icon: "briefcase" },
+  { href: "/job", key: "job", icon: "briefcase" },
+  { href: "/career", key: "career", icon: "star" },
   { href: "/profile", key: "profile", icon: "profile" },
 ];
 

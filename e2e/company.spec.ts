@@ -55,6 +55,11 @@ test("found a garage startup, run quarters, hire and post a job", async ({ page 
   await expect(header.getByText("Pixelbaecker")).toBeVisible();
   await expect(page.getByText("Das erste Quartal läuft noch.")).toBeVisible();
 
+  // Growth stages (ADR-062): the product needs specialists, the next step is named.
+  const growth = page.getByTestId("growth");
+  await expect(growth.getByText("Stufe 1")).toBeVisible();
+  await expect(growth.getByText(/Als Nächstes brauchst du: IT-Sicherheit/)).toBeVisible();
+
   // Close two quarters (demo button): a report appears.
   await header.getByText("Demo: Quartal jetzt abschließen").click();
   await header.getByText("Demo: Quartal jetzt abschließen").click();

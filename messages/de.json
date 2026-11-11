@@ -14,7 +14,8 @@
     "markets": "Märkte",
     "company": "Firma",
     "profile": "Profil",
-    "career": "Karriere"
+    "career": "Karriere",
+    "job": "Job"
   },
   "topbar": {
     "search": "Aktien, Firmen, Spieler suchen",
@@ -66,7 +67,9 @@
     "newsEmptyText": "Sobald der Markt in Meilenstein 1 läuft, erscheinen hier Meldungen aus der Simulation.",
     "nextGoal": "Nächstes Ziel",
     "sinceStart": "seit Spielstart",
-    "comingUp": "Später freischaltbar"
+    "comingUp": "Später freischaltbar",
+    "eventsLink": "Events und Nachrichten",
+    "eventsHint": "Quartalszahlen, Zinsentscheide, Schlagzeilen"
   },
   "vault": {
     "title": "Tresor",
@@ -80,7 +83,8 @@
     "empty": "Noch nichts zu holen",
     "progress": "Füllstand des Tresors",
     "claimFailed": "Tresor nicht geleert",
-    "treasuryLow": "Staatskasse knapp"
+    "treasuryLow": "Staatskasse knapp",
+    "jobIncome": "+ Job {amount} pro Stunde"
   },
   "portfolio": {
     "title": "Portfolio",
@@ -1034,6 +1038,334 @@
       "hybrid_people_analytics": {
         "name": "People Analytics",
         "desc": "Mit Daten bessere Teams bauen."
+      },
+      "it_web": {
+        "name": "Webentwicklung",
+        "desc": "Websites und Web-Apps, die jeder bedienen kann."
+      },
+      "it_mobile": {
+        "name": "App-Entwicklung",
+        "desc": "Apps für Handy und Tablet."
+      },
+      "it_databases": {
+        "name": "Datenbanken",
+        "desc": "Daten sicher speichern und schnell finden."
+      },
+      "it_devops": {
+        "name": "DevOps",
+        "desc": "Software automatisch testen und ausliefern."
+      },
+      "it_testing": {
+        "name": "Softwaretests",
+        "desc": "Fehler finden, bevor Kunden sie finden."
+      },
+      "it_ux": {
+        "name": "UX-Design",
+        "desc": "Oberflächen, die sich gut anfühlen."
+      },
+      "it_embedded": {
+        "name": "Embedded Systems",
+        "desc": "Software in Geräten und Maschinen."
+      },
+      "it_crypto": {
+        "name": "Kryptografie",
+        "desc": "Verschlüsselung, die hält."
+      },
+      "it_pentest": {
+        "name": "Penetrationstests",
+        "desc": "Systeme angreifen, um sie zu schützen."
+      },
+      "it_bigdata": {
+        "name": "Big Data",
+        "desc": "Riesige Datenmengen auswerten."
+      },
+      "finance_banking": {
+        "name": "Bankwesen",
+        "desc": "Konten, Kredite und Zahlungsverkehr."
+      },
+      "finance_tax_planning": {
+        "name": "Steuerplanung",
+        "desc": "Legal Steuern sparen."
+      },
+      "finance_budgeting": {
+        "name": "Budgetplanung",
+        "desc": "Geld planen, bevor es weg ist."
+      },
+      "finance_treasury": {
+        "name": "Treasury",
+        "desc": "Liquidität und Zinsen einer Firma steuern."
+      },
+      "finance_trading": {
+        "name": "Handel",
+        "desc": "Kaufen und verkaufen zur richtigen Zeit."
+      },
+      "finance_derivatives": {
+        "name": "Derivate",
+        "desc": "Optionen und Futures verstehen."
+      },
+      "finance_ma": {
+        "name": "Fusionen und Übernahmen",
+        "desc": "Firmen kaufen und zusammenführen."
+      },
+      "finance_vc": {
+        "name": "Wagniskapital",
+        "desc": "In junge Firmen investieren."
+      },
+      "finance_audit": {
+        "name": "Wirtschaftsprüfung",
+        "desc": "Zahlen anderer kritisch prüfen."
+      },
+      "finance_insurance": {
+        "name": "Versicherungen",
+        "desc": "Risiken gegen Geld abgeben."
+      },
+      "finance_quant": {
+        "name": "Quantitative Analyse",
+        "desc": "Märkte mit Mathematik verstehen."
+      },
+      "law_ip": {
+        "name": "Patentrecht",
+        "desc": "Erfindungen und Marken schützen."
+      },
+      "law_privacy": {
+        "name": "Datenschutz",
+        "desc": "Mit Kundendaten richtig umgehen."
+      },
+      "law_competition": {
+        "name": "Wettbewerbsrecht",
+        "desc": "Fair im Wettbewerb bleiben."
+      },
+      "law_consumer": {
+        "name": "Verbraucherrecht",
+        "desc": "Was Kunden zusteht."
+      },
+      "law_it": {
+        "name": "IT-Recht",
+        "desc": "Lizenzen, Software und Internet."
+      },
+      "law_environment": {
+        "name": "Umweltrecht",
+        "desc": "Auflagen für Natur und Klima."
+      },
+      "law_medical": {
+        "name": "Medizinrecht",
+        "desc": "Zulassungen und Haftung in der Medizin."
+      },
+      "law_international": {
+        "name": "Internationales Recht",
+        "desc": "Verträge über Grenzen hinweg."
+      },
+      "law_litigation": {
+        "name": "Prozessführung",
+        "desc": "Vor Gericht bestehen."
+      },
+      "law_mediation": {
+        "name": "Mediation",
+        "desc": "Streit beilegen ohne Gericht."
+      },
+      "management_leadership": {
+        "name": "Leadership",
+        "desc": "Menschen begeistern und führen."
+      },
+      "management_communication": {
+        "name": "Kommunikation",
+        "desc": "Klar sagen, was Sache ist."
+      },
+      "management_finance_lead": {
+        "name": "Finanzführung",
+        "desc": "Budgets verantworten."
+      },
+      "management_operations": {
+        "name": "Operations",
+        "desc": "Abläufe, die funktionieren."
+      },
+      "management_innovation": {
+        "name": "Innovationsmanagement",
+        "desc": "Neue Ideen ins Ziel bringen."
+      },
+      "management_coaching": {
+        "name": "Coaching",
+        "desc": "Andere besser machen."
+      },
+      "management_risk": {
+        "name": "Krisenmanagement",
+        "desc": "Ruhig bleiben, wenn es brennt."
+      },
+      "management_international": {
+        "name": "Internationale Führung",
+        "desc": "Teams in vielen Ländern."
+      },
+      "management_board": {
+        "name": "Aufsichtsrat",
+        "desc": "Firmen kontrollieren und beraten."
+      },
+      "management_culture": {
+        "name": "Unternehmenskultur",
+        "desc": "Wie eine Firma tickt."
+      },
+      "sales_social": {
+        "name": "Social Media",
+        "desc": "Kunden dort erreichen, wo sie scrollen."
+      },
+      "sales_content": {
+        "name": "Content Marketing",
+        "desc": "Inhalte, die verkaufen."
+      },
+      "sales_seo": {
+        "name": "Suchmaschinenoptimierung",
+        "desc": "Bei Google oben stehen."
+      },
+      "sales_ads": {
+        "name": "Werbekampagnen",
+        "desc": "Anzeigen, die wirken."
+      },
+      "sales_pricing": {
+        "name": "Preisgestaltung",
+        "desc": "Der richtige Preis zur richtigen Zeit."
+      },
+      "sales_retail": {
+        "name": "Einzelhandel",
+        "desc": "Verkaufen im Laden."
+      },
+      "sales_b2b": {
+        "name": "B2B-Vertrieb",
+        "desc": "Verkaufen an Firmen."
+      },
+      "sales_crm": {
+        "name": "Kundenbeziehungen",
+        "desc": "Kunden kennen und halten."
+      },
+      "sales_pr": {
+        "name": "Pressearbeit",
+        "desc": "Gute Schlagzeilen machen."
+      },
+      "sales_events": {
+        "name": "Messen und Events",
+        "desc": "Kunden live begeistern."
+      },
+      "logistics_inventory": {
+        "name": "Bestandsführung",
+        "desc": "Immer genug, nie zu viel."
+      },
+      "logistics_distribution": {
+        "name": "Distribution",
+        "desc": "Waren zum Kunden bringen."
+      },
+      "logistics_customs": {
+        "name": "Zoll",
+        "desc": "Waren über Grenzen bringen."
+      },
+      "logistics_shipping": {
+        "name": "Seefracht",
+        "desc": "Container um die Welt schicken."
+      },
+      "logistics_air": {
+        "name": "Luftfracht",
+        "desc": "Schnell, aber teuer."
+      },
+      "logistics_rail": {
+        "name": "Schienenverkehr",
+        "desc": "Viel Fracht auf Schienen."
+      },
+      "logistics_lastmile": {
+        "name": "Letzte Meile",
+        "desc": "Pakete bis an die Haustür."
+      },
+      "logistics_cold": {
+        "name": "Kühlkette",
+        "desc": "Frisch bis zum Ziel."
+      },
+      "logistics_planning": {
+        "name": "Tourenplanung",
+        "desc": "Die beste Route finden."
+      },
+      "logistics_automation": {
+        "name": "Lagerautomatisierung",
+        "desc": "Roboter im Lager."
+      },
+      "logistics_sustainability": {
+        "name": "Grüne Logistik",
+        "desc": "Weniger CO₂ pro Paket."
+      },
+      "craft_welding": {
+        "name": "Schweißen",
+        "desc": "Metall fest verbinden."
+      },
+      "craft_plumbing": {
+        "name": "Sanitärtechnik",
+        "desc": "Wasser dahin, wo es hin soll."
+      },
+      "craft_hvac": {
+        "name": "Heizung und Klima",
+        "desc": "Warm im Winter, kühl im Sommer."
+      },
+      "craft_carpentry": {
+        "name": "Holzbau",
+        "desc": "Bauen mit Holz."
+      },
+      "craft_cnc": {
+        "name": "CNC-Technik",
+        "desc": "Präzise Teile per Maschine."
+      },
+      "craft_3dprint": {
+        "name": "3D-Druck",
+        "desc": "Teile Schicht für Schicht."
+      },
+      "craft_vehicles": {
+        "name": "Fahrzeugtechnik",
+        "desc": "Autos und Lkw verstehen."
+      },
+      "craft_solar": {
+        "name": "Solartechnik",
+        "desc": "Strom von der Sonne."
+      },
+      "craft_robotics": {
+        "name": "Robotik",
+        "desc": "Roboter bauen und warten."
+      },
+      "craft_materials": {
+        "name": "Werkstoffkunde",
+        "desc": "Das richtige Material wählen."
+      },
+      "science_physics": {
+        "name": "Physik",
+        "desc": "Wie die Welt funktioniert."
+      },
+      "science_lab": {
+        "name": "Laborpraxis",
+        "desc": "Sauber messen und experimentieren."
+      },
+      "science_statistics": {
+        "name": "Statistik",
+        "desc": "Zufall von Wirkung trennen."
+      },
+      "science_microbiology": {
+        "name": "Mikrobiologie",
+        "desc": "Bakterien, Viren und Pilze."
+      },
+      "science_nutrition": {
+        "name": "Ernährungswissenschaft",
+        "desc": "Was der Körper braucht."
+      },
+      "science_materials": {
+        "name": "Materialforschung",
+        "desc": "Neue Stoffe entdecken."
+      },
+      "science_environment": {
+        "name": "Umweltwissenschaft",
+        "desc": "Klima und Ökosysteme."
+      },
+      "science_neuro": {
+        "name": "Neurowissenschaft",
+        "desc": "Wie das Gehirn arbeitet."
+      },
+      "science_devices": {
+        "name": "Medizintechnik",
+        "desc": "Geräte, die heilen helfen."
+      },
+      "science_vaccines": {
+        "name": "Impfstoffe",
+        "desc": "Schutz vor Krankheiten."
       }
     }
   },
@@ -1125,15 +1457,17 @@
     "raisePending": "Anfrage gesendet",
     "quit": "Kündigen",
     "quitTitle": "Wirklich kündigen?",
-    "quitText": "Du kündigst sofort. Das kostet dich ein Gehalt ({amount}), das an die Firma geht.",
-    "quitConfirm": "Kostenpflichtig kündigen",
+    "quitText": "Du kündigst ohne Kosten mit einem Tag Frist. Bis dahin arbeitest du automatisch weiter und bekommst Lohn. In der Zeit kannst du die Kündigung zurücknehmen.",
+    "quitConfirm": "Gedrückt halten zum Kündigen",
     "quitDone": "Gekündigt",
-    "quitDoneText": "{amount} gingen an die Firma.",
+    "quitDoneText": "Dein letzter Tag endet am {date}.",
     "cancel": "Abbrechen",
     "branchProgress": "Fortschritt im Job",
     "branchProgressHint": "Alle {hours} Arbeitsstunden bekommst du einen Punkt in den Bereichen deines Jobs.",
     "companyOwn": "Deine Firma führen",
-    "lastBonus": "Bonus letztes Quartal: {amount}"
+    "lastBonus": "Bonus letztes Quartal: {amount}",
+    "jobLink": "Dein Job",
+    "jobLinkHint": "{title} bei {company}"
   },
   "jobs": {
     "title": "Jobportal",
@@ -1209,11 +1543,13 @@
     "sign": "Unterschreiben",
     "signedTitle": "Willkommen im Team!",
     "signedText": "Du arbeitest jetzt bei {company}. Gehalt kommt automatisch, auch wenn du offline bist.",
-    "hasJobHint": "Du hast schon einen Job. Zum Unterschreiben musst du ihn erst kündigen."
+    "hasJobHint": "Du hast schon einen Job. Zum Unterschreiben musst du ihn erst kündigen.",
+    "aiOffer": "Diese KI-Firma bietet dir {amount}/Std. Mehr zahlt sie nicht, weniger musst du nicht nehmen.",
+    "skillsRequired": "Muss können"
   },
   "skillTree": {
-    "title": "Skill-Baum",
-    "intro": "Skills machen dich besser im Job. Sie lassen sich nicht zurücknehmen, also wähle bewusst. Mischen ist erlaubt.",
+    "title": "Skill-Karte",
+    "intro": "Jedes Feld ist ein Skill. Starte in der Mitte und arbeite dich in die Richtungen vor, die zu dir passen. Gelernte Skills bleiben für immer.",
     "freePoints": "Freie Punkte",
     "freePointsHint": "Für jeden Bereich. Kommen aus Level-ups, Missionen und der täglichen Belohnung.",
     "branchPoints": "Punkte aus Arbeit",
@@ -1240,7 +1576,16 @@
     "learnedToastText": "{branch} jetzt {score} Punkte",
     "notEnough": "Dir fehlen {count, plural, one {# Punkt} other {# Punkte}}",
     "overview": "Übersicht",
-    "progressHint": "{done} von {total} Skills"
+    "progressHint": "{done} von {total} Skills",
+    "lockedMap": "Lerne zuerst ein Feld direkt daneben. Nur die Felder nahe der Mitte sind von Anfang an offen.",
+    "start": "START",
+    "zoomIn": "Hineinzoomen",
+    "zoomOut": "Herauszoomen",
+    "center": "Zur Mitte",
+    "legendLearned": "Gelernt",
+    "legendOpen": "Lernbar",
+    "legendLocked": "Noch gesperrt",
+    "mapHint": "Ziehen zum Verschieben, Mausrad zum Zoomen"
   },
   "dailyReward": {
     "title": "Tägliche Belohnung",
@@ -1450,7 +1795,32 @@
     "dissolvedInsolvent": "{name} war 4 Quartale lang in Schieflage und wurde aufgelöst.",
     "dissolvedClosed": "Du hast {name} aufgelöst.",
     "dissolvedDebt": "Abgerechnet: {debt}, davon privat {founder}. Kredit: {loan}.",
-    "lockedUntil": "Nach der Insolvenz kannst du ab {date} wieder gründen."
+    "lockedUntil": "Nach der Insolvenz kannst du ab {date} wieder gründen.",
+    "product": "Produkt",
+    "productHint": "Was verkauft deine Firma? Jedes Produkt braucht andere Spezialisten zum Wachsen.",
+    "growthTitle": "Wachstum",
+    "growthIntro": "Um zu wachsen, braucht deine Firma die richtigen Spezialisten. Jede Stufe hebt Bekanntheit, Qualität und Kapazität.",
+    "stageN": "Stufe {stage}",
+    "stageReached": "Erreicht",
+    "coveredBy": "kann {name}",
+    "missing": "fehlt",
+    "nextStep": "Als Nächstes brauchst du: {skills}",
+    "allStages": "Alle Stufen erreicht. Deine Firma ist voll ausgebaut.",
+    "hireFor": "Stelle dafür ausschreiben",
+    "trainFor": "Mitarbeiter schulen",
+    "postingConcrete": "Konkrete Skills (optional)",
+    "postingConcreteHint": "Bewerben kann sich nur, wer diese Skills kann. Höchstens 4.",
+    "postingSearch": "Skill suchen",
+    "train": "Schulen",
+    "trainTitle": "{name} schulen",
+    "trainIntro": "Eine Schulung bringt sofort einen neuen Skill. Dein Mitarbeiter deckt dann mehr ab und verdient mehr.",
+    "trainCost": "Kostet die Firma {amount}, Lohn +{percent}",
+    "trainConfirm": "Gedrückt halten zum Schulen",
+    "trained": "Schulung abgeschlossen",
+    "trainedText": "Neuer Lohn: {amount}/Std.",
+    "trainNeeded": "Für deine nächste Stufe",
+    "trainOther": "Weitere Skills",
+    "noticeMember": "kündigt, letzter Tag {date}"
   },
   "debt": {
     "title": "Schulden",
@@ -1501,5 +1871,100 @@
       "fixed": "Fixkosten {amount}",
       "marketing": "Marketing {amount}"
     }
+  },
+  "products": {
+    "security_software": {
+      "name": "Security-Software",
+      "desc": "Schutz vor Hackern für Firmen."
+    },
+    "mobile_app": {
+      "name": "App-Studio",
+      "desc": "Apps für Millionen Handys."
+    },
+    "cloud_platform": {
+      "name": "Cloud-Plattform",
+      "desc": "Rechenleistung zum Mieten."
+    },
+    "online_shop": {
+      "name": "Onlineshop",
+      "desc": "Alles bequem nach Hause."
+    },
+    "fashion": {
+      "name": "Mode-Label",
+      "desc": "Kleidung mit eigener Handschrift."
+    },
+    "delicatessen": {
+      "name": "Feinkost",
+      "desc": "Besondere Lebensmittel."
+    },
+    "solar": {
+      "name": "Solaranlagen",
+      "desc": "Strom vom eigenen Dach."
+    },
+    "grid_service": {
+      "name": "Netzservice",
+      "desc": "Stromnetze bauen und warten."
+    },
+    "energy_storage": {
+      "name": "Energiespeicher",
+      "desc": "Batterien für Haus und Netz."
+    },
+    "generics": {
+      "name": "Generika",
+      "desc": "Bewährte Wirkstoffe, günstig."
+    },
+    "biotech": {
+      "name": "Biotech",
+      "desc": "Medizin aus lebenden Zellen."
+    },
+    "medtech": {
+      "name": "Medizintechnik",
+      "desc": "Geräte für Praxen und Kliniken."
+    },
+    "courier": {
+      "name": "Kurierdienst",
+      "desc": "Pakete noch am selben Tag."
+    },
+    "warehouse": {
+      "name": "Lagerdienstleister",
+      "desc": "Lagern und versenden für andere."
+    },
+    "freight": {
+      "name": "Spedition",
+      "desc": "Fracht über Grenzen."
+    }
+  },
+  "jobTab": {
+    "title": "Job",
+    "none": "Du hast gerade keinen Job.",
+    "noneText": "Im Jobportal findest du Stellen. Deine Arbeit läuft danach automatisch, auch wenn du offline bist.",
+    "toPortal": "Zum Jobportal",
+    "founder": "Du führst deine eigene Firma.",
+    "toCompany": "Zur Firma",
+    "working": "Arbeitet gerade",
+    "workingHint": "Deine Arbeit erledigt sich von selbst. Du musst nichts tun und wirst nicht gefeuert, wenn du mal ein paar Tage nicht reinschaust.",
+    "earnsCompany": "Deine Arbeit bringt der Firma etwa {amount} Umsatz pro Stunde.",
+    "employerTitle": "Dein Arbeitgeber",
+    "aiCompany": "KI-Firma an der Börse",
+    "playerCompany": "Spielerfirma",
+    "stock": "Aktie",
+    "toStock": "Zur Aktie",
+    "founderName": "Gründer: {name}",
+    "team": "{count, plural, one {# Person im Team} other {# Personen im Team}}",
+    "product": "Produkt",
+    "stage": "Wachstumsstufe {stage} von 4",
+    "lastQuarter": "Letztes Quartal",
+    "revenue": "Umsatz {amount}",
+    "profit": "Gewinn {amount}",
+    "chat": "Firmenchat",
+    "notice": "Gekündigt: Dein letzter Arbeitstag endet in",
+    "noticeHint": "Bis dahin bekommst du weiter Lohn. Du kannst die Kündigung zurücknehmen.",
+    "cancelNotice": "Kündigung zurücknehmen",
+    "noticeCancelled": "Kündigung zurückgenommen"
+  },
+  "events": {
+    "title": "Events",
+    "linkTitle": "Events und Nachrichten",
+    "linkHint": "Quartalszahlen, Zinsentscheide und Schlagzeilen"
   }
 }

@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { BALANCE } from "../../config/balance.ts";
 import { createRng } from "./rng.ts";
+import { skillNode } from "./skills.ts";
 import {
   capacityCents,
   closeStartupQuarter,
+  companyStage,
+  trainingFor,
   initialStartup,
   marketingGain,
   maxEmployees,
@@ -23,6 +26,7 @@ const base: StartupQuarterInput = {
   aiWorkers: 0,
   teamSectorScore: 0,
   noise: 0,
+  stage: 4,
 };
 
 describe("market size of a niche", () => {
@@ -115,6 +119,8 @@ describe("garage startups over ten real days (scenario, ADR-057)", () => {
         aiWorkers: ai,
         teamSectorScore: 3,
         noise: r.normal(),
+        // The founder brings the first stage's skill; later stages need specialists.
+        stage: 1,
       });
       state = result.next;
       last = result.operatingProfitCents;
@@ -142,5 +148,34 @@ describe("garage startups over ten real days (scenario, ADR-057)", () => {
     expect(share((r) => r.profitable)).toBeLessThan(0.75);
     expect(share((r) => r.soldOut)).toBeGreaterThan(0.03);
     expect(share((r) => r.soldOut)).toBeLessThan(0.2);
+  });
+});
+
+describe("growth stages (ADR-062)", () => {
+  it("need the skills of every stage in order", () => {
+    const product = BALANCE.startups.products.tech[0]!;
+    const all = new Set(product.stages.flat());
+    expect(companyStage("tech", product.key, new Set())).toBe(0);
+    expect(companyStage("tech", product.key, new Set(product.stages[0]))).toBe(1);
+    expect(companyStage("tech", product.key, new Set(product.stages[1]))).toBe(0);
+    expect(companyStage("tech", product.key, all)).toBe(product.stages.length);
+  });
+
+  it("cap the awareness: without specialists no growth", () => {
+    const s = { ...initialStartup(1e9, b(1_000_000)), awareness: 0.9, quality: 1 };
+    const capped = closeStartupQuarter(s, { ...base, stage: 0 });
+    expect(capped.next.awareness).toBeLessThanOrEqual(BALANCE.startups.stages.awarenessCaps[0]!);
+    expect(closeStartupQuarter(s, { ...base, stage: 4 }).next.awareness).toBeGreaterThan(0.8);
+  });
+
+  it("every product's skills exist on the skill map", () => {
+    for (const products of Object.values(BALANCE.startups.products)) {
+      for (const p of products) for (const skill of p.stages.flat()) expect(skillNode(skill), skill).toBeDefined();
+    }
+  });
+
+  it("trainings get dearer with the tier", () => {
+    expect(trainingFor(1).costCents).toBeLessThan(trainingFor(5).costCents);
+    expect(trainingFor(9).costCents).toBe(trainingFor(5).costCents);
   });
 });

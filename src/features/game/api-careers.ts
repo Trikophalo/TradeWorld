@@ -79,6 +79,7 @@ const postingSchema = z.object({
   posted_at: iso,
   expires_at: iso.nullable(),
   my_application: z.object({ id: z.string(), status: z.string() }).nullable(),
+  required_skills: z.array(z.string()).default([]),
 });
 
 export const applicationSchema = z.object({
@@ -91,6 +92,7 @@ export const applicationSchema = z.object({
     title_key: z.string().nullable(),
     title: z.string().nullable(),
     required,
+    required_skills: z.array(z.string()).default([]),
   }),
   salary_wish_cents_per_hour: num,
   offer_salary_cents_per_hour: nnum,
@@ -123,6 +125,7 @@ const jobSchema = z.object({
   last_bonus_cents: num.default(0),
   next_work_task_at: iso.nullable().default(null),
   work_task_open: z.boolean().default(false),
+  notice_ends_at: iso.nullable().default(null),
 });
 
 const cardSchema = z.object({
@@ -161,7 +164,27 @@ export const CAREER_RPC_SCHEMAS = {
   withdraw_application: applicationSchema,
   sign_contract: z.object({ job: jobSchema.nullable() }),
   get_my_job: z.object({ job: jobSchema.nullable() }),
-  quit_job: z.object({ paid_cents: num, cash_cents: num }),
+  quit_job: z.union([
+    z.object({ notice_ends_at: iso }),
+    // Servers before ADR-063 charged one salary and ended the job at once.
+    z.object({ paid_cents: num, cash_cents: num }),
+  ]),
+  cancel_quit: z.object({ job: jobSchema.nullable() }),
+  get_employer: z.object({
+    employer: z
+      .object({
+        company: employerSchema,
+        kind: z.enum(["ai", "player"]),
+        product_key: z.string().nullable(),
+        stage: nnum,
+        tier: z.enum(["garage", "small_business"]).nullable(),
+        founder: z.string().nullable(),
+        team_size: num,
+        last_quarter: z.object({ label: z.string(), revenue_cents: num, profit_cents: num }).nullable(),
+        pay_factor_bps: num,
+      })
+      .nullable(),
+  }),
   request_raise: z.object({ status: z.enum(["accepted", "pending"]), salary_cents_per_hour: num }),
   get_player_card: cardSchema,
 } as const;
@@ -207,6 +230,7 @@ const toPosting = (p: z.infer<typeof postingSchema>): JobPosting => ({
   myApplication: p.my_application
     ? { id: p.my_application.id, status: p.my_application.status as JobApplication["status"] }
     : null,
+  requiredSkills: p.required_skills,
 });
 
 export const toApplication = (a: z.infer<typeof applicationSchema>): JobApplication => ({
@@ -219,6 +243,7 @@ export const toApplication = (a: z.infer<typeof applicationSchema>): JobApplicat
     titleKey: a.posting.title_key,
     title: a.posting.title,
     required: toRequired(a.posting.required),
+    requiredSkills: a.posting.required_skills,
   },
   salaryWishCentsPerHour: a.salary_wish_cents_per_hour,
   offerSalaryCentsPerHour: a.offer_salary_cents_per_hour,
@@ -253,6 +278,7 @@ const toJob = (j: z.infer<typeof jobSchema>): MyJob => ({
   lastBonusCents: j.last_bonus_cents,
   nextWorkTaskAt: j.next_work_task_at,
   workTaskOpen: j.work_task_open,
+  noticeEndsAt: j.notice_ends_at,
 });
 
 type CareerEngine = Pick<
@@ -270,6 +296,8 @@ type CareerEngine = Pick<
   | "signContract"
   | "myJob"
   | "quitJob"
+  | "cancelQuit"
+  | "employer"
   | "requestRaise"
   | "playerCard"
 >;
@@ -373,7 +401,36 @@ export const liveCareerEngine: CareerEngine = {
 
   async quitJob(requestId) {
     const r = await rpc("quit_job", { p_request_id: requestId }, S.quit_job);
-    return { paidCents: r.paid_cents, cashCents: r.cash_cents };
+    return { noticeEndsAt: "notice_ends_at" in r ? r.notice_ends_at : new Date().toISOString() };
+  },
+
+  async cancelQuit(requestId) {
+    const r = await rpc("cancel_quit", { p_request_id: requestId }, S.cancel_quit);
+    if (!r.job) throw new Error("cancel_quit returned no job");
+    return toJob(r.job);
+  },
+
+  async employer() {
+    const r = await rpc("get_employer", {}, S.get_employer);
+    const e = r.employer;
+    if (!e) return null;
+    return {
+      company: toEmployer(e.company),
+      kind: e.kind,
+      productKey: e.product_key,
+      stage: e.stage,
+      tier: e.tier,
+      founder: e.founder,
+      teamSize: e.team_size,
+      lastQuarter: e.last_quarter
+        ? {
+            label: e.last_quarter.label,
+            revenueCents: e.last_quarter.revenue_cents,
+            profitCents: e.last_quarter.profit_cents,
+          }
+        : null,
+      payFactorBps: e.pay_factor_bps,
+    };
   },
 
   async requestRaise(requestId, raiseBps) {

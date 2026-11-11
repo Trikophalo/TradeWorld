@@ -13,6 +13,7 @@ import { toast } from "@/components/ui/toast";
 import { BALANCE } from "@/config/balance";
 import { useGame } from "@/features/game/store";
 import { useGameErrorText } from "@/features/game/errors";
+import { useMyJob } from "@/features/career/hooks";
 import { formatCountdown, formatMoney } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
 import { emitTutorial } from "@/features/tutorial/store";
@@ -31,6 +32,9 @@ const HOUR_MS = 3_600_000;
  */
 export function VaultCard() {
   const t = useTranslations("vault");
+  // The job pays on top of the basic income (ADR-064); shown here so both incomes sit together.
+  const job = useMyJob();
+  const jobRate = job.data?.effectiveSalaryCentsPerHour ?? 0;
   const now = useClock();
   const vault = useGame((state) => state.portfolio?.vault);
   const skew = useGame((state) => state.clockSkewMs);
@@ -80,6 +84,11 @@ export function VaultCard() {
             {t("subtitle", { rate: formatMoney(vault?.rateCentsPerHour ?? RATE, { whole: true }) })}
             {vault && vault.factorBps < 10_000 && ` · ${t("treasuryLow")}`}
           </p>
+          {jobRate > 0 && (
+            <p className="truncate nums text-sm text-gain" data-testid="vault-job-income">
+              {t("jobIncome", { amount: formatMoney(jobRate) })}
+            </p>
+          )}
         </div>
       </div>
       <Progress value={amount / CAP_CENTS} label={t("progress")} tone={full ? "warn" : "gold"} className="mt-4" />

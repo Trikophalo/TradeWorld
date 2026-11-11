@@ -64,7 +64,7 @@ test("the daily reward opens once and pays day 1", async ({ page }) => {
   await expect(page.getByRole("dialog", { name: "Tägliche Belohnung" })).toBeHidden();
 });
 
-test("learn a skill, apply to an AI company, sign, work and quit", async ({ page }) => {
+test("learn a skill on the map, apply to an AI company, sign, work and quit", async ({ page }) => {
   await preparePlayer(page);
 
   // Skill tree: 5 free points from the level-ups.
@@ -83,6 +83,8 @@ test("learn a skill, apply to an AI company, sign, work and quit", async ({ page
   await expect(posting).toBeVisible();
   await posting.getByRole("button", { name: "Bewerben" }).click();
   const apply = page.getByRole("dialog", { name: "Bewerbung" });
+  // AI employers have no salary wish: they offer their maximum (ADR-064).
+  await expect(apply.getByTestId("ai-offer")).toBeVisible();
   await apply.getByLabel("Ein Satz über dich").fill("Ich lerne schnell und liebe Code.");
   await apply.getByRole("button", { name: "Bewerbung senden" }).click();
   await expect(page.getByText("Bewerbung gesendet")).toBeVisible();
@@ -107,25 +109,27 @@ test("learn a skill, apply to an AI company, sign, work and quit", async ({ page
   await sign.click();
   await expect(page.getByText("Willkommen im Team!")).toBeVisible();
 
-  // The career tab shows the job with pay and productivity.
-  await expect(page).toHaveURL("/career");
+  // The job tab (ADR-064): work runs by itself, the worker sits at the desk.
+  await page.goto("/job");
   await expect(page.getByRole("heading", { name: "IT-Praktikum" })).toBeVisible();
+  await expect(page.getByTestId("worker")).toBeVisible();
   await expect(page.getByText(/× KI-Kraft/)).toBeVisible();
+  await expect(page.getByTestId("employer")).toContainText("KlarSoft");
 
-  // A work task is waiting right after signing (ADR-059).
-  const task = page.getByTestId("work-task");
-  await expect(task.getByText("Arbeitsaufgabe")).toBeVisible();
-  await task.getByRole("radio").first().click();
-  await task.getByRole("button", { name: "Antworten" }).click();
-  await expect(page.getByText(/Richtig!|Leider falsch/).first()).toBeVisible();
+  // The salary also shows next to the basic income at the vault.
+  await page.goto("/");
+  await expect(page.getByTestId("vault-job-income")).toBeVisible();
 
-  // Quitting costs one salary (12 hours of the wage).
+  // Quitting is free, with one day notice (ADR-063); it can be taken back.
+  await page.goto("/job");
   await page.getByRole("button", { name: "Kündigen" }).click();
-  // (the AI pays a little more than posted for the learned IT basics)
-  await expect(page.getByText(/kostet dich ein Gehalt \(1\.8\d\d,\d\d\s€\)/)).toBeVisible();
-  await hold(page, "Kostenpflichtig kündigen");
-  await expect(page.getByText("Gekündigt")).toBeVisible();
-  await expect(page.getByText("Noch kein Job")).toBeVisible();
+  await expect(page.getByText(/ohne Kosten mit einem Tag Frist/)).toBeVisible();
+  await hold(page, "Gedrückt halten zum Kündigen");
+  await expect(page.getByText("Gekündigt", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("notice")).toBeVisible();
+  await page.getByRole("button", { name: "Kündigung zurücknehmen" }).click();
+  await expect(page.getByText("Kündigung zurückgenommen")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Kündigen" })).toBeVisible();
 });
 
 test("pick a profile picture and see it on the business card", async ({ page }) => {

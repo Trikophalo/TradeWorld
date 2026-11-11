@@ -5,6 +5,8 @@ import {
   aiPostingSpec,
   aiSalaryCeiling,
   branchScores,
+  isReachable,
+  neighbours,
   emptyBranches,
   fitPercent,
   learnCheck,
@@ -17,34 +19,29 @@ import {
   skillNode,
 } from "./skills.ts";
 
-describe("skill tree", () => {
-  it("has 8 branches with 10 skills each plus 6 hybrids", () => {
-    expect(SKILL_NODES).toHaveLength(86);
+describe("skill map (ADR-061)", () => {
+  it("has 168 skills, 21 per direction, and keeps every earlier key", () => {
+    expect(SKILL_NODES).toHaveLength(168);
     for (const branch of SKILL_BRANCHES) {
-      expect(SKILL_NODES.filter((n) => n.branches.length === 1 && n.branches[0] === branch)).toHaveLength(10);
+      expect(SKILL_NODES.filter((n) => n.branches[0] === branch)).toHaveLength(21);
     }
-    expect(SKILL_NODES.filter((n) => n.branches.length === 2)).toHaveLength(6);
-  });
-
-  it("has unique keys and only known, lower-tier prerequisites", () => {
-    const keys = new Set(SKILL_NODES.map((n) => n.key));
-    expect(keys.size).toBe(SKILL_NODES.length);
-    for (const node of SKILL_NODES) {
-      for (const req of node.requires) {
-        const parent = skillNode(req);
-        expect(parent, `${node.key} requires ${req}`).toBeDefined();
-        expect(parent!.tier).toBeLessThan(node.tier);
-      }
+    for (const key of ["it_basics", "it_security", "finance_mastery", "hybrid_fintech", "logistics_quality"]) {
+      expect(skillNode(key), key).toBeDefined();
     }
   });
 
-  it("every skill is reachable from the basics", () => {
+  it("has unique keys and unique hex fields", () => {
+    expect(new Set(SKILL_NODES.map((n) => n.key)).size).toBe(SKILL_NODES.length);
+    expect(new Set(SKILL_NODES.map((n) => `${n.q},${n.r}`)).size).toBe(SKILL_NODES.length);
+  });
+
+  it("every skill can be reached from the entry fields", () => {
     const learned = new Set<string>();
     let grew = true;
     while (grew) {
       grew = false;
       for (const node of SKILL_NODES) {
-        if (!learned.has(node.key) && node.requires.every((r) => learned.has(r))) {
+        if (!learned.has(node.key) && isReachable(node, learned)) {
           learned.add(node.key);
           grew = true;
         }
@@ -53,9 +50,7 @@ describe("skill tree", () => {
     expect(learned.size).toBe(SKILL_NODES.length);
   });
 
-  it("a full branch scores 30, hybrids count for both branches", () => {
-    const it = SKILL_NODES.filter((n) => n.branches.length === 1 && n.branches[0] === "it").map((n) => n.key);
-    expect(branchScores(it).it).toBe(30);
+  it("hybrids count for both branches", () => {
     const scores = branchScores(["hybrid_fintech"]);
     expect(scores.it).toBe(4);
     expect(scores.finance).toBe(4);
@@ -66,10 +61,12 @@ describe("learning", () => {
   const none = emptyBranches();
 
   it("needs all prerequisites and enough points", () => {
+    const far = SKILL_NODES.find((n) => !n.entry && n.branches[0] === "it")!;
+    const near = neighbours(far).find((n) => n.key !== far.key)!;
     expect(learnCheck("it_basics", new Set(), 1, none)).toBe("ok");
-    expect(learnCheck("it_programming", new Set(), 5, none)).toBe("locked");
-    expect(learnCheck("it_programming", new Set(["it_basics"]), 1, none)).toBe("points");
-    expect(learnCheck("it_programming", new Set(["it_basics"]), 2, none)).toBe("ok");
+    expect(learnCheck(far.key, new Set(), 9, none)).toBe("locked");
+    expect(learnCheck(far.key, new Set([near.key]), 9, none)).toBe("ok");
+    expect(learnCheck(far.key, new Set([near.key]), 0, none)).toBe("points");
     expect(learnCheck("it_basics", new Set(["it_basics"]), 9, none)).toBe("learned");
     expect(learnCheck("nope", new Set(), 9, none)).toBe("unknown");
   });

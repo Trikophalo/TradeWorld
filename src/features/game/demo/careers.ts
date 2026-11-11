@@ -69,6 +69,8 @@ interface DemoJob {
   scoreAtRaise: number;
   lastRaiseAt: number | null;
   signature: string;
+  /** Quit with notice (ADR-063). */
+  noticeEndsAt?: number | null;
 }
 
 export interface CareerState {
@@ -167,6 +169,7 @@ const POSTINGS: { posting: Omit<JobPosting, "maxSalaryCentsPerHour" | "matchScor
             minLevel: spec.minLevel,
             required: [...spec.required],
             salaryCentsPerHour: spec.salaryCentsPerHour,
+            requiredSkills: [],
             slotsOpen: jobs.aiSlotsOpen,
             postedAt: iso(Date.UTC(2026, 10, 1)),
             expiresAt: null,
@@ -219,6 +222,7 @@ export function createCareerEngine(host: CareerHost) {
         titleKey: posting.titleKey,
         title: posting.title,
         required: posting.required,
+        requiredSkills: posting.requiredSkills,
       },
       salaryWishCentsPerHour: a.wish,
       offerSalaryCentsPerHour: a.offer,
@@ -242,7 +246,9 @@ export function createCareerEngine(host: CareerHost) {
   /** AI employers answer at once: offer the wish, at most the personal ceiling. */
   function aiOffer(a: DemoApplication, now: number) {
     const posting = postingById(a.postingId);
-    a.offer = Math.min(a.wish, ceilingFor(posting));
+    // AI employers offer their maximum at once, there is no salary wish (ADR-064).
+    a.offer = ceilingFor(posting);
+    a.wish = a.offer;
     a.offerExpiresAt = now + jobs.offerValidHours * HOUR;
     a.status = "offered";
     a.updatedAt = now;
@@ -252,6 +258,17 @@ export function createCareerEngine(host: CareerHost) {
   function accrue(now = Date.now()) {
     const job = st().job;
     if (!job) return;
+    // The notice period is over: pay up to its end, then the job ends (ADR-063).
+    if (job.noticeEndsAt && now >= job.noticeEndsAt) {
+      accrueUntil(job, job.noticeEndsAt);
+      st().job = null;
+      host.persist();
+      return;
+    }
+    accrueUntil(job, now);
+  }
+
+  function accrueUntil(job: DemoJob, now: number) {
     const today = host.day(now);
     if (job.payDay !== today) {
       job.payDay = today;
@@ -309,6 +326,7 @@ export function createCareerEngine(host: CareerHost) {
       pendingRaise: null,
       quitCostCents: oneSalaryCents(job.salary),
       signature: job.signature,
+      noticeEndsAt: job.noticeEndsAt ? iso(job.noticeEndsAt) : null,
       lastBonusCents: 0,
       nextWorkTaskAt: nextTaskAt(),
       workTaskOpen: openTask() !== null,
@@ -396,6 +414,8 @@ export function createCareerEngine(host: CareerHost) {
     | "signContract"
     | "myJob"
     | "quitJob"
+    | "cancelQuit"
+    | "employer"
     | "requestRaise"
     | "playerCard"
     | "workTask"
@@ -531,6 +551,8 @@ export function createCareerEngine(host: CareerHost) {
         const a = st().applications.find((x) => x.id === applicationId);
         if (!a) throw new GameError("application_not_found");
         if (a.status !== "offered") throw new GameError("application_not_offered");
+        // Only player employers negotiate; every demo employer is an AI company.
+        if (postingById(a.postingId).company.isAi) throw new GameError("invalid_argument");
         a.wish = Math.round(salary);
         aiOffer(a, Date.now());
         return toApplication(a);
@@ -595,12 +617,38 @@ export function createCareerEngine(host: CareerHost) {
         accrue();
         const s = st();
         if (!s.job) throw new GameError("no_active_job");
-        const cost = oneSalaryCents(s.job.salary);
-        if (host.cashCents() < cost) throw new GameError("insufficient_funds");
-        host.addCash(-cost);
-        s.job = null;
-        return { paidCents: cost, cashCents: host.cashCents() };
+        s.job.noticeEndsAt ??= Date.now() + jobs.quitNoticeHours * HOUR;
+        return { noticeEndsAt: iso(s.job.noticeEndsAt) };
       });
+    },
+
+    async cancelQuit(requestId) {
+      return host.idempotent(requestId, () => {
+        accrue();
+        const job = st().job;
+        if (!job) throw new GameError("no_active_job");
+        if (!job.noticeEndsAt) throw new GameError("invalid_argument");
+        job.noticeEndsAt = null;
+        return myJobNow()!;
+      });
+    },
+
+    async employer() {
+      accrue();
+      const job = st().job;
+      if (!job) return null;
+      const posting = postingById(job.postingId);
+      return {
+        company: posting.company,
+        kind: "ai" as const,
+        productKey: null,
+        stage: null,
+        tier: null,
+        founder: null,
+        teamSize: 1,
+        lastQuarter: null,
+        payFactorBps: 10_000,
+      };
     },
 
     async requestRaise(requestId, raiseBps) {
@@ -690,6 +738,7 @@ export function createCareerEngine(host: CareerHost) {
     accrue,
     hasJob: () => st().job !== null,
     branchScores: scores,
+    learnedSkills: () => st().learned.map((l) => l.key),
     freePoints,
     avatarKey: () => st().avatarKey,
     dailyClaimable: () => dailyPlan().state.claimable,

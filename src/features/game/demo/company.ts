@@ -5,6 +5,8 @@ import { matchScore, productivityBps } from "@/lib/sim/skills";
 import {
   capacityCents,
   closeStartupQuarter,
+  companyStage,
+  productOf,
   fixedCostCents,
   maxEmployees,
   potentialEstimate,
@@ -62,6 +64,8 @@ export interface DemoCompanyState {
   estimateSeeds: [number, number];
   postings: CompanyPosting[];
   seq: number;
+  /** Product (ADR-062); older demo companies get the first product of their sector. */
+  productKey?: string;
   /** Quarter closes in a row with open bills (ADR-058). */
   distressQuarters?: number;
   chat?: ChatMessage[];
@@ -80,6 +84,8 @@ export interface CompanyHost {
   addXp(base: number): number;
   hasJob(): boolean;
   branchScores(): Record<SkillBranch, number>;
+  /** Learned skill keys of the founder (the only team member with skills in the demo). */
+  learnedSkills(): string[];
   /** Name check like for nicknames. */
   nameViolation(name: string): GameErrorKey | null;
   idempotent<T>(requestId: string, run: () => T): T;
@@ -93,6 +99,9 @@ export interface CompanyHost {
   foundingLockedUntil(): number | null;
   lockFounding(until: number): void;
 }
+
+export const productKeyOf = (company: Pick<DemoCompanyState, "sector" | "productKey">) =>
+  productOf(company.sector, company.productKey ?? "").key;
 
 const smallBusiness = () => companyCfg.tiers.find((t) => t.id === "small_business")!;
 
@@ -123,6 +132,21 @@ export function createCompanyEngine(host: CompanyHost) {
     return company;
   };
 
+  /** Each stage with its skills and who covers them (in the demo only the founder). */
+  function stagesOf(company: DemoCompanyState): MyCompany["stages"] {
+    const known = new Set(host.learnedSkills());
+    const reached = stageOf(company);
+    return productOf(company.sector, productKeyOf(company)).stages.map((skills, i) => ({
+      stage: i + 1,
+      reached: i < reached,
+      skills: skills.map((key) => ({ key, coveredBy: known.has(key) ? host.nickname() : null })),
+    }));
+  }
+
+  function stageOf(company: DemoCompanyState): number {
+    return companyStage(company.sector, productKeyOf(company), new Set(host.learnedSkills()));
+  }
+
   function productivityList(company: DemoCompanyState): number[] {
     return [
       founderProductivityBps(company.sector, host.branchScores()),
@@ -147,6 +171,7 @@ export function createCompanyEngine(host: CompanyHost) {
         productivityBps: productivityList(company),
         aiWorkers: company.aiWorkers,
         teamSectorScore: sectorScore(company.sector, host.branchScores()),
+        stage: stageOf(company),
         noise: (Math.random() + Math.random() + Math.random() - 1.5) * 2,
       },
     );
@@ -286,6 +311,9 @@ export function createCompanyEngine(host: CompanyHost) {
       color: company.color,
       tier: company.tier,
       foundedAt: new Date(company.foundedAt).toISOString(),
+      productKey: productKeyOf(company),
+      stage: stageOf(company),
+      stages: stagesOf(company),
       cashCents: company.cashCents,
       valueCents: valueCents(company),
       unpaidCents: company.unpaidCents,
@@ -351,6 +379,7 @@ export function createCompanyEngine(host: CompanyHost) {
     | "companyTeam"
     | "fireEmployee"
     | "respondRaise"
+    | "trainEmployee"
   > = {
     async checkCompanyName(name) {
       const reason = host.nameViolation(name.trim());
@@ -377,6 +406,7 @@ export function createCompanyEngine(host: CompanyHost) {
           sector: input.sector,
           color: input.color,
           tier: input.tier,
+          productKey: productOf(input.sector, input.product).key,
           foundedAt: now,
           potentialAnnualCents: potentialFromUniform(1 - Math.random()),
           awareness: startups.awareness.initial,
@@ -525,6 +555,7 @@ export function createCompanyEngine(host: CompanyHost) {
           status: "open",
           applicationsPending: 0,
           postedAt: new Date().toISOString(),
+          requiredSkills: input.requiredSkills,
         });
         return null;
       });
@@ -553,6 +584,9 @@ export function createCompanyEngine(host: CompanyHost) {
     },
     async respondRaise() {
       throw new GameError("invalid_argument");
+    },
+    async trainEmployee() {
+      throw new GameError("no_active_job");
     },
   };
 

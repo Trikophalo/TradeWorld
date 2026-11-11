@@ -732,6 +732,161 @@ export interface BalanceConfig {
   readonly startups: StartupsConfig;
 }
 
+export interface ProductConfig {
+  readonly key: string;
+  /** Skill keys each growth stage needs, stage 1 first. */
+  readonly stages: readonly (readonly string[])[];
+}
+
+/** Products of player companies and the skills each growth stage needs (ADR-062). */
+export const PRODUCTS = {
+  tech: [
+    {
+      key: "security_software",
+      stages: [
+        ["it_security"],
+        ["it_architecture", "it_pentest"],
+        ["law_privacy", "sales_b2b"],
+        ["it_crypto", "management_leadership"],
+      ],
+    },
+    {
+      key: "mobile_app",
+      stages: [
+        ["it_mobile"],
+        ["it_ux", "sales_social"],
+        ["it_cloud", "sales_growth"],
+        ["it_data", "management_strategy"],
+      ],
+    },
+    {
+      key: "cloud_platform",
+      stages: [
+        ["it_cloud"],
+        ["it_devops", "it_databases"],
+        ["it_security", "sales_keyaccount"],
+        ["finance_controlling", "management_operations"],
+      ],
+    },
+  ],
+  retail: [
+    {
+      key: "online_shop",
+      stages: [
+        ["it_web"],
+        ["sales_marketing", "logistics_lastmile"],
+        ["hybrid_ecommerce", "sales_seo"],
+        ["logistics_automation", "management_operations"],
+      ],
+    },
+    {
+      key: "fashion",
+      stages: [
+        ["sales_brand"],
+        ["sales_social", "logistics_purchasing"],
+        ["sales_ads", "sales_retail"],
+        ["sales_international", "finance_controlling"],
+      ],
+    },
+    {
+      key: "delicatessen",
+      stages: [
+        ["logistics_cold"],
+        ["sales_retail", "science_nutrition"],
+        ["logistics_distribution", "sales_brand"],
+        ["law_consumer", "management_operations"],
+      ],
+    },
+  ],
+  energy: [
+    {
+      key: "solar",
+      stages: [
+        ["craft_solar"],
+        ["craft_electrical", "sales_selling"],
+        ["craft_energy", "law_environment"],
+        ["finance_corporate", "management_projects"],
+      ],
+    },
+    {
+      key: "grid_service",
+      stages: [
+        ["craft_energy"],
+        ["craft_electrical", "craft_site"],
+        ["craft_automation", "logistics_planning"],
+        ["law_compliance", "management_operations"],
+      ],
+    },
+    {
+      key: "energy_storage",
+      stages: [
+        ["science_physics"],
+        ["craft_engineering", "science_materials"],
+        ["craft_manufacturing", "finance_investment"],
+        ["law_ip", "sales_international"],
+      ],
+    },
+  ],
+  pharma: [
+    {
+      key: "generics",
+      stages: [
+        ["science_chemistry"],
+        ["science_lab", "science_pharmacology"],
+        ["logistics_quality", "hybrid_pharma_sales"],
+        ["law_ip", "finance_controlling"],
+      ],
+    },
+    {
+      key: "biotech",
+      stages: [
+        ["science_biology"],
+        ["science_biotech", "science_statistics"],
+        ["science_clinical", "law_medical"],
+        ["science_genetics", "finance_vc"],
+      ],
+    },
+    {
+      key: "medtech",
+      stages: [
+        ["science_devices"],
+        ["craft_engineering", "science_medicine"],
+        ["science_drugs", "it_embedded"],
+        ["sales_b2b", "law_medical"],
+      ],
+    },
+  ],
+  logistics: [
+    {
+      key: "courier",
+      stages: [
+        ["logistics_lastmile"],
+        ["logistics_planning", "logistics_fleet"],
+        ["it_mobile", "sales_b2b"],
+        ["logistics_sustainability", "management_operations"],
+      ],
+    },
+    {
+      key: "warehouse",
+      stages: [
+        ["logistics_warehouse"],
+        ["logistics_inventory", "logistics_automation"],
+        ["it_databases", "craft_robotics"],
+        ["logistics_supplychain", "management_agile"],
+      ],
+    },
+    {
+      key: "freight",
+      stages: [
+        ["logistics_transport"],
+        ["logistics_customs", "logistics_shipping"],
+        ["logistics_global", "sales_international"],
+        ["logistics_strategic", "finance_risk"],
+      ],
+    },
+  ],
+} as const satisfies Record<SectorId, readonly ProductConfig[]>;
+
 /**
  * Player companies (ADR-057, docs/PLAYER_COMPANIES.md): garage startup and small business.
  * One quarter = one game quarter (6 real hours). Money in cents.
@@ -791,6 +946,24 @@ export interface StartupsConfig {
     /** No new company for this many days after an insolvency. */
     readonly foundingLockoutDays: number;
   };
+  /**
+   * Products and growth stages (ADR-062): stage k is reached when the team (founder and player
+   * employees) knows every skill of stages 1..k. The stage caps the awareness a company can
+   * reach and adds quality.
+   */
+  readonly products: Readonly<Record<SectorId, readonly ProductConfig[]>>;
+  readonly stages: {
+    /** Highest awareness per reached stage (index = stage 0..4). */
+    readonly awarenessCaps: readonly number[];
+    readonly qualityBonusPerStage: number;
+    /** Specialists make the whole team more effective: capacity × (1 + bonus × stage). */
+    readonly capacityBonusPerStage: number;
+  };
+  /** Trainings the employer pays for: the employee learns a skill, the wage rises (ADR-062). */
+  readonly training: {
+    readonly costCentsByTier: readonly number[];
+    readonly wageRaiseBpsByTier: readonly number[];
+  };
   /** Company chat (clan, ADR-045). */
   readonly chat: {
     readonly maxMessageLength: number;
@@ -821,8 +994,10 @@ export interface JobsConfig {
   /** AI employers: salary = tier salary × (1 + perScore × matched score), at most cap × tier salary. */
   readonly aiSalaryPerScoreBps: number;
   readonly aiSalaryCapMultiplier: number;
-  /** "One salary" (quitting penalty, severance) = this many paid hours of the base salary. */
+  /** "One salary" (severance) = this many paid hours of the base salary. */
   readonly salaryUnitHours: number;
+  /** Quitting is free but takes effect after this notice period; the wage runs until then (ADR-063). */
+  readonly quitNoticeHours: number;
   readonly maxOpenApplications: number;
   readonly applicationMessageMaxLength: number;
   /** An offer must be signed within this time. */
@@ -1664,6 +1839,7 @@ export const BALANCE = {
     offerValidHours: 48,
     aiPostingsPerCompany: 2,
     aiSlotsOpen: 99,
+    quitNoticeHours: 24,
     tierMinScore: { intern: 0, junior: 2, senior: 6, team_lead: 12, c_level: 20 },
     sectorBranches: {
       tech: ["it", "finance", "sales", "management"],
@@ -1719,6 +1895,12 @@ export const BALANCE = {
     valuationPeDiscount: 0.5,
     estimate: { initialSpread: 2.3, decayPerQuarter: 0.85 },
     insolvency: { graceQuarters: 4, loanWithholdingBps: 5_000, foundingLockoutDays: 3 },
+    products: PRODUCTS,
+    stages: { awarenessCaps: [0.5, 0.7, 0.85, 0.95, 1], qualityBonusPerStage: 0.05, capacityBonusPerStage: 0.25 },
+    training: {
+      costCentsByTier: [200_000, 500_000, 1_200_000, 2_500_000, 5_000_000],
+      wageRaiseBpsByTier: [300, 500, 800, 1_200, 2_000],
+    },
     chat: { maxMessageLength: 300, historyLimit: 100, maxMessagesPerMinute: 10 },
   },
 

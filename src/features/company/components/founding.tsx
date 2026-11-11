@@ -24,6 +24,7 @@ import { playSound } from "@/lib/sound";
 import { useClock } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
 import { COMPANY_COLORS, useCompanyRefresh } from "../hooks";
+import { useProductText } from "../product-name";
 
 const SECTORS = Object.keys(SECTOR_ICONS) as SectorKey[];
 const lockDate = new Intl.DateTimeFormat("de-DE", {
@@ -140,6 +141,11 @@ function FoundingSheet({ tier, onClose }: { tier: CompanyTier | null; onClose: (
   const [idea, setIdea] = useState("");
   const [sector, setSector] = useState<SectorKey>("tech");
   const [color, setColor] = useState<string>(COMPANY_COLORS[0]);
+  const [product, setProduct] = useState<string>(BALANCE.startups.products.tech[0]!.key);
+  const productText = useProductText();
+  const products = BALANCE.startups.products[sector];
+  // A product always belongs to the chosen sector (state adjusted during render).
+  if (!products.some((p) => p.key === product)) setProduct(products[0]!.key);
   const [check, setCheck] = useState<{ name: string; reason: GameErrorKey | null } | null>(null);
   const [busy, setBusy] = useState(false);
   if (tier !== null && tier !== shown) setShown(tier);
@@ -172,6 +178,7 @@ function FoundingSheet({ tier, onClose }: { tier: CompanyTier | null; onClose: (
         sector,
         color,
         tier: shown,
+        product,
       });
       void playSound("levelUp");
       haptic("success");
@@ -236,6 +243,28 @@ function FoundingSheet({ tier, onClose }: { tier: CompanyTier | null; onClose: (
               >
                 <PixelIcon {...SECTOR_ICONS[key]} scale={2} />
                 <span className="w-full truncate text-center text-2xs text-fg-2">{ts(key)}</span>
+              </button>
+            ))}
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend className="label-pixel text-fg-2">{t("product")}</legend>
+          <p className="mb-2 text-xs text-pretty text-fg-3">{t("productHint")}</p>
+          <div role="radiogroup" aria-label={t("product")} className="grid gap-2">
+            {products.map((p) => (
+              <button
+                key={p.key}
+                type="button"
+                role="radio"
+                aria-checked={product === p.key}
+                onClick={() => setProduct(p.key)}
+                className={cn(
+                  "rounded-md border px-3 py-2 text-left focus-ring transition-colors duration-fast",
+                  product === p.key ? "border-accent bg-accent-soft" : "border-line-1 hover:bg-surface-2",
+                )}
+              >
+                <span className="block text-sm font-medium text-fg-1">{productText.name(p.key)}</span>
+                <span className="block text-xs text-fg-3">{productText.desc(p.key)}</span>
               </button>
             ))}
           </div>

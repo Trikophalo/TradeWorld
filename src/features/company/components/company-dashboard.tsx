@@ -27,6 +27,7 @@ import { isDemoMode } from "@/lib/supabase/env";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { useCompanyRefresh } from "../hooks";
+import { useProductText } from "../product-name";
 import { CompanyChat } from "./company-chat";
 import { Applications, Postings, Team } from "./employer";
 
@@ -42,6 +43,7 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
   const ts = useTranslations("sectors");
   const refresh = useCompanyRefresh();
   const [tab, setTab] = useState<Tab>("overview");
+  const [prefill, setPrefill] = useState<string[] | undefined>(undefined);
 
   return (
     <div className="space-y-5">
@@ -128,8 +130,17 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
         ]}
       />
 
-      {tab === "overview" && <Overview company={company} />}
-      {tab === "postings" && <Postings company={company} />}
+      {tab === "overview" && (
+        <Overview
+          company={company}
+          onHire={(skills) => {
+            setPrefill(skills);
+            setTab("postings");
+          }}
+          onTrain={() => setTab("team")}
+        />
+      )}
+      {tab === "postings" && <Postings key={prefill?.join() ?? "none"} company={company} prefillSkills={prefill} />}
       {tab === "applications" && <Applications company={company} />}
       {tab === "team" && <Team company={company} />}
       {tab === "chat" && <CompanyChat />}
@@ -153,10 +164,19 @@ function Kpi({ label, value, tone }: { label: string; value: string; tone?: "gai
   );
 }
 
-function Overview({ company }: { company: MyCompany }) {
+function Overview({
+  company,
+  onHire,
+  onTrain,
+}: {
+  company: MyCompany;
+  onHire: (skills: string[]) => void;
+  onTrain: () => void;
+}) {
   return (
     <div className="grid gap-5 *:min-w-0 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6">
       <div className="space-y-5">
+        <GrowthCard company={company} onHire={onHire} onTrain={onTrain} />
         <QuarterCard company={company} />
         <HistoryCard company={company} />
       </div>
@@ -567,5 +587,74 @@ function CloseSheet({ company, open, onClose }: { company: MyCompany; open: bool
         {t("closeEstimate", { cash: money(company.cashCents), unpaid: money(company.unpaidCents) })}
       </p>
     </Sheet>
+  );
+}
+
+/** Growth stages of the product (ADR-062): which specialists the company has and needs next. */
+function GrowthCard({
+  company,
+  onHire,
+  onTrain,
+}: {
+  company: MyCompany;
+  onHire: (skills: string[]) => void;
+  onTrain: () => void;
+}) {
+  const t = useTranslations("firm");
+  const tn = useTranslations("skills.nodes");
+  const product = useProductText();
+  const name = (key: string) => tn(`${key}.name` as Parameters<typeof tn>[0]);
+  const next = company.stages.find((st) => !st.reached);
+  const missing = next?.skills.filter((s) => !s.coveredBy).map((s) => s.key) ?? [];
+  return (
+    <Card padding="lg" className="space-y-4" data-testid="growth">
+      <div>
+        <p className="label-pixel text-fg-2">
+          {t("growthTitle")} · {product.name(company.productKey)}
+        </p>
+        <p className="mt-1 text-sm text-pretty text-fg-3">{t("growthIntro")}</p>
+      </div>
+      <ol className="space-y-2">
+        {company.stages.map((st) => (
+          <li
+            key={st.stage}
+            className={cn(
+              "rounded-md border px-3 py-2",
+              st.reached ? "border-gain/40 bg-gain-soft" : st === next ? "border-accent" : "border-line-1 opacity-70",
+            )}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="label-pixel text-fg-1">{t("stageN", { stage: st.stage })}</span>
+              {st.reached && <span className="label-pixel text-gain">{t("stageReached")}</span>}
+            </div>
+            <ul className="mt-1 space-y-0.5 text-sm">
+              {st.skills.map((s) => (
+                <li key={s.key} className="flex justify-between gap-2">
+                  <span className="text-fg-1">{name(s.key)}</span>
+                  <span className={s.coveredBy ? "text-gain" : "text-fg-3"}>
+                    {s.coveredBy ? t("coveredBy", { name: s.coveredBy }) : t("missing")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ol>
+      {next ? (
+        <div className="space-y-2">
+          <p className="text-sm text-fg-1">{t("nextStep", { skills: missing.map(name).join(", ") })}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => onHire(missing)}>
+              {t("hireFor")}
+            </Button>
+            <Button size="sm" variant="secondary" onClick={onTrain}>
+              {t("trainFor")}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-gain">{t("allStages")}</p>
+      )}
+    </Card>
   );
 }

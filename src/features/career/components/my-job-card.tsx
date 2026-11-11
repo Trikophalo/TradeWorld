@@ -8,13 +8,13 @@ import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Button, type ButtonState } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Card } from "@/components/ui/card";
+import { Countdown } from "@/components/ui/countdown";
 import { HoldButton } from "@/components/ui/hold-button";
 import { LockBadge } from "@/components/ui/lock-badge";
 import { Progress } from "@/components/ui/progress";
 import { Sheet } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
-import { BALANCE } from "@/config/balance";
 import { useGameErrorText } from "@/features/game/errors";
 import { engine, usePlayerLevel } from "@/features/game/store";
 import type { MyJob } from "@/features/game/types";
@@ -28,6 +28,12 @@ import { useCareerRefresh, useMyJob } from "../hooks";
 import { useJobTitle } from "./job-title";
 
 const date = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "short" });
+const noticeDate = new Intl.DateTimeFormat("de-DE", {
+  day: "2-digit",
+  month: "long",
+  hour: "2-digit",
+  minute: "2-digit",
+});
 const factor = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export function EmployerLogo({ job, scale = 2 }: { job: Pick<MyJob, "company">; scale?: 2 | 3 | 4 }) {
@@ -76,7 +82,7 @@ export function MyJobCard() {
   return <ActiveJob job={job.data} />;
 }
 
-function ActiveJob({ job }: { job: MyJob }) {
+export function ActiveJob({ job }: { job: MyJob }) {
   const t = useTranslations("career");
   const tc = useTranslations("careerTiers");
   const title = useJobTitle(job);
@@ -135,11 +141,15 @@ function ActiveJob({ job }: { job: MyJob }) {
 
       <RaiseBox job={job} />
 
-      <div className="mt-4 flex justify-end">
-        <Button variant="danger" size="sm" onClick={() => setQuitting(true)}>
-          {t("quit")}
-        </Button>
-      </div>
+      {job.noticeEndsAt ? (
+        <NoticeBox noticeEndsAt={job.noticeEndsAt} />
+      ) : (
+        <div className="mt-4 flex justify-end">
+          <Button variant="danger" size="sm" onClick={() => setQuitting(true)}>
+            {t("quit")}
+          </Button>
+        </div>
+      )}
       <QuitSheet job={job} open={quitting} onOpenChange={setQuitting} />
     </Card>
   );
@@ -195,6 +205,37 @@ function RaiseBox({ job }: { job: MyJob }) {
   );
 }
 
+/** Running notice (ADR-063): countdown to the last day, can be taken back. */
+function NoticeBox({ noticeEndsAt }: { noticeEndsAt: string }) {
+  const t = useTranslations("jobTab");
+  const errorText = useGameErrorText();
+  const refresh = useCareerRefresh();
+  const [state, setState] = useState<ButtonState>("idle");
+  const cancel = async () => {
+    setState("loading");
+    try {
+      await engine.cancelQuit(crypto.randomUUID());
+      toast.success(t("noticeCancelled"), undefined, { silent: true });
+      await refresh();
+    } catch (error) {
+      toast.error(t("cancelNotice"), errorText(error));
+    } finally {
+      setState("idle");
+    }
+  };
+  return (
+    <div className="mt-4 rounded-md bg-warn-soft px-3 py-3" data-testid="notice">
+      <p className="text-sm text-warn">
+        {t("notice")} <Countdown target={Date.parse(noticeEndsAt)} className="nums font-semibold" />
+      </p>
+      <p className="mt-0.5 text-xs text-pretty text-fg-2">{t("noticeHint")}</p>
+      <Button size="sm" variant="secondary" className="mt-2" state={state} onClick={() => void cancel()}>
+        {t("cancelNotice")}
+      </Button>
+    </div>
+  );
+}
+
 function QuitSheet({ job, open, onOpenChange }: { job: MyJob; open: boolean; onOpenChange: (open: boolean) => void }) {
   const t = useTranslations("career");
   const errorText = useGameErrorText();
@@ -205,7 +246,7 @@ function QuitSheet({ job, open, onOpenChange }: { job: MyJob; open: boolean; onO
     setBusy(true);
     try {
       const result = await engine.quitJob(crypto.randomUUID());
-      toast.success(t("quitDone"), t("quitDoneText", { amount: formatMoney(result.paidCents) }));
+      toast.success(t("quitDone"), t("quitDoneText", { date: noticeDate.format(new Date(result.noticeEndsAt)) }));
       onOpenChange(false);
       await refresh();
     } catch (error) {
@@ -231,10 +272,8 @@ function QuitSheet({ job, open, onOpenChange }: { job: MyJob; open: boolean; onO
         </div>
       }
     >
-      <p className="text-pretty text-fg-2">
-        {t("quitText", {
-          amount: formatMoney(job.quitCostCents ?? job.salaryCentsPerHour * BALANCE.jobs.salaryUnitHours),
-        })}
+      <p className="text-pretty text-fg-2" data-job={job.id}>
+        {t("quitText")}
       </p>
     </Sheet>
   );

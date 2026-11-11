@@ -18,13 +18,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "@/components/ui/toast";
 import { BALANCE } from "@/config/balance";
-import { SKILL_BRANCHES, type SkillBranch } from "@/config/skills";
+import { SKILL_BRANCHES, SKILL_NODES, type SkillBranch } from "@/config/skills";
 import { useJobTitle } from "@/features/career/components/job-title";
 import { useGameErrorText } from "@/features/game/errors";
 import { engine } from "@/features/game/store";
 import type { CareerTier, CompanyApplication, JobRequirementInfo, MyCompany, TeamMember } from "@/features/game/types";
 import { formatBps, formatMoney } from "@/lib/format";
 import { fitPercent } from "@/lib/sim/skills";
+import { trainingFor } from "@/lib/sim/startup";
 import { isDemoMode } from "@/lib/supabase/env";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
@@ -39,14 +40,16 @@ const baseWage = (tier: CareerTier): number =>
 
 // ------------------------------------------------------------------ postings
 
-export function Postings({ company }: { company: MyCompany }) {
+export function Postings({ company, prefillSkills }: { company: MyCompany; prefillSkills?: string[] }) {
   const t = useTranslations("firm");
   const tc = useTranslations("careerTiers");
   const tb = useTranslations("skills.branches");
+  const tn = useTranslations("skills.nodes");
   const errorText = useGameErrorText();
   const refresh = useCompanyRefresh();
   const postings = useCompanyPostings(true);
-  const [creating, setCreating] = useState(false);
+  // Coming from the growth card: open the form with the missing skills.
+  const [creating, setCreating] = useState(Boolean(prefillSkills?.length));
 
   const close = async (id: string) => {
     try {
@@ -92,6 +95,11 @@ export function Postings({ company }: { company: MyCompany }) {
                     )
                     .join(" · ")}
                 </p>
+                {p.requiredSkills.length > 0 && (
+                  <p className="text-xs text-accent">
+                    {p.requiredSkills.map((k) => tn(`${k}.name` as Parameters<typeof tn>[0])).join(" · ")}
+                  </p>
+                )}
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs text-fg-2">{t("postingPending", { count: p.applicationsPending })}</span>
                   {p.status === "open" && (
@@ -105,12 +113,27 @@ export function Postings({ company }: { company: MyCompany }) {
           ))}
         </ul>
       )}
-      <CreatePostingSheet company={company} open={creating} onClose={() => setCreating(false)} />
+      <CreatePostingSheet
+        company={company}
+        open={creating}
+        initialSkills={prefillSkills}
+        onClose={() => setCreating(false)}
+      />
     </div>
   );
 }
 
-function CreatePostingSheet({ company, open, onClose }: { company: MyCompany; open: boolean; onClose: () => void }) {
+function CreatePostingSheet({
+  company,
+  open,
+  initialSkills,
+  onClose,
+}: {
+  company: MyCompany;
+  open: boolean;
+  initialSkills?: string[];
+  onClose: () => void;
+}) {
   const t = useTranslations("firm");
   const tc = useTranslations("careerTiers");
   const tb = useTranslations("skills.branches");
@@ -122,6 +145,7 @@ function CreatePostingSheet({ company, open, onClose }: { company: MyCompany; op
   const [required, setRequired] = useState<JobRequirementInfo[]>([{ branch: sectorBranches[0]!, minScore: 0 }]);
   const [wage, setWage] = useState(baseWage("intern"));
   const [slots, setSlots] = useState(1);
+  const [skills, setSkills] = useState<string[]>(initialSkills ?? []);
   const [state, setState] = useState<ButtonState>("idle");
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
@@ -150,6 +174,7 @@ function CreatePostingSheet({ company, open, onClose }: { company: MyCompany; op
         required,
         salaryCentsPerHour: wage,
         slots,
+        requiredSkills: skills,
       });
       setState("success");
       void playSound("success");
@@ -250,6 +275,7 @@ function CreatePostingSheet({ company, open, onClose }: { company: MyCompany; op
             marks={[(baseWage(tier) - low) / (high - low)]}
           />
         </div>
+        <SkillPicker value={skills} onChange={setSkills} />
         <div className="flex items-center justify-between">
           <span className="label-pixel text-fg-2">{t("postingSlots")}</span>
           <Segmented<string>
@@ -434,6 +460,7 @@ export function Team({ company }: { company: MyCompany }) {
   const t = useTranslations("firm");
   const team = useCompanyTeam(company.id);
   const [firing, setFiring] = useState<TeamMember | null>(null);
+  const [training, setTraining] = useState<TeamMember | null>(null);
   if (!team.data) return <Skeleton className="h-32 w-full rounded-lg" />;
   if (team.data.length === 0) {
     return (
@@ -449,16 +476,18 @@ export function Team({ company }: { company: MyCompany }) {
       <ul className="space-y-3">
         {team.data.map((m) => (
           <li key={m.playerJobId}>
-            <MemberRow member={m} onFire={() => setFiring(m)} />
+            <MemberRow member={m} onFire={() => setFiring(m)} onTrain={() => setTraining(m)} />
           </li>
         ))}
       </ul>
       <FireSheet member={firing} onClose={() => setFiring(null)} />
+      <TrainSheet company={company} member={training} onClose={() => setTraining(null)} />
     </>
   );
 }
 
-function MemberRow({ member, onFire }: { member: TeamMember; onFire: () => void }) {
+function MemberRow({ member, onFire, onTrain }: { member: TeamMember; onFire: () => void; onTrain: () => void }) {
+  const tn = useTranslations("skills.nodes");
   const t = useTranslations("firm");
   const errorText = useGameErrorText();
   const refresh = useCompanyRefresh();
@@ -490,10 +519,29 @@ function MemberRow({ member, onFire }: { member: TeamMember; onFire: () => void 
             </span>
           </p>
         </div>
-        <Button size="sm" variant="danger" onClick={onFire}>
-          {t("fire")}
-        </Button>
+        <div className="flex flex-col gap-2">
+          <Button size="sm" onClick={onTrain}>
+            {t("train")}
+          </Button>
+          <Button size="sm" variant="danger" onClick={onFire}>
+            {t("fire")}
+          </Button>
+        </div>
       </div>
+      {member.skills.length > 0 && (
+        <ul className="mt-2 flex flex-wrap gap-1">
+          {member.skills.slice(0, 8).map((key) => (
+            <li key={key} className="rounded-xs bg-surface-3 px-1.5 py-0.5 text-xs text-fg-2">
+              {tn(`${key}.name` as Parameters<typeof tn>[0])}
+            </li>
+          ))}
+        </ul>
+      )}
+      {member.noticeEndsAt && (
+        <p className="mt-2 text-xs text-warn">
+          {t("noticeMember", { date: date.format(new Date(member.noticeEndsAt)) })}
+        </p>
+      )}
       {member.pendingRaise && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md bg-surface-2 px-3 py-2">
           <span className="text-sm text-fg-2">
@@ -546,6 +594,179 @@ function FireSheet({ member, onClose }: { member: TeamMember | null; onClose: ()
       }
     >
       <p className="text-pretty text-fg-2">{t("fireText")}</p>
+    </Sheet>
+  );
+}
+
+// ------------------------------------------------------------------ concrete skills and trainings (ADR-062)
+
+/** Searchable choice of up to four concrete skills. */
+function SkillPicker({ value, onChange }: { value: string[]; onChange: (skills: string[]) => void }) {
+  const t = useTranslations("firm");
+  const tn = useTranslations("skills.nodes");
+  const [query, setQuery] = useState("");
+  const name = (key: string) => tn(`${key}.name` as Parameters<typeof tn>[0]);
+  const q = query.trim().toLowerCase();
+  const matches = q
+    ? SKILL_NODES.filter((n) => !value.includes(n.key) && name(n.key).toLowerCase().includes(q)).slice(0, 6)
+    : [];
+  return (
+    <div>
+      <p className="label-pixel text-fg-2">{t("postingConcrete")}</p>
+      <p className="mb-2 text-xs text-fg-3">{t("postingConcreteHint")}</p>
+      {value.length > 0 && (
+        <ul className="mb-2 flex flex-wrap gap-1.5">
+          {value.map((key) => (
+            <li key={key}>
+              <button
+                type="button"
+                onClick={() => onChange(value.filter((k) => k !== key))}
+                className="rounded-xs border border-accent bg-accent-soft px-2 py-1 text-xs text-fg-1 focus-ring"
+              >
+                {name(key)} ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {value.length < 4 && (
+        <>
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t("postingSearch")}
+            aria-label={t("postingSearch")}
+            className="h-10 w-full rounded-md border border-line-2 bg-surface-2 px-3 text-sm text-fg-1 focus-ring placeholder:text-fg-3"
+          />
+          {matches.length > 0 && (
+            <ul className="mt-1 divide-y divide-line-1 rounded-md border border-line-1">
+              {matches.map((n) => (
+                <li key={n.key}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChange([...value, n.key]);
+                      setQuery("");
+                    }}
+                    className="w-full px-3 py-2 text-left text-sm text-fg-1 focus-ring hover:bg-surface-2"
+                  >
+                    {name(n.key)}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function TrainSheet({
+  company,
+  member,
+  onClose,
+}: {
+  company: MyCompany;
+  member: TeamMember | null;
+  onClose: () => void;
+}) {
+  const t = useTranslations("firm");
+  const tn = useTranslations("skills.nodes");
+  const errorText = useGameErrorText();
+  const refresh = useCompanyRefresh();
+  const [shown, setShown] = useState(member);
+  const [skill, setSkill] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  if (member && member !== shown) {
+    setShown(member);
+    setSkill(null);
+  }
+  if (!shown) return null;
+  const name = (key: string) => tn(`${key}.name` as Parameters<typeof tn>[0]);
+  const knows = new Set(shown.skills);
+  const needed = company.stages
+    .flatMap((st) => st.skills)
+    .filter((s) => !s.coveredBy && !knows.has(s.key))
+    .map((s) => s.key);
+  const others = (BALANCE.jobs.sectorBranches[company.sector] ?? [])
+    .flatMap((b) => SKILL_NODES.filter((n) => n.branches[0] === b && n.tier <= 3))
+    .map((n) => n.key)
+    .filter((k) => !knows.has(k) && !needed.includes(k))
+    .slice(0, 10);
+  const node = skill ? SKILL_NODES.find((n) => n.key === skill) : undefined;
+  const price = node ? trainingFor(node.tier) : null;
+
+  const train = async () => {
+    if (!skill) return;
+    setBusy(true);
+    try {
+      const r = await engine.trainEmployee(crypto.randomUUID(), shown.playerJobId, skill);
+      void playSound("levelUp", 0.6);
+      toast.success(t("trained"), t("trainedText", { amount: formatMoney(r.salaryCentsPerHour) }));
+      await refresh();
+      onClose();
+    } catch (error) {
+      toast.error(t("train"), errorText(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const option = (key: string) => (
+    <button
+      key={key}
+      type="button"
+      role="radio"
+      aria-checked={skill === key}
+      onClick={() => setSkill(key)}
+      className={cn(
+        "rounded-sm border px-2.5 py-1.5 text-left text-xs focus-ring transition-colors duration-fast",
+        skill === key ? "border-accent bg-accent-soft text-fg-1" : "border-line-1 text-fg-2 hover:bg-surface-2",
+      )}
+    >
+      {name(key)}
+    </button>
+  );
+
+  return (
+    <Sheet
+      open={member !== null}
+      onOpenChange={(o) => !o && onClose()}
+      title={t("trainTitle", { name: shown.nickname })}
+      footer={
+        <HoldButton tone="accent" onConfirm={() => void train()} disabled={!skill || busy} className="w-full">
+          {t("trainConfirm")}
+        </HoldButton>
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-pretty text-fg-2">{t("trainIntro")}</p>
+        {needed.length > 0 && (
+          <div>
+            <p className="mb-1.5 label-pixel text-accent">{t("trainNeeded")}</p>
+            <div role="radiogroup" className="flex flex-wrap gap-1.5">
+              {needed.map(option)}
+            </div>
+          </div>
+        )}
+        {others.length > 0 && (
+          <div>
+            <p className="mb-1.5 label-pixel text-fg-3">{t("trainOther")}</p>
+            <div role="radiogroup" className="flex flex-wrap gap-1.5">
+              {others.map(option)}
+            </div>
+          </div>
+        )}
+        {price && (
+          <p className="rounded-md bg-surface-2 px-3 py-2 nums text-sm text-fg-1">
+            {t("trainCost", {
+              amount: formatMoney(price.costCents, { whole: true }),
+              percent: formatBps(price.raiseBps).replace("+", ""),
+            })}
+          </p>
+        )}
+      </div>
     </Sheet>
   );
 }

@@ -4,6 +4,7 @@ import { expect, test } from "@playwright/test";
 const TABS = [
   { name: "Portfolio", path: "/portfolio", heading: "Portfolio" },
   { name: "Märkte", path: "/markets", heading: "Märkte" },
+  { name: /^Job/, path: "/job", heading: "Job" },
   { name: /Karriere/, path: "/career", heading: "Karriere" },
   { name: "Profil", path: "/profile", heading: "Profil" },
 ];
@@ -17,7 +18,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("the five tabs navigate without horizontal overflow or console errors", async ({ page }) => {
+test("the six tabs navigate without horizontal overflow or console errors", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {

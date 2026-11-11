@@ -174,12 +174,33 @@ function Postings({
   );
 }
 
-function Requirements({ required }: { required: readonly JobRequirementInfo[] }) {
+function Requirements({
+  required,
+  requiredSkills = [],
+}: {
+  required: readonly JobRequirementInfo[];
+  requiredSkills?: readonly string[];
+}) {
   const t = useTranslations("jobs");
   const tb = useTranslations("skills.branches");
+  const tn = useTranslations("skills.nodes");
   const skills = useSkills();
+  const learned = new Set(skills.data?.learned.map((l) => l.key) ?? []);
   return (
     <ul className="flex flex-wrap gap-1.5">
+      {requiredSkills.map((key) => (
+        <li
+          key={key}
+          className={cn(
+            "rounded-xs border px-1.5 py-0.5 text-xs",
+            learned.has(key) ? "border-gain/50 bg-gain-soft text-gain" : "border-warn/50 text-warn",
+          )}
+          title={t("skillsRequired")}
+        >
+          {learned.has(key) ? "✓ " : ""}
+          {tn(`${key}.name` as Parameters<typeof tn>[0])}
+        </li>
+      ))}
       {required.map((req) => {
         const met = (skills.data?.branchScores[req.branch] ?? 0) >= req.minScore;
         return (
@@ -229,7 +250,7 @@ function PostingCard({
         </div>
         <Badge tone={posting.company.isAi ? "neutral" : "accent"}>{tc(posting.tier)}</Badge>
       </div>
-      <Requirements required={posting.required} />
+      <Requirements required={posting.required} requiredSkills={posting.requiredSkills} />
       <div className="flex items-end justify-between gap-3">
         <div>
           <p className="nums font-semibold text-fg-1">{formatMoney(posting.salaryCentsPerHour)}/Std.</p>
@@ -379,7 +400,19 @@ function ApplySheet({
     >
       <div className="space-y-5">
         <p className="text-sm text-pretty text-fg-2">{t("applyIntro")}</p>
-        <WishPicker base={shown.salaryCentsPerHour} max={shown.maxSalaryCentsPerHour} value={wish} onChange={setWish} />
+        {shown.company.isAi ? (
+          // AI employers offer their maximum, there is nothing to wish for (ADR-064).
+          <p className="rounded-md bg-gain-soft px-4 py-3 text-sm text-pretty text-fg-1" data-testid="ai-offer">
+            {t("aiOffer", { amount: formatMoney(shown.maxSalaryCentsPerHour ?? shown.salaryCentsPerHour) })}
+          </p>
+        ) : (
+          <WishPicker
+            base={shown.salaryCentsPerHour}
+            max={shown.maxSalaryCentsPerHour}
+            value={wish}
+            onChange={setWish}
+          />
+        )}
         <Field
           label={t("message")}
           value={message}
@@ -554,9 +587,11 @@ function ApplicationRow({
           <Button size="sm" variant="ghost" disabled={busy} onClick={() => void withdraw()}>
             {t("decline")}
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => onCounter(application)}>
-            {t("counter")}
-          </Button>
+          {!application.posting.company.isAi && (
+            <Button size="sm" variant="secondary" onClick={() => onCounter(application)}>
+              {t("counter")}
+            </Button>
+          )}
           <Button size="sm" onClick={() => onContract(application)}>
             {t("toContract")}
           </Button>
@@ -602,7 +637,7 @@ function ContractSheet({ application, onClose }: { application: JobApplication |
       await refresh();
       window.setTimeout(() => {
         onClose();
-        router.push("/career");
+        router.push("/job");
       }, 900);
     } catch (error) {
       setState("idle");

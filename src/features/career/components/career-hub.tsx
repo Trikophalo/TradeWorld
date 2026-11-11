@@ -12,7 +12,7 @@ import { useMyCompany } from "@/features/company/hooks";
 import { useMyJob, usePlayerCard, useSkills } from "../hooks";
 import { BusinessCard } from "./business-card";
 import { MyJobCard } from "./my-job-card";
-import { WorkTaskCard } from "./work-task-card";
+import { useJobTitle } from "./job-title";
 
 /** Career tab: current job, skills, own business card and the way to the company (ADR-050–054). */
 export function CareerHub() {
@@ -23,14 +23,23 @@ export function CareerHub() {
   const companyLevel = BALANCE.startups.garage.minLevel;
   const company = useMyCompany();
   const job = useMyJob();
+  const jobTitle = useJobTitle(job.data ?? { titleKey: null, title: null });
   const tc = useTranslations("chat");
 
   return (
     <div className="grid items-start gap-5 *:min-w-0 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-6">
       <div className="space-y-5 lg:space-y-6">
         <p className="text-pretty text-fg-2">{t("intro")}</p>
-        <MyJobCard />
-        {job.data && <WorkTaskCard />}
+        {job.data ? (
+          <LinkCard
+            href="/job"
+            icon={<PixelIcon {...UI_ICONS.briefcase} scale={2} className="text-gain" />}
+            title={t("jobLink")}
+            hint={t("jobLinkHint", { title: jobTitle, company: job.data.company.name })}
+          />
+        ) : (
+          <MyJobCard />
+        )}
         {(job.data ? !job.data.company.isAi : Boolean(company.data?.company)) && (
           <LinkCard
             href="/career/chat"
