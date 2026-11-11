@@ -32,7 +32,9 @@ describe("RPC contract", () => {
       "get_offers",
       "subscribe_offer",
     ];
-    const pending = fixtures.some((file) => file.startsWith("get_offers")) ? [] : m3f;
+    // M3i (company ranking, hourly operations) is written in parallel with the database.
+    const m3i = fixtures.some((file) => file.startsWith("get_company_ranking")) ? [] : ["get_company_ranking"];
+    const pending = [...(fixtures.some((file) => file.startsWith("get_offers")) ? [] : m3f), ...m3i];
     for (const name of Object.keys(RPC_SCHEMAS).filter((key) => !pending.includes(key))) {
       expect(
         fixtures.some((file) => file.startsWith(name)),

@@ -72,7 +72,7 @@ test("found a garage startup, run quarters, hire and post a job", async ({ page 
   // Growth stages (ADR-062): the product needs specialists, the next step is named.
   const growth = page.getByTestId("growth");
   await expect(growth.getByText("Stufe 1")).toBeVisible();
-  await expect(growth.getByText(/Als Nächstes brauchst du: IT-Sicherheit/)).toBeVisible();
+  await expect(growth.getByText(/Als Nächstes brauchst du: Netzwerke/)).toBeVisible();
 
   // Close two quarters (demo button): a report appears.
   await header.getByText("Demo: Quartal jetzt abschließen").click();
@@ -93,21 +93,21 @@ test("found a garage startup, run quarters, hire and post a job", async ({ page 
   // Fill the open growth seat with an AI worker (ADR-071): the seat then shows the AI, not "fehlt".
   await page.getByRole("tab", { name: "Übersicht" }).click();
   const growthPath = page.getByTestId("growth");
-  await growthPath.getByRole("button", { name: /IT-Sicherheit/ }).click();
+  await growthPath.getByRole("button", { name: /Netzwerke/ }).click();
   const hire = page.getByRole("dialog", { name: "Stelle ausschreiben" });
   await hire.getByRole("radio", { name: "KI-Kraft" }).click();
   await expect(hire.getByText("700 € pro Quartal", { exact: true })).toBeVisible();
-  await expect(hire.getByRole("radio", { name: "IT-Sicherheit" })).toHaveAttribute("aria-checked", "true");
+  await expect(hire.getByRole("radio", { name: "Netzwerke" })).toHaveAttribute("aria-checked", "true");
   await hire.getByRole("button", { name: "KI-Kraft einstellen" }).click();
   await expect(page.getByText("KI-Kraft eingestellt")).toBeVisible();
-  await expect(growthPath.getByTestId("seat-ai")).toContainText("IT-Sicherheit");
+  await expect(growthPath.getByTestId("seat-ai")).toContainText("Netzwerke");
   await expect(growthPath.getByText("Stufe 1 von 4")).toBeVisible();
   await expect(page.getByTestId("ai-workers")).toHaveText("1");
   await expect(page.getByText("1 von 2 Plätzen belegt")).toBeVisible();
 
   // In the team the AI worker sits in its own seat and can be let go.
   await page.getByRole("tab", { name: "Team" }).click();
-  await expect(page.getByTestId("ai-seat")).toContainText("für IT-Sicherheit");
+  await expect(page.getByTestId("ai-seat")).toContainText("für Netzwerke");
   await page.getByTestId("ai-seat").getByRole("button", { name: "Entlassen" }).click();
   await expect(page.getByText("KI-Kraft entlassen")).toBeVisible();
   await expect(page.getByTestId("ai-seat")).toHaveCount(0);

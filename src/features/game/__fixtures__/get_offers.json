@@ -1,12 +1,12 @@
 {
   "offers": [
     {
-      "id": "22e609e6-113c-499b-b5b5-e637d0fbb1c2",
+      "id": "6841da6e-be1b-4871-8170-0bc6d34b80a5",
       "kind": "ipo",
       "status": "open",
       "ticker": null,
       "company": {
-        "id": "b50b4c9c-2f8d-449f-9247-84226efd8cf6",
+        "id": "70332b3e-e1a7-4d6b-afda-a5216c646ec5",
         "logo": {
           "grid": [
             "................",
@@ -34,21 +34,21 @@
         "sector": "tech",
         "product_key": "security_software"
       },
-      "ends_at": "2026-11-12T09:24:40.499033+00:00",
+      "ends_at": "2026-11-12T09:41:44.060834+00:00",
       "price_cents": 100,
-      "value_cents": 1025727,
-      "last_quarter": { "label": "J1 Q2", "profit_cents": -97658, "revenue_cents": 16456 },
+      "value_cents": 1015186,
+      "last_quarter": { "label": "J1 Q2", "profit_cents": -108199, "revenue_cents": 2401 },
       "my_shares_e6": 250000000,
       "shares_offered_e6": 200000000000,
       "shares_subscribed_e6": 250000000
     },
     {
-      "id": "4e0e299f-eb29-409c-ab11-f9d5d8b29e40",
+      "id": "c4f807b5-f8e0-4a2c-a6f6-4ef4a41b7378",
       "kind": "ipo",
       "status": "closed",
       "ticker": "FEN",
       "company": {
-        "id": "cc773c25-6304-42cc-aba1-987a80e01911",
+        "id": "312c123e-2d04-4f43-bb4f-1844cd7a61a5",
         "logo": {
           "grid": [
             "................",
@@ -76,21 +76,21 @@
         "sector": "tech",
         "product_key": "security_software"
       },
-      "ends_at": "2026-11-11T21:24:37.514922+00:00",
+      "ends_at": "2026-11-11T21:41:40.568197+00:00",
       "price_cents": 100,
-      "value_cents": 16975794,
-      "last_quarter": { "label": "J1 Q3", "profit_cents": -1348197, "revenue_cents": 2404 },
+      "value_cents": 16975747,
+      "last_quarter": { "label": "J1 Q3", "profit_cents": -1348244, "revenue_cents": 2341 },
       "my_shares_e6": 0,
       "shares_offered_e6": 300000000000,
       "shares_subscribed_e6": 700500000
     },
     {
-      "id": "1222c730-0fa3-45e0-a60d-469255c13c2c",
+      "id": "7a382f9a-efe2-46cf-9ae7-5803310eceb6",
       "kind": "capital_increase",
       "status": "closed",
       "ticker": "FEN",
       "company": {
-        "id": "cc773c25-6304-42cc-aba1-987a80e01911",
+        "id": "312c123e-2d04-4f43-bb4f-1844cd7a61a5",
         "logo": {
           "grid": [
             "................",
@@ -118,10 +118,10 @@
         "sector": "tech",
         "product_key": "security_software"
       },
-      "ends_at": "2026-11-11T21:24:37.629357+00:00",
+      "ends_at": "2026-11-11T21:41:40.716504+00:00",
       "price_cents": 100,
-      "value_cents": 16975794,
-      "last_quarter": { "label": "J1 Q3", "profit_cents": -1348197, "revenue_cents": 2404 },
+      "value_cents": 16975747,
+      "last_quarter": { "label": "J1 Q3", "profit_cents": -1348244, "revenue_cents": 2341 },
       "my_shares_e6": 0,
       "shares_offered_e6": 79797200000,
       "shares_subscribed_e6": 300000000

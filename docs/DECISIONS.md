@@ -711,3 +711,21 @@ Firmen verdienen laufend, nicht nur am Quartalsende.
 Konzept in docs/COMPANY_GROWTH.md: Forschungspunkte und Forschungsprojekte, mehrere Produkte mit Versionen und
 Lebenszyklus, Abteilungen, Standorte und Märkte, Wettbewerb in Nischen. Alle Ebenen haben unendliche Stufen mit
 steigenden Kosten und sinkendem Ertrag. Ziel des Spielers ist das größte Unternehmen. Umsetzung in Phasen A–D.
+
+## ADR-074: Ranglisten „Forbes 100“ und Top-Unternehmen, Missionen-Knopf, leichtere Einstiegs-Skills — `akzeptiert`
+
+- **Ranglisten** (früher „Reichenliste“) haben drei Ansichten:
+  - **Forbes 100:** die 100 reichsten echten Spieler.
+  - **Alle:** mit den KI-Tycoons.
+  - **Top-Unternehmen:** Spielerfirmen nach Firmenwert, wahlweise mit den KI-Firmen nach Börsenwert
+    (`get_company_ranking`).
+- **Missionen-Knopf:** In der Kopfleiste steht immer ein Knopf zu den Missionen. Ein blauer Punkt zeigt, dass
+  eine Belohnung abholbereit ist.
+- **Leichtere Einstiegs-Skills:** Wachstumsstufen fragen am Anfang einfache Skills ab. Stufe n verlangt
+  höchstens Skill-Stufe n + 1, Stufe 1 also Spezialisierung (Stufe 2) statt Expertise. Ein Test prüft das für
+  alle Produkte.
+- **Skill-Karte:**
+  - Beim Hovern erscheint eine Infokarte (Bereich, Stufe, lernbar oder nicht).
+  - Der Mauszeiger zoomt zur eigenen Position, Verschieben und Zoomen gleiten weich.
+  - Lernbare Felder pulsieren leicht.
+  - Bereiche lassen sich in der Übersicht hervorheben und anspringen.

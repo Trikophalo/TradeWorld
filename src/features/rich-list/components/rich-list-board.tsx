@@ -10,14 +10,22 @@ import { useGame } from "@/features/game/store";
 import type { RichListScope } from "@/features/game/types";
 import { SPRING } from "@/lib/motion";
 import { useRichList } from "../hooks";
+import { CompanyRankingList } from "./company-ranking";
 import { MyRankCard } from "./my-rank-card";
 import { RankRow } from "./rank-row";
 import { RichNews } from "./rich-news";
 
-/** The full rich list: everyone, or players only, refreshed every few seconds. */
+type Board = "forbes" | "all" | "companies";
+
+/**
+ * Rankings (ADR-074): "Forbes 100" (the 100 richest real players), everyone including the AI tycoons,
+ * and the most valuable companies. Refreshed every few seconds.
+ */
 export function RichListBoard() {
   const t = useTranslations("richList");
-  const [scope, setScope] = useState<RichListScope>("all");
+  const tr = useTranslations("ranking");
+  const [board, setBoard] = useState<Board>("forbes");
+  const scope: RichListScope = board === "all" ? "all" : "players";
   const list = useRichList(scope, 100);
   const track = useGame((state) => state.track);
 
@@ -44,33 +52,43 @@ export function RichListBoard() {
   return (
     <div className="grid gap-5 *:min-w-0 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6">
       <Card padding="lg">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <Segmented
-            value={scope}
-            onValueChange={setScope}
-            label={t("scope")}
-            size="sm"
-            options={[
-              { value: "all", label: t("scopeAll") },
-              { value: "players", label: t("scopePlayers") },
-            ]}
-          />
-          <span className="text-xs text-fg-3">{t("live")}</span>
-        </div>
-        {!list.data && Array.from({ length: 8 }, (_, i) => <SkeletonRow key={i} />)}
-        <ol className="space-y-1">
-          <AnimatePresence initial={false}>
-            {list.data?.entries.map((entry) => (
-              <motion.li key={`${entry.kind}-${entry.id}`} layout transition={SPRING.smooth}>
-                <RankRow entry={entry} />
-              </motion.li>
-            ))}
-          </AnimatePresence>
-        </ol>
-        {meEntry && (
-          <div className="mt-3 border-t border-line-1 pt-3">
-            <RankRow entry={meEntry} />
-          </div>
+        <Segmented<Board>
+          value={board}
+          onValueChange={setBoard}
+          label={t("scope")}
+          block
+          options={[
+            { value: "forbes", label: tr("forbes") },
+            { value: "all", label: t("scopeAll") },
+            { value: "companies", label: tr("companies") },
+          ]}
+        />
+        <p className="mt-3 mb-3 flex flex-wrap items-baseline justify-between gap-2 text-xs text-fg-3">
+          <span className="text-pretty">
+            {board === "forbes" ? tr("forbesHint") : board === "all" ? tr("allHint") : tr("companiesHint")}
+          </span>
+          <span>{t("live")}</span>
+        </p>
+        {board === "companies" ? (
+          <CompanyRankingList />
+        ) : (
+          <>
+            {!list.data && Array.from({ length: 8 }, (_, i) => <SkeletonRow key={i} />)}
+            <ol className="space-y-1">
+              <AnimatePresence initial={false}>
+                {list.data?.entries.map((entry) => (
+                  <motion.li key={`${entry.kind}-${entry.id}`} layout transition={SPRING.smooth}>
+                    <RankRow entry={entry} />
+                  </motion.li>
+                ))}
+              </AnimatePresence>
+            </ol>
+            {meEntry && (
+              <div className="mt-3 border-t border-line-1 pt-3">
+                <RankRow entry={meEntry} />
+              </div>
+            )}
+          </>
         )}
       </Card>
       <div className="space-y-5 lg:space-y-6">

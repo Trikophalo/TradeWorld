@@ -174,6 +174,33 @@ const orderResultSchema = z.object({
 
 const progressSchema = z.object({ xp_awarded: num, level: num, xp_total: num });
 
+const companyRankingSchema = z.object({
+  server_time: iso,
+  total: num,
+  entries: z.array(
+    z.object({
+      rank: num,
+      company_id: z.string(),
+      kind: z.enum(["ai", "player"]),
+      name: z.string(),
+      color: z.string(),
+      logo: z
+        .object({ palette: z.array(z.string()), grid: z.array(z.string()) })
+        .nullable()
+        .default(null),
+      ticker: z.string().nullable(),
+      sector: z.enum(["tech", "retail", "energy", "pharma", "logistics"]).nullable(),
+      tier: z.enum(["garage", "small_business", "gmbh", "ag"]).nullable(),
+      founder: z.string().nullable(),
+      value_cents: num,
+      revenue_cents: nnum,
+      team_size: nnum,
+      is_mine: z.boolean(),
+    }),
+  ),
+  mine: z.object({ rank: num, value_cents: num }).nullable(),
+});
+
 const richListSchema = z.object({
   server_time: iso,
   total: num,
@@ -248,6 +275,7 @@ export const RPC_SCHEMAS = {
   complete_tutorial: progressSchema,
   get_rich_list: richListSchema,
   get_rich_list_news: richNewsSchema,
+  get_company_ranking: companyRankingSchema,
   check_nickname: z.object({ allowed: z.boolean(), reason: z.string().nullable() }),
   change_nickname: z.object({ nickname: z.string(), changed_at: iso, next_change_at: iso }),
   reset_account: z.object({ ok: z.literal(true), reset_at: iso }),
@@ -499,6 +527,31 @@ export const liveEngine: GameEngine = {
   async richNews(limit) {
     const rows = await rpc("get_rich_list_news", { p_limit: limit }, richNewsSchema);
     return rows.map((n) => ({ publishedAt: n.published_at, headline: n.headline, body: n.body, kind: n.kind }));
+  },
+
+  async companyRanking(scope, limit) {
+    const r = await rpc("get_company_ranking", { p_scope: scope, p_limit: limit }, companyRankingSchema);
+    return {
+      serverTime: r.server_time,
+      total: r.total,
+      entries: r.entries.map((e) => ({
+        rank: e.rank,
+        companyId: e.company_id,
+        kind: e.kind,
+        name: e.name,
+        color: e.color,
+        logo: e.logo,
+        ticker: e.ticker,
+        sector: e.sector,
+        tier: e.tier,
+        founder: e.founder,
+        valueCents: e.value_cents,
+        revenueCents: e.revenue_cents,
+        teamSize: e.team_size,
+        isMine: e.is_mine,
+      })),
+      mine: r.mine ? { rank: r.mine.rank, valueCents: r.mine.value_cents } : null,
+    };
   },
 
   async checkNickname(nickname) {

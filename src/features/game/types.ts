@@ -236,6 +236,32 @@ export interface RichNews {
 
 export type RichListScope = "all" | "players";
 
+/** Ranking of the most valuable companies (ADR-074): AI companies by market value, player companies by value. */
+export interface CompanyRankingEntry {
+  rank: number;
+  companyId: string;
+  kind: "ai" | "player";
+  name: string;
+  color: string;
+  logo: CompanyLogoData | null;
+  ticker: string | null;
+  sector: SectorKey | null;
+  /** Player companies only. */
+  tier: CompanyTier | null;
+  founder: string | null;
+  valueCents: number;
+  revenueCents: number | null;
+  teamSize: number | null;
+  isMine: boolean;
+}
+
+export interface CompanyRanking {
+  serverTime: string;
+  total: number;
+  entries: CompanyRankingEntry[];
+  mine: { rank: number; valueCents: number } | null;
+}
+
 export type MissionKind = "quick" | "daily" | "weekly" | "milestone";
 
 export interface Mission {
@@ -769,6 +795,8 @@ export interface GameEngine {
   completeTutorial(requestId: string): Promise<ProgressResult>;
   richList(scope: RichListScope, limit: number, offset: number): Promise<RichList>;
   richNews(limit: number): Promise<RichNews[]>;
+  /** The most valuable companies (ADR-074). */
+  companyRanking(scope: RichListScope, limit: number): Promise<CompanyRanking>;
   checkNickname(nickname: string): Promise<{ allowed: boolean; reason: GameErrorKey | null }>;
   changeNickname(requestId: string, nickname: string): Promise<{ nickname: string; nextChangeAt: string }>;
   /** Starts over as a new player; `confirm` is the current nickname (ADR-070). */

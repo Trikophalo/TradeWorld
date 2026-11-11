@@ -1,6 +1,6 @@
 {
   "company": {
-    "id": "b50b4c9c-2f8d-449f-9247-84226efd8cf6",
+    "id": "70332b3e-e1a7-4d6b-afda-a5216c646ec5",
     "idea": "Werkzeuge für Bastler",
     "logo": {
       "grid": [
@@ -29,12 +29,12 @@
     "stage": 1,
     "sector": "tech",
     "stages": [
-      { "stage": 1, "skills": [{ "key": "it_security", "covered_by": null, "covered_by_ai": true }], "reached": true },
+      { "stage": 1, "skills": [{ "key": "it_networks", "covered_by": null, "covered_by_ai": true }], "reached": true },
       {
         "stage": 2,
         "skills": [
-          { "key": "it_architecture", "covered_by": null, "covered_by_ai": false },
-          { "key": "it_pentest", "covered_by": null, "covered_by_ai": false }
+          { "key": "it_security", "covered_by": null, "covered_by_ai": false },
+          { "key": "it_programming", "covered_by": "Fixture_Neu", "covered_by_ai": false }
         ],
         "reached": false
       },
@@ -42,7 +42,7 @@
         "stage": 3,
         "skills": [
           { "key": "law_privacy", "covered_by": null, "covered_by_ai": false },
-          { "key": "sales_b2b", "covered_by": null, "covered_by_ai": false }
+          { "key": "it_architecture", "covered_by": null, "covered_by_ai": false }
         ],
         "reached": false
       },
@@ -50,20 +50,20 @@
         "stage": 4,
         "skills": [
           { "key": "it_crypto", "covered_by": null, "covered_by_ai": false },
-          { "key": "management_leadership", "covered_by": null, "covered_by_ai": false }
+          { "key": "it_pentest", "covered_by": null, "covered_by_ai": false }
         ],
         "reached": false
       }
     ],
-    "history": [{ "label": "J1 Q2", "profit_cents": -97658, "revenue_cents": 16456 }],
+    "history": [{ "label": "J1 Q2", "profit_cents": -108199, "revenue_cents": 2401 }],
     "listing": {
       "offer": {
-        "id": "e795b2ff-0b3b-4c26-b3de-7e624505214e",
+        "id": "bab91022-422b-423d-ab32-b4e22fe84fb0",
         "kind": "capital_increase",
         "status": "open",
         "ticker": "FIX",
         "company": {
-          "id": "b50b4c9c-2f8d-449f-9247-84226efd8cf6",
+          "id": "70332b3e-e1a7-4d6b-afda-a5216c646ec5",
           "logo": {
             "grid": [
               "................",
@@ -91,10 +91,10 @@
           "sector": "tech",
           "product_key": "security_software"
         },
-        "ends_at": "2026-11-12T09:24:40.568065+00:00",
+        "ends_at": "2026-11-12T09:41:44.169477+00:00",
         "price_cents": 100,
-        "value_cents": 7677184,
-        "last_quarter": { "label": "J1 Q2", "profit_cents": -97658, "revenue_cents": 16456 },
+        "value_cents": 7666643,
+        "last_quarter": { "label": "J1 Q2", "profit_cents": -108199, "revenue_cents": 2401 },
         "my_shares_e6": 0,
         "shares_offered_e6": 86676400000,
         "shares_subscribed_e6": 0
@@ -110,27 +110,27 @@
     "headcount": 4,
     "ai_workers": 3,
     "cash_cents": 7707402,
-    "founded_at": "2026-11-11T21:24:40.035926+00:00",
+    "founded_at": "2026-11-11T21:41:43.541879+00:00",
     "can_upgrade": false,
     "logo_hidden": false,
     "product_key": "security_software",
     "quality_bps": 2660,
-    "value_cents": 7677184,
+    "value_cents": 7666643,
     "last_quarter": {
       "label": "J1 Q2",
-      "cogs_cents": 4114,
+      "cogs_cents": 600,
       "bonus_cents": 0,
       "fixed_cents": 15000,
       "wages_cents": 0,
-      "demand_cents": 16456,
-      "revenue_cents": 16456,
+      "demand_cents": 2401,
+      "revenue_cents": 2401,
       "capacity_cents": 798000,
       "ai_worker_cents": 70000,
       "marketing_cents": 25000,
-      "utilization_bps": 206,
-      "operating_profit_cents": -97658
+      "utilization_bps": 30,
+      "operating_profit_cents": -108199
     },
-    "unpaid_cents": 30218,
+    "unpaid_cents": 40759,
     "awareness_bps": 758,
     "can_go_public": false,
     "max_employees": 100,
@@ -143,11 +143,11 @@
     "founder_has_job": false,
     "next_quarter_at": "2026-11-12T01:00:00+00:00",
     "quarters_active": 1,
-    "ai_worker_skills": ["it_security"],
+    "ai_worker_skills": ["it_networks"],
     "distress_quarters": 1,
-    "estimate_low_cents": 375739,
+    "estimate_low_cents": 33339,
     "upgrade_cost_cents": null,
-    "estimate_high_cents": 3390253,
+    "estimate_high_cents": 559381,
     "ai_worker_cost_cents": 70000,
     "can_capital_increase": false,
     "pending_applications": 0,

@@ -174,6 +174,17 @@ describe("growth stages (ADR-062)", () => {
     }
   });
 
+  it("start with basics: stage n asks for skills of at most tier n + 1 (stage 1: tier 2)", () => {
+    for (const products of Object.values(BALANCE.startups.products)) {
+      for (const p of products) {
+        p.stages.forEach((skills, i) => {
+          for (const skill of skills)
+            expect(skillNode(skill)!.tier, `${p.key} stage ${i + 1}: ${skill}`).toBeLessThanOrEqual(i + 2);
+        });
+      }
+    }
+  });
+
   it("trainings get dearer with the tier", () => {
     expect(trainingFor(1).costCents).toBeLessThan(trainingFor(5).costCents);
     expect(trainingFor(9).costCents).toBe(trainingFor(5).costCents);

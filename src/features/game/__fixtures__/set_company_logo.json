@@ -1,6 +1,6 @@
 {
   "company": {
-    "id": "b50b4c9c-2f8d-449f-9247-84226efd8cf6",
+    "id": "70332b3e-e1a7-4d6b-afda-a5216c646ec5",
     "idea": "Werkzeuge für Bastler",
     "logo": {
       "grid": [
@@ -31,14 +31,14 @@
     "stages": [
       {
         "stage": 1,
-        "skills": [{ "key": "it_security", "covered_by": null, "covered_by_ai": false }],
+        "skills": [{ "key": "it_networks", "covered_by": null, "covered_by_ai": false }],
         "reached": false
       },
       {
         "stage": 2,
         "skills": [
-          { "key": "it_architecture", "covered_by": null, "covered_by_ai": false },
-          { "key": "it_pentest", "covered_by": null, "covered_by_ai": false }
+          { "key": "it_security", "covered_by": null, "covered_by_ai": false },
+          { "key": "it_programming", "covered_by": "Fixture_Neu", "covered_by_ai": false }
         ],
         "reached": false
       },
@@ -46,7 +46,7 @@
         "stage": 3,
         "skills": [
           { "key": "law_privacy", "covered_by": null, "covered_by_ai": false },
-          { "key": "sales_b2b", "covered_by": null, "covered_by_ai": false }
+          { "key": "it_architecture", "covered_by": null, "covered_by_ai": false }
         ],
         "reached": false
       },
@@ -54,7 +54,7 @@
         "stage": 4,
         "skills": [
           { "key": "it_crypto", "covered_by": null, "covered_by_ai": false },
-          { "key": "management_leadership", "covered_by": null, "covered_by_ai": false }
+          { "key": "it_pentest", "covered_by": null, "covered_by_ai": false }
         ],
         "reached": false
       }
@@ -66,7 +66,7 @@
     "headcount": 0,
     "ai_workers": 0,
     "cash_cents": 250000,
-    "founded_at": "2026-11-11T21:24:40.035926+00:00",
+    "founded_at": "2026-11-11T21:41:43.541879+00:00",
     "can_upgrade": false,
     "logo_hidden": false,
     "product_key": "security_software",
@@ -88,9 +88,9 @@
     "quarters_active": 0,
     "ai_worker_skills": [],
     "distress_quarters": 0,
-    "estimate_low_cents": 339786,
+    "estimate_low_cents": 45636,
     "upgrade_cost_cents": 1250000,
-    "estimate_high_cents": 2549172,
+    "estimate_high_cents": 392473,
     "ai_worker_cost_cents": 70000,
     "can_capital_increase": false,
     "pending_applications": 0,

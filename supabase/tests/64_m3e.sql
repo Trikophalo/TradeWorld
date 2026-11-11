@@ -114,7 +114,7 @@ select tests.company_of(:f) as fco \gset
 select tests.assert(
   :'fc'::jsonb ->> 'product_key' = 'mobile_app' and (:'fc'::jsonb ->> 'stage')::int = 0
   and jsonb_array_length(:'fc'::jsonb -> 'stages') = 4
-  and :'fc'::jsonb -> 'stages' -> 0 = '{"stage": 1, "reached": false, "skills": [{"key": "it_mobile", "covered_by": null, "covered_by_ai": false}]}'::jsonb
+  and :'fc'::jsonb -> 'stages' -> 0 = '{"stage": 1, "reached": false, "skills": [{"key": "it_programming", "covered_by": null, "covered_by_ai": false}]}'::jsonb
   and (select bool_and(jsonb_array_length(s -> 'skills') >= 1) from jsonb_array_elements(:'fc'::jsonb -> 'stages') s),
   'found_company(p_product): product, stage 0 and the skills of the four stages');
 
@@ -124,7 +124,7 @@ select tests.throws_key(format($$select public.create_job_posting(gen_random_uui
 select tests.throws_key(format($$select public.create_job_posting(gen_random_uuid(), %L, 'intern', 'Mobil', '[{"branch": "it", "min_score": 0}]', 15000, 1, '{flying}')$$, :'fco'),
   'invalid_argument', 'create_job_posting(): unknown skill');
 select public.create_job_posting(gen_random_uuid(), :'fco', 'intern', 'Mobil-Entwicklung', '[{"branch": "it", "min_score": 0}]',
-  15000, 1, '{it_programming}') as post \gset
+  15000, 1, '{it_basics}') as post \gset
 reset role;
 select tests.login_as('authenticated', :w);
 select (select x from jsonb_array_elements(public.get_job_board() -> 'postings') x where x ->> 'id' = :'post'::jsonb ->> 'id') as wb1 \gset
@@ -133,7 +133,6 @@ select tests.throws_key(format($$select public.apply_for_job(gen_random_uuid(), 
 reset role;
 select tests.give_points(:w, 10);
 select tests.login_as('authenticated', :w);
-select public.learn_skill(gen_random_uuid(), 'it_programming') is not null as ok \gset
 select public.learn_skill(gen_random_uuid(), 'it_basics') is not null as ok \gset
 select (select (x ->> 'eligible')::boolean from jsonb_array_elements(public.get_job_board() -> 'postings') x
          where x ->> 'id' = :'post'::jsonb ->> 'id') as wb2 \gset
@@ -151,11 +150,11 @@ select public.get_employer() -> 'employer' as wemp \gset
 reset role;
 select id as wjob from public.player_jobs where player_id = :w and status = 'active' \gset
 select tests.assert(
-  :'wb1'::jsonb -> 'required_skills' = '["it_programming"]'::jsonb and not (:'wb1'::jsonb ->> 'eligible')::boolean
+  :'wb1'::jsonb -> 'required_skills' = '["it_basics"]'::jsonb and not (:'wb1'::jsonb ->> 'eligible')::boolean
   and :'wb2'::boolean
-  and :'wapp'::jsonb -> 'posting' -> 'required_skills' = '["it_programming"]'::jsonb
-  and :'cp'::jsonb -> 'required_skills' = '["it_programming"]'::jsonb
-  and :'applicant'::jsonb -> 'skills' = '["it_programming"]'::jsonb,
+  and :'wapp'::jsonb -> 'posting' -> 'required_skills' = '["it_basics"]'::jsonb
+  and :'cp'::jsonb -> 'required_skills' = '["it_basics"]'::jsonb
+  and :'applicant'::jsonb -> 'skills' = '["it_basics"]'::jsonb,
   'postings with concrete skills: board, application, company postings; eligible only with the skill; applicant shows matching skills');
 select tests.assert(
   :'wemp'::jsonb ->> 'kind' = 'player' and :'wemp'::jsonb ->> 'founder' = 'Frieda_Format'
@@ -169,15 +168,15 @@ select tests.assert(
 select coalesce(value #> '{training,fromEmployees}', '5') as tr_from from public.game_config where key = 'startups' \gset
 update public.game_config set value = jsonb_set(value, '{training,fromEmployees}', '1') where key = 'startups';
 select tests.login_as('authenticated', :f);
-select tests.throws_key(format($$select public.train_employee(gen_random_uuid(), %L, 'it_mobile')$$, :'wjob'),
+select tests.throws_key(format($$select public.train_employee(gen_random_uuid(), %L, 'it_programming')$$, :'wjob'),
   'insufficient_funds', 'train_employee(): paid from the company cash');
 select public.company_deposit(gen_random_uuid(), 2000000) is not null as ok \gset
 reset role;
 select tests.company_cash(:'fco') as cc0 \gset
 select balance_cents as hh0 from public.ledger_accounts where system_key = 'households' \gset
 select tests.login_as('authenticated', :f);
-select public.train_employee(gen_random_uuid(), :'wjob', 'it_mobile') as tr \gset
-select tests.throws_key(format($$select public.train_employee(gen_random_uuid(), %L, 'it_mobile')$$, :'wjob'), 'skill_learned', 'already learned');
+select public.train_employee(gen_random_uuid(), :'wjob', 'it_programming') as tr \gset
+select tests.throws_key(format($$select public.train_employee(gen_random_uuid(), %L, 'it_programming')$$, :'wjob'), 'skill_learned', 'already learned');
 select tests.throws_key(format($$select public.train_employee(gen_random_uuid(), %L, 'magic')$$, :'wjob'), 'skill_unknown', 'unknown skill');
 select public.get_my_company() -> 'company' as fc2 \gset
 select public.get_company_team(:'fco') -> 'members' -> 0 as member \gset
@@ -186,18 +185,18 @@ select tests.login_as('authenticated', :a);
 select tests.throws_key(format($$select public.train_employee(gen_random_uuid(), %L, 'it_ux')$$, :'wjob'), 'employer_only', 'only the employer');
 reset role;
 select tests.assert(
-  :'tr'::jsonb = jsonb_build_object('skill_key', 'it_mobile', 'cost_cents', 1200000, 'salary_cents_per_hour', 16200)
-  and tests.company_cash(:'fco') <= :cc0::bigint - 1200000
-  and (select balance_cents from public.ledger_accounts where system_key = 'households') >= :hh0::bigint + 1200000
-  and exists (select 1 from public.player_skills where player_id = :w and skill_key = 'it_mobile')
-  and (select salary_cents_per_hour from public.player_jobs where id = :'wjob') = 16200
+  :'tr'::jsonb = jsonb_build_object('skill_key', 'it_programming', 'cost_cents', 500000, 'salary_cents_per_hour', 15750)
+  and tests.company_cash(:'fco') <= :cc0::bigint - 500000
+  and (select balance_cents from public.ledger_accounts where system_key = 'households') >= :hh0::bigint + 500000
+  and exists (select 1 from public.player_skills where player_id = :w and skill_key = 'it_programming')
+  and (select salary_cents_per_hour from public.player_jobs where id = :'wjob') = 15750
   and (:'fc2'::jsonb ->> 'stage')::int = 1
-  and :'fc2'::jsonb -> 'stages' -> 0 = '{"stage": 1, "reached": true, "skills": [{"key": "it_mobile", "covered_by": "Walter_Weg", "covered_by_ai": false}]}'::jsonb
+  and :'fc2'::jsonb -> 'stages' -> 0 = '{"stage": 1, "reached": true, "skills": [{"key": "it_programming", "covered_by": "Walter_Weg", "covered_by_ai": false}]}'::jsonb
   and (:'fc2'::jsonb ->> 'capacity_cents')::bigint
       = round((:'fc2'::jsonb ->> 'team_productivity_bps')::int / 10000.0 * 300000 * 1.25)
-  and :'member'::jsonb -> 'skills' @> '["it_mobile", "it_programming"]'::jsonb and :'member'::jsonb ? 'notice_ends_at'
+  and :'member'::jsonb -> 'skills' @> '["it_basics", "it_programming"]'::jsonb and :'member'::jsonb ? 'notice_ends_at'
   and exists (select 1 from public.company_messages where company_id = :'fco' and body = 'Walter_Weg hat eine Schulung abgeschlossen.'),
-  'train_employee(): tier-3 training 12.000 EUR to the households, skill at once, wage +8 %; stage 1 reached, capacity +25 %');
+  'train_employee(): tier-2 training 5.000 EUR to the households, skill at once, wage +5 %; stage 1 reached, capacity +25 %');
 update public.game_config set value = jsonb_set(value, '{training,fromEmployees}', :'tr_from'::jsonb) where key = 'startups';
 
 -- quarter close with stage 1: awareness capped at 0.7

@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { UI_ICONS } from "@/components/pixel/art";
+import { BULL, UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
+import { useGame } from "@/features/game/store";
 import { useSearch } from "@/features/market/search-store";
+import { cn } from "@/lib/utils";
 import { CashBalance } from "./cash-balance";
 import { MarketStatus } from "./market-status";
 import { Wordmark } from "./wordmark";
@@ -40,9 +42,38 @@ export function TopBar() {
           >
             <PixelIcon {...UI_ICONS.search} scale={2} />
           </button>
+          <MissionsButton />
           <CashBalance />
         </div>
       </div>
     </header>
+  );
+}
+
+/** Always reachable: the missions, with a blue dot when XP is waiting to be claimed. */
+function MissionsButton() {
+  const t = useTranslations("topbar");
+  // Missions refresh right after tracked actions; the portfolio count only with the next portfolio load.
+  const claimable = useGame((state) =>
+    state.missions
+      ? state.missions.reduce((n, g) => n + g.missions.filter((m) => m.status === "completed").length, 0)
+      : (state.portfolio?.missionsClaimable ?? 0),
+  );
+  return (
+    <Link
+      href="/missions"
+      aria-label={claimable > 0 ? t("missionsClaimable", { count: claimable }) : t("missions")}
+      data-testid="missions-button"
+      className="relative flex h-10 items-center gap-2 rounded-md px-2.5 text-sm text-fg-2 focus-ring transition duration-fast hover:bg-surface-2 hover:text-fg-1 active:scale-95"
+    >
+      <PixelIcon {...BULL} scale={2} />
+      <span className="hidden xl:inline">{t("missions")}</span>
+      {claimable > 0 && (
+        <span className="absolute top-1.5 right-1.5 grid size-2.5 place-items-center" data-testid="missions-dot">
+          <span className="absolute size-full rounded-pill bg-info motion-safe:animate-ping" />
+          <span className={cn("relative size-2.5 rounded-pill bg-info ring-2 ring-bg")} />
+        </span>
+      )}
+    </Link>
   );
 }

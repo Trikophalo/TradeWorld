@@ -5,7 +5,7 @@
   "color": "#FFD23F",
   "status": "listed",
   "ticker": "VLT",
-  "pe_x100": 1102,
+  "pe_x100": 1085,
   "coupon_bps": null,
   "eps_ttm_e4": 47000,
   "margin_bps": 904,
@@ -16,8 +16,8 @@
   "revenue_cents": 130000000000,
   "term_game_years": null,
   "face_value_cents": null,
-  "market_cap_cents": 517882000000,
+  "market_cap_cents": 510147000000,
   "net_income_cents": 11750000000,
-  "dividend_yield_bps": 590,
+  "dividend_yield_bps": 599,
   "shares_outstanding": 100000000
 }

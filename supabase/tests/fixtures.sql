@@ -252,7 +252,7 @@ select tests.login_as('authenticated', :p) is null as ok \gset
 -- M3h: an AI worker for the stage-1 skill, three general ones (trainings from 5 team members)
 select public.set_ai_workers(gen_random_uuid(), 0) is not null as ok \gset
 \o :fixture_dir/hire_ai_workers.json
-select public.hire_ai_workers(gen_random_uuid(), 1, 'it_security');
+select public.hire_ai_workers(gen_random_uuid(), 1, 'it_networks');
 \o
 select public.hire_ai_workers(gen_random_uuid(), 3) is not null as ok \gset
 \o :fixture_dir/train_employee.json

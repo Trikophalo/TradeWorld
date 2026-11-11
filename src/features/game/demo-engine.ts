@@ -22,6 +22,7 @@ import {
   type Candle,
   type CandleInterval,
   type GameEngine,
+  type CompanyRankingEntry,
   type GameErrorKey,
   type MarketSnapshot,
   type Mission,
@@ -1185,6 +1186,61 @@ export const demoEngine: GameEngine = {
         return { xpAwarded: xp, level: level(), xpTotal: pl.xpTotal };
       }),
     ),
+
+  // AI companies by market value plus the own company (ADR-074); other players do not exist in the demo.
+  companyRanking: async (scope, limit) => {
+    const snap = snapshotNow();
+    const own = (await company.engine.myCompany()).company;
+    const colors = new Map(DEMO_COMPANIES.map((c) => [c.ticker, c.color]));
+    const rows: Omit<CompanyRankingEntry, "rank">[] = [
+      ...(scope === "players"
+        ? []
+        : snap.securities
+            .filter((sec) => sec.kind === "stock" && sec.marketCapCents !== null && sec.companyKind === "ai")
+            .map((sec) => ({
+              companyId: sec.id,
+              kind: "ai" as const,
+              name: sec.name,
+              color: colors.get(sec.ticker) ?? "#8f7bff",
+              logo: null,
+              ticker: sec.ticker,
+              sector: sec.sector,
+              tier: null,
+              founder: null,
+              valueCents: sec.marketCapCents ?? 0,
+              revenueCents: null,
+              teamSize: null,
+              isMine: false,
+            }))),
+      ...(own
+        ? [
+            {
+              companyId: own.id,
+              kind: "player" as const,
+              name: own.name,
+              color: own.color,
+              logo: own.logo,
+              ticker: own.listing?.ticker ?? null,
+              sector: own.sector,
+              tier: own.tier,
+              founder: p().nickname,
+              valueCents: own.valueCents,
+              revenueCents: own.lastQuarter?.revenueCents ?? null,
+              teamSize: own.employees + own.aiWorkers + 1,
+              isMine: true,
+            },
+          ]
+        : []),
+    ];
+    const entries = rows.sort((a, b) => b.valueCents - a.valueCents).map((row, i) => ({ ...row, rank: i + 1 }));
+    const mine = entries.find((e) => e.isMine);
+    return {
+      serverTime: snap.serverTime,
+      total: entries.length,
+      entries: entries.slice(0, limit),
+      mine: mine ? { rank: mine.rank, valueCents: mine.valueCents } : null,
+    };
+  },
 
   richList: (scope, limit, offset) => {
     const list = richListNow(scope);

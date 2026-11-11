@@ -23,3 +23,12 @@ export function useRichNews(limit = 12) {
     staleTime: 30_000,
   });
 }
+
+export function useCompanyRanking(scope: RichListScope, limit = 100) {
+  return useQuery({
+    queryKey: ["company-ranking", scope, limit],
+    queryFn: () => engine.companyRanking(scope, limit),
+    refetchInterval: REFRESH_MS,
+    staleTime: REFRESH_MS,
+  });
+}

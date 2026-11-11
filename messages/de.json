@@ -26,7 +26,9 @@
     "marketClosed": "Nachbörse",
     "level": "Level {level}",
     "marketPaused": "Pausiert",
-    "afterHoursHint": "Nachbörslich: Handel möglich, aber mit größerem Spread."
+    "afterHoursHint": "Nachbörslich: Handel möglich, aber mit größerem Spread.",
+    "missions": "Missionen",
+    "missionsClaimable": "Missionen: {count, plural, one {# Belohnung} other {# Belohnungen}} abholbereit"
   },
   "search": {
     "title": "Suche",
@@ -278,8 +280,8 @@
     "rename": "Namen ändern",
     "missions": "Missionen",
     "missionsHint": "Schnelle, tägliche, wöchentliche und Story-Missionen",
-    "richList": "Reichenliste",
-    "richListHint": "Dein Platz unter allen Spielern und Tycoons"
+    "richList": "Ranglisten",
+    "richListHint": "Forbes 100, alle Reichen und die wertvollsten Firmen"
   },
   "unlocks": {
     "market_orders": "Aktien kaufen und verkaufen",
@@ -642,7 +644,7 @@
     }
   },
   "richList": {
-    "title": "Reichenliste",
+    "title": "Ranglisten",
     "rank": "Platz {rank}",
     "ofTotal": "von {total}",
     "nextTarget": "Noch {gap} bis Platz {rank} ({name}).",
@@ -1611,7 +1613,11 @@
     "legendLearned": "Gelernt",
     "legendOpen": "Lernbar",
     "legendLocked": "Noch gesperrt",
-    "mapHint": "Ziehen zum Verschieben, Mausrad zum Zoomen"
+    "mapHint": "Ziehen zum Verschieben, Mausrad zum Zoomen",
+    "branchHint": "Fahre über einen Bereich, um ihn hervorzuheben; klicke, um dorthin zu springen.",
+    "hoverOpen": "Lernbar für {cost}",
+    "hoverLocked": "Gesperrt – lerne zuerst ein Feld daneben",
+    "hoverClick": "Klicken für Details"
   },
   "dailyReward": {
     "title": "Tägliche Belohnung",
@@ -1677,7 +1683,7 @@
     "company": "Firma",
     "memberSince": "dabei seit {date}",
     "notFound": "Diesen Spieler gibt es nicht.",
-    "back": "Zur Reichenliste",
+    "back": "Zu den Ranglisten",
     "share": "Visitenkarte"
   },
   "firm": {
@@ -2121,5 +2127,22 @@
     "deleteConfirm": "Gedrückt halten zum Löschen",
     "resetDone": "Neustart! Viel Erfolg.",
     "deleted": "Dein Konto wurde gelöscht."
+  },
+  "ranking": {
+    "forbes": "Forbes 100",
+    "forbesHint": "Die 100 reichsten echten Spieler. Ohne KI-Tycoons.",
+    "allHint": "Alle, auch die erfundenen KI-Tycoons.",
+    "companies": "Top-Unternehmen",
+    "companiesHint": "Die wertvollsten Firmen nach Firmenwert.",
+    "companyScope": "Welche Firmen",
+    "companyScopePlayers": "Spielerfirmen",
+    "companyScopeAll": "Mit KI-Firmen",
+    "companyHint": "Spielerfirmen nach Firmenwert, KI-Firmen nach Börsenwert",
+    "companyEmpty": "Noch hat niemand eine Firma gegründet. Deine könnte die erste sein.",
+    "companyMine": "Deine Firma steht auf Platz {rank}.",
+    "yours": "Deine",
+    "foundedBy": "von {name}",
+    "aiCompany": "KI-Firma an der Börse",
+    "revenue": "Umsatz"
   }
 }

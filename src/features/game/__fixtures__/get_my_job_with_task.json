@@ -1,10 +1,10 @@
 {
   "job": {
-    "id": "7ec91344-84e9-4769-bd13-fd4cfb1effa4",
+    "id": "081deea0-0236-4a38-815f-69dad5e2310f",
     "tier": "intern",
     "title": "Werkstudium Daten",
     "company": {
-      "id": "b50b4c9c-2f8d-449f-9247-84226efd8cf6",
+      "id": "70332b3e-e1a7-4d6b-afda-a5216c646ec5",
       "logo": {
         "grid": [
           "................",
@@ -35,7 +35,7 @@
     "required": [{ "branch": "finance", "min_score": 0 }],
     "signature": "M2 2 L8 8",
     "title_key": null,
-    "started_at": "2026-11-11T21:24:40.369385+00:00",
+    "started_at": "2026-11-11T21:41:43.912072+00:00",
     "pending_raise": null,
     "raise_max_bps": 0,
     "notice_ends_at": null,

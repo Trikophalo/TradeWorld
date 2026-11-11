@@ -53,21 +53,32 @@ test("quick missions count real actions and pay XP when claimed", async ({ page 
     await expect(page.getByText(/Verkauf .* · Kauf /)).toBeVisible();
     await page.waitForTimeout(300);
   }
-  await page.goto("/missions");
+  // The missions button in the top bar shows a blue dot once a reward is ready, and leads to the missions.
+  await expect(page.getByTestId("missions-dot").filter({ visible: true })).toBeVisible();
+  await page.getByTestId("missions-button").filter({ visible: true }).click();
+  await expect(page).toHaveURL("/missions");
   const claim = page.getByRole("button", { name: /^\+\d+ XP$/ }).first();
   await expect(claim).toBeVisible();
   await claim.click();
   await expect(page.getByText("Belohnung abgeholt")).toBeVisible();
 });
 
-test("the rich list shows the player among the AI tycoons", async ({ page }) => {
+test("rankings: Forbes 100 of real players, everyone with the AI tycoons, top companies (ADR-074)", async ({
+  page,
+}) => {
   await preparePlayer(page);
   await page.goto("/rich-list");
-  await expect(page.getByRole("heading", { level: 1, name: "Reichenliste" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Ranglisten" })).toBeVisible();
+  // Forbes 100 first: only real players, so the demo player is number one.
+  await expect(page.getByRole("radio", { name: "Forbes 100" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByText("Platz 1").first()).toBeVisible();
+  await page.getByRole("radio", { name: "Alle" }).click();
   await expect(page.getByText("Testerin").first()).toBeVisible();
   await expect(page.getByText(/Noch .* bis Platz \d+/).first()).toBeVisible();
-  await page.getByRole("radio", { name: "Nur Spieler" }).click();
-  await expect(page.getByText("Platz 1").first()).toBeVisible();
+  await page.getByRole("radio", { name: "Top-Unternehmen" }).click();
+  await expect(page.getByText("Noch hat niemand eine Firma gegründet.")).toBeVisible();
+  await page.getByRole("radio", { name: "Mit KI-Firmen" }).click();
+  await expect(page.getByTestId("company-ranking").getByText("KlarSoft AG")).toBeVisible();
 });
 
 test("the player name is shown and can be changed, forbidden names are refused", async ({ page }) => {
@@ -106,10 +117,14 @@ test("reaching level 3 starts Finn's limit order tour", async ({ page }) => {
 });
 
 test("starting over resets the game after typing the name and Finn starts again (ADR-070)", async ({ page }) => {
-  await preparePlayer(page, { cashCents: 5_000_000, xpTotal: 5_000 });
+  await preparePlayer(page, { cashCents: 5_000_000 });
   await page.goto("/profile");
-  await page.getByRole("button", { name: "Spiel zurücksetzen" }).click();
   const sheet = page.getByRole("dialog", { name: "Spiel zurücksetzen?" });
+  // The profile page may still be hydrating: click until the sheet opens.
+  await expect(async () => {
+    await page.getByRole("button", { name: "Spiel zurücksetzen" }).click();
+    await expect(sheet).toBeVisible({ timeout: 1_000 });
+  }).toPass();
   await sheet.getByLabel(/Zum Bestätigen/).fill("Falsch");
   await expect(sheet.getByRole("button", { name: /Gedrückt halten zum Zurücksetzen/ })).toBeDisabled();
   await sheet.getByLabel(/Zum Bestätigen/).fill("testerin");

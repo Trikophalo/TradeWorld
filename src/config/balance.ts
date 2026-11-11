@@ -744,27 +744,27 @@ export const PRODUCTS = {
     {
       key: "security_software",
       stages: [
-        ["it_security"],
-        ["it_architecture", "it_pentest"],
-        ["law_privacy", "sales_b2b"],
-        ["it_crypto", "management_leadership"],
+        ["it_networks"],
+        ["it_security", "it_programming"],
+        ["law_privacy", "it_architecture"],
+        ["it_crypto", "it_pentest"],
       ],
     },
     {
       key: "mobile_app",
       stages: [
-        ["it_mobile"],
-        ["it_ux", "sales_social"],
-        ["it_cloud", "sales_growth"],
-        ["it_data", "management_strategy"],
+        ["it_programming"],
+        ["it_mobile", "sales_social"],
+        ["it_ux", "sales_growth"],
+        ["it_cloud", "management_strategy"],
       ],
     },
     {
       key: "cloud_platform",
       stages: [
-        ["it_cloud"],
-        ["it_devops", "it_databases"],
-        ["it_security", "sales_keyaccount"],
+        ["it_networks"],
+        ["it_databases", "it_devops"],
+        ["it_cloud", "sales_keyaccount"],
         ["finance_controlling", "management_operations"],
       ],
     },
@@ -774,7 +774,7 @@ export const PRODUCTS = {
       key: "online_shop",
       stages: [
         ["it_web"],
-        ["sales_marketing", "logistics_lastmile"],
+        ["sales_marketing", "logistics_warehouse"],
         ["hybrid_ecommerce", "sales_seo"],
         ["logistics_automation", "management_operations"],
       ],
@@ -782,8 +782,8 @@ export const PRODUCTS = {
     {
       key: "fashion",
       stages: [
-        ["sales_brand"],
-        ["sales_social", "logistics_purchasing"],
+        ["sales_marketing"],
+        ["sales_brand", "logistics_purchasing"],
         ["sales_ads", "sales_retail"],
         ["sales_international", "finance_controlling"],
       ],
@@ -791,10 +791,10 @@ export const PRODUCTS = {
     {
       key: "delicatessen",
       stages: [
-        ["logistics_cold"],
+        ["logistics_purchasing"],
+        ["sales_service", "logistics_distribution"],
         ["sales_retail", "science_nutrition"],
-        ["logistics_distribution", "sales_brand"],
-        ["law_consumer", "management_operations"],
+        ["logistics_cold", "law_consumer"],
       ],
     },
   ],
@@ -802,27 +802,27 @@ export const PRODUCTS = {
     {
       key: "solar",
       stages: [
-        ["craft_solar"],
-        ["craft_electrical", "sales_selling"],
-        ["craft_energy", "law_environment"],
-        ["finance_corporate", "management_projects"],
+        ["craft_electrical"],
+        ["sales_selling", "craft_site"],
+        ["craft_energy", "management_projects"],
+        ["craft_solar", "law_environment"],
       ],
     },
     {
       key: "grid_service",
       stages: [
-        ["craft_energy"],
-        ["craft_electrical", "craft_site"],
-        ["craft_automation", "logistics_planning"],
-        ["law_compliance", "management_operations"],
+        ["craft_electrical"],
+        ["craft_site", "craft_automation"],
+        ["craft_energy", "law_compliance"],
+        ["logistics_planning", "management_operations"],
       ],
     },
     {
       key: "energy_storage",
       stages: [
         ["science_physics"],
-        ["craft_engineering", "science_materials"],
-        ["craft_manufacturing", "finance_investment"],
+        ["craft_engineering", "finance_investment"],
+        ["science_materials", "craft_manufacturing"],
         ["law_ip", "sales_international"],
       ],
     },
@@ -842,17 +842,17 @@ export const PRODUCTS = {
       stages: [
         ["science_biology"],
         ["science_biotech", "science_statistics"],
-        ["science_clinical", "law_medical"],
-        ["science_genetics", "finance_vc"],
+        ["science_clinical", "science_genetics"],
+        ["law_medical", "finance_vc"],
       ],
     },
     {
       key: "medtech",
       stages: [
-        ["science_devices"],
-        ["craft_engineering", "science_medicine"],
-        ["science_drugs", "it_embedded"],
-        ["sales_b2b", "law_medical"],
+        ["science_medicine"],
+        ["craft_engineering", "science_lab"],
+        ["science_drugs", "law_compliance"],
+        ["science_devices", "it_embedded"],
       ],
     },
   ],
@@ -860,19 +860,19 @@ export const PRODUCTS = {
     {
       key: "courier",
       stages: [
-        ["logistics_lastmile"],
-        ["logistics_planning", "logistics_fleet"],
-        ["it_mobile", "sales_b2b"],
-        ["logistics_sustainability", "management_operations"],
+        ["logistics_transport"],
+        ["logistics_fleet", "it_mobile"],
+        ["logistics_lastmile", "management_operations"],
+        ["logistics_planning", "logistics_sustainability"],
       ],
     },
     {
       key: "warehouse",
       stages: [
         ["logistics_warehouse"],
-        ["logistics_inventory", "logistics_automation"],
-        ["it_databases", "craft_robotics"],
+        ["logistics_inventory", "it_databases"],
         ["logistics_supplychain", "management_agile"],
+        ["logistics_automation", "craft_robotics"],
       ],
     },
     {
