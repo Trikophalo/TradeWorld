@@ -7,6 +7,7 @@
  * computed with BigInt (src/features/market/order-schema.ts).
  */
 import type { SectorKey } from "@/components/pixel/art";
+import type { SkillBranch } from "@/config/skills";
 
 export type SecurityKind = "stock" | "bond";
 export type SizeClass = "bluechip" | "midcap" | "penny";
@@ -163,6 +164,10 @@ export interface Portfolio {
   nicknameChangeAvailableAt: string | null;
   missionsClaimable: number;
   streakDays: number;
+  /** Portrait key (src/components/pixel/avatars.ts). */
+  avatarKey: string;
+  skillPointsFree: number;
+  dailyRewardClaimable: boolean;
 }
 
 /** Either a quantity (fractions allowed) or an amount in cents; the server works out the other. */
@@ -202,6 +207,7 @@ export interface RichListEntry {
   change24hBps: number | null;
   rankChange24h: number | null;
   isMe: boolean;
+  avatarKey: string | null;
 }
 
 export interface RichList {
@@ -250,6 +256,148 @@ export interface ProgressResult {
   xpTotal: number;
 }
 
+// ------------------------------------------------------------------ daily reward (ADR-053)
+
+export interface DailyRewardDay {
+  day: number;
+  xp: number;
+  cashCents: number;
+  skillPoints: number;
+}
+
+export interface DailyRewardState {
+  /** Cycle day (1–7) that can be claimed now, or the next one if today's is done. */
+  day: number;
+  claimable: boolean;
+  streakDays: number;
+  freezesLeft: number;
+  nextResetAt: string;
+  cycle: DailyRewardDay[];
+}
+
+export interface DailyRewardResult extends ProgressResult {
+  day: number;
+  cashCents: number;
+  skillPoints: number;
+  streakDays: number;
+  leveledUp: boolean;
+}
+
+// ------------------------------------------------------------------ skills (ADR-050)
+
+export interface SkillState {
+  freePoints: number;
+  branchPoints: Record<SkillBranch, number>;
+  /** 0–1: progress from work towards the next branch point. */
+  branchProgress: Record<SkillBranch, number>;
+  branchScores: Record<SkillBranch, number>;
+  learned: { key: string; learnedAt: string }[];
+}
+
+// ------------------------------------------------------------------ jobs (ADR-051)
+
+export type CareerTier = "intern" | "junior" | "senior" | "team_lead" | "c_level";
+
+export interface JobRequirementInfo {
+  branch: SkillBranch;
+  minScore: number;
+}
+
+export interface Employer {
+  id: string;
+  name: string;
+  ticker: string | null;
+  sector: SectorKey | null;
+  color: string | null;
+  isAi: boolean;
+}
+
+export interface JobPosting {
+  id: string;
+  company: Employer;
+  tier: CareerTier;
+  /** Translated title (jobs.titles.<key>) for AI postings, or the employer's own title. */
+  titleKey: string | null;
+  title: string | null;
+  minLevel: number;
+  required: JobRequirementInfo[];
+  salaryCentsPerHour: number;
+  /** AI employers: the most they pay me. Player employers: null (open). */
+  maxSalaryCentsPerHour: number | null;
+  matchScore: number;
+  eligible: boolean;
+  slotsOpen: number;
+  postedAt: string;
+  expiresAt: string | null;
+  myApplication: { id: string; status: ApplicationStatus } | null;
+}
+
+export interface JobBoard {
+  postings: JobPosting[];
+  nextRefreshAt: string | null;
+}
+
+export type ApplicationStatus =
+  "pending" | "offered" | "rejected" | "declined" | "withdrawn" | "expired" | "signed" | "closed";
+
+export interface JobApplication {
+  id: string;
+  status: ApplicationStatus;
+  posting: Pick<JobPosting, "id" | "company" | "tier" | "titleKey" | "title" | "required">;
+  salaryWishCentsPerHour: number;
+  offerSalaryCentsPerHour: number | null;
+  offerExpiresAt: string | null;
+  message: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ApplyInput {
+  requestId: string;
+  postingId: string;
+  salaryWishCentsPerHour: number;
+  message: string;
+}
+
+export interface MyJob {
+  id: string;
+  company: Employer;
+  tier: CareerTier;
+  titleKey: string | null;
+  title: string | null;
+  required: JobRequirementInfo[];
+  salaryCentsPerHour: number;
+  payFactorBps: number;
+  effectiveSalaryCentsPerHour: number;
+  productivityBps: number;
+  startedAt: string;
+  paidHoursToday: number;
+  paidHoursCap: number;
+  earnedTotalCents: number;
+  raiseAvailableAt: string | null;
+  raiseMaxBps: number;
+  pendingRaise: { requestedBps: number; createdAt: string } | null;
+  quitCostCents: number;
+  signature: string | null;
+}
+
+// ------------------------------------------------------------------ player card (ADR-054)
+
+export interface PlayerCard {
+  nickname: string;
+  avatarKey: string;
+  level: number;
+  rank: number | null;
+  netWorthCents: number;
+  streakDays: number;
+  skillsLearned: number;
+  branchScores: Record<SkillBranch, number>;
+  topSkills: { key: string; tier: number }[];
+  job: { companyName: string; titleKey: string | null; title: string | null; tier: CareerTier; since: string } | null;
+  company: { name: string; ticker: string | null } | null;
+  memberSince: string;
+}
+
 /** Error keys the server raises (message of the Postgres exception). Texts: messages/de.json "errors". */
 export const GAME_ERROR_KEYS = [
   "not_authenticated",
@@ -280,6 +428,27 @@ export const GAME_ERROR_KEYS = [
   "mission_not_found",
   "mission_not_completed",
   "mission_already_claimed",
+  "avatar_unknown",
+  "avatar_locked",
+  "daily_reward_claimed",
+  "skill_unknown",
+  "skill_learned",
+  "skill_locked",
+  "skill_points_insufficient",
+  "job_not_found",
+  "job_level_too_low",
+  "job_skills_missing",
+  "application_limit",
+  "application_exists",
+  "application_not_found",
+  "application_not_offered",
+  "offer_expired",
+  "job_active_exists",
+  "no_active_job",
+  "raise_too_soon",
+  "raise_too_high",
+  "player_not_found",
+  "employer_only",
 ] as const;
 export type GameErrorKey = (typeof GAME_ERROR_KEYS)[number] | "unknown";
 
@@ -309,4 +478,22 @@ export interface GameEngine {
   claimMission(requestId: string, missionId: string): Promise<ProgressResult>;
   checkIn(requestId: string): Promise<ProgressResult & { streakDays: number; alreadyCheckedIn: boolean }>;
   track(event: TrackedEvent, ref?: string): Promise<void>;
+  setAvatar(requestId: string, avatarKey: string): Promise<string>;
+  dailyReward(): Promise<DailyRewardState>;
+  claimDailyReward(requestId: string): Promise<DailyRewardResult>;
+  skills(): Promise<SkillState>;
+  learnSkill(requestId: string, skillKey: string): Promise<SkillState>;
+  jobBoard(): Promise<JobBoard>;
+  applyForJob(input: ApplyInput): Promise<JobApplication>;
+  applications(): Promise<JobApplication[]>;
+  counterOffer(requestId: string, applicationId: string, salaryWishCentsPerHour: number): Promise<JobApplication>;
+  withdrawApplication(requestId: string, applicationId: string): Promise<JobApplication>;
+  signContract(requestId: string, applicationId: string, signature: string): Promise<MyJob>;
+  myJob(): Promise<MyJob | null>;
+  quitJob(requestId: string): Promise<{ paidCents: number; cashCents: number }>;
+  requestRaise(
+    requestId: string,
+    raiseBps: number,
+  ): Promise<{ status: "accepted" | "pending"; salaryCentsPerHour: number }>;
+  playerCard(nickname: string): Promise<PlayerCard>;
 }

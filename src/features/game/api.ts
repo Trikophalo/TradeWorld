@@ -1,11 +1,9 @@
 import { z } from "zod";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { CAREER_RPC_SCHEMAS, liveCareerEngine } from "./api-careers";
+import { rpc, toErrorKey } from "./rpc";
 import {
-  GAME_ERROR_KEYS,
-  GameError,
   type Candle,
   type GameEngine,
-  type GameErrorKey,
   type MarketSnapshot,
   type OrderBook,
   type OrderResult,
@@ -143,6 +141,9 @@ const portfolioSchema = z.object({
   nickname_change_available_at: iso.nullable(),
   missions_claimable: num.default(0),
   streak_days: num.default(0),
+  avatar_key: z.string().default("rookie"),
+  skill_points_free: num.default(0),
+  daily_reward_claimable: z.boolean().default(false),
 });
 
 const orderResultSchema = z.object({
@@ -177,6 +178,7 @@ const richListSchema = z.object({
       change_24h_bps: nnum,
       rank_change_24h: nnum,
       is_me: z.boolean(),
+      avatar_key: z.string().nullable().default(null),
     }),
   ),
   me: z
@@ -223,10 +225,6 @@ const checkInSchema = z.object({
   xp_total: num,
 });
 
-function toErrorKey(message: string | undefined): GameErrorKey {
-  return (GAME_ERROR_KEYS as readonly string[]).includes(message ?? "") ? (message as GameErrorKey) : "unknown";
-}
-
 /** Response schemas per RPC, exported for the contract test against real database output. */
 export const RPC_SCHEMAS = {
   get_market_snapshot: snapshotSchema,
@@ -246,25 +244,11 @@ export const RPC_SCHEMAS = {
   claim_mission: progressSchema,
   daily_check_in: checkInSchema,
   track_event: z.object({ ok: z.boolean() }),
+  ...CAREER_RPC_SCHEMAS,
 } as const;
 
-async function rpc<T>(fn: string, args: Record<string, unknown>, schema: z.ZodType<T>): Promise<T> {
-  const supabase = getSupabaseBrowserClient();
-  if (!supabase) throw new GameError("not_authenticated");
-  const { data, error } = await supabase.rpc(fn, args);
-  if (error) {
-    if (process.env.NODE_ENV !== "production") console.warn(`[rpc ${fn}]`, error);
-    throw new GameError(toErrorKey(error.message));
-  }
-  const parsed = schema.safeParse(data);
-  if (!parsed.success) {
-    console.error(`[rpc ${fn}] unexpected response`, parsed.error.issues.slice(0, 3));
-    throw new GameError("unknown");
-  }
-  return parsed.data;
-}
-
 export const liveEngine: GameEngine = {
+  ...liveCareerEngine,
   async snapshot(): Promise<MarketSnapshot> {
     const s = await rpc("get_market_snapshot", {}, snapshotSchema);
     return {
@@ -414,6 +398,9 @@ export const liveEngine: GameEngine = {
       nicknameChangeAvailableAt: p.nickname_change_available_at,
       missionsClaimable: p.missions_claimable,
       streakDays: p.streak_days,
+      avatarKey: p.avatar_key,
+      skillPointsFree: p.skill_points_free,
+      dailyRewardClaimable: p.daily_reward_claimable,
     };
   },
 
@@ -477,6 +464,7 @@ export const liveEngine: GameEngine = {
         change24hBps: e.change_24h_bps,
         rankChange24h: e.rank_change_24h,
         isMe: e.is_me,
+        avatarKey: e.avatar_key,
       })),
       me: r.me
         ? {

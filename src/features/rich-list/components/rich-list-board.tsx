@@ -37,6 +37,7 @@ export function RichListBoard() {
           change24hBps: null,
           rankChange24h: null,
           isMe: true,
+          avatarKey: null,
         }
       : null;
 

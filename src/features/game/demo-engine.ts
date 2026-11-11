@@ -11,6 +11,7 @@ import { DEMO_COMPANIES, DEMO_INDEX } from "@/lib/demo/market";
 import { bondPriceE4, bondYieldBps } from "@/lib/sim/bonds";
 import { levelFromTotalXp, levelProgress, scaledXp, unlockLevel } from "@/lib/sim/progression";
 import { MISSION_TEMPLATES, availableFor, missionXp, type Metric, type MissionTemplate } from "./demo/missions";
+import { createCareerEngine, initialCareer, tycoonAvatar, type CareerState } from "./demo/careers";
 import { demoTycoons } from "./demo/tycoons";
 import {
   GameError,
@@ -88,6 +89,8 @@ interface PlayerState {
   missionSeq: number;
   checkInDay: string | null;
   streakDays: number;
+  /** Avatar, skills, daily reward, jobs (demo/careers.ts). */
+  career?: CareerState;
 }
 
 interface MarketState {
@@ -625,6 +628,9 @@ function portfolioNow(): Portfolio {
       0,
     ),
     streakDays: pl.streakDays,
+    avatarKey: career.avatarKey(),
+    skillPointsFree: career.freePoints(),
+    dailyRewardClaimable: career.dailyClaimable(),
   };
 }
 
@@ -668,6 +674,7 @@ function richListNow(scope: "all" | "players"): RichList {
         change24hBps: Math.round((factor - 1) * 10_000),
         rankChange24h: null,
         isMe: false,
+        avatarKey: tycoonAvatar(t.id),
       });
     }
   }
@@ -681,6 +688,7 @@ function richListNow(scope: "all" | "players"): RichList {
     change24hBps: Math.round((mine / economy.startingCapitalCents - 1) * 10_000),
     rankChange24h: null,
     isMe: true,
+    avatarKey: career.avatarKey(),
   });
   const ranked = entries.sort((a, b) => b.netWorthCents - a.netWorthCents).map((e, i) => ({ ...e, rank: i + 1 }));
   const me = ranked.find((e) => e.isMe)!;
@@ -824,7 +832,45 @@ function nameViolation(name: string): GameErrorKey | null {
 
 // ------------------------------------------------------------------ engine
 
+function doCheckIn() {
+  const pl = p();
+  const today = berlinDay();
+  if (pl.checkInDay === today) {
+    return { xpAwarded: 0, level: level(), xpTotal: pl.xpTotal, streakDays: pl.streakDays, alreadyCheckedIn: true };
+  }
+  const yesterday = berlinDay(Date.now() - DAY);
+  pl.streakDays = pl.checkInDay === yesterday ? pl.streakDays + 1 : 1;
+  pl.checkInDay = today;
+  bump("check_ins");
+  const login = progression.xpSources.dailyLogin;
+  const xp = addXp(login.xp + Math.min(login.streakBonusCap, (pl.streakDays - 1) * login.streakBonusPerDay));
+  return { xpAwarded: xp, level: level(), xpTotal: pl.xpTotal, streakDays: pl.streakDays, alreadyCheckedIn: false };
+}
+
+// ------------------------------------------------------------------ careers
+
+const career = createCareerEngine({
+  state: () => (p().career ??= initialCareer()),
+  nickname: () => p().nickname,
+  level,
+  addXp,
+  xpTotal: () => p().xpTotal,
+  cashCents: () => p().cashCents,
+  addCash: (cents) => {
+    p().cashCents += cents;
+  },
+  netWorthCents: () => netWorth(),
+  rank: () => richListNow("all").me?.rank ?? null,
+  streakDays: () => p().streakDays,
+  checkIn: () => void doCheckIn(),
+  day: (at) => berlinDay(at),
+  week: (at) => weekKey(at),
+  idempotent,
+  persist,
+});
+
 export const demoEngine: GameEngine = {
+  ...career.engine,
   snapshot: () => Promise.resolve(snapshotNow()),
 
   candles: (ticker, interval, limit) => Promise.resolve(demoCandles(ticker, interval, limit)),
@@ -876,7 +922,10 @@ export const demoEngine: GameEngine = {
     });
   },
 
-  portfolio: () => Promise.resolve(portfolioNow()),
+  portfolio: () => {
+    career.accrue();
+    return Promise.resolve(portfolioNow());
+  },
 
   placeOrder: (input) =>
     delay(() =>
@@ -1090,35 +1139,7 @@ export const demoEngine: GameEngine = {
       }),
     ),
 
-  checkIn: (requestId) =>
-    delay(() =>
-      idempotent(requestId, () => {
-        const pl = p();
-        const today = berlinDay();
-        if (pl.checkInDay === today) {
-          return {
-            xpAwarded: 0,
-            level: level(),
-            xpTotal: pl.xpTotal,
-            streakDays: pl.streakDays,
-            alreadyCheckedIn: true,
-          };
-        }
-        const yesterday = berlinDay(Date.now() - DAY);
-        pl.streakDays = pl.checkInDay === yesterday ? pl.streakDays + 1 : 1;
-        pl.checkInDay = today;
-        bump("check_ins");
-        const login = progression.xpSources.dailyLogin;
-        const xp = addXp(login.xp + Math.min(login.streakBonusCap, (pl.streakDays - 1) * login.streakBonusPerDay));
-        return {
-          xpAwarded: xp,
-          level: level(),
-          xpTotal: pl.xpTotal,
-          streakDays: pl.streakDays,
-          alreadyCheckedIn: false,
-        };
-      }),
-    ),
+  checkIn: (requestId) => delay(() => idempotent(requestId, doCheckIn)),
 
   track: (event, ref) => {
     const pl = p();
