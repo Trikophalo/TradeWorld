@@ -441,6 +441,16 @@ der KI-Firmen). M3 ist empfohlen, weil sonst das Geld für die Gründung langsam
 
 **Vor dem Start zu entscheiden:** Fragen 6, 9, 14.
 
+**Erster Schritt umgesetzt (ADR-055 bis ADR-057, `PLAYER_COMPANIES.md`):**
+
+- [x] Garagen-Startup ab Level 3 und Kleinunternehmen ab Level 10, Gründung mit Name, Idee, Branche, Farbe
+- [x] Startup-Modell: verborgene Marktgröße, S-Kurve der Bekanntheit, Qualität aus Skills, Kapazität aus Leistung
+- [x] KI-Kräfte zum Festpreis, Marketing-Budget, Einzahlen und Entnehmen, Wachsen zum Kleinunternehmen
+- [x] Arbeitgeber-Oberfläche: Stellen, Bewerbungen (annehmen, ablehnen, Gegenangebot), Team (Erhöhung, Entlassung)
+- [x] Firmenwert zählt zum Vermögen und zur Reichenliste
+- [x] Spielergetriebene, schnellere Märkte (ADR-056), langsamere erste Level (ADR-055)
+- [ ] Gewinnabhängiger Lohn mit Bonus, Insolvenz mit Privathaftung, Finanzierungsrunden, GmbH/AG, Firmenchat
+
 ### Daten/Backend
 
 - [ ] Gründung als RPC: Kleinunternehmen (Level 10, 15.000 €), GmbH (Level 20, 75.000 €), AG vor IPO
