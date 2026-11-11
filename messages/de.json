@@ -270,7 +270,11 @@
     "rules": "Spielregeln",
     "rulesHint": "Steuern, Gebühren und wie Firmen Geld verdienen",
     "unlocksMore": "Weitere Freischaltungen entdeckst du beim Aufsteigen.",
-    "rename": "Namen ändern"
+    "rename": "Namen ändern",
+    "missions": "Missionen",
+    "missionsHint": "Schnelle, tägliche, wöchentliche und Story-Missionen",
+    "richList": "Reichenliste",
+    "richListHint": "Dein Platz unter allen Spielern und Tycoons"
   },
   "unlocks": {
     "market_orders": "Aktien kaufen und verkaufen",

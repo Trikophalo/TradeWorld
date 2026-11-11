@@ -84,6 +84,13 @@ export function formatInteger(value: Numeric): string {
 /** "02:14:09" or "14:09" for a duration in seconds. */
 export function formatCountdown(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds));
+  if (s >= 86_400) {
+    // "4 T 10:04" for anything longer than a day
+    const days = Math.floor(s / 86_400);
+    const rest = s % 86_400;
+    const pad2 = (n: number) => String(n).padStart(2, "0");
+    return `${days} T ${pad2(Math.floor(rest / 3600))}:${pad2(Math.floor((rest % 3600) / 60))}`;
+  }
   const hours = Math.floor(s / 3600);
   const minutes = Math.floor((s % 3600) / 60);
   const seconds = s % 60;
