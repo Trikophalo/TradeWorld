@@ -236,7 +236,7 @@ select tests.cash(:f) as fcash1 \gset
 select tests.company_cash(:'fco') as cc1 \gset
 select tests.login_as('authenticated', :f);
 select public.upgrade_company(gen_random_uuid()) -> 'company' as up \gset
-select tests.throws_key($$select public.upgrade_company(gen_random_uuid())$$, 'company_upgrade_unavailable', 'upgrade_company(): only from the garage');
+select tests.throws_key($$select public.upgrade_company(gen_random_uuid())$$, 'company_level_too_low', 'upgrade_company(): the next step, the GmbH, needs startups.gmbh.minLevel');
 reset role;
 select tests.set_level(:s, 10);
 select tests.login_as('authenticated', :s);
@@ -244,7 +244,7 @@ select public.found_company(gen_random_uuid(), 'Sven Handel', 'Regionale Lebensm
 reset role;
 select tests.assert(
   :'up'::jsonb ->> 'tier' = 'small_business' and (:'up'::jsonb ->> 'max_employees')::int = 5
-  and :'up'::jsonb -> 'upgrade_cost_cents' = 'null'::jsonb and not (:'up'::jsonb ->> 'can_upgrade')::boolean
+  and (:'up'::jsonb ->> 'upgrade_cost_cents')::bigint = 4500000 and not (:'up'::jsonb ->> 'can_upgrade')::boolean
   and tests.cash(:f) = :fcash1 - 1250000 and tests.company_cash(:'fco') = :cc1 + 1250000
   and (select max_employees from public.companies where id = :'fco') = 5
   and :'sb'::jsonb ->> 'tier' = 'small_business' and (:'sb'::jsonb ->> 'cash_cents')::bigint = 1500000,

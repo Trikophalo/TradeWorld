@@ -1,0 +1,156 @@
+{
+  "company": {
+    "id": "13e16b79-c110-4195-a2b5-06478e3c23eb",
+    "idea": "Werkzeuge für Bastler",
+    "logo": {
+      "grid": [
+        "................",
+        "................",
+        "....00000000....",
+        "....01111110....",
+        "....01111110....",
+        "....00000000....",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................"
+      ],
+      "palette": ["#112233", "#ffcc00"]
+    },
+    "name": "Fixture Labor",
+    "tier": "small_business",
+    "color": "#2266cc",
+    "stage": 0,
+    "sector": "tech",
+    "stages": [
+      { "stage": 1, "skills": [{ "key": "it_security", "covered_by": null }], "reached": false },
+      {
+        "stage": 2,
+        "skills": [
+          { "key": "it_architecture", "covered_by": null },
+          { "key": "it_pentest", "covered_by": null }
+        ],
+        "reached": false
+      },
+      {
+        "stage": 3,
+        "skills": [
+          { "key": "law_privacy", "covered_by": null },
+          { "key": "sales_b2b", "covered_by": null }
+        ],
+        "reached": false
+      },
+      {
+        "stage": 4,
+        "skills": [
+          { "key": "it_crypto", "covered_by": null },
+          { "key": "management_leadership", "covered_by": null }
+        ],
+        "reached": false
+      }
+    ],
+    "history": [{ "label": "J1 Q2", "profit_cents": -98420, "revenue_cents": 15440 }],
+    "listing": {
+      "offer": {
+        "id": "4f778462-554d-41d9-bf4d-f29bae5489de",
+        "kind": "ipo",
+        "status": "open",
+        "ticker": null,
+        "company": {
+          "id": "13e16b79-c110-4195-a2b5-06478e3c23eb",
+          "logo": {
+            "grid": [
+              "................",
+              "................",
+              "....00000000....",
+              "....01111110....",
+              "....01111110....",
+              "....00000000....",
+              "................",
+              "................",
+              "................",
+              "................",
+              "................",
+              "................",
+              "................",
+              "................",
+              "................",
+              "................"
+            ],
+            "palette": ["#112233", "#ffcc00"]
+          },
+          "name": "Fixture Labor",
+          "color": "#2266cc",
+          "stage": 0,
+          "sector": "tech",
+          "product_key": "security_software"
+        },
+        "ends_at": "2026-11-12T07:47:42.06369+00:00",
+        "price_cents": 100,
+        "value_cents": 999965,
+        "last_quarter": { "label": "J1 Q2", "profit_cents": -98420, "revenue_cents": 15440 },
+        "my_shares_e6": 0,
+        "shares_offered_e6": 200000000000,
+        "shares_subscribed_e6": 0
+      },
+      "status": "subscription",
+      "ticker": null,
+      "last_price_e4": null,
+      "shares_total_e6": 1000000000000,
+      "founder_shares_e6": 800000000000
+    },
+    "distress": true,
+    "employees": 1,
+    "headcount": 1,
+    "ai_workers": 0,
+    "cash_cents": 1030945,
+    "founded_at": "2026-11-11T19:47:41.737081+00:00",
+    "can_upgrade": true,
+    "logo_hidden": false,
+    "product_key": "security_software",
+    "quality_bps": 2842,
+    "value_cents": 999965,
+    "last_quarter": {
+      "label": "J1 Q2",
+      "cogs_cents": 3860,
+      "bonus_cents": 0,
+      "fixed_cents": 15000,
+      "wages_cents": 0,
+      "demand_cents": 15440,
+      "revenue_cents": 15440,
+      "capacity_cents": 798000,
+      "ai_worker_cents": 70000,
+      "marketing_cents": 25000,
+      "utilization_bps": 193,
+      "operating_profit_cents": -98420
+    },
+    "unpaid_cents": 30980,
+    "awareness_bps": 759,
+    "can_go_public": false,
+    "max_employees": 5,
+    "open_postings": 1,
+    "capacity_cents": 948000,
+    "full_time_from": 5,
+    "grace_quarters": 4,
+    "pay_factor_bps": 10000,
+    "founder_has_job": false,
+    "next_quarter_at": "2026-11-12T01:00:00+00:00",
+    "quarters_active": 1,
+    "distress_quarters": 1,
+    "estimate_low_cents": 564749,
+    "upgrade_cost_cents": 4500000,
+    "estimate_high_cents": 3249436,
+    "ai_worker_cost_cents": 70000,
+    "can_capital_increase": false,
+    "pending_applications": 0,
+    "team_productivity_bps": 31600,
+    "founder_productivity_bps": 16600,
+    "marketing_cents_per_quarter": 25000
+  }
+}

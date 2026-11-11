@@ -1,38 +1,11 @@
 {
   "applications": [
     {
-      "id": "6a1f78af-430e-43ee-942e-8fbb0a7cbab0",
+      "id": "0827502a-88a7-4459-950d-9e4906aca176",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "108c183e-1554-42d3-aa6b-a468abd68c90",
-        "tier": "intern",
-        "title": null,
-        "company": {
-          "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
-          "logo": null,
-          "name": "QuantenSprung Labs",
-          "color": "#35D0BA",
-          "is_ai": true,
-          "sector": "tech",
-          "ticker": "QSL"
-        },
-        "required": [{ "branch": "it", "min_score": 0 }],
-        "title_key": "it_intern",
-        "required_skills": []
-      },
-      "created_at": "2026-11-11T19:40:01.222393+00:00",
-      "updated_at": "2026-11-11T19:40:01.226786+00:00",
-      "offer_expires_at": "2026-11-13T19:40:01.222393+00:00",
-      "salary_wish_cents_per_hour": 15900,
-      "offer_salary_cents_per_hour": 15900
-    },
-    {
-      "id": "81223ce9-5b7e-4ba3-95f0-2ef80928d37a",
-      "status": "offered",
-      "message": "Ich lerne schnell.",
-      "posting": {
-        "id": "334e645b-0fc7-4a5c-8e4f-10c95a58a759",
+        "id": "1f874050-e699-4897-857c-302a293fd511",
         "tier": "junior",
         "title": null,
         "company": {
@@ -48,9 +21,36 @@
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-11T19:40:01.214828+00:00",
-      "updated_at": "2026-11-11T19:40:01.214828+00:00",
-      "offer_expires_at": "2026-11-13T19:40:01.214828+00:00",
+      "created_at": "2026-11-11T19:47:41.623902+00:00",
+      "updated_at": "2026-11-11T19:47:41.629256+00:00",
+      "offer_expires_at": "2026-11-13T19:47:41.623902+00:00",
+      "salary_wish_cents_per_hour": 32700,
+      "offer_salary_cents_per_hour": 32700
+    },
+    {
+      "id": "231ae062-a2a0-4edb-ac3e-02b698257acc",
+      "status": "offered",
+      "message": "Ich lerne schnell.",
+      "posting": {
+        "id": "1ac1bde8-591d-43a4-940b-ae640295daa9",
+        "tier": "junior",
+        "title": null,
+        "company": {
+          "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
+          "logo": null,
+          "name": "KlarSoft AG",
+          "color": "#4C8DFF",
+          "is_ai": true,
+          "sector": "tech",
+          "ticker": "KLS"
+        },
+        "required": [{ "branch": "it", "min_score": 2 }],
+        "title_key": "it_junior",
+        "required_skills": []
+      },
+      "created_at": "2026-11-11T19:47:41.616263+00:00",
+      "updated_at": "2026-11-11T19:47:41.616263+00:00",
+      "offer_expires_at": "2026-11-13T19:47:41.616263+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

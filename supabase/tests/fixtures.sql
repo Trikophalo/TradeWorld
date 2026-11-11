@@ -279,6 +279,37 @@ select tests.login_as('authenticated', :p) is null as ok \gset
 select public.post_company_message(gen_random_uuid(), 'Willkommen an Bord.') is not null as ok \gset
 \o :fixture_dir/get_company_chat.json
 select public.get_company_chat();
+\o
+reset role;
+-- M3f: IPO with subscription and a capital increase (level 15, small business)
+update public.profiles set level = 15, xp_total = public.xp_total_for_level(15) where id = :p;
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/go_public.json
+select public.go_public(gen_random_uuid(), 20);
+\o
+reset role;
+select id as fx_offer from public.company_share_offers where company_id = :'fco' and status = 'open' \gset
+select tests.login_as('authenticated', :boss) is null as ok \gset
+\o :fixture_dir/subscribe_offer.json
+select public.subscribe_offer(gen_random_uuid(), :'fx_offer', 25000);
+\o :fixture_dir/get_offers.json
+select public.get_offers();
+\o
+reset role;
+update public.company_share_offers set ends_at = now() - interval '1 second' where id = :'fx_offer';
+select public.close_due_offers() is not null as ok \gset
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/get_my_company_listed.json
+select public.get_my_company();
+\o :fixture_dir/capital_increase.json
+select public.capital_increase(gen_random_uuid(), 10);
+\o
+reset role;
+update public.company_share_offers set ends_at = now() - interval '1 second' where company_id = :'fco' and status = 'open';
+select public.close_due_offers() is not null as ok \gset
+update public.securities set status = 'delisted', delisted_at = now()
+ where id = (select security_id from public.companies where id = :'fco');
+select tests.login_as('authenticated', :p) is null as ok \gset
 \o :fixture_dir/close_company.json
 select public.close_company(gen_random_uuid());
 \o :fixture_dir/get_my_company_closed.json

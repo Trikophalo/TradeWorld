@@ -1,12 +1,24 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 14, "gap_cents": 481 }, "rank": 15, "net_worth_cents": 1019519 },
+  "me": { "next": { "name": "Vera", "rank": 14, "gap_cents": 480 }, "rank": 15, "net_worth_cents": 1019520 },
   "total": 54,
   "entries": [
+    {
+      "id": "0f3f3f3f-0000-4000-8000-0000000000f1",
+      "kind": "player",
+      "name": "Fenja_Firma",
+      "rank": 1,
+      "is_me": false,
+      "avatar_key": "rookie",
+      "description": null,
+      "change_24h_bps": null,
+      "net_worth_cents": 101288777,
+      "rank_change_24h": null
+    },
     {
       "id": "0e3e3e3e-0000-4000-8000-0000000000f1",
       "kind": "player",
       "name": "Frieda_Format",
-      "rank": 1,
+      "rank": 2,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
@@ -18,24 +30,12 @@
       "id": "0c3c3c3c-0000-4000-8000-0000000000f1",
       "kind": "player",
       "name": "Frida_Firma",
-      "rank": 2,
-      "is_me": false,
-      "avatar_key": "rookie",
-      "description": null,
-      "change_24h_bps": null,
-      "net_worth_cents": 40225000,
-      "rank_change_24h": null
-    },
-    {
-      "id": "0f3f3f3f-0000-4000-8000-0000000000f1",
-      "kind": "player",
-      "name": "Fenja_Firma",
       "rank": 3,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 20640000,
+      "net_worth_cents": 40225000,
       "rank_change_24h": null
     },
     {
@@ -47,21 +47,21 @@
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 6020638,
+      "net_worth_cents": 6029088,
       "rank_change_24h": null
     },
     {
-      "id": "0f3f3f3f-0000-4000-8000-0000000000a2",
+      "id": "0f3f3f3f-0000-4000-8000-0000000000a3",
       "kind": "player",
-      "name": "Rita_Zwei",
+      "name": "Rudi_Drei",
       "rank": 5,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 6000000,
+      "net_worth_cents": 5999705,
       "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-11T19:40:01.065958+00:00"
+  "server_time": "2026-11-11T19:47:41.509091+00:00"
 }

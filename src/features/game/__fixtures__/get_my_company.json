@@ -1,6 +1,6 @@
 {
   "company": {
-    "id": "56bda88d-4d6b-4759-ab1f-52163890846b",
+    "id": "13e16b79-c110-4195-a2b5-06478e3c23eb",
     "idea": "Werkzeuge für Bastler",
     "logo": {
       "grid": [
@@ -55,13 +55,14 @@
         "reached": false
       }
     ],
-    "history": [{ "label": "J1 Q2", "profit_cents": -108120, "revenue_cents": 2507 }],
+    "history": [{ "label": "J1 Q2", "profit_cents": -98420, "revenue_cents": 15440 }],
+    "listing": null,
     "distress": true,
     "employees": 0,
     "headcount": 0,
     "ai_workers": 0,
     "cash_cents": 0,
-    "founded_at": "2026-11-11T19:40:01.37011+00:00",
+    "founded_at": "2026-11-11T19:47:41.737081+00:00",
     "can_upgrade": true,
     "logo_hidden": false,
     "product_key": "security_software",
@@ -69,20 +70,21 @@
     "value_cents": 0,
     "last_quarter": {
       "label": "J1 Q2",
-      "cogs_cents": 627,
+      "cogs_cents": 3860,
       "bonus_cents": 0,
       "fixed_cents": 15000,
       "wages_cents": 0,
-      "demand_cents": 2507,
-      "revenue_cents": 2507,
+      "demand_cents": 15440,
+      "revenue_cents": 15440,
       "capacity_cents": 798000,
       "ai_worker_cents": 70000,
       "marketing_cents": 25000,
-      "utilization_bps": 31,
-      "operating_profit_cents": -108120
+      "utilization_bps": 193,
+      "operating_profit_cents": -98420
     },
-    "unpaid_cents": 40680,
+    "unpaid_cents": 30980,
     "awareness_bps": 759,
+    "can_go_public": false,
     "max_employees": 2,
     "open_postings": 0,
     "capacity_cents": 498000,
@@ -93,10 +95,11 @@
     "next_quarter_at": "2026-11-12T01:00:00+00:00",
     "quarters_active": 1,
     "distress_quarters": 1,
-    "estimate_low_cents": 30418,
+    "estimate_low_cents": 564749,
     "upgrade_cost_cents": 1250000,
-    "estimate_high_cents": 414117,
+    "estimate_high_cents": 3249436,
     "ai_worker_cost_cents": 70000,
+    "can_capital_increase": false,
     "pending_applications": 0,
     "team_productivity_bps": 16600,
     "founder_productivity_bps": 16600,
