@@ -1,0 +1,20 @@
+{
+  "side": "sell",
+  "type": "market",
+  "level": 7,
+  "status": "filled",
+  "ticker": "VLT",
+  "order_id": "92bf96de-bfed-4216-9a30-927a11e4b117",
+  "quantity": 2,
+  "xp_total": 5140,
+  "fee_cents": 100,
+  "tax_cents": 0,
+  "cash_cents": 973666,
+  "xp_awarded": 0,
+  "gross_cents": 10336,
+  "avg_price_e4": 516800,
+  "limit_price_e4": null,
+  "reserved_cents": 0,
+  "filled_quantity": 2,
+  "realized_pnl_cents": -110
+}

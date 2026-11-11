@@ -168,6 +168,7 @@ function stepSecurity(
     trading.priceImpact.immediateShare * impactReturn(playerNetShares, depth, trading.priceImpact);
   const sigma =
     (aiInvestors.tickNoiseBps[security.sizeClass] / 10_000) *
+    aiInvestors.tickNoiseScale *
     cfg.sectors[security.sectorId].volatilityMultiplier *
     noiseFactor;
   const noise = sigma * rng.normal();

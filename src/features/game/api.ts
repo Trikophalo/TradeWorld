@@ -157,6 +157,19 @@ function toErrorKey(message: string | undefined): GameErrorKey {
   return (GAME_ERROR_KEYS as readonly string[]).includes(message ?? "") ? (message as GameErrorKey) : "unknown";
 }
 
+/** Response schemas per RPC, exported for the contract test against real database output. */
+export const RPC_SCHEMAS = {
+  get_market_snapshot: snapshotSchema,
+  get_candles: z.array(candleSchema),
+  get_order_book: bookSchema,
+  get_security_details: detailsSchema,
+  get_my_portfolio: portfolioSchema,
+  place_order: orderResultSchema,
+  cancel_order: z.object({ order_id: z.string(), status: z.literal("cancelled") }),
+  claim_vault: z.object({ claimed_cents: num, cash_cents: num }),
+  complete_tutorial: progressSchema,
+} as const;
+
 async function rpc<T>(fn: string, args: Record<string, unknown>, schema: z.ZodType<T>): Promise<T> {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) throw new GameError("not_authenticated");

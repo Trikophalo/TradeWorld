@@ -41,6 +41,7 @@ pnpm db:config      # supabase/seeds/game_config.sql aus src/config/balance.ts e
 pnpm sounds         # 8-Bit-Sounds neu erzeugen
 pnpm icons          # App-Icons neu erzeugen
 bash supabase/tests/verify_local.sh   # Schema, RLS und Seeds gegen lokales Postgres prüfen
+NEXA_FIXTURE_DIR=$PWD/src/features/game/__fixtures__ bash supabase/tests/verify_local.sh   # dazu RPC-Antworten für den Vertragstest neu schreiben
 ```
 
 Vor jedem Commit müssen `pnpm typecheck`, `pnpm lint` und `pnpm test` grün sein.
@@ -78,6 +79,8 @@ Vor jedem Commit müssen `pnpm typecheck`, `pnpm lint` und `pnpm test` grün sei
 
 - RLS auf **jeder** Tabelle. Funktionen mit `SECURITY DEFINER` setzen `search_path = ''`.
 - Schema ändern heißt: neue Migration in `supabase/migrations`, nie eine alte umschreiben.
+- Ändern sich RPC-Antworten, die Fixtures neu schreiben (siehe Befehle); `src/features/game/api.test.ts` prüft sie
+  gegen die Zod-Schemas des Clients.
   Danach `verify_local.sh` laufen lassen und `docs/DATA_MODEL.md` nachziehen.
 - Zu jeder neuen Migration gehört eine idempotente Kopie in `supabase/updates/` (siehe dortige README).
   Danach `bash scripts/build-setup-sql.sh`: Das erzeugt `setup-all.sql` (neues Projekt) und

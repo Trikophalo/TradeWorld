@@ -1,0 +1,20 @@
+{
+  "side": "buy",
+  "type": "market",
+  "level": 7,
+  "status": "filled",
+  "ticker": "NXB02",
+  "order_id": "ec5106e3-3d4e-4a6d-8092-59ccb3fce3c8",
+  "quantity": 3,
+  "xp_total": 5140,
+  "fee_cents": 100,
+  "tax_cents": 0,
+  "cash_cents": 963430,
+  "xp_awarded": 20,
+  "gross_cents": 30204,
+  "avg_price_e4": 1006796,
+  "limit_price_e4": null,
+  "reserved_cents": 0,
+  "filled_quantity": 3,
+  "realized_pnl_cents": null
+}

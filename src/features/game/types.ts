@@ -198,6 +198,9 @@ export const GAME_ERROR_KEYS = [
   "market_paused",
   "nothing_to_claim",
   "locked",
+  "invalid_argument",
+  "invalid_interval",
+  "forbidden",
 ] as const;
 export type GameErrorKey = (typeof GAME_ERROR_KEYS)[number] | "unknown";
 

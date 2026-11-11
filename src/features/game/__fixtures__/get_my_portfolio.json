@@ -1,0 +1,108 @@
+{
+  "level": 7,
+  "vault": {
+    "full_at": "2026-11-11T21:15:50.6189+00:00",
+    "cap_cents": 80000,
+    "server_time": "2026-11-11T13:15:50.671651+00:00",
+    "accrued_cents": 0,
+    "last_claimed_at": "2026-11-11T13:15:50.6189+00:00",
+    "rate_cents_per_hour": 10000
+  },
+  "xp_total": 5140,
+  "positions": [
+    {
+      "kind": "bond",
+      "name": "Staatsanleihe 2 Jahre",
+      "ticker": "NXB02",
+      "quantity": 3,
+      "opened_at": "2026-11-11T13:15:50.644099+00:00",
+      "change_bps": 18,
+      "avg_price_e4": 1006796,
+      "last_price_e4": 1006293,
+      "cost_basis_cents": 30204,
+      "reserved_quantity": 0,
+      "market_value_cents": 30189,
+      "realized_pnl_cents": 0,
+      "unrealized_pnl_cents": -15
+    },
+    {
+      "kind": "stock",
+      "name": "Volta Energie AG",
+      "ticker": "VLT",
+      "quantity": 3,
+      "opened_at": "2026-11-11T13:15:50.624879+00:00",
+      "change_bps": -34,
+      "avg_price_e4": 517318,
+      "last_price_e4": 517059,
+      "cost_basis_cents": 15520,
+      "reserved_quantity": 0,
+      "market_value_cents": 15512,
+      "realized_pnl_cents": -110,
+      "unrealized_pnl_cents": -8
+    }
+  ],
+  "cash_cents": 973666,
+  "open_orders": [
+    {
+      "id": "701ea8bc-e41a-4cbb-b7fd-d4b8977784c9",
+      "side": "buy",
+      "type": "limit",
+      "status": "open",
+      "ticker": "KLS",
+      "quantity": 2,
+      "created_at": "2026-11-11T13:15:50.639204+00:00",
+      "limit_price_e4": 10000,
+      "reserved_cents": 300,
+      "filled_quantity": 0
+    }
+  ],
+  "server_time": "2026-11-11T13:15:50.671651+00:00",
+  "total_cents": 1019667,
+  "xp_for_next": 1852,
+  "recent_trades": [
+    {
+      "id": "591a2262-b68e-4691-bbed-da4ed775113e",
+      "side": "sell",
+      "ticker": "VLT",
+      "price_e4": 516800,
+      "quantity": 2,
+      "fee_cents": 100,
+      "tax_cents": 0,
+      "xp_awarded": 0,
+      "executed_at": "2026-11-11T13:15:50.650027+00:00",
+      "gross_cents": 10336,
+      "realized_pnl_cents": -110
+    },
+    {
+      "id": "ce5c9d5d-9553-44f4-a539-b86719b89606",
+      "side": "buy",
+      "ticker": "NXB02",
+      "price_e4": 1006796,
+      "quantity": 3,
+      "fee_cents": 100,
+      "tax_cents": 0,
+      "xp_awarded": 20,
+      "executed_at": "2026-11-11T13:15:50.644099+00:00",
+      "gross_cents": 30204,
+      "realized_pnl_cents": null
+    },
+    {
+      "id": "aa654bba-e490-4356-8172-9d4069dbdaff",
+      "side": "buy",
+      "ticker": "VLT",
+      "price_e4": 517318,
+      "quantity": 5,
+      "fee_cents": 100,
+      "tax_cents": 0,
+      "xp_awarded": 20,
+      "executed_at": "2026-11-11T13:15:50.624879+00:00",
+      "gross_cents": 25866,
+      "realized_pnl_cents": null
+    }
+  ],
+  "xp_into_level": 849,
+  "loss_pot_cents": 110,
+  "reserved_cents": 300,
+  "tutorial_completed": true,
+  "positions_value_cents": 45701
+}

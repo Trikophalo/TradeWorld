@@ -156,6 +156,12 @@ Wichtig:
 
 Lesen läuft über Views und Tabellen mit RLS direkt aus dem Client (TanStack Query), ohne Umweg über den Next.js-Server.
 
+> **Stand M1 (ADR-037):** Für die Alpha laufen Markt-Tick, Quartalsabschluss und Wartung als PL/pgSQL-Funktionen
+> über `pg_cron` direkt in Postgres (`market_tick()` alle 5 Sekunden, `run_due_jobs()` jede Minute), weil sich alles
+> per SQL Editor einspielen lassen muss. Der Client fragt `get_market_snapshot` im Tick-Takt ab statt Realtime zu
+> abonnieren. Die Abschnitte 5 und 6 beschreiben die ursprünglich geplante Edge-Function-Variante; sie bleibt der Weg,
+> wenn die Spielerzahl wächst. Funktionen, Fehlercodes und Jobs: `DATA_MODEL.md`, Abschnitt M1.
+
 ## 5. Echtzeit
 
 | Kanal           | Technik                    | Inhalt                                                           | Empfänger                  |

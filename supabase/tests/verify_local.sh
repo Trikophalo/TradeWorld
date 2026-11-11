@@ -6,7 +6,8 @@
 #   1. initdb into a temp directory and start a private server
 #   2. create a minimal Supabase stub (roles, auth schema, auth.uid())
 #   3. apply all migrations and seed.sql with ON_ERROR_STOP
-#   4. run the SQL assertions in supabase/tests/[1-9]*.sql
+#   4. run the SQL assertions in supabase/tests/[1-4]*.sql, then (older
+#      database mode only) apply update-to-latest.sql, then [5-9]*.sql
 #   5. stop and delete the cluster
 # Exits non-zero on the first failure.
 #
@@ -16,6 +17,8 @@
 #   NEXA_PG_PORT   port (default 54329)
 #   NEXA_KEEP=1    keep the cluster running for inspection
 #   NEXA_SINGLE_TX=0  apply migrations in autocommit mode instead of one transaction per file
+#   NEXA_MIGRATIONS_UPTO=<timestamp>  apply only migrations up to this one (simulates
+#                  an older database that is then brought up to date by update-to-latest.sql)
 # =============================================================================
 set -euo pipefail
 
@@ -114,11 +117,33 @@ echo "== seed.sql"
 echo "== seed.sql (second run: must be idempotent)"
 "${PSQL[@]}" -1 -f "$SUPABASE_DIR/seed.sql"
 
-echo "== assertions"
-for f in "$SCRIPT_DIR"/[1-9]*.sql; do
-  echo "-- $(basename "$f")"
-  "${PSQL[@]}" -At -f "$f" 2>&1 | sed -e 's/^psql:[^ ]* NOTICE:  /   /' -e '/^$/d'
-done
+run_assertions() {
+  for f in "$@"; do
+    echo "-- $(basename "$f")"
+    "${PSQL[@]}" -At -f "$f" 2>&1 | sed -e 's/^psql:[^ ]* NOTICE:  /   /' -e '/^$/d'
+  done
+}
+
+echo "== assertions (schema, sign-up, RLS, seed)"
+run_assertions "$SCRIPT_DIR"/[1-4]*.sql
+
+if [[ -n "${NEXA_MIGRATIONS_UPTO:-}" ]]; then
+  # An older database is brought up to date the way the owner does it: by
+  # pasting update-to-latest.sql (twice: it must be idempotent).
+  echo "== update-to-latest.sql on the older database (twice)"
+  "${PSQL[@]}" -1 -f "$SUPABASE_DIR/update-to-latest.sql"
+  "${PSQL[@]}" -1 -f "$SUPABASE_DIR/update-to-latest.sql"
+fi
+
+echo "== assertions (M1 market, trading, bonds, security)"
+run_assertions "$SCRIPT_DIR"/[5-9]*.sql
+
+if [[ -n "${NEXA_FIXTURE_DIR:-}" ]]; then
+  echo "== RPC fixtures -> $NEXA_FIXTURE_DIR"
+  mkdir -p "$NEXA_FIXTURE_DIR"
+  chmod 777 "$NEXA_FIXTURE_DIR" 2>/dev/null || true
+  "${PSQL[@]}" -v fixture_dir="$NEXA_FIXTURE_DIR" -f "$SCRIPT_DIR/fixtures.sql"
+fi
 
 # The assertions above set their own config rows, so the generated seed is checked last.
 if [ -f "$SUPABASE_DIR/seeds/game_config.sql" ]; then
@@ -134,4 +159,6 @@ echo "== update-to-latest.sql (twice: must be idempotent)"
 "${PSQL[@]}" -1 -f "$SUPABASE_DIR/update-to-latest.sql"
 "${PSQL[@]}" -tAc "select 'migration 1700 columns: ' || count(*) from information_schema.columns where table_name = 'company_quarter_reports' and column_name in ('market_segment','segment_demand_cents','uncovered_quarters','grace_quarters_left')"
 "${PSQL[@]}" -tAc "select 'tutorial xp: ' || coalesce(value #>> '{xpSources,tutorial,xp}', 'MISSING') from public.game_config where key = 'progression'"
+"${PSQL[@]}" -tAc "select 'M1 RPCs: ' || count(*) from pg_proc where pronamespace = 'public'::regnamespace and proname in ('get_market_snapshot','get_candles','get_order_book','get_security_details','get_my_portfolio','place_order','cancel_order','claim_vault','complete_tutorial','admin_set_paused','admin_run_tick','admin_close_quarter','market_tick','run_due_jobs')"
+"${PSQL[@]}" -tAc "select 'candles: ' || count(*) || ', market tick: ' || (public.market_tick() ->> 'securities') || ' securities' from public.candles"
 

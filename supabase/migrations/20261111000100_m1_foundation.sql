@@ -21,12 +21,12 @@
 -- 1. New columns and enum values
 -- ---------------------------------------------------------------------------
 alter table public.security_sim_state
-  add column if not exists ema_fast_e4     double precision,
-  add column if not exists ema_slow_e4     double precision,
+  add column if not exists ema_fast        double precision,
+  add column if not exists ema_slow        double precision,
   add column if not exists maker_inventory double precision not null default 0,
   add column if not exists price_deviation double precision not null default 0;
-comment on column public.security_sim_state.ema_fast_e4 is 'Fast EMA of the price (about 30 s), momentum signal.';
-comment on column public.security_sim_state.ema_slow_e4 is 'Slow EMA of the price (about 5 min), momentum signal.';
+comment on column public.security_sim_state.ema_fast is 'Fast EMA of the price (about 30 s), momentum signal.';
+comment on column public.security_sim_state.ema_slow is 'Slow EMA of the price (about 5 min), momentum signal.';
 comment on column public.security_sim_state.maker_inventory is 'Market maker inventory in shares taken from player flow; hedged into the market over time.';
 comment on column public.security_sim_state.price_deviation is 'Bonds: log deviation of the price from the yield-implied price (AR(1) noise plus player flow).';
 

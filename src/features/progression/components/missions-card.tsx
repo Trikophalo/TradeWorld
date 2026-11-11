@@ -20,7 +20,7 @@ export function MissionsCard() {
         <CardTitle>{t("missions")}</CardTitle>
         <Badge>{t("missionsSoon")}</Badge>
       </CardHeader>
-      <ul className="space-y-2.5 opacity-60" aria-disabled>
+      <ul className="space-y-2.5 opacity-60">
         {MISSIONS.map((mission) => (
           <li key={mission.key} className="flex items-center gap-3">
             <span aria-hidden className="size-4 shrink-0 border-2 border-line-2" />

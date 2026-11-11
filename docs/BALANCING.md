@@ -1098,3 +1098,21 @@ Dazu vier kurze Warnhinweise für Tooltips, jeder belegt durch die Szenarien in 
 - (b) Profil, neben dem XP-Balken ein Abzeichen „Alpha ×2“; jede XP-Einblendung zeigt den verdoppelten Wert.
 - (c) `progression.xpMultiplier` (2) × `progression.xpSources.workHour.xp` (40). Angewendet wird der Faktor genau
   einmal beim Gutschreiben (`scaledXp()` in `src/lib/sim/progression.ts`).
+
+## Nachtrag M1: Kalibrierung der Kursbewegung
+
+Der Datenbank-Tick wurde über einen simulierten Tag (17 280 Ticks) eingestellt. Mit den Rauschwerten aus
+`aiInvestors.tickNoiseBps` allein schwankten Blue Chips um 8 bis 15 % am Tag. Der Faktor
+`aiInvestors.tickNoiseScale = 0.2` bringt die Tagesspannen auf:
+
+| Klasse      | Tagesspanne im Mittel | Einzelwerte   | Größte Entfernung zum fairen Wert |
+| ----------- | --------------------- | ------------- | --------------------------------- |
+| Blue Chips  | 2,6 bis 3,1 %         | 1,6 bis 5,0 % | unter 3 %                         |
+| Mittelstand | 6 bis 7 %             | 3,5 bis 9,1 % | unter 7 %                         |
+| Pennystocks | 16 bis 19 %           | 10 bis 25 %   | unter 14 %                        |
+| NEXA 30     | 0,9 bis 1,8 %         |               |                                   |
+
+Der Faktor gilt in der TypeScript-Simulation (`src/lib/sim/tick.ts`) und im Datenbank-Tick gleichermaßen.
+Weitere seit M1 genutzte Schlüssel: `trading.maxOrderQuantity`, `progression.xpSources.trade.minOrderValueCents`,
+`economy.vaultMinClaimCents`, `company.aiPolicy.revenueNoisePersistence`, `company.aiPolicy.costNoiseShare`,
+`valuation.lossMakerRevenueElasticity`.

@@ -5,3 +5,7 @@ Every migration added after a database may already exist gets an **idempotent co
 `game_config`, into `supabase/update-to-latest.sql`, which can be pasted into the Supabase SQL Editor any number
 of times. `verify_local.sh` runs it twice on top of the full schema; with `NEXA_MIGRATIONS_UPTO=<timestamp>` it
 simulates an older database.
+
+The M1 migrations (`20261111000*_m1_*.sql`) are written idempotently themselves; their copies here are identical apart
+from a header line. After the config, both generated files call `public.market_bootstrap()` (idempotent: fair values
+once, bond series, price history only while no candle exists).

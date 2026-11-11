@@ -59,6 +59,8 @@ export interface EconomyConfig {
    * has something to claim right away.
    */
   readonly vaultInitialHours: number;
+  /** Smallest amount the vault can be emptied for. */
+  readonly vaultMinClaimCents: number;
   readonly bankruptcyStatusGameDays: number;
   readonly bankruptcyReputationPenalty: number;
 }
@@ -70,6 +72,8 @@ export interface LeverageTier {
 
 export interface TradingConfig {
   readonly orderFeeCents: number;
+  /** Largest number of shares per order. */
+  readonly maxOrderQuantity: number;
   readonly capitalGainsTaxBps: number;
   /** Bond coupons and dividends are taxed at this rate when paid out. */
   readonly incomeTaxOnCouponsAndDividendsBps: number;
@@ -310,6 +314,10 @@ export interface CompanyConfig {
     readonly utilizationBand: number;
     readonly hiringRatePerQuarter: number;
     readonly firingRatePerQuarter: number;
+    /** How much of last quarter's revenue surprise carries over (0..1). */
+    readonly revenueNoisePersistence: number;
+    /** Share of a revenue surprise that also shows up in costs. */
+    readonly costNoiseShare: number;
   };
 }
 
@@ -470,7 +478,12 @@ export interface ProgressionConfig {
    */
   readonly xpMultiplier: number;
   readonly xpSources: {
-    readonly trade: { readonly xp: number; readonly maxTradesPerDay: number };
+    readonly trade: {
+      readonly xp: number;
+      readonly maxTradesPerDay: number;
+      /** Orders below this value give no XP (no farming with 1-share trades). */
+      readonly minOrderValueCents: number;
+    };
     readonly profitableClose: { readonly profitCentsPerXp: number; readonly maxXpPerTrade: number };
     readonly workHour: {
       readonly xp: number;
@@ -505,6 +518,8 @@ export interface ValuationConfig {
   readonly macroFactorMax: number;
   /** Floor: this share of book value per share (loss-making companies). */
   readonly bookValueFloorShare: number;
+  /** Loss-making companies: fair value moves with revenue at this elasticity. */
+  readonly lossMakerRevenueElasticity: number;
   readonly analystTargetNoise: number;
   readonly analystWrongProbability: number;
 }
@@ -520,6 +535,12 @@ export interface InvestorArchetypeConfig {
 export interface AiInvestorsConfig {
   /** Standard deviation of the noise return per tick in bps, per size class. */
   readonly tickNoiseBps: Readonly<Record<SizeClass, number>>;
+  /**
+   * Global multiplier on tickNoiseBps. Calibrated with the database tick over a
+   * simulated day (docs/BALANCING.md): blue chips about 3 %, mid caps 6-7 %,
+   * penny stocks 16-19 % daily range.
+   */
+  readonly tickNoiseScale: number;
   readonly emaFastAlpha: number;
   readonly emaSlowAlpha: number;
   readonly sentimentDecayPerTick: number;
@@ -674,6 +695,7 @@ export const BALANCE = {
     basicIncomeCentsPerHour: 10_000,
     vaultCapHours: 8,
     vaultInitialHours: 2,
+    vaultMinClaimCents: 100,
     bankruptcyStatusGameDays: 3,
     bankruptcyReputationPenalty: 10,
   },
@@ -681,6 +703,7 @@ export const BALANCE = {
   // --------------------------------------------------------------- trading (spec 10)
   trading: {
     orderFeeCents: 100,
+    maxOrderQuantity: 100_000,
     capitalGainsTaxBps: 2500,
     incomeTaxOnCouponsAndDividendsBps: 2500,
     spread: {
@@ -974,6 +997,8 @@ export const BALANCE = {
       utilizationBand: 0.07,
       hiringRatePerQuarter: 0.06,
       firingRatePerQuarter: 0.03,
+      revenueNoisePersistence: 0.3,
+      costNoiseShare: 0.25,
     },
   },
 
@@ -1124,7 +1149,7 @@ export const BALANCE = {
     // Typed as `number` (not the literal 2) so that code may compare it with 1.
     xpMultiplier: 2 as number,
     xpSources: {
-      trade: { xp: 10, maxTradesPerDay: 30 },
+      trade: { xp: 10, maxTradesPerDay: 30, minOrderValueCents: 10_000 },
       profitableClose: { profitCentsPerXp: 10_000, maxXpPerTrade: 500 },
       workHour: { xp: 40, playerCompanyMultiplier: 1.5, maxHoursPerDay: 12 },
       workTask: { minXp: 50, maxXp: 150 },
@@ -1179,6 +1204,7 @@ export const BALANCE = {
     macroFactorMin: 0.6,
     macroFactorMax: 1.3,
     bookValueFloorShare: 0.5,
+    lossMakerRevenueElasticity: 0.5,
     analystTargetNoise: 0.08,
     analystWrongProbability: 0.25,
   },
@@ -1186,6 +1212,7 @@ export const BALANCE = {
   // ---------------------------------------------------------- aiInvestors (spec 5.3)
   aiInvestors: {
     tickNoiseBps: { bluechip: 6, midcap: 15, penny: 45 },
+    tickNoiseScale: 0.2,
     emaFastAlpha: 0.15,
     emaSlowAlpha: 0.0165,
     sentimentDecayPerTick: 0.0019,

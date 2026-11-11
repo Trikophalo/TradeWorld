@@ -42,14 +42,25 @@ select tests.assert(
      where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')),
   'anon cannot execute any function in public');
 
--- authenticated: executable functions are exactly the read-only allowlist
+-- authenticated: executable functions are the read-only helper allowlist plus
+-- (once the M1 migrations/update are applied) the M1 RPCs; nothing else.
+-- 55_m1_security.sql checks the M1 set exactly.
 select tests.assert(
   (select coalesce(array_agg(p.proname::text order by p.proname), '{}')
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute'))
-  = array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
-          'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account'],
-  'authenticated can execute exactly the 9 allowlisted helper functions');
+  <@ array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
+           'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account',
+           -- M1 RPCs
+           'admin_close_quarter', 'admin_run_tick', 'admin_set_paused', 'cancel_order', 'claim_vault',
+           'complete_tutorial', 'get_candles', 'get_market_snapshot', 'get_my_portfolio', 'get_order_book',
+           'get_security_details', 'place_order']
+  and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
+            'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
+      <@ (select coalesce(array_agg(p.proname::text), '{}')
+            from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')),
+  'authenticated can execute the 9 allowlisted helper functions and (after M1) the M1 RPCs, nothing else');
 
 -- authenticated: write privileges only on the documented client-writable tables
 select tests.assert(

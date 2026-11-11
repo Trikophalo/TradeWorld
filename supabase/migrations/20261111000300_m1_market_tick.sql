@@ -196,6 +196,7 @@ declare
   c_rh_ts     double precision;
   c_mm_speed  double precision;
   c_basevol   double precision;
+  c_nscale    double precision;
   c_qpy       double precision;
   c_qsec      double precision;
   -- per security
@@ -299,6 +300,10 @@ begin
   c_rh_ts     := public.cfg_num(v_ai, '{archetypes,retail_herd,params,trendScale}', 0.02);
   c_mm_speed  := public.cfg_num(v_ai, '{archetypes,market_maker,reactionSpeed}', 0.005) * c_liq;
   c_basevol   := public.cfg_num(v_ai, '{baselineVolumeDepthFraction}', 0.02);
+  -- Scale on tickNoiseBps for stocks. The TS values give daily ranges of about
+  -- 10 % (blue chips) to 90 % (penny stocks); 0.2 brings them to the M1 target
+  -- (1-4 %, 3-8 %, 10-30 %). Fallback until balance.ts has aiInvestors.tickNoiseScale.
+  c_nscale    := public.cfg_num(v_ai, '{tickNoiseScale}', 0.2);
   c_qpy       := greatest(1, public.cfg_num(v_bonds, '{couponsPerGameYear}', 4));
   c_qsec      := public.cfg_num(v_time, '{quarterHours}', 6) * 3600;
 
@@ -309,7 +314,7 @@ begin
   for r in
     select s.id, s.kind, s.sector_key, c.tier::text as tier, c.shares_outstanding,
            q.last_price_e4,
-           st.fair_value_e4, st.sentiment, st.ema_fast_e4, st.ema_slow_e4, st.maker_inventory,
+           st.fair_value_e4, st.sentiment, st.ema_fast, st.ema_slow, st.maker_inventory,
            st.pending_player_flow, st.price_deviation, st.volatility, st.liquidity_shares, st.spread_bps,
            b.coupon_bps, b.matures_at, b.face_value_cents
       from public.securities s
@@ -322,8 +327,8 @@ begin
     v_price := r.last_price_e4;
     v_flow  := r.pending_player_flow;
     v_sent  := greatest(-1, least(1, coalesce(r.sentiment, 0) * (1 - c_decay)));
-    v_ef    := coalesce(r.ema_fast_e4, v_price);
-    v_es    := coalesce(r.ema_slow_e4, v_price);
+    v_ef    := coalesce(r.ema_fast, v_price);
+    v_es    := coalesce(r.ema_slow, v_price);
     v_mm    := coalesce(r.maker_inventory, 0) - v_flow;
     v_dev   := coalesce(r.price_deviation, 0);
     v_yield_out := null;
@@ -347,7 +352,7 @@ begin
              + c_imm * sign(v_flow) * c_impact * power(abs(v_flow) / v_depth, c_exp);
       v_sigma := public.cfg_num(v_ai, array['tickNoiseBps', coalesce(r.tier, 'midcap')], 15) / 10000.0
                * public.cfg_num(v_sectors, array[coalesce(r.sector_key, ''), 'volatilityMultiplier'], 1)
-               * c_noise;
+               * c_noise * c_nscale;
       v_ret := greatest(-c_maxret, least(c_maxret, v_ret + v_sigma * public.gauss_random()));
       v_exact := v_price * exp(v_ret);
       v_new := floor(v_exact)::bigint + case when random() < v_exact - floor(v_exact) then 1 else 0 end;
@@ -395,7 +400,7 @@ begin
   end loop;
 
   update public.security_sim_state st
-     set sentiment = u.s, ema_fast_e4 = u.ef, ema_slow_e4 = u.es, maker_inventory = u.mm,
+     set sentiment = u.s, ema_fast = u.ef, ema_slow = u.es, maker_inventory = u.mm,
          price_deviation = u.dev, pending_player_flow = st.pending_player_flow - u.flow
     from unnest(a_id, a_s, a_ef, a_es, a_mm, a_dev, a_flow) as u(id, s, ef, es, mm, dev, flow)
    where st.security_id = u.id;

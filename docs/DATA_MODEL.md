@@ -3590,3 +3590,229 @@ Lauf von `supabase/tools/gen_data_model.py` aktualisiert.
 **Für M4 vorgemerkt:** eine Tabelle je Branche, Markt und Quartal (Nachfrage, Umsatz der etablierten Anbieter,
 unbediente Nachfrage) für das Marktanteils-Diagramm, sowie Startwerte der KI-Firmen passend zur neuen
 Kalkulation (Qualität, Bekanntheit, Entwickleranteil).
+
+## Nachtrag: M1 (Markt komplett in Postgres)
+
+**Entscheidung für die Alpha** (ersetzt ADR-004 und ADR-013 vorerst, ADR muss noch in `docs/DECISIONS.md` nachgetragen
+werden): Der Besitzer kann nur SQL in den Supabase SQL Editor einfügen. Deshalb läuft das ganze M1-Backend als
+PL/pgSQL in der Datenbank. Es gibt keine Edge Functions, keine Secrets und kein Realtime. Den Markt-Tick startet
+`pg_cron` alle 5 Sekunden, alles andere `run_due_jobs()` jede Minute. Clients fragen die Lese-RPCs regelmäßig ab
+(Polling). Zufall kommt aus `random()` (Box-Muller in `gauss_random()`). Die deterministische Referenz bleibt
+die TypeScript-Simulation in `src/lib/sim`.
+
+### Migrationen
+
+Jede Datei ist selbst idempotent geschrieben. Die Kopie in `supabase/updates/` ist inhaltsgleich.
+
+| Datei                                 | Inhalt                                                                                                                                                           |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `20261111000100_m1_foundation.sql`    | Neue Spalten, Rundung (`div_round_half_even`, `order_value_cents`, `apply_bps`), Config-Leser, Fehler, Level und XP, `handle_new_user()` mit vorgefülltem Tresor |
+| `20261111000200_m1_trading.sql`       | `execute_fill()`, `place_order`, `cancel_order`, `claim_vault`, `complete_tutorial`                                                                              |
+| `20261111000300_m1_market_tick.sql`   | `market_tick()`, `market_tick_at(ts)`, Anleihepreis, Ausführung ruhender Limits                                                                                  |
+| `20261111000400_m1_jobs.sql`          | Quartalsabschluss, Anleihen (Kupon, Rückzahlung, Neuemission), Kurshistorie, `market_bootstrap()`, `run_due_jobs()`, Admin-RPCs                                  |
+| `20261111000500_m1_read_api_cron.sql` | Lese-RPCs, Rechte, `pg_cron`-Jobs                                                                                                                                |
+
+Neue Spalten: `security_sim_state.ema_fast`, `ema_slow` (Momentum), `maker_inventory` (Bestand des Marktmachers aus
+Spielerorders), `price_deviation` (Anleihen); `player_private.tutorial_completed_at`, `player_private.tax_loss_pot_cents`
+(Verlusttopf, eigener Spieler darf lesen). Neuer Enum-Wert `xp_source.tutorial`. Neue Nachrichtenvorlagen
+`earnings_profit_up` … `earnings_loss_larger`, `bond_new_series`, `bond_matured`. Keine neuen Tabellen.
+
+### RPCs für den Client
+
+Alle in `public`, Rückgabe `jsonb`, `EXECUTE` nur für `authenticated` (nicht `anon`). Lesefunktionen sind
+`STABLE SECURITY DEFINER` und liefern nur öffentliche Marktdaten und die eigenen Daten (`auth.uid()`). Zahlen sind
+einfache JSON-Zahlen (Cent, e4, bps), Zeitpunkte ISO-Strings, Schlüssel `snake_case`. Felder, die über den
+vereinbarten Vertrag hinausgehen, sind mit _(zusätzlich)_ markiert.
+
+| RPC                                                                                        | Ergebnis (Kurzform)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `get_market_snapshot()`                                                                    | `server_time, tick_seq, session ('regular'/'after_hours'), paused, policy_rate_bps, index {ticker 'NEXA30', name, value_e4, prev_close_e4, change_bps}, securities[]` mit `id, ticker, name, kind, sector_key, size_class, last/bid/ask/prev_close_e4, change_bps, day_high/low_e4, day_volume, market_cap_cents` und bei Anleihen `term_game_years, coupon_bps, yield_bps, matures_at, face_value_cents` (sonst `null`). _(zusätzlich: `last_tick_at`, `day_start`, Index `day_high_e4/day_low_e4`, je Wertpapier `company_id`, `brand_color`)_ |
+| `get_candles(p_ticker, p_interval, p_limit = 300)`                                         | Array aufsteigend nach Zeit: `{t (Epoch-Sekunden), o, h, l, c (e4), v}`. Intervalle `1m, 5m, 1h, 1q, 1y`; `p_limit` 1 bis 1000. Funktioniert für Aktien, Anleihen und `NEXA30` (auch `NX30`). Die neueste Kerze ist die laufende.                                                                                                                                                                                                                                                                                                                |
+| `get_order_book(p_ticker, p_levels = 8)`                                                   | `{bids: [{price_e4, quantity, players}], asks: […]}`, beste Preise zuerst, höchstens 20 Stufen. Marktmacher-Stufen plus offene Spieler-Limits zum gleichen Preis zusammengefasst; `players` = Anzahl Spieler-Orders der Stufe, keine Identitäten. Für den Index leere Listen.                                                                                                                                                                                                                                                                    |
+| `get_security_details(p_ticker)`                                                           | `ticker, name, kind, description, sector_key, size_class, color, market_cap_cents, shares_outstanding, pe_x100, dividend_yield_bps, revenue_cents, net_income_cents, margin_bps, news[{published_at, headline, body}]` (letzte 10). _(zusätzlich: `status`, `eps_ttm_e4`, `term_game_years`, `coupon_bps`, `matures_at`, `face_value_cents`)_                                                                                                                                                                                                    |
+| `get_my_portfolio()`                                                                       | `cash_cents, reserved_cents, positions_value_cents, total_cents, loss_pot_cents, vault {accrued_cents, cap_cents, rate_cents_per_hour, last_claimed_at, full_at, server_time}, positions[], open_orders[], recent_trades[]` (50), `level, xp_total, xp_into_level, xp_for_next, tutorial_completed`. _(zusätzlich: `server_time`; Positionen `realized_pnl_cents, change_bps, opened_at`; Orders `reserved_cents`; Trades `xp_awarded`)_                                                                                                         |
+| `place_order(p_request_id, p_ticker, p_side, p_type, p_quantity, p_limit_price_e4 = null)` | `order_id, status ('filled'/'open'/'partially_filled'), filled_quantity, avg_price_e4, gross_cents, fee_cents, tax_cents, realized_pnl_cents, cash_cents, xp_awarded, level, xp_total`. _(zusätzlich: `reserved_cents, ticker, side, type, quantity, limit_price_e4`)_                                                                                                                                                                                                                                                                           |
+| `cancel_order(p_request_id, p_order_id)`                                                   | `{order_id, status: 'cancelled'}`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `claim_vault(p_request_id)`                                                                | `{claimed_cents, cash_cents, full_at}`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `complete_tutorial(p_request_id)`                                                          | `{xp_awarded, level, xp_total, already_completed}`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `admin_set_paused(p_paused)`, `admin_run_tick()`, `admin_close_quarter()`                  | Nur mit Eintrag in `admin_users`, sonst `forbidden`. Ergebnis: `{paused}`, das Tick-Ergebnis bzw. Quartalsdaten mit `closed_quarter_id, next_quarter_id, game_time, time_offset`. Jede Admin-Aktion landet in `admin_actions`.                                                                                                                                                                                                                                                                                                                   |
+
+Schreibende RPCs sind über `request_id` idempotent (`player_requests`; dieselbe `request_id` liefert das erste Ergebnis).
+
+### Fehler
+
+`raise exception using errcode = '<Code>', message = '<Schlüssel>'`. Der Client zeigt den Text zum Schlüssel
+(`error.message`).
+
+| Schlüssel               | Code    | Wann                                                                       |
+| ----------------------- | ------- | -------------------------------------------------------------------------- |
+| `insufficient_funds`    | `NX001` | Bargeld reicht nicht für Orderwert, Reservierung, Gebühr oder Steuer       |
+| `rate_limited`          | `NX004` | Order- oder Aktionslimit (`abuse.rateLimits`) überschritten                |
+| `forbidden`             | `NX006` | Admin-RPC ohne Admin                                                       |
+| `invalid_quantity`      | `NX007` | Stückzahl nicht 1 bis 100 000                                              |
+| `invalid_price`         | `NX007` | Limit fehlt oder ist ≤ 0                                                   |
+| `invalid_argument`      | `NX007` | unbekannte Seite/Ordertyp, fehlende `request_id` _(zusätzlich)_            |
+| `invalid_interval`      | `NX007` | unbekanntes Kerzenintervall _(zusätzlich)_                                 |
+| `not_authenticated`     | `NX010` | kein angemeldeter Spieler                                                  |
+| `unknown_security`      | `NX011` | Ticker unbekannt                                                           |
+| `not_tradable`          | `NX012` | Index, fällige oder nicht gelistete Wertpapiere                            |
+| `insufficient_position` | `NX013` | Verkauf über den freien (nicht reservierten) Bestand                       |
+| `order_not_found`       | `NX014` | Order existiert nicht oder gehört einem anderen Spieler                    |
+| `order_not_open`        | `NX015` | Order ist schon ausgeführt oder storniert                                  |
+| `market_paused`         | `NX016` | Simulation pausiert                                                        |
+| `nothing_to_claim`      | `NX017` | Tresor enthält weniger als 1 €                                             |
+| `locked`                | `NX018` | Funktion noch nicht freigeschaltet (Limit-Order ab Level 3, Anleihen ab 5) |
+
+Die bisherigen Codes `NX001` bis `NX009` behalten ihre Bedeutung.
+
+### Orderausführung
+
+- **Gegenpartei** ist immer der Marktmacher (Spieler gegen Spieler gibt es in M1 nicht). Eine Market-Order läuft vom
+  Briefkurs (Kauf) bzw. Geldkurs (Verkauf) durch das synthetische Buch. Bei linearem Impact ist der Durchschnittspreis
+  `touch × (1 ± a × (pending + q/2))` mit `a = impactBpsPerDepth / 10 000 / Tiefe`; `pending` ist der gleichgerichtete
+  Spielerfluss seit dem letzten Tick, damit Stückeln innerhalb eines Ticks nichts bringt. Tiefe = Aktien
+  `shares_outstanding × depthFreeFloatFraction`, Anleihen `security_sim_state.liquidity_shares`, nachbörslich × 0,25.
+- **Market-Orders werden immer voll ausgeführt** (höchstens 100 000 Stück, `trading.maxOrderQuantity`, Rückfallwert).
+  Die Kappung `maxImpactBpsPerOrder` aus `price-impact.ts` wird deshalb nicht angewendet.
+- **Limit-Kauf** am oder über dem Briefkurs wird sofort ausgeführt, aber nie über dem Limit (der Teil, der das Limit
+  überschreiten würde, bleibt als Rest im Buch: `partially_filled`). Ruhende Kauf-Limits reservieren
+  `Rest × Limit + Gebühr` vom Bargeld auf das Reservekonto (`order_reserve`), Verkaufs-Limits reservieren Stücke
+  (`positions.reserved_quantity`). Der Tick führt ruhende Limits zum Limitpreis aus, wenn der aktuelle Brief ≤ Kauflimit
+  bzw. Geld ≥ Verkaufslimit ist, und gibt die Reservierung dabei frei.
+- **Gebühr** `trading.orderFeeCents` einmal je Order (beim ersten Fill).
+- **Steuer** `trading.capitalGainsTaxBps` auf den realisierten Gewinn nach Gebühren. Anschaffungskosten nach FIFO aus
+  `position_lots` (Kaufkurs × Stück, ohne Kaufgebühr). Verluste füllen `player_private.tax_loss_pot_cents`, spätere
+  Gewinne werden erst oberhalb des Topfs besteuert, nichts wird erstattet. `player_tax_years` führt Gewinne,
+  Verluste und gezahlte Steuer je Spieljahr.
+- **Ledger** je Fill eine Transaktion: Kauf `cash −(Wert+Gebühr)`, `market +Wert`, `fees +Gebühr`; Verkauf
+  `cash +(Wert−Gebühr−Steuer)`, `market −Wert`, `fees`, `taxes`. Ruhende Kauf-Limits buchen vom Reservekonto.
+- **Kurswirkung:** Der Nettofluss steht in `security_sim_state.pending_player_flow`. Der nächste Tick bewegt den Kurs um
+  `immediateShare` (50 %) des Impacts; der Rest landet im Bestand des Marktmachers (`maker_inventory`), den er mit
+  0,5 % je Tick (nachbörslich 0,125 %) zur Hälfte am Markt glattstellt. Danach zieht der Value-Fonds zum fairen Wert zurück.
+- **Sperren** (verklemmungsfrei): Konten des Spielers in id-Reihenfolge → Position, Order, Spielerzeilen →
+  Systemkonten (`ledger_post`) → Kurs- und Simulationszeilen. Tick, Quartalsabschluss und Fälligkeiten sperren alle
+  betroffenen Spielerkonten vorab in id-Reihenfolge.
+- **XP:** `grant_xp()` wendet `progression.xpMultiplier` genau einmal an. Trade-XP (`xpSources.trade.xp`) einmal je
+  Order, nur für die ersten `maxTradesPerDay` je Berliner Kalendertag, nicht unter 100 € Orderwert
+  (`xpSources.trade.minOrderValueCents`, Rückfallwert) und nicht für einen Verkauf, wenn dieselbe Aktie innerhalb von
+  `trading.washTradeWindowSeconds` gekauft wurde (`trades.is_wash_trade`). Level nach `xpBase × n^xpExponent`, beim
+  Aufstieg werden die passenden Zeilen in `player_unlocks` angelegt.
+- **Freischaltungen:** Limit-Orders ab dem Level von `limit_orders`, Anleihen ab dem Level von `bonds`
+  (`game_config.progression.unlocks`, sonst Tabelle `unlocks`).
+- **Rate Limit:** `abuse.rateLimits.ordersPerMinute` und `ordersPerDay` für Orders, `actionsPerMinute` für Storno und Tresor.
+
+### Markt-Tick (`market_tick()`)
+
+Alle 5 Sekunden, Advisory Lock `7311001` (Tick, `run_due_jobs()` und Admin-Abschluss laufen nie gleichzeitig; ein
+Tick überspringt, wenn der Lock belegt ist). Während `sim_runtime.is_paused` passiert nichts. Reihenfolge:
+
+1. ruhende Limit-Orders gegen den Kurs ausführen, den die Spieler gerade sehen
+2. je Aktie: Sentiment-Zerfall, Spielerfluss → Marktmacher, Druck von Value-Fonds (Anker fairer Wert, tote Zone 1 %),
+   Momentum-Tradern und Kleinanlegern, Glattstellung des Marktmachers, linearer Impact, Rauschen
+   `tickNoiseBps[Größenklasse] × sectors.volatilityMultiplier × tickNoiseScale` (nachbörslich × 0,5), Begrenzung auf
+   `maxTickReturnBps`, stochastisch gerundet. Renten- und Indexfonds starten im Gleichgewicht und haben bei festem
+   Leitzins keinen Druck; sie fehlen in M1.
+3. je Anleihe: Rendite = Leitzins + Laufzeitaufschlag (`bonds.maturities`, linear interpoliert auf die Restlaufzeit,
+   begrenzt auf `minYieldBps`…`maxYieldBps`); Preis = Barwert der restlichen Kupons und der Rückzahlung minus
+   Stückzinsen („clean“), mal `exp(Abweichung)`. Die Abweichung ist ein kleiner AR(1)-Prozess
+   (`security_sim_state.volatility`) plus Spielerfluss. `yield_bps` im Kurs ist die Rendite inklusive Abweichung.
+   Preis je Anleihe in e4: 1 000 000 = 100 € = Nennwert.
+4. NEXA 30 = Σ (Aktien × Kurs) / Divisor
+5. `security_quotes` (Geld/Brief aus dem halben Spread `halfSpreadBps[Größenklasse]` + Sentiment, nachbörslich × 3;
+   Anleihen `spread_bps / 2`), `price_ticks`, Kerzen `1m/5m/1h/1q/1y`, `market_status`, `sim_tick_log`.
+
+Gemessen lokal (15 Aktien, 4 Anleihen, Index): im Mittel 3,3 ms je Tick, p99 5 ms, Maximum 25 ms.
+
+### Zeitgrenzen
+
+- **Handelszeit:** regulär 08:00 bis 22:00 Uhr Europe/Berlin (`time.marketOpenHour/CloseHour`), sonst nachbörslich.
+  Handel ist rund um die Uhr möglich.
+- **Handelstag:** beginnt mit der Schlussglocke um 22:00 Uhr Berlin. Der Schlusskurs um 22:00 ist `prev_close_e4`,
+  `change_bps` bezieht sich darauf; Tageshoch, -tief und -volumen beginnen um 22:00 neu. Der nachbörsliche Handel
+  ab 22:00 zählt also schon zum nächsten Tag.
+- **Kerzen:** `1m`, `5m`, `1h` an der Uhr (UTC) ausgerichtet; `1q` = Spielquartal (02/08/14/20 Uhr Berlin, wie
+  `game_quarters`); `1y` = Spieljahr = Spieltag ab 08:00 Uhr Berlin. Der Zeitstempel einer Kerze ist ihr Beginn.
+- Alle Zeitpunkte der Simulation sind `game_now()` (Uhr plus Admin-Versatz).
+
+### Quartalsabschluss (`close_game_quarter`, idempotent über `job_runs`)
+
+1. KI-Firmen: Umsatz = Basisumsatz × `exp(N(0, sectors.demandNoise))`, Kosten = Fixkosten + variabler Anteil × Umsatz
+   (Operating Leverage), Gewinn = Umsatz − Kosten. Der Basisumsatz wächst mit `demandGrowthBpsPerGameYear` und übernimmt
+   30 % der Überraschung (`company.aiPolicy.revenueNoisePersistence`, Rückfallwert). Bericht in
+   `company_quarter_reports` (sofort veröffentlicht), TTM-Werte und EPS in `companies`.
+2. Fairer Wert nach `fair-value.ts`: EPS × `sectors.peRatio` × Wachstums- × Makrofaktor. Verlustfirmen behalten ihren
+   Anker, skaliert mit der Umsatzentwicklung (Exponent `valuation.lossMakerRevenueElasticity`, Rückfallwert 0,5),
+   mindestens 50 % des Kassenbestands je Aktie.
+3. Überraschung gegen die Erwartung → Sentiment-Schock (`events.earnings`), Nachricht aus den Vorlagen, z. B.
+   „Volta Energie AG steigert Gewinn um 12 %“.
+4. Kupons aller laufenden Anleihen: `Nennwert × Kupon / couponsPerGameYear` je Anleihe, anteilig nach Haltedauer der
+   offenen Lots im Quartal (kein Stückzins im Kurs, daher kein Kupon für Kauf kurz vor dem Abschluss), Steuer
+   `incomeTaxOnCouponsAndDividendsBps`. Ledger `coupon`: `interest −brutto`, `cash +netto`, `taxes +Steuer`.
+   `security_distributions` + `distribution_payouts`.
+5. Fällige Anleihen: offene Orders storniert, Bestände zum Nennwert an den Emittenten verkauft (ohne Gebühr,
+   Steuer auf einen Gewinn mit Verlusttopf), Status `matured`. Für jede Laufzeit aus `bonds.maturities` wird bei Bedarf
+   eine neue Serie ausgegeben (Ticker `NXB01002` usw., Kupon = aktuelle Rendite, Kurs pari, `successor_security_id`).
+
+`run_due_jobs()` schließt jede Minute alle abgelaufenen Quartale (höchstens 8 je Lauf). Beim allerersten Lauf auf einer
+Datenbank werden ältere offene Quartale ohne Simulation geschlossen und nur das zuletzt abgelaufene simuliert.
+`admin_close_quarter()` schließt das laufende Quartal sofort, indem es den Admin-Zeitversatz bis zum Quartalsende
+vorstellt (ADR-006); die Spielzeit bleibt danach vorgerückt.
+
+### Start und Kurshistorie (`market_bootstrap()`)
+
+Idempotent; läuft am Ende von `setup-all.sql` und `update-to-latest.sql` und notfalls in `run_due_jobs()`:
+Kalender, EMAs, faire Werte aus den Fundamentaldaten (einmal), fällige Anleihen und neue Serien. Nur wenn es noch
+keine Kerzen gibt: Anleihen auf ihren Renditepreis, gewinnstarke Aktien ohne Trades auf ihren fairen Wert (die
+Seed-Kurse beruhten auf etwas anderen KGVs), NEXA-30-Divisor neu auf 1000 Punkte, dann die Kurshistorie:
+beschränkter Zufallspfad (`Band × tanh(Summe / Band)`), der genau im aktuellen Kurs endet; feinste Schritte 1 min
+(6 h), 5 min (30 Tage), 1 Spieltag (365 Tage), gröbere Kerzen daraus aggregiert, Index aus den Mitgliedern.
+Umfang: 364 × 1m, 577 × 5m, 727 × 1h, 121 × 1q, 365 × 1y je Wertpapier, zusammen rund 43 000 Zeilen für 20 Wertpapiere.
+Danach Vortagesschluss, Tageshoch/-tief und Volumen seit 22:00 aus der Historie.
+
+### Zeitpläne (ersetzen die Jobs aus Migration 1600)
+
+| Job                | Zeitplan        | Aufruf                         |
+| ------------------ | --------------- | ------------------------------ |
+| `nexa-market-tick` | alle 5 Sekunden | `select public.market_tick()`  |
+| `nexa-due-jobs`    | jede Minute     | `select public.run_due_jobs()` |
+
+`nexa-tick-runner`, `nexa-quarter-runner`, `nexa-ensure-quarters` und `nexa-maintenance` werden entfernt.
+`run_due_jobs()` erledigt Kalender, Quartalsabschlüsse, Fälligkeiten und einmal je UTC-Tag `run_maintenance()`,
+behält `price_ticks` nur noch rund einen Tag (Kerzen tragen die Historie) und löscht `cron.job_run_details` älter als
+einen Tag. Ohne `pg_cron` (lokale Prüfung) werden keine Jobs angelegt.
+
+### Konfiguration
+
+Gelesen werden die Abschnitte `time`, `economy`, `trading`, `bonds`, `sectors`, `valuation`, `aiInvestors`, `events`,
+`progression`, `abuse`, `centralBank`. Diese Schlüssel fehlen noch in `src/config/balance.ts` und wirken bis dahin mit
+ihrem Rückfallwert:
+
+| Schlüssel                                        | Rückfallwert | Bedeutung                                                                                                          |
+| ------------------------------------------------ | ------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `aiInvestors.tickNoiseScale`                     | 0,2          | Faktor auf `tickNoiseBps` für Aktien. Mit 1 (TS-Werte) lagen die Tagesspannen bei 10 % (Bluechip) bis 90 % (Penny) |
+| `trading.maxOrderQuantity`                       | 100 000      | höchste Stückzahl je Order                                                                                         |
+| `progression.xpSources.trade.minOrderValueCents` | 10 000       | Mindestorderwert für Trade-XP                                                                                      |
+| `economy.vaultMinClaimCents`                     | 100          | Mindestbetrag zum Leeren des Tresors                                                                               |
+| `company.aiPolicy.revenueNoisePersistence`       | 0,3          | Anteil der Umsatzüberraschung, der im Basisumsatz bleibt                                                           |
+| `company.aiPolicy.costNoiseShare`                | 0,25         | Kostenrauschen relativ zum Umsatzrauschen                                                                          |
+| `valuation.lossMakerRevenueElasticity`           | 0,5          | Anpassung des Ankers von Verlustfirmen an die Umsatzentwicklung                                                    |
+
+Gemessene Tagesspannen (ein simulierter Tag, 17 280 Ticks, Test `51_m1_day.sql`): Bluechips im Mittel 2,6 bis 2,9 %,
+Mittelständler 6 %, Pennystocks 16 % (einzelne Werte 10 bis 25 %), Anleihen 0,2 bis 1,2 %, NEXA 30 rund 1 %.
+
+### Bestehendes Projekt aktualisieren
+
+`supabase/update-to-latest.sql` komplett in den Supabase SQL Editor einfügen und ausführen. Die Datei darf beliebig
+oft laufen: Sie legt Spalten und Funktionen idempotent an, überschreibt `game_config` mit den Werten aus
+`balance.ts`, plant die `pg_cron`-Jobs neu und ruft `market_bootstrap()` auf (Kurshistorie nur beim ersten Mal).
+Danach laufen Tick und Quartale von selbst. Neue Projekte nehmen weiterhin `setup-all.sql`.
+
+### Bekannte Grenzen
+
+- Kein Handel Spieler gegen Spieler; Spieler-Limits erscheinen nur im Orderbuch.
+- `order_book_levels` wird nicht mehr beschrieben: `get_order_book()` berechnet die Stufen aus dem Kurs (spart 400
+  Zeilenänderungen je Tick).
+- Live-Kurse liegen nicht auf dem `tick_size_e4`-Raster (wie die TS-Simulation: stochastisch auf 0,0001 € gerundet).
+- Firmenumsätze werden in M1 nicht im Ledger gebucht (nur Berichte und fairer Wert).
+- Die Abschnitte 3 und 4 dieses Dokuments enthalten die neuen Spalten erst nach dem nächsten Lauf von
+  `supabase/tools/gen_data_model.py`.

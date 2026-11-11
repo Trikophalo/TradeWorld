@@ -1,0 +1,20 @@
+{
+  "side": "buy",
+  "type": "limit",
+  "level": 7,
+  "status": "open",
+  "ticker": "KLS",
+  "order_id": "701ea8bc-e41a-4cbb-b7fd-d4b8977784c9",
+  "quantity": 2,
+  "xp_total": 5120,
+  "fee_cents": 0,
+  "tax_cents": 0,
+  "cash_cents": 993734,
+  "xp_awarded": 0,
+  "gross_cents": 0,
+  "avg_price_e4": null,
+  "limit_price_e4": 10000,
+  "reserved_cents": 300,
+  "filled_quantity": 0,
+  "realized_pnl_cents": null
+}

@@ -164,53 +164,53 @@ und Edge Functions muss existieren.
 
 ### Daten/Backend
 
-- [ ] Edge Function `tick-runner` mit Minuten-Loop und 12 Ticks je Aufruf, Lease in `sim_runtime` (ADR-004)
-- [ ] `pg_cron`-Job, der den Runner jede Minute über `pg_net` startet
-- [ ] RPC `apply_market_tick(jsonb)`: Kurse, Ticks, Kerzen und fällige Limit-Orders in einer Transaktion
-- [ ] Kerzen-Aggregation: 1 min, 5 min, 1 h, 1 Quartal, 1 Spieljahr
-- [ ] RPC `place_order` (Market, Limit) mit `request_id`, Kontosperre und Ledger-Buchung (ADR-007, ADR-008)
-- [ ] RPC `cancel_order`
-- [ ] Ordergebühr 1 € und Steuer 25 % auf realisierte Gewinne mit Verlusttopf
-- [ ] Staatsanleihen: Kauf, Kupon, Rückzahlung bei Fälligkeit für 1, 2, 5 und 10 Spieljahre
-- [ ] Quartalsabschluss in Minimalform: Quartal fortschreiben, Quartalszahlen der KI-Firmen, Anleihezinsen
-- [ ] Realtime: ein Broadcast je Tick auf `market:ticks` (ADR-013)
-- [ ] Rate Limit für Orders
-- [ ] Admin-Minimum: Simulation pausieren und fortsetzen, Zeit vorspulen (ADR-006)
+- [x] ~~Edge Function `tick-runner`~~ ersetzt durch `market_tick()` in PL/pgSQL, alle 5 s per `pg_cron` (ADR-037)
+- [x] `pg_cron`-Jobs für Tick (5 s), fällige Quartale und Wartung, ohne Edge Functions (ADR-037)
+- [x] Tick schreibt Kurse, Ticks, Kerzen und füllt fällige Limit-Orders in einer Transaktion
+- [x] Kerzen-Aggregation: 1 min, 5 min, 1 h, 1 Quartal, 1 Spieljahr
+- [x] RPC `place_order` (Market, Limit) mit `request_id`, Kontosperre und Ledger-Buchung (ADR-007, ADR-008)
+- [x] RPC `cancel_order`
+- [x] Ordergebühr 1 € und Steuer 25 % auf realisierte Gewinne mit Verlusttopf
+- [x] Staatsanleihen: Kauf, Kupon, Rückzahlung bei Fälligkeit für 1, 2, 5 und 10 Spieljahre
+- [x] Quartalsabschluss in Minimalform: Quartal fortschreiben, Quartalszahlen der KI-Firmen, Anleihezinsen
+- [x] ~~Realtime-Broadcast~~ ersetzt durch Abfrage im Tick-Takt (ADR-037); Realtime bleibt eine spätere Optimierung
+- [x] Rate Limit für Orders
+- [x] Admin-Minimum: pausieren, fortsetzen, Tick auslösen, Quartal sofort abschließen (`admin_*`-RPCs, nur per SQL Editor)
 
 ### Simulation
 
-- [ ] Fairer Wert je Aktie aus Gewinn je Aktie, Branchen-KGV, Wachstums- und Makrofaktor
-- [ ] KI-Investoren vereinfacht als aggregierter Nachfragedruck (ADR-005): Marktmacher, Value-Fonds,
+- [x] Fairer Wert je Aktie aus Gewinn je Aktie, Branchen-KGV, Wachstums- und Makrofaktor
+- [x] KI-Investoren vereinfacht als aggregierter Nachfragedruck (ADR-005): Marktmacher, Value-Fonds,
       Momentum-Trader. Rentenfonds, Indexfonds und Kleinanleger-Herde als einfache Platzhalter.
-- [ ] Preis-Impact-Funktion für Spieler-Orders und KI-Druck
-- [ ] Synthetisches Orderbuch aus Marktmacher-Stufen plus Limit-Orders der Spieler
-- [ ] Börsenzeiten 08:00 bis 22:00 Uhr, nachbörslich dünnere Liquidität und größerer Spread
-- [ ] Unternehmenssimulation für KI-Firmen mit festen Entscheidungen (Umsatz, Kosten, Gewinn, Marktanteil)
-- [ ] NEXA 30: Indexberechnung nach Marktkapitalisierung
-- [ ] Zentralbank: Leitzins 3 %, noch ohne Anpassung. Anleiherendite an den Leitzins gekoppelt.
+- [x] Preis-Impact-Funktion für Spieler-Orders und KI-Druck
+- [x] Synthetisches Orderbuch aus Marktmacher-Stufen plus Limit-Orders der Spieler
+- [x] Börsenzeiten 08:00 bis 22:00 Uhr, nachbörslich dünnere Liquidität und größerer Spread
+- [x] Unternehmenssimulation für KI-Firmen mit festen Entscheidungen (Umsatz, Kosten, Gewinn, Marktanteil)
+- [x] NEXA 30: Indexberechnung nach Marktkapitalisierung
+- [x] Zentralbank: Leitzins 3 %, noch ohne Anpassung. Anleiherendite an den Leitzins gekoppelt.
 
 ### UI
 
-- [ ] Start: Live-Chart des NEXA 30, Top-Gewinner und -Verlierer
-- [ ] Märkte: Reiter Aktien, Staatsanleihen, Indizes. Filter nach Branche und Größe, Top-Mover.
-- [ ] Aktien-Detail: Kerzenchart (1 min bis 1 J, Kerze/Linie), Orderbuch, Kennzahlen, News aus Quartalszahlen
-- [ ] Order-Maske als Bottom Sheet (Handy) und Seitenpanel (PC) mit Vorschau von Gebühr und geschätztem Preis
-- [ ] Trade-Feedback: Erfolgsanimation, Toast, Kurs-Aufblitzen in Grün und Rot, Number Ticker
-- [ ] Einfache Positions- und Orderliste im Portfolio-Tab (das volle Portfolio folgt in M2)
-- [ ] Hinweis auf Börsenzeiten und nachbörslichen Handel
-- [ ] Globale Suche nach Aktien
-- [ ] TradingView-Attribution für Lightweight Charts
-- [ ] Ticks im Client gebündelt, höchstens ein Render je Animation-Frame (ADR-013)
+- [x] Start: Live-Chart des NEXA 30, Top-Gewinner und -Verlierer
+- [x] Märkte: Reiter Aktien, Staatsanleihen, Indizes. Filter nach Branche und Größe, Top-Mover.
+- [x] Aktien-Detail: Kerzenchart (1 min bis 1 J, Kerze/Linie), Orderbuch, Kennzahlen, News aus Quartalszahlen
+- [x] Order-Maske als Bottom Sheet (Handy) und Seitenpanel (PC) mit Vorschau von Gebühr und geschätztem Preis
+- [x] Trade-Feedback: Erfolgsanimation, Toast, Kurs-Aufblitzen in Grün und Rot, Number Ticker
+- [x] Einfache Positions- und Orderliste im Portfolio-Tab (das volle Portfolio folgt in M2)
+- [x] Hinweis auf Börsenzeiten und nachbörslichen Handel
+- [x] Globale Suche nach Aktien
+- [x] TradingView-Attribution für Lightweight Charts
+- [x] Ticks im Client gebündelt: ein Snapshot je Tick, Zeilen rendern nur bei eigener Kursänderung
 
 ### Tests
 
-- [ ] Vitest: Tick ist mit gleichem Seed deterministisch. Ohne Spieler-Orders bleibt der Kurs über viele Ticks
+- [x] Vitest: Tick ist mit gleichem Seed deterministisch. Ohne Spieler-Orders bleibt der Kurs über viele Ticks
       in einem Band um den fairen Wert.
-- [ ] Vitest: Preis-Impact wächst monoton mit der Ordergröße. Kerzen-Aggregation ist korrekt.
-- [ ] Vitest: Steuer und Verlusttopf, Rundung beim Orderwert
-- [ ] Datenbanktest: `place_order` ist idempotent. Zwei gleichzeitige Orders überziehen das Konto nicht.
+- [x] Vitest: Preis-Impact wächst monoton mit der Ordergröße. Kerzen-Aggregation ist korrekt.
+- [x] Vitest: Steuer und Verlusttopf, Rundung beim Orderwert
+- [x] Datenbanktest: `place_order` ist idempotent. Zwei gleichzeitige Orders überziehen das Konto nicht.
       Die Summe aller Ledger-Einträge ist 0.
-- [ ] Playwright: Anmelden, Aktie kaufen, Position sehen, verkaufen
+- [x] Playwright: Aktie kaufen (auch per Betrag), Position sehen, verkaufen (Demo-Modus; Anmelden gegen Supabase noch manuell)
 
 ### Abnahmekriterien
 
@@ -239,9 +239,9 @@ und gibt Kennzahlen aus (Tagesschwankung je Größenklasse), bevor die UI angebu
 
 ### Abschluss
 
-- [ ] Deploy auf Vercel mit angebundenem Supabase-Projekt
-- [ ] Tests der Tick- und Orderlogik grün
-- [ ] Changelog-Notiz „M1“
+- [ ] Deploy auf Vercel mit angebundenem Supabase-Projekt _(offen: Einspielen durch den Auftraggeber)_
+- [x] Tests der Tick- und Orderlogik grün
+- [x] Changelog-Notiz „M1“
 
 ---
 

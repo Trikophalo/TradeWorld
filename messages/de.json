@@ -502,7 +502,10 @@
     "market_paused": "Der Handel ist gerade pausiert.",
     "nothing_to_claim": "Im Tresor ist noch nichts.",
     "locked": "Das schaltest du erst mit einem höheren Level frei.",
-    "unknown": "Das hat nicht geklappt. Prüfe deine Verbindung und versuch es noch einmal."
+    "unknown": "Das hat nicht geklappt. Prüfe deine Verbindung und versuch es noch einmal.",
+    "invalid_argument": "Die Eingabe ist ungültig. Lade die Seite neu und versuch es noch einmal.",
+    "invalid_interval": "Diesen Zeitraum gibt es nicht.",
+    "forbidden": "Dafür fehlen dir die Rechte."
   },
   "locks": {
     "level": "Level {level}",
