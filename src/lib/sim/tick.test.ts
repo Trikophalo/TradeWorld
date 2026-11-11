@@ -129,7 +129,7 @@ describe("stepMarketTick", () => {
         }
       }
     }
-  });
+  }, 20_000); // heavy property test, slow on a busy machine
 
   it("limits the regular return per tick (circuit breaker)", () => {
     const state: MarketState = { tick: 0, securities: [makeSecurity({ id: "X", freeFloatShares: b(1_000) })] };

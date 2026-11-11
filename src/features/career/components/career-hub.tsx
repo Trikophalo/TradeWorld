@@ -7,7 +7,8 @@ import { Card } from "@/components/ui/card";
 import { LinkCard } from "@/components/ui/link-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useGame, usePlayerLevel } from "@/features/game/store";
-import { unlockLevel } from "@/lib/sim/progression";
+import { BALANCE } from "@/config/balance";
+import { useMyCompany } from "@/features/company/hooks";
 import { usePlayerCard, useSkills } from "../hooks";
 import { BusinessCard } from "./business-card";
 import { MyJobCard } from "./my-job-card";
@@ -18,7 +19,8 @@ export function CareerHub() {
   const level = usePlayerLevel();
   const skills = useSkills();
   const nickname = useGame((state) => state.portfolio?.nickname ?? null);
-  const companyLevel = unlockLevel("found_small_business") ?? 10;
+  const companyLevel = BALANCE.startups.garage.minLevel;
+  const company = useMyCompany();
 
   return (
     <div className="grid items-start gap-5 *:min-w-0 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-6">
@@ -46,8 +48,8 @@ export function CareerHub() {
         <LinkCard
           href="/company"
           icon={<PixelIcon {...UI_ICONS.company} scale={2} className="text-fg-2" />}
-          title={t("companyTitle")}
-          hint={level < companyLevel ? t("companyHint") : t("companyTitle")}
+          title={company.data ? t("companyOwn") : t("companyTitle")}
+          hint={company.data ? company.data.name : level < companyLevel ? t("companyHint") : t("companyOwn")}
         />
       </div>
       <div className="space-y-3">

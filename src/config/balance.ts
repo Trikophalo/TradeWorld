@@ -1413,6 +1413,7 @@ export const BALANCE = {
       { level: 2, key: "first_job" },
       { level: 3, key: "limit_orders" },
       { level: 3, key: "watchlist" },
+      { level: 3, key: "found_garage" },
       { level: 5, key: "stop_loss" },
       { level: 5, key: "bonds" },
       { level: 5, key: "junior_jobs" },

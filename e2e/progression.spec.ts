@@ -90,8 +90,8 @@ test("the player name is shown and can be changed, forbidden names are refused",
 });
 
 test("reaching level 3 starts Finn's limit order tour", async ({ page }) => {
-  // 380 XP: one trade (+20) reaches level 3 (383 XP).
-  await preparePlayer(page, { xpTotal: 380 });
+  // 790 XP: one trade (+20) reaches level 3 (807 XP, ADR-055).
+  await preparePlayer(page, { xpTotal: 790, curveVersion: 2 });
   await page.goto("/markets/VLT");
   await page.locator('[data-tour="buy"]').filter({ visible: true }).first().click();
   const dialog = page.getByRole("dialog", { name: "VLT kaufen" });

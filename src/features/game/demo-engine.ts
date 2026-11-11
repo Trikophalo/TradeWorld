@@ -185,6 +185,7 @@ function initialPlayer(): PlayerState {
 /** ADR-055: the steeper level curve never takes a level away from an earlier demo player. */
 function keepLevel(player: PlayerState): PlayerState {
   if (player.curveVersion === CURVE_VERSION) return player;
+  // Saved before ADR-055: convert to the new curve without losing the level.
   const oldCurve = { ...progression, firstLevelXp: 100, xpBase: 100 };
   const oldLevel = levelFromTotalXp(player.xpTotal, oldCurve);
   return { ...player, xpTotal: Math.max(player.xpTotal, totalXpForLevel(oldLevel)), curveVersion: CURVE_VERSION };
@@ -195,7 +196,7 @@ function restorePlayer(): PlayerState {
   if (typeof window === "undefined") return player;
   try {
     const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "null") as PlayerState | null;
-    if (saved) return keepLevel({ ...player, ...saved });
+    if (saved) return keepLevel({ ...player, ...saved, curveVersion: saved.curveVersion });
     // A finished tutorial from an earlier visit still counts.
     const tutorial = JSON.parse(window.localStorage.getItem(TUTORIAL_KEY) ?? "{}") as Record<
       string,

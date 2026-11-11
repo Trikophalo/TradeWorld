@@ -78,9 +78,9 @@ describe("unlocks", () => {
 
   it("returns the unlocks of a level", () => {
     expect(unlocksAtLevel(1).map((u) => u.key)).toEqual(["market_orders", "basic_income"]);
-    expect(unlocksAtLevel(3).map((u) => u.key)).toEqual(["limit_orders", "watchlist"]);
+    expect(unlocksAtLevel(3).map((u) => u.key)).toEqual(["limit_orders", "watchlist", "found_garage"]);
     expect(unlocksAtLevel(4)).toEqual([]);
-    expect(unlocksUpToLevel(3)).toHaveLength(5);
+    expect(unlocksUpToLevel(3)).toHaveLength(6);
   });
 
   it("answers feature gates", () => {

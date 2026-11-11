@@ -1,0 +1,80 @@
+import { expect, test, type Page } from "@playwright/test";
+
+/*
+ * Player companies in demo mode (ADR-057): found a garage startup, close quarters,
+ * hire an AI worker, post a job. Level 6 player with 20.000 €.
+ */
+async function preparePlayer(page: Page) {
+  await page.addInitScript(() => {
+    if (window.sessionStorage.getItem("nexa-test-prepared")) return;
+    window.sessionStorage.setItem("nexa-test-prepared", "1");
+    window.sessionStorage.setItem("nexa-daily-reward-seen", new Date().toDateString());
+    window.localStorage.setItem(
+      "nexa-tutorial",
+      JSON.stringify({ demo: { status: "done", step: 0, seenTours: ["first_job", "limit_orders", "bonds"] } }),
+    );
+    window.localStorage.setItem(
+      "nexa-demo-player-v2",
+      JSON.stringify({
+        nickname: "Gruenderin",
+        cashCents: 2_000_000,
+        xpTotal: 7_000,
+        tutorialCompleted: true,
+        curveVersion: 2,
+      }),
+    );
+  });
+}
+
+async function hold(page: Page, name: RegExp) {
+  const button = page.getByRole("button", { name });
+  const box = (await button.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(1_200);
+  await page.mouse.up();
+}
+
+test("found a garage startup, run quarters, hire and post a job", async ({ page }) => {
+  await preparePlayer(page);
+  await page.goto("/company");
+  // The small business needs level 10.
+  await expect(page.locator('[data-tier="small_business"]').getByRole("button", { name: "Gründen" })).toBeDisabled();
+  await page.locator('[data-tier="garage"]').getByRole("button", { name: "Gründen" }).click();
+
+  const sheet = page.getByRole("dialog", { name: "Firma gründen" });
+  await sheet.getByLabel("Firmenname").fill("4dm1n");
+  await expect(sheet.getByText(/nicht erlaubt|reserviert|vergeben/)).toBeVisible();
+  await sheet.getByLabel("Firmenname").fill("Pixelbaecker");
+  await sheet.getByLabel("Deine Idee in einem Satz").fill("Frische Brötchen per App bestellen.");
+  await expect(sheet.getByText("Name ist frei")).toBeVisible();
+  await hold(page, /Gedrückt halten zum Gründen/);
+  await expect(page.getByText("Firma gegründet!")).toBeVisible();
+
+  const header = page.getByTestId("company-header");
+  await expect(header.getByText("Pixelbaecker")).toBeVisible();
+  await expect(page.getByText("Das erste Quartal läuft noch.")).toBeVisible();
+
+  // Close two quarters (demo button): a report appears.
+  await header.getByText("Demo: Quartal jetzt abschließen").click();
+  await header.getByText("Demo: Quartal jetzt abschließen").click();
+  await expect(page.getByText(/Letztes Quartal · Q2/i)).toBeVisible();
+
+  // Hire an AI worker: more capacity.
+  await page.getByRole("button", { name: "+" }).click();
+  await expect(page.getByTestId("ai-workers")).toHaveText("1");
+  await expect(page.getByText("1 von 2 Plätzen belegt")).toBeVisible();
+
+  // Post a job.
+  await page.getByText("Stellen", { exact: true }).click();
+  await page.getByRole("button", { name: "Stelle ausschreiben" }).click();
+  const posting = page.getByRole("dialog", { name: "Stelle ausschreiben" });
+  await posting.getByLabel("Titel der Stelle").fill("Backstube digital");
+  await posting.getByRole("button", { name: "Ausschreiben" }).click();
+  await expect(page.getByText("Stelle ausgeschrieben")).toBeVisible();
+  await expect(page.locator("#main").getByText("Backstube digital")).toBeVisible();
+
+  // The founder cannot take a job elsewhere; the career tab links to the company.
+  await page.goto("/career");
+  await expect(page.getByText("Deine Firma führen")).toBeVisible();
+});

@@ -19,5 +19,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
 ];
 
 export function isActivePath(pathname: string, href: string): boolean {
-  return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+  if (href === "/") return pathname === "/";
+  // The company lives under the career tab (ADR-057).
+  if (href === "/career" && (pathname === "/company" || pathname.startsWith("/company/"))) return true;
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
