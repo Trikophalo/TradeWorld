@@ -11,7 +11,10 @@ async function preparePlayer(page: Page, player: Record<string, unknown> = {}) {
     window.sessionStorage.setItem("nexa-test-prepared", "1");
     // The daily reward popup is covered in careers.spec.ts.
     window.sessionStorage.setItem("nexa-daily-reward-seen", new Date().toDateString());
-    window.localStorage.setItem("nexa-tutorial", JSON.stringify({ demo: { status: "done", step: 0, seenTours: [] } }));
+    window.localStorage.setItem(
+      "nexa-tutorial",
+      JSON.stringify({ demo: { status: "done", step: 0, seenTours: ["first_job"] } }),
+    );
     const base = {
       nickname: "Testerin",
       nicknameChangedAt: null,

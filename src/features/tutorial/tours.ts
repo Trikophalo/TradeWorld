@@ -7,7 +7,15 @@ import { MARKETS, STOCK, type TutorialStep } from "./steps";
  * Tours for later features (short selling, founding, leverage, IPO) are added
  * together with those features.
  */
+const CAREER = /^\/career$/;
+
 export const TOURS: Readonly<Record<string, readonly TutorialStep[]>> = {
+  first_job: [
+    { id: "intro", advance: { on: "next" } },
+    { id: "goCareer", target: "nav-career", advance: { on: "route", path: CAREER } },
+    { id: "jobCard", target: "job-card", path: CAREER, recover: { to: "/career" }, advance: { on: "next" } },
+    { id: "skills", path: CAREER, recover: { to: "/career" }, advance: { on: "next" }, mood: "happy" },
+  ],
   limit_orders: [
     { id: "intro", advance: { on: "next" } },
     { id: "goMarkets", target: "nav-markets", advance: { on: "route", path: MARKETS } },

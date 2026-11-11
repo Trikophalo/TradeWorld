@@ -39,7 +39,7 @@ export function DailyReward() {
   const t = useTranslations("dailyReward");
   const errorText = useGameErrorText();
   const claimable = useGame((state) => state.portfolio?.dailyRewardClaimable ?? false);
-  const tutorialDone = useTutorial((state) => state.status === "done");
+  const tutorialDone = useTutorial((state) => state.status === "done" && state.tour === null);
   const { open, setOpen } = useDailyRewardSheet();
   const reward = useDailyReward(open || claimable);
   const refresh = useCareerRefresh();

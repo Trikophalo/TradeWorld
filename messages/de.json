@@ -504,6 +504,12 @@
         "goMarkets": "Tippe auf „Märkte“.",
         "bondsTab": "Tippe oben auf „Anleihen“.",
         "bondList": "Je länger die Laufzeit, desto mehr Zinsen. Am Ende bekommst du 100 € pro Anleihe zurück. Kaufen geht wie bei Aktien."
+      },
+      "first_job": {
+        "intro": "Neu freigeschaltet: Jobs! Ab jetzt kannst du neben der Börse Gehalt verdienen, auch wenn du offline bist.",
+        "goCareer": "Tippe auf „Karriere“.",
+        "jobCard": "Hier steht dein Job. Im Jobportal bewirbst du dich bei KI-Firmen. Sie nehmen jeden, zahlen aber gedeckelt.",
+        "skills": "Und das Wichtigste: Skills. Wer mehr kann, leistet mehr und verdient mehr. Deine Skillpunkte kommen aus Level-ups und Arbeit. Viel Erfolg!"
       }
     }
   },

@@ -4,25 +4,35 @@ import { expect, test, type Page } from "@playwright/test";
  * Daily reward, profile picture, skill tree, job portal and business card, in demo mode.
  * The player starts at level 6 (5 free skill points), like a returning player.
  */
-async function preparePlayer(page: Page, options: { dailySeen?: boolean } = {}) {
-  await page.addInitScript((dailySeen) => {
-    if (window.sessionStorage.getItem("nexa-test-prepared")) return;
-    window.sessionStorage.setItem("nexa-test-prepared", "1");
-    if (dailySeen) window.sessionStorage.setItem("nexa-daily-reward-seen", new Date().toDateString());
-    window.localStorage.setItem("nexa-tutorial", JSON.stringify({ demo: { status: "done", step: 0, seenTours: [] } }));
-    window.localStorage.setItem(
-      "nexa-demo-player-v2",
-      JSON.stringify({
-        nickname: "Karrierefrau",
-        cashCents: 1_000_000,
-        xpTotal: 3_000,
-        tutorialCompleted: true,
-        vaultClaimedAt: Date.now(),
-        checkInDay: null,
-        streakDays: 0,
-      }),
-    );
-  }, options.dailySeen ?? true);
+async function preparePlayer(
+  page: Page,
+  options: { dailySeen?: boolean; xpTotal?: number; seenTours?: string[] } = {},
+) {
+  await page.addInitScript(
+    ({ dailySeen, xpTotal, seenTours }) => {
+      if (window.sessionStorage.getItem("nexa-test-prepared")) return;
+      window.sessionStorage.setItem("nexa-test-prepared", "1");
+      if (dailySeen) window.sessionStorage.setItem("nexa-daily-reward-seen", new Date().toDateString());
+      window.localStorage.setItem("nexa-tutorial", JSON.stringify({ demo: { status: "done", step: 0, seenTours } }));
+      window.localStorage.setItem(
+        "nexa-demo-player-v2",
+        JSON.stringify({
+          nickname: "Karrierefrau",
+          cashCents: 1_000_000,
+          xpTotal,
+          tutorialCompleted: true,
+          vaultClaimedAt: Date.now(),
+          checkInDay: null,
+          streakDays: 0,
+        }),
+      );
+    },
+    {
+      dailySeen: options.dailySeen ?? true,
+      xpTotal: options.xpTotal ?? 3_000,
+      seenTours: options.seenTours ?? ["first_job", "limit_orders", "bonds"],
+    },
+  );
 }
 
 /** Press and hold a hold-to-confirm button until it fires. */
@@ -129,4 +139,25 @@ test("pick a profile picture and see it on the business card", async ({ page }) 
   const card = page.getByTestId("business-card");
   await expect(card.getByText("Karrierefrau")).toBeVisible();
   await expect(card.getByText("Level 6", { exact: false })).toBeVisible();
+});
+
+test("reaching level 2 starts Finn's job tour", async ({ page }) => {
+  // 80 XP: one trade (+20) reaches level 2 (100 XP).
+  await preparePlayer(page, { xpTotal: 80, seenTours: [] });
+  await page.goto("/markets/VLT");
+  await page.locator('[data-tour="buy"]').filter({ visible: true }).first().click();
+  const dialog = page.getByRole("dialog", { name: "VLT kaufen" });
+  await dialog.getByLabel("Betrag in Euro").fill("200");
+  await dialog.locator('[data-tour="order-confirm"] button').hover();
+  await page.mouse.down();
+  await expect(page.getByText("Aufgestiegen!")).toBeVisible({ timeout: 8000 });
+  await page.mouse.up();
+  await page.getByRole("button", { name: "Weiter" }).click();
+  const finn = page.locator("[data-tutorial]");
+  await expect(finn).toContainText("Neu freigeschaltet: Jobs!");
+  await finn.getByRole("button").last().click();
+  const nav = page.getByRole("navigation", { name: "Hauptnavigation" }).filter({ visible: true });
+  await nav.getByRole("link", { name: "Karriere" }).click();
+  await expect(page).toHaveURL("/career");
+  await expect(finn).toContainText("Hier steht dein Job");
 });
