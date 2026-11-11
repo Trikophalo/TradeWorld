@@ -4567,3 +4567,128 @@ last_quarter: null | { label, revenue_cents, profit_cents }, pay_factor_bps } }`
 ### Neue Fehlerschlüssel
 
 Keine.
+
+## Nachtrag: M3f (Logos, sofort kündigen, Gründer mit Job, GmbH, Börsengang)
+
+Entscheidungen ADR-065 bis ADR-067. Formeln in `src/lib/sim/logo.ts` (`isValidLogo`) und `src/lib/sim/startup.ts`
+(`founderFactor`, `needsFullTimeFounder`, `issuePriceCents`, `aiTakeShare`, `capitalIncreasePriceCents`). Getestet in
+acht Ausgangslagen (leer bis M3e).
+
+### Migrationen
+
+| Datei                               | Inhalt                                                                                                               |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `20261117000100_m3f_schema.sql`     | Fehlerschlüssel, Logo-Spalten, `company_logo_reports`, Stufen GmbH/AG, `company_share_offers`, `offer_subscriptions` |
+| `20261117000200_m3f_logos_jobs.sql` | Logos und Meldungen, sofortige Kündigung, Gründer mit Job, Vollzeitpflicht                                           |
+| `20261117000300_m3f_ipo.sql`        | GmbH, Börsengang mit Zeichnung, Kapitalerhöhung, Angebote, Fair Value börsennotierter Spielerfirmen                  |
+
+### A. Logos (ADR-065)
+
+- `player_companies.logo` (`{ palette, grid }`), `logo_version` und `logo_hidden`.
+- `set_company_logo(p_request_id, p_logo)` → `{ company }`. Die Prüfung `logo_valid` entspricht `isValidLogo`:
+  - 1 bis `startups.logo.maxColors` Farben, jede als `#rrggbb` in Kleinbuchstaben
+  - `size` Zeilen zu je `size` Zeichen aus `.` und den Palettenindizes
+  - mindestens 8 Pixel
+  - sonst `invalid_argument`
+- Ein neues Logo erhöht die Version und hebt das Ausblenden auf; Meldungen gelten je Version.
+- `report_company_logo(p_request_id, p_company_id)` → `{ reported: true }`:
+  - eine Meldung je Spieler und Logo-Version
+  - ab 3 Meldungen ist das Logo ausgeblendet (Rückfallwert; Schlüssel `startups.logo.reportsToHide`, noch nicht in
+    `balance.ts`)
+  - die eigene Firma und Firmen ohne Logo melden `invalid_argument`, unbekannte Firmen `company_not_found`
+- `logo` (null, wenn ausgeblendet oder KI-Firma) steht in jedem Firmenobjekt für den Client (`company_json`:
+  Jobbörse, Bewerbungen, Job, Arbeitgeber), in COMPANY (dazu `logo_hidden`) und in den Wertpapieren von
+  `get_market_snapshot` (dazu `company_kind` `ai` | `player`; Anleihen zählen als `ai`).
+
+### B. Sofort kündigen (ADR-066)
+
+- `quit_job(p_request_id, p_immediate = false)`. Die alte Signatur ist entfernt.
+- `p_immediate`: Zuerst wird der Lohn abgerechnet. Dann zahlt der Spieler `jobs.quitNowCostHours` × Vertragslohn an
+  die Kasse des Arbeitgebers (`insufficient_funds`), und der Job endet sofort, auch während einer Frist.
+  Antwort `{ ended: true, paid_cents }`, sonst `{ notice_ends_at }`.
+- `get_my_job` liefert zusätzlich `quit_now_cost_cents`.
+
+### C. Gründer mit Job (ADR-066)
+
+- `found_company` verlangt keinen jobfreien Gründer mehr.
+- Kopfzahl = aktive Spieler-Mitarbeiter + KI-Kräfte. `sign_contract` meldet `owns_company` nur bei Kopfzahl ≥
+  `startups.fullTimeFromEmployees` oder bei einer Stelle der eigenen Firma.
+- `company_full_time_check` läuft nach `sign_contract`, `set_ai_workers` und `upgrade_company`. Erreicht die Kopfzahl
+  die Schwelle und hat der Gründer einen Job ohne Frist, bekommt er die Frist `quitNoticeHours` und die Chatzeile
+  „Ab 5 Mitarbeitern arbeitet … Vollzeit in der Firma.“
+- Arbeitet der Gründer anderswo, zählt seine Leistung mal `sideJobFounderFactor`.
+- COMPANY liefert zusätzlich `founder_has_job`, `full_time_from` und `headcount`.
+
+### D. GmbH und AG (ADR-067)
+
+- `player_companies.tier` kennt jetzt `garage`, `small_business`, `gmbh` und `ag`; Werte stehen in
+  `company_tier_cfg`.
+- `upgrade_company` geht garage → small_business → gmbh. Die GmbH verlangt Level ≥ `startups.gmbh.minLevel` und
+  kostet die Differenz der Gründungskosten (`legal_form gmbh`). Weiter geht es nur über den Börsengang, sonst
+  `company_upgrade_unavailable`.
+- COMPANY: `can_upgrade` und `upgrade_cost_cents` beziehen sich auf den nächsten selbst bezahlten Schritt (null für
+  GmbH und AG).
+
+### E. Börsengang und Kapitalerhöhung (ADR-067)
+
+**Tabellen:**
+
+- `company_share_offers (id, company_id, kind 'ipo' | 'capital_increase', price_cents, shares_total_e6,
+shares_offered_e6, shares_subscribed_e6, shares_ai_e6, status, security_id, ends_at, …)`: alle Angemeldeten lesen.
+- `offer_subscriptions (offer_id, player_id, shares_e6, amount_cents)`: der Besitzer liest.
+
+**`go_public(p_request_id, p_share_percent)` → `{ company }`:**
+
+- Voraussetzungen: Level ≥ `ipo.minLevel` (`company_level_too_low`), Stufe in `ipo.fromTiers`
+  (`company_upgrade_unavailable`), Prozent zwischen `minSharePercent` und `maxSharePercent` (`invalid_argument`),
+  noch nicht an der Börse und keine laufende Zeichnung (`already_listed`).
+- Angeboten werden `sharesTotal` × p % zu `issuePriceCents(Firmenwert)`, Zeichnung bis jetzt +
+  `subscriptionHours`. `companies.phase` wird `ipo`.
+
+**`capital_increase(p_request_id, p_share_percent)` → `{ company }`:**
+
+- Nur börsennotiert und ohne laufendes Angebot; 1 bis `capitalIncreaseMaxPercent` % der ausgegebenen Aktien.
+- Preis = `capitalIncreasePriceCents(letzter Kurs)`.
+
+**`subscribe_offer(p_request_id, p_offer_id, p_amount_cents)` → `{ shares_e6, amount_cents, offer }`:**
+
+- Aktien in Millionsteln = ⌊Betrag × 10⁶ / Preis⌋, höchstens der Rest. Bezahlt wird ⌈Aktien × Preis / 10⁶⌉ an die
+  Firmenkasse.
+- Fehler: `offer_closed`, `offer_sold_out`, `insufficient_funds`, `invalid_argument` (auch für den Gründer).
+
+**Ende der Zeichnung** (`close_due_offers()` in `run_due_jobs()`):
+
+- KI-Investoren übernehmen `aiTakeShare(Qualität)` des Rests aus dem Finanzmarkt-Topf; der Rest wird nicht
+  ausgegeben.
+- Beim Börsengang:
+  - Neues Wertpapier (Aktie, Ticker aus 3–4 Großbuchstaben des Namens, eindeutig, Branche der Firma, gelistet).
+  - Kurs = Ausgabepreis; Fair Value = Firmenwert / ausgegebene Aktien, bei jedem Quartalsabschluss neu.
+  - Die Firma wird `penny`, `phase 'listed'`, `legal_form ag`, `player_companies.tier 'ag'` (100 Plätze).
+  - Der Gründer erhält alle nicht angebotenen Aktien (Einstand 0), die Zeichner ihre zum Ausgabepreis.
+  - `player_company_value_cents` ist danach 0, weil die Aktien im Depot zählen.
+- Bei der Kapitalerhöhung wachsen die ausgegebenen Aktien, und die Zeichner bekommen ihre Aktien.
+- Systemzeilen im Chat bei Beginn und Ende.
+- Börsennotierte Spieleraktien handeln und ticken wie die KI-Aktien.
+
+**Lesen:**
+
+- `get_offers()` → `{ offers: [OFFER] }`: laufende Angebote und solche, die in den letzten 24 h geendet haben.
+- OFFER = `{ id, kind, company: { id, name, color, logo, sector, product_key, stage }, ticker, price_cents,
+shares_offered_e6, shares_subscribed_e6, ends_at, status, my_shares_e6, value_cents, last_quarter }`.
+- COMPANY liefert zusätzlich:
+  - `listing`: null oder `{ status 'subscription' | 'listed', ticker, shares_total_e6, founder_shares_e6,
+offer, last_price_e4 }`
+  - `can_go_public` und `can_capital_increase`
+
+### Neue Fehlerschlüssel
+
+| Schlüssel        | Code    |
+| ---------------- | ------- |
+| `offer_closed`   | `NX058` |
+| `offer_sold_out` | `NX059` |
+| `already_listed` | `NX060` |
+
+### Bekannte Grenzen
+
+- Die Auflösung einer börsennotierten Firma nimmt die Aktie nicht vom Markt.
+- Ausgegebene Aktien werden in `companies.shares_outstanding` auf ganze Stück abgerundet; die Depots halten Millionstel.
