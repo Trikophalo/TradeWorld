@@ -938,7 +938,7 @@ export interface StartupsConfig {
   readonly sideJobFounderFactor: number;
   readonly fullTimeFromEmployees: number;
   /** Company logos drawn in the pixel editor (ADR-065). */
-  readonly logo: { readonly size: number; readonly maxColors: number };
+  readonly logo: { readonly size: number; readonly maxColors: number; readonly reportsToHide: number };
   /** Hidden market size of the niche: Pareto, P(> x) = (min / x)^alpha. */
   readonly potential: {
     readonly minAnnualCents: number;
@@ -1928,7 +1928,7 @@ export const BALANCE = {
     },
     sideJobFounderFactor: 0.5,
     fullTimeFromEmployees: 5,
-    logo: { size: 16, maxColors: 6 },
+    logo: { size: 16, maxColors: 6, reportsToHide: 3 },
     // P(> 50.000 €) ≈ 40 %, P(> 1 Mio. €) ≈ 7 %, P(> 50 Mio. €) ≈ 0.8 %, P(> 1 Mrd. €) ≈ 0.14 % (ECONOMY.md 6.2).
     potential: { minAnnualCents: 100_000, maxAnnualCents: 200_000_000_000, paretoAlpha: 0.57 },
     awareness: {
