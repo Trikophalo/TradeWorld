@@ -112,8 +112,9 @@ test("the showcase renders every section", async ({ page }) => {
 
 test("the rules page explains taxes with numbers from the config", async ({ page }) => {
   await page.goto("/profile");
-  // Demo data restores the level after load, which reveals the career card above the link.
-  await expect(page.getByText("Level 2").filter({ visible: true }).first()).toBeVisible();
+  // The level arrives with the portfolio and reveals the career card above the link; wait until the layout settled.
+  await expect(page.getByRole("heading", { name: "Karriere" })).toBeVisible();
+  await page.waitForTimeout(500);
   await page.getByRole("link", { name: /Spielregeln/ }).click();
   await expect(page).toHaveURL("/profile/rules");
   await page.getByRole("button", { name: /Steuer auf Kursgewinne/ }).click();

@@ -44,7 +44,8 @@ export function Tutorial() {
   const portfolioLoaded = useGame((state) => state.portfolio !== null);
   const serverCompleted = useGame((state) => state.portfolio?.tutorialCompleted ?? false);
   useEffect(() => {
-    if (!portfolioLoaded) return;
+    // Only on the first load: completing the tutorial later must not cut off its final step.
+    if (!portfolioLoaded || useTutorial.getState().status !== "loading") return;
     const { load, finish } = useTutorial.getState();
     const apply = (accountId: string) => {
       load(accountId);
