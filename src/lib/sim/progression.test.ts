@@ -1,4 +1,4 @@
-import {
+import { describe, expect, it } from "vitest";
 import { BALANCE } from "../../config/balance.ts";
 import {
   dailyLoginXp,
