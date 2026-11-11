@@ -70,7 +70,8 @@
     "missionReward": "+{xp} XP",
     "nextGoal": "Nächstes Ziel",
     "sinceStart": "seit Spielstart",
-    "comingUp": "Später freischaltbar"
+    "comingUp": "Später freischaltbar",
+    "missionsSoon": "Bald"
   },
   "vault": {
     "title": "Tresor",
