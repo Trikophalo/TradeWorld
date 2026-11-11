@@ -59,6 +59,9 @@ describe("BALANCE", () => {
       "lifestyle",
       "randomEvents",
       "abuse",
+      "money",
+      "richList",
+      "names",
     ];
     expect(Object.keys(BALANCE).sort()).toEqual([...sections].sort());
   });
@@ -77,7 +80,7 @@ describe("BALANCE", () => {
       priceExponent: 1.5,
     });
     expect(BALANCE.time.quarterHours * BALANCE.time.quartersPerGameYear).toBe(24);
-    expect(BALANCE.progression.maxLevel).toBe(50);
+    expect(BALANCE.progression.maxLevel).toBeGreaterThan(1000);
     expect(BALANCE.careers.paidHoursPerDayCap).toBe(12);
     expect(BALANCE.bonds.maturities.map((m) => m.years)).toEqual([1, 2, 5, 10]);
     expect(BALANCE.careers.tiers.map((t) => [t.minLevel, t.salaryCentsPerHour])).toEqual([

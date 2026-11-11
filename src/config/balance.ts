@@ -74,6 +74,12 @@ export interface TradingConfig {
   readonly orderFeeCents: number;
   /** Largest number of shares per order. */
   readonly maxOrderQuantity: number;
+  /**
+   * Fractional shares (owner decision, ADR-040): share quantities are stored in
+   * millionths. Smallest tradable step and smallest order value.
+   */
+  readonly quantityScale: number;
+  readonly minOrderValueCents: number;
   readonly capitalGainsTaxBps: number;
   /** Bond coupons and dividends are taxed at this rate when paid out. */
   readonly incomeTaxOnCouponsAndDividendsBps: number;
@@ -471,7 +477,13 @@ export interface UnlockConfig {
 export interface ProgressionConfig {
   readonly xpBase: number;
   readonly xpExponent: number;
+  /**
+   * Levels are endless (owner decision, ADR-039). This is only a technical
+   * ceiling far beyond reach; features unlock up to level 50, prestige titles after.
+   */
   readonly maxLevel: number;
+  /** From this level on, every `titleEveryLevels` levels brings a new prestige title. */
+  readonly prestige: { readonly fromLevel: number; readonly titleEveryLevels: number };
   /**
    * Global multiplier, 1 = spec values. Applied exactly once, when XP are granted
    * (`scaledXp()` in src/lib/sim/progression.ts); all other values are base XP.
@@ -664,6 +676,52 @@ export interface BalanceConfig {
   readonly lifestyle: LifestyleConfig;
   readonly randomEvents: RandomEventsConfig;
   readonly abuse: AbuseConfig;
+  readonly money: MoneyConfig;
+  readonly richList: RichListConfig;
+  readonly names: NamesConfig;
+}
+
+/**
+ * Closed money system (owner decision, ADR-041, docs/ECONOMY.md): the total
+ * amount of money is created once and afterwards only moves between accounts.
+ */
+export interface MoneyConfig {
+  /** All money that will ever exist in this game world. */
+  readonly totalSupplyCents: number;
+  /** Where the supply sits at world creation (shares sum to 1). */
+  readonly allocation: {
+    /** State treasury: starting capital, basic income, bond coupons and redemptions. */
+    readonly treasury: number;
+    /** AI investors and market makers: counterparty of player trades. */
+    readonly financialMarket: number;
+    /** Cash of the AI tycoons on the rich list. */
+    readonly tycoons: number;
+    /** Households: customers of all companies (company accounting from M4). */
+    readonly households: number;
+  };
+  /**
+   * Basic income shrinks when the treasury runs low: factor = treasury / target,
+   * clamped to [minFactor, 1]. Starting capital is always paid.
+   */
+  readonly basicIncome: { readonly treasuryTargetCents: number; readonly minFactor: number };
+}
+
+export interface RichListConfig {
+  /** Fictional AI tycoons that make the ranking alive from day one. */
+  readonly aiTycoons: number;
+  /** Their net worth spans this range (Pareto-like), from reachable to legendary. */
+  readonly tycoonMinWealthCents: number;
+  readonly tycoonMaxWealthCents: number;
+  /** How often ranks are snapshotted and rank news are written. */
+  readonly snapshotMinutes: number;
+  /** Entering one of these top ranks makes the news. */
+  readonly newsRanks: readonly number[];
+}
+
+export interface NamesConfig {
+  readonly minLength: number;
+  readonly maxLength: number;
+  readonly nicknameChangeDays: number;
 }
 
 export const BALANCE = {
@@ -704,6 +762,8 @@ export const BALANCE = {
   trading: {
     orderFeeCents: 100,
     maxOrderQuantity: 100_000,
+    quantityScale: 1_000_000,
+    minOrderValueCents: 100,
     capitalGainsTaxBps: 2500,
     incomeTaxOnCouponsAndDividendsBps: 2500,
     spread: {
@@ -1144,7 +1204,8 @@ export const BALANCE = {
   progression: {
     xpBase: 100,
     xpExponent: 1.5,
-    maxLevel: 50,
+    maxLevel: 10_000,
+    prestige: { fromLevel: 50, titleEveryLevels: 10 },
     // Alpha bonus: all XP count double (owner decision). 1 = spec values.
     // Typed as `number` (not the literal 2) so that code may compare it with 1.
     xpMultiplier: 2 as number,
@@ -1347,6 +1408,25 @@ export const BALANCE = {
       offMarketDeviationBps: 1000,
     },
   },
+
+  // --------------------------------------------- money (closed system, ADR-041)
+  money: {
+    totalSupplyCents: 1_000_000_000_000, // 10 Mrd. €
+    allocation: { treasury: 0.05, financialMarket: 0.6, tycoons: 0.05, households: 0.3 },
+    basicIncome: { treasuryTargetCents: 25_000_000_000, minFactor: 0.25 },
+  },
+
+  // ------------------------------------------------- rich list (ADR-042)
+  richList: {
+    aiTycoons: 120,
+    tycoonMinWealthCents: 1_500_000, // 15.000 €
+    tycoonMaxWealthCents: 40_000_000_000, // 400 Mio. €
+    snapshotMinutes: 5,
+    newsRanks: [1, 3, 10, 25, 50, 100],
+  },
+
+  // ------------------------------------------------------- names (ADR-043)
+  names: { minLength: 3, maxLength: 20, nicknameChangeDays: 60 },
 } as const satisfies BalanceConfig;
 
 /** Names of the `game_config` rows. */

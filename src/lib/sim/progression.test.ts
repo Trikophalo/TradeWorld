@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import {
+  totalXpForLevel, describe, expect, it } from "vitest";
 import { BALANCE } from "../../config/balance.ts";
 import {
   dailyLoginXp,
@@ -47,8 +48,10 @@ describe("xp curve", () => {
     }
   });
 
-  it("caps at the max level and tolerates bad input", () => {
-    expect(levelFromTotalXp(1e12)).toBe(50);
+  it("has no practical level cap and tolerates bad input", () => {
+    // Endless levels (ADR-039): 1e9 XP is far beyond level 50.
+    expect(levelFromTotalXp(1e9)).toBeGreaterThan(500);
+    expect(levelFromTotalXp(totalXpForLevel(120))).toBe(120);
     expect(levelFromTotalXp(-5)).toBe(1);
     expect(levelFromTotalXp(99.9)).toBe(1);
   });
@@ -57,7 +60,7 @@ describe("xp curve", () => {
     const p = levelProgress(150);
     expect(p).toMatchObject({ level: 2, xpIntoLevel: 50, xpForNext: 283, isMaxLevel: false });
     expect(p.progress).toBeCloseTo(50 / 283);
-    expect(levelProgress(1e12)).toMatchObject({ level: 50, isMaxLevel: true, progress: 1, xpForNext: 0 });
+    expect(levelProgress(totalXpForLevel(77) + 10)).toMatchObject({ level: 77, xpIntoLevel: 10, isMaxLevel: false });
   });
 });
 
