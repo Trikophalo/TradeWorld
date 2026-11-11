@@ -743,3 +743,13 @@ steigenden Kosten und sinkendem Ertrag. Ziel des Spielers ist das größte Unter
   - Der Kopf der Firma zeigt Umsatz und Gewinn heute live, dazu den Umsatz und Gewinn pro Stunde und wie weit
     die Löhne gedeckt sind.
   - KI-Kräfte kosten 120 € pro Stunde.
+
+## ADR-076: Logo nur einmal, verbotene Symbole gesperrt — `akzeptiert`
+
+- **Einmalig:** Das Firmenlogo wird einmal festgelegt, direkt nach der Gründung, mit Gedrückthalten. Danach lässt es
+  sich nicht mehr ändern (`logo_locked`).
+  - Ausnahme: Ein Logo, das nach Meldungen ausgeblendet wurde, darf neu gezeichnet werden.
+- **Verbotene Symbole:** `hasForbiddenSymbol` (src/lib/sim/logo.ts, getestet) sucht Hakenkreuz-Muster in jeder
+  Farbe und in der ganzen Zeichnung, gespiegelt, gedreht und 1- bis 3-fach skaliert, mit einem Fehlpixel Toleranz.
+  - Der Editor sperrt das Speichern, der Server lehnt mit `logo_forbidden` ab.
+  - Meldungen bleiben die zweite Verteidigungslinie für alles, was ein Muster nicht erkennt.

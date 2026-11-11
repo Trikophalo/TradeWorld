@@ -39,6 +39,8 @@ export function HeadquartersHero({ company, onDrawLogo }: { company: MyCompany; 
   const building = useAnimationControls();
   const q = company.lastQuarter;
   const live = company.live;
+  // The logo is drawn once (ADR-076); only one hidden after reports may be drawn again.
+  const logoLocked = company.logo !== null && !company.logoHidden;
   const profit = q ? netProfit(q) : null;
 
   return (
@@ -74,10 +76,15 @@ export function HeadquartersHero({ company, onDrawLogo }: { company: MyCompany; 
 
           <button
             type="button"
-            onClick={onDrawLogo}
-            aria-label={tl("draw")}
+            onClick={logoLocked ? undefined : onDrawLogo}
+            disabled={logoLocked}
+            aria-label={logoLocked ? tl("locked") : tl("draw")}
+            title={logoLocked ? tl("locked") : undefined}
             data-testid="logo-button"
-            className="group relative mb-1 shrink-0 rounded-sm focus-ring transition-transform duration-fast hover:-translate-y-0.5 active:scale-95"
+            className={cn(
+              "group relative mb-1 shrink-0 rounded-sm focus-ring",
+              !logoLocked && "transition-transform duration-fast hover:-translate-y-0.5 active:scale-95",
+            )}
           >
             {company.logo ? (
               <CompanyLogo ticker={company.name} color={company.color} logo={company.logo} scale={3} />
@@ -90,9 +97,11 @@ export function HeadquartersHero({ company, onDrawLogo }: { company: MyCompany; 
                 {company.name.slice(0, 2).toUpperCase()}
               </span>
             )}
-            <span className="absolute -right-1.5 -bottom-1.5 rounded-xs bg-surface-3 px-1 label-pixel text-fg-2 ring-1 ring-line-2">
-              ✎
-            </span>
+            {!logoLocked && (
+              <span className="absolute -right-1.5 -bottom-1.5 rounded-xs bg-surface-3 px-1 label-pixel text-fg-2 ring-1 ring-line-2">
+                ✎
+              </span>
+            )}
           </button>
         </div>
 

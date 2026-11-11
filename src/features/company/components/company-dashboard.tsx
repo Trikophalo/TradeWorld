@@ -58,6 +58,19 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
 
       <LogoEditor company={company} open={drawing} onClose={() => setDrawing(false)} />
       {company.logoHidden && <p className="rounded-md bg-warn-soft px-4 py-3 text-sm text-warn">{tl("hidden")}</p>}
+      {company.logo === null && (
+        <Card
+          padding="md"
+          className="flex flex-wrap items-center gap-4 border-accent/40 bg-accent-soft"
+          data-testid="logo-prompt"
+        >
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-fg-1">{tl("promptTitle")}</p>
+            <p className="text-sm text-pretty text-fg-2">{tl("promptText")}</p>
+          </div>
+          <Button onClick={() => setDrawing(true)}>{tl("promptButton")}</Button>
+        </Card>
+      )}
       <SideJobNotice company={company} />
       <ListingCard company={company} />
       {company.distress && (

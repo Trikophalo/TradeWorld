@@ -22,7 +22,7 @@ import {
 } from "@/lib/sim/startup";
 import { formatMoney } from "@/lib/format";
 import { dissolve, isInsolvent } from "@/lib/sim/insolvency";
-import { isValidLogo, type CompanyLogoData } from "@/lib/sim/logo";
+import { hasForbiddenSymbol, isValidLogo, type CompanyLogoData } from "@/lib/sim/logo";
 import {
   GameError,
   type ChatMessage,
@@ -880,6 +880,9 @@ export function createCompanyEngine(host: CompanyHost) {
     setCompanyLogo: (requestId, logo) =>
       mutate(requestId, (company) => {
         if (!isValidLogo(logo)) throw new GameError("invalid_argument");
+        // Drawn once at the start (ADR-076); only a logo hidden after reports may be replaced.
+        if (company.logo) throw new GameError("logo_locked");
+        if (hasForbiddenSymbol(logo)) throw new GameError("logo_forbidden");
         company.logo = { palette: [...logo.palette], grid: [...logo.grid] };
       }),
 

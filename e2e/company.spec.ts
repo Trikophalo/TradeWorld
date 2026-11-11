@@ -195,8 +195,8 @@ test("draw a logo, keep a job as founder, go public", async ({ page }) => {
   await hold(page, /Gedrückt halten zum Gründen/);
   await expect(page.getByText("Firma gegründet!")).toBeVisible();
 
-  // Pixel editor: draw a line (mirrored) and save.
-  await page.getByTestId("logo-button").click();
+  // Pixel editor (ADR-076): offered right after founding, drawn once, forbidden symbols are blocked.
+  await page.getByTestId("logo-prompt").getByRole("button", { name: "Logo zeichnen" }).click();
   const board = page.getByTestId("logo-board");
   await expect(page.getByRole("dialog", { name: "Logo zeichnen" })).toBeVisible();
   await page.waitForTimeout(900); // the panel slides in
@@ -206,8 +206,10 @@ test("draw a logo, keep a job as founder, go public", async ({ page }) => {
   await page.mouse.down();
   for (let x = 3; x < 8; x++) await page.mouse.move(box.x + cell * (x + 0.5), box.y + cell * 4.5, { steps: 2 });
   await page.mouse.up();
-  await page.getByRole("button", { name: "Logo speichern" }).click();
+  await hold(page, /Gedrückt halten: Logo festlegen/);
   await expect(page.getByText("Logo gespeichert")).toBeVisible();
+  await expect(page.getByTestId("logo-prompt")).toHaveCount(0);
+  await expect(page.getByTestId("logo-button")).toBeDisabled();
 
   // Going public: 25 % of the company, the subscription ends with the demo quarter.
   const listing = page.getByTestId("listing");

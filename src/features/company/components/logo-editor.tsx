@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { useRef, useState, type PointerEvent } from "react";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Button, type ButtonState } from "@/components/ui/button";
+import { HoldButton } from "@/components/ui/hold-button";
 import { Segmented } from "@/components/ui/segmented";
 import { Sheet } from "@/components/ui/sheet";
 import { toast } from "@/components/ui/toast";
@@ -11,7 +12,7 @@ import { BALANCE } from "@/config/balance";
 import { useGameErrorText } from "@/features/game/errors";
 import { engine } from "@/features/game/store";
 import type { MyCompany } from "@/features/game/types";
-import { floodFill, isValidLogo, logoArt, type CompanyLogoData } from "@/lib/sim/logo";
+import { floodFill, hasForbiddenSymbol, isValidLogo, logoArt, type CompanyLogoData } from "@/lib/sim/logo";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { useCompanyRefresh } from "../hooks";
@@ -72,7 +73,8 @@ export function LogoEditor({ company, open, onClose }: { company: MyCompany; ope
   };
 
   const logo: CompanyLogoData = { palette, grid };
-  const valid = isValidLogo(logo);
+  const forbidden = hasForbiddenSymbol(logo);
+  const valid = isValidLogo(logo) && !forbidden;
 
   const save = async () => {
     setState("loading");
@@ -96,9 +98,14 @@ export function LogoEditor({ company, open, onClose }: { company: MyCompany; ope
       title={t("title")}
       description={t("intro")}
       footer={
-        <Button block size="lg" state={state} disabled={!valid} onClick={() => void save()}>
-          {t("save")}
-        </Button>
+        <HoldButton
+          tone="accent"
+          onConfirm={() => void save()}
+          disabled={!valid || state === "loading" || state === "success"}
+          className="w-full"
+        >
+          {t("saveOnce")}
+        </HoldButton>
       }
     >
       <div className="space-y-4">
@@ -214,7 +221,14 @@ export function LogoEditor({ company, open, onClose }: { company: MyCompany; ope
             {t("clear")}
           </Button>
         </div>
-        {!valid && <p className="text-xs text-fg-3">{t("tooEmpty")}</p>}
+        {forbidden ? (
+          <p className="rounded-md bg-loss-soft px-3 py-2 text-sm text-loss" role="alert" data-testid="logo-forbidden">
+            {t("forbidden")}
+          </p>
+        ) : (
+          !valid && <p className="text-xs text-fg-3">{t("tooEmpty")}</p>
+        )}
+        <p className="rounded-md bg-warn-soft px-3 py-2 text-xs text-pretty text-warn">{t("once")}</p>
       </div>
     </Sheet>
   );

@@ -602,7 +602,9 @@
     "already_listed": "Deine Firma ist schon an der Börse.",
     "confirm_mismatch": "Der eingetippte Name passt nicht.",
     "skill_already_covered": "Für diesen Skill arbeitet schon eine KI-Kraft.",
-    "training_locked": "Schulungen gibt es erst ab 5 Leuten im Team."
+    "training_locked": "Schulungen gibt es erst ab 5 Leuten im Team.",
+    "logo_locked": "Dein Logo steht fest und lässt sich nicht mehr ändern.",
+    "logo_forbidden": "Dieses Logo zeigt ein verbotenes Symbol."
   },
   "locks": {
     "level": "Level {level}",
@@ -2076,7 +2078,14 @@
     "draw": "Logo zeichnen",
     "report": "Logo melden",
     "reported": "Danke, das Logo wurde gemeldet.",
-    "hidden": "Dein Logo wurde mehrfach gemeldet und ist ausgeblendet. Zeichne ein neues."
+    "hidden": "Dein Logo wurde mehrfach gemeldet und ist ausgeblendet. Zeichne ein neues.",
+    "once": "Du legst dein Logo einmal fest. Danach lässt es sich nicht mehr ändern – nimm dir Zeit.",
+    "forbidden": "Dieses Motiv ist gesperrt: Es zeigt ein verbotenes Symbol.",
+    "saveOnce": "Gedrückt halten: Logo festlegen",
+    "promptTitle": "Gestalte dein Logo",
+    "promptText": "Einmalig: Dein Logo erscheint in der Firmenansicht, in Ranglisten und später an der Börse.",
+    "promptButton": "Logo zeichnen",
+    "locked": "Logo steht fest"
   },
   "listing": {
     "title": "Börse",

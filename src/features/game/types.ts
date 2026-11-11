@@ -748,6 +748,8 @@ export const GAME_ERROR_KEYS = [
   "confirm_mismatch",
   "skill_already_covered",
   "training_locked",
+  "logo_locked",
+  "logo_forbidden",
   "mission_not_found",
   "mission_not_completed",
   "mission_already_claimed",

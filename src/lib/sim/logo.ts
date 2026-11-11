@@ -44,3 +44,78 @@ export function floodFill(grid: readonly string[], x: number, y: number, value: 
   }
   return rows.map((r) => r.join(""));
 }
+
+// ------------------------------------------------------------------ forbidden symbols (ADR-076)
+
+/**
+ * Hate symbols a logo must not show. Each template is a binary pattern ("x" set, "." free) that is matched in
+ * every colour of the logo and in the whole drawing, in both mirror images, scaled 1× to 3×. One wrong cell is
+ * tolerated, so a single extra pixel does not get a symbol through. Reports stay the second line of defence.
+ */
+const FORBIDDEN_TEMPLATES: readonly (readonly string[])[] = [
+  // Hooked cross, compact.
+  ["x.xxx", "x.x..", "xxxxx", "..x.x", "xxx.x"],
+  // Hooked cross with long arms.
+  ["x..xxxx", "x..x...", "x..x...", "xxxxxxx", "...x..x", "...x..x", "xxxx..x"],
+  // Hooked cross with thin gaps.
+  ["x...xxxxx", "x...x....", "x...x....", "x...x....", "xxxxxxxxx", "....x...x", "....x...x", "....x...x", "xxxxx...x"],
+];
+
+const mirror = (t: readonly string[]) => t.map((row) => row.split("").reverse().join(""));
+const rotate = (t: readonly string[]) =>
+  t[0]!.split("").map((_, x) =>
+    t
+      .map((row) => row[x])
+      .reverse()
+      .join(""),
+  );
+
+function variants(template: readonly string[]): string[][] {
+  const out: string[][] = [];
+  let current = [...template];
+  for (let i = 0; i < 4; i++) {
+    out.push(current, mirror(current));
+    current = rotate(current);
+  }
+  const seen = new Set<string>();
+  return out.filter((v) => (seen.has(v.join("/")) ? false : (seen.add(v.join("/")), true)));
+}
+
+const PATTERNS = FORBIDDEN_TEMPLATES.flatMap(variants);
+
+function matches(mask: readonly boolean[][], pattern: readonly string[], scale: number, ox: number, oy: number) {
+  let errors = 0;
+  for (let ty = 0; ty < pattern.length; ty++) {
+    for (let tx = 0; tx < pattern[0]!.length; tx++) {
+      const want = pattern[ty]![tx] === "x";
+      let set = 0;
+      for (let dy = 0; dy < scale; dy++) {
+        for (let dx = 0; dx < scale; dx++) if (mask[oy + ty * scale + dy]![ox + tx * scale + dx]) set++;
+      }
+      const ok = want ? set === scale * scale : set === 0;
+      if (!ok && ++errors > 1) return false;
+    }
+  }
+  return true;
+}
+
+/** True if the logo shows a forbidden symbol (ADR-076). */
+export function hasForbiddenSymbol(logo: CompanyLogoData): boolean {
+  const size = logo.grid.length;
+  const masks: boolean[][][] = [logo.grid.map((row) => row.split("").map((c) => c !== "."))];
+  for (let i = 0; i < logo.palette.length; i++) {
+    masks.push(logo.grid.map((row) => row.split("").map((c) => c === String(i))));
+  }
+  for (const mask of masks) {
+    for (const pattern of PATTERNS) {
+      const h = pattern.length;
+      const w = pattern[0]!.length;
+      for (let scale = 1; scale * Math.max(w, h) <= size && scale <= 3; scale++) {
+        for (let oy = 0; oy + h * scale <= size; oy++) {
+          for (let ox = 0; ox + w * scale <= size; ox++) if (matches(mask, pattern, scale, ox, oy)) return true;
+        }
+      }
+    }
+  }
+  return false;
+}
