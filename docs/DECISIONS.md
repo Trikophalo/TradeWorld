@@ -615,3 +615,35 @@ die Firma verdient an der Leistung, der Spieler bekommt Lohn. Die Arbeitsaufgabe
 Tab „Job“ arbeitet nur symbolisch eine kleine Pixelfigur. Der Tab zeigt alles über den Arbeitgeber (bei KI-Firmen
 auch den Kurs). Das Gehalt pro Stunde steht zusätzlich beim Tresor neben dem Grundeinkommen. KI-Firmen fragen keinen
 Gehaltswunsch ab, sie bieten direkt ihr Höchstgehalt. Die Events ziehen von der Startseite in einen eigenen Bereich.
+
+## ADR-065: Firmenlogo aus dem Pixel-Editor — `akzeptiert`
+
+Vorgabe: Gründer zeichnen ihr Logo selbst. 16×16 Raster, bis zu 6 Farben, Werkzeuge Stift, Radierer, Füllen und
+Spiegeln. Gespeichert als Raster plus Palette (`src/lib/sim/logo.ts`, die Datenbank prüft dieselben Regeln). Das Logo
+ersetzt überall die Farbkachel mit Kürzel. Weil kein Filter Bilder versteht, kann jeder Spieler ein Logo melden; ab
+3 Meldungen wird es ausgeblendet, bis der Gründer ein neues zeichnet.
+
+## ADR-066: Sofort kündigen gegen einen Tageslohn; Gründer dürfen nebenbei arbeiten — `akzeptiert`
+
+Vorgabe: Neben der kostenlosen Kündigung mit einem Tag Frist (ADR-063) geht Kündigen auch sofort, gegen einen Tageslohn
+(12 Stunden Lohn) an die Firma. Gründer dürfen einen Job haben, sonst gründet jeder und keiner arbeitet. Solange sie
+nebenbei arbeiten, zählt ihre Leistung in der eigenen Firma halb. Ab 5 Mitarbeitern (Spieler und KI-Kräfte) arbeitet
+der Gründer Vollzeit in der Firma: Sein Job bekommt automatisch die 1-Tages-Kündigung, das Dashboard und der Job-Tab
+zeigen es, und neue Verträge sind dann gesperrt. Ersetzt die strenge Regel aus ADR-045 (eine Firma oder ein Job).
+
+## ADR-067: Wachstum über GmbH, Börsengang und Kapitalerhöhung — `akzeptiert`
+
+Vorgabe: Kleine Firmen sollen groß werden können, sobald Kapital von Investoren kommt, die in die Aktie investieren.
+Stufen: Garage (2 Mitarbeiter), Kleinunternehmen (5), GmbH (20, aus eigener Tasche ab Level 15 für 60.000 €), AG (100).
+Die AG gibt es nur über den Börsengang (ab Level 12, aus Kleinunternehmen oder GmbH): 1 Mio. Aktien, der Gründer
+verkauft 10 bis 49 %, Ausgabepreis = Firmenwert / Aktien (mindestens 1 €). 12 Stunden lang zeichnen Spieler zum
+Ausgabepreis, das Geld geht in die Firmenkasse; vom Rest übernehmen KI-Investoren 20 % bis 70 % je nach Qualität,
+der Rest wird nicht ausgegeben. Danach ist die Aktie normal handelbar (Kurs spielergetrieben, ADR-056; fairer Wert aus
+dem Firmenwert je Aktie). Die Aktien des Gründers liegen in seinem Depot. Kapitalerhöhungen geben bis zu 25 % neue
+Aktien zu 90 % des Kurses aus, mit derselben Zeichnungsphase.
+
+## ADR-068: Finn erklärt neue Bereiche kurz — `akzeptiert`
+
+Vorgabe: Finn erklärt die wichtigsten Dinge, bei neuen Sachen kurz. Die Job-Tour (Level 2) zeigt Job-Tab und
+Skill-Karte, neue Touren bei der Gründungsfreischaltung (Level 3) und beim Börsengang. Beim ersten Besuch neuer
+Bereiche (Skill-Karte, Firma, Job-Tab) gibt es 1 bis 2 Sprechblasen. Mehrere fällige Touren laufen nacheinander.

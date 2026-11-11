@@ -1739,7 +1739,9 @@
     "upgraded": "Deine Firma ist jetzt ein Kleinunternehmen",
     "tiers": {
       "garage": "Garagen-Startup",
-      "small_business": "Kleinunternehmen"
+      "small_business": "Kleinunternehmen",
+      "gmbh": "GmbH",
+      "ag": "AG"
     },
     "postingsEmpty": "Noch keine Stellen. Schreib eine aus, damit Spieler sich bewerben können.",
     "newPosting": "Stelle ausschreiben",

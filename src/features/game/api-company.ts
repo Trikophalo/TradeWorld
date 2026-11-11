@@ -44,7 +44,7 @@ const companySchema = z.object({
   idea: z.string(),
   sector: z.string(),
   color: z.string(),
-  tier: z.enum(["garage", "small_business"]),
+  tier: z.enum(["garage", "small_business", "gmbh", "ag"]),
   founded_at: iso,
   cash_cents: num,
   value_cents: num,

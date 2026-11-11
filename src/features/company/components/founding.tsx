@@ -35,7 +35,9 @@ const lockDate = new Intl.DateTimeFormat("de-DE", {
 });
 const small = BALANCE.company.tiers.find((t) => t.id === "small_business")!;
 
-export const TIER_INFO: Record<CompanyTier, { level: number; cost: number; fixed: number; staff: number }> = {
+type FoundableTier = Extract<CompanyTier, "garage" | "small_business">;
+
+export const TIER_INFO: Record<FoundableTier, { level: number; cost: number; fixed: number; staff: number }> = {
   garage: {
     level: BALANCE.startups.garage.minLevel,
     cost: BALANCE.startups.garage.foundingCostCents,
@@ -56,7 +58,7 @@ export function Founding({ dissolution }: { dissolution: Dissolution | null }) {
   const level = usePlayerLevel();
   const lockedUntil = useGame((state) => state.portfolio?.foundingLockedUntil ?? null);
   const now = useClock();
-  const [tier, setTier] = useState<CompanyTier | null>(null);
+  const [tier, setTier] = useState<FoundableTier | null>(null);
 
   return (
     <div className="grid gap-5 *:min-w-0 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6">
@@ -128,7 +130,7 @@ export function Founding({ dissolution }: { dissolution: Dissolution | null }) {
   );
 }
 
-function FoundingSheet({ tier, onClose }: { tier: CompanyTier | null; onClose: () => void }) {
+function FoundingSheet({ tier, onClose }: { tier: FoundableTier | null; onClose: () => void }) {
   const t = useTranslations("firm");
   const ts = useTranslations("sectors");
   const te = useTranslations("errors");
@@ -136,7 +138,7 @@ function FoundingSheet({ tier, onClose }: { tier: CompanyTier | null; onClose: (
   const refresh = useCompanyRefresh();
   const job = useMyJob();
   const anchor = useRef<HTMLDivElement>(null);
-  const [shown, setShown] = useState<CompanyTier>("garage");
+  const [shown, setShown] = useState<FoundableTier>("garage");
   const [name, setName] = useState("");
   const [idea, setIdea] = useState("");
   const [sector, setSector] = useState<SectorKey>("tech");

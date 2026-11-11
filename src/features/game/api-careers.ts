@@ -177,7 +177,7 @@ export const CAREER_RPC_SCHEMAS = {
         kind: z.enum(["ai", "player"]),
         product_key: z.string().nullable(),
         stage: nnum,
-        tier: z.enum(["garage", "small_business"]).nullable(),
+        tier: z.enum(["garage", "small_business", "gmbh", "ag"]).nullable(),
         founder: z.string().nullable(),
         team_size: num,
         last_quarter: z.object({ label: z.string(), revenue_cents: num, profit_cents: num }).nullable(),

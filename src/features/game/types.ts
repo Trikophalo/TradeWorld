@@ -427,7 +427,7 @@ export interface PlayerCard {
 
 // ------------------------------------------------------------------ player companies (ADR-057)
 
-export type CompanyTier = "garage" | "small_business";
+export type CompanyTier = "garage" | "small_business" | "gmbh" | "ag";
 
 export interface CompanyQuarter {
   label: string;

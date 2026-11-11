@@ -901,6 +901,44 @@ export interface StartupsConfig {
   };
   /** Small business values come from company.tiers (small_business); upgrading pays the difference. */
   readonly upgradeCreditShare: number;
+  /** GmbH for player companies: self-funded growth to 20 employees (ADR-067). */
+  readonly gmbh: {
+    readonly minLevel: number;
+    readonly foundingCostCents: number;
+    readonly fixedCostCentsPerQuarter: number;
+    readonly maxEmployees: number;
+  };
+  /** AG: only through an IPO, investors fund the growth (ADR-067). */
+  readonly ag: {
+    readonly fixedCostCentsPerQuarter: number;
+    readonly maxEmployees: number;
+  };
+  /** Going public and capital increases (ADR-067). */
+  readonly ipo: {
+    readonly minLevel: number;
+    /** Tiers that may go public. */
+    readonly fromTiers: readonly string[];
+    readonly sharesTotal: number;
+    readonly minSharePercent: number;
+    readonly maxSharePercent: number;
+    /** Issue price = company value / shares, at least this (cents per share). */
+    readonly minIssuePriceCents: number;
+    readonly subscriptionHours: number;
+    /** AI investors take this share of what players leave: base + perQuality × quality (0..1). */
+    readonly aiTakeBase: number;
+    readonly aiTakePerQuality: number;
+    /** Capital increase: new shares at this share of the market price, at most this many % per round. */
+    readonly capitalIncreaseDiscount: number;
+    readonly capitalIncreaseMaxPercent: number;
+  };
+  /**
+   * Founder with a job elsewhere (ADR-066): the founder's productivity in the own company counts
+   * with this factor; from `fullTimeFromEmployees` employees the founder works there full time.
+   */
+  readonly sideJobFounderFactor: number;
+  readonly fullTimeFromEmployees: number;
+  /** Company logos drawn in the pixel editor (ADR-065). */
+  readonly logo: { readonly size: number; readonly maxColors: number };
   /** Hidden market size of the niche: Pareto, P(> x) = (min / x)^alpha. */
   readonly potential: {
     readonly minAnnualCents: number;
@@ -998,6 +1036,8 @@ export interface JobsConfig {
   readonly salaryUnitHours: number;
   /** Quitting is free but takes effect after this notice period; the wage runs until then (ADR-063). */
   readonly quitNoticeHours: number;
+  /** Quitting at once costs this many hours of the contract wage, paid to the company (ADR-066). */
+  readonly quitNowCostHours: number;
   readonly maxOpenApplications: number;
   readonly applicationMessageMaxLength: number;
   /** An offer must be signed within this time. */
@@ -1840,6 +1880,7 @@ export const BALANCE = {
     aiPostingsPerCompany: 2,
     aiSlotsOpen: 99,
     quitNoticeHours: 24,
+    quitNowCostHours: 12,
     tierMinScore: { intern: 0, junior: 2, senior: 6, team_lead: 12, c_level: 20 },
     sectorBranches: {
       tech: ["it", "finance", "sales", "management"],
@@ -1870,6 +1911,24 @@ export const BALANCE = {
   startups: {
     garage: { minLevel: 3, foundingCostCents: 250_000, fixedCostCentsPerQuarter: 15_000, maxEmployees: 2 },
     upgradeCreditShare: 1,
+    gmbh: { minLevel: 15, foundingCostCents: 6_000_000, fixedCostCentsPerQuarter: 600_000, maxEmployees: 20 },
+    ag: { fixedCostCentsPerQuarter: 1_000_000, maxEmployees: 100 },
+    ipo: {
+      minLevel: 12,
+      fromTiers: ["small_business", "gmbh"],
+      sharesTotal: 1_000_000,
+      minSharePercent: 10,
+      maxSharePercent: 49,
+      minIssuePriceCents: 100,
+      subscriptionHours: 12,
+      aiTakeBase: 0.2,
+      aiTakePerQuality: 0.5,
+      capitalIncreaseDiscount: 0.9,
+      capitalIncreaseMaxPercent: 25,
+    },
+    sideJobFounderFactor: 0.5,
+    fullTimeFromEmployees: 5,
+    logo: { size: 16, maxColors: 6 },
     // P(> 50.000 €) ≈ 40 %, P(> 1 Mio. €) ≈ 7 %, P(> 50 Mio. €) ≈ 0.8 %, P(> 1 Mrd. €) ≈ 0.14 % (ECONOMY.md 6.2).
     potential: { minAnnualCents: 100_000, maxAnnualCents: 200_000_000_000, paretoAlpha: 0.57 },
     awareness: {

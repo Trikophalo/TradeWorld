@@ -11,7 +11,7 @@ import { BALANCE } from "../../config/balance.ts";
 import type { BalanceConfig, SectorId, StartupsConfig } from "../../config/balance.ts";
 import { roundToBigInt } from "./money.ts";
 
-export type StartupTier = "garage" | "small_business";
+export type StartupTier = "garage" | "small_business" | "gmbh" | "ag";
 
 export interface StartupState {
   /** Hidden: yearly revenue the niche can carry at full awareness and quality. */
@@ -102,12 +102,44 @@ export function capacityCents(
 
 export function fixedCostCents(tier: StartupTier, cfg: BalanceConfig = BALANCE): number {
   if (tier === "garage") return cfg.startups.garage.fixedCostCentsPerQuarter;
+  if (tier === "gmbh") return cfg.startups.gmbh.fixedCostCentsPerQuarter;
+  if (tier === "ag") return cfg.startups.ag.fixedCostCentsPerQuarter;
   return cfg.company.tiers.find((t) => t.id === "small_business")?.fixedCostCentsPerQuarter ?? 0;
 }
 
 export function maxEmployees(tier: StartupTier, cfg: BalanceConfig = BALANCE): number {
   if (tier === "garage") return cfg.startups.garage.maxEmployees;
+  if (tier === "gmbh") return cfg.startups.gmbh.maxEmployees;
+  if (tier === "ag") return cfg.startups.ag.maxEmployees;
   return cfg.company.tiers.find((t) => t.id === "small_business")?.maxEmployees ?? 0;
+}
+
+/** Founder productivity in the own company: halved while working elsewhere (ADR-066). */
+export function founderFactor(hasJobElsewhere: boolean, cfg: StartupsConfig = BALANCE.startups): number {
+  return hasJobElsewhere ? cfg.sideJobFounderFactor : 1;
+}
+
+/** From this headcount (players and AI workers) the founder must work full time in the company. */
+export function needsFullTimeFounder(headcount: number, cfg: StartupsConfig = BALANCE.startups): boolean {
+  return headcount >= cfg.fullTimeFromEmployees;
+}
+
+// ------------------------------------------------------------------ going public (ADR-067)
+
+/** Issue price per share in cents: company value spread over all shares, never below the floor. */
+export function issuePriceCents(valueCents: bigint, cfg: StartupsConfig = BALANCE.startups): number {
+  const perShare = Number(valueCents) / cfg.ipo.sharesTotal;
+  return Math.max(cfg.ipo.minIssuePriceCents, Math.round(perShare));
+}
+
+/** Share of the unsubscribed shares AI investors take at the end of the subscription. */
+export function aiTakeShare(quality: number, cfg: StartupsConfig = BALANCE.startups): number {
+  return Math.min(1, Math.max(0, cfg.ipo.aiTakeBase + cfg.ipo.aiTakePerQuality * quality));
+}
+
+/** Price of new shares in a capital increase (cents per share). */
+export function capitalIncreasePriceCents(marketPriceCents: number, cfg: StartupsConfig = BALANCE.startups): number {
+  return Math.max(cfg.ipo.minIssuePriceCents, Math.round(marketPriceCents * cfg.ipo.capitalIncreaseDiscount));
 }
 
 /** Closes one quarter of a player company. */
