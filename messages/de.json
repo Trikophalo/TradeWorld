@@ -563,7 +563,13 @@
     "raise_too_soon": "Eine Gehaltserhöhung kannst du nur einmal pro Woche fordern.",
     "raise_too_high": "So viel mehr ist gerade nicht drin.",
     "player_not_found": "Diesen Spieler gibt es nicht.",
-    "employer_only": "Das darf nur der Arbeitgeber."
+    "employer_only": "Das darf nur der Arbeitgeber.",
+    "company_exists": "Du hast schon eine Firma.",
+    "company_not_found": "Diese Firma gibt es nicht.",
+    "company_level_too_low": "Für diese Firmenform ist dein Level noch zu niedrig.",
+    "owns_company": "Du führst deine eigene Firma und kannst nicht woanders arbeiten.",
+    "employee_limit": "Mehr Mitarbeiter erlaubt deine Firmenform nicht.",
+    "company_upgrade_unavailable": "Wachsen geht gerade nicht."
   },
   "locks": {
     "level": "Level {level}",

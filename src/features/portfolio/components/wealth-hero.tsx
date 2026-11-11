@@ -13,7 +13,10 @@ const format = (value: number) => formatMoney(Math.round(value));
 /** The big number at the top of the start page: total wealth and the change since the start. */
 export function WealthHero() {
   const t = useTranslations("home");
-  const total = useGame((state) => state.portfolio?.totalCents);
+  // Wealth includes the own company (ADR-057), like on the rich list.
+  const total = useGame((state) =>
+    state.portfolio ? state.portfolio.totalCents + state.portfolio.companyValueCents : undefined,
+  );
   const start = BALANCE.economy.startingCapitalCents;
   return (
     <section aria-label={t("portfolioValue")} data-tour="wealth" className="w-fit">

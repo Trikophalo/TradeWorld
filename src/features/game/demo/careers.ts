@@ -119,6 +119,8 @@ export interface CareerHost {
   week(at?: number): string;
   idempotent<T>(requestId: string, run: () => T): T;
   persist(): void;
+  /** Founders work in their own company (ADR-045). */
+  ownsCompany(): boolean;
 }
 
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -506,6 +508,7 @@ export function createCareerEngine(host: CareerHost) {
         if (a.status === "expired") throw new GameError("offer_expired");
         if (a.status !== "offered" || a.offer === null) throw new GameError("application_not_offered");
         if (s.job) throw new GameError("job_active_exists");
+        if (host.ownsCompany()) throw new GameError("owns_company");
         const now = Date.now();
         const posting = postingById(a.postingId);
         a.status = "signed";
@@ -601,6 +604,8 @@ export function createCareerEngine(host: CareerHost) {
   return {
     engine,
     accrue,
+    hasJob: () => st().job !== null,
+    branchScores: scores,
     freePoints,
     avatarKey: () => st().avatarKey,
     dailyClaimable: () => dailyPlan().state.claimable,

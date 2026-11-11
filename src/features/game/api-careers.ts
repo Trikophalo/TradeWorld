@@ -81,7 +81,7 @@ const postingSchema = z.object({
   my_application: z.object({ id: z.string(), status: z.string() }).nullable(),
 });
 
-const applicationSchema = z.object({
+export const applicationSchema = z.object({
   id: z.string(),
   status: z.enum(["pending", "offered", "rejected", "declined", "withdrawn", "expired", "signed", "closed"]),
   posting: z.object({
@@ -206,7 +206,7 @@ const toPosting = (p: z.infer<typeof postingSchema>): JobPosting => ({
     : null,
 });
 
-const toApplication = (a: z.infer<typeof applicationSchema>): JobApplication => ({
+export const toApplication = (a: z.infer<typeof applicationSchema>): JobApplication => ({
   id: a.id,
   status: a.status,
   posting: {

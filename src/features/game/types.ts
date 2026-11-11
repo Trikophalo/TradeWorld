@@ -168,6 +168,8 @@ export interface Portfolio {
   avatarKey: string;
   skillPointsFree: number;
   dailyRewardClaimable: boolean;
+  /** Value of the own company (0 without one); counts for the rich list, not in totalCents. */
+  companyValueCents: number;
 }
 
 /** Either a quantity (fractions allowed) or an amount in cents; the server works out the other. */
@@ -398,6 +400,114 @@ export interface PlayerCard {
   memberSince: string;
 }
 
+// ------------------------------------------------------------------ player companies (ADR-057)
+
+export type CompanyTier = "garage" | "small_business";
+
+export interface CompanyQuarter {
+  label: string;
+  demandCents: number;
+  capacityCents: number;
+  revenueCents: number;
+  cogsCents: number;
+  fixedCents: number;
+  aiWorkerCents: number;
+  marketingCents: number;
+  wagesCents: number;
+  operatingProfitCents: number;
+  utilizationBps: number;
+}
+
+export interface MyCompany {
+  id: string;
+  name: string;
+  idea: string;
+  sector: SectorKey;
+  color: string;
+  tier: CompanyTier;
+  foundedAt: string;
+  cashCents: number;
+  valueCents: number;
+  unpaidCents: number;
+  distress: boolean;
+  awarenessBps: number;
+  qualityBps: number;
+  quartersActive: number;
+  estimateLowCents: number;
+  estimateHighCents: number;
+  marketingCentsPerQuarter: number;
+  aiWorkers: number;
+  aiWorkerCostCents: number;
+  maxEmployees: number;
+  employees: number;
+  openPostings: number;
+  pendingApplications: number;
+  founderProductivityBps: number;
+  teamProductivityBps: number;
+  capacityCents: number;
+  nextQuarterAt: string;
+  canUpgrade: boolean;
+  upgradeCostCents: number | null;
+  lastQuarter: CompanyQuarter | null;
+  history: { label: string; revenueCents: number; profitCents: number }[];
+}
+
+export interface FoundCompanyInput {
+  requestId: string;
+  name: string;
+  idea: string;
+  sector: SectorKey;
+  color: string;
+  tier: CompanyTier;
+}
+
+export interface CompanyPosting {
+  id: string;
+  tier: CareerTier;
+  title: string | null;
+  titleKey: string | null;
+  required: JobRequirementInfo[];
+  salaryCentsPerHour: number;
+  slots: number;
+  slotsOpen: number;
+  status: "open" | "closed";
+  applicationsPending: number;
+  postedAt: string;
+}
+
+export interface CreatePostingInput {
+  requestId: string;
+  companyId: string;
+  tier: CareerTier;
+  title: string;
+  required: JobRequirementInfo[];
+  salaryCentsPerHour: number;
+  slots: number;
+}
+
+export interface Applicant {
+  nickname: string;
+  avatarKey: string;
+  level: number;
+  matchScore: number;
+  branchScores: Record<SkillBranch, number>;
+}
+
+export interface CompanyApplication extends JobApplication {
+  applicant: Applicant;
+}
+
+export interface TeamMember {
+  playerJobId: string;
+  nickname: string;
+  avatarKey: string;
+  title: string;
+  salaryCentsPerHour: number;
+  productivityBps: number;
+  startedAt: string;
+  pendingRaise: { requestedBps: number; createdAt: string } | null;
+}
+
 /** Error keys the server raises (message of the Postgres exception). Texts: messages/de.json "errors". */
 export const GAME_ERROR_KEYS = [
   "not_authenticated",
@@ -449,6 +559,12 @@ export const GAME_ERROR_KEYS = [
   "raise_too_high",
   "player_not_found",
   "employer_only",
+  "company_exists",
+  "company_not_found",
+  "company_level_too_low",
+  "owns_company",
+  "employee_limit",
+  "company_upgrade_unavailable",
 ] as const;
 export type GameErrorKey = (typeof GAME_ERROR_KEYS)[number] | "unknown";
 
@@ -496,4 +612,25 @@ export interface GameEngine {
     raiseBps: number,
   ): Promise<{ status: "accepted" | "pending"; salaryCentsPerHour: number }>;
   playerCard(nickname: string): Promise<PlayerCard>;
+  checkCompanyName(name: string): Promise<{ allowed: boolean; reason: GameErrorKey | null }>;
+  foundCompany(input: FoundCompanyInput): Promise<MyCompany>;
+  myCompany(): Promise<MyCompany | null>;
+  setCompanyMarketing(requestId: string, marketingCents: number): Promise<MyCompany>;
+  setAiWorkers(requestId: string, count: number): Promise<MyCompany>;
+  companyDeposit(requestId: string, amountCents: number): Promise<MyCompany>;
+  companyWithdraw(requestId: string, amountCents: number): Promise<MyCompany>;
+  upgradeCompany(requestId: string): Promise<MyCompany>;
+  companyPostings(): Promise<CompanyPosting[]>;
+  createJobPosting(input: CreatePostingInput): Promise<void>;
+  closeJobPosting(requestId: string, postingId: string): Promise<void>;
+  companyApplications(companyId: string): Promise<CompanyApplication[]>;
+  respondApplication(
+    requestId: string,
+    applicationId: string,
+    action: "accept" | "reject" | "counter",
+    salaryCentsPerHour?: number,
+  ): Promise<void>;
+  companyTeam(companyId: string): Promise<TeamMember[]>;
+  fireEmployee(requestId: string, playerJobId: string): Promise<{ severanceCents: number }>;
+  respondRaise(requestId: string, playerJobId: string, accept: boolean): Promise<void>;
 }

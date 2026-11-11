@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CAREER_RPC_SCHEMAS, liveCareerEngine } from "./api-careers";
+import { COMPANY_RPC_SCHEMAS, liveCompanyEngine } from "./api-company";
 import { rpc, toErrorKey } from "./rpc";
 import {
   type Candle,
@@ -144,6 +145,7 @@ const portfolioSchema = z.object({
   avatar_key: z.string().default("rookie"),
   skill_points_free: num.default(0),
   daily_reward_claimable: z.boolean().default(false),
+  company_value_cents: num.default(0),
 });
 
 const orderResultSchema = z.object({
@@ -245,10 +247,12 @@ export const RPC_SCHEMAS = {
   daily_check_in: checkInSchema,
   track_event: z.object({ ok: z.boolean() }),
   ...CAREER_RPC_SCHEMAS,
+  ...COMPANY_RPC_SCHEMAS,
 } as const;
 
 export const liveEngine: GameEngine = {
   ...liveCareerEngine,
+  ...liveCompanyEngine,
   async snapshot(): Promise<MarketSnapshot> {
     const s = await rpc("get_market_snapshot", {}, snapshotSchema);
     return {
@@ -401,6 +405,7 @@ export const liveEngine: GameEngine = {
       avatarKey: p.avatar_key,
       skillPointsFree: p.skill_points_free,
       dailyRewardClaimable: p.daily_reward_claimable,
+      companyValueCents: p.company_value_cents,
     };
   },
 

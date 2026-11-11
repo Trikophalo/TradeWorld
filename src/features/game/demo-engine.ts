@@ -9,9 +9,11 @@ import {
 } from "@/features/market/order-schema";
 import { DEMO_COMPANIES, DEMO_INDEX } from "@/lib/demo/market";
 import { bondPriceE4, bondYieldBps } from "@/lib/sim/bonds";
-import { levelFromTotalXp, levelProgress, scaledXp, unlockLevel } from "@/lib/sim/progression";
+import { anchoredFairValue, playerImpactReturn } from "@/lib/sim/player-influence";
+import { levelFromTotalXp, levelProgress, scaledXp, totalXpForLevel, unlockLevel } from "@/lib/sim/progression";
 import { MISSION_TEMPLATES, availableFor, missionXp, type Metric, type MissionTemplate } from "./demo/missions";
 import { createCareerEngine, initialCareer, tycoonAvatar, type CareerState } from "./demo/careers";
+import { createCompanyEngine, type DemoCompanyState } from "./demo/company";
 import { demoTycoons } from "./demo/tycoons";
 import {
   GameError,
@@ -91,6 +93,10 @@ interface PlayerState {
   streakDays: number;
   /** Avatar, skills, daily reward, jobs (demo/careers.ts). */
   career?: CareerState;
+  /** Level curve the XP were collected under (ADR-055). */
+  curveVersion?: number;
+  /** Own company (demo/company.ts, ADR-057). */
+  company?: DemoCompanyState | null;
 }
 
 interface MarketState {
@@ -115,6 +121,7 @@ const BONDS = [1, 2, 5, 10].map((years) => ({
 
 const TYCOONS = demoTycoons();
 const STORAGE_KEY = "nexa-demo-player-v2";
+const CURVE_VERSION = 2;
 const TUTORIAL_KEY = "nexa-tutorial";
 
 // ------------------------------------------------------------------ state
@@ -171,7 +178,16 @@ function initialPlayer(): PlayerState {
     missionSeq: 0,
     checkInDay: null,
     streakDays: 0,
+    curveVersion: CURVE_VERSION,
   };
+}
+
+/** ADR-055: the steeper level curve never takes a level away from an earlier demo player. */
+function keepLevel(player: PlayerState): PlayerState {
+  if (player.curveVersion === CURVE_VERSION) return player;
+  const oldCurve = { ...progression, firstLevelXp: 100, xpBase: 100 };
+  const oldLevel = levelFromTotalXp(player.xpTotal, oldCurve);
+  return { ...player, xpTotal: Math.max(player.xpTotal, totalXpForLevel(oldLevel)), curveVersion: CURVE_VERSION };
 }
 
 function restorePlayer(): PlayerState {
@@ -179,7 +195,7 @@ function restorePlayer(): PlayerState {
   if (typeof window === "undefined") return player;
   try {
     const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "null") as PlayerState | null;
-    if (saved) return { ...player, ...saved };
+    if (saved) return keepLevel({ ...player, ...saved });
     // A finished tutorial from an earlier visit still counts.
     const tutorial = JSON.parse(window.localStorage.getItem(TUTORIAL_KEY) ?? "{}") as Record<
       string,
@@ -265,17 +281,23 @@ function quote(ticker: string) {
   return { mid, bid: Math.max(1, mid - half), ask: mid + half };
 }
 
-/** Shares (e6) that move the price by `impactBpsPerDepth` (one "depth"). */
+/** Shares (e6) whose purchase moves the price by 1 % (ADR-056); for the order book. */
 function depthE6(ticker: string): number {
   const info = meta(ticker);
-  if (!info.company) return 50_000 * QUANTITY_SCALE;
-  const shares = info.company.marketCapCents / (info.company.priceE4 / 100);
+  const depthCents = info.company
+    ? trading.playerImpact.depthCentsPer100Bps[info.company.tier]
+    : trading.playerImpact.bondDepthCentsPer100Bps;
   const liquidity = demoSession() === "after_hours" ? time.afterHours.liquidityMultiplier : 1;
-  return Math.max(50, shares * trading.priceImpact.depthFreeFloatFraction * liquidity) * QUANTITY_SCALE;
+  return Math.max(1, (depthCents * 100 * liquidity) / m().mids.get(ticker)!) * QUANTITY_SCALE;
 }
 
+/** Price move of a player order in bps: measured in euros (ADR-056), stronger after hours. */
 function impactBps(ticker: string, quantityE6: number): number {
-  return (trading.priceImpact.impactBpsPerDepth * quantityE6) / depthE6(ticker);
+  const info = meta(ticker);
+  const mid = m().mids.get(ticker)!;
+  const liquidity = demoSession() === "after_hours" ? time.afterHours.liquidityMultiplier : 1;
+  const r = playerImpactReturn(quantityE6 / QUANTITY_SCALE, mid, info.company ? info.company.tier : "bond");
+  return (r * 10_000) / liquidity;
 }
 
 /** Fill price of a market order: best quote plus half the impact of the order itself. */
@@ -382,16 +404,22 @@ function snapshotNow(): MarketSnapshot {
   };
 }
 
-/** One market step: noise by size class, pull toward the start price, decaying player flow. */
+/**
+ * One market step: noise by size class, pull toward the start price lifted by what the
+ * player holds (ADR-056), decaying player flow.
+ */
 export function demoTick(): void {
   const st = m();
   st.tickSeq += 1;
   let indexMove = 0;
+  const held = holdings();
   for (const c of DEMO_COMPANIES) {
     const mid = st.mids.get(c.ticker)!;
-    const vol = { bluechip: 4, midcap: 9, penny: 28 }[c.tier];
+    const vol = { bluechip: 9, midcap: 20, penny: 60 }[c.tier];
     const noise = (Math.random() + Math.random() + Math.random() - 1.5) * vol;
-    const anchor = Math.log(c.priceE4 / mid) * 40; // gentle reversion
+    const heldShares = (held.get(c.ticker)?.quantityE6 ?? 0) / QUANTITY_SCALE;
+    const target = anchoredFairValue(c.priceE4, heldShares, mid, c.tier);
+    const anchor = Math.log(target / mid) * 60; // reversion to the (lifted) fair value
     const flow = st.flow.get(c.ticker) ?? 0;
     const moveBps = noise + anchor + flow * 0.15;
     st.flow.set(c.ticker, flow * 0.85);
@@ -475,11 +503,11 @@ function execute(ticker: string, side: OrderInput["side"], quantityE6: number, p
   saveHoldings(map);
   bump("trades");
 
-  // Impact: a buy pushes the price up, a sell down, and the push fades over the next ticks.
+  // Impact (ADR-056): the player moves the price at once; holding keeps it up (see demoTick).
   const st = m();
   const impact = impactBps(ticker, quantityE6) * (side === "buy" ? 1 : -1);
-  st.mids.set(ticker, Math.max(10, Math.round(st.mids.get(ticker)! * (1 + impact / 20_000))));
-  st.flow.set(ticker, (st.flow.get(ticker) ?? 0) + impact / 2);
+  st.mids.set(ticker, Math.max(10, Math.round(st.mids.get(ticker)! * Math.exp(impact / 10_000))));
+  st.flow.set(ticker, (st.flow.get(ticker) ?? 0) + impact / 10);
   st.volumeE6.set(ticker, (st.volumeE6.get(ticker) ?? 0) + quantityE6);
 
   const today = berlinDay();
@@ -631,11 +659,13 @@ function portfolioNow(): Portfolio {
     avatarKey: career.avatarKey(),
     skillPointsFree: career.freePoints(),
     dailyRewardClaimable: career.dailyClaimable(),
+    companyValueCents: company.valueCents(),
   };
 }
 
 function netWorth(): number {
-  return portfolioNow().totalCents;
+  const portfolio = portfolioNow();
+  return portfolio.totalCents + portfolio.companyValueCents;
 }
 
 function sectorsHeld(): number {
@@ -867,10 +897,35 @@ const career = createCareerEngine({
   week: (at) => weekKey(at),
   idempotent,
   persist,
+  ownsCompany: () => Boolean(p().company),
 });
+
+const company = createCompanyEngine({
+  company: () => p().company ?? null,
+  setCompany: (value) => {
+    p().company = value;
+  },
+  level,
+  cashCents: () => p().cashCents,
+  addCash: (cents) => {
+    p().cashCents += cents;
+  },
+  addXp,
+  hasJob: () => career.hasJob(),
+  branchScores: () => career.branchScores(),
+  nameViolation,
+  idempotent,
+  persist,
+});
+
+/** Demo only: close the current company quarter at once (button on the company page). */
+export function demoCloseQuarter(): void {
+  company.closeQuarterNow();
+}
 
 export const demoEngine: GameEngine = {
   ...career.engine,
+  ...company.engine,
   snapshot: () => Promise.resolve(snapshotNow()),
 
   candles: (ticker, interval, limit) => Promise.resolve(demoCandles(ticker, interval, limit)),
