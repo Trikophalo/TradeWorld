@@ -167,6 +167,21 @@ const companySchema = z.object({
     .default([]),
   ai_worker_skills: z.array(z.string()).default([]),
   training_from: num.default(5),
+  live: z
+    .object({
+      last_hour_at: iso,
+      revenue_per_hour_cents: num,
+      profit_per_hour_cents: num,
+      pay_factor_bps: num,
+      today_revenue_cents: num,
+      today_profit_cents: num,
+      quarter_revenue_cents: num,
+      quarter_profit_cents: num,
+    })
+    .nullable()
+    .default(null),
+  hours: z.array(z.object({ hour_start: iso, revenue_cents: num, profit_cents: num })).default([]),
+  ai_wage_cents_per_hour: num.default(12_000),
 });
 
 const wrapped = z.object({ company: companySchema.nullable() });
@@ -403,6 +418,24 @@ function toCompany(c: z.infer<typeof companySchema>): MyCompany {
     graceQuarters: c.grace_quarters,
     aiWorkerSkills: c.ai_worker_skills,
     trainingFrom: c.training_from,
+    live: c.live
+      ? {
+          lastHourAt: c.live.last_hour_at,
+          revenuePerHourCents: c.live.revenue_per_hour_cents,
+          profitPerHourCents: c.live.profit_per_hour_cents,
+          payFactorBps: c.live.pay_factor_bps,
+          todayRevenueCents: c.live.today_revenue_cents,
+          todayProfitCents: c.live.today_profit_cents,
+          quarterRevenueCents: c.live.quarter_revenue_cents,
+          quarterProfitCents: c.live.quarter_profit_cents,
+        }
+      : null,
+    hours: c.hours.map((h) => ({
+      hourStart: h.hour_start,
+      revenueCents: h.revenue_cents,
+      profitCents: h.profit_cents,
+    })),
+    aiWageCentsPerHour: c.ai_wage_cents_per_hour,
   };
 }
 

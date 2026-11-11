@@ -259,3 +259,79 @@ export function trainingFor(tier: number, cfg: StartupsConfig = BALANCE.startups
   const i = Math.max(0, Math.min(cfg.training.costCentsByTier.length - 1, tier - 1));
   return { costCents: cfg.training.costCentsByTier[i]!, raiseBps: cfg.training.wageRaiseBpsByTier[i]! };
 }
+
+// ------------------------------------------------------------------ operating hours (ADR-072)
+
+export interface StartupHourInput {
+  readonly sector: SectorId;
+  readonly tier: StartupTier;
+  readonly marketingCentsPerQuarter: bigint;
+  /** Productivity of every worker in bps, as in the quarter. */
+  readonly productivityBps: readonly number[];
+  readonly aiWorkers: number;
+  readonly stage: number;
+  /** Standard normal draw for the demand noise of this hour. */
+  readonly noise: number;
+  /** Contract wages of the players for this hour (sum of their hourly wages). */
+  readonly playerWagesCents: number;
+}
+
+export interface StartupHourResult {
+  readonly demandCents: bigint;
+  readonly capacityCents: bigint;
+  readonly revenueCents: bigint;
+  readonly cogsCents: bigint;
+  readonly fixedCents: bigint;
+  readonly marketingCents: bigint;
+  /** Share of the wages paid this hour: never more than revenue minus goods (ADR-072). */
+  readonly payFactorBps: number;
+  readonly playerWagesPaidCents: bigint;
+  readonly aiWagesPaidCents: bigint;
+  /** Revenue minus goods, wages paid, fixed costs and marketing. */
+  readonly profitCents: bigint;
+}
+
+/**
+ * One operating hour (ADR-072). Sales use the quarter's awareness and quality; players and AI workers are paid in
+ * the same hour, all with the same factor, and never with more than the hour earned (revenue minus goods).
+ */
+export function closeStartupHour(
+  state: StartupState,
+  input: StartupHourInput,
+  cfg: BalanceConfig = BALANCE,
+): StartupHourResult {
+  const sc = cfg.startups;
+  const hours = cfg.time.quarterHours;
+  const stage = clamp(Math.floor(input.stage), 0, sc.stages.awarenessCaps.length - 1);
+  const demand =
+    (state.potentialAnnualCents / 4 / hours) *
+    state.awareness *
+    (0.5 + 0.5 * state.quality) *
+    Math.exp(sc.demandNoise * input.noise);
+  const capacity =
+    (capacityCents(input.productivityBps, input.sector, sc) * (1 + sc.stages.capacityBonusPerStage * stage)) / hours;
+  const revenueCents = roundToBigInt(Math.min(demand, capacity));
+  const cogsCents = roundToBigInt(Number(revenueCents) * (1 - sc.grossMargin[input.sector]));
+  const gross = Number(revenueCents - cogsCents);
+
+  const aiDue = input.aiWorkers * sc.aiWorkerWageCentsPerHour;
+  const due = aiDue + Math.max(0, input.playerWagesCents);
+  const payFactorBps = due <= 0 ? 10_000 : clamp(Math.floor((Math.max(0, gross) * 10_000) / due), 0, 10_000);
+  const aiWagesPaidCents = BigInt(Math.floor((aiDue * payFactorBps) / 10_000));
+  const playerWagesPaidCents = BigInt(Math.floor((Math.max(0, input.playerWagesCents) * payFactorBps) / 10_000));
+
+  const fixedCents = BigInt(Math.round(fixedCostCents(input.tier, cfg) / hours));
+  const marketingCents = BigInt(Math.round(Number(input.marketingCentsPerQuarter) / hours));
+  return {
+    demandCents: roundToBigInt(demand),
+    capacityCents: roundToBigInt(capacity),
+    revenueCents,
+    cogsCents,
+    fixedCents,
+    marketingCents,
+    payFactorBps,
+    playerWagesPaidCents,
+    aiWagesPaidCents,
+    profitCents: revenueCents - cogsCents - playerWagesPaidCents - aiWagesPaidCents - fixedCents - marketingCents,
+  };
+}

@@ -6,6 +6,7 @@ import {
   aiTakeShare,
   capacityCents,
   capitalIncreasePriceCents,
+  closeStartupHour,
   closeStartupQuarter,
   founderFactor,
   issuePriceCents,
@@ -44,7 +45,23 @@ import {
  */
 
 const { startups, company: companyCfg, jobs } = BALANCE;
-const QUARTER_MS = BALANCE.time.quarterHours * 3_600_000;
+const HOUR_MS = 3_600_000;
+const QUARTER_MS = BALANCE.time.quarterHours * HOUR_MS;
+const berlinDay = (at: number) => new Intl.DateTimeFormat("en-CA", { timeZone: BALANCE.time.timezone }).format(at);
+
+/** One operating hour of the demo company (ADR-072). */
+interface DemoHour {
+  at: number;
+  demandCents: number;
+  capacityCents: number;
+  revenueCents: number;
+  cogsCents: number;
+  fixedCents: number;
+  marketingCents: number;
+  aiWagesCents: number;
+  payFactorBps: number;
+  profitCents: number;
+}
 
 interface DemoReport extends CompanyQuarter {
   closedAt: number;
@@ -66,6 +83,10 @@ export interface DemoCompanyState {
   unpaidCents: number;
   marketingCents: number;
   aiWorkers: number;
+  /** Hourly operations (ADR-072): start of the next hour to close, the last day of hours, this quarter's hours. */
+  lastHourAt?: number;
+  hours?: DemoHour[];
+  quarterHours?: DemoHour[];
   /** Skills AI workers were hired for (ADR-071); older demo companies have none. */
   aiWorkerSkills?: string[];
   lastClosedAt: number;
@@ -219,15 +240,64 @@ export function createCompanyEngine(host: CompanyHost) {
     ];
   }
 
-  /** Closes one quarter now. */
+  /** One operating hour: sell, pay players and AI workers with the same factor, book fixed costs and marketing. */
+  function closeHour(company: DemoCompanyState, at: number) {
+    const r = closeStartupHour(
+      {
+        potentialAnnualCents: company.potentialAnnualCents,
+        awareness: company.awareness,
+        quality: company.quality,
+        quartersActive: company.quartersActive,
+        cashCents: BigInt(company.cashCents),
+      },
+      {
+        sector: company.sector,
+        tier: company.tier,
+        marketingCentsPerQuarter: BigInt(company.marketingCents),
+        productivityBps: productivityList(company),
+        aiWorkers: company.aiWorkers,
+        stage: stageOf(company),
+        noise: (Math.random() + Math.random() + Math.random() - 1.5) * 2,
+        playerWagesCents: 0,
+      },
+    );
+    const revenue = Number(r.revenueCents);
+    const costs = Number(r.cogsCents + r.aiWagesPaidCents + r.fixedCents + r.marketingCents);
+    const available = company.cashCents + revenue;
+    const paid = Math.min(costs, Math.max(0, available));
+    company.cashCents = available - paid;
+    company.unpaidCents += costs - paid;
+    const hour: DemoHour = {
+      at,
+      demandCents: Number(r.demandCents),
+      capacityCents: Number(r.capacityCents),
+      revenueCents: revenue,
+      cogsCents: Number(r.cogsCents),
+      fixedCents: Number(r.fixedCents),
+      marketingCents: Number(r.marketingCents),
+      aiWagesCents: Number(r.aiWagesPaidCents),
+      payFactorBps: r.payFactorBps,
+      profitCents: Number(r.profitCents),
+    };
+    company.hours = [...(company.hours ?? []), hour].slice(-24);
+    company.quarterHours = [...(company.quarterHours ?? []), hour];
+    company.lastHourAt = at + HOUR_MS;
+  }
+
+  /** Closes the quarter: sums its hours, moves awareness and quality on, pays XP, counts distress. */
   function closeQuarter(company: DemoCompanyState, now: number) {
+    // Hours not run yet (demo shortcut) are run first, so a quarter always has its hours.
+    const missing = BALANCE.time.quarterHours - (company.quarterHours?.length ?? 0);
+    for (let i = 0; i < missing; i++) closeHour(company, company.lastHourAt ?? now);
+    const hours = company.quarterHours ?? [];
+    const sum = (pick: (h: DemoHour) => number) => hours.reduce((total, h) => total + pick(h), 0);
     const result = closeStartupQuarter(
       {
         potentialAnnualCents: company.potentialAnnualCents,
         awareness: company.awareness,
         quality: company.quality,
         quartersActive: company.quartersActive,
-        cashCents: BigInt(company.cashCents - company.unpaidCents),
+        cashCents: BigInt(company.cashCents),
       },
       {
         sector: company.sector,
@@ -237,15 +307,14 @@ export function createCompanyEngine(host: CompanyHost) {
         aiWorkers: company.aiWorkers,
         teamSectorScore: sectorScore(company.sector, host.branchScores()),
         stage: stageOf(company),
-        noise: (Math.random() + Math.random() + Math.random() - 1.5) * 2,
+        noise: 0,
       },
     );
-    const costs = Number(result.cogsCents + result.fixedCents + result.aiWorkerCents) + company.marketingCents;
-    const available = company.cashCents + Number(result.revenueCents);
-    const paid = Math.min(costs, Math.max(0, available));
-    company.cashCents = available - paid;
-    company.unpaidCents += costs - paid;
-    if (costs > paid) {
+    const demand = sum((h) => h.demandCents);
+    const capacity = sum((h) => h.capacityCents);
+    const profit = sum((h) => h.profitCents);
+    company.quarterHours = [];
+    if (company.unpaidCents > 0) {
       company.aiWorkers = 0;
       company.aiWorkerSkills = [];
     }
@@ -257,21 +326,21 @@ export function createCompanyEngine(host: CompanyHost) {
     company.seq += 1;
     company.reports.push({
       label: `Q${((company.seq - 1) % 4) + 1}/${Math.floor((company.seq - 1) / 4) + 1}`,
-      demandCents: Number(result.demandCents),
-      capacityCents: Number(result.capacityCents),
-      revenueCents: Number(result.revenueCents),
-      cogsCents: Number(result.cogsCents),
-      fixedCents: Number(result.fixedCents),
-      aiWorkerCents: Number(result.aiWorkerCents),
-      marketingCents: company.marketingCents,
+      demandCents: demand,
+      capacityCents: capacity,
+      revenueCents: sum((h) => h.revenueCents),
+      cogsCents: sum((h) => h.cogsCents),
+      fixedCents: sum((h) => h.fixedCents),
+      aiWorkerCents: sum((h) => h.aiWagesCents),
+      marketingCents: sum((h) => h.marketingCents),
       wagesCents: 0,
-      operatingProfitCents: Number(result.operatingProfitCents),
-      utilizationBps: Math.round(result.utilization * 10_000),
+      operatingProfitCents: profit,
+      utilizationBps: capacity > 0 ? Math.round(Math.min(1, demand / capacity) * 10_000) : 10_000,
       bonusCents: 0,
       closedAt: now,
     });
     company.reports = company.reports.slice(-12);
-    if (result.operatingProfitCents > BigInt(0)) host.addXp(BALANCE.progression.xpSources.profitableCompanyQuarter.xp);
+    if (profit > 0) host.addXp(BALANCE.progression.xpSources.profitableCompanyQuarter.xp);
     const last = company.reports.at(-1)!;
     system(
       company,
@@ -346,13 +415,41 @@ export function createCompanyEngine(host: CompanyHost) {
     const company = host.company();
     if (!company) return;
     if (company.listing?.offer && company.listing.offer.endsAt <= now) resolveOffer(company);
-    let closed = 0;
-    while (host.company() === company && now - company.lastClosedAt >= QUARTER_MS && closed < 4) {
-      closeQuarter(company, company.lastClosedAt + QUARTER_MS);
-      closed += 1;
+    // Hours first, the quarter when its hours are done; at most two days are caught up.
+    let steps = 0;
+    company.lastHourAt ??= company.lastClosedAt;
+    while (host.company() === company && steps < 48) {
+      const quarterEnd = company.lastClosedAt + QUARTER_MS;
+      if (company.lastHourAt + HOUR_MS <= Math.min(now, quarterEnd)) closeHour(company, company.lastHourAt);
+      else if (now >= quarterEnd) closeQuarter(company, quarterEnd);
+      else break;
+      steps += 1;
     }
-    if (host.company() === company && now - company.lastClosedAt >= QUARTER_MS) company.lastClosedAt = now;
-    if (closed > 0) host.persist();
+    if (host.company() === company && now - company.lastClosedAt >= QUARTER_MS) {
+      company.lastClosedAt = now;
+      company.lastHourAt = now;
+      company.quarterHours = [];
+    }
+    if (steps > 0) host.persist();
+  }
+
+  function liveOf(company: DemoCompanyState): MyCompany["live"] {
+    const hours = company.hours ?? [];
+    const last = hours.at(-1);
+    if (!last) return null;
+    const today = berlinDay(Date.now());
+    const todays = hours.filter((h) => berlinDay(h.at) === today);
+    const quarter = company.quarterHours ?? [];
+    return {
+      lastHourAt: new Date(last.at + HOUR_MS).toISOString(),
+      revenuePerHourCents: last.revenueCents,
+      profitPerHourCents: last.profitCents,
+      payFactorBps: last.payFactorBps,
+      todayRevenueCents: todays.reduce((a, h) => a + h.revenueCents, 0),
+      todayProfitCents: todays.reduce((a, h) => a + h.profitCents, 0),
+      quarterRevenueCents: quarter.reduce((a, h) => a + h.revenueCents, 0),
+      quarterProfitCents: quarter.reduce((a, h) => a + h.profitCents, 0),
+    };
   }
 
   function valueCents(company: DemoCompanyState): number {
@@ -455,6 +552,13 @@ export function createCompanyEngine(host: CompanyHost) {
       marketingCentsPerQuarter: company.marketingCents,
       aiWorkers: company.aiWorkers,
       aiWorkerCostCents: startups.aiWorkerCostCentsPerQuarter,
+      aiWageCentsPerHour: startups.aiWorkerWageCentsPerHour,
+      live: liveOf(company),
+      hours: (company.hours ?? []).map((h) => ({
+        hourStart: new Date(h.at).toISOString(),
+        revenueCents: h.revenueCents,
+        profitCents: h.profitCents,
+      })),
       maxEmployees: maxEmployees(company.tier),
       employees: 0,
       openPostings: company.postings.filter((p) => p.status === "open").length,
@@ -575,6 +679,7 @@ export function createCompanyEngine(host: CompanyHost) {
           marketingCents: 0,
           aiWorkers: 0,
           lastClosedAt: now,
+          lastHourAt: now,
           reports: [],
           estimateSeeds: [Math.random(), Math.random()],
           postings: [],

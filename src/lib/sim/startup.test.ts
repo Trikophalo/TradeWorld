@@ -4,6 +4,7 @@ import { createRng } from "./rng.ts";
 import { skillNode } from "./skills.ts";
 import {
   capacityCents,
+  closeStartupHour,
   closeStartupQuarter,
   companyStage,
   trainingFor,
@@ -208,5 +209,64 @@ describe("AI workers grow a company slower than players (ADR-069)", () => {
     });
     expect(ai.next.quality).toBeLessThan(players.next.quality);
     expect(ai.capacityCents).toBeLessThan(players.capacityCents);
+  });
+});
+
+describe("operating hours (ADR-072)", () => {
+  const hourInput = {
+    sector: "tech" as const,
+    tier: "garage" as const,
+    marketingCentsPerQuarter: b(60_000),
+    productivityBps: [15_000, 10_000],
+    aiWorkers: 1,
+    stage: 1,
+    noise: 0,
+    playerWagesCents: 20_000,
+  };
+
+  it("pays players and AI workers with the same factor, never more than the hour earned", () => {
+    const small = { ...initialStartup(2_000_000, b(1_000_000)), awareness: 0.3, quality: 0.5 };
+    const r = closeStartupHour(small, hourInput);
+    const gross = r.revenueCents - r.cogsCents;
+    expect(r.payFactorBps).toBeLessThan(10_000);
+    expect(r.playerWagesPaidCents + r.aiWagesPaidCents).toBeLessThanOrEqual(gross);
+    expect(Number(r.aiWagesPaidCents) / BALANCE.startups.aiWorkerWageCentsPerHour).toBeCloseTo(
+      Number(r.playerWagesPaidCents) / 20_000,
+      3,
+    );
+  });
+
+  it("pays everything when the hour earns enough", () => {
+    const big = { ...initialStartup(1e12, b(1_000_000)), awareness: 1, quality: 1 };
+    const r = closeStartupHour(big, hourInput);
+    expect(r.payFactorBps).toBe(10_000);
+    expect(r.aiWagesPaidCents).toBe(b(BALANCE.startups.aiWorkerWageCentsPerHour));
+    expect(r.playerWagesPaidCents).toBe(b(20_000));
+  });
+
+  it("without sales nobody is paid, fixed costs and marketing still run", () => {
+    const none = { ...initialStartup(0, b(0)), awareness: 0, quality: 0 };
+    const r = closeStartupHour(none, hourInput);
+    expect(r.revenueCents).toBe(b(0));
+    expect(r.payFactorBps).toBe(0);
+    expect(r.playerWagesPaidCents + r.aiWagesPaidCents).toBe(b(0));
+    expect(r.profitCents).toBe(-(r.fixedCents + r.marketingCents));
+  });
+
+  it("books revenue minus goods, wages, fixed costs and marketing", () => {
+    const s = { ...initialStartup(50_000_000, b(0)), awareness: 0.6, quality: 0.6 };
+    const r = closeStartupHour(s, hourInput);
+    expect(r.profitCents).toBe(
+      r.revenueCents - r.cogsCents - r.playerWagesPaidCents - r.aiWagesPaidCents - r.fixedCents - r.marketingCents,
+    );
+  });
+
+  it("a quarter's hours sell what the quarter would (same awareness and quality, no noise)", () => {
+    const s = { ...initialStartup(50_000_000, b(0)), awareness: 0.6, quality: 0.6 };
+    const hour = closeStartupHour(s, { ...hourInput, noise: 0 });
+    const quarter = closeStartupQuarter(s, { ...base, productivityBps: [15_000, 10_000], aiWorkers: 1, stage: 1 });
+    const demandQuarter = Number(hour.demandCents) * BALANCE.time.quarterHours;
+    expect(Math.abs(demandQuarter - (50_000_000 / 4) * 0.6 * 0.8) / demandQuarter).toBeLessThan(0.01);
+    expect(Number(hour.capacityCents) * BALANCE.time.quarterHours).toBeCloseTo(Number(quarter.capacityCents), -2);
   });
 });

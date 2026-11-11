@@ -729,3 +729,17 @@ steigenden Kosten und sinkendem Ertrag. Ziel des Spielers ist das größte Unter
   - Der Mauszeiger zoomt zur eigenen Position, Verschieben und Zoomen gleiten weich.
   - Lernbare Felder pulsieren leicht.
   - Bereiche lassen sich in der Übersicht hervorheben und anspringen.
+
+## ADR-075: Firma als eigener Tab auch auf dem Handy, Profil in der Kopfleiste, Gründer auf der Visitenkarte — `akzeptiert`
+
+- **Firma:** „Firma gründen“ steht nicht mehr unter Karriere. Die Firma hat überall einen eigenen Tab.
+- **Profil:** Auf dem Handy liegt das Profil als Avatar in der Kopfleiste, damit es bei sechs Tabs bleibt.
+- **Visitenkarte:**
+  - Sie nennt „Gründer:in von …“.
+  - Wer keinen anderen Job hat, ist in der eigenen Firma als Gründer:in angestellt („Gründer:in bei …“).
+- **Bewerbungen:** Vor dem Annehmen lässt sich die Visitenkarte des Bewerbers öffnen; von dort kann man direkt annehmen.
+- **Betrieb (Client und Demo zu ADR-072):**
+  - Firmen rechnen stündlich ab.
+  - Der Kopf der Firma zeigt Umsatz und Gewinn heute live, dazu den Umsatz und Gewinn pro Stunde und wie weit
+    die Löhne gedeckt sind.
+  - KI-Kräfte kosten 120 € pro Stunde.

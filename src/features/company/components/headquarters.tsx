@@ -7,7 +7,7 @@ import { COIN, COMPANY_BUILDINGS, SECTOR_ICONS, UI_ICONS } from "@/components/pi
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Badge } from "@/components/ui/badge";
 import { Countdown } from "@/components/ui/countdown";
-import { ShortMoney } from "@/components/ui/live-money";
+import { LiveMoney, ShortMoney } from "@/components/ui/live-money";
 import { BALANCE } from "@/config/balance";
 import { demoCloseQuarter } from "@/features/game/demo-engine";
 import type { CompanyQuarter, MyCompany } from "@/features/game/types";
@@ -38,6 +38,7 @@ export function HeadquartersHero({ company, onDrawLogo }: { company: MyCompany; 
   const product = useProductText();
   const building = useAnimationControls();
   const q = company.lastQuarter;
+  const live = company.live;
   const profit = q ? netProfit(q) : null;
 
   return (
@@ -116,23 +117,72 @@ export function HeadquartersHero({ company, onDrawLogo }: { company: MyCompany; 
       {/* Brass plates: the key figures */}
       <dl className="grid grid-cols-2 gap-px border-t border-line-1 bg-line-1 lg:grid-cols-4">
         <Plate icon={<PixelIcon {...COIN} scale={2} />} label={t("cash")}>
-          <ShortMoney cents={company.cashCents} />
+          {live ? (
+            <LiveMoney cents={company.cashCents} perHourCents={live.profitPerHourCents} asOf={live.lastHourAt} />
+          ) : (
+            <ShortMoney cents={company.cashCents} />
+          )}
         </Plate>
         <Plate icon={<PixelIcon {...UI_ICONS.markets} scale={2} />} label={t("value")}>
           <ShortMoney cents={company.valueCents} />
         </Plate>
-        <Plate icon={<PixelIcon {...UI_ICONS.portfolio} scale={2} />} label={t("revenue")}>
-          {q ? <ShortMoney cents={q.revenueCents} /> : "–"}
-        </Plate>
-        <Plate
-          icon={<PixelIcon {...UI_ICONS.star} scale={2} />}
-          label={t("profit")}
-          tone={profit === null ? undefined : profit >= 0 ? "gain" : "loss"}
-        >
-          {profit === null ? "–" : <ShortMoney cents={profit} />}
-        </Plate>
+        {live ? (
+          <>
+            <Plate icon={<PixelIcon {...UI_ICONS.portfolio} scale={2} />} label={t("revenueToday")} live>
+              <LiveMoney
+                cents={live.todayRevenueCents}
+                perHourCents={live.revenuePerHourCents}
+                asOf={live.lastHourAt}
+              />
+            </Plate>
+            <Plate
+              icon={<PixelIcon {...UI_ICONS.star} scale={2} />}
+              label={t("profitToday")}
+              tone={live.profitPerHourCents >= 0 ? "gain" : "loss"}
+              live
+            >
+              <LiveMoney cents={live.todayProfitCents} perHourCents={live.profitPerHourCents} asOf={live.lastHourAt} />
+            </Plate>
+          </>
+        ) : (
+          <>
+            <Plate icon={<PixelIcon {...UI_ICONS.portfolio} scale={2} />} label={t("revenue")}>
+              {q ? <ShortMoney cents={q.revenueCents} /> : "–"}
+            </Plate>
+            <Plate
+              icon={<PixelIcon {...UI_ICONS.star} scale={2} />}
+              label={t("profit")}
+              tone={profit === null ? undefined : profit >= 0 ? "gain" : "loss"}
+            >
+              {profit === null ? "–" : <ShortMoney cents={profit} />}
+            </Plate>
+          </>
+        )}
       </dl>
 
+      {live && (
+        <div
+          className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line-1 px-5 py-2.5 text-sm lg:px-7"
+          data-testid="live-strip"
+        >
+          <span className="inline-flex items-center gap-1.5 label-pixel text-gain">
+            <span className="size-2 rounded-pill bg-gain motion-safe:animate-pulse" aria-hidden /> {t("live")}
+          </span>
+          <span className="text-fg-2">
+            {t("perHourRevenue")} <ShortMoney cents={live.revenuePerHourCents} className="font-semibold text-fg-1" />
+          </span>
+          <span className="text-fg-2">
+            {t("perHourProfit")}{" "}
+            <ShortMoney
+              cents={live.profitPerHourCents}
+              className={cn("font-semibold", live.profitPerHourCents >= 0 ? "text-gain" : "text-loss")}
+            />
+          </span>
+          <span className={cn("text-fg-3", live.payFactorBps < 10_000 && "text-warn")}>
+            {t("payFactorLive", { percent: Math.round(live.payFactorBps / 100) })}
+          </span>
+        </div>
+      )}
       <QuarterClock company={company} />
     </section>
   );
@@ -142,11 +192,14 @@ function Plate({
   icon,
   label,
   tone,
+  live,
   children,
 }: {
   icon: ReactNode;
   label: string;
   tone?: "gain" | "loss";
+  /** Runs live between two operating hours (ADR-072). */
+  live?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -155,7 +208,10 @@ function Plate({
         {icon}
       </span>
       <div className="min-w-0">
-        <dt className="label-pixel text-fg-3">{label}</dt>
+        <dt className="flex items-center gap-1.5 label-pixel text-fg-3">
+          {label}
+          {live && <span className="size-1.5 rounded-pill bg-gain motion-safe:animate-pulse" aria-hidden />}
+        </dt>
         <dd
           className={cn(
             "truncate text-lg font-semibold",

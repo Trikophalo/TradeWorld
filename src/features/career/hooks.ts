@@ -48,6 +48,7 @@ export function usePlayerCard(nickname: string) {
   return useQuery({
     queryKey: CAREER_KEYS.card(nickname),
     queryFn: () => engine.playerCard(nickname),
+    enabled: nickname.length > 0,
     staleTime: 30_000,
     retry: false,
   });

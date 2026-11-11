@@ -19,7 +19,9 @@ import { Slider } from "@/components/ui/slider";
 import { toast } from "@/components/ui/toast";
 import { BALANCE } from "@/config/balance";
 import { SKILL_BRANCHES, SKILL_NODES, type SkillBranch } from "@/config/skills";
+import { BusinessCard } from "@/features/career/components/business-card";
 import { useJobTitle } from "@/features/career/components/job-title";
+import { usePlayerCard } from "@/features/career/hooks";
 import { useGameErrorText } from "@/features/game/errors";
 import { engine, useGame } from "@/features/game/store";
 import type { CareerTier, CompanyApplication, JobRequirementInfo, MyCompany, TeamMember } from "@/features/game/types";
@@ -414,7 +416,7 @@ function AiHirePanel({
       <div className="flex items-baseline justify-between">
         <span className="label-pixel text-fg-2">{t("aiWage")}</span>
         <span className="nums font-semibold text-fg-1">
-          {t("aiWageValue", { amount: formatMoney(company.aiWorkerCostCents, { whole: true }) })}
+          {t("aiWageValue", { amount: formatMoney(company.aiWageCentsPerHour, { whole: true }) })}
         </span>
       </div>
       {freeSlots === 0 ? (
@@ -436,7 +438,7 @@ function AiHirePanel({
       )}
       <p className="text-xs text-fg-3">
         {t("aiTotal", {
-          amount: formatMoney(company.aiWorkerCostCents * Math.min(count, Math.max(1, freeSlots)), { whole: true }),
+          amount: formatMoney(company.aiWageCentsPerHour * Math.min(count, Math.max(1, freeSlots)), { whole: true }),
         })}
       </p>
     </div>
@@ -480,6 +482,7 @@ function ApplicantRow({ application, onCounter }: { application: CompanyApplicat
   const refresh = useCompanyRefresh();
   const title = useJobTitle(application.posting);
   const [busy, setBusy] = useState(false);
+  const [viewing, setViewing] = useState(false);
   const fit = fitPercent(application.posting.required, application.applicant.branchScores);
   const pending = application.status === "pending";
 
@@ -519,20 +522,81 @@ function ApplicantRow({ application, onCounter }: { application: CompanyApplicat
           {application.message && <p className="mt-1 text-sm text-pretty text-fg-2">„{application.message}“</p>}
         </div>
       </div>
-      {pending && (
-        <div className="mt-3 flex flex-wrap justify-end gap-2">
-          <Button size="sm" variant="ghost" disabled={busy} onClick={() => void respond("reject")}>
-            {t("reject")}
-          </Button>
-          <Button size="sm" variant="secondary" disabled={busy} onClick={onCounter}>
-            {t("counter")}
-          </Button>
-          <Button size="sm" disabled={busy} onClick={() => void respond("accept")}>
+      <div className="mt-3 flex flex-wrap justify-end gap-2">
+        <Button size="sm" variant="ghost" onClick={() => setViewing(true)}>
+          {t("viewCard")}
+        </Button>
+        {pending && (
+          <>
+            <Button size="sm" variant="ghost" disabled={busy} onClick={() => void respond("reject")}>
+              {t("reject")}
+            </Button>
+            <Button size="sm" variant="secondary" disabled={busy} onClick={onCounter}>
+              {t("counter")}
+            </Button>
+            <Button size="sm" disabled={busy} onClick={() => void respond("accept")}>
+              {t("accept")}
+            </Button>
+          </>
+        )}
+      </div>
+      <ApplicantCardSheet
+        nickname={viewing ? application.applicant.nickname : null}
+        canAccept={pending}
+        busy={busy}
+        onAccept={() => {
+          setViewing(false);
+          void respond("accept");
+        }}
+        onClose={() => setViewing(false)}
+      />
+    </Card>
+  );
+}
+
+/** The applicant's business card, to look at before accepting. */
+function ApplicantCardSheet({
+  nickname,
+  canAccept,
+  busy,
+  onAccept,
+  onClose,
+}: {
+  nickname: string | null;
+  canAccept: boolean;
+  busy: boolean;
+  onAccept: () => void;
+  onClose: () => void;
+}) {
+  const t = useTranslations("firm");
+  const [shown, setShown] = useState(nickname);
+  if (nickname !== null && nickname !== shown) setShown(nickname);
+  const card = usePlayerCard(shown ?? "");
+  return (
+    <Sheet
+      open={nickname !== null}
+      onOpenChange={(o) => !o && onClose()}
+      title={t("cardTitle", { name: shown ?? "" })}
+      footer={
+        canAccept ? (
+          <Button block size="lg" disabled={busy} onClick={onAccept}>
             {t("accept")}
           </Button>
-        </div>
-      )}
-    </Card>
+        ) : undefined
+      }
+    >
+      <div data-testid="applicant-card">
+        {card.data ? <BusinessCard card={card.data} /> : <Skeleton className="h-48 w-full rounded-lg" />}
+        {shown && (
+          <Link
+            href={`/players/${encodeURIComponent(shown)}`}
+            className="mt-3 inline-block text-sm text-accent focus-ring hover:underline"
+          >
+            {t("fullProfile")}
+          </Link>
+        )}
+      </div>
+    </Sheet>
   );
 }
 
@@ -784,7 +848,7 @@ function AiWorkerRow({ company, skill }: { company: MyCompany; skill: string | n
           {skill ? t("aiForSkill", { skill: tn(`${skill}.name` as Parameters<typeof tn>[0]) }) : t("aiGeneral")}
         </p>
         <p className="text-xs text-fg-3">
-          {t("aiWageValue", { amount: formatMoney(company.aiWorkerCostCents, { whole: true }) })} ·{" "}
+          {t("aiWageValue", { amount: formatMoney(company.aiWageCentsPerHour, { whole: true }) })} ·{" "}
           {t("productivityValue", { value: factor.format(1) })}
         </p>
       </div>

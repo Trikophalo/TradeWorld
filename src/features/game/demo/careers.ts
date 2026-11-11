@@ -129,6 +129,8 @@ export interface CareerHost {
   persist(): void;
   /** Founders work in their own company (ADR-045). */
   ownsCompany(): boolean;
+  /** The own company for the business card (ADR-075). */
+  ownCompany(): { name: string; ticker: string | null } | null;
 }
 
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -737,7 +739,7 @@ export function createCareerEngine(host: CareerHost) {
               since: job.startedAt,
             }
           : null,
-        company: null,
+        company: host.ownCompany(),
         memberSince: iso(Date.now() - 3 * DAY),
       };
     },

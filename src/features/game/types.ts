@@ -499,6 +499,20 @@ export interface MyCompany {
   aiWorkerSkills: string[];
   /** Trainings unlock at this team size (ADR-071). */
   trainingFrom: number;
+  /** Hourly operations (ADR-072): the last closed hour, today and the running quarter. Null before the first hour. */
+  live: {
+    lastHourAt: string;
+    revenuePerHourCents: number;
+    profitPerHourCents: number;
+    payFactorBps: number;
+    todayRevenueCents: number;
+    todayProfitCents: number;
+    quarterRevenueCents: number;
+    quarterProfitCents: number;
+  } | null;
+  /** The last closed hours, oldest first. */
+  hours: { hourStart: string; revenueCents: number; profitCents: number }[];
+  aiWageCentsPerHour: number;
   cashCents: number;
   valueCents: number;
   unpaidCents: number;

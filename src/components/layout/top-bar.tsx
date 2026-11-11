@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { BULL, UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
+import { Avatar } from "@/components/ui/avatar";
 import { useGame } from "@/features/game/store";
 import { useSearch } from "@/features/market/search-store";
 import { cn } from "@/lib/utils";
@@ -44,6 +45,7 @@ export function TopBar() {
           </button>
           <MissionsButton />
           <CashBalance />
+          <ProfileButton />
         </div>
       </div>
     </header>
@@ -74,6 +76,22 @@ function MissionsButton() {
           <span className={cn("relative size-2.5 rounded-pill bg-info ring-2 ring-bg")} />
         </span>
       )}
+    </Link>
+  );
+}
+
+/** On phones the profile sits here instead of in the bottom bar (ADR-075). */
+function ProfileButton() {
+  const t = useTranslations("nav");
+  const avatarKey = useGame((state) => state.portfolio?.avatarKey ?? null);
+  return (
+    <Link
+      href="/profile"
+      aria-label={t("profile")}
+      data-tour="nav-profile"
+      className="grid size-10 place-items-center rounded-md focus-ring transition duration-fast hover:bg-surface-2 active:scale-95 lg:hidden"
+    >
+      <Avatar avatarKey={avatarKey} size="xs" />
     </Link>
   );
 }

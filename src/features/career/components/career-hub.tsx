@@ -6,21 +6,18 @@ import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Card } from "@/components/ui/card";
 import { LinkCard } from "@/components/ui/link-card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useGame, usePlayerLevel } from "@/features/game/store";
-import { BALANCE } from "@/config/balance";
+import { useGame } from "@/features/game/store";
 import { useMyCompany } from "@/features/company/hooks";
 import { useMyJob, usePlayerCard, useSkills } from "../hooks";
 import { BusinessCard } from "./business-card";
 import { MyJobCard } from "./my-job-card";
 import { useJobTitle } from "./job-title";
 
-/** Career tab: current job, skills, own business card and the way to the company (ADR-050–054). */
+/** Career tab: current job, skills, own business card (the company has its own tab, ADR-075) (ADR-050–054). */
 export function CareerHub() {
   const t = useTranslations("career");
-  const level = usePlayerLevel();
   const skills = useSkills();
   const nickname = useGame((state) => state.portfolio?.nickname ?? null);
-  const companyLevel = BALANCE.startups.garage.minLevel;
   const company = useMyCompany();
   const job = useMyJob();
   const jobTitle = useJobTitle(job.data ?? { titleKey: null, title: null });
@@ -66,18 +63,6 @@ export function CareerHub() {
             hint={t("portalHint")}
           />
         </div>
-        <LinkCard
-          href="/company"
-          icon={<PixelIcon {...UI_ICONS.company} scale={2} className="text-fg-2" />}
-          title={company.data?.company ? t("companyOwn") : t("companyTitle")}
-          hint={
-            company.data?.company
-              ? company.data.company.name
-              : level < companyLevel
-                ? t("companyHint")
-                : t("companyOwn")
-          }
-        />
       </div>
       <div className="space-y-3">
         <div>

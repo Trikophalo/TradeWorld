@@ -521,7 +521,7 @@
       },
       "found_garage": {
         "intro": "Neu: deine eigene Firma! Ein Garagen-Startup kostet 2.500 €. Mit Glück und guter Führung wird es groß.",
-        "where": "Du findest es unter Karriere → Eigene Firma. Deinen Job darfst du behalten."
+        "where": "Du findest es im Tab „Firma“. Deinen Job darfst du behalten."
       },
       "visit_skill_map": {
         "map": "Deine Skill-Karte. Ziehen zum Bewegen, zoomen mit zwei Fingern. Lernen kannst du Felder direkt neben dem, was du schon kannst."
@@ -1684,7 +1684,10 @@
     "memberSince": "dabei seit {date}",
     "notFound": "Diesen Spieler gibt es nicht.",
     "back": "Zu den Ranglisten",
-    "share": "Visitenkarte"
+    "share": "Visitenkarte",
+    "founder": "Gründer:in",
+    "founderOf": "Gründer:in von {company}",
+    "founderAt": "Gründer:in bei {company}"
   },
   "firm": {
     "title": "Firma",
@@ -1816,7 +1819,7 @@
     "distressCountdown": "Offene Rechnungen: {amount}. Noch {count, plural, one {# Quartal} other {# Quartale}} bis zur Insolvenz. Zahle Geld ein, um sie abzuwenden.",
     "bonus": "Bonus ans Team",
     "payFactor": "Lohnfaktor {value}",
-    "payFactorHint": "Reicht das Ergebnis nicht für alle Löhne, zahlt die Firma automatisch weniger (mindestens 50 %). Bei Gewinn gibt es Bonus.",
+    "payFactorHint": "Löhne von Spielern und KI-Kräften werden jede Stunde gezahlt, aber nie mit mehr Geld, als die Firma in der Stunde verdient hat. Reicht es nicht, sinken alle Löhne im selben Verhältnis. Bei Gewinn gibt es am Quartalsende Bonus.",
     "tabChat": "Chat",
     "closeTitle": "Firma auflösen",
     "closeText": "Die Firma wird sofort aufgelöst. Offene Rechnungen und je Mitarbeiter ein Gehalt Abfindung werden aus der Firmenkasse bezahlt, den Rest zahlst du privat. Was übrig bleibt, bekommst du.",
@@ -1863,12 +1866,12 @@
     "postingKindAi": "KI-Kraft",
     "aiIntro": "KI-Kräfte fangen sofort an, ohne Bewerbung. Echte Spieler bringen deine Firma aber weiter:",
     "aiPointProductivity": "Leistung 1,0 – Spieler leisten mindestens 1,5 und mit Skills mehr.",
-    "aiPointSkills": "Keine Skills: Sie helfen nicht, die nächste Wachstumsstufe zu erreichen.",
+    "aiPointSkills": "Eine KI-Kraft kann einen Platz im Wachstumspfad besetzen, aber nur nach Standard.",
     "aiPointQuality": "Standardarbeit: Je größer ihr Anteil im Team, desto niedriger die erreichbare Qualität (bis −{percent} %).",
     "aiWage": "Lohn",
-    "aiWageValue": "{amount} pro Quartal",
+    "aiWageValue": "{amount} pro Stunde",
     "aiCount": "Anzahl",
-    "aiTotal": "Zusammen {amount} pro Quartal, abgebucht vom Firmenkonto.",
+    "aiTotal": "Zusammen {amount} pro Stunde. Gezahlt wird stündlich zusammen mit den Spielern, nie mehr als die Firma in der Stunde verdient.",
     "aiNoSlots": "Alle {max} Plätze sind belegt. Wachse in die nächste Firmenstufe, um mehr einzustellen.",
     "aiHire": "{count, plural, one {KI-Kraft einstellen} other {# KI-Kräfte einstellen}}",
     "aiHired": "{count, plural, one {KI-Kraft eingestellt} other {# KI-Kräfte eingestellt}}",
@@ -1898,7 +1901,16 @@
     "teamLine": "davon {ai, plural, =0 {keine KI-Kraft} one {# KI-Kraft} other {# KI-Kräfte}}",
     "stampProfit": "Gewinn",
     "stampLoss": "Verlust",
-    "moreSettings": "Lohnfaktor und Auflösen"
+    "moreSettings": "Lohnfaktor und Auflösen",
+    "revenueToday": "Umsatz heute",
+    "profitToday": "Gewinn heute",
+    "live": "Live",
+    "perHourRevenue": "Umsatz/Std.",
+    "perHourProfit": "Gewinn/Std.",
+    "payFactorLive": "Löhne zu {percent} % gedeckt",
+    "viewCard": "Visitenkarte",
+    "cardTitle": "Visitenkarte von {name}",
+    "fullProfile": "Ganzes Profil öffnen"
   },
   "debt": {
     "title": "Schulden",

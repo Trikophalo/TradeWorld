@@ -1,12 +1,13 @@
 import { expect, test } from "@playwright/test";
 
-// Every tab is visible from the start; the company lives under Karriere.
+// Every tab is visible from the start; the company has its own tab, the profile sits in the top bar on phones.
 const TABS = [
   { name: "Portfolio", path: "/portfolio", heading: "Portfolio" },
   { name: "Märkte", path: "/markets", heading: "Märkte" },
   { name: /^Job/, path: "/job", heading: "Job" },
   { name: /Karriere/, path: "/career", heading: "Karriere" },
-  { name: "Profil", path: "/profile", heading: "Profil" },
+  { name: /^Firma/, path: "/company", heading: "Firma" },
+  { name: /^Profil/, path: "/profile", heading: "Profil" },
 ];
 
 // These tests look at the game after the first session: mark the tutorial as done.
@@ -18,7 +19,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("the six tabs navigate without horizontal overflow or console errors", async ({ page }) => {
+test("the tabs navigate without horizontal overflow or console errors", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
@@ -30,7 +31,8 @@ test("the six tabs navigate without horizontal overflow or console errors", asyn
   await expect(nav.getByRole("link", { name: "Start" })).toHaveAttribute("aria-current", "page");
 
   for (const tab of TABS) {
-    await nav.getByRole("link", { name: tab.name }).click();
+    // On phones the profile is the avatar in the top bar.
+    await page.getByRole("link", { name: tab.name }).filter({ visible: true }).first().click();
     await expect(page).toHaveURL(tab.path);
     await expect(page.getByRole("heading", { level: 1, name: tab.heading })).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -137,10 +139,13 @@ test("on desktop the company has its own tab in the sidebar", async ({ page }) =
   await expect(sidebar.getByRole("link", { name: /Karriere/ })).not.toHaveAttribute("aria-current", "page");
 });
 
-test("on phones the bottom bar keeps six tabs and the company lives under Karriere", async ({ page }) => {
+test("on phones the bottom bar has six tabs with the company, the profile is in the top bar", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/company");
   const bar = page.getByRole("navigation", { name: "Hauptnavigation" }).filter({ visible: true });
   await expect(bar.getByRole("link")).toHaveCount(6);
-  await expect(bar.getByRole("link", { name: /Karriere/ })).toHaveAttribute("aria-current", "page");
+  await expect(bar.getByRole("link", { name: /^Firma/ })).toHaveAttribute("aria-current", "page");
+  await expect(bar.getByRole("link", { name: /^Profil/ })).toHaveCount(0);
+  await page.getByRole("banner").getByRole("link", { name: "Profil" }).click();
+  await expect(page).toHaveURL("/profile");
 });

@@ -21,7 +21,7 @@ export const TOURS: Readonly<Record<string, readonly TutorialStep[]>> = {
   ],
   found_garage: [
     { id: "intro", advance: { on: "next" } },
-    { id: "where", target: "nav-career", advance: { on: "next" }, mood: "happy" },
+    { id: "where", target: "nav-company", advance: { on: "next" }, mood: "happy" },
   ],
   // Short tours on the first visit of a new area (ADR-068), started by useVisitTour.
   visit_skill_map: [{ id: "map", target: "skill-map", advance: { on: "next" }, mood: "happy" }],

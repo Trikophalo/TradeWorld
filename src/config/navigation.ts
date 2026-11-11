@@ -7,7 +7,7 @@ export interface NavItem {
   icon: UiIconName;
   /** Unlock key (BALANCE.progression.unlocks). The tab is always visible, with a lock until then. */
   unlock?: string;
-  /** Only in the sidebar; on phones the bottom bar has room for six tabs (ADR-069). */
+  /** Only in the sidebar; on phones the profile sits in the top bar (ADR-075). */
   desktopOnly?: boolean;
 }
 
@@ -18,13 +18,11 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { href: "/markets", key: "markets", icon: "markets" },
   { href: "/job", key: "job", icon: "briefcase" },
   { href: "/career", key: "career", icon: "star" },
-  { href: "/company", key: "company", icon: "company", unlock: "found_garage", desktopOnly: true },
-  { href: "/profile", key: "profile", icon: "profile" },
+  { href: "/company", key: "company", icon: "company", unlock: "found_garage" },
+  { href: "/profile", key: "profile", icon: "profile", desktopOnly: true },
 ];
 
-export function isActivePath(pathname: string, href: string, { mobile = false } = {}): boolean {
+export function isActivePath(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
-  // On phones the company lives under the career tab (ADR-057, ADR-069).
-  if (mobile && href === "/career" && (pathname === "/company" || pathname.startsWith("/company/"))) return true;
   return pathname === href || pathname.startsWith(`${href}/`);
 }

@@ -124,7 +124,11 @@ export function BusinessCard({ card, className }: { card: PlayerCard; className?
             <div className="col-span-2">
               <dt className="label-pixel text-fg-3">{t("job")}</dt>
               <dd className="mt-0.5 truncate text-fg-1">
-                {card.job && jobTitle ? t("jobAt", { title: jobTitle, company: card.job.companyName }) : t("noJob")}
+                {card.job && jobTitle
+                  ? t("jobAt", { title: jobTitle, company: card.job.companyName })
+                  : card.company
+                    ? t("founderAt", { company: card.company.name })
+                    : t("noJob")}
               </dd>
               {card.job && <dd className="text-xs text-fg-3">{tc(card.job.tier)}</dd>}
             </div>
@@ -137,9 +141,12 @@ export function BusinessCard({ card, className }: { card: PlayerCard; className?
               <dd className="mt-0.5 nums text-fg-1">{t("streakValue", { days: card.streakDays })}</dd>
             </div>
             {card.company && (
-              <div className="col-span-2">
-                <dt className="label-pixel text-fg-3">{t("company")}</dt>
-                <dd className="mt-0.5 truncate text-fg-1">{card.company.name}</dd>
+              <div className="col-span-2" data-testid="card-founder">
+                <dt className="label-pixel text-fg-3">{t("founder")}</dt>
+                <dd className="mt-0.5 truncate font-medium text-fg-1">
+                  {t("founderOf", { company: card.company.name })}
+                  {card.company.ticker && <span className="ml-1.5 nums text-xs text-fg-3">{card.company.ticker}</span>}
+                </dd>
               </div>
             )}
           </dl>

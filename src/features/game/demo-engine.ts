@@ -939,6 +939,10 @@ const career = createCareerEngine({
   persist,
   // Founders may work elsewhere until their company has 5 employees (ADR-066).
   ownsCompany: () => needsFullTimeFounder(p().company?.aiWorkers ?? 0) && Boolean(p().company),
+  ownCompany: () => {
+    const own = p().company;
+    return own ? { name: own.name, ticker: own.listing?.ticker ?? null } : null;
+  },
 });
 
 const company = createCompanyEngine({

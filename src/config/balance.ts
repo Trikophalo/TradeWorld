@@ -976,6 +976,8 @@ export interface StartupsConfig {
   readonly grossMargin: Readonly<Record<SectorId, number>>;
   /** AI workers: fixed price per quarter, productivity 1 (players are always better, ADR-050). */
   readonly aiWorkerCostCentsPerQuarter: number;
+  /** AI wage per operating hour (ADR-072); a quarter has time.quarterHours of them. */
+  readonly aiWorkerWageCentsPerHour: number;
   /** Value = cash + max(0, annualised profit) × sector P/E × this discount. */
   readonly valuationPeDiscount: number;
   /** Owner's estimate of the market size: ± spread (log), shrinking each quarter. */
@@ -1958,7 +1960,8 @@ export const BALANCE = {
       logistics: 250_000,
     },
     grossMargin: { tech: 0.75, retail: 0.35, energy: 0.45, pharma: 0.65, logistics: 0.35 },
-    aiWorkerCostCentsPerQuarter: 70_000,
+    aiWorkerCostCentsPerQuarter: 72_000,
+    aiWorkerWageCentsPerHour: 12_000,
     valuationPeDiscount: 0.5,
     estimate: { initialSpread: 2.3, decayPerQuarter: 0.85 },
     insolvency: { graceQuarters: 4, loanWithholdingBps: 5_000, foundingLockoutDays: 3 },

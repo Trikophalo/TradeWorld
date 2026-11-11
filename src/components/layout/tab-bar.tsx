@@ -27,7 +27,7 @@ export function TabBar() {
     >
       <ul className="mx-auto flex h-(--tabbar-height) max-w-lg">
         {NAV_ITEMS.filter((item) => !item.desktopOnly).map((item) => {
-          const active = isActivePath(pathname, item.href, { mobile: true });
+          const active = isActivePath(pathname, item.href);
           return (
             <li key={item.href} className="flex-1">
               <Link

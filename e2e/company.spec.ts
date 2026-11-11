@@ -96,7 +96,7 @@ test("found a garage startup, run quarters, hire and post a job", async ({ page 
   await growthPath.getByRole("button", { name: /Netzwerke/ }).click();
   const hire = page.getByRole("dialog", { name: "Stelle ausschreiben" });
   await hire.getByRole("radio", { name: "KI-Kraft" }).click();
-  await expect(hire.getByText("700 € pro Quartal", { exact: true })).toBeVisible();
+  await expect(hire.getByText("120 € pro Stunde", { exact: true })).toBeVisible();
   await expect(hire.getByRole("radio", { name: "Netzwerke" })).toHaveAttribute("aria-checked", "true");
   await hire.getByRole("button", { name: "KI-Kraft einstellen" }).click();
   await expect(page.getByText("KI-Kraft eingestellt")).toBeVisible();
@@ -112,9 +112,12 @@ test("found a garage startup, run quarters, hire and post a job", async ({ page 
   await expect(page.getByText("KI-Kraft entlassen")).toBeVisible();
   await expect(page.getByTestId("ai-seat")).toHaveCount(0);
 
-  // The founder cannot take a job elsewhere; the career tab links to the company.
+  // The company has its own tab now (ADR-075); the career tab no longer offers it.
   await page.goto("/career");
-  await expect(page.getByText("Deine Firma führen")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Karriere" })).toBeVisible();
+  await expect(page.locator("#main").getByRole("link", { name: /Firma/ })).toHaveCount(0);
+  // The own business card names the founder of the company (ADR-075).
+  await expect(page.getByTestId("card-founder")).toContainText("Gründer:in von Pixelbaecker");
 });
 
 test("company chat, then close the company voluntarily", async ({ page }) => {
