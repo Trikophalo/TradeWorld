@@ -43,6 +43,11 @@ const securitySchema = z.object({
   yield_bps: nnum.optional(),
   matures_at: iso.nullable().optional(),
   face_value_cents: nnum.optional(),
+  company_kind: z.enum(["ai", "player"]).default("ai"),
+  logo: z
+    .object({ palette: z.array(z.string()), grid: z.array(z.string()) })
+    .nullable()
+    .default(null),
 });
 
 const snapshotSchema = z.object({
@@ -304,6 +309,8 @@ export const liveEngine: GameEngine = {
                 faceValueCents: x.face_value_cents ?? 10_000,
               }
             : null,
+        companyKind: x.company_kind,
+        logo: x.logo,
       })),
     };
   },

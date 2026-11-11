@@ -3,8 +3,13 @@ import { SKILL_BRANCHES, type SkillBranch } from "@/config/skills";
 import type { SectorKey } from "@/components/pixel/art";
 import { matchScore, productivityBps } from "@/lib/sim/skills";
 import {
+  aiTakeShare,
   capacityCents,
+  capitalIncreasePriceCents,
   closeStartupQuarter,
+  founderFactor,
+  issuePriceCents,
+  needsFullTimeFounder,
   companyStage,
   productOf,
   fixedCostCents,
@@ -16,6 +21,7 @@ import {
 } from "@/lib/sim/startup";
 import { formatMoney } from "@/lib/format";
 import { dissolve, isInsolvent } from "@/lib/sim/insolvency";
+import { isValidLogo, type CompanyLogoData } from "@/lib/sim/logo";
 import {
   GameError,
   type ChatMessage,
@@ -28,6 +34,7 @@ import {
   type GameEngine,
   type GameErrorKey,
   type MyCompany,
+  type Offer,
 } from "../types";
 
 /*
@@ -66,6 +73,17 @@ export interface DemoCompanyState {
   seq: number;
   /** Product (ADR-062); older demo companies get the first product of their sector. */
   productKey?: string;
+  /** Pixel logo (ADR-065). */
+  logo?: CompanyLogoData | null;
+  /** Going public (ADR-067). In the demo AI investors are the only subscribers. */
+  listing?: {
+    status: "subscription" | "listed";
+    ticker: string;
+    sharesTotal: number;
+    founderShares: number;
+    lastPriceCents: number | null;
+    offer: { id: string; kind: "ipo" | "capital_increase"; priceCents: number; offered: number; endsAt: number } | null;
+  } | null;
   /** Quarter closes in a row with open bills (ADR-058). */
   distressQuarters?: number;
   chat?: ChatMessage[];
@@ -98,6 +116,7 @@ export interface CompanyHost {
   setLastDissolution(value: DemoDissolution): void;
   foundingLockedUntil(): number | null;
   lockFounding(until: number): void;
+  startFounderNotice(): void;
 }
 
 export const productKeyOf = (company: Pick<DemoCompanyState, "sector" | "productKey">) =>
@@ -107,6 +126,23 @@ const smallBusiness = () => companyCfg.tiers.find((t) => t.id === "small_busines
 
 export function foundingCostCents(tier: StartupTier): number {
   return tier === "garage" ? startups.garage.foundingCostCents : smallBusiness().foundingCostCents;
+}
+
+/** The next self-funded step: garage → small business → GmbH; the AG only by IPO (ADR-067). */
+export function nextStep(tier: StartupTier): { tier: StartupTier; level: number; cost: number } | null {
+  if (tier === "garage")
+    return {
+      tier: "small_business",
+      level: foundingLevel("small_business"),
+      cost: foundingCostCents("small_business") - foundingCostCents("garage") * startups.upgradeCreditShare,
+    };
+  if (tier === "small_business")
+    return {
+      tier: "gmbh",
+      level: startups.gmbh.minLevel,
+      cost: startups.gmbh.foundingCostCents - foundingCostCents("small_business") * startups.upgradeCreditShare,
+    };
+  return null;
 }
 
 export function foundingLevel(tier: StartupTier): number {
@@ -149,7 +185,7 @@ export function createCompanyEngine(host: CompanyHost) {
 
   function productivityList(company: DemoCompanyState): number[] {
     return [
-      founderProductivityBps(company.sector, host.branchScores()),
+      Math.round(founderProductivityBps(company.sector, host.branchScores()) * founderFactor(host.hasJob())),
       ...Array<number>(company.aiWorkers).fill(10_000),
     ];
   }
@@ -277,6 +313,7 @@ export function createCompanyEngine(host: CompanyHost) {
   function catchUp(now = Date.now()) {
     const company = host.company();
     if (!company) return;
+    if (company.listing?.offer && company.listing.offer.endsAt <= now) resolveOffer(company);
     let closed = 0;
     while (host.company() === company && now - company.lastClosedAt >= QUARTER_MS && closed < 4) {
       closeQuarter(company, company.lastClosedAt + QUARTER_MS);
@@ -297,12 +334,72 @@ export function createCompanyEngine(host: CompanyHost) {
     );
   }
 
+  function offerView(company: DemoCompanyState): Offer {
+    const offer = company.listing!.offer!;
+    return {
+      id: offer.id,
+      kind: offer.kind,
+      company: {
+        id: company.id,
+        name: company.name,
+        color: company.color,
+        logo: company.logo ?? null,
+        sector: company.sector,
+        productKey: productKeyOf(company),
+        stage: stageOf(company),
+      },
+      ticker: company.listing!.status === "listed" ? company.listing!.ticker : null,
+      priceCents: offer.priceCents,
+      sharesOfferedE6: offer.offered * 1_000_000,
+      sharesSubscribedE6: 0,
+      endsAt: new Date(offer.endsAt).toISOString(),
+      status: "open",
+      mySharesE6: 0,
+      valueCents: valueCents(company),
+      lastQuarter: company.reports.at(-1)
+        ? {
+            label: company.reports.at(-1)!.label,
+            revenueCents: company.reports.at(-1)!.revenueCents,
+            profitCents: company.reports.at(-1)!.operatingProfitCents,
+          }
+        : null,
+    };
+  }
+
+  /** End of a subscription: AI investors take their share, the rest is not issued (ADR-067). */
+  function resolveOffer(company: DemoCompanyState) {
+    const listing = company.listing;
+    const offer = listing?.offer;
+    if (!listing || !offer) return;
+    const sold = Math.floor(offer.offered * aiTakeShare(company.quality));
+    company.cashCents += sold * offer.priceCents;
+    if (offer.kind === "ipo") {
+      listing.sharesTotal = listing.founderShares + sold;
+      listing.status = "listed";
+      company.tier = "ag";
+    } else {
+      listing.sharesTotal += sold;
+    }
+    listing.lastPriceCents = offer.priceCents;
+    listing.offer = null;
+    system(
+      company,
+      `Zeichnung beendet: ${sold.toLocaleString("de-DE")} Aktien zu ${formatMoney(offer.priceCents)} ausgegeben.`,
+    );
+    host.persist();
+  }
+
+  function tickerFor(name: string): string {
+    const letters = name.toUpperCase().replace(/[^A-Z]/g, "");
+    return (letters.slice(0, 3) || "NEX").padEnd(3, "X");
+  }
+
   function view(company: DemoCompanyState): MyCompany {
     const productivity = productivityList(company);
     const [u1, u2] = company.estimateSeeds;
     const estimate = potentialEstimate(company.potentialAnnualCents, company.quartersActive, u1, u2);
     const last = company.reports.at(-1) ?? null;
-    const upgradeCost = foundingCostCents("small_business") - foundingCostCents("garage") * startups.upgradeCreditShare;
+    const step = nextStep(company.tier);
     return {
       id: company.id,
       name: company.name,
@@ -334,8 +431,8 @@ export function createCompanyEngine(host: CompanyHost) {
       teamProductivityBps: productivity.reduce((a, b) => a + b, 0),
       capacityCents: Math.round(capacityCents(productivity, company.sector)),
       nextQuarterAt: new Date(company.lastClosedAt + QUARTER_MS).toISOString(),
-      canUpgrade: company.tier === "garage" && host.level() >= foundingLevel("small_business"),
-      upgradeCostCents: company.tier === "garage" ? upgradeCost : null,
+      canUpgrade: step !== null && host.level() >= step.level,
+      upgradeCostCents: step?.cost ?? null,
       lastQuarter: last,
       history: company.reports.map((r) => ({
         label: r.label,
@@ -343,6 +440,26 @@ export function createCompanyEngine(host: CompanyHost) {
         profitCents: r.operatingProfitCents,
       })),
       payFactorBps: 10_000,
+      logo: company.logo ?? null,
+      logoHidden: false,
+      founderHasJob: host.hasJob(),
+      fullTimeFrom: startups.fullTimeFromEmployees,
+      headcount: company.aiWorkers,
+      listing: company.listing
+        ? {
+            status: company.listing.status,
+            ticker: company.listing.status === "listed" ? company.listing.ticker : null,
+            sharesTotalE6: company.listing.sharesTotal * 1_000_000,
+            founderSharesE6: company.listing.founderShares * 1_000_000,
+            offer: company.listing.offer ? offerView(company) : null,
+            lastPriceE4: company.listing.lastPriceCents === null ? null : company.listing.lastPriceCents * 100,
+          }
+        : null,
+      canGoPublic:
+        !company.listing &&
+        (startups.ipo.fromTiers as readonly string[]).includes(company.tier) &&
+        host.level() >= startups.ipo.minLevel,
+      canCapitalIncrease: company.listing?.status === "listed" && !company.listing.offer,
       distressQuarters: company.distressQuarters ?? 0,
       graceQuarters: startups.insolvency.graceQuarters,
     };
@@ -380,6 +497,12 @@ export function createCompanyEngine(host: CompanyHost) {
     | "fireEmployee"
     | "respondRaise"
     | "trainEmployee"
+    | "setCompanyLogo"
+    | "reportCompanyLogo"
+    | "goPublic"
+    | "capitalIncrease"
+    | "offers"
+    | "subscribeOffer"
   > = {
     async checkCompanyName(name) {
       const reason = host.nameViolation(name.trim());
@@ -391,7 +514,6 @@ export function createCompanyEngine(host: CompanyHost) {
         if (host.company()) throw new GameError("company_exists");
         const locked = host.foundingLockedUntil();
         if (locked !== null && locked > Date.now()) throw new GameError("founding_locked");
-        if (host.hasJob()) throw new GameError("job_active_exists");
         if (host.level() < foundingLevel(input.tier)) throw new GameError("company_level_too_low");
         const violation = host.nameViolation(input.name.trim());
         if (violation) throw new GameError(violation);
@@ -501,6 +623,13 @@ export function createCompanyEngine(host: CompanyHost) {
         if (!Number.isInteger(count) || count < 0) throw new GameError("invalid_argument");
         if (count > maxEmployees(company.tier)) throw new GameError("employee_limit");
         company.aiWorkers = count;
+        if (needsFullTimeFounder(count) && host.hasJob()) {
+          host.startFounderNotice();
+          system(
+            company,
+            `Ab ${startups.fullTimeFromEmployees} Mitarbeitern arbeitet ${host.nickname()} Vollzeit in der Firma.`,
+          );
+        }
       }),
 
     companyDeposit: (requestId, amountCents) =>
@@ -523,13 +652,12 @@ export function createCompanyEngine(host: CompanyHost) {
 
     upgradeCompany: (requestId) =>
       mutate(requestId, (company) => {
-        if (company.tier !== "garage" || host.level() < foundingLevel("small_business"))
-          throw new GameError("company_upgrade_unavailable");
-        const cost = foundingCostCents("small_business") - foundingCostCents("garage") * startups.upgradeCreditShare;
-        if (host.cashCents() < cost) throw new GameError("insufficient_funds");
-        host.addCash(-cost);
-        company.cashCents += cost;
-        company.tier = "small_business";
+        const step = nextStep(company.tier);
+        if (!step || host.level() < step.level) throw new GameError("company_upgrade_unavailable");
+        if (host.cashCents() < step.cost) throw new GameError("insufficient_funds");
+        host.addCash(-step.cost);
+        company.cashCents += step.cost;
+        company.tier = step.tier;
       }),
 
     async companyPostings() {
@@ -588,6 +716,72 @@ export function createCompanyEngine(host: CompanyHost) {
     async trainEmployee() {
       throw new GameError("no_active_job");
     },
+
+    setCompanyLogo: (requestId, logo) =>
+      mutate(requestId, (company) => {
+        if (!isValidLogo(logo)) throw new GameError("invalid_argument");
+        company.logo = { palette: [...logo.palette], grid: [...logo.grid] };
+      }),
+
+    async reportCompanyLogo() {
+      // In the demo there are no other players' logos to report.
+    },
+
+    goPublic: (requestId, sharePercent) =>
+      mutate(requestId, (company) => {
+        if (company.listing) throw new GameError("already_listed");
+        if (
+          !(startups.ipo.fromTiers as readonly string[]).includes(company.tier) ||
+          host.level() < startups.ipo.minLevel
+        )
+          throw new GameError("locked");
+        const pct = Math.round(sharePercent);
+        if (pct < startups.ipo.minSharePercent || pct > startups.ipo.maxSharePercent)
+          throw new GameError("invalid_argument");
+        const total = startups.ipo.sharesTotal;
+        const offered = Math.floor((total * pct) / 100);
+        company.listing = {
+          status: "subscription",
+          ticker: tickerFor(company.name),
+          sharesTotal: total,
+          founderShares: total - offered,
+          lastPriceCents: null,
+          offer: {
+            id: `${company.id}-ipo`,
+            kind: "ipo",
+            priceCents: issuePriceCents(BigInt(valueCents(company))),
+            offered,
+            endsAt: Date.now() + startups.ipo.subscriptionHours * 3_600_000,
+          },
+        };
+        system(company, `Börsengang gestartet: ${pct} % der Firma werden 12 Stunden lang gezeichnet.`);
+      }),
+
+    capitalIncrease: (requestId, sharePercent) =>
+      mutate(requestId, (company) => {
+        const listing = company.listing;
+        if (!listing || listing.status !== "listed" || listing.offer) throw new GameError("invalid_argument");
+        const pct = Math.round(sharePercent);
+        if (pct < 1 || pct > startups.ipo.capitalIncreaseMaxPercent) throw new GameError("invalid_argument");
+        listing.offer = {
+          id: `${company.id}-ci-${company.seq}`,
+          kind: "capital_increase",
+          priceCents: capitalIncreasePriceCents(listing.lastPriceCents ?? startups.ipo.minIssuePriceCents),
+          offered: Math.floor((listing.sharesTotal * pct) / 100),
+          endsAt: Date.now() + startups.ipo.subscriptionHours * 3_600_000,
+        };
+      }),
+
+    async offers() {
+      catchUp();
+      const company = host.company();
+      return company?.listing?.offer ? [offerView(company)] : [];
+    },
+
+    async subscribeOffer() {
+      // The only offer in the demo is the player's own; founders cannot subscribe to it.
+      throw new GameError("forbidden");
+    },
   };
 
   return {
@@ -597,6 +791,8 @@ export function createCompanyEngine(host: CompanyHost) {
     closeQuarterNow: () => {
       const company = host.company();
       if (!company) return;
+      // Demo shortcut: a running subscription ends with the quarter.
+      if (company.listing?.offer) resolveOffer(company);
       closeQuarter(company, Date.now());
       host.persist();
     },

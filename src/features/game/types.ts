@@ -8,6 +8,7 @@
  */
 import type { SectorKey } from "@/components/pixel/art";
 import type { SkillBranch } from "@/config/skills";
+import type { CompanyLogoData } from "@/lib/sim/logo";
 
 export type SecurityKind = "stock" | "bond";
 export type SizeClass = "bluechip" | "midcap" | "penny";
@@ -39,6 +40,9 @@ export interface Security {
     maturesAt: string;
     faceValueCents: number;
   } | null;
+  /** Listed player companies (ADR-067) bring their own pixel logo. */
+  companyKind: "ai" | "player";
+  logo: CompanyLogoData | null;
 }
 
 export interface MarketSnapshot {
@@ -316,6 +320,8 @@ export interface Employer {
   sector: SectorKey | null;
   color: string | null;
   isAi: boolean;
+  /** Pixel logo of a player company (ADR-065), null for AI companies or without one. */
+  logo: CompanyLogoData | null;
 }
 
 export interface JobPosting {
@@ -393,6 +399,8 @@ export interface MyJob {
   workTaskOpen: boolean;
   /** Quit with notice (ADR-063): the job ends at this time; null without notice. */
   noticeEndsAt: string | null;
+  /** Quitting at once costs this (ADR-066). */
+  quitNowCostCents: number;
 }
 
 /** What an employee sees about the employer in the job tab (ADR-064). */
@@ -483,6 +491,47 @@ export interface MyCompany {
   payFactorBps: number;
   distressQuarters: number;
   graceQuarters: number;
+  logo: CompanyLogoData | null;
+  logoHidden: boolean;
+  /** Founder with a job elsewhere (ADR-066). */
+  founderHasJob: boolean;
+  fullTimeFrom: number;
+  headcount: number;
+  /** Going public (ADR-067). */
+  listing: {
+    status: "subscription" | "listed";
+    ticker: string | null;
+    sharesTotalE6: number;
+    founderSharesE6: number;
+    offer: Offer | null;
+    lastPriceE4: number | null;
+  } | null;
+  canGoPublic: boolean;
+  canCapitalIncrease: boolean;
+}
+
+/** A running IPO or capital increase players can subscribe to (ADR-067). */
+export interface Offer {
+  id: string;
+  kind: "ipo" | "capital_increase";
+  company: {
+    id: string;
+    name: string;
+    color: string;
+    logo: CompanyLogoData | null;
+    sector: SectorKey;
+    productKey: string | null;
+    stage: number | null;
+  };
+  ticker: string | null;
+  priceCents: number;
+  sharesOfferedE6: number;
+  sharesSubscribedE6: number;
+  endsAt: string;
+  status: "open" | "closed";
+  mySharesE6: number;
+  valueCents: number;
+  lastQuarter: { label: string; revenueCents: number; profitCents: number } | null;
 }
 
 export interface Dissolution {
@@ -682,6 +731,9 @@ export const GAME_ERROR_KEYS = [
   "work_task_not_found",
   "work_task_expired",
   "work_task_done",
+  "offer_closed",
+  "offer_sold_out",
+  "already_listed",
 ] as const;
 export type GameErrorKey = (typeof GAME_ERROR_KEYS)[number] | "unknown";
 
@@ -723,7 +775,10 @@ export interface GameEngine {
   withdrawApplication(requestId: string, applicationId: string): Promise<JobApplication>;
   signContract(requestId: string, applicationId: string, signature: string): Promise<MyJob>;
   myJob(): Promise<MyJob | null>;
-  quitJob(requestId: string): Promise<{ noticeEndsAt: string }>;
+  quitJob(
+    requestId: string,
+    immediate?: boolean,
+  ): Promise<{ noticeEndsAt: string | null; ended: boolean; paidCents: number }>;
   cancelQuit(requestId: string): Promise<MyJob>;
   employer(): Promise<EmployerView | null>;
   requestRaise(
@@ -731,6 +786,16 @@ export interface GameEngine {
     raiseBps: number,
   ): Promise<{ status: "accepted" | "pending"; salaryCentsPerHour: number }>;
   playerCard(nickname: string): Promise<PlayerCard>;
+  setCompanyLogo(requestId: string, logo: CompanyLogoData): Promise<MyCompany>;
+  reportCompanyLogo(requestId: string, companyId: string): Promise<void>;
+  goPublic(requestId: string, sharePercent: number): Promise<MyCompany>;
+  capitalIncrease(requestId: string, sharePercent: number): Promise<MyCompany>;
+  offers(): Promise<Offer[]>;
+  subscribeOffer(
+    requestId: string,
+    offerId: string,
+    amountCents: number,
+  ): Promise<{ sharesE6: number; amountCents: number }>;
   checkCompanyName(name: string): Promise<{ allowed: boolean; reason: GameErrorKey | null }>;
   foundCompany(input: FoundCompanyInput): Promise<MyCompany>;
   myCompany(): Promise<CompanyOverview>;

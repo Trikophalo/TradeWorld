@@ -16,7 +16,7 @@ import { playSound } from "@/lib/sound";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { TUTORIAL_STEPS, stepIndex, type TutorialStep } from "../steps";
-import { TOURS } from "../tours";
+import { nextUnlockTour, TOURS } from "../tours";
 import { onTutorialEvent, useTutorial } from "../store";
 import { useTargetRect, type TargetRect } from "../use-target-rect";
 import { SpeechBubble } from "./speech-bubble";
@@ -121,8 +121,13 @@ export function Tutorial() {
     const { setStep, finish, endTour } = useTutorial.getState();
     haptic("tap");
     if (tour) {
-      if (last) endTour();
-      else goTo(index + 1);
+      if (last) {
+        endTour();
+        // Several unlocks at once: their tours run one after another (ADR-068).
+        const { seenTours, startTour } = useTutorial.getState();
+        const pending = nextUnlockTour(useGame.getState().portfolio?.level ?? 1, seenTours);
+        if (pending) window.setTimeout(() => startTour(pending), 400);
+      } else goTo(index + 1);
       return;
     }
     if (last) {

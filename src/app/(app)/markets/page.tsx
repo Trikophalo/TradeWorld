@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { Page, PageHeader } from "@/components/layout/page";
+import { OffersCard } from "@/features/company/components/listing";
 import { MarketBrowser } from "@/features/market/components/market-browser";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -13,6 +14,7 @@ export default async function MarketsPage() {
   return (
     <Page>
       <PageHeader title={t("title")} />
+      <OffersCard />
       <MarketBrowser />
     </Page>
   );

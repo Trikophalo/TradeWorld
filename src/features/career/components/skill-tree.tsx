@@ -20,6 +20,7 @@ import { haptic } from "@/lib/haptics";
 import { learnCheck, payForSkill, pointsFor, skillCost, type LearnCheck } from "@/lib/sim/skills";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
+import { useVisitTour } from "@/features/tutorial/use-visit-tour";
 import { useCareerRefresh, useSkills } from "../hooks";
 
 type NodeKey = Parameters<ReturnType<typeof useTranslations<"skills.nodes">>>[0];
@@ -70,6 +71,7 @@ export function SkillTree() {
   const [open, setOpen] = useState<string | null>(null);
   const data = skills.data;
   const learned = useMemo(() => new Set(data?.learned.map((l) => l.key) ?? []), [data]);
+  useVisitTour("visit_skill_map", Boolean(data));
 
   if (!data) return <Skeleton className="h-[70dvh] w-full rounded-lg" />;
 
@@ -206,7 +208,7 @@ function HexMap({
   const showText = view.zoom >= 0.75;
 
   return (
-    <Card padding="none" className="relative overflow-hidden">
+    <Card padding="none" className="relative overflow-hidden" data-tour="skill-map">
       <svg
         ref={box}
         viewBox={`${-size.w / 2} ${-size.h / 2} ${size.w} ${size.h}`}

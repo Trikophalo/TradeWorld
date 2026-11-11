@@ -73,12 +73,13 @@ export function JobView() {
 function WorkerCard({ job }: { job: MyJob }) {
   const t = useTranslations("jobTab");
   const avatarKey = useGame((state) => state.portfolio?.avatarKey ?? null);
+  const own = useMyCompany().data?.company ?? null;
   const sector = job.company.sector ?? "tech";
   const perHour =
     ((job.productivityBps / 10_000) * BALANCE.startups.capacityCentsPerProductivity[sector]) /
     BALANCE.time.quarterHours;
   return (
-    <Card padding="lg" className="overflow-hidden" data-testid="worker">
+    <Card padding="lg" className="overflow-hidden" data-testid="worker" data-tour="worker">
       <div className="flex items-center justify-between gap-3">
         <Badge tone="gain">
           <span className="size-2 animate-pulse rounded-pill bg-gain" aria-hidden /> {t("working")}
@@ -89,6 +90,11 @@ function WorkerCard({ job }: { job: MyJob }) {
         <PixelWorker avatarKey={avatarKey} />
       </div>
       <p className="text-sm text-pretty text-fg-2">{t("workingHint")}</p>
+      {own && (
+        <p className="mt-2 text-sm text-pretty text-info" data-testid="founder-hint">
+          {t("founderHint", { name: own.name, count: own.headcount, from: own.fullTimeFrom })}
+        </p>
+      )}
       <p className="mt-2 nums text-sm text-gain">{t("earnsCompany", { amount: formatMoney(Math.round(perHour)) })}</p>
     </Card>
   );

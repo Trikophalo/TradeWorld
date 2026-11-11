@@ -158,6 +158,7 @@ const POSTINGS: { posting: Omit<JobPosting, "maxSalaryCentsPerHour" | "matchScor
           sector: company.sector,
           color: company.color,
           isAi: true,
+          logo: null,
         };
         return {
           posting: {
@@ -327,6 +328,7 @@ export function createCareerEngine(host: CareerHost) {
       quitCostCents: oneSalaryCents(job.salary),
       signature: job.signature,
       noticeEndsAt: job.noticeEndsAt ? iso(job.noticeEndsAt) : null,
+      quitNowCostCents: job.salary * jobs.quitNowCostHours,
       lastBonusCents: 0,
       nextWorkTaskAt: nextTaskAt(),
       workTaskOpen: openTask() !== null,
@@ -612,13 +614,21 @@ export function createCareerEngine(host: CareerHost) {
       return myJobNow();
     },
 
-    async quitJob(requestId) {
+    async quitJob(requestId, immediate = false) {
       return host.idempotent(requestId, () => {
         accrue();
         const s = st();
         if (!s.job) throw new GameError("no_active_job");
+        if (immediate) {
+          // At once for a day's wage, paid to the company (ADR-066).
+          const cost = s.job.salary * jobs.quitNowCostHours;
+          if (host.cashCents() < cost) throw new GameError("insufficient_funds");
+          host.addCash(-cost);
+          s.job = null;
+          return { noticeEndsAt: null, ended: true, paidCents: cost };
+        }
         s.job.noticeEndsAt ??= Date.now() + jobs.quitNoticeHours * HOUR;
-        return { noticeEndsAt: iso(s.job.noticeEndsAt) };
+        return { noticeEndsAt: iso(s.job.noticeEndsAt), ended: false, paidCents: 0 };
       });
     },
 
@@ -737,6 +747,11 @@ export function createCareerEngine(host: CareerHost) {
     engine,
     accrue,
     hasJob: () => st().job !== null,
+    /** The founder's company reached full size: the job gets the regular notice (ADR-066). */
+    startNotice: () => {
+      const job = st().job;
+      if (job && !job.noticeEndsAt) job.noticeEndsAt = Date.now() + jobs.quitNoticeHours * HOUR;
+    },
     branchScores: scores,
     learnedSkills: () => st().learned.map((l) => l.key),
     freePoints,

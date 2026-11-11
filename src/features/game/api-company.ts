@@ -9,6 +9,7 @@ import type {
   CompanyPosting,
   GameEngine,
   MyCompany,
+  Offer,
   TeamMember,
   WorkTask,
 } from "./types";
@@ -22,6 +23,63 @@ const num = z.number();
 const iso = z.string();
 const tier = z.enum(["intern", "junior", "senior", "team_lead", "c_level"]);
 const required = z.array(z.object({ branch: z.string(), min_score: num }));
+
+const nnum = z.number().nullable();
+
+const offerSchema = z.object({
+  id: z.string(),
+  kind: z.enum(["ipo", "capital_increase"]),
+  company: z.object({
+    id: z.string(),
+    name: z.string(),
+    color: z.string(),
+    logo: z
+      .object({ palette: z.array(z.string()), grid: z.array(z.string()) })
+      .nullable()
+      .default(null),
+    sector: z.string(),
+    product_key: z.string().nullable(),
+    stage: nnum,
+  }),
+  ticker: z.string().nullable(),
+  price_cents: num,
+  shares_offered_e6: num,
+  shares_subscribed_e6: num,
+  ends_at: iso,
+  status: z.enum(["open", "closed"]),
+  my_shares_e6: num,
+  value_cents: num,
+  last_quarter: z.object({ label: z.string(), revenue_cents: num, profit_cents: num }).nullable(),
+});
+
+const toOffer = (o: z.infer<typeof offerSchema>): Offer => ({
+  id: o.id,
+  kind: o.kind,
+  company: {
+    id: o.company.id,
+    name: o.company.name,
+    color: o.company.color,
+    logo: o.company.logo,
+    sector: o.company.sector as SectorKey,
+    productKey: o.company.product_key,
+    stage: o.company.stage,
+  },
+  ticker: o.ticker,
+  priceCents: o.price_cents,
+  sharesOfferedE6: o.shares_offered_e6,
+  sharesSubscribedE6: o.shares_subscribed_e6,
+  endsAt: o.ends_at,
+  status: o.status,
+  mySharesE6: o.my_shares_e6,
+  valueCents: o.value_cents,
+  lastQuarter: o.last_quarter
+    ? {
+        label: o.last_quarter.label,
+        revenueCents: o.last_quarter.revenue_cents,
+        profitCents: o.last_quarter.profit_cents,
+      }
+    : null,
+});
 
 const quarterSchema = z.object({
   label: z.string(),
@@ -71,6 +129,27 @@ const companySchema = z.object({
   last_quarter: quarterSchema.nullable(),
   history: z.array(z.object({ label: z.string(), revenue_cents: num, profit_cents: num })),
   pay_factor_bps: num.default(10_000),
+  logo: z
+    .object({ palette: z.array(z.string()), grid: z.array(z.string()) })
+    .nullable()
+    .default(null),
+  logo_hidden: z.boolean().default(false),
+  founder_has_job: z.boolean().default(false),
+  full_time_from: num.default(5),
+  headcount: num.default(0),
+  listing: z
+    .object({
+      status: z.enum(["subscription", "listed"]),
+      ticker: z.string().nullable(),
+      shares_total_e6: num,
+      founder_shares_e6: num,
+      offer: z.lazy(() => offerSchema).nullable(),
+      last_price_e4: nnum,
+    })
+    .nullable()
+    .default(null),
+  can_go_public: z.boolean().default(false),
+  can_capital_increase: z.boolean().default(false),
   distress_quarters: num.default(0),
   grace_quarters: num.default(4),
   product_key: z.string().default(""),
@@ -230,6 +309,12 @@ export const COMPANY_RPC_SCHEMAS = {
   get_company_team: z.object({ members: z.array(memberSchema) }),
   fire_employee: z.object({ player_job_id: z.string(), status: z.literal("fired"), severance_cents: num }),
   respond_raise: z.object({ status: z.enum(["accepted", "rejected"]), salary_cents_per_hour: num }),
+  set_company_logo: wrapped,
+  report_company_logo: z.object({ reported: z.boolean() }),
+  go_public: wrapped,
+  capital_increase: wrapped,
+  get_offers: z.object({ offers: z.array(offerSchema) }),
+  subscribe_offer: z.object({ shares_e6: num, amount_cents: num, offer: offerSchema }),
   train_employee: z.object({ skill_key: z.string(), cost_cents: num, salary_cents_per_hour: num }),
 } as const;
 
@@ -284,6 +369,23 @@ function toCompany(c: z.infer<typeof companySchema>): MyCompany {
       : null,
     history: c.history.map((h) => ({ label: h.label, revenueCents: h.revenue_cents, profitCents: h.profit_cents })),
     payFactorBps: c.pay_factor_bps,
+    logo: c.logo,
+    logoHidden: c.logo_hidden,
+    founderHasJob: c.founder_has_job,
+    fullTimeFrom: c.full_time_from,
+    headcount: c.headcount,
+    listing: c.listing
+      ? {
+          status: c.listing.status,
+          ticker: c.listing.ticker,
+          sharesTotalE6: c.listing.shares_total_e6,
+          founderSharesE6: c.listing.founder_shares_e6,
+          offer: c.listing.offer ? toOffer(c.listing.offer) : null,
+          lastPriceE4: c.listing.last_price_e4,
+        }
+      : null,
+    canGoPublic: c.can_go_public,
+    canCapitalIncrease: c.can_capital_increase,
     productKey: c.product_key,
     stage: c.stage,
     stages: c.stages.map((st) => ({
@@ -376,6 +478,12 @@ type CompanyEngine = Pick<
   | "fireEmployee"
   | "respondRaise"
   | "trainEmployee"
+  | "setCompanyLogo"
+  | "reportCompanyLogo"
+  | "goPublic"
+  | "capitalIncrease"
+  | "offers"
+  | "subscribeOffer"
 >;
 
 export const liveCompanyEngine: CompanyEngine = {
@@ -580,6 +688,40 @@ export const liveCompanyEngine: CompanyEngine = {
   async fireEmployee(requestId, playerJobId) {
     const r = await rpc("fire_employee", { p_request_id: requestId, p_player_job_id: playerJobId }, S.fire_employee);
     return { severanceCents: r.severance_cents };
+  },
+
+  async setCompanyLogo(requestId, logo) {
+    return requireCompany(await rpc("set_company_logo", { p_request_id: requestId, p_logo: logo }, S.set_company_logo));
+  },
+
+  async reportCompanyLogo(requestId, companyId) {
+    await rpc("report_company_logo", { p_request_id: requestId, p_company_id: companyId }, S.report_company_logo);
+  },
+
+  async goPublic(requestId, sharePercent) {
+    return requireCompany(
+      await rpc("go_public", { p_request_id: requestId, p_share_percent: sharePercent }, S.go_public),
+    );
+  },
+
+  async capitalIncrease(requestId, sharePercent) {
+    return requireCompany(
+      await rpc("capital_increase", { p_request_id: requestId, p_share_percent: sharePercent }, S.capital_increase),
+    );
+  },
+
+  async offers() {
+    const r = await rpc("get_offers", {}, S.get_offers);
+    return r.offers.map(toOffer);
+  },
+
+  async subscribeOffer(requestId, offerId, amountCents) {
+    const r = await rpc(
+      "subscribe_offer",
+      { p_request_id: requestId, p_offer_id: offerId, p_amount_cents: amountCents },
+      S.subscribe_offer,
+    );
+    return { sharesE6: r.shares_e6, amountCents: r.amount_cents };
   },
 
   async trainEmployee(requestId, playerJobId, skillKey) {

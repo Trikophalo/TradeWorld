@@ -511,10 +511,25 @@
         "bondList": "Je länger die Laufzeit, desto mehr Zinsen. Am Ende bekommst du 100 € pro Anleihe zurück. Kaufen geht wie bei Aktien."
       },
       "first_job": {
-        "intro": "Neu freigeschaltet: Jobs! Ab jetzt kannst du neben der Börse Gehalt verdienen, auch wenn du offline bist.",
+        "intro": "Neu: Jobs! Du verdienst Gehalt neben der Börse, auch offline.",
+        "goJob": "Tippe auf „Job“.",
+        "job": "Hier arbeitest du. Das läuft von allein, du musst nichts tun. Bewerben kannst du dich im Jobportal unter Karriere.",
         "goCareer": "Tippe auf „Karriere“.",
-        "jobCard": "Hier steht dein Job. Im Jobportal bewirbst du dich bei KI-Firmen. Sie nehmen jeden, zahlen aber gedeckelt.",
-        "skills": "Und das Wichtigste: Skills. Wer mehr kann, leistet mehr und verdient mehr. Deine Skillpunkte kommen aus Level-ups und Arbeit. Viel Erfolg!"
+        "skills": "Skills machen dich besser und bringen mehr Gehalt. Punkte bekommst du durch Level-ups und Arbeit. Viel Erfolg!"
+      },
+      "found_garage": {
+        "intro": "Neu: deine eigene Firma! Ein Garagen-Startup kostet 2.500 €. Mit Glück und guter Führung wird es groß.",
+        "where": "Du findest es unter Karriere → Eigene Firma. Deinen Job darfst du behalten."
+      },
+      "visit_skill_map": {
+        "map": "Deine Skill-Karte. Ziehen zum Bewegen, zoomen mit zwei Fingern. Lernen kannst du Felder direkt neben dem, was du schon kannst."
+      },
+      "visit_company": {
+        "dashboard": "Deine Firma! Jedes Quartal (6 Stunden) siehst du hier Umsatz und Gewinn.",
+        "growth": "Zum Wachsen brauchst du die richtigen Spezialisten. Hier steht, wer dir als Nächstes fehlt."
+      },
+      "visit_listing": {
+        "listing": "Mit einem Börsengang holst du dir Geld von Investoren und kannst auf bis zu 100 Mitarbeiter wachsen."
       }
     }
   },
@@ -579,7 +594,10 @@
     "not_in_company": "Du bist in keiner Spielerfirma.",
     "work_task_not_found": "Diese Aufgabe gibt es nicht mehr.",
     "work_task_expired": "Die Aufgabe ist abgelaufen.",
-    "work_task_done": "Diese Aufgabe hast du schon gelöst."
+    "work_task_done": "Diese Aufgabe hast du schon gelöst.",
+    "offer_closed": "Die Zeichnung ist schon beendet.",
+    "offer_sold_out": "Alle Aktien sind schon vergeben.",
+    "already_listed": "Deine Firma ist schon an der Börse."
   },
   "locks": {
     "level": "Level {level}",
@@ -1467,7 +1485,12 @@
     "companyOwn": "Deine Firma führen",
     "lastBonus": "Bonus letztes Quartal: {amount}",
     "jobLink": "Dein Job",
-    "jobLinkHint": "{title} bei {company}"
+    "jobLinkHint": "{title} bei {company}",
+    "quitNoticeTitle": "Mit einem Tag Frist (kostenlos)",
+    "quitNowTitle": "Sofort kündigen",
+    "quitNowText": "Dein Job endet sofort. Dafür zahlst du der Firma einen Tageslohn: {amount}.",
+    "quitNowConfirm": "Gedrückt halten: sofort kündigen",
+    "quitNowDoneText": "Dein Job ist beendet. {amount} gingen an die Firma."
   },
   "jobs": {
     "title": "Jobportal",
@@ -1682,7 +1705,7 @@
     "foundConfirm": "Gedrückt halten zum Gründen",
     "founded": "Firma gegründet!",
     "foundedText": "{name} ist am Start. Das erste Quartal endet in 6 Stunden.",
-    "hasJob": "Du hast einen Job. Wer gründet, arbeitet in der eigenen Firma: Kündige erst.",
+    "hasJob": "Du darfst deinen Job behalten. Solange du nebenbei arbeitest, zählt deine Leistung in der Firma halb. Ab 5 Mitarbeitern arbeitest du Vollzeit in deiner Firma.",
     "tabOverview": "Übersicht",
     "tabPostings": "Stellen",
     "tabApplications": "Bewerbungen",
@@ -1822,7 +1845,10 @@
     "trainedText": "Neuer Lohn: {amount}/Std.",
     "trainNeeded": "Für deine nächste Stufe",
     "trainOther": "Weitere Skills",
-    "noticeMember": "kündigt, letzter Tag {date}"
+    "noticeMember": "kündigt, letzter Tag {date}",
+    "upgradeGmbhTitle": "Zur GmbH wachsen",
+    "upgradeGmbhText": "Bis zu 20 Mitarbeiter. Kostet {amount} Startkapital extra.",
+    "upgradeLockedAt": "Ab Level {level}"
   },
   "debt": {
     "title": "Schulden",
@@ -1962,11 +1988,74 @@
     "notice": "Gekündigt: Dein letzter Arbeitstag endet in",
     "noticeHint": "Bis dahin bekommst du weiter Lohn. Du kannst die Kündigung zurücknehmen.",
     "cancelNotice": "Kündigung zurücknehmen",
-    "noticeCancelled": "Kündigung zurückgenommen"
+    "noticeCancelled": "Kündigung zurückgenommen",
+    "founderHint": "Nebenbei führst du {name} ({count} von {from} Mitarbeitern). Ab {from} arbeitest du dort Vollzeit, dann endet dieser Job nach einem Tag."
   },
   "events": {
     "title": "Events",
     "linkTitle": "Events und Nachrichten",
     "linkHint": "Quartalszahlen, Zinsentscheide und Schlagzeilen"
+  },
+  "logo": {
+    "title": "Logo zeichnen",
+    "intro": "16 × 16 Pixel, bis zu 6 Farben. Mit Spiegeln wird dein Logo symmetrisch.",
+    "preview": "Vorschau",
+    "tool": "Werkzeug",
+    "pen": "Stift",
+    "eraser": "Radierer",
+    "fill": "Füllen",
+    "colors": "Farben {count}/{max}",
+    "addColor": "Farbe {color} hinzufügen",
+    "mirror": "Spiegeln",
+    "clear": "Leeren",
+    "save": "Logo speichern",
+    "saved": "Logo gespeichert",
+    "tooEmpty": "Male mindestens ein paar Pixel.",
+    "draw": "Logo zeichnen",
+    "report": "Logo melden",
+    "reported": "Danke, das Logo wurde gemeldet.",
+    "hidden": "Dein Logo wurde mehrfach gemeldet und ist ausgeblendet. Zeichne ein neues."
+  },
+  "listing": {
+    "title": "Börse",
+    "lockedHint": "Ab Level {level} kannst du mit deiner Firma an die Börse gehen und mit dem Geld der Investoren auf bis zu 100 Mitarbeiter wachsen.",
+    "intro": "Verkaufe einen Teil deiner Firma als Aktien. Das Geld der Investoren geht in die Firmenkasse, die Firma wird eine AG mit bis zu 100 Mitarbeitern.",
+    "goPublic": "Börsengang",
+    "ipoIntro": "12 Stunden lang zeichnen Spieler deine Aktien zum Ausgabepreis.",
+    "capitalIncrease": "Kapitalerhöhung",
+    "increaseIntro": "Neue Aktien zu 90 % des Kurses. Mehr Geld für die Firma, dein Anteil sinkt etwas.",
+    "share": "Anteil, den du verkaufst",
+    "price": "Ausgabepreis je Aktie",
+    "shares": "Aktien",
+    "maxProceeds": "Höchstens für die Firma",
+    "youKeep": "Du behältst",
+    "aiHint": "Was Spieler nicht zeichnen, übernehmen zum Teil KI-Investoren, je besser deine Qualität, desto mehr. Der Rest wird nicht ausgegeben.",
+    "start": "Zeichnung starten",
+    "ipoStarted": "Börsengang gestartet",
+    "increaseStarted": "Kapitalerhöhung gestartet",
+    "startedText": "Die Zeichnung läuft {hours} Stunden.",
+    "subscriptionIpo": "Zeichnung des Börsengangs",
+    "subscriptionIncrease": "Zeichnung der Kapitalerhöhung",
+    "endsIn": "Ende in",
+    "subscribed": "Gezeichnet",
+    "subscribedValue": "{subscribed} von {offered} Aktien gezeichnet, je {price}",
+    "listed": "An der Börse als {ticker}",
+    "founderShares": "Dir gehören {shares} Aktien ({percent} %).",
+    "toStock": "Zur Aktie",
+    "offersTitle": "Neuemissionen",
+    "perShare": "je Aktie",
+    "subscribe": "Zeichnen",
+    "subscribeTitle": "{name} zeichnen",
+    "subscribeIntro": "Du kaufst neue Aktien direkt von der Firma. Dein Geld fließt in ihr Wachstum.",
+    "revenue": "Umsatz",
+    "profit": "Gewinn",
+    "valueBadge": "Firmenwert {value}",
+    "amount": "Betrag in Euro",
+    "youGet": "Du bekommst etwa {shares} Aktien.",
+    "risk": "Neue Firmen sind riskant. Nach der Zeichnung bestimmen Angebot, Nachfrage und der Erfolg der Firma den Kurs.",
+    "subscribedDone": "Gezeichnet",
+    "subscribedDoneText": "{shares} Aktien für {amount}.",
+    "sideJob": "Du arbeitest nebenbei bei {company}. Deine Leistung zählt hier deshalb nur halb. Ab {from} Mitarbeitern arbeitest du Vollzeit in deiner Firma (noch {left} bis dahin), dann endet dein Job nach einem Tag.",
+    "fullTime": "Deine Firma hat genug Mitarbeiter: Du arbeitest jetzt Vollzeit hier. Dein Job bei {company} endet nach einem Tag."
   }
 }

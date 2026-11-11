@@ -11,6 +11,7 @@ import { DEMO_COMPANIES, DEMO_INDEX } from "@/lib/demo/market";
 import { bondPriceE4, bondYieldBps } from "@/lib/sim/bonds";
 import { withholdIncome } from "@/lib/sim/insolvency";
 import { anchoredFairValue, playerImpactReturn } from "@/lib/sim/player-influence";
+import { needsFullTimeFounder } from "@/lib/sim/startup";
 import { levelFromTotalXp, levelProgress, scaledXp, totalXpForLevel, unlockLevel } from "@/lib/sim/progression";
 import { MISSION_TEMPLATES, availableFor, missionXp, type Metric, type MissionTemplate } from "./demo/missions";
 import { createCareerEngine, initialCareer, tycoonAvatar, type CareerState } from "./demo/careers";
@@ -398,6 +399,8 @@ function securityOf(ticker: string): Security {
           faceValueCents: BALANCE.bonds.faceValueCents,
         }
       : null,
+    companyKind: "ai",
+    logo: null,
   };
 }
 
@@ -920,7 +923,8 @@ const career = createCareerEngine({
   week: (at) => weekKey(at),
   idempotent,
   persist,
-  ownsCompany: () => Boolean(p().company),
+  // Founders may work elsewhere until their company has 5 employees (ADR-066).
+  ownsCompany: () => needsFullTimeFounder(p().company?.aiWorkers ?? 0) && Boolean(p().company),
 });
 
 const company = createCompanyEngine({
@@ -954,6 +958,7 @@ const company = createCompanyEngine({
   lockFounding: (until) => {
     p().foundingLockedUntil = until;
   },
+  startFounderNotice: () => career.startNotice(),
 });
 
 /** Demo only: close the current company quarter at once (button on the company page). */

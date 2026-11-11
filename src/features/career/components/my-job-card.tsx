@@ -38,7 +38,14 @@ const factor = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximu
 
 export function EmployerLogo({ job, scale = 2 }: { job: Pick<MyJob, "company">; scale?: 2 | 3 | 4 }) {
   const ticker = job.company.ticker ?? job.company.name.slice(0, 3).toUpperCase();
-  return <CompanyLogo ticker={ticker} color={job.company.color ?? brandColor(ticker)} scale={scale} />;
+  return (
+    <CompanyLogo
+      ticker={ticker}
+      color={job.company.color ?? brandColor(ticker)}
+      scale={scale}
+      logo={job.company.logo}
+    />
+  );
 }
 
 /** The current job with pay, productivity, today's hours, raise and quitting (ADR-051). */
@@ -141,15 +148,12 @@ export function ActiveJob({ job }: { job: MyJob }) {
 
       <RaiseBox job={job} />
 
-      {job.noticeEndsAt ? (
-        <NoticeBox noticeEndsAt={job.noticeEndsAt} />
-      ) : (
-        <div className="mt-4 flex justify-end">
-          <Button variant="danger" size="sm" onClick={() => setQuitting(true)}>
-            {t("quit")}
-          </Button>
-        </div>
-      )}
+      {job.noticeEndsAt && <NoticeBox noticeEndsAt={job.noticeEndsAt} />}
+      <div className="mt-4 flex justify-end">
+        <Button variant="danger" size="sm" onClick={() => setQuitting(true)}>
+          {job.noticeEndsAt ? t("quitNowTitle") : t("quit")}
+        </Button>
+      </div>
       <QuitSheet job={job} open={quitting} onOpenChange={setQuitting} />
     </Card>
   );
@@ -242,11 +246,15 @@ function QuitSheet({ job, open, onOpenChange }: { job: MyJob; open: boolean; onO
   const refresh = useCareerRefresh();
   const [busy, setBusy] = useState(false);
 
-  const quit = async () => {
+  const quit = async (immediate: boolean) => {
     setBusy(true);
     try {
-      const result = await engine.quitJob(crypto.randomUUID());
-      toast.success(t("quitDone"), t("quitDoneText", { date: noticeDate.format(new Date(result.noticeEndsAt)) }));
+      const result = await engine.quitJob(crypto.randomUUID(), immediate);
+      if (result.ended) {
+        toast.success(t("quitDone"), t("quitNowDoneText", { amount: formatMoney(result.paidCents) }));
+      } else if (result.noticeEndsAt) {
+        toast.success(t("quitDone"), t("quitDoneText", { date: noticeDate.format(new Date(result.noticeEndsAt)) }));
+      }
       onOpenChange(false);
       await refresh();
     } catch (error) {
@@ -262,19 +270,31 @@ function QuitSheet({ job, open, onOpenChange }: { job: MyJob; open: boolean; onO
       onOpenChange={onOpenChange}
       title={t("quitTitle")}
       footer={
-        <div className="space-y-2">
-          <HoldButton tone="loss" onConfirm={() => void quit()} disabled={busy} className="w-full">
-            {t("quitConfirm")}
-          </HoldButton>
-          <Button block variant="ghost" onClick={() => onOpenChange(false)}>
-            {t("cancel")}
-          </Button>
-        </div>
+        <Button block variant="ghost" onClick={() => onOpenChange(false)}>
+          {t("cancel")}
+        </Button>
       }
     >
-      <p className="text-pretty text-fg-2" data-job={job.id}>
-        {t("quitText")}
-      </p>
+      <div className="space-y-4" data-job={job.id}>
+        {!job.noticeEndsAt && (
+          <div className="space-y-2 rounded-md border border-line-1 p-3">
+            <p className="font-medium text-fg-1">{t("quitNoticeTitle")}</p>
+            <p className="text-sm text-pretty text-fg-2">{t("quitText")}</p>
+            <HoldButton tone="loss" onConfirm={() => void quit(false)} disabled={busy} className="w-full">
+              {t("quitConfirm")}
+            </HoldButton>
+          </div>
+        )}
+        <div className="space-y-2 rounded-md border border-line-1 p-3">
+          <p className="font-medium text-fg-1">{t("quitNowTitle")}</p>
+          <p className="text-sm text-pretty text-fg-2">
+            {t("quitNowText", { amount: formatMoney(job.quitNowCostCents) })}
+          </p>
+          <HoldButton tone="loss" onConfirm={() => void quit(true)} disabled={busy} className="w-full">
+            {t("quitNowConfirm")}
+          </HoldButton>
+        </div>
+      </div>
     </Sheet>
   );
 }

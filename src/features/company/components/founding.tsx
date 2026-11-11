@@ -166,8 +166,9 @@ function FoundingSheet({ tier, onClose }: { tier: FoundableTier | null; onClose:
 
   const value = name.trim();
   const reason = check?.name === value ? check.reason : null;
+  // Founders may keep their job (ADR-066); the sheet only explains what that means.
   const hasJob = Boolean(job.data);
-  const ready = !hasJob && check?.name === value && reason === null && idea.trim().length >= 5;
+  const ready = check?.name === value && reason === null && idea.trim().length >= 5;
   const info = TIER_INFO[shown];
 
   const found = async () => {
@@ -208,7 +209,7 @@ function FoundingSheet({ tier, onClose }: { tier: FoundableTier | null; onClose:
       }
     >
       <div ref={anchor} className="space-y-5">
-        {hasJob && <p className="rounded-md bg-warn-soft px-4 py-3 text-sm text-warn">{t("hasJob")}</p>}
+        {hasJob && <p className="rounded-md bg-info-soft px-4 py-3 text-sm text-pretty text-info">{t("hasJob")}</p>}
         <Field
           label={t("name")}
           value={name}

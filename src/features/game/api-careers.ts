@@ -33,6 +33,10 @@ const employerSchema = z.object({
   sector: z.string().nullable(),
   color: z.string().nullable(),
   is_ai: z.boolean(),
+  logo: z
+    .object({ palette: z.array(z.string()), grid: z.array(z.string()) })
+    .nullable()
+    .default(null),
 });
 
 const dailyRewardSchema = z.object({
@@ -126,6 +130,7 @@ const jobSchema = z.object({
   next_work_task_at: iso.nullable().default(null),
   work_task_open: z.boolean().default(false),
   notice_ends_at: iso.nullable().default(null),
+  quit_now_cost_cents: num.default(0),
 });
 
 const cardSchema = z.object({
@@ -166,6 +171,7 @@ export const CAREER_RPC_SCHEMAS = {
   get_my_job: z.object({ job: jobSchema.nullable() }),
   quit_job: z.union([
     z.object({ notice_ends_at: iso }),
+    z.object({ ended: z.literal(true), paid_cents: num }),
     // Servers before ADR-063 charged one salary and ended the job at once.
     z.object({ paid_cents: num, cash_cents: num }),
   ]),
@@ -199,6 +205,7 @@ const toEmployer = (c: z.infer<typeof employerSchema>): Employer => ({
   sector: c.sector as SectorKey | null,
   color: c.color,
   isAi: c.is_ai,
+  logo: c.logo,
 });
 
 const toRequired = (r: z.infer<typeof required>) =>
@@ -279,6 +286,7 @@ const toJob = (j: z.infer<typeof jobSchema>): MyJob => ({
   nextWorkTaskAt: j.next_work_task_at,
   workTaskOpen: j.work_task_open,
   noticeEndsAt: j.notice_ends_at,
+  quitNowCostCents: j.quit_now_cost_cents,
 });
 
 type CareerEngine = Pick<
@@ -399,9 +407,10 @@ export const liveCareerEngine: CareerEngine = {
     return r.job ? toJob(r.job) : null;
   },
 
-  async quitJob(requestId) {
-    const r = await rpc("quit_job", { p_request_id: requestId }, S.quit_job);
-    return { noticeEndsAt: "notice_ends_at" in r ? r.notice_ends_at : new Date().toISOString() };
+  async quitJob(requestId, immediate = false) {
+    const r = await rpc("quit_job", { p_request_id: requestId, p_immediate: immediate }, S.quit_job);
+    if ("notice_ends_at" in r) return { noticeEndsAt: r.notice_ends_at, ended: false, paidCents: 0 };
+    return { noticeEndsAt: null, ended: true, paidCents: r.paid_cents };
   },
 
   async cancelQuit(requestId) {

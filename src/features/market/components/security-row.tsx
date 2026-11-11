@@ -22,7 +22,7 @@ export function SecurityRow({ ticker, shared = true }: { ticker: string; shared?
   const security = useSecurity(ticker);
   if (!security) return null;
 
-  const logo = <CompanyLogo ticker={ticker} color={brandColor(ticker)} />;
+  const logo = <CompanyLogo ticker={ticker} color={brandColor(ticker)} logo={security.logo} />;
 
   return (
     <Link

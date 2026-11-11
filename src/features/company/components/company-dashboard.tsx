@@ -28,7 +28,12 @@ import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { useCompanyRefresh } from "../hooks";
 import { useProductText } from "../product-name";
+import { useVisitTour } from "@/features/tutorial/use-visit-tour";
 import { CompanyChat } from "./company-chat";
+import { ListingCard, SideJobNotice } from "./listing";
+import { LogoEditor } from "./logo-editor";
+import { CompanyLogo } from "@/features/market/components/company-logo";
+import { BALANCE } from "@/config/balance";
 import { Applications, Postings, Team } from "./employer";
 
 type Tab = "overview" | "postings" | "applications" | "team" | "chat";
@@ -44,18 +49,36 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
   const refresh = useCompanyRefresh();
   const [tab, setTab] = useState<Tab>("overview");
   const [prefill, setPrefill] = useState<string[] | undefined>(undefined);
+  const [drawing, setDrawing] = useState(false);
+  useVisitTour("visit_company");
+  const tl = useTranslations("logo");
 
   return (
     <div className="space-y-5">
       <Card padding="lg" className="space-y-4" data-testid="company-header">
         <div className="flex items-center gap-4">
-          <span
-            aria-hidden
-            style={{ backgroundColor: company.color }}
-            className="grid size-14 shrink-0 place-items-center font-pixel text-base text-on-accent"
+          <button
+            type="button"
+            onClick={() => setDrawing(true)}
+            aria-label={tl("draw")}
+            data-testid="logo-button"
+            className="group relative shrink-0 rounded-sm focus-ring"
           >
-            {company.name.slice(0, 2).toUpperCase()}
-          </span>
+            {company.logo ? (
+              <CompanyLogo ticker={company.name} color={company.color} logo={company.logo} scale={4} />
+            ) : (
+              <span
+                aria-hidden
+                style={{ backgroundColor: company.color }}
+                className="grid size-16 place-items-center font-pixel text-base text-on-accent"
+              >
+                {company.name.slice(0, 2).toUpperCase()}
+              </span>
+            )}
+            <span className="absolute -right-1.5 -bottom-1.5 rounded-xs bg-surface-3 px-1 label-pixel text-fg-2 ring-1 ring-line-2">
+              ✎
+            </span>
+          </button>
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-xl font-semibold text-fg-1">{company.name}</h2>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-fg-3">
@@ -88,6 +111,10 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
         </div>
       </Card>
 
+      <LogoEditor company={company} open={drawing} onClose={() => setDrawing(false)} />
+      {company.logoHidden && <p className="rounded-md bg-warn-soft px-4 py-3 text-sm text-warn">{tl("hidden")}</p>}
+      <SideJobNotice company={company} />
+      <ListingCard company={company} />
       {company.distress && (
         <p className="rounded-md bg-loss-soft px-4 py-3 text-sm text-pretty text-loss" data-testid="distress">
           {t("distressCountdown", {
@@ -462,11 +489,15 @@ function Controls({ company }: { company: MyCompany }) {
         </div>
       </div>
 
-      {company.tier === "garage" && company.upgradeCostCents !== null && (
+      {company.upgradeCostCents !== null && (company.tier === "garage" || company.tier === "small_business") && (
         <div className="rounded-md border border-line-1 px-3 py-3">
-          <p className="text-sm font-medium text-fg-1">{t("upgradeTitle")}</p>
+          <p className="text-sm font-medium text-fg-1">
+            {company.tier === "garage" ? t("upgradeTitle") : t("upgradeGmbhTitle")}
+          </p>
           <p className="mt-0.5 text-xs text-fg-3">
-            {t("upgradeText", { amount: formatMoney(company.upgradeCostCents, { whole: true }) })}
+            {company.tier === "garage"
+              ? t("upgradeText", { amount: formatMoney(company.upgradeCostCents, { whole: true }) })
+              : t("upgradeGmbhText", { amount: formatMoney(company.upgradeCostCents, { whole: true }) })}
           </p>
           <Button
             size="sm"
@@ -475,7 +506,12 @@ function Controls({ company }: { company: MyCompany }) {
             disabled={!company.canUpgrade}
             onClick={() => void upgrade()}
           >
-            {company.canUpgrade ? t("upgrade") : t("upgradeLocked")}
+            {company.canUpgrade
+              ? t("upgrade")
+              : t("upgradeLockedAt", {
+                  level:
+                    company.tier === "garage" ? BALANCE.company.tiers[0]!.minLevel : BALANCE.startups.gmbh.minLevel,
+                })}
           </Button>
         </div>
       )}
@@ -607,7 +643,7 @@ function GrowthCard({
   const next = company.stages.find((st) => !st.reached);
   const missing = next?.skills.filter((s) => !s.coveredBy).map((s) => s.key) ?? [];
   return (
-    <Card padding="lg" className="space-y-4" data-testid="growth">
+    <Card padding="lg" className="space-y-4" data-testid="growth" data-tour="growth">
       <div>
         <p className="label-pixel text-fg-2">
           {t("growthTitle")} · {product.name(company.productKey)}

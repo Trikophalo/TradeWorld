@@ -30,7 +30,15 @@ async function preparePlayer(
     {
       dailySeen: options.dailySeen ?? true,
       xpTotal: options.xpTotal ?? 3_000,
-      seenTours: options.seenTours ?? ["first_job", "limit_orders", "bonds"],
+      seenTours: options.seenTours ?? [
+        "first_job",
+        "limit_orders",
+        "bonds",
+        "found_garage",
+        "visit_skill_map",
+        "visit_company",
+        "visit_listing",
+      ],
     },
   );
 }
@@ -130,6 +138,14 @@ test("learn a skill on the map, apply to an AI company, sign, work and quit", as
   await page.getByRole("button", { name: "Kündigung zurücknehmen" }).click();
   await expect(page.getByText("Kündigung zurückgenommen")).toBeVisible();
   await expect(page.getByRole("button", { name: "Kündigen" })).toBeVisible();
+
+  // Or at once, for a day's wage paid to the company (ADR-066).
+  await page.getByRole("button", { name: "Kündigen" }).click();
+  await expect(page.getByText(/Dafür zahlst du der Firma einen Tageslohn/)).toBeVisible();
+  await page.waitForTimeout(500);
+  await hold(page, "Gedrückt halten: sofort kündigen");
+  await expect(page.getByText(/Dein Job ist beendet/)).toBeVisible();
+  await expect(page.getByText("Du hast gerade keinen Job.")).toBeVisible();
 });
 
 test("pick a profile picture and see it on the business card", async ({ page }) => {
@@ -165,10 +181,14 @@ test("reaching level 2 starts Finn's job tour", async ({ page }) => {
   await page.mouse.up();
   await page.getByRole("button", { name: "Weiter" }).click();
   const finn = page.locator("[data-tutorial]");
-  await expect(finn).toContainText("Neu freigeschaltet: Jobs!");
+  await expect(finn).toContainText("Neu: Jobs!");
   await finn.getByRole("button").last().click();
   const nav = page.getByRole("navigation", { name: "Hauptnavigation" }).filter({ visible: true });
+  await nav.getByRole("link", { name: /^Job/ }).click();
+  await expect(page).toHaveURL("/job");
+  await expect(finn).toContainText("Das läuft von allein");
+  await finn.getByRole("button").last().click();
   await nav.getByRole("link", { name: "Karriere" }).click();
   await expect(page).toHaveURL("/career");
-  await expect(finn).toContainText("Hier steht dein Job");
+  await expect(finn).toContainText("Skills machen dich besser");
 });

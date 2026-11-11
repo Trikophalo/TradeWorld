@@ -12,8 +12,8 @@ import { useGame } from "@/features/game/store";
 import { useTutorial } from "@/features/tutorial/store";
 import { haptic } from "@/lib/haptics";
 import { DURATION, EASE, SPRING } from "@/lib/motion";
-import { unlocksAtLevel, unlocksUpToLevel } from "@/lib/sim/progression";
-import { TOURS } from "@/features/tutorial/tours";
+import { unlocksAtLevel } from "@/lib/sim/progression";
+import { nextUnlockTour } from "@/features/tutorial/tours";
 import { playSound } from "@/lib/sound";
 import type { UnlockKey } from "./level-card";
 
@@ -55,8 +55,8 @@ export function LevelUpOverlay() {
     setShownLevel(null);
     if (level === null) return;
     const { seenTours, startTour } = useTutorial.getState();
-    const pending = unlocksUpToLevel(level).find((unlock) => TOURS[unlock.key] && !seenTours.includes(unlock.key));
-    if (pending) window.setTimeout(() => startTour(pending.key), 350);
+    const pending = nextUnlockTour(level, seenTours);
+    if (pending) window.setTimeout(() => startTour(pending), 350);
   };
 
   return (

@@ -1,3 +1,4 @@
+import { unlocksUpToLevel } from "@/lib/sim/progression";
 import { MARKETS, STOCK, type TutorialStep } from "./steps";
 
 /**
@@ -8,14 +9,27 @@ import { MARKETS, STOCK, type TutorialStep } from "./steps";
  * together with those features.
  */
 const CAREER = /^\/career$/;
+const JOB = /^\/job$/;
 
 export const TOURS: Readonly<Record<string, readonly TutorialStep[]>> = {
   first_job: [
     { id: "intro", advance: { on: "next" } },
+    { id: "goJob", target: "nav-job", advance: { on: "route", path: JOB } },
+    { id: "job", path: JOB, recover: { to: "/job" }, advance: { on: "next" } },
     { id: "goCareer", target: "nav-career", advance: { on: "route", path: CAREER } },
-    { id: "jobCard", target: "job-card", path: CAREER, recover: { to: "/career" }, advance: { on: "next" } },
     { id: "skills", path: CAREER, recover: { to: "/career" }, advance: { on: "next" }, mood: "happy" },
   ],
+  found_garage: [
+    { id: "intro", advance: { on: "next" } },
+    { id: "where", target: "nav-career", advance: { on: "next" }, mood: "happy" },
+  ],
+  // Short tours on the first visit of a new area (ADR-068), started by useVisitTour.
+  visit_skill_map: [{ id: "map", target: "skill-map", advance: { on: "next" }, mood: "happy" }],
+  visit_company: [
+    { id: "dashboard", advance: { on: "next" } },
+    { id: "growth", target: "growth", advance: { on: "next" }, mood: "happy" },
+  ],
+  visit_listing: [{ id: "listing", target: "listing", advance: { on: "next" }, mood: "happy" }],
   limit_orders: [
     { id: "intro", advance: { on: "next" } },
     { id: "goMarkets", target: "nav-markets", advance: { on: "route", path: MARKETS } },
@@ -74,3 +88,8 @@ export const TOURS: Readonly<Record<string, readonly TutorialStep[]>> = {
 };
 
 export type TourKey = keyof typeof TOURS;
+
+/** The next unlock tour that is due at this level and not seen yet (they run one after another). */
+export function nextUnlockTour(level: number, seen: readonly string[]): string | null {
+  return unlocksUpToLevel(level).find((u) => TOURS[u.key] && !seen.includes(u.key))?.key ?? null;
+}

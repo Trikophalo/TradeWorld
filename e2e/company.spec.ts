@@ -11,7 +11,21 @@ async function preparePlayer(page: Page) {
     window.sessionStorage.setItem("nexa-daily-reward-seen", new Date().toDateString());
     window.localStorage.setItem(
       "nexa-tutorial",
-      JSON.stringify({ demo: { status: "done", step: 0, seenTours: ["first_job", "limit_orders", "bonds"] } }),
+      JSON.stringify({
+        demo: {
+          status: "done",
+          step: 0,
+          seenTours: [
+            "first_job",
+            "limit_orders",
+            "bonds",
+            "found_garage",
+            "visit_skill_map",
+            "visit_company",
+            "visit_listing",
+          ],
+        },
+      }),
     );
     window.localStorage.setItem(
       "nexa-demo-player-v2",
@@ -112,4 +126,73 @@ test("company chat, then close the company voluntarily", async ({ page }) => {
   await hold(page, /Gedrückt halten zum Auflösen/);
   await expect(page.getByText("Firma aufgelöst")).toBeVisible();
   await expect(page.getByTestId("dissolution")).toContainText("Du hast Chatbude aufgelöst.");
+});
+
+test("draw a logo, keep a job as founder, go public", async ({ page }) => {
+  // Level 12 (IPO), 300.000 € to found, upgrade and run the company.
+  await page.addInitScript(() => {
+    if (window.sessionStorage.getItem("nexa-test-prepared")) return;
+    window.sessionStorage.setItem("nexa-test-prepared", "1");
+    window.sessionStorage.setItem("nexa-daily-reward-seen", new Date().toDateString());
+    window.localStorage.setItem(
+      "nexa-tutorial",
+      JSON.stringify({
+        demo: {
+          status: "done",
+          step: 0,
+          seenTours: [
+            "first_job",
+            "limit_orders",
+            "bonds",
+            "found_garage",
+            "visit_skill_map",
+            "visit_company",
+            "visit_listing",
+          ],
+        },
+      }),
+    );
+    window.localStorage.setItem(
+      "nexa-demo-player-v2",
+      JSON.stringify({
+        nickname: "Boersenstar",
+        cashCents: 30_000_000,
+        xpTotal: 80_000,
+        tutorialCompleted: true,
+        curveVersion: 2,
+      }),
+    );
+  });
+  await page.goto("/company");
+  await page.locator('[data-tier="small_business"]').getByRole("button", { name: "Gründen" }).click();
+  const sheet = page.getByRole("dialog", { name: "Firma gründen" });
+  await sheet.getByLabel("Firmenname").fill("Pixelwerft");
+  await sheet.getByLabel("Deine Idee in einem Satz").fill("Logos für alle Firmen der Welt.");
+  await expect(sheet.getByText("Name ist frei")).toBeVisible();
+  await hold(page, /Gedrückt halten zum Gründen/);
+  await expect(page.getByText("Firma gegründet!")).toBeVisible();
+
+  // Pixel editor: draw a line (mirrored) and save.
+  await page.getByTestId("logo-button").click();
+  const board = page.getByTestId("logo-board");
+  await expect(page.getByRole("dialog", { name: "Logo zeichnen" })).toBeVisible();
+  await page.waitForTimeout(900); // the panel slides in
+  const box = (await board.boundingBox())!;
+  const cell = box.width / 16;
+  await page.mouse.move(box.x + cell * 2.5, box.y + cell * 4.5);
+  await page.mouse.down();
+  for (let x = 3; x < 8; x++) await page.mouse.move(box.x + cell * (x + 0.5), box.y + cell * 4.5, { steps: 2 });
+  await page.mouse.up();
+  await page.getByRole("button", { name: "Logo speichern" }).click();
+  await expect(page.getByText("Logo gespeichert")).toBeVisible();
+
+  // Going public: 25 % of the company, the subscription ends with the demo quarter.
+  const listing = page.getByTestId("listing");
+  await listing.getByRole("button", { name: "Börsengang" }).click();
+  await page.getByRole("dialog", { name: "Börsengang" }).getByRole("button", { name: "Zeichnung starten" }).click();
+  await expect(page.getByText("Börsengang gestartet")).toBeVisible();
+  await expect(listing.getByText("Zeichnung des Börsengangs")).toBeVisible();
+  await page.getByTestId("company-header").getByText("Demo: Quartal jetzt abschließen").click();
+  await expect(listing.getByText(/An der Börse als PIX/)).toBeVisible();
+  await expect(page.getByTestId("company-header").getByText("AG")).toBeVisible();
 });
