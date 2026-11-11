@@ -726,6 +726,8 @@ export interface JobsConfig {
   readonly offerValidHours: number;
   /** AI companies publish this many postings per sector and tier at each quarter close. */
   readonly aiPostingsPerCompany: number;
+  /** Minimum branch score a posting asks for, by career tier (AI postings). */
+  readonly tierMinScore: Readonly<Record<string, number>>;
   /** Player employers: wages follow company results (profit factor). */
   readonly profitLinkedPay: {
     /** Lowest share of the contract salary paid when the company cannot cover it. */
@@ -1528,6 +1530,7 @@ export const BALANCE = {
     applicationMessageMaxLength: 140,
     offerValidHours: 48,
     aiPostingsPerCompany: 2,
+    tierMinScore: { intern: 0, junior: 2, senior: 6, team_lead: 12, c_level: 20 },
     profitLinkedPay: { minFactor: 0.5, bonusShareOfProfit: 0.2, maxBonusFactor: 1 },
     raiseRequest: { cooldownDays: 7, maxRaiseBpsPerScore: 300 },
   },
