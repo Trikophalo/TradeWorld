@@ -159,7 +159,7 @@ const POSTINGS: { posting: Omit<JobPosting, "maxSalaryCentsPerHour" | "matchScor
             minLevel: spec.minLevel,
             required: [...spec.required],
             salaryCentsPerHour: spec.salaryCentsPerHour,
-            slotsOpen: 99,
+            slotsOpen: jobs.aiSlotsOpen,
             postedAt: iso(Date.UTC(2026, 10, 1)),
             expiresAt: null,
           },

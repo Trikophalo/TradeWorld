@@ -364,7 +364,7 @@ gegen ein Gehalt. Beförderung und Verhandlung mit Zufallschance entfallen dafü
 - [x] Jobkarte mit Gehalt, Leistung (× KI-Kraft), bezahlten Stunden, Gehaltserhöhung und Kündigung
 - [x] Tägliche Belohnung als 7-Tage-Kalender, Profilbilder, Visitenkarte mit 3D-Effekt, öffentliche Spielerseite
 - [x] Oberfläche und Demo-Modus, Playwright `careers.spec.ts`
-- [ ] Datenbank: Tabellen, RPCs, Lohnlauf aus der Firmenkasse, Fixtures (in Arbeit)
+- [x] Datenbank: Tabellen, RPCs, Lohnlauf aus der Firmenkasse, Arbeitgeber-RPCs, Fixtures, Test 60
 - [ ] Arbeitgeber-Oberfläche für Spielerfirmen (mit M4)
 
 **Abhängigkeiten:** M2 (Level, XP, Missionen, Benachrichtigungen), M1 (Quartalsabschluss für die Gehaltsabrechnung).

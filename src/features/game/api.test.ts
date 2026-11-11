@@ -2,7 +2,6 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { RPC_SCHEMAS } from "./api";
-import { CAREER_RPC_SCHEMAS } from "./api-careers";
 
 /*
  * Contract test between database and frontend. The fixtures are real
@@ -24,9 +23,7 @@ function schemaFor(file: string) {
 
 describe("RPC contract", () => {
   it("has a fixture for every RPC the client calls", () => {
-    // M2b RPCs are written in parallel with the database; their fixtures follow (TODO: remove this filter).
-    const pending = fixtures.some((file) => file.startsWith("get_my_skills")) ? [] : Object.keys(CAREER_RPC_SCHEMAS);
-    for (const name of Object.keys(RPC_SCHEMAS).filter((key) => !pending.includes(key))) {
+    for (const name of Object.keys(RPC_SCHEMAS)) {
       expect(
         fixtures.some((file) => file.startsWith(name)),
         name,

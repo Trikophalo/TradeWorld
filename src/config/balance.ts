@@ -726,6 +726,8 @@ export interface JobsConfig {
   readonly offerValidHours: number;
   /** AI companies publish this many postings per sector and tier at each quarter close. */
   readonly aiPostingsPerCompany: number;
+  /** Open places shown for an AI posting (AI companies hire everyone). */
+  readonly aiSlotsOpen: number;
   /** Minimum branch score a posting asks for, by career tier (AI postings). */
   readonly tierMinScore: Readonly<Record<string, number>>;
   /**
@@ -1537,6 +1539,7 @@ export const BALANCE = {
     applicationMessageMaxLength: 140,
     offerValidHours: 48,
     aiPostingsPerCompany: 2,
+    aiSlotsOpen: 99,
     tierMinScore: { intern: 0, junior: 2, senior: 6, team_lead: 12, c_level: 20 },
     sectorBranches: {
       tech: ["it", "finance", "sales", "management"],
