@@ -1,0 +1,37 @@
+{
+  "learned": [
+    { "key": "it_basics", "learned_at": "2026-11-11T15:45:00.176295+00:00" },
+    { "key": "it_programming", "learned_at": "2026-11-11T15:45:00.184151+00:00" }
+  ],
+  "free_points": 3,
+  "branch_points": {
+    "it": 0,
+    "law": 0,
+    "craft": 0,
+    "sales": 0,
+    "finance": 0,
+    "science": 0,
+    "logistics": 0,
+    "management": 0
+  },
+  "branch_scores": {
+    "it": 3,
+    "law": 0,
+    "craft": 0,
+    "sales": 0,
+    "finance": 0,
+    "science": 0,
+    "logistics": 0,
+    "management": 0
+  },
+  "branch_progress": {
+    "it": 0.0,
+    "law": 0.0,
+    "craft": 0.0,
+    "sales": 0.0,
+    "finance": 0.0,
+    "science": 0.0,
+    "logistics": 0.0,
+    "management": 0.0
+  }
+}

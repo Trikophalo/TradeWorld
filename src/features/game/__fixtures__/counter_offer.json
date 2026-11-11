@@ -1,0 +1,25 @@
+{
+  "id": "2e71dbdb-5e9a-442e-bad8-50e7a1b8d128",
+  "status": "offered",
+  "message": null,
+  "posting": {
+    "id": "1525a022-27b1-467c-8091-23d97c90bd56",
+    "tier": "intern",
+    "title": null,
+    "company": {
+      "id": "2faf9e4c-3f0a-8a5b-1645-c669e9481771",
+      "name": "NeuroPharm AG",
+      "color": "#6EE7A0",
+      "is_ai": true,
+      "sector": "pharma",
+      "ticker": "NPH"
+    },
+    "required": [{ "branch": "sales", "min_score": 0 }],
+    "title_key": "sales_intern"
+  },
+  "created_at": "2026-11-11T15:45:00.234021+00:00",
+  "updated_at": "2026-11-11T15:45:00.242827+00:00",
+  "offer_expires_at": "2026-11-13T15:45:00.242827+00:00",
+  "salary_wish_cents_per_hour": 9500,
+  "offer_salary_cents_per_hour": 9500
+}

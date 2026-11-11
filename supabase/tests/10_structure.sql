@@ -58,7 +58,12 @@ select tests.assert(
            'get_security_details', 'place_order',
            -- M2 RPCs
            'change_nickname', 'check_nickname', 'claim_mission', 'daily_check_in', 'get_my_missions',
-           'get_rich_list', 'get_rich_list_news', 'track_event']
+           'get_rich_list', 'get_rich_list_news', 'track_event',
+           -- M2b RPCs
+           'apply_for_job', 'claim_daily_reward', 'close_job_posting', 'counter_offer', 'create_job_posting', 'fire_employee',
+           'get_company_applications', 'get_company_team', 'get_daily_reward', 'get_job_board', 'get_my_applications', 'get_my_job',
+           'get_my_skills', 'get_player_card', 'learn_skill', 'quit_job', 'request_raise', 'respond_application',
+           'respond_raise', 'set_avatar', 'sign_contract', 'withdraw_application']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')

@@ -140,8 +140,8 @@ run_assertions "$SCRIPT_DIR"/[5-9]*.sql
 
 if [[ -n "${NEXA_FIXTURE_DIR:-}" ]]; then
   echo "== RPC fixtures -> $NEXA_FIXTURE_DIR"
-  mkdir -p "$NEXA_FIXTURE_DIR"
-  chmod 777 "$NEXA_FIXTURE_DIR" 2>/dev/null || true
+  mkdir -p "$NEXA_FIXTURE_DIR" "$NEXA_FIXTURE_DIR/employer"
+  chmod 777 "$NEXA_FIXTURE_DIR" "$NEXA_FIXTURE_DIR/employer" 2>/dev/null || true
   "${PSQL[@]}" -v fixture_dir="$NEXA_FIXTURE_DIR" -f "$SCRIPT_DIR/fixtures.sql"
 fi
 

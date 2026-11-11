@@ -1,0 +1,18 @@
+{
+  "id": "df7d9865-ce1a-4c99-9c94-02d080a72514",
+  "tier": "intern",
+  "slots": 2,
+  "title": "Werkstudium Software",
+  "status": "open",
+  "company": {
+    "id": "f1f1f1f1-0000-4000-8000-0000000000c1",
+    "name": "Fixture Werkstatt GmbH",
+    "color": null,
+    "is_ai": false,
+    "sector": "tech",
+    "ticker": null
+  },
+  "required": [{ "branch": "it", "min_score": 1 }],
+  "title_key": null,
+  "salary_cents_per_hour": 18000
+}

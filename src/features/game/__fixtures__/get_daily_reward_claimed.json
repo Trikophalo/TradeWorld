@@ -1,0 +1,16 @@
+{
+  "day": 2,
+  "cycle": [
+    { "xp": 50, "day": 1, "cash_cents": 10000, "xp_awarded": 100, "skill_points": 0 },
+    { "xp": 75, "day": 2, "cash_cents": 20000, "xp_awarded": 150, "skill_points": 0 },
+    { "xp": 100, "day": 3, "cash_cents": 30000, "xp_awarded": 200, "skill_points": 0 },
+    { "xp": 125, "day": 4, "cash_cents": 0, "xp_awarded": 250, "skill_points": 1 },
+    { "xp": 150, "day": 5, "cash_cents": 50000, "xp_awarded": 300, "skill_points": 0 },
+    { "xp": 200, "day": 6, "cash_cents": 75000, "xp_awarded": 400, "skill_points": 0 },
+    { "xp": 300, "day": 7, "cash_cents": 100000, "xp_awarded": 600, "skill_points": 1 }
+  ],
+  "claimable": false,
+  "streak_days": 1,
+  "freezes_left": 1,
+  "next_reset_at": "2026-11-11T23:00:00+00:00"
+}
