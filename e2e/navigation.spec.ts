@@ -1,18 +1,20 @@
 import { expect, test } from "@playwright/test";
 
-// Every tab is visible from the start; the company tab carries a lock until level 10.
+// Every tab is visible from the start; the company lives under Karriere.
 const TABS = [
   { name: "Portfolio", path: "/portfolio", heading: "Portfolio" },
   { name: "Märkte", path: "/markets", heading: "Märkte" },
-  { name: /Firma/, path: "/company", heading: "Unternehmen" },
+  { name: /Karriere/, path: "/career", heading: "Karriere" },
   { name: "Profil", path: "/profile", heading: "Profil" },
 ];
 
 // These tests look at the game after the first session: mark the tutorial as done.
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() =>
-    window.localStorage.setItem("nexa-tutorial", JSON.stringify({ demo: { status: "done", step: 0 } })),
-  );
+  await page.addInitScript(() => {
+    window.localStorage.setItem("nexa-tutorial", JSON.stringify({ demo: { status: "done", step: 0 } }));
+    // The daily reward popup is covered in careers.spec.ts.
+    window.sessionStorage.setItem("nexa-daily-reward-seen", new Date().toDateString());
+  });
 });
 
 test("the five tabs navigate without horizontal overflow or console errors", async ({ page }) => {

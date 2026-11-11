@@ -14,7 +14,7 @@ test("a new player is guided through the first session and cannot skip it", asyn
 
   // A beginner sees a calm start page; later features are there, but locked.
   const nav = page.getByRole("navigation", { name: "Hauptnavigation" }).filter({ visible: true });
-  await expect(nav.getByRole("link", { name: /Firma/ })).toBeVisible();
+  await expect(nav.getByRole("link", { name: /Karriere/ })).toBeVisible();
   // Missions are there from the start.
   await expect(page.getByRole("heading", { name: "Missionen" })).toBeVisible();
 

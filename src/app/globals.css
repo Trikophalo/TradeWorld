@@ -380,3 +380,19 @@
 :root[data-motion="reduced"]::view-transition-new(*) {
   animation: none !important;
 }
+
+/* Digital business card (src/features/career/components/business-card.tsx) */
+@utility bg-card-face {
+  background-image: linear-gradient(
+    135deg,
+    var(--bg-2),
+    var(--bg-1) 55%,
+    color-mix(in srgb, var(--accent) 12%, var(--bg-1))
+  );
+}
+
+@utility bg-card-pattern {
+  background-image: radial-gradient(var(--line-2) 1px, transparent 1.2px);
+  background-size: 6px 6px;
+  mask-image: linear-gradient(to left, black, transparent 65%);
+}

@@ -3,7 +3,7 @@ import type { UiIconName } from "@/components/pixel/art";
 export interface NavItem {
   href: string;
   /** Key in messages/*.json under "nav". */
-  key: "home" | "portfolio" | "markets" | "company" | "profile";
+  key: "home" | "portfolio" | "markets" | "career" | "profile";
   icon: UiIconName;
   /** Unlock key (BALANCE.progression.unlocks). The tab is always visible, with a lock until then. */
   unlock?: string;
@@ -14,7 +14,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { href: "/", key: "home", icon: "home" },
   { href: "/portfolio", key: "portfolio", icon: "portfolio" },
   { href: "/markets", key: "markets", icon: "markets" },
-  { href: "/company", key: "company", icon: "company", unlock: "found_small_business" },
+  { href: "/career", key: "career", icon: "briefcase" },
   { href: "/profile", key: "profile", icon: "profile" },
 ];
 

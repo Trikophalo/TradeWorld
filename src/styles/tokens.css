@@ -110,6 +110,9 @@
   --accent-strong: #6a54f0;
   --accent-soft: rgb(143 123 255 / 0.16);
   --on-accent: #ffffff;
+
+  /* Business card light reflex */
+  --card-glare: rgb(255 255 255 / 0.1);
 }
 
 /* ------------------------------------------------------------------ */
@@ -151,6 +154,8 @@
   --accent-strong: #4a35d1;
   --accent-soft: rgb(91 69 230 / 0.1);
   --on-accent: #ffffff;
+
+  --card-glare: rgb(255 255 255 / 0.6);
 }
 
 /* ------------------------------------------------------------------ */
