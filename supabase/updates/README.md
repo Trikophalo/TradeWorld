@@ -19,3 +19,9 @@ eine eigene Transaktion):
 - **Bestehendes Projekt aktualisieren:** `update-01.sql`, `update-02.sql`, … der Reihe nach ausführen. Der letzte Teil
   schreibt die aktuelle Spielkonfiguration. Alle Teile dürfen beliebig oft laufen.
 - **Neues, leeres Projekt:** `setup-01.sql`, `setup-02.sql`, … der Reihe nach ausführen.
+
+## Automatisch per GitHub Action
+
+`.github/workflows/supabase-update.yml` prüft jeden Push mit Datenbank-Änderungen gegen eine lokale Datenbank und
+spielt danach `update-to-latest.sql` auf Supabase ein (ADR-077). Einmalig nötig: das Repository-Secret
+`SUPABASE_DB_URL` (in Supabase „Connect“ → „Session pooler“, Passwort eingesetzt).

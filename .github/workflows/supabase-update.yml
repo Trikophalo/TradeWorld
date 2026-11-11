@@ -1,0 +1,57 @@
+# Brings the Supabase database up to date automatically (ADR-077).
+# On every push that touches the database, the schema is first verified on a
+# throwaway local Postgres (supabase/tests/verify_local.sh). Only if that passes,
+# supabase/update-to-latest.sql is applied to the real database. The file is
+# idempotent, so running it again never hurts.
+#
+# One-time setup: repository secret SUPABASE_DB_URL with the "Session pooler"
+# connection string from Supabase (Connect button), password filled in.
+# Without the secret the workflow only verifies and skips the update.
+name: Supabase-Datenbank aktualisieren
+
+on:
+  push:
+    branches: [main, "claude/new-session-mo9j2u"]
+    paths:
+      - "supabase/**"
+      - "src/config/balance.ts"
+      - ".github/workflows/supabase-update.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: supabase-update
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: PostgreSQL 16 for the local check
+        run: |
+          if [ ! -x /usr/lib/postgresql/16/bin/initdb ]; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-16
+          fi
+
+      - name: Verify schema, RLS and seeds on a throwaway database
+        run: bash supabase/tests/verify_local.sh
+
+      - name: Verify the update on an older database
+        run: NEXA_MIGRATIONS_UPTO=20261113000400 NEXA_PG_PORT=54330 bash supabase/tests/verify_local.sh
+
+      - name: Apply update-to-latest.sql to Supabase
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::warning::Secret SUPABASE_DB_URL fehlt – geprüft, aber nichts eingespielt."
+            exit 0
+          fi
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -1 -q -f supabase/update-to-latest.sql
+          echo "Datenbank ist auf dem neuesten Stand."

@@ -753,3 +753,15 @@ steigenden Kosten und sinkendem Ertrag. Ziel des Spielers ist das größte Unter
   Farbe und in der ganzen Zeichnung, gespiegelt, gedreht und 1- bis 3-fach skaliert, mit einem Fehlpixel Toleranz.
   - Der Editor sperrt das Speichern, der Server lehnt mit `logo_forbidden` ab.
   - Meldungen bleiben die zweite Verteidigungslinie für alles, was ein Muster nicht erkennt.
+
+## ADR-077: Datenbank-Updates automatisch per GitHub Action — `akzeptiert`
+
+Das Kopieren in den SQL Editor war mühsam. Die Action `.github/workflows/supabase-update.yml` läuft bei jedem Push mit
+Datenbank-Änderungen:
+
+1. Sie prüft das Schema auf einer frischen, lokalen Postgres-Datenbank (`verify_local.sh`, auch im Modus „ältere
+   Datenbank“).
+2. Nur wenn alles grün ist, spielt sie `update-to-latest.sql` auf Supabase ein. Die Datei ist idempotent.
+
+Zugang über das Repository-Secret `SUPABASE_DB_URL` (Session-Pooler-Verbindung), das nur der Besitzer in GitHub
+einträgt. Ohne Secret wird nur geprüft. Die Teile unter `supabase/sql-editor/` bleiben als Weg von Hand.
