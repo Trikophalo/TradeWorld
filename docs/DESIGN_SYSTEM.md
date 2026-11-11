@@ -190,8 +190,16 @@ Ein Test (`art.test.ts`) prüft bei jedem Motiv Rastergröße, Zeilenlängen, Pa
 (Volta Energie, Brotzeit Handel, KlarSoft), Münze, Stier, Bär, 8 Interface-Icons (5 Tabs, Schloss, Suche, Glocke).
 Firmen ohne gezeichnetes Logo zeigen eine Kachel in Firmenfarbe mit Kürzel.
 
-**Offen für später:** die übrigen 12 Firmenlogos (M1), Abzeichen für Erfolge (M2), Avatar-Teile und
-Statussymbole (M8), Logo-Editor für Spielerfirmen (M4, speichert dasselbe Rasterformat).
+**Profilbilder (ADR-054):** 20 Porträts in [`avatars.ts`](../src/components/pixel/avatars.ts), 16×16 auf einer
+farbigen Kachel, zusammengesetzt aus Kopf, Kleidung, Frisur und Accessoire. Ausnahme von der Farbregel: bis zu
+10 Farben, weil Haut, Haare und Kleidung je eigene brauchen. Komponente `Avatar` (Größen 32 bis 128 px, nur
+ganzzahlig). Neue Icons: Flamme, Geschenk, Aktenkoffer, Stern, Karte.
+
+**Visitenkarte:** `BusinessCard` kippt bis 7° zum Zeiger (Feder aus Motion) mit Lichtreflex (`--card-glare`);
+bei reduzierter Bewegung bleibt sie flach. Fläche `bg-card-face`, Punktmuster `bg-card-pattern`.
+
+**Offen für später:** die übrigen 12 Firmenlogos (M1), Abzeichen für Erfolge (M2), Statussymbole (M8),
+Logo-Editor für Spielerfirmen (M4, speichert dasselbe Rasterformat).
 
 ### Maskottchen Finn
 

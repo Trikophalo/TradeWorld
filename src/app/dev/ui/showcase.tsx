@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useRef, useState, type ReactNode } from "react";
 import { ALL_PIXEL_ART, BEAR, BULL, COIN } from "@/components/pixel/art";
+import { AVATAR_ART } from "@/components/pixel/avatars";
 import { Mascot } from "@/components/pixel/mascot";
+import { Avatar } from "@/components/ui/avatar";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Badge } from "@/components/ui/badge";
 import { Button, type ButtonState } from "@/components/ui/button";
@@ -23,6 +25,9 @@ import { Sheet } from "@/components/ui/sheet";
 import { Skeleton, SkeletonRow } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/toast";
+import { BusinessCard } from "@/features/career/components/business-card";
+import { SignaturePad } from "@/features/career/components/signature-pad";
+import type { PlayerCard } from "@/features/game/types";
 import { SpeechBubble } from "@/features/tutorial/components/speech-bubble";
 import { useTutorial } from "@/features/tutorial/store";
 import { resetDemoPlayer } from "@/features/game/demo-engine";
@@ -41,6 +46,27 @@ const COLOR_GROUPS = [
   { title: "Akzent", tokens: ["accent", "accent-strong", "accent-soft"] },
   { title: "Semantik", tokens: ["gain", "loss", "warn", "info", "gold"] },
 ] as const;
+
+const SAMPLE_CARD: PlayerCard = {
+  nickname: "Boersenfuchs_7",
+  avatarKey: "analyst",
+  level: 23,
+  rank: 42,
+  netWorthCents: 18_450_000_00,
+  streakDays: 12,
+  skillsLearned: 14,
+  branchScores: { it: 12, finance: 9, law: 0, craft: 0, sales: 4, management: 3, science: 0, logistics: 0 },
+  topSkills: [{ key: "it_cloud", tier: 4 }],
+  job: {
+    companyName: "KlarSoft AG",
+    titleKey: "it_team_lead",
+    title: null,
+    tier: "team_lead",
+    since: "2026-10-01T00:00:00Z",
+  },
+  company: null,
+  memberSince: "2026-09-01T00:00:00Z",
+};
 
 const money = (value: number) => formatMoney(Math.round(value));
 const price = (value: number) => formatPrice(Math.round(value));
@@ -532,6 +558,18 @@ export function Showcase() {
               </>
             }
           />
+        </Card>
+      </Section>
+
+      <Section id="career" title={t("career")} className="grid gap-4 lg:grid-cols-2">
+        <Demo label="Profilbilder (16×16, ganzzahlig skaliert)" className="flex-wrap justify-start gap-2">
+          {Object.keys(AVATAR_ART).map((key) => (
+            <Avatar key={key} avatarKey={key} size="sm" title={key} />
+          ))}
+        </Demo>
+        <BusinessCard card={SAMPLE_CARD} />
+        <Card padding="lg">
+          <SignaturePad onChange={() => undefined} />
         </Card>
       </Section>
 

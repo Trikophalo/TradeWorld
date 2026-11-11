@@ -353,6 +353,20 @@ Admin-Schalter für einen XP-Multiplikator während der Alpha.
 **Ziel:** Spieler haben neben dem Handel ein wachsendes Einkommen aus Jobs bei KI-Firmen, mit kurzen
 Arbeitsaufgaben, Beförderungen und einer wöchentlichen Gehaltsverhandlung.
 
+**Neu nach Vorgabe des Auftraggebers (ADR-050 bis ADR-054, `JOBS_AND_SKILLS.md`):** Skill-Baum statt reiner
+Erfahrung, Jobportal mit Bewerbung, Gegenangebot und Unterschrift, Gehaltserhöhung nach Skill-Zuwachs, Kündigung
+gegen ein Gehalt. Beförderung und Verhandlung mit Zufallschance entfallen dafür.
+
+- [x] Skill-Baum: 8 Bereiche, 86 Skills, unumkehrbar, Punkte aus Level-ups, Missionen, Belohnung und Arbeit
+- [x] Jobportal mit KI-Stellen (2 je Firma, Stufen und Mindest-Skills), Bewerbung mit Gehaltswunsch und Satz
+- [x] KI-Firmen nehmen sofort an, zahlen gedeckelt; Nachverhandeln, Ablehnen, Zurückziehen
+- [x] Arbeitsvertrag mit symbolischer Unterschrift, danach enden alle anderen Bewerbungen
+- [x] Jobkarte mit Gehalt, Leistung (× KI-Kraft), bezahlten Stunden, Gehaltserhöhung und Kündigung
+- [x] Tägliche Belohnung als 7-Tage-Kalender, Profilbilder, Visitenkarte mit 3D-Effekt, öffentliche Spielerseite
+- [x] Oberfläche und Demo-Modus, Playwright `careers.spec.ts`
+- [ ] Datenbank: Tabellen, RPCs, Lohnlauf aus der Firmenkasse, Fixtures (in Arbeit)
+- [ ] Arbeitgeber-Oberfläche für Spielerfirmen (mit M4)
+
 **Abhängigkeiten:** M2 (Level, XP, Missionen, Benachrichtigungen), M1 (Quartalsabschluss für die Gehaltsabrechnung).
 
 **Vor dem Start zu entscheiden:** Fragen 1, 21.
