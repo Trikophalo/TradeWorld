@@ -79,6 +79,9 @@ Vor jedem Commit müssen `pnpm typecheck`, `pnpm lint` und `pnpm test` grün sei
 - RLS auf **jeder** Tabelle. Funktionen mit `SECURITY DEFINER` setzen `search_path = ''`.
 - Schema ändern heißt: neue Migration in `supabase/migrations`, nie eine alte umschreiben.
   Danach `verify_local.sh` laufen lassen und `docs/DATA_MODEL.md` nachziehen.
+- Zu jeder neuen Migration gehört eine idempotente Kopie in `supabase/updates/` (siehe dortige README).
+  Danach `bash scripts/build-setup-sql.sh`: Das erzeugt `setup-all.sql` (neues Projekt) und
+  `update-to-latest.sql` (bestehendes Projekt, beliebig oft ausführbar) für den Supabase SQL Editor.
 
 ### Oberfläche
 

@@ -94,6 +94,11 @@ echo "== supabase stub"
 echo "== migrations"
 shopt -s nullglob
 for f in "$SUPABASE_DIR"/migrations/*.sql; do
+  # NEXA_MIGRATIONS_UPTO=<timestamp> simulates an older database (tests the update file)
+  if [[ -n "${NEXA_MIGRATIONS_UPTO:-}" && "$(basename "$f")" > "${NEXA_MIGRATIONS_UPTO}~" ]]; then
+    echo "   $(basename "$f") (skipped: older database)"
+    continue
+  fi
   echo "   $(basename "$f")"
   # default: one transaction per migration file; NEXA_SINGLE_TX=0 runs
   # statement by statement (autocommit) to prove the files work either way
@@ -122,3 +127,11 @@ if [ -f "$SUPABASE_DIR/seeds/game_config.sql" ]; then
   "${PSQL[@]}" -1 -f "$SUPABASE_DIR/seeds/game_config.sql"
   "${PSQL[@]}" -tAc "select 'config sections: ' || count(*) || ', starting capital: ' || public.config_bigint('economy', '{startingCapitalCents}', -1) from public.game_config"
 fi
+
+# Runs last: the assertions above insert their own game_config rows.
+echo "== update-to-latest.sql (twice: must be idempotent)"
+"${PSQL[@]}" -1 -f "$SUPABASE_DIR/update-to-latest.sql"
+"${PSQL[@]}" -1 -f "$SUPABASE_DIR/update-to-latest.sql"
+"${PSQL[@]}" -tAc "select 'migration 1700 columns: ' || count(*) from information_schema.columns where table_name = 'company_quarter_reports' and column_name in ('market_segment','segment_demand_cents','uncovered_quarters','grace_quarters_left')"
+"${PSQL[@]}" -tAc "select 'tutorial xp: ' || coalesce(value #>> '{xpSources,tutorial,xp}', 'MISSING') from public.game_config where key = 'progression'"
+
