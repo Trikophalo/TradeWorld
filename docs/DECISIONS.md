@@ -410,3 +410,58 @@ Limit-Orders (Level 3) und Anleihen (Level 5) gehören zu M1. Damit sie erreichb
 Erfahrungspunkte für Trades (10 XP × Alpha-Faktor, höchstens 30 Trades pro Tag, Mindestwert 100 €, keine XP für
 Rückkäufe innerhalb von 10 Minuten) und für das Tutorial, und er prüft die Freischaltungen selbst. Missionen, Login-
 Bonus und Erfolge folgen in M2.
+
+## ADR-039: Endlose Level — `akzeptiert`
+
+Vorgabe: Das Spiel darf nicht „durchgespielt“ werden können. Es gibt kein Maximallevel mehr
+(`progression.maxLevel` = 10.000 ist nur eine technische Obergrenze). Funktionen schalten bis Level 50 frei, danach
+bringt jedes zehnte Level einen Prestige-Titel. Das eigentliche Ziel ist Vermögen (ADR-042). Details: `ECONOMY.md` §7.
+
+## ADR-040: Bruchstücke von Aktien — `akzeptiert` (ersetzt ADR-036)
+
+Vorgabe: Man soll auch „ungerade“ Stückzahlen kaufen können. Stückzahlen von Spielerpositionen, Orders und Trades
+werden in Millionstel gespeichert (`*_e6`, `trading.quantityScale`). Beim Kauf per Betrag investiert der Server genau
+den Betrag (inklusive Gebühr) zum tatsächlichen Ausführungskurs; beim Verkauf per Betrag verkauft er so viele
+Bruchstücke, dass der Betrag zusammenkommt. Mindestorder 1 € (`trading.minOrderValueCents`). Die Aktienzahl einer
+Firma (`shares_outstanding`) bleibt ganzzahlig.
+
+## ADR-041: Geschlossener Geldkreislauf — `akzeptiert`
+
+Vorgabe: Keine Inflation; Geld kommt nur, wenn es woanders geht. Die gesamte Geldmenge (10 Mrd. €) entsteht einmalig
+und verteilt sich auf Staatskasse, Finanzmarkt, KI-Tycoons und Haushalte. Danach gibt es keine Geldschöpfung mehr:
+Startkapital, Grundeinkommen und Anleihezinsen zahlt die Staatskasse, Steuern und Gebühren fließen dorthin zurück,
+Trading-Gewinne kommen aus dem Finanzmarkt-Topf. Das Grundeinkommen sinkt, wenn die Staatskasse leer wird.
+Ein Test prüft, dass die Summe aller Konten konstant bleibt. Ersetzt die Geldschöpfung über das Konto `mint`
+(ADR-007, ADR-019). Details: `ECONOMY.md` §2.
+
+## ADR-042: Vermögen ist der Punktestand, öffentliche Reichenliste — `akzeptiert`
+
+Vorgabe: Es geht darum, der reichste Mensch zu sein. Eine Live-Reichenliste (Forbes-ähnlich, aber eigener Name und
+Look) zeigt alle Spieler mit Spielernamen und 120 erfundene KI-Tycoons (15.000 € bis 400 Mio. €), deren Vermögen in
+Aktien der KI-Firmen steckt. Rangwechsel erzeugen Nachrichten. Nettovermögen = Bargeld + Wertpapiere zum
+Verkaufskurs + Firmenanteile + Statussymbole − Schulden. Details: `ECONOMY.md` §3 und §4.
+
+## ADR-043: Spielername, Änderung alle 60 Tage, Namensfilter — `akzeptiert`
+
+Vorgabe: Der Anmeldename wird überall angezeigt und ist alle 60 Tage änderbar. Schimpfwörter und verbotene Namen sind
+weder für Spieler noch für Firmen möglich. Ein serverseitiger Filter mit Normalisierung (Leetspeak, Sonderzeichen,
+Wiederholungen) und Ausnahmen gegen Fehlalarme prüft beim Speichern; eine Vorabprüfung gibt schon beim Tippen
+Rückmeldung. Details: `ECONOMY.md` §9.
+
+## ADR-044: Garagen-Startups mit Potenzgesetz — `Konzept` (Umsetzung M4)
+
+Vorgabe: Schon am Anfang soll eine gute Idee zu einer Firma werden können, die etwa einer von tausend zum Big Player
+skaliert. Konzept: Garagen-Startup ab Level 3 für 2.500 €, Nischen mit verborgenem, Pareto-verteiltem Potenzial,
+S-Kurven-Wachstum, Finanzierungsrunden mit Verwässerung. Zielquoten als Szenario-Tests. Details: `ECONOMY.md` §6.
+
+## ADR-045: Firmen als Clans mit Chat, Mitgliedschaft in genau einer Firma — `Konzept` (Umsetzung M4/M5)
+
+Vorgabe: Eine Firma ist eine Art Clan mit Firmenchat; man arbeitet in höchstens einer Firma gleichzeitig. Ersetzt
+„eigene Firma plus eine Nebenrolle“ (spec 7.2). Beteiligungen an mehreren Firmen bleiben erlaubt; die Holding ab
+Level 40 bedeutet Besitz mehrerer Firmen, nicht Mitarbeit. Details: `ECONOMY.md` §8.
+
+## ADR-046: Mini-Tutorials bei Freischaltungen — `akzeptiert`
+
+Vorgabe: Wenn ein Level-up etwas Wichtiges freischaltet, erklärt Finn es in einem kurzen, interaktiven Tutorial
+direkt nach dem Level-up-Fenster. Die Touren stehen als Daten in `src/features/tutorial/tours.ts`; jede Tour läuft
+genau einmal pro Spieler.
