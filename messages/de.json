@@ -613,5 +613,387 @@
     "savedText": "Du heißt jetzt {name}.",
     "failed": "Name nicht geändert",
     "locked": "Die nächste Änderung ist ab dem {date} möglich."
+  },
+  "skills": {
+    "branches": {
+      "it": {
+        "name": "IT & Software",
+        "desc": "Programmieren, Daten, Sicherheit und KI."
+      },
+      "finance": {
+        "name": "Finanzen",
+        "desc": "Zahlen, Bilanzen, Investments und Risiko."
+      },
+      "law": {
+        "name": "Recht",
+        "desc": "Verträge, Gesellschaften, Steuern und Compliance."
+      },
+      "craft": {
+        "name": "Handwerk & Technik",
+        "desc": "Mechanik, Elektrotechnik, Bau und Fertigung."
+      },
+      "sales": {
+        "name": "Vertrieb & Marketing",
+        "desc": "Verkaufen, verhandeln, Marken aufbauen."
+      },
+      "management": {
+        "name": "Führung & Management",
+        "desc": "Teams, Projekte, Personal und Strategie."
+      },
+      "science": {
+        "name": "Wissenschaft & Gesundheit",
+        "desc": "Chemie, Biologie, Medizin und Forschung."
+      },
+      "logistics": {
+        "name": "Logistik & Betrieb",
+        "desc": "Lager, Transport, Einkauf und Qualität."
+      }
+    },
+    "nodes": {
+      "it_basics": {
+        "name": "IT-Grundlagen",
+        "desc": "Rechner, Netze und die erste Zeile Code."
+      },
+      "it_programming": {
+        "name": "Programmierung",
+        "desc": "Software schreiben, die läuft."
+      },
+      "it_networks": {
+        "name": "Netzwerke",
+        "desc": "Server und Verbindungen am Laufen halten."
+      },
+      "it_data": {
+        "name": "Datenanalyse",
+        "desc": "Aus Zahlen Erkenntnisse ziehen."
+      },
+      "it_architecture": {
+        "name": "Softwarearchitektur",
+        "desc": "Große Systeme sauber planen."
+      },
+      "it_security": {
+        "name": "IT-Sicherheit",
+        "desc": "Angriffe erkennen und abwehren."
+      },
+      "it_ml": {
+        "name": "Machine Learning",
+        "desc": "Modelle trainieren, die Muster finden."
+      },
+      "it_cloud": {
+        "name": "Cloud-Systeme",
+        "desc": "Dienste, die mit der Nachfrage wachsen."
+      },
+      "it_ai": {
+        "name": "Künstliche Intelligenz",
+        "desc": "Systeme, die selbst Entscheidungen vorbereiten."
+      },
+      "it_mastery": {
+        "name": "Tech-Visionär:in",
+        "desc": "Du baust, was andere erst in Jahren verstehen."
+      },
+      "finance_basics": {
+        "name": "Finanz-Grundlagen",
+        "desc": "Einnahmen, Ausgaben, Zinsen."
+      },
+      "finance_accounting": {
+        "name": "Buchhaltung",
+        "desc": "Jeder Euro an seinem Platz."
+      },
+      "finance_investment": {
+        "name": "Investment",
+        "desc": "Geld anlegen mit Plan."
+      },
+      "finance_controlling": {
+        "name": "Controlling",
+        "desc": "Kosten im Griff, Ziele im Blick."
+      },
+      "finance_balance": {
+        "name": "Bilanzierung",
+        "desc": "Abschlüsse, die jede Prüfung bestehen."
+      },
+      "finance_portfolio": {
+        "name": "Portfoliomanagement",
+        "desc": "Risiko streuen, Rendite steigern."
+      },
+      "finance_valuation": {
+        "name": "Unternehmensbewertung",
+        "desc": "Was ist eine Firma wirklich wert?"
+      },
+      "finance_corporate": {
+        "name": "Corporate Finance",
+        "desc": "Kapital beschaffen, Wachstum finanzieren."
+      },
+      "finance_risk": {
+        "name": "Risikomanagement",
+        "desc": "Krisen kommen, du bist vorbereitet."
+      },
+      "finance_mastery": {
+        "name": "Finanzvirtuos:in",
+        "desc": "Geld arbeitet für dich, nicht umgekehrt."
+      },
+      "law_basics": {
+        "name": "Rechts-Grundlagen",
+        "desc": "Wie Gesetze und Gerichte funktionieren."
+      },
+      "law_contracts": {
+        "name": "Vertragsrecht",
+        "desc": "Verträge lesen, schreiben, verhandeln."
+      },
+      "law_labor": {
+        "name": "Arbeitsrecht",
+        "desc": "Einstellen, kündigen, fair bleiben."
+      },
+      "law_tax": {
+        "name": "Steuerrecht",
+        "desc": "Abgaben verstehen und richtig planen."
+      },
+      "law_corporate": {
+        "name": "Gesellschaftsrecht",
+        "desc": "GmbH, AG und alles dazwischen."
+      },
+      "law_compliance": {
+        "name": "Compliance",
+        "desc": "Regeln einhalten, bevor es teuer wird."
+      },
+      "law_intltax": {
+        "name": "Internationales Steuerrecht",
+        "desc": "Steuern über Grenzen hinweg."
+      },
+      "law_capital": {
+        "name": "Kapitalmarktrecht",
+        "desc": "Börsengänge und Prospekte rechtssicher."
+      },
+      "law_crime": {
+        "name": "Wirtschaftsstrafrecht",
+        "desc": "Wo die Grauzone endet."
+      },
+      "law_mastery": {
+        "name": "Star-Anwält:in",
+        "desc": "Kein Fall ist zu groß."
+      },
+      "craft_basics": {
+        "name": "Handwerkliche Grundlagen",
+        "desc": "Werkzeug, Material, Sicherheit."
+      },
+      "craft_mechanics": {
+        "name": "Mechanik",
+        "desc": "Was sich bewegt, verstehst du."
+      },
+      "craft_electrical": {
+        "name": "Elektrotechnik",
+        "desc": "Strom, Schaltungen, Anlagen."
+      },
+      "craft_construction": {
+        "name": "Bau",
+        "desc": "Fundamente, Wände, Dächer."
+      },
+      "craft_engineering": {
+        "name": "Maschinenbau",
+        "desc": "Maschinen entwerfen und verbessern."
+      },
+      "craft_automation": {
+        "name": "Automatisierung",
+        "desc": "Anlagen, die von selbst laufen."
+      },
+      "craft_site": {
+        "name": "Bauleitung",
+        "desc": "Baustellen pünktlich und im Budget."
+      },
+      "craft_manufacturing": {
+        "name": "Fertigungstechnik",
+        "desc": "Produktion schneller und günstiger."
+      },
+      "craft_energy": {
+        "name": "Energietechnik",
+        "desc": "Kraftwerke, Netze, Speicher."
+      },
+      "craft_mastery": {
+        "name": "Meister:in",
+        "desc": "Was du anfasst, funktioniert."
+      },
+      "sales_basics": {
+        "name": "Vertriebs-Grundlagen",
+        "desc": "Kunden verstehen, Angebote machen."
+      },
+      "sales_selling": {
+        "name": "Verkauf",
+        "desc": "Abschlüsse statt Ausreden."
+      },
+      "sales_marketing": {
+        "name": "Marketing",
+        "desc": "Aufmerksamkeit gewinnen."
+      },
+      "sales_service": {
+        "name": "Kundenservice",
+        "desc": "Aus Kunden werden Stammkunden."
+      },
+      "sales_negotiation": {
+        "name": "Verhandlung",
+        "desc": "Der bessere Preis auf beiden Seiten."
+      },
+      "sales_brand": {
+        "name": "Markenführung",
+        "desc": "Eine Marke, die man wiedererkennt."
+      },
+      "sales_keyaccount": {
+        "name": "Key-Account",
+        "desc": "Die großen Kunden betreuen."
+      },
+      "sales_international": {
+        "name": "Internationaler Vertrieb",
+        "desc": "Neue Märkte erobern."
+      },
+      "sales_growth": {
+        "name": "Growth Hacking",
+        "desc": "Wachstum mit kleinem Budget."
+      },
+      "sales_mastery": {
+        "name": "Verkaufslegende",
+        "desc": "Du verkaufst Sand in der Wüste."
+      },
+      "management_basics": {
+        "name": "Führungs-Grundlagen",
+        "desc": "Ziele setzen, Aufgaben verteilen."
+      },
+      "management_team": {
+        "name": "Teamführung",
+        "desc": "Menschen motivieren."
+      },
+      "management_projects": {
+        "name": "Projektmanagement",
+        "desc": "Termine halten, Budgets einhalten."
+      },
+      "management_people": {
+        "name": "Personal",
+        "desc": "Die richtigen Leute finden."
+      },
+      "management_change": {
+        "name": "Change Management",
+        "desc": "Veränderung, ohne dass alle kündigen."
+      },
+      "management_agile": {
+        "name": "Agiles Arbeiten",
+        "desc": "Schnell lernen, schnell liefern."
+      },
+      "management_recruiting": {
+        "name": "Recruiting",
+        "desc": "Talente erkennen, bevor andere es tun."
+      },
+      "management_strategy": {
+        "name": "Strategie",
+        "desc": "Wohin die Firma in fünf Jahren will."
+      },
+      "management_organization": {
+        "name": "Organisationsentwicklung",
+        "desc": "Strukturen, die mitwachsen."
+      },
+      "management_mastery": {
+        "name": "Visionär:in",
+        "desc": "Andere folgen dir, weil sie wollen."
+      },
+      "science_basics": {
+        "name": "Naturwissenschaftliche Grundlagen",
+        "desc": "Experimente, Daten, Methoden."
+      },
+      "science_chemistry": {
+        "name": "Chemie",
+        "desc": "Stoffe und Reaktionen."
+      },
+      "science_biology": {
+        "name": "Biologie",
+        "desc": "Zellen, Organismen, Leben."
+      },
+      "science_medicine": {
+        "name": "Medizin",
+        "desc": "Diagnosen und Behandlungen."
+      },
+      "science_pharmacology": {
+        "name": "Pharmakologie",
+        "desc": "Wie Wirkstoffe im Körper wirken."
+      },
+      "science_biotech": {
+        "name": "Biotechnologie",
+        "desc": "Lebende Systeme als Fabrik."
+      },
+      "science_clinical": {
+        "name": "Klinische Forschung",
+        "desc": "Studien planen und auswerten."
+      },
+      "science_drugs": {
+        "name": "Wirkstoffentwicklung",
+        "desc": "Vom Molekül zum Medikament."
+      },
+      "science_genetics": {
+        "name": "Gentechnik",
+        "desc": "Erbgut lesen und verändern."
+      },
+      "science_mastery": {
+        "name": "Forschungsgenie",
+        "desc": "Durchbrüche sind dein Alltag."
+      },
+      "logistics_basics": {
+        "name": "Logistik-Grundlagen",
+        "desc": "Waren, Wege, Zeiten."
+      },
+      "logistics_warehouse": {
+        "name": "Lagerwirtschaft",
+        "desc": "Alles da, wenn es gebraucht wird."
+      },
+      "logistics_transport": {
+        "name": "Transport",
+        "desc": "Lkw, Schiff, Flugzeug."
+      },
+      "logistics_purchasing": {
+        "name": "Einkauf",
+        "desc": "Gute Ware zu guten Preisen."
+      },
+      "logistics_supplychain": {
+        "name": "Supply Chain",
+        "desc": "Lieferketten, die nicht reißen."
+      },
+      "logistics_fleet": {
+        "name": "Flottenmanagement",
+        "desc": "Fahrzeuge optimal einsetzen."
+      },
+      "logistics_strategic": {
+        "name": "Strategischer Einkauf",
+        "desc": "Lieferanten als Partner."
+      },
+      "logistics_global": {
+        "name": "Globale Logistik",
+        "desc": "Weltweit pünktlich."
+      },
+      "logistics_quality": {
+        "name": "Qualitätsmanagement",
+        "desc": "Fehler finden, bevor Kunden es tun."
+      },
+      "logistics_mastery": {
+        "name": "Logistik-Stratege:in",
+        "desc": "Die Welt ist dein Lager."
+      },
+      "hybrid_fintech": {
+        "name": "FinTech",
+        "desc": "Software für Geld: Zahlungen, Trading, Banking."
+      },
+      "hybrid_business_law": {
+        "name": "Wirtschaftsrecht",
+        "desc": "Recht und Zahlen in einer Person."
+      },
+      "hybrid_industry40": {
+        "name": "Industrie 4.0",
+        "desc": "Vernetzte Fabriken, die mitdenken."
+      },
+      "hybrid_pharma_sales": {
+        "name": "Pharmavertrieb",
+        "desc": "Medikamente erklären und verkaufen."
+      },
+      "hybrid_ecommerce": {
+        "name": "E-Commerce",
+        "desc": "Online verkaufen, pünktlich liefern."
+      },
+      "hybrid_people_analytics": {
+        "name": "People Analytics",
+        "desc": "Mit Daten bessere Teams bauen."
+      }
+    }
   }
 }

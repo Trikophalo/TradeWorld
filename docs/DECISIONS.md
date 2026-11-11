@@ -473,7 +473,7 @@ Kapital der Investoren und wird vom Finanzmarkt-Topf (6 Mrd. €) abgezogen. Fü
 661 Mio. €. Für eine Alpha mit wenigen Spielern reicht das bei Weitem; der Topf wird beobachtet (`ECONOMY.md` §10).
 Alternative, falls nötig: den Anteil `money.allocation.financialMarket` erhöhen und `households` senken.
 
-## ADR-048: Namensfilter lieber zu streng als zu lasch — `Annahme`
+## ADR-048: Namensfilter lieber zu streng als zu lasch — `akzeptiert`
 
 Der Filter (ADR-043) blockiert auch einige echte Namen, weil sie verbotene Begriffe enthalten: „Nazim“ und „Ignazio“
 (nazi), „Nigeria“ (niger), „Lisa88“ (Code 88). „Finn_Mueller“ ist reserviert (Maskottchen). Erlaubt bleiben dagegen
@@ -487,3 +487,40 @@ lang). Stückzahlen in Millionstel, Kauf per exaktem Betrag; Genesis mit einer e
 keine Systemkasse darf ins Minus; Reichenliste mit 120 KI-Tycoons, Schnappschüssen alle 5 Minuten und Schlagzeilen;
 70 Missionsvorlagen in vier Arten, tägliche Anmeldung mit Serie. Verträge und Fehlercodes: `DATA_MODEL.md`,
 Abschnitt M2. Geprüft auf einer frischen Datenbank, einer M1-Datenbank und einer Datenbank von vor M1.
+
+## ADR-050: Skill-Baum mit 8 Strängen, unumkehrbar — `akzeptiert`
+
+Vorgabe: riesiger Skill-Baum mit vielen Strängen (IT, Recht, Handwerk …), Mischungen möglich, Skills nicht
+zurücknehmbar, Punkte aus Level-ups, Missionen und vor allem Arbeit. Umsetzung: 8 Stränge × 10 Skills in 5 Stufen plus
+6 Hybrid-Skills (86 Skills, `src/config/skills.ts`). Arbeit bringt Strang-Punkte im Strang des Jobs, Level-ups und
+Missionen freie Punkte. Grundprinzip im ganzen Spiel: mehr Können → mehr Leistung → mehr Gewinn. Details:
+`JOBS_AND_SKILLS.md` §1–3.
+
+## ADR-051: Jobportal mit Bewerbung, Gegenangebot und symbolischer Unterschrift — `akzeptiert`
+
+Vorgabe: Stellen von KI-Firmen (Start) und Spielerfirmen (später), kurze Bewerbung mit Gehaltswunsch, Arbeitgeber nimmt
+an, lehnt ab oder bietet Gegenangebot, Spieler unterschreibt am Ende symbolisch; mehrere Bewerbungen gleichzeitig.
+KI-Firmen nehmen immer an, zahlen aber gedeckelt (höchstens 1,5-facher Stufenlohn). Kündigen sofort gegen ein Gehalt an
+die Firma, Entlassen sofort mit einem Gehalt Abfindung, Gehaltserhöhung je nach Skill-Zuwachs. Ersetzt die
+Karriereleiter aus ADR-031 als Weg zur Arbeit; die Karrierestufen bleiben als Stufen der Stellen. Details:
+`JOBS_AND_SKILLS.md` §4–8.
+
+## ADR-052: Gewinnabhängiger Lohn und Insolvenz mit Privathaftung — `Konzept` (Umsetzung M4)
+
+Vorgabe: Löhne kommen aus der Firmenkasse, sinken automatisch mit dem Gewinn (höchstens auf 50 %) und steigen mit ihm
+(20 % des Übergewinns als Bonus). Der Arbeitgeber kann den Vertragslohn nicht senken. Bei Insolvenz wird die Firma
+aufgelöst, jeder Mitarbeiter bekommt ein Gehalt Abfindung, der Gründer zahlt Restschulden privat, notfalls über einen
+Zwangskredit, der von allen Einnahmen getilgt wird. Ergänzt ADR-032. Details: `JOBS_AND_SKILLS.md` §6, §9.
+
+## ADR-053: Tägliche Belohnung als 7-Tage-Kalender — `akzeptiert`
+
+Vorgabe: Belohnung fürs tägliche Einloggen. 7-Tage-Zyklus mit steigenden XP, Geld aus der Staatskasse und je einem
+Skillpunkt an Tag 4 und 7; ein Serien-Schutz pro Woche. Ersetzt den stillen Check-in-Toast durch einen Kalender, der
+einmal am Tag aufgeht. Werte: `balance.dailyRewards`.
+
+## ADR-054: Profilbilder als Pixel-Porträts, digitale Visitenkarte — `akzeptiert`
+
+Vorgabe: Profilbild aus einer Reihe von Artworks, Visitenkarte mit Skills, Name und Firmen, leichter 3D-Effekt.
+20 prozedurale Pixel-Porträts (keine fremden Grafiken, nur ganzzahlig skaliert), einige ab bestimmten Leveln.
+Die Visitenkarte ist für alle Spieler sichtbar und von der Reichenliste aus erreichbar. Der Namensfilter bleibt
+bewusst streng (ADR-048 bestätigt).

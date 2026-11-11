@@ -1,3 +1,5 @@
+import { SKILL_NODES, type SkillNodeConfig } from "./skills.ts";
+
 /**
  * NEXA balancing defaults (ADR-009).
  *
@@ -688,6 +690,69 @@ export interface BalanceConfig {
   readonly money: MoneyConfig;
   readonly richList: RichListConfig;
   readonly names: NamesConfig;
+  readonly skills: SkillsConfig;
+  readonly jobs: JobsConfig;
+  readonly dailyRewards: DailyRewardsConfig;
+  readonly avatars: AvatarsConfig;
+}
+
+/** Skill tree and skill points (ADR-050, docs/JOBS_AND_SKILLS.md). */
+export interface SkillsConfig {
+  readonly tree: readonly SkillNodeConfig[];
+  /** Skill point cost per tier (index 0 = tier 1). */
+  readonly costByTier: readonly number[];
+  /** Branch score added per tier (index 0 = tier 1). Hybrid skills add to both branches. */
+  readonly scoreByTier: readonly number[];
+  /** Free skill points for every level-up. */
+  readonly freePointsPerLevel: number;
+  /** Paid work hours for one branch point in the job's branches (split by requirement weight). */
+  readonly workHoursPerBranchPoint: number;
+}
+
+/** Job market (ADR-051). Player employers arrive with companies (M4). */
+export interface JobsConfig {
+  /** Productivity of an AI employee is 1. A player is always better: base + per relevant skill score. */
+  readonly playerBaseProductivity: number;
+  readonly productivityPerSkillScore: number;
+  readonly maxProductivity: number;
+  /** AI employers: salary = tier salary × (1 + perScore × matched score), at most cap × tier salary. */
+  readonly aiSalaryPerScoreBps: number;
+  readonly aiSalaryCapMultiplier: number;
+  /** "One salary" (quitting penalty, severance) = this many paid hours of the base salary. */
+  readonly salaryUnitHours: number;
+  readonly maxOpenApplications: number;
+  readonly applicationMessageMaxLength: number;
+  /** An offer must be signed within this time. */
+  readonly offerValidHours: number;
+  /** AI companies publish this many postings per sector and tier at each quarter close. */
+  readonly aiPostingsPerCompany: number;
+  /** Player employers: wages follow company results (profit factor). */
+  readonly profitLinkedPay: {
+    /** Lowest share of the contract salary paid when the company cannot cover it. */
+    readonly minFactor: number;
+    /** Share of the profit above payroll paid out as bonus, by salary weight. */
+    readonly bonusShareOfProfit: number;
+    /** Bonus at most this multiple of the base salary. */
+    readonly maxBonusFactor: number;
+  };
+  readonly raiseRequest: {
+    readonly cooldownDays: number;
+    /** Allowed raise per branch score gained since the last raise or hiring. */
+    readonly maxRaiseBpsPerScore: number;
+  };
+}
+
+export interface DailyRewardsConfig {
+  /** One entry per day of the 7-day cycle. Cash comes from the state treasury (closed money system). */
+  readonly cycle: readonly { readonly xp: number; readonly cashCents: number; readonly skillPoints: number }[];
+  /** Missing a day starts the cycle over, except with a streak freeze. */
+  readonly freezesPerWeek: number;
+}
+
+export interface AvatarsConfig {
+  /** Portrait keys (art in src/components/pixel/avatars.ts) and the level that unlocks them. */
+  readonly portraits: readonly { readonly key: string; readonly level: number }[];
+  readonly defaultKey: string;
 }
 
 /**
@@ -1441,6 +1506,72 @@ export const BALANCE = {
 
   // ------------------------------------------------------- names (ADR-043)
   names: { minLength: 3, maxLength: 20, nicknameChangeDays: 60 },
+
+  // ------------------------------------------------------ skills (ADR-050)
+  skills: {
+    tree: SKILL_NODES,
+    costByTier: [1, 2, 3, 4, 6],
+    scoreByTier: [1, 2, 3, 4, 6],
+    freePointsPerLevel: 1,
+    workHoursPerBranchPoint: 6,
+  },
+
+  // -------------------------------------------------------- jobs (ADR-051)
+  jobs: {
+    playerBaseProductivity: 1.5,
+    productivityPerSkillScore: 0.08,
+    maxProductivity: 4,
+    aiSalaryPerScoreBps: 300,
+    aiSalaryCapMultiplier: 1.5,
+    salaryUnitHours: 12,
+    maxOpenApplications: 5,
+    applicationMessageMaxLength: 140,
+    offerValidHours: 48,
+    aiPostingsPerCompany: 2,
+    profitLinkedPay: { minFactor: 0.5, bonusShareOfProfit: 0.2, maxBonusFactor: 1 },
+    raiseRequest: { cooldownDays: 7, maxRaiseBpsPerScore: 300 },
+  },
+
+  // ------------------------------------------------- daily rewards (ADR-052)
+  dailyRewards: {
+    cycle: [
+      { xp: 50, cashCents: 10_000, skillPoints: 0 },
+      { xp: 75, cashCents: 20_000, skillPoints: 0 },
+      { xp: 100, cashCents: 30_000, skillPoints: 0 },
+      { xp: 125, cashCents: 0, skillPoints: 1 },
+      { xp: 150, cashCents: 50_000, skillPoints: 0 },
+      { xp: 200, cashCents: 75_000, skillPoints: 0 },
+      { xp: 300, cashCents: 100_000, skillPoints: 1 },
+    ],
+    freezesPerWeek: 1,
+  },
+
+  // ------------------------------------------------------- avatars (ADR-053)
+  avatars: {
+    defaultKey: "rookie",
+    portraits: [
+      { key: "rookie", level: 1 },
+      { key: "trader", level: 1 },
+      { key: "analyst", level: 1 },
+      { key: "coder", level: 1 },
+      { key: "builder", level: 1 },
+      { key: "seller", level: 1 },
+      { key: "lawyer", level: 1 },
+      { key: "scientist", level: 1 },
+      { key: "trucker", level: 1 },
+      { key: "punk", level: 3 },
+      { key: "gamer", level: 5 },
+      { key: "chef", level: 5 },
+      { key: "pilot", level: 8 },
+      { key: "founder", level: 10 },
+      { key: "banker", level: 15 },
+      { key: "astronaut", level: 20 },
+      { key: "magnate", level: 25 },
+      { key: "royal", level: 35 },
+      { key: "legend", level: 50 },
+      { key: "finn_fan", level: 1 },
+    ],
+  },
 } as const satisfies BalanceConfig;
 
 /** Names of the `game_config` rows. */
