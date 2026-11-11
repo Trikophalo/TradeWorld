@@ -54,6 +54,11 @@ export interface EconomyConfig {
   readonly bankruptcyRestartCents: number;
   readonly basicIncomeCentsPerHour: number;
   readonly vaultCapHours: number;
+  /**
+   * Hours of basic income already in the vault of a new account, so the tutorial
+   * has something to claim right away.
+   */
+  readonly vaultInitialHours: number;
   readonly bankruptcyStatusGameDays: number;
   readonly bankruptcyReputationPenalty: number;
 }
@@ -668,6 +673,7 @@ export const BALANCE = {
     bankruptcyRestartCents: 250_000,
     basicIncomeCentsPerHour: 10_000,
     vaultCapHours: 8,
+    vaultInitialHours: 2,
     bankruptcyStatusGameDays: 3,
     bankruptcyReputationPenalty: 10,
   },
