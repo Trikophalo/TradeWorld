@@ -8,7 +8,7 @@ import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { NAV_ITEMS, isActivePath } from "@/config/navigation";
+import { isActivePath, visibleNavItems } from "@/config/navigation";
 import { useDemo } from "@/lib/demo/store";
 import { SPRING } from "@/lib/motion";
 import { xpForNextLevel } from "@/lib/sim/progression";
@@ -36,13 +36,14 @@ export function Sidebar() {
       </Link>
 
       <nav aria-label={t("nav.label")} className="mt-6 flex flex-col gap-1 px-3">
-        {NAV_ITEMS.map((item) => {
+        {visibleNavItems(level).map((item) => {
           const active = isActivePath(pathname, item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
               aria-current={active ? "page" : undefined}
+              data-tour={`nav-${item.key}`}
               className={cn(
                 "group relative flex h-11 items-center gap-3 rounded-md px-3 text-base font-medium focus-ring transition-colors duration-fast",
                 active ? "text-fg-1" : "text-fg-2 hover:text-fg-1",

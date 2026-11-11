@@ -322,3 +322,49 @@ gewinnt die am besten geführte Firma, die schwächste verliert.
 2. **Eine gut geführte AG verdient das 4- bis 8-Fache eines C-Level-Gehalts**, mehr als das Ziel von 1 bis 2×.
    Enger stellen ließe sich das nur, indem der nationale Markt für zwei Spieler-AGs zu klein wird.
 3. Die Szenarien rechnen nur mit Mitarbeitern von Skill 5, ohne Kredite und ohne Führungsrollen.
+
+## ADR-033: Schrittweise Offenlegung statt voller Oberfläche — `akzeptiert`
+
+Vorgabe des Auftraggebers: weniger Überladung am Anfang, das Spiel soll sich beim Spielen entfalten.
+
+- `src/config/disclosure.ts` legt fest, ab welchem Level ein Teil der Oberfläche erscheint. Die Komponente
+  `<Reveal feature="…">` blendet ihn dann ein.
+- Ein neuer Spieler sieht auf der Startseite vier Dinge: Vermögen, Tresor, nächstes Ziel und einige Aktien.
+- Der Tab „Firma“ fehlt bis Level 8 und erscheint dann als gesperrte Vorschau (Gründung ab Level 10).
+- Das Profil zeigt erreichte Freischaltungen und nur die nächsten zwei Stufen. Der Rest bleibt eine Überraschung.
+
+| Bereich                                                                              | sichtbar ab Level            |
+| ------------------------------------------------------------------------------------ | ---------------------------- |
+| NEXA-30-Chart, tägliche Missionen, Kennzahlen einer Aktie, Handelshistorie, Karriere | 2 (direkt nach dem Tutorial) |
+| Event-Leiste, Nachrichten, Orderbuch                                                 | 3                            |
+| Reiter Anleihen und Indizes                                                          | 5                            |
+| Tab „Firma“                                                                          | 8                            |
+
+Das ist reine Darstellung. Ob eine Aktion erlaubt ist, entscheiden weiterhin die Freischaltungen in `balance.ts`
+und der Server.
+
+## ADR-034: Pflicht-Tutorial mit Maskottchen Finn — `akzeptiert`
+
+Vorgabe des Auftraggebers: geführte, interaktive Einführung direkt nach der ersten Anmeldung, nicht überspringbar,
+kurz, mit Pixel-Maskottchen und Sprechblase.
+
+- **Finn, der Börsenfuchs** („Börsenfuchs“ = gewiefter Händler): 16×16-Pixel-Art mit den Zuständen ruhig,
+  blinzelnd, sprechend, jubelnd. Die Fliege trägt die Akzentfarbe der App.
+- **13 Schritte, etwa zwei Minuten.** Sieben davon verlangen eine echte Aktion: Tresor leeren, zu den Märkten
+  wechseln, Aktie öffnen, „Kaufen“ tippen, Order durch Halten bestätigen, Portfolio und Profil öffnen.
+  Erklärt wird nur Spielrelevantes: Vermögen, Grundeinkommen, Kurse, Handeln, Portfolio, Level.
+- **Nicht überspringbar:** Eine unsichtbare Ebene sperrt alles außer dem markierten Element. Es gibt keinen
+  Schließen-Knopf, Escape und Tastenkürzel sind aus. Wer die Seite verlässt oder neu lädt, landet wieder im
+  selben Schritt auf der richtigen Seite.
+- **Belohnung:** `xpSources.tutorial` (50 XP, mit Alpha-Bonus 100) hebt den Spieler genau auf Level 2.
+  Ein Test sichert das ab.
+- Schritte stehen als Daten in `src/features/tutorial/steps.ts`, Texte in `messages/de.json`.
+
+**Stand und Einschränkungen**
+
+- Der Fortschritt liegt derzeit je Konto im Browser (`localStorage`). Ab M2 liegen „abgeschlossen“ und die XP
+  auf dem Server (RPC `complete_tutorial`), sonst ließe sich das Tutorial auf einem zweiten Gerät wiederholen.
+- Der Kauf im Tutorial ist bis M1 eine Vorschau ohne Buchung. Ab M1 ist es ein echter erster Trade.
+- Die Sperre wirkt auf Zeiger und Berührung. Mit der Tab-Taste lassen sich andere Elemente weiterhin fokussieren.
+- Im Bestätigungsschritt verbirgt die Order-Maske (Dialog) den Rest der Seite vor Screenreadern, also auch
+  Finns Hinweis. Die Maske selbst ist beschriftet.

@@ -65,7 +65,8 @@
     "missionTrade": "Führe einen Trade aus",
     "missionVault": "Leere deinen Tresor",
     "missionWatch": "Sieh dir drei Aktien an",
-    "missionReward": "+{xp} XP"
+    "missionReward": "+{xp} XP",
+    "nextGoal": "Nächstes Ziel"
   },
   "vault": {
     "title": "Tresor",
@@ -203,7 +204,8 @@
     "careerEmptyTitle": "Erster Job ab Level 2",
     "careerEmptyText": "Jobs, Arbeitsaufgaben und Beförderungen kommen mit Meilenstein 3.",
     "rules": "Spielregeln",
-    "rulesHint": "Steuern, Gebühren und wie Firmen Geld verdienen"
+    "rulesHint": "Steuern, Gebühren und wie Firmen Geld verdienen",
+    "unlocksMore": "Weitere Freischaltungen entdeckst du beim Aufsteigen."
   },
   "unlocks": {
     "market_orders": "Aktien kaufen und verkaufen",
@@ -283,7 +285,8 @@
     "feedback": "Feedback",
     "forms": "Formulare",
     "empty": "Leere Zustände",
-    "motion": "Motion-Tokens"
+    "motion": "Motion-Tokens",
+    "mascot": "Maskottchen"
   },
   "rules": {
     "title": "Spielregeln",
@@ -388,6 +391,31 @@
       "text": "Ist die Kasse deiner Firma am Quartalsende im Minus, beginnt eine Schonfrist von {quarters} Quartalen, also {hours} Stunden. Bringst du die Kasse in dieser Zeit ins Plus (Kosten senken, Geld einschießen, Kredit), ist alles gut. Sonst ist die Firma insolvent und du darfst {lockout} Tage keine neue gründen. Über Nacht verlierst du also keine gesunde Firma.",
       "example": "Solange die Kasse im Minus ist, zahlst du Überziehungszinsen von {rate} im Spieljahr: {perQuarter} je Quartal auf 1.000 € Minus.",
       "where": "Roter Balken im Firmen-Dashboard mit Countdown. Du bekommst eine Benachrichtigung beim ersten Minus und vor dem letzten Abschluss."
+    }
+  },
+  "tutorial": {
+    "label": "Einführung",
+    "name": "Finn",
+    "start": "Los geht's",
+    "next": "Weiter",
+    "finish": "Spiel starten",
+    "yourTurn": "Du bist dran",
+    "progress": "Schritt {current} von {total}",
+    "restart": "Tutorial neu starten",
+    "steps": {
+      "welcome": "Hi, ich bin Finn, der Börsenfuchs! Ich zeig dir in zwei Minuten, wie NEXA funktioniert. Bereit?",
+      "wealth": "Das ist dein Vermögen. Du startest mit {capital} Spielgeld. Dein Ziel: mehr daraus machen.",
+      "vault": "Jede Stunde landen {rate} in deinem Tresor, auch wenn du offline bist. Hol sie dir: Tippe auf „Tresor leeren“.",
+      "goMarkets": "Stark! Jetzt legen wir Geld an. Tippe auf „Märkte“.",
+      "pickStock": "Das sind die Aktien. Grün heißt heute gestiegen, Rot gefallen. Tippe auf eine Aktie, um sie dir anzusehen.",
+      "chart": "Oben steht der aktuelle Kurs, darunter sein Verlauf. Der Kurs bewegt sich live, weil ständig gekauft und verkauft wird.",
+      "buy": "Zeit für deinen ersten Trade. Tippe auf „Kaufen“.",
+      "hold": "Hier siehst du, was die Order kostet. Zum Bestätigen hältst du den Button gedrückt, bis er gefüllt ist.",
+      "goPortfolio": "Sauber, so läuft jeder Trade! Was dir gehört, findest du im Portfolio. Tippe darauf.",
+      "portfolio": "Hier siehst du dein Guthaben und deine Aktien, und ob sie gerade im Plus oder Minus stehen.",
+      "goProfile": "Fast geschafft. Tippe auf „Profil“.",
+      "profile": "Für fast alles bekommst du XP und steigst im Level auf. Jedes Level schaltet Neues frei: Jobs, eigene Firmen, den Börsengang. Was als Nächstes kommt, steht immer hier.",
+      "done": "Das war's! Zur Belohnung bekommst du {xp} XP und bist jetzt Level 2. Wenn du etwas nachlesen willst: Die Spielregeln findest du hier im Profil. Viel Erfolg an der Börse!"
     }
   }
 }

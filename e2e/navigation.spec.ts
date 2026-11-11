@@ -1,11 +1,18 @@
 import { expect, test } from "@playwright/test";
 
+// The company tab is hidden for new players (progressive disclosure), see tutorial.spec.ts.
 const TABS = [
   { name: "Portfolio", path: "/portfolio", heading: "Portfolio" },
   { name: "Märkte", path: "/markets", heading: "Märkte" },
-  { name: "Firma", path: "/company", heading: "Unternehmen" },
   { name: "Profil", path: "/profile", heading: "Profil" },
 ];
+
+// These tests look at the game after the first session: mark the tutorial as done.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() =>
+    window.localStorage.setItem("nexa-tutorial", JSON.stringify({ demo: { status: "done", step: 0 } })),
+  );
+});
 
 test("the five tabs navigate without horizontal overflow or console errors", async ({ page }) => {
   const errors: string[] = [];
@@ -69,13 +76,15 @@ test("the sign-in page explains demo mode", async ({ page }) => {
 
 test("the showcase renders every section", async ({ page }) => {
   await page.goto("/dev/ui");
-  for (const id of ["tokens", "buttons", "numbers", "skeletons", "toasts", "sheet", "pixel", "motion"]) {
+  for (const id of ["tokens", "buttons", "numbers", "skeletons", "toasts", "sheet", "mascot", "pixel", "motion"]) {
     await expect(page.locator(`#${id}`)).toBeVisible();
   }
 });
 
 test("the rules page explains taxes with numbers from the config", async ({ page }) => {
   await page.goto("/profile");
+  // Demo data restores the level after load, which reveals the career card above the link.
+  await expect(page.getByText("Level 2").filter({ visible: true }).first()).toBeVisible();
   await page.getByRole("link", { name: /Spielregeln/ }).click();
   await expect(page).toHaveURL("/profile/rules");
   await page.getByRole("button", { name: /Steuer auf Kursgewinne/ }).click();

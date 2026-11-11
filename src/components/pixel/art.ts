@@ -265,6 +265,48 @@ export const BEAR: PixelArt = {
   ],
 };
 
+// ---------------------------------------------------------------- mascot
+
+/*
+ * Finn, the "Börsenfuchs" (German for a shrewd trader). He guides new players
+ * through the tutorial. One base drawing plus row overrides per expression,
+ * so all frames stay pixel-identical outside the face. The bow tie uses the
+ * app accent colour.
+ */
+const FINN_PALETTE = { o: "#ff9a52", d: "#c2571a", w: "#fff3e6", k: INK, t: "var(--accent)" } as const;
+
+const FINN_BASE = [
+  "................",
+  ".oo..........oo.",
+  ".ooo........ooo.",
+  ".odoo......oodo.",
+  ".odoooooooooodo.",
+  ".oooooooooooooo.",
+  ".oooooooooooooo.",
+  ".ookkooooookkoo.",
+  ".ookkooooookkoo.",
+  ".wwooooooooooww.",
+  ".wwwwookkoowwww.",
+  "..wwwwwkkwwwww..",
+  "...wwwwwwwwww...",
+  "....wwwwwwww....",
+  "....tt.tt.tt....",
+  ".....tttttt.....",
+] as const;
+
+function finnFrame(overrides: Record<number, string>): PixelArt {
+  return { palette: FINN_PALETTE, grid: FINN_BASE.map((row, index) => overrides[index] ?? row) };
+}
+
+export const FINN = {
+  idle: finnFrame({}),
+  blink: finnFrame({ 7: ".oooooooooooooo." }),
+  talk: finnFrame({ 12: "...wwwwkkwwww..." }),
+  happy: finnFrame({ 7: ".ookkooooookkoo.", 8: ".okookooookooko.", 12: "...wwwkkkkwww..." }),
+} as const satisfies Record<string, PixelArt>;
+
+export type FinnMood = keyof typeof FINN;
+
 // ---------------------------------------------------------------- interface icons (12×12, single colour)
 
 const mono = { x: "currentColor" } as const;
@@ -417,5 +459,6 @@ export const ALL_PIXEL_ART: Record<string, PixelArt> = {
   coin: COIN,
   bull: BULL,
   bear: BEAR,
+  ...Object.fromEntries(Object.entries(FINN).map(([k, v]) => [`finn/${k}`, v])),
   ...Object.fromEntries(Object.entries(UI_ICONS).map(([k, v]) => [`ui/${k}`, v])),
 };

@@ -16,6 +16,8 @@ import { DEMO_RANGES, demoSeries, type DemoCompany, type DemoRange } from "@/lib
 import { useDemo } from "@/lib/demo/store";
 import { PRICE_SCALE, formatMoney, formatPrice } from "@/lib/format";
 import { useMountTime } from "@/lib/use-now";
+import { Reveal } from "@/features/progression/components/reveal";
+import { isTutorialActive } from "@/features/tutorial/store";
 import { CompanyLogo } from "./company-logo";
 import { OrderSheet, type OrderSide } from "./order-sheet";
 import { PriceChart } from "./price-chart";
@@ -46,7 +48,7 @@ export function StockDetail({ company }: { company: DemoCompany }) {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) return;
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.metaKey || event.ctrlKey || event.altKey || isTutorialActive()) return;
       if (event.key.toLowerCase() === "b") setOrder("buy");
       if (event.key.toLowerCase() === "s") setOrder("sell");
     };
@@ -93,7 +95,7 @@ export function StockDetail({ company }: { company: DemoCompany }) {
       </header>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6">
-        <Card padding="lg" className="self-start">
+        <Card padding="lg" className="self-start" data-tour="stock-price">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div className="flex items-baseline gap-3">
               <NumberTicker value={price} format={format} flash className="text-3xl font-semibold text-fg-1" />
@@ -112,7 +114,7 @@ export function StockDetail({ company }: { company: DemoCompany }) {
         <div className="space-y-5 lg:space-y-6">
           <Card padding="lg" className="hidden lg:block">
             <div className="grid grid-cols-2 gap-3">
-              <Button variant="gain" size="lg" onClick={() => setOrder("buy")}>
+              <Button variant="gain" size="lg" data-tour="buy" onClick={() => setOrder("buy")}>
                 {t("buy")}
               </Button>
               <Button variant="loss" size="lg" onClick={() => setOrder("sell")}>
@@ -122,39 +124,43 @@ export function StockDetail({ company }: { company: DemoCompany }) {
             <p className="mt-3 text-center text-xs text-fg-3">{to("shortcutHint")}</p>
           </Card>
 
-          <Card padding="lg">
-            <CardHeader>
-              <CardTitle>{t("stats")}</CardTitle>
-            </CardHeader>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-4">
-              {stats.map((stat) => (
-                <div key={stat.label}>
-                  <dt className="text-sm text-fg-3">{stat.label}</dt>
-                  <dd className="mt-0.5 nums font-medium text-fg-1">
-                    {stat.value ?? <span className="label-pixel text-fg-3">{t("statPending")}</span>}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </Card>
+          <Reveal feature="stockStats">
+            <Card padding="lg">
+              <CardHeader>
+                <CardTitle>{t("stats")}</CardTitle>
+              </CardHeader>
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-4">
+                {stats.map((stat) => (
+                  <div key={stat.label}>
+                    <dt className="text-sm text-fg-3">{stat.label}</dt>
+                    <dd className="mt-0.5 nums font-medium text-fg-1">
+                      {stat.value ?? <span className="label-pixel text-fg-3">{t("statPending")}</span>}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </Card>
+          </Reveal>
 
-          <Card padding="lg">
-            <CardHeader>
-              <CardTitle>{t("orderBook")}</CardTitle>
-            </CardHeader>
-            <EmptyState
-              className="py-2"
-              art={<PixelIcon {...SECTOR_ICONS[company.sector]} scale={4} />}
-              title={t("orderBookEmptyTitle")}
-              description={t("orderBookEmptyText")}
-            />
-          </Card>
+          <Reveal feature="stockOrderBook">
+            <Card padding="lg">
+              <CardHeader>
+                <CardTitle>{t("orderBook")}</CardTitle>
+              </CardHeader>
+              <EmptyState
+                className="py-2"
+                art={<PixelIcon {...SECTOR_ICONS[company.sector]} scale={4} />}
+                title={t("orderBookEmptyTitle")}
+                description={t("orderBookEmptyText")}
+              />
+            </Card>
+          </Reveal>
         </div>
       </div>
 
       {/* Phones: thumb-reachable actions above the tab bar. */}
       <div className="fixed inset-x-0 bottom-[calc(var(--tabbar-height)+var(--safe-bottom))] z-sticky grid grid-cols-2 gap-3 border-t border-line-1 bg-bg/92 px-4 py-3 backdrop-blur-lg lg:hidden">
-        <Button variant="gain" onClick={() => setOrder("buy")}>
+        <Button variant="gain" data-tour="buy" onClick={() => setOrder("buy")}>
           {t("buy")}
         </Button>
         <Button variant="loss" onClick={() => setOrder("sell")}>

@@ -29,6 +29,7 @@ export function SecurityRow({ company, shared = true }: { company: DemoCompany; 
     <Link
       href={`/markets/${company.ticker}`}
       transitionTypes={["nav-forward"]}
+      data-tour="stock-row"
       className="group -mx-2 flex items-center gap-3 rounded-md px-2 py-2.5 focus-ring transition-colors duration-fast hover:bg-surface-2 active:bg-surface-3"
     >
       {shared ? (

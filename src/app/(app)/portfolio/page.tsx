@@ -7,6 +7,7 @@ import { Page, PageHeader } from "@/components/layout/page";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Reveal } from "@/features/progression/components/reveal";
 import { PortfolioSummary } from "@/features/portfolio/components/portfolio-summary";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -20,7 +21,7 @@ export default async function PortfolioPage() {
     <Page>
       <PageHeader title={t("title")} />
       <PortfolioSummary />
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6">
+      <div className="grid gap-5 *:min-w-0 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6">
         <Card padding="lg">
           <CardHeader>
             <CardTitle>{t("positions")}</CardTitle>
@@ -36,17 +37,19 @@ export default async function PortfolioPage() {
             }
           />
         </Card>
-        <Card padding="lg">
-          <CardHeader>
-            <CardTitle>{t("history")}</CardTitle>
-          </CardHeader>
-          <EmptyState
-            className="py-4"
-            art={<PixelIcon {...COIN} scale={4} />}
-            title={t("historyEmptyTitle")}
-            description={t("historyEmptyText")}
-          />
-        </Card>
+        <Reveal feature="portfolioHistory">
+          <Card padding="lg">
+            <CardHeader>
+              <CardTitle>{t("history")}</CardTitle>
+            </CardHeader>
+            <EmptyState
+              className="py-4"
+              art={<PixelIcon {...COIN} scale={4} />}
+              title={t("historyEmptyTitle")}
+              description={t("historyEmptyText")}
+            />
+          </Card>
+        </Reveal>
       </div>
     </Page>
   );

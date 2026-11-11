@@ -193,6 +193,21 @@ Firmen ohne gezeichnetes Logo zeigen eine Kachel in Firmenfarbe mit Kürzel.
 **Offen für später:** die übrigen 12 Firmenlogos (M1), Abzeichen für Erfolge (M2), Avatar-Teile und
 Statussymbole (M8), Logo-Editor für Spielerfirmen (M4, speichert dasselbe Rasterformat).
 
+### Maskottchen Finn
+
+Finn, der Börsenfuchs, führt durch das Tutorial und darf später überall auftauchen, wo das Spiel etwas erklärt
+oder feiert (leere Zustände, Level-up, Hinweise). Komponente: `components/pixel/mascot.tsx`.
+
+| Zustand | Wann                                                          |
+| ------- | ------------------------------------------------------------- |
+| `idle`  | Wartet. Wippt leicht und blinzelt in unregelmäßigen Abständen |
+| `talk`  | Während Text in der Sprechblase erscheint: Mund bewegt sich   |
+| `happy` | Belohnung: lachende Augen, kurzer Hüpfer                      |
+
+Regeln: Finn spricht in der Du-Form, kurz und freundlich, höchstens drei Sätze pro Sprechblase. Er erklärt, er
+wertet nicht („Das war falsch“ sagt er nie). Die Sprechblase (`features/tutorial/components/speech-bubble.tsx`)
+tippt den Text ein; ein Tipp auf die Blase zeigt ihn sofort ganz.
+
 ## 7. Layout und Navigation
 
 |             | Handy (< 1024 px)                                             | PC (ab 1024 px)                             |

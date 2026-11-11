@@ -23,6 +23,7 @@ export function PortfolioSummary() {
       variants={staggerContainer}
       initial="hidden"
       animate="visible"
+      data-tour="portfolio-summary"
       className="grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-6"
     >
       {items.map((item) => (

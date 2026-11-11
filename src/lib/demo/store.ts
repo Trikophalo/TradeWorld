@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { BALANCE } from "@/config/balance";
+import { levelProgress } from "@/lib/sim/progression";
 import { DEMO_COMPANIES, DEMO_INDEX } from "./market";
 
 /**
@@ -27,6 +28,8 @@ interface DemoState {
   cashCents: number;
   /** Epoch ms of the last claim. Null until the client has mounted. */
   vaultClaimedAt: number | null;
+  /** Lifetime XP. Level and progress are derived from it. */
+  totalXp: number;
   level: number;
   xpInLevel: number;
   tick: () => void;
@@ -51,8 +54,9 @@ export const useDemo = create<DemoState>((set, get) => ({
   indexChangeBps: DEMO_INDEX.changeBps,
   cashCents: BALANCE.economy.startingCapitalCents,
   vaultClaimedAt: null,
-  level: 4,
-  xpInLevel: 520,
+  totalXp: 0,
+  level: 1,
+  xpInLevel: 0,
 
   mount: () => {
     // Start with a vault that is a bit more than half full.
@@ -92,5 +96,10 @@ export const useDemo = create<DemoState>((set, get) => ({
     return amount;
   },
 
-  addXp: (amount) => set((state) => ({ xpInLevel: state.xpInLevel + amount })),
+  addXp: (amount) =>
+    set((state) => {
+      const totalXp = state.totalXp + amount;
+      const progress = levelProgress(totalXp);
+      return { totalXp, level: progress.level, xpInLevel: progress.xpIntoLevel };
+    }),
 }));

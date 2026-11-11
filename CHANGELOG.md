@@ -16,3 +16,13 @@ Erste, navigierbare Fassung ohne Spiellogik.
 - Dokumentation: Game Design, Architektur, Datenmodell, Simulation, Balancing, Design-System, Roadmap, ADRs.
 
 Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Projekt.
+
+## Nach M0: Einstieg für neue Spieler
+
+- **Tutorial mit Finn, dem Börsenfuchs:** 13 kurze Schritte direkt nach dem ersten Start, nicht überspringbar,
+  mit Sprechblase, Spotlight und echten Aktionen (Tresor leeren, Aktie öffnen, kaufen). Abschluss: 100 XP, Level 2.
+- **Ruhigerer Anfang:** Neue Spieler sehen nur Vermögen, Tresor, nächstes Ziel und Aktien. Index, Missionen,
+  Events, Nachrichten, Orderbuch, Anleihen und der Firmen-Tab erscheinen mit steigendem Level.
+- **Spielregeln** in einfacher Sprache unter Profil → Spielregeln.
+- **Unternehmen:** eigener Markt je Firmenstufe, Schonfrist vor der Insolvenz, doppelte XP in der Alpha.
+- Der Demo-Spieler startet auf Level 1.

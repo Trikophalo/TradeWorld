@@ -13,7 +13,7 @@ export function WealthHero() {
   const t = useTranslations("home");
   const cash = useDemo((state) => state.cashCents);
   return (
-    <section aria-label={t("portfolioValue")}>
+    <section aria-label={t("portfolioValue")} data-tour="wealth" className="w-fit">
       <p className="label-pixel text-fg-3">{t("portfolioValue")}</p>
       <NumberTicker value={cash} format={format} className="mt-1 text-4xl font-semibold tracking-tight text-fg-1" />
       <p className="mt-1.5 flex items-center gap-2 text-sm text-fg-3">

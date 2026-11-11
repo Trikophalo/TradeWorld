@@ -274,6 +274,9 @@ Grundeinkommen, Level, Missionen, Streak, erste Erfolge und die Freundes-Liga.
 
 ### Daten/Backend
 
+- [ ] Tutorial serverseitig: Spalte `tutorial_completed_at` und RPC `complete_tutorial(request_id)`, der die
+      XP aus `xpSources.tutorial` genau einmal gutschreibt (ADR-034); der Client spiegelt nur noch den Zustand
+
 - [ ] Startkapital 10.000 € bei der Registrierung über das Ledger (ADR-011)
 - [ ] Grundeinkommen 100 € je Stunde, Tresor mit 8 Stunden Obergrenze, RPC `claim_vault`
 - [ ] XP-Vergabe serverseitig mit allen Schutzregeln (30 Trades pro Tag, Wash-Trading, max. 500 XP je Trade)

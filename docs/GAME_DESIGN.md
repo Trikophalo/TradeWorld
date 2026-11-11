@@ -50,15 +50,15 @@ dafür, dass der Markt schon mit 4 Spielern lebendig ist.
 Es ist ein **reines Menü- und Dashboard-Spiel**: keine Spielwelt, keine Karte, keine Figur. Das Spielgefühl
 entsteht aus Zahlen, Charts, Entscheidungen, Events und sozialer Dynamik.
 
-| Säule | Bedeutung für das Design |
-|---|---|
-| **Ein gemeinsamer Markt** | Jede Order, jede Preisentscheidung einer Firma wirkt auf alle. Es gibt keine privaten Instanzen. |
-| **Die KI trägt den Markt** | Etwa 80 % der Marktaktivität kommt von KI-Akteuren. Spieler sind die „großen Fische“, aber nicht nötig, damit sich etwas bewegt. |
-| **Eine Simulation für alle** | KI-Firmen und Spielerfirmen laufen durch exakt dieselbe Unternehmenssimulation. Kurse hängen an Fundamentaldaten (fairer Wert), nicht an Zufall allein. |
-| **Zocken und Analyse lohnen beide** | Zocker gewinnen gelegentlich groß, fundierte Spieler liegen langfristig vorne. |
-| **Vom Trader zum Unternehmer** | Das Levelsystem öffnet das Spiel schrittweise: Handeln, Job, Short und Hebel, Firma, IPO, Übernahmen. |
-| **Soziales Drama ist gewollt** | Abwerben, Kündigen, Wechsel zur Konkurrenz, Pump-and-Dump und Verrat sind möglich. Sie haben Folgen (Reputation), sind aber nicht verboten. |
-| **Hochwertige Oberfläche** | Gefühl einer modernen Neo-Broker-App mit Pixel-Art als Persönlichkeit. Details in `DESIGN_SYSTEM.md`. |
+| Säule                               | Bedeutung für das Design                                                                                                                                |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Ein gemeinsamer Markt**           | Jede Order, jede Preisentscheidung einer Firma wirkt auf alle. Es gibt keine privaten Instanzen.                                                        |
+| **Die KI trägt den Markt**          | Etwa 80 % der Marktaktivität kommt von KI-Akteuren. Spieler sind die „großen Fische“, aber nicht nötig, damit sich etwas bewegt.                        |
+| **Eine Simulation für alle**        | KI-Firmen und Spielerfirmen laufen durch exakt dieselbe Unternehmenssimulation. Kurse hängen an Fundamentaldaten (fairer Wert), nicht an Zufall allein. |
+| **Zocken und Analyse lohnen beide** | Zocker gewinnen gelegentlich groß, fundierte Spieler liegen langfristig vorne.                                                                          |
+| **Vom Trader zum Unternehmer**      | Das Levelsystem öffnet das Spiel schrittweise: Handeln, Job, Short und Hebel, Firma, IPO, Übernahmen.                                                   |
+| **Soziales Drama ist gewollt**      | Abwerben, Kündigen, Wechsel zur Konkurrenz, Pump-and-Dump und Verrat sind möglich. Sie haben Folgen (Reputation), sind aber nicht verboten.             |
+| **Hochwertige Oberfläche**          | Gefühl einer modernen Neo-Broker-App mit Pixel-Art als Persönlichkeit. Details in `DESIGN_SYSTEM.md`.                                                   |
 
 ---
 
@@ -66,16 +66,16 @@ entsteht aus Zahlen, Charts, Entscheidungen, Events und sozialer Dynamik.
 
 Diese Punkte sind nicht verhandelbar und gelten für jedes Feature.
 
-| Regel | Inhalt |
-|---|---|
-| Nur Spielwährung | Kein Echtgeld, keine Auszahlung, keine In-App-Käufe im MVP. Spielgeld kann niemals für echtes Geld gekauft werden. Später sind höchstens kosmetische Käufe denkbar, die keinerlei Einfluss auf Geld, Aktien oder XP haben. |
-| 18+ | Das Spiel enthält simuliertes Zocken (Hebel, Shorts). Die Registrierung verlangt die Bestätigung der Volljährigkeit (ADR-010). |
-| Server-Autorität | Alle Geld-, Order-, XP- und Simulationsvorgänge laufen serverseitig. Der Client zeigt an und sendet Absichten (ADR-008). |
-| Geld als Ganzzahlen | Geld als `bigint` in Cent, Kurse als `bigint` mit Skalierung 1 € = 10 000, Sätze in Basispunkten (ADR-003). Keine Floats für Geld. |
-| Funktioniert mit 4 Spielern | Kein Feature setzt voraus, dass viele Spieler online sind. Für jede Spielerrolle gibt es einen KI-Ersatz. |
-| Balancing konfigurierbar | Alle Zahlen zentral in `src/config/balance.ts` und `game_config` (ADR-009). |
-| Sprache | Spielsprache Deutsch, i18n-fähig (`messages/de.json`, ADR-002). Code, Kommentare und Datenbank auf Englisch. |
-| Responsiv | Handy zuerst, auf dem PC mehrspaltig. |
+| Regel                       | Inhalt                                                                                                                                                                                                                     |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Nur Spielwährung            | Kein Echtgeld, keine Auszahlung, keine In-App-Käufe im MVP. Spielgeld kann niemals für echtes Geld gekauft werden. Später sind höchstens kosmetische Käufe denkbar, die keinerlei Einfluss auf Geld, Aktien oder XP haben. |
+| 18+                         | Das Spiel enthält simuliertes Zocken (Hebel, Shorts). Die Registrierung verlangt die Bestätigung der Volljährigkeit (ADR-010).                                                                                             |
+| Server-Autorität            | Alle Geld-, Order-, XP- und Simulationsvorgänge laufen serverseitig. Der Client zeigt an und sendet Absichten (ADR-008).                                                                                                   |
+| Geld als Ganzzahlen         | Geld als `bigint` in Cent, Kurse als `bigint` mit Skalierung 1 € = 10 000, Sätze in Basispunkten (ADR-003). Keine Floats für Geld.                                                                                         |
+| Funktioniert mit 4 Spielern | Kein Feature setzt voraus, dass viele Spieler online sind. Für jede Spielerrolle gibt es einen KI-Ersatz.                                                                                                                  |
+| Balancing konfigurierbar    | Alle Zahlen zentral in `src/config/balance.ts` und `game_config` (ADR-009).                                                                                                                                                |
+| Sprache                     | Spielsprache Deutsch, i18n-fähig (`messages/de.json`, ADR-002). Code, Kommentare und Datenbank auf Englisch.                                                                                                               |
+| Responsiv                   | Handy zuerst, auf dem PC mehrspaltig.                                                                                                                                                                                      |
 
 ---
 
@@ -86,12 +86,12 @@ Diese Punkte sind nicht verhandelbar und gelten für jedes Feature.
   Später soll das Spiel auf viele Spieler skalieren.
 - **Spielertypen**, die das Design gleichzeitig bedient:
 
-| Typ | Sucht | Bekommt |
-|---|---|---|
-| Zocker | Schnelle, hohe Ausschläge | Pennystocks, Hebel, Shorts, binäre Pharma-Events, Hype bei Spieler-IPOs |
-| Analytiker | Verstehbare Zusammenhänge | Fundamentaldaten, Event-Kalender, Analystenkursziele, Branchenzusammenhänge |
-| Aufbauer | Etwas Eigenes führen | Firmengründung, Quartalsentscheidungen, Mitarbeiter, IPO |
-| Wettkämpfer | Vergleich mit Freunden | Freundes-Liga, Feed, Erfolge, Statussymbole |
+| Typ         | Sucht                     | Bekommt                                                                     |
+| ----------- | ------------------------- | --------------------------------------------------------------------------- |
+| Zocker      | Schnelle, hohe Ausschläge | Pennystocks, Hebel, Shorts, binäre Pharma-Events, Hype bei Spieler-IPOs     |
+| Analytiker  | Verstehbare Zusammenhänge | Fundamentaldaten, Event-Kalender, Analystenkursziele, Branchenzusammenhänge |
+| Aufbauer    | Etwas Eigenes führen      | Firmengründung, Quartalsentscheidungen, Mitarbeiter, IPO                    |
+| Wettkämpfer | Vergleich mit Freunden    | Freundes-Liga, Feed, Erfolge, Statussymbole                                 |
 
 - **Nutzungsmuster:** mehrere kurze Sitzungen am Tag (Tresor leeren, Aufgabe erledigen, Positionen prüfen),
   dazu längere Sitzungen rund um Events und Quartalszahlen. Das Spiel läuft offline weiter.
@@ -131,26 +131,26 @@ dadurch neue Möglichkeiten freischalten, die wieder mehr Einsatz und mehr Veran
 
 ### 4.2 Schleifen nach Zeitebene
 
-| Ebene | Was der Spieler tut | Was ihn belohnt |
-|---|---|---|
-| **Sekunden** | Kurse beobachten, Order aufgeben | Live-Kursticker, Trade-Ausführung mit Animation, Sound und Haptik, XP fliegt in den Balken |
-| **Minuten** | Arbeitsaufgabe lösen (20 bis 60 Sekunden), Mission abschließen, auf ein Event warten | Bonus und XP, abgehakte Mission, Countdown bis zu Quartalszahlen |
-| **Tag** | Einloggen, Tresor leeren, 3 tägliche Missionen, zur Börsenglocke um 8 Uhr handeln | Login-Streak mit wachsendem Bonus, Eröffnungsbonus in der ersten Handelsstunde, 4 Quartalsabschlüsse |
-| **Woche** | Portfolio gegen Freunde entwickeln, Wochen-Challenge, Gehalt verhandeln | Freundes-Liga (Platz 1 bekommt einen Titel), Gehaltsplus |
-| **Langfristig** | Level steigern, Firma aufbauen und an die Börse bringen | Freischaltungen, Firmenmeilensteine (erste 100.000 € Umsatz, erster Gewinn, IPO, Aufnahme in den NEXA 30), Hall of Fame |
+| Ebene           | Was der Spieler tut                                                                  | Was ihn belohnt                                                                                                         |
+| --------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| **Sekunden**    | Kurse beobachten, Order aufgeben                                                     | Live-Kursticker, Trade-Ausführung mit Animation, Sound und Haptik, XP fliegt in den Balken                              |
+| **Minuten**     | Arbeitsaufgabe lösen (20 bis 60 Sekunden), Mission abschließen, auf ein Event warten | Bonus und XP, abgehakte Mission, Countdown bis zu Quartalszahlen                                                        |
+| **Tag**         | Einloggen, Tresor leeren, 3 tägliche Missionen, zur Börsenglocke um 8 Uhr handeln    | Login-Streak mit wachsendem Bonus, Eröffnungsbonus in der ersten Handelsstunde, 4 Quartalsabschlüsse                    |
+| **Woche**       | Portfolio gegen Freunde entwickeln, Wochen-Challenge, Gehalt verhandeln              | Freundes-Liga (Platz 1 bekommt einen Titel), Gehaltsplus                                                                |
+| **Langfristig** | Level steigern, Firma aufbauen und an die Börse bringen                              | Freischaltungen, Firmenmeilensteine (erste 100.000 € Umsatz, erster Gewinn, IPO, Aufnahme in den NEXA 30), Hall of Fame |
 
 ---
 
 ## 5. Zeit und Spieltakt
 
-| Größe | Startwert | Quelle |
-|---|---|---|
-| Spielquartal | 6 echte Stunden | Prompt |
-| Spieljahr | 4 Quartale = 1 echter Tag | Prompt |
-| Quartalsgrenzen | 08:00, 14:00, 20:00, 02:00 Uhr (Europe/Berlin) | ADR-006 |
-| Börsenzeiten | 08:00 bis 22:00 Uhr (Europe/Berlin) | Prompt |
-| Markt-Tick | alle 5 Sekunden (Zielkorridor 5 bis 10 Sekunden) | ADR-004 |
-| Kerzen | 1 min, 5 min, 1 h, 1 Quartal, 1 Spieljahr | Prompt |
+| Größe           | Startwert                                        | Quelle  |
+| --------------- | ------------------------------------------------ | ------- |
+| Spielquartal    | 6 echte Stunden                                  | Prompt  |
+| Spieljahr       | 4 Quartale = 1 echter Tag                        | Prompt  |
+| Quartalsgrenzen | 08:00, 14:00, 20:00, 02:00 Uhr (Europe/Berlin)   | ADR-006 |
+| Börsenzeiten    | 08:00 bis 22:00 Uhr (Europe/Berlin)              | Prompt  |
+| Markt-Tick      | alle 5 Sekunden (Zielkorridor 5 bis 10 Sekunden) | ADR-004 |
+| Kerzen          | 1 min, 5 min, 1 h, 1 Quartal, 1 Spieljahr        | Prompt  |
 
 - **Börsenglocken:** Eröffnung um 08:00 Uhr und Schluss um 22:00 Uhr sind Events. Die erste Handelsstunde
   bringt einen Eröffnungsbonus.
@@ -192,23 +192,23 @@ glaubwürdigen Markt vorfinden.
 - Namen und Kürzel sind in ADR-014 festgelegt. Die Charakterbeschreibungen sind Designvorgaben für Seed-Daten
   und Simulation.
 
-| Kürzel | Unternehmen | Branche | Größe | Charakter |
-|---|---|---|---|---|
-| `KLS` | KlarSoft AG | Tech/Software | Bluechip | Bürosoftware im Abo, hohe Marge, verlässliches Wachstum, selten Überraschungen |
-| `PXW` | Pixelwerk Studios | Tech/Software | Mittelständler | Spielestudio, dessen Quartale von einzelnen Veröffentlichungen abhängen |
-| `QSL` | QuantenSprung Labs | Tech/Software | Pennystock | Forschungs-Start-up mit fast keinem Umsatz, lebt von Ankündigungen und Hype |
-| `BRZ` | Brotzeit Handel AG | Einzelhandel | Bluechip | Lebensmittelkette mit dünner Marge, stabilem Umsatz und verlässlicher Dividende |
-| `KFR` | Kaufrausch Märkte | Einzelhandel | Mittelständler | Expandierende Kaufhauskette, wächst über Marketing und ist konjunkturabhängig |
-| `FGD` | Fundgrube Discount | Einzelhandel | Pennystock | Restposten-Discounter, der Preiskriege anzettelt und am Rand der Gewinnzone arbeitet |
-| `VLT` | Volta Energie AG | Energie | Bluechip | Großer Versorger, kapitalintensiv, hohe Dividende, reagiert träge auf den Ölpreis |
-| `RKW` | Rheinkraft Werke | Energie | Mittelständler | Kraftwerksbetreiber mit hohem Rohstoffanteil, Gewinn schwankt mit dem Ölpreis |
-| `SFX` | SolarFuchs | Energie | Pennystock | Solar-Installateur mit hoher Verschuldung, stark zinsabhängig |
-| `NPH` | NeuroPharm AG | Pharma | Bluechip | Breites Medikamentenportfolio, einzelne Studienergebnisse bewegen den Kurs nur begrenzt |
-| `ALM` | Alpenmed | Pharma | Mittelständler | Wenige Produkte, jede Studie ist ein spürbares Ereignis |
-| `GNV` | GenoVita Biotech | Pharma | Pennystock | Ein einziger Wirkstoffkandidat, Kurs entscheidet sich binär am Studienergebnis |
-| `NDL` | Nordlicht Logistik AG | Logistik | Bluechip | Großer Fuhrpark, viele Mitarbeiter, Gewinn hängt an Lohnkosten und Konjunktur |
-| `EBX` | Eilbote Express | Logistik | Mittelständler | Paketdienst mit schnellem Wachstum und knapper Kapazität |
-| `FPT` | Frachtpilot | Logistik | Pennystock | Frachtvermittler mit wenig eigenem Kapital, reagiert heftig auf Ölpreis und Konjunktur |
+| Kürzel | Unternehmen           | Branche       | Größe          | Charakter                                                                               |
+| ------ | --------------------- | ------------- | -------------- | --------------------------------------------------------------------------------------- |
+| `KLS`  | KlarSoft AG           | Tech/Software | Bluechip       | Bürosoftware im Abo, hohe Marge, verlässliches Wachstum, selten Überraschungen          |
+| `PXW`  | Pixelwerk Studios     | Tech/Software | Mittelständler | Spielestudio, dessen Quartale von einzelnen Veröffentlichungen abhängen                 |
+| `QSL`  | QuantenSprung Labs    | Tech/Software | Pennystock     | Forschungs-Start-up mit fast keinem Umsatz, lebt von Ankündigungen und Hype             |
+| `BRZ`  | Brotzeit Handel AG    | Einzelhandel  | Bluechip       | Lebensmittelkette mit dünner Marge, stabilem Umsatz und verlässlicher Dividende         |
+| `KFR`  | Kaufrausch Märkte     | Einzelhandel  | Mittelständler | Expandierende Kaufhauskette, wächst über Marketing und ist konjunkturabhängig           |
+| `FGD`  | Fundgrube Discount    | Einzelhandel  | Pennystock     | Restposten-Discounter, der Preiskriege anzettelt und am Rand der Gewinnzone arbeitet    |
+| `VLT`  | Volta Energie AG      | Energie       | Bluechip       | Großer Versorger, kapitalintensiv, hohe Dividende, reagiert träge auf den Ölpreis       |
+| `RKW`  | Rheinkraft Werke      | Energie       | Mittelständler | Kraftwerksbetreiber mit hohem Rohstoffanteil, Gewinn schwankt mit dem Ölpreis           |
+| `SFX`  | SolarFuchs            | Energie       | Pennystock     | Solar-Installateur mit hoher Verschuldung, stark zinsabhängig                           |
+| `NPH`  | NeuroPharm AG         | Pharma        | Bluechip       | Breites Medikamentenportfolio, einzelne Studienergebnisse bewegen den Kurs nur begrenzt |
+| `ALM`  | Alpenmed              | Pharma        | Mittelständler | Wenige Produkte, jede Studie ist ein spürbares Ereignis                                 |
+| `GNV`  | GenoVita Biotech      | Pharma        | Pennystock     | Ein einziger Wirkstoffkandidat, Kurs entscheidet sich binär am Studienergebnis          |
+| `NDL`  | Nordlicht Logistik AG | Logistik      | Bluechip       | Großer Fuhrpark, viele Mitarbeiter, Gewinn hängt an Lohnkosten und Konjunktur           |
+| `EBX`  | Eilbote Express       | Logistik      | Mittelständler | Paketdienst mit schnellem Wachstum und knapper Kapazität                                |
+| `FPT`  | Frachtpilot           | Logistik      | Pennystock     | Frachtvermittler mit wenig eigenem Kapital, reagiert heftig auf Ölpreis und Konjunktur  |
 
 Pennystocks dürfen sich an einem Tag um ±30 % bewegen. Bluechips sind die ruhigen Werte und bilden zusammen
 mit den Mittelständlern den Kern des Leitindex.
@@ -218,14 +218,14 @@ mit den Mittelständlern den Kern des Leitindex.
 Mehrere Investortypen erzeugen zusammen Liquidität und nachvollziehbare Kursbewegungen. Technisch wirken sie
 als aggregierter Netto-Nachfragedruck je Typ und Aktie, nicht als Einzelorders (ADR-005).
 
-| Typ | Verhalten | Sichtbarer Effekt |
-|---|---|---|
-| **Marktmacher** | Stellt immer Kauf- und Verkaufsangebote mit Spread | Grundliquidität, man kann jederzeit handeln |
-| **Value-Fonds** | Kauft unter dem fairen Wert, verkauft darüber, reagiert langsam | Kurse kehren mittelfristig zum fairen Wert zurück |
-| **Momentum-Trader** | Springt auf Trends auf | Bewegungen werden verstärkt |
-| **Rentenfonds** | Schichtet je nach Leitzins zwischen Anleihen und Dividendenaktien um | Zinsentscheide bewegen den Gesamtmarkt |
-| **Indexfonds** | Hält die NEXA-30-Aktien nach Marktkapitalisierung, kauft bei Indexaufnahme | Kurssprung bei Aufnahme in den Index |
-| **Kleinanleger-Herde** | Reagiert emotional auf News und Hype | Übertreibung in beide Richtungen |
+| Typ                    | Verhalten                                                                  | Sichtbarer Effekt                                 |
+| ---------------------- | -------------------------------------------------------------------------- | ------------------------------------------------- |
+| **Marktmacher**        | Stellt immer Kauf- und Verkaufsangebote mit Spread                         | Grundliquidität, man kann jederzeit handeln       |
+| **Value-Fonds**        | Kauft unter dem fairen Wert, verkauft darüber, reagiert langsam            | Kurse kehren mittelfristig zum fairen Wert zurück |
+| **Momentum-Trader**    | Springt auf Trends auf                                                     | Bewegungen werden verstärkt                       |
+| **Rentenfonds**        | Schichtet je nach Leitzins zwischen Anleihen und Dividendenaktien um       | Zinsentscheide bewegen den Gesamtmarkt            |
+| **Indexfonds**         | Hält die NEXA-30-Aktien nach Marktkapitalisierung, kauft bei Indexaufnahme | Kurssprung bei Aufnahme in den Index              |
+| **Kleinanleger-Herde** | Reagiert emotional auf News und Hype                                       | Übertreibung in beide Richtungen                  |
 
 ### 6.4 Fairer Wert (Kursanker)
 
@@ -263,12 +263,12 @@ Formeln und Pseudocode stehen in `SIMULATION.md`.
   Spieleraktionen) über Textvorlagen mit Variablen. Es gibt keine Nachrichten ohne Ursache im Spielzustand.
 - **Geplante Events mit Countdown:**
 
-| Event | Wirkung |
-|---|---|
-| Zinsentscheid | Leitzins ändert sich, Rotation zwischen Aktien und Anleihen |
-| Quartalszahlen | Kursreaktion je nach Abweichung von der Erwartung |
-| Pharma-Studienergebnis | Binär, ±50 bis 70 % für die betroffene Aktie |
-| Ölpreis-Report | Energie und Logistik reagieren gegenläufig (Ölpreis ↑ → Energie ↑, Logistik ↓) |
+| Event                  | Wirkung                                                                        |
+| ---------------------- | ------------------------------------------------------------------------------ |
+| Zinsentscheid          | Leitzins ändert sich, Rotation zwischen Aktien und Anleihen                    |
+| Quartalszahlen         | Kursreaktion je nach Abweichung von der Erwartung                              |
+| Pharma-Studienergebnis | Binär, ±50 bis 70 % für die betroffene Aktie                                   |
+| Ölpreis-Report         | Energie und Logistik reagieren gegenläufig (Ölpreis ↑ → Energie ↑, Logistik ↓) |
 
 - **Zufällige Makro-Events:** Branchenkrise, Rohstoffschock, Konjunkturdelle, Tech-Boom.
 - Der **Event-Kalender** ist öffentlich. Planbare Events sind die Grundlage für Strategien beider Spielertypen.
@@ -279,13 +279,13 @@ Formeln und Pseudocode stehen in `SIMULATION.md`.
 
 ### 7.1 Branchen
 
-| Branche | Charakter | Typisches Risiko |
-|---|---|---|
-| Tech/Software | Wenig Kapital, langsamer Start, dann explosives Wachstum | Ein Produkt floppt |
-| Einzelhandel | Stabil, kleine Margen, Preiskriege | Konkurrent unterbietet |
-| Energie | Kapitalintensiv, hängt am Rohstoffpreis | Ölpreis-Event |
-| Pharma | Lange Entwicklung, binäre Studienevents | Studie scheitert |
-| Logistik | Skaliert über Mitarbeiter und Fuhrpark | Lohnkosten, Konjunktur |
+| Branche       | Charakter                                                | Typisches Risiko       |
+| ------------- | -------------------------------------------------------- | ---------------------- |
+| Tech/Software | Wenig Kapital, langsamer Start, dann explosives Wachstum | Ein Produkt floppt     |
+| Einzelhandel  | Stabil, kleine Margen, Preiskriege                       | Konkurrent unterbietet |
+| Energie       | Kapitalintensiv, hängt am Rohstoffpreis                  | Ölpreis-Event          |
+| Pharma        | Lange Entwicklung, binäre Studienevents                  | Studie scheitert       |
+| Logistik      | Skaliert über Mitarbeiter und Fuhrpark                   | Lohnkosten, Konjunktur |
 
 ### 7.2 Gemeinsame Nachfrage (Kernprinzip)
 
@@ -302,13 +302,13 @@ Konkurrenten. So entsteht direkte Rivalität ohne Spielkarte.
 
 ### 7.3 Quartalsentscheidungen des Gründers
 
-| Bereich | Entscheidung | Bremse |
-|---|---|---|
-| **Produkt** | Entwicklung starten oder verbessern, neue Produktlinie | Dauert mehrere Quartale (Zeit-Gate) |
-| **Preis** | Marge gegen Marktanteil | Wirkt über die gemeinsame Nachfrage auf alle Konkurrenten und zurück |
-| **Marketing** | Budget für Bekanntheit | Sinkender Grenznutzen: doppeltes Budget bringt etwa +40 % Bekanntheit |
-| **Personal** | Einstellen, entlassen, befördern, Gehälter | Einarbeitungszeit, Loyalität |
-| **Finanzen** | Kredit, Rücklagen, Dividende, Rückkauf, Kapitalerhöhung (nach IPO) | Zinsen, Reputation, Verwässerung |
+| Bereich       | Entscheidung                                                       | Bremse                                                                |
+| ------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| **Produkt**   | Entwicklung starten oder verbessern, neue Produktlinie             | Dauert mehrere Quartale (Zeit-Gate)                                   |
+| **Preis**     | Marge gegen Marktanteil                                            | Wirkt über die gemeinsame Nachfrage auf alle Konkurrenten und zurück  |
+| **Marketing** | Budget für Bekanntheit                                             | Sinkender Grenznutzen: doppeltes Budget bringt etwa +40 % Bekanntheit |
+| **Personal**  | Einstellen, entlassen, befördern, Gehälter                         | Einarbeitungszeit, Loyalität                                          |
+| **Finanzen**  | Kredit, Rücklagen, Dividende, Rückkauf, Kapitalerhöhung (nach IPO) | Zinsen, Reputation, Verwässerung                                      |
 
 **Geld allein darf nicht reichen.** Vier Mechaniken sorgen dafür: Einarbeitungszeit neuer Mitarbeiter,
 sinkender Grenznutzen, Entwicklungszeiten und Fixkosten bei Überexpansion.
@@ -322,11 +322,11 @@ sinkender Grenznutzen, Entwicklungszeiten und Fixkosten bei Überexpansion.
 
 ## 8. Unternehmensstufen
 
-| Typ | Ab Level | Gründungskosten | Fixkosten je Quartal | Max. Mitarbeiter | Kreditrahmen |
-|---|---|---|---|---|---|
-| Kleinunternehmen | 10 | 15.000 € | 2.000 € | 5 | – |
-| GmbH | 20 | 75.000 € | 10.000 € | 20 | bis 250.000 € |
-| AG (vor IPO) | 25 | 300.000 € | 40.000 € | 100 | bis 2 Mio. € |
+| Typ              | Ab Level | Gründungskosten | Fixkosten je Quartal | Max. Mitarbeiter | Kreditrahmen  |
+| ---------------- | -------- | --------------- | -------------------- | ---------------- | ------------- |
+| Kleinunternehmen | 10       | 15.000 €        | 2.000 €              | 5                | –             |
+| GmbH             | 20       | 75.000 €        | 10.000 €             | 20               | bis 250.000 € |
+| AG (vor IPO)     | 25       | 300.000 €       | 40.000 €             | 100              | bis 2 Mio. €  |
 
 - **Umwandlung** in die nächste Stufe gegen Gebühr und mit Level-Voraussetzung.
 - **Ab Level 18** ist ein Kleinunternehmen auf bis zu 20 Mitarbeiter erweiterbar.
@@ -363,12 +363,12 @@ sinkender Grenznutzen, Entwicklungszeiten und Fixkosten bei Überexpansion.
 
 **Prospekt** mit verbindlichen Angaben, die später automatisch geprüft werden:
 
-| Angabe | Prüfung |
-|---|---|
-| Umsatzprognose der nächsten 4 Quartale | Vergleich mit den tatsächlichen Quartalszahlen |
-| Mittelverwendung in Prozent (Expansion, Personal, Rücklage, Finanzanlagen) | Vergleich mit der tatsächlichen Verwendung des Emissionserlöses |
-| Gründer-Lock-up (Standard 4 Quartale) | Verkäufe des Gründers im Lock-up werden technisch gesperrt, die Haltedauer danach wird bewertet |
-| Anteil ausgegebener Aktien | Fix mit dem Prospekt |
+| Angabe                                                                     | Prüfung                                                                                         |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Umsatzprognose der nächsten 4 Quartale                                     | Vergleich mit den tatsächlichen Quartalszahlen                                                  |
+| Mittelverwendung in Prozent (Expansion, Personal, Rücklage, Finanzanlagen) | Vergleich mit der tatsächlichen Verwendung des Emissionserlöses                                 |
+| Gründer-Lock-up (Standard 4 Quartale)                                      | Verkäufe des Gründers im Lock-up werden technisch gesperrt, die Haltedauer danach wird bewertet |
+| Anteil ausgegebener Aktien                                                 | Fix mit dem Prospekt                                                                            |
 
 **Bookbuilding:**
 
@@ -398,13 +398,13 @@ Ein erfolgreicher IPO bringt 5.000 XP und den Erfolg „Glockenschläger“.
   - die Kreditzinsen,
   - den Zugang zum IPO.
 
-| Erhöht | Senkt |
-|---|---|
-| Prognosen eingehalten | Prognosen verfehlt (z. B. > 30 % Abweichung) |
-| Lock-up eingehalten, lange gehalten | Dumping nach dem IPO |
-| Verlässliche Dividende | Ständige Kapitalerhöhungen |
-| Prospekt-Mittelverwendung eingehalten | Mittel abweichend vom Prospekt verwendet |
-| Mitarbeiter bleiben lange | Insider-Verstoß aufgedeckt |
+| Erhöht                                | Senkt                                        |
+| ------------------------------------- | -------------------------------------------- |
+| Prognosen eingehalten                 | Prognosen verfehlt (z. B. > 30 % Abweichung) |
+| Lock-up eingehalten, lange gehalten   | Dumping nach dem IPO                         |
+| Verlässliche Dividende                | Ständige Kapitalerhöhungen                   |
+| Prospekt-Mittelverwendung eingehalten | Mittel abweichend vom Prospekt verwendet     |
+| Mitarbeiter bleiben lange             | Insider-Verstoß aufgedeckt                   |
 
 Weitere Reputationsverluste: geplatzter IPO, Insolvenz, Spielerbankrott.
 
@@ -444,24 +444,24 @@ möglicher Käufer stellt sicher, dass die Mechanik auch mit 4 Spielern vorkommt
 
 ### 12.1 KI-Mitarbeiter
 
-| Attribut | Wertebereich |
-|---|---|
-| Name | generiert |
-| Fachgebiet | Entwicklung, Vertrieb, Produktion, Finanzen, Marketing |
-| Skill | 1 bis 10 |
-| Gehalt | je Quartal |
-| Loyalität | in Prozent |
+| Attribut    | Wertebereich                                                                               |
+| ----------- | ------------------------------------------------------------------------------------------ |
+| Name        | generiert                                                                                  |
+| Fachgebiet  | Entwicklung, Vertrieb, Produktion, Finanzen, Marketing                                     |
+| Skill       | 1 bis 10                                                                                   |
+| Gehalt      | je Quartal                                                                                 |
+| Loyalität   | in Prozent                                                                                 |
 | Eigenschaft | eine je Mitarbeiter, z. B. „Ehrgeizig“: +15 % Leistung, kündigt bei Gehaltsstopp schneller |
 
 - **Normale Mitarbeiter** erhöhen die Kapazität ihrer Abteilung, nach einer Einarbeitungszeit.
 - **Führungspositionen** schalten Fähigkeiten frei:
 
-| Position | Wirkung |
-|---|---|
-| CFO | Senkt die Kreditzinsen, macht die Guidance-Spanne enger, ist IPO-Voraussetzung |
-| CTO | Verkürzt Entwicklungszeiten |
-| COO | Fähigkeit im Bereich Produktion und Kapazität (Details in `SIMULATION.md`) |
-| Vertriebsleitung | Kampagnen und Preisaktionen |
+| Position         | Wirkung                                                                        |
+| ---------------- | ------------------------------------------------------------------------------ |
+| CFO              | Senkt die Kreditzinsen, macht die Guidance-Spanne enger, ist IPO-Voraussetzung |
+| CTO              | Verkürzt Entwicklungszeiten                                                    |
+| COO              | Fähigkeit im Bereich Produktion und Kapazität (Details in `SIMULATION.md`)     |
+| Vertriebsleitung | Kampagnen und Preisaktionen                                                    |
 
 - Der **Bewerberpool** wird jedes Quartal neu generiert.
 - **Abwerben** durch Konkurrenten mit höherem Gehalt ist möglich. Auch KI-Firmen werben ab.
@@ -503,42 +503,42 @@ Jeder Spieler beginnt mit **10.000 €** (ADR-011).
 
 ### 13.3 Jobs
 
-| Stufe | Ab Level | Beispiel | Gehalt je Stunde |
-|---|---|---|---|
-| Praktikant | 2 | Assistenz bei Brotzeit Handel | 150 € |
-| Junior | 5 | Junior-Analyst bei Volta Energie | 300 € |
-| Senior | 12 | Senior Sales bei NeuroPharm | 700 € |
-| Teamleitung | 20 | Leitung Vertrieb | 1.300 € |
-| C-Level | 25 | CFO (Spielerfirmen oder große KI-Firmen) | 2.500 € + Optionen |
+| Stufe       | Ab Level | Beispiel                                 | Gehalt je Stunde   |
+| ----------- | -------- | ---------------------------------------- | ------------------ |
+| Praktikant  | 2        | Assistenz bei Brotzeit Handel            | 150 €              |
+| Junior      | 5        | Junior-Analyst bei Volta Energie         | 300 €              |
+| Senior      | 12       | Senior Sales bei NeuroPharm              | 700 €              |
+| Teamleitung | 20       | Leitung Vertrieb                         | 1.300 €            |
+| C-Level     | 25       | CFO (Spielerfirmen oder große KI-Firmen) | 2.500 € + Optionen |
 
 - Das Gehalt läuft **passiv**, höchstens **12 bezahlte Stunden pro Tag**.
 - **Arbeitsaufgaben** erscheinen alle paar Stunden, dauern 20 bis 60 Sekunden und bringen Bonus und XP:
 
-| Rolle | Beispielaufgabe |
-|---|---|
-| Analyst | Quartalszahlen einer Firma schätzen |
-| Vertrieb | Aus 3 Kundenprofilen das beste wählen |
+| Rolle    | Beispielaufgabe                           |
+| -------- | ----------------------------------------- |
+| Analyst  | Quartalszahlen einer Firma schätzen       |
+| Vertrieb | Aus 3 Kundenprofilen das beste wählen     |
 | Finanzen | Zwischen zwei Kreditangeboten entscheiden |
 
 ### 13.4 Gehaltsentwicklung
 
-| Hebel | Regel |
-|---|---|
-| Berufserfahrung | Wächst pro Arbeitsstunde |
-| Beförderung | Bei Erfahrungsschwellen, +10 bis 20 % Gehalt |
+| Hebel              | Regel                                                                   |
+| ------------------ | ----------------------------------------------------------------------- |
+| Berufserfahrung    | Wächst pro Arbeitsstunde                                                |
+| Beförderung        | Bei Erfahrungsschwellen, +10 bis 20 % Gehalt                            |
 | Gehaltsverhandlung | Einmal pro Woche, Erfolgschance nach Erfahrung, Leistung und Firmenlage |
-| Jobwechsel | Meist das größte Plus, setzt aber den Beförderungsfortschritt zurück |
+| Jobwechsel         | Meist das größte Plus, setzt aber den Beförderungsfortschritt zurück    |
 
 ### 13.5 Anreize, bei echten Spielern zu arbeiten
 
-| Vorteil | KI-Firma | Spielerfirma |
-|---|---|---|
-| XP pro Arbeitsstunde | 1× | 1,5× |
-| Erfahrungszuwachs | 1× | 2× |
-| Aktienoptionen | Nein | Ja |
-| Führungsrollen mit Entscheidungen | Nur C-Level großer Firmen | Ab Teamleitung |
-| Vorabwissen Quartalszahlen | Nein | Ja (mit Sperrfrist) |
-| Erfolgsbonus | Fix | Steigt mit Firmengewinn |
+| Vorteil                           | KI-Firma                  | Spielerfirma            |
+| --------------------------------- | ------------------------- | ----------------------- |
+| XP pro Arbeitsstunde              | 1×                        | 1,5×                    |
+| Erfahrungszuwachs                 | 1×                        | 2×                      |
+| Aktienoptionen                    | Nein                      | Ja                      |
+| Führungsrollen mit Entscheidungen | Nur C-Level großer Firmen | Ab Teamleitung          |
+| Vorabwissen Quartalszahlen        | Nein                      | Ja (mit Sperrfrist)     |
+| Erfolgsbonus                      | Fix                       | Steigt mit Firmengewinn |
 
 KI-Jobs sind immer verfügbar. Die Karriere funktioniert deshalb auch dann, wenn kein anderer Spieler eine
 Firma hat.
@@ -553,11 +553,11 @@ Firma hat.
 XP für Level n → n+1 = round(100 × n^1.5)
 ```
 
-| Schritt | XP |
-|---|---|
-| 1 → 2 | 100 |
-| 10 → 11 | ca. 3.160 |
-| 20 → 21 | ca. 8.940 |
+| Schritt                    | XP         |
+| -------------------------- | ---------- |
+| 1 → 2                      | 100        |
+| 10 → 11                    | ca. 3.160  |
+| 20 → 21                    | ca. 8.940  |
 | 50 (Formelwert für n = 50) | ca. 35.360 |
 
 - **Maximallevel 50.** Später ist ein Prestige-System möglich (nicht im MVP).
@@ -566,40 +566,40 @@ XP für Level n → n+1 = round(100 × n^1.5)
 
 ### 14.2 XP-Quellen und Missbrauchsschutz
 
-| Aktion | XP | Schutz |
-|---|---|---|
-| Trade ausführen | 10 | Nur die ersten 30 Trades pro Tag. Kauf und Rückverkauf innerhalb weniger Minuten geben keine XP (Wash-Trading). |
-| Trade mit Gewinn schließen | +1 je 100 € Gewinn | Max. 500 pro Trade |
-| Arbeitsstunde | 40 (×1,5 bei Spielerfirma) | Max. 12 h pro Tag |
-| Arbeitsaufgabe | 50 bis 150 nach Qualität | – |
-| Tägliche Mission | 200 bis 400 | 3 pro Tag |
-| Täglicher Login | 50 + Streak-Bonus | – |
-| Firmenquartal mit Gewinn | 500 | – |
-| Erfolgreicher IPO | 5.000 | – |
-| Erfolg freigeschaltet | 100 bis 10.000 | – |
+| Aktion                     | XP                         | Schutz                                                                                                          |
+| -------------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Trade ausführen            | 10                         | Nur die ersten 30 Trades pro Tag. Kauf und Rückverkauf innerhalb weniger Minuten geben keine XP (Wash-Trading). |
+| Trade mit Gewinn schließen | +1 je 100 € Gewinn         | Max. 500 pro Trade                                                                                              |
+| Arbeitsstunde              | 40 (×1,5 bei Spielerfirma) | Max. 12 h pro Tag                                                                                               |
+| Arbeitsaufgabe             | 50 bis 150 nach Qualität   | –                                                                                                               |
+| Tägliche Mission           | 200 bis 400                | 3 pro Tag                                                                                                       |
+| Täglicher Login            | 50 + Streak-Bonus          | –                                                                                                               |
+| Firmenquartal mit Gewinn   | 500                        | –                                                                                                               |
+| Erfolgreicher IPO          | 5.000                      | –                                                                                                               |
+| Erfolg freigeschaltet      | 100 bis 10.000             | –                                                                                                               |
 
 XP werden ausschließlich serverseitig vergeben (ADR-008). XP sind nicht kaufbar und nicht übertragbar.
 
 ### 14.3 Freischaltungen
 
-| Level | Freischaltung |
-|---|---|
-| 1 | Aktien kaufen und verkaufen (Market-Order), Grundeinkommen |
-| 2 | Erster Job (Praktikant) |
-| 3 | Limit-Order, Watchlist |
-| 5 | Stop-Loss, Staatsanleihen mit Laufzeiten, Junior-Jobs |
-| 7 | Analystenberichte (Kursziele) |
-| 8 | Leerverkäufe (Short) |
-| 10 | **Kleinunternehmen gründen** |
-| 12 | Hebel 2×, Senior-Jobs |
-| 15 | Kleinkredit bis 50.000 €, Business Angel werden |
-| 18 | Hebel 5×, Unternehmen auf 20 Mitarbeiter erweitern |
-| 20 | GmbH gründen, Kredite bis 250.000 €, Teamleitung |
-| 25 | IPO, C-Level-Jobs |
-| 30 | Hebel 10×, Optionen (Calls/Puts) |
-| 35 | Übernahmen, feindliche Übernahmeangebote |
-| 40 | Holding: mehrere Firmen gleichzeitig |
-| 50 | Titel „Börsenlegende“, goldener Profilrahmen, Hall of Fame |
+| Level | Freischaltung                                              |
+| ----- | ---------------------------------------------------------- |
+| 1     | Aktien kaufen und verkaufen (Market-Order), Grundeinkommen |
+| 2     | Erster Job (Praktikant)                                    |
+| 3     | Limit-Order, Watchlist                                     |
+| 5     | Stop-Loss, Staatsanleihen mit Laufzeiten, Junior-Jobs      |
+| 7     | Analystenberichte (Kursziele)                              |
+| 8     | Leerverkäufe (Short)                                       |
+| 10    | **Kleinunternehmen gründen**                               |
+| 12    | Hebel 2×, Senior-Jobs                                      |
+| 15    | Kleinkredit bis 50.000 €, Business Angel werden            |
+| 18    | Hebel 5×, Unternehmen auf 20 Mitarbeiter erweitern         |
+| 20    | GmbH gründen, Kredite bis 250.000 €, Teamleitung           |
+| 25    | IPO, C-Level-Jobs                                          |
+| 30    | Hebel 10×, Optionen (Calls/Puts)                           |
+| 35    | Übernahmen, feindliche Übernahmeangebote                   |
+| 40    | Holding: mehrere Firmen gleichzeitig                       |
+| 50    | Titel „Börsenlegende“, goldener Profilrahmen, Hall of Fame |
 
 ### 14.4 Inszenierung
 
@@ -618,16 +618,16 @@ immer klar, worauf man hinarbeitet.
 
 ### 15.1 Ordertypen
 
-| Ordertyp | Ab Level |
-|---|---|
-| Market | 1 |
-| Limit | 3 |
-| Stop-Loss | 5 |
-| Short (Leerverkauf) | 8 |
-| Hebel 2× | 12 |
-| Hebel 5× | 18 |
-| Hebel 10× | 30 |
-| Optionen (Calls/Puts) | 30 |
+| Ordertyp              | Ab Level |
+| --------------------- | -------- |
+| Market                | 1        |
+| Limit                 | 3        |
+| Stop-Loss             | 5        |
+| Short (Leerverkauf)   | 8        |
+| Hebel 2×              | 12       |
+| Hebel 5×              | 18       |
+| Hebel 10×             | 30       |
+| Optionen (Calls/Puts) | 30       |
 
 ### 15.2 Ausführung
 
@@ -638,12 +638,12 @@ immer klar, worauf man hinarbeitet.
 
 ### 15.3 Kosten
 
-| Kostenart | Startwert |
-|---|---|
-| Ordergebühr | 1 € fix je Order |
-| Spread | Ergibt sich aus den Marktmacher-Quotes, nachbörslich größer |
+| Kostenart                      | Startwert                                                         |
+| ------------------------------ | ----------------------------------------------------------------- |
+| Ordergebühr                    | 1 € fix je Order                                                  |
+| Spread                         | Ergibt sich aus den Marktmacher-Quotes, nachbörslich größer       |
 | Finanzierungskosten über Nacht | Für Hebel- und Short-Positionen. Dauerhebel verliert langfristig. |
-| Leihgebühr | Für Short-Positionen |
+| Leihgebühr                     | Für Short-Positionen                                              |
 
 ### 15.4 Steuern
 
@@ -669,13 +669,13 @@ Dividenden haben einen Ex-Tag und werden zum Quartalsende ausgezahlt (zur Lage d
 
 ### 15.8 Zocken und schlau sein: beides belohnen
 
-| Für Zocker | Für Analytiker |
-|---|---|
-| Pennystocks (±30 % am Tag) | Echte Fundamentaldaten, die die KI-Investoren verwenden |
-| Hebel und Shorts | Event-Kalender |
-| Binäre Pharma-Events | Analystenkursziele (manchmal falsch) |
-| Hype bei Spieler-IPOs | Branchenzusammenhänge (Ölpreis ↑ → Energie ↑, Logistik ↓) |
-| | Insiderwissen über Jobs |
+| Für Zocker                 | Für Analytiker                                            |
+| -------------------------- | --------------------------------------------------------- |
+| Pennystocks (±30 % am Tag) | Echte Fundamentaldaten, die die KI-Investoren verwenden   |
+| Hebel und Shorts           | Event-Kalender                                            |
+| Binäre Pharma-Events       | Analystenkursziele (manchmal falsch)                      |
+| Hype bei Spieler-IPOs      | Branchenzusammenhänge (Ölpreis ↑ → Energie ↑, Logistik ↓) |
+|                            | Insiderwissen über Jobs                                   |
 
 **Balancing-Ziel:** Zocker gewinnen gelegentlich groß, fundierte Spieler liegen langfristig vorne. Dafür
 sorgen die laufenden Kosten gehebelter Positionen, die Steuer, die Rückkehr der Kurse zum fairen Wert und die
@@ -687,17 +687,17 @@ Tatsache, dass die KI-Investoren dieselben Fundamentaldaten verwenden, die der S
 
 Die fünf Zeitebenen stehen in [Abschnitt 4.2](#42-schleifen-nach-zeitebene). Hier die einzelnen Systeme.
 
-| System | Regel |
-|---|---|
-| **Login-Streak** | Täglicher Login gibt 50 XP plus wachsenden Streak-Bonus. 1 Streak-Schutz pro Woche fängt einen verpassten Tag auf. |
-| **Tägliche Missionen** | 3 pro Tag, je 200 bis 400 XP |
-| **Börsenglocke** | Eröffnung um 8 Uhr mit Eröffnungsbonus für die erste Handelsstunde (Inhalt des Bonus: Frage 17) |
-| **Tresor** | Bis zu 800 € alle 8 Stunden abholen |
-| **Freundes-Liga** | Wochenrangliste nach Portfolio-Wachstum in **Prozent**, damit Neue mithalten können. Platz 1 bekommt einen Titel. |
-| **Wochen-Challenge** | Eine größere Aufgabe pro Woche |
-| **Gehaltsverhandlung** | Einmal pro Woche |
-| **Firmenmeilensteine** | Erste 100.000 € Umsatz, erster Gewinn, IPO, Aufnahme in den NEXA 30 |
-| **Hall of Fame** | Dauerhafte Bestenliste, ab Level 50 |
+| System                 | Regel                                                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Login-Streak**       | Täglicher Login gibt 50 XP plus wachsenden Streak-Bonus. 1 Streak-Schutz pro Woche fängt einen verpassten Tag auf. |
+| **Tägliche Missionen** | 3 pro Tag, je 200 bis 400 XP                                                                                       |
+| **Börsenglocke**       | Eröffnung um 8 Uhr mit Eröffnungsbonus für die erste Handelsstunde (Inhalt des Bonus: Frage 17)                    |
+| **Tresor**             | Bis zu 800 € alle 8 Stunden abholen                                                                                |
+| **Freundes-Liga**      | Wochenrangliste nach Portfolio-Wachstum in **Prozent**, damit Neue mithalten können. Platz 1 bekommt einen Titel.  |
+| **Wochen-Challenge**   | Eine größere Aufgabe pro Woche                                                                                     |
+| **Gehaltsverhandlung** | Einmal pro Woche                                                                                                   |
+| **Firmenmeilensteine** | Erste 100.000 € Umsatz, erster Gewinn, IPO, Aufnahme in den NEXA 30                                                |
+| **Hall of Fame**       | Dauerhafte Bestenliste, ab Level 50                                                                                |
 
 Grundsatz: Belohnungen sind Spielgeld, XP, Titel und Kosmetik. Keine Belohnung ist kaufbar.
 
@@ -710,62 +710,62 @@ Grundsatz: Belohnungen sind Spielgeld, XP, Titel und Kosmetik. Keine Belohnung i
 - Einige Erfolge sind bewusst „negativ“ (Totalverlust, Pleitegeier, Erwischt). Sie gehören zum Humor des Spiels.
 - Erfolge werden mit dem Meilenstein aktiv, in dem ihre Mechanik entsteht (siehe `ROADMAP.md`).
 
-| Nr. | Name | Bedingung | Kategorie |
-|---|---|---|---|
-| 1 | All In | Einen Trade mit 10×-Hebel mit Gewinn schließen | Trading |
-| 2 | Wolf der NEXA | 100.000 € Gewinn an einem Tag | Trading |
-| 3 | Totalverlust | Eine Position liquidiert bekommen | Trading |
-| 4 | Diamond Hands | Eine Aktie 14 Tage halten und mit +50 % verkaufen | Trading |
-| 5 | Orakel | 5 Quartalszahlen in Folge richtig geschätzt | Karriere |
-| 6 | Rentier | 10.000 € Dividende in einer Woche | Vermögen |
-| 7 | Glockenschläger | Die eigene Firma an die Börse gebracht | Unternehmen |
-| 8 | Index-Aufsteiger | Die eigene Firma im NEXA 30 | Unternehmen |
-| 9 | Erster Handel | Den ersten Trade ausführen | Trading |
-| 10 | Limit-Fuchs | 10 Limit-Orders ausgeführt bekommen | Trading |
-| 11 | Sicherheitsnetz | Zum ersten Mal von einem Stop-Loss ausgestoppt werden | Trading |
-| 12 | Bärenjäger | Eine Short-Position mit mindestens 20 % Gewinn schließen | Trading |
-| 13 | Pfennigfuchser | Mit einer Pennystock-Position mindestens 100 % Gewinn realisieren | Trading |
-| 14 | Frühaufsteher | An 7 Tagen in Folge in der ersten Handelsstunde handeln | Trading |
-| 15 | Nachteule | 10 Trades im nachbörslichen Handel ausführen | Trading |
-| 16 | Studienglück | Eine Pharma-Aktie über ein positives Studienergebnis halten und mit mindestens 50 % Gewinn verkaufen | Trading |
-| 17 | Gegen den Strom | Einen Tag im Plus beenden, an dem der NEXA 30 mindestens 5 % verliert | Trading |
-| 18 | Dauerläufer | Insgesamt 500 Trades ausführen | Trading |
-| 19 | Steuerzahler | Insgesamt 100.000 € Steuern auf Kursgewinne zahlen | Trading |
-| 20 | Sparstrumpf | Eine Staatsanleihe bis zur Fälligkeit halten | Vermögen |
-| 21 | Leiterbauer | Gleichzeitig Anleihen aller vier Laufzeiten halten | Vermögen |
-| 22 | Breit aufgestellt | Gleichzeitig Aktien aus allen 5 Branchen halten | Vermögen |
-| 23 | Erste Million | Gesamtvermögen von 1 Mio. € erreichen | Vermögen |
-| 24 | Achtstellig | Gesamtvermögen von 10 Mio. € erreichen | Vermögen |
-| 25 | Hundert-Millionen-Klub | Gesamtvermögen von 100 Mio. € erreichen | Vermögen |
-| 26 | Pleitegeier | Bankrott gehen | Vermögen |
-| 27 | Stehaufmännchen | Nach einem Bankrott wieder 100.000 € Gesamtvermögen erreichen | Vermögen |
-| 28 | Erster Arbeitstag | Den ersten Job antreten | Karriere |
-| 29 | Musterschüler | 10 Arbeitsaufgaben mit Bestwertung abschließen | Karriere |
-| 30 | Aufsteiger | Die erste Beförderung erhalten | Karriere |
-| 31 | Verhandlungsgeschick | 3 Gehaltsverhandlungen in Folge gewinnen | Karriere |
-| 32 | Chefetage | Einen C-Level-Job antreten | Karriere |
-| 33 | Seitenwechsler | Von einer Spielerfirma zu einem Konkurrenten derselben Branche wechseln | Karriere |
-| 34 | Gründergeist | Das erste Unternehmen gründen | Unternehmen |
-| 35 | Schwarze Null | Das erste Firmenquartal mit Gewinn abschließen | Unternehmen |
-| 36 | Sechsstellig | Mit der eigenen Firma insgesamt 100.000 € Umsatz erreichen | Unternehmen |
-| 37 | Marktführer | In einem Quartal den höchsten Marktanteil der Branche halten | Unternehmen |
-| 38 | Arbeitgeber | 20 Mitarbeiter gleichzeitig beschäftigen | Unternehmen |
-| 39 | Wort gehalten | 4 Quartale in Folge die eigene Guidance einhalten | Unternehmen |
-| 40 | Dividendenkönig | 8 Quartale in Folge eine Dividende zahlen | Unternehmen |
-| 41 | Weißer Ritter | Eine Firma per Rettungsübernahme übernehmen | Unternehmen |
-| 42 | Phönix | Nach einer Insolvenz mit einer neuen Firma ein Gewinnquartal abschließen | Unternehmen |
-| 43 | Musterbürger | Reputation 90 erreichen | Unternehmen |
-| 44 | Engel | Als Business Angel an einer Firma beteiligt sein, die an die Börse geht | Sozial |
-| 45 | Erwischt | Von der Finanzaufsicht bei einem Insider-Verstoß entdeckt werden | Sozial |
-| 46 | Wochensieger | Eine Woche der Freundes-Liga gewinnen | Sozial |
-| 47 | Seriensieger | Die Freundes-Liga 3 Wochen in Folge gewinnen | Sozial |
-| 48 | Stammgast | Login-Streak von 30 Tagen | Fortschritt |
-| 49 | Dauerbrenner | Login-Streak von 100 Tagen | Fortschritt |
-| 50 | Pflichtbewusst | 50 tägliche Missionen abschließen | Fortschritt |
-| 51 | Tresorknacker | Den Tresor 50-mal leeren | Fortschritt |
-| 52 | Lebemann | Das erste Statussymbol kaufen | Lebensstil |
-| 53 | Inselbesitzer | Die eigene Insel kaufen | Lebensstil |
-| 54 | Börsenlegende | Level 50 erreichen | Fortschritt |
+| Nr. | Name                   | Bedingung                                                                                            | Kategorie   |
+| --- | ---------------------- | ---------------------------------------------------------------------------------------------------- | ----------- |
+| 1   | All In                 | Einen Trade mit 10×-Hebel mit Gewinn schließen                                                       | Trading     |
+| 2   | Wolf der NEXA          | 100.000 € Gewinn an einem Tag                                                                        | Trading     |
+| 3   | Totalverlust           | Eine Position liquidiert bekommen                                                                    | Trading     |
+| 4   | Diamond Hands          | Eine Aktie 14 Tage halten und mit +50 % verkaufen                                                    | Trading     |
+| 5   | Orakel                 | 5 Quartalszahlen in Folge richtig geschätzt                                                          | Karriere    |
+| 6   | Rentier                | 10.000 € Dividende in einer Woche                                                                    | Vermögen    |
+| 7   | Glockenschläger        | Die eigene Firma an die Börse gebracht                                                               | Unternehmen |
+| 8   | Index-Aufsteiger       | Die eigene Firma im NEXA 30                                                                          | Unternehmen |
+| 9   | Erster Handel          | Den ersten Trade ausführen                                                                           | Trading     |
+| 10  | Limit-Fuchs            | 10 Limit-Orders ausgeführt bekommen                                                                  | Trading     |
+| 11  | Sicherheitsnetz        | Zum ersten Mal von einem Stop-Loss ausgestoppt werden                                                | Trading     |
+| 12  | Bärenjäger             | Eine Short-Position mit mindestens 20 % Gewinn schließen                                             | Trading     |
+| 13  | Pfennigfuchser         | Mit einer Pennystock-Position mindestens 100 % Gewinn realisieren                                    | Trading     |
+| 14  | Frühaufsteher          | An 7 Tagen in Folge in der ersten Handelsstunde handeln                                              | Trading     |
+| 15  | Nachteule              | 10 Trades im nachbörslichen Handel ausführen                                                         | Trading     |
+| 16  | Studienglück           | Eine Pharma-Aktie über ein positives Studienergebnis halten und mit mindestens 50 % Gewinn verkaufen | Trading     |
+| 17  | Gegen den Strom        | Einen Tag im Plus beenden, an dem der NEXA 30 mindestens 5 % verliert                                | Trading     |
+| 18  | Dauerläufer            | Insgesamt 500 Trades ausführen                                                                       | Trading     |
+| 19  | Steuerzahler           | Insgesamt 100.000 € Steuern auf Kursgewinne zahlen                                                   | Trading     |
+| 20  | Sparstrumpf            | Eine Staatsanleihe bis zur Fälligkeit halten                                                         | Vermögen    |
+| 21  | Leiterbauer            | Gleichzeitig Anleihen aller vier Laufzeiten halten                                                   | Vermögen    |
+| 22  | Breit aufgestellt      | Gleichzeitig Aktien aus allen 5 Branchen halten                                                      | Vermögen    |
+| 23  | Erste Million          | Gesamtvermögen von 1 Mio. € erreichen                                                                | Vermögen    |
+| 24  | Achtstellig            | Gesamtvermögen von 10 Mio. € erreichen                                                               | Vermögen    |
+| 25  | Hundert-Millionen-Klub | Gesamtvermögen von 100 Mio. € erreichen                                                              | Vermögen    |
+| 26  | Pleitegeier            | Bankrott gehen                                                                                       | Vermögen    |
+| 27  | Stehaufmännchen        | Nach einem Bankrott wieder 100.000 € Gesamtvermögen erreichen                                        | Vermögen    |
+| 28  | Erster Arbeitstag      | Den ersten Job antreten                                                                              | Karriere    |
+| 29  | Musterschüler          | 10 Arbeitsaufgaben mit Bestwertung abschließen                                                       | Karriere    |
+| 30  | Aufsteiger             | Die erste Beförderung erhalten                                                                       | Karriere    |
+| 31  | Verhandlungsgeschick   | 3 Gehaltsverhandlungen in Folge gewinnen                                                             | Karriere    |
+| 32  | Chefetage              | Einen C-Level-Job antreten                                                                           | Karriere    |
+| 33  | Seitenwechsler         | Von einer Spielerfirma zu einem Konkurrenten derselben Branche wechseln                              | Karriere    |
+| 34  | Gründergeist           | Das erste Unternehmen gründen                                                                        | Unternehmen |
+| 35  | Schwarze Null          | Das erste Firmenquartal mit Gewinn abschließen                                                       | Unternehmen |
+| 36  | Sechsstellig           | Mit der eigenen Firma insgesamt 100.000 € Umsatz erreichen                                           | Unternehmen |
+| 37  | Marktführer            | In einem Quartal den höchsten Marktanteil der Branche halten                                         | Unternehmen |
+| 38  | Arbeitgeber            | 20 Mitarbeiter gleichzeitig beschäftigen                                                             | Unternehmen |
+| 39  | Wort gehalten          | 4 Quartale in Folge die eigene Guidance einhalten                                                    | Unternehmen |
+| 40  | Dividendenkönig        | 8 Quartale in Folge eine Dividende zahlen                                                            | Unternehmen |
+| 41  | Weißer Ritter          | Eine Firma per Rettungsübernahme übernehmen                                                          | Unternehmen |
+| 42  | Phönix                 | Nach einer Insolvenz mit einer neuen Firma ein Gewinnquartal abschließen                             | Unternehmen |
+| 43  | Musterbürger           | Reputation 90 erreichen                                                                              | Unternehmen |
+| 44  | Engel                  | Als Business Angel an einer Firma beteiligt sein, die an die Börse geht                              | Sozial      |
+| 45  | Erwischt               | Von der Finanzaufsicht bei einem Insider-Verstoß entdeckt werden                                     | Sozial      |
+| 46  | Wochensieger           | Eine Woche der Freundes-Liga gewinnen                                                                | Sozial      |
+| 47  | Seriensieger           | Die Freundes-Liga 3 Wochen in Folge gewinnen                                                         | Sozial      |
+| 48  | Stammgast              | Login-Streak von 30 Tagen                                                                            | Fortschritt |
+| 49  | Dauerbrenner           | Login-Streak von 100 Tagen                                                                           | Fortschritt |
+| 50  | Pflichtbewusst         | 50 tägliche Missionen abschließen                                                                    | Fortschritt |
+| 51  | Tresorknacker          | Den Tresor 50-mal leeren                                                                             | Fortschritt |
+| 52  | Lebemann               | Das erste Statussymbol kaufen                                                                        | Lebensstil  |
+| 53  | Inselbesitzer          | Die eigene Insel kaufen                                                                              | Lebensstil  |
+| 54  | Börsenlegende          | Level 50 erreichen                                                                                   | Fortschritt |
 
 Die XP je Erfolg werden in `BALANCING.md` gestaffelt (Vorschlag: Einstiegserfolge 100, mittlere 500 bis 2.000,
 seltene 5.000, „Index-Aufsteiger“ und „Börsenlegende“ 10.000).
@@ -777,13 +777,13 @@ seltene 5.000, „Index-Aufsteiger“ und „Börsenlegende“ 10.000).
 Statussymbole sind im Profil sichtbar, haben **laufende Unterhaltskosten** und teils kleine Boni. Sie sind
 Statusanzeige und Geldsenke zugleich (Systemkonto `upkeep`, ADR-007). Alle werden als Pixel-Art dargestellt.
 
-| Statussymbol | Kaufpreis | Bonus |
-|---|---|---|
-| Rolex | 25.000 € | – |
-| Porsche | 150.000 € | – |
-| Penthouse | 1,5 Mio. € | +5 % Reputation |
-| Privatjet | 20 Mio. € | – |
-| Eigene Insel | 100 Mio. € | – |
+| Statussymbol | Kaufpreis  | Bonus           |
+| ------------ | ---------- | --------------- |
+| Rolex        | 25.000 €   | –               |
+| Porsche      | 150.000 €  | –               |
+| Penthouse    | 1,5 Mio. € | +5 % Reputation |
+| Privatjet    | 20 Mio. €  | –               |
+| Eigene Insel | 100 Mio. € | –               |
 
 Die Höhe der Unterhaltskosten und die genaue Wirkung von „+5 % Reputation“ gibt der Prompt nicht vor
 (Fragen 18 und 19).
@@ -794,11 +794,11 @@ Die Höhe der Unterhaltskosten und die genaue Wirkung von „+5 % Reputation“ 
 
 Zufallsereignisse sind kostenlos und **nie kaufbar**. Sie treffen einzelne Spieler, nicht den Markt.
 
-| Ereignis | Wirkung |
-|---|---|
-| Erbschaft | +5.000 € |
-| Steuerprüfung | −3 % Cash |
-| Headhunter | Angebot mit +30 % Gehalt |
+| Ereignis              | Wirkung                                                 |
+| --------------------- | ------------------------------------------------------- |
+| Erbschaft             | +5.000 €                                                |
+| Steuerprüfung         | −3 % Cash                                               |
+| Headhunter            | Angebot mit +30 % Gehalt                                |
 | Tipp aus dem Golfclub | Hinweis auf eine Kursbewegung, stimmt in 60 % der Fälle |
 
 Zufall kommt serverseitig aus einem seedbaren Generator (ADR-012). Ereignisse sind damit nachvollziehbar und
@@ -835,16 +835,16 @@ auch mit 4 Spielern vorkommt. Wo das nicht selbstverständlich ist, steht es in
 
 Das Spiel soll spannend sein, ohne Muster zu verwenden, die Stores oder Behörden problematisch finden.
 
-| Regel | Umsetzung |
-|---|---|
-| Kein Echtgeld im Zock-Kreislauf | Spielgeld ist nicht kaufbar und nicht auszahlbar |
-| Keine bezahlten Zufallsboxen | Zufallsereignisse sind kostenlos und nie kaufbar |
-| Keine manipulativen Countdown-Kaufangebote | Countdowns gibt es nur für Spielereignisse (Events, Quartalszahlen), nie für Angebote |
-| Push optional und gedeckelt | Opt-in, einzeln abschaltbar, Obergrenze pro Tag |
-| Sounds und Animationen abschaltbar | Einstellungen, zusätzlich wird `prefers-reduced-motion` respektiert |
-| Transparenz über die eigene Spielzeit | Optionale Statistik zur Spielzeit im Profil |
-| Risiko sichtbar machen | Liquidationspreis immer sichtbar, „Zum Kaufen halten“ bei großen oder gehebelten Orders |
-| 18+ | Bestätigung bei der Registrierung (ADR-010) |
+| Regel                                      | Umsetzung                                                                               |
+| ------------------------------------------ | --------------------------------------------------------------------------------------- |
+| Kein Echtgeld im Zock-Kreislauf            | Spielgeld ist nicht kaufbar und nicht auszahlbar                                        |
+| Keine bezahlten Zufallsboxen               | Zufallsereignisse sind kostenlos und nie kaufbar                                        |
+| Keine manipulativen Countdown-Kaufangebote | Countdowns gibt es nur für Spielereignisse (Events, Quartalszahlen), nie für Angebote   |
+| Push optional und gedeckelt                | Opt-in, einzeln abschaltbar, Obergrenze pro Tag                                         |
+| Sounds und Animationen abschaltbar         | Einstellungen, zusätzlich wird `prefers-reduced-motion` respektiert                     |
+| Transparenz über die eigene Spielzeit      | Optionale Statistik zur Spielzeit im Profil                                             |
+| Risiko sichtbar machen                     | Liquidationspreis immer sichtbar, „Zum Kaufen halten“ bei großen oder gehebelten Orders |
+| 18+                                        | Bestätigung bei der Registrierung (ADR-010)                                             |
 
 Verpasste Sitzungen sollen wenig kosten: Der Tresor fasst 8 Stunden, der Streak hat einen Schutz pro Woche,
 und die Liga misst Prozent statt absolute Beträge.
@@ -855,18 +855,18 @@ und die Liga misst Prozent statt absolute Beträge.
 
 Die technische Umsetzung steht in `ARCHITECTURE.md` und `DATA_MODEL.md`. Für den Spieler bedeutet sie:
 
-| Zusage an den Spieler | Mechanik dahinter |
-|---|---|
-| Niemand kann sich Geld, Aktien oder XP ercheaten | Server-Autorität, alle Aktionen als geprüfte RPCs (ADR-008) |
-| Jeder Kontostand ist nachvollziehbar | Unveränderliches Ledger mit doppelter Buchführung (ADR-007). Die Handelshistorie zeigt jede Bewegung mit Gebühren und Steuern. |
-| Ein Doppelklick kauft nicht doppelt | Idempotente Orders über eine `request_id` vom Client |
-| Private Daten bleiben privat | Row Level Security auf allen Tabellen. Andere sehen nur, was öffentlich ist oder freigegeben wurde. |
-| Niemand kann den Kursanker auslesen | Simulationsinterna (fairer Wert, Sentiment, KI-Bestände) sind für Clients nicht lesbar (ADR-008) |
-| Niemand flutet den Markt mit Automatisierung | Rate Limits für Orders und Aktionen |
-| XP lassen sich nicht farmen | Tageslimits und Wash-Trading-Erkennung ([Abschnitt 14.2](#142-xp-quellen-und-missbrauchsschutz)) |
-| Neue Accounts können Spieler-IPOs nicht manipulieren | Begrenzung der Investitionen neuer Accounts in Spieler-IPOs |
-| Verdächtige Muster fallen auf | Logging für spätere Multi-Account-Erkennung |
-| Zufall ist nicht beeinflussbar | Serverseitiger, seedbarer Zufallsgenerator (ADR-012) |
+| Zusage an den Spieler                                | Mechanik dahinter                                                                                                              |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Niemand kann sich Geld, Aktien oder XP ercheaten     | Server-Autorität, alle Aktionen als geprüfte RPCs (ADR-008)                                                                    |
+| Jeder Kontostand ist nachvollziehbar                 | Unveränderliches Ledger mit doppelter Buchführung (ADR-007). Die Handelshistorie zeigt jede Bewegung mit Gebühren und Steuern. |
+| Ein Doppelklick kauft nicht doppelt                  | Idempotente Orders über eine `request_id` vom Client                                                                           |
+| Private Daten bleiben privat                         | Row Level Security auf allen Tabellen. Andere sehen nur, was öffentlich ist oder freigegeben wurde.                            |
+| Niemand kann den Kursanker auslesen                  | Simulationsinterna (fairer Wert, Sentiment, KI-Bestände) sind für Clients nicht lesbar (ADR-008)                               |
+| Niemand flutet den Markt mit Automatisierung         | Rate Limits für Orders und Aktionen                                                                                            |
+| XP lassen sich nicht farmen                          | Tageslimits und Wash-Trading-Erkennung ([Abschnitt 14.2](#142-xp-quellen-und-missbrauchsschutz))                               |
+| Neue Accounts können Spieler-IPOs nicht manipulieren | Begrenzung der Investitionen neuer Accounts in Spieler-IPOs                                                                    |
+| Verdächtige Muster fallen auf                        | Logging für spätere Multi-Account-Erkennung                                                                                    |
+| Zufall ist nicht beeinflussbar                       | Serverseitiger, seedbarer Zufallsgenerator (ADR-012)                                                                           |
 
 **Erlaubt und gewollt:** Pump-and-Dump (kostet Reputation), Abwerben, Kündigen, Wechsel zur Konkurrenz,
 feindliche Übernahmen (ab Level 35), Handeln mit Vorabwissen außerhalb des Sperrfensters.
@@ -898,26 +898,26 @@ Stil, Tokens, Komponenten und Motion-Regeln stehen in `DESIGN_SYSTEM.md`. Hier s
 
 ### 24.2 Start (Marktübersicht)
 
-| Element | Inhalt |
-|---|---|
-| NEXA-30-Chart | Großer Live-Chart des Leitindex |
-| Portfoliowert | Eigener Gesamtwert mit Tagesveränderung |
-| Event-Leiste | Anstehende Events mit Countdowns |
-| Top-Gewinner und -Verlierer | Spielerfirmen sind markiert |
-| Newsticker | Nachrichten aus der Simulation |
-| Freundes-Feed | Ereignisse der Freunde |
-| Tresor-Status | Füllstand und „Tresor leeren“ |
-| Tägliche Missionen | Kompakte Übersicht |
+| Element                     | Inhalt                                  |
+| --------------------------- | --------------------------------------- |
+| NEXA-30-Chart               | Großer Live-Chart des Leitindex         |
+| Portfoliowert               | Eigener Gesamtwert mit Tagesveränderung |
+| Event-Leiste                | Anstehende Events mit Countdowns        |
+| Top-Gewinner und -Verlierer | Spielerfirmen sind markiert             |
+| Newsticker                  | Nachrichten aus der Simulation          |
+| Freundes-Feed               | Ereignisse der Freunde                  |
+| Tresor-Status               | Füllstand und „Tresor leeren“           |
+| Tägliche Missionen          | Kompakte Übersicht                      |
 
 ### 24.3 Portfolio
 
-| Element | Inhalt |
-|---|---|
-| Kennzahlen | Gesamtwert, Cash, investiert, offene Hebelpositionen |
-| Wertverlauf | 1 T / 1 W / 1 M / Gesamt |
-| Positionsliste | Einstand, Gewinn/Verlust in € und %, bei Hebelpositionen der **Liquidationspreis in Rot** |
-| Aufteilung | Donut nach Aktien, Anleihen, Cash und Branchen |
-| Handelshistorie | Alle Trades inklusive Gebühren und Steuern |
+| Element         | Inhalt                                                                                    |
+| --------------- | ----------------------------------------------------------------------------------------- |
+| Kennzahlen      | Gesamtwert, Cash, investiert, offene Hebelpositionen                                      |
+| Wertverlauf     | 1 T / 1 W / 1 M / Gesamt                                                                  |
+| Positionsliste  | Einstand, Gewinn/Verlust in € und %, bei Hebelpositionen der **Liquidationspreis in Rot** |
+| Aufteilung      | Donut nach Aktien, Anleihen, Cash und Branchen                                            |
+| Handelshistorie | Alle Trades inklusive Gebühren und Steuern                                                |
 
 ### 24.4 Märkte
 
@@ -926,15 +926,15 @@ Stil, Tokens, Komponenten und Motion-Regeln stehen in `DESIGN_SYSTEM.md`. Hier s
 
 **Aktien-Detailseite:**
 
-| Element | Inhalt |
-|---|---|
-| Chart | Kerzenchart von 1 min bis 1 J, umschaltbar Kerze/Linie |
-| Orderbuch | Marktmacher-Stufen und Limit-Orders der Spieler |
-| Kennzahlen | KGV, Umsatz, Marge, Dividendenrendite, Marktkapitalisierung |
-| Analystenrating | Kursziele (ab Level 7) |
-| News | Nachrichtenhistorie der Firma |
-| Nur Spielerfirmen | Gründer, Reputation, Cap Table, Prospekt-Erfüllung |
-| Order-Maske | Ordertypen nach Level |
+| Element           | Inhalt                                                      |
+| ----------------- | ----------------------------------------------------------- |
+| Chart             | Kerzenchart von 1 min bis 1 J, umschaltbar Kerze/Linie      |
+| Orderbuch         | Marktmacher-Stufen und Limit-Orders der Spieler             |
+| Kennzahlen        | KGV, Umsatz, Marge, Dividendenrendite, Marktkapitalisierung |
+| Analystenrating   | Kursziele (ab Level 7)                                      |
+| News              | Nachrichtenhistorie der Firma                               |
+| Nur Spielerfirmen | Gründer, Reputation, Cap Table, Prospekt-Erfüllung          |
+| Order-Maske       | Ordertypen nach Level                                       |
 
 ### 24.5 Unternehmen
 
@@ -942,15 +942,15 @@ Stil, Tokens, Komponenten und Motion-Regeln stehen in `DESIGN_SYSTEM.md`. Hier s
   Rechtsform → Finanzierung → Zusammenfassung. Unter Level 10 zeigt der Tab, was noch fehlt.
 - **Nach der Gründung:** Dashboard.
 
-| Element | Inhalt |
-|---|---|
-| Kennzahlen | Umsatz, Gewinn, Cash, Burn-Rate |
-| Marktanteil | Im Vergleich zur Konkurrenz der Branche |
-| Abteilungen | Quartalsentscheidungen je Bereich |
-| Personal | Mitarbeiter und Bewerber |
-| Cap Table | Anteilseigner |
-| IPO-Checkliste | Voraussetzungen mit Fortschritt |
-| Quartalsberichte | Historie aller Abschlüsse |
+| Element          | Inhalt                                  |
+| ---------------- | --------------------------------------- |
+| Kennzahlen       | Umsatz, Gewinn, Cash, Burn-Rate         |
+| Marktanteil      | Im Vergleich zur Konkurrenz der Branche |
+| Abteilungen      | Quartalsentscheidungen je Bereich       |
+| Personal         | Mitarbeiter und Bewerber                |
+| Cap Table        | Anteilseigner                           |
+| IPO-Checkliste   | Voraussetzungen mit Fortschritt         |
+| Quartalsberichte | Historie aller Abschlüsse               |
 
 ### 24.6 Karriere / Profil
 
@@ -959,13 +959,13 @@ Arbeitsaufgaben, Missionen, Wochen-Challenge, Erfolge, Lebensstil-Galerie, Freun
 
 ### 24.7 Customizing
 
-| Element | Umfang |
-|---|---|
-| **Pixel-Logo-Editor** | 16×16 (optional 24×24), Farbpalette, Stift, Radierer, Füllen, Spiegeln, Rückgängig. Logos erscheinen überall (Listen, Charts, Feed). |
-| **Firmenfarbe** | Färbt Firmenseite und Chart-Akzent |
-| **Avatar-Baukasten** | Pixel-Teile für Kopf, Frisur, Outfit, Accessoire. Teile werden über Level und Erfolge freigeschaltet. |
-| **Profilrahmen und Titel** | Aus Liga, Erfolgen und Level (z. B. goldener Rahmen und „Börsenlegende“ ab Level 50) |
-| **App-Einstellungen** | Akzentfarbe, Hell/Dunkel, Chart-Stil (Kerzen, Linie, Fläche), Sounds und Animationen an/aus |
+| Element                    | Umfang                                                                                                                               |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| **Pixel-Logo-Editor**      | 16×16 (optional 24×24), Farbpalette, Stift, Radierer, Füllen, Spiegeln, Rückgängig. Logos erscheinen überall (Listen, Charts, Feed). |
+| **Firmenfarbe**            | Färbt Firmenseite und Chart-Akzent                                                                                                   |
+| **Avatar-Baukasten**       | Pixel-Teile für Kopf, Frisur, Outfit, Accessoire. Teile werden über Level und Erfolge freigeschaltet.                                |
+| **Profilrahmen und Titel** | Aus Liga, Erfolgen und Level (z. B. goldener Rahmen und „Börsenlegende“ ab Level 50)                                                 |
+| **App-Einstellungen**      | Akzentfarbe, Hell/Dunkel, Chart-Stil (Kerzen, Linie, Fläche), Sounds und Animationen an/aus                                          |
 
 Customizing ist rein kosmetisch und wird ausschließlich erspielt.
 
@@ -977,29 +977,29 @@ Lücken und Spannungen im Prompt. Jede Frage hat einen **vorgeschlagenen Standar
 ändert keine Regel stillschweigend. Bis zur Entscheidung gilt der Vorschlag als Arbeitsannahme für die
 Planung. Entschiedene Fragen wandern als ADR nach `DECISIONS.md`.
 
-| Nr. | Frage | Vorgeschlagener Standard | Relevant ab |
-|---|---|---|---|
-| 1 | **„Maximal 1 Nebenrolle“ gegen Holding (Level 40) und KI-Jobs.** Zählt ein KI-Job als Nebenrolle? Erhöht die Holding die Zahl der Nebenrollen? | Ein Spieler hat höchstens **eine Anstellung** gleichzeitig, egal ob bei einer KI-Firma oder einer Spielerfirma. Sie ist die „Nebenrolle“. Eigene Firmen zählen nicht dazu. Die Holding erhöht die Zahl eigener Firmen, nicht die Zahl der Anstellungen. | M3, M5 |
-| 2 | **Quartalsabschluss um 02:00 Uhr im nachbörslichen Handel.** Zahlen erscheinen bei dünner Liquidität. Was gilt für Stop-Loss, Liquidation und Sperrfenster? | Zahlen werden an jeder Quartalsgrenze sofort veröffentlicht, auch um 02:00 Uhr. Der nachbörsliche Handel läuft weiter, Stop-Loss und Liquidation bleiben aktiv. Das Sperrfenster gilt von 00:00 bis 02:00 Uhr. Die Ordermaske warnt nachbörslich vor dem größeren Spread. Der Nachtabschluss ist damit bewusst riskanter. | M1, M4, M7 |
-| 3 | **Optionen von Spieler-Mitarbeitern bei Insolvenz, Kündigung und Entlassung.** | Bei Insolvenz verfallen alle Optionen wertlos. Bereits in Aktien gewandelte Anteile werden wie alle Aktien behandelt (nachrangig nach den Gläubigern). Bei Kündigung oder Entlassung verfallen nicht gevestete Optionen, gevestete bleiben. | M5 |
-| 4 | **XP-Angabe „50: ca. 35.360“ bei Maximallevel 50.** Der Wert ist der Formelwert für 50 → 51, den es nicht gibt. Der letzte Schritt 49 → 50 kostet 34.300 XP. | Level 50 ist das Ende. XP werden danach weitergezählt und angezeigt, haben aber bis zu einem Prestige-System keine Wirkung. | M2 |
-| 5 | **NEXA 30 mit nur 15 börsennotierten Firmen.** Jede Spielerfirma wäre nach dem IPO automatisch im Index. Das Event und der Erfolg „Index-Aufsteiger“ wären geschenkt. | Der Index hat bis zu 30 Mitglieder. Eine Aufnahme erfolgt nur beim Quartalsabschluss und nur, wenn die Marktkapitalisierung über der des kleinsten KI-Mitglieds liegt. Solange weniger als 30 Firmen gelistet sind, wird niemand verdrängt. | M1, M6 |
-| 6 | **„3 Spieltage Gründungssperre“ und „einige Tage Pleitegeier“.** Ein echter Tag ist ein Spieljahr. „Spieltag“ ist nicht definiert. | „Tag“ meint überall einen echten Kalendertag (Europe/Berlin), also 4 Quartale. Gründungssperre 3 echte Tage, „Pleitegeier“ 3 echte Tage. Tageslimits (30 Trades, 12 Arbeitsstunden, 3 Missionen) wechseln um 00:00 Uhr. | M2, M4, M7 |
-| 7 | **Zinsen pro Spieljahr sind Zinsen pro echtem Tag.** 3 % Leitzins und 2 bis 4 % Anleiherendite bedeuten risikolose 2 bis 4 % pro echtem Tag. Ab etwa 80.000 € Anleihen übersteigt das den Tageshöchstwert des Grundeinkommens. | Die Werte bleiben vorerst wie im Prompt, weil Firmengewinne und Kreditzinsen im selben Takt laufen. `BALANCING.md` rechnet den Geldfluss durch. Stellschrauben sind eine Obergrenze je Spieler für Anleihen oder ein niedrigeres Zinsniveau. Entscheidung vor M1. | M1 |
-| 8 | **Besteuerung von Dividenden und Anleihezinsen.** Der Prompt nennt nur realisierte Gewinne. Wann wird die Steuer erhoben? | Dividenden und Kupons zählen als Kapitalerträge und werden mit 25 % besteuert. Die Steuer wird bei jeder Realisierung sofort gebucht. Verluste gehen in einen Verlusttopf ohne Verfall, der spätere Gewinne mindert. Es gibt keine Erstattung in Cash. | M1 |
-| 9 | **„Kleinkredit bis 50.000 €“ ab Level 15 gegen „kein Kreditrahmen“ beim Kleinunternehmen.** Privatkredit oder Firmenkredit? | Firmenkredit: Ab Gründer-Level 15 bekommt das Kleinunternehmen einen Kreditrahmen bis 50.000 €. Es gibt keinen Privatkredit. Privates Fremdkapital entsteht nur über Hebel. | M4 |
-| 10 | **Short ab Level 8, Hebel erst ab Level 12.** Ein Short braucht eine Sicherheit und kann liquidiert werden. | Short ohne Hebel: Der Verkaufserlös plus 50 % des Positionswerts werden als Sicherheit gesperrt. Liquidation, wenn die Sicherheit den Rückkaufwert nicht mehr deckt. Gehebelte Shorts erst mit den Hebelstufen. | M7 |
-| 11 | **„Finanzierungskosten über Nacht“ bei einem Spieljahr pro Tag.** Wann und wie oft wird abgerechnet? | Einmal pro echtem Tag zur Schlussglocke um 22:00 Uhr auf alle dann offenen Hebel- und Short-Positionen. Satz = Leitzins plus Aufschlag, bezogen auf den fremdfinanzierten Betrag. Die Leihgebühr für Shorts wird im selben Lauf gebucht. | M7 |
-| 12 | **Ex-Tag der Dividende** bei 6 Stunden je Quartal. | Stichzeitpunkt ist 1 Stunde vor Quartalsende. Wer dann hält, bekommt die Dividende zum Quartalsende. Ab dem Stichzeitpunkt handelt die Aktie „ex“. | M6 |
-| 13 | **Hauptversammlung mit 4 Spielern.** KI-Fonds halten meist die Mehrheit. Mehr als 50 % der Spielerstimmen sind kaum erreichbar oder trivial. | Gezählt werden alle Aktien. KI-Aktionäre stimmen regelbasiert: mit dem Management, solange die Reputation des Gründers mindestens 40 beträgt, sonst für die Abberufung. Nach einer Abberufung führt ein KI-CEO die Firma, der Gründer behält seine Aktien. | M6 |
-| 14 | **Höhe der Kapitalobergrenze** für private Einlagen des Gründers. | Je Stufe höchstens das Doppelte der Gründungskosten zusätzlich zu den Gründungskosten: 30.000 €, 150.000 €, 600.000 €. | M4 |
-| 15 | **IPO-Schwellen:** Mindestumsatz und „positive Reputation“. | Mindestumsatz 500.000 € in den letzten 4 Quartalen, Reputation mindestens 50. | M6 |
-| 16 | **Freundes-Liga nach Portfolio-Wachstum in Prozent.** Einzahlungen (Grundeinkommen, Gehalt) verfälschen das Wachstum, besonders bei kleinen Depots. | Zeitgewichtete Rendite: Zuflüsse aus Einkommen werden herausgerechnet. In der Alpha sind alle Spieler der Instanz automatisch in einer gemeinsamen Liga. | M2 |
-| 17 | **Inhalt des Eröffnungsbonus** in der ersten Handelsstunde. | +50 % XP auf Trades zwischen 08:00 und 09:00 Uhr, innerhalb des Tageslimits von 30 Trades. Kein Geldbonus. | M2 |
-| 18 | **Höhe der Unterhaltskosten** der Statussymbole. | 1 % des Kaufpreises pro echtem Tag, gebucht um 00:00 Uhr. Kann der Unterhalt nicht gezahlt werden, wird das Statussymbol zu 50 % des Kaufpreises zwangsverkauft. | M8 |
-| 19 | **Penthouse „+5 % Reputation“:** Punkte oder relativ? Dauerhaft? | +5 Punkte auf die wirksame Reputation, gedeckelt bei 100, nur solange das Penthouse gehalten und der Unterhalt gezahlt wird. | M8 |
-| 20 | **Wash-Trading-Fenster „wenige Minuten“ und Mindestgröße.** 30 Trades mit je einer Aktie kosten 30 € Gebühr und geben 300 XP. | Fenster 10 Minuten je Aktie. XP für die Ausführung nur bei einem Orderwert ab 100 €. | M2 |
-| 21 | **Auszahlung des Jobgehalts.** Tresor, laufend oder zum Quartal? | Das Gehalt wird zur Gehaltsabrechnung beim Quartalsabschluss direkt aufs Konto gebucht, mit dem Deckel von 12 bezahlten Stunden je Tag. Der Tresor gilt nur für das Grundeinkommen. | M3 |
-| 22 | **Auslöser und Umfang des Spielerbankrotts.** Was passiert mit eigener Firma, Anleihen und Statussymbolen? | Bankrott tritt ein, wenn nach einer Liquidation das Konto negativ ist und Wertpapiere und Statussymbole den Fehlbetrag nicht decken. Diese werden zwangsverkauft, die Restschuld wird erlassen, der Spieler erhält 2.500 € (ADR-011). Anteile an der eigenen Firma werden zuletzt verwertet. Level, XP und Erfolge bleiben. | M7 |
-| 23 | **Spieler-Mitarbeiter und doppelte Produktivität.** Muss der Spieler dafür aktiv sein? | Die doppelte Produktivität gilt passiv, solange das Arbeitsverhältnis besteht. Arbeitsaufgaben und Führungsentscheidungen bringen zusätzliche Wirkung. So hängt keine Firma daran, dass ein Mitspieler online ist. | M5 |
-| 24 | **Level 30 bis 50 liegen außerhalb der Meilensteine M0 bis M8.** Optionen, Übernahmen, Holding und Hall of Fame sind in keinem Meilenstein enthalten. | Die Freischalttabelle zeigt diese Stufen als „kommt später“. Umsetzung nach dem Freundestest v1, siehe `ROADMAP.md`. | nach M8 |
+| Nr. | Frage                                                                                                                                                                                                                          | Vorgeschlagener Standard                                                                                                                                                                                                                                                                                                    | Relevant ab |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| 1   | **„Maximal 1 Nebenrolle“ gegen Holding (Level 40) und KI-Jobs.** Zählt ein KI-Job als Nebenrolle? Erhöht die Holding die Zahl der Nebenrollen?                                                                                 | Ein Spieler hat höchstens **eine Anstellung** gleichzeitig, egal ob bei einer KI-Firma oder einer Spielerfirma. Sie ist die „Nebenrolle“. Eigene Firmen zählen nicht dazu. Die Holding erhöht die Zahl eigener Firmen, nicht die Zahl der Anstellungen.                                                                     | M3, M5      |
+| 2   | **Quartalsabschluss um 02:00 Uhr im nachbörslichen Handel.** Zahlen erscheinen bei dünner Liquidität. Was gilt für Stop-Loss, Liquidation und Sperrfenster?                                                                    | Zahlen werden an jeder Quartalsgrenze sofort veröffentlicht, auch um 02:00 Uhr. Der nachbörsliche Handel läuft weiter, Stop-Loss und Liquidation bleiben aktiv. Das Sperrfenster gilt von 00:00 bis 02:00 Uhr. Die Ordermaske warnt nachbörslich vor dem größeren Spread. Der Nachtabschluss ist damit bewusst riskanter.   | M1, M4, M7  |
+| 3   | **Optionen von Spieler-Mitarbeitern bei Insolvenz, Kündigung und Entlassung.**                                                                                                                                                 | Bei Insolvenz verfallen alle Optionen wertlos. Bereits in Aktien gewandelte Anteile werden wie alle Aktien behandelt (nachrangig nach den Gläubigern). Bei Kündigung oder Entlassung verfallen nicht gevestete Optionen, gevestete bleiben.                                                                                 | M5          |
+| 4   | **XP-Angabe „50: ca. 35.360“ bei Maximallevel 50.** Der Wert ist der Formelwert für 50 → 51, den es nicht gibt. Der letzte Schritt 49 → 50 kostet 34.300 XP.                                                                   | Level 50 ist das Ende. XP werden danach weitergezählt und angezeigt, haben aber bis zu einem Prestige-System keine Wirkung.                                                                                                                                                                                                 | M2          |
+| 5   | **NEXA 30 mit nur 15 börsennotierten Firmen.** Jede Spielerfirma wäre nach dem IPO automatisch im Index. Das Event und der Erfolg „Index-Aufsteiger“ wären geschenkt.                                                          | Der Index hat bis zu 30 Mitglieder. Eine Aufnahme erfolgt nur beim Quartalsabschluss und nur, wenn die Marktkapitalisierung über der des kleinsten KI-Mitglieds liegt. Solange weniger als 30 Firmen gelistet sind, wird niemand verdrängt.                                                                                 | M1, M6      |
+| 6   | **„3 Spieltage Gründungssperre“ und „einige Tage Pleitegeier“.** Ein echter Tag ist ein Spieljahr. „Spieltag“ ist nicht definiert.                                                                                             | „Tag“ meint überall einen echten Kalendertag (Europe/Berlin), also 4 Quartale. Gründungssperre 3 echte Tage, „Pleitegeier“ 3 echte Tage. Tageslimits (30 Trades, 12 Arbeitsstunden, 3 Missionen) wechseln um 00:00 Uhr.                                                                                                     | M2, M4, M7  |
+| 7   | **Zinsen pro Spieljahr sind Zinsen pro echtem Tag.** 3 % Leitzins und 2 bis 4 % Anleiherendite bedeuten risikolose 2 bis 4 % pro echtem Tag. Ab etwa 80.000 € Anleihen übersteigt das den Tageshöchstwert des Grundeinkommens. | Die Werte bleiben vorerst wie im Prompt, weil Firmengewinne und Kreditzinsen im selben Takt laufen. `BALANCING.md` rechnet den Geldfluss durch. Stellschrauben sind eine Obergrenze je Spieler für Anleihen oder ein niedrigeres Zinsniveau. Entscheidung vor M1.                                                           | M1          |
+| 8   | **Besteuerung von Dividenden und Anleihezinsen.** Der Prompt nennt nur realisierte Gewinne. Wann wird die Steuer erhoben?                                                                                                      | Dividenden und Kupons zählen als Kapitalerträge und werden mit 25 % besteuert. Die Steuer wird bei jeder Realisierung sofort gebucht. Verluste gehen in einen Verlusttopf ohne Verfall, der spätere Gewinne mindert. Es gibt keine Erstattung in Cash.                                                                      | M1          |
+| 9   | **„Kleinkredit bis 50.000 €“ ab Level 15 gegen „kein Kreditrahmen“ beim Kleinunternehmen.** Privatkredit oder Firmenkredit?                                                                                                    | Firmenkredit: Ab Gründer-Level 15 bekommt das Kleinunternehmen einen Kreditrahmen bis 50.000 €. Es gibt keinen Privatkredit. Privates Fremdkapital entsteht nur über Hebel.                                                                                                                                                 | M4          |
+| 10  | **Short ab Level 8, Hebel erst ab Level 12.** Ein Short braucht eine Sicherheit und kann liquidiert werden.                                                                                                                    | Short ohne Hebel: Der Verkaufserlös plus 50 % des Positionswerts werden als Sicherheit gesperrt. Liquidation, wenn die Sicherheit den Rückkaufwert nicht mehr deckt. Gehebelte Shorts erst mit den Hebelstufen.                                                                                                             | M7          |
+| 11  | **„Finanzierungskosten über Nacht“ bei einem Spieljahr pro Tag.** Wann und wie oft wird abgerechnet?                                                                                                                           | Einmal pro echtem Tag zur Schlussglocke um 22:00 Uhr auf alle dann offenen Hebel- und Short-Positionen. Satz = Leitzins plus Aufschlag, bezogen auf den fremdfinanzierten Betrag. Die Leihgebühr für Shorts wird im selben Lauf gebucht.                                                                                    | M7          |
+| 12  | **Ex-Tag der Dividende** bei 6 Stunden je Quartal.                                                                                                                                                                             | Stichzeitpunkt ist 1 Stunde vor Quartalsende. Wer dann hält, bekommt die Dividende zum Quartalsende. Ab dem Stichzeitpunkt handelt die Aktie „ex“.                                                                                                                                                                          | M6          |
+| 13  | **Hauptversammlung mit 4 Spielern.** KI-Fonds halten meist die Mehrheit. Mehr als 50 % der Spielerstimmen sind kaum erreichbar oder trivial.                                                                                   | Gezählt werden alle Aktien. KI-Aktionäre stimmen regelbasiert: mit dem Management, solange die Reputation des Gründers mindestens 40 beträgt, sonst für die Abberufung. Nach einer Abberufung führt ein KI-CEO die Firma, der Gründer behält seine Aktien.                                                                  | M6          |
+| 14  | **Höhe der Kapitalobergrenze** für private Einlagen des Gründers.                                                                                                                                                              | Je Stufe höchstens das Doppelte der Gründungskosten zusätzlich zu den Gründungskosten: 30.000 €, 150.000 €, 600.000 €.                                                                                                                                                                                                      | M4          |
+| 15  | **IPO-Schwellen:** Mindestumsatz und „positive Reputation“.                                                                                                                                                                    | Mindestumsatz 500.000 € in den letzten 4 Quartalen, Reputation mindestens 50.                                                                                                                                                                                                                                               | M6          |
+| 16  | **Freundes-Liga nach Portfolio-Wachstum in Prozent.** Einzahlungen (Grundeinkommen, Gehalt) verfälschen das Wachstum, besonders bei kleinen Depots.                                                                            | Zeitgewichtete Rendite: Zuflüsse aus Einkommen werden herausgerechnet. In der Alpha sind alle Spieler der Instanz automatisch in einer gemeinsamen Liga.                                                                                                                                                                    | M2          |
+| 17  | **Inhalt des Eröffnungsbonus** in der ersten Handelsstunde.                                                                                                                                                                    | +50 % XP auf Trades zwischen 08:00 und 09:00 Uhr, innerhalb des Tageslimits von 30 Trades. Kein Geldbonus.                                                                                                                                                                                                                  | M2          |
+| 18  | **Höhe der Unterhaltskosten** der Statussymbole.                                                                                                                                                                               | 1 % des Kaufpreises pro echtem Tag, gebucht um 00:00 Uhr. Kann der Unterhalt nicht gezahlt werden, wird das Statussymbol zu 50 % des Kaufpreises zwangsverkauft.                                                                                                                                                            | M8          |
+| 19  | **Penthouse „+5 % Reputation“:** Punkte oder relativ? Dauerhaft?                                                                                                                                                               | +5 Punkte auf die wirksame Reputation, gedeckelt bei 100, nur solange das Penthouse gehalten und der Unterhalt gezahlt wird.                                                                                                                                                                                                | M8          |
+| 20  | **Wash-Trading-Fenster „wenige Minuten“ und Mindestgröße.** 30 Trades mit je einer Aktie kosten 30 € Gebühr und geben 300 XP.                                                                                                  | Fenster 10 Minuten je Aktie. XP für die Ausführung nur bei einem Orderwert ab 100 €.                                                                                                                                                                                                                                        | M2          |
+| 21  | **Auszahlung des Jobgehalts.** Tresor, laufend oder zum Quartal?                                                                                                                                                               | Das Gehalt wird zur Gehaltsabrechnung beim Quartalsabschluss direkt aufs Konto gebucht, mit dem Deckel von 12 bezahlten Stunden je Tag. Der Tresor gilt nur für das Grundeinkommen.                                                                                                                                         | M3          |
+| 22  | **Auslöser und Umfang des Spielerbankrotts.** Was passiert mit eigener Firma, Anleihen und Statussymbolen?                                                                                                                     | Bankrott tritt ein, wenn nach einer Liquidation das Konto negativ ist und Wertpapiere und Statussymbole den Fehlbetrag nicht decken. Diese werden zwangsverkauft, die Restschuld wird erlassen, der Spieler erhält 2.500 € (ADR-011). Anteile an der eigenen Firma werden zuletzt verwertet. Level, XP und Erfolge bleiben. | M7          |
+| 23  | **Spieler-Mitarbeiter und doppelte Produktivität.** Muss der Spieler dafür aktiv sein?                                                                                                                                         | Die doppelte Produktivität gilt passiv, solange das Arbeitsverhältnis besteht. Arbeitsaufgaben und Führungsentscheidungen bringen zusätzliche Wirkung. So hängt keine Firma daran, dass ein Mitspieler online ist.                                                                                                          | M5          |
+| 24  | **Level 30 bis 50 liegen außerhalb der Meilensteine M0 bis M8.** Optionen, Übernahmen, Holding und Hall of Fame sind in keinem Meilenstein enthalten.                                                                          | Die Freischalttabelle zeigt diese Stufen als „kommt später“. Umsetzung nach dem Freundestest v1, siehe `ROADMAP.md`.                                                                                                                                                                                                        | nach M8     |

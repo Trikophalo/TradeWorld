@@ -37,7 +37,7 @@ export function LevelCard({ showcase = false }: { showcase?: boolean }) {
   };
 
   return (
-    <Card padding="lg">
+    <Card padding="lg" data-tour="level-card">
       <div className="flex items-center gap-4">
         <div className="grid size-20 shrink-0 place-items-center rounded-lg bg-surface-2">
           <PixelIcon {...BULL} scale={4} />

@@ -307,7 +307,7 @@ export async function RulesList() {
     ));
 
   return (
-    <div className="grid items-start gap-5 lg:grid-cols-2 lg:gap-6">
+    <div className="grid items-start gap-5 *:min-w-0 lg:grid-cols-2 lg:gap-6">
       <div className="space-y-5 lg:space-y-6">{column(groups)}</div>
       <div className="space-y-5 lg:space-y-6">
         {column([{ id: "company", title: t("groupCompany"), items: companyRules }])}

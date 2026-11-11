@@ -1,6 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
 import { SearchDialog } from "@/features/market/components/search-dialog";
+import { Tutorial } from "@/features/tutorial/components/tutorial";
 import { Sidebar } from "./sidebar";
 import { TabBar } from "./tab-bar";
 import { TopBar } from "./top-bar";
@@ -28,6 +29,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
       </div>
       <TabBar />
       <SearchDialog />
+      <Tutorial />
     </>
   );
 }

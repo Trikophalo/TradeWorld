@@ -483,6 +483,8 @@ export interface ProgressionConfig {
     readonly profitableCompanyQuarter: { readonly xp: number };
     readonly successfulIpo: { readonly xp: number };
     readonly achievement: { readonly minXp: number; readonly maxXp: number };
+    /** One-time reward for finishing the tutorial. With the alpha multiplier it lifts a new player to level 2. */
+    readonly tutorial: { readonly xp: number };
   };
   readonly unlocks: readonly UnlockConfig[];
 }
@@ -1125,6 +1127,7 @@ export const BALANCE = {
       profitableCompanyQuarter: { xp: 500 },
       successfulIpo: { xp: 5000 },
       achievement: { minXp: 100, maxXp: 10_000 },
+      tutorial: { xp: 50 },
     },
     // Spec 9.3, one entry per unlocked feature. Keys are stable identifiers (DB, i18n, UI).
     unlocks: [

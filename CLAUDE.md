@@ -94,6 +94,10 @@ Vor jedem Commit müssen `pnpm typecheck`, `pnpm lint` und `pnpm test` grün sei
 - **Pixel-Art** nur über `PixelIcon`, nur ganzzahlig skaliert.
 - **Responsiv:** Handy zuerst (390 px), ab `lg` (1024 px) mehrspaltig. Kein horizontales Scrollen.
 - Jede Seite steckt in `<Page>`; neue Komponenten kommen auf `/dev/ui`.
+- **Schrittweise Offenlegung:** Neue Bereiche bekommen einen Eintrag in `src/config/disclosure.ts` und werden in
+  `<Reveal>` gewickelt. Neue Spieler sehen nur, was sie schon nutzen können.
+- **Tutorial:** Elemente, die das Tutorial markiert, tragen `data-tour="…"`. Wer sie umbaut, prüft
+  `src/features/tutorial/steps.ts` und lässt `e2e/tutorial.spec.ts` laufen.
 - Clock und `localStorage` erst nach der Hydration lesen (`useClock`, `useMountTime`, `useSettings`).
 
 ### Sprache
@@ -111,9 +115,9 @@ Vor jedem Commit müssen `pnpm typecheck`, `pnpm lint` und `pnpm test` grün sei
 ```
 src/app            Routen: (app) Spiel, (auth) Anmeldung, dev/ui Showcase
 src/components     ui (Bausteine), pixel (Pixel-Art), layout (App-Hülle)
-src/features       market, portfolio, company, career, progression, auth, settings
+src/features       market, portfolio, company, career, progression, tutorial, help, auth, settings
 src/lib            sim (Simulation), supabase, demo, format, motion, sound, haptics
-src/config         balance.ts, app.ts, navigation.ts
+src/config         balance.ts, disclosure.ts, app.ts, navigation.ts
 src/stores         Zustand-Stores (UI-State)
 src/styles         tokens.css
 messages           Texte

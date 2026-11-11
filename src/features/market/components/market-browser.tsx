@@ -8,6 +8,7 @@ import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Segmented } from "@/components/ui/segmented";
+import { useDisclosed } from "@/features/progression/components/reveal";
 import { DEMO_COMPANIES } from "@/lib/demo/market";
 import { SPRING } from "@/lib/motion";
 import { cn } from "@/lib/utils";
@@ -23,23 +24,26 @@ export function MarketBrowser() {
   const ts = useTranslations("sectors");
   const [tab, setTab] = useState<AssetTab>("stocks");
   const [sector, setSector] = useState<SectorFilter>("all");
+  const showTabs = useDisclosed("marketAssetTabs");
 
   const companies = sector === "all" ? DEMO_COMPANIES : DEMO_COMPANIES.filter((c) => c.sector === sector);
 
   return (
     <div className="space-y-4">
-      <Segmented
-        value={tab}
-        onValueChange={setTab}
-        label={t("tabs")}
-        block
-        className="lg:inline-flex lg:w-auto"
-        options={[
-          { value: "stocks", label: t("stocks") },
-          { value: "bonds", label: t("bonds") },
-          { value: "indices", label: t("indices") },
-        ]}
-      />
+      {showTabs && (
+        <Segmented
+          value={tab}
+          onValueChange={setTab}
+          label={t("tabs")}
+          block
+          className="lg:inline-flex lg:w-auto"
+          options={[
+            { value: "stocks", label: t("stocks") },
+            { value: "bonds", label: t("bonds") },
+            { value: "indices", label: t("indices") },
+          ]}
+        />
+      )}
 
       {tab === "stocks" && (
         <>

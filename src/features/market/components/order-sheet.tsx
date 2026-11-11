@@ -1,13 +1,14 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { burstConfetti } from "@/components/ui/effects";
 import { HoldButton } from "@/components/ui/hold-button";
 import { Field } from "@/components/ui/input";
 import { NumberTicker } from "@/components/ui/number-ticker";
 import { Sheet } from "@/components/ui/sheet";
 import { toast } from "@/components/ui/toast";
+import { emitTutorial } from "@/features/tutorial/store";
 import type { DemoCompany } from "@/lib/demo/market";
 import { useDemo } from "@/lib/demo/store";
 import { formatMoney, formatPrice } from "@/lib/format";
@@ -44,7 +45,16 @@ export function OrderSheet({ company, side, priceE4, onClose }: OrderSheetProps)
   const total = shown === "buy" ? value + ORDER_FEE_CENTS : value - ORDER_FEE_CENTS;
   const affordable = shown === "sell" || total <= cash;
 
+  // Tell the tutorial when the sheet opens and closes.
+  const open = side !== null;
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (open !== wasOpen.current) emitTutorial(open ? "order-sheet-opened" : "order-sheet-closed");
+    wasOpen.current = open;
+  }, [open]);
+
   const confirm = () => {
+    emitTutorial("order-confirmed");
     if (anchor.current) burstConfetti(anchor.current);
     toast.success(
       t("demoDoneTitle"),
@@ -66,7 +76,7 @@ export function OrderSheet({ company, side, priceE4, onClose }: OrderSheetProps)
       title={t(shown === "buy" ? "buyTitle" : "sellTitle", { ticker: company.ticker })}
       description={t("description")}
       footer={
-        <div ref={anchor}>
+        <div ref={anchor} data-tour="order-confirm">
           <HoldButton tone={shown === "buy" ? "gain" : "loss"} disabled={!valid || !affordable} onConfirm={confirm}>
             {t(shown === "buy" ? "holdBuy" : "holdSell")}
           </HoldButton>

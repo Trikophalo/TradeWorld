@@ -6,6 +6,7 @@ import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Page, PageHeader } from "@/components/layout/page";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Reveal } from "@/features/progression/components/reveal";
 import { LevelCard } from "@/features/progression/components/level-card";
 import { UnlockList } from "@/features/progression/components/unlock-list";
 import { SettingsCard } from "@/features/settings/components/settings-card";
@@ -20,20 +21,22 @@ export default async function ProfilePage() {
   return (
     <Page>
       <PageHeader title={t("title")} />
-      <div className="grid gap-5 lg:grid-cols-2 lg:gap-6">
+      <div className="grid gap-5 *:min-w-0 lg:grid-cols-2 lg:gap-6">
         <div className="space-y-5 lg:space-y-6">
           <LevelCard />
-          <Card padding="lg">
-            <CardHeader>
-              <CardTitle>{t("career")}</CardTitle>
-            </CardHeader>
-            <EmptyState
-              className="py-4"
-              art={<PixelIcon {...SECTOR_ICONS.retail} scale={4} />}
-              title={t("careerEmptyTitle")}
-              description={t("careerEmptyText")}
-            />
-          </Card>
+          <Reveal feature="profileCareer">
+            <Card padding="lg">
+              <CardHeader>
+                <CardTitle>{t("career")}</CardTitle>
+              </CardHeader>
+              <EmptyState
+                className="py-4"
+                art={<PixelIcon {...SECTOR_ICONS.retail} scale={4} />}
+                title={t("careerEmptyTitle")}
+                description={t("careerEmptyText")}
+              />
+            </Card>
+          </Reveal>
           <Link href="/profile/rules" transitionTypes={["nav-forward"]} className="block rounded-lg focus-ring">
             <Card padding="lg" interactive className="flex items-center gap-4">
               <span className="grid size-12 shrink-0 place-items-center rounded-md bg-surface-2">

@@ -50,9 +50,9 @@ gelten pro Spieljahr**, also pro echtem Tag.
 
 Die Simulation besteht aus zwei reinen Funktionen und vielen kleinen Formeln, die sie verwenden:
 
-| Funktion | Takt | Aufgabe |
-|---|---|---|
-| `stepMarketTick(state, inputs, rng)` | alle 5 s | Kurse, Quotes, Sentiment und KI-Bestände aller Aktien fortschreiben |
+| Funktion                              | Takt     | Aufgabe                                                                              |
+| ------------------------------------- | -------- | ------------------------------------------------------------------------------------ |
+| `stepMarketTick(state, inputs, rng)`  | alle 5 s | Kurse, Quotes, Sentiment und KI-Bestände aller Aktien fortschreiben                  |
 | `closeQuarter(state, decisions, rng)` | alle 6 h | Unternehmenssimulation: Nachfrage, Marktanteile, Gewinn- und Verlustrechnung, Events |
 
 Beide lesen keinen Zustand außerhalb ihrer Argumente und schreiben nichts. Der Aufrufer (Edge Function bzw.
@@ -166,14 +166,14 @@ Positive Werte sind Käufe. Es gibt zwei Familien:
 
 `speed = reactionSpeed × liquidityFactor`. Nachbörslich handeln die KI-Investoren also nur ein Viertel so viel.
 
-| Typ | `capitalShare` | `reactionSpeed` | Signal bzw. Ziel |
-|---|---|---|---|
-| `market_maker` | 0,05 | 0,005 | Ziel 0: baut Inventar aus Spielerorders ab. `pressure = −inventory × speed × marketMakerHedgeShare` |
-| `value_fund` | 0,30 | 0,000167 | `gap = ln(fairValue / price)`; innerhalb `deadBand` (1 %) kein Handel; `signal = clamp((gap ∓ deadBand) / gapScale, ±1)` mit `gapScale` 0,5 |
-| `momentum_trader` | 0,10 | 0,0002 | `trend = emaFast / emaSlow − 1`; `signal = tanh(trend / trendScale)` mit `trendScale` 0,02 |
-| `pension_fund` | 0,20 | 0,002 | `target = freeFloat × capitalShare × weight`; `weight = clamp(1 − 0,05 × (rate − neutral)/100bp + 0,03 × (dividendYield − bondYield10y)/100bp, 0,2, 1,8)` |
-| `index_fund` | 0,04 | 0,005 | `target = inIndex ? freeFloat × capitalShare : 0` |
-| `retail_herd` | 0,10 | 0,0012 | `signal = clamp(sentiment + chaseGain × tanh(trend / trendScale), ±1)` mit `chaseGain` 0,1 |
+| Typ               | `capitalShare` | `reactionSpeed` | Signal bzw. Ziel                                                                                                                                          |
+| ----------------- | -------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `market_maker`    | 0,05           | 0,005           | Ziel 0: baut Inventar aus Spielerorders ab. `pressure = −inventory × speed × marketMakerHedgeShare`                                                       |
+| `value_fund`      | 0,30           | 0,000167        | `gap = ln(fairValue / price)`; innerhalb `deadBand` (1 %) kein Handel; `signal = clamp((gap ∓ deadBand) / gapScale, ±1)` mit `gapScale` 0,5               |
+| `momentum_trader` | 0,10           | 0,0002          | `trend = emaFast / emaSlow − 1`; `signal = tanh(trend / trendScale)` mit `trendScale` 0,02                                                                |
+| `pension_fund`    | 0,20           | 0,002           | `target = freeFloat × capitalShare × weight`; `weight = clamp(1 − 0,05 × (rate − neutral)/100bp + 0,03 × (dividendYield − bondYield10y)/100bp, 0,2, 1,8)` |
+| `index_fund`      | 0,04           | 0,005           | `target = inIndex ? freeFloat × capitalShare : 0`                                                                                                         |
+| `retail_herd`     | 0,10           | 0,0012          | `signal = clamp(sentiment + chaseGain × tanh(trend / trendScale), ±1)` mit `chaseGain` 0,1                                                                |
 
 So entstehen die gewünschten Effekte:
 
@@ -203,12 +203,12 @@ mit `depth = freeFloat × depthFreeFloatFraction`. Für einen Flusstyp mit volle
 return/Tick = 0,01 × (freeFloat × capitalShare × speed) / (freeFloat × 0,002) = 5 × capitalShare × speed
 ```
 
-| Typ | maximale Rendite pro Tick |
-|---|---|
-| Value-Fonds | 5 × 0,30 × 0,000167 = 0,025 % (bei 50 % Fehlbewertung) |
-| Momentum-Trader | 5 × 0,10 × 0,0002 = 0,010 % |
-| Kleinanleger, Sentiment | 5 × 0,10 × 0,0012 = 0,060 % (bei Sentiment ±1) |
-| Kleinanleger, Trendjagd | 0,060 % × 0,1 = 0,006 % |
+| Typ                     | maximale Rendite pro Tick                              |
+| ----------------------- | ------------------------------------------------------ |
+| Value-Fonds             | 5 × 0,30 × 0,000167 = 0,025 % (bei 50 % Fehlbewertung) |
+| Momentum-Trader         | 5 × 0,10 × 0,0002 = 0,010 %                            |
+| Kleinanleger, Sentiment | 5 × 0,10 × 0,0012 = 0,060 % (bei Sentiment ±1)         |
+| Kleinanleger, Trendjagd | 0,060 % × 0,1 = 0,006 %                                |
 
 **Stabilitätsbedingung.** Trendfolger koppeln die Kursbewegung auf sich selbst zurück. Bei einer gleichmäßigen
 Drift `d` pro Tick liegt der schnelle Durchschnitt um etwa `d × (1/emaSlowAlpha − 1/emaFastAlpha) ≈ 54 d` über dem
@@ -242,14 +242,14 @@ Wert zurück. Kursmanipulation kostet deshalb Geld: Man kauft teuer, und der Eff
 fairValue = max(EPS, 0) × sector.peRatio × growthFactor × reputationFactor × macroFactor × eventValueFactor
 ```
 
-| Faktor | Berechnung | Spanne |
-|---|---|---|
-| `EPS` | Gewinn der letzten 4 Quartale je Aktie (bei weniger Historie auf 4 Quartale hochgerechnet) | – |
-| `peRatio` | Branchen-KGV: Tech 28, Pharma 22, Logistik 15, Einzelhandel 14, Energie 11 | – |
-| `growthFactor` | `1 + growthWeight × Umsatzwachstum` (letzte 4 Quartale gegen die 4 davor) | 0,6 bis 1,8 |
-| `reputationFactor` | nur Spielerfirmen: linear von Reputation 0 → 0,6 über 50 → 1,0 bis 100 → 1,4 | 0,6 bis 1,4 |
-| `macroFactor` | `1 − 0,04 × sector.sensitivity.valuationRate × (Leitzins − neutral) / 100 bp` | 0,6 bis 1,3 |
-| `eventValueFactor` | Produkt der binären Events (Pharma-Studien), sonst 1 | – |
+| Faktor             | Berechnung                                                                                 | Spanne      |
+| ------------------ | ------------------------------------------------------------------------------------------ | ----------- |
+| `EPS`              | Gewinn der letzten 4 Quartale je Aktie (bei weniger Historie auf 4 Quartale hochgerechnet) | –           |
+| `peRatio`          | Branchen-KGV: Tech 28, Pharma 22, Logistik 15, Einzelhandel 14, Energie 11                 | –           |
+| `growthFactor`     | `1 + growthWeight × Umsatzwachstum` (letzte 4 Quartale gegen die 4 davor)                  | 0,6 bis 1,8 |
+| `reputationFactor` | nur Spielerfirmen: linear von Reputation 0 → 0,6 über 50 → 1,0 bis 100 → 1,4               | 0,6 bis 1,4 |
+| `macroFactor`      | `1 − 0,04 × sector.sensitivity.valuationRate × (Leitzins − neutral) / 100 bp`              | 0,6 bis 1,3 |
+| `eventValueFactor` | Produkt der binären Events (Pharma-Studien), sonst 1                                       | –           |
 
 - **Verlustfirmen** haben kein sinnvolles Gewinnvielfaches. Für sie gilt als Untergrenze
   `bookValueFloorShare` (50 %) des Buchwerts je Aktie, ebenfalls mit Reputations-, Makro- und Eventfaktor.
@@ -343,12 +343,12 @@ place_order(side, type, quantity, limit?, leverage?):
 
 Außerhalb von 08:00 bis 22:00 Uhr (`marketSession(localHour)`):
 
-| Größe | Faktor | Wirkung |
-|---|---|---|
-| Tiefe (`liquidityMultiplier`) | 0,25 | Spielerorders bewegen den Kurs viermal so stark, höhere Slippage |
-| Spread (`spreadMultiplier`) | 3 | Handeln wird teurer |
-| Rauschen (`volatilityMultiplier`) | 0,5 | Der Markt ist ruhiger |
-| KI-Aktivität | 0,25 | KI-Investoren handeln entsprechend weniger, ihre Wirkung pro Tick bleibt gleich |
+| Größe                             | Faktor | Wirkung                                                                         |
+| --------------------------------- | ------ | ------------------------------------------------------------------------------- |
+| Tiefe (`liquidityMultiplier`)     | 0,25   | Spielerorders bewegen den Kurs viermal so stark, höhere Slippage                |
+| Spread (`spreadMultiplier`)       | 3      | Handeln wird teurer                                                             |
+| Rauschen (`volatilityMultiplier`) | 0,5    | Der Markt ist ruhiger                                                           |
+| KI-Aktivität                      | 0,25   | KI-Investoren handeln entsprechend weniger, ihre Wirkung pro Tick bleibt gleich |
 
 Der letzte Punkt ist wichtig: Würden die KI-Investoren bei dünnem Buch gleich viel handeln, wäre ihre eigene
 Rückkopplung viermal so stark und der Markt instabil.
@@ -414,12 +414,12 @@ Die Branchenzusammenhänge aus Abschnitt 10.1 des Prompts stecken in den Elastiz
 
 **Märkte (Segmente).** Jede Firmenstufe verkauft in genau einem Markt (`segmentForTier`):
 
-| Markt | Stufe | `demandShare` | wächst mit dem Trend | etablierte Anbieter |
-|---|---|---|---|---|
-| `local` | Kleinunternehmen | 0,0018 | nein | Qualität 40, Bekanntheit 0,5 |
-| `regional` | GmbH | 0,006 | nein | Qualität 50, Bekanntheit 0,5 |
-| `national` | AG vor IPO | 0,022 | nein | Qualität 55, Bekanntheit 0,5 |
-| `international` | börsennotiert (alle KI-Firmen) | 1 | ja | keine (die KI-Firmen sind die Etablierten) |
+| Markt           | Stufe                          | `demandShare` | wächst mit dem Trend | etablierte Anbieter                        |
+| --------------- | ------------------------------ | ------------- | -------------------- | ------------------------------------------ |
+| `local`         | Kleinunternehmen               | 0,0018        | nein                 | Qualität 40, Bekanntheit 0,5               |
+| `regional`      | GmbH                           | 0,006         | nein                 | Qualität 50, Bekanntheit 0,5               |
+| `national`      | AG vor IPO                     | 0,022         | nein                 | Qualität 55, Bekanntheit 0,5               |
+| `international` | börsennotiert (alle KI-Firmen) | 1             | ja                   | keine (die KI-Firmen sind die Etablierten) |
 
 ```
 segmentDemand = sectorDemand(ohne Trend, falls growsWithSector = false) × demandShare
@@ -593,13 +593,13 @@ marketSalary         = 185 € × skill ^ 1,3 × trait.salaryMultiplier      # p
 - Eigenschaften (`traits`): `ambitious` (+15 % Leistung, Loyalität sinkt doppelt so schnell), `loyal`, `frugal`,
   `genius`, `easygoing`, `mentor`.
 
-| Abteilung | Wirkung in der Simulation |
-|---|---|
-| `production` | Kapazität in Stück |
-| `development` | Zielwert der Qualität (relativ zur Firmengröße, Abschnitt 11.2) |
-| `sales` | Aufschlag auf die Attraktivität (bis +50 %) |
-| `marketing` | Marketingbudget zählt bis zu doppelt (halbe Wirkung bei 15 Skillpunkten) |
-| `finance` | senkt die Fixkosten um bis zu 30 % (halbe Wirkung bei 15 Skillpunkten) |
+| Abteilung     | Wirkung in der Simulation                                                |
+| ------------- | ------------------------------------------------------------------------ |
+| `production`  | Kapazität in Stück                                                       |
+| `development` | Zielwert der Qualität (relativ zur Firmengröße, Abschnitt 11.2)          |
+| `sales`       | Aufschlag auf die Attraktivität (bis +50 %)                              |
+| `marketing`   | Marketingbudget zählt bis zu doppelt (halbe Wirkung bei 15 Skillpunkten) |
+| `finance`     | senkt die Fixkosten um bis zu 30 % (halbe Wirkung bei 15 Skillpunkten)   |
 
 Führungspositionen: COO +1,5 % Kapazität je Skill, Vertriebsleitung +2 % Attraktivität je Skill, CFO senkt den
 Kreditzins um 10 bp je Skill, CTO verkürzt Entwicklungszeiten um 3 % je Skill (wirkt beim Anlegen eines Projekts).
@@ -762,13 +762,13 @@ Nachrichten entstehen als **Daten** aus der Simulation (`NewsItem`): `templateKe
 (`market`, `sector`, `company`), Variablen, Sentiment-Wirkung, Wichtigkeit 1 bis 3. Der deutsche Text steht in
 `messages/de.json` unter dem Schlüssel und wird mit den Variablen gefüllt. Die Simulation enthält keine Texte.
 
-| `templateKey` | Auslöser | Variablen |
-|---|---|---|
-| `earnings.beat`, `earnings.miss`, `earnings.inline` | Quartalsabschluss börsennotierter Firmen | Umsatz, Gewinn, Marktanteil, Überraschung in % |
-| `company.insolvency` | Insolvenz | Quartal, Cash |
-| `macro.sector_crisis`, `macro.recession`, `macro.tech_boom` | zufällige Makro-Events | Branche, Nachfrageänderung, Dauer |
-| `macro.commodity_shock_up`, `macro.commodity_shock_down` | Rohstoffschock | Ölpreisänderung |
-| `macro.oil_report_up`, `macro.oil_report_down` | Ölpreis-Report | Ölpreisänderung, Indexstand |
+| `templateKey`                                               | Auslöser                                 | Variablen                                      |
+| ----------------------------------------------------------- | ---------------------------------------- | ---------------------------------------------- |
+| `earnings.beat`, `earnings.miss`, `earnings.inline`         | Quartalsabschluss börsennotierter Firmen | Umsatz, Gewinn, Marktanteil, Überraschung in % |
+| `company.insolvency`                                        | Insolvenz                                | Quartal, Cash                                  |
+| `macro.sector_crisis`, `macro.recession`, `macro.tech_boom` | zufällige Makro-Events                   | Branche, Nachfrageänderung, Dauer              |
+| `macro.commodity_shock_up`, `macro.commodity_shock_down`    | Rohstoffschock                           | Ölpreisänderung                                |
+| `macro.oil_report_up`, `macro.oil_report_down`              | Ölpreis-Report                           | Ölpreisänderung, Indexstand                    |
 
 Weitere Schlüssel kommen mit den jeweiligen Meilensteinen dazu (Zinsentscheid, Studienergebnis, Indexaufnahme, IPO,
 Spieleraktionen für den Feed).
@@ -790,12 +790,12 @@ wirken gespiegelt auf die Logistik.
 
 **Geplant (mit Countdown):**
 
-| Event | Takt | Mechanik |
-|---|---|---|
-| Quartalszahlen | jedes Quartal | `closeQuarter`, Gewinnüberraschung → Sentiment, neuer fairer Wert |
-| Zinsentscheid | alle 4 Quartale, 1 Quartal vorher angekündigt | `decidePolicyRate` |
-| Ölpreis-Report | alle 2 Quartale | `stepOilIndex`: Log-Normal-Schritt (6 %) mit 25 % Rückzug zum Normalwert |
-| Pharma-Studie | je Pharmafirma 12 % Wahrscheinlichkeit pro Quartal, Ergebnis 2 Quartale nach Ankündigung | `resolvePharmaTrial` |
+| Event          | Takt                                                                                     | Mechanik                                                                 |
+| -------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Quartalszahlen | jedes Quartal                                                                            | `closeQuarter`, Gewinnüberraschung → Sentiment, neuer fairer Wert        |
+| Zinsentscheid  | alle 4 Quartale, 1 Quartal vorher angekündigt                                            | `decidePolicyRate`                                                       |
+| Ölpreis-Report | alle 2 Quartale                                                                          | `stepOilIndex`: Log-Normal-Schritt (6 %) mit 25 % Rückzug zum Normalwert |
+| Pharma-Studie  | je Pharmafirma 12 % Wahrscheinlichkeit pro Quartal, Ergebnis 2 Quartale nach Ankündigung | `resolvePharmaTrial`                                                     |
 
 **Pharma-Studie (binär).** Erfolgswahrscheinlichkeit nach Größe (Bluechip 60 %, Mittelständler 50 %,
 Pennystock 40 %), Kursbewegung gleichverteilt zwischen 50 % und 70 %, bei Erfolg nach oben, sonst nach unten.
@@ -805,12 +805,12 @@ machen. Der Erwartungswert ist bei 50 % ungefähr null; nach Spread und Gebühre
 
 **Zufällig (pro Quartal gewürfelt, `rollMacroEvents`):**
 
-| Event | Wahrscheinlichkeit | Wirkung |
-|---|---|---|
-| Branchenkrise | 3 % | Nachfrage einer zufälligen Branche −15 % für 3 Quartale, Sentiment −0,5 |
-| Rohstoffschock | 4 % | Ölpreis ×1,25 oder ÷1,25, Sentiment Energie ±0,3, Logistik gespiegelt |
-| Konjunkturdelle | 3 % | Nachfrage aller Branchen −8 % für 4 Quartale, Sentiment −0,4 |
-| Tech-Boom | 3 % | Tech-Nachfrage +20 % für 4 Quartale, Sentiment +0,5 |
+| Event           | Wahrscheinlichkeit | Wirkung                                                                 |
+| --------------- | ------------------ | ----------------------------------------------------------------------- |
+| Branchenkrise   | 3 %                | Nachfrage einer zufälligen Branche −15 % für 3 Quartale, Sentiment −0,5 |
+| Rohstoffschock  | 4 %                | Ölpreis ×1,25 oder ÷1,25, Sentiment Energie ±0,3, Logistik gespiegelt   |
+| Konjunkturdelle | 3 %                | Nachfrage aller Branchen −8 % für 4 Quartale, Sentiment −0,4            |
+| Tech-Boom       | 3 %                | Tech-Nachfrage +20 % für 4 Quartale, Sentiment +0,5                     |
 
 Dazu läuft die Konjunktur als langsamer, zum Mittelwert zurückkehrender Zufallspfad (`stepCycleIndex`, zwischen
 0,8 und 1,2). Persönliche Zufallsereignisse (Erbschaft, Steuerprüfung, Headhunter, Golfclub-Tipp) stehen in
@@ -827,22 +827,22 @@ Reputation gehört dem Gründer (0 bis 100, Start 50) und wirkt an drei Stellen:
 Die Simulation liefert Reputationsereignisse als Daten (`ReputationEvent`). Die Datenbank bucht sie und begrenzt
 auf 0 bis 100.
 
-| Ereignis | Punkte | Quelle |
-|---|---|---|
-| Guidance eingehalten (Abweichung ≤ 10 %) | +3 | `closeQuarter` |
-| Guidance verfehlt (Abweichung > 30 %, in beide Richtungen) | −5 | `closeQuarter` |
-| Dividende gezahlt (börsennotiert) | +1 | `closeQuarter` |
-| Angekündigte Dividende nicht gedeckt | −2 | `closeQuarter` |
-| Insolvenz | −30 | `closeQuarter` |
-| Lock-up eingehalten | +4 | M6 |
-| Lange gehalten, je Spieljahr | +1 | M6 |
-| Dumping nach dem IPO | −12 | M6 |
-| Wiederholte Kapitalerhöhung | −4 | M6 |
-| Prospekt-Mittelverwendung eingehalten / abgewichen | +5 / −8 | M6 |
-| Mitarbeiter bleiben lange | +1 | M5 |
-| Insider-Verstoß aufgedeckt | −15 | M5 |
-| IPO geplatzt | −10 | M6 |
-| Spielerbankrott | −10 | M7 |
+| Ereignis                                                   | Punkte  | Quelle         |
+| ---------------------------------------------------------- | ------- | -------------- |
+| Guidance eingehalten (Abweichung ≤ 10 %)                   | +3      | `closeQuarter` |
+| Guidance verfehlt (Abweichung > 30 %, in beide Richtungen) | −5      | `closeQuarter` |
+| Dividende gezahlt (börsennotiert)                          | +1      | `closeQuarter` |
+| Angekündigte Dividende nicht gedeckt                       | −2      | `closeQuarter` |
+| Insolvenz                                                  | −30     | `closeQuarter` |
+| Lock-up eingehalten                                        | +4      | M6             |
+| Lange gehalten, je Spieljahr                               | +1      | M6             |
+| Dumping nach dem IPO                                       | −12     | M6             |
+| Wiederholte Kapitalerhöhung                                | −4      | M6             |
+| Prospekt-Mittelverwendung eingehalten / abgewichen         | +5 / −8 | M6             |
+| Mitarbeiter bleiben lange                                  | +1      | M5             |
+| Insider-Verstoß aufgedeckt                                 | −15     | M5             |
+| IPO geplatzt                                               | −10     | M6             |
+| Spielerbankrott                                            | −10     | M7             |
 
 Die Guidance zählt in beide Richtungen, damit bewusst zu niedrige Prognosen („Sandbagging“) nichts bringen.
 Pump-and-Dump bleibt möglich, kostet aber Reputation, die bei der nächsten Firma als Bewertungsabschlag fehlt.
@@ -870,11 +870,11 @@ Short: Sicherheit = Einstand × Stück / L; Eigenkapital = Sicherheit + (Einstan
 ```
 
 | Hebel | Liquidation Long (Einstand 100 €) | Liquidation Short |
-|---|---|---|
-| 1× | keine | 190,48 € |
-| 2× | 52,63 € | 142,86 € |
-| 5× | 84,21 € | 114,29 € |
-| 10× | 94,74 € | 104,76 € |
+| ----- | --------------------------------- | ----------------- |
+| 1×    | keine                             | 190,48 €          |
+| 2×    | 52,63 €                           | 142,86 €          |
+| 5×    | 84,21 €                           | 114,29 €          |
+| 10×   | 94,74 €                           | 104,76 €          |
 
 `checkMargin()` liefert Eigenkapital und Status: `margin_call` (Warnung) unter 7,5 % Marge, `liquidation` bei
 höchstens 5 %. Aufgelaufene Finanzierungskosten verschieben den Liquidationspreis Richtung Markt.
@@ -925,36 +925,36 @@ Ob das Verhältnis stimmt, muss der Freundestest zeigen (Kennzahlen in BALANCING
 
 ## 23. Konzept → Code
 
-| Konzept | Funktion | Datei |
-|---|---|---|
-| Typmodell | `SecurityState`, `MarketState`, `TickInputs`, `TickResult`, `CompanyState`, `QuarterState`, `QuarterResult`, `NewsItem`, `OrderBookLevel`, `Rng` … | `types.ts` |
-| Zufall, Teilströme | `createRng`, `Rng.derive`, `deriveTickRng`, `hashSeed` | `rng.ts` |
-| Geld und Rundung | `orderValueCents`, `divRoundHalfEven`, `applyBps`, `scaleByFloat`, `toBigInt`, `toSafeNumber` | `money.ts` |
-| Börsenzeiten | `marketSession`, `secondsPerGameYear`, `ticksPerQuarter` | `time.ts` |
-| Markt-Tick | `stepMarketTick` | `tick.ts` |
-| KI-Investoren | `computeInvestorPressure`, `computeAllPressures`, `targetHoldingShares`, `pensionTargetWeight`, `initialArchetypeStates` | `investors.ts` |
-| Fairer Wert | `fairValueE4`, `reputationValuationFactor`, `macroFactor`, `growthFactor`, `trailingRevenueGrowth`, `analystPriceTargetE4` | `fair-value.ts` |
-| Liquidität, Impact, Slippage | `depthShares`, `impactReturn`, `estimateMarketOrder`, `maxFillableShares` | `price-impact.ts` |
-| Spread, Quotes, Orderbuch | `halfSpreadBps`, `quoteAround`, `synthesizeOrderBook` | `market-maker.ts` |
-| Orderausführung | `mergeOrderBook`, `walkBook`, `isLimitMarketable`, `isStopTriggered` | `orders.ts` |
-| Kerzen | `applyTickToCandle`, `aggregateCandles`, `mergeCandles`, `bucketStartMs` | `candles.ts` |
-| Marktanteil, Kapazität, Marketing | `attractiveness`, `marketShares`, `allocateDemand`, `marketingAwarenessGain`, `nextAwareness` | `market-share.ts` |
-| Quartalsabschluss | `closeQuarter`, `sectorDemand`, `nextQuality`, `qualityTarget`, `priceBandCents`, `marketPriceCents`, `unitCostCents`, `tierFixedCostCents`, `effectiveFixedCostCents`, `effectiveMarketingBudget` | `quarter.ts` |
-| Märkte je Firmenstufe | `segmentForTier`, `segmentDemand`, `segmentBaseDemand`, `incumbentAttractiveness`, `awarenessAfterTierChange`, `sectorAttractivenessConfig` | `quarter.ts` |
-| Szenarien für das Balancing | `runScenario`, `summarize` | `company-scenarios.ts` |
-| KI-Firmenpolitik | `aiCompanyDecision`, `aiAdjustStaffing` | `quarter.ts` |
-| Mitarbeiter | `effectiveSkillPoints`, `onboardingFactor`, `marketSalaryCents` | `employees.ts` |
-| Kredite | `loanRateBps`, `loanRiskPremiumBps`, `quarterlyInterestCents`, `creditLineCents` | `loans.ts` |
-| IPO | `unmetIpoRequirements`, `suggestIpoPriceRange`, `aiIpoDemandShares`, `resolveBookbuilding`, `allocateSubscription` | `ipo.ts` |
-| NEXA 30 | `indexLevel`, `initialDivisor`, `adjustDivisor`, `indexWeights`, `reviewIndexMembership` | `nexa-index.ts` |
-| Zentralbank | `moneyGrowthBps`, `annualizeGrowthBps`, `decidePolicyRate`, `isRateDecisionQuarter` | `central-bank.ts` |
-| Staatsanleihen | `bondYieldBps`, `bondCouponCents`, `bondPriceE4`, `bondValueCents` | `bonds.ts` |
-| Events | `resolvePharmaTrial`, `rollPharmaTrialAnnouncement`, `rollMacroEvents`, `stepOilIndex`, `stepCycleIndex`, `earningsSentiment`, `effectDemandFactor`, `ageEffects` | `events.ts` |
-| Steuer | `settleCapitalGainsTax`, `withholdingTaxCents` | `tax.ts` |
-| Hebel, Liquidation, Finanzierung | `liquidationPriceE4`, `checkMargin`, `initialMarginCents`, `maxLeverageForLevel`, `accruedFinancingCents` | `margin.ts` |
-| Tresor, Gehalt | `vaultStatus`, `vaultAccruedCents`, `salaryAccruedCents` | `vault.ts` |
-| Level und Freischaltungen | `xpForNextLevel`, `totalXpForLevel`, `levelFromTotalXp`, `levelProgress`, `unlocksAtLevel`, `isUnlocked`, `nextUnlocks`, `profitableCloseXp`, `dailyLoginXp`, `scaledXp` | `progression.ts` |
-| Noch nicht umgesetzt | `generateApplicantPool`, `stepEmployeeLoyalty`, `aiRescueOffer`, `optionPremiumE4` | `stubs.ts` |
+| Konzept                           | Funktion                                                                                                                                                                                           | Datei                  |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| Typmodell                         | `SecurityState`, `MarketState`, `TickInputs`, `TickResult`, `CompanyState`, `QuarterState`, `QuarterResult`, `NewsItem`, `OrderBookLevel`, `Rng` …                                                 | `types.ts`             |
+| Zufall, Teilströme                | `createRng`, `Rng.derive`, `deriveTickRng`, `hashSeed`                                                                                                                                             | `rng.ts`               |
+| Geld und Rundung                  | `orderValueCents`, `divRoundHalfEven`, `applyBps`, `scaleByFloat`, `toBigInt`, `toSafeNumber`                                                                                                      | `money.ts`             |
+| Börsenzeiten                      | `marketSession`, `secondsPerGameYear`, `ticksPerQuarter`                                                                                                                                           | `time.ts`              |
+| Markt-Tick                        | `stepMarketTick`                                                                                                                                                                                   | `tick.ts`              |
+| KI-Investoren                     | `computeInvestorPressure`, `computeAllPressures`, `targetHoldingShares`, `pensionTargetWeight`, `initialArchetypeStates`                                                                           | `investors.ts`         |
+| Fairer Wert                       | `fairValueE4`, `reputationValuationFactor`, `macroFactor`, `growthFactor`, `trailingRevenueGrowth`, `analystPriceTargetE4`                                                                         | `fair-value.ts`        |
+| Liquidität, Impact, Slippage      | `depthShares`, `impactReturn`, `estimateMarketOrder`, `maxFillableShares`                                                                                                                          | `price-impact.ts`      |
+| Spread, Quotes, Orderbuch         | `halfSpreadBps`, `quoteAround`, `synthesizeOrderBook`                                                                                                                                              | `market-maker.ts`      |
+| Orderausführung                   | `mergeOrderBook`, `walkBook`, `isLimitMarketable`, `isStopTriggered`                                                                                                                               | `orders.ts`            |
+| Kerzen                            | `applyTickToCandle`, `aggregateCandles`, `mergeCandles`, `bucketStartMs`                                                                                                                           | `candles.ts`           |
+| Marktanteil, Kapazität, Marketing | `attractiveness`, `marketShares`, `allocateDemand`, `marketingAwarenessGain`, `nextAwareness`                                                                                                      | `market-share.ts`      |
+| Quartalsabschluss                 | `closeQuarter`, `sectorDemand`, `nextQuality`, `qualityTarget`, `priceBandCents`, `marketPriceCents`, `unitCostCents`, `tierFixedCostCents`, `effectiveFixedCostCents`, `effectiveMarketingBudget` | `quarter.ts`           |
+| Märkte je Firmenstufe             | `segmentForTier`, `segmentDemand`, `segmentBaseDemand`, `incumbentAttractiveness`, `awarenessAfterTierChange`, `sectorAttractivenessConfig`                                                        | `quarter.ts`           |
+| Szenarien für das Balancing       | `runScenario`, `summarize`                                                                                                                                                                         | `company-scenarios.ts` |
+| KI-Firmenpolitik                  | `aiCompanyDecision`, `aiAdjustStaffing`                                                                                                                                                            | `quarter.ts`           |
+| Mitarbeiter                       | `effectiveSkillPoints`, `onboardingFactor`, `marketSalaryCents`                                                                                                                                    | `employees.ts`         |
+| Kredite                           | `loanRateBps`, `loanRiskPremiumBps`, `quarterlyInterestCents`, `creditLineCents`                                                                                                                   | `loans.ts`             |
+| IPO                               | `unmetIpoRequirements`, `suggestIpoPriceRange`, `aiIpoDemandShares`, `resolveBookbuilding`, `allocateSubscription`                                                                                 | `ipo.ts`               |
+| NEXA 30                           | `indexLevel`, `initialDivisor`, `adjustDivisor`, `indexWeights`, `reviewIndexMembership`                                                                                                           | `nexa-index.ts`        |
+| Zentralbank                       | `moneyGrowthBps`, `annualizeGrowthBps`, `decidePolicyRate`, `isRateDecisionQuarter`                                                                                                                | `central-bank.ts`      |
+| Staatsanleihen                    | `bondYieldBps`, `bondCouponCents`, `bondPriceE4`, `bondValueCents`                                                                                                                                 | `bonds.ts`             |
+| Events                            | `resolvePharmaTrial`, `rollPharmaTrialAnnouncement`, `rollMacroEvents`, `stepOilIndex`, `stepCycleIndex`, `earningsSentiment`, `effectDemandFactor`, `ageEffects`                                  | `events.ts`            |
+| Steuer                            | `settleCapitalGainsTax`, `withholdingTaxCents`                                                                                                                                                     | `tax.ts`               |
+| Hebel, Liquidation, Finanzierung  | `liquidationPriceE4`, `checkMargin`, `initialMarginCents`, `maxLeverageForLevel`, `accruedFinancingCents`                                                                                          | `margin.ts`            |
+| Tresor, Gehalt                    | `vaultStatus`, `vaultAccruedCents`, `salaryAccruedCents`                                                                                                                                           | `vault.ts`             |
+| Level und Freischaltungen         | `xpForNextLevel`, `totalXpForLevel`, `levelFromTotalXp`, `levelProgress`, `unlocksAtLevel`, `isUnlocked`, `nextUnlocks`, `profitableCloseXp`, `dailyLoginXp`, `scaledXp`                           | `progression.ts`       |
+| Noch nicht umgesetzt              | `generateApplicantPool`, `stepEmployeeLoyalty`, `aiRescueOffer`, `optionPremiumE4`                                                                                                                 | `stubs.ts`             |
 
 `index.ts` exportiert die öffentliche API. `test-fixtures.ts` und `company-scenarios.ts` sind Werkzeuge für Tests
 und Balancing und werden nicht exportiert.
@@ -989,12 +989,12 @@ und Balancing und werden nicht exportiert.
 
 **Nur als Signatur vorhanden** (`stubs.ts`, werfen `not implemented: …`):
 
-| Funktion | Meilenstein |
-|---|---|
-| `generateApplicantPool` (Bewerberpool je Quartal) | M4 |
-| `stepEmployeeLoyalty` (Loyalität, Kündigung) | M4 |
-| `aiRescueOffer` (Rettungsübernahme) | M4 |
-| `optionPremiumE4` (Optionen ab Level 30) | nach M8 |
+| Funktion                                          | Meilenstein |
+| ------------------------------------------------- | ----------- |
+| `generateApplicantPool` (Bewerberpool je Quartal) | M4          |
+| `stepEmployeeLoyalty` (Loyalität, Kündigung)      | M4          |
+| `aiRescueOffer` (Rettungsübernahme)               | M4          |
+| `optionPremiumE4` (Optionen ab Level 30)          | nach M8     |
 
 **Nicht Teil von `src/lib/sim`**, weil es Datenbanklogik ist: Buchen von Orders, Gehältern, Zinsen, Dividenden und
 Steuern; Wash-Trade-Erkennung; Rate Limits; Insider-Sperrfenster; Missionen, Erfolge, Login-Streak;

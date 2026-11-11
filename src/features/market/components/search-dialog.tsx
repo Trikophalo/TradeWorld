@@ -8,6 +8,7 @@ import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { DEMO_COMPANIES } from "@/lib/demo/market";
 import { cn } from "@/lib/utils";
+import { isTutorialActive } from "@/features/tutorial/store";
 import { useSearch } from "../search-store";
 import { CompanyLogo } from "./company-logo";
 
@@ -29,7 +30,7 @@ export function SearchDialog() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "/" && !isTyping(event.target) && !event.metaKey && !event.ctrlKey) {
+      if (event.key === "/" && !isTyping(event.target) && !event.metaKey && !event.ctrlKey && !isTutorialActive()) {
         event.preventDefault();
         setOpen(true);
       }

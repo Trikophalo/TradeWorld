@@ -5,7 +5,7 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
-  devIndicators: { position: "bottom-right" },
+  devIndicators: false,
   partialPrefetching: true,
   turbopack: {
     rules: {

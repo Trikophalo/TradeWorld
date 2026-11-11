@@ -120,6 +120,9 @@
 @utility z-toast {
   z-index: var(--z-toast);
 }
+@utility z-tutorial {
+  z-index: var(--z-tutorial);
+}
 @utility z-celebration {
   z-index: var(--z-celebration);
 }

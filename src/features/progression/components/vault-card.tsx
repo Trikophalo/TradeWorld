@@ -13,6 +13,7 @@ import { toast } from "@/components/ui/toast";
 import { DEMO_VAULT, useDemo, vaultCents } from "@/lib/demo/store";
 import { formatCountdown, formatMoney } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
+import { emitTutorial } from "@/features/tutorial/store";
 import { playSound } from "@/lib/sound";
 import { useClock } from "@/lib/use-now";
 
@@ -39,6 +40,7 @@ export function VaultCard() {
   const onClaim = () => {
     const claimed = claim();
     if (claimed <= 0) return;
+    emitTutorial("vault-claimed");
     if (art.current) flyCoins(art.current, document.querySelector('[data-fly-target="cash"]'));
     void playSound("coin");
     haptic("success");
@@ -66,7 +68,7 @@ export function VaultCard() {
         <span className={full ? "text-warn" : "text-fg-3"}>{full ? t("fullHint") : t("fillsIn")}</span>
         {!full && <span className="nums text-fg-2">{now === null ? "--:--" : formatCountdown(secondsToFull)}</span>}
       </div>
-      <Button block className="mt-4" state={state} disabled={amount < 100} onClick={onClaim}>
+      <Button block className="mt-4" data-tour="vault-claim" state={state} disabled={amount < 100} onClick={onClaim}>
         {amount < 100 ? t("empty") : t("claim")}
       </Button>
     </Card>

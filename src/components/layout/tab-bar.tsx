@@ -6,7 +6,8 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
-import { NAV_ITEMS, isActivePath } from "@/config/navigation";
+import { isActivePath, visibleNavItems } from "@/config/navigation";
+import { useDemo } from "@/lib/demo/store";
 import { haptic } from "@/lib/haptics";
 import { SPRING } from "@/lib/motion";
 import { cn } from "@/lib/utils";
@@ -15,20 +16,23 @@ import { cn } from "@/lib/utils";
 export function TabBar() {
   const pathname = usePathname();
   const t = useTranslations("nav");
+  const level = useDemo((state) => state.level);
+  const items = visibleNavItems(level);
 
   return (
     <nav
       aria-label={t("label")}
       className="fixed inset-x-0 bottom-0 z-nav border-t border-line-1 bg-surface-1/92 pb-safe backdrop-blur-lg lg:hidden"
     >
-      <ul className="mx-auto grid h-(--tabbar-height) max-w-lg grid-cols-5">
-        {NAV_ITEMS.map((item) => {
+      <ul className="mx-auto flex h-(--tabbar-height) max-w-lg">
+        {items.map((item) => {
           const active = isActivePath(pathname, item.href);
           return (
-            <li key={item.href}>
+            <li key={item.href} className="flex-1">
               <Link
                 href={item.href}
                 aria-current={active ? "page" : undefined}
+                data-tour={`nav-${item.key}`}
                 onClick={() => haptic("tap")}
                 className={cn(
                   "relative flex h-full flex-col items-center justify-center gap-1 rounded-md focus-ring transition-colors duration-fast",

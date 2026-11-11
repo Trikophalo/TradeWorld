@@ -1,9 +1,11 @@
 "use client";
 
 import { motion } from "motion/react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useRef, useState, type ReactNode } from "react";
 import { ALL_PIXEL_ART, BEAR, BULL, COIN } from "@/components/pixel/art";
+import { Mascot } from "@/components/pixel/mascot";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Badge } from "@/components/ui/badge";
 import { Button, type ButtonState } from "@/components/ui/button";
@@ -21,6 +23,8 @@ import { Sheet } from "@/components/ui/sheet";
 import { Skeleton, SkeletonRow } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/toast";
+import { SpeechBubble } from "@/features/tutorial/components/speech-bubble";
+import { useTutorial } from "@/features/tutorial/store";
 import { LevelCard } from "@/features/progression/components/level-card";
 import { formatMoney, formatPrice } from "@/lib/format";
 import { DURATION, SPRING, fadeUp, staggerContainer } from "@/lib/motion";
@@ -83,6 +87,8 @@ export function Showcase() {
   const [progress, setProgress] = useState(0.35);
   const [shake, setShake] = useState(0);
   const [items, setItems] = useState(["KLS", "VLT", "BRZ", "NPH"]);
+  const [bubble, setBubble] = useState(0);
+  const router = useRouter();
   const coinFrom = useRef<HTMLDivElement>(null);
   const coinTo = useRef<HTMLDivElement>(null);
   const now = useMountTime();
@@ -490,6 +496,38 @@ export function Showcase() {
             title="Watchlist ist leer"
             description="Beobachte Aktien, um ihre Kurse hier im Blick zu behalten."
             action={<Button variant="secondary">Aktien entdecken</Button>}
+          />
+        </Card>
+      </Section>
+
+      <Section id="mascot" title={t("mascot")} className="grid gap-4 lg:grid-cols-2">
+        <Demo label="Finn, der Börsenfuchs: ruhig, sprechend, jubelnd" className="justify-around">
+          <Mascot mood="idle" scale={6} />
+          <Mascot mood="talk" scale={6} />
+          <Mascot key={shake} mood="happy" scale={6} />
+        </Demo>
+        <Card padding="lg">
+          <p className="mb-4 label-pixel text-fg-3">Sprechblase und Tutorial</p>
+          <SpeechBubble
+            key={bubble}
+            name="Finn"
+            text="Hi, ich bin Finn! Ich erkläre neuen Spielern in zwei Minuten, wie die Börse läuft."
+            footer={
+              <>
+                <Button size="sm" variant="secondary" onClick={() => setBubble((v) => v + 1)}>
+                  Nochmal
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    useTutorial.getState().restart();
+                    router.push("/");
+                  }}
+                >
+                  Tutorial neu starten
+                </Button>
+              </>
+            }
           />
         </Card>
       </Section>
