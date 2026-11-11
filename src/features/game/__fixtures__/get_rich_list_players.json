@@ -1,6 +1,6 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 6, "gap_cents": 480 }, "rank": 7, "net_worth_cents": 1019520 },
-  "total": 42,
+  "me": { "next": { "name": "Vera", "rank": 9, "gap_cents": 481 }, "rank": 10, "net_worth_cents": 1019519 },
+  "total": 47,
   "entries": [
     {
       "id": "0c3c3c3c-0000-4000-8000-0000000000f1",
@@ -23,7 +23,7 @@
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 6027875,
+      "net_worth_cents": 6026911,
       "rank_change_24h": null
     },
     {
@@ -35,33 +35,33 @@
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 3800224,
+      "net_worth_cents": 3800359,
+      "rank_change_24h": null
+    },
+    {
+      "id": "0d3d3d3d-0000-4000-8000-0000000000f1",
+      "kind": "player",
+      "name": "Fiona_Fabrik",
+      "rank": 4,
+      "is_me": false,
+      "avatar_key": "rookie",
+      "description": null,
+      "change_24h_bps": null,
+      "net_worth_cents": 3310000,
       "rank_change_24h": null
     },
     {
       "id": "0c3c3c3c-0000-4000-8000-0000000000f3",
       "kind": "player",
       "name": "Gero_Garage",
-      "rank": 4,
-      "is_me": false,
-      "avatar_key": "rookie",
-      "description": null,
-      "change_24h_bps": null,
-      "net_worth_cents": 1830437,
-      "rank_change_24h": null
-    },
-    {
-      "id": "0a2b2b2b-0000-4000-8000-0000000000e1",
-      "kind": "player",
-      "name": "Willi_Werk",
       "rank": 5,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 1540612,
+      "net_worth_cents": 1830419,
       "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-11T16:31:59.948496+00:00"
+  "server_time": "2026-11-11T16:59:24.484476+00:00"
 }

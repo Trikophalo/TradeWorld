@@ -1,11 +1,11 @@
 {
-  "id": "b830eecb-6203-4a55-9c87-cdc55524a49c",
+  "id": "010b7296-b9f6-49e9-8cba-65d9ad12bbfc",
   "tier": "intern",
   "slots": 1,
   "title": "Werkstudium Software",
   "status": "open",
   "company": {
-    "id": "e795f405-7c4c-4624-953a-1754c3a50085",
+    "id": "6c6f790f-87dd-406f-9cdd-524bd7059696",
     "name": "Fixture Labor",
     "color": "#2266cc",
     "is_ai": false,

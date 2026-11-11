@@ -1,0 +1,33 @@
+{
+  "job": {
+    "id": "ec66620b-00a1-4bf5-ac0b-8295ecad5762",
+    "tier": "intern",
+    "title": "Werkstudium Daten",
+    "company": {
+      "id": "6c6f790f-87dd-406f-9cdd-524bd7059696",
+      "name": "Fixture Labor",
+      "color": "#2266cc",
+      "is_ai": false,
+      "sector": "tech",
+      "ticker": null
+    },
+    "required": [{ "branch": "finance", "min_score": 0 }],
+    "signature": "M2 2 L8 8",
+    "title_key": null,
+    "started_at": "2026-11-11T16:59:25.46053+00:00",
+    "pending_raise": null,
+    "raise_max_bps": 0,
+    "paid_hours_cap": 12,
+    "pay_factor_bps": 10000,
+    "work_task_open": false,
+    "quit_cost_cents": 216000,
+    "last_bonus_cents": 0,
+    "paid_hours_today": 0.0,
+    "productivity_bps": 15000,
+    "next_work_task_at": "2026-11-11T19:59:25.472484+00:00",
+    "earned_total_cents": 0,
+    "raise_available_at": null,
+    "salary_cents_per_hour": 18000,
+    "effective_salary_cents_per_hour": 18000
+  }
+}

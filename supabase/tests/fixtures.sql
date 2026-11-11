@@ -211,3 +211,45 @@ select public.get_player_card('fixture_neu');
 select public.get_my_portfolio();
 \o
 reset role;
+
+-- M3d: chat, work task, voluntary close of the fixture company
+select tests.login_as('authenticated', :p) is null as ok \gset
+select public.create_job_posting(gen_random_uuid(), :'fco', 'intern', 'Werkstudium Daten',
+  '[{"branch": "finance", "min_score": 0}]', 18000, 1) ->> 'id' as fx_post2 \gset
+select tests.login_as('authenticated', :boss) is null as ok \gset
+select public.apply_for_job(gen_random_uuid(), :'fx_post2', 18000, null) ->> 'id' as fx_papp2 \gset
+select tests.login_as('authenticated', :p) is null as ok \gset
+select public.respond_application(gen_random_uuid(), :'fx_papp2', 'accept', null) is not null as ok \gset
+select tests.login_as('authenticated', :boss) is null as ok \gset
+select public.sign_contract(gen_random_uuid(), :'fx_papp2', 'M2 2 L8 8') is not null as ok \gset
+\o :fixture_dir/get_work_task.json
+select public.get_work_task();
+\o
+reset role;
+select id as fx_task, correct_index as fx_ci from public.player_work_tasks where player_id = :boss order by created_at desc limit 1 \gset
+select tests.login_as('authenticated', :boss) is null as ok \gset
+\o :fixture_dir/submit_work_task.json
+select public.submit_work_task(gen_random_uuid(), :'fx_task', :fx_ci);
+\o :fixture_dir/get_work_task_none.json
+select public.get_work_task();
+\o :fixture_dir/get_my_job_with_task.json
+select public.get_my_job();
+\o :fixture_dir/post_company_message.json
+select public.post_company_message(gen_random_uuid(), 'Moin zusammen!');
+\o
+select tests.login_as('authenticated', :p) is null as ok \gset
+select public.post_company_message(gen_random_uuid(), 'Willkommen an Bord.') is not null as ok \gset
+\o :fixture_dir/get_company_chat.json
+select public.get_company_chat();
+\o :fixture_dir/close_company.json
+select public.close_company(gen_random_uuid());
+\o :fixture_dir/get_my_company_closed.json
+select public.get_my_company();
+\o :fixture_dir/get_my_portfolio_after_close.json
+select public.get_my_portfolio();
+\o
+select tests.login_as('authenticated', :boss) is null as ok \gset
+\o :fixture_dir/get_company_chat_none.json
+select public.get_company_chat();
+\o
+reset role;
