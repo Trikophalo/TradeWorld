@@ -14,12 +14,20 @@ export type TutorialStatus = "loading" | "active" | "done";
 interface Saved {
   status: "active" | "done";
   step: number;
+  /** Unlock tours already shown (ADR-046). */
+  seenTours?: string[];
 }
 
 interface TutorialState {
   status: TutorialStatus;
   step: number;
   accountId: string;
+  /** A running unlock tour, if any. */
+  tour: { key: string; step: number } | null;
+  seenTours: string[];
+  startTour: (key: string) => void;
+  setTourStep: (step: number) => void;
+  endTour: () => void;
   load: (accountId: string) => void;
   setStep: (step: number) => void;
   finish: () => void;
@@ -47,33 +55,52 @@ export const useTutorial = create<TutorialState>((set, get) => ({
   status: "loading",
   step: 0,
   accountId: "demo",
+  tour: null,
+  seenTours: [],
 
   load: (accountId) => {
     const saved = readAll()[accountId];
-    set({ accountId, status: saved?.status ?? "active", step: saved?.step ?? 0 });
+    set({ accountId, status: saved?.status ?? "active", step: saved?.step ?? 0, seenTours: saved?.seenTours ?? [] });
   },
   setStep: (step) => {
-    save(get().accountId, { status: "active", step });
+    save(get().accountId, { status: "active", step, seenTours: get().seenTours });
     set({ step });
   },
   finish: () => {
-    save(get().accountId, { status: "done", step: 0 });
+    save(get().accountId, { status: "done", step: 0, seenTours: get().seenTours });
     set({ status: "done", step: 0 });
   },
   restart: () => {
-    save(get().accountId, { status: "active", step: 0 });
-    set({ status: "active", step: 0 });
+    save(get().accountId, { status: "active", step: 0, seenTours: [] });
+    set({ status: "active", step: 0, seenTours: [], tour: null });
   },
+  startTour: (key) => {
+    const { seenTours, status } = get();
+    if (status !== "done" || seenTours.includes(key)) return;
+    const next = [...seenTours, key];
+    // Marked as seen right away: a tour is never forced twice, even after a reload.
+    save(get().accountId, { status: "done", step: 0, seenTours: next });
+    set({ tour: { key, step: 0 }, seenTours: next });
+  },
+  setTourStep: (step) => set((state) => (state.tour ? { tour: { ...state.tour, step } } : {})),
+  endTour: () => set({ tour: null }),
 }));
 
 /** True while the tutorial is running. Shortcuts and the search stay off meanwhile. */
 export function isTutorialActive(): boolean {
-  return useTutorial.getState().status === "active";
+  const { status, tour } = useTutorial.getState();
+  return status === "active" || tour !== null;
 }
 
 // ---- Events: game components report what the player did.
 
-export type TutorialEvent = "vault-claimed" | "order-sheet-opened" | "order-sheet-closed" | "order-confirmed";
+export type TutorialEvent =
+  | "vault-claimed"
+  | "order-sheet-opened"
+  | "order-sheet-closed"
+  | "order-confirmed"
+  | "limit-selected"
+  | "bonds-tab-opened";
 
 const listeners = new Set<(event: TutorialEvent) => void>();
 

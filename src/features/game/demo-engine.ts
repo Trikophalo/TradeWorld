@@ -1,17 +1,33 @@
 import { BALANCE } from "@/config/balance";
+import {
+  MAX_QUANTITY_E6,
+  MIN_ORDER_CENTS,
+  QUANTITY_SCALE,
+  quantityE6ForBudget,
+  quantityE6ForProceeds,
+  valueCents,
+} from "@/features/market/order-schema";
 import { DEMO_COMPANIES, DEMO_INDEX } from "@/lib/demo/market";
 import { bondPriceE4, bondYieldBps } from "@/lib/sim/bonds";
 import { levelFromTotalXp, levelProgress, scaledXp, unlockLevel } from "@/lib/sim/progression";
+import { MISSION_TEMPLATES, availableFor, missionXp, type Metric, type MissionTemplate } from "./demo/missions";
+import { demoTycoons } from "./demo/tycoons";
 import {
   GameError,
   type Candle,
   type CandleInterval,
   type GameEngine,
+  type GameErrorKey,
   type MarketSnapshot,
+  type Mission,
+  type MissionGroup,
+  type MissionKind,
   type OpenOrder,
   type OrderInput,
   type OrderResult,
   type Portfolio,
+  type RichList,
+  type RichListEntry,
   type Security,
   type Session,
   type Trade,
@@ -19,43 +35,72 @@ import {
 
 /*
  * Offline engine for demo mode (no Supabase settings, docs/DECISIONS.md ADR-015).
- * It follows the same rules as the server in simple form, so the whole game can
- * be tried without an account: spread, price impact, fee, tax with loss pot,
- * resting limit orders, vault, XP. State lives in memory and is gone on reload.
+ * It follows the server's rules in simple form, so the whole game can be tried
+ * without an account: spread, price impact, fee, tax with loss pot, fractional
+ * shares, limit orders, vault, XP, missions, rich list, names. The player's part
+ * survives a reload (localStorage); market prices start fresh.
  */
 
-const { trading, economy, time, progression } = BALANCE;
+const { trading, economy, time, progression, names } = BALANCE;
 const HOUR = 3_600_000;
+const DAY = 24 * HOUR;
 const PRICE_SCALE = 10_000;
+const BERLIN = time.timezone;
 
 interface Holding {
-  quantity: number;
-  reserved: number;
-  /** FIFO lots: quantity and price in e4 */
-  lots: { quantity: number; priceE4: number }[];
+  quantityE6: number;
+  reservedE6: number;
+  /** FIFO lots: quantity (e6) and price (e4) */
+  lots: { quantityE6: number; priceE4: number }[];
 }
 
-interface DemoState {
-  mids: Map<string, number>;
-  prevClose: Map<string, number>;
-  dayHigh: Map<string, number>;
-  dayLow: Map<string, number>;
-  volume: Map<string, number>;
-  /** Player-caused pressure in bps, decays every tick */
-  flow: Map<string, number>;
-  indexValueE4: number;
-  tickSeq: number;
+type DemoOrder = OpenOrder & { reservedCents: number };
+
+interface PlayerMission {
+  id: string;
+  key: string;
+  kind: MissionKind;
+  /** Metric value when the mission was assigned (progress counts from there). */
+  base: number;
+  status: Mission["status"];
+  /** Day (YYYY-MM-DD) or week key of daily/weekly missions. */
+  period: string | null;
+}
+
+interface PlayerState {
+  nickname: string;
+  nicknameChangedAt: number | null;
   cashCents: number;
   reservedCents: number;
   lossPotCents: number;
-  holdings: Map<string, Holding>;
-  orders: (OpenOrder & { reservedCents: number })[];
+  holdings: [string, Holding][];
+  orders: DemoOrder[];
   trades: Trade[];
   vaultClaimedAt: number;
   xpTotal: number;
   tradesToday: number;
+  tradesDay: string;
   tutorialCompleted: boolean;
-  requests: Map<string, unknown>;
+  /** Lifetime counters for missions. */
+  counters: Partial<Record<Metric, number>>;
+  viewedToday: string[];
+  missions: PlayerMission[];
+  missionSeq: number;
+  checkInDay: string | null;
+  streakDays: number;
+}
+
+interface MarketState {
+  mids: Map<string, number>;
+  prevClose: Map<string, number>;
+  dayHigh: Map<string, number>;
+  dayLow: Map<string, number>;
+  volumeE6: Map<string, number>;
+  /** Player-caused pressure in bps, decays every tick */
+  flow: Map<string, number>;
+  indexValueE4: number;
+  indexStartE4: number;
+  tickSeq: number;
 }
 
 const BONDS = [1, 2, 5, 10].map((years) => ({
@@ -65,12 +110,18 @@ const BONDS = [1, 2, 5, 10].map((years) => ({
   couponBps: bondYieldBps(BALANCE.centralBank.startRateBps, years),
 }));
 
+const TYCOONS = demoTycoons();
+const STORAGE_KEY = "nexa-demo-player-v2";
+const TUTORIAL_KEY = "nexa-tutorial";
+
+// ------------------------------------------------------------------ state
+
 function bondMid(couponBps: number, years: number): number {
   const remaining = years * BALANCE.bonds.couponsPerGameYear;
   return Number(bondPriceE4(couponBps, bondYieldBps(BALANCE.centralBank.startRateBps, years), remaining));
 }
 
-function initialState(): DemoState {
+function initialMarket(): MarketState {
   const mids = new Map<string, number>();
   const prevClose = new Map<string, number>();
   for (const c of DEMO_COMPANIES) {
@@ -82,100 +133,111 @@ function initialState(): DemoState {
     mids.set(b.ticker, mid);
     prevClose.set(b.ticker, mid);
   }
+  const index = Math.round(DEMO_INDEX.points * PRICE_SCALE);
   return {
     mids,
     prevClose,
     dayHigh: new Map(mids),
     dayLow: new Map(mids),
-    volume: new Map(),
+    volumeE6: new Map(),
     flow: new Map(),
-    indexValueE4: Math.round(DEMO_INDEX.points * PRICE_SCALE),
+    indexValueE4: index,
+    indexStartE4: index,
     tickSeq: 0,
-    cashCents: economy.startingCapitalCents,
-    reservedCents: 0,
-    lossPotCents: 0,
-    holdings: new Map(),
-    orders: [],
-    trades: [],
-    vaultClaimedAt: Date.now() - (economy.vaultInitialHours ?? 2) * HOUR,
-    xpTotal: 0,
-    tradesToday: 0,
-    tutorialCompleted: false,
-    requests: new Map(),
   };
 }
 
-/*
- * The player's part of the demo survives a reload (localStorage); market prices
- * start fresh. Wrapped in try/catch: storage can be unavailable.
- */
-const STORAGE_KEY = "nexa-demo-player";
-const TUTORIAL_KEY = "nexa-tutorial";
-
-interface SavedPlayer {
-  cashCents: number;
-  reservedCents: number;
-  lossPotCents: number;
-  holdings: [string, Holding][];
-  orders: DemoState["orders"];
-  trades: Trade[];
-  vaultClaimedAt: number;
-  xpTotal: number;
-  tradesToday: number;
-  tutorialCompleted: boolean;
+function initialPlayer(): PlayerState {
+  return {
+    nickname: "DemoSpieler",
+    nicknameChangedAt: null,
+    cashCents: economy.startingCapitalCents,
+    reservedCents: 0,
+    lossPotCents: 0,
+    holdings: [],
+    orders: [],
+    trades: [],
+    vaultClaimedAt: Date.now() - economy.vaultInitialHours * HOUR,
+    xpTotal: 0,
+    tradesToday: 0,
+    tradesDay: "",
+    tutorialCompleted: false,
+    counters: {},
+    viewedToday: [],
+    missions: [],
+    missionSeq: 0,
+    checkInDay: null,
+    streakDays: 0,
+  };
 }
 
-function restore(st: DemoState): DemoState {
-  if (typeof window === "undefined") return st;
+function restorePlayer(): PlayerState {
+  const player = initialPlayer();
+  if (typeof window === "undefined") return player;
   try {
-    const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "null") as SavedPlayer | null;
-    if (saved) {
-      Object.assign(st, { ...saved, holdings: new Map(saved.holdings) });
-    } else {
-      // A finished tutorial from an earlier visit still counts.
-      const tutorial = JSON.parse(window.localStorage.getItem(TUTORIAL_KEY) ?? "{}") as Record<
-        string,
-        { status?: string }
-      >;
-      if (tutorial.demo?.status === "done") {
-        st.tutorialCompleted = true;
-        st.xpTotal = scaledXp(progression.xpSources.tutorial.xp);
-      }
+    const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "null") as PlayerState | null;
+    if (saved) return { ...player, ...saved };
+    // A finished tutorial from an earlier visit still counts.
+    const tutorial = JSON.parse(window.localStorage.getItem(TUTORIAL_KEY) ?? "{}") as Record<
+      string,
+      { status?: string }
+    >;
+    if (tutorial.demo?.status === "done") {
+      player.tutorialCompleted = true;
+      player.xpTotal = scaledXp(progression.xpSources.tutorial.xp);
     }
   } catch {
     // Start fresh.
   }
-  return st;
+  return player;
 }
 
+let market: MarketState | null = null;
+let player: PlayerState | null = null;
+const requests = new Map<string, unknown>();
+const m = (): MarketState => (market ??= initialMarket());
+const p = (): PlayerState => (player ??= restorePlayer());
+
 function persist(): void {
-  if (typeof window === "undefined" || !state) return;
-  const st = state;
-  const saved: SavedPlayer = {
-    cashCents: st.cashCents,
-    reservedCents: st.reservedCents,
-    lossPotCents: st.lossPotCents,
-    holdings: [...st.holdings],
-    orders: st.orders,
-    trades: st.trades,
-    vaultClaimedAt: st.vaultClaimedAt,
-    xpTotal: st.xpTotal,
-    tradesToday: st.tradesToday,
-    tutorialCompleted: st.tutorialCompleted,
-  };
+  if (typeof window === "undefined" || !player) return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(player));
   } catch {
     // Ignore: the demo simply forgets on reload.
   }
 }
 
-let state: DemoState | null = null;
-const s = (): DemoState => (state ??= restore(initialState()));
+/** Test and showcase helper: forget the demo player (cash, positions, XP). */
+export function resetDemoPlayer(): void {
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Nothing to forget.
+  }
+  player = null;
+  requests.clear();
+}
+
+// ------------------------------------------------------------------ helpers
+
+const holdings = () => new Map(p().holdings);
+const saveHoldings = (map: Map<string, Holding>) => {
+  p().holdings = [...map];
+};
+
+function berlinDay(at = Date.now()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: BERLIN }).format(at);
+}
+
+function weekKey(at = Date.now()): string {
+  const day = new Date(berlinDay(at));
+  const monday = new Date(day.getTime() - ((day.getUTCDay() + 6) % 7) * DAY);
+  return monday.toISOString().slice(0, 10);
+}
 
 export function demoSession(now = new Date()): Session {
   const hour = Number(
-    new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hourCycle: "h23", timeZone: time.timezone }).format(now),
+    new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hourCycle: "h23", timeZone: BERLIN }).format(now),
   );
   return hour >= time.marketOpenHour && hour < time.marketCloseHour ? "regular" : "after_hours";
 }
@@ -189,35 +251,115 @@ function meta(ticker: string) {
 }
 
 function halfSpreadBps(ticker: string): number {
-  const m = meta(ticker);
-  const base = m.company ? trading.spread.halfSpreadBps[m.company.tier] : 3;
+  const info = meta(ticker);
+  const base = info.company ? trading.spread.halfSpreadBps[info.company.tier] : 3;
   return demoSession() === "after_hours" ? base * time.afterHours.spreadMultiplier : base;
 }
 
 function quote(ticker: string) {
-  const mid = s().mids.get(ticker)!;
+  const mid = m().mids.get(ticker)!;
   const half = Math.max(trading.spread.minHalfSpreadE4, Math.round((mid * halfSpreadBps(ticker)) / 10_000));
   return { mid, bid: Math.max(1, mid - half), ask: mid + half };
 }
 
-/** Shares that move the price by `impactBpsPerDepth` (one "depth"). */
-function depthShares(ticker: string): number {
-  const m = meta(ticker);
-  if (!m.company) return 50_000;
-  const shares = m.company.marketCapCents / (m.company.priceE4 / 100);
+/** Shares (e6) that move the price by `impactBpsPerDepth` (one "depth"). */
+function depthE6(ticker: string): number {
+  const info = meta(ticker);
+  if (!info.company) return 50_000 * QUANTITY_SCALE;
+  const shares = info.company.marketCapCents / (info.company.priceE4 / 100);
   const liquidity = demoSession() === "after_hours" ? time.afterHours.liquidityMultiplier : 1;
-  return Math.max(50, shares * trading.priceImpact.depthFreeFloatFraction * liquidity);
+  return Math.max(50, shares * trading.priceImpact.depthFreeFloatFraction * liquidity) * QUANTITY_SCALE;
 }
 
-function impactBps(ticker: string, quantity: number): number {
-  return (trading.priceImpact.impactBpsPerDepth * quantity) / depthShares(ticker);
+function impactBps(ticker: string, quantityE6: number): number {
+  return (trading.priceImpact.impactBpsPerDepth * quantityE6) / depthE6(ticker);
+}
+
+/** Fill price of a market order: best quote plus half the impact of the order itself. */
+function fillPriceE4(ticker: string, side: OrderInput["side"], quantityE6: number): number {
+  const q = quote(ticker);
+  const impact = impactBps(ticker, quantityE6) / 2;
+  return side === "buy"
+    ? Math.round(q.ask * (1 + impact / 10_000))
+    : Math.max(1, Math.round(q.bid * (1 - impact / 10_000)));
+}
+
+function level(): number {
+  return levelFromTotalXp(p().xpTotal);
+}
+
+function requireLevel(key: string): void {
+  const needed = unlockLevel(key);
+  if (needed !== null && level() < needed) throw new GameError("locked");
+}
+
+function addXp(base: number): number {
+  const amount = scaledXp(base);
+  p().xpTotal += amount;
+  return amount;
+}
+
+function bump(metric: Metric, by = 1): void {
+  const counters = p().counters;
+  counters[metric] = (counters[metric] ?? 0) + by;
+}
+
+function idempotent<T>(requestId: string, run: () => T): T {
+  if (requests.has(requestId)) return requests.get(requestId) as T;
+  const result = run();
+  requests.set(requestId, result);
+  persist();
+  return result;
+}
+
+const delay = <T>(value: () => T) =>
+  new Promise<T>((resolve, reject) =>
+    setTimeout(() => {
+      try {
+        resolve(value());
+      } catch (error) {
+        reject(error);
+      }
+    }, 120),
+  );
+
+// ------------------------------------------------------------------ market
+
+function securityOf(ticker: string): Security {
+  const st = m();
+  const info = meta(ticker);
+  const q = quote(ticker);
+  const prev = st.prevClose.get(ticker)!;
+  return {
+    id: `demo-${ticker}`,
+    ticker,
+    name: info.company?.name ?? info.bond!.name,
+    kind: info.kind,
+    sector: info.company?.sector ?? null,
+    sizeClass: info.company?.tier ?? null,
+    lastE4: q.mid,
+    bidE4: q.bid,
+    askE4: q.ask,
+    prevCloseE4: prev,
+    changeBps: Math.round((q.mid / prev - 1) * 10_000),
+    dayHighE4: st.dayHigh.get(ticker)!,
+    dayLowE4: st.dayLow.get(ticker)!,
+    dayVolumeE6: st.volumeE6.get(ticker) ?? 0,
+    marketCapCents: info.company ? Math.round((info.company.marketCapCents * q.mid) / info.company.priceE4) : null,
+    bond: info.bond
+      ? {
+          termGameYears: info.bond.years,
+          couponBps: info.bond.couponBps,
+          yieldBps: bondYieldBps(BALANCE.centralBank.startRateBps, info.bond.years),
+          maturesAt: new Date(Date.now() + info.bond.years * DAY).toISOString(),
+          faceValueCents: BALANCE.bonds.faceValueCents,
+        }
+      : null,
+  };
 }
 
 function snapshotNow(): MarketSnapshot {
-  const st = s();
-  const securities: Security[] = [];
-  for (const c of DEMO_COMPANIES) securities.push(securityOf(c.ticker));
-  for (const b of BONDS) securities.push(securityOf(b.ticker));
+  const st = m();
   const prevIndex = Math.round((DEMO_INDEX.points * PRICE_SCALE) / (1 + DEMO_INDEX.changeBps / 10_000));
   return {
     serverTime: new Date().toISOString(),
@@ -232,46 +374,14 @@ function snapshotNow(): MarketSnapshot {
       prevCloseE4: prevIndex,
       changeBps: Math.round((st.indexValueE4 / prevIndex - 1) * 10_000),
     },
-    securities,
-  };
-}
-
-function securityOf(ticker: string): Security {
-  const st = s();
-  const m = meta(ticker);
-  const q = quote(ticker);
-  const prev = st.prevClose.get(ticker)!;
-  return {
-    id: `demo-${ticker}`,
-    ticker,
-    name: m.company?.name ?? m.bond!.name,
-    kind: m.kind,
-    sector: m.company?.sector ?? null,
-    sizeClass: m.company?.tier ?? null,
-    lastE4: q.mid,
-    bidE4: q.bid,
-    askE4: q.ask,
-    prevCloseE4: prev,
-    changeBps: Math.round((q.mid / prev - 1) * 10_000),
-    dayHighE4: st.dayHigh.get(ticker)!,
-    dayLowE4: st.dayLow.get(ticker)!,
-    dayVolume: st.volume.get(ticker) ?? 0,
-    marketCapCents: m.company ? Math.round((m.company.marketCapCents * q.mid) / m.company.priceE4) : null,
-    bond: m.bond
-      ? {
-          termGameYears: m.bond.years,
-          couponBps: m.bond.couponBps,
-          yieldBps: bondYieldBps(BALANCE.centralBank.startRateBps, m.bond.years),
-          maturesAt: new Date(Date.now() + m.bond.years * 24 * HOUR).toISOString(),
-          faceValueCents: BALANCE.bonds.faceValueCents,
-        }
-      : null,
+    securities: [...DEMO_COMPANIES.map((c) => securityOf(c.ticker)), ...BONDS.map((b) => securityOf(b.ticker))],
+    economy: null,
   };
 }
 
 /** One market step: noise by size class, pull toward the start price, decaying player flow. */
 export function demoTick(): void {
-  const st = s();
+  const st = m();
   st.tickSeq += 1;
   let indexMove = 0;
   for (const c of DEMO_COMPANIES) {
@@ -289,92 +399,104 @@ export function demoTick(): void {
     indexMove += (moveBps * c.marketCapCents) / 1e14;
   }
   st.indexValueE4 = Math.round(st.indexValueE4 * (1 + indexMove / 10_000));
-  if (st.orders.length > 0) {
+  if (p().orders.length > 0) {
     fillRestingOrders();
     persist();
   }
 }
 
 function fillRestingOrders(): void {
-  const st = s();
-  for (const order of [...st.orders]) {
+  const pl = p();
+  for (const order of [...pl.orders]) {
     const q = quote(order.ticker);
     const limit = order.limitPriceE4!;
     const marketable = order.side === "buy" ? q.ask <= limit : q.bid >= limit;
     if (!marketable) continue;
-    st.orders = st.orders.filter((o) => o.id !== order.id);
+    pl.orders = pl.orders.filter((o) => o.id !== order.id);
     if (order.side === "buy") {
-      st.reservedCents -= order.reservedCents;
-      st.cashCents += order.reservedCents;
+      pl.reservedCents -= order.reservedCents;
+      pl.cashCents += order.reservedCents;
     } else {
-      const h = st.holdings.get(order.ticker);
-      if (h) h.reserved -= order.quantity;
+      const map = holdings();
+      const h = map.get(order.ticker);
+      if (h) h.reservedE6 -= order.quantityE6;
+      saveHoldings(map);
     }
-    execute(order.ticker, order.side, order.quantity, limit, order.id);
+    execute(order.ticker, order.side, order.quantityE6, limit, order.id);
   }
 }
 
-function addXp(base: number): number {
-  const st = s();
-  const amount = scaledXp(base);
-  st.xpTotal += amount;
-  return amount;
-}
-
-/** Books one fill. Price includes spread and impact already. */
-function execute(ticker: string, side: OrderInput["side"], quantity: number, priceE4: number, orderId: string) {
-  const st = s();
-  const gross = Math.round((quantity * priceE4) / 100);
+/** Books one fill. The price already includes spread and impact. */
+function execute(ticker: string, side: OrderInput["side"], quantityE6: number, priceE4: number, orderId: string) {
+  const pl = p();
+  const map = holdings();
+  const gross = valueCents(quantityE6, priceE4);
   const fee = trading.orderFeeCents;
   let tax = 0;
   let realized: number | null = null;
-  const holding = st.holdings.get(ticker) ?? { quantity: 0, reserved: 0, lots: [] };
+  const holding = map.get(ticker) ?? { quantityE6: 0, reservedE6: 0, lots: [] };
 
   if (side === "buy") {
-    st.cashCents -= gross + fee;
-    holding.quantity += quantity;
-    holding.lots.push({ quantity, priceE4 });
+    pl.cashCents -= gross + fee;
+    holding.quantityE6 += quantityE6;
+    holding.lots.push({ quantityE6, priceE4 });
+    bump("buys");
+    bump("buy_value_cents", gross);
+    if (meta(ticker).kind === "bond") bump("bond_buys");
   } else {
-    let remaining = quantity;
+    let remaining = quantityE6;
     let cost = 0;
     while (remaining > 0 && holding.lots.length > 0) {
       const lot = holding.lots[0]!;
-      const take = Math.min(lot.quantity, remaining);
-      cost += (take * lot.priceE4) / 100;
-      lot.quantity -= take;
+      const take = Math.min(lot.quantityE6, remaining);
+      cost += valueCents(take, lot.priceE4);
+      lot.quantityE6 -= take;
       remaining -= take;
-      if (lot.quantity === 0) holding.lots.shift();
+      if (lot.quantityE6 === 0) holding.lots.shift();
     }
-    holding.quantity -= quantity;
-    realized = Math.round(gross - cost - fee);
+    holding.quantityE6 -= quantityE6;
+    realized = gross - cost - fee;
     if (realized > 0) {
-      const taxable = Math.max(0, realized - st.lossPotCents);
-      st.lossPotCents = Math.max(0, st.lossPotCents - realized);
+      const taxable = Math.max(0, realized - pl.lossPotCents);
+      pl.lossPotCents = Math.max(0, pl.lossPotCents - realized);
       tax = Math.round((taxable * trading.capitalGainsTaxBps) / 10_000);
+      bump("profit_cents", realized);
     } else {
-      st.lossPotCents += -realized;
+      pl.lossPotCents += -realized;
     }
-    st.cashCents += gross - fee - tax;
+    pl.cashCents += gross - fee - tax;
+    bump("sells");
   }
-  if (holding.quantity > 0) st.holdings.set(ticker, holding);
-  else st.holdings.delete(ticker);
+  if (holding.quantityE6 > 0) map.set(ticker, holding);
+  else map.delete(ticker);
+  saveHoldings(map);
+  bump("trades");
 
   // Impact: a buy pushes the price up, a sell down, and the push fades over the next ticks.
-  const impact = impactBps(ticker, quantity) * (side === "buy" ? 1 : -1);
+  const st = m();
+  const impact = impactBps(ticker, quantityE6) * (side === "buy" ? 1 : -1);
   st.mids.set(ticker, Math.max(10, Math.round(st.mids.get(ticker)! * (1 + impact / 20_000))));
   st.flow.set(ticker, (st.flow.get(ticker) ?? 0) + impact / 2);
-  st.volume.set(ticker, (st.volume.get(ticker) ?? 0) + quantity);
+  st.volumeE6.set(ticker, (st.volumeE6.get(ticker) ?? 0) + quantityE6);
 
+  const today = berlinDay();
+  if (pl.tradesDay !== today) {
+    pl.tradesDay = today;
+    pl.tradesToday = 0;
+  }
   let xp = 0;
-  if (st.tradesToday < progression.xpSources.trade.maxTradesPerDay && gross >= 10_000) {
-    st.tradesToday += 1;
+  if (
+    pl.tradesToday < progression.xpSources.trade.maxTradesPerDay &&
+    gross >= progression.xpSources.trade.minOrderValueCents
+  ) {
+    pl.tradesToday += 1;
     xp = addXp(progression.xpSources.trade.xp);
   }
-  st.trades.unshift({
-    id: `${orderId}-fill`,
+  pl.trades.unshift({
+    id: `${orderId}-${pl.trades.length}`,
     ticker,
     side,
-    quantity,
+    quantityE6,
     priceE4,
     grossCents: gross,
     feeCents: fee,
@@ -382,32 +504,11 @@ function execute(ticker: string, side: OrderInput["side"], quantity: number, pri
     realizedPnlCents: realized,
     executedAt: new Date().toISOString(),
   });
-  st.trades = st.trades.slice(0, 50);
+  pl.trades = pl.trades.slice(0, 50);
   return { gross, fee, tax, realized, xp };
 }
 
-function requireLevel(key: string): void {
-  const needed = unlockLevel(key);
-  if (needed !== null && levelFromTotalXp(s().xpTotal) < needed) throw new GameError("locked");
-}
-
-function idempotent<T>(requestId: string, run: () => T): T {
-  const st = s();
-  if (st.requests.has(requestId)) return st.requests.get(requestId) as T;
-  const result = run();
-  st.requests.set(requestId, result);
-  persist();
-  return result;
-}
-
-/** Fill price of a market order: best quote plus half the impact of the order itself. */
-export function demoFillPriceE4(ticker: string, side: OrderInput["side"], quantity: number): number {
-  const q = quote(ticker);
-  const impact = impactBps(ticker, quantity) / 2;
-  return side === "buy"
-    ? Math.round(q.ask * (1 + impact / 10_000))
-    : Math.max(1, Math.round(q.bid * (1 - impact / 10_000)));
-}
+// ------------------------------------------------------------------ candles
 
 function seededRandom(seed: number) {
   let a = seed >>> 0;
@@ -429,9 +530,8 @@ const INTERVAL_SECONDS: Record<CandleInterval, number> = {
 };
 
 function demoCandles(ticker: string, interval: CandleInterval, limit: number): Candle[] {
-  const st = s();
   const isIndex = ticker === "NEXA30";
-  const last = isIndex ? st.indexValueE4 : quote(ticker).mid;
+  const last = isIndex ? m().indexValueE4 : quote(ticker).mid;
   const company = DEMO_COMPANIES.find((c) => c.ticker === ticker);
   const baseVol = isIndex ? 0.6 : company ? { bluechip: 1, midcap: 2, penny: 6 }[company.tier] : 0.05;
   const step = INTERVAL_SECONDS[interval];
@@ -450,22 +550,279 @@ function demoCandles(ticker: string, interval: CandleInterval, limit: number): C
     const wick = Math.abs(change) * 0.6 + volPerBar * 0.3 * random();
     const high = Math.round(Math.max(open, close) * (1 + wick * random()));
     const low = Math.max(1, Math.round(Math.min(open, close) * (1 - wick * random())));
-    bars.push({ time: end - i * step, open, high, low, close, volume: Math.round(random() * 5000) });
+    bars.push({ time: end - i * step, open, high, low, close, volume: Math.round(random() * 5000) * QUANTITY_SCALE });
     close = open;
   }
   return bars.reverse();
 }
 
-const delay = <T>(value: () => T) =>
-  new Promise<T>((resolve, reject) =>
-    setTimeout(() => {
-      try {
-        resolve(value());
-      } catch (error) {
-        reject(error);
-      }
-    }, 120),
-  );
+// ------------------------------------------------------------------ portfolio and wealth
+
+function portfolioNow(): Portfolio {
+  const pl = p();
+  const now = Date.now();
+  const capCents = economy.basicIncomeCentsPerHour * economy.vaultCapHours;
+  const hours = Math.min(economy.vaultCapHours, (now - pl.vaultClaimedAt) / HOUR);
+  const positions = [...holdings()].map(([ticker, h]) => {
+    const info = meta(ticker);
+    const q = quote(ticker);
+    const cost = h.lots.reduce((sum, lot) => sum + valueCents(lot.quantityE6, lot.priceE4), 0);
+    const value = valueCents(h.quantityE6, q.bid);
+    return {
+      ticker,
+      name: info.company?.name ?? info.bond!.name,
+      kind: info.kind,
+      quantityE6: h.quantityE6,
+      reservedQuantityE6: h.reservedE6,
+      avgPriceE4: h.quantityE6 > 0 ? Math.round((cost * 100 * QUANTITY_SCALE) / h.quantityE6) : 0,
+      lastPriceE4: q.mid,
+      marketValueCents: value,
+      costBasisCents: cost,
+      unrealizedPnlCents: value - cost,
+    };
+  });
+  const positionsValue = positions.reduce((sum, pos) => sum + pos.marketValueCents, 0);
+  const progress = levelProgress(pl.xpTotal);
+  const changeAvailable = pl.nicknameChangedAt === null ? null : pl.nicknameChangedAt + names.nicknameChangeDays * DAY;
+  return {
+    cashCents: pl.cashCents,
+    reservedCents: pl.reservedCents,
+    positionsValueCents: positionsValue,
+    totalCents: pl.cashCents + pl.reservedCents + positionsValue,
+    lossPotCents: pl.lossPotCents,
+    vault: {
+      accruedCents: Math.floor(hours * economy.basicIncomeCentsPerHour),
+      capCents,
+      rateCentsPerHour: economy.basicIncomeCentsPerHour,
+      factorBps: 10_000,
+      lastClaimedAt: new Date(pl.vaultClaimedAt).toISOString(),
+      fullAt: new Date(pl.vaultClaimedAt + economy.vaultCapHours * HOUR).toISOString(),
+      serverTime: new Date(now).toISOString(),
+    },
+    positions,
+    openOrders: pl.orders.map((order) => ({
+      id: order.id,
+      ticker: order.ticker,
+      side: order.side,
+      type: order.type,
+      quantityE6: order.quantityE6,
+      filledQuantityE6: order.filledQuantityE6,
+      limitPriceE4: order.limitPriceE4,
+      status: order.status,
+      createdAt: order.createdAt,
+    })),
+    recentTrades: pl.trades,
+    level: progress.level,
+    xpTotal: pl.xpTotal,
+    xpIntoLevel: progress.xpIntoLevel,
+    xpForNext: progress.xpForNext,
+    tutorialCompleted: pl.tutorialCompleted,
+    nickname: pl.nickname,
+    nicknameChangeAvailableAt:
+      changeAvailable !== null && changeAvailable > now ? new Date(changeAvailable).toISOString() : null,
+    missionsClaimable: missionGroups().reduce(
+      (sum, g) => sum + g.missions.filter((mission) => mission.status === "completed").length,
+      0,
+    ),
+    streakDays: pl.streakDays,
+  };
+}
+
+function netWorth(): number {
+  return portfolioNow().totalCents;
+}
+
+function sectorsHeld(): number {
+  const sectors = new Set<string>();
+  for (const [ticker] of holdings()) {
+    const company = DEMO_COMPANIES.find((c) => c.ticker === ticker);
+    if (company) sectors.add(company.sector);
+  }
+  return sectors.size;
+}
+
+/** Current value of a mission metric. */
+function metricValue(metric: Metric): number {
+  if (metric === "net_worth_cents") return netWorth();
+  if (metric === "level") return level();
+  if (metric === "sectors_held") return sectorsHeld();
+  return p().counters[metric] ?? 0;
+}
+
+/** Metrics that count from assignment; the others are states (reached or not). */
+const STATE_METRICS: readonly Metric[] = ["net_worth_cents", "level", "sectors_held"];
+
+function richListNow(scope: "all" | "players"): RichList {
+  const pl = p();
+  const marketMove = m().indexValueE4 / m().indexStartE4;
+  const entries: Omit<RichListEntry, "rank">[] = [];
+  if (scope === "all") {
+    for (const t of TYCOONS) {
+      const factor = 1 + (marketMove - 1) * t.beta * 3;
+      entries.push({
+        kind: "tycoon",
+        id: t.id,
+        name: t.name,
+        description: t.description,
+        netWorthCents: Math.round(t.baseWealthCents * factor),
+        change24hBps: Math.round((factor - 1) * 10_000),
+        rankChange24h: null,
+        isMe: false,
+      });
+    }
+  }
+  const mine = netWorth();
+  entries.push({
+    kind: "player",
+    id: "demo-player",
+    name: pl.nickname,
+    description: null,
+    netWorthCents: mine,
+    change24hBps: Math.round((mine / economy.startingCapitalCents - 1) * 10_000),
+    rankChange24h: null,
+    isMe: true,
+  });
+  const ranked = entries.sort((a, b) => b.netWorthCents - a.netWorthCents).map((e, i) => ({ ...e, rank: i + 1 }));
+  const me = ranked.find((e) => e.isMe)!;
+  const above = ranked[me.rank - 2];
+  return {
+    serverTime: new Date().toISOString(),
+    total: ranked.length,
+    entries: ranked,
+    me: {
+      rank: me.rank,
+      netWorthCents: me.netWorthCents,
+      next: above ? { rank: above.rank, name: above.name, gapCents: above.netWorthCents - me.netWorthCents } : null,
+    },
+  };
+}
+
+// ------------------------------------------------------------------ missions
+
+function periodOf(kind: MissionKind): string | null {
+  if (kind === "daily") return berlinDay();
+  if (kind === "weekly") return weekKey();
+  return null;
+}
+
+function template(key: string): MissionTemplate {
+  return MISSION_TEMPLATES.find((t) => t.key === key)!;
+}
+
+/** Fills every mission slot that is empty or expired. Deterministic order, no repeats while active. */
+function assignMissions(): void {
+  const pl = p();
+  const lvl = level();
+  const limits: Record<MissionKind, number> = {
+    quick: progression.xpSources.quickMission.active,
+    daily: progression.xpSources.dailyMission.perDay,
+    weekly: progression.xpSources.weeklyMission.perWeek,
+    milestone: progression.xpSources.milestoneMission.visible,
+  };
+  // Drop expired daily and weekly missions and replaced quick ones.
+  pl.missions = pl.missions.filter((mission) => {
+    if (mission.kind === "daily" || mission.kind === "weekly") return mission.period === periodOf(mission.kind);
+    if (mission.kind === "quick") return mission.status !== "claimed";
+    return true;
+  });
+  for (const kind of ["quick", "daily", "weekly", "milestone"] as const) {
+    const current = pl.missions.filter(
+      (mission) => mission.kind === kind && (kind !== "milestone" || mission.status !== "claimed"),
+    );
+    const used = new Set(pl.missions.filter((mission) => mission.kind === kind).map((mission) => mission.key));
+    const pool = MISSION_TEMPLATES.filter((t) => t.kind === kind && availableFor(t, lvl) && !used.has(t.key));
+    for (let i = current.length; i < limits[kind] && pool.length > 0; i++) {
+      // Quick missions rotate through the pool; the others take the next ones in order.
+      const pick = kind === "quick" ? pool.splice(pl.missionSeq % pool.length, 1)[0]! : pool.shift()!;
+      pl.missionSeq += 1;
+      pl.missions.push({
+        id: `mission-${pl.missionSeq}`,
+        key: pick.key,
+        kind,
+        base: STATE_METRICS.includes(pick.metric) ? 0 : metricValue(pick.metric),
+        status: "active",
+        period: periodOf(kind),
+      });
+    }
+    // Quick missions whose pool ran dry start over.
+    if (kind === "quick" && pool.length === 0 && current.length < limits.quick) {
+      pl.missions = pl.missions.filter((mission) => mission.kind !== "quick" || mission.status !== "claimed");
+    }
+  }
+}
+
+function missionGroups(): MissionGroup[] {
+  const pl = p();
+  assignMissions();
+  const resets: Record<MissionKind, string | null> = {
+    quick: null,
+    daily: new Date(new Date(`${berlinDay()}T00:00:00`).getTime() + DAY).toISOString(),
+    weekly: new Date(new Date(`${weekKey()}T00:00:00`).getTime() + 7 * DAY).toISOString(),
+    milestone: null,
+  };
+  return (["quick", "daily", "weekly", "milestone"] as const).map((kind) => ({
+    kind,
+    resetsAt: resets[kind],
+    missions: pl.missions
+      .filter((mission) => mission.kind === kind && (kind !== "milestone" || mission.status !== "claimed"))
+      .map((mission) => {
+        const t = template(mission.key);
+        const progress = Math.min(t.target, Math.max(0, metricValue(t.metric) - mission.base));
+        if (mission.status === "active" && progress >= t.target) mission.status = "completed";
+        return {
+          id: mission.id,
+          key: mission.key,
+          title: t.title,
+          description: null,
+          progress,
+          target: t.target,
+          xp: missionXp(t),
+          status: mission.status,
+          expiresAt: resets[kind],
+        };
+      }),
+  }));
+}
+
+// ------------------------------------------------------------------ names
+
+/** Small offline blocklist; the server has the full one (ADR-043). */
+const DEMO_BLOCKED = [
+  "admin",
+  "moderator",
+  "support",
+  "finn",
+  "nexa",
+  "arsch",
+  "fick",
+  "hure",
+  "nazi",
+  "hitler",
+  "fuck",
+  "shit",
+  "bitch",
+];
+
+function nameViolation(name: string): GameErrorKey | null {
+  if (name.length < names.minLength) return "name_too_short";
+  if (name.length > names.maxLength) return "name_too_long";
+  if (!/^[A-Za-z0-9_]+$/.test(name)) return "name_invalid_chars";
+  const normalised = name
+    .toLowerCase()
+    .replace(/0/g, "o")
+    .replace(/1/g, "i")
+    .replace(/3/g, "e")
+    .replace(/4/g, "a")
+    .replace(/5/g, "s")
+    .replace(/7/g, "t")
+    .replace(/[^a-z]/g, "")
+    .replace(/(.)\1+/g, "$1");
+  if (["admin", "moderator", "support", "finn", "nexa"].some((term) => normalised === term)) return "name_reserved";
+  if (DEMO_BLOCKED.some((term) => normalised.includes(term))) return "name_profanity";
+  return null;
+}
+
+// ------------------------------------------------------------------ engine
 
 export const demoEngine: GameEngine = {
   snapshot: () => Promise.resolve(snapshotNow()),
@@ -474,9 +831,9 @@ export const demoEngine: GameEngine = {
 
   orderBook: (ticker, levels) => {
     const q = quote(ticker);
-    const depth = depthShares(ticker);
+    const depth = depthE6(ticker);
     const step = Math.max(1, Math.round(q.mid * 0.0008));
-    const players = s().orders.filter((o) => o.ticker === ticker);
+    const players = p().orders.filter((o) => o.ticker === ticker);
     const level = (i: number, side: "bid" | "ask") => {
       const priceE4 = side === "bid" ? q.bid - i * step : q.ask + i * step;
       const own = players.filter(
@@ -484,17 +841,16 @@ export const demoEngine: GameEngine = {
       );
       return {
         priceE4,
-        quantity: Math.round(depth * (0.15 + i * 0.08)) + own.reduce((sum, o) => sum + o.quantity, 0),
+        quantityE6: Math.round(depth * (0.15 + i * 0.08)) + own.reduce((sum, o) => sum + o.quantityE6, 0),
         players: own.length,
       };
     };
     const bids = Array.from({ length: levels }, (_, i) => level(i, "bid"));
     const asks = Array.from({ length: levels }, (_, i) => level(i, "ask"));
-    // Resting player orders that sit between the synthetic levels
     for (const o of players) {
       const list = o.side === "buy" ? bids : asks;
       if (!list.some((l) => l.priceE4 === o.limitPriceE4))
-        list.push({ priceE4: o.limitPriceE4!, quantity: o.quantity, players: 1 });
+        list.push({ priceE4: o.limitPriceE4!, quantityE6: o.quantityE6, players: 1 });
     }
     bids.sort((a, b) => b.priceE4 - a.priceE4);
     asks.sort((a, b) => a.priceE4 - b.priceE4);
@@ -502,17 +858,16 @@ export const demoEngine: GameEngine = {
   },
 
   details: (ticker) => {
-    const m = meta(ticker);
-    const c = m.company;
+    const info = meta(ticker);
+    const c = info.company;
     const marketCap = c ? Math.round((c.marketCapCents * quote(ticker).mid) / c.priceE4) : null;
-    const pe = c ? { bluechip: 1650, midcap: 2100, penny: 0 }[c.tier] : null;
     return Promise.resolve({
       ticker,
-      name: c?.name ?? m.bond!.name,
+      name: c?.name ?? info.bond!.name,
       description: null,
       marketCapCents: marketCap,
       sharesOutstanding: c ? Math.round(c.marketCapCents / (c.priceE4 / 100)) : null,
-      peX100: pe || null,
+      peX100: c ? { bluechip: 1650, midcap: 2100, penny: null }[c.tier] : null,
       dividendYieldBps: c ? { bluechip: 280, midcap: 120, penny: 0 }[c.tier] : null,
       revenueCents: c ? Math.round(c.marketCapCents / 9) : null,
       netIncomeCents: c ? Math.round(c.marketCapCents / 70) : null,
@@ -521,148 +876,108 @@ export const demoEngine: GameEngine = {
     });
   },
 
-  portfolio: () => {
-    const st = s();
-    const now = Date.now();
-    const capCents = economy.basicIncomeCentsPerHour * economy.vaultCapHours;
-    const hours = Math.min(economy.vaultCapHours, (now - st.vaultClaimedAt) / HOUR);
-    const positions = [...st.holdings].map(([ticker, h]) => {
-      const m = meta(ticker);
-      const q = quote(ticker);
-      const cost = Math.round(h.lots.reduce((sum, lot) => sum + lot.quantity * lot.priceE4, 0) / 100);
-      const value = Math.round((h.quantity * q.bid) / 100);
-      return {
-        ticker,
-        name: m.company?.name ?? m.bond!.name,
-        kind: m.kind,
-        quantity: h.quantity,
-        reservedQuantity: h.reserved,
-        avgPriceE4: Math.round((cost * 100) / h.quantity),
-        lastPriceE4: q.mid,
-        marketValueCents: value,
-        costBasisCents: cost,
-        unrealizedPnlCents: value - cost,
-      };
-    });
-    const positionsValue = positions.reduce((sum, p) => sum + p.marketValueCents, 0);
-    const progress = levelProgress(st.xpTotal);
-    const result: Portfolio = {
-      cashCents: st.cashCents,
-      reservedCents: st.reservedCents,
-      positionsValueCents: positionsValue,
-      totalCents: st.cashCents + st.reservedCents + positionsValue,
-      lossPotCents: st.lossPotCents,
-      vault: {
-        accruedCents: Math.floor(hours * economy.basicIncomeCentsPerHour),
-        capCents,
-        rateCentsPerHour: economy.basicIncomeCentsPerHour,
-        lastClaimedAt: new Date(st.vaultClaimedAt).toISOString(),
-        fullAt: new Date(st.vaultClaimedAt + economy.vaultCapHours * HOUR).toISOString(),
-        serverTime: new Date(now).toISOString(),
-      },
-      positions,
-      openOrders: st.orders.map((order) => ({
-        id: order.id,
-        ticker: order.ticker,
-        side: order.side,
-        type: order.type,
-        quantity: order.quantity,
-        filledQuantity: order.filledQuantity,
-        limitPriceE4: order.limitPriceE4,
-        status: order.status,
-        createdAt: order.createdAt,
-      })),
-      recentTrades: st.trades,
-      level: progress.level,
-      xpTotal: st.xpTotal,
-      xpIntoLevel: progress.xpIntoLevel,
-      xpForNext: progress.xpForNext,
-      tutorialCompleted: st.tutorialCompleted,
-    };
-    return Promise.resolve(result);
-  },
+  portfolio: () => Promise.resolve(portfolioNow()),
 
   placeOrder: (input) =>
     delay(() =>
       idempotent(input.requestId, (): OrderResult => {
-        const st = s();
-        const m = meta(input.ticker);
-        if (!Number.isInteger(input.quantity) || input.quantity < 1 || input.quantity > 100_000)
-          throw new GameError("invalid_quantity");
-        if (m.kind === "bond") requireLevel("bonds");
+        const pl = p();
+        const info = meta(input.ticker);
+        if (info.kind === "bond") requireLevel("bonds");
         if (input.type === "limit") requireLevel("limit_orders");
-        const orderId = `demo-${input.requestId}`;
+        const hasQuantity = input.quantityE6 != null;
+        const hasAmount = input.amountCents != null;
+        if (hasQuantity === hasAmount) throw new GameError("invalid_argument");
         const fee = trading.orderFeeCents;
+        const orderId = `demo-${input.requestId}`;
+        const limit = input.type === "limit" ? (input.limitPriceE4 ?? 0) : null;
+        if (limit !== null && limit <= 0) throw new GameError("invalid_price");
 
+        // Price used to turn an amount into shares: the limit, or the estimated fill.
+        const q = quote(input.ticker);
+        const roughPrice = limit ?? (input.side === "buy" ? q.ask : q.bid);
+        let quantityE6 = hasQuantity
+          ? Math.round(input.quantityE6!)
+          : input.side === "buy"
+            ? quantityE6ForBudget(input.amountCents!, roughPrice, fee)
+            : quantityE6ForProceeds(input.amountCents!, roughPrice);
+        if (quantityE6 <= 0 || quantityE6 > MAX_QUANTITY_E6) throw new GameError("invalid_quantity");
+
+        const map = holdings();
+        const free = (map.get(input.ticker)?.quantityE6 ?? 0) - (map.get(input.ticker)?.reservedE6 ?? 0);
         if (input.side === "sell") {
-          const h = st.holdings.get(input.ticker);
-          if (!h || h.quantity - h.reserved < input.quantity) throw new GameError("insufficient_position");
+          // Selling (almost) everything sells everything: no dust left behind.
+          if (quantityE6 > free && quantityE6 <= free * 1.001) quantityE6 = free;
+          if (quantityE6 > free) throw new GameError("insufficient_position");
         }
+        if (hasAmount) bump("amount_orders");
 
-        if (input.type === "limit") {
-          const limit = input.limitPriceE4 ?? 0;
-          if (limit <= 0) throw new GameError("invalid_price");
-          const q = quote(input.ticker);
-          const marketable = input.side === "buy" ? q.ask <= limit : q.bid >= limit;
-          if (!marketable) {
-            let reserved = 0;
-            if (input.side === "buy") {
-              reserved = Math.round((input.quantity * limit) / 100) + fee;
-              if (reserved > st.cashCents) throw new GameError("insufficient_funds");
-              st.cashCents -= reserved;
-              st.reservedCents += reserved;
-            } else {
-              st.holdings.get(input.ticker)!.reserved += input.quantity;
-            }
-            st.orders.push({
-              id: orderId,
-              ticker: input.ticker,
-              side: input.side,
-              type: "limit",
-              quantity: input.quantity,
-              filledQuantity: 0,
-              limitPriceE4: limit,
-              status: "open",
-              createdAt: new Date().toISOString(),
-              reservedCents: reserved,
-            });
-            return {
-              orderId,
-              status: "open",
-              filledQuantity: 0,
-              avgPriceE4: null,
-              grossCents: 0,
-              feeCents: 0,
-              taxCents: 0,
-              realizedPnlCents: null,
-              cashCents: st.cashCents,
-              xpAwarded: 0,
-              level: levelFromTotalXp(st.xpTotal),
-              xpTotal: st.xpTotal,
-            };
+        if (limit !== null && !(input.side === "buy" ? q.ask <= limit : q.bid >= limit)) {
+          if (valueCents(quantityE6, limit) < MIN_ORDER_CENTS) throw new GameError("order_too_small");
+          let reserved = 0;
+          if (input.side === "buy") {
+            reserved = valueCents(quantityE6, limit) + fee;
+            if (reserved > pl.cashCents) throw new GameError("insufficient_funds");
+            pl.cashCents -= reserved;
+            pl.reservedCents += reserved;
+          } else {
+            const h = map.get(input.ticker)!;
+            h.reservedE6 += quantityE6;
+            saveHoldings(map);
           }
+          pl.orders.push({
+            id: orderId,
+            ticker: input.ticker,
+            side: input.side,
+            type: "limit",
+            quantityE6,
+            filledQuantityE6: 0,
+            limitPriceE4: limit,
+            status: "open",
+            createdAt: new Date().toISOString(),
+            reservedCents: reserved,
+          });
+          bump("limit_orders");
+          return {
+            orderId,
+            status: "open",
+            quantityE6,
+            filledQuantityE6: 0,
+            avgPriceE4: null,
+            grossCents: 0,
+            feeCents: 0,
+            taxCents: 0,
+            realizedPnlCents: null,
+            cashCents: pl.cashCents,
+            xpAwarded: 0,
+            level: level(),
+            xpTotal: pl.xpTotal,
+          };
         }
 
-        let price = demoFillPriceE4(input.ticker, input.side, input.quantity);
-        if (input.type === "limit" && input.limitPriceE4) {
-          price = input.side === "buy" ? Math.min(price, input.limitPriceE4) : Math.max(price, input.limitPriceE4);
-        }
-        if (input.side === "buy" && Math.round((input.quantity * price) / 100) + fee > st.cashCents)
+        let price = fillPriceE4(input.ticker, input.side, quantityE6);
+        if (limit !== null) price = input.side === "buy" ? Math.min(price, limit) : Math.max(price, limit);
+        // An amount buy spends exactly the amount at the real fill price.
+        if (hasAmount && input.side === "buy") quantityE6 = quantityE6ForBudget(input.amountCents!, price, fee);
+        if (quantityE6 <= 0 || valueCents(quantityE6, price) < MIN_ORDER_CENTS) throw new GameError("order_too_small");
+        if (input.side === "buy" && valueCents(quantityE6, price) + fee > pl.cashCents)
           throw new GameError("insufficient_funds");
-        const fill = execute(input.ticker, input.side, input.quantity, price, orderId);
+        if (input.type === "limit") bump("limit_orders");
+        const fill = execute(input.ticker, input.side, quantityE6, price, orderId);
         return {
           orderId,
           status: "filled",
-          filledQuantity: input.quantity,
+          quantityE6,
+          filledQuantityE6: quantityE6,
           avgPriceE4: price,
           grossCents: fill.gross,
           feeCents: fill.fee,
           taxCents: fill.tax,
           realizedPnlCents: fill.realized,
-          cashCents: st.cashCents,
+          cashCents: pl.cashCents,
           xpAwarded: fill.xp,
-          level: levelFromTotalXp(st.xpTotal),
-          xpTotal: st.xpTotal,
+          level: level(),
+          xpTotal: pl.xpTotal,
         };
       }),
     ),
@@ -670,16 +985,18 @@ export const demoEngine: GameEngine = {
   cancelOrder: (requestId, orderId) =>
     delay(() =>
       idempotent(requestId, () => {
-        const st = s();
-        const order = st.orders.find((o) => o.id === orderId);
+        const pl = p();
+        const order = pl.orders.find((o) => o.id === orderId);
         if (!order) throw new GameError("order_not_found");
-        st.orders = st.orders.filter((o) => o.id !== orderId);
+        pl.orders = pl.orders.filter((o) => o.id !== orderId);
         if (order.side === "buy") {
-          st.reservedCents -= order.reservedCents;
-          st.cashCents += order.reservedCents;
+          pl.reservedCents -= order.reservedCents;
+          pl.cashCents += order.reservedCents;
         } else {
-          const h = st.holdings.get(order.ticker);
-          if (h) h.reserved -= order.quantity;
+          const map = holdings();
+          const h = map.get(order.ticker);
+          if (h) h.reservedE6 -= order.quantityE6;
+          saveHoldings(map);
         }
       }),
     ),
@@ -687,34 +1004,133 @@ export const demoEngine: GameEngine = {
   claimVault: (requestId) =>
     delay(() =>
       idempotent(requestId, () => {
-        const st = s();
+        const pl = p();
         const now = Date.now();
-        const hours = Math.min(economy.vaultCapHours, (now - st.vaultClaimedAt) / HOUR);
+        const hours = Math.min(economy.vaultCapHours, (now - pl.vaultClaimedAt) / HOUR);
         const claimed = Math.floor(hours * economy.basicIncomeCentsPerHour);
-        if (claimed < 100) throw new GameError("nothing_to_claim");
-        st.cashCents += claimed;
-        st.vaultClaimedAt = now;
-        return { claimedCents: claimed, cashCents: st.cashCents };
+        if (claimed < economy.vaultMinClaimCents) throw new GameError("nothing_to_claim");
+        pl.cashCents += claimed;
+        pl.vaultClaimedAt = now;
+        bump("vault_claims");
+        return { claimedCents: claimed, cashCents: pl.cashCents };
       }),
     ),
 
   completeTutorial: (requestId) =>
     delay(() =>
       idempotent(requestId, () => {
-        const st = s();
-        const xp = st.tutorialCompleted ? 0 : addXp(progression.xpSources.tutorial.xp);
-        st.tutorialCompleted = true;
-        return { xpAwarded: xp, level: levelFromTotalXp(st.xpTotal), xpTotal: st.xpTotal };
+        const pl = p();
+        const xp = pl.tutorialCompleted ? 0 : addXp(progression.xpSources.tutorial.xp);
+        pl.tutorialCompleted = true;
+        return { xpAwarded: xp, level: level(), xpTotal: pl.xpTotal };
       }),
     ),
-};
 
-/** Test and showcase helper: forget the demo player (cash, positions, XP). */
-export function resetDemoPlayer(): void {
-  try {
-    window.localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // Nothing to forget.
-  }
-  state = null;
-}
+  richList: (scope, limit, offset) => {
+    const list = richListNow(scope);
+    return Promise.resolve({ ...list, entries: list.entries.slice(offset, offset + limit) });
+  },
+
+  richNews: () => {
+    const list = richListNow("all");
+    const me = list.me!;
+    const news = [
+      {
+        publishedAt: new Date(Date.now() - 4 * 60_000).toISOString(),
+        headline: `${list.entries[0]!.name} bleibt die Nummer eins`,
+        body: "Das größte Vermögen der Spielwelt steckt vor allem in Aktien der KI-Firmen.",
+        kind: "leader",
+      },
+    ];
+    if (me.next) {
+      news.unshift({
+        publishedAt: new Date().toISOString(),
+        headline: `${p().nickname} jagt Platz ${me.next.rank}`,
+        body: `Bis ${me.next.name} fehlen noch ${Math.round(me.next.gapCents / 100).toLocaleString("de-DE")} €.`,
+        kind: "chase",
+      });
+    }
+    return Promise.resolve(news);
+  },
+
+  checkNickname: (nickname) => {
+    const reason = nameViolation(nickname);
+    return Promise.resolve({ allowed: reason === null, reason });
+  },
+
+  changeNickname: (requestId, nickname) =>
+    delay(() =>
+      idempotent(requestId, () => {
+        const pl = p();
+        const now = Date.now();
+        if (pl.nicknameChangedAt !== null && now < pl.nicknameChangedAt + names.nicknameChangeDays * DAY)
+          throw new GameError("name_change_too_soon");
+        const reason = nameViolation(nickname);
+        if (reason) throw new GameError(reason);
+        pl.nickname = nickname;
+        pl.nicknameChangedAt = now;
+        return { nickname, nextChangeAt: new Date(now + names.nicknameChangeDays * DAY).toISOString() };
+      }),
+    ),
+
+  missions: () => Promise.resolve(missionGroups()),
+
+  claimMission: (requestId, missionId) =>
+    delay(() =>
+      idempotent(requestId, () => {
+        const pl = p();
+        missionGroups(); // refresh progress and status
+        const mission = pl.missions.find((x) => x.id === missionId);
+        if (!mission) throw new GameError("mission_not_found");
+        if (mission.status === "claimed") throw new GameError("mission_already_claimed");
+        if (mission.status !== "completed") throw new GameError("mission_not_completed");
+        mission.status = "claimed";
+        const xp = addXp(template(mission.key).xp);
+        return { xpAwarded: xp, level: level(), xpTotal: pl.xpTotal };
+      }),
+    ),
+
+  checkIn: (requestId) =>
+    delay(() =>
+      idempotent(requestId, () => {
+        const pl = p();
+        const today = berlinDay();
+        if (pl.checkInDay === today) {
+          return {
+            xpAwarded: 0,
+            level: level(),
+            xpTotal: pl.xpTotal,
+            streakDays: pl.streakDays,
+            alreadyCheckedIn: true,
+          };
+        }
+        const yesterday = berlinDay(Date.now() - DAY);
+        pl.streakDays = pl.checkInDay === yesterday ? pl.streakDays + 1 : 1;
+        pl.checkInDay = today;
+        bump("check_ins");
+        const login = progression.xpSources.dailyLogin;
+        const xp = addXp(login.xp + Math.min(login.streakBonusCap, (pl.streakDays - 1) * login.streakBonusPerDay));
+        return {
+          xpAwarded: xp,
+          level: level(),
+          xpTotal: pl.xpTotal,
+          streakDays: pl.streakDays,
+          alreadyCheckedIn: false,
+        };
+      }),
+    ),
+
+  track: (event, ref) => {
+    const pl = p();
+    if (event === "view_security" && ref) {
+      const key = `${berlinDay()}:${ref}`;
+      if (!pl.viewedToday.includes(key)) {
+        pl.viewedToday = [...pl.viewedToday.filter((v) => v.startsWith(berlinDay())), key];
+        bump("views");
+      }
+    } else if (event === "open_rich_list") bump("rich_list_views");
+    else if (event === "open_rules") bump("rules_views");
+    persist();
+    return Promise.resolve();
+  },
+};

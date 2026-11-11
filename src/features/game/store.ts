@@ -4,7 +4,17 @@ import { create } from "zustand";
 import { isDemoMode } from "@/lib/supabase/env";
 import { liveEngine } from "./api";
 import { demoEngine } from "./demo-engine";
-import type { GameEngine, MarketSnapshot, OrderInput, OrderResult, Portfolio, Security } from "./types";
+import type {
+  GameEngine,
+  MarketSnapshot,
+  MissionGroup,
+  OrderInput,
+  OrderResult,
+  Portfolio,
+  ProgressResult,
+  Security,
+  TrackedEvent,
+} from "./types";
 
 /** The live Supabase API, or the offline demo when no Supabase project is configured. */
 export const engine: GameEngine = isDemoMode ? demoEngine : liveEngine;
@@ -13,6 +23,7 @@ interface GameState {
   snapshot: MarketSnapshot | null;
   byTicker: Record<string, Security>;
   portfolio: Portfolio | null;
+  missions: MissionGroup[] | null;
   /** Local clock minus server clock in ms, for countdowns. */
   clockSkewMs: number;
   refreshSnapshot: () => Promise<void>;
@@ -21,10 +32,16 @@ interface GameState {
   cancelOrder: (orderId: string) => Promise<void>;
   claimVault: () => Promise<number>;
   completeTutorial: () => Promise<void>;
+  refreshMissions: () => Promise<void>;
+  claimMission: (missionId: string) => Promise<ProgressResult>;
+  checkIn: () => Promise<{ xpAwarded: number; streakDays: number; alreadyCheckedIn: boolean }>;
+  changeNickname: (nickname: string) => Promise<void>;
+  track: (event: TrackedEvent, ref?: string) => void;
 }
 
 let snapshotInFlight: Promise<void> | null = null;
 let portfolioInFlight: Promise<void> | null = null;
+let missionsInFlight: Promise<void> | null = null;
 
 /**
  * Server state the whole app shares: market snapshot (polled every tick) and
@@ -35,6 +52,7 @@ export const useGame = create<GameState>((set, get) => ({
   snapshot: null,
   byTicker: {},
   portfolio: null,
+  missions: null,
   clockSkewMs: 0,
 
   refreshSnapshot: () =>
@@ -67,10 +85,40 @@ export const useGame = create<GameState>((set, get) => ({
         portfolioInFlight = null;
       })),
 
+  refreshMissions: () =>
+    (missionsInFlight ??= engine
+      .missions()
+      .then((missions) => set({ missions }))
+      .catch(() => undefined)
+      .finally(() => {
+        missionsInFlight = null;
+      })),
+
   placeOrder: async (input) => {
     const result = await engine.placeOrder(input);
-    await Promise.all([get().refreshPortfolio(), get().refreshSnapshot()]);
+    await Promise.all([get().refreshPortfolio(), get().refreshSnapshot(), get().refreshMissions()]);
     return result;
+  },
+
+  claimMission: async (missionId) => {
+    const result = await engine.claimMission(crypto.randomUUID(), missionId);
+    await Promise.all([get().refreshPortfolio(), get().refreshMissions()]);
+    return result;
+  },
+
+  checkIn: async () => {
+    const result = await engine.checkIn(crypto.randomUUID());
+    if (!result.alreadyCheckedIn) await Promise.all([get().refreshPortfolio(), get().refreshMissions()]);
+    return result;
+  },
+
+  changeNickname: async (nickname) => {
+    await engine.changeNickname(crypto.randomUUID(), nickname);
+    await get().refreshPortfolio();
+  },
+
+  track: (event, ref) => {
+    void engine.track(event, ref).then(() => get().refreshMissions());
   },
 
   cancelOrder: async (orderId) => {
@@ -80,13 +128,13 @@ export const useGame = create<GameState>((set, get) => ({
 
   claimVault: async () => {
     const result = await engine.claimVault(crypto.randomUUID());
-    await get().refreshPortfolio();
+    await Promise.all([get().refreshPortfolio(), get().refreshMissions()]);
     return result.claimedCents;
   },
 
   completeTutorial: async () => {
     await engine.completeTutorial(crypto.randomUUID());
-    await get().refreshPortfolio();
+    await Promise.all([get().refreshPortfolio(), get().refreshMissions()]);
   },
 }));
 

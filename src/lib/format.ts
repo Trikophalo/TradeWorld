@@ -65,6 +65,18 @@ export function formatBps(bps: number): string {
   return percent.format(bps / 10_000);
 }
 
+const shares = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 6 });
+const sharesShort = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 4 });
+
+/**
+ * Share quantity from millionths (fractional shares): "4", "0,4439", "12,5".
+ * `precise` shows all six decimals where they matter (order receipts).
+ */
+export function formatShares(quantityE6: Numeric, precise = false): string {
+  const value = Number(quantityE6) / 1_000_000;
+  return (precise ? shares : sharesShort).format(value === 0 || Math.abs(value) >= 0.0001 || precise ? value : 0.0001);
+}
+
 export function formatInteger(value: Numeric): string {
   return integer.format(value);
 }

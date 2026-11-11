@@ -14,7 +14,7 @@ import { SkeletonRow } from "@/components/ui/skeleton";
 import { useGame } from "@/features/game/store";
 import { brandColor } from "@/features/market/brand";
 import { CompanyLogo } from "@/features/market/components/company-logo";
-import { formatInteger, formatMoney, formatPrice } from "@/lib/format";
+import { formatMoney, formatPrice, formatShares } from "@/lib/format";
 import { SPRING } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
@@ -69,7 +69,7 @@ export function PositionsList() {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium text-fg-1">{p.name}</span>
                     <span className="nums text-sm text-fg-3">
-                      {t("positionLine", { quantity: formatInteger(p.quantity), price: formatPrice(p.avgPriceE4) })}
+                      {t("positionLine", { quantity: formatShares(p.quantityE6), price: formatPrice(p.avgPriceE4) })}
                     </span>
                   </span>
                   <span className="flex flex-col items-end gap-0.5">

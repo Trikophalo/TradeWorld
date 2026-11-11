@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { SkeletonRow } from "@/components/ui/skeleton";
 import { useSecurities } from "@/features/game/hooks";
 import { useGame } from "@/features/game/store";
-import { formatBps, formatPrice } from "@/lib/format";
+import { formatBps, formatPrice, formatShares } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { OrderSheet, type OrderSide } from "./order-sheet";
 
@@ -27,12 +27,12 @@ export function BondList({ locked }: { locked: boolean }) {
   const [order, setOrder] = useState<{ ticker: string; side: OrderSide | null }>({ ticker: "", side: null });
 
   return (
-    <Card padding="lg" className={cn(locked && "opacity-60")} aria-disabled={locked || undefined}>
+    <Card padding="lg" className={cn(locked && "opacity-60")} aria-disabled={locked || undefined} data-tour="bond-list">
       <p className="mb-3 text-sm text-pretty text-fg-2">{t("bondsIntro")}</p>
       <ul className="divide-y divide-line-1">
         {bonds === null && Array.from({ length: 4 }, (_, i) => <SkeletonRow key={i} />)}
         {bonds?.map((bond) => {
-          const quantity = held?.find((p) => p.ticker === bond.ticker)?.quantity ?? 0;
+          const quantityE6 = held?.find((p) => p.ticker === bond.ticker)?.quantityE6 ?? 0;
           return (
             <li key={bond.ticker} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
               <span className="grid size-10 shrink-0 place-items-center rounded-md bg-surface-2">
@@ -42,7 +42,7 @@ export function BondList({ locked }: { locked: boolean }) {
                 <span className="block truncate font-medium text-fg-1">{bond.name}</span>
                 <span className="label-pixel text-fg-3">
                   {bond.ticker}
-                  {quantity > 0 && ` · ${t("bondsHeld", { count: quantity })}`}
+                  {quantityE6 > 0 && ` · ${t("bondsHeld", { count: formatShares(quantityE6) })}`}
                 </span>
               </span>
               <span className="flex flex-col items-end nums">
@@ -61,7 +61,7 @@ export function BondList({ locked }: { locked: boolean }) {
                   >
                     {t("buy")}
                   </Button>
-                  {quantity > 0 && (
+                  {quantityE6 > 0 && (
                     <Button
                       size="sm"
                       variant="secondary"

@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { SkeletonRow } from "@/components/ui/skeleton";
 import { useOrderBook } from "@/features/game/hooks";
 import type { BookLevel } from "@/features/game/types";
-import { formatInteger, formatPrice } from "@/lib/format";
+import { formatPrice, formatShares } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /**
@@ -24,7 +24,7 @@ export function OrderBook({ ticker }: { ticker: string }) {
       </div>
     );
   }
-  const max = Math.max(1, ...book.data.bids.map((l) => l.quantity), ...book.data.asks.map((l) => l.quantity));
+  const max = Math.max(1, ...book.data.bids.map((l) => l.quantityE6), ...book.data.asks.map((l) => l.quantityE6));
   const spread = (book.data.asks[0]?.priceE4 ?? 0) - (book.data.bids[0]?.priceE4 ?? 0);
 
   return (
@@ -71,14 +71,14 @@ function Side({
               "absolute inset-y-0 w-full transition-transform duration-slow ease-out",
               side === "bid" ? "right-0 origin-right bg-gain-soft" : "left-0 origin-left bg-loss-soft",
             )}
-            style={{ transform: `scaleX(${level.quantity / max})` }}
+            style={{ transform: `scaleX(${level.quantityE6 / max})` }}
           />
           <span className={cn("relative nums font-medium", side === "bid" ? "text-gain" : "text-loss")}>
             {formatPrice(level.priceE4)}
           </span>
           <span className="relative flex items-center gap-1.5 nums text-fg-2">
             {level.players > 0 && <span title={playerLabel} className="size-1.5 bg-accent" />}
-            {formatInteger(level.quantity)}
+            {formatShares(level.quantityE6)}
           </span>
         </li>
       ))}

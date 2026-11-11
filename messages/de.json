@@ -63,15 +63,9 @@
     "news": "Nachrichten",
     "newsEmptyTitle": "Noch keine Nachrichten",
     "newsEmptyText": "Sobald der Markt in Meilenstein 1 läuft, erscheinen hier Meldungen aus der Simulation.",
-    "missions": "Tägliche Missionen",
-    "missionTrade": "Führe einen Trade aus",
-    "missionVault": "Leere deinen Tresor",
-    "missionWatch": "Sieh dir drei Aktien an",
-    "missionReward": "+{xp} XP",
     "nextGoal": "Nächstes Ziel",
     "sinceStart": "seit Spielstart",
-    "comingUp": "Später freischaltbar",
-    "missionsSoon": "Bald"
+    "comingUp": "Später freischaltbar"
   },
   "vault": {
     "title": "Tresor",
@@ -84,7 +78,8 @@
     "claimedText": "{amount} sind auf deinem Konto.",
     "empty": "Noch nichts zu holen",
     "progress": "Füllstand des Tresors",
-    "claimFailed": "Tresor nicht geleert"
+    "claimFailed": "Tresor nicht geleert",
+    "treasuryLow": "Staatskasse knapp"
   },
   "portfolio": {
     "title": "Portfolio",
@@ -167,8 +162,8 @@
   "order": {
     "buyTitle": "{ticker} kaufen",
     "sellTitle": "{ticker} verkaufen",
-    "quantity": "Stückzahl",
-    "quantityError": "Gib eine ganze Zahl zwischen 1 und 100.000 ein.",
+    "quantity": "Stückzahl (auch Bruchteile)",
+    "quantityError": "Gib eine Stückzahl ein, zum Beispiel 2 oder 0,5.",
     "value": "Wert ({quantity} Stück)",
     "fee": "Ordergebühr",
     "total": "Summe",
@@ -186,9 +181,6 @@
     "amountBuy": "Betrag in Euro",
     "amountSell": "Erlös in Euro",
     "amountError": "Gib einen Betrag in Euro ein, zum Beispiel 250 oder 99,50.",
-    "amountTooSmall": "Dafür bekommst du keine ganze Aktie.",
-    "amountResult": "Das sind {quantity} Stück. Der Rest bleibt auf deinem Konto.",
-    "estimateHint": "Vorschau. Der genaue Preis steht nach der Ausführung fest.",
     "max": "Max",
     "all": "Alle",
     "limitPrice": "Limit-Preis",
@@ -201,8 +193,6 @@
     "proceeds": "Erlös",
     "availableShares": "Im Depot",
     "insufficientShares": "So viele Stück hast du nicht im Depot.",
-    "holdLimitBuy": "Halten: Limit setzen",
-    "holdLimitSell": "Halten: Limit setzen",
     "afterHours": "Nachbörse: weniger Umsatz, größerer Spread.",
     "boughtTitle": "Gekauft",
     "soldTitle": "Verkauft",
@@ -211,7 +201,14 @@
     "filledXp": "+{xp} XP",
     "restingTitle": "Limit-Order liegt im Orderbuch",
     "restingText": "{quantity} × {ticker} zu {price}. Du findest sie im Portfolio.",
-    "failedTitle": "Order nicht ausgeführt"
+    "failedTitle": "Order nicht ausgeführt",
+    "amountResultBuy": "Dafür bekommst du etwa {quantity} Stück.",
+    "amountResultSell": "Dafür verkaufst du etwa {quantity} Stück.",
+    "sharesResult": "Das sind etwa {value}.",
+    "pickHint": "Wähle mit dem Regler oder tippe einen Betrag ein.",
+    "slider": "Menge wählen",
+    "tooSmall": "Eine Order muss mindestens 1 € wert sein.",
+    "holdLimit": "Halten: Limit setzen"
   },
   "company": {
     "title": "Unternehmen",
@@ -237,8 +234,6 @@
   },
   "profile": {
     "title": "Profil",
-    "guest": "Gast",
-    "rank": "Börsenneuling",
     "level": "Level {level}",
     "xp": "{current} von {total} XP",
     "xpLabel": "Fortschritt zum nächsten Level",
@@ -274,7 +269,8 @@
     "careerEmptyText": "Jobs, Arbeitsaufgaben und Beförderungen kommen mit Meilenstein 3.",
     "rules": "Spielregeln",
     "rulesHint": "Steuern, Gebühren und wie Firmen Geld verdienen",
-    "unlocksMore": "Weitere Freischaltungen entdeckst du beim Aufsteigen."
+    "unlocksMore": "Weitere Freischaltungen entdeckst du beim Aufsteigen.",
+    "rename": "Namen ändern"
   },
   "unlocks": {
     "market_orders": "Aktien kaufen und verkaufen",
@@ -480,12 +476,29 @@
       "pickStock": "Das sind die Aktien. Grün heißt heute gestiegen, Rot gefallen. Tippe auf eine Aktie, um sie dir anzusehen.",
       "chart": "Oben steht der aktuelle Kurs, darunter sein Verlauf. Der Kurs bewegt sich live, weil ständig gekauft und verkauft wird.",
       "buy": "Zeit für deinen ersten Trade. Tippe auf „Kaufen“.",
-      "hold": "Hier siehst du, was die Order kostet. Zum Bestätigen hältst du den Button gedrückt, bis er gefüllt ist.",
+      "hold": "Hier stellst du ein, wie viel du investieren willst: Zieh den Regler oder tippe auf 25 %. Dann hältst du den Button gedrückt, bis er gefüllt ist.",
       "goPortfolio": "Sauber, so läuft jeder Trade! Was dir gehört, findest du im Portfolio. Tippe darauf.",
       "portfolio": "Hier siehst du dein Guthaben und deine Aktien, und ob sie gerade im Plus oder Minus stehen.",
       "goProfile": "Fast geschafft. Tippe auf „Profil“.",
       "profile": "Für fast alles bekommst du XP und steigst im Level auf. Jedes Level schaltet Neues frei: Jobs, eigene Firmen, den Börsengang. Was als Nächstes kommt, steht immer hier.",
       "done": "Das war's! Zur Belohnung bekommst du {xp} XP und bist jetzt Level 2. Wenn du etwas nachlesen willst: Die Spielregeln findest du hier im Profil. Viel Erfolg an der Börse!"
+    },
+    "tourDone": "Alles klar",
+    "tours": {
+      "limit_orders": {
+        "intro": "Neu freigeschaltet: Limit-Orders! Damit kaufst du erst, wenn der Kurs auf deinen Wunschpreis fällt, oder verkaufst, wenn er steigt. Ich zeig's dir kurz.",
+        "goMarkets": "Tippe auf „Märkte“.",
+        "pickStock": "Such dir eine Aktie aus.",
+        "buy": "Tippe auf „Kaufen“.",
+        "chooseLimit": "Oben stellst du jetzt von „Sofort“ auf „Limit“ um. Tippe darauf.",
+        "limitPrice": "Hier trägst du deinen Wunschpreis ein. Die Order wartet im Orderbuch, bis der Kurs ihn erreicht, und du findest sie im Portfolio. Setz eine oder schließ das Fenster."
+      },
+      "bonds": {
+        "intro": "Neu freigeschaltet: Staatsanleihen! Sie zahlen sichere Zinsen vom Staat, jedes Quartal. Ideal, wenn dir die Börse zu wild wird.",
+        "goMarkets": "Tippe auf „Märkte“.",
+        "bondsTab": "Tippe oben auf „Anleihen“.",
+        "bondList": "Je länger die Laufzeit, desto mehr Zinsen. Am Ende bekommst du 100 € pro Anleihe zurück. Kaufen geht wie bei Aktien."
+      }
     }
   },
   "errors": {
@@ -505,7 +518,19 @@
     "unknown": "Das hat nicht geklappt. Prüfe deine Verbindung und versuch es noch einmal.",
     "invalid_argument": "Die Eingabe ist ungültig. Lade die Seite neu und versuch es noch einmal.",
     "invalid_interval": "Diesen Zeitraum gibt es nicht.",
-    "forbidden": "Dafür fehlen dir die Rechte."
+    "forbidden": "Dafür fehlen dir die Rechte.",
+    "order_too_small": "Eine Order muss mindestens 1 € wert sein.",
+    "market_illiquid": "Gerade findet sich kein Handelspartner. Versuch es gleich noch einmal.",
+    "name_too_short": "Der Name ist zu kurz (mindestens 3 Zeichen).",
+    "name_too_long": "Der Name ist zu lang (höchstens 20 Zeichen).",
+    "name_invalid_chars": "Erlaubt sind Buchstaben, Zahlen und der Unterstrich.",
+    "name_profanity": "Dieser Name ist nicht erlaubt.",
+    "name_reserved": "Dieser Name ist reserviert.",
+    "name_taken": "Diesen Namen hat schon jemand.",
+    "name_change_too_soon": "Deinen Namen kannst du nur alle 60 Tage ändern.",
+    "mission_not_found": "Diese Mission gibt es nicht mehr.",
+    "mission_not_completed": "Diese Mission ist noch nicht erfüllt.",
+    "mission_already_claimed": "Die Belohnung hast du schon abgeholt."
   },
   "locks": {
     "level": "Level {level}",
@@ -518,5 +543,71 @@
     "kicker": "Aufgestiegen!",
     "title": "Level {level}",
     "continue": "Weiter"
+  },
+  "missions": {
+    "title": "Missionen",
+    "intro": "Für fast alles im Spiel gibt es Missionen. Schnelle Missionen füllen sich sofort wieder auf, tägliche und wöchentliche starten neu, und die Story-Missionen begleiten dich auf dem ganzen Weg.",
+    "all": "Alle Missionen",
+    "claimable": "{count} abholen",
+    "done": "Erledigt",
+    "claimedTitle": "Belohnung abgeholt",
+    "claimedText": "+{xp} XP",
+    "claimFailed": "Abholen fehlgeschlagen",
+    "resetsIn": "Neu in",
+    "empty": "Gerade nichts offen. Schau später wieder vorbei.",
+    "streak": "Login-Serie: {days, plural, one {# Tag} other {# Tage}}",
+    "checkInTitle": "Täglicher Bonus",
+    "checkInText": "+{xp} XP · Serie {days, plural, one {# Tag} other {# Tage}}",
+    "kind": {
+      "quick": "Schnell",
+      "daily": "Heute",
+      "weekly": "Diese Woche",
+      "milestone": "Deine Geschichte"
+    },
+    "hint": {
+      "quick": "Ein paar Minuten. Neue kommen sofort nach.",
+      "daily": "Starten jeden Tag um Mitternacht neu.",
+      "weekly": "Für mehrere Tage, mit großer Belohnung.",
+      "milestone": "Große Ziele auf dem Weg nach oben."
+    }
+  },
+  "richList": {
+    "title": "Reichenliste",
+    "rank": "Platz {rank}",
+    "ofTotal": "von {total}",
+    "nextTarget": "Noch {gap} bis Platz {rank} ({name}).",
+    "nextProgress": "Abstand zum nächsten Platz",
+    "top": "Du bist die Nummer eins!",
+    "you": "Du",
+    "youName": "Du",
+    "player": "Spieler",
+    "scope": "Ansicht",
+    "scopeAll": "Alle",
+    "scopePlayers": "Nur Spieler",
+    "live": "Live, alle 15 Sekunden",
+    "news": "Schlagzeilen",
+    "newsEmpty": "Noch keine Meldungen. Sobald sich Plätze verschieben, steht es hier.",
+    "explain": "Gezählt wird dein Vermögen: Bargeld plus Aktien und Anleihen zum aktuellen Verkaufskurs, später auch Firmenanteile. Die KI-Tycoons sind erfundene Personen, deren Vermögen in Aktien der KI-Firmen steckt."
+  },
+  "titles": {
+    "rookie": "Börsenneuling",
+    "investor": "Investor:in",
+    "founder": "Gründer:in",
+    "strategist": "Stratege:in",
+    "magnate": "Magnat:in",
+    "tycoon": "Tycoon",
+    "legend": "Börsenlegende"
+  },
+  "nickname": {
+    "title": "Spielername ändern",
+    "description": "Dein Name steht auf der Reichenliste. Du kannst ihn alle {days} Tage ändern.",
+    "label": "Neuer Name",
+    "hint": "3 bis 20 Zeichen: Buchstaben, Zahlen, Unterstrich.",
+    "free": "Dieser Name ist frei.",
+    "save": "Namen speichern",
+    "saved": "Name geändert",
+    "savedText": "Du heißt jetzt {name}.",
+    "failed": "Name nicht geändert",
+    "locked": "Die nächste Änderung ist ab dem {date} möglich."
   }
 }

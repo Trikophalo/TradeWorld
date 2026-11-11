@@ -18,7 +18,7 @@ import { CHART_RANGES, useCandles, useSecurityDetails, type ChartRange } from "@
 import { useGame, useMarketReady, useSecurity } from "@/features/game/store";
 import { Reveal } from "@/features/progression/components/reveal";
 import { isTutorialActive } from "@/features/tutorial/store";
-import { formatBps, formatInteger, formatMoney, formatPrice } from "@/lib/format";
+import { formatBps, formatMoney, formatPrice, formatShares } from "@/lib/format";
 import { useSettings } from "@/stores/settings";
 import { cn } from "@/lib/utils";
 import { brandColor } from "../brand";
@@ -51,6 +51,14 @@ export function StockDetail({ ticker }: { ticker: string }) {
   const [order, setOrder] = useState<OrderSide | null>(null);
   const candles = useCandles(ticker, range);
   const details = useSecurityDetails(ticker);
+
+  // Counts for "look at 3 stocks" style quick missions.
+  const track = useGame((state) => state.track);
+  useEffect(() => {
+    if (security) track("view_security", ticker);
+    // Only once per page visit, not on every price tick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticker, security !== undefined, track]);
 
   // Keyboard: B buys, S sells (desktop).
   useEffect(() => {
@@ -100,7 +108,7 @@ export function StockDetail({ ticker }: { ticker: string }) {
       value: security ? `${formatPrice(security.dayLowE4)} – ${formatPrice(security.dayHighE4)}` : null,
     },
   ];
-  const held = position ? position.quantity : 0;
+  const held = position ? position.quantityE6 : 0;
 
   return (
     <>
@@ -187,7 +195,7 @@ export function StockDetail({ ticker }: { ticker: string }) {
             {security && (
               <p className="mt-3 flex flex-wrap justify-between gap-2 nums text-sm text-fg-3">
                 <span>{t("bidAsk", { bid: formatPrice(security.bidE4), ask: formatPrice(security.askE4) })}</span>
-                <span>{t("volume", { volume: formatInteger(security.dayVolume) })}</span>
+                <span>{t("volume", { volume: formatShares(security.dayVolumeE6) })}</span>
               </p>
             )}
           </Card>
@@ -229,7 +237,7 @@ export function StockDetail({ ticker }: { ticker: string }) {
               <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
                 <div>
                   <dt className="text-sm text-fg-3">{t("positionQuantity")}</dt>
-                  <dd className="nums font-medium text-fg-1">{formatInteger(position.quantity)}</dd>
+                  <dd className="nums font-medium text-fg-1">{formatShares(position.quantityE6)}</dd>
                 </div>
                 <div>
                   <dt className="text-sm text-fg-3">{t("positionValue")}</dt>

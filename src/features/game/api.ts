@@ -37,7 +37,7 @@ const securitySchema = z.object({
   change_bps: num,
   day_high_e4: num,
   day_low_e4: num,
-  day_volume: num,
+  day_volume_e6: num,
   market_cap_cents: nnum,
   term_game_years: nnum.optional(),
   coupon_bps: nnum.optional(),
@@ -54,10 +54,14 @@ const snapshotSchema = z.object({
   policy_rate_bps: num,
   index: z.object({ ticker: z.string(), name: z.string(), value_e4: num, prev_close_e4: num, change_bps: num }),
   securities: z.array(securitySchema),
+  economy: z
+    .object({ money_supply_cents: num, treasury_cents: num, basic_income_factor_bps: num })
+    .nullable()
+    .optional(),
 });
 
 const candleSchema = z.object({ t: num, o: num, h: num, l: num, c: num, v: num });
-const levelSchema = z.object({ price_e4: num, quantity: num, players: num });
+const levelSchema = z.object({ price_e4: num, quantity_e6: num, players: num });
 const bookSchema = z.object({ bids: z.array(levelSchema), asks: z.array(levelSchema) });
 
 const detailsSchema = z.object({
@@ -84,6 +88,7 @@ const portfolioSchema = z.object({
     accrued_cents: num,
     cap_cents: num,
     rate_cents_per_hour: num,
+    factor_bps: num.default(10_000),
     last_claimed_at: iso.nullable(),
     full_at: iso,
     server_time: iso,
@@ -93,8 +98,8 @@ const portfolioSchema = z.object({
       ticker: z.string(),
       name: z.string(),
       kind: z.enum(["stock", "bond"]),
-      quantity: num,
-      reserved_quantity: num,
+      quantity_e6: num,
+      reserved_quantity_e6: num,
       avg_price_e4: num,
       last_price_e4: num,
       market_value_cents: num,
@@ -108,8 +113,8 @@ const portfolioSchema = z.object({
       ticker: z.string(),
       side: z.enum(["buy", "sell"]),
       type: z.enum(["market", "limit"]),
-      quantity: num,
-      filled_quantity: num,
+      quantity_e6: num,
+      filled_quantity_e6: num,
       limit_price_e4: nnum,
       status: z.string(),
       created_at: iso,
@@ -120,7 +125,7 @@ const portfolioSchema = z.object({
       id: z.string(),
       ticker: z.string(),
       side: z.enum(["buy", "sell"]),
-      quantity: num,
+      quantity_e6: num,
       price_e4: num,
       gross_cents: num,
       fee_cents: num,
@@ -134,12 +139,17 @@ const portfolioSchema = z.object({
   xp_into_level: num.default(0),
   xp_for_next: num.default(0),
   tutorial_completed: z.boolean().default(false),
+  nickname: z.string(),
+  nickname_change_available_at: iso.nullable(),
+  missions_claimable: num.default(0),
+  streak_days: num.default(0),
 });
 
 const orderResultSchema = z.object({
   order_id: z.string(),
   status: z.enum(["filled", "open", "partially_filled"]),
-  filled_quantity: num,
+  quantity_e6: num,
+  filled_quantity_e6: num,
   avg_price_e4: nnum,
   gross_cents: num,
   fee_cents: num,
@@ -152,6 +162,66 @@ const orderResultSchema = z.object({
 });
 
 const progressSchema = z.object({ xp_awarded: num, level: num, xp_total: num });
+
+const richListSchema = z.object({
+  server_time: iso,
+  total: num,
+  entries: z.array(
+    z.object({
+      rank: num,
+      kind: z.enum(["player", "tycoon"]),
+      id: z.string(),
+      name: z.string(),
+      description: z.string().nullable(),
+      net_worth_cents: num,
+      change_24h_bps: nnum,
+      rank_change_24h: nnum,
+      is_me: z.boolean(),
+    }),
+  ),
+  me: z
+    .object({
+      rank: num,
+      net_worth_cents: num,
+      next: z.object({ rank: num, name: z.string(), gap_cents: num }).nullable(),
+    })
+    .nullable(),
+});
+
+const richNewsSchema = z.array(
+  z.object({ published_at: iso, headline: z.string(), body: z.string().nullable(), kind: z.string() }),
+);
+
+const missionsSchema = z.object({
+  server_time: iso,
+  groups: z.array(
+    z.object({
+      kind: z.enum(["quick", "daily", "weekly", "milestone"]),
+      resets_at: iso.nullable(),
+      missions: z.array(
+        z.object({
+          id: z.string(),
+          key: z.string(),
+          title: z.string(),
+          description: z.string().nullable(),
+          progress: num,
+          target: num,
+          xp: num,
+          status: z.enum(["active", "completed", "claimed"]),
+          expires_at: iso.nullable(),
+        }),
+      ),
+    }),
+  ),
+});
+
+const checkInSchema = z.object({
+  xp_awarded: num,
+  streak_days: num,
+  already_checked_in: z.boolean(),
+  level: num,
+  xp_total: num,
+});
 
 function toErrorKey(message: string | undefined): GameErrorKey {
   return (GAME_ERROR_KEYS as readonly string[]).includes(message ?? "") ? (message as GameErrorKey) : "unknown";
@@ -168,6 +238,13 @@ export const RPC_SCHEMAS = {
   cancel_order: z.object({ order_id: z.string(), status: z.literal("cancelled") }),
   claim_vault: z.object({ claimed_cents: num, cash_cents: num }),
   complete_tutorial: progressSchema,
+  get_rich_list: richListSchema,
+  get_rich_list_news: richNewsSchema,
+  check_nickname: z.object({ allowed: z.boolean(), reason: z.string().nullable() }),
+  change_nickname: z.object({ nickname: z.string(), changed_at: iso, next_change_at: iso }),
+  get_my_missions: missionsSchema,
+  claim_mission: progressSchema,
+  daily_check_in: checkInSchema,
 } as const;
 
 async function rpc<T>(fn: string, args: Record<string, unknown>, schema: z.ZodType<T>): Promise<T> {
@@ -202,6 +279,13 @@ export const liveEngine: GameEngine = {
         prevCloseE4: s.index.prev_close_e4,
         changeBps: s.index.change_bps,
       },
+      economy: s.economy
+        ? {
+            moneySupplyCents: s.economy.money_supply_cents,
+            treasuryCents: s.economy.treasury_cents,
+            basicIncomeFactorBps: s.economy.basic_income_factor_bps,
+          }
+        : null,
       securities: s.securities.map((x) => ({
         id: x.id,
         ticker: x.ticker,
@@ -216,7 +300,7 @@ export const liveEngine: GameEngine = {
         changeBps: x.change_bps,
         dayHighE4: x.day_high_e4,
         dayLowE4: x.day_low_e4,
-        dayVolume: x.day_volume,
+        dayVolumeE6: x.day_volume_e6,
         marketCapCents: x.market_cap_cents,
         bond:
           x.kind === "bond" && x.term_game_years != null && x.matures_at
@@ -243,7 +327,11 @@ export const liveEngine: GameEngine = {
 
   async orderBook(ticker, levels): Promise<OrderBook> {
     const b = await rpc("get_order_book", { p_ticker: ticker, p_levels: levels }, bookSchema);
-    const map = (l: z.infer<typeof levelSchema>) => ({ priceE4: l.price_e4, quantity: l.quantity, players: l.players });
+    const map = (l: z.infer<typeof levelSchema>) => ({
+      priceE4: l.price_e4,
+      quantityE6: l.quantity_e6,
+      players: l.players,
+    });
     return { bids: b.bids.map(map), asks: b.asks.map(map) };
   },
 
@@ -276,6 +364,7 @@ export const liveEngine: GameEngine = {
         accruedCents: p.vault.accrued_cents,
         capCents: p.vault.cap_cents,
         rateCentsPerHour: p.vault.rate_cents_per_hour,
+        factorBps: p.vault.factor_bps,
         lastClaimedAt: p.vault.last_claimed_at,
         fullAt: p.vault.full_at,
         serverTime: p.vault.server_time,
@@ -284,8 +373,8 @@ export const liveEngine: GameEngine = {
         ticker: x.ticker,
         name: x.name,
         kind: x.kind,
-        quantity: x.quantity,
-        reservedQuantity: x.reserved_quantity,
+        quantityE6: x.quantity_e6,
+        reservedQuantityE6: x.reserved_quantity_e6,
         avgPriceE4: x.avg_price_e4,
         lastPriceE4: x.last_price_e4,
         marketValueCents: x.market_value_cents,
@@ -297,8 +386,8 @@ export const liveEngine: GameEngine = {
         ticker: o.ticker,
         side: o.side,
         type: o.type,
-        quantity: o.quantity,
-        filledQuantity: o.filled_quantity,
+        quantityE6: o.quantity_e6,
+        filledQuantityE6: o.filled_quantity_e6,
         limitPriceE4: o.limit_price_e4,
         status: o.status,
         createdAt: o.created_at,
@@ -307,7 +396,7 @@ export const liveEngine: GameEngine = {
         id: t.id,
         ticker: t.ticker,
         side: t.side,
-        quantity: t.quantity,
+        quantityE6: t.quantity_e6,
         priceE4: t.price_e4,
         grossCents: t.gross_cents,
         feeCents: t.fee_cents,
@@ -320,6 +409,10 @@ export const liveEngine: GameEngine = {
       xpIntoLevel: p.xp_into_level,
       xpForNext: p.xp_for_next,
       tutorialCompleted: p.tutorial_completed,
+      nickname: p.nickname,
+      nicknameChangeAvailableAt: p.nickname_change_available_at,
+      missionsClaimable: p.missions_claimable,
+      streakDays: p.streak_days,
     };
   },
 
@@ -331,7 +424,8 @@ export const liveEngine: GameEngine = {
         p_ticker: input.ticker,
         p_side: input.side,
         p_type: input.type,
-        p_quantity: input.quantity,
+        p_quantity_e6: input.quantityE6 ?? null,
+        p_amount_cents: input.amountCents ?? null,
         p_limit_price_e4: input.type === "limit" ? (input.limitPriceE4 ?? null) : null,
       },
       orderResultSchema,
@@ -339,7 +433,8 @@ export const liveEngine: GameEngine = {
     return {
       orderId: r.order_id,
       status: r.status,
-      filledQuantity: r.filled_quantity,
+      quantityE6: r.quantity_e6,
+      filledQuantityE6: r.filled_quantity_e6,
       avgPriceE4: r.avg_price_e4,
       grossCents: r.gross_cents,
       feeCents: r.fee_cents,
@@ -364,5 +459,91 @@ export const liveEngine: GameEngine = {
   async completeTutorial(requestId) {
     const r = await rpc("complete_tutorial", { p_request_id: requestId }, progressSchema);
     return { xpAwarded: r.xp_awarded, level: r.level, xpTotal: r.xp_total };
+  },
+
+  async richList(scope, limit, offset) {
+    const r = await rpc("get_rich_list", { p_scope: scope, p_limit: limit, p_offset: offset }, richListSchema);
+    return {
+      serverTime: r.server_time,
+      total: r.total,
+      entries: r.entries.map((e) => ({
+        rank: e.rank,
+        kind: e.kind,
+        id: e.id,
+        name: e.name,
+        description: e.description,
+        netWorthCents: e.net_worth_cents,
+        change24hBps: e.change_24h_bps,
+        rankChange24h: e.rank_change_24h,
+        isMe: e.is_me,
+      })),
+      me: r.me
+        ? {
+            rank: r.me.rank,
+            netWorthCents: r.me.net_worth_cents,
+            next: r.me.next ? { rank: r.me.next.rank, name: r.me.next.name, gapCents: r.me.next.gap_cents } : null,
+          }
+        : null,
+    };
+  },
+
+  async richNews(limit) {
+    const rows = await rpc("get_rich_list_news", { p_limit: limit }, richNewsSchema);
+    return rows.map((n) => ({ publishedAt: n.published_at, headline: n.headline, body: n.body, kind: n.kind }));
+  },
+
+  async checkNickname(nickname) {
+    const r = await rpc("check_nickname", { p_nickname: nickname }, RPC_SCHEMAS.check_nickname);
+    return { allowed: r.allowed, reason: r.reason ? toErrorKey(r.reason) : null };
+  },
+
+  async changeNickname(requestId, nickname) {
+    const r = await rpc(
+      "change_nickname",
+      { p_request_id: requestId, p_nickname: nickname },
+      RPC_SCHEMAS.change_nickname,
+    );
+    return { nickname: r.nickname, nextChangeAt: r.next_change_at };
+  },
+
+  async missions() {
+    const r = await rpc("get_my_missions", {}, missionsSchema);
+    return r.groups.map((g) => ({
+      kind: g.kind,
+      resetsAt: g.resets_at,
+      missions: g.missions.map((m) => ({
+        id: m.id,
+        key: m.key,
+        title: m.title,
+        description: m.description,
+        progress: m.progress,
+        target: m.target,
+        xp: m.xp,
+        status: m.status,
+        expiresAt: m.expires_at,
+      })),
+    }));
+  },
+
+  async claimMission(requestId, missionId) {
+    const r = await rpc("claim_mission", { p_request_id: requestId, p_mission_id: missionId }, progressSchema);
+    return { xpAwarded: r.xp_awarded, level: r.level, xpTotal: r.xp_total };
+  },
+
+  async checkIn(requestId) {
+    const r = await rpc("daily_check_in", { p_request_id: requestId }, checkInSchema);
+    return {
+      xpAwarded: r.xp_awarded,
+      level: r.level,
+      xpTotal: r.xp_total,
+      streakDays: r.streak_days,
+      alreadyCheckedIn: r.already_checked_in,
+    };
+  },
+
+  async track(event, ref) {
+    await rpc("track_event", { p_kind: event, p_ref: ref ?? null }, z.object({ ok: z.boolean() })).catch(
+      () => undefined,
+    );
   },
 };

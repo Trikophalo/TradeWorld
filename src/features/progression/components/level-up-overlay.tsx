@@ -12,7 +12,8 @@ import { useGame } from "@/features/game/store";
 import { useTutorial } from "@/features/tutorial/store";
 import { haptic } from "@/lib/haptics";
 import { DURATION, EASE, SPRING } from "@/lib/motion";
-import { unlocksAtLevel } from "@/lib/sim/progression";
+import { unlocksAtLevel, unlocksUpToLevel } from "@/lib/sim/progression";
+import { TOURS } from "@/features/tutorial/tours";
 import { playSound } from "@/lib/sound";
 import type { UnlockKey } from "./level-card";
 
@@ -48,6 +49,16 @@ export function LevelUpOverlay() {
 
   const unlocks = shownLevel ? unlocksAtLevel(shownLevel) : [];
 
+  // Closing the overlay starts Finn's short tour for a newly unlocked feature (ADR-046).
+  const close = () => {
+    const level = shownLevel;
+    setShownLevel(null);
+    if (level === null) return;
+    const { seenTours, startTour } = useTutorial.getState();
+    const pending = unlocksUpToLevel(level).find((unlock) => TOURS[unlock.key] && !seenTours.includes(unlock.key));
+    if (pending) window.setTimeout(() => startTour(pending.key), 350);
+  };
+
   return (
     <AnimatePresence>
       {shownLevel !== null && (
@@ -60,7 +71,7 @@ export function LevelUpOverlay() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: DURATION.base }}
-          onClick={() => setShownLevel(null)}
+          onClick={close}
         >
           <motion.div
             className="w-full max-w-sm rounded-xl border border-line-2 bg-surface-1 p-6 text-center shadow-3"
@@ -100,7 +111,7 @@ export function LevelUpOverlay() {
                 ))}
               </ul>
             )}
-            <Button block size="lg" className="mt-6" onClick={() => setShownLevel(null)}>
+            <Button block size="lg" className="mt-6" onClick={close}>
               {t("continue")}
             </Button>
           </motion.div>

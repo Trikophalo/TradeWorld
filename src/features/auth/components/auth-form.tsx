@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Button, type ButtonState } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Card } from "@/components/ui/card";
 import { Field } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { engine } from "@/features/game/store";
 import { isDemoMode } from "@/lib/supabase/env";
 import { fieldErrors, loginSchema, registerSchema } from "../schemas";
 
@@ -27,6 +28,27 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const params = useSearchParams();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [state, setState] = useState<ButtonState>("idle");
+  const te = useTranslations("errors");
+  const [nameDraft, setNameDraft] = useState("");
+  const [nameIssue, setNameIssue] = useState<{ name: string; text: string | null } | null>(null);
+
+  // Registration: check the player name while typing (profanity, reserved, taken).
+  useEffect(() => {
+    const value = nameDraft.trim();
+    if (mode !== "register" || value.length < 3) return;
+    const timer = window.setTimeout(() => {
+      void engine
+        .checkNickname(value)
+        .then((result) =>
+          setNameIssue({
+            name: value,
+            text: result.allowed ? null : te((result.reason ?? "name_profanity") as Parameters<typeof te>[0]),
+          }),
+        )
+        .catch(() => undefined);
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [nameDraft, mode, te]);
   const register = mode === "register";
   const message = (key?: string) => (key ? t(key as ErrorKey) : undefined);
 
@@ -60,6 +82,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       setErrors(fieldErrors(parsed.error));
       return;
     }
+    if (register && nameIssue?.name === raw.displayName.trim() && nameIssue.text) return;
     setErrors({});
     setState("loading");
 
@@ -92,7 +115,11 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             label={t("displayName")}
             hint={t("displayNameHint")}
             autoComplete="nickname"
-            error={message(errors.displayName)}
+            onChange={(event) => setNameDraft(event.target.value)}
+            error={
+              message(errors.displayName) ??
+              (nameIssue?.name === nameDraft.trim() ? (nameIssue.text ?? undefined) : undefined)
+            }
           />
         )}
         <Field

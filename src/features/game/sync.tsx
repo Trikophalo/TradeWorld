@@ -18,8 +18,10 @@ export function GameSync() {
   useEffect(() => {
     const { refreshSnapshot, refreshPortfolio } = useGame.getState();
     const visible = () => document.visibilityState === "visible";
+    const { refreshMissions } = useGame.getState();
     void refreshSnapshot();
     void refreshPortfolio();
+    void refreshMissions();
 
     const market = window.setInterval(() => {
       if (!visible()) return;
@@ -27,7 +29,9 @@ export function GameSync() {
       void refreshSnapshot();
     }, TICK_MS);
     const portfolio = window.setInterval(() => {
-      if (visible()) void refreshPortfolio();
+      if (!visible()) return;
+      void refreshPortfolio();
+      void refreshMissions();
     }, PORTFOLIO_MS);
     const onVisible = () => {
       if (!visible()) return;

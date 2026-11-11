@@ -10,7 +10,6 @@
 export const DISCLOSURE = {
   /** Lead index chart on the start page. Level 2 is reached by finishing the tutorial. */
   homeIndex: 2,
-  homeMissions: 2,
   homeEvents: 3,
   homeNews: 3,
   /** Key figures and order book arrive with limit orders. */

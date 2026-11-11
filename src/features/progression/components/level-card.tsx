@@ -13,6 +13,8 @@ import { useGame, usePlayerLevel } from "@/features/game/store";
 import { formatInteger } from "@/lib/format";
 import { EASE } from "@/lib/motion";
 import { xpForNextLevel } from "@/lib/sim/progression";
+import { romanTier, titleForLevel } from "@/config/titles";
+import { NicknameSheet } from "@/features/settings/components/nickname-sheet";
 
 /** Unlock keys have a translation each; see the test in src/features/progression. */
 export type UnlockKey = Parameters<ReturnType<typeof useTranslations<"unlocks">>>[0];
@@ -27,6 +29,10 @@ export function LevelCard({ showcase = false }: { showcase?: boolean }) {
   const level = usePlayerLevel();
   const xp = useGame((state) => state.portfolio?.xpIntoLevel ?? 0);
   const xpTotal = useGame((state) => state.portfolio?.xpTotal);
+  const tt = useTranslations("titles");
+  const nickname = useGame((state) => state.portfolio?.nickname);
+  const title = titleForLevel(level);
+  const [renaming, setRenaming] = useState(false);
   const [gains, setGains] = useState<{ id: number; amount: number }[]>([]);
   const lastTotal = useRef<number | undefined>(undefined);
   const needed = xpForNextLevel(level);
@@ -49,15 +55,35 @@ export function LevelCard({ showcase = false }: { showcase?: boolean }) {
 
   return (
     <Card padding="lg" data-tour="level-card">
+      <NicknameSheet open={renaming} onOpenChange={setRenaming} />
       <div className="flex items-center gap-4">
         <div className="grid size-20 shrink-0 place-items-center rounded-lg bg-surface-2">
           <PixelIcon {...BULL} scale={4} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xl font-semibold text-fg-1">{t("guest")}</p>
+          <div className="flex items-center gap-2">
+            <p className="truncate text-xl font-semibold text-fg-1">{nickname ?? "…"}</p>
+            {!showcase && (
+              <button
+                type="button"
+                onClick={() => setRenaming(true)}
+                aria-label={t("rename")}
+                className="grid size-8 shrink-0 place-items-center rounded-sm text-fg-3 focus-ring transition-colors duration-fast hover:bg-surface-2 hover:text-fg-1"
+              >
+                <svg viewBox="0 0 7 7" width="14" height="14" shapeRendering="crispEdges" aria-hidden>
+                  <path
+                    fill="currentColor"
+                    d="M5 0h1v1H5zM6 1h1v1H6zM4 1h1v1H4zM5 2h1v1H5zM3 2h1v1H3zM4 3h1v1H4zM2 3h1v1H2zM3 4h1v1H3zM1 4h1v1H1zM2 5h1v1H2zM0 5h1v2H0zM1 6h1v1H1z"
+                  />
+                </svg>
+              </button>
+            )}
+          </div>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <Badge tone="accent">{t("level", { level })}</Badge>
-            <span className="text-sm text-fg-3">{t("rank")}</span>
+            <span className="text-sm text-fg-3">
+              {tt(title.key)} {romanTier(title.tier)}
+            </span>
           </div>
         </div>
       </div>

@@ -6,7 +6,7 @@ import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useGame } from "@/features/game/store";
-import { formatInteger, formatMoney, formatPrice } from "@/lib/format";
+import { formatMoney, formatPrice, formatShares } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const dateTime = new Intl.DateTimeFormat("de-DE", {
@@ -56,8 +56,8 @@ export function TradeHistory() {
               </div>
               <p className="mt-0.5 nums text-sm text-fg-3">
                 {dateTime.format(new Date(trade.executedAt))} ·{" "}
-                {t("tradeLine", { quantity: formatInteger(trade.quantity), price: formatPrice(trade.priceE4) })} ·{" "}
-                {t("fee", { fee: formatMoney(trade.feeCents) })}
+                {t("tradeLine", { quantity: formatShares(trade.quantityE6, true), price: formatPrice(trade.priceE4) })}{" "}
+                · {t("fee", { fee: formatMoney(trade.feeCents) })}
                 {trade.taxCents > 0 && ` · ${t("tax", { tax: formatMoney(trade.taxCents) })}`}
                 {trade.realizedPnlCents != null &&
                   ` · ${t("realized", { pnl: formatMoney(trade.realizedPnlCents, { sign: true }) })}`}

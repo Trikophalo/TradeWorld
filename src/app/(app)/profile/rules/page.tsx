@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Page, PageHeader } from "@/components/layout/page";
 import { RulesList } from "@/features/help/components/rules-list";
+import { RulesTracker } from "@/features/help/components/rules-tracker";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("rules");
@@ -27,6 +28,7 @@ export default async function RulesPage() {
       <PageHeader title={t("title")} />
       <p className="max-w-2xl text-pretty text-fg-2">{t("intro")}</p>
       <RulesList />
+      <RulesTracker />
     </Page>
   );
 }

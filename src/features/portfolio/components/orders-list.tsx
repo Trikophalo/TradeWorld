@@ -9,7 +9,7 @@ import { toast } from "@/components/ui/toast";
 import { useGameErrorText } from "@/features/game/errors";
 import { useGame } from "@/features/game/store";
 import type { OpenOrder } from "@/features/game/types";
-import { formatInteger, formatPrice } from "@/lib/format";
+import { formatPrice, formatShares } from "@/lib/format";
 import { SPRING } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
@@ -67,7 +67,7 @@ function OrderRow({ order }: { order: OpenOrder }) {
       <span className="min-w-0 flex-1">
         <span className="block font-medium text-fg-1">{order.ticker}</span>
         <span className="nums text-sm text-fg-3">
-          {t("orderLine", { quantity: formatInteger(order.quantity), price: formatPrice(order.limitPriceE4 ?? 0) })}
+          {t("orderLine", { quantity: formatShares(order.quantityE6), price: formatPrice(order.limitPriceE4 ?? 0) })}
         </span>
       </span>
       <Button size="sm" variant="ghost" state={state} onClick={() => void onCancel()}>

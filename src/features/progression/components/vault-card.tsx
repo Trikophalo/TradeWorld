@@ -76,7 +76,10 @@ export function VaultCard() {
         <div className="min-w-0 flex-1">
           <h2 className="label-pixel text-fg-2">{t("title")}</h2>
           <NumberTicker value={amount} format={format} className="mt-0.5 text-2xl font-semibold text-fg-1" />
-          <p className="truncate text-sm text-fg-3">{t("subtitle", { rate: formatMoney(RATE, { whole: true }) })}</p>
+          <p className="truncate text-sm text-fg-3">
+            {t("subtitle", { rate: formatMoney(vault?.rateCentsPerHour ?? RATE, { whole: true }) })}
+            {vault && vault.factorBps < 10_000 && ` · ${t("treasuryLow")}`}
+          </p>
         </div>
       </div>
       <Progress value={amount / CAP_CENTS} label={t("progress")} tone={full ? "warn" : "gold"} className="mt-4" />

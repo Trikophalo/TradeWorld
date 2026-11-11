@@ -504,6 +504,12 @@ export interface ProgressionConfig {
     };
     readonly workTask: { readonly minXp: number; readonly maxXp: number };
     readonly dailyMission: { readonly minXp: number; readonly maxXp: number; readonly perDay: number };
+    /** Quick missions (a few minutes): always this many active, a new one replaces each claimed one. */
+    readonly quickMission: { readonly minXp: number; readonly maxXp: number; readonly active: number };
+    /** Weekly missions (several sessions), reset Monday 00:00 Berlin. */
+    readonly weeklyMission: { readonly minXp: number; readonly maxXp: number; readonly perWeek: number };
+    /** One-time story missions along the way (first trade, first 15.000 € ...); this many shown at once. */
+    readonly milestoneMission: { readonly minXp: number; readonly maxXp: number; readonly visible: number };
     readonly dailyLogin: {
       readonly xp: number;
       readonly streakBonusPerDay: number;
@@ -1215,6 +1221,9 @@ export const BALANCE = {
       workHour: { xp: 40, playerCompanyMultiplier: 1.5, maxHoursPerDay: 12 },
       workTask: { minXp: 50, maxXp: 150 },
       dailyMission: { minXp: 200, maxXp: 400, perDay: 3 },
+      quickMission: { minXp: 20, maxXp: 60, active: 3 },
+      weeklyMission: { minXp: 600, maxXp: 1200, perWeek: 3 },
+      milestoneMission: { minXp: 100, maxXp: 2000, visible: 3 },
       dailyLogin: { xp: 50, streakBonusPerDay: 10, streakBonusCap: 200, streakFreezesPerWeek: 1 },
       profitableCompanyQuarter: { xp: 500 },
       successfulIpo: { xp: 5000 },

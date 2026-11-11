@@ -15,7 +15,8 @@ import { scaledXp } from "@/lib/sim/progression";
 import { playSound } from "@/lib/sound";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
-import { TUTORIAL_STEPS, stepIndex } from "../steps";
+import { TUTORIAL_STEPS, stepIndex, type TutorialStep } from "../steps";
+import { TOURS } from "../tours";
 import { onTutorialEvent, useTutorial } from "../store";
 import { useTargetRect, type TargetRect } from "../use-target-rect";
 import { SpeechBubble } from "./speech-bubble";
@@ -34,8 +35,21 @@ export function Tutorial() {
   const router = useRouter();
   const pathname = usePathname();
   const status = useTutorial((state) => state.status);
-  const index = useTutorial((state) => state.step);
-  const step = status === "active" ? TUTORIAL_STEPS[index] : undefined;
+  const mainStep = useTutorial((state) => state.step);
+  const tour = useTutorial((state) => state.tour);
+  // The first-session tutorial, or a short unlock tour (ADR-046).
+  const steps: readonly TutorialStep[] | null = tour
+    ? (TOURS[tour.key] ?? null)
+    : status === "active"
+      ? TUTORIAL_STEPS
+      : null;
+  const index = tour ? tour.step : mainStep;
+  const step = steps?.[index];
+  const goTo = (to: number) => {
+    const { setStep, setTourStep } = useTutorial.getState();
+    if (useTutorial.getState().tour) setTourStep(to);
+    else setStep(to);
+  };
   const rect = useTargetRect(step?.target);
   const layer = useRef<HTMLDivElement>(null);
 
@@ -61,27 +75,26 @@ export function Tutorial() {
 
   // Keep the player on the page the step belongs to, and advance route steps.
   useEffect(() => {
-    if (!step) return;
-    const { setStep } = useTutorial.getState();
+    if (!step || !steps) return;
     if (step.advance.on === "route" && step.advance.path.test(pathname)) {
-      setStep(index + 1);
+      goTo(index + 1);
       return;
     }
     if (step.path && !step.path.test(pathname) && step.recover) {
       if ("to" in step.recover) router.replace(step.recover.to);
-      else setStep(stepIndex(step.recover.step));
+      else goTo(stepIndex(step.recover.step, steps));
     }
-  }, [step, index, pathname, router]);
+    // goTo only reads the store
+  }, [step, steps, index, pathname, router]);
 
   // Advance on actions reported by the game.
   useEffect(() => {
-    if (!step) return;
+    if (!step || !steps) return;
     return onTutorialEvent((event) => {
-      const { setStep } = useTutorial.getState();
-      if (step.advance.on === "event" && step.advance.event === event) setStep(index + 1);
-      else if (step.fallback?.event === event) setStep(stepIndex(step.fallback.step));
+      if (step.advance.on === "event" && step.advance.event === event) goTo(index + 1);
+      else if (step.fallback?.event === event) goTo(stepIndex(step.fallback.step, steps));
     });
-  }, [step, index]);
+  }, [step, steps, index]);
 
   // Escape must not close anything behind the tutorial, except the order sheet step.
   useEffect(() => {
@@ -93,9 +106,9 @@ export function Tutorial() {
     return () => window.removeEventListener("keydown", onKey, true);
   }, [step]);
 
-  if (!step) return null;
+  if (!step || !steps) return null;
 
-  const last = index === TUTORIAL_STEPS.length - 1;
+  const last = index === steps.length - 1;
   const hero = !step.target;
   const hole = rect && {
     top: rect.top - PADDING,
@@ -105,14 +118,19 @@ export function Tutorial() {
   };
 
   const next = () => {
-    const { setStep, finish } = useTutorial.getState();
+    const { setStep, finish, endTour } = useTutorial.getState();
     haptic("tap");
+    if (tour) {
+      if (last) endTour();
+      else goTo(index + 1);
+      return;
+    }
     if (last) {
       finish();
       return;
     }
     // Entering the final step pays the reward.
-    if (TUTORIAL_STEPS[index + 1]?.id === "done") {
+    if (steps[index + 1]?.id === "done") {
       void useGame
         .getState()
         .completeTutorial()
@@ -124,11 +142,14 @@ export function Tutorial() {
     setStep(index + 1);
   };
 
-  const text = t(`steps.${step.id}`, {
+  const vars = {
     capital: formatMoney(BALANCE.economy.startingCapitalCents, { whole: true }),
     rate: formatMoney(BALANCE.economy.basicIncomeCentsPerHour, { whole: true }),
     xp: formatInteger(TUTORIAL_XP),
-  });
+  };
+  const text = tour
+    ? t(`tours.${tour.key}.${step.id}` as Parameters<typeof t>[0])
+    : t(`steps.${step.id}` as Parameters<typeof t>[0], vars);
 
   return (
     <div className="pointer-events-none fixed inset-0 z-tutorial" role="region" aria-label={t("label")} data-tutorial>
@@ -185,12 +206,12 @@ export function Tutorial() {
               <>
                 <Progress
                   current={index}
-                  total={TUTORIAL_STEPS.length}
-                  label={t("progress", { current: index + 1, total: TUTORIAL_STEPS.length })}
+                  total={steps.length}
+                  label={t("progress", { current: index + 1, total: steps.length })}
                 />
                 {step.advance.on === "next" ? (
                   <Button size={hero ? "lg" : "sm"} block={hero} onClick={next} data-tour-next>
-                    {t(index === 0 ? "start" : last ? "finish" : "next")}
+                    {t(index === 0 && !tour ? "start" : last ? (tour ? "tourDone" : "finish") : "next")}
                   </Button>
                 ) : (
                   <span className="label-pixel text-accent">{t("yourTurn")}</span>

@@ -11,6 +11,7 @@ import { Segmented } from "@/components/ui/segmented";
 import { useSecurities } from "@/features/game/hooks";
 import { usePlayerLevel } from "@/features/game/store";
 import { LockedFeature } from "@/features/progression/components/locked-feature";
+import { emitTutorial } from "@/features/tutorial/store";
 import { SPRING } from "@/lib/motion";
 import { isUnlocked, unlockLevel } from "@/lib/sim/progression";
 import { cn } from "@/lib/utils";
@@ -47,22 +48,27 @@ export function MarketBrowser() {
 
   return (
     <div className="space-y-4">
-      <Segmented
-        value={tab}
-        onValueChange={setTab}
-        label={t("tabs")}
-        block
-        className="lg:inline-flex lg:w-auto"
-        options={[
-          { value: "stocks", label: t("stocks") },
-          {
-            value: "bonds",
-            label: t("bonds"),
-            adornment: bondsUnlocked ? undefined : <LockBadge level={BOND_LEVEL} />,
-          },
-          { value: "indices", label: t("indices") },
-        ]}
-      />
+      <div data-tour="asset-tabs">
+        <Segmented
+          value={tab}
+          onValueChange={(next) => {
+            setTab(next);
+            if (next === "bonds") emitTutorial("bonds-tab-opened");
+          }}
+          label={t("tabs")}
+          block
+          className="lg:inline-flex lg:w-auto"
+          options={[
+            { value: "stocks", label: t("stocks") },
+            {
+              value: "bonds",
+              label: t("bonds"),
+              adornment: bondsUnlocked ? undefined : <LockBadge level={BOND_LEVEL} />,
+            },
+            { value: "indices", label: t("indices") },
+          ]}
+        />
+      </div>
 
       {tab === "stocks" && (
         <>

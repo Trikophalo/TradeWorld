@@ -9,38 +9,26 @@ import type { TutorialEvent } from "./store";
  * Texts live in messages/*.json under "tutorial.steps.<id>".
  */
 export interface TutorialStep {
-  id:
-    | "welcome"
-    | "wealth"
-    | "vault"
-    | "goMarkets"
-    | "pickStock"
-    | "chart"
-    | "buy"
-    | "hold"
-    | "goPortfolio"
-    | "portfolio"
-    | "goProfile"
-    | "profile"
-    | "done";
+  /** Text key under "tutorial.steps" (first session) or "tutorial.tours.<tour>" (unlock tours). */
+  id: string;
   /** `data-tour` value of the highlighted element. None: Finn talks in the middle of the screen. */
   target?: string;
   /** Where the step takes place. The player is brought back if they end up elsewhere. */
   path?: RegExp;
   /** Path to navigate to when `path` does not match, or the step to fall back to. */
-  recover?: { to: string } | { step: TutorialStep["id"] };
+  recover?: { to: string } | { step: string };
   /** How the step is completed. */
   advance: { on: "next" } | { on: "route"; path: RegExp } | { on: "event"; event: TutorialEvent };
   /** Event that sends the player back to an earlier step (e.g. the order sheet was closed). */
-  fallback?: { event: TutorialEvent; step: TutorialStep["id"] };
+  fallback?: { event: TutorialEvent; step: string };
   /** The element sits in a dialog that already dims the page: draw the ring only. */
   inDialog?: boolean;
   mood?: "happy";
 }
 
-const HOME = /^\/$/;
-const MARKETS = /^\/markets$/;
-const STOCK = /^\/markets\/[A-Za-z]+$/;
+export const HOME = /^\/$/;
+export const MARKETS = /^\/markets$/;
+export const STOCK = /^\/markets\/[A-Za-z0-9]+$/;
 const PORTFOLIO = /^\/portfolio$/;
 const PROFILE = /^\/profile$/;
 
@@ -92,6 +80,6 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
   { id: "done", path: PROFILE, recover: { to: "/profile" }, advance: { on: "next" }, mood: "happy" },
 ];
 
-export function stepIndex(id: TutorialStep["id"]): number {
-  return TUTORIAL_STEPS.findIndex((step) => step.id === id);
+export function stepIndex(id: string, steps: readonly TutorialStep[] = TUTORIAL_STEPS): number {
+  return steps.findIndex((step) => step.id === id);
 }
