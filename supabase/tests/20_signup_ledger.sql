@@ -217,15 +217,19 @@ select tests.assert(
   public.request_begin(:user_a, '11111111-1111-4111-8111-111111111111', 'test') = '{"ok": true}'::jsonb,
   'request_begin: replay returns the stored result');
 
+-- share quantities are *_e6 after the M2 schema migration (older-database mode: not yet)
+select case when exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'orders'
+                           and column_name = 'quantity_e6') then 'quantity_e6' else 'quantity' end as qcol \gset
+
 -- unique (player_id, request_id) on orders
-insert into public.orders (player_id, security_id, request_id, side, type, quantity)
+insert into public.orders (player_id, security_id, request_id, side, type, :qcol)
 select :user_a, id, '22222222-2222-4222-8222-222222222222', 'buy', 'market', 10 from public.securities where ticker = 'KLS';
-select tests.throws($$
-  insert into public.orders (player_id, security_id, request_id, side, type, quantity)
+select tests.throws(format($$
+  insert into public.orders (player_id, security_id, request_id, side, type, %I)
   select 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', id, '22222222-2222-4222-8222-222222222222', 'sell', 'market', 5
     from public.securities where ticker = 'BRZ'
-$$, '23505', 'orders.request_id is unique per player (idempotency)');
-select tests.throws($$
-  insert into public.orders (player_id, security_id, request_id, side, type, quantity)
+$$, :'qcol'), '23505', 'orders.request_id is unique per player (idempotency)');
+select tests.throws(format($$
+  insert into public.orders (player_id, security_id, request_id, side, type, %I)
   select 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', id, gen_random_uuid(), 'buy', 'limit', 5 from public.securities where ticker = 'BRZ'
-$$, '23514', 'limit order without limit price violates the check constraint');
+$$, :'qcol'), '23514', 'limit order without limit price violates the check constraint');

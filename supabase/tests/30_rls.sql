@@ -11,13 +11,19 @@ set client_min_messages = notice;
 \set user_b '''bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'''
 \set company '''cccccccc-cccc-4ccc-8ccc-cccccccccccc'''
 
+-- share quantities are *_e6 after the M2 schema migration (older-database mode: not yet)
+select case when exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'orders'
+                           and column_name = 'quantity_e6') then 'quantity_e6' else 'quantity' end as qcol,
+       case when exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'orders'
+                           and column_name = 'quantity_e6') then 1000000 else 1 end as qscale \gset
+
 begin;
 
 -- ---- fixtures (as owner) ------------------------------------------------------
-insert into public.orders (player_id, security_id, request_id, side, type, quantity)
+insert into public.orders (player_id, security_id, request_id, side, type, :qcol)
 select :user_b, id, gen_random_uuid(), 'buy', 'market', 7 from public.securities where ticker = 'VLT';
-insert into public.positions (player_id, security_id, quantity, avg_entry_price_e4, cost_basis_cents)
-select p.id, s.id, 10, 800000, 800000 from public.profiles p cross join public.securities s where s.ticker = 'KLS';
+insert into public.positions (player_id, security_id, :qcol, avg_entry_price_e4, cost_basis_cents)
+select p.id, s.id, 10 * :qscale, 800000, 800000 from public.profiles p cross join public.securities s where s.ticker = 'KLS';
 insert into public.notifications (player_id, type_key, title)
 select p.id, 'system', 'Hallo ' || p.nickname from public.profiles p;
 insert into public.watchlist_items (player_id, security_id)
@@ -99,12 +105,12 @@ select tests.throws($$insert into public.ledger_entries (transaction_id, account
   '42501', 'cannot insert ledger entries');
 select tests.throws($$insert into public.ledger_transactions (kind) values ('admin_adjustment')$$, '42501', 'cannot insert ledger transactions');
 select tests.throws($$update public.ledger_accounts set balance_cents = 999999999$$, '42501', 'cannot update ledger accounts');
-select tests.throws($$insert into public.orders (player_id, security_id, request_id, side, type, quantity)
-  select auth.uid(), id, gen_random_uuid(), 'buy', 'market', 1 from public.securities limit 1$$,
+select tests.throws(format($$insert into public.orders (player_id, security_id, request_id, side, type, %I)
+  select auth.uid(), id, gen_random_uuid(), 'buy', 'market', 1 from public.securities limit 1$$, :'qcol'),
   '42501', 'cannot insert orders directly (must use place_order RPC)');
 select tests.throws($$update public.orders set status = 'filled'$$, '42501', 'cannot update orders');
 select tests.throws($$delete from public.orders$$, '42501', 'cannot delete orders');
-select tests.throws($$update public.positions set quantity = 1000000$$, '42501', 'cannot update positions');
+select tests.throws(format('update public.positions set %I = 1000000', :'qcol'), '42501', 'cannot update positions');
 select tests.throws($$update public.profiles set level = 50, xp_total = 999999 where id = auth.uid()$$, '42501', 'cannot update own profile (level/xp)');
 select tests.throws($$insert into public.xp_events (player_id, source, amount, game_day) values (auth.uid(), 'admin', 100000, current_date)$$,
   '42501', 'cannot insert XP events');

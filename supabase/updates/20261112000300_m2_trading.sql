@@ -124,8 +124,11 @@ begin
       perform public.api_error('insufficient_position');
     end if;
     -- the financial market (or the treasury for bonds) must be able to pay
-    if not v_counter_ok
-       and v_counter_bal - v_gross + case when v_counter = v_treasury then v_fee else 0 end < 0 then
+    v_counter_bal := v_counter_bal - v_gross;
+    if v_counter = v_treasury then
+      v_counter_bal := v_counter_bal + v_fee;
+    end if;
+    if not v_counter_ok and v_counter_bal < 0 then
       perform public.api_error('market_illiquid');
     end if;
     v_left := p_quantity;

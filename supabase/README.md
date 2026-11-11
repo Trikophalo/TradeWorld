@@ -49,7 +49,8 @@ supabase db reset     # migrations + seed.sql
 
 2. **Market jobs (M1)**: nothing to configure. The market runs inside Postgres: `pg_cron` calls
    `public.market_tick()` every 5 seconds and `public.run_due_jobs()` every minute (quarter close, bond
-   maturities, calendar, daily maintenance). The migrations enable `pg_cron` when the project offers it and remove
+   maturities, calendar, rich list snapshots, daily maintenance). The first bootstrap also runs the one-time money
+   genesis (closed money system, 10 Mrd. EUR) and seeds the 120 AI tycoons. The migrations enable `pg_cron` when the project offers it and remove
    the old edge-function jobs of migration 1600. Without `pg_cron`, call both functions yourself.
    Admin RPCs: `admin_set_paused(bool)`, `admin_run_tick()`, `admin_close_quarter()` (moves game time to the end of
    the running quarter and closes it).
@@ -89,12 +90,19 @@ idempotency) with `ON_ERROR_STOP`, and runs the assertions in `tests/[1-9]*.sql`
 | `51_m1_day.sql`         | M1: one simulated day (17 280 ticks) on a throwaway copy of the database; prints daily range per size class and tick times                        |
 | `52_m1_trading.sql`     | M1: orders, idempotency, fee, tax and loss pot, limits and order book, cancel, fills by the tick, error keys, XP, unlocks, tutorial, rate limit   |
 | `53_m1_bonds_vault.sql` | M1: bond coupons and redemption over admin quarter closes, run_due_jobs, admin pause, vault                                                       |
-| `55_m1_security.sql`    | M1: execute rights (authenticated/anon), internal functions, player isolation                                                                     |
+| `54_m2_fractional.sql`  | M2: fractional shares (millionths), orders by amount, minimum order value, 99.9 % rule, `*_e6` JSON shapes                                        |
+| `55_m1_security.sql`    | M1/M2: execute rights (authenticated/anon), internal functions, player isolation                                                                  |
+| `56_m2_money.sql`       | M2: closed money system (genesis, mint closed, invariant after trades, coupons, quarter closes), treasury flows, basic income factor              |
+| `57_m2_names.sql`       | M2: name filter with false-positive traps and leetspeak, reserved names, sign-up, `check_nickname`, `change_nickname`                             |
+| `58_m2_rich_list.sql`   | M2: AI tycoons, `get_rich_list` (scopes, me/next, 24 h changes), rank news                                                                        |
+| `59_m2_missions.sql`    | M2: mission assignment and idempotency, locked features, progress and claims, quick replacement, `track_event`, daily check-in and streaks        |
 
 It exits non-zero on the first failed assertion and removes the cluster afterwards. A full run takes about
 1.5 minutes (most of it is the simulated day). `NEXA_MIGRATIONS_UPTO=20261110001600 supabase/tests/verify_local.sh`
 simulates an older database: only migrations up to that timestamp, then `update-to-latest.sql` (twice) before the
-M1 assertions.
+M1/M2 assertions. `NEXA_MIGRATIONS_UPTO=20261111000500` simulates a project that already has M1.
+`NEXA_FIXTURE_DIR=$PWD/src/features/game/__fixtures__` also writes one real response of every RPC (`tests/fixtures.sql`)
+for the frontend contract test.
 
 | Variable       | Default                      | Purpose                                      |
 | -------------- | ---------------------------- | -------------------------------------------- |

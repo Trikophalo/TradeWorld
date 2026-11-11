@@ -39,8 +39,9 @@ select tests.assert(
 select tests.assert(
   not exists (
     select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-     where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')),
-  'anon cannot execute any function in public');
+     where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
+       and p.proname <> 'check_nickname'),
+  'anon cannot execute any function in public (except check_nickname for the registration form)');
 
 -- authenticated: executable functions are the read-only helper allowlist plus
 -- (once the M1 migrations/update are applied) the M1 RPCs; nothing else.
@@ -54,7 +55,10 @@ select tests.assert(
            -- M1 RPCs
            'admin_close_quarter', 'admin_run_tick', 'admin_set_paused', 'cancel_order', 'claim_vault',
            'complete_tutorial', 'get_candles', 'get_market_snapshot', 'get_my_portfolio', 'get_order_book',
-           'get_security_details', 'place_order']
+           'get_security_details', 'place_order',
+           -- M2 RPCs
+           'change_nickname', 'check_nickname', 'claim_mission', 'daily_check_in', 'get_my_missions',
+           'get_rich_list', 'get_rich_list_news', 'track_event']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')

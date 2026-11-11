@@ -245,6 +245,7 @@ export const RPC_SCHEMAS = {
   get_my_missions: missionsSchema,
   claim_mission: progressSchema,
   daily_check_in: checkInSchema,
+  track_event: z.object({ ok: z.boolean() }),
 } as const;
 
 async function rpc<T>(fn: string, args: Record<string, unknown>, schema: z.ZodType<T>): Promise<T> {

@@ -465,3 +465,25 @@ Level 40 bedeutet Besitz mehrerer Firmen, nicht Mitarbeit. Details: `ECONOMY.md`
 Vorgabe: Wenn ein Level-up etwas Wichtiges freischaltet, erklärt Finn es in einem kurzen, interaktiven Tutorial
 direkt nach dem Level-up-Fenster. Die Touren stehen als Daten in `src/features/tutorial/tours.ts`; jede Tour läuft
 genau einmal pro Spieler.
+
+## ADR-047: Startgeld der KI-Firmen kommt aus dem Finanzmarkt-Topf — `Annahme`
+
+Die 15 KI-Firmen halten aus dem Seed zusammen 5,34 Mrd. € Kasse. Bei der Genesis (ADR-041) zählt das als eingezahltes
+Kapital der Investoren und wird vom Finanzmarkt-Topf (6 Mrd. €) abgezogen. Für den Handel mit Spielern bleiben dort
+661 Mio. €. Für eine Alpha mit wenigen Spielern reicht das bei Weitem; der Topf wird beobachtet (`ECONOMY.md` §10).
+Alternative, falls nötig: den Anteil `money.allocation.financialMarket` erhöhen und `households` senken.
+
+## ADR-048: Namensfilter lieber zu streng als zu lasch — `Annahme`
+
+Der Filter (ADR-043) blockiert auch einige echte Namen, weil sie verbotene Begriffe enthalten: „Nazim“ und „Ignazio“
+(nazi), „Nigeria“ (niger), „Lisa88“ (Code 88). „Finn_Mueller“ ist reserviert (Maskottchen). Erlaubt bleiben dagegen
+z. B. Klassenbester, Matthias, Analyst, Bastian, Dickmann, Schwanstein, Arsenal. Für Spieler gibt es immer eine
+Alternative mit Ziffer oder Unterstrich. Die Liste liegt in der Datenbank und lässt sich ohne App-Update anpassen.
+
+## ADR-049: Bruchstücke, Geldkreislauf, Reichenliste und Missionen in der Datenbank — `akzeptiert`
+
+Umsetzung von ADR-039 bis ADR-043 und der Missionen (Vorgabe des Auftraggebers: viele Wege zu XP, von schnell bis
+lang). Stückzahlen in Millionstel, Kauf per exaktem Betrag; Genesis mit einer einzigen Buchung, Münzkonto gesperrt,
+keine Systemkasse darf ins Minus; Reichenliste mit 120 KI-Tycoons, Schnappschüssen alle 5 Minuten und Schlagzeilen;
+70 Missionsvorlagen in vier Arten, tägliche Anmeldung mit Serie. Verträge und Fehlercodes: `DATA_MODEL.md`,
+Abschnitt M2. Geprüft auf einer frischen Datenbank, einer M1-Datenbank und einer Datenbank von vor M1.

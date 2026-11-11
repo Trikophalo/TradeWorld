@@ -165,7 +165,7 @@ select tests.assert(
   'after hours the spread of every stock is wider (multiplier 3)');
 select tests.assert(
   (select count(*) from public.security_quotes q join public.securities s on s.id = q.security_id
-    where s.status = 'listed' and q.day_volume >= 0 and q.day_open_e4 = q.last_price_e4) = 20,
+    where s.status = 'listed' and q.day_volume_e6 >= 0 and q.day_open_e4 = q.last_price_e4) = 20,
   'the new trading day opens at the first price after the bell');
 rollback;
 
@@ -181,7 +181,7 @@ select tests.assert(
 select tests.assert(
   (select count(*) filter (where e ->> 'kind' = 'stock') = 15 and count(*) filter (where e ->> 'kind' = 'bond') = 4
           and bool_and(e ?& array['id', 'ticker', 'name', 'kind', 'sector_key', 'size_class', 'last_price_e4', 'bid_e4', 'ask_e4',
-                                  'prev_close_e4', 'change_bps', 'day_high_e4', 'day_low_e4', 'day_volume', 'market_cap_cents',
+                                  'prev_close_e4', 'change_bps', 'day_high_e4', 'day_low_e4', 'day_volume_e6', 'market_cap_cents',
                                   'term_game_years', 'coupon_bps', 'yield_bps', 'matures_at', 'face_value_cents'])
           and bool_and(e ->> 'kind' <> 'stock' or (e ->> 'sector_key' in ('tech', 'retail', 'energy', 'pharma', 'logistics')
                                                     and e ->> 'size_class' in ('bluechip', 'midcap', 'penny')
@@ -207,7 +207,7 @@ select public.get_order_book('KLS') as ob \gset
 select tests.assert(
   jsonb_array_length(:'ob'::jsonb -> 'bids') = 8 and jsonb_array_length(:'ob'::jsonb -> 'asks') = 8
   and ((:'ob'::jsonb -> 'bids' -> 0 ->> 'price_e4')::bigint < (:'ob'::jsonb -> 'asks' -> 0 ->> 'price_e4')::bigint)
-  and (select bool_and((b ->> 'quantity')::bigint > 0 and (b ->> 'players')::int = 0) from jsonb_array_elements(:'ob'::jsonb -> 'bids') b)
+  and (select bool_and((b ->> 'quantity_e6')::bigint >= 1000000 and (b ->> 'players')::int = 0) from jsonb_array_elements(:'ob'::jsonb -> 'bids') b)
   and (select (array_agg((b ->> 'price_e4')::bigint))[1] > (array_agg((b ->> 'price_e4')::bigint))[8] from jsonb_array_elements(:'ob'::jsonb -> 'bids') b)
   and (select (array_agg((b ->> 'price_e4')::bigint))[1] < (array_agg((b ->> 'price_e4')::bigint))[8] from jsonb_array_elements(:'ob'::jsonb -> 'asks') b),
   'get_order_book(KLS): 8 market-maker levels per side, best prices first, bid < ask');

@@ -482,6 +482,9 @@ export interface ProgressionConfig {
    * ceiling far beyond reach; features unlock up to level 50, prestige titles after.
    */
   readonly maxLevel: number;
+  /** Money targets of missions grow with the level: × (1 + perLevel × (level − 1)), at most `max`. */
+  readonly missionTargetScalePerLevel: number;
+  readonly missionTargetScaleMax: number;
   /** From this level on, every `titleEveryLevels` levels brings a new prestige title. */
   readonly prestige: { readonly fromLevel: number; readonly titleEveryLevels: number };
   /**
@@ -1212,6 +1215,8 @@ export const BALANCE = {
     xpExponent: 1.5,
     maxLevel: 10_000,
     prestige: { fromLevel: 50, titleEveryLevels: 10 },
+    missionTargetScalePerLevel: 0.2,
+    missionTargetScaleMax: 5,
     // Alpha bonus: all XP count double (owner decision). 1 = spec values.
     // Typed as `number` (not the literal 2) so that code may compare it with 1.
     xpMultiplier: 2 as number,

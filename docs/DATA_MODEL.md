@@ -3816,3 +3816,179 @@ Danach laufen Tick und Quartale von selbst. Neue Projekte nehmen weiterhin `setu
 - Firmenumsätze werden in M1 nicht im Ledger gebucht (nur Berichte und fairer Wert).
 - Die Abschnitte 3 und 4 dieses Dokuments enthalten die neuen Spalten erst nach dem nächsten Lauf von
   `supabase/tools/gen_data_model.py`.
+
+## Nachtrag: M2a (Bruchstücke, Geldkreislauf, Namen, Reichenliste, Missionen)
+
+Entscheidungen des Auftraggebers (ADR-039 bis ADR-045, `docs/ECONOMY.md`): Bruchstücke von Aktien, endlose Level,
+geschlossener Geldkreislauf, Live-Reichenliste, Spielername mit Filter und Änderung alle 60 Tage, Missionen ab der
+ersten Minute. Alles kommt wie M1 über `update-to-latest.sql` in bestehende Projekte (idempotent, zweimal getestet,
+in drei Ausgangslagen: leere Datenbank, Stand vor M1, Stand M1 mit echten Daten).
+
+### Migrationen
+
+| Datei                               | Inhalt                                                                                                                |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `20261112000100_m2_schema.sql`      | Spalten auf `*_e6`, Views, Levelgrenze, Systemkonten und Buchungssperren, Namensfilter, Reichenliste, Missionsspalten |
+| `20261112000200_m2_money_names.sql` | Genesis, Staatsauszahlungen, Grundeinkommensfaktor, Namensprüfung, `check_nickname`, `change_nickname`, Registrierung |
+| `20261112000300_m2_trading.sql`     | Handel in Millionstel, Order per Betrag, Tick/Kerzen/Historie in Millionstel, Lese-RPCs                               |
+| `20261112000400_m2_rich_list.sql`   | KI-Tycoons, Vermögensrangliste, Schnappschüsse, Ranglisten-Nachrichten, `get_rich_list(_news)`                        |
+| `20261112000500_m2_missions.sql`    | 70 Missionsvorlagen, Fortschritt, Zuteilung, `get_my_missions`, `claim_mission`, `daily_check_in`, `track_event`      |
+| `20261112000600_m2_jobs.sql`        | `market_bootstrap()` und `run_due_jobs()` mit Genesis, Tycoons und Reichenliste                                       |
+
+### A. Bruchstücke (Millionstel)
+
+Alle Stückzahlen von Spielern und KI-Flüssen sind `bigint` in Millionstel (`*_e6`, 1 Aktie = 1 000 000):
+`orders.quantity_e6/filled_quantity_e6/reserved_quantity_e6`, `positions.quantity_e6/reserved_quantity_e6`,
+`position_lots.quantity_initial_e6/quantity_open_e6`, `trades.quantity_e6`, `distribution_payouts.quantity_e6`,
+`security_quotes.day_volume_e6`, `candles.volume_e6`, `price_ticks.volume_e6`, `security_sim_state.pending_player_flow_e6`,
+`ai_investor_holdings.quantity_e6`, neu `rich_tycoon_holdings.quantity_e6`. Firmenanteile (`shares_outstanding`, Cap Table)
+bleiben ganze Aktien. **Bestehende Daten:** Je Spalte in einem geschützten Schritt umbenannt und mit 1 000 000
+multipliziert, genau einmal (gibt es die neue Spalte schon, passiert nichts). `trades` ist unveränderlich; der Trigger
+wird dafür kurz ausgesetzt. `v_my_positions` und `v_securities` wurden mit den neuen Spaltennamen neu angelegt.
+Geld aus Stückzahl: `value_cents = round_half_even(quantity_e6 × price_e4 / 100 000 000)` (`public.value_cents`).
+
+`place_order(p_request_id, p_ticker, p_side, p_type, p_quantity_e6 = null, p_limit_price_e4 = null, p_amount_cents = null)`
+(die alte Signatur ist entfernt). Genau eines von Stückzahl und Betrag, sonst `invalid_argument`.
+
+- **Kauf per Betrag:** Der Spieler zahlt höchstens den Betrag inklusive Gebühr. Market: Stückzahl =
+  `floor((Betrag − Gebühr) × 1e8 / Preis)`; der Preis ist der Ausführungspreis für die Stückzahl zum Briefkurs
+  (konservativ, also nie mehr als der Betrag). Limit: zum Limitpreis. Abweichung höchstens 1 Cent nach unten.
+- **Verkauf per Betrag:** Betrag = Bruttoerlös vor Gebühr und Steuer; Stückzahl = `ceil(Betrag × 1e8 / Preis)`, nie mehr
+  als der freie Bestand (`insufficient_position`). Sind es 99,9 % oder mehr des freien Bestands, wird der ganze Bestand
+  verkauft (kein Rest-Staub). Gilt auch für Verkäufe per Stückzahl.
+- **Mindestorderwert** `trading.minOrderValueCents` (1 €) zum Ausführungs- bzw. Limitpreis → `order_too_small`
+  (Ausnahme: Verkauf des ganzen Bestands). Höchstens `trading.maxOrderQuantity` ganze Aktien.
+- Ergebnis: `filled_quantity`/`quantity` heißen jetzt `filled_quantity_e6`/`quantity_e6`; zusätzlich `amount_cents`.
+- JSON-Umbenennungen: Snapshot `day_volume_e6`; Orderbuch `quantity_e6`; Portfolio-Positionen `quantity_e6`,
+  `reserved_quantity_e6`; offene Orders `quantity_e6`, `filled_quantity_e6`; Trades `quantity_e6`; Kerzen behalten `v`,
+  der Wert ist jetzt in Millionstel.
+
+### B. Endlose Level
+
+Die Prüfung `profiles.level between 1 and 50` ist ersetzt durch `level >= 1`. `level_progress()` rechnet bis
+`progression.maxLevel` (10 000, technische Decke); Freischaltungen bleiben in der Tabelle `levels`/`unlocks` (bis 50).
+
+### C. Geschlossener Geldkreislauf
+
+- **Genesis** (`money_genesis()`, einmal, aus `market_bootstrap()`): Konto `world_genesis` bucht `money.totalSupplyCents`
+  (10 Mrd. €) in einer einzigen Transaktion auf `treasury` (5 %), `market` = Finanzmarkt (60 %), `tycoons` (5 %),
+  `households` (30 %). Danach nimmt `world_genesis` keine Buchung mehr an, die `mint` ist geschlossen (Trigger
+  `ledger_entries_aa_money_guard`, `NX003`), und kein Systemkonto außer `world_genesis` darf negativ werden.
+- **Bestehende Daten (Re-Sourcing, im selben Schritt):** Was die alte `mint` schon geschaffen hat, wird umgebucht, so
+  dass sie bei 0 endet: Startguthaben der 15 KI-Firmen (Seed, 5,34 Mrd. €) aus dem Finanzmarkt (eingezahltes Kapital der
+  Investoren; Ersatz Haushalte), alles andere (Startkapital, Grundeinkommen) aus der Staatskasse (Ersatz Haushalte, dann
+  Finanzmarkt). Andere negative Systemkonten (`interest` aus Kupons usw.) werden aus der Staatskasse ausgeglichen,
+  positive Senken (`fees`, `taxes`, …) in die Staatskasse überführt. Ergebnis nach dem Seed: Finanzmarkt 661,3 Mio. €,
+  Staatskasse knapp 500 Mio. €, Tycoons 500 Mio. €, Haushalte 3 Mrd. €.
+- **Flüsse ab jetzt:** Startkapital, Grundeinkommen, Kupons und Rückzahlungen zahlt die Staatskasse
+  (`state_payout`; ist sie leer, zahlen die Haushalte, protokolliert in `admin_actions`). Gebühren und Steuern
+  gehen in die Staatskasse. Aktien handeln gegen den Finanzmarkt (`market`), Anleihen gegen die Staatskasse (der Staat
+  gibt aus und kauft zurück). Kann der Finanzmarkt (oder bei Anleihen die Staatskasse) einen Verkauf nicht zahlen:
+  `market_illiquid` (praktisch unerreichbar).
+- **Grundeinkommensfaktor** = clamp(Staatskasse / `money.basicIncome.treasuryTargetCents`, `minFactor`, 1), angewendet
+  beim Abholen. `claim_vault` liefert `factor_bps`; im Portfolio enthält `vault` `factor_bps`, und
+  `rate_cents_per_hour` ist die wirksame Rate.
+- `get_market_snapshot` liefert `economy: { money_supply_cents, treasury_cents, basic_income_factor_bps, total_supply_cents }`.
+- **Invariante** (Tests `51`, `56`): Summe aller Konten außer `world_genesis` = 10 Mrd. € exakt, `mint` = 0 und ohne
+  Buchung nach der Genesis, kein Systemkonto negativ, Ledger-Summe 0, `ledger_audit()` leer – nach Anmeldungen, einem
+  simulierten Tag, Trades, Tresor, Kupons, Rückzahlung und Quartalsabschlüssen.
+
+### D. Namen
+
+- `blocked_name_terms` (intern): 200 Begriffe (Schimpfwörter de/en, sexuelle Begriffe, Beleidigungen,
+  extremistische Begriffe und Codes, reservierte Namen). Dazu dynamisch reserviert: alle KI-Tycoons, alle KI-Firmen
+  (mit und ohne Rechtsform), alle Ticker, Indexschlüssel.
+- **Normalisierung:** Kleinbuchstaben, ä→ae ö→oe ü→ue ß→ss, Akzente weg, Leetspeak (0→o 1→i 3→e 4→a 5→s 7→t 8→b @→a
+  $→s !→i), Nicht-Buchstaben weg, Buchstabenwiederholungen zusammengezogen.
+- **Treffer:** Begriffe ab 5 Buchstaben als Teilwort, kürzere nur als ganzes Wort oder ganzer Name; Codes (88, 1488,
+  14, HH, SS, KKK, ACAB, 69, XXX) nur als eigenes Zifferns- bzw. Buchstabenstück. Ausnahmen pro Begriff:
+  `fuck`, `fick`, `nazi` auch als Teilwort; `arsch`, `mongo`, `fuehrer`, `pussy`, `anal`, `dick`, `cock`, `cunt` … nur als Wort.
+- **Bewusst erlaubt:** Klassenbester, Matthias, Analyst, Hans_Peter, Bastian, Dickmann, Schwanstein, Pussycat,
+  Scunthorpe, Grapefruit, Barsch, Mongolei, Lokfuehrer, Max1988, Therapeut, Arsenal. **Bewusst blockiert** (in Kauf
+  genommen): Nazim/Ignazio (enthält „nazi“), Lisa88 (Code 88), Finn_Mueller (Maskottchen Finn), Nigeria
+  (enthält normalisiert „niger“).
+- `name_violation(name, kind = 'player')` (intern) → `null` oder `name_too_short`, `name_too_long`, `name_invalid_chars`,
+  `name_profanity`, `name_reserved`, `name_taken`. Spieler: `names.minLength`–`maxLength`, `[A-Za-z0-9_]`. Firmen:
+  3–30 Zeichen, Buchstaben mit Umlauten, Ziffern, Leerzeichen, `- & . '`.
+- `check_nickname(p_nickname)` → `{ allowed, reason }`, auch für `anon` (Registrierungsformular). Schreibt nichts und
+  verrät nur, ob ein Name vergeben ist; eine Ratenbegrenzung pro IP ist in der Datenbank nicht möglich.
+- Registrierung: verbotene Namen werden mit dem Schlüssel als Meldung abgelehnt (`NX019`); vergebene Namen bekommen wie
+  bisher eine Ziffernfolge.
+- `change_nickname(p_request_id, p_nickname)` → `{ nickname, changed_at, next_change_at }`; die erste Änderung ist jederzeit
+  erlaubt, danach alle `names.nicknameChangeDays` (60) Tage (`name_change_too_soon`). Neue Spalte `profiles.nickname_changed_at`.
+- `get_my_portfolio` liefert `nickname` und `nickname_change_available_at` (`null` = jetzt möglich).
+
+### E. Reichenliste
+
+- `rich_tycoons` (120), `rich_tycoon_holdings`, `rich_list_snapshots` (alle intern). Vermögen der Tycoons:
+  `log W(r) = log 400 Mio. − (log 400 Mio. − log 15 000) × ((r − 1) / 119)^0,5`. Bargeld = W × 500 Mio. / ΣW
+  (genau die Tycoon-Geldmenge), der Rest in Aktien zum Geldkurs. Die 15 Reichsten haben je eine KI-Firma gegründet
+  (größtes Vermögen ↔ größte Marktkapitalisierung, höchstens 40 % der eigenen Firma); alle zusammen halten höchstens
+  60 % einer Firma (betrifft die Pennystocks). Bestände sind vorerst fest; das Vermögen bewegt sich mit den Kursen.
+  Verteilung beim Start: Platz 1 400 Mio. €, Platz 2 157 Mio. €, Platz 3 113 Mio. €, Platz 10 24 Mio. €; Perzentile
+  p10 25 Tsd. €, p25 57 Tsd. €, Median 288 Tsd. €, p75 2,4 Mio. €, p90 15,7 Mio. €. Neue Spieler (10 000 €) starten etwa auf Platz 121.
+- **Vermögen:** Spieler = Bargeld + Reserve + Positionen zum Geldkurs (Aktien und Anleihen; Platzhalter für
+  Firmenanteile ab M4 in `player_net_worth_cents`), Tycoon = Bargeld + Bestände zum Geldkurs.
+- `get_rich_list(p_limit = 100, p_offset = 0, p_scope = 'all' | 'players')` → `{ server_time, total, entries: [{ rank, kind,
+id, name, description, net_worth_cents, change_24h_bps, rank_change_24h, is_me }], me: { rank, net_worth_cents,
+next: { rank, name, gap_cents } | null } | null }`. Ränge innerhalb der Ansicht; 24-h-Werte gegen den letzten
+  Schnappschuss, der mindestens 24 h alt ist (sonst `null`).
+- Schnappschuss alle `richList.snapshotMinutes` aus `run_due_jobs()`, 8 Tage aufbewahrt. Nachrichten (`news_items`,
+  Kategorie `player`, Vorlagen `rich_*`): Einstieg in einen Rang aus `richList.newsRanks`, neue Nummer eins insgesamt,
+  neue Nummer eins unter Spielern, Überholen eines anderen Spielers (einmal pro Paar und Tag), Aufsteiger des Tages
+  (einmal täglich ab 22:00 Uhr Berlin).
+- `get_rich_list_news(p_limit = 20)` → `[{ published_at, headline, body, kind, player_id }]`, `kind` ∈ `rank_entry`,
+  `number_one`, `players_one`, `overtake`, `top_gainer`.
+
+### F. Missionen
+
+- Vorlagen in `mission_templates` (Spalten neu: `mode`, `params`, `chain_order`, `scale_with_level`; `kind` ist jetzt
+  Text): 20 schnelle, 15 tägliche, 9 wöchentliche, 26 Meilensteine. Alte Vorlagen ohne `mode` werden nie vergeben.
+  XP in den Vorlagen sind Basis-XP; `grant_xp` wendet den Multiplikator einmal an, das JSON-Feld `xp` zeigt den
+  ausgezahlten Wert.
+- **Arten:** schnell (immer `quickMission.active` = 3 offen, nach dem Abholen sofort Ersatz, dieselbe Vorlage nicht
+  zweimal in 24 h), täglich (`dailyMission.perDay` je Berliner Kalendertag, verfallen um Mitternacht), wöchentlich
+  (`weeklyMission.perWeek`, Montag 00:00 bis Montag), Meilensteine (Kette nach `chain_order`, `milestoneMission.visible`
+  sichtbar, verfallen nie; abgeholte Meilensteine verschwinden aus der Liste).
+- **Gesperrte Funktionen** werden nie angeboten (`params.unlock`: Limit-Order ab Level 3, Anleihen ab Level 5).
+- **Zielwerte** in Euro wachsen mit dem Level: × min(5, 1 + 0,2 × (Level − 1)) (`progression.missionTargetScalePerLevel`,
+  `missionTargetScaleMax`, Rückfallwerte).
+- **Fortschritt** serverseitig: Fills (`trade`, `buy`, `sell`, `trade_value`, `buy_value`, `distinct_security`,
+  `buy_sector`, `sectors_bought`, `bond_bought`, `realized_profit`, `trading_day`), `limit_order`, `vault_claim`,
+  `tutorial`, `check_in`; Zustände (`net_worth`, `level`, `sectors_held`, `rich_rank`, `rich_rank_improve`) beim Lesen
+  der Missionen und im Reichenlisten-Schnappschuss.
+- `get_my_missions()` → `{ server_time, groups: [{ kind, resets_at, missions: [{ id, key, title, description, progress,
+target, xp, status, expires_at }] }] }` (Reihenfolge quick, daily, weekly, milestone; teilt fehlende Missionen
+  zu, idempotent und pro Spieler serialisiert).
+- `claim_mission(p_request_id, p_mission_id)` → `{ xp_awarded, level, xp_total }`; Fehler `mission_not_found`
+  (auch verfallen), `mission_not_completed`, `mission_already_claimed`.
+- `daily_check_in(p_request_id)` → `{ xp_awarded, streak_days, already_checked_in, level, xp_total }` _(zusätzlich
+  `freeze_used`)_: einmal pro Berliner Tag `dailyLogin.xp` + min(`streakBonusCap`, (Serie − 1) × `streakBonusPerDay`).
+  Ein verpasster Tag wird mit dem wöchentlichen Streak-Schutz überbrückt (montags aufgefüllt).
+- `track_event(p_kind, p_ref)` → `{ ok: true }`: nur `view_security` (Ticker, verschiedene zählen), `open_rich_list`,
+  `open_rules`; pro Tag 50/20/20 Ereignisse. Davon hängen nur schnelle Missionen mit 20 Basis-XP ab.
+- `get_my_portfolio` liefert `missions_claimable` und `streak_days`.
+
+### Neue Fehlerschlüssel
+
+| Schlüssel                                                                                                | Code    |
+| -------------------------------------------------------------------------------------------------------- | ------- |
+| `name_too_short`, `name_too_long`, `name_invalid_chars`, `name_profanity`, `name_reserved`, `name_taken` | `NX019` |
+| `name_change_too_soon`                                                                                   | `NX020` |
+| `order_too_small`                                                                                        | `NX021` |
+| `market_illiquid`                                                                                        | `NX022` |
+| `mission_not_found`                                                                                      | `NX023` |
+| `mission_not_completed`                                                                                  | `NX024` |
+| `mission_already_claimed`                                                                                | `NX025` |
+
+### Neue RPCs und Rechte
+
+`authenticated`: `change_nickname`, `check_nickname`, `get_rich_list`, `get_rich_list_news`, `get_my_missions`,
+`claim_mission`, `daily_check_in`, `track_event`. `anon`: nur `check_nickname`. Alles andere (`money_genesis`,
+`state_payout`, `name_violation`, `seed_rich_tycoons`, `rich_list_snapshot`, `mission_event`, …) ist intern.
+
+### Bekannte Grenzen
+
+- Prestige-Titel ab Level 50 sind konfiguriert, aber noch nicht als Titel vergeben.
+- Tycoon-Bestände handeln nicht; Firmenumsätze laufen noch nicht über die Haushalte (M4).
+- Die Missionsvorlagen werden bei jedem Update auf den Stand der Migration gesetzt (`on conflict do update`).

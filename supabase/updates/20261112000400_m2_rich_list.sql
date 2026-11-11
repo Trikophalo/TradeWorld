@@ -244,7 +244,8 @@ set search_path = ''
 as $$
 declare
   v_rl     jsonb := coalesce(public.config_jsonb('richList'), '{}'::jsonb);
-  v_now    timestamptz := public.game_now();
+  -- wall clock (not the transaction start) plus the admin offset: unique per call
+  v_now    timestamptz := clock_timestamp() + (public.game_now() - now());
   v_prev   timestamptz;
   v_day    date := (public.game_now() at time zone 'Europe/Berlin')::date;
   v_ranks  integer[];
@@ -329,7 +330,7 @@ begin
        order by bps desc limit 1;
       if v_q.entity_id is not null then
         perform public.rich_news('rich_top_gainer', v_q.entity_id, v_q.nickname, null, null, null, v_q.net_worth_cents,
-                                 '+' || replace(to_char(v_q.bps / 100.0, 'FM999990.0'), '.', ',') || ' %');
+                                 '+' || replace(to_char(v_q.bps / 100.0, 'FM999999999990.0'), '.', ',') || ' %');
         v_news := v_news + 1;
       end if;
     end if;

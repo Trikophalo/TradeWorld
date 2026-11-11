@@ -75,7 +75,8 @@ select
   p.accrued_financing_cents, p.opened_at,
   q.last_price_e4, q.change_bps,
   round(p.quantity_e6::numeric * q.last_price_e4 / 100000000)::bigint as market_value_cents,
-  round(p.quantity_e6::numeric * q.last_price_e4 / 100000000)::bigint - p.cost_basis_cents as unrealized_pnl_cents
+  round(p.quantity_e6::numeric * (q.last_price_e4 - p.avg_entry_price_e4) / 100000000
+        * case when p.side = 'short' then -1 else 1 end)::bigint as unrealized_pnl_cents
 from public.positions p
 join public.securities s on s.id = p.security_id
 left join public.security_quotes q on q.security_id = p.security_id
@@ -155,8 +156,10 @@ end;
 $$;
 revoke all on function public.ledger_money_guard() from public, anon, authenticated;
 
+-- named so that it fires before ledger_entries_apply (triggers fire in name order)
 drop trigger if exists ledger_money_guard on public.ledger_entries;
-create trigger ledger_money_guard
+drop trigger if exists ledger_entries_aa_money_guard on public.ledger_entries;
+create trigger ledger_entries_aa_money_guard
   before insert on public.ledger_entries
   for each row execute function public.ledger_money_guard();
 

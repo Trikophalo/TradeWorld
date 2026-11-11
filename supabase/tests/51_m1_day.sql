@@ -81,6 +81,13 @@ select tests.assert(
   (select count(*) from public.candles c where c.interval = '1y' and c.bucket_start > now()) = 20,
   'the next game year (08:00 Berlin) opened a new 1y candle for every security');
 
+select tests.assert(
+  (select sum(balance_cents) from public.ledger_accounts where system_key is distinct from 'world_genesis')
+    = public.config_bigint('money', '{totalSupplyCents}', -1)
+  and (select balance_cents from public.ledger_accounts where system_key = 'mint') = 0
+  and (select sum(amount_cents) from public.ledger_entries) = 0,
+  'closed money system: after a simulated day all accounts except world_genesis still sum to the total supply');
+
 \c postgres
 drop database nexa_m1_day;
 \c :"srcdb"

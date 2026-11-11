@@ -19,7 +19,7 @@ begin;
 select tests.cash(:i) as i_cash0 \gset
 select count(*) as closed0 from public.game_quarters where status = 'closed' \gset
 select tests.login_as('authenticated', :i);
-select public.place_order(gen_random_uuid(), 'NXB01', 'buy', 'market', 50) as bb \gset
+select public.place_order(gen_random_uuid(), 'NXB01', 'buy', 'market', 50000000) as bb \gset
 select tests.throws_key($$select public.admin_close_quarter()$$, 'forbidden', 'admin_close_quarter() needs an admin');
 reset role;
 \echo '   bond buy:' :bb
@@ -55,7 +55,7 @@ select tests.assert(
   and tests.qty(:i, 'NXB01') = 0,
   'NXB01 matured within 5 quarter closes; the position is closed');
 select tests.assert(
-  (select t.price_e4 = 1000000 and t.fee_cents = 0 and t.counterparty = 'issuer' and t.quantity = 50
+  (select t.price_e4 = 1000000 and t.fee_cents = 0 and t.counterparty = 'issuer' and t.quantity_e6 = 50000000
      from public.trades t join public.securities s on s.id = t.security_id
     where t.player_id = :i and s.ticker = 'NXB01' and t.side = 'sell'),
   'redemption: 50 bonds sold to the issuer at face value (100 EUR), no fee');

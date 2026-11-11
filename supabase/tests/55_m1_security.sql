@@ -12,14 +12,16 @@ select tests.assert(
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute'))
   = array['admin_close_quarter', 'admin_run_tick', 'admin_set_paused', 'are_friends', 'can_read_ledger_transaction',
-          'cancel_order', 'claim_vault', 'complete_tutorial', 'current_game_quarter', 'game_day', 'game_now',
-          'get_candles', 'get_market_snapshot', 'get_my_portfolio', 'get_order_book', 'get_security_details',
-          'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account', 'place_order'],
-  'authenticated can execute exactly the 9 helpers and the 12 M1 RPCs');
+          'cancel_order', 'change_nickname', 'check_nickname', 'claim_mission', 'claim_vault', 'complete_tutorial',
+          'current_game_quarter', 'daily_check_in', 'game_day', 'game_now',
+          'get_candles', 'get_market_snapshot', 'get_my_missions', 'get_my_portfolio', 'get_order_book', 'get_rich_list',
+          'get_rich_list_news', 'get_security_details', 'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account',
+          'place_order', 'track_event'],
+  'authenticated can execute exactly the 9 helpers, the 12 M1 RPCs and the 8 M2 RPCs');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-               where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')),
-  'anon cannot execute any function');
+               where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute') and p.proname <> 'check_nickname'),
+  'anon cannot execute any function except check_nickname');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                where n.nspname = 'public' and p.prosecdef and not coalesce(p.proconfig @> array['search_path=""'], false)),
@@ -36,13 +38,21 @@ select tests.throws($$select public.get_candles('KLS', '1m')$$, '42501', 'anon: 
 select tests.throws($$select public.get_order_book('KLS')$$, '42501', 'anon: get_order_book');
 select tests.throws($$select public.get_security_details('KLS')$$, '42501', 'anon: get_security_details');
 select tests.throws($$select public.get_my_portfolio()$$, '42501', 'anon: get_my_portfolio');
-select tests.throws($$select public.place_order(gen_random_uuid(), 'KLS', 'buy', 'market', 1)$$, '42501', 'anon: place_order');
+select tests.throws($$select public.place_order(gen_random_uuid(), 'KLS', 'buy', 'market', 1000000)$$, '42501', 'anon: place_order');
 select tests.throws($$select public.cancel_order(gen_random_uuid(), gen_random_uuid())$$, '42501', 'anon: cancel_order');
 select tests.throws($$select public.claim_vault(gen_random_uuid())$$, '42501', 'anon: claim_vault');
 select tests.throws($$select public.complete_tutorial(gen_random_uuid())$$, '42501', 'anon: complete_tutorial');
 select tests.throws($$select public.admin_set_paused(true)$$, '42501', 'anon: admin_set_paused');
 select tests.throws($$select public.admin_run_tick()$$, '42501', 'anon: admin_run_tick');
 select tests.throws($$select public.admin_close_quarter()$$, '42501', 'anon: admin_close_quarter');
+select tests.throws($$select public.change_nickname(gen_random_uuid(), 'Neuer_Name')$$, '42501', 'anon: change_nickname');
+select tests.throws($$select public.get_rich_list()$$, '42501', 'anon: get_rich_list');
+select tests.throws($$select public.get_rich_list_news()$$, '42501', 'anon: get_rich_list_news');
+select tests.throws($$select public.get_my_missions()$$, '42501', 'anon: get_my_missions');
+select tests.throws($$select public.claim_mission(gen_random_uuid(), gen_random_uuid())$$, '42501', 'anon: claim_mission');
+select tests.throws($$select public.daily_check_in(gen_random_uuid())$$, '42501', 'anon: daily_check_in');
+select tests.throws($$select public.track_event('open_rules')$$, '42501', 'anon: track_event');
+select tests.assert((public.check_nickname('Freundlich_42') ->> 'allowed')::boolean, 'anon may pre-check a nickname (registration form)');
 reset role;
 
 -- authenticated without a JWT subject
@@ -63,8 +73,9 @@ select tests.throws($$select * from public.security_sim_state$$, '42501', 'playe
 reset role;
 
 -- player isolation: C has an open order, A can neither see nor cancel it
+select tests.set_level(:c, 5);
 select tests.login_as('authenticated', :c);
-select public.place_order(gen_random_uuid(), 'KLS', 'buy', 'limit', 1, 10000) as co \gset
+select public.place_order(gen_random_uuid(), 'KLS', 'buy', 'limit', 1000000, 10000) as co \gset
 reset role;
 select tests.login_as('authenticated', :user_a);
 select public.get_my_portfolio() as apf \gset

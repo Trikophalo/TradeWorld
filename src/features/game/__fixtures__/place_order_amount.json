@@ -1,0 +1,21 @@
+{
+  "side": "buy",
+  "type": "market",
+  "level": 7,
+  "status": "filled",
+  "ticker": "KLS",
+  "order_id": "52fb23b4-f81e-47d8-bceb-9e59f66c0b14",
+  "xp_total": 5160,
+  "fee_cents": 100,
+  "tax_cents": 0,
+  "cash_cents": 948661,
+  "xp_awarded": 20,
+  "gross_cents": 24900,
+  "quantity_e6": 2695228,
+  "amount_cents": 25000,
+  "avg_price_e4": 923855,
+  "limit_price_e4": null,
+  "reserved_cents": 0,
+  "filled_quantity_e6": 2695228,
+  "realized_pnl_cents": null
+}
