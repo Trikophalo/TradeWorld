@@ -1,11 +1,11 @@
 {
-  "id": "010b7296-b9f6-49e9-8cba-65d9ad12bbfc",
+  "id": "23076f6d-92ab-4071-9e3f-3b348ef7f22b",
   "tier": "intern",
   "slots": 1,
   "title": "Werkstudium Software",
   "status": "open",
   "company": {
-    "id": "6c6f790f-87dd-406f-9cdd-524bd7059696",
+    "id": "8f441559-9f6d-46dd-ae33-ed705522ec53",
     "name": "Fixture Labor",
     "color": "#2266cc",
     "is_ai": false,
@@ -14,5 +14,6 @@
   },
   "required": [{ "branch": "it", "min_score": 0 }],
   "title_key": null,
+  "required_skills": [],
   "salary_cents_per_hour": 18000
 }

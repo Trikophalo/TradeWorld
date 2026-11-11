@@ -1,0 +1,16 @@
+{
+  "members": [
+    {
+      "title": "Werkstudium Daten",
+      "skills": ["it_basics"],
+      "nickname": "Fixture_Chefin",
+      "avatar_key": "rookie",
+      "started_at": "2026-11-11T17:52:41.318932+00:00",
+      "pending_raise": null,
+      "player_job_id": "7576e0a4-7239-4054-890e-e94a7b4102b8",
+      "notice_ends_at": null,
+      "productivity_bps": 15000,
+      "salary_cents_per_hour": 19055
+    }
+  ]
+}

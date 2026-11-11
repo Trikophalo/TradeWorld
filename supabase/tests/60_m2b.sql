@@ -203,7 +203,7 @@ select tests.assert(
 
 update public.player_skill_points set free_points = 3, branch_points = '{"it": 2, "finance": 1}' where player_id = :s;
 select tests.login_as('authenticated', :s);
-select tests.throws_key($$select public.learn_skill(gen_random_uuid(), 'it_programming')$$, 'skill_locked', 'learn_skill(): requires it_basics');
+select tests.throws_key($$select public.learn_skill(gen_random_uuid(), 'it_networks')$$, 'skill_locked', 'learn_skill(): not an entry field and no learned neighbour (ADR-061)');
 select public.learn_skill(gen_random_uuid(), 'it_basics') as l1 \gset
 select tests.throws_key($$select public.learn_skill(gen_random_uuid(), 'it_basics')$$, 'skill_learned', 'learn_skill(): already learned');
 select public.learn_skill(gen_random_uuid(), 'it_programming') as l2 \gset
@@ -333,8 +333,9 @@ select tests.throws_key(format($$select public.apply_for_job(gen_random_uuid(), 
   'invalid_argument', 'apply_for_job(): message longer than applicationMessageMaxLength');
 select tests.throws_key($$select public.apply_for_job(gen_random_uuid(), gen_random_uuid(), 30000, null)$$,
   'job_not_found', 'apply_for_job(): unknown posting');
-select public.apply_for_job(gen_random_uuid(), :'pj2', 10000, null) as ap2 \gset
-select public.counter_offer(gen_random_uuid(), (:'ap2'::jsonb ->> 'id')::uuid, 999999) as co2 \gset
+select public.apply_for_job(gen_random_uuid(), :'pj2', null, null) as ap2 \gset
+select tests.throws_key(format($$select public.counter_offer(gen_random_uuid(), %L, 999999)$$, :'ap2'::jsonb ->> 'id'),
+  'invalid_argument', 'counter_offer(): AI employers already offer their maximum (ADR-064)');
 select public.withdraw_application(gen_random_uuid(), (:'ap2'::jsonb ->> 'id')::uuid) as wd2 \gset
 select tests.throws_key(format($$select public.withdraw_application(gen_random_uuid(), %L)$$, :'ap2'::jsonb ->> 'id'),
   'application_not_found', 'withdraw_application(): only open applications');
@@ -352,12 +353,11 @@ select tests.assert(
   and (:'ap1'::jsonb ->> 'offer_expires_at')::timestamptz between now() + interval '47 hours' and now() + interval '49 hours',
   'apply_for_job() at an AI company: offered at once, offer = min(wish, base x (1 + 3% x match 3)) = 327 EUR, valid 48 h');
 select tests.assert(
-  (:'ap2'::jsonb ->> 'offer_salary_cents_per_hour')::bigint = 10000
-  and (:'co2'::jsonb ->> 'offer_salary_cents_per_hour')::bigint = :pj2max and :'co2'::jsonb ->> 'status' = 'offered'
+  (:'ap2'::jsonb ->> 'offer_salary_cents_per_hour')::bigint = :pj2max and :'ap2'::jsonb ->> 'status' = 'offered'
   and :'wd2'::jsonb ->> 'status' = 'declined'
   and jsonb_array_length(:'ma'::jsonb -> 'applications') = 2
   and (:'ma'::jsonb -> 'applications' -> 0 ->> 'id') = :'ap2'::jsonb ->> 'id',
-  'AI offer = wish below the ceiling; counter_offer() re-offers capped; withdraw of an offer = declined; newest first');
+  'AI offer = personal ceiling without a wish (ADR-064); withdraw of an offer = declined; newest first');
 
 -- application limit (maxOpenApplications = 5): fill with intern applications from another player
 select tests.give_points(:f, 0);
@@ -417,10 +417,10 @@ select tests.assert(
   and (:'mj'::jsonb -> 'job' ->> 'pay_factor_bps')::int = 10000
   and (:'mj'::jsonb -> 'job' ->> 'productivity_bps')::int = 15000 + 800 * 3
   and (:'mj'::jsonb -> 'job' ->> 'raise_max_bps')::int = 0
-  and (:'mj'::jsonb -> 'job' ->> 'quit_cost_cents')::bigint = 32700 * 12
+  and (:'mj'::jsonb -> 'job' ->> 'quit_cost_cents')::bigint = 0 and :'mj'::jsonb -> 'job' ? 'notice_ends_at'
   and :'mj'::jsonb -> 'job' ->> 'signature' = 'M10 10 L20 20'
   and (select status from public.job_applications where id = (:'ap1'::jsonb ->> 'id')::uuid) = 'signed',
-  'sign_contract() returns the get_my_job shape: base wage, pay factor, productivity 1.5 + 0.08 x match, quit cost = 12 h');
+  'sign_contract() returns the get_my_job shape: base wage, pay factor, productivity 1.5 + 0.08 x match, no quit cost (ADR-063)');
 select tests.assert(
   :'card'::jsonb ?& array['nickname', 'avatar_key', 'level', 'rank', 'net_worth_cents', 'streak_days', 'skills_learned',
                           'branch_scores', 'top_skills', 'job', 'company', 'member_since']
@@ -483,22 +483,28 @@ select tests.assert(
   and (:'mj3'::jsonb ->> 'raise_max_bps')::int = 0,
   'request_raise() at an AI company: accepted at once up to the personal ceiling, then 7 days cooldown');
 
--- quit: one salary to the company
+-- quit with one day notice (ADR-063): no payment, the job ends when the notice is over
 select tests.cash(:w) as wc2 \gset
-select tests.company_cash(:'wco') as cc2 \gset
-select (:'rr'::jsonb ->> 'salary_cents_per_hour')::bigint * 12 as qcost \gset
 select tests.login_as('authenticated', :w);
 select public.quit_job(gen_random_uuid()) as qj \gset
+select coalesce(public.cancel_quit(gen_random_uuid()) -> 'job' ->> 'notice_ends_at', 'none') as qcancel \gset
+select public.quit_job(gen_random_uuid()) is not null as ok \gset
+reset role;
+update public.player_jobs set notice_ends_at = now() - interval '1 minute', last_paid_at = now() - interval '1 minute'
+ where id = :'wjob';
+select public.process_quit_notices() as qn \gset
+select tests.login_as('authenticated', :w);
 select public.get_my_job() as mj4 \gset
 select tests.throws_key($$select public.quit_job(gen_random_uuid())$$, 'no_active_job', 'quit_job(): no job');
 select tests.throws_key($$select public.request_raise(gen_random_uuid(), 10)$$, 'no_active_job', 'request_raise(): no job');
 reset role;
 select tests.assert(
-  (:'qj'::jsonb ->> 'paid_cents')::bigint = :qcost and (:'qj'::jsonb ->> 'cash_cents')::bigint = tests.cash(:w)
-  and tests.cash(:w) <= :wc2 - :qcost and tests.company_cash(:'wco') >= :cc2 + :qcost
+  (:'qj'::jsonb ->> 'notice_ends_at')::timestamptz between now() + interval '23 hours' and now() + interval '25 hours'
+  and :'qcancel' = 'none' and :qn::int >= 1
+  and tests.cash(:w) >= :wc2::bigint
   and :'mj4'::jsonb = '{"job": null}'::jsonb
   and (select end_reason from public.player_jobs where id = :'wjob') = 'quit',
-  'quit_job(): one salary (12 h x wage) from the player to the company');
+  'quit_job(): one day notice without payment, cancel_quit() takes it back, the job ends after the notice');
 
 -- =============================================================================
 -- E. Employer side (fixture company owned by Erna)

@@ -1,18 +1,1 @@
-{
-  "task": {
-    "id": "1da1811f-7f85-4d1a-9a39-40684e284b3b",
-    "kind": "finance_choice",
-    "params": {
-      "years": 2,
-      "offers": [
-        { "rate_bps": 790, "fee_cents": 260000 },
-        { "rate_bps": 240, "fee_cents": 90000 }
-      ],
-      "amount_cents": 10000000
-    },
-    "created_at": "2026-11-11T16:59:25.472484+00:00",
-    "expires_at": "2026-11-11T19:59:25.472484+00:00",
-    "started_at": "2026-11-11T16:59:25.472484+00:00"
-  },
-  "next_task_at": "2026-11-11T19:59:25.472484+00:00"
-}
+{ "task": null, "next_task_at": null }

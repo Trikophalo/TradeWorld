@@ -1,67 +1,67 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 9, "gap_cents": 481 }, "rank": 10, "net_worth_cents": 1019519 },
-  "total": 47,
+  "me": { "next": { "name": "Vera", "rank": 11, "gap_cents": 481 }, "rank": 12, "net_worth_cents": 1019519 },
+  "total": 50,
   "entries": [
     {
-      "id": "0c3c3c3c-0000-4000-8000-0000000000f1",
+      "id": "0e3e3e3e-0000-4000-8000-0000000000f1",
       "kind": "player",
-      "name": "Frida_Firma",
+      "name": "Frieda_Format",
       "rank": 1,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 39645000,
+      "net_worth_cents": 54603750,
+      "rank_change_24h": null
+    },
+    {
+      "id": "0c3c3c3c-0000-4000-8000-0000000000f1",
+      "kind": "player",
+      "name": "Frida_Firma",
+      "rank": 2,
+      "is_me": false,
+      "avatar_key": "rookie",
+      "description": null,
+      "change_24h_bps": null,
+      "net_worth_cents": 39825000,
       "rank_change_24h": null
     },
     {
       "id": "0b3c3c3c-0000-4000-8000-0000000000b1",
       "kind": "player",
       "name": "Bea_Boerse",
-      "rank": 2,
+      "rank": 3,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 6026911,
+      "net_worth_cents": 6023181,
       "rank_change_24h": null
     },
     {
       "id": "0c3c3c3c-0000-4000-8000-0000000000f4",
       "kind": "player",
       "name": "Sven_Small",
-      "rank": 3,
+      "rank": 4,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 3800359,
+      "net_worth_cents": 3814029,
       "rank_change_24h": null
     },
     {
       "id": "0d3d3d3d-0000-4000-8000-0000000000f1",
       "kind": "player",
       "name": "Fiona_Fabrik",
-      "rank": 4,
+      "rank": 5,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
       "net_worth_cents": 3310000,
       "rank_change_24h": null
-    },
-    {
-      "id": "0c3c3c3c-0000-4000-8000-0000000000f3",
-      "kind": "player",
-      "name": "Gero_Garage",
-      "rank": 5,
-      "is_me": false,
-      "avatar_key": "rookie",
-      "description": null,
-      "change_24h_bps": null,
-      "net_worth_cents": 1830419,
-      "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-11T16:59:24.484476+00:00"
+  "server_time": "2026-11-11T17:52:40.709713+00:00"
 }

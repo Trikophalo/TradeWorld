@@ -68,7 +68,9 @@ select tests.assert(
            'check_company_name', 'company_deposit', 'company_withdraw', 'found_company', 'get_company_postings',
            'get_my_company', 'set_ai_workers', 'set_company_marketing', 'upgrade_company',
            -- M3d RPCs
-           'close_company', 'get_company_chat', 'get_work_task', 'post_company_message', 'submit_work_task']
+           'close_company', 'get_company_chat', 'get_work_task', 'post_company_message', 'submit_work_task',
+           -- M3e RPCs
+           'cancel_quit', 'get_employer', 'train_employee']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')

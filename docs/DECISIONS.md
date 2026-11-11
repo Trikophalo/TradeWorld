@@ -581,3 +581,37 @@ Umsetzung von ADR-045 (Firma als Clan): Gründer und alle aktiven Mitarbeiter ei
 Nachrichten bis 300 Zeichen, Namensfilter gegen Beleidigungen, höchstens 10 pro Minute. Das Spiel schreibt
 Systemnachrichten (neues Teammitglied, Kündigung, Entlassung, Quartalsergebnis, Warnung vor Insolvenz). Neu geladen
 wird alle paar Sekunden (Polling, wie der Rest des Spiels).
+
+## ADR-061: Skill-Karte aus Hexagons — `akzeptiert`
+
+Vorgabe: Der Skill-Baum wird eine große Karte aus Sechsecken mit den 8 Richtungen von vorher, viel mehr Skills und
+Strängen, zoombar und mit der Maus verschiebbar. Umsetzung: Radius 7 um die Mitte, 168 Felder, 21 je Richtung
+(Reihenfolge im Uhrzeigersinn: IT, Finanzen, Recht, Führung, Vertrieb, Logistik, Handwerk, Wissenschaft). Die 86
+bisherigen Skills behalten ihre Schlüssel, niemand verliert etwas. Lernen darf man ein Feld, wenn es ein Einstiegsfeld
+ist (höchstens 2 Felder von der Mitte) oder ein Nachbarfeld schon gelernt ist. Kosten und Punktwert hängen weiter an
+der Stufe 1 bis 5, die mit dem Abstand zur Mitte steigt. Ersetzt die Voraussetzungs-Ketten aus ADR-050.
+
+## ADR-062: Produkte, Wachstumsstufen, Schulungen und Stellen mit konkreten Skills — `akzeptiert`
+
+Vorgabe: Wer eine Firma hochskalieren will, braucht die passenden Spezialisten; das Dashboard zeigt, was als Nächstes
+fehlt; Mitarbeiter lassen sich teuer schulen, damit sie mehr abdecken. Umsetzung: Jede Branche hat 3 Produkte, jedes
+mit 4 Wachstumsstufen aus 1 bis 2 konkreten Skills (z. B. Security-Software: IT-Sicherheit → Softwarearchitektur und
+Penetrationstests → Datenschutz und B2B-Vertrieb → Kryptografie und Leadership). Eine Stufe gilt, wenn Gründer oder
+Spieler-Mitarbeiter alle Skills dieser und der früheren Stufen können. Jede Stufe hebt die Obergrenze der Bekanntheit
+(50 % bis 100 %), die Qualität (+5 %) und die Kapazität des ganzen Teams (+25 %). KI-Kräfte bringen keine Skills.
+Schulungen kosten die Firma 2.000 € bis 50.000 € je Stufe des Skills, der Mitarbeiter lernt den Skill dauerhaft (auch
+ohne Nachbarfeld) und sein Vertragslohn steigt um 3 % bis 20 %. Stellenausschreibungen können konkrete Skills
+verlangen; bewerben kann sich nur, wer sie hat.
+
+## ADR-063: Kündigen ohne Kosten mit einem Tag Frist — `akzeptiert`
+
+Vorgabe: Kündigen kostet nichts mehr, wirkt aber erst nach einem Tag. Bis dahin läuft der Lohn weiter, die Kündigung
+lässt sich zurücknehmen. Ersetzt „Kündigen kostet ein Gehalt“ aus ADR-051. Entlassen bleibt sofort mit Abfindung.
+
+## ADR-064: Arbeit läuft automatisch, eigener Job-Tab — `akzeptiert`
+
+Vorgabe: Nicht jeder kann jeden Tag ans Handy; niemand soll deshalb Nachteile haben. Arbeit erledigt sich automatisch,
+die Firma verdient an der Leistung, der Spieler bekommt Lohn. Die Arbeitsaufgaben aus ADR-059 entfallen; im neuen
+Tab „Job“ arbeitet nur symbolisch eine kleine Pixelfigur. Der Tab zeigt alles über den Arbeitgeber (bei KI-Firmen
+auch den Kurs). Das Gehalt pro Stunde steht zusätzlich beim Tresor neben dem Grundeinkommen. KI-Firmen fragen keinen
+Gehaltswunsch ab, sie bieten direkt ihr Höchstgehalt. Die Events ziehen von der Startseite in einen eigenen Bereich.

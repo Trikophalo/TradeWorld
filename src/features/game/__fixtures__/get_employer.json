@@ -1,0 +1,20 @@
+{
+  "employer": {
+    "kind": "ai",
+    "tier": null,
+    "stage": null,
+    "company": {
+      "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
+      "name": "KlarSoft AG",
+      "color": "#4C8DFF",
+      "is_ai": true,
+      "sector": "tech",
+      "ticker": "KLS"
+    },
+    "founder": null,
+    "team_size": 1,
+    "product_key": null,
+    "last_quarter": null,
+    "pay_factor_bps": 10000
+  }
+}

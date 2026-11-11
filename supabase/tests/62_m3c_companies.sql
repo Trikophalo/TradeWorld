@@ -55,6 +55,10 @@ select public.sign_contract(gen_random_uuid(),
 select tests.throws_key($$select public.found_company(gen_random_uuid(), 'Garagen Code', 'Apps für Bäcker', 'tech', '#3366ff', 'garage')$$,
   'job_active_exists', 'found_company(): not while employed');
 select public.quit_job(gen_random_uuid()) is not null as ok \gset
+reset role;
+update public.player_jobs set notice_ends_at = now() - interval '1 second' where player_id = :f and status = 'active';
+select public.process_quit_notices() is not null as ok \gset
+select tests.login_as('authenticated', :f);
 select tests.throws_key($$select public.found_company(gen_random_uuid(), 'Garagen Code', 'Apps für Bäcker', 'mining', '#3366ff', 'garage')$$,
   'invalid_argument', 'found_company(): unknown sector');
 select tests.throws_key($$select public.found_company(gen_random_uuid(), 'Garagen Code', 'Apps für Bäcker', 'tech', 'blue', 'garage')$$,
@@ -162,7 +166,7 @@ select tests.assert(
 
 -- quarter close (capacity-bound, so revenue is deterministic) ---------------------------
 select id as qid from public.game_quarters order by status = 'closed' desc, ends_at <= now() desc, ends_at desc limit 1 \gset
-update public.player_companies set potential_annual_cents = 10000000000, awareness = 0.5 where company_id = :'fco';
+update public.player_companies set potential_annual_cents = 10000000000, awareness = 0.3 where company_id = :'fco';
 select public.player_company_team(:'fco') as team \gset
 select tests.company_cash(:'fco') as cc0 \gset
 select balance_cents as hh0 from public.ledger_accounts where system_key = 'households' \gset
@@ -183,7 +187,7 @@ select tests.assert(
 select tests.assert(
   (select pc.quarters_active = 1 and abs(pc.quality - (0.25 + 0.35 * (0.25 + 0.75 * (:'team'::jsonb ->> 'team_sector_score')::int
                                                                         / ((:'team'::jsonb ->> 'team_sector_score')::int + 20.0) - 0.25))) < 1e-9
-          and pc.awareness > 0.5 and pc.last_closed_quarter_id = :qid
+          and pc.awareness > 0.3 and pc.last_closed_quarter_id = :qid
      from public.player_companies pc where pc.company_id = :'fco')
   and (select sum(amount) from public.xp_events where player_id = :f and source = 'company_quarter_profit') - :fxp0
       = round(public.config_double('progression', '{xpSources,profitableCompanyQuarter,xp}', 500) * public.config_double('progression', '{xpMultiplier}', 2)),

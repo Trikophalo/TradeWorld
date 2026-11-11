@@ -1,0 +1,34 @@
+{
+  "job": {
+    "id": "1c816bb1-7b5f-4877-96d7-7aa2c0838a31",
+    "tier": "junior",
+    "title": null,
+    "company": {
+      "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
+      "name": "KlarSoft AG",
+      "color": "#4C8DFF",
+      "is_ai": true,
+      "sector": "tech",
+      "ticker": "KLS"
+    },
+    "required": [{ "branch": "it", "min_score": 2 }],
+    "signature": "M2 14 C6 4 10 4 14 12 S22 18 26 8",
+    "title_key": "it_junior",
+    "started_at": "2026-11-11T17:52:40.867656+00:00",
+    "pending_raise": null,
+    "raise_max_bps": 0,
+    "notice_ends_at": "2026-11-12T17:52:40.92356+00:00",
+    "paid_hours_cap": 12,
+    "pay_factor_bps": 10000,
+    "work_task_open": false,
+    "quit_cost_cents": 0,
+    "last_bonus_cents": 0,
+    "paid_hours_today": 1.02,
+    "productivity_bps": 17400,
+    "next_work_task_at": null,
+    "earned_total_cents": 32228,
+    "raise_available_at": "2026-11-18T17:52:40.907842+00:00",
+    "salary_cents_per_hour": 32651,
+    "effective_salary_cents_per_hour": 32651
+  }
+}

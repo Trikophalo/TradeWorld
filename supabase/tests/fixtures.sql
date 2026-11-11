@@ -106,8 +106,6 @@ select x ->> 'id' as fx_job2
 select public.apply_for_job(gen_random_uuid(), :'fx_job', :fx_wage, 'Ich lerne schnell.');
 \o
 select public.apply_for_job(gen_random_uuid(), :'fx_job2', 9000, null) ->> 'id' as fx_app2 \gset
-\o :fixture_dir/counter_offer.json
-select public.counter_offer(gen_random_uuid(), :'fx_app2', 9500);
 \o :fixture_dir/withdraw_application.json
 select public.withdraw_application(gen_random_uuid(), :'fx_app2');
 \o :fixture_dir/get_my_applications.json
@@ -119,7 +117,8 @@ select public.sign_contract(gen_random_uuid(),
 \o
 reset role;
 -- one paid hour and a raise opportunity (as if a skill had been learned since the hire)
-update public.player_jobs set last_paid_at = last_paid_at - interval '61 minutes', raise_base_score = raise_base_score - 1
+update public.player_jobs set last_paid_at = last_paid_at - interval '61 minutes', raise_base_score = raise_base_score - 1,
+       salary_cents_per_hour = salary_cents_per_hour - 1000
  where player_id = :p and status = 'active';
 select public.accrue_salaries() >= 0 as ok \gset
 select tests.login_as('authenticated', :p) is null as ok \gset
@@ -131,8 +130,22 @@ select public.get_player_card('fixture_neu');
 select public.request_raise(gen_random_uuid(), greatest(1, (public.get_my_job() -> 'job' ->> 'raise_max_bps')::int));
 \o :fixture_dir/quit_job.json
 select public.quit_job(gen_random_uuid());
+\o :fixture_dir/get_my_job_notice.json
+select public.get_my_job();
+\o :fixture_dir/cancel_quit.json
+select public.cancel_quit(gen_random_uuid());
+\o :fixture_dir/get_employer.json
+select public.get_employer();
+\o
+select public.quit_job(gen_random_uuid()) is not null as ok \gset
+reset role;
+update public.player_jobs set notice_ends_at = now() - interval '1 second' where player_id = :p and status = 'active';
+select public.process_quit_notices() is not null as ok \gset
+select tests.login_as('authenticated', :p) is null as ok \gset
 \o :fixture_dir/get_my_job_none.json
 select public.get_my_job();
+\o :fixture_dir/get_employer_none.json
+select public.get_employer();
 \o
 reset role;
 
@@ -218,14 +231,35 @@ select public.create_job_posting(gen_random_uuid(), :'fco', 'intern', 'Werkstudi
   '[{"branch": "finance", "min_score": 0}]', 18000, 1) ->> 'id' as fx_post2 \gset
 select tests.login_as('authenticated', :boss) is null as ok \gset
 select public.apply_for_job(gen_random_uuid(), :'fx_post2', 18000, null) ->> 'id' as fx_papp2 \gset
+-- counter offers only at player companies since M3e (AI employers offer their maximum)
+\o :fixture_dir/counter_offer.json
+select public.counter_offer(gen_random_uuid(), :'fx_papp2', 18500);
+\o
 select tests.login_as('authenticated', :p) is null as ok \gset
 select public.respond_application(gen_random_uuid(), :'fx_papp2', 'accept', null) is not null as ok \gset
 select tests.login_as('authenticated', :boss) is null as ok \gset
 select public.sign_contract(gen_random_uuid(), :'fx_papp2', 'M2 2 L8 8') is not null as ok \gset
+\o :fixture_dir/get_employer_player_company.json
+select public.get_employer();
+\o
+reset role;
+select id as fx_pjob2 from public.player_jobs where player_id = :boss and status = 'active' \gset
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/train_employee.json
+select public.train_employee(gen_random_uuid(), :'fx_pjob2', 'it_basics');
+\o :fixture_dir/get_company_team_trained.json
+select public.get_company_team(:'fco');
+\o
+select tests.login_as('authenticated', :boss) is null as ok \gset
 \o :fixture_dir/get_work_task.json
 select public.get_work_task();
 \o
 reset role;
+-- no new work tasks since M3e (ADR-064): an open task from before, for the submit fixture
+insert into public.player_work_tasks (player_id, player_job_id, kind, params, correct_index, status, started_at, expires_at)
+select j.player_id, j.id, 'finance_choice', t.p, public.work_task_correct('finance_choice', t.p), 'started', now(), now() + interval '3 hours'
+  from public.player_jobs j, (select public.work_task_generate('finance_choice') as p) t
+ where j.player_id = :boss and j.status = 'active';
 select id as fx_task, correct_index as fx_ci from public.player_work_tasks where player_id = :boss order by created_at desc limit 1 \gset
 select tests.login_as('authenticated', :boss) is null as ok \gset
 \o :fixture_dir/submit_work_task.json

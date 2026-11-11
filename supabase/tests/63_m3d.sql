@@ -276,20 +276,25 @@ select tests.assert(
        "options": [5500000, 3500000, 1500000, 2500000]}') = 1,
   'correctOption: cheaper loan (100.000 + 6.000 vs. 2.000 + 6.000 EUR), best customer profit, analyst profit 6 Mio. - 2 Mio. - 0,5 Mio.');
 
+-- since M3e no new tasks are handed out (ADR-064); open tasks from before are created here directly
+create or replace function tests.work_task(p_job uuid) returns jsonb language sql as $$
+  insert into public.player_work_tasks (player_id, player_job_id, kind, params, correct_index, status, started_at, expires_at)
+  select j.player_id, j.id, k.kind, k.params, public.work_task_correct(k.kind, k.params), 'started', now(), now() + interval '3 hours'
+    from public.player_jobs j,
+         lateral (select public.work_task_kind_for(j.required -> 0 ->> 'branch') as kind) k0,
+         lateral (select k0.kind, public.work_task_generate(k0.kind) as params) k
+   where j.id = p_job
+  returning jsonb_build_object('task', public.work_task_json(player_work_tasks.*)) $$;
+grant execute on function tests.work_task(uuid) to public;
+select tests.work_task(:'wjob') as t1 \gset
 select tests.login_as('authenticated', :w);
-select public.get_work_task() as t1 \gset
-select public.get_work_task() as t1b \gset
-select public.get_my_job() -> 'job' as wj3 \gset
 select tests.throws($$select correct_index from public.player_work_tasks$$, '42501', 'the right answer is not readable');
 reset role;
 select correct_index as ci from public.player_work_tasks where id = (:'t1'::jsonb -> 'task' ->> 'id')::uuid \gset
 select tests.assert(
   :'t1'::jsonb -> 'task' ?& array['id', 'kind', 'params', 'created_at', 'expires_at', 'started_at']
-  and :'t1'::jsonb -> 'task' ->> 'kind' = 'analyst_estimate' and :'t1'::jsonb -> 'task' ->> 'started_at' is not null
-  and :'t1'::jsonb -> 'task' ->> 'id' = :'t1b'::jsonb -> 'task' ->> 'id'
-  and (:'t1'::jsonb ->> 'next_task_at')::timestamptz = (:'t1'::jsonb -> 'task' ->> 'created_at')::timestamptz + interval '3 hours'
-  and (:'wj3'::jsonb ->> 'work_task_open')::boolean,
-  'get_work_task(): the first task right after signing (analyst task for an IT job), started when shown, the same task again');
+  and :'t1'::jsonb -> 'task' ->> 'kind' = 'analyst_estimate',
+  'work task for an IT job: analyst task');
 select tests.cash(:w) as wc1 \gset
 select tests.login_as('authenticated', :w);
 select public.submit_work_task(gen_random_uuid(), (:'t1'::jsonb -> 'task' ->> 'id')::uuid, (:ci::int + 1) % 4) as s1 \gset
@@ -303,13 +308,11 @@ select tests.assert(
   and not (:'s1'::jsonb ->> 'correct')::boolean and (:'s1'::jsonb ->> 'correct_index')::int = :ci::int
   and (:'s1'::jsonb ->> 'xp')::int = 50 * public.config_double('progression', '{xpMultiplier}', 2)::int
   and (:'s1'::jsonb ->> 'bonus_cents')::bigint = 0 and tests.cash(:w) = :wc1::bigint
-  and :'t2'::jsonb -> 'task' = 'null'::jsonb and :'t2'::jsonb ->> 'next_task_at' = :'t1'::jsonb ->> 'next_task_at',
-  'wrong answer: minXp, no bonus; the next task only after intervalHours');
+  and :'t2'::jsonb = '{"task": null, "next_task_at": null}'::jsonb,
+  'wrong answer: minXp, no bonus; get_work_task() hands out no new tasks (ADR-064)');
 update public.player_work_tasks set created_at = created_at - interval '3 hours' where player_job_id = :'wjob';
 select tests.company_cash(:'fco') as fcc \gset
-select tests.login_as('authenticated', :w);
-select public.get_work_task() as t3 \gset
-reset role;
+select tests.work_task(:'wjob') as t3 \gset
 select correct_index as ci3 from public.player_work_tasks where id = (:'t3'::jsonb -> 'task' ->> 'id')::uuid \gset
 select tests.login_as('authenticated', :w);
 select public.submit_work_task(gen_random_uuid(), (:'t3'::jsonb -> 'task' ->> 'id')::uuid, :ci3::int) as s3 \gset
@@ -322,9 +325,7 @@ select tests.assert(
   'right and fast: maxXp and a bonus of bonusSalaryHours x effective wage from the employer''s cash');
 -- slow answer and expiry
 update public.player_work_tasks set created_at = created_at - interval '3 hours' where player_job_id = :'wjob';
-select tests.login_as('authenticated', :w);
-select public.get_work_task() -> 'task' ->> 'id' as t4 \gset
-reset role;
+select tests.work_task(:'wjob') -> 'task' ->> 'id' as t4 \gset
 update public.player_work_tasks set started_at = now() - interval '2 minutes' where id = :'t4';
 select correct_index as ci4 from public.player_work_tasks where id = :'t4' \gset
 select tests.login_as('authenticated', :w);
@@ -333,9 +334,7 @@ reset role;
 select tests.assert(:xp4::int = 100 * public.config_double('progression', '{xpMultiplier}', 2)::int,
   'right but slow: (minXp + maxXp) / 2');
 update public.player_work_tasks set created_at = created_at - interval '3 hours' where player_job_id = :'wjob';
-select tests.login_as('authenticated', :w);
-select public.get_work_task() -> 'task' ->> 'id' as t5 \gset
-reset role;
+select tests.work_task(:'wjob') -> 'task' ->> 'id' as t5 \gset
 update public.player_work_tasks set expires_at = now() - interval '1 second' where id = :'t5';
 select tests.login_as('authenticated', :w);
 select tests.throws_key(format($$select public.submit_work_task(gen_random_uuid(), %L, 0)$$, :'t5'), 'work_task_expired', 'expired task');
@@ -345,9 +344,7 @@ reset role;
 -- B2. Voluntary close
 -- =============================================================================
 update public.player_work_tasks set created_at = created_at - interval '3 hours' where player_job_id = :'wjob';
-select tests.login_as('authenticated', :w);
-select public.get_work_task() -> 'task' ->> 'id' as t6 \gset
-reset role;
+select tests.work_task(:'wjob') -> 'task' ->> 'id' as t6 \gset
 select tests.company_cash(:'fco') as fcc2 \gset
 select tests.cash(:f) as fpc \gset
 select tests.cash(:w) as wc2 \gset
