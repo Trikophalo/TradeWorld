@@ -29,6 +29,8 @@
 --
 -- get_company_ranking (ADR-074): player companies by value (listed: market value),
 -- with scope 'all' also the listed AI companies by market value.
+-- Logos (ADR-076): set once (logo_locked NX064), forbidden symbols rejected
+-- (logo_forbidden NX065, port of hasForbiddenSymbol).
 -- Idempotent (identical copy in supabase/updates/).
 -- =============================================================================
 
@@ -68,6 +70,7 @@ create table if not exists public.player_company_hours (
 alter table public.player_company_hours enable row level security;
 create index if not exists player_company_hours_quarter_idx on public.player_company_hours (company_id, game_quarter_id);
 create index if not exists player_company_hours_start_idx on public.player_company_hours (hour_start);
+create index if not exists player_company_hours_game_quarter_idx on public.player_company_hours (game_quarter_id);
 comment on table public.player_company_hours is
   'Operating hours of player companies (closeStartupHour, ADR-072); about the last 7 days are kept.';
 comment on column public.player_company_hours.paid_costs_cents is 'Fixed costs and marketing paid from the cash this hour.';
@@ -194,6 +197,8 @@ begin
     return null;
   end if;
   if exists (select 1 from public.player_company_hours h where h.company_id = p_company and h.hour_start = v_start) then
+    update public.player_companies set last_hour_at = greatest(last_hour_at, v_start + interval '1 hour')
+     where company_id = p_company and last_hour_at < v_start + interval '1 hour';
     return jsonb_build_object('company_id', p_company, 'hour_start', v_start, 'skipped', 'already_closed');
   end if;
   v_end := v_start + interval '1 hour';
@@ -906,7 +911,178 @@ comment on function public.get_company_ranking(text, integer) is
   'RPC: top companies (ADR-074); players: active player companies by value, all: plus listed AI companies by market value.';
 
 -- ---------------------------------------------------------------------------
--- H. Grants
+-- H. Logo once, forbidden symbols blocked (ADR-076)
+-- ---------------------------------------------------------------------------
+-- Port of hasForbiddenSymbol (src/lib/sim/logo.ts): three templates in all
+-- rotations and mirror images, scales 1..3 while the scaled template fits,
+-- matched in the whole-drawing mask and in each colour's mask, at most one wrong
+-- template cell. At scale k a cell is right iff its k x k block is fully set ('x')
+-- or fully empty ('.'). Block counts come from prefix sums.
+create or replace function public.logo_has_forbidden_symbol(p_grid jsonb)
+returns boolean
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_templates jsonb := '[["x.xxx", "x.x..", "xxxxx", "..x.x", "xxx.x"],
+                         ["x..xxxx", "x..x...", "x..x...", "xxxxxxx", "...x..x", "...x..x", "xxxx..x"],
+                         ["x...xxxxx", "x...x....", "x...x....", "x...x....", "xxxxxxxxx", "....x...x", "....x...x", "....x...x", "xxxxx...x"]]';
+  v_rows  text[];
+  v_size  integer;
+  v_w1    integer;
+  v_pats  text[] := '{}';        -- variants, rows joined with '/'
+  v_cur   text[];
+  v_rot   text[];
+  v_key   text;
+  v_chars text[];
+  v_ch    text;
+  v_ps    integer[];
+  v_pat   text[];
+  v_h     integer;
+  v_w     integer;
+  v_k     integer;
+  v_set   integer;
+  v_err   integer;
+  v_ok    boolean;
+  t       jsonb;
+  i       integer;
+  x       integer;
+  y       integer;
+  ox      integer;
+  oy      integer;
+  tx      integer;
+  ty      integer;
+  y0      integer;
+  x0      integer;
+begin
+  if p_grid is null or jsonb_typeof(p_grid) <> 'array' then
+    return false;
+  end if;
+  select array_agg(coalesce(e #>> '{}', '') order by o) into v_rows from jsonb_array_elements(p_grid) with ordinality a(e, o);
+  v_size := coalesce(array_length(v_rows, 1), 0);
+  if v_size = 0 then
+    return false;
+  end if;
+  v_w1 := v_size + 1;
+
+  -- variants: four rotations, each with its mirror image (duplicates dropped)
+  for t in select value from jsonb_array_elements(v_templates) loop
+    select array_agg(r order by o) into v_cur from jsonb_array_elements_text(t) with ordinality a(r, o);
+    for i in 1..4 loop
+      v_key := array_to_string(v_cur, '/');
+      if not (v_key = any (v_pats)) then
+        v_pats := v_pats || v_key;
+      end if;
+      v_key := (select string_agg(reverse(r), '/' order by o) from unnest(v_cur) with ordinality a(r, o));
+      if not (v_key = any (v_pats)) then
+        v_pats := v_pats || v_key;
+      end if;
+      -- rotate: new row x = column x read from the bottom up
+      v_rot := '{}';
+      for x in 1..char_length(v_cur[1]) loop
+        v_rot := v_rot || (select string_agg(substr(v_cur[yy], x, 1), '' order by yy desc)
+                             from generate_series(1, array_length(v_cur, 1)) yy);
+      end loop;
+      v_cur := v_rot;
+    end loop;
+  end loop;
+
+  -- masks: the whole drawing ('*'), then every colour used
+  v_chars := array['*'] || coalesce((select array_agg(distinct ch order by ch)
+                                       from unnest(v_rows) r, regexp_split_to_table(r, '') ch where ch <> '.'), '{}');
+  foreach v_ch in array v_chars loop
+    -- prefix sums: v_ps[y * (size + 1) + x + 1] = set cells in rows < y and columns < x
+    v_ps := array_fill(0, array[v_w1 * v_w1]);
+    for y in 1..v_size loop
+      for x in 1..v_size loop
+        v_ps[y * v_w1 + x + 1] := v_ps[(y - 1) * v_w1 + x + 1] + v_ps[y * v_w1 + x] - v_ps[(y - 1) * v_w1 + x]
+          + case when (v_ch = '*' and substr(v_rows[y], x, 1) not in ('.', ''))
+                      or (v_ch <> '*' and substr(v_rows[y], x, 1) = v_ch) then 1 else 0 end;
+      end loop;
+    end loop;
+    foreach v_key in array v_pats loop
+      v_pat := string_to_array(v_key, '/');
+      v_h := array_length(v_pat, 1);
+      v_w := char_length(v_pat[1]);
+      v_k := 1;
+      while v_k <= 3 and v_k * greatest(v_w, v_h) <= v_size loop
+        for oy in 0..v_size - v_h * v_k loop
+          for ox in 0..v_size - v_w * v_k loop
+            v_err := 0;
+            v_ok := true;
+            <<cells>>
+            for ty in 0..v_h - 1 loop
+              for tx in 0..v_w - 1 loop
+                y0 := oy + ty * v_k;
+                x0 := ox + tx * v_k;
+                v_set := v_ps[(y0 + v_k) * v_w1 + x0 + v_k + 1] - v_ps[y0 * v_w1 + x0 + v_k + 1]
+                       - v_ps[(y0 + v_k) * v_w1 + x0 + 1] + v_ps[y0 * v_w1 + x0 + 1];
+                if (substr(v_pat[ty + 1], tx + 1, 1) = 'x' and v_set <> v_k * v_k)
+                   or (substr(v_pat[ty + 1], tx + 1, 1) <> 'x' and v_set <> 0) then
+                  v_err := v_err + 1;
+                  if v_err > 1 then
+                    v_ok := false;
+                    exit cells;
+                  end if;
+                end if;
+              end loop;
+            end loop;
+            if v_ok then
+              return true;
+            end if;
+          end loop;
+        end loop;
+        v_k := v_k + 1;
+      end loop;
+    end loop;
+  end loop;
+  return false;
+end;
+$$;
+comment on function public.logo_has_forbidden_symbol(jsonb) is
+  'True if a logo grid shows a forbidden symbol (port of hasForbiddenSymbol in src/lib/sim/logo.ts, ADR-076).';
+
+-- set_company_logo as in M3f: once (a logo hidden by reports may be replaced), no forbidden symbols
+-- Error keys (M3i): logo_locked NX064, logo_forbidden NX065.
+create or replace function public.set_company_logo(p_request_id uuid, p_logo jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid;
+  v_player  uuid;
+  v_replay  jsonb;
+  pc        public.player_companies;
+begin
+  v_company := public.require_own_company();
+  v_player := public.require_player();
+  if p_request_id is null or not public.logo_valid(p_logo) then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'set_company_logo');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into pc from public.player_companies where company_id = v_company for update;
+  if pc.logo is not null and not pc.logo_hidden then
+    raise exception using errcode = 'NX064', message = 'logo_locked';
+  end if;
+  if public.logo_has_forbidden_symbol(p_logo -> 'grid') then
+    raise exception using errcode = 'NX065', message = 'logo_forbidden';
+  end if;
+  update public.player_companies
+     set logo = jsonb_build_object('palette', p_logo -> 'palette', 'grid', p_logo -> 'grid'),
+         logo_version = logo_version + 1, logo_hidden = false
+   where company_id = v_company;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('company', public.company_state(v_company)));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- I. Grants
 -- ---------------------------------------------------------------------------
 do $$
 declare
@@ -916,11 +1092,13 @@ begin
     'public.job_payable_minutes(uuid, timestamptz)', 'public.accrue_salaries(timestamptz)',
     'public.player_company_close_hour(uuid, timestamptz)', 'public.player_company_close_quarter(uuid, bigint)',
     'public.player_companies_run_due()', 'public.player_companies_close_due()', 'public.run_due_jobs()', 'public.company_live_json(uuid)',
-    'public.company_hours_json(uuid)', 'public.company_state(uuid)', 'public.get_company_ranking(text, integer)'
+    'public.company_hours_json(uuid)', 'public.company_state(uuid)', 'public.get_company_ranking(text, integer)',
+    'public.logo_has_forbidden_symbol(jsonb)', 'public.set_company_logo(uuid, jsonb)'
   ] loop
     execute format('revoke all on function %s from public, anon, authenticated', f);
     execute format('grant execute on function %s to service_role', f);
   end loop;
   execute 'grant execute on function public.get_company_ranking(text, integer) to authenticated';
+  execute 'grant execute on function public.set_company_logo(uuid, jsonb) to authenticated';
 end;
 $$;

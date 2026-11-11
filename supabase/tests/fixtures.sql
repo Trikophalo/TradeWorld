@@ -217,9 +217,16 @@ select public.player_company_close_quarter(:'fco', (select id from public.game_q
 update public.profiles set level = 10, xp_total = public.xp_total_for_level(10) where id = :p;
 select public.ledger_transfer(public.ledger_system_account('households'), public.ledger_player_account(:p, 'player_cash'),
   2000000, 'transfer', 'Fixture-Kapital', 'player', :p, 'fixture:m3c:upgrade') is not null as ok \gset
+-- two operating hours for COMPANY.live and COMPANY.hours (ADR-072)
+select public.player_company_close_hour(:'fco', date_trunc('hour', now()) - interval '2 hours') is not null as ok \gset
+select public.player_company_close_hour(:'fco', date_trunc('hour', now()) - interval '1 hour') is not null as ok \gset
 select tests.login_as('authenticated', :p) is null as ok \gset
 \o :fixture_dir/get_my_company.json
 select public.get_my_company();
+\o :fixture_dir/get_company_ranking.json
+select public.get_company_ranking('players', 5);
+\o :fixture_dir/get_company_ranking_all.json
+select public.get_company_ranking('all', 5);
 \o :fixture_dir/upgrade_company.json
 select public.upgrade_company(gen_random_uuid());
 \o :fixture_dir/get_player_card_founder.json

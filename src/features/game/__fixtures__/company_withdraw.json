@@ -1,7 +1,17 @@
 {
   "company": {
-    "id": "70332b3e-e1a7-4d6b-afda-a5216c646ec5",
+    "id": "9d961290-e308-4aea-96e5-bf0a77385817",
     "idea": "Werkzeuge für Bastler",
+    "live": {
+      "last_hour_at": "2026-11-11T22:00:00+00:00",
+      "pay_factor_bps": 10000,
+      "today_profit_cents": 0,
+      "today_revenue_cents": 0,
+      "quarter_profit_cents": 0,
+      "profit_per_hour_cents": 0,
+      "quarter_revenue_cents": 0,
+      "revenue_per_hour_cents": 0
+    },
     "logo": {
       "grid": [
         "................",
@@ -26,6 +36,7 @@
     "name": "Fixture Labor",
     "tier": "garage",
     "color": "#2266cc",
+    "hours": [],
     "stage": 0,
     "sector": "tech",
     "stages": [
@@ -66,7 +77,7 @@
     "headcount": 1,
     "ai_workers": 1,
     "cash_cents": 300000,
-    "founded_at": "2026-11-11T21:41:43.541879+00:00",
+    "founded_at": "2026-11-11T22:19:33.809165+00:00",
     "can_upgrade": false,
     "logo_hidden": false,
     "product_key": "security_software",
@@ -88,13 +99,14 @@
     "quarters_active": 0,
     "ai_worker_skills": [],
     "distress_quarters": 0,
-    "estimate_low_cents": 45636,
+    "estimate_low_cents": 3596744,
     "upgrade_cost_cents": 1250000,
-    "estimate_high_cents": 392473,
-    "ai_worker_cost_cents": 70000,
+    "estimate_high_cents": 115650057,
+    "ai_worker_cost_cents": 72000,
     "can_capital_increase": false,
     "pending_applications": 0,
     "team_productivity_bps": 26600,
+    "ai_wage_cents_per_hour": 12000,
     "founder_productivity_bps": 16600,
     "marketing_cents_per_quarter": 25000
   }

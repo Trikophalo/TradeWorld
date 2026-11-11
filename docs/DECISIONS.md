@@ -697,7 +697,7 @@ Vorgabe: Die Firmenansicht war unübersichtlich und „kalt“. Neu:
 - **Große Beträge:** Große Beträge werden kurz angezeigt (`formatMoneyShort`: „15k €“, „1,2 Mio. €“, abgerundet), der
   genaue Betrag steht im Tooltip.
 
-## ADR-072: Stündlicher Betrieb, Lohnregel und Live-Umsatz — `vorgeschlagen`
+## ADR-072: Stündlicher Betrieb, Lohnregel und Live-Umsatz — `akzeptiert`
 
 Firmen verdienen laufend, nicht nur am Quartalsende.
 
@@ -765,3 +765,12 @@ Datenbank-Änderungen:
 
 Zugang über das Repository-Secret `SUPABASE_DB_URL` (Session-Pooler-Verbindung), das nur der Besitzer in GitHub
 einträgt. Ohne Secret wird nur geprüft. Die Teile unter `supabase/sql-editor/` bleiben als Weg von Hand.
+
+Umsetzung Server (M3i):
+
+- **Betriebsstunde:** `player_company_close_hour` rechnet jede volle Stunde ab und mit `player_companies_run_due`
+  bis zu 48 Stunden nach. Spieler werden in derselben Abrechnung über `accrue_job_salary` bezahlt; Jobs bei KI-Firmen
+  bezahlt `accrue_salaries` in ganzen Stunden.
+- **Quartalsabschluss:** Er bucht kein Geld mehr. Er fasst die Stunden zum Bericht zusammen, bewegt Bekanntheit und
+  Qualität und verteilt den Bonus (20 % des positiven Quartalsgewinns).
+- **Lohnfaktor:** Der alte Quartals-Mindestlohnfaktor (50 %) entfällt; es gilt die stündliche Regel.

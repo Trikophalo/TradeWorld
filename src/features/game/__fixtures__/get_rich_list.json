@@ -1,67 +1,67 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 137, "gap_cents": 642 }, "rank": 138, "net_worth_cents": 1019358 },
-  "total": 180,
+  "me": { "next": { "name": "Vera", "rank": 140, "gap_cents": 643 }, "rank": 141, "net_worth_cents": 1019357 },
+  "total": 184,
   "entries": [
     {
-      "id": "76a19c2f-ed8e-434b-94e1-7055e09edd99",
+      "id": "f9f627b3-ddec-4ed5-9662-839ea5c22616",
       "kind": "tycoon",
       "name": "Henrike Achterberg",
       "rank": 1,
       "is_me": false,
-      "avatar_key": "scientist",
+      "avatar_key": "magnate",
       "description": "Gründerin von NeuroPharm",
       "change_24h_bps": null,
-      "net_worth_cents": 39721239624,
+      "net_worth_cents": 40169233453,
       "rank_change_24h": null
     },
     {
-      "id": "8bbd804a-45c4-445c-9e92-3a87cb326e3e",
+      "id": "a141563d-5e2b-42b2-96dc-6caf0f6d9d95",
       "kind": "tycoon",
       "name": "Jonas Hartwigsen",
       "rank": 2,
       "is_me": false,
-      "avatar_key": "lawyer",
+      "avatar_key": "trucker",
       "description": "Gründer von Volta Energie",
       "change_24h_bps": null,
-      "net_worth_cents": 15586588918,
+      "net_worth_cents": 15702893711,
       "rank_change_24h": null
     },
     {
-      "id": "985cbd69-3657-495d-84f5-ed06f92468f6",
+      "id": "e3005e3c-95ba-4aef-9a8b-37e119763d9d",
       "kind": "tycoon",
       "name": "Dr. Clara Ostendorp",
       "rank": 3,
       "is_me": false,
-      "avatar_key": "trucker",
+      "avatar_key": "founder",
       "description": "Gründerin von KlarSoft",
       "change_24h_bps": null,
-      "net_worth_cents": 10775573973,
+      "net_worth_cents": 10898536061,
       "rank_change_24h": null
     },
     {
-      "id": "944ff5db-e38a-42aa-b844-fd585c1f24b0",
+      "id": "94816b39-05d2-405f-a77d-a842e1a4ce86",
       "kind": "tycoon",
       "name": "Matthis Vosskamp",
       "rank": 4,
       "is_me": false,
-      "avatar_key": "builder",
+      "avatar_key": "lawyer",
       "description": "Gründer von Brotzeit Handel",
       "change_24h_bps": null,
-      "net_worth_cents": 8239847105,
+      "net_worth_cents": 8264754703,
       "rank_change_24h": null
     },
     {
-      "id": "59df740c-a39b-4ac5-b7a6-dc84e81cac0a",
+      "id": "6fb061bb-1666-41b7-9191-40a9dfdafbb2",
       "kind": "tycoon",
       "name": "Lena Grotefend",
       "rank": 5,
       "is_me": false,
-      "avatar_key": "coder",
+      "avatar_key": "founder",
       "description": "Gründerin von Nordlicht Logistik",
       "change_24h_bps": null,
-      "net_worth_cents": 6167264698,
+      "net_worth_cents": 6142960860,
       "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-11T21:41:43.148537+00:00"
+  "server_time": "2026-11-11T22:19:33.561968+00:00"
 }

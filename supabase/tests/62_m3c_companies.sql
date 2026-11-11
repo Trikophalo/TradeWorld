@@ -163,26 +163,56 @@ select tests.assert(
       = 15000 + public.job_productivity_bps(public.job_match_score(public.player_branch_scores(:w), '[{"branch": "it", "min_score": 0}]')) + 10000,
   'get_company_postings(); employees and AI workers share the places; team = founder + player + AI worker');
 
--- quarter close (capacity-bound, so revenue is deterministic) ---------------------------
-select id as qid from public.game_quarters order by status = 'closed' desc, ends_at <= now() desc, ends_at desc limit 1 \gset
+-- operating hours and quarter close (capacity-bound, so revenue is deterministic) ----------
+-- since M3i (ADR-072) the money moves hourly; the quarter close only aggregates the hours
+select id as qid, starts_at as qs, ends_at as qe from public.game_quarters
+ order by status = 'closed' desc, ends_at <= now() desc, ends_at desc limit 1 \gset
 update public.player_companies set potential_annual_cents = 10000000000, awareness = 0.3 where company_id = :'fco';
 select public.player_company_team(:'fco') as team \gset
 select tests.company_cash(:'fco') as cc0 \gset
 select balance_cents as hh0 from public.ledger_accounts where system_key = 'households' \gset
 select coalesce(sum(amount), 0) as fxp0 from public.xp_events where player_id = :f and source = 'company_quarter_profit' \gset
+-- the player's wages are settled beyond these hours (only the AI worker is paid here)
+select last_paid_at as wpaid from public.player_jobs where player_id = :w and status = 'active' \gset
+update public.player_jobs set last_paid_at = greatest(last_paid_at, :'qe'::timestamptz) where player_id = :w and status = 'active';
+select count(*) as hours1
+  from generate_series(:'qs'::timestamptz, :'qe'::timestamptz - interval '1 hour', interval '1 hour') g(h),
+       lateral (select public.player_company_close_hour(:'fco', g.h) as r) x
+ where x.r ->> 'skipped' is null \gset
+select count(*) as hours2
+  from generate_series(:'qs'::timestamptz, :'qe'::timestamptz - interval '1 hour', interval '1 hour') g(h),
+       lateral (select public.player_company_close_hour(:'fco', g.h) as r) x
+ where x.r ->> 'skipped' = 'already_closed' \gset
+select coalesce(sum(profit_cents), 0) as hprofit, coalesce(sum(revenue_cents), 0) as hrev
+  from public.player_company_hours where company_id = :'fco' and game_quarter_id = :qid \gset
+select tests.assert(
+  :hours1::int between 5 and 7 and :hours2::int = :hours1::int
+  and (select bool_and(h.revenue_cents = h.capacity_cents and h.demand_cents > h.capacity_cents
+                       and abs(h.capacity_cents * 6 - (:'team'::jsonb ->> 'capacity_cents')::bigint) <= 6
+                       and h.cogs_cents = round(h.revenue_cents * 0.25) and h.fixed_cents = 2500 and h.marketing_cents = 8333
+                       and h.ai_wages_due_cents = 12000 and h.ai_wages_paid_cents = 12000 and h.pay_factor_bps = 10000
+                       and h.player_wages_due_cents = 0 and h.unpaid_added_cents = 0
+                       and h.profit_cents = h.revenue_cents - h.cogs_cents - 12000 - 2500 - 8333)
+         from public.player_company_hours h where h.company_id = :'fco' and h.game_quarter_id = :qid)
+  and tests.company_cash(:'fco') = :cc0::bigint + :hprofit::bigint
+  and (select balance_cents from public.ledger_accounts where system_key = 'households') = :hh0::bigint - :hprofit::bigint,
+  'operating hours: revenue = capacity / 6 when demand exceeds it; goods (25 % tech), fixed 25, AI worker 120, marketing 83,33 EUR per hour; households pay and receive; idempotent per hour');
+select tests.company_cash(:'fco') as cc1q \gset
 select public.player_company_close_quarter(:'fco', :qid) as close1 \gset
 select public.player_company_close_quarter(:'fco', :qid) ->> 'skipped' as close2 \gset
+update public.player_jobs set last_paid_at = :'wpaid' where player_id = :w and status = 'active';
 select (:'team'::jsonb ->> 'capacity_cents')::bigint as cap \gset
 select tests.assert(
-  (select r.revenue_cents = :cap and r.demand_cents > :cap and r.utilization_bps = 10000
-          and r.cogs_cents = round(:cap * 0.25) and r.fixed_cents = 15000 and r.ai_worker_cents = 70000 and r.marketing_cents = 50000
-          and r.operating_profit_cents = :cap - round(:cap * 0.25) - 15000 - 70000 - 50000
+  (select r.revenue_cents = :hrev::bigint and r.demand_cents > r.capacity_cents and r.utilization_bps = 10000
+          and r.cogs_cents = (select sum(h.cogs_cents) from public.player_company_hours h where h.company_id = :'fco' and h.game_quarter_id = :qid)
+          and r.fixed_cents = 2500 * :hours1::int and r.ai_worker_cents = 12000 * :hours1::int
+          and r.marketing_cents = 8333 * :hours1::int and r.wages_cents = 0
+          and r.operating_profit_cents = :hprofit::bigint
           and r.unpaid_added_cents = 0 and r.label ~ '^J[0-9]+ Q[1-4]$'
+          and tests.company_cash(:'fco') = :cc1q::bigint - r.bonus_cents
      from public.player_company_reports r where r.company_id = :'fco' and r.game_quarter_id = :qid)
-  and tests.company_cash(:'fco') = :cc0 + :cap - round(:cap * 0.25) - 15000 - 70000 - 50000
-  and (select balance_cents from public.ledger_accounts where system_key = 'households') = :hh0 - :cap + round(:cap * 0.25) + 15000 + 70000 + 50000
-  and :'close2' = 'already_closed',
-  'quarter close: revenue = capacity when demand exceeds it; goods (25 % tech), fixed 150, AI 700, marketing 500 EUR; households pay and receive; idempotent');
+  and (:'close1'::jsonb ->> 'hours')::int = :hours1::int and :'close2' = 'already_closed',
+  'quarter close: sums the quarter''s hours into the report and books no revenue or costs again; idempotent');
 select tests.assert(
   -- AI workers lower the target (ADR-069): founder + player + 1 AI worker -> × (1 − 0.3 / 3)
   (select pc.quarters_active = 1 and abs(pc.quality - (0.25 + 0.35 * ((0.25 + 0.75 * (:'team'::jsonb ->> 'team_sector_score')::int
@@ -198,7 +228,7 @@ reset role;
 select tests.assert(
   (:'mc2'::jsonb -> 'last_quarter') ?& array['label', 'demand_cents', 'capacity_cents', 'revenue_cents', 'cogs_cents', 'fixed_cents',
                                              'ai_worker_cents', 'marketing_cents', 'wages_cents', 'operating_profit_cents', 'utilization_bps']
-  and (:'mc2'::jsonb -> 'last_quarter' ->> 'revenue_cents')::bigint = :cap
+  and (:'mc2'::jsonb -> 'last_quarter' ->> 'revenue_cents')::bigint = :hrev::bigint
   and jsonb_array_length(:'mc2'::jsonb -> 'history') = 1 and (:'mc2'::jsonb ->> 'quarters_active')::int = 1
   and (:'mc2'::jsonb ->> 'value_cents')::bigint
       = tests.company_cash(:'fco') + round(4 * (:'mc2'::jsonb -> 'last_quarter' ->> 'operating_profit_cents')::bigint * 28 * 0.5),
@@ -212,6 +242,9 @@ select public.company_withdraw(gen_random_uuid(), 240000) -> 'company' ->> 'cash
 reset role;
 select tests.company_of(:g) as gco \gset
 update public.player_companies set potential_annual_cents = 100000 where company_id = :'gco';
+select count(*) as ghours
+  from generate_series(:'qs'::timestamptz, :'qe'::timestamptz - interval '1 hour', interval '1 hour') g(h),
+       lateral (select public.player_company_close_hour(:'gco', g.h) as r) x \gset
 select public.player_company_close_quarter(:'gco', :qid) as gclose \gset
 select tests.login_as('authenticated', :g);
 select public.get_my_company() -> 'company' as gc1 \gset
@@ -281,6 +314,7 @@ select coalesce(sum(n), 0) as due_expected
   from (select least(8, (select count(*) from public.game_quarters gq
                           where gq.status = 'closed'
                             and gq.ends_at > coalesce((select q2.ends_at from public.game_quarters q2 where q2.id = pc.last_closed_quarter_id), c.founded_at)
+                            and gq.ends_at <= pc.last_hour_at
                             and not exists (select 1 from public.player_company_reports r
                                              where r.company_id = pc.company_id and r.game_quarter_id = gq.id))) as n
           from public.player_companies pc join public.companies c on c.id = pc.company_id) x \gset
@@ -289,9 +323,9 @@ select public.player_companies_close_due() as due2 \gset
 update public.game_quarters gq set status = t.status from tests.q_status t where t.id = gq.id and gq.status is distinct from t.status;
 drop table tests.q_status;
 select tests.assert(:due1::int = :due_expected::int and :due1::int >= 1 and :due2::int = 0,
-  'player_companies_close_due(): closes every closed quarter since the founding not yet reported (' || :due1 || '), then nothing');
+  'player_companies_close_due(): closes every closed quarter since the founding whose hours are closed and not yet reported (' || :due1 || '), then nothing');
 select tests.assert(
-  (select prosrc ~ 'player_companies_close_due' from pg_proc where oid = 'public.run_due_jobs()'::regprocedure),
+  (select prosrc ~ 'player_companies_run_due' from pg_proc where oid = 'public.run_due_jobs()'::regprocedure),
   'run_due_jobs() closes the player companies after the game quarter');
 
 -- RLS ----------------------------------------------------------------------------------------

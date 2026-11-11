@@ -70,10 +70,18 @@ select tests.assert(
   and (select base_amount_cents from public.salary_payouts where player_job_id = :'wjob' order by id desc limit 1) = 40000
   and (:'wj'::jsonb ->> 'pay_factor_bps')::int = 7500 and (:'wj'::jsonb ->> 'effective_salary_cents_per_hour')::bigint = 15000
   and (:'wj'::jsonb ->> 'last_bonus_cents')::bigint = 0 and :'wj'::jsonb ? 'next_work_task_at' and :'wj'::jsonb ? 'work_task_open',
-  'payroll at a player company: contract wage x pay factor (75 %), base wages kept for the bonus; get_my_job shows the factor');
+  'settling a player-company job outside the hourly close (quit, fire, ...): contract wage x the company''s current pay factor (75 %), base wages kept for the bonus; get_my_job shows the factor');
 
+-- operating hours of the quarter (ADR-072); the employee's time is already settled, so only the profit counts
+select starts_at as qs, ends_at as qe from public.game_quarters where id = :qid \gset
+select last_paid_at as wpaid from public.player_jobs where id = :'wjob' \gset
+update public.player_jobs set last_paid_at = greatest(last_paid_at, :'qe'::timestamptz) where id = :'wjob';
+select count(*) as fhours
+  from generate_series(:'qs'::timestamptz, :'qe'::timestamptz - interval '1 hour', interval '1 hour') g(h),
+       lateral (select public.player_company_close_hour(:'fco', g.h) as r) x \gset
 select tests.cash(:w) as wc0 \gset
 select public.player_company_close_quarter(:'fco', :qid) as fclose \gset
+update public.player_jobs set last_paid_at = :'wpaid' where id = :'wjob';
 select tests.login_as('authenticated', :w);
 select public.get_my_job() -> 'job' as wj2 \gset
 reset role;
@@ -90,24 +98,33 @@ select tests.assert(
   and (:'fmc'::jsonb -> 'company' -> 'last_quarter' ->> 'bonus_cents')::bigint = 40000
   and (:'fmc'::jsonb -> 'company') ?& array['distress_quarters', 'grace_quarters', 'pay_factor_bps']
   and :'fmc'::jsonb ? 'last_dissolution' and :'fmc'::jsonb -> 'last_dissolution' = 'null'::jsonb,
-  'good quarter: pay factor back to 100 %, bonus = 20 % of the surplus by wage weight, capped at 1 x base wages (400 EUR)');
+  'good quarter: hours paid in full (factor 100 %), bonus = 20 % of the quarter''s profit by wage weight, capped at 1 x base wages (400 EUR)');
 
--- a bad quarter lowers the pay factor (at most to minFactor)
+-- a bad hour lowers the pay factor: wages never exceed revenue minus goods (ADR-072)
 select tests.fund(:h, 3000000, 'test:m3d:h');
 select tests.login_as('authenticated', :h);
 select public.found_company(gen_random_uuid(), 'Hanno Handel', 'Zubehör für Fahrräder', 'retail', '#884422', 'garage') is not null as ok \gset
 reset role;
 select tests.company_of(:h) as hco \gset
 select tests.hire(:h, :v, 10000) as vjob \gset
-select tests.work_hours(:'vjob', 2) is not null as ok \gset
 update public.player_companies set potential_annual_cents = 100000 where company_id = :'hco';
+-- the employee works the whole quarter (time settled up to its start)
+update public.player_jobs set last_paid_at = :'qs'::timestamptz, paid_day = null, paid_minutes_today = 0 where id = :'vjob';
+select count(*) as hhours
+  from generate_series(:'qs'::timestamptz, :'qe'::timestamptz - interval '1 hour', interval '1 hour') g(h),
+       lateral (select public.player_company_close_hour(:'hco', g.h) as r) x \gset
 select public.player_company_close_quarter(:'hco', :qid) as hclose \gset
 select tests.assert(
-  (:'hclose'::jsonb ->> 'pay_factor_bps')::int = 5000 and (:'hclose'::jsonb ->> 'bonus_cents')::bigint = 0
-  and (:'hclose'::jsonb ->> 'base_wages_cents')::bigint = 20000
-  and (select pay_factor_bps from public.player_companies where company_id = :'hco') = 5000
-  and exists (select 1 from public.company_messages where company_id = :'hco' and body = 'Lohnfaktor ab jetzt 50 %.'),
-  'loss quarter: pay factor drops to minFactor (50 %), no bonus, the team is told in the chat');
+  (select bool_and(h.pay_factor_bps < 10000 and h.player_wages_due_cents = 10000
+                   and h.player_wages_paid_cents = 10000 * h.pay_factor_bps / 10000
+                   and h.player_wages_paid_cents <= h.revenue_cents - h.cogs_cents)
+     from public.player_company_hours h where h.company_id = :'hco' and h.game_quarter_id = :qid)
+  and (:'hclose'::jsonb ->> 'pay_factor_bps')::int < 10000 and (:'hclose'::jsonb ->> 'bonus_cents')::bigint = 0
+  and (:'hclose'::jsonb ->> 'base_wages_cents')::bigint = 10000 * :hhours::int
+  and (select pay_factor_bps from public.player_companies where company_id = :'hco')
+      = (select h.pay_factor_bps from public.player_company_hours h where h.company_id = :'hco' order by h.hour_start desc limit 1)
+  and exists (select 1 from public.company_messages where company_id = :'hco' and body like 'Lohnfaktor im Quartal: %'),
+  'loss hours: the wages are cut to what the hour earned (factor < 100 %), no bonus, the team is told in the chat');
 
 -- =============================================================================
 -- B. Insolvency with private liability and forced loan
@@ -120,6 +137,9 @@ select public.ledger_transfer(public.ledger_player_account(:h, 'player_cash'), p
   tests.cash(:h) - 5000, 'transfer', 'Test: Privatkasse leeren', 'player', :h, 'test:m3d:hdrain') is not null as ok \gset
 update public.player_companies set distress_quarters = public.config_double('startups', '{insolvency,graceQuarters}', 4)::int - 1
  where company_id = :'hco';
+-- one operating hour without cash: fixed costs become an open bill
+select starts_at as q2s from public.game_quarters where id = :qid2 \gset
+select public.player_company_close_hour(:'hco', :'q2s'::timestamptz) is not null as ok \gset
 select balance_cents as mk0 from public.ledger_accounts where system_key = 'market' \gset
 select tests.cash(:v) as vc0 \gset
 select public.player_company_close_quarter(:'hco', :qid2) as hclose2 \gset

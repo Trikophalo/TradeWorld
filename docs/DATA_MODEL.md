@@ -4798,3 +4798,115 @@ offer, last_price_e4 }`
 | ----------------------- | ------- |
 | `skill_already_covered` | `NX062` |
 | `training_locked`       | `NX063` |
+
+## Nachtrag: M3i (Stündlicher Betrieb, Top-Unternehmen, Logo einmalig)
+
+### Migrationen
+
+| Datei                                   | Inhalt                                                                                                    |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `20261120000100_m3i_hourly_ranking.sql` | Betriebsstunden (ADR-072), Quartalsabschluss aus Stunden, `get_company_ranking` (ADR-074), Logo (ADR-076) |
+
+### Schema
+
+- `player_companies.last_hour_at timestamptz not null` (Standard: volle Stunde von `game_now()`, bestehende Firmen
+  bekommen die laufende Stunde): Ende der zuletzt abgerechneten Betriebsstunde = Beginn der nächsten. Für Clients
+  lesbar. `player_companies.pay_factor_bps` ist jetzt der Lohnfaktor der letzten Betriebsstunde.
+- `player_company_hours` (PK `company_id, hour_start`): `game_quarter_id` (Quartal, in dem die Stunde beginnt),
+  `demand_cents`, `capacity_cents`, `revenue_cents`, `cogs_cents`, `fixed_cents`, `marketing_cents`,
+  `player_wages_due_cents`, `player_wages_paid_cents`, `ai_wages_due_cents`, `ai_wages_paid_cents`, `pay_factor_bps`,
+  `paid_costs_cents` (bezahlte Fix- und Marketingkosten), `unpaid_added_cents`, `profit_cents`
+  (Umsatz − Wareneinsatz − Spielerlöhne − KI-Löhne − Fixkosten − Marketing). RLS: Gründer und aktive Mitarbeiter
+  lesen die Stunden ihrer Firma, keine Schreibrechte für Clients. Gehalten werden etwa 7 Tage.
+
+### Betriebsstunde (`player_company_close_hour(firma, stunde)`)
+
+Spiegelt `closeStartupHour` (src/lib/sim/startup.ts), intern, idempotent pro (Firma, Stunde):
+
+```
+Nachfrage/h  = Potenzial / 4 / quarterHours × Bekanntheit × (0,5 + 0,5 × Qualität) × exp(demandNoise × gauss)
+Kapazität/h  = Teamleistung × Kapazität je Leistung × (1 + capacityBonusPerStage × Stufe) / quarterHours
+Umsatz/h     = min(Nachfrage, Kapazität)   (höchstens, was die Haushalte haben)
+Lohnsumme    = KI-Kräfte × aiWorkerWageCentsPerHour + Σ Stundenlöhne der Spieler (Minuten wie accrue_job_salary)
+Lohnfaktor   = Lohnsumme ≤ 0 ? 10 000 : clamp(floor(max(0, Rohertrag) × 10 000 / Lohnsumme), 0, 10 000)
+```
+
+- Buchungen: Umsatz Haushalte → Firmenkasse; Wareneinsatz und KI-Löhne (`floor(KI-Lohnsumme × Faktor)`) Firmenkasse →
+  Haushalte; jeder Spieler bekommt seine Stunde über `accrue_job_salary(job, Stundenende)` mit dem Faktor der Stunde
+  (Lohnbuchung `salary`, Kreditabzug, XP je Arbeitsstunde, Bereichsminuten, `salary_payouts`, Tageskappe). Bei
+  Kündigungsfrist endet die Stunde am Fristende. Der Gründer bekommt keinen Lohn.
+- Fixkosten (`fixedCostCentsPerQuarter / quarterHours`) und Marketing (`marketing_cents_per_quarter / quarterHours`)
+  zahlt die Kasse; was fehlt, kommt zu `unpaid_cents` (Schieflage). Ohne neue offene Rechnung zahlt die Stunde alte ab.
+- `pay_factor_bps` der Firma = Faktor der Stunde; `last_hour_at` rückt vor.
+
+### Löhne
+
+- `accrue_salaries` zahlt nur noch Jobs bei KI-Firmen, und zwar in ganzen Stunden (ab 60 Minuten, Rest bleibt stehen).
+- Jobs bei Spielerfirmen werden nur in der Betriebsstunde bezahlt. Wege, die einen Job mitten in der Stunde abrechnen
+  (Kündigung, Entlassung, sofortige Kündigung, Fristende, Auflösung, Konto-Reset, Schulung), rufen weiter
+  `accrue_job_salary` auf: die angebrochene Stunde zum aktuellen Lohnfaktor der Firma, höchstens aus der Kasse.
+- Neu: `job_payable_minutes(job, bis)` (intern) liefert die Minuten, die `accrue_job_salary` zahlen würde.
+
+### Quartalsabschluss
+
+`player_company_close_quarter` bucht keinen Umsatz und keine Kosten mehr. Er summiert die Stunden des Quartals in
+`player_company_reports` (gleiche Spalten: `ai_worker_cents` = gezahlte KI-Löhne, `wages_cents` = gezahlte
+Spielerlöhne, `operating_profit_cents` = Summe der Stundengewinne, also nach allen Löhnen; `paid_costs_cents` =
+Wareneinsatz + KI-Löhne + bezahlte Fix-/Marketingkosten; `pay_factor_bps` = gezahlte ÷ fällige Löhne des Quartals;
+`base_wages_cents` = Vertragslöhne aus `salary_payouts` wie bisher). Danach wie bisher: Bekanntheit und Qualität,
+Gewinnbonus (ADR-058) als `bonusShareOfProfit` des Quartalsgewinns nach Lohngewicht (höchstens `maxBonusFactor` ×
+Vertragslöhne), XP für ein Gewinnquartal, Schieflage-Zähler, KI-Kräfte gehen bei neuen offenen Rechnungen, Chat.
+Der Quartals-Lohnfaktor mit `minFactor` entfällt; der Chat meldet „Lohnfaktor im Quartal: X %“, wenn er sich ändert.
+Die Antwort enthält zusätzlich `hours`.
+
+### Ablauf in `run_due_jobs`
+
+- Neu `player_companies_run_due()` → `{ hours, quarters }` (Schlüssel `player_companies` im Ergebnis von
+  `run_due_jobs`): je Firma, älteste zuerst, höchstens 48 Stunden pro Lauf bis zur letzten vollen Stunde. Endet
+  dazwischen ein noch nicht abgeschlossenes Quartal, wird erst dieses abgeschlossen (sobald `game_quarters.status`
+  `closed` ist und `last_hour_at ≥ ends_at`), damit Bekanntheit und Qualität des neuen Quartals gelten.
+- `player_companies_close_due()` bleibt (Rückgabe: Zahl der Quartale) und ruft `player_companies_run_due()`.
+
+### COMPANY-JSON
+
+Neu: `ai_wage_cents_per_hour`, `live` und `hours`.
+
+```
+live:  { last_hour_at, revenue_per_hour_cents, profit_per_hour_cents, pay_factor_bps,
+         today_revenue_cents, today_profit_cents, quarter_revenue_cents, quarter_profit_cents }
+hours: [{ hour_start, revenue_cents, profit_cents }]   -- die letzten 24 Stunden, älteste zuerst
+```
+
+Pro Stunde = letzte abgerechnete Stunde; heute = Berliner Kalendertag; Quartal = laufendes Quartal.
+
+### RPC `get_company_ranking(p_scope default 'players', p_limit default 100)`
+
+`{ server_time, total, entries: [{ rank, company_id, kind, name, color, logo, ticker, sector, tier, founder,
+value_cents, revenue_cents, team_size, is_mine }], mine: { rank, value_cents } | null }`
+
+- `players`: aktive Spielerfirmen; Wert `company_value_cents`, börsennotierte zum Börsenwert (Aktien × letzter Kurs,
+  wie die Aktien des Gründers in der Rangliste zählen). `all`: zusätzlich börsennotierte KI-Firmen zum Börsenwert.
+- Sortierung: Wert absteigend, dann Name. `p_limit` 1 bis 500. `revenue_cents` = Umsatz des letzten Quartalsberichts
+  (KI: `null`), `team_size` = Gründer + aktive Mitarbeiter + KI-Kräfte (KI: `null`), `tier` und `founder` nur bei
+  Spielerfirmen. `mine` = eigene aktive Firma, auch jenseits des Limits. Unbekannter Scope: `invalid_argument`.
+
+### Logo (ADR-076)
+
+- `set_company_logo` lehnt ein zweites Logo ab, solange das erste sichtbar ist (`logo_locked`); ein nach Meldungen
+  ausgeblendetes Logo darf ersetzt werden.
+- `logo_has_forbidden_symbol(grid)` (IMMUTABLE, intern) portiert `hasForbiddenSymbol`: drei Vorlagen, alle Drehungen
+  und Spiegelungen, Skalierung 1 bis 3, in der ganzen Zeichnung und in jeder Farbe, ein Fehlfeld Toleranz.
+  Treffer: `logo_forbidden`.
+
+### Neue Fehlerschlüssel
+
+| Schlüssel        | Code    |
+| ---------------- | ------- |
+| `logo_locked`    | `NX064` |
+| `logo_forbidden` | `NX065` |
+
+### Bekannte Grenzen
+
+- Beim Umstieg zählt erst die laufende Stunde; frühere Stunden des laufenden Quartals bringen keinen Umsatz.
+- Die angebrochene Stunde beim Auflösen bringt keinen Umsatz mehr; Löhne werden zum letzten Faktor abgerechnet.
+- Der Firmenwert nutzt den Quartalsgewinn jetzt nach Spielerlöhnen (vorher davor).

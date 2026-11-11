@@ -200,11 +200,19 @@ select tests.assert(
 update public.game_config set value = jsonb_set(value, '{training,fromEmployees}', :'tr_from'::jsonb) where key = 'startups';
 
 -- quarter close with stage 1: awareness capped at 0.7
+-- (M3i: the hours of the quarter carry the capacity; the employee's time is settled beyond them)
 update public.player_companies set awareness = 0.9, potential_annual_cents = 10000000000 where company_id = :'fco';
+select (public.current_game_quarter()).starts_at as cqs, (public.current_game_quarter()).ends_at as cqe \gset
+select last_paid_at as wpaid from public.player_jobs where id = :'wjob' \gset
+update public.player_jobs set last_paid_at = greatest(last_paid_at, :'cqe'::timestamptz) where id = :'wjob';
+select count(*) as fhours
+  from generate_series(:'cqs'::timestamptz, :'cqe'::timestamptz - interval '1 hour', interval '1 hour') g(h),
+       lateral (select public.player_company_close_hour(:'fco', g.h) as r) x \gset
 select public.player_company_close_quarter(:'fco', (public.current_game_quarter()).id) is not null as ok \gset
+update public.player_jobs set last_paid_at = :'wpaid' where id = :'wjob';
 select tests.assert(
   (select awareness <= 0.7 + 1e-12 from public.player_companies where company_id = :'fco')
-  and (select r.capacity_cents = round((:'fc2'::jsonb ->> 'team_productivity_bps')::int / 10000.0 * 300000 * 1.25)
+  and (select abs(r.capacity_cents * 6 / :fhours::int - round((:'fc2'::jsonb ->> 'team_productivity_bps')::int / 10000.0 * 300000 * 1.25)) <= 6
          from public.player_company_reports r where r.company_id = :'fco' order by r.created_at desc limit 1),
   'quarter close: awareness capped by the stage (0.7 at stage 1), capacity with the stage bonus');
 
