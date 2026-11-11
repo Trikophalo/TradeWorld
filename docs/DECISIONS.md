@@ -557,3 +557,27 @@ Marktgröße, Kapazität aus der Leistung des Teams, Qualität aus den Skills in
 Abweichend von `ECONOMY.md` §6.1 darf das Garagen-Startup bis zu zwei Mitarbeiter haben, damit Spieler früh
 Arbeitgeber werden. Die Marktgrößen sind auf Spieljahre von einem echten Tag umgerechnet (Faktor 1/10). Details:
 `PLAYER_COMPANIES.md`.
+
+## ADR-058: Insolvenz mit Privathaftung und Zwangskredit — `akzeptiert`
+
+Umsetzung von ADR-052 für Spielerfirmen. Eine Firma mit offenen Rechnungen ist „in Schieflage“; nach 4 Quartalsabschlüssen
+in Folge (ein echter Tag) wird sie aufgelöst. Reihenfolge: Die Firmenkasse zahlt offene Rechnungen und je Mitarbeiter
+ein Gehalt Abfindung; was fehlt, zahlt der Gründer privat; was er nicht hat, wird ein **Zwangskredit** aus dem
+Finanzmarkt-Topf, zinsfrei, getilgt durch 50 % jeder privaten Einnahme (Lohn, Bonus, Grundeinkommen, Verkaufserlöse,
+tägliche Belohnung, Entnahmen). Danach 3 Tage Gründungssperre. Der Gründer kann seine Firma jederzeit freiwillig
+auflösen; dann gilt dieselbe Abrechnung ohne Sperre. Schulden mindern das Vermögen auf der Reichenliste.
+
+## ADR-059: Arbeitsaufgaben als kurze Rechenaufgaben aus dem Job — `akzeptiert`
+
+Alle 3 Stunden bekommt jeder Spieler mit Job eine Aufgabe, die in unter einer Minute lösbar ist. Drei Arten nach dem
+ersten gesuchten Bereich des Jobs: Finanzen/Recht vergleichen zwei Kreditangebote, Vertrieb/Logistik/Führung wählen
+den profitabelsten von drei Kunden, IT/Handwerk/Wissenschaft schätzen den Quartalsgewinn aus vier Antworten. Die
+richtige Antwort folgt aus den gezeigten Zahlen. Richtig und schnell (bis 45 s): 150 XP, richtig: 100 XP,
+falsch: 50 XP. Richtig bringt zusätzlich eine Stunde Lohn als Bonus vom Arbeitgeber. Ersetzt die Aufgabenideen aus M3.
+
+## ADR-060: Firmenchat für Gründer und Mitarbeiter — `akzeptiert`
+
+Umsetzung von ADR-045 (Firma als Clan): Gründer und alle aktiven Mitarbeiter einer Spielerfirma teilen einen Chat.
+Nachrichten bis 300 Zeichen, Namensfilter gegen Beleidigungen, höchstens 10 pro Minute. Das Spiel schreibt
+Systemnachrichten (neues Teammitglied, Kündigung, Entlassung, Quartalsergebnis, Warnung vor Insolvenz). Neu geladen
+wird alle paar Sekunden (Polling, wie der Rest des Spiels).

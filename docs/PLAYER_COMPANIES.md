@@ -46,8 +46,16 @@ Gewinn     = Umsatz − Wareneinsatz (Branchenmarge) − Fixkosten − KI-Kräft
 ## 3. Wenn das Geld nicht reicht
 
 Kosten werden nur bis zur vorhandenen Kasse bezahlt; der Rest wird als **offene Rechnungen** gebucht, und die KI-Kräfte
-werden entlassen. Die Firma ist dann „in Schieflage“. Die Insolvenz mit Privathaftung (ADR-052) folgt in einem
-späteren Schritt; bis dahin kann der Gründer Geld einzahlen.
+werden entlassen. Die Firma ist dann „in Schieflage“. Bleibt sie das 4 Quartalsabschlüsse lang, wird sie aufgelöst
+(ADR-058): Firmenkasse zahlt Rechnungen und je Mitarbeiter ein Gehalt Abfindung, den Rest zahlt der Gründer privat,
+notfalls über einen Zwangskredit, der 50 % jeder privaten Einnahme einbehält. Danach 3 Tage Gründungssperre.
+Freiwillig auflösen geht jederzeit, ohne Sperre.
+
+### Gewinnabhängiger Lohn (ADR-052)
+
+Reicht das Quartalsergebnis vor Löhnen nicht für die Löhne, zahlt die Firma im nächsten Quartal nur den passenden
+Anteil (Lohnfaktor, mindestens 50 %). Liegt es darüber, gehen 20 % des Überschusses als Bonus an die Mitarbeiter,
+nach Lohnhöhe verteilt, höchstens das Doppelte des Quartalslohns. Formeln: `src/lib/sim/payroll.ts`.
 
 ## 4. Was der Gründer sieht und tut
 
@@ -75,4 +83,4 @@ die Reichenliste; auf der Visitenkarte steht die Firma.
 
 ## 7. Offen
 
-Finanzierungsrunden und Börsengang (Weg zum Big Player), GmbH und AG, Insolvenz mit Privathaftung, Firmenchat.
+Finanzierungsrunden und Börsengang (Weg zum Big Player), GmbH und AG.

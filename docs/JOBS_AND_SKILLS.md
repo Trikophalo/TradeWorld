@@ -137,6 +137,12 @@ sequenceDiagram
     verteilt, bis zum Doppelten des Basislohns. Steigt der Gewinn, steigt der Lohn: Niemand wird ausgenutzt.
 - Bei KI-Firmen ist der Lohnfaktor immer 100 %.
 
+### 6a. Arbeitsaufgaben (ADR-059)
+
+Alle 3 Stunden wartet eine kurze Aufgabe aus dem eigenen Fachgebiet (Kredite vergleichen, besten Kunden wählen oder
+Quartalsgewinn schätzen). Richtig und schnell bringt 150 XP und eine Stunde Lohn als Bonus, richtig 100 XP,
+falsch 50 XP. Nach 3 Stunden verfällt die Aufgabe, und die nächste kommt.
+
 ## 7. Gehaltserhöhung, Kündigung, Entlassung
 
 | Aktion                      | Regel                                                                                                                                                                                                                                                          |

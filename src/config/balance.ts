@@ -486,6 +486,10 @@ export interface CareersConfig {
     readonly intervalHours: number;
     /** Bonus = hours of salary x quality (0..1). */
     readonly bonusSalaryHours: number;
+    /** A task stays open this long, then expires. */
+    readonly expiresHours: number;
+    /** Correct answers within this time count as fast (full XP). */
+    readonly fastAnswerSeconds: number;
   };
 }
 
@@ -778,6 +782,21 @@ export interface StartupsConfig {
   readonly valuationPeDiscount: number;
   /** Owner's estimate of the market size: ± spread (log), shrinking each quarter. */
   readonly estimate: { readonly initialSpread: number; readonly decayPerQuarter: number };
+  /** Insolvency with private liability (ADR-052, ADR-058). */
+  readonly insolvency: {
+    /** Quarter closes in distress (open bills) before the company is dissolved. */
+    readonly graceQuarters: number;
+    /** Share of every private income kept back to repay a forced loan. */
+    readonly loanWithholdingBps: number;
+    /** No new company for this many days after an insolvency. */
+    readonly foundingLockoutDays: number;
+  };
+  /** Company chat (clan, ADR-045). */
+  readonly chat: {
+    readonly maxMessageLength: number;
+    readonly historyLimit: number;
+    readonly maxMessagesPerMinute: number;
+  };
 }
 
 /** Skill tree and skill points (ADR-050, docs/JOBS_AND_SKILLS.md). */
@@ -1374,7 +1393,7 @@ export const BALANCE = {
       raiseMaxBps: 1200,
     },
     jobSwitch: { raiseMinBps: 1500, raiseMaxBps: 3000 },
-    workTask: { intervalHours: 3, bonusSalaryHours: 1 },
+    workTask: { intervalHours: 3, bonusSalaryHours: 1, expiresHours: 3, fastAnswerSeconds: 45 },
   },
 
   // ----------------------------------------------------------- progression (spec 9)
@@ -1699,6 +1718,8 @@ export const BALANCE = {
     aiWorkerCostCentsPerQuarter: 70_000,
     valuationPeDiscount: 0.5,
     estimate: { initialSpread: 2.3, decayPerQuarter: 0.85 },
+    insolvency: { graceQuarters: 4, loanWithholdingBps: 5_000, foundingLockoutDays: 3 },
+    chat: { maxMessageLength: 300, historyLimit: 100, maxMessagesPerMinute: 10 },
   },
 
   // ------------------------------------------------------- avatars (ADR-053)
