@@ -4336,3 +4336,148 @@ ai_worker_cents, marketing_cents, wages_cents, operating_profit_cents, utilizati
 - Die Insolvenz mit Privathaftung fehlt noch. Eine Firma in Schieflage bleibt bestehen, bis der Gründer einzahlt.
 - Das Bruttovolumen für die Spieleraktivität kommt nur aus Spieler-Fills (`execute_fill` ohne `p_system`).
 - Eine Firma, die mitten im Quartal gegründet wird, wird am Ende dieses Quartals voll abgerechnet.
+
+## Nachtrag: M3d (gewinnabhängiger Lohn, Insolvenz, Firmenchat, Arbeitsaufgaben)
+
+Entscheidungen ADR-052 und ADR-058 bis ADR-060, Formeln in `src/lib/sim/payroll.ts`, `insolvency.ts` und
+`work-tasks.ts`, Konzept in `docs/PLAYER_COMPANIES.md` §3 und `docs/JOBS_AND_SKILLS.md` §6a. Getestet in sechs
+Ausgangslagen (leer, vor M1, M1, M2a, M2b, M3c).
+
+### Migrationen
+
+| Datei                                   | Inhalt                                                                                                         |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `20261115000100_m3d_schema.sql`         | Fehlerschlüssel, Spalten, `company_dissolutions`, `player_loans`, `company_messages`, `player_work_tasks`, RLS |
+| `20261115000200_m3d_pay_insolvency.sql` | Lohnfaktor, Bonus, Einbehalt, Auflösung, `close_company`, Anpassungen bestehender RPCs                         |
+| `20261115000300_m3d_chat.sql`           | `get_company_chat`, `post_company_message`                                                                     |
+| `20261115000400_m3d_work_tasks.sql`     | Ziehen, Lösen und Bewerten der Arbeitsaufgaben, `get_work_task`, `submit_work_task`                            |
+
+### A. Gewinnabhängiger Lohn (ADR-058)
+
+Neue Felder:
+
+- `player_companies.pay_factor_bps`, Vorgabe 10 000.
+- `salary_payouts.base_amount_cents`: der Lohn zum Vertragslohn, vor Faktor und Kassenmangel.
+- `player_company_reports.base_wages_cents`, `bonus_cents`, `pay_factor_bps`.
+
+Lohn und Quartalsabschluss:
+
+- Die Lohnabrechnung einer Spielerfirma zahlt Vertragslohn × `pay_factor_bps` / 10 000. Fehlt Geld in der Kasse,
+  zahlt sie, was da ist (wie in M2b).
+- `get_my_job.pay_factor_bps` = Faktor der Firma × Anteil, den die Firma zuletzt zahlen konnte. Daraus folgt
+  `effective_salary_cents_per_hour`.
+- Beim Quartalsabschluss gilt Grundlöhne = Summe `base_amount_cents` der Auszahlungen im Quartal und Ergebnis vor
+  Löhnen = Betriebsergebnis des Berichts.
+- Der neue Faktor ist `payFactorBps`: 10 000, wenn das Ergebnis die Löhne deckt, sonst Ergebnis / Löhne, mindestens
+  `jobs.profitLinkedPay.minFactor`.
+- Bonus (`distributeBonus`):
+  - Der Topf ist `bonusShareOfProfit` × Überschuss.
+  - Er wird nach Lohngewicht auf die aktiven Mitarbeiter verteilt, je höchstens `maxBonusFactor` × eigene Grundlöhne.
+  - Gezahlt wird nur aus vorhandenem Geld; reicht die Kasse nicht, werden alle Boni anteilig gekürzt.
+  - Jeder Bonus ist eine Ledger-Buchung `work_bonus` und eine Zeile in `salary_payouts` (`bonus_cents`,
+    `minutes_paid` 0, Zeitraum = Quartal).
+- `get_my_job` liefert zusätzlich `last_bonus_cents` (Bonus des letzten abgeschlossenen Quartals der Firma).
+- COMPANY liefert zusätzlich `pay_factor_bps`, und `last_quarter` hat `bonus_cents`. `wages_cents` bleiben die
+  gezahlten Löhne.
+
+### B. Insolvenz, Privathaftung, Zwangskredit, freiwillige Schließung (ADR-052)
+
+**Zähler:** `player_companies.distress_quarters` steigt bei jedem Abschluss mit offenen Rechnungen um 1, sonst wird er 0.
+Erreicht er `startups.insolvency.graceQuarters`, wird die Firma mit Grund `insolvent` aufgelöst (`isInsolvent`).
+
+**`company_dissolve(company, reason)`** folgt `dissolve()`:
+
+1. Löhne bis jetzt werden abgerechnet.
+2. Je aktivem Mitarbeiter fällt eine Abfindung von einem Gehalt an (`salaryUnitHours` × Vertragslohn). Die Schulden
+   sind offene Rechnungen plus Abfindungen.
+3. Die Firmenkasse zahlt, dann die Privatkasse des Gründers.
+4. Der Rest kommt als **Zwangskredit** aus dem Finanzmarkt-Topf (`market`). Der Gründer bekommt eine Zeile in
+   `player_loans` (`kind 'forced'`, ohne Zinsen).
+5. Gläubiger:
+   - Die Haushalte erhalten die offenen Rechnungen.
+   - Die Mitarbeiter erhalten ihre Abfindungen; ihr eigener Kredit wird davon einbehalten.
+   - Was in der Firmenkasse übrig bleibt, geht an den Gründer und wird für dessen Kredit einbehalten.
+6. Jobs enden mit `end_reason` `company_insolvent`, bei freiwilliger Schließung mit `fired`.
+7. Stellen und offene Bewerbungen werden geschlossen. `player_companies.status = 'dissolved'` (die Historie bleibt),
+   `companies.phase = 'dissolved'`, und eine Zeile kommt in `company_dissolutions`.
+8. Nur bei Insolvenz gilt `profiles.founding_locked_until` = jetzt + `startups.insolvency.foundingLockoutDays`.
+   `found_company` meldet dann `founding_locked`.
+
+**Weitere Regeln:**
+
+- Eine aktive Firma pro Gründer: Der eindeutige Index gilt nur für `status = 'active'`. Nach einer Schließung darf
+  man neu gründen.
+- **Einbehalt** (`loan_withhold`, `withholdIncome`): Von jeder privaten Einnahme geht
+  `startups.insolvency.loanWithholdingBps` an offene Zwangskredite (älteste zuerst, zurück in den Topf `market`).
+  Das gilt für Lohn, Bonus, Aufgabenbonus, Tresor, Nettoerlös aus Verkäufen, Tagesbelohnung, Entnahme aus der
+  Firma, Restguthaben und Abfindungen. Bei 0 wird der Kredit `repaid`.
+- `get_my_portfolio` liefert zusätzlich `debt_cents`, `debt_withholding_bps` und `founding_locked_until`.
+- Vermögen (Reichenliste, Visitenkarte, `player_net_worth_cents`) ist abzüglich `debt_cents`.
+- `get_my_company` → `{ company: COMPANY | null, last_dissolution: null | { company_name, reason, at,
+total_debt_cents, from_founder_cents, loan_cents } }`. `last_dissolution` ist die letzte Auflösung des Aufrufers
+  innerhalb von 7 Tagen.
+- COMPANY liefert zusätzlich `distress_quarters` und `grace_quarters`.
+- `close_company(p_request_id)` → `{ from_company_cents, from_founder_cents, loan_cents, to_founder_cents,
+total_debt_cents }`: dieselbe Auflösung mit Grund `closed`, ohne Sperre.
+
+### C. Firmenchat (ADR-060)
+
+- `company_messages (id bigint, company_id, author_id, kind 'player' | 'system', body, created_at)`.
+- RLS: lesen dürfen der Gründer der aktiven Firma und Spieler mit aktivem Job dort. Geschrieben wird nur über RPCs.
+- Die Chat-Firma ist die eigene aktive Firma, sonst der Arbeitgeber, wenn es eine aktive Spielerfirma ist.
+- `get_company_chat(p_before_id = null)` → `{ company: null | { id, name, color }, members, messages: [{ id, kind,
+author, avatar_key, is_me, is_founder, body, created_at }] }`. Die neueste Nachricht steht zuletzt; höchstens
+  `startups.chat.historyLimit`, mit `p_before_id` nur ältere.
+- `post_company_message(p_request_id, p_body)` → Nachricht. Fehler:
+  - `not_in_company`
+  - `invalid_argument` (leer oder länger als `maxMessageLength`)
+  - `name_profanity`
+  - `rate_limited` (mehr als `maxMessagesPerMinute`)
+- Systemzeilen:
+  - Eintritt: „… ist jetzt im Team.“, Kündigung: „… hat gekündigt.“, Entlassung: „… wurde entlassen.“
+  - Quartal: „Quartal J14 Q2: Umsatz 1.234 €, Gewinn -56 €.“
+  - Bonus, geänderter Lohnfaktor
+  - Warnung „Achtung: offene Rechnungen. Noch N Quartale bis zur Insolvenz.“
+  - Auflösung
+
+### D. Arbeitsaufgaben (ADR-059)
+
+`player_work_tasks` ist eine neue Tabelle; die ungenutzte Entwurfstabelle `work_tasks` bleibt unverändert. Ihre
+Spalte `correct_index` hat keine Spaltenfreigabe und ist für Spieler unlesbar.
+
+- `get_work_task()` → `{ task: null | { id, kind, params, created_at, expires_at, started_at }, next_task_at }`.
+  - Mit aktivem Job entsteht eine Aufgabe, wenn keine offen ist und die letzte mindestens
+    `careers.workTask.intervalHours` alt ist. Die erste kommt sofort nach der Unterschrift.
+  - Die Art folgt der ersten geforderten Branche (`workTaskKind`, Funktion `work_task_kind_for`).
+  - Die Zahlen werden wie `draw()` gezogen und neu gezogen, bis `isClear` gilt (höchstens 21 Mal).
+  - Beim ersten Anzeigen wird die Aufgabe `started`. Sie verfällt nach `expiresHours`.
+  - `next_task_at` = letzte Aufgabe + Intervall. Ohne Job sind beide Felder `null`.
+- `params`:
+  - `finance_choice`: `{ amount_cents, years, offers: [{ rate_bps, fee_cents } × 2] }`
+  - `sales_pick`: `{ customers: [{ units, price_cents, unit_cost_cents, service_cents } × 3] }`
+  - `analyst_estimate`: `{ revenue_cents, cogs_bps, fixed_cents, marketing_cents, options: [4 Zahlen] }`
+- `submit_work_task(p_request_id, p_task_id, p_choice)` → `{ correct, correct_index, xp, bonus_cents, level, xp_total }`.
+  - Bewertet nach `gradeWorkTask` mit Sekunden = jetzt − `started_at`.
+  - XP über `grant_xp` (Quelle `work_task`, Multiplikator einmal).
+  - Bonus = `bonusSalaryHours` × wirksamer Stundenlohn aus der Kasse des Arbeitgebers, höchstens was da ist, mit
+    Einbehalt für Kredite.
+  - Fehler: `work_task_not_found`, `work_task_expired`, `work_task_done`, `no_active_job`, `invalid_argument`
+    (Wahl außerhalb der Optionen).
+- `get_my_job` liefert zusätzlich `next_work_task_at` und `work_task_open`.
+
+### Neue Fehlerschlüssel
+
+| Schlüssel             | Code    |
+| --------------------- | ------- |
+| `founding_locked`     | `NX053` |
+| `not_in_company`      | `NX054` |
+| `work_task_not_found` | `NX055` |
+| `work_task_expired`   | `NX056` |
+| `work_task_done`      | `NX057` |
+
+### Bekannte Grenzen
+
+- Ein Ruf-Ereignis bei Insolvenz gibt es noch nicht (es gibt kein Rufsystem).
+- Coupons, Rückzahlungen von Anleihen und Grundeinkommen außerhalb des Tresors sind vom Einbehalt nicht erfasst; die
+  Liste folgt dem Vertrag.
+- Boni gehen nur an Mitarbeiter, die beim Abschluss noch aktiv sind; das Lohngewicht zählt nur ihre Grundlöhne.

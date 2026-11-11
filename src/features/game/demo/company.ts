@@ -12,8 +12,13 @@ import {
   startupValueCents,
   type StartupTier,
 } from "@/lib/sim/startup";
+import { formatMoney } from "@/lib/format";
+import { dissolve, isInsolvent } from "@/lib/sim/insolvency";
 import {
   GameError,
+  type ChatMessage,
+  type CloseCompanyResult,
+  type Dissolution,
   type CompanyPosting,
   type CompanyQuarter,
   type CreatePostingInput,
@@ -57,6 +62,13 @@ export interface DemoCompanyState {
   estimateSeeds: [number, number];
   postings: CompanyPosting[];
   seq: number;
+  /** Quarter closes in a row with open bills (ADR-058). */
+  distressQuarters?: number;
+  chat?: ChatMessage[];
+}
+
+export interface DemoDissolution extends Dissolution {
+  atMs: number;
 }
 
 export interface CompanyHost {
@@ -72,6 +84,14 @@ export interface CompanyHost {
   nameViolation(name: string): GameErrorKey | null;
   idempotent<T>(requestId: string, run: () => T): T;
   persist(): void;
+  nickname(): string;
+  avatarKey(): string;
+  /** Forced loan of the founder (ADR-058). */
+  addDebt(cents: number): void;
+  lastDissolution(): DemoDissolution | null;
+  setLastDissolution(value: DemoDissolution): void;
+  foundingLockedUntil(): number | null;
+  lockFounding(until: number): void;
 }
 
 const smallBusiness = () => companyCfg.tiers.find((t) => t.id === "small_business")!;
@@ -154,10 +174,78 @@ export function createCompanyEngine(host: CompanyHost) {
       wagesCents: 0,
       operatingProfitCents: Number(result.operatingProfitCents),
       utilizationBps: Math.round(result.utilization * 10_000),
+      bonusCents: 0,
       closedAt: now,
     });
     company.reports = company.reports.slice(-12);
     if (result.operatingProfitCents > BigInt(0)) host.addXp(BALANCE.progression.xpSources.profitableCompanyQuarter.xp);
+    const last = company.reports.at(-1)!;
+    system(
+      company,
+      `Quartal ${last.label}: Umsatz ${formatMoney(last.revenueCents, { whole: true })}, Gewinn ${formatMoney(
+        last.operatingProfitCents,
+        { whole: true },
+      )}.`,
+    );
+    company.distressQuarters = company.unpaidCents > 0 ? (company.distressQuarters ?? 0) + 1 : 0;
+    if (isInsolvent(company.distressQuarters)) {
+      dissolveCompany(company, "insolvent", now);
+      return;
+    }
+    if (company.distressQuarters > 0) {
+      const left = startups.insolvency.graceQuarters - company.distressQuarters;
+      system(
+        company,
+        `Achtung: offene Rechnungen. Noch ${left} ${left === 1 ? "Quartal" : "Quartale"} bis zur Insolvenz.`,
+      );
+    }
+  }
+
+  function system(company: DemoCompanyState, body: string) {
+    const chat = (company.chat ??= []);
+    chat.push({
+      id: (chat.at(-1)?.id ?? 0) + 1,
+      kind: "system",
+      author: null,
+      avatarKey: null,
+      isMe: false,
+      isFounder: false,
+      body,
+      createdAt: new Date().toISOString(),
+    });
+    company.chat = chat.slice(-startups.chat.historyLimit);
+  }
+
+  /** Dissolution with private liability (ADR-058). In the demo there are no employees. */
+  function dissolveCompany(company: DemoCompanyState, reason: "insolvent" | "closed", now: number): CloseCompanyResult {
+    const r = dissolve({
+      companyCashCents: BigInt(company.cashCents),
+      unpaidCents: BigInt(company.unpaidCents),
+      severancesCents: [],
+      founderCashCents: BigInt(Math.max(0, host.cashCents())),
+    });
+    host.addCash(-Number(r.fromFounderCents));
+    if (r.toFounderCents > BigInt(0)) host.addCash(Number(r.toFounderCents));
+    if (r.loanCents > BigInt(0)) host.addDebt(Number(r.loanCents));
+    if (reason === "insolvent") host.lockFounding(now + startups.insolvency.foundingLockoutDays * 86_400_000);
+    host.setLastDissolution({
+      companyName: company.name,
+      reason,
+      at: new Date(now).toISOString(),
+      atMs: now,
+      totalDebtCents: Number(r.totalDebtCents),
+      fromFounderCents: Number(r.fromFounderCents),
+      loanCents: Number(r.loanCents),
+    });
+    host.setCompany(null);
+    host.persist();
+    return {
+      fromCompanyCents: Number(r.fromCompanyCents),
+      fromFounderCents: Number(r.fromFounderCents),
+      loanCents: Number(r.loanCents),
+      toFounderCents: Number(r.toFounderCents),
+      totalDebtCents: Number(r.totalDebtCents),
+    };
   }
 
   /** Close every quarter that is due (the demo catches up after a break, at most a day). */
@@ -165,11 +253,11 @@ export function createCompanyEngine(host: CompanyHost) {
     const company = host.company();
     if (!company) return;
     let closed = 0;
-    while (now - company.lastClosedAt >= QUARTER_MS && closed < 4) {
+    while (host.company() === company && now - company.lastClosedAt >= QUARTER_MS && closed < 4) {
       closeQuarter(company, company.lastClosedAt + QUARTER_MS);
       closed += 1;
     }
-    if (now - company.lastClosedAt >= QUARTER_MS) company.lastClosedAt = now;
+    if (host.company() === company && now - company.lastClosedAt >= QUARTER_MS) company.lastClosedAt = now;
     if (closed > 0) host.persist();
   }
 
@@ -226,6 +314,9 @@ export function createCompanyEngine(host: CompanyHost) {
         revenueCents: r.revenueCents,
         profitCents: r.operatingProfitCents,
       })),
+      payFactorBps: 10_000,
+      distressQuarters: company.distressQuarters ?? 0,
+      graceQuarters: startups.insolvency.graceQuarters,
     };
   }
 
@@ -244,6 +335,9 @@ export function createCompanyEngine(host: CompanyHost) {
     | "checkCompanyName"
     | "foundCompany"
     | "myCompany"
+    | "closeCompany"
+    | "companyChat"
+    | "postCompanyMessage"
     | "setCompanyMarketing"
     | "setAiWorkers"
     | "companyDeposit"
@@ -266,6 +360,8 @@ export function createCompanyEngine(host: CompanyHost) {
     async foundCompany(input: FoundCompanyInput) {
       return host.idempotent(input.requestId, () => {
         if (host.company()) throw new GameError("company_exists");
+        const locked = host.foundingLockedUntil();
+        if (locked !== null && locked > Date.now()) throw new GameError("founding_locked");
         if (host.hasJob()) throw new GameError("job_active_exists");
         if (host.level() < foundingLevel(input.tier)) throw new GameError("company_level_too_low");
         const violation = host.nameViolation(input.name.trim());
@@ -304,7 +400,64 @@ export function createCompanyEngine(host: CompanyHost) {
     async myCompany() {
       catchUp();
       const company = host.company();
-      return company ? view(company) : null;
+      const last = host.lastDissolution();
+      const recent = last && Date.now() - last.atMs < 7 * 86_400_000 ? last : null;
+      return {
+        company: company ? view(company) : null,
+        lastDissolution: recent
+          ? {
+              companyName: recent.companyName,
+              reason: recent.reason,
+              at: recent.at,
+              totalDebtCents: recent.totalDebtCents,
+              fromFounderCents: recent.fromFounderCents,
+              loanCents: recent.loanCents,
+            }
+          : null,
+      };
+    },
+
+    async closeCompany(requestId) {
+      return host.idempotent(requestId, () => {
+        catchUp();
+        return dissolveCompany(own(), "closed", Date.now());
+      });
+    },
+
+    async companyChat() {
+      catchUp();
+      const company = host.company();
+      if (!company) return { company: null, members: 0, messages: [] };
+      return {
+        company: { id: company.id, name: company.name, color: company.color },
+        members: 1,
+        messages: (company.chat ?? []).slice(-startups.chat.historyLimit),
+      };
+    },
+
+    async postCompanyMessage(requestId, body) {
+      return host.idempotent(requestId, () => {
+        const company = host.company();
+        if (!company) throw new GameError("not_in_company");
+        const text = body.trim();
+        if (!text || text.length > startups.chat.maxMessageLength) throw new GameError("invalid_argument");
+        if (host.nameViolation(text.replace(/[^A-Za-z0-9_ ]/g, "")) === "name_profanity")
+          throw new GameError("name_profanity");
+        const chat = (company.chat ??= []);
+        const message: ChatMessage = {
+          id: (chat.at(-1)?.id ?? 0) + 1,
+          kind: "player",
+          author: host.nickname(),
+          avatarKey: host.avatarKey(),
+          isMe: true,
+          isFounder: true,
+          body: text,
+          createdAt: new Date().toISOString(),
+        };
+        chat.push(message);
+        company.chat = chat.slice(-startups.chat.historyLimit);
+        return message;
+      });
     },
 
     setCompanyMarketing: (requestId, marketingCents) =>

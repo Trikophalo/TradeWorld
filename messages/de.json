@@ -570,7 +570,12 @@
     "company_level_too_low": "Für diese Firmenform ist dein Level noch zu niedrig.",
     "owns_company": "Du führst deine eigene Firma und kannst nicht woanders arbeiten.",
     "employee_limit": "Mehr Mitarbeiter erlaubt deine Firmenform nicht.",
-    "company_upgrade_unavailable": "Wachsen geht gerade nicht."
+    "company_upgrade_unavailable": "Wachsen geht gerade nicht.",
+    "founding_locked": "Nach einer Insolvenz kannst du erst in ein paar Tagen wieder gründen.",
+    "not_in_company": "Du bist in keiner Spielerfirma.",
+    "work_task_not_found": "Diese Aufgabe gibt es nicht mehr.",
+    "work_task_expired": "Die Aufgabe ist abgelaufen.",
+    "work_task_done": "Diese Aufgabe hast du schon gelöst."
   },
   "locks": {
     "level": "Level {level}",
@@ -1127,7 +1132,8 @@
     "cancel": "Abbrechen",
     "branchProgress": "Fortschritt im Job",
     "branchProgressHint": "Alle {hours} Arbeitsstunden bekommst du einen Punkt in den Bereichen deines Jobs.",
-    "companyOwn": "Deine Firma führen"
+    "companyOwn": "Deine Firma führen",
+    "lastBonus": "Bonus letztes Quartal: {amount}"
   },
   "jobs": {
     "title": "Jobportal",
@@ -1428,6 +1434,72 @@
     "fireConfirm": "Gedrückt halten zum Entlassen",
     "fired": "Entlassen",
     "firedText": "Abfindung: {amount}",
-    "profileLink": "Visitenkarte"
+    "profileLink": "Visitenkarte",
+    "distressCountdown": "Offene Rechnungen: {amount}. Noch {count, plural, one {# Quartal} other {# Quartale}} bis zur Insolvenz. Zahle Geld ein, um sie abzuwenden.",
+    "bonus": "Bonus ans Team",
+    "payFactor": "Lohnfaktor {value}",
+    "payFactorHint": "Reicht das Ergebnis nicht für alle Löhne, zahlt die Firma automatisch weniger (mindestens 50 %). Bei Gewinn gibt es Bonus.",
+    "tabChat": "Chat",
+    "closeTitle": "Firma auflösen",
+    "closeText": "Die Firma wird sofort aufgelöst. Offene Rechnungen und je Mitarbeiter ein Gehalt Abfindung werden aus der Firmenkasse bezahlt, den Rest zahlst du privat. Was übrig bleibt, bekommst du.",
+    "closeEstimate": "Firmenkasse {cash}, offene Rechnungen {unpaid}",
+    "closeConfirm": "Gedrückt halten zum Auflösen",
+    "closed": "Firma aufgelöst",
+    "closedText": "Abgerechnet: {debt}. Du bekommst {back}.",
+    "closedLoan": "Ein Rest von {loan} wird als Kredit von deinen Einnahmen getilgt.",
+    "dissolvedInsolvent": "{name} war 4 Quartale lang in Schieflage und wurde aufgelöst.",
+    "dissolvedClosed": "Du hast {name} aufgelöst.",
+    "dissolvedDebt": "Abgerechnet: {debt}, davon privat {founder}. Kredit: {loan}.",
+    "lockedUntil": "Nach der Insolvenz kannst du ab {date} wieder gründen."
+  },
+  "debt": {
+    "title": "Schulden",
+    "text": "Aus deiner aufgelösten Firma sind noch {amount} offen. {percent} jeder Einnahme gehen automatisch in die Tilgung.",
+    "hint": "Lohn, Bonus, Grundeinkommen, Verkäufe und Belohnungen zählen."
+  },
+  "chat": {
+    "title": "Firmenchat",
+    "members": "{count, plural, one {# Mitglied} other {# Mitglieder}}",
+    "placeholder": "Nachricht an dein Team",
+    "send": "Senden",
+    "empty": "Noch keine Nachrichten. Sag hallo!",
+    "none": "Der Chat gehört zu einer Spielerfirma. Gründe eine oder arbeite in einer, um mitzureden.",
+    "founder": "Gründer",
+    "system": "NEXA",
+    "count": "{count}/{max}",
+    "link": "Firmenchat",
+    "linkHint": "Mit deinem Team reden"
+  },
+  "workTask": {
+    "title": "Arbeitsaufgabe",
+    "none": "Gerade keine Aufgabe.",
+    "next": "Nächste Aufgabe in {time}",
+    "expires": "Läuft ab in {time}",
+    "reward": "Richtig und schnell: 150 XP und eine Stunde Lohn als Bonus",
+    "submit": "Antworten",
+    "correct": "Richtig!",
+    "correctText": "+{xp} XP · Bonus {bonus}",
+    "wrong": "Leider falsch",
+    "wrongText": "+{xp} XP fürs Mitmachen. Die richtige Antwort ist markiert.",
+    "finance": {
+      "question": "Dein Chef braucht {amount} für {years, plural, one {# Jahr} other {# Jahre}}. Welches Kreditangebot ist insgesamt günstiger?",
+      "offer": "Angebot {n}",
+      "rate": "{rate} Zinsen pro Jahr",
+      "fee": "{fee} Gebühr"
+    },
+    "sales": {
+      "question": "Welcher Kunde bringt der Firma den meisten Gewinn?",
+      "customer": "Kunde {n}",
+      "units": "{units} Stück zu {price}",
+      "cost": "Kosten {cost} pro Stück",
+      "service": "Betreuung {service}"
+    },
+    "analyst": {
+      "question": "Schätze den Quartalsgewinn.",
+      "revenue": "Umsatz {amount}",
+      "cogs": "Wareneinsatz {percent} vom Umsatz",
+      "fixed": "Fixkosten {amount}",
+      "marketing": "Marketing {amount}"
+    }
   }
 }

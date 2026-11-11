@@ -78,3 +78,33 @@ test("found a garage startup, run quarters, hire and post a job", async ({ page 
   await page.goto("/career");
   await expect(page.getByText("Deine Firma führen")).toBeVisible();
 });
+
+test("company chat, then close the company voluntarily", async ({ page }) => {
+  await preparePlayer(page);
+  await page.goto("/company");
+  await page.locator('[data-tier="garage"]').getByRole("button", { name: "Gründen" }).click();
+  const sheet = page.getByRole("dialog", { name: "Firma gründen" });
+  await sheet.getByLabel("Firmenname").fill("Chatbude");
+  await sheet.getByLabel("Deine Idee in einem Satz").fill("Ein Laden, in dem alle reden.");
+  await expect(sheet.getByText("Name ist frei")).toBeVisible();
+  await hold(page, /Gedrückt halten zum Gründen/);
+  await expect(page.getByText("Firma gegründet!")).toBeVisible();
+
+  // The quarter close writes a system message into the chat.
+  await page.getByTestId("company-header").getByText("Demo: Quartal jetzt abschließen").click();
+  await page.getByText("Chat", { exact: true }).click();
+  const messages = page.getByTestId("chat-messages");
+  await expect(messages.getByText(/Quartal .*: Umsatz/)).toBeVisible();
+  await page.getByPlaceholder("Nachricht an dein Team").fill("Hallo Team!");
+  await page.getByRole("button", { name: "Senden" }).click();
+  await expect(messages.getByText("Hallo Team!")).toBeVisible();
+
+  // Close: the cash comes back, the founding page shows the settlement.
+  await page.getByText("Übersicht", { exact: true }).click();
+  await page.getByRole("button", { name: "Firma auflösen" }).click();
+  await expect(page.getByRole("dialog", { name: "Firma auflösen" })).toBeVisible();
+  await page.waitForTimeout(500); // the panel slides in
+  await hold(page, /Gedrückt halten zum Auflösen/);
+  await expect(page.getByText("Firma aufgelöst")).toBeVisible();
+  await expect(page.getByTestId("dissolution")).toContainText("Du hast Chatbude aufgelöst.");
+});

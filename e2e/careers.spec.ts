@@ -112,6 +112,13 @@ test("learn a skill, apply to an AI company, sign, work and quit", async ({ page
   await expect(page.getByRole("heading", { name: "IT-Praktikum" })).toBeVisible();
   await expect(page.getByText(/× KI-Kraft/)).toBeVisible();
 
+  // A work task is waiting right after signing (ADR-059).
+  const task = page.getByTestId("work-task");
+  await expect(task.getByText("Arbeitsaufgabe")).toBeVisible();
+  await task.getByRole("radio").first().click();
+  await task.getByRole("button", { name: "Antworten" }).click();
+  await expect(page.getByText(/Richtig!|Leider falsch/).first()).toBeVisible();
+
   // Quitting costs one salary (12 hours of the wage).
   await page.getByRole("button", { name: "Kündigen" }).click();
   // (the AI pays a little more than posted for the learned IT basics)

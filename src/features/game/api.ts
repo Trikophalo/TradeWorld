@@ -146,6 +146,9 @@ const portfolioSchema = z.object({
   skill_points_free: num.default(0),
   daily_reward_claimable: z.boolean().default(false),
   company_value_cents: num.default(0),
+  debt_cents: num.default(0),
+  debt_withholding_bps: num.default(0),
+  founding_locked_until: iso.nullable().default(null),
 });
 
 const orderResultSchema = z.object({
@@ -406,6 +409,9 @@ export const liveEngine: GameEngine = {
       skillPointsFree: p.skill_points_free,
       dailyRewardClaimable: p.daily_reward_claimable,
       companyValueCents: p.company_value_cents,
+      debtCents: p.debt_cents,
+      debtWithholdingBps: p.debt_withholding_bps,
+      foundingLockedUntil: p.founding_locked_until,
     };
   },
 

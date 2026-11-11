@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, type ButtonState } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Countdown } from "@/components/ui/countdown";
+import { HoldButton } from "@/components/ui/hold-button";
 import { Field } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Segmented } from "@/components/ui/segmented";
@@ -26,13 +27,14 @@ import { isDemoMode } from "@/lib/supabase/env";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { useCompanyRefresh } from "../hooks";
+import { CompanyChat } from "./company-chat";
 import { Applications, Postings, Team } from "./employer";
 
-type Tab = "overview" | "postings" | "applications" | "team";
+type Tab = "overview" | "postings" | "applications" | "team" | "chat";
 const factor = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
 const money = (cents: number) => formatMoney(cents, { whole: true });
 /** Profit after the player wages, which are paid continuously during the quarter. */
-const netProfit = (q: CompanyQuarter) => q.operatingProfitCents - q.wagesCents;
+const netProfit = (q: CompanyQuarter) => q.operatingProfitCents - q.wagesCents - (q.bonusCents ?? 0);
 
 /** The founder's view of the own company (ADR-057). */
 export function CompanyDashboard({ company }: { company: MyCompany }) {
@@ -85,8 +87,11 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
       </Card>
 
       {company.distress && (
-        <p className="rounded-md bg-loss-soft px-4 py-3 text-sm text-loss">
-          {t("distress", { amount: money(company.unpaidCents) })}
+        <p className="rounded-md bg-loss-soft px-4 py-3 text-sm text-pretty text-loss" data-testid="distress">
+          {t("distressCountdown", {
+            amount: money(company.unpaidCents),
+            count: Math.max(1, company.graceQuarters - company.distressQuarters),
+          })}
         </p>
       )}
 
@@ -119,6 +124,7 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
               ) : undefined,
           },
           { value: "team", label: t("tabTeam") },
+          { value: "chat", label: t("tabChat") },
         ]}
       />
 
@@ -126,6 +132,7 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
       {tab === "postings" && <Postings company={company} />}
       {tab === "applications" && <Applications company={company} />}
       {tab === "team" && <Team company={company} />}
+      {tab === "chat" && <CompanyChat />}
     </div>
   );
 }
@@ -179,6 +186,7 @@ function QuarterCard({ company }: { company: MyCompany }) {
     [t("aiCosts"), q.aiWorkerCents],
     [t("marketing"), q.marketingCents],
     [t("wages"), q.wagesCents],
+    [t("bonus"), q.bonusCents ?? 0],
   ];
   return (
     <Card padding="lg" className="space-y-4">
@@ -307,6 +315,7 @@ function Controls({ company }: { company: MyCompany }) {
   const [aiBusy, setAiBusy] = useState(false);
   const [money, setMoney] = useState<"deposit" | "withdraw" | null>(null);
   const [upgradeState, setUpgradeState] = useState<ButtonState>("idle");
+  const [closing, setClosing] = useState(false);
   const staff = company.employees + company.aiWorkers;
 
   const run = async (action: () => Promise<unknown>, done: string) => {
@@ -451,6 +460,17 @@ function Controls({ company }: { company: MyCompany }) {
         </div>
       )}
       <MoneySheet mode={money} company={company} onClose={() => setMoney(null)} />
+
+      <div className="border-t border-line-1 pt-4">
+        <p className="text-sm text-fg-2" title={t("payFactorHint")}>
+          {t("payFactor", { value: formatBps(company.payFactorBps).replace("+", "") })}
+        </p>
+        <p className="mt-0.5 text-xs text-pretty text-fg-3">{t("payFactorHint")}</p>
+        <Button size="sm" variant="danger" className="mt-3" onClick={() => setClosing(true)}>
+          {t("closeTitle")}
+        </Button>
+      </div>
+      <CloseSheet company={company} open={closing} onClose={() => setClosing(false)} />
     </Card>
   );
 }
@@ -504,6 +524,48 @@ function MoneySheet({
       }
     >
       <Field label={t("amount")} inputMode="decimal" value={text} onChange={(event) => setText(event.target.value)} />
+    </Sheet>
+  );
+}
+
+function CloseSheet({ company, open, onClose }: { company: MyCompany; open: boolean; onClose: () => void }) {
+  const t = useTranslations("firm");
+  const errorText = useGameErrorText();
+  const refresh = useCompanyRefresh();
+  const [busy, setBusy] = useState(false);
+  const close = async () => {
+    setBusy(true);
+    try {
+      const r = await engine.closeCompany(crypto.randomUUID());
+      toast.success(
+        t("closed"),
+        `${t("closedText", { debt: money(r.totalDebtCents), back: money(r.toFounderCents) })}${
+          r.loanCents > 0 ? ` ${t("closedLoan", { loan: money(r.loanCents) })}` : ""
+        }`,
+      );
+      onClose();
+      await refresh();
+    } catch (error) {
+      toast.error(t("closeTitle"), errorText(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Sheet
+      open={open}
+      onOpenChange={(o) => !o && onClose()}
+      title={t("closeTitle")}
+      footer={
+        <HoldButton tone="loss" onConfirm={() => void close()} disabled={busy} className="w-full">
+          {t("closeConfirm")}
+        </HoldButton>
+      }
+    >
+      <p className="text-pretty text-fg-2">{t("closeText")}</p>
+      <p className="mt-3 nums text-sm text-fg-3">
+        {t("closeEstimate", { cash: money(company.cashCents), unpaid: money(company.unpaidCents) })}
+      </p>
     </Sheet>
   );
 }

@@ -9,11 +9,12 @@ import {
 } from "@/features/market/order-schema";
 import { DEMO_COMPANIES, DEMO_INDEX } from "@/lib/demo/market";
 import { bondPriceE4, bondYieldBps } from "@/lib/sim/bonds";
+import { withholdIncome } from "@/lib/sim/insolvency";
 import { anchoredFairValue, playerImpactReturn } from "@/lib/sim/player-influence";
 import { levelFromTotalXp, levelProgress, scaledXp, totalXpForLevel, unlockLevel } from "@/lib/sim/progression";
 import { MISSION_TEMPLATES, availableFor, missionXp, type Metric, type MissionTemplate } from "./demo/missions";
 import { createCareerEngine, initialCareer, tycoonAvatar, type CareerState } from "./demo/careers";
-import { createCompanyEngine, type DemoCompanyState } from "./demo/company";
+import { createCompanyEngine, type DemoCompanyState, type DemoDissolution } from "./demo/company";
 import { demoTycoons } from "./demo/tycoons";
 import {
   GameError,
@@ -97,6 +98,10 @@ interface PlayerState {
   curveVersion?: number;
   /** Own company (demo/company.ts, ADR-057). */
   company?: DemoCompanyState | null;
+  /** Forced loan after an insolvency (ADR-058). */
+  debtCents?: number;
+  lastDissolution?: DemoDissolution | null;
+  foundingLockedUntil?: number | null;
 }
 
 interface MarketState {
@@ -325,6 +330,18 @@ function addXp(base: number): number {
   return amount;
 }
 
+/**
+ * Private income (ADR-058): with an open forced loan, a share is kept back for repayment.
+ * Returns what the player actually receives.
+ */
+function income(cents: number): number {
+  const pl = p();
+  const { netCents, repaidCents } = withholdIncome(BigInt(Math.round(cents)), BigInt(pl.debtCents ?? 0));
+  pl.debtCents = Math.max(0, (pl.debtCents ?? 0) - Number(repaidCents));
+  pl.cashCents += Number(netCents);
+  return Number(netCents);
+}
+
 function bump(metric: Metric, by = 1): void {
   const counters = p().counters;
   counters[metric] = (counters[metric] ?? 0) + by;
@@ -496,7 +513,7 @@ function execute(ticker: string, side: OrderInput["side"], quantityE6: number, p
     } else {
       pl.lossPotCents += -realized;
     }
-    pl.cashCents += gross - fee - tax;
+    income(gross - fee - tax); // a forced loan keeps back part of the proceeds (ADR-058)
     bump("sells");
   }
   if (holding.quantityE6 > 0) map.set(ticker, holding);
@@ -661,12 +678,16 @@ function portfolioNow(): Portfolio {
     skillPointsFree: career.freePoints(),
     dailyRewardClaimable: career.dailyClaimable(),
     companyValueCents: company.valueCents(),
+    debtCents: pl.debtCents ?? 0,
+    debtWithholdingBps: BALANCE.startups.insolvency.loanWithholdingBps,
+    foundingLockedUntil:
+      pl.foundingLockedUntil && pl.foundingLockedUntil > now ? new Date(pl.foundingLockedUntil).toISOString() : null,
   };
 }
 
 function netWorth(): number {
   const portfolio = portfolioNow();
-  return portfolio.totalCents + portfolio.companyValueCents;
+  return portfolio.totalCents + portfolio.companyValueCents - portfolio.debtCents;
 }
 
 function sectorsHeld(): number {
@@ -888,7 +909,8 @@ const career = createCareerEngine({
   xpTotal: () => p().xpTotal,
   cashCents: () => p().cashCents,
   addCash: (cents) => {
-    p().cashCents += cents;
+    if (cents > 0) income(cents);
+    else p().cashCents += cents;
   },
   netWorthCents: () => netWorth(),
   rank: () => richListNow("all").me?.rank ?? null,
@@ -909,7 +931,8 @@ const company = createCompanyEngine({
   level,
   cashCents: () => p().cashCents,
   addCash: (cents) => {
-    p().cashCents += cents;
+    if (cents > 0) income(cents);
+    else p().cashCents += cents;
   },
   addXp,
   hasJob: () => career.hasJob(),
@@ -917,6 +940,19 @@ const company = createCompanyEngine({
   nameViolation,
   idempotent,
   persist,
+  nickname: () => p().nickname,
+  avatarKey: () => career.avatarKey(),
+  addDebt: (cents) => {
+    p().debtCents = (p().debtCents ?? 0) + cents;
+  },
+  lastDissolution: () => p().lastDissolution ?? null,
+  setLastDissolution: (value) => {
+    p().lastDissolution = value;
+  },
+  foundingLockedUntil: () => p().foundingLockedUntil ?? null,
+  lockFounding: (until) => {
+    p().foundingLockedUntil = until;
+  },
 });
 
 /** Demo only: close the current company quarter at once (button on the company page). */
@@ -1114,10 +1150,10 @@ export const demoEngine: GameEngine = {
         const hours = Math.min(economy.vaultCapHours, (now - pl.vaultClaimedAt) / HOUR);
         const claimed = Math.floor(hours * economy.basicIncomeCentsPerHour);
         if (claimed < economy.vaultMinClaimCents) throw new GameError("nothing_to_claim");
-        pl.cashCents += claimed;
+        const received = income(claimed);
         pl.vaultClaimedAt = now;
         bump("vault_claims");
-        return { claimedCents: claimed, cashCents: pl.cashCents };
+        return { claimedCents: received, cashCents: pl.cashCents };
       }),
     ),
 

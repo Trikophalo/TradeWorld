@@ -128,6 +128,9 @@ function ActiveJob({ job }: { job: MyJob }) {
         <p className="mt-2 nums text-xs text-fg-3">
           {t("earnedTotal")}: {formatMoney(job.earnedTotalCents)}
         </p>
+        {job.lastBonusCents > 0 && (
+          <p className="mt-1 nums text-xs text-gain">{t("lastBonus", { amount: formatMoney(job.lastBonusCents) })}</p>
+        )}
       </div>
 
       <RaiseBox job={job} />

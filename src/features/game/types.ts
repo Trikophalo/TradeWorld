@@ -170,6 +170,10 @@ export interface Portfolio {
   dailyRewardClaimable: boolean;
   /** Value of the own company (0 without one); counts for the rich list, not in totalCents. */
   companyValueCents: number;
+  /** Open forced loan after an insolvency (ADR-058), repaid from incomes. */
+  debtCents: number;
+  debtWithholdingBps: number;
+  foundingLockedUntil: string | null;
 }
 
 /** Either a quantity (fractions allowed) or an amount in cents; the server works out the other. */
@@ -381,6 +385,10 @@ export interface MyJob {
   pendingRaise: { requestedBps: number; createdAt: string } | null;
   quitCostCents: number;
   signature: string | null;
+  /** Bonus of the last closed quarter (player companies, ADR-052). */
+  lastBonusCents: number;
+  nextWorkTaskAt: string | null;
+  workTaskOpen: boolean;
 }
 
 // ------------------------------------------------------------------ player card (ADR-054)
@@ -416,6 +424,7 @@ export interface CompanyQuarter {
   wagesCents: number;
   operatingProfitCents: number;
   utilizationBps: number;
+  bonusCents: number;
 }
 
 export interface MyCompany {
@@ -450,6 +459,81 @@ export interface MyCompany {
   upgradeCostCents: number | null;
   lastQuarter: CompanyQuarter | null;
   history: { label: string; revenueCents: number; profitCents: number }[];
+  payFactorBps: number;
+  distressQuarters: number;
+  graceQuarters: number;
+}
+
+export interface Dissolution {
+  companyName: string;
+  reason: "insolvent" | "closed";
+  at: string;
+  totalDebtCents: number;
+  fromFounderCents: number;
+  loanCents: number;
+}
+
+export interface CompanyOverview {
+  company: MyCompany | null;
+  lastDissolution: Dissolution | null;
+}
+
+export interface CloseCompanyResult {
+  fromCompanyCents: number;
+  fromFounderCents: number;
+  loanCents: number;
+  toFounderCents: number;
+  totalDebtCents: number;
+}
+
+// ------------------------------------------------------------------ company chat (ADR-060)
+
+export interface ChatMessage {
+  id: number;
+  kind: "player" | "system";
+  author: string | null;
+  avatarKey: string | null;
+  isMe: boolean;
+  isFounder: boolean;
+  body: string;
+  createdAt: string;
+}
+
+export interface CompanyChat {
+  company: { id: string; name: string; color: string } | null;
+  members: number;
+  messages: ChatMessage[];
+}
+
+// ------------------------------------------------------------------ work tasks (ADR-059)
+
+export type WorkTask =
+  | WorkTaskBase<
+      "finance_choice",
+      { amountCents: number; years: number; offers: { rateBps: number; feeCents: number }[] }
+    >
+  | WorkTaskBase<
+      "sales_pick",
+      { customers: { units: number; priceCents: number; unitCostCents: number; serviceCents: number }[] }
+    >
+  | WorkTaskBase<
+      "analyst_estimate",
+      { revenueCents: number; cogsBps: number; fixedCents: number; marketingCents: number; options: number[] }
+    >;
+
+interface WorkTaskBase<K extends string, P> {
+  id: string;
+  kind: K;
+  params: P;
+  createdAt: string;
+  expiresAt: string;
+  startedAt: string | null;
+}
+
+export interface WorkTaskResult extends ProgressResult {
+  correct: boolean;
+  correctIndex: number;
+  bonusCents: number;
 }
 
 export interface FoundCompanyInput {
@@ -565,6 +649,11 @@ export const GAME_ERROR_KEYS = [
   "owns_company",
   "employee_limit",
   "company_upgrade_unavailable",
+  "founding_locked",
+  "not_in_company",
+  "work_task_not_found",
+  "work_task_expired",
+  "work_task_done",
 ] as const;
 export type GameErrorKey = (typeof GAME_ERROR_KEYS)[number] | "unknown";
 
@@ -614,7 +703,12 @@ export interface GameEngine {
   playerCard(nickname: string): Promise<PlayerCard>;
   checkCompanyName(name: string): Promise<{ allowed: boolean; reason: GameErrorKey | null }>;
   foundCompany(input: FoundCompanyInput): Promise<MyCompany>;
-  myCompany(): Promise<MyCompany | null>;
+  myCompany(): Promise<CompanyOverview>;
+  closeCompany(requestId: string): Promise<CloseCompanyResult>;
+  companyChat(beforeId?: number): Promise<CompanyChat>;
+  postCompanyMessage(requestId: string, body: string): Promise<ChatMessage>;
+  workTask(): Promise<{ task: WorkTask | null; nextTaskAt: string | null }>;
+  submitWorkTask(requestId: string, taskId: string, choice: number): Promise<WorkTaskResult>;
   setCompanyMarketing(requestId: string, marketingCents: number): Promise<MyCompany>;
   setAiWorkers(requestId: string, count: number): Promise<MyCompany>;
   companyDeposit(requestId: string, amountCents: number): Promise<MyCompany>;

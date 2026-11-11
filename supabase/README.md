@@ -99,6 +99,7 @@ idempotency) with `ON_ERROR_STOP`, and runs the assertions in `tests/[1-9]*.sql`
 | `60_m2b.sql`                | M2b: avatars, daily reward cycle and freezes, skills and points, AI job board determinism, applications, contracts, wages, raises, employer side  |
 | `61_m3c_levels_markets.sql` | M3c: new XP curve and level protection, player orders move prices in euros, holdings premium, AI weight, bond impact                              |
 | `62_m3c_companies.sql`      | M3c: founding rules, places, quarter close (money, quality, awareness, XP), distress, deposit/withdraw, upgrade, net worth, RLS                   |
+| `63_m3d.sql`                | M3d: pay factor and bonus, insolvency with forced loan and withholding, voluntary close, company chat, work tasks                                 |
 
 It exits non-zero on the first failed assertion and removes the cluster afterwards. A full run takes about
 1.5 minutes (most of it is the simulated day). `NEXA_MIGRATIONS_UPTO=20261110001600 supabase/tests/verify_local.sh`

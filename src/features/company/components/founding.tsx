@@ -16,15 +16,22 @@ import { toast } from "@/components/ui/toast";
 import { BALANCE } from "@/config/balance";
 import { useMyJob } from "@/features/career/hooks";
 import { useGameErrorText } from "@/features/game/errors";
-import { engine, usePlayerLevel } from "@/features/game/store";
-import type { CompanyTier, GameErrorKey } from "@/features/game/types";
+import { engine, useGame, usePlayerLevel } from "@/features/game/store";
+import type { CompanyTier, Dissolution, GameErrorKey } from "@/features/game/types";
 import { formatMoney } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
 import { playSound } from "@/lib/sound";
+import { useClock } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
 import { COMPANY_COLORS, useCompanyRefresh } from "../hooks";
 
 const SECTORS = Object.keys(SECTOR_ICONS) as SectorKey[];
+const lockDate = new Intl.DateTimeFormat("de-DE", {
+  day: "2-digit",
+  month: "long",
+  hour: "2-digit",
+  minute: "2-digit",
+});
 const small = BALANCE.company.tiers.find((t) => t.id === "small_business")!;
 
 export const TIER_INFO: Record<CompanyTier, { level: number; cost: number; fixed: number; staff: number }> = {
@@ -43,26 +50,50 @@ export const TIER_INFO: Record<CompanyTier, { level: number; cost: number; fixed
 };
 
 /** Before the first company: the two forms, how it works, and the founding sheet (ADR-057). */
-export function Founding() {
+export function Founding({ dissolution }: { dissolution: Dissolution | null }) {
   const t = useTranslations("firm");
   const level = usePlayerLevel();
+  const lockedUntil = useGame((state) => state.portfolio?.foundingLockedUntil ?? null);
+  const now = useClock();
   const [tier, setTier] = useState<CompanyTier | null>(null);
 
   return (
     <div className="grid gap-5 *:min-w-0 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6">
       <div className="space-y-5">
+        {dissolution && (
+          <Card padding="lg" className="border-loss/40" data-testid="dissolution">
+            <p className="font-medium text-fg-1">
+              {dissolution.reason === "insolvent"
+                ? t("dissolvedInsolvent", { name: dissolution.companyName })
+                : t("dissolvedClosed", { name: dissolution.companyName })}
+            </p>
+            <p className="mt-1 nums text-sm text-fg-2">
+              {t("dissolvedDebt", {
+                debt: formatMoney(dissolution.totalDebtCents, { whole: true }),
+                founder: formatMoney(dissolution.fromFounderCents, { whole: true }),
+                loan: formatMoney(dissolution.loanCents, { whole: true }),
+              })}
+            </p>
+            {lockedUntil && (
+              <p className="mt-1 text-sm text-warn">
+                {t("lockedUntil", { date: lockDate.format(new Date(lockedUntil)) })}
+              </p>
+            )}
+          </Card>
+        )}
         <p className="text-pretty text-fg-2">{t("intro")}</p>
         <div className="grid gap-3 sm:grid-cols-2">
           {(["garage", "small_business"] as const).map((key) => {
             const info = TIER_INFO[key];
-            const locked = level < info.level;
+            const locked =
+              level < info.level || (lockedUntil !== null && now !== null && Date.parse(lockedUntil) > now);
             return (
               <Card key={key} padding="lg" className="flex flex-col gap-3" data-tier={key}>
                 <div className="flex items-start justify-between gap-2">
                   <h2 className="font-pixel text-sm text-fg-1 uppercase">
                     {key === "garage" ? t("garageTitle") : t("smallTitle")}
                   </h2>
-                  {locked && <LockBadge level={info.level} />}
+                  {level < info.level && <LockBadge level={info.level} />}
                 </div>
                 <p className="text-sm text-pretty text-fg-2">{key === "garage" ? t("garageText") : t("smallText")}</p>
                 <ul className="space-y-1 text-sm text-fg-3">

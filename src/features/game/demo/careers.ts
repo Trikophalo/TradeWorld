@@ -28,7 +28,11 @@ import {
   type MyJob,
   type PlayerCard,
   type SkillState,
+  type WorkTask,
+  type WorkTaskResult,
 } from "../types";
+import { createRng } from "@/lib/sim/rng";
+import { correctOption, generateWorkTask, gradeWorkTask, workTaskKind } from "@/lib/sim/work-tasks";
 
 /*
  * Demo part for avatars, daily rewards, skills and jobs (docs/JOBS_AND_SKILLS.md).
@@ -81,6 +85,8 @@ export interface CareerState {
   applications: DemoApplication[];
   job: DemoJob | null;
   seq: number;
+  /** Open or last work task (ADR-059). */
+  workTask?: { task: WorkTask; correctIndex: number; done: boolean } | null;
 }
 
 export function initialCareer(): CareerState {
@@ -303,6 +309,9 @@ export function createCareerEngine(host: CareerHost) {
       pendingRaise: null,
       quitCostCents: oneSalaryCents(job.salary),
       signature: job.signature,
+      lastBonusCents: 0,
+      nextWorkTaskAt: nextTaskAt(),
+      workTaskOpen: openTask() !== null,
     };
   }
 
@@ -334,6 +343,44 @@ export function createCareerEngine(host: CareerHost) {
     };
   }
 
+  /** The open task, if it is still open (not solved, not expired). */
+  function openTask() {
+    const current = st().workTask;
+    if (!current || current.done || Date.parse(current.task.expiresAt) < Date.now()) return null;
+    return current;
+  }
+
+  function nextTaskAt(): string | null {
+    const job = st().job;
+    if (!job) return null;
+    const current = st().workTask;
+    if (!current) return new Date().toISOString();
+    return new Date(Date.parse(current.task.createdAt) + careers.workTask.intervalHours * HOUR).toISOString();
+  }
+
+  /** A new task every few hours while the player has a job (the first one right away). */
+  function ensureTask() {
+    const job = st().job;
+    if (!job || openTask()) return;
+    const due = nextTaskAt();
+    if (due && Date.parse(due) > Date.now()) return;
+    const posting = postingById(job.postingId);
+    const kind = workTaskKind(posting.required[0]?.branch ?? "management");
+    const now = Date.now();
+    const generated = generateWorkTask(kind, createRng(now % 2_147_483_647));
+    const base = {
+      id: `task-${++st().seq}`,
+      createdAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + careers.workTask.expiresHours * HOUR).toISOString(),
+      startedAt: null,
+    };
+    st().workTask = {
+      task: { ...base, ...generated } as WorkTask,
+      correctIndex: correctOption(generated),
+      done: false,
+    };
+  }
+
   const engine: Pick<
     GameEngine,
     | "setAvatar"
@@ -351,6 +398,8 @@ export function createCareerEngine(host: CareerHost) {
     | "quitJob"
     | "requestRaise"
     | "playerCard"
+    | "workTask"
+    | "submitWorkTask"
   > = {
     async setAvatar(requestId, avatarKey) {
       return host.idempotent(requestId, () => {
@@ -566,6 +615,41 @@ export function createCareerEngine(host: CareerHost) {
         job.lastRaiseAt = Date.now();
         job.scoreAtRaise = matchScore(postingById(job.postingId).required, scores());
         return { status: "accepted" as const, salaryCentsPerHour: job.salary };
+      });
+    },
+
+    async workTask() {
+      accrue();
+      ensureTask();
+      const open = openTask();
+      if (open && !open.task.startedAt) open.task = { ...open.task, startedAt: new Date().toISOString() };
+      host.persist();
+      return { task: open?.task ?? null, nextTaskAt: nextTaskAt() };
+    },
+
+    async submitWorkTask(requestId, taskId, choice): Promise<WorkTaskResult> {
+      return host.idempotent(requestId, () => {
+        const job = st().job;
+        if (!job) throw new GameError("no_active_job");
+        const current = st().workTask;
+        if (!current || current.task.id !== taskId) throw new GameError("work_task_not_found");
+        if (current.done) throw new GameError("work_task_done");
+        if (Date.parse(current.task.expiresAt) < Date.now()) throw new GameError("work_task_expired");
+        const started = Date.parse(current.task.startedAt ?? current.task.createdAt);
+        const correct = choice === current.correctIndex;
+        const grade = gradeWorkTask(correct, (Date.now() - started) / 1000);
+        current.done = true;
+        const xp = host.addXp(grade.xp);
+        const bonus = Math.round(grade.bonusShare * careers.workTask.bonusSalaryHours * job.salary);
+        if (bonus > 0) host.addCash(bonus);
+        return {
+          correct,
+          correctIndex: current.correctIndex,
+          xpAwarded: xp,
+          bonusCents: bonus,
+          level: host.level(),
+          xpTotal: host.xpTotal(),
+        };
       });
     },
 

@@ -120,6 +120,9 @@ const jobSchema = z.object({
   pending_raise: z.object({ requested_bps: num, created_at: iso }).nullable(),
   quit_cost_cents: num,
   signature: z.string().nullable(),
+  last_bonus_cents: num.default(0),
+  next_work_task_at: iso.nullable().default(null),
+  work_task_open: z.boolean().default(false),
 });
 
 const cardSchema = z.object({
@@ -247,6 +250,9 @@ const toJob = (j: z.infer<typeof jobSchema>): MyJob => ({
     : null,
   quitCostCents: j.quit_cost_cents,
   signature: j.signature,
+  lastBonusCents: j.last_bonus_cents,
+  nextWorkTaskAt: j.next_work_task_at,
+  workTaskOpen: j.work_task_open,
 });
 
 type CareerEngine = Pick<

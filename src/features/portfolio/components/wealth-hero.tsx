@@ -15,7 +15,9 @@ export function WealthHero() {
   const t = useTranslations("home");
   // Wealth includes the own company (ADR-057), like on the rich list.
   const total = useGame((state) =>
-    state.portfolio ? state.portfolio.totalCents + state.portfolio.companyValueCents : undefined,
+    state.portfolio
+      ? state.portfolio.totalCents + state.portfolio.companyValueCents - state.portfolio.debtCents
+      : undefined,
   );
   const start = BALANCE.economy.startingCapitalCents;
   return (
