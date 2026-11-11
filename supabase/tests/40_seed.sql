@@ -108,11 +108,11 @@ select tests.assert(
 select tests.assert(
   (select count(*) = 50 from public.levels)
   and (select xp_to_next from public.levels where level = 1) = 100
-  and (select xp_to_next from public.levels where level = 10) = 3162
-  and (select xp_to_next from public.levels where level = 20) = 8944
+  and (select xp_to_next from public.levels where level = 10) = 7906
+  and (select xp_to_next from public.levels where level = 20) = 22361
   and (select xp_to_next is null from public.levels where level = 50)
-  and (select xp_cumulative from public.levels where level = 3) = 383,
-  'XP curve: 50 levels, round(100 * n^1.5)');
+  and (select xp_cumulative from public.levels where level = 3) = 807,
+  'XP curve (ADR-055): 50 levels, 100 XP to level 2, then round(250 * n^1.5)');
 select tests.assert(
   (select count(*) from public.unlocks) >= 16
   and (select level from public.unlocks where key = 'short_selling') = 8

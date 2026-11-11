@@ -277,15 +277,17 @@ insert into public.sim_rng_streams (stream_key, seed) values
 on conflict (stream_key) do nothing;
 
 -- ---------------------------------------------------------------------------
--- 7. Levels 1..50: xp_to_next = round(100 * n^1.5) (spec 9.1)
+-- 7. Levels 1..50 (ADR-055): xp_to_next = 100 at level 1, then round(250 * n^1.5)
+--    (progression.firstLevelXp / xpBase; game_config is loaded after this file)
 -- ---------------------------------------------------------------------------
 insert into public.levels (level, xp_to_next, xp_cumulative)
 select
   n,
-  case when n < 50 then round(100 * power(n, 1.5))::bigint end,
-  coalesce((select sum(round(100 * power(m, 1.5)))::bigint from generate_series(1, n - 1) as m), 0)
+  case when n = 1 then 100 when n < 50 then round(250 * power(n, 1.5))::bigint end,
+  case when n = 1 then 0
+       else 100 + coalesce((select sum(round(250 * power(m, 1.5)))::bigint from generate_series(2, n - 1) as m), 0) end
 from generate_series(1, 50) as n
-on conflict (level) do nothing;
+on conflict (level) do update set xp_to_next = excluded.xp_to_next, xp_cumulative = excluded.xp_cumulative;
 
 -- ---------------------------------------------------------------------------
 -- 8. Mission templates (daily: 200-400 XP, 3 per day; weekly; unlock intros)

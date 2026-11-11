@@ -9,7 +9,7 @@
 select tests.signup(:p, 'Fixture') is not null as ok \gset
 update public.sim_runtime set is_paused = false;
 -- enough XP for limit orders and bonds
-update public.profiles set xp_total = 5000, level = 6 where id = :p;
+update public.profiles set xp_total = public.xp_total_for_level(6) + 500, level = 6 where id = :p;
 select public.market_tick() is not null as ok \gset
 select public.rich_list_snapshot(true) is not null as ok \gset
 select public.rich_news('rich_rank_entry', :p, 'Fixture', null, 87, 100, 1234567, null) is null as ok \gset

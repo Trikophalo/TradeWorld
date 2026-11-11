@@ -51,7 +51,7 @@ language sql
 as $$
   update public.profiles
      set level = p_level,
-         xp_total = coalesce((select sum(round(100 * power(n, 1.5)))::bigint from generate_series(1, p_level - 1) n), 0)
+         xp_total = public.xp_total_for_level(p_level)
    where id = p_player;
 $$;
 grant execute on all functions in schema tests to public;
