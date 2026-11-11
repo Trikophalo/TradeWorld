@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Reveal } from "@/features/progression/components/reveal";
 import { LevelCard } from "@/features/progression/components/level-card";
 import { UnlockList } from "@/features/progression/components/unlock-list";
+import { AccountReset } from "@/features/settings/components/account-reset";
 import { SettingsCard } from "@/features/settings/components/settings-card";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -56,6 +57,7 @@ export default async function ProfilePage() {
             hint={t("rulesHint")}
           />
           <SettingsCard />
+          <AccountReset />
         </div>
         <UnlockList />
       </div>

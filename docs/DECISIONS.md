@@ -655,3 +655,13 @@ Firma ist dort über Karriere erreichbar). KI-Kräfte stellt man über „Stelle
 die KI wählt. Sie kosten Lohn und lassen die Firma im Schnitt langsamer wachsen als echte Spieler: Leistung 1,0 statt
 mindestens 1,5, keine Skills für Wachstumsstufen, und die erreichbare Qualität sinkt mit ihrem Anteil am Team um bis
 zu 30 % (`startups.aiQualityPenalty`).
+
+## ADR-070: Spiel zurücksetzen und Konto löschen — `akzeptiert`
+
+Vorgabe: Spieler können von vorn anfangen oder ihr Konto löschen. Beides steht im Profil unter „Neu anfangen“ und
+verlangt, den eigenen Namen einzutippen und den Knopf gedrückt zu halten (`reset_account`, `delete_account`; der Server
+prüft den Namen, Fehler `confirm_mismatch`). Zurücksetzen behält Konto, Name, Profilbild und Einstellungen; alles
+Spielerische geht zurück auf den Start einer Neuanmeldung, Finns Tutorial beginnt erneut. Eine eigene Firma wird wie
+beim freiwilligen Auflösen beendet, ihr Team verliert den Job. Löschen macht dasselbe und entfernt danach das Konto,
+der Name wird wieder frei. Das Hauptbuch bleibt ausgeglichen: Restguthaben werden gegen ein Systemkonto gebucht statt
+gelöscht. Im Demo-Modus gibt es nur „zurücksetzen“ (neuer Demo-Spieler).

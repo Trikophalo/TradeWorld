@@ -35,6 +35,8 @@ interface TutorialState {
   restart: () => void;
   /** Back to "loading" (sign-out, account switch): the next account loads its own progress. */
   reset: () => void;
+  /** Account reset (ADR-070): forget this account's progress, so Finn starts from the beginning. */
+  forget: () => void;
 }
 
 function readAll(): Record<string, Saved> {
@@ -73,6 +75,16 @@ export const useTutorial = create<TutorialState>((set, get) => ({
     set({ status: "done", step: 0 });
   },
   reset: () => set({ status: "loading", step: 0, accountId: "demo", tour: null, seenTours: [] }),
+  forget: () => {
+    try {
+      const saved = readAll();
+      delete saved[get().accountId];
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+    } catch {
+      // Nothing saved.
+    }
+    get().reset();
+  },
   restart: () => {
     save(get().accountId, { status: "active", step: 0, seenTours: [] });
     set({ status: "active", step: 0, seenTours: [], tour: null });

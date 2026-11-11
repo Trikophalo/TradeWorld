@@ -250,6 +250,8 @@ export const RPC_SCHEMAS = {
   get_rich_list_news: richNewsSchema,
   check_nickname: z.object({ allowed: z.boolean(), reason: z.string().nullable() }),
   change_nickname: z.object({ nickname: z.string(), changed_at: iso, next_change_at: iso }),
+  reset_account: z.object({ ok: z.literal(true), reset_at: iso }),
+  delete_account: z.object({ ok: z.literal(true) }),
   get_my_missions: missionsSchema,
   claim_mission: progressSchema,
   daily_check_in: checkInSchema,
@@ -511,6 +513,14 @@ export const liveEngine: GameEngine = {
       RPC_SCHEMAS.change_nickname,
     );
     return { nickname: r.nickname, nextChangeAt: r.next_change_at };
+  },
+
+  async resetAccount(requestId, confirm) {
+    await rpc("reset_account", { p_request_id: requestId, p_confirm: confirm }, RPC_SCHEMAS.reset_account);
+  },
+
+  async deleteAccount(confirm) {
+    await rpc("delete_account", { p_confirm: confirm }, RPC_SCHEMAS.delete_account);
   },
 
   async missions() {

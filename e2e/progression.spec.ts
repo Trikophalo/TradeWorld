@@ -104,3 +104,21 @@ test("reaching level 3 starts Finn's limit order tour", async ({ page }) => {
   const finn = page.locator("[data-tutorial]");
   await expect(finn).toContainText("Limit-Orders");
 });
+
+test("starting over resets the game after typing the name and Finn starts again (ADR-070)", async ({ page }) => {
+  await preparePlayer(page, { cashCents: 5_000_000, xpTotal: 5_000 });
+  await page.goto("/profile");
+  await page.getByRole("button", { name: "Spiel zurücksetzen" }).click();
+  const sheet = page.getByRole("dialog", { name: "Spiel zurücksetzen?" });
+  await sheet.getByLabel(/Zum Bestätigen/).fill("Falsch");
+  await expect(sheet.getByRole("button", { name: /Gedrückt halten zum Zurücksetzen/ })).toBeDisabled();
+  await sheet.getByLabel(/Zum Bestätigen/).fill("testerin");
+  const hold = sheet.getByRole("button", { name: /Gedrückt halten zum Zurücksetzen/ });
+  await hold.hover();
+  await page.mouse.down();
+  await page.waitForTimeout(1_200);
+  await page.mouse.up();
+  await expect(page).toHaveURL("/");
+  await expect(page.locator("[data-tutorial]")).toContainText("Hi, ich bin Finn");
+  await expect(page.locator('[data-fly-target="cash"]')).toContainText("10.000,00 €");
+});

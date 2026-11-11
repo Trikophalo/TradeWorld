@@ -696,6 +696,7 @@ export const GAME_ERROR_KEYS = [
   "name_reserved",
   "name_taken",
   "name_change_too_soon",
+  "confirm_mismatch",
   "mission_not_found",
   "mission_not_completed",
   "mission_already_claimed",
@@ -759,6 +760,10 @@ export interface GameEngine {
   richNews(limit: number): Promise<RichNews[]>;
   checkNickname(nickname: string): Promise<{ allowed: boolean; reason: GameErrorKey | null }>;
   changeNickname(requestId: string, nickname: string): Promise<{ nickname: string; nextChangeAt: string }>;
+  /** Starts over as a new player; `confirm` is the current nickname (ADR-070). */
+  resetAccount(requestId: string, confirm: string): Promise<void>;
+  /** Deletes the account for good; `confirm` is the current nickname (ADR-070). */
+  deleteAccount(confirm: string): Promise<void>;
   missions(): Promise<MissionGroup[]>;
   claimMission(requestId: string, missionId: string): Promise<ProgressResult>;
   checkIn(requestId: string): Promise<ProgressResult & { streakDays: number; alreadyCheckedIn: boolean }>;

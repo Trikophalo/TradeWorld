@@ -597,7 +597,8 @@
     "work_task_done": "Diese Aufgabe hast du schon gelöst.",
     "offer_closed": "Die Zeichnung ist schon beendet.",
     "offer_sold_out": "Alle Aktien sind schon vergeben.",
-    "already_listed": "Deine Firma ist schon an der Börse."
+    "already_listed": "Deine Firma ist schon an der Börse.",
+    "confirm_mismatch": "Der eingetippte Name passt nicht."
   },
   "locks": {
     "level": "Level {level}",
@@ -2074,5 +2075,25 @@
     "subscribedDoneText": "{shares} Aktien für {amount}.",
     "sideJob": "Du arbeitest nebenbei bei {company}. Deine Leistung zählt hier deshalb nur halb. Ab {from} Mitarbeitern arbeitest du Vollzeit in deiner Firma (noch {left} bis dahin), dann endet dein Job nach einem Tag.",
     "fullTime": "Deine Firma hat genug Mitarbeiter: Du arbeitest jetzt Vollzeit hier. Dein Job bei {company} endet nach einem Tag."
+  },
+  "account": {
+    "title": "Neu anfangen",
+    "intro": "Du kannst dein Spiel zurücksetzen und mit dem Startkapital von vorn beginnen, oder dein Konto ganz löschen.",
+    "reset": "Spiel zurücksetzen",
+    "delete": "Konto löschen",
+    "resetTitle": "Spiel zurücksetzen?",
+    "deleteTitle": "Konto löschen?",
+    "resetText": "Du fängst als neuer Spieler an: Startkapital, Level 1, Finn erklärt alles noch einmal.",
+    "deleteText": "Dein Konto und dein Spielstand werden endgültig gelöscht. Das lässt sich nicht rückgängig machen.",
+    "lostMoney": "Geld, Depot, offene Orders und Kredite sind weg.",
+    "lostCareer": "Level, XP, Skills und dein Job enden.",
+    "lostCompany": "Deine Firma wird aufgelöst, dein Team verliert seinen Job.",
+    "keptName": "Name, Profilbild und Einstellungen bleiben.",
+    "lostName": "Dein Name wird wieder frei.",
+    "typeName": "Zum Bestätigen „{name}“ eintippen",
+    "resetConfirm": "Gedrückt halten zum Zurücksetzen",
+    "deleteConfirm": "Gedrückt halten zum Löschen",
+    "resetDone": "Neustart! Viel Erfolg.",
+    "deleted": "Dein Konto wurde gelöscht."
   }
 }

@@ -233,6 +233,19 @@ function persist(): void {
   }
 }
 
+/** Account reset in the demo (ADR-070): a fresh player whose tutorial starts again. */
+function startOver(confirm: string): void {
+  if (confirm.trim().toLowerCase() !== p().nickname.toLowerCase()) throw new GameError("confirm_mismatch");
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(TUTORIAL_KEY) ?? "{}") as Record<string, unknown>;
+    delete saved.demo;
+    window.localStorage.setItem(TUTORIAL_KEY, JSON.stringify(saved));
+  } catch {
+    // Nothing saved.
+  }
+  resetDemoPlayer();
+}
+
 /** Test and showcase helper: forget the demo player (cash, positions, XP). */
 export function resetDemoPlayer(): void {
   try {
@@ -1219,6 +1232,10 @@ export const demoEngine: GameEngine = {
         return { nickname, nextChangeAt: new Date(now + names.nicknameChangeDays * DAY).toISOString() };
       }),
     ),
+
+  // The demo has no account: both start over with a fresh demo player (ADR-070).
+  resetAccount: (_requestId, confirm) => delay(() => startOver(confirm)),
+  deleteAccount: (confirm) => delay(() => startOver(confirm)),
 
   missions: () => Promise.resolve(missionGroups()),
 
