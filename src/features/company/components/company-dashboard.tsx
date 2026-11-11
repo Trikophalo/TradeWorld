@@ -2,114 +2,59 @@
 
 import { motion } from "motion/react";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
-import { SECTOR_ICONS } from "@/components/pixel/art";
+import { useState, type ReactNode } from "react";
+import { COMPANY_BUILDINGS, UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
-import { Badge } from "@/components/ui/badge";
 import { Button, type ButtonState } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Countdown } from "@/components/ui/countdown";
 import { HoldButton } from "@/components/ui/hold-button";
 import { Field } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
-import { Segmented } from "@/components/ui/segmented";
+import { ShortMoney } from "@/components/ui/live-money";
 import { Sheet } from "@/components/ui/sheet";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "@/components/ui/toast";
-import { demoCloseQuarter } from "@/features/game/demo-engine";
+import { BALANCE } from "@/config/balance";
 import { useGameErrorText } from "@/features/game/errors";
 import { engine } from "@/features/game/store";
-import type { CompanyQuarter, MyCompany } from "@/features/game/types";
+import type { MyCompany } from "@/features/game/types";
 import { parseEuroCents } from "@/features/market/order-schema";
+import { useVisitTour } from "@/features/tutorial/use-visit-tour";
 import { formatBps, formatMoney } from "@/lib/format";
+import { haptic } from "@/lib/haptics";
 import { SPRING } from "@/lib/motion";
-import { isDemoMode } from "@/lib/supabase/env";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { useCompanyRefresh } from "../hooks";
-import { useProductText } from "../product-name";
-import { useVisitTour } from "@/features/tutorial/use-visit-tour";
 import { CompanyChat } from "./company-chat";
+import { HireSheet, TeamView, type HireRequest } from "./employer";
+import { GrowthPath } from "./growth-path";
+import { HeadquartersHero, netProfit } from "./headquarters";
 import { ListingCard, SideJobNotice } from "./listing";
 import { LogoEditor } from "./logo-editor";
-import { CompanyLogo } from "@/features/market/components/company-logo";
-import { BALANCE } from "@/config/balance";
-import { Applications, Postings, Team } from "./employer";
 
-type Tab = "overview" | "postings" | "applications" | "team" | "chat";
+type Tab = "overview" | "team" | "chat";
 const factor = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
 const money = (cents: number) => formatMoney(cents, { whole: true });
-/** Profit after the player wages, which are paid continuously during the quarter. */
-const netProfit = (q: CompanyQuarter) => q.operatingProfitCents - q.wagesCents - (q.bonusCents ?? 0);
+const NEXT_TIER = { garage: "small_business", small_business: "gmbh", gmbh: "ag", ag: null } as const;
 
-/** The founder's view of the own company (ADR-057). */
+/** The founder's view of the own company (ADR-057, redesigned in ADR-071). */
 export function CompanyDashboard({ company }: { company: MyCompany }) {
   const t = useTranslations("firm");
-  const ts = useTranslations("sectors");
-  const refresh = useCompanyRefresh();
+  const tl = useTranslations("logo");
   const [tab, setTab] = useState<Tab>("overview");
-  const [prefill, setPrefill] = useState<string[] | undefined>(undefined);
+  const [hire, setHire] = useState<HireRequest | null>(null);
   const [drawing, setDrawing] = useState(false);
   useVisitTour("visit_company");
-  const tl = useTranslations("logo");
+  const trainingOpen = company.employees + company.aiWorkers >= company.trainingFrom;
+
+  const goTraining = () => {
+    setTab("team");
+    window.setTimeout(() => document.getElementById("training")?.scrollIntoView({ behavior: "smooth" }), 50);
+  };
 
   return (
     <div className="space-y-5">
-      <Card padding="lg" className="space-y-4" data-testid="company-header">
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={() => setDrawing(true)}
-            aria-label={tl("draw")}
-            data-testid="logo-button"
-            className="group relative shrink-0 rounded-sm focus-ring"
-          >
-            {company.logo ? (
-              <CompanyLogo ticker={company.name} color={company.color} logo={company.logo} scale={4} />
-            ) : (
-              <span
-                aria-hidden
-                style={{ backgroundColor: company.color }}
-                className="grid size-16 place-items-center font-pixel text-base text-on-accent"
-              >
-                {company.name.slice(0, 2).toUpperCase()}
-              </span>
-            )}
-            <span className="absolute -right-1.5 -bottom-1.5 rounded-xs bg-surface-3 px-1 label-pixel text-fg-2 ring-1 ring-line-2">
-              ✎
-            </span>
-          </button>
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-xl font-semibold text-fg-1">{company.name}</h2>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-fg-3">
-              <Badge tone="accent">{t(`tiers.${company.tier}`)}</Badge>
-              <span className="inline-flex items-center gap-1.5">
-                <PixelIcon {...SECTOR_ICONS[company.sector]} scale={1} /> {ts(company.sector)}
-              </span>
-            </div>
-          </div>
-        </div>
-        <p className="text-sm text-pretty text-fg-2">{company.idea}</p>
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-surface-2 px-3 py-2">
-          <span className="text-sm text-fg-2">
-            {t("nextQuarter")}{" "}
-            <Countdown target={Date.parse(company.nextQuarterAt)} className="nums font-semibold text-fg-1" />
-          </span>
-          {isDemoMode && (
-            <button
-              type="button"
-              onClick={() => {
-                demoCloseQuarter();
-                void playSound("coin");
-                void refresh();
-              }}
-              className="text-xs text-accent underline-offset-2 focus-ring hover:underline"
-            >
-              {t("demoClose")}
-            </button>
-          )}
-        </div>
-      </Card>
+      <HeadquartersHero company={company} onDrawLogo={() => setDrawing(true)} />
 
       <LogoEditor company={company} open={drawing} onClose={() => setDrawing(false)} />
       {company.logoHidden && <p className="rounded-md bg-warn-soft px-4 py-3 text-sm text-warn">{tl("hidden")}</p>}
@@ -124,220 +69,279 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
         </p>
       )}
 
-      <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi label={t("cash")} value={money(company.cashCents)} />
-        <Kpi label={t("value")} value={money(company.valueCents)} />
-        <Kpi label={t("revenue")} value={company.lastQuarter ? money(company.lastQuarter.revenueCents) : "–"} />
-        <Kpi
-          label={t("profit")}
-          value={company.lastQuarter ? money(netProfit(company.lastQuarter)) : "–"}
-          tone={company.lastQuarter ? (netProfit(company.lastQuarter) >= 0 ? "gain" : "loss") : undefined}
-        />
-      </dl>
-
-      <Segmented<Tab>
+      <DepartmentTabs
         value={tab}
-        onValueChange={setTab}
-        label={t("title")}
-        options={[
-          { value: "overview", label: t("tabOverview") },
-          { value: "postings", label: t("tabPostings") },
-          {
-            value: "applications",
-            label: t("tabApplications"),
-            adornment:
-              company.pendingApplications > 0 ? (
-                <span className="rounded-pill bg-accent px-1.5 nums text-2xs text-on-accent">
-                  {company.pendingApplications}
-                </span>
-              ) : undefined,
-          },
-          { value: "team", label: t("tabTeam") },
-          { value: "chat", label: t("tabChat") },
+        onChange={setTab}
+        tabs={[
+          { value: "overview", label: t("tabOverview"), icon: "home" },
+          { value: "team", label: t("tabTeam"), icon: "profile", badge: company.pendingApplications },
+          { value: "chat", label: t("tabChat"), icon: "bell" },
         ]}
       />
 
       {tab === "overview" && (
-        <Overview
-          company={company}
-          onHire={(skills) => {
-            setPrefill(skills);
-            setTab("postings");
-          }}
-          onTrain={() => setTab("team")}
-        />
+        <div className="grid gap-5 *:min-w-0 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6">
+          <div className="space-y-5">
+            <GrowthPath
+              company={company}
+              onFill={(skills) => setHire({ skills })}
+              onTrain={trainingOpen ? goTraining : undefined}
+            />
+            <QuarterReceipt company={company} />
+            <HistoryCard company={company} />
+          </div>
+          <div className="space-y-5">
+            <MarketCard company={company} />
+            <BossOffice company={company} onTeam={() => setTab("team")} />
+          </div>
+        </div>
       )}
-      {tab === "postings" && <Postings key={prefill?.join() ?? "none"} company={company} prefillSkills={prefill} />}
-      {tab === "applications" && <Applications company={company} />}
-      {tab === "team" && <Team company={company} />}
+      {tab === "team" && <TeamView company={company} onHire={setHire} />}
       {tab === "chat" && <CompanyChat />}
+
+      <HireSheet company={company} request={hire} onClose={() => setHire(null)} />
     </div>
   );
 }
 
-function Kpi({ label, value, tone }: { label: string; value: string; tone?: "gain" | "loss" }) {
+/** Departments as chunky, pressable tabs. */
+function DepartmentTabs({
+  value,
+  onChange,
+  tabs,
+}: {
+  value: Tab;
+  onChange: (tab: Tab) => void;
+  tabs: { value: Tab; label: string; icon: keyof typeof UI_ICONS; badge?: number }[];
+}) {
+  const t = useTranslations("firm");
   return (
-    <Card padding="md">
-      <dt className="label-pixel text-fg-3">{label}</dt>
-      <dd
-        className={cn(
-          "mt-1 nums text-lg font-semibold",
-          tone === "gain" ? "text-gain" : tone === "loss" ? "text-loss" : "text-fg-1",
-        )}
-      >
-        {value}
-      </dd>
+    <div role="tablist" aria-label={t("title")} className="grid grid-cols-3 gap-2 rounded-lg bg-surface-2 p-1.5">
+      {tabs.map((tab) => {
+        const active = tab.value === value;
+        return (
+          <button
+            key={tab.value}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => {
+              if (active) return;
+              haptic("tap");
+              void playSound("tap");
+              onChange(tab.value);
+            }}
+            className={cn(
+              "relative flex items-center justify-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium focus-ring transition duration-fast active:scale-[0.97]",
+              active ? "text-fg-1" : "text-fg-3 hover:text-fg-1",
+            )}
+          >
+            {active && (
+              <motion.span
+                layoutId="company-tab"
+                transition={SPRING.snappy}
+                className="absolute inset-0 rounded-md bg-surface-1 shadow-1 ring-1 ring-line-2"
+              />
+            )}
+            <PixelIcon {...UI_ICONS[tab.icon]} scale={1} className="relative" />
+            <span className="relative">{tab.label}</span>
+            {tab.badge ? (
+              <span className="relative rounded-pill bg-accent px-1.5 nums text-2xs text-on-accent">{tab.badge}</span>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function Panel({
+  title,
+  aside,
+  children,
+  className,
+}: {
+  title: string;
+  aside?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <Card padding="lg" className={cn("space-y-4", className)}>
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="label-pixel text-fg-2">{title}</p>
+        {aside}
+      </div>
+      {children}
     </Card>
   );
 }
 
-function Overview({
-  company,
-  onHire,
-  onTrain,
-}: {
-  company: MyCompany;
-  onHire: (skills: string[]) => void;
-  onTrain: () => void;
-}) {
-  return (
-    <div className="grid gap-5 *:min-w-0 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6">
-      <div className="space-y-5">
-        <GrowthCard company={company} onHire={onHire} onTrain={onTrain} />
-        <QuarterCard company={company} />
-        <HistoryCard company={company} />
-      </div>
-      <div className="space-y-5">
-        <MarketCard company={company} />
-        <Controls company={company} />
-      </div>
-    </div>
-  );
-}
-
-function QuarterCard({ company }: { company: MyCompany }) {
+/** The last quarter as a receipt: what came in, what went out, what stayed. */
+function QuarterReceipt({ company }: { company: MyCompany }) {
   const t = useTranslations("firm");
   const q = company.lastQuarter;
   if (!q) {
     return (
-      <Card padding="lg">
-        <p className="label-pixel text-fg-2">{t("lastQuarter")}</p>
-        <p className="mt-2 text-sm text-fg-3">{t("noQuarter")}</p>
-      </Card>
+      <Panel title={t("lastQuarter")}>
+        <p className="text-sm text-fg-3">{t("noQuarter")}</p>
+      </Panel>
     );
   }
+  const profit = netProfit(q);
   const scale = Math.max(q.demandCents, q.capacityCents, 1);
-  const costs: [string, number][] = [
-    [t("cogs"), q.cogsCents],
-    [t("fixedCosts"), q.fixedCents],
-    [t("aiCosts"), q.aiWorkerCents],
-    [t("marketing"), q.marketingCents],
-    [t("wages"), q.wagesCents],
-    [t("bonus"), q.bonusCents ?? 0],
-  ];
+  const costs: [string, number][] = (
+    [
+      [t("cogs"), q.cogsCents],
+      [t("fixedCosts"), q.fixedCents],
+      [t("aiCosts"), q.aiWorkerCents],
+      [t("marketing"), q.marketingCents],
+      [t("wages"), q.wagesCents],
+      [t("bonus"), q.bonusCents ?? 0],
+    ] as [string, number][]
+  ).filter(([, value]) => value > 0);
   return (
-    <Card padding="lg" className="space-y-4">
-      <div className="flex items-baseline justify-between">
-        <p className="label-pixel text-fg-2">
-          {t("lastQuarter")} · {q.label}
-        </p>
-        <span className="nums text-sm text-fg-3">
+    <Panel
+      title={`${t("lastQuarter")} · ${q.label}`}
+      aside={
+        <span className="nums text-xs text-fg-3">
           {t("utilization", { percent: formatBps(q.utilizationBps).replace("+", "") })}
         </span>
-      </div>
-      {(
-        [
-          [t("demand"), q.demandCents, "bg-info"],
-          [t("capacity"), q.capacityCents, "bg-accent"],
-          [t("revenue"), q.revenueCents, "bg-gain"],
-        ] as const
-      ).map(([label, value, color]) => (
-        <div key={label}>
-          <div className="mb-1 flex justify-between text-sm">
-            <span className="text-fg-2">{label}</span>
-            <span className="nums text-fg-1">{money(value)}</span>
-          </div>
-          <div className="h-2 overflow-hidden rounded-pill bg-surface-3">
-            <motion.div
-              className={cn("h-full origin-left rounded-pill", color)}
-              initial={{ scaleX: 0 }}
-              animate={{ scaleX: value / scale }}
-              transition={SPRING.smooth}
-            />
-          </div>
-        </div>
-      ))}
-      <p className="text-sm text-pretty text-fg-3">{q.utilizationBps >= 9_900 ? t("soldOut") : t("idle")}</p>
-      <dl className="divide-y divide-line-1 rounded-md border border-line-1 text-sm">
-        {costs.map(([label, value]) => (
-          <div key={label} className="flex justify-between px-3 py-2">
-            <dt className="text-fg-3">{label}</dt>
-            <dd className="nums text-fg-1">−{money(value)}</dd>
-          </div>
-        ))}
-        <div className="flex justify-between px-3 py-2 font-semibold">
-          <dt className="text-fg-1">{t("profit")}</dt>
-          <dd className={cn("nums", netProfit(q) >= 0 ? "text-gain" : "text-loss")}>{money(netProfit(q))}</dd>
-        </div>
-      </dl>
-    </Card>
-  );
-}
-
-function HistoryCard({ company }: { company: MyCompany }) {
-  const t = useTranslations("firm");
-  const max = Math.max(1, ...company.history.map((h) => Math.max(h.revenueCents, Math.abs(h.profitCents))));
-  return (
-    <Card padding="lg">
-      <p className="label-pixel text-fg-2">{t("historyTitle")}</p>
-      {company.history.length === 0 ? (
-        <p className="mt-2 text-sm text-fg-3">{t("historyEmpty")}</p>
-      ) : (
-        <div className="mt-4 flex h-36 items-end gap-1.5" role="img" aria-label={t("historyTitle")}>
-          {company.history.map((h) => (
-            <div
-              key={h.label}
-              className="flex h-full min-w-0 flex-1 flex-col justify-end gap-0.5"
-              title={`${h.label}: ${money(h.revenueCents)} / ${money(h.profitCents)}`}
-            >
+      }
+    >
+      <div className="space-y-3">
+        {(
+          [
+            [t("demand"), q.demandCents, "bg-info"],
+            [t("capacity"), q.capacityCents, "bg-accent"],
+            [t("revenue"), q.revenueCents, "bg-gain"],
+          ] as const
+        ).map(([label, value, color]) => (
+          <div key={label}>
+            <div className="mb-1 flex justify-between text-sm">
+              <span className="text-fg-2">{label}</span>
+              <span className="nums text-fg-1">{money(value)}</span>
+            </div>
+            <div className="h-2.5 overflow-hidden rounded-pill bg-surface-3">
               <motion.div
-                className="w-full origin-bottom rounded-t-xs bg-accent/70"
-                initial={{ scaleY: 0 }}
-                animate={{ scaleY: 1 }}
+                className={cn("h-full origin-left rounded-pill", color)}
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: value / scale }}
                 transition={SPRING.smooth}
-                style={{ height: `${(h.revenueCents / max) * 100}%` }}
-              />
-              <div
-                className={cn("w-full rounded-xs", h.profitCents >= 0 ? "bg-gain" : "bg-loss")}
-                style={{ height: `${Math.max(2, (Math.abs(h.profitCents) / max) * 30)}%` }}
               />
             </div>
+          </div>
+        ))}
+      </div>
+      <p className="text-sm text-pretty text-fg-3">{q.utilizationBps >= 9_900 ? t("soldOut") : t("idle")}</p>
+
+      <div className="rounded-md bg-surface-2 px-4 pt-3 pb-4 font-mono text-sm">
+        <dl className="space-y-1.5">
+          <div className="flex justify-between">
+            <dt className="text-fg-2">{t("revenue")}</dt>
+            <dd className="nums text-fg-1">{money(q.revenueCents)}</dd>
+          </div>
+          {costs.map(([label, value]) => (
+            <div key={label} className="flex justify-between">
+              <dt className="text-fg-3">{label}</dt>
+              <dd className="nums text-fg-2">−{money(value)}</dd>
+            </div>
           ))}
+        </dl>
+        <div className="my-2.5 border-t border-dashed border-line-2" />
+        <div className="flex items-center justify-between gap-3">
+          <span className="font-semibold text-fg-1">{t("profit")}</span>
+          <span
+            aria-hidden
+            className={cn(
+              "ml-auto -rotate-6 rounded-xs border-2 px-1.5 py-0.5 label-pixel",
+              profit >= 0 ? "border-gain text-gain" : "border-loss text-loss",
+            )}
+          >
+            {profit >= 0 ? t("stampProfit") : t("stampLoss")}
+          </span>
+          <span className={cn("nums text-lg font-semibold", profit >= 0 ? "text-gain" : "text-loss")}>
+            {money(profit)}
+          </span>
         </div>
-      )}
-    </Card>
+      </div>
+    </Panel>
   );
 }
 
+/** Revenue (bars up) and profit (green up, red down) around a zero line. */
+function HistoryCard({ company }: { company: MyCompany }) {
+  const t = useTranslations("firm");
+  const history = company.history;
+  const max = Math.max(1, ...history.map((h) => Math.max(h.revenueCents, Math.abs(h.profitCents))));
+  const hasLoss = history.some((h) => h.profitCents < 0);
+  return (
+    <Panel title={t("historyTitle")}>
+      {history.length === 0 ? (
+        <p className="text-sm text-fg-3">{t("historyEmpty")}</p>
+      ) : (
+        <>
+          <div className="flex h-40 flex-col" role="img" aria-label={t("historyTitle")}>
+            <div className="flex flex-1 items-end gap-1.5 border-b border-line-2">
+              {history.map((h) => (
+                <div
+                  key={h.label}
+                  className="flex h-full min-w-0 flex-1 items-end gap-0.5"
+                  title={`${h.label}: ${money(h.revenueCents)} / ${money(h.profitCents)}`}
+                >
+                  <Bar className="bg-accent/70" share={h.revenueCents / max} from="bottom" />
+                  <Bar className="bg-gain" share={Math.max(0, h.profitCents) / max} from="bottom" />
+                </div>
+              ))}
+            </div>
+            {hasLoss && (
+              <div className="flex h-1/3 gap-1.5">
+                {history.map((h) => (
+                  <div key={h.label} className="flex h-full min-w-0 flex-1 items-start gap-0.5">
+                    <span className="flex-1" />
+                    <Bar className="bg-loss" share={Math.max(0, -h.profitCents) / max} from="top" />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="flex gap-4 text-xs text-fg-3">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="size-2 rounded-xs bg-accent/70" /> {t("revenue")}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="size-2 rounded-xs bg-gain" /> {t("profit")}
+            </span>
+          </div>
+        </>
+      )}
+    </Panel>
+  );
+}
+
+function Bar({ share, className, from }: { share: number; className: string; from: "top" | "bottom" }) {
+  return (
+    <motion.div
+      className={cn(
+        "w-full flex-1",
+        from === "bottom" ? "origin-bottom rounded-t-xs" : "origin-top rounded-b-xs",
+        className,
+      )}
+      initial={{ scaleY: 0 }}
+      animate={{ scaleY: 1 }}
+      transition={SPRING.smooth}
+      style={{ height: `${Math.max(share > 0 ? 3 : 0, share * 100)}%` }}
+    />
+  );
+}
+
+/** Awareness and quality as chunky ten-block meters. */
 function MarketCard({ company }: { company: MyCompany }) {
   const t = useTranslations("firm");
   return (
-    <Card padding="lg" className="space-y-4">
-      <p className="label-pixel text-fg-2">{t("marketTitle")}</p>
-      <div>
-        <div className="mb-1 flex justify-between text-sm">
-          <span className="text-fg-2">{t("awareness")}</span>
-          <span className="nums text-fg-1">{formatBps(company.awarenessBps).replace("+", "")}</span>
-        </div>
-        <Progress value={company.awarenessBps / 10_000} label={t("awareness")} />
-      </div>
-      <div>
-        <div className="mb-1 flex justify-between text-sm">
-          <span className="text-fg-2">{t("quality")}</span>
-          <span className="nums text-fg-1">{formatBps(company.qualityBps).replace("+", "")}</span>
-        </div>
-        <Progress value={company.qualityBps / 10_000} label={t("quality")} tone="gain" />
-      </div>
+    <Panel title={t("marketTitle")}>
+      <Meter label={t("awareness")} bps={company.awarenessBps} tone="accent" />
+      <Meter label={t("quality")} bps={company.qualityBps} tone="gain" />
       <div className="rounded-md bg-surface-2 px-3 py-2.5">
         <p className="text-sm text-fg-2">{t("estimate")}</p>
         <p className="nums font-semibold text-fg-1">
@@ -348,11 +352,44 @@ function MarketCard({ company }: { company: MyCompany }) {
         </p>
         <p className="text-xs text-fg-3">{t("estimateHint")}</p>
       </div>
-    </Card>
+    </Panel>
   );
 }
 
-function Controls({ company }: { company: MyCompany }) {
+function Meter({ label, bps, tone }: { label: string; bps: number; tone: "accent" | "gain" }) {
+  const filled = bps / 1_000;
+  return (
+    <div>
+      <div className="mb-1.5 flex justify-between text-sm">
+        <span className="text-fg-2">{label}</span>
+        <span className="nums text-fg-1">{formatBps(bps).replace("+", "")}</span>
+      </div>
+      <div
+        className="grid grid-cols-10 gap-1"
+        role="meter"
+        aria-label={label}
+        aria-valuenow={bps / 100}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      >
+        {Array.from({ length: 10 }, (_, i) => {
+          const part = Math.min(1, Math.max(0, filled - i));
+          return (
+            <span key={i} className="h-3 overflow-hidden rounded-xs bg-surface-3">
+              <span
+                className={cn("block h-full origin-left", tone === "gain" ? "bg-gain" : "bg-accent")}
+                style={{ transform: `scaleX(${part})` }}
+              />
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** The boss's office: marketing, team, money, the next building and, far down, closing the company. */
+function BossOffice({ company, onTeam }: { company: MyCompany; onTeam: () => void }) {
   const t = useTranslations("firm");
   const errorText = useGameErrorText();
   const refresh = useCompanyRefresh();
@@ -363,11 +400,13 @@ function Controls({ company }: { company: MyCompany }) {
   const [upgradeState, setUpgradeState] = useState<ButtonState>("idle");
   const [closing, setClosing] = useState(false);
   const staff = company.employees + company.aiWorkers;
+  const next = NEXT_TIER[company.tier];
 
   const run = async (action: () => Promise<unknown>, done: string) => {
     await action();
     toast.success(done, undefined, { silent: true });
     void playSound("success");
+    haptic("success");
     await refresh();
   };
 
@@ -395,9 +434,7 @@ function Controls({ company }: { company: MyCompany }) {
   };
 
   return (
-    <Card padding="lg" className="space-y-5">
-      <p className="label-pixel text-fg-2">{t("controlsTitle")}</p>
-
+    <Panel title={t("controlsTitle")}>
       <div className="space-y-2">
         <div className="flex items-baseline justify-between">
           <span className="text-sm text-fg-2">{t("marketingBudget")}</span>
@@ -420,28 +457,29 @@ function Controls({ company }: { company: MyCompany }) {
         </Button>
       </div>
 
-      <div className="space-y-2">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm text-fg-2">{t("aiWorkers")}</p>
-            <p className="text-xs text-fg-3">{t("staffCount", { used: staff, max: company.maxEmployees })}</p>
-          </div>
-          <span className="nums text-lg font-semibold text-fg-1" data-testid="ai-workers">
-            {company.aiWorkers}
+      <button
+        type="button"
+        onClick={() => {
+          haptic("tap");
+          onTeam();
+        }}
+        className="flex w-full items-center gap-3 rounded-md bg-surface-2 px-3 py-3 text-left focus-ring transition duration-fast hover:-translate-y-0.5 hover:bg-surface-3 active:translate-y-0 active:scale-[0.98]"
+      >
+        <PixelIcon {...UI_ICONS.profile} scale={2} className="text-fg-2" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm text-fg-1">{t("staffCount", { used: staff, max: company.maxEmployees })}</span>
+          <span className="block text-xs text-fg-3">
+            {t("teamLine", { ai: company.aiWorkers })} ·{" "}
+            <span className="nums text-gain">
+              {t("productivityValue", { value: factor.format(company.teamProductivityBps / 10_000) })}
+            </span>{" "}
+            · {t("capacity")} <ShortMoney cents={company.capacityCents} />
           </span>
-        </div>
-        <p className="text-xs text-pretty text-fg-3">{t("aiWorkersViaPosting")}</p>
-        <p className="text-sm text-fg-2">
-          {t("productivity")}:{" "}
-          <span className="nums text-gain">
-            {t("productivityValue", { value: factor.format(company.teamProductivityBps / 10_000) })}
-          </span>{" "}
-          <span className="text-xs text-fg-3">
-            ({t("founderProductivity", { value: factor.format(company.founderProductivityBps / 10_000) })} ·{" "}
-            {t("capacity")} {formatMoney(company.capacityCents, { whole: true })})
-          </span>
-        </p>
-      </div>
+        </span>
+        <span className="nums text-lg font-semibold text-fg-1" data-testid="ai-workers" title={t("aiWorkers")}>
+          {company.aiWorkers}
+        </span>
+      </button>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-sm text-fg-2">{t("money")}</span>
@@ -454,46 +492,56 @@ function Controls({ company }: { company: MyCompany }) {
           </Button>
         </div>
       </div>
-
-      {company.upgradeCostCents !== null && (company.tier === "garage" || company.tier === "small_business") && (
-        <div className="rounded-md border border-line-1 px-3 py-3">
-          <p className="text-sm font-medium text-fg-1">
-            {company.tier === "garage" ? t("upgradeTitle") : t("upgradeGmbhTitle")}
-          </p>
-          <p className="mt-0.5 text-xs text-fg-3">
-            {company.tier === "garage"
-              ? t("upgradeText", { amount: formatMoney(company.upgradeCostCents, { whole: true }) })
-              : t("upgradeGmbhText", { amount: formatMoney(company.upgradeCostCents, { whole: true }) })}
-          </p>
-          <Button
-            size="sm"
-            className="mt-2"
-            state={upgradeState}
-            disabled={!company.canUpgrade}
-            onClick={() => void upgrade()}
-          >
-            {company.canUpgrade
-              ? t("upgrade")
-              : t("upgradeLockedAt", {
-                  level:
-                    company.tier === "garage" ? BALANCE.company.tiers[0]!.minLevel : BALANCE.startups.gmbh.minLevel,
-                })}
-          </Button>
-        </div>
-      )}
       <MoneySheet mode={money} company={company} onClose={() => setMoney(null)} />
 
-      <div className="border-t border-line-1 pt-4">
-        <p className="text-sm text-fg-2" title={t("payFactorHint")}>
-          {t("payFactor", { value: formatBps(company.payFactorBps).replace("+", "") })}
-        </p>
-        <p className="mt-0.5 text-xs text-pretty text-fg-3">{t("payFactorHint")}</p>
-        <Button size="sm" variant="danger" className="mt-3" onClick={() => setClosing(true)}>
-          {t("closeTitle")}
-        </Button>
-      </div>
+      {next &&
+        company.upgradeCostCents !== null &&
+        (company.tier === "garage" || company.tier === "small_business") && (
+          <div className="flex gap-3 rounded-md border border-line-1 bg-surface-1 px-3 py-3">
+            <PixelIcon
+              {...COMPANY_BUILDINGS[next]}
+              scale={3}
+              className={cn(!company.canUpgrade && "opacity-50 grayscale")}
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-fg-1">
+                {company.tier === "garage" ? t("upgradeTitle") : t("upgradeGmbhTitle")}
+              </p>
+              <p className="mt-0.5 text-xs text-pretty text-fg-3">
+                {company.tier === "garage"
+                  ? t("upgradeText", { amount: formatMoney(company.upgradeCostCents, { whole: true }) })
+                  : t("upgradeGmbhText", { amount: formatMoney(company.upgradeCostCents, { whole: true }) })}
+              </p>
+              <Button
+                size="sm"
+                className="mt-2"
+                state={upgradeState}
+                disabled={!company.canUpgrade}
+                onClick={() => void upgrade()}
+              >
+                {company.canUpgrade
+                  ? t("upgrade")
+                  : t("upgradeLockedAt", {
+                      level:
+                        company.tier === "garage" ? BALANCE.company.tiers[0]!.minLevel : BALANCE.startups.gmbh.minLevel,
+                    })}
+              </Button>
+            </div>
+          </div>
+        )}
+
+      <details className="group rounded-md border border-line-1 px-3 py-2 text-sm">
+        <summary className="cursor-pointer list-none text-fg-3 focus-ring hover:text-fg-1">{t("moreSettings")}</summary>
+        <div className="mt-3 space-y-2">
+          <p className="text-fg-2">{t("payFactor", { value: formatBps(company.payFactorBps).replace("+", "") })}</p>
+          <p className="text-xs text-pretty text-fg-3">{t("payFactorHint")}</p>
+          <Button size="sm" variant="danger" onClick={() => setClosing(true)}>
+            {t("closeTitle")}
+          </Button>
+        </div>
+      </details>
       <CloseSheet company={company} open={closing} onClose={() => setClosing(false)} />
-    </Card>
+    </Panel>
   );
 }
 
@@ -589,74 +637,5 @@ function CloseSheet({ company, open, onClose }: { company: MyCompany; open: bool
         {t("closeEstimate", { cash: money(company.cashCents), unpaid: money(company.unpaidCents) })}
       </p>
     </Sheet>
-  );
-}
-
-/** Growth stages of the product (ADR-062): which specialists the company has and needs next. */
-function GrowthCard({
-  company,
-  onHire,
-  onTrain,
-}: {
-  company: MyCompany;
-  onHire: (skills: string[]) => void;
-  onTrain: () => void;
-}) {
-  const t = useTranslations("firm");
-  const tn = useTranslations("skills.nodes");
-  const product = useProductText();
-  const name = (key: string) => tn(`${key}.name` as Parameters<typeof tn>[0]);
-  const next = company.stages.find((st) => !st.reached);
-  const missing = next?.skills.filter((s) => !s.coveredBy).map((s) => s.key) ?? [];
-  return (
-    <Card padding="lg" className="space-y-4" data-testid="growth" data-tour="growth">
-      <div>
-        <p className="label-pixel text-fg-2">
-          {t("growthTitle")} · {product.name(company.productKey)}
-        </p>
-        <p className="mt-1 text-sm text-pretty text-fg-3">{t("growthIntro")}</p>
-      </div>
-      <ol className="space-y-2">
-        {company.stages.map((st) => (
-          <li
-            key={st.stage}
-            className={cn(
-              "rounded-md border px-3 py-2",
-              st.reached ? "border-gain/40 bg-gain-soft" : st === next ? "border-accent" : "border-line-1 opacity-70",
-            )}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <span className="label-pixel text-fg-1">{t("stageN", { stage: st.stage })}</span>
-              {st.reached && <span className="label-pixel text-gain">{t("stageReached")}</span>}
-            </div>
-            <ul className="mt-1 space-y-0.5 text-sm">
-              {st.skills.map((s) => (
-                <li key={s.key} className="flex justify-between gap-2">
-                  <span className="text-fg-1">{name(s.key)}</span>
-                  <span className={s.coveredBy ? "text-gain" : "text-fg-3"}>
-                    {s.coveredBy ? t("coveredBy", { name: s.coveredBy }) : t("missing")}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </li>
-        ))}
-      </ol>
-      {next ? (
-        <div className="space-y-2">
-          <p className="text-sm text-fg-1">{t("nextStep", { skills: missing.map(name).join(", ") })}</p>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => onHire(missing)}>
-              {t("hireFor")}
-            </Button>
-            <Button size="sm" variant="secondary" onClick={onTrain}>
-              {t("trainFor")}
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <p className="text-sm text-gain">{t("allStages")}</p>
-      )}
-    </Card>
   );
 }

@@ -1,11 +1,11 @@
 {
   "offer": {
-    "id": "c23df185-e4c6-4996-94b0-5e6bf64be10c",
+    "id": "22e609e6-113c-499b-b5b5-e637d0fbb1c2",
     "kind": "ipo",
     "status": "open",
     "ticker": null,
     "company": {
-      "id": "6fad532c-0cc0-4e0d-8863-c8d63cf23643",
+      "id": "b50b4c9c-2f8d-449f-9247-84226efd8cf6",
       "logo": {
         "grid": [
           "................",
@@ -29,14 +29,14 @@
       },
       "name": "Fixture Labor",
       "color": "#2266cc",
-      "stage": 0,
+      "stage": 1,
       "sector": "tech",
       "product_key": "security_software"
     },
-    "ends_at": "2026-11-12T08:53:52.261083+00:00",
+    "ends_at": "2026-11-12T09:24:40.499033+00:00",
     "price_cents": 100,
-    "value_cents": 1014739,
-    "last_quarter": { "label": "J1 Q2", "profit_cents": -108646, "revenue_cents": 1805 },
+    "value_cents": 1025727,
+    "last_quarter": { "label": "J1 Q2", "profit_cents": -97658, "revenue_cents": 16456 },
     "my_shares_e6": 250000000,
     "shares_offered_e6": 200000000000,
     "shares_subscribed_e6": 250000000

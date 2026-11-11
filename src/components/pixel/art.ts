@@ -554,6 +554,96 @@ export const UI_ICONS = {
 
 export type UiIconName = keyof typeof UI_ICONS;
 
+// ---------------------------------------------------------------- company buildings (ADR-071)
+
+/** The headquarters grows with the company tier: garage, shop, office, tower. */
+export const COMPANY_BUILDINGS = {
+  garage: {
+    palette: { k: OUTLINE, w: "#e2cfa8", r: "#c8553d", d: "#9aa6b8" },
+    grid: [
+      "................",
+      "................",
+      "................",
+      "................",
+      "................",
+      "......kkkk......",
+      "....kkrrrrkk....",
+      "..kkrrrrrrrrkk..",
+      "kkrrrrrrrrrrrrkk",
+      ".kwwwwwwwwwwwwk.",
+      ".kwwkkkkkkkkwwk.",
+      ".kwwkddddddkwwk.",
+      ".kwwkkkkkkkkwwk.",
+      ".kwwkddddddkwwk.",
+      ".kwwkddddddkwwk.",
+      "kkkkkkkkkkkkkkkk",
+    ],
+  },
+  small_business: {
+    palette: { k: OUTLINE, w: "#f0e2c4", s: "#ffd15c", a: "#ff6170", b: "#fff3e6", g: "#62c8ff" },
+    grid: [
+      "................",
+      "................",
+      "................",
+      ".kkkkkkkkkkkkkk.",
+      ".kwsssssssssswk.",
+      ".kwwwwwwwwwwwwk.",
+      "kabababababababk",
+      ".kwwwwwwwwwwwwk.",
+      ".kwggggwkaakwwk.",
+      ".kwgbbgwkaakwwk.",
+      ".kwggggwkaakwwk.",
+      ".kwggggwkaakwwk.",
+      ".kwwwwwwkaakwwk.",
+      ".kwwwwwwkaskwwk.",
+      ".kwwwwwwkaakwwk.",
+      "kkkkkkkkkkkkkkkk",
+    ],
+  },
+  gmbh: {
+    palette: { k: OUTLINE, w: "#c9d3e3", g: "#62c8ff", d: "#46597a" },
+    grid: [
+      "................",
+      "................",
+      "...kkkkkkkkkk...",
+      "...kwwwwwwwwk...",
+      "...kwgwgwgwgk...",
+      "...kwwwwwwwwk...",
+      "...kwgwgwgwgk...",
+      "...kwwwwwwwwk...",
+      ".kkkkkkkkkkkkkk.",
+      ".kwwwwwwwwwwwwk.",
+      ".kwgwgwgwgwgwwk.",
+      ".kwwwwwwwwwwwwk.",
+      ".kwgwgwkddkgwwk.",
+      ".kwwwwwkddkwwwk.",
+      ".kwwwwwkddkwwwk.",
+      "kkkkkkkkkkkkkkkk",
+    ],
+  },
+  ag: {
+    palette: { k: OUTLINE, w: "#aab6cc", g: "#7fd8ff", d: "#2f3c58", f: "#ff6170" },
+    grid: [
+      "......kfff......",
+      "......kff.......",
+      "......k.........",
+      "....kkkkkkkk....",
+      "....kgwggwgk....",
+      "....kwwwwwwk....",
+      "....kgwggwgk....",
+      "....kwwwwwwk....",
+      "....kgwggwgk....",
+      "..kkkwwwwwwkkk..",
+      "..kgwgwggwgwgk..",
+      "..kwwwwwwwwwwk..",
+      "..kgwgwggwgwgk..",
+      "..kwwwkddkwwwk..",
+      "..kwwwkddkwwwk..",
+      "kkkkkkkkkkkkkkkk",
+    ],
+  },
+} as const satisfies Record<string, PixelArt>;
+
 /** Everything, for the showcase page and the shape test. */
 export const ALL_PIXEL_ART: Record<string, PixelArt> = {
   ...Object.fromEntries(Object.entries(SECTOR_ICONS).map(([k, v]) => [`sector/${k}`, v])),
@@ -563,4 +653,5 @@ export const ALL_PIXEL_ART: Record<string, PixelArt> = {
   bear: BEAR,
   ...Object.fromEntries(Object.entries(FINN).map(([k, v]) => [`finn/${k}`, v])),
   ...Object.fromEntries(Object.entries(UI_ICONS).map(([k, v]) => [`ui/${k}`, v])),
+  ...Object.fromEntries(Object.entries(COMPANY_BUILDINGS).map(([k, v]) => [`building/${k}`, v])),
 };

@@ -21,13 +21,14 @@ import { BALANCE } from "@/config/balance";
 import { SKILL_BRANCHES, SKILL_NODES, type SkillBranch } from "@/config/skills";
 import { useJobTitle } from "@/features/career/components/job-title";
 import { useGameErrorText } from "@/features/game/errors";
-import { engine } from "@/features/game/store";
+import { engine, useGame } from "@/features/game/store";
 import type { CareerTier, CompanyApplication, JobRequirementInfo, MyCompany, TeamMember } from "@/features/game/types";
 import { formatBps, formatMoney } from "@/lib/format";
 import { fitPercent } from "@/lib/sim/skills";
 import { trainingFor } from "@/lib/sim/startup";
 import { isDemoMode } from "@/lib/supabase/env";
 import { playSound } from "@/lib/sound";
+import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { useCompanyApplications, useCompanyPostings, useCompanyRefresh, useCompanyTeam } from "../hooks";
 
@@ -40,7 +41,7 @@ const baseWage = (tier: CareerTier): number =>
 
 // ------------------------------------------------------------------ postings
 
-export function Postings({ company, prefillSkills }: { company: MyCompany; prefillSkills?: string[] }) {
+export function Postings({ onCreate }: { onCreate: () => void }) {
   const t = useTranslations("firm");
   const tc = useTranslations("careerTiers");
   const tb = useTranslations("skills.branches");
@@ -48,8 +49,6 @@ export function Postings({ company, prefillSkills }: { company: MyCompany; prefi
   const errorText = useGameErrorText();
   const refresh = useCompanyRefresh();
   const postings = useCompanyPostings(true);
-  // Coming from the growth card: open the form with the missing skills.
-  const [creating, setCreating] = useState(Boolean(prefillSkills?.length));
 
   const close = async (id: string) => {
     try {
@@ -62,7 +61,7 @@ export function Postings({ company, prefillSkills }: { company: MyCompany; prefi
 
   return (
     <div className="space-y-4">
-      <Button onClick={() => setCreating(true)}>{t("newPosting")}</Button>
+      <Button onClick={onCreate}>{t("newPosting")}</Button>
       {!postings.data ? (
         <Skeleton className="h-28 w-full rounded-lg" />
       ) : postings.data.length === 0 ? (
@@ -113,27 +112,27 @@ export function Postings({ company, prefillSkills }: { company: MyCompany; prefi
           ))}
         </ul>
       )}
-      <CreatePostingSheet
-        company={company}
-        open={creating}
-        initialSkills={prefillSkills}
-        onClose={() => setCreating(false)}
-      />
     </div>
   );
 }
 
-function CreatePostingSheet({
+export interface HireRequest {
+  skills?: string[];
+  kind?: "player" | "ai";
+}
+
+/** One form for both: post a job for players, or hire AI workers at once (ADR-069, ADR-071). */
+export function HireSheet({
   company,
-  open,
-  initialSkills,
+  request,
   onClose,
 }: {
   company: MyCompany;
-  open: boolean;
-  initialSkills?: string[];
+  request: HireRequest | null;
   onClose: () => void;
 }) {
+  const open = request !== null;
+  const initialSkills = request?.skills;
   const t = useTranslations("firm");
   const tc = useTranslations("careerTiers");
   const tb = useTranslations("skills.branches");
@@ -146,8 +145,9 @@ function CreatePostingSheet({
   const [wage, setWage] = useState(baseWage("intern"));
   const [slots, setSlots] = useState(1);
   const [skills, setSkills] = useState<string[]>(initialSkills ?? []);
-  const [kind, setKind] = useState<"player" | "ai">("player");
+  const [kind, setKind] = useState<"player" | "ai">(request?.kind ?? "player");
   const [aiCount, setAiCount] = useState(1);
+  const [aiSkill, setAiSkill] = useState<string | null>(null);
   const [state, setState] = useState<ButtonState>("idle");
   const freeSlots = Math.max(0, company.maxEmployees - company.employees - company.aiWorkers);
   const hireCount = Math.max(1, Math.min(aiCount, freeSlots));
@@ -157,6 +157,9 @@ function CreatePostingSheet({
     if (open) {
       setState("idle");
       setAiCount(1);
+      setKind(request?.kind ?? "player");
+      setSkills(initialSkills ?? []);
+      setAiSkill(initialSkills?.length === 1 ? initialSkills[0]! : null);
     }
   }
 
@@ -198,7 +201,7 @@ function CreatePostingSheet({
   const hireAi = async () => {
     setState("loading");
     try {
-      await engine.setAiWorkers(crypto.randomUUID(), company.aiWorkers + hireCount);
+      await engine.hireAiWorkers(crypto.randomUUID(), aiSkill ? 1 : hireCount, aiSkill);
       setState("success");
       void playSound("success");
       toast.success(t("aiHired", { count: hireCount }), undefined, { silent: true });
@@ -221,7 +224,7 @@ function CreatePostingSheet({
       footer={
         kind === "ai" ? (
           <Button block size="lg" state={state} disabled={freeSlots === 0} onClick={() => void hireAi()}>
-            {t("aiHire", { count: hireCount })}
+            {t("aiHire", { count: aiSkill ? 1 : hireCount })}
           </Button>
         ) : (
           <Button
@@ -248,7 +251,14 @@ function CreatePostingSheet({
           ]}
         />
         {kind === "ai" ? (
-          <AiHirePanel company={company} count={aiCount} freeSlots={freeSlots} onCount={setAiCount} />
+          <AiHirePanel
+            company={company}
+            count={aiSkill ? 1 : aiCount}
+            freeSlots={freeSlots}
+            onCount={setAiCount}
+            skill={aiSkill}
+            onSkill={setAiSkill}
+          />
         ) : (
           <PlayerPostingFields>
             <Field
@@ -351,13 +361,20 @@ function AiHirePanel({
   count,
   freeSlots,
   onCount,
+  skill,
+  onSkill,
 }: {
   company: MyCompany;
   count: number;
   freeSlots: number;
   onCount: (count: number) => void;
+  skill: string | null;
+  onSkill: (skill: string | null) => void;
 }) {
   const t = useTranslations("firm");
+  const tn = useTranslations("skills.nodes");
+  // Open stage seats an AI worker can fill (ADR-071).
+  const open = company.stages.flatMap((st) => st.skills).filter((s) => !s.coveredBy && !s.coveredByAi);
   const penalty = BALANCE.startups.aiQualityPenalty;
   return (
     <div className="space-y-4" data-testid="ai-hire">
@@ -369,6 +386,31 @@ function AiHirePanel({
           <li>{t("aiPointQuality", { percent: Math.round(penalty * 100) })}</li>
         </ul>
       </Card>
+      {open.length > 0 && (
+        <div>
+          <p className="mb-1.5 label-pixel text-fg-2">{t("aiFor")}</p>
+          <div role="radiogroup" aria-label={t("aiFor")} className="flex flex-wrap gap-1.5">
+            {[null, ...open.map((s) => s.key)].map((key) => (
+              <button
+                key={key ?? "general"}
+                type="button"
+                role="radio"
+                aria-checked={skill === key}
+                onClick={() => onSkill(key)}
+                className={cn(
+                  "rounded-sm border px-2.5 py-1.5 text-xs focus-ring transition-colors duration-fast",
+                  skill === key
+                    ? "border-accent bg-accent-soft text-fg-1"
+                    : "border-line-1 text-fg-2 hover:bg-surface-2",
+                )}
+              >
+                {key ? tn(`${key}.name` as Parameters<typeof tn>[0]) : t("aiGeneral")}
+              </button>
+            ))}
+          </div>
+          {skill && <p className="mt-1.5 text-xs text-pretty text-fg-3">{t("aiForHint")}</p>}
+        </div>
+      )}
       <div className="flex items-baseline justify-between">
         <span className="label-pixel text-fg-2">{t("aiWage")}</span>
         <span className="nums font-semibold text-fg-1">
@@ -377,7 +419,7 @@ function AiHirePanel({
       </div>
       {freeSlots === 0 ? (
         <p className="text-sm text-loss">{t("aiNoSlots", { max: company.maxEmployees })}</p>
-      ) : (
+      ) : skill ? null : (
         <div className="flex items-center justify-between">
           <span className="label-pixel text-fg-2">{t("aiCount")}</span>
           <Segmented<string>
@@ -563,51 +605,166 @@ function CounterSheet({ application, onClose }: { application: CompanyApplicatio
 
 // ------------------------------------------------------------------ team
 
-export function Team({ company }: { company: MyCompany }) {
+export function TeamView({ company, onHire }: { company: MyCompany; onHire: (request: HireRequest) => void }) {
   const t = useTranslations("firm");
   const team = useCompanyTeam(company.id);
   const [firing, setFiring] = useState<TeamMember | null>(null);
+  const general = Math.max(0, company.aiWorkers - company.aiWorkerSkills.length);
+  const used = company.employees + company.aiWorkers;
+  const free = Math.max(0, company.maxEmployees - used);
+  return (
+    <div className="space-y-8">
+      <Section title={t("seatsTitle")} aside={t("staffCount", { used, max: company.maxEmployees })}>
+        {!team.data ? (
+          <Skeleton className="h-32 w-full rounded-lg" />
+        ) : (
+          <ul className="grid gap-3 lg:grid-cols-2" data-testid="seats">
+            <li>
+              <FounderSeat company={company} />
+            </li>
+            {team.data.map((m) => (
+              <li key={m.playerJobId}>
+                <MemberRow member={m} onFire={() => setFiring(m)} />
+              </li>
+            ))}
+            {company.aiWorkerSkills.map((skill) => (
+              <li key={`ai-${skill}`}>
+                <AiWorkerRow company={company} skill={skill} />
+              </li>
+            ))}
+            {Array.from({ length: general }, (_, i) => (
+              <li key={`ai-general-${i}`}>
+                <AiWorkerRow company={company} skill={null} />
+              </li>
+            ))}
+            {Array.from({ length: free }, (_, i) => (
+              <li key={`free-${i}`}>
+                <FreeSeat onHire={() => onHire({})} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
+      <Section title={t("tabApplications")}>
+        <Applications company={company} />
+      </Section>
+      <Section title={t("tabPostings")}>
+        <Postings onCreate={() => onHire({})} />
+      </Section>
+      <Section id="training" title={t("trainingTitle")}>
+        <Training company={company} members={team.data ?? []} />
+      </Section>
+      <FireSheet member={firing} onClose={() => setFiring(null)} />
+    </div>
+  );
+}
+
+function Section({ id, title, aside, children }: { id?: string; title: string; aside?: string; children: ReactNode }) {
+  return (
+    <section id={id} className="scroll-mt-24 space-y-3">
+      <div className="flex items-baseline justify-between gap-3 border-b border-line-1 pb-2">
+        <h3 className="label-pixel text-fg-1">{title}</h3>
+        {aside && <span className="nums text-xs text-fg-3">{aside}</span>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function FounderSeat({ company }: { company: MyCompany }) {
+  const t = useTranslations("firm");
+  const nickname = useGame((state) => state.portfolio?.nickname ?? "");
+  const avatarKey = useGame((state) => state.portfolio?.avatarKey ?? null);
+  return (
+    <Card padding="md" className="flex h-full items-center gap-3 border-accent/40 bg-accent-soft">
+      <Avatar avatarKey={avatarKey} size="sm" />
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-semibold text-fg-1">{nickname}</p>
+        <p className="text-sm text-fg-2">
+          {company.founderHasJob ? t("founderSideJob") : t("founderSeat")} ·{" "}
+          <span className="nums text-gain">
+            {t("productivityValue", { value: factor.format(company.founderProductivityBps / 10_000) })}
+          </span>
+        </p>
+      </div>
+      <span className="label-pixel text-accent">{t("boss")}</span>
+    </Card>
+  );
+}
+
+function FreeSeat({ onHire }: { onHire: () => void }) {
+  const t = useTranslations("firm");
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        haptic("tap");
+        onHire();
+      }}
+      className="flex h-full min-h-20 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-line-2 px-4 py-3 text-sm text-fg-2 focus-ring transition duration-fast hover:-translate-y-0.5 hover:border-accent hover:bg-surface-1 hover:text-fg-1 active:translate-y-0 active:scale-[0.98]"
+    >
+      <span className="text-lg text-accent">+</span> {t("freeSeat")}
+    </button>
+  );
+}
+
+/** Trainings (ADR-062) unlock once the team is big enough (ADR-071). */
+function Training({ company, members }: { company: MyCompany; members: TeamMember[] }) {
+  const t = useTranslations("firm");
   const [training, setTraining] = useState<TeamMember | null>(null);
-  if (!team.data) return <Skeleton className="h-32 w-full rounded-lg" />;
-  if (team.data.length === 0 && company.aiWorkers === 0) {
+  const size = company.employees + company.aiWorkers;
+  if (size < company.trainingFrom) {
     return (
-      <EmptyState
-        art={<PixelIcon {...UI_ICONS.profile} scale={4} />}
-        title={t("tabTeam")}
-        description={t("teamEmpty")}
-      />
+      <Card padding="lg" className="flex items-center gap-4 bg-surface-2/60" data-testid="training-locked">
+        <PixelIcon {...UI_ICONS.lock} scale={3} className="text-fg-3" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <p className="text-sm text-pretty text-fg-2">{t("trainingLocked", { count: company.trainingFrom })}</p>
+          <div className="h-2 overflow-hidden rounded-pill bg-surface-3">
+            <div
+              className="h-full origin-left rounded-pill bg-accent"
+              style={{ transform: `scaleX(${size / company.trainingFrom})` }}
+            />
+          </div>
+          <p className="nums text-xs text-fg-3">{t("trainingProgress", { size, count: company.trainingFrom })}</p>
+        </div>
+      </Card>
     );
+  }
+  if (members.length === 0) {
+    return <p className="text-sm text-fg-3">{t("trainingNoPlayers")}</p>;
   }
   return (
     <>
-      <ul className="space-y-3">
-        {team.data.map((m) => (
+      <p className="text-sm text-pretty text-fg-3">{t("trainIntro")}</p>
+      <ul className="grid gap-2 lg:grid-cols-2">
+        {members.map((m) => (
           <li key={m.playerJobId}>
-            <MemberRow member={m} onFire={() => setFiring(m)} onTrain={() => setTraining(m)} />
-          </li>
-        ))}
-        {Array.from({ length: company.aiWorkers }, (_, i) => (
-          <li key={`ai-${i}`}>
-            <AiWorkerRow company={company} />
+            <Card padding="md" className="flex items-center gap-3">
+              <Avatar avatarKey={m.avatarKey} size="xs" />
+              <span className="min-w-0 flex-1 truncate text-sm text-fg-1">{m.nickname}</span>
+              <Button size="sm" onClick={() => setTraining(m)}>
+                {t("train")}
+              </Button>
+            </Card>
           </li>
         ))}
       </ul>
-      <FireSheet member={firing} onClose={() => setFiring(null)} />
       <TrainSheet company={company} member={training} onClose={() => setTraining(null)} />
     </>
   );
 }
 
-/** One AI worker in the team list (ADR-069): fixed wage, no skills, can be let go at once. */
-function AiWorkerRow({ company }: { company: MyCompany }) {
+/** One AI worker in the team list (ADR-069, ADR-071): wage, maybe a stage skill it covers, can be let go at once. */
+function AiWorkerRow({ company, skill }: { company: MyCompany; skill: string | null }) {
   const t = useTranslations("firm");
+  const tn = useTranslations("skills.nodes");
   const errorText = useGameErrorText();
   const refresh = useCompanyRefresh();
   const [state, setState] = useState<ButtonState>("idle");
   const dismiss = async () => {
     setState("loading");
     try {
-      await engine.setAiWorkers(crypto.randomUUID(), Math.max(0, company.aiWorkers - 1));
+      await engine.dismissAiWorker(crypto.randomUUID(), skill);
       toast.success(t("aiDismissed"), undefined, { silent: true });
       await refresh();
     } catch (error) {
@@ -617,10 +774,15 @@ function AiWorkerRow({ company }: { company: MyCompany }) {
     }
   };
   return (
-    <Card padding="md" className="flex items-center gap-3">
-      <PixelIcon {...UI_ICONS.robot} scale={3} />
+    <Card padding="md" className="flex h-full items-center gap-3 border-info/30" data-testid="ai-seat">
+      <span className="grid size-10 shrink-0 place-items-center rounded-md bg-info-soft text-info">
+        <PixelIcon {...UI_ICONS.robot} scale={2} />
+      </span>
       <div className="min-w-0 flex-1">
         <p className="font-semibold text-fg-1">{t("aiWorkerName")}</p>
+        <p className="truncate text-xs text-info">
+          {skill ? t("aiForSkill", { skill: tn(`${skill}.name` as Parameters<typeof tn>[0]) }) : t("aiGeneral")}
+        </p>
         <p className="text-xs text-fg-3">
           {t("aiWageValue", { amount: formatMoney(company.aiWorkerCostCents, { whole: true }) })} ·{" "}
           {t("productivityValue", { value: factor.format(1) })}
@@ -633,7 +795,7 @@ function AiWorkerRow({ company }: { company: MyCompany }) {
   );
 }
 
-function MemberRow({ member, onFire, onTrain }: { member: TeamMember; onFire: () => void; onTrain: () => void }) {
+function MemberRow({ member, onFire }: { member: TeamMember; onFire: () => void }) {
   const tn = useTranslations("skills.nodes");
   const t = useTranslations("firm");
   const errorText = useGameErrorText();
@@ -651,7 +813,7 @@ function MemberRow({ member, onFire, onTrain }: { member: TeamMember; onFire: ()
     }
   };
   return (
-    <Card padding="md">
+    <Card padding="md" className="h-full">
       <div className="flex items-start gap-3">
         <Avatar avatarKey={member.avatarKey} size="sm" />
         <div className="min-w-0 flex-1">
@@ -666,14 +828,9 @@ function MemberRow({ member, onFire, onTrain }: { member: TeamMember; onFire: ()
             </span>
           </p>
         </div>
-        <div className="flex flex-col gap-2">
-          <Button size="sm" onClick={onTrain}>
-            {t("train")}
-          </Button>
-          <Button size="sm" variant="danger" onClick={onFire}>
-            {t("fire")}
-          </Button>
-        </div>
+        <Button size="sm" variant="ghost" onClick={onFire}>
+          {t("fire")}
+        </Button>
       </div>
       {member.skills.length > 0 && (
         <ul className="mt-2 flex flex-wrap gap-1">

@@ -79,27 +79,38 @@ test("found a garage startup, run quarters, hire and post a job", async ({ page 
   await header.getByText("Demo: Quartal jetzt abschließen").click();
   await expect(page.getByText(/Letztes Quartal · Q2/i)).toBeVisible();
 
-  // Post a job.
-  await page.getByText("Stellen", { exact: true }).click();
-  await page.getByRole("button", { name: "Stelle ausschreiben" }).click();
+  // Post a job from the team tab (ADR-071: seats, applications, postings, training in one place).
+  await page.getByRole("tab", { name: "Team" }).click();
+  await page.getByRole("button", { name: "Stelle ausschreiben", exact: true }).click();
   const posting = page.getByRole("dialog", { name: "Stelle ausschreiben" });
   await posting.getByLabel("Titel der Stelle").fill("Backstube digital");
   await posting.getByRole("button", { name: "Ausschreiben" }).click();
   await expect(page.getByText("Stelle ausgeschrieben")).toBeVisible();
   await expect(page.locator("#main").getByText("Backstube digital")).toBeVisible();
+  // Trainings unlock only with five people in the team.
+  await expect(page.getByTestId("training-locked")).toContainText("0 von 5 im Team");
 
-  // Hire an AI worker through the posting form (ADR-069): at once, with a wage, listed in the team.
-  await page.getByRole("button", { name: "Stelle ausschreiben" }).click();
+  // Fill the open growth seat with an AI worker (ADR-071): the seat then shows the AI, not "fehlt".
+  await page.getByRole("tab", { name: "Übersicht" }).click();
+  const growthPath = page.getByTestId("growth");
+  await growthPath.getByRole("button", { name: /IT-Sicherheit/ }).click();
   const hire = page.getByRole("dialog", { name: "Stelle ausschreiben" });
   await hire.getByRole("radio", { name: "KI-Kraft" }).click();
   await expect(hire.getByText("700 € pro Quartal", { exact: true })).toBeVisible();
+  await expect(hire.getByRole("radio", { name: "IT-Sicherheit" })).toHaveAttribute("aria-checked", "true");
   await hire.getByRole("button", { name: "KI-Kraft einstellen" }).click();
   await expect(page.getByText("KI-Kraft eingestellt")).toBeVisible();
-  await page.getByText("Team", { exact: true }).click();
-  await expect(page.locator("#main").getByRole("button", { name: "Entlassen" })).toHaveCount(1);
-  await page.getByText("Übersicht", { exact: true }).click();
+  await expect(growthPath.getByTestId("seat-ai")).toContainText("IT-Sicherheit");
+  await expect(growthPath.getByText("Stufe 1 von 4")).toBeVisible();
   await expect(page.getByTestId("ai-workers")).toHaveText("1");
   await expect(page.getByText("1 von 2 Plätzen belegt")).toBeVisible();
+
+  // In the team the AI worker sits in its own seat and can be let go.
+  await page.getByRole("tab", { name: "Team" }).click();
+  await expect(page.getByTestId("ai-seat")).toContainText("für IT-Sicherheit");
+  await page.getByTestId("ai-seat").getByRole("button", { name: "Entlassen" }).click();
+  await expect(page.getByText("KI-Kraft entlassen")).toBeVisible();
+  await expect(page.getByTestId("ai-seat")).toHaveCount(0);
 
   // The founder cannot take a job elsewhere; the career tab links to the company.
   await page.goto("/career");
@@ -128,6 +139,7 @@ test("company chat, then close the company voluntarily", async ({ page }) => {
 
   // Close: the cash comes back, the founding page shows the settlement.
   await page.getByText("Übersicht", { exact: true }).click();
+  await page.getByText("Lohnfaktor und Auflösen").click();
   await page.getByRole("button", { name: "Firma auflösen" }).click();
   await expect(page.getByRole("dialog", { name: "Firma auflösen" })).toBeVisible();
   await page.waitForTimeout(500); // the panel slides in

@@ -463,7 +463,16 @@ export interface MyCompany {
   /** Product and growth stages (ADR-062). */
   productKey: string;
   stage: number;
-  stages: { stage: number; reached: boolean; skills: { key: string; coveredBy: string | null }[] }[];
+  stages: {
+    stage: number;
+    reached: boolean;
+    /** coveredBy: nickname of a team member with the skill; coveredByAi: an AI worker hired for it (ADR-071). */
+    skills: { key: string; coveredBy: string | null; coveredByAi: boolean }[];
+  }[];
+  /** Skills AI workers were hired for; the others are general (ADR-071). */
+  aiWorkerSkills: string[];
+  /** Trainings unlock at this team size (ADR-071). */
+  trainingFrom: number;
   cashCents: number;
   valueCents: number;
   unpaidCents: number;
@@ -697,6 +706,8 @@ export const GAME_ERROR_KEYS = [
   "name_taken",
   "name_change_too_soon",
   "confirm_mismatch",
+  "skill_already_covered",
+  "training_locked",
   "mission_not_found",
   "mission_not_completed",
   "mission_already_claimed",
@@ -811,6 +822,10 @@ export interface GameEngine {
   submitWorkTask(requestId: string, taskId: string, choice: number): Promise<WorkTaskResult>;
   setCompanyMarketing(requestId: string, marketingCents: number): Promise<MyCompany>;
   setAiWorkers(requestId: string, count: number): Promise<MyCompany>;
+  /** Hire AI workers, optionally one for a stage skill it then covers (ADR-071). */
+  hireAiWorkers(requestId: string, count: number, skill?: string | null): Promise<MyCompany>;
+  /** Let one AI worker go: the one for this skill, or a general one. */
+  dismissAiWorker(requestId: string, skill?: string | null): Promise<MyCompany>;
   companyDeposit(requestId: string, amountCents: number): Promise<MyCompany>;
   companyWithdraw(requestId: string, amountCents: number): Promise<MyCompany>;
   upgradeCompany(requestId: string): Promise<MyCompany>;

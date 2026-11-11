@@ -1,27 +1,27 @@
 {
-  "id": "7f88a7ca-b221-43eb-97f8-fc69210ed7fa",
+  "id": "3f988db4-7c6e-4e95-8fff-24f9b07d3502",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "303359ba-c18b-4aa6-b6cd-45d91c9419d9",
+    "id": "048d86d3-afe9-47bd-b05d-3623e06b643e",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "cbfac5fd-3475-2166-ea22-0a85cbb6f5c0",
+      "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
       "logo": null,
-      "name": "Brotzeit Handel AG",
-      "color": "#F2A93B",
+      "name": "Frachtpilot",
+      "color": "#9ECE6A",
       "is_ai": true,
-      "sector": "retail",
-      "ticker": "BRZ"
+      "sector": "logistics",
+      "ticker": "FPT"
     },
-    "required": [{ "branch": "finance", "min_score": 0 }],
-    "title_key": "finance_intern",
+    "required": [{ "branch": "logistics", "min_score": 0 }],
+    "title_key": "logistics_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-11T20:53:51.74586+00:00",
-  "updated_at": "2026-11-11T20:53:51.749421+00:00",
-  "offer_expires_at": "2026-11-13T20:53:51.74586+00:00",
+  "created_at": "2026-11-11T21:24:39.898145+00:00",
+  "updated_at": "2026-11-11T21:24:39.902396+00:00",
+  "offer_expires_at": "2026-11-13T21:24:39.898145+00:00",
   "salary_wish_cents_per_hour": 15000,
   "offer_salary_cents_per_hour": 15000
 }

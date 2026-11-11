@@ -54,6 +54,28 @@ export function formatMoney(
   return options.sign && value > 0 ? `+${text}` : text;
 }
 
+const shortUnits = [
+  { at: 1e12, div: 1e12, unit: "Bio." },
+  { at: 1e9, div: 1e9, unit: "Mrd." },
+  { at: 1e6, div: 1e6, unit: "Mio." },
+] as const;
+const oneDecimal = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 1 });
+
+/**
+ * Short money for live counters (ADR-072): below 10.000 € in whole euros, then "15k €", "1,2 Mio. €".
+ * Always rounded towards zero, so "16k" only shows from 16.000 €. The exact amount belongs in a tooltip.
+ */
+export function formatMoneyShort(cents: Numeric): string {
+  const euros = Math.trunc(centsToEuros(cents));
+  const abs = Math.abs(euros);
+  const sign = euros < 0 ? "−" : "";
+  if (abs < 10_000) return eurWhole.format(euros);
+  for (const { at, div, unit } of shortUnits) {
+    if (abs >= at) return `${sign}${oneDecimal.format(Math.floor((abs / div) * 10) / 10)} ${unit} €`;
+  }
+  return `${sign}${integer.format(Math.floor(abs / 1_000))}k €`;
+}
+
 /** Prices below 1 € show up to four decimals so penny stocks stay readable. */
 export function formatPrice(priceE4: Numeric): string {
   const value = Number(priceE4) / PRICE_SCALE;

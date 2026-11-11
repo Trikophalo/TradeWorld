@@ -4751,3 +4751,50 @@ offer, last_price_e4 }`
 - Ein Admin kann sein Konto nicht löschen: `admin_actions.admin_id` setzt beim Löschen auf NULL, die Tabelle ist aber
   unveränderlich.
 - Texte mit dem Spitznamen (Firmenchat, Ranglisten-News) bleiben nach dem Löschen stehen.
+
+## Nachtrag: M3h (KI-Kräfte für Stufen-Skills, Schulungen ab Teamgröße)
+
+### Migrationen
+
+| Datei                                       | Inhalt                                                                                          |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `20261119000100_m3h_ai_skills_training.sql` | `player_companies.ai_worker_skills`, `hire_ai_workers`, `dismiss_ai_worker`, Stufen, Schulungen |
+
+### Schema
+
+- `player_companies.ai_worker_skills text[] not null default '{}'`: je ein Skill-Schlüssel pro KI-Kraft, die für einen
+  Stufen-Skill eingestellt wurde (in Einstellungsreihenfolge). KI-Kräfte über die Länge des Arrays hinaus sind
+  allgemeine KI-Kräfte. Für Clients lesbar wie `ai_workers`.
+- Invariante: `cardinality(ai_worker_skills) <= ai_workers` (Check-Constraint), keine Duplikate. Der Trigger
+  `ai_worker_skills_guard` entfernt Duplikate und kürzt das Array, sobald `ai_workers` sinkt. Dadurch halten alle
+  Wege, die KI-Kräfte entfernen (`set_ai_workers`, Quartalsabschluss mit offenen Rechnungen, Auflösung,
+  Konto-Reset), die Invariante: zuerst gehen allgemeine KI-Kräfte, dann spezialisierte vom Ende des Arrays.
+
+### RPCs
+
+- `hire_ai_workers(p_request_id, p_count, p_skill default null)` → `{ company }` (wie `set_ai_workers`). Nur
+  Gründer, idempotent über `request_id`, gleiche Platzgrenze (`maxEmployees` der Stufe, Spieler zählen mit).
+  Ohne `p_skill`: `p_count` allgemeine KI-Kräfte (1 bis 1000). Mit `p_skill`: `p_count` muss 1 sein, der Skill muss
+  zu einer Stufe des Produkts gehören (sonst `invalid_argument`) und darf noch nicht von einer KI-Kraft abgedeckt sein
+  (`skill_already_covered`).
+- `dismiss_ai_worker(p_request_id, p_skill default null)` → `{ company }`. Mit `p_skill`: entlässt die KI-Kraft für
+  diesen Skill (keine da: `invalid_argument`). Ohne: eine allgemeine KI-Kraft, gibt es keine, die zuletzt eingestellte
+  spezialisierte; ohne KI-Kräfte `invalid_argument`.
+- `set_ai_workers` bleibt unverändert; beim Senken greift der Trigger.
+- `train_employee` wirft `training_locked`, solange `company_headcount(firma)` (aktive Mitarbeiter plus KI-Kräfte)
+  unter `startups.training.fromEmployees` (Standard 5) liegt.
+
+### Stufen und COMPANY
+
+- `company_stage()` zählt Skills von KI-Kräften wie gelernte Skills des Teams. Alles, was die Stufe liest
+  (Quartalsabschluss, Arbeitgeberansicht, Jobs), folgt automatisch.
+- Stufen-Skills in `stages[].skills[]`: `{ key, covered_by, covered_by_ai }`. `covered_by` ist der Spitzname des
+  ersten Teammitglieds mit dem Skill (sonst `null`); `covered_by_ai` ist `true`, wenn nur eine KI-Kraft ihn abdeckt.
+- Neu im COMPANY-JSON: `ai_worker_skills: string[]` und `training_from: number`.
+
+### Neue Fehlerschlüssel
+
+| Schlüssel               | Code    |
+| ----------------------- | ------- |
+| `skill_already_covered` | `NX062` |
+| `training_locked`       | `NX063` |

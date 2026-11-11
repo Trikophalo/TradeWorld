@@ -114,7 +114,7 @@ select tests.company_of(:f) as fco \gset
 select tests.assert(
   :'fc'::jsonb ->> 'product_key' = 'mobile_app' and (:'fc'::jsonb ->> 'stage')::int = 0
   and jsonb_array_length(:'fc'::jsonb -> 'stages') = 4
-  and :'fc'::jsonb -> 'stages' -> 0 = '{"stage": 1, "reached": false, "skills": [{"key": "it_mobile", "covered_by": null}]}'::jsonb
+  and :'fc'::jsonb -> 'stages' -> 0 = '{"stage": 1, "reached": false, "skills": [{"key": "it_mobile", "covered_by": null, "covered_by_ai": false}]}'::jsonb
   and (select bool_and(jsonb_array_length(s -> 'skills') >= 1) from jsonb_array_elements(:'fc'::jsonb -> 'stages') s),
   'found_company(p_product): product, stage 0 and the skills of the four stages');
 
@@ -165,6 +165,9 @@ select tests.assert(
   'get_employer(): player company with founder, tier, product, stage and team size');
 
 -- training: the employee learns the stage-1 skill, the company reaches stage 1
+-- (trainings unlock from startups.training.fromEmployees since M3h; a garage never gets there, so lowered here)
+select coalesce(value #> '{training,fromEmployees}', '5') as tr_from from public.game_config where key = 'startups' \gset
+update public.game_config set value = jsonb_set(value, '{training,fromEmployees}', '1') where key = 'startups';
 select tests.login_as('authenticated', :f);
 select tests.throws_key(format($$select public.train_employee(gen_random_uuid(), %L, 'it_mobile')$$, :'wjob'),
   'insufficient_funds', 'train_employee(): paid from the company cash');
@@ -189,12 +192,13 @@ select tests.assert(
   and exists (select 1 from public.player_skills where player_id = :w and skill_key = 'it_mobile')
   and (select salary_cents_per_hour from public.player_jobs where id = :'wjob') = 16200
   and (:'fc2'::jsonb ->> 'stage')::int = 1
-  and :'fc2'::jsonb -> 'stages' -> 0 = '{"stage": 1, "reached": true, "skills": [{"key": "it_mobile", "covered_by": "Walter_Weg"}]}'::jsonb
+  and :'fc2'::jsonb -> 'stages' -> 0 = '{"stage": 1, "reached": true, "skills": [{"key": "it_mobile", "covered_by": "Walter_Weg", "covered_by_ai": false}]}'::jsonb
   and (:'fc2'::jsonb ->> 'capacity_cents')::bigint
       = round((:'fc2'::jsonb ->> 'team_productivity_bps')::int / 10000.0 * 300000 * 1.25)
   and :'member'::jsonb -> 'skills' @> '["it_mobile", "it_programming"]'::jsonb and :'member'::jsonb ? 'notice_ends_at'
   and exists (select 1 from public.company_messages where company_id = :'fco' and body = 'Walter_Weg hat eine Schulung abgeschlossen.'),
   'train_employee(): tier-3 training 12.000 EUR to the households, skill at once, wage +8 %; stage 1 reached, capacity +25 %');
+update public.game_config set value = jsonb_set(value, '{training,fromEmployees}', :'tr_from'::jsonb) where key = 'startups';
 
 -- quarter close with stage 1: awareness capped at 0.7
 update public.player_companies set awareness = 0.9, potential_annual_cents = 10000000000 where company_id = :'fco';

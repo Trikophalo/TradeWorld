@@ -598,7 +598,9 @@
     "offer_closed": "Die Zeichnung ist schon beendet.",
     "offer_sold_out": "Alle Aktien sind schon vergeben.",
     "already_listed": "Deine Firma ist schon an der Börse.",
-    "confirm_mismatch": "Der eingetippte Name passt nicht."
+    "confirm_mismatch": "Der eingetippte Name passt nicht.",
+    "skill_already_covered": "Für diesen Skill arbeitet schon eine KI-Kraft.",
+    "training_locked": "Schulungen gibt es erst ab 5 Leuten im Team."
   },
   "locks": {
     "level": "Level {level}",
@@ -1866,7 +1868,31 @@
     "aiHired": "{count, plural, one {KI-Kraft eingestellt} other {# KI-Kräfte eingestellt}}",
     "aiWorkerName": "KI-Kraft",
     "aiDismiss": "Entlassen",
-    "aiDismissed": "KI-Kraft entlassen"
+    "aiDismissed": "KI-Kraft entlassen",
+    "buildingLabel": "Firmensitz: {tier}",
+    "foundedOn": "Gegründet am {date}",
+    "teamSize": "{count, plural, one {# Person} other {# Leute}} im Team",
+    "stageOf": "Stufe {stage} von {total}",
+    "stageReach": "Marktreichweite bis {percent} %",
+    "nextStepSoon": "Alle Plätze dieser Stufe sind besetzt – zum nächsten Quartal steigt die Firma auf.",
+    "coveredByAi": "KI-Kraft",
+    "aiFor": "Wofür?",
+    "aiGeneral": "Allgemein",
+    "aiForHint": "Die KI-Kraft übernimmt diesen Platz im Wachstumspfad. Sie arbeitet nach Standard: Die Qualität steigt langsamer als mit einem echten Spezialisten.",
+    "aiForSkill": "für {skill}",
+    "seatsTitle": "Stellenplan",
+    "trainingTitle": "Weiterbildung",
+    "trainingLocked": "Schulungen schaltest du frei, sobald {count} Leute in deinem Team arbeiten (Spieler und KI-Kräfte).",
+    "trainingProgress": "{size} von {count} im Team",
+    "trainingNoPlayers": "Schulen kannst du nur echte Mitarbeiter. Stell Spieler ein, um sie weiterzubilden.",
+    "founderSeat": "Gründung, Vollzeit",
+    "founderSideJob": "Gründung, nebenbei",
+    "boss": "Chef",
+    "freeSeat": "Freier Platz – Stelle ausschreiben",
+    "teamLine": "davon {ai, plural, =0 {keine KI-Kraft} one {# KI-Kraft} other {# KI-Kräfte}}",
+    "stampProfit": "Gewinn",
+    "stampLoss": "Verlust",
+    "moreSettings": "Lohnfaktor und Auflösen"
   },
   "debt": {
     "title": "Schulden",

@@ -1,12 +1,12 @@
 {
   "offers": [
     {
-      "id": "c23df185-e4c6-4996-94b0-5e6bf64be10c",
+      "id": "22e609e6-113c-499b-b5b5-e637d0fbb1c2",
       "kind": "ipo",
       "status": "open",
       "ticker": null,
       "company": {
-        "id": "6fad532c-0cc0-4e0d-8863-c8d63cf23643",
+        "id": "b50b4c9c-2f8d-449f-9247-84226efd8cf6",
         "logo": {
           "grid": [
             "................",
@@ -30,25 +30,25 @@
         },
         "name": "Fixture Labor",
         "color": "#2266cc",
-        "stage": 0,
+        "stage": 1,
         "sector": "tech",
         "product_key": "security_software"
       },
-      "ends_at": "2026-11-12T08:53:52.261083+00:00",
+      "ends_at": "2026-11-12T09:24:40.499033+00:00",
       "price_cents": 100,
-      "value_cents": 1014739,
-      "last_quarter": { "label": "J1 Q2", "profit_cents": -108646, "revenue_cents": 1805 },
+      "value_cents": 1025727,
+      "last_quarter": { "label": "J1 Q2", "profit_cents": -97658, "revenue_cents": 16456 },
       "my_shares_e6": 250000000,
       "shares_offered_e6": 200000000000,
       "shares_subscribed_e6": 250000000
     },
     {
-      "id": "29df4a7d-bb33-4266-bef7-a14a3c8bce0f",
+      "id": "4e0e299f-eb29-409c-ab11-f9d5d8b29e40",
       "kind": "ipo",
       "status": "closed",
       "ticker": "FEN",
       "company": {
-        "id": "1dc14e97-44c7-45b4-8963-31d84bda67f8",
+        "id": "cc773c25-6304-42cc-aba1-987a80e01911",
         "logo": {
           "grid": [
             "................",
@@ -76,21 +76,21 @@
         "sector": "tech",
         "product_key": "security_software"
       },
-      "ends_at": "2026-11-11T20:53:49.943586+00:00",
+      "ends_at": "2026-11-11T21:24:37.514922+00:00",
       "price_cents": 100,
-      "value_cents": 16974931,
-      "last_quarter": { "label": "J1 Q3", "profit_cents": -1349060, "revenue_cents": 1254 },
+      "value_cents": 16975794,
+      "last_quarter": { "label": "J1 Q3", "profit_cents": -1348197, "revenue_cents": 2404 },
       "my_shares_e6": 0,
       "shares_offered_e6": 300000000000,
       "shares_subscribed_e6": 700500000
     },
     {
-      "id": "12853aa0-34f8-42ac-abd8-ba56cd5a8ea0",
+      "id": "1222c730-0fa3-45e0-a60d-469255c13c2c",
       "kind": "capital_increase",
       "status": "closed",
       "ticker": "FEN",
       "company": {
-        "id": "1dc14e97-44c7-45b4-8963-31d84bda67f8",
+        "id": "cc773c25-6304-42cc-aba1-987a80e01911",
         "logo": {
           "grid": [
             "................",
@@ -118,10 +118,10 @@
         "sector": "tech",
         "product_key": "security_software"
       },
-      "ends_at": "2026-11-11T20:53:50.047571+00:00",
+      "ends_at": "2026-11-11T21:24:37.629357+00:00",
       "price_cents": 100,
-      "value_cents": 16974931,
-      "last_quarter": { "label": "J1 Q3", "profit_cents": -1349060, "revenue_cents": 1254 },
+      "value_cents": 16975794,
+      "last_quarter": { "label": "J1 Q3", "profit_cents": -1348197, "revenue_cents": 2404 },
       "my_shares_e6": 0,
       "shares_offered_e6": 79797200000,
       "shares_subscribed_e6": 300000000

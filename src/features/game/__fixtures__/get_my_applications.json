@@ -1,38 +1,38 @@
 {
   "applications": [
     {
-      "id": "7f88a7ca-b221-43eb-97f8-fc69210ed7fa",
+      "id": "3f988db4-7c6e-4e95-8fff-24f9b07d3502",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "303359ba-c18b-4aa6-b6cd-45d91c9419d9",
+        "id": "048d86d3-afe9-47bd-b05d-3623e06b643e",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "cbfac5fd-3475-2166-ea22-0a85cbb6f5c0",
+          "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
           "logo": null,
-          "name": "Brotzeit Handel AG",
-          "color": "#F2A93B",
+          "name": "Frachtpilot",
+          "color": "#9ECE6A",
           "is_ai": true,
-          "sector": "retail",
-          "ticker": "BRZ"
+          "sector": "logistics",
+          "ticker": "FPT"
         },
-        "required": [{ "branch": "finance", "min_score": 0 }],
-        "title_key": "finance_intern",
+        "required": [{ "branch": "logistics", "min_score": 0 }],
+        "title_key": "logistics_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-11T20:53:51.74586+00:00",
-      "updated_at": "2026-11-11T20:53:51.749421+00:00",
-      "offer_expires_at": "2026-11-13T20:53:51.74586+00:00",
+      "created_at": "2026-11-11T21:24:39.898145+00:00",
+      "updated_at": "2026-11-11T21:24:39.902396+00:00",
+      "offer_expires_at": "2026-11-13T21:24:39.898145+00:00",
       "salary_wish_cents_per_hour": 15000,
       "offer_salary_cents_per_hour": 15000
     },
     {
-      "id": "41f1e06f-35f3-402a-ace3-9713c7d084cd",
+      "id": "f3894a4f-067d-4a37-af55-6e3b9f32146c",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "d872211e-7458-40c8-afc3-44b243c47c6c",
+        "id": "8f25aef3-f60f-45c7-918d-366998d7dd16",
         "tier": "junior",
         "title": null,
         "company": {
@@ -48,9 +48,9 @@
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-11T20:53:51.740769+00:00",
-      "updated_at": "2026-11-11T20:53:51.740769+00:00",
-      "offer_expires_at": "2026-11-13T20:53:51.740769+00:00",
+      "created_at": "2026-11-11T21:24:39.890898+00:00",
+      "updated_at": "2026-11-11T21:24:39.890898+00:00",
+      "offer_expires_at": "2026-11-13T21:24:39.890898+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

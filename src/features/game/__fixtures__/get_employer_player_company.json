@@ -4,7 +4,7 @@
     "tier": "small_business",
     "stage": 0,
     "company": {
-      "id": "6fad532c-0cc0-4e0d-8863-c8d63cf23643",
+      "id": "b50b4c9c-2f8d-449f-9247-84226efd8cf6",
       "logo": {
         "grid": [
           "................",
@@ -35,7 +35,7 @@
     "founder": "Fixture_Neu",
     "team_size": 2,
     "product_key": "security_software",
-    "last_quarter": { "label": "J1 Q2", "profit_cents": -108646, "revenue_cents": 1805 },
+    "last_quarter": { "label": "J1 Q2", "profit_cents": -97658, "revenue_cents": 16456 },
     "pay_factor_bps": 10000
   }
 }

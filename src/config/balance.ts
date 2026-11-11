@@ -1006,6 +1006,8 @@ export interface StartupsConfig {
   readonly training: {
     readonly costCentsByTier: readonly number[];
     readonly wageRaiseBpsByTier: readonly number[];
+    /** Trainings unlock once the team (players and AI workers) has this many members (ADR-071). */
+    readonly fromEmployees: number;
   };
   /** Company chat (clan, ADR-045). */
   readonly chat: {
@@ -1965,6 +1967,7 @@ export const BALANCE = {
     training: {
       costCentsByTier: [200_000, 500_000, 1_200_000, 2_500_000, 5_000_000],
       wageRaiseBpsByTier: [300, 500, 800, 1_200, 2_000],
+      fromEmployees: 5,
     },
     chat: { maxMessageLength: 300, historyLimit: 100, maxMessagesPerMinute: 10 },
   },

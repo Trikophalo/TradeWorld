@@ -249,10 +249,18 @@ select public.get_employer();
 reset role;
 select id as fx_pjob2 from public.player_jobs where player_id = :boss and status = 'active' \gset
 select tests.login_as('authenticated', :p) is null as ok \gset
+-- M3h: an AI worker for the stage-1 skill, three general ones (trainings from 5 team members)
+select public.set_ai_workers(gen_random_uuid(), 0) is not null as ok \gset
+\o :fixture_dir/hire_ai_workers.json
+select public.hire_ai_workers(gen_random_uuid(), 1, 'it_security');
+\o
+select public.hire_ai_workers(gen_random_uuid(), 3) is not null as ok \gset
 \o :fixture_dir/train_employee.json
 select public.train_employee(gen_random_uuid(), :'fx_pjob2', 'it_basics');
 \o :fixture_dir/get_company_team_trained.json
 select public.get_company_team(:'fco');
+\o :fixture_dir/dismiss_ai_worker.json
+select public.dismiss_ai_worker(gen_random_uuid());
 \o
 select tests.login_as('authenticated', :boss) is null as ok \gset
 \o :fixture_dir/get_work_task.json

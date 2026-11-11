@@ -66,6 +66,8 @@ export interface DemoCompanyState {
   unpaidCents: number;
   marketingCents: number;
   aiWorkers: number;
+  /** Skills AI workers were hired for (ADR-071); older demo companies have none. */
+  aiWorkerSkills?: string[];
   lastClosedAt: number;
   reports: DemoReport[];
   estimateSeeds: [number, number];
@@ -175,12 +177,39 @@ export function createCompanyEngine(host: CompanyHost) {
     return productOf(company.sector, productKeyOf(company)).stages.map((skills, i) => ({
       stage: i + 1,
       reached: i < reached,
-      skills: skills.map((key) => ({ key, coveredBy: known.has(key) ? host.nickname() : null })),
+      skills: skills.map((key) => ({
+        key,
+        coveredBy: known.has(key) ? host.nickname() : null,
+        coveredByAi: !known.has(key) && aiSkills(company).includes(key),
+      })),
     }));
   }
 
+  const aiSkills = (company: DemoCompanyState) => company.aiWorkerSkills ?? [];
+
+  /** AI workers hired for a skill cover it like a specialist (ADR-071). */
   function stageOf(company: DemoCompanyState): number {
-    return companyStage(company.sector, productKeyOf(company), new Set(host.learnedSkills()));
+    return companyStage(
+      company.sector,
+      productKeyOf(company),
+      new Set([...host.learnedSkills(), ...aiSkills(company)]),
+    );
+  }
+
+  /** Keeps at most one AI worker per skill and never more skills than AI workers. */
+  function setAiCount(company: DemoCompanyState, count: number) {
+    const skills = aiSkills(company);
+    const general = company.aiWorkers - skills.length;
+    const drop = Math.max(0, company.aiWorkers - count - general);
+    company.aiWorkerSkills = drop > 0 ? skills.slice(0, skills.length - drop) : skills;
+    company.aiWorkers = count;
+    if (needsFullTimeFounder(count) && host.hasJob()) {
+      host.startFounderNotice();
+      system(
+        company,
+        `Ab ${startups.fullTimeFromEmployees} Mitarbeitern arbeitet ${host.nickname()} Vollzeit in der Firma.`,
+      );
+    }
   }
 
   function productivityList(company: DemoCompanyState): number[] {
@@ -216,7 +245,10 @@ export function createCompanyEngine(host: CompanyHost) {
     const paid = Math.min(costs, Math.max(0, available));
     company.cashCents = available - paid;
     company.unpaidCents += costs - paid;
-    if (costs > paid) company.aiWorkers = 0;
+    if (costs > paid) {
+      company.aiWorkers = 0;
+      company.aiWorkerSkills = [];
+    }
     company.awareness = result.next.awareness;
     company.quality = result.next.quality;
     company.quartersActive += 1;
@@ -462,6 +494,8 @@ export function createCompanyEngine(host: CompanyHost) {
       canCapitalIncrease: company.listing?.status === "listed" && !company.listing.offer,
       distressQuarters: company.distressQuarters ?? 0,
       graceQuarters: startups.insolvency.graceQuarters,
+      aiWorkerSkills: aiSkills(company),
+      trainingFrom: startups.training.fromEmployees,
     };
   }
 
@@ -485,6 +519,8 @@ export function createCompanyEngine(host: CompanyHost) {
     | "postCompanyMessage"
     | "setCompanyMarketing"
     | "setAiWorkers"
+    | "hireAiWorkers"
+    | "dismissAiWorker"
     | "companyDeposit"
     | "companyWithdraw"
     | "upgradeCompany"
@@ -622,14 +658,33 @@ export function createCompanyEngine(host: CompanyHost) {
       mutate(requestId, (company) => {
         if (!Number.isInteger(count) || count < 0) throw new GameError("invalid_argument");
         if (count > maxEmployees(company.tier)) throw new GameError("employee_limit");
-        company.aiWorkers = count;
-        if (needsFullTimeFounder(count) && host.hasJob()) {
-          host.startFounderNotice();
-          system(
-            company,
-            `Ab ${startups.fullTimeFromEmployees} Mitarbeitern arbeitet ${host.nickname()} Vollzeit in der Firma.`,
-          );
+        setAiCount(company, count);
+      }),
+
+    hireAiWorkers: (requestId, count, skill) =>
+      mutate(requestId, (company) => {
+        if (!Number.isInteger(count) || count < 1) throw new GameError("invalid_argument");
+        if (company.aiWorkers + count > maxEmployees(company.tier)) throw new GameError("employee_limit");
+        if (skill) {
+          const all = productOf(company.sector, productKeyOf(company)).stages.flat();
+          if (count !== 1 || !all.includes(skill)) throw new GameError("invalid_argument");
+          if (aiSkills(company).includes(skill)) throw new GameError("skill_already_covered");
+          company.aiWorkerSkills = [...aiSkills(company), skill];
         }
+        setAiCount(company, company.aiWorkers + count);
+      }),
+
+    dismissAiWorker: (requestId, skill) =>
+      mutate(requestId, (company) => {
+        if (company.aiWorkers === 0) throw new GameError("invalid_argument");
+        const skills = aiSkills(company);
+        if (skill) {
+          if (!skills.includes(skill)) throw new GameError("invalid_argument");
+          company.aiWorkerSkills = skills.filter((k) => k !== skill);
+        } else if (company.aiWorkers === skills.length) {
+          company.aiWorkerSkills = skills.slice(0, -1);
+        }
+        company.aiWorkers -= 1;
       }),
 
     companyDeposit: (requestId, amountCents) =>

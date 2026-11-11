@@ -1,6 +1,6 @@
 {
   "company": {
-    "id": "6fad532c-0cc0-4e0d-8863-c8d63cf23643",
+    "id": "b50b4c9c-2f8d-449f-9247-84226efd8cf6",
     "idea": "Werkzeuge für Bastler",
     "logo": {
       "grid": [
@@ -29,28 +29,32 @@
     "stage": 0,
     "sector": "tech",
     "stages": [
-      { "stage": 1, "skills": [{ "key": "it_security", "covered_by": null }], "reached": false },
+      {
+        "stage": 1,
+        "skills": [{ "key": "it_security", "covered_by": null, "covered_by_ai": false }],
+        "reached": false
+      },
       {
         "stage": 2,
         "skills": [
-          { "key": "it_architecture", "covered_by": null },
-          { "key": "it_pentest", "covered_by": null }
+          { "key": "it_architecture", "covered_by": null, "covered_by_ai": false },
+          { "key": "it_pentest", "covered_by": null, "covered_by_ai": false }
         ],
         "reached": false
       },
       {
         "stage": 3,
         "skills": [
-          { "key": "law_privacy", "covered_by": null },
-          { "key": "sales_b2b", "covered_by": null }
+          { "key": "law_privacy", "covered_by": null, "covered_by_ai": false },
+          { "key": "sales_b2b", "covered_by": null, "covered_by_ai": false }
         ],
         "reached": false
       },
       {
         "stage": 4,
         "skills": [
-          { "key": "it_crypto", "covered_by": null },
-          { "key": "management_leadership", "covered_by": null }
+          { "key": "it_crypto", "covered_by": null, "covered_by_ai": false },
+          { "key": "management_leadership", "covered_by": null, "covered_by_ai": false }
         ],
         "reached": false
       }
@@ -62,7 +66,7 @@
     "headcount": 1,
     "ai_workers": 1,
     "cash_cents": 250000,
-    "founded_at": "2026-11-11T20:53:51.867856+00:00",
+    "founded_at": "2026-11-11T21:24:40.035926+00:00",
     "can_upgrade": false,
     "logo_hidden": false,
     "product_key": "security_software",
@@ -74,6 +78,7 @@
     "can_go_public": false,
     "max_employees": 2,
     "open_postings": 0,
+    "training_from": 5,
     "capacity_cents": 798000,
     "full_time_from": 5,
     "grace_quarters": 4,
@@ -81,10 +86,11 @@
     "founder_has_job": false,
     "next_quarter_at": "2026-11-12T01:00:00+00:00",
     "quarters_active": 0,
+    "ai_worker_skills": [],
     "distress_quarters": 0,
-    "estimate_low_cents": 43458,
+    "estimate_low_cents": 339786,
     "upgrade_cost_cents": 1250000,
-    "estimate_high_cents": 522077,
+    "estimate_high_cents": 2549172,
     "ai_worker_cost_cents": 70000,
     "can_capital_increase": false,
     "pending_applications": 0,

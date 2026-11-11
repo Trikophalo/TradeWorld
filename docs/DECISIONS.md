@@ -672,3 +672,42 @@ die Fremdschlüssel von Hauptbuch, Orders, Positionen und Trades auf `players`, 
 Trades vor einem Reset bleiben gespeichert, `get_my_portfolio` zeigt nur die danach (`player_private.account_reset_at`).
 Offene Zeichnungsangebote der eigenen Firma werden vor dem Auflösen abgerechnet. Bekannte Grenze: Admins mit Einträgen
 in `admin_actions` können ihr Konto nicht löschen.
+
+## ADR-071: Firmenansicht als Firmenzentrale, KI-Kräfte pro Wachstumsplatz, Schulungen ab 5 — `akzeptiert`
+
+Vorgabe: Die Firmenansicht war unübersichtlich und „kalt“. Neu:
+
+- **Firmenzentrale:** Kopf mit Pixel-Gebäude je Stufe (Garage, Laden, Büro, Turm), Logo, Name, Idee, Kennzahlen als
+  Plaketten und einer Stempeluhr bis zum Quartalsabschluss.
+- **Drei Abteilungen** statt fünf Tabs: Übersicht, Team, Chat.
+  - Das Team bündelt Stellenplan (Sitze für Gründer, Spieler, KI-Kräfte und freie Plätze), Bewerbungen,
+    Ausschreibungen und ganz unten die Weiterbildung.
+- **Übersicht:** Wachstumspfad als Zeitleiste mit Sitzen, Quartalsbilanz als Beleg, Verlauf um eine Nulllinie,
+  Markt als Blockanzeigen, „Chefbüro“ mit Marketing, Team, Kasse und nächstem Gebäude. Lohnfaktor und Auflösen liegen
+  eingeklappt darunter.
+- **KI-Kräfte können für einen Skill des Wachstumspfads eingestellt werden** (`hire_ai_workers` mit `p_skill`,
+  `dismiss_ai_worker`).
+  - Sie besetzen den Platz; dort steht dann „KI-Kraft“ statt „fehlt“, und die Stufe zählt.
+  - Das ändert ADR-069 an einer Stelle: KI-Kräfte bringen jetzt Skills für Wachstumsstufen, aber nur einen
+    pro KI-Kraft.
+  - Langsamer als mit Spielern bleibt es trotzdem durch die niedrigere Leistung und den Qualitätsabschlag.
+- **Schulungen** gibt es erst ab 5 Leuten im Team (Spieler und KI-Kräfte, ohne Gründer;
+  `startups.training.fromEmployees`).
+  - Der Server lehnt sie vorher mit `training_locked` ab.
+- **Große Beträge:** Große Beträge werden kurz angezeigt (`formatMoneyShort`: „15k €“, „1,2 Mio. €“, abgerundet), der
+  genaue Betrag steht im Tooltip.
+
+## ADR-072: Stündlicher Betrieb, Lohnregel und Live-Umsatz — `vorgeschlagen`
+
+Firmen verdienen laufend, nicht nur am Quartalsende.
+
+- Jede Stunde rechnet der Server eine Betriebsstunde ab (docs/COMPANY_GROWTH.md, Abschnitt 2).
+- Spieler und KI-Kräfte werden in derselben Abrechnung bezahlt, nie mit mehr Geld, als die Stunde erwirtschaftet hat.
+  Reicht es nicht, sinken alle Löhne im selben Verhältnis.
+- Der Umsatz läuft in der Anzeige live mit.
+
+## ADR-073: Unternehmensausbau ohne Ende — `vorgeschlagen`
+
+Konzept in docs/COMPANY_GROWTH.md: Forschungspunkte und Forschungsprojekte, mehrere Produkte mit Versionen und
+Lebenszyklus, Abteilungen, Standorte und Märkte, Wettbewerb in Nischen. Alle Ebenen haben unendliche Stufen mit
+steigenden Kosten und sinkendem Ertrag. Ziel des Spielers ist das größte Unternehmen. Umsetzung in Phasen A–D.

@@ -1,11 +1,11 @@
 {
   "company": null,
   "last_dissolution": {
-    "at": "2026-11-11T20:53:52.349086+00:00",
+    "at": "2026-11-11T21:24:40.597002+00:00",
     "reason": "closed",
     "loan_cents": 0,
     "company_name": "Fixture Labor",
-    "total_debt_cents": 269866,
+    "total_debt_cents": 258878,
     "from_founder_cents": 0
   }
 }

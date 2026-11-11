@@ -159,10 +159,14 @@ const companySchema = z.object({
       z.object({
         stage: num,
         reached: z.boolean(),
-        skills: z.array(z.object({ key: z.string(), covered_by: z.string().nullable() })),
+        skills: z.array(
+          z.object({ key: z.string(), covered_by: z.string().nullable(), covered_by_ai: z.boolean().default(false) }),
+        ),
       }),
     )
     .default([]),
+  ai_worker_skills: z.array(z.string()).default([]),
+  training_from: num.default(5),
 });
 
 const wrapped = z.object({ company: companySchema.nullable() });
@@ -296,6 +300,8 @@ export const COMPANY_RPC_SCHEMAS = {
   }),
   set_company_marketing: wrapped,
   set_ai_workers: wrapped,
+  hire_ai_workers: wrapped,
+  dismiss_ai_worker: wrapped,
   company_deposit: wrapped,
   company_withdraw: wrapped,
   upgrade_company: wrapped,
@@ -391,10 +397,12 @@ function toCompany(c: z.infer<typeof companySchema>): MyCompany {
     stages: c.stages.map((st) => ({
       stage: st.stage,
       reached: st.reached,
-      skills: st.skills.map((k) => ({ key: k.key, coveredBy: k.covered_by })),
+      skills: st.skills.map((k) => ({ key: k.key, coveredBy: k.covered_by, coveredByAi: k.covered_by_ai })),
     })),
     distressQuarters: c.distress_quarters,
     graceQuarters: c.grace_quarters,
+    aiWorkerSkills: c.ai_worker_skills,
+    trainingFrom: c.training_from,
   };
 }
 
@@ -466,6 +474,8 @@ type CompanyEngine = Pick<
   | "submitWorkTask"
   | "setCompanyMarketing"
   | "setAiWorkers"
+  | "hireAiWorkers"
+  | "dismissAiWorker"
   | "companyDeposit"
   | "companyWithdraw"
   | "upgradeCompany"
@@ -582,6 +592,22 @@ export const liveCompanyEngine: CompanyEngine = {
 
   async setAiWorkers(requestId, count) {
     return requireCompany(await rpc("set_ai_workers", { p_request_id: requestId, p_count: count }, S.set_ai_workers));
+  },
+
+  async hireAiWorkers(requestId, count, skill) {
+    return requireCompany(
+      await rpc(
+        "hire_ai_workers",
+        { p_request_id: requestId, p_count: count, p_skill: skill ?? null },
+        S.hire_ai_workers,
+      ),
+    );
+  },
+
+  async dismissAiWorker(requestId, skill) {
+    return requireCompany(
+      await rpc("dismiss_ai_worker", { p_request_id: requestId, p_skill: skill ?? null }, S.dismiss_ai_worker),
+    );
   },
 
   async companyDeposit(requestId, amountCents) {
