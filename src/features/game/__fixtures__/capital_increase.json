@@ -1,6 +1,6 @@
 {
   "company": {
-    "id": "13e16b79-c110-4195-a2b5-06478e3c23eb",
+    "id": "6fad532c-0cc0-4e0d-8863-c8d63cf23643",
     "idea": "Werkzeuge für Bastler",
     "logo": {
       "grid": [
@@ -55,15 +55,15 @@
         "reached": false
       }
     ],
-    "history": [{ "label": "J1 Q2", "profit_cents": -98420, "revenue_cents": 15440 }],
+    "history": [{ "label": "J1 Q2", "profit_cents": -108646, "revenue_cents": 1805 }],
     "listing": {
       "offer": {
-        "id": "0fa0f475-d264-4529-8cea-7cb86e8e52cf",
+        "id": "834ab9ca-b81d-4d01-82fe-55f8fe1f4c7d",
         "kind": "capital_increase",
         "status": "open",
         "ticker": "FIX",
         "company": {
-          "id": "13e16b79-c110-4195-a2b5-06478e3c23eb",
+          "id": "6fad532c-0cc0-4e0d-8863-c8d63cf23643",
           "logo": {
             "grid": [
               "................",
@@ -91,47 +91,47 @@
           "sector": "tech",
           "product_key": "security_software"
         },
-        "ends_at": "2026-11-12T07:47:42.130333+00:00",
+        "ends_at": "2026-11-12T08:53:52.323273+00:00",
         "price_cents": 100,
-        "value_cents": 7858803,
-        "last_quarter": { "label": "J1 Q2", "profit_cents": -98420, "revenue_cents": 15440 },
+        "value_cents": 7666196,
+        "last_quarter": { "label": "J1 Q2", "profit_cents": -108646, "revenue_cents": 1805 },
         "my_shares_e6": 0,
-        "shares_offered_e6": 86858800000,
+        "shares_offered_e6": 86676400000,
         "shares_subscribed_e6": 0
       },
       "status": "listed",
       "ticker": "FIX",
       "last_price_e4": 10000,
-      "shares_total_e6": 868588000000,
+      "shares_total_e6": 866764000000,
       "founder_shares_e6": 800000000000
     },
     "distress": true,
     "employees": 1,
     "headcount": 1,
     "ai_workers": 0,
-    "cash_cents": 7889783,
-    "founded_at": "2026-11-11T19:47:41.737081+00:00",
+    "cash_cents": 7707402,
+    "founded_at": "2026-11-11T20:53:51.867856+00:00",
     "can_upgrade": false,
     "logo_hidden": false,
     "product_key": "security_software",
-    "quality_bps": 2842,
-    "value_cents": 7858803,
+    "quality_bps": 2660,
+    "value_cents": 7666196,
     "last_quarter": {
       "label": "J1 Q2",
-      "cogs_cents": 3860,
+      "cogs_cents": 451,
       "bonus_cents": 0,
       "fixed_cents": 15000,
       "wages_cents": 0,
-      "demand_cents": 15440,
-      "revenue_cents": 15440,
+      "demand_cents": 1805,
+      "revenue_cents": 1805,
       "capacity_cents": 798000,
       "ai_worker_cents": 70000,
       "marketing_cents": 25000,
-      "utilization_bps": 193,
-      "operating_profit_cents": -98420
+      "utilization_bps": 23,
+      "operating_profit_cents": -108646
     },
-    "unpaid_cents": 30980,
-    "awareness_bps": 759,
+    "unpaid_cents": 41206,
+    "awareness_bps": 758,
     "can_go_public": false,
     "max_employees": 100,
     "open_postings": 1,
@@ -143,9 +143,9 @@
     "next_quarter_at": "2026-11-12T01:00:00+00:00",
     "quarters_active": 1,
     "distress_quarters": 1,
-    "estimate_low_cents": 564749,
+    "estimate_low_cents": 66915,
     "upgrade_cost_cents": null,
-    "estimate_high_cents": 3249436,
+    "estimate_high_cents": 548160,
     "ai_worker_cost_cents": 70000,
     "can_capital_increase": false,
     "pending_applications": 0,

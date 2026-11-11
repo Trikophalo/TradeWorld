@@ -4,37 +4,37 @@
       "kind": "quick",
       "missions": [
         {
-          "id": "3387badc-694f-40a1-a5f9-06a2b8c4626a",
-          "xp": 120,
-          "key": "q_two_securities",
-          "title": "Handle 2 verschiedene Wertpapiere",
-          "status": "completed",
-          "target": 2,
-          "progress": 2,
-          "expires_at": null,
-          "description": "Kauf oder Verkauf, egal welche."
-        },
-        {
-          "id": "38b13324-4217-4063-affe-881e50dd4279",
-          "xp": 66,
-          "key": "q_buy_retail",
-          "title": "Kaufe eine Aktie aus dem Einzelhandel",
-          "status": "active",
-          "target": 1,
-          "progress": 0,
-          "expires_at": null,
-          "description": "Supermärkte, Mode oder Discounter."
-        },
-        {
-          "id": "51cb1f80-1426-4329-96a8-3354096ade23",
-          "xp": 94,
-          "key": "q_bond",
-          "title": "Kaufe eine Staatsanleihe",
+          "id": "74b8d756-c189-4efa-ae8a-ca067e5a744e",
+          "xp": 90,
+          "key": "q_limit",
+          "title": "Setze eine Limit-Order",
           "status": "completed",
           "target": 1,
           "progress": 1,
           "expires_at": null,
-          "description": "Sichere Zinsen vom Staat."
+          "description": "Lege selbst fest, zu welchem Preis du kaufst."
+        },
+        {
+          "id": "7a5ad4fc-870e-4b14-a6e6-b8ba74a9b870",
+          "xp": 40,
+          "key": "q_check_in",
+          "title": "Hol dir deinen Tagesbonus",
+          "status": "completed",
+          "target": 1,
+          "progress": 1,
+          "expires_at": null,
+          "description": "Einmal am Tag gibt es XP fürs Vorbeischauen."
+        },
+        {
+          "id": "c8446a64-70a2-479f-b0f0-f0aad1dbc4fb",
+          "xp": 50,
+          "key": "q_trade",
+          "title": "Mach einen Trade",
+          "status": "completed",
+          "target": 1,
+          "progress": 1,
+          "expires_at": null,
+          "description": "Kaufe oder verkaufe ein beliebiges Wertpapier."
         }
       ],
       "resets_at": null
@@ -43,19 +43,19 @@
       "kind": "daily",
       "missions": [
         {
-          "id": "466e370a-b32d-435e-8a96-18411cb44c9a",
-          "xp": 690,
-          "key": "d_profit_sum",
-          "title": "Erziele heute insgesamt 246 € Gewinn",
+          "id": "bb540a05-7833-4f52-93cb-e722005c007e",
+          "xp": 590,
+          "key": "d_buy_value",
+          "title": "Kaufe für mindestens 1.000 €",
           "status": "active",
-          "target": 24600,
-          "progress": 0,
+          "target": 100000,
+          "progress": 30071,
           "expires_at": "2026-11-11T23:00:00+00:00",
-          "description": "Summe deiner realisierten Gewinne."
+          "description": "In einer einzigen Order."
         },
         {
-          "id": "7c1b0daf-8eff-47cf-a5be-fd9fb2e3447d",
-          "xp": 508,
+          "id": "eb353304-36dd-46a8-87ef-d8e2c0e51663",
+          "xp": 598,
           "key": "d_limits",
           "title": "Setze 2 Limit-Orders",
           "status": "active",
@@ -65,13 +65,13 @@
           "description": "Kaufen oder verkaufen zu deinem Preis."
         },
         {
-          "id": "f98c43b2-8210-48f7-82b0-c5c91b678814",
-          "xp": 666,
+          "id": "f24c8f37-74cd-4eaa-85ae-ab38d09c34d5",
+          "xp": 692,
           "key": "d_volume",
-          "title": "Handle Wertpapiere im Wert von 7.809 €",
+          "title": "Handle Wertpapiere im Wert von 7.763 €",
           "status": "active",
-          "target": 780900,
-          "progress": 91180,
+          "target": 776300,
+          "progress": 91233,
           "expires_at": "2026-11-11T23:00:00+00:00",
           "description": "Summe aller Käufe und Verkäufe heute."
         }
@@ -82,37 +82,37 @@
       "kind": "weekly",
       "missions": [
         {
-          "id": "60a9c8ff-3469-4d92-8029-3b08c5c82f90",
-          "xp": 1790,
-          "key": "w_volume",
-          "title": "Handle für insgesamt 38.240 €",
+          "id": "52d484c3-e631-412a-8373-1e6e653c2759",
+          "xp": 2130,
+          "key": "w_all_sectors",
+          "title": "Kaufe Aktien aus allen 5 Branchen",
           "status": "active",
-          "target": 3824000,
-          "progress": 91180,
+          "target": 5,
+          "progress": 2,
+          "expires_at": "2026-11-15T23:00:00+00:00",
+          "description": "Tech, Einzelhandel, Energie, Pharma und Logistik."
+        },
+        {
+          "id": "5a0e22c5-689c-4ced-b461-fd215fc8fb98",
+          "xp": 2374,
+          "key": "w_days",
+          "title": "Handle an 5 verschiedenen Tagen",
+          "status": "active",
+          "target": 5,
+          "progress": 1,
+          "expires_at": "2026-11-15T23:00:00+00:00",
+          "description": "Mindestens ein Trade pro Tag."
+        },
+        {
+          "id": "efd9cf98-b293-488a-bfcb-1f620d8453c4",
+          "xp": 1822,
+          "key": "w_volume",
+          "title": "Handle für insgesamt 26.767 €",
+          "status": "active",
+          "target": 2676700,
+          "progress": 91233,
           "expires_at": "2026-11-15T23:00:00+00:00",
           "description": "Summe aller Käufe und Verkäufe der Woche."
-        },
-        {
-          "id": "877e2e86-7aca-4b3b-ab6a-ec3528694414",
-          "xp": 1776,
-          "key": "w_limits",
-          "title": "Setze 5 Limit-Orders",
-          "status": "active",
-          "target": 5,
-          "progress": 1,
-          "expires_at": "2026-11-15T23:00:00+00:00",
-          "description": "Diese Woche."
-        },
-        {
-          "id": "b556ad4b-e33e-48f1-82e6-9a9d15ebeb05",
-          "xp": 1510,
-          "key": "w_check_in",
-          "title": "Hol dir an 5 Tagen den Tagesbonus",
-          "status": "active",
-          "target": 5,
-          "progress": 1,
-          "expires_at": "2026-11-15T23:00:00+00:00",
-          "description": "Tagesbonus an verschiedenen Tagen."
         }
       ],
       "resets_at": "2026-11-15T23:00:00+00:00"
@@ -121,7 +121,7 @@
       "kind": "milestone",
       "missions": [
         {
-          "id": "c7c2f562-5cc3-4b5a-8fc7-9777a96e8dae",
+          "id": "4682ea64-e3dc-46b4-861e-b1d7792d1d6f",
           "xp": 200,
           "key": "m_first_trade",
           "title": "Dein erster Trade",
@@ -132,7 +132,7 @@
           "description": "Kaufe dein erstes Wertpapier."
         },
         {
-          "id": "9b319c7e-df1d-456a-935d-a0db4a95bf74",
+          "id": "942d3af8-750c-4c55-b884-be520c297d5e",
           "xp": 200,
           "key": "m_first_vault",
           "title": "Erstes Grundeinkommen",
@@ -143,7 +143,7 @@
           "description": "Leere zum ersten Mal deinen Tresor."
         },
         {
-          "id": "a74eafbe-18f3-4d62-a88e-4d3975208215",
+          "id": "c0fe44b6-d3a0-491e-b041-dcc18c7b39f2",
           "xp": 300,
           "key": "m_first_profit",
           "title": "Dein erster Gewinn",
@@ -157,5 +157,5 @@
       "resets_at": null
     }
   ],
-  "server_time": "2026-11-11T19:47:41.558996+00:00"
+  "server_time": "2026-11-11T20:53:51.673922+00:00"
 }

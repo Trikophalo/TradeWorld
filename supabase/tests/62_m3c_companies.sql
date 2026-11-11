@@ -184,8 +184,9 @@ select tests.assert(
   and :'close2' = 'already_closed',
   'quarter close: revenue = capacity when demand exceeds it; goods (25 % tech), fixed 150, AI 700, marketing 500 EUR; households pay and receive; idempotent');
 select tests.assert(
-  (select pc.quarters_active = 1 and abs(pc.quality - (0.25 + 0.35 * (0.25 + 0.75 * (:'team'::jsonb ->> 'team_sector_score')::int
-                                                                        / ((:'team'::jsonb ->> 'team_sector_score')::int + 20.0) - 0.25))) < 1e-9
+  -- AI workers lower the target (ADR-069): founder + player + 1 AI worker -> × (1 − 0.3 / 3)
+  (select pc.quarters_active = 1 and abs(pc.quality - (0.25 + 0.35 * ((0.25 + 0.75 * (:'team'::jsonb ->> 'team_sector_score')::int
+                                                                        / ((:'team'::jsonb ->> 'team_sector_score')::int + 20.0)) * (1 - 0.3 / 3.0) - 0.25))) < 1e-9
           and pc.awareness > 0.3 and pc.last_closed_quarter_id = :qid
      from public.player_companies pc where pc.company_id = :'fco')
   and (select sum(amount) from public.xp_events where player_id = :f and source = 'company_quarter_profit') - :fxp0

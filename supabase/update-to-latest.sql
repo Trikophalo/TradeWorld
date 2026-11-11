@@ -17662,6 +17662,620 @@ begin
   end loop;
 end;
 $$;
+-- ===== idempotent copy of migrations/20261118000100_m3g_ai_workers.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · M3g · 0100 · AI workers lower the reachable quality (ADR-069)
+-- =============================================================================
+-- Mirrors src/lib/sim/startup.ts (closeStartupQuarter): the quality target is
+-- multiplied by 1 − aiQualityPenalty × AI workers / team size.
+-- Idempotent (identical copy in supabase/updates/).
+-- =============================================================================
+
+create or replace function public.player_company_close_quarter(p_company uuid, p_quarter_id bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  pc        public.player_companies;
+  c         public.companies;
+  q         public.game_quarters;
+  v_su      jsonb := coalesce(public.config_jsonb('startups'), '{}'::jsonb);
+  v_team    jsonb;
+  v_tier    jsonb;
+  v_qpot    double precision;
+  v_target  double precision;
+  v_quality double precision;
+  v_mk      bigint;
+  v_half    double precision;
+  v_gain    double precision := 0;
+  v_aw      double precision;
+  v_demand  double precision;
+  v_cap     double precision;
+  v_rev     double precision;
+  v_rev_c   bigint;
+  v_cogs    bigint;
+  v_fixed   bigint;
+  v_aiw     bigint;
+  v_op      bigint;
+  v_costs   bigint;
+  v_pay     bigint := 0;
+  v_unpaid  bigint := 0;
+  v_settle  bigint := 0;
+  v_cash    bigint;
+  v_acc     uuid;
+  v_hh      uuid;
+  v_wages   bigint;
+  v_xp      integer := 0;
+  v_ai      integer;
+  k         text;
+  v_bwages  bigint;
+  v_factor  integer;
+  v_pool    bigint;
+  v_weight  bigint;
+  v_btotal  bigint := 0;
+  v_bpaid   bigint := 0;
+  v_b       bigint;
+  v_unpaid_total bigint;
+  v_dq      integer;
+  v_grace   integer := public.config_double('startups', '{insolvency,graceQuarters}', 4)::integer;
+  v_plp     jsonb := coalesce(public.config_jsonb('jobs', '{profitLinkedPay}'), '{}'::jsonb);
+  b         record;
+  v_stage   integer;
+begin
+  select * into pc from public.player_companies where company_id = p_company and status = 'active' for update;
+  select * into q from public.game_quarters where id = p_quarter_id;
+  if pc.company_id is null or q.id is null then
+    return null;
+  end if;
+  if exists (select 1 from public.player_company_reports r where r.company_id = p_company and r.game_quarter_id = p_quarter_id) then
+    return jsonb_build_object('company_id', p_company, 'skipped', 'already_closed');
+  end if;
+  select * into c from public.companies where id = p_company;
+  v_team := public.player_company_team(p_company);
+  v_tier := public.company_tier_cfg(pc.tier);
+  k := 'pcq:' || p_company::text || ':' || p_quarter_id::text;
+
+  -- quality towards what the team can do, awareness by word of mouth and marketing
+  v_qpot := pc.potential_annual_cents / 4.0;
+  v_target := public.cfg_num(v_su, '{quality,base}', 0.25)
+            + (1 - public.cfg_num(v_su, '{quality,base}', 0.25))
+              * (greatest(0, (v_team ->> 'team_sector_score')::double precision)
+                 / (greatest(0, (v_team ->> 'team_sector_score')::double precision) + public.cfg_num(v_su, '{quality,halfSaturationScore}', 20)));
+  -- growth stage (ADR-062): quality bonus, awareness cap, capacity bonus
+  v_stage := least(greatest((v_team ->> 'stage')::integer, 0),
+                   greatest(jsonb_array_length(coalesce(v_su #> '{stages,awarenessCaps}', '[1]'::jsonb)) - 1, 0));
+  v_target := least(1, v_target + public.cfg_num(v_su, '{stages,qualityBonusPerStage}', 0.05) * v_stage);
+  -- AI workers do standard work (ADR-069)
+  v_target := v_target * (1 - public.cfg_num(v_su, '{aiQualityPenalty}', 0.3)
+              * pc.ai_workers::double precision
+              / greatest(1, 1 + coalesce((v_team ->> 'employees')::integer, 0) + pc.ai_workers));
+  v_quality := least(1, greatest(0, pc.quality + public.cfg_num(v_su, '{quality,adjustPerQuarter}', 0.35) * (v_target - pc.quality)));
+  v_mk := pc.marketing_cents_per_quarter;
+  if v_mk > 0 then
+    v_half := greatest(public.cfg_num(v_su, '{awareness,marketingMinHalfSaturationCents}', 50000),
+                       pc.potential_annual_cents / 4.0 * public.cfg_num(v_su, '{awareness,marketingHalfSaturationShare}', 0.1));
+    v_gain := public.cfg_num(v_su, '{awareness,marketingMaxGain}', 0.12) * v_mk / (v_mk + v_half);
+  end if;
+  v_aw := least(greatest(public.cfg_num(v_su, '{awareness,min}', 0.01),
+                         coalesce((v_su #>> array['stages', 'awarenessCaps', v_stage::text])::double precision, 1)),
+          greatest(public.cfg_num(v_su, '{awareness,min}', 0.01),
+            pc.awareness
+            + public.cfg_num(v_su, '{awareness,growthPerQuarter}', 0.3) * pc.awareness * (1 - pc.awareness) * (0.5 + v_quality)
+            + v_gain
+            - public.cfg_num(v_su, '{awareness,decayPerQuarter}', 0.03) * pc.awareness));
+
+  v_demand := v_qpot * v_aw * (0.5 + 0.5 * v_quality) * exp(public.cfg_num(v_su, '{demandNoise}', 0.1) * public.gauss_random());
+  v_cap := (v_team ->> 'team_productivity_bps')::double precision / 10000.0
+         * public.cfg_num(v_su, array['capacityCentsPerProductivity', c.sector_key], 250000)
+         * (1 + public.cfg_num(v_su, '{stages,capacityBonusPerStage}', 0.25) * v_stage);
+  v_rev := least(v_demand, v_cap);
+  v_rev_c := round(v_rev::numeric)::bigint;
+  v_cogs := round((v_rev * (1 - public.cfg_num(v_su, array['grossMargin', c.sector_key], 0.5)))::numeric)::bigint;
+  v_fixed := (v_tier ->> 'fixedCostCentsPerQuarter')::bigint;
+  v_aiw := pc.ai_workers * round(public.cfg_num(v_su, '{aiWorkerCostCentsPerQuarter}', 70000))::bigint;
+  v_op := v_rev_c - v_cogs - v_fixed - v_aiw - v_mk;
+
+  -- money (closed system): revenue from the households, costs back to them
+  v_acc := public.company_cash_account(p_company);
+  v_hh := public.ledger_system_account('households');
+  if v_rev_c > 0 then
+    v_pay := least(v_rev_c, greatest(0, (select a.balance_cents from public.ledger_accounts a where a.id = v_hh)));
+    if v_pay > 0 then
+      perform public.ledger_transfer(v_hh, v_acc, v_pay, 'company_revenue', 'Umsatz ' || public.game_quarter_label(q.id),
+                                     'company', p_company, k || ':revenue', pc.founder_id);
+    end if;
+  end if;
+  v_costs := v_cogs + v_fixed + v_aiw + v_mk;
+  select a.balance_cents into v_cash from public.ledger_accounts a where a.id = v_acc;
+  v_pay := least(v_costs, greatest(0, coalesce(v_cash, 0)));
+  if v_pay > 0 then
+    perform public.ledger_transfer(v_acc, v_hh, v_pay, 'company_costs', 'Kosten ' || public.game_quarter_label(q.id),
+                                   'company', p_company, k || ':costs', pc.founder_id);
+  end if;
+  v_unpaid := v_costs - v_pay;
+  v_ai := pc.ai_workers;
+  if v_unpaid > 0 then
+    v_ai := 0;                                  -- distress: the AI workers are let go
+  elsif pc.unpaid_cents > 0 then
+    select a.balance_cents into v_cash from public.ledger_accounts a where a.id = v_acc;
+    v_settle := least(pc.unpaid_cents, greatest(0, coalesce(v_cash, 0)));
+    if v_settle > 0 then
+      perform public.ledger_transfer(v_acc, v_hh, v_settle, 'company_costs', 'Offene Rechnungen',
+                                     'company', p_company, k || ':settle', pc.founder_id);
+    end if;
+  end if;
+
+  select coalesce(sum(sp.amount_cents), 0) into v_wages
+    from public.salary_payouts sp join public.player_jobs j on j.id = sp.player_job_id
+   where j.company_id = p_company and sp.period_end > q.starts_at and sp.period_end <= q.ends_at;
+
+  -- profit-linked pay (ADR-058): base wages of the quarter = paid hours x contract wage
+  select coalesce(sum(coalesce(sp.base_amount_cents, sp.minutes_paid::bigint * j.salary_cents_per_hour / 60)), 0) into v_bwages
+    from public.salary_payouts sp join public.player_jobs j on j.id = sp.player_job_id
+   where j.company_id = p_company and sp.period_end > q.starts_at and sp.period_end <= q.ends_at;
+  -- payFactorBps(result before wages, base wages)
+  if v_bwages <= 0 or v_op >= v_bwages then
+    v_factor := 10000;
+  else
+    v_factor := round(greatest(public.cfg_num(v_plp, '{minFactor}', 0.5), least(1, greatest(v_op, 0)::double precision / v_bwages)) * 10000)::integer;
+  end if;
+  -- distributeBonus: bonusShareOfProfit of the surplus by wage weight, at most maxBonusFactor x base wages
+  if to_regclass('pg_temp.nexa_bonus') is null then
+    create temporary table nexa_bonus (job_id uuid, player_id uuid, bonus bigint) on commit drop;
+  end if;
+  delete from pg_temp.nexa_bonus;
+  if v_op - v_bwages > 0 then
+    select coalesce(sum(x.w), 0) into v_weight
+      from (select sum(coalesce(sp.base_amount_cents, sp.minutes_paid::bigint * j.salary_cents_per_hour / 60)) as w
+              from public.salary_payouts sp join public.player_jobs j on j.id = sp.player_job_id
+             where j.company_id = p_company and j.status = 'active' and sp.period_end > q.starts_at and sp.period_end <= q.ends_at
+             group by j.id) x;
+    if v_weight > 0 then
+      v_pool := floor((v_op - v_bwages) * public.cfg_num(v_plp, '{bonusShareOfProfit}', 0.2))::bigint;
+      insert into pg_temp.nexa_bonus (job_id, player_id, bonus)
+      select x.id, x.player_id, least(v_pool * x.w / v_weight, floor(x.w * public.cfg_num(v_plp, '{maxBonusFactor}', 1))::bigint)
+        from (select j.id, j.player_id, sum(coalesce(sp.base_amount_cents, sp.minutes_paid::bigint * j.salary_cents_per_hour / 60)) as w
+                from public.salary_payouts sp join public.player_jobs j on j.id = sp.player_job_id
+               where j.company_id = p_company and j.status = 'active' and sp.period_end > q.starts_at and sp.period_end <= q.ends_at
+               group by j.id, j.player_id) x;
+      delete from pg_temp.nexa_bonus where bonus <= 0;
+      select coalesce(sum(bonus), 0) into v_btotal from pg_temp.nexa_bonus;
+    end if;
+  end if;
+  if v_btotal > 0 then
+    -- paid only from the cash that is there (scaled down proportionally)
+    select greatest(0, a.balance_cents) into v_cash from public.ledger_accounts a where a.id = v_acc;
+    for b in select * from pg_temp.nexa_bonus order by job_id loop
+      v_b := case when v_cash >= v_btotal then b.bonus else b.bonus * v_cash / v_btotal end;
+      if v_b > 0 then
+        perform public.ledger_transfer(v_acc, public.ledger_player_account(b.player_id, 'player_cash'), v_b, 'work_bonus',
+                                       'Bonus ' || public.game_quarter_label(q.id), 'player_job', b.job_id,
+                                       k || ':bonus:' || b.job_id::text, b.player_id);
+        perform public.loan_withhold(b.player_id, v_b, k || ':bonus:' || b.job_id::text);
+        insert into public.salary_payouts (player_job_id, player_id, pay_day, period_start, period_end, minutes_paid, amount_cents,
+                                           bonus_cents, base_amount_cents)
+        values (b.job_id, b.player_id, (q.ends_at at time zone 'Europe/Berlin')::date, q.starts_at, q.ends_at, 0, 0, v_b, 0);
+        v_bpaid := v_bpaid + v_b;
+      end if;
+    end loop;
+  end if;
+
+  if v_op > 0 then
+    v_xp := public.grant_xp(pc.founder_id, 'company_quarter_profit',
+                            public.config_double('progression', '{xpSources,profitableCompanyQuarter,xp}', 500)::integer,
+                            'company_quarter:' || p_company::text || ':' || q.id::text, 'company', p_company);
+  end if;
+
+  v_unpaid_total := pc.unpaid_cents + v_unpaid - v_settle;
+  v_dq := case when v_unpaid_total > 0 then pc.distress_quarters + 1 else 0 end;
+  update public.player_companies
+     set awareness = v_aw, quality = v_quality, quarters_active = quarters_active + 1, last_closed_quarter_id = q.id,
+         unpaid_cents = v_unpaid_total, distress = v_unpaid_total > 0, distress_quarters = v_dq,
+         ai_workers = v_ai, pay_factor_bps = v_factor
+   where company_id = p_company;
+
+  insert into public.player_company_reports (company_id, game_quarter_id, label, demand_cents, capacity_cents, revenue_cents,
+                                             cogs_cents, fixed_cents, ai_worker_cents, marketing_cents, wages_cents,
+                                             operating_profit_cents, utilization_bps, paid_costs_cents, unpaid_added_cents,
+                                             awareness_bps, quality_bps, team_productivity_bps, team_sector_score,
+                                             base_wages_cents, bonus_cents, pay_factor_bps)
+  values (p_company, q.id, public.game_quarter_label(q.id), round(v_demand::numeric)::bigint, round(v_cap::numeric)::bigint,
+          v_rev_c, v_cogs, v_fixed, v_aiw, v_mk, v_wages, v_op,
+          round(case when v_cap > 0 then least(1, v_demand / v_cap) else 1 end * 10000)::integer,
+          v_pay, v_unpaid, round(v_aw * 10000)::integer, round(v_quality * 10000)::integer,
+          (v_team ->> 'team_productivity_bps')::integer, (v_team ->> 'team_sector_score')::integer,
+          v_bwages, v_bpaid, v_factor);
+
+  -- listed: fair value per share = company value / shares outstanding (ADR-067)
+  if c.phase = 'listed' and c.security_id is not null then
+    update public.security_sim_state
+       set fair_value_e4 = greatest(1, public.company_value_cents(p_company) * 100 / greatest(c.shares_outstanding, 1))
+     where security_id = c.security_id;
+  end if;
+
+  -- company chat
+  perform public.company_system_message(p_company, 'Quartal ' || public.game_quarter_label(q.id) || ': Umsatz '
+                                                   || public.format_eur(v_rev_c) || ', Gewinn ' || public.format_eur(v_op) || '.');
+  if v_bpaid > 0 then
+    perform public.company_system_message(p_company, 'Bonus für das Team: ' || public.format_eur(v_bpaid) || '.');
+  end if;
+  if v_factor <> pc.pay_factor_bps then
+    perform public.company_system_message(p_company, 'Lohnfaktor ab jetzt ' || round(v_factor / 100.0) || ' %.');
+  end if;
+  -- insolvency after graceQuarters closes with open bills (isInsolvent)
+  if v_dq >= v_grace then
+    perform public.company_dissolve(p_company, 'insolvent');
+  elsif v_dq > 0 then
+    perform public.company_system_message(p_company, 'Achtung: offene Rechnungen. Noch ' || (v_grace - v_dq)
+                                                     || case when v_grace - v_dq = 1 then ' Quartal' else ' Quartale' end
+                                                     || ' bis zur Insolvenz.');
+  end if;
+
+  return jsonb_build_object('company_id', p_company, 'quarter_id', q.id, 'revenue_cents', v_rev_c,
+                            'operating_profit_cents', v_op, 'unpaid_added_cents', v_unpaid, 'xp', v_xp,
+                            'base_wages_cents', v_bwages, 'bonus_cents', v_bpaid, 'pay_factor_bps', v_factor,
+                            'distress_quarters', v_dq, 'dissolved', v_dq >= v_grace);
+end;
+$$;
+-- ===== idempotent copy of migrations/20261118000200_m3g_account_reset.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · M3g · 0200 · Reset and delete the own account
+-- =============================================================================
+-- reset_account(): back to the state of a freshly signed-up player. Kept: the
+-- auth user, nickname, avatar, settings, notification preferences, friendships,
+-- push subscriptions, idempotency journal, rate limits and anti-cheat records.
+-- delete_account(): the same cleanup, then the auth user (and with it the
+-- profile) is deleted; the nickname is free again.
+--
+-- The ledger, trades, orders and positions are immutable or referenced by
+-- immutable history. They outlive a deleted player: their player columns keep
+-- the UUID as an anonymous reference (no foreign key any more), the player's
+-- ledger accounts stay with balance 0 and are frozen. Every money movement of
+-- the cleanup is a balanced posting against the state (treasury; the mint
+-- before the world genesis).
+-- Idempotent (identical copy in supabase/updates/).
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- A. History outlives a deleted player
+-- ---------------------------------------------------------------------------
+alter table public.ledger_accounts     drop constraint if exists ledger_accounts_owner_player_fk;
+alter table public.ledger_transactions drop constraint if exists ledger_transactions_initiated_by_fk;
+alter table public.trades              drop constraint if exists trades_player_id_fkey;
+alter table public.orders              drop constraint if exists orders_player_id_fkey;
+alter table public.positions           drop constraint if exists positions_player_id_fkey;
+comment on column public.ledger_accounts.owner_player_id is
+  'Owning player. No foreign key: the accounts of a deleted player stay (balance 0, frozen) so the ledger history remains complete.';
+
+alter table public.player_private add column if not exists account_reset_at timestamptz;
+comment on column public.player_private.account_reset_at is 'Last reset_account() (game time); trades up to it are no longer shown to the player.';
+
+-- ---------------------------------------------------------------------------
+-- B. Shared cleanup (internal)
+-- ---------------------------------------------------------------------------
+-- Ends everything game-related of a player and returns the cash to the state.
+-- Leaves profile, settings and ledger accounts in place (balance 0).
+create or replace function public.account_wipe(p_player uuid, p_key text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_nick    text;
+  v_company uuid;
+  v_state   uuid := public.ledger_system_account(case when public.money_genesis_done() then 'treasury' else 'mint' end);
+  v_bal     bigint;
+  r         record;
+begin
+  perform public.lock_player_accounts(p_player);
+  select p.nickname into v_nick from public.profiles p where p.id = p_player for update;
+
+  -- own company: open share offers are settled first, then it is dissolved like close_company
+  select pc.company_id into v_company from public.player_companies pc where pc.founder_id = p_player and pc.status = 'active';
+  if v_company is not null then
+    for r in select o.id from public.company_share_offers o where o.company_id = v_company and o.status = 'open' order by o.id loop
+      perform public.close_share_offer(r.id);
+    end loop;
+    perform public.company_dissolve(v_company, 'closed');
+  end if;
+
+  -- subscriptions to other companies' open offers lapse (the money stays with the company)
+  for r in select s.offer_id, sum(s.shares_e6)::bigint as q from public.offer_subscriptions s
+            join public.company_share_offers o on o.id = s.offer_id and o.status = 'open'
+           where s.player_id = p_player group by s.offer_id order by s.offer_id loop
+    update public.company_share_offers set shares_subscribed_e6 = greatest(0, shares_subscribed_e6 - r.q) where id = r.offer_id;
+  end loop;
+
+  -- job: wages up to now, then ended without notice or fee
+  for r in select pj.id, pj.company_id from public.player_jobs pj where pj.player_id = p_player and pj.status = 'active' order by pj.id loop
+    perform public.accrue_job_salary(r.id);
+    update public.player_jobs set status = 'ended', ended_at = now(), end_reason = 'quit', notice_ends_at = null where id = r.id;
+    perform public.company_system_message(r.company_id, v_nick || ' hat das Unternehmen verlassen.');
+  end loop;
+
+  -- open orders release their reservations; holdings are given up
+  for r in select o.id from public.orders o
+            where o.player_id = p_player and o.status in ('pending', 'open', 'partially_filled') order by o.id loop
+    perform public.cancel_order_internal(r.id);
+  end loop;
+  update public.positions
+     set status = 'closed', closed_at = now(), quantity_e6 = 0, reserved_quantity_e6 = 0, cost_basis_cents = 0,
+         margin_cents = 0, borrowed_cents = 0, liquidation_price_e4 = null
+   where player_id = p_player and status = 'open';
+
+  -- game state of the player
+  for r in select * from (values
+             ('position_lots', 'player_id'), ('xp_events', 'player_id'), ('xp_daily_counters', 'player_id'),
+             ('vault_claims', 'player_id'), ('daily_logins', 'player_id'), ('player_missions', 'player_id'),
+             ('player_achievements', 'player_id'), ('player_cosmetics', 'player_id'), ('player_lifestyle_items', 'player_id'),
+             ('player_random_events', 'player_id'), ('player_bankruptcies', 'player_id'), ('margin_events', 'player_id'),
+             ('financing_charges', 'player_id'), ('player_tax_years', 'player_id'), ('distribution_payouts', 'player_id'),
+             ('watchlist_items', 'player_id'), ('portfolio_snapshots', 'player_id'), ('stock_option_grants', 'player_id'),
+             ('loans', 'player_id'), ('cap_table_entries', 'player_id'), ('share_lockups', 'player_id'),
+             ('capital_injections', 'player_id'), ('takeover_offers', 'bidder_player_id'), ('angel_offers', 'investor_player_id'),
+             ('ipo_subscriptions', 'player_id'), ('shareholder_vote_ballots', 'player_id'), ('reputation_events', 'player_id'),
+             ('insider_violations', 'player_id'), ('salary_payouts', 'player_id'), ('work_tasks', 'player_id'),
+             ('salary_negotiations', 'player_id'), ('player_work_tasks', 'player_id'), ('player_jobs', 'player_id'),
+             ('job_offers', 'to_player_id'), ('job_applications', 'player_id'), ('player_skills', 'player_id'),
+             ('player_skill_points', 'player_id'), ('daily_reward_claims', 'player_id'), ('player_loans', 'player_id'),
+             ('offer_subscriptions', 'player_id'), ('notifications', 'player_id'), ('feed_items', 'actor_id'),
+             ('league_entries', 'player_id'), ('league_entry_baselines', 'player_id'), ('company_logo_reports', 'reporter_id'),
+             ('player_unlocks', 'player_id')
+           ) as t(tbl, col) loop
+    execute format('delete from public.%I where %I = $1', r.tbl, r.col) using p_player;
+  end loop;
+  delete from public.rich_list_snapshots where entity_kind = 'player' and entity_id = p_player;
+
+  -- money back to the state: one balanced posting per account
+  for r in select a.id from public.ledger_accounts a where a.owner_player_id = p_player and a.balance_cents > 0 order by a.id loop
+    select a.balance_cents into v_bal from public.ledger_accounts a where a.id = r.id;
+    perform public.ledger_transfer(r.id, v_state, v_bal, 'transfer', 'Konto zurückgesetzt', 'profile', p_player,
+                                   p_key || ':' || r.id::text, p_player);
+  end loop;
+
+  update public.profiles
+     set level = 1, xp_total = 0, reputation = 50, title_key = null, frame_key = null,
+         bankrupt_until = null, founding_locked_until = null
+   where id = p_player;
+  update public.player_private
+     set founding_ban_until = null, bankruptcy_count = 0, career_experience_minutes = 0, ipo_investment_limit_cents = null,
+         tutorial_completed_at = null, tax_loss_pot_cents = 0
+   where player_id = p_player;
+end;
+$$;
+comment on function public.account_wipe(uuid, text) is 'Internal: cleanup shared by reset_account() and delete_account().';
+
+-- Checks the confirmation (the own nickname, case-insensitive, trimmed).
+create or replace function public.account_confirm(p_player uuid, p_confirm text)
+returns void
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if p_confirm is null
+     or not exists (select 1 from public.profiles p where p.id = p_player and lower(p.nickname) = lower(btrim(p_confirm))) then
+    raise exception using errcode = 'NX061', message = 'confirm_mismatch';
+  end if;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- C. RPCs
+-- ---------------------------------------------------------------------------
+create or replace function public.reset_account(p_request_id uuid, p_confirm text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player      uuid;
+  v_replay      jsonb;
+  v_now         timestamptz := public.game_now();
+  v_start_cents bigint := greatest(public.config_bigint('economy', '{startingCapitalCents}', 1000000), 0);
+  v_vault_hours double precision := greatest(0, least(
+                    public.config_double('economy', '{vaultInitialHours}', 2),
+                    public.config_double('economy', '{vaultCapHours}', 8)));
+  v_key         text;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'reset_account');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  perform public.account_confirm(v_player, p_confirm);
+  v_key := 'reset:' || v_player::text || ':' || p_request_id::text;
+
+  perform public.account_wipe(v_player, v_key);
+
+  -- what sign-up grants (handle_new_user)
+  update public.vaults
+     set accrual_started_at = public.game_now() - make_interval(secs => v_vault_hours * 3600),
+         last_claimed_at = null, total_claimed_cents = 0, full_notified_at = null
+   where player_id = v_player;
+  update public.login_streaks
+     set current_streak = 0, longest_streak = 0, last_login_day = null, freeze_tokens = 1, freeze_granted_week = null,
+         reward_cycle_day = 0, reward_last_day = null
+   where player_id = v_player;
+  insert into public.player_unlocks (player_id, unlock_key)
+  select v_player, u.key from public.unlocks u where u.level <= 1
+  on conflict do nothing;
+  update public.player_private set account_reset_at = v_now where player_id = v_player;
+  if v_start_cents > 0 then
+    perform public.state_payout(v_player, v_start_cents, 0, 'restart_capital', 'Starting capital (account reset)',
+                                'profile', v_player, v_key || ':start');
+  end if;
+
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('ok', true, 'reset_at', v_now));
+end;
+$$;
+comment on function public.reset_account(uuid, text) is 'RPC: resets the own account to a fresh start (p_confirm = own nickname).';
+
+create or replace function public.delete_account(p_confirm text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+begin
+  v_player := public.require_player();
+  perform public.account_confirm(v_player, p_confirm);
+  perform public.account_wipe(v_player, 'delete:' || v_player::text);
+  update public.ledger_accounts set is_frozen = true where owner_player_id = v_player;
+  delete from auth.users where id = v_player;
+  return jsonb_build_object('ok', true);
+end;
+$$;
+comment on function public.delete_account(text) is 'RPC: deletes the own account (p_confirm = own nickname); the nickname is free again.';
+
+-- ---------------------------------------------------------------------------
+-- D. Portfolio: trades before the last reset are no longer shown
+-- ---------------------------------------------------------------------------
+create or replace function public.get_my_portfolio()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player    uuid;
+  v_cash      bigint;
+  v_reserved  bigint;
+  v_positions jsonb;
+  v_value     bigint;
+  v_bid_value bigint;
+  v_orders    jsonb;
+  v_trades    jsonb;
+  v_prof      public.profiles;
+  v_priv      public.player_private;
+  v_level     jsonb;
+  v_days      double precision := public.config_double('names', '{nicknameChangeDays}', 60);
+  v_today     date := (public.game_now() at time zone 'Europe/Berlin')::date;
+  v_streak    integer;
+  ls          public.login_streaks;
+begin
+  v_player := public.require_player();
+  select * into v_priv from public.player_private where player_id = v_player;
+  select coalesce(sum(a.balance_cents) filter (where a.kind = 'player_cash'), 0),
+         coalesce(sum(a.balance_cents) filter (where a.kind = 'player_reserve'), 0)
+    into v_cash, v_reserved
+    from public.ledger_accounts a where a.owner_player_id = v_player;
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'ticker', x.ticker, 'name', x.name, 'kind', x.kind, 'quantity_e6', x.quantity_e6,
+           'reserved_quantity_e6', x.reserved_quantity_e6, 'avg_price_e4', x.avg_entry_price_e4,
+           'last_price_e4', x.last_price_e4, 'market_value_cents', x.mv, 'cost_basis_cents', x.cost_basis_cents,
+           'unrealized_pnl_cents', x.mv - x.cost_basis_cents, 'realized_pnl_cents', x.realized_pnl_cents,
+           'change_bps', x.change_bps, 'opened_at', x.opened_at)
+           order by x.mv desc), '[]'::jsonb),
+         coalesce(sum(x.mv), 0)::bigint,
+         coalesce(sum(x.bv), 0)::bigint
+    into v_positions, v_value, v_bid_value
+    from (select s.ticker, s.name, s.kind, p.quantity_e6, p.reserved_quantity_e6, p.avg_entry_price_e4, p.cost_basis_cents,
+                 p.realized_pnl_cents, p.opened_at, q.last_price_e4, q.change_bps,
+                 public.value_cents(p.quantity_e6, q.last_price_e4) as mv,
+                 public.value_cents(p.quantity_e6, coalesce(q.bid_e4, q.last_price_e4)) as bv
+            from public.positions p
+            join public.securities s on s.id = p.security_id
+            join public.security_quotes q on q.security_id = p.security_id
+           where p.player_id = v_player and p.status = 'open' and p.quantity_e6 > 0) x;
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', o.id, 'ticker', s.ticker, 'side', o.side, 'type', o.type, 'quantity_e6', o.quantity_e6,
+           'filled_quantity_e6', o.filled_quantity_e6, 'limit_price_e4', o.limit_price_e4, 'status', o.status,
+           'reserved_cents', o.reserved_cents, 'created_at', o.created_at)
+           order by o.created_at desc), '[]'::jsonb)
+    into v_orders
+    from public.orders o join public.securities s on s.id = o.security_id
+   where o.player_id = v_player and o.status in ('open', 'partially_filled');
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', t.id, 'ticker', t.ticker, 'side', t.side, 'quantity_e6', t.quantity_e6, 'price_e4', t.price_e4,
+           'gross_cents', t.gross_cents, 'fee_cents', t.fee_cents, 'tax_cents', t.tax_cents,
+           'realized_pnl_cents', t.realized_pnl_cents, 'xp_awarded', t.xp_awarded, 'executed_at', t.executed_at)
+           order by t.executed_at desc), '[]'::jsonb)
+    into v_trades
+    from (select tr.*, s.ticker from public.trades tr join public.securities s on s.id = tr.security_id
+           where tr.player_id = v_player and tr.executed_at > coalesce(v_priv.account_reset_at, '-infinity'::timestamptz)
+           order by tr.executed_at desc limit 50) t;
+
+  select * into v_prof from public.profiles where id = v_player;
+  select * into ls from public.login_streaks where player_id = v_player;
+  v_level := public.level_progress(v_prof.xp_total);
+  v_streak := case when ls.last_login_day >= v_today - 1 then ls.current_streak
+                   when ls.last_login_day = v_today - 2 and ls.freeze_tokens > 0 then ls.current_streak
+                   else 0 end;
+
+  return jsonb_build_object(
+    'cash_cents',            v_cash,
+    'reserved_cents',        v_reserved,
+    'positions_value_cents', v_value,
+    'total_cents',           v_cash + v_reserved + v_value,
+    'net_worth_cents',       v_cash + v_reserved + v_bid_value,
+    'loss_pot_cents',        coalesce(v_priv.tax_loss_pot_cents, 0),
+    'vault',                 public.vault_status(v_player) - 'accrued_seconds' - 'base_rate_cents_per_hour',
+    'positions',             v_positions,
+    'open_orders',           v_orders,
+    'recent_trades',         v_trades,
+    'level',                 v_prof.level,
+    'xp_total',              v_prof.xp_total,
+    'xp_into_level',         (v_level ->> 'xp_into_level')::bigint,
+    'xp_for_next',           (v_level ->> 'xp_for_next')::bigint,
+    'tutorial_completed',    v_priv.tutorial_completed_at is not null,
+    'nickname',              v_prof.nickname,
+    'nickname_change_available_at',
+                             case when v_prof.nickname_changed_at is null
+                                    or v_prof.nickname_changed_at + make_interval(secs => v_days * 86400) <= now() then null
+                                  else v_prof.nickname_changed_at + make_interval(secs => v_days * 86400) end,
+    'missions_claimable',    (select count(*) from public.player_missions m
+                               where m.player_id = v_player and m.status = 'completed'
+                                 and (m.expires_at is null or m.expires_at > public.game_now()))::integer,
+    'streak_days',           coalesce(v_streak, 0),
+    'avatar_key',            coalesce(v_prof.avatar_key, 'rookie'),
+    'skill_points_free',     coalesce((select sp.free_points from public.player_skill_points sp where sp.player_id = v_player), 0),
+    'daily_reward_claimable', not exists (select 1 from public.daily_reward_claims c
+                                           where c.player_id = v_player
+                                             and c.claim_day = (public.game_now() at time zone 'Europe/Berlin')::date),
+    'company_value_cents',   public.player_company_value_cents(v_player),
+    'debt_cents',            public.player_debt_cents(v_player),
+    'debt_withholding_bps',  public.config_double('startups', '{insolvency,loanWithholdingBps}', 5000)::integer,
+    'founding_locked_until', case when v_prof.founding_locked_until > now() then v_prof.founding_locked_until end,
+    'server_time',           public.game_now());
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- E. Grants
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.account_wipe(uuid, text)', 'public.account_confirm(uuid, text)',
+    'public.reset_account(uuid, text)', 'public.delete_account(text)'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+    execute format('grant execute on function %s to service_role', f);
+  end loop;
+  foreach f in array array['public.reset_account(uuid, text)', 'public.delete_account(text)'] loop
+    execute format('grant execute on function %s to authenticated', f);
+  end loop;
+end;
+$$;
 
 -- ===== game_config (current values, overwriting older ones) =====
 -- GENERATED by scripts/gen-config-seed.ts from src/config/balance.ts. Do not edit by hand.
@@ -17694,7 +18308,7 @@ insert into public.game_config (key, value, description) values
   ('skills', '{"tree":[{"key":"it_basics","branches":["it"],"tier":1,"q":1,"r":0,"entry":true},{"key":"it_programming","branches":["it"],"tier":2,"q":2,"r":0,"entry":true},{"key":"it_data","branches":["it"],"tier":2,"q":3,"r":-1,"entry":false},{"key":"it_networks","branches":["it"],"tier":2,"q":3,"r":0,"entry":false},{"key":"it_web","branches":["it"],"tier":2,"q":2,"r":1,"entry":false},{"key":"it_architecture","branches":["it"],"tier":3,"q":4,"r":0,"entry":false},{"key":"it_ml","branches":["it"],"tier":3,"q":4,"r":-1,"entry":false},{"key":"it_security","branches":["it"],"tier":3,"q":3,"r":1,"entry":false},{"key":"it_databases","branches":["it"],"tier":3,"q":4,"r":1,"entry":false},{"key":"it_devops","branches":["it"],"tier":3,"q":5,"r":-1,"entry":false},{"key":"it_mobile","branches":["it"],"tier":3,"q":5,"r":0,"entry":false},{"key":"hybrid_fintech","branches":["it","finance"],"tier":4,"q":6,"r":-2,"entry":false},{"key":"it_ai","branches":["it"],"tier":4,"q":5,"r":1,"entry":false},{"key":"it_cloud","branches":["it"],"tier":4,"q":6,"r":0,"entry":false},{"key":"it_testing","branches":["it"],"tier":4,"q":6,"r":-1,"entry":false},{"key":"it_ux","branches":["it"],"tier":4,"q":4,"r":2,"entry":false},{"key":"it_bigdata","branches":["it"],"tier":5,"q":5,"r":2,"entry":false},{"key":"it_crypto","branches":["it"],"tier":5,"q":7,"r":-1,"entry":false},{"key":"it_embedded","branches":["it"],"tier":5,"q":6,"r":1,"entry":false},{"key":"it_mastery","branches":["it"],"tier":5,"q":7,"r":0,"entry":false},{"key":"it_pentest","branches":["it"],"tier":5,"q":7,"r":-2,"entry":false},{"key":"finance_basics","branches":["finance"],"tier":1,"q":1,"r":-1,"entry":true},{"key":"finance_accounting","branches":["finance"],"tier":2,"q":2,"r":-2,"entry":true},{"key":"finance_investment","branches":["finance"],"tier":2,"q":2,"r":-1,"entry":true},{"key":"finance_banking","branches":["finance"],"tier":2,"q":3,"r":-3,"entry":false},{"key":"finance_controlling","branches":["finance"],"tier":2,"q":3,"r":-2,"entry":false},{"key":"finance_balance","branches":["finance"],"tier":3,"q":4,"r":-3,"entry":false},{"key":"finance_portfolio","branches":["finance"],"tier":3,"q":4,"r":-4,"entry":false},{"key":"finance_valuation","branches":["finance"],"tier":3,"q":4,"r":-2,"entry":false},{"key":"finance_budgeting","branches":["finance"],"tier":3,"q":5,"r":-3,"entry":false},{"key":"finance_tax_planning","branches":["finance"],"tier":3,"q":5,"r":-4,"entry":false},{"key":"finance_trading","branches":["finance"],"tier":3,"q":5,"r":-2,"entry":false},{"key":"finance_treasury","branches":["finance"],"tier":3,"q":5,"r":-5,"entry":false},{"key":"finance_corporate","branches":["finance"],"tier":4,"q":6,"r":-4,"entry":false},{"key":"finance_derivatives","branches":["finance"],"tier":4,"q":6,"r":-6,"entry":false},{"key":"finance_ma","branches":["finance"],"tier":4,"q":6,"r":-3,"entry":false},{"key":"finance_risk","branches":["finance"],"tier":4,"q":6,"r":-5,"entry":false},{"key":"finance_audit","branches":["finance"],"tier":5,"q":7,"r":-4,"entry":false},{"key":"finance_insurance","branches":["finance"],"tier":5,"q":7,"r":-7,"entry":false},{"key":"finance_mastery","branches":["finance"],"tier":5,"q":7,"r":-5,"entry":false},{"key":"finance_quant","branches":["finance"],"tier":5,"q":7,"r":-3,"entry":false},{"key":"finance_vc","branches":["finance"],"tier":5,"q":7,"r":-6,"entry":false},{"key":"law_basics","branches":["law"],"tier":1,"q":1,"r":-2,"entry":true},{"key":"law_contracts","branches":["law"],"tier":2,"q":2,"r":-3,"entry":false},{"key":"law_labor","branches":["law"],"tier":2,"q":1,"r":-3,"entry":false},{"key":"law_compliance","branches":["law"],"tier":3,"q":1,"r":-4,"entry":false},{"key":"law_corporate","branches":["law"],"tier":3,"q":3,"r":-4,"entry":false},{"key":"law_tax","branches":["law"],"tier":2,"q":2,"r":-4,"entry":false},{"key":"law_competition","branches":["law"],"tier":3,"q":1,"r":-5,"entry":false},{"key":"law_intltax","branches":["law"],"tier":3,"q":3,"r":-5,"entry":false},{"key":"law_ip","branches":["law"],"tier":3,"q":2,"r":-5,"entry":false},{"key":"law_privacy","branches":["law"],"tier":3,"q":4,"r":-5,"entry":false},{"key":"hybrid_business_law","branches":["law","finance"],"tier":4,"q":5,"r":-6,"entry":false},{"key":"law_capital","branches":["law"],"tier":4,"q":3,"r":-6,"entry":false},{"key":"law_consumer","branches":["law"],"tier":4,"q":2,"r":-6,"entry":false},{"key":"law_crime","branches":["law"],"tier":4,"q":4,"r":-6,"entry":false},{"key":"law_it","branches":["law"],"tier":4,"q":1,"r":-6,"entry":false},{"key":"law_environment","branches":["law"],"tier":5,"q":4,"r":-7,"entry":false},{"key":"law_international","branches":["law"],"tier":5,"q":2,"r":-7,"entry":false},{"key":"law_litigation","branches":["law"],"tier":5,"q":1,"r":-7,"entry":false},{"key":"law_mastery","branches":["law"],"tier":5,"q":3,"r":-7,"entry":false},{"key":"law_mediation","branches":["law"],"tier":5,"q":6,"r":-7,"entry":false},{"key":"law_medical","branches":["law"],"tier":5,"q":5,"r":-7,"entry":false},{"key":"management_basics","branches":["management"],"tier":1,"q":0,"r":-1,"entry":true},{"key":"management_projects","branches":["management"],"tier":2,"q":0,"r":-2,"entry":true},{"key":"management_team","branches":["management"],"tier":2,"q":-1,"r":-1,"entry":true},{"key":"management_leadership","branches":["management"],"tier":2,"q":0,"r":-3,"entry":false},{"key":"management_people","branches":["management"],"tier":2,"q":-1,"r":-2,"entry":false},{"key":"management_agile","branches":["management"],"tier":3,"q":-2,"r":-2,"entry":false},{"key":"management_change","branches":["management"],"tier":3,"q":-1,"r":-3,"entry":false},{"key":"management_recruiting","branches":["management"],"tier":3,"q":0,"r":-4,"entry":false},{"key":"hybrid_people_analytics","branches":["management","it"],"tier":4,"q":0,"r":-5,"entry":false},{"key":"management_communication","branches":["management"],"tier":3,"q":-1,"r":-4,"entry":false},{"key":"management_finance_lead","branches":["management"],"tier":3,"q":-2,"r":-3,"entry":false},{"key":"management_operations","branches":["management"],"tier":3,"q":-3,"r":-2,"entry":false},{"key":"management_coaching","branches":["management"],"tier":4,"q":0,"r":-6,"entry":false},{"key":"management_innovation","branches":["management"],"tier":4,"q":-3,"r":-3,"entry":false},{"key":"management_organization","branches":["management"],"tier":4,"q":-1,"r":-5,"entry":false},{"key":"management_strategy","branches":["management"],"tier":4,"q":-2,"r":-4,"entry":false},{"key":"management_board","branches":["management"],"tier":5,"q":0,"r":-7,"entry":false},{"key":"management_culture","branches":["management"],"tier":5,"q":-4,"r":-3,"entry":false},{"key":"management_international","branches":["management"],"tier":5,"q":-3,"r":-4,"entry":false},{"key":"management_mastery","branches":["management"],"tier":5,"q":-2,"r":-5,"entry":false},{"key":"management_risk","branches":["management"],"tier":5,"q":-1,"r":-6,"entry":false},{"key":"sales_basics","branches":["sales"],"tier":1,"q":-1,"r":0,"entry":true},{"key":"sales_selling","branches":["sales"],"tier":2,"q":-2,"r":0,"entry":true},{"key":"sales_marketing","branches":["sales"],"tier":2,"q":-3,"r":0,"entry":false},{"key":"sales_service","branches":["sales"],"tier":2,"q":-3,"r":1,"entry":false},{"key":"sales_social","branches":["sales"],"tier":2,"q":-2,"r":-1,"entry":false},{"key":"sales_brand","branches":["sales"],"tier":3,"q":-4,"r":1,"entry":false},{"key":"sales_keyaccount","branches":["sales"],"tier":3,"q":-3,"r":-1,"entry":false},{"key":"sales_negotiation","branches":["sales"],"tier":3,"q":-4,"r":0,"entry":false},{"key":"sales_ads","branches":["sales"],"tier":3,"q":-4,"r":-1,"entry":false},{"key":"sales_content","branches":["sales"],"tier":3,"q":-5,"r":0,"entry":false},{"key":"sales_seo","branches":["sales"],"tier":3,"q":-5,"r":1,"entry":false},{"key":"hybrid_ecommerce","branches":["sales","logistics"],"tier":4,"q":-6,"r":2,"entry":false},{"key":"sales_growth","branches":["sales"],"tier":4,"q":-6,"r":1,"entry":false},{"key":"sales_international","branches":["sales"],"tier":4,"q":-6,"r":0,"entry":false},{"key":"sales_pricing","branches":["sales"],"tier":4,"q":-5,"r":-1,"entry":false},{"key":"sales_retail","branches":["sales"],"tier":4,"q":-4,"r":-2,"entry":false},{"key":"sales_b2b","branches":["sales"],"tier":5,"q":-7,"r":1,"entry":false},{"key":"sales_crm","branches":["sales"],"tier":5,"q":-6,"r":-1,"entry":false},{"key":"sales_events","branches":["sales"],"tier":5,"q":-5,"r":-2,"entry":false},{"key":"sales_mastery","branches":["sales"],"tier":5,"q":-7,"r":0,"entry":false},{"key":"sales_pr","branches":["sales"],"tier":5,"q":-7,"r":2,"entry":false},{"key":"logistics_basics","branches":["logistics"],"tier":1,"q":-1,"r":1,"entry":true},{"key":"logistics_transport","branches":["logistics"],"tier":2,"q":-2,"r":2,"entry":true},{"key":"logistics_warehouse","branches":["logistics"],"tier":2,"q":-2,"r":1,"entry":true},{"key":"logistics_inventory","branches":["logistics"],"tier":2,"q":-3,"r":3,"entry":false},{"key":"logistics_purchasing","branches":["logistics"],"tier":2,"q":-3,"r":2,"entry":false},{"key":"logistics_fleet","branches":["logistics"],"tier":3,"q":-4,"r":2,"entry":false},{"key":"logistics_strategic","branches":["logistics"],"tier":3,"q":-4,"r":4,"entry":false},{"key":"logistics_supplychain","branches":["logistics"],"tier":3,"q":-4,"r":3,"entry":false},{"key":"logistics_air","branches":["logistics"],"tier":3,"q":-5,"r":2,"entry":false},{"key":"logistics_customs","branches":["logistics"],"tier":3,"q":-5,"r":3,"entry":false},{"key":"logistics_distribution","branches":["logistics"],"tier":3,"q":-5,"r":4,"entry":false},{"key":"logistics_shipping","branches":["logistics"],"tier":3,"q":-5,"r":5,"entry":false},{"key":"logistics_global","branches":["logistics"],"tier":4,"q":-6,"r":4,"entry":false},{"key":"logistics_lastmile","branches":["logistics"],"tier":4,"q":-6,"r":6,"entry":false},{"key":"logistics_quality","branches":["logistics"],"tier":4,"q":-6,"r":5,"entry":false},{"key":"logistics_rail","branches":["logistics"],"tier":4,"q":-6,"r":3,"entry":false},{"key":"logistics_automation","branches":["logistics"],"tier":5,"q":-7,"r":7,"entry":false},{"key":"logistics_cold","branches":["logistics"],"tier":5,"q":-7,"r":6,"entry":false},{"key":"logistics_mastery","branches":["logistics"],"tier":5,"q":-7,"r":5,"entry":false},{"key":"logistics_planning","branches":["logistics"],"tier":5,"q":-7,"r":4,"entry":false},{"key":"logistics_sustainability","branches":["logistics"],"tier":5,"q":-7,"r":3,"entry":false},{"key":"craft_basics","branches":["craft"],"tier":1,"q":-1,"r":2,"entry":true},{"key":"craft_electrical","branches":["craft"],"tier":2,"q":-2,"r":3,"entry":false},{"key":"craft_mechanics","branches":["craft"],"tier":2,"q":-1,"r":3,"entry":false},{"key":"craft_automation","branches":["craft"],"tier":3,"q":-3,"r":4,"entry":false},{"key":"craft_construction","branches":["craft"],"tier":2,"q":-2,"r":4,"entry":false},{"key":"craft_engineering","branches":["craft"],"tier":3,"q":-1,"r":4,"entry":false},{"key":"craft_hvac","branches":["craft"],"tier":3,"q":-4,"r":5,"entry":false},{"key":"craft_plumbing","branches":["craft"],"tier":3,"q":-1,"r":5,"entry":false},{"key":"craft_site","branches":["craft"],"tier":3,"q":-2,"r":5,"entry":false},{"key":"craft_welding","branches":["craft"],"tier":3,"q":-3,"r":5,"entry":false},{"key":"craft_carpentry","branches":["craft"],"tier":4,"q":-4,"r":6,"entry":false},{"key":"craft_cnc","branches":["craft"],"tier":4,"q":-5,"r":6,"entry":false},{"key":"craft_energy","branches":["craft"],"tier":4,"q":-2,"r":6,"entry":false},{"key":"craft_manufacturing","branches":["craft"],"tier":4,"q":-3,"r":6,"entry":false},{"key":"hybrid_industry40","branches":["craft","it"],"tier":4,"q":-1,"r":6,"entry":false},{"key":"craft_3dprint","branches":["craft"],"tier":5,"q":-3,"r":7,"entry":false},{"key":"craft_mastery","branches":["craft"],"tier":5,"q":-4,"r":7,"entry":false},{"key":"craft_materials","branches":["craft"],"tier":5,"q":-6,"r":7,"entry":false},{"key":"craft_robotics","branches":["craft"],"tier":5,"q":-1,"r":7,"entry":false},{"key":"craft_solar","branches":["craft"],"tier":5,"q":-5,"r":7,"entry":false},{"key":"craft_vehicles","branches":["craft"],"tier":5,"q":-2,"r":7,"entry":false},{"key":"science_basics","branches":["science"],"tier":1,"q":0,"r":1,"entry":true},{"key":"science_biology","branches":["science"],"tier":2,"q":1,"r":1,"entry":true},{"key":"science_chemistry","branches":["science"],"tier":2,"q":0,"r":2,"entry":true},{"key":"science_medicine","branches":["science"],"tier":2,"q":1,"r":2,"entry":false},{"key":"science_physics","branches":["science"],"tier":2,"q":0,"r":3,"entry":false},{"key":"science_biotech","branches":["science"],"tier":3,"q":0,"r":4,"entry":false},{"key":"science_clinical","branches":["science"],"tier":3,"q":2,"r":2,"entry":false},{"key":"science_pharmacology","branches":["science"],"tier":3,"q":1,"r":3,"entry":false},{"key":"hybrid_pharma_sales","branches":["science","sales"],"tier":4,"q":0,"r":5,"entry":false},{"key":"science_lab","branches":["science"],"tier":3,"q":1,"r":4,"entry":false},{"key":"science_microbiology","branches":["science"],"tier":3,"q":3,"r":2,"entry":false},{"key":"science_statistics","branches":["science"],"tier":3,"q":2,"r":3,"entry":false},{"key":"science_drugs","branches":["science"],"tier":4,"q":2,"r":4,"entry":false},{"key":"science_genetics","branches":["science"],"tier":4,"q":1,"r":5,"entry":false},{"key":"science_materials","branches":["science"],"tier":4,"q":3,"r":3,"entry":false},{"key":"science_nutrition","branches":["science"],"tier":4,"q":0,"r":6,"entry":false},{"key":"science_devices","branches":["science"],"tier":5,"q":0,"r":7,"entry":false},{"key":"science_environment","branches":["science"],"tier":5,"q":1,"r":6,"entry":false},{"key":"science_mastery","branches":["science"],"tier":5,"q":2,"r":5,"entry":false},{"key":"science_neuro","branches":["science"],"tier":5,"q":3,"r":4,"entry":false},{"key":"science_vaccines","branches":["science"],"tier":5,"q":4,"r":3,"entry":false}],"costByTier":[1,2,3,4,6],"scoreByTier":[1,2,3,4,6],"freePointsPerLevel":1,"workHoursPerBranchPoint":6}'::jsonb, 'Defaults from src/config/balance.ts, section "skills"'),
   ('jobs', '{"playerBaseProductivity":1.5,"productivityPerSkillScore":0.08,"maxProductivity":4,"aiSalaryPerScoreBps":300,"aiSalaryCapMultiplier":1.5,"salaryUnitHours":12,"maxOpenApplications":5,"applicationMessageMaxLength":140,"offerValidHours":48,"aiPostingsPerCompany":2,"aiSlotsOpen":99,"quitNoticeHours":24,"quitNowCostHours":12,"tierMinScore":{"intern":0,"junior":2,"senior":6,"team_lead":12,"c_level":20},"sectorBranches":{"tech":["it","finance","sales","management"],"retail":["sales","logistics","finance","management"],"energy":["craft","science","law","management"],"pharma":["science","law","sales","management"],"logistics":["logistics","craft","it","management"]},"profitLinkedPay":{"minFactor":0.5,"bonusShareOfProfit":0.2,"maxBonusFactor":1},"raiseRequest":{"cooldownDays":7,"maxRaiseBpsPerScore":300}}'::jsonb, 'Defaults from src/config/balance.ts, section "jobs"'),
   ('dailyRewards', '{"cycle":[{"xp":50,"cashCents":10000,"skillPoints":0},{"xp":75,"cashCents":20000,"skillPoints":0},{"xp":100,"cashCents":30000,"skillPoints":0},{"xp":125,"cashCents":0,"skillPoints":1},{"xp":150,"cashCents":50000,"skillPoints":0},{"xp":200,"cashCents":75000,"skillPoints":0},{"xp":300,"cashCents":100000,"skillPoints":1}],"freezesPerWeek":1}'::jsonb, 'Defaults from src/config/balance.ts, section "dailyRewards"'),
-  ('startups', '{"garage":{"minLevel":3,"foundingCostCents":250000,"fixedCostCentsPerQuarter":15000,"maxEmployees":2},"upgradeCreditShare":1,"gmbh":{"minLevel":15,"foundingCostCents":6000000,"fixedCostCentsPerQuarter":600000,"maxEmployees":20},"ag":{"fixedCostCentsPerQuarter":1000000,"maxEmployees":100},"ipo":{"minLevel":12,"fromTiers":["small_business","gmbh"],"sharesTotal":1000000,"minSharePercent":10,"maxSharePercent":49,"minIssuePriceCents":100,"subscriptionHours":12,"aiTakeBase":0.2,"aiTakePerQuality":0.5,"capitalIncreaseDiscount":0.9,"capitalIncreaseMaxPercent":25},"sideJobFounderFactor":0.5,"fullTimeFromEmployees":5,"logo":{"size":16,"maxColors":6,"reportsToHide":3},"potential":{"minAnnualCents":100000,"maxAnnualCents":200000000000,"paretoAlpha":0.57},"awareness":{"initial":0.03,"min":0.01,"growthPerQuarter":0.3,"decayPerQuarter":0.03,"marketingMaxGain":0.12,"marketingHalfSaturationShare":0.1,"marketingMinHalfSaturationCents":50000},"quality":{"base":0.25,"halfSaturationScore":20,"adjustPerQuarter":0.35},"demandNoise":0.1,"capacityCentsPerProductivity":{"tech":300000,"retail":250000,"energy":250000,"pharma":300000,"logistics":250000},"grossMargin":{"tech":0.75,"retail":0.35,"energy":0.45,"pharma":0.65,"logistics":0.35},"aiWorkerCostCentsPerQuarter":70000,"valuationPeDiscount":0.5,"estimate":{"initialSpread":2.3,"decayPerQuarter":0.85},"insolvency":{"graceQuarters":4,"loanWithholdingBps":5000,"foundingLockoutDays":3},"products":{"tech":[{"key":"security_software","stages":[["it_security"],["it_architecture","it_pentest"],["law_privacy","sales_b2b"],["it_crypto","management_leadership"]]},{"key":"mobile_app","stages":[["it_mobile"],["it_ux","sales_social"],["it_cloud","sales_growth"],["it_data","management_strategy"]]},{"key":"cloud_platform","stages":[["it_cloud"],["it_devops","it_databases"],["it_security","sales_keyaccount"],["finance_controlling","management_operations"]]}],"retail":[{"key":"online_shop","stages":[["it_web"],["sales_marketing","logistics_lastmile"],["hybrid_ecommerce","sales_seo"],["logistics_automation","management_operations"]]},{"key":"fashion","stages":[["sales_brand"],["sales_social","logistics_purchasing"],["sales_ads","sales_retail"],["sales_international","finance_controlling"]]},{"key":"delicatessen","stages":[["logistics_cold"],["sales_retail","science_nutrition"],["logistics_distribution","sales_brand"],["law_consumer","management_operations"]]}],"energy":[{"key":"solar","stages":[["craft_solar"],["craft_electrical","sales_selling"],["craft_energy","law_environment"],["finance_corporate","management_projects"]]},{"key":"grid_service","stages":[["craft_energy"],["craft_electrical","craft_site"],["craft_automation","logistics_planning"],["law_compliance","management_operations"]]},{"key":"energy_storage","stages":[["science_physics"],["craft_engineering","science_materials"],["craft_manufacturing","finance_investment"],["law_ip","sales_international"]]}],"pharma":[{"key":"generics","stages":[["science_chemistry"],["science_lab","science_pharmacology"],["logistics_quality","hybrid_pharma_sales"],["law_ip","finance_controlling"]]},{"key":"biotech","stages":[["science_biology"],["science_biotech","science_statistics"],["science_clinical","law_medical"],["science_genetics","finance_vc"]]},{"key":"medtech","stages":[["science_devices"],["craft_engineering","science_medicine"],["science_drugs","it_embedded"],["sales_b2b","law_medical"]]}],"logistics":[{"key":"courier","stages":[["logistics_lastmile"],["logistics_planning","logistics_fleet"],["it_mobile","sales_b2b"],["logistics_sustainability","management_operations"]]},{"key":"warehouse","stages":[["logistics_warehouse"],["logistics_inventory","logistics_automation"],["it_databases","craft_robotics"],["logistics_supplychain","management_agile"]]},{"key":"freight","stages":[["logistics_transport"],["logistics_customs","logistics_shipping"],["logistics_global","sales_international"],["logistics_strategic","finance_risk"]]}]},"stages":{"awarenessCaps":[0.5,0.7,0.85,0.95,1],"qualityBonusPerStage":0.05,"capacityBonusPerStage":0.25},"training":{"costCentsByTier":[200000,500000,1200000,2500000,5000000],"wageRaiseBpsByTier":[300,500,800,1200,2000]},"chat":{"maxMessageLength":300,"historyLimit":100,"maxMessagesPerMinute":10}}'::jsonb, 'Defaults from src/config/balance.ts, section "startups"'),
+  ('startups', '{"garage":{"minLevel":3,"foundingCostCents":250000,"fixedCostCentsPerQuarter":15000,"maxEmployees":2},"upgradeCreditShare":1,"gmbh":{"minLevel":15,"foundingCostCents":6000000,"fixedCostCentsPerQuarter":600000,"maxEmployees":20},"ag":{"fixedCostCentsPerQuarter":1000000,"maxEmployees":100},"ipo":{"minLevel":12,"fromTiers":["small_business","gmbh"],"sharesTotal":1000000,"minSharePercent":10,"maxSharePercent":49,"minIssuePriceCents":100,"subscriptionHours":12,"aiTakeBase":0.2,"aiTakePerQuality":0.5,"capitalIncreaseDiscount":0.9,"capitalIncreaseMaxPercent":25},"sideJobFounderFactor":0.5,"aiQualityPenalty":0.3,"fullTimeFromEmployees":5,"logo":{"size":16,"maxColors":6,"reportsToHide":3},"potential":{"minAnnualCents":100000,"maxAnnualCents":200000000000,"paretoAlpha":0.57},"awareness":{"initial":0.03,"min":0.01,"growthPerQuarter":0.3,"decayPerQuarter":0.03,"marketingMaxGain":0.12,"marketingHalfSaturationShare":0.1,"marketingMinHalfSaturationCents":50000},"quality":{"base":0.25,"halfSaturationScore":20,"adjustPerQuarter":0.35},"demandNoise":0.1,"capacityCentsPerProductivity":{"tech":300000,"retail":250000,"energy":250000,"pharma":300000,"logistics":250000},"grossMargin":{"tech":0.75,"retail":0.35,"energy":0.45,"pharma":0.65,"logistics":0.35},"aiWorkerCostCentsPerQuarter":70000,"valuationPeDiscount":0.5,"estimate":{"initialSpread":2.3,"decayPerQuarter":0.85},"insolvency":{"graceQuarters":4,"loanWithholdingBps":5000,"foundingLockoutDays":3},"products":{"tech":[{"key":"security_software","stages":[["it_security"],["it_architecture","it_pentest"],["law_privacy","sales_b2b"],["it_crypto","management_leadership"]]},{"key":"mobile_app","stages":[["it_mobile"],["it_ux","sales_social"],["it_cloud","sales_growth"],["it_data","management_strategy"]]},{"key":"cloud_platform","stages":[["it_cloud"],["it_devops","it_databases"],["it_security","sales_keyaccount"],["finance_controlling","management_operations"]]}],"retail":[{"key":"online_shop","stages":[["it_web"],["sales_marketing","logistics_lastmile"],["hybrid_ecommerce","sales_seo"],["logistics_automation","management_operations"]]},{"key":"fashion","stages":[["sales_brand"],["sales_social","logistics_purchasing"],["sales_ads","sales_retail"],["sales_international","finance_controlling"]]},{"key":"delicatessen","stages":[["logistics_cold"],["sales_retail","science_nutrition"],["logistics_distribution","sales_brand"],["law_consumer","management_operations"]]}],"energy":[{"key":"solar","stages":[["craft_solar"],["craft_electrical","sales_selling"],["craft_energy","law_environment"],["finance_corporate","management_projects"]]},{"key":"grid_service","stages":[["craft_energy"],["craft_electrical","craft_site"],["craft_automation","logistics_planning"],["law_compliance","management_operations"]]},{"key":"energy_storage","stages":[["science_physics"],["craft_engineering","science_materials"],["craft_manufacturing","finance_investment"],["law_ip","sales_international"]]}],"pharma":[{"key":"generics","stages":[["science_chemistry"],["science_lab","science_pharmacology"],["logistics_quality","hybrid_pharma_sales"],["law_ip","finance_controlling"]]},{"key":"biotech","stages":[["science_biology"],["science_biotech","science_statistics"],["science_clinical","law_medical"],["science_genetics","finance_vc"]]},{"key":"medtech","stages":[["science_devices"],["craft_engineering","science_medicine"],["science_drugs","it_embedded"],["sales_b2b","law_medical"]]}],"logistics":[{"key":"courier","stages":[["logistics_lastmile"],["logistics_planning","logistics_fleet"],["it_mobile","sales_b2b"],["logistics_sustainability","management_operations"]]},{"key":"warehouse","stages":[["logistics_warehouse"],["logistics_inventory","logistics_automation"],["it_databases","craft_robotics"],["logistics_supplychain","management_agile"]]},{"key":"freight","stages":[["logistics_transport"],["logistics_customs","logistics_shipping"],["logistics_global","sales_international"],["logistics_strategic","finance_risk"]]}]},"stages":{"awarenessCaps":[0.5,0.7,0.85,0.95,1],"qualityBonusPerStage":0.05,"capacityBonusPerStage":0.25},"training":{"costCentsByTier":[200000,500000,1200000,2500000,5000000],"wageRaiseBpsByTier":[300,500,800,1200,2000]},"chat":{"maxMessageLength":300,"historyLimit":100,"maxMessagesPerMinute":10}}'::jsonb, 'Defaults from src/config/balance.ts, section "startups"'),
   ('avatars', '{"defaultKey":"rookie","portraits":[{"key":"rookie","level":1},{"key":"trader","level":1},{"key":"analyst","level":1},{"key":"coder","level":1},{"key":"builder","level":1},{"key":"seller","level":1},{"key":"lawyer","level":1},{"key":"scientist","level":1},{"key":"trucker","level":1},{"key":"punk","level":3},{"key":"gamer","level":5},{"key":"chef","level":5},{"key":"pilot","level":8},{"key":"founder","level":10},{"key":"banker","level":15},{"key":"astronaut","level":20},{"key":"magnate","level":25},{"key":"royal","level":35},{"key":"legend","level":50},{"key":"finn_fan","level":1}]}'::jsonb, 'Defaults from src/config/balance.ts, section "avatars"')
 on conflict (key) do update set value = excluded.value, description = excluded.description, updated_at = now();
 

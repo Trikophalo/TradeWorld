@@ -322,3 +322,18 @@ select tests.login_as('authenticated', :boss) is null as ok \gset
 select public.get_company_chat();
 \o
 reset role;
+
+-- M3g: reset and delete the own account
+select nickname as fx_boss_nick from public.profiles where id = :boss \gset
+select tests.login_as('authenticated', :boss) is null as ok \gset
+\o :fixture_dir/reset_account.json
+select public.reset_account(gen_random_uuid(), :'fx_boss_nick');
+\o
+reset role;
+\set fx_gone '''f1f1f1f1-0000-4000-8000-0000000000f9'''
+select tests.signup(:fx_gone, 'Fixture_Weg') is not null as ok \gset
+select tests.login_as('authenticated', :fx_gone) is null as ok \gset
+\o :fixture_dir/delete_account.json
+select public.delete_account('Fixture_Weg');
+\o
+reset role;

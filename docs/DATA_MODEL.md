@@ -4692,3 +4692,62 @@ offer, last_price_e4 }`
 
 - Die Auflösung einer börsennotierten Firma nimmt die Aktie nicht vom Markt.
 - Ausgegebene Aktien werden in `companies.shares_outstanding` auf ganze Stück abgerundet; die Depots halten Millionstel.
+
+## Nachtrag: M3g (Konto zurücksetzen und löschen)
+
+### Migrationen
+
+| Datei                                  | Inhalt                                                                                     |
+| -------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `20261118000200_m3g_account_reset.sql` | `reset_account`, `delete_account`, gemeinsame Aufräumfunktion, Fremdschlüssel der Historie |
+
+### RPCs
+
+- `reset_account(p_request_id, p_confirm)` → `{ ok: true, reset_at }` (Spielzeit). Idempotent über `request_id`.
+- `delete_account(p_confirm)` → `{ ok: true }`. Löscht `auth.users`; das Profil folgt per Kaskade, der Spitzname ist
+  wieder frei.
+- `p_confirm` muss der eigene Spitzname sein (Groß- und Kleinschreibung egal, Leerzeichen am Rand egal), sonst
+  `confirm_mismatch`.
+- Beide rufen die interne Funktion `account_wipe(p_player, p_key)` auf (nicht für Clients freigegeben).
+
+### Was bleibt, was geht
+
+- Bleibt: Auth-Nutzer, Spitzname, Avatar, Akzentfarbe, `player_settings`, `notification_preferences`, Freundschaften,
+  Push-Abos, Einladungscode, `player_requests`, `rate_limits`, `player_login_events`, `suspicious_activity`,
+  `age_confirmed_at` und Spielzeit.
+- Eigene Firma: offene Zeichnungen werden zuerst regulär abgeschlossen (`close_share_offer`), dann wird die Firma wie
+  bei `close_company` aufgelöst (`company_dissolve(…, 'closed')`): Abfindungen, Gründerhaftung, Mitarbeiter verlieren
+  den Job. Aufgelöste Firmen bleiben als Historie stehen.
+- Job: Lohn bis jetzt, dann Ende ohne Kündigungsfrist und ohne Gebühr (`end_reason = 'quit'`), Systemnachricht im
+  Firmenchat.
+- Offene Orders werden storniert (Reservierung zurück), Bestände verfallen (`positions` geschlossen, Menge 0). Spieler
+  handeln gegen den Market Maker, Stückzahlen müssen nicht erhalten bleiben.
+- Zeichnungen bei offenen Angeboten anderer Firmen verfallen; das Geld bleibt bei der Firma.
+- Gelöscht: XP, Missionen, Erfolge, Skills, Skillpunkte, Bewerbungen, Jobs, Arbeitsaufgaben, Zwangskredite,
+  Tagesbelohnungen, Benachrichtigungen, Watchlist, Feed, Ligen, Ranglisten-Schnappschüsse und alles weitere mit
+  `player_id`.
+- Zurückgesetzt: Level 1, XP 0, Reputation 50, Titel, Rahmen, Gründungssperre, Tutorial, Verlusttopf, Tresor, Serie.
+- Geld: Bargeld und Reservekonto gehen per Buchung an den Staat (`treasury`, vor der Genesis `mint`). Danach zahlt
+  `state_payout` das Startkapital neu aus (`restart_capital`). Alle Buchungen haben die Summe 0.
+- Handelshistorie: `trades` sind unveränderlich und bleiben. `player_private.account_reset_at` blendet ältere Trades in
+  `get_my_portfolio.recent_trades` aus.
+
+### Löschen und Historie
+
+- `ledger_accounts.owner_player_id`, `ledger_transactions.initiated_by`, `trades.player_id`, `orders.player_id` und
+  `positions.player_id` haben keinen Fremdschlüssel mehr. Ledger und Trades sind unveränderlich und dürfen weder
+  kaskadiert gelöscht noch auf NULL gesetzt werden; Orders und Positionen werden von Trades referenziert.
+- Nach dem Löschen behalten diese Zeilen die UUID als anonyme Referenz. Die Ledger-Konten des Spielers bleiben mit
+  Saldo 0 und `is_frozen = true` stehen.
+
+### Neue Fehlerschlüssel
+
+| Schlüssel          | Code    |
+| ------------------ | ------- |
+| `confirm_mismatch` | `NX061` |
+
+### Bekannte Grenzen
+
+- Ein Admin kann sein Konto nicht löschen: `admin_actions.admin_id` setzt beim Löschen auf NULL, die Tabelle ist aber
+  unveränderlich.
+- Texte mit dem Spitznamen (Firmenchat, Ranglisten-News) bleiben nach dem Löschen stehen.

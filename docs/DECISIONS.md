@@ -665,3 +665,10 @@ Spielerische geht zurück auf den Start einer Neuanmeldung, Finns Tutorial begin
 beim freiwilligen Auflösen beendet, ihr Team verliert den Job. Löschen macht dasselbe und entfernt danach das Konto,
 der Name wird wieder frei. Das Hauptbuch bleibt ausgeglichen: Restguthaben werden gegen ein Systemkonto gebucht statt
 gelöscht. Im Demo-Modus gibt es nur „zurücksetzen“ (neuer Demo-Spieler).
+
+Umsetzung: Restguthaben gehen per Buchung an die Staatskasse, das Startkapital wird neu ausgezahlt (`restart_capital`).
+Buchungen und Trades sind unveränderlich und überleben ein gelöschtes Konto als anonyme UUID-Referenz; dafür entfallen
+die Fremdschlüssel von Hauptbuch, Orders, Positionen und Trades auf `players`, die Konten bleiben mit Saldo 0 eingefroren.
+Trades vor einem Reset bleiben gespeichert, `get_my_portfolio` zeigt nur die danach (`player_private.account_reset_at`).
+Offene Zeichnungsangebote der eigenen Firma werden vor dem Auflösen abgerechnet. Bekannte Grenze: Admins mit Einträgen
+in `admin_actions` können ihr Konto nicht löschen.

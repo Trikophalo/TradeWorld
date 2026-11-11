@@ -1,6 +1,6 @@
 {
   "company": {
-    "id": "13e16b79-c110-4195-a2b5-06478e3c23eb",
+    "id": "6fad532c-0cc0-4e0d-8863-c8d63cf23643",
     "idea": "Werkzeuge für Bastler",
     "logo": {
       "grid": [
@@ -62,7 +62,7 @@
     "headcount": 1,
     "ai_workers": 1,
     "cash_cents": 250000,
-    "founded_at": "2026-11-11T19:47:41.737081+00:00",
+    "founded_at": "2026-11-11T20:53:51.867856+00:00",
     "can_upgrade": false,
     "logo_hidden": false,
     "product_key": "security_software",
@@ -82,9 +82,9 @@
     "next_quarter_at": "2026-11-12T01:00:00+00:00",
     "quarters_active": 0,
     "distress_quarters": 0,
-    "estimate_low_cents": 437923,
+    "estimate_low_cents": 43458,
     "upgrade_cost_cents": 1250000,
-    "estimate_high_cents": 10184498,
+    "estimate_high_cents": 522077,
     "ai_worker_cost_cents": 70000,
     "can_capital_increase": false,
     "pending_applications": 0,

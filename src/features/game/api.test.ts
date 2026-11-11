@@ -32,9 +32,7 @@ describe("RPC contract", () => {
       "get_offers",
       "subscribe_offer",
     ];
-    // M3g account RPCs are written in parallel with the database (TODO: remove once reset_account.json exists).
-    const m3g = fixtures.some((file) => file.startsWith("reset_account")) ? [] : ["reset_account", "delete_account"];
-    const pending = [...(fixtures.some((file) => file.startsWith("get_offers")) ? [] : m3f), ...m3g];
+    const pending = fixtures.some((file) => file.startsWith("get_offers")) ? [] : m3f;
     for (const name of Object.keys(RPC_SCHEMAS).filter((key) => !pending.includes(key))) {
       expect(
         fixtures.some((file) => file.startsWith(name)),
