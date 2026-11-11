@@ -368,3 +368,45 @@ kurz, mit Pixel-Maskottchen und Sprechblase.
 - Die Sperre wirkt auf Zeiger und Berührung. Mit der Tab-Taste lassen sich andere Elemente weiterhin fokussieren.
 - Im Bestätigungsschritt verbirgt die Order-Maske (Dialog) den Rest der Seite vor Screenreadern, also auch
   Finns Hinweis. Die Maske selbst ist beschriftet.
+
+## ADR-035: Spätere Features sind sichtbar, aber gesperrt — `akzeptiert`
+
+Vorgabe des Auftraggebers (präzisiert ADR-033): Was man später freischaltet, sieht man von Anfang an, mit Schloss
+und Level. Damit weiß jeder Spieler, worauf er hinarbeitet.
+
+- Der Tab **Firma** ist immer da; Seitenleiste und Tab-Leiste zeigen ein Schloss bis Level 10.
+- **Anleihen** stehen als Reiter in den Märkten (Schloss bis Level 5); die Liste ist sichtbar, aber gedimmt, dazu ein
+  Fortschrittsbalken bis zur Freischaltung.
+- **Limit-Order** steht in der Order-Maske (Schloss bis Level 3); Antippen erklärt, ab wann sie geht.
+- Startseite: „Später freischaltbar“ mit den nächsten großen Features. Profil: die vollständige Liste aller Stufen.
+- Ein **Level-up-Overlay** mit Finn feiert jeden Aufstieg und zeigt, was neu freigeschaltet ist.
+- `src/config/disclosure.ts` blendet nur noch **Info-Panels** stufenweise ein (Index-Chart, Missionen, Nachrichten,
+  Orderbuch, Kennzahlen), damit der erste Bildschirm ruhig bleibt.
+
+## ADR-036: Kauf per Geldbetrag, ohne Bruchstücke — `Annahme`
+
+Vorgabe: Statt der Stückzahl kann man den Betrag eingeben, wie bei Neo-Brokern. Umsetzung: Die Order-Maske hat einen
+Umschalter **Stück / Betrag**. Beim Betrag kauft das Spiel so viele **ganze** Aktien, wie nach der Gebühr hineinpassen;
+der Rest bleibt auf dem Konto, und die Maske sagt das („Das sind 4 Stück“). Beim Verkauf per Betrag werden so viele
+Stück verkauft, dass mindestens der Betrag zusammenkommt.
+
+Bruchstücke (Teilaktien) wären die exaktere Lösung, verlangen aber Stückzahlen mit Nachkommastellen in Orders,
+Positionen, Lots und Ledger-Texten. Das bleibt eine Option für später, falls kleine Budgets bei teuren Aktien stören.
+
+## ADR-037: Markt läuft komplett in Postgres, Client fragt im Takt ab — `akzeptiert` (ersetzt ADR-004 und ADR-013 für die Alpha)
+
+Der Auftraggeber richtet alles im Browser ein und kann weder Edge Functions deployen noch Secrets setzen. Deshalb:
+
+- Der Markt-Tick ist eine PL/pgSQL-Funktion `market_tick()`, die `pg_cron` alle 5 Sekunden aufruft. Quartalsabschluss
+  und Wartung laufen ebenfalls über `pg_cron`. Alles wird über `update-to-latest.sql` im SQL Editor eingespielt.
+- Die TypeScript-Simulation in `src/lib/sim` bleibt die getestete Referenz der Formeln; die SQL-Fassung folgt ihr.
+- Der Client fragt den Markt alle 5 Sekunden ab (`get_market_snapshot`), das Portfolio alle 15 Sekunden und nach jeder
+  Aktion. Bei vier Spielern ist das unkritisch und robuster als Realtime. Realtime bleibt eine spätere Optimierung.
+- Ohne Supabase-Zugang läuft eine Offline-Fassung derselben Regeln im Browser (`src/features/game/demo-engine.ts`).
+
+## ADR-038: Level und Trade-XP schon in M1 auf dem Server — `akzeptiert`
+
+Limit-Orders (Level 3) und Anleihen (Level 5) gehören zu M1. Damit sie erreichbar sind, vergibt der Server ab M1
+Erfahrungspunkte für Trades (10 XP × Alpha-Faktor, höchstens 30 Trades pro Tag, Mindestwert 100 €, keine XP für
+Rückkäufe innerhalb von 10 Minuten) und für das Tutorial, und er prüft die Freischaltungen selbst. Missionen, Login-
+Bonus und Erfolge folgen in M2.
