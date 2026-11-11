@@ -37,6 +37,8 @@ interface GameState {
   checkIn: () => Promise<{ xpAwarded: number; streakDays: number; alreadyCheckedIn: boolean }>;
   changeNickname: (nickname: string) => Promise<void>;
   track: (event: TrackedEvent, ref?: string) => void;
+  /** Forget everything about the signed-in player (sign-out, account switch). The market stays. */
+  resetPlayer: () => void;
 }
 
 let snapshotInFlight: Promise<void> | null = null;
@@ -116,6 +118,8 @@ export const useGame = create<GameState>((set, get) => ({
     await engine.changeNickname(crypto.randomUUID(), nickname);
     await get().refreshPortfolio();
   },
+
+  resetPlayer: () => set({ portfolio: null, missions: null }),
 
   track: (event, ref) => {
     void engine.track(event, ref).then(() => get().refreshMissions());

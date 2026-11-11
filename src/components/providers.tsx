@@ -5,6 +5,7 @@ import { MotionConfig } from "motion/react";
 import { useEffect, useState, type ReactNode } from "react";
 import { EffectsLayer } from "@/components/ui/effects";
 import { Toaster } from "@/components/ui/toast";
+import { SessionWatcher } from "@/features/auth/components/session-watcher";
 import { preloadSounds } from "@/lib/sound";
 import { applySettingsToDocument, useSettings } from "@/stores/settings";
 
@@ -34,6 +35,7 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <SessionWatcher />
       <MotionConfig reducedMotion={motionMode === "reduced" ? "always" : motionMode === "full" ? "never" : "user"}>
         {children}
         <Toaster />

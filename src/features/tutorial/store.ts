@@ -33,6 +33,8 @@ interface TutorialState {
   finish: () => void;
   /** Development helper, used by the showcase page. */
   restart: () => void;
+  /** Back to "loading" (sign-out, account switch): the next account loads its own progress. */
+  reset: () => void;
 }
 
 function readAll(): Record<string, Saved> {
@@ -70,6 +72,7 @@ export const useTutorial = create<TutorialState>((set, get) => ({
     save(get().accountId, { status: "done", step: 0, seenTours: get().seenTours });
     set({ status: "done", step: 0 });
   },
+  reset: () => set({ status: "loading", step: 0, accountId: "demo", tour: null, seenTours: [] }),
   restart: () => {
     save(get().accountId, { status: "active", step: 0, seenTours: [] });
     set({ status: "active", step: 0, seenTours: [], tour: null });
