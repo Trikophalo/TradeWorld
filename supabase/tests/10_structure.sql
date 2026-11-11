@@ -70,7 +70,9 @@ select tests.assert(
            -- M3d RPCs
            'close_company', 'get_company_chat', 'get_work_task', 'post_company_message', 'submit_work_task',
            -- M3e RPCs
-           'cancel_quit', 'get_employer', 'train_employee']
+           'cancel_quit', 'get_employer', 'train_employee',
+           -- M3f RPCs
+           'capital_increase', 'get_offers', 'go_public', 'report_company_logo', 'set_company_logo', 'subscribe_offer']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')

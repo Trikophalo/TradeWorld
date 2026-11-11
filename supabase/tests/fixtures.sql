@@ -136,12 +136,8 @@ select public.get_my_job();
 select public.cancel_quit(gen_random_uuid());
 \o :fixture_dir/get_employer.json
 select public.get_employer();
-\o
-select public.quit_job(gen_random_uuid()) is not null as ok \gset
-reset role;
-update public.player_jobs set notice_ends_at = now() - interval '1 second' where player_id = :p and status = 'active';
-select public.process_quit_notices() is not null as ok \gset
-select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/quit_job_now.json
+select public.quit_job(gen_random_uuid(), true);
 \o :fixture_dir/get_my_job_none.json
 select public.get_my_job();
 \o :fixture_dir/get_employer_none.json
@@ -162,6 +158,11 @@ select public.check_company_name('KlarSoft');
 select public.get_my_company();
 \o :fixture_dir/found_company.json
 select public.found_company(gen_random_uuid(), 'Fixture Labor', 'Werkzeuge für Bastler', 'tech', '#2266cc', 'garage');
+\o :fixture_dir/set_company_logo.json
+select public.set_company_logo(gen_random_uuid(), '{"palette": ["#112233", "#ffcc00"], "grid": ["................", "................",
+  "....00000000....", "....01111110....", "....01111110....", "....00000000....", "................", "................",
+  "................", "................", "................", "................", "................", "................",
+  "................", "................"]}');
 \o :fixture_dir/set_company_marketing.json
 select public.set_company_marketing(gen_random_uuid(), 25000);
 \o :fixture_dir/set_ai_workers.json
@@ -181,6 +182,9 @@ select public.create_job_posting(gen_random_uuid(), :'fco', 'intern', 'Werkstudi
 select id as fx_post from public.job_postings where company_id = :'fco' \gset
 select tests.login_as('authenticated', :boss) is null as ok \gset
 select public.apply_for_job(gen_random_uuid(), :'fx_post', 20000, 'Gern im Team.') ->> 'id' as fx_papp \gset
+\o :fixture_dir/report_company_logo.json
+select public.report_company_logo(gen_random_uuid(), :'fco');
+\o
 select tests.login_as('authenticated', :p) is null as ok \gset
 \o :fixture_dir/get_company_postings.json
 select public.get_company_postings();

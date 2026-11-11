@@ -52,8 +52,6 @@ select x ->> 'id' as fintern from jsonb_array_elements(public.get_job_board() ->
  where x ->> 'tier' = 'intern' and (x ->> 'eligible')::boolean order by x ->> 'id' limit 1 \gset
 select public.sign_contract(gen_random_uuid(),
   (public.apply_for_job(gen_random_uuid(), :'fintern', 15000, null) ->> 'id')::uuid, 'M1 1') is not null as ok \gset
-select tests.throws_key($$select public.found_company(gen_random_uuid(), 'Garagen Code', 'Apps für Bäcker', 'tech', '#3366ff', 'garage')$$,
-  'job_active_exists', 'found_company(): not while employed');
 select public.quit_job(gen_random_uuid()) is not null as ok \gset
 reset role;
 update public.player_jobs set notice_ends_at = now() - interval '1 second' where player_id = :f and status = 'active';
@@ -110,9 +108,10 @@ select tests.assert(
 
 -- founders cannot work elsewhere -------------------------------------------------------
 select tests.login_as('authenticated', :f);
-select tests.throws_key(format($$select public.sign_contract(gen_random_uuid(), %L, 'M1 1')$$,
-  public.apply_for_job(gen_random_uuid(), :'fintern', 15000, null) ->> 'id'),
-  'owns_company', 'sign_contract(): founders cannot take a job');
+-- since M3f founders of small companies may work elsewhere (ADR-066); covered in 65_m3f.sql
+select public.sign_contract(gen_random_uuid(), (public.apply_for_job(gen_random_uuid(), :'fintern', 15000, null) ->> 'id')::uuid, 'M1 1')
+       is not null as ok \gset
+select public.quit_job(gen_random_uuid(), true) ->> 'ended' as fq \gset
 -- marketing and AI workers
 select tests.throws_key($$select public.set_company_marketing(gen_random_uuid(), -1)$$, 'invalid_argument', 'marketing >= 0');
 select tests.throws_key($$select public.set_company_marketing(gen_random_uuid(), 1000000001)$$, 'invalid_argument', 'marketing <= 10 Mio. EUR');

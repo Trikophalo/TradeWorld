@@ -22,10 +22,10 @@ select tests.assert(
           'get_my_portfolio', 'get_my_skills', 'get_order_book', 'get_player_card', 'get_rich_list',
           'get_rich_list_news', 'get_security_details', 'get_work_task', 'has_unlock', 'is_admin',
           'is_company_insider', 'learn_skill', 'owns_ledger_account', 'place_order', 'post_company_message',
-          'quit_job', 'request_raise', 'respond_application', 'respond_raise', 'set_ai_workers', 'set_avatar',
-          'set_company_marketing', 'sign_contract', 'submit_work_task', 'track_event', 'train_employee',
-          'upgrade_company', 'withdraw_application'],
-  'authenticated can execute exactly the 9 helpers, the 12 M1, 8 M2, 22 M2b, 9 M3c, 5 M3d and 3 M3e RPCs');
+          'quit_job', 'report_company_logo', 'request_raise', 'respond_application', 'respond_raise',
+          'set_ai_workers', 'set_avatar', 'set_company_logo', 'set_company_marketing', 'sign_contract',
+          'submit_work_task', 'track_event', 'train_employee', 'upgrade_company', 'withdraw_application'],
+  'authenticated can execute exactly the 9 helpers and the RPCs up to M3f (61)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute') and p.proname <> 'check_nickname'),

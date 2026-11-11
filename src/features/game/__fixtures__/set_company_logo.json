@@ -1,0 +1,92 @@
+{
+  "company": {
+    "id": "56bda88d-4d6b-4759-ab1f-52163890846b",
+    "idea": "Werkzeuge für Bastler",
+    "logo": {
+      "grid": [
+        "................",
+        "................",
+        "....00000000....",
+        "....01111110....",
+        "....01111110....",
+        "....00000000....",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................"
+      ],
+      "palette": ["#112233", "#ffcc00"]
+    },
+    "name": "Fixture Labor",
+    "tier": "garage",
+    "color": "#2266cc",
+    "stage": 0,
+    "sector": "tech",
+    "stages": [
+      { "stage": 1, "skills": [{ "key": "it_security", "covered_by": null }], "reached": false },
+      {
+        "stage": 2,
+        "skills": [
+          { "key": "it_architecture", "covered_by": null },
+          { "key": "it_pentest", "covered_by": null }
+        ],
+        "reached": false
+      },
+      {
+        "stage": 3,
+        "skills": [
+          { "key": "law_privacy", "covered_by": null },
+          { "key": "sales_b2b", "covered_by": null }
+        ],
+        "reached": false
+      },
+      {
+        "stage": 4,
+        "skills": [
+          { "key": "it_crypto", "covered_by": null },
+          { "key": "management_leadership", "covered_by": null }
+        ],
+        "reached": false
+      }
+    ],
+    "history": [],
+    "distress": false,
+    "employees": 0,
+    "headcount": 0,
+    "ai_workers": 0,
+    "cash_cents": 250000,
+    "founded_at": "2026-11-11T19:40:01.37011+00:00",
+    "can_upgrade": false,
+    "logo_hidden": false,
+    "product_key": "security_software",
+    "quality_bps": 2500,
+    "value_cents": 250000,
+    "last_quarter": null,
+    "unpaid_cents": 0,
+    "awareness_bps": 300,
+    "max_employees": 2,
+    "open_postings": 0,
+    "capacity_cents": 498000,
+    "full_time_from": 5,
+    "grace_quarters": 4,
+    "pay_factor_bps": 10000,
+    "founder_has_job": false,
+    "next_quarter_at": "2026-11-12T01:00:00+00:00",
+    "quarters_active": 0,
+    "distress_quarters": 0,
+    "estimate_low_cents": 26444,
+    "upgrade_cost_cents": 1250000,
+    "estimate_high_cents": 455591,
+    "ai_worker_cost_cents": 70000,
+    "pending_applications": 0,
+    "team_productivity_bps": 16600,
+    "founder_productivity_bps": 16600,
+    "marketing_cents_per_quarter": 0
+  }
+}

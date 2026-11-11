@@ -1,6 +1,6 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 11, "gap_cents": 481 }, "rank": 12, "net_worth_cents": 1019519 },
-  "total": 50,
+  "me": { "next": { "name": "Vera", "rank": 14, "gap_cents": 481 }, "rank": 15, "net_worth_cents": 1019519 },
+  "total": 54,
   "entries": [
     {
       "id": "0e3e3e3e-0000-4000-8000-0000000000f1",
@@ -23,45 +23,45 @@
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 39825000,
+      "net_worth_cents": 40225000,
+      "rank_change_24h": null
+    },
+    {
+      "id": "0f3f3f3f-0000-4000-8000-0000000000f1",
+      "kind": "player",
+      "name": "Fenja_Firma",
+      "rank": 3,
+      "is_me": false,
+      "avatar_key": "rookie",
+      "description": null,
+      "change_24h_bps": null,
+      "net_worth_cents": 20640000,
       "rank_change_24h": null
     },
     {
       "id": "0b3c3c3c-0000-4000-8000-0000000000b1",
       "kind": "player",
       "name": "Bea_Boerse",
-      "rank": 3,
-      "is_me": false,
-      "avatar_key": "rookie",
-      "description": null,
-      "change_24h_bps": null,
-      "net_worth_cents": 6023181,
-      "rank_change_24h": null
-    },
-    {
-      "id": "0c3c3c3c-0000-4000-8000-0000000000f4",
-      "kind": "player",
-      "name": "Sven_Small",
       "rank": 4,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 3814029,
+      "net_worth_cents": 6020638,
       "rank_change_24h": null
     },
     {
-      "id": "0d3d3d3d-0000-4000-8000-0000000000f1",
+      "id": "0f3f3f3f-0000-4000-8000-0000000000a2",
       "kind": "player",
-      "name": "Fiona_Fabrik",
+      "name": "Rita_Zwei",
       "rank": 5,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 3310000,
+      "net_worth_cents": 6000000,
       "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-11T17:52:40.709713+00:00"
+  "server_time": "2026-11-11T19:40:01.065958+00:00"
 }

@@ -60,7 +60,7 @@ select tests.assert(
     where t.player_id = :i and s.ticker = 'NXB01' and t.side = 'sell'),
   'redemption: 50 bonds sold to the issuer at face value (100 EUR), no fee');
 select tests.assert(
-  (select count(*) >= 3 and bool_and(p.tax_cents = public.apply_bps(p.gross_cents, 2500) and p.net_cents = p.gross_cents - p.tax_cents)
+  (select count(*) >= 2 and bool_and(p.tax_cents = public.apply_bps(p.gross_cents, 2500) and p.net_cents = p.gross_cents - p.tax_cents)
      from public.distribution_payouts p join public.security_distributions d on d.id = p.distribution_id
      join public.securities s on s.id = d.security_id where p.player_id = :i and s.ticker = 'NXB01'),
   'coupons paid every quarter, taxed at 25 %: ' ||

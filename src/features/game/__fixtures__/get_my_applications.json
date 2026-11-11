@@ -1,54 +1,56 @@
 {
   "applications": [
     {
-      "id": "ab4bb063-5a58-4630-a9cb-a47f20be60c4",
+      "id": "6a1f78af-430e-43ee-942e-8fbb0a7cbab0",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "1e7d70b0-f314-40e6-a866-25eee22a1e19",
+        "id": "108c183e-1554-42d3-aa6b-a468abd68c90",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "e50a6ff5-8dbd-8c90-f94e-5ac06d3fe862",
-          "name": "Volta Energie AG",
-          "color": "#FFD23F",
+          "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
+          "logo": null,
+          "name": "QuantenSprung Labs",
+          "color": "#35D0BA",
           "is_ai": true,
-          "sector": "energy",
-          "ticker": "VLT"
+          "sector": "tech",
+          "ticker": "QSL"
         },
-        "required": [{ "branch": "management", "min_score": 0 }],
-        "title_key": "management_intern",
+        "required": [{ "branch": "it", "min_score": 0 }],
+        "title_key": "it_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-11T17:52:40.855545+00:00",
-      "updated_at": "2026-11-11T17:52:40.863379+00:00",
-      "offer_expires_at": "2026-11-13T17:52:40.855545+00:00",
-      "salary_wish_cents_per_hour": 15000,
-      "offer_salary_cents_per_hour": 15000
+      "created_at": "2026-11-11T19:40:01.222393+00:00",
+      "updated_at": "2026-11-11T19:40:01.226786+00:00",
+      "offer_expires_at": "2026-11-13T19:40:01.222393+00:00",
+      "salary_wish_cents_per_hour": 15900,
+      "offer_salary_cents_per_hour": 15900
     },
     {
-      "id": "7d102f3f-c265-4f52-a363-937f840d9601",
+      "id": "81223ce9-5b7e-4ba3-95f0-2ef80928d37a",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "5b3acb72-253b-4a74-adf2-20736232a69a",
+        "id": "334e645b-0fc7-4a5c-8e4f-10c95a58a759",
         "tier": "junior",
         "title": null,
         "company": {
-          "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
-          "name": "KlarSoft AG",
-          "color": "#4C8DFF",
+          "id": "dc6cd683-c473-c0eb-8d8c-04ddf664b4d5",
+          "logo": null,
+          "name": "Eilbote Express",
+          "color": "#F7768E",
           "is_ai": true,
-          "sector": "tech",
-          "ticker": "KLS"
+          "sector": "logistics",
+          "ticker": "EBX"
         },
         "required": [{ "branch": "it", "min_score": 2 }],
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-11T17:52:40.846813+00:00",
-      "updated_at": "2026-11-11T17:52:40.846813+00:00",
-      "offer_expires_at": "2026-11-13T17:52:40.846813+00:00",
+      "created_at": "2026-11-11T19:40:01.214828+00:00",
+      "updated_at": "2026-11-11T19:40:01.214828+00:00",
+      "offer_expires_at": "2026-11-13T19:40:01.214828+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }
