@@ -1,4 +1,4 @@
-import { SKILL_NODES, type SkillNodeConfig } from "./skills.ts";
+import { SKILL_NODES, type SkillBranch, type SkillNodeConfig } from "./skills.ts";
 
 /**
  * NEXA balancing defaults (ADR-009).
@@ -728,6 +728,13 @@ export interface JobsConfig {
   readonly aiPostingsPerCompany: number;
   /** Minimum branch score a posting asks for, by career tier (AI postings). */
   readonly tierMinScore: Readonly<Record<string, number>>;
+  /**
+   * Branches AI companies hire for, by sector. AI posting i of the company with seed
+   * index c in quarter q: branch = list[(c + i) % length], tier = tiers[(2c + i + q) % 5],
+   * title key "<branch>_<tier>", required = [{branch, tierMinScore}], from team_lead on plus
+   * {management, floor(tierMinScore / 2)} unless the branch is management.
+   */
+  readonly sectorBranches: Readonly<Record<string, readonly SkillBranch[]>>;
   /** Player employers: wages follow company results (profit factor). */
   readonly profitLinkedPay: {
     /** Lowest share of the contract salary paid when the company cannot cover it. */
@@ -1531,6 +1538,13 @@ export const BALANCE = {
     offerValidHours: 48,
     aiPostingsPerCompany: 2,
     tierMinScore: { intern: 0, junior: 2, senior: 6, team_lead: 12, c_level: 20 },
+    sectorBranches: {
+      tech: ["it", "finance", "sales", "management"],
+      retail: ["sales", "logistics", "finance", "management"],
+      energy: ["craft", "science", "law", "management"],
+      pharma: ["science", "law", "sales", "management"],
+      logistics: ["logistics", "craft", "it", "management"],
+    },
     profitLinkedPay: { minFactor: 0.5, bonusShareOfProfit: 0.2, maxBonusFactor: 1 },
     raiseRequest: { cooldownDays: 7, maxRaiseBpsPerScore: 300 },
   },
