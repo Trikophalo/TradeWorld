@@ -12,17 +12,18 @@ select tests.assert(
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute'))
   = array['admin_close_quarter', 'admin_run_tick', 'admin_set_paused', 'apply_for_job', 'are_friends',
-          'can_read_ledger_transaction', 'cancel_order', 'change_nickname', 'check_nickname', 'claim_daily_reward',
-          'claim_mission', 'claim_vault', 'close_job_posting', 'complete_tutorial', 'counter_offer',
-          'create_job_posting', 'current_game_quarter', 'daily_check_in', 'fire_employee', 'game_day',
-          'game_now', 'get_candles', 'get_company_applications', 'get_company_team', 'get_daily_reward',
-          'get_job_board', 'get_market_snapshot', 'get_my_applications', 'get_my_job', 'get_my_missions',
-          'get_my_portfolio', 'get_my_skills', 'get_order_book', 'get_player_card', 'get_rich_list',
-          'get_rich_list_news', 'get_security_details', 'has_unlock', 'is_admin', 'is_company_insider',
-          'learn_skill', 'owns_ledger_account', 'place_order', 'quit_job', 'request_raise',
-          'respond_application', 'respond_raise', 'set_avatar', 'sign_contract', 'track_event',
-          'withdraw_application'],
-  'authenticated can execute exactly the 9 helpers, the 12 M1, 8 M2 and 22 M2b RPCs');
+          'can_read_ledger_transaction', 'cancel_order', 'change_nickname', 'check_company_name', 'check_nickname',
+          'claim_daily_reward', 'claim_mission', 'claim_vault', 'close_job_posting', 'company_deposit',
+          'company_withdraw', 'complete_tutorial', 'counter_offer', 'create_job_posting', 'current_game_quarter',
+          'daily_check_in', 'fire_employee', 'found_company', 'game_day', 'game_now', 'get_candles',
+          'get_company_applications', 'get_company_postings', 'get_company_team', 'get_daily_reward',
+          'get_job_board', 'get_market_snapshot', 'get_my_applications', 'get_my_company', 'get_my_job',
+          'get_my_missions', 'get_my_portfolio', 'get_my_skills', 'get_order_book', 'get_player_card',
+          'get_rich_list', 'get_rich_list_news', 'get_security_details', 'has_unlock', 'is_admin',
+          'is_company_insider', 'learn_skill', 'owns_ledger_account', 'place_order', 'quit_job', 'request_raise',
+          'respond_application', 'respond_raise', 'set_ai_workers', 'set_avatar', 'set_company_marketing',
+          'sign_contract', 'track_event', 'upgrade_company', 'withdraw_application'],
+  'authenticated can execute exactly the 9 helpers, the 12 M1, 8 M2, 22 M2b and 9 M3c RPCs');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute') and p.proname <> 'check_nickname'),

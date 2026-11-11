@@ -1,0 +1,17 @@
+{
+  "postings": [
+    {
+      "id": "b830eecb-6203-4a55-9c87-cdc55524a49c",
+      "tier": "intern",
+      "slots": 1,
+      "title": "Werkstudium Software",
+      "status": "open",
+      "required": [{ "branch": "it", "min_score": 0 }],
+      "posted_at": "2026-11-11T16:32:00.367059+00:00",
+      "title_key": null,
+      "slots_open": 1,
+      "applications_pending": 1,
+      "salary_cents_per_hour": 18000
+    }
+  ]
+}

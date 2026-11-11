@@ -1,36 +1,36 @@
 {
   "applications": [
     {
-      "id": "2e71dbdb-5e9a-442e-bad8-50e7a1b8d128",
+      "id": "263a77fc-4fdf-469d-a418-c4f7184c62e2",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "1525a022-27b1-467c-8091-23d97c90bd56",
+        "id": "0b39a2a1-0cf9-40dc-a9f8-b00eb1343747",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "2faf9e4c-3f0a-8a5b-1645-c669e9481771",
-          "name": "NeuroPharm AG",
-          "color": "#6EE7A0",
+          "id": "e50a6ff5-8dbd-8c90-f94e-5ac06d3fe862",
+          "name": "Volta Energie AG",
+          "color": "#FFD23F",
           "is_ai": true,
-          "sector": "pharma",
-          "ticker": "NPH"
+          "sector": "energy",
+          "ticker": "VLT"
         },
-        "required": [{ "branch": "sales", "min_score": 0 }],
-        "title_key": "sales_intern"
+        "required": [{ "branch": "management", "min_score": 0 }],
+        "title_key": "management_intern"
       },
-      "created_at": "2026-11-11T15:45:00.234021+00:00",
-      "updated_at": "2026-11-11T15:45:00.246533+00:00",
-      "offer_expires_at": "2026-11-13T15:45:00.242827+00:00",
+      "created_at": "2026-11-11T16:32:00.102774+00:00",
+      "updated_at": "2026-11-11T16:32:00.109444+00:00",
+      "offer_expires_at": "2026-11-13T16:32:00.105671+00:00",
       "salary_wish_cents_per_hour": 9500,
       "offer_salary_cents_per_hour": 9500
     },
     {
-      "id": "e4cfd54f-0232-41f7-9e17-efd9cb379fd0",
+      "id": "552ae8d1-6c03-42e1-82aa-54c11da01a4d",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "1796b970-2b4e-42dc-96a7-932aee9dad28",
+        "id": "3c77768d-2dbe-450b-afc3-b0dac59d3045",
         "tier": "junior",
         "title": null,
         "company": {
@@ -44,9 +44,9 @@
         "required": [{ "branch": "it", "min_score": 2 }],
         "title_key": "it_junior"
       },
-      "created_at": "2026-11-11T15:45:00.2272+00:00",
-      "updated_at": "2026-11-11T15:45:00.2272+00:00",
-      "offer_expires_at": "2026-11-13T15:45:00.2272+00:00",
+      "created_at": "2026-11-11T16:32:00.097587+00:00",
+      "updated_at": "2026-11-11T16:32:00.097587+00:00",
+      "offer_expires_at": "2026-11-13T16:32:00.097587+00:00",
       "salary_wish_cents_per_hour": 30000,
       "offer_salary_cents_per_hour": 30000
     }

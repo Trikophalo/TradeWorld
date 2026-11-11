@@ -136,45 +136,78 @@ select public.get_my_job();
 \o
 reset role;
 
--- M2b employer side (UI in M4): written to employer/, not yet part of the client contract test
+-- M3c: the fixture player founds a company and runs it as employer (top-level fixtures)
 \set boss '''f1f1f1f1-0000-4000-8000-0000000000f2'''
-\set fco '''f1f1f1f1-0000-4000-8000-0000000000c1'''
 select tests.signup(:boss, 'Fixture_Chefin') is not null as ok \gset
-insert into public.companies (id, name, slug, sector_key, legal_form, founder_id, shares_outstanding)
-values (:fco, 'Fixture Werkstatt GmbH', 'fixture-werkstatt', 'tech', 'gmbh', :boss, 1000);
-insert into public.ledger_accounts (kind, owner_company_id) values ('company_cash', :fco);
-select public.ledger_transfer(public.ledger_system_account('households'),
-  (select id from public.ledger_accounts where owner_company_id = :fco and kind = 'company_cash'), 50000000, 'transfer',
-  'Fixture-Kapital', 'company', :fco, 'fixture:m2b:company') is not null as ok \gset
-select tests.login_as('authenticated', :boss) is null as ok \gset
-\o :fixture_dir/employer/create_job_posting.json
-select public.create_job_posting(gen_random_uuid(), :fco, 'intern', 'Werkstudium Software',
-  '[{"branch": "it", "min_score": 1}]', 18000, 2);
-\o
-select id as fx_post from public.job_postings where company_id = :fco \gset
+update public.profiles set level = 3, xp_total = public.xp_total_for_level(3) where id = :boss;
 select tests.login_as('authenticated', :p) is null as ok \gset
-select public.apply_for_job(gen_random_uuid(), :'fx_post', 20000, 'Gern im Team.') ->> 'id' as fx_papp \gset
+\o :fixture_dir/check_company_name.json
+select public.check_company_name('Fixture Labor');
+\o :fixture_dir/check_company_name_rejected.json
+select public.check_company_name('KlarSoft');
+\o :fixture_dir/get_my_company_none.json
+select public.get_my_company();
+\o :fixture_dir/found_company.json
+select public.found_company(gen_random_uuid(), 'Fixture Labor', 'Werkzeuge für Bastler', 'tech', '#2266cc', 'garage');
+\o :fixture_dir/set_company_marketing.json
+select public.set_company_marketing(gen_random_uuid(), 25000);
+\o :fixture_dir/set_ai_workers.json
+select public.set_ai_workers(gen_random_uuid(), 1);
+\o :fixture_dir/company_deposit.json
+select public.company_deposit(gen_random_uuid(), 100000);
+\o :fixture_dir/company_withdraw.json
+select public.company_withdraw(gen_random_uuid(), 50000);
+\o
+reset role;
+select company_id as fco from public.player_companies where founder_id = :p \gset
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/create_job_posting.json
+select public.create_job_posting(gen_random_uuid(), :'fco', 'intern', 'Werkstudium Software',
+  '[{"branch": "it", "min_score": 0}]', 18000, 1);
+\o
+select id as fx_post from public.job_postings where company_id = :'fco' \gset
 select tests.login_as('authenticated', :boss) is null as ok \gset
-\o :fixture_dir/employer/get_company_applications.json
-select public.get_company_applications(:fco);
-\o :fixture_dir/employer/respond_application.json
+select public.apply_for_job(gen_random_uuid(), :'fx_post', 20000, 'Gern im Team.') ->> 'id' as fx_papp \gset
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/get_company_postings.json
+select public.get_company_postings();
+\o :fixture_dir/get_company_applications.json
+select public.get_company_applications(:'fco');
+\o :fixture_dir/respond_application.json
 select public.respond_application(gen_random_uuid(), :'fx_papp', 'counter', 19000);
 \o
-select tests.login_as('authenticated', :p) is null as ok \gset
+select tests.login_as('authenticated', :boss) is null as ok \gset
 select public.sign_contract(gen_random_uuid(), :'fx_papp', 'M1 1 L9 9') is not null as ok \gset
 reset role;
-update public.player_jobs set raise_base_score = raise_base_score - 1 where player_id = :p and status = 'active';
-select id as fx_pjob from public.player_jobs where company_id = :fco and status = 'active' \gset
-select tests.login_as('authenticated', :p) is null as ok \gset
-select public.request_raise(gen_random_uuid(), 200) is not null as ok \gset
+update public.player_jobs set raise_base_score = raise_base_score - 1 where player_id = :boss and status = 'active';
+select id as fx_pjob from public.player_jobs where company_id = :'fco' and status = 'active' \gset
 select tests.login_as('authenticated', :boss) is null as ok \gset
-\o :fixture_dir/employer/get_company_team.json
-select public.get_company_team(:fco);
-\o :fixture_dir/employer/respond_raise.json
+select public.request_raise(gen_random_uuid(), 200) is not null as ok \gset
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/get_company_team.json
+select public.get_company_team(:'fco');
+\o :fixture_dir/respond_raise.json
 select public.respond_raise(gen_random_uuid(), :'fx_pjob', true);
-\o :fixture_dir/employer/fire_employee.json
+\o :fixture_dir/fire_employee.json
 select public.fire_employee(gen_random_uuid(), :'fx_pjob');
-\o :fixture_dir/employer/close_job_posting.json
+\o :fixture_dir/close_job_posting.json
 select public.close_job_posting(gen_random_uuid(), :'fx_post');
+\o
+reset role;
+-- one quarter closed, level 10 and money for the upgrade
+select public.player_company_close_quarter(:'fco', (select id from public.game_quarters order by ends_at <= now() desc, ends_at desc limit 1))
+       is not null as ok \gset
+update public.profiles set level = 10, xp_total = public.xp_total_for_level(10) where id = :p;
+select public.ledger_transfer(public.ledger_system_account('households'), public.ledger_player_account(:p, 'player_cash'),
+  2000000, 'transfer', 'Fixture-Kapital', 'player', :p, 'fixture:m3c:upgrade') is not null as ok \gset
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/get_my_company.json
+select public.get_my_company();
+\o :fixture_dir/upgrade_company.json
+select public.upgrade_company(gen_random_uuid());
+\o :fixture_dir/get_player_card_founder.json
+select public.get_player_card('fixture_neu');
+\o :fixture_dir/get_my_portfolio_founder.json
+select public.get_my_portfolio();
 \o
 reset role;

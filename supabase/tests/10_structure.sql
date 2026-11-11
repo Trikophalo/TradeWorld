@@ -63,7 +63,10 @@ select tests.assert(
            'apply_for_job', 'claim_daily_reward', 'close_job_posting', 'counter_offer', 'create_job_posting', 'fire_employee',
            'get_company_applications', 'get_company_team', 'get_daily_reward', 'get_job_board', 'get_my_applications', 'get_my_job',
            'get_my_skills', 'get_player_card', 'learn_skill', 'quit_job', 'request_raise', 'respond_application',
-           'respond_raise', 'set_avatar', 'sign_contract', 'withdraw_application']
+           'respond_raise', 'set_avatar', 'sign_contract', 'withdraw_application',
+           -- M3c RPCs
+           'check_company_name', 'company_deposit', 'company_withdraw', 'found_company', 'get_company_postings',
+           'get_my_company', 'set_ai_workers', 'set_company_marketing', 'upgrade_company']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')
