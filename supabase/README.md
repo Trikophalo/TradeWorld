@@ -96,6 +96,7 @@ idempotency) with `ON_ERROR_STOP`, and runs the assertions in `tests/[1-9]*.sql`
 | `57_m2_names.sql`       | M2: name filter with false-positive traps and leetspeak, reserved names, sign-up, `check_nickname`, `change_nickname`                             |
 | `58_m2_rich_list.sql`   | M2: AI tycoons, `get_rich_list` (scopes, me/next, 24 h changes), rank news                                                                        |
 | `59_m2_missions.sql`    | M2: mission assignment and idempotency, locked features, progress and claims, quick replacement, `track_event`, daily check-in and streaks        |
+| `60_m2b.sql`            | M2b: avatars, daily reward cycle and freezes, skills and points, AI job board determinism, applications, contracts, wages, raises, employer side  |
 
 It exits non-zero on the first failed assertion and removes the cluster afterwards. A full run takes about
 1.5 minutes (most of it is the simulated day). `NEXA_MIGRATIONS_UPTO=20261110001600 supabase/tests/verify_local.sh`

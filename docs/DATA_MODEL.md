@@ -3992,3 +3992,168 @@ target, xp, status, expires_at }] }] }` (Reihenfolge quick, daily, weekly, miles
 - Prestige-Titel ab Level 50 sind konfiguriert, aber noch nicht als Titel vergeben.
 - Tycoon-Bestände handeln nicht; Firmenumsätze laufen noch nicht über die Haushalte (M4).
 - Die Missionsvorlagen werden bei jedem Update auf den Stand der Migration gesetzt (`on conflict do update`).
+
+## Nachtrag: M2b (Avatare, tägliche Belohnung, Fähigkeiten, Jobs, Spielerkarte)
+
+Entwurf in `docs/JOBS_AND_SKILLS.md` (ADR-050 bis ADR-054). Werte aus `game_config` (`skills`, `jobs`, `dailyRewards`,
+`avatars`, `careers`), der Fähigkeitenbaum aus `skills.tree`. Wie M1/M2a idempotent über `update-to-latest.sql` und in
+vier Ausgangslagen getestet (leer, Stand vor M1, Stand M1, Stand M2a).
+
+### Migrationen
+
+| Datei                                   | Inhalt                                                                                                           |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `20261113000100_m2b_schema.sql`         | `profiles.avatar_key`, Fähigkeiten, Punkte, Belohnungskalender, Stellenanzeigen, Bewerbungen, Vertragsspalten    |
+| `20261113000200_m2b_profile_skills.sql` | Fehlerschlüssel, Fähigkeiten, `grant_xp` mit Punkten, Avatare, tägliche Belohnung, `claim_mission`, Spielerkarte |
+| `20261113000300_m2b_jobs.sql`           | KI-Stellen, Jobbörse, Bewerbungen, Vertrag, Lohnabrechnung, Gehaltserhöhung, Kündigung, Arbeitgeber-RPCs         |
+| `20261113000400_m2b_wiring.sql`         | `get_my_portfolio`, `get_rich_list` (Avatar), `run_due_jobs` (KI-Stellen und Löhne)                              |
+
+### Tabellen
+
+- `profiles.avatar_key text not null default 'rookie'`: geprüft nur in `set_avatar` gegen `avatars.portraits`.
+- `player_skills (player_id, skill_key, learned_at)`, PK beide Spalten. Unumkehrbar; es gibt kein RPC zum Verlernen.
+- `player_skill_points (player_id PK, free_points, branch_points jsonb, branch_work_minutes jsonb)`. Bestehende Spieler
+  bekommen einmalig (Level − 1) × `skills.freePointsPerLevel` freie Punkte (beim Anlegen der Zeile). Fehlt die Zeile,
+  gilt sie als leer.
+- `daily_reward_claims (player_id, claim_day)` PK: ein Abholen pro Berliner Kalendertag mit `cycle_day`, `xp_awarded`,
+  `cash_cents`, `skill_points` und `freeze_used`. `login_streaks` hat zwei neue Spalten: `reward_cycle_day` (0 = noch
+  nie) und `reward_last_day`.
+- `job_postings`: `tier` (`job_tier`), `title_key` (KI, der Client übersetzt `jobs.titles.<key>`) oder `title`
+  (Spielerfirma), `required` `[{ branch, min_score }]` (1–8), `salary_cents_per_hour`, `slots` (`null` = unbegrenzt,
+  KI), `is_ai`, `ai_slot`, `status` `open`/`closed`, `game_quarter_id`, `posted_at`, `expires_at`. KI-Stellen sind
+  eindeutig je Firma, Quartal und `ai_slot`.
+- `job_applications`: Wunschlohn, Satz (≤ `jobs.applicationMessageMaxLength`, Namensfilter), Status `pending`,
+  `offered`, `rejected`, `declined`, `withdrawn`, `expired`, `signed` oder `closed`. Dazu Angebot, Ablauf und Unterschrift
+  (SVG-Pfad, ≤ 8000 Zeichen). Ein Angebot nach `offer_expires_at` wird als `expired` gelesen.
+- `player_jobs` neu: `posting_id`, `application_id`, `title_key`, `required`, `ceiling_cents_per_hour` (KI),
+  `raise_base_score` (Treffer-Score bei Einstellung bzw. letzter Erhöhung), `last_raise_at`, `raise_requested_at`,
+  `pending_raise_bps/_at`, `pay_factor_bps`, `earned_total_cents`, `paid_day`, `paid_minutes_today`, `signature`.
+- `mission_templates.reward_skill_points`: 1 für wöchentliche Missionen und Meilensteine, sonst 0.
+- RLS: Fähigkeiten, Punkte, Belohnungen und Bewerbungen liest nur der Besitzer, Stellenanzeigen alle Angemeldeten.
+  Schreiben geht nur über RPCs.
+
+### Formeln
+
+- **Branchen-Score** = Σ `skills.scoreByTier[tier − 1]` der gelernten Fähigkeiten der Branche (Hybride zählen für beide).
+- **Treffer-Score** einer Stelle = Σ über die geforderten Branchen min(Score, 2 × max(min_score, 1)).
+- **KI-Lohndecke** = Grundlohn × min(`aiSalaryCapMultiplier`, 1 + `aiSalaryPerScoreBps` / 10 000 × Treffer-Score).
+- **Produktivität** (bps) = 10 000 × min(`maxProductivity`, `playerBaseProductivity` + `productivityPerSkillScore` × Treffer-Score).
+- **Gehaltserhöhung**: höchstens `raiseRequest.maxRaiseBpsPerScore` × (Treffer-Score jetzt − `raise_base_score`); bei
+  KI-Firmen zusätzlich bis zur Lohndecke. Danach `raiseRequest.cooldownDays` Wartezeit.
+- **Ein Gehalt** (Kündigung, Abfindung) = `jobs.salaryUnitHours` × Vertragslohn.
+
+### KI-Stellen (`refresh_ai_job_postings()`, idempotent je Quartal)
+
+`c` ist der Index der börsennotierten KI-Firma nach Ticker, `i` läuft von 0 bis `aiPostingsPerCompany` − 1, und
+`q` = (Spieljahr − 1) × 4 + (Quartal − 1).
+
+- Branche = `jobs.sectorBranches[sector][(c + i) % len]`.
+- Stufe = `careers.tiers[(2c + i + q) % 5]`.
+- `title_key` = `<branche>_<stufe>`.
+- `min_score` kommt aus `jobs.tierMinScore`. Teamleitung und C-Level verlangen zusätzlich `management` mit
+  ⌊min_score / 2⌋, außer die Branche ist selbst `management`.
+- Lohn = Grundlohn der Stufe. Die Stelle läuft bis zum Quartalsende; danach werden die alten KI-Stellen geschlossen.
+
+Die Stellen werden beim Lesen der Jobbörse und in `run_due_jobs()` erzeugt.
+
+### RPCs
+
+| RPC                                                                                  | Antwort (Abweichungen vom Vertrag kursiv)                                                                                                         |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `set_avatar(p_request_id, p_avatar_key)`                                             | `{ avatar_key }`; `avatar_unknown`, `avatar_locked` (Level < Porträt-Level)                                                                       |
+| `get_daily_reward()`                                                                 | `{ day, claimable, streak_days, freezes_left, next_reset_at, cycle: [{ day, xp, cash_cents, skill_points, _xp_awarded_ }] }`                      |
+| `claim_daily_reward(p_request_id)`                                                   | `{ day, xp, cash_cents, skill_points, streak_days, level, xp_total, leveled_up, _freeze_used_ }`                                                  |
+| `get_my_skills()`                                                                    | `{ free_points, branch_points, branch_progress, branch_scores, learned: [{ key, learned_at }] }` (alle 8 Branchen)                                |
+| `learn_skill(p_request_id, p_skill_key)`                                             | wie `get_my_skills` plus `learned_key`                                                                                                            |
+| `get_job_board()`                                                                    | `{ postings: [...], next_refresh_at }`; _`slots_open` bei KI-Stellen = `jobs.aiSlotsOpen` (Rückfall 99)_                                          |
+| `apply_for_job(p_request_id, p_posting_id, p_salary_wish_cents_per_hour, p_message)` | Bewerbung (`{ id, status, posting, salary_wish_cents_per_hour, offer_salary_cents_per_hour, offer_expires_at, message, created_at, updated_at }`) |
+| `get_my_applications()`                                                              | `{ applications }`, neueste zuerst, letzte 30 Tage                                                                                                |
+| `counter_offer(p_request_id, p_application_id, p_salary_wish_cents_per_hour)`        | Bewerbung (KI: sofort neues Angebot, gedeckelt; Spielerfirma: wieder `pending`)                                                                   |
+| `withdraw_application(p_request_id, p_application_id)`                               | Bewerbung (`offered` → `declined`, `pending` → `withdrawn`)                                                                                       |
+| `sign_contract(p_request_id, p_application_id, p_signature)`                         | wie `get_my_job`; schließt alle anderen offenen Bewerbungen (`closed`)                                                                            |
+| `get_my_job()`                                                                       | `{ job: null \| {...} }`; _`raise_available_at` ist `null`, wenn eine Erhöhung jetzt möglich ist_                                                 |
+| `quit_job(p_request_id)`                                                             | `{ paid_cents, cash_cents }`: ein Gehalt vom Spieler an die Firma (`insufficient_funds`)                                                          |
+| `request_raise(p_request_id, p_raise_bps)`                                           | `{ status: accepted \| pending, salary_cents_per_hour }`                                                                                          |
+| `get_player_card(p_nickname)`                                                        | Vertragsform; Groß-/Kleinschreibung egal, `company` vorerst `null`                                                                                |
+
+**Arbeitgeber** (Gründer oder CEO einer Spielerfirma, sonst `employer_only`; Oberfläche in M4):
+
+| RPC                                                                                                             | Antwort                                                                                                                             |
+| --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `create_job_posting(p_request_id, p_company_id, p_tier, p_title, p_required, p_salary_cents_per_hour, p_slots)` | Stelle wie in der Jobbörse (ohne persönliche Felder) plus `salary_cents_per_hour`, `slots`, `status`                                |
+| `close_job_posting(p_request_id, p_posting_id)`                                                                 | `{ id, status: 'closed' }`; offene Bewerbungen werden `closed`                                                                      |
+| `get_company_applications(p_company_id)`                                                                        | `{ applications: [Bewerbung + applicant { nickname, avatar_key, level, branch_scores, match_score }] }`                             |
+| `respond_application(p_request_id, p_application_id, p_action, p_salary_cents_per_hour)`                        | Bewerbung; `accept` = Angebot zum Wunschlohn, `counter` = Angebot zum genannten Lohn                                                |
+| `get_company_team(p_company_id)`                                                                                | `{ members: [{ player_job_id, nickname, avatar_key, title, salary_cents_per_hour, productivity_bps, started_at, pending_raise }] }` |
+| `fire_employee(p_request_id, p_player_job_id)`                                                                  | `{ player_job_id, status: 'fired', severance_cents }`: ein Gehalt Abfindung aus der Firmenkasse                                     |
+| `respond_raise(p_request_id, p_player_job_id, p_accept)`                                                        | `{ status: accepted \| rejected, salary_cents_per_hour }`; ohne offene Anfrage `invalid_argument`                                   |
+
+Einen Lohn senken kann der Arbeitgeber nicht; dafür gibt es kein RPC.
+
+### Abläufe
+
+- **Tägliche Belohnung**: Ein Abholen pro Berliner Tag erledigt auch den täglichen Check-in (Serie, Missionsereignis
+  `check_in`; `daily_check_in` bleibt nutzbar und zählt denselben Tag).
+  - Gestern abgeholt: der Kalender läuft weiter, nach Tag 7 kommt wieder Tag 1.
+  - Ein Tag verpasst und der wöchentliche Schutz (`dailyRewards.freezesPerWeek`) ist noch frei: der Kalender läuft
+    weiter und der Schutz ist verbraucht.
+  - Sonst beginnt der Kalender wieder bei Tag 1.
+  - XP über `grant_xp` (Quelle `daily_login`, Multiplikator einmal).
+  - Geld kommt aus der Staatskasse. Fehlt dort Geld, wird gezahlt, was da ist (`state_pay_partial`).
+  - Fähigkeitspunkte werden als freie Punkte gutgeschrieben.
+- **Fähigkeiten**: Kosten `skills.costByTier[tier − 1]`. Zuerst werden die Branchenpunkte der Fähigkeit ausgegeben
+  (bei Hybriden zuerst die Branche mit mehr Punkten), dann freie Punkte. Alle `requires` müssen gelernt sein. Jeder
+  Levelaufstieg in `grant_xp` gibt `skills.freePointsPerLevel` freie Punkte; abgeholte wöchentliche Missionen und
+  Meilensteine geben `reward_skill_points` (`claim_mission` liefert zusätzlich `skill_points`).
+- **Bewerbung**:
+  - Voraussetzungen: Level ≥ `minLevel` der Stufe (`job_level_too_low`) und alle `min_score` erfüllt (`job_skills_missing`).
+  - Höchstens `jobs.maxOpenApplications` offene Bewerbungen (`application_limit`), je Stelle eine (`application_exists`).
+  - Bewerben ist auch mit Job erlaubt.
+  - KI-Firmen bieten sofort min(Wunsch, Lohndecke) für `jobs.offerValidHours` an. Spielerfirmen entscheiden selbst.
+  - Unterschreiben braucht ein gültiges Angebot (`application_not_offered`, `offer_expired`) und keinen aktiven Job
+    (`job_active_exists`).
+  - Freie Plätze bei Spielerfirmen: eine volle Stelle meldet `job_not_found`.
+- **Lohn** (`accrue_salaries()` in `run_due_jobs()`, auch vor Kündigung, Entlassung):
+  - Minutengenau seit `last_paid_at`, höchstens `careers.paidHoursPerDayCap` bezahlte Stunden pro Berliner Tag.
+  - Gezahlt wird aus der Firmenkasse (`company_cash` → `player_cash`, Art `salary`). Eine Spielerfirma mit zu wenig
+    Geld zahlt, was sie hat; `pay_factor_bps` hält den Anteil fest. Das Privatkonto des Inhabers wird nie belastet.
+  - Pro voller Stunde XP `xpSources.workHour` (bei Spielerfirmen × `playerCompanyMultiplier`).
+  - Arbeitsminuten werden gleichmäßig auf die geforderten Branchen verteilt. Alle `skills.workHoursPerBranchPoint`
+    Stunden gibt es +1 Branchenpunkt.
+  - Jede Abrechnung landet in `salary_payouts`.
+
+### Neue Fehlerschlüssel
+
+| Schlüssel                   | Code    | Schlüssel                 | Code    |
+| --------------------------- | ------- | ------------------------- | ------- |
+| `avatar_unknown`            | `NX026` | `application_not_found`   | `NX038` |
+| `avatar_locked`             | `NX027` | `application_not_offered` | `NX039` |
+| `daily_reward_claimed`      | `NX028` | `offer_expired`           | `NX040` |
+| `skill_unknown`             | `NX029` | `job_active_exists`       | `NX041` |
+| `skill_learned`             | `NX030` | `no_active_job`           | `NX042` |
+| `skill_locked`              | `NX031` | `raise_too_soon`          | `NX043` |
+| `skill_points_insufficient` | `NX032` | `raise_too_high`          | `NX044` |
+| `job_not_found`             | `NX033` | `player_not_found`        | `NX045` |
+| `job_level_too_low`         | `NX034` | `employer_only`           | `NX046` |
+| `job_skills_missing`        | `NX035` |                           |         |
+| `application_limit`         | `NX036` |                           |         |
+| `application_exists`        | `NX037` |                           |         |
+
+### Portfolio und Reichenliste
+
+- `get_my_portfolio` liefert zusätzlich `avatar_key` (alte Spieler: `rookie`), `skill_points_free` (ohne Zeile 0) und
+  `daily_reward_claimable`.
+- `get_rich_list`: jeder Eintrag hat `avatar_key`. Bei Tycoons wird es aus der Id per Hash unter den Porträts bis
+  Level 25 gewählt (`tycoon_avatar_key`).
+
+### Rechte
+
+`authenticated` darf die 22 RPCs aus den Tabellen oben ausführen. Intern bleiben `skill_*`, `player_branch_scores`,
+`daily_reward_next`, `state_pay_partial`, `refresh_ai_job_postings`, `accrue_job_salary`, `accrue_salaries`,
+`job_state`, `require_company_owner` und die übrigen Hilfsfunktionen.
+
+### Bekannte Grenzen
+
+- `companies.employee_count` wird noch nicht mitgezählt; das kommt mit den Firmen in M4.
+- Fixtures der Arbeitgeber-RPCs liegen in `__fixtures__/employer/`. Sie gehören noch nicht zum Vertragstest.
+- Verfällt eine KI-Stelle zum Quartalsende, bleiben die offenen Angebote bis zu ihrem eigenen Ablauf unterschreibbar.
