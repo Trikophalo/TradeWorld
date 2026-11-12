@@ -657,9 +657,20 @@ export interface MyCompany {
     fixedPerHourCents: number;
     aiWagesPerHourCents: number;
     marketingPerHourCents: number;
+    /** Automatic CEO payout (ADR-086): last hour and today. */
+    founderPayoutPerHourCents: number;
+    todayFounderPayoutCents: number;
   } | null;
   /** The last closed hours, oldest first. */
-  hours: { hourStart: string; revenueCents: number; profitCents: number; contractRevenueCents: number }[];
+  hours: {
+    hourStart: string;
+    revenueCents: number;
+    profitCents: number;
+    contractRevenueCents: number;
+    founderPayoutCents: number;
+  }[];
+  /** Share of every profitable hour paid to the founder automatically (ADR-086). */
+  founderPayoutBps: number;
   /** Profit levers and endless growth (ADR-083). */
   priceLevel: PriceLevel;
   contractWork: boolean;
@@ -1079,6 +1090,8 @@ export interface GameEngine {
   upgradeCompany(requestId: string): Promise<MyCompany>;
   /** Price strategy and contract work (ADR-083). */
   setCompanyStrategy(requestId: string, priceLevel: PriceLevel, contractWork: boolean): Promise<MyCompany>;
+  /** Automatic CEO payout share in bps (ADR-086). */
+  setFounderPayout(requestId: string, bps: number): Promise<MyCompany>;
   /** Next expansion level, paid from the company's cash (ADR-083). */
   expandCompany(requestId: string): Promise<MyCompany>;
   /** Friends (ADR-084). */

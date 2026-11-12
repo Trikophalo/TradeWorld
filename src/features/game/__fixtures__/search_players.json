@@ -1,9 +1,9 @@
 {
   "players": [
-    { "tag": "LBT8", "level": 15, "nickname": "Fixture_Gmbh", "avatar_key": "rookie" },
-    { "tag": "2Z7Q", "level": 15, "nickname": "Fixture_Neu", "avatar_key": "coder" },
-    { "tag": "5UHT", "level": 14, "nickname": "Fixture_Heim", "avatar_key": "rookie" },
-    { "tag": "N7FE", "level": 8, "nickname": "Fixture_Kunst", "avatar_key": "rookie" },
-    { "tag": "KXA3", "level": 1, "nickname": "Fixture_Chefin", "avatar_key": "rookie" }
+    { "tag": "NMMC", "level": 15, "nickname": "Fixture_Gmbh", "avatar_key": "rookie" },
+    { "tag": "C47J", "level": 15, "nickname": "Fixture_Neu", "avatar_key": "coder" },
+    { "tag": "GP84", "level": 14, "nickname": "Fixture_Heim", "avatar_key": "rookie" },
+    { "tag": "JQG2", "level": 8, "nickname": "Fixture_Kunst", "avatar_key": "rookie" },
+    { "tag": "MG5U", "level": 1, "nickname": "Fixture_Chefin", "avatar_key": "rookie" }
   ]
 }

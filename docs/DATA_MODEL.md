@@ -5407,3 +5407,54 @@ Nur `authenticated`, `STABLE`, `SECURITY DEFINER`, `search_path = ''`. Antwort:
 - Deaktivierte Spieler fehlen (wie bei `get_friends`), gelöschte gibt es nicht mehr. Keine Ratenbegrenzung (Lese-RPC).
 
 Interne Helfer (nur `service_role`): `new_player_tag`, `name_key`, `player_by_handle`. Keine neuen Fehlerschlüssel.
+
+## Nachtrag: M4e (Automatische Auszahlung an den CEO)
+
+Migration `20261126000100_m4e_founder_payout.sql` (ADR-086), idempotente Kopie in `supabase/updates/`. Die Regel
+spiegelt `src/lib/sim/startup.ts` (`isValidFounderPayout`, `founderPayoutCents`); Werte aus
+`game_config.startups.founderPayout` (`stepBps` 500, `maxBps` 10 000; dieselben Rückfallwerte im SQL).
+
+### Neue Spalten
+
+| Tabelle                | Spalte                 | Typ / Vorgabe                 | Bedeutung                                        |
+| ---------------------- | ---------------------- | ----------------------------- | ------------------------------------------------ |
+| `player_companies`     | `founder_payout_bps`   | `integer`, `0` (0 bis 10 000) | Anteil jedes Stundengewinns, der an den CEO geht |
+| `player_company_hours` | `founder_payout_cents` | `bigint`, `0` (≥ 0)           | Ausgezahlter Betrag der Stunde (nicht im Gewinn) |
+
+`founder_payout_bps` ist für `authenticated` lesbar (Spalten-Grant). Bestehende Firmen starten mit 0 %.
+
+### Stündlicher Abschluss (`player_company_close_hour`)
+
+Nach allen eigenen Buchungen der Stunde (Umsatz, Wareneinsatz und KI-Löhne, Spielerlöhne, Fixkosten und Marketing,
+offene Rechnungen):
+
+- Auszahlung = min(⌊Gewinn × `founder_payout_bps` / 10 000⌋, freie Kasse), nur bei **positivem** Stundengewinn und
+  Anteil > 0. Freie Kasse = Bestand der Firmenkasse − offene Rechnungen nach dieser Stunde (dieselbe Regel wie
+  `company_withdraw` und `expand_company`). Verlust, 0 % oder keine freie Kasse: nichts.
+- Gebucht genau wie `company_withdraw`: eine ausgeglichene Buchung `transfer` von der Firmenkasse an `player_cash`
+  des Gründers (Beschreibung „CEO-Auszahlung HH Uhr“, `ref_type = 'company'`, Schlüssel `pch:<firma>:<stunde>:payout`),
+  danach `loan_withhold` auf das Einkommen (offene Zwangskredite). Keine Steuer, wie bei der Entnahme.
+- Der Betrag steht in `player_company_hours.founder_payout_cents`. `profit_cents` bleibt unverändert: Die Auszahlung
+  ist eine Überweisung an den Eigentümer, keine Kosten. Die Firmenkasse sinkt um den Betrag.
+- Idempotent je (Firma, Stunde) wie der Rest der Stunde: Eine schon abgeschlossene Stunde wird übersprungen, die
+  Buchung hat dazu einen eindeutigen Schlüssel.
+
+Doppelt gezählt wird nichts: Firmenwert (`company_value_cents`, Kasse − offene Rechnungen + Ertragswert) sinkt um die
+Auszahlung, das Bargeld des Gründers steigt um sie; Tages-, Stunden- und Quartalsgewinn der Firma bleiben gleich.
+
+### RPC `set_founder_payout(p_request_id uuid, p_bps integer)`
+
+Nur der Gründer einer aktiven Firma (sonst `company_not_found`). Ganze Schritte von `stepBps` zwischen 0 und `maxBps`,
+sonst `invalid_argument` (auch ohne Wert). Antwort `{company: COMPANY}` wie `set_company_strategy`, idempotent über
+`request_id`. Gilt ab der nächsten abgeschlossenen Stunde.
+
+### COMPANY: neue Felder
+
+| Feld                                 | Typ      | Bedeutung                                                        |
+| ------------------------------------ | -------- | ---------------------------------------------------------------- |
+| `founder_payout_bps`                 | `number` | Gewählter Anteil in Basispunkten                                 |
+| `live.founder_payout_per_hour_cents` | `number` | Auszahlung der letzten abgeschlossenen Stunde (ohne Stunde 0)    |
+| `live.today_founder_payout_cents`    | `number` | Summe der Stunden des Berliner Tages (wie `today_revenue_cents`) |
+| `hours[].founder_payout_cents`       | `number` | Auszahlung der jeweiligen Stunde                                 |
+
+Die Antwort von `player_company_close_hour` hat zusätzlich `founder_payout_cents`. Keine neuen Fehlerschlüssel.

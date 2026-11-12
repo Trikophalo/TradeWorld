@@ -1,10 +1,10 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 33, "gap_cents": 644 }, "rank": 34, "net_worth_cents": 1019356 },
-  "total": 112,
+  "me": { "next": { "name": "Vera", "rank": 35, "gap_cents": 643 }, "rank": 36, "net_worth_cents": 1019357 },
+  "total": 114,
   "entries": [
     {
       "id": "0f3f3f3f-0000-4000-8000-0000000000f1",
-      "tag": "8Y9T",
+      "tag": "YXWV",
       "kind": "player",
       "name": "Fenja_Firma",
       "rank": 1,
@@ -12,12 +12,12 @@
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 102760991,
+      "net_worth_cents": 102375991,
       "rank_change_24h": null
     },
     {
       "id": "07170717-0000-4000-8000-0000000000a1",
-      "tag": "5XYE",
+      "tag": "CBGT",
       "kind": "player",
       "name": "Hanna_Haus",
       "rank": 2,
@@ -30,7 +30,7 @@
     },
     {
       "id": "0e3e3e3e-0000-4000-8000-0000000000f1",
-      "tag": "YMLG",
+      "tag": "HN52",
       "kind": "player",
       "name": "Frieda_Format",
       "rank": 3,
@@ -42,31 +42,31 @@
       "rank_change_24h": null
     },
     {
+      "id": "07070707-0000-4000-8000-0000000000c3",
+      "tag": "T5BZ",
+      "kind": "player",
+      "name": "Carla_Kunst",
+      "rank": 4,
+      "is_me": false,
+      "avatar_key": "rookie",
+      "description": null,
+      "change_24h_bps": null,
+      "net_worth_cents": 31000000,
+      "rank_change_24h": null
+    },
+    {
       "id": "07170717-0000-4000-8000-0000000000b2",
-      "tag": "T59T",
+      "tag": "QEKY",
       "kind": "player",
       "name": "Moritz_Moebel",
-      "rank": 4,
+      "rank": 5,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
       "net_worth_cents": 15904600,
       "rank_change_24h": null
-    },
-    {
-      "id": "06860686-0000-4000-8000-0000000000a1",
-      "tag": "KDZR",
-      "kind": "player",
-      "name": "Hanna_Stunde",
-      "rank": 5,
-      "is_me": false,
-      "avatar_key": "rookie",
-      "description": null,
-      "change_24h_bps": null,
-      "net_worth_cents": 10677957,
-      "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-12T22:57:41.605801+00:00"
+  "server_time": "2026-11-12T23:13:58.586092+00:00"
 }

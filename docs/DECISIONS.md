@@ -950,3 +950,32 @@ Suche findet.
     Tag, mit oder ohne `#`.
   - Höchstens acht Spieler pro Suche.
 - **Freunde:** Eine Anfrage geht auch per Tag.
+
+## ADR-086: Tresor zum Öffnen, automatische CEO-Auszahlung — `akzeptiert`
+
+Vorgabe: Der eigene Tresor soll viel schöner sein. Man soll ihn öffnen können und dort mit einer schönen
+Geld-Animation alle Einnahmequellen sehen, dynamisch und lebendig. Als CEO soll man sich automatisch einen Anteil vom
+Gewinn auszahlen können.
+
+- **Tresor:**
+  - Eine große Pixel-Tresortür mit goldenem Rad. Ein Tipp öffnet sie: Sie schwingt in den Angeln auf (3D-Drehung),
+    und Münzen springen heraus.
+  - Innen liegt Gold: Barren als Pyramide und Münzstapel, mehr, je voller der Tresor ist. Dazu ein goldenes Leuchten.
+  - Der volle Tresor leuchtet.
+  - Geöffnet zeigt er „Deine Einnahmequellen“: Grundeinkommen, Job und CEO-Auszahlung, jeweils pro Stunde. Jede Quelle
+    hat einen Geldstrom: Ein Balken zeigt ihren Anteil, und ein Lichtpunkt läuft ständig darüber. Oben steht die
+    Summe pro Stunde. Ein Tipp auf eine Quelle führt zu Job oder Firma.
+  - „Tresor leeren“ bleibt wie bisher: Die Münzen fliegen ins Guthaben. Mit reduzierter Bewegung blendet die Tür nur
+    über, und die Ströme stehen still.
+- **CEO-Auszahlung:**
+  - Im Unternehmen wählt der Gründer 0 bis 100 % in 5-%-Schritten.
+  - Nach jeder Stunde mit Gewinn geht dieser Anteil vom Gewinn automatisch aufs Privatkonto.
+  - Die Auszahlung ist nur aus freiem Geld möglich: Offene Rechnungen werden zuerst bezahlt. Eine Verlust-Stunde
+    zahlt nichts.
+  - Gebucht wird wie eine Entnahme. Der Gewinn der Firma bleibt gleich, die Kasse sinkt. Bei offenen Zwangskrediten
+    wird wie bei jeder Entnahme ein Teil einbehalten.
+  - Die Firmenkarte zeigt die letzte Stunde und die Summe von heute. Der Tresor zeigt sie als Einnahmequelle.
+  - Offen: Bei börsennotierten Firmen geht die Auszahlung wie jede Entnahme ganz an den Gründer. Eine Dividende für
+    alle Aktionäre wäre ein eigenes Feature.
+- Regeln: `founderPayoutCents`, `isValidFounderPayout` in `src/lib/sim/startup.ts`; Server `set_founder_payout` und
+  `player_company_close_hour` (Migration M4e).

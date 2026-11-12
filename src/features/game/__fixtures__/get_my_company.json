@@ -1,22 +1,24 @@
 {
   "company": {
-    "id": "c2f15610-5ee6-46ea-a194-3eb8ac929f1a",
+    "id": "738db3e0-e2ad-4ba8-972f-56a6f9fee45a",
     "idea": "Werkzeuge für Bastler",
     "live": {
-      "last_hour_at": "2026-11-12T22:00:00+00:00",
+      "last_hour_at": "2026-11-12T23:00:00+00:00",
       "pay_factor_bps": 8473,
-      "today_profit_cents": -13332,
-      "today_revenue_cents": 66981,
+      "today_profit_cents": 0,
+      "today_revenue_cents": 0,
       "fixed_per_hour_cents": 2500,
       "quarter_profit_cents": -13332,
-      "demand_per_hour_cents": 285,
+      "demand_per_hour_cents": 287,
       "profit_per_hour_cents": -6666,
-      "quarter_revenue_cents": 66981,
-      "revenue_per_hour_cents": 33464,
+      "quarter_revenue_cents": 66956,
+      "revenue_per_hour_cents": 33465,
       "ai_wages_per_hour_cents": 10167,
       "capacity_per_hour_cents": 133000,
       "marketing_per_hour_cents": 4167,
-      "contract_revenue_per_hour_cents": 33179
+      "today_founder_payout_cents": 0,
+      "founder_payout_per_hour_cents": 0,
+      "contract_revenue_per_hour_cents": 33178
     },
     "logo": {
       "grid": [
@@ -44,16 +46,18 @@
     "color": "#2266cc",
     "hours": [
       {
-        "hour_start": "2026-11-12T20:00:00+00:00",
-        "profit_cents": -6666,
-        "revenue_cents": 33517,
-        "contract_revenue_cents": 33161
-      },
-      {
         "hour_start": "2026-11-12T21:00:00+00:00",
         "profit_cents": -6666,
-        "revenue_cents": 33464,
-        "contract_revenue_cents": 33179
+        "revenue_cents": 33491,
+        "founder_payout_cents": 0,
+        "contract_revenue_cents": 33170
+      },
+      {
+        "hour_start": "2026-11-12T22:00:00+00:00",
+        "profit_cents": -6666,
+        "revenue_cents": 33465,
+        "founder_payout_cents": 0,
+        "contract_revenue_cents": 33178
       }
     ],
     "stage": 0,
@@ -114,7 +118,7 @@
     "ai_workers": 1,
     "can_expand": false,
     "cash_cents": 54108,
-    "founded_at": "2026-11-12T22:57:41.824621+00:00",
+    "founded_at": "2026-11-12T23:13:58.82464+00:00",
     "can_upgrade": true,
     "logo_hidden": false,
     "price_level": "normal",
@@ -153,9 +157,10 @@
     "quarters_active": 1,
     "ai_worker_skills": [],
     "distress_quarters": 0,
-    "estimate_low_cents": 80664,
+    "estimate_low_cents": 65243,
+    "founder_payout_bps": 0,
     "upgrade_cost_cents": 1250000,
-    "estimate_high_cents": 887684,
+    "estimate_high_cents": 558456,
     "ai_worker_cost_cents": 72000,
     "can_capital_increase": false,
     "expansion_cost_cents": null,

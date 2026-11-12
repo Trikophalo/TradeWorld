@@ -105,7 +105,22 @@
     "progress": "Füllstand des Tresors",
     "claimFailed": "Tresor nicht geleert",
     "treasuryLow": "Staatskasse knapp",
-    "jobIncome": "+ Job {amount} pro Stunde"
+    "jobIncome": "+ Job {amount} pro Stunde",
+    "open": "Tresor öffnen",
+    "close": "Tresor schließen",
+    "sourcesTitle": "Deine Einnahmequellen",
+    "perHour": "{amount}/Std.",
+    "sourcesHint": "Grundeinkommen sammelt sich im Tresor. Lohn und CEO-Auszahlung gehen jede Stunde direkt auf dein Konto.",
+    "sources": {
+      "basic": "Grundeinkommen",
+      "basicDetail": "Sammelt sich hier, bis zu {hours} Stunden",
+      "job": "Job",
+      "jobNone": "Noch kein Job: Im Tab „Job“ findest du Stellen.",
+      "ceo": "CEO-Auszahlung",
+      "ceoNone": "Mit einer eigenen Firma zahlst du dir einen Anteil vom Gewinn aus.",
+      "ceoOff": "{name}: Auszahlung steht auf 0 %. Stell sie in der Firma ein.",
+      "ceoOn": "{name}: {percent} % vom Gewinn · heute {today}"
+    }
   },
   "portfolio": {
     "title": "Portfolio",
@@ -2115,7 +2130,17 @@
     "gmbhTitle": "GmbH",
     "gmbhText": "Gleich groß einsteigen: ein Büro mit 20 Plätzen, ein 15-mal so großer Markt und schon bekannt. Teuer, aber du wächst viel schneller.",
     "headStart": "Markt × {market} · Start mit {awareness} % Bekanntheit",
-    "openProfile": "Profil von {name} öffnen"
+    "openProfile": "Profil von {name} öffnen",
+    "payout": {
+      "title": "CEO-Auszahlung",
+      "percent": "{percent} %",
+      "intro": "Dieser Anteil vom Gewinn jeder Stunde geht automatisch auf dein Privatkonto.",
+      "lastHour": "Letzte Stunde",
+      "today": "Heute ausgezahlt",
+      "hint": "Nur aus Gewinn und nur aus freiem Geld: Offene Rechnungen werden zuerst bezahlt. Was du nicht auszahlst, bleibt für Wachstum in der Firma.",
+      "save": "Auszahlung speichern",
+      "saved": "Auszahlung gespeichert"
+    }
   },
   "debt": {
     "title": "Schulden",

@@ -33,7 +33,7 @@ import { ListingCard, SideJobNotice } from "./listing";
 import { BannerEditor } from "./banner-editor";
 import { LogoEditor } from "./logo-editor";
 import { OfficeScene } from "./office-scene";
-import { ExpansionCard, ProfitCoach, StrategyCard } from "./profit";
+import { ExpansionCard, PayoutCard, ProfitCoach, StrategyCard } from "./profit";
 
 type Tab = "overview" | "team" | "chat";
 const factor = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
@@ -124,6 +124,7 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
           </div>
           <div className="space-y-5">
             <TreasuryCard company={company} />
+            <PayoutCard company={company} />
             <StrategyCard company={company} />
             <MarketCard company={company} />
             <div id="company-controls" className="scroll-mt-24">

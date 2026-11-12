@@ -187,11 +187,21 @@ const companySchema = z.object({
       fixed_per_hour_cents: num.default(0),
       ai_wages_per_hour_cents: num.default(0),
       marketing_per_hour_cents: num.default(0),
+      founder_payout_per_hour_cents: num.default(0),
+      today_founder_payout_cents: num.default(0),
     })
     .nullable()
     .default(null),
   hours: z
-    .array(z.object({ hour_start: iso, revenue_cents: num, profit_cents: num, contract_revenue_cents: num.default(0) }))
+    .array(
+      z.object({
+        hour_start: iso,
+        revenue_cents: num,
+        profit_cents: num,
+        contract_revenue_cents: num.default(0),
+        founder_payout_cents: num.default(0),
+      }),
+    )
     .default([]),
   ai_wage_cents_per_hour: num.default(12_000),
   price_level: z.enum(["budget", "normal", "premium"]).default("normal"),
@@ -200,6 +210,7 @@ const companySchema = z.object({
   can_expand: z.boolean().default(false),
   expansion_cost_cents: num.nullable().default(null),
   market_factor: num.default(1),
+  founder_payout_bps: num.default(0),
 });
 
 const wrapped = z.object({ company: companySchema.nullable() });
@@ -340,6 +351,7 @@ export const COMPANY_RPC_SCHEMAS = {
   upgrade_company: wrapped,
   set_company_strategy: wrapped,
   expand_company: wrapped,
+  set_founder_payout: wrapped,
   get_company_postings: z.object({ postings: z.array(postingSchema) }),
   create_job_posting: z.object({ id: z.string() }).passthrough(),
   close_job_posting: z.object({ id: z.string(), status: z.literal("closed") }),
@@ -456,6 +468,8 @@ function toCompany(c: z.infer<typeof companySchema>): MyCompany {
           fixedPerHourCents: c.live.fixed_per_hour_cents,
           aiWagesPerHourCents: c.live.ai_wages_per_hour_cents,
           marketingPerHourCents: c.live.marketing_per_hour_cents,
+          founderPayoutPerHourCents: c.live.founder_payout_per_hour_cents,
+          todayFounderPayoutCents: c.live.today_founder_payout_cents,
         }
       : null,
     hours: c.hours.map((h) => ({
@@ -463,6 +477,7 @@ function toCompany(c: z.infer<typeof companySchema>): MyCompany {
       revenueCents: h.revenue_cents,
       profitCents: h.profit_cents,
       contractRevenueCents: h.contract_revenue_cents,
+      founderPayoutCents: h.founder_payout_cents,
     })),
     aiWageCentsPerHour: c.ai_wage_cents_per_hour,
     priceLevel: c.price_level,
@@ -471,6 +486,7 @@ function toCompany(c: z.infer<typeof companySchema>): MyCompany {
     canExpand: c.can_expand,
     expansionCostCents: c.expansion_cost_cents,
     marketFactor: c.market_factor,
+    founderPayoutBps: c.founder_payout_bps,
   };
 }
 
@@ -549,6 +565,7 @@ type CompanyEngine = Pick<
   | "upgradeCompany"
   | "setCompanyStrategy"
   | "expandCompany"
+  | "setFounderPayout"
   | "companyPostings"
   | "createJobPosting"
   | "closeJobPosting"
@@ -704,6 +721,12 @@ export const liveCompanyEngine: CompanyEngine = {
         { p_request_id: requestId, p_price_level: priceLevel, p_contract_work: contractWork },
         S.set_company_strategy,
       ),
+    );
+  },
+
+  async setFounderPayout(requestId, bps) {
+    return requireCompany(
+      await rpc("set_founder_payout", { p_request_id: requestId, p_bps: bps }, S.set_founder_payout),
     );
   },
 

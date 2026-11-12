@@ -18,6 +18,8 @@ import {
   canExpand,
   effectivePotentialCents,
   expansionCostCents,
+  founderPayoutCents,
+  isValidFounderPayout,
   type PriceLevel,
   potentialEstimate,
   potentialFromUniform,
@@ -67,6 +69,8 @@ interface DemoHour {
   profitCents: number;
   /** Contract work (ADR-083); older demo hours have none. */
   contractRevenueCents?: number;
+  /** Automatic CEO payout (ADR-086). */
+  founderPayoutCents?: number;
 }
 
 interface DemoReport extends CompanyQuarter {
@@ -121,6 +125,8 @@ export interface DemoCompanyState {
   priceLevel?: PriceLevel;
   contractWork?: boolean;
   expansionLevel?: number;
+  /** Automatic CEO payout share (ADR-086), default 0. */
+  founderPayoutBps?: number;
   chat?: ChatMessage[];
 }
 
@@ -284,6 +290,14 @@ export function createCompanyEngine(host: CompanyHost) {
     const paid = Math.min(costs, Math.max(0, available));
     company.cashCents = available - paid;
     company.unpaidCents += costs - paid;
+    // Automatic CEO payout (ADR-086): a share of a profitable hour, never more than the free cash.
+    const payout = Number(
+      founderPayoutCents(r.profitCents, company.founderPayoutBps ?? 0, BigInt(company.cashCents - company.unpaidCents)),
+    );
+    if (payout > 0) {
+      company.cashCents -= payout;
+      host.addCash(payout);
+    }
     const hour: DemoHour = {
       at,
       demandCents: Number(r.demandCents),
@@ -296,6 +310,7 @@ export function createCompanyEngine(host: CompanyHost) {
       payFactorBps: r.payFactorBps,
       profitCents: Number(r.profitCents),
       contractRevenueCents: Number(r.contractRevenueCents),
+      founderPayoutCents: payout,
     };
     company.hours = [...(company.hours ?? []), hour].slice(-24);
     company.quarterHours = [...(company.quarterHours ?? []), hour];
@@ -475,6 +490,8 @@ export function createCompanyEngine(host: CompanyHost) {
       fixedPerHourCents: last.fixedCents,
       aiWagesPerHourCents: last.aiWagesCents,
       marketingPerHourCents: last.marketingCents,
+      founderPayoutPerHourCents: last.founderPayoutCents ?? 0,
+      todayFounderPayoutCents: todays.reduce((a, h) => a + (h.founderPayoutCents ?? 0), 0),
     };
   }
 
@@ -587,7 +604,9 @@ export function createCompanyEngine(host: CompanyHost) {
         revenueCents: h.revenueCents,
         profitCents: h.profitCents,
         contractRevenueCents: h.contractRevenueCents ?? 0,
+        founderPayoutCents: h.founderPayoutCents ?? 0,
       })),
+      founderPayoutBps: company.founderPayoutBps ?? 0,
       priceLevel: company.priceLevel ?? "normal",
       contractWork: company.contractWork ?? true,
       expansionLevel: level,
@@ -666,6 +685,7 @@ export function createCompanyEngine(host: CompanyHost) {
     | "upgradeCompany"
     | "setCompanyStrategy"
     | "expandCompany"
+    | "setFounderPayout"
     | "companyPostings"
     | "createJobPosting"
     | "closeJobPosting"
@@ -859,6 +879,12 @@ export function createCompanyEngine(host: CompanyHost) {
         if (!["budget", "normal", "premium"].includes(priceLevel)) throw new GameError("invalid_argument");
         company.priceLevel = priceLevel;
         company.contractWork = contractWork;
+      }),
+
+    setFounderPayout: (requestId, bps) =>
+      mutate(requestId, (company) => {
+        if (!isValidFounderPayout(bps)) throw new GameError("invalid_argument");
+        company.founderPayoutBps = bps;
       }),
 
     expandCompany: (requestId) =>

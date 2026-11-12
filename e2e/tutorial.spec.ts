@@ -34,6 +34,13 @@ test("a new player is guided through the first session and cannot skip it", asyn
   await next(page);
 
   await expect(finn(page)).toContainText("Tresor leeren");
+  // Finn scrolls the vault into view first (the card is tall on phones): click once it has settled.
+  await expect(tour(page, "vault-claim")).toBeInViewport();
+  await expect(async () => {
+    const before = await tour(page, "vault-claim").boundingBox();
+    await page.waitForTimeout(150);
+    expect(await tour(page, "vault-claim").boundingBox()).toEqual(before);
+  }).toPass();
   await tour(page, "vault-claim").click();
 
   await tour(page, "nav-markets").click();

@@ -17,6 +17,8 @@ const live: NonNullable<MyCompany["live"]> = {
   fixedPerHourCents: 2_500,
   aiWagesPerHourCents: 0,
   marketingPerHourCents: 0,
+  founderPayoutPerHourCents: 0,
+  todayFounderPayoutCents: 0,
 };
 
 const base = {

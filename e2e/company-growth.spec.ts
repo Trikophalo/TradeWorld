@@ -82,6 +82,20 @@ test("profit coach, price strategy, contract work, IPO from the garage, staff op
   await expect(page.getByTestId("expansion-locked")).toBeVisible();
   await expect(page.getByTestId("listing").getByRole("button", { name: "Börsengang" })).toBeVisible();
 
+  // Automatic CEO payout (ADR-086): set the share, the vault on the start page lists it as an income source.
+  const payout = page.getByTestId("payout");
+  await payout.getByRole("slider").focus();
+  await page.keyboard.press("End");
+  await expect(payout.getByTestId("payout-percent")).toHaveText("100 %");
+  await payout.getByRole("button", { name: "Auszahlung speichern" }).click();
+  await expect(page.getByText("Auszahlung gespeichert").first()).toBeVisible();
+  await page.goto("/");
+  await page.getByTestId("vault-open").click();
+  const sources = page.getByTestId("vault-sources");
+  await expect(sources.locator('[data-source="basic"]')).toContainText("Grundeinkommen");
+  await expect(sources.locator('[data-source="ceo"]')).toContainText("100 % vom Gewinn");
+  await page.goto("/company");
+
   // Staff in the office open their profile (ADR-084).
   await page.getByTestId("office-person").first().click();
   await expect(page).toHaveURL(/\/players\/Kassenwart$/);

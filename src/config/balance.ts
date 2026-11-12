@@ -1007,6 +1007,11 @@ export interface StartupsConfig {
    * Contract work (ADR-083): a share of the unused capacity is sold to other companies at a fixed gross margin.
    */
   readonly contractWork: { readonly shareOfFreeCapacity: number; readonly grossMargin: number };
+  /**
+   * Automatic CEO payout (ADR-086): after every profitable hour this share of the hour's profit goes from the company
+   * to the founder, never more than the free cash. Chosen in steps of `stepBps` up to `maxBps`.
+   */
+  readonly founderPayout: { readonly stepBps: number; readonly maxBps: number };
   /** Going public and capital increases (ADR-067). */
   readonly ipo: {
     readonly minLevel: number;
@@ -2039,6 +2044,7 @@ export const BALANCE = {
       premiumLowQualityDemand: 0.5,
     },
     contractWork: { shareOfFreeCapacity: 0.25, grossMargin: 0.3 },
+    founderPayout: { stepBps: 500, maxBps: 10_000 },
     ipo: {
       minLevel: 6,
       fromTiers: ["garage", "small_business", "gmbh"],

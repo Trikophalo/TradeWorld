@@ -10,6 +10,8 @@ import {
   expansionCapacityFactor,
   expansionCostCents,
   fixedCostCents,
+  founderPayoutCents,
+  isValidFounderPayout,
   priceEffect,
   closeStartupQuarter,
   companyStage,
@@ -368,5 +370,32 @@ describe("profit levers and growth without limit (ADR-083)", () => {
     const flat = closeStartupHour(s, { ...hourInput, tier: "ag" });
     const grown = closeStartupHour(s, { ...hourInput, tier: "ag", expansionLevel: 3 });
     expect(grown.revenueCents).toBeGreaterThan(flat.revenueCents);
+  });
+});
+
+describe("CEO payout (ADR-086)", () => {
+  it("pays the share of a positive profit, rounded down", () => {
+    expect(founderPayoutCents(b(10_001), 2_500, b(1_000_000))).toBe(b(2_500));
+    expect(founderPayoutCents(b(10_000), 10_000, b(1_000_000))).toBe(b(10_000));
+  });
+
+  it("pays nothing on a loss, at 0 % or without free cash", () => {
+    expect(founderPayoutCents(b(-500), 5_000, b(1_000_000))).toBe(b(0));
+    expect(founderPayoutCents(b(0), 5_000, b(1_000_000))).toBe(b(0));
+    expect(founderPayoutCents(b(10_000), 0, b(1_000_000))).toBe(b(0));
+    expect(founderPayoutCents(b(10_000), 5_000, b(0))).toBe(b(0));
+  });
+
+  it("never pays more than the free cash", () => {
+    expect(founderPayoutCents(b(10_000), 10_000, b(3_000))).toBe(b(3_000));
+  });
+
+  it("accepts whole steps from 0 to 100 %", () => {
+    expect(isValidFounderPayout(0)).toBe(true);
+    expect(isValidFounderPayout(2_500)).toBe(true);
+    expect(isValidFounderPayout(10_000)).toBe(true);
+    expect(isValidFounderPayout(2_550)).toBe(false);
+    expect(isValidFounderPayout(-500)).toBe(false);
+    expect(isValidFounderPayout(10_500)).toBe(false);
   });
 });

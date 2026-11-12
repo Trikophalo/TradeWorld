@@ -336,6 +336,24 @@ export function trainingFor(tier: number, cfg: StartupsConfig = BALANCE.startups
   return { costCents: cfg.training.costCentsByTier[i]!, raiseBps: cfg.training.wageRaiseBpsByTier[i]! };
 }
 
+// ------------------------------------------------------------------ CEO payout (ADR-086)
+
+/** Whether a payout share is allowed: whole steps from 0 to the maximum. */
+export function isValidFounderPayout(bps: number, cfg: StartupsConfig = BALANCE.startups): boolean {
+  const { stepBps, maxBps } = cfg.founderPayout;
+  return Number.isInteger(bps) && bps >= 0 && bps <= maxBps && bps % stepBps === 0;
+}
+
+/**
+ * What the founder receives after an hour: the share of a positive profit, rounded down to whole cents, never more
+ * than the free cash (cash minus open bills). Losses pay nothing.
+ */
+export function founderPayoutCents(profitCents: bigint, payoutBps: number, freeCashCents: bigint): bigint {
+  if (profitCents <= BigInt(0) || payoutBps <= 0 || freeCashCents <= BigInt(0)) return BigInt(0);
+  const share = (profitCents * BigInt(Math.min(10_000, Math.floor(payoutBps)))) / BigInt(10_000);
+  return share < freeCashCents ? share : freeCashCents;
+}
+
 // ------------------------------------------------------------------ operating hours (ADR-072)
 
 export interface StartupHourInput {

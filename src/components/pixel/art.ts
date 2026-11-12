@@ -199,6 +199,53 @@ export const COMPANY_LOGOS = { VLT: volta, BRZ: brotzeit, KLS: klarsoft } as con
 
 // ---------------------------------------------------------------- mascots and objects
 
+/** The vault door (ADR-086): steel frame, door with bolts and a golden wheel; hinges on the left. */
+export const VAULT_DOOR: PixelArt = {
+  palette: {
+    k: "#1c2230",
+    h: "#c9d2e0",
+    s: "#8e99ad",
+    l: "#aab4c6",
+    d: "#5d6880",
+    g: "#3b4456",
+    b: "#d8dee9",
+    y: "#f2c14e",
+    o: "#a8741a",
+  },
+  grid: [
+    ".kkkkkkkkkkkkkkkkkkkkkk.",
+    "khhhhhhhhhhhhhhhhhhhhhhk",
+    "khsssssssssssssssssssssk",
+    "khslllllllllllllllllkssk",
+    "khslddddddddddddddddkssk",
+    "khsldbddddddddddddbdkssk",
+    "khkgddddddkkkkddddddkssk",
+    "khkgddddkyyyyyykddddkssk",
+    "khsldddkyyddydyykdddkssk",
+    "khsldddyydddyddyydddkssk",
+    "khslddkyddddydddykddkssk",
+    "khslddkydddoodddykddkssk",
+    "khslddkyyyyoodyyykddkssk",
+    "khslddkyddddddddykddkssk",
+    "khsldddyydddyddyydddkssk",
+    "khsldddkyyddydyykdddkssk",
+    "khkgddddkyyyyyykddddkssk",
+    "khkgddddddkkkkddddddkssk",
+    "khsldbddddddddddddbdkssk",
+    "khslddddddddddddddddkssk",
+    "khskkkkkkkkkkkkkkkkkkssk",
+    "khsssssssssssssssssssssk",
+    "khsssssssssssssssssssssk",
+    ".kkkkkkkkkkkkkkkkkkkkkk.",
+  ],
+};
+
+/** A gold bar for the inside of the vault. */
+export const GOLD_BAR: PixelArt = {
+  palette: { k: "#7a4a00", y: "#ffd15c", h: "#fff3c4", o: "#e09a1f" },
+  grid: ["..kkkkkkk.", ".kyyhhyyyk", "kyyhyyyyok", "kyyyyyyyok", "kkkkkkkkkk"],
+};
+
 export const COIN: PixelArt = {
   palette: { o: "#7a4a00", y: "#ffd15c", h: "#fff3c4", d: "#e09a1f" },
   grid: [

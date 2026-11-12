@@ -90,7 +90,9 @@ select tests.assert(
            'expand_company', 'set_company_strategy',
            'get_friends', 'remove_friend', 'respond_friend_request', 'send_friend_request',
            -- M4d RPCs
-           'search_players']
+           'search_players',
+           -- M4e RPCs
+           'set_founder_payout']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')

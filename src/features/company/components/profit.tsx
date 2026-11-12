@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/card";
 import { HoldButton } from "@/components/ui/hold-button";
 import { ShortMoney } from "@/components/ui/live-money";
 import { Segmented } from "@/components/ui/segmented";
+import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/toast";
 import { BALANCE } from "@/config/balance";
@@ -324,6 +325,70 @@ export function ExpansionCard({ company }: { company: MyCompany }) {
       {!affordable && (
         <p className="text-xs text-fg-3">{t("needCash", { amount: formatMoney(cost - freeCash, { whole: true }) })}</p>
       )}
+    </Card>
+  );
+}
+
+/** Automatic CEO payout (ADR-086): a share of every profitable hour goes to the founder's private account. */
+export function PayoutCard({ company }: { company: MyCompany }) {
+  const t = useTranslations("firm.payout");
+  const act = useCompanyAction();
+  const { stepBps, maxBps } = cfg.founderPayout;
+  const [bps, setBps] = useState(company.founderPayoutBps);
+  const [state, setState] = useState<ButtonState>("idle");
+  const percent = Math.round(bps / 100);
+  const live = company.live;
+
+  const save = async () => {
+    setState("loading");
+    const ok = await act(() => engine.setFounderPayout(crypto.randomUUID(), bps), t("saved"), t("title"));
+    setState(ok ? "success" : "idle");
+    if (ok) window.setTimeout(() => setState("idle"), 800);
+  };
+
+  return (
+    <Card padding="lg" className="space-y-4" data-testid="payout">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="label-pixel text-fg-2">{t("title")}</p>
+        <span
+          className={cn("nums text-lg font-semibold", bps > 0 ? "text-gain" : "text-fg-3")}
+          data-testid="payout-percent"
+        >
+          {t("percent", { percent })}
+        </span>
+      </div>
+      <p className="text-sm text-pretty text-fg-2">{t("intro")}</p>
+      <Slider
+        value={bps / maxBps}
+        onValueChange={(v) => setBps(Math.round((v * maxBps) / stepBps) * stepBps)}
+        label={t("title")}
+        marks={[0.25, 0.5, 0.75]}
+        valueText={t("percent", { percent })}
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-md bg-surface-2 px-3 py-2">
+          <p className="text-2xs text-fg-3">{t("lastHour")}</p>
+          <p className="nums font-semibold text-fg-1">
+            {formatMoney(live?.founderPayoutPerHourCents ?? 0, { whole: true })}
+          </p>
+        </div>
+        <div className="rounded-md bg-surface-2 px-3 py-2">
+          <p className="text-2xs text-fg-3">{t("today")}</p>
+          <p className="nums font-semibold text-gain">
+            {formatMoney(live?.todayFounderPayoutCents ?? 0, { whole: true })}
+          </p>
+        </div>
+      </div>
+      <p className="text-xs text-pretty text-fg-3">{t("hint")}</p>
+      <Button
+        block
+        variant="secondary"
+        state={state}
+        disabled={bps === company.founderPayoutBps}
+        onClick={() => void save()}
+      >
+        {t("save")}
+      </Button>
     </Card>
   );
 }

@@ -474,6 +474,9 @@ select tests.login_as('authenticated', :fx_g) is null as ok \gset
 select public.found_company(gen_random_uuid(), 'Fixture Werke', 'Maschinen nach Maß', 'tech', '#336699', 'gmbh');
 \o :fixture_dir/set_company_strategy.json
 select public.set_company_strategy(gen_random_uuid(), 'premium', true);
+-- M4e: automatic CEO payout (ADR-086); the expanded company below closes an hour with it
+\o :fixture_dir/set_founder_payout.json
+select public.set_founder_payout(gen_random_uuid(), 2500);
 \o
 select public.company_deposit(gen_random_uuid(), 10000000) is not null as ok \gset
 \o :fixture_dir/expand_company.json
