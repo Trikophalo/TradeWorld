@@ -5349,3 +5349,61 @@ Interne Helfer (nur `service_role`): `friends_json`, `friend_target`, `friend_no
 `company_can_expand`, `company_expansion_cost_cents`, `company_price_effect`.
 
 Keine neuen Fehlerschlüssel.
+
+## Nachtrag: M4d (Spieler-Tag, Namen ohne Doppelgänger, Spielersuche)
+
+Migration `20261125000100_m4d_player_tags.sql` (ADR-085), idempotente Kopie in `supabase/updates/`.
+
+### Spieler-Tag
+
+`profiles.tag text not null`, eindeutig (`profiles_tag_uq`), Check `^[A-HJ-NP-Z2-9]{4}$`: vier Zeichen aus
+`ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (ohne 0/O/1/I), angezeigt als `#K7Q2`. Vergeben über den Spalten-Default
+`public.new_player_tag()` (Zufall, bis zu 100 Versuche gegen vorhandene Tags) bei jedem Insert, also auch bei der
+Registrierung; bestehende Spieler bekommen ihn beim Einspielen der Migration. Der Tag ändert sich nie: nicht beim
+Namenswechsel, nicht bei `reset_account`; erst `delete_account` gibt ihn mit dem Profil frei.
+
+### Namen ohne Doppelgänger
+
+Namensschlüssel `public.name_key(nick)` = `replace(name_normalize(nick, true), '_', '')`: klein, Umlaute und Akzente
+gefaltet, Leet-Ziffern zu Buchstaben (`0 1 3 4 5 7 8` → `o i e a s t b`), Unterstriche entfernt. Wiederholte
+Buchstaben werden **nicht** zusammengezogen („Matthias“ und „Mathias“ bleiben verschieden, „Mira2“ ist erlaubt, weil
+`2` nicht abgebildet wird).
+
+- `name_violation(…, 'player', …)` meldet `name_taken` auch, wenn ein anderes Profil denselben Schlüssel hat
+  (`M1ra`, `Mi_ra`, `MIRA` neben `Mira`). Gilt für `check_nickname`, `change_nickname` und die Registrierung.
+- Die Registrierung hängt wie bisher eine fünfstellige Zahl an, solange Name **oder** Schlüssel vergeben sind.
+- Bestehende Doppelgänger bleiben; es gibt nur einen nicht eindeutigen Index `profiles_name_key_idx` auf
+  `name_key(nickname)`. Wer `name_normalize` oder `name_key` ändert, muss diesen Index neu aufbauen.
+
+### Suche nach Nickname oder Tag
+
+Interner Helfer `player_by_handle(text)`: aktiver Spieler per Nickname (ohne Groß-/Kleinschreibung), sonst per Tag
+(`#K7Q2` oder `k7q2`). Den nutzen:
+
+- `get_player_card(p_nickname)`: nimmt auch einen Tag (`/players/%23K7Q2`). Neues Feld `tag`.
+- `send_friend_request`, `respond_friend_request`, `remove_friend`: `p_nickname` darf auch ein Tag sein.
+
+### Neue Felder
+
+| RPC                        | Feld  | Typ             | Bedeutung                               |
+| -------------------------- | ----- | --------------- | --------------------------------------- |
+| `get_player_card`          | `tag` | `string`        | Tag ohne `#`                            |
+| `get_my_portfolio`         | `tag` | `string`        | eigener Tag                             |
+| FRIENDS (alle drei Listen) | `tag` | `string`        | Tag des anderen Spielers                |
+| `get_rich_list` `entries`  | `tag` | `string / null` | Tag bei Spielern, `null` bei KI-Tycoons |
+
+### `search_players(p_query)`
+
+Nur `authenticated`, `STABLE`, `SECURITY DEFINER`, `search_path = ''`. Antwort:
+
+```json
+{ "players": [{ "nickname": "Mira", "tag": "K7Q2", "level": 12, "avatar_key": "rookie" }] }
+```
+
+- Anfrage getrimmt, ein führendes `#` entfällt; weniger als 2 oder mehr als 64 Zeichen: leere Liste.
+- Reihenfolge: zuerst der Spieler mit genau diesem Tag, dann Nickname exakt, dann Präfix, dann „enthält“ (jeweils ohne
+  Groß-/Kleinschreibung), innerhalb jeder Gruppe nach Level absteigend, dann Nickname. Höchstens 8 Einträge.
+- `%`, `_` und `\` aus der Eingabe gelten wörtlich (escaped), nicht als Platzhalter.
+- Deaktivierte Spieler fehlen (wie bei `get_friends`), gelöschte gibt es nicht mehr. Keine Ratenbegrenzung (Lese-RPC).
+
+Interne Helfer (nur `service_role`): `new_player_tag`, `name_key`, `player_by_handle`. Keine neuen Fehlerschlüssel.

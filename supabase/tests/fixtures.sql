@@ -1,5 +1,5 @@
 -- =============================================================================
--- Dumps one real response of every read/write RPC (M1 to M4b) as JSON files, so the
+-- Dumps one real response of every read/write RPC (M1 to M4d) as JSON files, so the
 -- frontend's Zod schemas can be tested against the database (contract test:
 -- src/features/game/api.test.ts). Run by verify_local.sh when
 -- NEXA_FIXTURE_DIR is set. Not an assertion file.
@@ -505,5 +505,17 @@ select tests.login_as('authenticated', :fx_g) is null as ok \gset
 select public.get_friends();
 \o :fixture_dir/remove_friend.json
 select public.remove_friend(gen_random_uuid(), 'Fixture_Heim');
+\o
+reset role;
+
+-- M4d: player search by nickname and by tag (ADR-085)
+select tag as fx_heim_tag from public.profiles where nickname = 'Fixture_Heim' \gset
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/search_players.json
+select public.search_players('fixture');
+\o :fixture_dir/search_players_tag.json
+select public.search_players('#' || :'fx_heim_tag');
+\o :fixture_dir/search_players_empty.json
+select public.search_players('x');
 \o
 reset role;

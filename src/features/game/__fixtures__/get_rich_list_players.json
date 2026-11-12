@@ -1,9 +1,10 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 33, "gap_cents": 643 }, "rank": 34, "net_worth_cents": 1019357 },
-  "total": 96,
+  "me": { "next": { "name": "Vera", "rank": 33, "gap_cents": 644 }, "rank": 34, "net_worth_cents": 1019356 },
+  "total": 112,
   "entries": [
     {
       "id": "0f3f3f3f-0000-4000-8000-0000000000f1",
+      "tag": "8Y9T",
       "kind": "player",
       "name": "Fenja_Firma",
       "rank": 1,
@@ -11,11 +12,12 @@
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 102718991,
+      "net_worth_cents": 102760991,
       "rank_change_24h": null
     },
     {
       "id": "07170717-0000-4000-8000-0000000000a1",
+      "tag": "5XYE",
       "kind": "player",
       "name": "Hanna_Haus",
       "rank": 2,
@@ -28,6 +30,7 @@
     },
     {
       "id": "0e3e3e3e-0000-4000-8000-0000000000f1",
+      "tag": "YMLG",
       "kind": "player",
       "name": "Frieda_Format",
       "rank": 3,
@@ -40,6 +43,7 @@
     },
     {
       "id": "07170717-0000-4000-8000-0000000000b2",
+      "tag": "T59T",
       "kind": "player",
       "name": "Moritz_Moebel",
       "rank": 4,
@@ -52,6 +56,7 @@
     },
     {
       "id": "06860686-0000-4000-8000-0000000000a1",
+      "tag": "KDZR",
       "kind": "player",
       "name": "Hanna_Stunde",
       "rank": 5,
@@ -59,9 +64,9 @@
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 10678071,
+      "net_worth_cents": 10677957,
       "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-12T22:24:29.825404+00:00"
+  "server_time": "2026-11-12T22:57:41.605801+00:00"
 }

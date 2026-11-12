@@ -32,11 +32,7 @@ describe("RPC contract", () => {
       "get_offers",
       "subscribe_offer",
     ];
-    // M4d (ADR-085) is written in parallel with the database (TODO: remove once search_players.json exists).
-    const pending = [
-      ...(fixtures.some((file) => file.startsWith("search_players")) ? [] : ["search_players"]),
-      ...(fixtures.some((file) => file.startsWith("get_offers")) ? [] : m3f),
-    ];
+    const pending = [...(fixtures.some((file) => file.startsWith("get_offers")) ? [] : m3f)];
     for (const name of Object.keys(RPC_SCHEMAS).filter((key) => !pending.includes(key))) {
       expect(
         fixtures.some((file) => file.startsWith(name)),

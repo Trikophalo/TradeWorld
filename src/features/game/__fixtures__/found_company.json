@@ -1,6 +1,6 @@
 {
   "company": {
-    "id": "3603df43-d152-4e63-832b-07e129564ef2",
+    "id": "c2f15610-5ee6-46ea-a194-3eb8ac929f1a",
     "idea": "Werkzeuge für Bastler",
     "live": {
       "last_hour_at": "2026-11-12T22:00:00+00:00",
@@ -65,7 +65,7 @@
     "ai_workers": 0,
     "can_expand": false,
     "cash_cents": 250000,
-    "founded_at": "2026-11-12T22:24:30.03727+00:00",
+    "founded_at": "2026-11-12T22:57:41.824621+00:00",
     "can_upgrade": false,
     "logo_hidden": false,
     "price_level": "normal",
@@ -91,9 +91,9 @@
     "quarters_active": 0,
     "ai_worker_skills": [],
     "distress_quarters": 0,
-    "estimate_low_cents": 31143,
+    "estimate_low_cents": 44232,
     "upgrade_cost_cents": 1250000,
-    "estimate_high_cents": 1028223,
+    "estimate_high_cents": 1104835,
     "ai_worker_cost_cents": 72000,
     "can_capital_increase": false,
     "expansion_cost_cents": null,

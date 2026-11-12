@@ -1,56 +1,56 @@
 {
   "applications": [
     {
-      "id": "140f4366-e014-42bd-bdc5-1fd611e0416f",
+      "id": "8b40f218-d3e9-452b-b7a1-2641c26d25a4",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "20ebd9cf-18f4-4580-8df1-0d6bb17e39ff",
+        "id": "140af0e8-e2d2-4baa-a535-579ee4c63112",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "e50a6ff5-8dbd-8c90-f94e-5ac06d3fe862",
+          "id": "2faf9e4c-3f0a-8a5b-1645-c669e9481771",
           "logo": null,
-          "name": "Volta Energie AG",
-          "color": "#FFD23F",
+          "name": "NeuroPharm AG",
+          "color": "#6EE7A0",
           "is_ai": true,
-          "sector": "energy",
-          "ticker": "VLT"
+          "sector": "pharma",
+          "ticker": "NPH"
         },
         "required": [{ "branch": "law", "min_score": 0 }],
         "title_key": "law_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-12T22:24:29.939052+00:00",
-      "updated_at": "2026-11-12T22:24:29.942422+00:00",
-      "offer_expires_at": "2026-11-14T22:24:29.939052+00:00",
+      "created_at": "2026-11-12T22:57:41.724317+00:00",
+      "updated_at": "2026-11-12T22:57:41.727982+00:00",
+      "offer_expires_at": "2026-11-14T22:57:41.724317+00:00",
       "salary_wish_cents_per_hour": 15000,
       "offer_salary_cents_per_hour": 15000
     },
     {
-      "id": "c937cb6c-9dd2-4fe0-975f-fc8badbcb359",
+      "id": "eecc7f88-4dff-4e17-ad8b-f8fef3f5f43f",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "1dbf14fb-5793-4d7f-b8f3-dbc3f8c18c55",
+        "id": "ab425ce6-e7eb-4605-a8ae-7e4122888421",
         "tier": "junior",
         "title": null,
         "company": {
-          "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
+          "id": "dc6cd683-c473-c0eb-8d8c-04ddf664b4d5",
           "logo": null,
-          "name": "KlarSoft AG",
-          "color": "#4C8DFF",
+          "name": "Eilbote Express",
+          "color": "#F7768E",
           "is_ai": true,
-          "sector": "tech",
-          "ticker": "KLS"
+          "sector": "logistics",
+          "ticker": "EBX"
         },
         "required": [{ "branch": "it", "min_score": 2 }],
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-12T22:24:29.934221+00:00",
-      "updated_at": "2026-11-12T22:24:29.934221+00:00",
-      "offer_expires_at": "2026-11-14T22:24:29.934221+00:00",
+      "created_at": "2026-11-12T22:57:41.719324+00:00",
+      "updated_at": "2026-11-12T22:57:41.719324+00:00",
+      "offer_expires_at": "2026-11-14T22:57:41.719324+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

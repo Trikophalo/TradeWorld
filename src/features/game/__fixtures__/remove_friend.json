@@ -1,5 +1,5 @@
 {
-  "friends": [{ "level": 8, "since": "2026-11-12T22:24:31.297062+00:00", "nickname": "Fixture_Kunst" }],
-  "incoming": [{ "at": "2026-11-12T22:24:31.299303+00:00", "level": 15, "nickname": "Fixture_Neu" }],
+  "friends": [{ "tag": "N7FE", "level": 8, "since": "2026-11-12T22:57:43.049472+00:00", "nickname": "Fixture_Kunst" }],
+  "incoming": [{ "at": "2026-11-12T22:57:43.051883+00:00", "tag": "2Z7Q", "level": 15, "nickname": "Fixture_Neu" }],
   "outgoing": []
 }
