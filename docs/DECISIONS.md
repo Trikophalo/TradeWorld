@@ -925,3 +925,28 @@ Vorgabe: Freunde hinzufügen und über sie ihre Profile sehen. Mitarbeiter in de
   Profil.
 - **Server:** RPCs `get_friends`, `send_friend_request`, `respond_friend_request`, `remove_friend` auf der
   bestehenden Tabelle `friendships`.
+
+## ADR-085: Spieler-Tag, Namen ohne Doppelgänger, Spielersuche — `akzeptiert`
+
+Vorgabe: Spielernamen sollen einzigartig sein. Jeder Spieler hat einen kleinen Tag, über den man ihn oben in der
+Suche findet.
+
+- **Namen:**
+  - Groß- und Kleinschreibung zählten schon vorher nicht ("Mira" = "mira").
+  - Neu: Auch Doppelgänger sind gesperrt. Ziffern als Buchstaben, Umlaute und Unterstriche zählen nicht. "M1ra" und
+    "Mi_ra" sind also vergeben, wenn es "Mira" gibt.
+  - Verschiedene Namen bleiben verschieden: "Mira2" ist frei, "Matthias" und "Mathias" sind zwei Namen.
+  - Das gilt für neue Namen und Umbenennungen. Bestehende Namen bleiben, wie sie sind.
+  - Regel: `nameKey` in `src/lib/player-tag.ts`, auf dem Server `name_violation`.
+- **Tag:**
+  - Jeder Spieler bekommt einmal einen Tag aus vier Zeichen, z. B. `#K7Q2`. Er bleibt auch nach einer Umbenennung
+    gleich.
+  - Die Zeichen sind ohne 0/O und 1/I, damit man ihn vorlesen und abtippen kann.
+  - Der Tag steht auf der Visitenkarte, in der Freundesliste, in der Suche und auf dem eigenen Profil (zum
+    Kopieren).
+- **Suche oben:**
+  - Findet Aktien und Spieler in einer Liste.
+  - Spieler ab zwei Zeichen: über den Namen (genaue Treffer zuerst, dann Anfang, dann Teil) oder direkt über den
+    Tag, mit oder ohne `#`.
+  - Höchstens acht Spieler pro Suche.
+- **Freunde:** Eine Anfrage geht auch per Tag.

@@ -18,6 +18,7 @@ import { createCareerEngine, initialCareer, tycoonAvatar, type CareerState } fro
 import { createArtEngine, type ArtState } from "./demo/artworks";
 import { createPropertyEngine, type HomeState } from "./demo/property";
 import { createFriendEngine } from "./demo/friends";
+import { tagFromUniform } from "@/lib/player-tag";
 import { createCompanyEngine, type DemoCompanyState, type DemoDissolution } from "./demo/company";
 import { demoTycoons } from "./demo/tycoons";
 import {
@@ -78,6 +79,8 @@ interface PlayerMission {
 
 interface PlayerState {
   nickname: string;
+  /** Permanent player tag (ADR-085); drawn once for older demo players. */
+  tag?: string;
   nicknameChangedAt: number | null;
   cashCents: number;
   reservedCents: number;
@@ -928,6 +931,7 @@ function doCheckIn() {
 const career = createCareerEngine({
   state: () => (p().career ??= initialCareer()),
   nickname: () => p().nickname,
+  tag: () => myTag(),
   level,
   addXp,
   xpTotal: () => p().xpTotal,
@@ -1005,7 +1009,23 @@ const art = createArtEngine({
   track: (metric) => bump(metric),
 });
 
-const friends = createFriendEngine({ nickname: () => p().nickname, idempotent });
+/** The demo player's tag, drawn once (ADR-085). */
+function myTag(): string {
+  const pl = p();
+  if (!pl.tag) {
+    pl.tag = tagFromUniform([Math.random(), Math.random(), Math.random(), Math.random()]);
+    persist();
+  }
+  return pl.tag;
+}
+
+const friends = createFriendEngine({
+  nickname: () => p().nickname,
+  tag: myTag,
+  level,
+  avatarKey: () => career.avatarKey(),
+  idempotent,
+});
 
 const home = createPropertyEngine({
   home: () => p().home,

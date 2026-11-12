@@ -11,12 +11,15 @@ import { Button, type ButtonState } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/input";
+import { PlayerTag } from "@/components/ui/player-tag";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
+import { usePlayerCard } from "@/features/career/hooks";
 import { useGameErrorText } from "@/features/game/errors";
 import { engine, useGame } from "@/features/game/store";
 import type { FriendEntry, Friends } from "@/features/game/types";
 import { haptic } from "@/lib/haptics";
+import { parseTag } from "@/lib/player-tag";
 import { playSound } from "@/lib/sound";
 import { friendStatus, useFriends, useSetFriends } from "../hooks";
 
@@ -115,6 +118,7 @@ export function FriendButton({ nickname }: { nickname: string }) {
 export function FriendsView() {
   const t = useTranslations("friends");
   const me = useGame((state) => state.portfolio?.nickname ?? "");
+  const myTag = usePlayerCard(me).data?.tag ?? null;
   const friends = useFriends();
   const act = useFriendAction();
   const [name, setName] = useState("");
@@ -124,7 +128,7 @@ export function FriendsView() {
     event.preventDefault();
     const value = name.trim();
     if (value.length < 3) return;
-    if (value.toLowerCase() === me.toLowerCase()) {
+    if (value.toLowerCase() === me.toLowerCase() || (myTag !== null && parseTag(value) === myTag)) {
       toast.error(t("title"), t("notYourself"));
       return;
     }
@@ -227,7 +231,10 @@ function PersonRow({ entry, hint, children }: { entry: FriendEntry; hint: string
           {entry.nickname.slice(0, 2).toUpperCase()}
         </span>
         <span className="min-w-0">
-          <span className="block truncate font-medium text-fg-1 group-hover:underline">{entry.nickname}</span>
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="truncate font-medium text-fg-1 group-hover:underline">{entry.nickname}</span>
+            <PlayerTag tag={entry.tag} />
+          </span>
           <span className="block text-xs text-fg-3">
             Level {entry.level} · {hint}
           </span>

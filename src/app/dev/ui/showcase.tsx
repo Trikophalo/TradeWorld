@@ -1,5 +1,6 @@
 "use client";
 
+import { PlayerTag } from "@/components/ui/player-tag";
 import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -49,6 +50,7 @@ const COLOR_GROUPS = [
 
 const SAMPLE_CARD: PlayerCard = {
   nickname: "Boersenfuchs_7",
+  tag: "K7Q2",
   avatarKey: "analyst",
   level: 23,
   rank: 42,
@@ -196,6 +198,8 @@ export function Showcase() {
             <Badge tone="loss">Margin Call</Badge>
             <Badge tone="warn">Sperrfrist</Badge>
             <Badge tone="info">IPO</Badge>
+            <PlayerTag tag="K7Q2" />
+            <PlayerTag tag="M4XA" copy />
           </div>
         </Card>
       </Section>

@@ -112,6 +112,8 @@ export function initialCareer(): CareerState {
 export interface CareerHost {
   state(): CareerState;
   nickname(): string;
+  /** Permanent player tag (ADR-085). */
+  tag(): string;
   level(): number;
   /** Adds XP (multiplier applied) and returns the amount. */
   addXp(base: number): number;
@@ -719,6 +721,7 @@ export function createCareerEngine(host: CareerHost) {
       const job = myJobNow();
       return {
         nickname: host.nickname(),
+        tag: host.tag(),
         avatarKey: s.avatarKey,
         level: host.level(),
         rank: host.rank(),

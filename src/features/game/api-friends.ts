@@ -7,6 +7,7 @@ import { rpc } from "./rpc";
  */
 const entry = z.object({
   nickname: z.string(),
+  tag: z.string().nullable().default(null),
   level: z.number(),
   since: z.string().optional(),
   at: z.string().optional(),
@@ -17,14 +18,31 @@ const friendsSchema = z.object({
   outgoing: z.array(entry),
 });
 
+const searchSchema = z.object({
+  players: z.array(
+    z.object({
+      nickname: z.string(),
+      tag: z.string().nullable().default(null),
+      level: z.number(),
+      avatar_key: z.string(),
+    }),
+  ),
+});
+
 export const FRIEND_RPC_SCHEMAS = {
+  search_players: searchSchema,
   get_friends: friendsSchema,
   send_friend_request: friendsSchema,
   respond_friend_request: friendsSchema,
   remove_friend: friendsSchema,
 } as const;
 
-const toEntry = (e: z.infer<typeof entry>) => ({ nickname: e.nickname, level: e.level, at: e.since ?? e.at ?? "" });
+const toEntry = (e: z.infer<typeof entry>) => ({
+  nickname: e.nickname,
+  tag: e.tag,
+  level: e.level,
+  at: e.since ?? e.at ?? "",
+});
 const toFriends = (r: z.infer<typeof friendsSchema>): Friends => ({
   friends: r.friends.map(toEntry),
   incoming: r.incoming.map(toEntry),
@@ -33,8 +51,13 @@ const toFriends = (r: z.infer<typeof friendsSchema>): Friends => ({
 
 export const liveFriendEngine: Pick<
   GameEngine,
-  "friends" | "sendFriendRequest" | "respondFriendRequest" | "removeFriend"
+  "friends" | "sendFriendRequest" | "respondFriendRequest" | "removeFriend" | "searchPlayers"
 > = {
+  async searchPlayers(query) {
+    if (query.trim().length < 2) return [];
+    const r = await rpc("search_players", { p_query: query.trim() }, searchSchema);
+    return r.players.map((p) => ({ nickname: p.nickname, tag: p.tag, level: p.level, avatarKey: p.avatar_key }));
+  },
   async friends() {
     return toFriends(await rpc("get_friends", {}, friendsSchema));
   },

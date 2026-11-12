@@ -1,5 +1,6 @@
 "use client";
 
+import { PlayerTag } from "@/components/ui/player-tag";
 import {
   motion,
   useMotionTemplate,
@@ -83,7 +84,10 @@ export function BusinessCard({ card, className }: { card: PlayerCard; className?
           <Avatar avatarKey={card.avatarKey} size="lg" className="shadow-2" />
           <div className="min-w-0 flex-1 pt-1">
             <p className="label-pixel text-accent">{t("title")}</p>
-            <p className="mt-1 truncate text-2xl font-semibold text-fg-1">{card.nickname}</p>
+            <p className="mt-1 flex min-w-0 items-center gap-2">
+              <span className="truncate text-2xl font-semibold text-fg-1">{card.nickname}</span>
+              <PlayerTag tag={card.tag} copy />
+            </p>
             <p className="mt-0.5 text-sm text-fg-2">
               {t("level", { level: card.level })} · {tt(title.key)} {romanTier(title.tier)}
             </p>

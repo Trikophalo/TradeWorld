@@ -7,6 +7,7 @@ import { Page, PageHeader } from "@/components/layout/page";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Reveal } from "@/features/progression/components/reveal";
+import { MyTagCard } from "@/features/friends/components/my-tag";
 import { LevelCard } from "@/features/progression/components/level-card";
 import { UnlockList } from "@/features/progression/components/unlock-list";
 import { AccountReset } from "@/features/settings/components/account-reset";
@@ -25,6 +26,7 @@ export default async function ProfilePage() {
       <div className="grid gap-5 *:min-w-0 lg:grid-cols-2 lg:gap-6">
         <div className="space-y-5 lg:space-y-6">
           <LevelCard />
+          <MyTagCard />
           <Reveal feature="profileCareer">
             <Card padding="lg">
               <CardHeader>

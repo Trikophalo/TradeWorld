@@ -49,10 +49,12 @@
   },
   "search": {
     "title": "Suche",
-    "placeholder": "Name oder Kürzel",
+    "placeholder": "Aktie, Kürzel, Spieler oder #Tag",
     "empty": "Nichts gefunden",
-    "emptyHint": "Prüfe die Schreibweise oder suche nach dem Kürzel, zum Beispiel VLT.",
-    "hint": "Spieler und Firmenprofile folgen in einem späteren Meilenstein."
+    "emptyHint": "Prüfe die Schreibweise. Aktien findest du über das Kürzel (zum Beispiel VLT), Spieler über den Namen oder ihren Tag (zum Beispiel #K7Q2).",
+    "hint": "Spieler findest du ab zwei Zeichen, mit # direkt über ihren Tag.",
+    "players": "Spieler",
+    "level": "Lvl {level}"
   },
   "sectors": {
     "all": "Alle",
@@ -2592,10 +2594,18 @@
     "wantsToBeFriends": "möchte dein Freund sein",
     "outgoingTitle": "Deine offenen Anfragen",
     "addTitle": "Freund hinzufügen",
-    "nameLabel": "Spielername",
+    "nameLabel": "Spielername oder #Tag",
     "send": "Anfrage schicken",
-    "addHint": "Sobald die Person annimmt, steht sie in deiner Liste.",
+    "addHint": "Du kannst auch den Tag eingeben, z. B. #K7Q2. Sobald die Person annimmt, steht sie in deiner Liste.",
     "openProfile": "Profil von {name} öffnen",
     "notYourself": "Das bist du selbst. Such dir jemand anderen aus."
+  },
+  "playerTag": {
+    "title": "Spieler-Tag: damit findet man dich in der Suche",
+    "copy": "Tag kopieren",
+    "copyLabel": "Spieler-Tag {tag} kopieren",
+    "copied": "Kopiert!",
+    "mine": "Dein Name und Tag",
+    "mineHint": "Mit deinem Tag finden dich andere oben in der Suche und können dich als Freund hinzufügen. Er bleibt auch, wenn du deinen Namen änderst."
   }
 }

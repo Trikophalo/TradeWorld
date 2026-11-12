@@ -3,10 +3,15 @@
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Dialog } from "radix-ui";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
+import { Avatar } from "@/components/ui/avatar";
+import { PlayerTag } from "@/components/ui/player-tag";
+import { Skeleton } from "@/components/ui/skeleton";
 import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
-import { useGame } from "@/features/game/store";
+import { engine, useGame } from "@/features/game/store";
+import type { PlayerSearchResult } from "@/features/game/types";
 import { brandColor } from "../brand";
 import { cn } from "@/lib/utils";
 import { isTutorialActive } from "@/features/tutorial/store";
@@ -20,7 +25,21 @@ function isTyping(target: EventTarget | null): boolean {
   );
 }
 
-/** Global search. Opens with "/" or from the top bar; arrow keys and Enter work. */
+type Hit =
+  | { kind: "stock"; id: string; ticker: string; name: string }
+  | { kind: "player"; id: string; player: PlayerSearchResult };
+
+/** The query after a short pause, so the player search does not run on every key. */
+function useDebounced(value: string, ms: number) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), ms);
+    return () => window.clearTimeout(timer);
+  }, [value, ms]);
+  return debounced;
+}
+
+/** Global search: stocks and players by name or #tag (ADR-085). Opens with "/" or from the top bar. */
 export function SearchDialog() {
   const t = useTranslations();
   const router = useRouter();
@@ -41,16 +60,39 @@ export function SearchDialog() {
   }, [setOpen]);
 
   const securities = useGame((state) => state.snapshot?.securities);
-  const results = useMemo(() => {
+  const playerQuery = useDebounced(query.trim(), 250);
+  const players = useQuery({
+    queryKey: ["search-players", playerQuery],
+    queryFn: () => engine.searchPlayers(playerQuery),
+    enabled: open && playerQuery.length >= 2,
+    staleTime: 30_000,
+  });
+  const stocks = useMemo(() => {
     const all = securities ?? [];
     const needle = query.trim().toLowerCase();
+    if (needle.startsWith("#")) return [];
     if (!needle) return all.filter((s) => s.kind === "stock").slice(0, 6);
     return all.filter((c) => c.name.toLowerCase().includes(needle) || c.ticker.toLowerCase().includes(needle));
   }, [query, securities]);
+  const results = useMemo<Hit[]>(
+    () => [
+      ...stocks.map((s): Hit => ({ kind: "stock", id: `stock-${s.ticker}`, ticker: s.ticker, name: s.name })),
+      ...(playerQuery.length >= 2 && playerQuery === query.trim() ? (players.data ?? []) : []).map((p): Hit => ({
+        kind: "player",
+        id: `player-${p.nickname}`,
+        player: p,
+      })),
+    ],
+    [stocks, players.data, playerQuery, query],
+  );
+  const firstPlayer = results.findIndex((r) => r.kind === "player");
+  const searchingPlayers = query.trim().length >= 2 && (players.isFetching || playerQuery !== query.trim());
 
-  const go = (ticker: string) => {
+  const go = (hit: Hit) => {
     setOpen(false);
-    router.push(`/markets/${ticker}`);
+    router.push(
+      hit.kind === "stock" ? `/markets/${hit.ticker}` : `/players/${encodeURIComponent(hit.player.nickname)}`,
+    );
   };
 
   return (
@@ -88,7 +130,7 @@ export function SearchDialog() {
                   event.preventDefault();
                   setCursor((c) => Math.max(0, c - 1));
                 } else if (event.key === "Enter" && results[cursor]) {
-                  go(results[cursor].ticker);
+                  go(results[cursor]);
                 }
               }}
               placeholder={t("search.placeholder")}
@@ -96,34 +138,56 @@ export function SearchDialog() {
               role="combobox"
               aria-expanded
               aria-controls="search-results"
-              aria-activedescendant={results[cursor] ? `search-${results[cursor].ticker}` : undefined}
+              aria-activedescendant={results[cursor] ? `search-${results[cursor].id}` : undefined}
               className="h-full flex-1 bg-transparent text-base text-fg-1 outline-none placeholder:text-fg-3"
             />
             <kbd className="hidden rounded-xs bg-surface-3 px-1.5 py-0.5 label-pixel text-fg-2 sm:block">Esc</kbd>
           </div>
 
-          {results.length === 0 ? (
+          {results.length === 0 && searchingPlayers ? (
+            <div className="space-y-2 p-4" aria-busy="true">
+              <Skeleton className="h-10 w-full rounded-md" />
+              <Skeleton className="h-10 w-full rounded-md" />
+            </div>
+          ) : results.length === 0 ? (
             <div className="px-6 py-10 text-center">
               <p className="font-pixel text-sm text-fg-1 uppercase">{t("search.empty")}</p>
               <p className="mt-2 text-sm text-fg-2">{t("search.emptyHint")}</p>
             </div>
           ) : (
             <ul id="search-results" role="listbox" className="max-h-[50dvh] overflow-y-auto p-2">
-              {results.map((company, index) => (
-                <li key={company.ticker} id={`search-${company.ticker}`} role="option" aria-selected={index === cursor}>
+              {results.map((hit, index) => (
+                <li key={hit.id} id={`search-${hit.id}`} role="option" aria-selected={index === cursor}>
+                  {index === firstPlayer && (
+                    <p className="px-3 pt-3 pb-1 label-pixel text-fg-3" role="presentation">
+                      {t("search.players")}
+                    </p>
+                  )}
                   <button
                     type="button"
                     tabIndex={-1}
-                    onClick={() => go(company.ticker)}
+                    onClick={() => go(hit)}
                     onPointerMove={() => setCursor(index)}
                     className={cn(
                       "flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors duration-fast",
                       index === cursor && "bg-surface-3",
                     )}
+                    data-testid={hit.kind === "player" ? "search-player" : undefined}
                   >
-                    <CompanyLogo ticker={company.ticker} color={brandColor(company.ticker)} />
-                    <span className="min-w-0 flex-1 truncate font-medium text-fg-1">{company.name}</span>
-                    <span className="label-pixel text-fg-3">{company.ticker}</span>
+                    {hit.kind === "stock" ? (
+                      <>
+                        <CompanyLogo ticker={hit.ticker} color={brandColor(hit.ticker)} />
+                        <span className="min-w-0 flex-1 truncate font-medium text-fg-1">{hit.name}</span>
+                        <span className="label-pixel text-fg-3">{hit.ticker}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Avatar avatarKey={hit.player.avatarKey} size="xs" />
+                        <span className="min-w-0 flex-1 truncate font-medium text-fg-1">{hit.player.nickname}</span>
+                        <PlayerTag tag={hit.player.tag} />
+                        <span className="nums text-xs text-fg-3">{t("search.level", { level: hit.player.level })}</span>
+                      </>
+                    )}
                   </button>
                 </li>
               ))}

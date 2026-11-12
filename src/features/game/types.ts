@@ -562,6 +562,8 @@ export interface EmployerView {
 
 export interface PlayerCard {
   nickname: string;
+  /** Permanent player tag without "#" (ADR-085); null until the server knows it. */
+  tag: string | null;
   avatarKey: string;
   level: number;
   rank: number | null;
@@ -583,10 +585,19 @@ export type PriceLevel = "budget" | "normal" | "premium";
 /** Friends (ADR-084). */
 export interface FriendEntry {
   nickname: string;
+  tag: string | null;
   level: number;
   /** Friends since / request sent at. */
   at: string;
 }
+/** A hit of the player search in the top bar (ADR-085). */
+export interface PlayerSearchResult {
+  nickname: string;
+  tag: string | null;
+  level: number;
+  avatarKey: string;
+}
+
 export interface Friends {
   friends: FriendEntry[];
   incoming: FriendEntry[];
@@ -1075,6 +1086,8 @@ export interface GameEngine {
   sendFriendRequest(requestId: string, nickname: string): Promise<Friends>;
   respondFriendRequest(requestId: string, nickname: string, accept: boolean): Promise<Friends>;
   removeFriend(requestId: string, nickname: string): Promise<Friends>;
+  /** Players by name or tag (ADR-085), at most 8. */
+  searchPlayers(query: string): Promise<PlayerSearchResult[]>;
   companyPostings(): Promise<CompanyPosting[]>;
   createJobPosting(input: CreatePostingInput): Promise<void>;
   closeJobPosting(requestId: string, postingId: string): Promise<void>;
