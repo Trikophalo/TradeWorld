@@ -18,6 +18,7 @@ import { isDemoMode } from "@/lib/supabase/env";
 import { playSound } from "@/lib/sound";
 import { useClock } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
+import { edgeStripes } from "../banner-fill";
 import { useCompanyRefresh } from "../hooks";
 import { useProductText } from "../product-name";
 
@@ -278,8 +279,9 @@ function QuarterClock({ company }: { company: MyCompany }) {
 }
 
 /**
- * The banner (ADR-078), scaled by whole pixels to fill the width; the free space on the sides takes the banner's
- * first colour. Without a banner: the company colour and an invitation to draw one.
+ * The banner (ADR-078), scaled by whole pixels; the box is exactly as high as the banner, and the space on the sides
+ * continues the banner's left and right edge row by row, so the whole strip shows the banner. Without a banner: the
+ * company colour and an invitation to draw one.
  */
 function Banner({ company, onEdit }: { company: MyCompany; onEdit: () => void }) {
   const t = useTranslations("banner");
@@ -293,21 +295,36 @@ function Banner({ company, onEdit }: { company: MyCompany; onEdit: () => void })
     return () => observer.disconnect();
   }, []);
   const banner = company.banner;
-  // Whole pixels only; at most 8× so the banner stays a strip, the sides take its first colour.
-  const scale = banner ? Math.min(8, Math.max(1, Math.floor(width / (banner.grid[0]?.length ?? 1)))) : 1;
+  // Whole pixels only; at most 10× so the banner stays a strip.
+  const scale = banner ? Math.min(10, Math.max(2, Math.floor(width / (banner.grid[0]?.length ?? 1)))) : 1;
+  const height = banner ? banner.grid.length * scale : undefined;
   return (
     <div
       ref={box}
       data-testid="company-banner"
-      className="relative flex min-h-24 items-center justify-center overflow-hidden sm:min-h-32"
+      className={cn("relative flex items-center justify-center overflow-hidden", !banner && "min-h-24 sm:min-h-32")}
       style={{
-        backgroundColor: banner ? banner.palette[0] : undefined,
+        height,
         backgroundImage: banner
           ? undefined
           : `linear-gradient(120deg, color-mix(in oklab, ${company.color} 70%, var(--bg-1)), color-mix(in oklab, ${company.color} 25%, var(--bg-1)))`,
       }}
     >
-      {banner && width > 0 && <PixelIcon {...logoArt(banner)} scale={scale} />}
+      {banner && (
+        <>
+          <span
+            aria-hidden
+            className="absolute inset-y-0 left-0 w-1/2"
+            style={{ backgroundImage: edgeStripes(banner, "left", scale) }}
+          />
+          <span
+            aria-hidden
+            className="absolute inset-y-0 right-0 w-1/2"
+            style={{ backgroundImage: edgeStripes(banner, "right", scale) }}
+          />
+        </>
+      )}
+      {banner && width > 0 && <PixelIcon {...logoArt(banner)} scale={scale} className="relative" />}
       <button
         type="button"
         onClick={() => {
