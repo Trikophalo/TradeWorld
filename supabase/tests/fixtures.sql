@@ -163,6 +163,10 @@ select public.set_company_logo(gen_random_uuid(), '{"palette": ["#112233", "#ffc
   "....00000000....", "....01111110....", "....01111110....", "....00000000....", "................", "................",
   "................", "................", "................", "................", "................", "................",
   "................", "................"]}');
+\o :fixture_dir/set_company_banner.json
+select public.set_company_banner(gen_random_uuid(), jsonb_build_object('palette', '["#112233", "#ffcc00"]'::jsonb,
+  'grid', (select to_jsonb(array_agg(case when y in (0, 11) then repeat('0', 48) else '0' || repeat('1', 46) || '0' end order by y))
+             from generate_series(0, 11) y)));
 \o :fixture_dir/set_company_marketing.json
 select public.set_company_marketing(gen_random_uuid(), 25000);
 \o :fixture_dir/set_ai_workers.json

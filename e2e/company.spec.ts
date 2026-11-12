@@ -69,6 +69,29 @@ test("found a garage startup, run quarters, hire and post a job", async ({ page 
   await expect(header.getByText("Pixelbaecker")).toBeVisible();
   await expect(page.getByText("Das erste Quartal läuft noch.")).toBeVisible();
 
+  // The office shows the founder; banner and till (ADR-078).
+  await expect(page.getByTestId("office")).toContainText("Gruenderin");
+  await page.getByTestId("banner-edit").click();
+  const bannerSheet = page.getByRole("dialog", { name: "Firmen-Banner" });
+  await expect(bannerSheet).toBeVisible();
+  await bannerSheet.getByRole("button", { name: "Banner speichern" }).click();
+  await expect(page.getByText("Banner gespeichert")).toBeVisible();
+  await page
+    .getByTestId("treasury")
+    .locator("..")
+    .getByRole("button", { name: /Einzahlen/ })
+    .click();
+  const deposit = page.getByRole("dialog", { name: "Einzahlen" });
+  await deposit.getByLabel(/Betrag/).fill("1000");
+  await expect(deposit.getByTestId("money-flow")).toContainText("→");
+  await deposit.getByRole("button", { name: /1\.000 € einzahlen/ }).click();
+  await expect(
+    page
+      .getByText("Eingezahlt")
+      .or(page.getByText(/eingezahlt/i))
+      .first(),
+  ).toBeVisible();
+
   // Growth stages (ADR-062): the product needs specialists, the next step is named.
   const growth = page.getByTestId("growth");
   await expect(growth.getByText("Stufe 1")).toBeVisible();

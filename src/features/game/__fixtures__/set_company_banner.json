@@ -1,0 +1,130 @@
+{
+  "company": {
+    "id": "f162a8b9-918b-4b66-9bb2-1aa1998f0d7f",
+    "idea": "Werkzeuge für Bastler",
+    "live": {
+      "last_hour_at": "2026-11-12T17:00:00+00:00",
+      "pay_factor_bps": 10000,
+      "today_profit_cents": 0,
+      "today_revenue_cents": 0,
+      "quarter_profit_cents": 0,
+      "profit_per_hour_cents": 0,
+      "quarter_revenue_cents": 0,
+      "revenue_per_hour_cents": 0
+    },
+    "logo": {
+      "grid": [
+        "................",
+        "................",
+        "....00000000....",
+        "....01111110....",
+        "....01111110....",
+        "....00000000....",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................"
+      ],
+      "palette": ["#112233", "#ffcc00"]
+    },
+    "name": "Fixture Labor",
+    "tier": "garage",
+    "color": "#2266cc",
+    "hours": [],
+    "stage": 0,
+    "banner": {
+      "grid": [
+        "000000000000000000000000000000000000000000000000",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "000000000000000000000000000000000000000000000000"
+      ],
+      "palette": ["#112233", "#ffcc00"]
+    },
+    "sector": "tech",
+    "stages": [
+      {
+        "stage": 1,
+        "skills": [{ "key": "it_networks", "covered_by": null, "covered_by_ai": false }],
+        "reached": false
+      },
+      {
+        "stage": 2,
+        "skills": [
+          { "key": "it_security", "covered_by": null, "covered_by_ai": false },
+          { "key": "it_programming", "covered_by": "Fixture_Neu", "covered_by_ai": false }
+        ],
+        "reached": false
+      },
+      {
+        "stage": 3,
+        "skills": [
+          { "key": "law_privacy", "covered_by": null, "covered_by_ai": false },
+          { "key": "it_architecture", "covered_by": null, "covered_by_ai": false }
+        ],
+        "reached": false
+      },
+      {
+        "stage": 4,
+        "skills": [
+          { "key": "it_crypto", "covered_by": null, "covered_by_ai": false },
+          { "key": "it_pentest", "covered_by": null, "covered_by_ai": false }
+        ],
+        "reached": false
+      }
+    ],
+    "history": [],
+    "listing": null,
+    "distress": false,
+    "employees": 0,
+    "headcount": 0,
+    "ai_workers": 0,
+    "cash_cents": 250000,
+    "founded_at": "2026-11-12T17:48:16.978535+00:00",
+    "can_upgrade": false,
+    "logo_hidden": false,
+    "product_key": "security_software",
+    "quality_bps": 2500,
+    "value_cents": 250000,
+    "last_quarter": null,
+    "unpaid_cents": 0,
+    "awareness_bps": 300,
+    "can_go_public": false,
+    "max_employees": 2,
+    "open_postings": 0,
+    "training_from": 5,
+    "capacity_cents": 498000,
+    "full_time_from": 5,
+    "grace_quarters": 4,
+    "pay_factor_bps": 10000,
+    "founder_has_job": false,
+    "next_quarter_at": "2026-11-12T19:00:00+00:00",
+    "quarters_active": 0,
+    "ai_worker_skills": [],
+    "distress_quarters": 0,
+    "estimate_low_cents": 26080,
+    "upgrade_cost_cents": 1250000,
+    "estimate_high_cents": 456185,
+    "ai_worker_cost_cents": 72000,
+    "can_capital_increase": false,
+    "pending_applications": 0,
+    "team_productivity_bps": 16600,
+    "ai_wage_cents_per_hour": 12000,
+    "founder_productivity_bps": 16600,
+    "marketing_cents_per_quarter": 0
+  }
+}

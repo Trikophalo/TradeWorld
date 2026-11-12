@@ -4910,3 +4910,34 @@ value_cents, revenue_cents, team_size, is_mine }], mine: { rank, value_cents } |
 - Beim Umstieg zählt erst die laufende Stunde; frühere Stunden des laufenden Quartals bringen keinen Umsatz.
 - Die angebrochene Stunde beim Auflösen bringt keinen Umsatz mehr; Löhne werden zum letzten Faktor abgerechnet.
 - Der Firmenwert nutzt den Quartalsgewinn jetzt nach Spielerlöhnen (vorher davor).
+
+## Nachtrag: M3j (Firmenbanner)
+
+### Migrationen
+
+| Datei                           | Inhalt                                                                           |
+| ------------------------------- | -------------------------------------------------------------------------------- |
+| `20261121000100_m3j_banner.sql` | `player_companies.banner`, `set_company_banner`, Symbolprüfung für Breite × Höhe |
+
+### Schema
+
+- `player_companies.banner jsonb` (nullable, unter 8 KB): Pixel-Banner über der Firmenseite (ADR-078), gleiche Form
+  wie `logo`: `{ palette: ["#rrggbb", …], grid: [Zeilen] }`. Für Clients lesbar wie `logo` (Spaltenrecht, RLS des
+  Gründers).
+
+### RPC `set_company_banner(p_request_id, p_banner)` → `{ company }`
+
+- Nur der Gründer der aktiven Firma (sonst `company_not_found`), idempotent über `request_id`.
+- `banner_valid` (intern) entspricht `isValidBanner` (src/lib/sim/logo.ts): 1 bis `startups.banner.maxColors` Farben
+  als `#rrggbb` in Kleinbuchstaben, genau `startups.banner.height` Zeilen mit genau `startups.banner.width` Zeichen aus
+  `.` und den Farbindizes (Rückfallwerte 48 × 12, 6 Farben). Kein Mindestmaß an Pixeln. Sonst `invalid_argument`.
+- Verbotene Symbole: `logo_forbidden` (wie beim Logo).
+- Keine Sperre und keine Meldungen: Das Banner darf jederzeit neu gezeichnet werden. `null` (SQL oder JSON) entfernt es.
+- COMPANY (`company_state`, `get_my_company` und alle Antworten mit `{ company }`) enthält `banner` (`{ palette, grid }`
+  oder `null`). Die Rangliste und `company_json` tragen kein Banner.
+
+### Symbolprüfung
+
+- `logo_has_forbidden_symbol(grid)` arbeitet jetzt auf Breite × Höhe (Breite = Länge der ersten Zeile, Höhe =
+  Zeilenzahl) wie `hasForbiddenSymbol`: Skalierung 1 bis 3, solange die Vorlage in beide Richtungen passt. Logos
+  (16 × 16) werden unverändert geprüft.

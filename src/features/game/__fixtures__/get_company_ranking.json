@@ -1,6 +1,6 @@
 {
-  "mine": { "rank": 9, "value_cents": 73431 },
-  "total": 9,
+  "mine": { "rank": 10, "value_cents": 54108 },
+  "total": 10,
   "entries": [
     {
       "kind": "player",
@@ -34,8 +34,8 @@
       "founder": "Fenja_Firma",
       "is_mine": false,
       "team_size": 6,
-      "company_id": "c17934e1-7fbc-4108-a0f0-aa7a586062c7",
-      "value_cents": 82348597,
+      "company_id": "b05c542a-67b6-4335-8346-b71c29d4b62c",
+      "value_cents": 82167485,
       "revenue_cents": 0
     },
     {
@@ -50,31 +50,15 @@
       "founder": "Frieda_Format",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "bf68a13f-8d72-47b1-879c-ee488c4476e0",
+      "company_id": "dc5d569d-3c3e-4400-b833-1cee3543e3cb",
       "value_cents": 51553750,
       "revenue_cents": 1185000
     },
     {
       "kind": "player",
       "logo": null,
-      "name": "Garagen Code",
-      "rank": 3,
-      "tier": "small_business",
-      "color": "#3366ff",
-      "sector": "tech",
-      "ticker": null,
-      "founder": "Frida_Firma",
-      "is_mine": false,
-      "team_size": 3,
-      "company_id": "664644e7-ec24-4f5d-a04b-a4eba153335e",
-      "value_cents": 44991114,
-      "revenue_cents": 1200000
-    },
-    {
-      "kind": "player",
-      "logo": null,
       "name": "Stunden Werk",
-      "rank": 4,
+      "rank": 3,
       "tier": "garage",
       "color": "#225566",
       "sector": "tech",
@@ -82,9 +66,25 @@
       "founder": "Hanna_Stunde",
       "is_mine": false,
       "team_size": 3,
-      "company_id": "d1b965d5-7384-4a83-beae-f30efb46a13e",
+      "company_id": "48000e11-2bfa-49c3-a9ea-fcae1654ec1b",
       "value_cents": 6928014,
-      "revenue_cents": 232510
+      "revenue_cents": 227911
+    },
+    {
+      "kind": "player",
+      "logo": null,
+      "name": "Garagen Code",
+      "rank": 4,
+      "tier": "small_business",
+      "color": "#3366ff",
+      "sector": "tech",
+      "ticker": null,
+      "founder": "Frida_Firma",
+      "is_mine": false,
+      "team_size": 3,
+      "company_id": "0a09e1e8-1f4d-4fcf-b070-99bdc2c8df5e",
+      "value_cents": 2263002,
+      "revenue_cents": 0
     },
     {
       "kind": "player",
@@ -98,10 +98,10 @@
       "founder": "Sven_Small",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "defdcd55-7fd3-4e16-ae0c-8fad5f5ec0b1",
+      "company_id": "fac4bd57-aa26-49e2-a9ca-9332653aa8e9",
       "value_cents": 1500000,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-11T22:19:34.13013+00:00"
+  "server_time": "2026-11-12T17:48:17.322395+00:00"
 }

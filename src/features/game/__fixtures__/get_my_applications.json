@@ -1,56 +1,56 @@
 {
   "applications": [
     {
-      "id": "d907adb9-869a-48cf-9db6-5900b806701c",
+      "id": "0ed7aa7a-8f92-499a-92e5-ec600e53e8f6",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "2fb1c8c9-ddbb-4407-891c-c30a6ea0b372",
+        "id": "1454b211-619c-4de6-a1aa-dc28556ce6a5",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "2faf9e4c-3f0a-8a5b-1645-c669e9481771",
+          "id": "db7c839c-c460-945e-1188-5e4a61db1e47",
           "logo": null,
-          "name": "NeuroPharm AG",
-          "color": "#6EE7A0",
+          "name": "Rheinkraft Werke",
+          "color": "#5BC0EB",
           "is_ai": true,
-          "sector": "pharma",
-          "ticker": "NPH"
+          "sector": "energy",
+          "ticker": "RKW"
         },
-        "required": [{ "branch": "law", "min_score": 0 }],
-        "title_key": "law_intern",
+        "required": [{ "branch": "craft", "min_score": 0 }],
+        "title_key": "craft_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-11T22:19:33.692708+00:00",
-      "updated_at": "2026-11-11T22:19:33.696445+00:00",
-      "offer_expires_at": "2026-11-13T22:19:33.692708+00:00",
+      "created_at": "2026-11-12T17:48:16.851593+00:00",
+      "updated_at": "2026-11-12T17:48:16.855136+00:00",
+      "offer_expires_at": "2026-11-14T17:48:16.851593+00:00",
       "salary_wish_cents_per_hour": 15000,
       "offer_salary_cents_per_hour": 15000
     },
     {
-      "id": "1c14948d-ba57-4c72-af29-c154d1a6ff96",
+      "id": "78245d71-9afa-4e6c-809e-54e65e94b9b2",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "43498798-dcbf-4a5e-a3a4-1ba13b1956ad",
+        "id": "86265572-35ec-4510-b9e6-f3bb9f77e646",
         "tier": "junior",
         "title": null,
         "company": {
-          "id": "dc6cd683-c473-c0eb-8d8c-04ddf664b4d5",
+          "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
           "logo": null,
-          "name": "Eilbote Express",
-          "color": "#F7768E",
+          "name": "KlarSoft AG",
+          "color": "#4C8DFF",
           "is_ai": true,
-          "sector": "logistics",
-          "ticker": "EBX"
+          "sector": "tech",
+          "ticker": "KLS"
         },
         "required": [{ "branch": "it", "min_score": 2 }],
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-11T22:19:33.686106+00:00",
-      "updated_at": "2026-11-11T22:19:33.686106+00:00",
-      "offer_expires_at": "2026-11-13T22:19:33.686106+00:00",
+      "created_at": "2026-11-12T17:48:16.846185+00:00",
+      "updated_at": "2026-11-12T17:48:16.846185+00:00",
+      "offer_expires_at": "2026-11-14T17:48:16.846185+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

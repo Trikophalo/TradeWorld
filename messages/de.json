@@ -1912,7 +1912,25 @@
     "payFactorLive": "Löhne zu {percent} % gedeckt",
     "viewCard": "Visitenkarte",
     "cardTitle": "Visitenkarte von {name}",
-    "fullProfile": "Ganzes Profil öffnen"
+    "fullProfile": "Ganzes Profil öffnen",
+    "officeTitle": "Im Büro",
+    "officeToTeam": "{count, plural, one {# Person} other {# Leute}} · Team öffnen",
+    "freeDesk": "Frei",
+    "treasuryTitle": "Firmenkasse",
+    "privateLine": "Dein Privatgeld:",
+    "unpaidLine": "offen {amount}",
+    "hoursChart": "Gewinn der letzten Stunden",
+    "depositShort": "Privat → Firma",
+    "withdrawShort": "Firma → Privat",
+    "depositHint": "Geld aus deinem Privatvermögen in die Firma legen. Offene Rechnungen werden zuerst bezahlt.",
+    "withdrawHint": "Geld aus der Firma auf dein Privatkonto holen. Offene Rechnungen müssen gedeckt bleiben.",
+    "depositAmount": "{amount} einzahlen",
+    "withdrawAmount": "{amount} entnehmen",
+    "private": "Privat",
+    "companyCash": "Firma",
+    "tooMuch": "Höchstens {amount}",
+    "all": "Alles",
+    "withdrawUnpaid": "{amount} offene Rechnungen bleiben in der Firma."
   },
   "debt": {
     "title": "Schulden",
@@ -2165,5 +2183,17 @@
     "foundedBy": "von {name}",
     "aiCompany": "KI-Firma an der Börse",
     "revenue": "Umsatz"
+  },
+  "banner": {
+    "title": "Firmen-Banner",
+    "intro": "48 × 12 Pixel über deiner Firmenseite. Du kannst ihn jederzeit neu gestalten.",
+    "create": "Banner gestalten",
+    "edit": "Banner ändern",
+    "save": "Banner speichern",
+    "saved": "Banner gespeichert",
+    "remove": "Entfernen",
+    "removed": "Banner entfernt",
+    "line": "Linie",
+    "reset": "Neu anfangen"
   }
 }

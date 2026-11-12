@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BALANCE } from "../../config/balance.ts";
-import { floodFill, hasForbiddenSymbol, isValidLogo, logoArt } from "./logo.ts";
+import { floodFill, hasForbiddenSymbol, isValidBanner, isValidLogo, logoArt } from "./logo.ts";
 import {
   aiTakeShare,
   capitalIncreasePriceCents,
@@ -105,5 +105,25 @@ describe("forbidden symbols (ADR-076)", () => {
     expect(hasForbiddenSymbol(logo(Array.from({ length: 16 }, () => "0".repeat(16))))).toBe(false);
     const letters = draw(["xxx.x.x", "x...x.x", "xx...x.", "x...x.x", "xxx.x.x"], 2, 1, 3);
     expect(hasForbiddenSymbol(logo(letters))).toBe(false);
+  });
+});
+
+describe("banner (ADR-078)", () => {
+  const row = (c: string) => c.repeat(BALANCE.startups.banner.width);
+  const banner = (grid: string[]) => ({ palette: ["#111318", "#ffd15c"], grid });
+  it("is width × height with palette indices", () => {
+    expect(isValidBanner(banner(Array.from({ length: BALANCE.startups.banner.height }, () => row("0"))))).toBe(true);
+    expect(isValidBanner(banner(Array.from({ length: 16 }, () => row("0"))))).toBe(false);
+    expect(isValidBanner(banner(Array.from({ length: BALANCE.startups.banner.height }, () => row("7"))))).toBe(false);
+  });
+  it("is checked for forbidden symbols too", () => {
+    const grid = Array.from({ length: BALANCE.startups.banner.height }, () => row(".").split(""));
+    ["x.xxx", "x.x..", "xxxxx", "..x.x", "xxx.x"].forEach((r, y) =>
+      r.split("").forEach((c, x) => {
+        if (c === "x") grid[y + 3]![x + 30] = "0";
+      }),
+    );
+    expect(hasForbiddenSymbol(banner(grid.map((r) => r.join(""))))).toBe(true);
+    expect(hasForbiddenSymbol(banner(Array.from({ length: 12 }, () => row("1"))))).toBe(false);
   });
 });

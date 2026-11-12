@@ -774,3 +774,21 @@ Umsetzung Server (M3i):
 - **Quartalsabschluss:** Er bucht kein Geld mehr. Er fasst die Stunden zum Bericht zusammen, bewegt Bekanntheit und
   Qualität und verteilt den Bonus (20 % des positiven Quartalsgewinns).
 - **Lohnfaktor:** Der alte Quartals-Mindestlohnfaktor (50 %) entfällt; es gilt die stündliche Regel.
+
+## ADR-078: Firmenseite mit Banner, großem Logo, Büro und Firmenkasse — `akzeptiert`
+
+Vorgabe: Die Firmenseite wirkte unübersichtlich, statisch und langweilig.
+
+- **Banner:** Ein Pixel-Banner (48 × 12, bis 6 Farben) steht über der Seite und lässt sich jederzeit neu zeichnen
+  (`set_company_banner`). Er wird auf verbotene Symbole geprüft wie das Logo.
+  - Er wird ganzzahlig skaliert, höchstens 8-fach; die Seiten füllt seine erste Farbe.
+- **Logo:** Es sitzt groß (6-fach) wie ein Siegel auf dem Banner.
+- **Büro:** Alle Mitarbeitenden stehen als Pixel-Figuren im Büro.
+  - Spieler mit Schreibtisch, KI-Kräfte als Roboter.
+  - Alle tragen ein T-Shirt in der Firmenfarbe mit dem verkleinerten Logo (`staffFigure`, `shrinkLogo`, getestet).
+  - Sie wippen leicht, jede Figur in ihrem eigenen Rhythmus; bei reduzierter Bewegung stehen sie still.
+  - Freie Plätze sind leere Tische.
+- **Firmenkasse:** Eine eigene Karte zeigt die Kasse live, das eigene Privatgeld, die letzten Stunden als Balken und
+  zwei große Knöpfe „Einzahlen“ / „Entnehmen“.
+  - Das Formular zeigt den Fluss Privat ↔ Firma mit dem Stand vorher und nachher und hat Schnellbeträge
+    (10 %, 25 %, 50 %, Alles).

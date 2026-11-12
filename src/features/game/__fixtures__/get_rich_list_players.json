@@ -1,6 +1,6 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 20, "gap_cents": 643 }, "rank": 21, "net_worth_cents": 1019357 },
-  "total": 64,
+  "me": { "next": { "name": "Vera", "rank": 21, "gap_cents": 481 }, "rank": 22, "net_worth_cents": 1019519 },
+  "total": 67,
   "entries": [
     {
       "id": "0f3f3f3f-0000-4000-8000-0000000000f1",
@@ -11,7 +11,7 @@
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 102564991,
+      "net_worth_cents": 102410991,
       "rank_change_24h": null
     },
     {
@@ -27,27 +27,27 @@
       "rank_change_24h": null
     },
     {
-      "id": "0c3c3c3c-0000-4000-8000-0000000000f1",
+      "id": "06860686-0000-4000-8000-0000000000a1",
       "kind": "player",
-      "name": "Frida_Firma",
+      "name": "Hanna_Stunde",
       "rank": 3,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 49311114,
+      "net_worth_cents": 10678014,
       "rank_change_24h": null
     },
     {
-      "id": "06860686-0000-4000-8000-0000000000a1",
+      "id": "0c3c3c3c-0000-4000-8000-0000000000f1",
       "kind": "player",
-      "name": "Hanna_Stunde",
+      "name": "Frida_Firma",
       "rank": 4,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 10678014,
+      "net_worth_cents": 6583002,
       "rank_change_24h": null
     },
     {
@@ -59,9 +59,9 @@
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 6009733,
+      "net_worth_cents": 6022984,
       "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-11T22:19:33.570136+00:00"
+  "server_time": "2026-11-12T17:48:16.744659+00:00"
 }

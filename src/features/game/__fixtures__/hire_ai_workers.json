@@ -1,16 +1,16 @@
 {
   "company": {
-    "id": "9d961290-e308-4aea-96e5-bf0a77385817",
+    "id": "f162a8b9-918b-4b66-9bb2-1aa1998f0d7f",
     "idea": "Werkzeuge für Bastler",
     "live": {
-      "last_hour_at": "2026-11-11T22:00:00+00:00",
-      "pay_factor_bps": 10000,
-      "today_profit_cents": 5991,
-      "today_revenue_cents": 57767,
-      "quarter_profit_cents": 5991,
-      "profit_per_hour_cents": 2809,
-      "quarter_revenue_cents": 57767,
-      "revenue_per_hour_cents": 28635
+      "last_hour_at": "2026-11-12T17:00:00+00:00",
+      "pay_factor_bps": 143,
+      "today_profit_cents": -13332,
+      "today_revenue_cents": 463,
+      "quarter_profit_cents": -13332,
+      "profit_per_hour_cents": -6666,
+      "quarter_revenue_cents": 463,
+      "revenue_per_hour_cents": 230
     },
     "logo": {
       "grid": [
@@ -37,10 +37,27 @@
     "tier": "small_business",
     "color": "#2266cc",
     "hours": [
-      { "hour_start": "2026-11-11T20:00:00+00:00", "profit_cents": 3182, "revenue_cents": 29132 },
-      { "hour_start": "2026-11-11T21:00:00+00:00", "profit_cents": 2809, "revenue_cents": 28635 }
+      { "hour_start": "2026-11-12T15:00:00+00:00", "profit_cents": -6666, "revenue_cents": 233 },
+      { "hour_start": "2026-11-12T16:00:00+00:00", "profit_cents": -6666, "revenue_cents": 230 }
     ],
     "stage": 1,
+    "banner": {
+      "grid": [
+        "000000000000000000000000000000000000000000000000",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "000000000000000000000000000000000000000000000000"
+      ],
+      "palette": ["#112233", "#ffcc00"]
+    },
     "sector": "tech",
     "stages": [
       { "stage": 1, "skills": [{ "key": "it_networks", "covered_by": null, "covered_by_ai": true }], "reached": true },
@@ -69,21 +86,21 @@
         "reached": false
       }
     ],
-    "history": [{ "label": "J1 Q2", "profit_cents": 0, "revenue_cents": 0 }],
+    "history": [{ "label": "J1 Q1", "profit_cents": 0, "revenue_cents": 0 }],
     "listing": null,
     "distress": false,
     "employees": 1,
     "headcount": 2,
     "ai_workers": 1,
-    "cash_cents": 1323431,
-    "founded_at": "2026-11-11T22:19:33.809165+00:00",
+    "cash_cents": 1304108,
+    "founded_at": "2026-11-12T17:48:16.978535+00:00",
     "can_upgrade": false,
     "logo_hidden": false,
     "product_key": "security_software",
     "quality_bps": 2660,
-    "value_cents": 1323431,
+    "value_cents": 1304108,
     "last_quarter": {
-      "label": "J1 Q2",
+      "label": "J1 Q1",
       "cogs_cents": 0,
       "bonus_cents": 0,
       "fixed_cents": 0,
@@ -97,7 +114,7 @@
       "operating_profit_cents": 0
     },
     "unpaid_cents": 0,
-    "awareness_bps": 405,
+    "awareness_bps": 758,
     "can_go_public": false,
     "max_employees": 5,
     "open_postings": 1,
@@ -105,15 +122,15 @@
     "capacity_cents": 1560000,
     "full_time_from": 5,
     "grace_quarters": 4,
-    "pay_factor_bps": 10000,
+    "pay_factor_bps": 143,
     "founder_has_job": false,
-    "next_quarter_at": "2026-11-12T01:00:00+00:00",
+    "next_quarter_at": "2026-11-12T19:00:00+00:00",
     "quarters_active": 1,
     "ai_worker_skills": ["it_networks"],
     "distress_quarters": 0,
-    "estimate_low_cents": 4110950,
+    "estimate_low_cents": 35391,
     "upgrade_cost_cents": 4500000,
-    "estimate_high_cents": 123411887,
+    "estimate_high_cents": 745029,
     "ai_worker_cost_cents": 72000,
     "can_capital_increase": false,
     "pending_applications": 0,

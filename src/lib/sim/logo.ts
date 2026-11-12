@@ -99,9 +99,21 @@ function matches(mask: readonly boolean[][], pattern: readonly string[], scale: 
   return true;
 }
 
-/** True if the logo shows a forbidden symbol (ADR-076). */
+/** A banner: like a logo, but width × height (ADR-078). */
+export function isValidBanner(banner: unknown, cfg: StartupsConfig = BALANCE.startups): banner is CompanyLogoData {
+  if (!banner || typeof banner !== "object") return false;
+  const { palette, grid } = banner as { palette?: unknown; grid?: unknown };
+  if (!Array.isArray(palette) || palette.length < 1 || palette.length > cfg.banner.maxColors) return false;
+  if (!palette.every((c) => typeof c === "string" && HEX.test(c))) return false;
+  if (!Array.isArray(grid) || grid.length !== cfg.banner.height) return false;
+  const allowed = new RegExp(`^[.0-${palette.length - 1}]{${cfg.banner.width}}$`);
+  return grid.every((row) => typeof row === "string" && allowed.test(row));
+}
+
+/** True if the logo (or banner) shows a forbidden symbol (ADR-076). */
 export function hasForbiddenSymbol(logo: CompanyLogoData): boolean {
-  const size = logo.grid.length;
+  const height = logo.grid.length;
+  const width = logo.grid[0]?.length ?? 0;
   const masks: boolean[][][] = [logo.grid.map((row) => row.split("").map((c) => c !== "."))];
   for (let i = 0; i < logo.palette.length; i++) {
     masks.push(logo.grid.map((row) => row.split("").map((c) => c === String(i))));
@@ -110,9 +122,9 @@ export function hasForbiddenSymbol(logo: CompanyLogoData): boolean {
     for (const pattern of PATTERNS) {
       const h = pattern.length;
       const w = pattern[0]!.length;
-      for (let scale = 1; scale * Math.max(w, h) <= size && scale <= 3; scale++) {
-        for (let oy = 0; oy + h * scale <= size; oy++) {
-          for (let ox = 0; ox + w * scale <= size; ox++) if (matches(mask, pattern, scale, ox, oy)) return true;
+      for (let scale = 1; scale * w <= width && scale * h <= height && scale <= 3; scale++) {
+        for (let oy = 0; oy + h * scale <= height; oy++) {
+          for (let ox = 0; ox + w * scale <= width; ox++) if (matches(mask, pattern, scale, ox, oy)) return true;
         }
       }
     }

@@ -134,6 +134,10 @@ const companySchema = z.object({
     .nullable()
     .default(null),
   logo_hidden: z.boolean().default(false),
+  banner: z
+    .object({ palette: z.array(z.string()), grid: z.array(z.string()) })
+    .nullable()
+    .default(null),
   founder_has_job: z.boolean().default(false),
   full_time_from: num.default(5),
   headcount: num.default(0),
@@ -331,6 +335,7 @@ export const COMPANY_RPC_SCHEMAS = {
   fire_employee: z.object({ player_job_id: z.string(), status: z.literal("fired"), severance_cents: num }),
   respond_raise: z.object({ status: z.enum(["accepted", "rejected"]), salary_cents_per_hour: num }),
   set_company_logo: wrapped,
+  set_company_banner: wrapped,
   report_company_logo: z.object({ reported: z.boolean() }),
   go_public: wrapped,
   capital_increase: wrapped,
@@ -391,6 +396,7 @@ function toCompany(c: z.infer<typeof companySchema>): MyCompany {
     history: c.history.map((h) => ({ label: h.label, revenueCents: h.revenue_cents, profitCents: h.profit_cents })),
     payFactorBps: c.pay_factor_bps,
     logo: c.logo,
+    banner: c.banner,
     logoHidden: c.logo_hidden,
     founderHasJob: c.founder_has_job,
     fullTimeFrom: c.full_time_from,
@@ -522,6 +528,7 @@ type CompanyEngine = Pick<
   | "respondRaise"
   | "trainEmployee"
   | "setCompanyLogo"
+  | "setCompanyBanner"
   | "reportCompanyLogo"
   | "goPublic"
   | "capitalIncrease"
@@ -751,6 +758,12 @@ export const liveCompanyEngine: CompanyEngine = {
 
   async setCompanyLogo(requestId, logo) {
     return requireCompany(await rpc("set_company_logo", { p_request_id: requestId, p_logo: logo }, S.set_company_logo));
+  },
+
+  async setCompanyBanner(requestId, banner) {
+    return requireCompany(
+      await rpc("set_company_banner", { p_request_id: requestId, p_banner: banner }, S.set_company_banner),
+    );
   },
 
   async reportCompanyLogo(requestId, companyId) {

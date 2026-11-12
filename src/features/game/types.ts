@@ -542,6 +542,8 @@ export interface MyCompany {
   graceQuarters: number;
   logo: CompanyLogoData | null;
   logoHidden: boolean;
+  /** Pixel banner above the company page (ADR-078). */
+  banner: CompanyLogoData | null;
   /** Founder with a job elsewhere (ADR-066). */
   founderHasJob: boolean;
   fullTimeFrom: number;
@@ -847,6 +849,8 @@ export interface GameEngine {
   ): Promise<{ status: "accepted" | "pending"; salaryCentsPerHour: number }>;
   playerCard(nickname: string): Promise<PlayerCard>;
   setCompanyLogo(requestId: string, logo: CompanyLogoData): Promise<MyCompany>;
+  /** Pixel banner, may be redrawn any time; null removes it (ADR-078). */
+  setCompanyBanner(requestId: string, banner: CompanyLogoData | null): Promise<MyCompany>;
   reportCompanyLogo(requestId: string, companyId: string): Promise<void>;
   goPublic(requestId: string, sharePercent: number): Promise<MyCompany>;
   capitalIncrease(requestId: string, sharePercent: number): Promise<MyCompany>;

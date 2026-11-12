@@ -1,9 +1,9 @@
 {
   "company": {
-    "id": "9d961290-e308-4aea-96e5-bf0a77385817",
+    "id": "f162a8b9-918b-4b66-9bb2-1aa1998f0d7f",
     "idea": "Werkzeuge für Bastler",
     "live": {
-      "last_hour_at": "2026-11-11T22:00:00+00:00",
+      "last_hour_at": "2026-11-12T17:00:00+00:00",
       "pay_factor_bps": 10000,
       "today_profit_cents": 0,
       "today_revenue_cents": 0,
@@ -38,6 +38,23 @@
     "color": "#2266cc",
     "hours": [],
     "stage": 0,
+    "banner": {
+      "grid": [
+        "000000000000000000000000000000000000000000000000",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "011111111111111111111111111111111111111111111110",
+        "000000000000000000000000000000000000000000000000"
+      ],
+      "palette": ["#112233", "#ffcc00"]
+    },
     "sector": "tech",
     "stages": [
       {
@@ -77,7 +94,7 @@
     "headcount": 1,
     "ai_workers": 1,
     "cash_cents": 250000,
-    "founded_at": "2026-11-11T22:19:33.809165+00:00",
+    "founded_at": "2026-11-12T17:48:16.978535+00:00",
     "can_upgrade": false,
     "logo_hidden": false,
     "product_key": "security_software",
@@ -95,13 +112,13 @@
     "grace_quarters": 4,
     "pay_factor_bps": 10000,
     "founder_has_job": false,
-    "next_quarter_at": "2026-11-12T01:00:00+00:00",
+    "next_quarter_at": "2026-11-12T19:00:00+00:00",
     "quarters_active": 0,
     "ai_worker_skills": [],
     "distress_quarters": 0,
-    "estimate_low_cents": 3596744,
+    "estimate_low_cents": 26080,
     "upgrade_cost_cents": 1250000,
-    "estimate_high_cents": 115650057,
+    "estimate_high_cents": 456185,
     "ai_worker_cost_cents": 72000,
     "can_capital_increase": false,
     "pending_applications": 0,

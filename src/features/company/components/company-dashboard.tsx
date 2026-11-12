@@ -9,13 +9,13 @@ import { Button, type ButtonState } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { HoldButton } from "@/components/ui/hold-button";
 import { Field } from "@/components/ui/input";
-import { ShortMoney } from "@/components/ui/live-money";
+import { LiveMoney, ShortMoney } from "@/components/ui/live-money";
 import { Sheet } from "@/components/ui/sheet";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "@/components/ui/toast";
 import { BALANCE } from "@/config/balance";
 import { useGameErrorText } from "@/features/game/errors";
-import { engine } from "@/features/game/store";
+import { engine, useGame } from "@/features/game/store";
 import type { MyCompany } from "@/features/game/types";
 import { parseEuroCents } from "@/features/market/order-schema";
 import { useVisitTour } from "@/features/tutorial/use-visit-tour";
@@ -30,7 +30,9 @@ import { HireSheet, TeamView, type HireRequest } from "./employer";
 import { GrowthPath } from "./growth-path";
 import { HeadquartersHero, netProfit } from "./headquarters";
 import { ListingCard, SideJobNotice } from "./listing";
+import { BannerEditor } from "./banner-editor";
 import { LogoEditor } from "./logo-editor";
+import { OfficeScene } from "./office-scene";
 
 type Tab = "overview" | "team" | "chat";
 const factor = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
@@ -44,6 +46,7 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
   const [tab, setTab] = useState<Tab>("overview");
   const [hire, setHire] = useState<HireRequest | null>(null);
   const [drawing, setDrawing] = useState(false);
+  const [bannerOpen, setBannerOpen] = useState(false);
   useVisitTour("visit_company");
   const trainingOpen = company.employees + company.aiWorkers >= company.trainingFrom;
 
@@ -54,9 +57,14 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
 
   return (
     <div className="space-y-5">
-      <HeadquartersHero company={company} onDrawLogo={() => setDrawing(true)} />
+      <HeadquartersHero
+        company={company}
+        onDrawLogo={() => setDrawing(true)}
+        onEditBanner={() => setBannerOpen(true)}
+      />
 
       <LogoEditor company={company} open={drawing} onClose={() => setDrawing(false)} />
+      <BannerEditor company={company} open={bannerOpen} onClose={() => setBannerOpen(false)} />
       {company.logoHidden && <p className="rounded-md bg-warn-soft px-4 py-3 text-sm text-warn">{tl("hidden")}</p>}
       {company.logo === null && (
         <Card
@@ -82,6 +90,8 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
         </p>
       )}
 
+      <OfficeScene company={company} onTeam={() => setTab("team")} />
+
       <DepartmentTabs
         value={tab}
         onChange={setTab}
@@ -104,6 +114,7 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
             <HistoryCard company={company} />
           </div>
           <div className="space-y-5">
+            <TreasuryCard company={company} />
             <MarketCard company={company} />
             <BossOffice company={company} onTeam={() => setTab("team")} />
           </div>
@@ -409,7 +420,6 @@ function BossOffice({ company, onTeam }: { company: MyCompany; onTeam: () => voi
   const maxMarketing = Math.max(100_000, Math.round(company.estimateHighCents / 4 / 5 / 1_000) * 1_000);
   const [marketing, setMarketing] = useState(company.marketingCentsPerQuarter);
   const [marketingState, setMarketingState] = useState<ButtonState>("idle");
-  const [money, setMoney] = useState<"deposit" | "withdraw" | null>(null);
   const [upgradeState, setUpgradeState] = useState<ButtonState>("idle");
   const [closing, setClosing] = useState(false);
   const staff = company.employees + company.aiWorkers;
@@ -494,19 +504,6 @@ function BossOffice({ company, onTeam }: { company: MyCompany; onTeam: () => voi
         </span>
       </button>
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm text-fg-2">{t("money")}</span>
-        <div className="flex gap-2">
-          <Button size="sm" variant="secondary" onClick={() => setMoney("deposit")}>
-            {t("deposit")}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setMoney("withdraw")}>
-            {t("withdraw")}
-          </Button>
-        </div>
-      </div>
-      <MoneySheet mode={money} company={company} onClose={() => setMoney(null)} />
-
       {next &&
         company.upgradeCostCents !== null &&
         (company.tier === "garage" || company.tier === "small_business") && (
@@ -570,6 +567,7 @@ function MoneySheet({
   const t = useTranslations("firm");
   const errorText = useGameErrorText();
   const refresh = useCompanyRefresh();
+  const privateCents = useGame((state) => state.portfolio?.cashCents ?? 0);
   const [text, setText] = useState("");
   const [state, setState] = useState<ButtonState>("idle");
   const [shown, setShown] = useState(mode);
@@ -578,15 +576,23 @@ function MoneySheet({
     setText("");
     setState("idle");
   }
-  const cents = parseEuroCents(text);
+  const deposit = shown !== "withdraw";
+  const available = deposit ? privateCents : Math.max(0, company.cashCents - company.unpaidCents);
+  const cents = parseEuroCents(text) ?? 0;
+  const tooMuch = cents > available;
+  const after = {
+    private: privateCents + (deposit ? -cents : cents),
+    company: company.cashCents + (deposit ? cents : -cents),
+  };
   const submit = async () => {
-    if (!cents || !shown) return;
+    if (!cents || tooMuch || !shown) return;
     setState("loading");
     try {
-      if (shown === "deposit") await engine.companyDeposit(crypto.randomUUID(), cents);
+      if (deposit) await engine.companyDeposit(crypto.randomUUID(), cents);
       else await engine.companyWithdraw(crypto.randomUUID(), cents);
-      toast.success(shown === "deposit" ? t("depositDone") : t("withdrawDone"), formatMoney(cents), { silent: true });
+      toast.success(deposit ? t("depositDone") : t("withdrawDone"), formatMoney(cents), { silent: true });
       void playSound("coin");
+      haptic("success");
       await refresh();
       onClose();
     } catch (error) {
@@ -594,20 +600,175 @@ function MoneySheet({
       toast.error(t("money"), errorText(error));
     }
   };
+  const pocket = (label: string, now: number, next: number, highlight: boolean) => (
+    <div
+      className={cn(
+        "min-w-0 flex-1 rounded-md px-3 py-2.5",
+        highlight ? "bg-accent-soft ring-1 ring-accent" : "bg-surface-2",
+      )}
+    >
+      <p className="label-pixel text-fg-3">{label}</p>
+      <p className="truncate nums font-semibold text-fg-1">{formatMoney(now, { whole: true })}</p>
+      {cents > 0 && !tooMuch && (
+        <p className="truncate nums text-xs text-fg-2">→ {formatMoney(next, { whole: true })}</p>
+      )}
+    </div>
+  );
   return (
     <Sheet
       open={mode !== null}
       onOpenChange={(open) => !open && onClose()}
-      title={shown === "withdraw" ? t("withdraw") : t("deposit")}
-      description={`${t("cash")}: ${formatMoney(company.cashCents)}`}
+      title={deposit ? t("deposit") : t("withdraw")}
+      description={deposit ? t("depositHint") : t("withdrawHint")}
       footer={
-        <Button block size="lg" state={state} disabled={!cents} onClick={() => void submit()}>
-          {shown === "withdraw" ? t("withdraw") : t("deposit")}
+        <Button block size="lg" state={state} disabled={!cents || tooMuch} onClick={() => void submit()}>
+          {cents > 0
+            ? t(deposit ? "depositAmount" : "withdrawAmount", { amount: formatMoney(cents, { whole: true }) })
+            : deposit
+              ? t("deposit")
+              : t("withdraw")}
         </Button>
       }
     >
-      <Field label={t("amount")} inputMode="decimal" value={text} onChange={(event) => setText(event.target.value)} />
+      <div className="space-y-4">
+        <div className="flex items-center gap-2" data-testid="money-flow">
+          {pocket(t("private"), privateCents, after.private, !deposit)}
+          <motion.span
+            aria-hidden
+            className="font-pixel text-lg text-accent"
+            animate={{ x: deposit ? [0, 4, 0] : [0, -4, 0] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+          >
+            {deposit ? "→" : "←"}
+          </motion.span>
+          {pocket(t("companyCash"), company.cashCents, after.company, deposit)}
+        </div>
+        <Field
+          label={t("amount")}
+          inputMode="decimal"
+          value={text}
+          error={tooMuch ? t("tooMuch", { amount: formatMoney(available, { whole: true }) }) : undefined}
+          onChange={(event) => setText(event.target.value)}
+        />
+        <div className="flex flex-wrap gap-2">
+          {[0.1, 0.25, 0.5, 1].map((share) => {
+            const value = Math.floor((available * share) / 100) * 100;
+            return (
+              <button
+                key={share}
+                type="button"
+                disabled={value <= 0}
+                onClick={() => {
+                  haptic("tap");
+                  setText(String(value / 100).replace(".", ","));
+                }}
+                className="rounded-pill border border-line-1 px-3 py-1.5 text-xs text-fg-2 focus-ring transition duration-fast hover:border-accent hover:text-fg-1 active:scale-95 disabled:opacity-40"
+              >
+                {share === 1 ? t("all") : `${share * 100} %`}
+              </button>
+            );
+          })}
+        </div>
+        {!deposit && company.unpaidCents > 0 && (
+          <p className="text-xs text-warn">{t("withdrawUnpaid", { amount: money(company.unpaidCents) })}</p>
+        )}
+      </div>
     </Sheet>
+  );
+}
+
+/** The company's till: balance (live), the founder's own money, deposit and withdraw as big buttons. */
+function TreasuryCard({ company }: { company: MyCompany }) {
+  const t = useTranslations("firm");
+  const privateCents = useGame((state) => state.portfolio?.cashCents ?? 0);
+  const [mode, setMode] = useState<"deposit" | "withdraw" | null>(null);
+  const live = company.live;
+  const hours = company.hours.slice(-12);
+  const max = Math.max(1, ...hours.map((h) => Math.abs(h.profitCents)));
+  return (
+    <Panel title={t("treasuryTitle")}>
+      <div data-testid="treasury">
+        <p className="text-3xl font-semibold text-fg-1">
+          {live ? (
+            <LiveMoney cents={company.cashCents} perHourCents={live.profitPerHourCents} asOf={live.lastHourAt} />
+          ) : (
+            <ShortMoney cents={company.cashCents} />
+          )}
+        </p>
+        <p className="mt-1 text-xs text-fg-3">
+          {t("privateLine")} <ShortMoney cents={privateCents} className="text-fg-2" />
+          {company.unpaidCents > 0 && (
+            <span className="text-warn"> · {t("unpaidLine", { amount: money(company.unpaidCents) })}</span>
+          )}
+        </p>
+      </div>
+      {hours.length > 0 && (
+        <div className="flex h-10 items-center gap-0.5" role="img" aria-label={t("hoursChart")}>
+          {hours.map((h) => (
+            <span key={h.hourStart} className="flex h-full flex-1 flex-col justify-center">
+              <span
+                className={cn("w-full rounded-xs", h.profitCents >= 0 ? "self-end bg-gain" : "bg-loss")}
+                style={{ height: `${Math.max(6, (Math.abs(h.profitCents) / max) * 50)}%` }}
+                title={`${new Date(h.hourStart).getHours()}:00 · ${formatMoney(h.profitCents, { whole: true })}`}
+              />
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        <MoneyButton
+          icon="↓"
+          label={t("deposit")}
+          hint={t("depositShort")}
+          onClick={() => setMode("deposit")}
+          primary
+        />
+        <MoneyButton icon="↑" label={t("withdraw")} hint={t("withdrawShort")} onClick={() => setMode("withdraw")} />
+      </div>
+      <MoneySheet mode={mode} company={company} onClose={() => setMode(null)} />
+    </Panel>
+  );
+}
+
+function MoneyButton({
+  icon,
+  label,
+  hint,
+  onClick,
+  primary,
+}: {
+  icon: string;
+  label: string;
+  hint: string;
+  onClick: () => void;
+  primary?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        haptic("tap");
+        onClick();
+      }}
+      className={cn(
+        "flex items-center gap-3 rounded-md px-3 py-3 text-left focus-ring transition duration-fast hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.97]",
+        primary ? "bg-accent text-on-accent shadow-1" : "bg-surface-2 text-fg-1 ring-1 ring-line-2 hover:bg-surface-3",
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          "grid size-8 shrink-0 place-items-center rounded-sm font-pixel text-base",
+          primary ? "bg-on-accent/15" : "bg-surface-3",
+        )}
+      >
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold">{label}</span>
+        <span className={cn("block truncate text-2xs", primary ? "opacity-80" : "text-fg-3")}>{hint}</span>
+      </span>
+    </button>
   );
 }
 

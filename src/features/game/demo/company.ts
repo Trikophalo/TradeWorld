@@ -22,7 +22,7 @@ import {
 } from "@/lib/sim/startup";
 import { formatMoney } from "@/lib/format";
 import { dissolve, isInsolvent } from "@/lib/sim/insolvency";
-import { hasForbiddenSymbol, isValidLogo, type CompanyLogoData } from "@/lib/sim/logo";
+import { hasForbiddenSymbol, isValidBanner, isValidLogo, type CompanyLogoData } from "@/lib/sim/logo";
 import {
   GameError,
   type ChatMessage,
@@ -98,6 +98,8 @@ export interface DemoCompanyState {
   productKey?: string;
   /** Pixel logo (ADR-065). */
   logo?: CompanyLogoData | null;
+  /** Pixel banner (ADR-078). */
+  banner?: CompanyLogoData | null;
   /** Going public (ADR-067). In the demo AI investors are the only subscribers. */
   listing?: {
     status: "subscription" | "listed";
@@ -578,6 +580,7 @@ export function createCompanyEngine(host: CompanyHost) {
       payFactorBps: 10_000,
       logo: company.logo ?? null,
       logoHidden: false,
+      banner: company.banner ?? null,
       founderHasJob: host.hasJob(),
       fullTimeFrom: startups.fullTimeFromEmployees,
       headcount: company.aiWorkers,
@@ -638,6 +641,7 @@ export function createCompanyEngine(host: CompanyHost) {
     | "respondRaise"
     | "trainEmployee"
     | "setCompanyLogo"
+    | "setCompanyBanner"
     | "reportCompanyLogo"
     | "goPublic"
     | "capitalIncrease"
@@ -884,6 +888,17 @@ export function createCompanyEngine(host: CompanyHost) {
         if (company.logo) throw new GameError("logo_locked");
         if (hasForbiddenSymbol(logo)) throw new GameError("logo_forbidden");
         company.logo = { palette: [...logo.palette], grid: [...logo.grid] };
+      }),
+
+    setCompanyBanner: (requestId, banner) =>
+      mutate(requestId, (company) => {
+        if (banner === null) {
+          company.banner = null;
+          return;
+        }
+        if (!isValidBanner(banner)) throw new GameError("invalid_argument");
+        if (hasForbiddenSymbol(banner)) throw new GameError("logo_forbidden");
+        company.banner = { palette: [...banner.palette], grid: [...banner.grid] };
       }),
 
     async reportCompanyLogo() {
