@@ -1,11 +1,11 @@
 {
   "offer": {
-    "id": "6604410e-65cf-4938-b14c-87483225873b",
+    "id": "8141c4a5-bba1-4f3e-8627-373bb924afb6",
     "kind": "ipo",
     "status": "open",
     "ticker": null,
     "company": {
-      "id": "e298d0ca-2fa5-4dd3-9d32-277b93e2e73d",
+      "id": "5ccf43ca-37d9-4a6d-9550-feabab26e5fd",
       "logo": {
         "grid": [
           "................",
@@ -33,9 +33,9 @@
       "sector": "tech",
       "product_key": "security_software"
     },
-    "ends_at": "2026-11-13T08:42:42.264453+00:00",
+    "ends_at": "2026-11-13T09:05:41.650839+00:00",
     "price_cents": 100,
-    "value_cents": 1127609,
+    "value_cents": 1128902,
     "last_quarter": { "label": "J1 Q2", "profit_cents": 0, "revenue_cents": 0 },
     "my_shares_e6": 250000000,
     "shares_offered_e6": 200000000000,

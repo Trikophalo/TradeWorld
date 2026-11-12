@@ -83,7 +83,9 @@ select tests.assert(
            'set_company_banner',
            -- M4a RPCs
            'bid_artwork', 'cancel_auction', 'create_artwork', 'get_art_rankings', 'get_art_studio', 'get_artwork',
-           'get_artworks', 'get_collection', 'like_artwork', 'start_auction']
+           'get_artworks', 'get_collection', 'like_artwork', 'start_auction',
+           -- M4b RPCs
+           'buy_car', 'buy_floor', 'buy_furniture', 'buy_home', 'get_property', 'save_layout', 'sell_item']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')

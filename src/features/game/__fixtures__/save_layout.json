@@ -1,0 +1,25 @@
+{
+  "property": {
+    "tier": "flat",
+    "floor": "parquet",
+    "owner": "Fixture_Heim",
+    "width": 8,
+    "garage": [],
+    "height": 6,
+    "placed": [
+      { "x": 1, "y": 1, "id": "602a7d5f-2155-4146-bfa6-071eadd77e0e", "rot": 0, "item_key": "sofa_leather" },
+      { "x": 1, "y": 1, "id": "d3353f91-fccd-4656-9de7-50e2d6c9d898", "rot": 0, "item_key": "rug_wool" }
+    ],
+    "wall_color": "#2f5fd0",
+    "value_cents": 1614400,
+    "floors_owned": ["laminate", "parquet"],
+    "garage_slots": 0
+  },
+  "inventory": {
+    "cars": [],
+    "furniture": [
+      { "id": "5a79f904-bd8b-4c2c-b685-524b63243a4f", "item_key": "plant_small" },
+      { "id": "6fe8b479-5ac5-4a83-b438-b748fdaa4ee9", "item_key": "plant_small" }
+    ]
+  }
+}

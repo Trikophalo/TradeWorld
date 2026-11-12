@@ -1,0 +1,24 @@
+{
+  "property": {
+    "tier": "house",
+    "floor": "parquet",
+    "owner": "Fixture_Heim",
+    "width": 13,
+    "garage": [{ "id": "d19e4f00-24de-4d03-8ca4-a7ddf43cf503", "slot": 0, "car_key": "car_electric" }],
+    "height": 9,
+    "placed": [],
+    "wall_color": "#2f5fd0",
+    "value_cents": 27843200,
+    "floors_owned": ["laminate", "parquet"],
+    "garage_slots": 2
+  },
+  "inventory": {
+    "cars": [],
+    "furniture": [
+      { "id": "602a7d5f-2155-4146-bfa6-071eadd77e0e", "item_key": "sofa_leather" },
+      { "id": "d3353f91-fccd-4656-9de7-50e2d6c9d898", "item_key": "rug_wool" },
+      { "id": "6fe8b479-5ac5-4a83-b438-b748fdaa4ee9", "item_key": "plant_small" }
+    ]
+  },
+  "refund_cents": 360000
+}

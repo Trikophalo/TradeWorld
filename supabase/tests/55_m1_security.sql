@@ -11,7 +11,7 @@ select tests.assert(
   (select array_agg(p.proname::text order by p.proname)
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute'))
-  = array['admin_close_quarter', 'admin_run_tick', 'admin_set_paused', 'apply_for_job', 'are_friends', 'bid_artwork',
+  = array['admin_close_quarter', 'admin_run_tick', 'admin_set_paused', 'apply_for_job', 'are_friends', 'bid_artwork', 'buy_car', 'buy_floor', 'buy_furniture', 'buy_home',
           'can_read_ledger_transaction', 'cancel_auction', 'cancel_order', 'cancel_quit', 'capital_increase', 'change_nickname',
           'check_company_name', 'check_nickname', 'claim_daily_reward', 'claim_mission', 'claim_vault',
           'close_company', 'close_job_posting', 'company_deposit', 'company_withdraw', 'complete_tutorial',
@@ -20,14 +20,14 @@ select tests.assert(
           'get_artworks', 'get_candles', 'get_collection', 'get_company_applications', 'get_company_chat',
           'get_company_postings', 'get_company_ranking', 'get_company_team', 'get_daily_reward', 'get_employer', 'get_job_board',
           'get_market_snapshot', 'get_my_applications', 'get_my_company', 'get_my_job', 'get_my_missions',
-          'get_my_portfolio', 'get_my_skills', 'get_offers', 'get_order_book', 'get_player_card', 'get_rich_list',
+          'get_my_portfolio', 'get_my_skills', 'get_offers', 'get_order_book', 'get_player_card', 'get_property', 'get_rich_list',
           'get_rich_list_news', 'get_security_details', 'get_work_task', 'go_public', 'has_unlock', 'hire_ai_workers', 'is_admin',
           'is_company_insider', 'learn_skill', 'like_artwork', 'owns_ledger_account', 'place_order', 'post_company_message',
           'quit_job', 'report_company_logo', 'request_raise', 'reset_account', 'respond_application', 'respond_raise',
-          'set_ai_workers', 'set_avatar', 'set_company_banner', 'set_company_logo', 'set_company_marketing', 'sign_contract',
+          'save_layout', 'sell_item', 'set_ai_workers', 'set_avatar', 'set_company_banner', 'set_company_logo', 'set_company_marketing', 'sign_contract',
           'start_auction', 'submit_work_task', 'subscribe_offer', 'track_event', 'train_employee', 'upgrade_company',
           'withdraw_application'],
-  'authenticated can execute exactly the 9 helpers and the RPCs up to M4a (70)');
+  'authenticated can execute exactly the 9 helpers and the RPCs up to M4b (71)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute') and p.proname <> 'check_nickname'),

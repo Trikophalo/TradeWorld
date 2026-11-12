@@ -1,38 +1,38 @@
 {
   "applications": [
     {
-      "id": "cfba9c0a-e266-4eff-99aa-d8ea6caece8e",
+      "id": "08f95a2a-f31a-4e48-9292-e37760a204c1",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "7e22dd8b-5a55-4e5b-876d-42bc12d2bdbd",
+        "id": "254d018b-71e2-44a7-8018-b1e683356154",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
+          "id": "12ef4943-a830-a22b-a142-8a080f7be8be",
           "logo": null,
-          "name": "Frachtpilot",
-          "color": "#9ECE6A",
+          "name": "Kaufrausch Märkte",
+          "color": "#FF6B8B",
           "is_ai": true,
-          "sector": "logistics",
-          "ticker": "FPT"
+          "sector": "retail",
+          "ticker": "KFR"
         },
-        "required": [{ "branch": "logistics", "min_score": 0 }],
-        "title_key": "logistics_intern",
+        "required": [{ "branch": "management", "min_score": 0 }],
+        "title_key": "management_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-12T20:42:41.54596+00:00",
-      "updated_at": "2026-11-12T20:42:41.548755+00:00",
-      "offer_expires_at": "2026-11-14T20:42:41.54596+00:00",
+      "created_at": "2026-11-12T21:05:41.010192+00:00",
+      "updated_at": "2026-11-12T21:05:41.013182+00:00",
+      "offer_expires_at": "2026-11-14T21:05:41.010192+00:00",
       "salary_wish_cents_per_hour": 15000,
       "offer_salary_cents_per_hour": 15000
     },
     {
-      "id": "bd531244-aa36-49e1-9f31-ff4c92cf213e",
+      "id": "926b7676-47ce-400c-b9c7-8c5fd2c5d0c7",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "b4c32ae6-4622-4ef7-9e53-79de7136da3e",
+        "id": "8a91ad57-6a27-4e5d-8f98-90ee00adda35",
         "tier": "junior",
         "title": null,
         "company": {
@@ -48,9 +48,9 @@
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-12T20:42:41.541334+00:00",
-      "updated_at": "2026-11-12T20:42:41.541334+00:00",
-      "offer_expires_at": "2026-11-14T20:42:41.541334+00:00",
+      "created_at": "2026-11-12T21:05:41.005833+00:00",
+      "updated_at": "2026-11-12T21:05:41.005833+00:00",
+      "offer_expires_at": "2026-11-14T21:05:41.005833+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

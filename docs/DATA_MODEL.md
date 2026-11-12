@@ -5114,3 +5114,123 @@ Arbeitsaufgaben gibt es seit ADR-064 nicht mehr; dafür gibt es keine neue Missi
 
 - Keine Benachrichtigungen beim Überbieten oder Verkauf (die Tabelle `notifications` wird noch nirgends befüllt).
 - Gelöschte Spieler verlieren ihre Gebote im Verlauf (`artwork_bids` mit `on delete cascade`).
+
+## Nachtrag: M4b (Grundstück: Bleibe, Möbel, Böden, Garage)
+
+### Migrationen
+
+| Datei                             | Inhalt                                                                                 |
+| --------------------------------- | -------------------------------------------------------------------------------------- |
+| `20261123000100_m4b_property.sql` | Katalog- und Spielertabellen, sieben RPCs, Vermögen, Zurücksetzen, Missionen (ADR-082) |
+| `seeds/furniture.sql` (generiert) | 65 Möbel und 14 Autos (`scripts/gen-furniture.ts`), `on conflict (key) do update`      |
+
+`seeds/furniture.sql` läuft nach `seeds/artworks.sql` (`verify_local.sh`, nur wenn `furniture_catalog` existiert) und
+steht in `setup-all.sql`, `setup-seeds.sql`, `update-to-latest.sql` und im letzten Teil von `sql-editor/setup-*` und
+`sql-editor/update-*`. Preise, Namen und Größen werden bei jedem Lauf aktualisiert.
+
+### Schema
+
+Alle fünf Tabellen haben RLS ohne Policy und ohne Rechte für Clients; gelesen wird nur über die RPCs.
+
+- `furniture_catalog`: `key` (PK), `name`, `category` (`seating`, `tables`, `beds`, `kitchen`, `bath`, `plants`,
+  `decor`, `tech`, `rugs`, `fun`), `tier` (`budget` bis `ultra`), `price_cents`, `width`, `height` (Felder),
+  `layer` (`floor` = Teppich, liegt unter Möbeln; `object`).
+- `car_catalog`: `key` (PK), `name`, `brand`, `tier`, `price_cents`.
+- `player_homes`: `player_id` (PK, → `profiles`, `on delete cascade`), `tier` (Schlüssel aus `property.tiers`,
+  `null` = noch keine Bleibe), `wall_color` (`#rrggbb`), `floor` (verwendeter Boden, Standard `laminate`),
+  `floors_owned text[]` (gekaufte Böden, Standard `{laminate}`), `updated_at` (Trigger `set_updated_at`). Die Zeile
+  entsteht beim ersten Kauf einer Bleibe oder eines Bodens.
+- `player_furniture`: `id`, `player_id`, `item_key` (→ `furniture_catalog`), `price_paid_cents`, `placed`, `x`, `y`
+  (linkes oberes Feld, nur wenn aufgestellt), `rot` (0 | 90), `bought_at`. Nicht aufgestellt = Inventar.
+- `player_cars`: `id`, `player_id`, `car_key` (→ `car_catalog`), `slot` (eindeutig je Spieler), `price_paid_cents`,
+  `bought_at`.
+
+### Geld
+
+- Alle Käufe gehen als Buchung `lifestyle_purchase` vom Bargeld an die Haushalte (`households`), Rückverkäufe als
+  `lifestyle_sale` von den Haushalten ans Bargeld (danach `loan_withhold` wie bei anderen Einkünften). Beide Arten gab
+  es schon im Enum; neue Buchungsarten sind nicht nötig.
+- Idempotenzschlüssel: `property:home:<spieler>:<request>`, `property:furniture:<spieler>:<request>`,
+  `property:floor:<spieler>:<material>` (jeder Boden höchstens einmal), `property:car:<auto>`, `property:sell:<id>`.
+- Vermögen: `player_property_value_cents(spieler)` = `⌊Preis der Stufe × tradeInBps / 10 000⌋` +
+  `⌊bezahlter Preis × resaleBps / 10 000⌋` je Möbelstück und Auto + `⌊Preis × resaleBps / 10 000⌋` je gekauftem Boden
+  (Preis aus `property.floors`, Laminat zählt 0). Zählt zu `player_net_worth_cents` und `rich_list_entries`.
+
+### Regeln (wie `src/lib/sim/property.ts`)
+
+- `property_config()` liest `game_config.property` (Rückfall: Werte aus `balance.ts`); `property_tier`,
+  `property_trade_in_cents`, `property_upgrade_cost_cents` (`upgradeCostCents`), `property_resale_cents`
+  (`resaleCents`), `property_floor_price_cents`, `property_floor_owned` (gekauft oder Preis 0).
+- Alle Schreib-RPCs verlangen Level ≥ `unlock_level('property')` (4), sonst `property_locked`, und sind über
+  `request_id` idempotent. Lesen darf jeder Spieler.
+- Aufstellung (`invalidPlacements`): Jedes Teil liegt ganz im Grundriss der Stufe (`rot` 90 tauscht Breite und Höhe),
+  auf einem Feld liegt höchstens ein Teil je Ebene (`floor`, `object`): Teppich unter Sofa ist erlaubt, zwei Teppiche
+  oder zwei Möbel übereinander nicht.
+
+### RPCs
+
+PROPERTY und INVENTORY wie in `docs/PROPERTY.md` Abschnitt 2. Ergänzungen:
+
+- `floors_owned` enthält gekaufte und kostenlose Böden, sortiert nach Preis. `placed` und das Inventar nach Kaufzeit,
+  `garage` nach Platz. `inventory.cars` ist immer leer (Autos stehen in der Garage).
+- `get_property(p_nickname)`: Spitzname ohne Groß-/Kleinschreibung, `null` = eigene Bleibe; unbekannt:
+  `player_not_found`. Fremde Bleiben sind öffentlich, `inventory` ist dann `null`. Ohne Bleibe: `tier` `null`,
+  `width`/`height`/`garage_slots` 0, erste Wandfarbe, Laminat.
+- `buy_home(p_request_id, p_tier)`: unbekannte Stufe `invalid_argument`; Level unter `minLevel` der Stufe
+  `property_locked`; gleiche oder niedrigere Stufe `invalid_tier`; Stufen dürfen übersprungen werden.
+  `cost_cents` = Preis − Anrechnung der alten Bleibe. Beim Umzug kommen alle Möbel ins Inventar, Autos, Böden und
+  Wandfarbe bleiben.
+- `buy_furniture(p_request_id, p_item_key, p_count)`: `p_count` 1 bis 20 (sonst `invalid_argument`), unbekanntes
+  Stück `item_not_found`. Eine Bleibe ist nicht nötig.
+- `buy_floor(p_request_id, p_material)`: unbekannter Boden `invalid_argument`; ein schon gekaufter oder kostenloser
+  Boden kostet nichts (Antwort wie gewohnt). Eine Bleibe ist nicht nötig.
+- `save_layout(p_request_id, p_wall_color, p_floor, p_placed)`: Prüfreihenfolge `p_placed` kein Array oder Wandfarbe
+  nicht in `property.wallColors` (Groß-/Kleinschreibung egal, gespeichert klein): `invalid_argument`; keine Bleibe:
+  `no_home`; Boden nicht im Besitz: `floor_not_owned`; Eintrag ohne `id`/`x`/`y`/`rot`, `x`/`y` keine ganze Zahl ≥ 0,
+  `rot` nicht 0 oder 90, eine `id` doppelt oder nicht im Besitz, außerhalb oder überlappend: `layout_invalid`.
+  Die Aufstellung ersetzt die alte vollständig.
+- `buy_car(p_request_id, p_car_key)`: ohne Bleibe `no_home`, unbekanntes Auto `item_not_found`, kein freier Platz
+  (Wohnung und Apartment haben 0) `garage_full`. Das Auto kommt auf den ersten freien Platz.
+- `sell_item(p_request_id, p_kind, p_id)`: `p_kind` `furniture` oder `car` (sonst `invalid_argument`); aufgestellte,
+  fremde oder unbekannte Stücke `item_not_found`. `refund_cents` = `⌊bezahlter Preis × resaleBps / 10 000⌋`.
+
+### Neue Fehlerschlüssel
+
+| Schlüssel         | Code    |
+| ----------------- | ------- |
+| `property_locked` | `NX074` |
+| `no_home`         | `NX075` |
+| `invalid_tier`    | `NX076` |
+| `item_not_found`  | `NX077` |
+| `layout_invalid`  | `NX078` |
+| `floor_not_owned` | `NX079` |
+| `garage_full`     | `NX080` |
+
+Dazu wie bisher `insufficient_funds` (`NX001`), `invalid_argument` (`NX007`), `player_not_found` (`NX045`).
+
+### Konto zurücksetzen und löschen
+
+`account_wipe` löscht `player_homes`, `player_furniture` und `player_cars` des Spielers ohne Erstattung: Das Geld ist
+beim Kauf an die Haushalte gegangen und bleibt dort (Geldmengen-Invariante unverändert). Beim Löschen des Kontos
+greift zusätzlich `on delete cascade`.
+
+### Freischaltung
+
+Zeile `property` (Level 4, „Grundstück“, Symbol `unlock_home`) in `unlocks` (in `seed.sql` und, sobald die
+Level-Tabelle gefüllt ist, in der Migration); Spieler ab Level 4 bekommen sie beim Update in `player_unlocks`.
+
+### Missionen
+
+Neue Messgrößen (`mission_event`): `home_bought` (`buy_home`), `home_upgraded` (`buy_home` mit vorhandener Bleibe),
+`furniture_bought` (`buy_furniture`, Summe der Stücke), `furniture_placed` (`save_layout`, Zahl der aufgestellten
+Stücke; Modus `max`), `car_bought` (`buy_car`). Alle Vorlagen mit `params.unlock = 'property'`:
+
+- Schnell: `q_home_furniture` (ein Möbelstück kaufen).
+- Meilensteine: `m_home_first` (20), `m_home_furnish` (5 Stücke aufstellen, 21), `m_home_upgrade` (ab Level 8, 23),
+  `m_home_car` (ab Level 14, 25).
+
+### Bekannte Grenzen
+
+- Die Böden zählen zum Vermögen mit dem aktuellen Preis aus `property.floors`, nicht mit dem damals bezahlten.
+- Missionen mit Ereignissen zählen erst ab ihrer Vergabe: Wer schon eine Bleibe hat, erfüllt `m_home_first` erst mit
+  dem nächsten Umzug.

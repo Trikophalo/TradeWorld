@@ -1,5 +1,5 @@
 {
-  "mine": { "rank": 11, "value_cents": 54108 },
+  "mine": { "rank": 11, "value_cents": 54107 },
   "total": 11,
   "entries": [
     {
@@ -34,8 +34,8 @@
       "founder": "Fenja_Firma",
       "is_mine": false,
       "team_size": 6,
-      "company_id": "2999656e-0f1f-4da1-9529-09bd9b1ff226",
-      "value_cents": 82249808,
+      "company_id": "518e688d-f0aa-4913-8d58-aa511cae5b51",
+      "value_cents": 82669660,
       "revenue_cents": 0
     },
     {
@@ -50,7 +50,7 @@
       "founder": "Frieda_Format",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "639fd166-bb37-49a4-9dda-e3ee094d249f",
+      "company_id": "2c83d50d-f380-411b-ac28-0700a3fb084f",
       "value_cents": 51553750,
       "revenue_cents": 1185000
     },
@@ -66,9 +66,9 @@
       "founder": "Hanna_Stunde",
       "is_mine": false,
       "team_size": 3,
-      "company_id": "138f8a5e-04a9-4b65-bdb4-e002c1218059",
-      "value_cents": 6927900,
-      "revenue_cents": 220502
+      "company_id": "ab30508d-f13b-449b-9ec4-3a465e97f5e7",
+      "value_cents": 6928071,
+      "revenue_cents": 231973
     },
     {
       "kind": "player",
@@ -82,7 +82,7 @@
       "founder": "Frida_Firma",
       "is_mine": false,
       "team_size": 3,
-      "company_id": "98bdf5ea-522d-4b57-ac41-c9185be6ffcc",
+      "company_id": "3e7c056f-6b00-484f-9f5e-588f0541376e",
       "value_cents": 2263002,
       "revenue_cents": 0
     },
@@ -98,10 +98,10 @@
       "founder": "Sven_Small",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "87f91204-56e9-4e6c-b9aa-38742d70ace5",
+      "company_id": "c18bfbab-6637-413a-b6a2-270808a5167c",
       "value_cents": 1500000,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-12T20:42:42.011094+00:00"
+  "server_time": "2026-11-12T21:05:41.478908+00:00"
 }

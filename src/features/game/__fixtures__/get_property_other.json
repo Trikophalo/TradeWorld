@@ -1,0 +1,16 @@
+{
+  "property": {
+    "tier": "house",
+    "floor": "parquet",
+    "owner": "Fixture_Heim",
+    "width": 13,
+    "garage": [{ "id": "d19e4f00-24de-4d03-8ca4-a7ddf43cf503", "slot": 0, "car_key": "car_electric" }],
+    "height": 9,
+    "placed": [],
+    "wall_color": "#2f5fd0",
+    "value_cents": 27843200,
+    "floors_owned": ["laminate", "parquet"],
+    "garage_slots": 2
+  },
+  "inventory": null
+}

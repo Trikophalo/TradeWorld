@@ -1,5 +1,5 @@
 -- =============================================================================
--- Dumps one real response of every read/write RPC (M1 to M4a) as JSON files, so the
+-- Dumps one real response of every read/write RPC (M1 to M4b) as JSON files, so the
 -- frontend's Zod schemas can be tested against the database (contract test:
 -- src/features/game/api.test.ts). Run by verify_local.sh when
 -- NEXA_FIXTURE_DIR is set. Not an assertion file.
@@ -414,5 +414,52 @@ select public.get_art_rankings(5);
 select public.get_collection('Fixture_Kunst');
 \o :fixture_dir/get_collection_own.json
 select public.get_collection(null);
+\o
+reset role;
+
+-- M4b: property (ADR-082): a player without a home, a flat with a layout, the move to a house,
+-- a car, a sale, and another player's view (no inventory)
+\set fx_h '''f1f1f1f1-0000-4000-8000-0000000000fb'''
+select tests.signup(:fx_h, 'Fixture_Heim') is not null as ok \gset
+select tests.set_level(:fx_h, 14);
+select tests.fund(:fx_h, 60000000, 'fixture:m4b:h');
+select tests.login_as('authenticated', :fx_h) is null as ok \gset
+\o :fixture_dir/get_property_empty.json
+select public.get_property(null);
+\o :fixture_dir/buy_home.json
+select public.buy_home(gen_random_uuid(), 'flat');
+\o :fixture_dir/buy_furniture.json
+select public.buy_furniture(gen_random_uuid(), 'sofa_leather', 1);
+\o
+select public.buy_furniture(gen_random_uuid(), 'rug_wool', 1) as fx_bf \gset
+select public.buy_furniture(gen_random_uuid(), 'plant_small', 2) is not null as ok \gset
+\o :fixture_dir/buy_floor.json
+select public.buy_floor(gen_random_uuid(), 'parquet');
+\o :fixture_dir/save_layout.json
+select public.save_layout(gen_random_uuid(), '#2f5fd0', 'parquet',
+         (select jsonb_agg(case e ->> 'item_key'
+                             when 'rug_wool' then jsonb_build_object('id', e ->> 'id', 'x', 1, 'y', 1, 'rot', 0)
+                             when 'sofa_leather' then jsonb_build_object('id', e ->> 'id', 'x', 1, 'y', 1, 'rot', 0)
+                             else jsonb_build_object('id', e ->> 'id', 'x', 7, 'y', 0, 'rot', 90) end)
+            from jsonb_array_elements(:'fx_bf'::jsonb #> '{inventory,furniture}') e));
+\o :fixture_dir/buy_home_upgrade.json
+select public.buy_home(gen_random_uuid(), 'house');
+\o :fixture_dir/buy_car.json
+select public.buy_car(gen_random_uuid(), 'car_electric');
+\o
+select (public.buy_car(gen_random_uuid(), 'car_city') #> '{property,garage}' -> 1 ->> 'id')::uuid as fx_car2 \gset
+\o :fixture_dir/sell_item.json
+select public.sell_item(gen_random_uuid(), 'furniture',
+         (select (e ->> 'id')::uuid from jsonb_array_elements(public.get_property(null) #> '{inventory,furniture}') e
+           where e ->> 'item_key' = 'plant_small' limit 1));
+\o :fixture_dir/sell_item_car.json
+select public.sell_item(gen_random_uuid(), 'car', :'fx_car2');
+\o :fixture_dir/get_property.json
+select public.get_property(null);
+\o
+reset role;
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/get_property_other.json
+select public.get_property('Fixture_Heim');
 \o
 reset role;

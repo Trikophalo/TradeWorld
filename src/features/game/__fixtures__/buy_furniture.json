@@ -1,0 +1,19 @@
+{
+  "property": {
+    "tier": "flat",
+    "floor": "laminate",
+    "owner": "Fixture_Heim",
+    "width": 8,
+    "garage": [],
+    "height": 6,
+    "placed": [],
+    "wall_color": "#f3efe4",
+    "value_cents": 1346000,
+    "floors_owned": ["laminate"],
+    "garage_slots": 0
+  },
+  "inventory": {
+    "cars": [],
+    "furniture": [{ "id": "602a7d5f-2155-4146-bfa6-071eadd77e0e", "item_key": "sofa_leather" }]
+  }
+}

@@ -32,11 +32,7 @@ describe("RPC contract", () => {
       "get_offers",
       "subscribe_offer",
     ];
-    // M4b property is written after the artworks (TODO: remove once get_property.json exists).
-    const m4b = fixtures.some((file) => file.startsWith("get_property"))
-      ? []
-      : ["get_property", "buy_home", "buy_furniture", "buy_floor", "save_layout", "buy_car", "sell_item"];
-    const pending = [...(fixtures.some((file) => file.startsWith("get_offers")) ? [] : m3f), ...m4b];
+    const pending = fixtures.some((file) => file.startsWith("get_offers")) ? [] : m3f;
     for (const name of Object.keys(RPC_SCHEMAS).filter((key) => !pending.includes(key))) {
       expect(
         fixtures.some((file) => file.startsWith(name)),

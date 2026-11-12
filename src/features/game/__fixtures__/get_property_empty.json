@@ -1,0 +1,16 @@
+{
+  "property": {
+    "tier": null,
+    "floor": "laminate",
+    "owner": "Fixture_Heim",
+    "width": 0,
+    "garage": [],
+    "height": 0,
+    "placed": [],
+    "wall_color": "#f3efe4",
+    "value_cents": 0,
+    "floors_owned": ["laminate"],
+    "garage_slots": 0
+  },
+  "inventory": { "cars": [], "furniture": [] }
+}

@@ -1,6 +1,6 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 26, "gap_cents": 481 }, "rank": 27, "net_worth_cents": 1019519 },
-  "total": 82,
+  "me": { "next": { "name": "Vera", "rank": 28, "gap_cents": 644 }, "rank": 29, "net_worth_cents": 1019356 },
+  "total": 88,
   "entries": [
     {
       "id": "0f3f3f3f-0000-4000-8000-0000000000f1",
@@ -11,14 +11,26 @@
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 102480991,
+      "net_worth_cents": 102837991,
+      "rank_change_24h": null
+    },
+    {
+      "id": "07170717-0000-4000-8000-0000000000a1",
+      "kind": "player",
+      "name": "Hanna_Haus",
+      "rank": 2,
+      "is_me": false,
+      "avatar_key": "rookie",
+      "description": null,
+      "change_24h_bps": null,
+      "net_worth_cents": 69258200,
       "rank_change_24h": null
     },
     {
       "id": "0e3e3e3e-0000-4000-8000-0000000000f1",
       "kind": "player",
       "name": "Frieda_Format",
-      "rank": 2,
+      "rank": 3,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
@@ -27,41 +39,29 @@
       "rank_change_24h": null
     },
     {
-      "id": "06860686-0000-4000-8000-0000000000a1",
+      "id": "07170717-0000-4000-8000-0000000000b2",
       "kind": "player",
-      "name": "Hanna_Stunde",
-      "rank": 3,
-      "is_me": false,
-      "avatar_key": "rookie",
-      "description": null,
-      "change_24h_bps": null,
-      "net_worth_cents": 10677900,
-      "rank_change_24h": null
-    },
-    {
-      "id": "0c3c3c3c-0000-4000-8000-0000000000f1",
-      "kind": "player",
-      "name": "Frida_Firma",
+      "name": "Moritz_Moebel",
       "rank": 4,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 6583002,
+      "net_worth_cents": 15904600,
       "rank_change_24h": null
     },
     {
-      "id": "0b3c3c3c-0000-4000-8000-0000000000b1",
+      "id": "06860686-0000-4000-8000-0000000000a1",
       "kind": "player",
-      "name": "Bea_Boerse",
+      "name": "Hanna_Stunde",
       "rank": 5,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 6032855,
+      "net_worth_cents": 10678071,
       "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-12T20:42:41.437656+00:00"
+  "server_time": "2026-11-12T21:05:40.891727+00:00"
 }
