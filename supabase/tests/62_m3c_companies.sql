@@ -310,6 +310,12 @@ create table tests.q_status as select id, status from public.game_quarters;
 update public.game_quarters set status = 'closed' where starts_at <= now();
 update public.companies set founded_at = now() - interval '1 day' where id = :'fco';
 update public.player_companies set last_closed_quarter_id = null where company_id = :'fco';
+-- Independent of the time of day: the company's hours reach the end of the latest closed quarter.
+update public.player_companies
+   set last_hour_at = (select max(ends_at) from public.game_quarters where status = 'closed')
+ where company_id = :'fco';
+delete from public.player_company_reports
+ where company_id = :'fco' and game_quarter_id = (select id from public.game_quarters where status = 'closed' order by ends_at desc limit 1);
 select coalesce(sum(n), 0) as due_expected
   from (select least(8, (select count(*) from public.game_quarters gq
                           where gq.status = 'closed'
