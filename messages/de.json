@@ -27,10 +27,12 @@
       "artworks": "Kunst",
       "profile": "Profil",
       "property": "Haus",
-      "more": "Mehr"
+      "more": "Mehr",
+      "friends": "Freunde"
     },
     "property": "Grundstück",
-    "more": "Mehr"
+    "more": "Mehr",
+    "friends": "Freunde"
   },
   "topbar": {
     "search": "Aktien, Firmen, Spieler suchen",
@@ -296,7 +298,9 @@
     "missions": "Missionen",
     "missionsHint": "Schnelle, tägliche, wöchentliche und Story-Missionen",
     "richList": "Ranglisten",
-    "richListHint": "Forbes 100, alle Reichen und die wertvollsten Firmen"
+    "richListHint": "Forbes 100, alle Reichen und die wertvollsten Firmen",
+    "friends": "Freunde",
+    "friendsHint": "Anfragen, Freundesliste und Profile"
   },
   "unlocks": {
     "market_orders": "Aktien kaufen und verkaufen",
@@ -1977,7 +1981,139 @@
     "companyCash": "Firma",
     "tooMuch": "Höchstens {amount}",
     "all": "Alles",
-    "withdrawUnpaid": "{amount} offene Rechnungen bleiben in der Firma."
+    "withdrawUnpaid": "{amount} offene Rechnungen bleiben in der Firma.",
+    "coach": {
+      "title": "Gewinn-Coach",
+      "perHour": "{amount} pro Stunde",
+      "flowIn": "Rein in der letzten Stunde",
+      "flowOut": "Raus in der letzten Stunde",
+      "flow": {
+        "own": "Eigene Verkäufe",
+        "contract": "Auftragsarbeit",
+        "goods": "Waren und Löhne",
+        "ai": "KI-Kräfte",
+        "fixed": "Fixkosten",
+        "marketing": "Werbung"
+      },
+      "footer": "Der Coach schaut auf die letzte volle Stunde. Nach einer Änderung siehst du die Wirkung in der nächsten Stunde.",
+      "strategySaved": "Strategie gespeichert",
+      "strategyTitle": "Strategie",
+      "expanded": "Ausgebaut!",
+      "expandTitle": "Ausbauen",
+      "actions": {
+        "contractOn": "Auftragsarbeit an",
+        "budget": "Günstig verkaufen",
+        "normal": "Normaler Preis",
+        "premium": "Premium testen",
+        "marketing": "Zur Werbung",
+        "dismissAi": "Zum Team",
+        "hire": "Zum Team",
+        "upgrade": "Zum Upgrade",
+        "expand": "Jetzt ausbauen"
+      },
+      "tips": {
+        "waiting": {
+          "title": "Die erste Stunde läuft",
+          "text": "Nach der ersten vollen Stunde zeigt dir der Coach, woher dein Geld kommt und wohin es geht."
+        },
+        "contractOff": {
+          "title": "Dein Team sitzt oft herum",
+          "text": "Du hast mehr Kapazität als Kunden. Mit Auftragsarbeit verkaufst du freie Zeit an andere Firmen und deckst damit deine Fixkosten."
+        },
+        "aiIdle": {
+          "title": "KI-Kräfte ohne Arbeit",
+          "text": "Es gibt gerade nicht genug Kunden für deine KI-Kräfte. Sie kosten trotzdem Lohn. Entlasse eine, bis die Nachfrage steigt."
+        },
+        "aiUnpaid": {
+          "title": "Löhne nur zum Teil gedeckt",
+          "text": "Die Stunde bringt nicht genug ein, um alle voll zu bezahlen. Weniger KI-Kräfte oder mehr Kunden helfen."
+        },
+        "fewCustomers": {
+          "title": "Zu wenige kennen dich",
+          "text": "Die Nachfrage ist viel kleiner als das, was dein Team schafft. Werbung macht dich bekannter. Mit der Zeit spricht sich gute Qualität herum."
+        },
+        "tryBudget": {
+          "title": "Günstig bekannt werden",
+          "text": "Günstige Preise bringen mehr Kunden und sprechen sich schneller herum. Die Marge ist kleiner, aber du wächst schneller."
+        },
+        "premiumLowQuality": {
+          "title": "Premium ohne Qualität",
+          "text": "Für Premium ist deine Qualität noch zu niedrig. Kunden bleiben weg. Geh zurück auf den normalen Preis, bis dein Team besser ist."
+        },
+        "soldOut": {
+          "title": "Ausverkauft!",
+          "text": "Mehr Kunden wollen kaufen, als dein Team schafft. Stell jemanden ein, sonst verschenkst du Umsatz."
+        },
+        "tryPremium": {
+          "title": "Zeit für Premium",
+          "text": "Deine Qualität stimmt und die Nachfrage ist größer als dein Angebot. Mit Premium verdienst du mehr pro Verkauf."
+        },
+        "marketingHigh": {
+          "title": "Werbung frisst den Gewinn",
+          "text": "Die Werbung kostet mehr, als sie gerade einbringt. Senke das Budget oder warte, bis die Bekanntheit wirkt."
+        },
+        "fixedHigh": {
+          "title": "Fixkosten sind zu hoch",
+          "text": "Miete und Verwaltung kosten mehr, als nach Waren und Löhnen übrig bleibt. Mehr Kunden (Werbung, günstige Preise) und Auftragsarbeit helfen. Bekanntheit wächst mit der Zeit."
+        },
+        "upgrade": {
+          "title": "Bereit für den nächsten Schritt",
+          "text": "Du machst Gewinn. Eine größere Rechtsform erreicht einen größeren Markt."
+        },
+        "expand": {
+          "title": "Ausbau möglich",
+          "text": "Deine Firmenkasse reicht für die nächste Ausbaustufe: mehr Markt, mehr Kapazität, mehr Plätze."
+        },
+        "healthy": {
+          "title": "Läuft!",
+          "text": "Deine Firma macht Gewinn. Halte die Qualität hoch und wachse weiter."
+        }
+      }
+    },
+    "strategy": {
+      "title": "Strategie",
+      "price": "Preis",
+      "levels": {
+        "budget": "Günstig",
+        "normal": "Normal",
+        "premium": "Premium"
+      },
+      "hints": {
+        "budget": "Mehr Kunden, schnellere Mundpropaganda, dafür kleinere Marge. Gut, um bekannt zu werden.",
+        "normal": "Der ausgewogene Weg.",
+        "premium": "Mehr Geld pro Verkauf, aber weniger Kunden. Lohnt sich ab 50 % Qualität."
+      },
+      "effects": {
+        "price": "Preis",
+        "demand": "Kunden",
+        "awareness": "Mundpropaganda"
+      },
+      "lowQuality": "Deine Qualität liegt unter 50 %. Mit Premium kommt nur die Hälfte der Kunden.",
+      "contract": "Auftragsarbeit",
+      "contractHint": "{share} % der freien Kapazität arbeitet für andere Firmen, mit {margin} % Marge. So verdient auch ein leeres Büro etwas.",
+      "contractNow": "Gerade {amount} pro Stunde aus Aufträgen",
+      "saved": "Strategie gespeichert"
+    },
+    "expansion": {
+      "title": "Ausbau",
+      "level": "Stufe {level}",
+      "intro": "Neue Regionen, neue Kunden, größere Büros. Jede Stufe macht deine Firma größer, und es gibt keine letzte.",
+      "effects": {
+        "market": "Markt",
+        "capacity": "Kapazität",
+        "places": "Plätze",
+        "fixed": "Fixkosten"
+      },
+      "market": "Dein Markt ist {factor}-mal so groß wie die Nische einer Garage.",
+      "button": "Auf Stufe {level} ausbauen · {amount}",
+      "needCash": "In der Firmenkasse fehlen noch {amount}.",
+      "done": "Ausgebaut! Mehr Markt, mehr Platz.",
+      "locked": "Ab der GmbH baust du deine Firma Stufe für Stufe aus, ohne Grenze nach oben."
+    },
+    "gmbhTitle": "GmbH",
+    "gmbhText": "Gleich groß einsteigen: ein Büro mit 20 Plätzen, ein 15-mal so großer Markt und schon bekannt. Teuer, aber du wächst viel schneller.",
+    "headStart": "Markt × {market} · Start mit {awareness} % Bekanntheit",
+    "openProfile": "Profil von {name} öffnen"
   },
   "debt": {
     "title": "Schulden",
@@ -2432,5 +2568,34 @@
     "dealerIntro": "Vom Stadtflitzer bis zum Hypercar. Alle Marken sind ausgedacht.",
     "garageFullHint": "Deine Garage ist voll. Zieh in ein größeres Zuhause, um mehr Autos zu parken.",
     "carBought": "Neues Auto in der Garage!"
+  },
+  "friends": {
+    "title": "Freunde",
+    "intro": "Füge Mitspieler hinzu und sieh dir ihre Profile, Firmen, Kunstwerke und ihr Zuhause an.",
+    "add": "Als Freund hinzufügen",
+    "sent": "Anfrage geschickt",
+    "pending": "Anfrage offen",
+    "cancel": "Zurückziehen",
+    "cancelled": "Anfrage zurückgezogen",
+    "accept": "Annehmen",
+    "accepted": "Ihr seid jetzt Freunde!",
+    "decline": "Ablehnen",
+    "declined": "Anfrage abgelehnt",
+    "isFriend": "Freund",
+    "remove": "Entfernen",
+    "removed": "Freundschaft beendet",
+    "emptyTitle": "Noch keine Freunde",
+    "emptyText": "Schick jemandem eine Anfrage, über die Rangliste, ein Profil oder hier mit dem Spielernamen.",
+    "listTitle": "Deine Freunde ({count})",
+    "since": "seit {date}",
+    "incomingTitle": "Anfragen an dich",
+    "wantsToBeFriends": "möchte dein Freund sein",
+    "outgoingTitle": "Deine offenen Anfragen",
+    "addTitle": "Freund hinzufügen",
+    "nameLabel": "Spielername",
+    "send": "Anfrage schicken",
+    "addHint": "Sobald die Person annimmt, steht sie in deiner Liste.",
+    "openProfile": "Profil von {name} öffnen",
+    "notYourself": "Das bist du selbst. Such dir jemand anderen aus."
   }
 }

@@ -805,7 +805,12 @@ function Training({ company, members }: { company: MyCompany; members: TeamMembe
           <li key={m.playerJobId}>
             <Card padding="md" className="flex items-center gap-3">
               <Avatar avatarKey={m.avatarKey} size="xs" />
-              <span className="min-w-0 flex-1 truncate text-sm text-fg-1">{m.nickname}</span>
+              <Link
+                href={`/players/${encodeURIComponent(m.nickname)}`}
+                className="min-w-0 flex-1 truncate text-sm text-fg-1 focus-ring hover:underline"
+              >
+                {m.nickname}
+              </Link>
               <Button size="sm" onClick={() => setTraining(m)}>
                 {t("train")}
               </Button>
@@ -881,7 +886,13 @@ function MemberRow({ member, onFire }: { member: TeamMember; onFire: () => void 
       <div className="flex items-start gap-3">
         <Avatar avatarKey={member.avatarKey} size="sm" />
         <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold text-fg-1">{member.nickname}</p>
+          <Link
+            href={`/players/${encodeURIComponent(member.nickname)}`}
+            className="block truncate font-semibold text-fg-1 focus-ring hover:underline"
+            data-testid="member-profile"
+          >
+            {member.nickname}
+          </Link>
           <p className="truncate text-sm text-fg-3">
             {member.title} · {t("since", { date: date.format(new Date(member.startedAt)) })}
           </p>

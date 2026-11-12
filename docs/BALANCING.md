@@ -1116,3 +1116,57 @@ Der Faktor gilt in der TypeScript-Simulation (`src/lib/sim/tick.ts`) und im Date
 Weitere seit M1 genutzte Schlüssel: `trading.maxOrderQuantity`, `progression.xpSources.trade.minOrderValueCents`,
 `economy.vaultMinClaimCents`, `company.aiPolicy.revenueNoisePersistence`, `company.aiPolicy.costNoiseShare`,
 `valuation.lossMakerRevenueElasticity`.
+
+## Nachtrag M4c: Gewinnhebel und Wachstum ohne Grenze (ADR-083)
+
+Werte in `BALANCE.startups`, Formeln in `src/lib/sim/startup.ts`.
+
+**Warum Firmen bisher fast nur Minus machten.** Eine typische Garage hat eine Nische von etwa 3.400 € im Spieljahr
+(einem echten Tag). Mit 3 % Bekanntheit verkauft sie in der Stunde nur ein paar Euro. Die Fixkosten liegen bei
+25 € pro Stunde. Das Team schafft aber viel mehr: Ein Gründer in Tech allein kann rund 750 € pro Stunde liefern.
+
+**Auftragsarbeit** verkauft 25 % der freien Kapazität mit 30 % Marge:
+
+- Gründer in Vollzeit in Tech: 750 € × 25 % × 30 % ≈ 56 € Rohertrag pro Stunde. Das deckt die 25 € Fixkosten.
+- Gründer mit Job (halbe Leistung): ≈ 28 € pro Stunde. Das deckt die Fixkosten knapp.
+- Eine KI-Kraft bringt so nur 500 € × 25 % × 30 % ≈ 38 € und kostet 120 € Lohn. Auftragsarbeit allein trägt keine
+  KI-Kraft, dafür braucht es echte Nachfrage.
+
+**Preisstrategie:**
+
+- Günstig: Preis × 0,8, Nachfrage × 1,35, Mundpropaganda × 1,5. Lohnt sich in jungen Firmen, die vor allem bekannt
+  werden müssen.
+- Premium: Preis × 1,3, Nachfrage × 0,75. Gewinnt dort, wo die Kapazität knapp ist. Unter 50 % Qualität halbiert
+  sich die Nachfrage.
+
+**Markt je Rechtsform:**
+
+| Rechtsform       | Markt | Start-Bekanntheit | Fixkosten / Stunde |
+| ---------------- | ----- | ----------------- | ------------------ |
+| Garage           | × 1   | 3 %               | 25 €               |
+| Kleinunternehmen | × 4   | 8 %               | 333 €              |
+| GmbH             | × 15  | 20 %              | 1.000 €            |
+| AG               | × 40  | (Börsengang)      | 1.667 €            |
+
+Rechenbeispiel GmbH in Tech:
+
+- Bei 60 % Bekanntheit und 60 % Qualität braucht sie rund 1.333 € Umsatz pro Stunde, um die Fixkosten zu decken.
+- Das entspricht einer Nische ab etwa 4.400 € im Jahr. Etwa die Hälfte aller Nischen schafft das (Median rund
+  3.400 €).
+- Die Marktschätzung im Unternehmen zeigt, ob man in einer guten Nische sitzt.
+- Mit dem Faktor × 10 wären es nur rund ein Drittel gewesen. Deshalb gilt × 15.
+
+**Ausbaustufen** ab der GmbH:
+
+- Kosten: 100.000 € × 1,8ⁿ, also 100.000 €, 180.000 €, 324.000 € und so weiter. Stufe 10 kostet 35,7 Mio. €.
+- Jede Stufe bringt +50 % Markt, +10 % Kapazität und +10 Plätze. Sie erhöht die Fixkosten um 25 % der Grundkosten.
+- Der Nutzen wächst linear, die Kosten wachsen geometrisch. Ab etwa Stufe 8 bis 12 dauert jede Stufe deutlich
+  länger. Es gibt aber nie eine letzte.
+- Das Geld für den Ausbau geht an die Haushalte, bleibt also im Kreislauf. So wird der Ausbau zur Geldsenke für
+  sehr reiche Firmen.
+
+**Telemetrie für den Freundestest:**
+
+- Anteil der Firmen mit Gewinn pro Stunde nach 1, 3 und 7 Tagen.
+- Anteil der Auftragsarbeit am Umsatz. Wenn sie dauerhaft über 50 % liegt, ist sie zu großzügig.
+- Verteilung der Ausbaustufen.

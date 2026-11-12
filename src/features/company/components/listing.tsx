@@ -53,7 +53,7 @@ export function ListingCard({ company }: { company: MyCompany }) {
   const listing = company.listing;
   useVisitTour("visit_listing", Boolean(listing) || company.canGoPublic);
   if (!listing && !company.canGoPublic) {
-    if (company.tier !== "small_business" && company.tier !== "gmbh") return null;
+    if (!(ipo.fromTiers as readonly string[]).includes(company.tier)) return null;
     return (
       <Card padding="md">
         <p className="label-pixel text-fg-2">{t("title")}</p>

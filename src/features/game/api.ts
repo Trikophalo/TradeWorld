@@ -2,6 +2,7 @@ import { z } from "zod";
 import { CAREER_RPC_SCHEMAS, liveCareerEngine } from "./api-careers";
 import { ARTWORK_RPC_SCHEMAS, liveArtEngine } from "./api-artworks";
 import { COMPANY_RPC_SCHEMAS, liveCompanyEngine } from "./api-company";
+import { FRIEND_RPC_SCHEMAS, liveFriendEngine } from "./api-friends";
 import { PROPERTY_RPC_SCHEMAS, livePropertyEngine } from "./api-property";
 import { rpc, toErrorKey } from "./rpc";
 import {
@@ -290,6 +291,7 @@ export const RPC_SCHEMAS = {
   ...COMPANY_RPC_SCHEMAS,
   ...ARTWORK_RPC_SCHEMAS,
   ...PROPERTY_RPC_SCHEMAS,
+  ...FRIEND_RPC_SCHEMAS,
 } as const;
 
 export const liveEngine: GameEngine = {
@@ -297,6 +299,7 @@ export const liveEngine: GameEngine = {
   ...liveCompanyEngine,
   ...liveArtEngine,
   ...livePropertyEngine,
+  ...liveFriendEngine,
   async snapshot(): Promise<MarketSnapshot> {
     const s = await rpc("get_market_snapshot", {}, snapshotSchema);
     return {

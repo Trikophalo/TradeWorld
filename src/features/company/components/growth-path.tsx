@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import Link from "next/link";
 import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Button } from "@/components/ui/button";
@@ -135,7 +136,12 @@ function SeatChip({ seat, name, onFill }: { seat: Seat; name: string; onFill: ()
       <span className="inline-flex items-center gap-2 rounded-md border border-gain/40 bg-gain-soft px-2.5 py-1.5 text-sm">
         <span className="size-2 rounded-pill bg-gain" aria-hidden />
         <span className="text-fg-1">{name}</span>
-        <span className="text-xs text-gain">{seat.coveredBy}</span>
+        <Link
+          href={`/players/${encodeURIComponent(seat.coveredBy)}`}
+          className="text-xs text-gain focus-ring hover:underline"
+        >
+          {seat.coveredBy}
+        </Link>
       </span>
     );
   }

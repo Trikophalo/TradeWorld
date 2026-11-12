@@ -32,7 +32,19 @@ describe("RPC contract", () => {
       "get_offers",
       "subscribe_offer",
     ];
-    const pending = fixtures.some((file) => file.startsWith("get_offers")) ? [] : m3f;
+    // M4c RPCs (ADR-083, ADR-084) are written in parallel with the database (TODO: remove once get_friends.json exists).
+    const m4c = [
+      "set_company_strategy",
+      "expand_company",
+      "get_friends",
+      "send_friend_request",
+      "respond_friend_request",
+      "remove_friend",
+    ];
+    const pending = [
+      ...(fixtures.some((file) => file.startsWith("get_offers")) ? [] : m3f),
+      ...(fixtures.some((file) => file.startsWith("get_friends")) ? [] : m4c),
+    ];
     for (const name of Object.keys(RPC_SCHEMAS).filter((key) => !pending.includes(key))) {
       expect(
         fixtures.some((file) => file.startsWith(name)),

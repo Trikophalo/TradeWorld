@@ -17,6 +17,8 @@ export const DISCLOSURE = {
   stockOrderBook: 3,
   portfolioHistory: 2,
   profileCareer: 2,
+  /** Friends (ADR-084): after the tutorial, when the game has a first shape. */
+  profileFriends: 2,
 } as const;
 
 export type DisclosureKey = keyof typeof DISCLOSURE;

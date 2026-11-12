@@ -33,6 +33,7 @@ import { ListingCard, SideJobNotice } from "./listing";
 import { BannerEditor } from "./banner-editor";
 import { LogoEditor } from "./logo-editor";
 import { OfficeScene } from "./office-scene";
+import { ExpansionCard, ProfitCoach, StrategyCard } from "./profit";
 
 type Tab = "overview" | "team" | "chat";
 const factor = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
@@ -105,18 +106,29 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
       {tab === "overview" && (
         <div className="grid gap-5 *:min-w-0 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6">
           <div className="space-y-5">
+            <ProfitCoach
+              company={company}
+              onNavigate={(to) => {
+                if (to === "team") return setTab("team");
+                document.getElementById("company-controls")?.scrollIntoView({ behavior: "smooth", block: "center" });
+              }}
+            />
             <GrowthPath
               company={company}
               onFill={(skills) => setHire({ skills })}
               onTrain={trainingOpen ? goTraining : undefined}
             />
+            <ExpansionCard company={company} />
             <QuarterReceipt company={company} />
             <HistoryCard company={company} />
           </div>
           <div className="space-y-5">
             <TreasuryCard company={company} />
+            <StrategyCard company={company} />
             <MarketCard company={company} />
-            <BossOffice company={company} onTeam={() => setTab("team")} />
+            <div id="company-controls" className="scroll-mt-24">
+              <BossOffice company={company} onTeam={() => setTab("team")} />
+            </div>
           </div>
         </div>
       )}

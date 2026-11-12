@@ -969,6 +969,44 @@ export interface StartupsConfig {
     readonly fixedCostCentsPerQuarter: number;
     readonly maxEmployees: number;
   };
+  /**
+   * Market reach by legal form (ADR-083): a bigger company reaches more customers, so the hidden niche size is
+   * multiplied by this factor. Upgrading the same company raises it, too.
+   */
+  readonly marketFactorByTier: Readonly<Record<"garage" | "small_business" | "gmbh" | "ag", number>>;
+  /** Awareness at founding (ADR-083): founding bigger directly buys a head start. */
+  readonly foundingAwareness: Readonly<Record<"garage" | "small_business" | "gmbh", number>>;
+  /**
+   * Endless growth (ADR-083): from `fromTiers`, expansion level n brings `employeesPerLevel` more places,
+   * `capacityBonusPerLevel` more capacity and `marketBonusPerLevel` more market (new regions, new customers), raises
+   * fixed costs by `fixedCostPerLevel` and costs baseCostCents × costGrowth^n. No upper limit.
+   */
+  readonly expansion: {
+    readonly fromTiers: readonly ("garage" | "small_business" | "gmbh" | "ag")[];
+    readonly baseCostCents: number;
+    readonly costGrowth: number;
+    readonly employeesPerLevel: number;
+    readonly capacityBonusPerLevel: number;
+    readonly marketBonusPerLevel: number;
+    readonly fixedCostPerLevel: number;
+  };
+  /**
+   * Price strategy (ADR-083): price per unit, how many customers buy, and how fast word of mouth spreads.
+   */
+  readonly pricing: Readonly<
+    Record<
+      "budget" | "normal" | "premium",
+      { readonly price: number; readonly demand: number; readonly awareness: number }
+    >
+  > & {
+    /** Premium below this quality scares customers away: demand × premiumLowQualityDemand. */
+    readonly premiumMinQuality: number;
+    readonly premiumLowQualityDemand: number;
+  };
+  /**
+   * Contract work (ADR-083): a share of the unused capacity is sold to other companies at a fixed gross margin.
+   */
+  readonly contractWork: { readonly shareOfFreeCapacity: number; readonly grossMargin: number };
   /** Going public and capital increases (ADR-067). */
   readonly ipo: {
     readonly minLevel: number;
@@ -1982,9 +2020,28 @@ export const BALANCE = {
     upgradeCreditShare: 1,
     gmbh: { minLevel: 15, foundingCostCents: 6_000_000, fixedCostCentsPerQuarter: 600_000, maxEmployees: 20 },
     ag: { fixedCostCentsPerQuarter: 1_000_000, maxEmployees: 100 },
+    marketFactorByTier: { garage: 1, small_business: 4, gmbh: 15, ag: 40 },
+    foundingAwareness: { garage: 0.03, small_business: 0.08, gmbh: 0.2 },
+    expansion: {
+      fromTiers: ["gmbh", "ag"],
+      baseCostCents: 10_000_000,
+      costGrowth: 1.8,
+      employeesPerLevel: 10,
+      capacityBonusPerLevel: 0.1,
+      marketBonusPerLevel: 0.5,
+      fixedCostPerLevel: 0.25,
+    },
+    pricing: {
+      budget: { price: 0.8, demand: 1.35, awareness: 1.5 },
+      normal: { price: 1, demand: 1, awareness: 1 },
+      premium: { price: 1.3, demand: 0.75, awareness: 0.7 },
+      premiumMinQuality: 0.5,
+      premiumLowQualityDemand: 0.5,
+    },
+    contractWork: { shareOfFreeCapacity: 0.25, grossMargin: 0.3 },
     ipo: {
-      minLevel: 12,
-      fromTiers: ["small_business", "gmbh"],
+      minLevel: 6,
+      fromTiers: ["garage", "small_business", "gmbh"],
       sharesTotal: 1_000_000,
       minSharePercent: 10,
       maxSharePercent: 49,

@@ -15,6 +15,10 @@ import {
   productOf,
   fixedCostCents,
   maxEmployees,
+  canExpand,
+  effectivePotentialCents,
+  expansionCostCents,
+  type PriceLevel,
   potentialEstimate,
   potentialFromUniform,
   startupValueCents,
@@ -61,6 +65,8 @@ interface DemoHour {
   aiWagesCents: number;
   payFactorBps: number;
   profitCents: number;
+  /** Contract work (ADR-083); older demo hours have none. */
+  contractRevenueCents?: number;
 }
 
 interface DemoReport extends CompanyQuarter {
@@ -111,6 +117,10 @@ export interface DemoCompanyState {
   } | null;
   /** Quarter closes in a row with open bills (ADR-058). */
   distressQuarters?: number;
+  /** Profit levers and expansion (ADR-083); older demo companies: normal price, contract work on, level 0. */
+  priceLevel?: PriceLevel;
+  contractWork?: boolean;
+  expansionLevel?: number;
   chat?: ChatMessage[];
 }
 
@@ -150,6 +160,7 @@ export const productKeyOf = (company: Pick<DemoCompanyState, "sector" | "product
 const smallBusiness = () => companyCfg.tiers.find((t) => t.id === "small_business")!;
 
 export function foundingCostCents(tier: StartupTier): number {
+  if (tier === "gmbh") return startups.gmbh.foundingCostCents;
   return tier === "garage" ? startups.garage.foundingCostCents : smallBusiness().foundingCostCents;
 }
 
@@ -171,6 +182,7 @@ export function nextStep(tier: StartupTier): { tier: StartupTier; level: number;
 }
 
 export function foundingLevel(tier: StartupTier): number {
+  if (tier === "gmbh") return startups.gmbh.minLevel;
   return tier === "garage" ? startups.garage.minLevel : smallBusiness().minLevel;
 }
 
@@ -261,6 +273,9 @@ export function createCompanyEngine(host: CompanyHost) {
         stage: stageOf(company),
         noise: (Math.random() + Math.random() + Math.random() - 1.5) * 2,
         playerWagesCents: 0,
+        priceLevel: company.priceLevel ?? "normal",
+        contractWork: company.contractWork ?? true,
+        expansionLevel: company.expansionLevel ?? 0,
       },
     );
     const revenue = Number(r.revenueCents);
@@ -280,6 +295,7 @@ export function createCompanyEngine(host: CompanyHost) {
       aiWagesCents: Number(r.aiWagesPaidCents),
       payFactorBps: r.payFactorBps,
       profitCents: Number(r.profitCents),
+      contractRevenueCents: Number(r.contractRevenueCents),
     };
     company.hours = [...(company.hours ?? []), hour].slice(-24);
     company.quarterHours = [...(company.quarterHours ?? []), hour];
@@ -310,6 +326,8 @@ export function createCompanyEngine(host: CompanyHost) {
         teamSectorScore: sectorScore(company.sector, host.branchScores()),
         stage: stageOf(company),
         noise: 0,
+        priceLevel: company.priceLevel ?? "normal",
+        expansionLevel: company.expansionLevel ?? 0,
       },
     );
     const demand = sum((h) => h.demandCents);
@@ -451,6 +469,12 @@ export function createCompanyEngine(host: CompanyHost) {
       todayProfitCents: todays.reduce((a, h) => a + h.profitCents, 0),
       quarterRevenueCents: quarter.reduce((a, h) => a + h.revenueCents, 0),
       quarterProfitCents: quarter.reduce((a, h) => a + h.profitCents, 0),
+      contractRevenuePerHourCents: last.contractRevenueCents ?? 0,
+      demandPerHourCents: last.demandCents,
+      capacityPerHourCents: last.capacityCents,
+      fixedPerHourCents: last.fixedCents,
+      aiWagesPerHourCents: last.aiWagesCents,
+      marketingPerHourCents: last.marketingCents,
     };
   }
 
@@ -528,7 +552,9 @@ export function createCompanyEngine(host: CompanyHost) {
   function view(company: DemoCompanyState): MyCompany {
     const productivity = productivityList(company);
     const [u1, u2] = company.estimateSeeds;
-    const estimate = potentialEstimate(company.potentialAnnualCents, company.quartersActive, u1, u2);
+    const level = company.expansionLevel ?? 0;
+    const marketFactor = effectivePotentialCents(1, company.tier, level);
+    const estimate = potentialEstimate(company.potentialAnnualCents * marketFactor, company.quartersActive, u1, u2);
     const last = company.reports.at(-1) ?? null;
     const step = nextStep(company.tier);
     return {
@@ -560,8 +586,15 @@ export function createCompanyEngine(host: CompanyHost) {
         hourStart: new Date(h.at).toISOString(),
         revenueCents: h.revenueCents,
         profitCents: h.profitCents,
+        contractRevenueCents: h.contractRevenueCents ?? 0,
       })),
-      maxEmployees: maxEmployees(company.tier),
+      priceLevel: company.priceLevel ?? "normal",
+      contractWork: company.contractWork ?? true,
+      expansionLevel: level,
+      canExpand: canExpand(company.tier),
+      expansionCostCents: canExpand(company.tier) ? expansionCostCents(level) : null,
+      marketFactor,
+      maxEmployees: maxEmployees(company.tier, BALANCE, level),
       employees: 0,
       openPostings: company.postings.filter((p) => p.status === "open").length,
       pendingApplications: 0,
@@ -631,6 +664,8 @@ export function createCompanyEngine(host: CompanyHost) {
     | "companyDeposit"
     | "companyWithdraw"
     | "upgradeCompany"
+    | "setCompanyStrategy"
+    | "expandCompany"
     | "companyPostings"
     | "createJobPosting"
     | "closeJobPosting"
@@ -656,6 +691,8 @@ export function createCompanyEngine(host: CompanyHost) {
     async foundCompany(input: FoundCompanyInput) {
       return host.idempotent(input.requestId, () => {
         if (host.company()) throw new GameError("company_exists");
+        // The AG only comes by going public (ADR-067); bigger forms can be founded directly (ADR-083).
+        if (input.tier === "ag") throw new GameError("invalid_argument");
         const locked = host.foundingLockedUntil();
         if (locked !== null && locked > Date.now()) throw new GameError("founding_locked");
         if (host.level() < foundingLevel(input.tier)) throw new GameError("company_level_too_low");
@@ -675,8 +712,9 @@ export function createCompanyEngine(host: CompanyHost) {
           productKey: productOf(input.sector, input.product).key,
           foundedAt: now,
           potentialAnnualCents: potentialFromUniform(1 - Math.random()),
-          awareness: startups.awareness.initial,
+          awareness: startups.foundingAwareness[input.tier as Exclude<StartupTier, "ag">],
           quality: startups.quality.base,
+          contractWork: true,
           quartersActive: 0,
           cashCents: cost,
           unpaidCents: 0,
@@ -766,14 +804,16 @@ export function createCompanyEngine(host: CompanyHost) {
     setAiWorkers: (requestId, count) =>
       mutate(requestId, (company) => {
         if (!Number.isInteger(count) || count < 0) throw new GameError("invalid_argument");
-        if (count > maxEmployees(company.tier)) throw new GameError("employee_limit");
+        if (count > maxEmployees(company.tier, BALANCE, company.expansionLevel ?? 0))
+          throw new GameError("employee_limit");
         setAiCount(company, count);
       }),
 
     hireAiWorkers: (requestId, count, skill) =>
       mutate(requestId, (company) => {
         if (!Number.isInteger(count) || count < 1) throw new GameError("invalid_argument");
-        if (company.aiWorkers + count > maxEmployees(company.tier)) throw new GameError("employee_limit");
+        if (company.aiWorkers + count > maxEmployees(company.tier, BALANCE, company.expansionLevel ?? 0))
+          throw new GameError("employee_limit");
         if (skill) {
           const all = productOf(company.sector, productKeyOf(company)).stages.flat();
           if (count !== 1 || !all.includes(skill)) throw new GameError("invalid_argument");
@@ -812,6 +852,23 @@ export function createCompanyEngine(host: CompanyHost) {
         if (amountCents > company.cashCents - company.unpaidCents) throw new GameError("insufficient_funds");
         company.cashCents -= amountCents;
         host.addCash(amountCents);
+      }),
+
+    setCompanyStrategy: (requestId, priceLevel, contractWork) =>
+      mutate(requestId, (company) => {
+        if (!["budget", "normal", "premium"].includes(priceLevel)) throw new GameError("invalid_argument");
+        company.priceLevel = priceLevel;
+        company.contractWork = contractWork;
+      }),
+
+    expandCompany: (requestId) =>
+      mutate(requestId, (company) => {
+        if (!canExpand(company.tier)) throw new GameError("company_upgrade_unavailable");
+        const cost = expansionCostCents(company.expansionLevel ?? 0);
+        if (company.cashCents < cost) throw new GameError("insufficient_funds");
+        company.cashCents -= cost;
+        company.expansionLevel = (company.expansionLevel ?? 0) + 1;
+        system(company, `Ausbaustufe ${company.expansionLevel} erreicht: mehr Markt, mehr Plätze, mehr Kapazität.`);
       }),
 
     upgradeCompany: (requestId) =>

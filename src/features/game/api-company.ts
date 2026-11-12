@@ -181,11 +181,25 @@ const companySchema = z.object({
       today_profit_cents: num,
       quarter_revenue_cents: num,
       quarter_profit_cents: num,
+      contract_revenue_per_hour_cents: num.default(0),
+      demand_per_hour_cents: num.default(0),
+      capacity_per_hour_cents: num.default(0),
+      fixed_per_hour_cents: num.default(0),
+      ai_wages_per_hour_cents: num.default(0),
+      marketing_per_hour_cents: num.default(0),
     })
     .nullable()
     .default(null),
-  hours: z.array(z.object({ hour_start: iso, revenue_cents: num, profit_cents: num })).default([]),
+  hours: z
+    .array(z.object({ hour_start: iso, revenue_cents: num, profit_cents: num, contract_revenue_cents: num.default(0) }))
+    .default([]),
   ai_wage_cents_per_hour: num.default(12_000),
+  price_level: z.enum(["budget", "normal", "premium"]).default("normal"),
+  contract_work: z.boolean().default(false),
+  expansion_level: num.default(0),
+  can_expand: z.boolean().default(false),
+  expansion_cost_cents: num.nullable().default(null),
+  market_factor: num.default(1),
 });
 
 const wrapped = z.object({ company: companySchema.nullable() });
@@ -324,6 +338,8 @@ export const COMPANY_RPC_SCHEMAS = {
   company_deposit: wrapped,
   company_withdraw: wrapped,
   upgrade_company: wrapped,
+  set_company_strategy: wrapped,
+  expand_company: wrapped,
   get_company_postings: z.object({ postings: z.array(postingSchema) }),
   create_job_posting: z.object({ id: z.string() }).passthrough(),
   close_job_posting: z.object({ id: z.string(), status: z.literal("closed") }),
@@ -434,14 +450,27 @@ function toCompany(c: z.infer<typeof companySchema>): MyCompany {
           todayProfitCents: c.live.today_profit_cents,
           quarterRevenueCents: c.live.quarter_revenue_cents,
           quarterProfitCents: c.live.quarter_profit_cents,
+          contractRevenuePerHourCents: c.live.contract_revenue_per_hour_cents,
+          demandPerHourCents: c.live.demand_per_hour_cents,
+          capacityPerHourCents: c.live.capacity_per_hour_cents,
+          fixedPerHourCents: c.live.fixed_per_hour_cents,
+          aiWagesPerHourCents: c.live.ai_wages_per_hour_cents,
+          marketingPerHourCents: c.live.marketing_per_hour_cents,
         }
       : null,
     hours: c.hours.map((h) => ({
       hourStart: h.hour_start,
       revenueCents: h.revenue_cents,
       profitCents: h.profit_cents,
+      contractRevenueCents: h.contract_revenue_cents,
     })),
     aiWageCentsPerHour: c.ai_wage_cents_per_hour,
+    priceLevel: c.price_level,
+    contractWork: c.contract_work,
+    expansionLevel: c.expansion_level,
+    canExpand: c.can_expand,
+    expansionCostCents: c.expansion_cost_cents,
+    marketFactor: c.market_factor,
   };
 }
 
@@ -518,6 +547,8 @@ type CompanyEngine = Pick<
   | "companyDeposit"
   | "companyWithdraw"
   | "upgradeCompany"
+  | "setCompanyStrategy"
+  | "expandCompany"
   | "companyPostings"
   | "createJobPosting"
   | "closeJobPosting"
@@ -664,6 +695,20 @@ export const liveCompanyEngine: CompanyEngine = {
 
   async upgradeCompany(requestId) {
     return requireCompany(await rpc("upgrade_company", { p_request_id: requestId }, S.upgrade_company));
+  },
+
+  async setCompanyStrategy(requestId, priceLevel, contractWork) {
+    return requireCompany(
+      await rpc(
+        "set_company_strategy",
+        { p_request_id: requestId, p_price_level: priceLevel, p_contract_work: contractWork },
+        S.set_company_strategy,
+      ),
+    );
+  },
+
+  async expandCompany(requestId) {
+    return requireCompany(await rpc("expand_company", { p_request_id: requestId }, S.expand_company));
   },
 
   async companyPostings(): Promise<CompanyPosting[]> {

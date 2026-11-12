@@ -35,7 +35,13 @@ const lockDate = new Intl.DateTimeFormat("de-DE", {
 });
 const small = BALANCE.company.tiers.find((t) => t.id === "small_business")!;
 
-type FoundableTier = Extract<CompanyTier, "garage" | "small_business">;
+type FoundableTier = Extract<CompanyTier, "garage" | "small_business" | "gmbh">;
+const FOUNDABLE: readonly FoundableTier[] = ["garage", "small_business", "gmbh"];
+const TIER_TEXT = {
+  garage: { title: "garageTitle", text: "garageText" },
+  small_business: { title: "smallTitle", text: "smallText" },
+  gmbh: { title: "gmbhTitle", text: "gmbhText" },
+} as const;
 
 export const TIER_INFO: Record<FoundableTier, { level: number; cost: number; fixed: number; staff: number }> = {
   garage: {
@@ -49,6 +55,13 @@ export const TIER_INFO: Record<FoundableTier, { level: number; cost: number; fix
     cost: small.foundingCostCents,
     fixed: small.fixedCostCentsPerQuarter,
     staff: small.maxEmployees,
+  },
+  // Founding bigger directly (ADR-083): more money, more market, a head start in awareness.
+  gmbh: {
+    level: BALANCE.startups.gmbh.minLevel,
+    cost: BALANCE.startups.gmbh.foundingCostCents,
+    fixed: BALANCE.startups.gmbh.fixedCostCentsPerQuarter,
+    staff: BALANCE.startups.gmbh.maxEmployees,
   },
 };
 
@@ -85,24 +98,28 @@ export function Founding({ dissolution }: { dissolution: Dissolution | null }) {
           </Card>
         )}
         <p className="text-pretty text-fg-2">{t("intro")}</p>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {(["garage", "small_business"] as const).map((key) => {
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {FOUNDABLE.map((key) => {
             const info = TIER_INFO[key];
             const locked =
               level < info.level || (lockedUntil !== null && now !== null && Date.parse(lockedUntil) > now);
             return (
               <Card key={key} padding="lg" className="flex flex-col gap-3" data-tier={key}>
                 <div className="flex items-start justify-between gap-2">
-                  <h2 className="font-pixel text-sm text-fg-1 uppercase">
-                    {key === "garage" ? t("garageTitle") : t("smallTitle")}
-                  </h2>
+                  <h2 className="font-pixel text-sm text-fg-1 uppercase">{t(TIER_TEXT[key].title)}</h2>
                   {level < info.level && <LockBadge level={info.level} />}
                 </div>
-                <p className="text-sm text-pretty text-fg-2">{key === "garage" ? t("garageText") : t("smallText")}</p>
+                <p className="text-sm text-pretty text-fg-2">{t(TIER_TEXT[key].text)}</p>
                 <ul className="space-y-1 text-sm text-fg-3">
                   <li className="nums">{t("cost", { amount: formatMoney(info.cost, { whole: true }) })}</li>
                   <li className="nums">{t("fixed", { amount: formatMoney(info.fixed, { whole: true }) })}</li>
                   <li>{t("staff", { count: info.staff })}</li>
+                  <li className="nums text-gain">
+                    {t("headStart", {
+                      market: BALANCE.startups.marketFactorByTier[key],
+                      awareness: Math.round(BALANCE.startups.foundingAwareness[key] * 100),
+                    })}
+                  </li>
                 </ul>
                 <Button className="mt-auto" block disabled={locked} onClick={() => setTier(key)}>
                   {t("found")}
@@ -201,7 +218,7 @@ function FoundingSheet({ tier, onClose }: { tier: FoundableTier | null; onClose:
       open={tier !== null}
       onOpenChange={(open) => !open && onClose()}
       title={t("foundTitle")}
-      description={shown === "garage" ? t("garageTitle") : t("smallTitle")}
+      description={t(TIER_TEXT[shown].title)}
       footer={
         <HoldButton tone="accent" onConfirm={() => void found()} disabled={!ready || busy} className="w-full">
           {t("foundConfirm")}

@@ -1,5 +1,6 @@
 "use client";
 
+import { FriendButton } from "@/features/friends/components/friends";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useEffect } from "react";
@@ -35,6 +36,8 @@ export function PlayerProfile({ nickname }: { nickname: string }) {
       {card.data ? (
         <>
           <BusinessCard card={card.data} />
+          {/* Friends (ADR-084) */}
+          <FriendButton nickname={card.data.nickname} />
           {/* Their artworks with values (ADR-080) */}
           <ProfileCollection nickname={card.data.nickname} />
           {/* Their home and garage, the flex (ADR-082) */}

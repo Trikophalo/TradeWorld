@@ -578,6 +578,20 @@ export interface PlayerCard {
 // ------------------------------------------------------------------ player companies (ADR-057)
 
 export type CompanyTier = "garage" | "small_business" | "gmbh" | "ag";
+export type PriceLevel = "budget" | "normal" | "premium";
+
+/** Friends (ADR-084). */
+export interface FriendEntry {
+  nickname: string;
+  level: number;
+  /** Friends since / request sent at. */
+  at: string;
+}
+export interface Friends {
+  friends: FriendEntry[];
+  incoming: FriendEntry[];
+  outgoing: FriendEntry[];
+}
 
 export interface CompanyQuarter {
   label: string;
@@ -625,9 +639,25 @@ export interface MyCompany {
     todayProfitCents: number;
     quarterRevenueCents: number;
     quarterProfitCents: number;
+    /** The last closed hour in detail, for the profit coach (ADR-083). */
+    contractRevenuePerHourCents: number;
+    demandPerHourCents: number;
+    capacityPerHourCents: number;
+    fixedPerHourCents: number;
+    aiWagesPerHourCents: number;
+    marketingPerHourCents: number;
   } | null;
   /** The last closed hours, oldest first. */
-  hours: { hourStart: string; revenueCents: number; profitCents: number }[];
+  hours: { hourStart: string; revenueCents: number; profitCents: number; contractRevenueCents: number }[];
+  /** Profit levers and endless growth (ADR-083). */
+  priceLevel: PriceLevel;
+  contractWork: boolean;
+  expansionLevel: number;
+  canExpand: boolean;
+  /** Price of the next expansion level, paid from the company's cash; null when the legal form cannot expand. */
+  expansionCostCents: number | null;
+  /** Market reach: legal form × expansion. */
+  marketFactor: number;
   aiWageCentsPerHour: number;
   cashCents: number;
   valueCents: number;
@@ -1036,6 +1066,15 @@ export interface GameEngine {
   companyDeposit(requestId: string, amountCents: number): Promise<MyCompany>;
   companyWithdraw(requestId: string, amountCents: number): Promise<MyCompany>;
   upgradeCompany(requestId: string): Promise<MyCompany>;
+  /** Price strategy and contract work (ADR-083). */
+  setCompanyStrategy(requestId: string, priceLevel: PriceLevel, contractWork: boolean): Promise<MyCompany>;
+  /** Next expansion level, paid from the company's cash (ADR-083). */
+  expandCompany(requestId: string): Promise<MyCompany>;
+  /** Friends (ADR-084). */
+  friends(): Promise<Friends>;
+  sendFriendRequest(requestId: string, nickname: string): Promise<Friends>;
+  respondFriendRequest(requestId: string, nickname: string, accept: boolean): Promise<Friends>;
+  removeFriend(requestId: string, nickname: string): Promise<Friends>;
   companyPostings(): Promise<CompanyPosting[]>;
   createJobPosting(input: CreatePostingInput): Promise<void>;
   closeJobPosting(requestId: string, postingId: string): Promise<void>;

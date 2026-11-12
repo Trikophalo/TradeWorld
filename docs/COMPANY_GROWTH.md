@@ -114,9 +114,10 @@ sind: **Vertrieb** (Nachfrage), **Marketing** (Bekanntheit), **F&E** (Forschungs
 
 ## 9. Umsetzung in Phasen
 
-| Phase | Inhalt                                                                             |
-| ----- | ---------------------------------------------------------------------------------- |
-| A     | Stündlicher Betrieb, Lohnregel, Live-Anzeige; Forbes 100 und Top-Unternehmen       |
-| B     | Forschungspunkte, Forschungsprojekte, mehrere Produkte, Versionen und Lebenszyklus |
-| C     | Abteilungen, Standorte, Märkte, weitere Gebäudestufen                              |
-| D     | Wettbewerb in Nischen, Übernahmen, Patente                                         |
+| Phase | Inhalt                                                                                                                                            |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A     | Stündlicher Betrieb, Lohnregel, Live-Anzeige; Forbes 100 und Top-Unternehmen                                                                      |
+| A2    | Gewinnhebel (Auftragsarbeit, Preisstrategie, Gewinn-Coach), Markt je Rechtsform, Ausbaustufen ohne Ende, GmbH direkt gründen (ADR-083, umgesetzt) |
+| B     | Forschungspunkte, Forschungsprojekte, mehrere Produkte, Versionen und Lebenszyklus                                                                |
+| C     | Abteilungen, Standorte, Märkte, weitere Gebäudestufen                                                                                             |
+| D     | Wettbewerb in Nischen, Übernahmen, Patente                                                                                                        |

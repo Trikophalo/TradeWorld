@@ -3,8 +3,14 @@ import { BALANCE } from "../../config/balance.ts";
 import { createRng } from "./rng.ts";
 import { skillNode } from "./skills.ts";
 import {
+  canExpand,
   capacityCents,
   closeStartupHour,
+  effectivePotentialCents,
+  expansionCapacityFactor,
+  expansionCostCents,
+  fixedCostCents,
+  priceEffect,
   closeStartupQuarter,
   companyStage,
   trainingFor,
@@ -268,5 +274,99 @@ describe("operating hours (ADR-072)", () => {
     const demandQuarter = Number(hour.demandCents) * BALANCE.time.quarterHours;
     expect(Math.abs(demandQuarter - (50_000_000 / 4) * 0.6 * 0.8) / demandQuarter).toBeLessThan(0.01);
     expect(Number(hour.capacityCents) * BALANCE.time.quarterHours).toBeCloseTo(Number(quarter.capacityCents), -2);
+  });
+});
+
+describe("profit levers and growth without limit (ADR-083)", () => {
+  const hourInput = {
+    sector: "tech" as const,
+    tier: "garage" as const,
+    marketingCentsPerQuarter: b(0),
+    productivityBps: [15_000],
+    aiWorkers: 0,
+    stage: 1,
+    noise: 0,
+    playerWagesCents: 0,
+  };
+  const young = { ...initialStartup(337_000, b(0)), awareness: 0.03, quality: 0.3 };
+
+  it("contract work sells part of the unused capacity at the contract margin", () => {
+    const off = closeStartupHour(young, hourInput);
+    const on = closeStartupHour(young, { ...hourInput, contractWork: true });
+    expect(off.contractRevenueCents).toBe(b(0));
+    const free = Number(on.capacityCents) - Number(on.demandCents);
+    expect(Number(on.contractRevenueCents)).toBeCloseTo(free * BALANCE.startups.contractWork.shareOfFreeCapacity, -1);
+    expect(on.revenueCents - on.contractRevenueCents).toBe(off.revenueCents);
+    expect(on.profitCents).toBeGreaterThan(off.profitCents);
+  });
+
+  it("a young garage with contract work covers its fixed costs (no more endless minus)", () => {
+    const r = closeStartupHour(young, { ...hourInput, contractWork: true });
+    expect(r.profitCents).toBeGreaterThan(b(0));
+    // An AI worker is not a money printer: contract work alone does not pay its wage.
+    const capacityPerAi = BALANCE.startups.capacityCentsPerProductivity.tech / BALANCE.time.quarterHours;
+    const aiGross =
+      capacityPerAi * BALANCE.startups.contractWork.shareOfFreeCapacity * BALANCE.startups.contractWork.grossMargin;
+    expect(aiGross).toBeLessThan(BALANCE.startups.aiWorkerWageCentsPerHour);
+  });
+
+  it("contract work never applies to sold-out capacity", () => {
+    const full = { ...initialStartup(1e12, b(0)), awareness: 1, quality: 1 };
+    const r = closeStartupHour(full, { ...hourInput, contractWork: true });
+    expect(r.contractRevenueCents).toBe(b(0));
+  });
+
+  it("budget sells more and spreads faster, premium earns more per unit but needs quality", () => {
+    expect(priceEffect("budget", 0.5).demand).toBeGreaterThan(1);
+    expect(priceEffect("budget", 0.5).awareness).toBeGreaterThan(1);
+    expect(priceEffect("premium", 0.8).price).toBeGreaterThan(1);
+    expect(priceEffect("premium", 0.2).demand).toBeLessThan(priceEffect("premium", 0.8).demand);
+    expect(priceEffect(undefined, 0.5)).toEqual(priceEffect("normal", 0.5));
+
+    const known = { ...initialStartup(10_000_000, b(0)), awareness: 0.5, quality: 0.8 };
+    const normal = closeStartupHour(known, hourInput);
+    const premium = closeStartupHour(known, { ...hourInput, priceLevel: "premium" });
+    const budget = closeStartupHour(known, { ...hourInput, priceLevel: "budget" });
+    expect(budget.demandCents).toBeGreaterThan(normal.demandCents);
+    expect(premium.revenueCents - premium.cogsCents).toBeGreaterThan(normal.revenueCents - normal.cogsCents);
+
+    const quarter = (priceLevel: "budget" | "premium") => closeStartupQuarter(young, { ...base, priceLevel });
+    expect(quarter("budget").next.awareness).toBeGreaterThan(quarter("premium").next.awareness);
+  });
+
+  it("a bigger legal form reaches a bigger market; upgrading the same company grows it", () => {
+    const tiers = ["garage", "small_business", "gmbh", "ag"] as const;
+    const markets = tiers.map((tier) => effectivePotentialCents(1_000_000, tier));
+    for (let i = 1; i < markets.length; i++) expect(markets[i]!).toBeGreaterThan(markets[i - 1]!);
+  });
+
+  it("founding bigger directly buys a head start in awareness", () => {
+    expect(initialStartup(1, b(0), BALANCE.startups, "gmbh").awareness).toBeGreaterThan(
+      initialStartup(1, b(0)).awareness,
+    );
+  });
+
+  it("expansion never ends: every level adds market, capacity, places and costs, each step costs more", () => {
+    expect(canExpand("garage")).toBe(false);
+    expect(canExpand("gmbh")).toBe(true);
+    for (const n of [0, 1, 5, 20, 60]) {
+      expect(effectivePotentialCents(1_000_000, "ag", n + 1)).toBeGreaterThan(
+        effectivePotentialCents(1_000_000, "ag", n),
+      );
+      expect(expansionCapacityFactor(n + 1)).toBeGreaterThan(expansionCapacityFactor(n));
+      expect(maxEmployees("ag", BALANCE, n + 1)).toBeGreaterThan(maxEmployees("ag", BALANCE, n));
+      expect(fixedCostCents("ag", BALANCE, n + 1)).toBeGreaterThan(fixedCostCents("ag", BALANCE, n));
+      expect(expansionCostCents(n + 1)).toBeGreaterThan(expansionCostCents(n));
+      expect(Number.isFinite(expansionCostCents(n))).toBe(true);
+    }
+    expect(expansionCostCents(0)).toBe(BALANCE.startups.expansion.baseCostCents);
+    expect(fixedCostCents("ag")).toBe(BALANCE.startups.ag.fixedCostCentsPerQuarter);
+  });
+
+  it("an expanded company sells more in the same hour when demand is there", () => {
+    const s = { ...initialStartup(1e10, b(0)), awareness: 1, quality: 1 };
+    const flat = closeStartupHour(s, { ...hourInput, tier: "ag" });
+    const grown = closeStartupHour(s, { ...hourInput, tier: "ag", expansionLevel: 3 });
+    expect(grown.revenueCents).toBeGreaterThan(flat.revenueCents);
   });
 });

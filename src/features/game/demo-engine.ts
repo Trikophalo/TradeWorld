@@ -17,6 +17,7 @@ import { MISSION_TEMPLATES, availableFor, missionXp, type Metric, type MissionTe
 import { createCareerEngine, initialCareer, tycoonAvatar, type CareerState } from "./demo/careers";
 import { createArtEngine, type ArtState } from "./demo/artworks";
 import { createPropertyEngine, type HomeState } from "./demo/property";
+import { createFriendEngine } from "./demo/friends";
 import { createCompanyEngine, type DemoCompanyState, type DemoDissolution } from "./demo/company";
 import { demoTycoons } from "./demo/tycoons";
 import {
@@ -1004,6 +1005,8 @@ const art = createArtEngine({
   track: (metric) => bump(metric),
 });
 
+const friends = createFriendEngine({ nickname: () => p().nickname, idempotent });
+
 const home = createPropertyEngine({
   home: () => p().home,
   setHome: (value) => {
@@ -1029,6 +1032,7 @@ export const demoEngine: GameEngine = {
   ...company.engine,
   ...art.engine,
   ...home.engine,
+  ...friends,
   snapshot: () => Promise.resolve(snapshotNow()),
 
   candles: (ticker, interval, limit) => Promise.resolve(demoCandles(ticker, interval, limit)),

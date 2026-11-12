@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { BULL, COIN, SECTOR_ICONS } from "@/components/pixel/art";
+import { BULL, COIN, SECTOR_ICONS, UI_ICONS } from "@/components/pixel/art";
 import { LinkCard } from "@/components/ui/link-card";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Page, PageHeader } from "@/components/layout/page";
@@ -37,6 +37,14 @@ export default async function ProfilePage() {
                 description={t("careerEmptyText")}
               />
             </Card>
+          </Reveal>
+          <Reveal feature="profileFriends">
+            <LinkCard
+              href="/friends"
+              icon={<PixelIcon {...UI_ICONS.heart} scale={2} />}
+              title={t("friends")}
+              hint={t("friendsHint")}
+            />
           </Reveal>
           <LinkCard
             href="/missions"

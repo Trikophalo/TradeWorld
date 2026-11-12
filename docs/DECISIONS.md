@@ -861,3 +861,67 @@ Vorgabe: ein eigenes Zuhause als großes, freiwilliges Ziel zum Geldausgeben und
   - Im Vermögen zählen die Bleibe mit 50 %, Möbel, Böden und Autos mit 40 % (so viel bringt ein Verkauf).
 - **Handy:** Die Leiste unten hat sechs Tabs und „Mehr“. Unter „Mehr“ liegen Kunst, Grundstück, Profil, Missionen
   und Ranglisten. Finn zeigt bei neuen Bereichen auf „Mehr“, wenn der Tab dort liegt.
+
+## ADR-083: Mehr Wege zum Gewinn, Wachstum ohne Grenze — `akzeptiert`
+
+Vorgabe: Viele Firmen machen nur Minus, und es ist unklar, warum. Spieler sollen mehr Hebel haben. Die gleiche
+kleine Firma soll zum Riesen wachsen können. Wer später einsteigt, soll größer anfangen können. Nach oben gibt es
+keine Grenze. Werte stehen in `BALANCE.startups`, Formeln in `src/lib/sim/startup.ts`.
+
+- **Auftragsarbeit:**
+  - Ein Teil der freien Kapazität (25 %) wird als Auftrag an andere Firmen verkauft, mit fester Bruttomarge (30 %).
+  - Standardmäßig an.
+  - Eine junge Garage deckt damit ihre Fixkosten. Eine KI-Kraft trägt sich damit aber nicht: Ihr Lohn verlangt
+    echte Nachfrage.
+- **Preisstrategie:**
+
+  | Strategie | Preis | Nachfrage | Mundpropaganda |
+  | --------- | ----- | --------- | -------------- |
+  | Günstig   | × 0,8 | × 1,35    | × 1,5          |
+  | Normal    | × 1   | × 1       | × 1            |
+  | Premium   | × 1,3 | × 0,75    | × 0,7          |
+  - Günstig lohnt sich zum Bekanntwerden.
+  - Premium lohnt sich mit guter Qualität. Unter 50 % Qualität halbiert Premium die Nachfrage.
+
+- **Gewinn-Coach:**
+  - Eine Karte im Unternehmen nennt den Engpass: zu wenig bekannt, Kapazität voll, KI-Kräfte zu teuer, Werbung zu
+    hoch, Fixkosten.
+  - Dazu nennt sie den passenden nächsten Schritt.
+  - Die Regeln stehen in `src/features/company/coach.ts`.
+- **Größere Rechtsform, größerer Markt:**
+  - Die verborgene Marktgröße wird je Rechtsform vervielfacht: Garage × 1, Kleinunternehmen × 4, GmbH × 15,
+    AG × 40.
+  - Ein Upgrade lässt also dieselbe Firma wachsen.
+- **Größer gründen:**
+  - Ab Level 15 kann man direkt eine GmbH gründen.
+  - Wer größer gründet, startet bekannter: Garage 3 %, Kleinunternehmen 8 %, GmbH 20 %.
+  - Die AG bleibt dem Börsengang vorbehalten.
+- **Börsengang früher:** ab Level 6, schon aus der Garage.
+- **Ausbaustufen ohne Ende:**
+  - Ab der GmbH kauft die Firma aus ihrer Kasse Ausbaustufen.
+  - Jede Stufe bringt +10 Plätze, +10 % Kapazität und +50 % Markt (neue Regionen, neue Kunden).
+  - Jede Stufe erhöht die Fixkosten um 25 % der Grundkosten.
+  - Stufe n kostet 100.000 € × 1,8ⁿ.
+  - Es gibt keine letzte Stufe. Die Kosten wachsen schneller als der Nutzen, deshalb wird Wachstum immer
+    schwerer, hört aber nie auf.
+- **Bestehende Firmen** behalten ihre Marktgröße. Sie profitieren sofort von Auftragsarbeit und vom Faktor ihrer
+  Rechtsform.
+
+## ADR-084: Freunde — `akzeptiert`
+
+Vorgabe: Freunde hinzufügen und über sie ihre Profile sehen. Mitarbeiter in der Firma anklicken und ihr Profil
+öffnen.
+
+- **Anfragen:**
+  - Auf jedem Spielerprofil steht „Als Freund hinzufügen“.
+  - Der andere nimmt an oder lehnt ab.
+  - Schickt der andere selbst schon eine Anfrage, macht eine Gegenanfrage die Freundschaft sofort.
+- **Seite „Freunde“** (unter „Mehr“ und auf dem eigenen Profil):
+  - Freunde mit Level und Link zum Profil.
+  - Offene Anfragen an mich, mit Annehmen und Ablehnen.
+  - Eigene, noch offene Anfragen.
+- **Entfernen:** Eine Freundschaft lässt sich jederzeit lösen. Eine eigene Anfrage lässt sich zurückziehen.
+- **Mitarbeiter:** Figuren im Büro und Plätze im Team öffnen das Profil des Spielers. KI-Kräfte haben kein
+  Profil.
+- **Server:** RPCs `get_friends`, `send_friend_request`, `respond_friend_request`, `remove_friend` auf der
+  bestehenden Tabelle `friendships`.

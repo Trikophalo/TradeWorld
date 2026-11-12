@@ -12,6 +12,7 @@ import type { BalanceConfig, SectorId, StartupsConfig } from "../../config/balan
 import { roundToBigInt } from "./money.ts";
 
 export type StartupTier = "garage" | "small_business" | "gmbh" | "ag";
+export type PriceLevel = "budget" | "normal" | "premium";
 
 export interface StartupState {
   /** Hidden: yearly revenue the niche can carry at full awareness and quality. */
@@ -37,6 +38,10 @@ export interface StartupQuarterInput {
   readonly stage: number;
   /** Standard normal draw for the demand noise (passed in: the sim never draws itself). */
   readonly noise: number;
+  /** Price strategy (ADR-083), default normal. */
+  readonly priceLevel?: PriceLevel;
+  /** Expansion level (ADR-083), default 0. */
+  readonly expansionLevel?: number;
 }
 
 export interface StartupQuarterResult {
@@ -62,10 +67,15 @@ export function potentialFromUniform(u: number, cfg: StartupsConfig = BALANCE.st
   return Math.min(maxAnnualCents, Math.round(minAnnualCents * Math.pow(safe, -1 / paretoAlpha)));
 }
 
-export function initialStartup(potentialAnnualCents: number, cashCents: bigint, cfg = BALANCE.startups): StartupState {
+export function initialStartup(
+  potentialAnnualCents: number,
+  cashCents: bigint,
+  cfg = BALANCE.startups,
+  tier: Exclude<StartupTier, "ag"> = "garage",
+): StartupState {
   return {
     potentialAnnualCents,
-    awareness: cfg.awareness.initial,
+    awareness: tier === "garage" ? cfg.awareness.initial : cfg.foundingAwareness[tier],
     quality: cfg.quality.base,
     quartersActive: 0,
     cashCents,
@@ -90,7 +100,7 @@ export function marketingGain(
   return (a.marketingMaxGain * marketingCents) / (marketingCents + half);
 }
 
-/** Revenue the team can serve per quarter. */
+/** Revenue the team can serve per quarter (before stage and expansion bonuses). */
 export function capacityCents(
   productivityBps: readonly number[],
   sector: SectorId,
@@ -100,18 +110,78 @@ export function capacityCents(
   return units * cfg.capacityCentsPerProductivity[sector];
 }
 
-export function fixedCostCents(tier: StartupTier, cfg: BalanceConfig = BALANCE): number {
-  if (tier === "garage") return cfg.startups.garage.fixedCostCentsPerQuarter;
-  if (tier === "gmbh") return cfg.startups.gmbh.fixedCostCentsPerQuarter;
-  if (tier === "ag") return cfg.startups.ag.fixedCostCentsPerQuarter;
-  return cfg.company.tiers.find((t) => t.id === "small_business")?.fixedCostCentsPerQuarter ?? 0;
+const level = (expansionLevel: number | undefined) => Math.max(0, Math.floor(expansionLevel ?? 0));
+
+/** Fixed costs per quarter; every expansion level adds a share of the base (ADR-083). */
+export function fixedCostCents(tier: StartupTier, cfg: BalanceConfig = BALANCE, expansionLevel = 0): number {
+  const base =
+    tier === "garage"
+      ? cfg.startups.garage.fixedCostCentsPerQuarter
+      : tier === "gmbh"
+        ? cfg.startups.gmbh.fixedCostCentsPerQuarter
+        : tier === "ag"
+          ? cfg.startups.ag.fixedCostCentsPerQuarter
+          : (cfg.company.tiers.find((t) => t.id === "small_business")?.fixedCostCentsPerQuarter ?? 0);
+  return Math.round(base * (1 + cfg.startups.expansion.fixedCostPerLevel * level(expansionLevel)));
 }
 
-export function maxEmployees(tier: StartupTier, cfg: BalanceConfig = BALANCE): number {
-  if (tier === "garage") return cfg.startups.garage.maxEmployees;
-  if (tier === "gmbh") return cfg.startups.gmbh.maxEmployees;
-  if (tier === "ag") return cfg.startups.ag.maxEmployees;
-  return cfg.company.tiers.find((t) => t.id === "small_business")?.maxEmployees ?? 0;
+/** Places for players and AI workers; every expansion level adds more (ADR-083). */
+export function maxEmployees(tier: StartupTier, cfg: BalanceConfig = BALANCE, expansionLevel = 0): number {
+  const base =
+    tier === "garage"
+      ? cfg.startups.garage.maxEmployees
+      : tier === "gmbh"
+        ? cfg.startups.gmbh.maxEmployees
+        : tier === "ag"
+          ? cfg.startups.ag.maxEmployees
+          : (cfg.company.tiers.find((t) => t.id === "small_business")?.maxEmployees ?? 0);
+  return base + cfg.startups.expansion.employeesPerLevel * level(expansionLevel);
+}
+
+// ------------------------------------------------------------------ growth without limit (ADR-083)
+
+/** The market the company reaches: niche size × legal form × expansion. */
+export function effectivePotentialCents(
+  potentialAnnualCents: number,
+  tier: StartupTier,
+  expansionLevel = 0,
+  cfg: StartupsConfig = BALANCE.startups,
+): number {
+  return (
+    potentialAnnualCents *
+    cfg.marketFactorByTier[tier] *
+    (1 + cfg.expansion.marketBonusPerLevel * level(expansionLevel))
+  );
+}
+
+/** Capacity factor of the expansion level. */
+export function expansionCapacityFactor(expansionLevel = 0, cfg: StartupsConfig = BALANCE.startups): number {
+  return 1 + cfg.expansion.capacityBonusPerLevel * level(expansionLevel);
+}
+
+/** Whether this legal form can expand at all. */
+export function canExpand(tier: StartupTier, cfg: StartupsConfig = BALANCE.startups): boolean {
+  return (cfg.expansion.fromTiers as readonly string[]).includes(tier);
+}
+
+/** Price of the step from expansion level n to n + 1 (whole cents). Grows geometrically, never ends. */
+export function expansionCostCents(currentLevel: number, cfg: StartupsConfig = BALANCE.startups): number {
+  return Math.round(cfg.expansion.baseCostCents * Math.pow(cfg.expansion.costGrowth, level(currentLevel)));
+}
+
+/** Effect of the price strategy; premium needs quality, or customers stay away. */
+export function priceEffect(
+  priceLevel: PriceLevel | undefined,
+  quality: number,
+  cfg: StartupsConfig = BALANCE.startups,
+): { price: number; demand: number; awareness: number } {
+  const p = cfg.pricing[priceLevel ?? "normal"];
+  const scared = priceLevel === "premium" && quality < cfg.pricing.premiumMinQuality;
+  return {
+    price: p.price,
+    demand: scared ? p.demand * cfg.pricing.premiumLowQualityDemand : p.demand,
+    awareness: p.awareness,
+  };
 }
 
 /** Founder productivity in the own company: halved while working elsewhere (ADR-066). */
@@ -149,7 +219,9 @@ export function closeStartupQuarter(
   cfg: BalanceConfig = BALANCE,
 ): StartupQuarterResult {
   const sc = cfg.startups;
-  const quarterPotential = state.potentialAnnualCents / 4;
+  const potential = effectivePotentialCents(state.potentialAnnualCents, input.tier, input.expansionLevel, sc);
+  const quarterPotential = potential / 4;
+  const pricing = priceEffect(input.priceLevel, state.quality, sc);
 
   // Quality moves towards what the team can do; awareness grows by word of mouth and marketing.
   const stage = clamp(Math.floor(input.stage), 0, sc.stages.awarenessCaps.length - 1);
@@ -162,22 +234,26 @@ export function closeStartupQuarter(
   const marketing = Number(input.marketingCents);
   const awareness = clamp(
     state.awareness +
-      sc.awareness.growthPerQuarter * state.awareness * (1 - state.awareness) * (0.5 + quality) +
-      marketingGain(marketing, state.potentialAnnualCents, sc) -
+      sc.awareness.growthPerQuarter * pricing.awareness * state.awareness * (1 - state.awareness) * (0.5 + quality) +
+      marketingGain(marketing, potential, sc) -
       sc.awareness.decayPerQuarter * state.awareness,
     sc.awareness.min,
     // Without the right specialists a company cannot grow beyond its stage (ADR-062).
     Math.max(sc.awareness.min, sc.stages.awarenessCaps[stage] ?? 1),
   );
 
-  const demand = quarterPotential * awareness * (0.5 + 0.5 * quality) * Math.exp(sc.demandNoise * input.noise);
+  // Demand and capacity count in units at the normal price; the price strategy changes both price and demand.
+  const demand =
+    quarterPotential * awareness * (0.5 + 0.5 * quality) * Math.exp(sc.demandNoise * input.noise) * pricing.demand;
   const capacity =
-    capacityCents(input.productivityBps, input.sector, sc) * (1 + sc.stages.capacityBonusPerStage * stage);
-  const revenue = Math.min(demand, capacity);
+    capacityCents(input.productivityBps, input.sector, sc) *
+    (1 + sc.stages.capacityBonusPerStage * stage) *
+    expansionCapacityFactor(input.expansionLevel, sc);
+  const sold = Math.min(demand, capacity);
 
-  const revenueCents = roundToBigInt(revenue);
-  const cogsCents = roundToBigInt(revenue * (1 - sc.grossMargin[input.sector]));
-  const fixedCents = BigInt(fixedCostCents(input.tier, cfg));
+  const revenueCents = roundToBigInt(sold * pricing.price);
+  const cogsCents = roundToBigInt(sold * (1 - sc.grossMargin[input.sector]));
+  const fixedCents = BigInt(fixedCostCents(input.tier, cfg, input.expansionLevel));
   const aiWorkerCents = BigInt(input.aiWorkers * sc.aiWorkerCostCentsPerQuarter);
   const operatingProfitCents = revenueCents - cogsCents - fixedCents - aiWorkerCents - input.marketingCents;
 
@@ -274,12 +350,21 @@ export interface StartupHourInput {
   readonly noise: number;
   /** Contract wages of the players for this hour (sum of their hourly wages). */
   readonly playerWagesCents: number;
+  /** Price strategy (ADR-083), default normal. */
+  readonly priceLevel?: PriceLevel;
+  /** Sell unused capacity as contract work (ADR-083), default off. */
+  readonly contractWork?: boolean;
+  /** Expansion level (ADR-083), default 0. */
+  readonly expansionLevel?: number;
 }
 
 export interface StartupHourResult {
   readonly demandCents: bigint;
   readonly capacityCents: bigint;
+  /** All revenue of the hour, contract work included. */
   readonly revenueCents: bigint;
+  /** Part of the revenue from contract work (ADR-083). */
+  readonly contractRevenueCents: bigint;
   readonly cogsCents: bigint;
   readonly fixedCents: bigint;
   readonly marketingCents: bigint;
@@ -303,15 +388,28 @@ export function closeStartupHour(
   const sc = cfg.startups;
   const hours = cfg.time.quarterHours;
   const stage = clamp(Math.floor(input.stage), 0, sc.stages.awarenessCaps.length - 1);
+  const pricing = priceEffect(input.priceLevel, state.quality, sc);
+  const potential = effectivePotentialCents(state.potentialAnnualCents, input.tier, input.expansionLevel, sc);
+  // Demand and capacity count in units at the normal price (see closeStartupQuarter).
   const demand =
-    (state.potentialAnnualCents / 4 / hours) *
+    (potential / 4 / hours) *
     state.awareness *
     (0.5 + 0.5 * state.quality) *
-    Math.exp(sc.demandNoise * input.noise);
+    Math.exp(sc.demandNoise * input.noise) *
+    pricing.demand;
   const capacity =
-    (capacityCents(input.productivityBps, input.sector, sc) * (1 + sc.stages.capacityBonusPerStage * stage)) / hours;
-  const revenueCents = roundToBigInt(Math.min(demand, capacity));
-  const cogsCents = roundToBigInt(Number(revenueCents) * (1 - sc.grossMargin[input.sector]));
+    (capacityCents(input.productivityBps, input.sector, sc) *
+      (1 + sc.stages.capacityBonusPerStage * stage) *
+      expansionCapacityFactor(input.expansionLevel, sc)) /
+    hours;
+  const sold = Math.min(demand, capacity);
+  const contract = input.contractWork ? (capacity - sold) * sc.contractWork.shareOfFreeCapacity : 0;
+  const ownRevenueCents = roundToBigInt(sold * pricing.price);
+  const contractRevenueCents = roundToBigInt(contract);
+  const revenueCents = ownRevenueCents + contractRevenueCents;
+  const cogsCents =
+    roundToBigInt(sold * (1 - sc.grossMargin[input.sector])) +
+    roundToBigInt(contract * (1 - sc.contractWork.grossMargin));
   const gross = Number(revenueCents - cogsCents);
 
   const aiDue = input.aiWorkers * sc.aiWorkerWageCentsPerHour;
@@ -320,12 +418,13 @@ export function closeStartupHour(
   const aiWagesPaidCents = BigInt(Math.floor((aiDue * payFactorBps) / 10_000));
   const playerWagesPaidCents = BigInt(Math.floor((Math.max(0, input.playerWagesCents) * payFactorBps) / 10_000));
 
-  const fixedCents = BigInt(Math.round(fixedCostCents(input.tier, cfg) / hours));
+  const fixedCents = BigInt(Math.round(fixedCostCents(input.tier, cfg, input.expansionLevel) / hours));
   const marketingCents = BigInt(Math.round(Number(input.marketingCentsPerQuarter) / hours));
   return {
     demandCents: roundToBigInt(demand),
     capacityCents: roundToBigInt(capacity),
     revenueCents,
+    contractRevenueCents,
     cogsCents,
     fixedCents,
     marketingCents,

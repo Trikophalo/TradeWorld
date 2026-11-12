@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { useTranslations } from "next-intl";
+import Link from "next/link";
 import { useMemo } from "react";
 import { OFFICE_DESK, OFFICE_PLANT, staffFigure } from "@/components/pixel/figures";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
@@ -107,8 +108,9 @@ function Figure({ company, staff }: { company: MyCompany; staff: Staff }) {
     [staff.kind, staff.name, staff.key, company.color, company.logo],
   );
   const r = rhythm(staff.key);
-  return (
-    <div className="group flex w-16 flex-col items-center gap-1" title={`${staff.name} · ${staff.role}`}>
+  const t = useTranslations("firm");
+  const body = (
+    <>
       {staff.boss && <span className="label-pixel text-2xs text-gold">★</span>}
       <div className="origin-bottom transition-transform duration-fast group-hover:scale-110">
         <motion.div
@@ -127,6 +129,26 @@ function Figure({ company, staff }: { company: MyCompany; staff: Staff }) {
       <span className={cn("max-w-16 truncate text-2xs", staff.boss ? "font-semibold text-fg-1" : "text-fg-2")}>
         {staff.name}
       </span>
+    </>
+  );
+  // People open their profile (ADR-084); AI workers have none.
+  if (staff.kind === "person" && staff.name) {
+    return (
+      <Link
+        href={`/players/${encodeURIComponent(staff.name)}`}
+        className="group flex w-16 flex-col items-center gap-1 rounded-md focus-ring"
+        title={`${staff.name} · ${staff.role}`}
+        aria-label={t("openProfile", { name: staff.name })}
+        data-testid="office-person"
+        onClick={() => haptic("tap")}
+      >
+        {body}
+      </Link>
+    );
+  }
+  return (
+    <div className="group flex w-16 flex-col items-center gap-1" title={`${staff.name} · ${staff.role}`}>
+      {body}
     </div>
   );
 }
