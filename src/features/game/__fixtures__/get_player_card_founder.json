@@ -1,6 +1,6 @@
 {
   "job": null,
-  "rank": 125,
+  "rank": 126,
   "level": 10,
   "company": { "name": "Fixture Labor", "ticker": null },
   "nickname": "Fixture_Neu",
@@ -10,7 +10,7 @@
     { "key": "it_basics", "tier": 1 }
   ],
   "streak_days": 1,
-  "member_since": "2026-11-12T21:05:40.62691+00:00",
+  "member_since": "2026-11-12T22:24:29.608447+00:00",
   "branch_scores": {
     "it": 3,
     "law": 0,
@@ -22,5 +22,5 @@
     "management": 0
   },
   "skills_learned": 2,
-  "net_worth_cents": 2423895
+  "net_worth_cents": 2423897
 }

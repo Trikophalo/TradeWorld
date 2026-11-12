@@ -31,6 +31,7 @@ const base = {
   canExpand: false,
   expansionCostCents: null,
   cashCents: 0,
+  unpaidCents: 0,
   maxEmployees: 2,
   headcount: 0,
 };

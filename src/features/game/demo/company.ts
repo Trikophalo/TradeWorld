@@ -865,7 +865,7 @@ export function createCompanyEngine(host: CompanyHost) {
       mutate(requestId, (company) => {
         if (!canExpand(company.tier)) throw new GameError("company_upgrade_unavailable");
         const cost = expansionCostCents(company.expansionLevel ?? 0);
-        if (company.cashCents < cost) throw new GameError("insufficient_funds");
+        if (company.cashCents - company.unpaidCents < cost) throw new GameError("insufficient_funds");
         company.cashCents -= cost;
         company.expansionLevel = (company.expansionLevel ?? 0) + 1;
         system(company, `Ausbaustufe ${company.expansionLevel} erreicht: mehr Markt, mehr Plätze, mehr Kapazität.`);

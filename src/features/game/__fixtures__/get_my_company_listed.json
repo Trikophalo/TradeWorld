@@ -1,16 +1,22 @@
 {
   "company": {
-    "id": "5ccf43ca-37d9-4a6d-9550-feabab26e5fd",
+    "id": "3603df43-d152-4e63-832b-07e129564ef2",
     "idea": "Werkzeuge für Bastler",
     "live": {
-      "last_hour_at": "2026-11-12T21:00:00+00:00",
-      "pay_factor_bps": 108,
-      "today_profit_cents": -13333,
-      "today_revenue_cents": 365,
-      "quarter_profit_cents": -13333,
+      "last_hour_at": "2026-11-12T22:00:00+00:00",
+      "pay_factor_bps": 8444,
+      "today_profit_cents": -13332,
+      "today_revenue_cents": 66867,
+      "fixed_per_hour_cents": 2500,
+      "quarter_profit_cents": -13332,
+      "demand_per_hour_cents": 235,
       "profit_per_hour_cents": -6666,
-      "quarter_revenue_cents": 365,
-      "revenue_per_hour_cents": 173
+      "quarter_revenue_cents": 66867,
+      "revenue_per_hour_cents": 33426,
+      "ai_wages_per_hour_cents": 10132,
+      "capacity_per_hour_cents": 133000,
+      "marketing_per_hour_cents": 4167,
+      "contract_revenue_per_hour_cents": 33191
     },
     "logo": {
       "grid": [
@@ -37,8 +43,18 @@
     "tier": "ag",
     "color": "#2266cc",
     "hours": [
-      { "hour_start": "2026-11-12T19:00:00+00:00", "profit_cents": -6667, "revenue_cents": 192 },
-      { "hour_start": "2026-11-12T20:00:00+00:00", "profit_cents": -6666, "revenue_cents": 173 }
+      {
+        "hour_start": "2026-11-12T20:00:00+00:00",
+        "profit_cents": -6666,
+        "revenue_cents": 33441,
+        "contract_revenue_cents": 33186
+      },
+      {
+        "hour_start": "2026-11-12T21:00:00+00:00",
+        "profit_cents": -6666,
+        "revenue_cents": 33426,
+        "contract_revenue_cents": 33191
+      }
     ],
     "stage": 1,
     "banner": {
@@ -99,13 +115,15 @@
     "employees": 1,
     "headcount": 4,
     "ai_workers": 3,
-    "cash_cents": 7780359,
-    "founded_at": "2026-11-12T21:05:41.126239+00:00",
+    "can_expand": true,
+    "cash_cents": 7764475,
+    "founded_at": "2026-11-12T22:24:30.03727+00:00",
     "can_upgrade": false,
     "logo_hidden": false,
+    "price_level": "normal",
     "product_key": "security_software",
     "quality_bps": 2660,
-    "value_cents": 7780359,
+    "value_cents": 7764475,
     "last_quarter": {
       "label": "J1 Q2",
       "cogs_cents": 0,
@@ -123,23 +141,27 @@
     "unpaid_cents": 0,
     "awareness_bps": 758,
     "can_go_public": false,
+    "contract_work": true,
+    "market_factor": 40.0,
     "max_employees": 100,
     "open_postings": 1,
     "training_from": 5,
     "capacity_cents": 2310000,
     "full_time_from": 5,
     "grace_quarters": 4,
-    "pay_factor_bps": 108,
+    "pay_factor_bps": 8444,
+    "expansion_level": 0,
     "founder_has_job": false,
     "next_quarter_at": "2026-11-13T01:00:00+00:00",
     "quarters_active": 1,
     "ai_worker_skills": ["it_networks"],
     "distress_quarters": 0,
-    "estimate_low_cents": 36196,
+    "estimate_low_cents": 1052267,
     "upgrade_cost_cents": null,
-    "estimate_high_cents": 484291,
+    "estimate_high_cents": 12802864,
     "ai_worker_cost_cents": 72000,
     "can_capital_increase": true,
+    "expansion_cost_cents": 10000000,
     "pending_applications": 0,
     "team_productivity_bps": 61600,
     "ai_wage_cents_per_hour": 12000,

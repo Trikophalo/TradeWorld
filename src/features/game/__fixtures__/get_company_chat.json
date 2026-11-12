@@ -1,75 +1,75 @@
 {
-  "company": { "id": "5ccf43ca-37d9-4a6d-9550-feabab26e5fd", "name": "Fixture Labor", "color": "#2266cc" },
+  "company": { "id": "3603df43-d152-4e63-832b-07e129564ef2", "name": "Fixture Labor", "color": "#2266cc" },
   "members": 2,
   "messages": [
     {
-      "id": 54,
+      "id": 59,
       "body": "Fixture_Chefin ist jetzt im Team.",
       "kind": "system",
       "is_me": false,
       "author": null,
       "avatar_key": null,
-      "created_at": "2026-11-12T21:05:41.369087+00:00",
+      "created_at": "2026-11-12T22:24:30.219286+00:00",
       "is_founder": false
     },
     {
-      "id": 55,
+      "id": 60,
       "body": "Fixture_Chefin wurde entlassen.",
       "kind": "system",
       "is_me": false,
       "author": null,
       "avatar_key": null,
-      "created_at": "2026-11-12T21:05:41.382326+00:00",
+      "created_at": "2026-11-12T22:24:30.231974+00:00",
       "is_founder": false
     },
     {
-      "id": 56,
+      "id": 61,
       "body": "Quartal J1 Q2: Umsatz 0 €, Gewinn 0 €.",
       "kind": "system",
       "is_me": false,
       "author": null,
       "avatar_key": null,
-      "created_at": "2026-11-12T21:05:41.391847+00:00",
+      "created_at": "2026-11-12T22:24:30.236607+00:00",
       "is_founder": false
     },
     {
-      "id": 57,
+      "id": 62,
       "body": "Fixture_Chefin ist jetzt im Team.",
       "kind": "system",
       "is_me": false,
       "author": null,
       "avatar_key": null,
-      "created_at": "2026-11-12T21:05:41.538473+00:00",
+      "created_at": "2026-11-12T22:24:30.359166+00:00",
       "is_founder": false
     },
     {
-      "id": 58,
+      "id": 63,
       "body": "Fixture_Chefin hat eine Schulung abgeschlossen.",
       "kind": "system",
       "is_me": false,
       "author": null,
       "avatar_key": null,
-      "created_at": "2026-11-12T21:05:41.602503+00:00",
+      "created_at": "2026-11-12T22:24:30.436894+00:00",
       "is_founder": false
     },
     {
-      "id": 59,
+      "id": 64,
       "body": "Moin zusammen!",
       "kind": "player",
       "is_me": false,
       "author": "Fixture_Chefin",
       "avatar_key": "rookie",
-      "created_at": "2026-11-12T21:05:41.642759+00:00",
+      "created_at": "2026-11-12T22:24:30.475187+00:00",
       "is_founder": false
     },
     {
-      "id": 60,
+      "id": 65,
       "body": "Willkommen an Bord.",
       "kind": "player",
       "is_me": true,
       "author": "Fixture_Neu",
       "avatar_key": "coder",
-      "created_at": "2026-11-12T21:05:41.645763+00:00",
+      "created_at": "2026-11-12T22:24:30.478206+00:00",
       "is_founder": true
     }
   ]

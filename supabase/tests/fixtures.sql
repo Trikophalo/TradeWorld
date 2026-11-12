@@ -463,3 +463,47 @@ select tests.login_as('authenticated', :p) is null as ok \gset
 select public.get_property('Fixture_Heim');
 \o
 reset role;
+
+-- M4c: company levers (ADR-083) with a GmbH, friends (ADR-084)
+\set fx_g '''f1f1f1f1-0000-4000-8000-0000000000fc'''
+select tests.signup(:fx_g, 'Fixture_Gmbh') is not null as ok \gset
+select tests.set_level(:fx_g, 15);
+select tests.fund(:fx_g, 20000000, 'fixture:m4c:g');
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/found_company_gmbh.json
+select public.found_company(gen_random_uuid(), 'Fixture Werke', 'Maschinen nach Maß', 'tech', '#336699', 'gmbh');
+\o :fixture_dir/set_company_strategy.json
+select public.set_company_strategy(gen_random_uuid(), 'premium', true);
+\o
+select public.company_deposit(gen_random_uuid(), 10000000) is not null as ok \gset
+\o :fixture_dir/expand_company.json
+select public.expand_company(gen_random_uuid());
+\o
+reset role;
+select company_id as fx_gco from public.player_companies where founder_id = :fx_g \gset
+select public.player_company_close_hour(:'fx_gco', date_trunc('hour', now()) - interval '1 hour') is not null as ok \gset
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/get_my_company_expanded.json
+select public.get_my_company();
+\o :fixture_dir/get_friends_empty.json
+select public.get_friends();
+\o :fixture_dir/send_friend_request.json
+select public.send_friend_request(gen_random_uuid(), 'Fixture_Heim');
+\o
+select public.send_friend_request(gen_random_uuid(), 'Fixture_Kunst') is not null as ok \gset
+reset role;
+select tests.login_as('authenticated', :fx_k) is null as ok \gset
+\o :fixture_dir/respond_friend_request.json
+select public.respond_friend_request(gen_random_uuid(), 'Fixture_Gmbh', true);
+\o
+reset role;
+select tests.login_as('authenticated', :p) is null as ok \gset
+select public.send_friend_request(gen_random_uuid(), 'Fixture_Gmbh') is not null as ok \gset
+reset role;
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/get_friends.json
+select public.get_friends();
+\o :fixture_dir/remove_friend.json
+select public.remove_friend(gen_random_uuid(), 'Fixture_Heim');
+\o
+reset role;

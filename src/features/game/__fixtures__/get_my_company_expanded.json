@@ -1,0 +1,114 @@
+{
+  "company": {
+    "id": "197e1d91-93ef-49ef-999a-4a926025e63d",
+    "idea": "Maschinen nach Maß",
+    "live": {
+      "last_hour_at": "2026-11-12T22:00:00+00:00",
+      "pay_factor_bps": 10000,
+      "today_profit_cents": -101546,
+      "today_revenue_cents": 39220,
+      "fixed_per_hour_cents": 125000,
+      "quarter_profit_cents": -101546,
+      "demand_per_hour_cents": 17710,
+      "profit_per_hour_cents": -101546,
+      "quarter_revenue_cents": 39220,
+      "revenue_per_hour_cents": 39220,
+      "ai_wages_per_hour_cents": 0,
+      "capacity_per_hour_cents": 82500,
+      "marketing_per_hour_cents": 0,
+      "contract_revenue_per_hour_cents": 16197
+    },
+    "logo": null,
+    "name": "Fixture Werke",
+    "tier": "gmbh",
+    "color": "#336699",
+    "hours": [
+      {
+        "hour_start": "2026-11-12T21:00:00+00:00",
+        "profit_cents": -101546,
+        "revenue_cents": 39220,
+        "contract_revenue_cents": 16197
+      }
+    ],
+    "stage": 0,
+    "banner": null,
+    "sector": "tech",
+    "stages": [
+      {
+        "stage": 1,
+        "skills": [{ "key": "it_networks", "covered_by": null, "covered_by_ai": false }],
+        "reached": false
+      },
+      {
+        "stage": 2,
+        "skills": [
+          { "key": "it_security", "covered_by": null, "covered_by_ai": false },
+          { "key": "it_programming", "covered_by": null, "covered_by_ai": false }
+        ],
+        "reached": false
+      },
+      {
+        "stage": 3,
+        "skills": [
+          { "key": "law_privacy", "covered_by": null, "covered_by_ai": false },
+          { "key": "it_architecture", "covered_by": null, "covered_by_ai": false }
+        ],
+        "reached": false
+      },
+      {
+        "stage": 4,
+        "skills": [
+          { "key": "it_crypto", "covered_by": null, "covered_by_ai": false },
+          { "key": "it_pentest", "covered_by": null, "covered_by_ai": false }
+        ],
+        "reached": false
+      }
+    ],
+    "history": [],
+    "listing": null,
+    "distress": false,
+    "employees": 0,
+    "headcount": 0,
+    "ai_workers": 0,
+    "can_expand": true,
+    "cash_cents": 5898454,
+    "founded_at": "2026-11-12T22:24:31.153042+00:00",
+    "can_upgrade": false,
+    "logo_hidden": false,
+    "price_level": "premium",
+    "product_key": "security_software",
+    "quality_bps": 2500,
+    "value_cents": 5898454,
+    "last_quarter": null,
+    "unpaid_cents": 0,
+    "awareness_bps": 2000,
+    "can_go_public": true,
+    "contract_work": true,
+    "market_factor": 22.5,
+    "max_employees": 30,
+    "open_postings": 0,
+    "training_from": 5,
+    "capacity_cents": 495000,
+    "full_time_from": 5,
+    "grace_quarters": 4,
+    "pay_factor_bps": 10000,
+    "expansion_level": 1,
+    "founder_has_job": false,
+    "next_quarter_at": "2026-11-13T01:00:00+00:00",
+    "quarters_active": 0,
+    "ai_worker_skills": [],
+    "distress_quarters": 0,
+    "estimate_low_cents": 1268434,
+    "upgrade_cost_cents": null,
+    "estimate_high_cents": 44919775,
+    "ai_worker_cost_cents": 72000,
+    "can_capital_increase": false,
+    "expansion_cost_cents": 18000000,
+    "pending_applications": 0,
+    "team_productivity_bps": 15000,
+    "ai_wage_cents_per_hour": 12000,
+    "founder_productivity_bps": 15000,
+    "marketing_cents_per_quarter": 0
+  },
+  "last_dissolution": null
+}

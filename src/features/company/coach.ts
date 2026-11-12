@@ -76,6 +76,7 @@ type CoachInput = Pick<
   | "canExpand"
   | "expansionCostCents"
   | "cashCents"
+  | "unpaidCents"
   | "maxEmployees"
   | "headcount"
 >;
@@ -114,7 +115,7 @@ export function coachAdvice(c: CoachInput, limit = 3, cfg = BALANCE.startups): C
   if (losing && live.fixedPerHourCents > gross) add("fixedHigh", "warn", null);
   if (!losing) {
     if (c.canUpgrade) add("upgrade", "good", "upgrade");
-    if (c.canExpand && c.expansionCostCents !== null && c.cashCents >= c.expansionCostCents)
+    if (c.canExpand && c.expansionCostCents !== null && c.cashCents - c.unpaidCents >= c.expansionCostCents)
       add("expand", "good", "expand");
   }
   if (out.length === 0) add("healthy", "good", null);

@@ -1,6 +1,6 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 28, "gap_cents": 644 }, "rank": 29, "net_worth_cents": 1019356 },
-  "total": 88,
+  "me": { "next": { "name": "Vera", "rank": 33, "gap_cents": 643 }, "rank": 34, "net_worth_cents": 1019357 },
+  "total": 96,
   "entries": [
     {
       "id": "0f3f3f3f-0000-4000-8000-0000000000f1",
@@ -11,7 +11,7 @@
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 102837991,
+      "net_worth_cents": 102718991,
       "rank_change_24h": null
     },
     {
@@ -63,5 +63,5 @@
       "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-12T21:05:40.891727+00:00"
+  "server_time": "2026-11-12T22:24:29.825404+00:00"
 }

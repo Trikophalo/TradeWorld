@@ -275,7 +275,9 @@ export function ExpansionCard({ company }: { company: MyCompany }) {
     );
   }
   const cost = company.expansionCostCents;
-  const affordable = company.cashCents >= cost;
+  // Free cash: open bills come first (same rule as withdrawing, ADR-083).
+  const freeCash = company.cashCents - company.unpaidCents;
+  const affordable = freeCash >= cost;
 
   const expand = async () => {
     setState("loading");
@@ -320,9 +322,7 @@ export function ExpansionCard({ company }: { company: MyCompany }) {
         </HoldButton>
       </div>
       {!affordable && (
-        <p className="text-xs text-fg-3">
-          {t("needCash", { amount: formatMoney(cost - company.cashCents, { whole: true }) })}
-        </p>
+        <p className="text-xs text-fg-3">{t("needCash", { amount: formatMoney(cost - freeCash, { whole: true }) })}</p>
       )}
     </Card>
   );

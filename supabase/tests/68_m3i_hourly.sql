@@ -36,6 +36,8 @@ select tests.company_of(:c) as cco \gset
 -- hours of a quarter that is not touched by the other tests
 select id as qid, starts_at as qs from public.game_quarters order by ends_at desc limit 1 \gset
 update public.player_companies set potential_annual_cents = 10000000000, awareness = 0.5 where company_id = :'aco';
+-- without contract work (ADR-083, tested in 72): revenue comes from demand only
+update public.player_companies set contract_work = false where company_id = :'aco';
 update public.player_jobs set last_paid_at = :'qs'::timestamptz, paid_day = null, paid_minutes_today = 0 where id = :'bjob';
 
 -- =============================================================================

@@ -5234,3 +5234,118 @@ Stücke; Modus `max`), `car_bought` (`buy_car`). Alle Vorlagen mit `params.unloc
 - Die Böden zählen zum Vermögen mit dem aktuellen Preis aus `property.floors`, nicht mit dem damals bezahlten.
 - Missionen mit Ereignissen zählen erst ab ihrer Vergabe: Wer schon eine Bleibe hat, erfüllt `m_home_first` erst mit
   dem nächsten Umzug.
+
+## Nachtrag: M4c (Gewinnhebel, Ausbaustufen, Freunde)
+
+Migrationen `20261124000100_m4c_company_levers.sql` (ADR-083) und `20261124000200_m4c_friends.sql` (ADR-084), je mit
+idempotenter Kopie in `supabase/updates/`. Die Formeln spiegeln `src/lib/sim/startup.ts`, alle Werte kommen aus
+`game_config.startups` (`marketFactorByTier`, `foundingAwareness`, `expansion`, `pricing`, `contractWork`, `ipo`).
+
+### Neue Spalten
+
+| Tabelle                | Spalte                   | Typ / Vorgabe        | Bedeutung                                     |
+| ---------------------- | ------------------------ | -------------------- | --------------------------------------------- |
+| `player_companies`     | `price_level`            | `text`, `'normal'`   | `budget`, `normal` oder `premium` (Check)     |
+| `player_companies`     | `contract_work`          | `boolean`, `true`    | Freie Kapazität als Auftragsarbeit verkaufen  |
+| `player_companies`     | `expansion_level`        | `integer`, `0` (≥ 0) | Gekaufte Ausbaustufen, ohne Obergrenze        |
+| `player_company_hours` | `contract_revenue_cents` | `bigint`, `0` (≥ 0)  | Anteil von `revenue_cents` aus Auftragsarbeit |
+
+Die drei Firmenspalten sind für `authenticated` lesbar (Spalten-Grant), wie die übrigen sichtbaren Spalten.
+Bestehende Firmen behalten ihre gespeicherte Marktgröße; sie starten mit `normal`, Auftragsarbeit an und Stufe 0.
+
+### Stündlicher Abschluss (`player_company_close_hour`)
+
+- Wirksamer Markt = Nische × `marketFactorByTier[tier]` × (1 + `expansion.marketBonusPerLevel` × Stufe)
+  (`company_market_factor`).
+- Nachfrage/h × `pricing[price_level].demand`; Premium unter `pricing.premiumMinQuality` zusätzlich
+  × `pricing.premiumLowQualityDemand` (`company_price_effect`).
+- Kapazität/h × (1 + `expansion.capacityBonusPerLevel` × Stufe) (`company_capacity_factor`).
+- Verkauft = min(Nachfrage, Kapazität); eigener Umsatz = verkauft × `pricing[price_level].price`.
+- Auftragsarbeit (nur mit `contract_work`) = (Kapazität − verkauft) × `contractWork.shareOfFreeCapacity`, zum
+  Normalpreis.
+- Wareneinsatz = verkauft × (1 − Bruttomarge der Branche) + Auftrag × (1 − `contractWork.grossMargin`).
+- Der Umsatz (eigener und Auftrag) ist eine Buchung `company_revenue` von den Haushalten an die Firmenkasse; die
+  Haushalte zahlen höchstens ihren Bestand (zuerst den eigenen Umsatz).
+- Fixkosten = Grundkosten der Rechtsform × (1 + `expansion.fixedCostPerLevel` × Stufe) (`company_fixed_cost_cents`).
+
+Quartalsabschluss: Der Marketing-Zuwachs rechnet mit dem wirksamen Markt, die Mundpropaganda wird mit
+`pricing[price_level].awareness` multipliziert.
+
+Plätze für Spieler und KI-Kräfte = `maxEmployees` der Rechtsform + `expansion.employeesPerLevel` × Stufe
+(`company_max_employees`), geprüft in `sign_contract`, `set_ai_workers` und `hire_ai_workers`.
+
+### Gründung und Börsengang
+
+- `found_company` nimmt zusätzlich `p_tier = 'gmbh'` an: ab `startups.gmbh.minLevel`, Kosten
+  `startups.gmbh.foundingCostCents`, Rechtsform `gmbh`.
+- Startbekanntheit aus `startups.foundingAwareness[tier]` (Garage, Kleinunternehmen, GmbH).
+- `go_public` und `can_go_public` folgen nur `startups.ipo.fromTiers` (jetzt mit Garage) und `startups.ipo.minLevel`
+  (6). Die Rückfallwerte im SQL sind dieselben.
+
+### RPC `set_company_strategy(p_request_id uuid, p_price_level text, p_contract_work boolean)`
+
+Nur der Gründer. Speichert Preisstrategie und Auftragsarbeit. Antwort `{company: COMPANY}` wie `set_company_marketing`,
+idempotent über `request_id`. Fehler: `invalid_argument` (unbekannte Stufe, fehlende Werte).
+
+### RPC `expand_company(p_request_id uuid)`
+
+Nur der Gründer. Erlaubt, wenn die Rechtsform in `expansion.fromTiers` steht (sonst `company_upgrade_unavailable`).
+Preis = round(`expansion.baseCostCents` × `expansion.costGrowth`^Stufe) aus der **Firmenkasse** (freie Kasse = Bestand −
+offene Rechnungen; zu wenig: `insufficient_funds`), gebucht als `company_costs` an die Haushalte. Danach Stufe + 1,
+`companies.max_employees` nachgezogen, Chatzeile in der Firma. Antwort `{company: COMPANY}`, idempotent.
+
+### COMPANY: neue Felder
+
+| Feld                   | Typ             | Bedeutung                                                              |
+| ---------------------- | --------------- | ---------------------------------------------------------------------- |
+| `price_level`          | `string`        | `budget` / `normal` / `premium`                                        |
+| `contract_work`        | `boolean`       | Auftragsarbeit an                                                      |
+| `expansion_level`      | `number`        | Gekaufte Stufen                                                        |
+| `can_expand`           | `boolean`       | Rechtsform darf ausbauen                                               |
+| `expansion_cost_cents` | `number / null` | Preis der nächsten Stufe; `null`, wenn nicht erlaubt                   |
+| `market_factor`        | `number`        | `marketFactorByTier[tier]` × (1 + `marketBonusPerLevel` × Stufe), 4 NK |
+
+Geändert: `max_employees` und `capacity_cents` enthalten die Ausbaustufen; `estimate_low_cents` und
+`estimate_high_cents` beschreiben den wirksamen Markt (× `market_factor`).
+
+`live` bekommt die Werte der letzten abgeschlossenen Stunde (ohne Stunde je 0): `contract_revenue_per_hour_cents`,
+`demand_per_hour_cents`, `capacity_per_hour_cents`, `fixed_per_hour_cents`, `ai_wages_per_hour_cents` (gezahlte
+KI-Löhne), `marketing_per_hour_cents`. Jeder Eintrag in `hours` hat zusätzlich `contract_revenue_cents`.
+
+### Freunde (ADR-084)
+
+Auf der bestehenden Tabelle `friendships` (eine Zeile je Paar). Alle RPCs nur für `authenticated`, `SECURITY DEFINER`,
+`search_path = ''`. Spieler werden über den Nickname gesucht (ohne Groß-/Kleinschreibung, deaktivierte nicht).
+
+FRIENDS:
+
+```json
+{
+  "friends": [{ "nickname": "…", "level": 7, "since": "timestamptz" }],
+  "incoming": [{ "nickname": "…", "level": 3, "at": "timestamptz" }],
+  "outgoing": [{ "nickname": "…", "level": 5, "at": "timestamptz" }]
+}
+```
+
+Freunde nach Nickname sortiert, Anfragen neueste zuerst.
+
+| RPC                                                          | Wirkung                                                                                                                                                                |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_friends()`                                              | FRIENDS des Aufrufers                                                                                                                                                  |
+| `send_friend_request(p_request_id, p_nickname)`              | Neue Anfrage; liegt schon eine Anfrage des anderen vor, wird sie angenommen; befreundet oder eigene offene Anfrage: nichts; abgelehnte Zeile wird neue Anfrage von mir |
+| `respond_friend_request(p_request_id, p_nickname, p_accept)` | Nur der Adressat einer offenen Anfrage; Annehmen setzt `accepted`, Ablehnen **löscht** die Zeile                                                                       |
+| `remove_friend(p_request_id, p_nickname)`                    | Löscht eine Freundschaft oder die eigene offene Anfrage; sonst nichts                                                                                                  |
+
+Alle schreibenden RPCs sind über `request_id` idempotent und antworten mit FRIENDS. Fehler: `player_not_found`
+(unbekannter Nickname), `invalid_argument` (man selbst, keine offene Anfrage, fehlende Werte), `rate_limited`
+(`send_friend_request`).
+
+Benachrichtigungen: `friend_request` an den Adressat einer neuen Anfrage, neuer Typ `friend_accepted` (Kategorie
+`social`, in der Migration angelegt) an den Anfragenden bei Annahme. Link `/players/<nickname>`, abschaltbar über
+`notification_preferences`.
+
+Interne Helfer (nur `service_role`): `friends_json`, `friend_target`, `friend_notify`, sowie für Firmen
+`company_market_factor`, `company_capacity_factor`, `company_fixed_cost_cents`, `company_max_employees`,
+`company_can_expand`, `company_expansion_cost_cents`, `company_price_effect`.
+
+Keine neuen Fehlerschlüssel.
