@@ -38,6 +38,8 @@ async function preparePlayer(
         "visit_skill_map",
         "visit_company",
         "visit_listing",
+        "artworks",
+        "visit_artworks",
       ],
     },
   );

@@ -18,7 +18,7 @@ export function TopBar() {
 
   return (
     <header className="sticky top-0 z-sticky border-b border-line-1 bg-bg/88 pt-safe backdrop-blur-lg">
-      <div className="mx-auto flex h-(--topbar-height) max-w-(--content-max) items-center gap-3 px-4 lg:px-8">
+      <div className="mx-auto flex h-(--topbar-height) max-w-(--content-max) items-center gap-2 px-4 sm:gap-3 lg:px-8">
         <Link href="/" className="rounded-sm focus-ring lg:hidden">
           <Wordmark />
         </Link>
@@ -33,13 +33,13 @@ export function TopBar() {
           <kbd className="grid size-5 place-items-center rounded-xs bg-surface-3 label-pixel text-fg-2">/</kbd>
         </button>
 
-        <div className="ml-auto flex items-center gap-2 lg:gap-4">
+        <div className="ml-auto flex min-w-0 items-center gap-0.5 sm:gap-2 lg:gap-4">
           <MarketStatus className="hidden sm:inline-flex" />
           <button
             type="button"
             onClick={() => openSearch(true)}
             aria-label={t("searchShort")}
-            className="grid size-10 place-items-center rounded-md text-fg-2 focus-ring transition-colors duration-fast hover:bg-surface-2 hover:text-fg-1 lg:hidden"
+            className="grid size-9 shrink-0 place-items-center rounded-md text-fg-2 focus-ring transition-colors duration-fast hover:bg-surface-2 hover:text-fg-1 lg:hidden"
           >
             <PixelIcon {...UI_ICONS.search} scale={2} />
           </button>
@@ -66,7 +66,7 @@ function MissionsButton() {
       href="/missions"
       aria-label={claimable > 0 ? t("missionsClaimable", { count: claimable }) : t("missions")}
       data-testid="missions-button"
-      className="relative flex h-10 items-center gap-2 rounded-md px-2.5 text-sm text-fg-2 focus-ring transition duration-fast hover:bg-surface-2 hover:text-fg-1 active:scale-95"
+      className="relative flex h-10 items-center gap-2 rounded-md px-1.5 text-sm text-fg-2 focus-ring transition duration-fast hover:bg-surface-2 hover:text-fg-1 active:scale-95 sm:px-2.5"
     >
       <PixelIcon {...BULL} scale={2} />
       <span className="hidden xl:inline">{t("missions")}</span>
@@ -89,7 +89,7 @@ function ProfileButton() {
       href="/profile"
       aria-label={t("profile")}
       data-tour="nav-profile"
-      className="grid size-10 place-items-center rounded-md focus-ring transition duration-fast hover:bg-surface-2 active:scale-95 lg:hidden"
+      className="grid size-9 shrink-0 place-items-center rounded-md focus-ring transition duration-fast hover:bg-surface-2 active:scale-95 lg:hidden"
     >
       <Avatar avatarKey={avatarKey} size="xs" />
     </Link>

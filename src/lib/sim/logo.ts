@@ -27,7 +27,8 @@ export function isValidLogo(logo: unknown, cfg: StartupsConfig = BALANCE.startup
 
 /** As art for PixelIcon: palette characters stay the indices. */
 export function logoArt(logo: CompanyLogoData): { grid: readonly string[]; palette: Record<string, string> } {
-  return { grid: logo.grid, palette: Object.fromEntries(logo.palette.map((c, i) => [String(i), c])) };
+  // Index characters 0-9, then a-f (artworks have up to 16 colours, ADR-080).
+  return { grid: logo.grid, palette: Object.fromEntries(logo.palette.map((c, i) => ["0123456789abcdef"[i]!, c])) };
 }
 
 /** Flood fill on the grid (editor tool). */
@@ -116,7 +117,8 @@ export function hasForbiddenSymbol(logo: CompanyLogoData): boolean {
   const width = logo.grid[0]?.length ?? 0;
   const masks: boolean[][][] = [logo.grid.map((row) => row.split("").map((c) => c !== "."))];
   for (let i = 0; i < logo.palette.length; i++) {
-    masks.push(logo.grid.map((row) => row.split("").map((c) => c === String(i))));
+    const ch = "0123456789abcdef"[i]!;
+    masks.push(logo.grid.map((row) => row.split("").map((c) => c === ch)));
   }
   for (const mask of masks) {
     for (const pattern of PATTERNS) {

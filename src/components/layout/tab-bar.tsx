@@ -29,10 +29,11 @@ export function TabBar() {
         {NAV_ITEMS.filter((item) => !item.desktopOnly).map((item) => {
           const active = isActivePath(pathname, item.href);
           return (
-            <li key={item.href} className="flex-1">
+            <li key={item.href} className="min-w-0 flex-1">
               <Link
                 href={item.href}
                 aria-current={active ? "page" : undefined}
+                aria-label={t(item.key)}
                 data-tour={`nav-${item.key}`}
                 onClick={() => {
                   haptic("tap");
@@ -43,7 +44,7 @@ export function TabBar() {
                   active ? "text-fg-1" : "text-fg-3",
                 )}
               >
-                <span className="relative grid h-8 w-14 place-items-center">
+                <span className="relative grid h-8 w-12 max-w-full place-items-center">
                   {active && (
                     <motion.span
                       layoutId="tabbar-active"
@@ -65,7 +66,10 @@ export function TabBar() {
                     )}
                   </motion.span>
                 </span>
-                <span className="label-pixel leading-none">{t(item.key)}</span>
+                {/* Short labels: seven tabs share 390 px (ADR-080). */}
+                <span className="max-w-full truncate px-0.5 label-pixel text-[0.5625rem] leading-none tracking-normal">
+                  {t(`short.${item.key}`)}
+                </span>
               </Link>
             </li>
           );

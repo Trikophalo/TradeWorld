@@ -803,3 +803,35 @@ Dialog, nur Opacity und Scale). Beide nutzen denselben `PixelEditor`:
 - **Malen mit gedrückter linker Maustaste:** Zwischen zwei Mauspositionen werden alle Felder gefüllt
   (`cellsBetween`, Bresenham, getestet), auch schnelle Striche haben keine Lücken.
 - Die rechte Maustaste radiert, das Feld unter dem Zeiger ist markiert.
+
+## ADR-080: Artworks – Pixel-Kunst, Auktionen, Sammlungen — `akzeptiert`
+
+Vorgabe: Geld soll freiwillig ausgegeben werden. Kunstwerke sind die erste solche Senke. Konzept und Schnittstelle:
+`docs/ARTWORKS.md`.
+
+- **Tab „Artworks“:** freigeschaltet ab Level 8, Finn erklärt ihn kurz bei der Freischaltung und beim ersten Besuch.
+- **Galerie:** 36 Werke des Spiels, erzeugt von `scripts/gen-artworks.ts`. Die Galerie versteigert 4 pro Tag.
+- **Eigene Werke:**
+  - 32 × 32 Pixel, 16 Farben, im großen Editor gemalt.
+  - Das erste kostet 15.000 €, jedes weitere das Doppelte.
+- **Einzigartig:** Jedes Werk gibt es einmal, mit Nummer (`ART-0042`), Urheber und Label
+  „NEXA-Galerie“ oder „von Spieler“.
+- **Auktionen:**
+  - Gebote mindestens 5 % über dem aktuellen.
+  - Das Geld des Führenden liegt auf einem Treuhandkonto.
+  - Gebote in den letzten 2 Minuten verlängern die Auktion.
+  - 10 % Gebühr an die Haushalte.
+- **Wert:** Der Wert ist der letzte Preis und zählt zum Vermögen.
+- **Beliebtheit:** Likes und Bieter heben ein Werk an, das Alter senkt es.
+- **Marktplatz:** sortierbar nach beliebt, teuerste, neueste und endet bald, filterbar nach Herkunft.
+- **Ranglisten und Profile:** Größte Sammlungen, Teuerste Kunstwerke; die Sammlung steht im Spielerprofil.
+- **Demo:** KI-Sammler (die Tycoons) bieten alle zehn Minuten mit.
+- **Navigation:** Auf dem Handy hat die Tab-Leiste jetzt sieben Tabs mit kurzen Beschriftungen („Depot“,
+  „Kunst“). Die vollen Namen stehen als `aria-label`.
+
+## ADR-081: Viel mehr Missionen — `akzeptiert`
+
+Die Missionen decken jetzt mehr Bereiche ab: Handel, Recherche, Tagesbonus, Limit-Orders, Anleihen, Kunst (Herzen,
+Gebote, eigenes Werk, Versteigern), Jobs, Skills und Firma, über schnelle, tägliche, wöchentliche und
+Meilenstein-Missionen. Kunst-Missionen erscheinen erst mit der Freischaltung. Der Server-Katalog steht in
+`mission_templates`, der Demo-Katalog in `src/features/game/demo/missions.ts`.

@@ -15,7 +15,18 @@
     "company": "Firma",
     "profile": "Profil",
     "career": "Karriere",
-    "job": "Job"
+    "job": "Job",
+    "artworks": "Artworks",
+    "short": {
+      "home": "Start",
+      "portfolio": "Depot",
+      "markets": "Märkte",
+      "job": "Job",
+      "career": "Karriere",
+      "company": "Firma",
+      "artworks": "Kunst",
+      "profile": "Profil"
+    }
   },
   "topbar": {
     "search": "Aktien, Firmen, Spieler suchen",
@@ -314,7 +325,8 @@
     "title_market_legend": "Titel „Börsenlegende“",
     "golden_profile_frame": "Goldener Profilrahmen",
     "hall_of_fame": "Hall of Fame",
-    "found_garage": "Garagen-Startup gründen"
+    "found_garage": "Garagen-Startup gründen",
+    "artworks": "Artworks: Pixel-Kunst sammeln und versteigern"
   },
   "auth": {
     "loginTitle": "Willkommen zurück",
@@ -532,6 +544,14 @@
       },
       "visit_listing": {
         "listing": "Mit einem Börsengang holst du dir Geld von Investoren und kannst auf bis zu 100 Mitarbeiter wachsen."
+      },
+      "artworks": {
+        "intro": "Neu: Artworks! Sammle einzigartige Pixel-Kunst, biete bei Auktionen mit oder male selbst Kunstwerke und versteigere sie.",
+        "where": "Du findest alles im Tab „Artworks“. Seltene Stücke werden mit jeder Auktion teurer."
+      },
+      "visit_artworks": {
+        "market": "Der Marktplatz zeigt oben die beliebtesten Werke. Gefällt dir eins, gib ihm ein Herz – das macht es berühmter.",
+        "studio": "Im Atelier malst du eigene Kunstwerke. Das erste kostet 15.000 €, jedes weitere doppelt so viel."
       }
     }
   },
@@ -604,7 +624,15 @@
     "skill_already_covered": "Für diesen Skill arbeitet schon eine KI-Kraft.",
     "training_locked": "Schulungen gibt es erst ab 5 Leuten im Team.",
     "logo_locked": "Dein Logo steht fest und lässt sich nicht mehr ändern.",
-    "logo_forbidden": "Dieses Logo zeigt ein verbotenes Symbol."
+    "logo_forbidden": "Dieses Logo zeigt ein verbotenes Symbol.",
+    "artworks_locked": "Artworks schaltest du mit Level 8 frei.",
+    "artwork_not_found": "Dieses Kunstwerk gibt es nicht oder es gehört dir nicht.",
+    "auction_not_found": "Diese Auktion gibt es nicht mehr.",
+    "auction_ended": "Die Auktion ist schon vorbei.",
+    "bid_too_low": "Dein Gebot ist zu niedrig. Biete mindestens das Mindestgebot.",
+    "own_artwork": "Bei eigenen Kunstwerken geht das nicht.",
+    "already_on_auction": "Das Kunstwerk ist schon in einer Auktion.",
+    "auction_has_bids": "Es gibt schon Gebote – die Auktion läuft bis zum Ende."
   },
   "locks": {
     "level": "Level {level}",
@@ -2212,5 +2240,90 @@
     "undo": "Rückgängig",
     "clear": "Leeren",
     "preview": "Vorschau"
+  },
+  "art": {
+    "title": "Artworks",
+    "intro": "Einzigartige Pixel-Kunst: sammeln, liken, ersteigern und selbst malen.",
+    "lockedTitle": "Ab Level 8",
+    "lockedText": "Mit Level 8 schaltest du Artworks frei: Pixel-Kunst sammeln, bei Auktionen bieten und eigene Werke malen.",
+    "tabMarket": "Marktplatz",
+    "tabCollection": "Meine Sammlung",
+    "tabRankings": "Ranglisten",
+    "spotlight": "Im Rampenlicht",
+    "sort": "Sortierung",
+    "sortHot": "Beliebt",
+    "sortPrice": "Teuerste",
+    "sortNew": "Neueste",
+    "sortEnding": "Endet bald",
+    "origin": "Herkunft",
+    "originAll": "Alle",
+    "originGame": "NEXA-Galerie",
+    "originPlayer": "Von Spielern",
+    "onlyAuctions": "Nur Auktionen",
+    "empty": "Hier ist gerade nichts. Schau später wieder vorbei oder male selbst ein Werk.",
+    "gallery": "NEXA-Galerie",
+    "byPlayer": "von {name}",
+    "ownedBy": "Besitz: {name}",
+    "ownedByGallery": "Besitz: NEXA-Galerie",
+    "rarity": {
+      "common": "Galerie",
+      "rare": "Selten",
+      "legendary": "Legendär"
+    },
+    "value": "Wert",
+    "noValue": "Noch nie verkauft",
+    "currentBid": "Aktuelles Gebot",
+    "startPrice": "Startpreis",
+    "endsIn": "Endet in",
+    "bids": "{count, plural, =0 {Noch kein Gebot} one {# Gebot} other {# Gebote}}",
+    "leading": "Du führst",
+    "like": "Gefällt mir",
+    "unlike": "Gefällt mir nicht mehr",
+    "likes": "{count, plural, one {# Herz} other {# Herzen}}",
+    "detailTitle": "{code} · {title}",
+    "creator": "Urheber",
+    "owner": "Besitzer",
+    "code": "Nummer",
+    "bidTitle": "Mitbieten",
+    "bidLabel": "Dein Gebot in Euro",
+    "bidMin": "Mindestens {amount}",
+    "bidButton": "{amount} bieten",
+    "bidDone": "Gebot abgegeben",
+    "bidHint": "Dein Geld wird reserviert. Wirst du überboten, bekommst du es sofort zurück. Gebote in den letzten 2 Minuten verlängern die Auktion.",
+    "ownAuction": "Das ist deine Auktion.",
+    "auctionSell": "Versteigern",
+    "auctionStart": "Auktion starten",
+    "auctionStarted": "Auktion gestartet",
+    "auctionStartPrice": "Startpreis in Euro",
+    "auctionDuration": "Dauer",
+    "hours": "{count, plural, one {# Stunde} other {# Stunden}}",
+    "auctionFee": "Nach dem Verkauf bekommst du den Preis minus 10 % Gebühr.",
+    "auctionCancel": "Auktion abbrechen",
+    "auctionCancelled": "Auktion abgebrochen",
+    "salesTitle": "Verkäufe",
+    "salesEmpty": "Noch nie verkauft.",
+    "bidsTitle": "Gebote",
+    "bidsEmpty": "Noch keine Gebote.",
+    "soldTo": "{price} an {buyer}",
+    "studioTitle": "Atelier",
+    "studioText": "Male ein eigenes, einzigartiges Kunstwerk. Es trägt deinen Namen für immer.",
+    "studioCost": "Nächstes Werk: {amount}",
+    "studioPainted": "{count, plural, =0 {Noch kein eigenes Werk} one {# eigenes Werk} other {# eigene Werke}}",
+    "studioButton": "Kunstwerk malen",
+    "editorTitle": "Kunstwerk malen",
+    "editorIntro": "32 × 32 Pixel, bis zu 16 Farben. Jedes Werk gibt es nur einmal.",
+    "artTitle": "Titel des Kunstwerks",
+    "artTitlePlaceholder": "z. B. Sonnenaufgang über Nexa",
+    "createConfirm": "Gedrückt halten: für {amount} malen",
+    "created": "Dein Kunstwerk ist fertig!",
+    "createdText": "{code} gehört jetzt dir. Du kannst es behalten oder versteigern.",
+    "collectionTitle": "Sammlung",
+    "collectionValue": "{count, plural, one {# Werk} other {# Werke}} · Wert {amount}",
+    "collectionEmpty": "Noch keine Kunstwerke. Biete auf dem Marktplatz mit oder male selbst eines.",
+    "rankCollections": "Größte Sammlungen",
+    "rankArtworks": "Teuerste Kunstwerke",
+    "rankEmpty": "Noch wurde nichts verkauft.",
+    "you": "Du",
+    "open": "Ansehen"
   }
 }

@@ -32,7 +32,22 @@ describe("RPC contract", () => {
       "get_offers",
       "subscribe_offer",
     ];
-    const pending = fixtures.some((file) => file.startsWith("get_offers")) ? [] : m3f;
+    // M4a artworks are written in parallel with the database (TODO: remove once get_artworks.json exists).
+    const m4a = fixtures.some((file) => file.startsWith("get_artworks"))
+      ? []
+      : [
+          "get_artworks",
+          "get_artwork",
+          "get_art_studio",
+          "create_artwork",
+          "like_artwork",
+          "start_auction",
+          "cancel_auction",
+          "bid_artwork",
+          "get_art_rankings",
+          "get_collection",
+        ];
+    const pending = [...(fixtures.some((file) => file.startsWith("get_offers")) ? [] : m3f), ...m4a];
     for (const name of Object.keys(RPC_SCHEMAS).filter((key) => !pending.includes(key))) {
       expect(
         fixtures.some((file) => file.startsWith(name)),

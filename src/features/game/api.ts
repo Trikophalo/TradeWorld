@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CAREER_RPC_SCHEMAS, liveCareerEngine } from "./api-careers";
+import { ARTWORK_RPC_SCHEMAS, liveArtEngine } from "./api-artworks";
 import { COMPANY_RPC_SCHEMAS, liveCompanyEngine } from "./api-company";
 import { rpc, toErrorKey } from "./rpc";
 import {
@@ -286,11 +287,13 @@ export const RPC_SCHEMAS = {
   track_event: z.object({ ok: z.boolean() }),
   ...CAREER_RPC_SCHEMAS,
   ...COMPANY_RPC_SCHEMAS,
+  ...ARTWORK_RPC_SCHEMAS,
 } as const;
 
 export const liveEngine: GameEngine = {
   ...liveCareerEngine,
   ...liveCompanyEngine,
+  ...liveArtEngine,
   async snapshot(): Promise<MarketSnapshot> {
     const s = await rpc("get_market_snapshot", {}, snapshotSchema);
     return {

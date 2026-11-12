@@ -236,6 +236,87 @@ export interface RichNews {
 
 export type RichListScope = "all" | "players";
 
+// ------------------------------------------------------------------ artworks (ADR-080, docs/ARTWORKS.md)
+
+export interface ArtworkPixels {
+  palette: string[];
+  grid: string[];
+}
+
+export interface ArtworkAuction {
+  id: string;
+  endsAt: string;
+  startCents: number;
+  currentCents: number | null;
+  minBidCents: number;
+  bids: number;
+  leader: string | null;
+  /** null = the NEXA gallery sells. */
+  seller: string | null;
+  /** My bid while I lead, else null. */
+  myBidCents: number | null;
+}
+
+export interface Artwork {
+  id: string;
+  /** Unique display code, e.g. "ART-0042". */
+  code: string;
+  title: string;
+  origin: "game" | "player";
+  rarity: "common" | "rare" | "legendary" | null;
+  creator: string | null;
+  /** null = the NEXA gallery owns it. */
+  owner: string | null;
+  pixels: ArtworkPixels;
+  /** Last sale price; null if never sold. */
+  valueCents: number | null;
+  likes: number;
+  liked: boolean;
+  createdAt: string;
+  hot: number;
+  auction: ArtworkAuction | null;
+}
+
+export type ArtSort = "hot" | "price" | "new" | "ending";
+export type ArtOrigin = "all" | "game" | "player";
+
+export interface ArtworkList {
+  serverTime: string;
+  total: number;
+  entries: Artwork[];
+}
+
+export interface ArtworkDetail {
+  artwork: Artwork;
+  sales: { at: string; priceCents: number; seller: string | null; buyer: string }[];
+  bids: { nickname: string; amountCents: number; at: string }[];
+}
+
+export interface ArtStudio {
+  painted: number;
+  nextCostCents: number;
+  unlocked: boolean;
+}
+
+export interface ArtRankings {
+  collections: {
+    rank: number;
+    nickname: string;
+    avatarKey: string | null;
+    count: number;
+    valueCents: number;
+    isMe: boolean;
+  }[];
+  artworks: { rank: number; artwork: Artwork }[];
+}
+
+export interface ArtCollection {
+  nickname: string;
+  count: number;
+  valueCents: number;
+  artworks: Artwork[];
+}
+
 /** Ranking of the most valuable companies (ADR-074): AI companies by market value, player companies by value. */
 export interface CompanyRankingEntry {
   rank: number;
@@ -752,6 +833,14 @@ export const GAME_ERROR_KEYS = [
   "training_locked",
   "logo_locked",
   "logo_forbidden",
+  "artworks_locked",
+  "artwork_not_found",
+  "auction_not_found",
+  "auction_ended",
+  "bid_too_low",
+  "own_artwork",
+  "already_on_auction",
+  "auction_has_bids",
   "mission_not_found",
   "mission_not_completed",
   "mission_already_claimed",
@@ -815,6 +904,21 @@ export interface GameEngine {
   richNews(limit: number): Promise<RichNews[]>;
   /** The most valuable companies (ADR-074). */
   companyRanking(scope: RichListScope, limit: number): Promise<CompanyRanking>;
+  // Artworks (ADR-080)
+  artworks(sort: ArtSort, origin: ArtOrigin, onAuction: boolean, limit: number, offset: number): Promise<ArtworkList>;
+  artwork(id: string): Promise<ArtworkDetail>;
+  artStudio(): Promise<ArtStudio>;
+  createArtwork(
+    requestId: string,
+    title: string,
+    pixels: ArtworkPixels,
+  ): Promise<{ artwork: Artwork; costCents: number; nextCostCents: number }>;
+  likeArtwork(requestId: string, artworkId: string, like: boolean): Promise<{ likes: number; liked: boolean }>;
+  startAuction(requestId: string, artworkId: string, startCents: number, hours: number): Promise<Artwork>;
+  cancelAuction(requestId: string, auctionId: string): Promise<Artwork>;
+  bidArtwork(requestId: string, auctionId: string, amountCents: number): Promise<Artwork>;
+  artRankings(limit: number): Promise<ArtRankings>;
+  collection(nickname: string): Promise<ArtCollection>;
   checkNickname(nickname: string): Promise<{ allowed: boolean; reason: GameErrorKey | null }>;
   changeNickname(requestId: string, nickname: string): Promise<{ nickname: string; nextChangeAt: string }>;
   /** Starts over as a new player; `confirm` is the current nickname (ADR-070). */

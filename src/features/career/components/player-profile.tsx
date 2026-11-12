@@ -7,6 +7,7 @@ import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ProfileCollection } from "@/features/artworks/components/artworks-hub";
 import { usePlayerCard } from "../hooks";
 import { BusinessCard } from "./business-card";
 
@@ -14,7 +15,7 @@ export function PlayerProfile({ nickname }: { nickname: string }) {
   const t = useTranslations("playerCard");
   const card = usePlayerCard(nickname);
   return (
-    <div className="mx-auto max-w-xl space-y-5">
+    <div className="mx-auto max-w-3xl space-y-5">
       <Link
         href="/rich-list"
         transitionTypes={["nav-back"]}
@@ -23,7 +24,11 @@ export function PlayerProfile({ nickname }: { nickname: string }) {
         ← {t("back")}
       </Link>
       {card.data ? (
-        <BusinessCard card={card.data} />
+        <>
+          <BusinessCard card={card.data} />
+          {/* Their artworks with values (ADR-080) */}
+          <ProfileCollection nickname={card.data.nickname} />
+        </>
       ) : card.isError ? (
         <EmptyState
           art={<PixelIcon {...BEAR} scale={4} />}

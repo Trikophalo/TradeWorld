@@ -730,6 +730,37 @@ export interface BalanceConfig {
   readonly dailyRewards: DailyRewardsConfig;
   readonly avatars: AvatarsConfig;
   readonly startups: StartupsConfig;
+  readonly artworks: ArtworksConfig;
+}
+
+/** Pixel artworks, gallery and auctions (ADR-080, docs/ARTWORKS.md). */
+export interface ArtworksConfig {
+  /** Edge length of an artwork in pixels (square). */
+  readonly size: number;
+  readonly maxColors: number;
+  readonly titleMaxLength: number;
+  /** Painting your first artwork costs this; every further one costs `createCostFactor` times the previous. */
+  readonly createBaseCostCents: number;
+  readonly createCostFactor: number;
+  readonly auction: {
+    /** Durations a seller may choose. */
+    readonly durationsHours: readonly number[];
+    /** Every bid must beat the current one by this much. */
+    readonly minIncrementBps: number;
+    readonly minStartCents: number;
+    /** Kept from the sale price; goes to the households (money back into circulation). */
+    readonly feeBps: number;
+    /** A bid in the last minutes extends the auction to this many minutes from the bid. */
+    readonly antiSnipeMinutes: number;
+  };
+  /** Artworks of the game: the gallery auctions a few every day. */
+  readonly gallery: {
+    readonly auctionsPerDay: number;
+    readonly auctionHours: number;
+    readonly startPriceCents: { readonly common: number; readonly rare: number; readonly legendary: number };
+  };
+  /** Popularity: (likes × likeWeight + bids × bidWeight + 1) / (age in hours + 2) ^ gravity. */
+  readonly hot: { readonly likeWeight: number; readonly bidWeight: number; readonly gravity: number };
 }
 
 export interface ProductConfig {
@@ -1664,6 +1695,7 @@ export const BALANCE = {
       { level: 5, key: "junior_jobs" },
       { level: 7, key: "analyst_reports" },
       { level: 8, key: "short_selling" },
+      { level: 8, key: "artworks" },
       { level: 10, key: "found_small_business" },
       { level: 12, key: "leverage_2x" },
       { level: 12, key: "senior_jobs" },
@@ -2003,6 +2035,26 @@ export const BALANCE = {
       { key: "legend", level: 50 },
       { key: "finn_fan", level: 1 },
     ],
+  },
+  artworks: {
+    size: 32,
+    maxColors: 16,
+    titleMaxLength: 40,
+    createBaseCostCents: 1_500_000,
+    createCostFactor: 2,
+    auction: {
+      durationsHours: [1, 6, 24],
+      minIncrementBps: 500,
+      minStartCents: 10_000,
+      feeBps: 1_000,
+      antiSnipeMinutes: 2,
+    },
+    gallery: {
+      auctionsPerDay: 4,
+      auctionHours: 6,
+      startPriceCents: { common: 500_000, rare: 2_500_000, legendary: 15_000_000 },
+    },
+    hot: { likeWeight: 1, bidWeight: 3, gravity: 1.5 },
   },
 } as const satisfies BalanceConfig;
 

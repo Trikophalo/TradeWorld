@@ -15,6 +15,7 @@ import { needsFullTimeFounder } from "@/lib/sim/startup";
 import { levelFromTotalXp, levelProgress, scaledXp, totalXpForLevel, unlockLevel } from "@/lib/sim/progression";
 import { MISSION_TEMPLATES, availableFor, missionXp, type Metric, type MissionTemplate } from "./demo/missions";
 import { createCareerEngine, initialCareer, tycoonAvatar, type CareerState } from "./demo/careers";
+import { createArtEngine, type ArtState } from "./demo/artworks";
 import { createCompanyEngine, type DemoCompanyState, type DemoDissolution } from "./demo/company";
 import { demoTycoons } from "./demo/tycoons";
 import {
@@ -104,6 +105,8 @@ interface PlayerState {
   debtCents?: number;
   lastDissolution?: DemoDissolution | null;
   foundingLockedUntil?: number | null;
+  /** Artworks, auctions, likes (demo/artworks.ts, ADR-080). */
+  art?: ArtState;
 }
 
 interface MarketState {
@@ -979,6 +982,25 @@ const company = createCompanyEngine({
   startFounderNotice: () => career.startNotice(),
 });
 
+const art = createArtEngine({
+  art: () => p().art,
+  setArt: (value) => {
+    p().art = value;
+  },
+  nickname: () => p().nickname,
+  level,
+  cashCents: () => p().cashCents,
+  addCash: (cents) => {
+    p().cashCents += cents;
+  },
+  collectors: () => TYCOONS.slice(0, 16).map((t) => t.name),
+  nameViolation,
+  day: berlinDay,
+  idempotent,
+  persist,
+  track: (metric) => bump(metric),
+});
+
 /** Demo only: close the current company quarter at once (button on the company page). */
 export function demoCloseQuarter(): void {
   company.closeQuarterNow();
@@ -987,6 +1009,7 @@ export function demoCloseQuarter(): void {
 export const demoEngine: GameEngine = {
   ...career.engine,
   ...company.engine,
+  ...art.engine,
   snapshot: () => Promise.resolve(snapshotNow()),
 
   candles: (ticker, interval, limit) => Promise.resolve(demoCandles(ticker, interval, limit)),

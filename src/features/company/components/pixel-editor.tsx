@@ -7,6 +7,8 @@ import { haptic } from "@/lib/haptics";
 import { floodFill, logoArt, type CompanyLogoData } from "@/lib/sim/logo";
 import { cn } from "@/lib/utils";
 
+/** Palette index as one character: 0-9, then a-f for artworks with up to 16 colours. */
+const IDX = "0123456789abcdef";
 /** Colours to start from (data, like the company colours). */
 const SWATCHES = [
   "#111318",
@@ -60,6 +62,7 @@ export function PixelEditor({
   value,
   onChange,
   mirror: allowMirror,
+  startMirrored = true,
   testId,
   aside,
 }: {
@@ -70,6 +73,8 @@ export function PixelEditor({
   onChange: (next: CompanyLogoData) => void;
   /** Offer mirror drawing (logos). */
   mirror?: boolean;
+  /** Mirror drawing on from the start (logos yes, artworks no). */
+  startMirrored?: boolean;
   testId: string;
   /** Notices under the tools (forbidden symbol, drawn once, …). */
   aside?: ReactNode;
@@ -77,7 +82,7 @@ export function PixelEditor({
   const t = useTranslations("pixelEditor");
   const [color, setColor] = useState(0);
   const [tool, setTool] = useState<PixelTool>("pen");
-  const [mirror, setMirror] = useState(Boolean(allowMirror));
+  const [mirror, setMirror] = useState(Boolean(allowMirror) && startMirrored);
   const [hover, setHover] = useState<Cell | null>(null);
   const history = useRef<CompanyLogoData[]>([]);
   const stroke = useRef<{ last: Cell; erase: boolean; start: Cell } | null>(null);
@@ -138,14 +143,14 @@ export function PixelEditor({
     const erase = event.button === 2 || tool === "eraser";
     remember();
     if (tool === "fill" && !erase) {
-      const next = { ...latest.current, grid: floodFill(latest.current.grid, cell.x, cell.y, String(color)) };
+      const next = { ...latest.current, grid: floodFill(latest.current.grid, cell.x, cell.y, IDX[color]!) };
       latest.current = next;
       commit(next);
       haptic("tap");
       return;
     }
     stroke.current = { last: cell, erase, start: cell };
-    if (tool !== "line" || erase) paintCells([cell], erase ? "." : String(color));
+    if (tool !== "line" || erase) paintCells([cell], erase ? "." : IDX[color]!);
   };
 
   const onMove = (event: PointerEvent<HTMLDivElement>) => {
@@ -154,7 +159,7 @@ export function PixelEditor({
     const s = stroke.current;
     if (!s || !cell || (tool === "line" && !s.erase)) return;
     if (cell.x === s.last.x && cell.y === s.last.y) return;
-    paintCells(cellsBetween(s.last, cell), s.erase ? "." : String(color));
+    paintCells(cellsBetween(s.last, cell), s.erase ? "." : IDX[color]!);
     s.last = cell;
   };
 
@@ -163,7 +168,7 @@ export function PixelEditor({
     stroke.current = null;
     if (!s || tool !== "line" || s.erase) return;
     const cell = cellAt(event);
-    if (cell) paintCells(cellsBetween(s.start, cell), String(color));
+    if (cell) paintCells(cellsBetween(s.start, cell), IDX[color]!);
   };
 
   const addColor = (c: string) => {
@@ -222,7 +227,7 @@ export function PixelEditor({
                     "border-[0.5px] border-line-1/30",
                     (hovered || mirrored) && "outline-2 -outline-offset-2 outline-fg-1/70",
                   )}
-                  style={{ backgroundColor: c === "." ? undefined : value.palette[Number(c)] }}
+                  style={{ backgroundColor: c === "." ? undefined : value.palette[IDX.indexOf(c)] }}
                 />
               );
             }),
