@@ -2195,5 +2195,22 @@
     "removed": "Banner entfernt",
     "line": "Linie",
     "reset": "Neu anfangen"
+  },
+  "pixelEditor": {
+    "board": "Zeichenfläche",
+    "hint": "Linke Maustaste gedrückt halten zum Malen, rechte zum Radieren. Strg+Z macht rückgängig.",
+    "tool": "Werkzeug",
+    "pen": "Stift",
+    "line": "Linie",
+    "fill": "Füllen",
+    "eraser": "Radierer",
+    "colors": "Farben {count}/{max}",
+    "colorsLabel": "Farben",
+    "addColorHint": "Farbe hinzufügen:",
+    "addColor": "Farbe {color} hinzufügen",
+    "mirror": "Spiegeln",
+    "undo": "Rückgängig",
+    "clear": "Leeren",
+    "preview": "Vorschau"
   }
 }

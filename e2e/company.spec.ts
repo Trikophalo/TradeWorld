@@ -229,6 +229,9 @@ test("draw a logo, keep a job as founder, go public", async ({ page }) => {
   await page.mouse.down();
   for (let x = 3; x < 8; x++) await page.mouse.move(box.x + cell * (x + 0.5), box.y + cell * 4.5, { steps: 2 });
   await page.mouse.up();
+  // Holding the left button paints every cell along the way, mirrored (ADR-079).
+  const painted = await board.locator("span[style*='background-color']").count();
+  expect(painted).toBeGreaterThanOrEqual(10);
   await hold(page, /Gedrückt halten: Logo festlegen/);
   await expect(page.getByText("Logo gespeichert")).toBeVisible();
   await expect(page.getByTestId("logo-prompt")).toHaveCount(0);

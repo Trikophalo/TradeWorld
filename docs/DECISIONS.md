@@ -792,3 +792,14 @@ Vorgabe: Die Firmenseite wirkte unübersichtlich, statisch und langweilig.
   zwei große Knöpfe „Einzahlen“ / „Entnehmen“.
   - Das Formular zeigt den Fluss Privat ↔ Firma mit dem Stand vorher und nachher und hat Schnellbeträge
     (10 %, 25 %, 50 %, Alles).
+
+## ADR-079: Pixel-Editor als großes Fenster in der Mitte — `akzeptiert`
+
+Logo- und Banner-Editor öffnen sich nicht mehr seitlich, sondern als großes Fenster in der Mitte (`Modal`, Radix
+Dialog, nur Opacity und Scale). Beide nutzen denselben `PixelEditor`:
+
+- große Zeichenfläche links, Werkzeuge rechts (Stift, Linie, Füllen, Radierer)
+- Farben, Spiegeln, Rückgängig (auch Strg+Z), Vorschau
+- **Malen mit gedrückter linker Maustaste:** Zwischen zwei Mauspositionen werden alle Felder gefüllt
+  (`cellsBetween`, Bresenham, getestet), auch schnelle Striche haben keine Lücken.
+- Die rechte Maustaste radiert, das Feld unter dem Zeiger ist markiert.
