@@ -139,13 +139,12 @@ test("on desktop the company has its own tab in the sidebar", async ({ page }) =
   await expect(sidebar.getByRole("link", { name: /Karriere/ })).not.toHaveAttribute("aria-current", "page");
 });
 
-test("on phones the bottom bar has seven short tabs with company and artworks, the profile is in the top bar", async ({
-  page,
-}) => {
+test("on phones the bottom bar has six short tabs and Mehr, the profile is in the top bar", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/company");
   const bar = page.getByRole("navigation", { name: "Hauptnavigation" }).filter({ visible: true });
-  await expect(bar.getByRole("link")).toHaveCount(7);
+  await expect(bar.getByRole("link")).toHaveCount(6);
+  await expect(bar.getByRole("button", { name: "Mehr" })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
   await expect(bar.getByRole("link", { name: /^Firma/ })).toHaveAttribute("aria-current", "page");

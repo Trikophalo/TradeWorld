@@ -27,7 +27,12 @@ export const TOURS: Readonly<Record<string, readonly TutorialStep[]>> = {
     { id: "intro", advance: { on: "next" }, mood: "happy" },
     { id: "where", target: "nav-artworks", advance: { on: "next" } },
   ],
+  property: [
+    { id: "intro", advance: { on: "next" }, mood: "happy" },
+    { id: "where", target: "nav-property", advance: { on: "next" } },
+  ],
   // Short tours on the first visit of a new area (ADR-068), started by useVisitTour.
+  visit_property: [{ id: "room", target: "home-room", advance: { on: "next" }, mood: "happy" }],
   visit_artworks: [
     { id: "market", target: "art-market", advance: { on: "next" } },
     { id: "studio", target: "art-studio", advance: { on: "next" }, mood: "happy" },

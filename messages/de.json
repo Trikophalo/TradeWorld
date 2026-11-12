@@ -25,8 +25,12 @@
       "career": "Karriere",
       "company": "Firma",
       "artworks": "Kunst",
-      "profile": "Profil"
-    }
+      "profile": "Profil",
+      "property": "Haus",
+      "more": "Mehr"
+    },
+    "property": "Grundstück",
+    "more": "Mehr"
   },
   "topbar": {
     "search": "Aktien, Firmen, Spieler suchen",
@@ -553,6 +557,13 @@
       "visit_artworks": {
         "market": "Der Marktplatz zeigt oben die beliebtesten Werke. Gefällt dir eins, gib ihm ein Herz – das macht es berühmter.",
         "studio": "Im Atelier malst du eigene Kunstwerke. Das erste kostet 15.000 €, jedes weitere doppelt so viel."
+      },
+      "property": {
+        "intro": "Neu: dein eigenes Zuhause! Kauf eine Wohnung, richte sie Stück für Stück ein und zieh später in eine Villa.",
+        "where": "Du findest es im Tab „Grundstück“. Andere sehen dein Zuhause auf deinem Profil."
+      },
+      "visit_property": {
+        "room": "Das ist dein Zuhause. Mit „Einrichten“ stellst du Möbel auf, im Möbelhaus kaufst du neue."
       }
     }
   },
@@ -2333,5 +2344,93 @@
     "rankEmpty": "Noch wurde nichts verkauft.",
     "you": "Du",
     "open": "Ansehen"
+  },
+  "estate": {
+    "title": "Grundstück",
+    "intro": "Kauf dir deine erste Bleibe und richte sie ein. Jedes Möbelstück kaufst du einzeln – vom Plastikstuhl bis zum goldenen Thron.",
+    "lockedTitle": "Ab Level {level}",
+    "lockedText": "Mit diesem Level kaufst du deine erste Wohnung und richtest sie ein.",
+    "yourHome": "Dein Zuhause",
+    "value": "Wert",
+    "size": "{w} × {h} Felder",
+    "garageSlots": "{count, plural, one {Garage für # Auto} other {Garage für # Autos}}",
+    "noGarage": "Keine Garage",
+    "tierNames": {
+      "flat": "Wohnung",
+      "apartment": "Apartment",
+      "house": "Haus",
+      "villa": "Villa",
+      "luxury_villa": "Luxus-Villa"
+    },
+    "current": "Hier wohnst du",
+    "fromLevel": "Ab Level {level}",
+    "buyFor": "Gedrückt halten: kaufen für {amount}",
+    "moveFor": "Gedrückt halten: umziehen für {amount}",
+    "movedIn": "Willkommen in deinem neuen Zuhause: {tier}!",
+    "moveUp": "Größer wohnen",
+    "moveTitle": "Umziehen",
+    "moveIntro": "Deine alte Bleibe wird zur Hälfte angerechnet. Beim Umzug kommen alle Möbel ins Inventar, die Autos bleiben in der Garage.",
+    "furnish": "Einrichten",
+    "inInventory": "{count, plural, one {# Stück im Inventar} other {# Stücke im Inventar}}",
+    "editorTitle": "Einrichten",
+    "editorIntro": "Wähle rechts ein Möbelstück und klick auf einen freien Platz. Klick ein Möbel an, um es zu drehen, zu verschieben oder wegzuräumen.",
+    "editorKeys": "R dreht · Entf räumt weg · Esc bricht ab",
+    "save": "Speichern",
+    "saved": "Eingerichtet!",
+    "rotate": "Drehen",
+    "move": "Verschieben",
+    "toInventory": "Ins Inventar",
+    "carrying": "Du platzierst: {name}",
+    "noRoom": "Dafür ist kein Platz.",
+    "inventory": "Inventar",
+    "inventoryEmpty": "Dein Inventar ist leer. Kauf Möbel im Möbelhaus.",
+    "wall": "Wandfarbe",
+    "floor": "Boden",
+    "owned": "Gekauft",
+    "floorBought": "Neuer Boden",
+    "floors": {
+      "laminate": "Laminat",
+      "carpet": "Teppichboden",
+      "tiles": "Fliesen",
+      "parquet": "Parkett",
+      "stone": "Naturstein",
+      "marble": "Marmor",
+      "gold": "Gold"
+    },
+    "shopTitle": "Möbelhaus",
+    "shopIntro": "Alles, was eine Wohnung braucht – und vieles, was sie nicht braucht. Gekauftes landet im Inventar.",
+    "category": "Kategorie",
+    "categories": {
+      "all": "Alles",
+      "seating": "Sitzen",
+      "tables": "Tische",
+      "beds": "Betten",
+      "kitchen": "Küche",
+      "bath": "Bad",
+      "rugs": "Teppiche",
+      "plants": "Pflanzen",
+      "decor": "Deko",
+      "tech": "Technik",
+      "fun": "Spaß"
+    },
+    "tier": "Preisklasse",
+    "tiers": {
+      "all": "Alle",
+      "budget": "Günstig",
+      "standard": "Standard",
+      "premium": "Edel",
+      "luxury": "Luxus",
+      "ultra": "Ultra"
+    },
+    "sort": "Sortierung",
+    "sortAsc": "Preis ↑",
+    "sortDesc": "Preis ↓",
+    "bought": "Gekauft",
+    "garage": "Garage",
+    "emptyBay": "Freier Stellplatz",
+    "dealerTitle": "Autohaus",
+    "dealerIntro": "Vom Stadtflitzer bis zum Hypercar. Alle Marken sind ausgedacht.",
+    "garageFullHint": "Deine Garage ist voll. Zieh in ein größeres Zuhause, um mehr Autos zu parken.",
+    "carBought": "Neues Auto in der Garage!"
   }
 }

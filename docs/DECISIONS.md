@@ -835,3 +835,29 @@ Die Missionen decken jetzt mehr Bereiche ab: Handel, Recherche, Tagesbonus, Limi
 Gebote, eigenes Werk, Versteigern), Jobs, Skills und Firma, über schnelle, tägliche, wöchentliche und
 Meilenstein-Missionen. Kunst-Missionen erscheinen erst mit der Freischaltung. Der Server-Katalog steht in
 `mission_templates`, der Demo-Katalog in `src/features/game/demo/missions.ts`.
+
+## ADR-082: Grundstück – Zuhause kaufen, einrichten, Garage — `akzeptiert`
+
+Vorgabe: ein eigenes Zuhause als großes, freiwilliges Ziel zum Geldausgeben und Herzeigen. Regeln und Schnittstelle:
+`docs/PROPERTY.md`.
+
+- **Tab „Grundstück“:** ab Level 4. Fünf Stufen von der Wohnung (25.000 €) bis zur Luxus-Villa (15 Mio. €), mit
+  wachsender Fläche.
+- **Umziehen:**
+  - Die alte Bleibe wird zur Hälfte angerechnet.
+  - Alle Möbel kommen ins Inventar, die Autos bleiben in der Garage.
+- **Möbel:**
+  - 65 Stücke in 10 Kategorien und 5 Preisklassen (25 € bis 1,5 Mio. €), von oben gezeichnet
+    (`scripts/gen-furniture.ts`).
+  - Teppiche liegen unter den Möbeln, sonst keine Überlappung.
+  - Drehen um 90°.
+- **Großer Einrichtungs-Editor:**
+  - Aus dem Inventar wählen, auf freie Felder setzen, auswählen, drehen, verschieben, wegräumen.
+  - Wandfarbe frei wählen; Böden einmal kaufen.
+- **Garage:** ab dem Haus, mit 14 Autos ausgedachter Marken (9.000 € bis 7,5 Mio. €), angelehnt an Kleinwagen bis
+  Supersportler. Echte Markennamen meiden wir aus rechtlichen Gründen.
+- **Herzeigen und Vermögen:**
+  - Auf jedem Spielerprofil sieht man Zuhause und Garage.
+  - Im Vermögen zählen die Bleibe mit 50 %, Möbel, Böden und Autos mit 40 % (so viel bringt ein Verkauf).
+- **Handy:** Die Leiste unten hat sechs Tabs und „Mehr“. Unter „Mehr“ liegen Kunst, Grundstück, Profil, Missionen
+  und Ranglisten. Finn zeigt bei neuen Bereichen auf „Mehr“, wenn der Tab dort liegt.

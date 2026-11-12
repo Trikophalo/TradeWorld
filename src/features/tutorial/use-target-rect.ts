@@ -16,7 +16,8 @@ function findVisible(target: string): HTMLElement | null {
     const rect = element.getBoundingClientRect();
     if (rect.width > 0 && rect.height > 0) return element;
   }
-  return null;
+  // On phones some tabs live in the "Mehr" sheet (ADR-082): point there instead.
+  return target.startsWith("nav-") && target !== "nav-more" ? findVisible("nav-more") : null;
 }
 
 /**

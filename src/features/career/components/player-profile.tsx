@@ -10,6 +10,7 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProfileCollection } from "@/features/artworks/components/artworks-hub";
+import { PropertyShowcase } from "@/features/property/components/property-hub";
 import { usePlayerCard } from "../hooks";
 import { BusinessCard } from "./business-card";
 
@@ -36,6 +37,8 @@ export function PlayerProfile({ nickname }: { nickname: string }) {
           <BusinessCard card={card.data} />
           {/* Their artworks with values (ADR-080) */}
           <ProfileCollection nickname={card.data.nickname} />
+          {/* Their home and garage, the flex (ADR-082) */}
+          <PropertyShowcase nickname={card.data.nickname} />
         </>
       ) : card.isError ? (
         <EmptyState
