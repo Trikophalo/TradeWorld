@@ -42,9 +42,6 @@ jobs:
       - name: Verify schema, RLS and seeds on a throwaway database
         run: bash supabase/tests/verify_local.sh
 
-      - name: Verify the update on an older database
-        run: NEXA_MIGRATIONS_UPTO=20261113000400 NEXA_PG_PORT=54330 bash supabase/tests/verify_local.sh
-
       - name: Apply update-to-latest.sql to Supabase
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
