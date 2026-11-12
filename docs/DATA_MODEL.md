@@ -4941,3 +4941,176 @@ value_cents, revenue_cents, team_size, is_mine }], mine: { rank, value_cents } |
 - `logo_has_forbidden_symbol(grid)` arbeitet jetzt auf Breite × Höhe (Breite = Länge der ersten Zeile, Höhe =
   Zeilenzahl) wie `hasForbiddenSymbol`: Skalierung 1 bis 3, solange die Vorlage in beide Richtungen passt. Logos
   (16 × 16) werden unverändert geprüft.
+
+## Nachtrag: M4a (Kunstwerke, Auktionen, mehr Missionen)
+
+### Migrationen
+
+| Datei                             | Inhalt                                                                                         |
+| --------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `20261122000100_m4a_artworks.sql` | Kunstwerke, Auktionen, Gebote, Likes, Verkäufe, `art_escrow`, zehn RPCs, Galerie-Job (ADR-080) |
+| `20261122000200_m4a_missions.sql` | 47 neue Missionen, neue Messgrößen, `params.requires`, `view_profile`                          |
+| `seeds/artworks.sql` (generiert)  | 36 Werke der NEXA-Galerie (`pnpm artworks`), `on conflict (gallery_key) do nothing`            |
+
+`seeds/artworks.sql` läuft nach `seed.sql` (`verify_local.sh`) und steht in `setup-all.sql`, `setup-seeds.sql`,
+`update-to-latest.sql` und im letzten Teil von `sql-editor/setup-*` und `sql-editor/update-*`.
+
+### Schema
+
+Alle fünf Tabellen haben RLS ohne Policy und ohne Rechte für Clients; gelesen wird nur über die RPCs.
+
+- `artworks`: `id`, `serial bigint unique` (Anzeige `ART-0042`, vergeben ohne Lücken per Trigger
+  `artworks_assign_serial`, daher bleibt die Galerie bei `ART-0001` bis `ART-0036`), `gallery_key text unique` (nur
+  Galerie), `title`, `origin` (`game` | `player`), `rarity` (`common` | `rare` | `legendary` | `null`), `creator_id`
+  und `owner_id` (→ `profiles`, `on delete set null`; `owner_id null` = NEXA-Galerie), `pixels jsonb`
+  (`{ palette, grid }`), `value_cents` (letzter Verkaufspreis, `null` = nie verkauft), `created_at`.
+- `artwork_auctions`: `artwork_id`, `seller_id` (`null` bei der Galerie), `by_gallery`, `start_cents`, `ends_at`,
+  `status` (`open` | `sold` | `unsold` | `cancelled`), `leader_id`, `current_cents` (Höchstgebot, liegt in
+  `art_escrow`), `bids`, `created_at`, `closed_at`. Höchstens eine offene Auktion je Werk (eindeutiger Teilindex).
+- `artwork_bids`: `auction_id`, `bidder_id`, `amount_cents`, `at` (Verlauf aller Gebote).
+- `artwork_likes`: PK `(artwork_id, player_id)`.
+- `artwork_sales`: `artwork_id`, `auction_id` (eindeutig), `seller_id` (`null` = Galerie), `buyer_id`, `price_cents`,
+  `fee_cents` (was an die Haushalte ging), `at`. Verkäufer und Käufer ohne Fremdschlüssel: Der Verlauf überdauert
+  gelöschte Spieler (Anzeige „Ehemaliger Spieler“).
+
+### Geld
+
+- Neues Systemkonto `art_escrow` (darf nicht negativ werden): hält die Höchstgebote der offenen Auktionen. Es zählt
+  wie jedes Konto zur Geldmengen-Invariante (Summe aller Konten außer `world_genesis` = Gesamtgeldmenge).
+- Neue Buchungsarten `artwork_creation` (Spieler → Staatskasse), `artwork_bid` (eine Buchung je Gebot: altes
+  Höchstgebot `art_escrow` → bisheriger Führender, neues Gebot Bieter → `art_escrow`), `artwork_refund` (Rückgabe
+  beim Zurücksetzen des Kontos), `artwork_sale` (`art_escrow` → Verkäufer `Preis − ⌊Preis × feeBps / 10 000⌋`,
+  Gebühr → Haushalte; Galerie: alles an die Haushalte). Auf den Erlös des Verkäufers wirkt der Kreditabzug
+  (`loan_withhold`) wie bei anderen Einkünften.
+- Vermögen: `player_art_value_cents(spieler)` = Summe `value_cents` der eigenen Werke (nie verkauft = 0) zählt zu
+  `player_net_worth_cents` und `rich_list_entries` (Reichenliste, Visitenkarte, Vermögensmissionen).
+  `get_my_portfolio` bleibt unverändert.
+
+### Regeln (wie `src/lib/sim/artworks.ts`)
+
+- `artwork_valid(pixels)`: `artworks.size` Zeilen mit `artworks.size` Zeichen aus `.` und den Indizes `0-9a-f`
+  unterhalb der Palettenlänge, 1 bis `maxColors` Farben `#rrggbb` (klein), mindestens 16 gemalte Pixel.
+- Verbotene Symbole: `logo_has_forbidden_symbol` (arbeitet mit beliebigen Zeichen je Farbe, also auch `a-f`).
+- Titel: getrimmt, Leerräume zusammengefasst, 3 bis `titleMaxLength` Zeichen, Buchstaben (mit Umlauten), Ziffern,
+  Leerzeichen und einfache Satzzeichen, mindestens ein Buchstabe, jedes Wort durch den Namensfilter
+  (`text_has_profanity`). Fehler wie beim Namensfilter: `name_too_short`, `name_too_long`, `name_invalid_chars`,
+  `name_profanity` (`NX019`).
+- Kosten: `createBaseCostCents × createCostFactor ^ (bisher gemalte Werke)`; gezählt werden alle Werke mit
+  `creator_id` = Spieler.
+- Mindestgebot: Startpreis, danach `⌈aktuell × (10 000 + minIncrementBps) / 10 000 / 100⌉ × 100`.
+- Anti-Sniping: Liegt das Gebot weniger als `antiSnipeMinutes` vor dem Ende, endet die Auktion `antiSnipeMinutes`
+  nach dem Gebot.
+- Beliebtheit: `(Likes × likeWeight + Gebote der laufenden Auktion × bidWeight + 1) / (Alter in h + 2) ^ gravity`.
+- Schreib-RPCs verlangen Level ≥ `unlock_level('artworks')` (8), sonst `artworks_locked`. Lesen darf jeder Spieler.
+  Alle Schreib-RPCs sind über `request_id` idempotent. Zeiten der Auktionen sind Spielzeit (`game_now()`).
+
+### Job (`run_due_jobs` → `artworks_run_due()`)
+
+- Fällige Auktionen (`ends_at ≤ game_now()`) werden abgerechnet: mit Gebot verkauft (Besitzerwechsel,
+  `value_cents` = Preis, Zeile in `artwork_sales`), ohne Gebot `unsold` (das Werk bleibt beim Besitzer).
+- Galerie (`artworks_gallery_schedule`): Der Berliner Tag hat `auctionsPerDay` Zeitfenster zu je 24 h /
+  `auctionsPerDay` (bei 4: 00, 06, 12, 18 Uhr). Für jedes begonnene Fenster startet eine Galerie-Auktion
+  (`auctionHours` lang, Startpreis nach Seltenheit; Werke ohne Seltenheit wie `common`); kommt der Job spät, holt er
+  die Fenster des Tages auf einmal nach. Kandidaten: Werke ohne Besitzer und ohne offene Auktion, die heute noch nicht
+  angeboten wurden; nie verkaufte zuerst, dann die seltener angebotenen, dann eine tägliche Mischung. Idempotent.
+
+### Konto zurücksetzen und löschen
+
+`account_wipe` ruft zuerst `artworks_wipe_player`: Auktionen des Spielers werden abgebrochen (der Führende bekommt sein
+Gebot zurück), Gebote, mit denen er führt, gehen auf sein Bargeld zurück (danach wie alles Bargeld an den Staat) und
+die Auktion hat wieder keinen Führenden, seine Werke gehen an die Galerie, seine Likes verschwinden. Der Urheber bleibt.
+
+### RPCs
+
+ARTWORK und alle Antworten wie in `docs/ARTWORKS.md` Abschnitt 8. Ergänzungen:
+
+- `current_cents` ist `null`, solange niemand geboten hat; `min_bid_cents` ist dann der Startpreis.
+  `seller` ist `null` bei Galerie-Auktionen. `hot` ist auf 6 Nachkommastellen gerundet.
+- `get_artworks(p_sort, p_origin, p_on_auction, p_limit, p_offset)`: `p_limit` 1 bis 100 (Standard 24). Sortierung
+  `hot` (Beliebtheit), `price` (aktuelles Gebot, sonst Wert, sonst Startpreis; ohne Preis zuletzt), `new`
+  (`created_at`), `ending` (laufende Auktionen nach Ende, danach der Rest nach Beliebtheit). Unbekannte Werte:
+  `invalid_argument`.
+- `get_artwork(p_artwork_id)`: `sales` neueste zuerst; `bids` = bis zu 50 Gebote der laufenden, sonst der letzten
+  Auktion, neueste zuerst.
+- `get_art_rankings(p_limit)`: `p_limit` 1 bis 100 (Standard 10). `collections`: Spieler mit mindestens einem Werk,
+  nach Wert, dann Anzahl; `artworks`: nur verkaufte Werke nach Wert.
+- `get_collection(p_nickname)`: Spitzname ohne Groß-/Kleinschreibung, `null` = eigene Sammlung; unbekannt:
+  `player_not_found`. Werke nach Wert, dann neueste.
+- `create_artwork`: Prüfreihenfolge Level, Pixel (`invalid_argument`), Titel, verbotenes Symbol (`logo_forbidden`),
+  Geld (`insufficient_funds`).
+- `like_artwork`: Weder Besitzer noch Urheber dürfen liken (`own_artwork`). Ein zweiter Like ändert nichts.
+- `start_auction`: nur der Besitzer (`forbidden`), Startpreis ≥ `minStartCents`, Dauer aus `durationsHours`
+  (sonst `invalid_argument`), schon in einer Auktion: `already_on_auction`.
+- `cancel_auction`: nur der Verkäufer (`forbidden`, Galerie-Auktionen nie), nicht mehr offen: `auction_ended`, mit
+  Höchstgebot: `auction_has_bids`.
+- `bid_artwork`: Verkäufer oder Besitzer: `own_artwork`; abgelaufen: `auction_ended`; unter dem Mindestgebot:
+  `bid_too_low`; zu wenig Bargeld: `insufficient_funds` (bei eigenem Höchstgebot zählt es mit).
+
+### Neue Fehlerschlüssel
+
+| Schlüssel            | Code    |
+| -------------------- | ------- |
+| `artworks_locked`    | `NX066` |
+| `artwork_not_found`  | `NX067` |
+| `auction_not_found`  | `NX068` |
+| `auction_ended`      | `NX069` |
+| `bid_too_low`        | `NX070` |
+| `own_artwork`        | `NX071` |
+| `already_on_auction` | `NX072` |
+| `auction_has_bids`   | `NX073` |
+
+Dazu wie bisher `insufficient_funds` (`NX001`), `forbidden` (`NX006`), `invalid_argument` (`NX007`), Namensfilter
+(`NX019`), `player_not_found` (`NX045`), `logo_forbidden` (`NX065`). `api_error` kennt jetzt auch `NX061` bis
+`NX065`.
+
+### Freischaltung
+
+Zeile `artworks` (Level 8, „Artworks“, Symbol `unlock_art`) in `unlocks` (in `seed.sql` und, sobald die Level-Tabelle
+gefüllt ist, in der Migration); Spieler ab Level 8 bekommen sie beim Update in `player_unlocks`.
+
+### Missionen
+
+Neue Messgrößen (`mission_event`):
+
+| Messgröße             | Quelle                                                                        |
+| --------------------- | ----------------------------------------------------------------------------- |
+| `work_hours`          | Trigger: `player_jobs.experience_minutes` überschreitet volle Stunden (Summe) |
+| `raise`               | Trigger: `salary_cents_per_hour` eines aktiven Jobs steigt                    |
+| `skill_learned`       | Trigger: neue Zeile in `player_skills`                                        |
+| `ai_worker_hired`     | Trigger: `player_companies.ai_workers` steigt (Gründer, Summe)                |
+| `job_posted`          | Trigger: Stellenanzeige einer Spielerfirma (Ausschreibender, sonst Gründer)   |
+| `profitable_hour`     | Trigger: Betriebsstunde mit `profit_cents > 0` (Gründer)                      |
+| `company_deposit`     | `company_deposit`                                                             |
+| `view_profile`        | `track_event('view_profile', spitzname)`: fremdes Profil, verschiedene Namen  |
+| `art_like`            | `like_artwork` (nur neue Likes, verschiedene Werke)                           |
+| `art_bid`             | `bid_artwork`                                                                 |
+| `art_won`, `art_sold` | Abrechnung einer verkauften Auktion (Käufer, Verkäufer)                       |
+| `art_painted`         | `create_artwork`                                                              |
+| `art_auction_started` | `start_auction`                                                               |
+
+Neue Zustände (`mission_state_value`): `login_streak` (aktuelle Serie), `skills_total` (gelernte Fähigkeiten),
+`art_collection_value` (Wert der eigenen Werke, in Euro angezeigt), `art_owned`.
+
+`params.requires` (`job`, `company`, `skill_point`, `artwork`): `missions_assign` bietet die Mission nur an, solange
+der Spieler einen aktiven Job, eine aktive eigene Firma, einen freien Fähigkeitspunkt oder ein eigenes Werk ohne
+offene Auktion hat. Freischaltungen weiter über `params.unlock` (`first_job`, `found_garage`, `artworks`).
+
+Neue Vorlagen (Basis-XP; Wochen- und Meilensteinmissionen mit 1 Fähigkeitspunkt):
+
+- Schnell: `q_trades_3`, `q_sectors_2`, `q_view_profile`, `q_learn_skill`, `q_deposit`, `q_ai_worker`, `q_art_like`,
+  `q_art_bid`.
+- Täglich: `d_trades_10`, `d_buys`, `d_buy_pharma`, `d_buy_retail`, `d_buy_logistics`, `d_rich_list`,
+  `d_view_profiles`, `d_work_hours`, `d_profit_hours`, `d_art_likes`, `d_art_bids`.
+- Wöchentlich: `w_sells`, `w_buy_value`, `w_profiles`, `w_streak`, `w_work_hours`, `w_raise`, `w_skills`,
+  `w_profit_hours`, `w_ai_workers`, `w_job_posting`, `w_art_bids`, `w_art_win`, `w_art_auction`.
+- Meilensteine (in die Kette eingereiht, `chain_order`): `m_first_skill` (5), `m_first_hours` (7), `m_streak_7` (9),
+  `m_first_raise` (10), `m_first_ai_worker` (11), `m_skills_5` (12), `m_first_posting` (13), `m_art_first_like` (14),
+  `m_art_first_bid` (15), `m_art_first_win` (16), `m_art_paint` (17), `m_work_100` (18), `m_profit_100` (19),
+  `m_art_collection` (22), `m_streak_30` (24).
+
+Arbeitsaufgaben gibt es seit ADR-064 nicht mehr; dafür gibt es keine neue Mission.
+
+### Bekannte Grenzen
+
+- Keine Benachrichtigungen beim Überbieten oder Verkauf (die Tabelle `notifications` wird noch nirgends befüllt).
+- Gelöschte Spieler verlieren ihre Gebote im Verlauf (`artwork_bids` mit `on delete cascade`).

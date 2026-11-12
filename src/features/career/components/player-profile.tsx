@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
+import { useEffect } from "react";
+import { useGame } from "@/features/game/store";
 import { BEAR } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -14,6 +16,12 @@ import { BusinessCard } from "./business-card";
 export function PlayerProfile({ nickname }: { nickname: string }) {
   const t = useTranslations("playerCard");
   const card = usePlayerCard(nickname);
+  const track = useGame((state) => state.track);
+  const loaded = card.data?.nickname ?? null;
+  // Visiting other players counts for missions (ADR-081).
+  useEffect(() => {
+    if (loaded) track("view_profile", loaded);
+  }, [loaded, track]);
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <Link

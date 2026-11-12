@@ -2,6 +2,7 @@ import { z } from "zod";
 import { CAREER_RPC_SCHEMAS, liveCareerEngine } from "./api-careers";
 import { ARTWORK_RPC_SCHEMAS, liveArtEngine } from "./api-artworks";
 import { COMPANY_RPC_SCHEMAS, liveCompanyEngine } from "./api-company";
+import { PROPERTY_RPC_SCHEMAS, livePropertyEngine } from "./api-property";
 import { rpc, toErrorKey } from "./rpc";
 import {
   type Candle,
@@ -288,12 +289,14 @@ export const RPC_SCHEMAS = {
   ...CAREER_RPC_SCHEMAS,
   ...COMPANY_RPC_SCHEMAS,
   ...ARTWORK_RPC_SCHEMAS,
+  ...PROPERTY_RPC_SCHEMAS,
 } as const;
 
 export const liveEngine: GameEngine = {
   ...liveCareerEngine,
   ...liveCompanyEngine,
   ...liveArtEngine,
+  ...livePropertyEngine,
   async snapshot(): Promise<MarketSnapshot> {
     const s = await rpc("get_market_snapshot", {}, snapshotSchema);
     return {

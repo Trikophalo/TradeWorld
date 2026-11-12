@@ -332,6 +332,7 @@ insert into public.unlocks (key, level, title, description, icon_key, intro_miss
   ('jobs_junior',           5,  'Junior-Jobs',             'Besser bezahlte Jobs mit anspruchsvolleren Aufgaben.',                          'unlock_job',       null,                   52),
   ('analyst_reports',       7,  'Analystenberichte',       'Kursziele der Analysten. Manchmal liegen sie daneben.',                         'unlock_analyst',   null,                   70),
   ('short_selling',         8,  'Leerverkäufe',            'Verdiene an fallenden Kursen.',                                                 'unlock_short',     'intro_first_short',    80),
+  ('artworks',              8,  'Artworks',                'Male eigene Pixel-Kunst, sammle Unikate und biete in Auktionen mit.',          'unlock_art',       null,                   81),
   ('found_small_business', 10,  'Kleinunternehmen gründen','Gründe deine eigene Firma und führe sie durch die Quartale.',                   'unlock_company',   'intro_found_company', 100),
   ('leverage_2x',          12,  'Hebel 2×',                'Handle mit doppeltem Einsatz. Gewinne und Verluste verdoppeln sich.',           'unlock_leverage',  'intro_first_leverage',120),
   ('jobs_senior',          12,  'Senior-Jobs',             'Senior-Positionen mit deutlich höherem Gehalt.',                                'unlock_job',       null,                  121),

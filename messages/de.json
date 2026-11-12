@@ -326,7 +326,8 @@
     "golden_profile_frame": "Goldener Profilrahmen",
     "hall_of_fame": "Hall of Fame",
     "found_garage": "Garagen-Startup gründen",
-    "artworks": "Artworks: Pixel-Kunst sammeln und versteigern"
+    "artworks": "Artworks: Pixel-Kunst sammeln und versteigern",
+    "property": "Grundstück: eigene Wohnung kaufen und einrichten"
   },
   "auth": {
     "loginTitle": "Willkommen zurück",
@@ -632,7 +633,14 @@
     "bid_too_low": "Dein Gebot ist zu niedrig. Biete mindestens das Mindestgebot.",
     "own_artwork": "Bei eigenen Kunstwerken geht das nicht.",
     "already_on_auction": "Das Kunstwerk ist schon in einer Auktion.",
-    "auction_has_bids": "Es gibt schon Gebote – die Auktion läuft bis zum Ende."
+    "auction_has_bids": "Es gibt schon Gebote – die Auktion läuft bis zum Ende.",
+    "property_locked": "Das schaltest du erst mit einem höheren Level frei.",
+    "no_home": "Dafür brauchst du zuerst eine eigene Bleibe.",
+    "invalid_tier": "Du kannst nur in eine größere Bleibe umziehen.",
+    "item_not_found": "Diesen Gegenstand gibt es nicht oder er gehört dir nicht.",
+    "layout_invalid": "So passt das nicht: Etwas steht außerhalb oder auf etwas anderem.",
+    "floor_not_owned": "Diesen Boden hast du noch nicht gekauft.",
+    "garage_full": "Deine Garage ist voll."
   },
   "locks": {
     "level": "Level {level}",

@@ -5,9 +5,9 @@
       "skills": [],
       "nickname": "Fixture_Chefin",
       "avatar_key": "rookie",
-      "started_at": "2026-11-12T17:48:17.239153+00:00",
-      "pending_raise": { "created_at": "2026-11-12T17:48:17.245146+00:00", "requested_bps": 200 },
-      "player_job_id": "fa8a7ffb-3f66-4a10-a4c7-d4dca753fc57",
+      "started_at": "2026-11-12T20:42:41.924317+00:00",
+      "pending_raise": { "created_at": "2026-11-12T20:42:41.938101+00:00", "requested_bps": 200 },
+      "player_job_id": "ebe31cad-d533-443c-a2da-172c160977aa",
       "notice_ends_at": null,
       "productivity_bps": 15000,
       "salary_cents_per_hour": 19000

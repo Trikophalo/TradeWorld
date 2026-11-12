@@ -16,6 +16,7 @@ import { levelFromTotalXp, levelProgress, scaledXp, totalXpForLevel, unlockLevel
 import { MISSION_TEMPLATES, availableFor, missionXp, type Metric, type MissionTemplate } from "./demo/missions";
 import { createCareerEngine, initialCareer, tycoonAvatar, type CareerState } from "./demo/careers";
 import { createArtEngine, type ArtState } from "./demo/artworks";
+import { createPropertyEngine, type HomeState } from "./demo/property";
 import { createCompanyEngine, type DemoCompanyState, type DemoDissolution } from "./demo/company";
 import { demoTycoons } from "./demo/tycoons";
 import {
@@ -107,6 +108,8 @@ interface PlayerState {
   foundingLockedUntil?: number | null;
   /** Artworks, auctions, likes (demo/artworks.ts, ADR-080). */
   art?: ArtState;
+  /** Own home, furniture, cars (demo/property.ts, ADR-082). */
+  home?: HomeState;
 }
 
 interface MarketState {
@@ -1001,6 +1004,21 @@ const art = createArtEngine({
   track: (metric) => bump(metric),
 });
 
+const home = createPropertyEngine({
+  home: () => p().home,
+  setHome: (value) => {
+    p().home = value;
+  },
+  nickname: () => p().nickname,
+  level,
+  cashCents: () => p().cashCents,
+  addCash: (cents) => {
+    p().cashCents += cents;
+  },
+  idempotent,
+  persist,
+});
+
 /** Demo only: close the current company quarter at once (button on the company page). */
 export function demoCloseQuarter(): void {
   company.closeQuarterNow();
@@ -1010,6 +1028,7 @@ export const demoEngine: GameEngine = {
   ...career.engine,
   ...company.engine,
   ...art.engine,
+  ...home.engine,
   snapshot: () => Promise.resolve(snapshotNow()),
 
   candles: (ticker, interval, limit) => Promise.resolve(demoCandles(ticker, interval, limit)),

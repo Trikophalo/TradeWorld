@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "5b308c6c-fd8a-4897-9620-1e5138d51e16",
+    "id": "d35afb60-866f-4544-adf3-9ddb7d125281",
     "tier": "junior",
     "title": null,
     "company": {
-      "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
+      "id": "dc6cd683-c473-c0eb-8d8c-04ddf664b4d5",
       "logo": null,
-      "name": "KlarSoft AG",
-      "color": "#4C8DFF",
+      "name": "Eilbote Express",
+      "color": "#F7768E",
       "is_ai": true,
-      "sector": "tech",
-      "ticker": "KLS"
+      "sector": "logistics",
+      "ticker": "EBX"
     },
     "required": [{ "branch": "it", "min_score": 2 }],
     "signature": "M2 14 C6 4 10 4 14 12 S22 18 26 8",
     "title_key": "it_junior",
-    "started_at": "2026-11-12T17:48:16.85825+00:00",
+    "started_at": "2026-11-12T20:42:41.551197+00:00",
     "pending_raise": null,
     "raise_max_bps": 0,
     "notice_ends_at": null,
@@ -28,7 +28,7 @@
     "productivity_bps": 17400,
     "next_work_task_at": null,
     "earned_total_cents": 31700,
-    "raise_available_at": "2026-11-19T17:48:16.883518+00:00",
+    "raise_available_at": "2026-11-19T20:42:41.575516+00:00",
     "quit_now_cost_cents": 391812,
     "salary_cents_per_hour": 32651,
     "effective_salary_cents_per_hour": 32651

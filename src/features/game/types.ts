@@ -7,6 +7,7 @@
  * computed with BigInt (src/features/market/order-schema.ts).
  */
 import type { SectorKey } from "@/components/pixel/art";
+import type { FloorMaterial, PropertyTier } from "@/config/balance";
 import type { SkillBranch } from "@/config/skills";
 import type { CompanyLogoData } from "@/lib/sim/logo";
 
@@ -278,6 +279,40 @@ export interface Artwork {
 }
 
 export type ArtSort = "hot" | "price" | "new" | "ending";
+
+// ------------------------------------------------------------------ property (ADR-082, docs/PROPERTY.md)
+
+export interface PlacedItem {
+  id: string;
+  itemKey: string;
+  x: number;
+  y: number;
+  rot: 0 | 90;
+}
+
+export interface Property {
+  owner: string;
+  tier: PropertyTier | null;
+  width: number;
+  height: number;
+  garageSlots: number;
+  wallColor: string;
+  floor: FloorMaterial;
+  floorsOwned: FloorMaterial[];
+  placed: PlacedItem[];
+  garage: { id: string; carKey: string; slot: number }[];
+  valueCents: number;
+}
+
+export interface PropertyInventory {
+  furniture: { id: string; itemKey: string }[];
+  cars: { id: string; carKey: string }[];
+}
+
+export interface PropertyState {
+  property: Property;
+  inventory: PropertyInventory | null;
+}
 export type ArtOrigin = "all" | "game" | "player";
 
 export interface ArtworkList {
@@ -365,7 +400,7 @@ export interface MissionGroup {
 }
 
 /** Client-only events that count for a few quick missions. */
-export type TrackedEvent = "view_security" | "open_rich_list" | "open_rules";
+export type TrackedEvent = "view_security" | "open_rich_list" | "open_rules" | "view_profile";
 
 export interface ProgressResult {
   xpAwarded: number;
@@ -841,6 +876,13 @@ export const GAME_ERROR_KEYS = [
   "own_artwork",
   "already_on_auction",
   "auction_has_bids",
+  "property_locked",
+  "no_home",
+  "invalid_tier",
+  "item_not_found",
+  "layout_invalid",
+  "floor_not_owned",
+  "garage_full",
   "mission_not_found",
   "mission_not_completed",
   "mission_already_claimed",
@@ -919,6 +961,19 @@ export interface GameEngine {
   bidArtwork(requestId: string, auctionId: string, amountCents: number): Promise<Artwork>;
   artRankings(limit: number): Promise<ArtRankings>;
   collection(nickname: string): Promise<ArtCollection>;
+  // Property (ADR-082)
+  property(nickname: string | null): Promise<PropertyState>;
+  buyHome(requestId: string, tier: PropertyTier): Promise<PropertyState & { costCents: number }>;
+  buyFurniture(requestId: string, itemKey: string, count: number): Promise<PropertyState>;
+  buyFloor(requestId: string, material: FloorMaterial): Promise<PropertyState>;
+  saveLayout(
+    requestId: string,
+    wallColor: string,
+    floor: FloorMaterial,
+    placed: { id: string; x: number; y: number; rot: 0 | 90 }[],
+  ): Promise<PropertyState>;
+  buyCar(requestId: string, carKey: string): Promise<PropertyState>;
+  sellItem(requestId: string, kind: "furniture" | "car", id: string): Promise<PropertyState & { refundCents: number }>;
   checkNickname(nickname: string): Promise<{ allowed: boolean; reason: GameErrorKey | null }>;
   changeNickname(requestId: string, nickname: string): Promise<{ nickname: string; nextChangeAt: string }>;
   /** Starts over as a new player; `confirm` is the current nickname (ADR-070). */

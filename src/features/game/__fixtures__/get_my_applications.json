@@ -1,56 +1,56 @@
 {
   "applications": [
     {
-      "id": "0ed7aa7a-8f92-499a-92e5-ec600e53e8f6",
+      "id": "cfba9c0a-e266-4eff-99aa-d8ea6caece8e",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "1454b211-619c-4de6-a1aa-dc28556ce6a5",
+        "id": "7e22dd8b-5a55-4e5b-876d-42bc12d2bdbd",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "db7c839c-c460-945e-1188-5e4a61db1e47",
+          "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
           "logo": null,
-          "name": "Rheinkraft Werke",
-          "color": "#5BC0EB",
+          "name": "Frachtpilot",
+          "color": "#9ECE6A",
           "is_ai": true,
-          "sector": "energy",
-          "ticker": "RKW"
+          "sector": "logistics",
+          "ticker": "FPT"
         },
-        "required": [{ "branch": "craft", "min_score": 0 }],
-        "title_key": "craft_intern",
+        "required": [{ "branch": "logistics", "min_score": 0 }],
+        "title_key": "logistics_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-12T17:48:16.851593+00:00",
-      "updated_at": "2026-11-12T17:48:16.855136+00:00",
-      "offer_expires_at": "2026-11-14T17:48:16.851593+00:00",
+      "created_at": "2026-11-12T20:42:41.54596+00:00",
+      "updated_at": "2026-11-12T20:42:41.548755+00:00",
+      "offer_expires_at": "2026-11-14T20:42:41.54596+00:00",
       "salary_wish_cents_per_hour": 15000,
       "offer_salary_cents_per_hour": 15000
     },
     {
-      "id": "78245d71-9afa-4e6c-809e-54e65e94b9b2",
+      "id": "bd531244-aa36-49e1-9f31-ff4c92cf213e",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "86265572-35ec-4510-b9e6-f3bb9f77e646",
+        "id": "b4c32ae6-4622-4ef7-9e53-79de7136da3e",
         "tier": "junior",
         "title": null,
         "company": {
-          "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
+          "id": "dc6cd683-c473-c0eb-8d8c-04ddf664b4d5",
           "logo": null,
-          "name": "KlarSoft AG",
-          "color": "#4C8DFF",
+          "name": "Eilbote Express",
+          "color": "#F7768E",
           "is_ai": true,
-          "sector": "tech",
-          "ticker": "KLS"
+          "sector": "logistics",
+          "ticker": "EBX"
         },
         "required": [{ "branch": "it", "min_score": 2 }],
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-12T17:48:16.846185+00:00",
-      "updated_at": "2026-11-12T17:48:16.846185+00:00",
-      "offer_expires_at": "2026-11-14T17:48:16.846185+00:00",
+      "created_at": "2026-11-12T20:42:41.541334+00:00",
+      "updated_at": "2026-11-12T20:42:41.541334+00:00",
+      "offer_expires_at": "2026-11-14T20:42:41.541334+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

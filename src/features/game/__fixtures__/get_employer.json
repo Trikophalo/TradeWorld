@@ -4,13 +4,13 @@
     "tier": null,
     "stage": null,
     "company": {
-      "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
+      "id": "dc6cd683-c473-c0eb-8d8c-04ddf664b4d5",
       "logo": null,
-      "name": "KlarSoft AG",
-      "color": "#4C8DFF",
+      "name": "Eilbote Express",
+      "color": "#F7768E",
       "is_ai": true,
-      "sector": "tech",
-      "ticker": "KLS"
+      "sector": "logistics",
+      "ticker": "EBX"
     },
     "founder": null,
     "team_size": 1,

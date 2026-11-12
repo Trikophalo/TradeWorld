@@ -731,6 +731,31 @@ export interface BalanceConfig {
   readonly avatars: AvatarsConfig;
   readonly startups: StartupsConfig;
   readonly artworks: ArtworksConfig;
+  readonly property: PropertyConfig;
+}
+
+export type PropertyTier = "flat" | "apartment" | "house" | "villa" | "luxury_villa";
+export type FloorMaterial = "laminate" | "carpet" | "tiles" | "parquet" | "stone" | "marble" | "gold";
+
+/** Own home, furniture and garage (ADR-082, docs/PROPERTY.md). Catalogue of items: src/config/furniture.ts. */
+export interface PropertyConfig {
+  readonly tiers: readonly {
+    readonly key: PropertyTier;
+    readonly priceCents: number;
+    /** Floor in tiles. */
+    readonly width: number;
+    readonly height: number;
+    readonly garageSlots: number;
+    readonly minLevel: number;
+  }[];
+  /** On an upgrade the old home is taken in at this share of its price. */
+  readonly tradeInBps: number;
+  /** Furniture and cars can be sold back for this share of the price. */
+  readonly resaleBps: number;
+  /** Floor materials are bought once, then usable in every home. */
+  readonly floors: Readonly<Record<FloorMaterial, number>>;
+  /** Wall colours (free to choose). */
+  readonly wallColors: readonly string[];
 }
 
 /** Pixel artworks, gallery and auctions (ADR-080, docs/ARTWORKS.md). */
@@ -1690,6 +1715,7 @@ export const BALANCE = {
       { level: 3, key: "limit_orders" },
       { level: 3, key: "watchlist" },
       { level: 3, key: "found_garage" },
+      { level: 4, key: "property" },
       { level: 5, key: "stop_loss" },
       { level: 5, key: "bonds" },
       { level: 5, key: "junior_jobs" },
@@ -2055,6 +2081,44 @@ export const BALANCE = {
       startPriceCents: { common: 500_000, rare: 2_500_000, legendary: 15_000_000 },
     },
     hot: { likeWeight: 1, bidWeight: 3, gravity: 1.5 },
+  },
+  property: {
+    tiers: [
+      { key: "flat", priceCents: 2_500_000, width: 8, height: 6, garageSlots: 0, minLevel: 4 },
+      { key: "apartment", priceCents: 10_000_000, width: 10, height: 8, garageSlots: 0, minLevel: 8 },
+      { key: "house", priceCents: 50_000_000, width: 13, height: 9, garageSlots: 2, minLevel: 14 },
+      { key: "villa", priceCents: 250_000_000, width: 16, height: 11, garageSlots: 4, minLevel: 22 },
+      { key: "luxury_villa", priceCents: 1_500_000_000, width: 20, height: 13, garageSlots: 8, minLevel: 30 },
+    ],
+    tradeInBps: 5_000,
+    resaleBps: 4_000,
+    floors: {
+      laminate: 0,
+      carpet: 150_000,
+      tiles: 400_000,
+      parquet: 600_000,
+      stone: 1_500_000,
+      marble: 6_000_000,
+      gold: 100_000_000,
+    },
+    wallColors: [
+      "#f3efe4",
+      "#ffffff",
+      "#d9d4c7",
+      "#8f9bb3",
+      "#3a4256",
+      "#1b1e2b",
+      "#c8e6c9",
+      "#2f7a4a",
+      "#bfe6ff",
+      "#2f5fd0",
+      "#ffe0b2",
+      "#ff9a52",
+      "#f8bbd0",
+      "#7a2f7a",
+      "#c8553d",
+      "#ffd15c",
+    ],
   },
 } as const satisfies BalanceConfig;
 

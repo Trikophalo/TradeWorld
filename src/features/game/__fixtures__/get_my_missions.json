@@ -4,8 +4,8 @@
       "kind": "quick",
       "missions": [
         {
-          "id": "3451e6b6-fc95-41eb-9cf4-5a3b165ce6b4",
-          "xp": 72,
+          "id": "13f05233-3e2d-41a4-9766-1e3ee20ce44e",
+          "xp": 66,
           "key": "q_vault",
           "title": "Leere deinen Tresor",
           "status": "completed",
@@ -15,26 +15,26 @@
           "description": "Hol dir dein Grundeinkommen ab."
         },
         {
-          "id": "498ccf58-0425-4c68-acfa-4808e2ee2dc4",
-          "xp": 112,
-          "key": "q_profit",
-          "title": "Verkaufe mit Gewinn",
-          "status": "active",
-          "target": 1,
-          "progress": 0,
+          "id": "42789e8c-a924-461a-b5a8-f7751d30a502",
+          "xp": 102,
+          "key": "q_sectors_2",
+          "title": "Kaufe Aktien aus 2 Branchen",
+          "status": "completed",
+          "target": 2,
+          "progress": 2,
           "expires_at": null,
-          "description": "Ein Verkauf über deinem Einstand reicht."
+          "description": "Zwei verschiedene Branchen reichen."
         },
         {
-          "id": "a2ad6921-704d-46f0-80be-9a59a11e8d67",
-          "xp": 40,
-          "key": "q_view",
-          "title": "Sieh dir 3 Aktien an",
+          "id": "a4acce22-cf36-4c2d-a4a4-90584fd48c58",
+          "xp": 86,
+          "key": "q_buy_value",
+          "title": "Kaufe für mindestens 400 €",
           "status": "active",
-          "target": 3,
-          "progress": 0,
+          "target": 40000,
+          "progress": 30244,
           "expires_at": null,
-          "description": "Öffne die Detailseiten verschiedener Aktien."
+          "description": "Eine einzelne Order zählt."
         }
       ],
       "resets_at": null
@@ -43,37 +43,37 @@
       "kind": "daily",
       "missions": [
         {
-          "id": "30951a89-3967-4693-83bf-30e4a93b5f69",
-          "xp": 558,
-          "key": "d_limits",
-          "title": "Setze 2 Limit-Orders",
+          "id": "00b63591-e174-44d3-8795-2fc44d11731d",
+          "xp": 402,
+          "key": "d_sells",
+          "title": "Verkaufe 2-mal",
           "status": "active",
           "target": 2,
           "progress": 1,
           "expires_at": "2026-11-12T23:00:00+00:00",
-          "description": "Kaufen oder verkaufen zu deinem Preis."
+          "description": "Teilverkäufe zählen auch."
         },
         {
-          "id": "3e131280-6845-4da6-8ccb-5c20dfd82b03",
-          "xp": 660,
-          "key": "d_securities",
-          "title": "Handle 3 verschiedene Wertpapiere",
+          "id": "42ecaa21-34fd-479f-84aa-8336a8b79146",
+          "xp": 542,
+          "key": "d_bond",
+          "title": "Kaufe eine Staatsanleihe",
           "status": "completed",
-          "target": 3,
-          "progress": 3,
+          "target": 1,
+          "progress": 1,
           "expires_at": "2026-11-12T23:00:00+00:00",
-          "description": "Jedes Wertpapier zählt einmal."
+          "description": "Rendite ohne Kursrisiko bis zur Fälligkeit."
         },
         {
-          "id": "3e5de3d6-a6f5-4920-81f4-6c58130344f8",
-          "xp": 414,
-          "key": "d_buy_value",
-          "title": "Kaufe für mindestens 1.000 €",
+          "id": "83ae43d2-df22-4c89-83cc-928cd02aad40",
+          "xp": 522,
+          "key": "d_buy_retail",
+          "title": "Kaufe 2 Aktien aus dem Einzelhandel",
           "status": "active",
-          "target": 100000,
-          "progress": 30350,
+          "target": 2,
+          "progress": 0,
           "expires_at": "2026-11-12T23:00:00+00:00",
-          "description": "In einer einzigen Order."
+          "description": "Zwei Käufe, auch derselben Aktie."
         }
       ],
       "resets_at": "2026-11-12T23:00:00+00:00"
@@ -82,37 +82,37 @@
       "kind": "weekly",
       "missions": [
         {
-          "id": "5ccd96bd-66d4-41fc-a628-3c5b7579b51c",
-          "xp": 1718,
-          "key": "w_volume",
-          "title": "Handle für insgesamt 29.170 €",
+          "id": "0b57e53c-2247-4a63-98be-b248e67d400d",
+          "xp": 1616,
+          "key": "w_limits",
+          "title": "Setze 5 Limit-Orders",
           "status": "active",
-          "target": 2917000,
-          "progress": 91414,
-          "expires_at": "2026-11-15T23:00:00+00:00",
-          "description": "Summe aller Käufe und Verkäufe der Woche."
-        },
-        {
-          "id": "d066dd19-1a2b-4d58-a6b0-bbddf0a01052",
-          "xp": 1586,
-          "key": "w_vault",
-          "title": "Leere deinen Tresor 10-mal",
-          "status": "active",
-          "target": 10,
+          "target": 5,
           "progress": 1,
           "expires_at": "2026-11-15T23:00:00+00:00",
           "description": "Diese Woche."
         },
         {
-          "id": "edb7bdd2-957d-43de-af97-23deb521e8b6",
-          "xp": 1724,
-          "key": "w_profit",
-          "title": "Erziele diese Woche 1.713 € Gewinn",
+          "id": "360c1e3e-c559-4a23-886b-177a0280f08d",
+          "xp": 1658,
+          "key": "w_sells",
+          "title": "Verkaufe diese Woche 10-mal",
           "status": "active",
-          "target": 171300,
-          "progress": 0,
+          "target": 10,
+          "progress": 1,
           "expires_at": "2026-11-15T23:00:00+00:00",
-          "description": "Summe deiner realisierten Gewinne."
+          "description": "Teilverkäufe zählen auch."
+        },
+        {
+          "id": "36bd35c1-25ff-4a00-8bfd-fa7d3639c442",
+          "xp": 1876,
+          "key": "w_volume",
+          "title": "Handle für insgesamt 38.151 €",
+          "status": "active",
+          "target": 3815100,
+          "progress": 91116,
+          "expires_at": "2026-11-15T23:00:00+00:00",
+          "description": "Summe aller Käufe und Verkäufe der Woche."
         }
       ],
       "resets_at": "2026-11-15T23:00:00+00:00"
@@ -121,7 +121,7 @@
       "kind": "milestone",
       "missions": [
         {
-          "id": "bedd33fc-aaa6-499b-9fd5-d190c3c638e3",
+          "id": "dffc5e93-d668-455b-9cb9-f0077e6b0266",
           "xp": 200,
           "key": "m_first_trade",
           "title": "Dein erster Trade",
@@ -132,7 +132,7 @@
           "description": "Kaufe dein erstes Wertpapier."
         },
         {
-          "id": "7db78872-bd30-4c57-a522-e39bbcc55532",
+          "id": "6dd333b4-666e-4af9-a558-2af105410de4",
           "xp": 200,
           "key": "m_first_vault",
           "title": "Erstes Grundeinkommen",
@@ -143,7 +143,7 @@
           "description": "Leere zum ersten Mal deinen Tresor."
         },
         {
-          "id": "63f41976-1e8e-4b4c-9146-589bc7ff6485",
+          "id": "5e3cf1a1-bda4-4212-bac3-e6026cf6cc4d",
           "xp": 300,
           "key": "m_first_profit",
           "title": "Dein erster Gewinn",
@@ -157,5 +157,5 @@
       "resets_at": null
     }
   ],
-  "server_time": "2026-11-12T17:48:16.788341+00:00"
+  "server_time": "2026-11-12T20:42:41.484471+00:00"
 }

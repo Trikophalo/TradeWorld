@@ -20153,6 +20153,1815 @@ begin
   execute 'grant execute on function public.set_company_banner(uuid, jsonb) to authenticated';
 end;
 $$;
+-- ===== idempotent copy of migrations/20261122000100_m4a_artworks.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · M4a · 0100 · Artworks: pixel art, gallery, auctions, collections (ADR-080)
+-- =============================================================================
+-- docs/ARTWORKS.md. Every artwork is unique (32 x 32 pixels, up to 16 colours).
+-- The 36 artworks of the game (supabase/seeds/artworks.sql) belong to the NEXA
+-- gallery (owner_id null), which auctions artworks.gallery.auctionsPerDay of them
+-- per Berlin day. Players paint their own (the cost doubles with every artwork,
+-- paid to the treasury), like, auction and bid. Bids are reserved in the system
+-- account art_escrow; an outbid leader is refunded in the same posting. A sale pays
+-- the seller the price minus artworks.auction.feeBps, the fee (gallery sales: all
+-- of it) goes to the households. Value = last sale price; it counts towards the
+-- net worth. Mirrors src/lib/sim/artworks.ts.
+-- Idempotent (identical copy in supabase/updates/).
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- A. Ledger: transaction kinds and the escrow account
+-- ---------------------------------------------------------------------------
+-- (new enum values are only used inside PL/pgSQL bodies, so they may be added in
+-- the same transaction that creates the functions)
+alter type public.ledger_tx_kind add value if not exists 'artwork_creation';
+alter type public.ledger_tx_kind add value if not exists 'artwork_bid';
+alter type public.ledger_tx_kind add value if not exists 'artwork_refund';
+alter type public.ledger_tx_kind add value if not exists 'artwork_sale';
+
+insert into public.ledger_accounts (kind, system_key, label, allow_negative) values
+  ('system', 'art_escrow', 'Artworks: reserved bids of running auctions (ADR-080)', false)
+on conflict do nothing;
+
+-- ---------------------------------------------------------------------------
+-- B. Tables (internal: read through the RPCs, never written by clients)
+-- ---------------------------------------------------------------------------
+create table if not exists public.artworks (
+  id          uuid primary key default gen_random_uuid(),
+  serial      bigint not null unique check (serial > 0),
+  gallery_key text unique,
+  title       text not null check (char_length(title) between 1 and 80),
+  origin      text not null check (origin in ('game', 'player')),
+  rarity      text check (rarity in ('common', 'rare', 'legendary')),
+  creator_id  uuid references public.profiles (id) on delete set null,
+  owner_id    uuid references public.profiles (id) on delete set null,
+  pixels      jsonb not null check (jsonb_typeof(pixels) = 'object' and pg_column_size(pixels) < 16384),
+  value_cents bigint check (value_cents is null or value_cents > 0),
+  created_at  timestamptz not null default now(),
+  constraint artworks_origin_key check ((origin = 'game') = (gallery_key is not null))
+);
+alter table public.artworks enable row level security;
+create index if not exists artworks_owner_idx on public.artworks (owner_id) where owner_id is not null;
+create index if not exists artworks_creator_idx on public.artworks (creator_id) where creator_id is not null;
+create index if not exists artworks_value_idx on public.artworks (value_cents desc) where value_cents is not null;
+comment on table public.artworks is
+  'Unique pixel artworks (ADR-080). serial = display code ART-0042; owner_id null = NEXA gallery; value_cents = last sale price (null = never sold). Internal (RPCs).';
+
+create table if not exists public.artwork_auctions (
+  id            uuid primary key default gen_random_uuid(),
+  artwork_id    uuid not null references public.artworks (id) on delete cascade,
+  seller_id     uuid references public.profiles (id) on delete set null,
+  by_gallery    boolean not null default false,
+  start_cents   bigint not null check (start_cents > 0),
+  ends_at       timestamptz not null,
+  status        text not null default 'open' check (status in ('open', 'sold', 'unsold', 'cancelled')),
+  leader_id     uuid references public.profiles (id) on delete set null,
+  current_cents bigint check (current_cents is null or current_cents > 0),
+  bids          integer not null default 0 check (bids >= 0),
+  created_at    timestamptz not null default now(),
+  closed_at     timestamptz
+);
+alter table public.artwork_auctions enable row level security;
+create index if not exists artwork_auctions_artwork_idx on public.artwork_auctions (artwork_id, created_at desc);
+create unique index if not exists artwork_auctions_open_uq on public.artwork_auctions (artwork_id) where status = 'open';
+create index if not exists artwork_auctions_due_idx on public.artwork_auctions (ends_at) where status = 'open';
+create index if not exists artwork_auctions_seller_idx on public.artwork_auctions (seller_id) where seller_id is not null;
+create index if not exists artwork_auctions_leader_idx on public.artwork_auctions (leader_id) where leader_id is not null;
+create index if not exists artwork_auctions_gallery_idx on public.artwork_auctions (created_at) where by_gallery;
+comment on table public.artwork_auctions is
+  'Auctions of artworks; at most one open per artwork. by_gallery = started by the NEXA gallery (seller_id null). current_cents is held in art_escrow while open. Internal (RPCs).';
+
+create table if not exists public.artwork_bids (
+  id           bigint generated always as identity primary key,
+  auction_id   uuid not null references public.artwork_auctions (id) on delete cascade,
+  bidder_id    uuid not null references public.profiles (id) on delete cascade,
+  amount_cents bigint not null check (amount_cents > 0),
+  at           timestamptz not null default now()
+);
+alter table public.artwork_bids enable row level security;
+create index if not exists artwork_bids_auction_idx on public.artwork_bids (auction_id, id desc);
+create index if not exists artwork_bids_bidder_idx on public.artwork_bids (bidder_id);
+comment on table public.artwork_bids is 'Every bid of an artwork auction (history). Internal (RPCs).';
+
+create table if not exists public.artwork_likes (
+  artwork_id uuid not null references public.artworks (id) on delete cascade,
+  player_id  uuid not null references public.profiles (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (artwork_id, player_id)
+);
+alter table public.artwork_likes enable row level security;
+create index if not exists artwork_likes_player_idx on public.artwork_likes (player_id);
+comment on table public.artwork_likes is 'One like per player and foreign artwork; can be taken back. Internal (RPCs).';
+
+-- seller_id / buyer_id without foreign key: the sales history outlives a deleted player
+create table if not exists public.artwork_sales (
+  id          bigint generated always as identity primary key,
+  artwork_id  uuid not null references public.artworks (id) on delete cascade,
+  auction_id  uuid not null unique references public.artwork_auctions (id) on delete cascade,
+  seller_id   uuid,
+  buyer_id    uuid not null,
+  price_cents bigint not null check (price_cents > 0),
+  fee_cents   bigint not null default 0 check (fee_cents >= 0),
+  at          timestamptz not null default now()
+);
+alter table public.artwork_sales enable row level security;
+create index if not exists artwork_sales_artwork_idx on public.artwork_sales (artwork_id, at desc);
+comment on table public.artwork_sales is
+  'Completed artwork sales (seller_id null = gallery). fee_cents = what went to the households. Internal (RPCs).';
+
+do $$
+declare
+  t text;
+begin
+  foreach t in array array['artworks', 'artwork_auctions', 'artwork_bids', 'artwork_likes', 'artwork_sales'] loop
+    execute format('revoke all on public.%I from public, anon, authenticated', t);
+    execute format('grant all on public.%I to service_role', t);
+  end loop;
+end;
+$$;
+
+-- ART-0001, ART-0002, ...: serials without gaps (the gallery seed runs with ON CONFLICT DO NOTHING
+-- any number of times, so a sequence would lose numbers)
+create or replace function public.artworks_assign_serial()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.serial is null then
+    perform pg_advisory_xact_lock(7311080);
+    select coalesce(max(a.serial), 0) + 1 into new.serial from public.artworks a;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists artworks_assign_serial on public.artworks;
+create trigger artworks_assign_serial
+  before insert on public.artworks
+  for each row execute function public.artworks_assign_serial();
+
+-- ---------------------------------------------------------------------------
+-- C. Error keys (M4a: NX066..NX073)
+-- ---------------------------------------------------------------------------
+create or replace function public.api_error(p_key text)
+returns void
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_code text;
+begin
+  v_code := case p_key
+    when 'insufficient_funds'          then 'NX001'
+    when 'rate_limited'                then 'NX004'
+    when 'forbidden'                   then 'NX006'
+    when 'invalid_quantity'            then 'NX007'
+    when 'invalid_price'               then 'NX007'
+    when 'invalid_argument'            then 'NX007'
+    when 'invalid_interval'            then 'NX007'
+    when 'not_authenticated'           then 'NX010'
+    when 'unknown_security'            then 'NX011'
+    when 'not_tradable'                then 'NX012'
+    when 'insufficient_position'       then 'NX013'
+    when 'order_not_found'             then 'NX014'
+    when 'order_not_open'              then 'NX015'
+    when 'market_paused'               then 'NX016'
+    when 'nothing_to_claim'            then 'NX017'
+    when 'locked'                      then 'NX018'
+    when 'name_too_short'              then 'NX019'
+    when 'name_too_long'               then 'NX019'
+    when 'name_invalid_chars'          then 'NX019'
+    when 'name_profanity'              then 'NX019'
+    when 'name_reserved'               then 'NX019'
+    when 'name_taken'                  then 'NX019'
+    when 'name_change_too_soon'        then 'NX020'
+    when 'order_too_small'             then 'NX021'
+    when 'market_illiquid'             then 'NX022'
+    when 'mission_not_found'           then 'NX023'
+    when 'mission_not_completed'       then 'NX024'
+    when 'mission_already_claimed'     then 'NX025'
+    when 'avatar_unknown'              then 'NX026'
+    when 'avatar_locked'               then 'NX027'
+    when 'daily_reward_claimed'        then 'NX028'
+    when 'skill_unknown'               then 'NX029'
+    when 'skill_learned'               then 'NX030'
+    when 'skill_locked'                then 'NX031'
+    when 'skill_points_insufficient'   then 'NX032'
+    when 'job_not_found'               then 'NX033'
+    when 'job_level_too_low'           then 'NX034'
+    when 'job_skills_missing'          then 'NX035'
+    when 'application_limit'           then 'NX036'
+    when 'application_exists'          then 'NX037'
+    when 'application_not_found'       then 'NX038'
+    when 'application_not_offered'     then 'NX039'
+    when 'offer_expired'               then 'NX040'
+    when 'job_active_exists'           then 'NX041'
+    when 'no_active_job'               then 'NX042'
+    when 'raise_too_soon'              then 'NX043'
+    when 'raise_too_high'              then 'NX044'
+    when 'player_not_found'            then 'NX045'
+    when 'employer_only'               then 'NX046'
+    when 'company_exists'              then 'NX047'
+    when 'company_not_found'           then 'NX048'
+    when 'company_level_too_low'       then 'NX049'
+    when 'owns_company'                then 'NX050'
+    when 'employee_limit'              then 'NX051'
+    when 'company_upgrade_unavailable' then 'NX052'
+    when 'founding_locked'             then 'NX053'
+    when 'not_in_company'              then 'NX054'
+    when 'work_task_not_found'         then 'NX055'
+    when 'work_task_expired'           then 'NX056'
+    when 'work_task_done'              then 'NX057'
+    when 'offer_closed'                then 'NX058'
+    when 'offer_sold_out'              then 'NX059'
+    when 'already_listed'              then 'NX060'
+    when 'confirm_mismatch'            then 'NX061'
+    when 'skill_already_covered'       then 'NX062'
+    when 'training_locked'             then 'NX063'
+    when 'logo_locked'                 then 'NX064'
+    when 'logo_forbidden'              then 'NX065'
+    when 'artworks_locked'             then 'NX066'
+    when 'artwork_not_found'           then 'NX067'
+    when 'auction_not_found'           then 'NX068'
+    when 'auction_ended'               then 'NX069'
+    when 'bid_too_low'                 then 'NX070'
+    when 'own_artwork'                 then 'NX071'
+    when 'already_on_auction'          then 'NX072'
+    when 'auction_has_bids'            then 'NX073'
+    else 'NX007'
+  end;
+  raise exception using errcode = v_code, message = p_key;
+end;
+$$;
+comment on function public.api_error(text) is 'Raises the API error <key> with its NX SQLSTATE. The client shows a text per key (error.message).';
+
+-- ---------------------------------------------------------------------------
+-- D. Rules (port of src/lib/sim/artworks.ts)
+-- ---------------------------------------------------------------------------
+-- isValidArtwork: artworks.size rows of artworks.size chars from '.' and the palette
+-- indices 0-9a-f below the palette length, 1..maxColors lowercase #rrggbb, >= 16 drawn pixels
+create or replace function public.artwork_valid(p_art jsonb)
+returns boolean
+language plpgsql
+stable
+set search_path = ''
+as $$
+declare
+  v_size integer := public.config_double('artworks', '{size}', 32)::integer;
+  v_max  integer := public.config_double('artworks', '{maxColors}', 16)::integer;
+  v_n    integer;
+  v_re   text;
+begin
+  if p_art is null or jsonb_typeof(p_art) <> 'object'
+     or jsonb_typeof(p_art -> 'palette') is distinct from 'array' or jsonb_typeof(p_art -> 'grid') is distinct from 'array' then
+    return false;
+  end if;
+  v_n := jsonb_array_length(p_art -> 'palette');
+  if v_n < 1 or v_n > least(v_max, 16)
+     or exists (select 1 from jsonb_array_elements(p_art -> 'palette') c
+                 where jsonb_typeof(c) <> 'string' or (c #>> '{}') !~ '^#[0-9a-f]{6}$') then
+    return false;
+  end if;
+  if jsonb_array_length(p_art -> 'grid') <> v_size then
+    return false;
+  end if;
+  v_re := '^[.' || substr('0123456789abcdef', 1, v_n) || ']{' || v_size || '}$';
+  if exists (select 1 from jsonb_array_elements(p_art -> 'grid') r
+              where jsonb_typeof(r) <> 'string' or (r #>> '{}') !~ v_re) then
+    return false;
+  end if;
+  return (select sum(char_length(replace(r #>> '{}', '.', ''))) from jsonb_array_elements(p_art -> 'grid') r) >= 16;
+end;
+$$;
+comment on function public.artwork_valid(jsonb) is 'Port of isValidArtwork (src/lib/sim/artworks.ts, ADR-080).';
+
+-- artworkCreateCostCents: base x factor ^ artworks already painted (capped far below the bigint limit)
+create or replace function public.artwork_create_cost_cents(p_painted integer)
+returns bigint
+language sql
+stable
+set search_path = ''
+as $$
+  select least(round(public.config_double('artworks', '{createBaseCostCents}', 1500000)::numeric
+                     * power(public.config_double('artworks', '{createCostFactor}', 2)::numeric, greatest(0, coalesce(p_painted, 0)))),
+               1000000000000000000)::bigint;
+$$;
+
+-- minNextBidCents: start price without a bid, else current + minIncrementBps, rounded up to whole euros
+create or replace function public.artwork_min_bid_cents(p_start_cents bigint, p_current_cents bigint)
+returns bigint
+language sql
+stable
+set search_path = ''
+as $$
+  select case when p_current_cents is null then p_start_cents
+              else (ceil(p_current_cents::numeric
+                         * (10000 + public.config_double('artworks', '{auction,minIncrementBps}', 500)::integer)
+                         / 1000000) * 100)::bigint end;
+$$;
+
+-- hotScore: (likes x likeWeight + bids x bidWeight + 1) / (age in hours + 2) ^ gravity
+create or replace function public.artwork_hot(p_likes bigint, p_bids bigint, p_created timestamptz, p_now timestamptz)
+returns double precision
+language sql
+stable
+set search_path = ''
+as $$
+  select (coalesce(p_likes, 0) * public.config_double('artworks', '{hot,likeWeight}', 1)
+          + coalesce(p_bids, 0) * public.config_double('artworks', '{hot,bidWeight}', 3) + 1)
+         / power(greatest(0, extract(epoch from (p_now - p_created)) / 3600.0) + 2, public.config_double('artworks', '{hot,gravity}', 1.5));
+$$;
+
+create or replace function public.artwork_code(p_serial bigint)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select 'ART-' || case when p_serial < 10000 then lpad(p_serial::text, 4, '0') else p_serial::text end;
+$$;
+
+-- Title: trimmed, single spaces, 3..artworks.titleMaxLength chars, letters (incl. umlauts), digits,
+-- space and simple punctuation, at least one letter; words through the name filter (text_has_profanity).
+-- Returns NULL or the reason (the name filter's keys).
+create or replace function public.artwork_title_violation(p_title text)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_max integer := public.config_double('artworks', '{titleMaxLength}', 40)::integer;
+begin
+  if p_title is null or char_length(p_title) < 3 then
+    return 'name_too_short';
+  end if;
+  if char_length(p_title) > v_max then
+    return 'name_too_long';
+  end if;
+  if p_title !~ '^[A-Za-zÄÖÜäöüßÀ-ÿ0-9 &.,:;!?''"()„“‚‘–-]+$' or public.name_letters(p_title) = '' then
+    return 'name_invalid_chars';
+  end if;
+  if public.text_has_profanity(p_title) then
+    return 'name_profanity';
+  end if;
+  return null;
+end;
+$$;
+comment on function public.artwork_title_violation(text) is
+  'Internal: NULL or name_too_short / name_too_long / name_invalid_chars / name_profanity for an artwork title (already trimmed).';
+
+create or replace function public.artworks_require_unlock(p_player uuid)
+returns void
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if coalesce((select p.level from public.profiles p where p.id = p_player), 1) < public.unlock_level('artworks') then
+    perform public.api_error('artworks_locked');
+  end if;
+end;
+$$;
+
+create or replace function public.player_art_value_cents(p_player uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(sum(a.value_cents), 0)::bigint from public.artworks a where a.owner_id = p_player;
+$$;
+comment on function public.player_art_value_cents(uuid) is 'Value of the artworks a player owns (last sale prices; never sold = 0).';
+
+create or replace function public.artwork_gallery_start_cents(p_rarity text)
+returns bigint
+language sql
+stable
+set search_path = ''
+as $$
+  select case p_rarity
+           when 'legendary' then public.config_bigint('artworks', '{gallery,startPriceCents,legendary}', 15000000)
+           when 'rare' then public.config_bigint('artworks', '{gallery,startPriceCents,rare}', 2500000)
+           else public.config_bigint('artworks', '{gallery,startPriceCents,common}', 500000) end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- E. ARTWORK (JSON of docs/ARTWORKS.md section 8)
+-- ---------------------------------------------------------------------------
+create or replace function public.artwork_json(p_artwork uuid, p_viewer uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  a       public.artworks;
+  au      public.artwork_auctions;
+  v_likes bigint;
+  v_now   timestamptz := public.game_now();
+begin
+  select * into a from public.artworks where id = p_artwork;
+  if a.id is null then
+    return null;
+  end if;
+  select * into au from public.artwork_auctions x where x.artwork_id = a.id and x.status = 'open';
+  select count(*) into v_likes from public.artwork_likes l where l.artwork_id = a.id;
+  return jsonb_build_object(
+    'id', a.id,
+    'code', public.artwork_code(a.serial),
+    'title', a.title,
+    'origin', a.origin,
+    'rarity', a.rarity,
+    'creator', (select p.nickname from public.profiles p where p.id = a.creator_id),
+    'owner', (select p.nickname from public.profiles p where p.id = a.owner_id),
+    'pixels', jsonb_build_object('palette', a.pixels -> 'palette', 'grid', a.pixels -> 'grid'),
+    'value_cents', a.value_cents,
+    'likes', v_likes,
+    'liked', exists (select 1 from public.artwork_likes l where l.artwork_id = a.id and l.player_id = p_viewer),
+    'created_at', a.created_at,
+    'hot', round(public.artwork_hot(v_likes, coalesce(au.bids, 0), a.created_at, v_now)::numeric, 6),
+    'auction', case when au.id is null then null else jsonb_build_object(
+      'id', au.id,
+      'ends_at', au.ends_at,
+      'start_cents', au.start_cents,
+      'current_cents', au.current_cents,
+      'min_bid_cents', public.artwork_min_bid_cents(au.start_cents, au.current_cents),
+      'bids', au.bids,
+      'leader', (select p.nickname from public.profiles p where p.id = au.leader_id),
+      'seller', case when au.by_gallery then null
+                     else coalesce((select p.nickname from public.profiles p where p.id = au.seller_id), 'Ehemaliger Spieler') end,
+      'my_bid_cents', case when au.leader_id = p_viewer then au.current_cents end) end);
+end;
+$$;
+comment on function public.artwork_json(uuid, uuid) is 'ARTWORK as seen by p_viewer (liked, my_bid_cents); docs/ARTWORKS.md section 8.';
+
+-- ---------------------------------------------------------------------------
+-- F. Settlement, gallery and the job
+-- ---------------------------------------------------------------------------
+-- Closes one auction if it is open and due: the leader gets the artwork, the seller the
+-- price minus the fee, the households the fee (gallery: the whole price); without a bid
+-- the artwork stays with its owner. Returns 'sold', 'unsold' or null (not due).
+create or replace function public.artwork_settle_auction(p_auction uuid)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  au        public.artwork_auctions;
+  v_now     timestamptz := public.game_now();
+  v_fee     bigint;
+  v_seller  uuid;
+  v_escrow  uuid := public.ledger_system_account('art_escrow');
+  v_house   uuid := public.ledger_system_account('households');
+  v_entries jsonb;
+  v_key     text;
+begin
+  select * into au from public.artwork_auctions where id = p_auction for update;
+  if au.id is null or au.status <> 'open' or au.ends_at > v_now then
+    return null;
+  end if;
+  if au.leader_id is null or au.current_cents is null then
+    update public.artwork_auctions set status = 'unsold', closed_at = v_now where id = au.id;
+    return 'unsold';
+  end if;
+
+  v_key := 'art:sale:' || au.id::text;
+  -- seller: a player whose cash account can still receive money, else the households take it all
+  if not au.by_gallery and au.seller_id is not null then
+    select a.id into v_seller from public.ledger_accounts a
+     where a.owner_player_id = au.seller_id and a.kind = 'player_cash' and not a.is_frozen;
+  end if;
+  if v_seller is null then
+    v_fee := au.current_cents;
+    v_entries := jsonb_build_array(jsonb_build_object('account_id', v_escrow, 'amount_cents', -au.current_cents),
+                                   jsonb_build_object('account_id', v_house, 'amount_cents', au.current_cents));
+  else
+    v_fee := floor(au.current_cents * public.config_double('artworks', '{auction,feeBps}', 1000)::integer / 10000.0)::bigint;
+    v_entries := jsonb_build_array(jsonb_build_object('account_id', v_escrow, 'amount_cents', -au.current_cents),
+                                   jsonb_build_object('account_id', v_seller, 'amount_cents', au.current_cents - v_fee));
+    if v_fee > 0 then
+      v_entries := v_entries || jsonb_build_object('account_id', v_house, 'amount_cents', v_fee);
+    end if;
+  end if;
+  perform public.ledger_post('artwork_sale', v_entries, 'Kunstwerk versteigert', 'artwork_auction', au.id, v_key, au.leader_id,
+                             jsonb_build_object('price_cents', au.current_cents, 'fee_cents', v_fee, 'artwork_id', au.artwork_id));
+  if v_seller is not null then
+    perform public.loan_withhold(au.seller_id, au.current_cents - v_fee, v_key);
+  end if;
+
+  update public.artworks set owner_id = au.leader_id, value_cents = au.current_cents where id = au.artwork_id;
+  insert into public.artwork_sales (artwork_id, auction_id, seller_id, buyer_id, price_cents, fee_cents, at)
+  values (au.artwork_id, au.id, case when au.by_gallery then null else au.seller_id end, au.leader_id, au.current_cents, v_fee, v_now)
+  on conflict (auction_id) do nothing;
+  update public.artwork_auctions set status = 'sold', closed_at = v_now where id = au.id;
+
+  perform public.mission_event(au.leader_id, 'art_won', 1, null);
+  if not au.by_gallery then
+    perform public.mission_event(au.seller_id, 'art_sold', 1, null);
+  end if;
+  return 'sold';
+end;
+$$;
+comment on function public.artwork_settle_auction(uuid) is 'Internal: closes one due artwork auction (sale with fee, or unsold).';
+
+-- The gallery auctions artworks.gallery.auctionsPerDay artworks per Berlin day, one per
+-- slot of 24 h / auctionsPerDay (a job run that comes late starts the missed slots of the
+-- day at once), each artworks.gallery.auctionHours long at its rarity's start price.
+-- Candidates: artworks without owner and without an open auction, never auctioned by the
+-- gallery today, unsold ones first, then the least often offered, then a daily shuffle.
+create or replace function public.artworks_gallery_schedule(p_now timestamptz default null)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now     timestamptz := coalesce(p_now, public.game_now());
+  v_day     date := (coalesce(p_now, public.game_now()) at time zone 'Europe/Berlin')::date;
+  v_start   timestamptz;
+  v_per     integer := greatest(0, public.config_double('artworks', '{gallery,auctionsPerDay}', 4)::integer);
+  v_hours   double precision := greatest(0.1, public.config_double('artworks', '{gallery,auctionHours}', 6));
+  v_due     integer;
+  v_started integer;
+  v_n       integer := 0;
+  r         record;
+begin
+  if v_per = 0 then
+    return 0;
+  end if;
+  v_start := v_day::timestamp at time zone 'Europe/Berlin';
+  v_due := least(v_per, floor(extract(epoch from (v_now - v_start)) / (86400.0 / v_per))::integer + 1);
+  select count(*) into v_started from public.artwork_auctions x
+   where x.by_gallery and x.created_at >= v_start and x.created_at < v_start + interval '1 day';
+  if v_started >= v_due then
+    return 0;
+  end if;
+  for r in
+    select a.id, a.rarity
+      from public.artworks a
+     where a.owner_id is null
+       and not exists (select 1 from public.artwork_auctions x where x.artwork_id = a.id
+                        and (x.status = 'open' or (x.by_gallery and x.created_at >= v_start)))
+     order by (a.value_cents is null) desc,
+              (select count(*) from public.artwork_auctions x where x.artwork_id = a.id and x.by_gallery),
+              md5(a.id::text || v_day::text)
+     limit v_due - v_started
+  loop
+    insert into public.artwork_auctions (artwork_id, seller_id, by_gallery, start_cents, ends_at, created_at)
+    values (r.id, null, true, public.artwork_gallery_start_cents(r.rarity), v_now + make_interval(secs => v_hours * 3600), v_now)
+    on conflict do nothing;
+    if found then
+      v_n := v_n + 1;
+    end if;
+  end loop;
+  return v_n;
+end;
+$$;
+comment on function public.artworks_gallery_schedule(timestamptz) is
+  'Internal: starts the gallery auctions due today (artworks.gallery, ADR-080). Idempotent.';
+
+create or replace function public.artworks_run_due()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_sold   integer := 0;
+  v_unsold integer := 0;
+  v_res    text;
+  r        record;
+begin
+  for r in select x.id from public.artwork_auctions x
+            where x.status = 'open' and x.ends_at <= public.game_now()
+            order by x.ends_at, x.id limit 200 loop
+    v_res := public.artwork_settle_auction(r.id);
+    if v_res = 'sold' then
+      v_sold := v_sold + 1;
+    elsif v_res = 'unsold' then
+      v_unsold := v_unsold + 1;
+    end if;
+  end loop;
+  return jsonb_build_object('sold', v_sold, 'unsold', v_unsold, 'gallery_started', public.artworks_gallery_schedule(null));
+end;
+$$;
+comment on function public.artworks_run_due() is 'Internal (run_due_jobs): closes due artwork auctions, then schedules the gallery.';
+
+-- Account reset/delete: the player's artworks go back to the gallery, auctions they sell are
+-- cancelled (the leader is refunded), auctions they lead lose them as leader (their money
+-- comes back to their cash before account_wipe returns it to the state), likes disappear.
+create or replace function public.artworks_wipe_player(p_player uuid, p_key text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_escrow uuid := public.ledger_system_account('art_escrow');
+  r        record;
+begin
+  for r in select x.* from public.artwork_auctions x where x.status = 'open' and (x.seller_id = p_player or x.leader_id = p_player)
+            order by x.id for update loop
+    if r.leader_id is not null and r.current_cents is not null then
+      perform public.ledger_transfer(v_escrow, public.ledger_player_account(r.leader_id, 'player_cash'), r.current_cents,
+                                     'artwork_refund', 'Gebot zurück (Auktion beendet)', 'artwork_auction', r.id,
+                                     p_key || ':art:' || r.id::text, r.leader_id);
+    end if;
+    if r.seller_id = p_player then
+      update public.artwork_auctions set status = 'cancelled', closed_at = public.game_now() where id = r.id;
+    else
+      delete from public.artwork_bids b where b.auction_id = r.id and b.bidder_id = p_player;
+      update public.artwork_auctions
+         set leader_id = null, current_cents = null,
+             bids = (select count(*) from public.artwork_bids b where b.auction_id = r.id)
+       where id = r.id;
+    end if;
+  end loop;
+  update public.artworks set owner_id = null where owner_id = p_player;
+  delete from public.artwork_likes where player_id = p_player;
+end;
+$$;
+comment on function public.artworks_wipe_player(uuid, text) is 'Internal (account_wipe): releases the artworks, auctions and bids of a player.';
+
+-- ---------------------------------------------------------------------------
+-- G. Read RPCs
+-- ---------------------------------------------------------------------------
+create or replace function public.get_artworks(p_sort text default 'hot', p_origin text default 'all',
+                                               p_on_auction boolean default false, p_limit integer default 24,
+                                               p_offset integer default 0)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid;
+  v_sort    text := coalesce(p_sort, 'hot');
+  v_origin  text := coalesce(p_origin, 'all');
+  v_auction boolean := coalesce(p_on_auction, false);
+  v_limit   integer := least(greatest(coalesce(p_limit, 24), 1), 100);
+  v_offset  integer := greatest(coalesce(p_offset, 0), 0);
+  v_now     timestamptz := public.game_now();
+  v_total   bigint;
+  v_entries jsonb;
+begin
+  v_player := public.require_player();
+  if v_sort not in ('hot', 'price', 'new', 'ending') or v_origin not in ('all', 'game', 'player') then
+    perform public.api_error('invalid_argument');
+  end if;
+  with base as (
+    select a.id, a.serial, a.created_at,
+           coalesce(au.current_cents, a.value_cents, au.start_cents) as price,
+           au.ends_at,
+           public.artwork_hot((select count(*) from public.artwork_likes l where l.artwork_id = a.id),
+                              coalesce(au.bids, 0), a.created_at, v_now) as hot
+      from public.artworks a
+      left join public.artwork_auctions au on au.artwork_id = a.id and au.status = 'open'
+     where (v_origin = 'all' or a.origin = v_origin)
+       and (not v_auction or au.id is not null)
+  ), ordered as (
+    select b.id,
+           row_number() over (order by
+             case when v_sort = 'hot' then b.hot end desc nulls last,
+             case when v_sort = 'price' then b.price end desc nulls last,
+             case when v_sort = 'new' then b.created_at end desc nulls last,
+             case when v_sort = 'ending' then b.ends_at end asc nulls last,
+             b.hot desc, b.serial desc) as ord,
+           count(*) over () as total
+      from base b
+  )
+  select coalesce(max(o.total), 0),
+         coalesce(jsonb_agg(public.artwork_json(o.id, v_player) order by o.ord)
+                    filter (where o.ord > v_offset and o.ord <= v_offset + v_limit), '[]'::jsonb)
+    into v_total, v_entries
+    from ordered o;
+  return jsonb_build_object('server_time', v_now, 'total', v_total, 'entries', v_entries);
+end;
+$$;
+comment on function public.get_artworks(text, text, boolean, integer, integer) is
+  'RPC: marketplace page {server_time, total, entries: [ARTWORK]}; sort hot|price|new|ending, origin all|game|player (ADR-080).';
+
+create or replace function public.get_artwork(p_artwork_id uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid;
+  v_auction uuid;
+begin
+  v_player := public.require_player();
+  if p_artwork_id is null or not exists (select 1 from public.artworks a where a.id = p_artwork_id) then
+    perform public.api_error('artwork_not_found');
+  end if;
+  -- bids of the running auction, else of the latest one
+  select x.id into v_auction from public.artwork_auctions x where x.artwork_id = p_artwork_id
+   order by (x.status = 'open') desc, x.created_at desc, x.id limit 1;
+  return jsonb_build_object(
+    'artwork', public.artwork_json(p_artwork_id, v_player),
+    'sales', coalesce((select jsonb_agg(jsonb_build_object(
+                         'at', s.at, 'price_cents', s.price_cents,
+                         'seller', case when s.seller_id is null then null
+                                        else coalesce(ps.nickname, 'Ehemaliger Spieler') end,
+                         'buyer', coalesce(pb.nickname, 'Ehemaliger Spieler')) order by s.at desc, s.id desc)
+                         from public.artwork_sales s
+                         left join public.profiles ps on ps.id = s.seller_id
+                         left join public.profiles pb on pb.id = s.buyer_id
+                        where s.artwork_id = p_artwork_id), '[]'::jsonb),
+    'bids', coalesce((select jsonb_agg(jsonb_build_object('nickname', coalesce(p.nickname, 'Ehemaliger Spieler'),
+                                                          'amount_cents', b.amount_cents, 'at', b.at) order by b.id desc)
+                        from (select * from public.artwork_bids b0 where b0.auction_id = v_auction order by b0.id desc limit 50) b
+                        left join public.profiles p on p.id = b.bidder_id), '[]'::jsonb));
+end;
+$$;
+comment on function public.get_artwork(uuid) is
+  'RPC: {artwork: ARTWORK, sales: [{at, price_cents, seller, buyer}], bids: [{nickname, amount_cents, at}]} (ADR-080).';
+
+create or replace function public.get_art_studio()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid;
+  v_painted integer;
+begin
+  v_player := public.require_player();
+  select count(*) into v_painted from public.artworks a where a.creator_id = v_player;
+  return jsonb_build_object(
+    'painted', v_painted,
+    'next_cost_cents', public.artwork_create_cost_cents(v_painted),
+    'unlocked', coalesce((select p.level from public.profiles p where p.id = v_player), 1) >= public.unlock_level('artworks'));
+end;
+$$;
+comment on function public.get_art_studio() is 'RPC: {painted, next_cost_cents, unlocked} for the art editor (ADR-080).';
+
+create or replace function public.get_art_rankings(p_limit integer default 10)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_limit  integer := least(greatest(coalesce(p_limit, 10), 1), 100);
+begin
+  v_player := public.require_player();
+  return jsonb_build_object(
+    'collections', coalesce((
+      select jsonb_agg(jsonb_build_object('rank', c.rnk, 'nickname', c.nickname, 'avatar_key', c.avatar_key,
+                                          'count', c.n, 'value_cents', c.val, 'is_me', c.owner_id = v_player) order by c.rnk)
+        from (select x.*, row_number() over (order by x.val desc, x.n desc, lower(x.nickname)) as rnk
+                from (select a.owner_id, p.nickname, p.avatar_key, count(*) as n, coalesce(sum(a.value_cents), 0)::bigint as val
+                        from public.artworks a join public.profiles p on p.id = a.owner_id
+                       where not p.is_deactivated
+                       group by a.owner_id, p.nickname, p.avatar_key) x) c
+       where c.rnk <= v_limit), '[]'::jsonb),
+    'artworks', coalesce((
+      select jsonb_agg(jsonb_build_object('rank', t.rnk, 'artwork', public.artwork_json(t.id, v_player)) order by t.rnk)
+        from (select a.id, row_number() over (order by a.value_cents desc, a.serial) as rnk
+                from public.artworks a where a.value_cents is not null
+               order by a.value_cents desc, a.serial limit v_limit) t), '[]'::jsonb));
+end;
+$$;
+comment on function public.get_art_rankings(integer) is
+  'RPC: largest collections (sum of values) and most valuable artworks (ADR-080).';
+
+-- p_nickname null = the caller
+create or replace function public.get_collection(p_nickname text default null)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_target uuid;
+  v_nick   text;
+begin
+  v_player := public.require_player();
+  if p_nickname is null then
+    v_target := v_player;
+  else
+    select p.id into v_target from public.profiles p where lower(p.nickname) = lower(btrim(p_nickname));
+  end if;
+  select p.nickname into v_nick from public.profiles p where p.id = v_target;
+  if v_nick is null then
+    perform public.api_error('player_not_found');
+  end if;
+  return jsonb_build_object(
+    'nickname', v_nick,
+    'count', (select count(*) from public.artworks a where a.owner_id = v_target),
+    'value_cents', public.player_art_value_cents(v_target),
+    'artworks', coalesce((select jsonb_agg(public.artwork_json(a.id, v_player)
+                                           order by a.value_cents desc nulls last, a.created_at desc, a.serial desc)
+                            from public.artworks a where a.owner_id = v_target), '[]'::jsonb));
+end;
+$$;
+comment on function public.get_collection(text) is 'RPC: {nickname, count, value_cents, artworks: [ARTWORK]} of a player (ADR-080).';
+
+-- ---------------------------------------------------------------------------
+-- H. Write RPCs (unlock level artworks, idempotent per request_id)
+-- ---------------------------------------------------------------------------
+create or replace function public.create_artwork(p_request_id uuid, p_title text, p_pixels jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid;
+  v_replay  jsonb;
+  v_title   text := btrim(regexp_replace(coalesce(p_title, ''), '\s+', ' ', 'g'));
+  v_reason  text;
+  v_painted integer;
+  v_cost    bigint;
+  v_cash    bigint;
+  v_id      uuid := gen_random_uuid();
+begin
+  v_player := public.require_player();
+  perform public.artworks_require_unlock(v_player);
+  if p_request_id is null or not public.artwork_valid(p_pixels) then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_reason := public.artwork_title_violation(v_title);
+  if v_reason is not null then
+    perform public.api_error(v_reason);
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'create_artwork');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  if public.logo_has_forbidden_symbol(p_pixels -> 'grid') then
+    perform public.api_error('logo_forbidden');
+  end if;
+  -- one painting at a time per player (the count decides the price)
+  perform 1 from public.profiles p where p.id = v_player for update;
+  select count(*) into v_painted from public.artworks a where a.creator_id = v_player;
+  v_cost := public.artwork_create_cost_cents(v_painted);
+  v_cash := public.lock_player_accounts(v_player);
+  if v_cash < v_cost then
+    perform public.api_error('insufficient_funds');
+  end if;
+  perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'), public.ledger_system_account('treasury'),
+                                 v_cost, 'artwork_creation', 'Kunstwerk gemalt', 'artwork', v_id,
+                                 'art:create:' || v_id::text, v_player, jsonb_build_object('painted_before', v_painted));
+  insert into public.artworks (id, title, origin, rarity, creator_id, owner_id, pixels)
+  values (v_id, v_title, 'player', null, v_player, v_player,
+          jsonb_build_object('palette', p_pixels -> 'palette', 'grid', p_pixels -> 'grid'));
+  perform public.mission_event(v_player, 'art_painted', 1, null);
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'artwork', public.artwork_json(v_id, v_player),
+    'cost_cents', v_cost,
+    'next_cost_cents', public.artwork_create_cost_cents(v_painted + 1)));
+end;
+$$;
+comment on function public.create_artwork(uuid, text, jsonb) is
+  'RPC: paints a new artwork (cost doubles per artwork, paid to the treasury); errors artworks_locked, invalid_argument, name_*, logo_forbidden, insufficient_funds.';
+
+create or replace function public.like_artwork(p_request_id uuid, p_artwork_id uuid, p_like boolean)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  a        public.artworks;
+begin
+  v_player := public.require_player();
+  perform public.artworks_require_unlock(v_player);
+  if p_request_id is null or p_artwork_id is null or p_like is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'like_artwork');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into a from public.artworks where id = p_artwork_id;
+  if a.id is null then
+    perform public.api_error('artwork_not_found');
+  end if;
+  if a.owner_id = v_player or a.creator_id = v_player then
+    perform public.api_error('own_artwork');
+  end if;
+  if p_like then
+    insert into public.artwork_likes (artwork_id, player_id) values (a.id, v_player) on conflict do nothing;
+    if found then
+      perform public.mission_event(v_player, 'art_like', 1, a.id::text);
+    end if;
+  else
+    delete from public.artwork_likes where artwork_id = a.id and player_id = v_player;
+  end if;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'likes', (select count(*) from public.artwork_likes l where l.artwork_id = a.id),
+    'liked', p_like));
+end;
+$$;
+comment on function public.like_artwork(uuid, uuid, boolean) is
+  'RPC: likes (p_like true) or unlikes a foreign artwork; errors artworks_locked, artwork_not_found, own_artwork.';
+
+create or replace function public.start_auction(p_request_id uuid, p_artwork_id uuid, p_start_cents bigint, p_hours integer)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  a        public.artworks;
+  v_now    timestamptz := public.game_now();
+begin
+  v_player := public.require_player();
+  perform public.artworks_require_unlock(v_player);
+  if p_request_id is null or p_artwork_id is null or p_hours is null or p_start_cents is null
+     or p_start_cents < public.config_bigint('artworks', '{auction,minStartCents}', 10000)
+     or not (coalesce(public.config_jsonb('artworks', '{auction,durationsHours}'), '[1, 6, 24]'::jsonb) @> to_jsonb(p_hours)) then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'start_auction');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into a from public.artworks where id = p_artwork_id for update;
+  if a.id is null then
+    perform public.api_error('artwork_not_found');
+  end if;
+  if a.owner_id is distinct from v_player then
+    perform public.api_error('forbidden');
+  end if;
+  if exists (select 1 from public.artwork_auctions x where x.artwork_id = a.id and x.status = 'open') then
+    perform public.api_error('already_on_auction');
+  end if;
+  insert into public.artwork_auctions (artwork_id, seller_id, by_gallery, start_cents, ends_at, created_at)
+  values (a.id, v_player, false, p_start_cents, v_now + make_interval(hours => p_hours), v_now);
+  perform public.mission_event(v_player, 'art_auction_started', 1, null);
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('artwork', public.artwork_json(a.id, v_player)));
+end;
+$$;
+comment on function public.start_auction(uuid, uuid, bigint, integer) is
+  'RPC: the owner offers an artwork (start >= artworks.auction.minStartCents, hours in durationsHours); errors forbidden, already_on_auction.';
+
+create or replace function public.cancel_auction(p_request_id uuid, p_auction_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  au       public.artwork_auctions;
+begin
+  v_player := public.require_player();
+  perform public.artworks_require_unlock(v_player);
+  if p_request_id is null or p_auction_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'cancel_auction');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into au from public.artwork_auctions where id = p_auction_id for update;
+  if au.id is null then
+    perform public.api_error('auction_not_found');
+  end if;
+  if au.by_gallery or au.seller_id is distinct from v_player then
+    perform public.api_error('forbidden');
+  end if;
+  if au.status <> 'open' then
+    perform public.api_error('auction_ended');
+  end if;
+  if au.leader_id is not null then
+    perform public.api_error('auction_has_bids');
+  end if;
+  update public.artwork_auctions set status = 'cancelled', closed_at = public.game_now() where id = au.id;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('artwork', public.artwork_json(au.artwork_id, v_player)));
+end;
+$$;
+comment on function public.cancel_auction(uuid, uuid) is
+  'RPC: the seller cancels an auction without a bid; errors auction_not_found, forbidden, auction_ended, auction_has_bids.';
+
+-- One posting per bid: the previous leader's reservation goes back to them and the new bid
+-- moves from the bidder's cash into art_escrow (accounts locked together, in id order).
+create or replace function public.bid_artwork(p_request_id uuid, p_auction_id uuid, p_amount_cents bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid;
+  v_replay  jsonb;
+  au        public.artwork_auctions;
+  v_owner   uuid;
+  v_now     timestamptz := public.game_now();
+  v_min     bigint;
+  v_cash    bigint;
+  v_escrow  uuid := public.ledger_system_account('art_escrow');
+  v_entries jsonb := '[]'::jsonb;
+  v_window  double precision := public.config_double('artworks', '{auction,antiSnipeMinutes}', 2) * 60;
+  v_bid     bigint;
+begin
+  v_player := public.require_player();
+  perform public.artworks_require_unlock(v_player);
+  if p_request_id is null or p_auction_id is null or p_amount_cents is null or p_amount_cents < 1 then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'bid_artwork');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into au from public.artwork_auctions where id = p_auction_id for update;
+  if au.id is null then
+    perform public.api_error('auction_not_found');
+  end if;
+  if au.status <> 'open' or au.ends_at <= v_now then
+    perform public.api_error('auction_ended');
+  end if;
+  select a.owner_id into v_owner from public.artworks a where a.id = au.artwork_id;
+  if au.seller_id = v_player or v_owner = v_player then
+    perform public.api_error('own_artwork');
+  end if;
+  v_min := public.artwork_min_bid_cents(au.start_cents, au.current_cents);
+  if p_amount_cents < v_min then
+    perform public.api_error('bid_too_low');
+  end if;
+  select a.balance_cents into v_cash from public.ledger_accounts a where a.owner_player_id = v_player and a.kind = 'player_cash';
+  if coalesce(v_cash, 0) + (case when au.leader_id = v_player then au.current_cents else 0 end) < p_amount_cents then
+    perform public.api_error('insufficient_funds');
+  end if;
+
+  if au.leader_id is not null and au.current_cents is not null then
+    v_entries := jsonb_build_array(
+      jsonb_build_object('account_id', v_escrow, 'amount_cents', -au.current_cents),
+      jsonb_build_object('account_id', public.ledger_player_account(au.leader_id, 'player_cash'), 'amount_cents', au.current_cents));
+  end if;
+  v_entries := v_entries
+    || jsonb_build_object('account_id', public.ledger_player_account(v_player, 'player_cash'), 'amount_cents', -p_amount_cents)
+    || jsonb_build_object('account_id', v_escrow, 'amount_cents', p_amount_cents);
+  insert into public.artwork_bids (auction_id, bidder_id, amount_cents, at) values (au.id, v_player, p_amount_cents, v_now)
+  returning id into v_bid;
+  begin
+    perform public.ledger_post('artwork_bid', v_entries, 'Gebot auf ein Kunstwerk', 'artwork_auction', au.id,
+                               'art:bid:' || v_bid::text, v_player,
+                               jsonb_build_object('amount_cents', p_amount_cents, 'refunded_player', au.leader_id,
+                                                  'refunded_cents', au.current_cents));
+  exception when sqlstate 'NX001' then
+    perform public.api_error('insufficient_funds');
+  end;
+  update public.artwork_auctions
+     set leader_id = v_player, current_cents = p_amount_cents, bids = bids + 1,
+         ends_at = case when extract(epoch from (au.ends_at - v_now)) < v_window
+                        then v_now + make_interval(secs => v_window) else au.ends_at end
+   where id = au.id;
+  perform public.mission_event(v_player, 'art_bid', 1, null);
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('artwork', public.artwork_json(au.artwork_id, v_player)));
+end;
+$$;
+comment on function public.bid_artwork(uuid, uuid, bigint) is
+  'RPC: bids on an artwork auction (reserved in art_escrow, previous leader refunded, anti-snipe); errors auction_not_found, auction_ended, own_artwork, bid_too_low, insufficient_funds.';
+
+-- ---------------------------------------------------------------------------
+-- I. Net worth with art (rich list, player card, state missions)
+-- ---------------------------------------------------------------------------
+create or replace function public.player_net_worth_cents(p_player uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select sum(a.balance_cents) from public.ledger_accounts a where a.owner_player_id = p_player), 0)::bigint
+       + coalesce((select sum(public.value_cents(p.quantity_e6, coalesce(q.bid_e4, q.last_price_e4)))
+                     from public.positions p join public.security_quotes q on q.security_id = p.security_id
+                    where p.player_id = p_player and p.status = 'open' and p.quantity_e6 > 0), 0)::bigint
+       -- founder's player company (ADR-057): cash - unpaid + earnings value
+       + public.player_company_value_cents(p_player)
+       -- artworks at their last sale price (ADR-080)
+       + public.player_art_value_cents(p_player)
+       - public.player_debt_cents(p_player);
+$$;
+
+-- rich_list_entries as in M3d plus the value of the artworks
+create or replace function public.rich_list_entries()
+returns table (entity_kind text, entity_id uuid, name text, description text, net_worth_cents bigint, rank_all integer, rank_players integer)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with players as (
+    select p.id,
+           coalesce(a.cash, 0) + coalesce(v.val, 0) + coalesce(public.company_value_cents(pc.company_id), 0)
+             + coalesce(art.val, 0) - coalesce(d.debt, 0) as nw,
+           p.nickname
+      from public.profiles p
+      left join (select owner_player_id, sum(balance_cents)::bigint as cash from public.ledger_accounts
+                  where owner_player_id is not null group by owner_player_id) a on a.owner_player_id = p.id
+      left join (select pos.player_id, sum(public.value_cents(pos.quantity_e6, coalesce(q.bid_e4, q.last_price_e4)))::bigint as val
+                   from public.positions pos join public.security_quotes q on q.security_id = pos.security_id
+                  where pos.status = 'open' and pos.quantity_e6 > 0 group by pos.player_id) v on v.player_id = p.id
+      left join public.player_companies pc on pc.founder_id = p.id and pc.status = 'active'
+      left join (select l.player_id, sum(l.outstanding_cents)::bigint as debt from public.player_loans l
+                  where l.status = 'open' group by l.player_id) d on d.player_id = p.id
+      left join (select aw.owner_id, sum(aw.value_cents)::bigint as val from public.artworks aw
+                  where aw.owner_id is not null and aw.value_cents is not null group by aw.owner_id) art on art.owner_id = p.id
+     where not p.is_deactivated
+  ), tycoons as (
+    select t.id, t.name, t.description,
+           t.cash_cents + coalesce(sum(public.value_cents(h.quantity_e6, coalesce(q.bid_e4, q.last_price_e4))), 0)::bigint as nw
+      from public.rich_tycoons t
+      left join public.rich_tycoon_holdings h on h.tycoon_id = t.id
+      left join public.security_quotes q on q.security_id = h.security_id
+     group by t.id
+  ), allx as (
+    select 'player'::text as entity_kind, id as entity_id, nickname as name, null::text as description, nw from players
+    union all
+    select 'tycoon', id, name, description, nw from tycoons
+  )
+  select x.entity_kind, x.entity_id, x.name, x.description, x.nw,
+         (row_number() over (order by x.nw desc, x.entity_kind, x.entity_id))::integer,
+         case when x.entity_kind = 'player'
+              then (row_number() over (partition by x.entity_kind order by x.nw desc, x.entity_id))::integer end
+    from allx x;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- J. Account reset/delete releases artworks (account_wipe as in M3g plus artworks)
+-- ---------------------------------------------------------------------------
+create or replace function public.account_wipe(p_player uuid, p_key text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_nick    text;
+  v_company uuid;
+  v_state   uuid := public.ledger_system_account(case when public.money_genesis_done() then 'treasury' else 'mint' end);
+  v_bal     bigint;
+  r         record;
+begin
+  perform public.lock_player_accounts(p_player);
+  select p.nickname into v_nick from public.profiles p where p.id = p_player for update;
+
+  -- artworks (ADR-080): back to the gallery, auctions cancelled, reserved bids back to the cash
+  perform public.artworks_wipe_player(p_player, p_key);
+
+  -- own company: open share offers are settled first, then it is dissolved like close_company
+  select pc.company_id into v_company from public.player_companies pc where pc.founder_id = p_player and pc.status = 'active';
+  if v_company is not null then
+    for r in select o.id from public.company_share_offers o where o.company_id = v_company and o.status = 'open' order by o.id loop
+      perform public.close_share_offer(r.id);
+    end loop;
+    perform public.company_dissolve(v_company, 'closed');
+  end if;
+
+  -- subscriptions to other companies' open offers lapse (the money stays with the company)
+  for r in select s.offer_id, sum(s.shares_e6)::bigint as q from public.offer_subscriptions s
+            join public.company_share_offers o on o.id = s.offer_id and o.status = 'open'
+           where s.player_id = p_player group by s.offer_id order by s.offer_id loop
+    update public.company_share_offers set shares_subscribed_e6 = greatest(0, shares_subscribed_e6 - r.q) where id = r.offer_id;
+  end loop;
+
+  -- job: wages up to now, then ended without notice or fee
+  for r in select pj.id, pj.company_id from public.player_jobs pj where pj.player_id = p_player and pj.status = 'active' order by pj.id loop
+    perform public.accrue_job_salary(r.id);
+    update public.player_jobs set status = 'ended', ended_at = now(), end_reason = 'quit', notice_ends_at = null where id = r.id;
+    perform public.company_system_message(r.company_id, v_nick || ' hat das Unternehmen verlassen.');
+  end loop;
+
+  -- open orders release their reservations; holdings are given up
+  for r in select o.id from public.orders o
+            where o.player_id = p_player and o.status in ('pending', 'open', 'partially_filled') order by o.id loop
+    perform public.cancel_order_internal(r.id);
+  end loop;
+  update public.positions
+     set status = 'closed', closed_at = now(), quantity_e6 = 0, reserved_quantity_e6 = 0, cost_basis_cents = 0,
+         margin_cents = 0, borrowed_cents = 0, liquidation_price_e4 = null
+   where player_id = p_player and status = 'open';
+
+  -- game state of the player
+  for r in select * from (values
+             ('position_lots', 'player_id'), ('xp_events', 'player_id'), ('xp_daily_counters', 'player_id'),
+             ('vault_claims', 'player_id'), ('daily_logins', 'player_id'), ('player_missions', 'player_id'),
+             ('player_achievements', 'player_id'), ('player_cosmetics', 'player_id'), ('player_lifestyle_items', 'player_id'),
+             ('player_random_events', 'player_id'), ('player_bankruptcies', 'player_id'), ('margin_events', 'player_id'),
+             ('financing_charges', 'player_id'), ('player_tax_years', 'player_id'), ('distribution_payouts', 'player_id'),
+             ('watchlist_items', 'player_id'), ('portfolio_snapshots', 'player_id'), ('stock_option_grants', 'player_id'),
+             ('loans', 'player_id'), ('cap_table_entries', 'player_id'), ('share_lockups', 'player_id'),
+             ('capital_injections', 'player_id'), ('takeover_offers', 'bidder_player_id'), ('angel_offers', 'investor_player_id'),
+             ('ipo_subscriptions', 'player_id'), ('shareholder_vote_ballots', 'player_id'), ('reputation_events', 'player_id'),
+             ('insider_violations', 'player_id'), ('salary_payouts', 'player_id'), ('work_tasks', 'player_id'),
+             ('salary_negotiations', 'player_id'), ('player_work_tasks', 'player_id'), ('player_jobs', 'player_id'),
+             ('job_offers', 'to_player_id'), ('job_applications', 'player_id'), ('player_skills', 'player_id'),
+             ('player_skill_points', 'player_id'), ('daily_reward_claims', 'player_id'), ('player_loans', 'player_id'),
+             ('offer_subscriptions', 'player_id'), ('notifications', 'player_id'), ('feed_items', 'actor_id'),
+             ('league_entries', 'player_id'), ('league_entry_baselines', 'player_id'), ('company_logo_reports', 'reporter_id'),
+             ('player_unlocks', 'player_id')
+           ) as t(tbl, col) loop
+    execute format('delete from public.%I where %I = $1', r.tbl, r.col) using p_player;
+  end loop;
+  delete from public.rich_list_snapshots where entity_kind = 'player' and entity_id = p_player;
+
+  -- money back to the state: one balanced posting per account
+  for r in select a.id from public.ledger_accounts a where a.owner_player_id = p_player and a.balance_cents > 0 order by a.id loop
+    select a.balance_cents into v_bal from public.ledger_accounts a where a.id = r.id;
+    perform public.ledger_transfer(r.id, v_state, v_bal, 'transfer', 'Konto zurückgesetzt', 'profile', p_player,
+                                   p_key || ':' || r.id::text, p_player);
+  end loop;
+
+  update public.profiles
+     set level = 1, xp_total = 0, reputation = 50, title_key = null, frame_key = null,
+         bankrupt_until = null, founding_locked_until = null
+   where id = p_player;
+  update public.player_private
+     set founding_ban_until = null, bankruptcy_count = 0, career_experience_minutes = 0, ipo_investment_limit_cents = null,
+         tutorial_completed_at = null, tax_loss_pot_cents = 0
+   where player_id = p_player;
+end;
+$$;
+comment on function public.account_wipe(uuid, text) is 'Internal: cleanup shared by reset_account() and delete_account().';
+
+-- ---------------------------------------------------------------------------
+-- K. run_due_jobs as in M3i plus artworks (auctions, gallery)
+-- ---------------------------------------------------------------------------
+create or replace function public.run_due_jobs()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now      timestamptz;
+  v_result   jsonb := '{}'::jsonb;
+  v_closed   jsonb := '[]'::jsonb;
+  v_latest   bigint;
+  q          record;
+  v_run      bigint;
+begin
+  -- waits for a running tick (ticks only try the lock and skip)
+  perform pg_advisory_xact_lock(7311001);
+  v_now := public.game_now();
+  perform public.ensure_game_quarters(3);
+
+  if not exists (select 1 from public.candles limit 1) or not public.money_genesis_done()
+     or not exists (select 1 from public.rich_tycoons) then
+    v_result := v_result || jsonb_build_object('bootstrap', public.market_bootstrap());
+  end if;
+
+  -- first run on a database: older quarters are skipped, only the latest ended one is closed
+  if not exists (select 1 from public.job_runs j where j.job_name = 'quarter_close') then
+    select gq.id into v_latest from public.game_quarters gq
+     where gq.ends_at <= v_now and gq.status <> 'closed' order by gq.ends_at desc limit 1;
+    for q in select gq.id from public.game_quarters gq
+              where gq.ends_at <= v_now and gq.status <> 'closed' and gq.id <> coalesce(v_latest, -1)
+    loop
+      update public.game_quarters set status = 'closed', closed_at = now() where id = q.id;
+      insert into public.job_runs (job_name, run_key, status, finished_at, details)
+      values ('quarter_close', q.id::text, 'succeeded', now(), '{"skipped": "before_first_run"}'::jsonb)
+      on conflict do nothing;
+    end loop;
+  end if;
+
+  for q in select gq.id from public.game_quarters gq
+            where gq.ends_at <= v_now and gq.status <> 'closed'
+            order by gq.ends_at limit 8
+  loop
+    v_closed := v_closed || public.close_game_quarter(q.id);
+  end loop;
+  v_result := v_result || jsonb_build_object('quarters', v_closed);
+  -- player companies: operating hours (ADR-072), then every closed quarter since their founding (ADR-057)
+  v_result := v_result || jsonb_build_object('player_companies', public.player_companies_run_due());
+
+  -- bonds that matured between quarter closes (or after a downtime)
+  if exists (select 1 from public.bonds bd join public.securities s on s.id = bd.security_id
+              where s.status = 'listed' and bd.matures_at <= v_now) then
+    v_result := v_result || jsonb_build_object('bonds_redeemed', public.redeem_matured_bonds(v_now));
+  end if;
+  v_result := v_result || jsonb_build_object('bonds_issued', public.ensure_bond_series());
+
+  -- jobs: AI postings of the running quarter, wages of AI-company jobs in whole hours
+  v_result := v_result || jsonb_build_object('quit_notices', public.process_quit_notices(null));
+  v_result := v_result || jsonb_build_object('share_offers', public.close_due_offers(null));
+  v_result := v_result || jsonb_build_object('job_postings', public.refresh_ai_job_postings(),
+                                             'salaries_paid', public.accrue_salaries(null));
+
+  -- artworks (ADR-080): due auctions are settled, the gallery starts the auctions of the day
+  v_result := v_result || jsonb_build_object('artworks', public.artworks_run_due());
+
+  -- rich list snapshot every richList.snapshotMinutes (rank news, 24 h changes, state missions)
+  v_result := v_result || jsonb_build_object('rich_list', public.rich_list_snapshot(false));
+
+  -- daily maintenance (first run per UTC day)
+  insert into public.job_runs (job_name, run_key) values ('maintenance', to_char(now() at time zone 'UTC', 'YYYY-MM-DD'))
+  on conflict (job_name, run_key) do nothing
+  returning id into v_run;
+  if v_run is not null then
+    v_result := v_result || jsonb_build_object('maintenance', public.run_maintenance());
+    -- price_ticks: keep about one day (candles hold the history), cron log: one day
+    perform public.maintain_price_tick_partitions(3, 1);
+    if to_regclass('cron.job_run_details') is not null then
+      begin
+        execute 'delete from cron.job_run_details where end_time < now() - interval ''1 day''';
+      exception when others then
+        raise warning 'NEXA: could not prune cron.job_run_details: %', sqlerrm;
+      end;
+    end if;
+    delete from public.job_runs j where j.job_name = 'maintenance' and j.started_at < now() - interval '30 days';
+    update public.job_runs set status = 'succeeded', finished_at = now() where id = v_run;
+  end if;
+  return v_result;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- L. Unlock row (seed.sql has it too; levels exist only after seed.sql on a new database)
+-- ---------------------------------------------------------------------------
+insert into public.unlocks (key, level, title, description, icon_key, intro_mission_key, sort_order)
+select 'artworks', 8, 'Artworks', 'Male eigene Pixel-Kunst, sammle Unikate und biete in Auktionen mit.', 'unlock_art', null, 81
+ where exists (select 1 from public.levels l where l.level = 8)
+on conflict (key) do nothing;
+insert into public.player_unlocks (player_id, unlock_key)
+select p.id, 'artworks' from public.profiles p
+ where p.level >= 8 and exists (select 1 from public.unlocks u where u.key = 'artworks')
+on conflict do nothing;
+
+-- ---------------------------------------------------------------------------
+-- M. Grants
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.artworks_assign_serial()', 'public.api_error(text)', 'public.artwork_valid(jsonb)',
+    'public.artwork_create_cost_cents(integer)', 'public.artwork_min_bid_cents(bigint, bigint)',
+    'public.artwork_hot(bigint, bigint, timestamptz, timestamptz)', 'public.artwork_code(bigint)',
+    'public.artwork_title_violation(text)', 'public.artworks_require_unlock(uuid)', 'public.player_art_value_cents(uuid)',
+    'public.artwork_gallery_start_cents(text)', 'public.artwork_json(uuid, uuid)', 'public.artwork_settle_auction(uuid)',
+    'public.artworks_gallery_schedule(timestamptz)', 'public.artworks_run_due()', 'public.artworks_wipe_player(uuid, text)',
+    'public.get_artworks(text, text, boolean, integer, integer)', 'public.get_artwork(uuid)', 'public.get_art_studio()',
+    'public.get_art_rankings(integer)', 'public.get_collection(text)', 'public.create_artwork(uuid, text, jsonb)',
+    'public.like_artwork(uuid, uuid, boolean)', 'public.start_auction(uuid, uuid, bigint, integer)',
+    'public.cancel_auction(uuid, uuid)', 'public.bid_artwork(uuid, uuid, bigint)',
+    'public.player_net_worth_cents(uuid)', 'public.rich_list_entries()', 'public.account_wipe(uuid, text)',
+    'public.run_due_jobs()'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+    execute format('grant execute on function %s to service_role', f);
+  end loop;
+  foreach f in array array[
+    'public.get_artworks(text, text, boolean, integer, integer)', 'public.get_artwork(uuid)', 'public.get_art_studio()',
+    'public.get_art_rankings(integer)', 'public.get_collection(text)', 'public.create_artwork(uuid, text, jsonb)',
+    'public.like_artwork(uuid, uuid, boolean)', 'public.start_auction(uuid, uuid, bigint, integer)',
+    'public.cancel_auction(uuid, uuid)', 'public.bid_artwork(uuid, uuid, bigint)'
+  ] loop
+    execute format('grant execute on function %s to authenticated', f);
+  end loop;
+end;
+$$;
+-- ===== idempotent copy of migrations/20261122000200_m4a_missions.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · M4a · 0200 · More missions: trading, jobs, skills, company, streak,
+--                     profiles and artworks
+-- =============================================================================
+-- New metrics (mission_event):
+--   work_hours          paid work hours (sum; player_jobs.experience_minutes crosses an hour)
+--   raise               salary raise in the running job (player_jobs.salary_cents_per_hour rises)
+--   skill_learned       a skill learned (player_skills insert)
+--   ai_worker_hired     AI workers hired (sum; player_companies.ai_workers rises, founder)
+--   job_posted          a job posting of a player company (job_postings insert, poster or founder)
+--   profitable_hour     an operating hour of the own company with profit > 0 (founder)
+--   company_deposit     a deposit into the own company's cash (company_deposit)
+--   view_profile        a foreign player profile opened (track_event, distinct nicknames)
+--   art_like, art_bid, art_won, art_sold, art_painted, art_auction_started (artwork RPCs, ADR-080)
+-- New state metrics (mission_state_value): login_streak, skills_total, art_collection_value
+-- (money), art_owned.
+-- params.requires ('job', 'company', 'skill_point', 'artwork'): the mission is only offered
+-- while the player has it (missions_assign). Feature gates stay in params.unlock.
+-- Idempotent (identical copy in supabase/updates/).
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- A. Templates (base XP; claim_mission applies progression.xpMultiplier)
+-- ---------------------------------------------------------------------------
+insert into public.mission_templates
+  (key, kind, title, description, icon_key, metric, mode, params, target_min, target_max, xp_min, xp_max, min_level, chain_order,
+   scale_with_level, weight, reward_skill_points)
+values
+  -- quick (base XP 20-60)
+  ('q_trades_3',        'quick', 'Mach {target} Trades',                       'Kauf oder Verkauf, egal welches Wertpapier.',               'mission_trade',   'trade',               'count',    '{}',                                        3, 3, 40, 60, 1, null, false, 60, 0),
+  ('q_sectors_2',       'quick', 'Kaufe Aktien aus {target} Branchen',         'Zwei verschiedene Branchen reichen.',                       'mission_sectors', 'sectors_bought',      'distinct', '{}',                                        2, 2, 40, 60, 1, null, false, 50, 0),
+  ('q_view_profile',    'quick', 'Sieh dir ein Spielerprofil an',              'Tippe auf einen Namen, zum Beispiel in der Reichenliste.',  'mission_growth',  'view_profile',        'distinct', '{}',                                        1, 1, 20, 30, 1, null, false, 60, 0),
+  ('q_learn_skill',     'quick', 'Lerne eine Fähigkeit',                       'Setze einen freien Fähigkeitspunkt ein.',                   'mission_skill',   'skill_learned',       'count',    '{"requires":"skill_point"}',                1, 1, 40, 60, 2, null, false, 60, 0),
+  ('q_deposit',         'quick', 'Zahle Geld in deine Firmenkasse ein',        'Jede Einlage zählt.',                                       'mission_company', 'company_deposit',     'count',    '{"unlock":"found_garage","requires":"company"}', 1, 1, 30, 50, 3, null, false, 50, 0),
+  ('q_ai_worker',       'quick', 'Stelle eine KI-Kraft ein',                   'KI-Kräfte arbeiten rund um die Uhr in deiner Firma.',       'mission_company', 'ai_worker_hired',     'sum',      '{"unlock":"found_garage","requires":"company"}', 1, 1, 40, 60, 3, null, false, 40, 0),
+  ('q_art_like',        'quick', 'Like ein Kunstwerk',                         'Auf dem Kunstmarkt, egal ob Galerie oder Spieler.',         'mission_art',     'art_like',            'distinct', '{"unlock":"artworks"}',                     1, 1, 20, 30, 8, null, false, 60, 0),
+  ('q_art_bid',         'quick', 'Biete auf ein Kunstwerk',                    'Jedes gültige Gebot zählt.',                                'mission_art',     'art_bid',             'count',    '{"unlock":"artworks"}',                     1, 1, 40, 60, 8, null, false, 50, 0),
+
+  -- daily (base XP 200-400)
+  ('d_trades_10',       'daily', 'Mach heute {target} Trades',                 'Jede ausgeführte Order zählt.',                             'mission_trade',   'trade',               'count',    '{}',                                        8, 12, 300, 400, 1, null, false, 60, 0),
+  ('d_buys',            'daily', 'Kaufe heute {target}-mal',                   'Auch Bruchstücke zählen.',                                  'mission_trade',   'buy',                 'count',    '{}',                                        3, 4, 200, 300, 1, null, false, 70, 0),
+  ('d_buy_pharma',      'daily', 'Kaufe {target} Aktien aus der Branche Pharma','Zwei Käufe, auch derselben Aktie.',                        'mission_sectors', 'buy_sector',          'count',    '{"sector":"pharma"}',                       2, 2, 250, 300, 1, null, false, 30, 0),
+  ('d_buy_retail',      'daily', 'Kaufe {target} Aktien aus dem Einzelhandel', 'Zwei Käufe, auch derselben Aktie.',                         'mission_sectors', 'buy_sector',          'count',    '{"sector":"retail"}',                       2, 2, 250, 300, 1, null, false, 30, 0),
+  ('d_buy_logistics',   'daily', 'Kaufe {target} Aktien aus der Logistik',     'Zwei Käufe, auch derselben Aktie.',                         'mission_sectors', 'buy_sector',          'count',    '{"sector":"logistics"}',                    2, 2, 250, 300, 1, null, false, 30, 0),
+  ('d_rich_list',       'daily', 'Schau auf der Reichenliste vorbei',          'Wer hat dich überholt, wen kannst du einholen?',            'mission_growth',  'open_rich_list',      'count',    '{}',                                        1, 1, 200, 200, 1, null, false, 30, 0),
+  ('d_view_profiles',   'daily', 'Sieh dir {target} Spielerprofile an',        'Verschiedene Spieler, zum Beispiel aus der Reichenliste.',  'mission_growth',  'view_profile',        'distinct', '{}',                                        3, 3, 200, 250, 1, null, false, 50, 0),
+  ('d_work_hours',      'daily', 'Arbeite heute {target} Stunden',             'Dein Job läuft automatisch, du musst nur angestellt sein.', 'mission_work',    'work_hours',          'sum',      '{"unlock":"first_job","requires":"job"}',   3, 6, 200, 300, 2, null, false, 80, 0),
+  ('d_profit_hours',    'daily', 'Erziele heute {target} Stunden mit Gewinn',  'Betriebsstunden deiner Firma, die Gewinn bringen.',         'mission_company', 'profitable_hour',     'count',    '{"unlock":"found_garage","requires":"company"}', 3, 6, 250, 350, 3, null, false, 70, 0),
+  ('d_art_likes',       'daily', 'Like {target} Kunstwerke',                   'Verschiedene Werke auf dem Kunstmarkt.',                    'mission_art',     'art_like',            'distinct', '{"unlock":"artworks"}',                     3, 3, 200, 250, 8, null, false, 60, 0),
+  ('d_art_bids',        'daily', 'Gib {target} Gebote auf Kunstwerke ab',      'Auch mehrere Gebote auf dasselbe Werk zählen.',             'mission_art',     'art_bid',             'count',    '{"unlock":"artworks"}',                     2, 3, 250, 350, 8, null, false, 50, 0),
+
+  -- weekly (base XP 600-1200)
+  ('w_sells',           'weekly', 'Verkaufe diese Woche {target}-mal',         'Teilverkäufe zählen auch.',                                 'mission_trade',   'sell',                'count',    '{}',                                       10, 10, 700, 900, 1, null, false, 60, 1),
+  ('w_buy_value',       'weekly', 'Kaufe in einer Order für mindestens {target}','Eine einzige große Order.',                               'mission_volume',  'buy_value',           'max',      '{}',                                   200000, 200000, 700, 1000, 1, null, true, 50, 1),
+  ('w_profiles',        'weekly', 'Sieh dir {target} Spielerprofile an',       'Verschiedene Spieler in dieser Woche.',                     'mission_growth',  'view_profile',        'distinct', '{}',                                       10, 10, 600, 700, 1, null, false, 40, 1),
+  ('w_streak',          'weekly', 'Halte eine Serie von {target} Tagen',       'Hol dir jeden Tag deinen Tagesbonus.',                      'mission_bell',    'login_streak',        'state',    '{}',                                        5, 5, 700, 900, 1, null, false, 60, 1),
+  ('w_work_hours',      'weekly', 'Arbeite diese Woche {target} Stunden',      'Bezahlte Arbeitsstunden in deinem Job.',                    'mission_work',    'work_hours',          'sum',      '{"unlock":"first_job","requires":"job"}',  20, 40, 700, 1000, 2, null, false, 80, 1),
+  ('w_raise',           'weekly', 'Hol dir eine Gehaltserhöhung',              'Frag im Job-Tab nach mehr Gehalt.',                         'mission_work',    'raise',               'count',    '{"unlock":"first_job","requires":"job"}',   1, 1, 800, 1000, 2, null, false, 50, 1),
+  ('w_skills',          'weekly', 'Lerne diese Woche {target} Fähigkeiten',    'Freie Punkte gibt es mit jedem Level.',                     'mission_skill',   'skill_learned',       'count',    '{"requires":"skill_point"}',                2, 2, 700, 900, 3, null, false, 50, 1),
+  ('w_profit_hours',    'weekly', 'Erziele diese Woche {target} Stunden mit Gewinn', 'Betriebsstunden deiner Firma, die Gewinn bringen.',   'mission_company', 'profitable_hour',     'count',    '{"unlock":"found_garage","requires":"company"}', 20, 30, 800, 1100, 3, null, false, 70, 1),
+  ('w_ai_workers',      'weekly', 'Stelle diese Woche {target} KI-Kräfte ein', 'Mehr Kapazität für deine Firma.',                           'mission_company', 'ai_worker_hired',     'sum',      '{"unlock":"found_garage","requires":"company"}', 2, 2, 700, 900, 3, null, false, 40, 1),
+  ('w_job_posting',     'weekly', 'Schreibe eine Stelle aus',                  'Suche Verstärkung für deine Firma.',                        'mission_company', 'job_posted',          'count',    '{"unlock":"found_garage","requires":"company"}', 1, 1, 600, 800, 3, null, false, 40, 1),
+  ('w_art_bids',        'weekly', 'Gib diese Woche {target} Gebote ab',        'Auf beliebige Kunstwerke.',                                 'mission_art',     'art_bid',             'count',    '{"unlock":"artworks"}',                     5, 5, 700, 900, 8, null, false, 60, 1),
+  ('w_art_win',         'weekly', 'Ersteigere ein Kunstwerk',                  'Sei am Ende einer Auktion Höchstbietender.',                'mission_art',     'art_won',             'count',    '{"unlock":"artworks"}',                     1, 1, 900, 1200, 8, null, false, 50, 1),
+  ('w_art_auction',     'weekly', 'Versteigere ein Kunstwerk',                 'Biete eines deiner Werke in einer Auktion an.',             'mission_art',     'art_auction_started', 'count',    '{"unlock":"artworks","requires":"artwork"}', 1, 1, 600, 800, 8, null, false, 40, 1),
+
+  -- milestones (base XP 100-2000), woven into the story chain (chain_order)
+  ('m_first_skill',     'milestone', 'Lerne deine erste Fähigkeit',            'Setze einen Fähigkeitspunkt auf der Skill-Karte ein.',      'mission_skill',   'skill_learned',       'count',    '{"requires":"skill_point"}',                1, 1, 150, 150, 2, 5, false, 100, 1),
+  ('m_first_hours',     'milestone', 'Arbeite deine ersten {target} Stunden',  'Dein Job läuft automatisch.',                               'mission_work',    'work_hours',          'sum',      '{"unlock":"first_job"}',                    8, 8, 300, 300, 2, 7, false, 100, 1),
+  ('m_streak_7',        'milestone', 'Halte eine Serie von {target} Tagen',    'Jeden Tag ein Tagesbonus.',                                 'mission_bell',    'login_streak',        'state',    '{}',                                        7, 7, 400, 400, 1, 9, false, 100, 1),
+  ('m_first_raise',     'milestone', 'Deine erste Gehaltserhöhung',            'Frag im Job-Tab nach mehr Gehalt.',                         'mission_work',    'raise',               'count',    '{"unlock":"first_job","requires":"job"}',   1, 1, 400, 400, 2, 10, false, 100, 1),
+  ('m_first_ai_worker', 'milestone', 'Deine erste KI-Kraft',                   'Stelle in deiner Firma eine KI-Kraft ein.',                 'mission_company', 'ai_worker_hired',     'sum',      '{"unlock":"found_garage","requires":"company"}', 1, 1, 400, 400, 3, 11, false, 100, 1),
+  ('m_skills_5',        'milestone', 'Lerne {target} Fähigkeiten',             'Insgesamt, auf der Skill-Karte.',                           'mission_skill',   'skills_total',        'state',    '{}',                                        5, 5, 600, 600, 2, 12, false, 100, 1),
+  ('m_first_posting',   'milestone', 'Deine erste Stellenanzeige',             'Suche Mitarbeiter für deine Firma.',                        'mission_company', 'job_posted',          'count',    '{"unlock":"found_garage","requires":"company"}', 1, 1, 400, 400, 3, 13, false, 100, 1),
+  ('m_art_first_like',  'milestone', 'Like dein erstes Kunstwerk',             'Zeig, welche Werke dir gefallen.',                          'mission_art',     'art_like',            'distinct', '{"unlock":"artworks"}',                     1, 1, 150, 150, 8, 14, false, 100, 1),
+  ('m_art_first_bid',   'milestone', 'Dein erstes Gebot auf ein Kunstwerk',    'Die Galerie versteigert jeden Tag neue Werke.',             'mission_art',     'art_bid',             'count',    '{"unlock":"artworks"}',                     1, 1, 300, 300, 8, 15, false, 100, 1),
+  ('m_art_first_win',   'milestone', 'Ersteigere dein erstes Kunstwerk',       'Sei am Ende einer Auktion Höchstbietender.',                'mission_art',     'art_won',             'count',    '{"unlock":"artworks"}',                     1, 1, 800, 800, 8, 16, false, 100, 1),
+  ('m_art_paint',       'milestone', 'Male dein erstes Kunstwerk',             'Im Kunst-Editor, 32 × 32 Pixel.',                           'mission_art',     'art_painted',         'count',    '{"unlock":"artworks"}',                     1, 1, 1000, 1000, 8, 17, false, 100, 1),
+  ('m_work_100',        'milestone', 'Arbeite {target} Stunden',               'Seit diese Mission sichtbar ist.',                          'mission_work',    'work_hours',          'sum',      '{"unlock":"first_job"}',                  100, 100, 1000, 1000, 2, 18, false, 100, 1),
+  ('m_profit_100',      'milestone', 'Erziele {target} Stunden mit Gewinn',    'Betriebsstunden deiner Firma, die Gewinn bringen.',         'mission_company', 'profitable_hour',     'count',    '{"unlock":"found_garage","requires":"company"}', 100, 100, 1200, 1200, 3, 19, false, 100, 1),
+  ('m_art_collection',  'milestone', 'Baue eine Sammlung im Wert von {target} auf', 'Wert = letzter Auktionspreis deiner Werke.',           'mission_art',     'art_collection_value','state',    '{"unlock":"artworks"}',              10000000, 10000000, 1500, 1500, 8, 22, false, 100, 1),
+  ('m_streak_30',       'milestone', 'Halte eine Serie von {target} Tagen',    'Einen ganzen Monat lang.',                                  'mission_bell',    'login_streak',        'state',    '{}',                                       30, 30, 1500, 1500, 1, 24, false, 100, 1)
+on conflict (key) do update
+   set kind = excluded.kind, title = excluded.title, description = excluded.description, icon_key = excluded.icon_key,
+       metric = excluded.metric, mode = excluded.mode, params = excluded.params, target_min = excluded.target_min,
+       target_max = excluded.target_max, xp_min = excluded.xp_min, xp_max = excluded.xp_max, min_level = excluded.min_level,
+       chain_order = excluded.chain_order, scale_with_level = excluded.scale_with_level, weight = excluded.weight,
+       reward_skill_points = excluded.reward_skill_points, is_active = true;
+
+-- ---------------------------------------------------------------------------
+-- B. Metrics: money formatting, state values, requirements
+-- ---------------------------------------------------------------------------
+create or replace function public.mission_is_money_metric(p_metric text)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select p_metric in ('trade_value', 'buy_value', 'realized_profit', 'net_worth', 'art_collection_value');
+$$;
+
+-- mission_state_value as in M2a plus login_streak, skills_total, art_collection_value, art_owned
+create or replace function public.mission_state_value(p_player uuid, p_metric text, p_params jsonb, p_state jsonb)
+returns bigint
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_rank integer;
+begin
+  case p_metric
+    when 'net_worth' then
+      return public.player_net_worth_cents(p_player);
+    when 'level' then
+      return (select p.level from public.profiles p where p.id = p_player);
+    when 'sectors_held' then
+      return (select count(distinct s.sector_key) from public.positions pos join public.securities s on s.id = pos.security_id
+               where pos.player_id = p_player and pos.status = 'open' and pos.quantity_e6 > 0 and s.kind = 'stock');
+    when 'rich_rank' then
+      v_rank := public.player_rich_rank(p_player);
+      return case when v_rank is not null and v_rank <= coalesce((p_params ->> 'rank')::integer, 1) then 1 else 0 end;
+    when 'rich_rank_improve' then
+      v_rank := public.player_rich_rank(p_player);
+      return case when v_rank is not null and (p_state ->> 'baseline_rank') is not null
+                       and v_rank < (p_state ->> 'baseline_rank')::integer then 1 else 0 end;
+    when 'login_streak' then
+      return coalesce(public.player_streak_days(p_player), 0);
+    when 'skills_total' then
+      return (select count(*) from public.player_skills s where s.player_id = p_player);
+    when 'art_collection_value' then
+      return public.player_art_value_cents(p_player);
+    when 'art_owned' then
+      return (select count(*) from public.artworks a where a.owner_id = p_player);
+    else
+      return 0;
+  end case;
+end;
+$$;
+
+-- params.requires: the mission is only offered while the player has what it needs
+create or replace function public.mission_requirement_ok(p_player uuid, p_requires text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case coalesce(p_requires, '')
+           when '' then true
+           when 'job' then exists (select 1 from public.player_jobs j where j.player_id = p_player and j.status = 'active')
+           when 'company' then exists (select 1 from public.player_companies pc where pc.founder_id = p_player and pc.status = 'active')
+           when 'skill_point' then coalesce((select sp.free_points > 0 from public.player_skill_points sp where sp.player_id = p_player), false)
+           when 'artwork' then exists (select 1 from public.artworks a where a.owner_id = p_player
+                                         and not exists (select 1 from public.artwork_auctions x
+                                                          where x.artwork_id = a.id and x.status = 'open'))
+           else false end;
+$$;
+comment on function public.mission_requirement_ok(uuid, text) is
+  'Internal: mission_templates.params.requires (job, company, skill_point, artwork) is met by the player.';
+
+-- ---------------------------------------------------------------------------
+-- C. missions_assign as in M2a plus params.requires
+-- ---------------------------------------------------------------------------
+create or replace function public.missions_assign(p_player uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_prog     jsonb := coalesce(public.config_jsonb('progression'), '{}'::jsonb);
+  v_now      timestamptz := public.game_now();
+  v_today    date := (public.game_now() at time zone 'Europe/Berlin')::date;
+  v_monday   date;
+  v_level    integer;
+  v_scale    double precision;
+  v_need     integer;
+  v_n        integer := 0;
+  v_kind     text;
+  v_period   date;
+  v_expires  timestamptz;
+  v_rank     integer;
+  t          record;
+begin
+  v_monday := v_today - (extract(isodow from v_today)::integer - 1);
+  select p.level into v_level from public.profiles p where p.id = p_player for update;
+  if v_level is null then
+    return 0;
+  end if;
+  v_scale := least(public.cfg_num(v_prog, '{missionTargetScaleMax}', 5),
+                   1 + public.cfg_num(v_prog, '{missionTargetScalePerLevel}', 0.2) * (v_level - 1));
+
+  -- expire what ran out
+  update public.player_missions set status = 'expired'
+   where player_id = p_player and status in ('active', 'completed') and expires_at is not null and expires_at <= v_now;
+
+  foreach v_kind in array array['quick', 'daily', 'weekly', 'milestone'] loop
+    if v_kind = 'quick' then
+      v_need := public.cfg_num(v_prog, '{xpSources,quickMission,active}', 3)::integer
+              - (select count(*) from public.player_missions m where m.player_id = p_player and m.kind = 'quick' and m.status in ('active', 'completed'));
+      v_period := v_today; v_expires := null;
+    elsif v_kind = 'daily' then
+      v_need := public.cfg_num(v_prog, '{xpSources,dailyMission,perDay}', 3)::integer
+              - (select count(*) from public.player_missions m where m.player_id = p_player and m.kind = 'daily' and m.period_start = v_today);
+      v_period := v_today; v_expires := ((v_today + 1)::timestamp) at time zone 'Europe/Berlin';
+    elsif v_kind = 'weekly' then
+      v_need := public.cfg_num(v_prog, '{xpSources,weeklyMission,perWeek}', 3)::integer
+              - (select count(*) from public.player_missions m where m.player_id = p_player and m.kind = 'weekly' and m.period_start = v_monday);
+      v_period := v_monday; v_expires := ((v_monday + 7)::timestamp) at time zone 'Europe/Berlin';
+    else
+      v_need := public.cfg_num(v_prog, '{xpSources,milestoneMission,visible}', 3)::integer
+              - (select count(*) from public.player_missions m where m.player_id = p_player and m.kind = 'milestone' and m.status in ('active', 'completed'));
+      v_period := date '2000-01-01'; v_expires := null;
+    end if;
+    continue when v_need <= 0;
+
+    for t in
+      select mt.*
+        from public.mission_templates mt
+       where mt.kind = v_kind and mt.mode is not null and mt.is_active
+         and mt.min_level <= v_level
+         and (not (mt.params ? 'unlock') or v_level >= public.unlock_level(mt.params ->> 'unlock'))
+         and public.mission_requirement_ok(p_player, mt.params ->> 'requires')
+         and not exists (select 1 from public.player_missions m
+                          where m.player_id = p_player and m.template_key = mt.key
+                            and (m.period_start = v_period
+                                 or (v_kind = 'quick' and (m.status in ('active', 'completed') or m.created_at > v_now - interval '24 hours'))
+                                 or v_kind = 'milestone'))
+       order by case when v_kind = 'milestone' then mt.chain_order end,
+                -ln(1 - random()) / greatest(mt.weight, 1)
+       limit v_need
+    loop
+      if t.metric = 'rich_rank_improve' then
+        v_rank := public.player_rich_rank(p_player);
+        continue when v_rank is null or v_rank <= 1;
+      end if;
+      insert into public.player_missions (player_id, template_key, kind, period_start, target, xp_reward, expires_at, state)
+      values (p_player, t.key, v_kind, v_period,
+              case when t.scale_with_level and public.mission_is_money_metric(t.metric)
+                   then round((t.target_min + floor(random() * (t.target_max - t.target_min + 1))) * v_scale / 100)::bigint * 100
+                   else t.target_min + floor(random() * (t.target_max - t.target_min + 1))::bigint end,
+              t.xp_min + floor(random() * (t.xp_max - t.xp_min + 1))::integer,
+              v_expires,
+              case when t.metric = 'rich_rank_improve' then jsonb_build_object('baseline_rank', v_rank) else '{}'::jsonb end)
+      on conflict (player_id, template_key, period_start) do nothing;
+      if found then
+        v_n := v_n + 1;
+      end if;
+    end loop;
+  end loop;
+  if v_n > 0 then
+    perform public.mission_refresh_state(p_player);
+  end if;
+  return v_n;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- D. Events from tables (every code path that changes them counts)
+-- ---------------------------------------------------------------------------
+create or replace function public.mission_metric_trigger()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+begin
+  if tg_table_name = 'player_jobs' then
+    if new.experience_minutes / 60 > old.experience_minutes / 60 then
+      perform public.mission_event(new.player_id, 'work_hours', new.experience_minutes / 60 - old.experience_minutes / 60, null);
+    end if;
+    if new.salary_cents_per_hour > old.salary_cents_per_hour and new.status = 'active' and old.status = 'active' then
+      perform public.mission_event(new.player_id, 'raise', 1, null);
+    end if;
+  elsif tg_table_name = 'player_skills' then
+    perform public.mission_event(new.player_id, 'skill_learned', 1, new.skill_key);
+  elsif tg_table_name = 'player_companies' then
+    perform public.mission_event(new.founder_id, 'ai_worker_hired', new.ai_workers - old.ai_workers, null);
+  elsif tg_table_name = 'job_postings' then
+    -- the founder or CEO who posted it (auth.uid() inside the RPC), else the founder
+    v_player := (select auth.uid());
+    if v_player is null or not exists (select 1 from public.profiles p where p.id = v_player) then
+      select pc.founder_id into v_player from public.player_companies pc where pc.company_id = new.company_id;
+    end if;
+    perform public.mission_event(v_player, 'job_posted', 1, null);
+  elsif tg_table_name = 'player_company_hours' then
+    select pc.founder_id into v_player from public.player_companies pc where pc.company_id = new.company_id;
+    perform public.mission_event(v_player, 'profitable_hour', 1, null);
+  end if;
+  return null;
+end;
+$$;
+comment on function public.mission_metric_trigger() is
+  'Mission events from table changes: work_hours, raise, skill_learned, ai_worker_hired, job_posted, profitable_hour.';
+
+drop trigger if exists mission_metrics on public.player_jobs;
+create trigger mission_metrics
+  after update of experience_minutes, salary_cents_per_hour on public.player_jobs
+  for each row
+  when (new.experience_minutes / 60 > old.experience_minutes / 60 or new.salary_cents_per_hour > old.salary_cents_per_hour)
+  execute function public.mission_metric_trigger();
+drop trigger if exists mission_metrics on public.player_skills;
+create trigger mission_metrics
+  after insert on public.player_skills
+  for each row execute function public.mission_metric_trigger();
+drop trigger if exists mission_metrics on public.player_companies;
+create trigger mission_metrics
+  after update of ai_workers on public.player_companies
+  for each row when (new.ai_workers > old.ai_workers)
+  execute function public.mission_metric_trigger();
+drop trigger if exists mission_metrics on public.job_postings;
+create trigger mission_metrics
+  after insert on public.job_postings
+  for each row when (not new.is_ai)
+  execute function public.mission_metric_trigger();
+drop trigger if exists mission_metrics on public.player_company_hours;
+create trigger mission_metrics
+  after insert on public.player_company_hours
+  for each row when (new.profit_cents > 0)
+  execute function public.mission_metric_trigger();
+
+-- ---------------------------------------------------------------------------
+-- E. company_deposit as in M3c plus the mission event
+-- ---------------------------------------------------------------------------
+create or replace function public.company_deposit(p_request_id uuid, p_amount_cents bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid;
+  v_player  uuid;
+  v_replay  jsonb;
+  v_cash    bigint;
+begin
+  v_company := public.require_own_company();
+  v_player := public.require_player();
+  if p_request_id is null or p_amount_cents is null or p_amount_cents < 1 then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'company_deposit');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  perform public.lock_player_accounts(v_player);
+  select a.balance_cents into v_cash from public.ledger_accounts a where a.owner_player_id = v_player and a.kind = 'player_cash';
+  if coalesce(v_cash, 0) < p_amount_cents then
+    perform public.api_error('insufficient_funds');
+  end if;
+  perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'), public.company_cash_account(v_company),
+                                 p_amount_cents, 'capital_injection', 'Einlage', 'company', v_company,
+                                 'deposit:' || p_request_id::text, v_player);
+  perform public.player_company_settle_unpaid(v_company, 'deposit-settle:' || p_request_id::text);
+  perform public.mission_event(v_player, 'company_deposit', 1, null);
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('company', public.company_state(v_company)));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- F. track_event as in M2a plus view_profile (ref: nickname of another player)
+-- ---------------------------------------------------------------------------
+create or replace function public.track_event(p_kind text, p_ref text default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_cap    integer;
+  v_ref    text := null;
+begin
+  v_player := public.require_player();
+  v_cap := case p_kind when 'view_security' then 50 when 'open_rich_list' then 20 when 'open_rules' then 20
+                       when 'view_profile' then 50 end;
+  if v_cap is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  if p_kind = 'view_security' then
+    select s.ticker into v_ref from public.securities s where s.id = public.resolve_security(p_ref);
+    if v_ref is null then
+      return jsonb_build_object('ok', true);
+    end if;
+  elsif p_kind = 'view_profile' then
+    select lower(p.nickname) into v_ref from public.profiles p
+     where lower(p.nickname) = lower(btrim(coalesce(p_ref, ''))) and p.id <> v_player;
+    if v_ref is null then
+      return jsonb_build_object('ok', true);
+    end if;
+  end if;
+  if public.rate_limit_hit(v_player, 'track:' || p_kind, v_cap, 86400) then
+    perform public.mission_event(v_player, p_kind, 1, v_ref);
+  end if;
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- G. Grants
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.mission_is_money_metric(text)', 'public.mission_state_value(uuid, text, jsonb, jsonb)',
+    'public.mission_requirement_ok(uuid, text)', 'public.missions_assign(uuid)', 'public.mission_metric_trigger()',
+    'public.company_deposit(uuid, bigint)', 'public.track_event(text, text)'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+    execute format('grant execute on function %s to service_role', f);
+  end loop;
+  grant execute on function public.company_deposit(uuid, bigint) to authenticated;
+  grant execute on function public.track_event(text, text) to authenticated;
+end;
+$$;
 
 -- ===== game_config (current values, overwriting older ones) =====
 -- GENERATED by scripts/gen-config-seed.ts from src/config/balance.ts. Do not edit by hand.
@@ -20171,7 +21980,7 @@ insert into public.game_config (key, value, description) values
   ('loans', '{"basePremiumBps":150,"reputationBpsPerPoint":4,"leverageBpsPerDebtToEquity":150,"maxLeveragePremiumBps":600,"lossMakingPremiumBps":200,"coverageDiscountBpsPerTurn":10,"maxCoverageDiscountBps":100,"cfoDiscountBpsPerSkill":10,"minPremiumBps":50,"maxPremiumBps":1500,"creditLinesByLevel":[{"level":15,"limitCents":5000000},{"level":20,"limitCents":25000000},{"level":25,"limitCents":200000000}],"creditLineReputationFactorMin":0.5,"creditLineReputationFactorMax":1.5}'::jsonb, 'Defaults from src/config/balance.ts, section "loans"'),
   ('employees', '{"minSkill":1,"maxSkill":10,"skillCapacityExponent":1.1,"salaryBaseCentsPerQuarter":18500,"salarySkillExponent":1.3,"playerProductivityMultiplier":2,"traits":[{"key":"ambitious","performanceMultiplier":1.15,"salaryMultiplier":1,"loyaltyDecayMultiplier":2},{"key":"loyal","performanceMultiplier":1,"salaryMultiplier":1,"loyaltyDecayMultiplier":0.5},{"key":"frugal","performanceMultiplier":1,"salaryMultiplier":0.9,"loyaltyDecayMultiplier":1},{"key":"genius","performanceMultiplier":1.25,"salaryMultiplier":1.3,"loyaltyDecayMultiplier":1.2},{"key":"easygoing","performanceMultiplier":0.92,"salaryMultiplier":0.95,"loyaltyDecayMultiplier":0.7},{"key":"mentor","performanceMultiplier":1.05,"salaryMultiplier":1.1,"loyaltyDecayMultiplier":0.8}],"loyalty":{"start":70,"quitThreshold":25,"decayPerQuarterOnSalaryFreeze":3,"gainPerQuarterOnRaise":8,"poachingSalaryPremiumBps":2000},"leadership":{"cooCapacityBonusPerSkill":0.015,"ctoDevelopmentTimeReductionPerSkill":0.03,"headOfSalesBoostPerSkill":0.02,"cfoGuidanceBandReductionPerSkill":0.02},"applicantPoolSize":6,"insiderLockHours":2,"insiderDetectionProbability":0.6,"insiderFineBps":15000,"maxSideRoles":1,"optionVestingQuarters":4}'::jsonb, 'Defaults from src/config/balance.ts, section "employees"'),
   ('careers', '{"tiers":[{"id":"intern","minLevel":2,"salaryCentsPerHour":15000,"stockOptions":false},{"id":"junior","minLevel":5,"salaryCentsPerHour":30000,"stockOptions":false},{"id":"senior","minLevel":12,"salaryCentsPerHour":70000,"stockOptions":false},{"id":"team_lead","minLevel":20,"salaryCentsPerHour":130000,"stockOptions":false},{"id":"c_level","minLevel":25,"salaryCentsPerHour":250000,"stockOptions":true}],"paidHoursPerDayCap":12,"playerCompanyExperienceMultiplier":2,"promotionSteps":[{"experienceHours":24,"raiseBps":1000},{"experienceHours":72,"raiseBps":1250},{"experienceHours":168,"raiseBps":1500},{"experienceHours":336,"raiseBps":2000}],"negotiation":{"cooldownDays":7,"baseSuccessProbability":0.3,"successPerExperienceHour":0.002,"maxSuccessProbability":0.85,"raiseMinBps":500,"raiseMaxBps":1200},"jobSwitch":{"raiseMinBps":1500,"raiseMaxBps":3000},"workTask":{"intervalHours":3,"bonusSalaryHours":1,"expiresHours":3,"fastAnswerSeconds":45}}'::jsonb, 'Defaults from src/config/balance.ts, section "careers"'),
-  ('progression', '{"firstLevelXp":100,"xpBase":250,"xpExponent":1.5,"maxLevel":10000,"prestige":{"fromLevel":50,"titleEveryLevels":10},"missionTargetScalePerLevel":0.2,"missionTargetScaleMax":5,"xpMultiplier":2,"xpSources":{"trade":{"xp":10,"maxTradesPerDay":30,"minOrderValueCents":10000},"profitableClose":{"profitCentsPerXp":10000,"maxXpPerTrade":500},"workHour":{"xp":40,"playerCompanyMultiplier":1.5,"maxHoursPerDay":12},"workTask":{"minXp":50,"maxXp":150},"dailyMission":{"minXp":200,"maxXp":400,"perDay":3},"quickMission":{"minXp":20,"maxXp":60,"active":3},"weeklyMission":{"minXp":600,"maxXp":1200,"perWeek":3},"milestoneMission":{"minXp":100,"maxXp":2000,"visible":3},"dailyLogin":{"xp":50,"streakBonusPerDay":10,"streakBonusCap":200,"streakFreezesPerWeek":1},"profitableCompanyQuarter":{"xp":500},"successfulIpo":{"xp":5000},"achievement":{"minXp":100,"maxXp":10000},"tutorial":{"xp":50}},"unlocks":[{"level":1,"key":"market_orders"},{"level":1,"key":"basic_income"},{"level":2,"key":"first_job"},{"level":3,"key":"limit_orders"},{"level":3,"key":"watchlist"},{"level":3,"key":"found_garage"},{"level":5,"key":"stop_loss"},{"level":5,"key":"bonds"},{"level":5,"key":"junior_jobs"},{"level":7,"key":"analyst_reports"},{"level":8,"key":"short_selling"},{"level":10,"key":"found_small_business"},{"level":12,"key":"leverage_2x"},{"level":12,"key":"senior_jobs"},{"level":15,"key":"small_loan"},{"level":15,"key":"business_angel"},{"level":18,"key":"leverage_5x"},{"level":18,"key":"expand_small_business"},{"level":20,"key":"found_gmbh"},{"level":20,"key":"loans_250k"},{"level":20,"key":"team_lead_jobs"},{"level":25,"key":"ipo"},{"level":25,"key":"c_level_jobs"},{"level":30,"key":"leverage_10x"},{"level":30,"key":"options"},{"level":35,"key":"takeovers"},{"level":35,"key":"hostile_takeovers"},{"level":40,"key":"holding"},{"level":50,"key":"title_market_legend"},{"level":50,"key":"golden_profile_frame"},{"level":50,"key":"hall_of_fame"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "progression"'),
+  ('progression', '{"firstLevelXp":100,"xpBase":250,"xpExponent":1.5,"maxLevel":10000,"prestige":{"fromLevel":50,"titleEveryLevels":10},"missionTargetScalePerLevel":0.2,"missionTargetScaleMax":5,"xpMultiplier":2,"xpSources":{"trade":{"xp":10,"maxTradesPerDay":30,"minOrderValueCents":10000},"profitableClose":{"profitCentsPerXp":10000,"maxXpPerTrade":500},"workHour":{"xp":40,"playerCompanyMultiplier":1.5,"maxHoursPerDay":12},"workTask":{"minXp":50,"maxXp":150},"dailyMission":{"minXp":200,"maxXp":400,"perDay":3},"quickMission":{"minXp":20,"maxXp":60,"active":3},"weeklyMission":{"minXp":600,"maxXp":1200,"perWeek":3},"milestoneMission":{"minXp":100,"maxXp":2000,"visible":3},"dailyLogin":{"xp":50,"streakBonusPerDay":10,"streakBonusCap":200,"streakFreezesPerWeek":1},"profitableCompanyQuarter":{"xp":500},"successfulIpo":{"xp":5000},"achievement":{"minXp":100,"maxXp":10000},"tutorial":{"xp":50}},"unlocks":[{"level":1,"key":"market_orders"},{"level":1,"key":"basic_income"},{"level":2,"key":"first_job"},{"level":3,"key":"limit_orders"},{"level":3,"key":"watchlist"},{"level":3,"key":"found_garage"},{"level":4,"key":"property"},{"level":5,"key":"stop_loss"},{"level":5,"key":"bonds"},{"level":5,"key":"junior_jobs"},{"level":7,"key":"analyst_reports"},{"level":8,"key":"short_selling"},{"level":8,"key":"artworks"},{"level":10,"key":"found_small_business"},{"level":12,"key":"leverage_2x"},{"level":12,"key":"senior_jobs"},{"level":15,"key":"small_loan"},{"level":15,"key":"business_angel"},{"level":18,"key":"leverage_5x"},{"level":18,"key":"expand_small_business"},{"level":20,"key":"found_gmbh"},{"level":20,"key":"loans_250k"},{"level":20,"key":"team_lead_jobs"},{"level":25,"key":"ipo"},{"level":25,"key":"c_level_jobs"},{"level":30,"key":"leverage_10x"},{"level":30,"key":"options"},{"level":35,"key":"takeovers"},{"level":35,"key":"hostile_takeovers"},{"level":40,"key":"holding"},{"level":50,"key":"title_market_legend"},{"level":50,"key":"golden_profile_frame"},{"level":50,"key":"hall_of_fame"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "progression"'),
   ('valuation', '{"growthWeight":1,"growthFactorMin":0.6,"growthFactorMax":1.8,"macroSensitivityPer100Bps":0.04,"macroFactorMin":0.6,"macroFactorMax":1.3,"bookValueFloorShare":0.5,"lossMakerRevenueElasticity":0.5,"analystTargetNoise":0.08,"analystWrongProbability":0.25}'::jsonb, 'Defaults from src/config/balance.ts, section "valuation"'),
   ('aiInvestors', '{"tickNoiseBps":{"bluechip":6,"midcap":15,"penny":45},"tickNoiseScale":0.45,"emaFastAlpha":0.15,"emaSlowAlpha":0.0165,"sentimentDecayPerTick":0.0019,"baselineVolumeDepthFraction":0.02,"playerWeight":{"activityHalfLifeHours":6,"referenceActivityCents":{"bluechip":100000000,"midcap":25000000,"penny":5000000},"minAiWeight":0.15},"archetypes":{"market_maker":{"capitalShare":0.05,"reactionSpeed":0.005,"params":{}},"value_fund":{"capitalShare":0.3,"reactionSpeed":0.0005,"params":{"gapScale":0.5,"deadBand":0.01}},"momentum_trader":{"capitalShare":0.1,"reactionSpeed":0.0002,"params":{"trendScale":0.02}},"pension_fund":{"capitalShare":0.2,"reactionSpeed":0.002,"params":{"rateSensitivityPer100Bps":-0.05,"yieldTiltPer100Bps":0.03,"minWeight":0.2,"maxWeight":1.8}},"index_fund":{"capitalShare":0.04,"reactionSpeed":0.005,"params":{}},"retail_herd":{"capitalShare":0.1,"reactionSpeed":0.002,"params":{"chaseGain":0.1,"trendScale":0.02}}}}'::jsonb, 'Defaults from src/config/balance.ts, section "aiInvestors"'),
   ('index', '{"size":30,"baseLevel":1000,"reviewEveryQuarters":4,"minListedQuarters":1,"entryBuffer":3}'::jsonb, 'Defaults from src/config/balance.ts, section "index"'),
@@ -20186,7 +21995,9 @@ insert into public.game_config (key, value, description) values
   ('jobs', '{"playerBaseProductivity":1.5,"productivityPerSkillScore":0.08,"maxProductivity":4,"aiSalaryPerScoreBps":300,"aiSalaryCapMultiplier":1.5,"salaryUnitHours":12,"maxOpenApplications":5,"applicationMessageMaxLength":140,"offerValidHours":48,"aiPostingsPerCompany":2,"aiSlotsOpen":99,"quitNoticeHours":24,"quitNowCostHours":12,"tierMinScore":{"intern":0,"junior":2,"senior":6,"team_lead":12,"c_level":20},"sectorBranches":{"tech":["it","finance","sales","management"],"retail":["sales","logistics","finance","management"],"energy":["craft","science","law","management"],"pharma":["science","law","sales","management"],"logistics":["logistics","craft","it","management"]},"profitLinkedPay":{"minFactor":0.5,"bonusShareOfProfit":0.2,"maxBonusFactor":1},"raiseRequest":{"cooldownDays":7,"maxRaiseBpsPerScore":300}}'::jsonb, 'Defaults from src/config/balance.ts, section "jobs"'),
   ('dailyRewards', '{"cycle":[{"xp":50,"cashCents":10000,"skillPoints":0},{"xp":75,"cashCents":20000,"skillPoints":0},{"xp":100,"cashCents":30000,"skillPoints":0},{"xp":125,"cashCents":0,"skillPoints":1},{"xp":150,"cashCents":50000,"skillPoints":0},{"xp":200,"cashCents":75000,"skillPoints":0},{"xp":300,"cashCents":100000,"skillPoints":1}],"freezesPerWeek":1}'::jsonb, 'Defaults from src/config/balance.ts, section "dailyRewards"'),
   ('startups', '{"garage":{"minLevel":3,"foundingCostCents":250000,"fixedCostCentsPerQuarter":15000,"maxEmployees":2},"upgradeCreditShare":1,"gmbh":{"minLevel":15,"foundingCostCents":6000000,"fixedCostCentsPerQuarter":600000,"maxEmployees":20},"ag":{"fixedCostCentsPerQuarter":1000000,"maxEmployees":100},"ipo":{"minLevel":12,"fromTiers":["small_business","gmbh"],"sharesTotal":1000000,"minSharePercent":10,"maxSharePercent":49,"minIssuePriceCents":100,"subscriptionHours":12,"aiTakeBase":0.2,"aiTakePerQuality":0.5,"capitalIncreaseDiscount":0.9,"capitalIncreaseMaxPercent":25},"sideJobFounderFactor":0.5,"aiQualityPenalty":0.3,"fullTimeFromEmployees":5,"logo":{"size":16,"maxColors":6,"reportsToHide":3},"banner":{"width":48,"height":12,"maxColors":6},"potential":{"minAnnualCents":100000,"maxAnnualCents":200000000000,"paretoAlpha":0.57},"awareness":{"initial":0.03,"min":0.01,"growthPerQuarter":0.3,"decayPerQuarter":0.03,"marketingMaxGain":0.12,"marketingHalfSaturationShare":0.1,"marketingMinHalfSaturationCents":50000},"quality":{"base":0.25,"halfSaturationScore":20,"adjustPerQuarter":0.35},"demandNoise":0.1,"capacityCentsPerProductivity":{"tech":300000,"retail":250000,"energy":250000,"pharma":300000,"logistics":250000},"grossMargin":{"tech":0.75,"retail":0.35,"energy":0.45,"pharma":0.65,"logistics":0.35},"aiWorkerCostCentsPerQuarter":72000,"aiWorkerWageCentsPerHour":12000,"valuationPeDiscount":0.5,"estimate":{"initialSpread":2.3,"decayPerQuarter":0.85},"insolvency":{"graceQuarters":4,"loanWithholdingBps":5000,"foundingLockoutDays":3},"products":{"tech":[{"key":"security_software","stages":[["it_networks"],["it_security","it_programming"],["law_privacy","it_architecture"],["it_crypto","it_pentest"]]},{"key":"mobile_app","stages":[["it_programming"],["it_mobile","sales_social"],["it_ux","sales_growth"],["it_cloud","management_strategy"]]},{"key":"cloud_platform","stages":[["it_networks"],["it_databases","it_devops"],["it_cloud","sales_keyaccount"],["finance_controlling","management_operations"]]}],"retail":[{"key":"online_shop","stages":[["it_web"],["sales_marketing","logistics_warehouse"],["hybrid_ecommerce","sales_seo"],["logistics_automation","management_operations"]]},{"key":"fashion","stages":[["sales_marketing"],["sales_brand","logistics_purchasing"],["sales_ads","sales_retail"],["sales_international","finance_controlling"]]},{"key":"delicatessen","stages":[["logistics_purchasing"],["sales_service","logistics_distribution"],["sales_retail","science_nutrition"],["logistics_cold","law_consumer"]]}],"energy":[{"key":"solar","stages":[["craft_electrical"],["sales_selling","craft_site"],["craft_energy","management_projects"],["craft_solar","law_environment"]]},{"key":"grid_service","stages":[["craft_electrical"],["craft_site","craft_automation"],["craft_energy","law_compliance"],["logistics_planning","management_operations"]]},{"key":"energy_storage","stages":[["science_physics"],["craft_engineering","finance_investment"],["science_materials","craft_manufacturing"],["law_ip","sales_international"]]}],"pharma":[{"key":"generics","stages":[["science_chemistry"],["science_lab","science_pharmacology"],["logistics_quality","hybrid_pharma_sales"],["law_ip","finance_controlling"]]},{"key":"biotech","stages":[["science_biology"],["science_biotech","science_statistics"],["science_clinical","science_genetics"],["law_medical","finance_vc"]]},{"key":"medtech","stages":[["science_medicine"],["craft_engineering","science_lab"],["science_drugs","law_compliance"],["science_devices","it_embedded"]]}],"logistics":[{"key":"courier","stages":[["logistics_transport"],["logistics_fleet","it_mobile"],["logistics_lastmile","management_operations"],["logistics_planning","logistics_sustainability"]]},{"key":"warehouse","stages":[["logistics_warehouse"],["logistics_inventory","it_databases"],["logistics_supplychain","management_agile"],["logistics_automation","craft_robotics"]]},{"key":"freight","stages":[["logistics_transport"],["logistics_customs","logistics_shipping"],["logistics_global","sales_international"],["logistics_strategic","finance_risk"]]}]},"stages":{"awarenessCaps":[0.5,0.7,0.85,0.95,1],"qualityBonusPerStage":0.05,"capacityBonusPerStage":0.25},"training":{"costCentsByTier":[200000,500000,1200000,2500000,5000000],"wageRaiseBpsByTier":[300,500,800,1200,2000],"fromEmployees":5},"chat":{"maxMessageLength":300,"historyLimit":100,"maxMessagesPerMinute":10}}'::jsonb, 'Defaults from src/config/balance.ts, section "startups"'),
-  ('avatars', '{"defaultKey":"rookie","portraits":[{"key":"rookie","level":1},{"key":"trader","level":1},{"key":"analyst","level":1},{"key":"coder","level":1},{"key":"builder","level":1},{"key":"seller","level":1},{"key":"lawyer","level":1},{"key":"scientist","level":1},{"key":"trucker","level":1},{"key":"punk","level":3},{"key":"gamer","level":5},{"key":"chef","level":5},{"key":"pilot","level":8},{"key":"founder","level":10},{"key":"banker","level":15},{"key":"astronaut","level":20},{"key":"magnate","level":25},{"key":"royal","level":35},{"key":"legend","level":50},{"key":"finn_fan","level":1}]}'::jsonb, 'Defaults from src/config/balance.ts, section "avatars"')
+  ('avatars', '{"defaultKey":"rookie","portraits":[{"key":"rookie","level":1},{"key":"trader","level":1},{"key":"analyst","level":1},{"key":"coder","level":1},{"key":"builder","level":1},{"key":"seller","level":1},{"key":"lawyer","level":1},{"key":"scientist","level":1},{"key":"trucker","level":1},{"key":"punk","level":3},{"key":"gamer","level":5},{"key":"chef","level":5},{"key":"pilot","level":8},{"key":"founder","level":10},{"key":"banker","level":15},{"key":"astronaut","level":20},{"key":"magnate","level":25},{"key":"royal","level":35},{"key":"legend","level":50},{"key":"finn_fan","level":1}]}'::jsonb, 'Defaults from src/config/balance.ts, section "avatars"'),
+  ('artworks', '{"size":32,"maxColors":16,"titleMaxLength":40,"createBaseCostCents":1500000,"createCostFactor":2,"auction":{"durationsHours":[1,6,24],"minIncrementBps":500,"minStartCents":10000,"feeBps":1000,"antiSnipeMinutes":2},"gallery":{"auctionsPerDay":4,"auctionHours":6,"startPriceCents":{"common":500000,"rare":2500000,"legendary":15000000}},"hot":{"likeWeight":1,"bidWeight":3,"gravity":1.5}}'::jsonb, 'Defaults from src/config/balance.ts, section "artworks"'),
+  ('property', '{"tiers":[{"key":"flat","priceCents":2500000,"width":8,"height":6,"garageSlots":0,"minLevel":4},{"key":"apartment","priceCents":10000000,"width":10,"height":8,"garageSlots":0,"minLevel":8},{"key":"house","priceCents":50000000,"width":13,"height":9,"garageSlots":2,"minLevel":14},{"key":"villa","priceCents":250000000,"width":16,"height":11,"garageSlots":4,"minLevel":22},{"key":"luxury_villa","priceCents":1500000000,"width":20,"height":13,"garageSlots":8,"minLevel":30}],"tradeInBps":5000,"resaleBps":4000,"floors":{"laminate":0,"carpet":150000,"tiles":400000,"parquet":600000,"stone":1500000,"marble":6000000,"gold":100000000},"wallColors":["#f3efe4","#ffffff","#d9d4c7","#8f9bb3","#3a4256","#1b1e2b","#c8e6c9","#2f7a4a","#bfe6ff","#2f5fd0","#ffe0b2","#ff9a52","#f8bbd0","#7a2f7a","#c8553d","#ffd15c"]}'::jsonb, 'Defaults from src/config/balance.ts, section "property"')
 on conflict (key) do update set value = excluded.value, description = excluded.description, updated_at = now();
 
 insert into public.game_config_public_keys (key) values
@@ -20199,6 +22010,49 @@ insert into public.game_config_public_keys (key) values
   ('progression'),
   ('lifestyle')
 on conflict (key) do nothing;
+
+-- ===== supabase/seeds/artworks.sql (gallery; existing artworks are kept) =====
+-- GENERATED by scripts/gen-artworks.ts. Do not edit by hand.
+-- The gallery: artworks of the game (ADR-080). Idempotent: existing keys are kept.
+insert into public.artworks (gallery_key, title, origin, rarity, pixels)
+values
+  ('gallery_01_sunset', 'Abendrot über der Börse', 'game', 'common', '{"palette":["#1b1440","#3b1f63","#7a2f7a","#c8486b","#f2865e","#ffc46b","#ffe9a3","#241a3a","#3a2a52","#0f2a4a","#1f4f7a"],"grid":["00000000000000000000000000000000","01000100000001000100000000000000","01000000010000000100010001000000","01000000000000000000000000000000","12111111111111111111111112111211","11111211111112111111111111111211","11111211111111111211111111111111","22222322222223222222232222222322","22222222322222222222222222222222","22222222222222222222222223222322","33333333333333333333343334333333","33433343334333666333334333333333","33333333333366666663333333333333","33333433333366666663333333333433","44444444544666666666588858844444","88544484888886868668888888888488","88848888888888888888888888888888","88888888888888888888888888888888","87778888888888888888888888888888","77777888888888888888888888888888","77777777888887877778888888788888","77777777777777777777777777777777","a9999a99999999999999999999999999","999a999a99a99999a9aa9a9999999999","999999999999999999a999a9999999a9","9999999999999999999a999a99a99999","99999999999a99999999999999999999","a999999aa999999a99999a9999a99a9a","999999999999999999a99a999999a999","99a999999999999999999a9aa9999999","99999a99999a99999a99999999999999","99999999999999999999a9999a999999"]}'::jsonb),
+  ('gallery_02_sunset', 'Letzte Handelsstunde', 'game', 'rare', '{"palette":["#1b1440","#3b1f63","#7a2f7a","#c8486b","#f2865e","#ffc46b","#ffe9a3","#241a3a","#3a2a52","#0f2a4a","#1f4f7a"],"grid":["00000000000000000000000000000000","00000000000000000000000000000000","00001000000010001000000000001000","00000010000000000000000000000000","11111111121111111211111111111111","12111111111111111211111112111111","11111111121111111111111112111111","22222222222222322222222222222222","22222222222222222222222222222222","22222222222222222222222222222222","33333333366643333333333343333333","33333336666666333333383333333333","33333366666666633883888333383333","33333366666866638888888833888333","84844666668886688888888888888884","88888866688888888888888888888888","88888886888888888888888888888888","78877788888888888888888888888888","77777777777888788887777888888888","77777777777777777777777778877777","77777777777777777777777777777777","77777777777777777777777777777777","9999999999aa999999999999999999aa","99a999999999999999999999aa999999","9a99a99999999999999999999999a999","999999999a9999999999999aaa99a999","a99999999999a9999999999999999999","999a999999a999999a99999999999a99","a9a999999999999a9999999999999999","999a99a9a9999999a999999999999999","99aa999a999999a999999a9999999999","9999999999a9a9999999aa9a9999a999"]}'::jsonb),
+  ('gallery_03_sunset', 'Violetter Horizont', 'game', 'common', '{"palette":["#1b1440","#3b1f63","#7a2f7a","#c8486b","#f2865e","#ffc46b","#ffe9a3","#241a3a","#3a2a52","#0f2a4a","#1f4f7a"],"grid":["00000000000000000000000000000000","00000000010000000000000000000100","10000000000000000000000010000000","00000000010000000000010000000000","12111111111111111211111111111211","11111111111111111211111112111111","11111111111111111111111121112111","22222232222222222222223222222222","22222322222222222322222222222322","22222222222222222222222222222232","33334333333343333366633333333333","33333333334333336666666333333333","33333333333343366666666633333333","33333333333333366666666633333433","84484488484448666888688664444444","88888888888488868888888888844444","88888888888888888888888888884844","88888888888888888888888888888885","88888888888888888888888888888888","77787787888787878888888888888777","77777777777777777778778888887777","77777777777777777777777777777777","9999999999999999999999999a99999a","9999999a99999999aa99a99999aa9999","99999999999a99999999aa9a999a9999","999999999a99a999999999999a9999a9","999aa999999999999a99999999999999","9999a99999999999a9999999999a99a9","9999999999999999999999a999999999","9a99999999999999999999a99999999a","9aa9a99a99a99999a99a999a99999999","99a9a999a999999999a9999999999999"]}'::jsonb),
+  ('gallery_04_sunset', 'Sonnenuntergang am Hafen', 'game', 'common', '{"palette":["#1b1440","#3b1f63","#7a2f7a","#c8486b","#f2865e","#ffc46b","#ffe9a3","#241a3a","#3a2a52","#0f2a4a","#1f4f7a"],"grid":["00000000000000000000000000000000","00000000010001000100000001000000","00001000000010000000000010001000","00000000001000100000000000000000","21112111111111112111111111112111","11111111121111111111111111111211","11111111111111111211111111111111","22322232223222222232222222222222","22222222222222222222222222222322","22222222232222222222222222222222","34333333838334366633333334333333","33333338888836666666333333333333","33333888888886666666643333333333","34338888888888666666633333338388","44488888888888868666884444488888","88888888888888888868888484888888","88888888888888888888888888888888","88878888878888888888888888888888","88777788777888888888888877888888","77777777777787777887888777788888","77777777777777777777777777777787","77777777777777777777777777777777","9999999999999999999999999999a9a9","9999999999a9999999a9999999a99999","99999999aaaa999999a99999a9a99999","9999a999a9a99999999aaa9999999999","a999a9999999a99a9999999999999a99","99999999a9999999999999999999aa99","99999a99999a999a99a9999999a999a9","99999a99999a99999999999999999999","a9999a99999999999a999a99999999a9","99999aa999999999999999a999999999"]}'::jsonb),
+  ('gallery_05_sunset', 'Glut über den Hügeln', 'game', 'common', '{"palette":["#1b1440","#3b1f63","#7a2f7a","#c8486b","#f2865e","#ffc46b","#ffe9a3","#241a3a","#3a2a52","#0f2a4a","#1f4f7a"],"grid":["00000000000000000000000000000000","00100010001000000010000000000000","00000100000000000100000000000100","00000100010000000100010000000100","12111111111111111211111111111111","11211121111111111111112111111111","11111111111112111211111111111111","22322232222222222222222222222222","22222222222222222322222222222222","22222222222222222222222223222322","33333333433343334333333333333333","33333433333333666433388383333333","33333338833886666663888888838838","33333888888888666668888888888888","44448888888888866688888888888888","88888888888888886888888888888888","88888888888887777888888778888888","88877877788777777787877777888888","78777777777777777777777777778877","77777777777777777777777777777777","77777777777777777777777777777777","77777777777777777777777777777777","99a99a9999999999999999999a999999","999999999a999999999999999999999a","99999999999999a999a9999999999999","999999999a9999999a999999999a9999","9999999999999999a999999999a999aa","9999a9999a999999a99a9999a9999999","99a99a99999999999a9a999999999999","a9999999999a9999999999999a9a9a99","999999a999999a9999999999a9999999","999a999999999a9a99999a9999999999"]}'::jsonb),
+  ('gallery_06_dawn', 'Morgen an der Bucht', 'game', 'rare', '{"palette":["#2a3a6b","#4a5f9a","#8fa3d1","#f2b8a0","#ffd9b0","#fff1d6","#ffe06b","#2d3b4f","#4b5d70","#1e5a6e","#3f8c9e"],"grid":["00000000000000000000000000000000","01000100010000000000000001000000","00000000000000000000000001000000","00000000000001000000010000000000","11111211111111111111121111111211","11211121111111111111111111111121","12111111111111111211121111111111","22222222222222222222222222222222","23222222222222222222222223222222","23222222222222222222222222222222","33334333333333334336663333334333","33333333333333333666666633333343","33333333333333336666666663333333","33333433343333336666666663333333","54485488488844466666666666444444","88888888888884466666666666444444","88888888888887788666666667744448","88888888888877778886777777778888","88887778887777777877777777777777","77777777777777777777777777777777","77777777777777777777777777777777","77777777777777777777777777777777","999999999999999999a99999999999aa","9999a99999a999aa9999999999999999","999999a9999999999a99999999a99999","9a9a99a99aa999a9999999999a999999","999999a99999999999999999999999a9","9999999999999999999a999999999a9a","a99a99999999999a999aa9999a999999","9aa9a999999999a9999a9999a99aa999","9999999999999999999a9a9a99999999","99aa9999999999a99999999999999999"]}'::jsonb),
+  ('gallery_07_dawn', 'Erste Glocke', 'game', 'common', '{"palette":["#2a3a6b","#4a5f9a","#8fa3d1","#f2b8a0","#ffd9b0","#fff1d6","#ffe06b","#2d3b4f","#4b5d70","#1e5a6e","#3f8c9e"],"grid":["00000000000000000000000000000000","00000000010000000000000001000000","00000000100000001000000010000000","00000000000001000000000001000100","11111111111121111111111111111111","11111121111111111121112111111121","11111111111112111111111112111111","22222222222222222222232222222222","22222322222222222322222222222322","22222322222223222222222223222222","33334333433333333333333333334333","33333333346663333333333333333333","43334333666666633333333333334333","38333333666666633433343334333333","88844446666666664544444445444444","88884846866666664444444444444444","88888888886878877844474454485888","88878888888777777777777877888888","77777887777777777777777777788778","77777777777777777777777777777777","77777777777777777777777777777777","77777777777777777777777777777777","999a999a99999a99999a99a999999999","99a9999999999999999a99a999999999","9999999999999999999a9999a9999999","99999999a99999999999999999999999","9aa99999a999999a999999999999999a","99999999999999999999999999999999","999a9a9a9999999999999a99a9999999","9999a9999a99a9999999999999999999","99999999999999999a9a999999999999","9a9a999999999999999999999999a9a9"]}'::jsonb),
+  ('gallery_08_dawn', 'Frühnebel', 'game', 'common', '{"palette":["#2a3a6b","#4a5f9a","#8fa3d1","#f2b8a0","#ffd9b0","#fff1d6","#ffe06b","#2d3b4f","#4b5d70","#1e5a6e","#3f8c9e"],"grid":["00000000000000000000000000000000","00000000000000000000000000100000","00000000000000000000010000000000","00000000001000000010001000000010","21111111111111111111111111111111","12111111111111111111111111111111","11111211121111111111111111111111","22222222222222222232222222222232","22223222222222222222322222222222","22222232222222222232222222222222","34333333333366633333333333333388","33333833346666666333333334333888","38838883366668666633343388338888","88888888386688866643888888888888","88888888888888888868888888888888","88888888888888888888888888888888","88888888888888888888888888888888","88888888888888888888888888888788","78888887888888888888888888777777","77777777777778887777777777777777","77777777777777777777777777777777","77777777777777777777777777777777","999a9999999999aa9999999999a99999","999999999999a99999999999999999a9","999a999999a999a99a9999999a9999a9","99999a99999a9999999999999a99a999","99999999999999a99999999999a9a999","a99a9999999a99aa99999999a9a99a9a","a9a9999aa99a9a999999a9a999999999","9a99999999aa99999999999a9999999a","99a9999a9999999a99a9999a999999a9","9999999999a99999999a9a99a99999a9"]}'::jsonb),
+  ('gallery_09_city', 'Nexa-City bei Nacht', 'game', 'common', '{"palette":["#0b0e1f","#15193a","#232a57","#ffe9a3","#fff6d8","#2b2f45","#3c425e","#ffcf4d","#9ad8ff","#5d6679"],"grid":["08000000000000004000000000400000","00000000000080000000000000000000","00800000000000000000000800000000","00000000000000800000000044400000","00080000000000000000000444440000","00000008000000000000804444444000","00000000000808000000004444444000","08000000000000000000004444444000","00000000000000000000040444440080","00000000000000000000000044400000","11181111141111111111111118111111","11111115555511111111111111111111","11111115555511111111111814811111","11116665355511111111111111181111","11116665555511811811811111111111","11116365555511111111141118111111","11116665555511111111111111111555","11116665353511111111111111111555","11116665555511111111111111111555","55516365553511111111111111111555","55526665555522222255555555555555","53526365555522222255555555555555","55526665555522222255535535355555","55526365353522222255555555555555","55526665555555555255555555555555","53526665355555555255555555555555","55526665555553575255575535355555","55526365355555555255555555555555","55526665555555535253535555555575","55526365553555555255555555555555","55526665555557555255535555555535","55526665555555555255555555555555"]}'::jsonb),
+  ('gallery_10_city', 'Lichter der Bankentürme', 'game', 'rare', '{"palette":["#0b0e1f","#15193a","#232a57","#ffe9a3","#fff6d8","#2b2f45","#3c425e","#ffcf4d","#9ad8ff","#5d6679"],"grid":["00000000040000000000000000000000","00000000000000000000000000000000","00000000000000000000080000000000","40800008000000000000800044400000","00000000000000000000000444440000","00000000000008000000004444444000","80000000000800000004084444444080","00000000000000000000044444444000","00000000000000000800800444440000","00080000400000000008000044400000","11111111111111111111111111111111","11111111111111115555581811111181","11111111111181115555511141811111","11111111111111115355511111111111","11111111111111115555555555111111","81111111118111115353555555111111","11111111111111115555557535111111","11111111111111115755555555111111","11111111111111115555553535111111","66661111111111115353555555111111","66665555222222225555555535222222","63665555266666665555555555222222","66665355266666665555553535222222","66665555266676665557555555555555","66665355266666665555553575555555","66665555266636665353555555535555","66665555266666665555555575555555","63665555266666665553555555555355","66665555266666665555553555555555","66665555266636765353555555535355","66665555266666665555553555555555","66665555266666665555555555555555"]}'::jsonb),
+  ('gallery_11_city', 'Nachtschicht', 'game', 'common', '{"palette":["#0b0e1f","#15193a","#232a57","#ffe9a3","#fff6d8","#2b2f45","#3c425e","#ffcf4d","#9ad8ff","#5d6679"],"grid":["00000000000000000800000000000000","00000000000000080000000080000000","00000000000000000000080000000000","00000000000000000800000044488000","00040080000400000008400444440000","00000000000080000000004444444000","00008000000000800000004444444800","80000000000000000800004444444000","00000000008000000000000444440000","00080000000000000000000044400000","11111111111111811111111111811814","11111111111111111111111111111111","18111111111111111111111111111111","11111111111111111111111111111111","55551111111111111111666666111111","55551111111111166666666666111111","55551111111111166666636666111111","55551111116666663636666666111111","55551111116666666666666666166666","55551111116663667666666666166666","57556666666666666666666366263636","55556666666666663636666666266666","53556666666666666666666366266636","55556666666366663666666666266666","53556766666666666666666666267666","55556666666663666636666666266666","53556763666666666666666666266636","55556666666363667636666666266666","53556666666666666666636366266666","55556666666363666676666666266666","55556666666666666666666366263666","55556666666666666666666666266666"]}'::jsonb),
+  ('gallery_12_city', 'Skyline im Mondlicht', 'game', 'common', '{"palette":["#0b0e1f","#15193a","#232a57","#ffe9a3","#fff6d8","#2b2f45","#3c425e","#ffcf4d","#9ad8ff","#5d6679"],"grid":["00000000000000000000000000000000","00000000000000000000040000000000","00000000080000000000000000000000","00000000800000008000000044400000","00000000004000000080000444440008","00000000400040000000004444444000","00000000000000000000004444444000","00000000008000000000004444444000","00000000000000800000000444440000","00008000000000000000040044400000","11111111111118118111111111111118","11111411111111111111111118111111","11111111111111811111111111114111","11111111181111111111111111111111","11111555555511811111111111111111","81111555555511811181111111118111","11111535357566611111111111111111","11111555555566611111111111111111","11111535553563611111115555511111","11111555555566655555555555511111","55555555355563655555555555555552","55555555555566655535355555555552","57555535353567655555555753555552","55555555555566653575555555555556","53535535555566655555555353555556","55555555555566657535355555555556","55555575355567655555555555553556","55555555555566655555555555555556","55535555553563655555555555555556","55555555555566653555355555555556","53535575555567655555555553555556","55555555555566655555555555555556"]}'::jsonb),
+  ('gallery_13_city', 'Schlaflose Stadt', 'game', 'common', '{"palette":["#0b0e1f","#15193a","#232a57","#ffe9a3","#fff6d8","#2b2f45","#3c425e","#ffcf4d","#9ad8ff","#5d6679"],"grid":["00000000000000000000000000000000","00800000000000000000040000004000","00040000000000000000000000000000","00004000040000000000000044400000","00000000000000000000000444448000","00008400000000000008004444444000","00800000000000080000004444444000","00000000000000000000004444444800","00008000008000040000000444440000","00000000000000000000000844400000","11181111111111111111114111111111","11111111111111811111111111111111","11111111111111111111111111111111","11111111111111111111118111811111","11111118111111114111111118111111","14111111111118111111111111111111","11111111111111111111111111111111","11111111111111111166666666661111","11111111111111111166666666661111","11111111111555111163636636661111","22222222222555222266666666662222","22222222222535222263666666662222","22222222222555222266666666662222","66666665555555666666666666666666","66666665555555666666666666666666","63666365355535666666636636666666","66666665555555666666666666666666","63676365355555666666666666666366","66666665555555666666666666666666","63666665355555666667676636366666","66666665555555666666666666666666","66666665555555666666666666666666"]}'::jsonb),
+  ('gallery_14_space', 'Ferner Ringplanet', 'game', 'rare', '{"palette":["#06070f","#121630","#2a1f4f","#5b2d7a","#ffffff","#9ad8ff","#ff9a52","#ffd15c","#c8553d","#62e0ff"],"grid":["33200000232002000001000000000000","01003300000501200010000100000010","10200200222020000000000000000000","02030000000000301000000045050000","22223003000040104000000000000000","00040202300000000000000000000000","02003022200067600014000000000000","03203010306666666002032040000000","00310022066766677700000000000500","00099905666666666660333330000000","00440099667776667772022200000040","00100006666666666666322303000000","00000006766666766776000235000000","00320006666666699966003032000000","00000002767777676799900300000000","03000200666666666662099000000000","04100022066777777600000900000000","00003002406666666000000000005000","00000000000066600000000000000400","00000200400002000000500004000000","00000422022003000000100020200030","00100030030333040000000031222220","23000200200250520100000212050300","02200000230020200040000330003000","03000000202042230020053322002300","20000000020002200002002202000300","35200000500000042003043003034000","00400000045000000000023002000000","00000200300000030000000000000000","01203000000000000000000101000000","10032300000000000400000000000100","00020000000000000000000000000000"]}'::jsonb),
+  ('gallery_15_space', 'Nebel im Orion', 'game', 'common', '{"palette":["#06070f","#121630","#2a1f4f","#5b2d7a","#ffffff","#9ad8ff","#ff9a52","#ffd15c","#c8553d","#62e0ff"],"grid":["00000022030000020100020000010000","00000022010000200000020000004000","00322030000000340021030000000000","00000020030001300200300010000000","00000000004000000200000000023000","00000200000000000000100013002000","00320000000000000008888830020401","22023300000000000888888888102030","30002000000040008878777788800000","22042000109000088888888888883000","00100020000999077778877787780000","00000002400000988888888888888000","00413000000000878788777888888000","51220303000000888888888888888000","03123330220100878887887999788000","00343032400200888888888888999040","03302313200000487777777878880990","00134030300300088888888888880009","00000000000000008778777887800001","00000000001000000888888888000000","40034000000000031028888800000000","00202303040000003302500000000003","00100300000000023303000000002300","00030200200000000000000001000500","00220000304000000302000010020023","03002000000400000000000010020122","00000000000004000000010022030330","00050000000040021003000203400221","00000000040000000020002034233003","00000100000020002000002523024000","00005010000000002303003020233000","00100040010002010002000220002000"]}'::jsonb),
+  ('gallery_16_space', 'Rote Welt', 'game', 'common', '{"palette":["#06070f","#121630","#2a1f4f","#5b2d7a","#ffffff","#9ad8ff","#ff9a52","#ffd15c","#c8553d","#62e0ff"],"grid":["00000000000000000004000000000000","02050000000000001000000000005040","00030000000000300400000000000010","00000500201000030200010000002000","01300020300002300000200000000330","00002003201001002000500003000003","00430300040000000300300000204330","00000030300000000330022423220022","00200000000000000000030133302221","00000000000000000000003000333020","00000000000000000004100000203000","00000400000000010010002000000000","00050000000067600000000000000000","00000000106666666400000000000504","00001000076767767600000400000000","00099900666666666660203022320000","00010099667667676760322323020000","40010006666666666666200003033040","00000146766766767676023330003000","00000056666666699966233420200010","00100000677777766799933300420000","00000040666666666662299100040000","00000002067777667600040900000000","00000002236666666000335002010000","04000001002367604034000002000000","40000000000323002200220000220040","30000301000303200000034000300000","30301030000200000000000300000000","20320031000200030001020002000000","40003320000000000003020000000000","32002000224000000000002200200000","00003002020000000003120000300000"]}'::jsonb),
+  ('gallery_17_space', 'Zwischen den Sternen', 'game', 'common', '{"palette":["#06070f","#121630","#2a1f4f","#5b2d7a","#ffffff","#9ad8ff","#ff9a52","#ffd15c","#c8553d","#62e0ff"],"grid":["00330003103000000000030230000000","30200030002230001003330322220000","00000000000000000103333230020000","00020000410000010000020303120000","00000000000303303002030020000000","00000000134201022302310000033000","00400000001300002003000040000000","00000000012000302300400000000140","00000430043500200003000004000000","00043200320400000012000000000000","00023020230000000000000000005000","20320220032000000040000000000000","12000444300000000000000000010000","02020031003000000000000100000000","30300000000088800000300000000000","33000000008888888000320200000000","00009900577788778740010030000103","05004099988888888833200002002000","00001000888888787780332003022000","00000300888888888883300220002200","04002100877887899980032000230003","00002020388888888899900000000000","00000430488788887800099000000100","00000010018888888300040010000000","00200300002287801400200000000100","20200044000030000000000000000000","30500552300220000000000000000000","02002400030000000001000000000000","00000000003000000000000005000000","00042004000000000000000001000500","00000000000000000000000000000500","00000010001000000000000001000000"]}'::jsonb),
+  ('gallery_18_space', 'Orbit 7', 'game', 'rare', '{"palette":["#06070f","#121630","#2a1f4f","#5b2d7a","#ffffff","#9ad8ff","#ff9a52","#ffd15c","#c8553d","#62e0ff"],"grid":["01000004000000333000000000000000","00040000000000210000000300000010","00000000000002000200020022300000","03000000000003243003323000000000","00000000000000212240205002000000","00330304000000000200200300100000","03000403200000000020000000000000","00200122000110010003030000000400","04000220302002000030000300000000","00003202301320050000010000000000","04300003222230012000000000000000","03022300220220220001004100000000","00020223334020230440000000000044","00000352430332230000000100000000","00000020320000000088888000000004","00000004300000008888888880020100","03003000000040087878777888000030","00501001090100888888888888830003","02050000009990877788888877800002","03300300000009888888888888883000","30020104000008878888778887882232","04200001000038888888888888882000","00000100000548787788789998883400","00000000000028888888888889990000","03243000000302788778788778829900","20000000000033888888888888833099","02000000000230188878877878000300","00000000001004008888888880304000","02050000000000000088788200000000","00011000000000001000002300000040","00000000000000100000000000000000","00000000000000000000114001000000"]}'::jsonb),
+  ('gallery_19_forest', 'Tannen am Morgen', 'game', 'common', '{"palette":["#bfe6ff","#8fd0f0","#2f7a4a","#2fb45a","#1d5a36","#7bd47a","#6e4a28","#ffd15c","#e6f7ff"],"grid":["00000000000000000000000000000000","00000000000000000000000000000000","00000777000000088888000000000000","00007777700000000000000000000000","00077777770000000000000000000000","00077777888880000000000000000000","00077777770000000000000000000000","00007777700000000000000000000000","11111777111111888881111111111111","11111111111111111111111111111111","11111111111111111111111111111111","11111111111111111111111111111111","11111111111111111111111111111111","11111111111113333333333111111111","11111111113333333333333333111111","11133333333333333333333333313311","33333333333333333333333333333331","33333333333333333233333333333333","33333333333333332333333333332333","33223333333333332223333333333333","33333323333333322233333233322233","32222333333333322222333333333333","44444222444444222224442224222224","22222244444444446644444444446444","55662222255555556655522222556555","44664464444444446644444644446444","44664464444444446444444644446444","55665565555555555555555655555555","44444464444444444444444644444444","44444444444444444444444444444444","55555555555555555555555555555555","44444444444444444444444444444444"]}'::jsonb),
+  ('gallery_20_forest', 'Stiller Wald', 'game', 'common', '{"palette":["#bfe6ff","#8fd0f0","#2f7a4a","#2fb45a","#1d5a36","#7bd47a","#6e4a28","#ffd15c","#e6f7ff"],"grid":["00000000000000000000000000000000","00000000000000000000000000000000","00000777000088888000000000000000","00007777700000000000000000000000","00077777770000000000000000000000","00077777788888000000000000000000","00077777770000000000000000000000","00007777700000000000000000000000","11111777111188888111111111111111","11111111111111111111111111111111","11111111111111111111111111111111","11111111111111111111111111111111","11111111111111111111111111111111","11111111111111111111111111111113","11111111111111111111111111113333","11111111111111111111111111133333","33112111111111111111111111333333","33321313331111111111111313333333","33322233333311322213333333233333","33222333333333333333333333333333","33222223333333222223333332223333","32226233333333333333333333333333","44466224444442222222444422222444","44466444444444466644444444644444","55566222555555566655555555655555","44464644444444466644444444644444","44444644444444466644444444644444","55555655555555555555555555555555","44444644444444444444444444444444","44444444444444444444444444444444","55555555555555555555555555555555","44444444444444444444444444444444"]}'::jsonb),
+  ('gallery_21_forest', 'Grüne Hügel', 'game', 'common', '{"palette":["#bfe6ff","#8fd0f0","#2f7a4a","#2fb45a","#1d5a36","#7bd47a","#6e4a28","#ffd15c","#e6f7ff"],"grid":["00000000000000000000000000000000","00000000000000000000000000000000","00000788888000000000000000000000","00007777700000000000000000000000","00077777770000000000000000000000","00077777770888880000000000000000","00077777770000000000000000000000","00007777700000000000000000000000","11111777111111111888881111111111","11111111111111111111111111111111","11111111111111111111111111111111","11111111111111111111111111111111","11111111111111111111111111111111","11111133333311311111113313333333","11113333333333333111133333333333","13333323333332333213333333333333","33333333333333333333333333323333","33333222333322232223333333233333","33333333333333333333233333222333","33332222233222222222332332223333","33333363333336333632223332222233","33333363333336333633322222262333","44444464444446444622222444664444","44444464444446444644622224664444","55555555555555555555656555665555","44444444444444444444646444644444","44444444444444444444646444444444","55555555555555555555556555555555","44444444444444444444444444444444","44444444444444444444444444444444","55555555555555555555555555555555","44444444444444444444444444444444"]}'::jsonb),
+  ('gallery_22_ocean', 'Segel im Wind', 'game', 'rare', '{"palette":["#d8f3ff","#9ad8ff","#4f8cff","#2f5fd0","#1d3a8a","#ffffff","#ffd15c","#0f2050"],"grid":["00000000000000000000000000000000","00000000000000000000000000000000","00000000000000000000000000000000","00000000000000000000000666000000","00000000000000000000006666600000","00000000000000000000066666660000","11111111111111111111166666661111","11111111111111111111166666661111","11111111111111111111116666611111","11111111111111755511111666111111","11111111111111755111111111111111","11111111111111751111111111111111","55222222222222725555522222222222","52222222222222755552222222222222","22222222222277777722222222222225","22222222225577777722222222222555","22222222555555222222222222255555","22222225555522222222222225555552","33333222223333333333333322222333","33322222333333333333332222233333","33222233333333333333222223333333","22222333333333333332222333333333","22233333333333333222223333333333","23333333333333322222333333333333","33333333333332222233333333333333","44444444444433334444444444444443","44444444443333444444444444444333","44444444333344444444444444433334","44444443334444444444444443333444","44444333344444444444444433344444","44433334444444444444443333444444","43333444444444444444333344444444"]}'::jsonb),
+  ('gallery_23_ocean', 'Brandung', 'game', 'common', '{"palette":["#d8f3ff","#9ad8ff","#4f8cff","#2f5fd0","#1d3a8a","#ffffff","#ffd15c","#0f2050"],"grid":["00000000000000000000000000000000","00000000000000000000000000000000","00000000000000000000000000000000","00000000000000000000000666000000","00000000000000000000006666600000","00000000000000000000066666660000","11111111111111111111166666661111","11111111111111111111166666661111","11111111111111111111116666611111","11111111111111111111111675551111","11111111111111111111111175511111","11111111111111111111111175111111","22222222222255555522222272222225","22222222225555552222222272222555","22222222555555222222227777775555","22222225555522222222227777775552","22222555552222222222222255555222","22255555522222222222225555522222","33222233333333333333322223333333","22222333333333333332222333333333","22233333333333333222223333333333","23333333333333322222333333333333","33333333333332222233333333333333","33333333333322223333333333333322","33333333332222333333333333333222","44444444333344444444444444433334","44444443334444444444444443333444","44444333344444444444444433344444","44433334444444444444443333444444","43333444444444444444333344444444","33344444444444444433334444444444","34444444444444443333444444444444"]}'::jsonb),
+  ('gallery_24_ocean', 'Blaue Weite', 'game', 'common', '{"palette":["#d8f3ff","#9ad8ff","#4f8cff","#2f5fd0","#1d3a8a","#ffffff","#ffd15c","#0f2050"],"grid":["00000000000000000000000000000000","00000000000000000000000000000000","00000000000000000000000000000000","00000000000000000000000666000000","00000000000000000000006666600000","00000000000000000000066666660000","11111111111111111111166666661111","11111111111111111111166666661111","11111111111111111111116666611111","11111111111111111755511666111111","11111111111111111755111111111111","11111111111111111751111111111111","52222222222222255755222222222222","22222222222225555722222222222222","22222222222555577777722222222255","22222222255555577777722222225555","22222222555552222222222222555555","22222255555222222222222225555522","33332222233333333333333222223333","33322223333333333333322222333333","32222333333333333333222233333333","22223333333333333322222333333333","22333333333333332222233333333333","33333333333333222223333333333333","33333333333322222333333333333332","44444444444333344444444444444433","44444444433334444444444444443333","44444443333444444444444444333344","44444433344444444444444433334444","44443333444444444444444333344444","44333344444444444444433334444444","33334444444444444443333444444444"]}'::jsonb),
+  ('gallery_25_desert', 'Pyramiden im Abendlicht', 'game', 'common', '{"palette":["#ffd9a0","#ffbf7a","#f29a4a","#d97a2f","#a8592a","#7a3f1f","#fff1c4","#5a2f1a"],"grid":["66666666666666666666666666666666","66666666666666666666666666666666","66666666666666666666666666666666","66666666666666666666666666666666","66666666666666666666666666666666","66666666666666666666666666666666","00000000000000000066666666600000","00000000000000000066666666600000","00000000000000000066666666600000","00000000000000000006666666000000","00000000000000000006666666000000","00000000000000000000066600000000","11111111111111111111111111111111","11111111131111111111111111111111","11111111334111111111111111111111","11111113334411111111111111111111","11111133334441111111311111111111","11111333334444111113341111111111","00003333334444400033344000000000","00033333334444440333344400000000","00333333334444443333344440000000","03333333334444433333344444000000","11111111111111122222222211111111","11111111111222222222111111111111","11111112222222221111111111111111","11122222222211111111111111112222","22222222111111111111111122222222","22221111111111111111222222222111","11111111111111112222222221111111","11111111111122222222211111111111","11111111222222222111111111111111","11112222222221111111111111111222"]}'::jsonb),
+  ('gallery_26_desert', 'Wüstenwind', 'game', 'rare', '{"palette":["#ffd9a0","#ffbf7a","#f29a4a","#d97a2f","#a8592a","#7a3f1f","#fff1c4","#5a2f1a"],"grid":["66666666666666666666666666666666","66666666666666666666666666666666","66666666666666666666666666666666","66666666666666666666666666666666","66666666666666666666666666666666","66666666666666666666666666666666","00000000000000000066666666600000","00000000000000000066666666600000","00000000000000000066666666600000","00000000000000000006666666000000","00000000000000000006666666000000","00000000000000000000066600000000","11111111111111111111111111111111","11111111131111111111111111111111","11111111334111111111111111111111","11111113334411111111111111111111","11111133334441111111131111111111","11111333334444111111334111111111","00003333334444400003334400000000","00033333334444440033334440000000","00333333334444444333334444000000","03333333334444443333334444400000","11111111111111122222222211111111","11111111111222222222111111111111","11111112222222221111111111111111","11122222222211111111111111112222","22222222111111111111111122222222","22221111111111111111222222222111","11111111111111112222222221111111","11111111111122222222211111111111","11111111222222222111111111111111","11112222222221111111111111111222"]}'::jsonb),
+  ('gallery_27_aurora', 'Polarlicht', 'game', 'common', '{"palette":["#050a14","#0c1a2a","#2fd98c","#62e0ff","#9a6bff","#ffffff","#17303d","#1f4a3a"],"grid":["00000000000000000000000000000005","00000000000000000000000000000000","05000000000000000000000000005000","00000000005000000000050000000000","00000000000000052202250000000000","00000000000000002252002200000000","20000000000022220222222222000000","20220000022222000000002002220000","02002202052203333300000005222222","02200222233333330030050000002002","00000002303303353333300000002220","00000003330300050000333000000033","33333033444400000000333033303300","33300004004044440000000003333344","33334444440040404000005030304444","04400400000004004444000000444404","44414111111515114414444444411411","41411111111111111144414141141111","41111111111511111551414414111111","11111111111151111111111111111111","11111111111111111111111111111111","11111111111111111111111111111111","11111111111111111111111111111111","11111111116111111111111111111111","11111111166616166611111111111111","66616666666666666666111111111166","66666666666666666666616661166666","66666666666666666666666666666666","77777777777777777777777777777777","77777777777777777777777777777777","77777777777777777777777777777777","77777777777777777777777777777777"]}'::jsonb),
+  ('gallery_28_aurora', 'Grüner Schleier', 'game', 'common', '{"palette":["#050a14","#0c1a2a","#2fd98c","#62e0ff","#9a6bff","#ffffff","#17303d","#1f4a3a"],"grid":["00000050000000000000000000500050","00000000000000000000000000500005","05000000000000000000000000000000","00000000000000000000000000000000","00000000000000002020220000000000","00000000000000220220222200050000","00050000000222200000202220000000","02200000022220220000052222002000","00022202202233330300000002222222","00002202000303003333000000200225","00000003033005033033330000000000","00000333030300000033330000000030","33333334444440000000330033333330","30305444400404440000000000333304","00034440440004004400000033030444","00004400000000444040400000440404","44444111111111111414441114441115","11441111151115111111414444141111","41111151551111111111114411111111","11111111111111111111111111111111","11111111111111111111111111111111","11111111111111111111111111111111","11111111111111111111111111111111","11111111111166111111111161111111","61111111111666666111111666661161","66666611116666666611116666666666","66666666666666666666666666666666","66666666666666666666666666666666","77777777777777777777777777777777","77777777777777777777777777777777","77777777777777777777777777777777","77777777777777777777777777777777"]}'::jsonb),
+  ('gallery_29_aurora', 'Nordische Nacht', 'game', 'common', '{"palette":["#050a14","#0c1a2a","#2fd98c","#62e0ff","#9a6bff","#ffffff","#17303d","#1f4a3a"],"grid":["00000000050000000000000000000000","00000000000000000000000000000000","00000000500000000000000000000000","00000000005050000000000005000050","00000000000000002202200000500000","00000005000002222220022020000000","00000000000222202202222202200000","22200000002200000005055022002000","22022222222223333055000000020252","22020022033303033333000000000020","00020003333303030333300000000005","00500035000300000000303000000033","00033333444000000000030033330333","33330304400004440000003033300034","03504000504004054400000000334440","04044444500004044004400500040044","41444111111111114444144444411141","41111111111111111154114141441111","11111111111111111111144144111111","15111111111111111111111111111111","11111111111111111111111111111111","11111116111111111166611666666616","16666666666611111666666666666666","66666666666661116666666666666666","66666666666666166666666666666666","66666666666666666666666666666666","66666666666666666666666666666666","66666666666666666666666666666666","77777777777777777777777777777777","77777777777777777777777777777777","77777777777777777777777777777777","77777777777777777777777777777777"]}'::jsonb),
+  ('gallery_30_mondrian', 'Komposition in Rot', 'game', 'rare', '{"palette":["#f3efe4","#111318","#d93a2f","#2f5fd0","#ffd15c"],"grid":["00000000011000000000114444444444","00000000011000000000114444444444","00000000011000000000114444444444","00000000011000000000114444444444","00000000011000000000114444444444","00000000011000000000114444444444","00000000011000000000114444444444","00000000011000000000114444444444","00000000011000000000114444444444","00000000011000000000114444444444","11111111111111111111111111111111","11111111111111111111111111111111","33333333311000000000110000000000","33333333311000000000110000000000","33333333311000000000110000000000","33333333311000000000110000000000","33333333311000000000110000000000","33333333311000000000110000000000","33333333311000000000110000000000","33333333311000000000110000000000","33333333311000000000110000000000","33333333311000000000110000000000","33333333311000000000110000000000","11111111111111111111111111111111","11111111111111111111111111111111","00000000011000000000110000000000","00000000011000000000110000000000","00000000011000000000110000000000","00000000011000000000110000000000","00000000011000000000110000000000","00000000011000000000110000000000","00000000011000000000110000000000"]}'::jsonb),
+  ('gallery_31_mondrian', 'Raster Nr. 4', 'game', 'common', '{"palette":["#f3efe4","#111318","#d93a2f","#2f5fd0","#ffd15c"],"grid":["00000000000011222221133333333333","00000000000011222221133333333333","00000000000011222221133333333333","00000000000011222221133333333333","00000000000011222221133333333333","00000000000011222221133333333333","00000000000011222221133333333333","00000000000011222221133333333333","00000000000011222221133333333333","00000000000011222221133333333333","00000000000011222221133333333333","11111111111111111111111111111111","11111111111111111111111111111111","00000000000011333331100000000000","00000000000011333331100000000000","00000000000011333331100000000000","00000000000011333331100000000000","00000000000011333331100000000000","00000000000011333331100000000000","00000000000011333331100000000000","11111111111111111111111111111111","11111111111111111111111111111111","33333333333311222221100000000000","33333333333311222221100000000000","33333333333311222221100000000000","33333333333311222221100000000000","33333333333311222221100000000000","33333333333311222221100000000000","33333333333311222221100000000000","33333333333311222221100000000000","33333333333311222221100000000000","33333333333311222221100000000000"]}'::jsonb),
+  ('gallery_32_mondrian', 'Gelb und Blau', 'game', 'common', '{"palette":["#f3efe4","#111318","#d93a2f","#2f5fd0","#ffd15c"],"grid":["00000000001133333333333112222222","00000000001133333333333112222222","00000000001133333333333112222222","00000000001133333333333112222222","00000000001133333333333112222222","00000000001133333333333112222222","00000000001133333333333112222222","00000000001133333333333112222222","00000000001133333333333112222222","00000000001133333333333112222222","00000000001133333333333112222222","11111111111111111111111111111111","11111111111111111111111111111111","44444444441144444444444114444444","44444444441144444444444114444444","44444444441144444444444114444444","44444444441144444444444114444444","44444444441144444444444114444444","44444444441144444444444114444444","44444444441144444444444114444444","44444444441144444444444114444444","11111111111111111111111111111111","11111111111111111111111111111111","33333333331122222222222110000000","33333333331122222222222110000000","33333333331122222222222110000000","33333333331122222222222110000000","33333333331122222222222110000000","33333333331122222222222110000000","33333333331122222222222110000000","33333333331122222222222110000000","33333333331122222222222110000000"]}'::jsonb),
+  ('gallery_33_mondrian', 'Ordnung', 'game', 'common', '{"palette":["#f3efe4","#111318","#d93a2f","#2f5fd0","#ffd15c"],"grid":["00000001100000000000011000000000","00000001100000000000011000000000","00000001100000000000011000000000","00000001100000000000011000000000","00000001100000000000011000000000","00000001100000000000011000000000","00000001100000000000011000000000","00000001100000000000011000000000","00000001100000000000011000000000","00000001100000000000011000000000","11111111111111111111111111111111","11111111111111111111111111111111","22222221100000000000011000000000","22222221100000000000011000000000","22222221100000000000011000000000","22222221100000000000011000000000","22222221100000000000011000000000","22222221100000000000011000000000","22222221100000000000011000000000","22222221100000000000011000000000","22222221100000000000011000000000","22222221100000000000011000000000","22222221100000000000011000000000","22222221100000000000011000000000","11111111111111111111111111111111","11111111111111111111111111111111","22222221100000000000011000000000","22222221100000000000011000000000","22222221100000000000011000000000","22222221100000000000011000000000","22222221100000000000011000000000","22222221100000000000011000000000"]}'::jsonb),
+  ('gallery_34_seal', 'Die Goldene Nexa', 'game', 'legendary', '{"palette":["#1a1206","#3a2a0c","#7a5a1a","#c8962f","#ffd15c","#fff1a8","#ffffff","#a8792a"],"grid":["10000001000000100000510000001000","00000010000001000000100000010000","00000100000010050001000000100000","00001000000100222220000001000000","00010005001222333332220010000001","00100000022333333333332200000010","01000000253333444443333350000100","10000002333444444444443332001000","00000023334444333334444333210050","00000233344433333333344433320000","00005233444663333333664443320000","00012334443666333333663444332001","00105334433666633333663344332010","05002334433666633333663344332100","10023344333663663333663534433200","00023344333663566333663334433200","00023344333663336633663334433200","00023344333663336633653334433200","00023344333663333663663334433201","00102334433663333366663344332010","01002334433663333336663344332100","10002334443663333336663444332000","00000233444663333333664443320000","00000233344433333335344433320000","00001025334454333334444333200000","00010002333444444454443332000001","00100000233333444443333320000010","01000000122333333333332200000100","10000001000222333332220000001000","00000010000001222220100000010000","00000100000010000001000000100000","00001000000105005010000051000000"]}'::jsonb),
+  ('gallery_35_aurora', 'Das Licht der Gründer', 'game', 'legendary', '{"palette":["#050a14","#0c1a2a","#2fd98c","#62e0ff","#9a6bff","#ffffff","#17303d","#1f4a3a"],"grid":["00000050000005000000000000000000","00005000000005000000000000000005","00000000000050000000000000000000","05000000000000000000000000000000","00005000050000002222020000000000","00000000050002020025002000000000","20000000000022020202202222000000","22200000002220020000002002222000","00222222220233303300005200022002","00022222023330333333005000002220","00000202333035003330300000500002","00000303030050000000303300000533","33033030404444050000003033333333","30033344540440440000003033033334","33004040044444404400000003334444","04400000050000404444000000405444","41151111111111151141444444141141","41111111111111111114144444141111","51115111111111111111141111111111","11111111111111111111111111111111","11111111111111111111111111111111","11111111111111111111111111111111","11111111111111111111111111111111","11111111111111111111111111111111","66616666661111111111111111111111","66666666666611111111111111111111","66666666666666111111111111111116","66666666666666666666666666666666","77777777777777777777777777777777","77777777777777777777777777777777","77777777777777777777777777777777","77777777777777777777777777777777"]}'::jsonb),
+  ('gallery_36_city', 'Die erste Glocke', 'game', 'legendary', '{"palette":["#0b0e1f","#15193a","#232a57","#ffe9a3","#fff6d8","#2b2f45","#3c425e","#ffcf4d","#9ad8ff","#5d6679"],"grid":["00000000000000000800000000000008","00000000000000000000008000000000","00000000008000000000000800000000","00000000000000000000800044400000","00000008000000000000000444440008","00000000000000000000004444444000","00000000000000800000004444444000","00000000000008000000004444444000","00008000000000008000000444440008","00000000000000000000000044400000","11111111484111111111111111111111","11411111111111111111111111111666","11111555581111111111111111111666","11111555566611111111111111111636","11111535566611111114411111111666","11111555567611811114116666666636","11111555566611111111116666666666","11111555563611111111116363636666","66666535566611111111116666666666","66666555563611111111116663666636","66676555566622222222226666666666","66666555566655552222226366666636","67676535566655555555556666666666","66666555566655555555556666636666","66666575566655555357556666666666","66666555563655555555556366666666","67666535566655555355556666666666","66666555563655555555556666636636","67676575566655555555556666666666","66666555563653555555556366636636","63636535566655555355556666666666","66666555566655555555556666666666"]}'::jsonb)
+on conflict (gallery_key) do nothing;
 
 -- ===== market bootstrap (M1) =====
 select public.market_bootstrap();

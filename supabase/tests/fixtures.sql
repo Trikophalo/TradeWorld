@@ -1,5 +1,5 @@
 -- =============================================================================
--- Dumps one real response of every read/write RPC (M1, M2, M2b) as JSON files, so the
+-- Dumps one real response of every read/write RPC (M1 to M4a) as JSON files, so the
 -- frontend's Zod schemas can be tested against the database (contract test:
 -- src/features/game/api.test.ts). Run by verify_local.sh when
 -- NEXA_FIXTURE_DIR is set. Not an assertion file.
@@ -354,5 +354,65 @@ select tests.signup(:fx_gone, 'Fixture_Weg') is not null as ok \gset
 select tests.login_as('authenticated', :fx_gone) is null as ok \gset
 \o :fixture_dir/delete_account.json
 select public.delete_account('Fixture_Weg');
+\o
+reset role;
+
+-- M4a: artworks (ADR-080): painting, likes, auctions with a bid, a gallery sale
+select tests.fund(:p, 10000000, 'fixture:m4a:p');
+\set fx_k '''f1f1f1f1-0000-4000-8000-0000000000fa'''
+select tests.signup(:fx_k, 'Fixture_Kunst') is not null as ok \gset
+select tests.set_level(:fx_k, 8);
+select tests.fund(:fx_k, 3000000, 'fixture:m4a:k');
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/create_artwork.json
+select public.create_artwork(gen_random_uuid(), 'Fixture im Abendrot', tests.art(array['#1b1440', '#ffc46b', '#c8486b'], '2'));
+\o
+select (public.create_artwork(gen_random_uuid(), 'Zweites Fixture', tests.art()) #>> '{artwork,id}')::uuid as fx_art2 \gset
+reset role;
+select id as fx_art from public.artworks where creator_id = :p and title = 'Fixture im Abendrot' \gset
+insert into public.artwork_auctions (artwork_id, by_gallery, start_cents, ends_at, created_at)
+select a.id, true, public.artwork_gallery_start_cents(a.rarity), public.game_now() + interval '6 hours', public.game_now() - interval '2 days'
+  from public.artworks a
+ where a.owner_id is null and a.origin = 'game'
+   and not exists (select 1 from public.artwork_auctions x where x.artwork_id = a.id and x.status = 'open')
+ order by a.serial limit 1
+returning id as fx_gau, artwork_id as fx_gart, start_cents as fx_gstart \gset
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/start_auction.json
+select public.start_auction(gen_random_uuid(), :'fx_art', 50000, 24);
+\o
+select (public.start_auction(gen_random_uuid(), :'fx_art2', 50000, 1) #>> '{artwork,auction,id}')::uuid as fx_au2 \gset
+\o :fixture_dir/cancel_auction.json
+select public.cancel_auction(gen_random_uuid(), :'fx_au2');
+\o
+reset role;
+select id as fx_au1 from public.artwork_auctions where artwork_id = :'fx_art' and status = 'open' \gset
+select tests.login_as('authenticated', :fx_k) is null as ok \gset
+\o :fixture_dir/like_artwork.json
+select public.like_artwork(gen_random_uuid(), :'fx_art', true);
+\o :fixture_dir/bid_artwork.json
+select public.bid_artwork(gen_random_uuid(), :'fx_au1', 50000);
+\o
+select public.bid_artwork(gen_random_uuid(), :'fx_gau', :fx_gstart) is not null as ok \gset
+reset role;
+update public.artwork_auctions set ends_at = public.game_now() - interval '1 second' where id = :'fx_gau';
+select public.artworks_run_due() is not null as ok \gset
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/get_artwork.json
+select public.get_artwork(:'fx_art');
+\o :fixture_dir/get_artwork_sold.json
+select public.get_artwork(:'fx_gart');
+\o :fixture_dir/get_artworks.json
+select public.get_artworks('hot', 'all', false, 6, 0);
+\o :fixture_dir/get_artworks_auctions.json
+select public.get_artworks('ending', 'all', true, 6, 0);
+\o :fixture_dir/get_art_studio.json
+select public.get_art_studio();
+\o :fixture_dir/get_art_rankings.json
+select public.get_art_rankings(5);
+\o :fixture_dir/get_collection.json
+select public.get_collection('Fixture_Kunst');
+\o :fixture_dir/get_collection_own.json
+select public.get_collection(null);
 \o
 reset role;
