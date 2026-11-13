@@ -105,8 +105,21 @@ test("later features are visible but locked", async ({ page }) => {
   await page.getByRole("radio", { name: /Anleihen/ }).click();
   await expect(page.getByText("Staatsanleihe 10 Jahre")).toBeVisible();
   await expect(page.getByRole("button", { name: "Kaufen" })).toHaveCount(0);
+  // The profile lists what comes later; the start page stays calm (ADR-109).
+  await page.goto("/profile");
+  await expect(page.getByText("Freischaltungen")).toBeVisible();
+});
+
+test("the start page is calm: one scene, one next step, the vault (ADR-109)", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByText("Später freischaltbar")).toBeVisible();
+  await expect(page.getByTestId("home-hero")).toContainText("Dein Vermögen");
+  const next = page.getByTestId("today");
+  await expect(next.locator("[data-primary]")).toHaveCount(1);
+  await expect(next.locator("[data-task]")).toHaveCount(3);
+  await expect(page.getByRole("button", { name: "Tresor leeren" })).toBeVisible();
+  // No rankings, feed, index or movers here any more.
+  await expect(page.getByTestId("feed-preview")).toHaveCount(0);
+  await expect(page.getByText("Top-Mover")).toHaveCount(0);
 });
 
 test("the sign-in page explains demo mode", async ({ page }) => {

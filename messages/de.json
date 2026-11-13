@@ -107,7 +107,24 @@
     "sinceStart": "seit Spielstart",
     "comingUp": "Später freischaltbar",
     "eventsLink": "Events und Nachrichten",
-    "eventsHint": "Termine, Ergebnisse und Schlagzeilen"
+    "eventsHint": "Termine, Ergebnisse und Schlagzeilen",
+    "next": {
+      "title": "Als Nächstes",
+      "then": "Danach",
+      "go": "Los geht's"
+    },
+    "stats": {
+      "level": "Level {level}",
+      "nextUnlock": "Bald: {name} (Level {level})",
+      "xp": "Noch {xp} XP",
+      "rank": "Platz {rank}",
+      "rankNone": "Rangliste",
+      "rankGap": "Noch {amount} bis Platz {rank}",
+      "rankOf": "von {total}",
+      "missions": "Missionen",
+      "missionsReady": "{count, plural, one {# Belohnung abholbereit} other {# Belohnungen abholbereit}}",
+      "missionsHint": "Aufgaben erledigen, XP kassieren"
+    }
   },
   "vault": {
     "title": "Tresor",

@@ -58,13 +58,9 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("feed on the start page and in the friends hub, applause toggles", async ({ page }) => {
-  await page.goto("/");
-  const preview = page.getByTestId("feed-preview");
-  await expect(preview).toContainText("hat mit Volta Energie AG 4.120 € Gewinn gemacht");
-  await expect(page.getByTestId("league-preview")).toContainText("Platz 1 von 1");
-
+test("feed in the friends hub, applause toggles", async ({ page }) => {
   await page.goto("/friends");
+  await expect(page.getByTestId("feed")).toContainText("hat mit Volta Energie AG 4.120 € Gewinn gemacht");
   const first = page.getByTestId("feed").getByTestId("feed-item").first();
   await expect(first).toHaveAttribute("data-kind", "big_trade");
   const react = first.getByTestId("feed-react");

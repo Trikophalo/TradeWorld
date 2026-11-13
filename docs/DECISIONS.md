@@ -1537,3 +1537,22 @@ ein Akzent-Pixel vor jeder Abschnittsüberschrift, schmale Scrollbalken und eine
 **Grenzen:** Zahlen bleiben in der glatten Schrift (Lesbarkeit). Animiert wird nur `transform` und `opacity`; mit
 „Animationen: Reduziert“ entfallen Dauerschleifen und Funken. Kontraste der Textfarben sind weiter getestet
 (`tokens.test.ts`).
+
+## ADR-109: Startseite ruhig und einfach — `akzeptiert`
+
+Vorgabe: Die Startseite überfordert extrem. Sie soll schön und simpel sein, sodass man immer Lust hat, ins Spiel zu
+kommen.
+
+**Befund:** Auf der Startseite standen bis zu elf Karten: „Heute dran“ mit vier Aufgaben, Vermögen, Tresor, Missionen,
+Rang, Freunde-Feed, Index, Top-Mover, nächstes Ziel, Wochenliga und Termine.
+
+**Entscheidung:** Vier Dinge, die auf einen Bildschirm passen:
+
+1. **Szene:** Finn begrüßt mit einem Satz, daneben groß das Vermögen, darunter die Skyline.
+2. **Als Nächstes:** genau eine große Aufgabe mit einem Knopf; höchstens zwei weitere klein unter „Danach“.
+3. **Tresor** wie bisher (täglicher Griff).
+4. **Drei Kacheln** ab Level 2: Level mit nächster Freischaltung, eigener Rang, Missionen.
+
+Rangliste, Freunde-Feed, Wochenliga, Index, Top-Mover und Termine stehen nicht mehr auf der Startseite. Sie sind auf
+ihren Seiten (Ranglisten, Freunde, Märkte, Events) und über Menü und Kacheln einen Tipp entfernt. Der Schulden-Hinweis
+erscheint weiter, wenn er nötig ist. `todayTasks` liefert dafür drei statt vier Aufgaben.

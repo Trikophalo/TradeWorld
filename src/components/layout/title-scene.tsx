@@ -49,8 +49,43 @@ const STARS = (() => {
   }));
 })();
 
-export function TitleScene() {
+/** The skyline alone: a strip of the city with lit windows, 200 × 30 units, drawn crisp at any size. */
+export function CitySkyline({ className }: { className?: string }) {
   const lit = sequence(5);
+  return (
+    <svg aria-hidden viewBox={`0 0 200 ${GROUND}`} className={`[shape-rendering:crispEdges] ${className ?? ""}`}>
+      {FAR.map((b) => (
+        <rect key={`f${b.x}`} x={b.x} y={GROUND - b.h} width={b.w} height={b.h} fill="var(--bg-2)" />
+      ))}
+      {NEAR.map((b) => (
+        <g key={`n${b.x}`}>
+          <rect x={b.x} y={GROUND - b.h} width={b.w} height={b.h} fill="var(--bg-3)" />
+          {Array.from({ length: Math.floor((b.h - 3) / 4) }, (_, row) =>
+            Array.from({ length: Math.floor((b.w - 2) / 3) }, (_, col) => {
+              const roll = lit();
+              if (roll > 0.42) return null;
+              return (
+                <rect
+                  key={`${row}-${col}`}
+                  x={b.x + 1.5 + col * 3}
+                  y={GROUND - b.h + 2 + row * 4}
+                  width={1.4}
+                  height={1.8}
+                  fill="var(--gold)"
+                  opacity={0.75}
+                  className={roll < 0.12 ? "animate-twinkle" : undefined}
+                  style={roll < 0.12 ? { animationDelay: `${Math.round(roll * 400) / 10}s` } : undefined}
+                />
+              );
+            }),
+          )}
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+export function TitleScene() {
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
       {STARS.map((star) => (
@@ -64,38 +99,7 @@ export function TitleScene() {
         <PixelIcon {...MOON} scale={4} className="sm:hidden" />
         <PixelIcon {...MOON} scale={5} className="hidden sm:block" />
       </span>
-      <svg
-        viewBox={`0 0 200 ${GROUND}`}
-        className="absolute bottom-0 left-1/2 w-full min-w-160 -translate-x-1/2 [shape-rendering:crispEdges]"
-      >
-        {FAR.map((b) => (
-          <rect key={`f${b.x}`} x={b.x} y={GROUND - b.h} width={b.w} height={b.h} fill="var(--bg-2)" />
-        ))}
-        {NEAR.map((b) => (
-          <g key={`n${b.x}`}>
-            <rect x={b.x} y={GROUND - b.h} width={b.w} height={b.h} fill="var(--bg-3)" />
-            {Array.from({ length: Math.floor((b.h - 3) / 4) }, (_, row) =>
-              Array.from({ length: Math.floor((b.w - 2) / 3) }, (_, col) => {
-                const roll = lit();
-                if (roll > 0.42) return null;
-                return (
-                  <rect
-                    key={`${row}-${col}`}
-                    x={b.x + 1.5 + col * 3}
-                    y={GROUND - b.h + 2 + row * 4}
-                    width={1.4}
-                    height={1.8}
-                    fill="var(--gold)"
-                    opacity={0.75}
-                    className={roll < 0.12 ? "animate-twinkle" : undefined}
-                    style={roll < 0.12 ? { animationDelay: `${Math.round(roll * 400) / 10}s` } : undefined}
-                  />
-                );
-              }),
-            )}
-          </g>
-        ))}
-      </svg>
+      <CitySkyline className="absolute bottom-0 left-1/2 w-full min-w-160 -translate-x-1/2" />
     </div>
   );
 }

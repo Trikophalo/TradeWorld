@@ -8,10 +8,8 @@
  * unlock rules in BALANCE.progression and enforced on the server.
  */
 export const DISCLOSURE = {
-  /** Lead index chart on the start page. Level 2 is reached by finishing the tutorial. */
-  homeIndex: 2,
-  homeEvents: 3,
-  homeNews: 3,
+  /** Level, rank and missions tiles on the start page (ADR-109). Level 2 is reached by finishing the tutorial. */
+  homeStats: 2,
   /** Key figures and order book arrive with limit orders. */
   stockStats: 2,
   stockOrderBook: 3,
@@ -19,8 +17,6 @@ export const DISCLOSURE = {
   profileCareer: 2,
   /** Friends (ADR-084): after the tutorial, when the game has a first shape. */
   profileFriends: 2,
-  /** Friends feed and weekly league on the start page (ADR-088, ADR-089). */
-  homeSocial: 2,
   /** Link from the vault to the upgrades (ADR-093): not during the tutorial. */
   homeUpgrades: 2,
 } as const;

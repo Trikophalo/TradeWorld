@@ -15,8 +15,8 @@ test("a new player is guided through the first session and cannot skip it", asyn
   // A beginner sees a calm start page; later features are there, but locked.
   const nav = page.getByRole("navigation", { name: "Hauptnavigation" }).filter({ visible: true });
   await expect(nav.getByRole("link", { name: /Karriere/ })).toBeVisible();
-  // Missions are there from the start.
-  await expect(page.getByRole("heading", { name: "Missionen" })).toBeVisible();
+  // Missions are there from the start: in the top bar (the start page itself stays calm, ADR-109).
+  await expect(page.getByRole("banner").getByRole("link", { name: /Missionen/ })).toBeVisible();
 
   // There is nothing to close, and Escape does nothing.
   await page.keyboard.press("Escape");
@@ -73,7 +73,7 @@ test("a new player is guided through the first session and cannot skip it", asyn
   await expect(page.getByText("Level 2").filter({ visible: true }).first()).toBeVisible();
   await page.goto("/");
   await expect(finn(page)).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Alle Missionen" })).toBeVisible();
+  await expect(page.getByTestId("tile-missions")).toBeVisible();
   expect(errors).toEqual([]);
 });
 
