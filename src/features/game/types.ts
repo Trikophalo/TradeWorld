@@ -587,6 +587,29 @@ export interface PromotionResult {
   chanceBps: number | null;
 }
 
+// ------------------------------------------------------------------ org chart (ADR-104)
+
+export interface OrgPerson {
+  nickname: string;
+  tag: string | null;
+  avatarKey: string;
+  isMe: boolean;
+}
+
+export interface OrgMember extends OrgPerson {
+  tier: CareerTier;
+  title: string | null;
+  since: string | null;
+}
+
+export interface CompanyOrg {
+  company: { id: string; name: string; tier: CompanyTier };
+  founder: OrgPerson;
+  members: OrgMember[];
+  aiWorkers: number;
+  aiWorkerSkills: string[];
+}
+
 // ------------------------------------------------------------------ campaigns (ADR-097)
 
 export type CampaignKind = "flyer" | "online" | "tv";
@@ -1434,6 +1457,8 @@ export interface GameEngine {
   requestPromotion(requestId: string): Promise<PromotionResult>;
   upgrades(): Promise<UpgradesState>;
   buyUpgrade(requestId: string, key: UpgradeKey): Promise<BuyUpgradeResult>;
+  /** Org chart of a player company for the founder and the staff (ADR-104). */
+  companyOrg(companyId: string): Promise<CompanyOrg>;
   /** Marketing campaign of the own company (ADR-097). */
   startCampaign(requestId: string, companyId: string, kind: CampaignKind): Promise<CompanyCampaign>;
   /** Deals between players (ADR-098). */

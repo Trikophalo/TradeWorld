@@ -49,10 +49,10 @@ async function hold(page: Page, name: RegExp) {
   await page.mouse.up();
 }
 
-test("artworks are locked below level 8", async ({ page }) => {
+test("artworks are locked below level 4 (ADR-099)", async ({ page }) => {
   await preparePlayer(page, 100);
   await page.goto("/artworks");
-  await expect(page.getByText("Ab Level 8")).toBeVisible();
+  await expect(page.getByText("Ab Level 4")).toBeVisible();
 });
 
 test("marketplace: gallery works, like, bid on an auction", async ({ page }) => {

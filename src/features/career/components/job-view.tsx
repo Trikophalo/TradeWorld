@@ -1,5 +1,6 @@
 "use client";
 
+import { AiOrgChart, OrgChart } from "@/features/company/components/org-chart";
 import { CompanyNewsCard, SituationCard } from "@/features/company/components/situation";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
@@ -36,6 +37,8 @@ export function JobView() {
   const job = useMyJob();
   const company = useMyCompany();
   const employer = useEmployer(Boolean(job.data));
+  const nickname = useGame((state) => state.portfolio?.nickname ?? "");
+  const avatarKey = useGame((state) => state.portfolio?.avatarKey ?? null);
 
   if (job.isPending) return <Skeleton className="h-96 w-full rounded-lg" />;
 
@@ -61,6 +64,11 @@ export function JobView() {
         <WorkerCard job={job.data} />
         <ActiveJob job={job.data} />
         <CareerLadder job={job.data} />
+        {employer.data?.kind === "player" ? (
+          <OrgChart companyId={employer.data.company.id} />
+        ) : (
+          <AiOrgChart job={job.data} nickname={nickname} avatarKey={avatarKey ?? "rookie"} />
+        )}
         {/* Staff of a player company see its situation and news (ADR-091). */}
         {employer.data?.kind === "player" && (
           <>

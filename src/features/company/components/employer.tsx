@@ -28,6 +28,7 @@ import type { CareerTier, CompanyApplication, JobRequirementInfo, MyCompany, Tea
 import { formatBps, formatMoney } from "@/lib/format";
 import { fitPercent } from "@/lib/sim/skills";
 import { trainingFor } from "@/lib/sim/startup";
+import { OrgChart } from "./org-chart";
 import { isDemoMode } from "@/lib/supabase/env";
 import { playSound } from "@/lib/sound";
 import { haptic } from "@/lib/haptics";
@@ -678,6 +679,7 @@ export function TeamView({ company, onHire }: { company: MyCompany; onHire: (req
   const free = Math.max(0, company.maxEmployees - used);
   return (
     <div className="space-y-8">
+      <OrgChart companyId={company.id} />
       <Section title={t("seatsTitle")} aside={t("staffCount", { used, max: company.maxEmployees })}>
         {!team.data ? (
           <Skeleton className="h-32 w-full rounded-lg" />

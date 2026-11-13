@@ -3950,5 +3950,18 @@
         "text": "Kauf günstig, verkauf teuer. Die Top-Mover zeigen, was sich bewegt."
       }
     }
+  },
+  "org": {
+    "title": "Aufbau von {company}",
+    "count": "{count, plural, one {# Person} other {# Personen}}",
+    "founder": "Gründer (CEO)",
+    "yourBoss": "deine Vorgesetzten",
+    "more": "+{count} weitere",
+    "ai": "KI-Kräfte",
+    "aiCount": "{count} KI-Kräfte",
+    "you": "Du",
+    "aiBoard": "KI-Vorstand",
+    "aiBoss": "KI-Chefin",
+    "hint": "Wer einen Rang höher steht, ist Vorgesetzter. Mit Beförderungen steigst du auf, in größeren Firmen gibt es mehr Ebenen."
   }
 }

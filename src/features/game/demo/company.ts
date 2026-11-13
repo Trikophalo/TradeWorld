@@ -770,6 +770,7 @@ export function createCompanyEngine(host: CompanyHost) {
     | "expandCompany"
     | "setFounderPayout"
     | "startCampaign"
+    | "companyOrg"
     | "companyPostings"
     | "createJobPosting"
     | "closeJobPosting"
@@ -972,6 +973,19 @@ export function createCompanyEngine(host: CompanyHost) {
         if (!isValidFounderPayout(bps)) throw new GameError("invalid_argument");
         company.founderPayoutBps = bps;
       }),
+
+    // Demo companies have only the founder and AI workers (ADR-104).
+    async companyOrg(companyId) {
+      const company = own();
+      if (company.id !== companyId) throw new GameError("company_not_found");
+      return {
+        company: { id: company.id, name: company.name, tier: company.tier },
+        founder: { nickname: host.nickname(), tag: null, avatarKey: host.avatarKey(), isMe: true },
+        members: [],
+        aiWorkers: company.aiWorkers,
+        aiWorkerSkills: company.aiWorkerSkills ?? [],
+      };
+    },
 
     startCampaign: (requestId, _companyId, kind) =>
       mutate(requestId, (company) => {

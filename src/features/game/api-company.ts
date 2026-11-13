@@ -388,6 +388,28 @@ export const COMPANY_RPC_SCHEMAS = {
   expand_company: wrapped,
   set_founder_payout: wrapped,
   start_campaign: campaignSchema,
+  get_company_org: z.object({
+    company: z.object({ id: z.string(), name: z.string(), tier: z.enum(["garage", "small_business", "gmbh", "ag"]) }),
+    founder: z.object({
+      nickname: z.string(),
+      tag: z.string().nullable().default(null),
+      avatar_key: z.string(),
+      is_me: z.boolean(),
+    }),
+    members: z.array(
+      z.object({
+        nickname: z.string(),
+        tag: z.string().nullable().default(null),
+        avatar_key: z.string(),
+        tier,
+        title: z.string().nullable().default(null),
+        since: iso.nullable().default(null),
+        is_me: z.boolean(),
+      }),
+    ),
+    ai_workers: num,
+    ai_worker_skills: z.array(z.string()).default([]),
+  }),
   get_company_postings: z.object({ postings: z.array(postingSchema) }),
   create_job_posting: z.object({ id: z.string() }).passthrough(),
   close_job_posting: z.object({ id: z.string(), status: z.literal("closed") }),
@@ -627,6 +649,7 @@ type CompanyEngine = Pick<
   | "respondRaise"
   | "promoteEmployee"
   | "startCampaign"
+  | "companyOrg"
   | "declinePromotion"
   | "trainEmployee"
   | "setCompanyLogo"
@@ -782,6 +805,30 @@ export const liveCompanyEngine: CompanyEngine = {
     return requireCompany(
       await rpc("set_founder_payout", { p_request_id: requestId, p_bps: bps }, S.set_founder_payout),
     );
+  },
+
+  async companyOrg(companyId) {
+    const r = await rpc("get_company_org", { p_company_id: companyId }, S.get_company_org);
+    return {
+      company: r.company,
+      founder: {
+        nickname: r.founder.nickname,
+        tag: r.founder.tag,
+        avatarKey: r.founder.avatar_key,
+        isMe: r.founder.is_me,
+      },
+      members: r.members.map((m) => ({
+        nickname: m.nickname,
+        tag: m.tag,
+        avatarKey: m.avatar_key,
+        tier: m.tier,
+        title: m.title,
+        since: m.since,
+        isMe: m.is_me,
+      })),
+      aiWorkers: r.ai_workers,
+      aiWorkerSkills: r.ai_worker_skills,
+    };
   },
 
   async startCampaign(requestId, companyId, kind) {
