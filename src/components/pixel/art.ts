@@ -522,6 +522,29 @@ export const WALLET: PixelArt = {
   ],
 };
 
+/** Missions (ADR-102): a clipboard with a golden clip, two tasks ticked off, one still open. */
+export const QUEST_BOARD: PixelArt = {
+  palette: { k: "#1c2230", b: "#a0612c", p: "#f2efe6", g: "#2fd98c", l: "#8e99ad", y: "#f2c14e" },
+  grid: [
+    "......kkkk......",
+    ".....kyyyyk.....",
+    "..kkkkykkykkkkk.",
+    "..kbbbkkkkbbbbk.",
+    "..kbpppppppppbk.",
+    "..kbpggplllllbk.",
+    "..kbpggppppppbk.",
+    "..kbpppppppppbk.",
+    "..kbpggplllllbk.",
+    "..kbpggppppppbk.",
+    "..kbpppppppppbk.",
+    "..kbpllplllllbk.",
+    "..kbpllppppppbk.",
+    "..kbpppppppppbk.",
+    "..kbbbbbbbbbbbk.",
+    "..kkkkkkkkkkkkk.",
+  ],
+};
+
 /** Marketing campaigns (ADR-097). */
 export const MEGAPHONE: PixelArt = {
   palette: { k: "#1c2230", r: "#ef5b5b", h: "#ffb3b3", s: "#8e99ad" },
@@ -1062,6 +1085,7 @@ export const ALL_PIXEL_ART: Record<string, PixelArt> = {
   alarm_clock: ALARM_CLOCK,
   speech: SPEECH,
   megaphone: MEGAPHONE,
+  quest_board: QUEST_BOARD,
   graduate: GRADUATE,
   palette: PALETTE,
   gears: GEARS,

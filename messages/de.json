@@ -3833,5 +3833,116 @@
     "loanLimit": "Kredite: bis {amount} (20.000 € je Level, du bist Level {level}).",
     "companyLimit": "Deine Firma ist {value} wert: Lieferverträge und Teilhaber bis {amount}. Wächst die Firma, werden größere Deals möglich.",
     "noCompany": "Lieferverträge und Teilhaber brauchen eine eigene Firma. Kredite gehen auch ohne."
+  },
+  "today": {
+    "title": "Heute dran",
+    "count": "{count, plural, =0 {alles erledigt} one {# Sache} other {# Sachen}}",
+    "hello": "Hallo {name}!",
+    "greeting": {
+      "morning": "Guten Morgen, {name}!",
+      "day": "Hey {name}!",
+      "evening": "Guten Abend, {name}!",
+      "night": "Noch wach, {name}?"
+    },
+    "lines": {
+      "about": {
+        "daily": "Deine Tagesbelohnung wartet. Hol sie dir, bevor die Serie reißt!",
+        "vault": "Dein Tresor ist fast voll. Was nicht reinpasst, ist weg. Schnell leeren!",
+        "missions": "Du hast Missionen geschafft! Die XP wollen abgeholt werden.",
+        "companyEvent": "In deiner Firma brennt's! Schau dir die Lage an und entscheide, was ihr tut.",
+        "allDone": "Alles erledigt. Zeit für einen Blick auf die Märkte, vielleicht ist ein Schnäppchen dabei."
+      },
+      "morning": {
+        "0": "Kaffee steht, Märkte wachen auf. Hier ist, was heute ansteht.",
+        "1": "Früher Vogel fängt die Rendite. Los geht's!",
+        "2": "Neuer Tag, neue Kurse. Das hier lohnt sich zuerst.",
+        "3": "Ich hab schon mal geschaut, was dran ist."
+      },
+      "day": {
+        "0": "Mittagszeit an der Börse. Kurz durchgehen?",
+        "1": "Läuft bei dir! Das hier bringt dich weiter.",
+        "2": "Die Kurse tanzen, wir bleiben cool. Erst das hier.",
+        "3": "Kleine Schritte, großes Vermögen. Hier sind die nächsten."
+      },
+      "evening": {
+        "0": "Feierabend? Fast. Erst noch das hier.",
+        "1": "Ruhiger Abend, gute Zeit für Entscheidungen.",
+        "2": "Bevor die Nachbörse beginnt: das hier.",
+        "3": "Der Tag war gut zu dir. Mach ihn rund."
+      },
+      "night": {
+        "0": "Die Nachbörse schläft nie, und du anscheinend auch nicht.",
+        "1": "Nachtschicht! Hier ist, was noch geht.",
+        "2": "Psst, die Kryptos laufen nachts weiter.",
+        "3": "Kurz vorm Schlafen noch Geld verdienen? Gern."
+      }
+    },
+    "features": {
+      "artworks": "Artworks",
+      "company": "Firma gründen",
+      "deals": "Deals",
+      "property": "Grundstück",
+      "crypto": "Kryptowährungen"
+    },
+    "tasks": {
+      "daily": {
+        "title": "Tagesbelohnung abholen",
+        "text": "Jeden Tag eine Truhe. Wer dranbleibt, bekommt mehr.",
+        "action": "Öffnen"
+      },
+      "vault": {
+        "title": "Tresor leeren: {amount}",
+        "text": "Dein Grundeinkommen sammelt sich hier. Ist er voll, geht nichts mehr rein.",
+        "action": "Leeren"
+      },
+      "missions": {
+        "title": "{count, plural, one {# Mission} other {# Missionen}} abholen",
+        "text": "Geschafft! Hol dir die XP."
+      },
+      "companyEvent": {
+        "title": "Lage in deiner Firma",
+        "text": "Eine Krise oder Chance wartet auf deine Entscheidung."
+      },
+      "promotion": {
+        "title": "Beförderung möglich",
+        "text": "Du erfüllst alle Anforderungen. Frag deinen Chef."
+      },
+      "workTask": {
+        "title": "Arbeitsaufgabe offen",
+        "text": "Kurz lösen, Extra-Lohn kassieren."
+      },
+      "dealOffers": {
+        "title": "{count, plural, one {# Deal-Angebot} other {# Deal-Angebote}} für dich",
+        "text": "Ein Spieler will mit dir handeln. Schau aufs Vertrauen."
+      },
+      "newFeature": {
+        "title": "Neu: {feature}",
+        "text": "Gerade freigeschaltet. Schau es dir an!"
+      },
+      "findJob": {
+        "title": "Such dir einen Job",
+        "text": "Ein Job zahlt jede Stunde Lohn und bringt XP und Skillpunkte."
+      },
+      "foundCompany": {
+        "title": "Gründe deine erste Firma",
+        "text": "Eine Garage reicht für den Anfang. Sie arbeitet von selbst."
+      },
+      "skills": {
+        "title": "{count, plural, one {# Skillpunkt} other {# Skillpunkte}} frei",
+        "text": "Lerne einen Skill: mehr Lohn, bessere Jobs, Beförderungen."
+      },
+      "companyCustomers": {
+        "title": "Deiner Firma fehlen Kunden",
+        "text": "Mehr Bekanntheit hilft: Kampagne oder günstigere Preise."
+      },
+      "companyStaff": {
+        "title": "Deiner Firma fehlen Leute",
+        "text": "Kunden warten. Stelle jemanden ein oder kauf per Deal zu."
+      },
+      "markets": {
+        "title": "Schau auf die Märkte",
+        "text": "Kauf günstig, verkauf teuer. Die Top-Mover zeigen, was sich bewegt."
+      }
+    }
   }
 }

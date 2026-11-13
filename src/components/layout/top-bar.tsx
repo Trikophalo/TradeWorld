@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { BULL, UI_ICONS } from "@/components/pixel/art";
+import { QUEST_BOARD, UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Avatar } from "@/components/ui/avatar";
 import { useGame } from "@/features/game/store";
@@ -70,7 +70,7 @@ function MissionsButton() {
       data-testid="missions-button"
       className="relative flex h-10 items-center gap-2 rounded-md px-1.5 text-sm text-fg-2 focus-ring transition duration-fast hover:bg-surface-2 hover:text-fg-1 active:scale-95 sm:px-2.5"
     >
-      <PixelIcon {...BULL} scale={2} />
+      <PixelIcon {...QUEST_BOARD} scale={2} />
       <span className="hidden xl:inline">{t("missions")}</span>
       {claimable > 0 && (
         <span className="absolute top-1.5 right-1.5 grid size-2.5 place-items-center" data-testid="missions-dot">
