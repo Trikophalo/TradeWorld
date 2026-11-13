@@ -672,6 +672,8 @@ export type FinnMood = keyof typeof FINN;
 // ---------------------------------------------------------------- interface icons (12×12, single colour)
 
 const mono = { x: "currentColor" } as const;
+/** Mono icons with a second, lighter tone of the same colour (follows the active state like `mono`). */
+const duo = { x: "currentColor", o: "color-mix(in srgb, currentColor 45%, transparent)" } as const;
 
 export const UI_ICONS = {
   home: {
@@ -897,21 +899,22 @@ export const UI_ICONS = {
       "....xxxx....",
     ],
   },
+  /** A contract being signed: the page, two lines of text, the pen setting the signature (deals, ADR-098). */
   deal: {
-    palette: mono,
+    palette: duo,
     grid: [
-      "............",
-      "xx........xx",
-      "xxx......xxx",
-      "xxxx.xx.xxxx",
-      "xx.xxxxxx.xx",
-      "xx..xxxxx.xx",
-      "xx.xxxxxx.xx",
-      "xx..xxxx..xx",
-      "xx...xx...xx",
-      "............",
-      "............",
-      "............",
+      "...........x",
+      "xxxxxxx...xx",
+      "x.....x..xx.",
+      "x.ooo...xx..",
+      "x......xx.x.",
+      "x.oooo.x..x.",
+      "x.....x...x.",
+      "x.........x.",
+      "x.xx..xx..x.",
+      "x...xx..x.x.",
+      "x.........x.",
+      "xxxxxxxxxxx.",
     ],
   },
   star: {
