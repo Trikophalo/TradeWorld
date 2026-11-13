@@ -83,7 +83,7 @@ export interface TrustConfig {
 }
 
 export const DEALS: DealsConfig = {
-  minLevel: 4,
+  minLevel: 7,
   offerValidHours: 48,
   maxOpenOffers: 5,
   maxActivePerKind: 5,

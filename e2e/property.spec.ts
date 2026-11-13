@@ -52,7 +52,7 @@ async function hold(page: Page, name: RegExp) {
 }
 
 test("buy a flat, shop furniture and furnish it", async ({ page }) => {
-  await preparePlayer(page, 5_000, 5_000_000);
+  await preparePlayer(page, 16_000, 5_000_000);
   await page.goto("/property");
   await expect(page.getByTestId("tier-ladder")).toBeVisible();
   await hold(page, /kaufen für 25\.000 €/);

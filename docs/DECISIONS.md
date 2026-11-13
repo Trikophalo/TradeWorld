@@ -1279,3 +1279,27 @@ Vorgabe: Viel soll über Vertrauen zwischen Spielern laufen.
   - Beim Neustart eines Kontos zahlt der Spieler zuerst seine Kredite zurück, soweit sein Geld reicht; dann
     verschwinden seine Deals und sein Vertrauensverlauf.
   - Grenze: Liefervertrag-Erlöse zählen nicht zum Stundengewinn, aus dem Teilhaber und Gründer bezahlt werden.
+
+## ADR-099: Reihenfolge der Freischaltungen — `akzeptiert`
+
+Vorgabe: Erst Jobs, dann Artworks, dann Firmen, dann Grundstücke. Nichts allzu spät, aber für manches soll man etwas
+grinden.
+
+| Level | Neu                                                          | etwa nach (aktiver Spieler) |
+| ----- | ------------------------------------------------------------ | --------------------------- |
+| 2     | erster Job (Ende des Tutorials)                              | Minuten                     |
+| 3     | Limit-Orders, Watchlist                                      | erste Stunde                |
+| 4     | **Artworks** (vorher 8)                                      | erster Tag                  |
+| 5     | Stop-Loss, Anleihen, Junior-Jobs                             | erster Tag                  |
+| 6     | **Garagen-Startup** (vorher 3)                               | zweiter Tag                 |
+| 7     | Deals unter Spielern (vorher 4), Analystenberichte           | dritter Tag                 |
+| 8     | **Grundstück** (vorher 4), Leerverkäufe                      | vierter bis fünfter Tag     |
+| 9     | Börsengang der eigenen Firma (vorher 6 bzw. 25 in der Liste) | knapp eine Woche            |
+| 10    | Kleinunternehmen, **Kryptowährungen** (neu, ADR-101)         | etwa eine Woche             |
+| 14    | **eigene Kryptowährung** (neu, ADR-101)                      | etwa zwei Wochen            |
+| 15    | GmbH (Liste jetzt passend zur Gründungsregel)                | etwa drei Wochen            |
+
+- Die Werte stehen in `progression.unlocks`, `startups.garage.minLevel`, `startups.ipo.minLevel`, `deals.minLevel`
+  und den Wohnungsstufen (`property.tiers`: Wohnung ab 8, Apartment ab 11). Der Server liest sie aus `game_config`.
+- Wer eine Funktion schon genutzt hat, behält sie: Bestehende Firmen, Wohnungen und Deals bleiben, auch wenn das Level
+  jetzt höher liegen müsste. Neu gründen, kaufen oder anbieten geht erst ab dem neuen Level.

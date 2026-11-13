@@ -345,7 +345,7 @@
     "found_gmbh": "GmbH gründen",
     "loans_250k": "Kredite bis 250.000 €",
     "team_lead_jobs": "Teamleitung",
-    "ipo": "Börsengang",
+    "ipo": "Börsengang der eigenen Firma",
     "c_level_jobs": "C-Level-Jobs",
     "leverage_10x": "Hebel 10×",
     "options": "Optionen (Calls und Puts)",
@@ -358,7 +358,9 @@
     "found_garage": "Garagen-Startup gründen",
     "artworks": "Artworks: Pixel-Kunst sammeln und versteigern",
     "property": "Grundstück: eigene Wohnung kaufen und einrichten",
-    "deals": "Deals: Kredite, Lieferverträge und Teilhaber unter Spielern"
+    "deals": "Deals: Kredite, Lieferverträge und Teilhaber unter Spielern",
+    "crypto": "Kryptowährungen handeln",
+    "crypto_create": "Eigene Kryptowährung entwickeln"
   },
   "auth": {
     "loginTitle": "Willkommen zurück",
@@ -664,7 +666,7 @@
     "training_locked": "Schulungen gibt es erst ab 5 Leuten im Team.",
     "logo_locked": "Dein Logo steht fest und lässt sich nicht mehr ändern.",
     "logo_forbidden": "Dieses Logo zeigt ein verbotenes Symbol.",
-    "artworks_locked": "Artworks schaltest du mit Level 8 frei.",
+    "artworks_locked": "Artworks schaltest du mit Level 4 frei.",
     "artwork_not_found": "Dieses Kunstwerk gibt es nicht oder es gehört dir nicht.",
     "auction_not_found": "Diese Auktion gibt es nicht mehr.",
     "auction_ended": "Die Auktion ist schon vorbei.",
@@ -1547,7 +1549,7 @@
     "portalTitle": "Jobportal",
     "portalHint": "Stellen von KI-Firmen, später auch von Spielern",
     "companyTitle": "Eigene Firma",
-    "companyHint": "Garagen-Startup ab Level 3",
+    "companyHint": "Garagen-Startup ab Level 6",
     "cardTitle": "Deine Visitenkarte",
     "cardHint": "So sehen dich andere Spieler",
     "salary": "Gehalt",
@@ -2483,8 +2485,8 @@
   "art": {
     "title": "Artworks",
     "intro": "Einzigartige Pixel-Kunst: sammeln, liken, ersteigern und selbst malen.",
-    "lockedTitle": "Ab Level 8",
-    "lockedText": "Mit Level 8 schaltest du Artworks frei: Pixel-Kunst sammeln, bei Auktionen bieten und eigene Werke malen.",
+    "lockedTitle": "Ab Level 4",
+    "lockedText": "Mit Level 4 schaltest du Artworks frei: Pixel-Kunst sammeln, bei Auktionen bieten und eigene Werke malen.",
     "tabMarket": "Marktplatz",
     "tabCollection": "Meine Sammlung",
     "tabRankings": "Ranglisten",

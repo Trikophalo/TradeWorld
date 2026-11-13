@@ -58,7 +58,8 @@ async function found(page: Page, tier: string, name: string, idea = "Ein Produkt
 }
 
 test("profit coach, price strategy, contract work, IPO from the garage, staff open profiles", async ({ page }) => {
-  await preparePlayer(page, "Kassenwart", 7_000, 2_000_000);
+  // Level 9: going public is open (unlock order, ADR-099).
+  await preparePlayer(page, "Kassenwart", 21_000, 2_000_000);
   await found(page, "garage", "Rechenhaus");
 
   // Before the first hour the coach waits; a demo quarter runs the hours.
@@ -78,7 +79,7 @@ test("profit coach, price strategy, contract work, IPO from the garage, staff op
   await strategy.getByRole("switch", { name: "Auftragsarbeit" }).click();
   await expect(strategy.getByRole("switch", { name: "Auftragsarbeit" })).not.toBeChecked();
 
-  // A garage cannot expand yet; going public is open from level 6 (ADR-083).
+  // A garage cannot expand yet; going public is open from level 9 (ADR-083, ADR-099).
   await expect(page.getByTestId("expansion-locked")).toBeVisible();
   await expect(page.getByTestId("listing").getByRole("button", { name: "Börsengang" })).toBeVisible();
 

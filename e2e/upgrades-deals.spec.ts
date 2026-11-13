@@ -183,7 +183,7 @@ test("career ladder: ready, the AI boss answers", async ({ page }) => {
 });
 
 test("deals: accept a loan from the board, repay it on time, trust grows", async ({ page }) => {
-  await preparePlayer(page, { nickname: "Vertrauensvoll", cashCents: 2_000_000, xpTotal: 7_000 });
+  await preparePlayer(page, { nickname: "Vertrauensvoll", cashCents: 2_000_000, xpTotal: 11_000 });
   await page.goto("/deals");
   await expect(page.getByTestId("my-trust")).toContainText("50");
   await expect(page.getByTestId("my-trust")).toContainText("Unbeschrieben");
@@ -209,7 +209,7 @@ test("deals: accept a loan from the board, repay it on time, trust grows", async
 });
 
 test("deals: propose a loan to a partner by name; the shaky partner shows a low trust", async ({ page }) => {
-  await preparePlayer(page, { nickname: "Geldgeber", cashCents: 2_000_000, xpTotal: 7_000 });
+  await preparePlayer(page, { nickname: "Geldgeber", cashCents: 2_000_000, xpTotal: 11_000 });
   await page.goto("/deals?tab=board");
   await expect(
     page.getByTestId("deal").filter({ hasText: "Gluecksritter" }).first().getByTestId("trust-badge"),

@@ -67,7 +67,7 @@ describe("xp curve", () => {
 describe("unlocks", () => {
   it("covers every row of spec 9.3", () => {
     const levels = [...new Set(BALANCE.progression.unlocks.map((u) => u.level))];
-    expect(levels).toEqual([1, 2, 3, 4, 5, 7, 8, 10, 12, 15, 18, 20, 25, 30, 35, 40, 50]);
+    expect(levels).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 15, 18, 20, 25, 30, 35, 40, 50]);
   });
 
   it("uses unique snake_case keys", () => {
@@ -78,10 +78,13 @@ describe("unlocks", () => {
 
   it("returns the unlocks of a level", () => {
     expect(unlocksAtLevel(1).map((u) => u.key)).toEqual(["market_orders", "basic_income"]);
-    expect(unlocksAtLevel(3).map((u) => u.key)).toEqual(["limit_orders", "watchlist", "found_garage"]);
-    expect(unlocksAtLevel(4).map((u) => u.key)).toEqual(["property", "deals"]);
-    expect(unlocksAtLevel(6)).toEqual([]);
-    expect(unlocksUpToLevel(3)).toHaveLength(6);
+    expect(unlocksAtLevel(3).map((u) => u.key)).toEqual(["limit_orders", "watchlist"]);
+    // Owner's order: jobs (2), artworks (4), companies (6), property (8).
+    expect(unlocksAtLevel(4).map((u) => u.key)).toEqual(["artworks"]);
+    expect(unlocksAtLevel(6).map((u) => u.key)).toEqual(["found_garage"]);
+    expect(unlocksAtLevel(8).map((u) => u.key)).toEqual(["property", "short_selling"]);
+    expect(unlocksAtLevel(11)).toEqual([]);
+    expect(unlocksUpToLevel(3)).toHaveLength(5);
   });
 
   it("answers feature gates", () => {
@@ -94,7 +97,7 @@ describe("unlocks", () => {
   });
 
   it("finds the next unlocks", () => {
-    expect(nextUnlocks(3).map((u) => u.key)).toEqual(["property", "deals"]);
+    expect(nextUnlocks(3).map((u) => u.key)).toEqual(["artworks"]);
     expect(nextUnlocks(50)).toEqual([]);
   });
 
