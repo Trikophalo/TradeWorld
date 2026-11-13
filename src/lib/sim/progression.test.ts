@@ -79,7 +79,7 @@ describe("unlocks", () => {
   it("returns the unlocks of a level", () => {
     expect(unlocksAtLevel(1).map((u) => u.key)).toEqual(["market_orders", "basic_income"]);
     expect(unlocksAtLevel(3).map((u) => u.key)).toEqual(["limit_orders", "watchlist", "found_garage"]);
-    expect(unlocksAtLevel(4).map((u) => u.key)).toEqual(["property"]);
+    expect(unlocksAtLevel(4).map((u) => u.key)).toEqual(["property", "deals"]);
     expect(unlocksAtLevel(6)).toEqual([]);
     expect(unlocksUpToLevel(3)).toHaveLength(6);
   });
@@ -94,7 +94,7 @@ describe("unlocks", () => {
   });
 
   it("finds the next unlocks", () => {
-    expect(nextUnlocks(3).map((u) => u.key)).toEqual(["property"]);
+    expect(nextUnlocks(3).map((u) => u.key)).toEqual(["property", "deals"]);
     expect(nextUnlocks(50)).toEqual([]);
   });
 

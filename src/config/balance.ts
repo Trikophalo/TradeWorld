@@ -1,5 +1,7 @@
 import { COMPANY_EVENTS, type CompanyEventsConfig } from "./company-events.ts";
+import { DEALS, TRUST, type DealsConfig, type TrustConfig } from "./deals.ts";
 import { SKILL_NODES, type SkillBranch, type SkillNodeConfig } from "./skills.ts";
+import { UPGRADES, type UpgradesConfig } from "./upgrades.ts";
 
 /**
  * NEXA balancing defaults (ADR-009).
@@ -29,6 +31,7 @@ export type CompanyTierId = "small_business" | "gmbh" | "ag" | "listed";
 export type SegmentId = "local" | "regional" | "national" | "international";
 export type DepartmentId = "development" | "sales" | "production" | "finance" | "marketing";
 export type JobTierId = "intern" | "junior" | "senior" | "team_lead" | "c_level";
+export type CampaignKind = "flyer" | "online" | "tv";
 export type InvestorArchetypeId =
   "market_maker" | "value_fund" | "momentum_trader" | "pension_fund" | "index_fund" | "retail_herd";
 
@@ -470,19 +473,23 @@ export interface CareersConfig {
   readonly tiers: readonly JobTierConfig[];
   readonly paidHoursPerDayCap: number;
   readonly playerCompanyExperienceMultiplier: number;
-  readonly promotionSteps: readonly {
-    readonly experienceHours: number;
+  /** Promotion to the next rank in the same job (ADR-094). */
+  readonly promotion: {
+    /** Hours worked in the current rank before the next one, by target rank. */
+    readonly hoursByTier: Readonly<Record<Exclude<JobTierId, "intern">, number>>;
+    /** From these ranks on, management needs half of the main branch score as well. */
+    readonly managementFrom: readonly JobTierId[];
+    /** AI bosses: chance when the requirements are just met, plus per score point above. */
+    readonly baseChanceBps: number;
+    readonly chancePerExtraScoreBps: number;
+    readonly maxChanceBps: number;
+    /** After a no, the next request is possible after this many hours. */
+    readonly retryHours: number;
+    /** New wage: at least this much more, and at least the base wage of the new rank. */
     readonly raiseBps: number;
-  }[];
-  readonly negotiation: {
-    readonly cooldownDays: number;
-    readonly baseSuccessProbability: number;
-    readonly successPerExperienceHour: number;
-    readonly maxSuccessProbability: number;
-    readonly raiseMinBps: number;
-    readonly raiseMaxBps: number;
+    /** A request to a player boss expires after this many hours. */
+    readonly requestValidHours: number;
   };
-  readonly jobSwitch: { readonly raiseMinBps: number; readonly raiseMaxBps: number };
   readonly workTask: {
     readonly intervalHours: number;
     /** Bonus = hours of salary x quality (0..1). */
@@ -770,6 +777,12 @@ export interface BalanceConfig {
   readonly social: SocialConfig;
   /** Crises and chances of player companies (ADR-091), catalog in company-events.ts. */
   readonly companyEvents: CompanyEventsConfig;
+  /** Upgrades bought with game money (ADR-093), values in upgrades.ts. */
+  readonly upgrades: UpgradesConfig;
+  /** Handshake deals between players (ADR-098), values in deals.ts. */
+  readonly deals: DealsConfig;
+  /** Trust score of a player from kept and broken deals (ADR-098). */
+  readonly trust: TrustConfig;
 }
 
 export type PropertyTier = "flat" | "apartment" | "house" | "villa" | "luxury_villa";
@@ -1149,6 +1162,25 @@ export interface StartupsConfig {
     readonly wageRaiseBpsByTier: readonly number[];
     /** Trainings unlock once the team (players and AI workers) has this many members (ADR-071). */
     readonly fromEmployees: number;
+  };
+  /**
+   * Marketing campaigns (ADR-097): a one-off push that raises demand for some hours. Cost = costHours × the demand of
+   * the last hour (at least minCostCents). The effect is rolled once: demandBps × luck × (1 − w + w × quality).
+   */
+  readonly campaigns: {
+    readonly kinds: Readonly<
+      Record<
+        CampaignKind,
+        { readonly hours: number; readonly costHours: number; readonly demandBps: number; readonly awareness: number }
+      >
+    >;
+    readonly minCostCents: number;
+    readonly luckMin: number;
+    readonly luckMax: number;
+    readonly qualityWeight: number;
+    /** Resonance labels: luck below `weak` is weak, from `strong` on strong. */
+    readonly weakBelow: number;
+    readonly strongFrom: number;
   };
   /** Company chat (clan, ADR-045). */
   readonly chat: {
@@ -1741,21 +1773,16 @@ export const BALANCE = {
     ],
     paidHoursPerDayCap: 12,
     playerCompanyExperienceMultiplier: 2,
-    promotionSteps: [
-      { experienceHours: 24, raiseBps: 1000 },
-      { experienceHours: 72, raiseBps: 1250 },
-      { experienceHours: 168, raiseBps: 1500 },
-      { experienceHours: 336, raiseBps: 2000 },
-    ],
-    negotiation: {
-      cooldownDays: 7,
-      baseSuccessProbability: 0.3,
-      successPerExperienceHour: 0.002,
-      maxSuccessProbability: 0.85,
-      raiseMinBps: 500,
-      raiseMaxBps: 1200,
+    promotion: {
+      hoursByTier: { junior: 12, senior: 36, team_lead: 72, c_level: 120 },
+      managementFrom: ["team_lead", "c_level"],
+      baseChanceBps: 4_000,
+      chancePerExtraScoreBps: 800,
+      maxChanceBps: 9_000,
+      retryHours: 24,
+      raiseBps: 1_500,
+      requestValidHours: 72,
     },
-    jobSwitch: { raiseMinBps: 1500, raiseMaxBps: 3000 },
     workTask: { intervalHours: 3, bonusSalaryHours: 1, expiresHours: 3, fastAnswerSeconds: 45 },
   },
 
@@ -1797,6 +1824,7 @@ export const BALANCE = {
       { level: 3, key: "watchlist" },
       { level: 3, key: "found_garage" },
       { level: 4, key: "property" },
+      { level: 4, key: "deals" },
       { level: 5, key: "stop_loss" },
       { level: 5, key: "bonds" },
       { level: 5, key: "junior_jobs" },
@@ -2135,6 +2163,19 @@ export const BALANCE = {
       wageRaiseBpsByTier: [300, 500, 800, 1_200, 2_000],
       fromEmployees: 5,
     },
+    campaigns: {
+      kinds: {
+        flyer: { hours: 24, costHours: 2, demandBps: 2_500, awareness: 0.005 },
+        online: { hours: 48, costHours: 6, demandBps: 4_000, awareness: 0.01 },
+        tv: { hours: 72, costHours: 18, demandBps: 7_000, awareness: 0.025 },
+      },
+      minCostCents: 20_000,
+      luckMin: 0.4,
+      luckMax: 1.6,
+      qualityWeight: 0.5,
+      weakBelow: 0.8,
+      strongFrom: 1.2,
+    },
     chat: { maxMessageLength: 300, historyLimit: 100, maxMessagesPerMinute: 10 },
   },
 
@@ -2185,6 +2226,9 @@ export const BALANCE = {
     hot: { likeWeight: 1, bidWeight: 3, gravity: 1.5 },
   },
   companyEvents: COMPANY_EVENTS,
+  upgrades: UPGRADES,
+  deals: DEALS,
+  trust: TRUST,
   social: {
     feed: {
       pageSize: 30,

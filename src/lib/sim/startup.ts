@@ -376,6 +376,8 @@ export interface StartupHourInput {
   readonly expansionLevel?: number;
   /** Active company event (ADR-091): demand, capacity and extra costs of this hour. */
   readonly event?: { readonly demandFactor: number; readonly capacityFactor: number; readonly extraCostShare: number };
+  /** Running marketing campaign (ADR-097): demand factor of this hour, default 1. */
+  readonly campaignFactor?: number;
 }
 
 export interface StartupHourResult {
@@ -417,7 +419,8 @@ export function closeStartupHour(
     (0.5 + 0.5 * state.quality) *
     Math.exp(sc.demandNoise * input.noise) *
     pricing.demand *
-    (input.event?.demandFactor ?? 1);
+    (input.event?.demandFactor ?? 1) *
+    Math.max(0, input.campaignFactor ?? 1);
   const capacity =
     (capacityCents(input.productivityBps, input.sector, sc) *
       (1 + sc.stages.capacityBonusPerStage * stage) *

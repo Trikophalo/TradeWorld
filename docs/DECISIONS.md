@@ -1140,3 +1140,123 @@ zurück, statt den Knopf zu drücken.
 - **Als App installieren:** Im Handy-Browser zeigt die Startseite einmal einen Hinweis, bis er weggeklickt wird.
   Android bekommt den Installations-Dialog, iPhones die zwei Schritte über „Teilen“. Als installierte App läuft
   NEXA im Vollbild, ganz ohne Browserleisten.
+
+## ADR-093: Verbesserungen für Spielgeld — `akzeptiert`
+
+Vorgabe: Spieler sollen Dinge für Geld verbessern können, etwa die Tresorgröße und ein wenig das Grundeinkommen.
+
+- **Fünf Verbesserungen** (`src/config/upgrades.ts`, Formeln in `src/lib/sim/upgrades.ts`), jede mit Stufen:
+
+  | Verbesserung   | Wirkung je Stufe                             | Stufen | Preise                       | ab Level |
+  | -------------- | -------------------------------------------- | ------ | ---------------------------- | -------- |
+  | Tresor         | +2 Stunden Platz (8 h → 20 h)                | 6      | 3.000 € bis 96.000 € (× 2)   | 1        |
+  | Grundeinkommen | +10 % (höchstens +30 %, also nur etwas)      | 3      | 4.000 €, 12.000 €, 36.000 €  | 3        |
+  | Weiterbildung  | 1 Arbeitsstunde weniger je Fachpunkt (6 → 3) | 3      | 8.000 €, 24.000 €, 72.000 €  | 2        |
+  | Überstunden    | +1 bezahlte Arbeitsstunde am Tag (12 → 14)   | 2      | 20.000 €, 60.000 €           | 5        |
+  | Rhetorik-Kurs  | +5 % Beförderungschance bei KI-Chefs         | 3      | 10.000 €, 25.000 €, 62.500 € | 5        |
+
+- Preis der nächsten Stufe: Grundpreis × Faktor^Stufe, auf ganze Euro gerundet.
+- Das Geld geht an die Staatskasse, aus der das Grundeinkommen kommt (geschlossener Geldkreislauf, ADR-041).
+- Die Seite **Verbesserungen** zeigt je Verbesserung „jetzt → danach“, die Stufen als Pixel-Balken und den Preis.
+  Der Tresor verlinkt dorthin („Tresor vergrößern“), die Skillpunkt-Erklärung auf „Weiterbildung“.
+- Der Treasury-Faktor des Grundeinkommens (ADR-041) gilt weiter, auch für die verbesserte Rate.
+
+## ADR-094: Karriereleiter und Beförderung — `akzeptiert`
+
+Vorgabe: Man soll intuitiv verstehen, wie das Gehalt steigt. Mit mehr Skills steigt die Chance auf eine Beförderung,
+der Chef befördert, der Lohn steigt. Es muss klar sein, welche Skills man braucht.
+
+- **Ränge:** Praktikant → Junior → Senior → Teamleitung → C-Level, innerhalb desselben Jobs.
+- **Anforderungen für den nächsten Rang** (`careers.promotion`, `src/lib/sim/promotion.ts`):
+  - das Level des Rangs (5, 12, 20, 25),
+  - im **Hauptfach** des Jobs (erste Anforderung der Stelle) die Punktzahl des Rangs (2, 6, 12, 20),
+  - ab Teamleitung zusätzlich die halbe Punktzahl in Management (außer der Job ist schon Management),
+  - gearbeitete Stunden im aktuellen Rang: 12, 36, 72, 120.
+- **KI-Chef:** Sind alle Anforderungen erfüllt, fragt man den Chef. Er sagt mit 40 % Ja, plus 8 % je Punkt über der
+  Anforderung im Hauptfach, plus Rhetorik-Kurs, höchstens 90 %. Bei Nein geht die nächste Frage nach 24 Stunden.
+  Mehr Skills heißen also direkt eine bessere Chance.
+- **Spieler-Chef:** Die Anfrage landet beim Chef (Benachrichtigung, Team-Liste). Er befördert oder lehnt ab, und er
+  kann jeden befördern, der die Anforderungen erfüllt, auch ohne Anfrage. Die Anforderungen sind dieselben, damit
+  „Was brauche ich für Senior?“ überall dieselbe Antwort hat.
+- **Neuer Lohn:** mindestens +15 % und mindestens der Grundlohn des neuen Rangs (bei KI-Chefs genau das, Spieler-Chefs
+  dürfen mehr zahlen). Danach beginnen Stunden und die Basis für Gehaltserhöhungen neu.
+- **Anzeige:** Im Job-Tab eine Karriereleiter mit allen Rängen. Der nächste Rang zeigt jede Anforderung mit Haken oder
+  Fortschritt und einem „So schaffst du das“-Hinweis (z. B. „Lerne IT-Skills auf der Skill-Karte“). Dazu eine Karte
+  „So steigt dein Gehalt“: Beförderung, Gehaltserhöhung (je neuem Punkt im Fach bis 3 %, alle 7 Tage), Bonus und
+  Arbeitsaufgaben.
+- Beförderungen erscheinen im Freunde-Feed.
+- Die alten, nie gebauten Werte `promotionSteps`, `negotiation` und `jobSwitch` entfallen.
+
+## ADR-095: Skillpunkte erklärt — `akzeptiert`
+
+Vorgabe: Es soll klarer werden, wie man Skillpunkte bekommt.
+
+- Die Skill-Karte zeigt eine Karte **„So bekommst du Skillpunkte“** mit dem Fortschritt jeder Quelle:
+  - **Level-Aufstieg:** +1 freier Punkt, mit XP-Balken bis zum nächsten Level.
+  - **Arbeit:** alle 6 Arbeitsstunden (mit Weiterbildung weniger) +1 Fachpunkt in den Fächern des Jobs, mit
+    Fortschritt je Fach. Ohne Job ein Hinweis auf die Jobbörse.
+  - **Tagesbelohnung:** Tag 4 und Tag 7 der Serie, mit „noch n Tage“.
+  - **Missionen** mit Skillpunkt-Belohnung.
+  - **Schulung durch den Chef** (Spielerfirmen ab 5 Leuten): Der Chef zahlt, man lernt einen Skill direkt.
+- Freie Punkte passen überall, Fachpunkte nur in ihrem Fach. Das steht in einem Satz darunter.
+- Darunter **„Was bringen Skills?“:** mehr Produktivität, höhere Löhne bei KI-Firmen, Gehaltserhöhungen,
+  Beförderungen und Stellen mit Anforderungen.
+
+## ADR-096: Gewinnwege für Firmen — `akzeptiert`
+
+Vorgabe: Als Unternehmer ist nicht klar, wie man Gewinn macht. Es braucht mehr Möglichkeiten und Erklärungen, intuitiv,
+aber nicht jeder soll extrem erfolgreich werden.
+
+- Die Firmenseite bekommt **„Gewinnwege“**: eine Liste aller Hebel mit einem Satz Erklärung, dem Stand der eigenen
+  Firma (aktiv, möglich, gesperrt ab …) und einer **Schätzung in €/Stunde** aus den Zahlen der letzten Stunde.
+  - Hebel: Preisstrategie, Auftragsarbeit, Team und KI-Kräfte, Marketing-Kampagne (neu, ADR-097), Lieferverträge
+    (neu, ADR-098), Teilhaber (neu, ADR-098), Ausbau und Aufstieg, Börsengang.
+  - Die Schätzung rechnet mit derselben Formel wie die Abrechnung: Mehr Nachfrage bringt nur etwas, wenn Kapazität
+    frei ist; mehr Kapazität nur, wenn Kunden warten. So sieht man, warum etwas hilft oder nicht.
+- Oben ein **Engpass-Satz** aus Nachfrage und Kapazität: „Dir fehlen Kunden“, „Dir fehlen Leute“ oder „ausgeglichen“.
+- Nicht jeder wird reich: Kampagnen haben Glück im Ergebnis, Verträge brauchen verlässliche Partner, Märkte sind
+  begrenzt, und viele Hebel kosten erst Geld.
+
+## ADR-097: Marketing-Kampagnen — `akzeptiert`
+
+- Drei Kampagnen (`startups.campaigns`, `src/lib/sim/campaigns.ts`):
+
+  | Kampagne | Dauer | Preis                           | Nachfrage | Bekanntheit dauerhaft |
+  | -------- | ----- | ------------------------------- | --------- | --------------------- |
+  | Flyer    | 24 h  | 2 Stunden der letzten Nachfrage | +25 %     | +0,5 Prozentpunkte    |
+  | Online   | 48 h  | 6 Stunden                       | +40 %     | +1 Prozentpunkt       |
+  | TV-Spot  | 72 h  | 18 Stunden                      | +70 %     | +2,5 Prozentpunkte    |
+
+- Mindestpreis 200 €. Bezahlt wird aus der Firmenkasse.
+- Die Wirkung wird beim Start einmal gewürfelt: Glück zwischen 0,4 und 1,6, mal Qualität (halb fest, halb nach
+  Qualität). Die Resonanz (schwach, ordentlich, stark) sieht man sofort.
+- Eine Kampagne zur Zeit. Sie hebt die Nachfrage in der stündlichen Abrechnung; die Bekanntheit steigt beim Start
+  (gedeckelt wie immer durch die Firmenstufe).
+- Lohnt sich nur mit freier Kapazität. Die Gewinnwege-Schätzung zeigt das vor dem Kauf.
+
+## ADR-098: Vertrauen und Deals unter Spielern — `akzeptiert`
+
+Vorgabe: Viel soll über Vertrauen zwischen Spielern laufen.
+
+- **Drei Deals per Handschlag** (`src/config/deals.ts`, `src/lib/sim/deals.ts`), ab Level 4:
+  - **Kredit:** Ein Spieler leiht einem anderen Geld, mit Zinsen für die ganze Laufzeit (bis 30 %), 1 bis 30 Tage.
+    Höchstens 20.000 € je Level des Verleihers. Zur Fälligkeit zieht der Server einmal ein, was frei auf dem Konto
+    liegt. Was fehlt, ist überfällig. Nach 7 Tagen gilt der Kredit als geplatzt. Zurückzahlen geht jederzeit, auch
+    später; der Verleiher kann den Rest erlassen.
+  - **Liefervertrag** (Firma an Firma): Der Lieferant stellt freie Kapazität bereit, bis zu einer Menge je Stunde.
+    Ist der Käufer ausverkauft, produziert der Lieferant die fehlende Ware; der Käufer verkauft sie zu seinem Preis
+    und zahlt je Stück die vereinbarte Gebühr. Beide gewinnen, wenn die Gebühr zwischen den Herstellkosten des
+    Lieferanten und dem Preis des Käufers liegt; die Vertragsmaske zeigt beide Margen. Optional eine Anzahlung
+    (bis 50 % des Höchstbetrags), aus der die Gebühren zuerst bezahlt werden. Endet der Vertrag vorzeitig, bleibt
+    der Rest der Anzahlung beim Lieferanten.
+  - **Teilhaber:** Ein Spieler gibt einer Firma Geld und bekommt dafür einen Anteil an jeder Gewinnstunde (bis 30 %,
+    alle Teilhaber zusammen bis 50 %), für eine feste Zeit. Teilhaber werden vor der Gründer-Auszahlung bedient.
+    Der Gründer kann die Beteiligung vorzeitig beenden, das Geld bleibt dann in der Firma.
+- **Angebote:** an einen bestimmten Spieler (Name oder Tag) oder offen an alle auf der Deal-Börse. Offene Angebote
+  gelten 48 Stunden. Geld fließt erst, wenn jemand annimmt.
+- **Vertrauen** (0 bis 100, Start 50): Pünktlich zurückgezahlt +4, später +2, überfällig −6, geplatzt −12,
+  Vertrag erfüllt +3, zu wenig geliefert −4, Vertrag gebrochen −12, Verleihen +1, Erlassen +2.
+  Stufen: Riskant, Wackelig, Unbeschrieben, Verlässlich, Felsenfest. Das Vertrauen steht auf der Visitenkarte und
+  an jedem Angebot. Gebrochene Verträge und geplatzte Kredite erscheinen im Freunde-Feed.
+- Der Server erzwingt, was er kann (Gebühren, Gewinnanteile, Einzug zur Fälligkeit). Das Wort halten muss man selbst:
+  Darum geht es beim Vertrauen.

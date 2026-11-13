@@ -438,3 +438,32 @@ describe("company events in the operating hour (ADR-091)", () => {
     expect(busy.revenueCents).toBeLessThan(plain.revenueCents);
   });
 });
+
+describe("marketing campaign in the operating hour (ADR-097)", () => {
+  const hourInput = {
+    sector: "tech" as const,
+    tier: "garage" as const,
+    marketingCentsPerQuarter: b(0),
+    productivityBps: [15_000],
+    aiWorkers: 0,
+    stage: 1,
+    noise: 0,
+    playerWagesCents: 0,
+  };
+
+  it("raises demand by its factor and sells more when capacity is free", () => {
+    const s = { ...initialStartup(2_000_000, b(0)), awareness: 0.3, quality: 0.6 };
+    const plain = closeStartupHour(s, hourInput);
+    const push = closeStartupHour(s, { ...hourInput, campaignFactor: 1.4 });
+    expect(plain.demandCents).toBeLessThan(plain.capacityCents);
+    expect(Number(push.demandCents)).toBeCloseTo(Number(plain.demandCents) * 1.4, -1);
+    expect(push.revenueCents).toBeGreaterThan(plain.revenueCents);
+  });
+
+  it("adds nothing when the company is sold out", () => {
+    const full = { ...initialStartup(1e12, b(0)), awareness: 1, quality: 1 };
+    const plain = closeStartupHour(full, hourInput);
+    const push = closeStartupHour(full, { ...hourInput, campaignFactor: 1.7 });
+    expect(push.revenueCents).toBe(plain.revenueCents);
+  });
+});

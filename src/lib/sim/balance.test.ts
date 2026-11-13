@@ -71,6 +71,9 @@ describe("BALANCE", () => {
       "property",
       "social",
       "companyEvents",
+      "upgrades",
+      "deals",
+      "trust",
     ];
     expect(Object.keys(BALANCE).sort()).toEqual([...sections].sort());
   });
