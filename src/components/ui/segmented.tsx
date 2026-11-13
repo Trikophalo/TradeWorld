@@ -41,7 +41,7 @@ export function Segmented<T extends string>({
       onValueChange={(next) => next && onValueChange(next as T)}
       aria-label={label}
       className={cn(
-        "no-scrollbar inline-flex max-w-full overflow-x-auto rounded-md bg-surface-2 p-1",
+        "no-scrollbar inline-flex max-w-full overflow-x-auto rounded-md bg-surface-2 p-1 sunken",
         block && "flex w-full",
         className,
       )}

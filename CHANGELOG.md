@@ -99,3 +99,14 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 - **Skills als Pfade** mit „Jetzt lernbar“, die Karte als zweite Ansicht.
 - **Neue Symbole** für Deals (Vertrag mit Feder) und Grundstück (Haus mit Garten).
 - **Grundstück:** drei Ebenen im Editor und detailreichere Möbel.
+
+## Grafik-Update „handgemacht“ (ADR-108)
+
+- **Neue Farbwelt:** Nachthimmel im dunklen, warmes Papier im hellen Thema, dahinter Punktraster und aufsteigende
+  Pixel-Stäubchen.
+- **Flächen und Tasten mit Gewicht:** kleine Ecken, dicke Ränder, harte Kanten; Buttons sinken beim Drücken ein und
+  sprühen Funken.
+- **Banner auf jeder Seite** mit Titel, einem Satz und schwebendem Pixel-Bild.
+- **Titelbildschirm** bei Anmeldung und Registrierung: Sternenhimmel, Mond, Skyline mit Lichtern, Finn begrüßt.
+- **Mehr Bewegung:** Inhalte kommen gestaffelt an, Icons hüpfen, Balken sind segmentiert, das Vermögen glänzt, die
+  Münze am Guthaben hüpft bei jeder Änderung.

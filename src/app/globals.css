@@ -211,9 +211,26 @@
     background-attachment: fixed;
   }
 
+  /* Slim, square scrollbars in the colours of the game. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-2) transparent;
+  }
+
   ::selection {
     background: var(--accent-soft);
     color: var(--fg-1);
+  }
+
+  /* Section headings carry a small pixel in the accent colour (ADR-108). */
+  h2.label-pixel::before {
+    content: "";
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    margin-right: 7px;
+    background: var(--accent);
+    vertical-align: 1px;
   }
 
   button,

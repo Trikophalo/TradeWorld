@@ -1530,6 +1530,10 @@ Pixel-Art gab es nur in Icons.
 5. **Bewegung:** Seiteninhalte kommen gestaffelt an, Icons hüpfen beim Überfahren, Fortschrittsbalken sind
    segmentiert wie Lebensbalken, das Vermögen glänzt, leere Zustände schweben.
 
+Dazu kommen der **Titelbildschirm** für Anmeldung und Registrierung (Sternenhimmel, Mond, Skyline mit Lichtern, Finn),
+ein Akzent-Pixel vor jeder Abschnittsüberschrift, schmale Scrollbalken und eine Münze am Guthaben, die bei jeder
+Änderung hüpft.
+
 **Grenzen:** Zahlen bleiben in der glatten Schrift (Lesbarkeit). Animiert wird nur `transform` und `opacity`; mit
 „Animationen: Reduziert“ entfallen Dauerschleifen und Funken. Kontraste der Textfarben sind weiter getestet
 (`tokens.test.ts`).

@@ -583,6 +583,25 @@ export const CONTRACT: PixelArt = {
   ],
 };
 
+/** The moon over the title screen (ADR-108). */
+export const MOON: PixelArt = {
+  palette: { y: "#fff3c4", d: "#e6d48a", s: "#c9b56a" },
+  grid: [
+    "....yyyy....",
+    "..yyyyyyyy..",
+    ".yyyydyyyyy.",
+    ".yyyyyyyydy.",
+    "yyydyyyyyyyy",
+    "yyyyyyysyyyy",
+    "yyyyyyyyyyyy",
+    "yysyyyyyydyy",
+    ".yyyyydyyyy.",
+    ".yyyyyyyyyy.",
+    "..yyyysyyy..",
+    "....yyyy....",
+  ],
+};
+
 /** Page heroes (ADR-108): a briefcase for work, a cottage for the own home, a heart for friends. */
 export const BRIEFCASE: PixelArt = {
   palette: { k: INK, b: "#a8622d", l: "#d08a4a", d: "#7a4520", g: "#ffd15c" },
@@ -1197,6 +1216,7 @@ export const ALL_PIXEL_ART: Record<string, PixelArt> = {
   key: KEY,
   wallet: WALLET,
   contract: CONTRACT,
+  moon: MOON,
   briefcase: BRIEFCASE,
   cottage: COTTAGE,
   heart: HEART,
