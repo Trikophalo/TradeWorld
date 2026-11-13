@@ -29,6 +29,9 @@ import { toast } from "@/components/ui/toast";
 import { BusinessCard } from "@/features/career/components/business-card";
 import { CareerLadder, PayRoutes } from "@/features/career/components/career-ladder";
 import { UpgradeCard } from "@/features/upgrades/components/upgrade-shop";
+import { CRYPTO } from "@/config/crypto";
+import { StatBars } from "@/features/crypto/components/coin-detail";
+import { CoinLogo } from "@/features/crypto/components/coin-logo";
 import { SignaturePad } from "@/features/career/components/signature-pad";
 import type { MyJob, PlayerCard } from "@/features/game/types";
 import { SpeechBubble } from "@/features/tutorial/components/speech-bubble";
@@ -636,6 +639,14 @@ export function Showcase() {
         <PayRoutes job={SAMPLE_JOB} />
         <UpgradeCard upgradeKey="vault" level={2} />
         <UpgradeCard upgradeKey="rhetoric" level={0} />
+        <Demo label="Krypto: Pixel-Coins der Markt-Coins (ADR-101)" className="flex-wrap justify-start gap-3">
+          {CRYPTO.coins.map((c) => (
+            <CoinLogo key={c.ticker} coin={{ ...c, logo: null }} scale={3} />
+          ))}
+        </Demo>
+        <Card padding="lg">
+          <StatBars stats={{ tech: 42, hype: 77, utility: 15 }} />
+        </Card>
       </Section>
 
       <Section id="sounds" title={t("sounds")}>

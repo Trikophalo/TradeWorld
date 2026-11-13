@@ -1,5 +1,7 @@
 "use client";
 
+import { useMountTime } from "@/lib/use-now";
+
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
@@ -41,12 +43,14 @@ export function SkillPointGuide() {
   const xp = useGame((s) => s.portfolio?.xpIntoLevel ?? 0);
   const job = useMyJob().data ?? null;
   const skills = useSkills().data;
+  // Query data can arrive before this part hydrates: show it only after mounting, like the server rendered it.
+  const mounted = useMountTime() !== null;
   const daily = useDailyReward(true).data;
   const upgrades = useUpgrades().data;
   const hours = upgradeEffects(upgrades?.levels ?? {}).workHoursPerBranchPoint;
   const needed = xpForNextLevel(level);
   const jobBranches = [...new Set(job?.required.map((r) => r.branch) ?? [])];
-  const dailyIn = daily ? daysToDailySkillPoint(daily) : null;
+  const dailyIn = daily && mounted ? daysToDailySkillPoint(daily) : null;
   const benefits = t.raw("benefits.items") as string[];
 
   return (
@@ -73,7 +77,7 @@ export function SkillPointGuide() {
             text={t("work.text", { hours })}
             testId="source-work"
           >
-            {job && skills ? (
+            {mounted && job && skills ? (
               <ul className="space-y-1.5">
                 {jobBranches.map((b) => (
                   <li key={b}>

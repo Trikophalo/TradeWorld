@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { burstConfetti } from "@/components/ui/effects";
 import { HoldButton } from "@/components/ui/hold-button";
 import { Progress } from "@/components/ui/progress";
+import { Segmented } from "@/components/ui/segmented";
 import { Sheet } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
@@ -17,11 +18,12 @@ import { useGameErrorText } from "@/features/game/errors";
 import { engine } from "@/features/game/store";
 import type { SkillState } from "@/features/game/types";
 import { haptic } from "@/lib/haptics";
-import { learnCheck, payForSkill, pointsFor, skillCost, type LearnCheck } from "@/lib/sim/skills";
+import { learnCheck, neighbours, payForSkill, pointsFor, skillCost, type LearnCheck } from "@/lib/sim/skills";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { useVisitTour } from "@/features/tutorial/use-visit-tour";
 import { useCareerRefresh, useSkills } from "../hooks";
+import { SkillPaths } from "./skill-paths";
 
 type NodeKey = Parameters<ReturnType<typeof useTranslations<"skills.nodes">>>[0];
 type BranchKey = Parameters<ReturnType<typeof useTranslations<"skills.branches">>>[0];
@@ -71,6 +73,8 @@ export function SkillTree() {
   const [open, setOpen] = useState<string | null>(null);
   const [focus, setFocus] = useState<SkillBranch | null>(null);
   const [goTo, setGoTo] = useState<{ branch: SkillBranch; n: number } | null>(null);
+  /** Paths are the default: easier to read than the map (ADR-105). */
+  const [view, setView] = useState<"paths" | "map">("paths");
   const data = skills.data;
   const learned = useMemo(() => new Set(data?.learned.map((l) => l.key) ?? []), [data]);
   useVisitTour("visit_skill_map", Boolean(data));
@@ -78,79 +82,97 @@ export function SkillTree() {
   if (!data) return <Skeleton className="h-[70dvh] w-full rounded-lg" />;
 
   return (
-    <div className="grid gap-5 *:min-w-0 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-6">
-      <HexMap state={data} learned={learned} onOpen={setOpen} focus={focus} goTo={goTo} />
-      <div className="space-y-4 lg:order-first lg:col-start-2 lg:row-start-1">
-        <Card padding="lg">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="label-pixel text-fg-3">{t("freePoints")}</p>
-              <p className="mt-1 nums text-3xl font-semibold text-fg-1" data-testid="free-points">
-                {data.freePoints}
-              </p>
-            </div>
-            <Badge tone="accent">{t("progressHint", { done: learned.size, total: SKILL_NODES.length })}</Badge>
+    <div className="space-y-5">
+      <Card padding="lg" className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div>
+            <p className="label-pixel text-fg-3">{t("freePoints")}</p>
+            <p className="mt-1 nums text-3xl font-semibold text-fg-1" data-testid="free-points">
+              {data.freePoints}
+            </p>
           </div>
-          <p className="mt-2 text-sm text-pretty text-fg-3">{t("freePointsHint")}</p>
-        </Card>
-        <Card padding="md">
-          <p className="mb-1 label-pixel text-fg-3">{t("overview")}</p>
-          <p className="mb-2 text-xs text-fg-3">{t("branchHint")}</p>
-          <ul className="-mx-2 space-y-0.5" onPointerLeave={() => setFocus(null)}>
-            {SKILL_BRANCHES.map((b) => {
-              const total = SKILL_NODES.filter((n) => n.branches[0] === b).length;
-              const done = SKILL_NODES.filter((n) => n.branches[0] === b && learned.has(n.key)).length;
-              return (
-                <li key={b}>
-                  <button
-                    type="button"
-                    onPointerEnter={() => setFocus(b)}
-                    onFocus={() => setFocus(b)}
-                    onBlur={() => setFocus(null)}
-                    onClick={() => {
-                      haptic("tap");
-                      setGoTo((g) => ({ branch: b, n: (g?.n ?? 0) + 1 }));
-                    }}
-                    className={cn(
-                      "w-full rounded-md px-2 py-1.5 text-left text-sm focus-ring transition duration-fast active:scale-[0.98]",
-                      focus === b ? "bg-surface-2" : "hover:bg-surface-2",
-                    )}
-                  >
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span
-                          aria-hidden
-                          className="size-2.5 shrink-0 rounded-xs"
-                          style={{ backgroundColor: BRANCH_COLORS[b] }}
-                        />
-                        <span className="truncate text-fg-2">{branchName(ts, b)}</span>
-                        <span className="nums text-xs text-fg-3">
-                          {done}/{total}
-                        </span>
-                      </span>
-                      <span className="nums text-fg-1">
-                        {data.branchScores[b] ?? 0}
-                        {(data.branchPoints[b] ?? 0) > 0 && (
-                          <span className="ml-1 text-gold">+{data.branchPoints[b]}</span>
+          <div className="max-w-xs">
+            <Badge tone="accent">{t("progressHint", { done: learned.size, total: SKILL_NODES.length })}</Badge>
+            <p className="mt-1.5 text-sm text-pretty text-fg-3">{t("freePointsHint")}</p>
+          </div>
+        </div>
+        <Segmented
+          value={view}
+          onValueChange={setView}
+          options={[
+            { value: "paths", label: t("view.paths") },
+            { value: "map", label: t("view.map") },
+          ]}
+          label={t("view.label")}
+          size="sm"
+        />
+      </Card>
+      {view === "paths" ? (
+        <SkillPaths state={data} learned={learned} colors={BRANCH_COLORS} onOpen={setOpen} />
+      ) : (
+        <div className="grid gap-5 *:min-w-0 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-6">
+          <HexMap state={data} learned={learned} onOpen={setOpen} focus={focus} goTo={goTo} />
+          <div className="space-y-4 lg:order-first lg:col-start-2 lg:row-start-1">
+            <Card padding="md">
+              <p className="mb-1 label-pixel text-fg-3">{t("overview")}</p>
+              <p className="mb-2 text-xs text-fg-3">{t("branchHint")}</p>
+              <ul className="-mx-2 space-y-0.5" onPointerLeave={() => setFocus(null)}>
+                {SKILL_BRANCHES.map((b) => {
+                  const total = SKILL_NODES.filter((n) => n.branches[0] === b).length;
+                  const done = SKILL_NODES.filter((n) => n.branches[0] === b && learned.has(n.key)).length;
+                  return (
+                    <li key={b}>
+                      <button
+                        type="button"
+                        onPointerEnter={() => setFocus(b)}
+                        onFocus={() => setFocus(b)}
+                        onBlur={() => setFocus(null)}
+                        onClick={() => {
+                          haptic("tap");
+                          setGoTo((g) => ({ branch: b, n: (g?.n ?? 0) + 1 }));
+                        }}
+                        className={cn(
+                          "w-full rounded-md px-2 py-1.5 text-left text-sm focus-ring transition duration-fast active:scale-[0.98]",
+                          focus === b ? "bg-surface-2" : "hover:bg-surface-2",
                         )}
-                      </span>
-                    </span>
-                    {data.branchProgress[b] > 0 && (
-                      <Progress
-                        value={data.branchProgress[b]}
-                        label={t("branchPoints")}
-                        tone="gold"
-                        size="sm"
-                        className="mt-1"
-                      />
-                    )}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
-      </div>
+                      >
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span
+                              aria-hidden
+                              className="size-2.5 shrink-0 rounded-xs"
+                              style={{ backgroundColor: BRANCH_COLORS[b] }}
+                            />
+                            <span className="truncate text-fg-2">{branchName(ts, b)}</span>
+                            <span className="nums text-xs text-fg-3">
+                              {done}/{total}
+                            </span>
+                          </span>
+                          <span className="nums text-fg-1">
+                            {data.branchScores[b] ?? 0}
+                            {(data.branchPoints[b] ?? 0) > 0 && (
+                              <span className="ml-1 text-gold">+{data.branchPoints[b]}</span>
+                            )}
+                          </span>
+                        </span>
+                        {data.branchProgress[b] > 0 && (
+                          <Progress
+                            value={data.branchProgress[b]}
+                            label={t("branchPoints")}
+                            tone="gold"
+                            size="sm"
+                            className="mt-1"
+                          />
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Card>
+          </div>
+        </div>
+      )}
       <LearnSheet skillKey={open} state={data} learned={learned} onClose={() => setOpen(null)} />
     </div>
   );
@@ -646,7 +668,17 @@ function LearnSheet({
         {check === "learned" && (
           <p className="rounded-md bg-accent-soft px-4 py-3 text-sm text-accent">{t("learned")}</p>
         )}
-        {check === "locked" && <p className="rounded-md bg-surface-2 px-4 py-3 text-sm text-fg-2">{t("lockedMap")}</p>}
+        {check === "locked" && (
+          <p className="rounded-md bg-surface-2 px-4 py-3 text-sm text-pretty text-fg-2">
+            {t("locked", {
+              names: neighbours(node)
+                .slice(0, 3)
+                .map((n) => nodeName(ts, n.key))
+                .join(t("or")),
+            })}{" "}
+            {t("lockedMap")}
+          </p>
+        )}
         {check === "points" && (
           <p className="rounded-md bg-warn-soft px-4 py-3 text-sm text-warn">
             {t("notEnough", { count: cost - pointsFor(node, state.freePoints, state.branchPoints) })}

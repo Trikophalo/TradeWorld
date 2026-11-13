@@ -1467,3 +1467,19 @@ Position. Größere Firmen bekommen später Vorgesetzte, Manager und mehr.
   Vorgesetzte (der nächsthöhere besetzte Rang) hervorgehoben.
 - Der Gründer sieht es im Team, Mitarbeiter im Job-Tab. Daten: `get_company_org` (Gründer und Mitarbeiter der Firma).
 - Mit mehr Rängen in größeren Firmen wächst das Organigramm von selbst.
+
+## ADR-105: Skills als Pfade, die Karte als zweite Ansicht — `akzeptiert`
+
+Vorgabe: Der Skilltree ist immer noch zu unübersichtlich; schöner und viel intuitiver.
+
+- Die Hex-Karte zeigt 168 Felder auf einmal, mit abgekürzten Namen. Neue Spieler sahen nicht, was sie als Nächstes
+  tun sollen. Standard ist jetzt die Ansicht **Pfade**, die Karte bleibt als zweite Ansicht.
+- **Jetzt lernbar:** bis zu sechs Skills, die man jetzt lernen kann (oder für die nur Punkte fehlen), die Fächer des
+  eigenen Jobs zuerst, dann die günstigen Stufen. Ein Tipp öffnet das Lernfenster.
+- **Pfade:** Jeder der acht Bereiche ist eine Karte mit Fortschritt, Punktzahl und den Skills nach Stufen
+  (Grundlagen bis Meisterschaft). Jeder Skill zeigt seinen Zustand: gelernt (Haken), lernbar (pulsierender Punkt),
+  Punkte fehlen (gestrichelt), gesperrt (Schloss). Gezeigt werden die erreichten Stufen und die nächste; weitere
+  Stufen klappen auf Wunsch auf.
+- Gesperrte Skills nennen im Lernfenster, welche Nachbarn man zuerst lernen muss.
+- Die Regeln bleiben gleich (ADR-061): Felder nahe der Mitte sind offen, alle anderen brauchen einen gelernten
+  Nachbarn.

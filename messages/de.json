@@ -572,7 +572,7 @@
         "where": "Du findest es im Tab „Firma“. Deinen Job darfst du behalten."
       },
       "visit_skill_map": {
-        "map": "Deine Skill-Karte. Ziehen zum Bewegen, zoomen mit zwei Fingern. Lernen kannst du Felder direkt neben dem, was du schon kannst."
+        "map": "Deine Skills: Oben steht, was du jetzt lernen kannst. Darunter ist jeder Bereich ein Pfad von den Grundlagen bis zur Meisterschaft. Unter „Karte“ siehst du alles auf einen Blick."
       },
       "visit_company": {
         "dashboard": "Deine Firma! Jedes Quartal (6 Stunden) siehst du hier Umsatz und Gewinn.",
@@ -1686,8 +1686,8 @@
     "skillsRequired": "Muss können"
   },
   "skillTree": {
-    "title": "Skill-Karte",
-    "intro": "Jedes Feld ist ein Skill. Starte in der Mitte und arbeite dich in die Richtungen vor, die zu dir passen. Gelernte Skills bleiben für immer.",
+    "title": "Skills",
+    "intro": "Jeder Skill macht dich in einem Bereich besser: mehr Lohn, bessere Jobs, mehr Leistung in deiner Firma. Oben siehst du, was du jetzt lernen kannst. Gelernte Skills bleiben für immer.",
     "freePoints": "Freie Punkte",
     "freePointsHint": "Für jeden Bereich. Kommen aus Level-ups, Missionen und der täglichen Belohnung.",
     "branchPoints": "Punkte aus Arbeit",
@@ -1704,7 +1704,7 @@
     "hybridsHint": "Verbinden zwei Bereiche und zählen für beide.",
     "cost": "{count, plural, one {# Punkt} other {# Punkte}}",
     "learned": "Gelernt",
-    "locked": "Erst {names} lernen",
+    "locked": "Erst {names} lernen.",
     "learn": "Lernen",
     "learnTitle": "{name} lernen?",
     "learnText": "Kostet {cost}. Gelernte Skills bleiben für immer, du kannst sie nicht zurücknehmen.",
@@ -1727,7 +1727,21 @@
     "branchHint": "Fahre über einen Bereich, um ihn hervorzuheben; klicke, um dorthin zu springen.",
     "hoverOpen": "Lernbar für {cost}",
     "hoverLocked": "Gesperrt – lerne zuerst ein Feld daneben",
-    "hoverClick": "Klicken für Details"
+    "hoverClick": "Klicken für Details",
+    "view": {
+      "label": "Ansicht",
+      "paths": "Pfade",
+      "map": "Karte"
+    },
+    "next": {
+      "title": "Jetzt lernbar",
+      "count": "{count, plural, =0 {gerade nichts} one {# Skill offen} other {# Skills offen}}",
+      "hint": "Skills neben dem, was du schon kannst. Was zu deinem Job passt, steht vorn.",
+      "forJob": "Für deinen Job",
+      "empty": "Gerade ist nichts offen. Sammle Punkte: Level-ups, Arbeit, Missionen und die tägliche Belohnung."
+    },
+    "or": " oder ",
+    "moreTiers": "Stufe {from} bis {to} zeigen"
   },
   "dailyReward": {
     "title": "Tägliche Belohnung",
