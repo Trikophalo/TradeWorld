@@ -7052,3 +7052,13 @@ Migration `20261203000200_skill_prerequisites.sql`, idempotente Kopie in `supaba
 - `skill_reachable(p_player, p_key)` (intern): wahr, wenn alle `requires` in `player_skills` stehen. Ein Baum ohne
   `requires` (ältere Konfiguration) wird wie bisher bewertet (Einstiegsfeld oder gelerntes Nachbarfeld).
 - `learn_skill` ist unverändert und meldet weiter `skill_locked`; `train_employee` prüft die Reihenfolge nicht.
+
+## Nachtrag: Rangliste ohne Stau
+
+Migration `20261203000300_rich_list_speed.sql`, idempotente Kopie in `supabase/updates/`.
+
+- Neuer Index `rich_list_snapshots_taken_idx (taken_at desc, entity_kind, entity_id)`: Der Minuten-Job liest die
+  Momentaufnahmen nach Zeitpunkt.
+- `player_rich_rank(uuid)` liest den Rang aus der neuesten Momentaufnahme, solange sie höchstens doppelt so alt ist
+  wie `richList.snapshotMinutes`; sonst wird er wie bisher berechnet. Vorher baute jeder Aufruf die ganze Rangliste
+  neu, pro Rang-Mission und Spieler, im Minuten-Job und bei jedem `get_my_missions()`.
