@@ -3268,5 +3268,12 @@
     },
     "more": "Alle Meldungen",
     "less": "Weniger anzeigen"
+  },
+  "install": {
+    "title": "NEXA als App installieren",
+    "android": "Als App startet NEXA im Vollbild, ohne Browserleisten, und jeder Tipp unten kommt sofort an.",
+    "ios": "Für das beste Spielgefühl: Tippe unten in Safari auf „Teilen“ und dann auf „Zum Home-Bildschirm“. Dann startet NEXA im Vollbild, ohne Browserleisten.",
+    "install": "Installieren",
+    "later": "Später"
   }
 }

@@ -1124,3 +1124,19 @@ Vorgabe:
   3. `ANTHROPIC_API_KEY`: ein API-Schlüssel aus der Claude-Konsole.
   4. Beim nächsten Push spielt die GitHub Action die Funktion ein und hinterlegt den Schlüssel als
      Funktions-Secret. Er erscheint nie im Log.
+
+## ADR-092: Handy: Inhalt scrollt im Spiel, nicht im Browser; Installations-Hinweis — `akzeptiert`
+
+Problem: Im Handy-Browser kamen Tipps auf die untere Navigation manchmal nicht an. Ist die Seite gescrollt, blendet
+der Browser (vor allem Safari am iPhone) seine Leisten aus. Ein Tipp in den unteren Bildschirmbereich holt sie
+zurück, statt den Knopf zu drücken.
+
+- **Unter 1024 px** scrollt nur der Spielinhalt (`#scroll-root` in der App-Hülle). Die Seite selbst steht still,
+  deshalb klappen die Browserleisten nicht mehr ein, und der erste Tipp unten zählt. Auf dem Desktop bleibt das
+  normale Seitenscrollen.
+- Beim Seitenwechsel springt der Inhalt nach oben (`ScrollReset`).
+- Schon vorher gesetzt: `touch-action: manipulation` (keine Doppeltipp-Verzögerung), keine Tipp-Hervorhebung, kein
+  Überscroll-Ziehen.
+- **Als App installieren:** Im Handy-Browser zeigt die Startseite einmal einen Hinweis, bis er weggeklickt wird.
+  Android bekommt den Installations-Dialog, iPhones die zwei Schritte über „Teilen“. Als installierte App läuft
+  NEXA im Vollbild, ganz ohne Browserleisten.

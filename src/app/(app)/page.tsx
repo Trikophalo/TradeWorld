@@ -10,6 +10,7 @@ import { NextGoalCard } from "@/features/progression/components/next-goal-card";
 import { Reveal } from "@/features/progression/components/reveal";
 import { VaultCard } from "@/features/progression/components/vault-card";
 import { MyRankCard } from "@/features/rich-list/components/my-rank-card";
+import { InstallHint } from "@/features/settings/components/install-hint";
 import { NextEventsCard } from "@/features/market/components/event-strip";
 import { FeedPreview } from "@/features/social/components/feed";
 import { LeaguePreview } from "@/features/social/components/league";
@@ -24,6 +25,7 @@ export default async function HomePage() {
   return (
     <Page>
       <h1 className="sr-only">{t("title")}</h1>
+      <InstallHint />
       <WealthHero />
       <div className="grid items-start gap-5 *:min-w-0 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6">
         {/* On phones the vault and the missions come first. */}

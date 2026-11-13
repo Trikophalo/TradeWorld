@@ -179,6 +179,15 @@
     text-rendering: optimizeLegibility;
   }
 
+  /* Phones: the game scrolls inside #scroll-root, the page itself stands still (see AppShell). */
+  @media (width < 64rem) {
+    html:has(#scroll-root),
+    body:has(#scroll-root) {
+      height: 100%;
+      overflow: hidden;
+    }
+  }
+
   body {
     min-height: 100dvh;
     font-size: 0.9375rem;
