@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
@@ -61,9 +62,11 @@ function CompanyRow({ entry }: { entry: CompanyRankingEntry }) {
   const t = useTranslations("ranking");
   const tf = useTranslations("firm");
   return (
-    <div
+    <Link
+      href={entry.isMine ? "/company" : `/companies/${encodeURIComponent(entry.companyId)}`}
+      data-company={entry.companyId}
       className={cn(
-        "flex items-center gap-3 rounded-md px-2 py-2.5",
+        "flex items-center gap-3 rounded-md px-2 py-2.5 focus-ring",
         entry.isMine ? "bg-accent-soft ring-1 ring-accent" : "transition-colors duration-fast hover:bg-surface-2",
       )}
     >
@@ -102,6 +105,6 @@ function CompanyRow({ entry }: { entry: CompanyRankingEntry }) {
           </span>
         )}
       </span>
-    </div>
+    </Link>
   );
 }

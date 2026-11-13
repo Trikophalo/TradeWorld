@@ -44,6 +44,8 @@ export interface Security {
   /** Listed player companies (ADR-067) bring their own pixel logo. */
   companyKind: "ai" | "player";
   logo: CompanyLogoData | null;
+  /** The company behind a stock (ADR-125); null for bonds. */
+  companyId: string | null;
 }
 
 export interface MarketSnapshot {
@@ -1064,6 +1066,53 @@ export interface PlayerSearchResult {
   avatarKey: string;
 }
 
+/** The public profile of any company (ADR-125). */
+export interface CompanyProfile {
+  company: {
+    id: string;
+    name: string;
+    ticker: string | null;
+    sector: string;
+    isAi: boolean;
+    tier: string | null;
+    brandColor: string | null;
+    logo: CompanyLogoData | null;
+    idea: string | null;
+    foundedAt: string;
+    listed: boolean;
+    priceE4: number | null;
+    changeBps: number | null;
+  };
+  founder: { nickname: string; tag: string | null; avatarKey: string } | null;
+  facts: {
+    valueCents: number | null;
+    revenueCents: number | null;
+    profitCents: number | null;
+    period: "quarter" | "ttm" | null;
+    staff: number;
+    maxStaff: number;
+    aiWorkers: number;
+    product: string | null;
+    stage: number | null;
+    qualityBps: number | null;
+    awarenessBps: number | null;
+  };
+  members: {
+    nickname: string;
+    tag: string | null;
+    avatarKey: string;
+    tier: string;
+    title: string | null;
+    since: string;
+  }[];
+}
+
+/** The own net worth over time (ADR-124), oldest first. */
+export interface NetWorthPoint {
+  at: string;
+  netWorthCents: number;
+}
+
 /** What a player holds, shown to the player and to friends (ADR-121). */
 export interface PlayerHoldings {
   /** False for everyone who is neither the player nor a friend. */
@@ -1699,6 +1748,10 @@ export interface GameEngine {
   removeFriend(requestId: string, nickname: string): Promise<Friends>;
   /** Stock news with a lead (ADR-119). */
   stockNews(limit?: number): Promise<StockNews>;
+  /** Public profile of any company (ADR-125). */
+  companyProfile(companyId: string): Promise<CompanyProfile>;
+  /** Own net worth over the last hours (ADR-124). */
+  netWorthHistory(hours: number): Promise<NetWorthPoint[]>;
   /** Investments of a player, for the player and friends (ADR-121). */
   playerHoldings(nickname: string): Promise<PlayerHoldings>;
   /** Friend code (ADR-111). */

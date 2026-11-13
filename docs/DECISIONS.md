@@ -1748,3 +1748,28 @@ immer wieder. Der Takt schreibt Kurse, Kerzen und Quotes aller Aktien und Coins.
 `time.tickSeconds` und `crypto.tickSeconds` sind 10 statt 5, der Cron-Job `nexa-market-tick` läuft alle 10 Sekunden.
 Die Simulation skaliert Schwankung und Abklingen mit dem Intervall, die Tagesschwankung bleibt gleich. Der Client
 fragt den Markt im selben Takt ab. Damit halbieren sich Schreibzugriffe des Takts und Marktabfragen der Spieler.
+
+## ADR-123: Weniger Rechenlast pro Spieler — `akzeptiert`
+
+Anlass: Mit sechs Spielern war die Datenbank (Micro) mit Rechnen ausgelastet, nicht mit Schreiben: Die Marktübersicht
+wurde bei jeder Abfrage jedes Spielers neu gebaut (rund 0,5 s), die Minuten-Aufgabe hielt ihre Sperren rund 13 s.
+
+- `get_market_snapshot()` baut die Übersicht einmal pro Takt und legt sie in `market_snapshot_cache`; weitere Abfragen
+  desselben Takts lesen sie. Neue Listungen, Namen, Farben und Logos leeren den Zwischenspeicher sofort.
+- Die Minuten-Aufgabe läuft als fünf kurze Cron-Jobs (`run_due_part`: core, companies, jobs, art, social), jede in
+  eigener Transaktion. `run_due_jobs()` bleibt für Tests und manuelles Nachholen.
+- Der Client fragt das eigene Depot alle 30 statt 15 Sekunden ab, Missionen jede Minute, Firmen-Chat und Kunstwerk
+  alle 10 Sekunden; nach eigenen Aktionen wird sofort neu geladen.
+- Messung statt Vermutung: Das Schreiben war mit rund 70 KB WAL pro Takt kein Engpass, deshalb werden Kerzen und
+  Kursverlauf nicht seltener geschrieben.
+
+## ADR-124: Vermögensverlauf im Portfolio — `akzeptiert`
+
+Das Portfolio zeigt das eigene Vermögen über 24 Stunden oder 7 Tage, aus den Momentaufnahmen der Rangliste
+(`get_my_net_worth_history`, alle paar Minuten, 8 Tage aufbewahrt).
+
+## ADR-125: Jede Firma lässt sich ansehen — `akzeptiert`
+
+`/companies/[id]` zeigt jede Firma, KI oder Spieler: Gründer, Team, Produkt und Ausbaustufe, Umsatz und Gewinn des
+letzten Quartals (KI: letzte vier Quartale), Wert und Aktie. Kasse, Schulden und Pläne bleiben intern. Erreichbar
+über die Firmen-Rangliste und die Aktienseite. Das Organigramm ist für alle Spieler offen.

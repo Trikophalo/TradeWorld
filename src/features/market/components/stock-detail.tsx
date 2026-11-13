@@ -43,6 +43,7 @@ export function StockDetail({ ticker }: { ticker: string }) {
   const ts = useTranslations("sectors");
   const tt = useTranslations("tiers");
   const ready = useMarketReady();
+  const tc = useTranslations("companyProfile");
   const security = useSecurity(ticker);
   const position = useGame((state) => state.portfolio?.positions.find((p) => p.ticker === ticker));
   const [range, setRange] = useState<ChartRange>("1T");
@@ -135,6 +136,15 @@ export function StockDetail({ ticker }: { ticker: string }) {
           )}
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <Badge>{ticker}</Badge>
+            {security?.companyId && (
+              <Link
+                href={`/companies/${encodeURIComponent(security.companyId)}`}
+                className="label-pixel text-accent focus-ring hover:underline"
+                data-testid="open-company"
+              >
+                {tc("open")}
+              </Link>
+            )}
             {security?.sector && (
               <Badge tone="accent">
                 <PixelIcon {...SECTOR_ICONS[security.sector]} scale={1} />

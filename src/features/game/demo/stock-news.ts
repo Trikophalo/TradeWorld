@@ -19,16 +19,20 @@ interface Tip extends StockNewsItem {
 }
 
 const UP = [
-  "Analysten heben den Daumen für {name}",
-  "{name}: Großauftrag in Sicht",
-  "Gerücht: {name} steht vor starken Zahlen",
-  "{name} gewinnt neue Kunden",
+  "Rekordauftrag für {name}",
+  "{name} hebt die Prognose an",
+  "Star-Investor steigt bei {name} ein",
+  "{name} gewinnt Branchenpreis",
+  "Übernahmegerüchte um {name}",
+  "{name} startet Aktienrückkauf",
 ];
 const DOWN = [
-  "Analysten warnen vor {name}",
-  "{name}: Lieferprobleme befürchtet",
-  "Gerücht: {name} verfehlt die Erwartungen",
-  "{name} verliert einen wichtigen Kunden",
+  "Affäre erschüttert {name}",
+  "{name} plant Kapitalerhöhung",
+  "Rückruf bei {name}",
+  "Datenleck bei {name}",
+  "{name}-Chef tritt überraschend zurück",
+  "Razzia bei {name}",
 ];
 const WORDS = ["leicht", "spürbar", "deutlich"] as const;
 

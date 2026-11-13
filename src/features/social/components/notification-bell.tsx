@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -26,23 +26,33 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const unread = list.data?.unread ?? 0;
 
-  // Opening counts as reading: mark everything read after a moment, so the dots stay visible while opening.
-  useEffect(() => {
-    if (!open || unread === 0) return;
-    const timer = window.setTimeout(() => {
-      void engine.markNotificationsRead().then((left) =>
+  // Opening counts as reading. The badge goes away at once; the server is told right away and, if that fails
+  // (busy database), again on the next open. The dots in the list stay until the sheet is closed.
+  const [seen, setSeen] = useState<ReadonlySet<string> | null>(null);
+  const markRead = () => {
+    client.setQueryData<NotificationList>(SOCIAL_KEYS.notifications, (data) => (data ? { ...data, unread: 0 } : data));
+    void engine
+      .markNotificationsRead()
+      .then((left) =>
         client.setQueryData<NotificationList>(SOCIAL_KEYS.notifications, (data) =>
-          data
-            ? {
-                unread: left,
-                items: data.items.map((n) => (n.readAt ? n : { ...n, readAt: new Date().toISOString() })),
-              }
-            : data,
+          data ? { ...data, unread: left } : data,
         ),
+      )
+      .catch(() => void client.invalidateQueries({ queryKey: SOCIAL_KEYS.notifications }));
+  };
+  const onOpenChange = (next: boolean) => {
+    if (next) {
+      setSeen(new Set((list.data?.items ?? []).filter((n) => !n.readAt).map((n) => n.id)));
+      if (unread > 0) markRead();
+    } else {
+      setSeen(null);
+      const now = new Date().toISOString();
+      client.setQueryData<NotificationList>(SOCIAL_KEYS.notifications, (data) =>
+        data ? { ...data, items: data.items.map((n) => (n.readAt ? n : { ...n, readAt: now })) } : data,
       );
-    }, 1_500);
-    return () => window.clearTimeout(timer);
-  }, [open, unread, client]);
+    }
+    setOpen(next);
+  };
 
   return (
     <>
@@ -50,7 +60,7 @@ export function NotificationBell() {
         type="button"
         onClick={() => {
           haptic("tap");
-          setOpen(true);
+          onOpenChange(true);
         }}
         aria-label={unread > 0 ? t("labelUnread", { count: unread }) : t("label")}
         data-testid="notification-bell"
@@ -73,7 +83,7 @@ export function NotificationBell() {
           </span>
         )}
       </button>
-      <Sheet open={open} onOpenChange={setOpen} title={t("title")} description={t("intro")}>
+      <Sheet open={open} onOpenChange={onOpenChange} title={t("title")} description={t("intro")}>
         {list.isPending ? (
           <div className="space-y-2">
             {Array.from({ length: 3 }, (_, i) => (
@@ -89,7 +99,12 @@ export function NotificationBell() {
         ) : (
           <ul className="space-y-2" data-testid="notification-list">
             {list.data.items.map((n) => (
-              <NotificationRow key={n.id} item={n} onNavigate={() => setOpen(false)} />
+              <NotificationRow
+                key={n.id}
+                item={n}
+                fresh={seen?.has(n.id) ?? !n.readAt}
+                onNavigate={() => onOpenChange(false)}
+              />
             ))}
           </ul>
         )}
@@ -98,13 +113,21 @@ export function NotificationBell() {
   );
 }
 
-function NotificationRow({ item, onNavigate }: { item: AppNotification; onNavigate: () => void }) {
+function NotificationRow({
+  item,
+  fresh,
+  onNavigate,
+}: {
+  item: AppNotification;
+  fresh: boolean;
+  onNavigate: () => void;
+}) {
   const ago = useAgo();
   const body = (
     <>
-      <span className={cn("mt-1.5 size-2 shrink-0 rounded-xs", item.readAt ? "bg-surface-3" : "bg-info")} aria-hidden />
+      <span className={cn("mt-1.5 size-2 shrink-0 rounded-xs", fresh ? "bg-info" : "bg-surface-3")} aria-hidden />
       <span className="min-w-0 flex-1">
-        <span className={cn("block text-sm", item.readAt ? "text-fg-2" : "font-semibold text-fg-1")}>{item.title}</span>
+        <span className={cn("block text-sm", fresh ? "font-semibold text-fg-1" : "text-fg-2")}>{item.title}</span>
         {item.body && <span className="block text-xs text-pretty text-fg-3">{item.body}</span>}
         <span className="mt-0.5 block text-2xs text-fg-3">{ago(item.createdAt)}</span>
       </span>

@@ -501,7 +501,8 @@ select tests.login_as('authenticated', :e);
 select public.get_company_org(:'sco') as org_e \gset
 reset role;
 select tests.login_as('authenticated', :g);
-select tests.throws_key(format('select public.get_company_org(%L)', :'sco'), 'forbidden', 'get_company_org(): not for strangers');
+select public.get_company_org(:'sco') -> 'company' ->> 'id' = :'sco' as org_open \gset
+select tests.assert(:'org_open'::boolean, 'get_company_org(): open to every player since ADR-125 (it only shows who works where)');
 select tests.throws_key(format('select public.get_company_org(%L)', :'fco_old'), 'company_not_found',
   'get_company_org(): not for a closed company');
 reset role;

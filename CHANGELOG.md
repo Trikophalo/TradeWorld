@@ -135,3 +135,10 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 - **Kündigen in einer Stunde** statt einem Tag; sofort gegen einen Tageslohn bleibt möglich.
 - **Portfolio nach Branche sortierbar**, Visitenkarte ohne gestauchten Text.
 - **Investments auf Profilen (ADR-121):** Freunde sehen, worin du investiert bist und wie viel.
+- **Flüssiger mit mehreren Spielern (ADR-123):** Marktübersicht einmal pro Takt, Minuten-Aufgabe in kurzen Teilen,
+  weniger Abfragen pro Spieler.
+- **Vermögensverlauf (ADR-124)** im Portfolio, 24 Stunden oder 7 Tage.
+- **Firmen ansehen (ADR-125):** jede Firma mit Team und Kennzahlen, auch die von Freunden.
+- **Mehr Börsen-News:** 30 Ereignisse, gute wie schlechte.
+- **Benachrichtigungen:** Der Zähler verschwindet beim Öffnen sofort, Meldungen oben schließen sich per Tipp.
+- Laufende Limit-Missionen sind beendet.

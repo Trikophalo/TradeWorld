@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Beobachter rechnen in Kürze mit einem leicht steigenden Kurs. Sicher ist das nicht.",
-      "name": "Volta Energie AG",
-      "due_at": "2026-11-13T23:49:51.652769+00:00",
+      "body": "Eine wichtige Technologie ist jetzt geschützt. Der Vorsprung dürfte sich auszahlen. Sicher ist das nicht.",
+      "name": "Fundgrube Discount",
+      "due_at": "2026-11-14T00:41:24.707522+00:00",
       "status": "open",
-      "ticker": "VLT",
-      "headline": "Volta Energie AG: Großauftrag in Sicht",
+      "ticker": "FGD",
+      "headline": "Patent für Fundgrube Discount erteilt",
       "move_bps": null,
-      "strength": 1,
+      "strength": 2,
       "direction": "up",
-      "published_at": "2026-11-13T23:20:42.041791+00:00"
+      "published_at": "2026-11-14T00:24:42.199035+00:00"
     },
     {
       "id": 3,
-      "body": "Beobachter rechnen in Kürze mit einem leicht fallenden Kurs. Sicher ist das nicht.",
-      "name": "QuantenSprung Labs",
-      "due_at": "2026-11-13T22:20:42.034464+00:00",
+      "body": "Eine wichtige Technologie ist jetzt geschützt. Der Vorsprung dürfte sich auszahlen. Sicher ist das nicht.",
+      "name": "GenoVita Biotech",
+      "due_at": "2026-11-13T23:24:42.19262+00:00",
       "status": "confirmed",
-      "ticker": "QSL",
-      "headline": "Gerücht: QuantenSprung Labs verfehlt die Erwartungen",
-      "move_bps": -588,
+      "ticker": "GNV",
+      "headline": "Patent für GenoVita Biotech erteilt",
+      "move_bps": 510,
       "strength": 1,
-      "direction": "down",
-      "published_at": "2026-11-13T22:20:42.034464+00:00"
+      "direction": "up",
+      "published_at": "2026-11-13T23:24:42.19262+00:00"
     }
   ],
   "reliability_bps": 7500

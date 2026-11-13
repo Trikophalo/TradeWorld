@@ -49,8 +49,12 @@ select tests.assert(
           -- stock news (89)
           || array['get_stock_news']
           -- friends' investments (90)
-          || array['get_player_holdings']) x),
-  'authenticated can execute exactly the 9 helpers and the RPCs up to the friends'' investments (90)');
+          || array['get_player_holdings']
+          -- portfolio chart (92)
+          || array['get_my_net_worth_history']
+          -- company profile (93)
+          || array['get_company_profile']) x),
+  'authenticated can execute exactly the 9 helpers and the RPCs up to the company profile (93)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute') and p.proname <> 'check_nickname'),
@@ -61,8 +65,8 @@ select tests.assert(
   'every SECURITY DEFINER function (incl. M1) pins search_path = ''''');
 select tests.assert(
   (select bool_and(p.provolatile = 's') from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'public' and p.proname in ('get_market_snapshot', 'get_candles', 'get_order_book', 'get_security_details', 'get_my_portfolio')),
-  'read RPCs are STABLE');
+    where n.nspname = 'public' and p.proname in ('get_candles', 'get_order_book', 'get_security_details', 'get_my_portfolio')),
+  'read RPCs are STABLE (get_market_snapshot writes its per-tick cache, ADR-123)');
 
 -- anon: every RPC is refused by the privilege system
 select tests.login_as('anon');

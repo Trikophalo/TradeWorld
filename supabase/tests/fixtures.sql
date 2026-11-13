@@ -975,3 +975,23 @@ select tests.login_as('authenticated', :fx_fa) is null as ok \gset
 select public.get_player_holdings('Fixture_Gast');
 \o
 reset role;
+
+-- Portfolio chart (ADR-124) ----------------------------------------------------------------------------------------
+select public.rich_list_snapshot(true) is not null as ok \gset
+select tests.login_as('authenticated', :fx_fb) is null as ok \gset
+\o :fixture_dir/get_my_net_worth_history.json
+select public.get_my_net_worth_history(24);
+\o
+reset role;
+
+-- Company profile (ADR-125) ----------------------------------------------------------------------------------------
+select c.id as fx_ai_company from public.companies c where c.is_ai and c.ticker = 'KLS' \gset
+select pc.company_id as fx_player_company from public.player_companies pc join public.companies c on c.id = pc.company_id
+ where c.dissolved_at is null limit 1 \gset
+select tests.login_as('authenticated', :fx_fb) is null as ok \gset
+\o :fixture_dir/get_company_profile.json
+select public.get_company_profile(:'fx_ai_company');
+\o :fixture_dir/get_company_profile_player.json
+select public.get_company_profile(:'fx_player_company');
+\o
+reset role;

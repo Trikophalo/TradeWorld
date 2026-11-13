@@ -453,6 +453,7 @@ function securityOf(ticker: string): Security {
       : null,
     companyKind: "ai",
     logo: null,
+    companyId: info.company ? `demo-company-${ticker}` : null,
   };
 }
 
@@ -1257,6 +1258,62 @@ const stockNews = createStockNewsEngine({
 
 export const demoEngine: GameEngine = {
   ...stockNews,
+  // AI companies of the demo (ADR-125): facts from the start values, no players work there.
+  companyProfile: async (companyId) => {
+    const ticker = companyId.replace(/^demo-company-/, "");
+    const c = DEMO_COMPANIES.find((x) => x.ticker === ticker);
+    if (!c) throw new GameError("company_not_found");
+    const lastE4 = m().mids.get(ticker) ?? c.priceE4;
+    const prevE4 = m().prevClose.get(ticker) ?? lastE4;
+    const shares = c.marketCapCents / (c.priceE4 / 100);
+    return {
+      company: {
+        id: companyId,
+        name: c.name,
+        ticker,
+        sector: c.sector,
+        isAi: true,
+        tier: c.tier,
+        brandColor: c.color,
+        logo: null,
+        idea: null,
+        foundedAt: new Date(Date.now() - 400 * 86_400_000).toISOString(),
+        listed: true,
+        priceE4: lastE4,
+        changeBps: Math.round(((lastE4 - prevE4) / prevE4) * 10_000),
+      },
+      founder: null,
+      facts: {
+        valueCents: Math.round((shares * lastE4) / 100),
+        revenueCents: Math.round(c.marketCapCents / 6),
+        profitCents: Math.round(c.marketCapCents / 40),
+        period: "ttm",
+        staff: { bluechip: 1_500, midcap: 300, penny: 40 }[c.tier],
+        maxStaff: 100_000,
+        aiWorkers: 0,
+        product: null,
+        stage: null,
+        qualityBps: null,
+        awarenessBps: null,
+      },
+      members: [],
+    };
+  },
+  // The demo keeps no history: a gentle line towards today's net worth (ADR-124).
+  netWorthHistory: async (hours) => {
+    const now = portfolioNow().totalCents;
+    const step = hours <= 24 ? 5 * 60_000 : 60 * 60_000;
+    const count = Math.floor((hours * 3_600_000) / step);
+    const end = Date.now();
+    return Array.from({ length: count + 1 }, (_, i) => {
+      const left = (count - i) / Math.max(1, count);
+      const wave = Math.sin(i / 7) * 0.015 + Math.sin(i / 23) * 0.025;
+      return {
+        at: new Date(end - (count - i) * step).toISOString(),
+        netWorthCents: Math.round(now * (1 - left * 0.06 + wave * left)),
+      };
+    });
+  },
   // The demo has no friends: only the own investments are visible (ADR-121).
   playerHoldings: async (nickname) => {
     if (nickname.trim().toLowerCase() !== p().nickname.toLowerCase()) {

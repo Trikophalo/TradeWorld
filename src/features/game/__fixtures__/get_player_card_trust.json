@@ -1,7 +1,7 @@
 {
   "job": null,
-  "tag": "7MY2",
-  "rank": 118,
+  "tag": "TEVH",
+  "rank": 117,
   "level": 6,
   "trust": { "band": "shaky", "kept": 0, "score": 41, "broken": 1 },
   "company": { "name": "Fixture Lieferwerk", "ticker": null },
@@ -10,7 +10,7 @@
   "avatar_key": "rookie",
   "top_skills": [],
   "streak_days": 0,
-  "member_since": "2026-11-13T22:20:40.130772+00:00",
+  "member_since": "2026-11-13T23:24:39.989121+00:00",
   "branch_scores": {
     "it": 0,
     "law": 0,

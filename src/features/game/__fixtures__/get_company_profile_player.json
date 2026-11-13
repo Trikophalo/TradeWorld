@@ -1,0 +1,32 @@
+{
+  "facts": {
+    "staff": 1,
+    "stage": 0,
+    "period": "quarter",
+    "product": "courier",
+    "max_staff": 2,
+    "ai_workers": 0,
+    "quality_bps": 2325,
+    "value_cents": 295006,
+    "profit_cents": -14994,
+    "awareness_bps": 355,
+    "revenue_cents": 219076
+  },
+  "company": {
+    "id": "8d15f33c-d7e8-4788-bb27-17871941a495",
+    "idea": "Fahrräder reparieren",
+    "logo": null,
+    "name": "Gero Werkstatt",
+    "tier": "garage",
+    "is_ai": false,
+    "listed": false,
+    "sector": "logistics",
+    "ticker": null,
+    "price_e4": null,
+    "change_bps": null,
+    "founded_at": "2026-11-13T23:24:08.171014+00:00",
+    "brand_color": "#aa5500"
+  },
+  "founder": { "tag": "WZ5A", "nickname": "Gero_Garage", "avatar_key": "rookie" },
+  "members": []
+}

@@ -1,0 +1,32 @@
+{
+  "facts": {
+    "staff": 14500,
+    "stage": null,
+    "period": "ttm",
+    "product": null,
+    "max_staff": 100000,
+    "ai_workers": 0,
+    "quality_bps": null,
+    "value_cents": 430979000000,
+    "profit_cents": 14762403484,
+    "awareness_bps": null,
+    "revenue_cents": 169610508686
+  },
+  "company": {
+    "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
+    "idea": "Marktführer für Unternehmenssoftware. Verdient verlässlich an Lizenzen und Cloud-Abos.",
+    "logo": null,
+    "name": "KlarSoft AG",
+    "tier": "bluechip",
+    "is_ai": true,
+    "listed": true,
+    "sector": "tech",
+    "ticker": "KLS",
+    "price_e4": 861958,
+    "change_bps": -23,
+    "founded_at": "2026-11-13T23:21:48.250413+00:00",
+    "brand_color": "#4C8DFF"
+  },
+  "founder": null,
+  "members": []
+}

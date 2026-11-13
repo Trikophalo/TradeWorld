@@ -27,7 +27,7 @@ select tests.assert(
   and (select t.move_bps = 500 and t.strength = 1 and t.comes_true and t.applied_at is null
               and t.due_at = :'t0'::timestamptz + interval '10 minutes' from public.stock_tips t)
   and (select n.security_id = :'sec' and n.headline = (select headline from public.stock_tips)
-              and n.body like 'Beobachter rechnen in Kürze mit einem leicht % Kurs. Sicher ist das nicht.'
+              and n.body like '%Sicher ist das nicht.' and n.body not like '%{%'
          from public.news_items n where n.id = :nid),
   'stock_news_run_due(): one hint per everyMinutes for a listed stock, with a news item on that stock and a due time');
 

@@ -27,7 +27,7 @@ export function useCompanyChat() {
   return useQuery({
     queryKey: ["company", "chat"],
     queryFn: () => engine.companyChat(),
-    refetchInterval: 5_000,
+    refetchInterval: 10_000,
     staleTime: 2_000,
   });
 }

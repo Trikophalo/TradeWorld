@@ -27,7 +27,7 @@ export function useArtwork(id: string | null) {
     queryKey: ART_KEYS.detail(id ?? ""),
     queryFn: () => engine.artwork(id!),
     enabled: Boolean(id),
-    refetchInterval: 5_000,
+    refetchInterval: 10_000,
   });
 }
 

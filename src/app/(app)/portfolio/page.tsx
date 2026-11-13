@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { WALLET } from "@/components/pixel/art";
 import { Page, PageHeader } from "@/components/layout/page";
+import { NetWorthChart } from "@/features/portfolio/components/net-worth-chart";
 import { OrdersList } from "@/features/portfolio/components/orders-list";
 import { PortfolioSummary } from "@/features/portfolio/components/portfolio-summary";
 import { PositionsList } from "@/features/portfolio/components/positions-list";
@@ -20,6 +21,7 @@ export default async function PortfolioPage() {
     <Page>
       <PageHeader title={t("title")} intro={th("portfolio")} art={WALLET} />
       <PortfolioSummary />
+      <NetWorthChart />
       <div className="grid gap-5 *:min-w-0 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-6">
         <div className="space-y-5 lg:space-y-6">
           <PositionsList />

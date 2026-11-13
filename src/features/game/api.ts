@@ -51,6 +51,7 @@ const securitySchema = z.object({
   matures_at: iso.nullable().optional(),
   face_value_cents: nnum.optional(),
   company_kind: z.enum(["ai", "player"]).default("ai"),
+  company_id: z.string().nullable().default(null),
   logo: z
     .object({ palette: z.array(z.string()), grid: z.array(z.string()) })
     .nullable()
@@ -270,6 +271,52 @@ const checkInSchema = z.object({
 });
 
 /** Response schemas per RPC, exported for the contract test against real database output. */
+const companyProfileSchema = z.object({
+  company: z.object({
+    id: z.string(),
+    name: z.string(),
+    ticker: z.string().nullable(),
+    sector: z.string(),
+    is_ai: z.boolean(),
+    tier: z.string().nullable(),
+    brand_color: z.string().nullable(),
+    logo: z.object({ palette: z.array(z.string()), grid: z.array(z.string()) }).nullable(),
+    idea: z.string().nullable(),
+    founded_at: z.string(),
+    listed: z.boolean(),
+    price_e4: z.number().nullable(),
+    change_bps: z.number().nullable(),
+  }),
+  founder: z.object({ nickname: z.string(), tag: z.string().nullable(), avatar_key: z.string() }).nullable(),
+  facts: z.object({
+    value_cents: z.number().nullable(),
+    revenue_cents: z.number().nullable(),
+    profit_cents: z.number().nullable(),
+    period: z.enum(["quarter", "ttm"]).nullable(),
+    staff: z.number(),
+    max_staff: z.number(),
+    ai_workers: z.number(),
+    product: z.string().nullable(),
+    stage: z.number().nullable(),
+    quality_bps: z.number().nullable(),
+    awareness_bps: z.number().nullable(),
+  }),
+  members: z.array(
+    z.object({
+      nickname: z.string(),
+      tag: z.string().nullable(),
+      avatar_key: z.string(),
+      tier: z.string(),
+      title: z.string().nullable(),
+      since: z.string(),
+    }),
+  ),
+});
+
+const netWorthHistorySchema = z.object({
+  points: z.array(z.object({ at: z.string(), net_worth_cents: z.number() })),
+});
+
 const holdingsSchema = z.object({
   visible: z.boolean(),
   total_cents: z.number().nullable(),
@@ -332,6 +379,8 @@ export const RPC_SCHEMAS = {
   ...PROPERTY_RPC_SCHEMAS,
   get_stock_news: stockNewsSchema,
   get_player_holdings: holdingsSchema,
+  get_my_net_worth_history: netWorthHistorySchema,
+  get_company_profile: companyProfileSchema,
   ...FRIEND_RPC_SCHEMAS,
   ...SOCIAL_RPC_SCHEMAS,
   ...COMPANY_EVENT_RPC_SCHEMAS,
@@ -345,6 +394,54 @@ export const liveEngine: GameEngine = {
   ...liveArtEngine,
   ...livePropertyEngine,
   ...liveFriendEngine,
+  async companyProfile(companyId) {
+    const r = await rpc("get_company_profile", { p_company_id: companyId }, companyProfileSchema);
+    const c = r.company;
+    const f = r.facts;
+    return {
+      company: {
+        id: c.id,
+        name: c.name,
+        ticker: c.ticker,
+        sector: c.sector,
+        isAi: c.is_ai,
+        tier: c.tier,
+        brandColor: c.brand_color,
+        logo: c.logo,
+        idea: c.idea,
+        foundedAt: c.founded_at,
+        listed: c.listed,
+        priceE4: c.price_e4,
+        changeBps: c.change_bps,
+      },
+      founder: r.founder ? { nickname: r.founder.nickname, tag: r.founder.tag, avatarKey: r.founder.avatar_key } : null,
+      facts: {
+        valueCents: f.value_cents,
+        revenueCents: f.revenue_cents,
+        profitCents: f.profit_cents,
+        period: f.period,
+        staff: f.staff,
+        maxStaff: f.max_staff,
+        aiWorkers: f.ai_workers,
+        product: f.product,
+        stage: f.stage,
+        qualityBps: f.quality_bps,
+        awarenessBps: f.awareness_bps,
+      },
+      members: r.members.map((m) => ({
+        nickname: m.nickname,
+        tag: m.tag,
+        avatarKey: m.avatar_key,
+        tier: m.tier,
+        title: m.title,
+        since: m.since,
+      })),
+    };
+  },
+  async netWorthHistory(hours) {
+    const r = await rpc("get_my_net_worth_history", { p_hours: hours }, netWorthHistorySchema);
+    return r.points.map((p) => ({ at: p.at, netWorthCents: p.net_worth_cents }));
+  },
   async playerHoldings(nickname) {
     const r = await rpc("get_player_holdings", { p_nickname: nickname }, holdingsSchema);
     return {
@@ -434,6 +531,7 @@ export const liveEngine: GameEngine = {
             : null,
         companyKind: x.company_kind,
         logo: x.logo,
+        companyId: x.company_id,
       })),
     };
   },

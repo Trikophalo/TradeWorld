@@ -7,7 +7,9 @@ import { demoTick } from "./demo-engine";
 import { useGame } from "./store";
 
 const TICK_MS = BALANCE.time.tickSeconds * 1000;
-const PORTFOLIO_MS = 15_000;
+// Own data changes after own actions (refreshed right then) and slowly otherwise (ADR-123).
+const PORTFOLIO_MS = 30_000;
+const MISSIONS_MS = 60_000;
 
 /**
  * Keeps the shared game state fresh while the tab is visible: the market every
@@ -31,8 +33,10 @@ export function GameSync() {
     const portfolio = window.setInterval(() => {
       if (!visible()) return;
       void refreshPortfolio();
-      void refreshMissions();
     }, PORTFOLIO_MS);
+    const missions = window.setInterval(() => {
+      if (visible()) void refreshMissions();
+    }, MISSIONS_MS);
     const onVisible = () => {
       if (!visible()) return;
       void refreshSnapshot();
@@ -42,6 +46,7 @@ export function GameSync() {
     return () => {
       window.clearInterval(market);
       window.clearInterval(portfolio);
+      window.clearInterval(missions);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);

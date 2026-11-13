@@ -22,9 +22,24 @@ const GLYPHS: Record<Tone, string> = {
   warn: "M3 0h2v4H3zM3 5h2v2H3z",
 };
 
-function ToastCard({ tone, title, description }: { tone: Tone; title: string; description?: ReactNode }) {
+function ToastCard({
+  tone,
+  title,
+  description,
+  onDismiss,
+}: {
+  tone: Tone;
+  title: string;
+  description?: ReactNode;
+  onDismiss: () => void;
+}) {
   return (
-    <div className="flex w-full items-start gap-3 rounded-lg border-2 border-line-2 bg-surface-2 p-3.5 shadow-3 sm:w-[356px]">
+    // A tap closes it: on phones a touch counts as hover and would keep the toast on screen.
+    <div
+      role="status"
+      onClick={onDismiss}
+      className="flex w-full cursor-pointer items-start gap-3 rounded-lg border-2 border-line-2 bg-surface-2 p-3.5 shadow-3 sm:w-[356px]"
+    >
       <span className={cn("grid size-8 shrink-0 place-items-center rounded-sm", TONE_STYLES[tone])}>
         <svg viewBox="0 0 8 7" width="16" height="14" shapeRendering="crispEdges" aria-hidden>
           <path fill="currentColor" d={GLYPHS[tone]} />
@@ -49,7 +64,10 @@ function show(tone: Tone, title: string, description?: ReactNode, options: Toast
   if (!options.silent) void playSound(TONE_SOUND[tone]);
   if (tone === "success") haptic("success");
   else if (tone === "error") haptic("error");
-  return sonner.custom(() => <ToastCard tone={tone} title={title} description={description} />);
+  return sonner.custom(
+    (id) => <ToastCard tone={tone} title={title} description={description} onDismiss={() => sonner.dismiss(id)} />,
+    { duration: tone === "error" ? 6000 : 4000 },
+  );
 }
 
 /** Confirmations and errors. Stacked, swipeable, announced to screen readers. */

@@ -185,7 +185,14 @@
     "sortLabel": "Sortierung",
     "sortValue": "Wert",
     "sortSector": "Branche",
-    "sectorOther": "Anleihen und Krypto"
+    "sectorOther": "Anleihen und Krypto",
+    "chartTitle": "Vermögen",
+    "chartDay": "24 Std.",
+    "chartWeek": "7 Tage",
+    "chartRange": "Zeitraum",
+    "chartEmpty": "Der Verlauf füllt sich alle paar Minuten. Schau gleich noch mal vorbei.",
+    "chartLabel": "Vermögen über {range}: {value}",
+    "chartChange": "{change} seit Beginn"
   },
   "markets": {
     "title": "Märkte",
@@ -4367,5 +4374,29 @@
     "private": "Nur Freunde sehen, worin {name} investiert.",
     "empty": "{name} hält gerade keine Wertpapiere.",
     "share": "{percent} % des Depots"
+  },
+  "companyProfile": {
+    "back": "Zurück",
+    "ai": "KI-Firma",
+    "player": "Spielerfirma",
+    "founder": "Gegründet von",
+    "since": "Seit {date}",
+    "value": "Wert",
+    "revenue": "Umsatz",
+    "profit": "Gewinn",
+    "periodQuarter": "letztes Quartal",
+    "periodTtm": "letzte vier Quartale",
+    "staff": "Mitarbeiter",
+    "staffValue": "{staff, plural, one {# Person} other {# Personen}}",
+    "aiWorkers": "davon {count} KI-Kräfte",
+    "product": "Produkt",
+    "stage": "Ausbaustufe {stage}",
+    "quality": "Qualität",
+    "awareness": "Bekanntheit",
+    "team": "Team",
+    "teamEmpty": "Hier arbeiten noch keine Spieler.",
+    "stock": "Zur Aktie",
+    "notFound": "Diese Firma gibt es nicht mehr.",
+    "open": "Firma ansehen"
   }
 }

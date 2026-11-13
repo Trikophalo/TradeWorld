@@ -40359,6 +40359,576 @@ begin
   end if;
 end;
 $$;
+-- ===== idempotent copy of migrations/20261203000900_snapshot_cache.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 0900 · The market snapshot is built once per tick, not once per request (ADR-123)
+-- =============================================================================
+-- Every open tab asks for get_market_snapshot() every tick. The answer is the same for every player, but each call
+-- built it anew (all quotes, logos, money supply over the ledger): about 0.5 s of database time per call, thousands
+-- of calls an hour. Now the first call of a tick builds it and stores it in market_snapshot_cache; every other call
+-- of that tick reads the stored answer. Only server_time is added per call.
+-- Idempotent: runs unchanged as supabase/updates/20261203000900_snapshot_cache.sql.
+
+create table if not exists public.market_snapshot_cache (
+  id        boolean primary key default true check (id),
+  tick_seq  bigint not null,
+  built_at  timestamptz not null,
+  payload   jsonb not null
+);
+alter table public.market_snapshot_cache enable row level security;
+revoke all on public.market_snapshot_cache from public, anon, authenticated;
+comment on table public.market_snapshot_cache is 'The market snapshot of the latest tick (ADR-123). Internal; read through get_market_snapshot().';
+
+-- Not stable any more: the first call of a tick writes the cache.
+drop function if exists public.get_market_snapshot();
+create function public.get_market_snapshot()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now     timestamptz := public.game_now();
+  v_tick    bigint;
+  v_cache   public.market_snapshot_cache;
+  v_index   jsonb;
+  v_secs    jsonb;
+  v_payload jsonb;
+begin
+  perform public.require_player();
+  select coalesce(r.tick_seq, 0) into v_tick from public.sim_runtime r where r.id;
+  select * into v_cache from public.market_snapshot_cache c where c.id;
+  -- the same tick, and not older than a minute (a paused market still refreshes its economy figures)
+  if v_cache.id is not null and v_cache.tick_seq = coalesce(v_tick, 0) and v_cache.built_at > now() - interval '1 minute' then
+    return v_cache.payload || jsonb_build_object('server_time', v_now);
+  end if;
+
+  select jsonb_build_object(
+           'ticker', upper(i.key), 'name', s.name, 'value_e4', q.last_price_e4,
+           'prev_close_e4', coalesce(q.prev_close_e4, q.last_price_e4), 'change_bps', q.change_bps,
+           'day_high_e4', q.day_high_e4, 'day_low_e4', q.day_low_e4)
+    into v_index
+    from public.indices i
+    join public.securities s on s.id = i.security_id
+    join public.security_quotes q on q.security_id = s.id
+   order by i.created_at
+   limit 1;
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', s.id, 'ticker', s.ticker, 'name', s.name, 'kind', s.kind,
+           'sector_key', s.sector_key, 'size_class', c.tier,
+           'last_price_e4', q.last_price_e4, 'bid_e4', q.bid_e4, 'ask_e4', q.ask_e4,
+           'prev_close_e4', coalesce(q.prev_close_e4, q.last_price_e4), 'change_bps', q.change_bps,
+           'day_high_e4', coalesce(q.day_high_e4, q.last_price_e4), 'day_low_e4', coalesce(q.day_low_e4, q.last_price_e4),
+           'day_volume_e6', q.day_volume_e6, 'market_cap_cents', case when s.kind = 'stock' then q.market_cap_cents end,
+           'term_game_years', b.term_game_years, 'coupon_bps', b.coupon_bps,
+           'yield_bps', case when s.kind = 'bond' then q.yield_bps end,
+           'matures_at', b.matures_at, 'face_value_cents', b.face_value_cents,
+           'company_id', s.company_id, 'brand_color', c.brand_color,
+           'logo', case when s.company_id is not null then public.company_logo(s.company_id) end,
+           'company_kind', case when c.id is not null and not c.is_ai then 'player' else 'ai' end)
+         order by case s.kind when 'stock' then 0 else 1 end, sec.sort_order, b.term_game_years, s.ticker), '[]'::jsonb)
+    into v_secs
+    from public.securities s
+    join public.security_quotes q on q.security_id = s.id
+    left join public.companies c on c.id = s.company_id
+    left join public.sectors sec on sec.key = s.sector_key
+    left join public.bonds b on b.security_id = s.id
+   where s.status = 'listed' and s.kind in ('stock', 'bond');
+
+  v_payload := jsonb_build_object(
+    'tick_seq',        (select r.tick_seq from public.sim_runtime r where r.id),
+    'last_tick_at',    (select r.last_tick_at from public.sim_runtime r where r.id),
+    'session',         public.market_session_at(v_now),
+    'paused',          coalesce((select r.is_paused from public.sim_runtime r where r.id), false),
+    'policy_rate_bps', (select cb.policy_rate_bps from public.central_bank_state cb where cb.id),
+    'day_start',       public.trading_day_start(v_now),
+    'index',           v_index,
+    'securities',      v_secs,
+    'economy',         jsonb_build_object(
+                         'money_supply_cents',      public.money_supply_cents(),
+                         'treasury_cents',          public.treasury_balance_cents(),
+                         'basic_income_factor_bps', public.basic_income_factor_bps(),
+                         'total_supply_cents',      public.config_bigint('money', '{totalSupplyCents}', 1000000000000)));
+
+  insert into public.market_snapshot_cache (id, tick_seq, built_at, payload)
+  values (true, coalesce(v_tick, 0), now(), v_payload)
+  on conflict (id) do update set tick_seq = excluded.tick_seq, built_at = excluded.built_at, payload = excluded.payload;
+  return v_payload || jsonb_build_object('server_time', v_now);
+end;
+$$;
+comment on function public.get_market_snapshot() is 'RPC: quotes, index and economy of the latest tick, built once per tick (ADR-123).';
+revoke all on function public.get_market_snapshot() from public, anon;
+grant execute on function public.get_market_snapshot() to authenticated, service_role;
+
+-- Listings, names, colours and logos change within a tick (IPO, new logo): then the cached answer is dropped.
+create or replace function public.market_snapshot_invalidate()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  delete from public.market_snapshot_cache;
+  return null;
+end;
+$$;
+revoke all on function public.market_snapshot_invalidate() from public, anon, authenticated;
+
+drop trigger if exists market_snapshot_securities_ins on public.securities;
+create trigger market_snapshot_securities_ins after insert or delete on public.securities
+  for each statement execute function public.market_snapshot_invalidate();
+drop trigger if exists market_snapshot_securities_upd on public.securities;
+create trigger market_snapshot_securities_upd after update on public.securities
+  for each row when (old.status is distinct from new.status or old.name is distinct from new.name
+                     or old.sector_key is distinct from new.sector_key or old.company_id is distinct from new.company_id)
+  execute function public.market_snapshot_invalidate();
+drop trigger if exists market_snapshot_companies_upd on public.companies;
+create trigger market_snapshot_companies_upd after update on public.companies
+  for each row when (old.brand_color is distinct from new.brand_color or old.is_ai is distinct from new.is_ai
+                     or old.tier is distinct from new.tier)
+  execute function public.market_snapshot_invalidate();
+drop trigger if exists market_snapshot_logos_upd on public.player_companies;
+create trigger market_snapshot_logos_upd after update on public.player_companies
+  for each row when (old.logo is distinct from new.logo or old.logo_hidden is distinct from new.logo_hidden)
+  execute function public.market_snapshot_invalidate();
+-- ===== idempotent copy of migrations/20261203001000_split_minute_job.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 1000 · The minute job in five short parts (ADR-123)
+-- =============================================================================
+-- run_due_jobs() did everything in one transaction: on the live database about 13 seconds every minute, holding the
+-- tick lock and the rows it touched; players waited behind it. The cron job now runs run_due_part() for five parts,
+-- each its own short transaction:
+--   core       calendar, bootstrap, crypto, quarter closes, bonds, daily maintenance
+--   companies  operating hours of player companies, company events, deals (in this order, as before)
+--   jobs       quit notices, share offers, AI job postings, wages
+--   art        artwork auctions
+--   social     rich list snapshot, feed and league, announced events
+-- run_due_jobs() stays and runs all parts in one go (tests, manual catch-up).
+-- Also (ADR-117): missions about limit orders that are still running are ended.
+-- Idempotent: runs unchanged as supabase/updates/20261203001000_split_minute_job.sql.
+
+create or replace function public.run_due_part(p_part text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now      timestamptz;
+  v_result   jsonb := '{}'::jsonb;
+  v_closed   jsonb := '[]'::jsonb;
+  v_latest   bigint;
+  q          record;
+  v_run      bigint;
+begin
+  -- waits for a running tick (ticks only try the lock and skip)
+  perform pg_advisory_xact_lock(7311001);
+  v_now := public.game_now();
+  if p_part = 'core' then
+  perform public.ensure_game_quarters(3);
+
+  if not exists (select 1 from public.candles limit 1) or not public.money_genesis_done()
+     or not exists (select 1 from public.rich_tycoons) then
+    v_result := v_result || jsonb_build_object('bootstrap', public.market_bootstrap());
+  end if;
+
+  -- cryptocurrencies (ADR-101) first: coin rows are locked before any ledger account (same order as trades)
+  v_result := v_result || jsonb_build_object('crypto', public.crypto_run_due(v_now));
+
+  -- first run on a database: older quarters are skipped, only the latest ended one is closed
+  if not exists (select 1 from public.job_runs j where j.job_name = 'quarter_close') then
+    select gq.id into v_latest from public.game_quarters gq
+     where gq.ends_at <= v_now and gq.status <> 'closed' order by gq.ends_at desc limit 1;
+    for q in select gq.id from public.game_quarters gq
+              where gq.ends_at <= v_now and gq.status <> 'closed' and gq.id <> coalesce(v_latest, -1)
+    loop
+      update public.game_quarters set status = 'closed', closed_at = now() where id = q.id;
+      insert into public.job_runs (job_name, run_key, status, finished_at, details)
+      values ('quarter_close', q.id::text, 'succeeded', now(), '{"skipped": "before_first_run"}'::jsonb)
+      on conflict do nothing;
+    end loop;
+  end if;
+
+  for q in select gq.id from public.game_quarters gq
+            where gq.ends_at <= v_now and gq.status <> 'closed'
+            order by gq.ends_at limit 8
+  loop
+    v_closed := v_closed || public.close_game_quarter(q.id);
+  end loop;
+  v_result := v_result || jsonb_build_object('quarters', v_closed);
+  -- bonds that matured between quarter closes (or after a downtime)
+  if exists (select 1 from public.bonds bd join public.securities s on s.id = bd.security_id
+              where s.status = 'listed' and bd.matures_at <= v_now) then
+    v_result := v_result || jsonb_build_object('bonds_redeemed', public.redeem_matured_bonds(v_now));
+  end if;
+  v_result := v_result || jsonb_build_object('bonds_issued', public.ensure_bond_series());
+
+  -- daily maintenance (first run per UTC day)
+  insert into public.job_runs (job_name, run_key) values ('maintenance', to_char(now() at time zone 'UTC', 'YYYY-MM-DD'))
+  on conflict (job_name, run_key) do nothing
+  returning id into v_run;
+  if v_run is not null then
+    v_result := v_result || jsonb_build_object('maintenance', public.run_maintenance());
+    -- price_ticks: keep about one day (candles hold the history), cron log: one day
+    perform public.maintain_price_tick_partitions(3, 1);
+    if to_regclass('cron.job_run_details') is not null then
+      begin
+        execute 'delete from cron.job_run_details where end_time < now() - interval ''1 day''';
+      exception when others then
+        raise warning 'NEXA: could not prune cron.job_run_details: %', sqlerrm;
+      end;
+    end if;
+    delete from public.job_runs j where j.job_name = 'maintenance' and j.started_at < now() - interval '30 days';
+    update public.job_runs set status = 'succeeded', finished_at = now() where id = v_run;
+  end if;
+  elsif p_part = 'companies' then
+  v_result := v_result || jsonb_build_object('player_companies', public.player_companies_run_due());
+  v_result := v_result || jsonb_build_object('company_events', public.company_events_run_due());
+  -- deals between players (ADR-098): after the company hours, so supply contracts see both companies' hours
+  v_result := v_result || jsonb_build_object('deals', public.deals_run_due());
+
+  elsif p_part = 'jobs' then
+  -- jobs: AI postings of the running quarter, wages of AI-company jobs in whole hours
+  v_result := v_result || jsonb_build_object('quit_notices', public.process_quit_notices(null));
+  v_result := v_result || jsonb_build_object('share_offers', public.close_due_offers(null));
+  v_result := v_result || jsonb_build_object('job_postings', public.refresh_ai_job_postings(),
+                                             'salaries_paid', public.accrue_salaries(null));
+
+  elsif p_part = 'art' then
+  -- artworks (ADR-080): due auctions are settled, the gallery starts the auctions of the day
+  v_result := v_result || jsonb_build_object('artworks', public.artworks_run_due());
+
+  elsif p_part = 'social' then
+  -- rich list snapshot every richList.snapshotMinutes (rank news, 24 h changes, state missions)
+  v_result := v_result || jsonb_build_object('rich_list', public.rich_list_snapshot(false));
+
+  -- weekly league and feed upkeep (M4f, ADR-088/089) and announced events (M4g, ADR-090): kept in this redefinition
+  v_result := v_result || jsonb_build_object('social', public.social_run_due());
+  v_result := v_result || jsonb_build_object('events', public.events_run_due());
+
+  else
+    perform public.api_error('invalid_argument');
+  end if;
+  return v_result;
+end;
+$$;
+comment on function public.run_due_part(text) is
+  'Internal, cron every minute (ADR-123): one part of the due jobs (core, companies, jobs, art, social), own transaction.';
+revoke all on function public.run_due_part(text) from public, anon, authenticated;
+grant execute on function public.run_due_part(text) to service_role;
+
+do $$
+declare
+  p text;
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    if exists (select 1 from cron.job where jobname = 'nexa-due-jobs') then
+      perform cron.unschedule('nexa-due-jobs');
+    end if;
+    foreach p in array array['core', 'companies', 'jobs', 'art', 'social'] loop
+      if exists (select 1 from cron.job where jobname = 'nexa-due-' || p) then
+        perform cron.unschedule('nexa-due-' || p);
+      end if;
+      perform cron.schedule('nexa-due-' || p, '* * * * *', format('select public.run_due_part(%L)', p));
+    end loop;
+  end if;
+end;
+$$;
+
+-- Limit orders are gone (ADR-117): running missions about them end as well.
+update public.player_missions m set status = 'expired'
+  from public.mission_templates t
+ where t.key = m.template_key and m.status = 'active'
+   and t.metric in ('limit_orders_placed', 'limit_orders_filled');
+-- ===== idempotent copy of migrations/20261203001100_net_worth_history.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 1100 · The own net worth over time, for the portfolio chart (ADR-124)
+-- =============================================================================
+-- get_my_net_worth_history(p_hours) (authenticated): the player's net worth from the rich list snapshots (every few
+-- minutes, kept 8 days), at most about 300 points: every snapshot for a day, hourly buckets for longer ranges.
+--   {"points": [{"at", "net_worth_cents"}]}   -- oldest first
+-- Idempotent: runs unchanged as supabase/updates/20261203001100_net_worth_history.sql.
+
+create or replace function public.get_my_net_worth_history(p_hours integer default 24)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  v_hours  integer := least(192, greatest(1, coalesce(p_hours, 24)));
+  v_from   timestamptz := public.game_now() - make_interval(hours => v_hours);
+  v_bucket interval := case when v_hours <= 24 then interval '5 minutes' else interval '1 hour' end;
+begin
+  return jsonb_build_object('points', coalesce((
+    select jsonb_agg(jsonb_build_object('at', b.at, 'net_worth_cents', b.nw) order by b.at)
+      from (select date_bin(v_bucket, s.taken_at, '2000-01-01 00:00:00+00') as at,
+                   (array_agg(s.net_worth_cents order by s.taken_at desc))[1] as nw
+              from public.rich_list_snapshots s
+             where s.entity_id = v_player and s.entity_kind = 'player' and s.taken_at >= v_from
+             group by 1) b), '[]'::jsonb));
+end;
+$$;
+comment on function public.get_my_net_worth_history(integer) is
+  'RPC: the own net worth over the last hours, from the rich list snapshots (ADR-124).';
+revoke all on function public.get_my_net_worth_history(integer) from public, anon;
+grant execute on function public.get_my_net_worth_history(integer) to authenticated, service_role;
+-- ===== idempotent copy of migrations/20261203001200_more_stock_news.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 1200 · Many more kinds of stock news, good and bad (ADR-119 follow-up)
+-- =============================================================================
+-- 15 good and 15 bad events (big orders, raised outlook, star investor, buyback ... affair, capital increase,
+-- racism allegations, recall, data leak, raid ...), each with its own headline and text. Up and down stay equally
+-- likely. Same rhythm and mechanics as before.
+-- Idempotent: runs unchanged as supabase/updates/20261203001200_more_stock_news.sql.
+
+create or replace function public.stock_news_run_due(p_now timestamptz default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_cfg      jsonb := public.config_jsonb('stockNews');
+  v_now      timestamptz := coalesce(p_now, public.game_now());
+  v_every    double precision;
+  v_lead_min double precision;
+  v_lead_max double precision;
+  v_min      integer;
+  v_max      integer;
+  v_rel      integer;
+  v_settled  integer := 0;
+  v_new      integer := 0;
+  t          public.stock_tips;
+  s          record;
+  v_dir      smallint;
+  v_move     integer;
+  v_strength smallint;
+  v_head     text;
+  v_body     text;
+  v_news     bigint;
+  v_good     jsonb := jsonb_build_array(
+      jsonb_build_array('Rekordauftrag für {name}', '{name} gewinnt einen Großkunden. Der Auftrag dürfte den Umsatz {w} anheben.'),
+      jsonb_build_array('{name} hebt die Prognose an', 'Die Geschäfte laufen besser als geplant. Analysten erwarten einen {w} steigenden Kurs.'),
+      jsonb_build_array('Neuer Chef-Entwickler wechselt zu {name}', 'Ein bekannter Kopf aus der Branche kommt an Bord. Anleger dürften das {w} honorieren.'),
+      jsonb_build_array('{name} gewinnt Branchenpreis', 'Das Unternehmen wird für sein neues Produkt ausgezeichnet. Rückenwind für die Aktie erwartet.'),
+      jsonb_build_array('Übernahmegerüchte um {name}', 'Ein großer Konkurrent soll Interesse haben. Spekulanten könnten den Kurs {w} treiben.'),
+      jsonb_build_array('{name} startet Aktienrückkauf', 'Das Unternehmen kauft eigene Aktien zurück. Das stützt den Kurs {w}.'),
+      jsonb_build_array('Staatlicher Großauftrag für {name}', 'Ein mehrjähriger Vertrag mit der öffentlichen Hand ist unterschrieben.'),
+      jsonb_build_array('{name}: Neues Produkt ausverkauft', 'Die Nachfrage übertrifft alle Erwartungen. Händler rechnen mit einem {w} steigenden Kurs.'),
+      jsonb_build_array('Patent für {name} erteilt', 'Eine wichtige Technologie ist jetzt geschützt. Der Vorsprung dürfte sich auszahlen.'),
+      jsonb_build_array('{name} senkt die Kosten deutlich', 'Ein Sparprogramm wirkt schneller als gedacht. Die Marge steigt.'),
+      jsonb_build_array('Star-Investor steigt bei {name} ein', 'Ein bekannter Anleger hat ein großes Paket gekauft. Andere könnten folgen.'),
+      jsonb_build_array('{name} erschließt neuen Markt', 'Der Start im Ausland läuft besser als geplant.'),
+      jsonb_build_array('Kooperation: {name} und ein Branchenriese', 'Die Partnerschaft soll beiden Seiten neue Kunden bringen.'),
+      jsonb_build_array('Analysten-Upgrade: {name} jetzt Kaufempfehlung', 'Mehrere Häuser heben ihr Kursziel {w} an.'),
+      jsonb_build_array('Sonderdividende bei {name} erwartet', 'Die Kasse ist voll. Aktionäre dürfen auf eine Extra-Ausschüttung hoffen.'));
+  v_bad      jsonb := jsonb_build_array(
+      jsonb_build_array('Affäre erschüttert {name}', 'Die Chefetage von {name} steht wegen einer Affäre in der Kritik. Anleger werden nervös.'),
+      jsonb_build_array('{name} plant Kapitalerhöhung', 'Neue Aktien sollen ausgegeben werden. Das verwässert die Anteile, der Kurs dürfte {w} nachgeben.'),
+      jsonb_build_array('Rassismus-Vorwürfe gegen {name}', 'Ehemalige Mitarbeiter erheben schwere Vorwürfe. Kunden kündigen erste Verträge.'),
+      jsonb_build_array('Rückruf bei {name}', 'Ein fehlerhaftes Produkt muss zurück in die Werkstatt. Das wird teuer.'),
+      jsonb_build_array('Datenleck bei {name}', 'Kundendaten sind im Netz aufgetaucht. Die Aufsicht prüft.'),
+      jsonb_build_array('{name}-Chef tritt überraschend zurück', 'Die Gründe sind unklar. Der Markt mag keine Unsicherheit.'),
+      jsonb_build_array('Razzia bei {name}', 'Ermittler durchsuchen die Zentrale wegen des Verdachts auf Bilanztricks.'),
+      jsonb_build_array('{name} senkt die Prognose', 'Das Geschäft läuft schwächer als erwartet. Analysten rechnen mit einem {w} fallenden Kurs.'),
+      jsonb_build_array('Streik legt {name} lahm', 'Die Belegschaft legt die Arbeit nieder. Lieferungen verzögern sich.'),
+      jsonb_build_array('Großkunde springt bei {name} ab', 'Ein wichtiger Vertrag wird nicht verlängert.'),
+      jsonb_build_array('Analysten-Downgrade für {name}', 'Mehrere Häuser streichen ihre Kaufempfehlung und senken das Kursziel.'),
+      jsonb_build_array('{name} verliert Patentstreit', 'Ein Gericht gibt dem Konkurrenten recht. Lizenzzahlungen drohen.'),
+      jsonb_build_array('Umweltskandal bei {name}', 'Ein Werk soll Grenzwerte überschritten haben. Bußgelder sind wahrscheinlich.'),
+      jsonb_build_array('Lieferkette reißt bei {name}', 'Ein wichtiger Zulieferer fällt aus. Die Produktion stockt.'),
+      jsonb_build_array('Leerverkäufer wetten gegen {name}', 'Ein bekannter Fonds hält die Aktie für überbewertet.'));
+  v_pick     jsonb;
+  v_words    text[] := array['leicht', 'spürbar', 'deutlich'];
+begin
+  if v_cfg is null or jsonb_typeof(v_cfg) <> 'object' then
+    return jsonb_build_object('skipped', 'no_config');
+  end if;
+  -- same lock as the minute job: never beside a running tick
+  perform pg_advisory_xact_lock(7311001);
+  v_every    := greatest(1, public.cfg_num(v_cfg, '{everyMinutes}', 12));
+  v_lead_min := greatest(1, public.cfg_num(v_cfg, '{leadMinMinutes}', 10));
+  v_lead_max := greatest(v_lead_min, public.cfg_num(v_cfg, '{leadMaxMinutes}', 40));
+  v_min      := greatest(1, public.cfg_num(v_cfg, '{minMoveBps}', 300))::integer;
+  v_max      := greatest(v_min, public.cfg_num(v_cfg, '{maxMoveBps}', 1200)::integer);
+  v_rel      := least(10000, greatest(0, public.cfg_num(v_cfg, '{reliabilityBps}', 7500)))::integer;
+
+  -- 1. hints whose time has come
+  for t in select * from public.stock_tips x where x.applied_at is null and x.due_at <= v_now order by x.due_at for update loop
+    select sec.name, sec.status into s from public.securities sec where sec.id = t.security_id;
+    if t.comes_true and s.status = 'listed' then
+      perform public.event_price_shock(t.security_id, t.direction * t.move_bps, v_now);
+      v_head := case when t.direction > 0 then s.name || ' legt zu: Die Erwartungen haben sich bestätigt'
+                     else s.name || ' gibt nach: Die Warnungen haben sich bestätigt' end;
+    else
+      v_head := 'Entwarnung bei ' || s.name || ': Die Meldung hat sich nicht bestätigt';
+    end if;
+    insert into public.news_items (category, headline, body, importance, security_id, published_at)
+    values ('company', v_head, null, 1, t.security_id, v_now) returning id into v_news;
+    update public.stock_tips set applied_at = v_now, result_news_id = v_news where id = t.id;
+    v_settled := v_settled + 1;
+  end loop;
+
+  -- 2. a new hint when the last one is old enough
+  if not exists (select 1 from public.stock_tips x where x.published_at > v_now - make_interval(secs => v_every * 60 - 5)) then
+    select sec.id, sec.name into s
+      from public.securities sec
+     where sec.kind = 'stock' and sec.status = 'listed'
+       and not exists (select 1 from public.stock_tips x where x.security_id = sec.id and x.applied_at is null)
+     order by random() limit 1;
+    if s.id is not null then
+      v_dir := case when random() < 0.5 then 1 else -1 end;
+      v_move := v_min + floor(random() * (v_max - v_min + 1))::integer;
+      v_strength := least(3, 1 + floor(3.0 * (v_move - v_min) / greatest(1, v_max - v_min + 1)))::smallint;
+      v_pick := case when v_dir > 0 then v_good -> floor(random() * jsonb_array_length(v_good))::integer
+                     else v_bad -> floor(random() * jsonb_array_length(v_bad))::integer end;
+      v_head := replace(v_pick ->> 0, '{name}', s.name);
+      v_body := replace(replace(v_pick ->> 1, '{name}', s.name), '{w}', v_words[v_strength]) || ' Sicher ist das nicht.';
+      insert into public.news_items (category, headline, body, importance, security_id, published_at)
+      values ('company', v_head, v_body, v_strength, s.id, v_now) returning id into v_news;
+      insert into public.stock_tips (security_id, news_item_id, direction, move_bps, strength, comes_true, headline, body,
+                                     published_at, due_at)
+      values (s.id, v_news, v_dir, v_move, v_strength, random() * 10000 < v_rel, v_head, v_body, v_now,
+              v_now + make_interval(secs => 60 * (v_lead_min + random() * (v_lead_max - v_lead_min))));
+      v_new := 1;
+    end if;
+  end if;
+
+  delete from public.stock_tips x
+   where x.applied_at is not null
+     and x.published_at < v_now - make_interval(hours => greatest(1, public.cfg_num(v_cfg, '{keepHours}', 24))::integer);
+  return jsonb_build_object('settled', v_settled, 'published', v_new);
+end;
+$$;
+-- ===== idempotent copy of migrations/20261203001300_company_profile.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 1300 · Every company can be opened: staff and key facts (ADR-125)
+-- =============================================================================
+-- get_company_profile(p_company_id) (authenticated): the public profile of any company, AI or player, for every
+-- player. Facts that a company shows anyway (team, product, stage, revenue and profit of the last quarter, value),
+-- never its cash, debts or plans.
+--   {"company": {"id", "name", "ticker", "sector", "is_ai", "tier", "brand_color", "logo", "idea", "founded_at",
+--                "listed", "price_e4", "change_bps"},
+--    "founder": {"nickname", "tag", "avatar_key"} | null,
+--    "facts": {"value_cents", "revenue_cents", "profit_cents", "period": "quarter"|"ttm"|null, "staff",
+--              "max_staff", "ai_workers", "product", "stage", "quality_bps", "awareness_bps"},
+--    "members": [{"nickname", "tag", "avatar_key", "tier", "title", "since"}]}
+-- get_company_org() is now open to every player as well (it shows the same people).
+-- Idempotent: runs unchanged as supabase/updates/20261203001300_company_profile.sql.
+
+create or replace function public.get_company_profile(p_company_id uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  c        public.companies;
+  pc       public.player_companies;
+  r        public.player_company_reports;
+  q        public.security_quotes;
+  v_listed boolean := false;
+begin
+  select * into c from public.companies where id = p_company_id and dissolved_at is null;
+  if c.id is null then
+    perform public.api_error('company_not_found');
+  end if;
+  select * into pc from public.player_companies where company_id = c.id;
+  if pc.company_id is not null then
+    select x.* into r from public.player_company_reports x join public.game_quarters gq on gq.id = x.game_quarter_id
+     where x.company_id = c.id order by gq.ends_at desc limit 1;
+  end if;
+  if c.security_id is not null then
+    select * into q from public.security_quotes where security_id = c.security_id;
+    v_listed := exists (select 1 from public.securities s where s.id = c.security_id and s.status = 'listed');
+  end if;
+
+  return jsonb_build_object(
+    'company', jsonb_build_object(
+      'id', c.id, 'name', c.name, 'ticker', c.ticker, 'sector', c.sector_key, 'is_ai', c.is_ai,
+      'tier', coalesce(pc.tier, c.tier::text), 'brand_color', c.brand_color, 'logo', public.company_logo(c.id),
+      'idea', coalesce(pc.idea, c.description), 'founded_at', c.founded_at, 'listed', v_listed,
+      'price_e4', case when v_listed then q.last_price_e4 end, 'change_bps', case when v_listed then q.change_bps end),
+    'founder', (select jsonb_build_object('nickname', p.nickname, 'tag', p.tag, 'avatar_key', p.avatar_key)
+                  from public.profiles p where p.id = coalesce(pc.founder_id, c.founder_id)),
+    'facts', jsonb_build_object(
+      'value_cents', case when pc.company_id is not null and not v_listed then public.company_value_cents(c.id)
+                          else q.market_cap_cents end,
+      'revenue_cents', case when r.company_id is not null then r.revenue_cents
+                            when c.is_ai then c.ttm_revenue_cents end,
+      'profit_cents', case when r.company_id is not null then r.operating_profit_cents
+                           when c.is_ai then c.ttm_net_income_cents end,
+      'period', case when r.company_id is not null then 'quarter' when c.is_ai then 'ttm' end,
+      'staff', case when pc.company_id is not null
+                    then 1 + pc.ai_workers + (select count(*) from public.player_jobs j
+                                               where j.company_id = c.id and j.status = 'active')::integer
+                    else c.employee_count end,
+      'max_staff', c.max_employees,
+      'ai_workers', coalesce(pc.ai_workers, 0),
+      'product', pc.product_key,
+      'stage', case when pc.company_id is not null then public.company_stage(c.id) end,
+      'quality_bps', case when r.company_id is not null then r.quality_bps end,
+      'awareness_bps', case when r.company_id is not null then r.awareness_bps end),
+    'members', coalesce((
+      select jsonb_agg(jsonb_build_object('nickname', p.nickname, 'tag', p.tag, 'avatar_key', p.avatar_key, 'tier', j.tier,
+                                          'title', coalesce(j.title, j.title_key), 'since', j.started_at)
+                       order by case j.tier::text when 'c_level' then 5 when 'team_lead' then 4 when 'senior' then 3
+                                                  when 'junior' then 2 else 1 end desc, j.started_at, p.nickname)
+        from public.player_jobs j join public.profiles p on p.id = j.player_id
+       where j.company_id = c.id and j.status = 'active'), '[]'::jsonb));
+end;
+$$;
+comment on function public.get_company_profile(uuid) is
+  'RPC: the public profile of any company (team, product, last quarter, value), for every player (ADR-125).';
+revoke all on function public.get_company_profile(uuid) from public, anon;
+grant execute on function public.get_company_profile(uuid) to authenticated, service_role;
+
+create or replace function public.get_company_org(p_company_id uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  pc       public.player_companies;
+  c        public.companies;
+begin
+  select * into pc from public.player_companies where company_id = p_company_id and status = 'active';
+  if pc.company_id is null then
+    perform public.api_error('company_not_found');
+  end if;
+  select * into c from public.companies where id = p_company_id;
+  -- open to every player (ADR-125): the org chart shows who works where, nothing more
+  return jsonb_build_object(
+    'company', jsonb_build_object('id', c.id, 'name', c.name, 'tier', pc.tier),
+    'founder', (select jsonb_build_object('nickname', p.nickname, 'tag', p.tag, 'avatar_key', p.avatar_key,
+                                          'is_me', p.id = v_player)
+                  from public.profiles p where p.id = pc.founder_id),
+    'members', coalesce((
+      select jsonb_agg(jsonb_build_object('nickname', p.nickname, 'tag', p.tag, 'avatar_key', p.avatar_key, 'tier', j.tier,
+                                          'title', coalesce(j.title, j.title_key), 'since', j.started_at,
+                                          'is_me', j.player_id = v_player)
+                       order by case j.tier::text when 'c_level' then 5 when 'team_lead' then 4 when 'senior' then 3
+                                                  when 'junior' then 2 else 1 end desc, j.started_at, p.nickname)
+        from public.player_jobs j join public.profiles p on p.id = j.player_id
+       where j.company_id = p_company_id and j.status = 'active'), '[]'::jsonb),
+    'ai_workers', pc.ai_workers,
+    'ai_worker_skills', to_jsonb(coalesce(pc.ai_worker_skills, '{}'::text[])));
+end;
+$$;
 
 -- ===== game_config (current values, overwriting older ones) =====
 -- GENERATED by scripts/gen-config-seed.ts from src/config/balance.ts. Do not edit by hand.
