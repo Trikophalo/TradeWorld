@@ -4,7 +4,7 @@
 # supabase/update-to-latest.sql replays every schema change since the first version in one transaction. That is fine
 # for the SQL Editor, but on a database with players online it holds locks for minutes. This script applies only the
 # update files that are new for this database, each in its own short transaction, and remembers them in
-# nexa_meta.applied_updates. Then it writes the current game config and seeds.
+# nexa_meta.applied_updates. Then it writes the game config and the seeds, each only when its content changed.
 #
 # Usage: NEXA_DB_URL=postgresql://... bash scripts/apply-updates.sh
 set -euo pipefail
@@ -64,8 +64,31 @@ for f in supabase/updates/*.sql; do
   } | apply "$name"
 done
 
-# Current game config, gallery, home catalogue and the market bootstrap: the last part of the generated update.
-last=$(ls supabase/sql-editor/update-*.sql | sort | tail -1)
-# The part brings its own begin/commit; apply() wraps a transaction itself.
-grep -v -x -e "begin;" -e "commit;" "$last" | apply "config and seeds ($(basename "$last"))"
+# Game config, gallery and home catalogue: each only when its content changed since the last run. Writing them
+# again every time kept the tick and every request waiting for minutes on a database with players online. They do
+# not take the tick lock: they only upsert their own rows.
+# (The market bootstrap is not run here: run_due_jobs() does it by itself on a database that needs it.)
+sql -c "create table if not exists nexa_meta.applied_seeds (name text primary key, hash text not null, applied_at timestamptz not null default now())" \
+    -c "revoke all on nexa_meta.applied_seeds from public, anon, authenticated"
+
+apply_seed() {
+  local name=$1 hash
+  hash=$(printf '%s' "$2" | sha256sum | cut -d' ' -f1)
+  if [[ "$(sql -tA -c "select exists (select 1 from nexa_meta.applied_seeds where name = '$name' and hash = '$hash')")" == "t" ]]; then
+    echo "same $name"
+    return 0
+  fi
+  {
+    printf '%s\n' "$2"
+    echo "insert into nexa_meta.applied_seeds (name, hash) values ('$name', '$hash')"
+    echo "  on conflict (name) do update set hash = excluded.hash, applied_at = now();"
+  } | apply "$name"
+}
+
+# The config seed inserts with "on conflict do nothing"; for an update the current values must win.
+# Only the first insert (the config rows) is turned into an upsert, as in scripts/build-setup-sql.sh.
+config=$(awk 'BEGIN{n=0} /^on conflict \(key\) do nothing;$/{n++; if(n==1){print "on conflict (key) do update set value = excluded.value, description = excluded.description, updated_at = now();"; next}} {print}' supabase/seeds/game_config.sql)
+apply_seed game_config "$config"
+apply_seed artworks "$(cat supabase/seeds/artworks.sql)"
+apply_seed furniture "$(cat supabase/seeds/furniture.sql)"
 echo "Datenbank ist auf dem neuesten Stand."

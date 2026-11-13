@@ -178,8 +178,8 @@ echo "== update-to-latest.sql (twice: must be idempotent)"
 "${PSQL[@]}" -1 -f "$SUPABASE_DIR/update-to-latest.sql"
 # The live database is updated step by step (scripts/apply-updates.sh): twice here, the second run applies nothing.
 echo "== scripts/apply-updates.sh (twice)"
-PATH="$PG_BIN:$PATH" NEXA_ATTEMPTS=1 NEXA_DB_URL="postgresql://postgres@127.0.0.1:$PORT/$DB" bash "$SUPABASE_DIR/../scripts/apply-updates.sh" | tail -3
-PATH="$PG_BIN:$PATH" NEXA_ATTEMPTS=1 NEXA_DB_URL="postgresql://postgres@127.0.0.1:$PORT/$DB" bash "$SUPABASE_DIR/../scripts/apply-updates.sh" | tail -2
+PATH="$PG_BIN:$PATH" NEXA_ATTEMPTS=1 NEXA_DB_URL="postgresql://postgres@127.0.0.1:$PORT/$DB" bash "$SUPABASE_DIR/../scripts/apply-updates.sh" | tail -4
+PATH="$PG_BIN:$PATH" NEXA_ATTEMPTS=1 NEXA_DB_URL="postgresql://postgres@127.0.0.1:$PORT/$DB" bash "$SUPABASE_DIR/../scripts/apply-updates.sh" | tail -4
 "${PSQL[@]}" -tAc "select 'applied updates: ' || count(*) from nexa_meta.applied_updates"
 "${PSQL[@]}" -tAc "select 'migration 1700 columns: ' || count(*) from information_schema.columns where table_name = 'company_quarter_reports' and column_name in ('market_segment','segment_demand_cents','uncovered_quarters','grace_quarters_left')"
 "${PSQL[@]}" -tAc "select 'tutorial xp: ' || coalesce(value #>> '{xpSources,tutorial,xp}', 'MISSING') from public.game_config where key = 'progression'"
