@@ -73,15 +73,6 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   { key: "q_rules", kind: "quick", title: "Lies die Spielregeln", metric: "rules_views", target: 1, xp: q.minXp },
   { key: "q_sell", kind: "quick", title: "Verkaufe eine Position", metric: "sells", target: 1, xp: q.maxXp },
   { key: "q_view_5", kind: "quick", title: "Sieh dir 5 Aktien an", metric: "views", target: 5, xp: q.minXp + 10 },
-  {
-    key: "q_limit",
-    kind: "quick",
-    title: "Setze eine Limit-Order",
-    metric: "limit_orders",
-    target: 1,
-    xp: q.maxXp,
-    requires: "limit_orders",
-  },
   // daily
   { key: "d_trades_3", kind: "daily", title: "Mach heute 3 Trades", metric: "trades", target: 3, xp: d.minXp },
   {
@@ -269,15 +260,6 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
     xp: d.minXp + 50,
   },
   {
-    key: "d_limit_2",
-    kind: "daily",
-    title: "Setze heute 2 Limit-Orders",
-    metric: "limit_orders",
-    target: 2,
-    xp: d.minXp + 50,
-    requires: "limit_orders",
-  },
-  {
     key: "d_like_art_5",
     kind: "daily",
     title: "Verteile heute 5 Herzen an Kunstwerke",
@@ -327,15 +309,6 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
     metric: "check_ins",
     target: 5,
     xp: w.minXp + 200,
-  },
-  {
-    key: "w_limit_5",
-    kind: "weekly",
-    title: "Setze diese Woche 5 Limit-Orders",
-    metric: "limit_orders",
-    target: 5,
-    xp: w.minXp + 100,
-    requires: "limit_orders",
   },
   {
     key: "w_bonds_3",

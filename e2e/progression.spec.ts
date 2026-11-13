@@ -100,22 +100,6 @@ test("the player name is shown and can be changed, forbidden names are refused",
   await expect(page.getByText(/nächste Änderung ist ab dem/)).toBeVisible();
 });
 
-test("reaching level 3 starts Finn's limit order tour", async ({ page }) => {
-  // 790 XP: one trade (+20) reaches level 3 (807 XP, ADR-055).
-  await preparePlayer(page, { xpTotal: 790, curveVersion: 2 });
-  await page.goto("/markets/VLT");
-  await page.locator('[data-tour="buy"]').filter({ visible: true }).first().click();
-  const dialog = page.getByRole("dialog", { name: "VLT kaufen" });
-  await dialog.getByLabel("Betrag in €").fill("200");
-  await dialog.locator('[data-tour="order-confirm"] button').hover();
-  await page.mouse.down();
-  await expect(page.getByText("Aufgestiegen!")).toBeVisible({ timeout: 8000 });
-  await page.mouse.up();
-  await page.getByRole("button", { name: "Weiter" }).click();
-  const finn = page.locator("[data-tutorial]");
-  await expect(finn).toContainText("Limit-Orders");
-});
-
 test("starting over resets the game after typing the name and Finn starts again (ADR-070)", async ({ page }) => {
   await preparePlayer(page, { cashCents: 5_000_000 });
   await page.goto("/profile");

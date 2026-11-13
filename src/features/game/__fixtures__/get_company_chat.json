@@ -1,5 +1,5 @@
 {
-  "company": { "id": "d0e109d0-325b-4d9e-9836-2572c13a88d6", "name": "Fixture Labor", "color": "#2266cc" },
+  "company": { "id": "f50ab512-6f2e-4961-99e6-be923cb2ddec", "name": "Fixture Labor", "color": "#2266cc" },
   "members": 2,
   "messages": [
     {
@@ -9,7 +9,7 @@
       "is_me": false,
       "author": null,
       "avatar_key": null,
-      "created_at": "2026-11-13T19:44:12.875269+00:00",
+      "created_at": "2026-11-13T20:43:31.721367+00:00",
       "is_founder": false
     },
     {
@@ -19,7 +19,7 @@
       "is_me": false,
       "author": null,
       "avatar_key": null,
-      "created_at": "2026-11-13T19:44:12.905587+00:00",
+      "created_at": "2026-11-13T20:43:31.754369+00:00",
       "is_founder": false
     },
     {
@@ -29,7 +29,7 @@
       "is_me": false,
       "author": null,
       "avatar_key": null,
-      "created_at": "2026-11-13T19:44:12.913992+00:00",
+      "created_at": "2026-11-13T20:43:31.762066+00:00",
       "is_founder": false
     },
     {
@@ -39,7 +39,7 @@
       "is_me": false,
       "author": null,
       "avatar_key": null,
-      "created_at": "2026-11-13T19:44:13.094744+00:00",
+      "created_at": "2026-11-13T20:43:31.938695+00:00",
       "is_founder": false
     },
     {
@@ -49,7 +49,7 @@
       "is_me": false,
       "author": null,
       "avatar_key": null,
-      "created_at": "2026-11-13T19:44:13.200295+00:00",
+      "created_at": "2026-11-13T20:43:32.042664+00:00",
       "is_founder": false
     },
     {
@@ -59,7 +59,7 @@
       "is_me": false,
       "author": "Fixture_Chefin",
       "avatar_key": "rookie",
-      "created_at": "2026-11-13T19:44:13.285916+00:00",
+      "created_at": "2026-11-13T20:43:32.116892+00:00",
       "is_founder": false
     },
     {
@@ -69,7 +69,7 @@
       "is_me": true,
       "author": "Fixture_Neu",
       "avatar_key": "coder",
-      "created_at": "2026-11-13T19:44:13.28996+00:00",
+      "created_at": "2026-11-13T20:43:32.120138+00:00",
       "is_founder": true
     }
   ]

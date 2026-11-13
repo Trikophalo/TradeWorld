@@ -7,7 +7,6 @@ import { PixelLoader } from "@/components/ui/button";
 import { burstConfetti } from "@/components/ui/effects";
 import { HoldButton } from "@/components/ui/hold-button";
 import { Field } from "@/components/ui/input";
-import { LockBadge } from "@/components/ui/lock-badge";
 import { NumberTicker } from "@/components/ui/number-ticker";
 import { Segmented } from "@/components/ui/segmented";
 import { Sheet } from "@/components/ui/sheet";
@@ -15,13 +14,12 @@ import { Slider } from "@/components/ui/slider";
 import { toast } from "@/components/ui/toast";
 import { BALANCE } from "@/config/balance";
 import { useGameErrorText } from "@/features/game/errors";
-import { useGame, usePlayerLevel, useSecurity } from "@/features/game/store";
+import { useGame, useSecurity } from "@/features/game/store";
 import type { OrderSide, OrderType } from "@/features/game/types";
 import { emitTutorial } from "@/features/tutorial/store";
 import { formatMoney, formatPrice, formatShares } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
 import { DURATION, EASE } from "@/lib/motion";
-import { isUnlocked, unlockLevel } from "@/lib/sim/progression";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import {
@@ -41,7 +39,6 @@ export type { OrderSide };
 type InputMode = "amount" | "shares";
 
 const money = (value: number) => formatMoney(Math.round(value));
-const LIMIT_LEVEL = unlockLevel("limit_orders") ?? 1;
 /** A sale with this much realized profit gets confetti. */
 const BIG_WIN_CENTS = 100_000;
 const TAX_BPS = BALANCE.trading.capitalGainsTaxBps;
@@ -69,13 +66,12 @@ export interface OrderSheetProps {
  * Order form: bottom sheet on phones, side panel on desktop. The player picks
  * an amount in euros (default, like a neo-broker) or a number of shares,
  * fractions allowed (ADR-040), by typing, by quick buttons or with the slider.
- * Market orders fill at once, limit orders (from level 3) wait in the order
+ * Market orders fill at once (the only kind, ADR-117). Limit orders would wait in the order
  * book. Confirmation is "hold to buy", so nothing happens by accident. The
  * estimate is only a preview; the server decides price and quantity.
  */
 export function OrderSheet({ ticker, side, onClose }: OrderSheetProps) {
   const t = useTranslations("order");
-  const tl = useTranslations("locks");
   const errorText = useGameErrorText();
   const security = useSecurity(ticker);
   const cash = useGame((state) => state.portfolio?.cashCents ?? 0);
@@ -83,8 +79,6 @@ export function OrderSheet({ ticker, side, onClose }: OrderSheetProps) {
   const lossPot = useGame((state) => state.portfolio?.lossPotCents ?? 0);
   const session = useGame((state) => state.snapshot?.session);
   const placeOrder = useGame((state) => state.placeOrder);
-  const level = usePlayerLevel();
-  const limitUnlocked = isUnlocked("limit_orders", level);
 
   // Keep the last side while the sheet animates out.
   const [shown, setShown] = useState<OrderSide>("buy");
@@ -92,7 +86,8 @@ export function OrderSheet({ ticker, side, onClose }: OrderSheetProps) {
   const open = side !== null;
 
   const [mode, setMode] = useState<InputMode>("amount");
-  const [type, setType] = useState<OrderType>("market");
+  // Market orders only (ADR-117); the limit branches below stay for a later return.
+  const type = "market" as OrderType;
   const [text, setText] = useState("");
   const [limitText, setLimitText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -114,7 +109,6 @@ export function OrderSheet({ ticker, side, onClose }: OrderSheetProps) {
   useEffect(() => {
     if (open && !wasOpen.current) {
       requestId.current = crypto.randomUUID();
-      setType("market");
       setMode("amount");
       setText("");
       setLimitText(security ? priceInput(side === "sell" ? security.bidE4 : security.askE4) : "");
@@ -228,15 +222,6 @@ export function OrderSheet({ ticker, side, onClose }: OrderSheetProps) {
     }
   };
 
-  const typeOptions = [
-    { value: "market" as const, label: t("typeMarket") },
-    {
-      value: "limit" as const,
-      label: t("typeLimit"),
-      adornment: limitUnlocked ? undefined : <LockBadge level={LIMIT_LEVEL} />,
-    },
-  ];
-
   const summary =
     quantityE6 > 0
       ? mode === "amount"
@@ -283,28 +268,6 @@ export function OrderSheet({ ticker, side, onClose }: OrderSheetProps) {
       }
     >
       <div className="space-y-4">
-        <div data-tour="order-type">
-          <Segmented
-            value={type}
-            onValueChange={(next) => {
-              if (next === "limit" && !limitUnlocked) {
-                haptic("warning");
-                toast.info(
-                  tl("lockedToast", { level: LIMIT_LEVEL }),
-                  tl("lockedToastText", { feature: t("typeLimit"), level: LIMIT_LEVEL }),
-                );
-                return;
-              }
-              setType(next);
-              if (next === "limit") emitTutorial("limit-selected");
-            }}
-            options={typeOptions}
-            label={t("type")}
-            block
-            size="sm"
-          />
-        </div>
-
         <div className="flex items-end gap-2">
           <div className="min-w-0 flex-1">
             <Field

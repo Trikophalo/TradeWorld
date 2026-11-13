@@ -1,6 +1,6 @@
 {
   "job": {
-    "id": "af20c54b-92a0-4031-ada3-8d8c768d09e2",
+    "id": "1ba71a7e-913c-4ff5-ab78-0f612fd220d3",
     "tier": "intern",
     "title": null,
     "company": {
@@ -13,9 +13,9 @@
       "ticker": "KFR"
     },
     "presence": {
-      "fire_at": "2026-11-18T19:44:14.973342+00:00",
+      "fire_at": "2026-11-18T20:43:33.751562+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-13T19:44:14.973342+00:00"
+      "last_active_at": "2026-11-13T20:43:33.751562+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-13T19:44:15.086112+00:00",
+    "started_at": "2026-11-13T20:43:33.830956+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

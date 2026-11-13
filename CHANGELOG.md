@@ -124,3 +124,7 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 - **Skills der Reihe nach (ADR-115):** Jeder Skill hat eine Voraussetzung, zum Beispiel Programmierung erst nach den
   IT-Grundlagen. Die Karte ist immer zu sehen und neu gezeichnet: ruhige Kacheln ohne Farbstreifen, Linien zeigen
   den Weg, Namen sind ausgeschrieben.
+- **Nur noch Sofort-Orders (ADR-117):** Limit-Orders und das Tutorial dazu sind entfernt.
+- **Bedienung:** Das Mausrad zoomt die Skill-Karte, ohne die Seite zu scrollen; der Betrags-Regler zieht das
+  Order-Fenster nicht mehr weg.
+- **Stabilität:** Der Minuten-Job hängt nicht mehr an der Rangliste, Datenbank-Updates laufen in kleinen Schritten.

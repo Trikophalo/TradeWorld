@@ -1681,3 +1681,16 @@ jede in einer eigenen kurzen Transaktion mit Wiederholung bei Deadlock. Danach s
 Stammdaten. `update-to-latest.sql` bleibt für den SQL Editor und für neue Projekte.
 
 Das Schema `nexa_meta` ist kein Teil der API und enthält keine Spieldaten.
+
+## ADR-117: Nur noch Sofort-Orders — `akzeptiert`
+
+Vorgabe: Man soll keine Limits mehr setzen können, auch das Tutorial dazu entfällt.
+
+- Die Order-Maske kennt keine Order-Art mehr: Jede Order wird sofort zum Marktpreis ausgeführt.
+- Finns Tour zu Limit-Orders (Level 3), die Freischaltung „Limit-Order“ und die Missionen dazu sind entfernt.
+- Der Server lehnt neue Limit-Orders von Spielern ab, solange `game_config.trading.limitOrders` auf `false` steht
+  (`locked`). Die Order-Engine bleibt vollständig und getestet; der Schalter holt die Funktion zurück.
+- Bereits wartende Limit-Orders bleiben im Buch, bis sie ausgeführt oder storniert werden.
+
+Dazu zwei kleine Korrekturen der Bedienung: Das Mausrad zoomt auf der Skill-Karte nur noch die Karte (die Seite
+scrollt nicht mit), und der Betrags-Regler zieht das Order-Fenster nicht mehr zur Seite.

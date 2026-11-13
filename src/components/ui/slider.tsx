@@ -56,6 +56,8 @@ export function Slider({
 
   return (
     <RadixSlider.Root
+      // Inside a sheet: dragging the thumb sideways must not drag the sheet away.
+      data-vaul-no-drag
       value={[Math.round(value * 1000)]}
       onValueChange={([next]) => change((next ?? 0) / 1000)}
       min={0}

@@ -78,6 +78,8 @@ export interface LeverageTier {
 }
 
 export interface TradingConfig {
+  /** Limit orders are switched off (ADR-117): only market orders. */
+  readonly limitOrders: boolean;
   readonly orderFeeCents: number;
   /** Largest number of shares per order. */
   readonly maxOrderQuantity: number;
@@ -1357,6 +1359,7 @@ export const BALANCE = {
 
   // --------------------------------------------------------------- trading (spec 10)
   trading: {
+    limitOrders: false,
     orderFeeCents: 100,
     maxOrderQuantity: 100_000,
     quantityScale: 1_000_000,
@@ -1843,7 +1846,6 @@ export const BALANCE = {
       { level: 1, key: "market_orders" },
       { level: 1, key: "basic_income" },
       { level: 2, key: "first_job" },
-      { level: 3, key: "limit_orders" },
       { level: 3, key: "watchlist" },
       // Order (owner): jobs, then artworks, then companies, then property; not too late, with a little grind.
       { level: 4, key: "artworks" },

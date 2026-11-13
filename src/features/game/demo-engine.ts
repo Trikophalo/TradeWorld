@@ -1319,7 +1319,8 @@ export const demoEngine: GameEngine = {
         const pl = p();
         const info = meta(input.ticker);
         if (info.kind === "bond") requireLevel("bonds");
-        if (input.type === "limit") requireLevel("limit_orders");
+        // Market orders only (ADR-117).
+        if ((input.type as string) === "limit") throw new GameError("locked");
         const hasQuantity = input.quantityE6 != null;
         const hasAmount = input.amountCents != null;
         if (hasQuantity === hasAmount) throw new GameError("invalid_argument");

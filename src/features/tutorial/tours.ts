@@ -1,5 +1,5 @@
 import { unlocksUpToLevel } from "@/lib/sim/progression";
-import { MARKETS, STOCK, type TutorialStep } from "./steps";
+import { MARKETS, type TutorialStep } from "./steps";
 
 /**
  * Short Finn tours when a level-up unlocks something important (ADR-046).
@@ -43,42 +43,6 @@ export const TOURS: Readonly<Record<string, readonly TutorialStep[]>> = {
     { id: "growth", target: "growth", advance: { on: "next" }, mood: "happy" },
   ],
   visit_listing: [{ id: "listing", target: "listing", advance: { on: "next" }, mood: "happy" }],
-  limit_orders: [
-    { id: "intro", advance: { on: "next" } },
-    { id: "goMarkets", target: "nav-markets", advance: { on: "route", path: MARKETS } },
-    {
-      id: "pickStock",
-      target: "stock-row",
-      path: MARKETS,
-      recover: { to: "/markets" },
-      advance: { on: "route", path: STOCK },
-    },
-    {
-      id: "buy",
-      target: "buy",
-      path: STOCK,
-      recover: { step: "pickStock" },
-      advance: { on: "event", event: "order-sheet-opened" },
-    },
-    {
-      id: "chooseLimit",
-      target: "order-type",
-      path: STOCK,
-      recover: { step: "pickStock" },
-      advance: { on: "event", event: "limit-selected" },
-      fallback: { event: "order-sheet-closed", step: "buy" },
-      inDialog: true,
-    },
-    {
-      id: "limitPrice",
-      target: "order-limit-price",
-      path: STOCK,
-      recover: { step: "pickStock" },
-      advance: { on: "next" },
-      inDialog: true,
-      mood: "happy",
-    },
-  ],
   bonds: [
     { id: "intro", advance: { on: "next" } },
     { id: "goMarkets", target: "nav-markets", advance: { on: "route", path: MARKETS } },

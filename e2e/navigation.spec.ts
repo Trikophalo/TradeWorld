@@ -72,9 +72,8 @@ test("buying by euro amount, seeing the position and selling it again", async ({
   await expect(dialog.getByLabel("Betrag in €")).toHaveValue("2500,00");
   await dialog.getByLabel("Betrag in €").fill("500");
 
-  // Limit orders are visible but locked for a new player.
-  await dialog.getByRole("radio", { name: /Limit/ }).click();
-  await expect(page.getByText("Ab Level 3")).toBeVisible();
+  // Market orders only: there is no order type to choose (ADR-117).
+  await expect(dialog.getByRole("radio", { name: /Limit/ })).toHaveCount(0);
 
   const hold = dialog.locator('[data-tour="order-confirm"] button');
   await hold.hover();

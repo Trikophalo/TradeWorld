@@ -9,6 +9,8 @@
 set client_min_messages = notice;
 
 \ir ../seeds/game_config.sql
+-- The game runs with market orders only (ADR-117); the tests keep exercising the whole order engine.
+update public.game_config set value = value || '{"limitOrders": true}'::jsonb where key = 'trading';
 
 -- helpers used by the M1 test files ---------------------------------------------
 create or replace function tests.throws_key(p_sql text, p_key text, p_message text) returns void

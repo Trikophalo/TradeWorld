@@ -15,7 +15,7 @@ import { xpForNextLevel } from "@/lib/sim/progression";
 import type { UnlockKey } from "./level-card";
 
 /** Highlights on the way up, shown as locked previews on the start page. */
-const HIGHLIGHTS = ["limit_orders", "bonds", "short_selling", "found_small_business", "leverage_2x", "ipo"] as const;
+const HIGHLIGHTS = ["bonds", "short_selling", "found_small_business", "leverage_2x", "ipo"] as const;
 
 /**
  * One clear goal on the start page (the next unlock and how far away it is),

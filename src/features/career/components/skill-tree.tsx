@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { memo, useEffect, useMemo, useRef, useState, type PointerEvent, type WheelEvent } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -323,8 +323,21 @@ function HexMap({
     }
   };
 
-  const onWheel = (event: WheelEvent<SVGSVGElement>) =>
-    zoomAt(event.deltaY < 0 ? 1.15 : 1 / 1.15, event.clientX, event.clientY);
+  // The wheel zooms the map and must not scroll the page. React listens passively, so the listener is set by hand.
+  const zoomAtRef = useRef(zoomAt);
+  useEffect(() => {
+    zoomAtRef.current = zoomAt;
+  });
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const onWheel = (event: globalThis.WheelEvent) => {
+      event.preventDefault();
+      zoomAtRef.current(event.deltaY < 0 ? 1.15 : 1 / 1.15, event.clientX, event.clientY);
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
 
   const showText = view.zoom >= 0.75;
   const hovered = hover ? SKILL_NODES.find((n) => n.key === hover.key) : undefined;
@@ -346,7 +359,6 @@ function HexMap({
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
         onPointerLeave={() => setHover(null)}
-        onWheel={onWheel}
       >
         <defs>
           <pattern id="skill-dots" width={24} height={24} patternUnits="userSpaceOnUse">
