@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "28dbca75-e1cc-401d-84d2-00e61497b347",
+    "id": "58accb94-83dd-4010-bbec-c710171ac22b",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
+      "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
       "logo": null,
-      "name": "QuantenSprung Labs",
-      "color": "#35D0BA",
+      "name": "Frachtpilot",
+      "color": "#9ECE6A",
       "is_ai": true,
-      "sector": "tech",
-      "ticker": "QSL"
+      "sector": "logistics",
+      "ticker": "FPT"
     },
     "presence": {
-      "fire_at": "2026-11-18T19:13:39.418442+00:00",
+      "fire_at": "2026-11-18T19:36:37.142176+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-13T19:13:39.418442+00:00"
+      "last_active_at": "2026-11-13T19:36:37.142176+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-13T19:13:39.505447+00:00",
+    "started_at": "2026-11-13T19:36:37.233499+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

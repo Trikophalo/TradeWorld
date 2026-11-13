@@ -7032,3 +7032,13 @@ FRIEND_CODE = {
 `friend_code_used` (NX106), dazu `invalid_argument` ohne `request_id`.
 
 **Benachrichtigung:** neuer Typ `friend_code_redeemed` (Kategorie `social`).
+
+## Nachtrag: Registrierung ohne Einladungscode (ADR-114)
+
+Migration `20261203000150_open_signup.sql`, idempotente Kopie in `supabase/updates/`, Test
+`supabase/tests/86_open_signup.sql`.
+
+- `handle_new_user()` wie in M4d, aber `auth.inviteRequired` hat den Standard `false`: Ohne Eintrag in `game_config`
+  braucht die Registrierung keinen Code. Ein mitgeschickter gültiger Code wird weiter gezählt, ein unbekannter
+  ignoriert. Mit `game_config.auth = {"inviteRequired": true}` gilt wieder die alte Regel (`NX005`).
+- Die 18+-Bestätigung (`age_confirmed`) bleibt Pflicht (`NX007`).

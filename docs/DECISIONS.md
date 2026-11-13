@@ -1627,3 +1627,14 @@ vergleichbar, und am Geldsystem ändert sich nichts.
   „NX“ als ganzes Wort; Fehlercodes wie NX104 und Kürzel bleiben).
 - **Eingaben:** Betragsfelder nehmen „€“, „$“ und „NX“ hinter der Zahl an.
 - Der Stablecoin EUS behält den neutralen Namen „Eins-Stabil“.
+
+## ADR-114: Registrierung ohne Einladungscode — `akzeptiert`
+
+Vorgabe: Der Einladungscode bei der Anmeldung soll weg. Das ersetzt den Einladungscode aus ADR-010; E-Mail, Passwort
+und die Bestätigung „mindestens 18 Jahre“ bleiben.
+
+- Das Registrierungsformular fragt keinen Code mehr ab.
+- `handle_new_user()` verlangt nur noch dann einen Code, wenn `game_config.auth.inviteRequired` ausdrücklich auf
+  `true` steht (Standard jetzt `false`). So lässt sich die Tür bei Bedarf wieder schließen, ohne neuen Code.
+- Die Tabellen `invite_codes` und `invite_code_redemptions` bleiben. Der Freundescode (ADR-111) ist davon unabhängig.
+- Schutz vor Mehrfachkonten sind jetzt E-Mail-Bestätigung, Login-Ereignisse und die Limits für neue Konten.

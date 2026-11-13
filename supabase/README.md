@@ -55,10 +55,11 @@ supabase db reset     # migrations + seed.sql
    Admin RPCs: `admin_set_paused(bool)`, `admin_run_tick()`, `admin_close_quarter()` (moves game time to the end of
    the running quarter and closes it).
 
-3. **Invite codes**: `seed.sql` creates placeholder codes (`NEXA-...`). Replace them before inviting anyone.
+3. **Invite codes**: not needed any more (ADR-114). They only apply again when `game_config.auth` is set to
+   `{"inviteRequired": true}`; `seed.sql` still creates placeholder codes (`NEXA-...`).
 
-4. **Auth settings**: sign-up passes `invite_code`, `age_confirmed` and optionally `nickname` in
-   `options.data`. A missing or invalid code makes the sign-up fail (trigger `handle_new_user`).
+4. **Auth settings**: sign-up passes `age_confirmed` and optionally `nickname` in `options.data`
+   (trigger `handle_new_user`).
 
 ## Updating an existing project (SQL Editor only)
 

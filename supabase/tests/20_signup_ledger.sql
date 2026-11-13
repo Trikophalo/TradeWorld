@@ -10,13 +10,28 @@ set client_min_messages = notice;
 
 insert into public.invite_codes (code, max_uses) values ('TEST-INVITE', 5), ('TEST-SINGLE', 1);
 
--- (b) sign-up is rejected without invite code / age confirmation ----------------
+-- (b) sign-up needs no invite code (ADR-114), but the 18+ confirmation -------------
+-- (the switch is set here by hand so that the test also holds on an older database; the default is checked in 86)
+begin;
+insert into public.game_config (key, value) values ('auth', '{"inviteRequired": false}');
+insert into auth.users (email, raw_user_meta_data) values
+  ('open@test.dev', '{"age_confirmed": true, "nickname": "Offen_Dabei"}'),
+  ('wrong@test.dev', '{"age_confirmed": true, "nickname": "Falscher_Code", "invite_code": "WRONG"}');
+select tests.assert(
+  (select count(*) from public.profiles where nickname in ('Offen_Dabei', 'Falscher_Code')) = 2
+  and (select count(*) from public.invite_code_redemptions) = 0,
+  'sign-up works without an invite code; an unknown code is ignored');
+rollback;
+-- an operator can close the doors again: auth.inviteRequired = true
+begin;
+insert into public.game_config (key, value) values ('auth', '{"inviteRequired": true}');
 select tests.throws(
   $$insert into auth.users (email, raw_user_meta_data) values ('x@test.dev', '{"age_confirmed": true}')$$,
-  'NX005', 'sign-up without invite code is rejected');
+  'NX005', 'with auth.inviteRequired: sign-up without invite code is rejected');
 select tests.throws(
   $$insert into auth.users (email, raw_user_meta_data) values ('x@test.dev', '{"age_confirmed": true, "invite_code": "WRONG"}')$$,
-  'NX005', 'sign-up with unknown invite code is rejected');
+  'NX005', 'with auth.inviteRequired: sign-up with unknown invite code is rejected');
+rollback;
 select tests.throws(
   $$insert into auth.users (email, raw_user_meta_data) values ('x@test.dev', '{"invite_code": "TEST-INVITE"}')$$,
   'NX007', 'sign-up without 18+ confirmation is rejected');
@@ -68,12 +83,13 @@ insert into auth.users (email, raw_user_meta_data) values
 select tests.assert(
   (select nickname ~ '^anna[0-9]{5}$' from public.profiles p join auth.users u on u.id = p.id where u.email = 'c@test.dev'),
   'taken nickname gets a numeric suffix');
+insert into public.game_config (key, value) values ('auth', '{"inviteRequired": true}');
 select tests.throws(
   $$insert into auth.users (email, raw_user_meta_data) values ('d@test.dev', '{"invite_code": "TEST-SINGLE", "age_confirmed": true}')$$,
-  'NX005', 'used-up invite code is rejected');
+  'NX005', 'with auth.inviteRequired: a used-up invite code is rejected');
+update public.game_config set value = '{"inviteRequired": false}' where key = 'auth';
 
-insert into public.game_config (key, value) values
-  ('economy', '{"startingCapitalCents": 2500000}'), ('auth', '{"inviteRequired": false}');
+insert into public.game_config (key, value) values ('economy', '{"startingCapitalCents": 2500000}');
 insert into auth.users (email, raw_user_meta_data) values ('e@test.dev', '{"age_confirmed": "true", "nickname": "!!"}');
 select tests.assert(
   (select a.balance_cents from public.ledger_accounts a join auth.users u on u.id = a.owner_player_id
@@ -81,7 +97,7 @@ select tests.assert(
   'starting capital is read from game_config (economy.startingCapitalCents)');
 select tests.assert(
   (select nickname ~ '^Trader[0-9]{5}$' from public.profiles p join auth.users u on u.id = p.id where u.email = 'e@test.dev'),
-  'invalid nickname falls back to TraderNNNNN; invite optional when auth.inviteRequired = false');
+  'invalid nickname falls back to TraderNNNNN; no invite code needed');
 rollback;
 
 -- (e) ledger immutability -----------------------------------------------------------

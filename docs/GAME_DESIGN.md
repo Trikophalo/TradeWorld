@@ -878,7 +878,7 @@ Verkäufe im Lock-up (gesperrt), Manipulation über Zweitaccounts (Begrenzung un
 Tests), Spieler zurücksetzen. In der Alpha ist der Betreiber selbst Mitspieler. Admin-Aktionen werden
 deshalb protokolliert.
 
-**Zugang:** Geschlossene Alpha mit Einladungscode, Anmeldung mit E-Mail und Passwort (ADR-010). Ohne
+**Zugang:** Anmeldung mit E-Mail und Passwort, ohne Einladungscode (ADR-114). Ohne
 Supabase-Zugangsdaten läuft die App im Demo-Modus mit Beispieldaten und ohne Anmeldung (ADR-015). Der
 Demo-Modus ist eine Vorschau der Oberfläche, kein Spielmodus.
 

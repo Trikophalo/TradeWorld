@@ -14,8 +14,7 @@ import { engine } from "@/features/game/store";
 import { isDemoMode } from "@/lib/supabase/env";
 import { fieldErrors, loginSchema, registerSchema } from "../schemas";
 
-type ErrorKey =
-  "errorEmail" | "errorPassword" | "errorDisplayName" | "errorInvite" | "errorAge" | "errorInvalid" | "errorGeneric";
+type ErrorKey = "errorEmail" | "errorPassword" | "errorDisplayName" | "errorAge" | "errorInvalid" | "errorGeneric";
 
 /** Only same-origin paths are accepted as a redirect target. */
 function safeNext(value: string | null): string {
@@ -74,7 +73,6 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       displayName: String(form.get("displayName") ?? ""),
       email: String(form.get("email") ?? "").trim(),
       password: String(form.get("password") ?? ""),
-      inviteCode: String(form.get("inviteCode") ?? ""),
       ageConfirmed: form.get("ageConfirmed") === "on",
     };
     const parsed = register ? registerSchema.safeParse(raw) : loginSchema.safeParse(raw);
@@ -90,8 +88,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       ? await supabase.auth.signUp({
           email: raw.email,
           password: raw.password,
-          // Read by the handle_new_user() trigger. The invite code is checked there, not here.
-          options: { data: { nickname: raw.displayName, invite_code: raw.inviteCode.trim(), age_confirmed: true } },
+          // Read by the handle_new_user() trigger.
+          options: { data: { nickname: raw.displayName, age_confirmed: true } },
         })
       : await supabase.auth.signInWithPassword({ email: raw.email, password: raw.password });
 
@@ -140,13 +138,6 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         />
         {register && (
           <>
-            <Field
-              name="inviteCode"
-              label={t("inviteCode")}
-              autoComplete="off"
-              autoCapitalize="characters"
-              error={message(errors.inviteCode)}
-            />
             <div>
               <label className="flex cursor-pointer items-start gap-3 text-fg-1">
                 <input

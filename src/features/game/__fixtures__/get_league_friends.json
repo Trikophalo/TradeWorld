@@ -8,7 +8,7 @@
   },
   "entries": [
     {
-      "tag": "ESH2",
+      "tag": "ACLE",
       "rank": 1,
       "is_me": false,
       "level": 15,
@@ -17,7 +17,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "EZKC",
+      "tag": "XC6K",
       "rank": 2,
       "is_me": false,
       "level": 8,
@@ -26,7 +26,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "RFFS",
+      "tag": "HBG9",
       "rank": 3,
       "is_me": true,
       "level": 15,
@@ -36,10 +36,10 @@
     }
   ],
   "last_winner": {
-    "tag": "RFFS",
+    "tag": "HBG9",
     "nickname": "Fixture_Gmbh",
     "avatar_key": "rookie",
-    "growth_bps": 235,
+    "growth_bps": 234,
     "week_start": "2026-11-02"
   }
 }

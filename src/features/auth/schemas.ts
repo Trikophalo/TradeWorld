@@ -10,7 +10,6 @@ export const registerSchema = z.object({
   displayName: z.string().regex(/^[A-Za-z0-9_]{3,20}$/, "errorDisplayName"),
   email: z.email("errorEmail"),
   password: z.string().min(10, "errorPassword"),
-  inviteCode: z.string().trim().min(4, "errorInvite"),
   ageConfirmed: z.literal(true, "errorAge"),
 });
 

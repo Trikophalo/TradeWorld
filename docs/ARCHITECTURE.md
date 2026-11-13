@@ -254,9 +254,9 @@ flowchart TD
 
 ## 9. Anmeldung und Sitzung
 
-- Supabase Auth mit E-Mail und Passwort; Registrierung nur mit Einladungscode und 18+-Bestätigung (ADR-010).
+- Supabase Auth mit E-Mail und Passwort; Registrierung mit 18+-Bestätigung, ohne Einladungscode (ADR-114).
 - Der Trigger `handle_new_user()` legt beim Anlegen des Auth-Nutzers Profil, Konto, Startkapital-Buchung und
-  Standardeinstellungen an und entwertet den Einladungscode.
+  Standardeinstellungen an.
 - `src/proxy.ts` erneuert das Sitzungs-Cookie und leitet nicht angemeldete Besucher auf `/login`. Das ist
   Komfort, nicht Schutz: Der Schutz ist RLS.
 - **Demo-Modus** (ADR-015): Ohne Supabase-Variablen sind alle Seiten offen und zeigen Beispieldaten.
