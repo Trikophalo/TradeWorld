@@ -30,6 +30,7 @@ import {
   type PromotionResult,
   type PromotionState,
   type SkillState,
+  type TrustInfo,
   type WorkTask,
   type WorkTaskResult,
 } from "../types";
@@ -147,6 +148,8 @@ export interface CareerHost {
   upgrades(): UpgradeLevels;
   /** Friends feed (ADR-088): a promotion is news. */
   feedPost?(kind: string, payload: Record<string, unknown>): void;
+  /** Trust from deals (ADR-098), for the business card. */
+  trust?(): TrustInfo;
 }
 
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -829,6 +832,7 @@ export function createCareerEngine(host: CareerHost) {
           : null,
         company: host.ownCompany(),
         memberSince: iso(Date.now() - 3 * DAY),
+        trust: host.trust?.() ?? null,
       };
     },
   };

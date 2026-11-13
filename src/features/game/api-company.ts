@@ -6,6 +6,7 @@ import { rpc, toErrorKey } from "./rpc";
 import type {
   ChatMessage,
   CompanyApplication,
+  CompanyCampaign,
   CompanyPosting,
   GameEngine,
   MyCompany,
@@ -94,6 +95,27 @@ const quarterSchema = z.object({
   operating_profit_cents: num,
   utilization_bps: num,
   bonus_cents: num.default(0),
+});
+
+/** Marketing campaign (ADR-097). */
+const campaignSchema = z.object({
+  id: z.string(),
+  kind: z.enum(["flyer", "online", "tv"]),
+  started_at: iso,
+  ends_at: iso,
+  cost_cents: num,
+  demand_bps: num,
+  resonance: z.enum(["weak", "solid", "strong"]),
+});
+
+const toCampaign = (c: z.infer<typeof campaignSchema>): CompanyCampaign => ({
+  id: c.id,
+  kind: c.kind,
+  startedAt: c.started_at,
+  endsAt: c.ends_at,
+  costCents: c.cost_cents,
+  demandBps: c.demand_bps,
+  resonance: c.resonance,
 });
 
 const companySchema = z.object({
@@ -200,6 +222,11 @@ const companySchema = z.object({
         profit_cents: num,
         contract_revenue_cents: num.default(0),
         founder_payout_cents: num.default(0),
+        supply_revenue_cents: num.default(0),
+        supply_fee_paid_cents: num.default(0),
+        supply_fee_income_cents: num.default(0),
+        supply_goods_cents: num.default(0),
+        stake_payout_cents: num.default(0),
       }),
     )
     .default([]),
@@ -211,6 +238,8 @@ const companySchema = z.object({
   expansion_cost_cents: num.nullable().default(null),
   market_factor: num.default(1),
   founder_payout_bps: num.default(0),
+  campaign: campaignSchema.nullable().default(null),
+  campaign_costs: z.object({ flyer: num, online: num, tv: num }).nullable().default(null),
 });
 
 const wrapped = z.object({ company: companySchema.nullable() });
@@ -358,6 +387,7 @@ export const COMPANY_RPC_SCHEMAS = {
   set_company_strategy: wrapped,
   expand_company: wrapped,
   set_founder_payout: wrapped,
+  start_campaign: campaignSchema,
   get_company_postings: z.object({ postings: z.array(postingSchema) }),
   create_job_posting: z.object({ id: z.string() }).passthrough(),
   close_job_posting: z.object({ id: z.string(), status: z.literal("closed") }),
@@ -490,7 +520,14 @@ function toCompany(c: z.infer<typeof companySchema>): MyCompany {
       profitCents: h.profit_cents,
       contractRevenueCents: h.contract_revenue_cents,
       founderPayoutCents: h.founder_payout_cents,
+      supplyRevenueCents: h.supply_revenue_cents,
+      supplyFeePaidCents: h.supply_fee_paid_cents,
+      supplyFeeIncomeCents: h.supply_fee_income_cents,
+      supplyGoodsCents: h.supply_goods_cents,
+      stakePayoutCents: h.stake_payout_cents,
     })),
+    campaign: c.campaign ? toCampaign(c.campaign) : null,
+    campaignCosts: c.campaign_costs,
     aiWageCentsPerHour: c.ai_wage_cents_per_hour,
     priceLevel: c.price_level,
     contractWork: c.contract_work,
@@ -587,6 +624,7 @@ type CompanyEngine = Pick<
   | "fireEmployee"
   | "respondRaise"
   | "promoteEmployee"
+  | "startCampaign"
   | "declinePromotion"
   | "trainEmployee"
   | "setCompanyLogo"
@@ -741,6 +779,12 @@ export const liveCompanyEngine: CompanyEngine = {
   async setFounderPayout(requestId, bps) {
     return requireCompany(
       await rpc("set_founder_payout", { p_request_id: requestId, p_bps: bps }, S.set_founder_payout),
+    );
+  },
+
+  async startCampaign(requestId, companyId, kind) {
+    return toCampaign(
+      await rpc("start_campaign", { p_request_id: requestId, p_company_id: companyId, p_kind: kind }, S.start_campaign),
     );
   },
 

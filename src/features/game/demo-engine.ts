@@ -21,6 +21,7 @@ import { createPropertyEngine, type HomeState } from "./demo/property";
 import { createFriendEngine } from "./demo/friends";
 import { createSocialEngine, type DemoSocialState } from "./demo/social";
 import { createCompanyEventsEngine } from "./demo/company-events";
+import { createDealEngine, initialDeals, type DemoDealsState } from "./demo/deals";
 import { tagFromUniform } from "@/lib/player-tag";
 import { createCompanyEngine, type DemoCompanyState, type DemoDissolution } from "./demo/company";
 import { demoTycoons } from "./demo/tycoons";
@@ -87,6 +88,8 @@ interface PlayerState {
   tag?: string;
   /** Feed, notifications and league of the demo (ADR-088, ADR-089). */
   social?: DemoSocialState;
+  /** Deals with the demo's trading partners and the trust log (ADR-098). */
+  deals?: DemoDealsState;
   nicknameChangedAt: number | null;
   cashCents: number;
   reservedCents: number;
@@ -999,6 +1002,7 @@ const career = createCareerEngine({
   },
   upgrades: () => p().upgrades ?? {},
   feedPost: (kind, payload) => feedPost(kind, payload),
+  trust: () => deals.trust(),
 });
 
 // ------------------------------------------------------------------ upgrades (ADR-093)
@@ -1033,8 +1037,30 @@ const upgradeEngine: Pick<GameEngine, "upgrades" | "buyUpgrade"> = {
     ),
 };
 
+// ------------------------------------------------------------------ deals and trust (ADR-098)
+
+const deals = createDealEngine({
+  state: () => (p().deals ??= initialDeals()),
+  nickname: () => p().nickname,
+  tag: () => myTag(),
+  avatarKey: () => career.avatarKey(),
+  level,
+  cashCents: () => p().cashCents,
+  addCash: (cents) => {
+    if (cents > 0) income(cents);
+    else p().cashCents += cents;
+  },
+  company: () => p().company ?? null,
+  day: (at) => berlinDay(at),
+  idempotent,
+  persist,
+  feedPost: (kind, payload) => feedPost(kind, payload),
+});
+
 const company = createCompanyEngine({
   eventModifiers: (c, at) => companyEvents.modifiers(c, at),
+  stakePayout: (c, profit, free) => deals.stakePayout(c, profit, free),
+  afterHour: (c, hour) => deals.afterHour(c, hour),
   company: () => p().company ?? null,
   setCompany: (value) => {
     p().company = value;
@@ -1159,6 +1185,7 @@ export function demoCloseQuarter(): void {
 export const demoEngine: GameEngine = {
   ...career.engine,
   ...upgradeEngine,
+  ...deals.engine,
   ...company.engine,
   ...art.engine,
   ...home.engine,

@@ -3,6 +3,7 @@
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { TROPHIES } from "@/components/pixel/art";
 import { PlayerTag } from "@/components/ui/player-tag";
+import { TrustBadge } from "@/features/deals/components/trust-badge";
 import {
   motion,
   useMotionTemplate,
@@ -146,6 +147,13 @@ export function BusinessCard({ card, className }: { card: PlayerCard; className?
               <dt className="label-pixel text-fg-3">{t("streak")}</dt>
               <dd className="mt-0.5 nums text-fg-1">{t("streakValue", { days: card.streakDays })}</dd>
             </div>
+            {card.trust && (
+              <div className="col-span-2" data-testid="card-trust">
+                <dd className="mt-1">
+                  <TrustBadge trust={card.trust} size="lg" />
+                </dd>
+              </div>
+            )}
             {card.trophies.gold + card.trophies.silver + card.trophies.bronze > 0 && (
               <div className="col-span-2" data-testid="card-trophies" title={t("trophiesHint")}>
                 <dt className="label-pixel text-fg-3">{t("trophies")}</dt>

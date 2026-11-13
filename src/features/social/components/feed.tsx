@@ -42,6 +42,9 @@ const ICONS: Record<string, PixelArt> = {
   league_won: TROPHIES.gold,
   friends_now: UI_ICONS.heart,
   promoted: UI_ICONS.upgrade,
+  deal_signed: UI_ICONS.deal,
+  deal_broken: UI_ICONS.deal,
+  loan_defaulted: UI_ICONS.deal,
 };
 
 const str = (v: unknown) => (typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
@@ -53,6 +56,7 @@ function useFeedText() {
   const tf = useTranslations("firm.tiers");
   const te = useTranslations("estate.tierNames");
   const tc = useTranslations("careerTiers");
+  const tk = useTranslations("deals.kinds");
   return (item: FeedItem): string => {
     const p = item.payload;
     switch (item.kind) {
@@ -93,6 +97,14 @@ function useFeedText() {
         return t("league_won", { growth: formatBps(n(p.growth_bps)) });
       case "friends_now":
         return t("friends_now", { other: str(p.other_nickname) });
+      case "deal_signed":
+      case "deal_broken": {
+        const kind = str(p.kind);
+        const known = ["loan", "supply", "stake"].includes(kind);
+        return t(item.kind, { other: str(p.with), kind: known ? tk(kind as "loan") : kind });
+      }
+      case "loan_defaulted":
+        return t("loan_defaulted", { other: str(p.with) });
       case "promoted": {
         const tier = str(p.tier);
         const known = ["intern", "junior", "senior", "team_lead", "c_level"].includes(tier);

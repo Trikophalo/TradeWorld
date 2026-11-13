@@ -1,5 +1,13 @@
 import type { DemoCompanyEventsState } from "./company-events";
 import type { EventModifiers } from "@/lib/sim/company-events";
+import {
+  campaignCostCents,
+  campaignDemandFactor,
+  campaignFactor,
+  campaignLuck,
+  campaignResonance,
+  type Campaign,
+} from "@/lib/sim/campaigns";
 import { BALANCE } from "@/config/balance";
 import { SKILL_BRANCHES, type SkillBranch } from "@/config/skills";
 import type { SectorKey } from "@/components/pixel/art";
@@ -33,6 +41,7 @@ import { dissolve, isInsolvent } from "@/lib/sim/insolvency";
 import { hasForbiddenSymbol, isValidBanner, isValidLogo, type CompanyLogoData } from "@/lib/sim/logo";
 import {
   GameError,
+  type CampaignKind,
   type ChatMessage,
   type CloseCompanyResult,
   type Dissolution,
@@ -73,7 +82,16 @@ interface DemoHour {
   contractRevenueCents?: number;
   /** Automatic CEO payout (ADR-086). */
   founderPayoutCents?: number;
+  /** Supply contracts and silent partners (ADR-098). */
+  supplyRevenueCents?: number;
+  supplyFeePaidCents?: number;
+  supplyFeeIncomeCents?: number;
+  supplyGoodsCents?: number;
+  stakePayoutCents?: number;
 }
+
+/** One hour as the deals part sees it (ADR-098). */
+export type DemoHourView = Pick<DemoHour, "at" | "demandCents" | "capacityCents" | "profitCents">;
 
 interface DemoReport extends CompanyQuarter {
   closedAt: number;
@@ -131,6 +149,8 @@ export interface DemoCompanyState {
   founderPayoutBps?: number;
   /** Crises, chances and news (ADR-091). */
   events?: DemoCompanyEventsState;
+  /** Marketing campaign (ADR-097). */
+  campaign?: (Campaign & { id: string; costCents: number; luck: number }) | null;
   chat?: ChatMessage[];
 }
 
@@ -164,6 +184,40 @@ export interface CompanyHost {
   startFounderNotice(): void;
   /** Effect of the company's current crisis or chance in this hour (ADR-091). */
   eventModifiers?(company: DemoCompanyState, at: number): EventModifiers;
+  /** Silent partners' share of a profitable hour, paid before the founder (ADR-098); returns what was paid. */
+  stakePayout?(company: DemoCompanyState, profitCents: number, freeCashCents: number): number;
+  /** Supply contracts after the hour (ADR-098): books into the company and returns the hour's supply lines. */
+  afterHour?(
+    company: DemoCompanyState,
+    hour: DemoHourView,
+  ): Partial<Pick<DemoHour, "supplyRevenueCents" | "supplyFeePaidCents" | "supplyFeeIncomeCents" | "supplyGoodsCents">>;
+}
+
+/** Campaign prices from the last hour's demand (ADR-097). */
+function campaignCosts(company: DemoCompanyState): Record<CampaignKind, number> {
+  const last = company.hours?.at(-1);
+  const demand = last
+    ? last.demandCents
+    : (company.potentialAnnualCents / 4 / BALANCE.time.quarterHours) * company.awareness;
+  return {
+    flyer: campaignCostCents("flyer", demand),
+    online: campaignCostCents("online", demand),
+    tv: campaignCostCents("tv", demand),
+  };
+}
+
+function campaignView(company: DemoCompanyState): MyCompany["campaign"] {
+  const c = company.campaign;
+  if (!c || Date.now() >= c.endsAt) return null;
+  return {
+    id: c.id,
+    kind: c.kind,
+    startedAt: new Date(c.startedAt).toISOString(),
+    endsAt: new Date(c.endsAt).toISOString(),
+    costCents: c.costCents,
+    demandBps: Math.round((c.demandFactor - 1) * 10_000),
+    resonance: campaignResonance(c.luck),
+  };
 }
 
 export const productKeyOf = (company: Pick<DemoCompanyState, "sector" | "productKey">) =>
@@ -289,6 +343,7 @@ export function createCompanyEngine(host: CompanyHost) {
         contractWork: company.contractWork ?? true,
         expansionLevel: company.expansionLevel ?? 0,
         event: host.eventModifiers?.(company, at),
+        campaignFactor: campaignDemandFactor(company.campaign, at),
       },
     );
     const revenue = Number(r.revenueCents);
@@ -297,6 +352,12 @@ export function createCompanyEngine(host: CompanyHost) {
     const paid = Math.min(costs, Math.max(0, available));
     company.cashCents = available - paid;
     company.unpaidCents += costs - paid;
+    // Silent partners first (ADR-098), then the automatic CEO payout (ADR-086).
+    const stakes =
+      Number(r.profitCents) > 0
+        ? (host.stakePayout?.(company, Number(r.profitCents), company.cashCents - company.unpaidCents) ?? 0)
+        : 0;
+    company.cashCents -= stakes;
     // Automatic CEO payout (ADR-086): a share of a profitable hour, never more than the free cash.
     const payout = Number(
       founderPayoutCents(r.profitCents, company.founderPayoutBps ?? 0, BigInt(company.cashCents - company.unpaidCents)),
@@ -318,7 +379,15 @@ export function createCompanyEngine(host: CompanyHost) {
       profitCents: Number(r.profitCents),
       contractRevenueCents: Number(r.contractRevenueCents),
       founderPayoutCents: payout,
+      stakePayoutCents: stakes,
     };
+    const supply = host.afterHour?.(company, hour) ?? {};
+    Object.assign(hour, supply);
+    hour.profitCents +=
+      (supply.supplyRevenueCents ?? 0) +
+      (supply.supplyFeeIncomeCents ?? 0) -
+      (supply.supplyFeePaidCents ?? 0) -
+      (supply.supplyGoodsCents ?? 0);
     company.hours = [...(company.hours ?? []), hour].slice(-24);
     company.quarterHours = [...(company.quarterHours ?? []), hour];
     company.lastHourAt = at + HOUR_MS;
@@ -612,8 +681,15 @@ export function createCompanyEngine(host: CompanyHost) {
         profitCents: h.profitCents,
         contractRevenueCents: h.contractRevenueCents ?? 0,
         founderPayoutCents: h.founderPayoutCents ?? 0,
+        supplyRevenueCents: h.supplyRevenueCents ?? 0,
+        supplyFeePaidCents: h.supplyFeePaidCents ?? 0,
+        supplyFeeIncomeCents: h.supplyFeeIncomeCents ?? 0,
+        supplyGoodsCents: h.supplyGoodsCents ?? 0,
+        stakePayoutCents: h.stakePayoutCents ?? 0,
       })),
       founderPayoutBps: company.founderPayoutBps ?? 0,
+      campaign: campaignView(company),
+      campaignCosts: campaignCosts(company),
       priceLevel: company.priceLevel ?? "normal",
       contractWork: company.contractWork ?? true,
       expansionLevel: level,
@@ -693,6 +769,7 @@ export function createCompanyEngine(host: CompanyHost) {
     | "setCompanyStrategy"
     | "expandCompany"
     | "setFounderPayout"
+    | "startCampaign"
     | "companyPostings"
     | "createJobPosting"
     | "closeJobPosting"
@@ -895,6 +972,29 @@ export function createCompanyEngine(host: CompanyHost) {
         if (!isValidFounderPayout(bps)) throw new GameError("invalid_argument");
         company.founderPayoutBps = bps;
       }),
+
+    startCampaign: (requestId, _companyId, kind) =>
+      mutate(requestId, (company) => {
+        if (!(kind in startups.campaigns.kinds)) throw new GameError("invalid_argument");
+        const now = Date.now();
+        if (company.campaign && now < company.campaign.endsAt) throw new GameError("campaign_running");
+        const cost = campaignCosts(company)[kind];
+        if (company.cashCents - company.unpaidCents < cost) throw new GameError("insufficient_funds");
+        company.cashCents -= cost;
+        const luck = campaignLuck(Math.random());
+        const spec = startups.campaigns.kinds[kind];
+        company.campaign = {
+          id: `campaign-${++company.seq}`,
+          kind,
+          startedAt: now,
+          endsAt: now + spec.hours * HOUR_MS,
+          demandFactor: campaignFactor(kind, company.quality, luck),
+          costCents: cost,
+          luck,
+        };
+        const cap = startups.stages.awarenessCaps[stageOf(company)] ?? 1;
+        company.awareness = Math.min(cap, Math.max(company.awareness, company.awareness + spec.awareness));
+      }).then((c) => c.campaign!),
 
     expandCompany: (requestId) =>
       mutate(requestId, (company) => {

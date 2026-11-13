@@ -34,6 +34,7 @@ import { BannerEditor } from "./banner-editor";
 import { LogoEditor } from "./logo-editor";
 import { OfficeScene } from "./office-scene";
 import { ExpansionCard, PayoutCard, ProfitCoach, StrategyCard } from "./profit";
+import { CampaignCard, ProfitRoutes } from "./routes";
 import { CompanyNewsCard, SituationCard } from "./situation";
 
 type Tab = "overview" | "team" | "chat";
@@ -115,6 +116,7 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
                 document.getElementById("company-controls")?.scrollIntoView({ behavior: "smooth", block: "center" });
               }}
             />
+            <ProfitRoutes company={company} />
             <GrowthPath
               company={company}
               onFill={(skills) => setHire({ skills })}
@@ -129,6 +131,7 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
             <TreasuryCard company={company} />
             <PayoutCard company={company} />
             <StrategyCard company={company} />
+            <CampaignCard company={company} />
             <MarketCard company={company} />
             <div id="company-controls" className="scroll-mt-24">
               <BossOffice company={company} onTeam={() => setTab("team")} />

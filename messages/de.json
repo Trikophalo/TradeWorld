@@ -29,12 +29,14 @@
       "property": "Haus",
       "more": "Mehr",
       "friends": "Freunde",
-      "upgrades": "Upgrades"
+      "upgrades": "Upgrades",
+      "deals": "Deals"
     },
     "property": "Grundstück",
     "more": "Mehr",
     "friends": "Freunde",
-    "upgrades": "Verbesserungen"
+    "upgrades": "Verbesserungen",
+    "deals": "Deals"
   },
   "topbar": {
     "search": "Aktien, Firmen, Spieler suchen",
@@ -683,7 +685,15 @@
     "upgrade_maxed": "Diese Verbesserung ist schon auf der höchsten Stufe.",
     "promotion_not_ready": "Für die Beförderung fehlt noch etwas. Schau in die Karriereleiter.",
     "promotion_too_soon": "Der Chef hat gerade erst Nein gesagt. Frag später noch einmal.",
-    "promotion_pending": "Deine Anfrage liegt schon beim Chef."
+    "promotion_pending": "Deine Anfrage liegt schon beim Chef.",
+    "campaign_running": "Es läuft schon eine Kampagne. Warte, bis sie vorbei ist.",
+    "deal_not_found": "Diesen Deal gibt es nicht (mehr).",
+    "deal_closed": "Dieser Deal ist schon vergeben oder beendet.",
+    "deal_terms": "Die Bedingungen passen nicht. Schau auf die Grenzen bei Betrag, Zins und Laufzeit.",
+    "deal_limit": "Du hast schon zu viele offene oder laufende Deals dieser Art.",
+    "deal_self": "Mit dir selbst kannst du keinen Deal machen.",
+    "stake_share_full": "Die Firma hat schon zu viele Teilhaber. Zusammen höchstens 50 % vom Gewinn.",
+    "deal_needs_company": "Dafür brauchst du eine eigene Firma (oder die andere Seite eine)."
   },
   "locks": {
     "level": "Level {level}",
@@ -2721,7 +2731,10 @@
         "league_won": "hat die Wochenliga gewonnen ({growth}).",
         "friends_now": "und {other} sind jetzt Freunde.",
         "other": "hat etwas erlebt.",
-        "promoted": "wurde befördert: {tier} bei {company}."
+        "promoted": "wurde befördert: {tier} bei {company}.",
+        "deal_signed": "hat einen Deal mit {other} geschlossen: {kind}.",
+        "deal_broken": "hat einen Deal mit {other} gebrochen: {kind}.",
+        "loan_defaulted": "hat einen Kredit von {other} platzen lassen."
       }
     },
     "notifications": {
@@ -3442,5 +3455,264 @@
     "hint": "Befördern geht, sobald alle Punkte erfüllt sind. Der Lohn steigt mindestens auf den Wert daneben.",
     "levelShort": "Level {have}/{need}",
     "hoursShort": "{have}/{need} h"
+  },
+  "trust": {
+    "label": "Vertrauen",
+    "bands": {
+      "risky": "Riskant",
+      "shaky": "Wackelig",
+      "blank": "Unbeschrieben",
+      "reliable": "Verlässlich",
+      "rock": "Felsenfest"
+    },
+    "record": "{kept} gehalten · {broken} gebrochen",
+    "explain": "Vertrauen wächst, wenn du Deals hältst, und sinkt, wenn du zu spät zahlst oder Verträge brichst. Alle sehen es, bevor sie mit dir handeln."
+  },
+  "deals": {
+    "title": "Deals",
+    "intro": "Kredite, Lieferverträge und Teilhaber unter Spielern. Der Server zahlt, was er kann. Ob jemand sein Wort hält, zeigt das Vertrauen.",
+    "tabs": {
+      "board": "Börse",
+      "mine": "Meine Deals",
+      "new": "Neuer Deal"
+    },
+    "kinds": {
+      "loan": "Kredit",
+      "supply": "Liefervertrag",
+      "stake": "Teilhaber"
+    },
+    "kindText": {
+      "loan": "Geld leihen oder verleihen, mit Zinsen für die ganze Laufzeit.",
+      "supply": "Freie Kapazität gegen Gebühr: Wer ausverkauft ist, verkauft mehr.",
+      "stake": "Geld in eine Firma stecken und am Gewinn jeder Stunde beteiligt sein."
+    },
+    "roles": {
+      "lender": "Ich verleihe",
+      "borrower": "Ich leihe mir",
+      "supplier": "Ich liefere",
+      "buyer": "Ich kaufe ein",
+      "investor": "Ich investiere",
+      "company": "Ich suche Geld"
+    },
+    "status": {
+      "open": "Offen",
+      "active": "Läuft",
+      "overdue": "Überfällig",
+      "defaulted": "Geplatzt",
+      "completed": "Erfüllt",
+      "forgiven": "Erlassen",
+      "broken": "Gebrochen",
+      "cancelled": "Zurückgezogen",
+      "declined": "Abgelehnt",
+      "expired": "Abgelaufen"
+    },
+    "sections": {
+      "incoming": "Angebote an dich",
+      "running": "Laufende Deals",
+      "outgoing": "Deine offenen Angebote",
+      "history": "Erledigt"
+    },
+    "empty": {
+      "board": "Gerade keine offenen Angebote",
+      "boardText": "Stell selbst eins ein: Wer zuerst annimmt, bekommt den Deal.",
+      "mine": "Noch keine Deals",
+      "mineText": "Nimm ein Angebot an oder schlag jemandem einen Deal vor."
+    },
+    "openOffer": "Offen für alle",
+    "to": "an {name}",
+    "from": "von {name}",
+    "until": "bis {date}",
+    "validUntil": "Angebot gilt bis {date}",
+    "terms": {
+      "loan": "{amount} für {days}, {interest} Zinsen",
+      "supply": "bis {volume}/h Ware, Gebühr {fee} vom Preis, {days}",
+      "stake": "{amount} für {share} vom Gewinn, {days}"
+    },
+    "days": "{count, plural, one {# Tag} other {# Tage}}",
+    "prepay": "Anzahlung {amount}",
+    "youGet": {
+      "lender": "Du verleihst {amount} und bekommst {due} zurück.",
+      "borrower": "Du bekommst {amount} und zahlst {due} zurück.",
+      "supplier": "Deine freie Kapazität produziert für {company}. Pro Stück bekommst du {fee} vom Preis.",
+      "buyer": "Wenn du ausverkauft bist, liefert {company}. Du verkaufst zu deinem Preis und zahlst {fee}.",
+      "investor": "Du gibst {amount} und bekommst {share} von jeder Gewinnstunde.",
+      "company": "Deine Firma bekommt {amount}. Teilhaber bekommen {share} von jeder Gewinnstunde."
+    },
+    "progress": {
+      "loan": "{repaid} von {due} zurück",
+      "supply": "{delivered} geliefert von {needed} gebraucht · Gebühren {fees}",
+      "stake": "{payouts} ausgezahlt",
+      "prepayLeft": "Anzahlung übrig: {amount}"
+    },
+    "actions": {
+      "accept": "Gedrückt halten zum Annehmen",
+      "decline": "Ablehnen",
+      "cancel": "Zurückziehen",
+      "repay": "Zurückzahlen",
+      "repayAll": "Alles zurückzahlen · {amount}",
+      "forgive": "Rest erlassen",
+      "break": "Vorzeitig beenden",
+      "profile": "Profil"
+    },
+    "breakTitle": "Deal wirklich brechen?",
+    "breakText": "Du verlierst {points} Vertrauen, und alle Freunde sehen es im Feed.",
+    "breakSupply": "Die übrige Anzahlung bleibt beim Lieferanten.",
+    "breakStake": "Das Geld des Teilhabers bleibt in deiner Firma.",
+    "breakConfirm": "Gedrückt halten zum Brechen",
+    "toasts": {
+      "proposed": "Angebot gesendet",
+      "proposedOpen": "Dein Angebot steht auf der Börse.",
+      "accepted": "Deal steht!",
+      "declined": "Abgelehnt",
+      "theyDeclined": "{name} hat abgelehnt.",
+      "cancelled": "Angebot zurückgezogen",
+      "repaid": "Zurückgezahlt",
+      "forgiven": "Rest erlassen",
+      "broken": "Deal gebrochen",
+      "failed": "Hat nicht geklappt"
+    },
+    "form": {
+      "kind": "Art",
+      "role": "Deine Seite",
+      "counterparty": "Mit wem? (Name oder #Tag)",
+      "counterpartyHint": "Leer lassen: Das Angebot steht offen auf der Börse.",
+      "amount": "Betrag in €",
+      "interest": "Zinsen für die ganze Laufzeit in %",
+      "days": "Laufzeit",
+      "volume": "Menge pro Stunde in €",
+      "volumeHint": "Ware zum Normalpreis, die höchstens pro Stunde geliefert wird.",
+      "fee": "Gebühr in % vom Preis",
+      "prepay": "Anzahlung in % (optional)",
+      "share": "Anteil am Stundengewinn in %",
+      "message": "Nachricht (optional)",
+      "submit": "Gedrückt halten zum Senden",
+      "summary": "So sieht der Deal aus",
+      "margins": "Pro Stück: Käufer {buyer} · Lieferant {supplier}",
+      "marginsHint": "Beide verdienen, wenn die Gebühr über den Herstellkosten des Lieferanten und unter dem Preis des Käufers liegt.",
+      "limits": "Grenzen: bis {max} Kredit (20.000 € je Level), Zinsen bis 30 %, 1 bis 30 Tage.",
+      "needsCompany": "Für diese Seite brauchst du eine eigene Firma.",
+      "myMargin": "Deine Marge pro Stück: {margin} vom Preis",
+      "myMarginLoss": "Achtung: Mit dieser Gebühr verlierst du {margin} pro Stück.",
+      "daysLabel": "Laufzeit in Tagen",
+      "invalid": "Die Bedingungen liegen außerhalb der Grenzen."
+    },
+    "repayTitle": "Kredit zurückzahlen",
+    "repayAmount": "Betrag in €",
+    "board": {
+      "title": "Deal-Börse",
+      "hint": "Offene Angebote anderer Spieler. Schau auf das Vertrauen, bevor du annimmst."
+    },
+    "partyTo": "An",
+    "partyFrom": "Von"
+  },
+  "campaigns": {
+    "title": "Marketing-Kampagne",
+    "intro": "Ein kurzer Schub für deine Nachfrage. Lohnt sich nur, wenn du noch Kapazität frei hast.",
+    "kinds": {
+      "flyer": {
+        "name": "Flyer",
+        "text": "Klein und günstig, 24 Stunden."
+      },
+      "online": {
+        "name": "Online",
+        "text": "Social Media und Anzeigen, 48 Stunden."
+      },
+      "tv": {
+        "name": "TV-Spot",
+        "text": "Groß und teuer, 72 Stunden."
+      }
+    },
+    "effect": "+{percent} Nachfrage · {hours} h",
+    "gain": "erwartet {amount} Gewinn",
+    "loss": "erwartet {amount} Verlust",
+    "soldOut": "Bringt dir gerade nichts: Du bist ausverkauft.",
+    "start": "Gedrückt halten · {price}",
+    "running": "Läuft: {kind}",
+    "resonance": {
+      "weak": "Schwache Resonanz",
+      "solid": "Ordentliche Resonanz",
+      "strong": "Starke Resonanz"
+    },
+    "runningEffect": "+{percent} Nachfrage noch {time}",
+    "started": "Kampagne gestartet",
+    "luckHint": "Wie gut sie ankommt, ist Glück und hängt an deiner Qualität."
+  },
+  "routes": {
+    "title": "Gewinnwege",
+    "intro": "Alle Wege, wie deine Firma mehr verdient, mit Schätzung aus der letzten Stunde.",
+    "bottleneck": {
+      "customers": "Dir fehlen Kunden: Du könntest {free} pro Stunde mehr herstellen.",
+      "staff": "Dir fehlen Leute: {missing} pro Stunde Nachfrage bleibt liegen.",
+      "balanced": "Nachfrage und Kapazität passen gerade zusammen.",
+      "waiting": "Nach der ersten Betriebsstunde siehst du hier deinen Engpass."
+    },
+    "state": {
+      "active": "aktiv",
+      "possible": "möglich",
+      "locked": "gesperrt",
+      "fits": "passt"
+    },
+    "perHour": "{amount}/h",
+    "items": {
+      "price": {
+        "name": "Preisstrategie",
+        "text": "Günstig bringt mehr Kunden, Premium mehr pro Stück (ab guter Qualität)."
+      },
+      "contract": {
+        "name": "Auftragsarbeit",
+        "text": "Ein Teil freier Kapazität wird anonym verkauft, mit kleiner Marge."
+      },
+      "staff": {
+        "name": "Team und KI-Kräfte",
+        "text": "Mehr Leute heißen mehr Kapazität. Lohnt sich nur, wenn Kunden warten."
+      },
+      "campaign": {
+        "name": "Marketing-Kampagne",
+        "text": "Kurzer Schub für die Nachfrage. Gut, wenn Kapazität frei ist."
+      },
+      "supplyBuy": {
+        "name": "Ware einkaufen (Liefervertrag)",
+        "text": "Ein anderer Spieler produziert, wenn du ausverkauft bist."
+      },
+      "supplySell": {
+        "name": "Kapazität verkaufen (Liefervertrag)",
+        "text": "Produziere für einen ausverkauften Spieler gegen Gebühr."
+      },
+      "stake": {
+        "name": "Teilhaber aufnehmen",
+        "text": "Geld von Spielern für den Ausbau, gegen einen Anteil am Gewinn."
+      },
+      "expand": {
+        "name": "Ausbau und Aufstieg",
+        "text": "Größerer Markt und mehr Plätze. Kostet einmal viel Geld."
+      },
+      "ipo": {
+        "name": "Börsengang",
+        "text": "Aktien verkaufen bringt frisches Geld. Danach schaut der Markt zu."
+      }
+    },
+    "hints": {
+      "priceBetter": "{level}: {amount}/h",
+      "priceFits": "Deine Preisstrategie passt gerade am besten.",
+      "contractOn": "Bringt gerade {amount}/h.",
+      "contractOff": "Einschalten: etwa {amount}/h.",
+      "staffGain": "Eine KI-Kraft mehr: etwa {amount}/h.",
+      "staffLoss": "Eine KI-Kraft mehr kostet etwa {amount}/h, weil Kunden fehlen.",
+      "campaignBest": "{kind}: etwa {amount} Gewinn insgesamt.",
+      "campaignNone": "Lohnt sich gerade nicht.",
+      "supplyBuyGain": "Bis {amount}/h bei 60 % Gebühr.",
+      "supplySellGain": "Bis {amount}/h bei 60 % Gebühr.",
+      "notNow": "Gerade nicht sinnvoll.",
+      "stakeHint": "Gut, wenn dir Geld für den Ausbau fehlt.",
+      "expandCost": "Nächster Schritt: {amount}.",
+      "listed": "Deine Firma ist an der Börse.",
+      "ipoOpen": "Möglich ab Level {level}."
+    },
+    "toDeals": "Zu den Deals",
+    "levels": {
+      "budget": "Günstig",
+      "normal": "Normal",
+      "premium": "Premium"
+    }
   }
 }

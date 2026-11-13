@@ -585,6 +585,119 @@ export interface PromotionResult {
   chanceBps: number | null;
 }
 
+// ------------------------------------------------------------------ campaigns (ADR-097)
+
+export type CampaignKind = "flyer" | "online" | "tv";
+export type CampaignResonance = "weak" | "solid" | "strong";
+
+export interface CompanyCampaign {
+  id: string;
+  kind: CampaignKind;
+  startedAt: string;
+  endsAt: string;
+  costCents: number;
+  /** Extra demand while it runs, in bps. */
+  demandBps: number;
+  resonance: CampaignResonance;
+}
+
+// ------------------------------------------------------------------ trust and deals (ADR-098)
+
+export type TrustBand = "risky" | "shaky" | "blank" | "reliable" | "rock";
+
+export interface TrustInfo {
+  score: number;
+  band: TrustBand;
+  /** Deals kept and broken (null where the server sends only the score). */
+  kept: number | null;
+  broken: number | null;
+}
+
+export type DealKind = "loan" | "supply" | "stake";
+export type DealRole = "lender" | "borrower" | "supplier" | "buyer" | "investor" | "company";
+export type DealStatus =
+  | "open"
+  | "active"
+  | "overdue"
+  | "defaulted"
+  | "completed"
+  | "forgiven"
+  | "broken"
+  | "cancelled"
+  | "declined"
+  | "expired";
+
+export interface DealParty extends FeedActor {
+  trust: Pick<TrustInfo, "score" | "band">;
+}
+
+export interface DealTerms {
+  hours: number;
+  principalCents?: number;
+  interestBps?: number;
+  volumeCentsPerHour?: number;
+  feeBps?: number;
+  prepayBps?: number;
+  amountCents?: number;
+  shareBps?: number;
+}
+
+export interface DealProgress {
+  dueCents?: number;
+  repaidCents?: number;
+  leftCents?: number;
+  deliveredCents?: number;
+  neededCents?: number;
+  feesPaidCents?: number;
+  prepayCents?: number;
+  prepayLeftCents?: number;
+  payoutsCents?: number;
+}
+
+export interface Deal {
+  id: string;
+  kind: DealKind;
+  status: DealStatus;
+  /** Role of the viewer; null on the board for offers of others. */
+  myRole: DealRole | null;
+  /** Role the proposer took; the other side takes the opposite one. */
+  proposerRole: DealRole;
+  isProposer: boolean;
+  proposer: DealParty;
+  /** The other side once fixed, else the target, else null (open offer). */
+  counterparty: DealParty | null;
+  supplierCompany: { id: string; name: string } | null;
+  buyerCompany: { id: string; name: string } | null;
+  company: { id: string; name: string } | null;
+  terms: DealTerms;
+  message: string | null;
+  createdAt: string;
+  expiresAt: string | null;
+  acceptedAt: string | null;
+  endsAt: string | null;
+  closedAt: string | null;
+  progress: DealProgress;
+  brokenByMe: boolean;
+}
+
+export interface DealsOverview {
+  incoming: Deal[];
+  outgoing: Deal[];
+  running: Deal[];
+  history: Deal[];
+  trust: TrustInfo;
+}
+
+export interface ProposeDealInput {
+  requestId: string;
+  kind: DealKind;
+  role: DealRole;
+  /** Name or tag; null = open offer on the deal board. */
+  counterparty: string | null;
+  terms: DealTerms;
+  message: string;
+}
+
 // ------------------------------------------------------------------ upgrades (ADR-093)
 
 export type UpgradeKey = "vault" | "income" | "study" | "overtime" | "rhetoric";
@@ -631,6 +744,8 @@ export interface PlayerCard {
   job: { companyName: string; titleKey: string | null; title: string | null; tier: CareerTier; since: string } | null;
   company: { name: string; ticker: string | null } | null;
   memberSince: string;
+  /** Trust from kept and broken deals (ADR-098); null on servers before M4j. */
+  trust: TrustInfo | null;
 }
 
 // ------------------------------------------------------------------ player companies (ADR-057)
@@ -889,9 +1004,20 @@ export interface MyCompany {
     profitCents: number;
     contractRevenueCents: number;
     founderPayoutCents: number;
+    /** Supply contracts (ADR-098): goods bought in and sold, fees paid and earned, own goods for others. */
+    supplyRevenueCents: number;
+    supplyFeePaidCents: number;
+    supplyFeeIncomeCents: number;
+    supplyGoodsCents: number;
+    /** Profit shares paid to silent partners (ADR-098). */
+    stakePayoutCents: number;
   }[];
   /** Share of every profitable hour paid to the founder automatically (ADR-086). */
   founderPayoutBps: number;
+  /** Running marketing campaign (ADR-097), null when none runs. */
+  campaign: CompanyCampaign | null;
+  /** Current price of each campaign, from the last hour's demand; null on servers before M4j. */
+  campaignCosts: Record<CampaignKind, number> | null;
   /** Profit levers and endless growth (ADR-083). */
   priceLevel: PriceLevel;
   contractWork: boolean;
@@ -1208,6 +1334,14 @@ export const GAME_ERROR_KEYS = [
   "promotion_not_ready",
   "promotion_too_soon",
   "promotion_pending",
+  "campaign_running",
+  "deal_not_found",
+  "deal_closed",
+  "deal_terms",
+  "deal_limit",
+  "deal_self",
+  "stake_share_full",
+  "deal_needs_company",
 ] as const;
 export type GameErrorKey = (typeof GAME_ERROR_KEYS)[number] | "unknown";
 
@@ -1297,6 +1431,17 @@ export interface GameEngine {
   requestPromotion(requestId: string): Promise<PromotionResult>;
   upgrades(): Promise<UpgradesState>;
   buyUpgrade(requestId: string, key: UpgradeKey): Promise<BuyUpgradeResult>;
+  /** Marketing campaign of the own company (ADR-097). */
+  startCampaign(requestId: string, companyId: string, kind: CampaignKind): Promise<CompanyCampaign>;
+  /** Deals between players (ADR-098). */
+  deals(): Promise<DealsOverview>;
+  dealBoard(): Promise<Deal[]>;
+  proposeDeal(input: ProposeDealInput): Promise<Deal>;
+  respondDeal(requestId: string, dealId: string, accept: boolean): Promise<Deal>;
+  cancelDeal(requestId: string, dealId: string): Promise<Deal>;
+  breakDeal(requestId: string, dealId: string): Promise<Deal>;
+  repayLoan(requestId: string, dealId: string, amountCents: number): Promise<Deal>;
+  forgiveLoan(requestId: string, dealId: string): Promise<Deal>;
   playerCard(nickname: string): Promise<PlayerCard>;
   setCompanyLogo(requestId: string, logo: CompanyLogoData): Promise<MyCompany>;
   /** Pixel banner, may be redrawn any time; null removes it (ADR-078). */

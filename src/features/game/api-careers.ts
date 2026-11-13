@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { SkillBranch } from "@/config/skills";
 import type { SectorKey } from "@/components/pixel/art";
+import { toTrust, trustSchema } from "./api-deals";
 import { rpc } from "./rpc";
 import type {
   CareerTier,
@@ -200,6 +201,7 @@ const cardSchema = z.object({
     .nullable(),
   company: z.object({ name: z.string(), ticker: z.string().nullable() }).nullable(),
   member_since: iso,
+  trust: trustSchema.nullable().default(null),
 });
 
 export const CAREER_RPC_SCHEMAS = {
@@ -551,6 +553,7 @@ export const liveCareerEngine: CareerEngine = {
         : null,
       company: c.company,
       memberSince: c.member_since,
+      trust: c.trust ? toTrust(c.trust) : null,
       tag: c.tag,
       trophies: c.trophies,
     };

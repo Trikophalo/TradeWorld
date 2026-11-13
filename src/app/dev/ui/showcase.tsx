@@ -71,6 +71,7 @@ const SAMPLE_CARD: PlayerCard = {
   },
   company: null,
   memberSince: "2026-09-01T00:00:00Z",
+  trust: { score: 72, band: "reliable", kept: 6, broken: 0 },
 };
 
 /** A junior in IT who is two IT points short of senior (ADR-094). */
