@@ -1,0 +1,918 @@
+{
+  "me": { "rank": 1, "growth_bps": 235 },
+  "season": {
+    "status": "finished",
+    "ends_at": "2026-11-08T23:00:00+00:00",
+    "starts_at": "2026-11-01T23:00:00+00:00",
+    "week_start": "2026-11-02"
+  },
+  "entries": [
+    {
+      "tag": "BVT5",
+      "rank": 1,
+      "is_me": true,
+      "level": 15,
+      "nickname": "Fixture_Gmbh",
+      "avatar_key": "rookie",
+      "growth_bps": 235
+    },
+    {
+      "tag": "WN9J",
+      "rank": 2,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Anna",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "J2NP",
+      "rank": 3,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Ben",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "6HSS",
+      "rank": 4,
+      "is_me": false,
+      "level": 5,
+      "nickname": "Carla",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "N4CK",
+      "rank": 5,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Dora",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "ZTCT",
+      "rank": 6,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Emil",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "U442",
+      "rank": 7,
+      "is_me": false,
+      "level": 2,
+      "nickname": "Frieda",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "GQDM",
+      "rank": 8,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Gustav",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "6RCL",
+      "rank": 9,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Hanna",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "GYCM",
+      "rank": 10,
+      "is_me": false,
+      "level": 5,
+      "nickname": "Ingo",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "KUKA",
+      "rank": 11,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Vera",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "XPJ9",
+      "rank": 12,
+      "is_me": false,
+      "level": 3,
+      "nickname": "Bruno",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "LDTA",
+      "rank": 13,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Mona",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "3STC",
+      "rank": 14,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Nora_Zwei",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "DXCL",
+      "rank": 15,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Rita_Reich",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "775K",
+      "rank": 16,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Rolf_Reich",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "TDUJ",
+      "rank": 17,
+      "is_me": false,
+      "level": 3,
+      "nickname": "Xaver",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "JL69",
+      "rank": 18,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Mission_1",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "B99S",
+      "rank": 19,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Mission_10",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "NR9F",
+      "rank": 20,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Mission_11",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "85YA",
+      "rank": 21,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Mission_12",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "4V3R",
+      "rank": 22,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Mission_2",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "H63M",
+      "rank": 23,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Mission_3",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "WSCC",
+      "rank": 24,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Mission_4",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "ECN6",
+      "rank": 25,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Mission_5",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "2FXZ",
+      "rank": 26,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Mission_6",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "ARSL",
+      "rank": 27,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Mission_7",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "AK8Q",
+      "rank": 28,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Mission_8",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "T93X",
+      "rank": 29,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Mission_9",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "ZP25",
+      "rank": 30,
+      "is_me": false,
+      "level": 4,
+      "nickname": "Ava_Tar",
+      "avatar_key": "punk",
+      "growth_bps": 0
+    },
+    {
+      "tag": "7CF5",
+      "rank": 31,
+      "is_me": false,
+      "level": 3,
+      "nickname": "Dora_Daily",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "KNB4",
+      "rank": 32,
+      "is_me": false,
+      "level": 12,
+      "nickname": "Erna_Chefin",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "AGKJ",
+      "rank": 33,
+      "is_me": false,
+      "level": 6,
+      "nickname": "Fritz_Frei",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "5EFT",
+      "rank": 34,
+      "is_me": false,
+      "level": 6,
+      "nickname": "Willi_Werk",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "TSGL",
+      "rank": 35,
+      "is_me": false,
+      "level": 7,
+      "nickname": "Sina_Skill",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "TS3W",
+      "rank": 36,
+      "is_me": false,
+      "level": 6,
+      "nickname": "Lena_Level",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "PW39",
+      "rank": 37,
+      "is_me": false,
+      "level": 6,
+      "nickname": "Max_Mehr",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "Q4SC",
+      "rank": 38,
+      "is_me": false,
+      "level": 5,
+      "nickname": "Bea_Boerse",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "7CTF",
+      "rank": 39,
+      "is_me": false,
+      "level": 10,
+      "nickname": "Frida_Firma",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "Q96T",
+      "rank": 40,
+      "is_me": false,
+      "level": 3,
+      "nickname": "Gero_Garage",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "2CDP",
+      "rank": 41,
+      "is_me": false,
+      "level": 10,
+      "nickname": "Sven_Small",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "V49L",
+      "rank": 42,
+      "is_me": false,
+      "level": 6,
+      "nickname": "Wanda_Werk",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "GXD2",
+      "rank": 43,
+      "is_me": false,
+      "level": 10,
+      "nickname": "Fiona_Fabrik",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "4G5X",
+      "rank": 44,
+      "is_me": false,
+      "level": 3,
+      "nickname": "Hanno_Haftung",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "HQRQ",
+      "rank": 45,
+      "is_me": false,
+      "level": 4,
+      "nickname": "Vera_Verlust",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "N385",
+      "rank": 46,
+      "is_me": false,
+      "level": 3,
+      "nickname": "Willi_Wert",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "EP4Q",
+      "rank": 47,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Xena_Aussen",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "5ZL5",
+      "rank": 48,
+      "is_me": false,
+      "level": 6,
+      "nickname": "Anke_Angebot",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "DWYB",
+      "rank": 49,
+      "is_me": false,
+      "level": 10,
+      "nickname": "Frieda_Format",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "VYSU",
+      "rank": 50,
+      "is_me": false,
+      "level": 6,
+      "nickname": "Walter_Weg",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "28FD",
+      "rank": 51,
+      "is_me": false,
+      "level": 15,
+      "nickname": "Fenja_Firma",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "4HEV",
+      "rank": 52,
+      "is_me": false,
+      "level": 6,
+      "nickname": "Rita_Zwei",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "P2EG",
+      "rank": 53,
+      "is_me": false,
+      "level": 6,
+      "nickname": "Rolf_Eins",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "4M7T",
+      "rank": 54,
+      "is_me": false,
+      "level": 6,
+      "nickname": "Rudi_Drei",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "6YZM",
+      "rank": 55,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Resi_Reset",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "6SFE",
+      "rank": 56,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Willa_Werk",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "FSPZ",
+      "rank": 57,
+      "is_me": false,
+      "level": 3,
+      "nickname": "Xaver_Extra",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "8PWC",
+      "rank": 58,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Dora_Delete",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "XGVR",
+      "rank": 59,
+      "is_me": false,
+      "level": 12,
+      "nickname": "Kira_Kollege",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "QM2N",
+      "rank": 60,
+      "is_me": false,
+      "level": 3,
+      "nickname": "Uwe_Umsicht",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "JGVS",
+      "rank": 61,
+      "is_me": false,
+      "level": 3,
+      "nickname": "Bert_Lohn",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "2QWJ",
+      "rank": 62,
+      "is_me": false,
+      "level": 4,
+      "nickname": "Carla_Rang",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "H9ZG",
+      "rank": 63,
+      "is_me": false,
+      "level": 6,
+      "nickname": "Dora_Takt",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "D9MT",
+      "rank": 64,
+      "is_me": false,
+      "level": 4,
+      "nickname": "Hanna_Stunde",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "H8V9",
+      "rank": 65,
+      "is_me": false,
+      "level": 4,
+      "nickname": "Bea_Banner",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "AAVS",
+      "rank": 66,
+      "is_me": false,
+      "level": 3,
+      "nickname": "Emil_Fahne",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "ZCSK",
+      "rank": 67,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Olga_Wimpel",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "MKGT",
+      "rank": 68,
+      "is_me": false,
+      "level": 8,
+      "nickname": "Anna_Pinsel",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "NEM4",
+      "rank": 69,
+      "is_me": false,
+      "level": 9,
+      "nickname": "Bruno_Bieter",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "FXNC",
+      "rank": 70,
+      "is_me": false,
+      "level": 12,
+      "nickname": "Carla_Kunst",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "8FMX",
+      "rank": 71,
+      "is_me": false,
+      "level": 5,
+      "nickname": "Lea_Neuling",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "TK8S",
+      "rank": 72,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Rudi_Reset",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "8D7V",
+      "rank": 73,
+      "is_me": false,
+      "level": 10,
+      "nickname": "Fiona_Firma",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "HQ9N",
+      "rank": 74,
+      "is_me": false,
+      "level": 4,
+      "nickname": "Willi_Werker",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "T7WH",
+      "rank": 75,
+      "is_me": false,
+      "level": 7,
+      "nickname": "Missionar_1",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "RCZH",
+      "rank": 76,
+      "is_me": false,
+      "level": 7,
+      "nickname": "Missionar_2",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "J933",
+      "rank": 77,
+      "is_me": false,
+      "level": 7,
+      "nickname": "Missionar_3",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "H3ZC",
+      "rank": 78,
+      "is_me": false,
+      "level": 7,
+      "nickname": "Missionar_4",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "JDPL",
+      "rank": 79,
+      "is_me": false,
+      "level": 12,
+      "nickname": "Missionar_5",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "T6WK",
+      "rank": 80,
+      "is_me": false,
+      "level": 12,
+      "nickname": "Missionar_6",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "39QU",
+      "rank": 81,
+      "is_me": false,
+      "level": 12,
+      "nickname": "Missionar_7",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "YZYU",
+      "rank": 82,
+      "is_me": false,
+      "level": 12,
+      "nickname": "Missionar_8",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "WH5V",
+      "rank": 83,
+      "is_me": false,
+      "level": 14,
+      "nickname": "Greta_Garage",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "2TWE",
+      "rank": 84,
+      "is_me": false,
+      "level": 30,
+      "nickname": "Hanna_Haus",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "FXD9",
+      "rank": 85,
+      "is_me": false,
+      "level": 8,
+      "nickname": "Moritz_Moebel",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "MX8F",
+      "rank": 86,
+      "is_me": false,
+      "level": 3,
+      "nickname": "Neo_Neuling",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "3NRD",
+      "rank": 87,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Mia_Mission",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "2G8P",
+      "rank": 88,
+      "is_me": false,
+      "level": 3,
+      "nickname": "Heimlos_Drei",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "L895",
+      "rank": 89,
+      "is_me": false,
+      "level": 15,
+      "nickname": "Anke_Ausbau",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "KX5J",
+      "rank": 90,
+      "is_me": false,
+      "level": 6,
+      "nickname": "Bodo_Garage",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "QXFM",
+      "rank": 91,
+      "is_me": false,
+      "level": 5,
+      "nickname": "Cleo_Klein",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "NSTC",
+      "rank": 92,
+      "is_me": false,
+      "level": 3,
+      "nickname": "Dirk_Billig",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "MCVT",
+      "rank": 93,
+      "is_me": false,
+      "level": 3,
+      "nickname": "Edda_Edel",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "VNUB",
+      "rank": 94,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Fiona_Freund",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "RCNR",
+      "rank": 95,
+      "is_me": false,
+      "level": 7,
+      "nickname": "Gustav_Gegen",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "ZRX7",
+      "rank": 96,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Hilde_Hallo",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "KRDY",
+      "rank": 97,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Mira",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "GRNF",
+      "rank": 98,
+      "is_me": false,
+      "level": 1,
+      "nickname": "Nepo_Neu",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "JYRH",
+      "rank": 99,
+      "is_me": false,
+      "level": 1,
+      "nickname": "M1ra10287",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "VS8K",
+      "rank": 100,
+      "is_me": false,
+      "level": 9,
+      "nickname": "Quirin_Such",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    }
+  ],
+  "last_winner": {
+    "tag": "BVT5",
+    "nickname": "Fixture_Gmbh",
+    "avatar_key": "rookie",
+    "growth_bps": 235,
+    "week_start": "2026-11-02"
+  }
+}

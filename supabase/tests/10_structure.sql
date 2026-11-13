@@ -92,7 +92,9 @@ select tests.assert(
            -- M4d RPCs
            'search_players',
            -- M4e RPCs
-           'set_founder_payout']
+           'set_founder_payout',
+           -- M4f RPCs (feed, notifications, league)
+           'get_feed', 'get_league', 'get_notifications', 'mark_notifications_read', 'react_feed']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')

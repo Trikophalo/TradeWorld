@@ -1,3 +1,5 @@
+import type { DemoCompanyEventsState } from "./company-events";
+import type { EventModifiers } from "@/lib/sim/company-events";
 import { BALANCE } from "@/config/balance";
 import { SKILL_BRANCHES, type SkillBranch } from "@/config/skills";
 import type { SectorKey } from "@/components/pixel/art";
@@ -127,6 +129,8 @@ export interface DemoCompanyState {
   expansionLevel?: number;
   /** Automatic CEO payout share (ADR-086), default 0. */
   founderPayoutBps?: number;
+  /** Crises, chances and news (ADR-091). */
+  events?: DemoCompanyEventsState;
   chat?: ChatMessage[];
 }
 
@@ -158,6 +162,8 @@ export interface CompanyHost {
   foundingLockedUntil(): number | null;
   lockFounding(until: number): void;
   startFounderNotice(): void;
+  /** Effect of the company's current crisis or chance in this hour (ADR-091). */
+  eventModifiers?(company: DemoCompanyState, at: number): EventModifiers;
 }
 
 export const productKeyOf = (company: Pick<DemoCompanyState, "sector" | "productKey">) =>
@@ -282,6 +288,7 @@ export function createCompanyEngine(host: CompanyHost) {
         priceLevel: company.priceLevel ?? "normal",
         contractWork: company.contractWork ?? true,
         expansionLevel: company.expansionLevel ?? 0,
+        event: host.eventModifiers?.(company, at),
       },
     );
     const revenue = Number(r.revenueCents);

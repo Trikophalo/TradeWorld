@@ -5458,3 +5458,197 @@ sonst `invalid_argument` (auch ohne Wert). Antwort `{company: COMPANY}` wie `set
 | `hours[].founder_payout_cents`       | `number` | Auszahlung der jeweiligen Stunde                                 |
 
 Die Antwort von `player_company_close_hour` hat zusätzlich `founder_payout_cents`. Keine neuen Fehlerschlüssel.
+
+## Nachtrag: M4f (Freundes-Feed, Benachrichtigungen, Wochen-Liga)
+
+Migrationen `20261127000100_m4f_social.sql` (ADR-088) und `20261127000200_m4f_league.sql` (ADR-089), je mit
+idempotenter Kopie in `supabase/updates/`. Werte aus `game_config.social` (`feed.pageSize` 30,
+`feed.bigTradeMinProfitCents` 100 000, `feed.bigTradeMinBps` 1 500, `feed.levelEvery` 5, `feed.artMinPriceCents`
+1 000 000, `feed.carMinPriceCents` 10 000 000, `feed.streakMilestones` [7, 30, 100, 365], `feed.keepDays` 30,
+`league.updateEveryMinutes` 10, `league.podium` 3, `league.minBaselineCents` 1 000 000; dieselben Rückfallwerte im SQL).
+
+### Schema
+
+| Tabelle          | Änderung                                                                                                        |
+| ---------------- | --------------------------------------------------------------------------------------------------------------- |
+| `feed_items`     | neue Spalte `dedupe_key text` (eindeutig, `null` erlaubt): dasselbe Ereignis erzeugt nie zwei Einträge          |
+| `feed_reactions` | neu: `item_id` (FK → `feed_items`, Cascade), `player_id` (FK → `profiles`), `created_at`; PK (Eintrag, Spieler) |
+| `league_seasons` | neue Spalte `refreshed_at timestamptz` (Spielzeit der letzten Neuberechnung, `null` = nie)                      |
+
+`feed_reactions` hat RLS ohne Policies und keine Grants (intern, nur über RPCs). Neue Benachrichtigungstypen:
+`feed_reaction` (social), `art_outbid` (social, Push-Vorgabe an), `job_application` (company); `league_result` gab es
+schon im Seed und wird jetzt befüllt.
+
+### Feed-Einträge
+
+Entstehen in **AFTER-Triggern** auf den Tabellen der bestehenden Schreibwege; keine RPC ändert dafür ihr Verhalten,
+ein zurückgerollter Vorgang hinterlässt keinen Eintrag. `feed_post(actor, kind, payload, dedupe)` schreibt mit
+Sichtbarkeit `friends` und nur für aktive Spieler. Der Text entsteht im Client aus `kind` und `payload`:
+
+| `kind`             | `payload`                                               | Auslöser                                                                                                                                                                               |
+| ------------------ | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `level_up`         | `level`                                                 | `profiles.level` steigt über ein Vielfaches von `levelEvery` (das höchste erreichte)                                                                                                   |
+| `big_trade`        | `ticker`, `security_name`, `profit_cents`, `profit_bps` | Verkaufs-Fill mit realisiertem Gewinn ≥ `bigTradeMinProfitCents` und ≥ `bigTradeMinBps` (Gewinn ÷ Einstand des verkauften Teils; nicht bei Anleihen-Rückzahlung, nicht bei Einstand 0) |
+| `company_founded`  | `name`, `tier`                                          | neue Spielerfirma                                                                                                                                                                      |
+| `company_upgraded` | `name`, `tier`                                          | Rechtsform wechselt (nicht zur AG)                                                                                                                                                     |
+| `company_ipo`      | `name`, `ticker`                                        | Rechtsform wird `ag` (Zeichnung endet mit Notierung)                                                                                                                                   |
+| `company_expanded` | `name`, `level`                                         | `expansion_level` steigt                                                                                                                                                               |
+| `art_won`          | `title`, `code`, `price_cents`                          | Verkauf (Galerie und Spieler) ab `artMinPriceCents`, Eintrag für den Käufer                                                                                                            |
+| `art_created`      | `title`, `code`                                         | neues Spieler-Kunstwerk                                                                                                                                                                |
+| `home_bought`      | `tier`                                                  | Bleibe gekauft oder gewechselt                                                                                                                                                         |
+| `car_bought`       | `car_key`, `price_cents`                                | Auto ab `carMinPriceCents`                                                                                                                                                             |
+| `job_started`      | `company_name`, `title`, `title_key`                    | Vertrag unterschrieben (`title` wie gespeichert, `title_key` bei KI-Stellen, sonst `null`)                                                                                             |
+| `streak`           | `days`                                                  | Login-Serie erreicht einen Wert aus `streakMilestones`                                                                                                                                 |
+| `league_won`       | `week_start`, `growth_bps`                              | Wochenliga gewonnen (beim Abschluss der Saison)                                                                                                                                        |
+| `friends_now`      | `other_nickname`                                        | Freundschaftsanfrage angenommen, ein Eintrag je Seite                                                                                                                                  |
+
+Einträge älter als `keepDays` löscht `social_run_due()` bei jeder Liga-Neuberechnung.
+
+### RPC `get_feed(p_before bigint default null, p_limit integer default null)`
+
+Nur `authenticated`, `STABLE`. Eigene Einträge und die der angenommenen Freunde, neueste zuerst, Keyset nach `id`
+(`id < p_before`). Limit: Vorgabe `feed.pageSize`, 1 bis 50. Einträge deaktivierter Spieler fehlen.
+
+```json
+{
+  "items": [
+    {
+      "id": 412,
+      "kind": "level_up",
+      "payload": { "level": 15 },
+      "created_at": "2026-11-13T10:00:00+00:00",
+      "is_me": false,
+      "actor": { "nickname": "Mira", "tag": "K7Q2", "avatar_key": "rookie", "level": 16 },
+      "reactions": 2,
+      "reacted": true
+    }
+  ],
+  "next_before": 412
+}
+```
+
+`next_before` ist die `id` des letzten Eintrags, wenn es weitere gibt, sonst `null`.
+
+### RPC `react_feed(p_request_id uuid, p_item_id bigint)`
+
+Schaltet die eigene Reaktion um (an/aus), auch auf eigene Einträge. Antwort `{item: FEED_ITEM}`, idempotent über
+`request_id`, Ratenbegrenzung `player_action`. Fehler: `feed_item_not_found` (Eintrag fehlt, gehört keinem Freund oder
+einem deaktivierten Spieler), `invalid_argument` (ohne Eintrag oder `request_id`), `rate_limited`. Reagiert jemand
+anderes, bekommt der Urheber `feed_reaction` („Mira gefällt dein Beitrag“, Text: kurze Beschreibung des Eintrags,
+Link `/friends`), höchstens einmal je (Eintrag, Reagierender), auch wenn die Reaktion mehrfach umgeschaltet wird.
+
+### Benachrichtigungen
+
+`social_notify(player, type, title, body, payload, link, dedupe)` beachtet `notification_preferences` wie
+`friend_notify` (fehlende Einstellung: Vorgabe des Typs; Pflichttypen immer). Neue Quellen:
+
+| Typ               | Empfänger                   | Titel / Text                                                                              | Link        |
+| ----------------- | --------------------------- | ----------------------------------------------------------------------------------------- | ----------- |
+| `feed_reaction`   | Urheber des Eintrags        | „Mira gefällt dein Beitrag“ / „Level 15 erreicht“                                         | `/friends`  |
+| `art_outbid`      | bisher Höchstbietender      | „Mira hat dich überboten“ / „„Titel“ (ART-0042): neues Gebot 12.000 €“                    | `/artworks` |
+| `job_application` | Gründer der Spielerfirma    | „Mira hat sich beworben“ / „Stelle: Werkstudium Software“                                 | `/company`  |
+| `league_result`   | jeder platzierte Teilnehmer | „Du hast die Wochenliga gewonnen!“ bzw. „Wochenliga: Platz 2“ / „Platz 2 von 4 · +3,40 %“ | `/friends`  |
+
+`art_outbid` kommt nicht, wenn der Führende sein eigenes Gebot erhöht. Die `payload` trägt jeweils die Ids und
+Zahlen (`auction_id`, `artwork_id`, `amount_cents`; `application_id`, `posting_id`; `week_start`, `rank`, `of`,
+`growth_bps`; `item_id`, `kind`), dazu `nickname`.
+
+### RPC `get_notifications(p_limit integer default 30)`
+
+Nur eigene, nicht abgelaufene, neueste zuerst (1 bis 100). `unread` zählt alle ungelesenen, nicht abgelaufenen.
+
+```json
+{
+  "items": [
+    {
+      "id": "uuid",
+      "type_key": "feed_reaction",
+      "title": "Mira gefällt dein Beitrag",
+      "body": "Level 15 erreicht",
+      "link": "/friends",
+      "payload": { "item_id": 412, "kind": "level_up", "nickname": "Mira" },
+      "created_at": "…",
+      "read_at": null
+    }
+  ],
+  "unread": 3
+}
+```
+
+### RPC `mark_notifications_read(p_ids uuid[] default null)`
+
+Setzt `read_at` für die eigenen Benachrichtigungen (`null` = alle); fremde Ids werden ignoriert, schon gelesene
+behalten ihren Zeitpunkt. Antwort `{unread: number}`. Ohne `request_id`, von Natur aus idempotent. Das direkte
+`UPDATE` auf `read_at` (Spalten-Grant mit Owner-Policy) bleibt erlaubt, der Client nutzt aber die RPC.
+
+### Wochenliga
+
+- **Saison** = Berliner Kalenderwoche, Montag 00:00 bis zum nächsten Montag 00:00 (Spielzeit, `league_week_start`).
+  `league_ensure_season` legt die Zeile mit Status `active` an; beim Abschluss wird sie `finished` (Enum
+  `league_season_status`).
+- **Teilnahme:** Jeder aktive Spieler bekommt bei der ersten Neuberechnung der Saison einen Eintrag und eine
+  Basislinie: `start_net_worth_cents` = Vermögen wie in der Reichenliste (`rich_list_entries()`).
+- **Zufluss:** `net_inflow_cents` zählt geschenktes Geld, damit es nicht als Leistung gilt: Grundeinkommen aus dem
+  Tresor (Trigger auf `vault_claims`) und Bargeld der täglichen Belohnung (Trigger auf `daily_reward_claims`), für
+  jede offene, schon begonnene Saison. Missionen zahlen kein Geld. Löhne, CEO-Auszahlungen, Entnahmen, Handel und
+  Kunst zählen als Leistung. Ein Konto-Neustart löscht Eintrag und Basislinie (`account_wipe`); der Spieler steigt
+  mit dem neuen Startkapital wieder ein.
+- **Wachstum:** `growth_bps` = round_half_even((aktuell − Start − Zufluss) × 10 000 ÷ max(Start, `minBaselineCents`)),
+  begrenzt auf ±2 Mrd.
+- **Rang:** nach Wachstum, bei Gleichstand das ältere Konto, dann Nickname. Deaktivierte behalten den Eintrag ohne Rang.
+- **Takt:** `run_due_jobs()` ruft jede Minute `social_run_due()`: fällige Saisons abschließen, aktuelle Saison
+  sicherstellen, alle `league.updateEveryMinutes` neu berechnen (`league_refresh`) und alte Feed-Einträge löschen.
+- **Abschluss** (erster Lauf nach `ends_at`, `league_close`): letzte Neuberechnung ohne neue Teilnehmer, Status
+  `finished`, `winner_id` = Rang 1, Feed-Eintrag `league_won` für den Sieger, `league_result` an jeden Platzierten.
+  Die Ränge bleiben in `league_entries` und ergeben die Pokale.
+
+### RPC `get_league(p_scope text default 'all', p_week text default 'current')`
+
+`p_scope`: `all` oder `friends` (ich und angenommene Freunde, Ränge innerhalb der Auswahl neu durchgezählt);
+`p_week`: `current` oder `last`. Sonst `invalid_argument`. Höchstens 100 Einträge; `me` steht immer da (oder `null`).
+Fehlt die Saisonzeile noch, kommen die berechneten Wochengrenzen mit `active` (bzw. `finished` für `last`) und leere
+Einträge. `last_winner` ist der Sieger der jüngsten abgeschlossenen Saison vor der laufenden Woche (unabhängig von
+`p_scope`).
+
+```json
+{
+  "season": { "week_start": "2026-11-09", "starts_at": "…", "ends_at": "…", "status": "active" },
+  "entries": [
+    {
+      "rank": 1,
+      "nickname": "Mira",
+      "tag": "K7Q2",
+      "avatar_key": "rookie",
+      "level": 12,
+      "growth_bps": 340,
+      "is_me": false
+    }
+  ],
+  "me": { "rank": 2, "growth_bps": 120 },
+  "last_winner": {
+    "nickname": "Mira",
+    "tag": "K7Q2",
+    "avatar_key": "rookie",
+    "growth_bps": 512,
+    "week_start": "2026-11-02"
+  }
+}
+```
+
+### `get_player_card`: neues Feld
+
+| Feld       | Typ                                              | Bedeutung                                                           |
+| ---------- | ------------------------------------------------ | ------------------------------------------------------------------- |
+| `trophies` | `{gold: number, silver: number, bronze: number}` | Plätze 1, 2, 3 in abgeschlossenen Saisons (nur bis `league.podium`) |
+
+### Neu definiert
+
+`get_player_card` (wie M4d plus `trophies`) und `run_due_jobs` (wie M4a plus `social_run_due()` vor der täglichen
+Wartung). Alle übrigen Schreibwege bleiben unverändert; neue Trigger: `profiles` (Level), `trades`,
+`player_companies`, `artworks`, `artwork_sales`, `artwork_auctions` (Überbieten), `player_homes`, `player_cars`,
+`player_jobs`, `job_applications`, `login_streaks`, `friendships`, `vault_claims`, `daily_reward_claims`.
+
+Interne Helfer (nur `service_role`): `feed_post`, `social_notify`, `feed_item_label`, `friend_ids`, `feed_item_json`,
+`league_week_start`, `format_growth_bps`, `league_ensure_season`, `league_add_inflow`, `league_refresh`,
+`league_close`, `social_run_due` sowie die Trigger-Funktionen `feed_on_*`, `notify_on_*`, `league_on_*`.
+Neuer Fehlerschlüssel: `feed_item_not_found` (SQLSTATE NX007 wie `invalid_argument`).

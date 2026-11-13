@@ -522,3 +522,42 @@ select public.search_players('#' || :'fx_heim_tag');
 select public.search_players('x');
 \o
 reset role;
+
+-- M4f: friends feed, reactions, notifications (ADR-088) and the weekly league (ADR-089).
+-- Feed items come from the triggers of the steps above; last week's league is rebuilt and closed.
+\set fx_e '''f1f1f1f1-0000-4000-8000-0000000000fd'''
+select tests.signup(:fx_e, 'Fixture_Leer') is not null as ok \gset
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+select public.respond_friend_request(gen_random_uuid(), 'Fixture_Neu', true) is not null as ok \gset
+reset role;
+delete from public.league_seasons where week_start = public.league_week_start(public.game_now()) - 7;
+select public.league_ensure_season(public.game_now() - interval '7 days') as fx_ls \gset
+select public.league_refresh(:'fx_ls') is not null as ok \gset
+update public.league_entry_baselines set start_net_worth_cents = current_net_worth_cents - 250000
+ where season_id = :'fx_ls' and player_id = :fx_g;
+select public.league_close(:'fx_ls') is not null as ok \gset
+update public.league_seasons set refreshed_at = null where week_start = public.league_week_start(public.game_now());
+select public.social_run_due() is not null as ok \gset
+select tests.login_as('authenticated', :fx_e) is null as ok \gset
+\o :fixture_dir/get_feed_empty.json
+select public.get_feed();
+\o
+reset role;
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/get_feed.json
+select public.get_feed(null, 5);
+\o :fixture_dir/react_feed.json
+select public.react_feed(gen_random_uuid(), (select id from public.feed_items where actor_id = :p order by id desc limit 1));
+\o :fixture_dir/get_league.json
+select public.get_league('all', 'last');
+\o :fixture_dir/get_league_friends.json
+select public.get_league('friends', 'current');
+\o
+reset role;
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/get_notifications.json
+select public.get_notifications(10);
+\o :fixture_dir/mark_notifications_read.json
+select public.mark_notifications_read(null);
+\o
+reset role;

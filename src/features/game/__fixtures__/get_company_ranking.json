@@ -1,6 +1,6 @@
 {
-  "mine": { "rank": 16, "value_cents": 54108 },
-  "total": 17,
+  "mine": { "rank": 17, "value_cents": 54107 },
+  "total": 18,
   "entries": [
     {
       "kind": "player",
@@ -34,8 +34,8 @@
       "founder": "Fenja_Firma",
       "is_mine": false,
       "team_size": 6,
-      "company_id": "6b4b1b11-4c4c-4e7c-b278-aa7bc8f97e52",
-      "value_cents": 82126323,
+      "company_id": "a8c33721-3088-4609-9348-5e6d8700c734",
+      "value_cents": 82373294,
       "revenue_cents": 0
     },
     {
@@ -50,47 +50,15 @@
       "founder": "Frieda_Format",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "9e6f64c3-ea13-448b-b4eb-d998ea3a444a",
+      "company_id": "f26e2df0-50da-4482-bb2e-f0f69c5ca1af",
       "value_cents": 51553750,
       "revenue_cents": 1185000
     },
     {
       "kind": "player",
       "logo": null,
-      "name": "Ausbau Werke",
-      "rank": 3,
-      "tier": "gmbh",
-      "color": "#224466",
-      "sector": "tech",
-      "ticker": null,
-      "founder": "Anke_Ausbau",
-      "is_mine": false,
-      "team_size": 1,
-      "company_id": "ec14c66d-5538-4236-a107-d79642c6ebaa",
-      "value_cents": 7856750,
-      "revenue_cents": null
-    },
-    {
-      "kind": "player",
-      "logo": null,
-      "name": "Stunden Werk",
-      "rank": 4,
-      "tier": "garage",
-      "color": "#225566",
-      "sector": "tech",
-      "ticker": null,
-      "founder": "Hanna_Stunde",
-      "is_mine": false,
-      "team_size": 3,
-      "company_id": "555019e6-f11a-4673-8d60-acb65296d06c",
-      "value_cents": 6927957,
-      "revenue_cents": 225802
-    },
-    {
-      "kind": "player",
-      "logo": null,
       "name": "Garagen Code",
-      "rank": 5,
+      "rank": 3,
       "tier": "small_business",
       "color": "#3366ff",
       "sector": "tech",
@@ -98,10 +66,42 @@
       "founder": "Frida_Firma",
       "is_mine": false,
       "team_size": 3,
-      "company_id": "80fd641a-be34-4433-baf9-2a823e1a5c48",
-      "value_cents": 2263002,
-      "revenue_cents": 0
+      "company_id": "92b4197e-db6e-4de7-8234-3d34d82d8dca",
+      "value_cents": 44991114,
+      "revenue_cents": 1200000
+    },
+    {
+      "kind": "player",
+      "logo": null,
+      "name": "Ausbau Werke",
+      "rank": 4,
+      "tier": "gmbh",
+      "color": "#224466",
+      "sector": "tech",
+      "ticker": null,
+      "founder": "Anke_Ausbau",
+      "is_mine": false,
+      "team_size": 1,
+      "company_id": "ff93762f-26b9-48c7-ac3d-63ebc0f78a5d",
+      "value_cents": 7856750,
+      "revenue_cents": null
+    },
+    {
+      "kind": "player",
+      "logo": null,
+      "name": "Stunden Werk",
+      "rank": 5,
+      "tier": "garage",
+      "color": "#225566",
+      "sector": "tech",
+      "ticker": null,
+      "founder": "Hanna_Stunde",
+      "is_mine": false,
+      "team_size": 3,
+      "company_id": "e2762612-c63a-4450-8550-e43be90e9a75",
+      "value_cents": 6928014,
+      "revenue_cents": 224808
     }
   ],
-  "server_time": "2026-11-12T23:13:59.148235+00:00"
+  "server_time": "2026-11-13T11:34:00.40115+00:00"
 }

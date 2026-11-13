@@ -672,7 +672,10 @@
     "item_not_found": "Diesen Gegenstand gibt es nicht oder er gehört dir nicht.",
     "layout_invalid": "So passt das nicht: Etwas steht außerhalb oder auf etwas anderem.",
     "floor_not_owned": "Diesen Boden hast du noch nicht gekauft.",
-    "garage_full": "Deine Garage ist voll."
+    "garage_full": "Deine Garage ist voll.",
+    "event_closed": "Diese Lage ist schon entschieden oder vorbei.",
+    "event_needs_staff": "Für diesen Schritt brauchst du mehr Leute im Team.",
+    "feed_item_not_found": "Diesen Beitrag gibt es nicht mehr."
   },
   "locks": {
     "level": "Level {level}",
@@ -2315,9 +2318,13 @@
     "outcome": {
       "trialSuccess": "Studie erfolgreich · {move}",
       "trialFailure": "Studie gescheitert · {move}",
-      "earningsBeat": "Besser als erwartet · {change}",
-      "earningsMiss": "Schwächer als erwartet · {change}",
-      "rate": "Leitzins {before} % → {after} %"
+      "earningsBeat": "Besser als erwartet · Gewinn {change}",
+      "earningsMiss": "Schwächer als erwartet · Gewinn {change}",
+      "rate": "Leitzins {before} % → {after} %",
+      "earningsInline": "Wie erwartet · Gewinn {change}",
+      "earningsBeatPlain": "Besser als erwartet",
+      "earningsMissPlain": "Schwächer als erwartet",
+      "earningsInlinePlain": "Wie erwartet"
     }
   },
   "logo": {
@@ -2733,6 +2740,522 @@
       "myPlace": "Platz {rank} von {count}",
       "previewEmpty": "Die Wertung startet gleich.",
       "leader": "Vorne: {name}"
+    }
+  },
+  "companyEvents": {
+    "title": "Lage",
+    "crisis": "Krise",
+    "chance": "Erfolgschance",
+    "severity": {
+      "1": "Leicht",
+      "2": "Ernst",
+      "3": "Schwer"
+    },
+    "status": {
+      "open": "Reagiere jetzt",
+      "accepted": "Entschieden",
+      "solved": "Gelöst",
+      "in_force": "Wirkt",
+      "expired": "Verpasst",
+      "over": "Vorbei"
+    },
+    "deadline": "Zeit zu reagieren",
+    "lasts": "Wirkt noch",
+    "noEvent": "Gerade ist es ruhig",
+    "noEventText": "Krisen und Chancen kommen höchstens einmal am Tag. Dann entscheidest du, wie deine Firma reagiert.",
+    "chooseTitle": "Wie reagierst du?",
+    "chooseHint": "Jede Strategie hat mehrere Schritte. Geld, Zeit, Leute und Know-how entscheiden, ob es klappt.",
+    "steps": "{count, plural, one {# Schritt} other {# Schritte}}",
+    "noSteps": "Kein Aufwand",
+    "choose": "Diese Strategie",
+    "chosen": "Strategie gewählt",
+    "switch": "Strategie wechseln",
+    "switchHint": "Bisheriger Fortschritt geht verloren.",
+    "start": "Schritt starten · {cost}",
+    "retry": "Nochmal versuchen · {cost}",
+    "running": "Läuft noch {time}",
+    "knowHow": "Know-how: {branch}",
+    "staff": "Braucht {count} Leute",
+    "capacity": "Bindet {percent} % der Kapazität",
+    "stepOk": "Geschafft",
+    "stepFailed": "Gescheitert",
+    "stepWaiting": "Wartet",
+    "mitigation": "Wirkung bei Erfolg: {percent} %",
+    "solvedText": "Gut gemacht! Die Folgen sind abgewendet.",
+    "solvedChance": "Chance genutzt!",
+    "employeeHint": "Nur die Gründerin oder der Gründer entscheidet. Du siehst, was gerade los ist.",
+    "history": "Frühere Lagen",
+    "aiBadge": "KI-Redaktion",
+    "started": "Schritt gestartet",
+    "failedStart": "Schritt nicht gestartet",
+    "archetypes": {
+      "regulation": {
+        "name": "Strenge Regulierung",
+        "headlines": [
+          "Neue {rule}: {company} muss umdenken",
+          "Regierung plant {rule} – {product} von {company} im Visier",
+          "{rule} kommt: Schwere Zeiten für {company}"
+        ],
+        "bodies": [
+          "Ein neues Gesetz trifft {product} direkt: Die {rule} macht die Herstellung teurer und schreckt Kunden ab. Wer nicht reagiert, verliert Umsatz.",
+          "In Berlin wird über eine {rule} beraten. Für {company} hieße das: weniger Kunden, mehr Kosten. Noch ist Zeit, Einfluss zu nehmen."
+        ],
+        "strategies": {
+          "lobby": "Lobbyarbeit",
+          "adapt": "Produktion anpassen",
+          "accept": "Aussitzen"
+        },
+        "strategyText": {
+          "lobby": "Gutachten, Verbündete, Anhörung: Wenn alles klappt, wird die Regel entschärft.",
+          "adapt": "Umbauen und zertifizieren lassen. Teuer, aber sicher.",
+          "accept": "Nichts tun und die Folgen tragen."
+        },
+        "steps": {
+          "study": "Gutachten in Auftrag geben",
+          "alliance": "Branchenverband gewinnen",
+          "hearing": "Anhörung im Parlament",
+          "retool": "Produktion umbauen",
+          "certify": "Zertifizierung bestehen"
+        }
+      },
+      "special_tax": {
+        "name": "Sondersteuer",
+        "headlines": [
+          "{tax} beschlossen: {company} unter Druck",
+          "Finanzministerium führt {tax} ein – {product} wird teurer",
+          "Überraschung im Bundestag: Die {tax} trifft {company}"
+        ],
+        "bodies": [
+          "Auf {input} wird künftig eine {tax} fällig. Für {company} steigen damit die Kosten pro Verkauf deutlich.",
+          "Die neue {tax} soll den Verbrauch von {input} senken. {company} muss entscheiden: kämpfen, Rezeptur ändern oder Preise erhöhen."
+        ],
+        "strategies": {
+          "lobby": "Gegen die Steuer kämpfen",
+          "reformulate": "Rezeptur ändern",
+          "pass_on": "Preise erhöhen",
+          "accept": "Zahlen"
+        },
+        "strategyText": {
+          "lobby": "Petition, Fachleute, Anhörung: Die Steuer kann noch kippen.",
+          "reformulate": "Ohne {input} auskommen. Klappt es, entfällt die Steuer fast ganz.",
+          "pass_on": "Die Steuer an die Kunden weitergeben. Halbiert den Schaden.",
+          "accept": "Die Steuer einfach bezahlen."
+        },
+        "steps": {
+          "petition": "Petition starten",
+          "experts": "Fachleute anheuern",
+          "hearing": "Anhörung im Finanzausschuss",
+          "lab": "Neue Rezeptur im Labor",
+          "relaunch": "Neustart im Handel",
+          "price_talk": "Preisgespräche mit Händlern"
+        }
+      },
+      "supply_shortage": {
+        "name": "Lieferengpass",
+        "headlines": [
+          "{input} wird knapp: {company} droht der Stillstand",
+          "Lieferengpass bei {input} – {product} könnten ausgehen",
+          "Zulieferer streicht {input}: {company} muss improvisieren"
+        ],
+        "bodies": [
+          "Der wichtigste Lieferant für {input} kann nicht mehr liefern. Ohne Ersatz kann {company} nur einen Teil der {product} herstellen.",
+          "Weltweit ist {input} knapp. Wer jetzt keinen Ersatz findet, verkauft in den nächsten Tagen deutlich weniger."
+        ],
+        "strategies": {
+          "new_supplier": "Neuen Lieferanten finden",
+          "stockpile": "Teuer auf Vorrat kaufen",
+          "redesign": "Produkt umbauen",
+          "accept": "Abwarten"
+        },
+        "strategyText": {
+          "new_supplier": "Suchen und verhandeln. Klappt es, ist das Problem gelöst.",
+          "stockpile": "Sofort, sicher, aber teuer.",
+          "redesign": "Ohne {input} bauen. Aufwendig, macht das Produkt aber besser.",
+          "accept": "Mit weniger Ware leben."
+        },
+        "steps": {
+          "scout": "Lieferanten suchen",
+          "contract": "Vertrag verhandeln",
+          "buy_stock": "Restbestände aufkaufen",
+          "prototype": "Prototyp entwickeln",
+          "switch": "Produktion umstellen"
+        }
+      },
+      "quality_scandal": {
+        "name": "Qualitätsskandal",
+        "headlines": [
+          "Ärger um {product}: {risk} bei {company}",
+          "Kunden beschweren sich über {risk} – {company} in der Kritik",
+          "{critic} warnt vor {product} von {company}"
+        ],
+        "bodies": [
+          "Mehrere Kunden berichten von {risk}. Das Vertrauen in {company} wackelt, die Verkäufe brechen ein.",
+          "{critic} hat Proben untersucht und Mängel gefunden. Jetzt kommt es darauf an, wie {company} reagiert."
+        ],
+        "strategies": {
+          "recall": "Rückruf",
+          "pr_offensive": "PR-Offensive",
+          "independent_test": "Unabhängiger Test",
+          "accept": "Schweigen"
+        },
+        "strategyText": {
+          "recall": "Alles zurückholen und reparieren. Teuer, stellt aber das Vertrauen ganz wieder her.",
+          "pr_offensive": "Stellungnahme und Kampagne. Schnell, aber nur halb so wirksam.",
+          "independent_test": "Ein Labor prüft und bestätigt die Qualität.",
+          "accept": "Hoffen, dass es vorbeigeht."
+        },
+        "steps": {
+          "pull_back": "Ware zurückrufen",
+          "fix": "Fehler beheben",
+          "statement": "Öffentliche Stellungnahme",
+          "campaign": "Imagekampagne",
+          "lab_test": "Labortest",
+          "publish": "Ergebnis veröffentlichen"
+        }
+      },
+      "data_breach": {
+        "name": "Datenleck",
+        "headlines": [
+          "Hackerangriff bei {company}: Kundendaten im Netz",
+          "Datenleck erschüttert {company}",
+          "{critic} entdeckt Sicherheitslücke bei {company}"
+        ],
+        "bodies": [
+          "Unbekannte haben Daten von Kunden erbeutet. Viele kündigen, und die Aufsicht schaut genau hin.",
+          "Eine Lücke in den Systemen von {company} wurde ausgenutzt. Jetzt zählt jede Stunde."
+        ],
+        "strategies": {
+          "forensics": "IT-Forensik",
+          "transparency": "Offen informieren",
+          "accept": "Totschweigen"
+        },
+        "strategyText": {
+          "forensics": "Analysieren, schließen, prüfen lassen. Braucht IT-Wissen und Leute.",
+          "transparency": "Alles offenlegen. Kostet wenig, hilft halb.",
+          "accept": "Nichts sagen und hoffen."
+        },
+        "steps": {
+          "analyse": "Angriff analysieren",
+          "patch": "Lücke schließen",
+          "audit": "Sicherheitsprüfung"
+        }
+      },
+      "price_war": {
+        "name": "Preiskampf",
+        "headlines": [
+          "Kampfpreise: Konkurrent greift {company} an",
+          "Billig-{product} überschwemmen den Markt",
+          "Preiskrieg bei {product}: {company} verliert Kunden"
+        ],
+        "bodies": [
+          "Ein neuer Anbieter verkauft {product} weit unter Preis. Viele Kunden von {company} wechseln.",
+          "Ein großer Händler wirft billige {product} auf den Markt. {company} muss sich etwas einfallen lassen."
+        ],
+        "strategies": {
+          "undercut": "Mitziehen",
+          "innovate": "Innovation",
+          "niche": "Nische besetzen",
+          "accept": "Aushalten"
+        },
+        "strategyText": {
+          "undercut": "Rabatte geben. Kostet Marge, hält die Kunden.",
+          "innovate": "Ein besseres Produkt bauen. Aufwendig, aber danach seid ihr vorne.",
+          "niche": "Sich auf treue Kunden konzentrieren.",
+          "accept": "Den Sturm aussitzen."
+        },
+        "steps": {
+          "calculate": "Preise kalkulieren",
+          "discount": "Rabattaktion",
+          "research": "Neue Funktion erforschen",
+          "build": "Bauen und testen",
+          "launch": "Neues Produkt starten",
+          "reposition": "Marke neu ausrichten"
+        }
+      },
+      "strike": {
+        "name": "Streik",
+        "headlines": [
+          "Streik bei {company}: Bänder stehen still",
+          "Unruhe im Team: {company} droht ein Arbeitskampf",
+          "Belegschaft von {company} legt die Arbeit nieder"
+        ],
+        "bodies": [
+          "Das Team ist unzufrieden und streikt. Bis eine Lösung gefunden ist, entsteht nur ein Teil der {product}.",
+          "Lange Schichten, wenig Anerkennung: Bei {company} kippt die Stimmung."
+        ],
+        "strategies": {
+          "negotiate": "Verhandeln",
+          "bonus": "Bonus zahlen",
+          "automate": "Automatisieren",
+          "accept": "Hart bleiben"
+        },
+        "strategyText": {
+          "negotiate": "Zuhören und einen fairen Deal finden.",
+          "bonus": "Mit Geld die Stimmung retten. Teuer, aber sofort.",
+          "automate": "Maschinen statt Menschen. Löst das Problem, kostet aber Qualität.",
+          "accept": "Den Streik aushalten."
+        },
+        "steps": {
+          "listen": "Zuhören",
+          "deal": "Vereinbarung aushandeln",
+          "pay_bonus": "Bonus auszahlen",
+          "machines": "Maschinen anschaffen"
+        }
+      },
+      "protest": {
+        "name": "Protest",
+        "headlines": [
+          "Aktivisten protestieren vor {company}",
+          "Shitstorm: {product} von {company} in der Kritik",
+          "{critic} ruft zum Boykott von {company} auf"
+        ],
+        "bodies": [
+          "Vor der Firmenzentrale stehen Demonstranten. Sie werfen {company} vor, zu wenig für die Umwelt zu tun.",
+          "Im Netz kursieren Boykottaufrufe gegen {product}. Die Verkäufe sinken."
+        ],
+        "strategies": {
+          "green": "Grünes Programm",
+          "dialogue": "Dialog",
+          "accept": "Ignorieren"
+        },
+        "strategyText": {
+          "green": "Messen, umbauen, berichten. Aufwendig, macht die Firma aber beliebter.",
+          "dialogue": "Mit den Protestierenden reden.",
+          "accept": "Abwarten, bis es vorbei ist."
+        },
+        "steps": {
+          "footprint": "Fußabdruck messen",
+          "program": "Nachhaltigkeitsprogramm",
+          "report": "Bericht veröffentlichen",
+          "invite": "Zum Gespräch einladen",
+          "round_table": "Runder Tisch"
+        }
+      },
+      "patent_claim": {
+        "name": "Patentklage",
+        "headlines": [
+          "Patentstreit: {company} soll Idee geklaut haben",
+          "Konkurrent verklagt {company} wegen {product}",
+          "Gericht prüft Patentvorwürfe gegen {company}"
+        ],
+        "bodies": [
+          "Ein Konkurrent behauptet, {product} verletze sein Patent. Bis zur Klärung drohen Strafen und Kunden zögern.",
+          "Die Klage hängt wie ein Schatten über {company}. Anwälte, Lizenz oder ein neuer Weg?"
+        ],
+        "strategies": {
+          "lawyers": "Vor Gericht ziehen",
+          "license": "Lizenz kaufen",
+          "workaround": "Neu entwickeln",
+          "accept": "Zahlen"
+        },
+        "strategyText": {
+          "lawyers": "Prüfen und vor Gericht gewinnen. Riskant, aber am Ende ist alles erledigt.",
+          "license": "Teuer, aber sofort Ruhe.",
+          "workaround": "Das Produkt so ändern, dass das Patent nicht mehr greift.",
+          "accept": "Die Strafe hinnehmen."
+        },
+        "steps": {
+          "review": "Patent prüfen",
+          "court": "Gerichtsverfahren",
+          "pay_license": "Lizenz bezahlen",
+          "redesign": "Technik umbauen",
+          "test": "Neue Version testen"
+        }
+      },
+      "bad_review": {
+        "name": "Verriss",
+        "headlines": [
+          "{critic} verreißt {product} von {company}",
+          "Note mangelhaft: {company} fällt im Test durch",
+          "\"Enttäuschend\": Harte Kritik an {company}"
+        ],
+        "bodies": [
+          "{critic} hat {product} getestet und hart geurteilt. Viele Kunden lesen mit.",
+          "Der Test trifft {company} empfindlich. Jetzt muss das Produkt besser werden oder die Kampagne lauter."
+        ],
+        "strategies": {
+          "improve": "Produkt verbessern",
+          "counter": "Gegenkampagne",
+          "accept": "Ignorieren"
+        },
+        "strategyText": {
+          "improve": "Analysieren, nachbessern, neu testen lassen.",
+          "counter": "Laut dagegenhalten.",
+          "accept": "Durchatmen und weitermachen."
+        },
+        "steps": {
+          "analyse": "Kritik auswerten",
+          "rework": "Nachbessern",
+          "retest": "Neuen Test beantragen",
+          "campaign": "Gegenkampagne"
+        }
+      },
+      "viral_trend": {
+        "name": "Viral-Trend",
+        "headlines": [
+          "{trend} feiert {product} von {company}",
+          "Viral: Plötzlich will jeder {product} von {company}",
+          "{product} von {company} gehen durch die Decke"
+        ],
+        "bodies": [
+          "Ein Video über {product} hat Millionen Aufrufe. Die Nachfrage explodiert, wenn {company} jetzt liefern kann.",
+          "Durch {trend} steht {company} im Rampenlicht. Wer jetzt schnell ist, gewinnt viele neue Kunden."
+        ],
+        "strategies": {
+          "scale_up": "Hochfahren",
+          "ride_wave": "Welle reiten",
+          "pass": "Verstreichen lassen"
+        },
+        "strategyText": {
+          "scale_up": "Überstunden und Nachschub: Die ganze Nachfrage mitnehmen.",
+          "ride_wave": "Mit eigenem Content mitschwimmen.",
+          "pass": "Die Chance verstreichen lassen."
+        },
+        "steps": {
+          "overtime": "Überstunden anordnen",
+          "restock": "Nachschub besorgen",
+          "content": "Eigene Clips drehen"
+        }
+      },
+      "big_contract": {
+        "name": "Großauftrag",
+        "headlines": [
+          "{buyer} will {product} von {company}",
+          "Großauftrag in Sicht: {company} verhandelt mit {buyer}",
+          "{buyer} sucht Lieferanten – {company} im Rennen"
+        ],
+        "bodies": [
+          "{buyer} möchte {product} in großen Mengen abnehmen. Ein Rahmenvertrag würde {company} auf Wochen auslasten.",
+          "Ein Großkunde klopft an. Für {company} wäre das der größte Deal bisher."
+        ],
+        "strategies": {
+          "pitch": "Ganz groß pitchen",
+          "quick_deal": "Schneller Deal",
+          "pass": "Ablehnen"
+        },
+        "strategyText": {
+          "pitch": "Angebot, Verhandlung, Lieferung: der volle Vertrag.",
+          "quick_deal": "Mit Rabatt schnell abschließen. Halber Gewinn.",
+          "pass": "Nicht mitbieten."
+        },
+        "steps": {
+          "offer": "Angebot schreiben",
+          "negotiate": "Verhandeln",
+          "deliver": "Erste Lieferung",
+          "discount_offer": "Rabatt anbieten"
+        }
+      },
+      "award": {
+        "name": "Auszeichnung",
+        "headlines": [
+          "Testsieger: {company} gewinnt mit {product}",
+          "{critic} kürt {company} zum Gewinner",
+          "Preisregen für {company}"
+        ],
+        "bodies": [
+          "{critic} hat {product} von {company} ausgezeichnet. Das ist Werbung, die man nicht kaufen kann.",
+          "Die Jury war begeistert. Jetzt muss {company} den Preis nur noch bekannt machen."
+        ],
+        "strategies": {
+          "press_tour": "Pressetour",
+          "badge": "Siegel aufdrucken",
+          "pass": "Still freuen"
+        },
+        "strategyText": {
+          "press_tour": "Interviews und Werbung: so viele Menschen erreichen wie möglich.",
+          "badge": "Das Siegel auf jede Packung. Klein, aber fein.",
+          "pass": "Nichts daraus machen."
+        },
+        "steps": {
+          "interviews": "Interviews geben",
+          "ads": "Werbung schalten",
+          "seal": "Siegel drucken"
+        }
+      },
+      "subsidy": {
+        "name": "Förderprogramm",
+        "headlines": [
+          "Förderprogramm für {product}: {company} kann profitieren",
+          "Staat fördert {product} – auch {company}?",
+          "Neue Fördergelder: Chance für {company}"
+        ],
+        "bodies": [
+          "Ein Programm bezuschusst Firmen, die {product} herstellen. Der Antrag ist aufwendig, lohnt sich aber.",
+          "Wer jetzt einen guten Antrag stellt, spart über Tage hinweg Kosten."
+        ],
+        "strategies": {
+          "apply": "Antrag stellen",
+          "pass": "Verzichten"
+        },
+        "strategyText": {
+          "apply": "Formulare, Plan, Jury: drei Hürden bis zum Geld.",
+          "pass": "Zu viel Papierkram."
+        },
+        "steps": {
+          "forms": "Formulare ausfüllen",
+          "plan": "Geschäftsplan schreiben",
+          "jury": "Vor der Jury bestehen"
+        }
+      },
+      "partnership": {
+        "name": "Partnerschaft",
+        "headlines": [
+          "{buyer} will mit {company} zusammenarbeiten",
+          "Partnerschaft in Sicht: {company} und {buyer}",
+          "Kooperationsangebot für {company}"
+        ],
+        "bodies": [
+          "{buyer} bietet an, {product} gemeinsam zu vertreiben. Mehr Kunden, mehr Kapazität.",
+          "Eine größere Firma will mit {company} zusammenarbeiten. Die Integration braucht Arbeit."
+        ],
+        "strategies": {
+          "join": "Zusagen",
+          "pass": "Absagen"
+        },
+        "strategyText": {
+          "join": "Treffen und Systeme verbinden.",
+          "pass": "Lieber allein weitermachen."
+        },
+        "steps": {
+          "meeting": "Treffen",
+          "integrate": "Systeme verbinden"
+        }
+      }
+    }
+  },
+  "companyNews": {
+    "title": "Firmen-News",
+    "empty": "Noch keine Meldungen.",
+    "employeeTitle": "News aus deiner Firma",
+    "kinds": {
+      "event_started": ["{headline}"],
+      "event_step_done": ["{company}: „{step}“ ist geschafft.", "Fortschritt bei {company}: {step} erledigt."],
+      "event_step_failed": [
+        "Rückschlag bei {company}: „{step}“ ist gescheitert.",
+        "{company} muss nachlegen: {step} hat nicht geklappt."
+      ],
+      "event_solved": ["{company} hat die Lage im Griff.", "Aufatmen bei {company}: Problem gelöst."],
+      "event_deadline": [
+        "Keine Lösung in Sicht: {company} spürt die Folgen.",
+        "Frist verstrichen: Die Lage trifft {company} jetzt voll."
+      ],
+      "event_expired": ["{company} lässt eine Chance liegen.", "Verpasst: {company} hat zu lange gezögert."],
+      "event_over": ["Bei {company} kehrt wieder Ruhe ein.", "Die Lage ist ausgestanden."],
+      "founded": ["{company} startet mit {product} durch.", "Neu am Markt: {company} will mit {product} groß werden."],
+      "upgraded": ["{company} wächst: jetzt als {tier}.", "Nächster Schritt für {company}: {tier}."],
+      "expanded": [
+        "{company} erschließt neue Märkte für {product} (Ausbaustufe {level}).",
+        "Expansion: {company} bringt {product} {place}."
+      ],
+      "ipo": [
+        "{company} geht an die Börse: Kürzel {ticker}.",
+        "Börsengang! {product} von {company} jetzt auch als Aktie ({ticker})."
+      ],
+      "hired": ["Verstärkung für {company}: {nickname} startet als {title}.", "{nickname} heuert bei {company} an."],
+      "record_hour": [
+        "Rekordstunde bei {company}: {profit} Gewinn mit {product}.",
+        "{company} verdient so viel wie nie: {profit} in einer Stunde."
+      ]
     }
   }
 }

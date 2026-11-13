@@ -68,10 +68,13 @@ function useOutcome() {
       };
     }
     if (e.kind === "earnings") {
-      const surprise = num(o.surprise_bps ?? o.profit_change_bps ?? o.revenue_change_bps);
+      // The server says beat / miss / inline and how the profit moved against the quarter before.
+      const surprise = typeof o.surprise === "string" ? o.surprise : "inline";
+      const change = o.net_income_change_bps ?? o.revenue_change_bps;
+      const key = surprise === "beat" ? "earningsBeat" : surprise === "miss" ? "earningsMiss" : "earningsInline";
       return {
-        text: t(surprise >= 0 ? "earningsBeat" : "earningsMiss", { change: formatBps(surprise) }),
-        tone: surprise >= 0 ? "gain" : "loss",
+        text: change == null ? t(`${key}Plain`) : t(key, { change: formatBps(num(change)) }),
+        tone: surprise === "beat" ? "gain" : surprise === "miss" ? "loss" : "neutral",
       };
     }
     if (e.kind === "rate_decision") {

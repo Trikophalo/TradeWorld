@@ -11,7 +11,7 @@ select tests.assert(
   (select array_agg(p.proname::text order by p.proname)
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute'))
-  = array['admin_close_quarter', 'admin_run_tick', 'admin_set_paused', 'apply_for_job', 'are_friends', 'bid_artwork', 'buy_car', 'buy_floor', 'buy_furniture', 'buy_home',
+  = (select array_agg(x order by x) from unnest(array['admin_close_quarter', 'admin_run_tick', 'admin_set_paused', 'apply_for_job', 'are_friends', 'bid_artwork', 'buy_car', 'buy_floor', 'buy_furniture', 'buy_home',
           'can_read_ledger_transaction', 'cancel_auction', 'cancel_order', 'cancel_quit', 'capital_increase', 'change_nickname',
           'check_company_name', 'check_nickname', 'claim_daily_reward', 'claim_mission', 'claim_vault',
           'close_company', 'close_job_posting', 'company_deposit', 'company_withdraw', 'complete_tutorial',
@@ -27,8 +27,10 @@ select tests.assert(
           'save_layout', 'search_players', 'sell_item', 'send_friend_request', 'set_ai_workers', 'set_avatar', 'set_company_banner', 'set_company_logo', 'set_company_marketing',
           'set_company_strategy', 'set_founder_payout', 'sign_contract',
           'start_auction', 'submit_work_task', 'subscribe_offer', 'track_event', 'train_employee', 'upgrade_company',
-          'withdraw_application'],
-  'authenticated can execute exactly the 9 helpers and the RPCs up to M4e (75)');
+          'withdraw_application']
+          -- M4f (76, 77): feed, notifications, league
+          || array['get_feed', 'get_league', 'get_notifications', 'mark_notifications_read', 'react_feed']) x),
+  'authenticated can execute exactly the 9 helpers and the RPCs up to M4f (77)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute') and p.proname <> 'check_nickname'),

@@ -1,56 +1,56 @@
 {
   "applications": [
     {
-      "id": "bfdbbbeb-86da-40e8-81b5-4f573c1db1b3",
+      "id": "c8b4d3b7-7b02-4e34-96f3-d5ec04473ea6",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "5d4d36e0-0c55-4f84-a749-ba0862b96ce0",
+        "id": "2bd0cea1-5d86-40dd-a33e-e11c4aee084d",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "e50a6ff5-8dbd-8c90-f94e-5ac06d3fe862",
+          "id": "5aaeae39-c17e-272b-db4c-3beb46144cb5",
           "logo": null,
-          "name": "Volta Energie AG",
-          "color": "#FFD23F",
+          "name": "GenoVita Biotech",
+          "color": "#E86AF0",
           "is_ai": true,
-          "sector": "energy",
-          "ticker": "VLT"
+          "sector": "pharma",
+          "ticker": "GNV"
         },
         "required": [{ "branch": "law", "min_score": 0 }],
         "title_key": "law_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-12T23:13:58.714451+00:00",
-      "updated_at": "2026-11-12T23:13:58.720072+00:00",
-      "offer_expires_at": "2026-11-14T23:13:58.714451+00:00",
+      "created_at": "2026-11-13T11:33:59.866771+00:00",
+      "updated_at": "2026-11-13T11:33:59.870812+00:00",
+      "offer_expires_at": "2026-11-15T11:33:59.866771+00:00",
       "salary_wish_cents_per_hour": 15000,
       "offer_salary_cents_per_hour": 15000
     },
     {
-      "id": "10a65580-edc8-4c01-ba8b-782713bdaed8",
+      "id": "0842b66e-d585-4ce7-b799-4113aaeab484",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "f5d0fc9a-b01a-4d13-b34c-e44e25ef8f73",
+        "id": "6dec2c57-c15c-46ed-b45b-5a24ab518794",
         "tier": "junior",
         "title": null,
         "company": {
-          "id": "dc6cd683-c473-c0eb-8d8c-04ddf664b4d5",
+          "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
           "logo": null,
-          "name": "Eilbote Express",
-          "color": "#F7768E",
+          "name": "KlarSoft AG",
+          "color": "#4C8DFF",
           "is_ai": true,
-          "sector": "logistics",
-          "ticker": "EBX"
+          "sector": "tech",
+          "ticker": "KLS"
         },
         "required": [{ "branch": "it", "min_score": 2 }],
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-12T23:13:58.705095+00:00",
-      "updated_at": "2026-11-12T23:13:58.705095+00:00",
-      "offer_expires_at": "2026-11-14T23:13:58.705095+00:00",
+      "created_at": "2026-11-13T11:33:59.859008+00:00",
+      "updated_at": "2026-11-13T11:33:59.859008+00:00",
+      "offer_expires_at": "2026-11-15T11:33:59.859008+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

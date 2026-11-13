@@ -668,6 +668,95 @@ export interface GameEvents {
   recent: GameEvent[];
 }
 
+// ------------------------------------------------------------------ company events and news (ADR-091)
+
+export interface CompanyBrief {
+  id: string;
+  name: string;
+  idea: string;
+  sector: string;
+  productKey: string | null;
+  tier: CompanyTier;
+}
+
+export interface CompanyEventStepState {
+  idx: number;
+  strategy: string;
+  key: string;
+  status: "running" | "succeeded" | "failed";
+  startedAt: string;
+  endsAt: string;
+  costCents: number;
+  successBps: number;
+  retry: boolean;
+}
+
+export interface CompanyEvent {
+  id: string;
+  archetype: string;
+  polarity: "crisis" | "chance";
+  severity: 1 | 2 | 3;
+  status: "open" | "accepted" | "solved" | "in_force" | "expired" | "over";
+  startedAt: string;
+  deadlineAt: string;
+  resolvedAt: string | null;
+  overAt: string | null;
+  strategy: string | null;
+  mitigation: number;
+  aiHeadline: string | null;
+  aiBody: string | null;
+  aiCause: string | null;
+  steps: CompanyEventStepState[];
+  /** The next step of the chosen strategy with today's price and chance. */
+  next: {
+    strategy: string;
+    idx: number;
+    key: string;
+    costCents: number;
+    successBps: number;
+    staffOk: boolean;
+    hours: number;
+  } | null;
+  /** First step of every strategy, to compare before choosing. */
+  options: { strategy: string; firstStepCostCents: number; firstStepSuccessBps: number }[];
+}
+
+export interface CompanyEventState {
+  company: CompanyBrief;
+  /** Only the founder decides; employees watch. */
+  canAct: boolean;
+  unitCents: number;
+  headcount: number;
+  branchScores: Record<SkillBranch, number>;
+  event: CompanyEvent | null;
+  history: {
+    id: string;
+    archetype: string;
+    polarity: "crisis" | "chance";
+    severity: number;
+    status: string;
+    startedAt: string;
+    resolvedAt: string | null;
+  }[];
+  /** Product words written by Claude (company-writer), else null and the Mini-KI decides. */
+  profileWords: Record<string, string[]> | null;
+}
+
+export interface CompanyNewsItem {
+  id: number;
+  kind: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+  aiHeadline: string | null;
+  aiBody: string | null;
+}
+
+export interface CompanyNews {
+  company: CompanyBrief;
+  profileWords: Record<string, string[]> | null;
+  items: CompanyNewsItem[];
+}
+
 /** A hit of the player search in the top bar (ADR-085). */
 export interface PlayerSearchResult {
   nickname: string;
@@ -1051,6 +1140,9 @@ export const GAME_ERROR_KEYS = [
   "offer_closed",
   "offer_sold_out",
   "already_listed",
+  "event_closed",
+  "event_needs_staff",
+  "feed_item_not_found",
 ] as const;
 export type GameErrorKey = (typeof GAME_ERROR_KEYS)[number] | "unknown";
 
@@ -1189,6 +1281,11 @@ export interface GameEngine {
   league(scope: LeagueScope, week: "current" | "last"): Promise<League>;
   /** Announced events (ADR-090). */
   events(): Promise<GameEvents>;
+  /** Company crises and chances (ADR-091): own company (null) or the employer's. */
+  companyEvent(companyId?: string | null): Promise<CompanyEventState>;
+  chooseEventStrategy(requestId: string, eventId: string, strategy: string): Promise<CompanyEventState>;
+  startEventStep(requestId: string, eventId: string): Promise<CompanyEventState>;
+  companyNews(companyId?: string | null): Promise<CompanyNews>;
   companyPostings(): Promise<CompanyPosting[]>;
   createJobPosting(input: CreatePostingInput): Promise<void>;
   closeJobPosting(requestId: string, postingId: string): Promise<void>;

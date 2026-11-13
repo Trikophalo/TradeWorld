@@ -1,0 +1,45 @@
+{
+  "me": { "rank": 3, "growth_bps": 0 },
+  "season": {
+    "status": "active",
+    "ends_at": "2026-11-15T23:00:00+00:00",
+    "starts_at": "2026-11-08T23:00:00+00:00",
+    "week_start": "2026-11-09"
+  },
+  "entries": [
+    {
+      "tag": "GMXT",
+      "rank": 1,
+      "is_me": false,
+      "level": 15,
+      "nickname": "Fixture_Neu",
+      "avatar_key": "coder",
+      "growth_bps": 0
+    },
+    {
+      "tag": "842S",
+      "rank": 2,
+      "is_me": false,
+      "level": 8,
+      "nickname": "Fixture_Kunst",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    },
+    {
+      "tag": "BVT5",
+      "rank": 3,
+      "is_me": true,
+      "level": 15,
+      "nickname": "Fixture_Gmbh",
+      "avatar_key": "rookie",
+      "growth_bps": 0
+    }
+  ],
+  "last_winner": {
+    "tag": "BVT5",
+    "nickname": "Fixture_Gmbh",
+    "avatar_key": "rookie",
+    "growth_bps": 235,
+    "week_start": "2026-11-02"
+  }
+}

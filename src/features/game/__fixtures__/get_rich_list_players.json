@@ -1,10 +1,10 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 35, "gap_cents": 643 }, "rank": 36, "net_worth_cents": 1019357 },
-  "total": 114,
+  "me": { "next": { "name": "Vera", "rank": 39, "gap_cents": 481 }, "rank": 40, "net_worth_cents": 1019519 },
+  "total": 121,
   "entries": [
     {
       "id": "0f3f3f3f-0000-4000-8000-0000000000f1",
-      "tag": "YXWV",
+      "tag": "28FD",
       "kind": "player",
       "name": "Fenja_Firma",
       "rank": 1,
@@ -12,12 +12,12 @@
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 102375991,
+      "net_worth_cents": 102585991,
       "rank_change_24h": null
     },
     {
       "id": "07170717-0000-4000-8000-0000000000a1",
-      "tag": "CBGT",
+      "tag": "2TWE",
       "kind": "player",
       "name": "Hanna_Haus",
       "rank": 2,
@@ -30,7 +30,7 @@
     },
     {
       "id": "0e3e3e3e-0000-4000-8000-0000000000f1",
-      "tag": "HN52",
+      "tag": "DWYB",
       "kind": "player",
       "name": "Frieda_Format",
       "rank": 3,
@@ -42,31 +42,31 @@
       "rank_change_24h": null
     },
     {
-      "id": "07070707-0000-4000-8000-0000000000c3",
-      "tag": "T5BZ",
+      "id": "0c3c3c3c-0000-4000-8000-0000000000f1",
+      "tag": "7CTF",
       "kind": "player",
-      "name": "Carla_Kunst",
+      "name": "Frida_Firma",
       "rank": 4,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 31000000,
+      "net_worth_cents": 49311114,
       "rank_change_24h": null
     },
     {
-      "id": "07170717-0000-4000-8000-0000000000b2",
-      "tag": "QEKY",
+      "id": "07607607-0000-4000-8000-0000000000a1",
+      "tag": "HWLE",
       "kind": "player",
-      "name": "Moritz_Moebel",
+      "name": "Feli_Feed",
       "rank": 5,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 15904600,
+      "net_worth_cents": 44462961,
       "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-12T23:13:58.586092+00:00"
+  "server_time": "2026-11-13T11:33:59.698656+00:00"
 }

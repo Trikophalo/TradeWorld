@@ -19,6 +19,7 @@ import { createArtEngine, type ArtState } from "./demo/artworks";
 import { createPropertyEngine, type HomeState } from "./demo/property";
 import { createFriendEngine } from "./demo/friends";
 import { createSocialEngine, type DemoSocialState } from "./demo/social";
+import { createCompanyEventsEngine } from "./demo/company-events";
 import { tagFromUniform } from "@/lib/player-tag";
 import { createCompanyEngine, type DemoCompanyState, type DemoDissolution } from "./demo/company";
 import { demoTycoons } from "./demo/tycoons";
@@ -988,6 +989,7 @@ const career = createCareerEngine({
 });
 
 const company = createCompanyEngine({
+  eventModifiers: (c, at) => companyEvents.modifiers(c, at),
   company: () => p().company ?? null,
   setCompany: (value) => {
     p().company = value;
@@ -1020,6 +1022,23 @@ const company = createCompanyEngine({
   },
   startFounderNotice: () => career.startNotice(),
 });
+
+const companyEvents = createCompanyEventsEngine({
+  company: () => p().company ?? null,
+  branchScores: () => career.branchScores(),
+  headcount: (c) => 1 + c.aiWorkers,
+  fixedCostCentsPerQuarter: (c) => company.fixedCostCents(c.tier, BALANCE, c.expansionLevel ?? 0),
+  idempotent,
+  persist,
+});
+
+/** Demo only (ADR-091): start a company crisis or chance now, or finish the running response step. */
+export function demoTriggerCompanyEvent(archetype?: string): void {
+  companyEvents.triggerNow(archetype);
+}
+export function demoFinishEventStep(): void {
+  companyEvents.finishStepNow();
+}
 
 const art = createArtEngine({
   art: () => p().art,
@@ -1099,6 +1118,7 @@ export const demoEngine: GameEngine = {
   ...home.engine,
   ...friends,
   ...social.engine,
+  ...companyEvents.engine,
   snapshot: () => Promise.resolve(snapshotNow()),
 
   candles: (ticker, interval, limit) => Promise.resolve(demoCandles(ticker, interval, limit)),

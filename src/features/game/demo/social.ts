@@ -165,7 +165,11 @@ export function createSocialEngine(host: SocialHost) {
             companyName: s.name,
             sector: s.sector,
           },
-          { surprise_bps: surprise, revenue_change_bps: surprise + 300 },
+          {
+            surprise: surprise > 200 ? "beat" : surprise < -200 ? "miss" : "inline",
+            net_income_change_bps: surprise * 2,
+            revenue_change_bps: surprise + 300,
+          },
         );
       });
       if (pharma && q % 3 === 0) {
