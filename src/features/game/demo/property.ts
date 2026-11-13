@@ -167,7 +167,7 @@ export function createPropertyEngine(host: PropertyHost) {
           const footprint = (id: string) => {
             const f = byId.get(id);
             const item = f && FURNITURE.find((x) => x.key === f.itemKey);
-            return item ? { w: item.w, h: item.h, layer: item.layer } : undefined;
+            return item ? { w: item.w, h: item.h, layer: item.layer, surface: item.surface } : undefined;
           };
           if (invalidPlacements(placed, footprint, t.width, t.height).length > 0) throw new GameError("layout_invalid");
           for (const f of s.furniture) f.placed = null;

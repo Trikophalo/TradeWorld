@@ -22,8 +22,10 @@ export interface FurnitureItem {
   /** Size in floor tiles (before rotation). */
   readonly w: number;
   readonly h: number;
-  /** Rugs lie under furniture. */
-  readonly layer: "floor" | "object";
+  /** Rugs lie under furniture, small things stand on surfaces (ADR-100). */
+  readonly layer: "floor" | "object" | "top";
+  /** Tables, counters and desks carry things of the top layer. */
+  readonly surface: boolean;
   readonly sprite: Sprite;
 }
 
@@ -50,6 +52,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#8f9bb3", "#d9d4c7", "#f3efe4", "#2b2f3a"],
       grid: [
@@ -81,6 +84,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#9a6b3c", "#c89a63", "#e6c48f", "#2b2f3a"],
       grid: [
@@ -112,6 +116,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#6b3a1e", "#8a4f2a", "#b06a3a", "#2b2f3a"],
       grid: [
@@ -143,6 +148,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#24272f", "#3a3f4b", "#5d6679", "#2b2f3a"],
       grid: [
@@ -174,6 +180,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#6f7a91", "#8f9bb3", "#b3bccd", "#2b2f3a"],
       grid: [
@@ -205,6 +212,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#5a1f5a", "#7a2f7a", "#a24aa2", "#2b2f3a"],
       grid: [
@@ -236,6 +244,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#c8962f", "#ffd15c", "#fff1a8", "#2b2f3a"],
       grid: [
@@ -267,6 +276,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 2,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#6f7a91", "#8f9bb3", "#b3bccd", "#2b2f3a"],
       grid: [
@@ -298,6 +308,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 3,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#6b3a1e", "#8a4f2a", "#b06a3a", "#2b2f3a"],
       grid: [
@@ -329,6 +340,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 3,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#1d5a36", "#2f7a4a", "#4fae6e", "#2b2f3a"],
       grid: [
@@ -360,6 +372,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 4,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#c5ccd6", "#e9edf2", "#ffffff", "#2b2f3a"],
       grid: [
@@ -391,6 +404,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: true,
     sprite: {
       palette: ["#d9d4c7", "#f3efe4", "#2b2f3a"],
       grid: [
@@ -422,6 +436,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 2,
     h: 1,
     layer: "object",
+    surface: true,
     sprite: {
       palette: ["#c89a63", "#e6c48f", "#2b2f3a"],
       grid: [
@@ -453,6 +468,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 2,
     h: 2,
     layer: "object",
+    surface: true,
     sprite: {
       palette: ["#9a6b3c", "#c89a63", "#2b2f3a"],
       grid: [
@@ -500,6 +516,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 2,
     h: 2,
     layer: "object",
+    surface: true,
     sprite: {
       palette: ["#2b2f3a", "#9a6b3c", "#c89a63"],
       grid: [
@@ -547,6 +564,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 2,
     h: 1,
     layer: "object",
+    surface: true,
     sprite: {
       palette: ["#bfe6ff", "#e6f7ff", "#2b2f3a", "#ffffff"],
       grid: [
@@ -578,6 +596,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 3,
     h: 2,
     layer: "object",
+    surface: true,
     sprite: {
       palette: ["#e3e3dc", "#fbfbf8", "#2b2f3a", "#b8b8b0"],
       grid: [
@@ -625,6 +644,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 2,
     h: 2,
     layer: "object",
+    surface: true,
     sprite: {
       palette: ["#2b2f3a", "#e3e3dc", "#fbfbf8"],
       grid: [
@@ -672,6 +692,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 4,
     h: 2,
     layer: "object",
+    surface: true,
     sprite: {
       palette: ["#ffd15c", "#fff1a8", "#2b2f3a"],
       grid: [
@@ -719,6 +740,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 2,
     h: 1,
     layer: "object",
+    surface: true,
     sprite: {
       palette: ["#9a6b3c", "#c89a63", "#2b2f3a", "#62e0ff", "#3a3f4b"],
       grid: [
@@ -750,6 +772,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 2,
     h: 2,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#d9d4c7", "#8f9bb3", "#ffffff", "#b3bccd", "#6f7a91", "#2b2f3a"],
       grid: [
@@ -797,6 +820,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 2,
     h: 3,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#c89a63", "#9a6b3c", "#ffffff", "#4f8cff", "#9ad8ff", "#2f5fd0", "#2b2f3a"],
       grid: [
@@ -860,6 +884,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 3,
     h: 3,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#9a6b3c", "#6e4a28", "#ffffff", "#d93a2f", "#ff8a8a", "#9a2420", "#2b2f3a"],
       grid: [
@@ -923,6 +948,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 3,
     h: 3,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#3a3f4b", "#24272f", "#ffffff", "#8f9bb3", "#b3bccd", "#6f7a91", "#2b2f3a"],
       grid: [
@@ -986,6 +1012,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 4,
     h: 3,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#3a3f4b", "#24272f", "#ffffff", "#7a2f7a", "#a24aa2", "#5a1f5a", "#2b2f3a"],
       grid: [
@@ -1049,6 +1076,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 4,
     h: 3,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#ffd15c", "#c8962f", "#ffffff", "#d93a2f", "#ff8a8a", "#9a2420", "#2b2f3a"],
       grid: [
@@ -1112,6 +1140,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: true,
     sprite: {
       palette: ["#e9edf2", "#ffffff", "#c5ccd6"],
       grid: [
@@ -1143,6 +1172,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#3a3f4b", "#5d6679", "#24272f", "#d93a2f"],
       grid: [
@@ -1174,6 +1204,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#e9edf2", "#ffffff", "#c5ccd6", "#8f9bb3"],
       grid: [
@@ -1205,6 +1236,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#e9edf2", "#ffffff", "#c5ccd6", "#9ad8ff", "#8f9bb3"],
       grid: [
@@ -1236,6 +1268,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#e3e3dc", "#fbfbf8", "#b8b8b0", "#c5ccd6", "#2b2f3a"],
       grid: [
@@ -1267,6 +1300,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 3,
     h: 1,
     layer: "object",
+    surface: true,
     sprite: {
       palette: ["#e3e3dc", "#fbfbf8", "#b8b8b0"],
       grid: [
@@ -1298,6 +1332,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 3,
     h: 1,
     layer: "object",
+    surface: true,
     sprite: {
       palette: ["#ffd15c", "#fff1a8", "#c8962f"],
       grid: [
@@ -1329,6 +1364,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#e9edf2", "#ffffff", "#9ad8ff"],
       grid: [
@@ -1360,6 +1396,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#c8962f", "#ffd15c", "#fff1a8"],
       grid: [
@@ -1391,6 +1428,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#bfe6ff", "#e6f7ff", "#8f9bb3"],
       grid: [
@@ -1422,6 +1460,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 2,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#ffffff", "#9ad8ff", "#2b2f3a"],
       grid: [
@@ -1453,6 +1492,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 2,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#e3e3dc", "#62e0ff", "#b8b8b0"],
       grid: [
@@ -1484,6 +1524,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 2,
     h: 2,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#c5ccd6", "#4f8cff", "#e6f7ff"],
       grid: [
@@ -1531,6 +1572,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#8a4f2a", "#2f7a4a", "#4fae6e", "#7bd47a"],
       grid: [
@@ -1562,6 +1604,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#e9edf2", "#2f7a4a", "#4fae6e", "#7bd47a"],
       grid: [
@@ -1593,6 +1636,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#3a3f4b", "#2f7a4a", "#4fae6e", "#7bd47a"],
       grid: [
@@ -1624,6 +1668,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#c89a63", "#2f7a4a", "#4fae6e"],
       grid: [
@@ -1655,6 +1700,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 2,
     h: 2,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#e3e3dc", "#2f7a4a", "#4fae6e", "#7bd47a", "#5a6b2f"],
       grid: [
@@ -1702,6 +1748,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 2,
     h: 1,
     layer: "floor",
+    surface: false,
     sprite: {
       palette: ["#6f7a91", "#8f9bb3"],
       grid: [
@@ -1733,6 +1780,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 2,
     h: 2,
     layer: "floor",
+    surface: false,
     sprite: {
       palette: ["#3a3f4b", "#f3efe4"],
       grid: [
@@ -1780,6 +1828,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 3,
     h: 2,
     layer: "floor",
+    surface: false,
     sprite: {
       palette: ["#9a2420", "#c8553d"],
       grid: [
@@ -1827,6 +1876,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 3,
     h: 2,
     layer: "floor",
+    surface: false,
     sprite: {
       palette: ["#e9edf2", "#ffffff"],
       grid: [
@@ -1874,6 +1924,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 4,
     h: 3,
     layer: "floor",
+    surface: false,
     sprite: {
       palette: ["#ffd15c", "#9a2420"],
       grid: [
@@ -1937,6 +1988,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 5,
     h: 3,
     layer: "floor",
+    surface: false,
     sprite: {
       palette: ["#ffd15c", "#5a1f5a"],
       grid: [
@@ -2000,6 +2052,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#ffe9a3", "#fff6d8", "#c8962f"],
       grid: [
@@ -2031,6 +2084,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 2,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#6e4a28", "#4f8cff", "#2fd98c", "#ffd15c", "#a24aa2", "#ff9a52", "#d93a2f"],
       grid: [
@@ -2062,6 +2116,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 2,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#8f9bb3", "#2b2f3a", "#ff9a52", "#ffe06b"],
       grid: [
@@ -2093,6 +2148,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 2,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#2f5fd0", "#4f8cff", "#ff9a52", "#ffd15c", "#ff6170", "#2fd98c", "#2b2f3a"],
       grid: [
@@ -2124,6 +2180,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#b8b8b0", "#fbfbf8", "#e3e3dc"],
       grid: [
@@ -2155,6 +2212,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#c8962f", "#ffd15c", "#fff1a8"],
       grid: [
@@ -2186,6 +2244,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#5d6679", "#2b2f3a", "#c5ccd6"],
       grid: [
@@ -2217,6 +2276,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 2,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#6e4a28", "#2b2f3a", "#4f8cff"],
       grid: [
@@ -2248,6 +2308,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 3,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#3a3f4b", "#2b2f3a", "#62e0ff"],
       grid: [
@@ -2279,6 +2340,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 4,
     h: 2,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#2b2f3a", "#62e0ff", "#7a2f7a", "#5a1f5a"],
       grid: [
@@ -2326,6 +2388,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 2,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#3a3f4b", "#5d6679", "#2b2f3a", "#2fd98c", "#ff6170"],
       grid: [
@@ -2357,6 +2420,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 1,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#3a3f4b", "#9a6bff", "#ff6170", "#2fd98c"],
       grid: [
@@ -2388,6 +2452,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 3,
     h: 2,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#6e4a28", "#2f7a4a", "#2b2f3a", "#ffffff", "#d93a2f", "#ffd15c", "#4f8cff"],
       grid: [
@@ -2435,6 +2500,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 2,
     h: 1,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#2b2f3a", "#ffffff"],
       grid: [
@@ -2466,6 +2532,7 @@ export const FURNITURE: readonly FurnitureItem[] = [
     w: 3,
     h: 2,
     layer: "object",
+    surface: false,
     sprite: {
       palette: ["#2b2f3a", "#ffffff", "#3a3f4b"],
       grid: [
@@ -2501,6 +2568,710 @@ export const FURNITURE: readonly FurnitureItem[] = [
         "....11111111111111111111111111000000............",
         "....111111111111111111111111110000..............",
         "..........................00000.................",
+      ],
+    },
+  },
+  {
+    key: "nightstand",
+    name: "Nachttisch",
+    category: "decor",
+    tier: "budget",
+    priceCents: 9000,
+    w: 1,
+    h: 1,
+    layer: "object",
+    surface: true,
+    sprite: {
+      palette: ["#9a6b3c", "#c89a63", "#6e4a28", "#ffd15c", "#2b2f3a"],
+      grid: [
+        "................",
+        "................",
+        "..444444444444..",
+        "..411111111114..",
+        "..411111111114..",
+        "..411111111114..",
+        "..400000000004..",
+        "..400000000004..",
+        "..422222222224..",
+        "..400000000004..",
+        "..400000300004..",
+        "..400000000004..",
+        "..400000000004..",
+        "..444444444444..",
+        "................",
+        "................",
+      ],
+    },
+  },
+  {
+    key: "sideboard",
+    name: "Sideboard",
+    category: "decor",
+    tier: "standard",
+    priceCents: 65000,
+    w: 2,
+    h: 1,
+    layer: "object",
+    surface: true,
+    sprite: {
+      palette: ["#3a3f4b", "#5d6679", "#24272f", "#c5ccd6", "#2b2f3a"],
+      grid: [
+        "................................",
+        "................................",
+        "................................",
+        ".444444444444444444444444444444.",
+        ".411111111111111111111111111114.",
+        ".411111111111111111111111111114.",
+        ".411111111111111111111111111114.",
+        ".400000002000000200000020000004.",
+        ".400000002000000200000020000004.",
+        ".400000002000000200000020000004.",
+        ".400030002003000200300020030004.",
+        ".400000002000000200000020000004.",
+        ".400000002000000200000020000004.",
+        ".444444444444444444444444444444.",
+        "................................",
+        "................................",
+      ],
+    },
+  },
+  {
+    key: "dresser",
+    name: "Kommode",
+    category: "decor",
+    tier: "premium",
+    priceCents: 320000,
+    w: 2,
+    h: 1,
+    layer: "object",
+    surface: true,
+    sprite: {
+      palette: ["#6e4a28", "#9a6b3c", "#8a5a32", "#ffd15c", "#2b2f3a"],
+      grid: [
+        "................................",
+        "................................",
+        ".444444444444444444444444444444.",
+        ".411111111111111111111111111114.",
+        ".411111111111111111111111111114.",
+        ".411111111111111111111111111114.",
+        ".400000000000000000000000000004.",
+        ".402222222222222222222222222204.",
+        ".402222232222222222222232222204.",
+        ".400000000000000000000000000004.",
+        ".402222222222222222222222222204.",
+        ".402222232222222222222232222204.",
+        ".400000000000000000000000000004.",
+        ".444444444444444444444444444444.",
+        "................................",
+        "................................",
+      ],
+    },
+  },
+  {
+    key: "bar_counter",
+    name: "Bartheke",
+    category: "kitchen",
+    tier: "luxury",
+    priceCents: 2400000,
+    w: 3,
+    h: 1,
+    layer: "object",
+    surface: true,
+    sprite: {
+      palette: ["#24272f", "#b8b8b0", "#fbfbf8", "#7a2f7a", "#2b2f3a"],
+      grid: [
+        "................................................",
+        "................................................",
+        "444444444444444444444444444444444444444444444444",
+        "411111111111111111111111111111111111111111111114",
+        "422222222222222222222222222222222222222222222224",
+        "411111111111111111111111111111111111111111111114",
+        "411111111111111111111111111111111111111111111114",
+        "400000000000000000000000000000000000000000000004",
+        "400000000000000000000000000000000000000000000004",
+        "400333000333000333000333000333000333000333000334",
+        "400333000333000333000333000333000333000333000334",
+        "400333000333000333000333000333000333000333000334",
+        "400333000333000333000333000333000333000333000334",
+        "444444444444444444444444444444444444444444444444",
+        "................................................",
+        "................................................",
+      ],
+    },
+  },
+  {
+    key: "photo_frame",
+    name: "Bilderrahmen",
+    category: "decor",
+    tier: "budget",
+    priceCents: 1500,
+    w: 1,
+    h: 1,
+    layer: "top",
+    surface: false,
+    sprite: {
+      palette: ["#c8962f", "#bfe6ff", "#4fae6e", "#ffd15c", "#2b2f3a"],
+      grid: [
+        "................",
+        "................",
+        "................",
+        "....44444444....",
+        "....41111114....",
+        "....41111114....",
+        "....41111314....",
+        "....41111114....",
+        "....41111114....",
+        "....42222224....",
+        "....42222224....",
+        "....42222224....",
+        "....44444444....",
+        "................",
+        "................",
+        "................",
+      ],
+    },
+  },
+  {
+    key: "cactus_pot",
+    name: "Kaktus im Topf",
+    category: "plants",
+    tier: "budget",
+    priceCents: 1800,
+    w: 1,
+    h: 1,
+    layer: "top",
+    surface: false,
+    sprite: {
+      palette: ["#c8553d", "#4fae6e", "#7bd47a", "#2f7a4a"],
+      grid: [
+        "................",
+        "................",
+        "................",
+        ".......111......",
+        ".......12111....",
+        ".....1111111....",
+        ".....1113111....",
+        ".....11111......",
+        "......01110.....",
+        ".....0011100....",
+        ".....0000000....",
+        ".....0000000....",
+        "......00000.....",
+        ".......000......",
+        "................",
+        "................",
+      ],
+    },
+  },
+  {
+    key: "candles",
+    name: "Kerzen",
+    category: "decor",
+    tier: "budget",
+    priceCents: 2000,
+    w: 1,
+    h: 1,
+    layer: "top",
+    surface: false,
+    sprite: {
+      palette: ["#f3efe4", "#ff9a52", "#ffe06b"],
+      grid: [
+        "................",
+        "................",
+        "................",
+        ".........2......",
+        "........1.......",
+        "......2.00......",
+        ".....1..00..2...",
+        ".....00.00.1....",
+        ".....00.00.00...",
+        ".....00.00.00...",
+        ".....00.00.00...",
+        ".....00.00.00...",
+        ".....00.00.00...",
+        "................",
+        "................",
+        "................",
+      ],
+    },
+  },
+  {
+    key: "books_stack",
+    name: "Bücherstapel",
+    category: "decor",
+    tier: "budget",
+    priceCents: 2500,
+    w: 1,
+    h: 1,
+    layer: "top",
+    surface: false,
+    sprite: {
+      palette: ["#d93a2f", "#2b2f3a", "#4f8cff", "#2fd98c", "#ffd15c"],
+      grid: [
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        ".....144444444..",
+        ".....444444444..",
+        "....133333333...",
+        "....333333333...",
+        ".....122222222..",
+        ".....222222222..",
+        "....100000000...",
+        "....000000000...",
+        "................",
+        "................",
+        "................",
+      ],
+    },
+  },
+  {
+    key: "fruit_bowl",
+    name: "Obstschale",
+    category: "kitchen",
+    tier: "budget",
+    priceCents: 3500,
+    w: 1,
+    h: 1,
+    layer: "top",
+    surface: false,
+    sprite: {
+      palette: ["#e9edf2", "#c5ccd6", "#d93a2f", "#ffd15c", "#7bd47a", "#ff9a52"],
+      grid: [
+        "................",
+        "................",
+        "................",
+        "................",
+        ".......000......",
+        ".....0011100....",
+        "....011113110...",
+        "....012133310...",
+        "...01222131110..",
+        "...01125114110..",
+        "...01155544410..",
+        "....011511410...",
+        "....011111110...",
+        ".....0011100....",
+        ".......000......",
+        "................",
+      ],
+    },
+  },
+  {
+    key: "lamp_table",
+    name: "Tischlampe",
+    category: "decor",
+    tier: "standard",
+    priceCents: 9000,
+    w: 1,
+    h: 1,
+    layer: "top",
+    surface: false,
+    sprite: {
+      palette: ["#ffe9a3", "#fff6d8", "#c8962f"],
+      grid: [
+        "................",
+        "................",
+        "................",
+        ".......000......",
+        ".....0000000....",
+        "....000111000...",
+        "....001111100...",
+        "...00111211100..",
+        "...00112221100..",
+        "...00111211100..",
+        "....001111100...",
+        "....000111000...",
+        ".....0000000....",
+        ".......000......",
+        "................",
+        "................",
+      ],
+    },
+  },
+  {
+    key: "vase_flowers",
+    name: "Blumenvase",
+    category: "plants",
+    tier: "standard",
+    priceCents: 6000,
+    w: 1,
+    h: 1,
+    layer: "top",
+    surface: false,
+    sprite: {
+      palette: ["#4f8cff", "#9ad8ff", "#ff6170", "#ffd15c", "#f8bbd0", "#a24aa2", "#2f7a4a"],
+      grid: [
+        "................",
+        "................",
+        "................",
+        "................",
+        ".........33.....",
+        "......22........",
+        ".......060.44...",
+        "......06110.....",
+        ".....5511110....",
+        ".....01111122...",
+        ".....0111110....",
+        "......01110.....",
+        ".......000......",
+        "................",
+        "................",
+        "................",
+      ],
+    },
+  },
+  {
+    key: "coffee_maker",
+    name: "Kaffeemaschine",
+    category: "kitchen",
+    tier: "standard",
+    priceCents: 18000,
+    w: 1,
+    h: 1,
+    layer: "top",
+    surface: false,
+    sprite: {
+      palette: ["#3a3f4b", "#5d6679", "#ffffff", "#6e4a28", "#2fd98c", "#2b2f3a"],
+      grid: [
+        "................",
+        "................",
+        "................",
+        "....55555555....",
+        "....51111115....",
+        "....51111145....",
+        "....51111115....",
+        "....50000005....",
+        "....50000005....",
+        "....50222205....",
+        "....50232205....",
+        "....50222205....",
+        "....55555555....",
+        "................",
+        "................",
+        "................",
+      ],
+    },
+  },
+  {
+    key: "radio_retro",
+    name: "Röhrenradio",
+    category: "tech",
+    tier: "standard",
+    priceCents: 22000,
+    w: 1,
+    h: 1,
+    layer: "top",
+    surface: false,
+    sprite: {
+      palette: ["#9a6b3c", "#e6c48f", "#c89a63", "#ffd15c", "#2b2f3a"],
+      grid: [
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "...4444444444...",
+        "...4222220004...",
+        "...4111110004...",
+        "...4222220034...",
+        "...4111110334...",
+        "...4222220034...",
+        "...4000000004...",
+        "...4444444444...",
+        "................",
+        "................",
+        "................",
+      ],
+    },
+  },
+  {
+    key: "chess_board",
+    name: "Schachbrett",
+    category: "fun",
+    tier: "standard",
+    priceCents: 15000,
+    w: 1,
+    h: 1,
+    layer: "top",
+    surface: false,
+    sprite: {
+      palette: ["#f3efe4", "#3a3f4b", "#d93a2f", "#4f8cff", "#6e4a28"],
+      grid: [
+        "................",
+        "................",
+        "................",
+        "...4444444444...",
+        "...4010101014...",
+        "...4101010104...",
+        "...4012101014...",
+        "...4101010104...",
+        "...4010101014...",
+        "...4101013104...",
+        "...4010101014...",
+        "...4101010104...",
+        "...4444444444...",
+        "................",
+        "................",
+        "................",
+      ],
+    },
+  },
+  {
+    key: "laptop",
+    name: "Laptop",
+    category: "tech",
+    tier: "premium",
+    priceCents: 140000,
+    w: 1,
+    h: 1,
+    layer: "top",
+    surface: false,
+    sprite: {
+      palette: ["#5d6679", "#62e0ff", "#c5ccd6", "#8f9bb3", "#2b2f3a"],
+      grid: [
+        "................",
+        "................",
+        "................",
+        "................",
+        "...4444444444...",
+        "...4111111114...",
+        "...4111111114...",
+        "...4111111114...",
+        "...4111111114...",
+        "...4444444444...",
+        "..222222222222..",
+        "..222333333222..",
+        "..222222222222..",
+        "................",
+        "................",
+        "................",
+      ],
+    },
+  },
+  {
+    key: "speaker_smart",
+    name: "Smart-Speaker",
+    category: "tech",
+    tier: "premium",
+    priceCents: 35000,
+    w: 1,
+    h: 1,
+    layer: "top",
+    surface: false,
+    sprite: {
+      palette: ["#3a3f4b", "#5d6679", "#62e0ff"],
+      grid: [
+        "................",
+        "................",
+        "................",
+        "................",
+        ".......000......",
+        ".....0011100....",
+        ".....0111110....",
+        "....011121110...",
+        "....011222110...",
+        "....011121110...",
+        ".....0111110....",
+        ".....0011100....",
+        ".......000......",
+        "................",
+        "................",
+        "................",
+      ],
+    },
+  },
+  {
+    key: "globe",
+    name: "Globus",
+    category: "decor",
+    tier: "premium",
+    priceCents: 60000,
+    w: 1,
+    h: 1,
+    layer: "top",
+    surface: false,
+    sprite: {
+      palette: ["#4f8cff", "#4fae6e", "#c8962f"],
+      grid: [
+        "................",
+        "................",
+        "................",
+        ".......000......",
+        ".....0000000....",
+        ".....0111000....",
+        "....001110000...",
+        "....000000000...",
+        "....000001100...",
+        ".....0000110....",
+        ".....0000000....",
+        ".......020......",
+        "......22222.....",
+        "................",
+        "................",
+        "................",
+      ],
+    },
+  },
+  {
+    key: "wine_bottle",
+    name: "Rotwein und Gläser",
+    category: "kitchen",
+    tier: "premium",
+    priceCents: 25000,
+    w: 1,
+    h: 1,
+    layer: "top",
+    surface: false,
+    sprite: {
+      palette: ["#2f7a4a", "#1d5a36", "#f3efe4", "#9a2420", "#e6f7ff"],
+      grid: [
+        "................",
+        "................",
+        "................",
+        "......00........",
+        "......00........",
+        "......00........",
+        ".....1111.......",
+        ".....1111.......",
+        ".....2222.......",
+        ".....2222..3....",
+        ".....1111.333...",
+        ".....1111..3....",
+        ".....1111..4....",
+        "................",
+        "................",
+        "................",
+      ],
+    },
+  },
+  {
+    key: "decanter",
+    name: "Kristallkaraffe",
+    category: "decor",
+    tier: "luxury",
+    priceCents: 450000,
+    w: 1,
+    h: 1,
+    layer: "top",
+    surface: false,
+    sprite: {
+      palette: ["#bfe6ff", "#7a2f7a", "#e6f7ff", "#ffffff"],
+      grid: [
+        "................",
+        "................",
+        "................",
+        "........3.......",
+        ".......222......",
+        ".......222......",
+        ".......222......",
+        ".......222......",
+        "......01110.....",
+        ".....0131110....",
+        ".....0111110....",
+        ".....0111110....",
+        "......01110.....",
+        ".......000......",
+        "................",
+        "................",
+      ],
+    },
+  },
+  {
+    key: "trophy_cup",
+    name: "Siegerpokal",
+    category: "decor",
+    tier: "luxury",
+    priceCents: 900000,
+    w: 1,
+    h: 1,
+    layer: "top",
+    surface: false,
+    sprite: {
+      palette: ["#ffd15c", "#fff1a8", "#c8962f", "#6e4a28"],
+      grid: [
+        "................",
+        "................",
+        "................",
+        ".....0000000....",
+        "....201100002...",
+        ".....0110000....",
+        ".....0110000....",
+        ".....0000000....",
+        "........2.......",
+        "........2.......",
+        "........2.......",
+        "......33333.....",
+        "......33333.....",
+        "................",
+        "................",
+        "................",
+      ],
+    },
+  },
+  {
+    key: "gold_bars",
+    name: "Goldbarren-Stapel",
+    category: "decor",
+    tier: "ultra",
+    priceCents: 25000000,
+    w: 1,
+    h: 1,
+    layer: "top",
+    surface: false,
+    sprite: {
+      palette: ["#ffd15c", "#fff1a8", "#c8962f"],
+      grid: [
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "......011110....",
+        "......000000....",
+        "......222222....",
+        "...011110011110.",
+        "...000000000000.",
+        "...222222222222.",
+        "................",
+        "................",
+        "................",
+        "................",
+      ],
+    },
+  },
+  {
+    key: "jewel_egg",
+    name: "Juwelen-Ei",
+    category: "decor",
+    tier: "ultra",
+    priceCents: 40000000,
+    w: 1,
+    h: 1,
+    layer: "top",
+    surface: false,
+    sprite: {
+      palette: ["#7c5cff", "#9b7bff", "#ffd15c", "#e4dcff", "#c8962f"],
+      grid: [
+        "................",
+        "................",
+        "................",
+        "................",
+        ".......000......",
+        ".....0031100....",
+        ".....0211110....",
+        "....011111210...",
+        "....011111110...",
+        "....011112110...",
+        ".....0121110....",
+        ".....0011100....",
+        "......44444.....",
+        "................",
+        "................",
+        "................",
       ],
     },
   },

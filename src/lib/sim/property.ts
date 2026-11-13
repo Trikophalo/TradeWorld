@@ -17,7 +17,10 @@ export interface Placement {
 export interface Footprint {
   readonly w: number;
   readonly h: number;
-  readonly layer: "floor" | "object";
+  /** floor = rugs, object = furniture, top = small things standing on a surface (ADR-100). */
+  readonly layer: "floor" | "object" | "top";
+  /** Objects whose surface carries top-layer things (tables, counters, desks). */
+  readonly surface?: boolean;
 }
 
 export function tierConfig(tier: PropertyTier, cfg: PropertyConfig = BALANCE.property) {
@@ -58,7 +61,8 @@ export function rotated(f: Footprint, rot: 0 | 90): { w: number; h: number } {
 
 /**
  * Checks a whole layout: every piece inside the floor and no two pieces of the same layer on the same tile
- * (rugs lie under furniture). Returns the ids that break a rule (empty = fine).
+ * (rugs lie under furniture). Things of the top layer must stand completely on surfaces (tables, counters, desks,
+ * ADR-100). Returns the ids that break a rule (empty = fine).
  */
 export function invalidPlacements(
   placements: readonly Placement[],
@@ -67,7 +71,9 @@ export function invalidPlacements(
   height: number,
 ): string[] {
   const bad = new Set<string>();
-  const used = { floor: new Map<number, string>(), object: new Map<number, string>() };
+  const used = { floor: new Map<number, string>(), object: new Map<number, string>(), top: new Map<number, string>() };
+  const surfaces = new Set<number>();
+  const tops: { id: string; cells: number[] }[] = [];
   for (const p of placements) {
     const f = footprint(p.id);
     if (!f) {
@@ -79,9 +85,12 @@ export function invalidPlacements(
       bad.add(p.id);
       continue;
     }
+    const cells: number[] = [];
     for (let y = p.y; y < p.y + h; y++) {
       for (let x = p.x; x < p.x + w; x++) {
         const cell = y * width + x;
+        cells.push(cell);
+        if (f.layer === "object" && f.surface) surfaces.add(cell);
         const other = used[f.layer].get(cell);
         if (other !== undefined && other !== p.id) {
           bad.add(p.id);
@@ -89,7 +98,9 @@ export function invalidPlacements(
         } else used[f.layer].set(cell, p.id);
       }
     }
+    if (f.layer === "top") tops.push({ id: p.id, cells });
   }
+  for (const t of tops) if (!t.cells.every((c) => surfaces.has(c))) bad.add(t.id);
   return [...bad];
 }
 

@@ -82,10 +82,31 @@ interface Item {
   priceCents: number;
   w: number;
   h: number;
-  layer: "floor" | "object";
+  layer: "floor" | "object" | "top";
+  /** Things of the top layer can stand on it (tables, counters, desks, ADR-100). */
+  surface: boolean;
   sprite: { palette: string[]; grid: string[] };
 }
 const items: Item[] = [];
+/** Objects with a surface for the top layer (ADR-100). */
+const SURFACES = new Set([
+  "table_folding",
+  "table_pine",
+  "table_oak",
+  "table_round",
+  "table_glass",
+  "table_marble",
+  "table_marble_round",
+  "table_gold",
+  "desk_pc",
+  "kitchen_counter",
+  "kitchen_island_marble",
+  "kitchen_island_gold",
+  "nightstand",
+  "sideboard",
+  "dresser",
+  "bar_counter",
+]);
 const add = (
   key: string,
   name: string,
@@ -95,11 +116,22 @@ const add = (
   w: number,
   h: number,
   draw: (s: Sprite) => void,
-  layer: "floor" | "object" = "object",
+  layer: "floor" | "object" | "top" = "object",
 ) => {
   const s = new Sprite(w * T, h * T);
   draw(s);
-  items.push({ key, name, category, tier, priceCents: euros * 100, w, h, layer, sprite: s.out() });
+  items.push({
+    key,
+    name,
+    category,
+    tier,
+    priceCents: euros * 100,
+    w,
+    h,
+    layer,
+    surface: SURFACES.has(key),
+    sprite: s.out(),
+  });
 };
 
 // ---------------------------------------------------------------- drawing helpers (top-down)
@@ -440,6 +472,194 @@ add("grand_piano", "Konzertflügel", "fun", "ultra", 650_000, 3, 2, (s) => {
   s.rect(10, 8, 14, 10, "#3a3f4b");
 });
 
+// surfaces for the top layer (ADR-100)
+add("nightstand", "Nachttisch", "decor", "budget", 90, 1, 1, (s) => {
+  s.rect(2, 2, 12, 12, "#9a6b3c");
+  s.rect(3, 3, 10, 3, "#c89a63");
+  s.rect(3, 8, 10, 1, "#6e4a28");
+  s.set(8, 10, "#ffd15c");
+  s.frame(2, 2, 12, 12, K);
+});
+add("sideboard", "Sideboard", "decor", "standard", 650, 2, 1, (s) => {
+  s.rect(1, 3, 30, 11, "#3a3f4b");
+  s.rect(2, 4, 28, 3, "#5d6679");
+  for (const x of [9, 16, 23]) s.rect(x, 7, 1, 6, "#24272f");
+  for (const x of [5, 12, 19, 26]) s.set(x, 10, "#c5ccd6");
+  s.frame(1, 3, 30, 11, K);
+});
+add("dresser", "Kommode", "decor", "premium", 3_200, 2, 1, (s) => {
+  s.rect(1, 2, 30, 12, "#6e4a28");
+  s.rect(2, 3, 28, 3, "#9a6b3c");
+  for (const y of [7, 10]) s.rect(3, y, 26, 2, "#8a5a32");
+  for (const [x, y] of [
+    [8, 8],
+    [23, 8],
+    [8, 11],
+    [23, 11],
+  ])
+    s.set(x!, y!, "#ffd15c");
+  s.frame(1, 2, 30, 12, K);
+});
+add("bar_counter", "Bartheke", "kitchen", "luxury", 24_000, 3, 1, (s) => {
+  s.rect(0, 2, 48, 12, "#24272f");
+  s.rect(1, 3, 46, 4, "#b8b8b0");
+  s.rect(1, 4, 46, 1, "#fbfbf8");
+  for (let x = 3; x < 46; x += 6) s.rect(x, 9, 3, 4, "#7a2f7a");
+  s.frame(0, 2, 48, 12, K);
+});
+
+// top layer: small things on tables, counters and desks (ADR-100); drawn small so the surface shows around them
+const top = (key: string, name: string, category: Category, tier: Tier, euros: number, draw: (s: Sprite) => void) =>
+  add(key, name, category, tier, euros, 1, 1, draw, "top");
+top("photo_frame", "Bilderrahmen", "decor", "budget", 15, (s) => {
+  s.rect(4, 3, 8, 10, "#c8962f");
+  s.rect(5, 4, 6, 8, "#bfe6ff");
+  s.rect(5, 9, 6, 3, "#4fae6e");
+  s.set(9, 6, "#ffd15c");
+  s.frame(4, 3, 8, 10, K);
+});
+top("cactus_pot", "Kaktus im Topf", "plants", "budget", 18, (s) => {
+  s.circle(8, 10, 3, "#c8553d");
+  s.rect(7, 3, 3, 7, "#4fae6e");
+  s.rect(5, 5, 2, 3, "#4fae6e");
+  s.rect(10, 4, 2, 3, "#4fae6e");
+  s.set(8, 4, "#7bd47a");
+  s.set(8, 6, "#2f7a4a");
+});
+top("candles", "Kerzen", "decor", "budget", 20, (s) => {
+  for (const [x, h] of [
+    [5, 6],
+    [8, 8],
+    [11, 5],
+  ] as const) {
+    s.rect(x, 13 - h, 2, h, "#f3efe4");
+    s.set(x, 12 - h, "#ff9a52");
+    s.set(x + 1, 11 - h, "#ffe06b");
+  }
+});
+top("books_stack", "Bücherstapel", "decor", "budget", 25, (s) => {
+  const colors = ["#d93a2f", "#4f8cff", "#2fd98c", "#ffd15c"];
+  colors.forEach((c, i) => {
+    s.rect(4 + (i % 2), 11 - i * 2, 9, 2, c);
+    s.set(4 + (i % 2), 11 - i * 2, K);
+  });
+});
+top("fruit_bowl", "Obstschale", "kitchen", "budget", 35, (s) => {
+  s.circle(8, 9, 5, "#e9edf2");
+  s.circle(8, 9, 4, "#c5ccd6");
+  s.circle(6, 8, 1, "#d93a2f");
+  s.circle(9, 7, 1, "#ffd15c");
+  s.circle(10, 10, 1, "#7bd47a");
+  s.circle(7, 10, 1, "#ff9a52");
+});
+top("lamp_table", "Tischlampe", "decor", "standard", 90, (s) => {
+  s.circle(8, 8, 5, "#ffe9a3");
+  s.circle(8, 8, 3, "#fff6d8");
+  s.circle(8, 8, 1, "#c8962f");
+});
+top("vase_flowers", "Blumenvase", "plants", "standard", 60, (s) => {
+  s.circle(8, 9, 3, "#4f8cff");
+  s.circle(8, 9, 2, "#9ad8ff");
+  for (const [x, y, c] of [
+    [6, 5, "#ff6170"],
+    [9, 4, "#ffd15c"],
+    [11, 6, "#f8bbd0"],
+    [5, 8, "#a24aa2"],
+    [11, 9, "#ff6170"],
+  ] as const) {
+    s.set(x, y, c);
+    s.set(x + 1, y, c);
+  }
+  s.set(8, 6, "#2f7a4a");
+  s.set(7, 7, "#2f7a4a");
+});
+top("coffee_maker", "Kaffeemaschine", "kitchen", "standard", 180, (s) => {
+  s.rect(4, 3, 8, 10, "#3a3f4b");
+  s.rect(5, 4, 6, 3, "#5d6679");
+  s.rect(6, 9, 4, 3, "#ffffff");
+  s.set(7, 10, "#6e4a28");
+  s.set(10, 5, "#2fd98c");
+  s.frame(4, 3, 8, 10, K);
+});
+top("radio_retro", "Röhrenradio", "tech", "standard", 220, (s) => {
+  s.rect(3, 5, 10, 8, "#9a6b3c");
+  s.rect(4, 6, 5, 5, "#e6c48f");
+  for (let y = 6; y < 11; y += 2) s.rect(4, y, 5, 1, "#c89a63");
+  s.circle(11, 9, 1, "#ffd15c");
+  s.frame(3, 5, 10, 8, K);
+});
+top("chess_board", "Schachbrett", "fun", "standard", 150, (s) => {
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) s.set(4 + x, 4 + y, (x + y) % 2 ? "#3a3f4b" : "#f3efe4");
+  s.set(6, 6, "#d93a2f");
+  s.set(9, 9, "#4f8cff");
+  s.frame(3, 3, 10, 10, "#6e4a28");
+});
+top("laptop", "Laptop", "tech", "premium", 1_400, (s) => {
+  s.rect(3, 4, 10, 6, "#5d6679");
+  s.rect(4, 5, 8, 4, "#62e0ff");
+  s.rect(2, 10, 12, 3, "#c5ccd6");
+  s.rect(5, 11, 6, 1, "#8f9bb3");
+  s.frame(3, 4, 10, 6, K);
+});
+top("speaker_smart", "Smart-Speaker", "tech", "premium", 350, (s) => {
+  s.circle(8, 8, 4, "#3a3f4b");
+  s.circle(8, 8, 3, "#5d6679");
+  s.circle(8, 8, 1, "#62e0ff");
+});
+top("globe", "Globus", "decor", "premium", 600, (s) => {
+  s.circle(8, 7, 4, "#4f8cff");
+  s.rect(6, 5, 3, 2, "#4fae6e");
+  s.rect(9, 8, 2, 2, "#4fae6e");
+  s.rect(6, 12, 5, 1, "#c8962f");
+  s.set(8, 11, "#c8962f");
+});
+top("wine_bottle", "Rotwein und Gläser", "kitchen", "premium", 250, (s) => {
+  s.rect(6, 3, 2, 3, "#2f7a4a");
+  s.rect(5, 6, 4, 7, "#1d5a36");
+  s.rect(5, 8, 4, 2, "#f3efe4");
+  s.circle(11, 10, 1, "#9a2420");
+  s.set(11, 12, "#e6f7ff");
+});
+top("decanter", "Kristallkaraffe", "decor", "luxury", 4_500, (s) => {
+  s.circle(8, 10, 3, "#bfe6ff");
+  s.circle(8, 10, 2, "#7a2f7a");
+  s.rect(7, 4, 3, 4, "#e6f7ff");
+  s.set(8, 3, "#ffffff");
+  s.set(7, 9, "#ffffff");
+});
+top("trophy_cup", "Siegerpokal", "decor", "luxury", 9_000, (s) => {
+  s.rect(5, 3, 7, 5, "#ffd15c");
+  s.rect(6, 4, 2, 3, "#fff1a8");
+  s.set(4, 4, "#c8962f");
+  s.set(12, 4, "#c8962f");
+  s.rect(8, 8, 1, 3, "#c8962f");
+  s.rect(6, 11, 5, 2, "#6e4a28");
+});
+top("gold_bars", "Goldbarren-Stapel", "decor", "ultra", 250_000, (s) => {
+  for (const [x, y] of [
+    [3, 9],
+    [9, 9],
+    [6, 6],
+  ] as const) {
+    s.rect(x, y, 6, 3, "#ffd15c");
+    s.rect(x + 1, y, 4, 1, "#fff1a8");
+    s.rect(x, y + 2, 6, 1, "#c8962f");
+  }
+});
+top("jewel_egg", "Juwelen-Ei", "decor", "ultra", 400_000, (s) => {
+  s.circle(8, 8, 4, "#7c5cff");
+  s.circle(8, 8, 3, "#9b7bff");
+  for (const [x, y] of [
+    [6, 6],
+    [10, 7],
+    [7, 10],
+    [9, 9],
+  ])
+    s.set(x!, y!, "#ffd15c");
+  s.set(7, 5, "#e4dcff");
+  s.rect(6, 12, 5, 1, "#c8962f");
+});
+
 // ---------------------------------------------------------------- floors (one 16 × 16 tile each)
 function floorTile(kind: string): { palette: string[]; grid: string[] } {
   const s = new Sprite(T, T);
@@ -616,8 +836,10 @@ export interface FurnitureItem {
   /** Size in floor tiles (before rotation). */
   readonly w: number;
   readonly h: number;
-  /** Rugs lie under furniture. */
-  readonly layer: "floor" | "object";
+  /** Rugs lie under furniture, small things stand on surfaces (ADR-100). */
+  readonly layer: "floor" | "object" | "top";
+  /** Tables, counters and desks carry things of the top layer. */
+  readonly surface: boolean;
   readonly sprite: Sprite;
 }
 
@@ -645,11 +867,12 @@ writeFileSync("src/config/furniture.ts", ts);
 const q = (x: string) => `'${x.replace(/'/g, "''")}'`;
 const sql = `-- GENERATED by scripts/gen-furniture.ts. Do not edit by hand.
 -- Home catalogue (ADR-082): furniture and cars without their pictures. Prices and sizes may be updated.
-insert into public.furniture_catalog (key, name, category, tier, price_cents, width, height, layer)
+insert into public.furniture_catalog (key, name, category, tier, price_cents, width, height, layer, surface)
 values
-${items.map((i) => `  (${q(i.key)}, ${q(i.name)}, ${q(i.category)}, ${q(i.tier)}, ${i.priceCents}, ${i.w}, ${i.h}, ${q(i.layer)})`).join(",\n")}
+${items.map((i) => `  (${q(i.key)}, ${q(i.name)}, ${q(i.category)}, ${q(i.tier)}, ${i.priceCents}, ${i.w}, ${i.h}, ${q(i.layer)}, ${i.surface})`).join(",\n")}
 on conflict (key) do update set name = excluded.name, category = excluded.category, tier = excluded.tier,
-  price_cents = excluded.price_cents, width = excluded.width, height = excluded.height, layer = excluded.layer;
+  price_cents = excluded.price_cents, width = excluded.width, height = excluded.height, layer = excluded.layer,
+  surface = excluded.surface;
 
 insert into public.car_catalog (key, name, brand, tier, price_cents)
 values

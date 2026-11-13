@@ -700,7 +700,8 @@ export interface ProposeDealInput {
 
 // ------------------------------------------------------------------ upgrades (ADR-093)
 
-export type UpgradeKey = "vault" | "income" | "study" | "overtime" | "rhetoric";
+export type { UpgradeKey } from "@/config/upgrades";
+import type { UpgradeKey } from "@/config/upgrades";
 
 export interface UpgradesState {
   levels: Record<UpgradeKey, number>;

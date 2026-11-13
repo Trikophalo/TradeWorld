@@ -3,7 +3,18 @@
 import { motion, useReducedMotion } from "motion/react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
-import { ALARM_CLOCK, BOOK, COIN, SPEECH, VAULT_DOOR } from "@/components/pixel/art";
+import {
+  ALARM_CLOCK,
+  BOOK,
+  COIN,
+  GEARS,
+  GRADUATE,
+  KEY,
+  PALETTE,
+  SPEECH,
+  VAULT_DOOR,
+  WALLET,
+} from "@/components/pixel/art";
 import { PixelIcon, type PixelArt } from "@/components/pixel/pixel-icon";
 import { Card } from "@/components/ui/card";
 import { HoldButton } from "@/components/ui/hold-button";
@@ -18,7 +29,7 @@ import { formatBps, formatMoney } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
 import { SPRING } from "@/lib/motion";
 import { playSound } from "@/lib/sound";
-import { upgradeCheck, upgradeCostCents, upgradeValue } from "@/lib/sim/upgrades";
+import { upgradeCheck, upgradeCostCents, upgradeStageLevel, upgradeValue } from "@/lib/sim/upgrades";
 import { cn } from "@/lib/utils";
 import { useSetUpgrades, useUpgrades } from "../hooks";
 
@@ -28,6 +39,11 @@ const ICONS: Record<UpgradeKey, PixelArt> = {
   study: BOOK,
   overtime: ALARM_CLOCK,
   rhetoric: SPEECH,
+  mentor: GRADUATE,
+  artist: PALETTE,
+  efficiency: GEARS,
+  makler: KEY,
+  crypto_wallet: WALLET,
 };
 
 const PIXEL_FRAME = "rounded-xs border-2 [box-shadow:0_4px_0_0_var(--line-2)]";
@@ -87,6 +103,12 @@ function useValueText() {
         return t("overtime.value", { value });
       case "rhetoric":
         return t("rhetoric.value", { percent: formatBps(value) });
+      case "mentor":
+      case "artist":
+      case "efficiency":
+      case "makler":
+      case "crypto_wallet":
+        return t(`${key}.value`, { percent: formatBps(value).replace("+", "") });
     }
   };
 }
@@ -179,7 +201,7 @@ export function UpgradeCard({ upgradeKey: key, level }: { upgradeKey: UpgradeKey
           <p className="rounded-md bg-surface-2 px-3 py-2.5 text-center text-sm font-medium text-gain">{t("maxed")}</p>
         ) : check === "level" ? (
           <p className="rounded-md bg-surface-2 px-3 py-2.5 text-center text-sm text-fg-3">
-            {t("fromLevel", { level: cfg.minLevel })}
+            {t("fromLevel", { level: upgradeStageLevel(key, level) ?? cfg.minLevel })}
           </p>
         ) : (
           <>

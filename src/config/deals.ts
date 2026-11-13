@@ -16,8 +16,14 @@
 export type DealKind = "loan" | "supply" | "stake";
 
 export interface DealsConfig {
-  /** Deals unlock at this level (both sides). */
+  /** Deals unlock at this level (both sides), together with the first company (ADR-100). */
   readonly minLevel: number;
+  /**
+   * Company deals grow with the company (ADR-100): supply contracts (their most possible cost) and stakes may be at
+   * most this share of the value of the company behind them, but always at least `minSizeCents`.
+   */
+  readonly sizeShareOfValueBps: number;
+  readonly minSizeCents: number;
   /** An offer that nobody accepts expires after this many hours. */
   readonly offerValidHours: number;
   /** Open offers per player at a time. */
@@ -77,13 +83,17 @@ export interface TrustConfig {
     readonly supplyShort: number;
     readonly stakeKept: number;
     readonly dealBroken: number;
+    /** Selling a large part of the own coin's team tokens at once (ADR-101). */
+    readonly rugPull: number;
   };
   /** Score from which a band starts, ascending. */
   readonly bands: readonly { readonly from: number; readonly key: TrustBand }[];
 }
 
 export const DEALS: DealsConfig = {
-  minLevel: 7,
+  minLevel: 6,
+  sizeShareOfValueBps: 5_000,
+  minSizeCents: 5_000_000,
   offerValidHours: 48,
   maxOpenOffers: 5,
   maxActivePerKind: 5,
@@ -128,6 +138,7 @@ export const TRUST: TrustConfig = {
     supplyShort: -4,
     stakeKept: 3,
     dealBroken: -12,
+    rugPull: -20,
   },
   bands: [
     { from: 0, key: "risky" },

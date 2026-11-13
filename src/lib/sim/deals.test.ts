@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  dealSizeLimitCents,
   loanCollect,
   loanDueCents,
   loanPhase,
@@ -165,5 +166,13 @@ describe("trust", () => {
     expect(trustOnEnd("supply", "short")).toEqual({ obligor: -4, other: 3 });
     expect(trustOnEnd("stake", "kept")).toEqual({ obligor: 3, other: 0 });
     expect(trustOnEnd("stake", "broken")).toEqual({ obligor: -12, other: 0 });
+  });
+});
+
+describe("deal size grows with the company (ADR-100)", () => {
+  it("is half the company value, at least 50.000 €", () => {
+    expect(dealSizeLimitCents(0)).toBe(5_000_000);
+    expect(dealSizeLimitCents(4_000_000)).toBe(5_000_000);
+    expect(dealSizeLimitCents(30_000_000)).toBe(15_000_000);
   });
 });

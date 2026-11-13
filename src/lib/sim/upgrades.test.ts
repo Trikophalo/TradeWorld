@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { BALANCE } from "../../config/balance.ts";
-import { basicIncomeCentsPerHour, upgradeCheck, upgradeCostCents, upgradeEffects, upgradeValue } from "./upgrades.ts";
+import {
+  basicIncomeCentsPerHour,
+  upgradeCheck,
+  upgradeCostCents,
+  upgradeEffects,
+  upgradeStageLevel,
+  upgradeValue,
+} from "./upgrades.ts";
 
 describe("upgrade prices", () => {
   it("grow by the factor and stop at the last level", () => {
@@ -28,6 +35,24 @@ describe("upgrade effects", () => {
       workHoursPerBranchPoint: 6,
       paidHoursCap: 12,
       promotionBonusBps: 0,
+      workXpBps: 10_000,
+      artDiscountBps: 0,
+      fixedCostDiscountBps: 0,
+      propertyDiscountBps: 0,
+      cryptoFeeDiscountBps: 0,
+    });
+  });
+
+  it("need a higher player level for every further stage (ADR-100)", () => {
+    expect(upgradeStageLevel("vault", 0)).toBe(1);
+    expect(upgradeStageLevel("vault", 1)).toBe(3);
+    expect(upgradeStageLevel("vault", 5)).toBe(11);
+    expect(upgradeStageLevel("vault", 6)).toBeNull();
+    expect(upgradeCheck("vault", 1, 2, 9_999_999)).toBe("level");
+    expect(upgradeCheck("vault", 1, 3, 9_999_999)).toBe("ok");
+    expect(upgradeEffects({ makler: 2, crypto_wallet: 1 })).toMatchObject({
+      propertyDiscountBps: 1_000,
+      cryptoFeeDiscountBps: 2_500,
     });
   });
 

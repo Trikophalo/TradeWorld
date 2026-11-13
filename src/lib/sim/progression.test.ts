@@ -81,7 +81,7 @@ describe("unlocks", () => {
     expect(unlocksAtLevel(3).map((u) => u.key)).toEqual(["limit_orders", "watchlist"]);
     // Owner's order: jobs (2), artworks (4), companies (6), property (8).
     expect(unlocksAtLevel(4).map((u) => u.key)).toEqual(["artworks"]);
-    expect(unlocksAtLevel(6).map((u) => u.key)).toEqual(["found_garage"]);
+    expect(unlocksAtLevel(6).map((u) => u.key)).toEqual(["found_garage", "deals"]);
     expect(unlocksAtLevel(8).map((u) => u.key)).toEqual(["property", "short_selling"]);
     expect(unlocksAtLevel(11)).toEqual([]);
     expect(unlocksUpToLevel(3)).toHaveLength(5);

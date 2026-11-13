@@ -3307,7 +3307,7 @@
     "next": "Danach",
     "levelOf": "Stufe {level} von {max}",
     "maxed": "Höchste Stufe erreicht",
-    "fromLevel": "Ab Level {level}",
+    "fromLevel": "Nächste Stufe ab Level {level}",
     "missing": "Dir fehlen {amount}",
     "buy": "Gedrückt halten · {price}",
     "bought": "Verbessert!",
@@ -3340,6 +3340,31 @@
         "name": "Rhetorik-Kurs",
         "text": "Bessere Chance, wenn du einen KI-Chef um eine Beförderung bittest.",
         "value": "+{percent} Chance"
+      },
+      "mentor": {
+        "name": "Mentor",
+        "text": "Ein erfahrener Kollege zeigt dir die Kniffe: mehr XP für jede Arbeitsstunde.",
+        "value": "+{percent} XP aus Arbeit"
+      },
+      "artist": {
+        "name": "Kunststudio",
+        "text": "Eigenes Atelier: Neue Artworks zu malen kostet weniger.",
+        "value": "−{percent} Malkosten"
+      },
+      "efficiency": {
+        "name": "Effizienz-Coach",
+        "text": "Schlankere Abläufe: Deine Firma hat weniger Fixkosten.",
+        "value": "−{percent} Fixkosten"
+      },
+      "makler": {
+        "name": "Makler-Kontakte",
+        "text": "Gute Beziehungen: Wohnungen, Möbel, Böden und Autos werden günstiger.",
+        "value": "−{percent} Wohnen und Autos"
+      },
+      "crypto_wallet": {
+        "name": "Hardware-Wallet",
+        "text": "Eigene Wallet: weniger Gebühren beim Krypto-Handel.",
+        "value": "−{percent} Krypto-Gebühren"
       }
     }
   },

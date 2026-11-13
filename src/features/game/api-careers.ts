@@ -146,8 +146,31 @@ const toPromotion = (p: z.infer<typeof promotionSchema>): PromotionState => ({
   nextSalaryCentsPerHour: p.next_salary_cents_per_hour,
 });
 
-const upgradeKey = z.enum(["vault", "income", "study", "overtime", "rhetoric"]);
-const levelsSchema = z.object({ vault: num, income: num, study: num, overtime: num, rhetoric: num });
+const upgradeKey = z.enum([
+  "vault",
+  "income",
+  "study",
+  "overtime",
+  "rhetoric",
+  "mentor",
+  "artist",
+  "efficiency",
+  "makler",
+  "crypto_wallet",
+]);
+// Upgrades added in M4k (ADR-100) are 0 on older servers.
+const levelsSchema = z.object({
+  vault: num,
+  income: num,
+  study: num,
+  overtime: num,
+  rhetoric: num,
+  mentor: num.default(0),
+  artist: num.default(0),
+  efficiency: num.default(0),
+  makler: num.default(0),
+  crypto_wallet: num.default(0),
+});
 
 const jobSchema = z.object({
   id: z.string(),

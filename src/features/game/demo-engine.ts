@@ -1010,7 +1010,7 @@ const career = createCareerEngine({
 
 const UPGRADE_KEYS = BALANCE.upgrades.order;
 const upgradeLevelsNow = () =>
-  Object.fromEntries(UPGRADE_KEYS.map((k) => [k, p().upgrades?.[k] ?? 0])) as Record<UpgradeKey, number>;
+  Object.fromEntries(UPGRADE_KEYS.map((k: UpgradeKey) => [k, p().upgrades?.[k] ?? 0])) as Record<UpgradeKey, number>;
 
 const upgradeEngine: Pick<GameEngine, "upgrades" | "buyUpgrade"> = {
   upgrades: () => delay(() => ({ levels: upgradeLevelsNow() })),

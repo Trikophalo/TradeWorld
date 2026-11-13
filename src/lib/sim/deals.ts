@@ -31,7 +31,13 @@ export interface StakeTerms {
   readonly hours: number;
 }
 
-export type TermsError = "amount" | "interest" | "hours" | "fee" | "prepay" | "share" | "volume";
+export type TermsError = "amount" | "interest" | "hours" | "fee" | "prepay" | "share" | "volume" | "size";
+
+/** Biggest company deal for a company of this value (ADR-100): a share of the value, at least the minimum. */
+export function dealSizeLimitCents(companyValueCents: number, cfg: BalanceConfig = BALANCE): number {
+  const d = cfg.deals;
+  return Math.max(d.minSizeCents, Math.floor((Math.max(0, companyValueCents) * d.sizeShareOfValueBps) / 10_000));
+}
 
 const inRange = (value: number, min: number, max: number) => Number.isInteger(value) && value >= min && value <= max;
 

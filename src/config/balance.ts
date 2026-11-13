@@ -1,4 +1,5 @@
 import { COMPANY_EVENTS, type CompanyEventsConfig } from "./company-events.ts";
+import { CRYPTO, type CryptoConfig } from "./crypto.ts";
 import { DEALS, TRUST, type DealsConfig, type TrustConfig } from "./deals.ts";
 import { SKILL_NODES, type SkillBranch, type SkillNodeConfig } from "./skills.ts";
 import { UPGRADES, type UpgradesConfig } from "./upgrades.ts";
@@ -783,6 +784,8 @@ export interface BalanceConfig {
   readonly deals: DealsConfig;
   /** Trust score of a player from kept and broken deals (ADR-098). */
   readonly trust: TrustConfig;
+  /** Cryptocurrencies and own coins (ADR-101), values in crypto.ts. */
+  readonly crypto: CryptoConfig;
 }
 
 export type PropertyTier = "flat" | "apartment" | "house" | "villa" | "luxury_villa";
@@ -1828,7 +1831,7 @@ export const BALANCE = {
       { level: 5, key: "bonds" },
       { level: 5, key: "junior_jobs" },
       { level: 6, key: "found_garage" },
-      { level: 7, key: "deals" },
+      { level: 6, key: "deals" },
       { level: 7, key: "analyst_reports" },
       { level: 8, key: "property" },
       { level: 8, key: "short_selling" },
@@ -2233,6 +2236,7 @@ export const BALANCE = {
   upgrades: UPGRADES,
   deals: DEALS,
   trust: TRUST,
+  crypto: CRYPTO,
   social: {
     feed: {
       pageSize: 30,

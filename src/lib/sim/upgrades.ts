@@ -30,6 +30,13 @@ export interface UpgradeEffects {
   readonly paidHoursCap: number;
   /** Extra promotion chance with AI bosses, in bps. */
   readonly promotionBonusBps: number;
+  /** XP from work hours, in bps (10 000 = base). */
+  readonly workXpBps: number;
+  /** Discounts in bps: painting artworks, company fixed costs, property, crypto pool fees. */
+  readonly artDiscountBps: number;
+  readonly fixedCostDiscountBps: number;
+  readonly propertyDiscountBps: number;
+  readonly cryptoFeeDiscountBps: number;
 }
 
 export function upgradeEffects(levels: UpgradeLevels, cfg: BalanceConfig = BALANCE): UpgradeEffects {
@@ -43,6 +50,11 @@ export function upgradeEffects(levels: UpgradeLevels, cfg: BalanceConfig = BALAN
     ),
     paidHoursCap: cfg.careers.paidHoursPerDayCap + levelOf(levels, "overtime", cfg) * u.overtime.perLevel,
     promotionBonusBps: levelOf(levels, "rhetoric", cfg) * u.rhetoric.perLevel,
+    workXpBps: 10_000 + levelOf(levels, "mentor", cfg) * u.mentor.perLevel,
+    artDiscountBps: levelOf(levels, "artist", cfg) * u.artist.perLevel,
+    fixedCostDiscountBps: levelOf(levels, "efficiency", cfg) * u.efficiency.perLevel,
+    propertyDiscountBps: levelOf(levels, "makler", cfg) * u.makler.perLevel,
+    cryptoFeeDiscountBps: levelOf(levels, "crypto_wallet", cfg) * u.crypto_wallet.perLevel,
   };
 }
 
@@ -65,7 +77,25 @@ export function upgradeValue(key: UpgradeKey, level: number, cfg: BalanceConfig 
       return e.paidHoursCap;
     case "rhetoric":
       return e.promotionBonusBps;
+    case "mentor":
+      return e.workXpBps - 10_000;
+    case "artist":
+      return e.artDiscountBps;
+    case "efficiency":
+      return e.fixedCostDiscountBps;
+    case "makler":
+      return e.propertyDiscountBps;
+    case "crypto_wallet":
+      return e.cryptoFeeDiscountBps;
   }
+}
+
+/** Player level the next stage needs (ADR-100): minLevel + stages bought · levelStep; null when maxed out. */
+export function upgradeStageLevel(key: UpgradeKey, currentLevel: number, cfg: BalanceConfig = BALANCE): number | null {
+  const u = cfg.upgrades[key];
+  const level = Math.max(0, Math.floor(currentLevel));
+  if (level >= u.maxLevel) return null;
+  return u.minLevel + level * u.levelStep;
 }
 
 export type UpgradeCheck = "ok" | "maxed" | "level" | "cash";
@@ -79,7 +109,7 @@ export function upgradeCheck(
 ): UpgradeCheck {
   const cost = upgradeCostCents(key, currentLevel, cfg);
   if (cost === null) return "maxed";
-  if (playerLevel < cfg.upgrades[key].minLevel) return "level";
+  if (playerLevel < (upgradeStageLevel(key, currentLevel, cfg) ?? 0)) return "level";
   if (cashCents < cost) return "cash";
   return "ok";
 }

@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import { BALANCE } from "../../config/balance.ts";
 import { invalidPlacements, nextTier, propertyValueCents, resaleCents, rotated, upgradeCostCents } from "./property.ts";
 
-const sizes: Record<string, { w: number; h: number; layer: "floor" | "object" }> = {
+const sizes: Record<string, { w: number; h: number; layer: "floor" | "object" | "top"; surface?: boolean }> = {
   sofa: { w: 3, h: 1, layer: "object" },
   chair: { w: 1, h: 1, layer: "object" },
   rug: { w: 3, h: 2, layer: "floor" },
+  table: { w: 2, h: 1, layer: "object", surface: true },
+  lamp: { w: 1, h: 1, layer: "top" },
 };
 const footprint = (id: string) => sizes[id.split("#")[0]!];
 
@@ -58,5 +60,40 @@ describe("property (ADR-082)", () => {
     ).toEqual(["chair#1", "sofa#1"]);
     expect(invalidPlacements([{ id: "sofa#1", x: 6, y: 0, rot: 0 }], footprint, 8, 6)).toEqual(["sofa#1"]);
     expect(invalidPlacements([{ id: "sofa#1", x: 7, y: 3, rot: 90 }], footprint, 8, 6)).toEqual([]);
+  });
+
+  it("small things stand on tables and counters only, one per tile (ADR-100)", () => {
+    const on = [
+      { id: "table#1", x: 2, y: 2, rot: 0 as const },
+      { id: "lamp#1", x: 2, y: 2, rot: 0 as const },
+      { id: "lamp#2", x: 3, y: 2, rot: 0 as const },
+    ];
+    expect(invalidPlacements(on, footprint, 8, 6)).toEqual([]);
+    // On the floor or on a sofa: not allowed.
+    expect(invalidPlacements([{ id: "lamp#1", x: 0, y: 0, rot: 0 }], footprint, 8, 6)).toEqual(["lamp#1"]);
+    expect(
+      invalidPlacements(
+        [
+          { id: "sofa#1", x: 0, y: 0, rot: 0 },
+          { id: "lamp#1", x: 1, y: 0, rot: 0 },
+        ],
+        footprint,
+        8,
+        6,
+      ),
+    ).toEqual(["lamp#1"]);
+    // Two things on the same tile of a table clash.
+    expect(
+      invalidPlacements(
+        [
+          { id: "table#1", x: 2, y: 2, rot: 0 },
+          { id: "lamp#1", x: 2, y: 2, rot: 0 },
+          { id: "lamp#2", x: 2, y: 2, rot: 0 },
+        ],
+        footprint,
+        8,
+        6,
+      ).sort(),
+    ).toEqual(["lamp#1", "lamp#2"]);
   });
 });

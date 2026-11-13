@@ -1303,3 +1303,101 @@ grinden.
   und den Wohnungsstufen (`property.tiers`: Wohnung ab 8, Apartment ab 11). Der Server liest sie aus `game_config`.
 - Wer eine Funktion schon genutzt hat, behält sie: Bestehende Firmen, Wohnungen und Deals bleiben, auch wenn das Level
   jetzt höher liegen müsste. Neu gründen, kaufen oder anbieten geht erst ab dem neuen Level.
+
+## ADR-100: Verbesserungen mit Level-Stufen, drei Möbel-Ebenen, eindeutige Namen, Deals mit der Firma — `akzeptiert`
+
+- **Verbesserungen nach Level** (`src/config/upgrades.ts`): Jede weitere Stufe braucht ein höheres Spieler-Level
+  (Stufe n ab `minLevel + (n − 1) · levelStep`), z. B. Tresor ab Level 1, 3, 5, 7, 9, 11. Fünf neue Verbesserungen:
+
+  | Verbesserung    | Wirkung je Stufe                        | Stufen | ab Level  |
+  | --------------- | --------------------------------------- | ------ | --------- |
+  | Mentor          | +10 % XP aus Arbeitsstunden             | 3      | 4, 8, 12  |
+  | Kunststudio     | −10 % Kosten für ein neues Artwork      | 3      | 4, 7, 10  |
+  | Effizienz-Coach | −5 % Fixkosten der eigenen Firma        | 3      | 6, 10, 14 |
+  | Makler-Kontakte | −5 % auf Wohnungen, Möbel, Böden, Autos | 3      | 8, 12, 16 |
+  | Hardware-Wallet | −25 % Pool-Gebühren beim Krypto-Handel  | 2      | 10, 15    |
+
+- **Drei Ebenen beim Einrichten** (`src/lib/sim/property.ts`): Boden (Teppiche), Möbel, und neu **obendrauf**:
+  kleine Dinge wie Lampen, Vasen, Laptop, Pokal oder Goldbarren stehen auf Tischen, Theken, Schreibtischen,
+  Nachttischen und Kommoden (Möbel mit Ablagefläche). Ein Ding obendrauf muss ganz auf Ablageflächen stehen, je
+  Kachel eines. Neu im Katalog: Nachttisch, Sideboard, Kommode, Bartheke und 18 Dinge für obendrauf.
+- **Eindeutige Namen:** Firmen, Artworks und Kryptowährungen haben eindeutige Namen (Groß- und Kleinschreibung,
+  Umlaute und ähnlich aussehende Zeichen zählen gleich, wie bei Spielernamen). Gründet jemand eine neue Firma, wird
+  die alte aufgelöst (nach Bestätigung, wie beim Schließen), und ihr Name ist wieder frei.
+- **Deals mit der Firma:** Deals schalten zusammen mit der ersten Firma frei (Level 6). Lieferverträge (ihre
+  höchstmöglichen Kosten) und Beteiligungen dürfen höchstens halb so groß sein wie der Wert der Firma dahinter,
+  mindestens aber 50.000 €. Große Deals kommen also mit einer wertvollen Firma. Kredite bleiben an das Level gebunden.
+
+## ADR-101: Kryptowährungen — `akzeptiert`
+
+Vorgabe: Kryptos ab einem Level, viel volatiler und schneller als Aktien, mehr Stablecoins und Shitcoins, mehr Risiko
+und mehr Chancen. Eigene Währung mit Pixel-Logo, eine zur Zeit. Ein durchdachtes Konzept für die Entwicklung einer
+Währung und Zufallsereignisse für den Kurs.
+
+**Markt** (`src/config/crypto.ts`, `src/lib/sim/crypto.ts`):
+
+- Handel ab Level 10, eigene Währung ab Level 14. Kryptos laufen rund um die Uhr, ohne Börsenzeiten.
+- Jeder Coin hat einen **Liquiditätspool** (konstantes Produkt, x · y = k). Kaufen legt Geld in den Pool und nimmt
+  Coins heraus, deshalb bewegt jeder Kauf den Kurs, kleine Pools viel stärker (Slippage). Die Pool-Gebühr (0,05 %
+  bei Stablecoins bis 1 % bei Shitcoins) bleibt im Pool. Kein Hebel, keine Leerverkäufe, 25 % Steuer auf Gewinne
+  wie bei Aktien.
+- Der Markt (KI-Händler) handelt alle 5 Sekunden gegen die Pools. Ihr Geld kommt aus dem Finanzmarkt-Topf des
+  geschlossenen Geldkreislaufs.
+- **15 Coins** in vier Klassen (alle Namen erfunden):
+
+  | Klasse      | Coins                                                         | Tagesschwankung | folgt dem Markt |
+  | ----------- | ------------------------------------------------------------- | --------------- | --------------- |
+  | Stablecoins | Euro-Stabil, Nexa-Stable, Algostabil, Goldtaler               | 0,2 %           | nein            |
+  | Große       | Kryptaler, Nebula Chain, Quantor                              | 6 %             | Beta 1          |
+  | Altcoins    | Flux, Orbit, Synapse                                          | 14 %            | Beta 1,3        |
+  | Shitcoins   | Hamsterrakete, Mondkeks, Laserfrosch, Turbobrezel, Pixelpudel | 40 %            | Beta 1,6        |
+
+  Zum Vergleich: Blue-Chip-Aktien schwanken um etwa 3 % am Tag.
+
+- **Krypto-Wetter:** Der ganze Markt ist in einer Phase (Bullenmarkt +3 %/Tag, seitwärts, Bärenmarkt −3 %/Tag), die
+  ein bis drei Tage dauert. Coins folgen ihr mit ihrem Beta, Stablecoins gar nicht.
+- **Stablecoins** werden zum Kurs von 1 € zurückgezogen (Goldtaler: Goldpreis). Selten verlieren sie ihre Bindung
+  (Depeg); Algostabil, ein algorithmischer Stablecoin, doppelt so hart.
+- Stürzt ein Shitcoin nach einem Rug Pull unter 0,0002 €, ist er tot. Nach 24 Stunden ersetzt ihn ein neuer
+  Shitcoin mit frischem Namen. Wer noch Coins hält, verliert sie.
+
+**Zufallsereignisse** (einmal je Coin und Stunde gewürfelt, Wirkung als Kurssprung):
+
+| Ereignis               | trifft                 | Wirkung                         | eigene Coins: wahrscheinlicher mit … |
+| ---------------------- | ---------------------- | ------------------------------- | ------------------------------------ |
+| Hack                   | Alt, Shit, eigene      | −30 … −60 %, Pool verliert 20 % | weniger Technik (Audit hilft)        |
+| Bug im Smart Contract  | Alt, Shit, eigene      | −8 … −22 %                      | weniger Technik                      |
+| Influencer-Post        | Alt, Shit, eigene      | +28 … +230 %                    | mehr Hype                            |
+| Listing an einer Börse | Alt, Shit, eigene      | +22 … +80 %                     | mehr Technik und Nutzen              |
+| Delisting-Gerücht      | Alt, Shit, eigene      | −10 … −30 %                     | weniger Technik und Nutzen           |
+| Wal kauft / verkauft   | alle außer Stablecoins | ±10 … ±40 %                     | mehr Hype (Kauf)                     |
+| Partnerschaft          | Große, Alt, eigene     | +10 … +42 %                     | mehr Nutzen                          |
+| FUD (Angstmache)       | alle außer Stablecoins | −5 … −26 %                      | weniger Hype                         |
+| Netzwerk-Upgrade       | Große, Alt             | +5 … +22 %                      |                                      |
+| Depeg                  | Stablecoins            | −3 … −33 %                      |                                      |
+| Meme-Welle             | ganzer Markt           | Shitcoins +22 … +120 %          |                                      |
+| Regulierung            | ganzer Markt           | −5 … −22 %                      |                                      |
+| Rug Pull               | KI-Shitcoins           | −92 … −99 %                     |                                      |
+
+**Eigene Kryptowährung** (eine zur Zeit je Spieler):
+
+1. **Gründen** (25.000 €): eindeutiger Name, Ticker (3 bis 5 Buchstaben, frei unter allen Wertpapieren), Pixel-Logo
+   16 × 16 wie bei Firmen. Die Währung startet im Entwurf.
+2. **Entwickeln:** Drei Werte von 0 bis 100 bestimmen den Kurs:
+   - **Technik** (Sicherheit): Smart Contract programmieren (6 h, 2.000 €, 50 % Erfolg plus 3 % je IT-Skillpunkt,
+     +15), Security-Audit (24 h, 15.000 €, sicher, +35), Bugfix (3 h, 1.000 €, +5). Technik verfällt nicht und
+     macht den Kurs ruhiger (bis halbe Schwankung).
+   - **Hype** (Community): Community aufbauen (4 h, 500 €, +10), Influencer bezahlen (2 h, 8.000 €, +35,
+     15 % Risiko, dass es auffliegt). Hype verfällt um 3 % je Stunde (halbiert sich in einem Tag).
+   - **Nutzen**: Partnerschaft (12 h, 6.000 €, +20), Staking einführen (12 h, 5.000 €, +15), beides erst nach dem
+     Start. Nutzen verfällt langsam (0,5 % je Stunde).
+   - Eine Aktion läuft zur Zeit.
+3. **Starten** (ab Technik 20): Der Gründer wählt den Startkurs (0,01 €, 0,10 €, 1 € oder 10 €), legt mindestens
+   5.000 € Liquidität in den Pool und behält 10 bis 50 % der Coins als Team-Anteil. Ab dann handeln alle.
+4. **Kurs:** Tagestrend = 20 % × Hype + 8 % × Nutzen − 6 % (ohne Pflege fällt jede Währung), dazu Krypto-Wetter,
+   Zufall und Ereignisse. Spieler bewegen den Kurs mit jedem Kauf und Verkauf über den Pool.
+5. **Vertrauen:** Verkauft der Gründer mehr als 20 % seines Team-Anteils innerhalb von 24 Stunden, ist das ein
+   **Rug Pull**: −20 Vertrauen, Hype fällt auf 0, und alle Freunde sehen es im Feed. Token verbrennen (+8 Hype) zeigt
+   dagegen, dass der Gründer an seine Währung glaubt.
+6. **Einstellen:** Der Gründer kann die Währung einstellen. Der Pool wird nach Coins an alle Halter ausgezahlt,
+   der Gründer bekommt seinen Teil wie alle. Danach sind Name und Ticker frei, und er kann eine neue Währung gründen.

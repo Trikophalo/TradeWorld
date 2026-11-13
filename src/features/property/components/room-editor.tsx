@@ -80,7 +80,7 @@ export function RoomEditor({
   );
   const footprint = (id: string) => {
     const item = furnitureItem(keyOf.get(id) ?? "");
-    return item ? { w: item.w, h: item.h, layer: item.layer } : undefined;
+    return item ? { w: item.w, h: item.h, layer: item.layer, surface: item.surface } : undefined;
   };
   const placements = (l: Layout): Placement[] => [...l].map(([id, p]) => ({ id, ...p }));
 

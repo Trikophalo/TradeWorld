@@ -431,6 +431,97 @@ export const SPEECH: PixelArt = {
   ],
 };
 
+/** Upgrades v2 (ADR-100): mentor cap, artist palette, efficiency gears, estate agent key, crypto wallet. */
+export const GRADUATE: PixelArt = {
+  palette: { k: "#1c2230", b: "#3a4256", h: "#5d6880", y: "#f2c14e" },
+  grid: [
+    "............",
+    ".....kk.....",
+    "...kkbbkk...",
+    ".kkbbhhbbkk.",
+    "kbbhhhhhhbbk",
+    ".kkbbbbbbkkk",
+    "...kbbbbk.yk",
+    "...kbbbbk.y.",
+    "...kkkkkk.y.",
+    "..........yy",
+    "............",
+    "............",
+  ],
+};
+
+export const PALETTE: PixelArt = {
+  palette: { k: "#1c2230", w: "#e6c48f", r: "#ef5b5b", b: "#4f8cff", g: "#2fd98c", y: "#f2c14e" },
+  grid: [
+    "............",
+    "...kkkkkk...",
+    "..kwwwwwwk..",
+    ".kwrrwwbbwk.",
+    "kwwrrwwbbwwk",
+    "kwwwwwwwwwwk",
+    "kwggwwk..kwk",
+    "kwggwk....kk",
+    "kwwwwk......",
+    ".kwyywk.....",
+    "..kkkkk.....",
+    "............",
+  ],
+};
+
+export const GEARS: PixelArt = {
+  palette: { k: "#1c2230", s: "#8e99ad", h: "#c9d2e0", d: "#5d6880" },
+  grid: [
+    "...k.k......",
+    "..kskskk....",
+    ".kshhhsk....",
+    "kshkkkhsk...",
+    ".shk.khs.k.k",
+    "kshkkkhskskk",
+    ".kshhhskshhs",
+    "..kskskshkkh",
+    "...k.k.shk.k",
+    "......kshkkh",
+    ".......kshhs",
+    "........kskk",
+  ],
+};
+
+export const KEY: PixelArt = {
+  palette: { k: "#1c2230", y: "#f2c14e", h: "#fff3c4", o: "#a8741a" },
+  grid: [
+    "............",
+    "..kkkk......",
+    ".kyhhyk.....",
+    "kyh..yyk....",
+    "kyh..yyk....",
+    ".kyyyyokkkkk",
+    "..kkkkyyyyyk",
+    "......kkokok",
+    "........k.k.",
+    "............",
+    "............",
+    "............",
+  ],
+};
+
+export const WALLET: PixelArt = {
+  palette: { k: "#1c2230", b: "#7c5cff", d: "#5a3fd1", h: "#b8a6ff", y: "#f2c14e" },
+  grid: [
+    "............",
+    "............",
+    ".kkkkkkkkkk.",
+    "kbhhhhhhhhbk",
+    "kbbbbbbbbbbk",
+    "kbbbbbbkkkkk",
+    "kbbbbbkyyyyk",
+    "kbbbbbkykyyk",
+    "kbbbbbkyyyyk",
+    "kddddddkkkkk",
+    ".kkkkkkkkkk.",
+    "............",
+  ],
+};
+
 /** Marketing campaigns (ADR-097). */
 export const MEGAPHONE: PixelArt = {
   palette: { k: "#1c2230", r: "#ef5b5b", h: "#ffb3b3", s: "#8e99ad" },
@@ -971,6 +1062,11 @@ export const ALL_PIXEL_ART: Record<string, PixelArt> = {
   alarm_clock: ALARM_CLOCK,
   speech: SPEECH,
   megaphone: MEGAPHONE,
+  graduate: GRADUATE,
+  palette: PALETTE,
+  gears: GEARS,
+  key: KEY,
+  wallet: WALLET,
   contract: CONTRACT,
   bull: BULL,
   bear: BEAR,
