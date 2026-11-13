@@ -47,8 +47,10 @@ select tests.assert(
           -- friend code (85)
           || array['get_friend_code', 'redeem_friend_code']
           -- stock news (89)
-          || array['get_stock_news']) x),
-  'authenticated can execute exactly the 9 helpers and the RPCs up to the stock news (89)');
+          || array['get_stock_news']
+          -- friends' investments (90)
+          || array['get_player_holdings']) x),
+  'authenticated can execute exactly the 9 helpers and the RPCs up to the friends'' investments (90)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute') and p.proname <> 'check_nickname'),

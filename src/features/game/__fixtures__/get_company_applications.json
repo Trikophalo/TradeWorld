@@ -1,15 +1,15 @@
 {
   "applications": [
     {
-      "id": "76ebbfa8-4bdb-4415-b553-6aa29eb63a2b",
+      "id": "38b7d56c-fda1-4b98-b389-bf39a5821faf",
       "status": "pending",
       "message": "Gern im Team.",
       "posting": {
-        "id": "e59c50eb-0937-4e05-91cc-eb78682f946d",
+        "id": "37bce658-25e1-4cf7-815b-c773f837f39e",
         "tier": "intern",
         "title": "Werkstudium Software",
         "company": {
-          "id": "7809dd58-afa9-48ce-83e9-64c2bd29b1b6",
+          "id": "774f8452-33c8-4bb4-af9d-20511c640e33",
           "logo": {
             "grid": [
               "................",
@@ -58,8 +58,8 @@
           "management": 0
         }
       },
-      "created_at": "2026-11-13T21:19:51.854295+00:00",
-      "updated_at": "2026-11-13T21:19:51.854295+00:00",
+      "created_at": "2026-11-13T21:26:25.192307+00:00",
+      "updated_at": "2026-11-13T21:26:25.192307+00:00",
       "offer_expires_at": null,
       "salary_wish_cents_per_hour": 20000,
       "offer_salary_cents_per_hour": null

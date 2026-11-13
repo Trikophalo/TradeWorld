@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Beobachter rechnen in Kürze mit einem spürbar steigenden Kurs. Sicher ist das nicht.",
-      "name": "Eilbote Express",
-      "due_at": "2026-11-13T22:54:29.905503+00:00",
+      "body": "Beobachter rechnen in Kürze mit einem leicht steigenden Kurs. Sicher ist das nicht.",
+      "name": "SolarFuchs",
+      "due_at": "2026-11-13T22:38:51.149925+00:00",
       "status": "open",
-      "ticker": "EBX",
-      "headline": "Analysten heben den Daumen für Eilbote Express",
+      "ticker": "SFX",
+      "headline": "Gerücht: SolarFuchs steht vor starken Zahlen",
       "move_bps": null,
-      "strength": 2,
+      "strength": 1,
       "direction": "up",
-      "published_at": "2026-11-13T22:19:55.53268+00:00"
+      "published_at": "2026-11-13T22:26:28.868796+00:00"
     },
     {
       "id": 3,
-      "body": "Beobachter rechnen in Kürze mit einem deutlich steigenden Kurs. Sicher ist das nicht.",
-      "name": "QuantenSprung Labs",
-      "due_at": "2026-11-13T21:19:55.528407+00:00",
-      "status": "confirmed",
-      "ticker": "QSL",
-      "headline": "QuantenSprung Labs gewinnt neue Kunden",
-      "move_bps": 1107,
-      "strength": 3,
+      "body": "Beobachter rechnen in Kürze mit einem spürbar steigenden Kurs. Sicher ist das nicht.",
+      "name": "Alpenmed",
+      "due_at": "2026-11-13T21:26:28.864439+00:00",
+      "status": "fizzled",
+      "ticker": "ALM",
+      "headline": "Insider rechnen bei Alpenmed mit Rückenwind",
+      "move_bps": null,
+      "strength": 2,
       "direction": "up",
-      "published_at": "2026-11-13T21:19:55.528407+00:00"
+      "published_at": "2026-11-13T21:26:28.864439+00:00"
     }
   ],
   "reliability_bps": 7500

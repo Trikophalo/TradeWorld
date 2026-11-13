@@ -112,7 +112,9 @@ select tests.assert(
            -- friend code (ADR-111)
            'get_friend_code', 'redeem_friend_code',
            -- stock news with a lead (ADR-119)
-           'get_stock_news']
+           'get_stock_news',
+           -- friends' investments (ADR-121)
+           'get_player_holdings']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')

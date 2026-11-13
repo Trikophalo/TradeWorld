@@ -1257,6 +1257,29 @@ const stockNews = createStockNewsEngine({
 
 export const demoEngine: GameEngine = {
   ...stockNews,
+  // The demo has no friends: only the own investments are visible (ADR-121).
+  playerHoldings: async (nickname) => {
+    if (nickname.trim().toLowerCase() !== p().nickname.toLowerCase()) {
+      return { visible: false, totalCents: null, positions: [] };
+    }
+    const portfolio = await demoEngine.portfolio();
+    const total = portfolio.positions.reduce((sum, pos) => sum + pos.marketValueCents, 0);
+    return {
+      visible: true,
+      totalCents: total,
+      positions: [...portfolio.positions]
+        .sort((a, b) => b.marketValueCents - a.marketValueCents)
+        .map((pos) => ({
+          ticker: pos.ticker,
+          name: pos.name,
+          kind: pos.kind,
+          sector: DEMO_COMPANIES.find((c) => c.ticker === pos.ticker)?.sector ?? null,
+          quantityE6: pos.quantityE6,
+          valueCents: pos.marketValueCents,
+          shareBps: total > 0 ? Math.round((pos.marketValueCents * 10_000) / total) : 0,
+        })),
+    };
+  },
   ...career.engine,
   ...upgradeEngine,
   ...deals.engine,

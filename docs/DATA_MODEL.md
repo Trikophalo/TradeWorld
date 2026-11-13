@@ -7088,3 +7088,12 @@ Migration `20261203000600_stock_news.sql`, idempotente Kopie in `supabase/update
             "published_at", "due_at", "status": "open"|"confirmed"|"fizzled",
             "move_bps": integer|null}]}     -- move_bps erst nach dem Eintreffen
 ```
+
+## Nachtrag: Investments auf dem Profil (ADR-121)
+
+Migration `20261203000700_friend_holdings.sql`, Test `supabase/tests/90_friend_holdings.sql`.
+
+`get_player_holdings(p_nickname text)` (RPC, `authenticated`): für den Spieler selbst und für Freunde
+`{"visible": true, "total_cents", "positions": [{"ticker", "name", "kind", "sector", "quantity_e6", "value_cents",
+"share_bps"}]}` (größte zuerst), sonst `{"visible": false, "total_cents": null, "positions": []}`.
+Unbekannter Name: `player_not_found`.

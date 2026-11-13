@@ -134,3 +134,4 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 - **Spieler bewegen den Markt (ADR-120):** Käufe und Verkäufe wirken etwa fünfmal so stark auf den Kurs.
 - **Kündigen in einer Stunde** statt einem Tag; sofort gegen einen Tageslohn bleibt möglich.
 - **Portfolio nach Branche sortierbar**, Visitenkarte ohne gestauchten Text.
+- **Investments auf Profilen (ADR-121):** Freunde sehen, worin du investiert bist und wie viel.

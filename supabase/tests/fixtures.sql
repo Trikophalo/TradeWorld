@@ -961,3 +961,17 @@ select tests.login_as('authenticated', :fx_fb) is null as ok \gset
 select public.get_stock_news(10);
 \o
 reset role;
+
+-- Friends' investments (ADR-121) -------------------------------------------------------------------------------------
+select tests.fund(:fx_fb, 2000000, 'fixture:holdings') is not null as ok \gset
+select tests.login_as('authenticated', :fx_fb) is null as ok \gset
+select public.place_order(gen_random_uuid(), 'KLS', 'buy', 'market', null, null, 500000) is not null as ok \gset
+\o :fixture_dir/get_player_holdings.json
+select public.get_player_holdings('Fixture_Gast');
+\o
+reset role;
+select tests.login_as('authenticated', :fx_fa) is null as ok \gset
+\o :fixture_dir/get_player_holdings_private.json
+select public.get_player_holdings('Fixture_Gast');
+\o
+reset role;

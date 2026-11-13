@@ -1,0 +1,15 @@
+{
+  "visible": true,
+  "positions": [
+    {
+      "kind": "stock",
+      "name": "KlarSoft AG",
+      "sector": "tech",
+      "ticker": "KLS",
+      "share_bps": 10000,
+      "quantity_e6": 56837368,
+      "value_cents": 497446
+    }
+  ],
+  "total_cents": 497446
+}

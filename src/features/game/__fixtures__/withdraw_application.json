@@ -1,27 +1,27 @@
 {
-  "id": "3a2854c9-c69e-47d4-b51e-e78b47324223",
+  "id": "9bc49e1d-4e56-4067-82fd-8ce6dfc86207",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "04c94f04-a464-4aa7-9706-95fe2362beb3",
+    "id": "2d4265f4-c9ab-4c80-8384-1f7b272d4977",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "2faf9e4c-3f0a-8a5b-1645-c669e9481771",
+      "id": "e50a6ff5-8dbd-8c90-f94e-5ac06d3fe862",
       "logo": null,
-      "name": "NeuroPharm AG",
-      "color": "#6EE7A0",
+      "name": "Volta Energie AG",
+      "color": "#FFD23F",
       "is_ai": true,
-      "sector": "pharma",
-      "ticker": "NPH"
+      "sector": "energy",
+      "ticker": "VLT"
     },
     "required": [{ "branch": "law", "min_score": 0 }],
     "title_key": "law_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-13T21:19:51.430038+00:00",
-  "updated_at": "2026-11-13T21:19:51.434231+00:00",
-  "offer_expires_at": "2026-11-15T21:19:51.430038+00:00",
+  "created_at": "2026-11-13T21:26:24.694128+00:00",
+  "updated_at": "2026-11-13T21:26:24.699691+00:00",
+  "offer_expires_at": "2026-11-15T21:26:24.694128+00:00",
   "salary_wish_cents_per_hour": 15000,
   "offer_salary_cents_per_hour": 15000
 }

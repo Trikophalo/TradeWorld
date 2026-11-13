@@ -1064,6 +1064,22 @@ export interface PlayerSearchResult {
   avatarKey: string;
 }
 
+/** What a player holds, shown to the player and to friends (ADR-121). */
+export interface PlayerHoldings {
+  /** False for everyone who is neither the player nor a friend. */
+  visible: boolean;
+  totalCents: number | null;
+  positions: {
+    ticker: string;
+    name: string;
+    kind: SecurityKind;
+    sector: string | null;
+    quantityE6: number;
+    valueCents: number;
+    shareBps: number;
+  }[];
+}
+
 /** Stock news with a lead (ADR-119): a hint that a stock is about to move. */
 export interface StockNewsItem {
   id: number;
@@ -1683,6 +1699,8 @@ export interface GameEngine {
   removeFriend(requestId: string, nickname: string): Promise<Friends>;
   /** Stock news with a lead (ADR-119). */
   stockNews(limit?: number): Promise<StockNews>;
+  /** Investments of a player, for the player and friends (ADR-121). */
+  playerHoldings(nickname: string): Promise<PlayerHoldings>;
   /** Friend code (ADR-111). */
   friendCode(): Promise<FriendCode>;
   redeemFriendCode(requestId: string, code: string): Promise<FriendCodeRedeemed>;

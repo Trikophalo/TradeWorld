@@ -270,6 +270,22 @@ const checkInSchema = z.object({
 });
 
 /** Response schemas per RPC, exported for the contract test against real database output. */
+const holdingsSchema = z.object({
+  visible: z.boolean(),
+  total_cents: z.number().nullable(),
+  positions: z.array(
+    z.object({
+      ticker: z.string(),
+      name: z.string(),
+      kind: z.enum(["stock", "bond", "crypto"]),
+      sector: z.string().nullable(),
+      quantity_e6: z.number(),
+      value_cents: z.number(),
+      share_bps: z.number(),
+    }),
+  ),
+});
+
 const stockNewsSchema = z.object({
   reliability_bps: z.number(),
   items: z.array(
@@ -315,6 +331,7 @@ export const RPC_SCHEMAS = {
   ...ARTWORK_RPC_SCHEMAS,
   ...PROPERTY_RPC_SCHEMAS,
   get_stock_news: stockNewsSchema,
+  get_player_holdings: holdingsSchema,
   ...FRIEND_RPC_SCHEMAS,
   ...SOCIAL_RPC_SCHEMAS,
   ...COMPANY_EVENT_RPC_SCHEMAS,
@@ -328,6 +345,22 @@ export const liveEngine: GameEngine = {
   ...liveArtEngine,
   ...livePropertyEngine,
   ...liveFriendEngine,
+  async playerHoldings(nickname) {
+    const r = await rpc("get_player_holdings", { p_nickname: nickname }, holdingsSchema);
+    return {
+      visible: r.visible,
+      totalCents: r.total_cents,
+      positions: r.positions.map((p) => ({
+        ticker: p.ticker,
+        name: p.name,
+        kind: p.kind,
+        sector: p.sector,
+        quantityE6: p.quantity_e6,
+        valueCents: p.value_cents,
+        shareBps: p.share_bps,
+      })),
+    };
+  },
   async stockNews(limit = 20) {
     const r = await rpc("get_stock_news", { p_limit: limit }, stockNewsSchema);
     return {

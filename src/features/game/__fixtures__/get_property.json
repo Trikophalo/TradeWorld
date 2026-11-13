@@ -4,7 +4,7 @@
     "floor": "parquet",
     "owner": "Fixture_Heim",
     "width": 13,
-    "garage": [{ "id": "472a3811-8ba0-4793-be98-c035c4bb4e4f", "slot": 0, "car_key": "car_electric" }],
+    "garage": [{ "id": "6ae94ae9-33cb-4dfe-accf-272c8ef66672", "slot": 0, "car_key": "car_electric" }],
     "height": 9,
     "placed": [],
     "wall_color": "#2f5fd0",
@@ -15,9 +15,9 @@
   "inventory": {
     "cars": [],
     "furniture": [
-      { "id": "692a17a4-ee02-4dca-a226-82a72235c3c1", "item_key": "sofa_leather" },
-      { "id": "3ff67f6e-8a4c-48e0-a89c-ee9cd008a464", "item_key": "rug_wool" },
-      { "id": "8bfabe6a-7bd5-4815-aabe-ea8ad1346e36", "item_key": "plant_small" }
+      { "id": "815d1aac-6661-459c-930f-5696cccc830d", "item_key": "sofa_leather" },
+      { "id": "d005acf4-6cd5-47cf-81b1-a7ec848f67f9", "item_key": "rug_wool" },
+      { "id": "d491539d-8fbd-4674-8439-b585bd632d73", "item_key": "plant_small" }
     ]
   }
 }

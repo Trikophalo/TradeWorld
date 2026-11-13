@@ -1731,3 +1731,11 @@ einen echten Tag dauern: eine Stunde warten (ein Tag im Spiel) oder ein Tagesgeh
 - **Portfolio:** Die Positionen lassen sich nach Wert oder nach Branche sortieren.
 - **Visitenkarte:** Die Spalten richten sich nach der Breite der Karte, nicht des Bildschirms; in der schmalen
   Spalte der Karriere-Seite steht alles untereinander und Namen brechen um, statt gestaucht zu werden.
+
+## ADR-121: Freunde sehen die Investments — `akzeptiert`
+
+Vorgabe: Auf dem Profil soll man sehen, in welche Aktien usw. Freunde investiert haben und wie viel.
+
+Das Profil zeigt die Karte „Investments“: jede Position mit Wert und Anteil am Depot, die größte zuerst. Sichtbar ist
+das für den Spieler selbst und für angenommene Freunde (`are_friends`). Alle anderen lesen nur, dass es Freunden
+vorbehalten ist; Einstandskurse und Gewinne werden nicht gezeigt.

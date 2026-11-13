@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "39e63762-7416-4c55-b9e5-7cc86b22ffb6",
+    "id": "d1dd2844-f8de-4fa7-8c67-17aa2f16b906",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "2faf9e4c-3f0a-8a5b-1645-c669e9481771",
+      "id": "e50a6ff5-8dbd-8c90-f94e-5ac06d3fe862",
       "logo": null,
-      "name": "NeuroPharm AG",
-      "color": "#6EE7A0",
+      "name": "Volta Energie AG",
+      "color": "#FFD23F",
       "is_ai": true,
-      "sector": "pharma",
-      "ticker": "NPH"
+      "sector": "energy",
+      "ticker": "VLT"
     },
     "presence": {
-      "fire_at": "2026-11-18T21:19:53.860658+00:00",
+      "fire_at": "2026-11-18T21:26:27.269077+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-13T21:19:53.860658+00:00"
+      "last_active_at": "2026-11-13T21:26:27.269077+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-13T21:19:53.945487+00:00",
+    "started_at": "2026-11-13T21:26:27.353632+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

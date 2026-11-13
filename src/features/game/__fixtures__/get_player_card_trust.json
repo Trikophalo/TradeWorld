@@ -1,7 +1,7 @@
 {
   "job": null,
-  "tag": "JSNU",
-  "rank": 122,
+  "tag": "ZQC7",
+  "rank": 124,
   "level": 6,
   "trust": { "band": "shaky", "kept": 0, "score": 41, "broken": 1 },
   "company": { "name": "Fixture Lieferwerk", "ticker": null },
@@ -10,7 +10,7 @@
   "avatar_key": "rookie",
   "top_skills": [],
   "streak_days": 0,
-  "member_since": "2026-11-13T21:19:54.108518+00:00",
+  "member_since": "2026-11-13T21:26:27.507878+00:00",
   "branch_scores": {
     "it": 0,
     "law": 0,
