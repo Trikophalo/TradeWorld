@@ -90,3 +90,12 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 - **Anwesenheit:** 8 bezahlte Stunden am Tag, weniger Lohn nach 1, 2 und 3 Tagen Abwesenheit, nach 5 Tagen
   gekündigt (Benachrichtigung an Spieler und Chef).
 - **Organigramm** der Firma mit Gründer, Rängen und KI-Kräften.
+
+## Nach M5a: Ruhigeres Menü, Börse rund um die Uhr
+
+- **Keine Nachbörse mehr:** Die Börse ist rund um die Uhr regulär offen, auch nachts ohne breiteren Spread.
+- **Menü in Gruppen:** Investieren (mit Krypto), Arbeit, Unternehmen, Besitz, Du. Gesperrtes steht gesammelt unter
+  „Bald frei“, das Profil auf dem Profilbild oben rechts.
+- **Skills als Pfade** mit „Jetzt lernbar“, die Karte als zweite Ansicht.
+- **Neue Symbole** für Deals (Vertrag mit Feder) und Grundstück (Haus mit Garten).
+- **Grundstück:** drei Ebenen im Editor und detailreichere Möbel.

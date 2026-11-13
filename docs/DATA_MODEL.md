@@ -6966,3 +6966,15 @@ Tabelle existiert.
 - Neue Ersatz-Shitcoins starten ohne Kurshistorie; die Kerzen füllen sich mit den Takten.
 - Die Hardware-Wallet-Stufe liest `player_upgrade_level(…, 'crypto_wallet')`; erst M4k (Verbesserung `crypto_wallet`)
   macht Stufen > 0 möglich.
+
+## Nachtrag: Börse rund um die Uhr (ADR-106)
+
+Migration `20261202000100_no_after_hours.sql`, idempotente Kopie in `supabase/updates/`.
+
+- `game_config.time` hat `marketOpenHour` 0 und `marketCloseHour` 24. Damit ist jeder Takt eine reguläre Sitzung
+  (`market_session_at`, `market_tick_at`), es gibt keinen nachbörslichen Spread mehr. `trading_day_start` legt den
+  Beginn des Handelstags auf Mitternacht.
+- `market_always_open()` (intern, ohne Client-Rechte): wahr, solange die Börse nie schließt.
+- Trigger `scheduled_events_skip_bells` (vor dem Einfügen in `scheduled_events`): Eröffnungs- und Schlussglocken
+  werden nicht gespeichert, solange `market_always_open()` gilt. Die Migration löscht bereits angekündigte Glocken.
+  Mit anderen Börsenzeiten plant `events_plan` die Glocken wieder wie vorher.

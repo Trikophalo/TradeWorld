@@ -82,7 +82,7 @@ function MissionsButton() {
   );
 }
 
-/** On phones the profile sits here instead of in the bottom bar (ADR-075). */
+/** The profile sits on the avatar, on phones and desktop (ADR-075, ADR-107). */
 function ProfileButton() {
   const t = useTranslations("nav");
   const avatarKey = useGame((state) => state.portfolio?.avatarKey ?? null);
@@ -91,7 +91,7 @@ function ProfileButton() {
       href="/profile"
       aria-label={t("profile")}
       data-tour="nav-profile"
-      className="grid size-8 shrink-0 place-items-center rounded-md focus-ring transition duration-fast hover:bg-surface-2 active:scale-95 sm:size-9 lg:hidden"
+      className="grid size-8 shrink-0 place-items-center rounded-md focus-ring transition duration-fast hover:bg-surface-2 active:scale-95 sm:size-9"
     >
       <Avatar avatarKey={avatarKey} size="xs" />
     </Link>

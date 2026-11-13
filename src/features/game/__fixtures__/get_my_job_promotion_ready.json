@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "bd5cef0e-0b00-4886-8bd7-f433d9118aeb",
+    "id": "757f2cff-afb2-4245-a11b-0e78a6670cc6",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "dc6cd683-c473-c0eb-8d8c-04ddf664b4d5",
+      "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
       "logo": null,
-      "name": "Eilbote Express",
-      "color": "#F7768E",
+      "name": "Frachtpilot",
+      "color": "#9ECE6A",
       "is_ai": true,
       "sector": "logistics",
-      "ticker": "EBX"
+      "ticker": "FPT"
     },
     "presence": {
-      "fire_at": "2026-11-18T16:33:11.370095+00:00",
+      "fire_at": "2026-11-18T17:28:18.709109+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-13T16:33:11.370095+00:00"
+      "last_active_at": "2026-11-13T17:28:18.709109+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-13T16:33:11.487058+00:00",
+    "started_at": "2026-11-13T17:28:18.794398+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

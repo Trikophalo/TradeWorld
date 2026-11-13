@@ -148,14 +148,14 @@ dadurch neue Möglichkeiten freischalten, die wieder mehr Einsatz und mehr Veran
 | Spielquartal    | 6 echte Stunden                                  | Prompt  |
 | Spieljahr       | 4 Quartale = 1 echter Tag                        | Prompt  |
 | Quartalsgrenzen | 08:00, 14:00, 20:00, 02:00 Uhr (Europe/Berlin)   | ADR-006 |
-| Börsenzeiten    | 08:00 bis 22:00 Uhr (Europe/Berlin)              | Prompt  |
+| Börsenzeiten    | rund um die Uhr (früher 08:00 bis 22:00 Uhr)     | ADR-106 |
 | Markt-Tick      | alle 5 Sekunden (Zielkorridor 5 bis 10 Sekunden) | ADR-004 |
 | Kerzen          | 1 min, 5 min, 1 h, 1 Quartal, 1 Spieljahr        | Prompt  |
 
-- **Börsenglocken:** Eröffnung um 08:00 Uhr und Schluss um 22:00 Uhr sind Events. Die erste Handelsstunde
-  bringt einen Eröffnungsbonus.
-- **Nachbörslicher Handel:** Außerhalb der Börsenzeiten ist Handel möglich, aber mit dünnerer Liquidität und
-  größerem Spread.
+- **Keine Nachbörse (ADR-106):** Die Börse ist rund um die Uhr regulär offen, ohne breiteren Spread in der Nacht und
+  ohne Börsenglocken. Der Handelstag (Tagesveränderung, Tageshoch und -tief) beginnt um Mitternacht. Die Regeln für
+  Börsenzeiten und Nachbörse bleiben in der Konfiguration (`time.marketOpenHour`, `time.marketCloseHour`) und kommen
+  mit anderen Werten zurück.
 - **Quartalsabschluss** an jeder Quartalsgrenze: Unternehmenssimulation, Quartalszahlen, Gehaltsabrechnung,
   Zinsen, Dividenden. Drei der vier Abschlüsse fallen in die Börsenzeit, der um 02:00 Uhr liegt im
   nachbörslichen Handel (ADR-006; zur Wechselwirkung siehe [Abschnitt 25](#25-offene-designfragen), Frage 2).

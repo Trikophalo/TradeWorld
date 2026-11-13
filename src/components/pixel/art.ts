@@ -899,6 +899,24 @@ export const UI_ICONS = {
       "....xxxx....",
     ],
   },
+  /** Own home with garden: a house, a tree and a fence (property, ADR-082). */
+  estate: {
+    palette: duo,
+    grid: [
+      "...x........",
+      "..xxx....oo.",
+      ".xxxxx..oooo",
+      "xxxxxxx.oooo",
+      ".x...x..oooo",
+      ".x.x.x...oo.",
+      ".x.x.x...x..",
+      ".xxxxx...x..",
+      "oooooooooooo",
+      "o..o..o..o..",
+      "............",
+      "............",
+    ],
+  },
   /** A contract being signed: the page, two lines of text, the pen setting the signature (deals, ADR-098). */
   deal: {
     palette: duo,

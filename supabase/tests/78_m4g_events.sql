@@ -19,6 +19,10 @@ delete from public.scheduled_events;
 delete from public.job_runs where job_name in ('events_plan', 'events_pharma_roll');
 select value as cfg_events from public.game_config where key = 'events' \gset
 select value as cfg_cb from public.game_config where key = 'centralBank' \gset
+-- The bells only exist with market hours (ADR-106: the game runs open around the clock); test them with 8 to 22.
+select value as cfg_time from public.game_config where key = 'time' \gset
+select tests.set_cfg('time', '{marketOpenHour}', '8');
+select tests.set_cfg('time', '{marketCloseHour}', '22');
 select policy_rate_bps as rate0 from public.central_bank_state where id \gset
 update public.central_bank_state set policy_rate_bps = 300 where id;
 select tests.set_cfg('events', '{pharmaTrial,probabilityPerQuarter}', '1');
@@ -336,7 +340,21 @@ select tests.assert(
   and position('public.events_run_due()' in pg_get_functiondef('public.run_due_jobs()'::regprocedure)) > 0,
   'events_run_due(): plans at most every 15 minutes; run_due_jobs() calls it');
 
+-- ADR-106: open around the clock, no bells are planned and the session is always regular
+select tests.set_cfg('time', '{marketOpenHour}', '0');
+select tests.set_cfg('time', '{marketCloseHour}', '24');
+delete from public.scheduled_events;
+delete from public.job_runs where job_name = 'events_plan';
+select public.events_plan(:'t0') ->> 'bells' as bells24 \gset
+select tests.assert(
+  public.market_always_open() and :bells24::int = 0
+  and not exists (select 1 from public.scheduled_events where kind in ('opening_bell', 'closing_bell'))
+  and public.market_session_at((current_date + time '03:00') at time zone 'Europe/Berlin') = 'regular'
+  and public.market_session_at((current_date + time '23:30') at time zone 'Europe/Berlin') = 'regular',
+  'open around the clock (0 to 24): no bells, every hour is a regular session');
+
 -- restore
 update public.game_config set value = :'cfg_events'::jsonb where key = 'events';
 update public.game_config set value = :'cfg_cb'::jsonb where key = 'centralBank';
+update public.game_config set value = :'cfg_time'::jsonb where key = 'time';
 update public.central_bank_state set policy_rate_bps = :rate0, next_decision_at = null where id;

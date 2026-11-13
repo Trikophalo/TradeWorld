@@ -147,8 +147,20 @@ update public.sim_runtime set is_paused = true;
 select tests.assert(public.market_tick() ->> 'skipped' = 'paused', 'market_tick() does nothing while paused');
 update public.sim_runtime set is_paused = false;
 
--- session: after hours quotes are wider and the 22:00 bell sets the previous close (rolled back)
+-- ADR-106: the game ships open around the clock: every hour is regular, the trading day starts at midnight
+select tests.assert(
+  public.market_session_at(((current_date::timestamp + interval '12 hours') at time zone 'Europe/Berlin')) = 'regular'
+  and public.market_session_at(((current_date::timestamp + interval '23 hours') at time zone 'Europe/Berlin')) = 'regular'
+  and public.market_session_at(((current_date::timestamp + interval '3 hours') at time zone 'Europe/Berlin')) = 'regular'
+  and public.trading_day_start(((current_date::timestamp + interval '15 hours') at time zone 'Europe/Berlin'))
+      = (current_date::timestamp at time zone 'Europe/Berlin'),
+  'open around the clock: 03:00, 12:00 and 23:00 Berlin are regular; the trading day starts at midnight');
+
+-- session with market hours 8 to 22: after hours quotes are wider and the 22:00 bell sets the previous close
+-- (rolled back, also the hours)
 begin;
+update public.game_config
+   set value = value || '{"marketOpenHour": 8, "marketCloseHour": 22}'::jsonb where key = 'time';
 select tests.assert(
   (public.market_tick_at(((public.game_day(now() + interval '1 day')::timestamp + interval '12 hours') at time zone 'Europe/Berlin')) ->> 'session') = 'regular'
   and public.market_session_at(((current_date::timestamp + interval '23 hours') at time zone 'Europe/Berlin')) = 'after_hours',

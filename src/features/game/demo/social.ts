@@ -7,6 +7,9 @@ import { GameError } from "../types";
  * The demo has no other players: the feed shows the own news, the league has one entry, the events are planned
  * from the clock and the demo market (bells, earnings of the largest companies, a pharma trial) without effect.
  */
+/** The market is open around the clock: no opening and closing bells (ADR-106). */
+const alwaysOpen = BALANCE.time.marketOpenHour <= 0 && BALANCE.time.marketCloseHour >= 24;
+
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 
@@ -122,6 +125,8 @@ export function createSocialEngine(host: SocialHost) {
 
     for (let d = Math.floor((recentFrom - day0) / DAY); d * DAY + day0 <= horizon; d++) {
       const dayStart = day0 + d * DAY;
+      // No bells while the market is open around the clock (ADR-106).
+      if (alwaysOpen) continue;
       const open = dayStart + BALANCE.time.marketOpenHour * HOUR;
       const close = dayStart + BALANCE.time.marketCloseHour * HOUR;
       add(

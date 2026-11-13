@@ -6,11 +6,11 @@ import { Sheet } from "@/components/ui/sheet";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { UI_ICONS } from "@/components/pixel/art";
+import { UI_ICONS, type UiIconName } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
-import { NAV_ITEMS, isActivePath } from "@/config/navigation";
+import { NAV_GROUPS, NAV_ITEMS, isActivePath, type NavItem } from "@/config/navigation";
 import { usePlayerLevel } from "@/features/game/store";
-import { isUnlocked } from "@/lib/sim/progression";
+import { isUnlocked, unlockLevel } from "@/lib/sim/progression";
 import { haptic } from "@/lib/haptics";
 import { playSound } from "@/lib/sound";
 import { SPRING } from "@/lib/motion";
@@ -84,7 +84,7 @@ export function TabBar() {
   );
 }
 
-/** The rest of the tabs on phones (ADR-082): artworks, property, profile, missions, rankings. */
+/** The rest of the tabs on phones (ADR-082, ADR-107), grouped like the sidebar, plus missions and rankings. */
 function MoreTab({ pathname }: { pathname: string }) {
   const t = useTranslations("nav");
   const tb = useTranslations("topbar");
@@ -96,6 +96,40 @@ function MoreTab({ pathname }: { pathname: string }) {
     { href: "/missions", label: tb("missions"), icon: "flame" as const },
     { href: "/rich-list", label: tp("richList"), icon: "star" as const },
   ];
+  type Entry = { href: string; label: string; icon: UiIconName; key: string; lockedLevel: number | null };
+  const entry = (item: NavItem): Entry => ({
+    href: item.href,
+    label: t(item.key),
+    icon: item.icon,
+    key: item.key,
+    lockedLevel: item.unlock && !isUnlocked(item.unlock, level) ? (unlockLevel(item.unlock) ?? 1) : null,
+  });
+  // Same groups as the sidebar (ADR-107); locked areas at the end under "Bald frei".
+  const openItems = items.filter((item) => !item.unlock || isUnlocked(item.unlock, level));
+  const lockedItems = items
+    .filter((item) => item.unlock && !isUnlocked(item.unlock, level))
+    .sort((a, b) => (unlockLevel(a.unlock!) ?? 99) - (unlockLevel(b.unlock!) ?? 99));
+  const sections = [
+    ...NAV_GROUPS.map((group) => ({
+      key: group,
+      title: group === "start" ? "" : t(`groups.${group}` as "groups.invest"),
+      entries: openItems.filter((item) => item.group === group).map(entry),
+    })),
+    {
+      key: "more",
+      title: t("groups.you"),
+      entries: extra.map((e) => ({ ...e, key: e.href, lockedLevel: null }) as Entry),
+    },
+    { key: "soon", title: t("soon"), entries: lockedItems.map(entry) },
+  ]
+    .filter((section) => section.entries.length > 0)
+    // "Du" collects the own pages and the extras in one section.
+    .reduce<{ key: string; title: string; entries: Entry[] }[]>((acc, section) => {
+      const same = acc.find((s) => s.title === section.title);
+      if (same) same.entries.push(...section.entries);
+      else acc.push({ ...section, entries: [...section.entries] });
+      return acc;
+    }, []);
   const active = [...items.map((i) => i.href), ...extra.map((e) => e.href)].some((href) =>
     isActivePath(pathname, href),
   );
@@ -124,34 +158,38 @@ function MoreTab({ pathname }: { pathname: string }) {
         </span>
       </button>
       <Sheet open={open} onOpenChange={setOpen} title={t("more")}>
-        <ul className="grid grid-cols-2 gap-2" data-testid="more-sheet">
-          {[
-            ...items.map((item) => ({
-              href: item.href,
-              label: t(item.key),
-              icon: item.icon,
-              locked: item.unlock ? !isUnlocked(item.unlock, level) : false,
-              key: item.key,
-            })),
-            ...extra.map((e) => ({ ...e, locked: false, key: e.href })),
-          ].map((entry) => (
-            <li key={entry.href}>
-              <Link
-                href={entry.href}
-                data-tour={`nav-${entry.key}`}
-                onClick={() => setOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 rounded-md bg-surface-2 px-3 py-3 text-sm focus-ring transition duration-fast hover:bg-surface-3 active:scale-[0.98]",
-                  isActivePath(pathname, entry.href) ? "text-fg-1 ring-1 ring-accent" : "text-fg-2",
-                )}
-              >
-                <PixelIcon {...UI_ICONS[entry.icon]} scale={2} />
-                <span className="min-w-0 flex-1 truncate">{entry.label}</span>
-                {entry.locked && <PixelIcon {...UI_ICONS.lock} scale={1} className="text-fg-3" />}
-              </Link>
-            </li>
+        <div className="space-y-4" data-testid="more-sheet">
+          {sections.map((section) => (
+            <section key={section.key}>
+              <p className="mb-1.5 label-pixel text-fg-3">{section.title}</p>
+              <ul className="grid grid-cols-2 gap-2">
+                {section.entries.map((entry) => (
+                  <li key={entry.href}>
+                    <Link
+                      href={entry.href}
+                      data-tour={`nav-${entry.key}`}
+                      onClick={() => setOpen(false)}
+                      className={cn(
+                        "flex items-center gap-3 rounded-md bg-surface-2 px-3 py-3 text-sm focus-ring transition duration-fast hover:bg-surface-3 active:scale-[0.98]",
+                        isActivePath(pathname, entry.href) ? "text-fg-1 ring-1 ring-accent" : "text-fg-2",
+                        entry.lockedLevel !== null && "text-fg-3",
+                      )}
+                    >
+                      <PixelIcon {...UI_ICONS[entry.icon]} scale={2} />
+                      <span className="min-w-0 flex-1 truncate">{entry.label}</span>
+                      {entry.lockedLevel !== null && (
+                        <span className="flex items-center gap-1 nums text-2xs text-fg-3">
+                          <PixelIcon {...UI_ICONS.lock} scale={1} />
+                          {entry.lockedLevel}
+                        </span>
+                      )}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ))}
-        </ul>
+        </div>
       </Sheet>
     </>
   );

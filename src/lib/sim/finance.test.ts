@@ -353,12 +353,16 @@ describe("central bank", () => {
 });
 
 describe("time", () => {
-  it("knows the market hours", () => {
-    expect(marketSession(7.99)).toBe("after_hours");
-    expect(marketSession(8)).toBe("open");
-    expect(marketSession(21.99)).toBe("open");
-    expect(marketSession(22)).toBe("after_hours");
-    expect(marketSession(2)).toBe("after_hours");
+  it("is open around the clock (ADR-106)", () => {
+    for (const hour of [0, 2, 7.99, 8, 21.99, 22, 23.99]) expect(marketSession(hour)).toBe("open");
+  });
+
+  it("still knows an after-hours session when hours are configured", () => {
+    const cfg = { ...BALANCE.time, marketOpenHour: 8, marketCloseHour: 22 };
+    expect(marketSession(7.99, cfg)).toBe("after_hours");
+    expect(marketSession(8, cfg)).toBe("open");
+    expect(marketSession(21.99, cfg)).toBe("open");
+    expect(marketSession(22, cfg)).toBe("after_hours");
   });
 
   it("derives tick counts", () => {

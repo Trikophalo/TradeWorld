@@ -38,7 +38,18 @@
     "friends": "Freunde",
     "upgrades": "Verbesserungen",
     "deals": "Deals",
-    "crypto": "Krypto"
+    "crypto": "Krypto",
+    "groups": {
+      "invest": "Investieren",
+      "work": "Arbeit",
+      "business": "Unternehmen",
+      "assets": "Besitz",
+      "you": "Du"
+    },
+    "soon": "Bald frei",
+    "soonNext": "{name} ab Level {level}",
+    "soonOpen": "Alle zeigen",
+    "soonClose": "Weniger"
   },
   "topbar": {
     "search": "Aktien, Firmen, Spieler suchen",
@@ -3914,11 +3925,11 @@
       "evening": {
         "0": "Feierabend? Fast. Erst noch das hier.",
         "1": "Ruhiger Abend, gute Zeit für Entscheidungen.",
-        "2": "Bevor die Nachbörse beginnt: das hier.",
+        "2": "Bevor der Tag endet: das hier.",
         "3": "Der Tag war gut zu dir. Mach ihn rund."
       },
       "night": {
-        "0": "Die Nachbörse schläft nie, und du anscheinend auch nicht.",
+        "0": "Die Börse schläft nie, und du anscheinend auch nicht.",
         "1": "Nachtschicht! Hier ist, was noch geht.",
         "2": "Psst, die Kryptos laufen nachts weiter.",
         "3": "Kurz vorm Schlafen noch Geld verdienen? Gern."

@@ -1483,3 +1483,30 @@ Vorgabe: Der Skilltree ist immer noch zu unübersichtlich; schöner und viel int
 - Gesperrte Skills nennen im Lernfenster, welche Nachbarn man zuerst lernen muss.
 - Die Regeln bleiben gleich (ADR-061): Felder nahe der Mitte sind offen, alle anderen brauchen einen gelernten
   Nachbarn.
+
+## ADR-106: Keine Nachbörse, die Börse ist rund um die Uhr offen — `akzeptiert`
+
+Vorgabe: Die Nachbörse soll aus.
+
+- Gespielt wird meist abends und nachts. Dann galt bisher die Nachbörse (22 bis 8 Uhr): dreifacher Spread, weniger
+  Umsatz, „Nachbörse“ oben in der Leiste. Das bestrafte genau die Zeit, in der die meisten spielen.
+- Die Börsenzeiten stehen auf 0 bis 24 Uhr (`time.marketOpenHour`, `time.marketCloseHour`). Server und Demo rechnen
+  damit jeden Takt als reguläre Sitzung. Der Handelstag beginnt um Mitternacht.
+- Eröffnungs- und Schlussglocke entfallen, solange die Börse nie schließt (beide lägen sonst um Mitternacht).
+- Die Mechanik selbst bleibt: Mit anderen Börsenzeiten in der Konfiguration kommen Nachbörse und Glocken zurück
+  (Tests prüfen beide Fälle).
+
+## ADR-107: Navigation in Gruppen, gesperrte Bereiche unter „Bald frei“ — `akzeptiert`
+
+Vorgabe: Links sind zu viele Tabs, das wirkt überfordernd. Kürzer und übersichtlicher gliedern; Krypto gehört wie
+Aktien zum Investieren.
+
+- Die Seitenleiste zeigt Gruppen mit kleiner Überschrift statt einer langen Spalte: **Investieren** (Portfolio,
+  Märkte, Krypto), **Arbeit** (Job, Karriere), **Unternehmen** (Firma, Deals), **Besitz** (Artworks, Grundstück),
+  **Du** (Freunde, Verbesserungen).
+- Gesperrte Bereiche stehen nicht mehr einzeln mit Schloss in der Liste, sondern gesammelt unter **„Bald frei“** am
+  Ende, mit dem nächsten Ziel („Krypto ab Level 10“). Aufgeklappt zeigt der Eintrag alle mit ihrem Level. Damit bleibt
+  sichtbar, was kommt (ADR-035), es nimmt aber nur eine Zeile ein. Ein neuer Spieler sieht 7 Einträge statt 13.
+- Das Profil liegt auf dem Profilbild oben rechts (jetzt auch am PC) und auf der Level-Karte unten in der Leiste.
+- Grundstück hat ein eigenes Symbol (Haus mit Baum und Zaun) statt desselben Hauses wie „Start“.
+- Am Handy bleibt die untere Leiste; „Mehr“ ist nach denselben Gruppen geordnet, Gesperrtes steht unter „Bald frei“.

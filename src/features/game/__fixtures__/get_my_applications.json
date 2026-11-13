@@ -1,38 +1,38 @@
 {
   "applications": [
     {
-      "id": "b432bd09-8636-416f-ac0b-8bb01807242c",
+      "id": "a7684147-8be7-4fc9-9394-ec5238e4a32b",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "0450a190-ce70-4677-b9ef-6deea785afe6",
+        "id": "3350700a-d694-4514-830d-8e868657968c",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "dc6cd683-c473-c0eb-8d8c-04ddf664b4d5",
+          "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
           "logo": null,
-          "name": "Eilbote Express",
-          "color": "#F7768E",
+          "name": "Frachtpilot",
+          "color": "#9ECE6A",
           "is_ai": true,
           "sector": "logistics",
-          "ticker": "EBX"
+          "ticker": "FPT"
         },
-        "required": [{ "branch": "it", "min_score": 0 }],
-        "title_key": "it_intern",
+        "required": [{ "branch": "craft", "min_score": 0 }],
+        "title_key": "craft_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-13T16:33:07.691127+00:00",
-      "updated_at": "2026-11-13T16:33:07.696744+00:00",
-      "offer_expires_at": "2026-11-15T16:33:07.691127+00:00",
-      "salary_wish_cents_per_hour": 15900,
-      "offer_salary_cents_per_hour": 15900
+      "created_at": "2026-11-13T17:28:16.162168+00:00",
+      "updated_at": "2026-11-13T17:28:16.166529+00:00",
+      "offer_expires_at": "2026-11-15T17:28:16.162168+00:00",
+      "salary_wish_cents_per_hour": 15000,
+      "offer_salary_cents_per_hour": 15000
     },
     {
-      "id": "68d9a5ae-22e4-47f5-be1b-cd3adf38f34c",
+      "id": "ad4a46ab-be21-4ab6-96c9-1165abaa569d",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "2335e402-2311-4e39-a43f-07e891a10314",
+        "id": "7a2a377c-5d2d-4c11-a58c-a98feb10d81a",
         "tier": "junior",
         "title": null,
         "company": {
@@ -48,9 +48,9 @@
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-13T16:33:07.681625+00:00",
-      "updated_at": "2026-11-13T16:33:07.681625+00:00",
-      "offer_expires_at": "2026-11-15T16:33:07.681625+00:00",
+      "created_at": "2026-11-13T17:28:16.152738+00:00",
+      "updated_at": "2026-11-13T17:28:16.152738+00:00",
+      "offer_expires_at": "2026-11-15T17:28:16.152738+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

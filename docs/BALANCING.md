@@ -29,15 +29,15 @@ und einzelne Testläufe der Simulation, nicht das Zusammenspiel mit echten Spiel
 
 ### 1.1 Zeit (`time`)
 
-| Wert            | Start                                          |
-| --------------- | ---------------------------------------------- |
-| Quartal         | 6 Stunden, 4 Quartale = 1 Spieljahr = 1 Tag    |
-| Quartalsgrenzen | 08:00, 14:00, 20:00, 02:00 Uhr (Europe/Berlin) |
-| Börsenzeit      | 08:00 bis 22:00 Uhr                            |
-| Tick            | 5 Sekunden, 12 Ticks je Runner-Aufruf          |
-| Nachbörslich    | Spread ×3, Liquidität ×0,25, Rauschen ×0,5     |
-| Kerzen          | 1 min, 5 min, 1 h, dazu Quartal und Spieljahr  |
-| Eröffnungsbonus | erste 60 Minuten, XP ×1,5                      |
+| Wert            | Start                                                                 |
+| --------------- | --------------------------------------------------------------------- |
+| Quartal         | 6 Stunden, 4 Quartale = 1 Spieljahr = 1 Tag                           |
+| Quartalsgrenzen | 08:00, 14:00, 20:00, 02:00 Uhr (Europe/Berlin)                        |
+| Börsenzeit      | rund um die Uhr (0 bis 24 Uhr, ADR-106)                               |
+| Tick            | 5 Sekunden, 12 Ticks je Runner-Aufruf                                 |
+| Nachbörslich    | aus; nur bei Börsenzeiten: Spread ×3, Liquidität ×0,25, Rauschen ×0,5 |
+| Kerzen          | 1 min, 5 min, 1 h, dazu Quartal und Spieljahr                         |
+| Eröffnungsbonus | erste 60 Minuten, XP ×1,5                                             |
 
 ### 1.2 Grundversorgung (`economy`)
 

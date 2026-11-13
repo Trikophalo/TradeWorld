@@ -1325,8 +1325,9 @@ export const BALANCE = {
     quartersPerGameYear: 4,
     timezone: "Europe/Berlin",
     quarterBoundaryHours: [8, 14, 20, 2],
-    marketOpenHour: 8,
-    marketCloseHour: 22,
+    // Open around the clock: no after-hours session, no bells (ADR-106). Players play whenever they have time.
+    marketOpenHour: 0,
+    marketCloseHour: 24,
     tickSeconds: 5,
     ticksPerRunnerInvocation: 12,
     afterHours: {

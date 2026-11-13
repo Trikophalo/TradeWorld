@@ -7,8 +7,8 @@
     "garage": [],
     "height": 6,
     "placed": [
-      { "x": 1, "y": 1, "id": "66bba0c7-4ed5-4fda-9cc2-0a3471176c4c", "rot": 0, "item_key": "sofa_leather" },
-      { "x": 1, "y": 1, "id": "5ff01166-ddc3-4676-82f4-a7c2c273d028", "rot": 0, "item_key": "rug_wool" }
+      { "x": 1, "y": 1, "id": "96037932-14fb-4726-ae90-4b536f9e4990", "rot": 0, "item_key": "sofa_leather" },
+      { "x": 1, "y": 1, "id": "12b4029b-0d34-4222-99e6-3961cfab461d", "rot": 0, "item_key": "rug_wool" }
     ],
     "wall_color": "#2f5fd0",
     "value_cents": 1614400,
@@ -18,8 +18,8 @@
   "inventory": {
     "cars": [],
     "furniture": [
-      { "id": "8c8901ff-6141-4ebe-a0e7-8a09b77ea5ea", "item_key": "plant_small" },
-      { "id": "d17dd147-5862-4776-b419-9854bf55ad36", "item_key": "plant_small" }
+      { "id": "26030639-8c0d-4d78-8724-089ab2919060", "item_key": "plant_small" },
+      { "id": "e3e8c220-ff24-4564-b5e5-2b370dbeafc1", "item_key": "plant_small" }
     ]
   }
 }
