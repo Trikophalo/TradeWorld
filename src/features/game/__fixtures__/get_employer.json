@@ -15,7 +15,7 @@
     "founder": null,
     "team_size": 1,
     "product_key": null,
-    "last_quarter": null,
+    "last_quarter": { "label": "J2 Q1", "profit_cents": 5220896530, "revenue_cents": 43021721655 },
     "pay_factor_bps": 10000
   }
 }

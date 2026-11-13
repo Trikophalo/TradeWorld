@@ -561,3 +561,38 @@ select public.get_notifications(10);
 select public.mark_notifications_read(null);
 \o
 reset role;
+
+-- =============================================================================
+-- M4g: announced events (ADR-090). One resolved event of every kind (outcome shapes), then the
+-- upcoming events from the real clock. Test leftovers at pinned future times are removed first.
+-- =============================================================================
+delete from public.scheduled_events;
+select gq.id as fx_eq, gq.status as fx_eq_status from public.game_quarters gq
+ order by (exists (select 1 from public.company_quarter_reports r where r.game_quarter_id = gq.id)) desc,
+          abs(extract(epoch from gq.ends_at - public.game_now())) limit 1 \gset
+select public.simulate_ai_companies(:fx_eq) is not null as ok \gset
+update public.game_quarters set status = 'closed' where id = :fx_eq;
+insert into public.scheduled_events (kind, title, importance, company_id, security_id, sector_key, game_quarter_id, dedupe_key,
+                                     announced_at, scheduled_at)
+select k.kind::public.scheduled_event_kind, k.title, k.imp, c.id, case when k.with_company then c.security_id end,
+       case when k.with_company then c.sector_key end, :fx_eq, 'fixture:' || k.kind,
+       public.game_now() - interval '6 hours', public.game_now() - k.ago
+  from (values ('closing_bell', 'Börsenschluss', 1, false, interval '4 minutes', 'VLT'),
+               ('earnings', 'Quartalszahlen', 2, true, interval '3 minutes', 'VLT'),
+               ('pharma_trial', 'Studienergebnis', 3, true, interval '2 minutes', 'ALM'),
+               ('rate_decision', 'Zinsentscheid der Zentralbank', 3, false, interval '1 minute', 'VLT'))
+       k(kind, title, imp, with_company, ago, ticker)
+  join public.securities s on s.ticker = k.ticker
+  join public.companies c on c.id = s.company_id
+ order by k.ago desc;
+update public.scheduled_events e set company_id = null where e.kind in ('closing_bell', 'rate_decision');
+insert into public.scheduled_event_secrets (event_id, params)
+select id, '{"success_probability": 1}'::jsonb from public.scheduled_events where kind = 'pharma_trial';
+select public.events_resolve_due(public.game_now()) is not null as ok \gset
+update public.game_quarters set status = :'fx_eq_status' where id = :fx_eq;
+select public.events_plan(public.game_now()) is not null as ok \gset
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/get_events.json
+select public.get_events(20);
+\o
+reset role;

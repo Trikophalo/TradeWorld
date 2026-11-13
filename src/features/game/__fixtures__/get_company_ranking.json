@@ -1,5 +1,5 @@
 {
-  "mine": { "rank": 17, "value_cents": 54107 },
+  "mine": { "rank": 17, "value_cents": 54108 },
   "total": 18,
   "entries": [
     {
@@ -34,8 +34,8 @@
       "founder": "Fenja_Firma",
       "is_mine": false,
       "team_size": 6,
-      "company_id": "a8c33721-3088-4609-9348-5e6d8700c734",
-      "value_cents": 82373294,
+      "company_id": "603e580f-c96b-43f2-93ca-69ba548812b9",
+      "value_cents": 82258041,
       "revenue_cents": 0
     },
     {
@@ -50,7 +50,7 @@
       "founder": "Frieda_Format",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "f26e2df0-50da-4482-bb2e-f0f69c5ca1af",
+      "company_id": "65f7bc71-bf04-4d16-92b9-3bc525fe05a0",
       "value_cents": 51553750,
       "revenue_cents": 1185000
     },
@@ -66,7 +66,7 @@
       "founder": "Frida_Firma",
       "is_mine": false,
       "team_size": 3,
-      "company_id": "92b4197e-db6e-4de7-8234-3d34d82d8dca",
+      "company_id": "30e4a205-f689-419d-9f6a-07cc0f9c4816",
       "value_cents": 44991114,
       "revenue_cents": 1200000
     },
@@ -82,7 +82,7 @@
       "founder": "Anke_Ausbau",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "ff93762f-26b9-48c7-ac3d-63ebc0f78a5d",
+      "company_id": "cbd094a6-4b88-4b71-aa69-4f33c234bdbf",
       "value_cents": 7856750,
       "revenue_cents": null
     },
@@ -98,10 +98,10 @@
       "founder": "Hanna_Stunde",
       "is_mine": false,
       "team_size": 3,
-      "company_id": "e2762612-c63a-4450-8550-e43be90e9a75",
-      "value_cents": 6928014,
-      "revenue_cents": 224808
+      "company_id": "f85272cf-0f9d-4f42-a86b-1810b75c7c3c",
+      "value_cents": 6928071,
+      "revenue_cents": 223901
     }
   ],
-  "server_time": "2026-11-13T11:34:00.40115+00:00"
+  "server_time": "2026-11-13T11:46:58.177984+00:00"
 }

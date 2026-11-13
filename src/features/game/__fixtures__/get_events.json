@@ -1,0 +1,230 @@
+{
+  "recent": [
+    {
+      "id": "ce11086c-6280-41a0-ba82-5b504c7a771c",
+      "kind": "rate_decision",
+      "sector": null,
+      "status": "resolved",
+      "ticker": null,
+      "outcome": { "new_bps": 300, "old_bps": 300, "money_growth_bps": null },
+      "importance": 3,
+      "announced_at": "2026-11-13T05:46:59.492953+00:00",
+      "company_name": null,
+      "scheduled_at": "2026-11-13T11:45:59.492953+00:00"
+    },
+    {
+      "id": "12132ad3-c433-45ba-ba1c-fd75e20cf82e",
+      "kind": "pharma_trial",
+      "sector": "pharma",
+      "status": "resolved",
+      "ticker": "ALM",
+      "outcome": { "success": true, "move_bps": 6592, "price_after_e4": 1430006, "price_before_e4": 861865 },
+      "importance": 3,
+      "announced_at": "2026-11-13T05:46:59.492953+00:00",
+      "company_name": "Alpenmed",
+      "scheduled_at": "2026-11-13T11:44:59.492953+00:00"
+    },
+    {
+      "id": "e1dc1a44-bc63-41db-853b-7807607fc3bd",
+      "kind": "earnings",
+      "sector": "energy",
+      "status": "resolved",
+      "ticker": "VLT",
+      "outcome": {
+        "eps_e4": 12931,
+        "surprise": "beat",
+        "revenue_cents": 133770943110,
+        "net_income_cents": 12930566267,
+        "revenue_change_bps": null,
+        "net_income_change_bps": null
+      },
+      "importance": 2,
+      "announced_at": "2026-11-13T05:46:59.492953+00:00",
+      "company_name": "Volta Energie AG",
+      "scheduled_at": "2026-11-13T11:43:59.492953+00:00"
+    },
+    {
+      "id": "a99b9152-e0d0-40de-99f5-b50f5f5878bf",
+      "kind": "closing_bell",
+      "sector": null,
+      "status": "resolved",
+      "ticker": null,
+      "outcome": {},
+      "importance": 1,
+      "announced_at": "2026-11-13T05:46:59.492953+00:00",
+      "company_name": null,
+      "scheduled_at": "2026-11-13T11:42:59.492953+00:00"
+    }
+  ],
+  "upcoming": [
+    {
+      "id": "1afecdc7-0681-4101-adfc-3565b86440f3",
+      "kind": "earnings",
+      "sector": "energy",
+      "status": "scheduled",
+      "ticker": "VLT",
+      "outcome": null,
+      "importance": 2,
+      "announced_at": "2026-11-13T11:46:59.505146+00:00",
+      "company_name": "Volta Energie AG",
+      "scheduled_at": "2026-11-13T13:00:00+00:00"
+    },
+    {
+      "id": "b3b04835-2f2e-4223-8519-2e5cbc3e66b6",
+      "kind": "earnings",
+      "sector": "tech",
+      "status": "scheduled",
+      "ticker": "KLS",
+      "outcome": null,
+      "importance": 2,
+      "announced_at": "2026-11-13T11:46:59.505146+00:00",
+      "company_name": "KlarSoft AG",
+      "scheduled_at": "2026-11-13T13:00:00+00:00"
+    },
+    {
+      "id": "fc98c2f1-6657-4cb3-a434-5c7f5b431c1e",
+      "kind": "earnings",
+      "sector": "pharma",
+      "status": "scheduled",
+      "ticker": "NPH",
+      "outcome": null,
+      "importance": 2,
+      "announced_at": "2026-11-13T11:46:59.505146+00:00",
+      "company_name": "NeuroPharm AG",
+      "scheduled_at": "2026-11-13T13:00:00+00:00"
+    },
+    {
+      "id": "3f8c94cb-d65b-42c9-ad58-2ab2f5739dd0",
+      "kind": "earnings",
+      "sector": "tech",
+      "status": "scheduled",
+      "ticker": "KLS",
+      "outcome": null,
+      "importance": 2,
+      "announced_at": "2026-11-13T11:46:59.505146+00:00",
+      "company_name": "KlarSoft AG",
+      "scheduled_at": "2026-11-13T19:00:00+00:00"
+    },
+    {
+      "id": "465fd04b-86bb-43e2-a1eb-5e0a2f3043f0",
+      "kind": "earnings",
+      "sector": "pharma",
+      "status": "scheduled",
+      "ticker": "NPH",
+      "outcome": null,
+      "importance": 2,
+      "announced_at": "2026-11-13T11:46:59.505146+00:00",
+      "company_name": "NeuroPharm AG",
+      "scheduled_at": "2026-11-13T19:00:00+00:00"
+    },
+    {
+      "id": "b550a2f7-6392-4ea8-a84e-e8c4291cb93a",
+      "kind": "earnings",
+      "sector": "energy",
+      "status": "scheduled",
+      "ticker": "VLT",
+      "outcome": null,
+      "importance": 2,
+      "announced_at": "2026-11-13T11:46:59.505146+00:00",
+      "company_name": "Volta Energie AG",
+      "scheduled_at": "2026-11-13T19:00:00+00:00"
+    },
+    {
+      "id": "ba30ada3-3005-484b-b16a-4da7011ba5cc",
+      "kind": "closing_bell",
+      "sector": null,
+      "status": "scheduled",
+      "ticker": null,
+      "outcome": null,
+      "importance": 1,
+      "announced_at": "2026-11-13T11:46:59.505146+00:00",
+      "company_name": null,
+      "scheduled_at": "2026-11-13T21:00:00+00:00"
+    },
+    {
+      "id": "0e2dbc99-ddc3-4885-9268-486005a38e73",
+      "kind": "earnings",
+      "sector": "pharma",
+      "status": "scheduled",
+      "ticker": "NPH",
+      "outcome": null,
+      "importance": 2,
+      "announced_at": "2026-11-13T11:46:59.505146+00:00",
+      "company_name": "NeuroPharm AG",
+      "scheduled_at": "2026-11-14T01:00:00+00:00"
+    },
+    {
+      "id": "7ca02e58-aded-49d2-a348-5a16fd21a1b2",
+      "kind": "earnings",
+      "sector": "energy",
+      "status": "scheduled",
+      "ticker": "VLT",
+      "outcome": null,
+      "importance": 2,
+      "announced_at": "2026-11-13T11:46:59.505146+00:00",
+      "company_name": "Volta Energie AG",
+      "scheduled_at": "2026-11-14T01:00:00+00:00"
+    },
+    {
+      "id": "cb3b9e4e-e17f-41d4-bc43-8404bc2542a1",
+      "kind": "earnings",
+      "sector": "tech",
+      "status": "scheduled",
+      "ticker": "KLS",
+      "outcome": null,
+      "importance": 2,
+      "announced_at": "2026-11-13T11:46:59.505146+00:00",
+      "company_name": "KlarSoft AG",
+      "scheduled_at": "2026-11-14T01:00:00+00:00"
+    },
+    {
+      "id": "4e71e6e9-80cb-4e75-9efd-45b462cf8be4",
+      "kind": "earnings",
+      "sector": "pharma",
+      "status": "scheduled",
+      "ticker": "NPH",
+      "outcome": null,
+      "importance": 2,
+      "announced_at": "2026-11-13T11:46:59.505146+00:00",
+      "company_name": "NeuroPharm AG",
+      "scheduled_at": "2026-11-14T07:00:00+00:00"
+    },
+    {
+      "id": "50b9b5b2-2b87-42bc-932b-6e9d37881db4",
+      "kind": "earnings",
+      "sector": "energy",
+      "status": "scheduled",
+      "ticker": "VLT",
+      "outcome": null,
+      "importance": 2,
+      "announced_at": "2026-11-13T11:46:59.505146+00:00",
+      "company_name": "Volta Energie AG",
+      "scheduled_at": "2026-11-14T07:00:00+00:00"
+    },
+    {
+      "id": "696d76d8-a57d-458b-8b60-940d5a0d4b80",
+      "kind": "earnings",
+      "sector": "tech",
+      "status": "scheduled",
+      "ticker": "KLS",
+      "outcome": null,
+      "importance": 2,
+      "announced_at": "2026-11-13T11:46:59.505146+00:00",
+      "company_name": "KlarSoft AG",
+      "scheduled_at": "2026-11-14T07:00:00+00:00"
+    },
+    {
+      "id": "e1ea42bc-ad9f-42b1-a941-68c6255f5a0a",
+      "kind": "opening_bell",
+      "sector": null,
+      "status": "scheduled",
+      "ticker": null,
+      "outcome": null,
+      "importance": 1,
+      "announced_at": "2026-11-13T11:46:59.505146+00:00",
+      "company_name": null,
+      "scheduled_at": "2026-11-14T07:00:00+00:00"
+    }
+  ],
+  "server_time": "2026-11-13T11:46:59.511123+00:00"
+}

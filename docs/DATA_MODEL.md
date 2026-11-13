@@ -5652,3 +5652,105 @@ Interne Helfer (nur `service_role`): `feed_post`, `social_notify`, `feed_item_la
 `league_week_start`, `format_growth_bps`, `league_ensure_season`, `league_add_inflow`, `league_refresh`,
 `league_close`, `social_run_due` sowie die Trigger-Funktionen `feed_on_*`, `notify_on_*`, `league_on_*`.
 Neuer Fehlerschlüssel: `feed_item_not_found` (SQLSTATE NX007 wie `invalid_argument`).
+
+## Nachtrag: M4g (Angekündigte Ereignisse)
+
+Migration `20261128000100_m4g_events.sql` (ADR-090), idempotente Kopie in `supabase/updates/`. Füllt die bisher
+ungenutzte Tabelle `scheduled_events` (Migration 1100). Formeln aus `src/lib/sim/events.ts` (`resolvePharmaTrial`,
+`rollPharmaTrialAnnouncement`) und `src/lib/sim/central-bank.ts` (`decidePolicyRate`, `moneyGrowthBps`,
+`annualizeGrowthBps`, `isRateDecisionQuarter`); Werte aus `game_config.events` (inkl. `schedule`) und
+`game_config.centralBank`.
+
+### Neue Spalten und Daten
+
+| Tabelle                  | Spalte               | Typ / Vorgabe                 | Bedeutung                                                         |
+| ------------------------ | -------------------- | ----------------------------- | ----------------------------------------------------------------- |
+| `security_sim_state`     | `event_value_factor` | `double precision`, `1` (> 0) | Faktor auf den fairen Wert aus binären Ereignissen (Pharmastudie) |
+| `money_supply_snapshots` | `active_players`     | `integer`, leer               | Aktive Spieler beim Schnappschuss (Pro-Kopf-Messung)              |
+| `notification_types`     | `event_holding`      | Kategorie `market`, in-app an | „Ereignis in deinem Depot“: eine Aktie im Depot wurde bewegt      |
+
+`fair_value_from_fundamentals` multipliziert jetzt mit `event_value_factor` (wie `eventValueFactor` in
+`fair-value.ts`). Damit macht der Quartalsabschluss einen Studiensprung nicht rückgängig. Verlustfirmen behalten ihren
+Anker, der den Sprung schon enthält.
+
+### Planung (`events_plan(p_now)`, intern)
+
+Idempotent über `dedupe_key`, höchstens `events.schedule.horizonHours` (24) im Voraus, `announced_at` = Planungszeit.
+
+| Art             | Wann                                                                           | Firma | Wichtigkeit | Schlüssel                        |
+| --------------- | ------------------------------------------------------------------------------ | ----- | ----------- | -------------------------------- |
+| `opening_bell`  | täglich `time.marketOpenHour` (8 Uhr Berlin)                                   | –     | 1           | `opening_bell:JJJJ-MM-TT`        |
+| `closing_bell`  | täglich `time.marketCloseHour` (22 Uhr Berlin)                                 | –     | 1           | `closing_bell:JJJJ-MM-TT`        |
+| `earnings`      | Ende jedes Spielquartals, für die `earningsTopCompanies` (3) größten KI-Firmen | ja    | 2           | `earnings:<quartal>:<firma>`     |
+| `pharma_trial`  | Mitte des Quartals `announceLeadQuarters` (2) nach dem laufenden               | ja    | 3           | `pharma_trial:<firma>:<quartal>` |
+| `rate_decision` | Ende eines Entscheidungsquartals, sobald das Ankündigungsquartal vorbei ist    | –     | 3           | `rate_decision:<quartal>`        |
+
+- **Quartalszahlen:** einmal je Quartal festgelegt, nach Börsenwert (`security_quotes.market_cap_cents`) unter den
+  notierten KI-Firmen. Spielerfirmen berichten stündlich und bekommen keinen Termin.
+- **Pharmastudie:** einmal je laufendem Quartal würfelt jede notierte KI-Pharmafirma ohne offene Studie mit
+  `pharmaTrial.probabilityPerQuarter` (Merker in `job_runs`, `events_pharma_roll`). Die Erfolgswahrscheinlichkeit
+  nach Größenklasse (`successProbability`) steht nur in `scheduled_event_secrets.params.success_probability`.
+- **Zinsentscheid:** laufender Quartalsindex = (`game_year` − 1) × 4 + `quarter` − 1. Entscheidungsquartal, wenn
+  Index ≥ `warmupQuarters` und Index mod `decisionEveryQuarters` = `decisionEveryQuarters` − 1. Geplant, sobald das
+  Quartal `announceLeadQuarters` davor geendet hat; `central_bank_state.next_decision_at` wird gesetzt. In den ersten
+  `warmupQuarters` (56 = 14 Tage) gibt es keinen.
+
+### Auflösung (`events_resolve_due(p_now)`, intern)
+
+Alle fälligen Termine (`scheduled_at` ≤ Zeitpunkt), älteste zuerst, je Aufruf höchstens 200. Status `resolved`,
+`resolved_at` = Zeitpunkt, `outcome` gefüllt; nach einer Pause wird jeder Termin genau einmal nachgeholt.
+
+| Art             | `outcome`                                                                                        |
+| --------------- | ------------------------------------------------------------------------------------------------ |
+| Glocken         | `{}`; mehr als eine Stunde verpasst: `cancelled` ohne `outcome`                                  |
+| `earnings`      | `{revenue_cents, net_income_cents, eps_e4, revenue_change_bps, net_income_change_bps, surprise}` |
+| `pharma_trial`  | `{success, move_bps, price_before_e4, price_after_e4}`                                           |
+| `rate_decision` | `{old_bps, new_bps, money_growth_bps}` (`money_growth_bps` `null` ohne Messung)                  |
+
+- **Quartalszahlen** warten, bis ihr Quartal geschlossen ist (`game_quarters.status = 'closed'`), und lesen dann
+  `company_quarter_reports`. Veränderungen gegen das Vorquartal in Basispunkten (bezogen auf den Betrag des
+  Vorquartals, `null` ohne Vorquartal oder bei 0). `surprise` (`beat`, `miss`, `inline`) kommt aus dem
+  Sentiment-Schock, den `simulate_ai_companies` beim Quartalsabschluss schon setzt (Schwelle ±0,05 Überraschung wie
+  bei der Nachricht). Der Termin selbst bewegt den Kurs nicht zusätzlich. Ohne Bericht: `cancelled`.
+- **Pharmastudie:** Erfolg mit der geheimen Wahrscheinlichkeit, Bewegung gleichverteilt in [`minMove`, `maxMove`]
+  (`move_bps` mit Vorzeichen). `event_price_shock` multipliziert mit (10 000 + `move_bps`) / 10 000 (mindestens 0,01):
+  Kurs, Geld- und Briefkurs, Tageshoch und -tief, `change_bps`, Börsenwert, fairer Wert (kaufmännisch gerundet),
+  `event_value_factor` und beide EMAs. Dazu ein Preistick und die Kerzen 1m bis 1y zum Zeitpunkt. Weil fairer Wert
+  und EMAs mitgehen, holen Value-Fonds den Sprung nicht zurück und Momentum-Händler sehen keinen Trend. Wer die Aktie
+  hält (offene Position), bekommt `event_holding` („Studie erfolgreich: Alpenmed“, „ALM steigt um 60,0 %.“, Link
+  `/markets/ALM`), außer er hat den Typ abgeschaltet. Nicht mehr notiert: `cancelled`.
+- **Zinsentscheid:** Geldmenge = Summe aller `player_cash`/`player_reserve`-Konten plus Kasse und Reserve der
+  Spielerfirmen (KI-Firmen gehören nicht dazu), geteilt durch die aktiven Spieler (Tageslogin in `daily_logins`
+  in den letzten `activePlayerWindowDays` Berliner Tagen, ohne deaktivierte). Verglichen wird mit dem
+  `money_supply_snapshots`-Eintrag `measurementWindowQuarters` (4) Quartale vorher, hochgerechnet auf ein Spieljahr.
+  Ohne Vergleichswert (neue Datenbank, Pause) hält die Bank den Satz, `money_growth_bps` ist dann `null`. Sonst
+  `decidePolicyRate`: Schritte von `stepBps` je volle Toleranzbreite
+  Abweichung vom Ziel, höchstens `maxStepsPerDecision`, im Band ein Schritt Richtung neutral, begrenzt auf
+  [`minRateBps`, `maxRateBps`]. Neuer Satz in `central_bank_state.policy_rate_bps` (Anleiherenditen lesen ihn im
+  nächsten Tick), Eintrag in `central_bank_decisions`. Ändert sich der Satz, bekommt jede notierte Aktie den
+  Sentiment-Schock `rateDecisionSentimentPer25Bps` je 25 bp und die fairen Werte werden mit dem neuen Makrofaktor
+  neu berechnet (`recompute_fair_values`).
+
+### Minutenjob
+
+`run_due_jobs()` ruft vor der täglichen Wartung `events_run_due()` auf. Der Aufruf wird in die bestehende Definition
+eingefügt, damit andere Ergänzungen von `run_due_jobs()` erhalten bleiben. `events_run_due()` plant höchstens alle
+15 Minuten (`job_runs`, `events_plan`, ältere Merker werden gelöscht), schreibt für das zuletzt beendete Quartal
+einmal einen `money_supply_snapshots`-Eintrag (Spieler, Spielerfirmen, aktive Spieler) und löst fällige Termine auf.
+
+### RPC `get_events(p_limit integer default 20)`
+
+Nur angemeldete Spieler (`authenticated`, sonst `not_authenticated`; `anon` hat kein Ausführungsrecht, wie bei
+`get_market_snapshot`). `p_limit` wird auf 1 bis 50 begrenzt und gilt je Liste.
+
+```
+{server_time, upcoming: [EVENT], recent: [EVENT]}
+EVENT = {id, kind, importance, scheduled_at, announced_at, status, ticker, company_name, sector, outcome}
+```
+
+- `upcoming`: Status `scheduled`, nach `scheduled_at` aufsteigend (auch überfällige, bis der Job sie auflöst),
+  `outcome` immer `null`.
+- `recent`: aufgelöst in den letzten `events.schedule.recentHours` (24) Stunden, neueste zuerst.
+- `ticker`, `company_name` und `sector` sind `null` bei Glocken und Zinsentscheid. Abgesagte Termine erscheinen nicht.
+- Die Texte baut der Client aus `kind`, `ticker` und `outcome`. Geheimnisse (`scheduled_event_secrets`) kommen nie
+  vor. Fixture: `get_events.json` (je ein aufgelöster Termin jeder Art, dazu kommende Termine).

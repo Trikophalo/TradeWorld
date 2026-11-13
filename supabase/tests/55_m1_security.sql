@@ -29,8 +29,10 @@ select tests.assert(
           'start_auction', 'submit_work_task', 'subscribe_offer', 'track_event', 'train_employee', 'upgrade_company',
           'withdraw_application']
           -- M4f (76, 77): feed, notifications, league
-          || array['get_feed', 'get_league', 'get_notifications', 'mark_notifications_read', 'react_feed']) x),
-  'authenticated can execute exactly the 9 helpers and the RPCs up to M4f (77)');
+          || array['get_feed', 'get_league', 'get_notifications', 'mark_notifications_read', 'react_feed']
+          -- M4g (78): announced events
+          || array['get_events']) x),
+  'authenticated can execute exactly the 9 helpers and the RPCs up to M4g (78)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute') and p.proname <> 'check_nickname'),

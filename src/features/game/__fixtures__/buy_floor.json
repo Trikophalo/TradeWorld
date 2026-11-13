@@ -15,10 +15,10 @@
   "inventory": {
     "cars": [],
     "furniture": [
-      { "id": "2a7c76bd-6863-4b09-b963-e8f9fecbf9f1", "item_key": "sofa_leather" },
-      { "id": "57c89aca-9ee4-4dfc-9de1-bc59c6ef4b1c", "item_key": "rug_wool" },
-      { "id": "c5429528-dc49-45be-b99b-1a5d930952a8", "item_key": "plant_small" },
-      { "id": "e6c785f4-f37d-432a-9a01-a002bb48aa91", "item_key": "plant_small" }
+      { "id": "be3a6319-7827-4e95-9b37-ce51f5e5baab", "item_key": "sofa_leather" },
+      { "id": "9f090180-bd41-4867-8b1b-f889ac197147", "item_key": "rug_wool" },
+      { "id": "5935743e-95f2-4679-8278-208039901b42", "item_key": "plant_small" },
+      { "id": "af9d56e4-5921-415b-867e-8fd4a4a452b9", "item_key": "plant_small" }
     ]
   }
 }

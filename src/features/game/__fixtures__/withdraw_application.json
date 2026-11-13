@@ -1,27 +1,27 @@
 {
-  "id": "c8b4d3b7-7b02-4e34-96f3-d5ec04473ea6",
+  "id": "695eac6c-3149-47cf-a112-0fb87a0731b1",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "2bd0cea1-5d86-40dd-a33e-e11c4aee084d",
+    "id": "10a70b1e-bcb4-43eb-8ba6-c3c003b7bb24",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "5aaeae39-c17e-272b-db4c-3beb46144cb5",
+      "id": "804ea36e-103a-dd9b-f972-085cde561b79",
       "logo": null,
-      "name": "GenoVita Biotech",
-      "color": "#E86AF0",
+      "name": "Pixelwerk Studios",
+      "color": "#B36BFF",
       "is_ai": true,
-      "sector": "pharma",
-      "ticker": "GNV"
+      "sector": "tech",
+      "ticker": "PXW"
     },
-    "required": [{ "branch": "law", "min_score": 0 }],
-    "title_key": "law_intern",
+    "required": [{ "branch": "sales", "min_score": 0 }],
+    "title_key": "sales_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-13T11:33:59.866771+00:00",
-  "updated_at": "2026-11-13T11:33:59.870812+00:00",
-  "offer_expires_at": "2026-11-15T11:33:59.866771+00:00",
+  "created_at": "2026-11-13T11:46:57.701439+00:00",
+  "updated_at": "2026-11-13T11:46:57.705502+00:00",
+  "offer_expires_at": "2026-11-15T11:46:57.701439+00:00",
   "salary_wish_cents_per_hour": 15000,
   "offer_salary_cents_per_hour": 15000
 }
