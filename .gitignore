@@ -44,3 +44,6 @@ next-env.d.ts
 # tests
 /test-results/
 /playwright-report/
+
+# Temporary git worktrees of parallel helpers
+.claude/worktrees/
