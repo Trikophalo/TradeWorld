@@ -2613,7 +2613,7 @@
     "furnish": "Einrichten",
     "inInventory": "{count, plural, one {# Stück im Inventar} other {# Stücke im Inventar}}",
     "editorTitle": "Einrichten",
-    "editorIntro": "Wähle rechts ein Möbelstück und klick auf einen freien Platz. Klick ein Möbel an, um es zu drehen, zu verschieben oder wegzuräumen.",
+    "editorIntro": "Wähle rechts ein Stück und klick auf einen Platz. Es gibt drei Ebenen: Teppiche am Boden, Möbel darauf, kleine Dinge auf Tischen und Theken. Klick ein Stück an, um es zu drehen, zu verschieben oder wegzuräumen.",
     "editorKeys": "R dreht · Entf räumt weg · Esc bricht ab",
     "save": "Speichern",
     "saved": "Eingerichtet!",
@@ -2671,7 +2671,19 @@
     "dealerTitle": "Autohaus",
     "dealerIntro": "Vom Stadtflitzer bis zum Hypercar. Alle Marken sind ausgedacht.",
     "garageFullHint": "Deine Garage ist voll. Zieh in ein größeres Zuhause, um mehr Autos zu parken.",
-    "carBought": "Neues Auto in der Garage!"
+    "carBought": "Neues Auto in der Garage!",
+    "layers": {
+      "pick": "Greifen auf Ebene",
+      "all": "Alle",
+      "floor": "Boden",
+      "object": "Möbel",
+      "top": "Obendrauf",
+      "floorText": "Teppiche, liegen unter Möbeln",
+      "objectText": "Tische, Schränke, Sofas",
+      "topText": "kleine Dinge für Tische und Theken",
+      "topHint": "Kleine Dinge stehen auf Tischen, Theken und Regalen. Grün markiert: hier ist Platz.",
+      "noSurface": "Stell zuerst einen Tisch, eine Theke oder ein Regal auf. Kleine Dinge brauchen eine Ablage."
+    }
   },
   "friends": {
     "title": "Freunde",

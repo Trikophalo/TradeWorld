@@ -108,3 +108,73 @@ test("a house brings a garage; cars come from the dealer", async ({ page }) => {
   await page.keyboard.press("Escape");
   await expect(garage.getByText("Toro Veloce Toro Furioso")).toBeVisible();
 });
+
+test("three layers: small things only stand on tables (ADR-100)", async ({ page }) => {
+  const home = {
+    tier: "flat",
+    wallColor: "#f3efe4",
+    floor: "laminate",
+    floorsOwned: ["laminate"],
+    cars: [],
+    seq: 10,
+    furniture: [
+      { id: "f1", itemKey: "rug_wool", placed: { x: 0, y: 2, rot: 0 } },
+      { id: "f2", itemKey: "table_oak", placed: { x: 1, y: 2, rot: 0 } },
+      { id: "f3", itemKey: "fruit_bowl", placed: null },
+    ],
+  };
+  await page.addInitScript((h) => {
+    if (window.sessionStorage.getItem("nexa-test-prepared")) return;
+    window.sessionStorage.setItem("nexa-test-prepared", "1");
+    window.sessionStorage.setItem("nexa-daily-reward-seen", new Date().toDateString());
+    window.localStorage.setItem(
+      "nexa-tutorial",
+      JSON.stringify({
+        demo: { status: "done", step: 0, seenTours: ["first_job", "artworks", "property", "visit_property"] },
+      }),
+    );
+    window.localStorage.setItem(
+      "nexa-demo-player-v2",
+      JSON.stringify({
+        nickname: "Ebenen",
+        cashCents: 100_000,
+        xpTotal: 16_000,
+        tutorialCompleted: true,
+        curveVersion: 2,
+        home: h,
+      }),
+    );
+  }, home);
+  await page.goto("/property");
+  await page.getByRole("button", { name: "Einrichten" }).first().click();
+  const room = page.getByTestId("room-editor");
+  await expect(room).toBeVisible();
+  await page.waitForTimeout(600); // the dialog slides in
+
+  await page.getByTestId("inventory").locator('[data-layer="top"] button').first().click();
+  await expect(page.getByTestId("top-hint")).toContainText("Grün markiert");
+  await expect(page.getByTestId("surface-hint")).toHaveCount(1);
+
+  const box = (await room.boundingBox())!;
+  const tileAt = async (x: number, y: number) => {
+    const hint = (await page.getByTestId("surface-hint").boundingBox())!;
+    // the table starts at tile (1, 2) and is 2 × 2 tiles: one tile = half its width
+    const tile = hint.width / 2;
+    return { x: hint.x + (x - 1 + 0.5) * tile, y: hint.y + (y - 2 + 0.5) * tile };
+  };
+  // On the bare floor: not allowed, still carrying.
+  const floor = await tileAt(5, 4);
+  expect(floor.x).toBeLessThan(box.x + box.width);
+  await page.mouse.click(floor.x, floor.y);
+  await expect(room.locator('[data-piece="fruit_bowl"]')).toHaveCount(0);
+  // On the table: placed, on top of the rug and the table.
+  const onTable = await tileAt(2, 3);
+  await page.mouse.click(onTable.x, onTable.y);
+  await expect(room.locator('[data-piece="fruit_bowl"]')).toHaveAttribute("data-layer", "top");
+
+  // Only the rug layer can be grabbed now.
+  await page.getByRole("radio", { name: "Boden" }).click();
+  await expect(room.locator('[data-piece="table_oak"]')).toHaveCSS("pointer-events", "none");
+  await page.getByRole("button", { name: "Speichern" }).click();
+  await expect(page.getByText("Eingerichtet!").first()).toBeVisible();
+});

@@ -5,7 +5,7 @@ import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { TILE } from "@/config/furniture";
 import type { Property } from "@/features/game/types";
 import { logoArt } from "@/lib/sim/logo";
-import { furnitureItem, furnitureSprite, roomBackdrop, WALL } from "../room";
+import { drawOrder, furnitureItem, furnitureSprite, roomBackdrop, WALL } from "../room";
 
 /** A home as it is furnished, drawn from above at a whole pixel scale (ADR-082). */
 export function RoomView({ property, scale }: { property: Property; scale: number }) {
@@ -13,10 +13,7 @@ export function RoomView({ property, scale }: { property: Property; scale: numbe
     () => roomBackdrop(property.width, property.height, property.floor, property.wallColor),
     [property.width, property.height, property.floor, property.wallColor],
   );
-  const ordered = [...property.placed].sort(
-    (a, b) =>
-      (furnitureItem(a.itemKey)?.layer === "floor" ? 0 : 1) - (furnitureItem(b.itemKey)?.layer === "floor" ? 0 : 1),
-  );
+  const ordered = drawOrder(property.placed, (p) => furnitureItem(p.itemKey)?.layer);
   return (
     <div className="relative mx-auto w-fit overflow-hidden rounded-md shadow-2 ring-1 ring-line-2" data-testid="room">
       <PixelIcon {...logoArt(backdrop)} scale={scale} />

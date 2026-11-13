@@ -53,9 +53,85 @@ class Sprite {
   out() {
     return { palette: this.pal, grid: this.px.map((r) => r.join("")) };
   }
+  /** Colour at a pixel, null when transparent or outside. */
+  at(x: number, y: number): string | null {
+    const ch = this.px[y]?.[x];
+    return ch === undefined || ch === "." ? null : this.pal[IDX.indexOf(ch)]!;
+  }
+  /**
+   * The finishing pass that gives every piece depth (ADR-100): light on the upper and left edges of each colour
+   * area, shade on the lower and right edges, an outline where none was drawn, and a soft shadow down and right.
+   * Colours are only added while the palette has room (16 at most).
+   */
+  finish(layer: "floor" | "object" | "top") {
+    if (layer === "floor") return;
+    const edge = (x: number, y: number) => {
+      const c = this.at(x, y);
+      return c === null || c === K;
+    };
+    // 1. bevel, for the colours with the most pixels first
+    const counts = new Map<string, number>();
+    for (let y = 0; y < this.h; y++)
+      for (let x = 0; x < this.w; x++) {
+        const c = this.at(x, y);
+        if (c && c !== K && c.startsWith("#")) counts.set(c, (counts.get(c) ?? 0) + 1);
+      }
+    const reserve = 2; // outline and shadow
+    const bevel = new Map<string, { hl: string; sh: string }>();
+    for (const [c] of [...counts].sort((a, b) => b[1] - a[1])) {
+      const hl = mix(c, "#ffffff", 0.32);
+      const sh = mix(c, "#000000", 0.22);
+      const extra = [hl, sh].filter(
+        (x) => !this.pal.includes(x) && ![...bevel.values()].some((b) => b.hl === x || b.sh === x),
+      );
+      if (this.pal.length + bevel.size * 2 + extra.length + reserve > 16) continue;
+      bevel.set(c, { hl, sh });
+    }
+    const paint: [number, number, string][] = [];
+    for (let y = 0; y < this.h; y++)
+      for (let x = 0; x < this.w; x++) {
+        const c = this.at(x, y);
+        const b = c ? bevel.get(c) : undefined;
+        if (!b || (counts.get(c!) ?? 0) < 6) continue;
+        if (edge(x, y - 1) || edge(x - 1, y)) paint.push([x, y, b.hl]);
+        else if (edge(x, y + 1) || edge(x + 1, y)) paint.push([x, y, b.sh]);
+      }
+    for (const [x, y, c] of paint) this.set(x, y, c);
+    // 2. outline where the drawing has none
+    const outline: [number, number][] = [];
+    for (let y = 0; y < this.h; y++)
+      for (let x = 0; x < this.w; x++) {
+        if (this.at(x, y) !== null) continue;
+        const near = [this.at(x - 1, y), this.at(x + 1, y), this.at(x, y - 1), this.at(x, y + 1)];
+        if (near.some((c) => c !== null && c !== K && c !== SHADOW)) outline.push([x, y]);
+      }
+    for (const [x, y] of outline) this.set(x, y, K);
+    // 3. soft shadow down and right
+    const shadow: [number, number][] = [];
+    for (let y = 1; y < this.h; y++)
+      for (let x = 1; x < this.w; x++)
+        if (this.at(x, y) === null && this.at(x - 1, y - 1) !== null && this.at(x - 1, y - 1) !== SHADOW)
+          shadow.push([x, y]);
+    for (const [x, y] of shadow) this.set(x, y, SHADOW);
+  }
+}
+
+/** Mixes two #rrggbb colours (0 = a, 1 = b). */
+function mix(a: string, b: string, t: number): string {
+  const pa = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16));
+  const pb = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16));
+  return `#${pa
+    .map((v, i) =>
+      Math.round(v + (pb[i]! - v) * t)
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
 }
 
 const K = "#2b2f3a"; // outline
+/** Soft shadow under furniture (drawn translucent over the floor). */
+const SHADOW = "rgba(12, 16, 26, 0.3)";
 const M = {
   wood: ["#c89a63", "#9a6b3c", "#6e4a28"],
   pine: ["#e6c48f", "#c89a63", "#9a6b3c"],
@@ -120,6 +196,7 @@ const add = (
 ) => {
   const s = new Sprite(w * T, h * T);
   draw(s);
+  s.finish(layer);
   items.push({
     key,
     name,
@@ -158,9 +235,13 @@ function sofa(s: Sprite, m: Mat) {
   s.rect(s.w - 4, 5, 3, 9, d);
   s.rect(4, 5, s.w - 8, 9, c);
   for (let x = 4; x < s.w - 4; x += T) {
-    s.rect(x + 1, 6, T - 3, 3, l);
+    s.rect(x + 1, 6, Math.min(T - 3, s.w - 5 - (x + 1)), 3, l);
     s.rect(x + T - 1, 5, 1, 9, d);
+    // tufted buttons
+    s.set(x + 4, 10, d);
+    s.set(x + T - 6, 10, d);
   }
+  for (let x = 3; x < s.w - 3; x += 4) s.set(x, 3, l);
   s.frame(1, 1, s.w - 2, 13, K);
 }
 function table(s: Sprite, m: Mat, round = false) {
@@ -173,6 +254,9 @@ function table(s: Sprite, m: Mat, round = false) {
     return;
   }
   s.rect(2, 2, s.w - 4, s.h - 4, c);
+  // wood grain: broken lines along the table
+  if (m === "wood" || m === "pine" || m === "leather")
+    for (let y = 6; y < s.h - 4; y += 3) for (let x = 4; x < s.w - 4; x++) if ((x * 3 + y * 5) % 11 > 3) s.set(x, y, d);
   s.rect(3, 3, s.w - 6, 2, l);
   s.frame(2, 2, s.w - 4, s.h - 4, K);
   if (m === "marble") for (let i = 0; i < s.w; i += 5) s.set(3 + i, 4 + ((i * 7) % (s.h - 8)), d);
@@ -187,7 +271,10 @@ function bed(s: Sprite, blanket: Mat, frameMat: Mat) {
   const pw = (s.w - 6 - (pillows - 1) * 2) / pillows;
   for (let i = 0; i < pillows; i++) s.rect(3 + i * (pw + 2), 6, pw, 5, "#ffffff");
   s.rect(2, 13, s.w - 4, s.h - 15, bc);
-  s.rect(2, 13, s.w - 4, 3, bl);
+  // turned-down sheet and a fold in the blanket
+  s.rect(2, 12, s.w - 4, 2, "#ffffff");
+  s.rect(2, 14, s.w - 4, 2, bl);
+  for (let x = 4; x < s.w - 4; x += 3) s.set(x, Math.floor(s.h * 0.62), bd);
   s.rect(2, s.h - 4, s.w - 4, 1, bd);
   s.frame(1, 1, s.w - 2, s.h - 2, K);
 }
@@ -205,24 +292,53 @@ function rug(s: Sprite, a: string, b: string, pattern: "plain" | "stripes" | "pe
       if (pattern === "fur" && (x * 7 + y * 13) % 5 === 0) col = b;
       s.set(x, y, col);
     }
+  // fringes on the short sides
+  if (pattern !== "fur")
+    for (let y = 2; y < s.h - 2; y += 2) {
+      s.set(0, y, b);
+      s.set(s.w - 1, y, b);
+    }
 }
 function plant(s: Sprite, kind: "small" | "monstera" | "palm" | "bonsai" | "olive", potMat: Mat) {
-  const cx = s.w / 2;
-  const cy = s.h / 2;
-  s.circle(cx, cy, Math.floor(s.w / 2) - 4, M[potMat][1]);
-  const g = ["#4fae6e", "#2f7a4a", "#7bd47a"];
+  const cx = Math.floor(s.w / 2);
+  const cy = Math.floor(s.h / 2);
+  const R = Math.floor(s.w / 2) - 2;
+  // pot from above: rim, inner rim, soil
+  s.circle(cx, cy, R, M[potMat][2]);
+  s.circle(cx, cy, R - 1, M[potMat][0]);
+  s.circle(cx, cy, R - 2, "#5a3a1e");
+  const g = ["#7bd47a", "#4fae6e", "#2f7a4a"];
   if (kind === "palm") {
     for (let a = 0; a < 8; a++) {
-      const dx = Math.cos((a * Math.PI) / 4);
-      const dy = Math.sin((a * Math.PI) / 4);
-      for (let r = 1; r < s.w / 2 - 1; r++) s.set(cx + dx * r, cy + dy * r, g[r % 2]!);
+      const dx = Math.cos((a * Math.PI) / 4 + 0.3);
+      const dy = Math.sin((a * Math.PI) / 4 + 0.3);
+      for (let r = 1; r <= R; r++) {
+        s.set(cx + dx * r, cy + dy * r, g[1]!);
+        if (r > 2) s.set(cx + dx * r + dy, cy + dy * r - dx, g[r % 3 === 0 ? 0 : 2]!);
+      }
     }
-  } else {
-    const r = kind === "small" ? 3 : kind === "bonsai" ? 4 : Math.floor(s.w / 2) - 2;
-    s.circle(cx, cy, r, g[1]!);
-    for (let i = 0; i < r * 3; i++) s.set(cx + ((i * 5) % (2 * r)) - r, cy + ((i * 3) % (2 * r)) - r, g[i % 3]!);
-    if (kind === "olive") for (let i = 0; i < 6; i++) s.set(cx - 4 + i * 2, cy - 2 + (i % 3) * 2, "#5a6b2f");
+    s.set(cx, cy, "#9a6b3c");
+    return;
   }
+  // leaves as overlapping lobes around the middle, lit from the top left
+  const lobes = kind === "small" ? 3 : kind === "bonsai" ? 4 : 6;
+  const reach = kind === "small" ? 2 : Math.max(2, Math.floor(R / 2));
+  const size = kind === "small" ? 2 : Math.max(2, Math.floor(R / 2));
+  for (let i = 0; i < lobes; i++) {
+    const a = (i / lobes) * Math.PI * 2 + 0.5;
+    const lx = cx + Math.round(Math.cos(a) * reach);
+    const ly = cy + Math.round(Math.sin(a) * reach);
+    s.circle(lx, ly, size, g[2]!);
+    s.circle(lx - 1, ly - 1, Math.max(1, size - 1), g[1]!);
+    s.set(lx - 1, ly - 2, g[0]!);
+  }
+  s.circle(cx, cy, Math.max(1, size - 1), g[1]!);
+  s.set(cx - 1, cy - 1, g[0]!);
+  if (kind === "monstera")
+    for (let i = 0; i < lobes; i++)
+      s.set(cx + Math.round(Math.cos(i) * reach), cy + Math.round(Math.sin(i) * reach), "#1d5a36");
+  if (kind === "bonsai") s.rect(cx - 1, cy + 1, 2, 2, "#6e4a28");
+  if (kind === "olive") for (let i = 0; i < 8; i++) s.set(cx - 5 + ((i * 3) % 10), cy - 4 + ((i * 5) % 9), "#5a6b2f");
 }
 
 // ---------------------------------------------------------------- the catalogue

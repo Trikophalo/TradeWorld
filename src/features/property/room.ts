@@ -69,3 +69,21 @@ export function furnitureSprite(itemKey: string, rot: 0 | 90): Sprite | null {
 export function furnitureItem(itemKey: string) {
   return FURNITURE.find((f) => f.key === itemKey);
 }
+
+export type FurnitureLayer = "floor" | "object" | "top";
+const LAYER_RANK: Record<FurnitureLayer, number> = { floor: 0, object: 1, top: 2 };
+
+/**
+ * Drawing order (ADR-100): rugs first, then furniture, then the small things standing on it; within a layer from the
+ * back wall to the front, so pieces further down cover the ones behind them.
+ */
+export function drawOrder<T extends { x: number; y: number }>(
+  pieces: readonly T[],
+  layerOf: (p: T) => FurnitureLayer | undefined,
+): T[] {
+  return [...pieces].sort((a, b) => {
+    const la = LAYER_RANK[layerOf(a) ?? "object"];
+    const lb = LAYER_RANK[layerOf(b) ?? "object"];
+    return la !== lb ? la - lb : a.y !== b.y ? a.y - b.y : a.x - b.x;
+  });
+}

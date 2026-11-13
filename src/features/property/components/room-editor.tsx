@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, type PointerEvent } from "react";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Button, type ButtonState } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { Segmented } from "@/components/ui/segmented";
 import { toast } from "@/components/ui/toast";
 import { BALANCE, type FloorMaterial } from "@/config/balance";
 import { FLOOR_TILES, TILE } from "@/config/furniture";
@@ -14,11 +15,11 @@ import type { Property, PropertyInventory } from "@/features/game/types";
 import { formatMoney } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
 import { logoArt } from "@/lib/sim/logo";
-import { invalidPlacements, type Placement } from "@/lib/sim/property";
+import { invalidPlacements, rotated, type Placement } from "@/lib/sim/property";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { useFitScale, usePropertyRefresh } from "../hooks";
-import { furnitureItem, furnitureSprite, roomBackdrop, WALL } from "../room";
+import { drawOrder, furnitureItem, furnitureSprite, roomBackdrop, WALL, type FurnitureLayer } from "../room";
 
 type Layout = Map<string, { x: number; y: number; rot: 0 | 90 }>;
 interface Carry {
@@ -58,6 +59,8 @@ export function RoomEditor({
   const [floor, setFloor] = useState<FloorMaterial>(property.floor);
   const [carry, setCarry] = useState<Carry | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  /** Which layer can be grabbed; "all" = every piece (ADR-100). */
+  const [only, setOnly] = useState<"all" | FurnitureLayer>("all");
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
   const [state, setState] = useState<ButtonState>("idle");
   const [wasOpen, setWasOpen] = useState(open);
@@ -69,6 +72,7 @@ export function RoomEditor({
       setFloor(property.floor);
       setCarry(null);
       setSelected(null);
+      setOnly("all");
       setState("idle");
     }
   }
@@ -84,10 +88,26 @@ export function RoomEditor({
   };
   const placements = (l: Layout): Placement[] => [...l].map(([id, p]) => ({ id, ...p }));
 
-  // Unplaced pieces, grouped by kind.
+  // Unplaced pieces, grouped by kind, then by layer (rugs, furniture, small things on top).
   const unplaced = [...keyOf].filter(([id]) => !layout.has(id) && carry?.id !== id);
   const groups = new Map<string, string[]>();
   for (const [id, key] of unplaced) groups.set(key, [...(groups.get(key) ?? []), id]);
+  const LAYERS: FurnitureLayer[] = ["floor", "object", "top"];
+  const byLayer = LAYERS.map((layer) => ({
+    layer,
+    groups: [...groups].filter(([key]) => (furnitureItem(key)?.layer ?? "object") === layer),
+  })).filter((g) => g.groups.length > 0);
+  const carryLayer = carry ? furnitureItem(carry.itemKey)?.layer : undefined;
+  // While carrying a small thing: show where it can stand.
+  const surfaceTiles =
+    carryLayer === "top"
+      ? placements(layout).flatMap((p) => {
+          const f = footprint(p.id);
+          if (!f || f.layer !== "object" || !f.surface) return [];
+          const { w, h } = rotated(f, p.rot);
+          return [{ id: p.id, x: p.x, y: p.y, w, h }];
+        })
+      : [];
 
   const cellAt = (event: PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -210,9 +230,7 @@ export function RoomEditor({
     }
   };
 
-  const ordered = placements(layout).sort(
-    (a, b) => (footprint(a.id)?.layer === "floor" ? 0 : 1) - (footprint(b.id)?.layer === "floor" ? 0 : 1),
-  );
+  const ordered = drawOrder(placements(layout), (p) => footprint(p.id)?.layer);
 
   return (
     <Modal
@@ -247,12 +265,16 @@ export function RoomEditor({
                 const sprite = furnitureSprite(keyOf.get(p.id)!, p.rot);
                 if (!sprite) return null;
                 const isSelected = selected === p.id;
+                const layer = footprint(p.id)?.layer ?? "object";
+                const muted = only !== "all" && layer !== only;
                 return (
                   <button
                     key={p.id}
                     type="button"
                     data-piece={keyOf.get(p.id)}
+                    data-layer={layer}
                     aria-label={furnitureItem(keyOf.get(p.id)!)?.name}
+                    tabIndex={muted ? -1 : 0}
                     onPointerDown={(event) => {
                       if (carry) return;
                       event.stopPropagation();
@@ -260,10 +282,12 @@ export function RoomEditor({
                       else setSelected(p.id);
                     }}
                     className={cn(
-                      "absolute rounded-xs focus-ring transition-[outline-color] duration-fast",
+                      "absolute rounded-xs focus-ring transition-[outline-color,opacity] duration-fast",
                       isSelected
                         ? "z-10 outline-2 outline-offset-1 outline-accent"
                         : "hover:outline hover:outline-fg-1/40",
+                      (muted || (carry !== null && carryLayer !== layer)) && "pointer-events-none",
+                      muted && "opacity-35",
                     )}
                     style={{ left: p.x * TILE * scale, top: (WALL + p.y * TILE) * scale }}
                   >
@@ -271,6 +295,20 @@ export function RoomEditor({
                   </button>
                 );
               })}
+              {surfaceTiles.map((s) => (
+                <span
+                  key={`surface-${s.id}`}
+                  aria-hidden
+                  data-testid="surface-hint"
+                  className="pointer-events-none absolute z-10 rounded-xs bg-gain/15 outline-2 outline-gain/70 outline-dashed"
+                  style={{
+                    left: s.x * TILE * scale,
+                    top: (WALL + s.y * TILE) * scale,
+                    width: s.w * TILE * scale,
+                    height: s.h * TILE * scale,
+                  }}
+                />
+              ))}
               {ghost && (
                 <span
                   aria-hidden
@@ -301,6 +339,25 @@ export function RoomEditor({
               </span>
             )}
           </div>
+          {carryLayer === "top" && (
+            <p className="text-sm text-pretty text-fg-2" data-testid="top-hint">
+              {surfaceTiles.length > 0 ? t("layers.topHint") : t("layers.noSurface")}
+            </p>
+          )}
+          <div className="space-y-1.5">
+            <p className="text-xs text-fg-3">{t("layers.pick")}</p>
+            <Segmented
+              value={only}
+              onValueChange={(v) => {
+                setOnly(v);
+                setSelected(null);
+              }}
+              options={(["all", ...LAYERS] as const).map((v) => ({ value: v, label: t(`layers.${v}`) }))}
+              label={t("layers.pick")}
+              size="sm"
+              block
+            />
+          </div>
         </div>
 
         <div className="space-y-5">
@@ -309,36 +366,45 @@ export function RoomEditor({
             {groups.size === 0 ? (
               <p className="text-sm text-fg-3">{t("inventoryEmpty")}</p>
             ) : (
-              <ul className="grid max-h-72 grid-cols-3 gap-2 overflow-y-auto pr-1" data-testid="inventory">
-                {[...groups].map(([key, ids]) => {
-                  const item = furnitureItem(key)!;
-                  return (
-                    <li key={key}>
-                      <button
-                        type="button"
-                        title={item.name}
-                        onClick={() => {
-                          haptic("tap");
-                          setSelected(null);
-                          setCarry({ id: ids[0]!, itemKey: key, rot: 0 });
-                        }}
-                        className={cn(
-                          "relative flex w-full flex-col items-center gap-1 rounded-md bg-surface-2 p-2 focus-ring transition duration-fast hover:bg-surface-3 active:scale-95",
-                          carry?.itemKey === key && "ring-2 ring-accent",
-                        )}
-                      >
-                        <PixelIcon {...logoArt(item.sprite)} scale={item.w * item.h > 2 ? 1 : 2} />
-                        <span className="w-full truncate text-2xs text-fg-2">{item.name}</span>
-                        {ids.length > 1 && (
-                          <span className="absolute top-1 right-1 rounded-pill bg-accent px-1.5 nums text-2xs text-on-accent">
-                            {ids.length}
-                          </span>
-                        )}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
+              <div className="max-h-80 space-y-3 overflow-y-auto pr-1" data-testid="inventory">
+                {byLayer.map(({ layer, groups: list }) => (
+                  <div key={layer} data-layer={layer}>
+                    <p className="mb-1.5 text-xs text-fg-3">
+                      {t(`layers.${layer}`)} · {t(`layers.${layer}Text`)}
+                    </p>
+                    <ul className="grid grid-cols-3 gap-2">
+                      {list.map(([key, ids]) => {
+                        const item = furnitureItem(key)!;
+                        return (
+                          <li key={key}>
+                            <button
+                              type="button"
+                              title={item.name}
+                              onClick={() => {
+                                haptic("tap");
+                                setSelected(null);
+                                setCarry({ id: ids[0]!, itemKey: key, rot: 0 });
+                              }}
+                              className={cn(
+                                "relative flex w-full flex-col items-center gap-1 rounded-md bg-surface-2 p-2 focus-ring transition duration-fast hover:bg-surface-3 active:scale-95",
+                                carry?.itemKey === key && "ring-2 ring-accent",
+                              )}
+                            >
+                              <PixelIcon {...logoArt(item.sprite)} scale={item.w * item.h > 2 ? 1 : 2} />
+                              <span className="w-full truncate text-2xs text-fg-2">{item.name}</span>
+                              {ids.length > 1 && (
+                                <span className="absolute top-1 right-1 rounded-pill bg-accent px-1.5 nums text-2xs text-on-accent">
+                                  {ids.length}
+                                </span>
+                              )}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ))}
+              </div>
             )}
           </section>
 
