@@ -784,5 +784,24 @@ export function createDealEngine(host: DealHost) {
       }),
   };
 
-  return { engine, trust: myTrust, stakePayout, afterHour, settle };
+  /** Net worth effect of running deals, like player_deal_balance_cents on the server (ADR-098). */
+  function balanceCents(now = Date.now()): number {
+    let sum = 0;
+    for (const d of st().deals) {
+      const me = roleOf(d, "me");
+      if (!me) continue;
+      const left = d.dueCents - d.repaidCents;
+      if (d.kind === "loan" && me === "lender" && (d.status === "active" || d.status === "overdue")) sum += left;
+      if (d.kind === "loan" && me === "borrower" && ["active", "overdue", "defaulted"].includes(d.status)) sum -= left;
+      if (d.kind === "stake" && d.status === "active" && d.endsAt !== null) {
+        const share = Math.min(1, Math.max(0, (d.endsAt - now) / (d.terms.hours * HOUR)));
+        const value = Math.floor((d.terms.amountCents ?? 0) * share);
+        sum += me === "investor" ? value : -value;
+      }
+      if (d.kind === "supply" && d.status === "active") sum += me === "buyer" ? d.prepayLeftCents : -d.prepayLeftCents;
+    }
+    return sum;
+  }
+
+  return { engine, trust: myTrust, stakePayout, afterHour, settle, balanceCents };
 }

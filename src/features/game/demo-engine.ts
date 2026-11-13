@@ -757,7 +757,8 @@ function portfolioNow(): Portfolio {
 
 function netWorth(): number {
   const portfolio = portfolioNow();
-  return portfolio.totalCents + portfolio.companyValueCents - portfolio.debtCents;
+  // Loans, stakes and prepayments between players count too (ADR-098).
+  return portfolio.totalCents + portfolio.companyValueCents - portfolio.debtCents + deals.balanceCents();
 }
 
 function sectorsHeld(): number {

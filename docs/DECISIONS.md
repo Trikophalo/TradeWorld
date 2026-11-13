@@ -1266,3 +1266,16 @@ Vorgabe: Viel soll über Vertrauen zwischen Spielern laufen.
   an jedem Angebot. Gebrochene Verträge und geplatzte Kredite erscheinen im Freunde-Feed.
 - Der Server erzwingt, was er kann (Gebühren, Gewinnanteile, Einzug zur Fälligkeit). Das Wort halten muss man selbst:
   Darum geht es beim Vertrauen.
+- **Vermögen:** Laufende Deals zählen im Vermögen, in der Reichenliste und in der Wochenliga mit. Der Verleiher hält,
+  was noch offen ist, der Leihende schuldet es (auch geplatzt). Eine Beteiligung zählt beim Teilhaber und als Schuld
+  der Firma, linear abgeschrieben über die Laufzeit. Eine unverbrauchte Anzahlung gehört dem Käufer. So macht ein
+  Kredit unter Freunden niemanden reicher als die Zinsen.
+- **Abrechnung (Migration M4j):**
+  - Die Gründer-Auszahlung rechnet mit dem Gewinn nach den Teilhabern, sonst leerten 100 % Auszahlung plus
+    Teilhaber jede Stunde die Firmenkasse.
+  - Kann der Käufer eine Lieferung nicht bezahlen, schrumpft sie; gebraucht zählt dann nur der bezahlte Teil, damit
+    der Lieferant nicht als unzuverlässig gilt.
+  - Wird eine Firma aufgelöst, gelten ihre laufenden Lieferverträge und Beteiligungen als vom Gründer gebrochen.
+  - Beim Neustart eines Kontos zahlt der Spieler zuerst seine Kredite zurück, soweit sein Geld reicht; dann
+    verschwinden seine Deals und sein Vertrauensverlauf.
+  - Grenze: Liefervertrag-Erlöse zählen nicht zum Stundengewinn, aus dem Teilhaber und Gründer bezahlt werden.
