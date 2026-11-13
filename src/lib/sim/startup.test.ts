@@ -399,3 +399,42 @@ describe("CEO payout (ADR-086)", () => {
     expect(isValidFounderPayout(10_500)).toBe(false);
   });
 });
+
+describe("company events in the operating hour (ADR-091)", () => {
+  const hourInput = {
+    sector: "tech" as const,
+    tier: "garage" as const,
+    marketingCentsPerQuarter: b(0),
+    productivityBps: [15_000],
+    aiWorkers: 0,
+    stage: 1,
+    noise: 0,
+    playerWagesCents: 0,
+  };
+  const s = { ...initialStartup(50_000_000, b(0)), awareness: 0.5, quality: 0.6 };
+
+  it("a crisis lowers demand and raises costs; a chance raises demand", () => {
+    const plain = closeStartupHour(s, hourInput);
+    const crisis = closeStartupHour(s, {
+      ...hourInput,
+      event: { demandFactor: 0.8, capacityFactor: 1, extraCostShare: 0.1 },
+    });
+    const chance = closeStartupHour(s, {
+      ...hourInput,
+      event: { demandFactor: 1.3, capacityFactor: 1, extraCostShare: 0 },
+    });
+    expect(crisis.demandCents).toBeLessThan(plain.demandCents);
+    expect(crisis.profitCents).toBeLessThan(plain.profitCents);
+    expect(chance.demandCents).toBeGreaterThan(plain.demandCents);
+  });
+
+  it("tied-up capacity sells less when sold out", () => {
+    const full = { ...initialStartup(1e12, b(0)), awareness: 1, quality: 1 };
+    const plain = closeStartupHour(full, hourInput);
+    const busy = closeStartupHour(full, {
+      ...hourInput,
+      event: { demandFactor: 1, capacityFactor: 0.7, extraCostShare: 0 },
+    });
+    expect(busy.revenueCents).toBeLessThan(plain.revenueCents);
+  });
+});

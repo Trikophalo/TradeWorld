@@ -70,6 +70,7 @@ describe("BALANCE", () => {
       "artworks",
       "property",
       "social",
+      "companyEvents",
     ];
     expect(Object.keys(BALANCE).sort()).toEqual([...sections].sort());
   });

@@ -1,3 +1,4 @@
+import { COMPANY_EVENTS, type CompanyEventsConfig } from "./company-events.ts";
 import { SKILL_NODES, type SkillBranch, type SkillNodeConfig } from "./skills.ts";
 
 /**
@@ -767,6 +768,8 @@ export interface BalanceConfig {
   readonly artworks: ArtworksConfig;
   readonly property: PropertyConfig;
   readonly social: SocialConfig;
+  /** Crises and chances of player companies (ADR-091), catalog in company-events.ts. */
+  readonly companyEvents: CompanyEventsConfig;
 }
 
 export type PropertyTier = "flat" | "apartment" | "house" | "villa" | "luxury_villa";
@@ -2181,6 +2184,7 @@ export const BALANCE = {
     },
     hot: { likeWeight: 1, bidWeight: 3, gravity: 1.5 },
   },
+  companyEvents: COMPANY_EVENTS,
   social: {
     feed: {
       pageSize: 30,

@@ -374,6 +374,8 @@ export interface StartupHourInput {
   readonly contractWork?: boolean;
   /** Expansion level (ADR-083), default 0. */
   readonly expansionLevel?: number;
+  /** Active company event (ADR-091): demand, capacity and extra costs of this hour. */
+  readonly event?: { readonly demandFactor: number; readonly capacityFactor: number; readonly extraCostShare: number };
 }
 
 export interface StartupHourResult {
@@ -414,19 +416,23 @@ export function closeStartupHour(
     state.awareness *
     (0.5 + 0.5 * state.quality) *
     Math.exp(sc.demandNoise * input.noise) *
-    pricing.demand;
+    pricing.demand *
+    (input.event?.demandFactor ?? 1);
   const capacity =
     (capacityCents(input.productivityBps, input.sector, sc) *
       (1 + sc.stages.capacityBonusPerStage * stage) *
-      expansionCapacityFactor(input.expansionLevel, sc)) /
+      expansionCapacityFactor(input.expansionLevel, sc) *
+      (input.event?.capacityFactor ?? 1)) /
     hours;
   const sold = Math.min(demand, capacity);
   const contract = input.contractWork ? (capacity - sold) * sc.contractWork.shareOfFreeCapacity : 0;
   const ownRevenueCents = roundToBigInt(sold * pricing.price);
   const contractRevenueCents = roundToBigInt(contract);
   const revenueCents = ownRevenueCents + contractRevenueCents;
+  // An event's extra costs (or savings) move with the revenue; goods never cost less than nothing.
+  const eventCost = Number(ownRevenueCents) * (input.event?.extraCostShare ?? 0);
   const cogsCents =
-    roundToBigInt(sold * (1 - sc.grossMargin[input.sector])) +
+    roundToBigInt(Math.max(0, sold * (1 - sc.grossMargin[input.sector]) + eventCost)) +
     roundToBigInt(contract * (1 - sc.contractWork.grossMargin));
   const gross = Number(revenueCents - cogsCents);
 
