@@ -59,3 +59,21 @@ export const COMPANY_COLORS = [
   "#e0384f",
   "#c03fb8",
 ] as const;
+
+/** Company crisis or chance (ADR-091): own company (no id) or the employer's (id). */
+export function useCompanyEvent(companyId?: string | null) {
+  return useQuery({
+    queryKey: ["company", "event", companyId ?? "mine"],
+    queryFn: () => engine.companyEvent(companyId ?? null),
+    refetchInterval: 30_000,
+  });
+}
+
+/** Company news for the founder and the staff (ADR-091). */
+export function useCompanyNews(companyId?: string | null) {
+  return useQuery({
+    queryKey: ["company", "news", companyId ?? "mine"],
+    queryFn: () => engine.companyNews(companyId ?? null),
+    refetchInterval: 60_000,
+  });
+}

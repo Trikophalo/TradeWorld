@@ -993,3 +993,71 @@ Pixel-Stil passen.
 - **Belohnungen** als kleine Pixel-Symbole: Stern für XP, Münze für Geld, Edelstein für einen Skillpunkt.
 - **Serien-Leiste:** Flamme, sieben Pixel-Kästchen für die Woche und ein Schild für den Serien-Schutz.
 - **Layout:** drei Spalten auf Handy und Desktop. Mit reduzierter Bewegung stehen Truhen und Funken still.
+
+## ADR-088: Freundes-Feed, Applaus und Benachrichtigungen — `akzeptiert`
+
+Vorgabe: Beim Öffnen soll man sehen, was die Freunde erlebt haben. Das soll zum täglichen Vorbeischauen motivieren,
+ohne Druck.
+
+- **Feed:**
+  - Der Server schreibt Einträge selbst, wenn etwas passiert:
+    - jedes 5. Level und große Gewinne (ab 1.000 € und 15 %)
+    - Firmen gegründet, gewachsen, an der Börse, ausgebaut
+    - Kunstwerke ersteigert oder gemalt
+    - Umzüge und teure Autos, neue Jobs
+    - Serien-Meilensteine (7, 30, 100, 365 Tage), Liga-Sieg, neue Freundschaften
+  - Die Einträge entstehen über Trigger an den Tabellen, damit keine große Funktion umgeschrieben werden musste.
+  - Man sieht die eigenen Einträge und die der Freunde, nach 30 Tagen werden sie gelöscht.
+  - Der Text entsteht im Client aus Art und Daten.
+- **Applaus:** Ein Herz unter jedem Eintrag. Der andere bekommt eine Benachrichtigung, pro Eintrag und Person nur
+  einmal.
+- **Benachrichtigungen:**
+  - Eine Glocke oben zeigt die Zahl der ungelesenen. Ein Tipp öffnet die Liste. Was man gesehen hat, gilt nach
+    kurzer Zeit als gelesen.
+  - Neue Arten: Applaus, überboten bei einer Auktion, neue Bewerbung, Ergebnis der Wochenliga, Ereignis im Depot,
+    Lage in der eigenen Firma.
+  - Jede Art lässt sich abschalten.
+- **Freunde-Bereich:** Tabs „Neuigkeiten“, „Wochenliga“, „Freunde“. Auf der Startseite stehen die letzten drei
+  Einträge.
+
+## ADR-089: Wochenliga mit Pokalen — `akzeptiert`
+
+- Eine Saison läuft von Montag 0 Uhr bis Montag 0 Uhr (Berlin).
+- **Gewertet wird der Zuwachs des Vermögens in Prozent seit Saisonstart.** Freies Geld zählt nicht als Leistung:
+  Grundeinkommen aus dem Tresor und Bargeld aus der täglichen Belohnung werden herausgerechnet. Lohn und
+  CEO-Auszahlungen zählen, sie sind erarbeitet.
+- Kleine Vermögen werden mit mindestens 10.000 € gerechnet, damit wenige Euro nicht hunderte Prozent ergeben.
+- Der Stand wird alle 10 Minuten neu berechnet. Man sieht „Freunde“ oder „Alle“ und „Diese Woche“ oder
+  „Letzte Woche“.
+- **Saisonende:**
+  - Die ersten drei bekommen Gold, Silber und Bronze.
+  - Die Pokale stehen auf der Visitenkarte.
+  - Alle Teilnehmer bekommen ihre Platzierung als Benachrichtigung.
+  - Der Sieger steht im Feed.
+- Ein Konto-Reset löscht auch die Pokale.
+
+## ADR-090: Angekündigte Ereignisse — `akzeptiert`
+
+Vorgabe: Termine mit Ankündigung, zu denen man zurückkommt, ohne Kauf-Countdowns. Die Formeln aus der Simulation
+(`src/lib/sim/events.ts`, `central-bank.ts`) laufen jetzt auf dem Server.
+
+- **Börsenglocke:** täglich 8 und 22 Uhr.
+- **Quartalszahlen:**
+  - Die drei größten KI-Firmen berichten am Ende jedes Quartals: besser, schwächer oder wie erwartet, mit der
+    Gewinnveränderung.
+  - Der Kurseffekt kam schon vorher aus dem Quartalsabschluss. Das Ereignis macht ihn sichtbar und angekündigt.
+- **Pharma-Studien:**
+  - Jede börsennotierte KI-Pharmafirma kann pro Quartal eine Studie bekommen. Sie wird zwei Quartale vorher
+    angekündigt.
+  - Erfolg oder Misserfolg bewegt den Kurs um 50 bis 70 %.
+  - Der fiktive faire Wert und die gleitenden Durchschnitte ziehen mit. So holen Fonds und Trendfolger den Sprung
+    nicht zurück.
+  - Wer die Aktie hält, bekommt eine Benachrichtigung.
+  - Spielerfirmen haben keine Studien.
+- **Zinsentscheid:**
+  - Alle zwei Quartale, nach einer Anlaufzeit von 14 Tagen.
+  - Gemessen wird das Geldmengenwachstum pro aktivem Spieler: Geld der Spieler und ihrer Firmen, ohne KI-Firmen.
+  - Ohne Vergleichswert bleibt der Zins gleich. Die Formel würde sonst „0 % Wachstum“ annehmen und senken.
+  - Eine Zinsänderung bewegt die Stimmung aller Aktien.
+- **Anzeige:** Die Seite „Events“ zeigt „Demnächst“ und „Die letzten 24 Stunden“. Termine zur selben Zeit stehen in
+  einer Zeile. Die Startseite zeigt die nächsten drei.

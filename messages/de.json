@@ -3221,7 +3221,15 @@
           "integrate": "Systeme verbinden"
         }
       }
-    }
+    },
+    "effects": {
+      "demand": "Nachfrage {value}",
+      "capacity": "Kapazität {value}",
+      "cost": "Kosten {value}"
+    },
+    "progress": "Abgewendet",
+    "demoTrigger": "Demo: Lage auslösen",
+    "demoFinish": "Demo: Schritt sofort beenden"
   },
   "companyNews": {
     "title": "Firmen-News",
@@ -3256,6 +3264,8 @@
         "Rekordstunde bei {company}: {profit} Gewinn mit {product}.",
         "{company} verdient so viel wie nie: {profit} in einer Stunde."
       ]
-    }
+    },
+    "more": "Alle Meldungen",
+    "less": "Weniger anzeigen"
   }
 }
