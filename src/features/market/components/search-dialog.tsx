@@ -26,7 +26,7 @@ function isTyping(target: EventTarget | null): boolean {
 }
 
 type Hit =
-  | { kind: "stock"; id: string; ticker: string; name: string }
+  | { kind: "stock"; id: string; ticker: string; name: string; crypto?: boolean }
   | { kind: "player"; id: string; player: PlayerSearchResult };
 
 /** The query after a short pause, so the player search does not run on every key. */
@@ -76,7 +76,13 @@ export function SearchDialog() {
   }, [query, securities]);
   const results = useMemo<Hit[]>(
     () => [
-      ...stocks.map((s): Hit => ({ kind: "stock", id: `stock-${s.ticker}`, ticker: s.ticker, name: s.name })),
+      ...stocks.map((s): Hit => ({
+        kind: "stock",
+        id: `stock-${s.ticker}`,
+        ticker: s.ticker,
+        name: s.name,
+        crypto: s.kind === "crypto",
+      })),
       ...(playerQuery.length >= 2 && playerQuery === query.trim() ? (players.data ?? []) : []).map((p): Hit => ({
         kind: "player",
         id: `player-${p.nickname}`,
@@ -91,7 +97,11 @@ export function SearchDialog() {
   const go = (hit: Hit) => {
     setOpen(false);
     router.push(
-      hit.kind === "stock" ? `/markets/${hit.ticker}` : `/players/${encodeURIComponent(hit.player.nickname)}`,
+      hit.kind === "stock"
+        ? hit.crypto
+          ? `/crypto/${hit.ticker}`
+          : `/markets/${hit.ticker}`
+        : `/players/${encodeURIComponent(hit.player.nickname)}`,
     );
   };
 

@@ -32,7 +32,7 @@ const securitySchema = z.object({
   id: z.string(),
   ticker: z.string(),
   name: z.string(),
-  kind: z.enum(["stock", "bond"]),
+  kind: z.enum(["stock", "bond", "crypto"]),
   sector_key: z.string().nullable(),
   size_class: z.enum(["bluechip", "midcap", "penny"]).nullable(),
   last_price_e4: num,
@@ -107,7 +107,7 @@ const portfolioSchema = z.object({
     z.object({
       ticker: z.string(),
       name: z.string(),
-      kind: z.enum(["stock", "bond"]),
+      kind: z.enum(["stock", "bond", "crypto"]),
       quantity_e6: num,
       reserved_quantity_e6: num,
       avg_price_e4: num,

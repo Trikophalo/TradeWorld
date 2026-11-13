@@ -62,7 +62,13 @@ export function PositionsList() {
                 transition={SPRING.smooth}
               >
                 <Link
-                  href={p.kind === "stock" ? `/markets/${p.ticker}` : "/markets"}
+                  href={
+                    p.kind === "stock"
+                      ? `/markets/${p.ticker}`
+                      : p.kind === "crypto"
+                        ? `/crypto/${p.ticker}`
+                        : "/markets"
+                  }
                   className="-mx-2 flex items-center gap-3 rounded-md px-2 py-2.5 focus-ring transition-colors duration-fast hover:bg-surface-2"
                 >
                   <CompanyLogo ticker={p.ticker} color={brandColor(p.ticker)} />

@@ -11,7 +11,7 @@ import type { FloorMaterial, PropertyTier } from "@/config/balance";
 import type { SkillBranch } from "@/config/skills";
 import type { CompanyLogoData } from "@/lib/sim/logo";
 
-export type SecurityKind = "stock" | "bond";
+export type SecurityKind = "stock" | "bond" | "crypto";
 export type SizeClass = "bluechip" | "midcap" | "penny";
 export type Session = "regular" | "after_hours";
 export type OrderSide = "buy" | "sell";
