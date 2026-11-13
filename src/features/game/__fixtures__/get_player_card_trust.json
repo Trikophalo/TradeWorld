@@ -1,7 +1,7 @@
 {
   "job": null,
-  "tag": "KFHS",
-  "rank": 105,
+  "tag": "GVQU",
+  "rank": 122,
   "level": 6,
   "trust": { "band": "shaky", "kept": 0, "score": 41, "broken": 1 },
   "company": { "name": "Fixture Lieferwerk", "ticker": null },
@@ -10,7 +10,7 @@
   "avatar_key": "rookie",
   "top_skills": [],
   "streak_days": 0,
-  "member_since": "2026-11-13T14:15:27.686827+00:00",
+  "member_since": "2026-11-13T16:08:01.754255+00:00",
   "branch_scores": {
     "it": 0,
     "law": 0,
@@ -22,5 +22,5 @@
     "management": 0
   },
   "skills_learned": 0,
-  "net_worth_cents": 6092000
+  "net_worth_cents": 5992001
 }

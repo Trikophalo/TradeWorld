@@ -116,7 +116,7 @@ select tests.assert(
 select tests.assert(
   (select count(*) from public.unlocks) >= 16
   and (select level from public.unlocks where key = 'short_selling') = 8
-  and (select level from public.unlocks where key = 'ipo') = 25
+  and (select level from public.unlocks where key = 'ipo') = 9
   and not exists (select 1 from public.unlocks u where u.intro_mission_key is not null
                    and not exists (select 1 from public.mission_templates m where m.key = u.intro_mission_key and m.kind = 'intro')),
   'unlocks seeded with levels and intro missions');

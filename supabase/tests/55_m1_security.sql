@@ -38,8 +38,10 @@ select tests.assert(
           || array['buy_upgrade', 'decline_promotion', 'get_upgrades', 'promote_employee', 'request_promotion']
           -- M4j (81): campaigns, deals and trust
           || array['break_deal', 'cancel_deal', 'forgive_loan', 'get_deal_board', 'get_deals', 'propose_deal', 'repay_loan',
-                   'respond_deal', 'start_campaign']) x),
-  'authenticated can execute exactly the 9 helpers and the RPCs up to M4j (81)');
+                   'respond_deal', 'start_campaign']
+          -- M4k (83): unique artwork titles, org chart
+          || array['check_artwork_title', 'get_company_org']) x),
+  'authenticated can execute exactly the 9 helpers and the RPCs up to M4k (83)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute') and p.proname <> 'check_nickname'),

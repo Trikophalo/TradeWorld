@@ -259,7 +259,7 @@ delete from public.trust_events where player_id = :e;
 -- =============================================================================
 select tests.login_as('authenticated', :d);
 select tests.throws_key($$select public.propose_deal(gen_random_uuid(), 'loan', 'lender', null,
-  '{"principal_cents": 100000, "interest_bps": 500, "hours": 48}', null)$$, 'locked', 'propose_deal(): from deals.minLevel (4)');
+  '{"principal_cents": 100000, "interest_bps": 500, "hours": 48}', null)$$, 'locked', 'propose_deal(): from deals.minLevel (6)');
 reset role;
 select tests.login_as('authenticated', :a);
 select tests.throws_key($$select public.propose_deal(gen_random_uuid(), 'gift', 'lender', null, '{}', null)$$, 'invalid_argument',
@@ -382,7 +382,8 @@ reset role;
 select tests.assert(
   :e_sees::int = 0 and :b_sees::int = 1
   and :'e_deals'::jsonb = '{"incoming": [], "outgoing": [], "running": [], "history": [],
-                           "trust": {"score": 50, "band": "blank", "kept": 0, "broken": 0}}'::jsonb
+                           "trust": {"score": 50, "band": "blank", "kept": 0, "broken": 0},
+                           "limits": {"company_deal_max_cents": null, "loan_max_cents": 12000000}}'::jsonb
   and jsonb_array_length(:'b_deals0'::jsonb -> 'incoming') = 1 and :'b_deals0'::jsonb -> 'incoming' -> 0 ->> 'my_role' = 'borrower'
   and not (:'b_deals0'::jsonb -> 'incoming' -> 0 ->> 'is_proposer')::boolean
   and :'a_deals0'::jsonb -> 'outgoing' -> 0 ->> 'id' = :'l1id' and jsonb_array_length(:'a_deals0'::jsonb -> 'incoming') = 0,

@@ -1,0 +1,17 @@
+{
+  "key": "makler",
+  "level": 1,
+  "levels": {
+    "study": 0,
+    "vault": 0,
+    "artist": 0,
+    "income": 0,
+    "makler": 1,
+    "mentor": 0,
+    "overtime": 0,
+    "rhetoric": 0,
+    "efficiency": 0,
+    "crypto_wallet": 0
+  },
+  "cost_cents": 1500000
+}

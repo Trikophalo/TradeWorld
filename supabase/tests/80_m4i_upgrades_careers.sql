@@ -16,7 +16,8 @@ select tests.signup(:u, 'Uwe_Ausbau') is not null and tests.signup(:n, 'Nina_Kna
    and tests.signup(:e, 'Emil_Aufstieg') is not null and tests.signup(:b, 'Berta_Chefin') is not null
    and tests.signup(:w, 'Wim_Werkbank') is not null as ok \gset
 update public.sim_runtime set is_paused = false;
-select tests.set_level(:u, 6);
+-- level 11: every vault stage (ADR-100: stage n from level 1 + (n - 1) x 2)
+select tests.set_level(:u, 11);
 select tests.set_level(:n, 2);
 select tests.set_level(:e, 2);
 select tests.set_level(:b, 6);
@@ -73,7 +74,7 @@ select tests.assert(
   and public.upgrade_cost_cents('jetpack', 0) is null,
   'upgradeCostCents: base x growth^level in whole euros (rhetoric 10.000 / 25.000 / 62.500 EUR), null when maxed');
 select tests.assert(
-  public.player_upgrade_levels(:u) = '{"vault": 0, "income": 0, "study": 0, "overtime": 0, "rhetoric": 0}'::jsonb
+  public.player_upgrade_levels(:u) = '{"vault": 0, "income": 0, "study": 0, "overtime": 0, "rhetoric": 0, "mentor": 0, "artist": 0, "efficiency": 0, "makler": 0, "crypto_wallet": 0}'::jsonb
   and public.player_vault_cap_hours(:u) = :cap0 and public.player_basic_income_cents_per_hour(:u) = :inc0
   and public.player_work_hours_per_branch_point(:u) = :hpp0 and public.player_paid_hours_cap(:u) = :paid0
   and public.player_promotion_bonus_bps(:u) = 0,
@@ -89,8 +90,8 @@ select tests.throws_key($$select public.buy_upgrade(gen_random_uuid(), 'jetpack'
 select tests.throws_key($$select public.buy_upgrade(gen_random_uuid(), null)$$, 'invalid_argument', 'buy_upgrade(): key required');
 select tests.throws_key($$select public.buy_upgrade(null, 'vault')$$, 'invalid_argument', 'buy_upgrade(): request_id required');
 reset role;
-select tests.assert(:'g0'::jsonb = '{"levels": {"vault": 0, "income": 0, "study": 0, "overtime": 0, "rhetoric": 0}}'::jsonb,
-  'get_upgrades(): all five keys with level 0');
+select tests.assert(:'g0'::jsonb = '{"levels": {"vault": 0, "income": 0, "study": 0, "overtime": 0, "rhetoric": 0, "mentor": 0, "artist": 0, "efficiency": 0, "makler": 0, "crypto_wallet": 0}}'::jsonb,
+  'get_upgrades(): all ten keys (ADR-100) with level 0');
 
 -- Nina: level 2, 2.999 EUR
 select public.ledger_transfer(public.ledger_player_account(:n, 'player_cash'), public.ledger_system_account('households'),
@@ -128,7 +129,7 @@ select tests.assert(
   and (select array_agg((x ->> 'cost_cents')::bigint order by i) from jsonb_array_elements(:'vb'::jsonb) with ordinality t(x, i))
       = array[300000, 600000, 1200000, 2400000, 4800000, 9600000]::bigint[]
   and (select bool_and(x ->> 'key' = 'vault') from jsonb_array_elements(:'vb'::jsonb) x)
-  and :'vb'::jsonb -> 5 -> 'levels' = '{"vault": 6, "income": 0, "study": 0, "overtime": 0, "rhetoric": 0}'::jsonb
+  and :'vb'::jsonb -> 5 -> 'levels' = '{"vault": 6, "income": 0, "study": 0, "overtime": 0, "rhetoric": 0, "mentor": 0, "artist": 0, "efficiency": 0, "makler": 0, "crypto_wallet": 0}'::jsonb
   and tests.cash(:u) = :uc0::bigint - 18900000 and tests.m4i_treasury() = :tr0::bigint + 18900000,
   'buy_upgrade(): six vault levels for 3.000 to 96.000 EUR (189.000 EUR), {key, level, cost_cents, levels}; paid to the treasury');
 select tests.assert(
@@ -153,7 +154,7 @@ reset role;
 select tests.assert(
   :'ib1'::jsonb = :'ib2'::jsonb and (:'ib1'::jsonb ->> 'level')::int = 1 and (:'ib1'::jsonb ->> 'cost_cents')::bigint = 400000
   and tests.cash(:u) = :uc0::bigint - 18900000 - 400000
-  and :'g1'::jsonb = '{"levels": {"vault": 6, "income": 1, "study": 0, "overtime": 0, "rhetoric": 0}}'::jsonb
+  and :'g1'::jsonb = '{"levels": {"vault": 6, "income": 1, "study": 0, "overtime": 0, "rhetoric": 0, "mentor": 0, "artist": 0, "efficiency": 0, "makler": 0, "crypto_wallet": 0}}'::jsonb
   and (select count(*) from public.ledger_transactions where initiated_by = :u and kind = 'upgrade_purchase') = 7,
   'buy_upgrade(): the same request_id twice answers the same and charges once; get_upgrades() shows the levels');
 

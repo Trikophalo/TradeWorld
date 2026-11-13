@@ -14,7 +14,7 @@ select tests.signup(:a, 'Anna_Pinsel') is not null and tests.signup(:b, 'Bruno_B
 select tests.set_level(:a, 8);
 select tests.set_level(:b, 9);
 select tests.set_level(:c, 12);
-select tests.set_level(:l, 5);
+select tests.set_level(:l, 3);
 select tests.fund(:a, 6000000, 'test:m4a:a');
 select tests.fund(:b, 3000000, 'test:m4a:b');
 
@@ -85,24 +85,24 @@ select tests.assert(
   'artwork_valid(): wrong size, index beyond the palette, upper case or named colours, 17 colours, no palette, 15 pixels, no grid');
 
 -- =============================================================================
--- B. Unlock level: reading is open, writing needs level 8
+-- B. Unlock level: reading is open, writing needs level 4 (ADR-099)
 -- =============================================================================
 select tests.login_as('authenticated', :l);
 select tests.throws_key(format('select public.create_artwork(gen_random_uuid(), %L, %L)', 'Mein Bild', tests.art()),
-  'artworks_locked', 'level 5: create_artwork is locked');
+  'artworks_locked', 'level 3: create_artwork is locked');
 select tests.throws_key(format('select public.like_artwork(gen_random_uuid(), %L, true)', :'g1'),
-  'artworks_locked', 'level 5: like_artwork is locked');
+  'artworks_locked', 'level 3: like_artwork is locked');
 select public.get_art_studio() as st_l \gset
 select public.get_artworks('hot', 'all', false, 5, 0) as list_l \gset
 reset role;
 select tests.assert(
   :'st_l'::jsonb = '{"painted": 0, "next_cost_cents": 1500000, "unlocked": false}'::jsonb
   and (:'list_l'::jsonb ->> 'total')::int >= 36 and jsonb_array_length(:'list_l'::jsonb -> 'entries') = 5,
-  'level 5: get_art_studio (unlocked false) and get_artworks can be read');
+  'level 3: get_art_studio (unlocked false) and get_artworks can be read');
 select tests.assert(
-  exists (select 1 from public.unlocks where key = 'artworks' and level = 8 and title = 'Artworks')
-  and public.unlock_level('artworks') = 8,
-  'the unlock row "artworks" (level 8) exists for has_unlock() and the level-up');
+  exists (select 1 from public.unlocks where key = 'artworks' and level = 4 and title = 'Artworks')
+  and public.unlock_level('artworks') = 4,
+  'the unlock row "artworks" (level 4) exists for has_unlock() and the level-up');
 
 -- =============================================================================
 -- C. Painting: validation, forbidden symbols, cost doubling to the treasury
@@ -551,7 +551,7 @@ select tests.assert(
   and (select status from public.player_missions where player_id = :w and template_key = 'w_streak' and period_start = date '1999-01-02') = 'completed',
   'missions: job_posted, company_deposit, ai_worker_hired, view_profile (distinct others), work_hours, raise, skill_learned, skills_total, login_streak');
 
--- requirements: no job, company or skill point -> no such missions; artworks only from level 8
+-- requirements: no job, company or skill point -> no such missions; artworks only from level 4
 do $$
 declare
   i integer;
@@ -559,7 +559,7 @@ declare
 begin
   for i in 1..8 loop
     v := tests.signup(gen_random_uuid(), 'Missionar_' || i);
-    perform tests.set_level(v, case when i <= 4 then 7 else 12 end);
+    perform tests.set_level(v, case when i <= 4 then 3 else 12 end);
     update public.player_skill_points set free_points = 0 where player_id = v;
     perform public.missions_assign(v);
   end loop;
@@ -570,7 +570,7 @@ select tests.assert(
                join public.profiles p on p.id = m.player_id
               where p.nickname like 'Missionar\_%'
                 and (t.params ->> 'requires' in ('job', 'company', 'skill_point', 'artwork')
-                     or (t.params ->> 'unlock' = 'artworks' and p.level < 8)))
+                     or (t.params ->> 'unlock' = 'artworks' and p.level < 4)))
   and (select count(*) from public.mission_templates where key in (
          'q_trades_3', 'q_sectors_2', 'q_view_profile', 'q_learn_skill', 'q_deposit', 'q_ai_worker', 'q_art_like', 'q_art_bid',
          'd_trades_10', 'd_buys', 'd_buy_pharma', 'd_buy_retail', 'd_buy_logistics', 'd_rich_list', 'd_view_profiles', 'd_work_hours',

@@ -16,7 +16,7 @@ select tests.signup(:f, 'Fiona_Fabrik') is not null and tests.signup(:w, 'Willi_
 update public.sim_runtime set is_paused = false;
 select tests.set_level(:f, 10);
 select tests.set_level(:w, 3);
-select tests.set_level(:h, 3);
+select tests.set_level(:h, 6);
 select tests.set_level(:v, 3);
 select tests.fund(:f, 2000000, 'test:m3d:f');
 select (public.current_game_quarter()).id as qid \gset

@@ -14,7 +14,7 @@ select tests.signup(:f, 'Frida_Firma') is not null and tests.signup(:w, 'Wanda_W
 update public.sim_runtime set is_paused = false;
 select tests.set_level(:f, 2);
 select tests.set_level(:w, 6);
-select tests.set_level(:g, 3);
+select tests.set_level(:g, 6);
 select tests.set_level(:s, 9);
 create or replace function tests.fund(p_player uuid, p_cents bigint, p_key text) returns void language sql as $$
   select public.ledger_transfer(public.ledger_system_account('households'), public.ledger_player_account(p_player, 'player_cash'),
@@ -43,9 +43,9 @@ select tests.assert(
 -- founding rules ---------------------------------------------------------------------------
 select tests.login_as('authenticated', :f);
 select tests.throws_key($$select public.found_company(gen_random_uuid(), 'Garagen Code', 'Apps für Bäcker', 'tech', '#3366ff', 'garage')$$,
-  'company_level_too_low', 'found_company(): garage needs level 3 (found_garage)');
+  'company_level_too_low', 'found_company(): garage needs level 6 (startups.garage.minLevel)');
 reset role;
-select tests.set_level(:f, 4);
+select tests.set_level(:f, 6);
 -- with an active job no company
 select tests.login_as('authenticated', :f);
 select x ->> 'id' as fintern from jsonb_array_elements(public.get_job_board() -> 'postings') x

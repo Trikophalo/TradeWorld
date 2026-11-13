@@ -1,5 +1,5 @@
 {
-  "id": "77a2a8c9-9bcf-442d-90a1-fb6a875c9665",
+  "id": "850b708b-d2df-4eae-9976-c942ea54ec19",
   "kind": "loan",
   "terms": { "hours": 24, "interest_bps": 0, "principal_cents": 20000 },
   "status": "declined",
@@ -9,20 +9,20 @@
   "my_role": "borrower",
   "progress": { "due_cents": 20000, "left_cents": 20000, "repaid_cents": 0 },
   "proposer": {
-    "tag": "KFHS",
+    "tag": "GVQU",
     "level": 6,
     "trust": { "band": "blank", "score": 50 },
     "nickname": "Fixture_Lieferant",
     "avatar_key": "rookie"
   },
-  "closed_at": "2026-11-13T14:15:28.16618+00:00",
-  "created_at": "2026-11-13T14:15:28.089294+00:00",
-  "expires_at": "2026-11-15T14:15:28.089294+00:00",
+  "closed_at": "2026-11-13T16:08:02.217564+00:00",
+  "created_at": "2026-11-13T16:08:02.104876+00:00",
+  "expires_at": "2026-11-15T16:08:02.104876+00:00",
   "accepted_at": null,
   "is_proposer": false,
   "broken_by_me": false,
   "counterparty": {
-    "tag": "4MGV",
+    "tag": "DSWW",
     "level": 6,
     "trust": { "band": "blank", "score": 50 },
     "nickname": "Fixture_Abnehmer",

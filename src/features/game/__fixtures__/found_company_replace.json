@@ -1,0 +1,107 @@
+{
+  "company": {
+    "id": "63667b66-459f-433f-9ad4-7f9568829a20",
+    "idea": "Zweite Idee",
+    "live": {
+      "last_hour_at": "2026-11-13T16:00:00+00:00",
+      "pay_factor_bps": 10000,
+      "today_profit_cents": 0,
+      "today_revenue_cents": 0,
+      "fixed_per_hour_cents": 0,
+      "quarter_profit_cents": 0,
+      "demand_per_hour_cents": 0,
+      "profit_per_hour_cents": 0,
+      "quarter_revenue_cents": 0,
+      "revenue_per_hour_cents": 0,
+      "ai_wages_per_hour_cents": 0,
+      "capacity_per_hour_cents": 0,
+      "marketing_per_hour_cents": 0,
+      "today_founder_payout_cents": 0,
+      "founder_payout_per_hour_cents": 0,
+      "contract_revenue_per_hour_cents": 0
+    },
+    "logo": null,
+    "name": "Fixture Zweitling",
+    "tier": "garage",
+    "color": "#553377",
+    "hours": [],
+    "stage": 0,
+    "banner": null,
+    "sector": "retail",
+    "stages": [
+      { "stage": 1, "skills": [{ "key": "it_web", "covered_by": null, "covered_by_ai": false }], "reached": false },
+      {
+        "stage": 2,
+        "skills": [
+          { "key": "sales_marketing", "covered_by": null, "covered_by_ai": false },
+          { "key": "logistics_warehouse", "covered_by": null, "covered_by_ai": false }
+        ],
+        "reached": false
+      },
+      {
+        "stage": 3,
+        "skills": [
+          { "key": "hybrid_ecommerce", "covered_by": null, "covered_by_ai": false },
+          { "key": "sales_seo", "covered_by": null, "covered_by_ai": false }
+        ],
+        "reached": false
+      },
+      {
+        "stage": 4,
+        "skills": [
+          { "key": "logistics_automation", "covered_by": null, "covered_by_ai": false },
+          { "key": "management_operations", "covered_by": null, "covered_by_ai": false }
+        ],
+        "reached": false
+      }
+    ],
+    "history": [],
+    "listing": null,
+    "campaign": null,
+    "distress": false,
+    "employees": 0,
+    "headcount": 0,
+    "ai_workers": 0,
+    "can_expand": false,
+    "cash_cents": 250000,
+    "founded_at": "2026-11-13T16:08:02.414201+00:00",
+    "can_upgrade": false,
+    "logo_hidden": false,
+    "price_level": "normal",
+    "product_key": "online_shop",
+    "quality_bps": 2500,
+    "value_cents": 250000,
+    "last_quarter": null,
+    "unpaid_cents": 0,
+    "awareness_bps": 300,
+    "can_go_public": false,
+    "contract_work": true,
+    "market_factor": 1.0,
+    "max_employees": 2,
+    "open_postings": 0,
+    "training_from": 5,
+    "campaign_costs": { "tv": 20000, "flyer": 20000, "online": 20000 },
+    "capacity_cents": 375000,
+    "full_time_from": 5,
+    "grace_quarters": 4,
+    "pay_factor_bps": 10000,
+    "expansion_level": 0,
+    "founder_has_job": false,
+    "next_quarter_at": "2026-11-13T19:00:00+00:00",
+    "quarters_active": 0,
+    "ai_worker_skills": [],
+    "distress_quarters": 0,
+    "estimate_low_cents": 73635,
+    "founder_payout_bps": 0,
+    "upgrade_cost_cents": 1250000,
+    "estimate_high_cents": 522815,
+    "ai_worker_cost_cents": 72000,
+    "can_capital_increase": false,
+    "expansion_cost_cents": null,
+    "pending_applications": 0,
+    "team_productivity_bps": 15000,
+    "ai_wage_cents_per_hour": 12000,
+    "founder_productivity_bps": 15000,
+    "marketing_cents_per_quarter": 0
+  }
+}

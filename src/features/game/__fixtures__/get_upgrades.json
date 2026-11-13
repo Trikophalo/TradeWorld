@@ -1,1 +1,14 @@
-{ "levels": { "study": 0, "vault": 0, "income": 0, "overtime": 0, "rhetoric": 0 } }
+{
+  "levels": {
+    "study": 0,
+    "vault": 0,
+    "artist": 0,
+    "income": 0,
+    "makler": 0,
+    "mentor": 0,
+    "overtime": 0,
+    "rhetoric": 0,
+    "efficiency": 0,
+    "crypto_wallet": 0
+  }
+}

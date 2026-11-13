@@ -1,27 +1,27 @@
 {
-  "id": "d3ad5ef5-692c-45d9-a3af-b90361f4b49b",
+  "id": "1f1dc049-7e2c-4ea8-b53a-fb4bd708d219",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "0f6bdb16-9d79-4eef-a1ec-565b3642303b",
+    "id": "3755c26a-8493-4a20-a34b-ff36804657b1",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "dc6cd683-c473-c0eb-8d8c-04ddf664b4d5",
+      "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
       "logo": null,
-      "name": "Eilbote Express",
-      "color": "#F7768E",
+      "name": "Frachtpilot",
+      "color": "#9ECE6A",
       "is_ai": true,
       "sector": "logistics",
-      "ticker": "EBX"
+      "ticker": "FPT"
     },
-    "required": [{ "branch": "it", "min_score": 0 }],
-    "title_key": "it_intern",
+    "required": [{ "branch": "craft", "min_score": 0 }],
+    "title_key": "craft_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-13T14:15:23.886371+00:00",
-  "updated_at": "2026-11-13T14:15:23.892489+00:00",
-  "offer_expires_at": "2026-11-15T14:15:23.886371+00:00",
-  "salary_wish_cents_per_hour": 15900,
-  "offer_salary_cents_per_hour": 15900
+  "created_at": "2026-11-13T16:07:56.564751+00:00",
+  "updated_at": "2026-11-13T16:07:56.570191+00:00",
+  "offer_expires_at": "2026-11-15T16:07:56.564751+00:00",
+  "salary_wish_cents_per_hour": 15000,
+  "offer_salary_cents_per_hour": 15000
 }

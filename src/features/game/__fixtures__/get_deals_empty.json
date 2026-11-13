@@ -1,5 +1,6 @@
 {
   "trust": { "band": "blank", "kept": 0, "score": 50, "broken": 0 },
+  "limits": { "loan_max_cents": 2000000, "company_deal_max_cents": null },
   "history": [],
   "running": [],
   "incoming": [],

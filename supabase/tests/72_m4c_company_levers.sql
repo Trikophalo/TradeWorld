@@ -16,10 +16,10 @@ select tests.signup(:a, 'Anke_Ausbau') is not null and tests.signup(:b, 'Bodo_Ga
    and tests.signup(:e, 'Edda_Edel') is not null as ok \gset
 update public.sim_runtime set is_paused = false;
 select tests.set_level(:a, 15);
-select tests.set_level(:b, 6);
-select tests.set_level(:c, 5);
-select tests.set_level(:d, 3);
-select tests.set_level(:e, 3);
+select tests.set_level(:b, 9);
+select tests.set_level(:c, 6);
+select tests.set_level(:d, 6);
+select tests.set_level(:e, 6);
 select tests.fund(:a, 7000000, 'test:m4c:a');
 select tests.fund(:b, 1000000, 'test:m4c:b');
 select tests.fund(:c, 1000000, 'test:m4c:c');
@@ -229,12 +229,12 @@ select tests.assert(
   'expansion: fixed costs + 25 % and capacity + 10 % per level');
 
 -- =============================================================================
--- E. IPO from the garage at level 6 (startups.ipo)
+-- E. IPO from the garage at level 9 (startups.ipo, ADR-099)
 -- =============================================================================
 select tests.login_as('authenticated', :c);
 select public.found_company(gen_random_uuid(), 'Cleos Garage', 'Kleine Roboter', 'tech', '#663311', 'garage') -> 'company' as gc \gset
 select tests.throws_key($$select public.go_public(gen_random_uuid(), 20)$$, 'company_level_too_low',
-  'go_public(): from startups.ipo.minLevel (6)');
+  'go_public(): from startups.ipo.minLevel (9)');
 reset role;
 select tests.login_as('authenticated', :b);
 select public.get_my_company() -> 'company' as bmc2 \gset
@@ -243,6 +243,6 @@ reset role;
 select tests.assert(
   not (:'gc'::jsonb ->> 'can_go_public')::boolean and (:'bmc2'::jsonb ->> 'can_go_public')::boolean
   and (select phase = 'ipo' from public.companies where id = :'bco'),
-  'go_public(): a garage may go public from level 6 (fromTiers incl. garage)');
+  'go_public(): a garage may go public from level 9 (fromTiers incl. garage)');
 
 select tests.set_cfg('startups', '{demandNoise}', :'noise0'::jsonb);

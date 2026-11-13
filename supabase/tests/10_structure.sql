@@ -103,7 +103,9 @@ select tests.assert(
            'buy_upgrade', 'decline_promotion', 'get_upgrades', 'promote_employee', 'request_promotion',
            -- M4j RPCs (campaigns, deals and trust, ADR-097/098)
            'break_deal', 'cancel_deal', 'forgive_loan', 'get_deal_board', 'get_deals', 'propose_deal', 'repay_loan',
-           'respond_deal', 'start_campaign']
+           'respond_deal', 'start_campaign',
+           -- M4k RPCs (unique artwork titles, ADR-100; org chart)
+           'check_artwork_title', 'get_company_org']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')

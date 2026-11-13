@@ -1,0 +1,17 @@
+{
+  "company": { "id": "1a67f2ae-93f9-4775-80f9-6ed7ae9bef8c", "name": "Fixture Leitern", "tier": "garage" },
+  "founder": { "tag": "QF2E", "is_me": true, "nickname": "Fixture_Chef", "avatar_key": "rookie" },
+  "members": [
+    {
+      "tag": "Y7E9",
+      "tier": "junior",
+      "is_me": false,
+      "since": "2026-11-13T16:08:01.640495+00:00",
+      "title": "Werkstudium Leitern",
+      "nickname": "Fixture_Team",
+      "avatar_key": "rookie"
+    }
+  ],
+  "ai_workers": 0,
+  "ai_worker_skills": []
+}

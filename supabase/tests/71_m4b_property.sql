@@ -12,7 +12,7 @@ set client_min_messages = notice;
 select tests.signup(:a, 'Hanna_Haus') is not null and tests.signup(:b, 'Moritz_Moebel') is not null
    and tests.signup(:c, 'Greta_Garage') is not null and tests.signup(:d, 'Neo_Neuling') is not null as ok \gset
 select tests.set_level(:a, 30);
-select tests.set_level(:b, 8);
+select tests.set_level(:b, 11);
 select tests.set_level(:c, 14);
 select tests.set_level(:d, 3);
 select tests.fund(:a, 100000000, 'test:m4b:a');
@@ -30,13 +30,13 @@ grant execute on all functions in schema tests to public;
 -- A. Catalogue, rules, unlock, error codes
 -- =============================================================================
 select tests.assert(
-  (select count(*) from public.furniture_catalog) = 65
+  (select count(*) from public.furniture_catalog) = 87
   and (select count(*) from public.furniture_catalog where layer = 'floor') = 6
   and (select count(distinct category) from public.furniture_catalog) = 10
   and (select count(*) from public.car_catalog) = 14
-  and (select min(price_cents) from public.furniture_catalog) = 2500
+  and (select min(price_cents) from public.furniture_catalog) = 1500
   and (select max(price_cents) from public.furniture_catalog) = 150000000,
-  'catalogue: 65 pieces of furniture in 10 categories (6 rugs), 14 cars, 25 EUR to 1.5 Mio. EUR (seed ran twice)');
+  'catalogue: 87 pieces of furniture in 10 categories (6 rugs), 14 cars, 15 EUR to 1.5 Mio. EUR (seed ran twice)');
 select tests.assert(
   public.property_upgrade_cost_cents(null, 'flat') = 2500000
   and public.property_upgrade_cost_cents('flat', 'house') = 50000000 - 1250000
@@ -50,9 +50,9 @@ select tests.assert(
   and public.property_floor_owned('{}', 'laminate') and not public.property_floor_owned('{laminate}', 'marble'),
   'upgradeCostCents, trade-in, resaleCents (floored), tiers, floor prices as in src/lib/sim/property.ts');
 select tests.assert(
-  exists (select 1 from public.unlocks where key = 'property' and level = 4 and title = 'Grundstück')
-  and public.unlock_level('property') = 4,
-  'the unlock row "property" (level 4, Grundstück) exists');
+  exists (select 1 from public.unlocks where key = 'property' and level = 8 and title = 'Grundstück')
+  and public.unlock_level('property') = 8,
+  'the unlock row "property" (level 8, Grundstück, ADR-099) exists');
 do $$
 declare
   k text;
@@ -84,7 +84,7 @@ select tests.throws($$select * from public.furniture_catalog$$, '42501', 'furnit
 reset role;
 
 -- =============================================================================
--- B. Level gates: reading is open, writing needs level 4, tiers their minLevel
+-- B. Level gates: reading is open, writing needs level 8 (ADR-099), tiers their minLevel
 -- =============================================================================
 select tests.login_as('authenticated', :d);
 select public.get_property(null) as d_view \gset
@@ -101,7 +101,7 @@ select tests.assert(
   and not exists (select 1 from public.player_homes where player_id = :d),
   'get_property(): a player without a home: tier null, 0 x 0, laminate, first wall colour, empty inventory (no row written)');
 select tests.login_as('authenticated', :b);
-select tests.throws_key($$select public.buy_home(gen_random_uuid(), 'house')$$, 'property_locked', 'level 8: the house needs level 14');
+select tests.throws_key($$select public.buy_home(gen_random_uuid(), 'house')$$, 'property_locked', 'level 11: the house needs level 14');
 select tests.throws_key($$select public.buy_home(gen_random_uuid(), 'castle')$$, 'invalid_argument', 'unknown tier');
 select tests.throws_key($$select public.buy_home(null, 'flat')$$, 'invalid_argument', 'request_id is required');
 reset role;
@@ -341,7 +341,7 @@ select tests.login_as('authenticated', :b);
 select public.buy_furniture(gen_random_uuid(), 'plant_small', 3) is not null as ok \gset
 select public.buy_floor(gen_random_uuid(), 'carpet') as b_floor \gset
 select tests.throws_key(format('select public.save_layout(gen_random_uuid(), %L, %L, %L)', '#ffffff', 'carpet', '[]'),
-  'no_home', 'level 8 without a home: no layout');
+  'no_home', 'level 11 without a home: no layout');
 select public.buy_home(gen_random_uuid(), 'apartment') as b_home \gset
 select public.get_property('hanna_haus') as b_sees_a \gset
 select tests.throws_key($$select public.get_property('Gibt_Es_Nicht')$$, 'player_not_found', 'unknown nickname');
@@ -358,7 +358,7 @@ select tests.assert(
   and jsonb_array_length(:'b_floor'::jsonb #> '{inventory,furniture}') = 3
   and (:'b_home'::jsonb ->> 'cost_cents')::bigint = 10000000
   and :'b_home'::jsonb #>> '{property,tier}' = 'apartment' and (:'b_home'::jsonb #>> '{property,width}')::int = 10,
-  'level 8: furniture and floors without a home; the first home may be the apartment (skipping the flat)');
+  'level 11: furniture and floors without a home; the first home may be the apartment (skipping the flat)');
 select tests.assert(
   :'b_sees_a'::jsonb -> 'property' = :'a_own'::jsonb -> 'property'
   and :'b_sees_a'::jsonb -> 'inventory' = 'null'::jsonb
@@ -423,9 +423,9 @@ begin
   perform public.missions_assign(v);
   if exists (select 1 from public.player_missions m join public.mission_templates t on t.key = m.template_key
               where m.player_id = v and t.params ->> 'unlock' = 'property') then
-    raise exception 'ASSERTION FAILED: property missions offered below level 4';
+    raise exception 'ASSERTION FAILED: property missions offered below level 8';
   end if;
-  raise notice 'ok - property missions only from level 4 (params.unlock property)';
+  raise notice 'ok - property missions only from level 8 (params.unlock property)';
 end;
 $$;
 

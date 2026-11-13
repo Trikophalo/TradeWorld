@@ -9,7 +9,7 @@ set client_min_messages = notice;
 \set o '''06960696-0000-4000-8000-0000000000a3'''
 select tests.signup(:f, 'Bea_Banner') is not null and tests.signup(:e, 'Emil_Fahne') is not null
    and tests.signup(:o, 'Olga_Wimpel') is not null as ok \gset
-select tests.set_level(:f, 4);
+select tests.set_level(:f, 6);
 select tests.set_level(:e, 3);
 select tests.fund(:f, 1000000, 'test:m3j:f');
 

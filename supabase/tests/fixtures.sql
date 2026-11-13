@@ -815,3 +815,46 @@ select public.get_deals();
 select public.get_player_card('Fixture_Lieferant');
 \o
 reset role;
+
+-- M4k: upgrade stages, unique names, replacing the own company, the top layer, presence and the org chart
+-- (ADR-100, ADR-103)
+update public.invite_codes set max_uses = max_uses + 5 where code = 'M1-TESTS';
+\set fx_n '''f1f1f1f1-0000-4000-8000-0000000001b1'''
+select tests.signup(:fx_n, 'Fixture_Neustart') is not null as ok \gset
+select tests.set_level(:fx_n, 8);
+select tests.fund(:fx_n, 5000000, 'fixture:m4k:n');
+select tests.login_as('authenticated', :fx_n) is null as ok \gset
+\o :fixture_dir/check_artwork_title.json
+select public.check_artwork_title('Fixture im Morgenrot');
+\o :fixture_dir/check_artwork_title_rejected.json
+select public.check_artwork_title('FIXTURE IM ABENDROT');
+\o :fixture_dir/buy_upgrade_makler.json
+select public.buy_upgrade(gen_random_uuid(), 'makler');
+\o
+select public.found_company(gen_random_uuid(), 'Fixture Erstling', 'Erste Idee', 'tech', '#335577', 'garage') is not null as ok \gset
+\o :fixture_dir/check_company_name_own.json
+select public.check_company_name('Fixture Erstling');
+\o :fixture_dir/found_company_replace.json
+select public.found_company(gen_random_uuid(), 'Fixture Zweitling', 'Zweite Idee', 'retail', '#553377', 'garage', null, true);
+\o
+reset role;
+select tests.login_as('authenticated', :fx_h) is null as ok \gset
+select public.buy_furniture(gen_random_uuid(), 'table_oak', 1) is not null as ok \gset
+select public.buy_furniture(gen_random_uuid(), 'laptop', 1) -> 'inventory' -> 'furniture' as fx_inv \gset
+\o :fixture_dir/save_layout_top.json
+select public.save_layout(gen_random_uuid(), '#2f5fd0', 'parquet',
+         (select jsonb_agg(case e ->> 'item_key' when 'table_oak' then jsonb_build_object('id', e ->> 'id', 'x', 2, 'y', 2, 'rot', 0)
+                                                 else jsonb_build_object('id', e ->> 'id', 'x', 3, 'y', 3, 'rot', 0) end)
+            from jsonb_array_elements(:'fx_inv'::jsonb) e where e ->> 'item_key' in ('table_oak', 'laptop')));
+\o
+reset role;
+select tests.login_as('authenticated', :fx_c) is null as ok \gset
+\o :fixture_dir/get_company_org.json
+select public.get_company_org(:'fx_cco');
+\o
+reset role;
+select tests.login_as('authenticated', :fx_m) is null as ok \gset
+\o :fixture_dir/get_company_org_member.json
+select public.get_company_org(:'fx_cco');
+\o
+reset role;

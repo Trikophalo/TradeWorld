@@ -6502,3 +6502,214 @@ Eine Zeile in `run_due_jobs`, nach den Firmenstunden und den Firmen-Ereignissen.
 - Preisstrategie und Qualität des Käufers gelten so, wie sie bei der Abrechnung sind, nicht wie in der Stunde.
 - Kredite stehen nicht im Vermögen der Reichenliste: Der Schuldner hat das Geld in der Kasse, die Schuld wird nicht
   abgezogen.
+
+## Nachtrag: M4k (Verbesserungen mit Level-Stufen, drei Möbel-Ebenen, eindeutige Namen, Deals mit der Firma, Anwesenheit, Organigramm)
+
+Migration `20261201000100_m4k_upgrades_layers_names.sql` (ADR-099, ADR-100, ADR-103), idempotente Kopie in
+`supabase/updates/`. Die Regeln spiegeln `src/lib/sim/upgrades.ts` (`upgradeStageLevel`, `upgradeEffects`),
+`src/lib/sim/property.ts` (`invalidPlacements` mit der Ebene obendrauf), `src/lib/sim/deals.ts`
+(`dealSizeLimitCents`, `supplyMaxCostCents`) und `src/lib/sim/skills.ts` (`presencePayBps`, `firedForAbsence`). Die
+Zahlen kommen aus `game_config` (`upgrades`, `deals`, `careers.inactivity`, `careers.paidHoursPerDayCap`). Fehlt ein
+Wert, gelten dieselben Standardwerte wie in `src/config`.
+
+### Schema
+
+| Änderung                      | Inhalt                                                                                                    |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `player_upgrades.key`         | zusätzlich `mentor`, `artist`, `efficiency`, `makler`, `crypto_wallet`                                    |
+| `furniture_catalog.layer`     | `floor`, `object` oder neu `top` (kleine Dinge obendrauf)                                                 |
+| `furniture_catalog.surface`   | `boolean`, Standard `false`; nur Möbel der Ebene `object` dürfen eine Ablagefläche haben                  |
+| `companies`                   | `companies_name_lower_uq` entfällt; eindeutig ist `lower(name)` nur noch, solange `dissolved_at` leer ist |
+| `companies_name_key_live_idx` | Suchindex auf `name_key(name)` der bestehenden Spielerfirmen (nicht eindeutig: alte Doppelgänger bleiben) |
+| `artworks_title_key_idx`      | Suchindex auf `name_key(title)`                                                                           |
+| `profiles.last_active_at`     | letzte Nutzung des Spiels (`timestamptz`, nie leer; beim Anlegen der Spalte jetzt)                        |
+| `player_absences`             | Abwesenheiten ab der ersten Stufe (`player_id`, `away_from`, `away_until`); RLS an, kein Client-Zugriff   |
+| `job_end_reason`              | neuer Wert `absent`                                                                                       |
+| `unlocks`                     | Level wie in `progression.unlocks` (ADR-099): `artworks` 4, `property` 8, `ipo` 9, `found_gmbh` 15        |
+
+- Die Freischalt-Zeilen stehen auch in `seed.sql` mit den neuen Leveln (für eine neue Datenbank). Wer ein Level schon
+  erreicht hat, bekommt die Zeile in `player_unlocks` nachgetragen; früher erhaltene Freischaltungen bleiben.
+- `player_absences` hält Einträge 30 Tage. Ein Konto-Neustart leert die Tabelle nicht (siehe Bekannte Grenzen).
+
+### Verbesserungen mit Level-Stufen (ADR-100)
+
+- **Stufen-Level:** Die nächste Stufe braucht Spieler-Level ≥ `minLevel` + (gekaufte Stufen) × `levelStep`
+  (`upgrade_stage_level(key, stufe)`, `null` ab der höchsten Stufe). `buy_upgrade` prüft wie bisher in der
+  Reihenfolge `upgrade_maxed`, `locked`, `insufficient_funds`. Preise unverändert. Gekaufte Stufen bleiben, auch wenn
+  das Level heute nicht mehr reichen würde.
+- **Alle zehn Schlüssel:** `get_upgrades` und `buy_upgrade.levels` enthalten immer
+  `{vault, income, study, overtime, rhetoric, mentor, artist, efficiency, makler, crypto_wallet}`.
+- **Neue Wirkungen** (intern, nur `service_role`):
+
+  | Hilfsfunktion                                    | Formel                                             | wirkt in                                                       |
+  | ------------------------------------------------ | -------------------------------------------------- | -------------------------------------------------------------- |
+  | `player_work_xp_bps(spieler)`                    | 10 000 + Mentor-Stufe × `mentor.perLevel`          | `accrue_job_salary`: XP aus Arbeitsstunden × bps / 10 000      |
+  | `player_art_discount_bps(spieler)`               | Kunststudio-Stufe × `artist.perLevel` (0 … 10 000) | `get_art_studio.next_cost_cents`, `create_artwork`             |
+  | `player_fixed_cost_discount_bps(spieler)`        | Effizienz-Stufe × `efficiency.perLevel`            | `player_company_close_hour`: Fixkosten der Stunde des Gründers |
+  | `player_property_discount_bps(spieler)`          | Makler-Stufe × `makler.perLevel`                   | `buy_home`, `buy_furniture`, `buy_floor`, `buy_car`            |
+  | `player_upgrade_level(spieler, 'crypto_wallet')` | Stufe des Hardware-Wallets                         | liest die Krypto-Migration (Pool-Gebühren)                     |
+
+- **Rundung:** Rabatte rechnen mit `apply_bps` (kaufmännisch „half even“, wie `applyBps`): Preis × (10 000 − Rabatt) /
+  10 000.
+  - Kunst: `player_artwork_create_cost_cents(spieler, gemalt)` = `apply_bps(artwork_create_cost_cents(gemalt), 10 000 −
+Rabatt)`. Die Buchung trägt `discount_bps` in den Metadaten.
+  - Fixkosten: `apply_bps(round(Quartals-Fixkosten / quarterHours), 10 000 − Rabatt)`. `player_company_hours.fixed_cents`
+    und damit `COMPANY.live.fixed_per_hour_cents` und die Quartalssummen zeigen den bezahlten Betrag.
+  - Zuhause: `buy_home` zahlt `apply_bps(Preis − Inzahlungnahme, 10 000 − Rabatt)` (Antwort `cost_cents`). Möbel und Autos:
+    der rabattierte Stückpreis ist `price_paid_cents`, Wiederverkauf und Vermögen rechnen damit. Böden: rabattierter
+    Preis. Metadaten der Buchung: `discount_bps` (Zuhause zusätzlich `list_cost_cents`, Boden `list_price_cents`).
+- XP der Mentor-Stufe: round(XP je Stunde × Stunden × `workXpBps` / 10 000 × Anwesenheitsanteil / 10 000), danach wie
+  immer `xpMultiplier` in `grant_xp`.
+
+### Drei Ebenen beim Einrichten (ADR-100)
+
+`save_layout` prüft wie `invalidPlacements`:
+
+- Jedes Stück liegt ganz auf der Fläche; je Ebene (`floor`, `object`, `top`) höchstens ein Stück pro Kachel. Teppiche
+  liegen unter Möbeln, kleine Dinge stehen auf Möbeln, auf einer Kachel also bis zu drei Stücke.
+- Ein Ding der Ebene `top` steht **ganz** auf Kacheln, die ein platziertes `object` mit `surface = true` belegt.
+  Teppiche, Möbel ohne Ablage und freie Kacheln tragen nichts.
+- Verstöße: `layout_invalid` wie bisher.
+
+`PROPERTY` gibt je Stück nur `item_key` aus, keine Katalogfelder. Ebene und Ablagefläche nimmt der Client aus seinem
+Katalog (`src/config/furniture.ts`), der aus derselben Quelle erzeugt wird wie `seeds/furniture.sql`.
+
+### Eindeutige Namen (ADR-100)
+
+Verglichen wird wie bei Spielernamen mit `name_key` (Kleinschreibung, Umlaute und Akzente gefaltet, Leetspeak-Ziffern
+umgedeutet, Unterstriche entfernt).
+
+- **Firmen:** `name_taken`, wenn eine noch bestehende Firma (`dissolved_at` leer) denselben Namen trägt
+  (Groß-/Kleinschreibung egal) oder eine aktive Spielerfirma denselben `name_key` hat. Eine geschlossene oder aufgelöste
+  Firma gibt ihren Namen frei. KI-Firmen bleiben wie bisher reserviert (`name_reserved`).
+  - `check_company_name(p_name)` antwortet entsprechend. Die eigene aktive Firma des Aufrufers zählt nicht: Wer neu
+    gründet, ersetzt sie.
+  - `found_company` sperrt den Namensschlüssel (Advisory-Lock), damit zwei gleichzeitige Gründungen nicht denselben Namen
+    bekommen.
+- **Artworks:** Ein neuer Titel muss unter allen Artworks (Galerie und Spieler) eindeutig sein, sonst `name_taken`.
+  `create_artwork` prüft nach `request_begin` (eine Wiederholung derselben Anfrage antwortet wie beim ersten Mal) und
+  sperrt den Titelschlüssel.
+- **`check_artwork_title(p_title text)`** → `{"allowed": boolean, "reason": null | "name_too_short" | "name_too_long" |
+"name_invalid_chars" | "name_profanity" | "name_taken"}`. Der Titel wird wie in `create_artwork` gekürzt (Leerzeichen
+  zusammengefasst). Für `authenticated`.
+
+### Neu gründen statt schließen (ADR-100)
+
+`found_company(p_request_id, p_name, p_idea, p_sector, p_color, p_tier, p_product text default null,
+p_replace boolean default false)` (die alte Signatur ohne `p_replace` entfällt):
+
+- Ohne aktive Firma wie bisher.
+- Mit aktiver Firma und `p_replace = false`: `company_exists` wie bisher.
+- Mit `p_replace = true`: Nach allen Prüfungen (Idee, Name, Gründungssperre, Level) wird die alte Firma genau wie bei
+  `close_company` aufgelöst (`company_dissolve(alt, 'closed')`: Löhne bis jetzt, eine Abfindung je Mitarbeiter, offene
+  Rechnungen, Rest an den Gründer, Zeile in `company_dissolutions`). Danach wird die neue Firma gegründet, in derselben
+  Transaktion. Scheitert die Gründung (z. B. `insufficient_funds`), bleibt auch die alte Firma bestehen.
+- Der Name der ersetzten Firma darf übernommen werden. Antwort wie bisher `{company: COMPANY}`.
+
+### Deals mit der Firma (ADR-100)
+
+- `deals.minLevel` kommt aus `game_config` (jetzt 6), der Rückfallwert ist 6.
+- **Größengrenze** je Firma (`deal_size_limit_cents(firma)`, intern): max(`deals.minSizeCents`,
+  ⌊max(0, `company_value_cents`) × `deals.sizeShareOfValueBps` / 10 000⌋), also mindestens 50.000 €. Firmenwert wie
+  `COMPANY.value_cents`.
+- **Liefervertrag:** die höchstmöglichen Kosten `supplyMaxCostCents` = `apply_bps(volume × hours, fee_bps)` dürfen die
+  Grenze **beider** Firmen nicht übersteigen. **Beteiligung:** `amount_cents` höchstens die Grenze der Firma.
+  Kredite haben keine Firmengrenze.
+- Geprüft wird beim Angebot (Firma des Anbieters und, bei einem gezielten Angebot, die Firma des Ziels) und noch einmal
+  bei der Annahme mit den Werten von dann. Fehler: `deal_too_big`.
+- **`get_deals`** liefert zusätzlich
+  `"limits": {"company_deal_max_cents": <Grenze der eigenen aktiven Firma> | null, "loan_max_cents": <Level × loan.maxPrincipalCentsPerLevel>}`.
+
+### Anwesenheit im Job (ADR-103)
+
+- **Nutzung:** Jeder RPC eines Spielers geht durch `require_player`. Liegt `last_active_at` mehr als 5 Minuten zurück,
+  ruft sie `presence_touch` auf:
+  1. Mit dem **alten** Zeitpunkt: War der Spieler `careers.inactivity.fireAfterHours` (120 h) oder länger weg, enden
+     zuerst seine Jobs (siehe unten).
+  2. War er mindestens die erste Stufe (24 h) weg, kommt die Abwesenheit `[alt, jetzt)` in `player_absences`.
+  3. Dann `last_active_at` = jetzt (`game_now()`).
+     Ein Lesezugriff in einer schreibgeschützten Transaktion (GET) kann das nicht speichern; der nächste schreibende Aufruf
+     (z. B. `get_my_missions`, das der Client beim Öffnen und alle 15 Sekunden ruft) holt es nach. Ein Fehler dabei
+     blockiert den Aufruf nie (Warnung im Log).
+- **Lohn:** `accrue_job_salary` zahlt für jede bezahlte Minute den Anteil `presencePayBps` der Stunden, die der Spieler
+  zu dieser Minute schon weg war (letzte Stufe mit `afterHours` ≤ Stunden: ab 24 h 75 %, ab 48 h 50 %, ab 72 h 25 %;
+  davor 100 %). Minuten nach `last_active_at` zählen ab dort, frühere Minuten ab dem Beginn einer gespeicherten
+  Abwesenheit, sonst 100 %. Der Durchschnitt (`presence_pay_bps_between`) kürzt den Grundlohn der Abrechnung
+  (`base_amount_cents`), damit auch das, was eine Spielerfirma zahlt, und die XP der Arbeitsstunden. Die bezahlten
+  Minuten des Tages zählen voll.
+- **Kündigung** (`job_absence_check(job, jetzt)`): Ist jetzt ≥ `last_active_at` + `fireAfterHours`, werden die Minuten bis
+  zu diesem Moment noch abgerechnet, dann endet der Job (`status = 'ended'`, `ended_at` = dieser Moment,
+  `end_reason = 'absent'`). Aufgerufen von `accrue_salaries` (KI-Jobs, stündlich über `run_due_jobs`),
+  `player_company_close_hour` (Spielerfirmen, vor den Löhnen der Stunde) und `presence_touch` (Rückkehr nach
+  langer Pause, falls die Stundenjobs noch nicht gelaufen sind).
+  - Benachrichtigung `job_absent` an den Spieler: „Gekündigt“, „Du warst 5 Tage nicht da. Dein Job bei {Firma} ist
+    beendet.“, Link `/job`.
+  - Bei Spielerfirmen `employee_absent` an Gründer und CEO: „Kündigung wegen Abwesenheit“, „{Name} ist nicht mehr
+    erschienen und wurde gekündigt.“, Link `/company`; dazu dieselbe Zeile als Systemnachricht im Firmenchat.
+- **Bezahlte Stunden am Tag:** `careers.paidHoursPerDayCap` fällt auf 8 zurück (vorher 12), Überstunden kommen dazu.
+- **`job_state`** (`get_my_job`, `sign_contract`, …): `job.presence = {last_active_at, pay_bps, fire_at}`. Liest der
+  Spieler selbst, ist `last_active_at` jetzt (der Aufruf zählt als Nutzung), `pay_bps` also 10 000. `fire_at` =
+  `last_active_at` + `fireAfterHours`.
+
+### Organigramm
+
+**`get_company_org(p_company_id uuid)`** (lesend, für `authenticated`) für eine aktive Spielerfirma:
+
+```
+{ company: {id, name, tier},
+  founder: {nickname, tag, avatar_key, is_me},
+  members: [{nickname, tag, avatar_key, tier: "intern" | "junior" | "senior" | "team_lead" | "c_level",
+             title, since, is_me}],          -- höchster Rang zuerst, dann nach Eintritt
+  ai_workers: number,
+  ai_worker_skills: [skill_key] }
+```
+
+- Erlaubt für Gründer, CEO und Spieler mit aktivem Job in der Firma, sonst `forbidden`. Unbekannte oder aufgelöste
+  Firma: `company_not_found`. Wer wem berichtet, leitet der Client aus den Rängen ab.
+
+### Neue und geänderte RPCs
+
+| RPC                                                   | Antwort / Änderung                                                         |
+| ----------------------------------------------------- | -------------------------------------------------------------------------- |
+| `check_artwork_title(p_title)` (neu)                  | `{allowed, reason}`                                                        |
+| `get_company_org(p_company_id)` (neu)                 | siehe Organigramm                                                          |
+| `found_company(…, p_replace boolean default false)`   | `{company: COMPANY}`; mit `p_replace` wird die alte Firma vorher aufgelöst |
+| `get_upgrades()` / `buy_upgrade(p_request_id, p_key)` | zehn Schlüssel; Stufen-Level (`locked`)                                    |
+| `check_company_name(p_name)`                          | eindeutig unter bestehenden Firmen, Doppelgänger zählen, eigene Firma frei |
+| `create_artwork`, `get_art_studio`                    | Kunststudio-Rabatt; `create_artwork` mit `name_taken`                      |
+| `buy_home`, `buy_furniture`, `buy_floor`, `buy_car`   | Makler-Rabatt; Form unverändert                                            |
+| `save_layout`                                         | Ebene `top`                                                                |
+| `propose_deal`, `respond_deal`                        | `deal_too_big`                                                             |
+| `get_deals()`                                         | zusätzlich `limits`                                                        |
+| `get_my_job()` und alle Antworten mit `job_state`     | zusätzlich `job.presence`                                                  |
+
+### Neuer Fehlerschlüssel und Benachrichtigungstypen
+
+| Schlüssel      | Code    | Wann                                                                        |
+| -------------- | ------- | --------------------------------------------------------------------------- |
+| `deal_too_big` | `NX095` | Liefervertrag (höchste Kosten) oder Beteiligung über der Grenze einer Firma |
+
+Benachrichtigungstypen `job_absent` (Kategorie `career`, in-app und Push an) und `employee_absent` (Kategorie
+`company`, in-app an).
+
+### Neu definiert
+
+`api_error` (alle bisherigen Schlüssel plus NX095), `upgrade_cfg`, `player_upgrade_levels`, `get_upgrades`,
+`buy_upgrade`, `accrue_job_salary`, `accrue_salaries`, `player_paid_hours_cap`, `job_state`, `require_player`,
+`get_art_studio`, `create_artwork`, `name_violation`, `check_company_name`, `found_company` (neue Signatur),
+`player_company_close_hour`, `buy_home`, `buy_furniture`, `buy_floor`, `buy_car`, `save_layout`, `propose_deal`,
+`respond_deal`, `get_deals`. Neue interne Helfer (nur `service_role`): `upgrade_stage_level`, die vier
+`player_*_bps`-Wirkungen, `player_artwork_create_cost_cents`, `artwork_title_taken`, `deal_supply_max_cost_cents`,
+`deal_size_limit_cents`, `deal_exceeds_size`, `presence_cfg`, `presence_pay_bps`, `presence_away_hours`,
+`presence_pay_bps_between`, `presence_json`, `job_absence_check`, `presence_touch`.
+
+### Bekannte Grenzen
+
+- Der Wert gekaufter Böden im Vermögen rechnet weiter mit dem Listenpreis (gespeichert wird nur der Belag), die
+  Inzahlungnahme der Bleibe ebenso.
+- Kündigt `job_absence_check` in `player_company_close_hour` mitten in einer Stunde, ist der Lohn bis dahin schon gezahlt,
+  aber nicht in den Lohnkosten dieser Stunde (`player_wages_paid_cents`) enthalten.
+- Liest ein Spieler nach langer Pause zuerst über einen reinen Lese-RPC (GET), zeigt diese erste Antwort den Job noch
+  mit dem alten Stand; die Kündigung oder die gespeicherte Abwesenheit folgt beim nächsten schreibenden Aufruf.
+- Ein Konto-Neustart (`account_wipe`, Krypto-Migration) setzt `last_active_at` nicht zurück und leert
+  `player_absences` nicht; beides schadet nicht, weil ein neuer Job erst nach einem Aufruf beginnt.

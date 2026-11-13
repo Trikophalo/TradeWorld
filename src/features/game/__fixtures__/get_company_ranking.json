@@ -1,6 +1,6 @@
 {
-  "mine": { "rank": 22, "value_cents": 54108 },
-  "total": 24,
+  "mine": { "rank": 25, "value_cents": 55567 },
+  "total": 28,
   "entries": [
     {
       "kind": "player",
@@ -14,7 +14,7 @@
       "founder": "Lars_Kursrutsch",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "1361936a-8273-4115-8bd1-b4569487130c",
+      "company_id": "649f271d-86ea-4781-b761-6ced59e5a680",
       "value_cents": 959140000,
       "revenue_cents": null
     },
@@ -50,8 +50,8 @@
       "founder": "Fenja_Firma",
       "is_mine": false,
       "team_size": 6,
-      "company_id": "cb9deb7f-7fc8-4318-862a-9ca99f751b7f",
-      "value_cents": 81978140,
+      "company_id": "ac79aa71-6438-4c1b-b99f-5a50bc6f1757",
+      "value_cents": 82307435,
       "revenue_cents": 0
     },
     {
@@ -66,15 +66,31 @@
       "founder": "Frieda_Format",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "75fd293c-637b-4ea8-8012-2d6b62ec6554",
+      "company_id": "da5eac2a-c73a-46bf-ab6d-db196c6d4c5e",
       "value_cents": 51553750,
       "revenue_cents": 1185000
     },
     {
       "kind": "player",
       "logo": null,
-      "name": "Ausbau Werke",
+      "name": "Sven Teile",
       "rank": 4,
+      "tier": "garage",
+      "color": "#335577",
+      "sector": "tech",
+      "ticker": null,
+      "founder": "Sven_Liefert",
+      "is_mine": false,
+      "team_size": 1,
+      "company_id": "736b0751-d82b-4629-802b-20407730ef95",
+      "value_cents": 20253809,
+      "revenue_cents": null
+    },
+    {
+      "kind": "player",
+      "logo": null,
+      "name": "Ausbau Werke",
+      "rank": 5,
       "tier": "gmbh",
       "color": "#224466",
       "sector": "tech",
@@ -82,26 +98,10 @@
       "founder": "Anke_Ausbau",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "560ab0d9-d06e-4439-8cf6-afa147dd529e",
+      "company_id": "634d4e72-5833-4adc-b70c-063dfd608b43",
       "value_cents": 7856750,
       "revenue_cents": null
-    },
-    {
-      "kind": "player",
-      "logo": null,
-      "name": "Stunden Werk",
-      "rank": 5,
-      "tier": "garage",
-      "color": "#225566",
-      "sector": "tech",
-      "ticker": null,
-      "founder": "Hanna_Stunde",
-      "is_mine": false,
-      "team_size": 3,
-      "company_id": "25596149-1c13-4bfe-bd4b-442e07a4b144",
-      "value_cents": 6928014,
-      "revenue_cents": 225671
     }
   ],
-  "server_time": "2026-11-13T14:15:24.985978+00:00"
+  "server_time": "2026-11-13T16:07:57.557424+00:00"
 }

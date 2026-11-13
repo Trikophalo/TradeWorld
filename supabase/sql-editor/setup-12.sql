@@ -3,6 +3,2387 @@
 begin;
 
 
+-- ===== supabase/migrations/20261201000100_m4k_upgrades_layers_names.sql =====
+-- =============================================================================
+-- NEXA · M4k · 0100 · Upgrades with level stages, three furniture layers, unique names, deals with the company
+-- =============================================================================
+-- ADR-100. Mirrors src/lib/sim/upgrades.ts (upgradeStageLevel; upgradeEffects: workXpBps, artDiscountBps,
+-- fixedCostDiscountBps, propertyDiscountBps), src/lib/sim/property.ts (invalidPlacements with the top layer) and
+-- src/lib/sim/deals.ts (dealSizeLimitCents, supplyMaxCostCents). Numbers: game_config 'upgrades'
+-- (src/config/upgrades.ts) and 'deals' (src/config/deals.ts); every helper falls back to the same defaults.
+--
+-- A. Schema: player_upgrades.key allows the five new upgrades (mentor, artist, efficiency, makler, crypto_wallet);
+--    furniture_catalog.layer allows 'top' and gets `surface` (objects that carry small things); company names are
+--    unique only among companies that still exist (partial unique index instead of companies_name_lower_uq); lookup
+--    indexes on the name keys of company names and artwork titles.
+-- B. Error key deal_too_big NX095 (api_error keeps every earlier key).
+-- C. Upgrades: ten keys, stage n needs minLevel + (n − 1) × levelStep (buy_upgrade -> locked). Effects: mentor (work
+--    XP in accrue_job_salary), artist (painting: get_art_studio, create_artwork), efficiency (fixed costs of the
+--    founder's company in player_company_close_hour), makler (buy_home, buy_furniture, buy_floor, buy_car; the price
+--    paid is stored). crypto_wallet is read by the crypto migration through player_upgrade_level(p, 'crypto_wallet').
+-- D./E. Unique names (lookalikes count, name_key as for nicknames): artwork titles among all artworks (new RPC
+--    check_artwork_title), company names among the companies that still exist (a closed or dissolved one frees its
+--    name). found_company gets p_replace: an active company is closed like close_company, then the new one is founded.
+-- F. Fixed costs with the efficiency upgrade in the hourly close.
+-- G. Home: makler discount; save_layout checks the top layer (completely on objects with a surface, one per tile).
+-- H. Deals with the company: supply contracts (their most possible cost) and stakes at most dealSizeLimitCents of
+--    every company involved, at the proposal and again at the acceptance (deal_too_big). get_deals returns `limits`.
+--    deals.minLevel falls back to 6 (the value comes from game_config).
+-- I. Presence at work (ADR-103): profiles.last_active_at (require_player, at most every 5 minutes), player_absences;
+--    accrue_job_salary pays the presence share of every minute (24 h away 75 %, 48 h 50 %, 72 h 25 %), the same for
+--    work XP; after 120 h away the job ends (end_reason absent: accrue_salaries, player_company_close_hour,
+--    presence_touch) with notifications job_absent / employee_absent; job_state gains presence;
+--    careers.paidHoursPerDayCap falls back to 8.
+-- J. New RPC get_company_org (org chart of a player company).
+-- Idempotent (identical copy in supabase/updates/).
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- A. Schema
+-- ---------------------------------------------------------------------------
+alter table public.player_upgrades drop constraint if exists player_upgrades_key_check;
+alter table public.player_upgrades add constraint player_upgrades_key_check
+  check (key in ('vault', 'income', 'study', 'overtime', 'rhetoric', 'mentor', 'artist', 'efficiency', 'makler', 'crypto_wallet'));
+comment on table public.player_upgrades is
+  'Upgrades bought with game money (ADR-093, ADR-100): one row per player and key, level 0..upgrades.<key>.maxLevel. '
+  'Owner read; written only by buy_upgrade.';
+
+-- Home catalogue: small things on top of furniture (ADR-100). The seed (supabase/seeds/furniture.sql) fills both.
+alter table public.furniture_catalog add column if not exists surface boolean not null default false;
+alter table public.furniture_catalog drop constraint if exists furniture_catalog_layer_check;
+alter table public.furniture_catalog add constraint furniture_catalog_layer_check check (layer in ('floor', 'object', 'top'));
+alter table public.furniture_catalog drop constraint if exists furniture_catalog_surface_check;
+alter table public.furniture_catalog add constraint furniture_catalog_surface_check check (not surface or layer = 'object');
+comment on table public.furniture_catalog is
+  'Furniture of the home (ADR-082, ADR-100): size in floor tiles; layer floor = rug (lies under objects), object = '
+  'furniture, top = small thing standing on objects with surface = true. Seed: supabase/seeds/furniture.sql. Internal (RPCs).';
+comment on column public.furniture_catalog.surface is
+  'Objects only: the top of this piece carries things of the top layer (tables, counters, desks, nightstands, dressers).';
+
+-- Company names: unique among the companies that still exist; a closed or dissolved company frees its name (ADR-100).
+create unique index if not exists companies_name_lower_live_uq on public.companies (lower(name)) where dissolved_at is null;
+drop index if exists public.companies_name_lower_uq;
+-- lookalike lookups (name_key as for nicknames, ADR-085); not unique: older lookalikes stay
+create index if not exists companies_name_key_live_idx on public.companies (public.name_key(name))
+  where dissolved_at is null and not is_ai;
+create index if not exists artworks_title_key_idx on public.artworks (public.name_key(title));
+
+-- Unlock rows at the levels of progression.unlocks (ADR-099: artworks before companies before property); seed.sql has
+-- the same levels for a new database (the rows exist only after seed.sql there). Who reached a level keeps its unlocks.
+update public.unlocks u set level = v.level, sort_order = v.sort_order
+  from (values ('artworks', 4, 40), ('property', 8, 81), ('ipo', 9, 90), ('found_gmbh', 15, 152)) v(key, level, sort_order)
+ where u.key = v.key and (u.level <> v.level or u.sort_order <> v.sort_order);
+insert into public.player_unlocks (player_id, unlock_key)
+select p.id, u.key from public.profiles p
+  join public.unlocks u on u.key in ('artworks', 'property', 'ipo', 'found_gmbh') and u.level <= p.level
+on conflict do nothing;
+
+-- ---------------------------------------------------------------------------
+-- B. Error keys (M4k: NX095)
+-- ---------------------------------------------------------------------------
+create or replace function public.api_error(p_key text)
+returns void
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_code text;
+begin
+  v_code := case p_key
+    when 'insufficient_funds'          then 'NX001'
+    when 'rate_limited'                then 'NX004'
+    when 'forbidden'                   then 'NX006'
+    when 'invalid_quantity'            then 'NX007'
+    when 'invalid_price'               then 'NX007'
+    when 'invalid_argument'            then 'NX007'
+    when 'invalid_interval'            then 'NX007'
+    when 'not_authenticated'           then 'NX010'
+    when 'unknown_security'            then 'NX011'
+    when 'not_tradable'                then 'NX012'
+    when 'insufficient_position'       then 'NX013'
+    when 'order_not_found'             then 'NX014'
+    when 'order_not_open'              then 'NX015'
+    when 'market_paused'               then 'NX016'
+    when 'nothing_to_claim'            then 'NX017'
+    when 'locked'                      then 'NX018'
+    when 'name_too_short'              then 'NX019'
+    when 'name_too_long'               then 'NX019'
+    when 'name_invalid_chars'          then 'NX019'
+    when 'name_profanity'              then 'NX019'
+    when 'name_reserved'               then 'NX019'
+    when 'name_taken'                  then 'NX019'
+    when 'name_change_too_soon'        then 'NX020'
+    when 'order_too_small'             then 'NX021'
+    when 'market_illiquid'             then 'NX022'
+    when 'mission_not_found'           then 'NX023'
+    when 'mission_not_completed'       then 'NX024'
+    when 'mission_already_claimed'     then 'NX025'
+    when 'avatar_unknown'              then 'NX026'
+    when 'avatar_locked'               then 'NX027'
+    when 'daily_reward_claimed'        then 'NX028'
+    when 'skill_unknown'               then 'NX029'
+    when 'skill_learned'               then 'NX030'
+    when 'skill_locked'                then 'NX031'
+    when 'skill_points_insufficient'   then 'NX032'
+    when 'job_not_found'               then 'NX033'
+    when 'job_level_too_low'           then 'NX034'
+    when 'job_skills_missing'          then 'NX035'
+    when 'application_limit'           then 'NX036'
+    when 'application_exists'          then 'NX037'
+    when 'application_not_found'       then 'NX038'
+    when 'application_not_offered'     then 'NX039'
+    when 'offer_expired'               then 'NX040'
+    when 'job_active_exists'           then 'NX041'
+    when 'no_active_job'               then 'NX042'
+    when 'raise_too_soon'              then 'NX043'
+    when 'raise_too_high'              then 'NX044'
+    when 'player_not_found'            then 'NX045'
+    when 'employer_only'               then 'NX046'
+    when 'company_exists'              then 'NX047'
+    when 'company_not_found'           then 'NX048'
+    when 'company_level_too_low'       then 'NX049'
+    when 'owns_company'                then 'NX050'
+    when 'employee_limit'              then 'NX051'
+    when 'company_upgrade_unavailable' then 'NX052'
+    when 'founding_locked'             then 'NX053'
+    when 'not_in_company'              then 'NX054'
+    when 'work_task_not_found'         then 'NX055'
+    when 'work_task_expired'           then 'NX056'
+    when 'work_task_done'              then 'NX057'
+    when 'offer_closed'                then 'NX058'
+    when 'offer_sold_out'              then 'NX059'
+    when 'already_listed'              then 'NX060'
+    when 'confirm_mismatch'            then 'NX061'
+    when 'skill_already_covered'       then 'NX062'
+    when 'training_locked'             then 'NX063'
+    when 'logo_locked'                 then 'NX064'
+    when 'logo_forbidden'              then 'NX065'
+    when 'artworks_locked'             then 'NX066'
+    when 'artwork_not_found'           then 'NX067'
+    when 'auction_not_found'           then 'NX068'
+    when 'auction_ended'               then 'NX069'
+    when 'bid_too_low'                 then 'NX070'
+    when 'own_artwork'                 then 'NX071'
+    when 'already_on_auction'          then 'NX072'
+    when 'auction_has_bids'            then 'NX073'
+    when 'property_locked'             then 'NX074'
+    when 'no_home'                     then 'NX075'
+    when 'invalid_tier'                then 'NX076'
+    when 'item_not_found'              then 'NX077'
+    when 'layout_invalid'              then 'NX078'
+    when 'floor_not_owned'             then 'NX079'
+    when 'garage_full'                 then 'NX080'
+    when 'event_closed'                then 'NX081'
+    when 'event_needs_staff'           then 'NX082'
+    when 'upgrade_maxed'               then 'NX083'
+    when 'promotion_not_ready'         then 'NX084'
+    when 'promotion_too_soon'          then 'NX085'
+    when 'promotion_pending'           then 'NX086'
+    when 'campaign_running'            then 'NX087'
+    when 'deal_not_found'              then 'NX088'
+    when 'deal_closed'                 then 'NX089'
+    when 'deal_terms'                  then 'NX090'
+    when 'deal_limit'                  then 'NX091'
+    when 'deal_self'                   then 'NX092'
+    when 'stake_share_full'            then 'NX093'
+    when 'deal_needs_company'          then 'NX094'
+    when 'deal_too_big'                then 'NX095'
+    else 'NX007'
+  end;
+  raise exception using errcode = v_code, message = p_key;
+end;
+$$;
+comment on function public.api_error(text) is 'Raises the API error <key> with its NX SQLSTATE. The client shows a text per key (error.message).';
+
+-- ---------------------------------------------------------------------------
+-- C. Upgrades with level stages and the five new effects (port of src/lib/sim/upgrades.ts)
+-- ---------------------------------------------------------------------------
+-- Config of one upgrade: the defaults of src/config/upgrades.ts, overridden by game_config upgrades.<key>; null for an
+-- unknown key.
+create or replace function public.upgrade_cfg(p_key text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select d.v || coalesce(case when jsonb_typeof(c.v) = 'object' then c.v end, '{}'::jsonb)
+    from (select '{"vault":         {"maxLevel": 6, "minLevel": 1,  "levelStep": 2, "baseCostCents": 300000,  "costGrowth": 2,   "perLevel": 2},
+                   "income":        {"maxLevel": 3, "minLevel": 3,  "levelStep": 4, "baseCostCents": 400000,  "costGrowth": 3,   "perLevel": 1000},
+                   "study":         {"maxLevel": 3, "minLevel": 2,  "levelStep": 4, "baseCostCents": 800000,  "costGrowth": 3,   "perLevel": 1},
+                   "mentor":        {"maxLevel": 3, "minLevel": 4,  "levelStep": 4, "baseCostCents": 600000,  "costGrowth": 3,   "perLevel": 1000},
+                   "overtime":      {"maxLevel": 2, "minLevel": 5,  "levelStep": 6, "baseCostCents": 2000000, "costGrowth": 3,   "perLevel": 1},
+                   "rhetoric":      {"maxLevel": 3, "minLevel": 5,  "levelStep": 5, "baseCostCents": 1000000, "costGrowth": 2.5, "perLevel": 500},
+                   "artist":        {"maxLevel": 3, "minLevel": 4,  "levelStep": 3, "baseCostCents": 500000,  "costGrowth": 2.5, "perLevel": 1000},
+                   "efficiency":    {"maxLevel": 3, "minLevel": 6,  "levelStep": 4, "baseCostCents": 1200000, "costGrowth": 2.5, "perLevel": 500},
+                   "makler":        {"maxLevel": 3, "minLevel": 8,  "levelStep": 4, "baseCostCents": 1500000, "costGrowth": 2.5, "perLevel": 500},
+                   "crypto_wallet": {"maxLevel": 2, "minLevel": 10, "levelStep": 5, "baseCostCents": 2000000, "costGrowth": 3,   "perLevel": 2500}}'::jsonb
+                 -> p_key as v) d
+   cross join lateral (select public.config_jsonb('upgrades', array[p_key]) as v) c
+   where d.v is not null;
+$$;
+comment on function public.upgrade_cfg(text) is 'Internal: game_config upgrades.<key> with the defaults of src/config/upgrades.ts.';
+
+-- upgradeStageLevel: player level the next stage needs, minLevel + stages bought × levelStep; null when maxed or unknown
+create or replace function public.upgrade_stage_level(p_key text, p_level integer)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when x.c is null or greatest(0, coalesce(p_level, 0)) >= public.cfg_num(x.c, '{maxLevel}', 0) then null
+              else (public.cfg_num(x.c, '{minLevel}', 1)
+                    + greatest(0, coalesce(p_level, 0)) * public.cfg_num(x.c, '{levelStep}', 0))::integer end
+    from (select public.upgrade_cfg(p_key) as c) x;
+$$;
+comment on function public.upgrade_stage_level(text, integer) is
+  'Internal: upgradeStageLevel (ADR-100), the player level the stage after p_level needs; null when maxed or unknown.';
+
+-- all ten keys, always
+create or replace function public.player_upgrade_levels(p_player uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_object_agg(k, public.player_upgrade_level(p_player, k))
+    from unnest(array['vault', 'income', 'study', 'overtime', 'rhetoric', 'mentor', 'artist', 'efficiency', 'makler',
+                      'crypto_wallet']) k;
+$$;
+comment on function public.player_upgrade_levels(uuid) is
+  'Internal: {vault, income, study, overtime, rhetoric, mentor, artist, efficiency, makler, crypto_wallet} levels of a player.';
+
+-- upgradeEffects().workXpBps: 10 000 + mentor level × perLevel
+create or replace function public.player_work_xp_bps(p_player uuid)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select greatest(0, 10000 + round(public.player_upgrade_level(p_player, 'mentor')
+                                   * public.cfg_num(public.upgrade_cfg('mentor'), '{perLevel}', 1000)))::integer;
+$$;
+
+-- upgradeEffects().artDiscountBps: artist level × perLevel (0..10 000)
+create or replace function public.player_art_discount_bps(p_player uuid)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select least(10000, greatest(0, round(public.player_upgrade_level(p_player, 'artist')
+                                        * public.cfg_num(public.upgrade_cfg('artist'), '{perLevel}', 1000))))::integer;
+$$;
+
+-- upgradeEffects().fixedCostDiscountBps: efficiency level × perLevel (0..10 000)
+create or replace function public.player_fixed_cost_discount_bps(p_player uuid)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select least(10000, greatest(0, round(public.player_upgrade_level(p_player, 'efficiency')
+                                        * public.cfg_num(public.upgrade_cfg('efficiency'), '{perLevel}', 500))))::integer;
+$$;
+
+-- upgradeEffects().propertyDiscountBps: makler level × perLevel (0..10 000)
+create or replace function public.player_property_discount_bps(p_player uuid)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select least(10000, greatest(0, round(public.player_upgrade_level(p_player, 'makler')
+                                        * public.cfg_num(public.upgrade_cfg('makler'), '{perLevel}', 500))))::integer;
+$$;
+
+create or replace function public.get_upgrades()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  return jsonb_build_object('levels', public.player_upgrade_levels(public.require_player()));
+end;
+$$;
+comment on function public.get_upgrades() is
+  'RPC: {levels: {vault, income, study, overtime, rhetoric, mentor, artist, efficiency, makler, crypto_wallet}} of the '
+  'caller (ADR-093, ADR-100).';
+
+-- Buys the next stage: upgradeCheck order maxed, level (the stage's player level, ADR-100), cash; the price goes from
+-- the player's cash to the treasury that pays the basic income (closed money system, ADR-041).
+create or replace function public.buy_upgrade(p_request_id uuid, p_key text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid;
+  v_replay  jsonb;
+  v_level   integer;
+  v_cost    bigint;
+  v_cash    bigint;
+  v_old_cap double precision;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_key is null or p_key not in ('vault', 'income', 'study', 'overtime', 'rhetoric', 'mentor', 'artist',
+                                                                  'efficiency', 'makler', 'crypto_wallet') then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'buy_upgrade');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_cash := public.lock_player_accounts(v_player);
+  if p_key = 'vault' then
+    perform 1 from public.vaults where player_id = v_player for update;
+  end if;
+  v_level := public.player_upgrade_level(v_player, p_key);
+  v_cost := public.upgrade_cost_cents(p_key, v_level);
+  if v_cost is null then
+    perform public.api_error('upgrade_maxed');
+  end if;
+  -- every further stage needs a higher player level (ADR-100, upgradeStageLevel)
+  if coalesce((select p.level from public.profiles p where p.id = v_player), 0) < public.upgrade_stage_level(p_key, v_level) then
+    perform public.api_error('locked');
+  end if;
+  if v_cash < v_cost then
+    perform public.api_error('insufficient_funds');
+  end if;
+  v_old_cap := greatest(0, public.player_vault_cap_hours(v_player));
+  perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'), public.ledger_system_account('treasury'),
+                                 v_cost, 'upgrade_purchase', 'Verbesserung gekauft', 'upgrade', null,
+                                 'upgrade:' || v_player::text || ':' || p_key || ':' || p_request_id::text, v_player,
+                                 jsonb_build_object('key', p_key, 'level', v_level + 1));
+  insert into public.player_upgrades (player_id, key, level) values (v_player, p_key, v_level + 1)
+  on conflict (player_id, key) do update set level = excluded.level;
+  -- a bigger vault keeps what it holds and fills on from there: the time it stood full earns nothing afterwards
+  if p_key = 'vault' then
+    update public.vaults v
+       set accrual_started_at = greatest(v.accrual_started_at, public.game_now() - make_interval(secs => v_old_cap * 3600)),
+           full_notified_at = null
+     where v.player_id = v_player;
+  end if;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'key',        p_key,
+    'level',      v_level + 1,
+    'cost_cents', v_cost,
+    'levels',     public.player_upgrade_levels(v_player)));
+end;
+$$;
+comment on function public.buy_upgrade(uuid, text) is
+  'RPC: buys the next stage of an upgrade (ADR-093, ADR-100) -> {key, level, cost_cents, levels}; errors '
+  'invalid_argument, upgrade_maxed, locked (player level below the stage''s level), insufficient_funds.';
+
+-- accrue_job_salary as in M4i; work XP with the mentor upgrade
+create or replace function public.accrue_job_salary(p_job_id uuid, p_now timestamptz default null)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now     timestamptz := coalesce(p_now, public.game_now());
+  j         public.player_jobs;
+  v_ai      boolean;
+  v_day     date := (coalesce(p_now, public.game_now()) at time zone 'Europe/Berlin')::date;
+  v_paid    integer;
+  v_elapsed integer;
+  v_minutes integer;
+  v_amount  bigint;
+  v_pay     bigint := 0;
+  v_company uuid;
+  v_bal     bigint;
+  v_tx      uuid;
+  v_xph     double precision;
+  v_hours   integer;
+  v_xp      integer := 0;
+  v_pres    integer := 10000;
+  v_hpp     double precision;
+  v_nb      integer;
+  v_share   integer;
+  v_bwm     jsonb;
+  v_base    bigint;
+  v_bp      jsonb;
+  v_before  integer;
+  r         record;
+  k         integer := 0;
+begin
+  select * into j from public.player_jobs where id = p_job_id and status = 'active' for update;
+  if j.id is null then
+    return 0;
+  end if;
+  v_elapsed := floor(extract(epoch from (v_now - j.last_paid_at)) / 60)::integer;
+  if v_elapsed < 1 then
+    return 0;
+  end if;
+  v_hpp := greatest(1, public.player_work_hours_per_branch_point(j.player_id));
+  v_paid := case when j.paid_day = v_day then j.paid_minutes_today else 0 end;
+  v_minutes := least(v_elapsed, greatest(0, (public.player_paid_hours_cap(j.player_id) * 60)::integer - v_paid));
+  select c.is_ai into v_ai from public.companies c where c.id = j.company_id;
+
+  if v_minutes > 0 then
+    -- presence (ADR-103): the share of the wage for these minutes, from the hours the player had been away by then
+    -- (10 000 while active); it lowers the wage, the XP and what a player company pays
+    v_pres := public.presence_pay_bps_between(j.player_id, j.last_paid_at, v_minutes);
+    v_base := j.salary_cents_per_hour * v_minutes * v_pres / 600000;
+    -- player companies pay the contract wage x pay factor of the quarter (ADR-058)
+    v_amount := v_base * coalesce((select pc.pay_factor_bps from public.player_companies pc
+                                    where pc.company_id = j.company_id and pc.status = 'active'), 10000) / 10000;
+    select a.id, a.balance_cents into v_company, v_bal
+      from public.ledger_accounts a where a.owner_company_id = j.company_id and a.kind = 'company_cash';
+    v_pay := least(v_amount, greatest(coalesce(v_bal, 0), 0));
+    if v_pay > 0 then
+      v_tx := public.ledger_transfer(v_company, public.ledger_player_account(j.player_id, 'player_cash'), v_pay, 'salary',
+                                     'Lohn', 'player_job', j.id,
+                                     'salary:' || j.id::text || ':' || to_char(v_now, 'YYYYMMDDHH24MISSUS'), j.player_id);
+      perform public.loan_withhold(j.player_id, v_pay, 'salary:' || j.id::text || ':' || to_char(v_now, 'YYYYMMDDHH24MISSUS'));
+    end if;
+    -- work XP per full paid hour (player companies: workHour.playerCompanyMultiplier)
+    v_xph := public.config_double('progression', '{xpSources,workHour,xp}', 40)
+           * case when v_ai then 1 else public.config_double('progression', '{xpSources,workHour,playerCompanyMultiplier}', 1.5) end;
+    v_hours := (j.experience_minutes + v_minutes) / 60 - j.experience_minutes / 60;
+    if v_hours > 0 then
+      -- mentor upgrade (ADR-100): work XP x workXpBps / 10 000; presence share as for the wage (ADR-103)
+      v_xp := public.grant_xp(j.player_id, 'work_hour',
+                              round(v_xph * v_hours * public.player_work_xp_bps(j.player_id) / 10000.0 * v_pres / 10000.0)::integer,
+                              'work:' || j.id::text || ':' || ((j.experience_minutes + v_minutes) / 60), 'player_job', j.id);
+    end if;
+    insert into public.salary_payouts (player_job_id, player_id, pay_day, period_start, period_end, minutes_paid, amount_cents,
+                                       xp_awarded, ledger_transaction_id, base_amount_cents)
+    values (j.id, j.player_id, v_day, j.last_paid_at, v_now, v_minutes, v_pay, v_xp, v_tx, v_base);
+
+    -- branch work minutes and branch points (work hours per point with the study upgrade)
+    perform public.skill_points_ensure(j.player_id);
+    select sp.branch_work_minutes, sp.branch_points into v_bwm, v_bp
+      from public.player_skill_points sp where sp.player_id = j.player_id for update;
+    v_nb := greatest(1, jsonb_array_length(j.required));
+    for r in select x ->> 'branch' as branch from jsonb_array_elements(j.required) x loop
+      v_share := v_minutes / v_nb + case when k = 0 then v_minutes % v_nb else 0 end;
+      v_before := coalesce((v_bwm ->> r.branch)::integer, 0);
+      v_bwm := jsonb_set(v_bwm, array[r.branch], to_jsonb(v_before + v_share));
+      v_bp := jsonb_set(v_bp, array[r.branch], to_jsonb(coalesce((v_bp ->> r.branch)::integer, 0)
+              + ((v_before + v_share) / (v_hpp * 60)::integer - v_before / (v_hpp * 60)::integer)));
+      k := k + 1;
+    end loop;
+    update public.player_skill_points set branch_work_minutes = v_bwm, branch_points = v_bp where player_id = j.player_id;
+  end if;
+
+  update public.player_jobs
+     set last_paid_at = last_paid_at + make_interval(mins => v_elapsed),
+         paid_day = v_day,
+         paid_minutes_today = v_paid + v_minutes,
+         experience_minutes = experience_minutes + v_minutes,
+         rank_minutes = least(2000000000::bigint, rank_minutes::bigint + v_minutes)::integer,
+         earned_total_cents = earned_total_cents + v_pay,
+         pay_factor_bps = case when v_minutes > 0 and v_amount > 0 then (v_pay * 10000 / v_amount)::integer else pay_factor_bps end
+   where id = j.id;
+  return v_pay;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- D. Artworks: artist discount, unique titles
+-- ---------------------------------------------------------------------------
+-- artworkCreateCostCents with the artist upgrade: price × (10 000 − artDiscountBps) / 10 000, half even
+create or replace function public.player_artwork_create_cost_cents(p_player uuid, p_painted integer)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select public.apply_bps(public.artwork_create_cost_cents(p_painted), 10000 - public.player_art_discount_bps(p_player));
+$$;
+comment on function public.player_artwork_create_cost_cents(uuid, integer) is
+  'Internal: price of the next artwork of a player with p_painted artworks, with the artist upgrade (ADR-100).';
+
+-- A title is taken when any artwork (gallery or player) has the same name key (lookalikes, as for nicknames)
+create or replace function public.artwork_title_taken(p_title text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (select 1 from public.artworks a where public.name_key(a.title) = public.name_key(p_title));
+$$;
+comment on function public.artwork_title_taken(text) is 'Internal: an artwork with this title or a lookalike exists (ADR-100).';
+
+-- -> {allowed, reason}: the title as create_artwork would store it (trimmed, single spaces)
+create or replace function public.check_artwork_title(p_title text)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_title  text := btrim(regexp_replace(coalesce(p_title, ''), '\s+', ' ', 'g'));
+  v_reason text;
+begin
+  perform public.require_player();
+  v_reason := public.artwork_title_violation(v_title);
+  if v_reason is null and public.artwork_title_taken(v_title) then
+    v_reason := 'name_taken';
+  end if;
+  return jsonb_build_object('allowed', v_reason is null, 'reason', v_reason);
+end;
+$$;
+comment on function public.check_artwork_title(text) is
+  'RPC: {allowed, reason} for an artwork title (ADR-100); reason null or name_too_short, name_too_long, '
+  'name_invalid_chars, name_profanity, name_taken.';
+
+create or replace function public.get_art_studio()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid;
+  v_painted integer;
+begin
+  v_player := public.require_player();
+  select count(*) into v_painted from public.artworks a where a.creator_id = v_player;
+  return jsonb_build_object(
+    'painted', v_painted,
+    'next_cost_cents', public.player_artwork_create_cost_cents(v_player, v_painted),
+    'unlocked', coalesce((select p.level from public.profiles p where p.id = v_player), 1) >= public.unlock_level('artworks'));
+end;
+$$;
+comment on function public.get_art_studio() is
+  'RPC: {painted, next_cost_cents, unlocked} for the art editor (ADR-080); next_cost_cents with the artist upgrade (ADR-100).';
+
+create or replace function public.create_artwork(p_request_id uuid, p_title text, p_pixels jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid;
+  v_replay  jsonb;
+  v_title   text := btrim(regexp_replace(coalesce(p_title, ''), '\s+', ' ', 'g'));
+  v_reason  text;
+  v_painted integer;
+  v_cost    bigint;
+  v_cash    bigint;
+  v_id      uuid := gen_random_uuid();
+begin
+  v_player := public.require_player();
+  perform public.artworks_require_unlock(v_player);
+  if p_request_id is null or not public.artwork_valid(p_pixels) then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_reason := public.artwork_title_violation(v_title);
+  if v_reason is not null then
+    perform public.api_error(v_reason);
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'create_artwork');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  -- unique titles (ADR-100): lookalikes count as the same title; the lock serialises two painters of one title
+  perform pg_advisory_xact_lock(hashtextextended('artwork_title:' || public.name_key(v_title), 0));
+  if public.artwork_title_taken(v_title) then
+    perform public.api_error('name_taken');
+  end if;
+  if public.logo_has_forbidden_symbol(p_pixels -> 'grid') then
+    perform public.api_error('logo_forbidden');
+  end if;
+  -- one painting at a time per player (the count decides the price)
+  perform 1 from public.profiles p where p.id = v_player for update;
+  select count(*) into v_painted from public.artworks a where a.creator_id = v_player;
+  -- artist upgrade (ADR-100): the price x (10 000 − artDiscountBps) / 10 000
+  v_cost := public.player_artwork_create_cost_cents(v_player, v_painted);
+  v_cash := public.lock_player_accounts(v_player);
+  if v_cash < v_cost then
+    perform public.api_error('insufficient_funds');
+  end if;
+  perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'), public.ledger_system_account('treasury'),
+                                 v_cost, 'artwork_creation', 'Kunstwerk gemalt', 'artwork', v_id,
+                                 'art:create:' || v_id::text, v_player, jsonb_build_object('painted_before', v_painted,
+                                                                   'discount_bps', public.player_art_discount_bps(v_player)));
+  insert into public.artworks (id, title, origin, rarity, creator_id, owner_id, pixels)
+  values (v_id, v_title, 'player', null, v_player, v_player,
+          jsonb_build_object('palette', p_pixels -> 'palette', 'grid', p_pixels -> 'grid'));
+  perform public.mission_event(v_player, 'art_painted', 1, null);
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'artwork', public.artwork_json(v_id, v_player),
+    'cost_cents', v_cost,
+    'next_cost_cents', public.player_artwork_create_cost_cents(v_player, v_painted + 1)));
+end;
+$$;
+comment on function public.create_artwork(uuid, text, jsonb) is
+  'RPC: paints a new artwork (cost doubles per artwork, less the artist upgrade, paid to the treasury); errors artworks_locked, '
+  'invalid_argument, name_* (name_taken: the title or a lookalike exists), logo_forbidden, insufficient_funds.';
+
+-- ---------------------------------------------------------------------------
+-- E. Company names: unique among the companies that still exist; replacing the own company
+-- ---------------------------------------------------------------------------
+-- name_violation as in M4d; companies: taken only by a company that still exists, player companies also by lookalikes
+create or replace function public.name_violation(p_name text, p_kind text default 'player', p_exclude uuid default null)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_names  jsonb := coalesce(public.config_jsonb('names'), '{}'::jsonb);
+  v_min    integer;
+  v_max    integer;
+  v_full   text;
+  v_tokens text[];
+  v_raw    text[];
+  v_cat    text;
+begin
+  if p_kind = 'company' then
+    v_min := 3; v_max := 30;
+  else
+    v_min := public.cfg_num(v_names, '{minLength}', 3)::integer;
+    v_max := public.cfg_num(v_names, '{maxLength}', 20)::integer;
+  end if;
+  if p_name is null or char_length(p_name) < v_min then
+    return 'name_too_short';
+  end if;
+  if char_length(p_name) > v_max then
+    return 'name_too_long';
+  end if;
+  if p_kind = 'company' then
+    if p_name !~ '^[A-Za-zÄÖÜäöüßÀ-ÿ0-9 &.''-]+$' or p_name <> btrim(p_name) or p_name ~ '  ' then
+      return 'name_invalid_chars';
+    end if;
+  elsif p_name !~ '^[A-Za-z0-9_]+$' then
+    return 'name_invalid_chars';
+  end if;
+
+  v_full := public.name_letters(p_name);
+  select coalesce(array_agg(regexp_replace(t, '(.)\1+', '\1', 'g')), '{}') into v_tokens
+    from regexp_split_to_table(public.name_normalize(p_name, true), '[^a-z]+') t where t <> '';
+  select coalesce(array_agg(m[1]), '{}') into v_raw
+    from regexp_matches(public.name_normalize(p_name, false), '([a-z]+|[0-9]+)', 'g') m;
+  if v_full = '' then
+    return 'name_invalid_chars';
+  end if;
+
+  select t.category into v_cat
+    from public.blocked_name_terms t
+   where (t.match_mode = 'substring' and strpos(v_full, t.term) > 0)
+      or (t.match_mode = 'token' and (t.term = v_full or t.term = any (v_tokens) or t.term = any (v_raw)))
+      or (t.match_mode = 'code' and t.term = any (v_raw))
+   order by (t.category = 'reserved'), t.term
+   limit 1;
+  if v_cat is not null then
+    return case when v_cat = 'reserved' then 'name_reserved' else 'name_profanity' end;
+  end if;
+
+  -- dynamic reserved names: AI tycoons, AI companies (with and without legal form), tickers, index keys
+  if exists (select 1 from public.rich_tycoons ty where public.name_letters(ty.name) = v_full
+                or (char_length(public.name_letters(ty.name)) >= 5 and strpos(v_full, public.name_letters(ty.name)) > 0))
+     or exists (select 1 from public.companies c
+                 where c.is_ai and c.id is distinct from p_exclude
+                   and (public.name_letters(c.name) = v_full
+                        or (char_length(public.name_letters(regexp_replace(c.name, '\s+(AG|SE|GmbH|KG)$', '', 'i'))) >= 5
+                            and strpos(v_full, public.name_letters(regexp_replace(c.name, '\s+(AG|SE|GmbH|KG)$', '', 'i'))) > 0)))
+     or exists (select 1 from public.securities s
+                 where lower(s.ticker) = any (v_raw) or lower(s.ticker) = lower(p_name)
+                    or public.name_letters(s.ticker) = v_full)
+     or exists (select 1 from public.indices i where lower(i.key) = any (v_raw) or public.name_letters(i.key) = v_full) then
+    return 'name_reserved';
+  end if;
+
+  if p_kind = 'company' then
+    -- ADR-100: taken only by a company that still exists (a closed or dissolved one frees its name); among player
+    -- companies lookalikes count as the same name (name_key, as for nicknames)
+    if exists (select 1 from public.companies c
+                where c.dissolved_at is null and c.id is distinct from p_exclude
+                  and (lower(c.name) = lower(p_name)
+                       or (not c.is_ai and public.name_key(c.name) = public.name_key(p_name)
+                           and exists (select 1 from public.player_companies pc
+                                        where pc.company_id = c.id and pc.status = 'active')))) then
+      return 'name_taken';
+    end if;
+  elsif exists (select 1 from public.profiles p
+                 where (lower(p.nickname) = lower(p_name) or public.name_key(p.nickname) = public.name_key(p_name))
+                   and p.id is distinct from p_exclude) then
+    -- also lookalikes (ADR-085): same name key as another player's nickname
+    return 'name_taken';
+  end if;
+  return null;
+end;
+$$;
+
+create or replace function public.check_company_name(p_name text)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_reason text;
+begin
+  v_player := public.require_player();
+  -- the caller's own company does not block its name: founding again replaces it (found_company p_replace)
+  v_reason := public.name_violation(p_name, 'company', public.player_active_company(v_player));
+  return jsonb_build_object('allowed', v_reason is null, 'reason', v_reason);
+end;
+$$;
+comment on function public.check_company_name(text) is
+  'RPC: {allowed, reason} for a company name (ADR-100: unique among companies that still exist, lookalikes taken; the '
+  'caller''s own company does not count).';
+
+-- found_company as in M4c plus p_replace (ADR-100): with an active company and p_replace the old company is closed
+-- exactly like close_company (company_dissolve 'closed': wages, severances, rest to the founder), then the new one is
+-- founded in the same transaction; without p_replace company_exists as before.
+drop function if exists public.found_company(uuid, text, text, text, text, text, text);
+create or replace function public.found_company(p_request_id uuid, p_name text, p_idea text, p_sector text, p_color text,
+                                                p_tier text, p_product text default null, p_replace boolean default false)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  v_idea   text := btrim(coalesce(p_idea, ''));
+  v_reason text;
+  v_tier   jsonb;
+  v_level  integer;
+  v_cost   bigint;
+  v_cash   bigint;
+  v_id     uuid := gen_random_uuid();
+  v_acc    uuid;
+  v_old    uuid;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'found_company');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  if not public.rate_limit_hit(v_player, 'player_action',
+           greatest(1, public.config_double('abuse', '{rateLimits,actionsPerMinute}', 60))::integer, 60) then
+    perform public.api_error('rate_limited');
+  end if;
+  if coalesce(p_tier, '') not in ('garage', 'small_business', 'gmbh')
+     or not exists (select 1 from public.sectors s where s.key = p_sector)
+     or public.config_jsonb('startups', array['capacityCentsPerProductivity', p_sector]) is null
+     or coalesce(p_color, '') !~ '^#[0-9a-fA-F]{6}$'
+     or char_length(v_idea) not between 1 and 120
+     or (p_product is not null
+         and not exists (select 1 from jsonb_array_elements(coalesce(public.config_jsonb('startups', array['products', p_sector]), '[]'::jsonb)) x
+                          where x ->> 'key' = p_product)) then
+    perform public.api_error('invalid_argument');
+  end if;
+  if public.text_has_profanity(v_idea) then
+    perform public.api_error('name_profanity');
+  end if;
+  perform 1 from public.profiles p where p.id = v_player for update;
+  -- one company at a time; with p_replace the old one is closed below exactly like close_company (ADR-100)
+  select pc.company_id into v_old from public.player_companies pc where pc.founder_id = v_player and pc.status = 'active';
+  if v_old is not null and not coalesce(p_replace, false) then
+    perform public.api_error('company_exists');
+  end if;
+  if exists (select 1 from public.profiles p where p.id = v_player and p.founding_locked_until > now()) then
+    perform public.api_error('founding_locked');
+  end if;
+  -- unique among existing companies (ADR-100); the lock serialises two foundings of one name (lookalikes share the
+  -- key). The company that is replaced may hand its own name on.
+  perform pg_advisory_xact_lock(hashtextextended('company_name:' || public.name_key(p_name), 0));
+  v_reason := public.name_violation(p_name, 'company', v_old);
+  if v_reason is not null then
+    perform public.api_error(v_reason);
+  end if;
+  v_tier := public.company_tier_cfg(p_tier);
+  select p.level into v_level from public.profiles p where p.id = v_player;
+  if v_level < (v_tier ->> 'minLevel')::integer then
+    perform public.api_error('company_level_too_low');
+  end if;
+  if v_old is not null then
+    perform public.company_dissolve(v_old, 'closed');
+  end if;
+  v_cost := (v_tier ->> 'foundingCostCents')::bigint;
+  perform public.lock_player_accounts(v_player);
+  select a.balance_cents into v_cash from public.ledger_accounts a where a.owner_player_id = v_player and a.kind = 'player_cash';
+  if coalesce(v_cash, 0) < v_cost then
+    perform public.api_error('insufficient_funds');
+  end if;
+
+  insert into public.companies (id, name, slug, description, sector_key, is_ai, legal_form, phase, founder_id, ceo_id,
+                                brand_color, shares_outstanding, max_employees, founded_quarter_id, founded_at)
+  values (v_id, p_name, trim(both '-' from lower(regexp_replace(p_name, '[^A-Za-z0-9]+', '-', 'g'))) || '-' || left(v_id::text, 8),
+          v_idea, p_sector, false, case when p_tier = 'gmbh' then 'gmbh' else 'small_business' end::public.legal_form, 'private', v_player, v_player, lower(p_color), 1,
+          (v_tier ->> 'maxEmployees')::integer, (public.current_game_quarter()).id, now());
+  insert into public.ledger_accounts (kind, owner_company_id, label) values ('company_cash', v_id, 'Firmenkasse')
+  returning id into v_acc;
+  if v_cost > 0 then
+    perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'), v_acc, v_cost, 'company_founding',
+                                   'Gründung ' || p_name, 'company', v_id, 'found:' || v_id::text, v_player);
+  end if;
+  insert into public.player_companies (company_id, founder_id, idea, tier, potential_annual_cents, awareness, quality, request_id,
+                                       product_key)
+  values (v_id, v_player, v_idea, p_tier, public.startup_potential_from_uniform(1 - random()),
+          -- founding bigger buys a head start (ADR-083, initialStartup(tier))
+          least(1, greatest(0, public.config_double('startups', array['foundingAwareness', p_tier],
+                                                    public.config_double('startups', '{awareness,initial}', 0.03)))),
+          public.config_double('startups', '{quality,base}', 0.25),
+          p_request_id,
+          coalesce(p_product, public.config_jsonb('startups', array['products', p_sector]) -> 0 ->> 'key'));
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('company', public.company_state(v_id)));
+end;
+$$;
+comment on function public.found_company(uuid, text, text, text, text, text, text, boolean) is
+  'RPC: founds a company -> {company: COMPANY}; p_replace closes the caller''s active company first (like close_company, '
+  'ADR-100), else company_exists. Errors invalid_argument, rate_limited, name_*, company_exists, founding_locked, '
+  'company_level_too_low, insufficient_funds.';
+
+-- ---------------------------------------------------------------------------
+-- F. Fixed costs with the efficiency upgrade (player_company_close_hour as in M4j)
+-- ---------------------------------------------------------------------------
+create or replace function public.player_company_close_hour(p_company uuid, p_hour_start timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  pc        public.player_companies;
+  c         public.companies;
+  v_su      jsonb := coalesce(public.config_jsonb('startups'), '{}'::jsonb);
+  v_hours   double precision := greatest(1, public.config_double('time', '{quarterHours}', 6));
+  v_start   timestamptz := date_trunc('hour', p_hour_start);
+  v_end     timestamptz;
+  v_qid     bigint;
+  v_team    jsonb;
+  v_price   jsonb;
+  v_ev      jsonb;
+  v_camp    public.company_campaigns;
+  v_stage   integer;
+  v_demand  double precision;
+  v_cap     double precision;
+  v_sold    double precision;
+  v_ctr     double precision;
+  v_own     bigint;
+  v_crev    bigint;
+  v_hhbal   bigint;
+  v_rev     bigint;
+  v_cogs    bigint;
+  v_gross   bigint;
+  v_aidue   bigint;
+  v_aipaid  bigint;
+  v_pdue    bigint := 0;
+  v_ppaid   bigint := 0;
+  v_due     bigint;
+  v_factor  integer;
+  v_fixed   bigint;
+  v_mk      bigint;
+  v_costs   bigint;
+  v_paid    bigint := 0;
+  v_unpaid  bigint := 0;
+  v_settle  bigint := 0;
+  v_cash    bigint;
+  v_acc     uuid;
+  v_hh      uuid;
+  v_profit  bigint;
+  v_owed    bigint;
+  v_free    bigint;
+  v_stakes  bigint := 0;
+  v_sp      bigint;
+  v_payout  bigint := 0;
+  v_bps     integer;
+  v_until   timestamptz;
+  v_news    bigint;
+  k         text;
+  j         record;
+  s         record;
+begin
+  if p_company is null or p_hour_start is null then
+    return null;
+  end if;
+  select * into pc from public.player_companies where company_id = p_company and status = 'active' for update;
+  if pc.company_id is null then
+    return null;
+  end if;
+  if exists (select 1 from public.player_company_hours h where h.company_id = p_company and h.hour_start = v_start) then
+    update public.player_companies set last_hour_at = greatest(last_hour_at, v_start + interval '1 hour')
+     where company_id = p_company and last_hour_at < v_start + interval '1 hour';
+    return jsonb_build_object('company_id', p_company, 'hour_start', v_start, 'skipped', 'already_closed');
+  end if;
+  v_end := v_start + interval '1 hour';
+  select * into c from public.companies where id = p_company;
+  select gq.id into v_qid from public.game_quarters gq where gq.starts_at <= v_start and gq.ends_at > v_start;
+  v_team := public.player_company_team(p_company);
+  v_acc := public.company_cash_account(p_company);
+  v_hh := public.ledger_system_account('households');
+  k := 'pch:' || p_company::text || ':' || to_char(v_start at time zone 'UTC', 'YYYYMMDDHH24');
+  -- company event of this hour (ADR-091): demand and capacity factors, extra costs as a share of the own revenue
+  v_ev := public.company_event_hour_effect(p_company, v_start, v_end);
+  -- marketing campaign (ADR-097, campaignDemandFactor): its factor when the hour starts inside its window
+  v_camp := public.company_campaign_at(p_company, v_start);
+
+  -- sales of the hour with the quarter's awareness and quality; demand and capacity count in units at the
+  -- normal price, the price strategy changes both price and demand (ADR-083)
+  v_price := public.company_price_effect(pc.price_level, pc.quality);
+  v_stage := least(greatest(coalesce((v_team ->> 'stage')::integer, 0), 0),
+                   greatest(jsonb_array_length(coalesce(v_su #> '{stages,awarenessCaps}', '[1]'::jsonb)) - 1, 0));
+  v_demand := pc.potential_annual_cents * public.company_market_factor(pc.tier, pc.expansion_level) / 4.0 / v_hours
+            * pc.awareness * (0.5 + 0.5 * pc.quality)
+            * exp(public.cfg_num(v_su, '{demandNoise}', 0.1) * public.gauss_random())
+            * (v_price ->> 'demand')::double precision
+            * (v_ev ->> 'demand_factor')::double precision
+            * greatest(0, coalesce(v_camp.demand_factor, 1));
+  v_cap := (v_team ->> 'team_productivity_bps')::double precision / 10000.0
+         * public.cfg_num(v_su, array['capacityCentsPerProductivity', c.sector_key], 250000)
+         * (1 + public.cfg_num(v_su, '{stages,capacityBonusPerStage}', 0.25) * v_stage)
+         * public.company_capacity_factor(pc.expansion_level)
+         * (v_ev ->> 'capacity_factor')::double precision / v_hours;
+  v_sold := least(v_demand, v_cap);
+  -- contract work: a share of the unused capacity at the normal price (ADR-083)
+  v_ctr := case when pc.contract_work
+                then greatest(0, v_cap - v_sold) * public.cfg_num(v_su, '{contractWork,shareOfFreeCapacity}', 0.25)
+                else 0 end;
+  v_own := round((v_sold * (v_price ->> 'price')::double precision)::numeric)::bigint;
+  v_crev := round(v_ctr::numeric)::bigint;
+  -- closed money system: the households pay at most what they have (own sales first)
+  v_hhbal := greatest(0, coalesce((select a.balance_cents from public.ledger_accounts a where a.id = v_hh), 0));
+  if v_own + v_crev > v_hhbal then
+    v_own := least(v_own, v_hhbal);
+    v_crev := least(v_crev, v_hhbal - v_own);
+    v_sold := least(v_sold, v_own / greatest((v_price ->> 'price')::double precision, 0.0001));
+    v_ctr := v_crev;
+  end if;
+  v_rev := v_own + v_crev;
+  -- goods; an event's extra costs (or savings) move with the own revenue, goods never cost less than nothing
+  v_cogs := round(greatest(0, v_sold * (1 - public.cfg_num(v_su, array['grossMargin', c.sector_key], 0.5))
+                              + v_own * (v_ev ->> 'extra_cost_share')::double precision)::numeric)::bigint
+          + round((v_ctr * (1 - public.cfg_num(v_su, '{contractWork,grossMargin}', 0.3)))::numeric)::bigint;
+  v_gross := v_rev - v_cogs;
+
+  -- presence (ADR-103): employees away for careers.inactivity.fireAfterHours lose the job first, paid up to that moment
+  for j in select pj.id from public.player_jobs pj where pj.company_id = p_company and pj.status = 'active' order by pj.id loop
+    perform public.job_absence_check(j.id, v_end);
+  end loop;
+  -- wages due: AI workers and the hourly contract wages of the players (the founder draws no wage)
+  v_aidue := pc.ai_workers * public.config_bigint('startups', '{aiWorkerWageCentsPerHour}', 12000);
+  for j in select pj.id, pj.salary_cents_per_hour, pj.notice_ends_at from public.player_jobs pj
+            where pj.company_id = p_company and pj.status = 'active' order by pj.id loop
+    v_until := least(v_end, coalesce(j.notice_ends_at, v_end));
+    v_pdue := v_pdue + j.salary_cents_per_hour * public.job_payable_minutes(j.id, v_until) / 60;
+  end loop;
+  v_due := v_aidue + v_pdue;
+  -- never more than the hour earned; everyone gets the same share (ADR-072)
+  v_factor := case when v_due <= 0 then 10000 else least(10000, greatest(0, v_gross) * 10000 / v_due)::integer end;
+  v_aipaid := v_aidue * v_factor / 10000;
+
+  -- money: revenue (own sales and contract work) from the households, goods and AI wages back to them
+  if v_rev > 0 then
+    perform public.ledger_transfer(v_hh, v_acc, v_rev, 'company_revenue',
+                                   'Umsatz ' || to_char(v_start at time zone 'Europe/Berlin', 'HH24') || ' Uhr',
+                                   'company', p_company, k || ':revenue', pc.founder_id);
+  end if;
+  if v_cogs + v_aipaid > 0 then
+    perform public.ledger_transfer(v_acc, v_hh, v_cogs + v_aipaid, 'company_costs', 'Wareneinsatz und KI-Kräfte',
+                                   'company', p_company, k || ':goods', pc.founder_id);
+  end if;
+  -- players: the hour (up to the end of a notice) at contract wage x factor, with XP and branch minutes
+  update public.player_companies set pay_factor_bps = v_factor where company_id = p_company;
+  for j in select pj.id, pj.player_id, pj.notice_ends_at from public.player_jobs pj
+            where pj.company_id = p_company and pj.status = 'active' order by pj.id loop
+    v_until := least(v_end, coalesce(j.notice_ends_at, v_end));
+    perform public.lock_player_accounts(j.player_id);
+    v_ppaid := v_ppaid + public.accrue_job_salary(j.id, v_until);
+  end loop;
+
+  -- fixed costs (with the expansion level) and marketing from the cash; the rest becomes an open bill
+  -- efficiency upgrade of the founder (ADR-100): the hour's fixed costs x (10 000 − fixedCostDiscountBps) / 10 000
+  v_fixed := public.apply_bps(round((public.company_fixed_cost_cents(pc.tier, pc.expansion_level) / v_hours)::numeric)::bigint,
+                              10000 - public.player_fixed_cost_discount_bps(pc.founder_id));
+  v_mk := round((pc.marketing_cents_per_quarter / v_hours)::numeric)::bigint;
+  v_costs := v_fixed + v_mk;
+  select greatest(0, a.balance_cents) into v_cash from public.ledger_accounts a where a.id = v_acc;
+  v_paid := least(v_costs, coalesce(v_cash, 0));
+  if v_paid > 0 then
+    perform public.ledger_transfer(v_acc, v_hh, v_paid, 'company_costs', 'Fixkosten und Marketing',
+                                   'company', p_company, k || ':costs', pc.founder_id);
+  end if;
+  v_unpaid := v_costs - v_paid;
+  if v_unpaid = 0 and pc.unpaid_cents > 0 then
+    select greatest(0, a.balance_cents) into v_cash from public.ledger_accounts a where a.id = v_acc;
+    v_settle := least(pc.unpaid_cents, coalesce(v_cash, 0));
+    if v_settle > 0 then
+      perform public.ledger_transfer(v_acc, v_hh, v_settle, 'company_costs', 'Offene Rechnungen',
+                                     'company', p_company, k || ':settle', pc.founder_id);
+    end if;
+  end if;
+
+  v_profit := v_rev - v_cogs - v_ppaid - v_aipaid - v_fixed - v_mk;
+  v_owed := pc.unpaid_cents + v_unpaid - v_settle;
+
+  -- stakes (ADR-098, stakePayoutCents): every running stake whose term holds this hour takes its share of a
+  -- profitable hour (rounded down), never more than the free cash; served before the CEO payout. The hour is marked
+  -- as handled (settled_until) whether it paid or not.
+  for s in select x.id, x.investor_id, x.share_bps from public.deals x
+            where x.kind = 'stake' and x.status = 'active' and x.company_id = p_company
+              and x.settled_until <= v_start and x.ends_at > v_start
+            order by x.accepted_at, x.id for update of x
+  loop
+    v_sp := 0;
+    if v_profit > 0 then
+      select a.balance_cents - v_owed into v_free from public.ledger_accounts a where a.id = v_acc;
+      v_sp := least(v_profit * s.share_bps / 10000, greatest(0, coalesce(v_free, 0)));
+    end if;
+    if v_sp > 0 then
+      perform public.lock_player_accounts(s.investor_id);
+      perform public.ledger_transfer(v_acc, public.ledger_player_account(s.investor_id, 'player_cash'), v_sp, 'dividend',
+                                     'Gewinnanteil ' || c.name || ' ' || to_char(v_start at time zone 'Europe/Berlin', 'HH24') || ' Uhr',
+                                     'deal', s.id, k || ':stake:' || s.id::text, s.investor_id);
+      perform public.loan_withhold(s.investor_id, v_sp, k || ':stake:' || s.id::text);
+      v_stakes := v_stakes + v_sp;
+    end if;
+    update public.deals set payouts_cents = payouts_cents + v_sp, settled_until = v_end where id = s.id;
+  end loop;
+
+  -- automatic CEO payout (ADR-086, founderPayoutCents): after the hour's own bookings and the stakes, a share of the
+  -- profit left after the stake payouts (rounded down) moves from the company cash to the founder's private cash like
+  -- company_withdraw, never more than the free cash. A transfer, not a cost: profit_cents stays as computed above.
+  v_bps := least(10000, greatest(0, coalesce(pc.founder_payout_bps, 0)));
+  if v_profit - v_stakes > 0 and v_bps > 0 then
+    select a.balance_cents - v_owed into v_free from public.ledger_accounts a where a.id = v_acc;
+    v_payout := least((v_profit - v_stakes) * v_bps / 10000, greatest(0, coalesce(v_free, 0)));
+  end if;
+  if v_payout > 0 then
+    perform public.lock_player_accounts(pc.founder_id);
+    perform public.ledger_transfer(v_acc, public.ledger_player_account(pc.founder_id, 'player_cash'), v_payout, 'transfer',
+                                   'CEO-Auszahlung ' || to_char(v_start at time zone 'Europe/Berlin', 'HH24') || ' Uhr',
+                                   'company', p_company, k || ':payout', pc.founder_id);
+    perform public.loan_withhold(pc.founder_id, v_payout, k || ':payout');
+  end if;
+
+  -- record hour (ADR-091): beating an earlier best hour is news, at most one item per Berlin day (updated while the
+  -- day's record keeps rising and no AI text was written for it)
+  if v_profit > coalesce(pc.best_hour_profit_cents, 0) and coalesce(pc.best_hour_profit_cents, 0) > 0 then
+    select n.id into v_news from public.company_news n
+     where n.company_id = p_company and n.kind = 'record_hour'
+       and ((n.payload ->> 'hour_start')::timestamptz at time zone 'Europe/Berlin')::date
+           = (v_start at time zone 'Europe/Berlin')::date
+     order by n.id desc limit 1;
+    if v_news is null then
+      perform public.company_news_add(p_company, 'record_hour',
+                                      jsonb_build_object('profit_cents', v_profit, 'hour_start', v_start));
+    else
+      update public.company_news set payload = jsonb_build_object('profit_cents', v_profit, 'hour_start', v_start)
+       where id = v_news and ai_headline is null;
+    end if;
+  end if;
+
+  update public.player_companies
+     set unpaid_cents = v_owed,
+         distress = v_owed > 0,
+         last_hour_at = greatest(pc.last_hour_at, v_end),
+         best_hour_profit_cents = greatest(best_hour_profit_cents, v_profit)
+   where company_id = p_company;
+  insert into public.player_company_hours (company_id, hour_start, game_quarter_id, demand_cents, capacity_cents, revenue_cents,
+                                           contract_revenue_cents, cogs_cents, fixed_cents, marketing_cents, player_wages_due_cents,
+                                           player_wages_paid_cents, ai_wages_due_cents, ai_wages_paid_cents, pay_factor_bps,
+                                           paid_costs_cents, unpaid_added_cents, profit_cents, founder_payout_cents, event_id,
+                                           stake_payout_cents, campaign_id)
+  values (p_company, v_start, v_qid, round(v_demand::numeric)::bigint, round(v_cap::numeric)::bigint, v_rev,
+          v_crev, v_cogs, v_fixed, v_mk, v_pdue, v_ppaid, v_aidue, v_aipaid, v_factor, v_paid, v_unpaid, v_profit, v_payout,
+          (v_ev ->> 'event_id')::uuid, v_stakes, v_camp.id);
+
+  return jsonb_build_object('company_id', p_company, 'hour_start', v_start, 'quarter_id', v_qid, 'revenue_cents', v_rev,
+                            'contract_revenue_cents', v_crev, 'profit_cents', v_profit, 'pay_factor_bps', v_factor,
+                            'player_wages_paid_cents', v_ppaid, 'ai_wages_paid_cents', v_aipaid, 'unpaid_added_cents', v_unpaid,
+                            'founder_payout_cents', v_payout, 'event_id', v_ev -> 'event_id', 'stake_payout_cents', v_stakes,
+                            'campaign_id', v_camp.id);
+end;
+$$;
+comment on function public.player_company_close_hour(uuid, timestamptz) is
+  'Closes one operating hour of a player company (closeStartupHour, ADR-072/083) with the company event (ADR-091) and '
+  'the marketing campaign (ADR-097) of the hour, fixed costs less the founder''s efficiency upgrade (ADR-100), pays the '
+  'stakes (ADR-098) and then the automatic CEO payout from the profit left (ADR-086), writes the record_hour news; '
+  'idempotent per (company, hour).';
+
+-- ---------------------------------------------------------------------------
+-- G. Home: makler discount on every purchase, the top layer in the layout
+-- ---------------------------------------------------------------------------
+create or replace function public.buy_home(p_request_id uuid, p_tier text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  h        public.player_homes;
+  t        jsonb;
+  cur      jsonb;
+  v_cash   bigint;
+  v_cost   bigint;
+  v_list   bigint;
+  v_disc   integer;
+begin
+  v_player := public.require_player();
+  perform public.property_require_unlock(v_player);
+  t := public.property_tier(p_tier);
+  if p_request_id is null or t is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'buy_home');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_cash := public.lock_player_accounts(v_player);
+  h := public.property_home_for_update(v_player);
+  if coalesce((select p.level from public.profiles p where p.id = v_player), 1) < (t ->> 'minLevel')::integer then
+    perform public.api_error('property_locked');
+  end if;
+  cur := public.property_tier(h.tier);
+  if cur is not null and (t ->> 'idx')::integer <= (cur ->> 'idx')::integer then
+    perform public.api_error('invalid_tier');
+  end if;
+  -- makler upgrade (ADR-100): what is paid (price minus trade-in) x (10 000 − propertyDiscountBps) / 10 000
+  v_list := public.property_upgrade_cost_cents(case when cur is null then null else h.tier end, p_tier);
+  v_disc := public.player_property_discount_bps(v_player);
+  v_cost := public.apply_bps(v_list, 10000 - v_disc);
+  if v_cash < v_cost then
+    perform public.api_error('insufficient_funds');
+  end if;
+  if v_cost > 0 then
+    perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'), public.ledger_system_account('households'),
+                                   v_cost, 'lifestyle_purchase',
+                                   case when cur is null then 'Eigene Bleibe gekauft' else 'Umzug in eine größere Bleibe' end,
+                                   'player_home', v_player, 'property:home:' || v_player::text || ':' || p_request_id::text, v_player,
+                                   jsonb_build_object('from', case when cur is null then null else h.tier end, 'to', p_tier,
+                                                      'trade_in_cents', public.property_trade_in_cents(case when cur is null then null else h.tier end),
+                                                      'list_cost_cents', v_list, 'discount_bps', v_disc));
+  end if;
+  update public.player_furniture set placed = false, x = null, y = null, rot = 0 where player_id = v_player and placed;
+  update public.player_homes set tier = p_tier, updated_at = now() where player_id = v_player;
+  perform public.mission_event(v_player, 'home_bought', 1, p_tier);
+  if cur is not null then
+    perform public.mission_event(v_player, 'home_upgraded', 1, p_tier);
+  end if;
+  return public.request_complete(v_player, p_request_id,
+    public.property_state(v_player, v_player) || jsonb_build_object('cost_cents', v_cost));
+end;
+$$;
+comment on function public.buy_home(uuid, text) is
+  'RPC: buys the first or a bigger home (cost = (price - trade-in of the current one) less the makler upgrade; furniture '
+  'back into the inventory); errors property_locked, invalid_argument, invalid_tier, insufficient_funds.';
+
+create or replace function public.buy_furniture(p_request_id uuid, p_item_key text, p_count integer)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  v_price  bigint;
+  v_cash   bigint;
+  v_cost   bigint;
+  v_disc   integer;
+begin
+  v_player := public.require_player();
+  perform public.property_require_unlock(v_player);
+  -- docs/PROPERTY.md: 1 to 20 pieces per purchase
+  if p_request_id is null or p_item_key is null or p_count is null or p_count < 1 or p_count > 20 then
+    perform public.api_error('invalid_argument');
+  end if;
+  select c.price_cents into v_price from public.furniture_catalog c where c.key = p_item_key;
+  if v_price is null then
+    perform public.api_error('item_not_found');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'buy_furniture');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  -- makler upgrade (ADR-100): the discounted unit price is the price paid (resale and net worth use it)
+  v_disc := public.player_property_discount_bps(v_player);
+  v_price := public.apply_bps(v_price, 10000 - v_disc);
+  v_cost := v_price * p_count;
+  v_cash := public.lock_player_accounts(v_player);
+  if v_cash < v_cost then
+    perform public.api_error('insufficient_funds');
+  end if;
+  if v_cost > 0 then
+    perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'), public.ledger_system_account('households'),
+                                   v_cost, 'lifestyle_purchase', 'Möbel gekauft', 'furniture', null,
+                                   'property:furniture:' || v_player::text || ':' || p_request_id::text, v_player,
+                                   jsonb_build_object('item_key', p_item_key, 'count', p_count, 'price_cents', v_price,
+                                                      'discount_bps', v_disc));
+  end if;
+  insert into public.player_furniture (player_id, item_key, price_paid_cents)
+  select v_player, p_item_key, v_price from generate_series(1, p_count);
+  perform public.mission_event(v_player, 'furniture_bought', p_count, p_item_key);
+  return public.request_complete(v_player, p_request_id, public.property_state(v_player, v_player));
+end;
+$$;
+comment on function public.buy_furniture(uuid, text, integer) is
+  'RPC: buys 1..20 pieces of furniture into the inventory (price less the makler upgrade, stored as price paid); errors '
+  'property_locked, invalid_argument, item_not_found, insufficient_funds.';
+
+create or replace function public.buy_floor(p_request_id uuid, p_material text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  v_price  bigint;
+  v_cash   bigint;
+  h        public.player_homes;
+  v_paid   bigint;
+  v_disc   integer;
+begin
+  v_player := public.require_player();
+  perform public.property_require_unlock(v_player);
+  v_price := public.property_floor_price_cents(p_material);
+  if p_request_id is null or v_price is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'buy_floor');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_cash := public.lock_player_accounts(v_player);
+  h := public.property_home_for_update(v_player);
+  if not public.property_floor_owned(h.floors_owned, p_material) then
+    -- makler upgrade (ADR-100)
+    v_disc := public.player_property_discount_bps(v_player);
+    v_paid := public.apply_bps(v_price, 10000 - v_disc);
+    if v_cash < v_paid then
+      perform public.api_error('insufficient_funds');
+    end if;
+    if v_paid > 0 then
+      perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'), public.ledger_system_account('households'),
+                                     v_paid, 'lifestyle_purchase', 'Bodenbelag gekauft', 'player_home', v_player,
+                                     'property:floor:' || v_player::text || ':' || p_material, v_player,
+                                     jsonb_build_object('material', p_material, 'list_price_cents', v_price, 'discount_bps', v_disc));
+    end if;
+    update public.player_homes set floors_owned = array_append(floors_owned, p_material), updated_at = now()
+     where player_id = v_player;
+  end if;
+  return public.request_complete(v_player, p_request_id, public.property_state(v_player, v_player));
+end;
+$$;
+comment on function public.buy_floor(uuid, text) is
+  'RPC: buys a floor material once (owned or free: no charge; price less the makler upgrade); errors property_locked, '
+  'invalid_argument, insufficient_funds.';
+
+create or replace function public.buy_car(p_request_id uuid, p_car_key text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  h        public.player_homes;
+  t        jsonb;
+  v_price  bigint;
+  v_cash   bigint;
+  v_slots  integer;
+  v_slot   integer;
+  v_id     uuid := gen_random_uuid();
+  v_disc   integer;
+begin
+  v_player := public.require_player();
+  perform public.property_require_unlock(v_player);
+  if p_request_id is null or p_car_key is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'buy_car');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_cash := public.lock_player_accounts(v_player);
+  select * into h from public.player_homes where player_id = v_player for update;
+  t := public.property_tier(h.tier);
+  if t is null then
+    perform public.api_error('no_home');
+  end if;
+  select c.price_cents into v_price from public.car_catalog c where c.key = p_car_key;
+  if v_price is null then
+    perform public.api_error('item_not_found');
+  end if;
+  -- makler upgrade (ADR-100): the discounted price is the price paid (resale and net worth use it)
+  v_disc := public.player_property_discount_bps(v_player);
+  v_price := public.apply_bps(v_price, 10000 - v_disc);
+  v_slots := coalesce((t ->> 'garageSlots')::integer, 0);
+  select min(s) into v_slot from generate_series(0, v_slots - 1) s
+   where not exists (select 1 from public.player_cars c where c.player_id = v_player and c.slot = s);
+  if v_slot is null then
+    perform public.api_error('garage_full');
+  end if;
+  if v_cash < v_price then
+    perform public.api_error('insufficient_funds');
+  end if;
+  if v_price > 0 then
+    perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'), public.ledger_system_account('households'),
+                                   v_price, 'lifestyle_purchase', 'Auto gekauft', 'car', v_id,
+                                   'property:car:' || v_id::text, v_player,
+                                   jsonb_build_object('car_key', p_car_key, 'discount_bps', v_disc));
+  end if;
+  insert into public.player_cars (id, player_id, car_key, slot, price_paid_cents) values (v_id, v_player, p_car_key, v_slot, v_price);
+  perform public.mission_event(v_player, 'car_bought', 1, p_car_key);
+  return public.request_complete(v_player, p_request_id, public.property_state(v_player, v_player));
+end;
+$$;
+comment on function public.buy_car(uuid, text) is
+  'RPC: buys a car into the first free garage slot (price less the makler upgrade, stored as price paid); errors '
+  'property_locked, invalid_argument, no_home, item_not_found, garage_full, insufficient_funds.';
+
+create or replace function public.save_layout(p_request_id uuid, p_wall_color text, p_floor text, p_placed jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  h        public.player_homes;
+  t        jsonb;
+  v_w      integer;
+  v_h      integer;
+  v_n      integer;
+begin
+  v_player := public.require_player();
+  perform public.property_require_unlock(v_player);
+  if p_request_id is null or p_wall_color is null or p_floor is null or jsonb_typeof(p_placed) is distinct from 'array'
+     or not coalesce(public.property_config() -> 'wallColors' @> to_jsonb(lower(p_wall_color)), false) then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'save_layout');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into h from public.player_homes where player_id = v_player for update;
+  t := public.property_tier(h.tier);
+  if t is null then
+    perform public.api_error('no_home');
+  end if;
+  if not public.property_floor_owned(h.floors_owned, p_floor) then
+    perform public.api_error('floor_not_owned');
+  end if;
+  v_w := (t ->> 'width')::integer;
+  v_h := (t ->> 'height')::integer;
+
+  -- shape: {id: uuid, x, y: integers >= 0, rot: 0 | 90}
+  if exists (select 1 from jsonb_array_elements(p_placed) e
+              where jsonb_typeof(e) is distinct from 'object'
+                 or jsonb_typeof(e -> 'id') is distinct from 'string'
+                 or (e ->> 'id') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                 or jsonb_typeof(e -> 'x') is distinct from 'number' or (e ->> 'x') !~ '^[0-9]{1,4}$'
+                 or jsonb_typeof(e -> 'y') is distinct from 'number' or (e ->> 'y') !~ '^[0-9]{1,4}$'
+                 or jsonb_typeof(e -> 'rot') is distinct from 'number' or (e ->> 'rot') not in ('0', '90')) then
+    perform public.api_error('layout_invalid');
+  end if;
+  -- every id once and owned by the caller
+  select count(*) into v_n from jsonb_array_elements(p_placed);
+  if v_n <> (select count(distinct (e ->> 'id')::uuid) from jsonb_array_elements(p_placed) e)
+     or v_n <> (select count(*) from jsonb_array_elements(p_placed) e
+                  join public.player_furniture f on f.id = (e ->> 'id')::uuid and f.player_id = v_player) then
+    perform public.api_error('layout_invalid');
+  end if;
+  -- invalidPlacements: inside the floor, no two pieces of the same layer on one tile (rugs lie under objects, small
+  -- things stand on objects: one per tile)
+  if exists (
+       with p as (
+         select (e ->> 'x')::integer as x, (e ->> 'y')::integer as y, c.layer,
+                case when (e ->> 'rot') = '90' then c.height else c.width end::integer as w,
+                case when (e ->> 'rot') = '90' then c.width else c.height end::integer as hh
+           from jsonb_array_elements(p_placed) e
+           join public.player_furniture f on f.id = (e ->> 'id')::uuid
+           join public.furniture_catalog c on c.key = f.item_key)
+       select 1 from p where p.x + p.w > v_w or p.y + p.hh > v_h)
+  then
+    perform public.api_error('layout_invalid');
+  end if;
+  if exists (
+       with p as (
+         select (e ->> 'x')::integer as x, (e ->> 'y')::integer as y, c.layer,
+                case when (e ->> 'rot') = '90' then c.height else c.width end::integer as w,
+                case when (e ->> 'rot') = '90' then c.width else c.height end::integer as hh
+           from jsonb_array_elements(p_placed) e
+           join public.player_furniture f on f.id = (e ->> 'id')::uuid
+           join public.furniture_catalog c on c.key = f.item_key)
+       select 1 from p
+         cross join lateral generate_series(p.x, p.x + p.w - 1) cx
+         cross join lateral generate_series(p.y, p.y + p.hh - 1) cy
+        group by p.layer, cx, cy
+       having count(*) > 1)
+  then
+    perform public.api_error('layout_invalid');
+  end if;
+
+  -- the top layer (ADR-100): every tile of a small thing lies on a placed object with a surface
+  if exists (
+       with p as (
+         select (e ->> 'x')::integer as x, (e ->> 'y')::integer as y, c.layer, c.surface,
+                case when (e ->> 'rot') = '90' then c.height else c.width end::integer as w,
+                case when (e ->> 'rot') = '90' then c.width else c.height end::integer as hh
+           from jsonb_array_elements(p_placed) e
+           join public.player_furniture f on f.id = (e ->> 'id')::uuid
+           join public.furniture_catalog c on c.key = f.item_key),
+       t as (
+         select p.layer, p.surface, cx, cy from p
+          cross join lateral generate_series(p.x, p.x + p.w - 1) cx
+          cross join lateral generate_series(p.y, p.y + p.hh - 1) cy)
+       select 1 from t
+        where t.layer = 'top'
+          and not exists (select 1 from t s where s.layer = 'object' and s.surface and s.cx = t.cx and s.cy = t.cy))
+  then
+    perform public.api_error('layout_invalid');
+  end if;
+
+  update public.player_furniture set placed = false, x = null, y = null, rot = 0 where player_id = v_player and placed;
+  update public.player_furniture f
+     set placed = true, x = (e ->> 'x')::smallint, y = (e ->> 'y')::smallint, rot = (e ->> 'rot')::smallint
+    from jsonb_array_elements(p_placed) e
+   where f.id = (e ->> 'id')::uuid and f.player_id = v_player;
+  update public.player_homes set wall_color = lower(p_wall_color), floor = p_floor, updated_at = now() where player_id = v_player;
+  perform public.mission_event(v_player, 'furniture_placed', v_n, null);
+  return public.request_complete(v_player, p_request_id, public.property_state(v_player, v_player));
+end;
+$$;
+comment on function public.save_layout(uuid, text, text, jsonb) is
+  'RPC: replaces the layout, wall colour and floor of the home (three layers: floor, object, top on surfaces, ADR-100); '
+  'errors property_locked, invalid_argument (wall colour), no_home, floor_not_owned, layout_invalid.';
+
+-- ---------------------------------------------------------------------------
+-- H. Deals with the company: size limit (port of dealSizeLimitCents, supplyMaxCostCents)
+-- ---------------------------------------------------------------------------
+-- supplyMaxCostCents: applyBps(volume × hours, fee), half even
+create or replace function public.deal_supply_max_cost_cents(p_volume bigint, p_hours integer, p_fee_bps integer)
+returns bigint
+language sql
+immutable
+set search_path = ''
+as $$
+  select public.div_round_half_even(p_volume::numeric * p_hours * p_fee_bps, 10000);
+$$;
+
+-- dealSizeLimitCents: max(minSizeCents, floor(max(0, company value) × sizeShareOfValueBps / 10 000)); null without a
+-- company. Company value as in COMPANY.value_cents (company_value_cents).
+create or replace function public.deal_size_limit_cents(p_company uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when p_company is null then null
+              else greatest(public.cfg_num(x.c, '{minSizeCents}', 5000000)::bigint,
+                            floor(greatest(0, coalesce(public.company_value_cents(p_company), 0))::numeric
+                                  * public.cfg_num(x.c, '{sizeShareOfValueBps}', 5000)::numeric / 10000)::bigint) end
+    from (select public.deals_cfg() as c) x;
+$$;
+comment on function public.deal_size_limit_cents(uuid) is
+  'Internal: biggest supply contract (most possible cost) or stake for a company (dealSizeLimitCents, ADR-100).';
+
+-- true when a supply contract (its most possible cost) or a stake (its amount) is bigger than the limit of p_company;
+-- false for loans, without a company and for terms deal_terms_error refuses anyway
+create or replace function public.deal_exceeds_size(p_kind text, p_terms jsonb, p_company uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(case
+    when p_company is null then false
+    when p_kind = 'supply' then public.deal_supply_max_cost_cents(public.deal_term_int(p_terms, 'volume_cents_per_hour'),
+                                                                  public.deal_term_int(p_terms, 'hours')::integer,
+                                                                  public.deal_term_int(p_terms, 'fee_bps')::integer)
+                                > public.deal_size_limit_cents(p_company)
+    when p_kind = 'stake' then public.deal_term_int(p_terms, 'amount_cents') > public.deal_size_limit_cents(p_company)
+    else false end, false);
+$$;
+comment on function public.deal_exceeds_size(text, jsonb, uuid) is
+  'Internal: the deal is bigger than the size limit of the company (ADR-100) -> deal_too_big.';
+
+-- propose_deal as in M4j plus the size limit of the proposer's and a targeted counterparty's company
+create or replace function public.propose_deal(p_request_id uuid, p_kind text, p_role text, p_counterparty text, p_terms jsonb,
+                                               p_message text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player   uuid;
+  v_replay   jsonb;
+  v_cfg      jsonb := public.deals_cfg();
+  v_now      timestamptz := public.game_now();
+  v_msg      text := nullif(btrim(coalesce(p_message, '')), '');
+  v_handle   text := nullif(btrim(coalesce(p_counterparty, '')), '');
+  v_level    integer;
+  v_target   uuid;
+  v_other    text;
+  v_err      text;
+  v_my_co    uuid;
+  v_their_co uuid;
+  v_share    integer;
+  v_id       uuid;
+  d          public.deals;
+  v_nick     text;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or coalesce(p_kind, '') not in ('loan', 'supply', 'stake') or not public.deal_role_ok(p_kind, p_role)
+     or char_length(coalesce(p_counterparty, '')) > 64 then
+    perform public.api_error('invalid_argument');
+  end if;
+  if v_msg is not null and (char_length(v_msg) > 140 or v_msg ~ '[[:cntrl:]]') then
+    perform public.api_error('invalid_argument');
+  end if;
+  if public.text_has_profanity(v_msg) then
+    perform public.api_error('name_profanity');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'propose_deal');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  if not public.rate_limit_hit(v_player, 'player_action',
+           greatest(1, public.config_double('abuse', '{rateLimits,actionsPerMinute}', 60))::integer, 60) then
+    perform public.api_error('rate_limited');
+  end if;
+  select p.level into v_level from public.profiles p where p.id = v_player;
+  if coalesce(v_level, 1) < public.cfg_num(v_cfg, '{minLevel}', 6) then
+    perform public.api_error('locked');
+  end if;
+  if v_handle is not null then
+    v_target := public.player_by_handle(v_handle);
+    if v_target is null then
+      perform public.api_error('player_not_found');
+    end if;
+    if v_target = v_player then
+      perform public.api_error('deal_self');
+    end if;
+  end if;
+  v_other := public.deal_other_role(p_role);
+  -- the loan cap needs the lender's level: the proposer, or a targeted lender; else at acceptance
+  v_err := public.deal_terms_error(p_kind, p_terms,
+             case when p_role = 'lender' then v_level
+                  when p_role = 'borrower' and v_target is not null then (select p.level from public.profiles p where p.id = v_target) end);
+  if v_err is not null then
+    perform public.api_error('deal_terms');
+  end if;
+  if public.deal_role_needs_company(p_role) then
+    v_my_co := public.player_active_company(v_player);
+    if v_my_co is null then
+      perform public.api_error('deal_needs_company');
+    end if;
+  end if;
+  if v_target is not null and public.deal_role_needs_company(v_other) then
+    v_their_co := public.player_active_company(v_target);
+    if v_their_co is null then
+      perform public.api_error('deal_needs_company');
+    end if;
+  end if;
+  -- company deals grow with the company (ADR-100): at most dealSizeLimitCents of the proposer's company and of a
+  -- targeted counterparty's company; checked again at acceptance
+  if public.deal_exceeds_size(p_kind, p_terms, v_my_co) or public.deal_exceeds_size(p_kind, p_terms, v_their_co) then
+    perform public.api_error('deal_too_big');
+  end if;
+  -- all stakes of a company together stay within maxTotalShareBps (company side: with its open offers)
+  if p_kind = 'stake' then
+    v_share := public.deal_term_int(p_terms, 'share_bps')::integer;
+    if (p_role = 'company' and public.deal_stake_shares(v_my_co, true) + v_share > public.cfg_num(v_cfg, '{stake,maxTotalShareBps}', 5000))
+       or (p_role = 'investor' and v_their_co is not null
+           and public.deal_stake_shares(v_their_co, false) + v_share > public.cfg_num(v_cfg, '{stake,maxTotalShareBps}', 5000)) then
+      perform public.api_error('stake_share_full');
+    end if;
+  end if;
+  if (select count(*) from public.deals x where x.proposer_id = v_player and x.status = 'open' and x.expires_at > v_now)
+     >= public.cfg_num(v_cfg, '{maxOpenOffers}', 5)
+     or public.deal_count_running(v_player, p_kind) >= public.cfg_num(v_cfg, '{maxActivePerKind}', 5) then
+    perform public.api_error('deal_limit');
+  end if;
+
+  insert into public.deals (kind, status, proposer_id, proposer_role, counterparty_id, board,
+                            lender_id, borrower_id, supplier_company_id, buyer_company_id, investor_id, company_id,
+                            principal_cents, interest_bps, volume_cents_per_hour, fee_bps, prepay_bps, amount_cents, share_bps,
+                            hours, message, due_cents, prepay_cents, created_at, expires_at, request_id)
+  values (p_kind, 'open', v_player, p_role, v_target, v_target is null,
+          case p_role when 'lender' then v_player when 'borrower' then v_target end,
+          case p_role when 'borrower' then v_player when 'lender' then v_target end,
+          case p_role when 'supplier' then v_my_co when 'buyer' then v_their_co end,
+          case p_role when 'buyer' then v_my_co when 'supplier' then v_their_co end,
+          case p_role when 'investor' then v_player when 'company' then v_target end,
+          case p_role when 'company' then v_my_co when 'investor' then v_their_co end,
+          case when p_kind = 'loan' then public.deal_term_int(p_terms, 'principal_cents') end,
+          case when p_kind = 'loan' then public.deal_term_int(p_terms, 'interest_bps')::integer end,
+          case when p_kind = 'supply' then public.deal_term_int(p_terms, 'volume_cents_per_hour') end,
+          case when p_kind = 'supply' then public.deal_term_int(p_terms, 'fee_bps')::integer end,
+          case when p_kind = 'supply' then public.deal_term_int(p_terms, 'prepay_bps')::integer end,
+          case when p_kind = 'stake' then public.deal_term_int(p_terms, 'amount_cents') end,
+          case when p_kind = 'stake' then public.deal_term_int(p_terms, 'share_bps')::integer end,
+          public.deal_term_int(p_terms, 'hours')::integer, v_msg,
+          -- loanDueCents and supplyPrepayCents: shown with the offer, fixed at acceptance
+          case when p_kind = 'loan' then public.deal_term_int(p_terms, 'principal_cents')
+                                         + public.apply_bps(public.deal_term_int(p_terms, 'principal_cents'),
+                                                            public.deal_term_int(p_terms, 'interest_bps'))
+               else 0 end,
+          case when p_kind = 'supply' then public.deal_supply_prepay_cents(public.deal_term_int(p_terms, 'volume_cents_per_hour'),
+                                                                           public.deal_term_int(p_terms, 'hours')::integer,
+                                                                           public.deal_term_int(p_terms, 'fee_bps')::integer,
+                                                                           public.deal_term_int(p_terms, 'prepay_bps')::integer)
+               else 0 end,
+          v_now, v_now + make_interval(secs => greatest(1, public.cfg_num(v_cfg, '{offerValidHours}', 48)) * 3600), p_request_id)
+  returning * into d;
+  v_id := d.id;
+
+  if v_target is not null then
+    v_nick := public.player_nickname(v_player);
+    perform public.deal_notify(v_target, 'deal_offer', v_id,
+      v_nick || case p_role
+                  when 'lender' then ' bietet dir einen Kredit an'
+                  when 'borrower' then ' bittet dich um einen Kredit'
+                  when 'supplier' then ' bietet dir einen Liefervertrag an'
+                  when 'buyer' then ' möchte Ware bei dir bestellen'
+                  when 'investor' then ' möchte bei deiner Firma einsteigen'
+                  else ' bietet dir eine Beteiligung an' end,
+      public.deal_terms_text(d) || coalesce(' – „' || v_msg || '“', ''),
+      'deal:' || v_id::text || ':offer');
+  end if;
+  return public.request_complete(v_player, p_request_id, public.deal_json(v_id, v_player));
+end;
+$$;
+comment on function public.propose_deal(uuid, text, text, text, jsonb, text) is
+  'RPC: proposes a loan, supply contract or stake (ADR-098) to a player (nickname or tag) or, with p_counterparty null, '
+  'on the deal board. No money moves. Errors invalid_argument, name_profanity, locked, player_not_found, deal_self, '
+  'deal_terms, deal_needs_company, deal_too_big (ADR-100), stake_share_full, deal_limit, rate_limited. -> DEAL';
+
+-- respond_deal as in M4j plus the size limit of both companies (supply) or the company (stake) at the acceptance
+create or replace function public.respond_deal(p_request_id uuid, p_deal_id uuid, p_accept boolean)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player   uuid;
+  v_replay   jsonb;
+  v_cfg      jsonb := public.deals_cfg();
+  v_now      timestamptz := public.game_now();
+  d          public.deals;
+  v_role     text;
+  v_level    integer;
+  v_my_co    uuid;
+  v_prop_co  uuid;
+  v_lender   uuid;
+  v_borrower uuid;
+  v_sup_co   uuid;
+  v_buy_co   uuid;
+  v_investor uuid;
+  v_company  uuid;
+  v_cash     bigint;
+  v_prepay   bigint;
+  v_nick     text;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_deal_id is null or p_accept is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'respond_deal');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  d := public.deal_for_action(v_player, p_deal_id);
+  if d.proposer_id = v_player then
+    perform public.api_error('deal_self');
+  end if;
+  if d.status <> 'open' or d.expires_at <= v_now then
+    perform public.api_error('deal_closed');
+  end if;
+  if d.counterparty_id is not null and d.counterparty_id <> v_player then
+    perform public.api_error('deal_not_found');
+  end if;
+  v_nick := public.player_nickname(v_player);
+
+  if not p_accept then
+    -- open board offers just stay open
+    if d.counterparty_id is null then
+      perform public.api_error('invalid_argument');
+    end if;
+    update public.deals set status = 'declined', closed_at = v_now where id = d.id;
+    perform public.deal_notify(d.proposer_id, 'deal_result', d.id,
+      v_nick || ' hat ' || public.deal_kind_text(d.kind, 'your') || ' abgelehnt', public.deal_terms_text(d),
+      'deal:' || d.id::text || ':declined');
+    return public.request_complete(v_player, p_request_id, public.deal_json(d.id, v_player));
+  end if;
+
+  -- who may accept: level, a company where the own side needs one, room for one more running deal of the kind
+  v_role := public.deal_other_role(d.proposer_role);
+  select p.level into v_level from public.profiles p where p.id = v_player;
+  if coalesce(v_level, 1) < public.cfg_num(v_cfg, '{minLevel}', 6) then
+    perform public.api_error('locked');
+  end if;
+  if public.deal_role_needs_company(v_role) then
+    v_my_co := public.player_active_company(v_player);
+    if v_my_co is null then
+      perform public.api_error('deal_needs_company');
+    end if;
+  end if;
+  if public.deal_role_needs_company(d.proposer_role) then
+    v_prop_co := public.player_active_company(d.proposer_id);
+    if v_prop_co is null then
+      perform public.api_error('deal_needs_company');
+    end if;
+  end if;
+  if public.deal_count_running(v_player, d.kind) >= public.cfg_num(v_cfg, '{maxActivePerKind}', 5)
+     or public.deal_count_running(d.proposer_id, d.kind) >= public.cfg_num(v_cfg, '{maxActivePerKind}', 5) then
+    perform public.api_error('deal_limit');
+  end if;
+
+  if d.kind = 'loan' then
+    v_lender := case when d.proposer_role = 'lender' then d.proposer_id else v_player end;
+    v_borrower := case when d.proposer_role = 'borrower' then d.proposer_id else v_player end;
+    if public.deal_terms_error('loan', public.deal_terms_json(d),
+                               (select p.level from public.profiles p where p.id = v_lender)) is not null then
+      perform public.api_error('deal_terms');
+    end if;
+    perform public.lock_player_accounts(v_borrower);
+    v_cash := public.lock_player_accounts(v_lender);
+    if v_cash < d.principal_cents then
+      perform public.api_error('insufficient_funds');
+    end if;
+    perform public.ledger_transfer(public.ledger_player_account(v_lender, 'player_cash'),
+                                   public.ledger_player_account(v_borrower, 'player_cash'), d.principal_cents, 'loan_disbursement',
+                                   'Kredit von ' || public.player_nickname(v_lender), 'deal', d.id,
+                                   'deal:' || d.id::text || ':principal', v_player);
+    update public.deals
+       set lender_id = v_lender, borrower_id = v_borrower,
+           due_cents = d.principal_cents + public.apply_bps(d.principal_cents, d.interest_bps)
+     where id = d.id;
+  elsif d.kind = 'supply' then
+    v_sup_co := case when d.proposer_role = 'supplier' then v_prop_co else v_my_co end;
+    v_buy_co := case when d.proposer_role = 'buyer' then v_prop_co else v_my_co end;
+    -- ADR-100: the most the contract can cost fits the limit of both companies (values of today)
+    if public.deal_exceeds_size('supply', public.deal_terms_json(d), v_sup_co)
+       or public.deal_exceeds_size('supply', public.deal_terms_json(d), v_buy_co) then
+      perform public.api_error('deal_too_big');
+    end if;
+    v_prepay := public.deal_supply_prepay_cents(d.volume_cents_per_hour, d.hours, d.fee_bps, d.prepay_bps);
+    -- the buyer's free cash (cash − open bills)
+    select a.balance_cents - pc.unpaid_cents into v_cash
+      from public.ledger_accounts a join public.player_companies pc on pc.company_id = a.owner_company_id
+     where a.owner_company_id = v_buy_co and a.kind = 'company_cash' for update of a;
+    if coalesce(v_cash, 0) < v_prepay then
+      perform public.api_error('insufficient_funds');
+    end if;
+    if v_prepay > 0 then
+      perform public.ledger_transfer(public.company_cash_account(v_buy_co), public.company_cash_account(v_sup_co), v_prepay,
+                                     'transfer', 'Anzahlung Liefervertrag', 'deal', d.id, 'deal:' || d.id::text || ':prepay',
+                                     v_player);
+    end if;
+    update public.deals
+       set supplier_company_id = v_sup_co, buyer_company_id = v_buy_co, prepay_cents = v_prepay, prepay_left_cents = v_prepay,
+           settled_until = public.deal_first_hour(v_now)
+     where id = d.id;
+  else
+    v_investor := case when d.proposer_role = 'investor' then d.proposer_id else v_player end;
+    v_company := case when d.proposer_role = 'company' then v_prop_co else v_my_co end;
+    -- ADR-100: the amount fits the limit of the company (value of today)
+    if public.deal_exceeds_size('stake', public.deal_terms_json(d), v_company) then
+      perform public.api_error('deal_too_big');
+    end if;
+    if public.deal_stake_shares(v_company, false) + d.share_bps > public.cfg_num(v_cfg, '{stake,maxTotalShareBps}', 5000) then
+      perform public.api_error('stake_share_full');
+    end if;
+    v_cash := public.lock_player_accounts(v_investor);
+    if v_cash < d.amount_cents then
+      perform public.api_error('insufficient_funds');
+    end if;
+    perform public.ledger_transfer(public.ledger_player_account(v_investor, 'player_cash'), public.company_cash_account(v_company),
+                                   d.amount_cents, 'angel_investment', 'Beteiligung von ' || public.player_nickname(v_investor),
+                                   'deal', d.id, 'deal:' || d.id::text || ':stake', v_player);
+    update public.deals
+       set investor_id = v_investor, company_id = v_company, settled_until = public.deal_first_hour(v_now)
+     where id = d.id;
+  end if;
+
+  update public.deals
+     set status = 'active', counterparty_id = v_player, accepted_at = v_now,
+         ends_at = v_now + make_interval(secs => d.hours * 3600)
+   where id = d.id;
+  perform public.deal_notify(d.proposer_id, 'deal_result', d.id,
+    v_nick || ' hat ' || public.deal_kind_text(d.kind, 'your') || ' angenommen', public.deal_terms_text(d),
+    'deal:' || d.id::text || ':accepted');
+  perform public.feed_post(v_player, 'deal_signed',
+    jsonb_build_object('kind', d.kind, 'with', public.player_nickname(d.proposer_id)), 'deal_signed:' || d.id::text);
+  return public.request_complete(v_player, p_request_id, public.deal_json(d.id, v_player));
+end;
+$$;
+comment on function public.respond_deal(uuid, uuid, boolean) is
+  'RPC: accepts or declines an offer (ADR-098). Targeted offers: only the target; board offers: any eligible player '
+  '(decline: invalid_argument). Accepting moves the money (loan principal, supply prepayment, stake amount). Errors '
+  'invalid_argument, deal_not_found, deal_self, deal_closed, locked, deal_needs_company, deal_limit, deal_terms, '
+  'deal_too_big (ADR-100), stake_share_full, insufficient_funds. -> DEAL';
+
+create or replace function public.get_deals()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  v_now    timestamptz := public.game_now();
+begin
+  return jsonb_build_object(
+    'incoming', coalesce((select jsonb_agg(public.deal_json(x.id, v_player) order by x.created_at desc, x.id)
+                            from public.deals x
+                           where x.status = 'open' and x.counterparty_id = v_player and x.expires_at > v_now), '[]'::jsonb),
+    'outgoing', coalesce((select jsonb_agg(public.deal_json(x.id, v_player) order by x.created_at desc, x.id)
+                            from public.deals x
+                           where x.status = 'open' and x.proposer_id = v_player and x.expires_at > v_now), '[]'::jsonb),
+    'running', coalesce((select jsonb_agg(public.deal_json(x.id, v_player) order by x.ends_at, x.id)
+                           from public.deals x
+                          where x.status in ('active', 'overdue', 'defaulted') and v_player in (x.proposer_id, x.counterparty_id)),
+                        '[]'::jsonb),
+    'history', coalesce((select jsonb_agg(public.deal_json(h.id, v_player) order by h.at desc, h.id)
+                           from (select x.id, coalesce(x.closed_at, x.expires_at) as at from public.deals x
+                                  where x.status in ('completed', 'forgiven', 'broken', 'cancelled', 'declined', 'expired')
+                                    and v_player in (x.proposer_id, x.counterparty_id)
+                                  order by coalesce(x.closed_at, x.expires_at) desc, x.id limit 20) h), '[]'::jsonb),
+    'trust', public.player_trust(v_player),
+    -- ADR-100: the biggest company deal of the caller's company (null without one) and the biggest loan they may lend
+    'limits', jsonb_build_object(
+      'company_deal_max_cents', case when public.player_active_company(v_player) is not null
+                                     then public.deal_size_limit_cents(public.player_active_company(v_player)) end,
+      'loan_max_cents', greatest(1, coalesce((select p.level from public.profiles p where p.id = v_player), 1))::bigint
+                        * public.cfg_num(public.deals_cfg(), '{loan,maxPrincipalCentsPerLevel}', 2000000)::bigint));
+end;
+$$;
+comment on function public.get_deals() is
+  'RPC: the caller''s deals (ADR-098): {incoming, outgoing, running, history (last 20), trust, limits: '
+  '{company_deal_max_cents (null without company), loan_max_cents}} (ADR-100).';
+
+-- ---------------------------------------------------------------------------
+-- I. Presence at work (ADR-103, port of presencePayBps and firedForAbsence in src/lib/sim/skills.ts)
+-- ---------------------------------------------------------------------------
+-- careers.inactivity with the defaults of balance.ts
+create or replace function public.presence_cfg()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select '{"steps": [{"afterHours": 24, "payBps": 7500}, {"afterHours": 48, "payBps": 5000}, {"afterHours": 72, "payBps": 2500}],
+           "fireAfterHours": 120}'::jsonb
+         || coalesce(case when jsonb_typeof(public.config_jsonb('careers', '{inactivity}')) = 'object'
+                          then public.config_jsonb('careers', '{inactivity}') end, '{}'::jsonb);
+$$;
+comment on function public.presence_cfg() is 'Internal: game_config careers.inactivity (ADR-103) with the defaults of balance.ts.';
+
+-- presencePayBps: the last step (in order) whose afterHours ≤ hours away gives the share of the wage; 10 000 before
+-- the first step
+create or replace function public.presence_pay_bps(p_hours double precision, p_cfg jsonb default null)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select round(public.cfg_num(x.s, '{payBps}', 10000))::integer
+                     from jsonb_array_elements(case when jsonb_typeof(y.c -> 'steps') = 'array' then y.c -> 'steps'
+                                                    else '[]'::jsonb end) with ordinality x(s, ord)
+                    where public.cfg_num(x.s, '{afterHours}', 1e9) <= coalesce(p_hours, 0)
+                    order by x.ord desc limit 1), 10000)
+    from (select coalesce(p_cfg, public.presence_cfg()) as c) y;
+$$;
+comment on function public.presence_pay_bps(double precision, jsonb) is
+  'Internal: presencePayBps (ADR-103), share of the wage in bps after p_hours away.';
+
+-- profiles.last_active_at: the last time the player used the game (require_player, at most every 5 minutes)
+alter table public.profiles add column if not exists last_active_at timestamptz;
+update public.profiles set last_active_at = public.game_now() where last_active_at is null;
+alter table public.profiles alter column last_active_at set default now();
+alter table public.profiles alter column last_active_at set not null;
+comment on column public.profiles.last_active_at is
+  'Last use of the game (ADR-103): set by require_player at most every 5 minutes; decides the presence share of job pay.';
+
+-- Absences long enough to lower the pay (≥ the first step), kept when the player comes back: hours of the absence that
+-- are paid later (the hourly close of a player company runs behind) still get the share of their time.
+create table if not exists public.player_absences (
+  id         bigint generated always as identity primary key,
+  player_id  uuid not null references public.profiles (id) on delete cascade,
+  away_from  timestamptz not null,
+  away_until timestamptz not null,
+  created_at timestamptz not null default now(),
+  constraint player_absences_window_check check (away_until > away_from)
+);
+alter table public.player_absences enable row level security;
+create index if not exists player_absences_player_idx on public.player_absences (player_id, away_until desc);
+comment on table public.player_absences is
+  'Absences from the game of at least the first careers.inactivity step (ADR-103), written by presence_touch when the '
+  'player comes back; kept 30 days. Internal (no client access).';
+do $$
+begin
+  revoke all on public.player_absences from public, anon, authenticated;
+  grant all on public.player_absences to service_role;
+end;
+$$;
+
+alter type public.job_end_reason add value if not exists 'absent';
+
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('job_absent', 'career', 'Kündigung wegen Abwesenheit', 'Du warst zu lange nicht da, dein Job ist beendet.',
+        'notif_briefcase', true, true, false, 146),
+       ('employee_absent', 'company', 'Mitarbeiter nicht erschienen',
+        'Jemand aus deinem Team war zu lange nicht da und wurde gekündigt.', 'notif_briefcase', true, false, false, 227)
+on conflict (key) do nothing;
+
+-- Hours away at p_at: after the last activity from there, earlier from the start of a recorded absence, else 0. Times
+-- after now count as now (nobody is absent in the future; only tests pay hours ahead).
+create or replace function public.presence_away_hours(p_player uuid, p_at timestamptz)
+returns double precision
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select greatest(0, extract(epoch from (x.t - coalesce(
+           case when x.t >= p.last_active_at then p.last_active_at end,
+           (select a.away_from from public.player_absences a
+             where a.player_id = p.id and a.away_from <= x.t and a.away_until > x.t order by a.away_from desc limit 1),
+           x.t))) / 3600.0)
+    from public.profiles p cross join (select least(p_at, public.game_now()) as t) x
+   where p.id = p_player;
+$$;
+comment on function public.presence_away_hours(uuid, timestamptz) is 'Internal: hours the player had been away at p_at (ADR-103).';
+
+-- Average presence share (bps) of the p_minutes paid from p_from on, minute by minute; 10 000 without a long absence
+create or replace function public.presence_pay_bps_between(p_player uuid, p_from timestamptz, p_minutes integer)
+returns integer
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  c       jsonb := public.presence_cfg();
+  v_first double precision;
+  v_last  timestamptz;
+  v_to    timestamptz;
+begin
+  if coalesce(p_minutes, 0) <= 0 or p_from is null then
+    return 10000;
+  end if;
+  select min(public.cfg_num(s, '{afterHours}', 0)) into v_first
+    from jsonb_array_elements(case when jsonb_typeof(c -> 'steps') = 'array' then c -> 'steps' else '[]'::jsonb end) s;
+  select p.last_active_at into v_last from public.profiles p where p.id = p_player;
+  if v_first is null or v_last is null then
+    return 10000;
+  end if;
+  v_to := p_from + make_interval(mins => p_minutes);
+  -- the usual case: the minutes end before the first step after the last activity (minutes after now count as now), no
+  -- recorded absence touches them
+  if least(v_to, public.game_now()) <= v_last + make_interval(secs => v_first * 3600)
+     and not exists (select 1 from public.player_absences a
+                      where a.player_id = p_player and a.away_from < v_to and a.away_until > p_from) then
+    return 10000;
+  end if;
+  return coalesce((
+    select round(avg(public.presence_pay_bps(public.presence_away_hours(p_player, m.t), c)))::integer
+      from generate_series(p_from, v_to - interval '1 minute', interval '1 minute') m(t)), 10000);
+end;
+$$;
+comment on function public.presence_pay_bps_between(uuid, timestamptz, integer) is
+  'Internal: average presence share in bps of the minutes [p_from, p_from + p_minutes) (ADR-103).';
+
+-- PRESENCE of job_state: {last_active_at, pay_bps (share right now), fire_at}. For the player themself a stored time
+-- older than 5 minutes reads as now: require_player has just recorded the call, a stable read does not see that write.
+create or replace function public.presence_json(p_player uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'last_active_at', x.at,
+    'pay_bps', public.presence_pay_bps(extract(epoch from (public.game_now() - x.at)) / 3600.0),
+    'fire_at', x.at + make_interval(secs => public.cfg_num(public.presence_cfg(), '{fireAfterHours}', 120) * 3600))
+    from (select case when p.id = (select auth.uid()) and p.last_active_at < public.game_now() - interval '5 minutes'
+                      then public.game_now() else p.last_active_at end as at
+            from public.profiles p where p.id = p_player) x;
+$$;
+comment on function public.presence_json(uuid) is
+  'Internal: PRESENCE {last_active_at, pay_bps, fire_at} of a player (ADR-103).';
+
+-- firedForAbsence: a player away for fireAfterHours (from last_active_at) loses the job. The hours up to that moment
+-- are paid first (with their presence share), then the job ends with end_reason 'absent'; the player and the owners of
+-- a player company are told. Cheap when nothing is due (no lock). Returns whether the job ended.
+create or replace function public.job_absence_check(p_job uuid, p_now timestamptz default null)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  -- an hour closed ahead of time (tests) cannot end a job before its time
+  v_now   timestamptz := least(coalesce(p_now, public.game_now()), public.game_now());
+  v_hours double precision := public.cfg_num(public.presence_cfg(), '{fireAfterHours}', 120);
+  j       public.player_jobs;
+  v_last  timestamptz;
+  v_fire  timestamptz;
+  v_nick  text;
+  v_co    text;
+  v_ceo   uuid;
+  v_fdr   uuid;
+  v_owner uuid;
+begin
+  select pj.* into j from public.player_jobs pj where pj.id = p_job and pj.status = 'active';
+  if j.id is null then
+    return false;
+  end if;
+  select p.last_active_at, p.nickname into v_last, v_nick from public.profiles p where p.id = j.player_id;
+  v_fire := v_last + make_interval(secs => v_hours * 3600);
+  if v_last is null or v_now < v_fire then
+    return false;
+  end if;
+  perform public.lock_player_accounts(j.player_id);
+  select pj.* into j from public.player_jobs pj where pj.id = p_job and pj.status = 'active' for update;
+  if j.id is null then
+    return false;
+  end if;
+  if v_fire > j.last_paid_at then
+    perform public.accrue_job_salary(j.id, v_fire);
+  end if;
+  update public.player_jobs
+     set status = 'ended', ended_at = greatest(v_fire, started_at), end_reason = 'absent'
+   where id = j.id;
+  select c.name, c.ceo_id into v_co, v_ceo from public.companies c where c.id = j.company_id;
+  select pc.founder_id into v_fdr from public.player_companies pc where pc.company_id = j.company_id;
+  perform public.company_system_message(j.company_id, coalesce(v_nick, '?') || ' ist nicht mehr erschienen und wurde gekündigt.');
+  perform public.social_notify(j.player_id, 'job_absent', 'Gekündigt',
+    'Du warst ' || round(v_hours / 24)::integer || ' Tage nicht da. Dein Job bei ' || coalesce(v_co, 'deiner Firma')
+    || ' ist beendet.', jsonb_build_object('player_job_id', j.id, 'company', v_co), '/job', 'job_absent:' || j.id::text);
+  if v_fdr is not null then
+    for v_owner in select distinct x from unnest(array[v_fdr, v_ceo]) x where x is not null and x <> j.player_id loop
+      perform public.social_notify(v_owner, 'employee_absent', 'Kündigung wegen Abwesenheit',
+        coalesce(v_nick, '?') || ' ist nicht mehr erschienen und wurde gekündigt.',
+        jsonb_build_object('player_job_id', j.id, 'nickname', v_nick), '/company', 'employee_absent:' || j.id::text);
+    end loop;
+  end if;
+  return true;
+end;
+$$;
+comment on function public.job_absence_check(uuid, timestamptz) is
+  'Internal: ends a job whose player was away for careers.inactivity.fireAfterHours (ADR-103), paid up to that moment; '
+  'called by accrue_salaries (AI jobs), player_company_close_hour and presence_touch.';
+
+-- A use of the game: with the old last_active_at, a player away for fireAfterHours loses the jobs first; an absence of
+-- at least the first step is recorded; then last_active_at = now. Throttled to once in 5 minutes (row lock: once).
+create or replace function public.presence_touch(p_player uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  c       jsonb := public.presence_cfg();
+  v_now   timestamptz := public.game_now();
+  v_old   timestamptz;
+  v_first double precision;
+  r       record;
+begin
+  select p.last_active_at into v_old from public.profiles p where p.id = p_player;
+  if v_old is null or v_old > v_now - interval '5 minutes' then
+    return;
+  end if;
+  -- locks in the order of the job accruals (the player's accounts, then the profile in grant_xp): no deadlock with them
+  perform public.lock_player_accounts(p_player);
+  select p.last_active_at into v_old from public.profiles p where p.id = p_player for update;
+  if v_old > v_now - interval '5 minutes' then
+    return;
+  end if;
+  if v_now >= v_old + make_interval(secs => public.cfg_num(c, '{fireAfterHours}', 120) * 3600) then
+    for r in select j.id from public.player_jobs j where j.player_id = p_player and j.status = 'active' order by j.id loop
+      perform public.job_absence_check(r.id, v_now);
+    end loop;
+  end if;
+  select min(public.cfg_num(s, '{afterHours}', 0)) into v_first
+    from jsonb_array_elements(case when jsonb_typeof(c -> 'steps') = 'array' then c -> 'steps' else '[]'::jsonb end) s;
+  if v_first is not null and v_now >= v_old + make_interval(secs => v_first * 3600) then
+    insert into public.player_absences (player_id, away_from, away_until) values (p_player, v_old, v_now);
+    delete from public.player_absences a where a.player_id = p_player and a.away_until < v_now - interval '30 days';
+  end if;
+  update public.profiles set last_active_at = v_now where id = p_player;
+end;
+$$;
+comment on function public.presence_touch(uuid) is 'Internal: records a use of the game (ADR-103), see require_player.';
+
+-- require_player as in M1 plus the presence: every RPC of a player is a use of the game. A read-only transaction (a
+-- GET request) cannot record it; the next write does. A failing record never blocks the call.
+create or replace function public.require_player()
+returns uuid
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid  uuid := (select auth.uid());
+  v_last timestamptz;
+begin
+  if v_uid is not null then
+    select p.last_active_at into v_last from public.profiles p where p.id = v_uid;
+  end if;
+  if v_uid is null or not found then
+    perform public.api_error('not_authenticated');
+  end if;
+  if v_last < public.game_now() - interval '5 minutes' then
+    begin
+      perform public.presence_touch(v_uid);
+    exception
+      when read_only_sql_transaction then
+        null;
+      when others then
+        raise warning 'presence_touch(%): %', v_uid, sqlerrm;
+    end;
+  end if;
+  return v_uid;
+end;
+$$;
+
+-- careers.paidHoursPerDayCap falls back to 8 (ADR-103); overtime adds its hours on top
+create or replace function public.player_paid_hours_cap(p_player uuid)
+returns double precision
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select public.config_double('careers', '{paidHoursPerDayCap}', 8)
+       + public.player_upgrade_level(p_player, 'overtime') * public.cfg_num(public.upgrade_cfg('overtime'), '{perLevel}', 1);
+$$;
+
+-- accrue_salaries as in M3i: AI jobs whose player was away too long end first
+create or replace function public.accrue_salaries(p_now timestamptz default null)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now   timestamptz := coalesce(p_now, public.game_now());
+  r       record;
+  v_whole integer;
+  v_n     integer := 0;
+begin
+  for r in select j.id, j.player_id, j.last_paid_at
+             from public.player_jobs j join public.companies c on c.id = j.company_id
+            where j.status = 'active' and c.is_ai
+            order by j.player_id loop
+    -- presence (ADR-103): a player away for careers.inactivity.fireAfterHours loses the job, paid up to that moment
+    continue when public.job_absence_check(r.id, v_now);
+    v_whole := floor(extract(epoch from (v_now - r.last_paid_at)) / 3600)::integer;
+    continue when v_whole < 1;
+    perform public.lock_player_accounts(r.player_id);
+    if public.accrue_job_salary(r.id, r.last_paid_at + make_interval(hours => v_whole)) > 0 then
+      v_n := v_n + 1;
+    end if;
+  end loop;
+  return v_n;
+end;
+$$;
+comment on function public.accrue_salaries(timestamptz) is
+  'run_due_jobs: pays the whole hours of every AI job; a player away for careers.inactivity.fireAfterHours loses the job '
+  'first (ADR-103).';
+
+-- job_state as in M4i plus presence (ADR-103)
+create or replace function public.job_state(p_player uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  j        public.player_jobs;
+  v_match  integer;
+  v_base   bigint;
+  v_max    integer;
+  v_ai     boolean;
+  v_today  date := (public.game_now() at time zone 'Europe/Berlin')::date;
+  v_cool   double precision := public.config_double('jobs', '{raiseRequest,cooldownDays}', 7);
+  v_factor integer;
+  v_bonus  bigint;
+  v_next   timestamptz;
+  v_open   boolean;
+begin
+  select * into j from public.player_jobs where player_id = p_player and status = 'active';
+  if j.id is null then
+    return jsonb_build_object('job', null);
+  end if;
+  select c.is_ai into v_ai from public.companies c where c.id = j.company_id;
+  v_match := public.job_match_score(public.player_branch_scores(p_player), j.required);
+  v_max := greatest(0, public.config_double('jobs', '{raiseRequest,maxRaiseBpsPerScore}', 300)::integer * (v_match - j.raise_base_score));
+  if v_ai then
+    v_base := coalesce((public.career_tier(j.tier::text) ->> 'salaryCentsPerHour')::bigint, j.salary_cents_per_hour);
+    v_max := least(v_max, greatest(0, floor((public.ai_salary_ceiling(v_base, v_match)::numeric / j.salary_cents_per_hour - 1) * 10000)::integer));
+  end if;
+  -- player companies: pay factor of the quarter x share the company could pay at the last payout
+  select pc.pay_factor_bps * j.pay_factor_bps / 10000,
+         coalesce((select sum(sp.bonus_cents) from public.salary_payouts sp join public.game_quarters gq on gq.id = pc.last_closed_quarter_id
+                    where sp.player_job_id = j.id and sp.bonus_cents > 0 and sp.period_end = gq.ends_at), 0)
+    into v_factor, v_bonus
+    from public.player_companies pc where pc.company_id = j.company_id and pc.status = 'active';
+  v_factor := coalesce(v_factor, j.pay_factor_bps);
+  -- automatic work (ADR-064): no new work tasks
+  v_next := null;
+  v_open := false;
+  return jsonb_build_object('job', jsonb_build_object(
+    'id', j.id,
+    'company', public.company_json(j.company_id),
+    'tier', j.tier,
+    'title_key', j.title_key,
+    'title', case when j.title_key is null then j.title end,
+    'required', j.required,
+    'salary_cents_per_hour', j.salary_cents_per_hour,
+    'pay_factor_bps', v_factor,
+    'effective_salary_cents_per_hour', j.salary_cents_per_hour * v_factor / 10000,
+    'last_bonus_cents', coalesce(v_bonus, 0),
+    'next_work_task_at', v_next,
+    'work_task_open', v_open,
+    'productivity_bps', public.job_productivity_bps(v_match),
+    'started_at', j.started_at,
+    'paid_hours_today', case when j.paid_day = v_today then round(j.paid_minutes_today / 60.0, 2) else 0 end,
+    'paid_hours_cap', public.player_paid_hours_cap(p_player),
+    'earned_total_cents', j.earned_total_cents,
+    'raise_available_at', case when j.raise_requested_at is null
+                                    or j.raise_requested_at + make_interval(secs => v_cool * 86400) <= now() then null
+                               else j.raise_requested_at + make_interval(secs => v_cool * 86400) end,
+    'raise_max_bps', v_max,
+    'pending_raise', case when j.pending_raise_bps is not null
+                          then jsonb_build_object('requested_bps', j.pending_raise_bps, 'created_at', j.pending_raise_at) end,
+    'quit_cost_cents', 0,
+    'quit_now_cost_cents', round(j.salary_cents_per_hour * public.config_double('jobs', '{quitNowCostHours}', 12))::bigint,
+    'notice_ends_at', j.notice_ends_at,
+    'signature', j.signature,
+    'rank_hours', round(j.rank_minutes / 60.0, 1),
+    'promotion', public.promotion_state(j.id),
+    -- ADR-103: presence and what it does to the pay
+    'presence', public.presence_json(p_player)));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- J. Org chart of a player company
+-- ---------------------------------------------------------------------------
+-- {company: {id, name, tier}, founder: {nickname, tag, avatar_key, is_me}, members: [{nickname, tag, avatar_key, tier,
+-- title, since, is_me}] (highest rank first), ai_workers, ai_worker_skills}; for the founder, the CEO and employees
+create or replace function public.get_company_org(p_company_id uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  pc       public.player_companies;
+  c        public.companies;
+begin
+  select * into pc from public.player_companies where company_id = p_company_id and status = 'active';
+  if pc.company_id is null then
+    perform public.api_error('company_not_found');
+  end if;
+  select * into c from public.companies where id = p_company_id;
+  if not (v_player = pc.founder_id or v_player is not distinct from c.ceo_id
+          or exists (select 1 from public.player_jobs j
+                      where j.company_id = p_company_id and j.player_id = v_player and j.status = 'active')) then
+    perform public.api_error('forbidden');
+  end if;
+  return jsonb_build_object(
+    'company', jsonb_build_object('id', c.id, 'name', c.name, 'tier', pc.tier),
+    'founder', (select jsonb_build_object('nickname', p.nickname, 'tag', p.tag, 'avatar_key', p.avatar_key,
+                                          'is_me', p.id = v_player)
+                  from public.profiles p where p.id = pc.founder_id),
+    'members', coalesce((
+      select jsonb_agg(jsonb_build_object('nickname', p.nickname, 'tag', p.tag, 'avatar_key', p.avatar_key, 'tier', j.tier,
+                                          'title', coalesce(j.title, j.title_key), 'since', j.started_at,
+                                          'is_me', j.player_id = v_player)
+                       order by case j.tier::text when 'c_level' then 5 when 'team_lead' then 4 when 'senior' then 3
+                                                  when 'junior' then 2 else 1 end desc, j.started_at, p.nickname)
+        from public.player_jobs j join public.profiles p on p.id = j.player_id
+       where j.company_id = p_company_id and j.status = 'active'), '[]'::jsonb),
+    'ai_workers', pc.ai_workers,
+    'ai_worker_skills', to_jsonb(coalesce(pc.ai_worker_skills, '{}'::text[])));
+end;
+$$;
+comment on function public.get_company_org(uuid) is
+  'RPC: org chart of a player company {company, founder, members (tier, title, since), ai_workers, ai_worker_skills} '
+  'for the founder, the CEO and employees; errors company_not_found, forbidden.';
+
+-- ---------------------------------------------------------------------------
+-- K. Grants
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.api_error(text)', 'public.upgrade_cfg(text)', 'public.upgrade_stage_level(text, integer)',
+    'public.player_upgrade_levels(uuid)', 'public.player_work_xp_bps(uuid)', 'public.player_art_discount_bps(uuid)',
+    'public.player_fixed_cost_discount_bps(uuid)', 'public.player_property_discount_bps(uuid)',
+    'public.accrue_job_salary(uuid, timestamptz)', 'public.player_artwork_create_cost_cents(uuid, integer)',
+    'public.artwork_title_taken(text)', 'public.name_violation(text, text, uuid)',
+    'public.player_company_close_hour(uuid, timestamptz)', 'public.deal_supply_max_cost_cents(bigint, integer, integer)',
+    'public.deal_size_limit_cents(uuid)', 'public.deal_exceeds_size(text, jsonb, uuid)', 'public.presence_cfg()',
+    'public.presence_pay_bps(double precision, jsonb)', 'public.presence_away_hours(uuid, timestamptz)',
+    'public.presence_pay_bps_between(uuid, timestamptz, integer)', 'public.presence_json(uuid)',
+    'public.job_absence_check(uuid, timestamptz)', 'public.presence_touch(uuid)', 'public.require_player()',
+    'public.player_paid_hours_cap(uuid)', 'public.accrue_salaries(timestamptz)', 'public.job_state(uuid)'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+    execute format('grant execute on function %s to service_role', f);
+  end loop;
+  foreach f in array array[
+    'public.get_upgrades()', 'public.buy_upgrade(uuid, text)', 'public.check_artwork_title(text)', 'public.get_art_studio()',
+    'public.create_artwork(uuid, text, jsonb)', 'public.check_company_name(text)',
+    'public.found_company(uuid, text, text, text, text, text, text, boolean)', 'public.buy_home(uuid, text)',
+    'public.buy_furniture(uuid, text, integer)', 'public.buy_floor(uuid, text)', 'public.buy_car(uuid, text)',
+    'public.save_layout(uuid, text, text, jsonb)', 'public.propose_deal(uuid, text, text, text, jsonb, text)',
+    'public.respond_deal(uuid, uuid, boolean)', 'public.get_deals()', 'public.get_company_org(uuid)'
+  ] loop
+    execute format('revoke all on function %s from public, anon', f);
+    execute format('grant execute on function %s to authenticated, service_role', f);
+  end loop;
+end;
+$$;
+
 -- ===== supabase/seed.sql =====
 -- =============================================================================
 -- NEXA · seed.sql · reference data
@@ -333,25 +2714,25 @@ insert into public.unlocks (key, level, title, description, icon_key, intro_miss
   ('jobs_intern',           2,  'Erster Job',              'Bewirb dich als Praktikant und verdiene ein Gehalt.',                           'unlock_job',       'intro_first_job',      20),
   ('limit_orders',          3,  'Limit-Order',             'Lege den Preis fest, zu dem du kaufen oder verkaufen willst.',                  'unlock_limit',     'intro_first_limit',    30),
   ('watchlist',             3,  'Watchlist',               'Behalte deine Lieblingsaktien im Blick.',                                       'unlock_watchlist', null,                   31),
-  ('property',              4,  'Grundstück',              'Kauf dir eine eigene Bleibe, richte sie ein und stell Autos in die Garage.',    'unlock_home',      null,                   40),
+  ('artworks',              4,  'Artworks',                'Male eigene Pixel-Kunst, sammle Unikate und biete in Auktionen mit.',          'unlock_art',       null,                   40),
   ('stop_loss',             5,  'Stop-Loss',               'Begrenze Verluste automatisch.',                                                'unlock_stop',      'intro_first_stop',     50),
   ('bonds',                 5,  'Staatsanleihen',          'Sichere Zinsen mit Laufzeiten von 1 bis 10 Spieljahren.',                       'unlock_bond',      'intro_first_bond',     51),
   ('jobs_junior',           5,  'Junior-Jobs',             'Besser bezahlte Jobs mit anspruchsvolleren Aufgaben.',                          'unlock_job',       null,                   52),
   ('analyst_reports',       7,  'Analystenberichte',       'Kursziele der Analysten. Manchmal liegen sie daneben.',                         'unlock_analyst',   null,                   70),
   ('short_selling',         8,  'Leerverkäufe',            'Verdiene an fallenden Kursen.',                                                 'unlock_short',     'intro_first_short',    80),
-  ('artworks',              8,  'Artworks',                'Male eigene Pixel-Kunst, sammle Unikate und biete in Auktionen mit.',          'unlock_art',       null,                   81),
+  ('property',              8,  'Grundstück',              'Kauf dir eine eigene Bleibe, richte sie ein und stell Autos in die Garage.',    'unlock_home',      null,                   81),
+  ('ipo',                   9,  'Börsengang',              'Bring dein Unternehmen an die Börse.',                                          'unlock_ipo',       null,                   90),
   ('found_small_business', 10,  'Kleinunternehmen gründen','Gründe deine eigene Firma und führe sie durch die Quartale.',                   'unlock_company',   'intro_found_company', 100),
   ('leverage_2x',          12,  'Hebel 2×',                'Handle mit doppeltem Einsatz. Gewinne und Verluste verdoppeln sich.',           'unlock_leverage',  'intro_first_leverage',120),
   ('jobs_senior',          12,  'Senior-Jobs',             'Senior-Positionen mit deutlich höherem Gehalt.',                                'unlock_job',       null,                  121),
   ('personal_loan',        15,  'Kleinkredit',             'Leihe dir bis zu 50.000 €.',                                                    'unlock_loan',      null,                  150),
   ('business_angel',       15,  'Business Angel',          'Investiere vorbörslich in die Firmen anderer Spieler.',                         'unlock_angel',     null,                  151),
+  ('found_gmbh',           15,  'GmbH gründen',            'Gründe eine GmbH oder wandle dein Kleinunternehmen um.',                        'unlock_company',   null,                  152),
   ('leverage_5x',          18,  'Hebel 5×',                'Fünffacher Hebel für erfahrene Trader.',                                        'unlock_leverage',  null,                  180),
   ('expand_small_business',18,  'Firmenerweiterung',       'Erweitere dein Kleinunternehmen auf bis zu 20 Mitarbeiter.',                    'unlock_company',   null,                  181),
-  ('found_gmbh',           20,  'GmbH gründen',            'Gründe eine GmbH oder wandle dein Kleinunternehmen um.',                        'unlock_company',   null,                  200),
   ('company_loans',        20,  'Firmenkredite',           'Kredite bis 250.000 € für dein Unternehmen.',                                   'unlock_loan',      null,                  201),
   ('jobs_team_lead',       20,  'Teamleitung',             'Führungsjobs mit Verantwortung.',                                               'unlock_job',       null,                  202),
   ('found_ag',             25,  'Aktiengesellschaft',      'Wandle deine Firma in eine AG um und bereite den Börsengang vor.',              'unlock_company',   null,                  250),
-  ('ipo',                  25,  'Börsengang',              'Bring dein Unternehmen an die Börse.',                                          'unlock_ipo',       null,                  251),
   ('jobs_c_level',         25,  'C-Level-Jobs',            'Werde CFO oder COO und triff echte Entscheidungen.',                            'unlock_job',       null,                  252),
   ('leverage_10x',         30,  'Hebel 10×',               'Maximaler Hebel. Maximales Risiko.',                                            'unlock_leverage',  null,                  300),
   ('options',              30,  'Optionen',                'Handle Calls und Puts.',                                                        'unlock_options',   null,                  301),

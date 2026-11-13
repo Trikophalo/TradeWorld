@@ -12,9 +12,9 @@ set client_min_messages = notice;
 select tests.signup(:a, 'Hanna_Stunde') is not null and tests.signup(:b, 'Bert_Lohn') is not null
    and tests.signup(:c, 'Carla_Rang') is not null and tests.signup(:d, 'Dora_Takt') is not null as ok \gset
 update public.sim_runtime set is_paused = false;
-select tests.set_level(:a, 4);
+select tests.set_level(:a, 6);
 select tests.set_level(:b, 3);
-select tests.set_level(:c, 4);
+select tests.set_level(:c, 6);
 select tests.set_level(:d, 6);
 select tests.fund(:a, 3000000, 'test:m3i:a');
 select tests.fund(:c, 1000000, 'test:m3i:c');

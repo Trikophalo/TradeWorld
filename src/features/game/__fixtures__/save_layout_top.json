@@ -1,0 +1,26 @@
+{
+  "property": {
+    "tier": "house",
+    "floor": "parquet",
+    "owner": "Fixture_Heim",
+    "width": 13,
+    "garage": [{ "id": "3d639c69-5ae1-4359-acfe-05a8ef331be0", "slot": 0, "car_key": "car_electric" }],
+    "height": 9,
+    "placed": [
+      { "x": 2, "y": 2, "id": "42e78220-32d5-484c-8d00-f0118b45142c", "rot": 0, "item_key": "table_oak" },
+      { "x": 3, "y": 3, "id": "0dfb229a-b1a9-42dd-805e-36daea16401f", "rot": 0, "item_key": "laptop" }
+    ],
+    "wall_color": "#2f5fd0",
+    "value_cents": 27955200,
+    "floors_owned": ["laminate", "parquet"],
+    "garage_slots": 2
+  },
+  "inventory": {
+    "cars": [],
+    "furniture": [
+      { "id": "b9b338e6-2708-4935-b41a-3550e449372b", "item_key": "sofa_leather" },
+      { "id": "78d5b03b-fa84-4343-9093-15743ec84e4f", "item_key": "rug_wool" },
+      { "id": "8bb8352c-fa3a-4146-9699-e0696441c291", "item_key": "plant_small" }
+    ]
+  }
+}
