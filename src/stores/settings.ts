@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { SETTINGS_STORAGE_KEY } from "@/config/app";
+import { DEFAULT_CURRENCY, SETTINGS_STORAGE_KEY, type CurrencyKey } from "@/config/app";
 
 export const THEMES = ["dark", "light"] as const;
 export const ACCENTS = ["violet", "blue", "pink", "orange", "cyan"] as const;
@@ -21,6 +21,8 @@ export interface SettingsState {
   sound: boolean;
   haptics: boolean;
   chartStyle: ChartStyle;
+  /** Sign shown behind amounts (ADR-113); display only. */
+  currency: CurrencyKey;
   set: <K extends keyof SettingsValues>(key: K, value: SettingsValues[K]) => void;
 }
 
@@ -33,6 +35,7 @@ export const DEFAULT_SETTINGS: SettingsValues = {
   sound: true,
   haptics: true,
   chartStyle: "area",
+  currency: DEFAULT_CURRENCY,
 };
 
 /**

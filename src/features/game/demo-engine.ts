@@ -1538,7 +1538,7 @@ export const demoEngine: GameEngine = {
       news.unshift({
         publishedAt: new Date().toISOString(),
         headline: `${p().nickname} jagt Platz ${me.next.rank}`,
-        body: `Bis ${me.next.name} fehlen noch ${Math.round(me.next.gapCents / 100).toLocaleString("de-DE")} NX.`,
+        body: `Bis ${me.next.name} fehlen noch ${Math.round(me.next.gapCents / 100).toLocaleString("de-DE")} €.`,
         kind: "chase",
       });
     }

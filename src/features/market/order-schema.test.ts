@@ -46,6 +46,8 @@ describe("parsing", () => {
   it("parses German euro amounts", () => {
     expect(parseEuroCents("1.234,56")).toBe(123_456);
     expect(parseEuroCents("50")).toBe(5_000);
+    expect(parseEuroCents("12,5 €")).toBe(1_250);
+    expect(parseEuroCents("12,5 $")).toBe(1_250);
     expect(parseEuroCents("12,5 NX")).toBe(1_250);
     expect(parseEuroCents("abc")).toBeNull();
     expect(parseEuroCents("1,234")).toBeNull();

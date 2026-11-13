@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 /*
  * Artworks in demo mode (ADR-080): marketplace with the gallery, likes, bids, painting your own artwork and
- * putting it up for auction. Level 8 player with 100.000 NX.
+ * putting it up for auction. Level 8 player with 100.000 €.
  */
 async function preparePlayer(page: Page, xpTotal = 16_000) {
   await page.addInitScript((xp) => {
@@ -96,7 +96,7 @@ test("marketplace: gallery works, like, bid on an auction", async ({ page }) => 
 test("paint an artwork, see it in the collection and put it up for auction", async ({ page }) => {
   await preparePlayer(page);
   await page.goto("/artworks");
-  await expect(page.getByTestId("art-studio")).toContainText("15.000 NX");
+  await expect(page.getByTestId("art-studio")).toContainText("15.000 €");
   await page.getByTestId("art-studio").getByRole("button", { name: "Kunstwerk malen" }).click();
   const editor = page.getByRole("dialog", { name: "Kunstwerk malen" });
   await expect(editor).toBeVisible();
@@ -111,10 +111,10 @@ test("paint an artwork, see it in the collection and put it up for auction", asy
     await page.mouse.up();
   }
   await editor.getByLabel("Titel des Kunstwerks").fill("Morgenrot");
-  await hold(page, /Gedrückt halten: für 15\.000 NX malen/);
+  await hold(page, /Gedrückt halten: für 15\.000 € malen/);
   await expect(page.getByText("Dein Kunstwerk ist fertig!")).toBeVisible();
   // The next one costs double.
-  await expect(page.getByTestId("art-studio")).toContainText("30.000 NX");
+  await expect(page.getByTestId("art-studio")).toContainText("30.000 €");
 
   await page.getByRole("radio", { name: "Meine Sammlung" }).click();
   const mine = page.getByTestId("collection").getByTestId("artwork-card");
@@ -123,7 +123,7 @@ test("paint an artwork, see it in the collection and put it up for auction", asy
   await expect(mine).toContainText("von Sammlerin");
   await mine.click();
   const sell = page.getByTestId("sell-box");
-  await sell.getByLabel("Startpreis in Nex").fill("2000");
+  await sell.getByLabel("Startpreis in €").fill("2000");
   await sell.getByRole("button", { name: "Auktion starten" }).click();
   await expect(page.getByText("Auktion gestartet")).toBeVisible();
   await expect(page.getByText("Das ist deine Auktion.")).toBeVisible();

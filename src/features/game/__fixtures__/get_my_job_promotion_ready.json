@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "bb3dd1ac-735c-42ad-989a-505e87d2c8db",
+    "id": "28dbca75-e1cc-401d-84d2-00e61497b347",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "db7c839c-c460-945e-1188-5e4a61db1e47",
+      "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
       "logo": null,
-      "name": "Rheinkraft Werke",
-      "color": "#5BC0EB",
+      "name": "QuantenSprung Labs",
+      "color": "#35D0BA",
       "is_ai": true,
-      "sector": "energy",
-      "ticker": "RKW"
+      "sector": "tech",
+      "ticker": "QSL"
     },
     "presence": {
-      "fire_at": "2026-11-18T18:58:22.91985+00:00",
+      "fire_at": "2026-11-18T19:13:39.418442+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-13T18:58:22.91985+00:00"
+      "last_active_at": "2026-11-13T19:13:39.418442+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-13T18:58:23.071532+00:00",
+    "started_at": "2026-11-13T19:13:39.505447+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

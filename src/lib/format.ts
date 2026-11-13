@@ -3,11 +3,58 @@
  * scaled by 10_000 (see docs/DECISIONS.md, ADR-003). Conversion to a
  * floating-point number happens only here, at the very edge, for display.
  */
-import { CURRENCY } from "@/config/app";
+import { CURRENCIES, DEFAULT_CURRENCY, type CurrencyKey } from "@/config/app";
 
 const LOCALE = "de-DE";
-/** Intl lays the amount out like a currency; the euro sign is then swapped for the game's own code (ADR-110). */
-const own = (text: string) => text.replace("€", CURRENCY.code);
+const EURO = CURRENCIES.eur.sign;
+
+/**
+ * The sign shown behind amounts (ADR-113). A display setting of the player, set once after the settings are loaded;
+ * on the server it stays the default.
+ */
+let moneySign: string = CURRENCIES[DEFAULT_CURRENCY].sign;
+
+export function setDisplayCurrency(key: CurrencyKey): void {
+  moneySign = CURRENCIES[key].sign;
+}
+
+export function currencySign(): string {
+  return moneySign;
+}
+
+/** Intl lays the amount out as euros; the sign is then swapped for the chosen one. */
+const own = (text: string) => (moneySign === EURO ? text : text.replace(EURO, moneySign));
+
+/** Texts from messages and from the server name amounts in euros: show them in the chosen currency. */
+export function localizeMoneyText(text: string): string {
+  return moneySign === EURO || !text.includes(EURO) ? text : text.replaceAll(EURO, moneySign);
+}
+
+/**
+ * The same for whole answers (objects, arrays): every text inside. Untouched parts keep their identity, nothing is
+ * changed in place.
+ */
+export function localizeMoneyDeep<T>(value: T): T {
+  if (moneySign === EURO) return value;
+  if (typeof value === "string") return localizeMoneyText(value) as T;
+  if (Array.isArray(value)) {
+    let copy: unknown[] | null = null;
+    for (let i = 0; i < value.length; i++) {
+      const next = localizeMoneyDeep(value[i] as unknown);
+      if (next !== value[i]) (copy ??= [...(value as unknown[])])[i] = next;
+    }
+    return (copy ?? value) as T;
+  }
+  if (value !== null && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype) {
+    let copy: Record<string, unknown> | null = null;
+    for (const [key, item] of Object.entries(value)) {
+      const next = localizeMoneyDeep(item);
+      if (next !== item) (copy ??= { ...(value as Record<string, unknown>) })[key] = next;
+    }
+    return (copy ?? value) as T;
+  }
+  return value;
+}
 
 export const PRICE_SCALE = 10_000;
 
@@ -75,9 +122,9 @@ export function formatMoneyShort(cents: Numeric): string {
   const sign = euros < 0 ? "−" : "";
   if (abs < 10_000) return own(eurWhole.format(euros));
   for (const { at, div, unit } of shortUnits) {
-    if (abs >= at) return `${sign}${oneDecimal.format(Math.floor((abs / div) * 10) / 10)} ${unit} ${CURRENCY.code}`;
+    if (abs >= at) return `${sign}${oneDecimal.format(Math.floor((abs / div) * 10) / 10)} ${unit} ${moneySign}`;
   }
-  return `${sign}${integer.format(Math.floor(abs / 1_000))}k ${CURRENCY.code}`;
+  return `${sign}${integer.format(Math.floor(abs / 1_000))}k ${moneySign}`;
 }
 
 /** Prices below 1 € show up to four decimals so penny stocks stay readable. */

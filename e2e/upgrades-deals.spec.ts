@@ -69,10 +69,10 @@ test("upgrades: buy a bigger vault, the vault card links to the shop", async ({ 
   await expect(vault.getByTestId("upgrade-level")).toHaveText("Stufe 0 von 6");
   await expect(vault.getByTestId("upgrade-effect")).toContainText("8 h Platz");
   await expect(vault.getByTestId("upgrade-effect")).toContainText("10 h Platz");
-  await hold(page, vault.getByRole("button", { name: /3\.000 NX/ }));
+  await hold(page, vault.getByRole("button", { name: /3\.000 €/ }));
   await expect(page.getByText("Verbessert!").first()).toBeVisible();
   await expect(vault.getByTestId("upgrade-level")).toHaveText("Stufe 1 von 6");
-  await expect(vault.getByRole("button", { name: /6\.000 NX/ })).toBeVisible();
+  await expect(vault.getByRole("button", { name: /6\.000 €/ })).toBeVisible();
   await expect(page.getByTestId("upgrades-cash")).toHaveText(/17\.000,00/);
 
   // Overtime needs level 5: the player is level 6, rhetoric too; nothing is locked here.
@@ -190,7 +190,7 @@ test("deals: accept a loan from the board, repay it on time, trust grows", async
   await expect(page.getByTestId("my-trust")).toContainText("Unbeschrieben");
 
   const loan = page.getByTestId("deal").filter({ hasText: "Lina_Kontor" }).filter({ hasText: "Kredit" });
-  await expect(loan.getByTestId("deal-you-get")).toContainText("Du bekommst 20.000 NX und zahlst 21.200 NX zurück.");
+  await expect(loan.getByTestId("deal-you-get")).toContainText("Du bekommst 20.000 € und zahlst 21.200 € zurück.");
   await expect(loan.getByTestId("trust-badge")).toHaveAttribute("data-band", "rock");
   await hold(page, loan.getByRole("button", { name: /Annehmen/ }));
   await expect(page.getByText("Deal steht!").first()).toBeVisible();
@@ -219,9 +219,9 @@ test("deals: propose a loan to a partner by name; the shaky partner shows a low 
   await page.goto("/deals?tab=new");
   const form = page.getByTestId("deal-form");
   await form.getByLabel("Mit wem? (Name oder #Tag)").fill("Werkbank_Ole");
-  await form.getByLabel("Betrag in NX").fill("5000");
+  await form.getByLabel("Betrag in €").fill("5000");
   await form.getByLabel("Zinsen für die ganze Laufzeit in %").fill("5");
-  await expect(form.getByTestId("deal-preview")).toContainText("Du verleihst 5.000 NX und bekommst 5.250 NX zurück.");
+  await expect(form.getByTestId("deal-preview")).toContainText("Du verleihst 5.000 € und bekommst 5.250 € zurück.");
   await hold(page, form.getByRole("button", { name: /Senden/ }));
   await expect(page.getByText("Deal steht!").first()).toBeVisible();
   await expect(page).toHaveURL(/tab=mine/);

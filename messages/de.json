@@ -210,7 +210,7 @@
     "sortMovers": "Bewegung",
     "bondsLockedTitle": "Staatsanleihen",
     "bondsLockedText": "Sichere Zinsen vom Staat, mit Laufzeiten von 1 bis 10 Spieljahren. Ideal, um Geld zu parken, wenn dir die Börse zu wild wird.",
-    "bondsIntro": "Staatsanleihen zahlen jedes Quartal Zinsen und am Ende der Laufzeit den Nennwert von 100 NX pro Stück zurück. Sicher, aber mit weniger Rendite als gute Aktien.",
+    "bondsIntro": "Staatsanleihen zahlen jedes Quartal Zinsen und am Ende der Laufzeit den Nennwert von 100 € pro Stück zurück. Sicher, aber mit weniger Rendite als gute Aktien.",
     "bondsHeld": "{count} im Depot",
     "bondsYield": "{yield} p. a.",
     "indexMembers": "Im Index ({count})",
@@ -254,9 +254,9 @@
     "inputMode": "Eingabe",
     "modeShares": "Stück",
     "modeAmount": "Betrag",
-    "amountBuy": "Betrag in Nex",
-    "amountSell": "Erlös in Nex",
-    "amountError": "Gib einen Betrag in Nex ein, zum Beispiel 250 oder 99,50.",
+    "amountBuy": "Betrag in €",
+    "amountSell": "Erlös in €",
+    "amountError": "Gib einen Betrag in € ein, zum Beispiel 250 oder 99,50.",
     "max": "Max",
     "all": "Alle",
     "limitPrice": "Limit-Preis",
@@ -283,7 +283,7 @@
     "sharesResult": "Das sind etwa {value}.",
     "pickHint": "Wähle mit dem Regler oder tippe einen Betrag ein.",
     "slider": "Menge wählen",
-    "tooSmall": "Eine Order muss mindestens 1 NX wert sein.",
+    "tooSmall": "Eine Order muss mindestens 1 € wert sein.",
     "holdLimit": "Halten: Limit setzen"
   },
   "company": {
@@ -331,6 +331,11 @@
     "motionSystem": "System",
     "motionFull": "An",
     "motionReduced": "Reduziert",
+    "currency": "Währung",
+    "currencyHint": "Nur das Zeichen hinter den Beträgen. Die Beträge selbst bleiben gleich.",
+    "currencyEur": "Euro",
+    "currencyUsd": "Dollar",
+    "currencyNx": "Nex",
     "sound": "Sounds",
     "soundHint": "Kurze 8-Bit-Töne bei Aktionen",
     "haptics": "Vibration",
@@ -368,12 +373,12 @@
     "found_small_business": "Kleinunternehmen gründen",
     "leverage_2x": "Hebel 2×",
     "senior_jobs": "Senior-Jobs",
-    "small_loan": "Kleinkredit bis 50.000 NX",
+    "small_loan": "Kleinkredit bis 50.000 €",
     "business_angel": "Business Angel werden",
     "leverage_5x": "Hebel 5×",
     "expand_small_business": "Firma auf 20 Mitarbeiter erweitern",
     "found_gmbh": "GmbH gründen",
-    "loans_250k": "Kredite bis 250.000 NX",
+    "loans_250k": "Kredite bis 250.000 €",
     "team_lead_jobs": "Teamleitung",
     "ipo": "Börsengang der eigenen Firma",
     "c_level_jobs": "C-Level-Jobs",
@@ -456,7 +461,7 @@
       "title": "Ordergebühr",
       "summary": "{fee} pro ausgeführter Order",
       "text": "Jede ausgeführte Order kostet fest {fee}, egal wie groß sie ist. Dazu kommt der Spread: Du kaufst etwas über und verkaufst etwas unter dem angezeigten Kurs.",
-      "example": "Du kaufst 10 Aktien zu je 50 NX. Du zahlst {value} für die Aktien und {fee} Gebühr, zusammen {total}.",
+      "example": "Du kaufst 10 Aktien zu je 50 €. Du zahlst {value} für die Aktien und {fee} Gebühr, zusammen {total}.",
       "where": "In der Order-Maske vor dem Absenden und in der Handelshistorie."
     },
     "taxGains": {
@@ -544,7 +549,7 @@
       "title": "Insolvenz und Schonfrist",
       "summary": "{quarters} Quartale Zeit, die Kasse zu retten",
       "text": "Ist die Kasse deiner Firma am Quartalsende im Minus, beginnt eine Schonfrist von {quarters} Quartalen, also {hours} Stunden. Bringst du die Kasse in dieser Zeit ins Plus (Kosten senken, Geld einschießen, Kredit), ist alles gut. Sonst ist die Firma insolvent und du darfst {lockout} Tage keine neue gründen. Über Nacht verlierst du also keine gesunde Firma.",
-      "example": "Solange die Kasse im Minus ist, zahlst du Überziehungszinsen von {rate} im Spieljahr: {perQuarter} je Quartal auf 1.000 NX Minus.",
+      "example": "Solange die Kasse im Minus ist, zahlst du Überziehungszinsen von {rate} im Spieljahr: {perQuarter} je Quartal auf 1.000 € Minus.",
       "where": "Roter Balken im Firmen-Dashboard mit Countdown. Du bekommst eine Benachrichtigung beim ersten Minus und vor dem letzten Abschluss."
     }
   },
@@ -586,7 +591,7 @@
         "intro": "Neu freigeschaltet: Staatsanleihen! Sie zahlen sichere Zinsen vom Staat, jedes Quartal. Ideal, wenn dir die Börse zu wild wird.",
         "goMarkets": "Tippe auf „Märkte“.",
         "bondsTab": "Tippe oben auf „Anleihen“.",
-        "bondList": "Je länger die Laufzeit, desto mehr Zinsen. Am Ende bekommst du 100 NX pro Anleihe zurück. Kaufen geht wie bei Aktien."
+        "bondList": "Je länger die Laufzeit, desto mehr Zinsen. Am Ende bekommst du 100 € pro Anleihe zurück. Kaufen geht wie bei Aktien."
       },
       "first_job": {
         "intro": "Neu: Jobs! Du verdienst Gehalt neben der Börse, auch offline.",
@@ -596,7 +601,7 @@
         "skills": "Skills machen dich besser und bringen mehr Gehalt. Punkte bekommst du durch Level-ups und Arbeit. Viel Erfolg!"
       },
       "found_garage": {
-        "intro": "Neu: deine eigene Firma! Ein Garagen-Startup kostet 2.500 NX. Mit Glück und guter Führung wird es groß.",
+        "intro": "Neu: deine eigene Firma! Ein Garagen-Startup kostet 2.500 €. Mit Glück und guter Führung wird es groß.",
         "where": "Du findest es im Tab „Firma“. Deinen Job darfst du behalten."
       },
       "visit_skill_map": {
@@ -615,7 +620,7 @@
       },
       "visit_artworks": {
         "market": "Der Marktplatz zeigt oben die beliebtesten Werke. Gefällt dir eins, gib ihm ein Herz – das macht es berühmter.",
-        "studio": "Im Atelier malst du eigene Kunstwerke. Das erste kostet 15.000 NX, jedes weitere doppelt so viel."
+        "studio": "Im Atelier malst du eigene Kunstwerke. Das erste kostet 15.000 €, jedes weitere doppelt so viel."
       },
       "property": {
         "intro": "Neu: dein eigenes Zuhause! Kauf eine Wohnung, richte sie Stück für Stück ein und zieh später in eine Villa.",
@@ -644,7 +649,7 @@
     "invalid_argument": "Die Eingabe ist ungültig. Lade die Seite neu und versuch es noch einmal.",
     "invalid_interval": "Diesen Zeitraum gibt es nicht.",
     "forbidden": "Dafür fehlen dir die Rechte.",
-    "order_too_small": "Eine Order muss mindestens 1 NX wert sein.",
+    "order_too_small": "Eine Order muss mindestens 1 € wert sein.",
     "market_illiquid": "Gerade findet sich kein Handelspartner. Versuch es gleich noch einmal.",
     "name_too_short": "Der Name ist zu kurz (mindestens 3 Zeichen).",
     "name_too_long": "Der Name ist zu lang (höchstens 20 Zeichen).",
@@ -899,7 +904,7 @@
       },
       "finance_accounting": {
         "name": "Buchhaltung",
-        "desc": "Jeder Nex an seinem Platz."
+        "desc": "Jeder Cent an seinem Platz."
       },
       "finance_investment": {
         "name": "Investment",
@@ -1923,7 +1928,7 @@
     "money": "Geld",
     "deposit": "Einzahlen",
     "withdraw": "Entnehmen",
-    "amount": "Betrag in Nex",
+    "amount": "Betrag in €",
     "depositDone": "Eingezahlt",
     "withdrawDone": "Entnommen",
     "upgradeTitle": "Zum Kleinunternehmen wachsen",
@@ -2471,7 +2476,7 @@
     "revenue": "Umsatz",
     "profit": "Gewinn",
     "valueBadge": "Firmenwert {value}",
-    "amount": "Betrag in Nex",
+    "amount": "Betrag in €",
     "youGet": "Du bekommst etwa {shares} Aktien.",
     "risk": "Neue Firmen sind riskant. Nach der Zeichnung bestimmen Angebot, Nachfrage und der Erfolg der Firma den Kurs.",
     "subscribedDone": "Gezeichnet",
@@ -2589,7 +2594,7 @@
     "owner": "Besitzer",
     "code": "Nummer",
     "bidTitle": "Mitbieten",
-    "bidLabel": "Dein Gebot in Nex",
+    "bidLabel": "Dein Gebot in €",
     "bidMin": "Mindestens {amount}",
     "bidButton": "{amount} bieten",
     "bidDone": "Gebot abgegeben",
@@ -2598,7 +2603,7 @@
     "auctionSell": "Versteigern",
     "auctionStart": "Auktion starten",
     "auctionStarted": "Auktion gestartet",
-    "auctionStartPrice": "Startpreis in Nex",
+    "auctionStartPrice": "Startpreis in €",
     "auctionDuration": "Dauer",
     "hours": "{count, plural, one {# Stunde} other {# Stunden}}",
     "auctionFee": "Nach dem Verkauf bekommst du den Preis minus 10 % Gebühr.",
@@ -3703,10 +3708,10 @@
       "role": "Deine Seite",
       "counterparty": "Mit wem? (Name oder #Tag)",
       "counterpartyHint": "Leer lassen: Das Angebot steht offen auf der Börse.",
-      "amount": "Betrag in NX",
+      "amount": "Betrag in €",
       "interest": "Zinsen für die ganze Laufzeit in %",
       "days": "Laufzeit",
-      "volume": "Menge pro Stunde in NX",
+      "volume": "Menge pro Stunde in €",
       "volumeHint": "Ware zum Normalpreis, die höchstens pro Stunde geliefert wird.",
       "fee": "Gebühr in % vom Preis",
       "prepay": "Anzahlung in % (optional)",
@@ -3716,7 +3721,7 @@
       "summary": "So sieht der Deal aus",
       "margins": "Pro Stück: Käufer {buyer} · Lieferant {supplier}",
       "marginsHint": "Beide verdienen, wenn die Gebühr über den Herstellkosten des Lieferanten und unter dem Preis des Käufers liegt.",
-      "limits": "Grenzen: bis {max} Kredit (20.000 NX je Level), Zinsen bis 30 %, 1 bis 30 Tage.",
+      "limits": "Grenzen: bis {max} Kredit (20.000 € je Level), Zinsen bis 30 %, 1 bis 30 Tage.",
       "needsCompany": "Für diese Seite brauchst du eine eigene Firma.",
       "myMargin": "Deine Marge pro Stück: {margin} vom Preis",
       "myMarginLoss": "Achtung: Mit dieser Gebühr verlierst du {margin} pro Stück.",
@@ -3724,7 +3729,7 @@
       "invalid": "Die Bedingungen liegen außerhalb der Grenzen."
     },
     "repayTitle": "Kredit zurückzahlen",
-    "repayAmount": "Betrag in NX",
+    "repayAmount": "Betrag in €",
     "board": {
       "title": "Deal-Börse",
       "hint": "Offene Angebote anderer Spieler. Schau auf das Vertrauen, bevor du annimmst."
@@ -3906,7 +3911,7 @@
       "loan": {
         "name": "Kredit",
         "what": "Einer leiht dem anderen Geld und bekommt es mit Zinsen zurück.",
-        "example": "Mia leiht Tom 10.000 NX für 7 Tage zu 5 %. Tom zahlt 10.500 NX zurück.",
+        "example": "Mia leiht Tom 10.000 € für 7 Tage zu 5 %. Tom zahlt 10.500 € zurück.",
         "when": "Lohnt sich, wenn du Geld für eine Chance brauchst oder Zinsen verdienen willst."
       },
       "supply": {
@@ -3918,7 +3923,7 @@
       "stake": {
         "name": "Teilhaber",
         "what": "Ein Spieler gibt einer Firma Geld und bekommt dafür einen Anteil an jedem Stundengewinn.",
-        "example": "Mia gibt Toms Firma 20.000 NX für 15 % vom Gewinn, 7 Tage lang.",
+        "example": "Mia gibt Toms Firma 20.000 € für 15 % vom Gewinn, 7 Tage lang.",
         "when": "Lohnt sich für Gründer, die Geld für den Ausbau brauchen, und für Anleger mit Vertrauen in die Firma."
       }
     },
@@ -3928,7 +3933,7 @@
       "Der Server bucht Gebühren, Gewinnanteile und Fälligkeiten automatisch.",
       "Wer sein Wort hält, gewinnt Vertrauen. Wer bricht, verliert es."
     ],
-    "loanLimit": "Kredite: bis {amount} (20.000 NX je Level, du bist Level {level}).",
+    "loanLimit": "Kredite: bis {amount} (20.000 € je Level, du bist Level {level}).",
     "companyLimit": "Deine Firma ist {value} wert: Lieferverträge und Teilhaber bis {amount}. Wächst die Firma, werden größere Deals möglich.",
     "noCompany": "Lieferverträge und Teilhaber brauchen eine eigene Firma. Kredite gehen auch ohne."
   },
@@ -4204,7 +4209,7 @@
     "trade": {
       "buyTitle": "{ticker} kaufen",
       "sellTitle": "{ticker} verkaufen",
-      "amount": "Betrag in Nex",
+      "amount": "Betrag in €",
       "quantity": "Anzahl Coins",
       "available": "Verfügbar: {amount}",
       "holding": "Im Depot: {amount}",

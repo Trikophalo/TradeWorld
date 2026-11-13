@@ -1,27 +1,27 @@
 {
-  "id": "754a9958-79f0-4dee-96c0-aa9e9d0c1533",
+  "id": "5926b455-e915-4e18-ab3c-8e8c05b8dc5c",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "0721dd7d-ecfe-4d5c-ae1a-381e48389b86",
+    "id": "2a5e9158-b0dd-46bd-bec6-fa29f5e14a24",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "db7c839c-c460-945e-1188-5e4a61db1e47",
+      "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
       "logo": null,
-      "name": "Rheinkraft Werke",
-      "color": "#5BC0EB",
+      "name": "QuantenSprung Labs",
+      "color": "#35D0BA",
       "is_ai": true,
-      "sector": "energy",
-      "ticker": "RKW"
+      "sector": "tech",
+      "ticker": "QSL"
     },
-    "required": [{ "branch": "craft", "min_score": 0 }],
-    "title_key": "craft_intern",
+    "required": [{ "branch": "it", "min_score": 0 }],
+    "title_key": "it_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-13T18:58:19.446152+00:00",
-  "updated_at": "2026-11-13T18:58:19.452218+00:00",
-  "offer_expires_at": "2026-11-15T18:58:19.446152+00:00",
-  "salary_wish_cents_per_hour": 15000,
-  "offer_salary_cents_per_hour": 15000
+  "created_at": "2026-11-13T19:13:36.949192+00:00",
+  "updated_at": "2026-11-13T19:13:36.953341+00:00",
+  "offer_expires_at": "2026-11-15T19:13:36.949192+00:00",
+  "salary_wish_cents_per_hour": 15900,
+  "offer_salary_cents_per_hour": 15900
 }

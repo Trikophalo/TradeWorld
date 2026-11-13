@@ -4,6 +4,7 @@ import { motion, useReducedMotionConfig } from "motion/react";
 import { useEffect, useState } from "react";
 import { avatarArt } from "@/components/pixel/avatars";
 import { PixelIcon, type PixelArt } from "@/components/pixel/pixel-icon";
+import { currencySign } from "@/lib/format";
 
 /** Desk with a monitor, 24×12; the screen lines change while the figure works. */
 const desk = (frame: number): PixelArt => ({
@@ -58,7 +59,7 @@ export function PixelWorker({ avatarKey, scale = 4 }: { avatarKey: string | null
           transition={{ duration: 2.4, ease: "easeOut" }}
           className="absolute top-0 right-0 font-pixel text-xs text-gold"
         >
-          +NX
+          +{currencySign()}
         </motion.span>
       )}
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { localizeMoneyDeep } from "@/lib/format";
 import { isDemoMode } from "@/lib/supabase/env";
 import { liveEngine } from "./api";
 import { demoEngine } from "./demo-engine";
@@ -16,8 +17,25 @@ import type {
   TrackedEvent,
 } from "./types";
 
+/**
+ * Texts written by the server (news, notifications, mission texts) name amounts in euros. Every answer passes
+ * through here once and comes out in the player's display currency (ADR-113).
+ */
+function inDisplayCurrency(source: GameEngine): GameEngine {
+  return new Proxy(source, {
+    get(target, key, receiver) {
+      const value: unknown = Reflect.get(target, key, receiver);
+      if (typeof value !== "function") return value;
+      return (...args: unknown[]) => {
+        const result: unknown = (value as (...a: unknown[]) => unknown).apply(target, args);
+        return result instanceof Promise ? result.then(localizeMoneyDeep) : localizeMoneyDeep(result);
+      };
+    },
+  });
+}
+
 /** The live Supabase API, or the offline demo when no Supabase project is configured. */
-export const engine: GameEngine = isDemoMode ? demoEngine : liveEngine;
+export const engine: GameEngine = inDisplayCurrency(isDemoMode ? demoEngine : liveEngine);
 
 interface GameState {
   snapshot: MarketSnapshot | null;

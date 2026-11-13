@@ -1557,7 +1557,7 @@ Rangliste, Freunde-Feed, Wochenliga, Index, Top-Mover und Termine stehen nicht m
 ihren Seiten (Ranglisten, Freunde, Märkte, Events) und über Menü und Kacheln einen Tipp entfernt. Der Schulden-Hinweis
 erscheint weiter, wenn er nötig ist. `todayTasks` liefert dafür drei statt vier Aufgaben.
 
-## ADR-110: Eigene Spielwährung „Nex“ (NX) — `akzeptiert`
+## ADR-110: Eigene Spielwährung „Nex“ (NX) — `ersetzt durch ADR-113`
 
 Vorgabe: Das Spiel soll nicht in Euro laufen, sondern eine eigene Währung haben.
 
@@ -1588,7 +1588,7 @@ bekommen sie einmalig 5.000.
   Spalte, bleibt bei einer Namensänderung gleich und lässt sich vorlesen (keine 0/O, 1/I). Eingaben wie
   `nexa k7q2`, `#K7Q2` oder nur `K7Q2` gelten auch.
 - **Einlösen** im Profil, genau **einmal pro Konto**, nie der eigene Code. Der Bonus beträgt
-  `social.friendCode.bonusCents` (5.000 NX) und kommt wie jede Belohnung aus der Staatskasse (ADR-041); bei einem
+  `social.friendCode.bonusCents` (5.000 €) und kommt wie jede Belohnung aus der Staatskasse (ADR-041); bei einem
   offenen Zwangskredit greift der übliche Einbehalt. Die Aktion ist idempotent (`request_id`), der Bonus eine
   Ledger-Buchung.
 - **Wer geworben hat**, bekommt eine Benachrichtigung („… ist mit deinem Code dabei“) und sieht im Profil, wie viele
@@ -1600,3 +1600,30 @@ bekommen sie einmalig 5.000.
   brauchen sie am ersten Tag.
 - **Demo-Modus:** Es gibt keine anderen Spieler; zum Ausprobieren gilt der Code `NEXA-F7NN` von Finn.
 - Fehler: `friend_code_unknown` (NX104), `friend_code_self` (NX105), `friend_code_used` (NX106).
+
+## ADR-113: Euro als Standard, Dollar oder NX zur Wahl — `akzeptiert`
+
+Vorgabe: Die Währung soll doch Euro sein. Man kann aber auch Dollar oder NX auswählen. Das ersetzt ADR-110, in dem
+NX die einzige Währung war.
+
+**Entscheidung:** Die Währung ist eine **Anzeige-Einstellung** je Spieler (Profil → Einstellungen → Währung):
+Euro (Standard), Dollar oder Nex. Es ändert sich nur das Zeichen hinter dem Betrag („5.000 €“, „5.000 $“,
+„5.000 NX“). Es gibt keinen Wechselkurs: Alle Spieler sehen dieselben Zahlen, Ranglisten und Preise bleiben
+vergleichbar, und am Geldsystem ändert sich nichts.
+
+- **Ort der Einstellung:** `currency` im Einstellungs-Store (`localStorage`, wie Thema und Akzentfarbe), also je
+  Gerät. Die Auswahl steht in `CURRENCIES` in `src/config/app.ts`.
+- **Beträge:** `src/lib/format.ts` kennt das gewählte Zeichen (`setDisplayCurrency`) und setzt es in `formatMoney`,
+  `formatMoneyShort` und `formatPrice` ein. Das Zahlenformat bleibt deutsch.
+- **Texte:** In `messages/de.json` und in allen Texten des Servers (Nachrichten, Missionen, Benachrichtigungen,
+  Firmen-Chat) stehen Beträge mit „€“. Der Client tauscht das Zeichen an zwei Stellen: `<Providers>` reicht die
+  Texte mit getauschtem Zeichen weiter, und `engine` (`src/features/game/store.ts`) schickt jede Antwort von Server
+  oder Demo durch `localizeMoneyDeep`. Mit Euro passiert nichts.
+- **Erster Bildaufbau:** Server und erster Client-Render zeigen den Standard. Sobald die Einstellungen geladen sind,
+  wird alles unter `<Providers>` einmal mit dem gewählten Zeichen neu aufgebaut (wie beim Umschalten). Seiten, die
+  Beträge zeigen, sind dafür Client-Komponenten; die Spielregeln wurden entsprechend umgestellt.
+- **Server:** Die Migration nimmt ADR-110 zurück: `format_eur`, `format_eur_short`, `mission_text` und
+  `crypto_event_text` schreiben wieder „€“, gespeicherte Beträge mit „NX“ werden zurückgeschrieben (nur Zahl plus
+  „NX“ als ganzes Wort; Fehlercodes wie NX104 und Kürzel bleiben).
+- **Eingaben:** Betragsfelder nehmen „€“, „$“ und „NX“ hinter der Zahl an.
+- Der Stablecoin EUS behält den neutralen Namen „Eins-Stabil“.

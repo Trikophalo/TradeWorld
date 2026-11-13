@@ -27,7 +27,7 @@ test("friend code: own code, wrong codes, one bonus", async ({ page }) => {
   await page.goto("/profile");
   const card = page.getByTestId("friend-code");
   await expect(card.getByTestId("friend-code-own")).toHaveText("NEXA-K7Q2");
-  await expect(card).toContainText("5.000 NX");
+  await expect(card).toContainText("5.000 €");
   await expect(card.getByTestId("friend-code-invited")).toContainText("Noch hat niemand");
   await expect(card.getByTestId("friend-code-submit")).toBeDisabled();
 

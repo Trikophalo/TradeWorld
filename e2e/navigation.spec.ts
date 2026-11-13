@@ -49,7 +49,7 @@ test("the tabs navigate without horizontal overflow or console errors", async ({
 test("emptying the vault moves the money to the cash balance", async ({ page }) => {
   await page.goto("/");
   const cash = page.locator('[data-fly-target="cash"]');
-  await expect(cash).toContainText("10.000,00 NX");
+  await expect(cash).toContainText("10.000,00 €");
   await page.getByRole("button", { name: "Tresor leeren" }).click();
   await expect(page.getByText("Tresor geleert")).toBeVisible();
   await expect(cash).toContainText("10.200");
@@ -61,16 +61,16 @@ test("buying by euro amount, seeing the position and selling it again", async ({
   await expect(page).toHaveURL("/markets/VLT");
   await expect(page.getByRole("heading", { level: 1, name: "Volta Energie AG" })).toBeVisible();
 
-  // Buy for 500 NX (the default input is an amount; fractions of shares are bought).
+  // Buy for 500 € (the default input is an amount; fractions of shares are bought).
   await page.locator('[data-tour="buy"]').filter({ visible: true }).first().click();
   const dialog = page.getByRole("dialog", { name: "VLT kaufen" });
   await expect(dialog).toBeVisible();
-  await dialog.getByLabel("Betrag in Nex").fill("500");
+  await dialog.getByLabel("Betrag in €").fill("500");
   await expect(dialog.getByText(/Dafür bekommst du etwa 4,4\d* Stück/)).toBeVisible();
   // The slider and quick buttons fill the field without typing.
   await dialog.getByRole("button", { name: "25 %" }).click();
-  await expect(dialog.getByLabel("Betrag in Nex")).toHaveValue("2500,00");
-  await dialog.getByLabel("Betrag in Nex").fill("500");
+  await expect(dialog.getByLabel("Betrag in €")).toHaveValue("2500,00");
+  await dialog.getByLabel("Betrag in €").fill("500");
 
   // Limit orders are visible but locked for a new player.
   await dialog.getByRole("radio", { name: /Limit/ }).click();
@@ -142,7 +142,7 @@ test("the rules page explains taxes with numbers from the config", async ({ page
   await page.getByRole("link", { name: /Spielregeln/ }).click();
   await expect(page).toHaveURL("/profile/rules");
   await page.getByRole("button", { name: /Steuer auf Kursgewinne/ }).click();
-  await expect(page.getByText("250 NX Steuer, 750 NX bleiben dir", { exact: false })).toBeVisible();
+  await expect(page.getByText("250 € Steuer, 750 € bleiben dir", { exact: false })).toBeVisible();
 });
 
 test("on desktop the sidebar groups the tabs; locked ones wait under Bald frei (ADR-107)", async ({ page }) => {

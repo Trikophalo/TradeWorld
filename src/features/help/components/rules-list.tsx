@@ -1,4 +1,6 @@
-import { getTranslations } from "next-intl/server";
+"use client";
+
+import { useTranslations } from "next-intl";
 import { BEAR, BULL, COIN, SECTOR_ICONS, UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Accordion, type AccordionItem } from "@/components/ui/accordion";
@@ -14,10 +16,11 @@ const whole = (cents: number) => formatMoney(cents, { whole: true });
 /**
  * Every rule a player has to know, in plain words with one worked example.
  * All numbers are computed from BALANCE, so the texts can never drift from
- * the values the game actually uses (docs/DECISIONS.md, ADR-029).
+ * the values the game actually uses (docs/DECISIONS.md, ADR-029). A client component, so the amounts follow the
+ * display currency (ADR-113).
  */
-export async function RulesList() {
-  const t = await getTranslations("rules");
+export function RulesList() {
+  const t = useTranslations("rules");
   const labels = { example: t("example"), where: t("where") };
   const { trading, economy, progression } = BALANCE;
 

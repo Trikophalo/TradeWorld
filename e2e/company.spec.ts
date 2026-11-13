@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 /*
  * Player companies in demo mode (ADR-057): found a garage startup, close quarters,
- * hire an AI worker, post a job. Level 6 player with 20.000 NX.
+ * hire an AI worker, post a job. Level 6 player with 20.000 €.
  */
 async function preparePlayer(page: Page) {
   await page.addInitScript(() => {
@@ -95,7 +95,7 @@ test("found a garage startup, run quarters, hire and post a job", async ({ page 
   const deposit = page.getByRole("dialog", { name: "Einzahlen" });
   await deposit.getByLabel(/Betrag/).fill("1000");
   await expect(deposit.getByTestId("money-flow")).toContainText("→");
-  await deposit.getByRole("button", { name: /1\.000 NX einzahlen/ }).click();
+  await deposit.getByRole("button", { name: /1\.000 € einzahlen/ }).click();
   await expect(
     page
       .getByText("Eingezahlt")
@@ -130,7 +130,7 @@ test("found a garage startup, run quarters, hire and post a job", async ({ page 
   await growthPath.getByRole("button", { name: /Netzwerke/ }).click();
   const hire = page.getByRole("dialog", { name: "Stelle ausschreiben" });
   await hire.getByRole("radio", { name: "KI-Kraft" }).click();
-  await expect(hire.getByText("120 NX pro Stunde", { exact: true })).toBeVisible();
+  await expect(hire.getByText("120 € pro Stunde", { exact: true })).toBeVisible();
   await expect(hire.getByRole("radio", { name: "Netzwerke" })).toHaveAttribute("aria-checked", "true");
   await hire.getByRole("button", { name: "KI-Kraft einstellen" }).click();
   await expect(page.getByText("KI-Kraft eingestellt")).toBeVisible();
@@ -186,7 +186,7 @@ test("company chat, then close the company voluntarily", async ({ page }) => {
 });
 
 test("draw a logo, keep a job as founder, go public", async ({ page }) => {
-  // Level 12 (IPO), 300.000 NX to found, upgrade and run the company.
+  // Level 12 (IPO), 300.000 € to found, upgrade and run the company.
   await page.addInitScript(() => {
     if (window.sessionStorage.getItem("nexa-test-prepared")) return;
     window.sessionStorage.setItem("nexa-test-prepared", "1");

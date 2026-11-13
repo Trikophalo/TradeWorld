@@ -26,7 +26,7 @@
   "stats": { "hype": 0.0, "tech": 35.0, "utility": 0.0 },
   "events": [
     {
-      "at": "2026-11-13T18:58:24.681548+00:00",
+      "at": "2026-11-13T19:13:40.964268+00:00",
       "key": "launch",
       "name": "Fixture Taler",
       "ticker": "FXT",
@@ -34,7 +34,7 @@
       "shock_bps": null
     },
     {
-      "at": "2026-11-13T18:58:24.677298+00:00",
+      "at": "2026-11-13T19:13:40.95749+00:00",
       "key": "action",
       "name": "Fixture Taler",
       "ticker": "FXT",
@@ -42,7 +42,7 @@
       "shock_bps": null
     },
     {
-      "at": "2026-11-13T18:58:24.612202+00:00",
+      "at": "2026-11-13T19:13:40.885008+00:00",
       "key": "created",
       "name": "Fixture Taler",
       "ticker": "FXT",
@@ -52,7 +52,7 @@
   ],
   "status": "listed",
   "ticker": "FXT",
-  "creator": { "tag": "5FE2", "trust": { "band": "blank", "score": 50 }, "nickname": "Fixture_Coiner" },
+  "creator": { "tag": "BJAB", "trust": { "band": "blank", "score": 50 }, "nickname": "Fixture_Coiner" },
   "fee_bps": 100,
   "holders": 2,
   "category": "player",

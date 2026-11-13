@@ -28,6 +28,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
           always lands (a tap near the bottom of a scrolled page would only bring Safari's toolbar back). */}
       <div
         id="scroll-root"
+        data-scroll-root
         className="flex h-dvh flex-col overflow-y-auto overscroll-y-contain lg:h-auto lg:min-h-dvh lg:overflow-visible lg:pl-(--sidebar-width)"
       >
         <TopBar />

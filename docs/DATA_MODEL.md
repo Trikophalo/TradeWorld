@@ -6979,17 +6979,19 @@ Migration `20261202000100_no_after_hours.sql`, idempotente Kopie in `supabase/up
   werden nicht gespeichert, solange `market_always_open()` gilt. Die Migration löscht bereits angekündigte Glocken.
   Mit anderen Börsenzeiten plant `events_plan` die Glocken wieder wie vorher.
 
-## Nachtrag: Spielwährung Nex (ADR-110)
+## Nachtrag: Währung (ADR-110, ADR-113)
 
-Migration `20261202000200_game_currency.sql`, idempotente Kopie in `supabase/updates/`.
+Migrationen `20261202000200_game_currency.sql` und `20261203000100_currency_choice.sql`, idempotente Kopien in
+`supabase/updates/`.
 
-- Keine Schemaänderung. Geld bleibt `bigint` in Hundertsteln (`*_cents`); die Währung heißt Nex (NX).
-- `format_eur(bigint)`, `format_eur_short(bigint)`, `mission_text(text, text, bigint)` und
-  `crypto_event_text(text, text)` schreiben „NX“ statt „€“. Die Namen der Funktionen bleiben.
-- Ein `do`-Block ersetzt „€“ durch „NX“ in allen Textspalten der öffentlichen Tabellen, außer `ledger_*`, `profiles`
-  und `game_config`. Er darf beliebig oft laufen.
+- Keine Schemaänderung. Geld bleibt `bigint` in Hundertsteln (`*_cents`).
+- **Der Server schreibt Beträge immer mit „€“** (`format_eur`, `format_eur_short`, `mission_text`,
+  `crypto_event_text`, `supabase/seed.sql`). Ob ein Spieler Euro, Dollar oder NX sieht, ist eine Einstellung im
+  Client, der das Zeichen beim Anzeigen tauscht. In der Datenbank steht dazu nichts.
+- Die erste Migration hatte alle Texte auf „NX“ umgestellt (ADR-110), die zweite stellt „€“ wieder her: Funktionen
+  neu definiert, und ein `do`-Block schreibt in allen Textspalten der öffentlichen Tabellen (außer `ledger_*`,
+  `profiles`, `game_config`) Beträge der Form „Zahl NX“ zurück. Beide dürfen beliebig oft laufen.
 - Der Stablecoin `EUS` heißt „Eins-Stabil“ (`securities.name`, `crypto_coins.name`, Konfiguration `crypto.coins`).
-- `supabase/seed.sql` nennt in Freischaltungen, Erfolgen und Zufallsereignissen NX.
 
 ## Nachtrag: Freundescode (ADR-111)
 

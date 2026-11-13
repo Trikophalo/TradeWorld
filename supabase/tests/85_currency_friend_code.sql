@@ -1,5 +1,5 @@
 -- =============================================================================
--- 85 · The game's own currency in server texts (ADR-110) and the friend code (ADR-111)
+-- 85 · Currency in server texts (ADR-110, ADR-113) and the friend code (ADR-111)
 -- =============================================================================
 \set QUIET 1
 set client_min_messages = notice;
@@ -16,25 +16,31 @@ select tests.signup(:a, 'Anna_Wirbt') is not null and tests.signup(:b, 'Bert_Kom
    and tests.signup(:c, 'Cleo_Auch') is not null as ok \gset
 
 -- Currency ---------------------------------------------------------------------------------------------------------
+-- The server writes euros; dollar and NX are a display choice of the client (ADR-113).
 select tests.assert(
-  public.format_eur(123456) = '1.235 NX' and public.format_eur(-5600) = '-56 NX'
-  and public.format_eur_short(42000000000) = '420,0 Mio. NX' and public.format_eur_short(40000000) = '400 Tsd. NX'
-  and public.mission_text('Sammlung im Wert von {target}', 'art_collection_value', 200000) = 'Sammlung im Wert von 2.000 NX',
-  'money texts of the server say NX: format_eur, format_eur_short, mission_text');
+  public.format_eur(123456) = '1.235 €' and public.format_eur(-5600) = '-56 €'
+  and public.format_eur_short(42000000000) = '420,0 Mio. €' and public.format_eur_short(40000000) = '400 Tsd. €'
+  and public.mission_text('Sammlung im Wert von {target}', 'art_collection_value', 200000) = 'Sammlung im Wert von 2.000 €',
+  'money texts of the server say €: format_eur, format_eur_short, mission_text');
 select tests.assert(
-  public.crypto_event_text('depeg', 'Eins-Stabil') ->> 'body' = 'Der Stablecoin ist nicht mehr 1 NX wert.',
-  'crypto_event_text(depeg): the peg is 1 NX');
+  public.crypto_event_text('depeg', 'Eins-Stabil') ->> 'body' = 'Der Stablecoin ist nicht mehr 1 € wert.',
+  'crypto_event_text(depeg): the peg is 1 €');
 select tests.assert(
-  not exists (select 1 from public.unlocks where description like '%€%')
-  and not exists (select 1 from public.achievements where description like '%€%')
-  and not exists (select 1 from public.random_event_definitions where description like '%€%')
-  and not exists (select 1 from public.notifications where title like '%€%' or body like '%€%')
-  and exists (select 1 from public.unlocks where description like '% NX%'),
-  'stored texts carry no euro sign any more');
+  not exists (select 1 from public.unlocks where description ~ '[0-9] NX\M')
+  and not exists (select 1 from public.achievements where description ~ '[0-9] NX\M')
+  and not exists (select 1 from public.random_event_definitions where description ~ '[0-9] NX\M')
+  and not exists (select 1 from public.notifications where title ~ '[0-9] NX\M' or body ~ '[0-9] NX\M')
+  and exists (select 1 from public.unlocks where description like '% €%'),
+  'stored texts name amounts in euros');
+-- the migration's rewrite: amounts only, words and codes stay
+select tests.assert(
+  regexp_replace('5.000 NX und 1,2 Mio. NX, Code NX104, NXT, 1 NX wert', '([0-9]|Tsd\.|Mio\.|Mrd\.) NX\M', '\1 €', 'g')
+    = '5.000 € und 1,2 Mio. €, Code NX104, NXT, 1 € wert',
+  'the rewrite of ADR-113 touches amounts only: error codes and tickers keep their NX');
 select tests.assert(
   not exists (select 1 from public.securities where name = 'Euro-Stabil')
   and (select count(*) from public.securities where ticker = 'EUS' and name <> 'Eins-Stabil') = 0,
-  'the stablecoin EUS is called Eins-Stabil');
+  'the stablecoin EUS keeps its neutral name Eins-Stabil');
 
 -- Friend code ------------------------------------------------------------------------------------------------------
 select tests.login_as('authenticated', :a) is null as ok \gset
@@ -70,7 +76,7 @@ select tests.assert(
   and (:'r1'::jsonb ->> 'cash_after_cents')::bigint = :cash_b0 + 500000
   and tests.cash(:b) = :cash_b0 + 500000
   and :'r1b'::jsonb = :'r1'::jsonb,
-  'redeem_friend_code(): 5.000 NX from the treasury once, {..., redeemed_from, paid_cents, cash_after_cents}; the same request replays');
+  'redeem_friend_code(): 5.000 from the treasury once, {..., redeemed_from, paid_cents, cash_after_cents}; the same request replays');
 select tests.assert(
   (select count(*) from public.ledger_transactions t where t.idempotency_key like 'friend_code:' || :b || '%') >= 1
   and (select friend_code_from from public.profiles where id = :b) = :a

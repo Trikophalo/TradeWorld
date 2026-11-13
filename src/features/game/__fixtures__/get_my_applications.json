@@ -1,56 +1,56 @@
 {
   "applications": [
     {
-      "id": "754a9958-79f0-4dee-96c0-aa9e9d0c1533",
+      "id": "5926b455-e915-4e18-ab3c-8e8c05b8dc5c",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "0721dd7d-ecfe-4d5c-ae1a-381e48389b86",
+        "id": "2a5e9158-b0dd-46bd-bec6-fa29f5e14a24",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "db7c839c-c460-945e-1188-5e4a61db1e47",
+          "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
           "logo": null,
-          "name": "Rheinkraft Werke",
-          "color": "#5BC0EB",
+          "name": "QuantenSprung Labs",
+          "color": "#35D0BA",
           "is_ai": true,
-          "sector": "energy",
-          "ticker": "RKW"
+          "sector": "tech",
+          "ticker": "QSL"
         },
-        "required": [{ "branch": "craft", "min_score": 0 }],
-        "title_key": "craft_intern",
+        "required": [{ "branch": "it", "min_score": 0 }],
+        "title_key": "it_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-13T18:58:19.446152+00:00",
-      "updated_at": "2026-11-13T18:58:19.452218+00:00",
-      "offer_expires_at": "2026-11-15T18:58:19.446152+00:00",
-      "salary_wish_cents_per_hour": 15000,
-      "offer_salary_cents_per_hour": 15000
+      "created_at": "2026-11-13T19:13:36.949192+00:00",
+      "updated_at": "2026-11-13T19:13:36.953341+00:00",
+      "offer_expires_at": "2026-11-15T19:13:36.949192+00:00",
+      "salary_wish_cents_per_hour": 15900,
+      "offer_salary_cents_per_hour": 15900
     },
     {
-      "id": "0e9fa130-a87e-4335-8d57-70ef752e1152",
+      "id": "5be930f0-fb8a-473b-ac3c-b2c790885f99",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "b8dd53c0-08f8-4a50-8e1b-1dd905b06d0a",
+        "id": "61c0af7f-c910-4118-b020-fb3655d06730",
         "tier": "junior",
         "title": null,
         "company": {
-          "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
+          "id": "dc6cd683-c473-c0eb-8d8c-04ddf664b4d5",
           "logo": null,
-          "name": "KlarSoft AG",
-          "color": "#4C8DFF",
+          "name": "Eilbote Express",
+          "color": "#F7768E",
           "is_ai": true,
-          "sector": "tech",
-          "ticker": "KLS"
+          "sector": "logistics",
+          "ticker": "EBX"
         },
         "required": [{ "branch": "it", "min_score": 2 }],
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-13T18:58:19.437892+00:00",
-      "updated_at": "2026-11-13T18:58:19.437892+00:00",
-      "offer_expires_at": "2026-11-15T18:58:19.437892+00:00",
+      "created_at": "2026-11-13T19:13:36.942986+00:00",
+      "updated_at": "2026-11-13T19:13:36.942986+00:00",
+      "offer_expires_at": "2026-11-15T19:13:36.942986+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

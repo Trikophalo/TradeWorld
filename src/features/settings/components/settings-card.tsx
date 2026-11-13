@@ -7,6 +7,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { keepScrollOnCurrencySwitch } from "@/components/providers";
+import { CURRENCIES } from "@/config/app";
 import { Segmented } from "@/components/ui/segmented";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/toast";
@@ -109,6 +111,23 @@ export function SettingsCard() {
               { value: "system", label: t("motionSystem") },
               { value: "full", label: t("motionFull") },
               { value: "reduced", label: t("motionReduced") },
+            ]}
+          />
+        </Row>
+        <Row label={t("currency")} hint={t("currencyHint")}>
+          <Segmented
+            value={settings.currency}
+            onValueChange={(value) => {
+              keepScrollOnCurrencySwitch();
+              settings.set("currency", value);
+            }}
+            label={t("currency")}
+            size="sm"
+            options={[
+              // The signs come from the config, not from the texts: those follow the chosen currency.
+              { value: "eur", label: `${t("currencyEur")} ${CURRENCIES.eur.sign}` },
+              { value: "usd", label: `${t("currencyUsd")} ${CURRENCIES.usd.sign}` },
+              { value: "nx", label: `${t("currencyNx")} ${CURRENCIES.nx.sign}` },
             ]}
           />
         </Row>
