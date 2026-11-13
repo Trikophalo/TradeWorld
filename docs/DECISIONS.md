@@ -1402,6 +1402,22 @@ Währung und Zufallsereignisse für den Kurs.
 6. **Einstellen:** Der Gründer kann die Währung einstellen. Der Pool wird nach Coins an alle Halter ausgezahlt,
    der Gründer bekommt seinen Teil wie alle. Danach sind Name und Ticker frei, und er kann eine neue Währung gründen.
 
+**Umsetzung auf dem Server (M5a) und Abweichungen:**
+
+- Wie bei Aktien kostet jeder Krypto-Handel zusätzlich die Ordergebühr (1 €). Beim Kauf ist sie im Betrag enthalten,
+  beim Verkauf wird sie vom Erlös abgezogen. Der Kursrutsch (Slippage) wird ohne Ordergebühr gerechnet, mit
+  Pool-Gebühr.
+- Einstand und Steuer rechnen mit dem genauen Durchschnitt in Cent (keine Lose), weil Kurse unter einem Cent mit vier
+  Nachkommastellen zu grob wären. Steuer, Verlusttopf, XP und Missionen wie bei Aktien.
+- Die Geldflüsse der KI-Händler werden je Stunde gebucht statt je Tick (sonst 17.000 Buchungen am Tag). Pool-Konto
+  plus offene Flüsse ergeben immer das Pool-Geld.
+- Coins verbrennen ist eine eigene Aktion: höchstens einmal je Stunde und mindestens 1 % der Team-Coins beim Start
+  (`create.burnMinBps`), sonst gäbe winziges Verbrennen Hype für nichts. Fliegt bezahlte Influencer-Werbung auf,
+  kostet das 20 Hype und 15 % Kurs (`create.exposedHype`, `create.exposedShock`).
+- Ein eingestellter Coin gibt Name und Ticker frei; sein Wertpapier bekommt intern einen Ersatz-Ticker, damit die
+  Handelshistorie erhalten bleibt.
+- Marktweite Ereignisse stehen einmal im Protokoll (ohne Coin); die Coin-Seite zeigt sie mit an.
+
 ## ADR-102: Beim Einloggen klar, was zu tun ist; Firma und Deals erklärt — `akzeptiert`
 
 Vorgabe: Das Spiel ist am Anfang verwirrend, es soll intuitiver sein und beim Einloggen sofort zeigen, was zu tun

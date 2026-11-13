@@ -4,18 +4,18 @@
   "level": 6,
   "status": "filled",
   "ticker": "VLT",
-  "order_id": "7cbf3832-9f5d-4dbe-94c4-ea23e86bf38f",
+  "order_id": "fd115c33-b1e6-4efa-92c2-b261464534b2",
   "xp_total": 7541,
   "fee_cents": 100,
   "tax_cents": 0,
-  "cash_cents": 973547,
+  "cash_cents": 973644,
   "xp_awarded": 0,
-  "gross_cents": 10373,
+  "gross_cents": 10272,
   "quantity_e6": 2000000,
   "amount_cents": null,
-  "avg_price_e4": 518633,
+  "avg_price_e4": 513621,
   "limit_price_e4": null,
   "reserved_cents": 0,
   "filled_quantity_e6": 2000000,
-  "realized_pnl_cents": -137
+  "realized_pnl_cents": -152
 }

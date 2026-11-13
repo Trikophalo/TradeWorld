@@ -10,7 +10,7 @@ import {
   minNextBidCents,
   sellerProceedsCents,
 } from "@/lib/sim/artworks";
-import { GameError, type Artwork, type ArtworkPixels, type GameEngine } from "../types";
+import { GameError, type Artwork, type ArtworkPixels, type GameEngine, type GameErrorKey } from "../types";
 
 /*
  * Artworks in the offline demo (ADR-080). The gallery auctions a few works at a time; AI collectors (the tycoons)
@@ -255,11 +255,24 @@ export function createArtEngine(host: ArtHost) {
     };
   }
 
+  /** Unique titles (ADR-100): compared without case, spaces and punctuation. */
+  const titleKey = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+  const titleTaken = (t: string) => works().some((w) => titleKey(w.title) === titleKey(t));
+  function titleProblem(title: string): GameErrorKey | null {
+    const name = title.trim().replace(/\s+/g, " ");
+    if (name.length < 3) return "name_too_short";
+    if (name.length > cfg.titleMaxLength) return "name_too_long";
+    const violation = host.nameViolation(name);
+    if (violation) return violation as GameErrorKey;
+    return titleTaken(name) ? "name_taken" : null;
+  }
+
   const engine: Pick<
     GameEngine,
     | "artworks"
     | "artwork"
     | "artStudio"
+    | "checkArtworkTitle"
     | "createArtwork"
     | "likeArtwork"
     | "startAuction"
@@ -305,14 +318,20 @@ export function createArtEngine(host: ArtHost) {
       return { painted: state().painted, nextCostCents: artworkCreateCostCents(state().painted), unlocked: unlocked() };
     },
 
+    async checkArtworkTitle(title) {
+      const reason = titleProblem(title);
+      return { allowed: reason === null, reason };
+    },
+
     createArtwork: (requestId, title, pixels) =>
       Promise.resolve(
         host.idempotent(requestId, () => {
           requireUnlocked();
-          const name = title.trim();
+          const name = title.trim().replace(/\s+/g, " ");
           if (name.length < 3 || name.length > cfg.titleMaxLength) throw new GameError("invalid_argument");
           const violation = host.nameViolation(name);
           if (violation) throw new GameError(violation as never);
+          if (titleTaken(name)) throw new GameError("name_taken");
           if (!isValidArtwork(pixels)) throw new GameError("invalid_argument");
           if (hasForbiddenSymbol(pixels)) throw new GameError("logo_forbidden");
           const s = state();

@@ -157,6 +157,7 @@ export const DEAL_RPC_SCHEMAS = {
     running: z.array(dealSchema),
     history: z.array(dealSchema),
     trust: trustSchema,
+    limits: z.object({ company_deal_max_cents: num.nullable(), loan_max_cents: num }).nullable().default(null),
   }),
   get_deal_board: z.object({ offers: z.array(dealSchema) }),
   propose_deal: dealSchema,
@@ -183,6 +184,9 @@ export const liveDealEngine: DealEngine = {
       running: r.running.map(toDeal),
       history: r.history.map(toDeal),
       trust: toTrust(r.trust),
+      limits: r.limits
+        ? { companyDealMaxCents: r.limits.company_deal_max_cents, loanMaxCents: r.limits.loan_max_cents }
+        : null,
     };
   },
 

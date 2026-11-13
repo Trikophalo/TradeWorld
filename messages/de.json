@@ -2185,7 +2185,8 @@
       "hint": "Nur aus Gewinn und nur aus freiem Geld: Offene Rechnungen werden zuerst bezahlt. Was du nicht auszahlst, bleibt für Wachstum in der Firma.",
       "save": "Auszahlung speichern",
       "saved": "Auszahlung gespeichert"
-    }
+    },
+    "closeNext": "Danach kannst du sofort eine neue Firma gründen. Der Name deiner alten Firma ist dann wieder frei."
   },
   "debt": {
     "title": "Schulden",

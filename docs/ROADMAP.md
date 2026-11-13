@@ -462,6 +462,14 @@ der KI-Firmen). M3 ist empfohlen, weil sonst das Geld für die Gründung langsam
 - [x] Skillpunkte erklärt: Quellen mit Fortschritt, Nutzen von Skills (ADR-095)
 - [x] Gewinnwege mit Engpass und Schätzung je Hebel, Marketing-Kampagnen (ADR-096, ADR-097)
 - [x] Deals unter Spielern (Kredit, Liefervertrag, Teilhaber) mit Deal-Börse und Vertrauen (ADR-098)
+- [x] Freischalt-Reihenfolge Jobs → Artworks → Firma → Grundstück, Krypto ab Level 10 (ADR-099)
+- [x] Verbesserungen mit Level-Stufen, drei Möbel-Ebenen, eindeutige Firmen- und Bildnamen, Deal-Grenzen nach
+      Firmenwert (ADR-100, Server M4k)
+- [x] Kryptowährungen: 15 Coins mit Pools, Krypto-Wetter, Zufallsereignisse, eigener Coin mit Pixel-Logo,
+      Rug Pull und Einstellen (ADR-101, Server M5a, Oberfläche unter `/crypto`)
+- [x] „Heute dran“ mit Finn auf der Startseite, Firma und Deals erklärt (ADR-102)
+- [x] Achtstundentag, Lohn direkt aufs Konto, weniger Lohn bei Abwesenheit, Kündigung nach 5 Tagen (ADR-103)
+- [x] Organigramm der Firma (ADR-104)
 
 ### Daten/Backend
 

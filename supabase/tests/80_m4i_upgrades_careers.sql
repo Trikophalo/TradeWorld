@@ -239,7 +239,7 @@ select tests.assert(
 
 -- overtime: one more paid hour a day (needs level 5)
 select tests.set_level(:e, 5);
-update public.player_jobs set paid_day = (now() at time zone 'Europe/Berlin')::date, paid_minutes_today = 720,
+update public.player_jobs set paid_day = (now() at time zone 'Europe/Berlin')::date, paid_minutes_today = :paid0::int * 60,
        last_paid_at = now() - interval '2 hours'
  where id = :'ejob';
 select public.job_payable_minutes(:'ejob', now()) as pm0 \gset
@@ -252,8 +252,9 @@ select public.job_payable_minutes(:'ejob', now()) as pm1 \gset
 select public.accrue_job_salary(:'ejob', now()) >= 0 as ok \gset
 select tests.assert(
   :pm0::int = 0 and :pc0::numeric = :paid0 and :ol::int = 1 and :pc1::numeric = :paid0 + 1 and :pm1::int = 60
-  and (select paid_minutes_today = 780 and rank_minutes = 360 from public.player_jobs where id = :'ejob'),
-  'overtime 1: paid_hours_cap 12 -> 13; after 12 paid hours one more hour is paid (job_payable_minutes, accrue_job_salary)');
+  and (select paid_minutes_today = (:paid0::int + 1) * 60 and rank_minutes = 360 from public.player_jobs where id = :'ejob'),
+  format('overtime 1: paid_hours_cap %s -> %s; after the cap one more hour is paid (job_payable_minutes, accrue_job_salary)',
+         :paid0, :paid0::int + 1));
 
 -- ready: level 5, IT score 3 (basics 1 + programming 2), 12 hours in the rank
 insert into public.player_skills (player_id, skill_key) values (:e, 'it_basics'), (:e, 'it_programming') on conflict do nothing;

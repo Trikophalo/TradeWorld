@@ -451,20 +451,26 @@ select tests.assert(
   and (select (branch_points ->> 'it')::int from public.player_skill_points where player_id = :w) = 1
   and (select (branch_work_minutes ->> 'it')::int from public.player_skill_points where player_id = :w) = 420,
   'accrual: 7 h x contract wage from the AI company''s cash (ledger), work XP per hour, 6 work hours = 1 IT branch point');
+select public.config_double('careers', '{paidHoursPerDayCap}', 8)::int as wcap \gset
 select public.accrue_job_salary(:'wjob', (:'bday'::date + time '22:00') at time zone 'Europe/Berlin') as paid20 \gset
-select tests.assert(:paid20::bigint = 32700 * 5
-  and (select paid_minutes_today from public.player_jobs where id = :'wjob') = 720,
-  'accrual: at most careers.paidHoursPerDayCap (12) paid hours per day');
+select tests.assert(:paid20::bigint = 32700 * (:wcap - 7)
+  and (select paid_minutes_today from public.player_jobs where id = :'wjob') = :wcap * 60,
+  format('accrual: at most careers.paidHoursPerDayCap (%s) paid hours per day', :wcap));
 select tests.login_as('authenticated', :w);
 select public.get_my_job() -> 'job' as mj2 \gset
 select public.get_my_skills() as wsk \gset
 reset role;
 select tests.assert(
-  (:'mj2'::jsonb ->> 'earned_total_cents')::bigint = 32700 * 12
+  (:'mj2'::jsonb ->> 'earned_total_cents')::bigint = 32700 * :wcap
   and (:'wsk'::jsonb -> 'branch_progress' ->> 'it')::numeric between 0 and 1,
   'get_my_job(): earned_total_cents; get_my_skills(): branch_progress fraction to the next point');
 
 -- raise: learn it_networks (match 3 -> 4), AI caps at the ceiling
+-- (an 8-hour day gives one IT branch point; it_networks costs two, so top up like a second working day)
+update public.player_skill_points
+   set branch_points = jsonb_set(coalesce(branch_points, '{}'::jsonb), '{it}',
+                                 to_jsonb(greatest(2, coalesce((branch_points ->> 'it')::int, 0))))
+ where player_id = :w;
 select tests.login_as('authenticated', :w);
 select public.learn_skill(gen_random_uuid(), 'it_networks') is not null as ok \gset
 select (public.get_my_job() -> 'job' ->> 'raise_max_bps')::int as rmax \gset

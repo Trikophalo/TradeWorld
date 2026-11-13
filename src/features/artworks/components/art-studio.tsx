@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Button } from "@/components/ui/button";
@@ -65,6 +65,31 @@ export function ArtStudio() {
   );
 }
 
+/** Live check of a title (ADR-100): unique in the whole game, lookalikes included. */
+function useTitleCheck(name: string) {
+  const te = useTranslations("errors");
+  const [result, setResult] = useState<{ name: string; allowed: boolean; reason: string | null } | null>(null);
+  useEffect(() => {
+    if (name.length < 3) return;
+    let live = true;
+    const timer = window.setTimeout(() => {
+      void engine
+        .checkArtworkTitle(name)
+        .then((r) => live && setResult({ name, ...r }))
+        .catch(() => {});
+    }, 350);
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+    };
+  }, [name]);
+  if (!result || result.name !== name) return null;
+  return {
+    allowed: result.allowed,
+    text: result.allowed ? "" : te((result.reason ?? "unknown") as "name_taken"),
+  };
+}
+
 function ArtEditor({ open, costCents, onClose }: { open: boolean; costCents: number; onClose: () => void }) {
   const t = useTranslations("art");
   const tl = useTranslations("logo");
@@ -83,8 +108,9 @@ function ArtEditor({ open, costCents, onClose }: { open: boolean; costCents: num
     }
   }
   const forbidden = hasForbiddenSymbol(art);
-  const name = title.trim();
-  const valid = isValidArtwork(art) && !forbidden && name.length >= 3;
+  const name = title.trim().replace(/\s+/g, " ");
+  const titleCheck = useTitleCheck(name);
+  const valid = isValidArtwork(art) && !forbidden && name.length >= 3 && titleCheck?.allowed !== false;
 
   const create = async () => {
     setBusy(true);
@@ -116,6 +142,8 @@ function ArtEditor({ open, costCents, onClose }: { open: boolean; costCents: num
               maxLength={BALANCE.artworks.titleMaxLength}
               placeholder={t("artTitlePlaceholder")}
               onChange={(event) => setTitle(event.target.value)}
+              error={titleCheck && !titleCheck.allowed ? titleCheck.text : undefined}
+              data-testid="art-title"
             />
           </div>
           <HoldButton

@@ -837,6 +837,7 @@ function CloseSheet({ company, open, onClose }: { company: MyCompany; open: bool
       <p className="mt-3 nums text-sm text-fg-3">
         {t("closeEstimate", { cash: money(company.cashCents), unpaid: money(company.unpaidCents) })}
       </p>
+      <p className="mt-3 text-sm text-pretty text-fg-2">{t("closeNext")}</p>
     </Sheet>
   );
 }

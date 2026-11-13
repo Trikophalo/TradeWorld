@@ -11,6 +11,7 @@ import type { DealKind } from "@/features/game/types";
 import { formatMoney } from "@/lib/format";
 import { SPRING, STAGGER } from "@/lib/motion";
 import { dealSizeLimitCents, maxLoanPrincipalCents } from "@/lib/sim/deals";
+import { useDeals } from "../hooks";
 
 const ART: Record<DealKind, PixelArt> = { loan: COIN, supply: CONTRACT, stake: UI_ICONS.company };
 const KINDS: readonly DealKind[] = ["loan", "supply", "stake"];
@@ -24,6 +25,10 @@ export function DealsGuide({ open }: { open: boolean }) {
   const reduced = useReducedMotion();
   const level = useGame((s) => s.portfolio?.level ?? 1);
   const company = useMyCompany().data?.company ?? null;
+  // The server's limits when it sends them (M4k), otherwise the same formulas here.
+  const limits = useDeals().data?.limits ?? null;
+  const loanMax = limits?.loanMaxCents ?? maxLoanPrincipalCents(level);
+  const companyMax = company ? (limits?.companyDealMaxCents ?? dealSizeLimitCents(company.valueCents)) : null;
   const steps = t.raw("steps") as string[];
 
   return (
@@ -75,13 +80,13 @@ export function DealsGuide({ open }: { open: boolean }) {
 
           <div className="grid gap-2 text-sm sm:grid-cols-2" data-testid="deal-limits">
             <p className="rounded-md border border-line-1 px-3 py-2 text-fg-2">
-              {t("loanLimit", { amount: formatMoney(maxLoanPrincipalCents(level), { whole: true }), level })}
+              {t("loanLimit", { amount: formatMoney(loanMax, { whole: true }), level })}
             </p>
             <p className="rounded-md border border-line-1 px-3 py-2 text-fg-2">
-              {company
+              {company && companyMax !== null
                 ? t("companyLimit", {
                     value: formatMoney(company.valueCents, { whole: true }),
-                    amount: formatMoney(dealSizeLimitCents(company.valueCents), { whole: true }),
+                    amount: formatMoney(companyMax, { whole: true }),
                   })
                 : t("noCompany")}
             </p>

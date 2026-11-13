@@ -1,7 +1,7 @@
 {
   "job": null,
-  "tag": "WHW4",
-  "rank": 139,
+  "tag": "39B6",
+  "rank": 152,
   "level": 10,
   "trust": { "band": "blank", "kept": 0, "score": 50, "broken": 0 },
   "company": { "name": "Fixture Labor", "ticker": null },
@@ -13,7 +13,7 @@
     { "key": "it_basics", "tier": 1 }
   ],
   "streak_days": 1,
-  "member_since": "2026-11-13T16:11:05.218415+00:00",
+  "member_since": "2026-11-13T16:33:06.948919+00:00",
   "branch_scores": {
     "it": 3,
     "law": 0,
@@ -25,5 +25,5 @@
     "management": 0
   },
   "skills_learned": 2,
-  "net_worth_cents": 2424207
+  "net_worth_cents": 2423952
 }

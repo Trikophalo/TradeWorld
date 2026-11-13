@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Artwork, GameEngine } from "./types";
+import type { Artwork, GameEngine, GameErrorKey } from "./types";
 import { rpc } from "./rpc";
 
 /*
@@ -47,6 +47,7 @@ export const ARTWORK_RPC_SCHEMAS = {
   }),
   get_art_studio: z.object({ painted: num, next_cost_cents: num, unlocked: z.boolean() }),
   create_artwork: z.object({ artwork: artworkSchema, cost_cents: num, next_cost_cents: num }),
+  check_artwork_title: z.object({ allowed: z.boolean(), reason: z.string().nullable() }),
   like_artwork: z.object({ likes: num, liked: z.boolean() }),
   start_auction: z.object({ artwork: artworkSchema }),
   cancel_auction: z.object({ artwork: artworkSchema }),
@@ -104,6 +105,7 @@ type ArtEngine = Pick<
   | "artworks"
   | "artwork"
   | "artStudio"
+  | "checkArtworkTitle"
   | "createArtwork"
   | "likeArtwork"
   | "startAuction"
@@ -133,6 +135,10 @@ export const liveArtEngine: ArtEngine = {
   async artStudio() {
     const r = await rpc("get_art_studio", {}, S.get_art_studio);
     return { painted: r.painted, nextCostCents: r.next_cost_cents, unlocked: r.unlocked };
+  },
+  async checkArtworkTitle(title) {
+    const r = await rpc("check_artwork_title", { p_title: title }, S.check_artwork_title);
+    return { allowed: r.allowed, reason: r.reason as GameErrorKey | null };
   },
   async createArtwork(requestId, title, pixels) {
     const r = await rpc(

@@ -16,6 +16,8 @@ import {
   trustOnEnd,
   trustScore,
   unmetDemandCents,
+  dealSizeLimitCents,
+  maxLoanPrincipalCents,
   type TrustReason,
 } from "@/lib/sim/deals";
 import { priceEffect } from "@/lib/sim/startup";
@@ -145,6 +147,8 @@ export interface DealHost {
   cashCents(): number;
   addCash(cents: number): void;
   company(): DemoCompanyState | null;
+  /** Value of the own company (deal size limit, ADR-098). */
+  companyValueCents(): number;
   day(at?: number): string;
   idempotent<T>(requestId: string, run: () => T): T;
   persist(): void;
@@ -668,6 +672,10 @@ export function createDealEngine(host: DealHost) {
           .slice(0, 20)
           .map(toDeal),
         trust: myTrust(),
+        limits: {
+          companyDealMaxCents: host.company() ? dealSizeLimitCents(host.companyValueCents()) : null,
+          loanMaxCents: maxLoanPrincipalCents(host.level()),
+        },
       };
     },
 

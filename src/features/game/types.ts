@@ -813,6 +813,8 @@ export interface DealsOverview {
   running: Deal[];
   history: Deal[];
   trust: TrustInfo;
+  /** Largest loan and largest deal of the own company (ADR-098); null in older responses. */
+  limits: { companyDealMaxCents: number | null; loanMaxCents: number } | null;
 }
 
 export interface ProposeDealInput {
@@ -1308,6 +1310,8 @@ export interface FoundCompanyInput {
   color: string;
   tier: CompanyTier;
   product: string;
+  /** Close the current company first and found this one in its place (ADR-100). */
+  replace?: boolean;
 }
 
 export interface CompanyPosting {
@@ -1508,6 +1512,8 @@ export interface GameEngine {
   artworks(sort: ArtSort, origin: ArtOrigin, onAuction: boolean, limit: number, offset: number): Promise<ArtworkList>;
   artwork(id: string): Promise<ArtworkDetail>;
   artStudio(): Promise<ArtStudio>;
+  /** Titles are unique, lookalikes included (ADR-100). */
+  checkArtworkTitle(title: string): Promise<{ allowed: boolean; reason: GameErrorKey | null }>;
   createArtwork(
     requestId: string,
     title: string,

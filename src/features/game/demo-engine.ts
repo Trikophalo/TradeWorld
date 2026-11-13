@@ -1069,6 +1069,7 @@ const deals = createDealEngine({
     else p().cashCents += cents;
   },
   company: () => p().company ?? null,
+  companyValueCents: () => company.valueCents(),
   day: (at) => berlinDay(at),
   idempotent,
   persist,
@@ -1141,7 +1142,11 @@ const art = createArtEngine({
     p().cashCents += cents;
   },
   collectors: () => TYCOONS.slice(0, 16).map((t) => t.name),
-  nameViolation,
+  // Titles may have spaces and punctuation: only the word filter applies.
+  nameViolation: (title) => {
+    const v = nameViolation(title.replace(/[^A-Za-z0-9]/g, ""));
+    return v === "name_profanity" || v === "name_reserved" ? v : null;
+  },
   day: berlinDay,
   idempotent,
   persist,

@@ -797,7 +797,8 @@ export function createCompanyEngine(host: CompanyHost) {
 
     async foundCompany(input: FoundCompanyInput) {
       return host.idempotent(input.requestId, () => {
-        if (host.company()) throw new GameError("company_exists");
+        const previous = host.company();
+        if (previous && !input.replace) throw new GameError("company_exists");
         // The AG only comes by going public (ADR-067); bigger forms can be founded directly (ADR-083).
         if (input.tier === "ag") throw new GameError("invalid_argument");
         const locked = host.foundingLockedUntil();
@@ -807,6 +808,11 @@ export function createCompanyEngine(host: CompanyHost) {
         if (violation) throw new GameError(violation);
         const cost = foundingCostCents(input.tier);
         if (host.cashCents() < cost) throw new GameError("insufficient_funds");
+        // Replacing: the old company is closed like "Firma auflösen", its name becomes free.
+        if (previous) {
+          catchUp();
+          dissolveCompany(previous, "closed", Date.now());
+        }
         host.addCash(-cost);
         const now = Date.now();
         const company: DemoCompanyState = {

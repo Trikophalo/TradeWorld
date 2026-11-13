@@ -678,6 +678,7 @@ export const liveCompanyEngine: CompanyEngine = {
         p_color: input.color,
         p_tier: input.tier,
         p_product: input.product,
+        p_replace: input.replace ?? false,
       },
       S.found_company,
     );

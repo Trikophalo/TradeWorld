@@ -72,3 +72,21 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 - **Deals unter Spielern:** Kredite, Lieferverträge (freie Kapazität gegen Gebühr) und Teilhaber, an einen
   Spieler oder offen auf der Deal-Börse. Wer Wort hält, gewinnt Vertrauen; wer zu spät zahlt oder bricht, verliert es,
   und alle sehen es auf der Visitenkarte.
+
+## M4k und M5a: Krypto, Stufen, Ebenen, eindeutige Namen, Anwesenheit
+
+- **Kryptowährungen ab Level 10** unter „Krypto“: 15 Coins von Stablecoins bis Memecoins, rund um die Uhr, jeder
+  Kauf bewegt den Kurs über einen Topf aus Geld und Coins. Krypto-Wetter (Bullen-, Bären-, Seitwärtsmarkt),
+  Ereignisse wie Hacks, Wale, Influencer und Rug Pulls, tote Memecoins werden ersetzt. Handelsmaske mit Gebühr,
+  Kursrutsch-Vorschau und Grenze.
+- **Eigener Coin ab Level 14** im Coin-Studio: Name, Kürzel und Pixel-Logo, Aufgaben fürs Team (Technik, Hype,
+  Nutzen), Start mit eigenem Geld im Topf und Team-Anteil, Coins verbrennen, Rug-Pull-Warnung, Einstellen mit
+  Auszahlung an alle Halter.
+- **Verbesserungen mit Level-Stufen** und fünf neuen Verbesserungen (Mentor, Kunststudio, Effizienz, Makler,
+  Hardware-Wallet).
+- **Drei Ebenen beim Einrichten:** Teppich, Möbel, kleine Dinge auf Tischen und Theken.
+- **Eindeutige Namen** für Firmen, Kunstwerke und Coins; wer seine Firma auflöst, gibt den Namen frei.
+- **Deals nach Firmenwert:** große Deals erst mit einer wertvolleren Firma.
+- **Anwesenheit:** 8 bezahlte Stunden am Tag, weniger Lohn nach 1, 2 und 3 Tagen Abwesenheit, nach 5 Tagen
+  gekündigt (Benachrichtigung an Spieler und Chef).
+- **Organigramm** der Firma mit Gründer, Rängen und KI-Kräften.
