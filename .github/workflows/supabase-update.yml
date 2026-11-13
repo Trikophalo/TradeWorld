@@ -52,8 +52,18 @@ jobs:
             echo "::warning::Secret SUPABASE_DB_URL fehlt – geprüft, aber nichts eingespielt."
             exit 0
           fi
-          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -1 -q -f supabase/update-to-latest.sql
-          echo "Datenbank ist auf dem neuesten Stand."
+          # The update is one transaction with many schema changes. A player request in flight can deadlock with
+          # it; Postgres then cancels the update and nothing is changed. So try again a few times.
+          for attempt in 1 2 3 4 5 6; do
+            if psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -1 -q -f supabase/update-to-latest.sql; then
+              echo "Datenbank ist auf dem neuesten Stand."
+              exit 0
+            fi
+            echo "::warning::Versuch $attempt ist fehlgeschlagen, neuer Versuch in 10 Sekunden."
+            sleep 10
+          done
+          echo "::error::Das Update ließ sich nach 6 Versuchen nicht einspielen."
+          exit 1
 
       # Optional (ADR-091): the company-writer Edge Function lets Claude write product-fitting company news.
       # Needs the repository secrets SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF; ANTHROPIC_API_KEY turns the AI on.
