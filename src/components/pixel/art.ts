@@ -880,6 +880,23 @@ export const UI_ICONS = {
     ],
   },
   /** Deals between players (ADR-098): two hands meet. */
+  crypto: {
+    palette: mono,
+    grid: [
+      "....xxxx....",
+      "..xx....xx..",
+      ".x.....x..x.",
+      ".x....xx..x.",
+      "x....xx....x",
+      "x...xxxxx..x",
+      "x....xx....x",
+      "x...xx.....x",
+      ".x..x.....x.",
+      ".x........x.",
+      "..xx....xx..",
+      "....xxxx....",
+    ],
+  },
   deal: {
     palette: mono,
     grid: [

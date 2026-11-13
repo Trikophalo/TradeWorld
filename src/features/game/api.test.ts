@@ -34,9 +34,23 @@ describe("RPC contract", () => {
     ];
     // M4k RPC written in parallel with the database (TODO: remove once get_company_org.json exists).
     const m4k = ["get_company_org"];
+    // M5a RPCs, same (TODO: remove once get_crypto_market.json exists).
+    const m5a = [
+      "get_crypto_market",
+      "get_coin",
+      "crypto_trade",
+      "get_my_coin",
+      "check_coin_name",
+      "create_coin",
+      "start_coin_action",
+      "launch_coin",
+      "burn_coin_tokens",
+      "discontinue_coin",
+    ];
     const pending = [
       ...(fixtures.some((file) => file.startsWith("get_offers")) ? [] : m3f),
       ...(fixtures.some((file) => file.startsWith("get_company_org")) ? [] : m4k),
+      ...(fixtures.some((file) => file.startsWith("get_crypto_market")) ? [] : m5a),
     ];
     for (const name of Object.keys(RPC_SCHEMAS).filter((key) => !pending.includes(key))) {
       expect(

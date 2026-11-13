@@ -803,5 +803,8 @@ export function createDealEngine(host: DealHost) {
     return sum;
   }
 
-  return { engine, trust: myTrust, stakePayout, afterHour, settle, balanceCents };
+  /** A rug pull with the player's own coin (ADR-101). */
+  const rugPull = () => addTrust("me", BALANCE.trust.deltas.rugPull, "rugPull");
+
+  return { engine, trust: myTrust, stakePayout, afterHour, settle, balanceCents, rugPull };
 }

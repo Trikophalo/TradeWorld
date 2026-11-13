@@ -131,6 +131,11 @@ export interface CryptoConfig {
     /** Selling more than this share of the team tokens within a day counts as a rug pull. */
     readonly rugShareBps: number;
     readonly rugWindowHours: number;
+    /** A paid influencer is exposed when the action fails: hype loss and a price shock (log return). */
+    readonly exposedHype: number;
+    readonly exposedShock: number;
+    /** Smallest burn as a share of the team coins at launch (one burn per marketing_burn hours). */
+    readonly burnMinBps: number;
   };
 }
 
@@ -313,5 +318,8 @@ export const CRYPTO: CryptoConfig = {
     ],
     rugShareBps: 2_000,
     rugWindowHours: 24,
+    exposedHype: -20,
+    exposedShock: -0.1625,
+    burnMinBps: 100,
   },
 };

@@ -587,6 +587,108 @@ export interface PromotionResult {
   chanceBps: number | null;
 }
 
+// ------------------------------------------------------------------ crypto (ADR-101)
+
+export type CoinCategory = "stable" | "major" | "alt" | "meme" | "player";
+export type CoinStatus = "draft" | "listed" | "dead" | "closed";
+export type CryptoRegime = "bull" | "flat" | "bear";
+
+export interface CoinStats {
+  tech: number;
+  hype: number;
+  utility: number;
+}
+
+export interface CoinRow {
+  ticker: string;
+  name: string;
+  category: CoinCategory;
+  status: CoinStatus;
+  priceE4: number;
+  change24hBps: number;
+  high24hE4: number;
+  low24hE4: number;
+  poolCents: number;
+  marketCapCents: number;
+  volume24hCents: number;
+  feeBps: number;
+  color: string;
+  logo: CompanyLogoData | null;
+  creator: { nickname: string; tag: string | null; trust: Pick<TrustInfo, "score" | "band"> } | null;
+  stats: CoinStats | null;
+  myQuantityE6: number;
+}
+
+export interface CryptoEvent {
+  /** "*" for market-wide events. */
+  ticker: string;
+  name: string;
+  key: string;
+  shockBps: number;
+  at: string;
+  payload: Record<string, unknown>;
+}
+
+export interface CryptoMarket {
+  regime: { kind: CryptoRegime; until: string };
+  coins: CoinRow[];
+  events: CryptoEvent[];
+}
+
+export interface CoinDetail extends CoinRow {
+  pool: { cashCents: number; tokensE6: number };
+  supplyE6: number;
+  teamTokensE6: number | null;
+  holders: number;
+  myPosition: { quantityE6: number; avgPriceE4: number; valueCents: number } | null;
+  events: CryptoEvent[];
+}
+
+export interface CryptoTradeInput {
+  requestId: string;
+  ticker: string;
+  side: "buy" | "sell";
+  amountCents?: number;
+  quantityE6?: number;
+  maxSlippageBps: number;
+}
+
+export interface CryptoTradeResult {
+  side: "buy" | "sell";
+  ticker: string;
+  quantityE6: number;
+  cashCents: number;
+  feeCents: number;
+  priceE4: number;
+  avgPriceE4: number;
+  positionE6: number;
+  cashAfterCents: number;
+  taxCents: number;
+  xpAwarded: number;
+  /** The creator sold too many team coins (ADR-101). */
+  rugPull: boolean;
+}
+
+export type CoinActionKey =
+  "smart_contract" | "audit" | "community" | "influencer" | "partnership" | "staking" | "bugfix" | "marketing_burn";
+
+export interface MyCoin extends CoinRow {
+  id: string;
+  stats: CoinStats;
+  action: { key: CoinActionKey; startedAt: string; endsAt: string } | null;
+  actions: { key: CoinActionKey; costCents: number; hours: number; successBps: number; available: boolean }[];
+  teamTokensE6: number;
+  teamAtLaunchE6: number;
+  teamSoldWindowE6: number;
+  rugLimitE6: number;
+  launch: { startPriceE4: number; liquidityCents: number; teamShareBps: number; at: string } | null;
+  createdAt: string;
+  /** Burning team coins: hype per burn, smallest amount, next possible burn (null: now). */
+  burnHype: number;
+  burnMinE6: number;
+  burnAvailableAt: string | null;
+}
+
 // ------------------------------------------------------------------ org chart (ADR-104)
 
 export interface OrgPerson {
@@ -1368,6 +1470,15 @@ export const GAME_ERROR_KEYS = [
   "deal_self",
   "stake_share_full",
   "deal_needs_company",
+  "deal_too_big",
+  "coin_not_found",
+  "coin_exists",
+  "ticker_taken",
+  "coin_not_tradable",
+  "coin_action_running",
+  "coin_tech_too_low",
+  "slippage_exceeded",
+  "coin_not_launched",
 ] as const;
 export type GameErrorKey = (typeof GAME_ERROR_KEYS)[number] | "unknown";
 
@@ -1457,6 +1568,17 @@ export interface GameEngine {
   requestPromotion(requestId: string): Promise<PromotionResult>;
   upgrades(): Promise<UpgradesState>;
   buyUpgrade(requestId: string, key: UpgradeKey): Promise<BuyUpgradeResult>;
+  /** Cryptocurrencies (ADR-101). */
+  cryptoMarket(): Promise<CryptoMarket>;
+  coin(ticker: string): Promise<CoinDetail>;
+  cryptoTrade(input: CryptoTradeInput): Promise<CryptoTradeResult>;
+  myCoin(): Promise<MyCoin | null>;
+  checkCoinName(name: string, ticker: string): Promise<{ allowed: boolean; reason: GameErrorKey | null }>;
+  createCoin(requestId: string, name: string, ticker: string, logo: CompanyLogoData): Promise<MyCoin>;
+  startCoinAction(requestId: string, action: CoinActionKey): Promise<MyCoin>;
+  launchCoin(requestId: string, startPriceE4: number, liquidityCents: number, teamShareBps: number): Promise<MyCoin>;
+  burnCoinTokens(requestId: string, quantityE6: number): Promise<MyCoin>;
+  discontinueCoin(requestId: string): Promise<MyCoin>;
   /** Org chart of a player company for the founder and the staff (ADR-104). */
   companyOrg(companyId: string): Promise<CompanyOrg>;
   /** Marketing campaign of the own company (ADR-097). */

@@ -30,13 +30,15 @@
       "more": "Mehr",
       "friends": "Freunde",
       "upgrades": "Upgrades",
-      "deals": "Deals"
+      "deals": "Deals",
+      "crypto": "Krypto"
     },
     "property": "Grundstück",
     "more": "Mehr",
     "friends": "Freunde",
     "upgrades": "Verbesserungen",
-    "deals": "Deals"
+    "deals": "Deals",
+    "crypto": "Krypto"
   },
   "topbar": {
     "search": "Aktien, Firmen, Spieler suchen",
@@ -695,7 +697,16 @@
     "deal_limit": "Du hast schon zu viele offene oder laufende Deals dieser Art.",
     "deal_self": "Mit dir selbst kannst du keinen Deal machen.",
     "stake_share_full": "Die Firma hat schon zu viele Teilhaber. Zusammen höchstens 50 % vom Gewinn.",
-    "deal_needs_company": "Dafür brauchst du eine eigene Firma (oder die andere Seite eine)."
+    "deal_needs_company": "Dafür brauchst du eine eigene Firma (oder die andere Seite eine).",
+    "deal_too_big": "Der Deal ist zu groß für deine Firma. Große Deals gibt es, wenn deine Firma mehr wert ist.",
+    "coin_not_found": "Diesen Coin gibt es nicht (mehr).",
+    "coin_exists": "Du hast schon einen Coin. Es läuft immer nur einer gleichzeitig.",
+    "ticker_taken": "Dieser Name oder dieses Kürzel ist schon vergeben.",
+    "coin_not_tradable": "Dieser Coin ist gerade nicht handelbar.",
+    "coin_action_running": "Dein Team arbeitet noch an einer anderen Aufgabe.",
+    "coin_tech_too_low": "Die Technik ist noch zu schwach. Erst ausbauen, dann starten.",
+    "slippage_exceeded": "Der Kurs hat sich zu stark bewegt. Nichts wurde gehandelt, versuch es nochmal.",
+    "coin_not_launched": "Dein Coin ist noch nicht gestartet."
   },
   "locks": {
     "level": "Level {level}",
@@ -2742,7 +2753,10 @@
         "promoted": "wurde befördert: {tier} bei {company}.",
         "deal_signed": "hat einen Deal mit {other} geschlossen: {kind}.",
         "deal_broken": "hat einen Deal mit {other} gebrochen: {kind}.",
-        "loan_defaulted": "hat einen Kredit von {other} platzen lassen."
+        "loan_defaulted": "hat einen Kredit von {other} platzen lassen.",
+        "coin_launched": "hat einen eigenen Coin gestartet: {name} ({ticker}).",
+        "rug_pull": "hat bei {name} ({ticker}) die Team-Coins abgestoßen. Rug Pull!",
+        "coin_closed": "hat den Coin {name} ({ticker}) eingestellt."
       }
     },
     "notifications": {
@@ -3963,5 +3977,280 @@
     "aiBoard": "KI-Vorstand",
     "aiBoss": "KI-Chefin",
     "hint": "Wer einen Rang höher steht, ist Vorgesetzter. Mit Beförderungen steigst du auf, in größeren Firmen gibt es mehr Ebenen."
+  },
+  "crypto": {
+    "title": "Krypto",
+    "intro": "Coins handeln rund um die Uhr gegen einen Topf aus Geld und Coins. Jeder Kauf treibt den Kurs hoch, jeder Verkauf drückt ihn. Viel mehr Risiko als Aktien, aber auch viel mehr Chance.",
+    "lockedTitle": "Krypto",
+    "lockedText": "Coins schwanken viel stärker als Aktien und handeln auch nachts. Ab Level {level} kannst du einsteigen.",
+    "regime": {
+      "bull": "Bullenmarkt",
+      "flat": "Seitwärts",
+      "bear": "Bärenmarkt"
+    },
+    "regimeText": {
+      "bull": "Die Stimmung ist gut: Die meisten Coins steigen eher.",
+      "flat": "Keine klare Richtung: Die Kurse schwanken ohne Trend.",
+      "bear": "Die Stimmung ist schlecht: Die meisten Coins fallen eher."
+    },
+    "regimeUntil": "Stimmung wechselt in etwa {hours, plural, one {# Stunde} other {# Stunden}}",
+    "categories": {
+      "all": "Alle",
+      "stable": "Stablecoins",
+      "major": "Große",
+      "alt": "Altcoins",
+      "meme": "Memecoins",
+      "player": "Spieler-Coins"
+    },
+    "categoryText": {
+      "stable": "an einen Wert gebunden, schwanken kaum",
+      "major": "groß und bekannt, schwanken deutlich",
+      "alt": "kleiner, schwanken stark",
+      "meme": "reine Wette, Totalverlust jederzeit möglich",
+      "player": "von Spielern gemacht, nur so gut wie ihr Team"
+    },
+    "risk": {
+      "stable": "Sehr geringes Risiko",
+      "major": "Mittleres Risiko",
+      "alt": "Hohes Risiko",
+      "meme": "Extremes Risiko",
+      "player": "Extremes Risiko"
+    },
+    "riskShort": {
+      "stable": "sicher",
+      "major": "mittel",
+      "alt": "hoch",
+      "meme": "extrem",
+      "player": "extrem"
+    },
+    "status": {
+      "draft": "In Entwicklung",
+      "listed": "Am Markt",
+      "dead": "Wertlos",
+      "closed": "Eingestellt"
+    },
+    "filterLabel": "Coin-Gruppe",
+    "empty": "Keine Coins in dieser Gruppe.",
+    "emptyPlayer": "Noch hat kein Spieler einen Coin gestartet. Ab Level {level} kannst du der Erste sein.",
+    "held": "Du hältst {amount}",
+    "guideTitle": "So funktioniert Krypto",
+    "guide": {
+      "clock": {
+        "title": "Rund um die Uhr",
+        "text": "Coins handeln auch nachts und am Wochenende. Die Kurse bewegen sich alle paar Sekunden."
+      },
+      "pool": {
+        "title": "Der Topf entscheidet",
+        "text": "Jeder Coin hat einen Topf aus Geld und Coins. Kaufst du, steigt der Kurs. Je kleiner der Topf, desto stärker."
+      },
+      "fees": {
+        "title": "Gebühr und Kursrutsch",
+        "text": "Jeder Handel kostet eine Gebühr. Große Käufe in kleinen Töpfen bekommen zusätzlich einen schlechteren Schnitt."
+      },
+      "events": {
+        "title": "Ereignisse",
+        "text": "Hacks, Wale, Influencer und Gerüchte bewegen Kurse plötzlich. Memecoins können über Nacht wertlos werden."
+      }
+    },
+    "eventsTitle": "Was gerade passiert",
+    "eventsEmpty": "Noch ruhig. Ereignisse erscheinen hier, sobald etwas passiert.",
+    "market": "Markt",
+    "events": {
+      "hack": "{name} wurde gehackt",
+      "bug": "Fehler im Code von {name}",
+      "influencer": "Influencer feiern {name}",
+      "exchange_listing": "{name} kommt an eine große Börse",
+      "delisting_rumor": "Gerücht: {name} fliegt von einer Börse",
+      "whale_buy": "Ein Wal kauft groß bei {name}",
+      "whale_dump": "Ein Wal wirft {name} ab",
+      "partnership": "{name} verkündet eine Partnerschaft",
+      "fud": "Angst und Zweifel um {name}",
+      "network_upgrade": "{name} bekommt ein Netz-Upgrade",
+      "depeg": "{name} verliert die Bindung",
+      "meme_wave": "Meme-Welle: Memecoins springen",
+      "regulation": "Neue Regeln: der ganze Kryptomarkt fällt",
+      "rug_pull": "Rug Pull bei {name}: Das Team verkauft alles",
+      "dead": "{name} ist praktisch wertlos",
+      "burn": "{name}: Das Team verbrennt Coins",
+      "actionOk": "{name}: {action} geschafft",
+      "actionFail": "{name}: {action} ist schiefgegangen",
+      "other": "Ereignis bei {name}",
+      "listed": "Neuer Coin am Markt: {name}",
+      "launch": "{name} ist gestartet",
+      "created": "{name} ist in Entwicklung",
+      "closed": "{name} wurde eingestellt",
+      "delisted": "{name} wurde vom Markt genommen",
+      "exposed": "{name}: Bezahlte Werbung aufgeflogen"
+    },
+    "back": "Krypto",
+    "notFoundTitle": "Coin nicht gefunden",
+    "notFoundText": "Diesen Coin gibt es nicht oder nicht mehr.",
+    "stats": {
+      "marketCap": "Marktwert",
+      "pool": "Topf",
+      "volume": "Umsatz 24 h",
+      "fee": "Gebühr",
+      "holders": "Halter",
+      "supply": "Coins insgesamt",
+      "range": "Spanne 24 h"
+    },
+    "chartLabel": "Kursverlauf {name}, {price}",
+    "position": {
+      "title": "Deine Coins",
+      "value": "Wert",
+      "avg": "Einstand",
+      "pnl": "Gewinn oder Verlust",
+      "none": "Du hältst noch keine {ticker}."
+    },
+    "buy": "Kaufen",
+    "sell": "Verkaufen",
+    "deadNote": "Dieser Coin ist wertlos und wird bald vom Markt genommen.",
+    "creator": {
+      "title": "Gemacht von",
+      "teamHolds": "Das Team hält noch {share} aller Coins.",
+      "teamNone": "Das Team hat keine Coins mehr.",
+      "warning": "Verkauft das Team viele Coins auf einmal, bricht der Kurs ein. Achte auf das Vertrauen des Machers."
+    },
+    "statsNames": {
+      "tech": "Technik",
+      "hype": "Hype",
+      "utility": "Nutzen"
+    },
+    "statsText": {
+      "tech": "Schützt vor Hacks und Fehlern und beruhigt den Kurs. Bleibt erhalten.",
+      "hype": "Treibt den Kurs und lockt Käufer. Verfliegt schnell.",
+      "utility": "Gibt dem Coin einen Zweck und stützt ihn lange. Verfliegt langsam."
+    },
+    "coinEvents": "Ereignisse",
+    "coinEventsEmpty": "Bei diesem Coin war es bisher ruhig.",
+    "trade": {
+      "buyTitle": "{ticker} kaufen",
+      "sellTitle": "{ticker} verkaufen",
+      "amount": "Betrag in Euro",
+      "quantity": "Anzahl Coins",
+      "available": "Verfügbar: {amount}",
+      "holding": "Im Depot: {amount}",
+      "all": "Alles",
+      "youGet": "Du bekommst etwa",
+      "youReceive": "Du erhältst etwa",
+      "price": "Kurs jetzt",
+      "avg": "Dein Schnitt",
+      "fee": "Gebühr ({pct})",
+      "slippage": "Kursrutsch",
+      "slippageHint": "So viel schlechter als der Kurs jetzt ist dein Schnitt, weil dein Handel den Kurs selbst bewegt.",
+      "maxSlippage": "Höchstens erlaubter Kursrutsch",
+      "tooMuch": "Zu viel Kursrutsch: kleiner handeln oder mehr erlauben.",
+      "rugWarning": "Das sind Team-Coins. Mehr als {limit} in 24 Stunden gilt als Rug Pull: Dein Vertrauen sinkt um 20 und der Hype ist weg.",
+      "bought": "Gekauft",
+      "boughtText": "{quantity} {ticker} für {amount}",
+      "sold": "Verkauft",
+      "soldText": "{quantity} {ticker} für {amount}",
+      "failed": "Handel fehlgeschlagen",
+      "level": "Krypto gibt es ab Level {level}.",
+      "orderFee": "Ordergebühr",
+      "rugPulled": "Rug Pull! Dein Vertrauen ist gesunken und der Hype ist weg."
+    },
+    "myCoinCard": {
+      "title": "Dein Coin",
+      "none": "Entwickle deinen eigenen Coin mit Pixel-Logo.",
+      "open": "Zum Coin-Studio",
+      "locked": "Eigener Coin ab Level {level}"
+    },
+    "studio": {
+      "title": "Coin-Studio",
+      "intro": "Entwickle deinen eigenen Coin: Technik bauen, Hype machen, Nutzen schaffen. Dann bringst du ihn mit eigenem Geld im Topf an den Markt.",
+      "lockedTitle": "Eigener Coin",
+      "lockedText": "Ab Level {level} entwickelst du einen eigenen Coin mit Pixel-Logo und bringst ihn an den Markt.",
+      "steps": {
+        "create": "Gründen",
+        "develop": "Entwickeln",
+        "launch": "Starten",
+        "run": "Betreiben"
+      },
+      "oneAtATime": "Du kannst immer nur einen Coin gleichzeitig haben. Stellst du ihn ein, sind Name und Kürzel wieder frei.",
+      "createTitle": "Neuen Coin gründen",
+      "name": "Name",
+      "nameHint": "{min} bis {max} Zeichen, einmalig im Spiel",
+      "ticker": "Kürzel",
+      "tickerHint": "{min} bis {max} Großbuchstaben",
+      "free": "Name und Kürzel sind frei.",
+      "logo": "Pixel-Logo",
+      "logoHint": "Dein Logo erscheint überall, wo dein Coin auftaucht.",
+      "logoForbidden": "Dieses Motiv ist nicht erlaubt.",
+      "logoEmpty": "Male mindestens ein paar Pixel.",
+      "cost": "Gründung kostet {amount}",
+      "create": "Coin gründen",
+      "created": "Coin gegründet",
+      "createdText": "Jetzt die Technik bauen, damit du starten kannst.",
+      "statsTitle": "Werte",
+      "actionsTitle": "Aufgaben fürs Team",
+      "actionsHint": "Immer eine Aufgabe zur Zeit. Deine IT-Skills erhöhen die Erfolgschance.",
+      "actions": {
+        "smart_contract": "Smart Contract schreiben",
+        "audit": "Sicherheitsprüfung",
+        "community": "Community aufbauen",
+        "influencer": "Influencer bezahlen",
+        "partnership": "Partnerschaft suchen",
+        "staking": "Staking anbieten",
+        "bugfix": "Fehler beheben",
+        "marketing_burn": "Coins verbrennen"
+      },
+      "actionText": {
+        "smart_contract": "Die Grundlage: ohne Code kein Coin. Kann scheitern.",
+        "audit": "Teuer und langsam, aber sicher: viel Technik.",
+        "community": "Billig und schnell: etwas Hype.",
+        "influencer": "Viel Hype auf einmal. Fliegt die Werbung auf, kippt die Stimmung.",
+        "partnership": "Echter Nutzen durch einen Partner. Erst nach dem Start.",
+        "staking": "Halter bekommen Zinsen: mehr Nutzen. Erst nach dem Start.",
+        "bugfix": "Kleine Verbesserung der Technik.",
+        "marketing_burn": "Team-Coins vernichten: knapper und etwas Hype."
+      },
+      "gains": "+{value} {stat}",
+      "duration": "{hours} h",
+      "chance": "{pct} Erfolg",
+      "start": "Starten",
+      "started": "Aufgabe gestartet",
+      "running": "Läuft gerade",
+      "busy": "Dein Team ist beschäftigt",
+      "afterLaunch": "Nach dem Start",
+      "launchTitle": "Coin an den Markt bringen",
+      "launchNeedsTech": "Für den Start braucht dein Coin mindestens {tech} Technik. Jetzt: {now}.",
+      "startPrice": "Startkurs",
+      "liquidity": "Geld im Topf",
+      "liquidityHint": "Dein Geld wird der Topf. Je mehr, desto ruhiger der Kurs. Zurück kommt es nur über Verkäufe oder beim Einstellen.",
+      "teamShare": "Team-Anteil",
+      "teamShareHint": "So viele Coins behältst du. Verkaufst du zu viele auf einmal, ist das ein Rug Pull.",
+      "preview": "Es gibt dann {supply} Coins. Du behältst {team}, der Rest liegt im Topf.",
+      "launch": "Coin starten",
+      "launched": "Dein Coin ist am Markt!",
+      "runTitle": "Am Markt",
+      "openCoin": "Zur Coin-Seite",
+      "teamTokens": "Team-Coins",
+      "rugMeter": "In 24 h verkauft",
+      "rugLimit": "Rug-Pull-Grenze: {limit}",
+      "rugDone": "Rug Pull! Dein Vertrauen ist gesunken.",
+      "sellTeam": "Team-Coins verkaufen",
+      "burnTitle": "Coins verbrennen",
+      "burnText": "Verbrannte Team-Coins verschwinden für immer. Der Coin wird knapper, dazu gibt es {hype} Hype.",
+      "burnAmount": "Anzahl",
+      "burn": "Verbrennen",
+      "burned": "Coins verbrannt",
+      "discontinueTitle": "Coin einstellen",
+      "discontinueText": "Das Geld im Topf wird an alle Halter verteilt, auch an dich. Danach sind Name und Kürzel wieder frei.",
+      "discontinue": "Halten zum Einstellen",
+      "discontinued": "Coin eingestellt",
+      "deadText": "Dein Coin ist praktisch wertlos. Stell ihn ein, dann kannst du einen neuen gründen.",
+      "concept": {
+        "title": "Der Plan",
+        "steps": [
+          "Gründen: Name, Kürzel und Pixel-Logo. Beides ist einmalig im Spiel.",
+          "Entwickeln: Aufgaben bauen Technik, Hype und Nutzen auf.",
+          "Starten: Du füllst den Topf mit eigenem Geld und behältst einen Team-Anteil.",
+          "Betreiben: Hype verfliegt, Nutzen hält. Zufallsereignisse helfen oder schaden."
+        ]
+      },
+      "burnMin": "Mindestens {amount}",
+      "burnWait": "Nächstes Verbrennen möglich in"
+    }
   }
 }

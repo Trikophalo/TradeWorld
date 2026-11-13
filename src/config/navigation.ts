@@ -14,6 +14,7 @@ export interface NavItem {
     | "property"
     | "friends"
     | "deals"
+    | "crypto"
     | "upgrades"
     | "profile";
   icon: UiIconName;
@@ -35,6 +36,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { href: "/property", key: "property", icon: "home", unlock: "property", more: true },
   { href: "/friends", key: "friends", icon: "heart", more: true },
   { href: "/deals", key: "deals", icon: "deal", unlock: "deals", more: true },
+  { href: "/crypto", key: "crypto", icon: "crypto", unlock: "crypto", more: true },
   { href: "/upgrades", key: "upgrades", icon: "upgrade", more: true },
   { href: "/profile", key: "profile", icon: "profile", more: true },
 ];

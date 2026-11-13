@@ -45,6 +45,9 @@ const ICONS: Record<string, PixelArt> = {
   deal_signed: UI_ICONS.deal,
   deal_broken: UI_ICONS.deal,
   loan_defaulted: UI_ICONS.deal,
+  coin_launched: UI_ICONS.crypto,
+  rug_pull: UI_ICONS.crypto,
+  coin_closed: UI_ICONS.crypto,
 };
 
 const str = (v: unknown) => (typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
@@ -105,6 +108,10 @@ function useFeedText() {
       }
       case "loan_defaulted":
         return t("loan_defaulted", { other: str(p.with) });
+      case "coin_launched":
+      case "rug_pull":
+      case "coin_closed":
+        return t(item.kind, { name: str(p.name), ticker: str(p.ticker) });
       case "promoted": {
         const tier = str(p.tier);
         const known = ["intern", "junior", "senior", "team_lead", "c_level"].includes(tier);

@@ -21,6 +21,7 @@ import { createPropertyEngine, type HomeState } from "./demo/property";
 import { createFriendEngine } from "./demo/friends";
 import { createSocialEngine, type DemoSocialState } from "./demo/social";
 import { createCompanyEventsEngine } from "./demo/company-events";
+import { createCryptoEngine, type DemoCryptoState } from "./demo/crypto";
 import { createDealEngine, initialDeals, type DemoDealsState } from "./demo/deals";
 import { tagFromUniform } from "@/lib/player-tag";
 import { createCompanyEngine, type DemoCompanyState, type DemoDissolution } from "./demo/company";
@@ -41,6 +42,7 @@ import {
   type OrderInput,
   type OrderResult,
   type Portfolio,
+  type Position,
   type RichList,
   type RichListEntry,
   type Security,
@@ -125,6 +127,8 @@ interface PlayerState {
   art?: ArtState;
   /** Own home, furniture, cars (demo/property.ts, ADR-082). */
   home?: HomeState;
+  /** Crypto market, positions and the own coin (demo/crypto.ts, ADR-101). */
+  crypto?: DemoCryptoState;
 }
 
 interface MarketState {
@@ -523,6 +527,37 @@ function fillRestingOrders(): void {
   }
 }
 
+/** Books a realised gain or loss: losses fill the loss pot, gains above it are taxed. Returns the tax. */
+function realizeGain(realized: number): number {
+  const pl = p();
+  if (realized > 0) {
+    const taxable = Math.max(0, realized - pl.lossPotCents);
+    pl.lossPotCents = Math.max(0, pl.lossPotCents - realized);
+    bump("profit_cents", realized);
+    return Math.round((taxable * trading.capitalGainsTaxBps) / 10_000);
+  }
+  pl.lossPotCents += -realized;
+  return 0;
+}
+
+/** XP for a trade (daily cap), shared by stocks and crypto. */
+function tradeXp(grossCents: number): number {
+  const pl = p();
+  const today = berlinDay();
+  if (pl.tradesDay !== today) {
+    pl.tradesDay = today;
+    pl.tradesToday = 0;
+  }
+  if (
+    pl.tradesToday < progression.xpSources.trade.maxTradesPerDay &&
+    grossCents >= progression.xpSources.trade.minOrderValueCents
+  ) {
+    pl.tradesToday += 1;
+    return addXp(progression.xpSources.trade.xp);
+  }
+  return 0;
+}
+
 /** Books one fill. The price already includes spread and impact. */
 function execute(ticker: string, side: OrderInput["side"], quantityE6: number, priceE4: number, orderId: string) {
   const pl = p();
@@ -553,14 +588,7 @@ function execute(ticker: string, side: OrderInput["side"], quantityE6: number, p
     }
     holding.quantityE6 -= quantityE6;
     realized = gross - cost - fee;
-    if (realized > 0) {
-      const taxable = Math.max(0, realized - pl.lossPotCents);
-      pl.lossPotCents = Math.max(0, pl.lossPotCents - realized);
-      tax = Math.round((taxable * trading.capitalGainsTaxBps) / 10_000);
-      bump("profit_cents", realized);
-    } else {
-      pl.lossPotCents += -realized;
-    }
+    tax = realizeGain(realized);
     income(gross - fee - tax); // a forced loan keeps back part of the proceeds (ADR-058)
     bump("sells");
   }
@@ -576,19 +604,7 @@ function execute(ticker: string, side: OrderInput["side"], quantityE6: number, p
   st.flow.set(ticker, (st.flow.get(ticker) ?? 0) + impact / 10);
   st.volumeE6.set(ticker, (st.volumeE6.get(ticker) ?? 0) + quantityE6);
 
-  const today = berlinDay();
-  if (pl.tradesDay !== today) {
-    pl.tradesDay = today;
-    pl.tradesToday = 0;
-  }
-  let xp = 0;
-  if (
-    pl.tradesToday < progression.xpSources.trade.maxTradesPerDay &&
-    gross >= progression.xpSources.trade.minOrderValueCents
-  ) {
-    pl.tradesToday += 1;
-    xp = addXp(progression.xpSources.trade.xp);
-  }
+  const xp = tradeXp(gross);
   pl.trades.unshift({
     id: `${orderId}-${pl.trades.length}`,
     ticker,
@@ -682,7 +698,7 @@ function portfolioNow(): Portfolio {
   const vt = vaultTerms();
   const capCents = vt.rate * vt.capHours;
   const hours = Math.min(vt.capHours, (now - pl.vaultClaimedAt) / HOUR);
-  const positions = [...holdings()].map(([ticker, h]) => {
+  const positions: Position[] = [...holdings()].map(([ticker, h]) => {
     const info = meta(ticker);
     const q = quote(ticker);
     const cost = h.lots.reduce((sum, lot) => sum + valueCents(lot.quantityE6, lot.priceE4), 0);
@@ -700,6 +716,7 @@ function portfolioNow(): Portfolio {
       unrealizedPnlCents: value - cost,
     };
   });
+  positions.push(...crypto.positions());
   const positionsValue = positions.reduce((sum, pos) => sum + pos.marketValueCents, 0);
   const progress = levelProgress(pl.xpTotal);
   const changeAvailable = pl.nicknameChangedAt === null ? null : pl.nicknameChangedAt + names.nicknameChangeDays * DAY;
@@ -1178,6 +1195,34 @@ const home = createPropertyEngine({
   persist,
 });
 
+// ------------------------------------------------------------------ crypto (ADR-101)
+
+const crypto = createCryptoEngine({
+  state: () => p().crypto,
+  setState: (state) => {
+    p().crypto = state;
+  },
+  level,
+  nickname: () => p().nickname,
+  tag: () => myTag(),
+  trust: () => deals.trust(),
+  cashCents: () => p().cashCents,
+  pay: (cents) => {
+    p().cashCents -= cents;
+  },
+  income: (cents) => void income(cents),
+  realize: realizeGain,
+  tradeXp,
+  itScore: () => career.branchScores().it ?? 0,
+  feeDiscountBps: () => upgradeEffects(p().upgrades ?? {}).cryptoFeeDiscountBps,
+  profane: (name) => nameViolation(name.replace(/[^A-Za-z0-9]/g, "")) === "name_profanity",
+  takenTickers: () => [...DEMO_COMPANIES.map((c) => c.ticker), ...BONDS.map((b) => b.ticker), "NEXA30"],
+  rugPull: () => deals.rugPull(),
+  feed: (kind, payload) => feedPost(kind, payload),
+  idempotent,
+  persist,
+});
+
 /** Demo only: close the current company quarter at once (button on the company page). */
 export function demoCloseQuarter(): void {
   company.closeQuarterNow();
@@ -1187,6 +1232,7 @@ export const demoEngine: GameEngine = {
   ...career.engine,
   ...upgradeEngine,
   ...deals.engine,
+  ...crypto.engine,
   ...company.engine,
   ...art.engine,
   ...home.engine,
@@ -1195,7 +1241,10 @@ export const demoEngine: GameEngine = {
   ...companyEvents.engine,
   snapshot: () => Promise.resolve(snapshotNow()),
 
-  candles: (ticker, interval, limit) => Promise.resolve(demoCandles(ticker, interval, limit)),
+  candles: (ticker, interval, limit) =>
+    Promise.resolve(
+      crypto.isCoin(ticker) ? crypto.candles(ticker, interval, limit) : demoCandles(ticker, interval, limit),
+    ),
 
   orderBook: (ticker, levels) => {
     const q = quote(ticker);
