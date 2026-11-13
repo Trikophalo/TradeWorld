@@ -34,6 +34,7 @@ import { BannerEditor } from "./banner-editor";
 import { LogoEditor } from "./logo-editor";
 import { OfficeScene } from "./office-scene";
 import { ExpansionCard, PayoutCard, ProfitCoach, StrategyCard } from "./profit";
+import { ProductionCard } from "./production";
 import { CampaignCard, ProfitRoutes } from "./routes";
 import { CompanyNewsCard, SituationCard } from "./situation";
 
@@ -108,6 +109,13 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
       {tab === "overview" && (
         <div className="grid gap-5 *:min-w-0 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6">
           <div className="space-y-5">
+            <ProductionCard
+              company={company}
+              onTeam={() => setTab("team")}
+              onCampaign={() =>
+                document.getElementById("campaign")?.scrollIntoView({ behavior: "smooth", block: "center" })
+              }
+            />
             <SituationCard />
             <ProfitCoach
               company={company}

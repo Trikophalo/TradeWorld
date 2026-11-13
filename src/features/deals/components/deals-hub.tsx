@@ -12,6 +12,7 @@ import type { Deal } from "@/features/game/types";
 import { useDealBoard, useDeals } from "../hooks";
 import { DealCard } from "./deal-card";
 import { DealForm } from "./deal-form";
+import { DealsGuide } from "./deals-guide";
 import { TrustBadge } from "./trust-badge";
 
 type Tab = "board" | "mine" | "new";
@@ -38,6 +39,12 @@ export function DealsHub() {
         {deals.data ? <TrustBadge trust={deals.data.trust} size="lg" /> : <Skeleton className="h-14 w-48 rounded-xs" />}
         <p className="max-w-md text-sm text-pretty text-fg-3">{tt("explain")}</p>
       </Card>
+      <DealsGuide
+        open={
+          deals.data !== undefined &&
+          deals.data.running.length + deals.data.history.length + deals.data.outgoing.length === 0
+        }
+      />
       <Segmented
         value={tab}
         onValueChange={go}

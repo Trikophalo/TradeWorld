@@ -3743,5 +3743,95 @@
       "normal": "Normal",
       "premium": "Premium"
     }
+  },
+  "production": {
+    "title": "So verdient deine Firma Geld",
+    "intro": "Deine Firma arbeitet von selbst, jede Stunde. Du musst nichts herstellen oder klicken. Du entscheidest nur, wie viele Leute arbeiten und wie du Kunden gewinnst.",
+    "team": "Team",
+    "teamValue": "{count, plural, one {# Person} other {# Personen}}",
+    "teamHint": "Du, deine Mitarbeiter und KI-Kräfte.",
+    "make": "Herstellung",
+    "makeHint": "So viel Ware schafft dein Team pro Stunde. Mehr Leute, mehr Ware.",
+    "customers": "Kunden",
+    "customersHint": "So viel wollen Kunden kaufen. Wächst mit Bekanntheit (jetzt {awareness}) und Qualität.",
+    "profit": "Gewinn",
+    "profitHint": "{sold} verkauft, {contract} aus Auftragsarbeit, danach Kosten.",
+    "profitHintWaiting": "Kommt nach der ersten Betriebsstunde.",
+    "perHour": "{amount}/h",
+    "unknown": "noch offen",
+    "neck": {
+      "waiting": {
+        "title": "Die erste Betriebsstunde läuft",
+        "text": "In {time} rechnet deine Firma ihre erste Stunde ab. Dann siehst du hier echte Zahlen und was du verbessern kannst."
+      },
+      "customers": {
+        "title": "Dir fehlen Kunden",
+        "text": "Dein Team könnte {free} pro Stunde mehr herstellen, als Kunden kaufen. Bekanntheit wächst jedes Quartal von selbst; schneller geht es mit einer Kampagne oder günstigeren Preisen. Bis dahin verkauft die Auftragsarbeit einen Teil des Rests.",
+        "action": "Kunden gewinnen"
+      },
+      "staff": {
+        "title": "Dir fehlen Leute",
+        "text": "Kunden wollen {missing} pro Stunde mehr, als dein Team schafft. Stelle eine KI-Kraft oder Mitarbeiter ein, oder kauf per Liefervertrag bei einem anderen Spieler zu.",
+        "action": "Team aufstocken"
+      },
+      "balanced": {
+        "title": "Gut ausbalanciert",
+        "text": "Herstellung und Kunden passen zusammen. Wachse jetzt beides: mehr Leute und mehr Bekanntheit."
+      }
+    },
+    "faq": {
+      "title": "Fragen zur Firma",
+      "items": [
+        {
+          "q": "Warum verdiene ich am Anfang so wenig?",
+          "a": "Eine neue Firma kennt kaum jemand (etwa 3 % Bekanntheit). Jedes Quartal wächst die Bekanntheit von selbst. Bis dahin bringt vor allem die Auftragsarbeit Geld."
+        },
+        {
+          "q": "Was ist Auftragsarbeit?",
+          "a": "Ein Teil der Ware, die deine Kunden nicht kaufen, geht an anonyme Abnehmer, mit kleiner Marge. Lass sie an, solange Kunden fehlen."
+        },
+        {
+          "q": "Lohnt sich eine KI-Kraft?",
+          "a": "Nur wenn Kunden warten (Engpass „Leute“). Sonst kostet sie Lohn und stellt Ware her, die niemand kauft."
+        },
+        {
+          "q": "Wofür sind Deals?",
+          "a": "Mit anderen Spielern: freie Kapazität verkaufen, fehlende Ware einkaufen oder Geld von Teilhabern für den Ausbau holen. Unter Deals findest du Beispiele."
+        }
+      ]
+    }
+  },
+  "dealsGuide": {
+    "title": "So funktionieren Deals",
+    "example": "Beispiel",
+    "kinds": {
+      "loan": {
+        "name": "Kredit",
+        "what": "Einer leiht dem anderen Geld und bekommt es mit Zinsen zurück.",
+        "example": "Mia leiht Tom 10.000 € für 7 Tage zu 5 %. Tom zahlt 10.500 € zurück.",
+        "when": "Lohnt sich, wenn du Geld für eine Chance brauchst oder Zinsen verdienen willst."
+      },
+      "supply": {
+        "name": "Liefervertrag",
+        "what": "Zwei Firmen helfen sich: Wer ausverkauft ist, lässt die andere Firma herstellen und zahlt pro Stück eine Gebühr.",
+        "example": "Toms Firma hat zu viele Kunden, Mias Firma hat freie Leute. Mia stellt her, Tom verkauft und zahlt 60 % vom Preis.",
+        "when": "Lohnt sich bei freier Kapazität (verkaufen) oder wenn Kunden warten (einkaufen)."
+      },
+      "stake": {
+        "name": "Teilhaber",
+        "what": "Ein Spieler gibt einer Firma Geld und bekommt dafür einen Anteil an jedem Stundengewinn.",
+        "example": "Mia gibt Toms Firma 20.000 € für 15 % vom Gewinn, 7 Tage lang.",
+        "when": "Lohnt sich für Gründer, die Geld für den Ausbau brauchen, und für Anleger mit Vertrauen in die Firma."
+      }
+    },
+    "steps": [
+      "Du machst ein Angebot, an einen Spieler oder offen für alle.",
+      "Jemand nimmt an. Erst dann fließt Geld.",
+      "Der Server bucht Gebühren, Gewinnanteile und Fälligkeiten automatisch.",
+      "Wer sein Wort hält, gewinnt Vertrauen. Wer bricht, verliert es."
+    ],
+    "loanLimit": "Kredite: bis {amount} (20.000 € je Level, du bist Level {level}).",
+    "companyLimit": "Deine Firma ist {value} wert: Lieferverträge und Teilhaber bis {amount}. Wächst die Firma, werden größere Deals möglich.",
+    "noCompany": "Lieferverträge und Teilhaber brauchen eine eigene Firma. Kredite gehen auch ohne."
   }
 }

@@ -494,26 +494,28 @@ function toCompany(c: z.infer<typeof companySchema>): MyCompany {
     graceQuarters: c.grace_quarters,
     aiWorkerSkills: c.ai_worker_skills,
     trainingFrom: c.training_from,
-    live: c.live
-      ? {
-          lastHourAt: c.live.last_hour_at,
-          revenuePerHourCents: c.live.revenue_per_hour_cents,
-          profitPerHourCents: c.live.profit_per_hour_cents,
-          payFactorBps: c.live.pay_factor_bps,
-          todayRevenueCents: c.live.today_revenue_cents,
-          todayProfitCents: c.live.today_profit_cents,
-          quarterRevenueCents: c.live.quarter_revenue_cents,
-          quarterProfitCents: c.live.quarter_profit_cents,
-          contractRevenuePerHourCents: c.live.contract_revenue_per_hour_cents,
-          demandPerHourCents: c.live.demand_per_hour_cents,
-          capacityPerHourCents: c.live.capacity_per_hour_cents,
-          fixedPerHourCents: c.live.fixed_per_hour_cents,
-          aiWagesPerHourCents: c.live.ai_wages_per_hour_cents,
-          marketingPerHourCents: c.live.marketing_per_hour_cents,
-          founderPayoutPerHourCents: c.live.founder_payout_per_hour_cents,
-          todayFounderPayoutCents: c.live.today_founder_payout_cents,
-        }
-      : null,
+    // Before the first closed hour the server sends zeros; that is "the first hour is running", not "sold out".
+    live:
+      c.live && c.hours.length > 0
+        ? {
+            lastHourAt: c.live.last_hour_at,
+            revenuePerHourCents: c.live.revenue_per_hour_cents,
+            profitPerHourCents: c.live.profit_per_hour_cents,
+            payFactorBps: c.live.pay_factor_bps,
+            todayRevenueCents: c.live.today_revenue_cents,
+            todayProfitCents: c.live.today_profit_cents,
+            quarterRevenueCents: c.live.quarter_revenue_cents,
+            quarterProfitCents: c.live.quarter_profit_cents,
+            contractRevenuePerHourCents: c.live.contract_revenue_per_hour_cents,
+            demandPerHourCents: c.live.demand_per_hour_cents,
+            capacityPerHourCents: c.live.capacity_per_hour_cents,
+            fixedPerHourCents: c.live.fixed_per_hour_cents,
+            aiWagesPerHourCents: c.live.ai_wages_per_hour_cents,
+            marketingPerHourCents: c.live.marketing_per_hour_cents,
+            founderPayoutPerHourCents: c.live.founder_payout_per_hour_cents,
+            todayFounderPayoutCents: c.live.today_founder_payout_cents,
+          }
+        : null,
     hours: c.hours.map((h) => ({
       hourStart: h.hour_start,
       revenueCents: h.revenue_cents,
