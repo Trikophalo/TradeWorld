@@ -3,28 +3,28 @@
     {
       "id": 4,
       "body": "Beobachter rechnen in Kürze mit einem leicht steigenden Kurs. Sicher ist das nicht.",
-      "name": "SolarFuchs",
-      "due_at": "2026-11-13T22:38:51.149925+00:00",
+      "name": "Volta Energie AG",
+      "due_at": "2026-11-13T23:49:51.652769+00:00",
       "status": "open",
-      "ticker": "SFX",
-      "headline": "Gerücht: SolarFuchs steht vor starken Zahlen",
+      "ticker": "VLT",
+      "headline": "Volta Energie AG: Großauftrag in Sicht",
       "move_bps": null,
       "strength": 1,
       "direction": "up",
-      "published_at": "2026-11-13T22:26:28.868796+00:00"
+      "published_at": "2026-11-13T23:20:42.041791+00:00"
     },
     {
       "id": 3,
-      "body": "Beobachter rechnen in Kürze mit einem spürbar steigenden Kurs. Sicher ist das nicht.",
-      "name": "Alpenmed",
-      "due_at": "2026-11-13T21:26:28.864439+00:00",
-      "status": "fizzled",
-      "ticker": "ALM",
-      "headline": "Insider rechnen bei Alpenmed mit Rückenwind",
-      "move_bps": null,
-      "strength": 2,
-      "direction": "up",
-      "published_at": "2026-11-13T21:26:28.864439+00:00"
+      "body": "Beobachter rechnen in Kürze mit einem leicht fallenden Kurs. Sicher ist das nicht.",
+      "name": "QuantenSprung Labs",
+      "due_at": "2026-11-13T22:20:42.034464+00:00",
+      "status": "confirmed",
+      "ticker": "QSL",
+      "headline": "Gerücht: QuantenSprung Labs verfehlt die Erwartungen",
+      "move_bps": -588,
+      "strength": 1,
+      "direction": "down",
+      "published_at": "2026-11-13T22:20:42.034464+00:00"
     }
   ],
   "reliability_bps": 7500

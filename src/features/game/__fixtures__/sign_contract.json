@@ -1,6 +1,6 @@
 {
   "job": {
-    "id": "5bd35864-101a-4b1e-b156-3056098ef964",
+    "id": "fc6b2298-f824-4b69-9e90-88b40ad1983e",
     "tier": "junior",
     "title": null,
     "company": {
@@ -13,9 +13,9 @@
       "ticker": "EBX"
     },
     "presence": {
-      "fire_at": "2026-11-18T21:26:24.208828+00:00",
+      "fire_at": "2026-11-18T22:20:35.843852+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-13T21:26:24.208828+00:00"
+      "last_active_at": "2026-11-13T22:20:35.843852+00:00"
     },
     "required": [{ "branch": "it", "min_score": 2 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M2 14 C6 4 10 4 14 12 S22 18 26 8",
     "title_key": "it_junior",
     "rank_hours": 0.0,
-    "started_at": "2026-11-13T21:26:24.704887+00:00",
+    "started_at": "2026-11-13T22:20:36.423773+00:00",
     "pending_raise": null,
     "raise_max_bps": 0,
     "notice_ends_at": null,

@@ -142,7 +142,7 @@ export interface CryptoConfig {
 export const CRYPTO: CryptoConfig = {
   minLevel: 10,
   createMinLevel: 14,
-  tickSeconds: 5,
+  tickSeconds: 10,
   categories: {
     stable: { sigmaDay: 0.002, beta: 0, feeBps: 5, pegPullPerHour: 0.5 },
     major: { sigmaDay: 0.06, beta: 1, feeBps: 10, pegPullPerHour: 0 },

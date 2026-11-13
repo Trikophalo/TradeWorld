@@ -1739,3 +1739,12 @@ Vorgabe: Auf dem Profil soll man sehen, in welche Aktien usw. Freunde investiert
 Das Profil zeigt die Karte „Investments“: jede Position mit Wert und Anteil am Depot, die größte zuerst. Sichtbar ist
 das für den Spieler selbst und für angenommene Freunde (`are_friends`). Alle anderen lesen nur, dass es Freunden
 vorbehalten ist; Einstandskurse und Gewinne werden nicht gezeigt.
+
+## ADR-122: Markt-Takt alle 10 Sekunden — `akzeptiert`
+
+Anlass: Mit sechs Spielern auf der kleinsten Supabase-Größe waren CPU und Disk-IO-Budget erschöpft; das Spiel lud
+immer wieder. Der Takt schreibt Kurse, Kerzen und Quotes aller Aktien und Coins.
+
+`time.tickSeconds` und `crypto.tickSeconds` sind 10 statt 5, der Cron-Job `nexa-market-tick` läuft alle 10 Sekunden.
+Die Simulation skaliert Schwankung und Abklingen mit dem Intervall, die Tagesschwankung bleibt gleich. Der Client
+fragt den Markt im selben Takt ab. Damit halbieren sich Schreibzugriffe des Takts und Marktabfragen der Spieler.

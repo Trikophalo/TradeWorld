@@ -1,5 +1,5 @@
 {
-  "id": "13cfb98c-65f3-44b9-8090-2fbe7b94866a",
+  "id": "ea93a016-f650-457a-95c0-f141e0c43680",
   "kind": "loan",
   "terms": { "hours": 24, "interest_bps": 0, "principal_cents": 20000 },
   "status": "cancelled",
@@ -9,15 +9,15 @@
   "my_role": "lender",
   "progress": { "due_cents": 20000, "left_cents": 20000, "repaid_cents": 0 },
   "proposer": {
-    "tag": "ZQC7",
+    "tag": "7MY2",
     "level": 6,
     "trust": { "band": "blank", "score": 50 },
     "nickname": "Fixture_Lieferant",
     "avatar_key": "rookie"
   },
-  "closed_at": "2026-11-13T21:26:27.747784+00:00",
-  "created_at": "2026-11-13T21:26:27.743611+00:00",
-  "expires_at": "2026-11-15T21:26:27.743611+00:00",
+  "closed_at": "2026-11-13T22:20:40.480313+00:00",
+  "created_at": "2026-11-13T22:20:40.473673+00:00",
+  "expires_at": "2026-11-15T22:20:40.473673+00:00",
   "accepted_at": null,
   "is_proposer": true,
   "broken_by_me": false,

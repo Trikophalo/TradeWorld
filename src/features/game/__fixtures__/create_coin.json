@@ -1,5 +1,5 @@
 {
-  "id": "78a421f9-92d6-42b7-8893-17b276f7d5ea",
+  "id": "6c868dc9-2727-4fd5-a707-7e22ce9598fe",
   "logo": {
     "grid": [
       "................",
@@ -37,12 +37,12 @@
     { "key": "staking", "hours": 12, "available": false, "cost_cents": 500000, "success_bps": 10000 },
     { "key": "bugfix", "hours": 3, "available": true, "cost_cents": 100000, "success_bps": 10000 }
   ],
-  "creator": { "tag": "CWE4", "trust": { "band": "blank", "score": 50 }, "nickname": "Fixture_Coiner" },
+  "creator": { "tag": "R452", "trust": { "band": "blank", "score": 50 }, "nickname": "Fixture_Coiner" },
   "fee_bps": 100,
   "category": "player",
   "price_e4": null,
   "burn_hype": 8,
-  "created_at": "2026-11-13T21:26:28.664943+00:00",
+  "created_at": "2026-11-13T22:20:41.759497+00:00",
   "low_24h_e4": null,
   "pool_cents": 0,
   "burn_min_e6": 0,

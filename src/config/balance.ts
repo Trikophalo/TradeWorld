@@ -1351,7 +1351,8 @@ export const BALANCE = {
     // Open around the clock: no after-hours session, no bells (ADR-106). Players play whenever they have time.
     marketOpenHour: 0,
     marketCloseHour: 24,
-    tickSeconds: 5,
+    // 10 s: half the writes of the market tick (ADR-122); volatility scales with the interval.
+    tickSeconds: 10,
     ticksPerRunnerInvocation: 12,
     afterHours: {
       spreadMultiplier: 3,

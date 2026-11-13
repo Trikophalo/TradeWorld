@@ -366,6 +366,6 @@ describe("time", () => {
   });
 
   it("derives tick counts", () => {
-    expect(ticksPerQuarter()).toBe(4320);
+    expect(ticksPerQuarter()).toBe(2160);
   });
 });
