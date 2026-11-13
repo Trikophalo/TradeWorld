@@ -3,6 +3,8 @@ import { BALANCE } from "../../config/balance.ts";
 import { SKILL_BRANCHES, SKILL_NODES } from "../../config/skills.ts";
 import {
   aiPostingSpec,
+  firedForAbsence,
+  presencePayBps,
   aiSalaryCeiling,
   branchScores,
   isReachable,
@@ -130,5 +132,17 @@ describe("AI postings", () => {
       { branch: "management", minScore: 6 },
     ]);
     expect(aiPostingSpec("tech", 0, 0, 1).tier).toBe("junior");
+  });
+});
+
+describe("presence (ADR-103)", () => {
+  it("pays the full wage for a day, then less, and ends the job after five days", () => {
+    expect(presencePayBps(0)).toBe(10_000);
+    expect(presencePayBps(23.9)).toBe(10_000);
+    expect(presencePayBps(24)).toBe(7_500);
+    expect(presencePayBps(50)).toBe(5_000);
+    expect(presencePayBps(100)).toBe(2_500);
+    expect(firedForAbsence(119)).toBe(false);
+    expect(firedForAbsence(120)).toBe(true);
   });
 });

@@ -24,6 +24,7 @@ import { unlockLevel } from "@/lib/sim/progression";
 import { formatBps, formatMoney } from "@/lib/format";
 import { playSound } from "@/lib/sound";
 import { useClock } from "@/lib/use-now";
+import { cn } from "@/lib/utils";
 import { useCareerRefresh, useMyJob } from "../hooks";
 import { useJobTitle } from "./job-title";
 
@@ -146,6 +147,8 @@ export function ActiveJob({ job }: { job: MyJob }) {
         )}
       </div>
 
+      {job.presence && <PresenceBox presence={job.presence} />}
+
       <RaiseBox job={job} />
 
       {job.noticeEndsAt && <NoticeBox noticeEndsAt={job.noticeEndsAt} />}
@@ -205,6 +208,25 @@ function RaiseBox({ job }: { job: MyJob }) {
       ) : (
         <p className="mt-1 text-sm text-pretty text-fg-3">{t("raiseNone")}</p>
       )}
+    </div>
+  );
+}
+
+/** Presence (ADR-103): full pay while the player comes by, less when away, the job ends after five days. */
+function PresenceBox({ presence }: { presence: NonNullable<MyJob["presence"]> }) {
+  const t = useTranslations("career.presence");
+  const full = presence.payBps >= 10_000;
+  return (
+    <div
+      className={cn("mt-4 rounded-md border px-3 py-3", full ? "border-line-1" : "border-warn/40 bg-warn-soft")}
+      data-testid="presence"
+      data-pay={presence.payBps}
+    >
+      <p className="text-sm font-medium text-fg-1">
+        {full ? t("full") : t("reduced", { percent: formatBps(presence.payBps).replace("+", "") })}
+      </p>
+      <p className="mt-0.5 text-xs text-pretty text-fg-3">{t("rules")}</p>
+      <p className="mt-1 text-xs text-fg-2">{t("comeBack", { date: date.format(new Date(presence.fireAt)) })}</p>
     </div>
   );
 }

@@ -473,6 +473,14 @@ export interface JobTierConfig {
 export interface CareersConfig {
   readonly tiers: readonly JobTierConfig[];
   readonly paidHoursPerDayCap: number;
+  /**
+   * Presence (ADR-103): the job pays less the longer the player has not been in the game, and ends after
+   * `fireAfterHours`. Steps are checked from the top; before the first one the full wage is paid.
+   */
+  readonly inactivity: {
+    readonly steps: readonly { readonly afterHours: number; readonly payBps: number }[];
+    readonly fireAfterHours: number;
+  };
   readonly playerCompanyExperienceMultiplier: number;
   /** Promotion to the next rank in the same job (ADR-094). */
   readonly promotion: {
@@ -1774,7 +1782,16 @@ export const BALANCE = {
       { id: "team_lead", minLevel: 20, salaryCentsPerHour: 130_000, stockOptions: false },
       { id: "c_level", minLevel: 25, salaryCentsPerHour: 250_000, stockOptions: true },
     ],
-    paidHoursPerDayCap: 12,
+    // Owner: one works 8 hours a day (ADR-103).
+    paidHoursPerDayCap: 8,
+    inactivity: {
+      steps: [
+        { afterHours: 24, payBps: 7_500 },
+        { afterHours: 48, payBps: 5_000 },
+        { afterHours: 72, payBps: 2_500 },
+      ],
+      fireAfterHours: 120,
+    },
     playerCompanyExperienceMultiplier: 2,
     promotion: {
       hoursByTier: { junior: 12, senior: 36, team_lead: 72, c_level: 120 },
@@ -1806,7 +1823,7 @@ export const BALANCE = {
     xpSources: {
       trade: { xp: 10, maxTradesPerDay: 30, minOrderValueCents: 10_000 },
       profitableClose: { profitCentsPerXp: 10_000, maxXpPerTrade: 500 },
-      workHour: { xp: 40, playerCompanyMultiplier: 1.5, maxHoursPerDay: 12 },
+      workHour: { xp: 40, playerCompanyMultiplier: 1.5, maxHoursPerDay: 8 },
       workTask: { minXp: 50, maxXp: 150 },
       dailyMission: { minXp: 200, maxXp: 400, perDay: 3 },
       quickMission: { minXp: 20, maxXp: 60, active: 3 },

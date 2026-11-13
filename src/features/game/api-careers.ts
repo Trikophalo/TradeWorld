@@ -199,6 +199,7 @@ const jobSchema = z.object({
   quit_now_cost_cents: num.default(0),
   rank_hours: num.default(0),
   promotion: promotionSchema.nullable().default(null),
+  presence: z.object({ last_active_at: iso, pay_bps: num, fire_at: iso }).nullable().default(null),
 });
 
 const cardSchema = z.object({
@@ -369,6 +370,9 @@ const toJob = (j: z.infer<typeof jobSchema>): MyJob => ({
   quitNowCostCents: j.quit_now_cost_cents,
   rankHours: j.rank_hours,
   promotion: j.promotion ? toPromotion(j.promotion) : null,
+  presence: j.presence
+    ? { lastActiveAt: j.presence.last_active_at, payBps: j.presence.pay_bps, fireAt: j.presence.fire_at }
+    : null,
 });
 
 type CareerEngine = Pick<

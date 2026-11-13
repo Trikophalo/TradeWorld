@@ -1401,3 +1401,53 @@ Währung und Zufallsereignisse für den Kurs.
    dagegen, dass der Gründer an seine Währung glaubt.
 6. **Einstellen:** Der Gründer kann die Währung einstellen. Der Pool wird nach Coins an alle Halter ausgezahlt,
    der Gründer bekommt seinen Teil wie alle. Danach sind Name und Ticker frei, und er kann eine neue Währung gründen.
+
+## ADR-102: Beim Einloggen klar, was zu tun ist; Firma und Deals erklärt — `akzeptiert`
+
+Vorgabe: Das Spiel ist am Anfang verwirrend, es soll intuitiver sein und beim Einloggen sofort zeigen, was zu tun
+ist. Wie eine Firma etwas herstellt und wie Deals funktionieren, versteht man nicht.
+
+- **„Heute dran“** oben auf der Startseite (`src/features/home/today.ts`, getestet):
+  - Finn begrüßt nach Tageszeit, mit einem Satz zur wichtigsten Sache oder einem von vier Sätzen je Tageszeit.
+  - Darunter höchstens vier Aufgaben in fester Reihenfolge, jede mit einem Tipp erledigt:
+    1. Tagesbelohnung, voller Tresor (ab 40 %, ab 90 % dringend), fertige Missionen
+    2. Lage in der Firma, Beförderung möglich, Arbeitsaufgabe, Deal-Angebote
+    3. neu freigeschaltete Bereiche (noch nicht besucht), erster Job, erste Firma, freie Skillpunkte
+    4. der Engpass der Firma
+  - Ist nichts offen, zeigt sie den Weg zu den Märkten.
+  - Hinter dem Bereich eine Pixel-Stadt, in der langsam Fenster aufleuchten.
+- **Firma:** Die Karte „So verdient deine Firma Geld“ zeigt Team → Herstellung → Kunden → Gewinn mit den Zahlen der
+  Firma, den Engpass in einem Satz, genau einen Knopf für den nächsten Schritt und kurze Fragen und Antworten.
+  - Bis zur ersten abgerechneten Stunde schickt der Server Nullen. Das gilt jetzt als „erste Stunde läuft“ und
+    nicht mehr als „ausverkauft“.
+- **Deals:** „So funktionieren Deals“ erklärt die drei Arten mit Beispiel und wann sie sich lohnen, den Ablauf in vier
+  Schritten und die eigenen Grenzen (Kredite nach Level, Firmen-Deals nach Firmenwert).
+- **Missionen:** ein Klemmbrett mit abgehakten Punkten statt des Bullen.
+
+## ADR-103: Achtstundentag, Lohn direkt aufs Konto, Anwesenheit — `akzeptiert`
+
+Vorgabe: Der Lohn soll nicht in den Tresor gehen (der ist bei 800 € voll), man arbeitet 8 Stunden am Tag, wer lange
+nicht da ist, verdient weniger, und nach mehr als 5 Tagen ohne Besuch wird man gekündigt.
+
+- Der Lohn ging schon direkt aufs Konto. Die Anzeige „+ Job … pro Stunde“ stand aber unter dem Tresorbetrag. Jetzt
+  steht sie getrennt: „Lohn … geht direkt auf dein Konto, nicht in den Tresor.“
+- **8 bezahlte Stunden am Tag** (`careers.paidHoursPerDayCap`, auch für die Arbeits-XP). Die Verbesserung
+  „Überstunden“ hebt auf 9 und 10 Stunden.
+- **Anwesenheit** (`careers.inactivity`, `presencePayBps`): Ab einem Tag ohne Besuch gibt es 75 % Lohn, ab zwei Tagen
+  50 %, ab drei Tagen 25 %. Nach fünf Tagen ohne Besuch endet der Job (Benachrichtigung, bei Spielerfirmen auch an
+  den Chef). Als Besuch zählt jede Nutzung des Spiels. Die Zeit, in der man weg war, wird beim Zurückkommen mit dem
+  gekürzten Satz abgerechnet.
+- Die Job-Karte zeigt die Regel und bis wann man spätestens wieder vorbeischauen muss.
+- Folge fürs Balancing: Der Lohn sinkt um ein Drittel. Firmen verdienen damit im Verhältnis mehr als Jobs
+  (Kleinunternehmen etwa 2 bis 3 Junior-Löhne).
+
+## ADR-104: Organigramm der Firma — `akzeptiert`
+
+Vorgabe: Eine Hierarchie-Ansicht, in der man die Mitarbeiter als Personen sieht, seine Vorgesetzten und die eigene
+Position. Größere Firmen bekommen später Vorgesetzte, Manager und mehr.
+
+- Ganz oben der Gründer (CEO), darunter die Ränge Vorstand, Teamleitung, Senior, Junior, Praktikum, unten die
+  KI-Kräfte. Jede Person als Pixel-Figur mit Name, Rang und Titel; die eigene Position ist markiert, der direkte
+  Vorgesetzte (der nächsthöhere besetzte Rang) hervorgehoben.
+- Der Gründer sieht es im Team, Mitarbeiter im Job-Tab. Daten: `get_company_org` (Gründer und Mitarbeiter der Firma).
+- Mit mehr Rängen in größeren Firmen wächst das Organigramm von selbst.

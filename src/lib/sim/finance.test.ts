@@ -285,11 +285,11 @@ describe("vault", () => {
     expect(vaultStatus(0, 2 * HOUR)).toMatchObject({ isFull: false, msUntilFull: 6 * HOUR });
   });
 
-  it("pays salary for at most 12 hours per day", () => {
+  it("pays salary for at most 8 hours per day (ADR-103)", () => {
     const rate = b(30_000);
     expect(salaryAccruedCents(rate, 2 * HOUR, 0)).toEqual({ cents: b(60_000), paidMs: 2 * HOUR });
-    expect(salaryAccruedCents(rate, 5 * HOUR, 10 * HOUR)).toEqual({ cents: b(60_000), paidMs: 2 * HOUR });
-    expect(salaryAccruedCents(rate, 5 * HOUR, 12 * HOUR)).toEqual({ cents: b(0), paidMs: 0 });
+    expect(salaryAccruedCents(rate, 5 * HOUR, 6 * HOUR)).toEqual({ cents: b(60_000), paidMs: 2 * HOUR });
+    expect(salaryAccruedCents(rate, 5 * HOUR, 8 * HOUR)).toEqual({ cents: b(0), paidMs: 0 });
   });
 });
 

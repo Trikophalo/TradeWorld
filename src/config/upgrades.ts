@@ -69,7 +69,7 @@ export const UPGRADES: UpgradesConfig = {
   study: { maxLevel: 3, minLevel: 2, levelStep: 4, baseCostCents: 800_000, costGrowth: 3, perLevel: 1 },
   // +10 % XP from work per level: 6.000 €, 18.000 €, 54.000 €; levels 4, 8, 12
   mentor: { maxLevel: 3, minLevel: 4, levelStep: 4, baseCostCents: 600_000, costGrowth: 3, perLevel: 1_000 },
-  // 12 → 14 paid hours a day: 20.000 €, 60.000 €; levels 5, 11
+  // 8 → 10 paid hours a day: 20.000 €, 60.000 €; levels 5, 11
   overtime: { maxLevel: 2, minLevel: 5, levelStep: 6, baseCostCents: 2_000_000, costGrowth: 3, perLevel: 1 },
   // +5 % promotion chance per level: 10.000 €, 25.000 €, 62.500 €; levels 5, 10, 15
   rhetoric: { maxLevel: 3, minLevel: 5, levelStep: 5, baseCostCents: 1_000_000, costGrowth: 2.5, perLevel: 500 },

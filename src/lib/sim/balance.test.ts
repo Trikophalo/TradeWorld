@@ -94,7 +94,7 @@ describe("BALANCE", () => {
     });
     expect(BALANCE.time.quarterHours * BALANCE.time.quartersPerGameYear).toBe(24);
     expect(BALANCE.progression.maxLevel).toBeGreaterThan(1000);
-    expect(BALANCE.careers.paidHoursPerDayCap).toBe(12);
+    expect(BALANCE.careers.paidHoursPerDayCap).toBe(8);
     expect(BALANCE.bonds.maturities.map((m) => m.years)).toEqual([1, 2, 5, 10]);
     expect(BALANCE.careers.tiers.map((t) => [t.minLevel, t.salaryCentsPerHour])).toEqual([
       [2, 15_000],

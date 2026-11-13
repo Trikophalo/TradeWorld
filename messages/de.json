@@ -109,7 +109,7 @@
     "progress": "Füllstand des Tresors",
     "claimFailed": "Tresor nicht geleert",
     "treasuryLow": "Staatskasse knapp",
-    "jobIncome": "+ Job {amount} pro Stunde",
+    "jobIncome": "Lohn {amount}/h geht direkt auf dein Konto, nicht in den Tresor.",
     "open": "Tresor öffnen",
     "close": "Tresor schließen",
     "sourcesTitle": "Deine Einnahmequellen",
@@ -1588,7 +1588,13 @@
     "quitNowTitle": "Sofort kündigen",
     "quitNowText": "Dein Job endet sofort. Dafür zahlst du der Firma einen Tageslohn: {amount}.",
     "quitNowConfirm": "Gedrückt halten: sofort kündigen",
-    "quitNowDoneText": "Dein Job ist beendet. {amount} gingen an die Firma."
+    "quitNowDoneText": "Dein Job ist beendet. {amount} gingen an die Firma.",
+    "presence": {
+      "full": "Du bist da: voller Lohn.",
+      "reduced": "Du warst länger weg: nur {percent} Lohn.",
+      "rules": "Gearbeitet wird 8 Stunden am Tag, von selbst. Ab einem Tag ohne Besuch gibt es 75 % Lohn, ab zwei Tagen 50 %, ab drei Tagen 25 %. Nach fünf Tagen ohne Besuch wirst du gekündigt.",
+      "comeBack": "Spätestens am {date} wieder vorbeischauen."
+    }
   },
   "jobs": {
     "title": "Jobportal",

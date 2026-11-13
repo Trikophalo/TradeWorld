@@ -547,6 +547,8 @@ export interface MyJob {
   rankHours: number;
   /** Next rank and what it takes; null on servers before M4i. */
   promotion: PromotionState | null;
+  /** Presence (ADR-103): pay share now and when the job ends without a visit; null on servers before M4k. */
+  presence: { lastActiveAt: string; payBps: number; fireAt: string } | null;
 }
 
 // ------------------------------------------------------------------ promotions (ADR-094)

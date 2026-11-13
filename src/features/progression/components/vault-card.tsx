@@ -157,11 +157,7 @@ export function VaultCard() {
             {t("subtitle", { rate: formatMoney(vault?.rateCentsPerHour ?? RATE, { whole: true }) })}
             {vault && vault.factorBps < 10_000 && ` · ${t("treasuryLow")}`}
           </p>
-          {jobRate > 0 && (
-            <p className="truncate nums text-sm text-gain" data-testid="vault-job-income">
-              {t("jobIncome", { amount: formatMoney(jobRate) })}
-            </p>
-          )}
+
           <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
             <button
               type="button"
@@ -185,6 +181,15 @@ export function VaultCard() {
         </div>
       </div>
 
+      {jobRate > 0 && (
+        <p
+          className="flex items-center gap-2 rounded-md bg-gain-soft px-3 py-2 nums text-sm text-gain"
+          data-testid="vault-job-income"
+        >
+          <PixelIcon {...UI_ICONS.briefcase} scale={1} />
+          {t("jobIncome", { amount: formatMoney(jobRate) })}
+        </p>
+      )}
       <div>
         <Progress value={fill} label={t("progress")} tone={full ? "warn" : "gold"} />
         <div className="mt-2 flex justify-between text-sm">

@@ -33,7 +33,7 @@ describe("upgrade effects", () => {
       vaultCapHours: 8,
       incomeBps: 10_000,
       workHoursPerBranchPoint: 6,
-      paidHoursCap: 12,
+      paidHoursCap: 8,
       promotionBonusBps: 0,
       workXpBps: 10_000,
       artDiscountBps: 0,
@@ -61,7 +61,7 @@ describe("upgrade effects", () => {
     expect(e.vaultCapHours).toBe(14);
     expect(e.incomeBps).toBe(13_000);
     expect(e.workHoursPerBranchPoint).toBe(3);
-    expect(e.paidHoursCap).toBe(14);
+    expect(e.paidHoursCap).toBe(10);
     expect(e.promotionBonusBps).toBe(500);
   });
 
@@ -75,7 +75,7 @@ describe("upgrade effects", () => {
     expect(upgradeValue("vault", 1)).toBe(10);
     expect(upgradeValue("income", 2)).toBe(12_000);
     expect(upgradeValue("study", 1)).toBe(5);
-    expect(upgradeValue("overtime", 1)).toBe(13);
+    expect(upgradeValue("overtime", 1)).toBe(9);
     expect(upgradeValue("rhetoric", 3)).toBe(1_500);
   });
 });

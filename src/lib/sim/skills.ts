@@ -196,3 +196,15 @@ export function aiPostingSpec(
     required,
   };
 }
+
+/** Share of the wage paid after `hoursAway` without the player in the game (ADR-103), in bps. */
+export function presencePayBps(hoursAway: number, cfg: BalanceConfig = BALANCE): number {
+  let bps = 10_000;
+  for (const step of cfg.careers.inactivity.steps) if (hoursAway >= step.afterHours) bps = step.payBps;
+  return bps;
+}
+
+/** After this long away the job ends (ADR-103). */
+export function firedForAbsence(hoursAway: number, cfg: BalanceConfig = BALANCE): boolean {
+  return hoursAway >= cfg.careers.inactivity.fireAfterHours;
+}

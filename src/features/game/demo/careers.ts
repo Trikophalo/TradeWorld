@@ -10,6 +10,7 @@ import {
   matchScore,
   maxRaiseBps,
   meetsRequirements,
+  presencePayBps,
   oneSalaryCents,
   payForSkill,
   productivityBps,
@@ -98,6 +99,8 @@ export interface CareerState {
   seq: number;
   /** Open or last work task (ADR-059). */
   workTask?: { task: WorkTask; correctIndex: number; done: boolean } | null;
+  /** Last time the player was in the game (ADR-103). */
+  lastActiveAt?: number;
 }
 
 export function initialCareer(): CareerState {
@@ -278,19 +281,27 @@ export function createCareerEngine(host: CareerHost) {
 
   /** Passive salary: up to the daily cap, paid for the time since the last payout. */
   function accrue(now = Date.now()) {
-    const job = st().job;
-    if (!job) return;
-    // The notice period is over: pay up to its end, then the job ends (ADR-063).
-    if (job.noticeEndsAt && now >= job.noticeEndsAt) {
-      accrueUntil(job, job.noticeEndsAt);
-      st().job = null;
-      host.persist();
-      return;
+    const s = st();
+    const job = s.job;
+    const lastActive = s.lastActiveAt ?? now;
+    if (job) {
+      // Away too long (ADR-103): pay up to the firing, then the job ends.
+      const fireAt = lastActive + careers.inactivity.fireAfterHours * HOUR;
+      if (now >= fireAt) {
+        accrueUntil(job, fireAt, lastActive);
+        s.job = null;
+      } else if (job.noticeEndsAt && now >= job.noticeEndsAt) {
+        // The notice period is over: pay up to its end, then the job ends (ADR-063).
+        accrueUntil(job, job.noticeEndsAt, lastActive);
+        s.job = null;
+      } else accrueUntil(job, now, lastActive);
     }
-    accrueUntil(job, now);
+    // The demo engine is only called while the player is in the game.
+    s.lastActiveAt = now;
+    host.persist();
   }
 
-  function accrueUntil(job: DemoJob, now: number) {
+  function accrueUntil(job: DemoJob, now: number, lastActive: number) {
     const today = host.day(now);
     if (job.payDay !== today) {
       job.payDay = today;
@@ -303,13 +314,17 @@ export function createCareerEngine(host: CareerHost) {
       job.lastPaidAt = Math.max(job.lastPaidAt, now - 60_000);
       return;
     }
-    const pay = Math.floor((job.salary * minutes) / 60);
+    // Less pay the longer the player has been away (ADR-103), measured in the middle of the paid stretch.
+    const presence = presencePayBps((job.lastPaidAt + now) / 2 / HOUR - lastActive / HOUR);
+    const pay = Math.floor((job.salary * minutes * presence) / 60 / 10_000);
     host.addCash(pay);
     job.earnedTotal += pay;
     job.paidMinutesToday += minutes;
     job.rankMinutes = (job.rankMinutes ?? 0) + minutes;
     job.lastPaidAt = now;
-    host.addXp((BALANCE.progression.xpSources.workHour.xp * minutes) / 60);
+    host.addXp(
+      (BALANCE.progression.xpSources.workHour.xp * minutes * (effects.workXpBps / 10_000) * (presence / 10_000)) / 60,
+    );
     const posting = postingById(job.postingId);
     const per = effects.workHoursPerBranchPoint * 60;
     const share = minutes / posting.required.length;
@@ -359,6 +374,11 @@ export function createCareerEngine(host: CareerHost) {
       workTaskOpen: openTask() !== null,
       rankHours: Math.floor((job.rankMinutes ?? 0) / 6) / 10,
       promotion: promotionNow(job),
+      presence: {
+        lastActiveAt: iso(st().lastActiveAt ?? Date.now()),
+        payBps: 10_000,
+        fireAt: iso((st().lastActiveAt ?? Date.now()) + careers.inactivity.fireAfterHours * HOUR),
+      },
     };
   }
 

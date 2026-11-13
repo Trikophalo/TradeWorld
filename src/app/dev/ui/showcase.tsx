@@ -109,6 +109,7 @@ const SAMPLE_JOB: MyJob = {
   noticeEndsAt: null,
   quitNowCostCents: 360_000,
   rankHours: 20,
+  presence: { lastActiveAt: "2026-11-13T08:00:00Z", payBps: 10_000, fireAt: "2026-11-18T08:00:00Z" },
   promotion: {
     nextTier: "senior",
     mainBranch: "it",

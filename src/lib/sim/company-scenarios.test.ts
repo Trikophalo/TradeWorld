@@ -96,15 +96,16 @@ describe("a well-run company pays off (solid manager)", () => {
     ).toBeGreaterThanOrEqual(0.8);
   });
 
-  it("small business: steady profit of 1 to 2 junior salaries, not a money printer", () => {
-    const junior = jobIncomePerQuarter("junior"); // 900 EUR per quarter = 3 600 EUR per real day
-    expect(junior).toBe(900 * EUR);
+  it("small business: steady profit of 1 to 3 junior salaries, not a money printer", () => {
+    // 8-hour day (ADR-103): 600 EUR per quarter = 2 400 EUR per real day.
+    const junior = jobIncomePerQuarter("junior");
+    expect(junior).toBe(600 * EUR);
     const outcomes = solo("small_business", "solid");
     // Measured: 1 190 to 1 688 EUR per quarter.
     expect(
       rate(
         outcomes,
-        (o) => (o.steadyProfitCentsPerQuarter ?? 0) >= junior && (o.steadyProfitCentsPerQuarter ?? 0) <= 2 * junior,
+        (o) => (o.steadyProfitCentsPerQuarter ?? 0) >= junior && (o.steadyProfitCentsPerQuarter ?? 0) <= 3 * junior,
       ),
     ).toBeGreaterThanOrEqual(0.9);
   });
@@ -127,11 +128,12 @@ describe("a well-run company pays off (solid manager)", () => {
     const ag = steady("ag");
     expect(gmbh).toBeGreaterThan(small * 3);
     expect(ag).toBeGreaterThan(gmbh * 3);
-    // Measured multiples of the job income: about 1.4x (junior), 2.4x (team lead), 6.7x (C-level).
+    // Measured multiples of the job income with the 8-hour day (ADR-103): about 2x (junior), 3.6x (team lead),
+    // 10x (C-level).
     expect(gmbh / jobIncomePerQuarter("team_lead")).toBeGreaterThan(1);
-    expect(gmbh / jobIncomePerQuarter("team_lead")).toBeLessThan(4.5);
+    expect(gmbh / jobIncomePerQuarter("team_lead")).toBeLessThan(6);
     expect(ag / jobIncomePerQuarter("c_level")).toBeGreaterThan(2);
-    expect(ag / jobIncomePerQuarter("c_level")).toBeLessThan(9);
+    expect(ag / jobIncomePerQuarter("c_level")).toBeLessThan(13);
   });
 });
 
