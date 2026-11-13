@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { BRIEFCASE } from "@/components/pixel/art";
 import { Page, PageHeader } from "@/components/layout/page";
 import { JobPortal } from "@/features/career/components/job-portal";
 
@@ -10,9 +11,10 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function JobsPage() {
   const t = await getTranslations("jobs");
+  const th = await getTranslations("pageHero");
   return (
     <Page>
-      <PageHeader title={t("title")} />
+      <PageHeader title={t("title")} intro={th("careerJobs")} art={BRIEFCASE} />
       <JobPortal />
     </Page>
   );

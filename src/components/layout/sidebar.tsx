@@ -36,8 +36,8 @@ export function Sidebar() {
   const soonOpen = showSoon || locked.some((item) => isActivePath(pathname, item.href));
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-nav hidden w-(--sidebar-width) flex-col border-r border-line-1 bg-surface-1 lg:flex">
-      <Link href="/" className="mx-3 mt-4 flex h-12 items-center rounded-md px-3 focus-ring">
+    <aside className="fixed inset-y-0 left-0 z-nav hidden w-(--sidebar-width) flex-col border-r-2 border-line-1 bg-surface-1 lg:flex">
+      <Link href="/" className="group mx-3 mt-4 flex h-12 items-center rounded-md px-3 focus-ring">
         <Wordmark />
         {isDemoMode && (
           <Badge tone="accent" className="ml-auto">
@@ -104,7 +104,7 @@ export function Sidebar() {
 
       <Link
         href="/profile"
-        className="mx-3 mb-4 rounded-lg border border-line-1 bg-surface-2 p-3.5 focus-ring transition-colors duration-fast hover:border-line-2"
+        className="mx-3 mb-4 rounded-lg border-2 border-line-1 bg-surface-2 p-3.5 shadow-1 focus-ring transition duration-fast hover:-translate-y-0.5 hover:border-line-2 active:translate-y-0.5"
       >
         <div className="mb-2.5 flex items-baseline justify-between">
           <span className="font-pixel text-xs text-fg-1 uppercase">{t("topbar.level", { level })}</span>
@@ -135,16 +135,18 @@ function NavLink({ item, pathname, lockedLevel }: { item: NavItem; pathname: str
       {active ? (
         <motion.span
           layoutId="sidebar-active"
-          className="absolute inset-0 rounded-md bg-surface-3"
+          className="absolute inset-0 overflow-hidden rounded-md bg-accent-soft shadow-1"
           transition={SPRING.snappy}
-        />
+        >
+          <span className="absolute inset-y-0 left-0 w-1 bg-accent" />
+        </motion.span>
       ) : (
         <span className="absolute inset-0 rounded-md bg-surface-2 opacity-0 transition-opacity duration-fast group-hover:opacity-100" />
       )}
       <PixelIcon
         {...UI_ICONS[item.icon]}
         scale={2}
-        className={cn("relative transition-colors duration-fast", active && "text-accent")}
+        className={cn("relative transition-colors duration-fast group-hover:animate-hop", active && "text-accent")}
       />
       <span className="relative truncate">{t(item.key)}</span>
       {lockedLevel !== undefined && <LockBadge level={lockedLevel} className="relative ml-auto" />}

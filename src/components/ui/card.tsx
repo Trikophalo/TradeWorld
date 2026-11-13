@@ -11,11 +11,12 @@ export function Card({ className, interactive, padding = "md", ...props }: CardP
   return (
     <div
       className={cn(
-        "rounded-lg border border-line-1 bg-surface-1 shadow-1",
+        // A panel with weight: thick border, a hard edge underneath (ADR-108).
+        "rounded-lg border-2 border-line-1 bg-surface-1 shadow-1",
         padding === "md" && "p-4",
         padding === "lg" && "p-5 lg:p-6",
         interactive &&
-          "transition duration-fast ease-standard hover:-translate-y-0.5 hover:border-line-2 hover:bg-surface-2 hover:shadow-2 active:translate-y-0 active:scale-[0.99]",
+          "transition duration-fast ease-standard hover:-translate-y-1 hover:border-line-2 hover:bg-surface-2 hover:shadow-2 active:translate-y-0.5 active:shadow-none",
         className,
       )}
       {...props}

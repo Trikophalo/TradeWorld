@@ -40,7 +40,8 @@ async function preparePlayer(page: Page, player: Record<string, unknown>) {
 }
 
 async function hold(page: Page, target: Locator) {
-  await target.scrollIntoViewIfNeeded();
+  // Into the middle of the screen: at the lower edge the tab bar would cover it on phones.
+  await target.evaluate((el) => el.scrollIntoView({ block: "center" }));
   // Settle first: a click during a layout animation would miss.
   await expect(async () => {
     const a = await target.boundingBox();

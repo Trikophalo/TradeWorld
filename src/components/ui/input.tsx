@@ -22,7 +22,7 @@ export function Field({ label, hint, error, className, id, ...props }: FieldProp
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy}
         className={cn(
-          "h-12 w-full rounded-md border border-line-2 bg-surface-2 px-3.5 text-base text-fg-1 placeholder:text-fg-3",
+          "h-12 w-full rounded-md border-2 border-line-2 bg-surface-2 px-3.5 text-base text-fg-1 sunken placeholder:text-fg-3",
           "transition-colors duration-fast ease-standard hover:border-fg-3",
           "outline-2 outline-offset-0 outline-transparent focus:border-accent focus:outline-accent-soft",
           error && "border-loss focus:border-loss focus:outline-loss-soft",

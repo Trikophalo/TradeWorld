@@ -1510,3 +1510,26 @@ Aktien zum Investieren.
 - Das Profil liegt auf dem Profilbild oben rechts (jetzt auch am PC) und auf der Level-Karte unten in der Leiste.
 - Grundstück hat ein eigenes Symbol (Haus mit Baum und Zaun) statt desselben Hauses wie „Start“.
 - Am Handy bleibt die untere Leiste; „Mehr“ ist nach denselben Gruppen geordnet, Gesperrtes steht unter „Bald frei“.
+
+## ADR-108: Grafik-Update „handgemacht“ — `akzeptiert`
+
+Vorgabe: Ein großes grafisches Update. Alles soll schöner aussehen, mehr handgemacht, mehr wie ein Spiel, in das viel
+Liebe gesteckt wurde; extrem flüssig und intuitiv, mit vielen Animationen.
+
+**Befund:** Die Oberfläche sah aus wie ein sauberes Dashboard: graue Flächen, weiche runde Karten mit feinen Linien.
+Pixel-Art gab es nur in Icons.
+
+**Entscheidung:** Die Bausteine ändern, nicht jede Seite einzeln. Fünf Hebel wirken überall zugleich:
+
+1. **Farbwelt:** dunkel ein blau getönter Nachthimmel, hell warmes Papier; dahinter Punktraster, Akzent-Schimmer und
+   aufsteigende Pixel-Stäubchen.
+2. **Form:** kleine Ecken, 2-px-Ränder, harte Kanten unter Flächen statt weicher Schatten (`--edge`).
+3. **Tasten:** Lichtkante oben, dunkle Kante unten, sinken beim Drücken ein; wichtige Buttons sprühen Funken.
+4. **Seitenbanner:** `PageHeader` mit Titel, einem Satz und schwebendem Pixel-Bild auf allen 20 Seiten. Neue Bilder:
+   Aktentasche, Häuschen, Herz.
+5. **Bewegung:** Seiteninhalte kommen gestaffelt an, Icons hüpfen beim Überfahren, Fortschrittsbalken sind
+   segmentiert wie Lebensbalken, das Vermögen glänzt, leere Zustände schweben.
+
+**Grenzen:** Zahlen bleiben in der glatten Schrift (Lesbarkeit). Animiert wird nur `transform` und `opacity`; mit
+„Animationen: Reduziert“ entfallen Dauerschleifen und Funken. Kontraste der Textfarben sind weiter getestet
+(`tokens.test.ts`).

@@ -25,12 +25,12 @@ export function Modal({ open, onOpenChange, title, description, children, footer
         <Dialog.Overlay className="fixed inset-0 z-overlay bg-scrim backdrop-blur-sm data-[state=open]:animate-[fade-in_var(--duration-base)_var(--ease-out)]" />
         <Dialog.Content
           className={cn(
-            "fixed inset-0 z-sheet m-auto flex h-fit max-h-[94dvh] w-[min(96vw,1100px)] flex-col rounded-xl border border-line-2 bg-surface-1 shadow-3 outline-none",
+            "fixed inset-0 z-sheet m-auto flex h-fit max-h-[94dvh] w-[min(96vw,1100px)] flex-col rounded-xl border-2 border-line-2 bg-surface-1 shadow-3 outline-none",
             "data-[state=open]:animate-[modal-in_var(--duration-slow)_var(--ease-out)]",
             className,
           )}
         >
-          <header className="flex items-start justify-between gap-4 border-b border-line-1 px-5 py-4 lg:px-6">
+          <header className="flex items-start justify-between gap-4 border-b-2 border-line-1 px-5 py-4 lg:px-6">
             <div>
               <Dialog.Title className="font-pixel text-base text-fg-1 uppercase">{title}</Dialog.Title>
               {description && <Dialog.Description className="mt-1 text-sm text-fg-2">{description}</Dialog.Description>}
@@ -48,7 +48,7 @@ export function Modal({ open, onOpenChange, title, description, children, footer
             </Dialog.Close>
           </header>
           <div className="min-h-0 flex-1 overflow-y-auto p-5 lg:p-6">{children}</div>
-          {footer && <footer className="border-t border-line-1 px-5 py-4 lg:px-6">{footer}</footer>}
+          {footer && <footer className="border-t-2 border-line-1 px-5 py-4 lg:px-6">{footer}</footer>}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

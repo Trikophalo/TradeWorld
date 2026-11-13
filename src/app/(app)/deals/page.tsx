@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { Suspense } from "react";
+import { CONTRACT } from "@/components/pixel/art";
 import { Page, PageHeader } from "@/components/layout/page";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DealsHub } from "@/features/deals/components/deals-hub";
@@ -15,8 +16,7 @@ export default async function DealsPage() {
   const t = await getTranslations("deals");
   return (
     <Page>
-      <PageHeader title={t("title")} />
-      <p className="text-pretty text-fg-2">{t("intro")}</p>
+      <PageHeader title={t("title")} intro={t("intro")} art={CONTRACT} />
       <Suspense fallback={<Skeleton className="h-64 w-full rounded-xs" />}>
         <DealsHub />
       </Suspense>

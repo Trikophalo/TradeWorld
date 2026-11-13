@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { COIN } from "@/components/pixel/art";
 import { Page, PageHeader } from "@/components/layout/page";
 import { CryptoMarketView } from "@/features/crypto/components/crypto-market";
 
@@ -13,8 +14,7 @@ export default async function CryptoPage() {
   const t = await getTranslations("crypto");
   return (
     <Page>
-      <PageHeader title={t("title")} />
-      <p className="text-pretty text-fg-2">{t("intro")}</p>
+      <PageHeader title={t("title")} intro={t("intro")} art={COIN} />
       <CryptoMarketView />
     </Page>
   );

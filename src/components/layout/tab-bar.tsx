@@ -25,7 +25,7 @@ export function TabBar() {
   return (
     <nav
       aria-label={t("label")}
-      className="fixed inset-x-0 bottom-0 z-nav border-t border-line-1 bg-surface-1/92 pb-safe backdrop-blur-lg lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-nav border-t-2 border-line-1 bg-surface-1/92 pb-safe backdrop-blur-lg lg:hidden"
     >
       <ul className="mx-auto flex h-(--tabbar-height) max-w-lg">
         {NAV_ITEMS.filter((item) => !item.more).map((item) => {

@@ -25,7 +25,11 @@ export function Progress({ value, label, tone = "accent", size = "md", className
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(ratio * 100)}
-      className={cn("overflow-hidden rounded-xs bg-surface-3", size === "sm" ? "h-1.5" : "h-2.5", className)}
+      className={cn(
+        "relative overflow-hidden rounded-xs bg-surface-3 ring-1 ring-line-1 ring-inset",
+        size === "sm" ? "h-2" : "h-3",
+        className,
+      )}
     >
       <motion.div
         className={cn("h-full w-full origin-left", TONES[tone])}
@@ -33,6 +37,9 @@ export function Progress({ value, label, tone = "accent", size = "md", className
         animate={{ scaleX: ratio }}
         transition={SPRING.smooth}
       />
+      {/* Light on the upper half and notches, like a health bar (ADR-108). */}
+      <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-shine opacity-50" />
+      <span aria-hidden className="pointer-events-none absolute inset-0 pixel-segments opacity-60" />
     </div>
   );
 }

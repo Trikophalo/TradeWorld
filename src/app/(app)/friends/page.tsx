@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { HEART } from "@/components/pixel/art";
 import { Page, PageHeader } from "@/components/layout/page";
 import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,8 +16,7 @@ export default async function FriendsPage() {
   const t = await getTranslations("friends");
   return (
     <Page>
-      <PageHeader title={t("title")} />
-      <p className="text-pretty text-fg-2">{t("intro")}</p>
+      <PageHeader title={t("title")} intro={t("intro")} art={HEART} />
       <Suspense fallback={<Skeleton className="h-64 w-full rounded-xs" />}>
         <FriendsHub />
       </Suspense>

@@ -583,6 +583,73 @@ export const CONTRACT: PixelArt = {
   ],
 };
 
+/** Page heroes (ADR-108): a briefcase for work, a cottage for the own home, a heart for friends. */
+export const BRIEFCASE: PixelArt = {
+  palette: { k: INK, b: "#a8622d", l: "#d08a4a", d: "#7a4520", g: "#ffd15c" },
+  grid: [
+    "................",
+    "................",
+    ".....kkkkkk.....",
+    "....kk....kk....",
+    "....k......k....",
+    ".kkkkkkkkkkkkkk.",
+    "kllllllllllllllk",
+    "klbbbbbbbbbbbbdk",
+    "kbbbbbbbbbbbbbdk",
+    "kkkkkkkggkkkkkkk",
+    "kbbbbbkggkbbbbdk",
+    "kbbbbbbkkbbbbbdk",
+    "kbbbbbbbbbbbbbdk",
+    "kddddddddddddddk",
+    ".kkkkkkkkkkkkkk.",
+    "................",
+  ],
+};
+
+export const COTTAGE: PixelArt = {
+  palette: { k: INK, r: "#d9483b", s: "#a8322a", w: "#f2e6c9", d: "#8a5a32", g: "#62b0ff" },
+  grid: [
+    "................",
+    ".......kk...kk..",
+    "......krrk..kdk.",
+    ".....krrrrk.kdk.",
+    "....krrrrrrkkdk.",
+    "...krrrrrrrrrdk.",
+    "..krrrrrrrrrrrk.",
+    ".krsssssssssssk.",
+    "kkkkkkkkkkkkkkkk",
+    ".kwwwwwwwwwwwwk.",
+    ".kwkkkwwwwkkkwk.",
+    ".kwkgkwwwwkdkwk.",
+    ".kwkkkwwwwkdkwk.",
+    ".kwwwwwwwwkdkwk.",
+    ".kkkkkkkkkkkkkk.",
+    "................",
+  ],
+};
+
+export const HEART: PixelArt = {
+  palette: { k: INK, r: "#ff6170", h: "#ffc2c9", d: "#c93a4c" },
+  grid: [
+    "................",
+    "................",
+    "..kkkk....kkkk..",
+    ".krrrrk..krrrrk.",
+    "krhhrrrkkrrrrrdk",
+    "krhrrrrrrrrrrrdk",
+    "krrrrrrrrrrrrrdk",
+    "krrrrrrrrrrrrrdk",
+    ".krrrrrrrrrrrdk.",
+    "..krrrrrrrrrdk..",
+    "...krrrrrrrdk...",
+    "....krrrrrdk....",
+    ".....krrrdk.....",
+    "......krdk......",
+    ".......kk.......",
+    "................",
+  ],
+};
+
 export const BULL: PixelArt = {
   palette: { h: "#e9c88a", g: "#2fd98c", d: "#17a866", k: INK, s: "#c9f7e0" },
   grid: [
@@ -1130,6 +1197,9 @@ export const ALL_PIXEL_ART: Record<string, PixelArt> = {
   key: KEY,
   wallet: WALLET,
   contract: CONTRACT,
+  briefcase: BRIEFCASE,
+  cottage: COTTAGE,
+  heart: HEART,
   bull: BULL,
   bear: BEAR,
   ...Object.fromEntries(Object.entries(FINN).map(([k, v]) => [`finn/${k}`, v])),

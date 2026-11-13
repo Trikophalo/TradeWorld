@@ -5,6 +5,7 @@ import { GameSync } from "@/features/game/sync";
 import { DailyReward } from "@/features/progression/components/daily-reward";
 import { LevelUpOverlay } from "@/features/progression/components/level-up-overlay";
 import { Tutorial } from "@/features/tutorial/components/tutorial";
+import { Ambient } from "./ambient";
 import { Sidebar } from "./sidebar";
 import { ScrollReset } from "./scroll-reset";
 import { TabBar } from "./tab-bar";
@@ -21,6 +22,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
       >
         {t("skipToContent")}
       </a>
+      <Ambient />
       <Sidebar />
       {/* Phones scroll this box, not the page: the browser keeps its toolbars and the first tap on the tab bar
           always lands (a tap near the bottom of a scrolled page would only bring Safari's toolbar back). */}

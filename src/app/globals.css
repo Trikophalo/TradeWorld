@@ -41,6 +41,9 @@
   --color-info-soft: var(--info-soft);
   --color-on-semantic: var(--on-semantic);
   --color-gold: var(--gold);
+  --color-edge: var(--edge);
+  --color-shade: var(--shade);
+  --color-shine: var(--shine);
 
   --font-sans: var(--font-sans);
   --font-pixel: var(--font-pixel);
@@ -87,6 +90,11 @@
   --animate-pulse-danger: pulse-danger 1.2s var(--ease-in-out) infinite;
   --animate-shake: shake 0.4s var(--ease-in-out);
   --animate-pop: pop var(--duration-slow) var(--ease-out);
+  --animate-float: float 3.2s var(--ease-in-out) infinite;
+  --animate-hop: hop 0.45s steps(4, end);
+  --animate-twinkle: twinkle 2.4s var(--ease-in-out) infinite;
+  --animate-sheen: sheen 2.8s var(--ease-in-out) infinite;
+  --animate-drift: drift 50s linear infinite;
 }
 
 /* Token-backed duration and layer utilities */
@@ -193,6 +201,14 @@
     font-size: 0.9375rem;
     line-height: 1.375rem;
     overscroll-behavior-y: none;
+    /* The world behind the panels: a pixel dot grid and a faint glow in the accent colour (ADR-108). */
+    background-image:
+      radial-gradient(70% 45% at 75% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent),
+      radial-gradient(var(--dot) 1px, transparent 1.5px);
+    background-size:
+      100% 100%,
+      16px 16px;
+    background-attachment: fixed;
   }
 
   ::selection {
@@ -283,6 +299,112 @@
     transform: scale(1);
     opacity: 1;
   }
+}
+
+/* Ambient motion (ADR-108): things that live a little, transform and opacity only. */
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes hop {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes sheen {
+  0%,
+  55% {
+    transform: translateX(-120%) skewX(-18deg);
+  }
+  100% {
+    transform: translateX(620%) skewX(-18deg);
+  }
+}
+
+@keyframes drift {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  8%,
+  88% {
+    opacity: 0.55;
+  }
+  100% {
+    transform: translateY(-108vh);
+    opacity: 0;
+  }
+}
+
+/* The parts of a page arrive one after the other (see <Page>). No fill after the end: nothing stays transformed. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+@utility page-stack {
+  & > * {
+    animation: rise var(--duration-slower) var(--ease-out) backwards;
+  }
+  & > *:nth-child(2) {
+    animation-delay: calc(var(--duration-fast) * 0.4);
+  }
+  & > *:nth-child(3) {
+    animation-delay: calc(var(--duration-fast) * 0.8);
+  }
+  & > *:nth-child(4) {
+    animation-delay: calc(var(--duration-fast) * 1.2);
+  }
+  & > *:nth-child(5) {
+    animation-delay: calc(var(--duration-fast) * 1.6);
+  }
+  & > *:nth-child(n + 6) {
+    animation-delay: calc(var(--duration-fast) * 2);
+  }
+}
+
+/* Chunky progress: notches every few pixels, like a health bar. */
+@utility pixel-segments {
+  background-image: repeating-linear-gradient(90deg, transparent 0 10px, var(--bg-1) 10px 12px);
+}
+
+/* Fields are pressed into the panel: a hard shade along the upper edge. */
+@utility sunken {
+  box-shadow: inset 0 2px 0 var(--shade);
+}
+
+/* Banner backdrop: the accent colour glows in from the right. */
+@utility bg-hero {
+  background-image: linear-gradient(100deg, transparent 35%, color-mix(in srgb, var(--accent) 16%, transparent));
+}
+
+/* Dither band for banners: a 2 px checker in the line colour. */
+@utility bg-dither {
+  background-image: repeating-conic-gradient(var(--line-1) 0% 25%, transparent 0% 50%);
+  background-size: 4px 4px;
 }
 
 /* ------------------------------------------------------------------ */

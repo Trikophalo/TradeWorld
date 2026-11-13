@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { BULL, COIN, SECTOR_ICONS, UI_ICONS } from "@/components/pixel/art";
 import { LinkCard } from "@/components/ui/link-card";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
+import { TROPHIES } from "@/components/pixel/art";
 import { Page, PageHeader } from "@/components/layout/page";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -20,9 +21,10 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function ProfilePage() {
   const t = await getTranslations("profile");
+  const th = await getTranslations("pageHero");
   return (
     <Page>
-      <PageHeader title={t("title")} />
+      <PageHeader title={t("title")} intro={th("profile")} art={TROPHIES.gold} />
       <div className="grid gap-5 *:min-w-0 lg:grid-cols-2 lg:gap-6">
         <div className="space-y-5 lg:space-y-6">
           <LevelCard />

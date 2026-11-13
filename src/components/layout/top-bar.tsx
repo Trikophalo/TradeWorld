@@ -18,7 +18,7 @@ export function TopBar() {
   const openSearch = useSearch((state) => state.setOpen);
 
   return (
-    <header className="sticky top-0 z-sticky border-b border-line-1 bg-bg/88 pt-safe backdrop-blur-lg">
+    <header className="sticky top-0 z-sticky border-b-2 border-line-1 bg-bg/88 pt-safe backdrop-blur-lg">
       <div className="mx-auto flex h-(--topbar-height) max-w-(--content-max) items-center gap-2 px-4 sm:gap-3 lg:px-8">
         <Link href="/" className="rounded-sm focus-ring lg:hidden">
           <Wordmark />
@@ -27,7 +27,7 @@ export function TopBar() {
         <button
           type="button"
           onClick={() => openSearch(true)}
-          className="hidden h-10 w-80 items-center gap-3 rounded-md border border-line-1 bg-surface-1 px-3 text-sm text-fg-3 focus-ring transition-colors duration-fast hover:border-line-2 hover:text-fg-2 lg:flex"
+          className="hidden h-10 w-80 items-center gap-3 rounded-md border-2 border-line-1 bg-surface-1 px-3 text-sm text-fg-3 sunken focus-ring transition-colors duration-fast hover:border-line-2 hover:text-fg-2 lg:flex"
         >
           <PixelIcon {...UI_ICONS.search} scale={1} />
           <span className="flex-1 text-left">{t("search")}</span>

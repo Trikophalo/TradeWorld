@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { PALETTE } from "@/components/pixel/art";
 import { Page, PageHeader } from "@/components/layout/page";
 import { ArtworksHub } from "@/features/artworks/components/artworks-hub";
 
@@ -10,9 +11,10 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function ArtworksPage() {
   const t = await getTranslations("art");
+  const th = await getTranslations("pageHero");
   return (
     <Page>
-      <PageHeader title={t("title")} />
+      <PageHeader title={t("title")} intro={th("artworks")} art={PALETTE} />
       <ArtworksHub />
     </Page>
   );

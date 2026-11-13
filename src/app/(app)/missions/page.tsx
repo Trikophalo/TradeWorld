@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { QUEST_BOARD } from "@/components/pixel/art";
 import { Page, PageHeader } from "@/components/layout/page";
 import { MissionsBoard } from "@/features/progression/components/missions-board";
 
@@ -12,8 +13,7 @@ export default async function MissionsPage() {
   const t = await getTranslations("missions");
   return (
     <Page>
-      <PageHeader title={t("title")} />
-      <p className="max-w-2xl text-pretty text-fg-2">{t("intro")}</p>
+      <PageHeader title={t("title")} intro={t("intro")} art={QUEST_BOARD} />
       <MissionsBoard />
     </Page>
   );

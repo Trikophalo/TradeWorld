@@ -24,7 +24,7 @@ const GLYPHS: Record<Tone, string> = {
 
 function ToastCard({ tone, title, description }: { tone: Tone; title: string; description?: ReactNode }) {
   return (
-    <div className="flex w-full items-start gap-3 rounded-lg border border-line-2 bg-surface-2 p-3.5 shadow-3 sm:w-[356px]">
+    <div className="flex w-full items-start gap-3 rounded-lg border-2 border-line-2 bg-surface-2 p-3.5 shadow-3 sm:w-[356px]">
       <span className={cn("grid size-8 shrink-0 place-items-center rounded-sm", TONE_STYLES[tone])}>
         <svg viewBox="0 0 8 7" width="16" height="14" shapeRendering="crispEdges" aria-hidden>
           <path fill="currentColor" d={GLYPHS[tone]} />

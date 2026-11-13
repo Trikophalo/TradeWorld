@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
+import { BOOK } from "@/components/pixel/art";
 import { Page, PageHeader } from "@/components/layout/page";
 import { RulesList } from "@/features/help/components/rules-list";
 import { RulesTracker } from "@/features/help/components/rules-tracker";
@@ -25,8 +26,7 @@ export default async function RulesPage() {
         </svg>
         {tp("title")}
       </Link>
-      <PageHeader title={t("title")} />
-      <p className="max-w-2xl text-pretty text-fg-2">{t("intro")}</p>
+      <PageHeader title={t("title")} intro={t("intro")} art={BOOK} />
       <RulesList />
       <RulesTracker />
     </Page>

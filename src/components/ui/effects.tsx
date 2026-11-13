@@ -14,7 +14,7 @@ interface Point {
 
 interface Particle {
   id: number;
-  kind: "coin" | "confetti";
+  kind: "coin" | "confetti" | "spark";
   from: Point;
   to: Point;
   delay: number;
@@ -76,6 +76,25 @@ export function burstConfetti(from: Element, count = 28): void {
   );
 }
 
+/** A few pixel sparks where the player pressed (ADR-108): small, fast, no gravity. */
+export function pixelSparks(at: Point, color = "var(--gold)", count = 6): void {
+  if (prefersReducedMotion()) return;
+  useEffects.getState().add(
+    Array.from({ length: count }, (_, i) => {
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.6;
+      const distance = 16 + Math.random() * 18;
+      return {
+        id: nextId++,
+        kind: "spark" as const,
+        from: at,
+        to: { x: at.x + Math.cos(angle) * distance, y: at.y + Math.sin(angle) * distance },
+        delay: 0,
+        color: i % 2 === 0 ? color : "var(--fg-1)",
+      };
+    }),
+  );
+}
+
 /** Fixed, click-through layer that renders flying particles. Mounted once in the root layout. */
 export function EffectsLayer() {
   const particles = useEffects((state) => state.particles);
@@ -100,6 +119,16 @@ export function EffectsLayer() {
             >
               <PixelIcon {...COIN} scale={2} />
             </motion.div>
+          ) : particle.kind === "spark" ? (
+            <motion.div
+              key={particle.id}
+              className="absolute top-0 left-0 -mt-0.5 -ml-0.5 size-1"
+              style={{ backgroundColor: particle.color }}
+              initial={{ x: particle.from.x, y: particle.from.y, scale: 1.6, opacity: 1 }}
+              animate={{ x: particle.to.x, y: particle.to.y, scale: 0.4, opacity: 0 }}
+              transition={{ duration: 0.38, ease: EASE.out }}
+              onAnimationComplete={() => remove(particle.id)}
+            />
           ) : (
             <motion.div
               key={particle.id}

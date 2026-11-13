@@ -98,7 +98,7 @@ export function TodayPanel() {
 
   return (
     <section
-      className="relative overflow-hidden rounded-xl border border-line-1 bg-surface-1 shadow-1"
+      className="relative overflow-hidden rounded-xl border-2 border-line-1 bg-surface-1 shadow-1"
       aria-labelledby="today-title"
       data-testid="today"
     >
@@ -189,7 +189,7 @@ function TaskRow({ task, primary, vaultCents }: { task: TodayTask; primary: bool
             : "border-line-2 bg-surface-2 text-fg-2",
         )}
       >
-        <PixelIcon {...ICON[task.key]} scale={2} />
+        <PixelIcon {...ICON[task.key]} scale={2} className="group-hover:animate-hop" />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-semibold text-fg-1">{title}</span>
@@ -199,19 +199,25 @@ function TaskRow({ task, primary, vaultCents }: { task: TodayTask; primary: bool
   );
 
   const rowClass = cn(
-    "flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition duration-fast",
-    task.tone === "urgent" ? "border-accent/40 bg-accent-soft/40" : "border-line-1 bg-surface-1/80",
+    "group flex w-full items-center gap-3 rounded-lg border-2 px-3 py-2.5 text-left transition duration-fast",
+    task.tone === "urgent" ? "border-accent/50 bg-surface-2 shadow-1" : "border-line-1 bg-surface-1 shadow-1",
   );
 
   if (task.href) {
     return (
       <Link
         href={task.href}
-        className={cn(rowClass, "focus-ring hover:border-line-2 hover:bg-surface-2 active:scale-[0.99]")}
+        className={cn(
+          rowClass,
+          "focus-ring hover:-translate-y-0.5 hover:border-line-2 hover:bg-surface-2 active:translate-y-0.5",
+        )}
         data-task={task.key}
       >
         {body}
-        <span aria-hidden className="text-fg-3">
+        <span
+          aria-hidden
+          className="text-fg-3 transition-transform duration-fast ease-out group-hover:translate-x-1 group-hover:text-accent"
+        >
           ›
         </span>
       </Link>
@@ -248,11 +254,11 @@ function Skyline({ reduced }: { reduced: boolean }) {
       aria-hidden
       viewBox="0 0 100 44"
       preserveAspectRatio="none"
-      className="pointer-events-none absolute inset-x-0 bottom-0 h-24 w-full opacity-60 [shape-rendering:crispEdges]"
+      className="pointer-events-none absolute inset-x-0 bottom-0 h-20 w-full opacity-50 [shape-rendering:crispEdges]"
     >
       {buildings.map((b, i) => (
         <g key={b.x}>
-          <rect x={b.x} y={44 - b.h} width={b.w} height={b.h} fill="var(--surface-2)" />
+          <rect x={b.x} y={44 - b.h} width={b.w} height={b.h} fill="var(--bg-3)" />
           {Array.from({ length: Math.floor(b.h / 6) }, (_, row) =>
             Array.from({ length: Math.floor(b.w / 4) }, (_, col) => (
               <motion.rect

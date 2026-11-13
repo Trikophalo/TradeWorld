@@ -48,7 +48,15 @@ async function preparePlayer(
 /** Press and hold a hold-to-confirm button until it fires. */
 async function hold(page: Page, name: string | RegExp) {
   const button = page.getByRole("button", { name });
-  await button.scrollIntoViewIfNeeded();
+  // Into the middle of the screen: at the lower edge the tab bar would cover it on phones.
+  await button.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  // Settle first: page content rises in (ADR-108), a press during that would miss.
+  await expect(async () => {
+    const a = await button.boundingBox();
+    await page.waitForTimeout(100);
+    const b = await button.boundingBox();
+    expect(a && b && Math.abs(a.y - b.y) < 1).toBe(true);
+  }).toPass();
   const box = (await button.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();

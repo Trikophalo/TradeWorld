@@ -4290,5 +4290,19 @@
       "burnMin": "Mindestens {amount}",
       "burnWait": "Nächstes Verbrennen möglich in"
     }
+  },
+  "pageHero": {
+    "portfolio": "Alles, was dir gehört, auf einen Blick.",
+    "markets": "Kaufen, wenn alle zittern. Verkaufen, wenn alle jubeln.",
+    "job": "Dein Arbeitsplatz: Lohn, Aufgaben und Kollegen.",
+    "career": "Skills lernen, Jobs finden, aufsteigen.",
+    "careerJobs": "Offene Stellen bei KI-Firmen und bei Spielern.",
+    "careerChat": "Der Flurfunk deiner Firma.",
+    "company": "Dein eigenes Unternehmen: von der Garage zum Konzern.",
+    "property": "Dein Zuhause. Richte es ein und zeig, was du hast.",
+    "artworks": "Pixel-Kunst sammeln, selbst malen und versteigern.",
+    "richList": "Wer hat am meisten? Hier steht es schwarz auf weiß.",
+    "events": "Was heute an der Börse ansteht.",
+    "profile": "Dein Fortschritt, dein Aussehen, deine Einstellungen."
   }
 }

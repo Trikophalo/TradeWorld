@@ -32,6 +32,19 @@ Eine Zahl steht nie in der Pixelschrift.
 
 NEXA hat eine eigene Identität. Keine Logos, Namen, Farbschemata oder Markenelemente anderer Apps übernehmen.
 
+**Handgemacht statt Baukasten (ADR-108).** Die Oberfläche soll aussehen wie ein Spiel, in dem viel Liebe steckt:
+
+- **Flächen mit Gewicht:** Karten haben einen 2-px-Rand und eine harte Kante darunter (`shadow-1`), keine weichen
+  Schlagschatten. Ecken sind klein (2 bis 12 px), wie bei Pixel-Panels.
+- **Tasten, die man drücken kann:** Gefüllte Buttons haben oben eine Lichtkante und unten eine dunkle Kante; beim
+  Drücken sinken sie ein, die wichtigen antworten mit ein paar Pixel-Funken.
+- **Eine Welt dahinter:** Nachthimmel (dunkel) oder warmes Papier (hell) mit feinem Punktraster, einem Schimmer in der
+  Akzentfarbe und langsam aufsteigenden Pixel-Stäubchen.
+- **Jede Seite hat ein Gesicht:** Das Banner oben (`PageHeader`) zeigt Titel, einen Satz zur Seite und ein
+  schwebendes Pixel-Bild.
+- **Dinge leben:** Bilder schweben, Sterne funkeln, Icons hüpfen beim Überfahren, Seiteninhalte kommen nacheinander
+  an. Alles bleibt klein und schnell, nichts lenkt von Zahlen ab.
+
 ## 2. Tokens
 
 Quelle: [`src/styles/tokens.css`](../src/styles/tokens.css) (CSS-Variablen). In
@@ -71,13 +84,14 @@ Ein neues Token, das die Schwelle reißt, lässt den Test fehlschlagen.
 
 ### Abstände, Radien, Schatten, Ebenen
 
-| Gruppe   | Werte                                                                                                                                  |
-| -------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Abstände | 4er-Raster über die Tailwind-Skala (`p-1` = 4 px, `gap-3` = 12 px, `p-5` = 20 px). Keine krummen Werte                                 |
-| Radien   | `rounded-xs` 4, `-sm` 8, `-md` 12, `-lg` 16, `-xl` 24, `-pill`. Pixel-Elemente (Badges, Checkboxen, Logos) bleiben bei `xs` oder eckig |
-| Schatten | `shadow-1` (Karten), `shadow-2` (Hover), `shadow-3` (Sheets, Toasts, Dialoge)                                                          |
-| Ebenen   | `z-sticky` 10, `z-nav` 20, `z-overlay` 40, `z-sheet` 50, `z-toast` 60, `z-celebration` 70. Keine freien `z-[…]`-Werte                  |
-| Layout   | `--sidebar-width` 248 px, `--tabbar-height` 64 px, `--topbar-height` 56 px, `--content-max` 1280 px, Safe-Area-Variablen               |
+| Gruppe   | Werte                                                                                                                                      |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Abstände | 4er-Raster über die Tailwind-Skala (`p-1` = 4 px, `gap-3` = 12 px, `p-5` = 20 px). Keine krummen Werte                                     |
+| Radien   | `rounded-xs` 2, `-sm` 4, `-md` 6, `-lg` 8, `-xl` 12, `-pill`. Klein mit Absicht: Panels mit pixelartigen Ecken (ADR-108)                   |
+| Schatten | Harte Kanten statt Weichzeichner: `shadow-1` (Karten, 3 px Kante), `shadow-2` (Hover, 5 px), `shadow-3` (Sheets, Toasts, Dialoge)          |
+| Tiefe    | `--edge` (Kante unter Flächen), `--rim` (Licht am oberen Rand), `bg-shade` / `bg-shine` (Schatten und Licht auf Tasten), `sunken` (Felder) |
+| Ebenen   | `z-sticky` 10, `z-nav` 20, `z-overlay` 40, `z-sheet` 50, `z-toast` 60, `z-celebration` 70. Keine freien `z-[…]`-Werte                      |
+| Layout   | `--sidebar-width` 248 px, `--tabbar-height` 64 px, `--topbar-height` 56 px, `--content-max` 1280 px, Safe-Area-Variablen                   |
 
 ## 3. Typografie
 
@@ -159,6 +173,20 @@ Motion-Bibliothek in [`src/lib/motion.ts`](../src/lib/motion.ts).
 5. Echtzeitdaten werden gebündelt: höchstens ein Render pro Animation-Frame, Zahlen über `NumberTicker`.
 6. `prefers-reduced-motion` wird respektiert, und die Einstellung „Animationen“ (System, An, Reduziert) kann es
    übersteuern. Reduziert heißt: Dauern auf 0, keine Partikel, Zahlen springen direkt.
+
+**Lebendige Kleinigkeiten (ADR-108)**, alle nur `transform` und `opacity`:
+
+| Utility           | Wirkung                                                         | Einsatz                                  |
+| ----------------- | --------------------------------------------------------------- | ---------------------------------------- |
+| `page-stack`      | Kinder kommen nacheinander von unten an (in `<Page>` eingebaut) | jede Seite                               |
+| `animate-float`   | sanftes Schweben                                                | Bilder in Bannern und leeren Zuständen   |
+| `animate-twinkle` | Funkeln                                                         | kleine Sterne in Bannern                 |
+| `animate-hop`     | kurzer Hüpfer in vier Stufen                                    | Icons beim Überfahren (`group-hover:`)   |
+| `animate-sheen`   | Glanz, der alle paar Sekunden über eine Fläche läuft            | Vermögen auf der Startseite              |
+| `animate-drift`   | langsames Aufsteigen                                            | Pixel-Stäubchen hinter dem Spiel         |
+| `pixelSparks()`   | ein paar Funken am Klickpunkt                                   | gefüllte Buttons (in `Button` eingebaut) |
+
+Mit „Animationen: Reduziert“ entfallen Funken und Dauerschleifen, die Verzögerungen der Seiteninhalte sind 0.
 
 **Seitenübergänge** laufen über Reacts `<ViewTransition>` (Browser-API, keine zusätzliche Bibliothek):
 

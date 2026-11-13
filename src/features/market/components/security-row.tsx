@@ -38,7 +38,7 @@ export function SecurityRow({ ticker, shared = true }: { ticker: string; shared?
       ) : (
         logo
       )}
-      <span className="min-w-0 flex-1">
+      <span className="min-w-0 flex-1 transition-transform duration-fast ease-out group-hover:translate-x-1">
         <span className="block truncate font-medium text-fg-1">{security.name}</span>
         <span className="label-pixel text-fg-3">
           {ticker}

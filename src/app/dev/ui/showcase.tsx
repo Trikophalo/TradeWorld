@@ -5,6 +5,7 @@ import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useRef, useState, type ReactNode } from "react";
+import { PageHeader } from "@/components/layout/page";
 import { ALL_PIXEL_ART, BEAR, BULL, COIN } from "@/components/pixel/art";
 import { AVATAR_ART } from "@/components/pixel/avatars";
 import { Mascot } from "@/components/pixel/mascot";
@@ -341,6 +342,10 @@ export function Showcase() {
             )}
           </p>
         </Demo>
+      </Section>
+
+      <Section id="banner" title="Seitenbanner (ADR-108)">
+        <PageHeader title="Märkte" intro="Kaufen, wenn alle zittern. Verkaufen, wenn alle jubeln." art={BULL} />
       </Section>
 
       <Section id="cards" title={t("cards")} className="grid gap-4 lg:grid-cols-3">

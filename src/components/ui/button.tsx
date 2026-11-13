@@ -5,6 +5,7 @@ import type { ButtonHTMLAttributes, ReactNode, Ref } from "react";
 import { DURATION, EASE } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { buttonVariants, type ButtonVariantProps } from "./button-variants";
+import { pixelSparks } from "./effects";
 
 export type ButtonState = "idle" | "loading" | "success";
 
@@ -27,13 +28,20 @@ export function Button({
   ...props
 }: ButtonProps) {
   const busy = state !== "idle";
+  const filled = !variant || variant === "primary" || variant === "gain" || variant === "loss";
+  const { onPointerDown, ...rest } = props;
   return (
     <button
       type={type}
       data-busy={busy}
       aria-busy={state === "loading"}
       className={cn(buttonVariants({ variant, size, block }), className)}
-      {...props}
+      onPointerDown={(event) => {
+        // The important buttons answer the press with a few sparks (ADR-108).
+        if (filled && !busy) pixelSparks({ x: event.clientX, y: event.clientY });
+        onPointerDown?.(event);
+      }}
+      {...rest}
     >
       <span
         className={cn(

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { GEARS } from "@/components/pixel/art";
 import { Page, PageHeader } from "@/components/layout/page";
 import { UpgradeShop } from "@/features/upgrades/components/upgrade-shop";
 
@@ -13,8 +14,7 @@ export default async function UpgradesPage() {
   const t = await getTranslations("upgrades");
   return (
     <Page>
-      <PageHeader title={t("title")} />
-      <p className="text-pretty text-fg-2">{t("intro")}</p>
+      <PageHeader title={t("title")} intro={t("intro")} art={GEARS} />
       <UpgradeShop />
     </Page>
   );

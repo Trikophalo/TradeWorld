@@ -29,8 +29,8 @@ export function Sheet({ open, onOpenChange, title, description, children, footer
           className={cn(
             "fixed z-sheet flex flex-col border-line-2 bg-surface-1 shadow-3 outline-none",
             desktop
-              ? "inset-y-3 right-3 w-[420px] rounded-xl border"
-              : "inset-x-0 bottom-0 max-h-[92dvh] rounded-t-xl border-t pb-safe",
+              ? "inset-y-3 right-3 w-[420px] rounded-xl border-2"
+              : "inset-x-0 bottom-0 max-h-[92dvh] rounded-t-xl border-t-2 pb-safe",
           )}
         >
           {!desktop && <div aria-hidden className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-pill bg-line-2" />}
@@ -52,7 +52,7 @@ export function Sheet({ open, onOpenChange, title, description, children, footer
             </Drawer.Close>
           </header>
           <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">{children}</div>
-          {footer && <footer className="border-t border-line-1 p-5">{footer}</footer>}
+          {footer && <footer className="border-t-2 border-line-1 p-5">{footer}</footer>}
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>

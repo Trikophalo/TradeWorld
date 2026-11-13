@@ -6,7 +6,11 @@ import { cn } from "@/lib/utils";
 export function Wordmark({ className, size = "md" }: { className?: string; size?: "md" | "lg" }) {
   return (
     <span className={cn("inline-flex items-center gap-2.5", className)}>
-      <PixelIcon {...COIN} scale={size === "lg" ? 3 : 2} />
+      <PixelIcon
+        {...COIN}
+        scale={size === "lg" ? 3 : 2}
+        className="transition-transform duration-slow ease-out group-hover:-translate-y-0.5 group-hover:-rotate-12 group-active:scale-90"
+      />
       <span className={cn("font-pixel font-bold tracking-wider text-fg-1", size === "lg" ? "text-3xl" : "text-xl")}>
         {APP_NAME}
       </span>
