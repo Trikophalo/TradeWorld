@@ -62,9 +62,11 @@ test("the daily reward opens once and pays day 1", async ({ page }) => {
   const sheet = page.getByRole("dialog", { name: "Tägliche Belohnung" });
   await expect(sheet).toBeVisible();
   await expect(sheet.getByText("Heute")).toBeVisible();
-  await sheet.getByRole("button", { name: "Abholen" }).click();
+  await expect(sheet.locator('[data-day="1"]')).toHaveAttribute("data-state", "today");
+  await sheet.getByRole("button", { name: "Truhe öffnen" }).click();
   await expect(page.getByText("Tag 1 abgeholt")).toBeVisible();
-  await expect(sheet.getByText("Abgeholt", { exact: true })).toBeVisible();
+  // The chest is open now and the first streak block is lit (ADR-087).
+  await expect(sheet.locator('[data-day="1"]')).toHaveAttribute("data-state", "claimed");
   await sheet.getByRole("button", { name: "Weiter" }).click();
   await expect(sheet).toBeHidden();
   // Claimed: no reminder card on the start page, no popup after a reload.

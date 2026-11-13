@@ -1691,19 +1691,22 @@
   },
   "dailyReward": {
     "title": "Tägliche Belohnung",
-    "intro": "Komm jeden Tag vorbei. Je länger deine Serie, desto größer die Belohnung.",
+    "intro": "Jeden Tag eine Truhe. Je länger deine Serie, desto größer der Schatz.",
     "day": "Tag {day}",
     "today": "Heute",
-    "claim": "Abholen",
+    "claim": "Truhe öffnen",
     "claimed": "Abgeholt",
     "claimedTitle": "Tag {day} abgeholt",
     "skillPoint": "{count, plural, one {# Skillpunkt} other {# Skillpunkte}}",
-    "streak": "{days, plural, one {# Tag} other {# Tage}} in Folge",
+    "streak": "{days, plural, =0 {Neue Serie} one {# Tag in Folge} other {# Tage in Folge}}",
     "freeze": "Serien-Schutz: {count, plural, =0 {diese Woche verbraucht} one {# übrig diese Woche} other {# übrig diese Woche}}",
     "freezeHint": "Verpasst du einen Tag, rettet der Schutz einmal pro Woche deine Serie.",
-    "next": "Morgen: Tag {day}",
+    "next": "Morgen wartet Truhe {day}",
     "comeBack": "Nächste Belohnung in {time}",
-    "close": "Weiter"
+    "close": "Weiter",
+    "bigDay": "Schatz",
+    "skillPointShort": "{count, plural, one {# Skillpunkt} other {# Skillpunkte}}",
+    "weekProgress": "{done} von 7 Truhen dieser Woche geöffnet"
   },
   "avatars": {
     "title": "Profilbild",

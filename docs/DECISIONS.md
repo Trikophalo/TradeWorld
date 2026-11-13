@@ -979,3 +979,17 @@ Gewinn auszahlen können.
     alle Aktionäre wäre ein eigenes Feature.
 - Regeln: `founderPayoutCents`, `isValidFounderPayout` in `src/lib/sim/startup.ts`; Server `set_founder_payout` und
   `player_company_close_hour` (Migration M4e).
+
+## ADR-087: Tägliche Belohnung als Schatztruhen im Pixel-Stil — `akzeptiert`
+
+Vorgabe: Das Fenster der täglichen Belohnung soll schöner werden, weniger nach Standard-Oberfläche aussehen und zum
+Pixel-Stil passen.
+
+- **Truhen:**
+  - Jeder Tag ist eine Pixel-Truhe. Tag 7 ist eine große goldene „Schatz“-Truhe über die ganze Breite.
+  - Die Truhe von heute hüpft und funkelt. Beim Öffnen springt der Deckel auf, und Münzen fliegen heraus.
+  - Abgeholte Tage zeigen offene, leere Truhen.
+- **Pixel-Rahmen:** eckige Kanten, 2-px-Rand und ein harter Stufen-Schatten wie bei Knöpfen alter Konsolenspiele.
+- **Belohnungen** als kleine Pixel-Symbole: Stern für XP, Münze für Geld, Edelstein für einen Skillpunkt.
+- **Serien-Leiste:** Flamme, sieben Pixel-Kästchen für die Woche und ein Schild für den Serien-Schutz.
+- **Layout:** drei Spalten auf Handy und Desktop. Mit reduzierter Bewegung stehen Truhen und Funken still.

@@ -199,6 +199,76 @@ export const COMPANY_LOGOS = { VLT: volta, BRZ: brotzeit, KLS: klarsoft } as con
 
 // ---------------------------------------------------------------- mascots and objects
 
+/** Treasure chests for the daily reward (ADR-087): closed, open with coins, open and empty; gold for day 7. */
+const CHEST_WOOD = { k: "#2a1a10", w: "#a0612c", h: "#c98a4b", d: "#6e3d1a", g: "#8e99ad", y: "#ffd15c", e: "#1a1410" };
+const CHEST_GOLD = { k: "#4a2a00", w: "#e0a92e", h: "#ffe08a", d: "#a8741a", g: "#7a4a00", y: "#fff3c4", e: "#2a1a00" };
+const CHEST_CLOSED_GRID = [
+  "..kkkkkkkkkkkk..",
+  ".khhhhhhhhhhhhk.",
+  "kwwwwwwwwwwwwwwk",
+  "kgwwwwwwwwwwwwgk",
+  "kggggggggggggggk",
+  "kddddddkkddddddk",
+  "kwwwwwkyykwwwwwk",
+  "kgwwwwkyykwwwwgk",
+  "kgwwwwwkkwwwwwgk",
+  "kgwwwwwwwwwwwwgk",
+  "kgddddddddddddgk",
+  "kkkkkkkkkkkkkkkk",
+];
+const CHEST_OPEN_GRID = [
+  "..kkkkkkkkkkkk..",
+  ".kddddddddddddk.",
+  ".khhhhhhhhhhhhk.",
+  "..kkkkkkkkkkkk..",
+  "..kyyhyykyyhyk..",
+  "kkyyyyyyyyyyyykk",
+  "kggggggggggggggk",
+  "kwwwwwwwwwwwwwwk",
+  "kgwwwwwwwwwwwwgk",
+  "kgwwwwwwwwwwwwgk",
+  "kgddddddddddddgk",
+  "kkkkkkkkkkkkkkkk",
+];
+const CHEST_EMPTY_GRID = [
+  "..kkkkkkkkkkkk..",
+  ".kddddddddddddk.",
+  ".khhhhhhhhhhhhk.",
+  "..kkkkkkkkkkkk..",
+  "..keeeeeeeeeek..",
+  "kkeeeeeeeeeeeekk",
+  "kggggggggggggggk",
+  "kwwwwwwwwwwwwwwk",
+  "kgwwwwwwwwwwwwgk",
+  "kgwwwwwwwwwwwwgk",
+  "kgddddddddddddgk",
+  "kkkkkkkkkkkkkkkk",
+];
+export const CHESTS = {
+  wood: {
+    closed: { palette: CHEST_WOOD, grid: CHEST_CLOSED_GRID },
+    open: { palette: CHEST_WOOD, grid: CHEST_OPEN_GRID },
+    empty: { palette: CHEST_WOOD, grid: CHEST_EMPTY_GRID },
+  },
+  gold: {
+    closed: { palette: CHEST_GOLD, grid: CHEST_CLOSED_GRID },
+    open: { palette: CHEST_GOLD, grid: CHEST_OPEN_GRID },
+    empty: { palette: CHEST_GOLD, grid: CHEST_EMPTY_GRID },
+  },
+} satisfies Record<string, Record<"closed" | "open" | "empty", PixelArt>>;
+
+/** A skill point as a small gem. */
+export const GEM: PixelArt = {
+  palette: { k: "#1c1440", c: "#9b7bff", h: "#e4dcff", d: "#5b3fd1" },
+  grid: ["..kkkk..", ".kchhck.", "kcchccck", "kcccccdk", ".kccdk..", "..kdk...", "...k...."],
+};
+
+/** The streak shield (one missed day per week is forgiven). */
+export const SHIELD: PixelArt = {
+  palette: { k: "#1c2230", b: "#4f8cff", h: "#cfe0ff" },
+  grid: ["kkkkkkkk", "kbbhbbbk", "kbhbbbbk", "kbbbbbbk", ".kbbbbk.", "..kbbk..", "...kk..."],
+};
+
 /** The vault door (ADR-086): steel frame, door with bolts and a golden wheel; hinges on the left. */
 export const VAULT_DOOR: PixelArt = {
   palette: {
