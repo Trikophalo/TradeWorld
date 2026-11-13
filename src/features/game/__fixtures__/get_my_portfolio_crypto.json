@@ -1,0 +1,81 @@
+{
+  "tag": "BNBF",
+  "level": 10,
+  "vault": {
+    "full_at": "2026-11-13T22:11:10.14749+00:00",
+    "cap_cents": 80000,
+    "factor_bps": 10000,
+    "server_time": "2026-11-13T16:11:10.399039+00:00",
+    "accrued_cents": 20000,
+    "last_claimed_at": null,
+    "rate_cents_per_hour": 10000
+  },
+  "nickname": "Fixture_Halter",
+  "xp_total": 27632,
+  "positions": [
+    {
+      "kind": "crypto",
+      "name": "Kryptaler",
+      "ticker": "KTL",
+      "opened_at": "2026-11-13T16:11:10.358507+00:00",
+      "change_bps": -331,
+      "quantity_e6": 11877,
+      "avg_price_e4": 420577587,
+      "last_price_e4": 420152867,
+      "cost_basis_cents": 49952,
+      "market_value_cents": 49902,
+      "realized_pnl_cents": -201,
+      "reserved_quantity_e6": 0,
+      "unrealized_pnl_cents": -50
+    }
+  ],
+  "avatar_key": "rookie",
+  "cash_cents": 5949747,
+  "debt_cents": 0,
+  "open_orders": [],
+  "server_time": "2026-11-13T16:11:10.399039+00:00",
+  "streak_days": 0,
+  "total_cents": 5999649,
+  "xp_for_next": 7906,
+  "recent_trades": [
+    {
+      "id": "3fa180cf-64ee-4719-aa61-9d6a5d0d32ad",
+      "side": "sell",
+      "ticker": "KTL",
+      "price_e4": 419728865,
+      "fee_cents": 100,
+      "tax_cents": 0,
+      "xp_awarded": 0,
+      "executed_at": "2026-11-13T16:11:10.383925+00:00",
+      "gross_cents": 49847,
+      "quantity_e6": 11876,
+      "realized_pnl_cents": -201
+    },
+    {
+      "id": "0ab9a7a8-f7e9-4915-8891-2d20e458046d",
+      "side": "buy",
+      "ticker": "KTL",
+      "price_e4": 420578453,
+      "fee_cents": 100,
+      "tax_cents": 0,
+      "xp_awarded": 20,
+      "executed_at": "2026-11-13T16:11:10.358507+00:00",
+      "gross_cents": 99900,
+      "quantity_e6": 23753,
+      "realized_pnl_cents": null
+    }
+  ],
+  "xp_into_level": 20,
+  "loss_pot_cents": 201,
+  "reserved_cents": 0,
+  "net_worth_cents": 5999599,
+  "skill_points_free": 0,
+  "missions_claimable": 0,
+  "tutorial_completed": false,
+  "company_value_cents": 0,
+  "debt_withholding_bps": 5000,
+  "founding_locked_until": null,
+  "positions_value_cents": 49902,
+  "daily_reward_claimable": true,
+  "nickname_change_available_at": null
+}

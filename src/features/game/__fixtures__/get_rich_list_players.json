@@ -1,10 +1,10 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 59, "gap_cents": 612 }, "rank": 60, "net_worth_cents": 1019388 },
-  "total": 153,
+  "me": { "next": { "name": "Vera", "rank": 54, "gap_cents": 619 }, "rank": 55, "net_worth_cents": 1019381 },
+  "total": 146,
   "entries": [
     {
       "id": "0f3f3f3f-0000-4000-8000-0000000000f1",
-      "tag": "3XZZ",
+      "tag": "T79M",
       "kind": "player",
       "name": "Fenja_Firma",
       "rank": 1,
@@ -12,12 +12,12 @@
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 102529991,
+      "net_worth_cents": 102291991,
       "rank_change_24h": null
     },
     {
       "id": "07170717-0000-4000-8000-0000000000a1",
-      "tag": "4FT8",
+      "tag": "BSGH",
       "kind": "player",
       "name": "Hanna_Haus",
       "rank": 2,
@@ -30,7 +30,7 @@
     },
     {
       "id": "0e3e3e3e-0000-4000-8000-0000000000f1",
-      "tag": "MWEY",
+      "tag": "ZLWW",
       "kind": "player",
       "name": "Frieda_Format",
       "rank": 3,
@@ -42,31 +42,31 @@
       "rank_change_24h": null
     },
     {
-      "id": "08308308-0000-4000-8000-0000000000b1",
-      "tag": "NHKS",
+      "id": "07607607-0000-4000-8000-0000000000a1",
+      "tag": "GTU9",
       "kind": "player",
-      "name": "Hugo_Heim",
+      "name": "Feli_Feed",
       "rank": 4,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 54945680,
+      "net_worth_cents": 44462956,
       "rank_change_24h": null
     },
     {
-      "id": "07607607-0000-4000-8000-0000000000a1",
-      "tag": "C895",
+      "id": "08008008-0000-4000-8000-0000000000c1",
+      "tag": "JSLJ",
       "kind": "player",
-      "name": "Feli_Feed",
+      "name": "Emil_Aufstieg",
       "rank": 5,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 44462962,
+      "net_worth_cents": 27380000,
       "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-13T16:07:56.32058+00:00"
+  "server_time": "2026-11-13T16:11:05.763151+00:00"
 }

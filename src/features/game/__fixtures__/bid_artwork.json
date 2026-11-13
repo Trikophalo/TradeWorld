@@ -1,8 +1,8 @@
 {
   "artwork": {
-    "id": "32b2ac5c-d098-43ec-9ce6-75e92a242c29",
-    "hot": 1.767648,
-    "code": "ART-0043",
+    "id": "1863d6cd-a849-4990-83ab-548f08e89213",
+    "hot": 1.767709,
+    "code": "ART-0042",
     "liked": true,
     "likes": 1,
     "owner": "Fixture_Neu",
@@ -47,18 +47,18 @@
     },
     "rarity": null,
     "auction": {
-      "id": "c0faa716-22a9-45bf-8366-a37e90589d8d",
+      "id": "6bb8ff27-9b91-475f-89da-59ec87d31031",
       "bids": 1,
       "leader": "Fixture_Kunst",
       "seller": "Fixture_Neu",
-      "ends_at": "2026-11-14T16:07:58.732652+00:00",
+      "ends_at": "2026-11-14T16:11:07.851192+00:00",
       "start_cents": 50000,
       "my_bid_cents": 50000,
       "current_cents": 50000,
       "min_bid_cents": 52500
     },
     "creator": "Fixture_Neu",
-    "created_at": "2026-11-13T16:07:58.45351+00:00",
+    "created_at": "2026-11-13T16:11:07.707715+00:00",
     "value_cents": null
   }
 }

@@ -1,0 +1,18 @@
+{
+  "side": "sell",
+  "ticker": "FXT",
+  "price_e4": 1032,
+  "rug_pull": true,
+  "fee_cents": 937,
+  "tax_cents": 20703,
+  "cash_cents": 62108,
+  "xp_awarded": 20,
+  "position_e6": 17500000000,
+  "quantity_e6": 7500000000,
+  "avg_price_e4": 1105,
+  "slippage_bps": 860,
+  "pool_fee_cents": 837,
+  "order_fee_cents": 100,
+  "cash_after_cents": 6062108,
+  "realized_pnl_cents": 82811
+}

@@ -1,11 +1,10 @@
 {
   "trust": { "band": "blank", "kept": 0, "score": 50, "broken": 0 },
-  "limits": { "loan_max_cents": 12000000, "company_deal_max_cents": 5000000 },
   "history": [],
   "running": [],
   "incoming": [
     {
-      "id": "850b708b-d2df-4eae-9976-c942ea54ec19",
+      "id": "56e449a2-e646-446a-b454-a21637397013",
       "kind": "loan",
       "terms": { "hours": 24, "interest_bps": 0, "principal_cents": 20000 },
       "status": "open",
@@ -15,20 +14,20 @@
       "my_role": "borrower",
       "progress": { "due_cents": 20000, "left_cents": 20000, "repaid_cents": 0 },
       "proposer": {
-        "tag": "GVQU",
+        "tag": "2BNQ",
         "level": 6,
         "trust": { "band": "blank", "score": 50 },
         "nickname": "Fixture_Lieferant",
         "avatar_key": "rookie"
       },
       "closed_at": null,
-      "created_at": "2026-11-13T16:08:02.104876+00:00",
-      "expires_at": "2026-11-15T16:08:02.104876+00:00",
+      "created_at": "2026-11-13T16:11:09.835411+00:00",
+      "expires_at": "2026-11-15T16:11:09.835411+00:00",
       "accepted_at": null,
       "is_proposer": false,
       "broken_by_me": false,
       "counterparty": {
-        "tag": "DSWW",
+        "tag": "ZPZS",
         "level": 6,
         "trust": { "band": "blank", "score": 50 },
         "nickname": "Fixture_Abnehmer",
@@ -39,7 +38,7 @@
       "supplier_company": null
     },
     {
-      "id": "3390e8a4-97bf-4a8c-affe-5b4ebbacb4e4",
+      "id": "90dda31e-a4b0-4616-b2f3-c54170426e68",
       "kind": "supply",
       "terms": { "hours": 24, "fee_bps": 5000, "prepay_bps": 2000, "volume_cents_per_hour": 30000 },
       "status": "open",
@@ -55,31 +54,31 @@
         "prepay_left_cents": 0
       },
       "proposer": {
-        "tag": "GVQU",
+        "tag": "2BNQ",
         "level": 6,
         "trust": { "band": "blank", "score": 50 },
         "nickname": "Fixture_Lieferant",
         "avatar_key": "rookie"
       },
       "closed_at": null,
-      "created_at": "2026-11-13T16:08:02.083038+00:00",
-      "expires_at": "2026-11-15T16:08:02.083038+00:00",
+      "created_at": "2026-11-13T16:11:09.824963+00:00",
+      "expires_at": "2026-11-15T16:11:09.824963+00:00",
       "accepted_at": null,
       "is_proposer": false,
       "broken_by_me": false,
       "counterparty": {
-        "tag": "DSWW",
+        "tag": "ZPZS",
         "level": 6,
         "trust": { "band": "blank", "score": 50 },
         "nickname": "Fixture_Abnehmer",
         "avatar_key": "rookie"
       },
-      "buyer_company": { "id": "e650994b-e4c1-4bfc-b277-1fb59f85b8cf", "name": "Fixture Abnahme" },
+      "buyer_company": { "id": "6d69aecd-df7c-4e96-a042-9d09da16b9ca", "name": "Fixture Abnahme" },
       "proposer_role": "supplier",
-      "supplier_company": { "id": "9e32a132-8af5-4acd-8cd6-ca5f5052f31d", "name": "Fixture Lieferwerk" }
+      "supplier_company": { "id": "05d7d4c0-0152-40a5-a827-409fbcda2fd3", "name": "Fixture Lieferwerk" }
     },
     {
-      "id": "d2fcd40a-29c5-4c25-89da-7c6e9c54f2ab",
+      "id": "22fcea48-5100-48ac-a991-ce5b856cf01e",
       "kind": "loan",
       "terms": { "hours": 48, "interest_bps": 1000, "principal_cents": 100000 },
       "status": "open",
@@ -89,20 +88,20 @@
       "my_role": "borrower",
       "progress": { "due_cents": 110000, "left_cents": 110000, "repaid_cents": 0 },
       "proposer": {
-        "tag": "GVQU",
+        "tag": "2BNQ",
         "level": 6,
         "trust": { "band": "blank", "score": 50 },
         "nickname": "Fixture_Lieferant",
         "avatar_key": "rookie"
       },
       "closed_at": null,
-      "created_at": "2026-11-13T16:08:02.067365+00:00",
-      "expires_at": "2026-11-15T16:08:02.067365+00:00",
+      "created_at": "2026-11-13T16:11:09.814222+00:00",
+      "expires_at": "2026-11-15T16:11:09.814222+00:00",
       "accepted_at": null,
       "is_proposer": false,
       "broken_by_me": false,
       "counterparty": {
-        "tag": "DSWW",
+        "tag": "ZPZS",
         "level": 6,
         "trust": { "band": "blank", "score": 50 },
         "nickname": "Fixture_Abnehmer",

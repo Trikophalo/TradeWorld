@@ -1,0 +1,66 @@
+{
+  "coin": {
+    "id": "804e43d6-a630-4eb8-a7d4-f8162d3b2126",
+    "logo": {
+      "grid": [
+        "................",
+        "................",
+        "....00000000....",
+        "....01111110....",
+        "....01111110....",
+        "....00000000....",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................"
+      ],
+      "palette": ["#2bc3d9", "#111318"]
+    },
+    "name": "Fixture Taler",
+    "color": "#2bc3d9",
+    "stats": { "hype": 8.0, "tech": 35.0, "utility": 0.0 },
+    "action": null,
+    "launch": {
+      "at": "2026-11-13T16:11:10.570104+00:00",
+      "start_price_e4": 1000,
+      "team_share_bps": 2000,
+      "liquidity_cents": 1000000
+    },
+    "status": "listed",
+    "ticker": "FXT",
+    "actions": [
+      { "key": "smart_contract", "hours": 6, "available": true, "cost_cents": 200000, "success_bps": 5000 },
+      { "key": "audit", "hours": 24, "available": true, "cost_cents": 1500000, "success_bps": 10000 },
+      { "key": "community", "hours": 4, "available": true, "cost_cents": 50000, "success_bps": 10000 },
+      { "key": "influencer", "hours": 2, "available": true, "cost_cents": 800000, "success_bps": 8500 },
+      { "key": "partnership", "hours": 12, "available": true, "cost_cents": 600000, "success_bps": 7000 },
+      { "key": "staking", "hours": 12, "available": true, "cost_cents": 500000, "success_bps": 10000 },
+      { "key": "bugfix", "hours": 3, "available": true, "cost_cents": 100000, "success_bps": 10000 }
+    ],
+    "creator": { "tag": "4NME", "trust": { "band": "shaky", "score": 30 }, "nickname": "Fixture_Coiner" },
+    "fee_bps": 100,
+    "category": "player",
+    "price_e4": 1032,
+    "burn_hype": 8,
+    "created_at": "2026-11-13T16:11:10.484771+00:00",
+    "low_24h_e4": 1000,
+    "pool_cents": 1016989,
+    "burn_min_e6": 250000000,
+    "high_24h_e4": 1209,
+    "rug_limit_e6": 5000000000,
+    "change_24h_bps": 320,
+    "my_quantity_e6": 17250000000,
+    "team_tokens_e6": 17250000000,
+    "market_cap_cents": 1287420,
+    "volume_24h_cents": 182811,
+    "burn_available_at": "2026-11-13T17:11:10.62617+00:00",
+    "team_at_launch_e6": 25000000000,
+    "team_sold_window_e6": 7500000000
+  }
+}

@@ -1,38 +1,38 @@
 {
   "applications": [
     {
-      "id": "1f1dc049-7e2c-4ea8-b53a-fb4bd708d219",
+      "id": "de4c57e3-f608-447e-81b1-75b5dff83b6c",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "3755c26a-8493-4a20-a34b-ff36804657b1",
+        "id": "43b58285-b29d-41e8-a477-fd1b62cd6230",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
+          "id": "e50a6ff5-8dbd-8c90-f94e-5ac06d3fe862",
           "logo": null,
-          "name": "Frachtpilot",
-          "color": "#9ECE6A",
+          "name": "Volta Energie AG",
+          "color": "#FFD23F",
           "is_ai": true,
-          "sector": "logistics",
-          "ticker": "FPT"
+          "sector": "energy",
+          "ticker": "VLT"
         },
-        "required": [{ "branch": "craft", "min_score": 0 }],
-        "title_key": "craft_intern",
+        "required": [{ "branch": "management", "min_score": 0 }],
+        "title_key": "management_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-13T16:07:56.564751+00:00",
-      "updated_at": "2026-11-13T16:07:56.570191+00:00",
-      "offer_expires_at": "2026-11-15T16:07:56.564751+00:00",
+      "created_at": "2026-11-13T16:11:05.944754+00:00",
+      "updated_at": "2026-11-13T16:11:05.94969+00:00",
+      "offer_expires_at": "2026-11-15T16:11:05.944754+00:00",
       "salary_wish_cents_per_hour": 15000,
       "offer_salary_cents_per_hour": 15000
     },
     {
-      "id": "fd1c8f86-bf27-4f28-a2b3-5914c5471947",
+      "id": "f6d2aefd-3bc6-4322-bd20-47433020ce62",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "165ed0a5-eaca-4997-a740-b0f14a29ccdb",
+        "id": "24066169-ac31-4c38-96c3-d5286de4b444",
         "tier": "junior",
         "title": null,
         "company": {
@@ -48,9 +48,9 @@
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-13T16:07:56.554821+00:00",
-      "updated_at": "2026-11-13T16:07:56.554821+00:00",
-      "offer_expires_at": "2026-11-15T16:07:56.554821+00:00",
+      "created_at": "2026-11-13T16:11:05.932608+00:00",
+      "updated_at": "2026-11-13T16:11:05.932608+00:00",
+      "offer_expires_at": "2026-11-15T16:11:05.932608+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

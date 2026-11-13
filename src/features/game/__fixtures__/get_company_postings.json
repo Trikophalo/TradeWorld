@@ -1,13 +1,13 @@
 {
   "postings": [
     {
-      "id": "e443f8d9-b9a2-4ef9-b8ad-92f3b2a997b6",
+      "id": "855b7cb9-7867-4ff5-9fcc-b9cacec9fa7e",
       "tier": "intern",
       "slots": 1,
       "title": "Werkstudium Software",
       "status": "open",
       "required": [{ "branch": "it", "min_score": 0 }],
-      "posted_at": "2026-11-13T16:07:57.369513+00:00",
+      "posted_at": "2026-11-13T16:11:06.746948+00:00",
       "title_key": null,
       "slots_open": 1,
       "required_skills": [],

@@ -1,21 +1,16 @@
 {
   "job": {
-    "id": "332f79db-5429-4784-af2c-37379fab186f",
+    "id": "4ab79389-a561-425e-aae8-5ac45839dc42",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
+      "id": "e50a6ff5-8dbd-8c90-f94e-5ac06d3fe862",
       "logo": null,
-      "name": "Frachtpilot",
-      "color": "#9ECE6A",
+      "name": "Volta Energie AG",
+      "color": "#FFD23F",
       "is_ai": true,
-      "sector": "logistics",
-      "ticker": "FPT"
-    },
-    "presence": {
-      "fire_at": "2026-11-18T16:08:01.27987+00:00",
-      "pay_bps": 10000,
-      "last_active_at": "2026-11-13T16:08:01.27987+00:00"
+      "sector": "energy",
+      "ticker": "VLT"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +31,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-13T16:08:01.431366+00:00",
+    "started_at": "2026-11-13T16:11:09.415526+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

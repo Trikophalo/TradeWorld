@@ -1,28 +1,12 @@
 {
-  "mine": { "rank": 40, "value_cents": 55567 },
-  "total": 43,
+  "mine": { "rank": 37, "value_cents": 54394 },
+  "total": 39,
   "entries": [
     {
       "kind": "ai",
       "logo": null,
-      "name": "NeuroPharm AG",
-      "rank": 1,
-      "tier": null,
-      "color": "#6EE7A0",
-      "sector": "pharma",
-      "ticker": "NPH",
-      "founder": null,
-      "is_mine": false,
-      "team_size": null,
-      "company_id": "2faf9e4c-3f0a-8a5b-1645-c669e9481771",
-      "value_cents": 1742695800000,
-      "revenue_cents": null
-    },
-    {
-      "kind": "ai",
-      "logo": null,
       "name": "Volta Energie AG",
-      "rank": 2,
+      "rank": 1,
       "tier": null,
       "color": "#FFD23F",
       "sector": "energy",
@@ -31,14 +15,14 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "e50a6ff5-8dbd-8c90-f94e-5ac06d3fe862",
-      "value_cents": 524050000000,
+      "value_cents": 519575000000,
       "revenue_cents": null
     },
     {
       "kind": "ai",
       "logo": null,
       "name": "KlarSoft AG",
-      "rank": 3,
+      "rank": 2,
       "tier": null,
       "color": "#4C8DFF",
       "sector": "tech",
@@ -47,14 +31,14 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
-      "value_cents": 434677000000,
+      "value_cents": 431529000000,
       "revenue_cents": null
     },
     {
       "kind": "ai",
       "logo": null,
       "name": "Brotzeit Handel AG",
-      "rank": 4,
+      "rank": 3,
       "tier": null,
       "color": "#F2A93B",
       "sector": "retail",
@@ -63,14 +47,14 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "cbfac5fd-3475-2166-ea22-0a85cbb6f5c0",
-      "value_cents": 352652000000,
+      "value_cents": 354512000000,
       "revenue_cents": null
     },
     {
       "kind": "ai",
       "logo": null,
       "name": "Nordlicht Logistik AG",
-      "rank": 5,
+      "rank": 4,
       "tier": null,
       "color": "#7AA2F7",
       "sector": "logistics",
@@ -79,9 +63,25 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "d21331b8-a414-66aa-de07-f036108fc91d",
-      "value_cents": 311126900000,
+      "value_cents": 315973700000,
+      "revenue_cents": null
+    },
+    {
+      "kind": "ai",
+      "logo": null,
+      "name": "Alpenmed",
+      "rank": 5,
+      "tier": null,
+      "color": "#8FD3F4",
+      "sector": "pharma",
+      "ticker": "ALM",
+      "founder": null,
+      "is_mine": false,
+      "team_size": null,
+      "company_id": "533f0569-8570-a8f1-ebc9-07f9808291c9",
+      "value_cents": 137018400000,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-13T16:07:57.563231+00:00"
+  "server_time": "2026-11-13T16:11:06.931152+00:00"
 }

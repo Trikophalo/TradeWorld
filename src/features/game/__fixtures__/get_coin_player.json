@@ -1,0 +1,70 @@
+{
+  "logo": {
+    "grid": [
+      "................",
+      "................",
+      "....00000000....",
+      "....01111110....",
+      "....01111110....",
+      "....00000000....",
+      "................",
+      "................",
+      "................",
+      "................",
+      "................",
+      "................",
+      "................",
+      "................",
+      "................",
+      "................"
+    ],
+    "palette": ["#2bc3d9", "#111318"]
+  },
+  "name": "Fixture Taler",
+  "pool": { "tokens_e6": 91000008191, "cash_cents": 1099900 },
+  "color": "#2bc3d9",
+  "stats": { "hype": 0.0, "tech": 35.0, "utility": 0.0 },
+  "events": [
+    {
+      "at": "2026-11-13T16:11:10.570104+00:00",
+      "key": "launch",
+      "name": "Fixture Taler",
+      "ticker": "FXT",
+      "payload": { "start_price_e4": 1000, "team_share_bps": 2000, "liquidity_cents": 1000000 },
+      "shock_bps": null
+    },
+    {
+      "at": "2026-11-13T16:11:10.565272+00:00",
+      "key": "action",
+      "name": "Fixture Taler",
+      "ticker": "FXT",
+      "payload": { "action": "audit", "success": true },
+      "shock_bps": null
+    },
+    {
+      "at": "2026-11-13T16:11:10.484771+00:00",
+      "key": "created",
+      "name": "Fixture Taler",
+      "ticker": "FXT",
+      "payload": {},
+      "shock_bps": null
+    }
+  ],
+  "status": "listed",
+  "ticker": "FXT",
+  "creator": { "tag": "4NME", "trust": { "band": "blank", "score": 50 }, "nickname": "Fixture_Coiner" },
+  "fee_bps": 100,
+  "holders": 2,
+  "category": "player",
+  "price_e4": 1209,
+  "supply_e6": 125000000000,
+  "low_24h_e4": 1000,
+  "pool_cents": 1099900,
+  "high_24h_e4": 1209,
+  "my_position": { "quantity_e6": 8999991809, "value_cents": 108810, "avg_price_e4": 1110 },
+  "change_24h_bps": 2090,
+  "my_quantity_e6": 8999991809,
+  "team_tokens_e6": 25000000000,
+  "market_cap_cents": 1511250,
+  "volume_24h_cents": 99900
+}
