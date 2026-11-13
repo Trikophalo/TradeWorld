@@ -108,7 +108,9 @@ select tests.assert(
            'check_artwork_title', 'get_company_org',
            -- M5a RPCs (cryptocurrencies and own coins, ADR-101)
            'burn_coin_tokens', 'check_coin_name', 'create_coin', 'crypto_trade', 'discontinue_coin', 'get_coin',
-           'get_crypto_market', 'get_my_coin', 'launch_coin', 'start_coin_action']
+           'get_crypto_market', 'get_my_coin', 'launch_coin', 'start_coin_action',
+           -- friend code (ADR-111)
+           'get_friend_code', 'redeem_friend_code']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')

@@ -62,6 +62,8 @@ Vor jedem Commit müssen `pnpm typecheck`, `pnpm lint` und `pnpm test` grün sei
 - Geld: `bigint` in **Cent** (`*_cents`). Kurse: `bigint` × 10 000 (`*_e4`). Sätze: Basispunkte (`*_bps`).
 - Niemals Floats für Geld. Gerundet wird einmal, beim Übergang von Kurs zu Geld, kaufmännisch „half even“.
 - Umrechnung in `number` nur für die Anzeige, in `src/lib/format.ts`.
+- Die Spielwährung heißt **Nex (NX)** (ADR-110), nie Euro. Beträge nur über `formatMoney` & Co. anzeigen; in Texten
+  „NX“ schreiben.
 - Jede Geldbewegung ist eine Ledger-Buchung mit Summe 0. Kein `UPDATE` auf Kontostände an der Buchung vorbei.
 
 ### Balancing

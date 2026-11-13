@@ -18,7 +18,7 @@ import { MISSION_TEMPLATES, availableFor, missionXp, type Metric, type MissionTe
 import { createCareerEngine, initialCareer, tycoonAvatar, type CareerState } from "./demo/careers";
 import { createArtEngine, type ArtState } from "./demo/artworks";
 import { createPropertyEngine, type HomeState } from "./demo/property";
-import { createFriendEngine } from "./demo/friends";
+import { createFriendEngine, type DemoFriendCode } from "./demo/friends";
 import { createSocialEngine, type DemoSocialState } from "./demo/social";
 import { createCompanyEventsEngine } from "./demo/company-events";
 import { createCryptoEngine, type DemoCryptoState } from "./demo/crypto";
@@ -88,6 +88,8 @@ interface PlayerState {
   nickname: string;
   /** Permanent player tag (ADR-085); drawn once for older demo players. */
   tag?: string;
+  /** The friend code redeemed once (ADR-111). */
+  friendCode?: DemoFriendCode;
   /** Feed, notifications and league of the demo (ADR-088, ADR-089). */
   social?: DemoSocialState;
   /** Deals with the demo's trading partners and the trust log (ADR-098). */
@@ -1183,6 +1185,14 @@ const friends = createFriendEngine({
   level,
   avatarKey: () => career.avatarKey(),
   idempotent,
+  friendCode: () => p().friendCode ?? null,
+  setFriendCode: (value) => {
+    p().friendCode = value;
+  },
+  addCash: (cents) => {
+    p().cashCents += cents;
+  },
+  now: () => new Date(),
 });
 
 const home = createPropertyEngine({
@@ -1528,7 +1538,7 @@ export const demoEngine: GameEngine = {
       news.unshift({
         publishedAt: new Date().toISOString(),
         headline: `${p().nickname} jagt Platz ${me.next.rank}`,
-        body: `Bis ${me.next.name} fehlen noch ${Math.round(me.next.gapCents / 100).toLocaleString("de-DE")} €.`,
+        body: `Bis ${me.next.name} fehlen noch ${Math.round(me.next.gapCents / 100).toLocaleString("de-DE")} NX.`,
         kind: "chase",
       });
     }

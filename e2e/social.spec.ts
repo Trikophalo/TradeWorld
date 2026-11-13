@@ -60,7 +60,7 @@ test.beforeEach(async ({ page }) => {
 
 test("feed in the friends hub, applause toggles", async ({ page }) => {
   await page.goto("/friends");
-  await expect(page.getByTestId("feed")).toContainText("hat mit Volta Energie AG 4.120 € Gewinn gemacht");
+  await expect(page.getByTestId("feed")).toContainText("hat mit Volta Energie AG 4.120 NX Gewinn gemacht");
   const first = page.getByTestId("feed").getByTestId("feed-item").first();
   await expect(first).toHaveAttribute("data-kind", "big_trade");
   const react = first.getByTestId("feed-react");

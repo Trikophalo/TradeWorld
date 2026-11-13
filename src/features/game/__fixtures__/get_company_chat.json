@@ -1,5 +1,5 @@
 {
-  "company": { "id": "523e7ea0-aeb7-46a5-b3ba-1667bad03490", "name": "Fixture Labor", "color": "#2266cc" },
+  "company": { "id": "a8c62a52-7aaf-4320-aa8a-0d8eed0176bc", "name": "Fixture Labor", "color": "#2266cc" },
   "members": 2,
   "messages": [
     {
@@ -9,7 +9,7 @@
       "is_me": false,
       "author": null,
       "avatar_key": null,
-      "created_at": "2026-11-13T17:28:16.664355+00:00",
+      "created_at": "2026-11-13T18:58:20.229947+00:00",
       "is_founder": false
     },
     {
@@ -19,17 +19,17 @@
       "is_me": false,
       "author": null,
       "avatar_key": null,
-      "created_at": "2026-11-13T17:28:16.698393+00:00",
+      "created_at": "2026-11-13T18:58:20.260974+00:00",
       "is_founder": false
     },
     {
       "id": 67,
-      "body": "Quartal J1 Q1: Umsatz 0 €, Gewinn 0 €.",
+      "body": "Quartal J1 Q1: Umsatz 0 NX, Gewinn 0 NX.",
       "kind": "system",
       "is_me": false,
       "author": null,
       "avatar_key": null,
-      "created_at": "2026-11-13T17:28:16.705292+00:00",
+      "created_at": "2026-11-13T18:58:20.269108+00:00",
       "is_founder": false
     },
     {
@@ -39,7 +39,7 @@
       "is_me": false,
       "author": null,
       "avatar_key": null,
-      "created_at": "2026-11-13T17:28:16.882199+00:00",
+      "created_at": "2026-11-13T18:58:20.5822+00:00",
       "is_founder": false
     },
     {
@@ -49,7 +49,7 @@
       "is_me": false,
       "author": null,
       "avatar_key": null,
-      "created_at": "2026-11-13T17:28:16.992741+00:00",
+      "created_at": "2026-11-13T18:58:20.756679+00:00",
       "is_founder": false
     },
     {
@@ -59,7 +59,7 @@
       "is_me": false,
       "author": "Fixture_Chefin",
       "avatar_key": "rookie",
-      "created_at": "2026-11-13T17:28:17.072155+00:00",
+      "created_at": "2026-11-13T18:58:20.893797+00:00",
       "is_founder": false
     },
     {
@@ -69,7 +69,7 @@
       "is_me": true,
       "author": "Fixture_Neu",
       "avatar_key": "coder",
-      "created_at": "2026-11-13T17:28:17.075735+00:00",
+      "created_at": "2026-11-13T18:58:20.897583+00:00",
       "is_founder": true
     }
   ]

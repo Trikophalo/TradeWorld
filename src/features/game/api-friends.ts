@@ -1,9 +1,9 @@
 import { z } from "zod";
-import type { Friends, GameEngine } from "./types";
+import type { FriendCode, Friends, GameEngine } from "./types";
 import { rpc } from "./rpc";
 
 /*
- * Friends against the server (ADR-084).
+ * Friends (ADR-084) and the friend code (ADR-111) against the server.
  */
 const entry = z.object({
   nickname: z.string(),
@@ -29,7 +29,31 @@ const searchSchema = z.object({
   ),
 });
 
+const friendCodeSchema = z.object({
+  code: z.string(),
+  bonus_cents: z.number(),
+  redeemed: z.boolean(),
+  redeemed_from: z
+    .object({ nickname: z.string(), tag: z.string().nullable().default(null) })
+    .nullable()
+    .default(null),
+  redeemed_at: z.string().nullable().default(null),
+  invited: z.number().default(0),
+});
+const redeemedSchema = friendCodeSchema.extend({ paid_cents: z.number() });
+
+const toFriendCode = (r: z.infer<typeof friendCodeSchema>): FriendCode => ({
+  code: r.code,
+  bonusCents: r.bonus_cents,
+  redeemed: r.redeemed,
+  redeemedFrom: r.redeemed_from,
+  redeemedAt: r.redeemed_at,
+  invited: r.invited,
+});
+
 export const FRIEND_RPC_SCHEMAS = {
+  get_friend_code: friendCodeSchema,
+  redeem_friend_code: redeemedSchema,
   search_players: searchSchema,
   get_friends: friendsSchema,
   send_friend_request: friendsSchema,
@@ -51,8 +75,21 @@ const toFriends = (r: z.infer<typeof friendsSchema>): Friends => ({
 
 export const liveFriendEngine: Pick<
   GameEngine,
-  "friends" | "sendFriendRequest" | "respondFriendRequest" | "removeFriend" | "searchPlayers"
+  | "friends"
+  | "sendFriendRequest"
+  | "respondFriendRequest"
+  | "removeFriend"
+  | "searchPlayers"
+  | "friendCode"
+  | "redeemFriendCode"
 > = {
+  async friendCode() {
+    return toFriendCode(await rpc("get_friend_code", {}, friendCodeSchema));
+  },
+  async redeemFriendCode(requestId, code) {
+    const r = await rpc("redeem_friend_code", { p_request_id: requestId, p_code: code }, redeemedSchema);
+    return { ...toFriendCode(r), paidCents: r.paid_cents };
+  },
   async searchPlayers(query) {
     if (query.trim().length < 2) return [];
     const r = await rpc("search_players", { p_query: query.trim() }, searchSchema);

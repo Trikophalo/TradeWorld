@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { TAG_ALPHABET, formatTag, nameKey, parseTag, tagFromUniform } from "./player-tag";
+import {
+  TAG_ALPHABET,
+  formatTag,
+  friendCodeOf,
+  nameKey,
+  parseFriendCode,
+  parseTag,
+  tagFromUniform,
+} from "./player-tag";
 
 describe("player tags (ADR-085)", () => {
   it("parses with or without #, any case, and rejects ambiguous letters", () => {
@@ -18,6 +26,25 @@ describe("player tags (ADR-085)", () => {
     const tag = tagFromUniform([0.1, 0.4, 0.7, 0.95]);
     expect(parseTag(tag)).toBe(tag);
     expect([...tag].every((c) => TAG_ALPHABET.includes(c))).toBe(true);
+  });
+});
+
+describe("friend codes (ADR-111)", () => {
+  it("is NEXA plus the tag and reads back however it is typed", () => {
+    expect(friendCodeOf("K7Q2")).toBe("NEXA-K7Q2");
+    expect(parseFriendCode("NEXA-K7Q2")).toBe("K7Q2");
+    expect(parseFriendCode(" nexa k7q2 ")).toBe("K7Q2");
+    expect(parseFriendCode("#k7q2")).toBe("K7Q2");
+    expect(parseFriendCode("K7Q2")).toBe("K7Q2");
+  });
+
+  it("keeps a tag that spells NEXA and rejects everything else", () => {
+    expect(parseFriendCode("NEXA")).toBe("NEXA");
+    expect(parseFriendCode("NEXA-NEXA")).toBe("NEXA");
+    expect(parseFriendCode("NEXA-0000")).toBeNull();
+    expect(parseFriendCode("NEXA-K7Q")).toBeNull();
+    expect(parseFriendCode("")).toBeNull();
+    expect(parseFriendCode("NEXA-K7Q2X")).toBeNull();
   });
 });
 

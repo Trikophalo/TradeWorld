@@ -3277,4 +3277,392 @@ create trigger scheduled_events_skip_bells
 delete from public.scheduled_events
  where kind in ('opening_bell', 'closing_bell') and status = 'scheduled' and public.market_always_open();
 
+-- ===== supabase/migrations/20261202000200_game_currency.sql =====
+-- =============================================================================
+-- NEXA · 0200 · The game's own currency: Nex (NX) instead of euro (ADR-110)
+-- =============================================================================
+-- Amounts stay bigint hundredths (`*_cents`). Only the texts the server writes change: the three money text helpers
+-- and the crypto event texts say "NX"; texts already stored (unlocks, achievements, mission templates, news,
+-- notifications, company chat) are rewritten once; the stablecoin "Euro-Stabil" becomes "Eins-Stabil".
+-- Idempotent: runs unchanged as supabase/updates/20261202000200_game_currency.sql.
+
+-- German short money text for news: "420,0 Mio. NX", "1,96 Mrd. NX", "400 Tsd. NX" (name kept for its callers).
+create or replace function public.format_eur_short(p_cents bigint)
+returns text
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_abs  numeric := abs(coalesce(p_cents, 0));
+  v_sign text := case when coalesce(p_cents, 0) < 0 then '-' else '' end;
+begin
+  if v_abs >= 100000000000 then
+    return v_sign || replace(to_char(v_abs / 100000000000, 'FM999990.00'), '.', ',') || ' Mrd. NX';
+  elsif v_abs >= 100000000 then
+    return v_sign || replace(to_char(v_abs / 100000000, 'FM999990.0'), '.', ',') || ' Mio. NX';
+  elsif v_abs >= 100000 then
+    return v_sign || to_char(round(v_abs / 100000), 'FM999990') || ' Tsd. NX';
+  end if;
+  return v_sign || to_char(round(v_abs / 100), 'FM999990') || ' NX';
+end;
+$$;
+
+-- German money text for system messages: "1.234 NX", "-56 NX" (name kept for its callers).
+create or replace function public.format_eur(p_cents bigint)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when p_cents < 0 then '-' else '' end
+      || reverse(regexp_replace(reverse(round(abs(p_cents) / 100.0)::bigint::text), '(\d{3})(?=\d)', '\1.', 'g'))
+      || ' NX';
+$$;
+
+-- "{target}" in titles and descriptions: Nex for money metrics ("2.000 NX"), else the number.
+create or replace function public.mission_text(p_text text, p_metric text, p_target bigint)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select replace(p_text, '{target}',
+           case when public.mission_is_money_metric(p_metric)
+                then replace(to_char(p_target / 100, 'FM999G999G999G990'), ',', '.') || ' NX'
+                else p_target::text end);
+$$;
+
+-- Crypto event texts (as in M5a): the peg is 1 NX.
+create or replace function public.crypto_event_text(p_key text, p_name text)
+returns jsonb
+language sql
+immutable
+set search_path = ''
+as $$
+  select case p_key
+    when 'hack' then jsonb_build_object('title', 'Hack bei ' || n, 'body', 'Angreifer haben Geld aus dem Pool gestohlen. Der Kurs bricht ein.')
+    when 'bug' then jsonb_build_object('title', 'Bug bei ' || n, 'body', 'Ein Fehler im Smart Contract verunsichert die Halter.')
+    when 'influencer' then jsonb_build_object('title', 'Influencer feiert ' || n, 'body', 'Ein bekannter Influencer schwärmt von der Währung. Der Kurs springt.')
+    when 'exchange_listing' then jsonb_build_object('title', n || ' an einer Börse gelistet', 'body', 'Eine große Krypto-Börse nimmt die Währung auf.')
+    when 'delisting_rumor' then jsonb_build_object('title', 'Delisting-Gerücht um ' || n, 'body', 'Es heißt, eine Börse wolle die Währung streichen.')
+    when 'whale_buy' then jsonb_build_object('title', 'Wal kauft ' || n, 'body', 'Ein Großanleger kauft in großem Stil.')
+    when 'whale_dump' then jsonb_build_object('title', 'Wal verkauft ' || n, 'body', 'Ein Großanleger wirft seine Coins auf den Markt.')
+    when 'partnership' then jsonb_build_object('title', 'Partnerschaft für ' || n, 'body', 'Ein Unternehmen will die Währung nutzen.')
+    when 'fud' then jsonb_build_object('title', 'Angstmache um ' || n, 'body', 'Gerüchte und Panik drücken den Kurs.')
+    when 'network_upgrade' then jsonb_build_object('title', 'Netzwerk-Upgrade bei ' || n, 'body', 'Das Netzwerk wird schneller und günstiger.')
+    when 'depeg' then jsonb_build_object('title', n || ' verliert die Bindung', 'body', 'Der Stablecoin ist nicht mehr 1 NX wert.')
+    when 'meme_wave' then jsonb_build_object('title', 'Meme-Welle', 'body', 'Shitcoins sind plötzlich überall gefragt.')
+    when 'regulation' then jsonb_build_object('title', 'Regulierung trifft ' || n, 'body', 'Neue Regeln für Kryptowährungen drücken den ganzen Markt.')
+    when 'rug_pull' then jsonb_build_object('title', 'Rug Pull bei ' || n, 'body', 'Die Macher haben in großem Stil Coins verkauft. Der Kurs stürzt ab.')
+    when 'exposed' then jsonb_build_object('title', 'Werbedeal von ' || n || ' aufgeflogen', 'body', 'Die bezahlte Influencer-Werbung ist aufgeflogen: Der Hype ist weg, der Kurs fällt.')
+    when 'dead' then jsonb_build_object('title', n || ' ist tot', 'body', 'Der Kurs ist fast null. In einem Tag wird die Währung gestrichen.')
+    when 'delisted' then jsonb_build_object('title', n || ' gestrichen', 'body', 'Die Währung ist vom Markt verschwunden.')
+    when 'closed' then jsonb_build_object('title', n || ' eingestellt', 'body', 'Der Pool wurde nach Coins an alle Halter ausgezahlt.')
+    else jsonb_build_object('title', 'Neuigkeit zu ' || n, 'body', 'Bei der Währung hat sich etwas getan.')
+  end
+  from (select coalesce(p_name, 'einer Kryptowährung') as n) x;
+$$;
+
+-- Texts stored before the change (seed texts, news, notifications, chat, reports): every text column of the public
+-- tables. The ledger is append-only and keeps its wording; profiles are the players' own words.
+do $$
+declare
+  r record;
+begin
+  for r in
+    select c.table_name, c.column_name
+      from information_schema.columns c
+      join information_schema.tables t on t.table_schema = c.table_schema and t.table_name = c.table_name
+     where c.table_schema = 'public' and t.table_type = 'BASE TABLE'
+       and c.data_type in ('text', 'character varying') and c.is_generated = 'NEVER'
+       and c.table_name not like 'ledger%' and c.table_name not in ('profiles', 'game_config')
+     order by c.table_name, c.column_name
+  loop
+    begin
+      execute format('update public.%I set %I = replace(%I, %L, %L) where %I like %L',
+                     r.table_name, r.column_name, r.column_name, '€', 'NX', r.column_name, '%€%');
+    exception when others then
+      -- a table that guards its rows keeps its old wording
+      null;
+    end;
+  end loop;
+end;
+$$;
+
+-- The stablecoin pegged to 1 NX is no "euro" any more. The ticker EUS stays.
+do $$
+begin
+  if to_regclass('public.crypto_coins') is not null then
+    update public.crypto_coins set name = 'Eins-Stabil' where ticker = 'EUS' and name = 'Euro-Stabil';
+  end if;
+  update public.securities set name = 'Eins-Stabil' where ticker = 'EUS' and name = 'Euro-Stabil';
+end;
+$$;
+
+-- ===== supabase/migrations/20261202000300_friend_code.sql =====
+-- =============================================================================
+-- NEXA · 0300 · Friend code: bring friends, they get a bonus once (ADR-111)
+-- =============================================================================
+-- Every player has a code to hand out: "NEXA-" plus the permanent player tag (ADR-085), e.g. NEXA-K7Q2. A friend
+-- enters it in the profile under "Freundescode" and gets social.friendCode.bonusCents (5.000 NX) once, paid by the
+-- treasury (closed money system, ADR-041). Every account can redeem exactly one code, never its own.
+--
+-- RPCs (authenticated):
+--   get_friend_code() -> FRIEND_CODE
+--   redeem_friend_code(p_request_id uuid, p_code text) -> FRIEND_CODE plus {"paid_cents", "cash_after_cents"}
+--   FRIEND_CODE = {"code", "bonus_cents", "redeemed", "redeemed_from": {"nickname","tag"}|null, "redeemed_at"|null,
+--                  "invited"}
+-- New error keys: friend_code_unknown NX104, friend_code_self NX105, friend_code_used NX106.
+-- New notification type: friend_code_redeemed (social), to the owner of the code.
+-- Idempotent: runs unchanged as supabase/updates/20261202000300_friend_code.sql.
+
+alter table public.profiles add column if not exists friend_code_from uuid references public.profiles (id) on delete set null;
+alter table public.profiles add column if not exists friend_code_at timestamptz;
+create index if not exists profiles_friend_code_from_idx on public.profiles (friend_code_from) where friend_code_from is not null;
+comment on column public.profiles.friend_code_from is 'Whose friend code this player redeemed (ADR-111); once, never reset.';
+
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('friend_code_redeemed', 'social', 'Freundescode eingelöst', 'Jemand hat deinen Freundescode eingelöst.',
+        'notif_friend', true, false, false, 276)
+on conflict (key) do nothing;
+
+-- Error keys (as in M5a plus the friend code)
+create or replace function public.api_error(p_key text)
+returns void
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_code text;
+begin
+  v_code := case p_key
+    when 'insufficient_funds'          then 'NX001'
+    when 'rate_limited'                then 'NX004'
+    when 'forbidden'                   then 'NX006'
+    when 'invalid_quantity'            then 'NX007'
+    when 'invalid_price'               then 'NX007'
+    when 'invalid_argument'            then 'NX007'
+    when 'invalid_interval'            then 'NX007'
+    when 'not_authenticated'           then 'NX010'
+    when 'unknown_security'            then 'NX011'
+    when 'not_tradable'                then 'NX012'
+    when 'insufficient_position'       then 'NX013'
+    when 'order_not_found'             then 'NX014'
+    when 'order_not_open'              then 'NX015'
+    when 'market_paused'               then 'NX016'
+    when 'nothing_to_claim'            then 'NX017'
+    when 'locked'                      then 'NX018'
+    when 'name_too_short'              then 'NX019'
+    when 'name_too_long'               then 'NX019'
+    when 'name_invalid_chars'          then 'NX019'
+    when 'name_profanity'              then 'NX019'
+    when 'name_reserved'               then 'NX019'
+    when 'name_taken'                  then 'NX019'
+    when 'name_change_too_soon'        then 'NX020'
+    when 'order_too_small'             then 'NX021'
+    when 'market_illiquid'             then 'NX022'
+    when 'mission_not_found'           then 'NX023'
+    when 'mission_not_completed'       then 'NX024'
+    when 'mission_already_claimed'     then 'NX025'
+    when 'avatar_unknown'              then 'NX026'
+    when 'avatar_locked'               then 'NX027'
+    when 'daily_reward_claimed'        then 'NX028'
+    when 'skill_unknown'               then 'NX029'
+    when 'skill_learned'               then 'NX030'
+    when 'skill_locked'                then 'NX031'
+    when 'skill_points_insufficient'   then 'NX032'
+    when 'job_not_found'               then 'NX033'
+    when 'job_level_too_low'           then 'NX034'
+    when 'job_skills_missing'          then 'NX035'
+    when 'application_limit'           then 'NX036'
+    when 'application_exists'          then 'NX037'
+    when 'application_not_found'       then 'NX038'
+    when 'application_not_offered'     then 'NX039'
+    when 'offer_expired'               then 'NX040'
+    when 'job_active_exists'           then 'NX041'
+    when 'no_active_job'               then 'NX042'
+    when 'raise_too_soon'              then 'NX043'
+    when 'raise_too_high'              then 'NX044'
+    when 'player_not_found'            then 'NX045'
+    when 'employer_only'               then 'NX046'
+    when 'company_exists'              then 'NX047'
+    when 'company_not_found'           then 'NX048'
+    when 'company_level_too_low'       then 'NX049'
+    when 'owns_company'                then 'NX050'
+    when 'employee_limit'              then 'NX051'
+    when 'company_upgrade_unavailable' then 'NX052'
+    when 'founding_locked'             then 'NX053'
+    when 'not_in_company'              then 'NX054'
+    when 'work_task_not_found'         then 'NX055'
+    when 'work_task_expired'           then 'NX056'
+    when 'work_task_done'              then 'NX057'
+    when 'offer_closed'                then 'NX058'
+    when 'offer_sold_out'              then 'NX059'
+    when 'already_listed'              then 'NX060'
+    when 'confirm_mismatch'            then 'NX061'
+    when 'skill_already_covered'       then 'NX062'
+    when 'training_locked'             then 'NX063'
+    when 'logo_locked'                 then 'NX064'
+    when 'logo_forbidden'              then 'NX065'
+    when 'artworks_locked'             then 'NX066'
+    when 'artwork_not_found'           then 'NX067'
+    when 'auction_not_found'           then 'NX068'
+    when 'auction_ended'               then 'NX069'
+    when 'bid_too_low'                 then 'NX070'
+    when 'own_artwork'                 then 'NX071'
+    when 'already_on_auction'          then 'NX072'
+    when 'auction_has_bids'            then 'NX073'
+    when 'property_locked'             then 'NX074'
+    when 'no_home'                     then 'NX075'
+    when 'invalid_tier'                then 'NX076'
+    when 'item_not_found'              then 'NX077'
+    when 'layout_invalid'              then 'NX078'
+    when 'floor_not_owned'             then 'NX079'
+    when 'garage_full'                 then 'NX080'
+    when 'event_closed'                then 'NX081'
+    when 'event_needs_staff'           then 'NX082'
+    when 'upgrade_maxed'               then 'NX083'
+    when 'promotion_not_ready'         then 'NX084'
+    when 'promotion_too_soon'          then 'NX085'
+    when 'promotion_pending'           then 'NX086'
+    when 'campaign_running'            then 'NX087'
+    when 'deal_not_found'              then 'NX088'
+    when 'deal_closed'                 then 'NX089'
+    when 'deal_terms'                  then 'NX090'
+    when 'deal_limit'                  then 'NX091'
+    when 'deal_self'                   then 'NX092'
+    when 'stake_share_full'            then 'NX093'
+    when 'deal_needs_company'          then 'NX094'
+    when 'deal_too_big'                then 'NX095'
+    when 'coin_not_found'              then 'NX096'
+    when 'coin_exists'                 then 'NX097'
+    when 'ticker_taken'                then 'NX098'
+    when 'coin_not_tradable'           then 'NX099'
+    when 'coin_action_running'         then 'NX100'
+    when 'coin_tech_too_low'           then 'NX101'
+    when 'slippage_exceeded'           then 'NX102'
+    when 'coin_not_launched'           then 'NX103'
+    when 'friend_code_unknown'         then 'NX104'
+    when 'friend_code_self'            then 'NX105'
+    when 'friend_code_used'            then 'NX106'
+    else 'NX007'
+  end;
+  raise exception using errcode = v_code, message = p_key;
+end;
+$$;
+
+-- FRIEND_CODE of a player.
+create or replace function public.friend_code_state(p_player uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'code',          'NEXA-' || p.tag,
+    'bonus_cents',   greatest(0, public.config_bigint('social', '{friendCode,bonusCents}', 500000)),
+    'redeemed',      p.friend_code_at is not null,
+    'redeemed_from', (select jsonb_build_object('nickname', i.nickname, 'tag', i.tag)
+                        from public.profiles i where i.id = p.friend_code_from),
+    'redeemed_at',   p.friend_code_at,
+    'invited',       (select count(*) from public.profiles x where x.friend_code_from = p.id))
+    from public.profiles p where p.id = p_player;
+$$;
+
+create or replace function public.get_friend_code()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+begin
+  v_player := public.require_player();
+  return public.friend_code_state(v_player);
+end;
+$$;
+comment on function public.get_friend_code() is 'RPC: the own friend code, whether one was redeemed, how many friends came (ADR-111).';
+
+create or replace function public.redeem_friend_code(p_request_id uuid, p_code text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid;
+  v_replay  jsonb;
+  v_tag     text;
+  v_owner   public.profiles;
+  v_me      public.profiles;
+  v_bonus   bigint;
+  v_paid    bigint;
+  v_cash    bigint;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'redeem_friend_code');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  -- "NEXA-K7Q2", "nexa k7q2", "#K7Q2" and "K7Q2" all mean the same code
+  v_tag := regexp_replace(upper(coalesce(p_code, '')), '[^A-Z0-9]', '', 'g');
+  if length(v_tag) = 8 and left(v_tag, 4) = 'NEXA' then
+    v_tag := right(v_tag, 4);
+  end if;
+  if v_tag !~ '^[A-HJ-NP-Z2-9]{4}$' then
+    perform public.api_error('friend_code_unknown');
+  end if;
+  perform public.lock_player_accounts(v_player);
+  select * into v_me from public.profiles where id = v_player for update;
+  if v_me.friend_code_at is not null then
+    perform public.api_error('friend_code_used');
+  end if;
+  select * into v_owner from public.profiles p where p.tag = v_tag and not p.is_deactivated;
+  if v_owner.id is null then
+    perform public.api_error('friend_code_unknown');
+  end if;
+  if v_owner.id = v_player then
+    perform public.api_error('friend_code_self');
+  end if;
+
+  v_bonus := greatest(0, public.config_bigint('social', '{friendCode,bonusCents}', 500000));
+  update public.profiles set friend_code_from = v_owner.id, friend_code_at = now() where id = v_player;
+  v_paid := public.state_pay_partial(v_player, v_bonus, 'mission_reward', 'Freundescode von ' || v_owner.nickname,
+                                     'friend_code:' || v_player::text);
+  perform public.loan_withhold(v_player, v_paid, 'friend_code:' || v_player::text);
+  perform public.social_notify(v_owner.id, 'friend_code_redeemed', 'Freundescode eingelöst',
+    v_me.nickname || ' ist mit deinem Code dabei.',
+    jsonb_build_object('nickname', v_me.nickname, 'tag', v_me.tag), '/friends', 'friend_code:' || v_player::text);
+
+  select a.balance_cents into v_cash from public.ledger_accounts a
+   where a.owner_player_id = v_player and a.kind = 'player_cash';
+  return public.request_complete(v_player, p_request_id,
+    public.friend_code_state(v_player) || jsonb_build_object('paid_cents', v_paid, 'cash_after_cents', v_cash));
+end;
+$$;
+comment on function public.redeem_friend_code(uuid, text) is 'RPC: redeem a friend''s code once for the bonus (ADR-111).';
+
+do $$
+declare
+  f text;
+begin
+  foreach f in array array['public.friend_code_state(uuid)'] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+    execute format('grant execute on function %s to service_role', f);
+  end loop;
+  foreach f in array array['public.get_friend_code()', 'public.redeem_friend_code(uuid, text)'] loop
+    execute format('revoke all on function %s from public, anon', f);
+    execute format('grant execute on function %s to authenticated, service_role', f);
+  end loop;
+end;
+$$;
+
 commit;

@@ -106,7 +106,7 @@ test("reaching level 3 starts Finn's limit order tour", async ({ page }) => {
   await page.goto("/markets/VLT");
   await page.locator('[data-tour="buy"]').filter({ visible: true }).first().click();
   const dialog = page.getByRole("dialog", { name: "VLT kaufen" });
-  await dialog.getByLabel("Betrag in Euro").fill("200");
+  await dialog.getByLabel("Betrag in Nex").fill("200");
   await dialog.locator('[data-tour="order-confirm"] button').hover();
   await page.mouse.down();
   await expect(page.getByText("Aufgestiegen!")).toBeVisible({ timeout: 8000 });
@@ -135,5 +135,5 @@ test("starting over resets the game after typing the name and Finn starts again 
   await page.mouse.up();
   await expect(page).toHaveURL("/");
   await expect(page.locator("[data-tutorial]")).toContainText("Hi, ich bin Finn");
-  await expect(page.locator('[data-fly-target="cash"]')).toContainText("10.000,00 €");
+  await expect(page.locator('[data-fly-target="cash"]')).toContainText("10.000,00 NX");
 });

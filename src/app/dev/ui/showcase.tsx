@@ -38,6 +38,7 @@ import type { MyJob, PlayerCard } from "@/features/game/types";
 import { SpeechBubble } from "@/features/tutorial/components/speech-bubble";
 import { useTutorial } from "@/features/tutorial/store";
 import { resetDemoPlayer } from "@/features/game/demo-engine";
+import { FriendCodeCard } from "@/features/friends/components/friend-code";
 import { LevelCard } from "@/features/progression/components/level-card";
 import { formatMoney, formatPrice } from "@/lib/format";
 import { DURATION, SPRING, fadeUp, staggerContainer } from "@/lib/motion";
@@ -239,7 +240,7 @@ export function Showcase() {
       <Section id="typography" title={t("typography")} className="grid gap-4 lg:grid-cols-2">
         <Card padding="lg" className="space-y-3">
           <p className="label-pixel text-fg-3">Inter · Fließtext und Zahlen</p>
-          <p className="nums text-4xl font-semibold">12.842,50 €</p>
+          <p className="nums text-4xl font-semibold">12.842,50 NX</p>
           <p className="text-2xl font-semibold">Volta Energie AG</p>
           <p className="text-lg">Quartalszahlen über den Erwartungen</p>
           <p className="text-fg-2">
@@ -263,6 +264,7 @@ export function Showcase() {
             <PlayerTag tag="M4XA" copy />
           </div>
         </Card>
+        <FriendCodeCard />
       </Section>
 
       <Section id="buttons" title={t("buttons")} className="grid gap-4 lg:grid-cols-2">
@@ -288,7 +290,7 @@ export function Showcase() {
           </Button>
         </Demo>
         <Demo label="Zum Kaufen halten" className="flex-col items-stretch">
-          <HoldButton onConfirm={() => toast.success("Order ausgeführt", "10 × VLT für 1.127,40 €")}>
+          <HoldButton onConfirm={() => toast.success("Order ausgeführt", "10 × VLT für 1.127,40 NX")}>
             Zum Kaufen halten
           </HoldButton>
           <HoldButton tone="loss" onConfirm={() => toast.info("Verkauf bestätigt")}>
@@ -302,10 +304,10 @@ export function Showcase() {
           <NumberTicker value={balance} format={money} className="text-3xl font-semibold" />
           <div className="flex gap-2">
             <Button size="sm" variant="secondary" onClick={() => setBalance((v) => v + 123_450)}>
-              + 1.234,50 €
+              + 1.234,50 NX
             </Button>
             <Button size="sm" variant="secondary" onClick={() => setBalance((v) => Math.max(0, v - 80_000))}>
-              − 800 €
+              − 800 NX
             </Button>
           </div>
         </Demo>
@@ -430,7 +432,7 @@ export function Showcase() {
 
       <Section id="toasts" title={t("toasts")}>
         <Demo label="Gestapelt, wischbar">
-          <Button variant="secondary" onClick={() => toast.success("Order ausgeführt", "10 × VLT zu 112,64 €")}>
+          <Button variant="secondary" onClick={() => toast.success("Order ausgeführt", "10 × VLT zu 112,64 NX")}>
             Erfolg
           </Button>
           <Button
@@ -491,11 +493,11 @@ export function Showcase() {
         <dl className="mt-5 space-y-3 text-fg-2">
           <div className="flex justify-between">
             <dt>Orderwert</dt>
-            <dd className="nums text-fg-1">1.126,40 €</dd>
+            <dd className="nums text-fg-1">1.126,40 NX</dd>
           </div>
           <div className="flex justify-between">
             <dt>Ordergebühr</dt>
-            <dd className="nums text-fg-1">1,00 €</dd>
+            <dd className="nums text-fg-1">1,00 NX</dd>
           </div>
         </dl>
       </Sheet>
@@ -552,7 +554,7 @@ export function Showcase() {
               />
             )}
             <p className="font-medium">QSL · Hebel 5×</p>
-            <p className="nums text-sm text-loss">Liquidation bei 0,6120 €</p>
+            <p className="nums text-sm text-loss">Liquidation bei 0,6120 NX</p>
           </div>
           <Button
             variant="danger"

@@ -64,7 +64,7 @@ test("buy a flat, shop furniture and furnish it", async ({ page }) => {
   await preparePlayer(page, 16_000, 5_000_000);
   await page.goto("/property");
   await expect(page.getByTestId("tier-ladder")).toBeVisible();
-  await hold(page, /kaufen für 25\.000 €/);
+  await hold(page, /kaufen für 25\.000 NX/);
   await expect(page.getByText(/Willkommen in deinem neuen Zuhause/)).toBeVisible();
   await expect(page.getByTestId("home-header")).toContainText("Wohnung");
 
@@ -107,7 +107,7 @@ test("buy a flat, shop furniture and furnish it", async ({ page }) => {
 test("a house brings a garage; cars come from the dealer", async ({ page }) => {
   await preparePlayer(page, 120_000, 200_000_000);
   await page.goto("/property");
-  await hold(page, /kaufen für 500\.000 €/);
+  await hold(page, /kaufen für 500\.000 NX/);
   await expect(page.getByTestId("home-header")).toContainText("Haus");
   const garage = page.getByTestId("garage");
   await expect(garage.getByText("Freier Stellplatz")).toHaveCount(2);

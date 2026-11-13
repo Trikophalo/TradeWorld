@@ -18,6 +18,22 @@ export function formatTag(tag: string): string {
   return `#${tag}`;
 }
 
+/** The friend code a player hands out (ADR-111): "NEXA-" plus the tag. */
+export const FRIEND_CODE_PREFIX = "NEXA";
+
+export function friendCodeOf(tag: string): string {
+  return `${FRIEND_CODE_PREFIX}-${tag}`;
+}
+
+/** "NEXA-K7Q2", "nexa k7q2", "#K7Q2", "K7Q2" → "K7Q2"; anything else → null. Same as redeem_friend_code(). */
+export function parseFriendCode(input: string): string | null {
+  let value = input.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (value.length === FRIEND_CODE_PREFIX.length + TAG_LENGTH && value.startsWith(FRIEND_CODE_PREFIX)) {
+    value = value.slice(FRIEND_CODE_PREFIX.length);
+  }
+  return TAG_RE.test(value) ? value : null;
+}
+
 /** A tag from uniform numbers in [0, 1) (randomness is passed in). */
 export function tagFromUniform(u: readonly number[]): string {
   return Array.from({ length: TAG_LENGTH }, (_, i) => {

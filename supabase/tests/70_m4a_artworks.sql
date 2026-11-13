@@ -463,7 +463,7 @@ select tests.assert(
       = public.player_art_value_cents(:b),
   'missions: art_bid, art_like (distinct artworks, unlike + like counts once), art_won, art_painted, art_auction_started, art_collection_value');
 select tests.assert(
-  public.mission_text('Sammlung im Wert von {target}', 'art_collection_value', 10000000) = 'Sammlung im Wert von 100.000 €',
+  public.mission_text('Sammlung im Wert von {target}', 'art_collection_value', 10000000) = 'Sammlung im Wert von 100.000 NX',
   'mission_text(): the collection value is shown in euros');
 
 -- =============================================================================

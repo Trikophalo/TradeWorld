@@ -1,29 +1,79 @@
-import { nameKey, parseTag } from "@/lib/player-tag";
-import { GameError, type Friends, type GameEngine } from "../types";
+import { BALANCE } from "@/config/balance";
+import { friendCodeOf, nameKey, parseFriendCode, parseTag } from "@/lib/player-tag";
+import { GameError, type FriendCode, type Friends, type GameEngine } from "../types";
 
 /*
  * Friends and player search in the offline demo (ADR-084, ADR-085). The demo has no other players: the list stays
- * empty, the search finds only oneself, and every request explains why it cannot work here.
+ * empty, the search finds only oneself, and every request explains why it cannot work here. The friend code
+ * (ADR-111) can be tried with the code of one made-up friend.
  */
+export const DEMO_FRIEND = { nickname: "Finn", tag: "F7NN" } as const;
+
+export interface DemoFriendCode {
+  from: { nickname: string; tag: string };
+  at: string;
+}
+
 export interface FriendHost {
   nickname(): string;
   tag(): string;
   level(): number;
   avatarKey(): string;
   idempotent<T>(requestId: string, run: () => T): T;
+  friendCode(): DemoFriendCode | null;
+  setFriendCode(value: DemoFriendCode): void;
+  addCash(cents: number): void;
+  now(): Date;
 }
 
 const empty = (): Friends => ({ friends: [], incoming: [], outgoing: [] });
 
 export function createFriendEngine(
   host: FriendHost,
-): Pick<GameEngine, "friends" | "sendFriendRequest" | "respondFriendRequest" | "removeFriend" | "searchPlayers"> {
+): Pick<
+  GameEngine,
+  | "friends"
+  | "sendFriendRequest"
+  | "respondFriendRequest"
+  | "removeFriend"
+  | "searchPlayers"
+  | "friendCode"
+  | "redeemFriendCode"
+> {
+  const codeState = (): FriendCode => {
+    const used = host.friendCode();
+    return {
+      code: friendCodeOf(host.tag()),
+      bonusCents: BALANCE.social.friendCode.bonusCents,
+      redeemed: used !== null,
+      redeemedFrom: used?.from ?? null,
+      redeemedAt: used?.at ?? null,
+      invited: 0,
+    };
+  };
   const isMe = (input: string) =>
     input.trim().toLowerCase() === host.nickname().toLowerCase() || parseTag(input) === host.tag();
   return {
     async friends() {
       return empty();
     },
+    async friendCode() {
+      return codeState();
+    },
+    redeemFriendCode: (requestId, code) =>
+      Promise.resolve().then(() =>
+        host.idempotent(requestId, () => {
+          const tag = parseFriendCode(code);
+          if (!tag) throw new GameError("friend_code_unknown");
+          if (host.friendCode()) throw new GameError("friend_code_used");
+          if (tag === host.tag()) throw new GameError("friend_code_self");
+          if (tag !== DEMO_FRIEND.tag) throw new GameError("friend_code_unknown");
+          const paidCents = BALANCE.social.friendCode.bonusCents;
+          host.setFriendCode({ from: { ...DEMO_FRIEND }, at: host.now().toISOString() });
+          host.addCash(paidCents);
+          return { ...codeState(), paidCents };
+        }),
+      ),
     sendFriendRequest: (requestId, nickname) =>
       Promise.resolve().then(() =>
         host.idempotent(requestId, () => {

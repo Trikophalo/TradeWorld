@@ -1064,6 +1064,22 @@ export interface PlayerSearchResult {
   avatarKey: string;
 }
 
+/** Friend code (ADR-111): the own code to hand out and the one code a player may redeem. */
+export interface FriendCode {
+  /** "NEXA-K7Q2" */
+  code: string;
+  bonusCents: number;
+  redeemed: boolean;
+  redeemedFrom: { nickname: string; tag: string | null } | null;
+  redeemedAt: string | null;
+  /** Friends who entered this player's code. */
+  invited: number;
+}
+
+export interface FriendCodeRedeemed extends FriendCode {
+  paidCents: number;
+}
+
 export interface Friends {
   friends: FriendEntry[];
   incoming: FriendEntry[];
@@ -1483,6 +1499,9 @@ export const GAME_ERROR_KEYS = [
   "coin_tech_too_low",
   "slippage_exceeded",
   "coin_not_launched",
+  "friend_code_unknown",
+  "friend_code_self",
+  "friend_code_used",
 ] as const;
 export type GameErrorKey = (typeof GAME_ERROR_KEYS)[number] | "unknown";
 
@@ -1639,6 +1658,9 @@ export interface GameEngine {
   sendFriendRequest(requestId: string, nickname: string): Promise<Friends>;
   respondFriendRequest(requestId: string, nickname: string, accept: boolean): Promise<Friends>;
   removeFriend(requestId: string, nickname: string): Promise<Friends>;
+  /** Friend code (ADR-111). */
+  friendCode(): Promise<FriendCode>;
+  redeemFriendCode(requestId: string, code: string): Promise<FriendCodeRedeemed>;
   /** Players by name or tag (ADR-085), at most 8. */
   searchPlayers(query: string): Promise<PlayerSearchResult[]>;
   /** Friends feed (ADR-088). */

@@ -124,7 +124,7 @@ test("found a GmbH directly and expand it, step after step", async ({ page }) =>
   await found(page, "gmbh", "Weitblick");
   await expect(page.getByTestId("company-header").getByText("GmbH")).toBeVisible();
 
-  // The first expansion costs 100.000 €, from the company's cash: 60.000 € are in, the rest is missing.
+  // The first expansion costs 100.000 NX, from the company's cash: 60.000 NX are in, the rest is missing.
   const expansion = page.getByTestId("expansion");
   await expect(expansion.getByText("Stufe 0")).toBeVisible();
   await expect(expansion.getByText(/fehlen noch 40\.000/)).toBeVisible();
@@ -135,7 +135,7 @@ test("found a GmbH directly and expand it, step after step", async ({ page }) =>
     .click();
   const deposit = page.getByRole("dialog", { name: "Einzahlen" });
   await deposit.getByLabel(/Betrag/).fill("100000");
-  await deposit.getByRole("button", { name: /100\.000 € einzahlen/ }).click();
+  await deposit.getByRole("button", { name: /100\.000 NX einzahlen/ }).click();
   await expect(page.getByText(/eingezahlt/i).first()).toBeVisible();
 
   await hold(page, /Auf Stufe 1 ausbauen/);

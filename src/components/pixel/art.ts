@@ -669,6 +669,29 @@ export const HEART: PixelArt = {
   ],
 };
 
+/** A wrapped present: the friend code (ADR-111). */
+export const GIFT: PixelArt = {
+  palette: { k: INK, r: "#ff6170", d: "#c93a4c", h: "#ffc2c9", g: "#ffd24a", y: "#c98f1e" },
+  grid: [
+    "................",
+    "...kkk....kkk...",
+    "..kgggk..kgggk..",
+    "..kgyggkkggygk..",
+    "...kgggggggggk..",
+    ".kkkkkkggkkkkkk.",
+    ".krhrrrggrrrrdk.",
+    ".krrrrrggrrrrdk.",
+    ".kkkkkkggkkkkkk.",
+    "..krhrrggrrrdk..",
+    "..krrrrggrrrdk..",
+    "..krrrrggrrrdk..",
+    "..krrrrggrrrdk..",
+    "..kddddyydddkk..",
+    "..kkkkkkkkkkk...",
+    "................",
+  ],
+};
+
 export const BULL: PixelArt = {
   palette: { h: "#e9c88a", g: "#2fd98c", d: "#17a866", k: INK, s: "#c9f7e0" },
   grid: [
@@ -1220,6 +1243,7 @@ export const ALL_PIXEL_ART: Record<string, PixelArt> = {
   briefcase: BRIEFCASE,
   cottage: COTTAGE,
   heart: HEART,
+  gift: GIFT,
   bull: BULL,
   bear: BEAR,
   ...Object.fromEntries(Object.entries(FINN).map(([k, v]) => [`finn/${k}`, v])),

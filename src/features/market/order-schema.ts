@@ -44,7 +44,7 @@ export function quantityE6ForProceeds(amountCents: number, priceE4: number): num
 
 /** Parses a euro amount as typed by German players ("1.234,56", "50", "12,5") into cents. Null if invalid. */
 export function parseEuroCents(input: string): number | null {
-  const text = input.trim().replace(/\s|€/g, "");
+  const text = input.trim().replace(/\s|€|nx/gi, "");
   if (!text) return null;
   const normalised = text.includes(",") ? text.replace(/\./g, "").replace(",", ".") : text;
   if (!/^\d+(\.\d{0,2})?$/.test(normalised)) return null;
@@ -53,7 +53,7 @@ export function parseEuroCents(input: string): number | null {
 
 /** Parses a price in euros with up to four decimals into e4. Null if invalid or not positive. */
 export function parsePriceE4(input: string): number | null {
-  const text = input.trim().replace(/\s|€/g, "");
+  const text = input.trim().replace(/\s|€|nx/gi, "");
   const normalised = text.includes(",") ? text.replace(/\./g, "").replace(",", ".") : text;
   if (!/^\d+(\.\d{0,4})?$/.test(normalised)) return null;
   const value = Math.round(Number(normalised) * 10_000);

@@ -1,38 +1,38 @@
 {
   "applications": [
     {
-      "id": "a7684147-8be7-4fc9-9394-ec5238e4a32b",
+      "id": "754a9958-79f0-4dee-96c0-aa9e9d0c1533",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "3350700a-d694-4514-830d-8e868657968c",
+        "id": "0721dd7d-ecfe-4d5c-ae1a-381e48389b86",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
+          "id": "db7c839c-c460-945e-1188-5e4a61db1e47",
           "logo": null,
-          "name": "Frachtpilot",
-          "color": "#9ECE6A",
+          "name": "Rheinkraft Werke",
+          "color": "#5BC0EB",
           "is_ai": true,
-          "sector": "logistics",
-          "ticker": "FPT"
+          "sector": "energy",
+          "ticker": "RKW"
         },
         "required": [{ "branch": "craft", "min_score": 0 }],
         "title_key": "craft_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-13T17:28:16.162168+00:00",
-      "updated_at": "2026-11-13T17:28:16.166529+00:00",
-      "offer_expires_at": "2026-11-15T17:28:16.162168+00:00",
+      "created_at": "2026-11-13T18:58:19.446152+00:00",
+      "updated_at": "2026-11-13T18:58:19.452218+00:00",
+      "offer_expires_at": "2026-11-15T18:58:19.446152+00:00",
       "salary_wish_cents_per_hour": 15000,
       "offer_salary_cents_per_hour": 15000
     },
     {
-      "id": "ad4a46ab-be21-4ab6-96c9-1165abaa569d",
+      "id": "0e9fa130-a87e-4335-8d57-70ef752e1152",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "7a2a377c-5d2d-4c11-a58c-a98feb10d81a",
+        "id": "b8dd53c0-08f8-4a50-8e1b-1dd905b06d0a",
         "tier": "junior",
         "title": null,
         "company": {
@@ -48,9 +48,9 @@
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-13T17:28:16.152738+00:00",
-      "updated_at": "2026-11-13T17:28:16.152738+00:00",
-      "offer_expires_at": "2026-11-15T17:28:16.152738+00:00",
+      "created_at": "2026-11-13T18:58:19.437892+00:00",
+      "updated_at": "2026-11-13T18:58:19.437892+00:00",
+      "offer_expires_at": "2026-11-15T18:58:19.437892+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

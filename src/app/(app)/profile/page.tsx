@@ -8,6 +8,7 @@ import { Page, PageHeader } from "@/components/layout/page";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Reveal } from "@/features/progression/components/reveal";
+import { FriendCodeCard } from "@/features/friends/components/friend-code";
 import { MyTagCard } from "@/features/friends/components/my-tag";
 import { LevelCard } from "@/features/progression/components/level-card";
 import { UnlockList } from "@/features/progression/components/unlock-list";
@@ -29,6 +30,7 @@ export default async function ProfilePage() {
         <div className="space-y-5 lg:space-y-6">
           <LevelCard />
           <MyTagCard />
+          <FriendCodeCard />
           <Reveal feature="profileCareer">
             <Card padding="lg">
               <CardHeader>

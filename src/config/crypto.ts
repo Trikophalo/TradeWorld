@@ -153,7 +153,7 @@ export const CRYPTO: CryptoConfig = {
   coins: [
     {
       ticker: "EUS",
-      name: "Euro-Stabil",
+      name: "Eins-Stabil",
       category: "stable",
       priceE4: 10_000,
       poolCents: 5_000_000_000,

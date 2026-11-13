@@ -58,7 +58,7 @@ export function PixelWorker({ avatarKey, scale = 4 }: { avatarKey: string | null
           transition={{ duration: 2.4, ease: "easeOut" }}
           className="absolute top-0 right-0 font-pixel text-xs text-gold"
         >
-          +€
+          +NX
         </motion.span>
       )}
     </div>

@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { engine } from "@/features/game/store";
-import type { Friends } from "@/features/game/types";
+import type { FriendCode, Friends } from "@/features/game/types";
 
 /** Friends (ADR-084). */
 export const FRIENDS_KEY = ["friends"] as const;
@@ -15,6 +15,18 @@ export function useFriends() {
 export function useSetFriends() {
   const client = useQueryClient();
   return (friends: Friends) => client.setQueryData(FRIENDS_KEY, friends);
+}
+
+/** Friend code (ADR-111). */
+export const FRIEND_CODE_KEY = ["friend-code"] as const;
+
+export function useFriendCode() {
+  return useQuery({ queryKey: FRIEND_CODE_KEY, queryFn: () => engine.friendCode(), refetchInterval: 120_000 });
+}
+
+export function useSetFriendCode() {
+  const client = useQueryClient();
+  return (code: FriendCode) => client.setQueryData(FRIEND_CODE_KEY, code);
 }
 
 export type FriendStatus = "self" | "friends" | "incoming" | "outgoing" | "none";

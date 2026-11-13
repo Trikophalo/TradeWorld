@@ -359,7 +359,7 @@ select tests.assert(
 select tests.assert(
   (tests.m4j_note(:b, 'deal_offer', :'a_nick' || ' bietet dir einen Kredit an')).link = '/deals'
   and (tests.m4j_note(:b, 'deal_offer', :'a_nick' || ' bietet dir einen Kredit an')).body
-      = '1.000 € für 2 Tage, 10 % Zinsen – „Für deinen Laden“'
+      = '1.000 NX für 2 Tage, 10 % Zinsen – „Für deinen Laden“'
   and (tests.m4j_note(:b, 'deal_offer', :'a_nick' || ' bietet dir einen Kredit an')).payload ->> 'deal_id' = :'l1id',
   'propose_deal(): the target gets a deal_offer notification');
 

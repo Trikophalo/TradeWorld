@@ -87,7 +87,7 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   {
     key: "d_buy_500",
     kind: "daily",
-    title: "Kaufe heute für mindestens 500 €",
+    title: "Kaufe heute für mindestens 500 NX",
     metric: "buy_value_cents",
     target: 50_000,
     xp: d.minXp,
@@ -95,7 +95,7 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   {
     key: "d_profit_50",
     kind: "daily",
-    title: "Erziele heute 50 € Gewinn mit Verkäufen",
+    title: "Erziele heute 50 NX Gewinn mit Verkäufen",
     metric: "profit_cents",
     target: 5_000,
     xp: d.maxXp,
@@ -136,7 +136,7 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   {
     key: "w_profit_500",
     kind: "weekly",
-    title: "Erziele diese Woche 500 € Gewinn",
+    title: "Erziele diese Woche 500 NX Gewinn",
     metric: "profit_cents",
     target: 50_000,
     xp: w.maxXp,
@@ -152,7 +152,7 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   {
     key: "w_buy_5000",
     kind: "weekly",
-    title: "Kaufe diese Woche für 5.000 €",
+    title: "Kaufe diese Woche für 5.000 NX",
     metric: "buy_value_cents",
     target: 500_000,
     xp: w.minXp + 200,
@@ -188,7 +188,7 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   {
     key: "m_worth_11k",
     kind: "milestone",
-    title: "Erreiche 11.000 € Vermögen",
+    title: "Erreiche 11.000 NX Vermögen",
     metric: "net_worth_cents",
     target: 1_100_000,
     xp: m.minXp + 200,
@@ -200,7 +200,7 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   {
     key: "q_buy_250",
     kind: "quick",
-    title: "Kaufe für mindestens 250 €",
+    title: "Kaufe für mindestens 250 NX",
     metric: "buy_value_cents",
     target: 25_000,
     xp: q.minXp + 10,
@@ -255,7 +255,7 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   {
     key: "d_buy_2000",
     kind: "daily",
-    title: "Kaufe heute für mindestens 2.000 €",
+    title: "Kaufe heute für mindestens 2.000 NX",
     metric: "buy_value_cents",
     target: 200_000,
     xp: d.minXp + 100,
@@ -315,7 +315,7 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   {
     key: "w_profit_2000",
     kind: "weekly",
-    title: "Erziele diese Woche 2.000 € Gewinn",
+    title: "Erziele diese Woche 2.000 NX Gewinn",
     metric: "profit_cents",
     target: 200_000,
     xp: w.maxXp,
@@ -384,7 +384,7 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   {
     key: "m_profit_1000",
     kind: "milestone",
-    title: "Insgesamt 1.000 € Gewinn",
+    title: "Insgesamt 1.000 NX Gewinn",
     metric: "profit_cents",
     target: 100_000,
     xp: m.minXp + 300,
@@ -394,7 +394,7 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   {
     key: "m_worth_20k",
     kind: "milestone",
-    title: "Erreiche 20.000 € Vermögen",
+    title: "Erreiche 20.000 NX Vermögen",
     metric: "net_worth_cents",
     target: 2_000_000,
     xp: m.minXp + 500,
@@ -402,7 +402,7 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   {
     key: "m_worth_50k",
     kind: "milestone",
-    title: "Erreiche 50.000 € Vermögen",
+    title: "Erreiche 50.000 NX Vermögen",
     metric: "net_worth_cents",
     target: 5_000_000,
     xp: m.maxXp,
@@ -428,7 +428,7 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   {
     key: "m_worth_12_5k",
     kind: "milestone",
-    title: "Erreiche 12.500 € Vermögen",
+    title: "Erreiche 12.500 NX Vermögen",
     metric: "net_worth_cents",
     target: 1_250_000,
     xp: m.minXp + 400,
@@ -445,7 +445,7 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   {
     key: "m_worth_15k",
     kind: "milestone",
-    title: "Erreiche 15.000 € Vermögen",
+    title: "Erreiche 15.000 NX Vermögen",
     metric: "net_worth_cents",
     target: 1_500_000,
     xp: m.minXp + 600,
@@ -454,7 +454,7 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   {
     key: "m_worth_25k",
     kind: "milestone",
-    title: "Erreiche 25.000 € Vermögen",
+    title: "Erreiche 25.000 NX Vermögen",
     metric: "net_worth_cents",
     target: 2_500_000,
     xp: m.maxXp,

@@ -935,3 +935,19 @@ select public.get_crypto_market();
 select public.discontinue_coin(gen_random_uuid());
 \o
 reset role;
+
+-- Friend code (ADR-111) -------------------------------------------------------------------------------------------
+update public.invite_codes set max_uses = max_uses + 5 where code = 'M1-TESTS';
+\set fx_fa '''f1f1f1f1-0000-4000-8000-00000000fc01'''
+\set fx_fb '''f1f1f1f1-0000-4000-8000-00000000fc02'''
+select tests.signup(:fx_fa, 'Fixture_Werber') is not null and tests.signup(:fx_fb, 'Fixture_Gast') is not null as ok \gset
+select 'NEXA-' || tag as fx_code from public.profiles where id = :fx_fa \gset
+select tests.login_as('authenticated', :fx_fb) is null as ok \gset
+\o :fixture_dir/get_friend_code.json
+select public.get_friend_code();
+\o :fixture_dir/redeem_friend_code.json
+select public.redeem_friend_code(gen_random_uuid(), :'fx_code');
+\o :fixture_dir/get_friend_code_redeemed.json
+select public.get_friend_code();
+\o
+reset role;

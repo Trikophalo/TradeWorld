@@ -175,7 +175,7 @@ select tests.assert(
   :ob0 = 0
   and (select count(*) from public.notifications where player_id = :c and type_key = 'art_outbid') = 1
   and (select title from public.notifications where player_id = :c and type_key = 'art_outbid') = 'Feli_Feed hat dich überboten'
-  and (select body from public.notifications where player_id = :c and type_key = 'art_outbid') like '%neues Gebot 12.000 €'
+  and (select body from public.notifications where player_id = :c and type_key = 'art_outbid') like '%neues Gebot 12.000 NX'
   and (select (payload ->> 'amount_cents')::bigint from public.notifications where player_id = :c and type_key = 'art_outbid') = 1200000
   and (tests.feed_item(:a, 'art_won')).payload
       = jsonb_build_object('title', (select title from public.artworks where id = :'gart'),

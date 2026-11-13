@@ -1556,3 +1556,47 @@ Rang, Freunde-Feed, Index, Top-Mover, nächstes Ziel, Wochenliga und Termine.
 Rangliste, Freunde-Feed, Wochenliga, Index, Top-Mover und Termine stehen nicht mehr auf der Startseite. Sie sind auf
 ihren Seiten (Ranglisten, Freunde, Märkte, Events) und über Menü und Kacheln einen Tipp entfernt. Der Schulden-Hinweis
 erscheint weiter, wenn er nötig ist. `todayTasks` liefert dafür drei statt vier Aufgaben.
+
+## ADR-110: Eigene Spielwährung „Nex“ (NX) — `akzeptiert`
+
+Vorgabe: Das Spiel soll nicht in Euro laufen, sondern eine eigene Währung haben.
+
+**Entscheidung:** Die Währung heißt **Nex**, geschrieben **NX** hinter dem Betrag („5.000 NX“, „1,2 Mio. NX“).
+Ein eigener Name macht klar, dass es Spielgeld ist, und passt zum Arbeitstitel. Das Kürzel besteht aus zwei
+Buchstaben, damit es auch in der Pixel-Schrift sauber aussieht; ein eigenes Sonderzeichen gäbe es dort nicht.
+
+- **Werte bleiben 1:1.** Aus 1 € wird 1 NX. Kein Betrag, kein Preis und kein Balancing-Wert ändert sich.
+- **Technik unverändert:** Geld bleibt `bigint` in Hundertsteln (`*_cents`), Kurse in `*_e4`. Die Hundertstel haben
+  keinen eigenen Namen; angezeigt wird „12,50 NX“.
+- **Client:** Name und Kürzel stehen einmal in `src/config/app.ts` (`CURRENCY`). `src/lib/format.ts` setzt das Kürzel
+  ein; alle Texte in `messages/de.json` nennen NX. Eingabefelder nehmen „NX“ und weiterhin „€“ hinter der Zahl an.
+- **Server:** `format_eur`, `format_eur_short`, `mission_text` und `crypto_event_text` schreiben „NX“ (die
+  Funktionsnamen bleiben, damit kein Aufrufer bricht). Die Migration ersetzt das Euro-Zeichen einmalig in allen
+  gespeicherten Texten (Freischaltungen, Erfolge, Nachrichten, Benachrichtigungen, Firmen-Chat). Das Ledger bleibt
+  unangetastet (nur anhängen), ebenso die Profile der Spieler.
+- **Stablecoin:** „Euro-Stabil“ (EUS) heißt jetzt „Eins-Stabil“ und ist an 1 NX gebunden. Das Kürzel bleibt.
+- **Ältere Dokumente** (Game Design, Balancing, frühere ADRs) nennen Beträge noch in €. Sie gelten 1:1 in NX.
+
+## ADR-111: Freundescode — `akzeptiert`
+
+Vorgabe: Wer Freunde ins Spiel holt, bekommt einen Code. Tragen die Freunde ihn im Profil unter „Freundescode“ ein,
+bekommen sie einmalig 5.000.
+
+**Entscheidung:**
+
+- **Der Code** ist `NEXA-` plus der feste Spieler-Tag (ADR-085), zum Beispiel `NEXA-K7Q2`. Er braucht keine eigene
+  Spalte, bleibt bei einer Namensänderung gleich und lässt sich vorlesen (keine 0/O, 1/I). Eingaben wie
+  `nexa k7q2`, `#K7Q2` oder nur `K7Q2` gelten auch.
+- **Einlösen** im Profil, genau **einmal pro Konto**, nie der eigene Code. Der Bonus beträgt
+  `social.friendCode.bonusCents` (5.000 NX) und kommt wie jede Belohnung aus der Staatskasse (ADR-041); bei einem
+  offenen Zwangskredit greift der übliche Einbehalt. Die Aktion ist idempotent (`request_id`), der Bonus eine
+  Ledger-Buchung.
+- **Wer geworben hat**, bekommt eine Benachrichtigung („… ist mit deinem Code dabei“) und sieht im Profil, wie viele
+  Freunde den Code eingetragen haben. Geld bekommt nur der neue Spieler, so wie vorgegeben; das hält auch den Anreiz
+  klein, sich mit Zweitkonten selbst zu beschenken. Zwei Freunde dürfen gegenseitig ihre Codes einlösen.
+- **Kein Zeitlimit:** Auch wer schon länger spielt, kann einmal einen Code eintragen. Ein Konto-Neustart setzt das
+  nicht zurück.
+- **Sichtbarkeit:** Die Karte „Freundescode“ steht im Profil von Anfang an (kein `<Reveal>`), denn neue Spieler
+  brauchen sie am ersten Tag.
+- **Demo-Modus:** Es gibt keine anderen Spieler; zum Ausprobieren gilt der Code `NEXA-F7NN` von Finn.
+- Fehler: `friend_code_unknown` (NX104), `friend_code_self` (NX105), `friend_code_used` (NX106).

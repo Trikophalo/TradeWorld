@@ -470,6 +470,9 @@ der KI-Firmen). M3 ist empfohlen, weil sonst das Geld für die Gründung langsam
 - [x] „Heute dran“ mit Finn auf der Startseite, Firma und Deals erklärt (ADR-102)
 - [x] Achtstundentag, Lohn direkt aufs Konto, weniger Lohn bei Abwesenheit, Kündigung nach 5 Tagen (ADR-103)
 - [x] Organigramm der Firma (ADR-104)
+- [x] Ruhige Startseite: Szene mit Finn, eine nächste Aufgabe, Tresor, drei Kacheln (ADR-109)
+- [x] Eigene Spielwährung Nex (NX) statt Euro, Client und Server (ADR-110)
+- [x] Freundescode im Profil: eigener Code zum Teilen, einmalig 5.000 NX für den eingetragenen Code (ADR-111)
 
 ### Daten/Backend
 

@@ -6978,3 +6978,55 @@ Migration `20261202000100_no_after_hours.sql`, idempotente Kopie in `supabase/up
 - Trigger `scheduled_events_skip_bells` (vor dem Einfügen in `scheduled_events`): Eröffnungs- und Schlussglocken
   werden nicht gespeichert, solange `market_always_open()` gilt. Die Migration löscht bereits angekündigte Glocken.
   Mit anderen Börsenzeiten plant `events_plan` die Glocken wieder wie vorher.
+
+## Nachtrag: Spielwährung Nex (ADR-110)
+
+Migration `20261202000200_game_currency.sql`, idempotente Kopie in `supabase/updates/`.
+
+- Keine Schemaänderung. Geld bleibt `bigint` in Hundertsteln (`*_cents`); die Währung heißt Nex (NX).
+- `format_eur(bigint)`, `format_eur_short(bigint)`, `mission_text(text, text, bigint)` und
+  `crypto_event_text(text, text)` schreiben „NX“ statt „€“. Die Namen der Funktionen bleiben.
+- Ein `do`-Block ersetzt „€“ durch „NX“ in allen Textspalten der öffentlichen Tabellen, außer `ledger_*`, `profiles`
+  und `game_config`. Er darf beliebig oft laufen.
+- Der Stablecoin `EUS` heißt „Eins-Stabil“ (`securities.name`, `crypto_coins.name`, Konfiguration `crypto.coins`).
+- `supabase/seed.sql` nennt in Freischaltungen, Erfolgen und Zufallsereignissen NX.
+
+## Nachtrag: Freundescode (ADR-111)
+
+Migration `20261202000300_friend_code.sql`, idempotente Kopie in `supabase/updates/`, Test
+`supabase/tests/85_currency_friend_code.sql`.
+
+**Spalten** in `profiles`:
+
+| Spalte             | Typ                       | Bedeutung                                           |
+| ------------------ | ------------------------- | --------------------------------------------------- |
+| `friend_code_from` | `uuid` → `profiles`, null | Wessen Code der Spieler eingelöst hat               |
+| `friend_code_at`   | `timestamptz`, null       | Wann; gesetzt heißt: kein zweiter Code mehr möglich |
+
+Beide bleiben bei einem Konto-Neustart erhalten. Der Code selbst wird nicht gespeichert: `'NEXA-' || profiles.tag`.
+
+**Konfiguration:** `game_config.social.friendCode.bonusCents` (500000).
+
+**RPCs** (nur `authenticated`):
+
+- `get_friend_code()` → `FRIEND_CODE`
+- `redeem_friend_code(p_request_id uuid, p_code text)` → `FRIEND_CODE` plus `paid_cents`, `cash_after_cents`.
+  Idempotent über `request_id`. Liest den Code großzügig (Groß/klein, Leerzeichen, `#`, mit oder ohne `NEXA-`), sperrt
+  die Konten des Spielers, zahlt den Bonus mit `state_pay_partial` (Art `mission_reward`, Schlüssel
+  `friend_code:<Spieler>`) aus der Staatskasse, ruft `loan_withhold` und benachrichtigt den Besitzer des Codes
+  (`friend_code_redeemed`, Link `/friends`).
+
+```
+FRIEND_CODE = {
+  "code": "NEXA-K7Q2", "bonus_cents": 500000,
+  "redeemed": false, "redeemed_from": {"nickname", "tag"} | null, "redeemed_at": timestamptz | null,
+  "invited": 0            -- so viele Spieler haben diesen Code eingelöst
+}
+```
+
+**Intern** (ohne Client-Rechte): `friend_code_state(uuid)`.
+
+**Fehler:** `friend_code_unknown` (NX104: kein gültiger Code oder kein aktiver Spieler), `friend_code_self` (NX105),
+`friend_code_used` (NX106), dazu `invalid_argument` ohne `request_id`.
+
+**Benachrichtigung:** neuer Typ `friend_code_redeemed` (Kategorie `social`).

@@ -39306,6 +39306,394 @@ create trigger scheduled_events_skip_bells
 -- Bells announced before the change.
 delete from public.scheduled_events
  where kind in ('opening_bell', 'closing_bell') and status = 'scheduled' and public.market_always_open();
+-- ===== idempotent copy of migrations/20261202000200_game_currency.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 0200 · The game's own currency: Nex (NX) instead of euro (ADR-110)
+-- =============================================================================
+-- Amounts stay bigint hundredths (`*_cents`). Only the texts the server writes change: the three money text helpers
+-- and the crypto event texts say "NX"; texts already stored (unlocks, achievements, mission templates, news,
+-- notifications, company chat) are rewritten once; the stablecoin "Euro-Stabil" becomes "Eins-Stabil".
+-- Idempotent: runs unchanged as supabase/updates/20261202000200_game_currency.sql.
+
+-- German short money text for news: "420,0 Mio. NX", "1,96 Mrd. NX", "400 Tsd. NX" (name kept for its callers).
+create or replace function public.format_eur_short(p_cents bigint)
+returns text
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_abs  numeric := abs(coalesce(p_cents, 0));
+  v_sign text := case when coalesce(p_cents, 0) < 0 then '-' else '' end;
+begin
+  if v_abs >= 100000000000 then
+    return v_sign || replace(to_char(v_abs / 100000000000, 'FM999990.00'), '.', ',') || ' Mrd. NX';
+  elsif v_abs >= 100000000 then
+    return v_sign || replace(to_char(v_abs / 100000000, 'FM999990.0'), '.', ',') || ' Mio. NX';
+  elsif v_abs >= 100000 then
+    return v_sign || to_char(round(v_abs / 100000), 'FM999990') || ' Tsd. NX';
+  end if;
+  return v_sign || to_char(round(v_abs / 100), 'FM999990') || ' NX';
+end;
+$$;
+
+-- German money text for system messages: "1.234 NX", "-56 NX" (name kept for its callers).
+create or replace function public.format_eur(p_cents bigint)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when p_cents < 0 then '-' else '' end
+      || reverse(regexp_replace(reverse(round(abs(p_cents) / 100.0)::bigint::text), '(\d{3})(?=\d)', '\1.', 'g'))
+      || ' NX';
+$$;
+
+-- "{target}" in titles and descriptions: Nex for money metrics ("2.000 NX"), else the number.
+create or replace function public.mission_text(p_text text, p_metric text, p_target bigint)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select replace(p_text, '{target}',
+           case when public.mission_is_money_metric(p_metric)
+                then replace(to_char(p_target / 100, 'FM999G999G999G990'), ',', '.') || ' NX'
+                else p_target::text end);
+$$;
+
+-- Crypto event texts (as in M5a): the peg is 1 NX.
+create or replace function public.crypto_event_text(p_key text, p_name text)
+returns jsonb
+language sql
+immutable
+set search_path = ''
+as $$
+  select case p_key
+    when 'hack' then jsonb_build_object('title', 'Hack bei ' || n, 'body', 'Angreifer haben Geld aus dem Pool gestohlen. Der Kurs bricht ein.')
+    when 'bug' then jsonb_build_object('title', 'Bug bei ' || n, 'body', 'Ein Fehler im Smart Contract verunsichert die Halter.')
+    when 'influencer' then jsonb_build_object('title', 'Influencer feiert ' || n, 'body', 'Ein bekannter Influencer schwärmt von der Währung. Der Kurs springt.')
+    when 'exchange_listing' then jsonb_build_object('title', n || ' an einer Börse gelistet', 'body', 'Eine große Krypto-Börse nimmt die Währung auf.')
+    when 'delisting_rumor' then jsonb_build_object('title', 'Delisting-Gerücht um ' || n, 'body', 'Es heißt, eine Börse wolle die Währung streichen.')
+    when 'whale_buy' then jsonb_build_object('title', 'Wal kauft ' || n, 'body', 'Ein Großanleger kauft in großem Stil.')
+    when 'whale_dump' then jsonb_build_object('title', 'Wal verkauft ' || n, 'body', 'Ein Großanleger wirft seine Coins auf den Markt.')
+    when 'partnership' then jsonb_build_object('title', 'Partnerschaft für ' || n, 'body', 'Ein Unternehmen will die Währung nutzen.')
+    when 'fud' then jsonb_build_object('title', 'Angstmache um ' || n, 'body', 'Gerüchte und Panik drücken den Kurs.')
+    when 'network_upgrade' then jsonb_build_object('title', 'Netzwerk-Upgrade bei ' || n, 'body', 'Das Netzwerk wird schneller und günstiger.')
+    when 'depeg' then jsonb_build_object('title', n || ' verliert die Bindung', 'body', 'Der Stablecoin ist nicht mehr 1 NX wert.')
+    when 'meme_wave' then jsonb_build_object('title', 'Meme-Welle', 'body', 'Shitcoins sind plötzlich überall gefragt.')
+    when 'regulation' then jsonb_build_object('title', 'Regulierung trifft ' || n, 'body', 'Neue Regeln für Kryptowährungen drücken den ganzen Markt.')
+    when 'rug_pull' then jsonb_build_object('title', 'Rug Pull bei ' || n, 'body', 'Die Macher haben in großem Stil Coins verkauft. Der Kurs stürzt ab.')
+    when 'exposed' then jsonb_build_object('title', 'Werbedeal von ' || n || ' aufgeflogen', 'body', 'Die bezahlte Influencer-Werbung ist aufgeflogen: Der Hype ist weg, der Kurs fällt.')
+    when 'dead' then jsonb_build_object('title', n || ' ist tot', 'body', 'Der Kurs ist fast null. In einem Tag wird die Währung gestrichen.')
+    when 'delisted' then jsonb_build_object('title', n || ' gestrichen', 'body', 'Die Währung ist vom Markt verschwunden.')
+    when 'closed' then jsonb_build_object('title', n || ' eingestellt', 'body', 'Der Pool wurde nach Coins an alle Halter ausgezahlt.')
+    else jsonb_build_object('title', 'Neuigkeit zu ' || n, 'body', 'Bei der Währung hat sich etwas getan.')
+  end
+  from (select coalesce(p_name, 'einer Kryptowährung') as n) x;
+$$;
+
+-- Texts stored before the change (seed texts, news, notifications, chat, reports): every text column of the public
+-- tables. The ledger is append-only and keeps its wording; profiles are the players' own words.
+do $$
+declare
+  r record;
+begin
+  for r in
+    select c.table_name, c.column_name
+      from information_schema.columns c
+      join information_schema.tables t on t.table_schema = c.table_schema and t.table_name = c.table_name
+     where c.table_schema = 'public' and t.table_type = 'BASE TABLE'
+       and c.data_type in ('text', 'character varying') and c.is_generated = 'NEVER'
+       and c.table_name not like 'ledger%' and c.table_name not in ('profiles', 'game_config')
+     order by c.table_name, c.column_name
+  loop
+    begin
+      execute format('update public.%I set %I = replace(%I, %L, %L) where %I like %L',
+                     r.table_name, r.column_name, r.column_name, '€', 'NX', r.column_name, '%€%');
+    exception when others then
+      -- a table that guards its rows keeps its old wording
+      null;
+    end;
+  end loop;
+end;
+$$;
+
+-- The stablecoin pegged to 1 NX is no "euro" any more. The ticker EUS stays.
+do $$
+begin
+  if to_regclass('public.crypto_coins') is not null then
+    update public.crypto_coins set name = 'Eins-Stabil' where ticker = 'EUS' and name = 'Euro-Stabil';
+  end if;
+  update public.securities set name = 'Eins-Stabil' where ticker = 'EUS' and name = 'Euro-Stabil';
+end;
+$$;
+-- ===== idempotent copy of migrations/20261202000300_friend_code.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 0300 · Friend code: bring friends, they get a bonus once (ADR-111)
+-- =============================================================================
+-- Every player has a code to hand out: "NEXA-" plus the permanent player tag (ADR-085), e.g. NEXA-K7Q2. A friend
+-- enters it in the profile under "Freundescode" and gets social.friendCode.bonusCents (5.000 NX) once, paid by the
+-- treasury (closed money system, ADR-041). Every account can redeem exactly one code, never its own.
+--
+-- RPCs (authenticated):
+--   get_friend_code() -> FRIEND_CODE
+--   redeem_friend_code(p_request_id uuid, p_code text) -> FRIEND_CODE plus {"paid_cents", "cash_after_cents"}
+--   FRIEND_CODE = {"code", "bonus_cents", "redeemed", "redeemed_from": {"nickname","tag"}|null, "redeemed_at"|null,
+--                  "invited"}
+-- New error keys: friend_code_unknown NX104, friend_code_self NX105, friend_code_used NX106.
+-- New notification type: friend_code_redeemed (social), to the owner of the code.
+-- Idempotent: runs unchanged as supabase/updates/20261202000300_friend_code.sql.
+
+alter table public.profiles add column if not exists friend_code_from uuid references public.profiles (id) on delete set null;
+alter table public.profiles add column if not exists friend_code_at timestamptz;
+create index if not exists profiles_friend_code_from_idx on public.profiles (friend_code_from) where friend_code_from is not null;
+comment on column public.profiles.friend_code_from is 'Whose friend code this player redeemed (ADR-111); once, never reset.';
+
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('friend_code_redeemed', 'social', 'Freundescode eingelöst', 'Jemand hat deinen Freundescode eingelöst.',
+        'notif_friend', true, false, false, 276)
+on conflict (key) do nothing;
+
+-- Error keys (as in M5a plus the friend code)
+create or replace function public.api_error(p_key text)
+returns void
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_code text;
+begin
+  v_code := case p_key
+    when 'insufficient_funds'          then 'NX001'
+    when 'rate_limited'                then 'NX004'
+    when 'forbidden'                   then 'NX006'
+    when 'invalid_quantity'            then 'NX007'
+    when 'invalid_price'               then 'NX007'
+    when 'invalid_argument'            then 'NX007'
+    when 'invalid_interval'            then 'NX007'
+    when 'not_authenticated'           then 'NX010'
+    when 'unknown_security'            then 'NX011'
+    when 'not_tradable'                then 'NX012'
+    when 'insufficient_position'       then 'NX013'
+    when 'order_not_found'             then 'NX014'
+    when 'order_not_open'              then 'NX015'
+    when 'market_paused'               then 'NX016'
+    when 'nothing_to_claim'            then 'NX017'
+    when 'locked'                      then 'NX018'
+    when 'name_too_short'              then 'NX019'
+    when 'name_too_long'               then 'NX019'
+    when 'name_invalid_chars'          then 'NX019'
+    when 'name_profanity'              then 'NX019'
+    when 'name_reserved'               then 'NX019'
+    when 'name_taken'                  then 'NX019'
+    when 'name_change_too_soon'        then 'NX020'
+    when 'order_too_small'             then 'NX021'
+    when 'market_illiquid'             then 'NX022'
+    when 'mission_not_found'           then 'NX023'
+    when 'mission_not_completed'       then 'NX024'
+    when 'mission_already_claimed'     then 'NX025'
+    when 'avatar_unknown'              then 'NX026'
+    when 'avatar_locked'               then 'NX027'
+    when 'daily_reward_claimed'        then 'NX028'
+    when 'skill_unknown'               then 'NX029'
+    when 'skill_learned'               then 'NX030'
+    when 'skill_locked'                then 'NX031'
+    when 'skill_points_insufficient'   then 'NX032'
+    when 'job_not_found'               then 'NX033'
+    when 'job_level_too_low'           then 'NX034'
+    when 'job_skills_missing'          then 'NX035'
+    when 'application_limit'           then 'NX036'
+    when 'application_exists'          then 'NX037'
+    when 'application_not_found'       then 'NX038'
+    when 'application_not_offered'     then 'NX039'
+    when 'offer_expired'               then 'NX040'
+    when 'job_active_exists'           then 'NX041'
+    when 'no_active_job'               then 'NX042'
+    when 'raise_too_soon'              then 'NX043'
+    when 'raise_too_high'              then 'NX044'
+    when 'player_not_found'            then 'NX045'
+    when 'employer_only'               then 'NX046'
+    when 'company_exists'              then 'NX047'
+    when 'company_not_found'           then 'NX048'
+    when 'company_level_too_low'       then 'NX049'
+    when 'owns_company'                then 'NX050'
+    when 'employee_limit'              then 'NX051'
+    when 'company_upgrade_unavailable' then 'NX052'
+    when 'founding_locked'             then 'NX053'
+    when 'not_in_company'              then 'NX054'
+    when 'work_task_not_found'         then 'NX055'
+    when 'work_task_expired'           then 'NX056'
+    when 'work_task_done'              then 'NX057'
+    when 'offer_closed'                then 'NX058'
+    when 'offer_sold_out'              then 'NX059'
+    when 'already_listed'              then 'NX060'
+    when 'confirm_mismatch'            then 'NX061'
+    when 'skill_already_covered'       then 'NX062'
+    when 'training_locked'             then 'NX063'
+    when 'logo_locked'                 then 'NX064'
+    when 'logo_forbidden'              then 'NX065'
+    when 'artworks_locked'             then 'NX066'
+    when 'artwork_not_found'           then 'NX067'
+    when 'auction_not_found'           then 'NX068'
+    when 'auction_ended'               then 'NX069'
+    when 'bid_too_low'                 then 'NX070'
+    when 'own_artwork'                 then 'NX071'
+    when 'already_on_auction'          then 'NX072'
+    when 'auction_has_bids'            then 'NX073'
+    when 'property_locked'             then 'NX074'
+    when 'no_home'                     then 'NX075'
+    when 'invalid_tier'                then 'NX076'
+    when 'item_not_found'              then 'NX077'
+    when 'layout_invalid'              then 'NX078'
+    when 'floor_not_owned'             then 'NX079'
+    when 'garage_full'                 then 'NX080'
+    when 'event_closed'                then 'NX081'
+    when 'event_needs_staff'           then 'NX082'
+    when 'upgrade_maxed'               then 'NX083'
+    when 'promotion_not_ready'         then 'NX084'
+    when 'promotion_too_soon'          then 'NX085'
+    when 'promotion_pending'           then 'NX086'
+    when 'campaign_running'            then 'NX087'
+    when 'deal_not_found'              then 'NX088'
+    when 'deal_closed'                 then 'NX089'
+    when 'deal_terms'                  then 'NX090'
+    when 'deal_limit'                  then 'NX091'
+    when 'deal_self'                   then 'NX092'
+    when 'stake_share_full'            then 'NX093'
+    when 'deal_needs_company'          then 'NX094'
+    when 'deal_too_big'                then 'NX095'
+    when 'coin_not_found'              then 'NX096'
+    when 'coin_exists'                 then 'NX097'
+    when 'ticker_taken'                then 'NX098'
+    when 'coin_not_tradable'           then 'NX099'
+    when 'coin_action_running'         then 'NX100'
+    when 'coin_tech_too_low'           then 'NX101'
+    when 'slippage_exceeded'           then 'NX102'
+    when 'coin_not_launched'           then 'NX103'
+    when 'friend_code_unknown'         then 'NX104'
+    when 'friend_code_self'            then 'NX105'
+    when 'friend_code_used'            then 'NX106'
+    else 'NX007'
+  end;
+  raise exception using errcode = v_code, message = p_key;
+end;
+$$;
+
+-- FRIEND_CODE of a player.
+create or replace function public.friend_code_state(p_player uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'code',          'NEXA-' || p.tag,
+    'bonus_cents',   greatest(0, public.config_bigint('social', '{friendCode,bonusCents}', 500000)),
+    'redeemed',      p.friend_code_at is not null,
+    'redeemed_from', (select jsonb_build_object('nickname', i.nickname, 'tag', i.tag)
+                        from public.profiles i where i.id = p.friend_code_from),
+    'redeemed_at',   p.friend_code_at,
+    'invited',       (select count(*) from public.profiles x where x.friend_code_from = p.id))
+    from public.profiles p where p.id = p_player;
+$$;
+
+create or replace function public.get_friend_code()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+begin
+  v_player := public.require_player();
+  return public.friend_code_state(v_player);
+end;
+$$;
+comment on function public.get_friend_code() is 'RPC: the own friend code, whether one was redeemed, how many friends came (ADR-111).';
+
+create or replace function public.redeem_friend_code(p_request_id uuid, p_code text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid;
+  v_replay  jsonb;
+  v_tag     text;
+  v_owner   public.profiles;
+  v_me      public.profiles;
+  v_bonus   bigint;
+  v_paid    bigint;
+  v_cash    bigint;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'redeem_friend_code');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  -- "NEXA-K7Q2", "nexa k7q2", "#K7Q2" and "K7Q2" all mean the same code
+  v_tag := regexp_replace(upper(coalesce(p_code, '')), '[^A-Z0-9]', '', 'g');
+  if length(v_tag) = 8 and left(v_tag, 4) = 'NEXA' then
+    v_tag := right(v_tag, 4);
+  end if;
+  if v_tag !~ '^[A-HJ-NP-Z2-9]{4}$' then
+    perform public.api_error('friend_code_unknown');
+  end if;
+  perform public.lock_player_accounts(v_player);
+  select * into v_me from public.profiles where id = v_player for update;
+  if v_me.friend_code_at is not null then
+    perform public.api_error('friend_code_used');
+  end if;
+  select * into v_owner from public.profiles p where p.tag = v_tag and not p.is_deactivated;
+  if v_owner.id is null then
+    perform public.api_error('friend_code_unknown');
+  end if;
+  if v_owner.id = v_player then
+    perform public.api_error('friend_code_self');
+  end if;
+
+  v_bonus := greatest(0, public.config_bigint('social', '{friendCode,bonusCents}', 500000));
+  update public.profiles set friend_code_from = v_owner.id, friend_code_at = now() where id = v_player;
+  v_paid := public.state_pay_partial(v_player, v_bonus, 'mission_reward', 'Freundescode von ' || v_owner.nickname,
+                                     'friend_code:' || v_player::text);
+  perform public.loan_withhold(v_player, v_paid, 'friend_code:' || v_player::text);
+  perform public.social_notify(v_owner.id, 'friend_code_redeemed', 'Freundescode eingelöst',
+    v_me.nickname || ' ist mit deinem Code dabei.',
+    jsonb_build_object('nickname', v_me.nickname, 'tag', v_me.tag), '/friends', 'friend_code:' || v_player::text);
+
+  select a.balance_cents into v_cash from public.ledger_accounts a
+   where a.owner_player_id = v_player and a.kind = 'player_cash';
+  return public.request_complete(v_player, p_request_id,
+    public.friend_code_state(v_player) || jsonb_build_object('paid_cents', v_paid, 'cash_after_cents', v_cash));
+end;
+$$;
+comment on function public.redeem_friend_code(uuid, text) is 'RPC: redeem a friend''s code once for the bonus (ADR-111).';
+
+do $$
+declare
+  f text;
+begin
+  foreach f in array array['public.friend_code_state(uuid)'] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+    execute format('grant execute on function %s to service_role', f);
+  end loop;
+  foreach f in array array['public.get_friend_code()', 'public.redeem_friend_code(uuid, text)'] loop
+    execute format('revoke all on function %s from public, anon', f);
+    execute format('grant execute on function %s to authenticated, service_role', f);
+  end loop;
+end;
+$$;
 
 -- ===== game_config (current values, overwriting older ones) =====
 -- GENERATED by scripts/gen-config-seed.ts from src/config/balance.ts. Do not edit by hand.
@@ -39345,8 +39733,8 @@ insert into public.game_config (key, value, description) values
   ('upgrades', '{"order":["vault","income","study","mentor","overtime","rhetoric","artist","efficiency","makler","crypto_wallet"],"vault":{"maxLevel":6,"minLevel":1,"levelStep":2,"baseCostCents":300000,"costGrowth":2,"perLevel":2},"income":{"maxLevel":3,"minLevel":3,"levelStep":4,"baseCostCents":400000,"costGrowth":3,"perLevel":1000},"study":{"maxLevel":3,"minLevel":2,"levelStep":4,"baseCostCents":800000,"costGrowth":3,"perLevel":1},"mentor":{"maxLevel":3,"minLevel":4,"levelStep":4,"baseCostCents":600000,"costGrowth":3,"perLevel":1000},"overtime":{"maxLevel":2,"minLevel":5,"levelStep":6,"baseCostCents":2000000,"costGrowth":3,"perLevel":1},"rhetoric":{"maxLevel":3,"minLevel":5,"levelStep":5,"baseCostCents":1000000,"costGrowth":2.5,"perLevel":500},"artist":{"maxLevel":3,"minLevel":4,"levelStep":3,"baseCostCents":500000,"costGrowth":2.5,"perLevel":1000},"efficiency":{"maxLevel":3,"minLevel":6,"levelStep":4,"baseCostCents":1200000,"costGrowth":2.5,"perLevel":500},"makler":{"maxLevel":3,"minLevel":8,"levelStep":4,"baseCostCents":1500000,"costGrowth":2.5,"perLevel":500},"crypto_wallet":{"maxLevel":2,"minLevel":10,"levelStep":5,"baseCostCents":2000000,"costGrowth":3,"perLevel":2500},"minWorkHoursPerBranchPoint":3}'::jsonb, 'Defaults from src/config/balance.ts, section "upgrades"'),
   ('deals', '{"minLevel":6,"sizeShareOfValueBps":5000,"minSizeCents":5000000,"offerValidHours":48,"maxOpenOffers":5,"maxActivePerKind":5,"loan":{"minPrincipalCents":10000,"maxPrincipalCentsPerLevel":2000000,"maxInterestBps":3000,"minHours":24,"maxHours":720,"defaultAfterHours":168},"supply":{"minVolumeCentsPerHour":1000,"minFeeBps":1000,"maxFeeBps":9500,"maxPrepayBps":5000,"minHours":24,"maxHours":336,"keptDeliveryBps":5000},"stake":{"minAmountCents":10000,"maxShareBps":3000,"maxTotalShareBps":5000,"minHours":24,"maxHours":720}}'::jsonb, 'Defaults from src/config/balance.ts, section "deals"'),
   ('trust', '{"start":50,"min":0,"max":100,"deltas":{"loanRepaidOnTime":4,"loanRepaidLate":2,"loanOverdue":-6,"loanDefaulted":-12,"loanLent":1,"loanForgiven":2,"supplyKept":3,"supplyShort":-4,"stakeKept":3,"dealBroken":-12,"rugPull":-20},"bands":[{"from":0,"key":"risky"},{"from":30,"key":"shaky"},{"from":45,"key":"blank"},{"from":60,"key":"reliable"},{"from":80,"key":"rock"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "trust"'),
-  ('crypto', '{"minLevel":10,"createMinLevel":14,"tickSeconds":5,"categories":{"stable":{"sigmaDay":0.002,"beta":0,"feeBps":5,"pegPullPerHour":0.5},"major":{"sigmaDay":0.06,"beta":1,"feeBps":10,"pegPullPerHour":0},"alt":{"sigmaDay":0.14,"beta":1.3,"feeBps":30,"pegPullPerHour":0},"meme":{"sigmaDay":0.4,"beta":1.6,"feeBps":100,"pegPullPerHour":0},"player":{"sigmaDay":0.35,"beta":1.2,"feeBps":100,"pegPullPerHour":0}},"coins":[{"ticker":"EUS","name":"Euro-Stabil","category":"stable","priceE4":10000,"poolCents":5000000000,"color":"#4f8cff"},{"ticker":"NXS","name":"Nexa-Stable","category":"stable","priceE4":10000,"poolCents":3000000000,"color":"#7c5cff"},{"ticker":"ALGS","name":"Algostabil","category":"stable","priceE4":10000,"poolCents":800000000,"algorithmic":true,"color":"#2fd98c"},{"ticker":"GTL","name":"Goldtaler","category":"stable","priceE4":600000,"poolCents":1500000000,"color":"#f2c14e"},{"ticker":"KTL","name":"Kryptaler","category":"major","priceE4":420000000,"poolCents":10000000000,"color":"#ff9a52"},{"ticker":"NBC","name":"Nebula Chain","category":"major","priceE4":21000000,"poolCents":5000000000,"color":"#9b7bff"},{"ticker":"QTR","name":"Quantor","category":"major","priceE4":850000,"poolCents":2000000000,"color":"#2bc3d9"},{"ticker":"FLX","name":"Flux","category":"alt","priceE4":12000,"poolCents":300000000,"color":"#ef5b5b"},{"ticker":"ORB","name":"Orbit","category":"alt","priceE4":4500,"poolCents":150000000,"color":"#8e99ad"},{"ticker":"SNP","name":"Synapse","category":"alt","priceE4":120000,"poolCents":200000000,"color":"#c8553d"},{"ticker":"HMR","name":"Hamsterrakete","category":"meme","priceE4":420,"poolCents":30000000,"color":"#e0a92e"},{"ticker":"MKS","name":"Mondkeks","category":"meme","priceE4":690,"poolCents":15000000,"color":"#c9d2e0"},{"ticker":"LFR","name":"Laserfrosch","category":"meme","priceE4":1000,"poolCents":25000000,"color":"#2f7a4a"},{"ticker":"TBZ","name":"Turbobrezel","category":"meme","priceE4":2500,"poolCents":10000000,"color":"#a0612c"},{"ticker":"PPD","name":"Pixelpudel","category":"meme","priceE4":150,"poolCents":8000000,"color":"#f8bbd0"}],"regimes":{"bull":{"driftDay":0.03,"weight":0.3},"flat":{"driftDay":0,"weight":0.45},"bear":{"driftDay":-0.03,"weight":0.25}},"regimeHoursMin":24,"regimeHoursMax":72,"deadCoinReplaceHours":24,"deadPriceE4":2,"memeNames":["Katzenkanone","Wurstwal","Raketenrentner","Glitzergurke","Turbotoaster","Mondmaulwurf","Laserlama","Pixelpinguin","Bananenbank","Sockensaurus","Kometenkrabbe","Diamanthamster"],"events":[{"key":"hack","scope":["alt","meme","player"],"chanceBps":20,"shockMin":-0.9,"shockMax":-0.35,"tech":-10,"hype":-30,"poolLossShare":0.2},{"key":"bug","scope":["alt","meme","player"],"chanceBps":40,"shockMin":-0.25,"shockMax":-0.08,"tech":-5,"hype":-5},{"key":"influencer","scope":["alt","meme","player"],"chanceBps":60,"shockMin":0.25,"shockMax":1.2,"hype":20},{"key":"exchange_listing","scope":["alt","meme","player"],"chanceBps":25,"shockMin":0.2,"shockMax":0.6,"utility":10},{"key":"delisting_rumor","scope":["alt","meme","player"],"chanceBps":30,"shockMin":-0.35,"shockMax":-0.1,"hype":-10},{"key":"whale_buy","scope":["major","alt","meme","player"],"chanceBps":50,"shockMin":0.1,"shockMax":0.4},{"key":"whale_dump","scope":["major","alt","meme","player"],"chanceBps":50,"shockMin":-0.4,"shockMax":-0.1},{"key":"partnership","scope":["major","alt","player"],"chanceBps":30,"shockMin":0.1,"shockMax":0.35,"utility":15},{"key":"fud","scope":["major","alt","meme","player"],"chanceBps":60,"shockMin":-0.3,"shockMax":-0.05,"hype":-8},{"key":"network_upgrade","scope":["major","alt"],"chanceBps":20,"shockMin":0.05,"shockMax":0.2},{"key":"depeg","scope":["stable"],"chanceBps":3,"shockMin":-0.4,"shockMax":-0.03},{"key":"meme_wave","scope":["market"],"chanceBps":40,"shockMin":0.2,"shockMax":0.8},{"key":"regulation","scope":["market"],"chanceBps":25,"shockMin":-0.25,"shockMax":-0.05},{"key":"rug_pull","scope":["meme"],"chanceBps":12,"shockMin":-4.5,"shockMax":-2.5}],"create":{"costCents":2500000,"minLiquidityCents":500000,"startPriceOptionsE4":[100,1000,10000,100000],"teamShareMinBps":1000,"teamShareMaxBps":5000,"launchMinTech":20,"nameMinLength":3,"nameMaxLength":24,"tickerMinLength":3,"tickerMaxLength":5,"hypeDecayPerHour":0.97,"utilityDecayPerHour":0.995,"driftPerHype":0.2,"driftPerUtility":0.08,"driftBase":-0.06,"sigmaDay":0.35,"sigmaTechDamping":0.5,"itBpsPerScore":300,"actions":[{"key":"smart_contract","hours":6,"costCents":200000,"tech":15,"baseBps":5000},{"key":"audit","hours":24,"costCents":1500000,"tech":35},{"key":"community","hours":4,"costCents":50000,"hype":10},{"key":"influencer","hours":2,"costCents":800000,"hype":35,"baseBps":8500},{"key":"partnership","hours":12,"costCents":600000,"utility":20,"baseBps":7000,"afterLaunch":true},{"key":"staking","hours":12,"costCents":500000,"utility":15,"afterLaunch":true},{"key":"bugfix","hours":3,"costCents":100000,"tech":5},{"key":"marketing_burn","hours":1,"costCents":0,"hype":8,"afterLaunch":true}],"rugShareBps":2000,"rugWindowHours":24,"exposedHype":-20,"exposedShock":-0.1625,"burnMinBps":100}}'::jsonb, 'Defaults from src/config/balance.ts, section "crypto"'),
-  ('social', '{"feed":{"pageSize":30,"bigTradeMinProfitCents":100000,"bigTradeMinBps":1500,"levelEvery":5,"artMinPriceCents":1000000,"carMinPriceCents":10000000,"streakMilestones":[7,30,100,365],"keepDays":30},"league":{"updateEveryMinutes":10,"podium":3,"minBaselineCents":1000000}}'::jsonb, 'Defaults from src/config/balance.ts, section "social"'),
+  ('crypto', '{"minLevel":10,"createMinLevel":14,"tickSeconds":5,"categories":{"stable":{"sigmaDay":0.002,"beta":0,"feeBps":5,"pegPullPerHour":0.5},"major":{"sigmaDay":0.06,"beta":1,"feeBps":10,"pegPullPerHour":0},"alt":{"sigmaDay":0.14,"beta":1.3,"feeBps":30,"pegPullPerHour":0},"meme":{"sigmaDay":0.4,"beta":1.6,"feeBps":100,"pegPullPerHour":0},"player":{"sigmaDay":0.35,"beta":1.2,"feeBps":100,"pegPullPerHour":0}},"coins":[{"ticker":"EUS","name":"Eins-Stabil","category":"stable","priceE4":10000,"poolCents":5000000000,"color":"#4f8cff"},{"ticker":"NXS","name":"Nexa-Stable","category":"stable","priceE4":10000,"poolCents":3000000000,"color":"#7c5cff"},{"ticker":"ALGS","name":"Algostabil","category":"stable","priceE4":10000,"poolCents":800000000,"algorithmic":true,"color":"#2fd98c"},{"ticker":"GTL","name":"Goldtaler","category":"stable","priceE4":600000,"poolCents":1500000000,"color":"#f2c14e"},{"ticker":"KTL","name":"Kryptaler","category":"major","priceE4":420000000,"poolCents":10000000000,"color":"#ff9a52"},{"ticker":"NBC","name":"Nebula Chain","category":"major","priceE4":21000000,"poolCents":5000000000,"color":"#9b7bff"},{"ticker":"QTR","name":"Quantor","category":"major","priceE4":850000,"poolCents":2000000000,"color":"#2bc3d9"},{"ticker":"FLX","name":"Flux","category":"alt","priceE4":12000,"poolCents":300000000,"color":"#ef5b5b"},{"ticker":"ORB","name":"Orbit","category":"alt","priceE4":4500,"poolCents":150000000,"color":"#8e99ad"},{"ticker":"SNP","name":"Synapse","category":"alt","priceE4":120000,"poolCents":200000000,"color":"#c8553d"},{"ticker":"HMR","name":"Hamsterrakete","category":"meme","priceE4":420,"poolCents":30000000,"color":"#e0a92e"},{"ticker":"MKS","name":"Mondkeks","category":"meme","priceE4":690,"poolCents":15000000,"color":"#c9d2e0"},{"ticker":"LFR","name":"Laserfrosch","category":"meme","priceE4":1000,"poolCents":25000000,"color":"#2f7a4a"},{"ticker":"TBZ","name":"Turbobrezel","category":"meme","priceE4":2500,"poolCents":10000000,"color":"#a0612c"},{"ticker":"PPD","name":"Pixelpudel","category":"meme","priceE4":150,"poolCents":8000000,"color":"#f8bbd0"}],"regimes":{"bull":{"driftDay":0.03,"weight":0.3},"flat":{"driftDay":0,"weight":0.45},"bear":{"driftDay":-0.03,"weight":0.25}},"regimeHoursMin":24,"regimeHoursMax":72,"deadCoinReplaceHours":24,"deadPriceE4":2,"memeNames":["Katzenkanone","Wurstwal","Raketenrentner","Glitzergurke","Turbotoaster","Mondmaulwurf","Laserlama","Pixelpinguin","Bananenbank","Sockensaurus","Kometenkrabbe","Diamanthamster"],"events":[{"key":"hack","scope":["alt","meme","player"],"chanceBps":20,"shockMin":-0.9,"shockMax":-0.35,"tech":-10,"hype":-30,"poolLossShare":0.2},{"key":"bug","scope":["alt","meme","player"],"chanceBps":40,"shockMin":-0.25,"shockMax":-0.08,"tech":-5,"hype":-5},{"key":"influencer","scope":["alt","meme","player"],"chanceBps":60,"shockMin":0.25,"shockMax":1.2,"hype":20},{"key":"exchange_listing","scope":["alt","meme","player"],"chanceBps":25,"shockMin":0.2,"shockMax":0.6,"utility":10},{"key":"delisting_rumor","scope":["alt","meme","player"],"chanceBps":30,"shockMin":-0.35,"shockMax":-0.1,"hype":-10},{"key":"whale_buy","scope":["major","alt","meme","player"],"chanceBps":50,"shockMin":0.1,"shockMax":0.4},{"key":"whale_dump","scope":["major","alt","meme","player"],"chanceBps":50,"shockMin":-0.4,"shockMax":-0.1},{"key":"partnership","scope":["major","alt","player"],"chanceBps":30,"shockMin":0.1,"shockMax":0.35,"utility":15},{"key":"fud","scope":["major","alt","meme","player"],"chanceBps":60,"shockMin":-0.3,"shockMax":-0.05,"hype":-8},{"key":"network_upgrade","scope":["major","alt"],"chanceBps":20,"shockMin":0.05,"shockMax":0.2},{"key":"depeg","scope":["stable"],"chanceBps":3,"shockMin":-0.4,"shockMax":-0.03},{"key":"meme_wave","scope":["market"],"chanceBps":40,"shockMin":0.2,"shockMax":0.8},{"key":"regulation","scope":["market"],"chanceBps":25,"shockMin":-0.25,"shockMax":-0.05},{"key":"rug_pull","scope":["meme"],"chanceBps":12,"shockMin":-4.5,"shockMax":-2.5}],"create":{"costCents":2500000,"minLiquidityCents":500000,"startPriceOptionsE4":[100,1000,10000,100000],"teamShareMinBps":1000,"teamShareMaxBps":5000,"launchMinTech":20,"nameMinLength":3,"nameMaxLength":24,"tickerMinLength":3,"tickerMaxLength":5,"hypeDecayPerHour":0.97,"utilityDecayPerHour":0.995,"driftPerHype":0.2,"driftPerUtility":0.08,"driftBase":-0.06,"sigmaDay":0.35,"sigmaTechDamping":0.5,"itBpsPerScore":300,"actions":[{"key":"smart_contract","hours":6,"costCents":200000,"tech":15,"baseBps":5000},{"key":"audit","hours":24,"costCents":1500000,"tech":35},{"key":"community","hours":4,"costCents":50000,"hype":10},{"key":"influencer","hours":2,"costCents":800000,"hype":35,"baseBps":8500},{"key":"partnership","hours":12,"costCents":600000,"utility":20,"baseBps":7000,"afterLaunch":true},{"key":"staking","hours":12,"costCents":500000,"utility":15,"afterLaunch":true},{"key":"bugfix","hours":3,"costCents":100000,"tech":5},{"key":"marketing_burn","hours":1,"costCents":0,"hype":8,"afterLaunch":true}],"rugShareBps":2000,"rugWindowHours":24,"exposedHype":-20,"exposedShock":-0.1625,"burnMinBps":100}}'::jsonb, 'Defaults from src/config/balance.ts, section "crypto"'),
+  ('social', '{"feed":{"pageSize":30,"bigTradeMinProfitCents":100000,"bigTradeMinBps":1500,"levelEvery":5,"artMinPriceCents":1000000,"carMinPriceCents":10000000,"streakMilestones":[7,30,100,365],"keepDays":30},"league":{"updateEveryMinutes":10,"podium":3,"minBaselineCents":1000000},"friendCode":{"bonusCents":500000}}'::jsonb, 'Defaults from src/config/balance.ts, section "social"'),
   ('property', '{"tiers":[{"key":"flat","priceCents":2500000,"width":8,"height":6,"garageSlots":0,"minLevel":8},{"key":"apartment","priceCents":10000000,"width":10,"height":8,"garageSlots":0,"minLevel":11},{"key":"house","priceCents":50000000,"width":13,"height":9,"garageSlots":2,"minLevel":14},{"key":"villa","priceCents":250000000,"width":16,"height":11,"garageSlots":4,"minLevel":22},{"key":"luxury_villa","priceCents":1500000000,"width":20,"height":13,"garageSlots":8,"minLevel":30}],"tradeInBps":5000,"resaleBps":4000,"floors":{"laminate":0,"carpet":150000,"tiles":400000,"parquet":600000,"stone":1500000,"marble":6000000,"gold":100000000},"wallColors":["#f3efe4","#ffffff","#d9d4c7","#8f9bb3","#3a4256","#1b1e2b","#c8e6c9","#2f7a4a","#bfe6ff","#2f5fd0","#ffe0b2","#ff9a52","#f8bbd0","#7a2f7a","#c8553d","#ffd15c"]}'::jsonb, 'Defaults from src/config/balance.ts, section "property"')
 on conflict (key) do update set value = excluded.value, description = excluded.description, updated_at = now();
 

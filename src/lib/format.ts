@@ -3,7 +3,11 @@
  * scaled by 10_000 (see docs/DECISIONS.md, ADR-003). Conversion to a
  * floating-point number happens only here, at the very edge, for display.
  */
+import { CURRENCY } from "@/config/app";
+
 const LOCALE = "de-DE";
+/** Intl lays the amount out like a currency; the euro sign is then swapped for the game's own code (ADR-110). */
+const own = (text: string) => text.replace("€", CURRENCY.code);
 
 export const PRICE_SCALE = 10_000;
 
@@ -50,7 +54,7 @@ export function formatMoney(
 ): string {
   const value = centsToEuros(cents);
   const formatter = options.compact ? eurCompact : options.whole ? eurWhole : eur;
-  const text = formatter.format(value);
+  const text = own(formatter.format(value));
   return options.sign && value > 0 ? `+${text}` : text;
 }
 
@@ -69,17 +73,17 @@ export function formatMoneyShort(cents: Numeric): string {
   const euros = Math.trunc(centsToEuros(cents));
   const abs = Math.abs(euros);
   const sign = euros < 0 ? "−" : "";
-  if (abs < 10_000) return eurWhole.format(euros);
+  if (abs < 10_000) return own(eurWhole.format(euros));
   for (const { at, div, unit } of shortUnits) {
-    if (abs >= at) return `${sign}${oneDecimal.format(Math.floor((abs / div) * 10) / 10)} ${unit} €`;
+    if (abs >= at) return `${sign}${oneDecimal.format(Math.floor((abs / div) * 10) / 10)} ${unit} ${CURRENCY.code}`;
   }
-  return `${sign}${integer.format(Math.floor(abs / 1_000))}k €`;
+  return `${sign}${integer.format(Math.floor(abs / 1_000))}k ${CURRENCY.code}`;
 }
 
 /** Prices below 1 € show up to four decimals so penny stocks stay readable. */
 export function formatPrice(priceE4: Numeric): string {
   const value = Number(priceE4) / PRICE_SCALE;
-  return Math.abs(value) < 1 ? pricePenny.format(value) : eur.format(value);
+  return own(Math.abs(value) < 1 ? pricePenny.format(value) : eur.format(value));
 }
 
 /** 150 bps -> "+1,50 %" */

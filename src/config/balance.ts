@@ -750,6 +750,8 @@ export interface SocialConfig {
     /** Below this start value growth in percent means little; the baseline is at least this. */
     readonly minBaselineCents: number;
   };
+  /** Friend code (ADR-111): what a player gets once for entering a friend's code. */
+  readonly friendCode: { readonly bonusCents: number };
 }
 
 export interface BalanceConfig {
@@ -2267,6 +2269,7 @@ export const BALANCE = {
       keepDays: 30,
     },
     league: { updateEveryMinutes: 10, podium: 3, minBaselineCents: 1_000_000 },
+    friendCode: { bonusCents: 500_000 },
   },
   property: {
     tiers: [

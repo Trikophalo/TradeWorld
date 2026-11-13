@@ -110,3 +110,12 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 - **Titelbildschirm** bei Anmeldung und Registrierung: Sternenhimmel, Mond, Skyline mit Lichtern, Finn begrüßt.
 - **Mehr Bewegung:** Inhalte kommen gestaffelt an, Icons hüpfen, Balken sind segmentiert, das Vermögen glänzt, die
   Münze am Guthaben hüpft bei jeder Änderung.
+
+## Startseite, eigene Währung, Freundescode
+
+- **Ruhige Startseite (ADR-109):** Finn begrüßt, groß das Vermögen, genau eine nächste Aufgabe, der Tresor und drei
+  Kacheln. Feed, Liga, Index und Termine stehen auf ihren eigenen Seiten.
+- **Eigene Währung (ADR-110):** Das Spiel rechnet in **Nex (NX)** statt in Euro. Alle Beträge bleiben gleich, nur der
+  Name ändert sich, auch in Nachrichten, Missionen und Benachrichtigungen. Der Stablecoin heißt jetzt „Eins-Stabil“.
+- **Freundescode (ADR-111):** Im Profil steht dein Code (z. B. `NEXA-K7Q2`) zum Kopieren und Teilen. Wer den Code
+  eines Freundes dort einträgt, bekommt einmalig 5.000 NX; der Freund erfährt es per Benachrichtigung.

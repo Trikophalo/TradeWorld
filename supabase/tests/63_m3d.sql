@@ -245,7 +245,7 @@ select tests.assert(
   and (:'chat'::jsonb -> 'messages' -> -1 ->> 'id')::bigint = (:'m2'::jsonb ->> 'id')::bigint
   and exists (select 1 from jsonb_array_elements(:'chat'::jsonb -> 'messages') m
                where m ->> 'kind' = 'system' and m ->> 'body' = 'Willi_Wert ist jetzt im Team.' and m -> 'author' = 'null'::jsonb)
-  and exists (select 1 from jsonb_array_elements(:'chat'::jsonb -> 'messages') m where m ->> 'body' ~ '^Quartal J[0-9]+ Q[1-4]: Umsatz .* €, Gewinn .* €\.$')
+  and exists (select 1 from jsonb_array_elements(:'chat'::jsonb -> 'messages') m where m ->> 'body' ~ '^Quartal J[0-9]+ Q[1-4]: Umsatz .* NX, Gewinn .* NX\.$')
   and :wsee::int = jsonb_array_length(:'chat'::jsonb -> 'messages')
   and :'xchat'::jsonb = '{"company": null, "members": 0, "messages": []}'::jsonb and :xsee::int = 0,
   'chat: members read and write, newest last, system lines for joins and quarter closes; outsiders see nothing (RLS)');
