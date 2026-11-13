@@ -1,13 +1,26 @@
 {
   "members": [
     {
+      "tier": "intern",
       "title": "Werkstudium Daten",
       "skills": ["it_basics"],
       "nickname": "Fixture_Chefin",
+      "promotion": {
+        "ready": false,
+        "next_tier": "junior",
+        "requirements": [
+          { "key": "level", "met": false, "have": 3, "need": 5, "branch": null },
+          { "key": "branch", "met": false, "have": 0, "need": 2, "branch": "finance" },
+          { "key": "hours", "met": false, "have": 0, "need": 12, "branch": null }
+        ],
+        "pending_since": null,
+        "next_salary_cents_per_hour": 30000
+      },
       "avatar_key": "rookie",
-      "started_at": "2026-11-13T12:34:42.471526+00:00",
+      "rank_hours": 0.0,
+      "started_at": "2026-11-13T13:52:09.408142+00:00",
       "pending_raise": null,
-      "player_job_id": "d8a10b8e-77e1-440d-b85c-c21a0c238e32",
+      "player_job_id": "0ab08d13-9dde-46ff-b5f0-f07c8d588b05",
       "notice_ends_at": null,
       "productivity_bps": 15000,
       "salary_cents_per_hour": 19055

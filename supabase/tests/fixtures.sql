@@ -1,5 +1,5 @@
 -- =============================================================================
--- Dumps one real response of every read/write RPC (M1 to M4d) as JSON files, so the
+-- Dumps one real response of every read/write RPC (M1 to M4i) as JSON files, so the
 -- frontend's Zod schemas can be tested against the database (contract test:
 -- src/features/game/api.test.ts). Run by verify_local.sh when
 -- NEXA_FIXTURE_DIR is set. Not an assertion file.
@@ -643,5 +643,94 @@ select public.get_company_event();
 select public.get_company_news();
 \o :fixture_dir/company_ai_context.json
 select public.company_ai_context();
+\o
+reset role;
+
+-- M4i: upgrades (ADR-093) and promotions (ADR-094) ---------------------------------------------------------------
+-- (separate block; an AI intern who is turned down once and then promoted, and a player company whose boss
+-- sees a request in the team list, declines it and promotes anyway)
+\set fx_i '''f1f1f1f1-0000-4000-8000-0000000001a1'''
+\set fx_c '''f1f1f1f1-0000-4000-8000-0000000001a2'''
+\set fx_m '''f1f1f1f1-0000-4000-8000-0000000001a3'''
+select tests.signup(:fx_i, 'Fixture_Aufstieg') is not null and tests.signup(:fx_c, 'Fixture_Chef') is not null
+   and tests.signup(:fx_m, 'Fixture_Team') is not null as ok \gset
+select tests.set_level(:fx_i, 5);
+select tests.set_level(:fx_c, 6);
+select tests.set_level(:fx_m, 5);
+select tests.fund(:fx_i, 5000000, 'fixture:m4i:i');
+select tests.fund(:fx_c, 5000000, 'fixture:m4i:c');
+select tests.login_as('authenticated', :fx_i) is null as ok \gset
+\o :fixture_dir/get_upgrades.json
+select public.get_upgrades();
+\o :fixture_dir/buy_upgrade.json
+select public.buy_upgrade(gen_random_uuid(), 'vault');
+\o :fixture_dir/get_upgrades_bought.json
+select public.get_upgrades();
+\o
+select x ->> 'id' as fx_ipost from jsonb_array_elements(public.get_job_board() -> 'postings') x
+ where x ->> 'tier' = 'intern' and (x ->> 'eligible')::boolean and (x -> 'company' ->> 'is_ai')::boolean
+ order by x ->> 'id' limit 1 \gset
+select public.sign_contract(gen_random_uuid(), (public.apply_for_job(gen_random_uuid(), :'fx_ipost', 15000, null) ->> 'id')::uuid,
+                            'M1 1 L5 5') is not null as ok \gset
+reset role;
+-- IT as main branch, level 5, IT score 3, 12.5 hours in the rank: ready for junior
+update public.player_jobs set required = '[{"branch": "it", "min_score": 0}]', title_key = 'it_intern', title = 'it_intern',
+       rank_minutes = 750
+ where player_id = :fx_i and status = 'active';
+insert into public.player_skills (player_id, skill_key) values (:fx_i, 'it_basics'), (:fx_i, 'it_programming') on conflict do nothing;
+select value -> 'promotion' as fx_promo from public.game_config where key = 'careers' \gset
+select tests.login_as('authenticated', :fx_i) is null as ok \gset
+\o :fixture_dir/get_my_job_promotion_ready.json
+select public.get_my_job();
+\o
+reset role;
+-- the AI boss's answer is forced: first no (chance 0), then yes (chance 100 %)
+select tests.set_cfg('careers', '{promotion,maxChanceBps}', '0');
+select tests.login_as('authenticated', :fx_i) is null as ok \gset
+\o :fixture_dir/request_promotion_declined.json
+select public.request_promotion(gen_random_uuid());
+\o
+reset role;
+update public.player_jobs set promotion_retry_at = null where player_id = :fx_i and status = 'active';
+select tests.set_cfg('careers', '{promotion,maxChanceBps}', '10000');
+select tests.set_cfg('careers', '{promotion,baseChanceBps}', '10000');
+select tests.login_as('authenticated', :fx_i) is null as ok \gset
+\o :fixture_dir/request_promotion.json
+select public.request_promotion(gen_random_uuid());
+\o
+reset role;
+select tests.set_cfg('careers', '{promotion}', :'fx_promo'::jsonb);
+-- player company: hire, request, team list, no, promotion by the boss
+select tests.login_as('authenticated', :fx_c) is null as ok \gset
+select public.found_company(gen_random_uuid(), 'Fixture Leitern', 'Leitern für jede Höhe', 'tech', '#447799', 'garage')
+       is not null as ok \gset
+reset role;
+select company_id as fx_cco from public.player_companies where founder_id = :fx_c \gset
+select tests.login_as('authenticated', :fx_c) is null as ok \gset
+select public.create_job_posting(gen_random_uuid(), :'fx_cco', 'intern', 'Werkstudium Leitern',
+  '[{"branch": "it", "min_score": 0}]', 20000, 1) ->> 'id' as fx_cpost \gset
+select tests.login_as('authenticated', :fx_m) is null as ok \gset
+select public.apply_for_job(gen_random_uuid(), :'fx_cpost', 20000, null) ->> 'id' as fx_capp \gset
+select tests.login_as('authenticated', :fx_c) is null as ok \gset
+select public.respond_application(gen_random_uuid(), :'fx_capp', 'accept', null) is not null as ok \gset
+select tests.login_as('authenticated', :fx_m) is null as ok \gset
+select public.sign_contract(gen_random_uuid(), :'fx_capp', 'M1 1 L6 6') is not null as ok \gset
+reset role;
+select id as fx_mjob from public.player_jobs where player_id = :fx_m and status = 'active' \gset
+update public.player_jobs set rank_minutes = 750 where id = :'fx_mjob';
+insert into public.player_skills (player_id, skill_key) values (:fx_m, 'it_basics'), (:fx_m, 'it_programming') on conflict do nothing;
+select tests.login_as('authenticated', :fx_m) is null as ok \gset
+\o :fixture_dir/request_promotion_pending.json
+select public.request_promotion(gen_random_uuid());
+\o :fixture_dir/get_my_job_promotion_pending.json
+select public.get_my_job();
+\o
+select tests.login_as('authenticated', :fx_c) is null as ok \gset
+\o :fixture_dir/get_company_team_promotion.json
+select public.get_company_team(:'fx_cco');
+\o :fixture_dir/decline_promotion.json
+select public.decline_promotion(gen_random_uuid(), :'fx_cco', :'fx_mjob');
+\o :fixture_dir/promote_employee.json
+select public.promote_employee(gen_random_uuid(), :'fx_cco', :'fx_mjob', null);
 \o
 reset role;

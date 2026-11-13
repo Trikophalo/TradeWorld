@@ -33,8 +33,10 @@ select tests.assert(
           -- M4g (78): announced events
           || array['get_events']
           -- M4h (79): company events and news
-          || array['choose_event_strategy', 'company_ai_context', 'get_company_event', 'get_company_news', 'start_event_step']) x),
-  'authenticated can execute exactly the 9 helpers and the RPCs up to M4h (79)');
+          || array['choose_event_strategy', 'company_ai_context', 'get_company_event', 'get_company_news', 'start_event_step']
+          -- M4i (80): upgrades and promotions
+          || array['buy_upgrade', 'decline_promotion', 'get_upgrades', 'promote_employee', 'request_promotion']) x),
+  'authenticated can execute exactly the 9 helpers and the RPCs up to M4i (80)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute') and p.proname <> 'check_nickname'),

@@ -1,55 +1,55 @@
 {
   "items": [
     {
-      "id": 179,
+      "id": 188,
       "kind": "league_won",
-      "actor": { "tag": "4U5F", "level": 15, "nickname": "Fixture_Gmbh", "avatar_key": "rookie" },
+      "actor": { "tag": "SML2", "level": 15, "nickname": "Fixture_Gmbh", "avatar_key": "rookie" },
       "is_me": true,
-      "payload": { "growth_bps": 234, "week_start": "2026-11-02" },
+      "payload": { "growth_bps": 233, "week_start": "2026-11-02" },
       "reacted": false,
       "reactions": 0,
-      "created_at": "2026-11-13T12:34:43.872884+00:00"
+      "created_at": "2026-11-13T13:52:10.788236+00:00"
     },
     {
-      "id": 178,
+      "id": 187,
       "kind": "friends_now",
-      "actor": { "tag": "4U5F", "level": 15, "nickname": "Fixture_Gmbh", "avatar_key": "rookie" },
+      "actor": { "tag": "SML2", "level": 15, "nickname": "Fixture_Gmbh", "avatar_key": "rookie" },
       "is_me": true,
       "payload": { "other_nickname": "Fixture_Neu" },
       "reacted": false,
       "reactions": 0,
-      "created_at": "2026-11-13T12:34:43.826058+00:00"
+      "created_at": "2026-11-13T13:52:10.739694+00:00"
     },
     {
-      "id": 177,
+      "id": 186,
       "kind": "friends_now",
-      "actor": { "tag": "D77Z", "level": 15, "nickname": "Fixture_Neu", "avatar_key": "coder" },
+      "actor": { "tag": "4RVG", "level": 15, "nickname": "Fixture_Neu", "avatar_key": "coder" },
       "is_me": false,
       "payload": { "other_nickname": "Fixture_Gmbh" },
       "reacted": false,
       "reactions": 0,
-      "created_at": "2026-11-13T12:34:43.826058+00:00"
+      "created_at": "2026-11-13T13:52:10.739694+00:00"
     },
     {
-      "id": 176,
+      "id": 185,
       "kind": "friends_now",
-      "actor": { "tag": "8BKU", "level": 8, "nickname": "Fixture_Kunst", "avatar_key": "rookie" },
+      "actor": { "tag": "M3VP", "level": 8, "nickname": "Fixture_Kunst", "avatar_key": "rookie" },
       "is_me": false,
       "payload": { "other_nickname": "Fixture_Gmbh" },
       "reacted": false,
       "reactions": 0,
-      "created_at": "2026-11-13T12:34:43.784459+00:00"
+      "created_at": "2026-11-13T13:52:10.708147+00:00"
     },
     {
-      "id": 175,
+      "id": 184,
       "kind": "friends_now",
-      "actor": { "tag": "4U5F", "level": 15, "nickname": "Fixture_Gmbh", "avatar_key": "rookie" },
+      "actor": { "tag": "SML2", "level": 15, "nickname": "Fixture_Gmbh", "avatar_key": "rookie" },
       "is_me": true,
       "payload": { "other_nickname": "Fixture_Kunst" },
       "reacted": false,
       "reactions": 0,
-      "created_at": "2026-11-13T12:34:43.784459+00:00"
+      "created_at": "2026-11-13T13:52:10.708147+00:00"
     }
   ],
-  "next_before": 175
+  "next_before": 184
 }

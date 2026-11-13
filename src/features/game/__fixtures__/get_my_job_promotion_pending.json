@@ -1,0 +1,52 @@
+{
+  "job": {
+    "id": "796ad841-bf1b-4802-a022-625fa2de352d",
+    "tier": "intern",
+    "title": "Werkstudium Leitern",
+    "company": {
+      "id": "2295123b-3a78-4662-b0a7-7ea11ab17172",
+      "logo": null,
+      "name": "Fixture Leitern",
+      "color": "#447799",
+      "is_ai": false,
+      "sector": "tech",
+      "ticker": null
+    },
+    "required": [{ "branch": "it", "min_score": 0 }],
+    "promotion": {
+      "boss": "player",
+      "ready": true,
+      "retry_at": null,
+      "next_tier": "junior",
+      "chance_bps": null,
+      "main_branch": "it",
+      "requirements": [
+        { "key": "level", "met": true, "have": 5, "need": 5, "branch": null },
+        { "key": "branch", "met": true, "have": 3, "need": 2, "branch": "it" },
+        { "key": "hours", "met": true, "have": 12, "need": 12, "branch": null }
+      ],
+      "pending_since": "2026-11-13T13:52:11.347799+00:00",
+      "next_salary_cents_per_hour": 30000
+    },
+    "signature": "M1 1 L6 6",
+    "title_key": null,
+    "rank_hours": 12.5,
+    "started_at": "2026-11-13T13:52:11.338258+00:00",
+    "pending_raise": null,
+    "raise_max_bps": 600,
+    "notice_ends_at": null,
+    "paid_hours_cap": 12,
+    "pay_factor_bps": 10000,
+    "work_task_open": false,
+    "quit_cost_cents": 0,
+    "last_bonus_cents": 0,
+    "paid_hours_today": 0.0,
+    "productivity_bps": 16600,
+    "next_work_task_at": null,
+    "earned_total_cents": 0,
+    "raise_available_at": null,
+    "quit_now_cost_cents": 240000,
+    "salary_cents_per_hour": 20000,
+    "effective_salary_cents_per_hour": 20000
+  }
+}

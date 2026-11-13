@@ -1,0 +1,52 @@
+{
+  "job": {
+    "id": "3325cc3f-ad6f-4aaf-9d28-a309f9ea12ed",
+    "tier": "intern",
+    "title": null,
+    "company": {
+      "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
+      "logo": null,
+      "name": "KlarSoft AG",
+      "color": "#4C8DFF",
+      "is_ai": true,
+      "sector": "tech",
+      "ticker": "KLS"
+    },
+    "required": [{ "branch": "it", "min_score": 0 }],
+    "promotion": {
+      "boss": "ai",
+      "ready": true,
+      "retry_at": null,
+      "next_tier": "junior",
+      "chance_bps": 4800,
+      "main_branch": "it",
+      "requirements": [
+        { "key": "level", "met": true, "have": 5, "need": 5, "branch": null },
+        { "key": "branch", "met": true, "have": 3, "need": 2, "branch": "it" },
+        { "key": "hours", "met": true, "have": 12, "need": 12, "branch": null }
+      ],
+      "pending_since": null,
+      "next_salary_cents_per_hour": 30000
+    },
+    "signature": "M1 1 L5 5",
+    "title_key": "it_intern",
+    "rank_hours": 12.5,
+    "started_at": "2026-11-13T13:52:11.223215+00:00",
+    "pending_raise": null,
+    "raise_max_bps": 600,
+    "notice_ends_at": null,
+    "paid_hours_cap": 12,
+    "pay_factor_bps": 10000,
+    "work_task_open": false,
+    "quit_cost_cents": 0,
+    "last_bonus_cents": 0,
+    "paid_hours_today": 0.0,
+    "productivity_bps": 16600,
+    "next_work_task_at": null,
+    "earned_total_cents": 0,
+    "raise_available_at": null,
+    "quit_now_cost_cents": 180000,
+    "salary_cents_per_hour": 15000,
+    "effective_salary_cents_per_hour": 15000
+  }
+}

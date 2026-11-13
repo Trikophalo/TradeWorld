@@ -1,0 +1,6 @@
+{
+  "key": "vault",
+  "level": 1,
+  "levels": { "study": 0, "vault": 1, "income": 0, "overtime": 0, "rhetoric": 0 },
+  "cost_cents": 300000
+}

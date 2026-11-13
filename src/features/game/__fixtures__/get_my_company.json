@@ -1,24 +1,24 @@
 {
   "company": {
-    "id": "0610ba22-846e-498f-b38a-d335b79943c8",
+    "id": "2debea22-badc-414e-a54a-f5b4e0da620e",
     "idea": "Werkzeuge für Bastler",
     "live": {
-      "last_hour_at": "2026-11-13T12:00:00+00:00",
-      "pay_factor_bps": 8626,
+      "last_hour_at": "2026-11-13T13:00:00+00:00",
+      "pay_factor_bps": 8412,
       "today_profit_cents": -13332,
-      "today_revenue_cents": 67359,
+      "today_revenue_cents": 66820,
       "fixed_per_hour_cents": 2500,
-      "quarter_profit_cents": -13332,
-      "demand_per_hour_cents": 557,
+      "quarter_profit_cents": 0,
+      "demand_per_hour_cents": 179,
       "profit_per_hour_cents": -6666,
-      "quarter_revenue_cents": 67359,
-      "revenue_per_hour_cents": 33668,
-      "ai_wages_per_hour_cents": 10351,
+      "quarter_revenue_cents": 0,
+      "revenue_per_hour_cents": 33384,
+      "ai_wages_per_hour_cents": 10094,
       "capacity_per_hour_cents": 133000,
       "marketing_per_hour_cents": 4167,
       "today_founder_payout_cents": 0,
       "founder_payout_per_hour_cents": 0,
-      "contract_revenue_per_hour_cents": 33111
+      "contract_revenue_per_hour_cents": 33205
     },
     "logo": {
       "grid": [
@@ -46,18 +46,18 @@
     "color": "#2266cc",
     "hours": [
       {
-        "hour_start": "2026-11-13T10:00:00+00:00",
-        "profit_cents": -6666,
-        "revenue_cents": 33691,
-        "founder_payout_cents": 0,
-        "contract_revenue_cents": 33103
-      },
-      {
         "hour_start": "2026-11-13T11:00:00+00:00",
         "profit_cents": -6666,
-        "revenue_cents": 33668,
+        "revenue_cents": 33436,
         "founder_payout_cents": 0,
-        "contract_revenue_cents": 33111
+        "contract_revenue_cents": 33188
+      },
+      {
+        "hour_start": "2026-11-13T12:00:00+00:00",
+        "profit_cents": -6666,
+        "revenue_cents": 33384,
+        "founder_payout_cents": 0,
+        "contract_revenue_cents": 33205
       }
     ],
     "stage": 0,
@@ -110,7 +110,7 @@
         "reached": false
       }
     ],
-    "history": [{ "label": "J4 Q4", "profit_cents": 0, "revenue_cents": 0 }],
+    "history": [{ "label": "J1 Q1", "profit_cents": 0, "revenue_cents": 0 }],
     "listing": null,
     "distress": false,
     "employees": 0,
@@ -118,7 +118,7 @@
     "ai_workers": 1,
     "can_expand": false,
     "cash_cents": 54108,
-    "founded_at": "2026-11-13T12:34:41.881858+00:00",
+    "founded_at": "2026-11-13T13:52:08.866373+00:00",
     "can_upgrade": true,
     "logo_hidden": false,
     "price_level": "normal",
@@ -126,7 +126,7 @@
     "quality_bps": 2660,
     "value_cents": 54108,
     "last_quarter": {
-      "label": "J4 Q4",
+      "label": "J1 Q1",
       "cogs_cents": 0,
       "bonus_cents": 0,
       "fixed_cents": 0,
@@ -150,17 +150,17 @@
     "capacity_cents": 798000,
     "full_time_from": 5,
     "grace_quarters": 4,
-    "pay_factor_bps": 8626,
+    "pay_factor_bps": 8412,
     "expansion_level": 0,
     "founder_has_job": false,
-    "next_quarter_at": "2026-11-13T13:00:00+00:00",
+    "next_quarter_at": "2026-11-13T19:00:00+00:00",
     "quarters_active": 1,
     "ai_worker_skills": [],
     "distress_quarters": 0,
-    "estimate_low_cents": 143142,
+    "estimate_low_cents": 17664,
     "founder_payout_bps": 0,
     "upgrade_cost_cents": 1250000,
-    "estimate_high_cents": 2199650,
+    "estimate_high_cents": 357305,
     "ai_worker_cost_cents": 72000,
     "can_capital_increase": false,
     "expansion_cost_cents": null,

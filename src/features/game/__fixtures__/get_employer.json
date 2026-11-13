@@ -13,9 +13,9 @@
       "ticker": "KLS"
     },
     "founder": null,
-    "team_size": 4,
+    "team_size": 5,
     "product_key": null,
-    "last_quarter": { "label": "J2 Q1", "profit_cents": 2328796435, "revenue_cents": 39202930417 },
+    "last_quarter": { "label": "J2 Q1", "profit_cents": 4323744150, "revenue_cents": 45550414773 },
     "pay_factor_bps": 10000
   }
 }

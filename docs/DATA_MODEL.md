@@ -5999,3 +5999,220 @@ Dazu wie bisher `invalid_argument` (unbekannte Strategie, kein startbarer Schrit
 - Beim Nachholen vieler Stunden gilt für jede Stunde die zuletzt gespeicherte `mitigation`, nicht die damalige.
 - Der Lösungszeitpunkt ist das Ende des letzten Schritts. Wertet der Job erst nach der Frist aus, zählt der Schritt
   trotzdem, wenn er davor endete.
+
+## Nachtrag: M4i (Verbesserungen, Karriereleiter und Beförderung)
+
+Migration `20261130000100_m4i_upgrades_careers.sql` (ADR-093, ADR-094), idempotente Kopie in `supabase/updates/`. Die
+Regeln spiegeln `src/lib/sim/upgrades.ts` (`upgradeCostCents`, `upgradeEffects`, `basicIncomeCentsPerHour`,
+`upgradeCheck`) und `src/lib/sim/promotion.ts` (`nextTier`, `rankScore`, `promotionRequirements`,
+`promotionChanceBps`, `promotionCheck`, `promotedSalaryCents`, `promotionGranted`). Die Zahlen kommen aus
+`game_config.upgrades` und `careers.promotion`. Fehlt ein Wert, gelten dieselben Standardwerte wie in
+`src/config/upgrades.ts` und `src/config/balance.ts`.
+
+### Tabelle `player_upgrades`
+
+| Spalte                      | Typ           | Bedeutung                                                        |
+| --------------------------- | ------------- | ---------------------------------------------------------------- |
+| `player_id`                 | `uuid`        | Spieler (`profiles`, `on delete cascade`)                        |
+| `key`                       | `text`        | `vault`, `income`, `study`, `overtime` oder `rhetoric`           |
+| `level`                     | `integer ≥ 0` | Gekaufte Stufe; gelesen wird immer begrenzt auf 0 bis `maxLevel` |
+| `created_at` / `updated_at` | `timestamptz` | Zeitstempel (`set_updated_at`)                                   |
+
+- Primärschlüssel (`player_id`, `key`). Fehlt eine Zeile, ist die Stufe 0.
+- RLS: Spieler lesen nur eigene Zeilen (`owner read`). Clients schreiben nicht; nur `buy_upgrade` legt Stufen an.
+- Der Account-Reset (M4j) leert die Tabelle.
+
+### Neue Spalten in `player_jobs`
+
+| Spalte                 | Typ                 | Bedeutung                                                                         |
+| ---------------------- | ------------------- | --------------------------------------------------------------------------------- |
+| `rank_minutes`         | `integer ≥ 0`       | Bezahlte Minuten im aktuellen Rang; Stunden = ⌊`rank_minutes` / 60⌋               |
+| `promotion_retry_at`   | `timestamptz`, null | Nach einem Nein: ab hier darf man wieder fragen                                   |
+| `pending_promotion_at` | `timestamptz`, null | Anfrage bei einem Spieler-Chef; gilt `careers.promotion.requestValidHours` (72 h) |
+| `promoted_at`          | `timestamptz`, null | Letzte Beförderung in diesem Job                                                  |
+
+- `rank_minutes` steigt in `accrue_job_salary` um genau die bezahlten Minuten, bei KI- und Spielerfirmen. Bei einer
+  Beförderung beginnt es bei 0.
+- **Vorbelegung:** Beim Anlegen der Spalte (einmalig) bekommen laufende Jobs ihre bisher bezahlten Minuten
+  (`experience_minutes`). Begrenzt wird auf die Stunden, die der nächste Rang braucht. Wer schon lange im Job ist,
+  darf also sofort fragen, aber nicht mehr.
+
+### Wirkungen der Verbesserungen
+
+| Hilfsfunktion (intern)                        | Formel                                                                                   |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `player_upgrade_level(spieler, key)`          | gespeicherte Stufe, 0 ohne Zeile, begrenzt auf 0 bis `maxLevel`                          |
+| `upgrade_cost_cents(key, stufe)`              | round(`baseCostCents` × `costGrowth`^Stufe / 100) × 100; `null` ab `maxLevel`            |
+| `player_vault_cap_hours(spieler)`             | `economy.vaultCapHours` + Tresor-Stufe × `upgrades.vault.perLevel`                       |
+| `player_basic_income_cents_per_hour(spieler)` | round(`economy.basicIncomeCentsPerHour` × (10 000 + Stufe × `income.perLevel`) / 10 000) |
+| `player_work_hours_per_branch_point(spieler)` | max(`minWorkHoursPerBranchPoint`, `skills.workHoursPerBranchPoint` − Stufe × `perLevel`) |
+| `player_paid_hours_cap(spieler)`              | `careers.paidHoursPerDayCap` + Überstunden-Stufe × `overtime.perLevel`                   |
+| `player_promotion_bonus_bps(spieler)`         | Rhetorik-Stufe × `rhetoric.perLevel`                                                     |
+
+Gerundet wird wie `Math.round` (kaufmännisch, mit `numeric`). Die Funktionen wirken an diesen Stellen:
+
+- **Tresor:** `vault_status` (also `get_my_portfolio.vault`) und `claim_vault` rechnen mit Tresorgröße und
+  Grundeinkommen des Spielers. Der Treasury-Faktor (ADR-041) gilt wie bisher obendrauf: `rate_cents_per_hour` =
+  verbessertes Grundeinkommen × `factor_bps` / 10 000, `cap_cents` = Rate × Stunden, `full_at` = Beginn + Stunden.
+  Die Form der Antworten bleibt gleich.
+- **Arbeit:** `accrue_job_salary` und `job_payable_minutes` begrenzen die bezahlten Minuten je Berliner Tag mit
+  `player_paid_hours_cap`. Fachpunkte gibt es alle `player_work_hours_per_branch_point` Stunden. Die schon
+  gesammelten Minuten je Fach zählen weiter, nur der Teiler ist neu.
+- **Skill-Karte:** `get_my_skills` / `learn_skill` (`skills_state`) rechnen `branch_progress` mit den Stunden des
+  Spielers. Neu ist das Feld `work_hours_per_branch_point` (Zahl).
+- **Job:** `job_state` gibt `paid_hours_cap` mit Überstunden aus.
+- **Größerer Tresor bei vollem Tresor:** `accrual_started_at` rückt auf höchstens „jetzt − alte Größe“. Der Tresor
+  behält, was er hatte, und füllt sich von dort weiter. Die Stunden, in denen er voll stand, bringen nachträglich
+  nichts.
+
+### Beförderung: Regeln
+
+- **Ränge:** `careers.tiers` (`intern` → `junior` → `senior` → `team_lead` → `c_level`). `career_next_tier` gibt den
+  nächsten Rang zurück, `null` an der Spitze.
+- **Hauptfach:** die Branche der ersten Anforderung des Jobs (`player_jobs.required -> 0 ->> 'branch'`).
+- **Anforderungen** (`promotion_requirements`, Reihenfolge fest):
+
+  | `key`        | `branch`     | `need`                             | `have`                 |
+  | ------------ | ------------ | ---------------------------------- | ---------------------- |
+  | `level`      | `null`       | `minLevel` des Rangs               | Level des Spielers     |
+  | `branch`     | Hauptfach    | `jobs.tierMinScore[Rang]`          | Punktzahl im Hauptfach |
+  | `management` | `management` | ⌊`tierMinScore` / 2⌋ (siehe unten) | Management-Punktzahl   |
+  | `hours`      | `null`       | `hoursByTier[Rang]`                | ⌊`rank_minutes` / 60⌋  |
+
+  `management` gibt es nur für Ränge in `managementFrom` (Teamleitung, C-Level) und nur, wenn das Hauptfach nicht
+  Management ist. Punktzahlen kommen aus `player_branch_scores` (Summe der Stufenwerte gelernter Skills). `met` =
+  `have ≥ need`.
+
+- **Chance beim KI-Chef:** min(`maxChanceBps`, `baseChanceBps` + `chancePerExtraScoreBps` × max(0, Hauptfach −
+  Bedarf) + Rhetorik-Bonus); 0, solange nicht alles erfüllt ist. Gewürfelt wird mit `random()`: Ja, wenn
+  u × 10 000 < Chance.
+- **Neuer Lohn** (`promoted_salary_cents`): max(round(Lohn × (10 000 + `raiseBps`) / 10 000), Grundlohn des neuen
+  Rangs). KI-Chefs zahlen genau das, Spieler-Chefs mindestens das.
+- **Beförderung** (`promotion_apply`, intern):
+  - Rang = nächster Rang, neuer Lohn, `rank_minutes` = 0, `promoted_at` = jetzt.
+  - Eine wartende Anfrage und eine Wartezeit enden.
+  - Die Basis für Gehaltserhöhungen beginnt neu (`raise_base_score` = aktuelle Passung). Eine offene Gehaltsanfrage
+    verfällt, weil sie sich auf die alte Basis bezog. Die Sperrfrist für Gehaltsanfragen bleibt.
+  - **KI-Firmen:** Der Job bekommt Titel und Anforderungen der KI-Stelle des neuen Rangs: `title_key` = `title` =
+    `<hauptfach>_<rang>`, `required` wie in `refresh_ai_job_postings`, `ceiling_cents_per_hour` neu. Sonst bliebe
+    die Passung auf dem Deckel der Praktikumsstelle, und Gehaltserhöhungen wären unmöglich.
+  - **Spielerfirmen:** Titel und Anforderungen der Stelle bleiben.
+  - Feed-Eintrag `promoted` und Benachrichtigung `promotion_result` an den Beförderten.
+
+### Neue RPCs
+
+| RPC                                                                                                          | Antwort                                                       |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| `get_upgrades()`                                                                                             | `{levels: {vault, income, study, overtime, rhetoric}}`        |
+| `buy_upgrade(p_request_id uuid, p_key text)`                                                                 | `{key, level, cost_cents, levels}`                            |
+| `request_promotion(p_request_id uuid)`                                                                       | `{status, tier, salary_cents_per_hour, retry_at, chance_bps}` |
+| `promote_employee(p_request_id, p_company_id, p_player_job_id, p_salary_cents_per_hour bigint default null)` | `{status: "promoted", tier, salary_cents_per_hour}`           |
+| `decline_promotion(p_request_id uuid, p_company_id uuid, p_player_job_id uuid)`                              | `{status: "declined", retry_at}`                              |
+
+`levels` enthält immer alle fünf Schlüssel. Alle schreibenden RPCs sind über `request_id` idempotent
+(`request_begin` / `request_complete`).
+
+**`buy_upgrade`:**
+
+- Prüfreihenfolge wie `upgradeCheck`: `upgrade_maxed` (höchste Stufe erreicht), `locked` (Level unter
+  `upgrades.<key>.minLevel`), `insufficient_funds` (Bargeld unter dem Preis). Ein unbekannter oder fehlender
+  Schlüssel ergibt `invalid_argument`.
+- Freies Geld = Saldo von `player_cash` nach `lock_player_accounts`, wie beim Möbel- und Autokauf.
+- Buchung: eine ausgeglichene Überweisung `player_cash` → `treasury`, Art `upgrade_purchase`, `ref_type` `upgrade`,
+  Schlüssel `upgrade:<spieler>:<key>:<request_id>`, Metadaten `{key, level}`. Das Geld fließt in die Staatskasse,
+  aus der das Grundeinkommen kommt (ADR-041). Kein XP, keine Missionen.
+- `level` ist die neue Stufe, `cost_cents` der bezahlte Preis.
+
+**`request_promotion`** (Mitarbeiter):
+
+- Fehler in dieser Reihenfolge: `no_active_job`; `promotion_pending` (Anfrage wartet noch beim Spieler-Chef);
+  `promotion_too_soon` (`promotion_retry_at` liegt in der Zukunft); `promotion_not_ready` (Anforderungen nicht
+  erfüllt oder schon C-Level).
+- **KI-Firma:** sofortige Entscheidung.
+  - Ja: `{status: "promoted", tier: <neuer Rang>, salary_cents_per_hour: <neuer Lohn>, retry_at: null, chance_bps}`.
+  - Nein: `promotion_retry_at` = jetzt + `retryHours` (24 h);
+    `{status: "declined", tier: <alter Rang>, salary_cents_per_hour: <alter Lohn>, retry_at, chance_bps}`.
+- **Spielerfirma:** `pending_promotion_at` = jetzt;
+  `{status: "pending", tier, salary_cents_per_hour, retry_at: null, chance_bps: null}`. Gründer und CEO bekommen
+  `promotion_request`.
+- Gezählt werden die Stunden bis zur letzten Lohnabrechnung (KI-Firmen: volle Stunden, Spielerfirmen: stündlicher
+  Abschluss), so wie sie `get_my_job` zeigt.
+
+**`promote_employee`** (Gründer oder CEO über `require_company_owner`, sonst `employer_only`):
+
+- Mit oder ohne Anfrage, auch während einer Wartezeit. Die Anforderungen müssen erfüllt sein
+  (`promotion_not_ready`).
+- `p_salary_cents_per_hour = null` zahlt den Formel-Lohn. Weniger als die Formel ergibt `invalid_argument`.
+- Ein fremder oder beendeter Job ergibt `no_active_job`, der eigene Job `forbidden`.
+
+**`decline_promotion`** (Gründer oder CEO):
+
+- Braucht eine gültige Anfrage (sonst `invalid_argument`).
+- Löscht die Anfrage, setzt `promotion_retry_at` = jetzt + `retryHours` und benachrichtigt den Mitarbeiter.
+
+Anfragen älter als `requestValidHours` (72 h) gelten als erledigt: `pending_since` ist `null`, man darf neu fragen,
+und ablehnen geht nicht mehr. Ein Job dafür ist nicht nötig.
+
+### Geänderte Antworten
+
+**`get_my_job` / `sign_contract`** (`job_state`): `job` bekommt
+
+```
+rank_hours: number (eine Nachkommastelle),
+promotion: { next_tier: "junior" | … | null, main_branch: "it" | … | null,
+             requirements: [{key, branch, need, have, met}],
+             ready: boolean, boss: "ai" | "player",
+             chance_bps: number (KI-Chef; 0, solange nicht bereit) | null (Spieler-Chef),
+             retry_at: timestamptz | null (null, sobald vorbei),
+             pending_since: timestamptz | null (nur gültige Anfragen),
+             next_salary_cents_per_hour: number | null (null an der Spitze) }
+```
+
+An der Spitze (C-Level) ist `next_tier` `null`, `requirements` leer und `ready` `false`. `paid_hours_cap` enthält
+die Überstunden.
+
+**`get_company_team`:** Jedes Mitglied bekommt `tier`, `rank_hours` und
+`promotion: {next_tier, requirements, ready, pending_since, next_salary_cents_per_hour}`.
+
+**`get_my_skills` / `learn_skill`:** neues Feld `work_hours_per_branch_point`.
+
+### Feed, Benachrichtigungen, Fehler, Buchungsart
+
+- **Feed-Eintrag** `promoted` `{tier, company}` (Schlüssel `promoted:<job>:<rang>`). `feed_item_label` kennt ihn
+  („Beförderung zum Senior“).
+- **Benachrichtigungen:**
+
+  | Typ                 | Kategorie | Empfänger       | Titel                                     | Link       |
+  | ------------------- | --------- | --------------- | ----------------------------------------- | ---------- |
+  | `promotion_result`  | `career`  | Beförderter     | „Befördert!“ bzw. „Noch nicht befördert“  | `/job`     |
+  | `promotion_request` | `company` | Gründer und CEO | „{Name} bittet um Beförderung zum Junior“ | `/company` |
+
+  Ränge im Text: zum Junior, zum Senior, zur Teamleitung, in den Vorstand. Ein Nein des KI-Chefs schickt keine
+  Benachrichtigung, das zeigt schon die Antwort. Der alte Typ `promotion` aus `seed.sql` bleibt ungenutzt.
+
+- **Neue Fehlerschlüssel:**
+
+  | Schlüssel             | Code    | Wann                                               |
+  | --------------------- | ------- | -------------------------------------------------- |
+  | `upgrade_maxed`       | `NX083` | Verbesserung hat schon die höchste Stufe           |
+  | `promotion_not_ready` | `NX084` | Anforderungen nicht erfüllt oder kein höherer Rang |
+  | `promotion_too_soon`  | `NX085` | Nach einem Nein läuft die Wartezeit noch           |
+  | `promotion_pending`   | `NX086` | Eine Anfrage wartet noch auf den Spieler-Chef      |
+
+- **Neue Buchungsart:** `upgrade_purchase` (`ledger_tx_kind`).
+
+### Neu definiert
+
+`api_error` (alle bisherigen Schlüssel plus NX083 bis NX086), `vault_status`, `claim_vault`, `accrue_job_salary`,
+`job_payable_minutes`, `skills_state`, `job_state`, `get_company_team` und `feed_item_label`. Neue interne Helfer
+(nur `service_role`): `upgrade_cfg`, `player_upgrade_level`, `player_upgrade_levels`, `upgrade_cost_cents`, die fünf
+`player_*`-Wirkungen oben, `career_tiers`, `promotion_cfg`, `career_next_tier`, `career_tier_min_score`,
+`career_tier_phrase`, `promotion_requirements`, `promotion_chance_bps`, `promoted_salary_cents`, `ai_job_required`,
+`promotion_state`, `promotion_apply`.
+
+### Bekannte Grenzen
+
+- Das verbesserte Grundeinkommen gilt auch für die schon angesammelte, noch nicht abgeholte Zeit im Tresor (wie der
+  Treasury-Faktor).
+- Mit der Weiterbildung springt der Fortschritt zum nächsten Fachpunkt, weil die gesammelten Minuten durch die neue
+  Stundenzahl geteilt werden. Verloren geht nichts.

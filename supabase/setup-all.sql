@@ -33982,6 +33982,1301 @@ begin
 end;
 $$;
 
+-- ===== supabase/migrations/20261130000100_m4i_upgrades_careers.sql =====
+-- =============================================================================
+-- NEXA · M4i · 0100 · Upgrades and the career ladder with promotions (ADR-093, ADR-094)
+-- =============================================================================
+-- Mirrors src/lib/sim/upgrades.ts (upgradeCostCents, upgradeEffects, basicIncomeCentsPerHour, upgradeCheck) and
+-- src/lib/sim/promotion.ts (nextTier, rankScore, promotionRequirements, promotionChanceBps, promotionCheck,
+-- promotedSalaryCents, promotionGranted). Numbers: game_config 'upgrades' (src/config/upgrades.ts) and
+-- careers.promotion (src/config/balance.ts); every helper falls back to the same defaults.
+--
+-- Schema:
+--   player_upgrades (player_id, key, level)  bought upgrade levels; owner read, no client writes
+--   player_jobs.rank_minutes                 paid minutes in the current rank (backfilled once, see section A)
+--   player_jobs.promotion_retry_at           next promotion request after a no
+--   player_jobs.pending_promotion_at         request waiting for a player boss (expires after requestValidHours)
+--   player_jobs.promoted_at                  last promotion
+-- Upgrade effects wired in: vault_status and claim_vault (vault size, basic income before the treasury factor),
+-- accrue_job_salary and job_payable_minutes (paid hours per day, work hours per branch point, rank minutes),
+-- skills_state (branch progress), job_state (paid_hours_cap, rank_hours, promotion), get_company_team.
+-- RPCs: get_upgrades, buy_upgrade, request_promotion, promote_employee, decline_promotion.
+-- New error keys: upgrade_maxed (NX083), promotion_not_ready (NX084), promotion_too_soon (NX085),
+-- promotion_pending (NX086). New notification types: promotion_request, promotion_result. New feed kind: promoted.
+-- New ledger kind: upgrade_purchase (player cash -> treasury).
+-- Idempotent (identical copy in supabase/updates/).
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- A. Schema
+-- ---------------------------------------------------------------------------
+alter type public.ledger_tx_kind add value if not exists 'upgrade_purchase';
+
+create table if not exists public.player_upgrades (
+  player_id  uuid not null references public.profiles (id) on delete cascade,
+  key        text not null check (key in ('vault', 'income', 'study', 'overtime', 'rhetoric')),
+  level      integer not null check (level >= 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (player_id, key)
+);
+alter table public.player_upgrades enable row level security;
+comment on table public.player_upgrades is
+  'Upgrades bought with game money (ADR-093): one row per player and key, level 0..upgrades.<key>.maxLevel. '
+  'Owner read; written only by buy_upgrade.';
+do $$
+begin
+  revoke all on public.player_upgrades from public, anon, authenticated;
+  grant select on public.player_upgrades to authenticated;
+  grant all on public.player_upgrades to service_role;
+  drop policy if exists "owner read" on public.player_upgrades;
+  create policy "owner read" on public.player_upgrades for select to authenticated
+    using (player_id = (select auth.uid()));
+  if not exists (select 1 from pg_trigger where tgname = 'set_updated_at' and tgrelid = 'public.player_upgrades'::regclass) then
+    create trigger set_updated_at before update on public.player_upgrades
+      for each row execute function public.set_updated_at();
+  end if;
+end;
+$$;
+
+-- rank_minutes: added once. Existing active jobs get their paid minutes so far (experience_minutes counts exactly the
+-- paid minutes of the job), at most the hours the next rank needs: nobody is promoted on old hours alone twice, and a
+-- long-standing employee can ask right away.
+do $$
+begin
+  if not exists (select 1 from information_schema.columns
+                  where table_schema = 'public' and table_name = 'player_jobs' and column_name = 'rank_minutes') then
+    alter table public.player_jobs add column rank_minutes integer not null default 0 check (rank_minutes >= 0);
+    update public.player_jobs j
+       set rank_minutes = least(j.experience_minutes, 2000000000::bigint,
+             coalesce(60 * ceil(public.cfg_num(public.config_jsonb('careers', '{promotion,hoursByTier}'),
+                                               array[case j.tier when 'intern' then 'junior' when 'junior' then 'senior'
+                                                                 when 'senior' then 'team_lead' when 'team_lead' then 'c_level' end],
+                                               case j.tier when 'intern' then 12 when 'junior' then 36 when 'senior' then 72
+                                                           when 'team_lead' then 120 end))::bigint,
+                      j.experience_minutes))::integer
+     where j.status = 'active' and j.experience_minutes > 0;
+  end if;
+end;
+$$;
+alter table public.player_jobs
+  add column if not exists promotion_retry_at   timestamptz,
+  add column if not exists pending_promotion_at timestamptz,
+  add column if not exists promoted_at          timestamptz;
+comment on column public.player_jobs.rank_minutes is
+  'Paid minutes in the current rank (ADR-094); hours = floor(rank_minutes / 60), back to 0 on a promotion.';
+comment on column public.player_jobs.promotion_retry_at is 'Next promotion request allowed from here (after a no).';
+comment on column public.player_jobs.pending_promotion_at is
+  'Promotion request waiting for a player boss; void after careers.promotion.requestValidHours.';
+comment on column public.player_jobs.promoted_at is 'Time of the last promotion in this job.';
+
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('promotion_result', 'career', 'Beförderung', 'Dein Chef hat über deine Beförderung entschieden.',
+        'notif_promotion', true, true, false, 145),
+       ('promotion_request', 'company', 'Bitte um Beförderung', 'Jemand aus deinem Team bittet um eine Beförderung.',
+        'notif_briefcase', true, false, false, 226)
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- B. Error keys (M4i: NX083 to NX086)
+-- ---------------------------------------------------------------------------
+create or replace function public.api_error(p_key text)
+returns void
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_code text;
+begin
+  v_code := case p_key
+    when 'insufficient_funds'          then 'NX001'
+    when 'rate_limited'                then 'NX004'
+    when 'forbidden'                   then 'NX006'
+    when 'invalid_quantity'            then 'NX007'
+    when 'invalid_price'               then 'NX007'
+    when 'invalid_argument'            then 'NX007'
+    when 'invalid_interval'            then 'NX007'
+    when 'not_authenticated'           then 'NX010'
+    when 'unknown_security'            then 'NX011'
+    when 'not_tradable'                then 'NX012'
+    when 'insufficient_position'       then 'NX013'
+    when 'order_not_found'             then 'NX014'
+    when 'order_not_open'              then 'NX015'
+    when 'market_paused'               then 'NX016'
+    when 'nothing_to_claim'            then 'NX017'
+    when 'locked'                      then 'NX018'
+    when 'name_too_short'              then 'NX019'
+    when 'name_too_long'               then 'NX019'
+    when 'name_invalid_chars'          then 'NX019'
+    when 'name_profanity'              then 'NX019'
+    when 'name_reserved'               then 'NX019'
+    when 'name_taken'                  then 'NX019'
+    when 'name_change_too_soon'        then 'NX020'
+    when 'order_too_small'             then 'NX021'
+    when 'market_illiquid'             then 'NX022'
+    when 'mission_not_found'           then 'NX023'
+    when 'mission_not_completed'       then 'NX024'
+    when 'mission_already_claimed'     then 'NX025'
+    when 'avatar_unknown'              then 'NX026'
+    when 'avatar_locked'               then 'NX027'
+    when 'daily_reward_claimed'        then 'NX028'
+    when 'skill_unknown'               then 'NX029'
+    when 'skill_learned'               then 'NX030'
+    when 'skill_locked'                then 'NX031'
+    when 'skill_points_insufficient'   then 'NX032'
+    when 'job_not_found'               then 'NX033'
+    when 'job_level_too_low'           then 'NX034'
+    when 'job_skills_missing'          then 'NX035'
+    when 'application_limit'           then 'NX036'
+    when 'application_exists'          then 'NX037'
+    when 'application_not_found'       then 'NX038'
+    when 'application_not_offered'     then 'NX039'
+    when 'offer_expired'               then 'NX040'
+    when 'job_active_exists'           then 'NX041'
+    when 'no_active_job'               then 'NX042'
+    when 'raise_too_soon'              then 'NX043'
+    when 'raise_too_high'              then 'NX044'
+    when 'player_not_found'            then 'NX045'
+    when 'employer_only'               then 'NX046'
+    when 'company_exists'              then 'NX047'
+    when 'company_not_found'           then 'NX048'
+    when 'company_level_too_low'       then 'NX049'
+    when 'owns_company'                then 'NX050'
+    when 'employee_limit'              then 'NX051'
+    when 'company_upgrade_unavailable' then 'NX052'
+    when 'founding_locked'             then 'NX053'
+    when 'not_in_company'              then 'NX054'
+    when 'work_task_not_found'         then 'NX055'
+    when 'work_task_expired'           then 'NX056'
+    when 'work_task_done'              then 'NX057'
+    when 'offer_closed'                then 'NX058'
+    when 'offer_sold_out'              then 'NX059'
+    when 'already_listed'              then 'NX060'
+    when 'confirm_mismatch'            then 'NX061'
+    when 'skill_already_covered'       then 'NX062'
+    when 'training_locked'             then 'NX063'
+    when 'logo_locked'                 then 'NX064'
+    when 'logo_forbidden'              then 'NX065'
+    when 'artworks_locked'             then 'NX066'
+    when 'artwork_not_found'           then 'NX067'
+    when 'auction_not_found'           then 'NX068'
+    when 'auction_ended'               then 'NX069'
+    when 'bid_too_low'                 then 'NX070'
+    when 'own_artwork'                 then 'NX071'
+    when 'already_on_auction'          then 'NX072'
+    when 'auction_has_bids'            then 'NX073'
+    when 'property_locked'             then 'NX074'
+    when 'no_home'                     then 'NX075'
+    when 'invalid_tier'                then 'NX076'
+    when 'item_not_found'              then 'NX077'
+    when 'layout_invalid'              then 'NX078'
+    when 'floor_not_owned'             then 'NX079'
+    when 'garage_full'                 then 'NX080'
+    when 'event_closed'                then 'NX081'
+    when 'event_needs_staff'           then 'NX082'
+    when 'upgrade_maxed'               then 'NX083'
+    when 'promotion_not_ready'         then 'NX084'
+    when 'promotion_too_soon'          then 'NX085'
+    when 'promotion_pending'           then 'NX086'
+    else 'NX007'
+  end;
+  raise exception using errcode = v_code, message = p_key;
+end;
+$$;
+comment on function public.api_error(text) is 'Raises the API error <key> with its NX SQLSTATE. The client shows a text per key (error.message).';
+
+-- ---------------------------------------------------------------------------
+-- C. Upgrade rules (port of src/lib/sim/upgrades.ts)
+-- ---------------------------------------------------------------------------
+-- Config of one upgrade: the defaults of src/config/upgrades.ts, overridden by game_config upgrades.<key>; null for an
+-- unknown key.
+create or replace function public.upgrade_cfg(p_key text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select d.v || coalesce(case when jsonb_typeof(c.v) = 'object' then c.v end, '{}'::jsonb)
+    from (select '{"vault":    {"maxLevel": 6, "minLevel": 1, "baseCostCents": 300000,  "costGrowth": 2,   "perLevel": 2},
+                   "income":   {"maxLevel": 3, "minLevel": 3, "baseCostCents": 400000,  "costGrowth": 3,   "perLevel": 1000},
+                   "study":    {"maxLevel": 3, "minLevel": 2, "baseCostCents": 800000,  "costGrowth": 3,   "perLevel": 1},
+                   "overtime": {"maxLevel": 2, "minLevel": 5, "baseCostCents": 2000000, "costGrowth": 3,   "perLevel": 1},
+                   "rhetoric": {"maxLevel": 3, "minLevel": 5, "baseCostCents": 1000000, "costGrowth": 2.5, "perLevel": 500}}'::jsonb
+                 -> p_key as v) d
+   cross join lateral (select public.config_jsonb('upgrades', array[p_key]) as v) c
+   where d.v is not null;
+$$;
+comment on function public.upgrade_cfg(text) is 'Internal: game_config upgrades.<key> with the defaults of src/config/upgrades.ts.';
+
+-- levelOf: the stored level, 0 when absent, clamped to 0..maxLevel
+create or replace function public.player_upgrade_level(p_player uuid, p_key text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select greatest(0, least(floor(coalesce(public.cfg_num(public.upgrade_cfg(p_key), '{maxLevel}', 0), 0))::integer,
+                           coalesce((select u.level from public.player_upgrades u
+                                      where u.player_id = p_player and u.key = p_key), 0)));
+$$;
+
+-- {vault, income, study, overtime, rhetoric}: all five keys, always
+create or replace function public.player_upgrade_levels(p_player uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'vault',    public.player_upgrade_level(p_player, 'vault'),
+    'income',   public.player_upgrade_level(p_player, 'income'),
+    'study',    public.player_upgrade_level(p_player, 'study'),
+    'overtime', public.player_upgrade_level(p_player, 'overtime'),
+    'rhetoric', public.player_upgrade_level(p_player, 'rhetoric'));
+$$;
+
+-- upgradeCostCents: round(baseCostCents x costGrowth^level / 100) x 100 (whole euros); null when maxed or unknown
+create or replace function public.upgrade_cost_cents(p_key text, p_level integer)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when x.c is null or greatest(0, coalesce(p_level, 0)) >= public.cfg_num(x.c, '{maxLevel}', 0) then null
+              else (round(public.cfg_num(x.c, '{baseCostCents}', 0)::numeric
+                          * power(public.cfg_num(x.c, '{costGrowth}', 1)::numeric, greatest(0, coalesce(p_level, 0))::numeric)
+                          / 100) * 100)::bigint end
+    from (select public.upgrade_cfg(p_key) as c) x;
+$$;
+
+-- upgradeEffects().vaultCapHours
+create or replace function public.player_vault_cap_hours(p_player uuid)
+returns double precision
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select public.config_double('economy', '{vaultCapHours}', 8)
+       + public.player_upgrade_level(p_player, 'vault') * public.cfg_num(public.upgrade_cfg('vault'), '{perLevel}', 2);
+$$;
+
+-- basicIncomeCentsPerHour(): base x (10 000 + income level x perLevel) / 10 000, before the treasury factor
+create or replace function public.player_basic_income_cents_per_hour(p_player uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select round(greatest(0, public.config_bigint('economy', '{basicIncomeCentsPerHour}', 10000))::numeric
+               * (10000 + public.player_upgrade_level(p_player, 'income')
+                          * public.cfg_num(public.upgrade_cfg('income'), '{perLevel}', 1000))::numeric
+               / 10000)::bigint;
+$$;
+
+-- upgradeEffects().workHoursPerBranchPoint
+create or replace function public.player_work_hours_per_branch_point(p_player uuid)
+returns double precision
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select greatest(public.config_double('upgrades', '{minWorkHoursPerBranchPoint}', 3),
+                  public.config_double('skills', '{workHoursPerBranchPoint}', 6)
+                  - public.player_upgrade_level(p_player, 'study') * public.cfg_num(public.upgrade_cfg('study'), '{perLevel}', 1));
+$$;
+
+-- upgradeEffects().paidHoursCap
+create or replace function public.player_paid_hours_cap(p_player uuid)
+returns double precision
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select public.config_double('careers', '{paidHoursPerDayCap}', 12)
+       + public.player_upgrade_level(p_player, 'overtime') * public.cfg_num(public.upgrade_cfg('overtime'), '{perLevel}', 1);
+$$;
+
+-- upgradeEffects().promotionBonusBps
+create or replace function public.player_promotion_bonus_bps(p_player uuid)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select round(public.player_upgrade_level(p_player, 'rhetoric')
+               * public.cfg_num(public.upgrade_cfg('rhetoric'), '{perLevel}', 500))::integer;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- D. Vault: size and basic income with the upgrades (treasury factor on top, as before)
+-- ---------------------------------------------------------------------------
+create or replace function public.vault_status(p_player uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_base    bigint := public.player_basic_income_cents_per_hour(p_player);
+  v_hours   double precision := greatest(0, public.player_vault_cap_hours(p_player));
+  v_factor  integer := public.basic_income_factor_bps();
+  v_rate    bigint;
+  v_now     timestamptz := public.game_now();
+  v         public.vaults;
+  v_ms      double precision;
+begin
+  select * into v from public.vaults where player_id = p_player;
+  if not found then
+    return null;
+  end if;
+  v_rate := v_base * v_factor / 10000;
+  v_ms := least(greatest(0, extract(epoch from (v_now - v.accrual_started_at)) * 1000), v_hours * 3600000);
+  return jsonb_build_object(
+    'accrued_cents',       floor(v_rate * v_ms / 3600000)::bigint,
+    'cap_cents',           round(v_rate * v_hours)::bigint,
+    'rate_cents_per_hour', v_rate,
+    'base_rate_cents_per_hour', v_base,
+    'factor_bps',          v_factor,
+    'last_claimed_at',     v.last_claimed_at,
+    'full_at',             v.accrual_started_at + make_interval(secs => v_hours * 3600),
+    'server_time',         v_now,
+    'accrued_seconds',     floor(v_ms / 1000)::bigint);
+end;
+$$;
+
+-- claim_vault as in M3d; full_at with the player's vault size
+create or replace function public.claim_vault(p_request_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid;
+  v_replay  jsonb;
+  v_status  jsonb;
+  v_amount  bigint;
+  v_now     timestamptz := public.game_now();
+  v_tx      uuid;
+  v_total   integer;
+  v_counted integer;
+  v_hours   double precision;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'claim_vault');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  if not public.rate_limit_hit(v_player, 'player_action',
+           greatest(1, public.config_double('abuse', '{rateLimits,actionsPerMinute}', 60))::integer, 60) then
+    perform public.api_error('rate_limited');
+  end if;
+  perform public.lock_player_accounts(v_player);
+  perform 1 from public.vaults where player_id = v_player for update;
+  v_hours := greatest(0, public.player_vault_cap_hours(v_player));
+  v_status := public.vault_status(v_player);
+  v_amount := coalesce((v_status ->> 'accrued_cents')::bigint, 0);
+  if v_amount < greatest(1, public.config_bigint('economy', '{vaultMinClaimCents}', 100)) then
+    perform public.api_error('nothing_to_claim');
+  end if;
+
+  v_tx := public.state_payout(v_player, v_amount, 0, 'vault_claim', 'Grundeinkommen aus dem Tresor', 'vault', null,
+                              'vault:' || v_player::text || ':' || p_request_id::text);
+  perform public.loan_withhold(v_player, v_amount, 'vault:' || v_player::text || ':' || p_request_id::text);
+
+  select greatest(0, floor(extract(epoch from (v_now - v.accrual_started_at))))::integer into v_total
+    from public.vaults v where v.player_id = v_player;
+  v_counted := (v_status ->> 'accrued_seconds')::integer;
+  insert into public.vault_claims (player_id, request_id, amount_cents, accrued_seconds, forfeited_seconds, ledger_transaction_id)
+  values (v_player, p_request_id, v_amount, v_counted, greatest(0, v_total - v_counted), v_tx)
+  on conflict (player_id, request_id) do nothing;
+  update public.vaults
+     set accrual_started_at = v_now, last_claimed_at = v_now,
+         total_claimed_cents = total_claimed_cents + v_amount, full_notified_at = null
+   where player_id = v_player;
+  perform public.mission_event(v_player, 'vault_claim', 1, null);
+
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'claimed_cents', v_amount,
+    'cash_cents',    (select a.balance_cents from public.ledger_accounts a where a.owner_player_id = v_player and a.kind = 'player_cash'),
+    'full_at',       v_now + make_interval(secs => v_hours * 3600),
+    'factor_bps',    (v_status ->> 'factor_bps')::integer));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- E. Work: paid hours per day (overtime), branch points (study), minutes in the rank
+-- ---------------------------------------------------------------------------
+-- accrue_job_salary as in M3d plus the player's upgrades and rank_minutes
+create or replace function public.accrue_job_salary(p_job_id uuid, p_now timestamptz default null)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now     timestamptz := coalesce(p_now, public.game_now());
+  j         public.player_jobs;
+  v_ai      boolean;
+  v_day     date := (coalesce(p_now, public.game_now()) at time zone 'Europe/Berlin')::date;
+  v_paid    integer;
+  v_elapsed integer;
+  v_minutes integer;
+  v_amount  bigint;
+  v_pay     bigint := 0;
+  v_company uuid;
+  v_bal     bigint;
+  v_tx      uuid;
+  v_xph     double precision;
+  v_hours   integer;
+  v_xp      integer := 0;
+  v_hpp     double precision;
+  v_nb      integer;
+  v_share   integer;
+  v_bwm     jsonb;
+  v_base    bigint;
+  v_bp      jsonb;
+  v_before  integer;
+  r         record;
+  k         integer := 0;
+begin
+  select * into j from public.player_jobs where id = p_job_id and status = 'active' for update;
+  if j.id is null then
+    return 0;
+  end if;
+  v_elapsed := floor(extract(epoch from (v_now - j.last_paid_at)) / 60)::integer;
+  if v_elapsed < 1 then
+    return 0;
+  end if;
+  v_hpp := greatest(1, public.player_work_hours_per_branch_point(j.player_id));
+  v_paid := case when j.paid_day = v_day then j.paid_minutes_today else 0 end;
+  v_minutes := least(v_elapsed, greatest(0, (public.player_paid_hours_cap(j.player_id) * 60)::integer - v_paid));
+  select c.is_ai into v_ai from public.companies c where c.id = j.company_id;
+
+  if v_minutes > 0 then
+    v_base := j.salary_cents_per_hour * v_minutes / 60;
+    -- player companies pay the contract wage x pay factor of the quarter (ADR-058)
+    v_amount := v_base * coalesce((select pc.pay_factor_bps from public.player_companies pc
+                                    where pc.company_id = j.company_id and pc.status = 'active'), 10000) / 10000;
+    select a.id, a.balance_cents into v_company, v_bal
+      from public.ledger_accounts a where a.owner_company_id = j.company_id and a.kind = 'company_cash';
+    v_pay := least(v_amount, greatest(coalesce(v_bal, 0), 0));
+    if v_pay > 0 then
+      v_tx := public.ledger_transfer(v_company, public.ledger_player_account(j.player_id, 'player_cash'), v_pay, 'salary',
+                                     'Lohn', 'player_job', j.id,
+                                     'salary:' || j.id::text || ':' || to_char(v_now, 'YYYYMMDDHH24MISSUS'), j.player_id);
+      perform public.loan_withhold(j.player_id, v_pay, 'salary:' || j.id::text || ':' || to_char(v_now, 'YYYYMMDDHH24MISSUS'));
+    end if;
+    -- work XP per full paid hour (player companies: workHour.playerCompanyMultiplier)
+    v_xph := public.config_double('progression', '{xpSources,workHour,xp}', 40)
+           * case when v_ai then 1 else public.config_double('progression', '{xpSources,workHour,playerCompanyMultiplier}', 1.5) end;
+    v_hours := (j.experience_minutes + v_minutes) / 60 - j.experience_minutes / 60;
+    if v_hours > 0 then
+      v_xp := public.grant_xp(j.player_id, 'work_hour', round(v_xph * v_hours)::integer,
+                              'work:' || j.id::text || ':' || ((j.experience_minutes + v_minutes) / 60), 'player_job', j.id);
+    end if;
+    insert into public.salary_payouts (player_job_id, player_id, pay_day, period_start, period_end, minutes_paid, amount_cents,
+                                       xp_awarded, ledger_transaction_id, base_amount_cents)
+    values (j.id, j.player_id, v_day, j.last_paid_at, v_now, v_minutes, v_pay, v_xp, v_tx, v_base);
+
+    -- branch work minutes and branch points (work hours per point with the study upgrade)
+    perform public.skill_points_ensure(j.player_id);
+    select sp.branch_work_minutes, sp.branch_points into v_bwm, v_bp
+      from public.player_skill_points sp where sp.player_id = j.player_id for update;
+    v_nb := greatest(1, jsonb_array_length(j.required));
+    for r in select x ->> 'branch' as branch from jsonb_array_elements(j.required) x loop
+      v_share := v_minutes / v_nb + case when k = 0 then v_minutes % v_nb else 0 end;
+      v_before := coalesce((v_bwm ->> r.branch)::integer, 0);
+      v_bwm := jsonb_set(v_bwm, array[r.branch], to_jsonb(v_before + v_share));
+      v_bp := jsonb_set(v_bp, array[r.branch], to_jsonb(coalesce((v_bp ->> r.branch)::integer, 0)
+              + ((v_before + v_share) / (v_hpp * 60)::integer - v_before / (v_hpp * 60)::integer)));
+      k := k + 1;
+    end loop;
+    update public.player_skill_points set branch_work_minutes = v_bwm, branch_points = v_bp where player_id = j.player_id;
+  end if;
+
+  update public.player_jobs
+     set last_paid_at = last_paid_at + make_interval(mins => v_elapsed),
+         paid_day = v_day,
+         paid_minutes_today = v_paid + v_minutes,
+         experience_minutes = experience_minutes + v_minutes,
+         rank_minutes = least(2000000000::bigint, rank_minutes::bigint + v_minutes)::integer,
+         earned_total_cents = earned_total_cents + v_pay,
+         pay_factor_bps = case when v_minutes > 0 and v_amount > 0 then (v_pay * 10000 / v_amount)::integer else pay_factor_bps end
+   where id = j.id;
+  return v_pay;
+end;
+$$;
+
+-- job_payable_minutes as in M3i with the player's paid hours per day
+create or replace function public.job_payable_minutes(p_job uuid, p_until timestamptz)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((
+    select case when floor(extract(epoch from (p_until - j.last_paid_at)) / 60) < 1 then 0
+                else least(floor(extract(epoch from (p_until - j.last_paid_at)) / 60)::integer,
+                           greatest(0, (public.player_paid_hours_cap(j.player_id) * 60)::integer
+                                       - case when j.paid_day = (p_until at time zone 'Europe/Berlin')::date
+                                              then j.paid_minutes_today else 0 end)) end
+      from public.player_jobs j
+     where j.id = p_job and j.status = 'active'), 0);
+$$;
+comment on function public.job_payable_minutes(uuid, timestamptz) is
+  'Minutes accrue_job_salary(p_job, p_until) would pay (elapsed whole minutes, limited by the player''s paid hours per day: '
+  'careers.paidHoursPerDayCap plus the overtime upgrade).';
+
+-- get_my_skills() shape as in M2b; progress with the player's work hours per branch point (study upgrade), which is
+-- returned as well
+create or replace function public.skills_state(p_player uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_zero  jsonb := public.skill_branch_zero();
+  v_hours double precision := greatest(1, public.player_work_hours_per_branch_point(p_player));
+  sp      public.player_skill_points;
+begin
+  select * into sp from public.player_skill_points where player_id = p_player;
+  return jsonb_build_object(
+    'free_points',     coalesce(sp.free_points, 0),
+    'branch_points',   v_zero || coalesce(sp.branch_points, '{}'::jsonb),
+    'branch_progress', (select coalesce(jsonb_object_agg(k.key,
+                                 round(((coalesce((sp.branch_work_minutes ->> k.key)::numeric, 0) % (v_hours * 60)::numeric)
+                                        / (v_hours * 60)::numeric), 3)), '{}'::jsonb)
+                          from jsonb_each(v_zero) k),
+    'branch_scores',   public.player_branch_scores(p_player),
+    'work_hours_per_branch_point', v_hours,
+    'learned',         coalesce((select jsonb_agg(jsonb_build_object('key', s.skill_key, 'learned_at', s.learned_at)
+                                                  order by s.learned_at, s.skill_key)
+                                   from public.player_skills s where s.player_id = p_player), '[]'::jsonb));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- F. Promotion rules (port of src/lib/sim/promotion.ts)
+-- ---------------------------------------------------------------------------
+-- careers.tiers, or the defaults of balance.ts
+create or replace function public.career_tiers()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when jsonb_typeof(x.t) = 'array' and jsonb_array_length(x.t) > 0 then x.t
+              else '[{"id": "intern", "minLevel": 2, "salaryCentsPerHour": 15000},
+                     {"id": "junior", "minLevel": 5, "salaryCentsPerHour": 30000},
+                     {"id": "senior", "minLevel": 12, "salaryCentsPerHour": 70000},
+                     {"id": "team_lead", "minLevel": 20, "salaryCentsPerHour": 130000},
+                     {"id": "c_level", "minLevel": 25, "salaryCentsPerHour": 250000}]'::jsonb end
+    from (select public.config_jsonb('careers', '{tiers}') as t) x;
+$$;
+
+-- careers.promotion with the defaults of balance.ts (top-level keys)
+create or replace function public.promotion_cfg()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select '{"hoursByTier": {"junior": 12, "senior": 36, "team_lead": 72, "c_level": 120},
+           "managementFrom": ["team_lead", "c_level"], "baseChanceBps": 4000, "chancePerExtraScoreBps": 800,
+           "maxChanceBps": 9000, "retryHours": 24, "raiseBps": 1500, "requestValidHours": 72}'::jsonb
+         || coalesce(case when jsonb_typeof(x.p) = 'object' then x.p end, '{}'::jsonb)
+    from (select public.config_jsonb('careers', '{promotion}') as p) x;
+$$;
+
+-- nextTier: the rank after p_tier, null at the top (or for an unknown rank)
+create or replace function public.career_next_tier(p_tier text)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with t as (select e ->> 'id' as id, i from jsonb_array_elements(public.career_tiers()) with ordinality x(e, i))
+  select n.id from t n where n.i = (select c.i + 1 from t c where c.id = p_tier limit 1);
+$$;
+
+-- rankScore: jobs.tierMinScore[tier]
+create or replace function public.career_tier_min_score(p_tier text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(floor(public.cfg_num(public.config_jsonb('jobs', '{tierMinScore}'), array[p_tier],
+                                       case p_tier when 'intern' then 0 when 'junior' then 2 when 'senior' then 6
+                                                   when 'team_lead' then 12 when 'c_level' then 20 else 0 end))::integer, 0);
+$$;
+
+-- German names of the ranks for notifications (as messages/de.json careerTiers)
+create or replace function public.career_tier_phrase(p_tier text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case p_tier
+    when 'intern'    then 'zum Praktikum'
+    when 'junior'    then 'zum Junior'
+    when 'senior'    then 'zum Senior'
+    when 'team_lead' then 'zur Teamleitung'
+    when 'c_level'   then 'in den Vorstand'
+    else 'in einen neuen Rang'
+  end;
+$$;
+
+-- promotionRequirements: [level, branch, management (team lead and C-level, not for management jobs), hours]
+create or replace function public.promotion_requirements(p_next text, p_level integer, p_scores jsonb, p_main text,
+                                                         p_rank_minutes bigint)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with c as (
+    select public.promotion_cfg() as p,
+           public.career_tier_min_score(p_next) as score,
+           coalesce((select floor(public.cfg_num(t, '{minLevel}', 1))::integer
+                       from jsonb_array_elements(public.career_tiers()) t where t ->> 'id' = p_next limit 1), 1) as min_level
+  ), r as (
+    select 1 as ord, 'level' as key, null::text as branch, c.min_level as need, coalesce(p_level, 0) as have from c
+    union all
+    select 2, 'branch', p_main, c.score, coalesce((p_scores ->> p_main)::integer, 0) from c
+    union all
+    select 3, 'management', 'management', c.score / 2, coalesce((p_scores ->> 'management')::integer, 0) from c
+     where coalesce(c.p -> 'managementFrom', '[]'::jsonb) ? p_next and p_main is distinct from 'management'
+    union all
+    -- whole hours worked against the hours of the rank (ceil keeps "have >= need" exact for whole hours)
+    select 4, 'hours', null, ceil(public.cfg_num(c.p, array['hoursByTier', p_next], 0))::integer,
+           (greatest(0, coalesce(p_rank_minutes, 0)) / 60)::integer from c
+  )
+  select coalesce(jsonb_agg(jsonb_build_object('key', r.key, 'branch', r.branch, 'need', r.need, 'have', r.have,
+                                               'met', r.have >= r.need) order by r.ord), '[]'::jsonb)
+    from r;
+$$;
+
+-- promotionChanceBps: base + per score point above the requirement + rhetoric bonus, at most maxChanceBps
+create or replace function public.promotion_chance_bps(p_extra_score integer, p_bonus_bps integer)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select round(least(public.cfg_num(x.p, '{maxChanceBps}', 9000),
+                     public.cfg_num(x.p, '{baseChanceBps}', 4000)
+                     + public.cfg_num(x.p, '{chancePerExtraScoreBps}', 800) * greatest(0, coalesce(p_extra_score, 0))
+                     + greatest(0, coalesce(p_bonus_bps, 0))))::integer
+    from (select public.promotion_cfg() as p) x;
+$$;
+
+-- promotedSalaryCents: + raiseBps, at least the base wage of the new rank
+create or replace function public.promoted_salary_cents(p_current bigint, p_next text)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select greatest(round(coalesce(p_current, 0)::numeric
+                        * (10000 + public.cfg_num(public.promotion_cfg(), '{raiseBps}', 1500))::numeric / 10000)::bigint,
+                  coalesce((select round(public.cfg_num(t, '{salaryCentsPerHour}', 0))::bigint
+                              from jsonb_array_elements(public.career_tiers()) t where t ->> 'id' = p_next limit 1), 0));
+$$;
+
+-- Requirements of an AI posting of this rank (as refresh_ai_job_postings): main branch, plus half of it in
+-- management from team lead on
+create or replace function public.ai_job_required(p_main text, p_tier text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_array(jsonb_build_object('branch', p_main, 'min_score', x.s))
+         || case when p_tier in ('team_lead', 'c_level') and p_main <> 'management'
+                 then jsonb_build_array(jsonb_build_object('branch', 'management', 'min_score', x.s / 2))
+                 else '[]'::jsonb end
+    from (select public.career_tier_min_score(p_tier) as s) x;
+$$;
+
+-- promotionCheck for a job:
+-- {next_tier, main_branch, requirements, ready, boss, chance_bps, retry_at, pending_since, next_salary_cents_per_hour}
+create or replace function public.promotion_state(p_job_id uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  j        public.player_jobs;
+  v_ai     boolean;
+  v_next   text;
+  v_main   text;
+  v_level  integer;
+  v_reqs   jsonb := '[]'::jsonb;
+  v_ready  boolean := false;
+  v_chance integer := 0;
+  v_branch jsonb;
+  v_valid  double precision := public.cfg_num(public.promotion_cfg(), '{requestValidHours}', 72);
+begin
+  select * into j from public.player_jobs where id = p_job_id;
+  if j.id is null then
+    return null;
+  end if;
+  select c.is_ai into v_ai from public.companies c where c.id = j.company_id;
+  v_ai := coalesce(v_ai, false);
+  v_next := public.career_next_tier(j.tier::text);
+  v_main := j.required -> 0 ->> 'branch';
+  if v_next is not null then
+    select p.level into v_level from public.profiles p where p.id = j.player_id;
+    v_reqs := public.promotion_requirements(v_next, v_level, public.player_branch_scores(j.player_id), v_main, j.rank_minutes);
+    v_ready := not exists (select 1 from jsonb_array_elements(v_reqs) r where not (r ->> 'met')::boolean);
+    if v_ready then
+      select r into v_branch from jsonb_array_elements(v_reqs) r where r ->> 'key' = 'branch';
+      v_chance := public.promotion_chance_bps((v_branch ->> 'have')::integer - (v_branch ->> 'need')::integer,
+                                              public.player_promotion_bonus_bps(j.player_id));
+    end if;
+  end if;
+  return jsonb_build_object(
+    'next_tier',     v_next,
+    'main_branch',   v_main,
+    'requirements',  v_reqs,
+    'ready',         v_ready,
+    'boss',          case when v_ai then 'ai' else 'player' end,
+    'chance_bps',    case when v_ai then v_chance end,
+    'retry_at',      case when j.promotion_retry_at > now() then j.promotion_retry_at end,
+    'pending_since', case when j.pending_promotion_at + make_interval(secs => v_valid * 3600) > now()
+                          then j.pending_promotion_at end,
+    'next_salary_cents_per_hour', case when v_next is not null
+                                       then public.promoted_salary_cents(j.salary_cents_per_hour, v_next) end);
+end;
+$$;
+comment on function public.promotion_state(uuid) is
+  'Internal: promotionCheck of a job (ADR-094); chance_bps only for AI bosses, pending_since only while the request is valid.';
+
+-- The promotion itself (AI yes, promote_employee): next rank, new wage, hours and raise baseline start over, a pending
+-- request and a retry wait end; AI jobs take the title and requirements of the AI posting of the new rank.
+-- Feed item 'promoted' and notification 'promotion_result' to the employee.
+create or replace function public.promotion_apply(p_job_id uuid, p_salary bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  j       public.player_jobs;
+  c       public.companies;
+  v_next  text;
+  v_main  text;
+  v_req   jsonb;
+  v_ai    boolean;
+  v_match integer;
+begin
+  select * into j from public.player_jobs where id = p_job_id and status = 'active' for update;
+  v_next := public.career_next_tier(j.tier::text);
+  if j.id is null or v_next is null then
+    perform public.api_error('promotion_not_ready');
+  end if;
+  if p_salary is null or p_salary < 1 then
+    perform public.api_error('invalid_argument');
+  end if;
+  select * into c from public.companies where id = j.company_id;
+  v_ai := coalesce(c.is_ai, false);
+  v_main := j.required -> 0 ->> 'branch';
+  v_req := case when v_ai and v_main is not null then public.ai_job_required(v_main, v_next) else j.required end;
+  v_match := public.job_match_score(public.player_branch_scores(j.player_id), v_req);
+  update public.player_jobs
+     set tier = v_next::public.job_tier,
+         salary_cents_per_hour = p_salary,
+         rank_minutes = 0,
+         promoted_at = now(),
+         pending_promotion_at = null,
+         promotion_retry_at = null,
+         raise_base_score = v_match,
+         pending_raise_bps = null,
+         pending_raise_at = null,
+         required = v_req,
+         title_key = case when v_ai and j.title_key is not null and v_main is not null then v_main || '_' || v_next
+                          else title_key end,
+         title = case when v_ai and j.title_key is not null and v_main is not null then v_main || '_' || v_next
+                      else title end,
+         ceiling_cents_per_hour = case when v_ai
+                                       then public.ai_salary_ceiling(coalesce((public.career_tier(v_next) ->> 'salaryCentsPerHour')::bigint,
+                                                                              p_salary), v_match)
+                                       else ceiling_cents_per_hour end
+   where id = j.id;
+  perform public.feed_post(j.player_id, 'promoted', jsonb_build_object('tier', v_next, 'company', c.name),
+                           'promoted:' || j.id::text || ':' || v_next);
+  perform public.social_notify(j.player_id, 'promotion_result', 'Befördert!',
+    'Beförderung ' || public.career_tier_phrase(v_next) || ' bei ' || c.name || '. Neuer Lohn: '
+      || public.format_eur(p_salary) || ' pro Stunde.',
+    jsonb_build_object('status', 'promoted', 'player_job_id', j.id, 'company', c.name, 'tier', v_next,
+                       'salary_cents_per_hour', p_salary),
+    '/job', 'promotion_result:' || j.id::text || ':' || v_next);
+  return jsonb_build_object('tier', v_next, 'salary_cents_per_hour', p_salary);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- G. Job and team views
+-- ---------------------------------------------------------------------------
+-- job_state as in M3f plus paid hours with overtime, rank_hours and promotion
+create or replace function public.job_state(p_player uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  j        public.player_jobs;
+  v_match  integer;
+  v_base   bigint;
+  v_max    integer;
+  v_ai     boolean;
+  v_today  date := (public.game_now() at time zone 'Europe/Berlin')::date;
+  v_cool   double precision := public.config_double('jobs', '{raiseRequest,cooldownDays}', 7);
+  v_factor integer;
+  v_bonus  bigint;
+  v_next   timestamptz;
+  v_open   boolean;
+begin
+  select * into j from public.player_jobs where player_id = p_player and status = 'active';
+  if j.id is null then
+    return jsonb_build_object('job', null);
+  end if;
+  select c.is_ai into v_ai from public.companies c where c.id = j.company_id;
+  v_match := public.job_match_score(public.player_branch_scores(p_player), j.required);
+  v_max := greatest(0, public.config_double('jobs', '{raiseRequest,maxRaiseBpsPerScore}', 300)::integer * (v_match - j.raise_base_score));
+  if v_ai then
+    v_base := coalesce((public.career_tier(j.tier::text) ->> 'salaryCentsPerHour')::bigint, j.salary_cents_per_hour);
+    v_max := least(v_max, greatest(0, floor((public.ai_salary_ceiling(v_base, v_match)::numeric / j.salary_cents_per_hour - 1) * 10000)::integer));
+  end if;
+  -- player companies: pay factor of the quarter x share the company could pay at the last payout
+  select pc.pay_factor_bps * j.pay_factor_bps / 10000,
+         coalesce((select sum(sp.bonus_cents) from public.salary_payouts sp join public.game_quarters gq on gq.id = pc.last_closed_quarter_id
+                    where sp.player_job_id = j.id and sp.bonus_cents > 0 and sp.period_end = gq.ends_at), 0)
+    into v_factor, v_bonus
+    from public.player_companies pc where pc.company_id = j.company_id and pc.status = 'active';
+  v_factor := coalesce(v_factor, j.pay_factor_bps);
+  -- automatic work (ADR-064): no new work tasks
+  v_next := null;
+  v_open := false;
+  return jsonb_build_object('job', jsonb_build_object(
+    'id', j.id,
+    'company', public.company_json(j.company_id),
+    'tier', j.tier,
+    'title_key', j.title_key,
+    'title', case when j.title_key is null then j.title end,
+    'required', j.required,
+    'salary_cents_per_hour', j.salary_cents_per_hour,
+    'pay_factor_bps', v_factor,
+    'effective_salary_cents_per_hour', j.salary_cents_per_hour * v_factor / 10000,
+    'last_bonus_cents', coalesce(v_bonus, 0),
+    'next_work_task_at', v_next,
+    'work_task_open', v_open,
+    'productivity_bps', public.job_productivity_bps(v_match),
+    'started_at', j.started_at,
+    'paid_hours_today', case when j.paid_day = v_today then round(j.paid_minutes_today / 60.0, 2) else 0 end,
+    'paid_hours_cap', public.player_paid_hours_cap(p_player),
+    'earned_total_cents', j.earned_total_cents,
+    'raise_available_at', case when j.raise_requested_at is null
+                                    or j.raise_requested_at + make_interval(secs => v_cool * 86400) <= now() then null
+                               else j.raise_requested_at + make_interval(secs => v_cool * 86400) end,
+    'raise_max_bps', v_max,
+    'pending_raise', case when j.pending_raise_bps is not null
+                          then jsonb_build_object('requested_bps', j.pending_raise_bps, 'created_at', j.pending_raise_at) end,
+    'quit_cost_cents', 0,
+    'quit_now_cost_cents', round(j.salary_cents_per_hour * public.config_double('jobs', '{quitNowCostHours}', 12))::bigint,
+    'notice_ends_at', j.notice_ends_at,
+    'signature', j.signature,
+    'rank_hours', round(j.rank_minutes / 60.0, 1),
+    'promotion', public.promotion_state(j.id)));
+end;
+$$;
+
+-- get_company_team as in M3e plus rank, hours in the rank and the promotion state of every member
+create or replace function public.get_company_team(p_company_id uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  perform public.require_company_owner(p_company_id);
+  return jsonb_build_object('members', coalesce((
+    select jsonb_agg(jsonb_build_object(
+             'player_job_id', j.id, 'nickname', pr.nickname, 'avatar_key', pr.avatar_key,
+             'title', coalesce(j.title, j.title_key), 'salary_cents_per_hour', j.salary_cents_per_hour,
+             'productivity_bps', public.job_productivity_bps(public.job_match_score(public.player_branch_scores(pr.id), j.required)),
+             'started_at', j.started_at,
+             'notice_ends_at', j.notice_ends_at,
+             'skills', coalesce((select jsonb_agg(s.skill_key order by s.skill_key) from public.player_skills s
+                                  where s.player_id = pr.id), '[]'::jsonb),
+             'pending_raise', case when j.pending_raise_bps is not null
+                                   then jsonb_build_object('requested_bps', j.pending_raise_bps, 'created_at', j.pending_raise_at) end,
+             'tier', j.tier,
+             'rank_hours', round(j.rank_minutes / 60.0, 1),
+             'promotion', (select jsonb_build_object('next_tier', ps -> 'next_tier', 'requirements', ps -> 'requirements',
+                                                     'ready', ps -> 'ready', 'pending_since', ps -> 'pending_since',
+                                                     'next_salary_cents_per_hour', ps -> 'next_salary_cents_per_hour')
+                             from (select public.promotion_state(j.id) as ps) x))
+             order by j.started_at, j.id)
+      from public.player_jobs j join public.profiles pr on pr.id = j.player_id
+     where j.company_id = p_company_id and j.status = 'active'), '[]'::jsonb));
+end;
+$$;
+
+-- Feed label (body of the reaction notification) as in M4f plus 'promoted'
+create or replace function public.feed_item_label(p_kind text, p_payload jsonb)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case p_kind
+    when 'level_up' then 'Level ' || coalesce(p_payload ->> 'level', '?') || ' erreicht'
+    when 'big_trade' then 'Gewinn mit ' || coalesce(p_payload ->> 'ticker', 'einer Aktie')
+    when 'company_founded' then coalesce(p_payload ->> 'name', 'Firma') || ' gegründet'
+    when 'company_upgraded' then coalesce(p_payload ->> 'name', 'Firma') || ' aufgestiegen'
+    when 'company_ipo' then coalesce(p_payload ->> 'name', 'Firma') || ' an der Börse'
+    when 'company_expanded' then coalesce(p_payload ->> 'name', 'Firma') || ' erweitert'
+    when 'art_won' then 'Kunstwerk „' || coalesce(p_payload ->> 'title', '?') || '“ ersteigert'
+    when 'art_created' then 'Kunstwerk „' || coalesce(p_payload ->> 'title', '?') || '“ gemalt'
+    when 'home_bought' then 'Neues Zuhause'
+    when 'car_bought' then 'Neues Auto'
+    when 'job_started' then 'Neuer Job bei ' || coalesce(p_payload ->> 'company_name', '?')
+    when 'promoted' then 'Beförderung ' || public.career_tier_phrase(p_payload ->> 'tier')
+    when 'streak' then coalesce(p_payload ->> 'days', '?') || ' Tage in Folge dabei'
+    when 'league_won' then 'Wochenliga gewonnen'
+    when 'friends_now' then 'Jetzt befreundet mit ' || coalesce(p_payload ->> 'other_nickname', '?')
+    else 'Beitrag im Feed'
+  end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- H. RPCs: upgrades
+-- ---------------------------------------------------------------------------
+create or replace function public.get_upgrades()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  return jsonb_build_object('levels', public.player_upgrade_levels(public.require_player()));
+end;
+$$;
+comment on function public.get_upgrades() is 'RPC: {levels: {vault, income, study, overtime, rhetoric}} of the caller (ADR-093).';
+
+-- Buys the next level: upgradeCheck order maxed, level, cash; the price goes from the player's cash to the treasury
+-- that pays the basic income (closed money system, ADR-041).
+create or replace function public.buy_upgrade(p_request_id uuid, p_key text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid;
+  v_replay  jsonb;
+  v_level   integer;
+  v_cost    bigint;
+  v_cash    bigint;
+  v_old_cap double precision;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_key is null or p_key not in ('vault', 'income', 'study', 'overtime', 'rhetoric') then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'buy_upgrade');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_cash := public.lock_player_accounts(v_player);
+  if p_key = 'vault' then
+    perform 1 from public.vaults where player_id = v_player for update;
+  end if;
+  v_level := public.player_upgrade_level(v_player, p_key);
+  v_cost := public.upgrade_cost_cents(p_key, v_level);
+  if v_cost is null then
+    perform public.api_error('upgrade_maxed');
+  end if;
+  if coalesce((select p.level from public.profiles p where p.id = v_player), 0)
+     < public.cfg_num(public.upgrade_cfg(p_key), '{minLevel}', 1) then
+    perform public.api_error('locked');
+  end if;
+  if v_cash < v_cost then
+    perform public.api_error('insufficient_funds');
+  end if;
+  v_old_cap := greatest(0, public.player_vault_cap_hours(v_player));
+  perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'), public.ledger_system_account('treasury'),
+                                 v_cost, 'upgrade_purchase', 'Verbesserung gekauft', 'upgrade', null,
+                                 'upgrade:' || v_player::text || ':' || p_key || ':' || p_request_id::text, v_player,
+                                 jsonb_build_object('key', p_key, 'level', v_level + 1));
+  insert into public.player_upgrades (player_id, key, level) values (v_player, p_key, v_level + 1)
+  on conflict (player_id, key) do update set level = excluded.level;
+  -- a bigger vault keeps what it holds and fills on from there: the time it stood full earns nothing afterwards
+  if p_key = 'vault' then
+    update public.vaults v
+       set accrual_started_at = greatest(v.accrual_started_at, public.game_now() - make_interval(secs => v_old_cap * 3600)),
+           full_notified_at = null
+     where v.player_id = v_player;
+  end if;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'key',        p_key,
+    'level',      v_level + 1,
+    'cost_cents', v_cost,
+    'levels',     public.player_upgrade_levels(v_player)));
+end;
+$$;
+comment on function public.buy_upgrade(uuid, text) is
+  'RPC: buys the next level of an upgrade (ADR-093) -> {key, level, cost_cents, levels}; errors invalid_argument, '
+  'upgrade_maxed, locked, insufficient_funds.';
+
+-- ---------------------------------------------------------------------------
+-- I. RPCs: promotions
+-- ---------------------------------------------------------------------------
+-- The employee asks. AI boss: decides now (server randomness against chance_bps); player boss: the request waits.
+create or replace function public.request_promotion(p_request_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  j        public.player_jobs;
+  c        public.companies;
+  v_state  jsonb;
+  v_next   text;
+  v_wage   bigint;
+  v_chance integer;
+  v_retry  timestamptz;
+  v_res    jsonb;
+  v_nick   text;
+  v_boss   uuid;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'request_promotion');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into j from public.player_jobs where player_id = v_player and status = 'active' for update;
+  if j.id is null then
+    perform public.api_error('no_active_job');
+  end if;
+  v_state := public.promotion_state(j.id);
+  if v_state ->> 'pending_since' is not null then
+    perform public.api_error('promotion_pending');
+  end if;
+  if v_state ->> 'retry_at' is not null then
+    perform public.api_error('promotion_too_soon');
+  end if;
+  if not coalesce((v_state ->> 'ready')::boolean, false) then
+    perform public.api_error('promotion_not_ready');
+  end if;
+  v_next := v_state ->> 'next_tier';
+  v_wage := (v_state ->> 'next_salary_cents_per_hour')::bigint;
+  select * into c from public.companies where id = j.company_id;
+
+  if c.is_ai then
+    v_chance := coalesce((v_state ->> 'chance_bps')::integer, 0);
+    -- promotionGranted: u x 10 000 < chance
+    if random() * 10000 < v_chance then
+      v_res := public.promotion_apply(j.id, v_wage);
+      return public.request_complete(v_player, p_request_id, jsonb_build_object(
+        'status', 'promoted', 'tier', v_res ->> 'tier', 'salary_cents_per_hour', (v_res ->> 'salary_cents_per_hour')::bigint,
+        'retry_at', null, 'chance_bps', v_chance));
+    end if;
+    v_retry := now() + make_interval(secs => public.cfg_num(public.promotion_cfg(), '{retryHours}', 24) * 3600);
+    update public.player_jobs set promotion_retry_at = v_retry where id = j.id;
+    return public.request_complete(v_player, p_request_id, jsonb_build_object(
+      'status', 'declined', 'tier', j.tier, 'salary_cents_per_hour', j.salary_cents_per_hour,
+      'retry_at', v_retry, 'chance_bps', v_chance));
+  end if;
+
+  -- player boss: the request waits for promote_employee / decline_promotion (founder and CEO are told)
+  update public.player_jobs set pending_promotion_at = now() where id = j.id;
+  select p.nickname into v_nick from public.profiles p where p.id = v_player;
+  for v_boss in select distinct x from unnest(array[c.founder_id, c.ceo_id]) x where x is not null and x <> v_player loop
+    perform public.social_notify(v_boss, 'promotion_request',
+      v_nick || ' bittet um Beförderung ' || public.career_tier_phrase(v_next),
+      'Die Anforderungen sind erfüllt. Neuer Lohn mindestens ' || public.format_eur(v_wage) || ' pro Stunde.',
+      jsonb_build_object('player_job_id', j.id, 'company_id', c.id, 'nickname', v_nick, 'tier', j.tier, 'next_tier', v_next,
+                         'min_salary_cents_per_hour', v_wage),
+      '/company', 'promotion_request:' || j.id::text || ':' || floor(extract(epoch from now()))::bigint::text);
+  end loop;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'status', 'pending', 'tier', j.tier, 'salary_cents_per_hour', j.salary_cents_per_hour,
+    'retry_at', null, 'chance_bps', null));
+end;
+$$;
+comment on function public.request_promotion(uuid) is
+  'RPC: asks for the next rank (ADR-094) -> {status promoted|declined|pending, tier, salary_cents_per_hour, retry_at, chance_bps}; '
+  'errors no_active_job, promotion_pending, promotion_too_soon, promotion_not_ready.';
+
+-- Player boss promotes a member whose requirements are met, with or without a request; at least the formula wage.
+create or replace function public.promote_employee(p_request_id uuid, p_company_id uuid, p_player_job_id uuid,
+                                                   p_salary_cents_per_hour bigint default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  j        public.player_jobs;
+  v_state  jsonb;
+  v_min    bigint;
+  v_res    jsonb;
+begin
+  v_player := public.require_company_owner(p_company_id);
+  if p_request_id is null or p_player_job_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'promote_employee');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into j from public.player_jobs
+   where id = p_player_job_id and company_id = p_company_id and status = 'active' for update;
+  if j.id is null then
+    perform public.api_error('no_active_job');
+  end if;
+  if j.player_id = v_player then
+    perform public.api_error('forbidden');
+  end if;
+  v_state := public.promotion_state(j.id);
+  if not coalesce((v_state ->> 'ready')::boolean, false) then
+    perform public.api_error('promotion_not_ready');
+  end if;
+  v_min := (v_state ->> 'next_salary_cents_per_hour')::bigint;
+  if p_salary_cents_per_hour is not null and p_salary_cents_per_hour < v_min then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_res := public.promotion_apply(j.id, coalesce(p_salary_cents_per_hour, v_min));
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'status', 'promoted', 'tier', v_res ->> 'tier', 'salary_cents_per_hour', (v_res ->> 'salary_cents_per_hour')::bigint));
+end;
+$$;
+comment on function public.promote_employee(uuid, uuid, uuid, bigint) is
+  'RPC (founder/CEO): promotes a team member who meets the requirements (ADR-094) -> {status, tier, salary_cents_per_hour}; '
+  'p_salary_cents_per_hour null = formula wage, lower = invalid_argument; errors employer_only, no_active_job, promotion_not_ready.';
+
+-- Player boss says no to a waiting request: the employee may ask again after retryHours.
+create or replace function public.decline_promotion(p_request_id uuid, p_company_id uuid, p_player_job_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  j        public.player_jobs;
+  v_name   text;
+  v_retry  timestamptz;
+begin
+  v_player := public.require_company_owner(p_company_id);
+  if p_request_id is null or p_player_job_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'decline_promotion');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into j from public.player_jobs
+   where id = p_player_job_id and company_id = p_company_id and status = 'active' for update;
+  if j.id is null then
+    perform public.api_error('no_active_job');
+  end if;
+  if public.promotion_state(j.id) ->> 'pending_since' is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_retry := now() + make_interval(secs => public.cfg_num(public.promotion_cfg(), '{retryHours}', 24) * 3600);
+  update public.player_jobs set pending_promotion_at = null, promotion_retry_at = v_retry where id = j.id;
+  select c.name into v_name from public.companies c where c.id = j.company_id;
+  perform public.social_notify(j.player_id, 'promotion_result', 'Noch nicht befördert',
+    v_name || ' hat deine Bitte um Beförderung abgelehnt. Nächster Versuch ab '
+      || to_char(v_retry at time zone 'Europe/Berlin', 'DD.MM., HH24:MI') || ' Uhr.',
+    jsonb_build_object('status', 'declined', 'player_job_id', j.id, 'company', v_name, 'tier', j.tier, 'retry_at', v_retry),
+    '/job', 'promotion_result:' || j.id::text || ':declined:' || floor(extract(epoch from v_retry))::bigint::text);
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('status', 'declined', 'retry_at', v_retry));
+end;
+$$;
+comment on function public.decline_promotion(uuid, uuid, uuid) is
+  'RPC (founder/CEO): declines a waiting promotion request (ADR-094) -> {status, retry_at}; errors employer_only, '
+  'no_active_job, invalid_argument (no valid request).';
+
+-- ---------------------------------------------------------------------------
+-- J. Grants
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.api_error(text)', 'public.upgrade_cfg(text)', 'public.player_upgrade_level(uuid, text)',
+    'public.player_upgrade_levels(uuid)', 'public.upgrade_cost_cents(text, integer)', 'public.player_vault_cap_hours(uuid)',
+    'public.player_basic_income_cents_per_hour(uuid)', 'public.player_work_hours_per_branch_point(uuid)',
+    'public.player_paid_hours_cap(uuid)', 'public.player_promotion_bonus_bps(uuid)', 'public.vault_status(uuid)',
+    'public.accrue_job_salary(uuid, timestamptz)', 'public.job_payable_minutes(uuid, timestamptz)',
+    'public.skills_state(uuid)', 'public.career_tiers()', 'public.promotion_cfg()', 'public.career_next_tier(text)',
+    'public.career_tier_min_score(text)', 'public.career_tier_phrase(text)',
+    'public.promotion_requirements(text, integer, jsonb, text, bigint)', 'public.promotion_chance_bps(integer, integer)',
+    'public.promoted_salary_cents(bigint, text)', 'public.ai_job_required(text, text)', 'public.promotion_state(uuid)',
+    'public.promotion_apply(uuid, bigint)', 'public.job_state(uuid)', 'public.feed_item_label(text, jsonb)'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+    execute format('grant execute on function %s to service_role', f);
+  end loop;
+  foreach f in array array[
+    'public.claim_vault(uuid)', 'public.get_company_team(uuid)', 'public.get_upgrades()', 'public.buy_upgrade(uuid, text)',
+    'public.request_promotion(uuid)', 'public.promote_employee(uuid, uuid, uuid, bigint)',
+    'public.decline_promotion(uuid, uuid, uuid)'
+  ] loop
+    execute format('revoke all on function %s from public, anon', f);
+    execute format('grant execute on function %s to authenticated, service_role', f);
+  end loop;
+end;
+$$;
+
 -- ===== supabase/seed.sql =====
 -- =============================================================================
 -- NEXA · seed.sql · reference data
@@ -34609,8 +35904,8 @@ insert into public.game_config (key, value, description) values
   ('reputation', '{"start":50,"min":0,"max":100,"valuationFactorMin":0.6,"valuationFactorMax":1.4,"guidanceMissThreshold":0.3,"guidanceHitThreshold":0.1,"deltas":{"guidanceMet":3,"guidanceMissed":-5,"lockupKept":4,"longHoldPerGameYear":1,"postIpoDumping":-12,"reliableDividend":1,"dividendCut":-2,"repeatedCapitalIncrease":-4,"useOfProceedsKept":5,"useOfProceedsDeviated":-8,"employeeTenure":1,"insiderViolation":-15,"ipoFailed":-10,"insolvency":-30,"playerBankruptcy":-10}}'::jsonb, 'Defaults from src/config/balance.ts, section "reputation"'),
   ('loans', '{"basePremiumBps":150,"reputationBpsPerPoint":4,"leverageBpsPerDebtToEquity":150,"maxLeveragePremiumBps":600,"lossMakingPremiumBps":200,"coverageDiscountBpsPerTurn":10,"maxCoverageDiscountBps":100,"cfoDiscountBpsPerSkill":10,"minPremiumBps":50,"maxPremiumBps":1500,"creditLinesByLevel":[{"level":15,"limitCents":5000000},{"level":20,"limitCents":25000000},{"level":25,"limitCents":200000000}],"creditLineReputationFactorMin":0.5,"creditLineReputationFactorMax":1.5}'::jsonb, 'Defaults from src/config/balance.ts, section "loans"'),
   ('employees', '{"minSkill":1,"maxSkill":10,"skillCapacityExponent":1.1,"salaryBaseCentsPerQuarter":18500,"salarySkillExponent":1.3,"playerProductivityMultiplier":2,"traits":[{"key":"ambitious","performanceMultiplier":1.15,"salaryMultiplier":1,"loyaltyDecayMultiplier":2},{"key":"loyal","performanceMultiplier":1,"salaryMultiplier":1,"loyaltyDecayMultiplier":0.5},{"key":"frugal","performanceMultiplier":1,"salaryMultiplier":0.9,"loyaltyDecayMultiplier":1},{"key":"genius","performanceMultiplier":1.25,"salaryMultiplier":1.3,"loyaltyDecayMultiplier":1.2},{"key":"easygoing","performanceMultiplier":0.92,"salaryMultiplier":0.95,"loyaltyDecayMultiplier":0.7},{"key":"mentor","performanceMultiplier":1.05,"salaryMultiplier":1.1,"loyaltyDecayMultiplier":0.8}],"loyalty":{"start":70,"quitThreshold":25,"decayPerQuarterOnSalaryFreeze":3,"gainPerQuarterOnRaise":8,"poachingSalaryPremiumBps":2000},"leadership":{"cooCapacityBonusPerSkill":0.015,"ctoDevelopmentTimeReductionPerSkill":0.03,"headOfSalesBoostPerSkill":0.02,"cfoGuidanceBandReductionPerSkill":0.02},"applicantPoolSize":6,"insiderLockHours":2,"insiderDetectionProbability":0.6,"insiderFineBps":15000,"maxSideRoles":1,"optionVestingQuarters":4}'::jsonb, 'Defaults from src/config/balance.ts, section "employees"'),
-  ('careers', '{"tiers":[{"id":"intern","minLevel":2,"salaryCentsPerHour":15000,"stockOptions":false},{"id":"junior","minLevel":5,"salaryCentsPerHour":30000,"stockOptions":false},{"id":"senior","minLevel":12,"salaryCentsPerHour":70000,"stockOptions":false},{"id":"team_lead","minLevel":20,"salaryCentsPerHour":130000,"stockOptions":false},{"id":"c_level","minLevel":25,"salaryCentsPerHour":250000,"stockOptions":true}],"paidHoursPerDayCap":12,"playerCompanyExperienceMultiplier":2,"promotionSteps":[{"experienceHours":24,"raiseBps":1000},{"experienceHours":72,"raiseBps":1250},{"experienceHours":168,"raiseBps":1500},{"experienceHours":336,"raiseBps":2000}],"negotiation":{"cooldownDays":7,"baseSuccessProbability":0.3,"successPerExperienceHour":0.002,"maxSuccessProbability":0.85,"raiseMinBps":500,"raiseMaxBps":1200},"jobSwitch":{"raiseMinBps":1500,"raiseMaxBps":3000},"workTask":{"intervalHours":3,"bonusSalaryHours":1,"expiresHours":3,"fastAnswerSeconds":45}}'::jsonb, 'Defaults from src/config/balance.ts, section "careers"'),
-  ('progression', '{"firstLevelXp":100,"xpBase":250,"xpExponent":1.5,"maxLevel":10000,"prestige":{"fromLevel":50,"titleEveryLevels":10},"missionTargetScalePerLevel":0.2,"missionTargetScaleMax":5,"xpMultiplier":2,"xpSources":{"trade":{"xp":10,"maxTradesPerDay":30,"minOrderValueCents":10000},"profitableClose":{"profitCentsPerXp":10000,"maxXpPerTrade":500},"workHour":{"xp":40,"playerCompanyMultiplier":1.5,"maxHoursPerDay":12},"workTask":{"minXp":50,"maxXp":150},"dailyMission":{"minXp":200,"maxXp":400,"perDay":3},"quickMission":{"minXp":20,"maxXp":60,"active":3},"weeklyMission":{"minXp":600,"maxXp":1200,"perWeek":3},"milestoneMission":{"minXp":100,"maxXp":2000,"visible":3},"dailyLogin":{"xp":50,"streakBonusPerDay":10,"streakBonusCap":200,"streakFreezesPerWeek":1},"profitableCompanyQuarter":{"xp":500},"successfulIpo":{"xp":5000},"achievement":{"minXp":100,"maxXp":10000},"tutorial":{"xp":50}},"unlocks":[{"level":1,"key":"market_orders"},{"level":1,"key":"basic_income"},{"level":2,"key":"first_job"},{"level":3,"key":"limit_orders"},{"level":3,"key":"watchlist"},{"level":3,"key":"found_garage"},{"level":4,"key":"property"},{"level":5,"key":"stop_loss"},{"level":5,"key":"bonds"},{"level":5,"key":"junior_jobs"},{"level":7,"key":"analyst_reports"},{"level":8,"key":"short_selling"},{"level":8,"key":"artworks"},{"level":10,"key":"found_small_business"},{"level":12,"key":"leverage_2x"},{"level":12,"key":"senior_jobs"},{"level":15,"key":"small_loan"},{"level":15,"key":"business_angel"},{"level":18,"key":"leverage_5x"},{"level":18,"key":"expand_small_business"},{"level":20,"key":"found_gmbh"},{"level":20,"key":"loans_250k"},{"level":20,"key":"team_lead_jobs"},{"level":25,"key":"ipo"},{"level":25,"key":"c_level_jobs"},{"level":30,"key":"leverage_10x"},{"level":30,"key":"options"},{"level":35,"key":"takeovers"},{"level":35,"key":"hostile_takeovers"},{"level":40,"key":"holding"},{"level":50,"key":"title_market_legend"},{"level":50,"key":"golden_profile_frame"},{"level":50,"key":"hall_of_fame"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "progression"'),
+  ('careers', '{"tiers":[{"id":"intern","minLevel":2,"salaryCentsPerHour":15000,"stockOptions":false},{"id":"junior","minLevel":5,"salaryCentsPerHour":30000,"stockOptions":false},{"id":"senior","minLevel":12,"salaryCentsPerHour":70000,"stockOptions":false},{"id":"team_lead","minLevel":20,"salaryCentsPerHour":130000,"stockOptions":false},{"id":"c_level","minLevel":25,"salaryCentsPerHour":250000,"stockOptions":true}],"paidHoursPerDayCap":12,"playerCompanyExperienceMultiplier":2,"promotion":{"hoursByTier":{"junior":12,"senior":36,"team_lead":72,"c_level":120},"managementFrom":["team_lead","c_level"],"baseChanceBps":4000,"chancePerExtraScoreBps":800,"maxChanceBps":9000,"retryHours":24,"raiseBps":1500,"requestValidHours":72},"workTask":{"intervalHours":3,"bonusSalaryHours":1,"expiresHours":3,"fastAnswerSeconds":45}}'::jsonb, 'Defaults from src/config/balance.ts, section "careers"'),
+  ('progression', '{"firstLevelXp":100,"xpBase":250,"xpExponent":1.5,"maxLevel":10000,"prestige":{"fromLevel":50,"titleEveryLevels":10},"missionTargetScalePerLevel":0.2,"missionTargetScaleMax":5,"xpMultiplier":2,"xpSources":{"trade":{"xp":10,"maxTradesPerDay":30,"minOrderValueCents":10000},"profitableClose":{"profitCentsPerXp":10000,"maxXpPerTrade":500},"workHour":{"xp":40,"playerCompanyMultiplier":1.5,"maxHoursPerDay":12},"workTask":{"minXp":50,"maxXp":150},"dailyMission":{"minXp":200,"maxXp":400,"perDay":3},"quickMission":{"minXp":20,"maxXp":60,"active":3},"weeklyMission":{"minXp":600,"maxXp":1200,"perWeek":3},"milestoneMission":{"minXp":100,"maxXp":2000,"visible":3},"dailyLogin":{"xp":50,"streakBonusPerDay":10,"streakBonusCap":200,"streakFreezesPerWeek":1},"profitableCompanyQuarter":{"xp":500},"successfulIpo":{"xp":5000},"achievement":{"minXp":100,"maxXp":10000},"tutorial":{"xp":50}},"unlocks":[{"level":1,"key":"market_orders"},{"level":1,"key":"basic_income"},{"level":2,"key":"first_job"},{"level":3,"key":"limit_orders"},{"level":3,"key":"watchlist"},{"level":3,"key":"found_garage"},{"level":4,"key":"property"},{"level":4,"key":"deals"},{"level":5,"key":"stop_loss"},{"level":5,"key":"bonds"},{"level":5,"key":"junior_jobs"},{"level":7,"key":"analyst_reports"},{"level":8,"key":"short_selling"},{"level":8,"key":"artworks"},{"level":10,"key":"found_small_business"},{"level":12,"key":"leverage_2x"},{"level":12,"key":"senior_jobs"},{"level":15,"key":"small_loan"},{"level":15,"key":"business_angel"},{"level":18,"key":"leverage_5x"},{"level":18,"key":"expand_small_business"},{"level":20,"key":"found_gmbh"},{"level":20,"key":"loans_250k"},{"level":20,"key":"team_lead_jobs"},{"level":25,"key":"ipo"},{"level":25,"key":"c_level_jobs"},{"level":30,"key":"leverage_10x"},{"level":30,"key":"options"},{"level":35,"key":"takeovers"},{"level":35,"key":"hostile_takeovers"},{"level":40,"key":"holding"},{"level":50,"key":"title_market_legend"},{"level":50,"key":"golden_profile_frame"},{"level":50,"key":"hall_of_fame"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "progression"'),
   ('valuation', '{"growthWeight":1,"growthFactorMin":0.6,"growthFactorMax":1.8,"macroSensitivityPer100Bps":0.04,"macroFactorMin":0.6,"macroFactorMax":1.3,"bookValueFloorShare":0.5,"lossMakerRevenueElasticity":0.5,"analystTargetNoise":0.08,"analystWrongProbability":0.25}'::jsonb, 'Defaults from src/config/balance.ts, section "valuation"'),
   ('aiInvestors', '{"tickNoiseBps":{"bluechip":6,"midcap":15,"penny":45},"tickNoiseScale":0.45,"emaFastAlpha":0.15,"emaSlowAlpha":0.0165,"sentimentDecayPerTick":0.0019,"baselineVolumeDepthFraction":0.02,"playerWeight":{"activityHalfLifeHours":6,"referenceActivityCents":{"bluechip":100000000,"midcap":25000000,"penny":5000000},"minAiWeight":0.15},"archetypes":{"market_maker":{"capitalShare":0.05,"reactionSpeed":0.005,"params":{}},"value_fund":{"capitalShare":0.3,"reactionSpeed":0.0005,"params":{"gapScale":0.5,"deadBand":0.01}},"momentum_trader":{"capitalShare":0.1,"reactionSpeed":0.0002,"params":{"trendScale":0.02}},"pension_fund":{"capitalShare":0.2,"reactionSpeed":0.002,"params":{"rateSensitivityPer100Bps":-0.05,"yieldTiltPer100Bps":0.03,"minWeight":0.2,"maxWeight":1.8}},"index_fund":{"capitalShare":0.04,"reactionSpeed":0.005,"params":{}},"retail_herd":{"capitalShare":0.1,"reactionSpeed":0.002,"params":{"chaseGain":0.1,"trendScale":0.02}}}}'::jsonb, 'Defaults from src/config/balance.ts, section "aiInvestors"'),
   ('index', '{"size":30,"baseLevel":1000,"reviewEveryQuarters":4,"minListedQuarters":1,"entryBuffer":3}'::jsonb, 'Defaults from src/config/balance.ts, section "index"'),
@@ -34624,10 +35919,13 @@ insert into public.game_config (key, value, description) values
   ('skills', '{"tree":[{"key":"it_basics","branches":["it"],"tier":1,"q":1,"r":0,"entry":true},{"key":"it_programming","branches":["it"],"tier":2,"q":2,"r":0,"entry":true},{"key":"it_data","branches":["it"],"tier":2,"q":3,"r":-1,"entry":false},{"key":"it_networks","branches":["it"],"tier":2,"q":3,"r":0,"entry":false},{"key":"it_web","branches":["it"],"tier":2,"q":2,"r":1,"entry":false},{"key":"it_architecture","branches":["it"],"tier":3,"q":4,"r":0,"entry":false},{"key":"it_ml","branches":["it"],"tier":3,"q":4,"r":-1,"entry":false},{"key":"it_security","branches":["it"],"tier":3,"q":3,"r":1,"entry":false},{"key":"it_databases","branches":["it"],"tier":3,"q":4,"r":1,"entry":false},{"key":"it_devops","branches":["it"],"tier":3,"q":5,"r":-1,"entry":false},{"key":"it_mobile","branches":["it"],"tier":3,"q":5,"r":0,"entry":false},{"key":"hybrid_fintech","branches":["it","finance"],"tier":4,"q":6,"r":-2,"entry":false},{"key":"it_ai","branches":["it"],"tier":4,"q":5,"r":1,"entry":false},{"key":"it_cloud","branches":["it"],"tier":4,"q":6,"r":0,"entry":false},{"key":"it_testing","branches":["it"],"tier":4,"q":6,"r":-1,"entry":false},{"key":"it_ux","branches":["it"],"tier":4,"q":4,"r":2,"entry":false},{"key":"it_bigdata","branches":["it"],"tier":5,"q":5,"r":2,"entry":false},{"key":"it_crypto","branches":["it"],"tier":5,"q":7,"r":-1,"entry":false},{"key":"it_embedded","branches":["it"],"tier":5,"q":6,"r":1,"entry":false},{"key":"it_mastery","branches":["it"],"tier":5,"q":7,"r":0,"entry":false},{"key":"it_pentest","branches":["it"],"tier":5,"q":7,"r":-2,"entry":false},{"key":"finance_basics","branches":["finance"],"tier":1,"q":1,"r":-1,"entry":true},{"key":"finance_accounting","branches":["finance"],"tier":2,"q":2,"r":-2,"entry":true},{"key":"finance_investment","branches":["finance"],"tier":2,"q":2,"r":-1,"entry":true},{"key":"finance_banking","branches":["finance"],"tier":2,"q":3,"r":-3,"entry":false},{"key":"finance_controlling","branches":["finance"],"tier":2,"q":3,"r":-2,"entry":false},{"key":"finance_balance","branches":["finance"],"tier":3,"q":4,"r":-3,"entry":false},{"key":"finance_portfolio","branches":["finance"],"tier":3,"q":4,"r":-4,"entry":false},{"key":"finance_valuation","branches":["finance"],"tier":3,"q":4,"r":-2,"entry":false},{"key":"finance_budgeting","branches":["finance"],"tier":3,"q":5,"r":-3,"entry":false},{"key":"finance_tax_planning","branches":["finance"],"tier":3,"q":5,"r":-4,"entry":false},{"key":"finance_trading","branches":["finance"],"tier":3,"q":5,"r":-2,"entry":false},{"key":"finance_treasury","branches":["finance"],"tier":3,"q":5,"r":-5,"entry":false},{"key":"finance_corporate","branches":["finance"],"tier":4,"q":6,"r":-4,"entry":false},{"key":"finance_derivatives","branches":["finance"],"tier":4,"q":6,"r":-6,"entry":false},{"key":"finance_ma","branches":["finance"],"tier":4,"q":6,"r":-3,"entry":false},{"key":"finance_risk","branches":["finance"],"tier":4,"q":6,"r":-5,"entry":false},{"key":"finance_audit","branches":["finance"],"tier":5,"q":7,"r":-4,"entry":false},{"key":"finance_insurance","branches":["finance"],"tier":5,"q":7,"r":-7,"entry":false},{"key":"finance_mastery","branches":["finance"],"tier":5,"q":7,"r":-5,"entry":false},{"key":"finance_quant","branches":["finance"],"tier":5,"q":7,"r":-3,"entry":false},{"key":"finance_vc","branches":["finance"],"tier":5,"q":7,"r":-6,"entry":false},{"key":"law_basics","branches":["law"],"tier":1,"q":1,"r":-2,"entry":true},{"key":"law_contracts","branches":["law"],"tier":2,"q":2,"r":-3,"entry":false},{"key":"law_labor","branches":["law"],"tier":2,"q":1,"r":-3,"entry":false},{"key":"law_compliance","branches":["law"],"tier":3,"q":1,"r":-4,"entry":false},{"key":"law_corporate","branches":["law"],"tier":3,"q":3,"r":-4,"entry":false},{"key":"law_tax","branches":["law"],"tier":2,"q":2,"r":-4,"entry":false},{"key":"law_competition","branches":["law"],"tier":3,"q":1,"r":-5,"entry":false},{"key":"law_intltax","branches":["law"],"tier":3,"q":3,"r":-5,"entry":false},{"key":"law_ip","branches":["law"],"tier":3,"q":2,"r":-5,"entry":false},{"key":"law_privacy","branches":["law"],"tier":3,"q":4,"r":-5,"entry":false},{"key":"hybrid_business_law","branches":["law","finance"],"tier":4,"q":5,"r":-6,"entry":false},{"key":"law_capital","branches":["law"],"tier":4,"q":3,"r":-6,"entry":false},{"key":"law_consumer","branches":["law"],"tier":4,"q":2,"r":-6,"entry":false},{"key":"law_crime","branches":["law"],"tier":4,"q":4,"r":-6,"entry":false},{"key":"law_it","branches":["law"],"tier":4,"q":1,"r":-6,"entry":false},{"key":"law_environment","branches":["law"],"tier":5,"q":4,"r":-7,"entry":false},{"key":"law_international","branches":["law"],"tier":5,"q":2,"r":-7,"entry":false},{"key":"law_litigation","branches":["law"],"tier":5,"q":1,"r":-7,"entry":false},{"key":"law_mastery","branches":["law"],"tier":5,"q":3,"r":-7,"entry":false},{"key":"law_mediation","branches":["law"],"tier":5,"q":6,"r":-7,"entry":false},{"key":"law_medical","branches":["law"],"tier":5,"q":5,"r":-7,"entry":false},{"key":"management_basics","branches":["management"],"tier":1,"q":0,"r":-1,"entry":true},{"key":"management_projects","branches":["management"],"tier":2,"q":0,"r":-2,"entry":true},{"key":"management_team","branches":["management"],"tier":2,"q":-1,"r":-1,"entry":true},{"key":"management_leadership","branches":["management"],"tier":2,"q":0,"r":-3,"entry":false},{"key":"management_people","branches":["management"],"tier":2,"q":-1,"r":-2,"entry":false},{"key":"management_agile","branches":["management"],"tier":3,"q":-2,"r":-2,"entry":false},{"key":"management_change","branches":["management"],"tier":3,"q":-1,"r":-3,"entry":false},{"key":"management_recruiting","branches":["management"],"tier":3,"q":0,"r":-4,"entry":false},{"key":"hybrid_people_analytics","branches":["management","it"],"tier":4,"q":0,"r":-5,"entry":false},{"key":"management_communication","branches":["management"],"tier":3,"q":-1,"r":-4,"entry":false},{"key":"management_finance_lead","branches":["management"],"tier":3,"q":-2,"r":-3,"entry":false},{"key":"management_operations","branches":["management"],"tier":3,"q":-3,"r":-2,"entry":false},{"key":"management_coaching","branches":["management"],"tier":4,"q":0,"r":-6,"entry":false},{"key":"management_innovation","branches":["management"],"tier":4,"q":-3,"r":-3,"entry":false},{"key":"management_organization","branches":["management"],"tier":4,"q":-1,"r":-5,"entry":false},{"key":"management_strategy","branches":["management"],"tier":4,"q":-2,"r":-4,"entry":false},{"key":"management_board","branches":["management"],"tier":5,"q":0,"r":-7,"entry":false},{"key":"management_culture","branches":["management"],"tier":5,"q":-4,"r":-3,"entry":false},{"key":"management_international","branches":["management"],"tier":5,"q":-3,"r":-4,"entry":false},{"key":"management_mastery","branches":["management"],"tier":5,"q":-2,"r":-5,"entry":false},{"key":"management_risk","branches":["management"],"tier":5,"q":-1,"r":-6,"entry":false},{"key":"sales_basics","branches":["sales"],"tier":1,"q":-1,"r":0,"entry":true},{"key":"sales_selling","branches":["sales"],"tier":2,"q":-2,"r":0,"entry":true},{"key":"sales_marketing","branches":["sales"],"tier":2,"q":-3,"r":0,"entry":false},{"key":"sales_service","branches":["sales"],"tier":2,"q":-3,"r":1,"entry":false},{"key":"sales_social","branches":["sales"],"tier":2,"q":-2,"r":-1,"entry":false},{"key":"sales_brand","branches":["sales"],"tier":3,"q":-4,"r":1,"entry":false},{"key":"sales_keyaccount","branches":["sales"],"tier":3,"q":-3,"r":-1,"entry":false},{"key":"sales_negotiation","branches":["sales"],"tier":3,"q":-4,"r":0,"entry":false},{"key":"sales_ads","branches":["sales"],"tier":3,"q":-4,"r":-1,"entry":false},{"key":"sales_content","branches":["sales"],"tier":3,"q":-5,"r":0,"entry":false},{"key":"sales_seo","branches":["sales"],"tier":3,"q":-5,"r":1,"entry":false},{"key":"hybrid_ecommerce","branches":["sales","logistics"],"tier":4,"q":-6,"r":2,"entry":false},{"key":"sales_growth","branches":["sales"],"tier":4,"q":-6,"r":1,"entry":false},{"key":"sales_international","branches":["sales"],"tier":4,"q":-6,"r":0,"entry":false},{"key":"sales_pricing","branches":["sales"],"tier":4,"q":-5,"r":-1,"entry":false},{"key":"sales_retail","branches":["sales"],"tier":4,"q":-4,"r":-2,"entry":false},{"key":"sales_b2b","branches":["sales"],"tier":5,"q":-7,"r":1,"entry":false},{"key":"sales_crm","branches":["sales"],"tier":5,"q":-6,"r":-1,"entry":false},{"key":"sales_events","branches":["sales"],"tier":5,"q":-5,"r":-2,"entry":false},{"key":"sales_mastery","branches":["sales"],"tier":5,"q":-7,"r":0,"entry":false},{"key":"sales_pr","branches":["sales"],"tier":5,"q":-7,"r":2,"entry":false},{"key":"logistics_basics","branches":["logistics"],"tier":1,"q":-1,"r":1,"entry":true},{"key":"logistics_transport","branches":["logistics"],"tier":2,"q":-2,"r":2,"entry":true},{"key":"logistics_warehouse","branches":["logistics"],"tier":2,"q":-2,"r":1,"entry":true},{"key":"logistics_inventory","branches":["logistics"],"tier":2,"q":-3,"r":3,"entry":false},{"key":"logistics_purchasing","branches":["logistics"],"tier":2,"q":-3,"r":2,"entry":false},{"key":"logistics_fleet","branches":["logistics"],"tier":3,"q":-4,"r":2,"entry":false},{"key":"logistics_strategic","branches":["logistics"],"tier":3,"q":-4,"r":4,"entry":false},{"key":"logistics_supplychain","branches":["logistics"],"tier":3,"q":-4,"r":3,"entry":false},{"key":"logistics_air","branches":["logistics"],"tier":3,"q":-5,"r":2,"entry":false},{"key":"logistics_customs","branches":["logistics"],"tier":3,"q":-5,"r":3,"entry":false},{"key":"logistics_distribution","branches":["logistics"],"tier":3,"q":-5,"r":4,"entry":false},{"key":"logistics_shipping","branches":["logistics"],"tier":3,"q":-5,"r":5,"entry":false},{"key":"logistics_global","branches":["logistics"],"tier":4,"q":-6,"r":4,"entry":false},{"key":"logistics_lastmile","branches":["logistics"],"tier":4,"q":-6,"r":6,"entry":false},{"key":"logistics_quality","branches":["logistics"],"tier":4,"q":-6,"r":5,"entry":false},{"key":"logistics_rail","branches":["logistics"],"tier":4,"q":-6,"r":3,"entry":false},{"key":"logistics_automation","branches":["logistics"],"tier":5,"q":-7,"r":7,"entry":false},{"key":"logistics_cold","branches":["logistics"],"tier":5,"q":-7,"r":6,"entry":false},{"key":"logistics_mastery","branches":["logistics"],"tier":5,"q":-7,"r":5,"entry":false},{"key":"logistics_planning","branches":["logistics"],"tier":5,"q":-7,"r":4,"entry":false},{"key":"logistics_sustainability","branches":["logistics"],"tier":5,"q":-7,"r":3,"entry":false},{"key":"craft_basics","branches":["craft"],"tier":1,"q":-1,"r":2,"entry":true},{"key":"craft_electrical","branches":["craft"],"tier":2,"q":-2,"r":3,"entry":false},{"key":"craft_mechanics","branches":["craft"],"tier":2,"q":-1,"r":3,"entry":false},{"key":"craft_automation","branches":["craft"],"tier":3,"q":-3,"r":4,"entry":false},{"key":"craft_construction","branches":["craft"],"tier":2,"q":-2,"r":4,"entry":false},{"key":"craft_engineering","branches":["craft"],"tier":3,"q":-1,"r":4,"entry":false},{"key":"craft_hvac","branches":["craft"],"tier":3,"q":-4,"r":5,"entry":false},{"key":"craft_plumbing","branches":["craft"],"tier":3,"q":-1,"r":5,"entry":false},{"key":"craft_site","branches":["craft"],"tier":3,"q":-2,"r":5,"entry":false},{"key":"craft_welding","branches":["craft"],"tier":3,"q":-3,"r":5,"entry":false},{"key":"craft_carpentry","branches":["craft"],"tier":4,"q":-4,"r":6,"entry":false},{"key":"craft_cnc","branches":["craft"],"tier":4,"q":-5,"r":6,"entry":false},{"key":"craft_energy","branches":["craft"],"tier":4,"q":-2,"r":6,"entry":false},{"key":"craft_manufacturing","branches":["craft"],"tier":4,"q":-3,"r":6,"entry":false},{"key":"hybrid_industry40","branches":["craft","it"],"tier":4,"q":-1,"r":6,"entry":false},{"key":"craft_3dprint","branches":["craft"],"tier":5,"q":-3,"r":7,"entry":false},{"key":"craft_mastery","branches":["craft"],"tier":5,"q":-4,"r":7,"entry":false},{"key":"craft_materials","branches":["craft"],"tier":5,"q":-6,"r":7,"entry":false},{"key":"craft_robotics","branches":["craft"],"tier":5,"q":-1,"r":7,"entry":false},{"key":"craft_solar","branches":["craft"],"tier":5,"q":-5,"r":7,"entry":false},{"key":"craft_vehicles","branches":["craft"],"tier":5,"q":-2,"r":7,"entry":false},{"key":"science_basics","branches":["science"],"tier":1,"q":0,"r":1,"entry":true},{"key":"science_biology","branches":["science"],"tier":2,"q":1,"r":1,"entry":true},{"key":"science_chemistry","branches":["science"],"tier":2,"q":0,"r":2,"entry":true},{"key":"science_medicine","branches":["science"],"tier":2,"q":1,"r":2,"entry":false},{"key":"science_physics","branches":["science"],"tier":2,"q":0,"r":3,"entry":false},{"key":"science_biotech","branches":["science"],"tier":3,"q":0,"r":4,"entry":false},{"key":"science_clinical","branches":["science"],"tier":3,"q":2,"r":2,"entry":false},{"key":"science_pharmacology","branches":["science"],"tier":3,"q":1,"r":3,"entry":false},{"key":"hybrid_pharma_sales","branches":["science","sales"],"tier":4,"q":0,"r":5,"entry":false},{"key":"science_lab","branches":["science"],"tier":3,"q":1,"r":4,"entry":false},{"key":"science_microbiology","branches":["science"],"tier":3,"q":3,"r":2,"entry":false},{"key":"science_statistics","branches":["science"],"tier":3,"q":2,"r":3,"entry":false},{"key":"science_drugs","branches":["science"],"tier":4,"q":2,"r":4,"entry":false},{"key":"science_genetics","branches":["science"],"tier":4,"q":1,"r":5,"entry":false},{"key":"science_materials","branches":["science"],"tier":4,"q":3,"r":3,"entry":false},{"key":"science_nutrition","branches":["science"],"tier":4,"q":0,"r":6,"entry":false},{"key":"science_devices","branches":["science"],"tier":5,"q":0,"r":7,"entry":false},{"key":"science_environment","branches":["science"],"tier":5,"q":1,"r":6,"entry":false},{"key":"science_mastery","branches":["science"],"tier":5,"q":2,"r":5,"entry":false},{"key":"science_neuro","branches":["science"],"tier":5,"q":3,"r":4,"entry":false},{"key":"science_vaccines","branches":["science"],"tier":5,"q":4,"r":3,"entry":false}],"costByTier":[1,2,3,4,6],"scoreByTier":[1,2,3,4,6],"freePointsPerLevel":1,"workHoursPerBranchPoint":6}'::jsonb, 'Defaults from src/config/balance.ts, section "skills"'),
   ('jobs', '{"playerBaseProductivity":1.5,"productivityPerSkillScore":0.08,"maxProductivity":4,"aiSalaryPerScoreBps":300,"aiSalaryCapMultiplier":1.5,"salaryUnitHours":12,"maxOpenApplications":5,"applicationMessageMaxLength":140,"offerValidHours":48,"aiPostingsPerCompany":2,"aiSlotsOpen":99,"quitNoticeHours":24,"quitNowCostHours":12,"tierMinScore":{"intern":0,"junior":2,"senior":6,"team_lead":12,"c_level":20},"sectorBranches":{"tech":["it","finance","sales","management"],"retail":["sales","logistics","finance","management"],"energy":["craft","science","law","management"],"pharma":["science","law","sales","management"],"logistics":["logistics","craft","it","management"]},"profitLinkedPay":{"minFactor":0.5,"bonusShareOfProfit":0.2,"maxBonusFactor":1},"raiseRequest":{"cooldownDays":7,"maxRaiseBpsPerScore":300}}'::jsonb, 'Defaults from src/config/balance.ts, section "jobs"'),
   ('dailyRewards', '{"cycle":[{"xp":50,"cashCents":10000,"skillPoints":0},{"xp":75,"cashCents":20000,"skillPoints":0},{"xp":100,"cashCents":30000,"skillPoints":0},{"xp":125,"cashCents":0,"skillPoints":1},{"xp":150,"cashCents":50000,"skillPoints":0},{"xp":200,"cashCents":75000,"skillPoints":0},{"xp":300,"cashCents":100000,"skillPoints":1}],"freezesPerWeek":1}'::jsonb, 'Defaults from src/config/balance.ts, section "dailyRewards"'),
-  ('startups', '{"garage":{"minLevel":3,"foundingCostCents":250000,"fixedCostCentsPerQuarter":15000,"maxEmployees":2},"upgradeCreditShare":1,"gmbh":{"minLevel":15,"foundingCostCents":6000000,"fixedCostCentsPerQuarter":600000,"maxEmployees":20},"ag":{"fixedCostCentsPerQuarter":1000000,"maxEmployees":100},"marketFactorByTier":{"garage":1,"small_business":4,"gmbh":15,"ag":40},"foundingAwareness":{"garage":0.03,"small_business":0.08,"gmbh":0.2},"expansion":{"fromTiers":["gmbh","ag"],"baseCostCents":10000000,"costGrowth":1.8,"employeesPerLevel":10,"capacityBonusPerLevel":0.1,"marketBonusPerLevel":0.5,"fixedCostPerLevel":0.25},"pricing":{"budget":{"price":0.8,"demand":1.35,"awareness":1.5},"normal":{"price":1,"demand":1,"awareness":1},"premium":{"price":1.3,"demand":0.75,"awareness":0.7},"premiumMinQuality":0.5,"premiumLowQualityDemand":0.5},"contractWork":{"shareOfFreeCapacity":0.25,"grossMargin":0.3},"founderPayout":{"stepBps":500,"maxBps":10000},"ipo":{"minLevel":6,"fromTiers":["garage","small_business","gmbh"],"sharesTotal":1000000,"minSharePercent":10,"maxSharePercent":49,"minIssuePriceCents":100,"subscriptionHours":12,"aiTakeBase":0.2,"aiTakePerQuality":0.5,"capitalIncreaseDiscount":0.9,"capitalIncreaseMaxPercent":25},"sideJobFounderFactor":0.5,"aiQualityPenalty":0.3,"fullTimeFromEmployees":5,"logo":{"size":16,"maxColors":6,"reportsToHide":3},"banner":{"width":48,"height":12,"maxColors":6},"potential":{"minAnnualCents":100000,"maxAnnualCents":200000000000,"paretoAlpha":0.57},"awareness":{"initial":0.03,"min":0.01,"growthPerQuarter":0.3,"decayPerQuarter":0.03,"marketingMaxGain":0.12,"marketingHalfSaturationShare":0.1,"marketingMinHalfSaturationCents":50000},"quality":{"base":0.25,"halfSaturationScore":20,"adjustPerQuarter":0.35},"demandNoise":0.1,"capacityCentsPerProductivity":{"tech":300000,"retail":250000,"energy":250000,"pharma":300000,"logistics":250000},"grossMargin":{"tech":0.75,"retail":0.35,"energy":0.45,"pharma":0.65,"logistics":0.35},"aiWorkerCostCentsPerQuarter":72000,"aiWorkerWageCentsPerHour":12000,"valuationPeDiscount":0.5,"estimate":{"initialSpread":2.3,"decayPerQuarter":0.85},"insolvency":{"graceQuarters":4,"loanWithholdingBps":5000,"foundingLockoutDays":3},"products":{"tech":[{"key":"security_software","stages":[["it_networks"],["it_security","it_programming"],["law_privacy","it_architecture"],["it_crypto","it_pentest"]]},{"key":"mobile_app","stages":[["it_programming"],["it_mobile","sales_social"],["it_ux","sales_growth"],["it_cloud","management_strategy"]]},{"key":"cloud_platform","stages":[["it_networks"],["it_databases","it_devops"],["it_cloud","sales_keyaccount"],["finance_controlling","management_operations"]]}],"retail":[{"key":"online_shop","stages":[["it_web"],["sales_marketing","logistics_warehouse"],["hybrid_ecommerce","sales_seo"],["logistics_automation","management_operations"]]},{"key":"fashion","stages":[["sales_marketing"],["sales_brand","logistics_purchasing"],["sales_ads","sales_retail"],["sales_international","finance_controlling"]]},{"key":"delicatessen","stages":[["logistics_purchasing"],["sales_service","logistics_distribution"],["sales_retail","science_nutrition"],["logistics_cold","law_consumer"]]}],"energy":[{"key":"solar","stages":[["craft_electrical"],["sales_selling","craft_site"],["craft_energy","management_projects"],["craft_solar","law_environment"]]},{"key":"grid_service","stages":[["craft_electrical"],["craft_site","craft_automation"],["craft_energy","law_compliance"],["logistics_planning","management_operations"]]},{"key":"energy_storage","stages":[["science_physics"],["craft_engineering","finance_investment"],["science_materials","craft_manufacturing"],["law_ip","sales_international"]]}],"pharma":[{"key":"generics","stages":[["science_chemistry"],["science_lab","science_pharmacology"],["logistics_quality","hybrid_pharma_sales"],["law_ip","finance_controlling"]]},{"key":"biotech","stages":[["science_biology"],["science_biotech","science_statistics"],["science_clinical","science_genetics"],["law_medical","finance_vc"]]},{"key":"medtech","stages":[["science_medicine"],["craft_engineering","science_lab"],["science_drugs","law_compliance"],["science_devices","it_embedded"]]}],"logistics":[{"key":"courier","stages":[["logistics_transport"],["logistics_fleet","it_mobile"],["logistics_lastmile","management_operations"],["logistics_planning","logistics_sustainability"]]},{"key":"warehouse","stages":[["logistics_warehouse"],["logistics_inventory","it_databases"],["logistics_supplychain","management_agile"],["logistics_automation","craft_robotics"]]},{"key":"freight","stages":[["logistics_transport"],["logistics_customs","logistics_shipping"],["logistics_global","sales_international"],["logistics_strategic","finance_risk"]]}]},"stages":{"awarenessCaps":[0.5,0.7,0.85,0.95,1],"qualityBonusPerStage":0.05,"capacityBonusPerStage":0.25},"training":{"costCentsByTier":[200000,500000,1200000,2500000,5000000],"wageRaiseBpsByTier":[300,500,800,1200,2000],"fromEmployees":5},"chat":{"maxMessageLength":300,"historyLimit":100,"maxMessagesPerMinute":10}}'::jsonb, 'Defaults from src/config/balance.ts, section "startups"'),
+  ('startups', '{"garage":{"minLevel":3,"foundingCostCents":250000,"fixedCostCentsPerQuarter":15000,"maxEmployees":2},"upgradeCreditShare":1,"gmbh":{"minLevel":15,"foundingCostCents":6000000,"fixedCostCentsPerQuarter":600000,"maxEmployees":20},"ag":{"fixedCostCentsPerQuarter":1000000,"maxEmployees":100},"marketFactorByTier":{"garage":1,"small_business":4,"gmbh":15,"ag":40},"foundingAwareness":{"garage":0.03,"small_business":0.08,"gmbh":0.2},"expansion":{"fromTiers":["gmbh","ag"],"baseCostCents":10000000,"costGrowth":1.8,"employeesPerLevel":10,"capacityBonusPerLevel":0.1,"marketBonusPerLevel":0.5,"fixedCostPerLevel":0.25},"pricing":{"budget":{"price":0.8,"demand":1.35,"awareness":1.5},"normal":{"price":1,"demand":1,"awareness":1},"premium":{"price":1.3,"demand":0.75,"awareness":0.7},"premiumMinQuality":0.5,"premiumLowQualityDemand":0.5},"contractWork":{"shareOfFreeCapacity":0.25,"grossMargin":0.3},"founderPayout":{"stepBps":500,"maxBps":10000},"ipo":{"minLevel":6,"fromTiers":["garage","small_business","gmbh"],"sharesTotal":1000000,"minSharePercent":10,"maxSharePercent":49,"minIssuePriceCents":100,"subscriptionHours":12,"aiTakeBase":0.2,"aiTakePerQuality":0.5,"capitalIncreaseDiscount":0.9,"capitalIncreaseMaxPercent":25},"sideJobFounderFactor":0.5,"aiQualityPenalty":0.3,"fullTimeFromEmployees":5,"logo":{"size":16,"maxColors":6,"reportsToHide":3},"banner":{"width":48,"height":12,"maxColors":6},"potential":{"minAnnualCents":100000,"maxAnnualCents":200000000000,"paretoAlpha":0.57},"awareness":{"initial":0.03,"min":0.01,"growthPerQuarter":0.3,"decayPerQuarter":0.03,"marketingMaxGain":0.12,"marketingHalfSaturationShare":0.1,"marketingMinHalfSaturationCents":50000},"quality":{"base":0.25,"halfSaturationScore":20,"adjustPerQuarter":0.35},"demandNoise":0.1,"capacityCentsPerProductivity":{"tech":300000,"retail":250000,"energy":250000,"pharma":300000,"logistics":250000},"grossMargin":{"tech":0.75,"retail":0.35,"energy":0.45,"pharma":0.65,"logistics":0.35},"aiWorkerCostCentsPerQuarter":72000,"aiWorkerWageCentsPerHour":12000,"valuationPeDiscount":0.5,"estimate":{"initialSpread":2.3,"decayPerQuarter":0.85},"insolvency":{"graceQuarters":4,"loanWithholdingBps":5000,"foundingLockoutDays":3},"products":{"tech":[{"key":"security_software","stages":[["it_networks"],["it_security","it_programming"],["law_privacy","it_architecture"],["it_crypto","it_pentest"]]},{"key":"mobile_app","stages":[["it_programming"],["it_mobile","sales_social"],["it_ux","sales_growth"],["it_cloud","management_strategy"]]},{"key":"cloud_platform","stages":[["it_networks"],["it_databases","it_devops"],["it_cloud","sales_keyaccount"],["finance_controlling","management_operations"]]}],"retail":[{"key":"online_shop","stages":[["it_web"],["sales_marketing","logistics_warehouse"],["hybrid_ecommerce","sales_seo"],["logistics_automation","management_operations"]]},{"key":"fashion","stages":[["sales_marketing"],["sales_brand","logistics_purchasing"],["sales_ads","sales_retail"],["sales_international","finance_controlling"]]},{"key":"delicatessen","stages":[["logistics_purchasing"],["sales_service","logistics_distribution"],["sales_retail","science_nutrition"],["logistics_cold","law_consumer"]]}],"energy":[{"key":"solar","stages":[["craft_electrical"],["sales_selling","craft_site"],["craft_energy","management_projects"],["craft_solar","law_environment"]]},{"key":"grid_service","stages":[["craft_electrical"],["craft_site","craft_automation"],["craft_energy","law_compliance"],["logistics_planning","management_operations"]]},{"key":"energy_storage","stages":[["science_physics"],["craft_engineering","finance_investment"],["science_materials","craft_manufacturing"],["law_ip","sales_international"]]}],"pharma":[{"key":"generics","stages":[["science_chemistry"],["science_lab","science_pharmacology"],["logistics_quality","hybrid_pharma_sales"],["law_ip","finance_controlling"]]},{"key":"biotech","stages":[["science_biology"],["science_biotech","science_statistics"],["science_clinical","science_genetics"],["law_medical","finance_vc"]]},{"key":"medtech","stages":[["science_medicine"],["craft_engineering","science_lab"],["science_drugs","law_compliance"],["science_devices","it_embedded"]]}],"logistics":[{"key":"courier","stages":[["logistics_transport"],["logistics_fleet","it_mobile"],["logistics_lastmile","management_operations"],["logistics_planning","logistics_sustainability"]]},{"key":"warehouse","stages":[["logistics_warehouse"],["logistics_inventory","it_databases"],["logistics_supplychain","management_agile"],["logistics_automation","craft_robotics"]]},{"key":"freight","stages":[["logistics_transport"],["logistics_customs","logistics_shipping"],["logistics_global","sales_international"],["logistics_strategic","finance_risk"]]}]},"stages":{"awarenessCaps":[0.5,0.7,0.85,0.95,1],"qualityBonusPerStage":0.05,"capacityBonusPerStage":0.25},"training":{"costCentsByTier":[200000,500000,1200000,2500000,5000000],"wageRaiseBpsByTier":[300,500,800,1200,2000],"fromEmployees":5},"campaigns":{"kinds":{"flyer":{"hours":24,"costHours":2,"demandBps":2500,"awareness":0.005},"online":{"hours":48,"costHours":6,"demandBps":4000,"awareness":0.01},"tv":{"hours":72,"costHours":18,"demandBps":7000,"awareness":0.025}},"minCostCents":20000,"luckMin":0.4,"luckMax":1.6,"qualityWeight":0.5,"weakBelow":0.8,"strongFrom":1.2},"chat":{"maxMessageLength":300,"historyLimit":100,"maxMessagesPerMinute":10}}'::jsonb, 'Defaults from src/config/balance.ts, section "startups"'),
   ('avatars', '{"defaultKey":"rookie","portraits":[{"key":"rookie","level":1},{"key":"trader","level":1},{"key":"analyst","level":1},{"key":"coder","level":1},{"key":"builder","level":1},{"key":"seller","level":1},{"key":"lawyer","level":1},{"key":"scientist","level":1},{"key":"trucker","level":1},{"key":"punk","level":3},{"key":"gamer","level":5},{"key":"chef","level":5},{"key":"pilot","level":8},{"key":"founder","level":10},{"key":"banker","level":15},{"key":"astronaut","level":20},{"key":"magnate","level":25},{"key":"royal","level":35},{"key":"legend","level":50},{"key":"finn_fan","level":1}]}'::jsonb, 'Defaults from src/config/balance.ts, section "avatars"'),
   ('artworks', '{"size":32,"maxColors":16,"titleMaxLength":40,"createBaseCostCents":1500000,"createCostFactor":2,"auction":{"durationsHours":[1,6,24],"minIncrementBps":500,"minStartCents":10000,"feeBps":1000,"antiSnipeMinutes":2},"gallery":{"auctionsPerDay":4,"auctionHours":6,"startPriceCents":{"common":500000,"rare":2500000,"legendary":15000000}},"hot":{"likeWeight":1,"bidWeight":3,"gravity":1.5}}'::jsonb, 'Defaults from src/config/balance.ts, section "artworks"'),
   ('companyEvents', '{"chancePerDay":0.6,"minGapHours":22,"minAgeHours":6,"chanceShare":0.4,"severityWeights":[0.5,0.35,0.15],"severityScale":[1,1.7,2.5],"preDeadlineShare":0.25,"costUnit":{"minUnitCents":20000,"unitShareOfFixed":0.5},"knowHow":{"bpsPerPoint":150,"maxBonusBps":2500},"severityPenaltyBps":700,"retryCostShare":0.5,"shareShockBps":[400,900,1500],"archetypes":[{"key":"regulation","polarity":"crisis","weight":12,"effect":{"demand":-0.12,"cost":0.06},"deadlineHours":30,"lastsHours":72,"strategies":[{"key":"lobby","mitigation":1,"bonus":{"awareness":0.02},"steps":[{"key":"study","hours":3,"cost":2,"branch":"law","baseBps":9000},{"key":"alliance","hours":5,"cost":1,"branch":"sales","staff":2,"baseBps":6500},{"key":"hearing","hours":6,"cost":3,"branch":"law","baseBps":5500}]},{"key":"adapt","mitigation":0.7,"bonus":{"quality":0.03},"steps":[{"key":"retool","hours":8,"cost":4,"staff":1,"capacityHit":0.3,"baseBps":9500},{"key":"certify","hours":4,"cost":1,"branch":"science","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"special_tax","polarity":"crisis","weight":10,"effect":{"cost":0.1},"deadlineHours":30,"lastsHours":96,"strategies":[{"key":"lobby","mitigation":1,"steps":[{"key":"petition","hours":2,"cost":1,"branch":"sales","baseBps":9000},{"key":"experts","hours":5,"cost":2,"branch":"finance","baseBps":7000},{"key":"hearing","hours":6,"cost":3,"branch":"law","baseBps":5500}]},{"key":"reformulate","mitigation":0.8,"bonus":{"quality":-0.02},"steps":[{"key":"lab","hours":6,"cost":3,"branch":"science","staff":1,"baseBps":6500},{"key":"relaunch","hours":4,"cost":2,"branch":"sales","baseBps":8500}]},{"key":"pass_on","mitigation":0.5,"steps":[{"key":"price_talk","hours":3,"cost":1,"branch":"sales","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"supply_shortage","polarity":"crisis","weight":11,"effect":{"capacity":-0.25,"cost":0.05},"deadlineHours":24,"lastsHours":60,"strategies":[{"key":"new_supplier","mitigation":1,"steps":[{"key":"scout","hours":3,"cost":1,"branch":"logistics","baseBps":8500},{"key":"contract","hours":4,"cost":3,"branch":"finance","baseBps":7500}]},{"key":"stockpile","mitigation":0.8,"steps":[{"key":"buy_stock","hours":2,"cost":6,"baseBps":10000}]},{"key":"redesign","mitigation":1,"bonus":{"quality":0.02},"steps":[{"key":"prototype","hours":6,"cost":2,"branch":"science","staff":1,"baseBps":6000},{"key":"switch","hours":6,"cost":2,"branch":"craft","capacityHit":0.2,"baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"quality_scandal","polarity":"crisis","weight":9,"effect":{"demand":-0.2},"deadlineHours":20,"lastsHours":72,"strategies":[{"key":"recall","mitigation":1,"bonus":{"quality":0.04},"steps":[{"key":"pull_back","hours":4,"cost":4,"branch":"logistics","capacityHit":0.3,"baseBps":9500},{"key":"fix","hours":6,"cost":2,"branch":"craft","baseBps":7500}]},{"key":"pr_offensive","mitigation":0.6,"bonus":{"awareness":0.03},"steps":[{"key":"statement","hours":1,"cost":1,"branch":"management","baseBps":9000},{"key":"campaign","hours":5,"cost":3,"branch":"sales","baseBps":6500}]},{"key":"independent_test","mitigation":0.9,"steps":[{"key":"lab_test","hours":8,"cost":2,"branch":"science","baseBps":7000},{"key":"publish","hours":2,"cost":1,"branch":"sales","baseBps":9000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"data_breach","polarity":"crisis","weight":8,"sectors":["tech","retail","logistics"],"effect":{"demand":-0.15,"cost":0.04},"deadlineHours":18,"lastsHours":60,"strategies":[{"key":"forensics","mitigation":1,"bonus":{"quality":0.02},"steps":[{"key":"analyse","hours":4,"cost":2,"branch":"it","baseBps":7500},{"key":"patch","hours":4,"cost":1,"branch":"it","staff":2,"baseBps":8000},{"key":"audit","hours":3,"cost":2,"branch":"law","baseBps":9000}]},{"key":"transparency","mitigation":0.6,"bonus":{"awareness":0.01},"steps":[{"key":"disclose","hours":2,"cost":1,"branch":"management","baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"price_war","polarity":"crisis","weight":10,"effect":{"demand":-0.18},"deadlineHours":30,"lastsHours":72,"strategies":[{"key":"undercut","mitigation":0.8,"steps":[{"key":"calculate","hours":2,"cost":1,"branch":"finance","baseBps":9000},{"key":"discount","hours":6,"cost":4,"branch":"sales","baseBps":9500}]},{"key":"innovate","mitigation":1,"bonus":{"quality":0.04},"steps":[{"key":"research","hours":6,"cost":2,"branch":"science","baseBps":7000},{"key":"build","hours":6,"cost":2,"branch":"craft","staff":2,"capacityHit":0.2,"baseBps":7500},{"key":"launch","hours":3,"cost":2,"branch":"sales","baseBps":8500}]},{"key":"niche","mitigation":0.6,"steps":[{"key":"reposition","hours":4,"cost":2,"branch":"sales","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"strike","polarity":"crisis","weight":7,"effect":{"capacity":-0.35},"deadlineHours":16,"lastsHours":48,"strategies":[{"key":"negotiate","mitigation":1,"steps":[{"key":"listen","hours":2,"cost":0,"branch":"management","baseBps":9000},{"key":"deal","hours":4,"cost":3,"branch":"management","baseBps":7000}]},{"key":"bonus","mitigation":0.8,"steps":[{"key":"pay_bonus","hours":1,"cost":5,"baseBps":10000}]},{"key":"automate","mitigation":0.7,"bonus":{"quality":-0.02},"steps":[{"key":"machines","hours":8,"cost":4,"branch":"it","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"protest","polarity":"crisis","weight":8,"effect":{"demand":-0.1,"cost":0.03},"deadlineHours":30,"lastsHours":72,"strategies":[{"key":"green","mitigation":1,"bonus":{"awareness":0.03,"quality":0.02},"steps":[{"key":"footprint","hours":4,"cost":1,"branch":"science","baseBps":8500},{"key":"program","hours":8,"cost":4,"branch":"craft","staff":1,"baseBps":8500},{"key":"report","hours":2,"cost":1,"branch":"sales","baseBps":9000}]},{"key":"dialogue","mitigation":0.6,"steps":[{"key":"invite","hours":2,"cost":0,"branch":"management","baseBps":8500},{"key":"round_table","hours":4,"cost":1,"branch":"sales","baseBps":7000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"patent_claim","polarity":"crisis","weight":6,"effect":{"demand":-0.08,"cost":0.08},"deadlineHours":36,"lastsHours":96,"strategies":[{"key":"lawyers","mitigation":1,"steps":[{"key":"review","hours":4,"cost":2,"branch":"law","baseBps":8000},{"key":"court","hours":8,"cost":4,"branch":"law","baseBps":5500}]},{"key":"license","mitigation":0.7,"steps":[{"key":"pay_license","hours":2,"cost":5,"baseBps":10000}]},{"key":"workaround","mitigation":0.9,"bonus":{"quality":0.02},"steps":[{"key":"redesign","hours":8,"cost":2,"branch":"science","staff":1,"baseBps":6500},{"key":"test","hours":4,"cost":1,"branch":"craft","baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"bad_review","polarity":"crisis","weight":9,"effect":{"demand":-0.14},"deadlineHours":24,"lastsHours":48,"strategies":[{"key":"improve","mitigation":1,"bonus":{"quality":0.05},"steps":[{"key":"analyse","hours":3,"cost":1,"branch":"science","baseBps":9000},{"key":"rework","hours":6,"cost":3,"branch":"craft","capacityHit":0.2,"baseBps":7500},{"key":"retest","hours":3,"cost":1,"branch":"sales","baseBps":7000}]},{"key":"counter","mitigation":0.6,"bonus":{"awareness":0.02},"steps":[{"key":"campaign","hours":4,"cost":3,"branch":"sales","baseBps":7500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"viral_trend","polarity":"chance","weight":10,"effect":{"demand":0.35},"deadlineHours":12,"lastsHours":48,"strategies":[{"key":"scale_up","mitigation":1,"bonus":{"awareness":0.04},"steps":[{"key":"overtime","hours":2,"cost":2,"staff":1,"baseBps":9500},{"key":"restock","hours":4,"cost":3,"branch":"logistics","baseBps":8500}]},{"key":"ride_wave","mitigation":0.6,"bonus":{"awareness":0.06},"steps":[{"key":"content","hours":3,"cost":1,"branch":"sales","baseBps":8000}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"big_contract","polarity":"chance","weight":9,"effect":{"demand":0.25},"deadlineHours":24,"lastsHours":72,"strategies":[{"key":"pitch","mitigation":1,"steps":[{"key":"offer","hours":3,"cost":1,"branch":"sales","baseBps":8500},{"key":"negotiate","hours":4,"cost":1,"branch":"management","baseBps":6500},{"key":"deliver","hours":6,"cost":3,"staff":2,"capacityHit":0.2,"baseBps":9000}]},{"key":"quick_deal","mitigation":0.5,"steps":[{"key":"discount_offer","hours":2,"cost":1,"branch":"sales","baseBps":9000}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"award","polarity":"chance","weight":8,"effect":{"demand":0.15},"deadlineHours":24,"lastsHours":72,"strategies":[{"key":"press_tour","mitigation":1,"bonus":{"awareness":0.06},"steps":[{"key":"interviews","hours":3,"cost":1,"branch":"management","baseBps":8500},{"key":"ads","hours":4,"cost":3,"branch":"sales","baseBps":9000}]},{"key":"badge","mitigation":0.5,"steps":[{"key":"seal","hours":1,"cost":1,"baseBps":10000}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"subsidy","polarity":"chance","weight":7,"effect":{"cost":-0.08},"deadlineHours":36,"lastsHours":96,"strategies":[{"key":"apply","mitigation":1,"steps":[{"key":"forms","hours":3,"cost":0,"branch":"law","baseBps":9000},{"key":"plan","hours":5,"cost":1,"branch":"finance","baseBps":7500},{"key":"jury","hours":4,"cost":0,"branch":"management","baseBps":6000}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"partnership","polarity":"chance","weight":7,"effect":{"demand":0.2,"capacity":0.1},"deadlineHours":24,"lastsHours":96,"strategies":[{"key":"join","mitigation":1,"bonus":{"awareness":0.03},"steps":[{"key":"meeting","hours":2,"cost":0,"branch":"management","baseBps":9000},{"key":"integrate","hours":6,"cost":2,"branch":"it","staff":1,"baseBps":7500}]},{"key":"pass","mitigation":0,"steps":[]}]}]}'::jsonb, 'Defaults from src/config/balance.ts, section "companyEvents"'),
+  ('upgrades', '{"order":["vault","income","study","overtime","rhetoric"],"vault":{"maxLevel":6,"minLevel":1,"baseCostCents":300000,"costGrowth":2,"perLevel":2},"income":{"maxLevel":3,"minLevel":3,"baseCostCents":400000,"costGrowth":3,"perLevel":1000},"study":{"maxLevel":3,"minLevel":2,"baseCostCents":800000,"costGrowth":3,"perLevel":1},"overtime":{"maxLevel":2,"minLevel":5,"baseCostCents":2000000,"costGrowth":3,"perLevel":1},"rhetoric":{"maxLevel":3,"minLevel":5,"baseCostCents":1000000,"costGrowth":2.5,"perLevel":500},"minWorkHoursPerBranchPoint":3}'::jsonb, 'Defaults from src/config/balance.ts, section "upgrades"'),
+  ('deals', '{"minLevel":4,"offerValidHours":48,"maxOpenOffers":5,"maxActivePerKind":5,"loan":{"minPrincipalCents":10000,"maxPrincipalCentsPerLevel":2000000,"maxInterestBps":3000,"minHours":24,"maxHours":720,"defaultAfterHours":168},"supply":{"minVolumeCentsPerHour":1000,"minFeeBps":1000,"maxFeeBps":9500,"maxPrepayBps":5000,"minHours":24,"maxHours":336,"keptDeliveryBps":5000},"stake":{"minAmountCents":10000,"maxShareBps":3000,"maxTotalShareBps":5000,"minHours":24,"maxHours":720}}'::jsonb, 'Defaults from src/config/balance.ts, section "deals"'),
+  ('trust', '{"start":50,"min":0,"max":100,"deltas":{"loanRepaidOnTime":4,"loanRepaidLate":2,"loanOverdue":-6,"loanDefaulted":-12,"loanLent":1,"loanForgiven":2,"supplyKept":3,"supplyShort":-4,"stakeKept":3,"dealBroken":-12},"bands":[{"from":0,"key":"risky"},{"from":30,"key":"shaky"},{"from":45,"key":"blank"},{"from":60,"key":"reliable"},{"from":80,"key":"rock"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "trust"'),
   ('social', '{"feed":{"pageSize":30,"bigTradeMinProfitCents":100000,"bigTradeMinBps":1500,"levelEvery":5,"artMinPriceCents":1000000,"carMinPriceCents":10000000,"streakMilestones":[7,30,100,365],"keepDays":30},"league":{"updateEveryMinutes":10,"podium":3,"minBaselineCents":1000000}}'::jsonb, 'Defaults from src/config/balance.ts, section "social"'),
   ('property', '{"tiers":[{"key":"flat","priceCents":2500000,"width":8,"height":6,"garageSlots":0,"minLevel":4},{"key":"apartment","priceCents":10000000,"width":10,"height":8,"garageSlots":0,"minLevel":8},{"key":"house","priceCents":50000000,"width":13,"height":9,"garageSlots":2,"minLevel":14},{"key":"villa","priceCents":250000000,"width":16,"height":11,"garageSlots":4,"minLevel":22},{"key":"luxury_villa","priceCents":1500000000,"width":20,"height":13,"garageSlots":8,"minLevel":30}],"tradeInBps":5000,"resaleBps":4000,"floors":{"laminate":0,"carpet":150000,"tiles":400000,"parquet":600000,"stone":1500000,"marble":6000000,"gold":100000000},"wallColors":["#f3efe4","#ffffff","#d9d4c7","#8f9bb3","#3a4256","#1b1e2b","#c8e6c9","#2f7a4a","#bfe6ff","#2f5fd0","#ffe0b2","#ff9a52","#f8bbd0","#7a2f7a","#c8553d","#ffd15c"]}'::jsonb, 'Defaults from src/config/balance.ts, section "property"')
 on conflict (key) do nothing;

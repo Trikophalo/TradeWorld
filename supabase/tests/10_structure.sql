@@ -98,7 +98,9 @@ select tests.assert(
            -- M4g RPCs (announced events, ADR-090)
            'get_events',
            -- M4h RPCs (company events and news, ADR-091)
-           'choose_event_strategy', 'company_ai_context', 'get_company_event', 'get_company_news', 'start_event_step']
+           'choose_event_strategy', 'company_ai_context', 'get_company_event', 'get_company_news', 'start_event_step',
+           -- M4i RPCs (upgrades and promotions, ADR-093, ADR-094)
+           'buy_upgrade', 'decline_promotion', 'get_upgrades', 'promote_employee', 'request_promotion']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')
