@@ -19,6 +19,7 @@ import { createCareerEngine, initialCareer, tycoonAvatar, type CareerState } fro
 import { createArtEngine, type ArtState } from "./demo/artworks";
 import { createPropertyEngine, type HomeState } from "./demo/property";
 import { createFriendEngine, type DemoFriendCode } from "./demo/friends";
+import { createStockNewsEngine } from "./demo/stock-news";
 import { createSocialEngine, type DemoSocialState } from "./demo/social";
 import { createCompanyEventsEngine } from "./demo/company-events";
 import { createCryptoEngine, type DemoCryptoState } from "./demo/crypto";
@@ -1243,7 +1244,19 @@ export function demoCloseQuarter(): void {
   company.closeQuarterNow();
 }
 
+const stockNews = createStockNewsEngine({
+  companies: () => DEMO_COMPANIES,
+  shock: (ticker, moveBps) => {
+    const st = m();
+    const mid = st.mids.get(ticker);
+    if (mid) st.mids.set(ticker, Math.max(10, Math.round(mid * (1 + moveBps / 10_000))));
+  },
+  now: () => Date.now(),
+  random: () => Math.random(),
+});
+
 export const demoEngine: GameEngine = {
+  ...stockNews,
   ...career.engine,
   ...upgradeEngine,
   ...deals.engine,

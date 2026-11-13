@@ -951,3 +951,13 @@ select public.redeem_friend_code(gen_random_uuid(), :'fx_code');
 select public.get_friend_code();
 \o
 reset role;
+
+-- Stock news with a lead (ADR-119) -----------------------------------------------------------------------------------
+select public.stock_news_run_due() is not null as ok \gset
+update public.stock_tips set due_at = published_at where id = (select min(id) from public.stock_tips);
+select public.stock_news_run_due(public.game_now() + interval '1 hour') is not null as ok \gset
+select tests.login_as('authenticated', :fx_fb) is null as ok \gset
+\o :fixture_dir/get_stock_news.json
+select public.get_stock_news(10);
+\o
+reset role;

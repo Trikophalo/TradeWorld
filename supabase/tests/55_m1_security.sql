@@ -45,8 +45,10 @@ select tests.assert(
           || array['burn_coin_tokens', 'check_coin_name', 'create_coin', 'crypto_trade', 'discontinue_coin', 'get_coin',
                    'get_crypto_market', 'get_my_coin', 'launch_coin', 'start_coin_action']
           -- friend code (85)
-          || array['get_friend_code', 'redeem_friend_code']) x),
-  'authenticated can execute exactly the 9 helpers and the RPCs up to the friend code (85)');
+          || array['get_friend_code', 'redeem_friend_code']
+          -- stock news (89)
+          || array['get_stock_news']) x),
+  'authenticated can execute exactly the 9 helpers and the RPCs up to the stock news (89)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute') and p.proname <> 'check_nickname'),

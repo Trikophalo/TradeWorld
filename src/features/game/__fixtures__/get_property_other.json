@@ -4,7 +4,7 @@
     "floor": "parquet",
     "owner": "Fixture_Heim",
     "width": 13,
-    "garage": [{ "id": "3d57c139-3cc9-4b55-9780-1b0646d7af93", "slot": 0, "car_key": "car_electric" }],
+    "garage": [{ "id": "b6c95884-a033-4422-88da-4ea920912f83", "slot": 0, "car_key": "car_electric" }],
     "height": 9,
     "placed": [],
     "wall_color": "#2f5fd0",

@@ -110,7 +110,9 @@ select tests.assert(
            'burn_coin_tokens', 'check_coin_name', 'create_coin', 'crypto_trade', 'discontinue_coin', 'get_coin',
            'get_crypto_market', 'get_my_coin', 'launch_coin', 'start_coin_action',
            -- friend code (ADR-111)
-           'get_friend_code', 'redeem_friend_code']
+           'get_friend_code', 'redeem_friend_code',
+           -- stock news with a lead (ADR-119)
+           'get_stock_news']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')
@@ -150,10 +152,13 @@ select tests.assert(
       'sim_rng_streams', 'sim_tick_log', 'job_runs', 'internal_settings', 'admin_users',
       'insider_violations', 'work_task_solutions', 'scheduled_event_secrets', 'macro_event_definitions',
       'random_event_definitions', 'news_templates', 'news_item_effects', 'league_entry_baselines',
+      'stock_tips',
       'rate_limits', 'player_requests', 'player_login_events', 'push_deliveries', 'invite_code_redemptions',
       'price_ticks_default']) as t
-     where has_table_privilege('authenticated', ('public.' || t)::regclass, 'select')
-        or has_any_column_privilege('authenticated', ('public.' || t)::regclass, 'select')),
+     -- (a table from a later migration is not there yet on an older database)
+     where to_regclass('public.' || t) is not null
+       and (has_table_privilege('authenticated', to_regclass('public.' || t), 'select')
+            or has_any_column_privilege('authenticated', to_regclass('public.' || t), 'select'))),
   'authenticated has no SELECT on internal tables (fair value, sentiment, AI holdings, lease, RNG ...)');
 
 -- every table without any policy must be one without grants (internal)

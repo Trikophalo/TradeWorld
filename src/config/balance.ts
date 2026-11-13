@@ -758,6 +758,22 @@ export interface SocialConfig {
   readonly friendCode: { readonly bonusCents: number };
 }
 
+/** Stock news with a lead (ADR-119): hints that announce a price move. */
+export interface StockNewsConfig {
+  /** A new hint this often. */
+  readonly everyMinutes: number;
+  /** The move follows after a random time in this range. */
+  readonly leadMinMinutes: number;
+  readonly leadMaxMinutes: number;
+  /** Size of the move. */
+  readonly minMoveBps: number;
+  readonly maxMoveBps: number;
+  /** Share of hints that come true. */
+  readonly reliabilityBps: number;
+  /** Settled hints are kept this long. */
+  readonly keepHours: number;
+}
+
 export interface BalanceConfig {
   readonly time: TimeConfig;
   readonly economy: EconomyConfig;
@@ -800,6 +816,7 @@ export interface BalanceConfig {
   readonly trust: TrustConfig;
   /** Cryptocurrencies and own coins (ADR-101), values in crypto.ts. */
   readonly crypto: CryptoConfig;
+  readonly stockNews: StockNewsConfig;
 }
 
 export type PropertyTier = "flat" | "apartment" | "house" | "villa" | "luxury_villa";
@@ -2262,6 +2279,15 @@ export const BALANCE = {
   deals: DEALS,
   trust: TRUST,
   crypto: CRYPTO,
+  stockNews: {
+    everyMinutes: 12,
+    leadMinMinutes: 10,
+    leadMaxMinutes: 40,
+    minMoveBps: 300,
+    maxMoveBps: 1_200,
+    reliabilityBps: 7_500,
+    keepHours: 24,
+  },
   social: {
     feed: {
       pageSize: 30,

@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "1d093293-c39d-491c-bf0e-dcfe90965afb",
+    "id": "0ccc6120-cc0c-42e2-96b9-8edda20ea0ec",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "12ef4943-a830-a22b-a142-8a080f7be8be",
+      "id": "2faf9e4c-3f0a-8a5b-1645-c669e9481771",
       "logo": null,
-      "name": "Kaufrausch Märkte",
-      "color": "#FF6B8B",
+      "name": "NeuroPharm AG",
+      "color": "#6EE7A0",
       "is_ai": true,
-      "sector": "retail",
-      "ticker": "KFR"
+      "sector": "pharma",
+      "ticker": "NPH"
     },
     "presence": {
-      "fire_at": "2026-11-18T20:54:29.121377+00:00",
+      "fire_at": "2026-11-18T21:11:31.435568+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-13T20:54:29.121377+00:00"
+      "last_active_at": "2026-11-13T21:11:31.435568+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-13T20:54:29.20073+00:00",
+    "started_at": "2026-11-13T21:11:31.518536+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

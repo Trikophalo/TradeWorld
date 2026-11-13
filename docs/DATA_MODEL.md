@@ -7062,3 +7062,29 @@ Migration `20261203000300_rich_list_speed.sql`, idempotente Kopie in `supabase/u
 - `player_rich_rank(uuid)` liest den Rang aus der neuesten Momentaufnahme, solange sie höchstens doppelt so alt ist
   wie `richList.snapshotMinutes`; sonst wird er wie bisher berechnet. Vorher baute jeder Aufruf die ganze Rangliste
   neu, pro Rang-Mission und Spieler, im Minuten-Job und bei jedem `get_my_missions()`.
+
+## Nachtrag: Aktien-News mit Vorlauf (ADR-119)
+
+Migration `20261203000600_stock_news.sql`, idempotente Kopie in `supabase/updates/`, Test
+`supabase/tests/89_stock_news.sql`.
+
+**Tabelle `stock_tips`** (intern, RLS ohne Policy, keine Client-Rechte): `security_id`, `news_item_id`,
+`result_news_id`, `direction` (−1/1), `move_bps`, `strength` (1 bis 3), `comes_true`, `headline`, `body`,
+`published_at`, `due_at`, `applied_at`.
+
+**Konfiguration** `game_config.stockNews`: `everyMinutes`, `leadMinMinutes`, `leadMaxMinutes`, `minMoveBps`,
+`maxMoveBps`, `reliabilityBps`, `keepHours`. Ohne den Abschnitt erscheinen keine Meldungen.
+
+**Funktionen:**
+
+- `stock_news_run_due(p_now)` (intern, Cron `nexa-stock-news` jede Minute): rechnet fällige Meldungen ab
+  (`event_price_shock` oder „nicht bestätigt“, jeweils mit `news_items`-Eintrag) und veröffentlicht eine neue, wenn
+  die letzte alt genug ist. Nimmt dieselbe Sperre wie der Minuten-Job.
+- `get_stock_news(p_limit integer default 20)` (RPC, `authenticated`):
+
+```
+{"reliability_bps": 7500,
+ "items": [{"id", "ticker", "name", "headline", "body", "direction": "up"|"down", "strength": 1..3,
+            "published_at", "due_at", "status": "open"|"confirmed"|"fizzled",
+            "move_bps": integer|null}]}     -- move_bps erst nach dem Eintreffen
+```

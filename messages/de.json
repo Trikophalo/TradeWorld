@@ -4343,5 +4343,18 @@
     "richList": "Wer hat am meisten? Hier steht es schwarz auf weiß.",
     "events": "Was heute an der Börse ansteht.",
     "profile": "Dein Fortschritt, dein Aussehen, deine Einstellungen."
+  },
+  "stockNews": {
+    "title": "Börsen-News",
+    "intro": "Meldungen kündigen an, wohin eine Aktie bald laufen könnte. Etwa {percent} % treffen ein.",
+    "empty": "Gerade ist es ruhig. Die nächste Meldung kommt bald.",
+    "up": "Steigt wohl",
+    "down": "Fällt wohl",
+    "soon": "in etwa {minutes, plural, =0 {wenigen Sekunden} one {# Minute} other {# Minuten}}",
+    "any": "jeden Moment",
+    "confirmed": "Eingetroffen {move}",
+    "fizzled": "Nicht eingetroffen",
+    "open": "Zur Aktie {ticker}",
+    "strength": "{strength, select, 1 {leicht} 2 {spürbar} other {deutlich}}"
   }
 }

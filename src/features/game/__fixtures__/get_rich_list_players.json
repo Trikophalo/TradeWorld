@@ -1,10 +1,10 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 64, "gap_cents": 588 }, "rank": 65, "net_worth_cents": 1019412 },
-  "total": 161,
+  "me": { "next": { "name": "Vera", "rank": 64, "gap_cents": 620 }, "rank": 65, "net_worth_cents": 1019380 },
+  "total": 162,
   "entries": [
     {
       "id": "0f3f3f3f-0000-4000-8000-0000000000f1",
-      "tag": "E885",
+      "tag": "ME8U",
       "kind": "player",
       "name": "Fenja_Firma",
       "rank": 1,
@@ -12,12 +12,12 @@
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 102417991,
+      "net_worth_cents": 102361991,
       "rank_change_24h": null
     },
     {
       "id": "07170717-0000-4000-8000-0000000000a1",
-      "tag": "MNZS",
+      "tag": "ETND",
       "kind": "player",
       "name": "Hanna_Haus",
       "rank": 2,
@@ -30,7 +30,7 @@
     },
     {
       "id": "0e3e3e3e-0000-4000-8000-0000000000f1",
-      "tag": "TLHV",
+      "tag": "59EL",
       "kind": "player",
       "name": "Frieda_Format",
       "rank": 3,
@@ -43,7 +43,7 @@
     },
     {
       "id": "08308308-0000-4000-8000-0000000000b1",
-      "tag": "J3UY",
+      "tag": "K53T",
       "kind": "player",
       "name": "Hugo_Heim",
       "rank": 4,
@@ -56,7 +56,7 @@
     },
     {
       "id": "07607607-0000-4000-8000-0000000000a1",
-      "tag": "5TBW",
+      "tag": "GR8T",
       "kind": "player",
       "name": "Feli_Feed",
       "rank": 5,
@@ -68,5 +68,5 @@
       "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-13T20:54:26.657634+00:00"
+  "server_time": "2026-11-13T21:11:28.783488+00:00"
 }

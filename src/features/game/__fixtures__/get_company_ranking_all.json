@@ -15,7 +15,7 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "e50a6ff5-8dbd-8c90-f94e-5ac06d3fe862",
-      "value_cents": 518146000000,
+      "value_cents": 520318000000,
       "revenue_cents": null
     },
     {
@@ -31,14 +31,30 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
-      "value_cents": 432857500000,
+      "value_cents": 434013000000,
+      "revenue_cents": null
+    },
+    {
+      "kind": "ai",
+      "logo": null,
+      "name": "NeuroPharm AG",
+      "rank": 3,
+      "tier": null,
+      "color": "#6EE7A0",
+      "sector": "pharma",
+      "ticker": "NPH",
+      "founder": null,
+      "is_mine": false,
+      "team_size": null,
+      "company_id": "2faf9e4c-3f0a-8a5b-1645-c669e9481771",
+      "value_cents": 433979400000,
       "revenue_cents": null
     },
     {
       "kind": "ai",
       "logo": null,
       "name": "Brotzeit Handel AG",
-      "rank": 3,
+      "rank": 4,
       "tier": null,
       "color": "#F2A93B",
       "sector": "retail",
@@ -47,14 +63,14 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "cbfac5fd-3475-2166-ea22-0a85cbb6f5c0",
-      "value_cents": 354635200000,
+      "value_cents": 349648000000,
       "revenue_cents": null
     },
     {
       "kind": "ai",
       "logo": null,
       "name": "Nordlicht Logistik AG",
-      "rank": 4,
+      "rank": 5,
       "tier": null,
       "color": "#7AA2F7",
       "sector": "logistics",
@@ -63,25 +79,9 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "d21331b8-a414-66aa-de07-f036108fc91d",
-      "value_cents": 312375700000,
-      "revenue_cents": null
-    },
-    {
-      "kind": "ai",
-      "logo": null,
-      "name": "Alpenmed",
-      "rank": 5,
-      "tier": null,
-      "color": "#8FD3F4",
-      "sector": "pharma",
-      "ticker": "ALM",
-      "founder": null,
-      "is_mine": false,
-      "team_size": null,
-      "company_id": "533f0569-8570-a8f1-ebc9-07f9808291c9",
-      "value_cents": 135123750000,
+      "value_cents": 313325600000,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-13T20:54:27.330305+00:00"
+  "server_time": "2026-11-13T21:11:29.538204+00:00"
 }

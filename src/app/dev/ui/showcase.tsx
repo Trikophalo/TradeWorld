@@ -39,6 +39,7 @@ import { SpeechBubble } from "@/features/tutorial/components/speech-bubble";
 import { useTutorial } from "@/features/tutorial/store";
 import { resetDemoPlayer } from "@/features/game/demo-engine";
 import { FriendCodeCard } from "@/features/friends/components/friend-code";
+import { StockNewsCard } from "@/features/news/stock-news";
 import { LevelCard } from "@/features/progression/components/level-card";
 import { formatMoney, formatPrice } from "@/lib/format";
 import { DURATION, SPRING, fadeUp, staggerContainer } from "@/lib/motion";
@@ -265,6 +266,7 @@ export function Showcase() {
           </div>
         </Card>
         <FriendCodeCard />
+        <StockNewsCard />
       </Section>
 
       <Section id="buttons" title={t("buttons")} className="grid gap-4 lg:grid-cols-2">

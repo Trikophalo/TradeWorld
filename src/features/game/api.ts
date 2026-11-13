@@ -270,6 +270,25 @@ const checkInSchema = z.object({
 });
 
 /** Response schemas per RPC, exported for the contract test against real database output. */
+const stockNewsSchema = z.object({
+  reliability_bps: z.number(),
+  items: z.array(
+    z.object({
+      id: z.number(),
+      ticker: z.string(),
+      name: z.string(),
+      headline: z.string(),
+      body: z.string(),
+      direction: z.enum(["up", "down"]),
+      strength: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+      published_at: z.string(),
+      due_at: z.string(),
+      status: z.enum(["open", "confirmed", "fizzled"]),
+      move_bps: z.number().nullable().default(null),
+    }),
+  ),
+});
+
 export const RPC_SCHEMAS = {
   get_market_snapshot: snapshotSchema,
   get_candles: z.array(candleSchema),
@@ -295,6 +314,7 @@ export const RPC_SCHEMAS = {
   ...COMPANY_RPC_SCHEMAS,
   ...ARTWORK_RPC_SCHEMAS,
   ...PROPERTY_RPC_SCHEMAS,
+  get_stock_news: stockNewsSchema,
   ...FRIEND_RPC_SCHEMAS,
   ...SOCIAL_RPC_SCHEMAS,
   ...COMPANY_EVENT_RPC_SCHEMAS,
@@ -308,6 +328,25 @@ export const liveEngine: GameEngine = {
   ...liveArtEngine,
   ...livePropertyEngine,
   ...liveFriendEngine,
+  async stockNews(limit = 20) {
+    const r = await rpc("get_stock_news", { p_limit: limit }, stockNewsSchema);
+    return {
+      reliabilityBps: r.reliability_bps,
+      items: r.items.map((i) => ({
+        id: i.id,
+        ticker: i.ticker,
+        name: i.name,
+        headline: i.headline,
+        body: i.body,
+        direction: i.direction,
+        strength: i.strength,
+        publishedAt: i.published_at,
+        dueAt: i.due_at,
+        status: i.status,
+        moveBps: i.move_bps,
+      })),
+    };
+  },
   ...liveSocialEngine,
   ...liveCompanyEventEngine,
   ...liveDealEngine,

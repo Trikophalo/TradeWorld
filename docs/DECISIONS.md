@@ -1703,3 +1703,18 @@ Eine bezahlte echte Stunde zählt als 24 Stunden im Rang (`careers.promotion.ran
 (12, 36, 72, 120 Stunden) bleiben stehen, sind aber nach 30 Minuten, 1,5, 3 und 5 Stunden bezahlter Arbeit erfüllt.
 Gezählt werden weiter bezahlte echte Minuten (`player_jobs.rank_minutes`); der Faktor wird beim Vergleich auf dem
 Server und bei der Anzeige angewendet. Lohn, Arbeitspunkte und der Achtstundentag ändern sich nicht.
+
+## ADR-119: Aktien-News mit Vorlauf — `akzeptiert`
+
+Vorgabe: Es soll Aktien-News geben, mit denen man vorhersehen kann, in was man investieren sollte.
+
+- Alle `stockNews.everyMinutes` (12) Minuten bekommt eine gelistete Aktie eine Meldung mit Richtung („Analysten heben
+  den Daumen für …“, „… warnen vor …“) und Stärke (leicht, spürbar, deutlich).
+- Nach einer Vorlaufzeit von 10 bis 40 Minuten bewegt sich der Kurs um 3 bis 12 % in die genannte Richtung
+  (`event_price_shock`, wie bei angekündigten Ereignissen). Nicht jede Meldung trifft ein: 75 %
+  (`stockNews.reliabilityBps`). Wer liest, hat einen Vorteil, aber kein sicheres Geld.
+- Die Märkte-Seite zeigt die Meldungen als „Börsen-News“: offene zuerst mit erwarteter Zeit, danach ob sie
+  eingetroffen sind und wie stark. Ein Tipp führt zur Aktie; dort steht die Meldung auch bei den Nachrichten.
+- Der Plan einer Meldung (ob sie eintrifft, wie stark genau) bleibt auf dem Server (`stock_tips`, ohne Client-Rechte).
+- Ein eigener Cron-Job (`nexa-stock-news`, jede Minute) erledigt das, damit der Minuten-Job kurz bleibt.
+- Das Geld bleibt im geschlossenen System: Gewinne aus Tipps zahlt die Gegenseite am Markt.

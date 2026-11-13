@@ -475,6 +475,7 @@ der KI-Firmen). M3 ist empfohlen, weil sonst das Geld für die Gründung langsam
 - [x] Freundescode im Profil: eigener Code zum Teilen, einmalig 5.000 € für den eingetragenen Code (ADR-111)
 - [x] Registrierung ohne Einladungscode (ADR-114)
 - [x] Skills der Reihe nach mit Voraussetzungen, Karte immer sichtbar und neu gezeichnet (ADR-115)
+- [x] Nur Sofort-Orders (ADR-117), Zeit im Rang 24-fach (ADR-118), Börsen-News mit Vorlauf (ADR-119)
 
 ### Daten/Backend
 

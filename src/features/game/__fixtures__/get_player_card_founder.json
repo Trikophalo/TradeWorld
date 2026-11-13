@@ -1,7 +1,7 @@
 {
   "job": null,
-  "tag": "7YDM",
-  "rank": 265,
+  "tag": "2RM3",
+  "rank": 270,
   "level": 10,
   "trust": { "band": "blank", "kept": 0, "score": 50, "broken": 0 },
   "company": { "name": "Fixture Labor", "ticker": null },
@@ -13,7 +13,7 @@
     { "key": "it_basics", "tier": 1 }
   ],
   "streak_days": 1,
-  "member_since": "2026-11-13T20:54:26.414588+00:00",
+  "member_since": "2026-11-13T21:11:28.522681+00:00",
   "branch_scores": {
     "it": 3,
     "law": 0,
@@ -25,5 +25,5 @@
     "management": 0
   },
   "skills_learned": 2,
-  "net_worth_cents": 2423952
+  "net_worth_cents": 2423920
 }

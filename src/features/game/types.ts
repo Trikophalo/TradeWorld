@@ -1064,6 +1064,29 @@ export interface PlayerSearchResult {
   avatarKey: string;
 }
 
+/** Stock news with a lead (ADR-119): a hint that a stock is about to move. */
+export interface StockNewsItem {
+  id: number;
+  ticker: string;
+  name: string;
+  headline: string;
+  body: string;
+  direction: "up" | "down";
+  strength: 1 | 2 | 3;
+  publishedAt: string;
+  /** When the move is expected. */
+  dueAt: string;
+  status: "open" | "confirmed" | "fizzled";
+  /** Told once the hint is settled and came true. */
+  moveBps: number | null;
+}
+
+export interface StockNews {
+  /** Share of hints that come true. */
+  reliabilityBps: number;
+  items: StockNewsItem[];
+}
+
 /** Friend code (ADR-111): the own code to hand out and the one code a player may redeem. */
 export interface FriendCode {
   /** "NEXA-K7Q2" */
@@ -1658,6 +1681,8 @@ export interface GameEngine {
   sendFriendRequest(requestId: string, nickname: string): Promise<Friends>;
   respondFriendRequest(requestId: string, nickname: string, accept: boolean): Promise<Friends>;
   removeFriend(requestId: string, nickname: string): Promise<Friends>;
+  /** Stock news with a lead (ADR-119). */
+  stockNews(limit?: number): Promise<StockNews>;
   /** Friend code (ADR-111). */
   friendCode(): Promise<FriendCode>;
   redeemFriendCode(requestId: string, code: string): Promise<FriendCodeRedeemed>;

@@ -1,0 +1,31 @@
+{
+  "items": [
+    {
+      "id": 4,
+      "body": "Beobachter rechnen in Kürze mit einem leicht fallenden Kurs. Sicher ist das nicht.",
+      "name": "Nordlicht Logistik AG",
+      "due_at": "2026-11-13T22:41:35.182171+00:00",
+      "status": "open",
+      "ticker": "NDL",
+      "headline": "Gegenwind für Nordlicht Logistik AG erwartet",
+      "move_bps": null,
+      "strength": 1,
+      "direction": "down",
+      "published_at": "2026-11-13T22:11:32.95086+00:00"
+    },
+    {
+      "id": 3,
+      "body": "Beobachter rechnen in Kürze mit einem spürbar fallenden Kurs. Sicher ist das nicht.",
+      "name": "QuantenSprung Labs",
+      "due_at": "2026-11-13T21:11:32.946209+00:00",
+      "status": "confirmed",
+      "ticker": "QSL",
+      "headline": "Gerücht: QuantenSprung Labs verfehlt die Erwartungen",
+      "move_bps": -743,
+      "strength": 2,
+      "direction": "down",
+      "published_at": "2026-11-13T21:11:32.946209+00:00"
+    }
+  ],
+  "reliability_bps": 7500
+}
