@@ -2,8 +2,8 @@
   "count": 1,
   "artworks": [
     {
-      "id": "14619245-88d5-48f6-a877-d7ffdf8e8e58",
-      "hot": 0.346546,
+      "id": "b2a9e23e-f4fc-4feb-975f-ab3acd9b19dd",
+      "hot": 0.345624,
       "code": "ART-0001",
       "liked": false,
       "likes": 0,
@@ -62,7 +62,7 @@
       "rarity": "common",
       "auction": null,
       "creator": null,
-      "created_at": "2026-11-13T11:45:22.023853+00:00",
+      "created_at": "2026-11-13T12:32:53.398392+00:00",
       "value_cents": 500000
     }
   ],

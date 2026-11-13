@@ -1,0 +1,89 @@
+{
+  "items": [
+    {
+      "id": 93,
+      "kind": "event_step_done",
+      "ai_body": null,
+      "payload": {
+        "idx": 0,
+        "step": "study",
+        "success": true,
+        "event_id": "a44e8ca5-7f74-45e0-b413-9eb9c82733e7",
+        "strategy": "lobby",
+        "archetype": "regulation"
+      },
+      "created_at": "2026-11-13T12:34:44.238582+00:00",
+      "ai_headline": null
+    },
+    {
+      "id": 92,
+      "kind": "event_started",
+      "ai_body": null,
+      "payload": {
+        "event_id": "a44e8ca5-7f74-45e0-b413-9eb9c82733e7",
+        "polarity": "crisis",
+        "severity": 2,
+        "archetype": "regulation",
+        "deadline_at": "2026-11-14T18:34:44.192294+00:00",
+        "share_shock_bps": null
+      },
+      "created_at": "2026-11-13T12:34:44.192294+00:00",
+      "ai_headline": null
+    },
+    {
+      "id": 91,
+      "kind": "event_expired",
+      "ai_body": null,
+      "payload": {
+        "event_id": "1203fa27-fc4f-4e67-9f1d-890cab919138",
+        "polarity": "chance",
+        "severity": 1,
+        "archetype": "viral_trend"
+      },
+      "created_at": "2026-11-13T12:34:44.186564+00:00",
+      "ai_headline": null
+    },
+    {
+      "id": 90,
+      "kind": "event_started",
+      "ai_body": null,
+      "payload": {
+        "event_id": "1203fa27-fc4f-4e67-9f1d-890cab919138",
+        "polarity": "chance",
+        "severity": 1,
+        "archetype": "viral_trend",
+        "deadline_at": "2026-11-13T11:34:44.180925+00:00",
+        "share_shock_bps": null
+      },
+      "created_at": "2026-11-13T12:34:44.180925+00:00",
+      "ai_headline": null
+    },
+    {
+      "id": 89,
+      "kind": "founded",
+      "ai_body": "Strom vom Dach, gebaut in der Garage.",
+      "payload": { "tier": "garage" },
+      "created_at": "2026-11-13T12:34:44.108708+00:00",
+      "ai_headline": "Fixture Krisenstab geht ans Netz"
+    }
+  ],
+  "company": {
+    "id": "ceb52c23-f9ac-4541-a1f1-3878c99dce4c",
+    "idea": "Strom vom Dach",
+    "name": "Fixture Krisenstab",
+    "tier": "garage",
+    "sector": "energy",
+    "product_key": "solar"
+  },
+  "profile_words": {
+    "tax": ["Stromsteuer"],
+    "risk": ["Hagel"],
+    "rule": ["Bauordnung"],
+    "buyer": ["Hausbesitzer", "Stadtwerke"],
+    "input": ["Silizium", "Glas"],
+    "place": ["Dachboden"],
+    "trend": ["Balkonkraftwerk"],
+    "critic": ["Denkmalschutz"],
+    "product": ["Solarziegel"]
+  }
+}

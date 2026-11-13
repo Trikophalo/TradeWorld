@@ -1,0 +1,26 @@
+{
+  "event": null,
+  "can_act": true,
+  "company": {
+    "id": "3f3579e7-a60d-4ffa-8261-8053368b49d6",
+    "idea": "Maschinen nach Maß",
+    "name": "Fixture Werke",
+    "tier": "gmbh",
+    "sector": "tech",
+    "product_key": "security_software"
+  },
+  "history": [],
+  "headcount": 1,
+  "unit_cents": 375000,
+  "branch_scores": {
+    "it": 0,
+    "law": 0,
+    "craft": 0,
+    "sales": 0,
+    "finance": 0,
+    "science": 0,
+    "logistics": 0,
+    "management": 0
+  },
+  "profile_words": null
+}

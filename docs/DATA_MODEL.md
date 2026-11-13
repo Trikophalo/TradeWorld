@@ -5754,3 +5754,248 @@ EVENT = {id, kind, importance, scheduled_at, announced_at, status, ticker, compa
 - `ticker`, `company_name` und `sector` sind `null` bei Glocken und Zinsentscheid. Abgesagte Termine erscheinen nicht.
 - Die Texte baut der Client aus `kind`, `ticker` und `outcome`. Geheimnisse (`scheduled_event_secrets`) kommen nie
   vor. Fixture: `get_events.json` (je ein aufgelöster Termin jeder Art, dazu kommende Termine).
+
+## Nachtrag: M4h (Firmen-Ereignisse, Gegenmaßnahmen, Firmen-News)
+
+Migration `20261129000100_m4h_company_events.sql` (ADR-091), idempotente Kopie in `supabase/updates/`. Die Regeln
+spiegeln `src/lib/sim/company-events.ts` (`rollCompanyEvent`, `rollSeverity`, `pickArchetype`, `costUnitCents`,
+`stepCostCents`, `stepSuccessBps`, `canStartStep`, `stepSucceeds`, `announcementShockBps`, `resolutionShockBps`,
+`eventPhase`, `eventModifiers`) und den Ereignis-Eingang von `closeStartupHour`. Katalog und Zahlen kommen aus
+`game_config.companyEvents` (`src/config/company-events.ts`, `pnpm db:config`). Ohne diesen Abschnitt wird nicht
+gewürfelt.
+
+### Tabellen
+
+Alle mit RLS, ohne Rechte für `authenticated`; gelesen wird nur über die RPCs.
+
+| Tabelle                 | Inhalt                                                                                                   |
+| ----------------------- | -------------------------------------------------------------------------------------------------------- |
+| `player_company_events` | Eine Krise oder Chance: Archetyp, `polarity`, `severity` 1–3, `status`, Zeiten, Strategie, `mitigation`  |
+| `company_event_steps`   | Schritte der gewählten Strategie: Index, Schlüssel, `running`/`succeeded`/`failed`, Preis, Chance, Retry |
+| `company_event_rolls`   | Ein Wurf je Firma und Berliner Tag (Primärschlüssel), `event_id` des daraus entstandenen Ereignisses     |
+| `company_news`          | Firmen-News: `kind`, `payload` (Variablen für den Text), optional `ai_headline`/`ai_body`; 30 Tage       |
+| `company_ai_profiles`   | Produktwörter von Claude je Firma (`words`), einmal geschrieben                                          |
+
+- **Name:** `company_events` gibt es schon seit der ersten Migration (alte, ungenutzte Firmen-Zeitleiste). Darum
+  heißt die neue Tabelle `player_company_events`, passend zu `player_company_hours` und `player_company_reports`.
+- **Schnappschuss:** `player_company_events.definition` hält den Archetyp aus der Konfiguration beim Start. Eine
+  Balancing-Änderung ändert laufende Ereignisse nicht.
+- **Ein aktives Ereignis:** Höchstens ein Ereignis je Firma ist nicht `over`/`expired` (eindeutiger Teilindex).
+- **Zahlenformat:** `mitigation` und `capacity_hit` sind `double precision`, weil `numeric` in Tabellen verboten ist
+  (Strukturtest).
+- **Weitere Felder:** `announce_shock_bps` und `resolution_shock_bps` speichern die Kursbewegung einer
+  börsennotierten Firma, sonst `null`. `bonus_applied` merkt sich den einmaligen Bonus. `ai_headline` (≤ 120),
+  `ai_body` (≤ 600) und `ai_cause` (≤ 60) kommen von der Edge Function.
+- **Schritte:** `discarded` markiert Fortschritt einer verlassenen Strategie. Je Ereignis läuft höchstens ein
+  Schritt.
+- **Neue Spalten:** `player_company_hours.event_id` (Ereignis der Stunde, `on delete set null`) und
+  `player_companies.best_hour_profit_cents` (bisher beste Stunde, aus den vorhandenen Stunden vorbelegt).
+
+### Status
+
+| Status     | Bedeutung                                                                                      |
+| ---------- | ---------------------------------------------------------------------------------------------- |
+| `open`     | Wartet auf eine Antwort (vor der Frist)                                                        |
+| `accepted` | Krise ausgesessen oder Chance ausgelassen (`accept`/`pass`); wirkt weiter nach `eventPhase`    |
+| `solved`   | Alle Schritte der Strategie geschafft; `resolved_at` = Ende des letzten Schritts               |
+| `in_force` | Krise nach der Frist ohne Lösung; Schritte sind weiter erlaubt und beenden den Schaden früher  |
+| `expired`  | Chance verpasst (Frist ohne Erfolg), `over_at` = Frist                                         |
+| `over`     | Wirkung vorbei (`over_at` = Ende des Wirkungsfensters) oder Firma nicht mehr aktiv (ohne News) |
+
+Die Wirkung richtet sich nur nach den Zeiten, nicht nach dem Status:
+
+- `company_event_phase` ist `eventPhase`.
+- Eine Chance wirkt nur nach Erfolg, und zwar `lastsHours` lang ab `resolved_at`.
+- Eine Krise wirkt vor der Frist mit `preDeadlineShare` (25 %), danach voll. Das Fenster läuft `lastsHours` ab
+  min(Frist, Lösung). In jedem Fall wird die Wirkung um `mitigation` gemindert.
+
+### Ablauf in `run_due_jobs` → `company_events_run_due(p_now default null, p_roll default true)`
+
+Eine Zeile in `run_due_jobs` (nach den Firmenstunden), Antwort `{steps, deadlines, over, started}`. Reihenfolge:
+
+1. **Firma nicht mehr aktiv:** Ihr Ereignis endet still (`over`, keine News).
+2. **Schritte mit `ends_at ≤ jetzt`:** Serverzufall gegen `success_bps` (`stepSucceeds`: u × 10 000 < Chance).
+   - Erfolg: News `event_step_done`. Ist es der letzte Schritt der Strategie, wird das Ereignis `solved` (siehe
+     unten).
+   - Misserfolg: News `event_step_failed`. Der Spieler kann wiederholen (Preis × `retryCostShare`) oder wechseln.
+   - Benachrichtigung an den Gründer (geschafft / gescheitert / gelöst).
+3. **Frist:** Eine offene Krise wird `in_force` mit Teilgutschrift. Die Gutschrift ist `mitigation` der Strategie ×
+   bis zur Frist geschaffte Schritte / Schritte × `partialCredit` (0,5; ohne Strategie 0). News `event_deadline`
+   {mitigation}. Eine offene Chance wird `expired`, ein laufender Schritt endet, News `event_expired`.
+4. **Ende der Wirkung:** `in_force`, `solved` und `accepted` werden `over`, sobald `eventPhase` „over“ ist. News
+   `event_over` {status}.
+5. **Täglicher Wurf:**
+   - Jede aktive Firma ohne Wurf am Berliner Tag würfelt einmal. Der Zeitpunkt ist je Firma und Tag fest
+     (`company_event_roll_at`): zwischen `rollWindowHours` [7, 21] Uhr Berlin, aus einem Hash von Firma und Datum.
+     Ereignisse beginnen so nicht alle um Mitternacht.
+   - Der Wurf (`company_event_roll`) spiegelt `rollCompanyEvent`: Alter ≥ `minAgeHours` (ab `companies.founded_at`),
+     kein aktives Ereignis, ≥ `minGapHours` seit dem letzten Start, `chancePerDay`, `chanceShare`, Archetyp nach
+     Gewicht und Branche, Schwere. Der Wurf zählt auch, wenn nichts passiert.
+6. **Aufräumen:** News und Würfe älter als `newsKeepDays` (30) werden gelöscht.
+
+`rollWindowHours`, `partialCredit` und `newsKeepDays` stehen noch nicht in `company-events.ts`. Das SQL nutzt die
+genannten Rückfallwerte.
+
+### Start eines Ereignisses (`company_event_start`)
+
+- Frist = Start + `deadlineHours`.
+- News `event_started` {event_id, archetype, polarity, severity, deadline_at, share_shock_bps}.
+- Benachrichtigung `company_event` an den Gründer: „Krise bei {Firma}“ bzw. „Chance für {Firma}“, Text „Reagiere bis
+  TT.MM., HH:MM Uhr.“, Link `/company`.
+- Börsennotierte Firmen bekommen den Ankündigungs-Schock.
+
+### Lösung (`company_event_solve`)
+
+- `status = solved`, `resolved_at` = Ende des letzten Schritts, `mitigation` = Wert der Strategie.
+- Einmaliger Bonus (`bonus.awareness`/`bonus.quality` auf `player_companies`, begrenzt auf 0..1). `bonus_applied`
+  verhindert eine Wiederholung.
+- Bei Börsennotierung der Lösungs-Schock.
+- News `event_solved` {strategy, mitigation, share_shock_bps}.
+- Benachrichtigung „Krise gemeistert: {Firma}“ bzw. „Chance genutzt: {Firma}“.
+
+### Kurs-Schock (`company_event_share_shock`)
+
+Nur für Firmen mit `phase = 'listed'` und Wertpapier. Alles wird mit demselben Faktor (1 + bps / 10 000) bewegt:
+
+- `security_quotes`: letzter Kurs, Geld- und Briefkurs, Tageshoch und -tief, `change_bps`, Marktkapitalisierung.
+- `security_sim_state`: der faire Wert (Anker des Wertfonds) und beide EMAs.
+
+Der Markt zieht den Kurs also nicht sofort zurück, und es entsteht kein künstlicher Trend.
+
+| Zeitpunkt   | Krise                        | Chance                           |
+| ----------- | ---------------------------- | -------------------------------- |
+| Ankündigung | −`shareShockBps[Schwere]`    | +`shareShockBps[Schwere]` / 2    |
+| Lösung      | +`shareShockBps` × Minderung | +`shareShockBps` / 2 × Minderung |
+
+Der faire Wert wird beim nächsten Quartalsabschluss wie bisher aus dem Firmenwert neu gesetzt.
+
+### Stündlicher Abschluss (`player_company_close_hour`)
+
+Wie in M4e, dazu `company_event_hour_effect(firma, stunde, stunde + 1 h)`:
+
+- **Welches Ereignis:** das letzte vor Ende der Stunde gestartete Ereignis, seine Phase zu Beginn der Stunde, die
+  gespeicherte `mitigation`.
+- **Laufende Schritte:** Sie binden `capacity_hit` anteilig für den Teil der Stunde, in dem sie laufen.
+- **Nachfrage:** × `demand_factor`.
+- **Kapazität:** × `capacity_factor`.
+- **Wareneinsatz:** + eigener Umsatz × `extra_cost_share`, nie unter 0. Bei negativen Werten (Subvention) sind das
+  Einsparungen.
+- **Ohne Ereignis:** Faktoren 1 und 0, das Ergebnis ist identisch zu M4e.
+- **Gespeichert:** `event_id` in `player_company_hours` und in der Antwort.
+
+**Rekordstunde:** Ist der Gewinn größer als `best_hour_profit_cents` und war dieser schon > 0, gibt es die News
+`record_hour` {profit_cents, hour_start}. Je Berliner Tag gibt es höchstens eine solche News; steigt der Rekord am
+selben Tag weiter, wird ihr `payload` aktualisiert, solange sie keinen KI-Text hat. Die erste Gewinnstunde setzt den
+Rekord ohne News.
+
+### Weitere Firmen-News (Trigger)
+
+| `kind`     | Auslöser                                                                  | `payload`           |
+| ---------- | ------------------------------------------------------------------------- | ------------------- |
+| `founded`  | neue Zeile in `player_companies`                                          | `{tier}`            |
+| `upgraded` | `player_companies.tier` ändert sich (nicht zur AG, die kommt mit dem IPO) | `{tier}`            |
+| `expanded` | `player_companies.expansion_level` steigt                                 | `{level}`           |
+| `ipo`      | `companies.phase` wird `listed` (Spielerfirma)                            | `{ticker}`          |
+| `hired`    | neuer aktiver `player_jobs`-Eintrag bei einer Spielerfirma                | `{nickname, title}` |
+
+Die Ereignis-News stehen oben: `event_started`, `event_step_done`, `event_step_failed`, `event_solved`,
+`event_deadline`, `event_expired`, `event_over`. Die Schritt-News tragen `{event_id, archetype, strategy, idx, step,
+success}`.
+
+### RPCs
+
+**Zugriff:** Gründer der aktiven Firma oder aktueller Spieler-Mitarbeiter. `p_company_id = null` bedeutet die eigene
+Firma, sonst die Spielerfirma, bei der man arbeitet. Alle anderen bekommen `company_not_found`.
+
+`EVENT_STATE`:
+
+```
+{ company: {id, name, idea, sector, product_key, tier}, can_act, unit_cents, headcount,
+  branch_scores: {it, finance, law, craft, sales, management, science, logistics},
+  event: null | {id, archetype, polarity, severity, status, started_at, deadline_at, resolved_at, over_at, strategy,
+                 mitigation, ai_headline, ai_body, ai_cause,
+                 steps: [{idx, strategy, key, status, started_at, ends_at, cost_cents, success_bps, retry}],
+                 next: null | {strategy, idx, key, cost_cents, success_bps, staff, staff_ok, hours, retry},
+                 options: [{strategy, first_step_cost_cents | null, first_step_success_bps | null}]},
+  history: [{id, archetype, polarity, severity, status, started_at, resolved_at}],
+  profile_words: null | {product, input, tax, rule, risk, trend, buyer, critic, place} }
+```
+
+- `can_act` ist wahr nur für den Gründer.
+- `unit_cents` ist `costUnitCents` (Fixkosten je Quartal mit Ausbaustufe).
+- `headcount` zählt Gründer, Spieler-Mitarbeiter und KI-Kräfte.
+- `branch_scores` ist die Summe der `player_branch_scores` von Gründer und aktuellen Spieler-Mitarbeitern.
+- `event` ist das letzte noch nicht beendete Ereignis.
+- `steps` enthält nur den aktuellen Versuch (ohne verworfene Schritte).
+- `next` ist der Schritt, der jetzt startbar ist, mit aktuellem Preis und aktueller Chance. Er ist `null` ohne
+  Strategie, bei Strategien ohne Schritte, während ein Schritt läuft und außerhalb von `open`/`in_force`.
+- `options` enthält alle Strategien des Archetyps (für `accept`/`pass` mit `null`).
+- `history` enthält die letzten 5 anderen Ereignisse, neueste zuerst.
+
+| RPC                                                            | Antwort       |
+| -------------------------------------------------------------- | ------------- |
+| `get_company_event(p_company_id uuid default null)`            | `EVENT_STATE` |
+| `choose_event_strategy(p_request_id, p_event_id, p_strategy)`  | `EVENT_STATE` |
+| `start_event_step(p_request_id, p_event_id)`                   | `EVENT_STATE` |
+| `get_company_news(p_company_id uuid default null, p_limit 30)` | `NEWS`        |
+| `company_ai_context(p_company_id uuid default null)`           | `AI_CONTEXT`  |
+
+- `NEWS` = `{company, profile_words, items: [{id, kind, payload, created_at, ai_headline, ai_body}]}`, neueste
+  zuerst, `p_limit` 1–100.
+- `AI_CONTEXT` = `{company: {id, name, idea, sector, product_key}, has_profile, events_without_text: [{id, archetype,
+polarity, severity, status}], news_without_text: [{id, kind, payload}]}`, je die neuesten 5 ohne Text.
+
+**`choose_event_strategy`:**
+
+- Nur der Gründer, Ereignis `open` oder `in_force`, Strategie des Archetyps.
+- Ein Wechsel verwirft den Fortschritt: Alle Schritte werden `discarded`, ein laufender endet als `failed`. Gezahltes
+  Geld bleibt ausgegeben.
+- `accept`/`pass` (ohne Schritte) setzt sofort `accepted`.
+- Dieselbe Strategie noch einmal ändert nichts.
+- Idempotent über `request_id`.
+
+**`start_event_step`:**
+
+- Startet den Schritt mit Index = geschaffte Schritte der aktuellen Strategie.
+- Voraussetzungen: kein laufender Schritt, Kopfzahl ≥ `staff`.
+- Preis `stepCostCents` (Retry, wenn dieser Index schon gescheitert ist) aus der **freien** Firmenkasse (Kasse −
+  offene Rechnungen, wie `company_withdraw`). Gebucht als eine ausgeglichene Buchung `company_costs` von der
+  Firmenkasse an die Haushalte (Schlüssel `event-step:<ereignis>:<request_id>`).
+- Chance `stepSuccessBps` mit dem Team-Wert in der Branche des Schritts.
+- `capacity_hit` aus dem Katalog.
+- Erlaubt bei `open` und `in_force`.
+
+### Texte von Claude (nur `service_role`)
+
+| Funktion                                                                         | Prüfung                                             |
+| -------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `store_company_ai_profile(p_company_id, p_words jsonb)`                          | genau die 9 Slots, je 1–5 Strings mit 1–40 Zeichen  |
+| `store_company_event_text(p_event_id, p_headline, p_body, p_cause default null)` | Überschrift 1–120, Text 1–600, Ursache leer o. 1–60 |
+| `store_company_news_text(p_news_id bigint, p_headline, p_body default null)`     | Überschrift 1–120, Text leer oder 1–600             |
+
+- Alle drei geben `boolean` zurück: `true`, wenn gespeichert.
+- Keine Steuerzeichen (auch kein Zeilenumbruch).
+- Kein gesperrter Begriff: `text_has_profanity`, also die Regeln aus `blocked_name_terms` je Wort auf dem gefalteten
+  Text, ohne die Kategorie `reserved`.
+- Vorhandene Texte werden nie überschrieben (dann `false`).
+- `anon` und `authenticated` dürfen diese Funktionen nicht ausführen.
+
+### Neue Fehlerschlüssel
+
+| Schlüssel           | Code    | Wann                                                               |
+| ------------------- | ------- | ------------------------------------------------------------------ |
+| `event_closed`      | `NX081` | Ereignis ist nicht `open`/`in_force` (gelöst, ausgesessen, vorbei) |
+| `event_needs_staff` | `NX082` | Zu wenige Leute für den Schritt                                    |
+
+Dazu wie bisher `invalid_argument` (unbekannte Strategie, kein startbarer Schritt, ein Schritt läuft),
+`company_not_found` (fremdes Ereignis, Mitarbeiter, Fremde) und `insufficient_funds`.
+
+### Neuer Benachrichtigungstyp
+
+`company_event` (Kategorie `company`, in-app und Push standardmäßig an).
+
+### Bekannte Grenzen
+
+- Beim Nachholen vieler Stunden gilt für jede Stunde die zuletzt gespeicherte `mitigation`, nicht die damalige.
+- Der Lösungszeitpunkt ist das Ende des letzten Schritts. Wertet der Job erst nach der Frist aus, zählt der Schritt
+  trotzdem, wenn er davor endete.

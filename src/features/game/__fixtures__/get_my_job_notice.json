@@ -1,6 +1,6 @@
 {
   "job": {
-    "id": "75dff9f3-c00d-4f9e-8e07-5e0867a1dfaa",
+    "id": "d8c675cf-ccdd-49ac-b101-01ce31d7016c",
     "tier": "junior",
     "title": null,
     "company": {
@@ -15,10 +15,10 @@
     "required": [{ "branch": "it", "min_score": 2 }],
     "signature": "M2 14 C6 4 10 4 14 12 S22 18 26 8",
     "title_key": "it_junior",
-    "started_at": "2026-11-13T11:46:57.709653+00:00",
+    "started_at": "2026-11-13T12:34:41.732167+00:00",
     "pending_raise": null,
     "raise_max_bps": 0,
-    "notice_ends_at": "2026-11-14T11:46:57.762138+00:00",
+    "notice_ends_at": "2026-11-14T12:34:41.802755+00:00",
     "paid_hours_cap": 12,
     "pay_factor_bps": 10000,
     "work_task_open": false,
@@ -28,7 +28,7 @@
     "productivity_bps": 17400,
     "next_work_task_at": null,
     "earned_total_cents": 31700,
-    "raise_available_at": "2026-11-20T11:46:57.754868+00:00",
+    "raise_available_at": "2026-11-20T12:34:41.793873+00:00",
     "quit_now_cost_cents": 391812,
     "salary_cents_per_hour": 32651,
     "effective_salary_cents_per_hour": 32651

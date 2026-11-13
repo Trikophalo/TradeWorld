@@ -55,7 +55,13 @@ const eventSchema = z.object({
       hours: num,
     })
     .nullable(),
-  options: z.array(z.object({ strategy: z.string(), first_step_cost_cents: num, first_step_success_bps: num })),
+  options: z.array(
+    z.object({
+      strategy: z.string(),
+      first_step_cost_cents: num.nullable(),
+      first_step_success_bps: num.nullable(),
+    }),
+  ),
 });
 const stateSchema = z.object({
   company,
@@ -171,8 +177,8 @@ function toState(r: z.infer<typeof stateSchema>): CompanyEventState {
             : null,
           options: e.options.map((o) => ({
             strategy: o.strategy,
-            firstStepCostCents: o.first_step_cost_cents,
-            firstStepSuccessBps: o.first_step_success_bps,
+            firstStepCostCents: o.first_step_cost_cents ?? 0,
+            firstStepSuccessBps: o.first_step_success_bps ?? 10_000,
           })),
         }
       : null,

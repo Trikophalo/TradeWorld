@@ -1,24 +1,24 @@
 {
   "company": {
-    "id": "0eedc45f-ea23-4249-8530-fe00452acab3",
+    "id": "0610ba22-846e-498f-b38a-d335b79943c8",
     "idea": "Werkzeuge für Bastler",
     "live": {
-      "last_hour_at": "2026-11-13T11:00:00+00:00",
-      "pay_factor_bps": 8619,
+      "last_hour_at": "2026-11-13T12:00:00+00:00",
+      "pay_factor_bps": 8626,
       "today_profit_cents": -13332,
-      "today_revenue_cents": 67274,
+      "today_revenue_cents": 67359,
       "fixed_per_hour_cents": 2500,
       "quarter_profit_cents": -13332,
-      "demand_per_hour_cents": 546,
+      "demand_per_hour_cents": 557,
       "profit_per_hour_cents": -6666,
-      "quarter_revenue_cents": 67274,
-      "revenue_per_hour_cents": 33659,
-      "ai_wages_per_hour_cents": 10342,
+      "quarter_revenue_cents": 67359,
+      "revenue_per_hour_cents": 33668,
+      "ai_wages_per_hour_cents": 10351,
       "capacity_per_hour_cents": 133000,
       "marketing_per_hour_cents": 4167,
       "today_founder_payout_cents": 0,
       "founder_payout_per_hour_cents": 0,
-      "contract_revenue_per_hour_cents": 33113
+      "contract_revenue_per_hour_cents": 33111
     },
     "logo": {
       "grid": [
@@ -46,18 +46,18 @@
     "color": "#2266cc",
     "hours": [
       {
-        "hour_start": "2026-11-13T09:00:00+00:00",
-        "profit_cents": -6666,
-        "revenue_cents": 33615,
-        "founder_payout_cents": 0,
-        "contract_revenue_cents": 33128
-      },
-      {
         "hour_start": "2026-11-13T10:00:00+00:00",
         "profit_cents": -6666,
-        "revenue_cents": 33659,
+        "revenue_cents": 33691,
         "founder_payout_cents": 0,
-        "contract_revenue_cents": 33113
+        "contract_revenue_cents": 33103
+      },
+      {
+        "hour_start": "2026-11-13T11:00:00+00:00",
+        "profit_cents": -6666,
+        "revenue_cents": 33668,
+        "founder_payout_cents": 0,
+        "contract_revenue_cents": 33111
       }
     ],
     "stage": 1,
@@ -114,7 +114,7 @@
     "ai_workers": 3,
     "can_expand": false,
     "cash_cents": 1104108,
-    "founded_at": "2026-11-13T11:46:57.832386+00:00",
+    "founded_at": "2026-11-13T12:34:41.881858+00:00",
     "can_upgrade": false,
     "logo_hidden": false,
     "price_level": "normal",
@@ -146,17 +146,17 @@
     "capacity_cents": 2310000,
     "full_time_from": 5,
     "grace_quarters": 4,
-    "pay_factor_bps": 8619,
+    "pay_factor_bps": 8626,
     "expansion_level": 0,
     "founder_has_job": false,
     "next_quarter_at": "2026-11-13T13:00:00+00:00",
     "quarters_active": 1,
     "ai_worker_skills": ["it_networks"],
     "distress_quarters": 0,
-    "estimate_low_cents": 182388,
+    "estimate_low_cents": 572570,
     "founder_payout_bps": 0,
     "upgrade_cost_cents": 4500000,
-    "estimate_high_cents": 1935897,
+    "estimate_high_cents": 8798600,
     "ai_worker_cost_cents": 72000,
     "can_capital_increase": false,
     "expansion_cost_cents": null,

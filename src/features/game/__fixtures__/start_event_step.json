@@ -1,0 +1,80 @@
+{
+  "event": {
+    "id": "a44e8ca5-7f74-45e0-b413-9eb9c82733e7",
+    "next": null,
+    "steps": [
+      {
+        "idx": 0,
+        "key": "study",
+        "retry": false,
+        "status": "running",
+        "ends_at": "2026-11-13T15:34:44.221549+00:00",
+        "strategy": "lobby",
+        "cost_cents": 50000,
+        "started_at": "2026-11-13T12:34:44.221549+00:00",
+        "success_bps": 8300
+      }
+    ],
+    "status": "open",
+    "ai_body": "Die Stadt verlangt für jede Dachanlage ein Gutachten. Fixture Krisenstab muss reagieren.",
+    "options": [
+      { "strategy": "lobby", "first_step_cost_cents": 50000, "first_step_success_bps": 8300 },
+      { "strategy": "adapt", "first_step_cost_cents": 100000, "first_step_success_bps": 8800 },
+      { "strategy": "accept", "first_step_cost_cents": null, "first_step_success_bps": null }
+    ],
+    "over_at": null,
+    "ai_cause": "Bauamt",
+    "polarity": "crisis",
+    "severity": 2,
+    "strategy": "lobby",
+    "archetype": "regulation",
+    "mitigation": 0,
+    "started_at": "2026-11-13T12:34:44.192294+00:00",
+    "ai_headline": "Neue Bauordnung bremst Solardächer",
+    "deadline_at": "2026-11-14T18:34:44.192294+00:00",
+    "resolved_at": null
+  },
+  "can_act": true,
+  "company": {
+    "id": "ceb52c23-f9ac-4541-a1f1-3878c99dce4c",
+    "idea": "Strom vom Dach",
+    "name": "Fixture Krisenstab",
+    "tier": "garage",
+    "sector": "energy",
+    "product_key": "solar"
+  },
+  "history": [
+    {
+      "id": "1203fa27-fc4f-4e67-9f1d-890cab919138",
+      "status": "expired",
+      "polarity": "chance",
+      "severity": 1,
+      "archetype": "viral_trend",
+      "started_at": "2026-11-12T23:34:44.180925+00:00",
+      "resolved_at": null
+    }
+  ],
+  "headcount": 1,
+  "unit_cents": 20000,
+  "branch_scores": {
+    "it": 0,
+    "law": 0,
+    "craft": 0,
+    "sales": 0,
+    "finance": 0,
+    "science": 0,
+    "logistics": 0,
+    "management": 0
+  },
+  "profile_words": {
+    "tax": ["Stromsteuer"],
+    "risk": ["Hagel"],
+    "rule": ["Bauordnung"],
+    "buyer": ["Hausbesitzer", "Stadtwerke"],
+    "input": ["Silizium", "Glas"],
+    "place": ["Dachboden"],
+    "trend": ["Balkonkraftwerk"],
+    "critic": ["Denkmalschutz"],
+    "product": ["Solarziegel"]
+  }
+}

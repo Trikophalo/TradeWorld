@@ -596,3 +596,52 @@ select tests.login_as('authenticated', :p) is null as ok \gset
 select public.get_events(20);
 \o
 reset role;
+
+-- M4h: company events, response steps and company news (ADR-091) -------------------------------------------------
+-- (separate block; a garage with a missed chance in its history and an open crisis with one finished step)
+\set fx_e '''f1f1f1f1-0000-4000-8000-0000000000fe'''
+select tests.signup(:fx_e, 'Fixture_Krise') is not null as ok \gset
+select tests.set_level(:fx_e, 6);
+select tests.fund(:fx_e, 5000000, 'fixture:m4h:e');
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/get_company_event_none.json
+select public.get_company_event();
+\o
+reset role;
+select tests.login_as('authenticated', :fx_e) is null as ok \gset
+select public.found_company(gen_random_uuid(), 'Fixture Krisenstab', 'Strom vom Dach', 'energy', '#aa5533', 'garage') is not null as ok \gset
+reset role;
+select company_id as fx_eco from public.player_companies where founder_id = :fx_e \gset
+select public.company_event_start(:'fx_eco', 'viral_trend', 1, now() - interval '13 hours') is not null as ok \gset
+select public.company_events_run_due(now(), false) is not null as ok \gset
+select public.company_event_start(:'fx_eco', 'regulation', 2, now()) as fx_ev \gset
+select tests.login_as('service_role') is null as ok \gset
+select public.store_company_ai_profile(:'fx_eco', '{"product": ["Solarziegel"], "input": ["Silizium", "Glas"], "tax": ["Stromsteuer"],
+  "rule": ["Bauordnung"], "risk": ["Hagel"], "trend": ["Balkonkraftwerk"], "buyer": ["Hausbesitzer", "Stadtwerke"],
+  "critic": ["Denkmalschutz"], "place": ["Dachboden"]}'::jsonb) as ok \gset
+select public.store_company_event_text(:'fx_ev', 'Neue Bauordnung bremst Solardächer',
+  'Die Stadt verlangt für jede Dachanlage ein Gutachten. Fixture Krisenstab muss reagieren.', 'Bauamt') as ok \gset
+reset role;
+select tests.login_as('authenticated', :fx_e) is null as ok \gset
+\o :fixture_dir/choose_event_strategy.json
+select public.choose_event_strategy(gen_random_uuid(), :'fx_ev', 'lobby');
+\o :fixture_dir/start_event_step.json
+select public.start_event_step(gen_random_uuid(), :'fx_ev');
+\o
+reset role;
+-- the step is resolved now with a fixed draw instead of waiting for run_due_jobs and the server's randomness
+select public.company_event_resolve_step(id, 0) as ok from public.company_event_steps
+ where event_id = :'fx_ev' and status = 'running' \gset
+select id as fx_nid from public.company_news where company_id = :'fx_eco' and kind = 'founded' \gset
+select tests.login_as('service_role') is null as ok \gset
+select public.store_company_news_text(:fx_nid, 'Fixture Krisenstab geht ans Netz', 'Strom vom Dach, gebaut in der Garage.') as ok \gset
+reset role;
+select tests.login_as('authenticated', :fx_e) is null as ok \gset
+\o :fixture_dir/get_company_event.json
+select public.get_company_event();
+\o :fixture_dir/get_company_news.json
+select public.get_company_news();
+\o :fixture_dir/company_ai_context.json
+select public.company_ai_context();
+\o
+reset role;

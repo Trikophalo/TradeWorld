@@ -1,13 +1,13 @@
 {
   "job": {
     "tier": "junior",
-    "since": "2026-11-13T11:46:57.709653+00:00",
+    "since": "2026-11-13T12:34:41.732167+00:00",
     "title": null,
     "title_key": "it_junior",
     "company_name": "KlarSoft AG"
   },
-  "tag": "RK44",
-  "rank": 159,
+  "tag": "D77Z",
+  "rank": 162,
   "level": 6,
   "company": null,
   "nickname": "Fixture_Neu",
@@ -18,7 +18,7 @@
     { "key": "it_basics", "tier": 1 }
   ],
   "streak_days": 1,
-  "member_since": "2026-11-13T11:46:57.28883+00:00",
+  "member_since": "2026-11-13T12:34:40.976858+00:00",
   "branch_scores": {
     "it": 3,
     "law": 0,
@@ -30,5 +30,5 @@
     "management": 0
   },
   "skills_learned": 2,
-  "net_worth_cents": 1061107
+  "net_worth_cents": 1061034
 }

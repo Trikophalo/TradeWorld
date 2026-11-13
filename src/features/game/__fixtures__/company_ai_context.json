@@ -1,0 +1,67 @@
+{
+  "company": {
+    "id": "ceb52c23-f9ac-4541-a1f1-3878c99dce4c",
+    "idea": "Strom vom Dach",
+    "name": "Fixture Krisenstab",
+    "sector": "energy",
+    "product_key": "solar"
+  },
+  "has_profile": true,
+  "news_without_text": [
+    {
+      "id": 93,
+      "kind": "event_step_done",
+      "payload": {
+        "idx": 0,
+        "step": "study",
+        "success": true,
+        "event_id": "a44e8ca5-7f74-45e0-b413-9eb9c82733e7",
+        "strategy": "lobby",
+        "archetype": "regulation"
+      }
+    },
+    {
+      "id": 92,
+      "kind": "event_started",
+      "payload": {
+        "event_id": "a44e8ca5-7f74-45e0-b413-9eb9c82733e7",
+        "polarity": "crisis",
+        "severity": 2,
+        "archetype": "regulation",
+        "deadline_at": "2026-11-14T18:34:44.192294+00:00",
+        "share_shock_bps": null
+      }
+    },
+    {
+      "id": 91,
+      "kind": "event_expired",
+      "payload": {
+        "event_id": "1203fa27-fc4f-4e67-9f1d-890cab919138",
+        "polarity": "chance",
+        "severity": 1,
+        "archetype": "viral_trend"
+      }
+    },
+    {
+      "id": 90,
+      "kind": "event_started",
+      "payload": {
+        "event_id": "1203fa27-fc4f-4e67-9f1d-890cab919138",
+        "polarity": "chance",
+        "severity": 1,
+        "archetype": "viral_trend",
+        "deadline_at": "2026-11-13T11:34:44.180925+00:00",
+        "share_shock_bps": null
+      }
+    }
+  ],
+  "events_without_text": [
+    {
+      "id": "1203fa27-fc4f-4e67-9f1d-890cab919138",
+      "status": "expired",
+      "polarity": "chance",
+      "severity": 1,
+      "archetype": "viral_trend"
+    }
+  ]
+}

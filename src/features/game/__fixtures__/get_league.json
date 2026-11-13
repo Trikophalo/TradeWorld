@@ -1,5 +1,5 @@
 {
-  "me": { "rank": 1, "growth_bps": 235 },
+  "me": { "rank": 1, "growth_bps": 234 },
   "season": {
     "status": "finished",
     "ends_at": "2026-11-08T23:00:00+00:00",
@@ -8,16 +8,16 @@
   },
   "entries": [
     {
-      "tag": "EEFJ",
+      "tag": "4U5F",
       "rank": 1,
       "is_me": true,
       "level": 15,
       "nickname": "Fixture_Gmbh",
       "avatar_key": "rookie",
-      "growth_bps": 235
+      "growth_bps": 234
     },
     {
-      "tag": "LKSQ",
+      "tag": "YBGE",
       "rank": 2,
       "is_me": false,
       "level": 1,
@@ -26,7 +26,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "75RB",
+      "tag": "KEYX",
       "rank": 3,
       "is_me": false,
       "level": 1,
@@ -35,7 +35,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "KMD3",
+      "tag": "6H85",
       "rank": 4,
       "is_me": false,
       "level": 5,
@@ -44,7 +44,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "YP49",
+      "tag": "ZBHZ",
       "rank": 5,
       "is_me": false,
       "level": 1,
@@ -53,7 +53,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "RFAH",
+      "tag": "3EEZ",
       "rank": 6,
       "is_me": false,
       "level": 1,
@@ -62,7 +62,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "GY3K",
+      "tag": "M5DW",
       "rank": 7,
       "is_me": false,
       "level": 2,
@@ -71,7 +71,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "6ZYL",
+      "tag": "HCC5",
       "rank": 8,
       "is_me": false,
       "level": 1,
@@ -80,7 +80,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "FY6M",
+      "tag": "M793",
       "rank": 9,
       "is_me": false,
       "level": 1,
@@ -89,7 +89,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "YYSP",
+      "tag": "RZ5X",
       "rank": 10,
       "is_me": false,
       "level": 5,
@@ -98,7 +98,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "7UYU",
+      "tag": "ULCB",
       "rank": 11,
       "is_me": false,
       "level": 1,
@@ -107,7 +107,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "QZXM",
+      "tag": "YYN2",
       "rank": 12,
       "is_me": false,
       "level": 3,
@@ -116,7 +116,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "SAAQ",
+      "tag": "Y6CM",
       "rank": 13,
       "is_me": false,
       "level": 1,
@@ -125,7 +125,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "24SM",
+      "tag": "72PD",
       "rank": 14,
       "is_me": false,
       "level": 1,
@@ -134,7 +134,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "QPN9",
+      "tag": "JST4",
       "rank": 15,
       "is_me": false,
       "level": 1,
@@ -143,7 +143,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "39L5",
+      "tag": "V9CF",
       "rank": 16,
       "is_me": false,
       "level": 1,
@@ -152,7 +152,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "BKPK",
+      "tag": "CFM9",
       "rank": 17,
       "is_me": false,
       "level": 3,
@@ -161,7 +161,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "PMKS",
+      "tag": "8CLW",
       "rank": 18,
       "is_me": false,
       "level": 1,
@@ -170,7 +170,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "KDWE",
+      "tag": "9LXH",
       "rank": 19,
       "is_me": false,
       "level": 1,
@@ -179,7 +179,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "J597",
+      "tag": "DSDB",
       "rank": 20,
       "is_me": false,
       "level": 1,
@@ -188,7 +188,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "SHJT",
+      "tag": "HFUQ",
       "rank": 21,
       "is_me": false,
       "level": 1,
@@ -197,7 +197,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "9T58",
+      "tag": "8KGD",
       "rank": 22,
       "is_me": false,
       "level": 1,
@@ -206,7 +206,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "M9B3",
+      "tag": "MSJ9",
       "rank": 23,
       "is_me": false,
       "level": 1,
@@ -215,7 +215,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "NRQG",
+      "tag": "TR8E",
       "rank": 24,
       "is_me": false,
       "level": 1,
@@ -224,7 +224,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "3ETM",
+      "tag": "4N7L",
       "rank": 25,
       "is_me": false,
       "level": 1,
@@ -233,7 +233,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "5KQL",
+      "tag": "QB6R",
       "rank": 26,
       "is_me": false,
       "level": 1,
@@ -242,7 +242,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "WYEL",
+      "tag": "KMLJ",
       "rank": 27,
       "is_me": false,
       "level": 1,
@@ -251,7 +251,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "SFCZ",
+      "tag": "NHNV",
       "rank": 28,
       "is_me": false,
       "level": 1,
@@ -260,7 +260,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "FUBW",
+      "tag": "C3CL",
       "rank": 29,
       "is_me": false,
       "level": 1,
@@ -269,7 +269,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "VCF4",
+      "tag": "JUMC",
       "rank": 30,
       "is_me": false,
       "level": 4,
@@ -278,7 +278,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "NBWG",
+      "tag": "V7DD",
       "rank": 31,
       "is_me": false,
       "level": 3,
@@ -287,7 +287,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "Y34J",
+      "tag": "ZCAR",
       "rank": 32,
       "is_me": false,
       "level": 12,
@@ -296,7 +296,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "LF5L",
+      "tag": "DJZB",
       "rank": 33,
       "is_me": false,
       "level": 6,
@@ -305,7 +305,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "MJXN",
+      "tag": "USE8",
       "rank": 34,
       "is_me": false,
       "level": 6,
@@ -314,7 +314,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "8U4N",
+      "tag": "QW3C",
       "rank": 35,
       "is_me": false,
       "level": 7,
@@ -323,7 +323,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "66BJ",
+      "tag": "ZFVR",
       "rank": 36,
       "is_me": false,
       "level": 6,
@@ -332,7 +332,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "LCFH",
+      "tag": "KPGY",
       "rank": 37,
       "is_me": false,
       "level": 6,
@@ -341,7 +341,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "9T2F",
+      "tag": "FE7G",
       "rank": 38,
       "is_me": false,
       "level": 5,
@@ -350,7 +350,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "J95W",
+      "tag": "35YK",
       "rank": 39,
       "is_me": false,
       "level": 10,
@@ -359,7 +359,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "J7C9",
+      "tag": "MDCK",
       "rank": 40,
       "is_me": false,
       "level": 3,
@@ -368,7 +368,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "REDL",
+      "tag": "2ENM",
       "rank": 41,
       "is_me": false,
       "level": 10,
@@ -377,7 +377,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "9VA4",
+      "tag": "VUQP",
       "rank": 42,
       "is_me": false,
       "level": 6,
@@ -386,7 +386,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "FUGR",
+      "tag": "SNM6",
       "rank": 43,
       "is_me": false,
       "level": 10,
@@ -395,7 +395,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "CDUD",
+      "tag": "U5VX",
       "rank": 44,
       "is_me": false,
       "level": 3,
@@ -404,7 +404,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "FNGA",
+      "tag": "4UNT",
       "rank": 45,
       "is_me": false,
       "level": 4,
@@ -413,7 +413,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "4SVY",
+      "tag": "DMR4",
       "rank": 46,
       "is_me": false,
       "level": 3,
@@ -422,7 +422,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "QYPC",
+      "tag": "BYZ5",
       "rank": 47,
       "is_me": false,
       "level": 1,
@@ -431,7 +431,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "TH99",
+      "tag": "WFCG",
       "rank": 48,
       "is_me": false,
       "level": 6,
@@ -440,7 +440,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "X83A",
+      "tag": "F48U",
       "rank": 49,
       "is_me": false,
       "level": 10,
@@ -449,7 +449,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "8PV4",
+      "tag": "9VVR",
       "rank": 50,
       "is_me": false,
       "level": 6,
@@ -458,7 +458,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "MFZV",
+      "tag": "D37P",
       "rank": 51,
       "is_me": false,
       "level": 15,
@@ -467,7 +467,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "LAJW",
+      "tag": "NCPT",
       "rank": 52,
       "is_me": false,
       "level": 6,
@@ -476,7 +476,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "BKLD",
+      "tag": "GZDZ",
       "rank": 53,
       "is_me": false,
       "level": 6,
@@ -485,7 +485,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "KV9P",
+      "tag": "DU6V",
       "rank": 54,
       "is_me": false,
       "level": 6,
@@ -494,7 +494,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "ZZCA",
+      "tag": "SKXR",
       "rank": 55,
       "is_me": false,
       "level": 1,
@@ -503,7 +503,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "C88X",
+      "tag": "KW37",
       "rank": 56,
       "is_me": false,
       "level": 1,
@@ -512,7 +512,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "DZ27",
+      "tag": "37FW",
       "rank": 57,
       "is_me": false,
       "level": 3,
@@ -521,7 +521,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "R636",
+      "tag": "CEAP",
       "rank": 58,
       "is_me": false,
       "level": 1,
@@ -530,7 +530,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "4JVU",
+      "tag": "FY29",
       "rank": 59,
       "is_me": false,
       "level": 12,
@@ -539,7 +539,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "YN4Q",
+      "tag": "DMH2",
       "rank": 60,
       "is_me": false,
       "level": 3,
@@ -548,7 +548,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "3FW4",
+      "tag": "YAXV",
       "rank": 61,
       "is_me": false,
       "level": 3,
@@ -557,7 +557,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "YE3M",
+      "tag": "K7MJ",
       "rank": 62,
       "is_me": false,
       "level": 4,
@@ -566,7 +566,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "RBNE",
+      "tag": "RX8A",
       "rank": 63,
       "is_me": false,
       "level": 6,
@@ -575,7 +575,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "393J",
+      "tag": "5PSB",
       "rank": 64,
       "is_me": false,
       "level": 4,
@@ -584,7 +584,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "53ZM",
+      "tag": "HY97",
       "rank": 65,
       "is_me": false,
       "level": 4,
@@ -593,7 +593,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "T5F3",
+      "tag": "EMTL",
       "rank": 66,
       "is_me": false,
       "level": 3,
@@ -602,7 +602,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "BW9U",
+      "tag": "57MP",
       "rank": 67,
       "is_me": false,
       "level": 1,
@@ -611,7 +611,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "EBP4",
+      "tag": "YFBK",
       "rank": 68,
       "is_me": false,
       "level": 8,
@@ -620,7 +620,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "BLR3",
+      "tag": "SQMY",
       "rank": 69,
       "is_me": false,
       "level": 9,
@@ -629,7 +629,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "WQKH",
+      "tag": "PGLU",
       "rank": 70,
       "is_me": false,
       "level": 12,
@@ -638,7 +638,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "9UCD",
+      "tag": "JVNJ",
       "rank": 71,
       "is_me": false,
       "level": 5,
@@ -647,7 +647,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "MYT6",
+      "tag": "JCCR",
       "rank": 72,
       "is_me": false,
       "level": 1,
@@ -656,7 +656,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "FZ7L",
+      "tag": "8Y4J",
       "rank": 73,
       "is_me": false,
       "level": 10,
@@ -665,7 +665,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "Z2MF",
+      "tag": "WHH8",
       "rank": 74,
       "is_me": false,
       "level": 4,
@@ -674,7 +674,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "L2A3",
+      "tag": "JBRX",
       "rank": 75,
       "is_me": false,
       "level": 7,
@@ -683,7 +683,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "DHG7",
+      "tag": "7G6Z",
       "rank": 76,
       "is_me": false,
       "level": 7,
@@ -692,7 +692,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "H6JA",
+      "tag": "S66M",
       "rank": 77,
       "is_me": false,
       "level": 7,
@@ -701,7 +701,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "94A2",
+      "tag": "ZE9R",
       "rank": 78,
       "is_me": false,
       "level": 7,
@@ -710,7 +710,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "JL46",
+      "tag": "EYVH",
       "rank": 79,
       "is_me": false,
       "level": 12,
@@ -719,7 +719,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "WQYN",
+      "tag": "U2ZG",
       "rank": 80,
       "is_me": false,
       "level": 12,
@@ -728,7 +728,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "SAWE",
+      "tag": "S2UE",
       "rank": 81,
       "is_me": false,
       "level": 12,
@@ -737,7 +737,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "UDEQ",
+      "tag": "GRZY",
       "rank": 82,
       "is_me": false,
       "level": 12,
@@ -746,7 +746,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "WXZY",
+      "tag": "QSEF",
       "rank": 83,
       "is_me": false,
       "level": 14,
@@ -755,7 +755,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "2EG3",
+      "tag": "C8Q5",
       "rank": 84,
       "is_me": false,
       "level": 30,
@@ -764,7 +764,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "GPNM",
+      "tag": "58X5",
       "rank": 85,
       "is_me": false,
       "level": 8,
@@ -773,7 +773,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "PVRJ",
+      "tag": "PKX3",
       "rank": 86,
       "is_me": false,
       "level": 3,
@@ -782,7 +782,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "7BWL",
+      "tag": "2GGB",
       "rank": 87,
       "is_me": false,
       "level": 1,
@@ -791,7 +791,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "M8B4",
+      "tag": "KHJ5",
       "rank": 88,
       "is_me": false,
       "level": 3,
@@ -800,7 +800,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "3HFY",
+      "tag": "AWTD",
       "rank": 89,
       "is_me": false,
       "level": 15,
@@ -809,7 +809,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "6AL8",
+      "tag": "HWNX",
       "rank": 90,
       "is_me": false,
       "level": 6,
@@ -818,7 +818,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "6BPF",
+      "tag": "LM4U",
       "rank": 91,
       "is_me": false,
       "level": 5,
@@ -827,7 +827,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "BBD7",
+      "tag": "QAU2",
       "rank": 92,
       "is_me": false,
       "level": 3,
@@ -836,7 +836,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "AER8",
+      "tag": "HYEB",
       "rank": 93,
       "is_me": false,
       "level": 3,
@@ -845,7 +845,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "UH7X",
+      "tag": "RWDE",
       "rank": 94,
       "is_me": false,
       "level": 1,
@@ -854,7 +854,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "SRXV",
+      "tag": "U6KN",
       "rank": 95,
       "is_me": false,
       "level": 7,
@@ -863,7 +863,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "VFWH",
+      "tag": "JMTD",
       "rank": 96,
       "is_me": false,
       "level": 1,
@@ -872,7 +872,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "GLHW",
+      "tag": "B88X",
       "rank": 97,
       "is_me": false,
       "level": 1,
@@ -881,7 +881,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "7L6G",
+      "tag": "Y9H9",
       "rank": 98,
       "is_me": false,
       "level": 1,
@@ -890,16 +890,16 @@
       "growth_bps": 0
     },
     {
-      "tag": "VENK",
+      "tag": "5XGL",
       "rank": 99,
       "is_me": false,
       "level": 1,
-      "nickname": "M1ra12752",
+      "nickname": "M1ra34849",
       "avatar_key": "rookie",
       "growth_bps": 0
     },
     {
-      "tag": "SULJ",
+      "tag": "YLK3",
       "rank": 100,
       "is_me": false,
       "level": 9,
@@ -909,10 +909,10 @@
     }
   ],
   "last_winner": {
-    "tag": "EEFJ",
+    "tag": "4U5F",
     "nickname": "Fixture_Gmbh",
     "avatar_key": "rookie",
-    "growth_bps": 235,
+    "growth_bps": 234,
     "week_start": "2026-11-02"
   }
 }
