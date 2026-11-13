@@ -34,8 +34,10 @@ function skyline(seed: number, minH: number, maxH: number): Building[] {
   return out;
 }
 
-const FAR = skyline(7, 22, 46);
-const NEAR = skyline(23, 10, 34);
+const FAR = skyline(7, 12, 28);
+const NEAR = skyline(23, 5, 19);
+/** Height of the skyline picture in its own units (200 wide). */
+const GROUND = 30;
 const STARS = (() => {
   const next = sequence(99);
   return Array.from({ length: 34 }, (_, i) => ({
@@ -63,16 +65,15 @@ export function TitleScene() {
         <PixelIcon {...MOON} scale={5} className="hidden sm:block" />
       </span>
       <svg
-        viewBox="0 0 200 56"
-        preserveAspectRatio="xMidYMax slice"
-        className="absolute inset-x-0 bottom-0 h-32 w-full [shape-rendering:crispEdges] sm:h-44"
+        viewBox={`0 0 200 ${GROUND}`}
+        className="absolute bottom-0 left-1/2 w-full min-w-160 -translate-x-1/2 [shape-rendering:crispEdges]"
       >
         {FAR.map((b) => (
-          <rect key={`f${b.x}`} x={b.x} y={56 - b.h} width={b.w} height={b.h} fill="var(--bg-2)" />
+          <rect key={`f${b.x}`} x={b.x} y={GROUND - b.h} width={b.w} height={b.h} fill="var(--bg-2)" />
         ))}
         {NEAR.map((b) => (
           <g key={`n${b.x}`}>
-            <rect x={b.x} y={56 - b.h} width={b.w} height={b.h} fill="var(--bg-3)" />
+            <rect x={b.x} y={GROUND - b.h} width={b.w} height={b.h} fill="var(--bg-3)" />
             {Array.from({ length: Math.floor((b.h - 3) / 4) }, (_, row) =>
               Array.from({ length: Math.floor((b.w - 2) / 3) }, (_, col) => {
                 const roll = lit();
@@ -81,7 +82,7 @@ export function TitleScene() {
                   <rect
                     key={`${row}-${col}`}
                     x={b.x + 1.5 + col * 3}
-                    y={56 - b.h + 2 + row * 4}
+                    y={GROUND - b.h + 2 + row * 4}
                     width={1.4}
                     height={1.8}
                     fill="var(--gold)"
