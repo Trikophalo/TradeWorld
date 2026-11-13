@@ -1061,3 +1061,66 @@ Vorgabe: Termine mit Ankündigung, zu denen man zurückkommt, ohne Kauf-Countdow
   - Eine Zinsänderung bewegt die Stimmung aller Aktien.
 - **Anzeige:** Die Seite „Events“ zeigt „Demnächst“ und „Die letzten 24 Stunden“. Termine zur selben Zeit stehen in
   einer Zeile. Die Startseite zeigt die nächsten drei.
+
+## ADR-091: Firmen-Lagen (Krisen und Chancen), Gegenmaßnahmen, Firmen-News und KI-Redaktion — `akzeptiert`
+
+Vorgabe:
+
+- Unternehmer erleben Zufallsereignisse, die ihr Geschäft und ihre Aktie bewegen, höchstens eines am Tag.
+- Probleme lassen sich nicht mit einem Klick lösen. Die Lösungen sind verschieden aufwendig.
+- Firmen-News sehen Gründer und Mitarbeiter.
+- Texte und Ereignisse passen zu dem, was die Firma herstellt. Dafür versteht eine kleine KI die Firmenbeschreibung.
+
+- **Lagen:**
+  - 15 Arten im Katalog `src/config/company-events.ts`:
+    - 10 Krisen: Regulierung, Sondersteuer, Lieferengpass, Qualitätsskandal, Datenleck, Preiskampf, Streik,
+      Protest, Patentklage, Verriss
+    - 5 Chancen: Viral-Trend, Großauftrag, Auszeichnung, Förderprogramm, Partnerschaft
+  - Jede Firma würfelt einmal am Tag (60 %). Zwischen zwei Lagen liegen mindestens 22 Stunden. Neue Firmen haben
+    6 Stunden Ruhe.
+  - Schwere 1 bis 3 vervielfacht die Wirkung.
+- **Wirkung** (`src/lib/sim/company-events.ts`):
+  - Lagen verändern Nachfrage, Kapazität oder Kosten in der stündlichen Abrechnung.
+  - Eine Krise wirkt bis zur Frist schon zu 25 %, danach voll, bis sie gelöst oder vorbei ist.
+  - Eine Chance wirkt nur, wenn man sie nutzt.
+  - Börsennotierte Firmen: Die Aktie fällt bei einer Krise und erholt sich, wenn sie gelöst wird. Bei einer Chance
+    steigt sie.
+- **Gegenmaßnahmen:**
+  - Jede Lage hat zwei bis vier Strategien, z. B. Lobbyarbeit, Produktion anpassen oder Aussitzen.
+  - Eine Strategie ist eine Kette von Schritten. Jeder Schritt kostet Geld aus der Firmenkasse (mit der
+    Firmengröße skaliert) und dauert Stunden. Manche brauchen eine Mindestzahl an Leuten oder binden Kapazität.
+  - Jeder Schritt kann scheitern. Know-how des Teams im passenden Skill-Bereich (Recht, Vertrieb, Wissenschaft …)
+    erhöht die Chance, Schwere senkt sie.
+  - Gescheiterte Schritte lassen sich zum halben Preis wiederholen. Ein Strategiewechsel verwirft den
+    Fortschritt.
+  - Wer bis zur Frist teilweise fertig ist, bekommt einen Teil der Wirkung.
+  - Lohnende Strategien geben einmalig Bekanntheit oder Qualität.
+- **Firmen-News:**
+  - Jede Lage und jeder Schritt erzeugt eine Meldung, ebenso Gründung, Wachstum, Ausbau, Börsengang, neue
+    Mitarbeiter und Rekordstunden.
+  - Der Gründer sieht sie im Unternehmen, Mitarbeiter im Job-Tab, zusammen mit der aktuellen Lage (nur lesend).
+- **Mini-KI** (`src/lib/company-story.ts`, `src/config/company-lexicon.ts`):
+  - Erkennt aus Name und Beschreibung eine von 33 Produktfamilien, z. B. Energy-Drinks oder Toilettenpapier.
+  - Das Produktwort nimmt sie aus dem Satz des Spielers.
+  - Sie füllt die Textbausteine mit passenden Rohstoffen, Steuern, Vorschriften, Risiken, Trends, Kunden und
+    Kritikern.
+  - Steuer und Rohstoff passen zusammen („Taurin-Steuer“ und „Taurin“).
+  - Unbekannte Produkte behalten das Wort des Spielers und bekommen Begriffe aus der Branche.
+- **KI-Redaktion (optional, Claude):**
+  - Die Edge Function `company-writer` lässt Claude einmal pro Firma ein Wortprofil schreiben und zu jeder Lage
+    Schlagzeile, Meldung und Auslöser. Das ergibt quasi unendlich viele Varianten.
+  - Claude schreibt nur Text. Zahlen, Chancen und Preise kommen immer aus der Datenbank.
+  - Die Datenbank prüft Länge und gesperrte Begriffe und überschreibt nichts.
+  - Die Firmenbeschreibung gilt im Prompt als Spielermaterial, nicht als Anweisung.
+  - Modell und Einstellungen:
+    - Modell: `claude-opus-5-5` mit niedrigem Aufwand und strukturierter JSON-Ausgabe.
+    - Lehnt das Modell eine Anfrage ab, übernimmt automatisch ein anderes (Server-Fallback).
+  - Kosten: ein Aufruf pro Firma und einer pro Lage, also höchstens ein paar Cent am Tag für vier Spieler.
+    `claude-haiku-5-5` wäre deutlich günstiger, wenn gewünscht.
+  - Ohne Schlüssel antwortet die Funktion `not_configured`, und die Mini-KI schreibt alle Texte.
+- **Einrichtung der KI-Redaktion** (einmalig, alles in GitHub unter Settings → Secrets and variables → Actions):
+  1. `SUPABASE_ACCESS_TOKEN`: ein persönlicher Zugriffstoken aus dem Supabase-Dashboard (Account → Access Tokens).
+  2. `SUPABASE_PROJECT_REF`: die Projekt-ID (steht in der Supabase-URL hinter `/project/`).
+  3. `ANTHROPIC_API_KEY`: ein API-Schlüssel aus der Claude-Konsole.
+  4. Beim nächsten Push spielt die GitHub Action die Funktion ein und hinterlegt den Schlüssel als
+     Funktions-Secret. Er erscheint nie im Log.
