@@ -30673,6 +30673,2828 @@ begin
   end loop;
 end;
 $$;
+-- ===== idempotent copy of migrations/20261130000200_m4j_campaigns_deals.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · M4j · 0200 · Marketing campaigns, deals between players and trust (ADR-096 to ADR-098)
+-- =============================================================================
+-- Mirrors src/lib/sim/campaigns.ts (campaignCostCents, campaignLuck, campaignFactor, campaignResonance,
+-- campaignDemandFactor), the campaignFactor input of closeStartupHour (src/lib/sim/startup.ts) and
+-- src/lib/sim/deals.ts (loanTermsError, supplyTermsError, stakeTermsError, loanDueCents, loanCollect, loanPhase,
+-- supplyFreeCapacityCents, unmetDemandCents, supplyHour, supplyMaxCostCents, supplyPrepayCents, supplyFeeSplit,
+-- supplyKept, stakePayoutCents, trustScore, trustBand, trustOnEnd). Config: game_config 'startups' (campaigns),
+-- 'deals' and 'trust' (src/config/deals.ts); the SQL falls back to the same defaults.
+--
+-- Tables (RLS on, read-only for clients):
+--   company_campaigns  one marketing campaign of a player company (founder and employees read)
+--   deals              loans, supply contracts and stakes between players (parties read; open board offers: everyone)
+--   trust_events       the trust changes of a player (own rows)
+-- New columns: player_company_hours.supply_in_cents, supply_out_cents, supply_revenue_cents, supply_fee_paid_cents,
+--   supply_fee_income_cents, supply_goods_cents, stake_payout_cents, campaign_id.
+--
+-- Hourly close (player_company_close_hour, as in M4h): demand × the factor of the campaign whose window holds the
+-- hour start; then the stake payouts (share of a profitable hour, never more than the free cash), then the CEO payout
+-- from the profit left after the stakes. Supply contracts are settled by deals_run_due() (one line in run_due_jobs,
+-- after the company hours) from the stored hour rows of both companies.
+-- RPCs: start_campaign, propose_deal, respond_deal, cancel_deal, break_deal, repay_loan, forgive_loan, get_deals,
+-- get_deal_board. COMPANY gains campaign and campaign_costs, the player card gains trust.
+-- Error keys: campaign_running NX087, deal_not_found NX088, deal_closed NX089, deal_terms NX090, deal_limit NX091,
+-- deal_self NX092, stake_share_full NX093, deal_needs_company NX094 (plus M4i's NX083..NX086).
+-- Notification types: deal_offer, deal_result. Feed kinds: deal_signed, deal_broken, loan_defaulted.
+-- Idempotent (identical copy in supabase/updates/).
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- A. Schema
+-- ---------------------------------------------------------------------------
+create table if not exists public.company_campaigns (
+  id             uuid primary key default gen_random_uuid(),
+  company_id     uuid not null references public.player_companies (company_id) on delete cascade,
+  kind           text not null check (kind in ('flyer', 'online', 'tv')),
+  cost_cents     bigint not null check (cost_cents >= 0),
+  luck           double precision not null check (luck >= 0),
+  demand_factor  double precision not null check (demand_factor >= 0),
+  awareness_gain double precision not null default 0 check (awareness_gain >= 0),
+  started_at     timestamptz not null,
+  ends_at        timestamptz not null,
+  created_by     uuid references public.profiles (id) on delete set null,
+  request_id     uuid unique,
+  created_at     timestamptz not null default now(),
+  constraint company_campaigns_window_check check (ends_at > started_at)
+);
+alter table public.company_campaigns enable row level security;
+create index if not exists company_campaigns_company_idx on public.company_campaigns (company_id, started_at desc);
+create index if not exists company_campaigns_created_by_idx on public.company_campaigns (created_by) where created_by is not null;
+comment on table public.company_campaigns is
+  'Marketing campaigns of player companies (ADR-097): luck rolled once at the start, demand_factor applies to the hours '
+  'whose start lies in [started_at, ends_at); awareness_gain = awareness added at the start (after the stage cap).';
+
+create table if not exists public.deals (
+  id                    uuid primary key default gen_random_uuid(),
+  kind                  text not null check (kind in ('loan', 'supply', 'stake')),
+  status                text not null default 'open'
+                        check (status in ('open', 'active', 'overdue', 'defaulted', 'completed', 'forgiven', 'broken',
+                                          'cancelled', 'declined', 'expired')),
+  proposer_id           uuid not null references public.profiles (id) on delete cascade,
+  proposer_role         text not null
+                        check (proposer_role in ('lender', 'borrower', 'supplier', 'buyer', 'investor', 'company')),
+  counterparty_id       uuid references public.profiles (id) on delete cascade,
+  board                 boolean not null default false,
+  lender_id             uuid references public.profiles (id) on delete cascade,
+  borrower_id           uuid references public.profiles (id) on delete cascade,
+  supplier_company_id   uuid references public.companies (id) on delete cascade,
+  buyer_company_id      uuid references public.companies (id) on delete cascade,
+  investor_id           uuid references public.profiles (id) on delete cascade,
+  company_id            uuid references public.companies (id) on delete cascade,
+  principal_cents       bigint check (principal_cents > 0),
+  interest_bps          integer check (interest_bps >= 0),
+  volume_cents_per_hour bigint check (volume_cents_per_hour > 0),
+  fee_bps               integer check (fee_bps >= 0),
+  prepay_bps            integer check (prepay_bps >= 0),
+  amount_cents          bigint check (amount_cents > 0),
+  share_bps             integer check (share_bps > 0),
+  hours                 integer not null check (hours > 0),
+  message               text check (message is null or char_length(message) between 1 and 140),
+  due_cents             bigint not null default 0 check (due_cents >= 0),
+  repaid_cents          bigint not null default 0 check (repaid_cents >= 0),
+  delivered_cents       bigint not null default 0 check (delivered_cents >= 0),
+  needed_cents          bigint not null default 0 check (needed_cents >= 0),
+  fees_paid_cents       bigint not null default 0 check (fees_paid_cents >= 0),
+  prepay_cents          bigint not null default 0 check (prepay_cents >= 0),
+  prepay_left_cents     bigint not null default 0 check (prepay_left_cents >= 0),
+  payouts_cents         bigint not null default 0 check (payouts_cents >= 0),
+  settled_until         timestamptz,
+  created_at            timestamptz not null default now(),
+  expires_at            timestamptz not null,
+  accepted_at           timestamptz,
+  ends_at               timestamptz,
+  closed_at             timestamptz,
+  broken_by             uuid references public.profiles (id) on delete set null,
+  request_id            uuid unique,
+  constraint deals_terms_check check (
+    (kind = 'loan' and proposer_role in ('lender', 'borrower') and principal_cents is not null and interest_bps is not null)
+    or (kind = 'supply' and proposer_role in ('supplier', 'buyer') and volume_cents_per_hour is not null
+        and fee_bps is not null and prepay_bps is not null)
+    or (kind = 'stake' and proposer_role in ('investor', 'company') and amount_cents is not null and share_bps is not null)),
+  constraint deals_counterparty_check check (counterparty_id is null or counterparty_id <> proposer_id),
+  constraint deals_repaid_check check (repaid_cents <= due_cents)
+);
+alter table public.deals enable row level security;
+create index if not exists deals_proposer_idx on public.deals (proposer_id, created_at desc);
+create index if not exists deals_counterparty_idx on public.deals (counterparty_id, created_at desc) where counterparty_id is not null;
+create index if not exists deals_lender_idx on public.deals (lender_id) where lender_id is not null;
+create index if not exists deals_borrower_idx on public.deals (borrower_id) where borrower_id is not null;
+create index if not exists deals_supplier_company_idx on public.deals (supplier_company_id) where supplier_company_id is not null;
+create index if not exists deals_buyer_company_idx on public.deals (buyer_company_id) where buyer_company_id is not null;
+create index if not exists deals_investor_idx on public.deals (investor_id) where investor_id is not null;
+create index if not exists deals_company_idx on public.deals (company_id) where company_id is not null;
+create index if not exists deals_broken_by_idx on public.deals (broken_by) where broken_by is not null;
+create index if not exists deals_board_idx on public.deals (created_at desc) where status = 'open' and counterparty_id is null;
+create index if not exists deals_open_expiry_idx on public.deals (expires_at) where status = 'open';
+create index if not exists deals_running_idx on public.deals (kind, status, ends_at) where status in ('active', 'overdue');
+comment on table public.deals is
+  'Handshake deals between players (ADR-098): loan (lender -> borrower), supply (supplier company -> buyer company), '
+  'stake (investor -> company). counterparty_id = the target of an offer (null on the board) and, once accepted, the '
+  'player who accepted; board = it was an open offer. settled_until = next operating hour to settle (supply) or to pay '
+  '(stake). Written only by the RPCs and deals_run_due().';
+
+create table if not exists public.trust_events (
+  id         bigint generated always as identity primary key,
+  player_id  uuid not null references public.profiles (id) on delete cascade,
+  deal_id    uuid references public.deals (id) on delete set null,
+  reason     text not null check (reason ~ '^[a-zA-Z]+$'),
+  delta      integer not null,
+  created_at timestamptz not null default now()
+);
+alter table public.trust_events enable row level security;
+create index if not exists trust_events_player_idx on public.trust_events (player_id, created_at desc);
+create unique index if not exists trust_events_once_uq on public.trust_events (deal_id, player_id, reason) where deal_id is not null;
+comment on table public.trust_events is
+  'Trust changes (ADR-098): reason = a key of game_config trust.deltas, delta as configured when it happened. '
+  'Score = clamp(start + sum(delta), min, max). Once per (deal, player, reason).';
+
+do $$
+begin
+  revoke all on public.company_campaigns from public, anon, authenticated;
+  grant select on public.company_campaigns to authenticated;
+  grant all on public.company_campaigns to service_role;
+  drop policy if exists "members read" on public.company_campaigns;
+  create policy "members read" on public.company_campaigns for select to authenticated
+    using (exists (select 1 from public.player_companies pc
+                    where pc.company_id = company_campaigns.company_id and pc.founder_id = (select auth.uid()))
+           or exists (select 1 from public.player_jobs j
+                       where j.company_id = company_campaigns.company_id and j.player_id = (select auth.uid())
+                         and j.status = 'active'));
+
+  revoke all on public.deals from public, anon, authenticated;
+  grant select on public.deals to authenticated;
+  grant all on public.deals to service_role;
+  drop policy if exists "parties or open offers" on public.deals;
+  create policy "parties or open offers" on public.deals for select to authenticated
+    using ((status = 'open' and counterparty_id is null)
+           or (select auth.uid()) in (proposer_id, counterparty_id, lender_id, borrower_id, investor_id)
+           or exists (select 1 from public.player_companies pc
+                       where pc.founder_id = (select auth.uid())
+                         and pc.company_id in (deals.supplier_company_id, deals.buyer_company_id, deals.company_id)));
+
+  revoke all on public.trust_events from public, anon, authenticated;
+  grant select on public.trust_events to authenticated;
+  grant all on public.trust_events to service_role;
+  drop policy if exists "owner read" on public.trust_events;
+  create policy "owner read" on public.trust_events for select to authenticated using (player_id = (select auth.uid()));
+end;
+$$;
+
+alter table public.player_company_hours add column if not exists supply_in_cents bigint not null default 0;
+alter table public.player_company_hours add column if not exists supply_out_cents bigint not null default 0;
+alter table public.player_company_hours add column if not exists supply_revenue_cents bigint not null default 0;
+alter table public.player_company_hours add column if not exists supply_fee_paid_cents bigint not null default 0;
+alter table public.player_company_hours add column if not exists supply_fee_income_cents bigint not null default 0;
+alter table public.player_company_hours add column if not exists supply_goods_cents bigint not null default 0;
+alter table public.player_company_hours add column if not exists stake_payout_cents bigint not null default 0;
+alter table public.player_company_hours add column if not exists campaign_id uuid;
+do $$
+declare
+  c text;
+begin
+  foreach c in array array['supply_in_cents', 'supply_out_cents', 'supply_revenue_cents', 'supply_fee_paid_cents',
+                           'supply_fee_income_cents', 'supply_goods_cents', 'stake_payout_cents'] loop
+    if not exists (select 1 from pg_constraint where conname = 'player_company_hours_' || c || '_check'
+                      and conrelid = 'public.player_company_hours'::regclass) then
+      execute format('alter table public.player_company_hours add constraint %I check (%I >= 0)',
+                     'player_company_hours_' || c || '_check', c);
+    end if;
+  end loop;
+  if not exists (select 1 from pg_constraint where conname = 'player_company_hours_campaign_id_fkey'
+                    and conrelid = 'public.player_company_hours'::regclass) then
+    alter table public.player_company_hours add constraint player_company_hours_campaign_id_fkey
+      foreign key (campaign_id) references public.company_campaigns (id) on delete set null;
+  end if;
+end;
+$$;
+create index if not exists player_company_hours_campaign_idx on public.player_company_hours (campaign_id) where campaign_id is not null;
+comment on column public.player_company_hours.supply_in_cents is 'Goods received through supply contracts this hour (normal price, ADR-098).';
+comment on column public.player_company_hours.supply_out_cents is 'Goods delivered through supply contracts this hour (normal price, ADR-098).';
+comment on column public.player_company_hours.supply_revenue_cents is 'Buyer: revenue from supplied goods (households), part of profit_cents.';
+comment on column public.player_company_hours.supply_fee_paid_cents is 'Buyer: supply fees of the hour (prepayment and cash), part of profit_cents.';
+comment on column public.player_company_hours.supply_fee_income_cents is 'Supplier: supply fees earned this hour, part of profit_cents.';
+comment on column public.player_company_hours.supply_goods_cents is 'Supplier: goods for supply deliveries, part of profit_cents.';
+comment on column public.player_company_hours.stake_payout_cents is 'Profit shares paid to stake investors this hour (ADR-098); not part of profit_cents.';
+comment on column public.player_company_hours.campaign_id is 'Marketing campaign that raised the demand of this hour (ADR-097), if any.';
+
+-- ---------------------------------------------------------------------------
+-- B. Error keys (M4i: NX083..NX086, M4j: NX087..NX094)
+-- ---------------------------------------------------------------------------
+create or replace function public.api_error(p_key text)
+returns void
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_code text;
+begin
+  v_code := case p_key
+    when 'insufficient_funds'          then 'NX001'
+    when 'rate_limited'                then 'NX004'
+    when 'forbidden'                   then 'NX006'
+    when 'invalid_quantity'            then 'NX007'
+    when 'invalid_price'               then 'NX007'
+    when 'invalid_argument'            then 'NX007'
+    when 'invalid_interval'            then 'NX007'
+    when 'not_authenticated'           then 'NX010'
+    when 'unknown_security'            then 'NX011'
+    when 'not_tradable'                then 'NX012'
+    when 'insufficient_position'       then 'NX013'
+    when 'order_not_found'             then 'NX014'
+    when 'order_not_open'              then 'NX015'
+    when 'market_paused'               then 'NX016'
+    when 'nothing_to_claim'            then 'NX017'
+    when 'locked'                      then 'NX018'
+    when 'name_too_short'              then 'NX019'
+    when 'name_too_long'               then 'NX019'
+    when 'name_invalid_chars'          then 'NX019'
+    when 'name_profanity'              then 'NX019'
+    when 'name_reserved'               then 'NX019'
+    when 'name_taken'                  then 'NX019'
+    when 'name_change_too_soon'        then 'NX020'
+    when 'order_too_small'             then 'NX021'
+    when 'market_illiquid'             then 'NX022'
+    when 'mission_not_found'           then 'NX023'
+    when 'mission_not_completed'       then 'NX024'
+    when 'mission_already_claimed'     then 'NX025'
+    when 'avatar_unknown'              then 'NX026'
+    when 'avatar_locked'               then 'NX027'
+    when 'daily_reward_claimed'        then 'NX028'
+    when 'skill_unknown'               then 'NX029'
+    when 'skill_learned'               then 'NX030'
+    when 'skill_locked'                then 'NX031'
+    when 'skill_points_insufficient'   then 'NX032'
+    when 'job_not_found'               then 'NX033'
+    when 'job_level_too_low'           then 'NX034'
+    when 'job_skills_missing'          then 'NX035'
+    when 'application_limit'           then 'NX036'
+    when 'application_exists'          then 'NX037'
+    when 'application_not_found'       then 'NX038'
+    when 'application_not_offered'     then 'NX039'
+    when 'offer_expired'               then 'NX040'
+    when 'job_active_exists'           then 'NX041'
+    when 'no_active_job'               then 'NX042'
+    when 'raise_too_soon'              then 'NX043'
+    when 'raise_too_high'              then 'NX044'
+    when 'player_not_found'            then 'NX045'
+    when 'employer_only'               then 'NX046'
+    when 'company_exists'              then 'NX047'
+    when 'company_not_found'           then 'NX048'
+    when 'company_level_too_low'       then 'NX049'
+    when 'owns_company'                then 'NX050'
+    when 'employee_limit'              then 'NX051'
+    when 'company_upgrade_unavailable' then 'NX052'
+    when 'founding_locked'             then 'NX053'
+    when 'not_in_company'              then 'NX054'
+    when 'work_task_not_found'         then 'NX055'
+    when 'work_task_expired'           then 'NX056'
+    when 'work_task_done'              then 'NX057'
+    when 'offer_closed'                then 'NX058'
+    when 'offer_sold_out'              then 'NX059'
+    when 'already_listed'              then 'NX060'
+    when 'confirm_mismatch'            then 'NX061'
+    when 'skill_already_covered'       then 'NX062'
+    when 'training_locked'             then 'NX063'
+    when 'logo_locked'                 then 'NX064'
+    when 'logo_forbidden'              then 'NX065'
+    when 'artworks_locked'             then 'NX066'
+    when 'artwork_not_found'           then 'NX067'
+    when 'auction_not_found'           then 'NX068'
+    when 'auction_ended'               then 'NX069'
+    when 'bid_too_low'                 then 'NX070'
+    when 'own_artwork'                 then 'NX071'
+    when 'already_on_auction'          then 'NX072'
+    when 'auction_has_bids'            then 'NX073'
+    when 'property_locked'             then 'NX074'
+    when 'no_home'                     then 'NX075'
+    when 'invalid_tier'                then 'NX076'
+    when 'item_not_found'              then 'NX077'
+    when 'layout_invalid'              then 'NX078'
+    when 'floor_not_owned'             then 'NX079'
+    when 'garage_full'                 then 'NX080'
+    when 'event_closed'                then 'NX081'
+    when 'event_needs_staff'           then 'NX082'
+    when 'upgrade_maxed'               then 'NX083'
+    when 'promotion_not_ready'         then 'NX084'
+    when 'promotion_too_soon'          then 'NX085'
+    when 'promotion_pending'           then 'NX086'
+    when 'campaign_running'            then 'NX087'
+    when 'deal_not_found'              then 'NX088'
+    when 'deal_closed'                 then 'NX089'
+    when 'deal_terms'                  then 'NX090'
+    when 'deal_limit'                  then 'NX091'
+    when 'deal_self'                   then 'NX092'
+    when 'stake_share_full'            then 'NX093'
+    when 'deal_needs_company'          then 'NX094'
+    else 'NX007'
+  end;
+  raise exception using errcode = v_code, message = p_key;
+end;
+$$;
+comment on function public.api_error(text) is 'Raises the API error <key> with its NX SQLSTATE. The client shows a text per key (error.message).';
+
+-- ---------------------------------------------------------------------------
+-- C. Notification types
+-- ---------------------------------------------------------------------------
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('deal_offer', 'social', 'Deal-Angebot', 'Jemand bietet dir einen Kredit, einen Liefervertrag oder eine Beteiligung an.',
+        'notif_deal', true, true, false, 296),
+       ('deal_result', 'social', 'Deal-Neuigkeiten',
+        'Ein Deal wurde angenommen, abgelehnt, erfüllt, zurückgezahlt oder gebrochen.', 'notif_deal', true, false, false, 297)
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- D. Marketing campaigns (port of src/lib/sim/campaigns.ts)
+-- ---------------------------------------------------------------------------
+create or replace function public.campaigns_cfg()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(public.config_jsonb('startups', '{campaigns}'), '{}'::jsonb);
+$$;
+comment on function public.campaigns_cfg() is 'Internal: game_config startups.campaigns (ADR-097), {} when missing.';
+
+-- one number of a campaign kind (hours, costHours, demandBps, awareness) with the defaults of balance.ts
+create or replace function public.campaign_kind_num(p_kind text, p_field text)
+returns double precision
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select public.cfg_num(public.campaigns_cfg(), array['kinds', p_kind, p_field],
+    case p_field
+      when 'hours'     then case p_kind when 'flyer' then 24 when 'online' then 48 else 72 end
+      when 'costHours' then case p_kind when 'flyer' then 2 when 'online' then 6 else 18 end
+      when 'demandBps' then case p_kind when 'flyer' then 2500 when 'online' then 4000 else 7000 end
+      when 'awareness' then case p_kind when 'flyer' then 0.005 when 'online' then 0.01 else 0.025 end
+      else 0
+    end);
+$$;
+
+-- campaignCostCents: max(minCostCents, costHours × demand of the last hour), whole euros
+create or replace function public.campaign_cost_cents(p_kind text, p_demand_cents double precision)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select (round(greatest(public.cfg_num(public.campaigns_cfg(), '{minCostCents}', 20000),
+                         public.campaign_kind_num(p_kind, 'costHours') * greatest(0, coalesce(p_demand_cents, 0)))::numeric
+                / 100) * 100)::bigint;
+$$;
+
+-- campaignLuck: luckMin + (luckMax − luckMin) × u
+create or replace function public.campaign_luck(p_u double precision)
+returns double precision
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select public.cfg_num(c, '{luckMin}', 0.4)
+         + (public.cfg_num(c, '{luckMax}', 1.6) - public.cfg_num(c, '{luckMin}', 0.4)) * least(1, greatest(0, coalesce(p_u, 0)))
+    from (select public.campaigns_cfg() as c) x;
+$$;
+
+-- campaignFactor: 1 + demandBps / 10 000 × luck × (1 − w + w × quality)
+create or replace function public.campaign_factor(p_kind text, p_quality double precision, p_luck double precision)
+returns double precision
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select 1 + public.campaign_kind_num(p_kind, 'demandBps') / 10000.0 * coalesce(p_luck, 0)
+             * (1 - public.cfg_num(c, '{qualityWeight}', 0.5)
+                + public.cfg_num(c, '{qualityWeight}', 0.5) * least(1, greatest(0, coalesce(p_quality, 0))))
+    from (select public.campaigns_cfg() as c) x;
+$$;
+
+-- campaignResonance
+create or replace function public.campaign_resonance(p_luck double precision)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when p_luck < public.cfg_num(c, '{weakBelow}', 0.8) then 'weak'
+              when p_luck >= public.cfg_num(c, '{strongFrom}', 1.2) then 'strong'
+              else 'solid' end
+    from (select public.campaigns_cfg() as c) x;
+$$;
+
+-- Demand per hour without a closed hour, as closeStartupHour (no noise, no event):
+-- effective potential / 4 / quarterHours × awareness × (0.5 + 0.5 × quality) × price demand factor
+create or replace function public.company_demand_estimate_cents(p_company uuid)
+returns double precision
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select pc.potential_annual_cents * public.company_market_factor(pc.tier, pc.expansion_level) / 4.0
+         / greatest(1, public.config_double('time', '{quarterHours}', 6))
+         * pc.awareness * (0.5 + 0.5 * pc.quality)
+         * (public.company_price_effect(pc.price_level, pc.quality) ->> 'demand')::double precision
+    from public.player_companies pc where pc.company_id = p_company;
+$$;
+
+-- The demand a campaign is priced on: the last closed hour, else the estimate
+create or replace function public.company_campaign_base_cents(p_company uuid)
+returns double precision
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select h.demand_cents::double precision from public.player_company_hours h
+                    where h.company_id = p_company order by h.hour_start desc limit 1),
+                  public.company_demand_estimate_cents(p_company), 0);
+$$;
+
+-- COMPANY.campaign_costs: {flyer, online, tv}
+create or replace function public.company_campaign_costs(p_company uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_object_agg(k.kind, public.campaign_cost_cents(k.kind, b.base))
+    from (values ('flyer'), ('online'), ('tv')) k(kind),
+         (select public.company_campaign_base_cents(p_company) as base) b;
+$$;
+
+-- The campaign whose window holds p_at (null when none)
+create or replace function public.company_campaign_at(p_company uuid, p_at timestamptz)
+returns public.company_campaigns
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select x.* from public.company_campaigns x
+   where x.company_id = p_company and x.started_at <= p_at and x.ends_at > p_at
+   order by x.started_at desc limit 1;
+$$;
+
+-- CAMPAIGN: {id, kind, started_at, ends_at, cost_cents, demand_bps, resonance}
+create or replace function public.campaign_json(p_campaign uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object('id', x.id, 'kind', x.kind, 'started_at', x.started_at, 'ends_at', x.ends_at,
+                            'cost_cents', x.cost_cents, 'demand_bps', round(((x.demand_factor - 1) * 10000)::numeric)::integer,
+                            'resonance', public.campaign_resonance(x.luck))
+    from public.company_campaigns x where x.id = p_campaign;
+$$;
+
+-- RPC: starts a campaign (owner or CEO of the player company), paid from the free company cash like the other
+-- company spending (company_costs to the households); awareness grows at once up to the stage cap.
+create or replace function public.start_campaign(p_request_id uuid, p_company_id uuid, p_kind text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  pc       public.player_companies;
+  v_now    timestamptz := public.game_now();
+  v_su     jsonb := coalesce(public.config_jsonb('startups'), '{}'::jsonb);
+  v_cost   bigint;
+  v_free   bigint;
+  v_luck   double precision;
+  v_factor double precision;
+  v_stage  integer;
+  v_cap    double precision;
+  v_aw     double precision;
+  v_id     uuid;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_company_id is null or coalesce(p_kind, '') not in ('flyer', 'online', 'tv') then
+    perform public.api_error('invalid_argument');
+  end if;
+  perform public.require_company_owner(p_company_id);
+  v_replay := public.request_begin(v_player, p_request_id, 'start_campaign');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into pc from public.player_companies where company_id = p_company_id and status = 'active' for update;
+  if pc.company_id is null then
+    perform public.api_error('company_not_found');
+  end if;
+  if exists (select 1 from public.company_campaigns x where x.company_id = p_company_id and x.ends_at > v_now) then
+    perform public.api_error('campaign_running');
+  end if;
+  v_cost := public.campaign_cost_cents(p_kind, public.company_campaign_base_cents(p_company_id));
+  -- free cash: open bills come first (as expand_company and event steps)
+  select a.balance_cents - pc.unpaid_cents into v_free
+    from public.ledger_accounts a where a.owner_company_id = p_company_id and a.kind = 'company_cash' for update;
+  if coalesce(v_free, 0) < v_cost then
+    perform public.api_error('insufficient_funds');
+  end if;
+  if v_cost > 0 then
+    perform public.ledger_transfer(public.company_cash_account(p_company_id), public.ledger_system_account('households'), v_cost,
+                                   'company_costs', 'Marketing-Kampagne', 'company', p_company_id,
+                                   'campaign:' || p_company_id::text || ':' || p_request_id::text, v_player);
+  end if;
+  v_luck := public.campaign_luck(random());
+  v_factor := public.campaign_factor(p_kind, pc.quality, v_luck);
+  -- awareness at once, capped by the growth stage (ADR-062) as in the quarter close; never lowered
+  v_stage := least(greatest(coalesce(public.company_stage(p_company_id), 0), 0),
+                   greatest(jsonb_array_length(coalesce(v_su #> '{stages,awarenessCaps}', '[1]'::jsonb)) - 1, 0));
+  v_cap := greatest(public.cfg_num(v_su, '{awareness,min}', 0.01),
+                    coalesce((v_su #>> array['stages', 'awarenessCaps', v_stage::text])::double precision, 1));
+  v_aw := least(1, greatest(pc.awareness, least(v_cap, pc.awareness + public.campaign_kind_num(p_kind, 'awareness'))));
+  update public.player_companies set awareness = v_aw where company_id = p_company_id;
+  insert into public.company_campaigns (company_id, kind, cost_cents, luck, demand_factor, awareness_gain, started_at, ends_at,
+                                        created_by, request_id)
+  values (p_company_id, p_kind, v_cost, v_luck, v_factor, greatest(0, v_aw - pc.awareness), v_now,
+          v_now + make_interval(secs => greatest(1, public.campaign_kind_num(p_kind, 'hours')) * 3600), v_player, p_request_id)
+  returning id into v_id;
+  perform public.company_news_add(p_company_id, 'campaign_started',
+    jsonb_build_object('kind', p_kind, 'resonance', public.campaign_resonance(v_luck),
+                       'demand_bps', round(((v_factor - 1) * 10000)::numeric)::integer));
+  return public.request_complete(v_player, p_request_id, public.campaign_json(v_id));
+end;
+$$;
+comment on function public.start_campaign(uuid, uuid, text) is
+  'RPC (owner or CEO): starts a marketing campaign flyer | online | tv (ADR-097), paid from the free company cash. '
+  'Errors invalid_argument, employer_only, company_not_found, campaign_running, insufficient_funds. -> CAMPAIGN';
+
+-- ---------------------------------------------------------------------------
+-- E. Trust (port of trustScore, trustBand)
+-- ---------------------------------------------------------------------------
+create or replace function public.deals_cfg()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(public.config_jsonb('deals'), '{}'::jsonb);
+$$;
+comment on function public.deals_cfg() is 'Internal: game_config deals (ADR-098), {} when missing.';
+
+create or replace function public.trust_cfg()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(public.config_jsonb('trust'), '{}'::jsonb);
+$$;
+comment on function public.trust_cfg() is 'Internal: game_config trust (ADR-098), {} when missing.';
+
+create or replace function public.trust_delta(p_reason text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select round(public.cfg_num(public.trust_cfg(), array['deltas', p_reason],
+    case p_reason
+      when 'loanRepaidOnTime' then 4 when 'loanRepaidLate' then 2 when 'loanOverdue' then -6 when 'loanDefaulted' then -12
+      when 'loanLent' then 1 when 'loanForgiven' then 2 when 'supplyKept' then 3 when 'supplyShort' then -4
+      when 'stakeKept' then 3 when 'dealBroken' then -12 else 0
+    end)::numeric)::integer;
+$$;
+
+-- One trust change; once per (deal, player, reason). Returns the delta written (0 when nothing was written).
+create or replace function public.trust_add(p_player uuid, p_deal uuid, p_reason text)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_delta integer := public.trust_delta(p_reason);
+begin
+  if p_player is null or p_reason is null or not exists (select 1 from public.profiles p where p.id = p_player) then
+    return 0;
+  end if;
+  insert into public.trust_events (player_id, deal_id, reason, delta) values (p_player, p_deal, p_reason, v_delta)
+  on conflict do nothing;
+  return case when found then v_delta else 0 end;
+end;
+$$;
+
+-- trustScore: clamp(start + sum of deltas, min, max)
+create or replace function public.trust_score(p_player uuid)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select least(public.cfg_num(c, '{max}', 100),
+               greatest(public.cfg_num(c, '{min}', 0),
+                        public.cfg_num(c, '{start}', 50)
+                        + coalesce((select sum(t.delta) from public.trust_events t where t.player_id = p_player), 0)))::integer
+    from (select public.trust_cfg() as c) x;
+$$;
+
+-- trustBand: the last band (ascending) whose `from` ≤ score, else the first
+create or replace function public.trust_band(p_score integer)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with b as (
+    select t.x, t.ord
+      from jsonb_array_elements(case when jsonb_typeof(public.trust_cfg() -> 'bands') = 'array'
+                                     then public.trust_cfg() -> 'bands'
+                                     else '[{"from": 0, "key": "risky"}, {"from": 30, "key": "shaky"}, {"from": 45, "key": "blank"},
+                                            {"from": 60, "key": "reliable"}, {"from": 80, "key": "rock"}]'::jsonb end)
+           with ordinality t(x, ord))
+  select coalesce((select b.x ->> 'key' from b where public.cfg_num(b.x, '{from}', 0) <= p_score order by b.ord desc limit 1),
+                  (select b.x ->> 'key' from b order by b.ord limit 1), 'risky');
+$$;
+
+-- TRUST: {score, band, kept, broken}; kept = loans repaid as borrower, supply contracts that ended kept,
+-- stakes kept as company side; broken = deals broken + loans defaulted (counted from the trust events)
+create or replace function public.player_trust(p_player uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'score', s.score,
+    'band', public.trust_band(s.score),
+    'kept', (select count(*) from public.trust_events t
+              where t.player_id = p_player and t.reason in ('loanRepaidOnTime', 'loanRepaidLate', 'supplyKept', 'stakeKept'))::integer,
+    'broken', (select count(*) from public.trust_events t
+                where t.player_id = p_player and t.reason in ('dealBroken', 'loanDefaulted'))::integer)
+    from (select public.trust_score(p_player) as score) s;
+$$;
+comment on function public.player_trust(uuid) is 'TRUST of a player (ADR-098): {score, band, kept, broken}.';
+
+-- ---------------------------------------------------------------------------
+-- F. Deal rules and helpers (port of src/lib/sim/deals.ts)
+-- ---------------------------------------------------------------------------
+-- A whole JSON number of the terms, null when missing, not a number, fractional or out of range
+create or replace function public.deal_term_int(p_terms jsonb, p_key text)
+returns bigint
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v jsonb := p_terms -> p_key;
+  n numeric;
+begin
+  if v is null or jsonb_typeof(v) <> 'number' then
+    return null;
+  end if;
+  n := (v #>> '{}')::numeric;
+  if n <> trunc(n) or abs(n) > 1000000000000000 then
+    return null;
+  end if;
+  return n::bigint;
+end;
+$$;
+
+create or replace function public.deal_other_role(p_role text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case p_role when 'lender' then 'borrower' when 'borrower' then 'lender' when 'supplier' then 'buyer'
+                     when 'buyer' then 'supplier' when 'investor' then 'company' when 'company' then 'investor' end;
+$$;
+
+create or replace function public.deal_role_ok(p_kind text, p_role text)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce((p_kind = 'loan' and p_role in ('lender', 'borrower')) or (p_kind = 'supply' and p_role in ('supplier', 'buyer'))
+                  or (p_kind = 'stake' and p_role in ('investor', 'company')), false);
+$$;
+
+create or replace function public.deal_role_needs_company(p_role text)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce(p_role in ('supplier', 'buyer', 'company'), false);
+$$;
+
+-- The active company a player founded (at most one)
+create or replace function public.player_active_company(p_player uuid)
+returns uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select pc.company_id from public.player_companies pc where pc.founder_id = p_player and pc.status = 'active' limit 1;
+$$;
+
+-- The first operating hour of a deal accepted at p_at: the next full hour (the hour itself when p_at is on the hour)
+create or replace function public.deal_first_hour(p_at timestamptz)
+returns timestamptz
+language sql
+immutable
+set search_path = ''
+as $$
+  select date_trunc('hour', p_at at time zone 'UTC') at time zone 'UTC'
+         + case when p_at > date_trunc('hour', p_at at time zone 'UTC') at time zone 'UTC' then interval '1 hour'
+                else interval '0' end;
+$$;
+
+-- The terms of a stored deal as the RPC takes them
+create or replace function public.deal_terms_json(p_deal public.deals)
+returns jsonb
+language sql
+immutable
+set search_path = ''
+as $$
+  select case p_deal.kind
+    when 'loan' then jsonb_build_object('principal_cents', p_deal.principal_cents, 'interest_bps', p_deal.interest_bps,
+                                        'hours', p_deal.hours)
+    when 'supply' then jsonb_build_object('volume_cents_per_hour', p_deal.volume_cents_per_hour, 'fee_bps', p_deal.fee_bps,
+                                          'prepay_bps', p_deal.prepay_bps, 'hours', p_deal.hours)
+    else jsonb_build_object('amount_cents', p_deal.amount_cents, 'share_bps', p_deal.share_bps, 'hours', p_deal.hours)
+  end;
+$$;
+
+-- loanTermsError / supplyTermsError / stakeTermsError: null when fine, else amount | interest | hours | volume | fee |
+-- prepay | share | terms. The loan cap needs the lender's level (null: not known yet, checked at acceptance); the
+-- share sum of a company is checked separately (stake_share_full).
+create or replace function public.deal_terms_error(p_kind text, p_terms jsonb, p_lender_level integer default null)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  c   jsonb := public.deals_cfg();
+  v_a bigint;
+  v_b bigint;
+  v_c bigint;
+  v_h bigint;
+begin
+  if p_terms is null or jsonb_typeof(p_terms) <> 'object' then
+    return 'terms';
+  end if;
+  v_h := public.deal_term_int(p_terms, 'hours');
+  if p_kind = 'loan' then
+    v_a := public.deal_term_int(p_terms, 'principal_cents');
+    v_b := public.deal_term_int(p_terms, 'interest_bps');
+    if v_a is null or v_a < public.cfg_num(c, '{loan,minPrincipalCents}', 10000)
+       or (p_lender_level is not null
+           and v_a > greatest(1, p_lender_level) * public.cfg_num(c, '{loan,maxPrincipalCentsPerLevel}', 2000000)) then
+      return 'amount';
+    end if;
+    if v_b is null or v_b < 0 or v_b > public.cfg_num(c, '{loan,maxInterestBps}', 3000) then
+      return 'interest';
+    end if;
+    if v_h is null or v_h < public.cfg_num(c, '{loan,minHours}', 24) or v_h > public.cfg_num(c, '{loan,maxHours}', 720) then
+      return 'hours';
+    end if;
+  elsif p_kind = 'supply' then
+    v_a := public.deal_term_int(p_terms, 'volume_cents_per_hour');
+    v_b := public.deal_term_int(p_terms, 'fee_bps');
+    v_c := public.deal_term_int(p_terms, 'prepay_bps');
+    -- the upper bound only keeps the products in range (1 bn EUR per hour)
+    if v_a is null or v_a < public.cfg_num(c, '{supply,minVolumeCentsPerHour}', 1000) or v_a > 100000000000 then
+      return 'volume';
+    end if;
+    if v_b is null or v_b < public.cfg_num(c, '{supply,minFeeBps}', 1000) or v_b > public.cfg_num(c, '{supply,maxFeeBps}', 9500) then
+      return 'fee';
+    end if;
+    if v_c is null or v_c < 0 or v_c > public.cfg_num(c, '{supply,maxPrepayBps}', 5000) then
+      return 'prepay';
+    end if;
+    if v_h is null or v_h < public.cfg_num(c, '{supply,minHours}', 24) or v_h > public.cfg_num(c, '{supply,maxHours}', 336) then
+      return 'hours';
+    end if;
+  elsif p_kind = 'stake' then
+    v_a := public.deal_term_int(p_terms, 'amount_cents');
+    v_b := public.deal_term_int(p_terms, 'share_bps');
+    if v_a is null or v_a < public.cfg_num(c, '{stake,minAmountCents}', 10000) then
+      return 'amount';
+    end if;
+    if v_b is null or v_b < 1 or v_b > public.cfg_num(c, '{stake,maxShareBps}', 3000) then
+      return 'share';
+    end if;
+    if v_h is null or v_h < public.cfg_num(c, '{stake,minHours}', 24) or v_h > public.cfg_num(c, '{stake,maxHours}', 720) then
+      return 'hours';
+    end if;
+  else
+    return 'terms';
+  end if;
+  return null;
+end;
+$$;
+
+-- supplyPrepayCents: applyBps(applyBps(volume × hours, fee), prepay), half even at each step
+create or replace function public.deal_supply_prepay_cents(p_volume bigint, p_hours integer, p_fee_bps integer, p_prepay_bps integer)
+returns bigint
+language sql
+immutable
+set search_path = ''
+as $$
+  select public.div_round_half_even(
+           public.div_round_half_even(p_volume::numeric * p_hours * p_fee_bps, 10000)::numeric * p_prepay_bps, 10000);
+$$;
+
+-- Sum of the stake shares of a company: running stakes, plus (p_with_open) the open offers of the company side
+create or replace function public.deal_stake_shares(p_company uuid, p_with_open boolean)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(sum(d.share_bps), 0)::integer from public.deals d
+   where d.kind = 'stake' and d.company_id = p_company
+     and (d.status = 'active'
+          or (p_with_open and d.status = 'open' and d.proposer_role = 'company' and d.expires_at > public.game_now()));
+$$;
+
+-- Running deals of a kind a player is party to (active, overdue, defaulted)
+create or replace function public.deal_count_running(p_player uuid, p_kind text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select count(*)::integer from public.deals d
+   where d.kind = p_kind and d.status in ('active', 'overdue', 'defaulted') and p_player in (d.proposer_id, d.counterparty_id);
+$$;
+
+-- The parties of a deal are its proposer and its counterparty; is p_player one of them (or the founder of a company
+-- in it)?
+create or replace function public.deal_is_party(p_deal public.deals, p_player uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select p_player is not null
+         and (p_player in (p_deal.proposer_id, p_deal.counterparty_id, p_deal.lender_id, p_deal.borrower_id, p_deal.investor_id)
+              is true
+              or exists (select 1 from public.player_companies pc
+                          where pc.founder_id = p_player
+                            and pc.company_id in (p_deal.supplier_company_id, p_deal.buyer_company_id, p_deal.company_id)));
+$$;
+
+-- The other player of a deal from p_player's point of view
+create or replace function public.deal_other_player(p_deal public.deals, p_player uuid)
+returns uuid
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when p_deal.proposer_id = p_player then p_deal.counterparty_id else p_deal.proposer_id end;
+$$;
+
+-- The player on a role of a deal (after acceptance; before it, the target for the other role)
+create or replace function public.deal_player_of(p_deal public.deals, p_role text)
+returns uuid
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when p_deal.proposer_role = p_role then p_deal.proposer_id
+              when public.deal_other_role(p_deal.proposer_role) = p_role then p_deal.counterparty_id end;
+$$;
+
+create or replace function public.player_nickname(p_player uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select p.nickname from public.profiles p where p.id = p_player;
+$$;
+
+-- German words for the texts: p_form 'a' (einen Kredit), 'your' (deinen Kredit), 'the' (den Kredit), else the noun
+create or replace function public.deal_kind_text(p_kind text, p_form text default null)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case p_form
+    when 'a' then case p_kind when 'loan' then 'einen Kredit' when 'supply' then 'einen Liefervertrag' else 'eine Beteiligung' end
+    when 'your' then case p_kind when 'loan' then 'deinen Kredit' when 'supply' then 'deinen Liefervertrag' else 'deine Beteiligung' end
+    when 'the' then case p_kind when 'loan' then 'den Kredit' when 'supply' then 'den Liefervertrag' else 'die Beteiligung' end
+    else case p_kind when 'loan' then 'Kredit' when 'supply' then 'Liefervertrag' else 'Beteiligung' end
+  end;
+$$;
+
+-- "12,5 %" from bps
+create or replace function public.deal_pct_text(p_bps integer)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select replace(trim(trailing '.' from trim(trailing '0' from to_char(coalesce(p_bps, 0) / 100.0, 'FM9999990.00'))), '.', ',')
+         || ' %';
+$$;
+
+-- "2 Tage" / "36 Stunden"
+create or replace function public.deal_hours_text(p_hours integer)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when p_hours % 24 = 0 then (p_hours / 24)::text || case when p_hours = 24 then ' Tag' else ' Tage' end
+              else p_hours::text || case when p_hours = 1 then ' Stunde' else ' Stunden' end end;
+$$;
+
+-- One line about the terms (notification text)
+create or replace function public.deal_terms_text(p_deal public.deals)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case p_deal.kind
+    when 'loan' then public.format_eur(p_deal.principal_cents) || ' für ' || public.deal_hours_text(p_deal.hours) || ', '
+                     || public.deal_pct_text(p_deal.interest_bps) || ' Zinsen'
+    when 'supply' then 'bis ' || public.format_eur(p_deal.volume_cents_per_hour) || ' je Stunde, Gebühr '
+                       || public.deal_pct_text(p_deal.fee_bps) || ', ' || public.deal_hours_text(p_deal.hours)
+    else public.format_eur(p_deal.amount_cents) || ' für ' || public.deal_pct_text(p_deal.share_bps) || ' vom Gewinn, '
+         || public.deal_hours_text(p_deal.hours)
+  end;
+$$;
+
+-- In-app notification about a deal (deal_offer / deal_result), link /deals
+create or replace function public.deal_notify(p_player uuid, p_type text, p_deal uuid, p_title text, p_body text, p_dedupe text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  d public.deals;
+begin
+  select * into d from public.deals where id = p_deal;
+  if d.id is null or p_player is null then
+    return;
+  end if;
+  perform public.social_notify(p_player, p_type, p_title, p_body,
+                               jsonb_build_object('deal_id', d.id, 'kind', d.kind, 'status', d.status), '/deals', p_dedupe);
+end;
+$$;
+
+-- PARTY: {nickname, tag, avatar_key, level, trust: {score, band}}
+create or replace function public.deal_party_json(p_player uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object('nickname', p.nickname, 'tag', p.tag, 'avatar_key', p.avatar_key, 'level', p.level,
+                            'trust', jsonb_build_object('score', s.score, 'band', public.trust_band(s.score)))
+    from public.profiles p, lateral (select public.trust_score(p.id) as score) s
+   where p.id = p_player;
+$$;
+
+create or replace function public.deal_company_json(p_company uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object('id', c.id, 'name', c.name) from public.companies c where c.id = p_company;
+$$;
+
+-- DEAL from the point of view of p_viewer (docs/DATA_MODEL.md, Nachtrag M4j)
+create or replace function public.deal_json(p_deal uuid, p_viewer uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'id', d.id,
+    'kind', d.kind,
+    'status', d.status,
+    'my_role', case when d.proposer_id = p_viewer then d.proposer_role
+                    when d.counterparty_id = p_viewer then public.deal_other_role(d.proposer_role) end,
+    'is_proposer', d.proposer_id = p_viewer,
+    'proposer_role', d.proposer_role,
+    'proposer', public.deal_party_json(d.proposer_id),
+    'counterparty', public.deal_party_json(d.counterparty_id),
+    'supplier_company', public.deal_company_json(d.supplier_company_id),
+    'buyer_company', public.deal_company_json(d.buyer_company_id),
+    'company', public.deal_company_json(d.company_id),
+    'terms', public.deal_terms_json(d),
+    'message', d.message,
+    'created_at', d.created_at,
+    'expires_at', d.expires_at,
+    'accepted_at', d.accepted_at,
+    'ends_at', d.ends_at,
+    'closed_at', d.closed_at,
+    'progress', case d.kind
+      when 'loan' then jsonb_build_object('due_cents', d.due_cents, 'repaid_cents', d.repaid_cents,
+                                          'left_cents', greatest(0, d.due_cents - d.repaid_cents))
+      when 'supply' then jsonb_build_object('delivered_cents', d.delivered_cents, 'needed_cents', d.needed_cents,
+                                            'fees_paid_cents', d.fees_paid_cents, 'prepay_cents', d.prepay_cents,
+                                            'prepay_left_cents', d.prepay_left_cents)
+      else jsonb_build_object('payouts_cents', d.payouts_cents)
+    end,
+    'broken_by_me', coalesce(d.broken_by = p_viewer, false))
+    from public.deals d where d.id = p_deal;
+$$;
+comment on function public.deal_json(uuid, uuid) is 'DEAL (ADR-098) from the point of view of a player.';
+
+-- ---------------------------------------------------------------------------
+-- G. Endings: broken, supply and stake completed
+-- ---------------------------------------------------------------------------
+-- An active supply contract or stake ends early by p_breaker (dealBroken); a supply prepayment stays with the supplier
+create or replace function public.deal_break(p_deal uuid, p_breaker uuid, p_at timestamptz)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  d       public.deals;
+  v_other uuid;
+  v_nick  text;
+begin
+  update public.deals set status = 'broken', broken_by = p_breaker, closed_at = p_at
+   where id = p_deal and status = 'active'
+  returning * into d;
+  if d.id is null then
+    return;
+  end if;
+  perform public.trust_add(p_breaker, d.id, 'dealBroken');
+  v_other := public.deal_other_player(d, p_breaker);
+  v_nick := public.player_nickname(p_breaker);
+  perform public.deal_notify(v_other, 'deal_result', d.id,
+    coalesce(v_nick, 'Dein Partner') || ' hat ' || public.deal_kind_text(d.kind, 'the') || ' beendet',
+    case d.kind when 'supply' then 'Der Vertrag endet vorzeitig. Der Rest der Anzahlung bleibt beim Lieferanten.'
+                else 'Die Beteiligung endet vorzeitig. Das Geld bleibt in der Firma.' end,
+    'deal:' || d.id::text || ':broken');
+  perform public.feed_post(p_breaker, 'deal_broken',
+    jsonb_build_object('kind', d.kind, 'with', public.player_nickname(v_other)), 'deal_broken:' || d.id::text);
+end;
+$$;
+
+-- supplyKept at the end; what is left of the prepayment goes back to the buyer (as far as the supplier's cash reaches)
+create or replace function public.deal_finish_supply(p_deal uuid, p_at timestamptz)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  d          public.deals;
+  v_kept     boolean;
+  v_supplier uuid;
+  v_buyer    uuid;
+  v_cash     bigint;
+  v_refund   bigint := 0;
+begin
+  select * into d from public.deals where id = p_deal and kind = 'supply' and status = 'active' for update;
+  if d.id is null then
+    return;
+  end if;
+  v_kept := d.needed_cents <= 0
+            or d.delivered_cents * 10000 >= d.needed_cents * public.cfg_num(public.deals_cfg(), '{supply,keptDeliveryBps}', 5000);
+  v_supplier := public.deal_player_of(d, 'supplier');
+  v_buyer := public.deal_player_of(d, 'buyer');
+  if d.prepay_left_cents > 0 then
+    select greatest(0, a.balance_cents) into v_cash
+      from public.ledger_accounts a where a.owner_company_id = d.supplier_company_id and a.kind = 'company_cash' for update;
+    v_refund := least(d.prepay_left_cents, coalesce(v_cash, 0));
+    if v_refund > 0 then
+      perform public.ledger_transfer(public.company_cash_account(d.supplier_company_id), public.company_cash_account(d.buyer_company_id),
+                                     v_refund, 'transfer', 'Rest der Anzahlung', 'deal', d.id, 'deal:' || d.id::text || ':refund',
+                                     v_supplier);
+    end if;
+  end if;
+  update public.deals set status = 'completed', closed_at = p_at, prepay_left_cents = prepay_left_cents - v_refund where id = d.id;
+  perform public.trust_add(v_supplier, d.id, case when v_kept then 'supplyKept' else 'supplyShort' end);
+  perform public.trust_add(v_buyer, d.id, 'supplyKept');
+  perform public.deal_notify(v_supplier, 'deal_result', d.id,
+    case when v_kept then 'Liefervertrag erfüllt' else 'Liefervertrag beendet: zu wenig geliefert' end,
+    'Geliefert: ' || public.format_eur(d.delivered_cents) || ' von ' || public.format_eur(d.needed_cents) || '.',
+    'deal:' || d.id::text || ':completed');
+  perform public.deal_notify(v_buyer, 'deal_result', d.id,
+    case when v_kept then 'Liefervertrag erfüllt' else 'Liefervertrag beendet: zu wenig bekommen' end,
+    'Geliefert: ' || public.format_eur(d.delivered_cents) || ' von ' || public.format_eur(d.needed_cents)
+    || case when v_refund > 0 then '. Zurück aus der Anzahlung: ' || public.format_eur(v_refund) || '.' else '.' end,
+    'deal:' || d.id::text || ':completed');
+end;
+$$;
+
+create or replace function public.deal_finish_stake(p_deal uuid, p_at timestamptz)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  d         public.deals;
+  v_founder uuid;
+begin
+  update public.deals set status = 'completed', closed_at = p_at
+   where id = p_deal and kind = 'stake' and status = 'active'
+  returning * into d;
+  if d.id is null then
+    return;
+  end if;
+  v_founder := public.deal_player_of(d, 'company');
+  perform public.trust_add(v_founder, d.id, 'stakeKept');
+  perform public.deal_notify(d.investor_id, 'deal_result', d.id, 'Beteiligung beendet',
+    'Ausgezahlt: ' || public.format_eur(d.payouts_cents) || '.', 'deal:' || d.id::text || ':completed');
+  perform public.deal_notify(v_founder, 'deal_result', d.id, 'Beteiligung beendet',
+    'Ausgezahlt an ' || coalesce(public.player_nickname(d.investor_id), 'den Teilhaber') || ': '
+    || public.format_eur(d.payouts_cents) || '.', 'deal:' || d.id::text || ':completed');
+end;
+$$;
+
+-- A loan is paid in full: completed; on time (≤ ends_at) or late for the borrower, loanLent for the lender
+create or replace function public.deal_loan_paid(p_deal uuid, p_at timestamptz)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  d public.deals;
+begin
+  update public.deals set status = 'completed', closed_at = p_at
+   where id = p_deal and kind = 'loan' and status in ('active', 'overdue', 'defaulted') and repaid_cents >= due_cents
+  returning * into d;
+  if d.id is null then
+    return;
+  end if;
+  perform public.trust_add(d.borrower_id, d.id, case when p_at <= d.ends_at then 'loanRepaidOnTime' else 'loanRepaidLate' end);
+  perform public.trust_add(d.lender_id, d.id, 'loanLent');
+  perform public.deal_notify(d.lender_id, 'deal_result', d.id,
+    coalesce(public.player_nickname(d.borrower_id), 'Dein Schuldner') || ' hat den Kredit zurückgezahlt',
+    'Zurück: ' || public.format_eur(d.repaid_cents) || '.', 'deal:' || d.id::text || ':paid');
+  perform public.deal_notify(d.borrower_id, 'deal_result', d.id, 'Kredit zurückgezahlt',
+    'Du hast ' || public.format_eur(d.repaid_cents) || ' an ' || coalesce(public.player_nickname(d.lender_id), 'den Verleiher')
+    || ' zurückgezahlt.', 'deal:' || d.id::text || ':paid');
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- H. Supply settlement over the closed hours of both companies (supplyHour)
+-- ---------------------------------------------------------------------------
+-- Every operating hour from settled_until up to ends_at that both companies have closed, from the stored hour rows:
+-- supplier free capacity (minus contract work and earlier contracts of the hour), buyer unmet demand (minus earlier
+-- contracts), needed = min(volume, unmet), delivered = min(needed, free). The fee is paid from the prepayment first,
+-- then from the buyer's free cash; if the buyer cannot pay, the delivery shrinks to what it can pay for (the buyer
+-- sells the goods first). Returns the number of hours walked.
+create or replace function public.deal_settle_supply(p_deal uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  d        public.deals;
+  sp       public.player_companies;
+  bp       public.player_companies;
+  hs       public.player_company_hours;
+  hb       public.player_company_hours;
+  v_su     jsonb := coalesce(public.config_jsonb('startups'), '{}'::jsonb);
+  v_hh     uuid := public.ledger_system_account('households');
+  v_sacc   uuid;
+  v_bacc   uuid;
+  v_margin double precision;
+  v_share  double precision;
+  v_f      double precision;
+  v_price  double precision;
+  v_until  timestamptz;
+  v_h      timestamptz;
+  v_n      integer := 0;
+  v_free   double precision;
+  v_unmet  double precision;
+  v_need   double precision;
+  v_del    bigint;
+  v_needc  bigint;
+  v_rev    bigint;
+  v_fee    bigint;
+  v_pre    bigint;
+  v_part   bigint;
+  v_bfree  bigint;
+  v_budget bigint;
+  v_hhbal  bigint;
+  v_goods  bigint;
+  v_gpaid  bigint;
+  v_cash   bigint;
+  k        text;
+begin
+  select * into d from public.deals where id = p_deal and kind = 'supply' and status = 'active' for update;
+  if d.id is null or d.settled_until is null then
+    return 0;
+  end if;
+  select * into sp from public.player_companies where company_id = d.supplier_company_id;
+  select * into bp from public.player_companies where company_id = d.buyer_company_id;
+  if sp.company_id is null or bp.company_id is null then
+    return 0;
+  end if;
+  v_until := least(sp.last_hour_at, bp.last_hour_at);
+  v_margin := public.cfg_num(v_su, array['grossMargin', (select c.sector_key from public.companies c where c.id = sp.company_id)], 0.5);
+  v_share := public.cfg_num(v_su, '{contractWork,shareOfFreeCapacity}', 0.25);
+  v_f := d.fee_bps / 10000.0;
+  v_sacc := public.company_cash_account(d.supplier_company_id);
+  v_bacc := public.company_cash_account(d.buyer_company_id);
+  v_h := d.settled_until;
+  while v_h < d.ends_at and v_h + interval '1 hour' <= v_until and v_n < 168 loop
+    select * into hs from public.player_company_hours where company_id = d.supplier_company_id and hour_start = v_h for update;
+    select * into hb from public.player_company_hours where company_id = d.buyer_company_id and hour_start = v_h for update;
+    if hs.company_id is not null and hb.company_id is not null then
+      k := 'deal:' || d.id::text || ':' || to_char(v_h at time zone 'UTC', 'YYYYMMDDHH24');
+      -- supplyFreeCapacityCents (contract work as it ran that hour) and unmetDemandCents, minus earlier contracts
+      v_free := greatest(0, hs.capacity_cents - hs.demand_cents)::double precision
+                * case when hs.contract_revenue_cents > 0 then 1 - v_share else 1 end
+                - hs.supply_out_cents;
+      v_unmet := greatest(0, hb.demand_cents - hb.capacity_cents - hb.supply_in_cents);
+      v_need := greatest(0, least(d.volume_cents_per_hour::double precision, v_unmet));
+      v_del := round(greatest(0, least(v_need, v_free))::numeric)::bigint;
+      v_needc := round(v_need::numeric)::bigint;
+      v_price := (public.company_price_effect(bp.price_level, bp.quality) ->> 'price')::double precision;
+      v_rev := round((v_del * v_price)::numeric)::bigint;
+      v_fee := public.apply_bps(v_del, d.fee_bps);
+      -- what the buyer can pay: the prepayment left and its free cash (cash − open bills), plus the sales of the goods
+      select greatest(0, a.balance_cents - bp.unpaid_cents) into v_bfree from public.ledger_accounts a where a.id = v_bacc for update;
+      v_budget := d.prepay_left_cents + coalesce(v_bfree, 0);
+      if v_fee - v_rev > v_budget and v_f > v_price then
+        v_del := least(v_del, greatest(0, floor((v_budget - 1) / (v_f - v_price)))::bigint);
+        v_needc := v_del;
+        v_rev := round((v_del * v_price)::numeric)::bigint;
+        v_fee := public.apply_bps(v_del, d.fee_bps);
+      end if;
+      -- closed money system: the households pay at most what they have
+      select greatest(0, a.balance_cents) into v_hhbal from public.ledger_accounts a where a.id = v_hh;
+      v_rev := least(v_rev, coalesce(v_hhbal, 0));
+      if v_rev > 0 then
+        perform public.ledger_transfer(v_hh, v_bacc, v_rev, 'company_revenue', 'Umsatz aus Liefervertrag', 'company',
+                                       d.buyer_company_id, k || ':revenue', bp.founder_id);
+      end if;
+      -- supplyFeeSplit: prepayment first (already with the supplier), the rest from the buyer's free cash
+      v_pre := least(v_fee, d.prepay_left_cents);
+      v_part := v_fee - v_pre;
+      select greatest(0, a.balance_cents - bp.unpaid_cents) into v_bfree from public.ledger_accounts a where a.id = v_bacc;
+      if v_part > coalesce(v_bfree, 0) then
+        v_part := coalesce(v_bfree, 0);
+        v_fee := v_pre + v_part;
+      end if;
+      if v_part > 0 then
+        perform public.ledger_transfer(v_bacc, v_sacc, v_part, 'company_costs', 'Liefergebühr', 'company', d.buyer_company_id,
+                                       k || ':fee', bp.founder_id);
+      end if;
+      -- the supplier's goods like its own goods; what the cash cannot pay becomes an open bill
+      v_goods := round((v_del * (1 - v_margin))::numeric)::bigint;
+      select greatest(0, a.balance_cents) into v_cash from public.ledger_accounts a where a.id = v_sacc for update;
+      v_gpaid := least(v_goods, coalesce(v_cash, 0));
+      if v_gpaid > 0 then
+        perform public.ledger_transfer(v_sacc, v_hh, v_gpaid, 'company_costs', 'Wareneinsatz Liefervertrag', 'company',
+                                       d.supplier_company_id, k || ':goods', sp.founder_id);
+      end if;
+      if v_goods > v_gpaid then
+        update public.player_companies set unpaid_cents = unpaid_cents + (v_goods - v_gpaid), distress = true
+         where company_id = d.supplier_company_id;
+      end if;
+      update public.player_company_hours
+         set supply_in_cents = supply_in_cents + v_del, supply_revenue_cents = supply_revenue_cents + v_rev,
+             supply_fee_paid_cents = supply_fee_paid_cents + v_fee, profit_cents = profit_cents + v_rev - v_fee
+       where company_id = d.buyer_company_id and hour_start = v_h;
+      update public.player_company_hours
+         set supply_out_cents = supply_out_cents + v_del, supply_fee_income_cents = supply_fee_income_cents + v_fee,
+             supply_goods_cents = supply_goods_cents + v_goods, profit_cents = profit_cents + v_fee - v_goods,
+             unpaid_added_cents = unpaid_added_cents + (v_goods - v_gpaid)
+       where company_id = d.supplier_company_id and hour_start = v_h;
+      update public.deals
+         set delivered_cents = delivered_cents + v_del, needed_cents = needed_cents + v_needc,
+             fees_paid_cents = fees_paid_cents + v_fee, prepay_left_cents = prepay_left_cents - v_pre
+       where id = d.id
+      returning * into d;
+    end if;
+    v_h := v_h + interval '1 hour';
+    v_n := v_n + 1;
+  end loop;
+  update public.deals set settled_until = v_h where id = d.id;
+  return v_n;
+end;
+$$;
+comment on function public.deal_settle_supply(uuid) is
+  'Internal (deals_run_due, break_deal): settles the closed operating hours of an active supply contract (supplyHour, ADR-098).';
+
+-- ---------------------------------------------------------------------------
+-- I. RPCs
+-- ---------------------------------------------------------------------------
+-- A deal for an action of p_player: locked, known to the player (a party, or a board offer, also once taken or
+-- closed: the RPCs answer deal_closed then); else deal_not_found
+create or replace function public.deal_for_action(p_player uuid, p_deal uuid)
+returns public.deals
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  d public.deals;
+begin
+  select * into d from public.deals where id = p_deal for update;
+  if d.id is null or not (public.deal_is_party(d, p_player) or d.board) then
+    perform public.api_error('deal_not_found');
+  end if;
+  return d;
+end;
+$$;
+
+create or replace function public.propose_deal(p_request_id uuid, p_kind text, p_role text, p_counterparty text, p_terms jsonb,
+                                               p_message text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player   uuid;
+  v_replay   jsonb;
+  v_cfg      jsonb := public.deals_cfg();
+  v_now      timestamptz := public.game_now();
+  v_msg      text := nullif(btrim(coalesce(p_message, '')), '');
+  v_handle   text := nullif(btrim(coalesce(p_counterparty, '')), '');
+  v_level    integer;
+  v_target   uuid;
+  v_other    text;
+  v_err      text;
+  v_my_co    uuid;
+  v_their_co uuid;
+  v_share    integer;
+  v_id       uuid;
+  d          public.deals;
+  v_nick     text;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or coalesce(p_kind, '') not in ('loan', 'supply', 'stake') or not public.deal_role_ok(p_kind, p_role)
+     or char_length(coalesce(p_counterparty, '')) > 64 then
+    perform public.api_error('invalid_argument');
+  end if;
+  if v_msg is not null and (char_length(v_msg) > 140 or v_msg ~ '[[:cntrl:]]') then
+    perform public.api_error('invalid_argument');
+  end if;
+  if public.text_has_profanity(v_msg) then
+    perform public.api_error('name_profanity');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'propose_deal');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  if not public.rate_limit_hit(v_player, 'player_action',
+           greatest(1, public.config_double('abuse', '{rateLimits,actionsPerMinute}', 60))::integer, 60) then
+    perform public.api_error('rate_limited');
+  end if;
+  select p.level into v_level from public.profiles p where p.id = v_player;
+  if coalesce(v_level, 1) < public.cfg_num(v_cfg, '{minLevel}', 4) then
+    perform public.api_error('locked');
+  end if;
+  if v_handle is not null then
+    v_target := public.player_by_handle(v_handle);
+    if v_target is null then
+      perform public.api_error('player_not_found');
+    end if;
+    if v_target = v_player then
+      perform public.api_error('deal_self');
+    end if;
+  end if;
+  v_other := public.deal_other_role(p_role);
+  -- the loan cap needs the lender's level: the proposer, or a targeted lender; else at acceptance
+  v_err := public.deal_terms_error(p_kind, p_terms,
+             case when p_role = 'lender' then v_level
+                  when p_role = 'borrower' and v_target is not null then (select p.level from public.profiles p where p.id = v_target) end);
+  if v_err is not null then
+    perform public.api_error('deal_terms');
+  end if;
+  if public.deal_role_needs_company(p_role) then
+    v_my_co := public.player_active_company(v_player);
+    if v_my_co is null then
+      perform public.api_error('deal_needs_company');
+    end if;
+  end if;
+  if v_target is not null and public.deal_role_needs_company(v_other) then
+    v_their_co := public.player_active_company(v_target);
+    if v_their_co is null then
+      perform public.api_error('deal_needs_company');
+    end if;
+  end if;
+  -- all stakes of a company together stay within maxTotalShareBps (company side: with its open offers)
+  if p_kind = 'stake' then
+    v_share := public.deal_term_int(p_terms, 'share_bps')::integer;
+    if (p_role = 'company' and public.deal_stake_shares(v_my_co, true) + v_share > public.cfg_num(v_cfg, '{stake,maxTotalShareBps}', 5000))
+       or (p_role = 'investor' and v_their_co is not null
+           and public.deal_stake_shares(v_their_co, false) + v_share > public.cfg_num(v_cfg, '{stake,maxTotalShareBps}', 5000)) then
+      perform public.api_error('stake_share_full');
+    end if;
+  end if;
+  if (select count(*) from public.deals x where x.proposer_id = v_player and x.status = 'open' and x.expires_at > v_now)
+     >= public.cfg_num(v_cfg, '{maxOpenOffers}', 5)
+     or public.deal_count_running(v_player, p_kind) >= public.cfg_num(v_cfg, '{maxActivePerKind}', 5) then
+    perform public.api_error('deal_limit');
+  end if;
+
+  insert into public.deals (kind, status, proposer_id, proposer_role, counterparty_id, board,
+                            lender_id, borrower_id, supplier_company_id, buyer_company_id, investor_id, company_id,
+                            principal_cents, interest_bps, volume_cents_per_hour, fee_bps, prepay_bps, amount_cents, share_bps,
+                            hours, message, due_cents, prepay_cents, created_at, expires_at, request_id)
+  values (p_kind, 'open', v_player, p_role, v_target, v_target is null,
+          case p_role when 'lender' then v_player when 'borrower' then v_target end,
+          case p_role when 'borrower' then v_player when 'lender' then v_target end,
+          case p_role when 'supplier' then v_my_co when 'buyer' then v_their_co end,
+          case p_role when 'buyer' then v_my_co when 'supplier' then v_their_co end,
+          case p_role when 'investor' then v_player when 'company' then v_target end,
+          case p_role when 'company' then v_my_co when 'investor' then v_their_co end,
+          case when p_kind = 'loan' then public.deal_term_int(p_terms, 'principal_cents') end,
+          case when p_kind = 'loan' then public.deal_term_int(p_terms, 'interest_bps')::integer end,
+          case when p_kind = 'supply' then public.deal_term_int(p_terms, 'volume_cents_per_hour') end,
+          case when p_kind = 'supply' then public.deal_term_int(p_terms, 'fee_bps')::integer end,
+          case when p_kind = 'supply' then public.deal_term_int(p_terms, 'prepay_bps')::integer end,
+          case when p_kind = 'stake' then public.deal_term_int(p_terms, 'amount_cents') end,
+          case when p_kind = 'stake' then public.deal_term_int(p_terms, 'share_bps')::integer end,
+          public.deal_term_int(p_terms, 'hours')::integer, v_msg,
+          -- loanDueCents and supplyPrepayCents: shown with the offer, fixed at acceptance
+          case when p_kind = 'loan' then public.deal_term_int(p_terms, 'principal_cents')
+                                         + public.apply_bps(public.deal_term_int(p_terms, 'principal_cents'),
+                                                            public.deal_term_int(p_terms, 'interest_bps'))
+               else 0 end,
+          case when p_kind = 'supply' then public.deal_supply_prepay_cents(public.deal_term_int(p_terms, 'volume_cents_per_hour'),
+                                                                           public.deal_term_int(p_terms, 'hours')::integer,
+                                                                           public.deal_term_int(p_terms, 'fee_bps')::integer,
+                                                                           public.deal_term_int(p_terms, 'prepay_bps')::integer)
+               else 0 end,
+          v_now, v_now + make_interval(secs => greatest(1, public.cfg_num(v_cfg, '{offerValidHours}', 48)) * 3600), p_request_id)
+  returning * into d;
+  v_id := d.id;
+
+  if v_target is not null then
+    v_nick := public.player_nickname(v_player);
+    perform public.deal_notify(v_target, 'deal_offer', v_id,
+      v_nick || case p_role
+                  when 'lender' then ' bietet dir einen Kredit an'
+                  when 'borrower' then ' bittet dich um einen Kredit'
+                  when 'supplier' then ' bietet dir einen Liefervertrag an'
+                  when 'buyer' then ' möchte Ware bei dir bestellen'
+                  when 'investor' then ' möchte bei deiner Firma einsteigen'
+                  else ' bietet dir eine Beteiligung an' end,
+      public.deal_terms_text(d) || coalesce(' – „' || v_msg || '“', ''),
+      'deal:' || v_id::text || ':offer');
+  end if;
+  return public.request_complete(v_player, p_request_id, public.deal_json(v_id, v_player));
+end;
+$$;
+comment on function public.propose_deal(uuid, text, text, text, jsonb, text) is
+  'RPC: proposes a loan, supply contract or stake (ADR-098) to a player (nickname or tag) or, with p_counterparty null, '
+  'on the deal board. No money moves. Errors invalid_argument, name_profanity, locked, player_not_found, deal_self, '
+  'deal_terms, deal_needs_company, stake_share_full, deal_limit, rate_limited. -> DEAL';
+
+create or replace function public.respond_deal(p_request_id uuid, p_deal_id uuid, p_accept boolean)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player   uuid;
+  v_replay   jsonb;
+  v_cfg      jsonb := public.deals_cfg();
+  v_now      timestamptz := public.game_now();
+  d          public.deals;
+  v_role     text;
+  v_level    integer;
+  v_my_co    uuid;
+  v_prop_co  uuid;
+  v_lender   uuid;
+  v_borrower uuid;
+  v_sup_co   uuid;
+  v_buy_co   uuid;
+  v_investor uuid;
+  v_company  uuid;
+  v_cash     bigint;
+  v_prepay   bigint;
+  v_nick     text;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_deal_id is null or p_accept is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'respond_deal');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  d := public.deal_for_action(v_player, p_deal_id);
+  if d.proposer_id = v_player then
+    perform public.api_error('deal_self');
+  end if;
+  if d.status <> 'open' or d.expires_at <= v_now then
+    perform public.api_error('deal_closed');
+  end if;
+  if d.counterparty_id is not null and d.counterparty_id <> v_player then
+    perform public.api_error('deal_not_found');
+  end if;
+  v_nick := public.player_nickname(v_player);
+
+  if not p_accept then
+    -- open board offers just stay open
+    if d.counterparty_id is null then
+      perform public.api_error('invalid_argument');
+    end if;
+    update public.deals set status = 'declined', closed_at = v_now where id = d.id;
+    perform public.deal_notify(d.proposer_id, 'deal_result', d.id,
+      v_nick || ' hat ' || public.deal_kind_text(d.kind, 'your') || ' abgelehnt', public.deal_terms_text(d),
+      'deal:' || d.id::text || ':declined');
+    return public.request_complete(v_player, p_request_id, public.deal_json(d.id, v_player));
+  end if;
+
+  -- who may accept: level, a company where the own side needs one, room for one more running deal of the kind
+  v_role := public.deal_other_role(d.proposer_role);
+  select p.level into v_level from public.profiles p where p.id = v_player;
+  if coalesce(v_level, 1) < public.cfg_num(v_cfg, '{minLevel}', 4) then
+    perform public.api_error('locked');
+  end if;
+  if public.deal_role_needs_company(v_role) then
+    v_my_co := public.player_active_company(v_player);
+    if v_my_co is null then
+      perform public.api_error('deal_needs_company');
+    end if;
+  end if;
+  if public.deal_role_needs_company(d.proposer_role) then
+    v_prop_co := public.player_active_company(d.proposer_id);
+    if v_prop_co is null then
+      perform public.api_error('deal_needs_company');
+    end if;
+  end if;
+  if public.deal_count_running(v_player, d.kind) >= public.cfg_num(v_cfg, '{maxActivePerKind}', 5)
+     or public.deal_count_running(d.proposer_id, d.kind) >= public.cfg_num(v_cfg, '{maxActivePerKind}', 5) then
+    perform public.api_error('deal_limit');
+  end if;
+
+  if d.kind = 'loan' then
+    v_lender := case when d.proposer_role = 'lender' then d.proposer_id else v_player end;
+    v_borrower := case when d.proposer_role = 'borrower' then d.proposer_id else v_player end;
+    if public.deal_terms_error('loan', public.deal_terms_json(d),
+                               (select p.level from public.profiles p where p.id = v_lender)) is not null then
+      perform public.api_error('deal_terms');
+    end if;
+    perform public.lock_player_accounts(v_borrower);
+    v_cash := public.lock_player_accounts(v_lender);
+    if v_cash < d.principal_cents then
+      perform public.api_error('insufficient_funds');
+    end if;
+    perform public.ledger_transfer(public.ledger_player_account(v_lender, 'player_cash'),
+                                   public.ledger_player_account(v_borrower, 'player_cash'), d.principal_cents, 'loan_disbursement',
+                                   'Kredit von ' || public.player_nickname(v_lender), 'deal', d.id,
+                                   'deal:' || d.id::text || ':principal', v_player);
+    update public.deals
+       set lender_id = v_lender, borrower_id = v_borrower,
+           due_cents = d.principal_cents + public.apply_bps(d.principal_cents, d.interest_bps)
+     where id = d.id;
+  elsif d.kind = 'supply' then
+    v_sup_co := case when d.proposer_role = 'supplier' then v_prop_co else v_my_co end;
+    v_buy_co := case when d.proposer_role = 'buyer' then v_prop_co else v_my_co end;
+    v_prepay := public.deal_supply_prepay_cents(d.volume_cents_per_hour, d.hours, d.fee_bps, d.prepay_bps);
+    -- the buyer's free cash (cash − open bills)
+    select a.balance_cents - pc.unpaid_cents into v_cash
+      from public.ledger_accounts a join public.player_companies pc on pc.company_id = a.owner_company_id
+     where a.owner_company_id = v_buy_co and a.kind = 'company_cash' for update of a;
+    if coalesce(v_cash, 0) < v_prepay then
+      perform public.api_error('insufficient_funds');
+    end if;
+    if v_prepay > 0 then
+      perform public.ledger_transfer(public.company_cash_account(v_buy_co), public.company_cash_account(v_sup_co), v_prepay,
+                                     'transfer', 'Anzahlung Liefervertrag', 'deal', d.id, 'deal:' || d.id::text || ':prepay',
+                                     v_player);
+    end if;
+    update public.deals
+       set supplier_company_id = v_sup_co, buyer_company_id = v_buy_co, prepay_cents = v_prepay, prepay_left_cents = v_prepay,
+           settled_until = public.deal_first_hour(v_now)
+     where id = d.id;
+  else
+    v_investor := case when d.proposer_role = 'investor' then d.proposer_id else v_player end;
+    v_company := case when d.proposer_role = 'company' then v_prop_co else v_my_co end;
+    if public.deal_stake_shares(v_company, false) + d.share_bps > public.cfg_num(v_cfg, '{stake,maxTotalShareBps}', 5000) then
+      perform public.api_error('stake_share_full');
+    end if;
+    v_cash := public.lock_player_accounts(v_investor);
+    if v_cash < d.amount_cents then
+      perform public.api_error('insufficient_funds');
+    end if;
+    perform public.ledger_transfer(public.ledger_player_account(v_investor, 'player_cash'), public.company_cash_account(v_company),
+                                   d.amount_cents, 'angel_investment', 'Beteiligung von ' || public.player_nickname(v_investor),
+                                   'deal', d.id, 'deal:' || d.id::text || ':stake', v_player);
+    update public.deals
+       set investor_id = v_investor, company_id = v_company, settled_until = public.deal_first_hour(v_now)
+     where id = d.id;
+  end if;
+
+  update public.deals
+     set status = 'active', counterparty_id = v_player, accepted_at = v_now,
+         ends_at = v_now + make_interval(secs => d.hours * 3600)
+   where id = d.id;
+  perform public.deal_notify(d.proposer_id, 'deal_result', d.id,
+    v_nick || ' hat ' || public.deal_kind_text(d.kind, 'your') || ' angenommen', public.deal_terms_text(d),
+    'deal:' || d.id::text || ':accepted');
+  perform public.feed_post(v_player, 'deal_signed',
+    jsonb_build_object('kind', d.kind, 'with', public.player_nickname(d.proposer_id)), 'deal_signed:' || d.id::text);
+  return public.request_complete(v_player, p_request_id, public.deal_json(d.id, v_player));
+end;
+$$;
+comment on function public.respond_deal(uuid, uuid, boolean) is
+  'RPC: accepts or declines an offer (ADR-098). Targeted offers: only the target; board offers: any eligible player '
+  '(decline: invalid_argument). Accepting moves the money (loan principal, supply prepayment, stake amount). Errors '
+  'invalid_argument, deal_not_found, deal_self, deal_closed, locked, deal_needs_company, deal_limit, deal_terms, '
+  'stake_share_full, insufficient_funds. -> DEAL';
+
+create or replace function public.cancel_deal(p_request_id uuid, p_deal_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  d        public.deals;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_deal_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'cancel_deal');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  d := public.deal_for_action(v_player, p_deal_id);
+  if d.proposer_id <> v_player then
+    perform public.api_error('deal_not_found');
+  end if;
+  if d.status <> 'open' or d.expires_at <= public.game_now() then
+    perform public.api_error('deal_closed');
+  end if;
+  update public.deals set status = 'cancelled', closed_at = public.game_now() where id = d.id;
+  return public.request_complete(v_player, p_request_id, public.deal_json(d.id, v_player));
+end;
+$$;
+comment on function public.cancel_deal(uuid, uuid) is
+  'RPC (proposer): withdraws an open offer (ADR-098). Errors invalid_argument, deal_not_found, deal_closed. -> DEAL';
+
+create or replace function public.break_deal(p_request_id uuid, p_deal_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  d        public.deals;
+  v_role   text;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_deal_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'break_deal');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  d := public.deal_for_action(v_player, p_deal_id);
+  if not public.deal_is_party(d, v_player) then
+    perform public.api_error('deal_not_found');
+  end if;
+  v_role := case when d.proposer_id = v_player then d.proposer_role else public.deal_other_role(d.proposer_role) end;
+  -- loans cannot be broken (repay or forgive); investors cannot end a stake
+  if d.kind = 'loan' or v_role = 'investor' then
+    perform public.api_error('invalid_argument');
+  end if;
+  if d.status <> 'active' then
+    perform public.api_error('deal_closed');
+  end if;
+  -- the hours both companies have closed are settled first
+  if d.kind = 'supply' then
+    perform public.deal_settle_supply(d.id);
+  end if;
+  perform public.deal_break(d.id, v_player, public.game_now());
+  return public.request_complete(v_player, p_request_id, public.deal_json(d.id, v_player));
+end;
+$$;
+comment on function public.break_deal(uuid, uuid) is
+  'RPC: ends an active supply contract (either side) or stake (company side) early (ADR-098): dealBroken for the caller, '
+  'a supply prepayment stays with the supplier. Errors invalid_argument, deal_not_found, deal_closed. -> DEAL';
+
+create or replace function public.repay_loan(p_request_id uuid, p_deal_id uuid, p_amount_cents bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  d        public.deals;
+  v_now    timestamptz := public.game_now();
+  v_cash   bigint;
+  v_pay    bigint;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_deal_id is null or p_amount_cents is null or p_amount_cents <= 0 then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'repay_loan');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  d := public.deal_for_action(v_player, p_deal_id);
+  if not public.deal_is_party(d, v_player) then
+    perform public.api_error('deal_not_found');
+  end if;
+  if d.kind <> 'loan' or d.borrower_id is distinct from v_player then
+    perform public.api_error('invalid_argument');
+  end if;
+  if d.status not in ('active', 'overdue', 'defaulted') then
+    perform public.api_error('deal_closed');
+  end if;
+  perform public.lock_player_accounts(d.lender_id);
+  v_cash := public.lock_player_accounts(v_player);
+  if v_cash < p_amount_cents then
+    perform public.api_error('insufficient_funds');
+  end if;
+  -- loanCollect: never more than what is left
+  v_pay := least(p_amount_cents, d.due_cents - d.repaid_cents);
+  if v_pay > 0 then
+    perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'),
+                                   public.ledger_player_account(d.lender_id, 'player_cash'), v_pay, 'loan_repayment',
+                                   'Rückzahlung an ' || public.player_nickname(d.lender_id), 'deal', d.id,
+                                   'deal:' || d.id::text || ':repay:' || p_request_id::text, v_player);
+    update public.deals set repaid_cents = repaid_cents + v_pay where id = d.id returning * into d;
+  end if;
+  if d.repaid_cents >= d.due_cents then
+    perform public.deal_loan_paid(d.id, v_now);
+  else
+    perform public.deal_notify(d.lender_id, 'deal_result', d.id,
+      public.player_nickname(v_player) || ' hat ' || public.format_eur(v_pay) || ' zurückgezahlt',
+      'Offen: ' || public.format_eur(d.due_cents - d.repaid_cents) || '.', 'deal:' || d.id::text || ':repay:' || p_request_id::text);
+  end if;
+  return public.request_complete(v_player, p_request_id, public.deal_json(d.id, v_player));
+end;
+$$;
+comment on function public.repay_loan(uuid, uuid, bigint) is
+  'RPC (borrower): pays min(amount, rest) of a running, overdue or defaulted loan (ADR-098); fully repaid = completed '
+  '(on time or late). Errors invalid_argument, deal_not_found, deal_closed, insufficient_funds. -> DEAL';
+
+create or replace function public.forgive_loan(p_request_id uuid, p_deal_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  d        public.deals;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_deal_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'forgive_loan');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  d := public.deal_for_action(v_player, p_deal_id);
+  if not public.deal_is_party(d, v_player) then
+    perform public.api_error('deal_not_found');
+  end if;
+  if d.kind <> 'loan' or d.lender_id is distinct from v_player then
+    perform public.api_error('invalid_argument');
+  end if;
+  if d.status not in ('active', 'overdue', 'defaulted') then
+    perform public.api_error('deal_closed');
+  end if;
+  update public.deals set status = 'forgiven', closed_at = public.game_now() where id = d.id;
+  perform public.trust_add(v_player, d.id, 'loanForgiven');
+  perform public.trust_add(v_player, d.id, 'loanLent');
+  perform public.deal_notify(d.borrower_id, 'deal_result', d.id,
+    public.player_nickname(v_player) || ' hat dir den Rest erlassen',
+    'Erlassen: ' || public.format_eur(greatest(0, d.due_cents - d.repaid_cents)) || '.', 'deal:' || d.id::text || ':forgiven');
+  return public.request_complete(v_player, p_request_id, public.deal_json(d.id, v_player));
+end;
+$$;
+comment on function public.forgive_loan(uuid, uuid) is
+  'RPC (lender): forgives the rest of a loan (ADR-098): forgiven, loanForgiven + loanLent for the lender. Errors '
+  'invalid_argument, deal_not_found, deal_closed. -> DEAL';
+
+create or replace function public.get_deals()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  v_now    timestamptz := public.game_now();
+begin
+  return jsonb_build_object(
+    'incoming', coalesce((select jsonb_agg(public.deal_json(x.id, v_player) order by x.created_at desc, x.id)
+                            from public.deals x
+                           where x.status = 'open' and x.counterparty_id = v_player and x.expires_at > v_now), '[]'::jsonb),
+    'outgoing', coalesce((select jsonb_agg(public.deal_json(x.id, v_player) order by x.created_at desc, x.id)
+                            from public.deals x
+                           where x.status = 'open' and x.proposer_id = v_player and x.expires_at > v_now), '[]'::jsonb),
+    'running', coalesce((select jsonb_agg(public.deal_json(x.id, v_player) order by x.ends_at, x.id)
+                           from public.deals x
+                          where x.status in ('active', 'overdue', 'defaulted') and v_player in (x.proposer_id, x.counterparty_id)),
+                        '[]'::jsonb),
+    'history', coalesce((select jsonb_agg(public.deal_json(h.id, v_player) order by h.at desc, h.id)
+                           from (select x.id, coalesce(x.closed_at, x.expires_at) as at from public.deals x
+                                  where x.status in ('completed', 'forgiven', 'broken', 'cancelled', 'declined', 'expired')
+                                    and v_player in (x.proposer_id, x.counterparty_id)
+                                  order by coalesce(x.closed_at, x.expires_at) desc, x.id limit 20) h), '[]'::jsonb),
+    'trust', public.player_trust(v_player));
+end;
+$$;
+comment on function public.get_deals() is
+  'RPC: the caller''s deals (ADR-098): {incoming, outgoing, running, history (last 20), trust}.';
+
+create or replace function public.get_deal_board()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+begin
+  return jsonb_build_object(
+    'offers', coalesce((select jsonb_agg(public.deal_json(b.id, v_player) order by b.created_at desc, b.id)
+                          from (select x.id, x.created_at from public.deals x
+                                 where x.status = 'open' and x.counterparty_id is null and x.proposer_id <> v_player
+                                   and x.expires_at > public.game_now()
+                                 order by x.created_at desc, x.id limit 50) b), '[]'::jsonb));
+end;
+$$;
+comment on function public.get_deal_board() is
+  'RPC: open offers of other players on the deal board (ADR-098), newest first, at most 50.';
+
+-- ---------------------------------------------------------------------------
+-- J. Periodic work: deals_run_due (expiry, loans, supply settlement, stake ends)
+-- ---------------------------------------------------------------------------
+create or replace function public.deals_run_due(p_now timestamptz default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now      timestamptz := coalesce(p_now, public.game_now());
+  v_default  double precision := public.cfg_num(public.deals_cfg(), '{loan,defaultAfterHours}', 168);
+  v_expired  integer := 0;
+  v_due      integer := 0;
+  v_default_n integer := 0;
+  v_hours    integer := 0;
+  v_done     integer := 0;
+  v_broken   integer := 0;
+  d          public.deals;
+  sp         public.player_companies;
+  bp         public.player_companies;
+  v_cash     bigint;
+  v_pay      bigint;
+  v_lnick    text;
+  v_bnick    text;
+begin
+  -- 1. offers nobody accepted
+  update public.deals set status = 'expired', closed_at = expires_at where status = 'open' and expires_at <= v_now;
+  get diagnostics v_expired = row_count;
+
+  -- 2. loans at their due date: collect once what is free on the borrower's cash (loanCollect); the rest is overdue
+  for d in select * from public.deals x where x.kind = 'loan' and x.status = 'active' and x.ends_at <= v_now
+            order by x.ends_at, x.id for update
+  loop
+    perform public.lock_player_accounts(d.lender_id);
+    v_cash := public.lock_player_accounts(d.borrower_id);
+    v_pay := least(d.due_cents - d.repaid_cents, greatest(0, v_cash));
+    if v_pay > 0 then
+      perform public.ledger_transfer(public.ledger_player_account(d.borrower_id, 'player_cash'),
+                                     public.ledger_player_account(d.lender_id, 'player_cash'), v_pay, 'loan_repayment',
+                                     'Kredit fällig: ' || public.player_nickname(d.lender_id), 'deal', d.id,
+                                     'deal:' || d.id::text || ':due', d.borrower_id);
+      update public.deals set repaid_cents = repaid_cents + v_pay where id = d.id returning * into d;
+    end if;
+    if d.repaid_cents >= d.due_cents then
+      perform public.deal_loan_paid(d.id, d.ends_at);
+    else
+      update public.deals set status = 'overdue' where id = d.id;
+      perform public.trust_add(d.borrower_id, d.id, 'loanOverdue');
+      v_lnick := public.player_nickname(d.lender_id);
+      v_bnick := public.player_nickname(d.borrower_id);
+      perform public.deal_notify(d.borrower_id, 'deal_result', d.id, 'Kredit überfällig',
+        'Offen bei ' || coalesce(v_lnick, 'deinem Verleiher') || ': ' || public.format_eur(d.due_cents - d.repaid_cents) || '.',
+        'deal:' || d.id::text || ':overdue');
+      perform public.deal_notify(d.lender_id, 'deal_result', d.id,
+        coalesce(v_bnick, 'Dein Schuldner') || ' ist mit dem Kredit im Verzug',
+        'Offen: ' || public.format_eur(d.due_cents - d.repaid_cents) || '.', 'deal:' || d.id::text || ':overdue');
+    end if;
+    v_due := v_due + 1;
+  end loop;
+
+  -- 3. overdue loans default after defaultAfterHours (no automatic collection after the due date)
+  for d in select * from public.deals x
+            where x.kind = 'loan' and x.status = 'overdue' and x.ends_at + make_interval(secs => v_default * 3600) <= v_now
+            order by x.ends_at, x.id for update
+  loop
+    update public.deals set status = 'defaulted' where id = d.id;
+    perform public.trust_add(d.borrower_id, d.id, 'loanDefaulted');
+    v_lnick := public.player_nickname(d.lender_id);
+    v_bnick := public.player_nickname(d.borrower_id);
+    perform public.feed_post(d.borrower_id, 'loan_defaulted', jsonb_build_object('with', v_lnick), 'loan_defaulted:' || d.id::text);
+    perform public.deal_notify(d.borrower_id, 'deal_result', d.id, 'Kredit geplatzt',
+      'Offen bei ' || coalesce(v_lnick, 'deinem Verleiher') || ': ' || public.format_eur(d.due_cents - d.repaid_cents)
+      || '. Zurückzahlen geht weiterhin.', 'deal:' || d.id::text || ':defaulted');
+    perform public.deal_notify(d.lender_id, 'deal_result', d.id, 'Kredit an ' || coalesce(v_bnick, '?') || ' geplatzt',
+      'Offen: ' || public.format_eur(d.due_cents - d.repaid_cents) || '. Du kannst den Rest erlassen.',
+      'deal:' || d.id::text || ':defaulted');
+    v_default_n := v_default_n + 1;
+  end loop;
+
+  -- 4. supply contracts: settle the hours both companies closed; end at ends_at; a company that is gone breaks it
+  for d in select * from public.deals x where x.kind = 'supply' and x.status = 'active' order by x.accepted_at, x.id loop
+    v_hours := v_hours + public.deal_settle_supply(d.id);
+    select * into d from public.deals where id = d.id;
+    select * into sp from public.player_companies where company_id = d.supplier_company_id;
+    select * into bp from public.player_companies where company_id = d.buyer_company_id;
+    if d.settled_until >= d.ends_at then
+      perform public.deal_finish_supply(d.id, v_now);
+      v_done := v_done + 1;
+    elsif coalesce(sp.status, '') <> 'active' then
+      perform public.deal_break(d.id, coalesce(sp.founder_id, public.deal_player_of(d, 'supplier')), v_now);
+      v_broken := v_broken + 1;
+    elsif coalesce(bp.status, '') <> 'active' then
+      perform public.deal_break(d.id, coalesce(bp.founder_id, public.deal_player_of(d, 'buyer')), v_now);
+      v_broken := v_broken + 1;
+    end if;
+  end loop;
+
+  -- 5. stakes: paid in the hourly close; they end once every hour of the term is closed (or break when the company is gone)
+  for d in select * from public.deals x where x.kind = 'stake' and x.status = 'active' order by x.accepted_at, x.id loop
+    select * into sp from public.player_companies where company_id = d.company_id;
+    if d.settled_until >= d.ends_at then
+      perform public.deal_finish_stake(d.id, v_now);
+      v_done := v_done + 1;
+    elsif coalesce(sp.status, '') <> 'active' then
+      perform public.deal_break(d.id, coalesce(sp.founder_id, public.deal_player_of(d, 'company')), v_now);
+      v_broken := v_broken + 1;
+    end if;
+  end loop;
+
+  return jsonb_build_object('expired', v_expired, 'loans_due', v_due, 'loans_defaulted', v_default_n,
+                            'supply_hours', v_hours, 'completed', v_done, 'broken', v_broken);
+end;
+$$;
+comment on function public.deals_run_due(timestamptz) is
+  'run_due_jobs (ADR-098): expires offers, collects due loans once (else overdue), defaults overdue loans, settles '
+  'supply hours and ends supply contracts and stakes. p_now for tests.';
+
+-- ---------------------------------------------------------------------------
+-- K. One operating hour as in M4h, with the campaign factor and the stake payouts
+-- ---------------------------------------------------------------------------
+create or replace function public.player_company_close_hour(p_company uuid, p_hour_start timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  pc        public.player_companies;
+  c         public.companies;
+  v_su      jsonb := coalesce(public.config_jsonb('startups'), '{}'::jsonb);
+  v_hours   double precision := greatest(1, public.config_double('time', '{quarterHours}', 6));
+  v_start   timestamptz := date_trunc('hour', p_hour_start);
+  v_end     timestamptz;
+  v_qid     bigint;
+  v_team    jsonb;
+  v_price   jsonb;
+  v_ev      jsonb;
+  v_camp    public.company_campaigns;
+  v_stage   integer;
+  v_demand  double precision;
+  v_cap     double precision;
+  v_sold    double precision;
+  v_ctr     double precision;
+  v_own     bigint;
+  v_crev    bigint;
+  v_hhbal   bigint;
+  v_rev     bigint;
+  v_cogs    bigint;
+  v_gross   bigint;
+  v_aidue   bigint;
+  v_aipaid  bigint;
+  v_pdue    bigint := 0;
+  v_ppaid   bigint := 0;
+  v_due     bigint;
+  v_factor  integer;
+  v_fixed   bigint;
+  v_mk      bigint;
+  v_costs   bigint;
+  v_paid    bigint := 0;
+  v_unpaid  bigint := 0;
+  v_settle  bigint := 0;
+  v_cash    bigint;
+  v_acc     uuid;
+  v_hh      uuid;
+  v_profit  bigint;
+  v_owed    bigint;
+  v_free    bigint;
+  v_stakes  bigint := 0;
+  v_sp      bigint;
+  v_payout  bigint := 0;
+  v_bps     integer;
+  v_until   timestamptz;
+  v_news    bigint;
+  k         text;
+  j         record;
+  s         record;
+begin
+  if p_company is null or p_hour_start is null then
+    return null;
+  end if;
+  select * into pc from public.player_companies where company_id = p_company and status = 'active' for update;
+  if pc.company_id is null then
+    return null;
+  end if;
+  if exists (select 1 from public.player_company_hours h where h.company_id = p_company and h.hour_start = v_start) then
+    update public.player_companies set last_hour_at = greatest(last_hour_at, v_start + interval '1 hour')
+     where company_id = p_company and last_hour_at < v_start + interval '1 hour';
+    return jsonb_build_object('company_id', p_company, 'hour_start', v_start, 'skipped', 'already_closed');
+  end if;
+  v_end := v_start + interval '1 hour';
+  select * into c from public.companies where id = p_company;
+  select gq.id into v_qid from public.game_quarters gq where gq.starts_at <= v_start and gq.ends_at > v_start;
+  v_team := public.player_company_team(p_company);
+  v_acc := public.company_cash_account(p_company);
+  v_hh := public.ledger_system_account('households');
+  k := 'pch:' || p_company::text || ':' || to_char(v_start at time zone 'UTC', 'YYYYMMDDHH24');
+  -- company event of this hour (ADR-091): demand and capacity factors, extra costs as a share of the own revenue
+  v_ev := public.company_event_hour_effect(p_company, v_start, v_end);
+  -- marketing campaign (ADR-097, campaignDemandFactor): its factor when the hour starts inside its window
+  v_camp := public.company_campaign_at(p_company, v_start);
+
+  -- sales of the hour with the quarter's awareness and quality; demand and capacity count in units at the
+  -- normal price, the price strategy changes both price and demand (ADR-083)
+  v_price := public.company_price_effect(pc.price_level, pc.quality);
+  v_stage := least(greatest(coalesce((v_team ->> 'stage')::integer, 0), 0),
+                   greatest(jsonb_array_length(coalesce(v_su #> '{stages,awarenessCaps}', '[1]'::jsonb)) - 1, 0));
+  v_demand := pc.potential_annual_cents * public.company_market_factor(pc.tier, pc.expansion_level) / 4.0 / v_hours
+            * pc.awareness * (0.5 + 0.5 * pc.quality)
+            * exp(public.cfg_num(v_su, '{demandNoise}', 0.1) * public.gauss_random())
+            * (v_price ->> 'demand')::double precision
+            * (v_ev ->> 'demand_factor')::double precision
+            * greatest(0, coalesce(v_camp.demand_factor, 1));
+  v_cap := (v_team ->> 'team_productivity_bps')::double precision / 10000.0
+         * public.cfg_num(v_su, array['capacityCentsPerProductivity', c.sector_key], 250000)
+         * (1 + public.cfg_num(v_su, '{stages,capacityBonusPerStage}', 0.25) * v_stage)
+         * public.company_capacity_factor(pc.expansion_level)
+         * (v_ev ->> 'capacity_factor')::double precision / v_hours;
+  v_sold := least(v_demand, v_cap);
+  -- contract work: a share of the unused capacity at the normal price (ADR-083)
+  v_ctr := case when pc.contract_work
+                then greatest(0, v_cap - v_sold) * public.cfg_num(v_su, '{contractWork,shareOfFreeCapacity}', 0.25)
+                else 0 end;
+  v_own := round((v_sold * (v_price ->> 'price')::double precision)::numeric)::bigint;
+  v_crev := round(v_ctr::numeric)::bigint;
+  -- closed money system: the households pay at most what they have (own sales first)
+  v_hhbal := greatest(0, coalesce((select a.balance_cents from public.ledger_accounts a where a.id = v_hh), 0));
+  if v_own + v_crev > v_hhbal then
+    v_own := least(v_own, v_hhbal);
+    v_crev := least(v_crev, v_hhbal - v_own);
+    v_sold := least(v_sold, v_own / greatest((v_price ->> 'price')::double precision, 0.0001));
+    v_ctr := v_crev;
+  end if;
+  v_rev := v_own + v_crev;
+  -- goods; an event's extra costs (or savings) move with the own revenue, goods never cost less than nothing
+  v_cogs := round(greatest(0, v_sold * (1 - public.cfg_num(v_su, array['grossMargin', c.sector_key], 0.5))
+                              + v_own * (v_ev ->> 'extra_cost_share')::double precision)::numeric)::bigint
+          + round((v_ctr * (1 - public.cfg_num(v_su, '{contractWork,grossMargin}', 0.3)))::numeric)::bigint;
+  v_gross := v_rev - v_cogs;
+
+  -- wages due: AI workers and the hourly contract wages of the players (the founder draws no wage)
+  v_aidue := pc.ai_workers * public.config_bigint('startups', '{aiWorkerWageCentsPerHour}', 12000);
+  for j in select pj.id, pj.salary_cents_per_hour, pj.notice_ends_at from public.player_jobs pj
+            where pj.company_id = p_company and pj.status = 'active' order by pj.id loop
+    v_until := least(v_end, coalesce(j.notice_ends_at, v_end));
+    v_pdue := v_pdue + j.salary_cents_per_hour * public.job_payable_minutes(j.id, v_until) / 60;
+  end loop;
+  v_due := v_aidue + v_pdue;
+  -- never more than the hour earned; everyone gets the same share (ADR-072)
+  v_factor := case when v_due <= 0 then 10000 else least(10000, greatest(0, v_gross) * 10000 / v_due)::integer end;
+  v_aipaid := v_aidue * v_factor / 10000;
+
+  -- money: revenue (own sales and contract work) from the households, goods and AI wages back to them
+  if v_rev > 0 then
+    perform public.ledger_transfer(v_hh, v_acc, v_rev, 'company_revenue',
+                                   'Umsatz ' || to_char(v_start at time zone 'Europe/Berlin', 'HH24') || ' Uhr',
+                                   'company', p_company, k || ':revenue', pc.founder_id);
+  end if;
+  if v_cogs + v_aipaid > 0 then
+    perform public.ledger_transfer(v_acc, v_hh, v_cogs + v_aipaid, 'company_costs', 'Wareneinsatz und KI-Kräfte',
+                                   'company', p_company, k || ':goods', pc.founder_id);
+  end if;
+  -- players: the hour (up to the end of a notice) at contract wage x factor, with XP and branch minutes
+  update public.player_companies set pay_factor_bps = v_factor where company_id = p_company;
+  for j in select pj.id, pj.player_id, pj.notice_ends_at from public.player_jobs pj
+            where pj.company_id = p_company and pj.status = 'active' order by pj.id loop
+    v_until := least(v_end, coalesce(j.notice_ends_at, v_end));
+    perform public.lock_player_accounts(j.player_id);
+    v_ppaid := v_ppaid + public.accrue_job_salary(j.id, v_until);
+  end loop;
+
+  -- fixed costs (with the expansion level) and marketing from the cash; the rest becomes an open bill
+  v_fixed := round((public.company_fixed_cost_cents(pc.tier, pc.expansion_level) / v_hours)::numeric)::bigint;
+  v_mk := round((pc.marketing_cents_per_quarter / v_hours)::numeric)::bigint;
+  v_costs := v_fixed + v_mk;
+  select greatest(0, a.balance_cents) into v_cash from public.ledger_accounts a where a.id = v_acc;
+  v_paid := least(v_costs, coalesce(v_cash, 0));
+  if v_paid > 0 then
+    perform public.ledger_transfer(v_acc, v_hh, v_paid, 'company_costs', 'Fixkosten und Marketing',
+                                   'company', p_company, k || ':costs', pc.founder_id);
+  end if;
+  v_unpaid := v_costs - v_paid;
+  if v_unpaid = 0 and pc.unpaid_cents > 0 then
+    select greatest(0, a.balance_cents) into v_cash from public.ledger_accounts a where a.id = v_acc;
+    v_settle := least(pc.unpaid_cents, coalesce(v_cash, 0));
+    if v_settle > 0 then
+      perform public.ledger_transfer(v_acc, v_hh, v_settle, 'company_costs', 'Offene Rechnungen',
+                                     'company', p_company, k || ':settle', pc.founder_id);
+    end if;
+  end if;
+
+  v_profit := v_rev - v_cogs - v_ppaid - v_aipaid - v_fixed - v_mk;
+  v_owed := pc.unpaid_cents + v_unpaid - v_settle;
+
+  -- stakes (ADR-098, stakePayoutCents): every running stake whose term holds this hour takes its share of a
+  -- profitable hour (rounded down), never more than the free cash; served before the CEO payout. The hour is marked
+  -- as handled (settled_until) whether it paid or not.
+  for s in select x.id, x.investor_id, x.share_bps from public.deals x
+            where x.kind = 'stake' and x.status = 'active' and x.company_id = p_company
+              and x.settled_until <= v_start and x.ends_at > v_start
+            order by x.accepted_at, x.id for update of x
+  loop
+    v_sp := 0;
+    if v_profit > 0 then
+      select a.balance_cents - v_owed into v_free from public.ledger_accounts a where a.id = v_acc;
+      v_sp := least(v_profit * s.share_bps / 10000, greatest(0, coalesce(v_free, 0)));
+    end if;
+    if v_sp > 0 then
+      perform public.lock_player_accounts(s.investor_id);
+      perform public.ledger_transfer(v_acc, public.ledger_player_account(s.investor_id, 'player_cash'), v_sp, 'dividend',
+                                     'Gewinnanteil ' || c.name || ' ' || to_char(v_start at time zone 'Europe/Berlin', 'HH24') || ' Uhr',
+                                     'deal', s.id, k || ':stake:' || s.id::text, s.investor_id);
+      perform public.loan_withhold(s.investor_id, v_sp, k || ':stake:' || s.id::text);
+      v_stakes := v_stakes + v_sp;
+    end if;
+    update public.deals set payouts_cents = payouts_cents + v_sp, settled_until = v_end where id = s.id;
+  end loop;
+
+  -- automatic CEO payout (ADR-086, founderPayoutCents): after the hour's own bookings and the stakes, a share of the
+  -- profit left after the stake payouts (rounded down) moves from the company cash to the founder's private cash like
+  -- company_withdraw, never more than the free cash. A transfer, not a cost: profit_cents stays as computed above.
+  v_bps := least(10000, greatest(0, coalesce(pc.founder_payout_bps, 0)));
+  if v_profit - v_stakes > 0 and v_bps > 0 then
+    select a.balance_cents - v_owed into v_free from public.ledger_accounts a where a.id = v_acc;
+    v_payout := least((v_profit - v_stakes) * v_bps / 10000, greatest(0, coalesce(v_free, 0)));
+  end if;
+  if v_payout > 0 then
+    perform public.lock_player_accounts(pc.founder_id);
+    perform public.ledger_transfer(v_acc, public.ledger_player_account(pc.founder_id, 'player_cash'), v_payout, 'transfer',
+                                   'CEO-Auszahlung ' || to_char(v_start at time zone 'Europe/Berlin', 'HH24') || ' Uhr',
+                                   'company', p_company, k || ':payout', pc.founder_id);
+    perform public.loan_withhold(pc.founder_id, v_payout, k || ':payout');
+  end if;
+
+  -- record hour (ADR-091): beating an earlier best hour is news, at most one item per Berlin day (updated while the
+  -- day's record keeps rising and no AI text was written for it)
+  if v_profit > coalesce(pc.best_hour_profit_cents, 0) and coalesce(pc.best_hour_profit_cents, 0) > 0 then
+    select n.id into v_news from public.company_news n
+     where n.company_id = p_company and n.kind = 'record_hour'
+       and ((n.payload ->> 'hour_start')::timestamptz at time zone 'Europe/Berlin')::date
+           = (v_start at time zone 'Europe/Berlin')::date
+     order by n.id desc limit 1;
+    if v_news is null then
+      perform public.company_news_add(p_company, 'record_hour',
+                                      jsonb_build_object('profit_cents', v_profit, 'hour_start', v_start));
+    else
+      update public.company_news set payload = jsonb_build_object('profit_cents', v_profit, 'hour_start', v_start)
+       where id = v_news and ai_headline is null;
+    end if;
+  end if;
+
+  update public.player_companies
+     set unpaid_cents = v_owed,
+         distress = v_owed > 0,
+         last_hour_at = greatest(pc.last_hour_at, v_end),
+         best_hour_profit_cents = greatest(best_hour_profit_cents, v_profit)
+   where company_id = p_company;
+  insert into public.player_company_hours (company_id, hour_start, game_quarter_id, demand_cents, capacity_cents, revenue_cents,
+                                           contract_revenue_cents, cogs_cents, fixed_cents, marketing_cents, player_wages_due_cents,
+                                           player_wages_paid_cents, ai_wages_due_cents, ai_wages_paid_cents, pay_factor_bps,
+                                           paid_costs_cents, unpaid_added_cents, profit_cents, founder_payout_cents, event_id,
+                                           stake_payout_cents, campaign_id)
+  values (p_company, v_start, v_qid, round(v_demand::numeric)::bigint, round(v_cap::numeric)::bigint, v_rev,
+          v_crev, v_cogs, v_fixed, v_mk, v_pdue, v_ppaid, v_aidue, v_aipaid, v_factor, v_paid, v_unpaid, v_profit, v_payout,
+          (v_ev ->> 'event_id')::uuid, v_stakes, v_camp.id);
+
+  return jsonb_build_object('company_id', p_company, 'hour_start', v_start, 'quarter_id', v_qid, 'revenue_cents', v_rev,
+                            'contract_revenue_cents', v_crev, 'profit_cents', v_profit, 'pay_factor_bps', v_factor,
+                            'player_wages_paid_cents', v_ppaid, 'ai_wages_paid_cents', v_aipaid, 'unpaid_added_cents', v_unpaid,
+                            'founder_payout_cents', v_payout, 'event_id', v_ev -> 'event_id', 'stake_payout_cents', v_stakes,
+                            'campaign_id', v_camp.id);
+end;
+$$;
+comment on function public.player_company_close_hour(uuid, timestamptz) is
+  'Closes one operating hour of a player company (closeStartupHour, ADR-072/083) with the company event (ADR-091) and '
+  'the marketing campaign (ADR-097) of the hour, pays the stakes (ADR-098) and then the automatic CEO payout from the '
+  'profit left (ADR-086), writes the record_hour news; idempotent per (company, hour).';
+
+-- ---------------------------------------------------------------------------
+-- L. COMPANY: campaign, campaign prices, hours with supply and stakes
+-- ---------------------------------------------------------------------------
+create or replace function public.company_hours_json(p_company uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object('hour_start', x.hour_start, 'revenue_cents', x.revenue_cents,
+                                               'contract_revenue_cents', x.contract_revenue_cents,
+                                               'profit_cents', x.profit_cents,
+                                               'founder_payout_cents', x.founder_payout_cents,
+                                               'stake_payout_cents', x.stake_payout_cents,
+                                               'supply_revenue_cents', x.supply_revenue_cents,
+                                               'supply_fee_paid_cents', x.supply_fee_paid_cents,
+                                               'supply_fee_income_cents', x.supply_fee_income_cents,
+                                               'supply_goods_cents', x.supply_goods_cents,
+                                               'campaign_id', x.campaign_id) order by x.hour_start), '[]'::jsonb)
+    from (select h.* from public.player_company_hours h
+           where h.company_id = p_company order by h.hour_start desc limit 24) x;
+$$;
+comment on function public.company_hours_json(uuid) is
+  'COMPANY.hours: the last 24 closed operating hours, oldest first, with CEO payout, stakes, supply and campaign.';
+
+-- company_state as in M4e plus the running campaign and the campaign prices (ADR-097)
+create or replace function public.company_state(p_company uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  pc       public.player_companies;
+  c        public.companies;
+  v_team   jsonb;
+  v_tier   jsonb;
+  v_sb     jsonb;
+  v_level  integer;
+  v_cash   bigint;
+  v_spread double precision;
+  v_last   jsonb;
+  v_hist   jsonb;
+  v_cost   bigint;
+  v_mf     double precision;
+  v_camp   public.company_campaigns;
+begin
+  select * into pc from public.player_companies where company_id = p_company;
+  if pc.company_id is null then
+    return null;
+  end if;
+  select * into c from public.companies where id = p_company;
+  v_team := public.player_company_team(p_company);
+  v_tier := public.company_tier_cfg(pc.tier);
+  v_sb := public.company_tier_cfg('small_business');
+  select p.level into v_level from public.profiles p where p.id = pc.founder_id;
+  v_cash := coalesce((select a.balance_cents from public.ledger_accounts a where a.owner_company_id = p_company and a.kind = 'company_cash'), 0);
+  v_spread := public.config_double('startups', '{estimate,initialSpread}', 2.3)
+            * power(public.config_double('startups', '{estimate,decayPerQuarter}', 0.85), pc.quarters_active);
+  select jsonb_build_object(
+           'label', r.label, 'demand_cents', r.demand_cents, 'capacity_cents', r.capacity_cents,
+           'revenue_cents', r.revenue_cents, 'cogs_cents', r.cogs_cents, 'fixed_cents', r.fixed_cents,
+           'ai_worker_cents', r.ai_worker_cents, 'marketing_cents', r.marketing_cents, 'wages_cents', r.wages_cents,
+           'operating_profit_cents', r.operating_profit_cents, 'utilization_bps', r.utilization_bps,
+           'bonus_cents', r.bonus_cents)
+    into v_last
+    from public.player_company_reports r join public.game_quarters gq on gq.id = r.game_quarter_id
+   where r.company_id = p_company order by gq.ends_at desc limit 1;
+  select coalesce(jsonb_agg(jsonb_build_object('label', h.label, 'revenue_cents', h.revenue_cents,
+                                               'profit_cents', h.operating_profit_cents) order by h.ends_at), '[]'::jsonb)
+    into v_hist
+    from (select r.label, r.revenue_cents, r.operating_profit_cents, gq.ends_at
+            from public.player_company_reports r join public.game_quarters gq on gq.id = r.game_quarter_id
+           where r.company_id = p_company order by gq.ends_at desc limit 12) h;
+  v_cost := public.company_upgrade_cost(pc.tier);
+  -- the estimate describes the market the company reaches (ADR-083)
+  v_mf := public.company_market_factor(pc.tier, pc.expansion_level);
+  v_camp := public.company_campaign_at(p_company, public.game_now());
+  return jsonb_build_object(
+    'id', c.id,
+    'name', c.name,
+    'idea', pc.idea,
+    'sector', c.sector_key,
+    'color', c.brand_color,
+    'logo', public.company_logo(p_company),
+    'logo_hidden', pc.logo_hidden,
+    'founder_has_job', exists (select 1 from public.player_jobs x where x.player_id = pc.founder_id and x.status = 'active'),
+    'full_time_from', public.config_double('startups', '{fullTimeFromEmployees}', 5)::integer,
+    'training_from', public.config_double('startups', '{training,fromEmployees}', 5)::integer,
+    'headcount', public.company_headcount(p_company),
+    'tier', pc.tier,
+    'founded_at', c.founded_at,
+    'cash_cents', v_cash,
+    'value_cents', public.company_value_cents(p_company),
+    'unpaid_cents', pc.unpaid_cents,
+    'distress', pc.distress,
+    'distress_quarters', pc.distress_quarters,
+    'grace_quarters', public.config_double('startups', '{insolvency,graceQuarters}', 4)::integer,
+    'pay_factor_bps', pc.pay_factor_bps,
+    'product_key', public.company_product(p_company) ->> 'key',
+    'stage', (v_team ->> 'stage')::integer,
+    'stages', public.company_stages_json(p_company),
+    'awareness_bps', round(pc.awareness * 10000)::integer,
+    'quality_bps', round(pc.quality * 10000)::integer,
+    'quarters_active', pc.quarters_active,
+    'estimate_low_cents', round(pc.potential_annual_cents * v_mf
+                                * exp(-v_spread * (0.3 + 0.7 * public.uniform_from_text(pc.company_id::text || ':' || pc.quarters_active || ':low'))))::bigint,
+    'estimate_high_cents', round(pc.potential_annual_cents * v_mf
+                                 * exp(v_spread * (0.3 + 0.7 * public.uniform_from_text(pc.company_id::text || ':' || pc.quarters_active || ':high'))))::bigint,
+    'marketing_cents_per_quarter', pc.marketing_cents_per_quarter,
+    'ai_workers', pc.ai_workers,
+    'ai_worker_cost_cents', public.config_bigint('startups', '{aiWorkerCostCentsPerQuarter}', 72000),
+    'ai_wage_cents_per_hour', public.config_bigint('startups', '{aiWorkerWageCentsPerHour}', 12000),
+    'ai_worker_skills', to_jsonb(pc.ai_worker_skills),
+    'max_employees', public.company_max_employees(p_company),
+    'employees', (v_team ->> 'employees')::integer,
+    'open_postings', (select count(*) from public.job_postings jp where jp.company_id = p_company and jp.status = 'open')::integer,
+    'pending_applications', (select count(*) from public.job_applications a join public.job_postings jp on jp.id = a.posting_id
+                              where jp.company_id = p_company and a.status = 'pending')::integer,
+    'founder_productivity_bps', (v_team ->> 'founder_productivity_bps')::integer,
+    'team_productivity_bps', (v_team ->> 'team_productivity_bps')::integer,
+    'capacity_cents', round((v_team ->> 'capacity_cents')::bigint * public.company_capacity_factor(pc.expansion_level))::bigint,
+    'next_quarter_at', coalesce((public.current_game_quarter()).ends_at, public.game_now()),
+    'can_upgrade', public.company_next_tier(pc.tier) is not null
+                   and coalesce(v_level, 1) >= (public.company_tier_cfg(public.company_next_tier(pc.tier)) ->> 'minLevel')::integer,
+    'listing', public.company_listing_json(p_company, pc.founder_id),
+    'can_go_public', c.phase = 'private' and public.company_open_offer(p_company) is null
+                     and coalesce(public.config_jsonb('startups', '{ipo,fromTiers}'), '["garage", "small_business", "gmbh"]'::jsonb) ? pc.tier
+                     and coalesce(v_level, 1) >= public.config_double('startups', '{ipo,minLevel}', 6),
+    'can_capital_increase', c.phase = 'listed' and public.company_open_offer(p_company) is null,
+    'upgrade_cost_cents', v_cost,
+    'last_quarter', v_last,
+    'history', v_hist,
+    'live', public.company_live_json(p_company),
+    'hours', public.company_hours_json(p_company))
+    || jsonb_build_object(
+         'banner', pc.banner,
+         -- ADR-083: price strategy, contract work, expansion
+         'price_level', pc.price_level,
+         'contract_work', pc.contract_work,
+         'expansion_level', pc.expansion_level,
+         'can_expand', public.company_can_expand(pc.tier),
+         'expansion_cost_cents', case when public.company_can_expand(pc.tier)
+                                      then public.company_expansion_cost_cents(pc.expansion_level) end,
+         'market_factor', round(v_mf::numeric, 4),
+         -- ADR-086: share of the hourly profit paid to the founder automatically
+         'founder_payout_bps', pc.founder_payout_bps,
+         -- ADR-097: the running campaign and the current prices (from the demand of the last closed hour)
+         'campaign', case when v_camp.id is not null then public.campaign_json(v_camp.id) end,
+         'campaign_costs', public.company_campaign_costs(p_company));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- M. Player card (as in M4f plus trust), feed labels
+-- ---------------------------------------------------------------------------
+create or replace function public.get_player_card(p_nickname text)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  p      public.profiles;
+  v_job  jsonb;
+  v_pod  integer := least(3, greatest(0, public.config_double('social', '{league,podium}', 3)::integer));
+begin
+  perform public.require_player();
+  select * into p from public.profiles x where x.id = public.player_by_handle(p_nickname);
+  if p.id is null then
+    perform public.api_error('player_not_found');
+  end if;
+  select jsonb_build_object('company_name', c.name, 'title_key', j.title_key, 'title', case when j.title_key is null then j.title end,
+                            'tier', j.tier, 'since', j.started_at)
+    into v_job
+    from public.player_jobs j join public.companies c on c.id = j.company_id
+   where j.player_id = p.id and j.status = 'active';
+  return jsonb_build_object(
+    'nickname',        p.nickname,
+    'tag',             p.tag,
+    'avatar_key',      p.avatar_key,
+    'level',           p.level,
+    'rank',            public.player_rich_rank(p.id),
+    'net_worth_cents', public.player_net_worth_cents(p.id),
+    'streak_days',     public.player_streak_days(p.id),
+    'skills_learned',  (select count(*) from public.player_skills s where s.player_id = p.id)::integer,
+    'branch_scores',   public.player_branch_scores(p.id),
+    'top_skills',      coalesce((select jsonb_agg(jsonb_build_object('key', x.skill_key, 'tier', x.tier) order by x.tier desc, x.learned_at)
+                                   from (select s.skill_key, s.learned_at, (public.skill_node(s.skill_key) ->> 'tier')::integer as tier
+                                           from public.player_skills s where s.player_id = p.id
+                                          order by 3 desc nulls last, s.learned_at limit 3) x), '[]'::jsonb),
+    'job',             v_job,
+    'company',         (select jsonb_build_object('name', c.name, 'ticker', c.ticker)
+                          from public.player_companies pc join public.companies c on c.id = pc.company_id
+                         where pc.founder_id = p.id and pc.status = 'active'),
+    'trophies',        (select jsonb_build_object('gold',   count(*) filter (where e.rank = 1),
+                                                  'silver', count(*) filter (where e.rank = 2),
+                                                  'bronze', count(*) filter (where e.rank = 3))
+                          from public.league_entries e join public.league_seasons ls on ls.id = e.season_id
+                         where e.player_id = p.id and ls.status = 'finished' and e.rank between 1 and v_pod),
+    'member_since',    p.created_at,
+    'trust',           public.player_trust(p.id));
+end;
+$$;
+
+-- Short German description of a feed item (body of the reaction notification), as in M4f and M4i plus the deal kinds
+create or replace function public.feed_item_label(p_kind text, p_payload jsonb)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case p_kind
+    when 'level_up' then 'Level ' || coalesce(p_payload ->> 'level', '?') || ' erreicht'
+    when 'big_trade' then 'Gewinn mit ' || coalesce(p_payload ->> 'ticker', 'einer Aktie')
+    when 'company_founded' then coalesce(p_payload ->> 'name', 'Firma') || ' gegründet'
+    when 'company_upgraded' then coalesce(p_payload ->> 'name', 'Firma') || ' aufgestiegen'
+    when 'company_ipo' then coalesce(p_payload ->> 'name', 'Firma') || ' an der Börse'
+    when 'company_expanded' then coalesce(p_payload ->> 'name', 'Firma') || ' erweitert'
+    when 'art_won' then 'Kunstwerk „' || coalesce(p_payload ->> 'title', '?') || '“ ersteigert'
+    when 'art_created' then 'Kunstwerk „' || coalesce(p_payload ->> 'title', '?') || '“ gemalt'
+    when 'home_bought' then 'Neues Zuhause'
+    when 'car_bought' then 'Neues Auto'
+    when 'job_started' then 'Neuer Job bei ' || coalesce(p_payload ->> 'company_name', '?')
+    when 'streak' then coalesce(p_payload ->> 'days', '?') || ' Tage in Folge dabei'
+    when 'league_won' then 'Wochenliga gewonnen'
+    when 'friends_now' then 'Jetzt befreundet mit ' || coalesce(p_payload ->> 'other_nickname', '?')
+    -- M4i (migration 0100): promotion {tier, company}
+    when 'promoted' then 'Befördert bei ' || coalesce(p_payload ->> 'company', '?')
+    when 'deal_signed' then 'Deal mit ' || coalesce(p_payload ->> 'with', '?') || ' per Handschlag'
+    when 'deal_broken' then 'Deal mit ' || coalesce(p_payload ->> 'with', '?') || ' gebrochen'
+    when 'loan_defaulted' then 'Kredit von ' || coalesce(p_payload ->> 'with', '?') || ' geplatzt'
+    else 'Beitrag im Feed'
+  end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- N. Account reset/delete (account_wipe as in M4b plus deals, trust and M4i's upgrades)
+-- ---------------------------------------------------------------------------
+-- The deals of a player end with the account: what the player owes as a borrower is collected from the cash first
+-- (before it goes back to the state), then every deal the player is party to is deleted, with the player's trust
+-- events. The other side is told; its own trust events stay (without the deal).
+create or replace function public.deals_wipe_player(p_player uuid, p_key text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  d      public.deals;
+  v_cash bigint;
+  v_pay  bigint;
+  v_nick text := public.player_nickname(p_player);
+  v_cos  uuid[];
+begin
+  select coalesce(array_agg(pc.company_id), '{}') into v_cos from public.player_companies pc where pc.founder_id = p_player;
+  for d in select * from public.deals x
+            where x.kind = 'loan' and x.borrower_id = p_player and x.status in ('active', 'overdue', 'defaulted')
+            order by x.accepted_at, x.id for update
+  loop
+    perform public.lock_player_accounts(d.lender_id);
+    v_cash := public.lock_player_accounts(p_player);
+    v_pay := least(d.due_cents - d.repaid_cents, greatest(0, v_cash));
+    if v_pay > 0 then
+      perform public.ledger_transfer(public.ledger_player_account(p_player, 'player_cash'),
+                                     public.ledger_player_account(d.lender_id, 'player_cash'), v_pay, 'loan_repayment',
+                                     'Rückzahlung (Konto zurückgesetzt)', 'deal', d.id, p_key || ':deal:' || d.id::text, p_player);
+    end if;
+  end loop;
+  for d in select * from public.deals x
+            where (p_player in (x.proposer_id, x.counterparty_id, x.lender_id, x.borrower_id, x.investor_id)
+                   or x.supplier_company_id = any (v_cos) or x.buyer_company_id = any (v_cos) or x.company_id = any (v_cos))
+              and x.status in ('active', 'overdue', 'defaulted')
+  loop
+    perform public.social_notify(public.deal_other_player(d, p_player), 'deal_result',
+      coalesce(v_nick, 'Dein Partner') || ' hat neu angefangen', public.deal_kind_text(d.kind) || ' beendet.',
+      jsonb_build_object('deal_id', d.id, 'kind', d.kind, 'status', 'closed'), '/deals', 'deal:' || d.id::text || ':wiped');
+  end loop;
+  delete from public.deals x
+   where p_player in (x.proposer_id, x.counterparty_id, x.lender_id, x.borrower_id, x.investor_id)
+      or x.supplier_company_id = any (v_cos) or x.buyer_company_id = any (v_cos) or x.company_id = any (v_cos);
+  delete from public.trust_events where player_id = p_player;
+end;
+$$;
+comment on function public.deals_wipe_player(uuid, text) is
+  'Internal (account_wipe): collects what the player owes as a borrower, then deletes the player''s deals and trust events.';
+
+create or replace function public.account_wipe(p_player uuid, p_key text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_nick    text;
+  v_company uuid;
+  v_state   uuid := public.ledger_system_account(case when public.money_genesis_done() then 'treasury' else 'mint' end);
+  v_bal     bigint;
+  r         record;
+begin
+  perform public.lock_player_accounts(p_player);
+  select p.nickname into v_nick from public.profiles p where p.id = p_player for update;
+
+  -- artworks (ADR-080): back to the gallery, auctions cancelled, reserved bids back to the cash
+  perform public.artworks_wipe_player(p_player, p_key);
+
+  -- deals (ADR-098): debts as a borrower are collected first, then the deals end
+  perform public.deals_wipe_player(p_player, p_key);
+
+  -- own company: open share offers are settled first, then it is dissolved like close_company
+  select pc.company_id into v_company from public.player_companies pc where pc.founder_id = p_player and pc.status = 'active';
+  if v_company is not null then
+    for r in select o.id from public.company_share_offers o where o.company_id = v_company and o.status = 'open' order by o.id loop
+      perform public.close_share_offer(r.id);
+    end loop;
+    perform public.company_dissolve(v_company, 'closed');
+  end if;
+
+  -- subscriptions to other companies' open offers lapse (the money stays with the company)
+  for r in select s.offer_id, sum(s.shares_e6)::bigint as q from public.offer_subscriptions s
+            join public.company_share_offers o on o.id = s.offer_id and o.status = 'open'
+           where s.player_id = p_player group by s.offer_id order by s.offer_id loop
+    update public.company_share_offers set shares_subscribed_e6 = greatest(0, shares_subscribed_e6 - r.q) where id = r.offer_id;
+  end loop;
+
+  -- job: wages up to now, then ended without notice or fee
+  for r in select pj.id, pj.company_id from public.player_jobs pj where pj.player_id = p_player and pj.status = 'active' order by pj.id loop
+    perform public.accrue_job_salary(r.id);
+    update public.player_jobs set status = 'ended', ended_at = now(), end_reason = 'quit', notice_ends_at = null where id = r.id;
+    perform public.company_system_message(r.company_id, v_nick || ' hat das Unternehmen verlassen.');
+  end loop;
+
+  -- open orders release their reservations; holdings are given up
+  for r in select o.id from public.orders o
+            where o.player_id = p_player and o.status in ('pending', 'open', 'partially_filled') order by o.id loop
+    perform public.cancel_order_internal(r.id);
+  end loop;
+  update public.positions
+     set status = 'closed', closed_at = now(), quantity_e6 = 0, reserved_quantity_e6 = 0, cost_basis_cents = 0,
+         margin_cents = 0, borrowed_cents = 0, liquidation_price_e4 = null
+   where player_id = p_player and status = 'open';
+
+  -- game state of the player (M4b: home, furniture and cars are given up without a refund)
+  for r in select * from (values
+             ('position_lots', 'player_id'), ('xp_events', 'player_id'), ('xp_daily_counters', 'player_id'),
+             ('vault_claims', 'player_id'), ('daily_logins', 'player_id'), ('player_missions', 'player_id'),
+             ('player_achievements', 'player_id'), ('player_cosmetics', 'player_id'), ('player_lifestyle_items', 'player_id'),
+             ('player_random_events', 'player_id'), ('player_bankruptcies', 'player_id'), ('margin_events', 'player_id'),
+             ('financing_charges', 'player_id'), ('player_tax_years', 'player_id'), ('distribution_payouts', 'player_id'),
+             ('watchlist_items', 'player_id'), ('portfolio_snapshots', 'player_id'), ('stock_option_grants', 'player_id'),
+             ('loans', 'player_id'), ('cap_table_entries', 'player_id'), ('share_lockups', 'player_id'),
+             ('capital_injections', 'player_id'), ('takeover_offers', 'bidder_player_id'), ('angel_offers', 'investor_player_id'),
+             ('ipo_subscriptions', 'player_id'), ('shareholder_vote_ballots', 'player_id'), ('reputation_events', 'player_id'),
+             ('insider_violations', 'player_id'), ('salary_payouts', 'player_id'), ('work_tasks', 'player_id'),
+             ('salary_negotiations', 'player_id'), ('player_work_tasks', 'player_id'), ('player_jobs', 'player_id'),
+             ('job_offers', 'to_player_id'), ('job_applications', 'player_id'), ('player_skills', 'player_id'),
+             ('player_skill_points', 'player_id'), ('daily_reward_claims', 'player_id'), ('player_loans', 'player_id'),
+             ('offer_subscriptions', 'player_id'), ('notifications', 'player_id'), ('feed_items', 'actor_id'),
+             ('league_entries', 'player_id'), ('league_entry_baselines', 'player_id'), ('company_logo_reports', 'reporter_id'),
+             ('player_unlocks', 'player_id'), ('player_furniture', 'player_id'), ('player_cars', 'player_id'),
+             ('player_homes', 'player_id'), ('trust_events', 'player_id')
+           ) as t(tbl, col) loop
+    execute format('delete from public.%I where %I = $1', r.tbl, r.col) using p_player;
+  end loop;
+  -- M4i (upgrades, migration 0100) when present
+  if to_regclass('public.player_upgrades') is not null
+     and exists (select 1 from information_schema.columns
+                  where table_schema = 'public' and table_name = 'player_upgrades' and column_name = 'player_id') then
+    execute 'delete from public.player_upgrades where player_id = $1' using p_player;
+  end if;
+  delete from public.rich_list_snapshots where entity_kind = 'player' and entity_id = p_player;
+
+  -- money back to the state: one balanced posting per account
+  for r in select a.id from public.ledger_accounts a where a.owner_player_id = p_player and a.balance_cents > 0 order by a.id loop
+    select a.balance_cents into v_bal from public.ledger_accounts a where a.id = r.id;
+    perform public.ledger_transfer(r.id, v_state, v_bal, 'transfer', 'Konto zurückgesetzt', 'profile', p_player,
+                                   p_key || ':' || r.id::text, p_player);
+  end loop;
+
+  update public.profiles
+     set level = 1, xp_total = 0, reputation = 50, title_key = null, frame_key = null,
+         bankrupt_until = null, founding_locked_until = null
+   where id = p_player;
+  update public.player_private
+     set founding_ban_until = null, bankruptcy_count = 0, career_experience_minutes = 0, ipo_investment_limit_cents = null,
+         tutorial_completed_at = null, tax_loss_pot_cents = 0
+   where player_id = p_player;
+end;
+$$;
+comment on function public.account_wipe(uuid, text) is 'Internal: cleanup shared by reset_account() and delete_account().';
+
+-- ---------------------------------------------------------------------------
+-- O. run_due_jobs as in M4h plus the deals
+-- ---------------------------------------------------------------------------
+create or replace function public.run_due_jobs()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now      timestamptz;
+  v_result   jsonb := '{}'::jsonb;
+  v_closed   jsonb := '[]'::jsonb;
+  v_latest   bigint;
+  q          record;
+  v_run      bigint;
+begin
+  -- waits for a running tick (ticks only try the lock and skip)
+  perform pg_advisory_xact_lock(7311001);
+  v_now := public.game_now();
+  perform public.ensure_game_quarters(3);
+
+  if not exists (select 1 from public.candles limit 1) or not public.money_genesis_done()
+     or not exists (select 1 from public.rich_tycoons) then
+    v_result := v_result || jsonb_build_object('bootstrap', public.market_bootstrap());
+  end if;
+
+  -- first run on a database: older quarters are skipped, only the latest ended one is closed
+  if not exists (select 1 from public.job_runs j where j.job_name = 'quarter_close') then
+    select gq.id into v_latest from public.game_quarters gq
+     where gq.ends_at <= v_now and gq.status <> 'closed' order by gq.ends_at desc limit 1;
+    for q in select gq.id from public.game_quarters gq
+              where gq.ends_at <= v_now and gq.status <> 'closed' and gq.id <> coalesce(v_latest, -1)
+    loop
+      update public.game_quarters set status = 'closed', closed_at = now() where id = q.id;
+      insert into public.job_runs (job_name, run_key, status, finished_at, details)
+      values ('quarter_close', q.id::text, 'succeeded', now(), '{"skipped": "before_first_run"}'::jsonb)
+      on conflict do nothing;
+    end loop;
+  end if;
+
+  for q in select gq.id from public.game_quarters gq
+            where gq.ends_at <= v_now and gq.status <> 'closed'
+            order by gq.ends_at limit 8
+  loop
+    v_closed := v_closed || public.close_game_quarter(q.id);
+  end loop;
+  v_result := v_result || jsonb_build_object('quarters', v_closed);
+  -- player companies: operating hours (ADR-072), then every closed quarter since their founding (ADR-057)
+  v_result := v_result || jsonb_build_object('player_companies', public.player_companies_run_due());
+  v_result := v_result || jsonb_build_object('company_events', public.company_events_run_due());
+  -- deals between players (ADR-098): after the company hours, so supply contracts see both companies' hours
+  v_result := v_result || jsonb_build_object('deals', public.deals_run_due());
+
+  -- bonds that matured between quarter closes (or after a downtime)
+  if exists (select 1 from public.bonds bd join public.securities s on s.id = bd.security_id
+              where s.status = 'listed' and bd.matures_at <= v_now) then
+    v_result := v_result || jsonb_build_object('bonds_redeemed', public.redeem_matured_bonds(v_now));
+  end if;
+  v_result := v_result || jsonb_build_object('bonds_issued', public.ensure_bond_series());
+
+  -- jobs: AI postings of the running quarter, wages of AI-company jobs in whole hours
+  v_result := v_result || jsonb_build_object('quit_notices', public.process_quit_notices(null));
+  v_result := v_result || jsonb_build_object('share_offers', public.close_due_offers(null));
+  v_result := v_result || jsonb_build_object('job_postings', public.refresh_ai_job_postings(),
+                                             'salaries_paid', public.accrue_salaries(null));
+
+  -- artworks (ADR-080): due auctions are settled, the gallery starts the auctions of the day
+  v_result := v_result || jsonb_build_object('artworks', public.artworks_run_due());
+
+  -- rich list snapshot every richList.snapshotMinutes (rank news, 24 h changes, state missions)
+  v_result := v_result || jsonb_build_object('rich_list', public.rich_list_snapshot(false));
+
+  -- weekly league and feed upkeep (M4f, ADR-088/089) and announced events (M4g, ADR-090): kept in this redefinition
+  v_result := v_result || jsonb_build_object('social', public.social_run_due());
+  v_result := v_result || jsonb_build_object('events', public.events_run_due());
+
+  -- daily maintenance (first run per UTC day)
+  insert into public.job_runs (job_name, run_key) values ('maintenance', to_char(now() at time zone 'UTC', 'YYYY-MM-DD'))
+  on conflict (job_name, run_key) do nothing
+  returning id into v_run;
+  if v_run is not null then
+    v_result := v_result || jsonb_build_object('maintenance', public.run_maintenance());
+    -- price_ticks: keep about one day (candles hold the history), cron log: one day
+    perform public.maintain_price_tick_partitions(3, 1);
+    if to_regclass('cron.job_run_details') is not null then
+      begin
+        execute 'delete from cron.job_run_details where end_time < now() - interval ''1 day''';
+      exception when others then
+        raise warning 'NEXA: could not prune cron.job_run_details: %', sqlerrm;
+      end;
+    end if;
+    delete from public.job_runs j where j.job_name = 'maintenance' and j.started_at < now() - interval '30 days';
+    update public.job_runs set status = 'succeeded', finished_at = now() where id = v_run;
+  end if;
+  return v_result;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- P. Grants
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.api_error(text)', 'public.campaigns_cfg()', 'public.campaign_kind_num(text, text)',
+    'public.campaign_cost_cents(text, double precision)', 'public.campaign_luck(double precision)',
+    'public.campaign_factor(text, double precision, double precision)', 'public.campaign_resonance(double precision)',
+    'public.company_demand_estimate_cents(uuid)', 'public.company_campaign_base_cents(uuid)',
+    'public.company_campaign_costs(uuid)', 'public.company_campaign_at(uuid, timestamptz)', 'public.campaign_json(uuid)',
+    'public.start_campaign(uuid, uuid, text)', 'public.deals_cfg()', 'public.trust_cfg()', 'public.trust_delta(text)',
+    'public.trust_add(uuid, uuid, text)', 'public.trust_score(uuid)', 'public.trust_band(integer)', 'public.player_trust(uuid)',
+    'public.deal_term_int(jsonb, text)', 'public.deal_other_role(text)', 'public.deal_role_ok(text, text)',
+    'public.deal_role_needs_company(text)', 'public.player_active_company(uuid)', 'public.deal_first_hour(timestamptz)',
+    'public.deal_terms_json(public.deals)', 'public.deal_terms_error(text, jsonb, integer)',
+    'public.deal_supply_prepay_cents(bigint, integer, integer, integer)', 'public.deal_stake_shares(uuid, boolean)',
+    'public.deal_count_running(uuid, text)', 'public.deal_is_party(public.deals, uuid)',
+    'public.deal_other_player(public.deals, uuid)', 'public.deal_player_of(public.deals, text)', 'public.player_nickname(uuid)',
+    'public.deal_kind_text(text, text)', 'public.deal_pct_text(integer)', 'public.deal_hours_text(integer)',
+    'public.deal_terms_text(public.deals)', 'public.deal_notify(uuid, text, uuid, text, text, text)',
+    'public.deal_party_json(uuid)', 'public.deal_company_json(uuid)', 'public.deal_json(uuid, uuid)',
+    'public.deal_break(uuid, uuid, timestamptz)', 'public.deal_finish_supply(uuid, timestamptz)',
+    'public.deal_finish_stake(uuid, timestamptz)', 'public.deal_loan_paid(uuid, timestamptz)',
+    'public.deal_settle_supply(uuid)', 'public.deal_for_action(uuid, uuid)',
+    'public.propose_deal(uuid, text, text, text, jsonb, text)', 'public.respond_deal(uuid, uuid, boolean)',
+    'public.cancel_deal(uuid, uuid)', 'public.break_deal(uuid, uuid)', 'public.repay_loan(uuid, uuid, bigint)',
+    'public.forgive_loan(uuid, uuid)', 'public.get_deals()', 'public.get_deal_board()', 'public.deals_run_due(timestamptz)',
+    'public.player_company_close_hour(uuid, timestamptz)', 'public.company_hours_json(uuid)', 'public.company_state(uuid)',
+    'public.get_player_card(text)', 'public.feed_item_label(text, jsonb)', 'public.deals_wipe_player(uuid, text)',
+    'public.account_wipe(uuid, text)', 'public.run_due_jobs()'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+    execute format('grant execute on function %s to service_role', f);
+  end loop;
+  foreach f in array array[
+    'public.start_campaign(uuid, uuid, text)', 'public.propose_deal(uuid, text, text, text, jsonb, text)',
+    'public.respond_deal(uuid, uuid, boolean)', 'public.cancel_deal(uuid, uuid)', 'public.break_deal(uuid, uuid)',
+    'public.repay_loan(uuid, uuid, bigint)', 'public.forgive_loan(uuid, uuid)', 'public.get_deals()', 'public.get_deal_board()',
+    'public.get_player_card(text)'
+  ] loop
+    execute format('grant execute on function %s to authenticated', f);
+  end loop;
+end;
+$$;
 
 -- ===== game_config (current values, overwriting older ones) =====
 -- GENERATED by scripts/gen-config-seed.ts from src/config/balance.ts. Do not edit by hand.

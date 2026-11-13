@@ -1,6 +1,6 @@
 {
   "job": {
-    "id": "94a892d3-8277-49ec-b68a-337e5702bb86",
+    "id": "f4db3f6e-b903-4eff-95f4-dbacf64b4505",
     "tier": "junior",
     "title": null,
     "company": {
@@ -31,7 +31,7 @@
     "signature": "M2 14 C6 4 10 4 14 12 S22 18 26 8",
     "title_key": "it_junior",
     "rank_hours": 1.0,
-    "started_at": "2026-11-13T13:52:08.709115+00:00",
+    "started_at": "2026-11-13T14:15:23.901833+00:00",
     "pending_raise": null,
     "raise_max_bps": 300,
     "notice_ends_at": null,

@@ -1,16 +1,16 @@
 {
   "job": {
-    "id": "3325cc3f-ad6f-4aaf-9d28-a309f9ea12ed",
+    "id": "4153f7c8-abf0-439a-b547-5ce48631211e",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
+      "id": "dc6cd683-c473-c0eb-8d8c-04ddf664b4d5",
       "logo": null,
-      "name": "KlarSoft AG",
-      "color": "#4C8DFF",
+      "name": "Eilbote Express",
+      "color": "#F7768E",
       "is_ai": true,
-      "sector": "tech",
-      "ticker": "KLS"
+      "sector": "logistics",
+      "ticker": "EBX"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -31,7 +31,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-13T13:52:11.223215+00:00",
+    "started_at": "2026-11-13T14:15:27.484188+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

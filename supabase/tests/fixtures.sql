@@ -1,5 +1,5 @@
 -- =============================================================================
--- Dumps one real response of every read/write RPC (M1 to M4i) as JSON files, so the
+-- Dumps one real response of every read/write RPC (M1 to M4j) as JSON files, so the
 -- frontend's Zod schemas can be tested against the database (contract test:
 -- src/features/game/api.test.ts). Run by verify_local.sh when
 -- NEXA_FIXTURE_DIR is set. Not an assertion file.
@@ -732,5 +732,86 @@ select public.get_company_team(:'fx_cco');
 select public.decline_promotion(gen_random_uuid(), :'fx_cco', :'fx_mjob');
 \o :fixture_dir/promote_employee.json
 select public.promote_employee(gen_random_uuid(), :'fx_cco', :'fx_mjob', null);
+\o
+reset role;
+
+-- M4j: marketing campaigns, deals between players and trust (ADR-097/098) ---------------------------------------
+-- (the M1 test invite code is shared by every block; give this one its own room)
+update public.invite_codes set max_uses = max_uses + 20 where code = 'M1-TESTS';
+-- (separate block: a supplier with a tech garage, a buyer with a retail garage and an investor without a company)
+\set fx_da '''f1f1f1f1-0000-4000-8000-00000000d4a1'''
+\set fx_db '''f1f1f1f1-0000-4000-8000-00000000d4b1'''
+\set fx_dc '''f1f1f1f1-0000-4000-8000-00000000d4c1'''
+select tests.signup(:fx_da, 'Fixture_Lieferant') is not null and tests.signup(:fx_db, 'Fixture_Abnehmer') is not null
+   and tests.signup(:fx_dc, 'Fixture_Anleger') is not null as ok \gset
+select tests.set_level(x, 6) from unnest(array[:fx_da, :fx_db, :fx_dc]::uuid[]) x;
+select tests.fund(:fx_da, 5000000, 'fixture:m4j:a');
+select tests.fund(:fx_db, 5000000, 'fixture:m4j:b');
+select tests.fund(:fx_dc, 2000000, 'fixture:m4j:c');
+select tests.login_as('authenticated', :fx_db);
+select public.found_company(gen_random_uuid(), 'Fixture Abnahme', 'Alles für den Laden', 'retail', '#55aa33', 'garage') is not null as ok \gset
+reset role;
+select tests.login_as('authenticated', :fx_da);
+select public.found_company(gen_random_uuid(), 'Fixture Lieferwerk', 'Teile auf Abruf', 'tech', '#3355aa', 'garage') is not null as ok \gset
+select company_id as fx_dco from public.player_companies where founder_id = :fx_da and status = 'active' \gset
+\o :fixture_dir/start_campaign.json
+select public.start_campaign(gen_random_uuid(), :'fx_dco', 'flyer');
+\o :fixture_dir/get_my_company_campaign.json
+select public.get_my_company();
+\o :fixture_dir/propose_deal.json
+select public.propose_deal(gen_random_uuid(), 'loan', 'lender', 'Fixture_Abnehmer',
+         '{"principal_cents": 100000, "interest_bps": 1000, "hours": 48}', 'Für den Wareneinkauf');
+\o :fixture_dir/propose_deal_supply.json
+select public.propose_deal(gen_random_uuid(), 'supply', 'supplier', 'Fixture_Abnehmer',
+         '{"volume_cents_per_hour": 30000, "fee_bps": 5000, "prepay_bps": 2000, "hours": 24}', null);
+\o :fixture_dir/propose_deal_board.json
+select public.propose_deal(gen_random_uuid(), 'stake', 'company', null, '{"amount_cents": 100000, "share_bps": 2000, "hours": 72}',
+                           'Wer steigt ein?');
+\o
+select public.propose_deal(gen_random_uuid(), 'loan', 'lender', 'Fixture_Abnehmer',
+         '{"principal_cents": 20000, "interest_bps": 0, "hours": 24}', null) ->> 'id' as fx_dl2 \gset
+select public.propose_deal(gen_random_uuid(), 'loan', 'lender', null, '{"principal_cents": 20000, "interest_bps": 0, "hours": 24}',
+                           null) ->> 'id' as fx_dl3 \gset
+\o :fixture_dir/cancel_deal.json
+select public.cancel_deal(gen_random_uuid(), :'fx_dl3');
+\o
+reset role;
+select id as fx_dl1 from public.deals where proposer_id = :fx_da and kind = 'loan' and principal_cents = 100000 \gset
+select id as fx_ds1 from public.deals where proposer_id = :fx_da and kind = 'supply' \gset
+select id as fx_dk1 from public.deals where proposer_id = :fx_da and kind = 'stake' \gset
+select tests.login_as('authenticated', :fx_dc);
+\o :fixture_dir/get_deal_board.json
+select public.get_deal_board();
+\o :fixture_dir/respond_deal_stake.json
+select public.respond_deal(gen_random_uuid(), :'fx_dk1', true);
+\o
+reset role;
+select tests.login_as('authenticated', :fx_db);
+\o :fixture_dir/get_deals_incoming.json
+select public.get_deals();
+\o :fixture_dir/respond_deal.json
+select public.respond_deal(gen_random_uuid(), :'fx_dl1', true);
+\o :fixture_dir/respond_deal_supply.json
+select public.respond_deal(gen_random_uuid(), :'fx_ds1', true);
+\o :fixture_dir/respond_deal_declined.json
+select public.respond_deal(gen_random_uuid(), :'fx_dl2', false);
+\o :fixture_dir/repay_loan.json
+select public.repay_loan(gen_random_uuid(), :'fx_dl1', 40000);
+\o
+reset role;
+select tests.login_as('authenticated', :fx_da);
+\o :fixture_dir/forgive_loan.json
+select public.forgive_loan(gen_random_uuid(), :'fx_dl1');
+\o :fixture_dir/break_deal.json
+select public.break_deal(gen_random_uuid(), :'fx_ds1');
+\o :fixture_dir/get_deals.json
+select public.get_deals();
+\o
+reset role;
+select tests.login_as('authenticated', 'f1f1f1f1-0000-4000-8000-0000000000fd');
+\o :fixture_dir/get_deals_empty.json
+select public.get_deals();
+\o :fixture_dir/get_player_card_trust.json
+select public.get_player_card('Fixture_Lieferant');
 \o
 reset role;

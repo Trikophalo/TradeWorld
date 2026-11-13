@@ -1,6 +1,6 @@
 {
-  "mine": { "rank": 36, "value_cents": 54108 },
-  "total": 37,
+  "mine": { "rank": 37, "value_cents": 54108 },
+  "total": 39,
   "entries": [
     {
       "kind": "ai",
@@ -15,7 +15,7 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "e50a6ff5-8dbd-8c90-f94e-5ac06d3fe862",
-      "value_cents": 517398000000,
+      "value_cents": 516220000000,
       "revenue_cents": null
     },
     {
@@ -31,7 +31,7 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
-      "value_cents": 434938000000,
+      "value_cents": 433012500000,
       "revenue_cents": null
     },
     {
@@ -47,7 +47,7 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "2faf9e4c-3f0a-8a5b-1645-c669e9481771",
-      "value_cents": 426147600000,
+      "value_cents": 430632000000,
       "revenue_cents": null
     },
     {
@@ -63,7 +63,7 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "cbfac5fd-3475-2166-ea22-0a85cbb6f5c0",
-      "value_cents": 352925600000,
+      "value_cents": 352611200000,
       "revenue_cents": null
     },
     {
@@ -79,9 +79,9 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "d21331b8-a414-66aa-de07-f036108fc91d",
-      "value_cents": 314406400000,
+      "value_cents": 314218100000,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-13T13:52:09.298902+00:00"
+  "server_time": "2026-11-13T14:15:24.994754+00:00"
 }

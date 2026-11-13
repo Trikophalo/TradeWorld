@@ -1,12 +1,12 @@
 {
   "offers": [
     {
-      "id": "25baad07-15c3-47b0-9f85-6238aff90f63",
+      "id": "b3a66920-b05a-48ec-a4d7-96549ec90c1c",
       "kind": "ipo",
       "status": "open",
       "ticker": null,
       "company": {
-        "id": "20692308-655e-4f12-9ea3-9052bf20ae3c",
+        "id": "17a88892-e2c6-4d11-9208-579ec795759b",
         "logo": null,
         "name": "Bodos Garage",
         "color": "#446622",
@@ -14,7 +14,7 @@
         "sector": "tech",
         "product_key": "security_software"
       },
-      "ends_at": "2026-11-14T01:52:03.677026+00:00",
+      "ends_at": "2026-11-14T02:15:13.215349+00:00",
       "price_cents": 100,
       "value_cents": 307639,
       "last_quarter": null,
@@ -23,12 +23,12 @@
       "shares_subscribed_e6": 0
     },
     {
-      "id": "41cced75-7954-438d-bcb6-010951dadb7a",
+      "id": "46f5a340-a4cd-44cd-9e85-78b9cef6f5c2",
       "kind": "ipo",
       "status": "open",
       "ticker": null,
       "company": {
-        "id": "2debea22-badc-414e-a54a-f5b4e0da620e",
+        "id": "83fd0b40-0b68-4f1d-a540-fe3e41d4c6cb",
         "logo": {
           "grid": [
             "................",
@@ -56,21 +56,21 @@
         "sector": "tech",
         "product_key": "security_software"
       },
-      "ends_at": "2026-11-14T01:52:09.597103+00:00",
+      "ends_at": "2026-11-14T02:15:25.388765+00:00",
       "price_cents": 100,
-      "value_cents": 1113079,
+      "value_cents": 1112546,
       "last_quarter": { "label": "J1 Q1", "profit_cents": 0, "revenue_cents": 0 },
       "my_shares_e6": 250000000,
       "shares_offered_e6": 200000000000,
       "shares_subscribed_e6": 250000000
     },
     {
-      "id": "390c23ba-3300-499e-9a99-0d883444e3fd",
+      "id": "da231285-233d-46d1-a108-352d19873dff",
       "kind": "ipo",
       "status": "closed",
       "ticker": "FEN",
       "company": {
-        "id": "34c3dca1-bed6-4cf5-91fb-e35076637a49",
+        "id": "cb9deb7f-7fc8-4318-862a-9ca99f751b7f",
         "logo": {
           "grid": [
             "................",
@@ -98,7 +98,7 @@
         "sector": "tech",
         "product_key": "security_software"
       },
-      "ends_at": "2026-11-13T13:51:55.284671+00:00",
+      "ends_at": "2026-11-13T14:15:01.094059+00:00",
       "price_cents": 100,
       "value_cents": 18323991,
       "last_quarter": { "label": "J1 Q2", "profit_cents": 0, "revenue_cents": 0 },
@@ -107,12 +107,12 @@
       "shares_subscribed_e6": 700500000
     },
     {
-      "id": "b0fbf7bd-f61f-40b3-9345-f11e8b3b3f26",
+      "id": "258fb96e-6647-4c23-98f3-a40d97e178a6",
       "kind": "capital_increase",
       "status": "closed",
       "ticker": "FEN",
       "company": {
-        "id": "34c3dca1-bed6-4cf5-91fb-e35076637a49",
+        "id": "cb9deb7f-7fc8-4318-862a-9ca99f751b7f",
         "logo": {
           "grid": [
             "................",
@@ -140,7 +140,7 @@
         "sector": "tech",
         "product_key": "security_software"
       },
-      "ends_at": "2026-11-13T13:51:55.450229+00:00",
+      "ends_at": "2026-11-13T14:15:01.318368+00:00",
       "price_cents": 100,
       "value_cents": 18323991,
       "last_quarter": { "label": "J1 Q2", "profit_cents": 0, "revenue_cents": 0 },

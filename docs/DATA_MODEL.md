@@ -8,6 +8,7 @@ aus einer echten Datenbank erzeugt (`supabase/tools/gen_data_model.py`) und stim
 <!-- BEGIN GENERATED:stats -->
 
 Stand der Generierung: **132 Tabellen**, 18 Views, 81 Enums, 121 RLS-Policies, 437 Indizes, 35 Funktionen.
+
 <!-- END GENERATED:stats -->
 
 Inhalt:
@@ -6216,3 +6217,288 @@ die Überstunden.
   Treasury-Faktor).
 - Mit der Weiterbildung springt der Fortschritt zum nächsten Fachpunkt, weil die gesammelten Minuten durch die neue
   Stundenzahl geteilt werden. Verloren geht nichts.
+
+## Nachtrag: M4j (Marketing-Kampagnen, Deals unter Spielern, Vertrauen)
+
+Migration `20261130000200_m4j_campaigns_deals.sql` (ADR-096 bis ADR-098), idempotente Kopie in `supabase/updates/`.
+Die Regeln spiegeln `src/lib/sim/campaigns.ts` (`campaignCostCents`, `campaignLuck`, `campaignFactor`,
+`campaignResonance`, `campaignDemandFactor`), den Eingang `campaignFactor` von `closeStartupHour` und
+`src/lib/sim/deals.ts` (`loanTermsError`, `supplyTermsError`, `stakeTermsError`, `loanDueCents`, `loanCollect`,
+`loanPhase`, `supplyFreeCapacityCents`, `unmetDemandCents`, `supplyHour`, `supplyPrepayCents`, `supplyFeeSplit`,
+`supplyKept`, `stakePayoutCents`, `trustScore`, `trustBand`, `trustOnEnd`). Die Zahlen kommen aus `game_config`
+(`startups.campaigns`, `deals`, `trust`; `src/config/balance.ts`, `src/config/deals.ts`). Fehlt ein Wert, nimmt das SQL
+denselben Rückfallwert wie die Konfiguration.
+
+### Tabellen
+
+| Tabelle             | Inhalt                                                                                      | Lesen (RLS)                                        |
+| ------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `company_campaigns` | Eine Kampagne: `kind`, `cost_cents`, `luck`, `demand_factor`, `awareness_gain`, Zeitfenster | Gründer und aktive Spieler-Mitarbeiter der Firma   |
+| `deals`             | Kredit, Liefervertrag oder Beteiligung: Parteien, Bedingungen, Fortschritt, Zeiten, Brecher | Parteien; offene Börsen-Angebote alle Angemeldeten |
+| `trust_events`      | Vertrauensänderungen: `player_id`, `deal_id` (oder `null`), `reason`, `delta`               | nur die eigenen Zeilen                             |
+
+- Keine Schreibrechte für Clients; geschrieben wird nur über die RPCs und `deals_run_due()`.
+- **`deals`:** `proposer_id`/`proposer_role` sind der Anbieter. `counterparty_id` ist das Ziel eines Angebots (`null` =
+  offen auf der Deal-Börse) und nach der Annahme der Spieler, der angenommen hat. `board` merkt sich, dass es ein
+  offenes Angebot war. Die festen Parteien stehen in `lender_id`/`borrower_id` (Kredit), `supplier_company_id`/
+  `buyer_company_id` (Liefervertrag) und `investor_id`/`company_id` (Beteiligung). `settled_until` ist die nächste
+  Betriebsstunde, die abgerechnet (Liefervertrag) bzw. ausgezahlt (Beteiligung) wird. `request_id` ist die Anfrage des
+  Anbieters, `broken_by` der Spieler, der vorzeitig beendet hat.
+- **`trust_events`:** `reason` ist ein Schlüssel aus `trust.deltas`, `delta` der damalige Wert. Je (Deal, Spieler,
+  Grund) gibt es höchstens eine Zeile (eindeutiger Teilindex).
+- **Neue Spalten in `player_company_hours`:** `supply_in_cents` und `supply_out_cents` (erhaltene bzw. gelieferte Ware
+  zum Normalpreis), `supply_revenue_cents`, `supply_fee_paid_cents` (Käufer), `supply_fee_income_cents`,
+  `supply_goods_cents` (Lieferant), `stake_payout_cents` und `campaign_id`. Die Liefer-Spalten sind in `profit_cents`
+  enthalten, `stake_payout_cents` nicht (eine Auszahlung, kein Aufwand). `revenue_cents` bleibt der eigene Umsatz.
+
+### Marketing-Kampagnen
+
+| Kampagne | Dauer | Preis (`costHours`) | Nachfrage (`demandBps`) | Bekanntheit |
+| -------- | ----- | ------------------- | ----------------------- | ----------- |
+| `flyer`  | 24 h  | 2 Stunden           | +25 %                   | +0,005      |
+| `online` | 48 h  | 6 Stunden           | +40 %                   | +0,01       |
+| `tv`     | 72 h  | 18 Stunden          | +70 %                   | +0,025      |
+
+- **Preis** (`campaignCostCents`): max(`minCostCents`, `costHours` × Nachfrage der letzten abgeschlossenen Stunde),
+  auf ganze Euro gerundet. Ohne abgeschlossene Stunde gilt die Schätzung wie in `closeStartupHour` ohne Rauschen:
+  wirksames Potenzial / 4 / `quarterHours` × Bekanntheit × (0,5 + 0,5 × Qualität) × Nachfragefaktor der Preisstrategie.
+- **Glück:** `luckMin` + (`luckMax` − `luckMin`) × Serverzufall, einmal beim Start. **Faktor:** 1 + `demandBps` / 10 000
+  × Glück × (1 − `qualityWeight` + `qualityWeight` × Qualität). **Resonanz:** Glück < `weakBelow` ergibt `weak`,
+  ≥ `strongFrom` ergibt `strong`, sonst `solid`.
+- **Stündlicher Abschluss:** Liegt der Beginn der Stunde in [`started_at`, `ends_at`), wird die Nachfrage mit dem Faktor
+  multipliziert, und `campaign_id` steht in der Stunde.
+- **Bekanntheit:** steigt sofort, höchstens bis zur Stufen-Grenze (`stages.awarenessCaps`) wie im Quartalsabschluss,
+  nie nach unten. `awareness_gain` speichert den tatsächlichen Zuwachs.
+
+### Vertrauen
+
+- **Wert** (`trust_score`): clamp(`start` + Summe der `delta`, `min`, `max`), Start 50.
+- **Stufe** (`trust_band`): die letzte Stufe aus `trust.bands` (aufsteigend), deren `from` ≤ Wert ist: `risky` (0),
+  `shaky` (30), `blank` (45), `reliable` (60), `rock` (80).
+- **`player_trust(spieler)`** = `TRUST` = `{score, band, kept, broken}`. Gezählt wird aus `trust_events`: `kept` =
+  `loanRepaidOnTime`, `loanRepaidLate`, `supplyKept`, `stakeKept`; `broken` = `dealBroken`, `loanDefaulted`.
+
+| Grund              | Δ   | Wer                                         | Wann                                          |
+| ------------------ | --- | ------------------------------------------- | --------------------------------------------- |
+| `loanRepaidOnTime` | +4  | Schuldner                                   | Kredit voll bezahlt bis `ends_at`             |
+| `loanRepaidLate`   | +2  | Schuldner                                   | Kredit voll bezahlt nach `ends_at`            |
+| `loanOverdue`      | −6  | Schuldner                                   | Fälligkeit, Rest offen                        |
+| `loanDefaulted`    | −12 | Schuldner                                   | `defaultAfterHours` nach der Fälligkeit       |
+| `loanLent`         | +1  | Verleiher                                   | Kredit zurückgezahlt oder erlassen            |
+| `loanForgiven`     | +2  | Verleiher                                   | Rest erlassen                                 |
+| `supplyKept`       | +3  | Käufer immer, Lieferant bei genug Lieferung | Vertragsende                                  |
+| `supplyShort`      | −4  | Lieferant                                   | geliefert < `keptDeliveryBps` des Gebrauchten |
+| `stakeKept`        | +3  | Gründer                                     | Beteiligung bis zum Ende bedient              |
+| `dealBroken`       | −12 | wer bricht                                  | `break_deal` oder Firma aufgelöst             |
+
+### Deals
+
+**Rollen:** Kredit `lender`/`borrower`, Liefervertrag `supplier`/`buyer`, Beteiligung `investor`/`company`. Wer
+`supplier`, `buyer` oder `company` ist, braucht eine eigene aktive Firma (als Gründer); heute hat jeder Spieler
+höchstens eine.
+
+**Bedingungen (`p_terms`)**, sonst `deal_terms` (alle Werte ganze JSON-Zahlen):
+
+| Art      | Felder                                                    | Grenzen                                                                                                                       |
+| -------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `loan`   | `principal_cents`, `interest_bps`, `hours`                | Betrag ≥ `minPrincipalCents` und ≤ max(1, Level des Verleihers) × `maxPrincipalCentsPerLevel`; Zins 0 bis 3 000; 24 bis 720 h |
+| `supply` | `volume_cents_per_hour`, `fee_bps`, `prepay_bps`, `hours` | Menge ≥ `minVolumeCentsPerHour` (und ≤ 1 Mrd. € je Stunde); Gebühr 1 000 bis 9 500; Anzahlung 0 bis 5 000; 24 bis 336 h       |
+| `stake`  | `amount_cents`, `share_bps`, `hours`                      | Betrag ≥ `minAmountCents`; Anteil 1 bis 3 000; 24 bis 720 h                                                                   |
+
+Die Kreditgrenze prüft das SQL mit dem Level des Verleihers: beim Anbieten, wenn er feststeht (der Anbieter verleiht,
+oder ein gezieltes Angebot geht an den Verleiher), und noch einmal bei der Annahme.
+
+**Status:**
+
+| Status      | Bedeutung                                                       |
+| ----------- | --------------------------------------------------------------- |
+| `open`      | Angebot, gilt `offerValidHours` (48) Stunden                    |
+| `active`    | angenommen, läuft bis `ends_at`                                 |
+| `overdue`   | Kredit fällig, Rest offen                                       |
+| `defaulted` | Kredit geplatzt (`defaultAfterHours` nach der Fälligkeit)       |
+| `completed` | erfüllt (Kredit bezahlt, Vertrag oder Beteiligung bis zum Ende) |
+| `forgiven`  | Kredit: Rest erlassen                                           |
+| `broken`    | vorzeitig beendet (`broken_by`)                                 |
+| `cancelled` | vom Anbieter zurückgezogen                                      |
+| `declined`  | vom Ziel abgelehnt                                              |
+| `expired`   | niemand hat angenommen                                          |
+
+**Geld bei der Annahme** (eine ausgeglichene Buchung nach Prüfung der freien Kasse, sonst `insufficient_funds`):
+
+- Kredit: Betrag von der Spielerkasse des Verleihers an die des Schuldners (`loan_disbursement`, Schlüssel
+  `deal:<id>:principal`); `due_cents` = Betrag + `round_half_even(Betrag × Zins / 10 000)`.
+- Liefervertrag: Anzahlung `applyBps(applyBps(Menge × Stunden, Gebühr), Anzahlung)` (halb gerade je Schritt) von der
+  freien Firmenkasse des Käufers (Kasse − offene Rechnungen) an die des Lieferanten (`transfer`, `deal:<id>:prepay`).
+- Beteiligung: Betrag von der Spielerkasse des Teilhabers an die Firmenkasse (`angel_investment`, `deal:<id>:stake`).
+
+Beim Anbieten fließt kein Geld; `due_cents` und `prepay_cents` werden schon zur Anzeige gespeichert.
+
+### RPCs
+
+`DEAL` (eine Form überall):
+
+```
+{ id, kind, status, my_role: <Rolle des Aufrufers> | null, is_proposer, proposer_role,
+  proposer: PARTY, counterparty: PARTY | null,
+  supplier_company: {id, name} | null, buyer_company: {id, name} | null, company: {id, name} | null,
+  terms: {principal_cents, interest_bps, hours} | {volume_cents_per_hour, fee_bps, prepay_bps, hours}
+         | {amount_cents, share_bps, hours},
+  message | null, created_at, expires_at, accepted_at, ends_at, closed_at,
+  progress: {due_cents, repaid_cents, left_cents} | {delivered_cents, needed_cents, fees_paid_cents, prepay_cents,
+            prepay_left_cents} | {payouts_cents},
+  broken_by_me }
+PARTY = {nickname, tag, avatar_key, level, trust: {score, band}}
+```
+
+- `my_role` ist `null` für Zuschauer (Deal-Börse); `proposer_role` zeigt dann, welche Seite man übernehmen würde.
+- `counterparty` ist die andere Seite (nach der Annahme), sonst das Ziel, sonst `null`.
+
+| RPC                                                                              | Antwort                                         |
+| -------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `start_campaign(p_request_id, p_company_id, p_kind)`                             | `CAMPAIGN`                                      |
+| `propose_deal(p_request_id, p_kind, p_role, p_counterparty, p_terms, p_message)` | `DEAL`                                          |
+| `respond_deal(p_request_id, p_deal_id, p_accept boolean)`                        | `DEAL`                                          |
+| `cancel_deal(p_request_id, p_deal_id)`                                           | `DEAL`                                          |
+| `break_deal(p_request_id, p_deal_id)`                                            | `DEAL`                                          |
+| `repay_loan(p_request_id, p_deal_id, p_amount_cents bigint)`                     | `DEAL`                                          |
+| `forgive_loan(p_request_id, p_deal_id)`                                          | `DEAL`                                          |
+| `get_deals()`                                                                    | `{incoming, outgoing, running, history, trust}` |
+| `get_deal_board()`                                                               | `{offers}`                                      |
+
+`CAMPAIGN` = `{id, kind, started_at, ends_at, cost_cents, demand_bps, resonance}` mit `demand_bps` =
+round((`demand_factor` − 1) × 10 000). Alle schreibenden RPCs sind über `request_id` idempotent.
+
+- **`start_campaign`:**
+  - Nur Gründer oder CEO (`require_company_owner`, sonst `employer_only`) einer aktiven Spielerfirma (sonst
+    `company_not_found`), keine laufende Kampagne (`campaign_running`).
+  - Bezahlt aus der freien Firmenkasse an die Haushalte (`company_costs`, Schlüssel `campaign:<firma>:<request_id>`),
+    wie Marketing und Fixkosten.
+  - Firmen-News `campaign_started` `{kind, resonance, demand_bps}`.
+- **`propose_deal`:**
+  - Ab `deals.minLevel` (sonst `locked`).
+  - `p_counterparty` = Nickname oder Tag (mit oder ohne `#`, wie `player_by_handle`), `null` = offen auf der
+    Deal-Börse. Unbekannt: `player_not_found`; man selbst: `deal_self`.
+  - Nachricht ≤ 140 Zeichen, Wortfilter `text_has_profanity` (`name_profanity`).
+  - Braucht die eigene Seite oder die Seite des Ziels eine Firma und fehlt sie: `deal_needs_company`.
+  - Beteiligung: Anteile der Firma (laufend, bei der Firmenseite plus ihre offenen Angebote) + neuer Anteil ≤
+    `maxTotalShareBps`, sonst `stake_share_full`.
+  - Höchstens `maxOpenOffers` offene Angebote und `maxActivePerKind` laufende Deals je Art (`deal_limit`).
+  - Benachrichtigung `deal_offer` an das Ziel.
+- **`respond_deal`:**
+  - Gezielte Angebote nur das Ziel, Börsen-Angebote jeder außer dem Anbieter. Fremde gezielte Angebote:
+    `deal_not_found`; das eigene: `deal_self`; nicht mehr offen oder abgelaufen: `deal_closed`.
+  - Ablehnen geht nur bei gezielten Angeboten (sonst `invalid_argument`) und benachrichtigt den Anbieter.
+  - Annehmen prüft Level, Firma, `maxActivePerKind` beider Seiten, Kreditgrenze, Anteilsgrenze (`stake_share_full`) und
+    Geld. Es setzt die Parteien, `accepted_at`, `ends_at` = jetzt + Laufzeit und bei Liefervertrag und Beteiligung
+    `settled_until` = nächste volle Stunde.
+  - Danach: Benachrichtigung `deal_result` an den Anbieter, Feed `deal_signed` `{kind, with}` für den Annehmenden.
+- **`cancel_deal`:** nur der Anbieter (sonst `deal_not_found`), nur offene Angebote (`deal_closed`).
+- **`break_deal`:**
+  - Laufender Liefervertrag (beide Seiten) oder Beteiligung (nur die Firmenseite). Kredite und Teilhaber:
+    `invalid_argument`.
+  - Erst werden die Stunden abgerechnet, die beide Firmen abgeschlossen haben. Der Rest der Anzahlung bleibt beim
+    Lieferanten.
+  - `dealBroken` für den Brechenden, Feed `deal_broken` `{kind, with}`, Benachrichtigung an die andere Seite.
+- **`repay_loan`:**
+  - Nur der Schuldner (`invalid_argument`), Status `active`, `overdue` oder `defaulted` (sonst `deal_closed`), Kasse ≥
+    gewünschter Betrag (sonst `insufficient_funds`).
+  - Gezahlt wird min(Betrag, Rest) (`loan_repayment`). Voll bezahlt: `completed`, Vertrauen wie oben,
+    Benachrichtigung an beide; sonst eine Benachrichtigung an den Verleiher.
+- **`forgive_loan`:** nur der Verleiher; Rest erlassen: `forgiven`, `loanForgiven` + `loanLent`, Benachrichtigung an
+  den Schuldner.
+- **`get_deals`:** `incoming` (gezielte offene Angebote an mich), `outgoing` (meine offenen Angebote), `running`
+  (`active`/`overdue`/`defaulted`, nach `ends_at`), `history` (die letzten 20 beendeten, neueste zuerst), `trust`.
+- **`get_deal_board`:** offene, nicht abgelaufene Börsen-Angebote anderer Spieler, neueste zuerst, höchstens 50.
+
+### Stündlicher Abschluss (`player_company_close_hour`)
+
+Wie in M4h, dazu:
+
+1. **Kampagne:** Nachfrage × `demand_factor` der Kampagne, deren Fenster den Beginn der Stunde enthält.
+2. **Beteiligungen** (nach allen eigenen Buchungen der Stunde, vor der CEO-Auszahlung):
+   - Jede laufende Beteiligung mit `settled_until` ≤ Stunde < `ends_at` (nach Annahme sortiert) bekommt
+     min(⌊Gewinn × Anteil / 10 000⌋, freie Kasse) einer Gewinnstunde.
+   - Buchung `dividend` an die Spielerkasse (Schlüssel `pch:…:stake:<deal>`), danach `loan_withhold` wie bei Einkommen.
+   - `settled_until` rückt in jeder Stunde der Laufzeit eine Stunde weiter, auch ohne Gewinn. Summe in
+     `stake_payout_cents`.
+3. **CEO-Auszahlung:** wie in M4e, aber vom Gewinn nach den Beteiligungen: min(⌊(Gewinn − Beteiligungen) × Anteil /
+   10 000⌋, freie Kasse).
+
+### Minutenjob: `deals_run_due(p_now default null)`
+
+Eine Zeile in `run_due_jobs`, nach den Firmenstunden und den Firmen-Ereignissen. Antwort
+`{expired, loans_due, loans_defaulted, supply_hours, completed, broken}`.
+
+1. **Angebote:** offene Angebote mit `expires_at` ≤ jetzt werden `expired`.
+2. **Kredite zur Fälligkeit:** einmal min(Rest, Kasse des Schuldners) an den Verleiher (`deal:<id>:due`). Alles bezahlt:
+   `completed` (pünktlich). Sonst `overdue`, `loanOverdue`, Benachrichtigung an beide. Danach zieht der Server nichts
+   mehr ein.
+3. **Geplatzt:** `overdue` mit `ends_at` + `defaultAfterHours` ≤ jetzt wird `defaulted`, `loanDefaulted`, Feed
+   `loan_defaulted` `{with}` für den Schuldner, Benachrichtigung an beide.
+4. **Lieferverträge** (`deal_settle_supply`, nach Annahme sortiert): jede Stunde ab `settled_until` vor `ends_at`, die
+   beide Firmen abgeschlossen haben (höchstens 168 je Lauf), aus den gespeicherten Stunden:
+   - frei beim Lieferanten = max(0, Kapazität − Nachfrage) × (1 − `shareOfFreeCapacity`, wenn die Stunde
+     Auftragsarbeit hatte) − was frühere Verträge in dieser Stunde schon geliefert haben (`supply_out_cents`);
+   - ungedeckt beim Käufer = max(0, Nachfrage − Kapazität − schon erhalten (`supply_in_cents`));
+   - gebraucht = min(Menge, ungedeckt), geliefert = min(gebraucht, frei), beides gerundet;
+   - Gebühr = `round_half_even(geliefert × fee_bps / 10 000)`, zuerst aus der Anzahlung (liegt schon beim Lieferanten),
+     dann aus der freien Kasse des Käufers. Reichen beide zusammen mit dem Umsatz der Ware nicht, wird die Lieferung auf
+     das Bezahlbare gekürzt (bei Gebühr > Preis: ⌊(Budget − 1) / (Gebühr − Preis)⌋); „gebraucht“ zählt dann nur das;
+   - Käufer: Umsatz = round(geliefert × Preisfaktor der Preisstrategie) von den Haushalten (`company_revenue`);
+   - Lieferant: Ware = round(geliefert × (1 − Bruttomarge der Branche)) an die Haushalte (`company_costs`); was die
+     Kasse nicht trägt, wird offene Rechnung;
+   - der Gewinn beider Stunden wird angepasst; der Deal sammelt geliefert, gebraucht, Gebühren und den Anzahlungsrest.
+
+   Ist `settled_until` ≥ `ends_at`, wird der Vertrag `completed`:
+   - Erfüllt, wenn geliefert × 10 000 ≥ gebraucht × `keptDeliveryBps` (oder nichts gebraucht wurde): beide
+     `supplyKept`. Sonst Lieferant `supplyShort`, Käufer `supplyKept`.
+   - Der Anzahlungsrest geht zurück an den Käufer, soweit die Kasse des Lieferanten reicht (`deal:<id>:refund`).
+
+   Ist eine Firma nicht mehr aktiv, gilt der Vertrag als von ihrem Gründer gebrochen.
+
+5. **Beteiligungen:** `settled_until` ≥ `ends_at` (alle Stunden der Laufzeit abgeschlossen): `completed`, `stakeKept`
+   für den Gründer, Benachrichtigung an beide. Firma nicht mehr aktiv: vom Gründer gebrochen.
+
+### Weitere Änderungen
+
+- **COMPANY** (`company_state`): `campaign` = `CAMPAIGN` | `null` (nur während sie läuft) und `campaign_costs` =
+  `{flyer, online, tv}` (aktuelle Preise). `hours[]` trägt zusätzlich `stake_payout_cents`, `supply_revenue_cents`,
+  `supply_fee_paid_cents`, `supply_fee_income_cents`, `supply_goods_cents` und `campaign_id`.
+- **Visitenkarte** (`get_player_card`): neues Feld `trust` = `TRUST`.
+- **Feed** (`feed_item_label`): `deal_signed` `{kind, with}`, `deal_broken` `{kind, with}`, `loan_defaulted` `{with}`;
+  `promoted` aus M4i bleibt erhalten.
+- **Konto zurücksetzen/löschen** (`account_wipe`):
+  - Zuerst zahlt der Spieler als Schuldner aus seiner Kasse, was er schuldet (soweit vorhanden).
+  - Dann werden alle seine Deals und `trust_events` gelöscht. Die andere Seite bekommt eine Benachrichtigung, ihre
+    eigenen `trust_events` bleiben (ohne Deal).
+  - `player_upgrades` (M4i) wird gelöscht, wenn die Tabelle existiert.
+
+### Neue Fehlerschlüssel
+
+| Schlüssel            | Code    | Wann                                                                     |
+| -------------------- | ------- | ------------------------------------------------------------------------ |
+| `campaign_running`   | `NX087` | Es läuft schon eine Kampagne                                             |
+| `deal_not_found`     | `NX088` | Deal nicht sichtbar oder nicht der eigene                                |
+| `deal_closed`        | `NX089` | Nicht mehr offen bzw. nicht mehr laufend, oder abgelaufen                |
+| `deal_terms`         | `NX090` | Bedingungen außerhalb der Grenzen (auch die Kreditgrenze des Verleihers) |
+| `deal_limit`         | `NX091` | Zu viele offene Angebote oder laufende Deals einer Art                   |
+| `deal_self`          | `NX092` | Deal mit sich selbst                                                     |
+| `stake_share_full`   | `NX093` | Alle Beteiligungen der Firma zusammen über `maxTotalShareBps`            |
+| `deal_needs_company` | `NX094` | Die Seite braucht eine eigene aktive Firma                               |
+
+`api_error` enthält außerdem die Schlüssel aus M4i: `upgrade_maxed` (NX083), `promotion_not_ready` (NX084),
+`promotion_too_soon` (NX085) und `promotion_pending` (NX086).
+
+### Neue Benachrichtigungstypen
+
+`deal_offer` (Kategorie `social`, in-app und Push an) und `deal_result` (in-app an). Link jeweils `/deals`, `payload`
+`{deal_id, kind, status}`.
+
+### Bekannte Grenzen
+
+- Ein Liefervertrag wird erst abgerechnet, wenn beide Firmen die Stunde abgeschlossen haben. Sein Gewinn fließt deshalb
+  nicht in die Beteiligungen und die CEO-Auszahlung dieser Stunde, und ein Quartalsabschluss, der vor der Abrechnung
+  läuft, enthält ihn nicht.
+- Preisstrategie und Qualität des Käufers gelten so, wie sie bei der Abrechnung sind, nicht wie in der Stunde.
+- Kredite stehen nicht im Vermögen der Reichenliste: Der Schuldner hat das Geld in der Kasse, die Schuld wird nicht
+  abgezogen.

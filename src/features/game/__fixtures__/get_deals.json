@@ -1,0 +1,179 @@
+{
+  "trust": { "band": "shaky", "kept": 0, "score": 41, "broken": 1 },
+  "history": [
+    {
+      "id": "02f708a7-242a-4561-ab66-1e011ea6f867",
+      "kind": "supply",
+      "terms": { "hours": 24, "fee_bps": 5000, "prepay_bps": 2000, "volume_cents_per_hour": 30000 },
+      "status": "broken",
+      "company": null,
+      "ends_at": "2026-11-14T14:15:28.151907+00:00",
+      "message": null,
+      "my_role": "supplier",
+      "progress": {
+        "needed_cents": 0,
+        "prepay_cents": 72000,
+        "delivered_cents": 0,
+        "fees_paid_cents": 0,
+        "prepay_left_cents": 72000
+      },
+      "proposer": {
+        "tag": "KFHS",
+        "level": 6,
+        "trust": { "band": "shaky", "score": 41 },
+        "nickname": "Fixture_Lieferant",
+        "avatar_key": "rookie"
+      },
+      "closed_at": "2026-11-13T14:15:28.198256+00:00",
+      "created_at": "2026-11-13T14:15:28.068819+00:00",
+      "expires_at": "2026-11-15T14:15:28.068819+00:00",
+      "accepted_at": "2026-11-13T14:15:28.151907+00:00",
+      "is_proposer": true,
+      "broken_by_me": true,
+      "counterparty": {
+        "tag": "4MGV",
+        "level": 6,
+        "trust": { "band": "blank", "score": 50 },
+        "nickname": "Fixture_Abnehmer",
+        "avatar_key": "rookie"
+      },
+      "buyer_company": { "id": "75f8db3c-c3c5-4d2b-b3dc-f546de76d3e9", "name": "Fixture Abnahme" },
+      "proposer_role": "supplier",
+      "supplier_company": { "id": "772daace-9b37-4438-a23f-4e462395785e", "name": "Fixture Lieferwerk" }
+    },
+    {
+      "id": "5f10742a-4669-485d-baa5-6c933d6c9d03",
+      "kind": "loan",
+      "terms": { "hours": 48, "interest_bps": 1000, "principal_cents": 100000 },
+      "status": "forgiven",
+      "company": null,
+      "ends_at": "2026-11-15T14:15:28.14046+00:00",
+      "message": "Für den Wareneinkauf",
+      "my_role": "lender",
+      "progress": { "due_cents": 110000, "left_cents": 70000, "repaid_cents": 40000 },
+      "proposer": {
+        "tag": "KFHS",
+        "level": 6,
+        "trust": { "band": "shaky", "score": 41 },
+        "nickname": "Fixture_Lieferant",
+        "avatar_key": "rookie"
+      },
+      "closed_at": "2026-11-13T14:15:28.189715+00:00",
+      "created_at": "2026-11-13T14:15:28.049626+00:00",
+      "expires_at": "2026-11-15T14:15:28.049626+00:00",
+      "accepted_at": "2026-11-13T14:15:28.14046+00:00",
+      "is_proposer": true,
+      "broken_by_me": false,
+      "counterparty": {
+        "tag": "4MGV",
+        "level": 6,
+        "trust": { "band": "blank", "score": 50 },
+        "nickname": "Fixture_Abnehmer",
+        "avatar_key": "rookie"
+      },
+      "buyer_company": null,
+      "proposer_role": "lender",
+      "supplier_company": null
+    },
+    {
+      "id": "77a2a8c9-9bcf-442d-90a1-fb6a875c9665",
+      "kind": "loan",
+      "terms": { "hours": 24, "interest_bps": 0, "principal_cents": 20000 },
+      "status": "declined",
+      "company": null,
+      "ends_at": null,
+      "message": null,
+      "my_role": "lender",
+      "progress": { "due_cents": 20000, "left_cents": 20000, "repaid_cents": 0 },
+      "proposer": {
+        "tag": "KFHS",
+        "level": 6,
+        "trust": { "band": "shaky", "score": 41 },
+        "nickname": "Fixture_Lieferant",
+        "avatar_key": "rookie"
+      },
+      "closed_at": "2026-11-13T14:15:28.16618+00:00",
+      "created_at": "2026-11-13T14:15:28.089294+00:00",
+      "expires_at": "2026-11-15T14:15:28.089294+00:00",
+      "accepted_at": null,
+      "is_proposer": true,
+      "broken_by_me": false,
+      "counterparty": {
+        "tag": "4MGV",
+        "level": 6,
+        "trust": { "band": "blank", "score": 50 },
+        "nickname": "Fixture_Abnehmer",
+        "avatar_key": "rookie"
+      },
+      "buyer_company": null,
+      "proposer_role": "lender",
+      "supplier_company": null
+    },
+    {
+      "id": "ccfad185-f0b9-47d1-8e6f-bee3d0759ced",
+      "kind": "loan",
+      "terms": { "hours": 24, "interest_bps": 0, "principal_cents": 20000 },
+      "status": "cancelled",
+      "company": null,
+      "ends_at": null,
+      "message": null,
+      "my_role": "lender",
+      "progress": { "due_cents": 20000, "left_cents": 20000, "repaid_cents": 0 },
+      "proposer": {
+        "tag": "KFHS",
+        "level": 6,
+        "trust": { "band": "shaky", "score": 41 },
+        "nickname": "Fixture_Lieferant",
+        "avatar_key": "rookie"
+      },
+      "closed_at": "2026-11-13T14:15:28.103718+00:00",
+      "created_at": "2026-11-13T14:15:28.097115+00:00",
+      "expires_at": "2026-11-15T14:15:28.097115+00:00",
+      "accepted_at": null,
+      "is_proposer": true,
+      "broken_by_me": false,
+      "counterparty": null,
+      "buyer_company": null,
+      "proposer_role": "lender",
+      "supplier_company": null
+    }
+  ],
+  "running": [
+    {
+      "id": "9cbf00b5-fa4d-4e47-b234-0fe98e37e130",
+      "kind": "stake",
+      "terms": { "hours": 72, "share_bps": 2000, "amount_cents": 100000 },
+      "status": "active",
+      "company": { "id": "772daace-9b37-4438-a23f-4e462395785e", "name": "Fixture Lieferwerk" },
+      "ends_at": "2026-11-16T14:15:28.11625+00:00",
+      "message": "Wer steigt ein?",
+      "my_role": "company",
+      "progress": { "payouts_cents": 0 },
+      "proposer": {
+        "tag": "KFHS",
+        "level": 6,
+        "trust": { "band": "shaky", "score": 41 },
+        "nickname": "Fixture_Lieferant",
+        "avatar_key": "rookie"
+      },
+      "closed_at": null,
+      "created_at": "2026-11-13T14:15:28.079026+00:00",
+      "expires_at": "2026-11-15T14:15:28.079026+00:00",
+      "accepted_at": "2026-11-13T14:15:28.11625+00:00",
+      "is_proposer": true,
+      "broken_by_me": false,
+      "counterparty": {
+        "tag": "WX57",
+        "level": 6,
+        "trust": { "band": "blank", "score": 50 },
+        "nickname": "Fixture_Anleger",
+        "avatar_key": "rookie"
+      },
+      "buyer_company": null,
+      "proposer_role": "company",
+      "supplier_company": null
+    }
+  ],
+  "incoming": [],
+  "outgoing": []
+}

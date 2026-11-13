@@ -1,0 +1,28 @@
+{
+  "id": "ccfad185-f0b9-47d1-8e6f-bee3d0759ced",
+  "kind": "loan",
+  "terms": { "hours": 24, "interest_bps": 0, "principal_cents": 20000 },
+  "status": "cancelled",
+  "company": null,
+  "ends_at": null,
+  "message": null,
+  "my_role": "lender",
+  "progress": { "due_cents": 20000, "left_cents": 20000, "repaid_cents": 0 },
+  "proposer": {
+    "tag": "KFHS",
+    "level": 6,
+    "trust": { "band": "blank", "score": 50 },
+    "nickname": "Fixture_Lieferant",
+    "avatar_key": "rookie"
+  },
+  "closed_at": "2026-11-13T14:15:28.103718+00:00",
+  "created_at": "2026-11-13T14:15:28.097115+00:00",
+  "expires_at": "2026-11-15T14:15:28.097115+00:00",
+  "accepted_at": null,
+  "is_proposer": true,
+  "broken_by_me": false,
+  "counterparty": null,
+  "buyer_company": null,
+  "proposer_role": "lender",
+  "supplier_company": null
+}

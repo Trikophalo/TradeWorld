@@ -1,0 +1,120 @@
+{
+  "company": {
+    "id": "772daace-9b37-4438-a23f-4e462395785e",
+    "idea": "Teile auf Abruf",
+    "live": {
+      "last_hour_at": "2026-11-13T14:00:00+00:00",
+      "pay_factor_bps": 10000,
+      "today_profit_cents": 0,
+      "today_revenue_cents": 0,
+      "fixed_per_hour_cents": 0,
+      "quarter_profit_cents": 0,
+      "demand_per_hour_cents": 0,
+      "profit_per_hour_cents": 0,
+      "quarter_revenue_cents": 0,
+      "revenue_per_hour_cents": 0,
+      "ai_wages_per_hour_cents": 0,
+      "capacity_per_hour_cents": 0,
+      "marketing_per_hour_cents": 0,
+      "today_founder_payout_cents": 0,
+      "founder_payout_per_hour_cents": 0,
+      "contract_revenue_per_hour_cents": 0
+    },
+    "logo": null,
+    "name": "Fixture Lieferwerk",
+    "tier": "garage",
+    "color": "#3355aa",
+    "hours": [],
+    "stage": 0,
+    "banner": null,
+    "sector": "tech",
+    "stages": [
+      {
+        "stage": 1,
+        "skills": [{ "key": "it_networks", "covered_by": null, "covered_by_ai": false }],
+        "reached": false
+      },
+      {
+        "stage": 2,
+        "skills": [
+          { "key": "it_security", "covered_by": null, "covered_by_ai": false },
+          { "key": "it_programming", "covered_by": null, "covered_by_ai": false }
+        ],
+        "reached": false
+      },
+      {
+        "stage": 3,
+        "skills": [
+          { "key": "law_privacy", "covered_by": null, "covered_by_ai": false },
+          { "key": "it_architecture", "covered_by": null, "covered_by_ai": false }
+        ],
+        "reached": false
+      },
+      {
+        "stage": 4,
+        "skills": [
+          { "key": "it_crypto", "covered_by": null, "covered_by_ai": false },
+          { "key": "it_pentest", "covered_by": null, "covered_by_ai": false }
+        ],
+        "reached": false
+      }
+    ],
+    "history": [],
+    "listing": null,
+    "campaign": {
+      "id": "9789d936-b1f2-4e42-9fb5-2e3246733fac",
+      "kind": "flyer",
+      "ends_at": "2026-11-14T14:15:27.983125+00:00",
+      "resonance": "solid",
+      "cost_cents": 20000,
+      "demand_bps": 1671,
+      "started_at": "2026-11-13T14:15:27.983125+00:00"
+    },
+    "distress": false,
+    "employees": 0,
+    "headcount": 0,
+    "ai_workers": 0,
+    "can_expand": false,
+    "cash_cents": 230000,
+    "founded_at": "2026-11-13T14:15:27.892604+00:00",
+    "can_upgrade": false,
+    "logo_hidden": false,
+    "price_level": "normal",
+    "product_key": "security_software",
+    "quality_bps": 2500,
+    "value_cents": 230000,
+    "last_quarter": null,
+    "unpaid_cents": 0,
+    "awareness_bps": 350,
+    "can_go_public": true,
+    "contract_work": true,
+    "market_factor": 1.0,
+    "max_employees": 2,
+    "open_postings": 0,
+    "training_from": 5,
+    "campaign_costs": { "tv": 20000, "flyer": 20000, "online": 20000 },
+    "capacity_cents": 450000,
+    "full_time_from": 5,
+    "grace_quarters": 4,
+    "pay_factor_bps": 10000,
+    "expansion_level": 0,
+    "founder_has_job": false,
+    "next_quarter_at": "2026-11-13T19:00:00+00:00",
+    "quarters_active": 0,
+    "ai_worker_skills": [],
+    "distress_quarters": 0,
+    "estimate_low_cents": 71372,
+    "founder_payout_bps": 0,
+    "upgrade_cost_cents": 1250000,
+    "estimate_high_cents": 327128,
+    "ai_worker_cost_cents": 72000,
+    "can_capital_increase": false,
+    "expansion_cost_cents": null,
+    "pending_applications": 0,
+    "team_productivity_bps": 15000,
+    "ai_wage_cents_per_hour": 12000,
+    "founder_productivity_bps": 15000,
+    "marketing_cents_per_quarter": 0
+  },
+  "last_dissolution": null
+}

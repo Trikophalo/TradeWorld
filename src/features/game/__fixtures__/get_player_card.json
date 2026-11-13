@@ -1,14 +1,15 @@
 {
   "job": {
     "tier": "junior",
-    "since": "2026-11-13T13:52:08.709115+00:00",
+    "since": "2026-11-13T14:15:23.901833+00:00",
     "title": null,
     "title_key": "it_junior",
     "company_name": "KlarSoft AG"
   },
-  "tag": "4RVG",
-  "rank": 165,
+  "tag": "DRY9",
+  "rank": 167,
   "level": 6,
+  "trust": { "band": "blank", "kept": 0, "score": 50, "broken": 0 },
   "company": null,
   "nickname": "Fixture_Neu",
   "trophies": { "gold": 0, "bronze": 0, "silver": 0 },
@@ -18,7 +19,7 @@
     { "key": "it_basics", "tier": 1 }
   ],
   "streak_days": 1,
-  "member_since": "2026-11-13T13:52:08.242432+00:00",
+  "member_since": "2026-11-13T14:15:23.117187+00:00",
   "branch_scores": {
     "it": 3,
     "law": 0,
@@ -30,5 +31,5 @@
     "management": 0
   },
   "skills_learned": 2,
-  "net_worth_cents": 1061188
+  "net_worth_cents": 1061139
 }

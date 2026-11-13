@@ -1,10 +1,10 @@
 {
   "job": {
-    "id": "0ab08d13-9dde-46ff-b5f0-f07c8d588b05",
+    "id": "4d2009fc-3ee6-47ab-9820-e251bb5d7c99",
     "tier": "intern",
     "title": "Werkstudium Daten",
     "company": {
-      "id": "2debea22-badc-414e-a54a-f5b4e0da620e",
+      "id": "83fd0b40-0b68-4f1d-a540-fe3e41d4c6cb",
       "logo": {
         "grid": [
           "................",
@@ -51,12 +51,12 @@
     "signature": "M2 2 L8 8",
     "title_key": null,
     "rank_hours": 0.0,
-    "started_at": "2026-11-13T13:52:09.408142+00:00",
+    "started_at": "2026-11-13T14:15:25.137266+00:00",
     "pending_raise": null,
     "raise_max_bps": 0,
     "notice_ends_at": null,
     "paid_hours_cap": 12,
-    "pay_factor_bps": 8412,
+    "pay_factor_bps": 8692,
     "work_task_open": false,
     "quit_cost_cents": 0,
     "last_bonus_cents": 0,
@@ -67,6 +67,6 @@
     "raise_available_at": null,
     "quit_now_cost_cents": 228660,
     "salary_cents_per_hour": 19055,
-    "effective_salary_cents_per_hour": 16029
+    "effective_salary_cents_per_hour": 16562
   }
 }

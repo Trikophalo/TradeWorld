@@ -32,22 +32,7 @@ describe("RPC contract", () => {
       "get_offers",
       "subscribe_offer",
     ];
-    // M4j RPCs are written in parallel with the database (TODO: remove once get_deals.json exists).
-    const m4j = [
-      "start_campaign",
-      "get_deals",
-      "get_deal_board",
-      "propose_deal",
-      "respond_deal",
-      "cancel_deal",
-      "break_deal",
-      "repay_loan",
-      "forgive_loan",
-    ];
-    const pending = [
-      ...(fixtures.some((file) => file.startsWith("get_offers")) ? [] : m3f),
-      ...(fixtures.some((file) => file.startsWith("get_deals")) ? [] : m4j),
-    ];
+    const pending = [...(fixtures.some((file) => file.startsWith("get_offers")) ? [] : m3f)];
     for (const name of Object.keys(RPC_SCHEMAS).filter((key) => !pending.includes(key))) {
       expect(
         fixtures.some((file) => file.startsWith(name)),
