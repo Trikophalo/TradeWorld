@@ -105,7 +105,10 @@ select tests.assert(
            'break_deal', 'cancel_deal', 'forgive_loan', 'get_deal_board', 'get_deals', 'propose_deal', 'repay_loan',
            'respond_deal', 'start_campaign',
            -- M4k RPCs (unique artwork titles, ADR-100; org chart)
-           'check_artwork_title', 'get_company_org']
+           'check_artwork_title', 'get_company_org',
+           -- M5a RPCs (cryptocurrencies and own coins, ADR-101)
+           'burn_coin_tokens', 'check_coin_name', 'create_coin', 'crypto_trade', 'discontinue_coin', 'get_coin',
+           'get_crypto_market', 'get_my_coin', 'launch_coin', 'start_coin_action']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')

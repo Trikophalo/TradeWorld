@@ -6713,3 +6713,256 @@ Benachrichtigungstypen `job_absent` (Kategorie `career`, in-app und Push an) und
   mit dem alten Stand; die Kündigung oder die gespeicherte Abwesenheit folgt beim nächsten schreibenden Aufruf.
 - Ein Konto-Neustart (`account_wipe`, Krypto-Migration) setzt `last_active_at` nicht zurück und leert
   `player_absences` nicht; beides schadet nicht, weil ein neuer Job erst nach einem Aufruf beginnt.
+
+## Nachtrag: M5a (Kryptowährungen und eigene Coins)
+
+Migrationen `20261201000150_m5a_crypto_enum.sql` (nur Enum-Werte) und `20261201000200_m5a_crypto.sql` (ADR-101),
+idempotente Kopien in `supabase/updates/`. Die Regeln spiegeln `src/lib/sim/crypto.ts` (`poolPriceE4`, `poolAt`,
+`swapBuy`, `swapSell`, `buySlippageBps`, `flowForReturn`/`applyFlow`, `tickReturn`, `stableReturn`, `pickRegime`,
+`regimeHours`, `playerCoinDriftDay`, `playerCoinSigmaDay`, `decayStats`, `applyStats`, `actionSuccessBps`, `launchPool`,
+`isRugPull`, `discontinuePayoutCents`, `eventChanceBps`, `rollCoinEvent`, `rollMarketEvent`, `eventShock`, `isDead`,
+`nextMemeCoin`) mit den Werten aus `game_config.crypto` (`src/config/crypto.ts`). Fehlt ein Zahlenwert, nimmt das SQL
+denselben Rückfallwert; Listen (Coins, Ereignisse, Aktionen, Namen) kommen nur aus der Konfiguration.
+
+**Einheiten:** Pool-Geld in Cent, Coins in Millionstel (`*_e6`), Kurse ×10 000 (`*_e4`), Kurs = Cent × 10⁸ / Coins.
+Das Produkt k = Geld × Coins übersteigt `bigint`; die Pool-Rechnung läuft in `numeric`, Ergebnisse sind ganze Cent.
+
+### Enum-Werte und Transaktionen
+
+- `security_kind` bekommt `crypto`, `ledger_tx_kind` die Buchungsarten `crypto_buy`, `crypto_sell`, `crypto_flow`,
+  `crypto_fee`, `crypto_launch` und `crypto_payout`.
+- Ein neuer Enum-Wert darf in der Transaktion, die ihn anlegt, nicht benutzt werden (SQLSTATE 55P04). Darum stehen die
+  Werte in einer eigenen Migration (Supabase und `verify_local.sh` committen jede Datei für sich). Die Hauptmigration
+  benutzt sie nur in PL/pgSQL-Körpern. `update-to-latest.sql` (eine einzige Transaktion) legt deshalb nur Schema und
+  Funktionen an; die 15 Coins legt erst `run_due_jobs()` nach dem Commit an (`crypto_bootstrap()`, das 55P04 abfängt und
+  beim nächsten Lauf weitermacht).
+
+### Tabellen
+
+Alle mit RLS, Lesen für alle Angemeldeten (`authenticated`), keine Schreibrechte für Clients.
+
+| Tabelle               | Inhalt                                                                                                                     |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `crypto_state`        | Eine Zeile: Krypto-Wetter `regime` (`bull`/`flat`/`bear`) bis `regime_until`, `seeded_at`, `hour_done` (Stundenjob)        |
+| `crypto_coins`        | Ein Coin: `security_id`, `ticker`, `name`, `category`, `status`, Pool, Werte, Team-Coins, Start, Gründer                   |
+| `crypto_coin_actions` | Entwicklungs-Aktionen eigener Coins: `key`, `cost_cents`, `success_bps`, `started_at`, `ends_at`, `resolved_at`, `success` |
+| `crypto_team_sales`   | Verkaufte Team-Coins des Gründers (`quantity_e6`, `at`) für die Rug-Pull-Prüfung                                           |
+| `crypto_events`       | Ereignis-Log: `coin_id` (`null` = ganzer Markt), `key`, `shock_bps` (Kursänderung), `payload`, `at`                        |
+| `crypto_volume_hours` | Gehandeltes Geld je Coin und Stunde (KI und Spieler) für das 24-h-Volumen, 48 h aufbewahrt                                 |
+
+- **`crypto_coins.category`:** `stable`, `major`, `alt`, `meme` (KI-Coins) oder `player` (eigene Währung, `creator_id`).
+  **`status`:** `draft` (eigener Coin vor dem Start), `listed`, `dead` (KI-Shitcoin unter `deadPriceE4`, eingefroren,
+  Wertpapier `halted`), `closed` (eingestellt oder gestrichen).
+- **Pool:** `pool_cash_cents`, `pool_tokens_e6`, Buchungskonto `pool_account_id` (Systemkonto `crypto_pool:<coin id>`,
+  nie negativ). `pending_flow_cents` = Handel der KI-Händler, der noch nicht gebucht ist. Es gilt immer:
+  Kontostand des Pools + `pending_flow_cents` = `pool_cash_cents`.
+- **Werte eigener Coins:** `tech`, `hype`, `utility` (0 bis 100, `double precision`), `stats_at` (letzter Verfall).
+  `team_at_launch_e6` (Team-Coins beim Start), `team_tokens_e6` (davon noch übrig), `burned_e6`, `last_burn_at`,
+  `last_rug_at`. Start: `start_price_e4`, `start_pool_cents`, `team_share_bps`, `launched_at`. KI-Coins:
+  `seed_ticker` (Coin aus `crypto.coins`), `peg_e4` (Stablecoins, Goldtaler zum Startkurs), `algorithmic`, `color`.
+- **Eindeutig:** ein offener Coin (`draft`/`listed`) je Gründer; Namen offener Coins über `name_key` (wie Spielernamen,
+  ähnlich aussehende Zeichen zählen gleich). Der Ticker ist eindeutig, weil er als Wertpapier existiert (schon im Entwurf,
+  Status `pending`). `crypto_coins.ticker` behält den Ticker auch nach dem Einstellen; das Wertpapier bekommt dann
+  `TICKER1`, `TICKER2` … (Ziffern kommen in Coin-Tickern nicht vor), damit der Ticker wieder frei ist.
+- **Coins sind Wertpapiere** (`securities.kind = 'crypto'`, `tick_size_e4` 1, keine Leerverkäufe, kein Hebel): Positionen,
+  `security_quotes`, `price_ticks`, `candles`, Depot (`get_my_portfolio`, `kind: "crypto"`), Vermögen, Reichenliste,
+  Wochenliga und `get_candles` funktionieren ohne Änderung. `place_order` lehnt Coins ab (`not_tradable`).
+- **Kurs** (`security_quotes`): `last_price_e4` = Pool-Kurs, `bid_e4`/`ask_e4` = Kurs ∓ Pool-Gebühr der Klasse,
+  `market_cap_cents` = (Coins im Pool + gehaltene Coins) × Kurs. Tageswerte wie bei Aktien ab der Schlussglocke.
+
+### Geld (geschlossener Kreislauf, ADR-041)
+
+| Vorgang                        | Buchung (`ledger_tx_kind`)                                                                   |
+| ------------------------------ | -------------------------------------------------------------------------------------------- |
+| KI-Coin anlegen / ersetzen     | Finanzmarkt (`market`) → Pool (`crypto_flow`, Schlüssel `crypto:fund:<coin>`)                |
+| KI-Händler (jeder Takt)        | gesammelt in `pending_flow_cents`, stündlich Finanzmarkt ↔ Pools in einer Buchung            |
+| Spieler kauft                  | Spielerkasse → Pool, Order-Gebühr → Staatskasse (`crypto_buy`, `crypto:<order id>`)          |
+| Spieler verkauft               | Pool → Spielerkasse, Order-Gebühr und Steuer → Staatskasse (`crypto_sell`)                   |
+| Eigene Währung gründen, Aktion | Spielerkasse → Staatskasse (`crypto_fee`)                                                    |
+| Start                          | Spielerkasse → Pool (`crypto_launch`, `crypto:launch:<coin>`)                                |
+| Hack                           | Pool → Staatskasse (`crypto_flow`)                                                           |
+| Einstellen                     | Pool → Halter nach Coins, Steuer → Staatskasse (`crypto_payout`), Rundungsrest → Staatskasse |
+| Toter KI-Coin gestrichen       | Pool → Halter zum toten Kurs (`crypto_payout`), Rest → Finanzmarkt                           |
+
+Bevor eine Buchung einen Pool berührt (Handel, Hack, Einstellen), werden seine offenen KI-Flüsse gebucht
+(`crypto_pool_settle`). Die Pool-Gebühr bleibt im Pool. Kann der Finanzmarkt einen Kauf-Fluss nicht bezahlen (Kontostand
+minus offene Flüsse), bewegt sich der Coin in diesem Takt nicht.
+
+### Takt: `crypto_tick_at(p_now, p_seq)` (aus `market_tick()`, alle 5 Sekunden)
+
+1. Ist `regime_until` vorbei: neues Wetter `pickRegime(random())` für `regimeHours(random())` Stunden.
+2. Für jeden `listed` Coin eine log. Rendite:
+   - Stablecoins: `stableReturn(Kurs, peg_e4, pegPullPerHour, sigmaDay, z, tickSeconds)`;
+   - eigene Coins: `tickReturn(playerCoinSigmaDay(tech), beta player, playerCoinDriftDay(hype, utility), Wetter, zMarkt, z)`;
+   - sonst `tickReturn(sigmaDay, beta der Klasse, 0, Wetter, zMarkt, z)` mit einem gemeinsamen `zMarkt` je Takt.
+3. `applyFlow` gegen den Pool (k bleibt), die Geld-Differenz geht nach `pending_flow_cents`.
+4. Kurs, Tageswerte, `price_ticks` (gleiche `tick_seq` wie der Aktien-Takt), Kerzen `1m`/`5m`/`1h`/`1q`/`1y` und das
+   Stundenvolumen.
+
+`market_tick()` nimmt die Sperre 7311001, prüft „pausiert“ und läuft dann zuerst den Krypto-Takt, danach
+`market_tick_at`. Die Antwort bekommt `crypto: {coins, regime}`. Reihenfolge der Sperren überall: Coin-Zeilen vor
+Buchungskonten (Takt, Handel, Jobs, Konto-Löschung), damit nichts verklemmt.
+
+### Job: `crypto_run_due(p_now default null)` (aus `run_due_jobs()`, jede Minute, als erster Schritt)
+
+- **Anlegen:** solange `seeded_at` leer ist, `crypto_bootstrap()`: nach der Geldschöpfung die Coins aus `crypto.coins`
+  (Wertpapier, Pool zum Startkurs vom Finanzmarkt, Kurs, leichte Kurshistorie: 1-Minuten-Schritte für die letzte Stunde,
+  5-Minuten-Schritte für drei Tage davor als Kerzen `1m`, `5m`, `1h`, `1q`, `1y`), dann das erste Wetter.
+- **Fällige Aktionen** (jeden Lauf): Erfolg, wenn `random() × 10 000 < success_bps`. Erfolg: Werte + Aktion (`applyStats`,
+  0 bis 100). Misslungene Influencer-Kampagne fliegt auf: Hype `create.exposedHype` (−20) und Kurssprung
+  `create.exposedShock` (ln 0,85 = −15 %) als Ereignis `exposed`. Log `action` `{action, success}`, Benachrichtigung an
+  den Gründer.
+- **Stündlich** (einmal je Stunde, `hour_done`):
+  1. Hype und Nutzen eigener Coins verfallen (`decayStats` für die Stunden seit `stats_at`).
+  2. Je `listed` Coin ein Wurf `rollCoinEvent` (eigene Coins mit ihren Werten), Wirkung `eventShock` als Fluss. Hack:
+     zuerst `poolLossShare` des Pool-Geldes an die Staatskasse, dann der Rest des Sprungs, sodass der Kurs insgesamt um
+     den Sprung fällt. Eigene Coins: Werte ändern sich, Halter und Gründer bekommen `crypto_event`.
+  3. Ein Marktereignis `rollMarketEvent`: `meme_wave` trifft alle Shitcoins (`meme`), jedes andere alle außer
+     Stablecoins, mit demselben Sprung. Eine Log-Zeile mit `coin_id null`, `shock_bps` = (e^Sprung − 1) × 10 000.
+  4. KI-Shitcoins mit Pool-Kurs ≤ `deadPriceE4` werden `dead` (Wertpapier `halted`, kein Handel, kein Takt), Halter
+     bekommen eine Nachricht.
+  5. Nach `deadCoinReplaceHours`: gestrichen (Halter bekommen ihre Coins zum toten Kurs, höchstens den Pool, Rest an den
+     Finanzmarkt; Log `delisted`), dann ein neuer Shitcoin aus `nextMemeCoin` mit Startkurs und Pool des toten Coins
+     (Log `listed` `{replaces}`).
+  6. Alle offenen KI-Flüsse in einer Buchung (`crypto_settle_flows`).
+  7. Aufräumen: Volumen älter als 48 h, Team-Verkäufe älter als 2 × `rugWindowHours`, Log älter als 30 Tage.
+
+### RPCs
+
+```
+COIN_ROW = { ticker, name, category, status, price_e4 | null, change_24h_bps, high_24h_e4 | null, low_24h_e4 | null,
+             pool_cents, market_cap_cents, volume_24h_cents, fee_bps, color, logo | null,
+             creator: {nickname, tag, trust: {score, band}} | null, stats: {tech, hype, utility} | null, my_quantity_e6 }
+CRYPTO_EVENT = { ticker | null, name | null, key, shock_bps | null, at, payload }
+MY_COIN = COIN_ROW + { id, status, stats: {tech, hype, utility}, action: {key, started_at, ends_at} | null,
+                       actions: [{key, cost_cents, hours, success_bps, available}], team_tokens_e6, team_at_launch_e6,
+                       team_sold_window_e6, rug_limit_e6, launch: {start_price_e4, liquidity_cents, team_share_bps, at} | null,
+                       created_at, burn_hype, burn_min_e6, burn_available_at | null }
+TRADE = { side, ticker, quantity_e6, cash_cents, fee_cents, pool_fee_cents, order_fee_cents, tax_cents,
+          realized_pnl_cents | null, price_e4, avg_price_e4, slippage_bps, position_e6, cash_after_cents, xp_awarded, rug_pull }
+```
+
+- `price_e4` ist `null` für Entwürfe; 24-h-Werte aus den `1h`-Kerzen der letzten 24 Stunden und dem Stundenvolumen.
+  `fee_bps` = Pool-Gebühr für den Aufrufer (mit Hardware-Wallet), `logo` und `stats` nur bei eigenen Coins, `creator` mit
+  Vertrauen (`player_trust`). `ticker` ist der Ticker des Coins (nach dem Einstellen der alte).
+- `actions` enthält alle Aktionen aus `create.actions` außer `marketing_burn` (das ist `burn_coin_tokens`); `available`
+  = keine laufende Aktion und (gestartet oder nicht `afterLaunch`). `success_bps` = `actionSuccessBps` mit dem IT-Wert des
+  Gründers (`player_branch_scores`). `rug_limit_e6` = `team_at_launch_e6` × `rugShareBps` / 10 000: Wer im Fenster mehr
+  verkauft, macht einen Rug Pull.
+
+| RPC                                                                                               | Antwort                                                                                                               |
+| ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `get_crypto_market()`                                                                             | `{regime: {kind, until}, coins: [COIN_ROW], events: [CRYPTO_EVENT]}`                                                  |
+| `get_coin(p_ticker)`                                                                              | COIN_ROW + `{pool: {cash_cents, tokens_e6}, supply_e6, team_tokens_e6 \| null, holders, my_position \| null, events}` |
+| `crypto_trade(p_request_id, p_ticker, p_side, p_amount_cents, p_quantity_e6, p_max_slippage_bps)` | `TRADE`                                                                                                               |
+| `check_coin_name(p_name, p_ticker)`                                                               | `{allowed, reason}`                                                                                                   |
+| `create_coin(p_request_id, p_name, p_ticker, p_logo)`                                             | `MY_COIN`                                                                                                             |
+| `get_my_coin()`                                                                                   | `{coin: MY_COIN \| null}`                                                                                             |
+| `start_coin_action(p_request_id, p_action)`                                                       | `MY_COIN`                                                                                                             |
+| `launch_coin(p_request_id, p_start_price_e4, p_liquidity_cents, p_team_share_bps)`                | `MY_COIN`                                                                                                             |
+| `burn_coin_tokens(p_request_id, p_quantity_e6)`                                                   | `MY_COIN`                                                                                                             |
+| `discontinue_coin(p_request_id)`                                                                  | `MY_COIN` (Status `closed`)                                                                                           |
+
+`my_position` = `{quantity_e6, avg_price_e4, value_cents}`. Alle schreibenden RPCs sind über `request_id` idempotent.
+
+- **`get_crypto_market`:** Coins `listed` und `dead`, sortiert nach Klasse (Stable, Groß, Alt, Shit, eigene), dann
+  Marktwert. `events` = die letzten 20 Log-Zeilen ohne `action` und `created`. `get_coin` zeigt die letzten 20 Zeilen des
+  Coins plus die Marktereignisse, die ihn trafen; geschlossene Coins: `coin_not_found`.
+- **`crypto_trade`** (ab `crypto.minLevel`, sonst `locked`; pausiert: `market_paused`; Limits wie `place_order`):
+  - Kauf: `p_amount_cents` ist alles, was der Spieler zahlt (wie `place_order` mit Betrag): Order-Gebühr
+    `trading.orderFeeCents` geht ab, der Rest (mindestens `minOrderValueCents`, sonst `order_too_small`) geht per
+    `swapBuy` in den Pool. Pool-Gebühr = Gebühr der Klasse × (10 000 − Wallet-Stufe × `upgrades.crypto_wallet.perLevel`)
+    / 10 000, halb gerade gerundet.
+  - Verkauf: `p_quantity_e6` Coins (ab 99,9 % der freien Position die ganze), `swapSell`; Erlös unter
+    `minOrderValueCents` nur beim Verkauf der ganzen Position.
+  - `cash_cents` = beim Kauf der gezahlte Betrag, beim Verkauf die Gutschrift nach Gebühren und Steuer.
+    `fee_cents` = Pool-Gebühr + Order-Gebühr, `price_e4` = Pool-Kurs danach, `avg_price_e4` = Geld im/aus dem Pool je
+    Coin, `slippage_bps` wie `buySlippageBps` (beim Verkauf spiegelbildlich); über `p_max_slippage_bps`:
+    `slippage_exceeded`.
+  - Einstandswert: **Durchschnittskosten in exakten Cent** (`cost_basis_cents`), Gewinn = Erlös − Order-Gebühr − anteilige
+    Kosten, Steuer wie bei Aktien (Verlusttopf, `capitalGainsTaxBps`, `player_tax_years`), Zwangskredit-Tilgung
+    (`loan_withhold`), Trade-XP wie bei Aktien (Tageslimit, Wash-Trade-Fenster), Missionen wie bei Aktien. Für die
+    Historie entstehen eine gefüllte Market-Order (`request_id` = `p_request_id`) und ein Trade (`counterparty`
+    `market_maker`); `big_trade` im Feed wie bei Aktien.
+  - Gründer: Verkauft er unter seine übrigen Team-Coins (gekaufte Coins gehen zuerst), zählen die Team-Coins als
+    Team-Verkauf. Mehr als `rugShareBps` von `team_at_launch_e6` in `rugWindowHours`: **Rug Pull** (höchstens einmal je
+    Fenster): Vertrauen `rugPull` (−20), Hype 0, Feed `rug_pull`, Log `rug_pull`, Halter bekommen `crypto_event`,
+    Antwort `rug_pull: true`.
+- **`check_coin_name`** (Gründe sind Fehlerschlüssel): Länge `create.nameMinLength`..`nameMaxLength`
+  (`name_too_short`/`name_too_long`), der Namensfilter für Firmen (`name_invalid_chars`, `name_profanity`,
+  `name_reserved`), eindeutig unter offenen Coins (`name_taken`); Ticker 3 bis 5 Buchstaben A–Z (`invalid_argument`),
+  frei unter allen Wertpapieren und Indizes (`ticker_taken`), kein Schimpfwort (`name_profanity`).
+- **`create_coin`:** ab `crypto.createMinLevel` (`locked`), ein offener Coin (`coin_exists`), Name/Ticker wie oben, Logo
+  wie bei Firmen (`logo_valid`, sonst `invalid_argument`; `logo_forbidden`), `create.costCents` an die Staatskasse
+  (`insufficient_funds`). Legt das Wertpapier (`pending`) und den Entwurf an, Log `created`.
+- **`start_coin_action`:** eigener offener Coin (`coin_not_found`), Aktion aus `create.actions` außer `marketing_burn`
+  (`invalid_argument`), `afterLaunch` nur gestartet (`coin_not_launched`), eine zur Zeit (`coin_action_running`), Kosten
+  an die Staatskasse. Endet nach `hours` (Minutenjob).
+- **`launch_coin`:** nur Entwürfe (`already_listed`), `tech` ≥ `launchMinTech` (`coin_tech_too_low`), Startkurs aus
+  `startPriceOptionsE4`, Liquidität ≥ `minLiquidityCents`, Team-Anteil `teamShareMinBps`..`teamShareMaxBps` (sonst
+  `invalid_argument`). `launchPool`: Pool = Liquidität zum Startkurs, Team-Coins = Position des Gründers mit Einstand 0.
+  Wertpapier `listed`, Log `launch`, Feed `coin_launched` `{ticker, name}`.
+- **`burn_coin_tokens`:** gestartet (`coin_not_launched`), nur übrige Team-Coins der eigenen Position
+  (`insufficient_position`), mindestens `create.burnMinBps` (Rückfall 100 = 1 %) der Team-Coins beim Start oder der
+  ganze Rest (`invalid_quantity`), höchstens einmal je `marketing_burn.hours` (`rate_limited`). Hype +
+  `marketing_burn.hype`; die Coins verlassen das Angebot, der Einstandswert bleibt bei den übrigen Coins. Log `burn`.
+- **`discontinue_coin`:** Entwürfe schließen einfach. Gestartete Coins: `discontinuePayoutCents` je Halter (Gründer
+  eingeschlossen) aus dem Pool, Position geschlossen wie ein Verkauf (Trade mit `counterparty` `issuer`), Rest an die
+  Staatskasse, Wertpapier `delisted`, Ticker frei, laufende Aktion beendet, Log `closed`, Halter bekommen
+  `crypto_event`, Feed `coin_closed`.
+
+### Log-Schlüssel (`crypto_events.key`)
+
+Die Ereignisse aus `crypto.events` (`hack`, `bug`, `influencer`, `exchange_listing`, `delisting_rumor`, `whale_buy`,
+`whale_dump`, `partnership`, `fud`, `network_upgrade`, `depeg`, `meme_wave`, `regulation`, `rug_pull`), dazu `exposed`,
+`action` `{action, success}`, `created`, `launch`, `burn` `{quantity_e6}`, `rug_pull` `{by_creator, sold_e6}`, `closed`
+`{paid_cents, holders}`, `dead`, `delisted`, `listed` `{replaces}`. Zufallsereignisse tragen `payload.shock` (log.
+Rendite) und bei Hacks `loss_cents`.
+
+### Benachrichtigungen, Feed, Vertrauen
+
+- Neuer Benachrichtigungstyp `crypto_event` (Kategorie `market`, in-app an): Ereignisse eigener Coins an Halter und
+  Gründer, Ergebnisse der Aktionen an den Gründer, Rug Pulls an die Halter, tote und gestrichene KI-Coins und
+  eingestellte Coins an die Halter. Link `/crypto/<TICKER>` (eingestellt/gestrichen: `/crypto`), `payload`
+  `{ticker, name, key, …}`.
+- Feed (`feed_item_label`, alle bisherigen Arten bleiben): `coin_launched`, `rug_pull`, `coin_closed`, jeweils
+  `{ticker, name}`.
+- Vertrauen: Grund `rugPull` (`trust.deltas.rugPull`, Rückfall −20 in `trust_delta`), ohne Deal (`deal_id null`); die
+  Einmal-Regel je Fenster sichert `crypto_coins.last_rug_at`.
+
+### Konto zurücksetzen/löschen (`account_wipe`)
+
+Zuerst (vor allen Kontosperren) `crypto_wipe_player`: Der eigene offene Coin wird wie `discontinue_coin` eingestellt
+(alle Halter, der Spieler selbst eingeschlossen, werden ausgezahlt), Aktionen und Team-Verkäufe verschwinden, nie
+gestartete Entwürfe samt ihrem Wertpapier ebenfalls, geschlossene Coins bleiben ohne Gründer. Danach wie bisher: Alle
+Positionen (auch Coins) werden aufgegeben, das Geld geht an die Staatskasse; `player_upgrades` wird gelöscht, wenn die
+Tabelle existiert.
+
+### Neue Fehlerschlüssel
+
+| Schlüssel             | Code    | Wann                                            |
+| --------------------- | ------- | ----------------------------------------------- |
+| `coin_not_found`      | `NX096` | Unbekannter Ticker, kein eigener offener Coin   |
+| `coin_exists`         | `NX097` | Schon ein offener eigener Coin                  |
+| `ticker_taken`        | `NX098` | Ticker gehört schon einem Wertpapier oder Index |
+| `coin_not_tradable`   | `NX099` | Coin ist Entwurf oder tot                       |
+| `coin_action_running` | `NX100` | Es läuft schon eine Aktion                      |
+| `coin_tech_too_low`   | `NX101` | Technik unter `launchMinTech`                   |
+| `slippage_exceeded`   | `NX102` | Slippage über `p_max_slippage_bps`              |
+| `coin_not_launched`   | `NX103` | Aktion oder Verbrennen erst nach dem Start      |
+
+`api_error` enthält außerdem `deal_too_big` (NX095, M4k). Weiter benutzt: `locked`, `invalid_argument`,
+`insufficient_funds`, `insufficient_position`, `order_too_small`, `market_paused`, `rate_limited`, `already_listed`,
+`logo_forbidden`, `invalid_quantity` und die Namensfehler.
+
+### Bekannte Grenzen
+
+- Krypto-Positionen rechnen mit Durchschnittskosten in Cent statt mit FIFO-Losen wie Aktien: Kurse in E4 sind für
+  Coins unter einem Cent zu grob für exakte Einstandswerte. Es entstehen keine `position_lots`.
+- Die KI-Flüsse stehen bis zur stündlichen Buchung nur in `pending_flow_cents`; der Kontostand des Finanzmarkts hinkt bis
+  zu einer Stunde hinterher.
+- `create.exposedHype`, `create.exposedShock` und `create.burnMinBps` stehen noch nicht in `src/config/crypto.ts`; das
+  SQL nimmt −20, ln 0,85 und 100 als Rückfallwerte.
+- Neue Ersatz-Shitcoins starten ohne Kurshistorie; die Kerzen füllen sich mit den Takten.
+- Die Hardware-Wallet-Stufe liest `player_upgrade_level(…, 'crypto_wallet')`; erst M4k (Verbesserung `crypto_wallet`)
+  macht Stufen > 0 möglich.

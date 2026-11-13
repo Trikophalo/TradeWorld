@@ -858,3 +858,80 @@ select tests.login_as('authenticated', :fx_m) is null as ok \gset
 select public.get_company_org(:'fx_cco');
 \o
 reset role;
+
+-- M5a: cryptocurrencies and own coins (ADR-101) -------------------------------------------------------------------
+-- (the coins were seeded by run_due_jobs() in the assertions; a trader and a creator of their own)
+update public.invite_codes set max_uses = max_uses + 5 where code = 'M1-TESTS';
+\set fx_ca '''f1f1f1f1-0000-4000-8000-00000000c5a1'''
+\set fx_cb '''f1f1f1f1-0000-4000-8000-00000000c5b1'''
+\set fx_logo '''{"palette": ["#2bc3d9", "#111318"], "grid": ["................", "................", "....00000000....", "....01111110....", "....01111110....", "....00000000....", "................", "................", "................", "................", "................", "................", "................", "................", "................", "................"]}'''
+select tests.signup(:fx_ca, 'Fixture_Coiner') is not null and tests.signup(:fx_cb, 'Fixture_Halter') is not null as ok \gset
+select tests.set_level(:fx_ca, 14);
+select tests.set_level(:fx_cb, 10);
+select tests.fund(:fx_ca, 10000000, 'fixture:m5a:a');
+select tests.fund(:fx_cb, 5000000, 'fixture:m5a:b');
+update public.sim_runtime set is_paused = false;
+select public.crypto_run_due() is not null as ok \gset
+select public.market_tick() is not null as ok \gset
+select tests.login_as('authenticated', :fx_cb) is null as ok \gset
+\o :fixture_dir/get_crypto_market.json
+select public.get_crypto_market();
+\o :fixture_dir/crypto_trade.json
+select public.crypto_trade(gen_random_uuid(), 'KTL', 'buy', 100000, null, 200);
+\o
+reset role;
+select p.quantity_e6 / 2 as fx_half from public.positions p join public.securities s on s.id = p.security_id
+ where p.player_id = :fx_cb and s.ticker = 'KTL' and p.status = 'open' \gset
+select tests.login_as('authenticated', :fx_cb) is null as ok \gset
+\o :fixture_dir/crypto_trade_sell.json
+select public.crypto_trade(gen_random_uuid(), 'KTL', 'sell', null, :fx_half);
+\o :fixture_dir/get_coin.json
+select public.get_coin('KTL');
+\o :fixture_dir/get_candles_crypto.json
+select public.get_candles('KTL', '5m', 20);
+\o :fixture_dir/get_my_portfolio_crypto.json
+select public.get_my_portfolio();
+\o
+reset role;
+select tests.login_as('authenticated', :fx_ca) is null as ok \gset
+\o :fixture_dir/get_my_coin_none.json
+select public.get_my_coin();
+\o :fixture_dir/check_coin_name.json
+select public.check_coin_name('Fixture Taler', 'FXT');
+\o :fixture_dir/check_coin_name_rejected.json
+select public.check_coin_name('Fixture Taler', 'KTL');
+\o :fixture_dir/create_coin.json
+select public.create_coin(gen_random_uuid(), 'Fixture Taler', 'FXT', :fx_logo);
+\o :fixture_dir/start_coin_action.json
+select public.start_coin_action(gen_random_uuid(), 'audit');
+\o :fixture_dir/get_my_coin.json
+select public.get_my_coin();
+\o
+reset role;
+-- the audit ends (resolved by the minute job), then the launch
+update public.crypto_coin_actions set ends_at = started_at
+ where coin_id = (select c.id from public.crypto_coins c where c.creator_id = :fx_ca and c.status = 'draft');
+update public.crypto_state set hour_done = date_bin('1 hour', public.game_now(), '2000-01-01 00:00:00+00'::timestamptz);
+select public.crypto_run_due() is not null as ok \gset
+select tests.login_as('authenticated', :fx_ca) is null as ok \gset
+\o :fixture_dir/launch_coin.json
+select public.launch_coin(gen_random_uuid(), 1000, 1000000, 2000);
+\o
+select tests.login_as('authenticated', :fx_cb) is null as ok \gset
+select public.crypto_trade(gen_random_uuid(), 'FXT', 'buy', 100000) is not null as ok \gset
+\o :fixture_dir/get_coin_player.json
+select public.get_coin('FXT');
+\o
+select tests.login_as('authenticated', :fx_ca) is null as ok \gset
+\o :fixture_dir/crypto_trade_rug_pull.json
+select public.crypto_trade(gen_random_uuid(), 'FXT', 'sell', null, 7500000000);
+\o :fixture_dir/burn_coin_tokens.json
+select public.burn_coin_tokens(gen_random_uuid(), 250000000);
+\o :fixture_dir/get_my_coin_listed.json
+select public.get_my_coin();
+\o :fixture_dir/get_crypto_market_with_own_coin.json
+select public.get_crypto_market();
+\o :fixture_dir/discontinue_coin.json
+select public.discontinue_coin(gen_random_uuid());
+\o
+reset role;

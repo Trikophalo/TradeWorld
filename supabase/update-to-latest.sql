@@ -36005,6 +36005,3258 @@ begin
   end loop;
 end;
 $$;
+-- ===== idempotent copy of migrations/20261201000150_m5a_crypto_enum.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · M5a · 0150 · Enum values for cryptocurrencies (ADR-101)
+-- =============================================================================
+-- A new enum value cannot be used in the transaction that adds it (SQLSTATE 55P04). The values live in their own
+-- migration file, so a migration run with one transaction per file (supabase db push, verify_local.sh) has committed
+-- them before 20261201000200_m5a_crypto.sql starts. That migration and its update copy use them only inside PL/pgSQL
+-- bodies, never at the top level, so update-to-latest.sql (one transaction for everything) works as well: the coins
+-- are seeded by run_due_jobs() after the commit (crypto_bootstrap()).
+--   security_kind  'crypto'          coins trade as securities (positions, quotes, candles, portfolio, net worth)
+--   ledger_tx_kind 'crypto_buy'      player cash -> pool (plus the order fee to the treasury)
+--                  'crypto_sell'     pool -> player cash (order fee and tax to the treasury)
+--                  'crypto_flow'     financial market <-> pool (seed, AI flows, dead coins), hacks: pool -> treasury
+--                  'crypto_fee'      own coin: founding and development actions, player -> treasury
+--                  'crypto_launch'   own coin: the creator's liquidity, player -> pool
+--                  'crypto_payout'   pool -> holders when a coin is closed or delisted (tax to the treasury)
+-- Idempotent (identical copy in supabase/updates/).
+-- =============================================================================
+
+alter type public.security_kind add value if not exists 'crypto';
+alter type public.ledger_tx_kind add value if not exists 'crypto_buy';
+alter type public.ledger_tx_kind add value if not exists 'crypto_sell';
+alter type public.ledger_tx_kind add value if not exists 'crypto_flow';
+alter type public.ledger_tx_kind add value if not exists 'crypto_fee';
+alter type public.ledger_tx_kind add value if not exists 'crypto_launch';
+alter type public.ledger_tx_kind add value if not exists 'crypto_payout';
+-- ===== idempotent copy of migrations/20261201000200_m5a_crypto.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · M5a · 0200 · Cryptocurrencies and own coins (ADR-101)
+-- =============================================================================
+-- Mirrors src/lib/sim/crypto.ts (poolPriceE4, poolAt, swapBuy, swapSell, buySlippageBps, flowForReturn/applyFlow,
+-- sigmaTick, tickReturn, stableReturn, pickRegime, regimeHours, playerCoinDriftDay, playerCoinSigmaDay, decayStats,
+-- applyStats, actionSuccessBps, launchPool, isRugPull, discontinuePayoutCents, eventChanceBps, rollCoinEvent,
+-- rollMarketEvent, eventShock, isDead, nextMemeCoin). Config: game_config 'crypto' (src/config/crypto.ts); the SQL
+-- falls back to the same scalar defaults. Units: pool cash in cents, coins in millionths (E6), prices in E4,
+-- price_e4 = cash_cents · 10^8 / tokens_e6. The constant product k exceeds bigint, pool math uses numeric.
+--
+-- Coins are securities (kind 'crypto', added in 20261201000150): positions, security_quotes, candles, price_ticks,
+-- the portfolio, the net worth, the rich list and get_candles work as for stocks. No orders: crypto_trade swaps
+-- against the coin's liquidity pool at once (an order and a trade row are written for the history).
+--
+-- Money (closed money system, ADR-041): every pool is a system ledger account 'crypto_pool:<coin id>'.
+--   * seed / replacement coins: financial market ('market') -> pool
+--   * AI flows every tick: market <-> pool. The tick only adds the cash difference to crypto_coins.pending_flow_cents;
+--     the ledger is booked by crypto_settle_flows() (hourly, one transaction) and before any booking that touches the
+--     pool (trades, hacks, closing). Invariant: ledger balance of the pool + pending_flow_cents = pool_cash_cents.
+--   * trades: player cash <-> pool; the pool fee stays in the pool; order fee and tax -> treasury
+--   * own coins: founding and actions player -> treasury, launch liquidity player -> pool, closing pool -> holders
+--   * hacks: poolLossShare of the pool -> treasury; dead AI coins: payouts to holders, the rest -> market
+--
+-- Tables (RLS on, read-only for authenticated, no client writes): crypto_state, crypto_coins, crypto_coin_actions,
+-- crypto_team_sales, crypto_events, crypto_volume_hours.
+-- Jobs: market_tick() runs crypto_tick_at() before the stock tick (coin rows are always locked before ledger
+-- accounts); run_due_jobs() runs crypto_run_due() first (seeding, due actions, the hourly part).
+-- RPCs: crypto_trade, get_crypto_market, get_coin, check_coin_name, create_coin, get_my_coin, start_coin_action,
+-- launch_coin, burn_coin_tokens, discontinue_coin.
+-- Error keys: coin_not_found NX096, coin_exists NX097, ticker_taken NX098, coin_not_tradable NX099,
+-- coin_action_running NX100, coin_tech_too_low NX101, slippage_exceeded NX102, coin_not_launched NX103
+-- (plus deal_too_big NX095 of M4k). Notification type: crypto_event. Feed kinds: coin_launched, rug_pull, coin_closed.
+-- Trust reason: rugPull (trust.deltas.rugPull).
+-- New enum values are only used inside PL/pgSQL bodies (see 20261201000150).
+-- Idempotent (identical copy in supabase/updates/).
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- A. Schema
+-- ---------------------------------------------------------------------------
+create table if not exists public.crypto_state (
+  id           boolean primary key default true check (id),
+  regime       text not null default 'flat' check (regime in ('bull', 'flat', 'bear')),
+  regime_until timestamptz,
+  seeded_at    timestamptz,
+  hour_done    timestamptz,
+  updated_at   timestamptz not null default now()
+);
+alter table public.crypto_state enable row level security;
+insert into public.crypto_state (id) values (true) on conflict (id) do nothing;
+comment on table public.crypto_state is
+  'One row: the crypto weather (regime bull/flat/bear until regime_until, ADR-101), when the 15 coins were seeded and '
+  'the last hour the hourly crypto job ran for.';
+
+create table if not exists public.crypto_coins (
+  id                 uuid primary key default gen_random_uuid(),
+  security_id        uuid not null unique references public.securities (id),
+  ticker             text not null check (ticker ~ '^[A-Z]{2,8}$'),
+  name               text not null check (char_length(name) between 1 and 40),
+  category           text not null check (category in ('stable', 'major', 'alt', 'meme', 'player')),
+  status             text not null default 'listed' check (status in ('draft', 'listed', 'dead', 'closed')),
+  peg_e4             bigint check (peg_e4 > 0),
+  algorithmic        boolean not null default false,
+  color              text,
+  logo               jsonb,
+  creator_id         uuid references public.profiles (id) on delete set null,
+  seed_ticker        text,
+  pool_account_id    uuid references public.ledger_accounts (id),
+  pool_cash_cents    bigint not null default 0 check (pool_cash_cents >= 0),
+  pool_tokens_e6     bigint not null default 0 check (pool_tokens_e6 >= 0),
+  pending_flow_cents bigint not null default 0,
+  tech               double precision not null default 0 check (tech between 0 and 100),
+  hype               double precision not null default 0 check (hype between 0 and 100),
+  utility            double precision not null default 0 check (utility between 0 and 100),
+  stats_at           timestamptz not null default now(),
+  start_price_e4     bigint check (start_price_e4 > 0),
+  start_pool_cents   bigint check (start_pool_cents > 0),
+  team_share_bps     integer check (team_share_bps between 0 and 9999),
+  team_at_launch_e6  bigint not null default 0 check (team_at_launch_e6 >= 0),
+  team_tokens_e6     bigint not null default 0 check (team_tokens_e6 >= 0),
+  burned_e6          bigint not null default 0 check (burned_e6 >= 0),
+  last_burn_at       timestamptz,
+  last_rug_at        timestamptz,
+  launched_at        timestamptz,
+  dead_since         timestamptz,
+  closed_at          timestamptz,
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now(),
+  constraint crypto_coins_peg_check check (category <> 'stable' or peg_e4 is not null)
+);
+alter table public.crypto_coins enable row level security;
+create unique index if not exists crypto_coins_creator_open_uq on public.crypto_coins (creator_id)
+  where creator_id is not null and status in ('draft', 'listed');
+create unique index if not exists crypto_coins_name_open_uq on public.crypto_coins (public.name_key(name))
+  where status in ('draft', 'listed');
+create unique index if not exists crypto_coins_seed_uq on public.crypto_coins (seed_ticker) where seed_ticker is not null;
+create index if not exists crypto_coins_status_idx on public.crypto_coins (status, category);
+create index if not exists crypto_coins_pool_account_idx on public.crypto_coins (pool_account_id);
+comment on table public.crypto_coins is
+  'Cryptocurrencies (ADR-101): the 15 AI coins of crypto.coins, their meme replacements and player coins (category '
+  'player, creator_id). ticker = the ticker when the coin was created (the security''s ticker is freed on closing). '
+  'Pool: pool_cash_cents / pool_tokens_e6 (x · y = k), ledger account pool_account_id; pending_flow_cents = AI flows '
+  'not yet booked (ledger balance + pending = pool cash). Stats tech/hype/utility (0..100) for player coins.';
+
+create table if not exists public.crypto_coin_actions (
+  id          uuid primary key default gen_random_uuid(),
+  coin_id     uuid not null references public.crypto_coins (id) on delete cascade,
+  key         text not null check (key ~ '^[a-z_]+$'),
+  cost_cents  bigint not null default 0 check (cost_cents >= 0),
+  success_bps integer not null check (success_bps between 0 and 10000),
+  started_at  timestamptz not null default now(),
+  ends_at     timestamptz not null,
+  resolved_at timestamptz,
+  success     boolean,
+  constraint crypto_coin_actions_time_check check (ends_at >= started_at)
+);
+alter table public.crypto_coin_actions enable row level security;
+create unique index if not exists crypto_coin_actions_running_uq on public.crypto_coin_actions (coin_id) where resolved_at is null;
+create index if not exists crypto_coin_actions_due_idx on public.crypto_coin_actions (ends_at) where resolved_at is null;
+create index if not exists crypto_coin_actions_coin_idx on public.crypto_coin_actions (coin_id, started_at desc);
+comment on table public.crypto_coin_actions is
+  'Development actions of a player coin (crypto.create.actions): one at a time, resolved by run_due_jobs() at ends_at '
+  '(success with success_bps).';
+
+create table if not exists public.crypto_team_sales (
+  id          bigint generated always as identity primary key,
+  coin_id     uuid not null references public.crypto_coins (id) on delete cascade,
+  quantity_e6 bigint not null check (quantity_e6 > 0),
+  at          timestamptz not null default now()
+);
+alter table public.crypto_team_sales enable row level security;
+create index if not exists crypto_team_sales_coin_idx on public.crypto_team_sales (coin_id, at desc);
+comment on table public.crypto_team_sales is
+  'Team tokens a creator sold (rug pull check: more than rugShareBps of the team tokens at launch within rugWindowHours).';
+
+create table if not exists public.crypto_events (
+  id        bigint generated always as identity primary key,
+  coin_id   uuid references public.crypto_coins (id) on delete cascade,
+  key       text not null check (key ~ '^[a-z_]+$'),
+  shock_bps integer,
+  payload   jsonb not null default '{}'::jsonb,
+  at        timestamptz not null default now()
+);
+alter table public.crypto_events enable row level security;
+create index if not exists crypto_events_at_idx on public.crypto_events (at desc, id desc);
+create index if not exists crypto_events_coin_idx on public.crypto_events (coin_id, at desc) where coin_id is not null;
+comment on table public.crypto_events is
+  'Event log of the crypto market: random events (crypto.events keys), market events (coin_id null), own coin results '
+  '(action, exposed, launch, burn, rug_pull, closed) and AI coin life (dead, delisted, listed). shock_bps = price change.';
+
+create table if not exists public.crypto_volume_hours (
+  coin_id      uuid not null references public.crypto_coins (id) on delete cascade,
+  hour         timestamptz not null,
+  volume_cents bigint not null default 0 check (volume_cents >= 0),
+  primary key (coin_id, hour)
+);
+alter table public.crypto_volume_hours enable row level security;
+comment on table public.crypto_volume_hours is 'Traded cash per coin and hour (AI flows and players), for the 24 h volume. Kept 48 h.';
+
+do $$
+declare
+  t text;
+begin
+  foreach t in array array['crypto_state', 'crypto_coins', 'crypto_coin_actions', 'crypto_team_sales', 'crypto_events',
+                           'crypto_volume_hours'] loop
+    execute format('revoke all on public.%I from public, anon, authenticated', t);
+    execute format('grant select on public.%I to authenticated', t);
+    execute format('grant all on public.%I to service_role', t);
+    execute format('drop policy if exists "authenticated read" on public.%I', t);
+    execute format('create policy "authenticated read" on public.%I for select to authenticated using (true)', t);
+  end loop;
+  foreach t in array array['crypto_state', 'crypto_coins'] loop
+    if not exists (select 1 from pg_trigger where tgname = 'set_updated_at' and tgrelid = ('public.' || t)::regclass) then
+      execute format('create trigger set_updated_at before update on public.%I for each row execute function public.set_updated_at()', t);
+    end if;
+  end loop;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- B. Error keys (M4k: deal_too_big NX095; M5a: NX096..NX103)
+-- ---------------------------------------------------------------------------
+create or replace function public.api_error(p_key text)
+returns void
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_code text;
+begin
+  v_code := case p_key
+    when 'insufficient_funds'          then 'NX001'
+    when 'rate_limited'                then 'NX004'
+    when 'forbidden'                   then 'NX006'
+    when 'invalid_quantity'            then 'NX007'
+    when 'invalid_price'               then 'NX007'
+    when 'invalid_argument'            then 'NX007'
+    when 'invalid_interval'            then 'NX007'
+    when 'not_authenticated'           then 'NX010'
+    when 'unknown_security'            then 'NX011'
+    when 'not_tradable'                then 'NX012'
+    when 'insufficient_position'       then 'NX013'
+    when 'order_not_found'             then 'NX014'
+    when 'order_not_open'              then 'NX015'
+    when 'market_paused'               then 'NX016'
+    when 'nothing_to_claim'            then 'NX017'
+    when 'locked'                      then 'NX018'
+    when 'name_too_short'              then 'NX019'
+    when 'name_too_long'               then 'NX019'
+    when 'name_invalid_chars'          then 'NX019'
+    when 'name_profanity'              then 'NX019'
+    when 'name_reserved'               then 'NX019'
+    when 'name_taken'                  then 'NX019'
+    when 'name_change_too_soon'        then 'NX020'
+    when 'order_too_small'             then 'NX021'
+    when 'market_illiquid'             then 'NX022'
+    when 'mission_not_found'           then 'NX023'
+    when 'mission_not_completed'       then 'NX024'
+    when 'mission_already_claimed'     then 'NX025'
+    when 'avatar_unknown'              then 'NX026'
+    when 'avatar_locked'               then 'NX027'
+    when 'daily_reward_claimed'        then 'NX028'
+    when 'skill_unknown'               then 'NX029'
+    when 'skill_learned'               then 'NX030'
+    when 'skill_locked'                then 'NX031'
+    when 'skill_points_insufficient'   then 'NX032'
+    when 'job_not_found'               then 'NX033'
+    when 'job_level_too_low'           then 'NX034'
+    when 'job_skills_missing'          then 'NX035'
+    when 'application_limit'           then 'NX036'
+    when 'application_exists'          then 'NX037'
+    when 'application_not_found'       then 'NX038'
+    when 'application_not_offered'     then 'NX039'
+    when 'offer_expired'               then 'NX040'
+    when 'job_active_exists'           then 'NX041'
+    when 'no_active_job'               then 'NX042'
+    when 'raise_too_soon'              then 'NX043'
+    when 'raise_too_high'              then 'NX044'
+    when 'player_not_found'            then 'NX045'
+    when 'employer_only'               then 'NX046'
+    when 'company_exists'              then 'NX047'
+    when 'company_not_found'           then 'NX048'
+    when 'company_level_too_low'       then 'NX049'
+    when 'owns_company'                then 'NX050'
+    when 'employee_limit'              then 'NX051'
+    when 'company_upgrade_unavailable' then 'NX052'
+    when 'founding_locked'             then 'NX053'
+    when 'not_in_company'              then 'NX054'
+    when 'work_task_not_found'         then 'NX055'
+    when 'work_task_expired'           then 'NX056'
+    when 'work_task_done'              then 'NX057'
+    when 'offer_closed'                then 'NX058'
+    when 'offer_sold_out'              then 'NX059'
+    when 'already_listed'              then 'NX060'
+    when 'confirm_mismatch'            then 'NX061'
+    when 'skill_already_covered'       then 'NX062'
+    when 'training_locked'             then 'NX063'
+    when 'logo_locked'                 then 'NX064'
+    when 'logo_forbidden'              then 'NX065'
+    when 'artworks_locked'             then 'NX066'
+    when 'artwork_not_found'           then 'NX067'
+    when 'auction_not_found'           then 'NX068'
+    when 'auction_ended'               then 'NX069'
+    when 'bid_too_low'                 then 'NX070'
+    when 'own_artwork'                 then 'NX071'
+    when 'already_on_auction'          then 'NX072'
+    when 'auction_has_bids'            then 'NX073'
+    when 'property_locked'             then 'NX074'
+    when 'no_home'                     then 'NX075'
+    when 'invalid_tier'                then 'NX076'
+    when 'item_not_found'              then 'NX077'
+    when 'layout_invalid'              then 'NX078'
+    when 'floor_not_owned'             then 'NX079'
+    when 'garage_full'                 then 'NX080'
+    when 'event_closed'                then 'NX081'
+    when 'event_needs_staff'           then 'NX082'
+    when 'upgrade_maxed'               then 'NX083'
+    when 'promotion_not_ready'         then 'NX084'
+    when 'promotion_too_soon'          then 'NX085'
+    when 'promotion_pending'           then 'NX086'
+    when 'campaign_running'            then 'NX087'
+    when 'deal_not_found'              then 'NX088'
+    when 'deal_closed'                 then 'NX089'
+    when 'deal_terms'                  then 'NX090'
+    when 'deal_limit'                  then 'NX091'
+    when 'deal_self'                   then 'NX092'
+    when 'stake_share_full'            then 'NX093'
+    when 'deal_needs_company'          then 'NX094'
+    when 'deal_too_big'                then 'NX095'
+    when 'coin_not_found'              then 'NX096'
+    when 'coin_exists'                 then 'NX097'
+    when 'ticker_taken'                then 'NX098'
+    when 'coin_not_tradable'           then 'NX099'
+    when 'coin_action_running'         then 'NX100'
+    when 'coin_tech_too_low'           then 'NX101'
+    when 'slippage_exceeded'           then 'NX102'
+    when 'coin_not_launched'           then 'NX103'
+    else 'NX007'
+  end;
+  raise exception using errcode = v_code, message = p_key;
+end;
+$$;
+comment on function public.api_error(text) is 'Raises the API error <key> with its NX SQLSTATE. The client shows a text per key (error.message).';
+
+-- ---------------------------------------------------------------------------
+-- C. Notification type
+-- ---------------------------------------------------------------------------
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('crypto_event', 'market', 'Krypto-Neuigkeiten',
+        'Ereignisse, Rug Pulls und Einstellungen bei Kryptowährungen, die du hältst, und Ergebnisse deiner eigenen Währung.',
+        'notif_chart', true, false, false, 120)
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- D. Config helpers (game_config 'crypto', fallbacks as in src/config/crypto.ts)
+-- ---------------------------------------------------------------------------
+create or replace function public.crypto_cfg()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(public.config_jsonb('crypto'), '{}'::jsonb);
+$$;
+comment on function public.crypto_cfg() is 'Internal: game_config crypto (ADR-101), {} when missing.';
+
+-- A value of crypto.categories.<category> from a loaded config document
+create or replace function public.crypto_cat_val(p_cfg jsonb, p_category text, p_field text)
+returns double precision
+language sql
+immutable
+set search_path = ''
+as $$
+  select public.cfg_num(p_cfg, array['categories', p_category, p_field],
+    case p_field
+      when 'sigmaDay' then case p_category when 'stable' then 0.002 when 'major' then 0.06 when 'alt' then 0.14
+                                           when 'meme' then 0.4 else 0.35 end
+      when 'beta' then case p_category when 'stable' then 0 when 'major' then 1 when 'alt' then 1.3 when 'meme' then 1.6
+                                       else 1.2 end
+      when 'feeBps' then case p_category when 'stable' then 5 when 'major' then 10 when 'alt' then 30 else 100 end
+      when 'pegPullPerHour' then case p_category when 'stable' then 0.5 else 0 end
+      else 0
+    end);
+$$;
+
+-- The array crypto.<path> (events, coins, memeNames, create.actions, create.startPriceOptionsE4), [] when missing
+create or replace function public.crypto_cfg_array(p_cfg jsonb, p_path text[])
+returns jsonb
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when jsonb_typeof(p_cfg #> p_path) = 'array' then p_cfg #> p_path else '[]'::jsonb end;
+$$;
+
+create or replace function public.crypto_event_cfg(p_cfg jsonb, p_key text)
+returns jsonb
+language sql
+immutable
+set search_path = ''
+as $$
+  select e from jsonb_array_elements(public.crypto_cfg_array(p_cfg, '{events}')) e where e ->> 'key' = p_key limit 1;
+$$;
+
+create or replace function public.crypto_action_cfg(p_cfg jsonb, p_key text)
+returns jsonb
+language sql
+immutable
+set search_path = ''
+as $$
+  select a from jsonb_array_elements(public.crypto_cfg_array(p_cfg, '{create,actions}')) a where a ->> 'key' = p_key limit 1;
+$$;
+
+-- Pool fee after the hardware wallet: fee × (10 000 − level × perLevel) / 10 000, rounded half even, never below 0
+create or replace function public.crypto_discounted_fee_bps(p_fee_bps double precision, p_level integer, p_per_level double precision)
+returns integer
+language sql
+immutable
+set search_path = ''
+as $$
+  select greatest(0, public.div_round_half_even(
+           round(p_fee_bps::numeric) * greatest(0::numeric, 10000 - least(10000::numeric, greatest(0, coalesce(p_level, 0)) * round(p_per_level::numeric))),
+           10000))::integer;
+$$;
+
+-- The pool fee a player pays for a category (upgrades.crypto_wallet, M4i/M4k player_upgrade_level)
+create or replace function public.crypto_player_fee_bps(p_player uuid, p_category text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select public.crypto_discounted_fee_bps(public.crypto_cat_val(public.crypto_cfg(), p_category, 'feeBps'),
+           case when p_player is null then 0 else coalesce(public.player_upgrade_level(p_player, 'crypto_wallet'), 0) end,
+           public.config_double('upgrades', '{crypto_wallet,perLevel}', 2500));
+$$;
+
+-- ---------------------------------------------------------------------------
+-- E. Pure math (port of src/lib/sim/crypto.ts)
+-- ---------------------------------------------------------------------------
+-- poolPriceE4
+create or replace function public.crypto_pool_price_e4(p_cash bigint, p_tokens bigint)
+returns bigint
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when coalesce(p_tokens, 0) <= 0 then 0::bigint
+              else public.div_round_half_even(coalesce(p_cash, 0)::numeric * 100000000, p_tokens) end;
+$$;
+
+-- poolAt: the coins of a pool holding p_cash at p_price
+create or replace function public.crypto_pool_tokens_at(p_cash bigint, p_price_e4 bigint)
+returns bigint
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when coalesce(p_price_e4, 0) > 0 then public.div_round_half_even(p_cash::numeric * 100000000, p_price_e4)
+              else 0::bigint end;
+$$;
+
+-- swapBuy: the fee stays in the pool, k holds for the rest, the pool's coins are rounded up
+create or replace function public.crypto_swap_buy(p_cash bigint, p_tokens bigint, p_cash_in bigint, p_fee_bps integer,
+                                                  out tokens_out_e6 bigint, out fee_cents bigint,
+                                                  out cash_after_cents bigint, out tokens_after_e6 bigint)
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_k    numeric := p_cash::numeric * p_tokens;
+  v_cash bigint;
+begin
+  fee_cents := public.div_round_half_even(p_cash_in::numeric * p_fee_bps, 10000);
+  v_cash := p_cash + (p_cash_in - fee_cents);
+  if v_cash <= 0 then
+    tokens_out_e6 := 0;
+  else
+    tokens_out_e6 := greatest(0::numeric, p_tokens - div(v_k + v_cash - 1, v_cash))::bigint;
+  end if;
+  cash_after_cents := v_cash + fee_cents;
+  tokens_after_e6 := p_tokens - tokens_out_e6;
+end;
+$$;
+
+-- swapSell: the fee is kept back from the payout
+create or replace function public.crypto_swap_sell(p_cash bigint, p_tokens bigint, p_tokens_in bigint, p_fee_bps integer,
+                                                   out cash_out_cents bigint, out fee_cents bigint,
+                                                   out cash_after_cents bigint, out tokens_after_e6 bigint)
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_k     numeric := p_cash::numeric * p_tokens;
+  v_tok   bigint := p_tokens + p_tokens_in;
+  v_gross bigint;
+begin
+  if v_tok <= 0 then
+    cash_out_cents := 0; fee_cents := 0; cash_after_cents := p_cash; tokens_after_e6 := p_tokens;
+    return;
+  end if;
+  v_gross := greatest(0::numeric, p_cash - div(v_k + v_tok - 1, v_tok))::bigint;
+  fee_cents := public.div_round_half_even(v_gross::numeric * p_fee_bps, 10000);
+  cash_out_cents := v_gross - fee_cents;
+  cash_after_cents := p_cash - v_gross + fee_cents;
+  tokens_after_e6 := v_tok;
+end;
+$$;
+
+-- Slippage of a fill in bps: how much worse than p_before the average price is (buy: higher, sell: lower)
+create or replace function public.crypto_slippage_bps(p_before_e4 bigint, p_avg_e4 bigint, p_side text)
+returns integer
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when coalesce(p_before_e4, 0) <= 0 or coalesce(p_avg_e4, 0) <= 0 then 10000
+              when p_side = 'buy' then public.div_round_half_even((p_avg_e4 - p_before_e4)::numeric * 10000, p_before_e4)::integer
+              else public.div_round_half_even((p_before_e4 - p_avg_e4)::numeric * 10000, p_before_e4)::integer end;
+$$;
+
+-- flowForReturn + applyFlow: the market's trade that moves the price by the log return r (no fee). Buying: the cash
+-- goes up by round(cash × (e^(r/2) − 1)); selling: the coins go up by round(tokens × (e^(−r/2) − 1)); k / the other side.
+create or replace function public.crypto_apply_flow(p_cash bigint, p_tokens bigint, p_r double precision,
+                                                    out cash_cents bigint, out tokens_e6 bigint)
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_k numeric := p_cash::numeric * p_tokens;
+  v_f double precision := exp(coalesce(p_r, 0) / 2);
+begin
+  if coalesce(p_r, 0) >= 0 then
+    cash_cents := p_cash + floor(p_cash::double precision * (v_f - 1) + 0.5)::bigint;
+    tokens_e6 := case when cash_cents > 0 then div(v_k, cash_cents)::bigint else p_tokens end;
+  else
+    tokens_e6 := p_tokens + floor(p_tokens::double precision * (1 / v_f - 1) + 0.5)::bigint;
+    cash_cents := case when tokens_e6 > 0 then div(v_k, tokens_e6)::bigint else p_cash end;
+  end if;
+end;
+$$;
+
+-- tickReturn: drift and shock of the market times beta, plus the coin's own shock
+create or replace function public.crypto_tick_return(p_sigma_day double precision, p_beta double precision,
+                                                     p_extra_drift_day double precision, p_regime_drift_day double precision,
+                                                     p_z_market double precision, p_z_own double precision,
+                                                     p_tick_seconds double precision)
+returns double precision
+language sql
+immutable
+set search_path = ''
+as $$
+  select (b.beta * p_regime_drift_day + coalesce(p_extra_drift_day, 0)) * (p_tick_seconds / 86400.0)
+         + p_sigma_day * sqrt(p_tick_seconds / 86400.0)
+           * (b.common * p_z_market + sqrt(greatest(0, 1 - b.common * b.common)) * p_z_own)
+    from (select greatest(0, p_beta) as beta, least(1, greatest(0, p_beta)) as common) b;
+$$;
+
+-- stableReturn: pulled back to the peg, a little noise
+create or replace function public.crypto_stable_return(p_price_e4 double precision, p_peg_e4 double precision,
+                                                       p_pull_per_hour double precision, p_sigma_day double precision,
+                                                       p_z double precision, p_tick_seconds double precision)
+returns double precision
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when coalesce(p_price_e4, 0) <= 0 or coalesce(p_peg_e4, 0) <= 0 then 0::double precision
+              else -ln(p_price_e4 / p_peg_e4) * (1 - power(1 - least(1, greatest(0, p_pull_per_hour)), p_tick_seconds / 3600.0))
+                   + p_sigma_day * sqrt(p_tick_seconds / 86400.0) * p_z end;
+$$;
+
+-- pickRegime: bull / flat / bear by weight
+create or replace function public.crypto_pick_regime(p_cfg jsonb, p_u double precision)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when x.v < w.bull then 'bull' when x.v < w.bull + w.flat then 'flat' else 'bear' end
+    from (select public.cfg_num(p_cfg, '{regimes,bull,weight}', 0.3) as bull,
+                 public.cfg_num(p_cfg, '{regimes,flat,weight}', 0.45) as flat,
+                 public.cfg_num(p_cfg, '{regimes,bear,weight}', 0.25) as bear) w
+   cross join lateral (select least(0.999999, greatest(0, coalesce(p_u, 0))) * (w.bull + w.flat + w.bear) as v) x;
+$$;
+
+-- regimeHours: min + (max − min) × u, rounded like Math.round
+create or replace function public.crypto_regime_hours(p_cfg jsonb, p_u double precision)
+returns integer
+language sql
+immutable
+set search_path = ''
+as $$
+  select floor(public.cfg_num(p_cfg, '{regimeHoursMin}', 24)
+               + (public.cfg_num(p_cfg, '{regimeHoursMax}', 72) - public.cfg_num(p_cfg, '{regimeHoursMin}', 24))
+                 * least(1, greatest(0, coalesce(p_u, 0))) + 0.5)::integer;
+$$;
+
+create or replace function public.crypto_regime_drift(p_cfg jsonb, p_regime text)
+returns double precision
+language sql
+immutable
+set search_path = ''
+as $$
+  select public.cfg_num(p_cfg, array['regimes', p_regime, 'driftDay'],
+                        case p_regime when 'bull' then 0.03 when 'bear' then -0.03 else 0 end);
+$$;
+
+-- playerCoinDriftDay: hype and utility push, a base selling pressure pulls
+create or replace function public.crypto_player_drift_day(p_cfg jsonb, p_hype double precision, p_utility double precision)
+returns double precision
+language sql
+immutable
+set search_path = ''
+as $$
+  select public.cfg_num(p_cfg, '{create,driftPerHype}', 0.2) * (coalesce(p_hype, 0) / 100)
+       + public.cfg_num(p_cfg, '{create,driftPerUtility}', 0.08) * (coalesce(p_utility, 0) / 100)
+       + public.cfg_num(p_cfg, '{create,driftBase}', -0.06);
+$$;
+
+-- playerCoinSigmaDay: good technology calms the coin
+create or replace function public.crypto_player_sigma_day(p_cfg jsonb, p_tech double precision)
+returns double precision
+language sql
+immutable
+set search_path = ''
+as $$
+  select public.cfg_num(p_cfg, '{create,sigmaDay}', 0.35)
+         * (1 - public.cfg_num(p_cfg, '{create,sigmaTechDamping}', 0.5) * (least(100, greatest(0, coalesce(p_tech, 0))) / 100));
+$$;
+
+-- eventChanceBps: chance per hour; own coins move it with their stats (p_tech null = no stats)
+create or replace function public.crypto_event_chance_bps(p_event jsonb, p_category text, p_tech double precision,
+                                                          p_hype double precision, p_utility double precision)
+returns integer
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_base double precision := public.cfg_num(p_event, '{chanceBps}', 0);
+  t      double precision := coalesce(p_tech, 0) / 100;
+  h      double precision := coalesce(p_hype, 0) / 100;
+  u      double precision := coalesce(p_utility, 0) / 100;
+  f      double precision;
+begin
+  if p_event is null or jsonb_typeof(p_event -> 'scope') is distinct from 'array' or not ((p_event -> 'scope') ? p_category) then
+    return 0;
+  end if;
+  if p_category <> 'player' or p_tech is null then
+    return floor(v_base + 0.5)::integer;
+  end if;
+  f := case p_event ->> 'key'
+    when 'hack' then power(1 - t, 2) * 1.5
+    when 'bug' then 1.2 - t
+    when 'influencer' then 0.5 + h
+    when 'exchange_listing' then 0.4 + (t + u) / 2
+    when 'delisting_rumor' then 1.3 - (t + u) / 2
+    when 'whale_buy' then 0.5 + h
+    when 'whale_dump' then 1
+    when 'partnership' then 0.4 + u
+    when 'fud' then 1.2 - h / 2
+    else 1
+  end;
+  return floor(v_base * f + 0.5)::integer;
+end;
+$$;
+
+-- rollCoinEvent: u0 decides whether, u1 which event (weighted by chance); null = nothing happens
+create or replace function public.crypto_roll_coin_event(p_cfg jsonb, p_u0 double precision, p_u1 double precision,
+                                                         p_category text, p_tech double precision, p_hype double precision,
+                                                         p_utility double precision)
+returns jsonb
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_total double precision := 0;
+  v_x     double precision;
+  v_last  jsonb;
+  r       record;
+begin
+  for r in select e.x as ev, public.crypto_event_chance_bps(e.x, p_category, p_tech, p_hype, p_utility) as w
+             from jsonb_array_elements(public.crypto_cfg_array(p_cfg, '{events}')) with ordinality e(x, ord)
+            where not coalesce((e.x -> 'scope') ? 'market', false)
+            order by e.ord loop
+    if r.w > 0 then
+      v_total := v_total + r.w;
+    end if;
+  end loop;
+  if v_total <= 0 or coalesce(p_u0, 1) * 10000 >= v_total then
+    return null;
+  end if;
+  v_x := coalesce(p_u1, 0) * v_total;
+  for r in select e.x as ev, public.crypto_event_chance_bps(e.x, p_category, p_tech, p_hype, p_utility) as w
+             from jsonb_array_elements(public.crypto_cfg_array(p_cfg, '{events}')) with ordinality e(x, ord)
+            where not coalesce((e.x -> 'scope') ? 'market', false)
+            order by e.ord loop
+    continue when r.w <= 0;
+    if v_x < r.w then
+      return r.ev;
+    end if;
+    v_x := v_x - r.w;
+    v_last := r.ev;
+  end loop;
+  return v_last;
+end;
+$$;
+
+-- rollMarketEvent: one market-wide event per hour (meme_wave, regulation) or null
+create or replace function public.crypto_roll_market_event(p_cfg jsonb, p_u0 double precision, p_u1 double precision)
+returns jsonb
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_total double precision := 0;
+  v_x     double precision;
+  v_last  jsonb;
+  r       record;
+begin
+  select coalesce(sum(public.cfg_num(e, '{chanceBps}', 0)), 0) into v_total
+    from jsonb_array_elements(public.crypto_cfg_array(p_cfg, '{events}')) e
+   where coalesce((e -> 'scope') ? 'market', false);
+  if coalesce(p_u0, 1) * 10000 >= v_total then
+    return null;
+  end if;
+  v_x := coalesce(p_u1, 0) * v_total;
+  for r in select e.x as ev, public.cfg_num(e.x, '{chanceBps}', 0) as w
+             from jsonb_array_elements(public.crypto_cfg_array(p_cfg, '{events}')) with ordinality e(x, ord)
+            where coalesce((e.x -> 'scope') ? 'market', false)
+            order by e.ord loop
+    if v_x < r.w then
+      return r.ev;
+    end if;
+    v_x := v_x - r.w;
+    v_last := r.ev;
+  end loop;
+  return v_last;
+end;
+$$;
+
+-- eventShock: a log return inside the range; algorithmic stablecoins lose their peg twice as hard
+create or replace function public.crypto_event_shock(p_event jsonb, p_u double precision, p_algorithmic boolean default false)
+returns double precision
+language sql
+immutable
+set search_path = ''
+as $$
+  select (public.cfg_num(p_event, '{shockMin}', 0)
+          + (public.cfg_num(p_event, '{shockMax}', 0) - public.cfg_num(p_event, '{shockMin}', 0))
+            * least(1, greatest(0, coalesce(p_u, 0))))
+         * case when p_event ->> 'key' = 'depeg' and coalesce(p_algorithmic, false) then 2 else 1 end;
+$$;
+
+-- actionSuccessBps: base plus IT skill points (always 100 % without a base)
+create or replace function public.crypto_action_success_bps(p_cfg jsonb, p_action jsonb, p_it_score double precision)
+returns integer
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when p_action is null then 0
+              when jsonb_typeof(p_action -> 'baseBps') is distinct from 'number' then 10000
+              else least(10000, round(public.cfg_num(p_action, '{baseBps}', 0)
+                                      + greatest(0, floor(coalesce(p_it_score, 0)))
+                                        * public.cfg_num(p_cfg, '{create,itBpsPerScore}', 300)))::integer end;
+$$;
+
+-- launchPool: the team keeps its share on top of the pool's coins (team / (pool + team) = share)
+create or replace function public.crypto_launch_team_e6(p_pool_tokens bigint, p_share_bps integer)
+returns bigint
+language sql
+immutable
+set search_path = ''
+as $$
+  select public.div_round_half_even(p_pool_tokens::numeric * s.v, 10000 - s.v)
+    from (select least(9999, greatest(0, coalesce(p_share_bps, 0)))::numeric as v) s;
+$$;
+
+-- isRugPull: more than rugShareBps of the team tokens at launch sold within the window
+create or replace function public.crypto_is_rug_pull(p_cfg jsonb, p_sold_e6 bigint, p_team_at_launch_e6 bigint)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce(p_team_at_launch_e6, 0) > 0
+     and coalesce(p_sold_e6, 0)::numeric * 10000
+         > p_team_at_launch_e6::numeric * round(public.cfg_num(p_cfg, '{create,rugShareBps}', 2000))::numeric;
+$$;
+
+-- discontinuePayoutCents: the pool's cash by coins
+create or replace function public.crypto_discontinue_payout_cents(p_pool_cash bigint, p_holder_e6 bigint, p_circulating_e6 bigint)
+returns bigint
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when coalesce(p_circulating_e6, 0) <= 0 then 0::bigint
+              else div(p_pool_cash::numeric * p_holder_e6, p_circulating_e6)::bigint end;
+$$;
+
+-- nextMemeCoin: the first unused name of crypto.memeNames, the ticker from its consonants (unused among securities)
+create or replace function public.crypto_next_meme_coin(out name text, out ticker text)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_name    text;
+  v_letters text;
+  v_cons    text;
+  v_t       text;
+begin
+  name := null;
+  ticker := null;
+  for v_name in select x #>> '{}' from jsonb_array_elements(public.crypto_cfg_array(public.crypto_cfg(), '{memeNames}'))
+                       with ordinality a(x, ord) order by a.ord loop
+    continue when exists (select 1 from public.crypto_coins c where c.name = v_name);
+    v_letters := regexp_replace(upper(v_name), '[^A-Z]', '', 'g');
+    v_cons := regexp_replace(v_letters, '[AEIOU]', '', 'g');
+    foreach v_t in array array[left(v_cons, 3), left(v_letters, 3), left(v_letters, 4), left(v_cons, 4)] loop
+      if char_length(v_t) >= 3 and not exists (select 1 from public.securities s where s.ticker = v_t) then
+        name := v_name;
+        ticker := v_t;
+        return;
+      end if;
+    end loop;
+  end loop;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- F. Coin helpers: pool account, quote and candles, settlement, texts
+-- ---------------------------------------------------------------------------
+-- The pool's ledger account (system account 'crypto_pool:<coin id>', never negative)
+create or replace function public.crypto_pool_account(p_coin uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_id     uuid;
+  v_ticker text;
+begin
+  select c.pool_account_id, c.ticker into v_id, v_ticker from public.crypto_coins c where c.id = p_coin;
+  if v_id is not null then
+    return v_id;
+  end if;
+  insert into public.ledger_accounts (kind, system_key, label, allow_negative)
+  values ('system', 'crypto_pool:' || p_coin::text, 'Crypto pool ' || coalesce(v_ticker, '?') || ' (ADR-101)', false)
+  on conflict do nothing;
+  v_id := public.ledger_system_account('crypto_pool:' || p_coin::text);
+  update public.crypto_coins set pool_account_id = v_id where id = p_coin;
+  return v_id;
+end;
+$$;
+
+-- Coins in circulation: held by players (open positions)
+create or replace function public.crypto_held_e6(p_security uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(sum(p.quantity_e6), 0)::bigint from public.positions p
+   where p.security_id = p_security and p.status = 'open' and p.quantity_e6 > 0;
+$$;
+
+-- Quote, candles and hourly volume after the pool of a coin changed outside the tick (trades, events, launch).
+-- bid/ask = price ∓ the category fee; market cap = (pool + held coins) × price.
+create or replace function public.crypto_mark(p_coin uuid, p_now timestamptz, p_volume_e6 bigint default 0,
+                                              p_volume_cents bigint default 0)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  c       public.crypto_coins;
+  v_epoch constant timestamptz := '2000-01-01 00:00:00+00';
+  v_price bigint;
+  v_half  bigint;
+  v_mcap  bigint;
+  v_seq   bigint;
+  v_vol   bigint := greatest(0, coalesce(p_volume_e6, 0));
+  v_cents bigint := greatest(0, coalesce(p_volume_cents, 0));
+begin
+  select * into c from public.crypto_coins where id = p_coin;
+  if c.id is null or c.pool_tokens_e6 <= 0 then
+    return null;
+  end if;
+  v_price := greatest(1, public.crypto_pool_price_e4(c.pool_cash_cents, c.pool_tokens_e6));
+  v_half := greatest(1, public.div_round_half_even(v_price::numeric * public.crypto_cat_val(public.crypto_cfg(), c.category, 'feeBps')::numeric, 10000));
+  v_mcap := public.value_cents(c.pool_tokens_e6 + public.crypto_held_e6(c.security_id), v_price);
+  select r.tick_seq into v_seq from public.sim_runtime r where r.id;
+
+  insert into public.security_quotes as q (security_id, last_price_e4, bid_e4, ask_e4, prev_close_e4, day_open_e4, day_high_e4,
+                                           day_low_e4, day_volume_e6, day_turnover_cents, change_bps, market_cap_cents,
+                                           tick_seq, updated_at)
+  values (c.security_id, v_price, greatest(1, v_price - v_half), v_price + v_half, v_price, v_price, v_price, v_price,
+          v_vol, v_cents, 0, v_mcap, coalesce(v_seq, 0), p_now)
+  on conflict (security_id) do update
+     set last_price_e4 = excluded.last_price_e4,
+         bid_e4 = excluded.bid_e4,
+         ask_e4 = excluded.ask_e4,
+         day_high_e4 = greatest(coalesce(q.day_high_e4, excluded.last_price_e4), excluded.last_price_e4),
+         day_low_e4 = least(coalesce(q.day_low_e4, excluded.last_price_e4), excluded.last_price_e4),
+         day_volume_e6 = q.day_volume_e6 + excluded.day_volume_e6,
+         day_turnover_cents = q.day_turnover_cents + excluded.day_turnover_cents,
+         change_bps = greatest(-1000000, least(1000000, round((excluded.last_price_e4 - coalesce(q.prev_close_e4, excluded.last_price_e4))
+                                                               * 10000.0 / greatest(1, coalesce(q.prev_close_e4, excluded.last_price_e4)))))::integer,
+         market_cap_cents = excluded.market_cap_cents,
+         updated_at = excluded.updated_at;
+
+  insert into public.candles as k (security_id, interval, bucket_start, open_e4, high_e4, low_e4, close_e4, volume_e6, tick_count)
+  select c.security_id, iv.i, iv.b, v_price, v_price, v_price, v_price, v_vol, 1
+    from (values
+      ('1m'::public.candle_interval, date_bin('1 minute', p_now, v_epoch)),
+      ('5m'::public.candle_interval, date_bin('5 minutes', p_now, v_epoch)),
+      ('1h'::public.candle_interval, date_bin('1 hour', p_now, v_epoch)),
+      ('1q'::public.candle_interval, public.quarter_bucket_start(p_now)),
+      ('1y'::public.candle_interval, public.game_year_bucket_start(p_now))) as iv(i, b)
+  on conflict (security_id, interval, bucket_start) do update
+     set high_e4 = greatest(k.high_e4, excluded.high_e4),
+         low_e4 = least(k.low_e4, excluded.low_e4),
+         close_e4 = excluded.close_e4,
+         volume_e6 = k.volume_e6 + excluded.volume_e6,
+         tick_count = k.tick_count + 1;
+
+  if v_cents > 0 then
+    insert into public.crypto_volume_hours as h (coin_id, hour, volume_cents)
+    values (c.id, date_bin('1 hour', p_now, v_epoch), v_cents)
+    on conflict (coin_id, hour) do update set volume_cents = h.volume_cents + excluded.volume_cents;
+  end if;
+  return v_price;
+end;
+$$;
+
+-- Books the AI flows of one coin that the ticks collected (market <-> pool). The caller holds the coin row lock.
+create or replace function public.crypto_pool_settle(p_coin uuid)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  c public.crypto_coins;
+begin
+  select * into c from public.crypto_coins where id = p_coin;
+  if c.id is null or c.pending_flow_cents = 0 or c.pool_account_id is null then
+    return 0;
+  end if;
+  perform public.ledger_post('crypto_flow', jsonb_build_array(
+      jsonb_build_object('account_id', public.ledger_system_account('market'), 'amount_cents', -c.pending_flow_cents),
+      jsonb_build_object('account_id', c.pool_account_id, 'amount_cents', c.pending_flow_cents)),
+    'Krypto-Markt: Handel mit ' || c.ticker, 'crypto_coin', c.id, null, null,
+    jsonb_build_object('flow_cents', c.pending_flow_cents));
+  update public.crypto_coins set pending_flow_cents = 0 where id = p_coin;
+  return c.pending_flow_cents;
+end;
+$$;
+
+-- Books the AI flows of all coins in one transaction (hourly). Coins are locked by the caller.
+create or replace function public.crypto_settle_flows()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_entries jsonb;
+  v_sum     bigint;
+  v_n       integer;
+begin
+  select coalesce(jsonb_agg(jsonb_build_object('account_id', c.pool_account_id, 'amount_cents', c.pending_flow_cents)
+                            order by c.pool_account_id), '[]'::jsonb),
+         coalesce(sum(c.pending_flow_cents), 0)::bigint, count(*)::integer
+    into v_entries, v_sum, v_n
+    from public.crypto_coins c
+   where c.pending_flow_cents <> 0 and c.pool_account_id is not null;
+  if v_n = 0 then
+    return jsonb_build_object('coins', 0, 'net_cents', 0);
+  end if;
+  if v_sum <> 0 then
+    v_entries := v_entries || jsonb_build_array(
+      jsonb_build_object('account_id', public.ledger_system_account('market'), 'amount_cents', -v_sum));
+  end if;
+  perform public.ledger_post('crypto_flow', v_entries, 'Krypto-Markt: Handel der KI-Händler', 'crypto', null, null, null,
+                             jsonb_build_object('coins', v_n, 'net_cents', v_sum));
+  update public.crypto_coins set pending_flow_cents = 0 where pending_flow_cents <> 0 and pool_account_id is not null;
+  return jsonb_build_object('coins', v_n, 'net_cents', v_sum);
+end;
+$$;
+
+-- Frees the ticker of a closed coin's security: TICKER1, TICKER2, ... (digits never occur in coin tickers)
+create or replace function public.crypto_tombstone_ticker(p_security uuid)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_ticker text;
+  v_new    text;
+  i        integer := 1;
+begin
+  select s.ticker into v_ticker from public.securities s where s.id = p_security;
+  if v_ticker is null or v_ticker ~ '[0-9]' then
+    return v_ticker;
+  end if;
+  loop
+    v_new := left(v_ticker, 8 - char_length(i::text)) || i::text;
+    exit when not exists (select 1 from public.securities s where s.ticker = v_new);
+    i := i + 1;
+  end loop;
+  update public.securities set ticker = v_new where id = p_security;
+  return v_new;
+end;
+$$;
+
+-- German name of an action (notifications)
+create or replace function public.crypto_action_label(p_key text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case p_key
+    when 'smart_contract' then 'Smart Contract'
+    when 'audit' then 'Security-Audit'
+    when 'community' then 'Community-Aufbau'
+    when 'influencer' then 'Influencer-Kampagne'
+    when 'partnership' then 'Partnerschaft'
+    when 'staking' then 'Staking'
+    when 'bugfix' then 'Bugfix'
+    when 'marketing_burn' then 'Token-Verbrennung'
+    else coalesce(p_key, 'Aktion')
+  end;
+$$;
+
+-- German title and body of a crypto event about a coin (notification type crypto_event)
+create or replace function public.crypto_event_text(p_key text, p_name text)
+returns jsonb
+language sql
+immutable
+set search_path = ''
+as $$
+  select case p_key
+    when 'hack' then jsonb_build_object('title', 'Hack bei ' || n, 'body', 'Angreifer haben Geld aus dem Pool gestohlen. Der Kurs bricht ein.')
+    when 'bug' then jsonb_build_object('title', 'Bug bei ' || n, 'body', 'Ein Fehler im Smart Contract verunsichert die Halter.')
+    when 'influencer' then jsonb_build_object('title', 'Influencer feiert ' || n, 'body', 'Ein bekannter Influencer schwärmt von der Währung. Der Kurs springt.')
+    when 'exchange_listing' then jsonb_build_object('title', n || ' an einer Börse gelistet', 'body', 'Eine große Krypto-Börse nimmt die Währung auf.')
+    when 'delisting_rumor' then jsonb_build_object('title', 'Delisting-Gerücht um ' || n, 'body', 'Es heißt, eine Börse wolle die Währung streichen.')
+    when 'whale_buy' then jsonb_build_object('title', 'Wal kauft ' || n, 'body', 'Ein Großanleger kauft in großem Stil.')
+    when 'whale_dump' then jsonb_build_object('title', 'Wal verkauft ' || n, 'body', 'Ein Großanleger wirft seine Coins auf den Markt.')
+    when 'partnership' then jsonb_build_object('title', 'Partnerschaft für ' || n, 'body', 'Ein Unternehmen will die Währung nutzen.')
+    when 'fud' then jsonb_build_object('title', 'Angstmache um ' || n, 'body', 'Gerüchte und Panik drücken den Kurs.')
+    when 'network_upgrade' then jsonb_build_object('title', 'Netzwerk-Upgrade bei ' || n, 'body', 'Das Netzwerk wird schneller und günstiger.')
+    when 'depeg' then jsonb_build_object('title', n || ' verliert die Bindung', 'body', 'Der Stablecoin ist nicht mehr 1 € wert.')
+    when 'meme_wave' then jsonb_build_object('title', 'Meme-Welle', 'body', 'Shitcoins sind plötzlich überall gefragt.')
+    when 'regulation' then jsonb_build_object('title', 'Regulierung trifft ' || n, 'body', 'Neue Regeln für Kryptowährungen drücken den ganzen Markt.')
+    when 'rug_pull' then jsonb_build_object('title', 'Rug Pull bei ' || n, 'body', 'Die Macher haben in großem Stil Coins verkauft. Der Kurs stürzt ab.')
+    when 'exposed' then jsonb_build_object('title', 'Werbedeal von ' || n || ' aufgeflogen', 'body', 'Die bezahlte Influencer-Werbung ist aufgeflogen: Der Hype ist weg, der Kurs fällt.')
+    when 'dead' then jsonb_build_object('title', n || ' ist tot', 'body', 'Der Kurs ist fast null. In einem Tag wird die Währung gestrichen.')
+    when 'delisted' then jsonb_build_object('title', n || ' gestrichen', 'body', 'Die Währung ist vom Markt verschwunden.')
+    when 'closed' then jsonb_build_object('title', n || ' eingestellt', 'body', 'Der Pool wurde nach Coins an alle Halter ausgezahlt.')
+    else jsonb_build_object('title', 'Neuigkeit zu ' || n, 'body', 'Bei der Währung hat sich etwas getan.')
+  end
+  from (select coalesce(p_name, 'einer Kryptowährung') as n) x;
+$$;
+
+-- In-app notification to every holder of a coin (open position) and, if wanted, its creator
+create or replace function public.crypto_notify(p_coin uuid, p_title text, p_body text, p_payload jsonb, p_dedupe text,
+                                                p_creator boolean default true, p_holders boolean default true,
+                                                p_except uuid default null)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  c   public.crypto_coins;
+  s   public.securities;
+  r   record;
+  v_n integer := 0;
+begin
+  select * into c from public.crypto_coins where id = p_coin;
+  select * into s from public.securities where id = c.security_id;
+  for r in select x.player_id from (
+             select p.player_id from public.positions p
+              where p_holders and p.security_id = c.security_id and p.status = 'open' and p.quantity_e6 > 0
+             union
+             select c.creator_id where p_creator and c.creator_id is not null) x
+            where x.player_id is distinct from p_except
+            order by x.player_id loop
+    perform public.social_notify(r.player_id, 'crypto_event', p_title, p_body,
+                                 jsonb_build_object('ticker', s.ticker, 'name', c.name) || coalesce(p_payload, '{}'::jsonb),
+                                 '/crypto/' || s.ticker, p_dedupe);
+    v_n := v_n + 1;
+  end loop;
+  return v_n;
+end;
+$$;
+
+-- One crypto event row
+create or replace function public.crypto_log(p_coin uuid, p_key text, p_shock_bps integer, p_payload jsonb, p_at timestamptz)
+returns bigint
+language sql
+security definer
+set search_path = ''
+as $$
+  insert into public.crypto_events (coin_id, key, shock_bps, payload, at)
+  values (p_coin, p_key, p_shock_bps, coalesce(p_payload, '{}'::jsonb), coalesce(p_at, now()))
+  returning id;
+$$;
+
+-- Capital gains tax of a realised result, exactly as execute_fill: losses fill the loss pot, gains are offset against
+-- it first, then taxed with trading.capitalGainsTaxBps; the game year's tax row is updated. Returns the tax.
+create or replace function public.crypto_realise(p_player uuid, p_pnl bigint)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_pot    bigint;
+  v_offset bigint;
+  v_tax    bigint := 0;
+  v_year   integer;
+begin
+  select pp.tax_loss_pot_cents into v_pot from public.player_private pp where pp.player_id = p_player for update;
+  v_pot := coalesce(v_pot, 0);
+  if p_pnl <= 0 then
+    v_pot := v_pot - p_pnl;
+  else
+    v_offset := least(p_pnl, v_pot);
+    v_tax := public.apply_bps(p_pnl - v_offset, public.config_double('trading', '{capitalGainsTaxBps}', 2500)::numeric);
+    v_pot := v_pot - v_offset;
+  end if;
+  update public.player_private set tax_loss_pot_cents = v_pot where player_id = p_player;
+  v_year := coalesce((select q.game_year from public.current_game_quarter() q), 0);
+  insert into public.player_tax_years as t (player_id, game_year, realized_gains_cents, realized_losses_cents, tax_paid_cents)
+  values (p_player, v_year, greatest(p_pnl, 0), greatest(-p_pnl, 0), v_tax)
+  on conflict (player_id, game_year) do update
+    set realized_gains_cents  = t.realized_gains_cents + excluded.realized_gains_cents,
+        realized_losses_cents = t.realized_losses_cents + excluded.realized_losses_cents,
+        tax_paid_cents        = t.tax_paid_cents + excluded.tax_paid_cents,
+        updated_at            = now();
+  return v_tax;
+end;
+$$;
+
+-- Closes a whole position of a coin with a payout from the pool (coin closed, dead coin delisted): realised result and
+-- tax like a sale, a system order and a trade for the history (counterparty issuer). The coin row is locked and its
+-- pending flows are settled by the caller.
+create or replace function public.crypto_close_position(p_position uuid, p_payout_cents bigint, p_key text, p_now timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  pos      public.positions;
+  c        public.crypto_coins;
+  v_payout bigint := greatest(0, coalesce(p_payout_cents, 0));
+  v_pnl    bigint;
+  v_tax    bigint;
+  v_net    bigint;
+  v_tx     uuid;
+  v_order  uuid := gen_random_uuid();
+  v_trade  uuid := gen_random_uuid();
+  v_price  bigint;
+  v_seq    bigint;
+begin
+  select * into pos from public.positions where id = p_position for update;
+  if pos.id is null or pos.status <> 'open' or pos.quantity_e6 <= 0 then
+    return null;
+  end if;
+  select * into c from public.crypto_coins where security_id = pos.security_id;
+  perform public.lock_player_accounts(pos.player_id);
+  v_pnl := v_payout - pos.cost_basis_cents;
+  v_tax := least(public.crypto_realise(pos.player_id, v_pnl), v_payout);
+  v_net := v_payout - v_tax;
+  if v_payout > 0 then
+    v_tx := public.ledger_post('crypto_payout',
+      (select jsonb_agg(jsonb_build_object('account_id', x.a, 'amount_cents', x.v))
+         from (values (c.pool_account_id, -v_payout),
+                      (public.ledger_player_account(pos.player_id, 'player_cash'), v_net),
+                      (public.ledger_system_account('treasury'), v_tax)) as x(a, v)
+        where x.v <> 0),
+      'Auszahlung ' || c.ticker, 'crypto_coin', c.id, p_key || ':' || pos.id::text, pos.player_id,
+      jsonb_build_object('quantity_e6', pos.quantity_e6, 'payout_cents', v_payout, 'tax_cents', v_tax));
+  else
+    v_tx := null;
+  end if;
+  v_price := greatest(1, public.div_round_half_even(v_payout::numeric * 100000000, pos.quantity_e6));
+  select r.tick_seq into v_seq from public.sim_runtime r where r.id;
+  insert into public.orders (id, player_id, security_id, request_id, source, side, type, quantity_e6, filled_quantity_e6,
+                             status, avg_fill_price_e4, fee_cents, filled_at)
+  values (v_order, pos.player_id, pos.security_id, gen_random_uuid(), 'system', 'sell', 'market', pos.quantity_e6,
+          pos.quantity_e6, 'filled', v_price, 0, p_now);
+  insert into public.trades (id, order_id, player_id, security_id, position_id, side, quantity_e6, price_e4, gross_cents,
+                             fee_cents, tax_cents, realized_pnl_cents, counterparty, ledger_transaction_id, tick_seq, executed_at)
+  values (v_trade, v_order, pos.player_id, pos.security_id, pos.id, 'sell', pos.quantity_e6, v_price, v_payout, 0, v_tax,
+          v_pnl, 'issuer', v_tx, v_seq, p_now);
+  update public.positions
+     set quantity_e6 = 0, reserved_quantity_e6 = 0, cost_basis_cents = 0, status = 'closed', closed_at = p_now,
+         realized_pnl_cents = realized_pnl_cents + v_pnl
+   where id = pos.id;
+  if v_net > 0 then
+    perform public.loan_withhold(pos.player_id, v_net, p_key || ':' || pos.id::text);
+  end if;
+  return jsonb_build_object('player_id', pos.player_id, 'quantity_e6', pos.quantity_e6, 'payout_cents', v_payout,
+                            'tax_cents', v_tax, 'realized_pnl_cents', v_pnl);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- G. Listing coins and seeding the market
+-- ---------------------------------------------------------------------------
+-- A light price history for a new AI coin: a bounded random walk that ends at the current price (1 minute steps for
+-- the last hour, 5 minute steps for three days before), as candles 1m, 5m, 1h, 1q and 1y.
+create or replace function public.crypto_seed_history(p_coin uuid, p_now timestamptz)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  c        public.crypto_coins;
+  v_cfg    jsonb := public.crypto_cfg();
+  v_epoch  constant timestamptz := '2000-01-01 00:00:00+00';
+  v_m1_end timestamptz := date_bin('1 minute', p_now, '2000-01-01 00:00:00+00'::timestamptz);
+  v_fine   timestamptz := date_bin('5 minutes', p_now - interval '1 hour', '2000-01-01 00:00:00+00'::timestamptz);
+  v_sigma  double precision;
+  v_band   double precision;
+  v_price  double precision;
+  v_vol    double precision;
+  v_n      integer;
+begin
+  select * into c from public.crypto_coins where id = p_coin;
+  if c.id is null or c.pool_tokens_e6 <= 0
+     or exists (select 1 from public.candles k
+                 where k.security_id = c.security_id and k.interval = '5m' and k.bucket_start < p_now - interval '1 hour'
+                 limit 1) then
+    return 0;
+  end if;
+  -- only the candles of the listing itself exist: the history replaces them
+  delete from public.candles k where k.security_id = c.security_id;
+  v_sigma := greatest(1e-6, public.crypto_cat_val(v_cfg, c.category, 'sigmaDay'));
+  v_band := v_sigma * sqrt(3.0) * 1.5;
+  v_price := public.crypto_pool_price_e4(c.pool_cash_cents, c.pool_tokens_e6);
+  v_vol := c.pool_tokens_e6 * 0.0005;
+
+  if to_regclass('pg_temp.nexa_crypto_bf') is not null then
+    drop table pg_temp.nexa_crypto_bf;
+  end if;
+  create temporary table nexa_crypto_bf (
+    k integer, iv text, bucket_start timestamptz, minutes integer, sigma double precision,
+    close_e4 bigint, open_e4 bigint, high_e4 bigint, low_e4 bigint, volume bigint
+  ) on commit drop;
+  insert into pg_temp.nexa_crypto_bf (k, iv, bucket_start, minutes, sigma)
+  select (row_number() over (order by s.b desc) - 1)::integer, s.iv, s.b, s.m, v_sigma * sqrt(s.m / 1440.0)
+    from (select 'm'::text as iv, g as b, 1 as m from generate_series(v_m1_end, v_fine, interval '-1 minute') g
+          union all
+          select '5', g, 5 from generate_series(v_fine - interval '5 minutes', v_fine - interval '3 days', interval '-5 minutes') g) s;
+
+  update pg_temp.nexa_crypto_bf t
+     set close_e4 = x.c
+    from (select y.k, greatest(1, round(v_price * exp(v_band * tanh(y.s_cum / v_band))))::bigint as c
+            from (select b.k, sum(case when b.k = 0 then 0 else b.sigma * public.gauss_random() end) over (order by b.k) as s_cum
+                    from pg_temp.nexa_crypto_bf b) y) x
+   where t.k = x.k;
+  update pg_temp.nexa_crypto_bf t
+     set open_e4 = x.o,
+         high_e4 = ceil(greatest(x.o, t.close_e4) * exp(abs(public.gauss_random()) * t.sigma * 0.5))::bigint,
+         low_e4  = greatest(1, floor(least(x.o, t.close_e4) * exp(-abs(public.gauss_random()) * t.sigma * 0.5)))::bigint,
+         volume  = round(v_vol * t.minutes * (0.5 + random()))::bigint
+    from (select b.k, coalesce(lead(b.close_e4) over (order by b.k), b.close_e4) as o from pg_temp.nexa_crypto_bf b) x
+   where t.k = x.k;
+
+  insert into public.candles (security_id, interval, bucket_start, open_e4, high_e4, low_e4, close_e4, volume_e6, tick_count)
+  select c.security_id, '1m', b.bucket_start, b.open_e4, b.high_e4, b.low_e4, b.close_e4, b.volume, 12
+    from pg_temp.nexa_crypto_bf b where b.iv = 'm'
+  on conflict do nothing;
+  insert into public.candles (security_id, interval, bucket_start, open_e4, high_e4, low_e4, close_e4, volume_e6, tick_count)
+  select c.security_id, g.target_iv::public.candle_interval, g.bucket,
+         (array_agg(g.open_e4 order by g.bucket_start))[1], max(g.high_e4), min(g.low_e4),
+         (array_agg(g.close_e4 order by g.bucket_start desc))[1], sum(g.volume), sum(g.minutes * 12)
+    from (select b.*, '5m' as target_iv, date_bin('5 minutes', b.bucket_start, v_epoch) as bucket from pg_temp.nexa_crypto_bf b
+          union all
+          select b.*, '1h', date_bin('1 hour', b.bucket_start, v_epoch) from pg_temp.nexa_crypto_bf b
+          union all
+          select b.*, '1q', public.quarter_bucket_start(b.bucket_start) from pg_temp.nexa_crypto_bf b
+          union all
+          select b.*, '1y', public.game_year_bucket_start(b.bucket_start) from pg_temp.nexa_crypto_bf b) g
+   group by g.target_iv, g.bucket
+  on conflict do nothing;
+  get diagnostics v_n = row_count;
+
+  -- the day's statistics since the last bell, like market_bootstrap does for stocks
+  update public.security_quotes q
+     set prev_close_e4 = coalesce((select k.close_e4 from public.candles k
+                                    where k.security_id = q.security_id and k.interval = '5m'
+                                      and k.bucket_start < public.trading_day_start(p_now)
+                                    order by k.bucket_start desc limit 1), q.last_price_e4),
+         day_high_e4 = greatest(q.last_price_e4, coalesce((select max(k.high_e4) from public.candles k
+                                    where k.security_id = q.security_id and k.interval = '5m'
+                                      and k.bucket_start >= public.trading_day_start(p_now)), q.last_price_e4)),
+         day_low_e4 = least(q.last_price_e4, coalesce((select min(k.low_e4) from public.candles k
+                                    where k.security_id = q.security_id and k.interval = '5m'
+                                      and k.bucket_start >= public.trading_day_start(p_now)), q.last_price_e4))
+   where q.security_id = c.security_id;
+  update public.security_quotes q
+     set change_bps = round((q.last_price_e4 - q.prev_close_e4) * 10000.0 / greatest(1, q.prev_close_e4))::integer
+   where q.security_id = c.security_id and q.prev_close_e4 is not null;
+  drop table pg_temp.nexa_crypto_bf;
+  return v_n;
+end;
+$$;
+
+-- Lists an AI coin: security, coin, pool funded from the financial market at p_price, quote. Null if the ticker is
+-- taken or the market cannot pay.
+create or replace function public.crypto_list_ai_coin(p_ticker text, p_name text, p_category text, p_price_e4 bigint,
+                                                      p_pool_cents bigint, p_algorithmic boolean, p_color text,
+                                                      p_seed_ticker text, p_now timestamptz)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_sec    uuid;
+  v_coin   uuid;
+  v_acc    uuid;
+  v_market bigint;
+  v_tokens bigint;
+begin
+  if p_ticker is null or p_ticker !~ '^[A-Z]{2,8}$' or p_price_e4 is null or p_price_e4 <= 0 or p_pool_cents is null
+     or p_pool_cents <= 0 or p_category not in ('stable', 'major', 'alt', 'meme')
+     or exists (select 1 from public.securities s where s.ticker = p_ticker) then
+    return null;
+  end if;
+  select a.balance_cents into v_market from public.ledger_accounts a where a.system_key = 'market';
+  if coalesce(v_market, 0) - coalesce((select sum(greatest(c.pending_flow_cents, 0)) from public.crypto_coins c), 0) < p_pool_cents then
+    return null;
+  end if;
+  v_tokens := public.crypto_pool_tokens_at(p_pool_cents, p_price_e4);
+  if v_tokens <= 0 then
+    return null;
+  end if;
+  insert into public.securities (kind, ticker, name, status, tick_size_e4, is_tradable, is_shortable, max_leverage, listed_at)
+  values ('crypto', p_ticker, p_name, 'listed', 1, true, false, 1, p_now)
+  returning id into v_sec;
+  insert into public.crypto_coins (security_id, ticker, name, category, status, peg_e4, algorithmic, color, seed_ticker,
+                                   start_price_e4, start_pool_cents, launched_at, stats_at)
+  values (v_sec, p_ticker, p_name, p_category, 'listed', case when p_category = 'stable' then p_price_e4 end,
+          coalesce(p_algorithmic, false), p_color, p_seed_ticker, p_price_e4, p_pool_cents, p_now, p_now)
+  returning id into v_coin;
+  v_acc := public.crypto_pool_account(v_coin);
+  perform public.ledger_transfer(public.ledger_system_account('market'), v_acc, p_pool_cents, 'crypto_flow',
+                                 'Krypto-Pool ' || p_ticker || ': Startkapital vom Finanzmarkt', 'crypto_coin', v_coin,
+                                 'crypto:fund:' || v_coin::text);
+  update public.crypto_coins set pool_cash_cents = p_pool_cents, pool_tokens_e6 = v_tokens where id = v_coin;
+  perform public.crypto_mark(v_coin, p_now, 0, 0);
+  return v_coin;
+end;
+$$;
+
+-- Seeds the coins of crypto.coins once (after the money genesis). Run by run_due_jobs() (crypto_run_due). Inside the
+-- transaction that added the enum value 'crypto' (update-to-latest.sql) it skips and the next run seeds.
+create or replace function public.crypto_bootstrap()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  st      public.crypto_state;
+  v_cfg   jsonb := public.crypto_cfg();
+  v_now   timestamptz := public.game_now();
+  v_coin  uuid;
+  v_n     integer := 0;
+  v_skip  jsonb := '[]'::jsonb;
+  v_t     text;
+  r       record;
+begin
+  select * into st from public.crypto_state where id for update;
+  if st.seeded_at is not null then
+    return jsonb_build_object('skipped', 'seeded');
+  end if;
+  if not public.money_genesis_done() then
+    return jsonb_build_object('skipped', 'no_genesis');
+  end if;
+  if jsonb_array_length(public.crypto_cfg_array(v_cfg, '{coins}')) = 0 then
+    return jsonb_build_object('skipped', 'no_config');
+  end if;
+  begin
+    for r in select x, ord from jsonb_array_elements(public.crypto_cfg_array(v_cfg, '{coins}')) with ordinality a(x, ord)
+              order by a.ord loop
+      v_t := upper(coalesce(r.x ->> 'ticker', ''));
+      continue when exists (select 1 from public.crypto_coins c where c.seed_ticker = v_t);
+      v_coin := public.crypto_list_ai_coin(v_t, r.x ->> 'name', r.x ->> 'category',
+                                           public.cfg_num(r.x, '{priceE4}', 0)::bigint, public.cfg_num(r.x, '{poolCents}', 0)::bigint,
+                                           coalesce((r.x ->> 'algorithmic')::boolean, false), r.x ->> 'color', v_t, v_now);
+      if v_coin is null then
+        v_skip := v_skip || to_jsonb(v_t);
+      else
+        perform public.crypto_seed_history(v_coin, v_now);
+        v_n := v_n + 1;
+      end if;
+    end loop;
+    update public.crypto_state
+       set seeded_at = now(),
+           regime = public.crypto_pick_regime(v_cfg, random()),
+           regime_until = v_now + make_interval(hours => public.crypto_regime_hours(v_cfg, random()))
+     where id;
+  exception when sqlstate '55P04' then
+    -- unsafe use of the new enum value 'crypto': it was added in this very transaction
+    return jsonb_build_object('skipped', 'enum_not_committed');
+  end;
+  return jsonb_build_object('seeded', v_n, 'skipped_tickers', v_skip);
+end;
+$$;
+comment on function public.crypto_bootstrap() is
+  'Seeds the AI coins of crypto.coins once (ADR-101): securities (kind crypto), pools funded by the financial market, quotes and a light price history.';
+
+-- ---------------------------------------------------------------------------
+-- H. Tick: the AI traders trade against every pool (from market_tick(), every crypto.tickSeconds)
+-- ---------------------------------------------------------------------------
+create or replace function public.crypto_tick_at(p_now timestamptz, p_seq bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_cfg     jsonb := public.crypto_cfg();
+  v_tick    double precision := greatest(1, public.cfg_num(v_cfg, '{tickSeconds}', 5));
+  v_epoch   constant timestamptz := '2000-01-01 00:00:00+00';
+  st        public.crypto_state;
+  v_regime  text;
+  v_drift   double precision;
+  v_zm      double precision := public.gauss_random();
+  v_bell    timestamptz := public.trading_day_start(p_now);
+  v_qstart  timestamptz := public.quarter_bucket_start(p_now);
+  v_ystart  timestamptz := public.game_year_bucket_start(p_now);
+  v_new_day boolean;
+  v_free    bigint;
+  r         record;
+  v_r       double precision;
+  v_cash    bigint;
+  v_tok     bigint;
+  v_delta   bigint;
+  v_price   bigint;
+  v_half    bigint;
+  a_coin uuid[] := '{}';   a_sec uuid[] := '{}';
+  a_cash bigint[] := '{}'; a_tok bigint[] := '{}';  a_flow bigint[] := '{}';
+  a_p bigint[] := '{}';    a_b bigint[] := '{}';    a_a bigint[] := '{}';
+  a_v bigint[] := '{}';    a_vc bigint[] := '{}';   a_mc bigint[] := '{}';
+begin
+  select * into st from public.crypto_state where id for update;
+  if st.id is null or st.seeded_at is null then
+    return jsonb_build_object('skipped', 'not_seeded');
+  end if;
+  -- crypto weather: a new regime when the old one ran out
+  if st.regime_until is null or st.regime_until <= p_now then
+    v_regime := public.crypto_pick_regime(v_cfg, random());
+    update public.crypto_state
+       set regime = v_regime, regime_until = p_now + make_interval(hours => public.crypto_regime_hours(v_cfg, random()))
+     where id;
+  else
+    v_regime := st.regime;
+  end if;
+  v_drift := public.crypto_regime_drift(v_cfg, v_regime);
+  v_new_day := coalesce((select (rt.state ->> 'day_start')::timestamptz from public.sim_runtime rt where rt.id),
+                        '-infinity'::timestamptz) < v_bell;
+  -- the financial market pays for buying flows: its balance minus what the ticks already owe the pools
+  select a.balance_cents into v_free from public.ledger_accounts a where a.system_key = 'market';
+  v_free := coalesce(v_free, 0) - coalesce((select sum(greatest(c.pending_flow_cents, 0)) from public.crypto_coins c), 0);
+
+  perform 1 from public.crypto_coins c where c.status = 'listed' order by c.id for update;
+  for r in select c.id, c.security_id, c.category, c.peg_e4, c.pool_cash_cents, c.pool_tokens_e6, c.tech, c.hype, c.utility,
+                  public.crypto_held_e6(c.security_id) as held
+             from public.crypto_coins c
+             join public.security_quotes q on q.security_id = c.security_id
+            where c.status = 'listed' and c.pool_cash_cents > 0 and c.pool_tokens_e6 > 0
+            order by c.id loop
+    if r.category = 'stable' then
+      v_r := public.crypto_stable_return(public.crypto_pool_price_e4(r.pool_cash_cents, r.pool_tokens_e6)::double precision,
+                                         coalesce(r.peg_e4, public.crypto_pool_price_e4(r.pool_cash_cents, r.pool_tokens_e6))::double precision,
+                                         public.crypto_cat_val(v_cfg, 'stable', 'pegPullPerHour'),
+                                         public.crypto_cat_val(v_cfg, 'stable', 'sigmaDay'), public.gauss_random(), v_tick);
+    elsif r.category = 'player' then
+      v_r := public.crypto_tick_return(public.crypto_player_sigma_day(v_cfg, r.tech), public.crypto_cat_val(v_cfg, 'player', 'beta'),
+                                       public.crypto_player_drift_day(v_cfg, r.hype, r.utility), v_drift, v_zm,
+                                       public.gauss_random(), v_tick);
+    else
+      v_r := public.crypto_tick_return(public.crypto_cat_val(v_cfg, r.category, 'sigmaDay'),
+                                       public.crypto_cat_val(v_cfg, r.category, 'beta'), 0, v_drift, v_zm,
+                                       public.gauss_random(), v_tick);
+    end if;
+    select f.cash_cents, f.tokens_e6 into v_cash, v_tok from public.crypto_apply_flow(r.pool_cash_cents, r.pool_tokens_e6, v_r) f;
+    v_delta := v_cash - r.pool_cash_cents;
+    if v_cash <= 0 or v_tok <= 0 or (v_delta > 0 and v_delta > v_free) then
+      -- nothing moves (the financial market cannot pay, or the pool would empty)
+      v_cash := r.pool_cash_cents;
+      v_tok := r.pool_tokens_e6;
+      v_delta := 0;
+    end if;
+    v_free := v_free - v_delta;
+    v_price := greatest(1, public.crypto_pool_price_e4(v_cash, v_tok));
+    v_half := greatest(1, public.div_round_half_even(v_price::numeric * public.crypto_cat_val(v_cfg, r.category, 'feeBps')::numeric, 10000));
+    a_coin := a_coin || r.id;            a_sec := a_sec || r.security_id;
+    a_cash := a_cash || v_cash;          a_tok := a_tok || v_tok;          a_flow := a_flow || v_delta;
+    a_p := a_p || v_price;               a_b := a_b || greatest(1, v_price - v_half);
+    a_a := a_a || (v_price + v_half);    a_v := a_v || abs(v_tok - r.pool_tokens_e6);
+    a_vc := a_vc || abs(v_delta);        a_mc := a_mc || public.value_cents(v_tok + r.held, v_price);
+  end loop;
+
+  update public.crypto_coins c
+     set pool_cash_cents = u.cash, pool_tokens_e6 = u.tok, pending_flow_cents = c.pending_flow_cents + u.flow
+    from unnest(a_coin, a_cash, a_tok, a_flow) as u(id, cash, tok, flow)
+   where c.id = u.id;
+
+  update public.security_quotes q
+     set last_price_e4 = u.p,
+         bid_e4 = u.b,
+         ask_e4 = u.a,
+         prev_close_e4 = case when v_new_day then q.last_price_e4 else coalesce(q.prev_close_e4, q.last_price_e4) end,
+         day_open_e4 = case when v_new_day then u.p else coalesce(q.day_open_e4, u.p) end,
+         day_high_e4 = case when v_new_day then u.p else greatest(coalesce(q.day_high_e4, u.p), u.p) end,
+         day_low_e4 = case when v_new_day then u.p else least(coalesce(q.day_low_e4, u.p), u.p) end,
+         day_volume_e6 = case when v_new_day then u.v else q.day_volume_e6 + u.v end,
+         day_turnover_cents = case when v_new_day then u.vc else q.day_turnover_cents + u.vc end,
+         change_bps = greatest(-1000000, least(1000000, round(
+                        (u.p - case when v_new_day then q.last_price_e4 else coalesce(q.prev_close_e4, q.last_price_e4) end) * 10000.0
+                        / greatest(1, case when v_new_day then q.last_price_e4 else coalesce(q.prev_close_e4, q.last_price_e4) end))))::integer,
+         market_cap_cents = u.mc,
+         tick_seq = p_seq,
+         updated_at = p_now
+    from unnest(a_sec, a_p, a_b, a_a, a_v, a_vc, a_mc) as u(id, p, b, a, v, vc, mc)
+   where q.security_id = u.id;
+
+  insert into public.price_ticks (security_id, ts, tick_seq, price_e4, volume_e6)
+  select u.id, p_now, p_seq, u.p, u.v from unnest(a_sec, a_p, a_v) as u(id, p, v)
+  on conflict do nothing;
+
+  insert into public.candles as k (security_id, interval, bucket_start, open_e4, high_e4, low_e4, close_e4, volume_e6, tick_count)
+  select u.id, iv.i, iv.b, u.p, u.p, u.p, u.p, u.v, 1
+    from unnest(a_sec, a_p, a_v) as u(id, p, v)
+   cross join (values
+     ('1m'::public.candle_interval, date_bin('1 minute', p_now, v_epoch)),
+     ('5m'::public.candle_interval, date_bin('5 minutes', p_now, v_epoch)),
+     ('1h'::public.candle_interval, date_bin('1 hour', p_now, v_epoch)),
+     ('1q'::public.candle_interval, v_qstart),
+     ('1y'::public.candle_interval, v_ystart)) as iv(i, b)
+  on conflict (security_id, interval, bucket_start) do update
+     set high_e4 = greatest(k.high_e4, excluded.high_e4),
+         low_e4 = least(k.low_e4, excluded.low_e4),
+         close_e4 = excluded.close_e4,
+         volume_e6 = k.volume_e6 + excluded.volume_e6,
+         tick_count = k.tick_count + 1;
+
+  insert into public.crypto_volume_hours as h (coin_id, hour, volume_cents)
+  select u.id, date_bin('1 hour', p_now, v_epoch), u.vc from unnest(a_coin, a_vc) as u(id, vc) where u.vc > 0
+  on conflict (coin_id, hour) do update set volume_cents = h.volume_cents + excluded.volume_cents;
+
+  return jsonb_build_object('coins', coalesce(array_length(a_coin, 1), 0), 'regime', v_regime);
+end;
+$$;
+comment on function public.crypto_tick_at(timestamptz, bigint) is
+  'Internal: one crypto tick (ADR-101): tickReturn/stableReturn per listed coin as the market''s flow against the pool (applyFlow); the cash difference goes to pending_flow_cents.';
+
+-- ---------------------------------------------------------------------------
+-- I. Events, actions, rug pulls, closing coins and the minute/hourly job
+-- ---------------------------------------------------------------------------
+-- Applies an event to a listed coin: hack = poolLossShare of the pool's cash to the treasury first, then the rest of the
+-- shock as the market's flow (applyFlow); stats of player coins move; log row (not for market events: those have one
+-- row with coin_id null, p_market_event); holders and creator of a player coin are notified.
+create or replace function public.crypto_apply_event(p_coin uuid, p_event jsonb, p_shock double precision, p_now timestamptz,
+                                                     p_market_event bigint default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  c        public.crypto_coins;
+  v_key    text := p_event ->> 'key';
+  v_before bigint;
+  v_after  bigint;
+  v_r      double precision := coalesce(p_shock, 0);
+  v_loss   bigint := 0;
+  v_cash   bigint;
+  v_tok    bigint;
+  v_delta  bigint;
+  v_free   bigint;
+  v_bps    integer;
+  v_id     bigint;
+  v_txt    jsonb;
+begin
+  select * into c from public.crypto_coins where id = p_coin for update;
+  if c.id is null or c.status <> 'listed' or c.pool_tokens_e6 <= 0 or c.pool_cash_cents <= 0 then
+    return null;
+  end if;
+  v_before := public.crypto_pool_price_e4(c.pool_cash_cents, c.pool_tokens_e6);
+  if v_key = 'hack' then
+    v_loss := floor(c.pool_cash_cents::numeric
+                    * least(0.99, greatest(0, public.cfg_num(p_event, '{poolLossShare}', 0)))::numeric)::bigint;
+    if v_loss > 0 then
+      perform public.crypto_pool_settle(c.id);
+      perform public.ledger_transfer(c.pool_account_id, public.ledger_system_account('treasury'), v_loss, 'crypto_flow',
+                                     'Hack bei ' || c.name, 'crypto_coin', c.id, null);
+      -- the stolen cash already moves the price; the flow does the rest of the shock
+      v_r := v_r - ln((c.pool_cash_cents - v_loss)::double precision / c.pool_cash_cents);
+      c.pool_cash_cents := c.pool_cash_cents - v_loss;
+      c.pending_flow_cents := 0;
+    end if;
+  end if;
+  select f.cash_cents, f.tokens_e6 into v_cash, v_tok from public.crypto_apply_flow(c.pool_cash_cents, c.pool_tokens_e6, v_r) f;
+  v_delta := v_cash - c.pool_cash_cents;
+  if v_delta > 0 then
+    select a.balance_cents into v_free from public.ledger_accounts a where a.system_key = 'market';
+    v_free := coalesce(v_free, 0) - coalesce((select sum(greatest(x.pending_flow_cents, 0)) from public.crypto_coins x), 0);
+    if v_delta > v_free then
+      v_cash := c.pool_cash_cents;
+      v_tok := c.pool_tokens_e6;
+      v_delta := 0;
+    end if;
+  end if;
+  if v_cash <= 0 or v_tok <= 0 then
+    v_cash := c.pool_cash_cents;
+    v_tok := c.pool_tokens_e6;
+    v_delta := 0;
+  end if;
+  update public.crypto_coins x
+     set pool_cash_cents = v_cash, pool_tokens_e6 = v_tok, pending_flow_cents = c.pending_flow_cents + v_delta,
+         tech = case when x.category = 'player' then least(100, greatest(0, x.tech + public.cfg_num(p_event, '{tech}', 0))) else x.tech end,
+         hype = case when x.category = 'player' then least(100, greatest(0, x.hype + public.cfg_num(p_event, '{hype}', 0))) else x.hype end,
+         utility = case when x.category = 'player' then least(100, greatest(0, x.utility + public.cfg_num(p_event, '{utility}', 0)))
+                        else x.utility end
+   where x.id = c.id;
+  v_after := public.crypto_pool_price_e4(v_cash, v_tok);
+  v_bps := greatest(-1000000, least(1000000, round((v_after - v_before) * 10000.0 / greatest(1, v_before))))::integer;
+  if p_market_event is null then
+    v_id := public.crypto_log(c.id, v_key, v_bps,
+      jsonb_build_object('shock', round(coalesce(p_shock, 0)::numeric, 4))
+      || case when v_loss > 0 then jsonb_build_object('loss_cents', v_loss) else '{}'::jsonb end, p_now);
+  end if;
+  perform public.crypto_mark(c.id, p_now, abs(v_tok - c.pool_tokens_e6), abs(v_delta));
+  if c.category = 'player' then
+    v_txt := public.crypto_event_text(v_key, c.name);
+    perform public.crypto_notify(c.id, v_txt ->> 'title', v_txt ->> 'body', jsonb_build_object('key', v_key, 'shock_bps', v_bps),
+                                 'crypto:ev:' || coalesce(v_id, p_market_event)::text || ':' || c.id::text);
+  end if;
+  return jsonb_build_object('ticker', c.ticker, 'key', v_key, 'shock_bps', v_bps, 'loss_cents', v_loss);
+end;
+$$;
+
+-- Rug pull by a creator (more than rugShareBps of the team tokens sold within rugWindowHours): trust rugPull, hype 0,
+-- friends feed, holders notified. Once per window (last_rug_at). The coin row is locked by the caller.
+create or replace function public.crypto_rug_pull(p_coin uuid, p_now timestamptz, p_sold_e6 bigint)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  c    public.crypto_coins;
+  s    public.securities;
+  v_id bigint;
+begin
+  select * into c from public.crypto_coins where id = p_coin;
+  select * into s from public.securities where id = c.security_id;
+  if c.creator_id is null then
+    return null;
+  end if;
+  perform public.trust_add(c.creator_id, null, 'rugPull');
+  update public.crypto_coins set hype = 0, last_rug_at = p_now where id = c.id;
+  v_id := public.crypto_log(c.id, 'rug_pull', null, jsonb_build_object('by_creator', true, 'sold_e6', p_sold_e6), p_now);
+  perform public.feed_post(c.creator_id, 'rug_pull', jsonb_build_object('ticker', s.ticker, 'name', c.name),
+                           'rug_pull:' || c.id::text || ':' || v_id::text);
+  perform public.crypto_notify(c.id, 'Rug Pull bei ' || c.name,
+                               'Der Gründer hat in kurzer Zeit einen großen Teil seiner Team-Coins verkauft.',
+                               jsonb_build_object('key', 'rug_pull'), 'crypto:ev:' || v_id::text, false, true, c.creator_id);
+  return v_id;
+end;
+$$;
+
+-- Resolves a development action at its end: success roll with success_bps, stats on success; a failed influencer deal
+-- is exposed (create.exposedHype, create.exposedShock as an event). Log row, notification to the creator.
+create or replace function public.crypto_resolve_action(p_action uuid, p_now timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  a      public.crypto_coin_actions;
+  c      public.crypto_coins;
+  v_cfg  jsonb := public.crypto_cfg();
+  v_act  jsonb;
+  v_ok   boolean;
+  v_dt   double precision;
+  v_dh   double precision;
+  v_du   double precision;
+  v_gain text;
+begin
+  select * into a from public.crypto_coin_actions where id = p_action for update;
+  if a.id is null or a.resolved_at is not null then
+    return null;
+  end if;
+  select * into c from public.crypto_coins where id = a.coin_id for update;
+  if c.id is null or c.status not in ('draft', 'listed') then
+    update public.crypto_coin_actions set resolved_at = p_now where id = a.id;
+    return null;
+  end if;
+  v_act := public.crypto_action_cfg(v_cfg, a.key);
+  v_ok := random() * 10000 < a.success_bps;
+  v_dt := public.cfg_num(v_act, '{tech}', 0);
+  v_dh := public.cfg_num(v_act, '{hype}', 0);
+  v_du := public.cfg_num(v_act, '{utility}', 0);
+  if v_ok then
+    update public.crypto_coins
+       set tech = least(100, greatest(0, tech + v_dt)), hype = least(100, greatest(0, hype + v_dh)),
+           utility = least(100, greatest(0, utility + v_du))
+     where id = c.id;
+  elsif a.key = 'influencer' then
+    update public.crypto_coins
+       set hype = least(100, greatest(0, hype + public.cfg_num(v_cfg, '{create,exposedHype}', -20)))
+     where id = c.id;
+    if c.status = 'listed' then
+      perform public.crypto_apply_event(c.id, '{"key": "exposed"}'::jsonb,
+                                        public.cfg_num(v_cfg, '{create,exposedShock}', ln(0.85)), p_now);
+    else
+      perform public.crypto_log(c.id, 'exposed', null, '{}'::jsonb, p_now);
+    end if;
+  end if;
+  update public.crypto_coin_actions set resolved_at = p_now, success = v_ok where id = a.id;
+  perform public.crypto_log(c.id, 'action', null, jsonb_build_object('action', a.key, 'success', v_ok), p_now);
+  v_gain := concat_ws(', ',
+    case when v_dt <> 0 then to_char(v_dt, 'FMS999') || ' Technik' end,
+    case when v_dh <> 0 then to_char(v_dh, 'FMS999') || ' Hype' end,
+    case when v_du <> 0 then to_char(v_du, 'FMS999') || ' Nutzen' end);
+  perform public.crypto_notify(c.id,
+    public.crypto_action_label(a.key) || case when v_ok then ' geschafft' else ' gescheitert' end,
+    case when v_ok then c.name || ': ' || coalesce(nullif(v_gain, ''), 'erledigt') || '.'
+         when a.key = 'influencer' then 'Der bezahlte Post ist aufgeflogen. Der Hype ist weg.'
+         else 'Diesmal hat es nicht geklappt. Das Geld ist weg.' end,
+    jsonb_build_object('key', 'action', 'action', a.key, 'success', v_ok), 'crypto:action:' || a.id::text, true, false);
+  return jsonb_build_object('action', a.key, 'success', v_ok);
+end;
+$$;
+
+-- Ends a coin. Player coin (p_dead false): the pool's cash goes to all holders by their coins (discontinuePayoutCents,
+-- creator included), the rounding rest to the treasury. Dead AI coin (p_dead true): holders get their coins at the dead
+-- price (at most the pool), the rest goes back to the financial market. Positions are closed like a sale (tax), the
+-- security is delisted and its ticker freed, the coin is closed. Draft coins simply close.
+create or replace function public.crypto_close_coin(p_coin uuid, p_key text, p_now timestamptz, p_dead boolean default false)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  c        public.crypto_coins;
+  r        record;
+  v_circ   bigint;
+  v_price  bigint;
+  v_left   bigint;
+  v_pay    bigint;
+  v_paid   bigint := 0;
+  v_n      integer := 0;
+  v_ticker text;
+begin
+  select * into c from public.crypto_coins where id = p_coin for update;
+  if c.id is null or c.status not in ('draft', 'listed', 'dead') then
+    return null;
+  end if;
+  update public.crypto_coin_actions set resolved_at = p_now where coin_id = c.id and resolved_at is null;
+  if c.status in ('listed', 'dead') then
+    perform public.crypto_pool_settle(c.id);
+    select * into c from public.crypto_coins where id = p_coin;
+    v_circ := public.crypto_held_e6(c.security_id);
+    v_price := public.crypto_pool_price_e4(c.pool_cash_cents, c.pool_tokens_e6);
+    v_left := c.pool_cash_cents;
+    for r in select p.id, p.player_id, p.quantity_e6 from public.positions p
+              where p.security_id = c.security_id and p.status = 'open' and p.quantity_e6 > 0
+              order by p.player_id, p.id loop
+      v_pay := least(v_left, case when p_dead then public.value_cents(r.quantity_e6, v_price)
+                                  else public.crypto_discontinue_payout_cents(c.pool_cash_cents, r.quantity_e6, v_circ) end);
+      perform public.crypto_close_position(r.id, v_pay, p_key, p_now);
+      v_left := v_left - v_pay;
+      v_paid := v_paid + v_pay;
+      v_n := v_n + 1;
+      if r.player_id is distinct from c.creator_id then
+        perform public.social_notify(r.player_id, 'crypto_event',
+          c.name || case when p_dead then ' gestrichen' else ' eingestellt' end,
+          case when v_pay > 0 then 'Für deine Coins hast du ' || public.format_eur(v_pay) || ' aus dem Pool bekommen.'
+               else 'Deine Coins sind wertlos verfallen.' end,
+          jsonb_build_object('ticker', c.ticker, 'name', c.name, 'key', case when p_dead then 'delisted' else 'closed' end,
+                             'payout_cents', v_pay),
+          '/crypto', 'crypto:closed:' || c.id::text || ':' || r.player_id::text);
+      end if;
+    end loop;
+    if v_left > 0 then
+      perform public.ledger_transfer(c.pool_account_id,
+                                     public.ledger_system_account(case when p_dead then 'market' else 'treasury' end), v_left,
+                                     'crypto_flow', 'Rest des Pools ' || c.ticker, 'crypto_coin', c.id, p_key || ':rest');
+    end if;
+  end if;
+  update public.crypto_coins
+     set status = 'closed', closed_at = p_now, pool_cash_cents = 0, pool_tokens_e6 = 0, pending_flow_cents = 0,
+         team_tokens_e6 = 0
+   where id = c.id;
+  update public.securities set status = 'delisted', is_tradable = false, delisted_at = p_now where id = c.security_id;
+  v_ticker := public.crypto_tombstone_ticker(c.security_id);
+  perform public.crypto_log(c.id, case when p_dead then 'delisted' else 'closed' end, null,
+                            jsonb_build_object('paid_cents', v_paid, 'holders', v_n), p_now);
+  return jsonb_build_object('ticker', c.ticker, 'paid_cents', v_paid, 'holders', v_n, 'rest_cents', greatest(0, coalesce(v_left, 0)));
+end;
+$$;
+
+-- Minute job (from run_due_jobs): seeding, due actions; once per hour: stats fade, events, dead coins, settlement
+create or replace function public.crypto_run_due(p_now timestamptz default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now      timestamptz := coalesce(p_now, public.game_now());
+  v_epoch    constant timestamptz := '2000-01-01 00:00:00+00';
+  v_cfg      jsonb := public.crypto_cfg();
+  v_hour     timestamptz;
+  st         public.crypto_state;
+  v_out      jsonb := '{}'::jsonb;
+  v_n        integer := 0;
+  v_events   integer := 0;
+  v_dead     integer := 0;
+  v_repl     integer := 0;
+  v_ev       jsonb;
+  v_shock    double precision;
+  v_mid      bigint;
+  v_txt      jsonb;
+  v_coin     uuid;
+  v_new      record;
+  r          record;
+begin
+  v_hour := date_bin('1 hour', v_now, v_epoch);
+  select * into st from public.crypto_state where id for update;
+  if st.id is null then
+    return jsonb_build_object('skipped', 'no_state');
+  end if;
+  if st.seeded_at is null then
+    v_out := v_out || jsonb_build_object('bootstrap', public.crypto_bootstrap());
+    select * into st from public.crypto_state where id;
+    if st.seeded_at is null then
+      return v_out;
+    end if;
+  end if;
+  -- coin rows first, in id order: the same lock order as trades and ticks (coins, then ledger accounts)
+  perform 1 from public.crypto_coins c where c.status in ('draft', 'listed', 'dead') order by c.id for update;
+
+  for r in select a.id from public.crypto_coin_actions a
+            where a.resolved_at is null and a.ends_at <= v_now order by a.ends_at, a.id loop
+    perform public.crypto_resolve_action(r.id, v_now);
+    v_n := v_n + 1;
+  end loop;
+  v_out := v_out || jsonb_build_object('actions', v_n);
+  if st.hour_done is not null and st.hour_done >= v_hour then
+    return v_out;
+  end if;
+
+  -- 1. hype and utility of player coins fade (decayStats for the hours since the last time)
+  update public.crypto_coins c
+     set hype = c.hype * power(public.cfg_num(v_cfg, '{create,hypeDecayPerHour}', 0.97), d.h),
+         utility = c.utility * power(public.cfg_num(v_cfg, '{create,utilityDecayPerHour}', 0.995), d.h),
+         stats_at = v_now
+    from (select x.id, extract(epoch from (v_now - x.stats_at)) / 3600.0 as h from public.crypto_coins x
+           where x.category = 'player' and x.status in ('draft', 'listed') and x.stats_at < v_now) d
+   where c.id = d.id;
+
+  -- 2. one event roll per listed coin
+  for r in select c.id, c.category, c.tech, c.hype, c.utility, c.algorithmic from public.crypto_coins c
+            where c.status = 'listed' order by c.id loop
+    v_ev := public.crypto_roll_coin_event(v_cfg, random(), random(), r.category,
+                                          case when r.category = 'player' then r.tech end, r.hype, r.utility);
+    if v_ev is not null then
+      perform public.crypto_apply_event(r.id, v_ev, public.crypto_event_shock(v_ev, random(), r.algorithmic), v_now);
+      v_events := v_events + 1;
+    end if;
+  end loop;
+
+  -- 3. one market event: meme_wave moves the meme coins, every other market event all coins but stablecoins
+  v_ev := public.crypto_roll_market_event(v_cfg, random(), random());
+  if v_ev is not null then
+    v_shock := public.crypto_event_shock(v_ev, random(), false);
+    v_mid := public.crypto_log(null, v_ev ->> 'key', round((exp(v_shock) - 1) * 10000)::integer,
+                               jsonb_build_object('shock', round(v_shock::numeric, 4)), v_now);
+    for r in select c.id from public.crypto_coins c
+              where c.status = 'listed'
+                and case when v_ev ->> 'key' = 'meme_wave' then c.category = 'meme' else c.category <> 'stable' end
+              order by c.id loop
+      perform public.crypto_apply_event(r.id, v_ev, v_shock, v_now, v_mid);
+    end loop;
+    v_events := v_events + 1;
+  end if;
+
+  -- 4. AI meme coins at or below deadPriceE4 are dead (no trading, frozen)
+  for r in select c.id, c.name, c.security_id from public.crypto_coins c
+            where c.status = 'listed' and c.category = 'meme' and c.creator_id is null
+              and public.crypto_pool_price_e4(c.pool_cash_cents, c.pool_tokens_e6) <= public.cfg_num(v_cfg, '{deadPriceE4}', 2)
+            order by c.id loop
+    update public.crypto_coins set status = 'dead', dead_since = v_now where id = r.id;
+    update public.securities set status = 'halted', is_tradable = false where id = r.security_id;
+    v_mid := public.crypto_log(r.id, 'dead', null, '{}'::jsonb, v_now);
+    v_txt := public.crypto_event_text('dead', r.name);
+    perform public.crypto_notify(r.id, v_txt ->> 'title', v_txt ->> 'body', jsonb_build_object('key', 'dead'),
+                                 'crypto:ev:' || v_mid::text, false, true);
+    v_dead := v_dead + 1;
+  end loop;
+
+  -- 5. dead for deadCoinReplaceHours: delisted (holders get the dead price), a new meme coin takes the place
+  for r in select c.* from public.crypto_coins c
+            where c.status = 'dead'
+              and c.dead_since <= v_now - make_interval(hours => public.cfg_num(v_cfg, '{deadCoinReplaceHours}', 24)::integer)
+            order by c.dead_since, c.id loop
+    perform public.crypto_close_coin(r.id, 'crypto:delist:' || r.id::text, v_now, true);
+    select x.name, x.ticker into v_new from public.crypto_next_meme_coin() x;
+    if v_new.name is not null then
+      v_coin := public.crypto_list_ai_coin(v_new.ticker, v_new.name, 'meme', r.start_price_e4, r.start_pool_cents, false,
+                                           r.color, null, v_now);
+      if v_coin is not null then
+        perform public.crypto_log(v_coin, 'listed', null, jsonb_build_object('replaces', r.ticker), v_now);
+        v_repl := v_repl + 1;
+      end if;
+    end if;
+  end loop;
+
+  -- 6. the AI flows of the hour in one ledger transaction
+  v_out := v_out || jsonb_build_object('settled', public.crypto_settle_flows());
+
+  -- 7. housekeeping
+  delete from public.crypto_volume_hours where hour < v_now - interval '48 hours';
+  delete from public.crypto_team_sales
+   where at < v_now - make_interval(hours => 2 * public.cfg_num(v_cfg, '{create,rugWindowHours}', 24)::integer);
+  delete from public.crypto_events where at < v_now - interval '30 days';
+  update public.crypto_state set hour_done = v_hour where id;
+  return v_out || jsonb_build_object('events', v_events, 'dead', v_dead, 'replaced', v_repl);
+end;
+$$;
+comment on function public.crypto_run_due(timestamptz) is
+  'Crypto job (run_due_jobs, every minute): seeding, due coin actions; once per hour stats fade, events, market event, dead coins, replacement, settlement of the AI flows.';
+
+-- ---------------------------------------------------------------------------
+-- J. Read model
+-- ---------------------------------------------------------------------------
+-- COIN_ROW = {ticker, name, category, status, price_e4, change_24h_bps, high_24h_e4, low_24h_e4, pool_cents,
+--             market_cap_cents, volume_24h_cents, fee_bps, color, logo|null, creator: {nickname, tag, trust: {score, band}}|null,
+--             stats: {tech, hype, utility}|null, my_quantity_e6}
+create or replace function public.crypto_coin_row(p_coin uuid, p_viewer uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  c         public.crypto_coins;
+  q         public.security_quotes;
+  v_from    timestamptz := date_bin('1 hour', public.game_now() - interval '24 hours', '2000-01-01 00:00:00+00'::timestamptz);
+  v_price   bigint;
+  v_ref     bigint;
+  v_hi      bigint;
+  v_lo      bigint;
+  v_vol     bigint := 0;
+  v_creator jsonb;
+begin
+  select * into c from public.crypto_coins where id = p_coin;
+  if c.id is null then
+    return null;
+  end if;
+  select * into q from public.security_quotes where security_id = c.security_id;
+  if c.status in ('listed', 'dead') then
+    v_price := q.last_price_e4;
+  end if;
+  if v_price is not null then
+    select k.open_e4 into v_ref from public.candles k
+     where k.security_id = c.security_id and k.interval = '1h' and k.bucket_start >= v_from
+     order by k.bucket_start limit 1;
+    select max(k.high_e4), min(k.low_e4) into v_hi, v_lo from public.candles k
+     where k.security_id = c.security_id and k.interval = '1h' and k.bucket_start >= v_from;
+    v_hi := greatest(coalesce(v_hi, v_price), v_price);
+    v_lo := least(coalesce(v_lo, v_price), v_price);
+    select coalesce(sum(h.volume_cents), 0)::bigint into v_vol from public.crypto_volume_hours h
+     where h.coin_id = c.id and h.hour >= v_from;
+  end if;
+  if c.creator_id is not null then
+    select jsonb_build_object('nickname', p.nickname, 'tag', p.tag,
+                              'trust', jsonb_build_object('score', t.v -> 'score', 'band', t.v -> 'band'))
+      into v_creator
+      from public.profiles p cross join lateral (select public.player_trust(p.id) as v) t
+     where p.id = c.creator_id;
+  end if;
+  return jsonb_build_object(
+    'ticker',           c.ticker,
+    'name',             c.name,
+    'category',         c.category,
+    'status',           c.status,
+    'price_e4',         v_price,
+    'change_24h_bps',   case when v_price is not null and coalesce(v_ref, 0) > 0
+                             then greatest(-1000000, least(1000000, round((v_price - v_ref) * 10000.0 / v_ref)))::integer
+                             else 0 end,
+    'high_24h_e4',      v_hi,
+    'low_24h_e4',       v_lo,
+    'pool_cents',       c.pool_cash_cents,
+    'market_cap_cents', case when v_price is not null then coalesce(q.market_cap_cents, 0) else 0 end,
+    'volume_24h_cents', v_vol,
+    'fee_bps',          public.crypto_player_fee_bps(p_viewer, c.category),
+    'color',            c.color,
+    'logo',             case when c.category = 'player' then c.logo end,
+    'creator',          v_creator,
+    'stats',            case when c.category = 'player'
+                             then jsonb_build_object('tech', round(c.tech::numeric, 1), 'hype', round(c.hype::numeric, 1),
+                                                     'utility', round(c.utility::numeric, 1)) end,
+    'my_quantity_e6',   coalesce((select sum(p.quantity_e6) from public.positions p
+                                   where p.player_id = p_viewer and p.security_id = c.security_id and p.status = 'open'), 0)::bigint);
+end;
+$$;
+
+-- CRYPTO_EVENT = {ticker, name, key, shock_bps, at, payload}; market events: ticker and name null
+create or replace function public.crypto_event_json(p_event bigint)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object('ticker', c.ticker, 'name', c.name, 'key', e.key, 'shock_bps', e.shock_bps, 'at', e.at,
+                            'payload', e.payload)
+    from public.crypto_events e left join public.crypto_coins c on c.id = e.coin_id
+   where e.id = p_event;
+$$;
+
+-- MY_COIN = COIN_ROW + {id, status, stats, action, actions, team_tokens_e6, team_at_launch_e6, team_sold_window_e6,
+--                       rug_limit_e6, launch, created_at, burn_hype, burn_min_e6, burn_available_at}
+create or replace function public.crypto_my_coin(p_coin uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  c        public.crypto_coins;
+  v_cfg    jsonb := public.crypto_cfg();
+  v_now    timestamptz := public.game_now();
+  v_it     double precision;
+  v_run    jsonb;
+  v_acts   jsonb;
+  v_window bigint;
+  v_burn   jsonb;
+begin
+  select * into c from public.crypto_coins where id = p_coin;
+  if c.id is null then
+    return null;
+  end if;
+  v_it := coalesce((public.player_branch_scores(c.creator_id) ->> 'it')::double precision, 0);
+  select jsonb_build_object('key', a.key, 'started_at', a.started_at, 'ends_at', a.ends_at) into v_run
+    from public.crypto_coin_actions a where a.coin_id = c.id and a.resolved_at is null;
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'key', x.a ->> 'key',
+           'cost_cents', public.cfg_num(x.a, '{costCents}', 0)::bigint,
+           'hours', public.cfg_num(x.a, '{hours}', 1),
+           'success_bps', public.crypto_action_success_bps(v_cfg, x.a, v_it),
+           'available', c.status in ('draft', 'listed') and v_run is null
+                        and (c.status = 'listed' or not coalesce((x.a ->> 'afterLaunch')::boolean, false)))
+           order by x.ord), '[]'::jsonb)
+    into v_acts
+    from jsonb_array_elements(public.crypto_cfg_array(v_cfg, '{create,actions}')) with ordinality x(a, ord)
+   where x.a ->> 'key' <> 'marketing_burn';
+  select coalesce(sum(t.quantity_e6), 0)::bigint into v_window from public.crypto_team_sales t
+   where t.coin_id = c.id and t.at > v_now - make_interval(hours => public.cfg_num(v_cfg, '{create,rugWindowHours}', 24)::integer);
+  v_burn := public.crypto_action_cfg(v_cfg, 'marketing_burn');
+  return public.crypto_coin_row(c.id, c.creator_id) || jsonb_build_object(
+    'id',                  c.id,
+    'status',              c.status,
+    'stats',               jsonb_build_object('tech', round(c.tech::numeric, 1), 'hype', round(c.hype::numeric, 1),
+                                              'utility', round(c.utility::numeric, 1)),
+    'action',              v_run,
+    'actions',             v_acts,
+    'team_tokens_e6',      c.team_tokens_e6,
+    'team_at_launch_e6',   c.team_at_launch_e6,
+    'team_sold_window_e6', v_window,
+    'rug_limit_e6',        public.div_round_half_even(c.team_at_launch_e6::numeric
+                                                      * round(public.cfg_num(v_cfg, '{create,rugShareBps}', 2000))::numeric, 10000),
+    'launch',              case when c.launched_at is not null
+                                then jsonb_build_object('start_price_e4', c.start_price_e4, 'liquidity_cents', c.start_pool_cents,
+                                                        'team_share_bps', c.team_share_bps, 'at', c.launched_at) end,
+    'created_at',          c.created_at,
+    'burn_hype',           public.cfg_num(v_burn, '{hype}', 8),
+    'burn_min_e6',         least(c.team_tokens_e6, greatest(1, public.div_round_half_even(c.team_at_launch_e6::numeric
+                                 * round(public.cfg_num(v_cfg, '{create,burnMinBps}', 100))::numeric, 10000))),
+    'burn_available_at',   case when c.last_burn_at is not null
+                                 and c.last_burn_at + make_interval(secs => public.cfg_num(v_burn, '{hours}', 1) * 3600) > v_now
+                                then c.last_burn_at + make_interval(secs => public.cfg_num(v_burn, '{hours}', 1) * 3600) end);
+end;
+$$;
+
+create or replace function public.get_crypto_market()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  st       public.crypto_state;
+  v_coins  jsonb;
+  v_events jsonb;
+begin
+  v_player := public.require_player();
+  select * into st from public.crypto_state where id;
+  select coalesce(jsonb_agg(public.crypto_coin_row(x.id, v_player) order by x.rank, x.mcap desc, x.name), '[]'::jsonb)
+    into v_coins
+    from (select c.id, c.name, coalesce(q.market_cap_cents, 0) as mcap,
+                 case c.category when 'stable' then 0 when 'major' then 1 when 'alt' then 2 when 'meme' then 3 else 4 end as rank
+            from public.crypto_coins c left join public.security_quotes q on q.security_id = c.security_id
+           where c.status in ('listed', 'dead')) x;
+  select coalesce(jsonb_agg(public.crypto_event_json(e.id) order by e.at desc, e.id desc), '[]'::jsonb)
+    into v_events
+    from (select e.id, e.at from public.crypto_events e
+           where e.key not in ('action', 'created')
+           order by e.at desc, e.id desc limit 20) e;
+  return jsonb_build_object(
+    'regime', jsonb_build_object('kind', coalesce(st.regime, 'flat'), 'until', st.regime_until),
+    'coins',  v_coins,
+    'events', v_events);
+end;
+$$;
+
+-- COIN_ROW + {pool: {cash_cents, tokens_e6}, supply_e6, team_tokens_e6|null, holders, my_position|null, events}
+create or replace function public.get_coin(p_ticker text)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  c        public.crypto_coins;
+  v_price  bigint;
+  v_pos    jsonb;
+  v_events jsonb;
+begin
+  v_player := public.require_player();
+  select x.* into c from public.crypto_coins x join public.securities s on s.id = x.security_id
+   where s.ticker = upper(btrim(coalesce(p_ticker, ''))) and x.status <> 'closed';
+  if c.id is null then
+    perform public.api_error('coin_not_found');
+  end if;
+  select q.last_price_e4 into v_price from public.security_quotes q where q.security_id = c.security_id;
+  select jsonb_build_object('quantity_e6', p.quantity_e6, 'avg_price_e4', p.avg_entry_price_e4,
+                            'value_cents', public.value_cents(p.quantity_e6, coalesce(v_price, 0)))
+    into v_pos
+    from public.positions p
+   where p.player_id = v_player and p.security_id = c.security_id and p.status = 'open' and p.quantity_e6 > 0
+   limit 1;
+  select coalesce(jsonb_agg(public.crypto_event_json(e.id) order by e.at desc, e.id desc), '[]'::jsonb)
+    into v_events
+    from (select e.id, e.at from public.crypto_events e
+           where e.coin_id = c.id
+              or (e.coin_id is null and e.at >= c.created_at and c.status in ('listed', 'dead')
+                  and case when e.key = 'meme_wave' then c.category = 'meme' else c.category <> 'stable' end)
+           order by e.at desc, e.id desc limit 20) e;
+  return public.crypto_coin_row(c.id, v_player) || jsonb_build_object(
+    'pool',           jsonb_build_object('cash_cents', c.pool_cash_cents, 'tokens_e6', c.pool_tokens_e6),
+    'supply_e6',      c.pool_tokens_e6 + public.crypto_held_e6(c.security_id),
+    'team_tokens_e6', case when c.category = 'player' then c.team_tokens_e6 end,
+    'holders',        (select count(distinct p.player_id) from public.positions p
+                        where p.security_id = c.security_id and p.status = 'open' and p.quantity_e6 > 0)::integer,
+    'my_position',    v_pos,
+    'events',         v_events);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- K. Own coins
+-- ---------------------------------------------------------------------------
+-- Why a coin name / ticker is not allowed (null = allowed): name length (create.nameMinLength..nameMaxLength), the
+-- company name filter (characters, profanity, reserved names), unique among draft and listed coins with the lookalike
+-- key of player names (name_key); ticker 3..5 letters A-Z, free among all securities and index keys, no profanity.
+create or replace function public.crypto_coin_name_violation(p_name text, p_ticker text)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_cfg    jsonb := public.crypto_cfg();
+  v_t      text := upper(btrim(coalesce(p_ticker, '')));
+  v_reason text;
+begin
+  if p_name is null or char_length(p_name) < public.cfg_num(v_cfg, '{create,nameMinLength}', 3) then
+    return 'name_too_short';
+  end if;
+  if char_length(p_name) > public.cfg_num(v_cfg, '{create,nameMaxLength}', 24) then
+    return 'name_too_long';
+  end if;
+  v_reason := public.name_violation(p_name, 'company');
+  if v_reason is not null and v_reason <> 'name_taken' then
+    return v_reason;
+  end if;
+  if exists (select 1 from public.crypto_coins c
+              where c.status in ('draft', 'listed') and public.name_key(c.name) = public.name_key(p_name)) then
+    return 'name_taken';
+  end if;
+  if v_t !~ '^[A-Z]+$' or char_length(v_t) < public.cfg_num(v_cfg, '{create,tickerMinLength}', 3)
+     or char_length(v_t) > public.cfg_num(v_cfg, '{create,tickerMaxLength}', 5) then
+    return 'invalid_argument';
+  end if;
+  if exists (select 1 from public.securities s where s.ticker = v_t)
+     or exists (select 1 from public.indices i where upper(i.key) = v_t) then
+    return 'ticker_taken';
+  end if;
+  if public.name_violation(v_t, 'company') = 'name_profanity' then
+    return 'name_profanity';
+  end if;
+  return null;
+end;
+$$;
+
+create or replace function public.check_coin_name(p_name text, p_ticker text)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_reason text;
+begin
+  perform public.require_player();
+  v_reason := public.crypto_coin_name_violation(p_name, p_ticker);
+  return jsonb_build_object('allowed', v_reason is null, 'reason', v_reason);
+end;
+$$;
+
+-- The caller's draft or listed coin, locked
+create or replace function public.crypto_own_coin(p_player uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+begin
+  select c.id into v_id from public.crypto_coins c
+   where c.creator_id = p_player and c.status in ('draft', 'listed')
+   for update;
+  if v_id is null then
+    perform public.api_error('coin_not_found');
+  end if;
+  return v_id;
+end;
+$$;
+
+create or replace function public.create_coin(p_request_id uuid, p_name text, p_ticker text, p_logo jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  v_cfg    jsonb := public.crypto_cfg();
+  v_now    timestamptz := public.game_now();
+  v_level  integer;
+  v_reason text;
+  v_ticker text := upper(btrim(coalesce(p_ticker, '')));
+  v_cost   bigint;
+  v_cash   bigint;
+  v_sec    uuid;
+  v_coin   uuid;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'create_coin');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select p.level into v_level from public.profiles p where p.id = v_player;
+  if v_level < public.cfg_num(v_cfg, '{createMinLevel}', 14) then
+    perform public.api_error('locked');
+  end if;
+  if exists (select 1 from public.crypto_coins c where c.creator_id = v_player and c.status in ('draft', 'listed')) then
+    perform public.api_error('coin_exists');
+  end if;
+  v_reason := public.crypto_coin_name_violation(p_name, p_ticker);
+  if v_reason is not null then
+    perform public.api_error(v_reason);
+  end if;
+  if p_logo is null or not public.logo_valid(p_logo) then
+    perform public.api_error('invalid_argument');
+  end if;
+  if public.logo_has_forbidden_symbol(p_logo -> 'grid') then
+    perform public.api_error('logo_forbidden');
+  end if;
+  v_cost := greatest(0, public.cfg_num(v_cfg, '{create,costCents}', 2500000))::bigint;
+  v_cash := public.lock_player_accounts(v_player);
+  if v_cash < v_cost then
+    perform public.api_error('insufficient_funds');
+  end if;
+  if v_cost > 0 then
+    perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'), public.ledger_system_account('treasury'),
+                                   v_cost, 'crypto_fee', 'Gründung der Kryptowährung ' || v_ticker, 'crypto_coin', null,
+                                   'crypto:create:' || p_request_id::text, v_player);
+  end if;
+  insert into public.securities (kind, ticker, name, status, tick_size_e4, is_tradable, is_shortable, max_leverage)
+  values ('crypto', v_ticker, p_name, 'pending', 1, false, false, 1)
+  returning id into v_sec;
+  insert into public.crypto_coins (security_id, ticker, name, category, status, color, logo, creator_id, stats_at, created_at)
+  values (v_sec, v_ticker, p_name, 'player', 'draft', p_logo -> 'palette' ->> 0,
+          jsonb_build_object('palette', p_logo -> 'palette', 'grid', p_logo -> 'grid'), v_player, v_now, v_now)
+  returning id into v_coin;
+  perform public.crypto_log(v_coin, 'created', null, '{}'::jsonb, v_now);
+  return public.request_complete(v_player, p_request_id, public.crypto_my_coin(v_coin));
+end;
+$$;
+
+create or replace function public.get_my_coin()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_coin   uuid;
+begin
+  v_player := public.require_player();
+  select c.id into v_coin from public.crypto_coins c
+   where c.creator_id = v_player and c.status in ('draft', 'listed')
+   order by c.created_at desc limit 1;
+  return jsonb_build_object('coin', case when v_coin is not null then public.crypto_my_coin(v_coin) end);
+end;
+$$;
+
+create or replace function public.start_coin_action(p_request_id uuid, p_action text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  v_cfg    jsonb := public.crypto_cfg();
+  v_now    timestamptz := public.game_now();
+  v_coin   uuid;
+  c        public.crypto_coins;
+  v_act    jsonb;
+  v_cost   bigint;
+  v_cash   bigint;
+  v_it     double precision;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'start_coin_action');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_coin := public.crypto_own_coin(v_player);
+  select * into c from public.crypto_coins where id = v_coin;
+  v_act := public.crypto_action_cfg(v_cfg, p_action);
+  if v_act is null or p_action = 'marketing_burn' then
+    perform public.api_error('invalid_argument');
+  end if;
+  if coalesce((v_act ->> 'afterLaunch')::boolean, false) and c.status <> 'listed' then
+    perform public.api_error('coin_not_launched');
+  end if;
+  if exists (select 1 from public.crypto_coin_actions a where a.coin_id = c.id and a.resolved_at is null) then
+    perform public.api_error('coin_action_running');
+  end if;
+  v_cost := greatest(0, public.cfg_num(v_act, '{costCents}', 0))::bigint;
+  v_cash := public.lock_player_accounts(v_player);
+  if v_cash < v_cost then
+    perform public.api_error('insufficient_funds');
+  end if;
+  if v_cost > 0 then
+    perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'), public.ledger_system_account('treasury'),
+                                   v_cost, 'crypto_fee', c.name || ': ' || public.crypto_action_label(p_action), 'crypto_coin', c.id,
+                                   'crypto:action:' || p_request_id::text, v_player);
+  end if;
+  v_it := coalesce((public.player_branch_scores(v_player) ->> 'it')::double precision, 0);
+  insert into public.crypto_coin_actions (coin_id, key, cost_cents, success_bps, started_at, ends_at)
+  values (c.id, p_action, v_cost, public.crypto_action_success_bps(v_cfg, v_act, v_it), v_now,
+          v_now + make_interval(secs => public.cfg_num(v_act, '{hours}', 1) * 3600));
+  return public.request_complete(v_player, p_request_id, public.crypto_my_coin(c.id));
+end;
+$$;
+
+create or replace function public.launch_coin(p_request_id uuid, p_start_price_e4 bigint, p_liquidity_cents bigint,
+                                               p_team_share_bps integer)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  v_cfg    jsonb := public.crypto_cfg();
+  v_now    timestamptz := public.game_now();
+  v_coin   uuid;
+  c        public.crypto_coins;
+  v_cash   bigint;
+  v_tokens bigint;
+  v_team   bigint;
+  v_acc    uuid;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'launch_coin');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_coin := public.crypto_own_coin(v_player);
+  select * into c from public.crypto_coins where id = v_coin;
+  if c.status <> 'draft' then
+    perform public.api_error('already_listed');
+  end if;
+  if c.tech < public.cfg_num(v_cfg, '{create,launchMinTech}', 20) then
+    perform public.api_error('coin_tech_too_low');
+  end if;
+  if p_start_price_e4 is null
+     or not exists (select 1 from jsonb_array_elements(public.crypto_cfg_array(v_cfg, '{create,startPriceOptionsE4}')) o
+                     where jsonb_typeof(o) = 'number' and (o #>> '{}')::numeric = p_start_price_e4)
+     or p_liquidity_cents is null or p_liquidity_cents < public.cfg_num(v_cfg, '{create,minLiquidityCents}', 500000)
+     or p_team_share_bps is null or p_team_share_bps < public.cfg_num(v_cfg, '{create,teamShareMinBps}', 1000)
+     or p_team_share_bps > public.cfg_num(v_cfg, '{create,teamShareMaxBps}', 5000) then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_cash := public.lock_player_accounts(v_player);
+  if v_cash < p_liquidity_cents then
+    perform public.api_error('insufficient_funds');
+  end if;
+  v_tokens := public.crypto_pool_tokens_at(p_liquidity_cents, p_start_price_e4);
+  v_team := public.crypto_launch_team_e6(v_tokens, p_team_share_bps);
+  if v_tokens <= 0 or v_team <= 0 then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_acc := public.crypto_pool_account(c.id);
+  perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'), v_acc, p_liquidity_cents, 'crypto_launch',
+                                 'Start von ' || c.name || ': Liquidität für den Pool', 'crypto_coin', c.id,
+                                 'crypto:launch:' || c.id::text, v_player);
+  update public.crypto_coins
+     set status = 'listed', pool_cash_cents = p_liquidity_cents, pool_tokens_e6 = v_tokens, start_price_e4 = p_start_price_e4,
+         start_pool_cents = p_liquidity_cents, team_share_bps = p_team_share_bps, team_at_launch_e6 = v_team,
+         team_tokens_e6 = v_team, launched_at = v_now
+   where id = c.id;
+  update public.securities set status = 'listed', is_tradable = true, listed_at = now() where id = c.security_id;
+  -- the team tokens are the creator's position, cost basis 0
+  insert into public.positions (player_id, security_id, quantity_e6, avg_entry_price_e4, cost_basis_cents, opened_at)
+  values (v_player, c.security_id, v_team, 0, 0, v_now);
+  perform public.crypto_mark(c.id, v_now, 0, 0);
+  perform public.crypto_log(c.id, 'launch', null,
+    jsonb_build_object('start_price_e4', p_start_price_e4, 'liquidity_cents', p_liquidity_cents, 'team_share_bps', p_team_share_bps),
+    v_now);
+  perform public.feed_post(v_player, 'coin_launched', jsonb_build_object('ticker', c.ticker, 'name', c.name),
+                           'coin_launched:' || c.id::text);
+  return public.request_complete(v_player, p_request_id, public.crypto_my_coin(c.id));
+end;
+$$;
+
+create or replace function public.burn_coin_tokens(p_request_id uuid, p_quantity_e6 bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  v_cfg    jsonb := public.crypto_cfg();
+  v_now    timestamptz := public.game_now();
+  v_coin   uuid;
+  c        public.crypto_coins;
+  pos      public.positions;
+  v_burn   jsonb;
+  v_min    bigint;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_quantity_e6 is null or p_quantity_e6 < 1 then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'burn_coin_tokens');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_coin := public.crypto_own_coin(v_player);
+  select * into c from public.crypto_coins where id = v_coin;
+  if c.status <> 'listed' then
+    perform public.api_error('coin_not_launched');
+  end if;
+  v_burn := public.crypto_action_cfg(v_cfg, 'marketing_burn');
+  if c.last_burn_at is not null and c.last_burn_at + make_interval(secs => public.cfg_num(v_burn, '{hours}', 1) * 3600) > v_now then
+    perform public.api_error('rate_limited');
+  end if;
+  select * into pos from public.positions p
+   where p.player_id = v_player and p.security_id = c.security_id and p.side = 'long' and p.leverage = 1 and p.status = 'open'
+   for update;
+  if pos.id is null or p_quantity_e6 > c.team_tokens_e6 or p_quantity_e6 > pos.quantity_e6 - pos.reserved_quantity_e6 then
+    perform public.api_error('insufficient_position');
+  end if;
+  v_min := greatest(1, public.div_round_half_even(c.team_at_launch_e6::numeric
+                                                  * round(public.cfg_num(v_cfg, '{create,burnMinBps}', 100))::numeric, 10000));
+  if p_quantity_e6 < v_min and p_quantity_e6 < c.team_tokens_e6 then
+    perform public.api_error('invalid_quantity');
+  end if;
+  if pos.quantity_e6 - p_quantity_e6 = 0 then
+    -- nothing left: whatever cost basis remains is a realised loss
+    if pos.cost_basis_cents > 0 then
+      perform public.crypto_realise(v_player, -pos.cost_basis_cents);
+    end if;
+    update public.positions
+       set quantity_e6 = 0, cost_basis_cents = 0, status = 'closed', closed_at = v_now,
+           realized_pnl_cents = realized_pnl_cents - cost_basis_cents
+     where id = pos.id;
+  else
+    -- burnt team tokens cost nothing: the cost basis stays with the remaining coins
+    update public.positions
+       set quantity_e6 = quantity_e6 - p_quantity_e6,
+           avg_entry_price_e4 = public.div_round_half_even(cost_basis_cents::numeric * 100000000, quantity_e6 - p_quantity_e6)
+     where id = pos.id;
+  end if;
+  update public.crypto_coins
+     set team_tokens_e6 = team_tokens_e6 - p_quantity_e6, burned_e6 = burned_e6 + p_quantity_e6,
+         hype = least(100, greatest(0, hype + public.cfg_num(v_burn, '{hype}', 8))), last_burn_at = v_now
+   where id = c.id;
+  perform public.crypto_mark(c.id, v_now, 0, 0);
+  perform public.crypto_log(c.id, 'burn', null, jsonb_build_object('quantity_e6', p_quantity_e6), v_now);
+  return public.request_complete(v_player, p_request_id, public.crypto_my_coin(c.id));
+end;
+$$;
+
+create or replace function public.discontinue_coin(p_request_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  v_now    timestamptz := public.game_now();
+  v_coin   uuid;
+  c        public.crypto_coins;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'discontinue_coin');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_coin := public.crypto_own_coin(v_player);
+  select * into c from public.crypto_coins where id = v_coin;
+  perform public.crypto_close_coin(c.id, 'crypto:close:' || c.id::text, v_now, false);
+  if c.status = 'listed' then
+    perform public.feed_post(v_player, 'coin_closed', jsonb_build_object('ticker', c.ticker, 'name', c.name),
+                             'coin_closed:' || c.id::text);
+  end if;
+  return public.request_complete(v_player, p_request_id, public.crypto_my_coin(c.id));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- L. Trading against the pool
+-- ---------------------------------------------------------------------------
+-- buy: p_amount_cents in total (order fee trading.orderFeeCents included, like place_order with an amount), the rest is
+-- swapped (swapBuy, pool fee of the category minus the hardware wallet). sell: p_quantity_e6 coins (≥ 99.9 % of the
+-- free position = all of it), swapSell. Average cost basis (exact cents), realised result and tax like stocks.
+create or replace function public.crypto_trade(p_request_id uuid, p_ticker text, p_side text, p_amount_cents bigint default null,
+                                               p_quantity_e6 bigint default null, p_max_slippage_bps integer default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player   uuid;
+  v_replay   jsonb;
+  v_cfg      jsonb := public.crypto_cfg();
+  v_trading  jsonb := coalesce(public.config_jsonb('trading'), '{}'::jsonb);
+  v_prog     jsonb := coalesce(public.config_jsonb('progression'), '{}'::jsonb);
+  v_abuse    jsonb := coalesce(public.config_jsonb('abuse'), '{}'::jsonb);
+  v_now      timestamptz := public.game_now();
+  v_side     text := lower(coalesce(p_side, ''));
+  v_level    integer;
+  v_coin     uuid;
+  c          public.crypto_coins;
+  s          public.securities;
+  pos        public.positions;
+  v_cash     bigint;
+  v_fee_bps  integer;
+  v_ofee     bigint;
+  v_min      bigint;
+  v_before   bigint;
+  v_after    bigint;
+  v_avg      bigint;
+  v_slip     integer;
+  v_qty      bigint;
+  v_swap     bigint;
+  v_pool_fee bigint;
+  v_new_cash bigint;
+  v_new_tok  bigint;
+  v_net      bigint := 0;
+  v_tax      bigint := 0;
+  v_pnl      bigint;
+  v_cost     bigint;
+  v_avail    bigint;
+  v_after_q  bigint;
+  v_tx       uuid;
+  v_order    uuid := gen_random_uuid();
+  v_trade    uuid := gen_random_uuid();
+  v_xp       integer := 0;
+  v_wash     boolean := false;
+  v_seq      bigint;
+  v_team     bigint;
+  v_window   bigint;
+  v_rug      boolean := false;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'crypto_trade');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  if v_side not in ('buy', 'sell') or (p_max_slippage_bps is not null and p_max_slippage_bps < 0)
+     or (v_side = 'buy' and (p_amount_cents is null or p_amount_cents < 1))
+     or (v_side = 'sell' and (p_quantity_e6 is null or p_quantity_e6 < 1)) then
+    perform public.api_error('invalid_argument');
+  end if;
+  select p.level into v_level from public.profiles p where p.id = v_player;
+  if v_level < public.cfg_num(v_cfg, '{minLevel}', 10) then
+    perform public.api_error('locked');
+  end if;
+  if (select r.is_paused from public.sim_runtime r where r.id) then
+    perform public.api_error('market_paused');
+  end if;
+  if not public.rate_limit_hit(v_player, 'place_order',
+           greatest(1, public.cfg_num(v_abuse, '{rateLimits,ordersPerMinute}', 20))::integer, 60)
+     or not public.rate_limit_hit(v_player, 'place_order_day',
+           greatest(1, public.cfg_num(v_abuse, '{rateLimits,ordersPerDay}', 500))::integer, 86400) then
+    perform public.api_error('rate_limited');
+  end if;
+
+  -- the coin first (lock order everywhere: coin rows, then ledger accounts)
+  select x.id into v_coin from public.crypto_coins x join public.securities sx on sx.id = x.security_id
+   where sx.ticker = upper(btrim(coalesce(p_ticker, ''))) and x.status <> 'closed'
+   for update of x;
+  if v_coin is null then
+    perform public.api_error('coin_not_found');
+  end if;
+  select * into c from public.crypto_coins where id = v_coin;
+  if c.status <> 'listed' or c.pool_cash_cents <= 0 or c.pool_tokens_e6 <= 0 then
+    perform public.api_error('coin_not_tradable');
+  end if;
+  select * into s from public.securities where id = c.security_id;
+  v_cash := public.lock_player_accounts(v_player);
+  perform public.crypto_pool_settle(c.id);
+  select * into c from public.crypto_coins where id = v_coin;
+
+  v_fee_bps := public.crypto_player_fee_bps(v_player, c.category);
+  v_ofee := greatest(0, public.cfg_num(v_trading, '{orderFeeCents}', 100))::bigint;
+  v_min := greatest(1, public.cfg_num(v_trading, '{minOrderValueCents}', 100))::bigint;
+  v_before := public.crypto_pool_price_e4(c.pool_cash_cents, c.pool_tokens_e6);
+  select * into pos from public.positions p
+   where p.player_id = v_player and p.security_id = c.security_id and p.side = 'long' and p.leverage = 1 and p.status = 'open'
+   for update;
+
+  if v_side = 'buy' then
+    v_swap := p_amount_cents - v_ofee;
+    if v_swap < v_min then
+      perform public.api_error('order_too_small');
+    end if;
+    if p_amount_cents > v_cash then
+      perform public.api_error('insufficient_funds');
+    end if;
+    select b.tokens_out_e6, b.fee_cents, b.cash_after_cents, b.tokens_after_e6 into v_qty, v_pool_fee, v_new_cash, v_new_tok
+      from public.crypto_swap_buy(c.pool_cash_cents, c.pool_tokens_e6, v_swap, v_fee_bps) b;
+    if v_qty < 1 then
+      perform public.api_error('order_too_small');
+    end if;
+    v_avg := greatest(1, public.div_round_half_even(v_swap::numeric * 100000000, v_qty));
+    v_slip := public.crypto_slippage_bps(v_before, v_avg, 'buy');
+    if p_max_slippage_bps is not null and v_slip > p_max_slippage_bps then
+      perform public.api_error('slippage_exceeded');
+    end if;
+    v_tx := public.ledger_post('crypto_buy',
+      (select jsonb_agg(jsonb_build_object('account_id', x.a, 'amount_cents', x.v))
+         from (values (public.ledger_player_account(v_player, 'player_cash'), -p_amount_cents),
+                      (c.pool_account_id, v_swap),
+                      (public.ledger_system_account('treasury'), v_ofee)) as x(a, v)
+        where x.v <> 0),
+      'Kauf ' || s.ticker, 'order', v_order, 'crypto:' || v_order::text, v_player,
+      jsonb_build_object('quantity_e6', v_qty, 'price_e4', v_avg, 'pool_fee_cents', v_pool_fee, 'trade_id', v_trade));
+    if pos.id is null then
+      insert into public.positions (player_id, security_id, quantity_e6, avg_entry_price_e4, cost_basis_cents, opened_at)
+      values (v_player, c.security_id, v_qty, v_avg, v_swap, v_now)
+      returning * into pos;
+      v_after_q := v_qty;
+    else
+      update public.positions
+         set quantity_e6 = quantity_e6 + v_qty, cost_basis_cents = cost_basis_cents + v_swap,
+             avg_entry_price_e4 = public.div_round_half_even((cost_basis_cents + v_swap)::numeric * 100000000, quantity_e6 + v_qty)
+       where id = pos.id;
+      v_after_q := pos.quantity_e6 + v_qty;
+    end if;
+    v_net := -p_amount_cents;
+  else
+    v_avail := coalesce(pos.quantity_e6 - pos.reserved_quantity_e6, 0);
+    v_qty := p_quantity_e6;
+    if v_qty < v_avail and v_qty * 1000 >= v_avail * 999 then
+      v_qty := v_avail;
+    end if;
+    if v_avail < v_qty then
+      perform public.api_error('insufficient_position');
+    end if;
+    select x.cash_out_cents, x.fee_cents, x.cash_after_cents, x.tokens_after_e6 into v_swap, v_pool_fee, v_new_cash, v_new_tok
+      from public.crypto_swap_sell(c.pool_cash_cents, c.pool_tokens_e6, v_qty, v_fee_bps) x;
+    if v_swap < v_min and v_qty <> v_avail then
+      perform public.api_error('order_too_small');
+    end if;
+    v_avg := greatest(1, public.div_round_half_even(v_swap::numeric * 100000000, v_qty));
+    v_slip := public.crypto_slippage_bps(v_before, v_avg, 'sell');
+    if p_max_slippage_bps is not null and v_slip > p_max_slippage_bps then
+      perform public.api_error('slippage_exceeded');
+    end if;
+    v_cost := case when v_qty = pos.quantity_e6 then pos.cost_basis_cents
+                   else public.div_round_half_even(pos.cost_basis_cents::numeric * v_qty, pos.quantity_e6) end;
+    v_pnl := v_swap - v_ofee - v_cost;
+    v_tax := public.crypto_realise(v_player, v_pnl);
+    v_net := v_swap - v_ofee - v_tax;
+    if v_cash + v_net < 0 then
+      perform public.api_error('insufficient_funds');
+    end if;
+    if v_swap <> 0 or v_ofee + v_tax <> 0 then
+      v_tx := public.ledger_post('crypto_sell',
+        (select jsonb_agg(jsonb_build_object('account_id', x.a, 'amount_cents', x.v))
+           from (select y.a, sum(y.v)::bigint as v
+                   from (values (c.pool_account_id, -v_swap),
+                                (public.ledger_player_account(v_player, 'player_cash'), v_net),
+                                (public.ledger_system_account('treasury'), v_ofee + v_tax)) as y(a, v)
+                  group by y.a) x
+          where x.v <> 0),
+        'Verkauf ' || s.ticker, 'order', v_order, 'crypto:' || v_order::text, v_player,
+        jsonb_build_object('quantity_e6', v_qty, 'price_e4', v_avg, 'pool_fee_cents', v_pool_fee, 'trade_id', v_trade));
+    end if;
+    update public.positions
+       set quantity_e6 = quantity_e6 - v_qty,
+           cost_basis_cents = cost_basis_cents - v_cost,
+           realized_pnl_cents = realized_pnl_cents + v_pnl,
+           avg_entry_price_e4 = case when quantity_e6 - v_qty = 0 then avg_entry_price_e4
+                                     else public.div_round_half_even((cost_basis_cents - v_cost)::numeric * 100000000,
+                                                                     quantity_e6 - v_qty) end,
+           status = case when quantity_e6 - v_qty = 0 then 'closed'::public.position_status else status end,
+           closed_at = case when quantity_e6 - v_qty = 0 then v_now else closed_at end
+     where id = pos.id;
+    v_after_q := pos.quantity_e6 - v_qty;
+    v_wash := exists (
+      select 1 from public.trades t
+       where t.player_id = v_player and t.security_id = c.security_id and t.side = 'buy'
+         and t.executed_at > v_now - make_interval(secs => public.cfg_num(v_trading, '{washTradeWindowSeconds}', 600)));
+    if v_net > 0 then
+      perform public.loan_withhold(v_player, v_net, 'crypto:' || v_order::text);
+    end if;
+  end if;
+
+  update public.crypto_coins set pool_cash_cents = v_new_cash, pool_tokens_e6 = v_new_tok where id = c.id;
+  v_after := public.crypto_pool_price_e4(v_new_cash, v_new_tok);
+
+  -- the creator's team tokens: the coins held beyond them are sold first; selling below counts as team sales
+  if v_side = 'sell' and c.creator_id = v_player and c.team_tokens_e6 > 0 then
+    v_team := least(c.team_tokens_e6, v_after_q);
+    if v_team < c.team_tokens_e6 then
+      insert into public.crypto_team_sales (coin_id, quantity_e6, at) values (c.id, c.team_tokens_e6 - v_team, v_now);
+      update public.crypto_coins set team_tokens_e6 = v_team where id = c.id;
+      select coalesce(sum(t.quantity_e6), 0)::bigint into v_window from public.crypto_team_sales t
+       where t.coin_id = c.id
+         and t.at > v_now - make_interval(hours => public.cfg_num(v_cfg, '{create,rugWindowHours}', 24)::integer);
+      if public.crypto_is_rug_pull(v_cfg, v_window, c.team_at_launch_e6)
+         and (c.last_rug_at is null
+              or c.last_rug_at <= v_now - make_interval(hours => public.cfg_num(v_cfg, '{create,rugWindowHours}', 24)::integer)) then
+        perform public.crypto_rug_pull(c.id, v_now, v_window);
+        v_rug := true;
+      end if;
+    end if;
+  end if;
+
+  -- trade XP like stocks (one per trade, daily cap in grant_xp, not for closing inside the wash-trade window)
+  if not v_wash and v_swap >= public.cfg_num(v_prog, '{xpSources,trade,minOrderValueCents}', 10000) then
+    v_xp := public.grant_xp(v_player, 'trade', public.cfg_num(v_prog, '{xpSources,trade,xp}', 10)::integer,
+                            'trade:' || v_order::text, 'trade', v_trade);
+  end if;
+
+  -- history: one filled market order and its trade (counterparty: the pool, an automated market maker)
+  select r.tick_seq into v_seq from public.sim_runtime r where r.id;
+  insert into public.orders (id, player_id, security_id, request_id, side, type, quantity_e6, filled_quantity_e6, status,
+                             avg_fill_price_e4, fee_cents, filled_at)
+  values (v_order, v_player, c.security_id, p_request_id, v_side::public.order_side, 'market', v_qty, v_qty, 'filled',
+          v_avg, v_ofee, v_now);
+  insert into public.trades (id, order_id, player_id, security_id, position_id, side, quantity_e6, price_e4, gross_cents,
+                             fee_cents, tax_cents, realized_pnl_cents, counterparty, ledger_transaction_id, tick_seq,
+                             is_wash_trade, xp_awarded, executed_at)
+  values (v_trade, v_order, v_player, c.security_id, pos.id, v_side::public.order_side, v_qty, v_avg, v_swap, v_ofee, v_tax,
+          case when v_side = 'sell' then v_pnl end, 'market_maker', v_tx, v_seq, v_wash, v_xp, v_now);
+
+  perform public.crypto_mark(c.id, v_now, v_qty, v_swap);
+
+  -- missions as for stocks
+  perform public.mission_event(v_player, 'trade', 1, null);
+  perform public.mission_event(v_player, v_side, 1, null);
+  perform public.mission_event(v_player, 'trade_value', v_swap, null);
+  perform public.mission_event(v_player, 'trading_day', 1, to_char(v_now at time zone 'Europe/Berlin', 'YYYY-MM-DD'));
+  perform public.mission_event(v_player, 'distinct_security', 1, s.ticker);
+  if v_side = 'buy' then
+    perform public.mission_event(v_player, 'buy_value', v_swap, null);
+  elsif v_pnl > 0 then
+    perform public.mission_event(v_player, 'realized_profit', v_pnl, null);
+  end if;
+
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'side',               v_side,
+    'ticker',             s.ticker,
+    'quantity_e6',        v_qty,
+    'cash_cents',         case when v_side = 'buy' then p_amount_cents else v_net end,
+    'fee_cents',          v_pool_fee + v_ofee,
+    'pool_fee_cents',     v_pool_fee,
+    'order_fee_cents',    v_ofee,
+    'tax_cents',          v_tax,
+    'realized_pnl_cents', case when v_side = 'sell' then v_pnl end,
+    'price_e4',           v_after,
+    'avg_price_e4',       v_avg,
+    'slippage_bps',       v_slip,
+    'position_e6',        v_after_q,
+    'cash_after_cents',   (select a.balance_cents from public.ledger_accounts a
+                            where a.owner_player_id = v_player and a.kind = 'player_cash'),
+    'xp_awarded',         v_xp,
+    'rug_pull',           v_rug));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- M. Trust reason rugPull, feed labels
+-- ---------------------------------------------------------------------------
+create or replace function public.trust_delta(p_reason text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select round(public.cfg_num(public.trust_cfg(), array['deltas', p_reason],
+    case p_reason
+      when 'loanRepaidOnTime' then 4 when 'loanRepaidLate' then 2 when 'loanOverdue' then -6 when 'loanDefaulted' then -12
+      when 'loanLent' then 1 when 'loanForgiven' then 2 when 'supplyKept' then 3 when 'supplyShort' then -4
+      when 'stakeKept' then 3 when 'dealBroken' then -12 when 'rugPull' then -20 else 0
+    end)::numeric)::integer;
+$$;
+
+-- Short German description of a feed item (body of the reaction notification), as in M4j plus the crypto kinds
+create or replace function public.feed_item_label(p_kind text, p_payload jsonb)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case p_kind
+    when 'level_up' then 'Level ' || coalesce(p_payload ->> 'level', '?') || ' erreicht'
+    when 'big_trade' then 'Gewinn mit ' || coalesce(p_payload ->> 'ticker', 'einer Aktie')
+    when 'company_founded' then coalesce(p_payload ->> 'name', 'Firma') || ' gegründet'
+    when 'company_upgraded' then coalesce(p_payload ->> 'name', 'Firma') || ' aufgestiegen'
+    when 'company_ipo' then coalesce(p_payload ->> 'name', 'Firma') || ' an der Börse'
+    when 'company_expanded' then coalesce(p_payload ->> 'name', 'Firma') || ' erweitert'
+    when 'art_won' then 'Kunstwerk „' || coalesce(p_payload ->> 'title', '?') || '“ ersteigert'
+    when 'art_created' then 'Kunstwerk „' || coalesce(p_payload ->> 'title', '?') || '“ gemalt'
+    when 'home_bought' then 'Neues Zuhause'
+    when 'car_bought' then 'Neues Auto'
+    when 'job_started' then 'Neuer Job bei ' || coalesce(p_payload ->> 'company_name', '?')
+    when 'streak' then coalesce(p_payload ->> 'days', '?') || ' Tage in Folge dabei'
+    when 'league_won' then 'Wochenliga gewonnen'
+    when 'friends_now' then 'Jetzt befreundet mit ' || coalesce(p_payload ->> 'other_nickname', '?')
+    -- M4i (migration 0100): promotion {tier, company}
+    when 'promoted' then 'Befördert bei ' || coalesce(p_payload ->> 'company', '?')
+    -- M4j: deals
+    when 'deal_signed' then 'Deal mit ' || coalesce(p_payload ->> 'with', '?') || ' per Handschlag'
+    when 'deal_broken' then 'Deal mit ' || coalesce(p_payload ->> 'with', '?') || ' gebrochen'
+    when 'loan_defaulted' then 'Kredit von ' || coalesce(p_payload ->> 'with', '?') || ' geplatzt'
+    -- M5a: own cryptocurrencies {ticker, name}
+    when 'coin_launched' then 'Kryptowährung ' || coalesce(p_payload ->> 'name', '?') || ' gestartet'
+    when 'rug_pull' then 'Rug Pull bei ' || coalesce(p_payload ->> 'name', '?')
+    when 'coin_closed' then coalesce(p_payload ->> 'name', 'Kryptowährung') || ' eingestellt'
+    else 'Beitrag im Feed'
+  end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- N. Account reset/delete: the player's own coin is closed first (holders paid), then the crypto rows go
+-- ---------------------------------------------------------------------------
+create or replace function public.crypto_wipe_player(p_player uuid, p_key text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  r record;
+begin
+  for r in select c.id from public.crypto_coins c
+            where c.creator_id = p_player and c.status in ('draft', 'listed')
+            order by c.id for update loop
+    perform public.crypto_close_coin(r.id, p_key || ':coin:' || r.id::text, public.game_now(), false);
+  end loop;
+  delete from public.crypto_team_sales t using public.crypto_coins c where c.id = t.coin_id and c.creator_id = p_player;
+  delete from public.crypto_coin_actions a using public.crypto_coins c where c.id = a.coin_id and c.creator_id = p_player;
+  -- drafts that never traded disappear with their reserved security
+  for r in select c.id, c.security_id from public.crypto_coins c
+            where c.creator_id = p_player and c.launched_at is null and c.status = 'closed'
+              and not exists (select 1 from public.trades t where t.security_id = c.security_id)
+              and not exists (select 1 from public.positions p where p.security_id = c.security_id) loop
+    delete from public.crypto_coins where id = r.id;
+    delete from public.security_quotes where security_id = r.security_id;
+    delete from public.securities where id = r.security_id;
+  end loop;
+  update public.crypto_coins set creator_id = null where creator_id = p_player;
+end;
+$$;
+comment on function public.crypto_wipe_player(uuid, text) is
+  'Internal (account_wipe): closes the player''s own coin like discontinue_coin (holders paid), deletes its actions and team sales; drafts disappear, closed coins stay without creator.';
+
+create or replace function public.account_wipe(p_player uuid, p_key text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_nick    text;
+  v_company uuid;
+  v_state   uuid := public.ledger_system_account(case when public.money_genesis_done() then 'treasury' else 'mint' end);
+  v_bal     bigint;
+  r         record;
+begin
+  -- M5a: the own coin first (coin rows are locked before ledger accounts); its holders, the player included, are paid
+  perform public.crypto_wipe_player(p_player, p_key);
+
+  perform public.lock_player_accounts(p_player);
+  select p.nickname into v_nick from public.profiles p where p.id = p_player for update;
+
+  -- artworks (ADR-080): back to the gallery, auctions cancelled, reserved bids back to the cash
+  perform public.artworks_wipe_player(p_player, p_key);
+
+  -- deals (ADR-098): debts as a borrower are collected first, then the deals end
+  perform public.deals_wipe_player(p_player, p_key);
+
+  -- own company: open share offers are settled first, then it is dissolved like close_company
+  select pc.company_id into v_company from public.player_companies pc where pc.founder_id = p_player and pc.status = 'active';
+  if v_company is not null then
+    for r in select o.id from public.company_share_offers o where o.company_id = v_company and o.status = 'open' order by o.id loop
+      perform public.close_share_offer(r.id);
+    end loop;
+    perform public.company_dissolve(v_company, 'closed');
+  end if;
+
+  -- subscriptions to other companies' open offers lapse (the money stays with the company)
+  for r in select s.offer_id, sum(s.shares_e6)::bigint as q from public.offer_subscriptions s
+            join public.company_share_offers o on o.id = s.offer_id and o.status = 'open'
+           where s.player_id = p_player group by s.offer_id order by s.offer_id loop
+    update public.company_share_offers set shares_subscribed_e6 = greatest(0, shares_subscribed_e6 - r.q) where id = r.offer_id;
+  end loop;
+
+  -- job: wages up to now, then ended without notice or fee
+  for r in select pj.id, pj.company_id from public.player_jobs pj where pj.player_id = p_player and pj.status = 'active' order by pj.id loop
+    perform public.accrue_job_salary(r.id);
+    update public.player_jobs set status = 'ended', ended_at = now(), end_reason = 'quit', notice_ends_at = null where id = r.id;
+    perform public.company_system_message(r.company_id, v_nick || ' hat das Unternehmen verlassen.');
+  end loop;
+
+  -- open orders release their reservations; holdings (stocks, bonds and coins) are given up
+  for r in select o.id from public.orders o
+            where o.player_id = p_player and o.status in ('pending', 'open', 'partially_filled') order by o.id loop
+    perform public.cancel_order_internal(r.id);
+  end loop;
+  update public.positions
+     set status = 'closed', closed_at = now(), quantity_e6 = 0, reserved_quantity_e6 = 0, cost_basis_cents = 0,
+         margin_cents = 0, borrowed_cents = 0, liquidation_price_e4 = null
+   where player_id = p_player and status = 'open';
+
+  -- game state of the player (M4b: home, furniture and cars are given up without a refund)
+  for r in select * from (values
+             ('position_lots', 'player_id'), ('xp_events', 'player_id'), ('xp_daily_counters', 'player_id'),
+             ('vault_claims', 'player_id'), ('daily_logins', 'player_id'), ('player_missions', 'player_id'),
+             ('player_achievements', 'player_id'), ('player_cosmetics', 'player_id'), ('player_lifestyle_items', 'player_id'),
+             ('player_random_events', 'player_id'), ('player_bankruptcies', 'player_id'), ('margin_events', 'player_id'),
+             ('financing_charges', 'player_id'), ('player_tax_years', 'player_id'), ('distribution_payouts', 'player_id'),
+             ('watchlist_items', 'player_id'), ('portfolio_snapshots', 'player_id'), ('stock_option_grants', 'player_id'),
+             ('loans', 'player_id'), ('cap_table_entries', 'player_id'), ('share_lockups', 'player_id'),
+             ('capital_injections', 'player_id'), ('takeover_offers', 'bidder_player_id'), ('angel_offers', 'investor_player_id'),
+             ('ipo_subscriptions', 'player_id'), ('shareholder_vote_ballots', 'player_id'), ('reputation_events', 'player_id'),
+             ('insider_violations', 'player_id'), ('salary_payouts', 'player_id'), ('work_tasks', 'player_id'),
+             ('salary_negotiations', 'player_id'), ('player_work_tasks', 'player_id'), ('player_jobs', 'player_id'),
+             ('job_offers', 'to_player_id'), ('job_applications', 'player_id'), ('player_skills', 'player_id'),
+             ('player_skill_points', 'player_id'), ('daily_reward_claims', 'player_id'), ('player_loans', 'player_id'),
+             ('offer_subscriptions', 'player_id'), ('notifications', 'player_id'), ('feed_items', 'actor_id'),
+             ('league_entries', 'player_id'), ('league_entry_baselines', 'player_id'), ('company_logo_reports', 'reporter_id'),
+             ('player_unlocks', 'player_id'), ('player_furniture', 'player_id'), ('player_cars', 'player_id'),
+             ('player_homes', 'player_id'), ('trust_events', 'player_id')
+           ) as t(tbl, col) loop
+    execute format('delete from public.%I where %I = $1', r.tbl, r.col) using p_player;
+  end loop;
+  -- M4i (upgrades, migration 0100) when present
+  if to_regclass('public.player_upgrades') is not null
+     and exists (select 1 from information_schema.columns
+                  where table_schema = 'public' and table_name = 'player_upgrades' and column_name = 'player_id') then
+    execute 'delete from public.player_upgrades where player_id = $1' using p_player;
+  end if;
+  delete from public.rich_list_snapshots where entity_kind = 'player' and entity_id = p_player;
+
+  -- money back to the state: one balanced posting per account
+  for r in select a.id from public.ledger_accounts a where a.owner_player_id = p_player and a.balance_cents > 0 order by a.id loop
+    select a.balance_cents into v_bal from public.ledger_accounts a where a.id = r.id;
+    perform public.ledger_transfer(r.id, v_state, v_bal, 'transfer', 'Konto zurückgesetzt', 'profile', p_player,
+                                   p_key || ':' || r.id::text, p_player);
+  end loop;
+
+  update public.profiles
+     set level = 1, xp_total = 0, reputation = 50, title_key = null, frame_key = null,
+         bankrupt_until = null, founding_locked_until = null
+   where id = p_player;
+  update public.player_private
+     set founding_ban_until = null, bankruptcy_count = 0, career_experience_minutes = 0, ipo_investment_limit_cents = null,
+         tutorial_completed_at = null, tax_loss_pot_cents = 0
+   where player_id = p_player;
+end;
+$$;
+comment on function public.account_wipe(uuid, text) is 'Internal: cleanup shared by reset_account() and delete_account().';
+
+-- ---------------------------------------------------------------------------
+-- O. Jobs: market_tick() with the crypto tick, run_due_jobs() with the crypto job
+-- ---------------------------------------------------------------------------
+create or replace function public.market_tick()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now    timestamptz := public.game_now();
+  v_crypto jsonb;
+begin
+  if not pg_try_advisory_xact_lock(7311001) then
+    return jsonb_build_object('skipped', 'busy');
+  end if;
+  if coalesce((select r.is_paused from public.sim_runtime r where r.id), false) then
+    return public.market_tick_at(v_now);
+  end if;
+  -- coins first: the crypto tick locks coin rows before the stock tick books fills (same order as crypto_trade)
+  v_crypto := public.crypto_tick_at(v_now, coalesce((select r.tick_seq from public.sim_runtime r where r.id), 0) + 1);
+  return public.market_tick_at(v_now) || jsonb_build_object('crypto', v_crypto);
+end;
+$$;
+comment on function public.market_tick() is
+  'pg_cron every 5 seconds: one crypto tick (ADR-101) and one market tick at game_now(). Skips while paused or while another tick holds the lock.';
+
+create or replace function public.run_due_jobs()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now      timestamptz;
+  v_result   jsonb := '{}'::jsonb;
+  v_closed   jsonb := '[]'::jsonb;
+  v_latest   bigint;
+  q          record;
+  v_run      bigint;
+begin
+  -- waits for a running tick (ticks only try the lock and skip)
+  perform pg_advisory_xact_lock(7311001);
+  v_now := public.game_now();
+  perform public.ensure_game_quarters(3);
+
+  if not exists (select 1 from public.candles limit 1) or not public.money_genesis_done()
+     or not exists (select 1 from public.rich_tycoons) then
+    v_result := v_result || jsonb_build_object('bootstrap', public.market_bootstrap());
+  end if;
+
+  -- cryptocurrencies (ADR-101) first: coin rows are locked before any ledger account (same order as trades)
+  v_result := v_result || jsonb_build_object('crypto', public.crypto_run_due(v_now));
+
+  -- first run on a database: older quarters are skipped, only the latest ended one is closed
+  if not exists (select 1 from public.job_runs j where j.job_name = 'quarter_close') then
+    select gq.id into v_latest from public.game_quarters gq
+     where gq.ends_at <= v_now and gq.status <> 'closed' order by gq.ends_at desc limit 1;
+    for q in select gq.id from public.game_quarters gq
+              where gq.ends_at <= v_now and gq.status <> 'closed' and gq.id <> coalesce(v_latest, -1)
+    loop
+      update public.game_quarters set status = 'closed', closed_at = now() where id = q.id;
+      insert into public.job_runs (job_name, run_key, status, finished_at, details)
+      values ('quarter_close', q.id::text, 'succeeded', now(), '{"skipped": "before_first_run"}'::jsonb)
+      on conflict do nothing;
+    end loop;
+  end if;
+
+  for q in select gq.id from public.game_quarters gq
+            where gq.ends_at <= v_now and gq.status <> 'closed'
+            order by gq.ends_at limit 8
+  loop
+    v_closed := v_closed || public.close_game_quarter(q.id);
+  end loop;
+  v_result := v_result || jsonb_build_object('quarters', v_closed);
+  -- player companies: operating hours (ADR-072), then every closed quarter since their founding (ADR-057)
+  v_result := v_result || jsonb_build_object('player_companies', public.player_companies_run_due());
+  v_result := v_result || jsonb_build_object('company_events', public.company_events_run_due());
+  -- deals between players (ADR-098): after the company hours, so supply contracts see both companies' hours
+  v_result := v_result || jsonb_build_object('deals', public.deals_run_due());
+
+  -- bonds that matured between quarter closes (or after a downtime)
+  if exists (select 1 from public.bonds bd join public.securities s on s.id = bd.security_id
+              where s.status = 'listed' and bd.matures_at <= v_now) then
+    v_result := v_result || jsonb_build_object('bonds_redeemed', public.redeem_matured_bonds(v_now));
+  end if;
+  v_result := v_result || jsonb_build_object('bonds_issued', public.ensure_bond_series());
+
+  -- jobs: AI postings of the running quarter, wages of AI-company jobs in whole hours
+  v_result := v_result || jsonb_build_object('quit_notices', public.process_quit_notices(null));
+  v_result := v_result || jsonb_build_object('share_offers', public.close_due_offers(null));
+  v_result := v_result || jsonb_build_object('job_postings', public.refresh_ai_job_postings(),
+                                             'salaries_paid', public.accrue_salaries(null));
+
+  -- artworks (ADR-080): due auctions are settled, the gallery starts the auctions of the day
+  v_result := v_result || jsonb_build_object('artworks', public.artworks_run_due());
+
+  -- rich list snapshot every richList.snapshotMinutes (rank news, 24 h changes, state missions)
+  v_result := v_result || jsonb_build_object('rich_list', public.rich_list_snapshot(false));
+
+  -- weekly league and feed upkeep (M4f, ADR-088/089) and announced events (M4g, ADR-090): kept in this redefinition
+  v_result := v_result || jsonb_build_object('social', public.social_run_due());
+  v_result := v_result || jsonb_build_object('events', public.events_run_due());
+
+  -- daily maintenance (first run per UTC day)
+  insert into public.job_runs (job_name, run_key) values ('maintenance', to_char(now() at time zone 'UTC', 'YYYY-MM-DD'))
+  on conflict (job_name, run_key) do nothing
+  returning id into v_run;
+  if v_run is not null then
+    v_result := v_result || jsonb_build_object('maintenance', public.run_maintenance());
+    -- price_ticks: keep about one day (candles hold the history), cron log: one day
+    perform public.maintain_price_tick_partitions(3, 1);
+    if to_regclass('cron.job_run_details') is not null then
+      begin
+        execute 'delete from cron.job_run_details where end_time < now() - interval ''1 day''';
+      exception when others then
+        raise warning 'NEXA: could not prune cron.job_run_details: %', sqlerrm;
+      end;
+    end if;
+    delete from public.job_runs j where j.job_name = 'maintenance' and j.started_at < now() - interval '30 days';
+    update public.job_runs set status = 'succeeded', finished_at = now() where id = v_run;
+  end if;
+  return v_result;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- P. Grants
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.api_error(text)', 'public.crypto_cfg()', 'public.crypto_cat_val(jsonb, text, text)',
+    'public.crypto_cfg_array(jsonb, text[])', 'public.crypto_event_cfg(jsonb, text)', 'public.crypto_action_cfg(jsonb, text)',
+    'public.crypto_discounted_fee_bps(double precision, integer, double precision)', 'public.crypto_player_fee_bps(uuid, text)',
+    'public.crypto_pool_price_e4(bigint, bigint)', 'public.crypto_pool_tokens_at(bigint, bigint)',
+    'public.crypto_swap_buy(bigint, bigint, bigint, integer)', 'public.crypto_swap_sell(bigint, bigint, bigint, integer)',
+    'public.crypto_slippage_bps(bigint, bigint, text)', 'public.crypto_apply_flow(bigint, bigint, double precision)',
+    'public.crypto_tick_return(double precision, double precision, double precision, double precision, double precision, double precision, double precision)',
+    'public.crypto_stable_return(double precision, double precision, double precision, double precision, double precision, double precision)',
+    'public.crypto_pick_regime(jsonb, double precision)', 'public.crypto_regime_hours(jsonb, double precision)',
+    'public.crypto_regime_drift(jsonb, text)', 'public.crypto_player_drift_day(jsonb, double precision, double precision)',
+    'public.crypto_player_sigma_day(jsonb, double precision)',
+    'public.crypto_event_chance_bps(jsonb, text, double precision, double precision, double precision)',
+    'public.crypto_roll_coin_event(jsonb, double precision, double precision, text, double precision, double precision, double precision)',
+    'public.crypto_roll_market_event(jsonb, double precision, double precision)',
+    'public.crypto_event_shock(jsonb, double precision, boolean)', 'public.crypto_action_success_bps(jsonb, jsonb, double precision)',
+    'public.crypto_launch_team_e6(bigint, integer)', 'public.crypto_is_rug_pull(jsonb, bigint, bigint)',
+    'public.crypto_discontinue_payout_cents(bigint, bigint, bigint)', 'public.crypto_next_meme_coin()',
+    'public.crypto_pool_account(uuid)', 'public.crypto_held_e6(uuid)',
+    'public.crypto_mark(uuid, timestamptz, bigint, bigint)', 'public.crypto_pool_settle(uuid)', 'public.crypto_settle_flows()',
+    'public.crypto_tombstone_ticker(uuid)', 'public.crypto_action_label(text)', 'public.crypto_event_text(text, text)',
+    'public.crypto_notify(uuid, text, text, jsonb, text, boolean, boolean, uuid)',
+    'public.crypto_log(uuid, text, integer, jsonb, timestamptz)', 'public.crypto_realise(uuid, bigint)',
+    'public.crypto_close_position(uuid, bigint, text, timestamptz)', 'public.crypto_seed_history(uuid, timestamptz)',
+    'public.crypto_list_ai_coin(text, text, text, bigint, bigint, boolean, text, text, timestamptz)',
+    'public.crypto_bootstrap()', 'public.crypto_tick_at(timestamptz, bigint)',
+    'public.crypto_apply_event(uuid, jsonb, double precision, timestamptz, bigint)',
+    'public.crypto_rug_pull(uuid, timestamptz, bigint)', 'public.crypto_resolve_action(uuid, timestamptz)',
+    'public.crypto_close_coin(uuid, text, timestamptz, boolean)', 'public.crypto_run_due(timestamptz)',
+    'public.crypto_coin_row(uuid, uuid)', 'public.crypto_event_json(bigint)', 'public.crypto_my_coin(uuid)',
+    'public.crypto_coin_name_violation(text, text)', 'public.crypto_own_coin(uuid)',
+    'public.get_crypto_market()', 'public.get_coin(text)', 'public.check_coin_name(text, text)',
+    'public.create_coin(uuid, text, text, jsonb)', 'public.get_my_coin()', 'public.start_coin_action(uuid, text)',
+    'public.launch_coin(uuid, bigint, bigint, integer)', 'public.burn_coin_tokens(uuid, bigint)', 'public.discontinue_coin(uuid)',
+    'public.crypto_trade(uuid, text, text, bigint, bigint, integer)',
+    'public.trust_delta(text)', 'public.feed_item_label(text, jsonb)', 'public.crypto_wipe_player(uuid, text)',
+    'public.account_wipe(uuid, text)', 'public.market_tick()', 'public.run_due_jobs()'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+    execute format('grant execute on function %s to service_role', f);
+  end loop;
+  foreach f in array array[
+    'public.get_crypto_market()', 'public.get_coin(text)', 'public.check_coin_name(text, text)',
+    'public.create_coin(uuid, text, text, jsonb)', 'public.get_my_coin()', 'public.start_coin_action(uuid, text)',
+    'public.launch_coin(uuid, bigint, bigint, integer)', 'public.burn_coin_tokens(uuid, bigint)', 'public.discontinue_coin(uuid)',
+    'public.crypto_trade(uuid, text, text, bigint, bigint, integer)'
+  ] loop
+    execute format('grant execute on function %s to authenticated', f);
+  end loop;
+end;
+$$;
 
 -- ===== game_config (current values, overwriting older ones) =====
 -- GENERATED by scripts/gen-config-seed.ts from src/config/balance.ts. Do not edit by hand.

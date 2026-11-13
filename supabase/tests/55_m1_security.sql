@@ -40,8 +40,11 @@ select tests.assert(
           || array['break_deal', 'cancel_deal', 'forgive_loan', 'get_deal_board', 'get_deals', 'propose_deal', 'repay_loan',
                    'respond_deal', 'start_campaign']
           -- M4k (83): unique artwork titles, org chart
-          || array['check_artwork_title', 'get_company_org']) x),
-  'authenticated can execute exactly the 9 helpers and the RPCs up to M4k (83)');
+          || array['check_artwork_title', 'get_company_org']
+          -- M5a (84): cryptocurrencies and own coins
+          || array['burn_coin_tokens', 'check_coin_name', 'create_coin', 'crypto_trade', 'discontinue_coin', 'get_coin',
+                   'get_crypto_market', 'get_my_coin', 'launch_coin', 'start_coin_action']) x),
+  'authenticated can execute exactly the 9 helpers and the RPCs up to M5a (84)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute') and p.proname <> 'check_nickname'),
