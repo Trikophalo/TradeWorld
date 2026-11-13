@@ -11,6 +11,14 @@ set client_min_messages = notice;
 \ir ../seeds/game_config.sql
 -- The game runs with market orders only (ADR-117); the tests keep exercising the whole order engine.
 update public.game_config set value = value || '{"limitOrders": true}'::jsonb where key = 'trading';
+-- The tests check the mechanics with the tuning they were written for: the game's stronger player impact
+-- (ADR-120) and the one-hour quit notice are config values and are set back here.
+update public.game_config
+   set value = jsonb_set(jsonb_set(value, '{playerImpact}', '{"depthCentsPer100Bps": {"bluechip": 10000000, "midcap": 2500000,
+         "penny": 500000}, "bondDepthCentsPer100Bps": 5000000, "maxHoldingsPremium": 0.6, "premiumScaleDepths": 20}'),
+       '{maxTickReturnBps}', '300')
+ where key = 'trading';
+update public.game_config set value = jsonb_set(value, '{quitNoticeHours}', '24') where key = 'jobs';
 -- Time in a rank runs 24 times as fast in the game (ADR-118); the career tests count plain paid hours.
 update public.game_config set value = jsonb_set(value, '{promotion,rankHoursPerRealHour}', '1') where key = 'careers';
 

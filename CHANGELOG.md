@@ -131,3 +131,6 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 - **Börsen-News (ADR-119):** Auf der Märkte-Seite kündigen Meldungen an, welche Aktie bald steigen oder fallen
   dürfte. Etwa drei von vier treffen ein.
 - **Schnellere Beförderung (ADR-118):** Eine bezahlte Stunde zählt als ganzer Tag im Rang.
+- **Spieler bewegen den Markt (ADR-120):** Käufe und Verkäufe wirken etwa fünfmal so stark auf den Kurs.
+- **Kündigen in einer Stunde** statt einem Tag; sofort gegen einen Tageslohn bleibt möglich.
+- **Portfolio nach Branche sortierbar**, Visitenkarte ohne gestauchten Text.

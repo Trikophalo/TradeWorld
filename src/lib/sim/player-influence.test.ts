@@ -13,13 +13,13 @@ const EUR = 100; // cents
 const priceE4 = 50 * 10_000; // 50 €
 
 describe("player impact", () => {
-  it("10.000 € net buying moves a penny stock 2 %, a mid cap 0.4 %, a blue chip 0.1 %", () => {
+  it("10.000 € net buying moves a penny stock 10 %, a mid cap 2 %, a blue chip 0.5 %", () => {
     const shares = (10_000 * EUR * 100) / priceE4; // 200 shares at 50 €
     expect(sharesValueCents(shares, priceE4)).toBe(10_000 * EUR);
-    expect(playerImpactReturn(shares, priceE4, "penny")).toBeCloseTo(0.02, 12);
-    expect(playerImpactReturn(shares, priceE4, "midcap")).toBeCloseTo(0.004, 12);
-    expect(playerImpactReturn(shares, priceE4, "bluechip")).toBeCloseTo(0.001, 12);
-    expect(playerImpactReturn(-shares, priceE4, "penny")).toBeCloseTo(-0.02, 12);
+    expect(playerImpactReturn(shares, priceE4, "penny")).toBeCloseTo(0.1, 12);
+    expect(playerImpactReturn(shares, priceE4, "midcap")).toBeCloseTo(0.02, 12);
+    expect(playerImpactReturn(shares, priceE4, "bluechip")).toBeCloseTo(0.005, 12);
+    expect(playerImpactReturn(-shares, priceE4, "penny")).toBeCloseTo(-0.1, 12);
     expect(playerImpactReturn(0, priceE4, "penny")).toBe(0);
   });
 

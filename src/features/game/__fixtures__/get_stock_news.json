@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Beobachter rechnen in Kürze mit einem leicht fallenden Kurs. Sicher ist das nicht.",
-      "name": "Nordlicht Logistik AG",
-      "due_at": "2026-11-13T22:41:35.182171+00:00",
+      "body": "Beobachter rechnen in Kürze mit einem spürbar steigenden Kurs. Sicher ist das nicht.",
+      "name": "Eilbote Express",
+      "due_at": "2026-11-13T22:54:29.905503+00:00",
       "status": "open",
-      "ticker": "NDL",
-      "headline": "Gegenwind für Nordlicht Logistik AG erwartet",
+      "ticker": "EBX",
+      "headline": "Analysten heben den Daumen für Eilbote Express",
       "move_bps": null,
-      "strength": 1,
-      "direction": "down",
-      "published_at": "2026-11-13T22:11:32.95086+00:00"
+      "strength": 2,
+      "direction": "up",
+      "published_at": "2026-11-13T22:19:55.53268+00:00"
     },
     {
       "id": 3,
-      "body": "Beobachter rechnen in Kürze mit einem spürbar fallenden Kurs. Sicher ist das nicht.",
+      "body": "Beobachter rechnen in Kürze mit einem deutlich steigenden Kurs. Sicher ist das nicht.",
       "name": "QuantenSprung Labs",
-      "due_at": "2026-11-13T21:11:32.946209+00:00",
+      "due_at": "2026-11-13T21:19:55.528407+00:00",
       "status": "confirmed",
       "ticker": "QSL",
-      "headline": "Gerücht: QuantenSprung Labs verfehlt die Erwartungen",
-      "move_bps": -743,
-      "strength": 2,
-      "direction": "down",
-      "published_at": "2026-11-13T21:11:32.946209+00:00"
+      "headline": "QuantenSprung Labs gewinnt neue Kunden",
+      "move_bps": 1107,
+      "strength": 3,
+      "direction": "up",
+      "published_at": "2026-11-13T21:19:55.528407+00:00"
     }
   ],
   "reliability_bps": 7500

@@ -73,7 +73,7 @@ export function BusinessCard({ card, className }: { card: PlayerCard; className?
         onPointerLeave={reset}
         onPointerUp={reset}
         style={reduced ? undefined : { rotateX, rotateY, transformStyle: "preserve-3d" }}
-        className="relative overflow-hidden rounded-xl border border-line-2 bg-card-face p-5 shadow-3 select-none"
+        className="@container relative overflow-hidden rounded-xl border border-line-2 bg-card-face p-5 shadow-3 select-none"
         data-testid="business-card"
       >
         {/* Pixel pattern and accent edge */}
@@ -87,21 +87,21 @@ export function BusinessCard({ card, className }: { card: PlayerCard; className?
           <Avatar avatarKey={card.avatarKey} size="lg" className="shadow-2" />
           <div className="min-w-0 flex-1 pt-1">
             <p className="label-pixel text-accent">{t("title")}</p>
-            <p className="mt-1 flex min-w-0 items-center gap-2">
-              <span className="truncate text-2xl font-semibold text-fg-1">{card.nickname}</span>
+            <p className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="text-xl font-semibold break-words text-fg-1 @md:text-2xl">{card.nickname}</span>
               <PlayerTag tag={card.tag} copy />
             </p>
-            <p className="mt-0.5 text-sm text-fg-2">
+            <p className="mt-0.5 text-sm text-pretty text-fg-2">
               {t("level", { level: card.level })} · {tt(title.key)} {romanTier(title.tier)}
             </p>
-            <p className="mt-0.5 nums text-sm text-fg-3">
+            <p className="mt-0.5 nums text-sm text-pretty text-fg-3">
               {card.rank !== null ? t("rank", { rank: card.rank }) : t("noRank")} ·{" "}
               {formatMoney(card.netWorthCents, { compact: true })}
             </p>
           </div>
         </div>
 
-        <div className="relative mt-5 grid gap-4 sm:grid-cols-2" style={{ transform: "translateZ(18px)" }}>
+        <div className="relative mt-5 grid gap-5 @lg:grid-cols-2" style={{ transform: "translateZ(18px)" }}>
           <div>
             <p className="label-pixel text-fg-3">{t("topBranches")}</p>
             {strongest.length === 0 ? (
@@ -130,7 +130,7 @@ export function BusinessCard({ card, className }: { card: PlayerCard; className?
           <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
             <div className="col-span-2">
               <dt className="label-pixel text-fg-3">{t("job")}</dt>
-              <dd className="mt-0.5 truncate text-fg-1">
+              <dd className="mt-0.5 text-pretty break-words text-fg-1">
                 {card.job && jobTitle
                   ? t("jobAt", { title: jobTitle, company: card.job.companyName })
                   : card.company
@@ -171,7 +171,7 @@ export function BusinessCard({ card, className }: { card: PlayerCard; className?
             {card.company && (
               <div className="col-span-2" data-testid="card-founder">
                 <dt className="label-pixel text-fg-3">{t("founder")}</dt>
-                <dd className="mt-0.5 truncate font-medium text-fg-1">
+                <dd className="mt-0.5 font-medium text-pretty break-words text-fg-1">
                   {t("founderOf", { company: card.company.name })}
                   {card.company.ticker && <span className="ml-1.5 nums text-xs text-fg-3">{card.company.ticker}</span>}
                 </dd>

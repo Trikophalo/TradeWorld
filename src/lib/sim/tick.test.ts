@@ -293,7 +293,8 @@ describe("stepMarketTick", () => {
     const spread = (r: typeof open) => Number((r?.askE4 ?? b(0)) - (r?.bidE4 ?? b(0)));
     expect(spread(late)).toBeGreaterThan(spread(open) * 2);
 
-    const flow: PlayerFlow[] = [{ securityId: "BLUE", netShares: b(500), volumeShares: b(500) }];
+    // Small enough to stay below the per-tick cap in both sessions.
+    const flow: PlayerFlow[] = [{ securityId: "BLUE", netShares: b(100), volumeShares: b(100) }];
     const impact = (session: "open" | "after_hours") => {
       const withFlow = stepMarketTick(state, inputs(0, { session, playerFlows: flow }), createRng(1)).records[0];
       const withoutFlow = stepMarketTick(state, inputs(0, { session }), createRng(1)).records[0];

@@ -1,10 +1,10 @@
 {
-  "code": "NEXA-GALT",
+  "code": "NEXA-XSXZ",
   "invited": 0,
   "redeemed": true,
   "paid_cents": 500000,
   "bonus_cents": 500000,
-  "redeemed_at": "2026-11-13T21:11:32.94045+00:00",
-  "redeemed_from": { "tag": "4ZKL", "nickname": "Fixture_Werber" },
+  "redeemed_at": "2026-11-13T21:19:55.522673+00:00",
+  "redeemed_from": { "tag": "6K42", "nickname": "Fixture_Werber" },
   "cash_after_cents": 1500000
 }

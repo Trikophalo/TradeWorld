@@ -1718,3 +1718,16 @@ Vorgabe: Es soll Aktien-News geben, mit denen man vorhersehen kann, in was man i
 - Der Plan einer Meldung (ob sie eintrifft, wie stark genau) bleibt auf dem Server (`stock_tips`, ohne Client-Rechte).
 - Ein eigener Cron-Job (`nexa-stock-news`, jede Minute) erledigt das, damit der Minuten-Job kurz bleibt.
 - Das Geld bleibt im geschlossenen System: Gewinne aus Tipps zahlt die Gegenseite am Markt.
+
+## ADR-120: Spieler bewegen Kurse deutlich stärker, kürzere Kündigungsfrist — `akzeptiert`
+
+Vorgaben: Aktive Spieler sollen viel stärker beeinflussen, wie sich eine Aktie entwickelt. Kündigen soll nicht mehr
+einen echten Tag dauern: eine Stunde warten (ein Tag im Spiel) oder ein Tagesgehalt zahlen und sofort gehen.
+
+- **Kurseinfluss** (`trading.playerImpact`): 10.000 € Nettokauf bewegen einen Pennystock um 10 % (vorher 2 %), einen
+  Mittelwert um 2 % (0,4 %), einen Blue Chip um 0,5 % (0,1 %). Die Halteprämie steigt von 60 auf 90 %, die Grenze
+  je Takt von 3 auf 10 %, damit ein großer Kauf sofort sichtbar wird. Die Grenze je Order (15 %) bleibt.
+- **Kündigen:** `jobs.quitNoticeHours` ist 1. Sofort kündigen gegen einen Tageslohn gab es schon und bleibt.
+- **Portfolio:** Die Positionen lassen sich nach Wert oder nach Branche sortieren.
+- **Visitenkarte:** Die Spalten richten sich nach der Breite der Karte, nicht des Bildschirms; in der schmalen
+  Spalte der Karriere-Seite steht alles untereinander und Namen brechen um, statt gestaucht zu werden.

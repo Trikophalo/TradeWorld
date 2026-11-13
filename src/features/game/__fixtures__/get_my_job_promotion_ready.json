@@ -1,6 +1,6 @@
 {
   "job": {
-    "id": "0ccc6120-cc0c-42e2-96b9-8edda20ea0ec",
+    "id": "39e63762-7416-4c55-b9e5-7cc86b22ffb6",
     "tier": "intern",
     "title": null,
     "company": {
@@ -13,9 +13,9 @@
       "ticker": "NPH"
     },
     "presence": {
-      "fire_at": "2026-11-18T21:11:31.435568+00:00",
+      "fire_at": "2026-11-18T21:19:53.860658+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-13T21:11:31.435568+00:00"
+      "last_active_at": "2026-11-13T21:19:53.860658+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-13T21:11:31.518536+00:00",
+    "started_at": "2026-11-13T21:19:53.945487+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

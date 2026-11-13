@@ -5,40 +5,8 @@
     {
       "kind": "ai",
       "logo": null,
-      "name": "Volta Energie AG",
-      "rank": 1,
-      "tier": null,
-      "color": "#FFD23F",
-      "sector": "energy",
-      "ticker": "VLT",
-      "founder": null,
-      "is_mine": false,
-      "team_size": null,
-      "company_id": "e50a6ff5-8dbd-8c90-f94e-5ac06d3fe862",
-      "value_cents": 520318000000,
-      "revenue_cents": null
-    },
-    {
-      "kind": "ai",
-      "logo": null,
-      "name": "KlarSoft AG",
-      "rank": 2,
-      "tier": null,
-      "color": "#4C8DFF",
-      "sector": "tech",
-      "ticker": "KLS",
-      "founder": null,
-      "is_mine": false,
-      "team_size": null,
-      "company_id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
-      "value_cents": 434013000000,
-      "revenue_cents": null
-    },
-    {
-      "kind": "ai",
-      "logo": null,
       "name": "NeuroPharm AG",
-      "rank": 3,
+      "rank": 1,
       "tier": null,
       "color": "#6EE7A0",
       "sector": "pharma",
@@ -47,7 +15,39 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "2faf9e4c-3f0a-8a5b-1645-c669e9481771",
-      "value_cents": 433979400000,
+      "value_cents": 1713802200000,
+      "revenue_cents": null
+    },
+    {
+      "kind": "ai",
+      "logo": null,
+      "name": "Volta Energie AG",
+      "rank": 2,
+      "tier": null,
+      "color": "#FFD23F",
+      "sector": "energy",
+      "ticker": "VLT",
+      "founder": null,
+      "is_mine": false,
+      "team_size": null,
+      "company_id": "e50a6ff5-8dbd-8c90-f94e-5ac06d3fe862",
+      "value_cents": 514344000000,
+      "revenue_cents": null
+    },
+    {
+      "kind": "ai",
+      "logo": null,
+      "name": "KlarSoft AG",
+      "rank": 3,
+      "tier": null,
+      "color": "#4C8DFF",
+      "sector": "tech",
+      "ticker": "KLS",
+      "founder": null,
+      "is_mine": false,
+      "team_size": null,
+      "company_id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
+      "value_cents": 438362500000,
       "revenue_cents": null
     },
     {
@@ -63,7 +63,7 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "cbfac5fd-3475-2166-ea22-0a85cbb6f5c0",
-      "value_cents": 349648000000,
+      "value_cents": 355172000000,
       "revenue_cents": null
     },
     {
@@ -79,9 +79,9 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "d21331b8-a414-66aa-de07-f036108fc91d",
-      "value_cents": 313325600000,
+      "value_cents": 309196300000,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-13T21:11:29.538204+00:00"
+  "server_time": "2026-11-13T21:19:51.97448+00:00"
 }

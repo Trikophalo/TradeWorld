@@ -154,7 +154,7 @@ test("learn a skill on the map, apply to an AI company, sign, work and quit", as
   // Quitting is free, with one day notice (ADR-063); it can be taken back.
   await page.goto("/job");
   await page.getByRole("button", { name: "Kündigen" }).click();
-  await expect(page.getByText(/ohne Kosten mit einem Tag Frist/)).toBeVisible();
+  await expect(page.getByText(/ohne Kosten mit einer Stunde Frist/)).toBeVisible();
   await hold(page, "Gedrückt halten zum Kündigen");
   await expect(page.getByText("Gekündigt", { exact: true })).toBeVisible();
   await expect(page.getByTestId("notice")).toBeVisible();

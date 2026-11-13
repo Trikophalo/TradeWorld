@@ -181,7 +181,11 @@
     "tradeLine": "{quantity} × {price}",
     "fee": "Gebühr {fee}",
     "tax": "Steuer {tax}",
-    "realized": "G/V {pnl}"
+    "realized": "G/V {pnl}",
+    "sortLabel": "Sortierung",
+    "sortValue": "Wert",
+    "sortSector": "Branche",
+    "sectorOther": "Anleihen und Krypto"
   },
   "markets": {
     "title": "Märkte",
@@ -1617,7 +1621,7 @@
     "raisePending": "Anfrage gesendet",
     "quit": "Kündigen",
     "quitTitle": "Wirklich kündigen?",
-    "quitText": "Du kündigst ohne Kosten mit einem Tag Frist. Bis dahin arbeitest du automatisch weiter und bekommst Lohn. In der Zeit kannst du die Kündigung zurücknehmen.",
+    "quitText": "Du kündigst ohne Kosten mit einer Stunde Frist (ein Tag im Spiel). Bis dahin arbeitest du automatisch weiter und bekommst Lohn. In der Zeit kannst du die Kündigung zurücknehmen.",
     "quitConfirm": "Gedrückt halten zum Kündigen",
     "quitDone": "Gekündigt",
     "quitDoneText": "Dein letzter Tag endet am {date}.",
@@ -1628,7 +1632,7 @@
     "lastBonus": "Bonus letztes Quartal: {amount}",
     "jobLink": "Dein Job",
     "jobLinkHint": "{title} bei {company}",
-    "quitNoticeTitle": "Mit einem Tag Frist (kostenlos)",
+    "quitNoticeTitle": "Mit einer Stunde Frist (kostenlos)",
     "quitNowTitle": "Sofort kündigen",
     "quitNowText": "Dein Job endet sofort. Dafür zahlst du der Firma einen Tageslohn: {amount}.",
     "quitNowConfirm": "Gedrückt halten: sofort kündigen",

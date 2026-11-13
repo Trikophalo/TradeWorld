@@ -1,5 +1,5 @@
 {
-  "id": "ff4c0694-47ba-43a2-ae65-1ceeec7644d6",
+  "id": "cdac4384-da3f-4bb9-9e1a-73e593d7c72b",
   "kind": "loan",
   "terms": { "hours": 24, "interest_bps": 0, "principal_cents": 20000 },
   "status": "cancelled",
@@ -9,15 +9,15 @@
   "my_role": "lender",
   "progress": { "due_cents": 20000, "left_cents": 20000, "repaid_cents": 0 },
   "proposer": {
-    "tag": "LRCL",
+    "tag": "JSNU",
     "level": 6,
     "trust": { "band": "blank", "score": 50 },
     "nickname": "Fixture_Lieferant",
     "avatar_key": "rookie"
   },
-  "closed_at": "2026-11-13T21:11:31.88714+00:00",
-  "created_at": "2026-11-13T21:11:31.881869+00:00",
-  "expires_at": "2026-11-15T21:11:31.881869+00:00",
+  "closed_at": "2026-11-13T21:19:54.349401+00:00",
+  "created_at": "2026-11-13T21:19:54.345404+00:00",
+  "expires_at": "2026-11-15T21:19:54.345404+00:00",
   "accepted_at": null,
   "is_proposer": true,
   "broken_by_me": false,

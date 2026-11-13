@@ -14,7 +14,7 @@
       "founder": "Lars_Kursrutsch",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "eedbc5fb-93f2-46ac-9380-0e52ea3d4104",
+      "company_id": "f3c7f10a-7f92-4a77-b898-21e696f1b7a1",
       "value_cents": 959140000,
       "revenue_cents": null
     },
@@ -50,8 +50,8 @@
       "founder": "Fenja_Firma",
       "is_mine": false,
       "team_size": 6,
-      "company_id": "0e9d36bc-c9a3-428f-9f7e-82d71d5bd9d0",
-      "value_cents": 82109858,
+      "company_id": "0e0158d2-4dc9-4482-875a-154ce590fc2d",
+      "value_cents": 82183949,
       "revenue_cents": 0
     },
     {
@@ -66,7 +66,7 @@
       "founder": "Frieda_Format",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "b36dc901-0517-40c4-abd0-caac50bd0691",
+      "company_id": "ce4d7263-5c79-4ed3-b8b1-d66e032ce776",
       "value_cents": 51553750,
       "revenue_cents": 1185000
     },
@@ -82,8 +82,8 @@
       "founder": "Sven_Liefert",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "d43cb742-531b-444b-8e0a-f597a8fa8a0f",
-      "value_cents": 20253826,
+      "company_id": "cfe203c1-c1d5-4ceb-bcb2-06d1c403a99e",
+      "value_cents": 20253831,
       "revenue_cents": null
     },
     {
@@ -98,10 +98,10 @@
       "founder": "Anke_Ausbau",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "081d0b58-b6c5-4ae4-af37-c96441619c3f",
+      "company_id": "4d986ec1-c079-437d-85fa-56f58f12840e",
       "value_cents": 7856750,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-13T21:11:29.533184+00:00"
+  "server_time": "2026-11-13T21:19:51.969646+00:00"
 }

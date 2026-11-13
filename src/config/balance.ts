@@ -1417,12 +1417,14 @@ export const BALANCE = {
     liquidationFeeBps: 50,
     washTradeWindowSeconds: 300,
     minPriceE4: 1,
-    maxTickReturnBps: 300,
+    // Wide enough for a strong player order to show at once (ADR-120).
+    maxTickReturnBps: 1000,
     playerImpact: {
-      // 10.000 € net buying moves a penny stock by 2 %, a mid cap by 0.4 %, a blue chip by 0.1 %.
-      depthCentsPer100Bps: { bluechip: 10_000_000, midcap: 2_500_000, penny: 500_000 },
-      bondDepthCentsPer100Bps: 5_000_000,
-      maxHoldingsPremium: 0.6,
+      // Active players move prices strongly (ADR-120): 10.000 € net buying moves a penny stock by 10 %,
+      // a mid cap by 2 %, a blue chip by 0.5 %.
+      depthCentsPer100Bps: { bluechip: 2_000_000, midcap: 500_000, penny: 100_000 },
+      bondDepthCentsPer100Bps: 1_000_000,
+      maxHoldingsPremium: 0.9,
       premiumScaleDepths: 20,
     },
   },
@@ -2107,7 +2109,8 @@ export const BALANCE = {
     offerValidHours: 48,
     aiPostingsPerCompany: 2,
     aiSlotsOpen: 99,
-    quitNoticeHours: 24,
+    // One real hour is a day in the game (ADR-120).
+    quitNoticeHours: 1,
     quitNowCostHours: 12,
     tierMinScore: { intern: 0, junior: 2, senior: 6, team_lead: 12, c_level: 20 },
     sectorBranches: {

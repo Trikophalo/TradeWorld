@@ -1,9 +1,9 @@
 {
-  "id": "c99bb2ae-5a8b-4506-a390-1b0d5fad5793",
+  "id": "3a2854c9-c69e-47d4-b51e-e78b47324223",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "2c7f96a9-b3ce-4c0d-b61e-c8526ae4961c",
+    "id": "04c94f04-a464-4aa7-9706-95fe2362beb3",
     "tier": "intern",
     "title": null,
     "company": {
@@ -19,9 +19,9 @@
     "title_key": "law_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-13T21:11:28.949151+00:00",
-  "updated_at": "2026-11-13T21:11:28.953526+00:00",
-  "offer_expires_at": "2026-11-15T21:11:28.949151+00:00",
+  "created_at": "2026-11-13T21:19:51.430038+00:00",
+  "updated_at": "2026-11-13T21:19:51.434231+00:00",
+  "offer_expires_at": "2026-11-15T21:19:51.430038+00:00",
   "salary_wish_cents_per_hour": 15000,
   "offer_salary_cents_per_hour": 15000
 }

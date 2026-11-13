@@ -1,27 +1,27 @@
 {
-  "id": "e4520e17-452e-49e4-a9f5-aeec3d4456ae",
+  "id": "187581e6-3249-489d-b8ce-7da45d037ef5",
   "status": "offered",
   "message": "Ich lerne schnell.",
   "posting": {
-    "id": "8159b3dd-eb32-43e4-b435-6b004dc63028",
+    "id": "51f3aac4-3d97-4ee2-86b9-6a1d115acc79",
     "tier": "junior",
     "title": null,
     "company": {
-      "id": "dc6cd683-c473-c0eb-8d8c-04ddf664b4d5",
+      "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
       "logo": null,
-      "name": "Eilbote Express",
-      "color": "#F7768E",
+      "name": "KlarSoft AG",
+      "color": "#4C8DFF",
       "is_ai": true,
-      "sector": "logistics",
-      "ticker": "EBX"
+      "sector": "tech",
+      "ticker": "KLS"
     },
     "required": [{ "branch": "it", "min_score": 2 }],
     "title_key": "it_junior",
     "required_skills": []
   },
-  "created_at": "2026-11-13T21:11:28.942969+00:00",
-  "updated_at": "2026-11-13T21:11:28.942969+00:00",
-  "offer_expires_at": "2026-11-15T21:11:28.942969+00:00",
+  "created_at": "2026-11-13T21:19:51.423897+00:00",
+  "updated_at": "2026-11-13T21:19:51.423897+00:00",
+  "offer_expires_at": "2026-11-15T21:19:51.423897+00:00",
   "salary_wish_cents_per_hour": 32700,
   "offer_salary_cents_per_hour": 32700
 }
