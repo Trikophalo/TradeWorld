@@ -1694,3 +1694,12 @@ Vorgabe: Man soll keine Limits mehr setzen können, auch das Tutorial dazu entf�
 
 Dazu zwei kleine Korrekturen der Bedienung: Das Mausrad zoomt auf der Skill-Karte nur noch die Karte (die Seite
 scrollt nicht mit), und der Betrags-Regler zieht das Order-Fenster nicht mehr zur Seite.
+
+## ADR-118: Zeit im Rang läuft schnell — `akzeptiert`
+
+Vorgabe: „12 Stunden im Rang gearbeitet“ dauert zu lange; eine Stunde soll wie ein Tag zählen.
+
+Eine bezahlte echte Stunde zählt als 24 Stunden im Rang (`careers.promotion.rankHoursPerRealHour`). Die Anforderungen
+(12, 36, 72, 120 Stunden) bleiben stehen, sind aber nach 30 Minuten, 1,5, 3 und 5 Stunden bezahlter Arbeit erfüllt.
+Gezählt werden weiter bezahlte echte Minuten (`player_jobs.rank_minutes`); der Faktor wird beim Vergleich auf dem
+Server und bei der Anzeige angewendet. Lohn, Arbeitspunkte und der Achtstundentag ändern sich nicht.

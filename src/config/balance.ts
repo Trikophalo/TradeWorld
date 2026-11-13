@@ -486,8 +486,10 @@ export interface CareersConfig {
   readonly playerCompanyExperienceMultiplier: number;
   /** Promotion to the next rank in the same job (ADR-094). */
   readonly promotion: {
-    /** Hours worked in the current rank before the next one, by target rank. */
+    /** Hours worked in the current rank before the next one, by target rank (game hours, see below). */
     readonly hoursByTier: Readonly<Record<Exclude<JobTierId, "intern">, number>>;
+    /** Time in a rank runs fast (ADR-118): one paid real hour counts as this many hours, 24 = a whole day. */
+    readonly rankHoursPerRealHour: number;
     /** From these ranks on, management needs half of the main branch score as well. */
     readonly managementFrom: readonly JobTierId[];
     /** AI bosses: chance when the requirements are just met, plus per score point above. */
@@ -1801,6 +1803,7 @@ export const BALANCE = {
     playerCompanyExperienceMultiplier: 2,
     promotion: {
       hoursByTier: { junior: 12, senior: 36, team_lead: 72, c_level: 120 },
+      rankHoursPerRealHour: 24,
       managementFrom: ["team_lead", "c_level"],
       baseChanceBps: 4_000,
       chancePerExtraScoreBps: 800,

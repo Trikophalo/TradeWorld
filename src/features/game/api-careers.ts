@@ -1,3 +1,4 @@
+import { BALANCE } from "@/config/balance";
 import { z } from "zod";
 import type { SkillBranch } from "@/config/skills";
 import type { SectorKey } from "@/components/pixel/art";
@@ -368,7 +369,7 @@ const toJob = (j: z.infer<typeof jobSchema>): MyJob => ({
   workTaskOpen: j.work_task_open,
   noticeEndsAt: j.notice_ends_at,
   quitNowCostCents: j.quit_now_cost_cents,
-  rankHours: j.rank_hours,
+  rankHours: j.rank_hours * BALANCE.careers.promotion.rankHoursPerRealHour,
   promotion: j.promotion ? toPromotion(j.promotion) : null,
   presence: j.presence
     ? { lastActiveAt: j.presence.last_active_at, payBps: j.presence.pay_bps, fireAt: j.presence.fire_at }

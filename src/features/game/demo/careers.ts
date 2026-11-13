@@ -372,7 +372,7 @@ export function createCareerEngine(host: CareerHost) {
       lastBonusCents: 0,
       nextWorkTaskAt: nextTaskAt(),
       workTaskOpen: openTask() !== null,
-      rankHours: Math.floor((job.rankMinutes ?? 0) / 6) / 10,
+      rankHours: Math.floor(((job.rankMinutes ?? 0) * careers.promotion.rankHoursPerRealHour) / 6) / 10,
       promotion: promotionNow(job),
       presence: {
         lastActiveAt: iso(st().lastActiveAt ?? Date.now()),
@@ -392,7 +392,7 @@ export function createCareerEngine(host: CareerHost) {
       level: host.level(),
       scores: scores(),
       mainBranch,
-      rankHours: (job.rankMinutes ?? 0) / 60,
+      rankHours: ((job.rankMinutes ?? 0) * careers.promotion.rankHoursPerRealHour) / 60,
       bonusBps: upgradeEffects(host.upgrades()).promotionBonusBps,
     });
     const retry = job.promotionRetryAt ?? null;

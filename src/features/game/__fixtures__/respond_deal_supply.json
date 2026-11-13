@@ -1,10 +1,10 @@
 {
-  "id": "30770282-8366-4d67-8058-d6a50048e5a3",
+  "id": "9623f725-59c9-4c4b-be19-c306a30d6a26",
   "kind": "supply",
   "terms": { "hours": 24, "fee_bps": 5000, "prepay_bps": 2000, "volume_cents_per_hour": 30000 },
   "status": "active",
   "company": null,
-  "ends_at": "2026-11-14T20:43:34.354726+00:00",
+  "ends_at": "2026-11-14T20:54:29.632541+00:00",
   "message": null,
   "my_role": "buyer",
   "progress": {
@@ -15,26 +15,26 @@
     "prepay_left_cents": 72000
   },
   "proposer": {
-    "tag": "XGJ8",
+    "tag": "ZL3Q",
     "level": 6,
     "trust": { "band": "blank", "score": 50 },
     "nickname": "Fixture_Lieferant",
     "avatar_key": "rookie"
   },
   "closed_at": null,
-  "created_at": "2026-11-13T20:43:34.298779+00:00",
-  "expires_at": "2026-11-15T20:43:34.298779+00:00",
-  "accepted_at": "2026-11-13T20:43:34.354726+00:00",
+  "created_at": "2026-11-13T20:54:29.555134+00:00",
+  "expires_at": "2026-11-15T20:54:29.555134+00:00",
+  "accepted_at": "2026-11-13T20:54:29.632541+00:00",
   "is_proposer": false,
   "broken_by_me": false,
   "counterparty": {
-    "tag": "VXM8",
+    "tag": "PPQG",
     "level": 6,
     "trust": { "band": "blank", "score": 50 },
     "nickname": "Fixture_Abnehmer",
     "avatar_key": "rookie"
   },
-  "buyer_company": { "id": "47caa079-e44a-4494-b4fb-caf3cf68f177", "name": "Fixture Abnahme" },
+  "buyer_company": { "id": "85a0fd1e-3dcf-4497-9a15-8611005a4db3", "name": "Fixture Abnahme" },
   "proposer_role": "supplier",
-  "supplier_company": { "id": "91edeff2-0562-49e2-b4c5-ed6059e11f38", "name": "Fixture Lieferwerk" }
+  "supplier_company": { "id": "4063c42d-a69a-45a6-ab98-c1fc95552f10", "name": "Fixture Lieferwerk" }
 }

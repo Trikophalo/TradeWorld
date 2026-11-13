@@ -11,6 +11,8 @@ set client_min_messages = notice;
 \ir ../seeds/game_config.sql
 -- The game runs with market orders only (ADR-117); the tests keep exercising the whole order engine.
 update public.game_config set value = value || '{"limitOrders": true}'::jsonb where key = 'trading';
+-- Time in a rank runs 24 times as fast in the game (ADR-118); the career tests count plain paid hours.
+update public.game_config set value = jsonb_set(value, '{promotion,rankHoursPerRealHour}', '1') where key = 'careers';
 
 -- helpers used by the M1 test files ---------------------------------------------
 create or replace function tests.throws_key(p_sql text, p_key text, p_message text) returns void

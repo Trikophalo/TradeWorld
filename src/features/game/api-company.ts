@@ -1,3 +1,4 @@
+import { BALANCE } from "@/config/balance";
 import { z } from "zod";
 import type { SectorKey } from "@/components/pixel/art";
 import type { SkillBranch } from "@/config/skills";
@@ -925,7 +926,7 @@ export const liveCompanyEngine: CompanyEngine = {
       skills: m.skills,
       noticeEndsAt: m.notice_ends_at,
       tier: m.tier,
-      rankHours: m.rank_hours,
+      rankHours: m.rank_hours * BALANCE.careers.promotion.rankHoursPerRealHour,
       promotion: m.promotion
         ? {
             nextTier: m.promotion.next_tier,

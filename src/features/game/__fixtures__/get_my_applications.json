@@ -1,11 +1,11 @@
 {
   "applications": [
     {
-      "id": "30c67d08-773a-45f8-a789-f3bb2d92467c",
+      "id": "e6e0baef-0ba8-4771-bf2c-5be36b43efee",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "04e57353-dffc-4f90-948d-4ba2343bf15d",
+        "id": "1f81272d-be1d-41aa-8e7b-840dce0cf474",
         "tier": "intern",
         "title": null,
         "company": {
@@ -21,18 +21,18 @@
         "title_key": "management_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-13T20:43:31.24442+00:00",
-      "updated_at": "2026-11-13T20:43:31.248294+00:00",
-      "offer_expires_at": "2026-11-15T20:43:31.24442+00:00",
+      "created_at": "2026-11-13T20:54:26.800532+00:00",
+      "updated_at": "2026-11-13T20:54:26.806055+00:00",
+      "offer_expires_at": "2026-11-15T20:54:26.800532+00:00",
       "salary_wish_cents_per_hour": 15000,
       "offer_salary_cents_per_hour": 15000
     },
     {
-      "id": "63b207dc-a9ca-4bf0-b245-df1f30b6ee44",
+      "id": "b29895cb-88de-4994-af82-628e52a0db9a",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "2174918e-41e2-4a99-9ebf-6a05141991b3",
+        "id": "217ed4b5-09db-4b05-9ee3-25538b6ff9b1",
         "tier": "junior",
         "title": null,
         "company": {
@@ -48,9 +48,9 @@
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-13T20:43:31.238368+00:00",
-      "updated_at": "2026-11-13T20:43:31.238368+00:00",
-      "offer_expires_at": "2026-11-15T20:43:31.238368+00:00",
+      "created_at": "2026-11-13T20:54:26.792641+00:00",
+      "updated_at": "2026-11-13T20:54:26.792641+00:00",
+      "offer_expires_at": "2026-11-15T20:54:26.792641+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }
