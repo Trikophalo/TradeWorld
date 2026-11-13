@@ -19,6 +19,8 @@ export const DISCLOSURE = {
   profileCareer: 2,
   /** Friends (ADR-084): after the tutorial, when the game has a first shape. */
   profileFriends: 2,
+  /** Friends feed and weekly league on the start page (ADR-088, ADR-089). */
+  homeSocial: 2,
 } as const;
 
 export type DisclosureKey = keyof typeof DISCLOSURE;

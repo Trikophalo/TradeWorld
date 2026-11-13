@@ -51,6 +51,7 @@ const COLOR_GROUPS = [
 const SAMPLE_CARD: PlayerCard = {
   nickname: "Boersenfuchs_7",
   tag: "K7Q2",
+  trophies: { gold: 2, silver: 1, bronze: 0 },
   avatarKey: "analyst",
   level: 23,
   rank: 42,

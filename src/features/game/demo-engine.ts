@@ -18,6 +18,7 @@ import { createCareerEngine, initialCareer, tycoonAvatar, type CareerState } fro
 import { createArtEngine, type ArtState } from "./demo/artworks";
 import { createPropertyEngine, type HomeState } from "./demo/property";
 import { createFriendEngine } from "./demo/friends";
+import { createSocialEngine, type DemoSocialState } from "./demo/social";
 import { tagFromUniform } from "@/lib/player-tag";
 import { createCompanyEngine, type DemoCompanyState, type DemoDissolution } from "./demo/company";
 import { demoTycoons } from "./demo/tycoons";
@@ -81,6 +82,8 @@ interface PlayerState {
   nickname: string;
   /** Permanent player tag (ADR-085); drawn once for older demo players. */
   tag?: string;
+  /** Feed, notifications and league of the demo (ADR-088, ADR-089). */
+  social?: DemoSocialState;
   nicknameChangedAt: number | null;
   cashCents: number;
   reservedCents: number;
@@ -351,8 +354,18 @@ function requireLevel(key: string): void {
 
 function addXp(base: number): number {
   const amount = scaledXp(base);
+  const before = levelFromTotalXp(p().xpTotal);
   p().xpTotal += amount;
+  const after = levelFromTotalXp(p().xpTotal);
+  // Every few levels are news for the friends (ADR-088).
+  for (let l = before + 1; l <= after; l++)
+    if (l % BALANCE.social.feed.levelEvery === 0) feedPost("level_up", { level: l });
   return amount;
+}
+
+/** Posts to the demo feed once the engine exists (the feed module is created further down). */
+function feedPost(kind: string, payload: Record<string, unknown>) {
+  socialRef?.post(kind, payload);
 }
 
 /**
@@ -581,6 +594,21 @@ function execute(ticker: string, side: OrderInput["side"], quantityE6: number, p
     executedAt: new Date().toISOString(),
   });
   pl.trades = pl.trades.slice(0, 50);
+  const cost = gross - (realized ?? 0);
+  if (
+    realized !== null &&
+    realized >= BALANCE.social.feed.bigTradeMinProfitCents &&
+    cost > 0 &&
+    (realized * 10_000) / cost >= BALANCE.social.feed.bigTradeMinBps
+  ) {
+    const sec = snapshotNow().securities.find((x) => x.ticker === ticker);
+    feedPost("big_trade", {
+      ticker,
+      security_name: sec?.name ?? ticker,
+      profit_cents: realized,
+      profit_bps: Math.round((realized * 10_000) / cost),
+    });
+  }
   return { gross, fee, tax, realized, xp };
 }
 
@@ -921,6 +949,8 @@ function doCheckIn() {
   pl.streakDays = pl.checkInDay === yesterday ? pl.streakDays + 1 : 1;
   pl.checkInDay = today;
   bump("check_ins");
+  if ((BALANCE.social.feed.streakMilestones as readonly number[]).includes(pl.streakDays))
+    feedPost("streak", { days: pl.streakDays });
   const login = progression.xpSources.dailyLogin;
   const xp = addXp(login.xp + Math.min(login.streakBonusCap, (pl.streakDays - 1) * login.streakBonusPerDay));
   return { xpAwarded: xp, level: level(), xpTotal: pl.xpTotal, streakDays: pl.streakDays, alreadyCheckedIn: false };
@@ -932,6 +962,7 @@ const career = createCareerEngine({
   state: () => (p().career ??= initialCareer()),
   nickname: () => p().nickname,
   tag: () => myTag(),
+  trophies: () => social.trophies(),
   level,
   addXp,
   xpTotal: () => p().xpTotal,
@@ -1019,6 +1050,20 @@ function myTag(): string {
   return pl.tag;
 }
 
+let socialRef: ReturnType<typeof createSocialEngine> | null = null;
+const social = createSocialEngine({
+  state: () => (p().social ??= { seq: 0, feed: [], notifications: [] }),
+  nickname: () => p().nickname,
+  tag: myTag,
+  level,
+  avatarKey: () => career.avatarKey(),
+  netWorthCents: () => netWorth(),
+  snapshot: () => snapshotNow(),
+  idempotent,
+  persist,
+});
+socialRef = social;
+
 const friends = createFriendEngine({
   nickname: () => p().nickname,
   tag: myTag,
@@ -1053,6 +1098,7 @@ export const demoEngine: GameEngine = {
   ...art.engine,
   ...home.engine,
   ...friends,
+  ...social.engine,
   snapshot: () => Promise.resolve(snapshotNow()),
 
   candles: (ticker, interval, limit) => Promise.resolve(demoCandles(ticker, interval, limit)),
@@ -1241,6 +1287,7 @@ export const demoEngine: GameEngine = {
         const claimed = Math.floor(hours * economy.basicIncomeCentsPerHour);
         if (claimed < economy.vaultMinClaimCents) throw new GameError("nothing_to_claim");
         const received = income(claimed);
+        socialRef?.inflow(received);
         pl.vaultClaimedAt = now;
         bump("vault_claims");
         return { claimedCents: received, cashCents: pl.cashCents };

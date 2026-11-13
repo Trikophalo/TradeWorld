@@ -199,6 +199,44 @@ export const COMPANY_LOGOS = { VLT: volta, BRZ: brotzeit, KLS: klarsoft } as con
 
 // ---------------------------------------------------------------- mascots and objects
 
+/** League trophies (ADR-089): one cup, three metals. */
+const TROPHY_GRID = [
+  "kkkkkkkkkkkk",
+  "kyhyyyyyyydk",
+  "kyhyyyyyyydk",
+  "kkyhyyyyydkk",
+  ".kyyyyyyydk.",
+  "..kyyyyydk..",
+  "...kyyydk...",
+  "....kydk....",
+  "....kydk....",
+  "...kkkkkk...",
+  "..kyyyyydk..",
+  "..kkkkkkkk..",
+];
+export const TROPHIES = {
+  gold: { palette: { k: "#4a2a00", y: "#ffd15c", h: "#fff3c4", d: "#c98a1f" }, grid: TROPHY_GRID },
+  silver: { palette: { k: "#2a2f3a", y: "#c9d2e0", h: "#ffffff", d: "#8e99ad" }, grid: TROPHY_GRID },
+  bronze: { palette: { k: "#3a1d0a", y: "#d9894a", h: "#f5c49a", d: "#9a5524" }, grid: TROPHY_GRID },
+} satisfies Record<string, PixelArt>;
+
+/** A lab flask for pharma trials (ADR-090). */
+export const FLASK: PixelArt = {
+  palette: { k: "#1c2230", d: "#c9d2e0", g: "#2fd98c", h: "#c9f7e0" },
+  grid: [
+    "...kkkk...",
+    "...kddk...",
+    "...kddk...",
+    "..kddddk..",
+    ".kddddddk.",
+    "kddggggddk",
+    "kdggggggdk",
+    "kggghggggk",
+    "kgggggggkk",
+    ".kkkkkkkk.",
+  ],
+};
+
 /** Treasure chests for the daily reward (ADR-087): closed, open with coins, open and empty; gold for day 7. */
 const CHEST_WOOD = { k: "#2a1a10", w: "#a0612c", h: "#c98a4b", d: "#6e3d1a", g: "#8e99ad", y: "#ffd15c", e: "#1a1410" };
 const CHEST_GOLD = { k: "#4a2a00", w: "#e0a92e", h: "#ffe08a", d: "#a8741a", g: "#7a4a00", y: "#fff3c4", e: "#2a1a00" };

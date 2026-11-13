@@ -7,6 +7,7 @@ import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Avatar } from "@/components/ui/avatar";
 import { useGame } from "@/features/game/store";
 import { useSearch } from "@/features/market/search-store";
+import { NotificationBell } from "@/features/social/components/notification-bell";
 import { cn } from "@/lib/utils";
 import { CashBalance } from "./cash-balance";
 import { MarketStatus } from "./market-status";
@@ -39,10 +40,11 @@ export function TopBar() {
             type="button"
             onClick={() => openSearch(true)}
             aria-label={t("searchShort")}
-            className="grid size-9 shrink-0 place-items-center rounded-md text-fg-2 focus-ring transition-colors duration-fast hover:bg-surface-2 hover:text-fg-1 lg:hidden"
+            className="grid size-8 shrink-0 place-items-center rounded-md text-fg-2 focus-ring transition-colors duration-fast hover:bg-surface-2 hover:text-fg-1 sm:size-9 lg:hidden"
           >
             <PixelIcon {...UI_ICONS.search} scale={2} />
           </button>
+          <NotificationBell />
           <MissionsButton />
           <CashBalance />
           <ProfileButton />
@@ -89,7 +91,7 @@ function ProfileButton() {
       href="/profile"
       aria-label={t("profile")}
       data-tour="nav-profile"
-      className="grid size-9 shrink-0 place-items-center rounded-md focus-ring transition duration-fast hover:bg-surface-2 active:scale-95 lg:hidden"
+      className="grid size-8 shrink-0 place-items-center rounded-md focus-ring transition duration-fast hover:bg-surface-2 active:scale-95 sm:size-9 lg:hidden"
     >
       <Avatar avatarKey={avatarKey} size="xs" />
     </Link>

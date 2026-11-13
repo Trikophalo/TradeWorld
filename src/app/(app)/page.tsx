@@ -1,8 +1,5 @@
 import { getTranslations } from "next-intl/server";
 import { Page } from "@/components/layout/page";
-import { UI_ICONS } from "@/components/pixel/art";
-import { PixelIcon } from "@/components/pixel/pixel-icon";
-import { LinkCard } from "@/components/ui/link-card";
 import { IndexCard } from "@/features/market/components/index-card";
 import { MoversCard } from "@/features/market/components/movers-card";
 import { WealthHero } from "@/features/portfolio/components/wealth-hero";
@@ -13,6 +10,9 @@ import { NextGoalCard } from "@/features/progression/components/next-goal-card";
 import { Reveal } from "@/features/progression/components/reveal";
 import { VaultCard } from "@/features/progression/components/vault-card";
 import { MyRankCard } from "@/features/rich-list/components/my-rank-card";
+import { NextEventsCard } from "@/features/market/components/event-strip";
+import { FeedPreview } from "@/features/social/components/feed";
+import { LeaguePreview } from "@/features/social/components/league";
 
 /**
  * Start page. From the first minute: wealth, vault, missions, rank and a few
@@ -35,6 +35,9 @@ export default async function HomePage() {
         </div>
         <div className="space-y-5 lg:col-start-1 lg:row-span-2 lg:row-start-1 lg:space-y-6">
           <MyRankCard link />
+          <Reveal feature="homeSocial">
+            <FeedPreview />
+          </Reveal>
           <Reveal feature="homeIndex">
             <IndexCard />
           </Reveal>
@@ -42,13 +45,11 @@ export default async function HomePage() {
         </div>
         <div className="space-y-5 lg:col-start-2 lg:row-start-2 lg:space-y-6">
           <NextGoalCard />
+          <Reveal feature="homeSocial">
+            <LeaguePreview />
+          </Reveal>
           <Reveal feature="homeEvents">
-            <LinkCard
-              href="/events"
-              icon={<PixelIcon {...UI_ICONS.bell} scale={2} className="text-accent" />}
-              title={t("eventsLink")}
-              hint={t("eventsHint")}
-            />
+            <NextEventsCard />
           </Reveal>
         </div>
       </div>

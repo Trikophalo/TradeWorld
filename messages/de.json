@@ -90,7 +90,7 @@
     "sinceStart": "seit Spielstart",
     "comingUp": "Später freischaltbar",
     "eventsLink": "Events und Nachrichten",
-    "eventsHint": "Quartalszahlen, Zinsentscheide, Schlagzeilen"
+    "eventsHint": "Termine, Ergebnisse und Schlagzeilen"
   },
   "vault": {
     "title": "Tresor",
@@ -1760,7 +1760,9 @@
     "share": "Visitenkarte",
     "founder": "Gründer:in",
     "founderOf": "Gründer:in von {company}",
-    "founderAt": "Gründer:in bei {company}"
+    "founderAt": "Gründer:in bei {company}",
+    "trophies": "Pokale",
+    "trophiesHint": "Gold, Silber und Bronze aus der Wochenliga"
   },
   "firm": {
     "title": "Firma",
@@ -2289,7 +2291,34 @@
   "events": {
     "title": "Events",
     "linkTitle": "Events und Nachrichten",
-    "linkHint": "Quartalszahlen, Zinsentscheide und Schlagzeilen"
+    "linkHint": "Quartalszahlen, Zinsentscheide und Schlagzeilen",
+    "upcoming": "Demnächst",
+    "recent": "Die letzten 24 Stunden",
+    "recentEmpty": "Noch keine Ergebnisse.",
+    "nextTitle": "Nächste Termine",
+    "all": "Alle Termine",
+    "today": "Heute",
+    "tomorrow": "Morgen",
+    "yesterday": "Gestern",
+    "important": "Wichtig",
+    "emptyTitle": "Keine Termine",
+    "emptyText": "Gerade ist nichts angekündigt. Schau später wieder vorbei.",
+    "kinds": {
+      "opening_bell": "Eröffnungsglocke: Der Handel beginnt",
+      "closing_bell": "Schlussglocke: danach Nachbörse",
+      "earnings": "Quartalszahlen {company}",
+      "pharma_trial": "Studienergebnis {company}",
+      "rate_decision": "Zinsentscheid der Zentralbank",
+      "other": "Ereignis",
+      "earningsMany": "Quartalszahlen: {companies}"
+    },
+    "outcome": {
+      "trialSuccess": "Studie erfolgreich · {move}",
+      "trialFailure": "Studie gescheitert · {move}",
+      "earningsBeat": "Besser als erwartet · {change}",
+      "earningsMiss": "Schwächer als erwartet · {change}",
+      "rate": "Leitzins {before} % → {after} %"
+    }
   },
   "logo": {
     "title": "Logo zeichnen",
@@ -2635,5 +2664,75 @@
     "copied": "Kopiert!",
     "mine": "Dein Name und Tag",
     "mineHint": "Mit deinem Tag finden dich andere oben in der Suche und können dich als Freund hinzufügen. Er bleibt auch, wenn du deinen Namen änderst."
+  },
+  "social": {
+    "title": "Neuigkeiten",
+    "previewTitle": "Bei deinen Freunden",
+    "previewEmpty": "Noch nichts passiert. Sobald du oder deine Freunde etwas erleben, steht es hier.",
+    "all": "Alle anzeigen",
+    "more": "Ältere laden",
+    "you": "(du)",
+    "react": "Applaus geben",
+    "unreact": "Applaus zurücknehmen",
+    "openProfile": "Profil von {name} öffnen",
+    "emptyTitle": "Noch keine Neuigkeiten",
+    "emptyText": "Hier siehst du, was du und deine Freunde erleben: große Gewinne, neue Firmen, Kunstkäufe, Umzüge.",
+    "findFriends": "Freunde hinzufügen",
+    "ago": {
+      "now": "gerade eben",
+      "minutes": "vor {count} Min.",
+      "hours": "vor {count} Std.",
+      "days": "{count, plural, one {vor # Tag} other {vor # Tagen}}"
+    },
+    "tabs": {
+      "feed": "Neuigkeiten",
+      "league": "Wochenliga",
+      "friends": "Freunde"
+    },
+    "feed": {
+      "kinds": {
+        "level_up": "hat Level {level} erreicht.",
+        "big_trade": "hat mit {security} {profit} Gewinn gemacht ({pct}).",
+        "company_founded": "hat {company} gegründet ({tier}).",
+        "company_upgraded": "hat {company} zur {tier} gemacht.",
+        "company_ipo": "bringt {company} an die Börse: {ticker}.",
+        "company_expanded": "baut {company} auf Stufe {level} aus.",
+        "art_won": "hat „{title}“ für {price} ersteigert.",
+        "art_created": "hat ein neues Kunstwerk gemalt: „{title}“.",
+        "home_bought": "ist umgezogen: {home}.",
+        "car_bought": "fährt jetzt einen {car}.",
+        "job_started": "arbeitet jetzt bei {company} als {title}.",
+        "streak": "spielt seit {days} Tagen in Folge.",
+        "league_won": "hat die Wochenliga gewonnen ({growth}).",
+        "friends_now": "und {other} sind jetzt Freunde.",
+        "other": "hat etwas erlebt."
+      }
+    },
+    "notifications": {
+      "label": "Benachrichtigungen",
+      "labelUnread": "{count, plural, one {# neue Benachrichtigung} other {# neue Benachrichtigungen}}",
+      "title": "Benachrichtigungen",
+      "intro": "Anfragen, Applaus, Auktionen, Bewerbungen und die Wochenliga.",
+      "emptyTitle": "Alles ruhig",
+      "emptyText": "Sobald etwas für dich passiert, klingelt hier die Glocke."
+    },
+    "league": {
+      "title": "Wochenliga",
+      "rules": "Wer macht diese Woche am meisten aus seinem Vermögen? Es zählt der Zuwachs in Prozent seit Montag. Grundeinkommen und Geschenke zählen nicht mit. Die besten drei bekommen einen Pokal.",
+      "scope": "Wer",
+      "scopeFriends": "Freunde",
+      "scopeAll": "Alle",
+      "week": "Woche",
+      "weekCurrent": "Diese Woche",
+      "weekLast": "Letzte Woche",
+      "endsIn": "Endet in",
+      "endsInShort": "Endet in",
+      "emptyTitle": "Noch keine Wertung",
+      "emptyLastTitle": "Letzte Woche gab es keine Wertung",
+      "emptyText": "Die Wertung beginnt, sobald Spieler in dieser Woche aktiv sind.",
+      "myPlace": "Platz {rank} von {count}",
+      "previewEmpty": "Die Wertung startet gleich.",
+      "leader": "Vorne: {name}"
+    }
   }
 }

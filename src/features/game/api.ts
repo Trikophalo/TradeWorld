@@ -3,6 +3,7 @@ import { CAREER_RPC_SCHEMAS, liveCareerEngine } from "./api-careers";
 import { ARTWORK_RPC_SCHEMAS, liveArtEngine } from "./api-artworks";
 import { COMPANY_RPC_SCHEMAS, liveCompanyEngine } from "./api-company";
 import { FRIEND_RPC_SCHEMAS, liveFriendEngine } from "./api-friends";
+import { SOCIAL_RPC_SCHEMAS, liveSocialEngine } from "./api-social";
 import { PROPERTY_RPC_SCHEMAS, livePropertyEngine } from "./api-property";
 import { rpc, toErrorKey } from "./rpc";
 import {
@@ -292,6 +293,7 @@ export const RPC_SCHEMAS = {
   ...ARTWORK_RPC_SCHEMAS,
   ...PROPERTY_RPC_SCHEMAS,
   ...FRIEND_RPC_SCHEMAS,
+  ...SOCIAL_RPC_SCHEMAS,
 } as const;
 
 export const liveEngine: GameEngine = {
@@ -300,6 +302,7 @@ export const liveEngine: GameEngine = {
   ...liveArtEngine,
   ...livePropertyEngine,
   ...liveFriendEngine,
+  ...liveSocialEngine,
   async snapshot(): Promise<MarketSnapshot> {
     const s = await rpc("get_market_snapshot", {}, snapshotSchema);
     return {

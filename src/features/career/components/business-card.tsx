@@ -1,5 +1,7 @@
 "use client";
 
+import { PixelIcon } from "@/components/pixel/pixel-icon";
+import { TROPHIES } from "@/components/pixel/art";
 import { PlayerTag } from "@/components/ui/player-tag";
 import {
   motion,
@@ -144,6 +146,20 @@ export function BusinessCard({ card, className }: { card: PlayerCard; className?
               <dt className="label-pixel text-fg-3">{t("streak")}</dt>
               <dd className="mt-0.5 nums text-fg-1">{t("streakValue", { days: card.streakDays })}</dd>
             </div>
+            {card.trophies.gold + card.trophies.silver + card.trophies.bronze > 0 && (
+              <div className="col-span-2" data-testid="card-trophies" title={t("trophiesHint")}>
+                <dt className="label-pixel text-fg-3">{t("trophies")}</dt>
+                <dd className="mt-1 flex flex-wrap items-center gap-3">
+                  {(["gold", "silver", "bronze"] as const).map((metal) =>
+                    card.trophies[metal] > 0 ? (
+                      <span key={metal} className="inline-flex items-center gap-1 nums text-sm text-fg-1">
+                        <PixelIcon {...TROPHIES[metal]} scale={2} />×{card.trophies[metal]}
+                      </span>
+                    ) : null,
+                  )}
+                </dd>
+              </div>
+            )}
             {card.company && (
               <div className="col-span-2" data-testid="card-founder">
                 <dt className="label-pixel text-fg-3">{t("founder")}</dt>

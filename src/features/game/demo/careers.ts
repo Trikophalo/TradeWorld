@@ -114,6 +114,8 @@ export interface CareerHost {
   nickname(): string;
   /** Permanent player tag (ADR-085). */
   tag(): string;
+  /** League trophies (ADR-089). */
+  trophies(): { gold: number; silver: number; bronze: number };
   level(): number;
   /** Adds XP (multiplier applied) and returns the amount. */
   addXp(base: number): number;
@@ -722,6 +724,7 @@ export function createCareerEngine(host: CareerHost) {
       return {
         nickname: host.nickname(),
         tag: host.tag(),
+        trophies: host.trophies(),
         avatarKey: s.avatarKey,
         level: host.level(),
         rank: host.rank(),

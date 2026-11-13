@@ -32,7 +32,12 @@ describe("RPC contract", () => {
       "get_offers",
       "subscribe_offer",
     ];
-    const pending = [...(fixtures.some((file) => file.startsWith("get_offers")) ? [] : m3f)];
+    // M4f/M4g (ADR-088 to ADR-090) are written in parallel with the database (TODO: remove once the fixtures exist).
+    const m4fg = ["get_feed", "react_feed", "get_notifications", "mark_notifications_read", "get_league", "get_events"];
+    const pending = [
+      ...m4fg.filter((name) => !fixtures.some((file) => file.startsWith(name))),
+      ...(fixtures.some((file) => file.startsWith("get_offers")) ? [] : m3f),
+    ];
     for (const name of Object.keys(RPC_SCHEMAS).filter((key) => !pending.includes(key))) {
       expect(
         fixtures.some((file) => file.startsWith(name)),

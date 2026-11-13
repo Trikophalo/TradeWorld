@@ -561,6 +561,8 @@ export interface EmployerView {
 // ------------------------------------------------------------------ player card (ADR-054)
 
 export interface PlayerCard {
+  /** League trophies from closed weeks (ADR-089). */
+  trophies: { gold: number; silver: number; bronze: number };
   nickname: string;
   /** Permanent player tag without "#" (ADR-085); null until the server knows it. */
   tag: string | null;
@@ -590,6 +592,82 @@ export interface FriendEntry {
   /** Friends since / request sent at. */
   at: string;
 }
+// ------------------------------------------------------------------ social (ADR-088, ADR-089) and events (ADR-090)
+
+export interface FeedActor {
+  nickname: string;
+  tag: string | null;
+  avatarKey: string;
+  level: number;
+}
+
+/** One entry of the friends feed; the text is rendered from kind and payload. */
+export interface FeedItem {
+  id: number;
+  kind: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+  isMe: boolean;
+  actor: FeedActor;
+  reactions: number;
+  reacted: boolean;
+}
+
+export interface FeedPage {
+  items: FeedItem[];
+  nextBefore: number | null;
+}
+
+export interface AppNotification {
+  id: string;
+  typeKey: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  createdAt: string;
+  readAt: string | null;
+}
+
+export interface NotificationList {
+  items: AppNotification[];
+  unread: number;
+}
+
+export type LeagueScope = "all" | "friends";
+
+export interface LeagueEntry extends FeedActor {
+  rank: number;
+  growthBps: number;
+  isMe: boolean;
+}
+
+export interface League {
+  season: { weekStart: string; startsAt: string; endsAt: string; status: string };
+  entries: LeagueEntry[];
+  me: { rank: number; growthBps: number } | null;
+  lastWinner: (Omit<FeedActor, "level"> & { growthBps: number; weekStart: string }) | null;
+}
+
+/** An announced market event (ADR-090); texts come from kind, ticker and outcome. */
+export interface GameEvent {
+  id: string;
+  kind: string;
+  importance: number;
+  scheduledAt: string;
+  announcedAt: string;
+  status: string;
+  ticker: string | null;
+  companyName: string | null;
+  sector: string | null;
+  outcome: Record<string, unknown> | null;
+}
+
+export interface GameEvents {
+  serverTime: string;
+  upcoming: GameEvent[];
+  recent: GameEvent[];
+}
+
 /** A hit of the player search in the top bar (ADR-085). */
 export interface PlayerSearchResult {
   nickname: string;
@@ -1101,6 +1179,16 @@ export interface GameEngine {
   removeFriend(requestId: string, nickname: string): Promise<Friends>;
   /** Players by name or tag (ADR-085), at most 8. */
   searchPlayers(query: string): Promise<PlayerSearchResult[]>;
+  /** Friends feed (ADR-088). */
+  feed(before?: number | null): Promise<FeedPage>;
+  reactFeed(requestId: string, itemId: number): Promise<FeedItem>;
+  /** In-app notifications. */
+  notifications(): Promise<NotificationList>;
+  markNotificationsRead(ids?: string[]): Promise<number>;
+  /** Weekly league (ADR-089). */
+  league(scope: LeagueScope, week: "current" | "last"): Promise<League>;
+  /** Announced events (ADR-090). */
+  events(): Promise<GameEvents>;
   companyPostings(): Promise<CompanyPosting[]>;
   createJobPosting(input: CreatePostingInput): Promise<void>;
   closeJobPosting(requestId: string, postingId: string): Promise<void>;

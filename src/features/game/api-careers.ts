@@ -136,6 +136,7 @@ const jobSchema = z.object({
 const cardSchema = z.object({
   nickname: z.string(),
   tag: z.string().nullable().default(null),
+  trophies: z.object({ gold: num, silver: num, bronze: num }).default({ gold: 0, silver: 0, bronze: 0 }),
   avatar_key: z.string(),
   level: num,
   rank: nnum,
@@ -472,6 +473,7 @@ export const liveCareerEngine: CareerEngine = {
       company: c.company,
       memberSince: c.member_since,
       tag: c.tag,
+      trophies: c.trophies,
     };
   },
 };
