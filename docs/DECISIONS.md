@@ -1668,3 +1668,16 @@ Farbstreifen gefallen nicht.
 - Namen werden nicht mehr abgeschnitten: Lange Wörter tragen in `messages/de.json` weiche Trennstellen (`\u00ad`),
   die Karte bricht dort in bis zu drei Zeilen um.
 - Das Detailblatt zeigt die Voraussetzung (antippbar, mit Haken wenn gelernt) und was der Skill freimacht.
+
+## ADR-116: Live-Datenbank in kleinen Schritten aktualisieren — `akzeptiert`
+
+**Anlass:** Mit vier Spielern online hing das Spiel minutenlang. Zwei Ursachen: Die Rangliste brauchte im
+Minuten-Job 30 Sekunden (behoben mit Index und Rang aus der Momentaufnahme), und jedes Datenbank-Update spielte die
+komplette Historie (über 2 MB SQL) in einer Transaktion neu ein und hielt dabei Sperren.
+
+**Entscheidung:** Die GitHub Action ruft `scripts/apply-updates.sh` auf. Das Skript merkt sich in
+`nexa_meta.applied_updates`, welche Dateien aus `supabase/updates/` schon eingespielt sind, und spielt nur neue ein,
+jede in einer eigenen kurzen Transaktion mit Wiederholung bei Deadlock. Danach schreibt es Spielkonfiguration und
+Stammdaten. `update-to-latest.sql` bleibt für den SQL Editor und für neue Projekte.
+
+Das Schema `nexa_meta` ist kein Teil der API und enthält keine Spieldaten.
