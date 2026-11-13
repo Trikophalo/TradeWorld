@@ -13,6 +13,7 @@ import { NumberTicker } from "@/components/ui/number-ticker";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "@/components/ui/toast";
 import { BALANCE } from "@/config/balance";
+import { isDisclosed } from "@/config/disclosure";
 import { useMyJob } from "@/features/career/hooks";
 import { useMyCompany } from "@/features/company/hooks";
 import { useGameErrorText } from "@/features/game/errors";
@@ -54,6 +55,7 @@ export function VaultCard() {
   const company = useMyCompany().data?.company ?? null;
   const now = useClock();
   const vault = useGame((state) => state.portfolio?.vault);
+  const level = useGame((state) => state.portfolio?.level ?? 1);
   const skew = useGame((state) => state.clockSkewMs);
   const claim = useGame((state) => state.claimVault);
   const errorText = useGameErrorText();
@@ -170,13 +172,15 @@ export function VaultCard() {
             >
               {open ? t("close") : t("open")}
             </button>
-            <Link
-              href="/upgrades"
-              data-testid="vault-upgrade"
-              className="text-sm font-medium text-fg-2 focus-ring transition duration-fast hover:text-fg-1 hover:underline"
-            >
-              {t("upgrade")}
-            </Link>
+            {isDisclosed("homeUpgrades", level) && (
+              <Link
+                href="/upgrades"
+                data-testid="vault-upgrade"
+                className="text-sm font-medium text-fg-2 focus-ring transition duration-fast hover:text-fg-1 hover:underline"
+              >
+                {t("upgrade")}
+              </Link>
+            )}
           </div>
         </div>
       </div>

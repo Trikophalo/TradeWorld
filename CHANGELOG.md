@@ -55,3 +55,20 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 - **Endlose Level** mit Titeln und Prestige-Stufen; Finn erklärt neue Funktionen (Limit-Order, Anleihen).
 - **Spielername** statt „Gast“, alle 60 Tage änderbar, Filter gegen Schimpfwörter und reservierte Namen.
 - Konzept für Garagen-Startups und Firmen als Clans mit Chat (`docs/ECONOMY.md`), Umsetzung mit M4/M5.
+
+## M4i und M4j: Aufstieg, Verbesserungen und Vertrauen
+
+- **Verbesserungen:** Für Spielgeld wird der Tresor größer (8 bis 20 Stunden), das Grundeinkommen etwas höher
+  (bis +30 %), Fachpunkte kommen schneller, es gibt bis zu 14 bezahlte Stunden am Tag und bessere
+  Beförderungschancen. Jede Stufe zeigt „jetzt → danach“.
+- **Karriereleiter:** Praktikum, Junior, Senior, Teamleitung, Vorstand. Für jede Stufe steht da, was fehlt:
+  Level, Punkte im Hauptfach, ab Teamleitung Management, Stunden im Rang. KI-Chefs sagen mit einer Chance Ja, die mit
+  jedem Punkt über der Anforderung steigt; Spieler-Chefs entscheiden selbst. Eine Beförderung bringt mindestens
+  15 % oder den Lohn des neuen Rangs.
+- **Skillpunkte erklärt:** Level, Arbeit, Tagesbelohnung, Missionen und Schulungen mit ihrem Fortschritt, dazu,
+  wofür Skills gut sind.
+- **Gewinnwege:** Die Firmenseite nennt den Engpass (Kunden oder Leute) und schätzt für jeden Hebel, was er pro
+  Stunde bringt. Neu: Marketing-Kampagnen mit Glück im Ergebnis.
+- **Deals unter Spielern:** Kredite, Lieferverträge (freie Kapazität gegen Gebühr) und Teilhaber, an einen
+  Spieler oder offen auf der Deal-Börse. Wer Wort hält, gewinnt Vertrauen; wer zu spät zahlt oder bricht, verliert es,
+  und alle sehen es auf der Visitenkarte.

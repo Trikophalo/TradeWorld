@@ -451,6 +451,18 @@ der KI-Firmen). M3 ist empfohlen, weil sonst das Geld für die Gründung langsam
 - [x] Spielergetriebene, schnellere Märkte (ADR-056), langsamere erste Level (ADR-055)
 - [ ] Gewinnabhängiger Lohn mit Bonus, Insolvenz mit Privathaftung, Finanzierungsrunden, GmbH/AG, Firmenchat
 
+**Weitere Schritte umgesetzt (ADR-083 bis ADR-098):**
+
+- [x] Gewinnhebel (Preisstrategie, Auftragsarbeit, Ausbau ohne Obergrenze), Börsengang ab Level 6 (ADR-083)
+- [x] Freunde, Spieler-Tags, Suche, Feed, Wochenliga, angekündigte Ereignisse (ADR-084 bis ADR-090)
+- [x] Tresor mit Einnahmequellen, automatische Gründer-Auszahlung (ADR-086)
+- [x] Firmen-Lagen mit Gegenmaßnahmen, Firmen-News, Mini-KI (ADR-091)
+- [x] Verbesserungen für Spielgeld: Tresor, Grundeinkommen, Weiterbildung, Überstunden, Rhetorik (ADR-093)
+- [x] Karriereleiter mit Beförderung durch den Chef und klaren Anforderungen (ADR-094)
+- [x] Skillpunkte erklärt: Quellen mit Fortschritt, Nutzen von Skills (ADR-095)
+- [x] Gewinnwege mit Engpass und Schätzung je Hebel, Marketing-Kampagnen (ADR-096, ADR-097)
+- [x] Deals unter Spielern (Kredit, Liefervertrag, Teilhaber) mit Deal-Börse und Vertrauen (ADR-098)
+
 ### Daten/Backend
 
 - [ ] Gründung als RPC: Kleinunternehmen (Level 10, 15.000 €), GmbH (Level 20, 75.000 €), AG vor IPO

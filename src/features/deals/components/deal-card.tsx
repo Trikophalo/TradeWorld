@@ -80,7 +80,8 @@ export function useYouGetText() {
   const t = useTranslations("deals.youGet");
   return (deal: Deal, role: DealRole) => {
     const due = Number(loanDueCents(BigInt(deal.terms.principalCents ?? 0), deal.terms.interestBps ?? 0));
-    const company = (role === "supplier" ? deal.buyerCompany : deal.supplierCompany)?.name ?? "?";
+    const known = (role === "supplier" ? deal.buyerCompany : deal.supplierCompany)?.name;
+    const company = known ?? (role === "supplier" ? t("anyoneFor") : t("anyoneWho"));
     switch (role) {
       case "lender":
       case "borrower":

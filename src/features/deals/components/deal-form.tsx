@@ -85,9 +85,9 @@ export function DealForm({ onSent }: { onSent: () => void }) {
     isProposer: true,
     proposer: { nickname: "", tag: null, avatarKey: "rookie", level, trust: { score: 50, band: "blank" } },
     counterparty: null,
-    supplierCompany: role === "supplier" && company ? { id: company.id, name: company.name } : { id: "", name: "?" },
-    buyerCompany:
-      role === "buyer" && company ? { id: company.id, name: company.name } : { id: "", name: partner || "?" },
+    // The partner's company is unknown before the deal: the sentence names "another player".
+    supplierCompany: role === "supplier" && company ? { id: company.id, name: company.name } : null,
+    buyerCompany: role === "buyer" && company ? { id: company.id, name: company.name } : null,
     company: null,
     terms,
     message: null,

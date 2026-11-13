@@ -222,7 +222,6 @@ export function createDealEngine(host: DealHost) {
   }
 
   function toDeal(d: DemoDeal): Deal {
-    const other = otherOf(d, "me");
     const left = Math.max(0, d.dueCents - d.repaidCents);
     return {
       id: d.id,
@@ -232,7 +231,7 @@ export function createDealEngine(host: DealHost) {
       proposerRole: d.proposerRole,
       isProposer: d.proposer === "me",
       proposer: party(d.proposer),
-      counterparty: d.proposer === "me" ? (d.counterparty ? party(d.counterparty) : null) : other ? party("me") : null,
+      counterparty: d.counterparty ? party(d.counterparty) : null,
       supplierCompany: d.kind === "supply" ? companyOf(sideWith(d, "supplier")) : null,
       buyerCompany: d.kind === "supply" ? companyOf(sideWith(d, "buyer")) : null,
       company: d.kind === "stake" ? companyOf(sideWith(d, "company")) : null,

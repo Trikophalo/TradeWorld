@@ -1170,3 +1170,21 @@ Rechenbeispiel GmbH in Tech:
 - Anteil der Firmen mit Gewinn pro Stunde nach 1, 3 und 7 Tagen.
 - Anteil der Auftragsarbeit am Umsatz. Wenn sie dauerhaft über 50 % liegt, ist sie zu großzügig.
 - Verteilung der Ausbaustufen.
+
+## Nachtrag M4i/M4j: Verbesserungen, Beförderung, Kampagnen, Deals (ADR-093 bis ADR-098)
+
+Alle Werte stehen in `src/config/upgrades.ts`, `src/config/deals.ts` und `src/config/balance.ts`
+(`careers.promotion`, `startups.campaigns`).
+
+- **Verbesserungen:** Preise wachsen je Stufe um den Faktor 2 bis 3. Der Tresor amortisiert sich bei zwei
+  Leerungen am Tag nach ein bis zwei Wochen (Stufe 1, nur wenn er sonst überläuft), das Grundeinkommen +10 % nach
+  etwa vier Wochen. Absichtlich
+  langsam: Verbesserungen sind ein Geldziel für die Zeit, nicht der schnellste Weg zu Vermögen.
+- **Beförderung:** Grundchance 40 %, +8 % je Punkt über der Anforderung, +5 % je Rhetorik-Stufe, höchstens 90 %.
+  Stunden im Rang (12, 36, 72, 120) entsprechen bei 12 bezahlten Stunden am Tag 1, 3, 6 und 10 Tagen.
+- **Kampagnen:** Bei durchschnittlichem Glück lohnt eine Kampagne nur mit freier Kapazität und hoher Marge
+  (Tech, Pharma). Handel und Logistik verdienen mit Kampagnen kaum etwas, eher mit Lieferverträgen.
+- **Lieferverträge:** Gewinn je Stück für den Käufer = Preis − Gebühr, für den Lieferanten = Gebühr − (1 − Marge).
+  Bei 60 % Gebühr gewinnen Tech-Lieferanten 35 %, Handels-Lieferanten verlieren 5 %: Handel liefert nur teurer.
+- **Vertrauen:** Start 50. Ein pünktlicher Kredit +4, ein gebrochener Vertrag −12: Drei Brüche machen aus
+  „Unbeschrieben“ „Riskant“, gut zehn gehaltene Deals „Felsenfest“.

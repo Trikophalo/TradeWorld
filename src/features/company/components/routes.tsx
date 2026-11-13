@@ -238,7 +238,7 @@ export function CampaignCard({ company }: { company: MyCompany }) {
           <p className="text-sm text-fg-1">{t(`resonance.${running.resonance}`)}</p>
           <p className="nums text-xs text-fg-2">
             {t("runningEffect", {
-              percent: formatBps(running.demandBps).replace("+", ""),
+              percent: formatBps(Math.round(running.demandBps / 100) * 100).replace("+", ""),
               time: now === null ? "" : formatCountdown(Math.max(0, (Date.parse(running.endsAt) - now) / 1000)),
             })}
           </p>
@@ -259,7 +259,8 @@ export function CampaignCard({ company }: { company: MyCompany }) {
               : 0;
             const total = perHour * spec.hours - cost;
             const soldOut = live !== null && live.demandPerHourCents >= live.capacityPerHourCents;
-            const effect = Math.round((campaignFactor(kind, quality, 1) - 1) * 10_000);
+            // Whole percent: the effect is an estimate with average luck.
+            const effect = Math.round((campaignFactor(kind, quality, 1) - 1) * 100) * 100;
             return (
               <li key={kind} className="rounded-md border border-line-1 p-3" data-campaign={kind}>
                 <div className="flex flex-wrap items-baseline justify-between gap-2">

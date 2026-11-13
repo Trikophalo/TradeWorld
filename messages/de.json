@@ -3536,7 +3536,9 @@
       "supplier": "Deine freie Kapazität produziert für {company}. Pro Stück bekommst du {fee} vom Preis.",
       "buyer": "Wenn du ausverkauft bist, liefert {company}. Du verkaufst zu deinem Preis und zahlst {fee}.",
       "investor": "Du gibst {amount} und bekommst {share} von jeder Gewinnstunde.",
-      "company": "Deine Firma bekommt {amount}. Teilhaber bekommen {share} von jeder Gewinnstunde."
+      "company": "Deine Firma bekommt {amount}. Teilhaber bekommen {share} von jeder Gewinnstunde.",
+      "anyoneFor": "einen anderen Spieler",
+      "anyoneWho": "ein anderer Spieler"
     },
     "progress": {
       "loan": "{repaid} von {due} zurück",
