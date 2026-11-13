@@ -2937,7 +2937,8 @@
         "steps": {
           "analyse": "Angriff analysieren",
           "patch": "Lücke schließen",
-          "audit": "Sicherheitsprüfung"
+          "audit": "Sicherheitsprüfung",
+          "disclose": "Alles offenlegen"
         }
       },
       "price_war": {

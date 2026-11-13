@@ -13,6 +13,17 @@ describe("Mini-KI: understanding what a company makes (ADR-091)", () => {
     expect(p.words.input).toContain("Zellstoff");
   });
 
+  it("keeps compound products and pairs taxes with their raw material", () => {
+    expect(productWord("Energy Drinks mit extra Taurin für Gamer.", "Blitzdose")).toBe("Energy Drinks");
+    expect(productWord("Unsere Gartenzwerge aus alten Flaschen", "Zwergenwerk")).toBe("Gartenzwerge");
+    const p = companyProfile({ name: "Blitz", idea: "Energy Drink", sector: "retail" });
+    for (let seed = 0; seed < 30; seed++) {
+      const v = storyValues(p, "Blitz", seed);
+      if (v.tax === "Taurin-Steuer") expect(v.input).toBe("Taurin");
+      if (v.tax === "Zuckerabgabe") expect(v.input).toBe("Zucker");
+    }
+  });
+
   it("an energy drink company gets the taurine tax", () => {
     const p = companyProfile({ name: "Blitz Energy", idea: "Energy Drink mit extra Koffein", sector: "retail" });
     expect(p.family).toBe("energy_drink");

@@ -34,6 +34,7 @@ import { BannerEditor } from "./banner-editor";
 import { LogoEditor } from "./logo-editor";
 import { OfficeScene } from "./office-scene";
 import { ExpansionCard, PayoutCard, ProfitCoach, StrategyCard } from "./profit";
+import { CompanyNewsCard, SituationCard } from "./situation";
 
 type Tab = "overview" | "team" | "chat";
 const factor = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
@@ -106,6 +107,7 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
       {tab === "overview" && (
         <div className="grid gap-5 *:min-w-0 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6">
           <div className="space-y-5">
+            <SituationCard />
             <ProfitCoach
               company={company}
               onNavigate={(to) => {
@@ -119,6 +121,7 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
               onTrain={trainingOpen ? goTraining : undefined}
             />
             <ExpansionCard company={company} />
+            <CompanyNewsCard />
             <QuarterReceipt company={company} />
             <HistoryCard company={company} />
           </div>

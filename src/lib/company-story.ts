@@ -51,18 +51,29 @@ export function matchFamily(text: string): ProductFamily | null {
 }
 
 /**
- * The product as the player wrote it: German nouns are capitalised, so take the longest capitalised word of the
- * idea that is not the company's name or a filler word ("Wir stellen Toilettenpapier her" → "Toilettenpapier").
+ * The product as the player wrote it: German nouns are capitalised, so take the longest run of capitalised words of
+ * the idea that is not the company's name or a filler word ("Wir stellen Toilettenpapier her" → "Toilettenpapier",
+ * "Energy Drinks mit Taurin" → "Energy Drinks").
  */
 export function productWord(idea: string, name: string): string | null {
   const nameWords = new Set(fold(name).trim().split(/\s+/));
-  const words = idea.match(/[A-ZÄÖÜ][a-zäöüß-]{3,}/g) ?? [];
-  const candidates = words.filter((w) => {
+  const keep = (w: string) => {
     const f = fold(w).trim();
-    return !NOT_A_PRODUCT.includes(f) && !nameWords.has(f);
-  });
-  if (candidates.length === 0) return null;
-  return candidates.reduce((a, b) => (b.length > a.length ? b : a));
+    return w.length >= 4 && !NOT_A_PRODUCT.includes(f) && !nameWords.has(f);
+  };
+  const runs: string[] = [];
+  let run: string[] = [];
+  for (const word of idea.split(/[\s,.;:!?()]+/)) {
+    if (/^[A-ZÄÖÜ][a-zäöüß-]+$/.test(word) && keep(word)) {
+      run.push(word);
+    } else {
+      if (run.length) runs.push(run.slice(0, 2).join(" "));
+      run = [];
+    }
+  }
+  if (run.length) runs.push(run.slice(0, 2).join(" "));
+  if (runs.length === 0) return null;
+  return runs.reduce((a, b) => (b.length > a.length ? b : a));
 }
 
 export function companyProfile(input: StoryInput): CompanyProfile {
@@ -103,6 +114,10 @@ export function storyValues(profile: CompanyProfile, company: string, seed: numb
     // The product stays the same in one story; other slots vary with the seed.
     values[slot] = slot === "product" ? profile.words.product[0]! : pick(profile.words[slot], seed, i + 1);
   });
+  // A tax is on a raw material: the lexicon lists them in the same order, so they are picked as a pair.
+  const taxIndex = (seed + 3 * 7919) % profile.words.tax.length;
+  values.tax = profile.words.tax[taxIndex]!;
+  values.input = profile.words.input[taxIndex % profile.words.input.length]!;
   return values;
 }
 

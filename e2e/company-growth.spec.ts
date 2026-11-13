@@ -46,12 +46,12 @@ async function hold(page: Page, name: RegExp) {
   await page.mouse.up();
 }
 
-async function found(page: Page, tier: string, name: string) {
+async function found(page: Page, tier: string, name: string, idea = "Ein Produkt, das jeder braucht.") {
   await page.goto("/company");
   await page.locator(`[data-tier="${tier}"]`).getByRole("button", { name: "Gründen" }).click();
   const sheet = page.getByRole("dialog", { name: "Firma gründen" });
   await sheet.getByLabel("Firmenname").fill(name);
-  await sheet.getByLabel("Deine Idee in einem Satz").fill("Ein Produkt, das jeder braucht.");
+  await sheet.getByLabel("Deine Idee in einem Satz").fill(idea);
   await expect(sheet.getByText("Name ist frei")).toBeVisible();
   await hold(page, /Gedrückt halten zum Gründen/);
   await expect(page.getByText("Firma gegründet!")).toBeVisible();
@@ -155,4 +155,39 @@ test("friends page: empty list, add by name, helpful errors", async ({ page }) =
     .first()
     .click();
   await expect(page).toHaveURL(/\/friends$/);
+});
+
+test("company situation: a crisis or chance, a strategy, a step, the news", async ({ page }) => {
+  await preparePlayer(page, "Krisenchefin", 7_000, 2_000_000);
+  await found(page, "garage", "Blitzdose", "Energy Drinks mit extra Taurin für Gamer.");
+  // The idea names the product: the Mini-KI writes about it (ADR-091).
+  await expect(page.getByTestId("situation-calm")).toBeVisible();
+  await page.getByTestId("demo-trigger-event").click();
+  const situation = page.getByTestId("situation");
+  await expect(situation).toBeVisible();
+  await expect(situation.getByTestId("situation-headline")).not.toBeEmpty();
+
+  // Choose the first strategy that takes real work.
+  const picker = situation.getByTestId("strategy-picker");
+  const working = picker
+    .locator("[data-strategy]")
+    .filter({ has: page.getByText(/Schritte?$/) })
+    .first();
+  await working.getByRole("button", { name: "Diese Strategie" }).click();
+  await expect(page.getByText("Strategie gewählt").first()).toBeVisible();
+  const path = situation.getByTestId("step-path");
+  await expect(path.locator('[data-step-status="next"]')).toHaveCount(1);
+
+  // Start the first step (paid from the company's cash), finish it at once in the demo.
+  await path.getByTestId("start-step").click();
+  await expect(page.getByText("Schritt gestartet").first()).toBeVisible();
+  await expect(path.locator('[data-step-status="running"]')).toHaveCount(1);
+  await situation.getByTestId("demo-finish-step").click();
+  await expect(path.locator('[data-step-status="running"]')).toHaveCount(0);
+  await expect(path.locator('[data-step-status="done"], [data-step-status="failed"]').first()).toBeVisible();
+
+  // The news tell the story.
+  const news = page.getByTestId("company-news");
+  await expect(news.locator('[data-kind="event_started"]')).toHaveCount(1);
+  await expect(news.locator('[data-kind="event_step_done"], [data-kind="event_step_failed"]').first()).toBeVisible();
 });

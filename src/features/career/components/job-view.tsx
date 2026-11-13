@@ -1,5 +1,6 @@
 "use client";
 
+import { CompanyNewsCard, SituationCard } from "@/features/company/components/situation";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -29,6 +30,7 @@ function useEmployer(enabled: boolean) {
 
 /** The job tab (ADR-064): the worker at the desk, pay, and everything about the employer. */
 export function JobView() {
+  const tn = useTranslations("companyNews");
   const t = useTranslations("jobTab");
   const job = useMyJob();
   const company = useMyCompany();
@@ -57,6 +59,13 @@ export function JobView() {
       <div className="space-y-5">
         <WorkerCard job={job.data} />
         <ActiveJob job={job.data} />
+        {/* Staff of a player company see its situation and news (ADR-091). */}
+        {employer.data?.kind === "player" && (
+          <>
+            <SituationCard companyId={employer.data.company.id} />
+            <CompanyNewsCard companyId={employer.data.company.id} title={tn("employeeTitle")} />
+          </>
+        )}
       </div>
       <div className="space-y-5">
         {employer.data ? <EmployerCard employer={employer.data} /> : <Skeleton className="h-64 w-full rounded-lg" />}
