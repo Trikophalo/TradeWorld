@@ -649,6 +649,15 @@ export interface EventsConfig {
     readonly techBoom: MacroEventConfig;
   };
   readonly rateDecisionSentimentPer25Bps: number;
+  /**
+   * Announced events (ADR-090): how far ahead they are planned, which companies report earnings, how long resolved
+   * events stay visible.
+   */
+  readonly schedule: {
+    readonly horizonHours: number;
+    readonly earningsTopCompanies: number;
+    readonly recentHours: number;
+  };
 }
 
 export interface MacroEventConfig {
@@ -701,6 +710,31 @@ export interface AbuseConfig {
   };
 }
 
+/** Friends feed and weekly league (ADR-088, ADR-089). */
+export interface SocialConfig {
+  readonly feed: {
+    readonly pageSize: number;
+    /** A closed trade is news when it made at least this much and this many bps. */
+    readonly bigTradeMinProfitCents: number;
+    readonly bigTradeMinBps: number;
+    /** Level-ups are news every n levels. */
+    readonly levelEvery: number;
+    /** Artworks bought at auction and cars from this price are news. */
+    readonly artMinPriceCents: number;
+    readonly carMinPriceCents: number;
+    readonly streakMilestones: readonly number[];
+    readonly keepDays: number;
+  };
+  readonly league: {
+    /** Standings are recomputed this often. */
+    readonly updateEveryMinutes: number;
+    /** Places that win a trophy. */
+    readonly podium: number;
+    /** Below this start value growth in percent means little; the baseline is at least this. */
+    readonly minBaselineCents: number;
+  };
+}
+
 export interface BalanceConfig {
   readonly time: TimeConfig;
   readonly economy: EconomyConfig;
@@ -732,6 +766,7 @@ export interface BalanceConfig {
   readonly startups: StartupsConfig;
   readonly artworks: ArtworksConfig;
   readonly property: PropertyConfig;
+  readonly social: SocialConfig;
 }
 
 export type PropertyTier = "flat" | "apartment" | "house" | "villa" | "luxury_villa";
@@ -1907,6 +1942,7 @@ export const BALANCE = {
       techBoom: { probabilityPerQuarter: 0.03, magnitude: 0.2, durationQuarters: 4, sentimentShock: 0.5 },
     },
     rateDecisionSentimentPer25Bps: -0.1,
+    schedule: { horizonHours: 24, earningsTopCompanies: 3, recentHours: 24 },
   },
 
   // ----------------------------------------------------------- lifestyle (spec 11.3)
@@ -2144,6 +2180,19 @@ export const BALANCE = {
       startPriceCents: { common: 500_000, rare: 2_500_000, legendary: 15_000_000 },
     },
     hot: { likeWeight: 1, bidWeight: 3, gravity: 1.5 },
+  },
+  social: {
+    feed: {
+      pageSize: 30,
+      bigTradeMinProfitCents: 100_000,
+      bigTradeMinBps: 1_500,
+      levelEvery: 5,
+      artMinPriceCents: 1_000_000,
+      carMinPriceCents: 10_000_000,
+      streakMilestones: [7, 30, 100, 365],
+      keepDays: 30,
+    },
+    league: { updateEveryMinutes: 10, podium: 3, minBaselineCents: 1_000_000 },
   },
   property: {
     tiers: [
