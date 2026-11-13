@@ -70,9 +70,12 @@ export function VaultCard() {
           vault.capCents,
           vault.accruedCents + ((now - skew - Date.parse(vault.serverTime)) / HOUR_MS) * vault.rateCentsPerHour,
         );
-  const fill = Math.min(1, amount / CAP_CENTS);
-  const full = amount >= CAP_CENTS;
-  const secondsToFull = ((CAP_CENTS - amount) / RATE) * 3600;
+  // Size and rate come from the server: upgrades make the vault bigger and the income a little higher (ADR-093).
+  const cap = vault?.capCents ?? CAP_CENTS;
+  const rate = vault?.rateCentsPerHour || RATE;
+  const fill = Math.min(1, amount / cap);
+  const full = amount >= cap;
+  const secondsToFull = ((cap - amount) / rate) * 3600;
 
   const jobRate = job.data?.effectiveSalaryCentsPerHour ?? 0;
   const sources: Source[] = [
@@ -80,7 +83,7 @@ export function VaultCard() {
       key: "basic",
       art: COIN,
       name: t("sources.basic"),
-      detail: t("sources.basicDetail", { hours: BALANCE.economy.vaultCapHours }),
+      detail: t("sources.basicDetail", { hours: Math.round(cap / rate) }),
       perHourCents: vault?.rateCentsPerHour ?? RATE,
       href: null,
       tone: "bg-gold",
@@ -157,15 +160,24 @@ export function VaultCard() {
               {t("jobIncome", { amount: formatMoney(jobRate) })}
             </p>
           )}
-          <button
-            type="button"
-            onClick={toggle}
-            aria-expanded={open}
-            data-testid="vault-open"
-            className="mt-1.5 text-sm font-medium text-accent focus-ring transition duration-fast hover:underline"
-          >
-            {open ? t("close") : t("open")}
-          </button>
+          <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
+            <button
+              type="button"
+              onClick={toggle}
+              aria-expanded={open}
+              data-testid="vault-open"
+              className="text-sm font-medium text-accent focus-ring transition duration-fast hover:underline"
+            >
+              {open ? t("close") : t("open")}
+            </button>
+            <Link
+              href="/upgrades"
+              data-testid="vault-upgrade"
+              className="text-sm font-medium text-fg-2 focus-ring transition duration-fast hover:text-fg-1 hover:underline"
+            >
+              {t("upgrade")}
+            </Link>
+          </div>
         </div>
       </div>
 

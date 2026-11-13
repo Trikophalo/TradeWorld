@@ -28,11 +28,13 @@
       "profile": "Profil",
       "property": "Haus",
       "more": "Mehr",
-      "friends": "Freunde"
+      "friends": "Freunde",
+      "upgrades": "Upgrades"
     },
     "property": "Grundstück",
     "more": "Mehr",
-    "friends": "Freunde"
+    "friends": "Freunde",
+    "upgrades": "Verbesserungen"
   },
   "topbar": {
     "search": "Aktien, Firmen, Spieler suchen",
@@ -120,7 +122,8 @@
       "ceoNone": "Mit einer eigenen Firma zahlst du dir einen Anteil vom Gewinn aus.",
       "ceoOff": "{name}: Auszahlung steht auf 0 %. Stell sie in der Firma ein.",
       "ceoOn": "{name}: {percent} % vom Gewinn · heute {today}"
-    }
+    },
+    "upgrade": "Tresor vergrößern"
   },
   "portfolio": {
     "title": "Portfolio",
@@ -676,7 +679,11 @@
     "garage_full": "Deine Garage ist voll.",
     "event_closed": "Diese Lage ist schon entschieden oder vorbei.",
     "event_needs_staff": "Für diesen Schritt brauchst du mehr Leute im Team.",
-    "feed_item_not_found": "Diesen Beitrag gibt es nicht mehr."
+    "feed_item_not_found": "Diesen Beitrag gibt es nicht mehr.",
+    "upgrade_maxed": "Diese Verbesserung ist schon auf der höchsten Stufe.",
+    "promotion_not_ready": "Für die Beförderung fehlt noch etwas. Schau in die Karriereleiter.",
+    "promotion_too_soon": "Der Chef hat gerade erst Nein gesagt. Frag später noch einmal.",
+    "promotion_pending": "Deine Anfrage liegt schon beim Chef."
   },
   "locks": {
     "level": "Level {level}",
@@ -2713,7 +2720,8 @@
         "streak": "spielt seit {days} Tagen in Folge.",
         "league_won": "hat die Wochenliga gewonnen ({growth}).",
         "friends_now": "und {other} sind jetzt Freunde.",
-        "other": "hat etwas erlebt."
+        "other": "hat etwas erlebt.",
+        "promoted": "wurde befördert: {tier} bei {company}."
       }
     },
     "notifications": {
@@ -3276,5 +3284,163 @@
     "ios": "Für das beste Spielgefühl: Tippe unten in Safari auf „Teilen“ und dann auf „Zum Home-Bildschirm“. Dann startet NEXA im Vollbild, ohne Browserleisten.",
     "install": "Installieren",
     "later": "Später"
+  },
+  "upgrades": {
+    "title": "Verbesserungen",
+    "intro": "Steck dein Spielgeld in dich selbst. Jede Stufe wirkt für immer.",
+    "now": "Jetzt",
+    "next": "Danach",
+    "levelOf": "Stufe {level} von {max}",
+    "maxed": "Höchste Stufe erreicht",
+    "fromLevel": "Ab Level {level}",
+    "missing": "Dir fehlen {amount}",
+    "buy": "Gedrückt halten · {price}",
+    "bought": "Verbessert!",
+    "boughtText": "{name} ist jetzt auf Stufe {level}.",
+    "failed": "Nicht gekauft",
+    "cashLabel": "Dein Geld",
+    "moneyNote": "Das Geld geht an die Staatskasse, aus der alle ihr Grundeinkommen bekommen.",
+    "items": {
+      "vault": {
+        "name": "Tresor",
+        "text": "Mehr Platz für dein Grundeinkommen. Du verpasst weniger, wenn du länger nicht reinschaust.",
+        "value": "{value} h Platz"
+      },
+      "income": {
+        "name": "Grundeinkommen",
+        "text": "Ein bisschen mehr Grundeinkommen jede Stunde. Klein, aber es läuft immer.",
+        "value": "{amount} pro Stunde"
+      },
+      "study": {
+        "name": "Weiterbildung",
+        "text": "Schneller Fachpunkte durch Arbeit: weniger Arbeitsstunden pro Punkt.",
+        "value": "alle {value} h ein Fachpunkt"
+      },
+      "overtime": {
+        "name": "Überstunden",
+        "text": "Mehr bezahlte Stunden am Tag in deinem Job, also mehr Lohn.",
+        "value": "{value} h Lohn am Tag"
+      },
+      "rhetoric": {
+        "name": "Rhetorik-Kurs",
+        "text": "Bessere Chance, wenn du einen KI-Chef um eine Beförderung bittest.",
+        "value": "+{percent} Chance"
+      }
+    }
+  },
+  "ladder": {
+    "title": "Karriereleiter",
+    "intro": "Jede Stufe höher bringt mehr Lohn. So schaffst du die nächste:",
+    "you": "Du",
+    "next": "Nächste Stufe",
+    "top": "Ganz oben! Mehr Lohn gibt es jetzt über Gehaltserhöhungen und Boni.",
+    "req": {
+      "level": "Level {need}",
+      "branch": "{branch}: {need} Punkte",
+      "management": "Management: {need} Punkte",
+      "hours": "{need} Stunden im Rang gearbeitet"
+    },
+    "have": "{have} von {need}",
+    "how": {
+      "level": "XP gibt es für Handel, Arbeit und Missionen.",
+      "branch": "Lerne {branch}-Skills auf der Skill-Karte.",
+      "management": "Lerne Management-Skills auf der Skill-Karte.",
+      "hours": "Läuft von selbst, solange du arbeitest (bis {cap} h am Tag)."
+    },
+    "toSkills": "Zur Skill-Karte",
+    "chance": "Chance auf ein Ja: {percent}",
+    "chanceHint": "Jeder {branch}-Punkt über der Anforderung bringt +8 %.",
+    "playerBoss": "Dein Chef ist ein Spieler. Er entscheidet selbst.",
+    "ask": "Chef um Beförderung bitten",
+    "notReady": "Erst alle Punkte erfüllen",
+    "retry": "Der Chef hat Nein gesagt. Neue Anfrage ab {time}.",
+    "pending": "Deine Anfrage liegt beim Chef.",
+    "wageAfter": "Lohn danach: {amount}/h",
+    "promoted": "Befördert!",
+    "promotedText": "Du bist jetzt {tier}. Neuer Lohn: {amount}/h.",
+    "declined": "Noch nicht",
+    "declinedText": "Der Chef sagt: noch nicht. Mit mehr {branch}-Punkten steigt deine Chance.",
+    "pendingToast": "Anfrage geschickt",
+    "pendingText": "Dein Chef entscheidet.",
+    "rhetoric": "Rhetorik-Kurs hilft."
+  },
+  "payRoutes": {
+    "title": "So steigt dein Gehalt",
+    "promotion": {
+      "title": "Beförderung",
+      "text": "Der große Sprung: neuer Rang, mindestens 15 % mehr oder der Lohn des neuen Rangs."
+    },
+    "raise": {
+      "title": "Gehaltserhöhung",
+      "text": "Alle 7 Tage: je neuem Skillpunkt in deinem Fach bis zu 3 % mehr."
+    },
+    "bonus": {
+      "title": "Bonus",
+      "text": "In Firmen von Spielern: ein Anteil am Gewinn, wenn die Firma gut läuft."
+    },
+    "tasks": {
+      "title": "Arbeitsaufgaben",
+      "text": "Alle 3 Stunden eine kurze Aufgabe. Richtig gelöst gibt es Extra-Lohn."
+    },
+    "overtime": {
+      "title": "Überstunden",
+      "text": "Mit der Verbesserung mehr bezahlte Stunden am Tag.",
+      "link": "Ansehen"
+    }
+  },
+  "skillGuide": {
+    "title": "So bekommst du Skillpunkte",
+    "rule": "Freie Punkte passen überall, Fachpunkte nur in ihrem Fach.",
+    "level": {
+      "title": "Level-Aufstieg",
+      "text": "+1 freier Punkt pro Level.",
+      "progress": "noch {xp} XP bis Level {level}"
+    },
+    "work": {
+      "title": "Arbeit",
+      "text": "Alle {hours} Arbeitsstunden +1 Fachpunkt in den Fächern deines Jobs.",
+      "noJob": "Ohne Job gibt es keine Fachpunkte. Schau in die Jobbörse.",
+      "toJobs": "Zur Jobbörse",
+      "faster": "Schneller mit Weiterbildung"
+    },
+    "daily": {
+      "title": "Tagesbelohnung",
+      "text": "Tag 4 und Tag 7 der Serie bringen je einen Punkt.",
+      "today": "Heute gibt es einen Punkt!",
+      "inDays": "{count, plural, one {Noch # Tag} other {Noch # Tage}} bis zum nächsten Punkt"
+    },
+    "missions": {
+      "title": "Missionen",
+      "text": "Manche Missionen geben einen Skillpunkt als Belohnung."
+    },
+    "training": {
+      "title": "Schulung durch den Chef",
+      "text": "In Firmen von Spielern ab 5 Leuten kann der Chef dir einen Skill bezahlen."
+    },
+    "benefits": {
+      "title": "Was bringen Skills?",
+      "items": [
+        "Mehr Produktivität: Deine Firma oder dein Arbeitgeber schafft mehr.",
+        "Höhere Löhne: KI-Firmen zahlen dir mehr, je besser du passt.",
+        "Gehaltserhöhung: Jeder neue Punkt in deinem Fach ist bis zu 3 % mehr wert.",
+        "Beförderung: Die Karriereleiter verlangt Punkte im Hauptfach.",
+        "Bessere Jobs: Viele Stellen setzen Punkte voraus."
+      ]
+    }
+  },
+  "teamPromotion": {
+    "rank": "Rang",
+    "ready": "Bereit für {tier}",
+    "notReady": "Für {tier} fehlt noch etwas",
+    "pending": "Bittet um Beförderung",
+    "top": "Höchster Rang",
+    "promote": "Befördern · {amount}/h",
+    "decline": "Ablehnen",
+    "promoted": "Befördert",
+    "promotedText": "{name} ist jetzt {tier}.",
+    "declined": "Abgelehnt",
+    "hint": "Befördern geht, sobald alle Punkte erfüllt sind. Der Lohn steigt mindestens auf den Wert daneben.",
+    "levelShort": "Level {have}/{need}",
+    "hoursShort": "{have}/{need} h"
   }
 }

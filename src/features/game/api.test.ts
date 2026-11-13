@@ -32,7 +32,12 @@ describe("RPC contract", () => {
       "get_offers",
       "subscribe_offer",
     ];
-    const pending = [...(fixtures.some((file) => file.startsWith("get_offers")) ? [] : m3f)];
+    // M4i RPCs are written in parallel with the database (TODO: remove once get_upgrades.json exists).
+    const m4i = ["get_upgrades", "buy_upgrade", "request_promotion", "promote_employee", "decline_promotion"];
+    const pending = [
+      ...(fixtures.some((file) => file.startsWith("get_offers")) ? [] : m3f),
+      ...(fixtures.some((file) => file.startsWith("get_upgrades")) ? [] : m4i),
+    ];
     for (const name of Object.keys(RPC_SCHEMAS).filter((key) => !pending.includes(key))) {
       expect(
         fixtures.some((file) => file.startsWith(name)),

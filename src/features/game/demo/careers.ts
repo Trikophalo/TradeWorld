@@ -27,11 +27,15 @@ import {
   type JobPosting,
   type MyJob,
   type PlayerCard,
+  type PromotionResult,
+  type PromotionState,
   type SkillState,
   type WorkTask,
   type WorkTaskResult,
 } from "../types";
 import { createRng } from "@/lib/sim/rng";
+import { promotedSalaryCents, promotionCheck } from "@/lib/sim/promotion";
+import { upgradeEffects, type UpgradeLevels } from "@/lib/sim/upgrades";
 import { correctOption, generateWorkTask, gradeWorkTask, workTaskKind } from "@/lib/sim/work-tasks";
 
 /*
@@ -71,6 +75,10 @@ interface DemoJob {
   signature: string;
   /** Quit with notice (ADR-063). */
   noticeEndsAt?: number | null;
+  /** Rank after promotions (ADR-094); the posting's tier until the first one. */
+  tier?: CareerTier;
+  rankMinutes?: number;
+  promotionRetryAt?: number | null;
 }
 
 export interface CareerState {
@@ -135,6 +143,10 @@ export interface CareerHost {
   ownsCompany(): boolean;
   /** The own company for the business card (ADR-075). */
   ownCompany(): { name: string; ticker: string | null } | null;
+  /** Bought upgrades (ADR-093). */
+  upgrades(): UpgradeLevels;
+  /** Friends feed (ADR-088): a promotion is news. */
+  feedPost?(kind: string, payload: Record<string, unknown>): void;
 }
 
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -194,7 +206,7 @@ export function createCareerEngine(host: CareerHost) {
 
   function skillState(): SkillState {
     const s = st();
-    const per = skillCfg.workHoursPerBranchPoint * 60;
+    const per = upgradeEffects(host.upgrades()).workHoursPerBranchPoint * 60;
     return {
       freePoints: freePoints(),
       branchPoints: { ...s.branchPoints },
@@ -281,7 +293,8 @@ export function createCareerEngine(host: CareerHost) {
       job.payDay = today;
       job.paidMinutesToday = 0;
     }
-    const capMinutes = careers.paidHoursPerDayCap * 60;
+    const effects = upgradeEffects(host.upgrades());
+    const capMinutes = effects.paidHoursCap * 60;
     const minutes = Math.min(Math.floor((now - job.lastPaidAt) / 60_000), capMinutes - job.paidMinutesToday);
     if (minutes <= 0) {
       job.lastPaidAt = Math.max(job.lastPaidAt, now - 60_000);
@@ -291,10 +304,11 @@ export function createCareerEngine(host: CareerHost) {
     host.addCash(pay);
     job.earnedTotal += pay;
     job.paidMinutesToday += minutes;
+    job.rankMinutes = (job.rankMinutes ?? 0) + minutes;
     job.lastPaidAt = now;
     host.addXp((BALANCE.progression.xpSources.workHour.xp * minutes) / 60);
     const posting = postingById(job.postingId);
-    const per = skillCfg.workHoursPerBranchPoint * 60;
+    const per = effects.workHoursPerBranchPoint * 60;
     const share = minutes / posting.required.length;
     for (const req of posting.required) {
       const before = Math.floor(st().workMinutes[req.branch] / per);
@@ -313,11 +327,13 @@ export function createCareerEngine(host: CareerHost) {
     const ceiling = ceilingFor(posting);
     const raiseRoom = Math.max(0, Math.floor(((ceiling - job.salary) * 10_000) / job.salary));
     const raiseAvailable = job.lastRaiseAt === null ? null : job.lastRaiseAt + jobs.raiseRequest.cooldownDays * DAY;
+    const tier = job.tier ?? posting.tier;
+    const mainBranch = posting.required[0]?.branch ?? "management";
     return {
       id: job.id,
       company: posting.company,
-      tier: posting.tier,
-      titleKey: posting.titleKey,
+      tier,
+      titleKey: job.tier ? `${mainBranch}_${tier}` : posting.titleKey,
       title: posting.title,
       required: posting.required,
       salaryCentsPerHour: job.salary,
@@ -326,7 +342,7 @@ export function createCareerEngine(host: CareerHost) {
       productivityBps: productivityBps(score),
       startedAt: iso(job.startedAt),
       paidHoursToday: job.paidMinutesToday / 60,
-      paidHoursCap: careers.paidHoursPerDayCap,
+      paidHoursCap: upgradeEffects(host.upgrades()).paidHoursCap,
       earnedTotalCents: job.earnedTotal,
       raiseAvailableAt: raiseAvailable !== null && raiseAvailable > Date.now() ? iso(raiseAvailable) : null,
       raiseMaxBps: Math.min(maxRaiseBps(score - job.scoreAtRaise), raiseRoom),
@@ -338,6 +354,35 @@ export function createCareerEngine(host: CareerHost) {
       lastBonusCents: 0,
       nextWorkTaskAt: nextTaskAt(),
       workTaskOpen: openTask() !== null,
+      rankHours: Math.floor((job.rankMinutes ?? 0) / 6) / 10,
+      promotion: promotionNow(job),
+    };
+  }
+
+  /** Next rank and what it takes (ADR-094); demo employers are AI bosses. */
+  function promotionNow(job: DemoJob): PromotionState {
+    const posting = postingById(job.postingId);
+    const tier = job.tier ?? posting.tier;
+    const mainBranch = posting.required[0]?.branch ?? "management";
+    const check = promotionCheck({
+      tier,
+      level: host.level(),
+      scores: scores(),
+      mainBranch,
+      rankHours: (job.rankMinutes ?? 0) / 60,
+      bonusBps: upgradeEffects(host.upgrades()).promotionBonusBps,
+    });
+    const retry = job.promotionRetryAt ?? null;
+    return {
+      nextTier: check.next,
+      mainBranch,
+      requirements: check.requirements.map((r) => ({ ...r })),
+      ready: check.ready,
+      boss: "ai",
+      chanceBps: check.chanceBps,
+      retryAt: retry !== null && retry > Date.now() ? iso(retry) : null,
+      pendingSince: null,
+      nextSalaryCentsPerHour: check.next ? promotedSalaryCents(job.salary, check.next) : null,
     };
   }
 
@@ -425,6 +470,7 @@ export function createCareerEngine(host: CareerHost) {
     | "cancelQuit"
     | "employer"
     | "requestRaise"
+    | "requestPromotion"
     | "playerCard"
     | "workTask"
     | "submitWorkTask"
@@ -665,6 +711,42 @@ export function createCareerEngine(host: CareerHost) {
         lastQuarter: null,
         payFactorBps: 10_000,
       };
+    },
+
+    async requestPromotion(requestId): Promise<PromotionResult> {
+      return host.idempotent(requestId, () => {
+        accrue();
+        const job = st().job;
+        if (!job) throw new GameError("no_active_job");
+        const promotion = promotionNow(job);
+        if (!promotion.nextTier || !promotion.ready) throw new GameError("promotion_not_ready");
+        if (promotion.retryAt) throw new GameError("promotion_too_soon");
+        const chance = promotion.chanceBps ?? 0;
+        // The demo has no server dice; a uniform draw is fine for a local preview.
+        if (Math.random() * 10_000 >= chance) {
+          job.promotionRetryAt = Date.now() + careers.promotion.retryHours * HOUR;
+          return {
+            status: "declined" as const,
+            tier: job.tier ?? postingById(job.postingId).tier,
+            salaryCentsPerHour: job.salary,
+            retryAt: iso(job.promotionRetryAt),
+            chanceBps: chance,
+          };
+        }
+        job.tier = promotion.nextTier;
+        job.salary = promotion.nextSalaryCentsPerHour ?? job.salary;
+        job.rankMinutes = 0;
+        job.promotionRetryAt = null;
+        job.scoreAtRaise = matchScore(postingById(job.postingId).required, scores());
+        host.feedPost?.("promoted", { tier: job.tier, company: postingById(job.postingId).company.name });
+        return {
+          status: "promoted" as const,
+          tier: job.tier,
+          salaryCentsPerHour: job.salary,
+          retryAt: null,
+          chanceBps: chance,
+        };
+      });
     },
 
     async requestRaise(requestId, raiseBps) {

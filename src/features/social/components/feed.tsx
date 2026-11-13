@@ -41,6 +41,7 @@ const ICONS: Record<string, PixelArt> = {
   streak: UI_ICONS.flame,
   league_won: TROPHIES.gold,
   friends_now: UI_ICONS.heart,
+  promoted: UI_ICONS.upgrade,
 };
 
 const str = (v: unknown) => (typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
@@ -51,6 +52,7 @@ function useFeedText() {
   const t = useTranslations("social.feed.kinds");
   const tf = useTranslations("firm.tiers");
   const te = useTranslations("estate.tierNames");
+  const tc = useTranslations("careerTiers");
   return (item: FeedItem): string => {
     const p = item.payload;
     switch (item.kind) {
@@ -91,6 +93,11 @@ function useFeedText() {
         return t("league_won", { growth: formatBps(n(p.growth_bps)) });
       case "friends_now":
         return t("friends_now", { other: str(p.other_nickname) });
+      case "promoted": {
+        const tier = str(p.tier);
+        const known = ["intern", "junior", "senior", "team_lead", "c_level"].includes(tier);
+        return t("promoted", { tier: known ? tc(tier as "junior") : tier, company: str(p.company) });
+      }
       default:
         return t("other");
     }

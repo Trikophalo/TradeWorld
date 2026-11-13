@@ -27,8 +27,10 @@ import { Skeleton, SkeletonRow } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/toast";
 import { BusinessCard } from "@/features/career/components/business-card";
+import { CareerLadder, PayRoutes } from "@/features/career/components/career-ladder";
+import { UpgradeCard } from "@/features/upgrades/components/upgrade-shop";
 import { SignaturePad } from "@/features/career/components/signature-pad";
-import type { PlayerCard } from "@/features/game/types";
+import type { MyJob, PlayerCard } from "@/features/game/types";
 import { SpeechBubble } from "@/features/tutorial/components/speech-bubble";
 import { useTutorial } from "@/features/tutorial/store";
 import { resetDemoPlayer } from "@/features/game/demo-engine";
@@ -69,6 +71,58 @@ const SAMPLE_CARD: PlayerCard = {
   },
   company: null,
   memberSince: "2026-09-01T00:00:00Z",
+};
+
+/** A junior in IT who is two IT points short of senior (ADR-094). */
+const SAMPLE_JOB: MyJob = {
+  id: "job-sample",
+  company: {
+    id: "demo-KLS",
+    name: "KlarSoft AG",
+    ticker: "KLS",
+    sector: "tech",
+    color: null,
+    isAi: true,
+    logo: null,
+  },
+  tier: "junior",
+  titleKey: "it_junior",
+  title: null,
+  required: [{ branch: "it", minScore: 2 }],
+  salaryCentsPerHour: 30_000,
+  payFactorBps: 10_000,
+  effectiveSalaryCentsPerHour: 30_000,
+  productivityBps: 18_000,
+  startedAt: "2026-11-01T00:00:00Z",
+  paidHoursToday: 4,
+  paidHoursCap: 12,
+  earnedTotalCents: 1_200_000,
+  raiseAvailableAt: null,
+  raiseMaxBps: 0,
+  pendingRaise: null,
+  quitCostCents: 360_000,
+  signature: null,
+  lastBonusCents: 0,
+  nextWorkTaskAt: null,
+  workTaskOpen: false,
+  noticeEndsAt: null,
+  quitNowCostCents: 360_000,
+  rankHours: 20,
+  promotion: {
+    nextTier: "senior",
+    mainBranch: "it",
+    requirements: [
+      { key: "level", branch: null, need: 12, have: 14, met: true },
+      { key: "branch", branch: "it", need: 6, have: 4, met: false },
+      { key: "hours", branch: null, need: 36, have: 20, met: false },
+    ],
+    ready: false,
+    boss: "ai",
+    chanceBps: 0,
+    retryAt: null,
+    pendingSince: null,
+    nextSalaryCentsPerHour: 70_000,
+  },
 };
 
 const money = (value: number) => formatMoney(Math.round(value));
@@ -576,6 +630,10 @@ export function Showcase() {
         <Card padding="lg">
           <SignaturePad onChange={() => undefined} />
         </Card>
+        <CareerLadder job={SAMPLE_JOB} />
+        <PayRoutes job={SAMPLE_JOB} />
+        <UpgradeCard upgradeKey="vault" level={2} />
+        <UpgradeCard upgradeKey="rhetoric" level={0} />
       </Section>
 
       <Section id="sounds" title={t("sounds")}>

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { SectorKey } from "@/components/pixel/art";
 import type { SkillBranch } from "@/config/skills";
-import { applicationSchema, toApplication } from "./api-careers";
+import { applicationSchema, promotionSchema, toApplication, toRequirements } from "./api-careers";
 import { rpc, toErrorKey } from "./rpc";
 import type {
   ChatMessage,
@@ -314,6 +314,12 @@ const memberSchema = z.object({
   pending_raise: z.object({ requested_bps: num, created_at: iso }).nullable(),
   skills: z.array(z.string()).default([]),
   notice_ends_at: iso.nullable().default(null),
+  tier: z.enum(["intern", "junior", "senior", "team_lead", "c_level"]).nullable().default(null),
+  rank_hours: num.default(0),
+  promotion: promotionSchema
+    .pick({ next_tier: true, requirements: true, ready: true, pending_since: true, next_salary_cents_per_hour: true })
+    .nullable()
+    .default(null),
 });
 
 export const COMPANY_RPC_SCHEMAS = {
@@ -362,6 +368,12 @@ export const COMPANY_RPC_SCHEMAS = {
   get_company_team: z.object({ members: z.array(memberSchema) }),
   fire_employee: z.object({ player_job_id: z.string(), status: z.literal("fired"), severance_cents: num }),
   respond_raise: z.object({ status: z.enum(["accepted", "rejected"]), salary_cents_per_hour: num }),
+  promote_employee: z.object({
+    status: z.literal("promoted"),
+    tier: z.enum(["intern", "junior", "senior", "team_lead", "c_level"]),
+    salary_cents_per_hour: num,
+  }),
+  decline_promotion: z.object({ status: z.literal("declined"), retry_at: iso.nullable() }),
   set_company_logo: wrapped,
   set_company_banner: wrapped,
   report_company_logo: z.object({ reported: z.boolean() }),
@@ -574,6 +586,8 @@ type CompanyEngine = Pick<
   | "companyTeam"
   | "fireEmployee"
   | "respondRaise"
+  | "promoteEmployee"
+  | "declinePromotion"
   | "trainEmployee"
   | "setCompanyLogo"
   | "setCompanyBanner"
@@ -816,7 +830,41 @@ export const liveCompanyEngine: CompanyEngine = {
         : null,
       skills: m.skills,
       noticeEndsAt: m.notice_ends_at,
+      tier: m.tier,
+      rankHours: m.rank_hours,
+      promotion: m.promotion
+        ? {
+            nextTier: m.promotion.next_tier,
+            requirements: toRequirements(m.promotion.requirements),
+            ready: m.promotion.ready,
+            pendingSince: m.promotion.pending_since,
+            nextSalaryCentsPerHour: m.promotion.next_salary_cents_per_hour,
+          }
+        : null,
     }));
+  },
+
+  async promoteEmployee(requestId, companyId, playerJobId, salaryCentsPerHour) {
+    const r = await rpc(
+      "promote_employee",
+      {
+        p_request_id: requestId,
+        p_company_id: companyId,
+        p_player_job_id: playerJobId,
+        p_salary_cents_per_hour: salaryCentsPerHour,
+      },
+      S.promote_employee,
+    );
+    return { tier: r.tier, salaryCentsPerHour: r.salary_cents_per_hour };
+  },
+
+  async declinePromotion(requestId, companyId, playerJobId) {
+    const r = await rpc(
+      "decline_promotion",
+      { p_request_id: requestId, p_company_id: companyId, p_player_job_id: playerJobId },
+      S.decline_promotion,
+    );
+    return { retryAt: r.retry_at };
   },
 
   async fireEmployee(requestId, playerJobId) {

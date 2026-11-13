@@ -21,6 +21,7 @@ import type { EmployerView, MyJob } from "@/features/game/types";
 import { PriceChart } from "@/features/market/components/price-chart";
 import { formatMoney, formatPrice } from "@/lib/format";
 import { useMyJob } from "../hooks";
+import { CareerLadder, PayRoutes } from "./career-ladder";
 import { ActiveJob } from "./my-job-card";
 import { PixelWorker } from "./pixel-worker";
 
@@ -59,6 +60,7 @@ export function JobView() {
       <div className="space-y-5">
         <WorkerCard job={job.data} />
         <ActiveJob job={job.data} />
+        <CareerLadder job={job.data} />
         {/* Staff of a player company see its situation and news (ADR-091). */}
         {employer.data?.kind === "player" && (
           <>
@@ -68,6 +70,7 @@ export function JobView() {
         )}
       </div>
       <div className="space-y-5">
+        <PayRoutes job={job.data} />
         {employer.data ? <EmployerCard employer={employer.data} /> : <Skeleton className="h-64 w-full rounded-lg" />}
         {employer.data?.kind === "player" && (
           <Link href="/career/chat" className={buttonVariants({ variant: "secondary", block: true })}>

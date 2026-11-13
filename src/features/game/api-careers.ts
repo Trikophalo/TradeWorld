@@ -11,7 +11,10 @@ import type {
   JobPosting,
   MyJob,
   PlayerCard,
+  PromotionState,
   SkillState,
+  UpgradeKey,
+  UpgradesState,
 } from "./types";
 
 /*
@@ -106,6 +109,45 @@ export const applicationSchema = z.object({
   updated_at: iso,
 });
 
+const requirementSchema = z.object({
+  key: z.enum(["level", "branch", "management", "hours"]),
+  branch: z.string().nullable(),
+  need: num,
+  have: num,
+  met: z.boolean(),
+});
+
+/** Promotion block of the job (ADR-094); also the team view uses a part of it. */
+export const promotionSchema = z.object({
+  next_tier: tier.nullable(),
+  main_branch: z.string(),
+  requirements: z.array(requirementSchema),
+  ready: z.boolean(),
+  boss: z.enum(["ai", "player"]),
+  chance_bps: nnum,
+  retry_at: iso.nullable(),
+  pending_since: iso.nullable(),
+  next_salary_cents_per_hour: nnum,
+});
+
+export const toRequirements = (r: z.infer<typeof requirementSchema>[]) =>
+  r.map((x) => ({ ...x, branch: x.branch as SkillBranch | null }));
+
+const toPromotion = (p: z.infer<typeof promotionSchema>): PromotionState => ({
+  nextTier: p.next_tier,
+  mainBranch: p.main_branch as SkillBranch,
+  requirements: toRequirements(p.requirements),
+  ready: p.ready,
+  boss: p.boss,
+  chanceBps: p.chance_bps,
+  retryAt: p.retry_at,
+  pendingSince: p.pending_since,
+  nextSalaryCentsPerHour: p.next_salary_cents_per_hour,
+});
+
+const upgradeKey = z.enum(["vault", "income", "study", "overtime", "rhetoric"]);
+const levelsSchema = z.object({ vault: num, income: num, study: num, overtime: num, rhetoric: num });
+
 const jobSchema = z.object({
   id: z.string(),
   company: employerSchema,
@@ -131,6 +173,8 @@ const jobSchema = z.object({
   work_task_open: z.boolean().default(false),
   notice_ends_at: iso.nullable().default(null),
   quit_now_cost_cents: num.default(0),
+  rank_hours: num.default(0),
+  promotion: promotionSchema.nullable().default(null),
 });
 
 const cardSchema = z.object({
@@ -194,6 +238,15 @@ export const CAREER_RPC_SCHEMAS = {
       .nullable(),
   }),
   request_raise: z.object({ status: z.enum(["accepted", "pending"]), salary_cents_per_hour: num }),
+  request_promotion: z.object({
+    status: z.enum(["promoted", "declined", "pending"]),
+    tier,
+    salary_cents_per_hour: num,
+    retry_at: iso.nullable(),
+    chance_bps: nnum,
+  }),
+  get_upgrades: z.object({ levels: levelsSchema }),
+  buy_upgrade: z.object({ key: upgradeKey, level: num, cost_cents: num, levels: levelsSchema }),
   get_player_card: cardSchema,
 } as const;
 
@@ -289,6 +342,8 @@ const toJob = (j: z.infer<typeof jobSchema>): MyJob => ({
   workTaskOpen: j.work_task_open,
   noticeEndsAt: j.notice_ends_at,
   quitNowCostCents: j.quit_now_cost_cents,
+  rankHours: j.rank_hours,
+  promotion: j.promotion ? toPromotion(j.promotion) : null,
 });
 
 type CareerEngine = Pick<
@@ -309,6 +364,9 @@ type CareerEngine = Pick<
   | "cancelQuit"
   | "employer"
   | "requestRaise"
+  | "requestPromotion"
+  | "upgrades"
+  | "buyUpgrade"
   | "playerCard"
 >;
 
@@ -447,6 +505,27 @@ export const liveCareerEngine: CareerEngine = {
   async requestRaise(requestId, raiseBps) {
     const r = await rpc("request_raise", { p_request_id: requestId, p_raise_bps: raiseBps }, S.request_raise);
     return { status: r.status, salaryCentsPerHour: r.salary_cents_per_hour };
+  },
+
+  async requestPromotion(requestId) {
+    const r = await rpc("request_promotion", { p_request_id: requestId }, S.request_promotion);
+    return {
+      status: r.status,
+      tier: r.tier,
+      salaryCentsPerHour: r.salary_cents_per_hour,
+      retryAt: r.retry_at,
+      chanceBps: r.chance_bps,
+    };
+  },
+
+  async upgrades(): Promise<UpgradesState> {
+    const r = await rpc("get_upgrades", {}, S.get_upgrades);
+    return { levels: r.levels };
+  },
+
+  async buyUpgrade(requestId, key: UpgradeKey) {
+    const r = await rpc("buy_upgrade", { p_request_id: requestId, p_key: key }, S.buy_upgrade);
+    return { key: r.key, level: r.level, costCents: r.cost_cents, levels: r.levels };
   },
 
   async playerCard(nickname): Promise<PlayerCard> {

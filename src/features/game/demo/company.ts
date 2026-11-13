@@ -701,6 +701,8 @@ export function createCompanyEngine(host: CompanyHost) {
     | "companyTeam"
     | "fireEmployee"
     | "respondRaise"
+    | "promoteEmployee"
+    | "declinePromotion"
     | "trainEmployee"
     | "setCompanyLogo"
     | "setCompanyBanner"
@@ -966,6 +968,13 @@ export function createCompanyEngine(host: CompanyHost) {
     },
     async respondRaise() {
       throw new GameError("invalid_argument");
+    },
+    // Demo companies have no player employees to promote (ADR-094).
+    async promoteEmployee() {
+      throw new GameError("job_not_found");
+    },
+    async declinePromotion() {
+      throw new GameError("job_not_found");
     },
     async trainEmployee() {
       throw new GameError("no_active_job");

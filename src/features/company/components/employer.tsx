@@ -688,7 +688,7 @@ export function TeamView({ company, onHire }: { company: MyCompany; onHire: (req
             </li>
             {team.data.map((m) => (
               <li key={m.playerJobId}>
-                <MemberRow member={m} onFire={() => setFiring(m)} />
+                <MemberRow member={m} companyId={company.id} onFire={() => setFiring(m)} />
               </li>
             ))}
             {company.aiWorkerSkills.map((skill) => (
@@ -864,7 +864,7 @@ function AiWorkerRow({ company, skill }: { company: MyCompany; skill: string | n
   );
 }
 
-function MemberRow({ member, onFire }: { member: TeamMember; onFire: () => void }) {
+function MemberRow({ member, companyId, onFire }: { member: TeamMember; companyId: string; onFire: () => void }) {
   const tn = useTranslations("skills.nodes");
   const t = useTranslations("firm");
   const errorText = useGameErrorText();
@@ -936,7 +936,89 @@ function MemberRow({ member, onFire }: { member: TeamMember; onFire: () => void 
           </div>
         </div>
       )}
+      {member.promotion && <MemberPromotion member={member} companyId={companyId} />}
     </Card>
+  );
+}
+
+/** Rank and promotion of an employee for the boss (ADR-094): ready, waiting for an answer, or what is missing. */
+function MemberPromotion({ member, companyId }: { member: TeamMember; companyId: string }) {
+  const t = useTranslations("teamPromotion");
+  const tc = useTranslations("careerTiers");
+  const tb = useTranslations("skills.branches");
+  const errorText = useGameErrorText();
+  const refresh = useCompanyRefresh();
+  const [busy, setBusy] = useState(false);
+  const promotion = member.promotion!;
+  const next = promotion.nextTier;
+
+  const act = async (promote: boolean) => {
+    setBusy(true);
+    try {
+      if (promote) {
+        const r = await engine.promoteEmployee(crypto.randomUUID(), companyId, member.playerJobId, null);
+        void playSound("levelUp");
+        toast.success(t("promoted"), t("promotedText", { name: member.nickname, tier: tc(r.tier) }));
+      } else {
+        await engine.declinePromotion(crypto.randomUUID(), companyId, member.playerJobId);
+        toast.info(t("declined"));
+      }
+      await refresh();
+    } catch (error) {
+      toast.error(t("promoted"), errorText(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const missing = promotion.requirements
+    .filter((r) => !r.met)
+    .map((r) =>
+      r.key === "hours"
+        ? t("hoursShort", { have: r.have, need: r.need })
+        : r.key === "level"
+          ? t("levelShort", { have: r.have, need: r.need })
+          : `${tb(`${r.branch}.name` as Parameters<typeof tb>[0])} ${r.have}/${r.need}`,
+    );
+
+  return (
+    <div
+      className="mt-3 space-y-2 rounded-md bg-surface-2 px-3 py-2"
+      data-testid="member-promotion"
+      data-ready={promotion.ready}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+        <span className="text-fg-3">
+          {t("rank")}: <span className="text-fg-1">{member.tier ? tc(member.tier) : "—"}</span>
+        </span>
+        {!next ? (
+          <span className="text-fg-3">{t("top")}</span>
+        ) : promotion.pendingSince ? (
+          <span className="font-medium text-info">{t("pending")}</span>
+        ) : promotion.ready ? (
+          <span className="font-medium text-gain">{t("ready", { tier: tc(next) })}</span>
+        ) : (
+          <span className="text-fg-3">{t("notReady", { tier: tc(next) })}</span>
+        )}
+      </div>
+      {next && !promotion.ready && missing.length > 0 && (
+        <p className="nums text-xs text-fg-3">{missing.join(" · ")}</p>
+      )}
+      {next && promotion.ready && (
+        <div className="flex flex-wrap justify-end gap-2">
+          {promotion.pendingSince && (
+            <Button size="sm" variant="ghost" disabled={busy} onClick={() => void act(false)}>
+              {t("decline")}
+            </Button>
+          )}
+          <Button size="sm" disabled={busy} onClick={() => void act(true)} data-testid="promote-member">
+            {t("promote", {
+              amount: formatMoney(promotion.nextSalaryCentsPerHour ?? member.salaryCentsPerHour, { whole: true }),
+            })}
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 

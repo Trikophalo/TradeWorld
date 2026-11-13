@@ -4,7 +4,17 @@ export interface NavItem {
   href: string;
   /** Key in messages/*.json under "nav". */
   key:
-    "home" | "portfolio" | "markets" | "job" | "career" | "company" | "artworks" | "property" | "friends" | "profile";
+    | "home"
+    | "portfolio"
+    | "markets"
+    | "job"
+    | "career"
+    | "company"
+    | "artworks"
+    | "property"
+    | "friends"
+    | "upgrades"
+    | "profile";
   icon: UiIconName;
   /** Unlock key (BALANCE.progression.unlocks). The tab is always visible, with a lock until then. */
   unlock?: string;
@@ -23,6 +33,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { href: "/artworks", key: "artworks", icon: "art", unlock: "artworks", more: true },
   { href: "/property", key: "property", icon: "home", unlock: "property", more: true },
   { href: "/friends", key: "friends", icon: "heart", more: true },
+  { href: "/upgrades", key: "upgrades", icon: "upgrade", more: true },
   { href: "/profile", key: "profile", icon: "profile", more: true },
 ];
 

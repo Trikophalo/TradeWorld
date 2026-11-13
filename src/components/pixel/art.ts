@@ -376,6 +376,99 @@ export const COIN: PixelArt = {
   ],
 };
 
+/** Upgrades (ADR-093): a book for further training, an alarm clock for overtime, a speech bubble for rhetoric. */
+export const BOOK: PixelArt = {
+  palette: { k: "#1c2230", b: "#4f8cff", h: "#cfe0ff", d: "#2b5bc4", p: "#f2efe6", y: "#f2c14e" },
+  grid: [
+    "............",
+    ".kkkkkkkkkk.",
+    ".kbbbbbbbbbk",
+    ".kbhbbbbbbbk",
+    ".kbhbyyyybbk",
+    ".kbhbbbbbbbk",
+    ".kbhbyyybbbk",
+    ".kbhbbbbbbbk",
+    ".kbbbbbbbbbk",
+    ".kdddddddddk",
+    ".kpppppppppk",
+    ".kkkkkkkkkk.",
+  ],
+};
+
+export const ALARM_CLOCK: PixelArt = {
+  palette: { k: "#1c2230", w: "#f2efe6", y: "#f2c14e" },
+  grid: [
+    "kk........kk",
+    "kyk.kkkk.kyk",
+    ".kkkwwwwkkk.",
+    ".kwwwwkwwwk.",
+    "kwwwwwkwwwwk",
+    "kwwwwwkwwwwk",
+    "kwwwwwkkkwwk",
+    "kwwwwwwwwwwk",
+    ".kwwwwwwwwk.",
+    ".kkwwwwwwkk.",
+    ".k.kkkkkk.k.",
+    "............",
+  ],
+};
+
+export const SPEECH: PixelArt = {
+  palette: { k: "#1c2230", w: "#f2efe6", a: "#9b7bff" },
+  grid: [
+    "............",
+    ".kkkkkkkkkk.",
+    "kwwwwwwwwwwk",
+    "kwaawaaawwwk",
+    "kwwwwwwwwwwk",
+    "kwaaawaawwwk",
+    "kwwwwwwwwwwk",
+    ".kkwwkkkkkk.",
+    "..kwk.......",
+    "..kk........",
+    "............",
+    "............",
+  ],
+};
+
+/** Marketing campaigns (ADR-097). */
+export const MEGAPHONE: PixelArt = {
+  palette: { k: "#1c2230", r: "#ef5b5b", h: "#ffb3b3", s: "#8e99ad" },
+  grid: [
+    "............",
+    ".........kk.",
+    ".......kkrk.",
+    ".....kkrrrk.",
+    "kkkkkrrhrrk.",
+    "ksskrrrhrrk.",
+    "ksskrrrrrrk.",
+    "kkkkkrrrrrk.",
+    "..k..kkrrrk.",
+    "..k....kkrk.",
+    "..kk.....kk.",
+    "............",
+  ],
+};
+
+/** A contract with a wax seal: deals between players (ADR-098). */
+export const CONTRACT: PixelArt = {
+  palette: { k: "#1c2230", p: "#f2efe6", l: "#c9d2e0", r: "#ef5b5b", d: "#a83a3a" },
+  grid: [
+    ".kkkkkkkk...",
+    "kppppppppk..",
+    "kpllllllpk..",
+    "kppppppppk..",
+    "kplllllppk..",
+    "kppppppppk..",
+    "kpllllllpk..",
+    "kppppppppk..",
+    "kpllllkkkk..",
+    "kppppkrrrrk.",
+    "kkkkkkrddrk.",
+    "......krrk..",
+  ],
+};
+
 export const BULL: PixelArt = {
   palette: { h: "#e9c88a", g: "#2fd98c", d: "#17a866", k: INK, s: "#c9f7e0" },
   grid: [
@@ -654,6 +747,42 @@ export const UI_ICONS = {
       "............",
     ],
   },
+  /** Upgrades (ADR-093): an arrow up out of a box. */
+  upgrade: {
+    palette: mono,
+    grid: [
+      ".....xx.....",
+      "....xxxx....",
+      "...xxxxxx...",
+      "..xxxxxxxx..",
+      ".....xx.....",
+      ".....xx.....",
+      "x....xx....x",
+      "x....xx....x",
+      "x..........x",
+      "x..........x",
+      "xxxxxxxxxxxx",
+      "............",
+    ],
+  },
+  /** Deals between players (ADR-098): two hands meet. */
+  deal: {
+    palette: mono,
+    grid: [
+      "............",
+      "xx........xx",
+      "xxx......xxx",
+      "xxxx.xx.xxxx",
+      "xx.xxxxxx.xx",
+      "xx..xxxxx.xx",
+      "xx.xxxxxx.xx",
+      "xx..xxxx..xx",
+      "xx...xx...xx",
+      "............",
+      "............",
+      "............",
+    ],
+  },
   star: {
     palette: mono,
     grid: [
@@ -838,6 +967,11 @@ export const ALL_PIXEL_ART: Record<string, PixelArt> = {
   ...Object.fromEntries(Object.entries(SECTOR_ICONS).map(([k, v]) => [`sector/${k}`, v])),
   ...Object.fromEntries(Object.entries(COMPANY_LOGOS).map(([k, v]) => [`logo/${k}`, v])),
   coin: COIN,
+  book: BOOK,
+  alarm_clock: ALARM_CLOCK,
+  speech: SPEECH,
+  megaphone: MEGAPHONE,
+  contract: CONTRACT,
   bull: BULL,
   bear: BEAR,
   ...Object.fromEntries(Object.entries(FINN).map(([k, v]) => [`finn/${k}`, v])),

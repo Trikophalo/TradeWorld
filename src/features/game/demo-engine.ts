@@ -12,6 +12,7 @@ import { bondPriceE4, bondYieldBps } from "@/lib/sim/bonds";
 import { withholdIncome } from "@/lib/sim/insolvency";
 import { anchoredFairValue, playerImpactReturn } from "@/lib/sim/player-influence";
 import { needsFullTimeFounder } from "@/lib/sim/startup";
+import { basicIncomeCentsPerHour, upgradeCheck, upgradeCostCents, upgradeEffects } from "@/lib/sim/upgrades";
 import { levelFromTotalXp, levelProgress, scaledXp, totalXpForLevel, unlockLevel } from "@/lib/sim/progression";
 import { MISSION_TEMPLATES, availableFor, missionXp, type Metric, type MissionTemplate } from "./demo/missions";
 import { createCareerEngine, initialCareer, tycoonAvatar, type CareerState } from "./demo/careers";
@@ -28,6 +29,7 @@ import {
   type Candle,
   type CandleInterval,
   type GameEngine,
+  type UpgradeKey,
   type CompanyRankingEntry,
   type GameErrorKey,
   type MarketSnapshot,
@@ -106,6 +108,8 @@ interface PlayerState {
   streakDays: number;
   /** Avatar, skills, daily reward, jobs (demo/careers.ts). */
   career?: CareerState;
+  /** Bought upgrades (ADR-093). */
+  upgrades?: Partial<Record<UpgradeKey, number>>;
   /** Level curve the XP were collected under (ADR-055). */
   curveVersion?: number;
   /** Own company (demo/company.ts, ADR-057). */
@@ -663,11 +667,18 @@ function demoCandles(ticker: string, interval: CandleInterval, limit: number): C
 
 // ------------------------------------------------------------------ portfolio and wealth
 
+/** Vault size and basic income with the upgrades (ADR-093). */
+function vaultTerms() {
+  const levels = p().upgrades ?? {};
+  return { capHours: upgradeEffects(levels).vaultCapHours, rate: basicIncomeCentsPerHour(levels) };
+}
+
 function portfolioNow(): Portfolio {
   const pl = p();
   const now = Date.now();
-  const capCents = economy.basicIncomeCentsPerHour * economy.vaultCapHours;
-  const hours = Math.min(economy.vaultCapHours, (now - pl.vaultClaimedAt) / HOUR);
+  const vt = vaultTerms();
+  const capCents = vt.rate * vt.capHours;
+  const hours = Math.min(vt.capHours, (now - pl.vaultClaimedAt) / HOUR);
   const positions = [...holdings()].map(([ticker, h]) => {
     const info = meta(ticker);
     const q = quote(ticker);
@@ -696,12 +707,12 @@ function portfolioNow(): Portfolio {
     totalCents: pl.cashCents + pl.reservedCents + positionsValue,
     lossPotCents: pl.lossPotCents,
     vault: {
-      accruedCents: Math.floor(hours * economy.basicIncomeCentsPerHour),
+      accruedCents: Math.floor(hours * vt.rate),
       capCents,
-      rateCentsPerHour: economy.basicIncomeCentsPerHour,
+      rateCentsPerHour: vt.rate,
       factorBps: 10_000,
       lastClaimedAt: new Date(pl.vaultClaimedAt).toISOString(),
-      fullAt: new Date(pl.vaultClaimedAt + economy.vaultCapHours * HOUR).toISOString(),
+      fullAt: new Date(pl.vaultClaimedAt + vt.capHours * HOUR).toISOString(),
       serverTime: new Date(now).toISOString(),
     },
     positions,
@@ -986,7 +997,41 @@ const career = createCareerEngine({
     const own = p().company;
     return own ? { name: own.name, ticker: own.listing?.ticker ?? null } : null;
   },
+  upgrades: () => p().upgrades ?? {},
+  feedPost: (kind, payload) => feedPost(kind, payload),
 });
+
+// ------------------------------------------------------------------ upgrades (ADR-093)
+
+const UPGRADE_KEYS = BALANCE.upgrades.order;
+const upgradeLevelsNow = () =>
+  Object.fromEntries(UPGRADE_KEYS.map((k) => [k, p().upgrades?.[k] ?? 0])) as Record<UpgradeKey, number>;
+
+const upgradeEngine: Pick<GameEngine, "upgrades" | "buyUpgrade"> = {
+  upgrades: () => delay(() => ({ levels: upgradeLevelsNow() })),
+  buyUpgrade: (requestId, key) =>
+    delay(() =>
+      idempotent(requestId, () => {
+        const pl = p();
+        if (!UPGRADE_KEYS.includes(key)) throw new GameError("invalid_argument");
+        const current = pl.upgrades?.[key] ?? 0;
+        const check = upgradeCheck(key, current, level(), pl.cashCents);
+        if (check === "maxed") throw new GameError("upgrade_maxed");
+        if (check === "level") throw new GameError("locked");
+        if (check === "cash") throw new GameError("insufficient_funds");
+        const cost = upgradeCostCents(key, current)!;
+        // Claim the vault at the old terms first, so a bigger vault does not pay hours that were already lost.
+        if (key === "vault" || key === "income") {
+          const vt = vaultTerms();
+          const hours = Math.min(vt.capHours, (Date.now() - pl.vaultClaimedAt) / HOUR);
+          pl.vaultClaimedAt = Date.now() - Math.max(0, hours) * HOUR;
+        }
+        pl.cashCents -= cost;
+        pl.upgrades = { ...pl.upgrades, [key]: current + 1 };
+        return { key, level: current + 1, costCents: cost, levels: upgradeLevelsNow() };
+      }),
+    ),
+};
 
 const company = createCompanyEngine({
   eventModifiers: (c, at) => companyEvents.modifiers(c, at),
@@ -1113,6 +1158,7 @@ export function demoCloseQuarter(): void {
 
 export const demoEngine: GameEngine = {
   ...career.engine,
+  ...upgradeEngine,
   ...company.engine,
   ...art.engine,
   ...home.engine,
@@ -1303,8 +1349,9 @@ export const demoEngine: GameEngine = {
       idempotent(requestId, () => {
         const pl = p();
         const now = Date.now();
-        const hours = Math.min(economy.vaultCapHours, (now - pl.vaultClaimedAt) / HOUR);
-        const claimed = Math.floor(hours * economy.basicIncomeCentsPerHour);
+        const vt = vaultTerms();
+        const hours = Math.min(vt.capHours, (now - pl.vaultClaimedAt) / HOUR);
+        const claimed = Math.floor(hours * vt.rate);
         if (claimed < economy.vaultMinClaimCents) throw new GameError("nothing_to_claim");
         const received = income(claimed);
         socialRef?.inflow(received);

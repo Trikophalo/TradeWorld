@@ -543,6 +543,60 @@ export interface MyJob {
   noticeEndsAt: string | null;
   /** Quitting at once costs this (ADR-066). */
   quitNowCostCents: number;
+  /** Hours worked in the current rank (ADR-094). */
+  rankHours: number;
+  /** Next rank and what it takes; null on servers before M4i. */
+  promotion: PromotionState | null;
+}
+
+// ------------------------------------------------------------------ promotions (ADR-094)
+
+export type PromotionRequirementKey = "level" | "branch" | "management" | "hours";
+
+export interface PromotionRequirementInfo {
+  key: PromotionRequirementKey;
+  branch: SkillBranch | null;
+  need: number;
+  have: number;
+  met: boolean;
+}
+
+export interface PromotionState {
+  /** Null at the top (C-level). */
+  nextTier: CareerTier | null;
+  mainBranch: SkillBranch;
+  requirements: PromotionRequirementInfo[];
+  ready: boolean;
+  boss: "ai" | "player";
+  /** AI bosses: chance of a yes now; player bosses: null. */
+  chanceBps: number | null;
+  /** After a no: the next request is possible from then on. */
+  retryAt: string | null;
+  /** Request waiting for a player boss. */
+  pendingSince: string | null;
+  nextSalaryCentsPerHour: number | null;
+}
+
+export interface PromotionResult {
+  status: "promoted" | "declined" | "pending";
+  tier: CareerTier;
+  salaryCentsPerHour: number;
+  retryAt: string | null;
+  chanceBps: number | null;
+}
+
+// ------------------------------------------------------------------ upgrades (ADR-093)
+
+export type UpgradeKey = "vault" | "income" | "study" | "overtime" | "rhetoric";
+
+export interface UpgradesState {
+  levels: Record<UpgradeKey, number>;
+}
+
+export interface BuyUpgradeResult extends UpgradesState {
+  key: UpgradeKey;
+  level: number;
+  costCents: number;
 }
 
 /** What an employee sees about the employer in the job tab (ADR-064). */
@@ -1053,6 +1107,13 @@ export interface TeamMember {
   pendingRaise: { requestedBps: number; createdAt: string } | null;
   skills: string[];
   noticeEndsAt: string | null;
+  /** Rank and promotion (ADR-094); null on servers before M4i. */
+  tier: CareerTier | null;
+  rankHours: number;
+  promotion: Pick<
+    PromotionState,
+    "nextTier" | "requirements" | "ready" | "pendingSince" | "nextSalaryCentsPerHour"
+  > | null;
 }
 
 /** Error keys the server raises (message of the Postgres exception). Texts: messages/de.json "errors". */
@@ -1143,6 +1204,10 @@ export const GAME_ERROR_KEYS = [
   "event_closed",
   "event_needs_staff",
   "feed_item_not_found",
+  "upgrade_maxed",
+  "promotion_not_ready",
+  "promotion_too_soon",
+  "promotion_pending",
 ] as const;
 export type GameErrorKey = (typeof GAME_ERROR_KEYS)[number] | "unknown";
 
@@ -1228,6 +1293,10 @@ export interface GameEngine {
     requestId: string,
     raiseBps: number,
   ): Promise<{ status: "accepted" | "pending"; salaryCentsPerHour: number }>;
+  /** Ask the boss for the next rank (ADR-094). */
+  requestPromotion(requestId: string): Promise<PromotionResult>;
+  upgrades(): Promise<UpgradesState>;
+  buyUpgrade(requestId: string, key: UpgradeKey): Promise<BuyUpgradeResult>;
   playerCard(nickname: string): Promise<PlayerCard>;
   setCompanyLogo(requestId: string, logo: CompanyLogoData): Promise<MyCompany>;
   /** Pixel banner, may be redrawn any time; null removes it (ADR-078). */
@@ -1299,6 +1368,14 @@ export interface GameEngine {
   companyTeam(companyId: string): Promise<TeamMember[]>;
   fireEmployee(requestId: string, playerJobId: string): Promise<{ severanceCents: number }>;
   respondRaise(requestId: string, playerJobId: string, accept: boolean): Promise<void>;
+  /** Boss promotes an employee who meets the requirements (ADR-094); salary null = the standard raise. */
+  promoteEmployee(
+    requestId: string,
+    companyId: string,
+    playerJobId: string,
+    salaryCentsPerHour: number | null,
+  ): Promise<{ tier: CareerTier; salaryCentsPerHour: number }>;
+  declinePromotion(requestId: string, companyId: string, playerJobId: string): Promise<{ retryAt: string | null }>;
   trainEmployee(
     requestId: string,
     playerJobId: string,
