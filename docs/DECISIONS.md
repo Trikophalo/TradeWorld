@@ -1160,6 +1160,8 @@ Vorgabe: Spieler sollen Dinge für Geld verbessern können, etwa die Tresorgrö�
 - Die Seite **Verbesserungen** zeigt je Verbesserung „jetzt → danach“, die Stufen als Pixel-Balken und den Preis.
   Der Tresor verlinkt dorthin („Tresor vergrößern“), die Skillpunkt-Erklärung auf „Weiterbildung“.
 - Der Treasury-Faktor des Grundeinkommens (ADR-041) gilt weiter, auch für die verbesserte Rate.
+- Ein größerer Tresor zahlt keine Stunden nach, in denen er schon voll war: Er behält, was drin ist, und füllt sich
+  von da an weiter.
 
 ## ADR-094: Karriereleiter und Beförderung — `akzeptiert`
 
@@ -1185,6 +1187,10 @@ der Chef befördert, der Lohn steigt. Es muss klar sein, welche Skills man brauc
   „So steigt dein Gehalt“: Beförderung, Gehaltserhöhung (je neuem Punkt im Fach bis 3 %, alle 7 Tage), Bonus und
   Arbeitsaufgaben.
 - Beförderungen erscheinen im Freunde-Feed.
+- Bei KI-Chefs übernimmt der Job mit dem neuen Rang auch dessen Anforderungen und Lohnobergrenze, sonst wären weitere
+  Gehaltserhöhungen gedeckelt. Eine offene Gehaltsanfrage verfällt mit der Beförderung.
+- Bestehende Jobs bekommen ihre bisher bezahlten Minuten als Stunden im Rang gutgeschrieben, höchstens so viele, wie
+  der nächste Rang braucht.
 - Die alten, nie gebauten Werte `promotionSteps`, `negotiation` und `jobSwitch` entfallen.
 
 ## ADR-095: Skillpunkte erklärt — `akzeptiert`
