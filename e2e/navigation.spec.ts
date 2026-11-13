@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-// Every tab is visible from the start; the company has its own tab, the profile sits in the top bar on phones.
+// Every tab is reachable from the start; locked ones wait under "Bald frei" in the sidebar (ADR-107), the profile sits
+// on the avatar in the top bar.
 const TABS = [
   { name: "Portfolio", path: "/portfolio", heading: "Portfolio" },
   { name: "Märkte", path: "/markets", heading: "Märkte" },
@@ -31,8 +32,10 @@ test("the tabs navigate without horizontal overflow or console errors", async ({
   await expect(nav.getByRole("link", { name: "Start" })).toHaveAttribute("aria-current", "page");
 
   for (const tab of TABS) {
-    // On phones the profile is the avatar in the top bar.
-    await page.getByRole("link", { name: tab.name }).filter({ visible: true }).first().click();
+    // The profile is the avatar in the top bar; on desktop locked tabs are folded into "Bald frei".
+    const link = page.getByRole("link", { name: tab.name }).filter({ visible: true }).first();
+    if (!(await link.isVisible())) await page.getByTestId("nav-soon").getByRole("button").click();
+    await link.click();
     await expect(page).toHaveURL(tab.path);
     await expect(page.getByRole("heading", { level: 1, name: tab.heading })).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -129,10 +132,14 @@ test("the rules page explains taxes with numbers from the config", async ({ page
   await expect(page.getByText("250 € Steuer, 750 € bleiben dir", { exact: false })).toBeVisible();
 });
 
-test("on desktop the company has its own tab in the sidebar", async ({ page }) => {
+test("on desktop the sidebar groups the tabs; locked ones wait under Bald frei (ADR-107)", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
   const sidebar = page.getByRole("navigation", { name: "Hauptnavigation" }).filter({ visible: true });
+  await expect(sidebar.getByText("Investieren")).toBeVisible();
+  // A new player's company is still locked: folded into "Bald frei" until opened.
+  await expect(sidebar.getByRole("link", { name: /Firma/ })).toHaveCount(0);
+  await sidebar.getByTestId("nav-soon").getByRole("button").click();
   await sidebar.getByRole("link", { name: /Firma/ }).click();
   await expect(page).toHaveURL("/company");
   await expect(sidebar.getByRole("link", { name: /Firma/ })).toHaveAttribute("aria-current", "page");

@@ -52,7 +52,8 @@ async function hold(page: Page, name: RegExp) {
 test("artworks are locked below level 4 (ADR-099)", async ({ page }) => {
   await preparePlayer(page, 100);
   await page.goto("/artworks");
-  await expect(page.getByText("Ab Level 4")).toBeVisible();
+  // The sidebar's "Bald frei" names the level too (ADR-107): check the page itself.
+  await expect(page.getByRole("main").getByText("Ab Level 4")).toBeVisible();
 });
 
 test("marketplace: gallery works, like, bid on an auction", async ({ page }) => {
