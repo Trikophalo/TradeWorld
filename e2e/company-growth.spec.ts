@@ -90,8 +90,12 @@ test("profit coach, price strategy, contract work, IPO from the garage, staff op
   await payout.getByRole("button", { name: "Auszahlung speichern" }).click();
   await expect(page.getByText("Auszahlung gespeichert").first()).toBeVisible();
   await page.goto("/");
-  await page.getByTestId("vault-open").click();
   const sources = page.getByTestId("vault-sources");
+  // Open once the page is interactive (a click before hydration does nothing).
+  await expect(async () => {
+    if (!(await sources.isVisible())) await page.getByTestId("vault-open").click();
+    await expect(sources).toBeVisible({ timeout: 1_000 });
+  }).toPass();
   await expect(sources.locator('[data-source="basic"]')).toContainText("Grundeinkommen");
   await expect(sources.locator('[data-source="ceo"]')).toContainText("100 % vom Gewinn");
   await page.goto("/company");
@@ -135,7 +139,7 @@ test("found a GmbH directly and expand it, step after step", async ({ page }) =>
 
 test("friends page: empty list, add by name, helpful errors", async ({ page }) => {
   await preparePlayer(page, "Freundlich", 7_000, 2_000_000);
-  await page.goto("/friends");
+  await page.goto("/friends?tab=friends");
   await expect(page.getByRole("heading", { level: 1, name: "Freunde" })).toBeVisible();
   await expect(page.getByText("Noch keine Freunde")).toBeVisible();
 
@@ -154,7 +158,7 @@ test("friends page: empty list, add by name, helpful errors", async ({ page }) =
     .getByRole("link", { name: /Freunde/ })
     .first()
     .click();
-  await expect(page).toHaveURL(/\/friends$/);
+  await expect(page).toHaveURL(/\/friends/);
 });
 
 test("company situation: a crisis or chance, a strategy, a step, the news", async ({ page }) => {

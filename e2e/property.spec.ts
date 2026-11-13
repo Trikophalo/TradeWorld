@@ -71,11 +71,23 @@ test("buy a flat, shop furniture and furnish it", async ({ page }) => {
   await page.getByTestId("furnish").click();
   const editor = page.getByTestId("room-editor");
   await expect(page.getByTestId("inventory").getByRole("button")).toHaveCount(2);
+  // The editor slides in and fits the room to the screen: measure once it stands still.
+  await expect(async () => {
+    const before = await editor.boundingBox();
+    await page.waitForTimeout(200);
+    expect(await editor.boundingBox()).toEqual(before);
+  }).toPass();
   const box = (await editor.boundingBox())!;
   const tile = box.width / 8;
-  await page.getByTestId("inventory").getByRole("button", { name: "Läufer" }).click();
+  // The editor slides in: pick until the right piece is really in hand (no click on a moving list).
+  const pickUp = async (name: string) =>
+    expect(async () => {
+      await page.getByTestId("inventory").getByRole("button", { name }).click();
+      await expect(page.getByText(`Du platzierst: ${name}`).first()).toBeVisible({ timeout: 1_000 });
+    }).toPass();
+  await pickUp("Läufer");
   await page.mouse.click(box.x + tile * 1.5, box.y + box.height - tile * 2.5);
-  await page.getByTestId("inventory").getByRole("button", { name: "Holzstuhl" }).click();
+  await pickUp("Holzstuhl");
   await page.mouse.click(box.x + tile * 1.5, box.y + box.height - tile * 2.5);
   await expect(page.getByTestId("inventory").getByRole("button")).toHaveCount(0);
   await page.getByRole("button", { name: "Speichern" }).click();

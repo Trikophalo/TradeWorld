@@ -56,7 +56,7 @@ test("own tag on the profile, find players by name and #tag in the top search", 
 });
 
 test("adding oneself by tag is refused", async ({ page }) => {
-  await page.goto("/friends");
+  await page.goto("/friends?tab=friends");
   await page.getByLabel("Spielername oder #Tag").fill("#K7Q2");
   await page.getByRole("button", { name: "Anfrage schicken" }).click();
   await expect(page.getByText("Das bist du selbst.", { exact: false })).toBeVisible();
