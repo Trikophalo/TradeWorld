@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "58accb94-83dd-4010-bbec-c710171ac22b",
+    "id": "af20c54b-92a0-4031-ada3-8d8c768d09e2",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
+      "id": "12ef4943-a830-a22b-a142-8a080f7be8be",
       "logo": null,
-      "name": "Frachtpilot",
-      "color": "#9ECE6A",
+      "name": "Kaufrausch Märkte",
+      "color": "#FF6B8B",
       "is_ai": true,
-      "sector": "logistics",
-      "ticker": "FPT"
+      "sector": "retail",
+      "ticker": "KFR"
     },
     "presence": {
-      "fire_at": "2026-11-18T19:36:37.142176+00:00",
+      "fire_at": "2026-11-18T19:44:14.973342+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-13T19:36:37.142176+00:00"
+      "last_active_at": "2026-11-13T19:44:14.973342+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-13T19:36:37.233499+00:00",
+    "started_at": "2026-11-13T19:44:15.086112+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

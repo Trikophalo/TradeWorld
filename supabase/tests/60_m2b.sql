@@ -203,7 +203,7 @@ select tests.assert(
 
 update public.player_skill_points set free_points = 3, branch_points = '{"it": 2, "finance": 1}' where player_id = :s;
 select tests.login_as('authenticated', :s);
-select tests.throws_key($$select public.learn_skill(gen_random_uuid(), 'it_networks')$$, 'skill_locked', 'learn_skill(): not an entry field and no learned neighbour (ADR-061)');
+select tests.throws_key($$select public.learn_skill(gen_random_uuid(), 'it_networks')$$, 'skill_locked', 'learn_skill(): the prerequisite is not learned (ADR-115)');
 select public.learn_skill(gen_random_uuid(), 'it_basics') as l1 \gset
 select tests.throws_key($$select public.learn_skill(gen_random_uuid(), 'it_basics')$$, 'skill_learned', 'learn_skill(): already learned');
 select public.learn_skill(gen_random_uuid(), 'it_programming') as l2 \gset

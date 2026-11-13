@@ -1,8 +1,8 @@
 {
-  "code": "NEXA-SUNC",
+  "code": "NEXA-RWMN",
   "invited": 0,
   "redeemed": true,
   "bonus_cents": 500000,
-  "redeemed_at": "2026-11-13T19:36:39.00246+00:00",
-  "redeemed_from": { "tag": "VM59", "nickname": "Fixture_Werber" }
+  "redeemed_at": "2026-11-13T19:44:16.911937+00:00",
+  "redeemed_from": { "tag": "FUXC", "nickname": "Fixture_Werber" }
 }

@@ -1,27 +1,27 @@
 {
-  "id": "ca0b3e6c-64f8-4d53-8c2e-29a80b0562cf",
+  "id": "31a7e449-536b-4e44-82b5-a92ab18f1a7a",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "08e1bb86-636d-4e29-9bb5-309571775da6",
+    "id": "277c0dd7-b63f-4df5-b483-529621a1569d",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
+      "id": "12ef4943-a830-a22b-a142-8a080f7be8be",
       "logo": null,
-      "name": "Frachtpilot",
-      "color": "#9ECE6A",
+      "name": "Kaufrausch Märkte",
+      "color": "#FF6B8B",
       "is_ai": true,
-      "sector": "logistics",
-      "ticker": "FPT"
+      "sector": "retail",
+      "ticker": "KFR"
     },
-    "required": [{ "branch": "logistics", "min_score": 0 }],
-    "title_key": "logistics_intern",
+    "required": [{ "branch": "management", "min_score": 0 }],
+    "title_key": "management_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-13T19:36:33.71812+00:00",
-  "updated_at": "2026-11-13T19:36:33.724051+00:00",
-  "offer_expires_at": "2026-11-15T19:36:33.71812+00:00",
+  "created_at": "2026-11-13T19:44:12.360202+00:00",
+  "updated_at": "2026-11-13T19:44:12.36484+00:00",
+  "offer_expires_at": "2026-11-15T19:44:12.360202+00:00",
   "salary_wish_cents_per_hour": 15000,
   "offer_salary_cents_per_hour": 15000
 }

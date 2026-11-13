@@ -61,16 +61,22 @@ export function neighbours(node: SkillNodeConfig, cfg: SkillsConfig = BALANCE.sk
   return result;
 }
 
+/** The skills that must be learned before this one (ADR-115). */
+export function prerequisites(node: SkillNodeConfig, cfg: SkillsConfig = BALANCE.skills): SkillNodeConfig[] {
+  return node.requires.flatMap((key) => skillNode(key, cfg) ?? []);
+}
+
+/** The skills this one opens up: those that name it as a prerequisite. */
+export function unlocksSkills(node: SkillNodeConfig, cfg: SkillsConfig = BALANCE.skills): SkillNodeConfig[] {
+  return cfg.tree.filter((other) => other.requires.includes(node.key));
+}
+
 /**
- * Whether the map lets the player reach a skill (ADR-061): entry fields near the
- * centre are always open, every other field needs a learned neighbour.
+ * Whether a skill is next in line (ADR-115): the basics are always open, every other skill needs all of its
+ * prerequisites learned.
  */
-export function isReachable(
-  node: SkillNodeConfig,
-  learned: ReadonlySet<string>,
-  cfg: SkillsConfig = BALANCE.skills,
-): boolean {
-  return node.entry || neighbours(node, cfg).some((n) => learned.has(n.key));
+export function isReachable(node: SkillNodeConfig, learned: ReadonlySet<string>): boolean {
+  return node.requires.every((key) => learned.has(key));
 }
 
 /**
@@ -87,7 +93,7 @@ export function learnCheck(
   const node = skillNode(key, cfg);
   if (!node) return "unknown";
   if (learned.has(key)) return "learned";
-  if (!isReachable(node, learned, cfg)) return "locked";
+  if (!isReachable(node, learned)) return "locked";
   return payForSkill(node, freePoints, branchPoints, cfg) ? "ok" : "points";
 }
 

@@ -7042,3 +7042,13 @@ Migration `20261203000150_open_signup.sql`, idempotente Kopie in `supabase/updat
   braucht die Registrierung keinen Code. Ein mitgeschickter gültiger Code wird weiter gezählt, ein unbekannter
   ignoriert. Mit `game_config.auth = {"inviteRequired": true}` gilt wieder die alte Regel (`NX005`).
 - Die 18+-Bestätigung (`age_confirmed`) bleibt Pflicht (`NX007`).
+
+## Nachtrag: Skills der Reihe nach (ADR-115)
+
+Migration `20261203000200_skill_prerequisites.sql`, idempotente Kopie in `supabase/updates/`.
+
+- `game_config.skills.tree`: jeder Knoten hat `requires` (Liste von Skill-Schlüsseln, alle nötig; leer bei den acht
+  Grundlagen). Das Feld `entry` entfällt.
+- `skill_reachable(p_player, p_key)` (intern): wahr, wenn alle `requires` in `player_skills` stehen. Ein Baum ohne
+  `requires` (ältere Konfiguration) wird wie bisher bewertet (Einstiegsfeld oder gelerntes Nachbarfeld).
+- `learn_skill` ist unverändert und meldet weiter `skill_locked`; `train_employee` prüft die Reihenfolge nicht.

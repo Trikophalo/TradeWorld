@@ -8,7 +8,6 @@ import { Card } from "@/components/ui/card";
 import { burstConfetti } from "@/components/ui/effects";
 import { HoldButton } from "@/components/ui/hold-button";
 import { Progress } from "@/components/ui/progress";
-import { Segmented } from "@/components/ui/segmented";
 import { Sheet } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
@@ -18,12 +17,20 @@ import { useGameErrorText } from "@/features/game/errors";
 import { engine } from "@/features/game/store";
 import type { SkillState } from "@/features/game/types";
 import { haptic } from "@/lib/haptics";
-import { learnCheck, neighbours, payForSkill, pointsFor, skillCost, type LearnCheck } from "@/lib/sim/skills";
+import {
+  learnCheck,
+  payForSkill,
+  pointsFor,
+  prerequisites,
+  skillCost,
+  unlocksSkills,
+  type LearnCheck,
+} from "@/lib/sim/skills";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { useVisitTour } from "@/features/tutorial/use-visit-tour";
 import { useCareerRefresh, useSkills } from "../hooks";
-import { SkillPaths } from "./skill-paths";
+import { NextSkills } from "./skill-paths";
 
 type NodeKey = Parameters<ReturnType<typeof useTranslations<"skills.nodes">>>[0];
 type BranchKey = Parameters<ReturnType<typeof useTranslations<"skills.branches">>>[0];
@@ -48,24 +55,55 @@ export const BRANCH_COLORS: Record<SkillBranch, string> = {
 const SIZE = 30; // hex radius in map units
 const SQRT3 = Math.sqrt(3);
 const toPixel = (q: number, r: number) => ({ x: SIZE * SQRT3 * (q + r / 2), y: SIZE * 1.5 * r });
+/** Tiles are a little smaller than their field, so the paths between them show. */
+const TILE = 0.84;
 const HEX = Array.from({ length: 6 }, (_, i) => {
   const a = (Math.PI / 180) * (60 * i - 30);
-  return `${(SIZE * 0.94 * Math.cos(a)).toFixed(2)},${(SIZE * 0.94 * Math.sin(a)).toFixed(2)}`;
+  return `${(SIZE * TILE * Math.cos(a)).toFixed(2)},${(SIZE * TILE * Math.sin(a)).toFixed(2)}`;
 }).join(" ");
 const MIN_ZOOM = 0.3;
 const MAX_ZOOM = 2.5;
 const START_ZOOM = 1.2;
 
-/** Two short lines for a hex label. */
-function label(name: string): [string, string] {
-  const words = name.split(/[\s-]+/);
-  if (words.length === 1) return [name.length > 11 ? `${name.slice(0, 10)}.` : name, ""];
-  const first = words[0]!.length > 11 ? `${words[0]!.slice(0, 10)}.` : words[0]!;
-  const rest = words.slice(1).join(" ");
-  return [first, rest.length > 11 ? `${rest.slice(0, 10)}.` : rest];
+const SOFT = "\u00ad";
+const LINE_MAX = 11;
+const plain = (name: string) => name.replaceAll(SOFT, "");
+
+/**
+ * Up to three short lines for a tile. Names break at spaces, at hyphens and at the soft hyphens the texts carry
+ * for long words ("Software\u00adarchitektur" becomes "Software-" and "architektur").
+ */
+export function hexLabel(name: string): string[] {
+  const pieces = [...name.matchAll(/([^\s\u00ad-]+)([\s\u00ad-]?)/g)].map((m) => ({ text: m[1]!, sep: m[2] ?? "" }));
+  const lines: string[] = [];
+  let line = "";
+  let sep = "";
+  for (const piece of pieces) {
+    const joined = line + (sep === SOFT ? "" : sep) + piece.text;
+    if (line === "" || joined.length <= LINE_MAX) {
+      line = line === "" ? piece.text : joined;
+    } else {
+      lines.push(sep === " " ? line : `${line}-`);
+      line = piece.text;
+    }
+    sep = piece.sep;
+  }
+  if (line) lines.push(line);
+  return lines.length > 3 ? [lines[0]!, lines[1]!, `${lines[2]!.slice(0, LINE_MAX - 1)}.`] : lines;
 }
 
-/** The skill map (ADR-061): hex fields in 8 directions, pan by dragging, zoom with wheel, buttons or two fingers. */
+/** Every step of the order of learning (ADR-115): from a skill to the one it opens. */
+const PATHS = SKILL_NODES.flatMap((node) =>
+  node.requires.flatMap((key) => {
+    const from = SKILL_NODES.find((n) => n.key === key);
+    return from ? [{ from, to: node }] : [];
+  }),
+);
+
+/**
+ * The skills page: the map is always there (owner decision, ADR-115). Around it: the points, what can be learned
+ * now, and the eight areas.
+ */
 export function SkillTree() {
   const t = useTranslations("skillTree");
   const ts = useTranslations("skills");
@@ -73,8 +111,6 @@ export function SkillTree() {
   const [open, setOpen] = useState<string | null>(null);
   const [focus, setFocus] = useState<SkillBranch | null>(null);
   const [goTo, setGoTo] = useState<{ branch: SkillBranch; n: number } | null>(null);
-  /** Paths are the default: easier to read than the map (ADR-105). */
-  const [view, setView] = useState<"paths" | "map">("paths");
   const data = skills.data;
   const learned = useMemo(() => new Set(data?.learned.map((l) => l.key) ?? []), [data]);
   useVisitTour("visit_skill_map", Boolean(data));
@@ -83,97 +119,81 @@ export function SkillTree() {
 
   return (
     <div className="space-y-5">
-      <Card padding="lg" className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div>
-            <p className="label-pixel text-fg-3">{t("freePoints")}</p>
-            <p className="mt-1 nums text-3xl font-semibold text-fg-1" data-testid="free-points">
-              {data.freePoints}
-            </p>
-          </div>
-          <div className="max-w-xs">
-            <Badge tone="accent">{t("progressHint", { done: learned.size, total: SKILL_NODES.length })}</Badge>
-            <p className="mt-1.5 text-sm text-pretty text-fg-3">{t("freePointsHint")}</p>
-          </div>
+      <Card padding="lg" className="flex flex-wrap items-center gap-4">
+        <div>
+          <p className="label-pixel text-fg-3">{t("freePoints")}</p>
+          <p className="mt-1 nums text-3xl font-semibold text-fg-1" data-testid="free-points">
+            {data.freePoints}
+          </p>
         </div>
-        <Segmented
-          value={view}
-          onValueChange={setView}
-          options={[
-            { value: "paths", label: t("view.paths") },
-            { value: "map", label: t("view.map") },
-          ]}
-          label={t("view.label")}
-          size="sm"
-        />
+        <div className="max-w-md min-w-0 flex-1">
+          <Badge tone="accent">{t("progressHint", { done: learned.size, total: SKILL_NODES.length })}</Badge>
+          <p className="mt-1.5 text-sm text-pretty text-fg-3">{t("freePointsHint")}</p>
+        </div>
       </Card>
-      {view === "paths" ? (
-        <SkillPaths state={data} learned={learned} colors={BRANCH_COLORS} onOpen={setOpen} />
-      ) : (
-        <div className="grid gap-5 *:min-w-0 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-6">
-          <HexMap state={data} learned={learned} onOpen={setOpen} focus={focus} goTo={goTo} />
-          <div className="space-y-4 lg:order-first lg:col-start-2 lg:row-start-1">
-            <Card padding="md">
-              <p className="mb-1 label-pixel text-fg-3">{t("overview")}</p>
-              <p className="mb-2 text-xs text-fg-3">{t("branchHint")}</p>
-              <ul className="-mx-2 space-y-0.5" onPointerLeave={() => setFocus(null)}>
-                {SKILL_BRANCHES.map((b) => {
-                  const total = SKILL_NODES.filter((n) => n.branches[0] === b).length;
-                  const done = SKILL_NODES.filter((n) => n.branches[0] === b && learned.has(n.key)).length;
-                  return (
-                    <li key={b}>
-                      <button
-                        type="button"
-                        onPointerEnter={() => setFocus(b)}
-                        onFocus={() => setFocus(b)}
-                        onBlur={() => setFocus(null)}
-                        onClick={() => {
-                          haptic("tap");
-                          setGoTo((g) => ({ branch: b, n: (g?.n ?? 0) + 1 }));
-                        }}
-                        className={cn(
-                          "w-full rounded-md px-2 py-1.5 text-left text-sm focus-ring transition duration-fast active:scale-[0.98]",
-                          focus === b ? "bg-surface-2" : "hover:bg-surface-2",
-                        )}
-                      >
-                        <span className="flex items-center justify-between gap-2">
-                          <span className="flex min-w-0 items-center gap-2">
-                            <span
-                              aria-hidden
-                              className="size-2.5 shrink-0 rounded-xs"
-                              style={{ backgroundColor: BRANCH_COLORS[b] }}
-                            />
-                            <span className="truncate text-fg-2">{branchName(ts, b)}</span>
-                            <span className="nums text-xs text-fg-3">
-                              {done}/{total}
-                            </span>
-                          </span>
-                          <span className="nums text-fg-1">
-                            {data.branchScores[b] ?? 0}
-                            {(data.branchPoints[b] ?? 0) > 0 && (
-                              <span className="ml-1 text-gold">+{data.branchPoints[b]}</span>
-                            )}
-                          </span>
+      <div className="grid gap-5 *:min-w-0 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-6">
+        <HexMap state={data} learned={learned} onOpen={setOpen} focus={focus} goTo={goTo} />
+        <Card padding="md" className="self-start">
+          <p className="mb-1 label-pixel text-fg-3">{t("overview")}</p>
+          <p className="mb-2 text-xs text-fg-3">{t("branchHint")}</p>
+          <ul className="-mx-2 space-y-0.5" onPointerLeave={() => setFocus(null)}>
+            {SKILL_BRANCHES.map((b) => {
+              const total = SKILL_NODES.filter((n) => n.branches[0] === b).length;
+              const done = SKILL_NODES.filter((n) => n.branches[0] === b && learned.has(n.key)).length;
+              return (
+                <li key={b}>
+                  <button
+                    type="button"
+                    data-branch={b}
+                    onPointerEnter={() => setFocus(b)}
+                    onFocus={() => setFocus(b)}
+                    onBlur={() => setFocus(null)}
+                    onClick={() => {
+                      haptic("tap");
+                      setGoTo((g) => ({ branch: b, n: (g?.n ?? 0) + 1 }));
+                    }}
+                    className={cn(
+                      "w-full rounded-md px-2 py-1.5 text-left text-sm focus-ring transition duration-fast active:scale-[0.98]",
+                      focus === b ? "bg-surface-2" : "hover:bg-surface-2",
+                    )}
+                  >
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span
+                          aria-hidden
+                          className="size-2.5 shrink-0 rounded-xs"
+                          style={{ backgroundColor: BRANCH_COLORS[b] }}
+                        />
+                        <span className="truncate text-fg-2">{branchName(ts, b)}</span>
+                        <span className="nums text-xs text-fg-3">
+                          {done}/{total}
                         </span>
-                        {data.branchProgress[b] > 0 && (
-                          <Progress
-                            value={data.branchProgress[b]}
-                            label={t("branchPoints")}
-                            tone="gold"
-                            size="sm"
-                            className="mt-1"
-                          />
+                      </span>
+                      <span className="nums text-fg-1">
+                        {data.branchScores[b] ?? 0}
+                        {(data.branchPoints[b] ?? 0) > 0 && (
+                          <span className="ml-1 text-gold">+{data.branchPoints[b]}</span>
                         )}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </Card>
-          </div>
-        </div>
-      )}
-      <LearnSheet skillKey={open} state={data} learned={learned} onClose={() => setOpen(null)} />
+                      </span>
+                    </span>
+                    {data.branchProgress[b] > 0 && (
+                      <Progress
+                        value={data.branchProgress[b]}
+                        label={t("branchPoints")}
+                        tone="gold"
+                        size="sm"
+                        className="mt-1"
+                      />
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      </div>
+      <NextSkills state={data} learned={learned} colors={BRANCH_COLORS} onOpen={setOpen} />
+      <LearnSheet skillKey={open} state={data} learned={learned} onOpen={setOpen} onClose={() => setOpen(null)} />
     </div>
   );
 }
@@ -345,37 +365,51 @@ function HexMap({
           }}
         >
           <circle r={SIZE * 6} fill="url(#skill-glow)" />
+          {/* The order of learning: a path from every skill to the ones it opens. */}
+          <g strokeLinecap="round">
+            {PATHS.map(({ from, to }) => {
+              const a = toPixel(from.q, from.r);
+              const b = toPixel(to.q, to.r);
+              const walked = learned.has(from.key) && learned.has(to.key);
+              const ahead = learned.has(from.key) && !learned.has(to.key);
+              const dim = focus !== null && !to.branches.includes(focus);
+              return (
+                <line
+                  key={`${from.key}>${to.key}`}
+                  x1={a.x}
+                  y1={a.y}
+                  x2={b.x}
+                  y2={b.y}
+                  stroke={walked ? "var(--fg-1)" : ahead ? "var(--fg-2)" : "var(--line-2)"}
+                  strokeWidth={walked ? 5 : 4}
+                  strokeDasharray={ahead ? "1 7" : undefined}
+                  opacity={dim ? 0.15 : 1}
+                  className="transition-opacity duration-base"
+                />
+              );
+            })}
+          </g>
           {MAP_ORDER.map((b, i) => {
             const angle = (i * 45 * Math.PI) / 180;
             const d = SIZE * SQRT3 * 8.7;
-            const dim = focus !== null && focus !== b;
             return (
-              <g key={b} opacity={dim ? 0.25 : 1} className="transition-opacity duration-base">
-                <line
-                  x1={Math.cos(angle) * SIZE * 1.4}
-                  y1={-Math.sin(angle) * SIZE * 1.4}
-                  x2={Math.cos(angle) * (d - 18)}
-                  y2={-Math.sin(angle) * (d - 18)}
-                  stroke={BRANCH_COLORS[b]}
-                  strokeOpacity={0.18}
-                  strokeWidth={SIZE * 1.6}
-                  strokeLinecap="round"
-                />
-                <text
-                  x={Math.cos(angle) * d}
-                  y={-Math.sin(angle) * d}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  className="font-pixel uppercase"
-                  fontSize={13}
-                  fill={BRANCH_COLORS[b]}
-                >
-                  {branchName(ts, b)}
-                </text>
-              </g>
+              <text
+                key={b}
+                x={Math.cos(angle) * d}
+                y={-Math.sin(angle) * d}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className="font-pixel uppercase transition-opacity duration-base"
+                fontSize={13}
+                fill={BRANCH_COLORS[b]}
+                opacity={focus !== null && focus !== b ? 0.25 : 1}
+              >
+                {branchName(ts, b)}
+              </text>
             );
           })}
           <g>
+            <polygon points={HEX} transform="translate(0 3)" fill="var(--edge)" />
             <polygon points={HEX} className="fill-surface-1 stroke-accent" strokeWidth={2} />
             <text textAnchor="middle" dominantBaseline="middle" fontSize={9} className="fill-fg-1 font-pixel">
               {t("start")}
@@ -397,6 +431,7 @@ function HexMap({
 
       {hover && hovered && !dragging && (
         <HoverCard
+          learned={learned}
           node={hovered}
           check={learnCheck(hovered.key, learned, state.freePoints, state.branchPoints)}
           state={state}
@@ -430,7 +465,10 @@ function HexMap({
           <span aria-hidden className="size-2.5 rounded-xs border border-accent" /> {t("legendOpen")}
         </span>
         <span className="flex items-center gap-1.5">
-          <span aria-hidden className="size-2.5 rounded-xs bg-line-2" /> {t("legendLocked")}
+          <span aria-hidden className="size-2.5 rounded-xs border border-line-2 bg-surface-1" /> {t("legendLocked")}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span aria-hidden className="h-0.5 w-3 rounded-pill bg-fg-2" /> {t("legendPath")}
         </span>
         <span className="hidden text-fg-3 sm:inline">{t("mapHint")}</span>
       </div>
@@ -443,11 +481,13 @@ function HoverCard({
   node,
   check,
   state,
+  learned,
   x,
   y,
   width,
 }: {
   node: SkillNodeConfig;
+  learned: ReadonlySet<string>;
   check: LearnCheck;
   state: SkillState;
   x: number;
@@ -472,9 +512,7 @@ function HoverCard({
             {branchName(ts, b)}
           </span>
         ))}
-        <span>
-          · {t(`tierNames.${node.tier}` as `tierNames.${TierKey}`)} {"★".repeat(node.tier)}
-        </span>
+        <span>· {t(`tierNames.${node.tier}` as `tierNames.${TierKey}`)}</span>
       </p>
       <p
         className={cn(
@@ -491,7 +529,12 @@ function HoverCard({
             ? t("hoverOpen", { cost: t("cost", { count: cost }) })
             : check === "points"
               ? t("notEnough", { count: cost - pointsFor(node, state.freePoints, state.branchPoints) })
-              : t("hoverLocked")}
+              : t("hoverLocked", {
+                  names: prerequisites(node)
+                    .filter((p) => !learned.has(p.key))
+                    .map((p) => nodeName(ts, p.key))
+                    .join(t("and")),
+                })}
       </p>
       <p className="mt-1.5 text-2xs text-fg-3">{t("hoverClick")}</p>
     </div>
@@ -516,22 +559,22 @@ const Hex = memo(function Hex({
   const { x, y } = toPixel(node.q, node.r);
   const color = BRANCH_COLORS[node.branches[0]!];
   const second = node.branches[1] ? BRANCH_COLORS[node.branches[1]] : null;
-  const [line1, line2] = label(name);
+  const lines = hexLabel(name);
   const learned = check === "learned";
   const open = check === "ok" || check === "points";
-  const opacity = dim ? 0.15 : check === "locked" ? (hovered ? 0.65 : 0.35) : 1;
+  const locked = !learned && !open;
   return (
     <g
       transform={`translate(${x} ${y})`}
       data-skill={node.key}
       data-state={check}
       className="cursor-pointer"
-      style={{ opacity, transition: "opacity var(--duration-base) var(--ease-standard)" }}
+      style={{ opacity: dim ? 0.2 : 1, transition: "opacity var(--duration-base) var(--ease-standard)" }}
     >
-      <title>{name}</title>
+      <title>{plain(name)}</title>
       <g
         style={{
-          transform: hovered ? "scale(1.14)" : "scale(1)",
+          transform: hovered ? "translateY(-2px) scale(1.1)" : "none",
           transformBox: "fill-box",
           transformOrigin: "center",
           transition: "transform var(--duration-fast) var(--ease-standard)",
@@ -542,54 +585,52 @@ const Hex = memo(function Hex({
             points={HEX}
             fill="none"
             stroke={color}
-            strokeWidth={5}
-            className="motion-safe:animate-pulse"
+            strokeWidth={6}
             strokeOpacity={0.35}
+            className="motion-safe:animate-pulse"
           />
         )}
+        {/* A tile with weight: a hard edge underneath, like every panel (ADR-108). */}
+        <polygon points={HEX} transform="translate(0 3)" fill="var(--edge)" />
+        <polygon points={HEX} fill={learned ? color : locked ? "var(--color-surface-3)" : "var(--color-surface-1)"} />
+        {!learned && <polygon points={HEX} fill={color} fillOpacity={open ? 0.2 : 0.06} />}
         <polygon
           points={HEX}
-          fill={learned ? color : open ? `${color}2e` : "var(--bg-1)"}
-          stroke={second ?? color}
-          strokeWidth={hovered ? 3 : learned ? 1 : open ? 2.5 : 1}
+          fill="none"
+          stroke={locked ? "var(--line-2)" : (second ?? color)}
+          strokeWidth={locked ? 1 : hovered ? 3 : 2}
           strokeDasharray={check === "points" ? "4 3" : undefined}
         />
         {learned && (
-          <polygon
-            points={HEX}
-            transform="scale(0.8)"
-            fill="none"
-            stroke="var(--on-accent)"
-            strokeOpacity={0.35}
-            strokeWidth={1}
-          />
+          <polygon points={HEX} transform="scale(0.84)" fill="none" stroke="var(--shine)" strokeWidth={1.5} />
         )}
         {showText ? (
           <text
             textAnchor="middle"
             fontSize={7.2}
-            className={learned ? "fill-on-accent font-medium" : "fill-fg-1"}
+            className={learned ? "fill-on-accent font-medium" : locked ? "fill-fg-2" : "fill-fg-1 font-medium"}
             pointerEvents="none"
           >
-            <tspan x={0} y={line2 ? -2 : 2.5}>
-              {line1}
-            </tspan>
-            {line2 && (
-              <tspan x={0} y={7}>
-                {line2}
+            {lines.map((line, i) => (
+              <tspan key={i} x={0} y={(i - (lines.length - 1) / 2) * 8 + 1}>
+                {line}
               </tspan>
-            )}
+            ))}
           </text>
-        ) : (
-          <text textAnchor="middle" dominantBaseline="middle" fontSize={11} className="fill-fg-1" pointerEvents="none">
-            {"•".repeat(node.tier)}
-          </text>
-        )}
-        {node.tier >= 4 && showText && (
-          <text y={-17} textAnchor="middle" fontSize={7} className="fill-gold" pointerEvents="none">
-            {"★".repeat(node.tier - 3)}
-          </text>
-        )}
+        ) : null}
+        {/* Tier as small pips at the foot of the tile. */}
+        <g pointerEvents="none" opacity={locked ? 0.5 : 1}>
+          {Array.from({ length: node.tier }, (_, i) => (
+            <rect
+              key={i}
+              x={(i - (node.tier - 1) / 2) * 4.5 - 1.5}
+              y={showText ? 16.5 : -1.5}
+              width={3}
+              height={3}
+              fill={learned ? "var(--on-accent)" : locked ? "var(--fg-3)" : color}
+            />
+          ))}
+        </g>
       </g>
     </g>
   );
@@ -599,11 +640,14 @@ function LearnSheet({
   skillKey,
   state,
   learned,
+  onOpen,
   onClose,
 }: {
   skillKey: string | null;
   state: SkillState;
   learned: ReadonlySet<string>;
+  /** Jump to another skill, e.g. a missing prerequisite. */
+  onOpen: (key: string) => void;
   onClose: () => void;
 }) {
   const t = useTranslations("skillTree");
@@ -620,6 +664,8 @@ function LearnSheet({
   const check: LearnCheck = learnCheck(node.key, learned, state.freePoints, state.branchPoints);
   const cost = skillCost(node);
   const pay = payForSkill(node, state.freePoints, state.branchPoints);
+  const before = prerequisites(node);
+  const after = unlocksSkills(node);
 
   const learn = async () => {
     setBusy(true);
@@ -647,7 +693,7 @@ function LearnSheet({
     <Sheet
       open={skillKey !== null}
       onOpenChange={(o) => !o && onClose()}
-      title={nodeName(ts, node.key)}
+      title={plain(nodeName(ts, node.key))}
       description={`${t("tier", { tier: node.tier })} · ${t(`tierNames.${node.tier}` as `tierNames.${TierKey}`)}`}
       footer={
         check === "ok" ? (
@@ -668,13 +714,43 @@ function LearnSheet({
         {check === "learned" && (
           <p className="rounded-md bg-accent-soft px-4 py-3 text-sm text-accent">{t("learned")}</p>
         )}
+        {before.length > 0 && (
+          <div data-testid="skill-requires">
+            <p className="label-pixel text-fg-3">{t("requires")}</p>
+            <ul className="mt-1.5 flex flex-wrap gap-1.5">
+              {before.map((p) => {
+                const done = learned.has(p.key);
+                return (
+                  <li key={p.key}>
+                    <button
+                      type="button"
+                      data-requires={p.key}
+                      data-done={done}
+                      onClick={() => {
+                        haptic("tap");
+                        onOpen(p.key);
+                      }}
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-md border-2 px-2.5 py-1 text-sm focus-ring transition duration-fast hover:-translate-y-0.5 active:translate-y-0",
+                        done ? "border-gain bg-gain-soft text-gain" : "border-line-2 bg-surface-2 text-fg-1",
+                      )}
+                    >
+                      <span aria-hidden>{done ? "✓" : "→"}</span>
+                      {nodeName(ts, p.key)}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
         {check === "locked" && (
-          <p className="rounded-md bg-surface-2 px-4 py-3 text-sm text-pretty text-fg-2">
+          <p className="rounded-md bg-surface-2 px-4 py-3 text-sm text-pretty text-fg-2" data-testid="skill-locked">
             {t("locked", {
-              names: neighbours(node)
-                .slice(0, 3)
-                .map((n) => nodeName(ts, n.key))
-                .join(t("or")),
+              names: before
+                .filter((p) => !learned.has(p.key))
+                .map((p) => nodeName(ts, p.key))
+                .join(t("and")),
             })}{" "}
             {t("lockedMap")}
           </p>
@@ -698,6 +774,27 @@ function LearnSheet({
                 })}
               </p>
             )}
+          </div>
+        )}
+        {after.length > 0 && (
+          <div>
+            <p className="label-pixel text-fg-3">{t("unlocks")}</p>
+            <ul className="mt-1.5 flex flex-wrap gap-1.5">
+              {after.map((n) => (
+                <li key={n.key}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptic("tap");
+                      onOpen(n.key);
+                    }}
+                    className="rounded-md border border-line-1 bg-surface-2 px-2.5 py-1 text-sm text-fg-2 focus-ring transition duration-fast hover:text-fg-1 active:scale-95"
+                  >
+                    {nodeName(ts, n.key)}
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
         <p className={cn("text-xs text-fg-3")}>

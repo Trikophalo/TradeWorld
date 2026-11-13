@@ -1638,3 +1638,33 @@ und die Bestätigung „mindestens 18 Jahre“ bleiben.
   `true` steht (Standard jetzt `false`). So lässt sich die Tür bei Bedarf wieder schließen, ohne neuen Code.
 - Die Tabellen `invite_codes` und `invite_code_redemptions` bleiben. Der Freundescode (ADR-111) ist davon unabhängig.
 - Schutz vor Mehrfachkonten sind jetzt E-Mail-Bestätigung, Login-Ereignisse und die Limits für neue Konten.
+
+## ADR-115: Skills der Reihe nach, Karte immer sichtbar — `akzeptiert`
+
+Vorgabe: Skills soll man chronologisch lernen, dort wo es Sinn ergibt: Programmierung erst, wenn man die
+IT-Grundlagen beherrscht. Bei den Skills soll immer die Karte zu sehen sein, und sie soll besser aussehen; die
+Farbstreifen gefallen nicht.
+
+**Reihenfolge (ersetzt die Nachbar-Regel aus ADR-061):**
+
+- Jeder Skill nennt in `src/config/skills.ts` seine **Voraussetzung** (`requires`). Gelernt werden kann er erst, wenn
+  sie gelernt ist. Nur die acht Grundlagen brauchen nichts. Vorher reichte irgendein gelerntes Nachbarfeld, und
+  Felder nahe der Mitte waren immer offen, auch Programmierung ohne IT-Grundlagen.
+- Die Voraussetzung ist immer ein Nachbarfeld desselben Bereichs, das früher kommt (niedrigere Stufe, sonst gleiche
+  Stufe weiter innen), und inhaltlich gewählt: IT-Grundlagen → Programmierung → Datenanalyse → Machine Learning.
+- Kombi-Skills zwischen zwei Bereichen, die beide berühren, brauchen je einen Skill aus beiden (FinTech: DevOps und
+  Handel; Wirtschaftsrecht: Datenschutz und Treasury; E-Commerce: Suchmaschinenoptimierung und Luftfracht).
+- Server (`skill_reachable`), Demo und Oberfläche rechnen gleich. Schon gelernte Skills bleiben, egal in welcher
+  Reihenfolge sie gelernt wurden. Schulungen durch den Arbeitgeber bleiben davon unberührt.
+- Kosten, Punkte und Bereichswerte ändern sich nicht.
+
+**Seite:**
+
+- Die Karte steht immer auf der Seite; die Umschaltung „Pfade / Karte“ entfällt. Daneben die acht Bereiche, darunter
+  „Jetzt lernbar“.
+- Karte neu gezeichnet: keine Farbstreifen mehr. Felder sind Kacheln mit Kante und Abstand; gesperrte sind ruhig und
+  grau mit einem Hauch Bereichsfarbe, lernbare haben einen farbigen Rand, gelernte sind gefüllt. Dünne, neutrale
+  Verbindungen zwischen den Kacheln zeigen die Reihenfolge. Die Stufe steht als kleine Punkte am Fuß der Kachel.
+- Namen werden nicht mehr abgeschnitten: Lange Wörter tragen in `messages/de.json` weiche Trennstellen (`\u00ad`),
+  die Karte bricht dort in bis zu drei Zeilen um.
+- Das Detailblatt zeigt die Voraussetzung (antippbar, mit Haken wenn gelernt) und was der Skill freimacht.

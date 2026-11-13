@@ -22,17 +22,30 @@ select tests.fund(:f, 5000000, 'test:m3e:f');
 select tests.give_points(:a, 20);
 select tests.login_as('authenticated', :a);
 select tests.throws_key($$select public.learn_skill(gen_random_uuid(), 'it_networks')$$, 'skill_locked',
-  'learn_skill(): not an entry field and no learned neighbour');
+  'learn_skill(): a skill whose prerequisite is not learned is locked');
+select tests.throws_key($$select public.learn_skill(gen_random_uuid(), 'it_programming')$$, 'skill_locked',
+  'learn_skill(): programming needs the IT basics (ADR-115)');
+select public.learn_skill(gen_random_uuid(), 'it_basics') is not null as ok \gset
 select public.learn_skill(gen_random_uuid(), 'it_programming') -> 'learned' as l1 \gset
+select tests.throws_key($$select public.learn_skill(gen_random_uuid(), 'it_ml')$$, 'skill_locked',
+  'learn_skill(): a learned neighbour that is not the prerequisite opens nothing (it_ml needs it_data)');
 select public.learn_skill(gen_random_uuid(), 'it_networks') ->> 'learned_key' as l2 \gset
 select tests.throws_key($$select public.learn_skill(gen_random_uuid(), 'it_mobile')$$, 'skill_locked',
-  'learn_skill(): two fields away is still locked');
+  'learn_skill(): two steps ahead is still locked');
+select tests.throws_key($$select public.learn_skill(gen_random_uuid(), 'hybrid_fintech')$$, 'skill_locked',
+  'learn_skill(): a hybrid needs its prerequisites from both areas');
 reset role;
 select tests.assert(
-  jsonb_array_length(:'l1'::jsonb) = 1 and :'l2' = 'it_networks'
-  and (select count(*) = 168 and bool_and(n ? 'q' and n ? 'r' and n ? 'entry')
-         from jsonb_array_elements(public.config_jsonb('skills', '{tree}')) n),
-  'hex map: entry fields are open (it_programming without it_basics), a learned neighbour opens a field (it_networks)');
+  jsonb_array_length(:'l1'::jsonb) = 2 and :'l2' = 'it_networks'
+  and (select count(*) = 168 and bool_and(n ? 'q' and n ? 'r' and n ? 'requires')
+              and count(*) filter (where jsonb_array_length(n -> 'requires') = 0) = 8
+         from jsonb_array_elements(public.config_jsonb('skills', '{tree}')) n)
+  and public.skill_reachable(:a, 'it_architecture') and not public.skill_reachable(:a, 'it_databases')
+  and public.skill_reachable(:a, 'finance_basics') and not public.skill_reachable(:a, 'finance_accounting'),
+  'skill map: only the 8 basics are open, every other skill needs its prerequisites (it_basics -> it_programming -> it_networks)');
+select tests.assert(
+  (select public.skill_node('it_programming') ? 'requires'),
+  'the tree in game_config carries the prerequisites');
 
 -- =============================================================================
 -- D. AI employers offer their maximum (ADR-064)

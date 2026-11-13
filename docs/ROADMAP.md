@@ -473,6 +473,8 @@ der KI-Firmen). M3 ist empfohlen, weil sonst das Geld für die Gründung langsam
 - [x] Ruhige Startseite: Szene mit Finn, eine nächste Aufgabe, Tresor, drei Kacheln (ADR-109)
 - [x] Währung als Anzeige-Einstellung: Euro (Standard), Dollar oder NX (ADR-113, ersetzt ADR-110)
 - [x] Freundescode im Profil: eigener Code zum Teilen, einmalig 5.000 € für den eingetragenen Code (ADR-111)
+- [x] Registrierung ohne Einladungscode (ADR-114)
+- [x] Skills der Reihe nach mit Voraussetzungen, Karte immer sichtbar und neu gezeichnet (ADR-115)
 
 ### Daten/Backend
 

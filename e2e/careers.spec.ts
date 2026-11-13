@@ -90,12 +90,23 @@ test("learn a skill on the map, apply to an AI company, sign, work and quit", as
   // Skill tree: 5 free points from the level-ups.
   await page.goto("/career/skills");
   await expect(page.getByTestId("free-points")).toHaveText("5");
-  await page.locator('[data-skill="it_basics"]').click();
+  // Skills come in order (ADR-115): programming is locked until the IT basics are learned.
+  await expect(page.getByTestId("skill-map")).toBeVisible();
+  await expect(page.locator('[data-skill="it_programming"]')).toHaveAttribute("data-state", "locked");
+  await page.locator('[data-skill="it_programming"]').click();
+  const sheet = page.getByRole("dialog", { name: "Programmierung" });
+  await expect(sheet.getByTestId("skill-locked")).toContainText("Erst IT-Grundlagen lernen.");
+  await expect(sheet.getByRole("button", { name: "Für immer lernen" })).toHaveCount(0);
+  // The prerequisite is one tap away.
+  await sheet.locator('[data-requires="it_basics"]').click();
+  await expect(page.getByRole("dialog", { name: "IT-Grundlagen" })).toBeVisible();
   await hold(page, "Für immer lernen");
   await expect(page.getByText("Neuer Skill: IT-Grundlagen")).toBeVisible();
   await expect(page.getByTestId("free-points")).toHaveText("4");
   await expect(page.locator('[data-skill="it_basics"]')).toHaveAttribute("data-state", "learned");
   await expect(page.locator('[data-skill="it_programming"]')).toHaveAttribute("data-state", "ok");
+  await expect(page.locator('[data-skill="it_data"]')).toHaveAttribute("data-state", "locked");
+  await expect(page.getByTestId("next-skills").locator("[data-next-skill]")).toHaveCount(6);
 
   // Job portal: the IT internship at KlarSoft.
   await page.goto("/career/jobs");

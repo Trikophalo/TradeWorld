@@ -664,7 +664,7 @@
     "daily_reward_claimed": "Die heutige Belohnung hast du schon abgeholt.",
     "skill_unknown": "Diesen Skill gibt es nicht.",
     "skill_learned": "Diesen Skill kannst du schon.",
-    "skill_locked": "Lerne zuerst die Skills davor.",
+    "skill_locked": "Lerne zuerst die Voraussetzung. Skills gehen der Reihe nach.",
     "skill_points_insufficient": "Dafür hast du nicht genug Skillpunkte.",
     "job_not_found": "Diese Stelle gibt es nicht mehr.",
     "job_level_too_low": "Für diese Stelle ist dein Level noch zu niedrig.",
@@ -861,7 +861,7 @@
         "desc": "Rechner, Netze und die erste Zeile Code."
       },
       "it_programming": {
-        "name": "Programmierung",
+        "name": "Program\u00admierung",
         "desc": "Software schreiben, die läuft."
       },
       "it_networks": {
@@ -869,11 +869,11 @@
         "desc": "Server und Verbindungen am Laufen halten."
       },
       "it_data": {
-        "name": "Datenanalyse",
+        "name": "Daten\u00adanalyse",
         "desc": "Aus Zahlen Erkenntnisse ziehen."
       },
       "it_architecture": {
-        "name": "Softwarearchitektur",
+        "name": "Software\u00adarchi\u00adtektur",
         "desc": "Große Systeme sauber planen."
       },
       "it_security": {
@@ -901,7 +901,7 @@
         "desc": "Einnahmen, Ausgaben, Zinsen."
       },
       "finance_accounting": {
-        "name": "Buchhaltung",
+        "name": "Buch\u00adhaltung",
         "desc": "Jeder Cent an seinem Platz."
       },
       "finance_investment": {
@@ -909,19 +909,19 @@
         "desc": "Geld anlegen mit Plan."
       },
       "finance_controlling": {
-        "name": "Controlling",
+        "name": "Control\u00adling",
         "desc": "Kosten im Griff, Ziele im Blick."
       },
       "finance_balance": {
-        "name": "Bilanzierung",
+        "name": "Bilan\u00adzierung",
         "desc": "Abschlüsse, die jede Prüfung bestehen."
       },
       "finance_portfolio": {
-        "name": "Portfoliomanagement",
+        "name": "Portfolio\u00admanage\u00adment",
         "desc": "Risiko streuen, Rendite steigern."
       },
       "finance_valuation": {
-        "name": "Unternehmensbewertung",
+        "name": "Unter\u00adnehmens\u00adbewertung",
         "desc": "Was ist eine Firma wirklich wert?"
       },
       "finance_corporate": {
@@ -929,11 +929,11 @@
         "desc": "Kapital beschaffen, Wachstum finanzieren."
       },
       "finance_risk": {
-        "name": "Risikomanagement",
+        "name": "Risiko\u00admanage\u00adment",
         "desc": "Krisen kommen, du bist vorbereitet."
       },
       "finance_mastery": {
-        "name": "Finanzvirtuos:in",
+        "name": "Finanz\u00advirtuos:in",
         "desc": "Geld arbeitet für dich, nicht umgekehrt."
       },
       "law_basics": {
@@ -941,19 +941,19 @@
         "desc": "Wie Gesetze und Gerichte funktionieren."
       },
       "law_contracts": {
-        "name": "Vertragsrecht",
+        "name": "Vertrags\u00adrecht",
         "desc": "Verträge lesen, schreiben, verhandeln."
       },
       "law_labor": {
-        "name": "Arbeitsrecht",
+        "name": "Arbeits\u00adrecht",
         "desc": "Einstellen, kündigen, fair bleiben."
       },
       "law_tax": {
-        "name": "Steuerrecht",
+        "name": "Steuer\u00adrecht",
         "desc": "Abgaben verstehen und richtig planen."
       },
       "law_corporate": {
-        "name": "Gesellschaftsrecht",
+        "name": "Gesell\u00adschafts\u00adrecht",
         "desc": "GmbH, AG und alles dazwischen."
       },
       "law_compliance": {
@@ -961,15 +961,15 @@
         "desc": "Regeln einhalten, bevor es teuer wird."
       },
       "law_intltax": {
-        "name": "Internationales Steuerrecht",
+        "name": "Inter\u00adnationales Steuer\u00adrecht",
         "desc": "Steuern über Grenzen hinweg."
       },
       "law_capital": {
-        "name": "Kapitalmarktrecht",
+        "name": "Kapital\u00admarkt\u00adrecht",
         "desc": "Börsengänge und Prospekte rechtssicher."
       },
       "law_crime": {
-        "name": "Wirtschaftsstrafrecht",
+        "name": "Wirtschafts\u00adstraf\u00adrecht",
         "desc": "Wo die Grauzone endet."
       },
       "law_mastery": {
@@ -977,7 +977,7 @@
         "desc": "Kein Fall ist zu groß."
       },
       "craft_basics": {
-        "name": "Handwerkliche Grundlagen",
+        "name": "Handwerks-Grundlagen",
         "desc": "Werkzeug, Material, Sicherheit."
       },
       "craft_mechanics": {
@@ -985,7 +985,7 @@
         "desc": "Was sich bewegt, verstehst du."
       },
       "craft_electrical": {
-        "name": "Elektrotechnik",
+        "name": "Elektro\u00adtechnik",
         "desc": "Strom, Schaltungen, Anlagen."
       },
       "craft_construction": {
@@ -993,11 +993,11 @@
         "desc": "Fundamente, Wände, Dächer."
       },
       "craft_engineering": {
-        "name": "Maschinenbau",
+        "name": "Maschinen\u00adbau",
         "desc": "Maschinen entwerfen und verbessern."
       },
       "craft_automation": {
-        "name": "Automatisierung",
+        "name": "Automati\u00adsierung",
         "desc": "Anlagen, die von selbst laufen."
       },
       "craft_site": {
@@ -1005,11 +1005,11 @@
         "desc": "Baustellen pünktlich und im Budget."
       },
       "craft_manufacturing": {
-        "name": "Fertigungstechnik",
+        "name": "Fertigungs\u00adtechnik",
         "desc": "Produktion schneller und günstiger."
       },
       "craft_energy": {
-        "name": "Energietechnik",
+        "name": "Energie\u00adtechnik",
         "desc": "Kraftwerke, Netze, Speicher."
       },
       "craft_mastery": {
@@ -1029,15 +1029,15 @@
         "desc": "Aufmerksamkeit gewinnen."
       },
       "sales_service": {
-        "name": "Kundenservice",
+        "name": "Kunden\u00adservice",
         "desc": "Aus Kunden werden Stammkunden."
       },
       "sales_negotiation": {
-        "name": "Verhandlung",
+        "name": "Verhand\u00adlung",
         "desc": "Der bessere Preis auf beiden Seiten."
       },
       "sales_brand": {
-        "name": "Markenführung",
+        "name": "Marken\u00adführung",
         "desc": "Eine Marke, die man wiedererkennt."
       },
       "sales_keyaccount": {
@@ -1045,7 +1045,7 @@
         "desc": "Die großen Kunden betreuen."
       },
       "sales_international": {
-        "name": "Internationaler Vertrieb",
+        "name": "Inter\u00adnationaler Vertrieb",
         "desc": "Neue Märkte erobern."
       },
       "sales_growth": {
@@ -1053,7 +1053,7 @@
         "desc": "Wachstum mit kleinem Budget."
       },
       "sales_mastery": {
-        "name": "Verkaufslegende",
+        "name": "Verkaufs\u00adlegende",
         "desc": "Du verkaufst Sand in der Wüste."
       },
       "management_basics": {
@@ -1061,11 +1061,11 @@
         "desc": "Ziele setzen, Aufgaben verteilen."
       },
       "management_team": {
-        "name": "Teamführung",
+        "name": "Team\u00adführung",
         "desc": "Menschen motivieren."
       },
       "management_projects": {
-        "name": "Projektmanagement",
+        "name": "Projekt\u00admanage\u00adment",
         "desc": "Termine halten, Budgets einhalten."
       },
       "management_people": {
@@ -1089,7 +1089,7 @@
         "desc": "Wohin die Firma in fünf Jahren will."
       },
       "management_organization": {
-        "name": "Organisationsentwicklung",
+        "name": "Organi\u00adsations\u00adentwick\u00adlung",
         "desc": "Strukturen, die mitwachsen."
       },
       "management_mastery": {
@@ -1097,7 +1097,7 @@
         "desc": "Andere folgen dir, weil sie wollen."
       },
       "science_basics": {
-        "name": "Naturwissenschaftliche Grundlagen",
+        "name": "Wissen\u00adschafts-Grundlagen",
         "desc": "Experimente, Daten, Methoden."
       },
       "science_chemistry": {
@@ -1113,11 +1113,11 @@
         "desc": "Diagnosen und Behandlungen."
       },
       "science_pharmacology": {
-        "name": "Pharmakologie",
+        "name": "Pharma\u00adkologie",
         "desc": "Wie Wirkstoffe im Körper wirken."
       },
       "science_biotech": {
-        "name": "Biotechnologie",
+        "name": "Bio\u00adtechno\u00adlogie",
         "desc": "Lebende Systeme als Fabrik."
       },
       "science_clinical": {
@@ -1125,7 +1125,7 @@
         "desc": "Studien planen und auswerten."
       },
       "science_drugs": {
-        "name": "Wirkstoffentwicklung",
+        "name": "Wirkstoff\u00adentwick\u00adlung",
         "desc": "Vom Molekül zum Medikament."
       },
       "science_genetics": {
@@ -1133,7 +1133,7 @@
         "desc": "Erbgut lesen und verändern."
       },
       "science_mastery": {
-        "name": "Forschungsgenie",
+        "name": "Forschungs\u00adgenie",
         "desc": "Durchbrüche sind dein Alltag."
       },
       "logistics_basics": {
@@ -1141,7 +1141,7 @@
         "desc": "Waren, Wege, Zeiten."
       },
       "logistics_warehouse": {
-        "name": "Lagerwirtschaft",
+        "name": "Lager\u00adwirtschaft",
         "desc": "Alles da, wenn es gebraucht wird."
       },
       "logistics_transport": {
@@ -1157,11 +1157,11 @@
         "desc": "Lieferketten, die nicht reißen."
       },
       "logistics_fleet": {
-        "name": "Flottenmanagement",
+        "name": "Flotten\u00admanage\u00adment",
         "desc": "Fahrzeuge optimal einsetzen."
       },
       "logistics_strategic": {
-        "name": "Strategischer Einkauf",
+        "name": "Strate\u00adgischer Einkauf",
         "desc": "Lieferanten als Partner."
       },
       "logistics_global": {
@@ -1169,7 +1169,7 @@
         "desc": "Weltweit pünktlich."
       },
       "logistics_quality": {
-        "name": "Qualitätsmanagement",
+        "name": "Qualitäts\u00admanage\u00adment",
         "desc": "Fehler finden, bevor Kunden es tun."
       },
       "logistics_mastery": {
@@ -1181,7 +1181,7 @@
         "desc": "Software für Geld: Zahlungen, Trading, Banking."
       },
       "hybrid_business_law": {
-        "name": "Wirtschaftsrecht",
+        "name": "Wirtschafts\u00adrecht",
         "desc": "Recht und Zahlen in einer Person."
       },
       "hybrid_industry40": {
@@ -1189,7 +1189,7 @@
         "desc": "Vernetzte Fabriken, die mitdenken."
       },
       "hybrid_pharma_sales": {
-        "name": "Pharmavertrieb",
+        "name": "Pharma\u00advertrieb",
         "desc": "Medikamente erklären und verkaufen."
       },
       "hybrid_ecommerce": {
@@ -1201,7 +1201,7 @@
         "desc": "Mit Daten bessere Teams bauen."
       },
       "it_web": {
-        "name": "Webentwicklung",
+        "name": "Web\u00adentwicklung",
         "desc": "Websites und Web-Apps, die jeder bedienen kann."
       },
       "it_mobile": {
@@ -1209,7 +1209,7 @@
         "desc": "Apps für Handy und Tablet."
       },
       "it_databases": {
-        "name": "Datenbanken",
+        "name": "Daten\u00adbanken",
         "desc": "Daten sicher speichern und schnell finden."
       },
       "it_devops": {
@@ -1217,7 +1217,7 @@
         "desc": "Software automatisch testen und ausliefern."
       },
       "it_testing": {
-        "name": "Softwaretests",
+        "name": "Software\u00adtests",
         "desc": "Fehler finden, bevor Kunden sie finden."
       },
       "it_ux": {
@@ -1229,11 +1229,11 @@
         "desc": "Software in Geräten und Maschinen."
       },
       "it_crypto": {
-        "name": "Kryptografie",
+        "name": "Krypto\u00adgrafie",
         "desc": "Verschlüsselung, die hält."
       },
       "it_pentest": {
-        "name": "Penetrationstests",
+        "name": "Pene\u00adtrations\u00adtests",
         "desc": "Systeme angreifen, um sie zu schützen."
       },
       "it_bigdata": {
@@ -1245,11 +1245,11 @@
         "desc": "Konten, Kredite und Zahlungsverkehr."
       },
       "finance_tax_planning": {
-        "name": "Steuerplanung",
+        "name": "Steuer\u00adplanung",
         "desc": "Legal Steuern sparen."
       },
       "finance_budgeting": {
-        "name": "Budgetplanung",
+        "name": "Budget\u00adplanung",
         "desc": "Geld planen, bevor es weg ist."
       },
       "finance_treasury": {
@@ -1269,35 +1269,35 @@
         "desc": "Firmen kaufen und zusammenführen."
       },
       "finance_vc": {
-        "name": "Wagniskapital",
+        "name": "Wagnis\u00adkapital",
         "desc": "In junge Firmen investieren."
       },
       "finance_audit": {
-        "name": "Wirtschaftsprüfung",
+        "name": "Wirtschafts\u00adprüfung",
         "desc": "Zahlen anderer kritisch prüfen."
       },
       "finance_insurance": {
-        "name": "Versicherungen",
+        "name": "Versiche\u00adrungen",
         "desc": "Risiken gegen Geld abgeben."
       },
       "finance_quant": {
-        "name": "Quantitative Analyse",
+        "name": "Quanti\u00adtative Analyse",
         "desc": "Märkte mit Mathematik verstehen."
       },
       "law_ip": {
-        "name": "Patentrecht",
+        "name": "Patent\u00adrecht",
         "desc": "Erfindungen und Marken schützen."
       },
       "law_privacy": {
-        "name": "Datenschutz",
+        "name": "Daten\u00adschutz",
         "desc": "Mit Kundendaten richtig umgehen."
       },
       "law_competition": {
-        "name": "Wettbewerbsrecht",
+        "name": "Wett\u00adbewerbs\u00adrecht",
         "desc": "Fair im Wettbewerb bleiben."
       },
       "law_consumer": {
-        "name": "Verbraucherrecht",
+        "name": "Verbraucher\u00adrecht",
         "desc": "Was Kunden zusteht."
       },
       "law_it": {
@@ -1305,19 +1305,19 @@
         "desc": "Lizenzen, Software und Internet."
       },
       "law_environment": {
-        "name": "Umweltrecht",
+        "name": "Umwelt\u00adrecht",
         "desc": "Auflagen für Natur und Klima."
       },
       "law_medical": {
-        "name": "Medizinrecht",
+        "name": "Medizin\u00adrecht",
         "desc": "Zulassungen und Haftung in der Medizin."
       },
       "law_international": {
-        "name": "Internationales Recht",
+        "name": "Inter\u00adnationales Recht",
         "desc": "Verträge über Grenzen hinweg."
       },
       "law_litigation": {
-        "name": "Prozessführung",
+        "name": "Prozess\u00adführung",
         "desc": "Vor Gericht bestehen."
       },
       "law_mediation": {
@@ -1329,11 +1329,11 @@
         "desc": "Menschen begeistern und führen."
       },
       "management_communication": {
-        "name": "Kommunikation",
+        "name": "Kommuni\u00adkation",
         "desc": "Klar sagen, was Sache ist."
       },
       "management_finance_lead": {
-        "name": "Finanzführung",
+        "name": "Finanz\u00adführung",
         "desc": "Budgets verantworten."
       },
       "management_operations": {
@@ -1341,7 +1341,7 @@
         "desc": "Abläufe, die funktionieren."
       },
       "management_innovation": {
-        "name": "Innovationsmanagement",
+        "name": "Inno\u00advations\u00admanage\u00adment",
         "desc": "Neue Ideen ins Ziel bringen."
       },
       "management_coaching": {
@@ -1349,19 +1349,19 @@
         "desc": "Andere besser machen."
       },
       "management_risk": {
-        "name": "Krisenmanagement",
+        "name": "Krisen\u00admanage\u00adment",
         "desc": "Ruhig bleiben, wenn es brennt."
       },
       "management_international": {
-        "name": "Internationale Führung",
+        "name": "Inter\u00adnationale Führung",
         "desc": "Teams in vielen Ländern."
       },
       "management_board": {
-        "name": "Aufsichtsrat",
+        "name": "Aufsichts\u00adrat",
         "desc": "Firmen kontrollieren und beraten."
       },
       "management_culture": {
-        "name": "Unternehmenskultur",
+        "name": "Unter\u00adnehmens\u00adkultur",
         "desc": "Wie eine Firma tickt."
       },
       "sales_social": {
@@ -1373,19 +1373,19 @@
         "desc": "Inhalte, die verkaufen."
       },
       "sales_seo": {
-        "name": "Suchmaschinenoptimierung",
+        "name": "Such\u00admaschinen\u00adoptimie\u00adrung",
         "desc": "Bei Google oben stehen."
       },
       "sales_ads": {
-        "name": "Werbekampagnen",
+        "name": "Werbe\u00adkampagnen",
         "desc": "Anzeigen, die wirken."
       },
       "sales_pricing": {
-        "name": "Preisgestaltung",
+        "name": "Preis\u00adgestaltung",
         "desc": "Der richtige Preis zur richtigen Zeit."
       },
       "sales_retail": {
-        "name": "Einzelhandel",
+        "name": "Einzel\u00adhandel",
         "desc": "Verkaufen im Laden."
       },
       "sales_b2b": {
@@ -1393,11 +1393,11 @@
         "desc": "Verkaufen an Firmen."
       },
       "sales_crm": {
-        "name": "Kundenbeziehungen",
+        "name": "Kunden\u00adbezie\u00adhungen",
         "desc": "Kunden kennen und halten."
       },
       "sales_pr": {
-        "name": "Pressearbeit",
+        "name": "Presse\u00adarbeit",
         "desc": "Gute Schlagzeilen machen."
       },
       "sales_events": {
@@ -1405,11 +1405,11 @@
         "desc": "Kunden live begeistern."
       },
       "logistics_inventory": {
-        "name": "Bestandsführung",
+        "name": "Bestands\u00adführung",
         "desc": "Immer genug, nie zu viel."
       },
       "logistics_distribution": {
-        "name": "Distribution",
+        "name": "Distri\u00adbution",
         "desc": "Waren zum Kunden bringen."
       },
       "logistics_customs": {
@@ -1417,15 +1417,15 @@
         "desc": "Waren über Grenzen bringen."
       },
       "logistics_shipping": {
-        "name": "Seefracht",
+        "name": "See\u00adfracht",
         "desc": "Container um die Welt schicken."
       },
       "logistics_air": {
-        "name": "Luftfracht",
+        "name": "Luft\u00adfracht",
         "desc": "Schnell, aber teuer."
       },
       "logistics_rail": {
-        "name": "Schienenverkehr",
+        "name": "Schienen\u00adverkehr",
         "desc": "Viel Fracht auf Schienen."
       },
       "logistics_lastmile": {
@@ -1437,11 +1437,11 @@
         "desc": "Frisch bis zum Ziel."
       },
       "logistics_planning": {
-        "name": "Tourenplanung",
+        "name": "Touren\u00adplanung",
         "desc": "Die beste Route finden."
       },
       "logistics_automation": {
-        "name": "Lagerautomatisierung",
+        "name": "Lager\u00adautomati\u00adsierung",
         "desc": "Roboter im Lager."
       },
       "logistics_sustainability": {
@@ -1453,7 +1453,7 @@
         "desc": "Metall fest verbinden."
       },
       "craft_plumbing": {
-        "name": "Sanitärtechnik",
+        "name": "Sanitär\u00adtechnik",
         "desc": "Wasser dahin, wo es hin soll."
       },
       "craft_hvac": {
@@ -1473,11 +1473,11 @@
         "desc": "Teile Schicht für Schicht."
       },
       "craft_vehicles": {
-        "name": "Fahrzeugtechnik",
+        "name": "Fahrzeug\u00adtechnik",
         "desc": "Autos und Lkw verstehen."
       },
       "craft_solar": {
-        "name": "Solartechnik",
+        "name": "Solar\u00adtechnik",
         "desc": "Strom von der Sonne."
       },
       "craft_robotics": {
@@ -1485,7 +1485,7 @@
         "desc": "Roboter bauen und warten."
       },
       "craft_materials": {
-        "name": "Werkstoffkunde",
+        "name": "Werkstoff\u00adkunde",
         "desc": "Das richtige Material wählen."
       },
       "science_physics": {
@@ -1493,7 +1493,7 @@
         "desc": "Wie die Welt funktioniert."
       },
       "science_lab": {
-        "name": "Laborpraxis",
+        "name": "Labor\u00adpraxis",
         "desc": "Sauber messen und experimentieren."
       },
       "science_statistics": {
@@ -1501,27 +1501,27 @@
         "desc": "Zufall von Wirkung trennen."
       },
       "science_microbiology": {
-        "name": "Mikrobiologie",
+        "name": "Mikro\u00adbiologie",
         "desc": "Bakterien, Viren und Pilze."
       },
       "science_nutrition": {
-        "name": "Ernährungswissenschaft",
+        "name": "Ernährungs\u00adwissen\u00adschaft",
         "desc": "Was der Körper braucht."
       },
       "science_materials": {
-        "name": "Materialforschung",
+        "name": "Material\u00adforschung",
         "desc": "Neue Stoffe entdecken."
       },
       "science_environment": {
-        "name": "Umweltwissenschaft",
+        "name": "Umwelt\u00adwissen\u00adschaft",
         "desc": "Klima und Ökosysteme."
       },
       "science_neuro": {
-        "name": "Neurowissenschaft",
+        "name": "Neuro\u00adwissen\u00adschaft",
         "desc": "Wie das Gehirn arbeitet."
       },
       "science_devices": {
-        "name": "Medizintechnik",
+        "name": "Medizin\u00adtechnik",
         "desc": "Geräte, die heilen helfen."
       },
       "science_vaccines": {
@@ -1721,7 +1721,7 @@
   },
   "skillTree": {
     "title": "Skills",
-    "intro": "Jeder Skill macht dich in einem Bereich besser: mehr Lohn, bessere Jobs, mehr Leistung in deiner Firma. Oben siehst du, was du jetzt lernen kannst. Gelernte Skills bleiben für immer.",
+    "intro": "Jeder Skill macht dich in einem Bereich besser: mehr Lohn, bessere Jobs, mehr Leistung in deiner Firma. Du lernst der Reihe nach: erst die Grundlagen, dann Schritt für Schritt weiter nach außen.",
     "freePoints": "Freie Punkte",
     "freePointsHint": "Für jeden Bereich. Kommen aus Level-ups, Missionen und der täglichen Belohnung.",
     "branchPoints": "Punkte aus Arbeit",
@@ -1749,7 +1749,7 @@
     "notEnough": "Dir fehlen {count, plural, one {# Punkt} other {# Punkte}}",
     "overview": "Übersicht",
     "progressHint": "{done} von {total} Skills",
-    "lockedMap": "Lerne zuerst ein Feld direkt daneben. Nur die Felder nahe der Mitte sind von Anfang an offen.",
+    "lockedMap": "Skills lernst du der Reihe nach. Die Linien auf der Karte zeigen den Weg.",
     "start": "START",
     "zoomIn": "Hineinzoomen",
     "zoomOut": "Herauszoomen",
@@ -1758,24 +1758,21 @@
     "legendOpen": "Lernbar",
     "legendLocked": "Noch gesperrt",
     "mapHint": "Ziehen zum Verschieben, Mausrad zum Zoomen",
-    "branchHint": "Fahre über einen Bereich, um ihn hervorzuheben; klicke, um dorthin zu springen.",
+    "branchHint": "Tippe einen Bereich an, um auf der Karte dorthin zu springen.",
     "hoverOpen": "Lernbar für {cost}",
-    "hoverLocked": "Gesperrt – lerne zuerst ein Feld daneben",
+    "hoverLocked": "Gesperrt: erst {names} lernen",
     "hoverClick": "Klicken für Details",
-    "view": {
-      "label": "Ansicht",
-      "paths": "Pfade",
-      "map": "Karte"
-    },
     "next": {
       "title": "Jetzt lernbar",
       "count": "{count, plural, =0 {gerade nichts} one {# Skill offen} other {# Skills offen}}",
-      "hint": "Skills neben dem, was du schon kannst. Was zu deinem Job passt, steht vorn.",
+      "hint": "Skills, deren Voraussetzung du schon kannst. Was zu deinem Job passt, steht vorn.",
       "forJob": "Für deinen Job",
       "empty": "Gerade ist nichts offen. Sammle Punkte: Level-ups, Arbeit, Missionen und die tägliche Belohnung."
     },
-    "or": " oder ",
-    "moreTiers": "Stufe {from} bis {to} zeigen"
+    "and": " und ",
+    "requires": "Voraussetzung",
+    "unlocks": "Macht den Weg frei für",
+    "legendPath": "Reihenfolge"
   },
   "dailyReward": {
     "title": "Tägliche Belohnung",
