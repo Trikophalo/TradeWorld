@@ -11,6 +11,7 @@ import { ALL_PIXEL_ART, BEAR, BULL, COIN, MIRA } from "@/components/pixel/art";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { DelegatedTaskOverlay } from "@/features/company/components/delegated-task-overlay";
 import { AVATAR_ART } from "@/components/pixel/avatars";
+import { NEWS_STUDIO_ART } from "@/components/pixel/news-art";
 import { Mascot } from "@/components/pixel/mascot";
 import { Avatar } from "@/components/ui/avatar";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
@@ -45,6 +46,7 @@ import { SpeechBubble } from "@/features/tutorial/components/speech-bubble";
 import { useTutorial } from "@/features/tutorial/store";
 import { resetDemoPlayer } from "@/features/game/demo-engine";
 import { FriendCodeCard } from "@/features/friends/components/friend-code";
+import { NewsStudioDemo } from "@/features/news/show/studio-demo";
 import { StockNewsCard } from "@/features/news/stock-news";
 import { LevelCard } from "@/features/progression/components/level-card";
 import { PatchNotesButton, PatchNotesList } from "@/features/patch-notes/components/patch-notes";
@@ -831,6 +833,24 @@ export function Showcase() {
             }
           />
         </Card>
+      </Section>
+
+      <Section id="news-studio" title="NEXA Nachrichten: Studio" className="space-y-4">
+        <NewsStudioDemo />
+        <Demo label="Mr. Doodle Dangle und sein Studio (große Sprites)" className="items-end gap-4">
+          {Object.entries(NEWS_STUDIO_ART)
+            .filter(([name]) => /^(anchor|hands|mug|topic-screen|title|desk-sign)/.test(name))
+            .map(([name, art]) => (
+              <figure key={name} className="flex flex-col items-center gap-2">
+                <span className="rounded-md bg-surface-2 p-2">
+                  <PixelIcon {...art} scale={2} title={name} />
+                </span>
+                <figcaption>
+                  <code className="text-xs text-fg-3">{name}</code>
+                </figcaption>
+              </figure>
+            ))}
+        </Demo>
       </Section>
 
       <Section id="career" title={t("career")} className="grid gap-4 lg:grid-cols-2">

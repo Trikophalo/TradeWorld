@@ -73,7 +73,8 @@ export function NewsShow() {
     queryKey: NEWS_SHOW_KEY,
     queryFn: () => engine.newsShow(),
     // Poll fast around and during a show, slowly otherwise.
-    refetchInterval: (q) => (showIsNear(q.state.data, q.state.dataUpdatedAt, Date.now()) ? 2_500 : 12_000),
+    // (judged at the time of the last answer: no clock is read while rendering)
+    refetchInterval: (q) => (showIsNear(q.state.data, q.state.dataUpdatedAt, q.state.dataUpdatedAt) ? 2_500 : 12_000),
   });
   const data = query.data;
   // The server's clock minus ours, so every viewer is at the same point of the show.

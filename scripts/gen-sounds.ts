@@ -717,6 +717,160 @@ function win(): Float64Array {
   return master(m.buf, { room: { mix: 0.18, size: 0.9 } });
 }
 
+// --- NEXA Nachrichten (the hourly news show) --------------------------------
+
+/** A soft kettle drum: a sine that drops a fourth, a triangle body and a breath of low noise. */
+function timpani(mix: Mix, at: number, note: string, gain: number): void {
+  const f = hz(note);
+  const env = { a: 0.003, d: 0.22, s: 0, r: 0.2 };
+  mix.tone({ at, note: f * 1.35, to: f, glide: 0.05, gate: 0.05, gain: 0.7 * gain, env });
+  mix.tone({ at, note: f, gate: 0.05, wave: "triangle", gain: 0.3 * gain, env });
+  noise(mix, at, 0.03, { type: "lp", cutoff: 500 }, 0.25 * gain, { a: 0.002, d: 0.05, r: 0.03 });
+}
+
+/**
+ * News jingle (~1.9 s): a teletype ticking on one note, three urgent pick-up notes, a fanfare up the chord
+ * (C5 E5 G5) and a held C6+E6 over a kettle drum. Punchy, but the same warm chip voice as the rest.
+ */
+function newsIntro(): Float64Array {
+  const m = new Mix(2.4, 41);
+  const staccato = { d: 0.05, s: 0.3, r: 0.04 };
+  // Teletype: quiet sixteenths that run under the whole opening.
+  for (let i = 0; i < 12; i++) {
+    m.tone({
+      at: i * 0.0725,
+      note: "G6",
+      gate: 0.012,
+      wave: "pulse",
+      duty: 0.125,
+      gain: i % 4 === 0 ? 0.1 : 0.06,
+      env: { a: 0.002, d: 0.03, s: 0, r: 0.02 },
+      filter: { type: "lp", cutoff: 5000 },
+    });
+  }
+  timpani(m, 0, "C3", 0.9);
+  chip(m, 0, "G4", 0.05, { env: staccato, gain: 0.8, sub: 0.2 });
+  chip(m, 0.145, "G4", 0.05, { env: staccato, gain: 0.7, sub: 0.2 });
+  chip(m, 0.29, "G4", 0.05, { env: staccato, gain: 0.8, sub: 0.2 });
+  timpani(m, 0.435, "G2", 0.7);
+  chip(m, 0.435, "C5", 0.09, { env: { d: 0.1, s: 0.4, r: 0.06 }, gain: 0.9, sub: 0.2 });
+  chip(m, 0.58, "E5", 0.07, { env: staccato, gain: 0.85 });
+  chip(m, 0.725, "G5", 0.07, { env: staccato, gain: 0.9 });
+
+  const at = 0.87;
+  const hold = 0.5;
+  const ring = { d: 0.35, s: 0.55, r: 0.4 };
+  const vibrato = { rate: 5.5, cents: 12, delay: 0.18 };
+  timpani(m, at, "C3", 1);
+  chip(m, at, "C6", hold, { env: ring, sparkle: 0.2, vibrato, gain: 0.9 });
+  chip(m, at, "E6", hold, { env: ring, vibrato, gain: 0.5, bright: 0.7 });
+  chip(m, at, "G5", hold, { env: ring, vibrato, gain: 0.5, bright: 0.8 });
+  m.tone({ at, note: "C4", gate: hold, wave: "triangle", gain: 0.28, env: ring });
+  m.tone({ at, note: "C3", gate: hold, wave: "triangle", gain: 0.22, env: ring });
+  noise(m, at, 0.5, { type: "hp", cutoff: 7000 }, 0.03, { a: 0.02, d: 0.5, r: 0.15 });
+  // Two last ticks of the teletype as the chord fades.
+  bell(m, at + 0.36, "G6", { gain: 0.16, decay: 0.12, index: 0.8 });
+  bell(m, at + 0.48, "C7", { gain: 0.14, decay: 0.16, index: 0.8 });
+  return master(m.buf, { room: { mix: 0.16, size: 0.9 }, maxSeconds: 2 });
+}
+
+/**
+ * One syllable of the anchor: a low, mumbly "mwuh". A pulse far below the mascot's blip, pushed through a vowel
+ * formant so that small phone speakers still carry it, with a little scoop in the pitch like an old man talking.
+ */
+function anchorTalk(note: string, to: string, formant: number, duty: number, seed: number): () => Float64Array {
+  return () => {
+    const m = new Mix(0.14, seed);
+    const env = { a: 0.008, d: 0.05, s: 0.35, r: 0.03 };
+    const voice = { at: 0, note, to, glide: 0.06, gate: 0.045, env };
+    m.tone({
+      ...voice,
+      wave: "pulse",
+      duty,
+      gain: 0.6,
+      filter: { type: "bp", cutoff: formant * 1.25, to: formant * 0.85, sweep: 0.06, q: 1.6 },
+    });
+    // The second formant keeps the voice from sounding like a hum.
+    m.tone({ ...voice, wave: "pulse", duty, gain: 0.22, filter: { type: "bp", cutoff: formant * 2.6, q: 2.2 } });
+    m.tone({ ...voice, wave: "triangle", gain: 0.35 });
+    noise(m, 0, 0.012, { type: "bp", cutoff: 1400, q: 0.8 }, 0.05, { a: 0.003, r: 0.01 });
+    return master(m.buf, { lowpass: 3200, maxSeconds: 0.09 });
+  };
+}
+
+/** New story: a quick swoosh into a two-step stab (C5+G5, then C5+G5+C6) over a kettle drum. */
+function newsSting(): Float64Array {
+  const m = new Mix(0.9, 46);
+  noise(m, 0, 0.13, { type: "bp", cutoff: 900, to: 5200, sweep: 0.13, q: 1.3 }, 0.1, {
+    a: 0.05,
+    d: 0.2,
+    s: 0.5,
+    r: 0.04,
+  });
+  const short = { d: 0.06, s: 0.3, r: 0.05 };
+  chip(m, 0.12, "C5", 0.04, { env: short, gain: 0.7 });
+  chip(m, 0.12, "G5", 0.04, { env: short, gain: 0.6, bright: 0.8 });
+  timpani(m, 0.235, "C3", 0.8);
+  const ring = { d: 0.18, s: 0.3, r: 0.18 };
+  chip(m, 0.235, "C5", 0.09, { env: ring, gain: 0.7, sub: 0.2 });
+  chip(m, 0.235, "G5", 0.09, { env: ring, gain: 0.6, bright: 0.8 });
+  chip(m, 0.235, "C6", 0.09, { env: ring, gain: 0.8, sparkle: 0.18 });
+  return master(m.buf, { room: { mix: 0.14, size: 0.8 }, maxSeconds: 0.6 });
+}
+
+/** Bad news for somebody: a short "womp-womp", two soft notes that sag (D4, then A3 sinking further). */
+function newsBad(): Float64Array {
+  const m = new Mix(0.9, 47);
+  const womp = (at: number, note: string, drop: number, gate: number, gain: number) => {
+    const to = hz(note) * 2 ** (-drop / 12);
+    const env = { a: 0.012, d: 0.14, s: 0.6, r: 0.1 };
+    const voice = { at, note, to, glide: gate + 0.1, gate, env, vibrato: { rate: 6, cents: 18, delay: 0.05 } };
+    // A muted trombone: a pulse whose filter closes as the note sags, over a soft square for the body.
+    m.tone({
+      ...voice,
+      wave: "pulse",
+      duty: 0.4,
+      gain: 0.4 * gain,
+      filter: { type: "lp", cutoff: 2600, to: 900, sweep: gate + 0.05, q: 1.2 },
+    });
+    m.tone({ ...voice, wave: "soft", drive: 2, gain: 0.35 * gain, filter: { type: "lp", cutoff: 1600 } });
+    m.tone({ ...voice, note: hz(note) / 2, to: to / 2, gain: 0.15 * gain });
+  };
+  womp(0, "D4", 0.5, 0.11, 0.9);
+  womp(0.2, "A3", 2.2, 0.22, 1);
+  return master(m.buf, { room: { mix: 0.1, size: 0.7 }, lowpass: 3600, maxSeconds: 0.62 });
+}
+
+/** Good news for somebody: a tiny cash register, a click and two bright bells (G6 → C7) with a shimmer. */
+function newsGood(): Float64Array {
+  const m = new Mix(0.8, 48);
+  noise(m, 0, 0.008, { type: "bp", cutoff: 2600, q: 1 }, 0.25, { a: 0.002, r: 0.012 });
+  bell(m, 0.02, "G6", { gain: 0.7, decay: 0.16, index: 1.1 });
+  bell(m, 0.085, "C7", { gain: 0.9, decay: 0.3, index: 1.1 });
+  m.tone({ at: 0.085, note: "C6", gate: 0.02, gain: 0.25, env: { a: 0.003, d: 0.2, s: 0, r: 0.15 } });
+  noise(m, 0.08, 0.25, { type: "bp", cutoff: 8000, q: 1.5 }, 0.035, { a: 0.02, d: 0.25, r: 0.1 });
+  return master(m.buf, { room: { mix: 0.16, size: 0.9 }, lowpass: 9500, maxSeconds: 0.6 });
+}
+
+/** Countdown to the show: one studio-clock pip (G5) for each of the last ten seconds. */
+function newsTick(): Float64Array {
+  const m = new Mix(0.3, 49);
+  const env = { a: 0.003, d: 0.07, s: 0.25, r: 0.05 };
+  m.tone({ at: 0, note: "G5", gate: 0.05, gain: 0.7, env });
+  m.tone({
+    at: 0,
+    note: "G5",
+    gate: 0.05,
+    wave: "pulse",
+    duty: 0.5,
+    gain: 0.12,
+    env,
+    filter: { type: "lp", cutoff: 2400 },
+  });
+  m.tone({ at: 0, note: "G4", gate: 0.05, wave: "triangle", gain: 0.2, env });
+  return master(m.buf, { room: { mix: 0.08, size: 0.6 }, lowpass: 6000, maxSeconds: 0.16 });
+}
+
 /** File name → renderer. The names are what src/lib/sound.ts references. */
 const RENDER: Record<string, () => Float64Array> = {
   tap,
@@ -733,6 +887,15 @@ const RENDER: Record<string, () => Float64Array> = {
   "blip-2": blip("G5", "E5", 0.3, 2000, 32),
   "blip-3": blip("D5", "C5", 0.4, 1600, 33),
   win,
+  "news-intro": newsIntro,
+  "anchor-talk-1": anchorTalk("A2", "G2", 620, 0.3, 42),
+  "anchor-talk-2": anchorTalk("C3", "A2", 820, 0.36, 43),
+  "anchor-talk-3": anchorTalk("G2", "A2", 540, 0.26, 44),
+  "anchor-talk-4": anchorTalk("D3", "C3", 720, 0.32, 45),
+  "news-sting": newsSting,
+  "news-bad": newsBad,
+  "news-good": newsGood,
+  "news-tick": newsTick,
 };
 
 // ---------------------------------------------------------------------------
