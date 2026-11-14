@@ -168,6 +168,9 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   Missionsjäger, Teamplayer, Bilanzprofi, Ehrgeiz), ein größerer Tresor (Panzertresor) und vieles für die eigene
   Firma (KI-Turbo, Glückshand, Werbeagentur, Krisenmanager …). Sie schalten sich zwischen Level 1 und 30 frei.
 
+- **Große Benachrichtigung bei Aufgaben (ADR-143):** Wenn dir in deiner Firma eine Aufgabe zugewiesen wird, erscheint
+  jetzt ein großes Pop-up, damit du es nicht mehr übersiehst.
+
 - **Mehr XP für Missionen (ADR-142):** Je höher dein Level, desto mehr XP bringen Missionen (Level 10 etwa das
   2,3-Fache, Level 30 das 5-Fache). Neuer Meilenstein für alle: Arbeite einmal bei der Firma eines echten Spielers und
   bekomme 2500 XP.

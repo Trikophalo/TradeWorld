@@ -6033,6 +6033,12 @@
         "fail": "{company} hat sich verrechnet und arbeitet umsonst.",
         "question": "{a} Helfer arbeiten je 1 Stunde zu {b} €. Was kostet der Umzug?"
       }
+    },
+    "delegatedPopup": {
+      "title": "Neue Aufgabe für dich",
+      "kicker": "Aufgabe erhalten",
+      "go": "Jetzt ansehen",
+      "later": "Später"
     }
   },
   "funNews": {

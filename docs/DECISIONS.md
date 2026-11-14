@@ -2241,3 +2241,14 @@ außerdem einmal bei der Firma eines anderen Spielers arbeiten (Multiplayer).
   freigeschaltet sind, damit ihn jeder bekommt. Metrik `player_job`: Jobstart bei einer Spielerfirma oder jede dort
   gearbeitete Stunde (so zählt er auch für alle, die schon bei jemandem arbeiten). Im Demo-Modus gibt es keine anderen
   Spieler, dort fehlt er.
+
+## ADR-143: Großes Pop-up, wenn dir eine Aufgabe zugewiesen wird — `akzeptiert`
+
+**Kontext:** Bekam ein Mitarbeiter eine Aufgabe delegiert (ADR-129), kam nur eine stille Benachrichtigung in der
+Glocke. Das wurde übersehen.
+
+**Entscheidung:** Der Server benachrichtigt den Empfänger schon (type_key `company_task`). Zusätzlich zeigt der Client
+ein großes, zentrales Pop-up (`DelegatedTaskOverlay`, in der App-Hülle neben dem Level-up-Overlay), sobald eine neue,
+ungelesene `company_task`-Benachrichtigung auftaucht. „Jetzt ansehen“ führt zum Job-Tab, „Später“ schließt es.
+Bereits gezeigte Pop-ups merkt sich der Browser (`localStorage`, nach der Hydration gelesen), damit es nach einem
+Neuladen nicht wiederkommt. Rein clientseitig; keine Schema-Änderung.

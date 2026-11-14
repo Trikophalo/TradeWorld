@@ -5,9 +5,11 @@ import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useRef, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page";
 import { ALL_PIXEL_ART, BEAR, BULL, COIN, MIRA } from "@/components/pixel/art";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
+import { DelegatedTaskOverlay } from "@/features/company/components/delegated-task-overlay";
 import { AVATAR_ART } from "@/components/pixel/avatars";
 import { Mascot } from "@/components/pixel/mascot";
 import { Avatar } from "@/components/ui/avatar";
@@ -339,6 +341,7 @@ export function Showcase() {
 
   return (
     <>
+      <DelegatedTaskOverlay />
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <Segmented
           value={settings.theme}
@@ -579,6 +582,9 @@ export function Showcase() {
       </Section>
 
       <Section id="toasts" title={t("toasts")}>
+        <Demo label="Großes Pop-up: Aufgabe delegiert (ADR-143)">
+          <DelegatedPopupDemo />
+        </Demo>
         <Demo label="Gestapelt, wischbar">
           <Button variant="secondary" onClick={() => toast.success("Order ausgeführt", "10 × VLT zu 112,64 €")}>
             Erfolg
@@ -903,5 +909,33 @@ function ShowcaseSection() {
     >
       <p className="text-sm text-fg-2">Inhalt eines aufklappbaren Bereichs.</p>
     </CollapsibleSection>
+  );
+}
+
+/** Fires the delegated-task popup (ADR-143) by seeding a notification the real overlay then shows. */
+function DelegatedPopupDemo() {
+  const client = useQueryClient();
+  return (
+    <Button
+      variant="secondary"
+      onClick={() =>
+        client.setQueryData(["social", "notifications"], {
+          unread: 1,
+          items: [
+            {
+              id: `demo-${Date.now()}`,
+              typeKey: "company_task",
+              title: "Chefin gibt dir eine Aufgabe",
+              body: "Erledige sie vor Ablauf der Frist im Job-Tab.",
+              link: "/dev/ui",
+              createdAt: new Date().toISOString(),
+              readAt: null,
+            },
+          ],
+        })
+      }
+    >
+      Pop-up zeigen
+    </Button>
   );
 }
