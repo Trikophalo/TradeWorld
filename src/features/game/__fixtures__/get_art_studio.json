@@ -1,1 +1,8 @@
-{ "painted": 2, "unlocked": true, "next_cost_cents": 6000000 }
+{
+  "mint_xp": 100,
+  "painted": 2,
+  "unlocked": true,
+  "royalty_bps": 1000,
+  "next_cost_cents": 3375000,
+  "royalties_cents": 0
+}

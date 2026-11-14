@@ -28,7 +28,7 @@ import { ArtworkImage } from "./artwork-image";
 type Tab = "market" | "collection" | "rankings";
 const UNLOCK = BALANCE.progression.unlocks.find((u) => u.key === "artworks")?.level ?? 8;
 
-/** The Artworks tab (ADR-080): marketplace, own collection, rankings and the studio. */
+/** The NFT tab (ADR-080, ADR-135): marketplace, own collection, rankings and the studio. */
 export function ArtworksHub() {
   const t = useTranslations("art");
   const level = usePlayerLevel();
@@ -104,6 +104,8 @@ function Market({ onOpen }: { onOpen: (id: string) => void }) {
             { value: "hot", label: t("sortHot") },
             { value: "price", label: t("sortPrice") },
             { value: "new", label: t("sortNew") },
+            { value: "wanted", label: t("sortWanted") },
+            { value: "for_sale", label: t("sortForSale") },
             { value: "ending", label: t("sortEnding") },
           ]}
         />
@@ -165,6 +167,14 @@ export function CollectionView({ nickname, onOpen }: { nickname: string | null; 
           amount: formatMoney(collection.data.valueCents, { whole: true }),
         })}
       </p>
+      {collection.data.created > 0 && (
+        <p className="text-sm text-gain" data-testid="collection-royalties">
+          {t("collectionCreated", {
+            count: collection.data.created,
+            amount: formatMoney(collection.data.royaltiesCents, { whole: true }),
+          })}
+        </p>
+      )}
       {collection.data.artworks.length === 0 ? (
         <EmptyState
           art={<PixelIcon {...UI_ICONS.art} scale={4} />}
@@ -190,6 +200,30 @@ function Rankings({ onOpen }: { onOpen: (id: string) => void }) {
   if (!rankings.data) return <Skeleton className="h-64 w-full rounded-lg" />;
   return (
     <div className="grid gap-5 lg:grid-cols-2">
+      <Card padding="lg" className="lg:col-span-2">
+        <p className="mb-3 label-pixel text-fg-2">{t("rankCreators")}</p>
+        {rankings.data.creators.length === 0 ? (
+          <p className="text-sm text-fg-3">{t("rankEmpty")}</p>
+        ) : (
+          <ol className="grid gap-1 lg:grid-cols-2" data-testid="rank-creators">
+            {rankings.data.creators.map((c) => (
+              <li
+                key={c.nickname}
+                className={cn(
+                  "flex items-center gap-3 rounded-md px-2 py-2",
+                  c.isMe ? "bg-accent-soft ring-1 ring-accent" : "hover:bg-surface-2",
+                )}
+              >
+                <span className="w-7 text-center font-pixel nums text-xs text-fg-2">{c.rank}</span>
+                <Avatar avatarKey={c.avatarKey} size="xs" />
+                <span className="min-w-0 flex-1 truncate text-fg-1">{c.isMe ? t("you") : c.nickname}</span>
+                <span className="text-xs text-fg-3">{t("rankCreatorsCount", { count: c.count })}</span>
+                <ShortMoney cents={c.royaltiesCents} className="font-semibold text-gain" />
+              </li>
+            ))}
+          </ol>
+        )}
+      </Card>
       <Card padding="lg">
         <p className="mb-3 label-pixel text-fg-2">{t("rankCollections")}</p>
         {rankings.data.collections.length === 0 ? (
@@ -244,7 +278,11 @@ function RankedArtwork({ rank, artwork, onOpen }: { rank: number; artwork: Artwo
         <span className="min-w-0 flex-1">
           <span className="block truncate text-fg-1">{artwork.title}</span>
           <span className="block truncate text-xs text-fg-3">
-            {artwork.owner ? t("ownedBy", { name: artwork.owner }) : t("ownedByGallery")}
+            {artwork.owner
+              ? t("ownedBy", { name: artwork.owner })
+              : artwork.aiOwner
+                ? t("ownedByAi", { name: artwork.aiOwner })
+                : t("ownedByGallery")}
           </span>
         </span>
         <ShortMoney cents={artwork.valueCents ?? 0} className="font-semibold text-fg-1" />

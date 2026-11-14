@@ -1,8 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
 /*
- * Artworks in demo mode (ADR-080): marketplace with the gallery, likes, bids, painting your own artwork and
- * putting it up for auction. Level 8 player with 100.000 €.
+ * NFTs in demo mode (ADR-080, ADR-135): marketplace with the gallery, likes, bids, minting your own NFT,
+ * auctions, fixed prices and the offer chat with AI collectors. Level 8 player with 100.000 €.
  */
 async function preparePlayer(page: Page, xpTotal = 16_000) {
   await page.addInitScript((xp) => {
@@ -84,7 +84,7 @@ test("marketplace: gallery works, like, bid on an auction", async ({ page }) => 
   await page.getByRole("switch", { name: "Nur Auktionen" }).click();
   await grid.getByTestId("artwork-card").first().click();
   const detail = page.getByTestId("artwork-detail");
-  await expect(detail.getByText(/ART-\d{4}/).first()).toBeVisible();
+  await expect(detail.getByText(/NFT-\d{4}/).first()).toBeVisible();
   await detail
     .getByTestId("bid-box")
     .getByRole("button", { name: /bieten/ })
@@ -93,12 +93,10 @@ test("marketplace: gallery works, like, bid on an auction", async ({ page }) => 
   await expect(detail.getByText("Du führst")).toBeVisible();
 });
 
-test("paint an artwork, see it in the collection and put it up for auction", async ({ page }) => {
-  await preparePlayer(page);
-  await page.goto("/artworks");
-  await expect(page.getByTestId("art-studio")).toContainText("15.000 €");
-  await page.getByTestId("art-studio").getByRole("button", { name: "Kunstwerk malen" }).click();
-  const editor = page.getByRole("dialog", { name: "Kunstwerk malen" });
+/** Paints three stripes in the editor and mints the NFT (hold to confirm). */
+async function mint(page: Page, title: string, cost: RegExp) {
+  await page.getByTestId("art-studio").getByRole("button", { name: "NFT prägen" }).click();
+  const editor = page.getByRole("dialog", { name: "NFT prägen" });
   await expect(editor).toBeVisible();
   await page.waitForTimeout(400);
   const board = page.getByTestId("art-board");
@@ -110,11 +108,18 @@ test("paint an artwork, see it in the collection and put it up for auction", asy
     await page.mouse.move(box.x + cell * 27.5, box.y + cell * (row + 0.5), { steps: 12 });
     await page.mouse.up();
   }
-  await editor.getByLabel("Titel des Kunstwerks").fill("Morgenrot");
-  await hold(page, /Gedrückt halten: für 15\.000 € malen/);
-  await expect(page.getByText("Dein Kunstwerk ist fertig!")).toBeVisible();
-  // The next one costs double.
-  await expect(page.getByTestId("art-studio")).toContainText("30.000 €");
+  await editor.getByLabel("Titel des NFTs").fill(title);
+  await hold(page, cost);
+  await expect(page.getByText("Dein NFT ist geprägt!")).toBeVisible();
+}
+
+test("mint an NFT, see it in the collection and put it up for auction", async ({ page }) => {
+  await preparePlayer(page);
+  await page.goto("/artworks");
+  await expect(page.getByTestId("art-studio")).toContainText("15.000 €");
+  await mint(page, "Morgenrot", /Gedrückt halten: für 15\.000 € prägen/);
+  // The next one costs 1.5 times as much (ADR-135).
+  await expect(page.getByTestId("art-studio")).toContainText("22.500 €");
 
   await page.getByRole("radio", { name: "Meine Sammlung" }).click();
   const mine = page.getByTestId("collection").getByTestId("artwork-card");
@@ -127,4 +132,56 @@ test("paint an artwork, see it in the collection and put it up for auction", asy
   await sell.getByRole("button", { name: "Auktion starten" }).click();
   await expect(page.getByText("Auktion gestartet")).toBeVisible();
   await expect(page.getByText("Das ist deine Auktion.")).toBeVisible();
+});
+
+test("offer chat: AI collectors decline a low offer and accept a good one (ADR-135)", async ({ page }) => {
+  await preparePlayer(page);
+  await page.goto("/nfts");
+  await expect(page).toHaveURL(/\/artworks$/);
+  await page.getByRole("radio", { name: "Zum Verkauf" }).click();
+  const grid = page.getByTestId("art-grid");
+  await grid.getByTestId("artwork-card").first().click();
+  const detail = page.getByTestId("artwork-detail");
+  const chat = detail.getByTestId("nft-chat");
+  await expect(detail.getByTestId("buy-box")).toBeVisible();
+  const ask = Number((await detail.getByTestId("buy-box").getByText(/€/).first().innerText()).replace(/\D/g, ""));
+
+  // A plain message.
+  await chat.getByLabel("Nachricht").fill("Schönes Stück!");
+  await chat.getByRole("button", { name: "Senden" }).click();
+  await expect(chat.getByTestId("nft-message").filter({ hasText: "Schönes Stück!" })).toBeVisible();
+
+  // Far too low: the collector declines in the chat.
+  await chat.getByRole("switch", { name: "Mit Preisangebot" }).click();
+  await chat.getByLabel("Dein Angebot in €").fill("100");
+  await chat.getByRole("button", { name: /anbieten/ }).click();
+  await expect(chat.getByTestId("nft-offer").first()).toContainText("abgelehnt");
+
+  // At the asking price (125 % of the valuation, above the 105 % it needs): sold to me.
+  await chat.getByRole("switch", { name: "Mit Preisangebot" }).click();
+  await chat.getByLabel("Dein Angebot in €").fill(String(ask));
+  await chat.getByRole("button", { name: /anbieten/ }).click();
+  await expect(chat.getByText(/Verkauft an Sammlerin/)).toBeVisible();
+  await expect(detail.getByTestId("price-box")).toBeVisible();
+});
+
+test("owner: a fixed price too high gets a lowball offer, accepting it sells the NFT (ADR-135)", async ({ page }) => {
+  await preparePlayer(page);
+  await page.goto("/artworks");
+  await mint(page, "Abendstern", /Gedrückt halten: für 15\.000 € prägen/);
+  await page.getByRole("radio", { name: "Meine Sammlung" }).click();
+  await page.getByTestId("collection").getByTestId("artwork-card").click();
+  const detail = page.getByTestId("artwork-detail");
+  const price = detail.getByTestId("price-box");
+  await price.getByLabel("Preis in €").fill("90000");
+  await price.getByRole("button", { name: "Preis festlegen" }).click();
+  await expect(page.getByText("Preis gespeichert")).toBeVisible();
+  // Too expensive for the collectors: one of them writes a lowball offer instead of buying.
+  const chat = detail.getByTestId("nft-chat");
+  const offer = chat.getByTestId("nft-offer").first();
+  await expect(offer).toContainText("offen");
+  await offer.getByRole("button", { name: "Annehmen" }).click();
+  await expect(page.getByText(/Verkauft für/)).toBeVisible();
+  await expect(chat.getByText(/Verkauft an/)).toBeVisible();
+  await expect(detail.getByTestId("price-box")).toHaveCount(0);
 });

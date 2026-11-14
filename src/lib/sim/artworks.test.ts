@@ -13,10 +13,10 @@ import {
 const size = BALANCE.artworks.size;
 
 describe("artworks (ADR-080)", () => {
-  it("cost 15.000 € for the first, double for every further one", () => {
+  it("cost 15.000 € for the first, 1.5 times the previous for every further one (ADR-135)", () => {
     expect(artworkCreateCostCents(0)).toBe(1_500_000);
-    expect(artworkCreateCostCents(1)).toBe(3_000_000);
-    expect(artworkCreateCostCents(3)).toBe(12_000_000);
+    expect(artworkCreateCostCents(1)).toBe(2_250_000);
+    expect(artworkCreateCostCents(3)).toBe(5_062_500);
   });
 
   it("bids beat the current one by 5 %, rounded up to whole euros", () => {
@@ -49,6 +49,6 @@ describe("artworks (ADR-080)", () => {
     expect(isValidArtwork({ palette: ["#000000"], grid: Array.from({ length: size }, () => ".".repeat(size)) })).toBe(
       false,
     );
-    expect(artworkCode(42)).toBe("ART-0042");
+    expect(artworkCode(42)).toBe("NFT-0042");
   });
 });

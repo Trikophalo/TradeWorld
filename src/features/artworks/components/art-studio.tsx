@@ -19,6 +19,7 @@ import type { ArtworkPixels } from "@/features/game/types";
 import { isValidArtwork } from "@/lib/sim/artworks";
 import { formatMoney } from "@/lib/format";
 import { hasForbiddenSymbol } from "@/lib/sim/logo";
+import { scaledXp } from "@/lib/sim/progression";
 import { playSound } from "@/lib/sound";
 import { useArtRefresh, useArtStudio } from "../hooks";
 
@@ -28,7 +29,7 @@ const blank = (): ArtworkPixels => ({
   grid: Array.from({ length: SIZE }, () => ".".repeat(SIZE)),
 });
 
-/** The studio (ADR-080): paint an artwork of your own; each one costs double the previous. */
+/** The studio (ADR-080, ADR-135): mint an NFT of your own; each one costs 1.5 times the previous. */
 export function ArtStudio() {
   const t = useTranslations("art");
   const studio = useArtStudio();
@@ -48,13 +49,24 @@ export function ArtStudio() {
         </span>
         <div className="min-w-0 flex-1">
           <p className="label-pixel text-fg-1">{t("studioTitle")}</p>
-          <p className="text-sm text-pretty text-fg-2">{t("studioText")}</p>
+          <p className="text-sm text-pretty text-fg-2">
+            {t("studioText", { percent: Math.round((studio.data?.royaltyBps ?? BALANCE.nfts.royaltyBps) / 100) })}
+          </p>
           <p className="mt-1 text-xs text-fg-3">
             {t("studioPainted", { count: studio.data?.painted ?? 0 })} ·{" "}
             <span className="font-semibold text-fg-1">
               {t("studioCost", { amount: formatMoney(cost, { whole: true }) })}
+            </span>{" "}
+            ·{" "}
+            <span className="text-accent">
+              {t("studioXp", { xp: scaledXp(studio.data?.mintXp ?? BALANCE.nfts.mintXp) })}
             </span>
           </p>
+          {(studio.data?.royaltiesCents ?? 0) > 0 && (
+            <p className="mt-1 text-xs font-semibold text-gain" data-testid="studio-royalties">
+              {t("studioRoyalties", { amount: formatMoney(studio.data!.royaltiesCents, { whole: true }) })}
+            </p>
+          )}
         </div>
       </div>
       <Button className="w-full sm:w-auto" onClick={() => setOpen(true)} disabled={cash < cost}>
@@ -118,7 +130,7 @@ function ArtEditor({ open, costCents, onClose }: { open: boolean; costCents: num
       const r = await engine.createArtwork(crypto.randomUUID(), name, art);
       void playSound("levelUp", 0.7);
       burstConfetti(document.body, 30);
-      toast.success(t("created"), t("createdText", { code: r.artwork.code }));
+      toast.success(t("created"), `${t("createdText", { code: r.artwork.code })} ${t("studioXp", { xp: r.xp })}`);
       await refresh();
       onClose();
     } catch (error) {

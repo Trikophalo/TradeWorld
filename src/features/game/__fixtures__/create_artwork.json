@@ -1,12 +1,14 @@
 {
+  "xp": 200,
   "artwork": {
-    "id": "1368c977-f3e2-430c-ab8e-6ba614421022",
+    "id": "e974aaea-1ff4-4a10-a36a-aa6f87052711",
     "hot": 0.353553,
-    "code": "ART-0043",
+    "code": "NFT-0045",
     "liked": false,
     "likes": 0,
     "owner": "Fixture_Neu",
     "title": "Fixture im Abendrot",
+    "offers": 0,
     "origin": "player",
     "pixels": {
       "grid": [
@@ -48,9 +50,14 @@
     "rarity": null,
     "auction": null,
     "creator": "Fixture_Neu",
-    "created_at": "2026-11-14T13:53:30.197357+00:00",
-    "value_cents": null
+    "ai_owner": null,
+    "ask_cents": null,
+    "created_at": "2026-11-14T14:31:05.189633+00:00",
+    "royalty_bps": 1000,
+    "value_cents": null,
+    "royalties_cents": 0,
+    "best_offer_cents": null
   },
   "cost_cents": 1500000,
-  "next_cost_cents": 3000000
+  "next_cost_cents": 2250000
 }

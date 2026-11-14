@@ -1995,3 +1995,40 @@ viele mitmachen, auch die KI, und nur ganz selten hat das echte Auswirkungen.
   schon die Werbekampagnen (ADR-083) bezeichnet. Test `supabase/tests/99_protests.sql`.
 
 Dazu: Der letzte Quartalsabschluss steht im Firmen-Dashboard jetzt ganz oben, gleich unter der Produktion.
+
+## ADR-135: NFTs statt Artworks: Lizenzgebühren, KI-Sammler, Angebots-Chat — `akzeptiert`
+
+Vorgabe: Artworks heißen jetzt NFTs. Selbst welche zu machen soll sich lohnen: Der Macher bekommt bei jedem
+Weiterverkauf einen Anteil, auch wenn ihm das NFT nicht mehr gehört. Die KI kauft NFTs von Spielern, aber nur zu guten
+Preisen. Unter jedem NFT gibt es einen Chat mit Preisangeboten, in dem auch die KI schreibt. Es soll ein größeres Ding
+werden, bei dem mehr Leute mitmachen. Ersetzt den offenen Wunsch „KI-Sammler kaufen deine Kunstwerke, machen aber
+Gegenangebote und zahlen sehr wenig“.
+
+- **Nur die Texte heißen NFT.** Tabellen, RPCs und die Route `/artworks` bleiben (kein riskantes Umbenennen),
+  `/nfts` leitet dorthin. Der Code eines NFTs lautet jetzt `NFT-0042`. Es bleiben Pixel-Bilder mit Spielgeld, keine
+  Blockchain und kein Echtgeld.
+- **Lizenzgebühr:** Bei jedem Verkauf, bei dem der Macher weder Verkäufer noch Käufer ist (Auktion, Festpreis,
+  angenommenes Angebot, KI-Kauf, Verkauf der Galerie), gehen 10 % des Preises an den Macher. Sie kommen aus dem Erlös:
+  Der Verkäufer bekommt Preis − 10 % Gebühr − 10 % Lizenz. Eigene Ledger-Art `artwork_royalty`, Benachrichtigung,
+  Summe am NFT („Lizenzgebühren verdient“), im Atelier, auf dem Profil und in der neuen Rangliste „Top-Macher“.
+- **Prägen lohnt sich:** Jedes weitere NFT kostet das 1,5-Fache statt das Doppelte, das Prägen bringt XP, und die
+  KI-Sammler bewerten ein NFT nie unter seinen Prägekosten.
+- **Festpreis:** Der Besitzer stellt ein NFT zu einem Preis ein, jeder kann sofort kaufen. Eine Auktion beendet den
+  Festpreis.
+- **KI-Sammler** (acht feste Namen, Geld der Haushalte, geschlossener Kreislauf): Sie bewerten ein NFT mit
+  Prägekosten oder letztem Preis (der höhere, mindestens 1.000 €), +4 % je Like (bis 40), +3 % je früherem Verkauf von
+  NFTs desselben Machers (bis 10), +1 % je Tag Alter (bis 30). Ein Festpreis bis zu diesem Wert wird mit 25 % pro
+  Minute gekauft, höchstens 20 Käufe am Tag. Liegt er darüber, schreiben sie mit 8 % pro Minute ein Lowball-Angebot
+  (65–90 % des Werts) in den Chat; NFTs ohne Festpreis bekommen selten eins. Was sie gekauft haben, bieten sie für
+  125 % ihres Werts wieder an; Angebote ab 105 % nehmen sie an, kleinere lehnen sie im Chat ab. Ihre NFTs versteigert
+  die Galerie nicht.
+- **Angebots-Chat:** Unter jedem NFT, 1 bis 200 Zeichen durch den Wortfilter, höchstens 6 Nachrichten pro Minute.
+  Ein Angebot reserviert kein Geld (es gilt 24 Stunden); beim Annehmen muss der Bieter zahlen können, sonst ist es
+  ungültig. Ein neues Angebot ersetzt das eigene alte. Der Besitzer bekommt eine Benachrichtigung und nimmt mit einem
+  Tipp an; alle anderen offenen Angebote enden, der Chat vermerkt den Verkauf.
+- **Mehr Leute:** Sortierungen „Neu geprägt“ und „Heiß begehrt“ (meiste Angebote) sowie „Zum Verkauf“, neun neue
+  Missionen (Chat, Angebote, Festpreis, Kauf, Verkauf, Lizenzgebühren; Wochen- und Meilenstein-Missionen mit einem
+  Skillpunkt).
+- Werte in `src/config/nfts.ts` (`game_config.nfts`), Formeln in `src/lib/sim/nfts.ts`. Test
+  `supabase/tests/9b_nfts.sql`. Der Demo-Modus spielt dasselbe: KI-Sammler halten von Anfang an einige NFTs, antworten
+  sofort auf Angebote und reagieren sofort auf einen Festpreis.

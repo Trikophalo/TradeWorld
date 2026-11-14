@@ -127,7 +127,9 @@ select tests.assert(
            -- own strategies (ADR-132)
            'get_company_pitches', 'submit_company_pitch', 'company_pitch_context',
            -- protest campaigns (ADR-133)
-           'get_protests', 'start_protest', 'join_protest']
+           'get_protests', 'start_protest', 'join_protest',
+           -- NFTs: offer chat, fixed price (ADR-135)
+           'get_artwork_chat', 'post_artwork_message', 'accept_artwork_offer', 'set_artwork_price', 'buy_artwork']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')
@@ -167,7 +169,7 @@ select tests.assert(
       'sim_rng_streams', 'sim_tick_log', 'job_runs', 'internal_settings', 'admin_users',
       'insider_violations', 'work_task_solutions', 'scheduled_event_secrets', 'macro_event_definitions',
       'random_event_definitions', 'news_templates', 'news_item_effects', 'league_entry_baselines',
-      'stock_tips', 'market_snapshot_cache', 'company_moves', 'company_tasks', 'fun_news', 'company_pitches', 'company_protests', 'company_protest_supporters',
+      'stock_tips', 'market_snapshot_cache', 'company_moves', 'company_tasks', 'fun_news', 'company_pitches', 'company_protests', 'company_protest_supporters', 'artwork_messages',
       'rate_limits', 'player_requests', 'player_login_events', 'push_deliveries', 'invite_code_redemptions',
       'price_ticks_default']) as t
      -- (a table from a later migration is not there yet on an older database)

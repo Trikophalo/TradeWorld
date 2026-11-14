@@ -3,6 +3,7 @@ import { COMPANY_MOVE_RULES, COMPANY_MOVES, type CompanyMoveConfig } from "./com
 import { COMPANY_TASK_RULES, COMPANY_TASKS, FUN_NEWS, type CompanyTaskConfig } from "./company-tasks.ts";
 import { PITCH_RULES } from "./pitches.ts";
 import { PROTEST_RULES } from "./protests.ts";
+import { NFT_RULES } from "./nfts.ts";
 import { CRYPTO, type CryptoConfig } from "./crypto.ts";
 import { DEALS, TRUST, type DealsConfig, type TrustConfig } from "./deals.ts";
 import { SKILL_NODES, type SkillBranch, type SkillNodeConfig } from "./skills.ts";
@@ -831,6 +832,8 @@ export interface BalanceConfig {
   readonly pitches: typeof PITCH_RULES;
   /** Protest campaigns against other companies (ADR-133), values in protests.ts. */
   readonly protests: typeof PROTEST_RULES;
+  /** NFTs: royalties, AI collectors, offer chat (ADR-135), values in nfts.ts. */
+  readonly nfts: typeof NFT_RULES;
   /** Crises, scandals and a falling share price cut wages (ADR-131). */
   readonly wageMood: {
     /** Wage cut per severity level (1..3) of an open or running crisis. */
@@ -2347,7 +2350,8 @@ export const BALANCE = {
     maxColors: 16,
     titleMaxLength: 40,
     createBaseCostCents: 1_500_000,
-    createCostFactor: 2,
+    // ADR-135: 1.5 instead of 2, minting more NFTs stays worth it (royalties, AI collectors)
+    createCostFactor: 1.5,
     auction: {
       durationsHours: [1, 6, 24],
       minIncrementBps: 500,
@@ -2372,6 +2376,7 @@ export const BALANCE = {
   funNews: FUN_NEWS,
   pitches: PITCH_RULES,
   protests: PROTEST_RULES,
+  nfts: NFT_RULES,
   wageMood: {
     crisisPerSeverityBps: 500,
     scandalBps: 500,

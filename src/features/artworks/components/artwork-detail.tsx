@@ -13,19 +13,20 @@ import { toast } from "@/components/ui/toast";
 import { BALANCE } from "@/config/balance";
 import { useGameErrorText } from "@/features/game/errors";
 import { engine, useGame } from "@/features/game/store";
-import type { Artwork } from "@/features/game/types";
+import type { Artwork, ArtworkDetail as Detail } from "@/features/game/types";
 import { parseEuroCents } from "@/features/market/order-schema";
 import { formatMoney } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
 import { playSound } from "@/lib/sound";
 import { useArtRefresh, useArtwork } from "../hooks";
 import { LikeButton, OriginLabel } from "./artwork-card";
+import { ArtworkChat } from "./artwork-chat";
 import { ArtworkImage } from "./artwork-image";
 
 const date = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 const euros = (cents: number) => String(cents / 100).replace(".", ",");
 
-/** One artwork in a large window: picture, facts, bidding, selling and its history (ADR-080). */
+/** One NFT in a large window: picture, facts, bidding, buying, selling, the offer chat and its history (ADR-080, ADR-135). */
 export function ArtworkDetail({ id, onClose }: { id: string | null; onClose: () => void }) {
   const t = useTranslations("art");
   const detail = useArtwork(id);
@@ -50,6 +51,7 @@ export function ArtworkDetail({ id, onClose }: { id: string | null; onClose: () 
           <div className="min-w-0 space-y-5">
             <Facts artwork={art} />
             <AuctionPanel artwork={art} />
+            <ArtworkChat artwork={art} />
             <History sales={detail.data.sales} bids={detail.data.bids} />
           </div>
         </div>
@@ -86,14 +88,36 @@ function Facts({ artwork }: { artwork: Artwork }) {
       </div>
       <div>
         <dt className="label-pixel text-fg-3">{t("owner")}</dt>
-        <dd className="text-fg-1">{person(artwork.owner, t("gallery"))}</dd>
+        <dd className="text-fg-1">
+          {artwork.aiOwner ? (
+            <span className="inline-flex items-center gap-1.5">
+              {artwork.aiOwner}
+              <span className="label-pixel text-2xs text-info">{t("aiBadge")}</span>
+            </span>
+          ) : (
+            person(artwork.owner, t("gallery"))
+          )}
+        </dd>
       </div>
-      <div className="col-span-2">
+      <div>
         <dt className="label-pixel text-fg-3">{t("value")}</dt>
-        <dd className="text-xl font-semibold text-fg-1">
+        <dd className="nums text-xl font-semibold text-fg-1">
           {artwork.valueCents !== null ? formatMoney(artwork.valueCents, { whole: true }) : t("noValue")}
         </dd>
       </div>
+      {artwork.origin === "player" && (
+        <div>
+          <dt className="label-pixel text-fg-3">{t("royalties")}</dt>
+          <dd className="nums text-xl font-semibold text-gain" data-testid="nft-royalties">
+            {formatMoney(artwork.royaltiesCents, { whole: true })}
+          </dd>
+        </div>
+      )}
+      {artwork.origin === "player" && artwork.creator && (
+        <p className="col-span-2 text-xs text-fg-3">
+          {t("royaltyShare", { percent: Math.round(artwork.royaltyBps / 100), name: artwork.creator })}
+        </p>
+      )}
     </dl>
   );
 }
@@ -106,8 +130,102 @@ function AuctionPanel({ artwork }: { artwork: Artwork }) {
     if (a.seller === me) return <OwnAuction artwork={artwork} />;
     return <BidBox artwork={artwork} />;
   }
-  if (artwork.owner && artwork.owner === me) return <SellBox artwork={artwork} />;
-  return artwork.owner ? null : <p className="text-sm text-fg-3">{t("ownedByGallery")}</p>;
+  if (artwork.owner && artwork.owner === me) {
+    return (
+      <div className="space-y-3">
+        <PriceBox artwork={artwork} />
+        <SellBox artwork={artwork} />
+      </div>
+    );
+  }
+  if (artwork.askCents !== null) return <BuyBox artwork={artwork} />;
+  return artwork.owner || artwork.aiOwner ? null : <p className="text-sm text-fg-3">{t("ownedByGallery")}</p>;
+}
+
+/** Buy at the fixed price (ADR-135): from a player or an AI collector. */
+function BuyBox({ artwork }: { artwork: Artwork }) {
+  const t = useTranslations("art");
+  const errorText = useGameErrorText();
+  const refresh = useArtRefresh();
+  const cash = useGame((state) => state.portfolio?.cashCents ?? 0);
+  const [state, setState] = useState<ButtonState>("idle");
+  const ask = artwork.askCents!;
+  const buy = async () => {
+    setState("loading");
+    try {
+      await engine.buyArtwork(crypto.randomUUID(), artwork.id, ask);
+      setState("success");
+      haptic("success");
+      void playSound("coin");
+      toast.success(t("buyDone"), formatMoney(ask, { whole: true }), { silent: true });
+      await refresh();
+    } catch (error) {
+      setState("idle");
+      toast.error(t("buyTitle"), errorText(error));
+    }
+  };
+  return (
+    <section className="space-y-3 rounded-lg border border-gain/40 bg-gain-soft/40 p-4" data-testid="buy-box">
+      <div>
+        <p className="label-pixel text-fg-3">{t("forSale")}</p>
+        <p className="nums text-2xl font-semibold text-fg-1">{formatMoney(ask, { whole: true })}</p>
+      </div>
+      <Button size="lg" state={state} disabled={cash < ask} onClick={() => void buy()}>
+        {t("buyButton", { amount: formatMoney(ask, { whole: true }) })}
+      </Button>
+      <p className="text-xs text-pretty text-fg-3">{t("buyHint")}</p>
+    </section>
+  );
+}
+
+/** The owner sets or removes a fixed price; AI collectors buy at a fair one (ADR-135). */
+function PriceBox({ artwork }: { artwork: Artwork }) {
+  const t = useTranslations("art");
+  const errorText = useGameErrorText();
+  const refresh = useArtRefresh();
+  const [text, setText] = useState(
+    euros(artwork.askCents ?? Math.max(artwork.valueCents ?? 0, BALANCE.nfts.minAskCents * 10)),
+  );
+  const [state, setState] = useState<ButtonState>("idle");
+  const cents = parseEuroCents(text) ?? 0;
+  const save = async (askCents: number | null) => {
+    setState("loading");
+    try {
+      await engine.setArtworkPrice(crypto.randomUUID(), artwork.id, askCents);
+      setState("success");
+      void playSound("success");
+      toast.success(askCents === null ? t("priceRemoved") : t("priceSaved"), undefined, { silent: true });
+      await refresh();
+      window.setTimeout(() => setState("idle"), 600);
+    } catch (error) {
+      setState("idle");
+      toast.error(t("priceTitle"), errorText(error));
+    }
+  };
+  return (
+    <section className="space-y-3 rounded-lg border border-gain/40 bg-gain-soft/40 p-4" data-testid="price-box">
+      <p className="label-pixel text-fg-1">{t("priceTitle")}</p>
+      {artwork.askCents !== null && (
+        <p className="text-sm font-semibold text-gain">
+          {t("priceCurrent", { amount: formatMoney(artwork.askCents, { whole: true }) })}
+        </p>
+      )}
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="min-w-40 flex-1">
+          <Field label={t("priceLabel")} inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} />
+        </div>
+        <Button state={state} disabled={cents < BALANCE.nfts.minAskCents} onClick={() => void save(cents)}>
+          {t("priceSet")}
+        </Button>
+        {artwork.askCents !== null && (
+          <Button variant="ghost" onClick={() => void save(null)}>
+            {t("priceRemove")}
+          </Button>
+        )}
+      </div>
+      <p className="text-xs text-pretty text-fg-3">{t("priceHint")}</p>
+    </section>
+  );
 }
 
 function AuctionHead({ artwork }: { artwork: Artwork }) {
@@ -240,7 +358,7 @@ function SellBox({ artwork }: { artwork: Artwork }) {
   };
   return (
     <section className="space-y-4 rounded-lg border border-accent/40 bg-accent-soft/40 p-4" data-testid="sell-box">
-      <p className="label-pixel text-fg-1">{t("auctionSell")}</p>
+      <p className="label-pixel text-fg-1">{t("orAuction")}</p>
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-40 flex-1">
           <Field
@@ -266,13 +384,7 @@ function SellBox({ artwork }: { artwork: Artwork }) {
   );
 }
 
-function History({
-  sales,
-  bids,
-}: {
-  sales: { at: string; priceCents: number; seller: string | null; buyer: string }[];
-  bids: { nickname: string; amountCents: number; at: string }[];
-}) {
+function History({ sales, bids }: Pick<Detail, "sales" | "bids">) {
   const t = useTranslations("art");
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -299,9 +411,16 @@ function History({
           <ul className="space-y-1 text-sm">
             {sales.slice(0, 8).map((s, i) => (
               <li key={`${s.at}-${i}`} className="flex justify-between gap-2">
-                <span className="truncate text-fg-3">{date.format(new Date(s.at))}</span>
-                <span className="truncate text-fg-1">
+                <span className="min-w-0 truncate text-fg-3">
+                  {date.format(new Date(s.at))} · {t(`saleKind.${s.kind}`)}
+                </span>
+                <span className="min-w-0 truncate text-right text-fg-1">
                   {t("soldTo", { price: formatMoney(s.priceCents, { whole: true }), buyer: s.buyer })}
+                  {s.royaltyCents > 0 && (
+                    <span className="block text-2xs text-gain">
+                      {t("royaltyPaid", { amount: formatMoney(s.royaltyCents, { whole: true }) })}
+                    </span>
+                  )}
                 </span>
               </li>
             ))}

@@ -7241,3 +7241,42 @@ join_protest(p_request_id uuid, p_protest_id bigint) -> wie get_protests
 ```
 
 Intern: `protest_check(id, u, u2)`, `protests_run_due(p_now)` (Cron `nexa-protests`).
+
+## Nachtrag: NFTs – Lizenzgebühren, KI-Sammler, Angebots-Chat (ADR-135)
+
+Migration `20261204000800_nfts.sql`, Test `supabase/tests/9b_nfts.sql`. Tabellen und RPCs behalten den Namen
+„artwork“, nur die Texte und der Code (`NFT-0042`) sagen NFT.
+
+- `artworks` neu: `mint_cents` (Prägekosten, Anker der KI-Bewertung), `ask_cents` (Festpreis, `null` = nicht zu
+  verkaufen), `listed_at`, `ai_owner` (Name des KI-Sammlers, dann `owner_id` `null`), `royalties_cents` (bisher an
+  den Macher gezahlt).
+- `artwork_sales` neu: `kind` (`auction`/`buy`/`offer`/`ai`), `seller_ai`, `buyer_ai`, `royalty_cents`, `creator_id`;
+  `auction_id` und `buyer_id` dürfen `null` sein (Direktverkauf, KI-Käufer).
+- Neue Tabelle `artwork_messages` (intern): `artwork_id`, `author_id` (Spieler) oder `ai_name` (KI-Sammler), `kind`
+  (`chat`/`offer`/`sale`), `body` (1–200 Zeichen), `offer_cents`, `offer_status`
+  (`open`/`accepted`/`declined`/`closed`/`expired`), `expires_at`, `created_at`. Eine Verkaufsnotiz (`sale`) trägt den
+  Käufer in `body` und den Preis in `offer_cents`.
+- Ledger-Art `artwork_royalty` (Lizenz vom Konto, das den Erlös hält: Treuhand, Käufer oder Haushalte, an den Macher),
+  XP-Quelle `nft_mint`. Benachrichtigungen `nft_offer`, `nft_sale`, `nft_royalty`.
+- Fehler `nft_text_invalid` NX121, `nft_offer_closed` NX122, `nft_offer_unfunded` NX123, `nft_not_for_sale` NX124,
+  `nft_price_changed` NX125.
+- ARTWORK hat zusätzlich `ai_owner`, `ask_cents`, `royalty_bps`, `royalties_cents`, `offers`, `best_offer_cents`.
+  `get_artworks` sortiert auch nach `wanted` (meiste Angebote) und `for_sale` (nur Festpreise, günstigste zuerst).
+  `get_artwork().sales[]` hat `kind` und `royalty_cents`; `get_art_studio()` hat `royalties_cents`, `royalty_bps`,
+  `mint_xp`; `get_art_rankings()` hat `creators` (`rank`, `nickname`, `avatar_key`, `count`, `royalties_cents`,
+  `is_me`); `get_collection()` hat `created` und `royalties_cents`; `create_artwork()` meldet `xp`.
+
+```
+get_artwork_chat(p_artwork_id uuid) -> CHAT
+post_artwork_message(p_request_id uuid, p_artwork_id uuid, p_text text, p_offer_cents bigint default null) -> CHAT
+  CHAT = {"artwork_id", "is_owner", "ask_cents", "min_offer_cents", "max_length", "my_offer_cents",
+          "messages": [{"id","author","ai","kind","text","offer_cents","offer_status","expires_at","at","mine"}]}
+accept_artwork_offer(p_request_id uuid, p_message_id bigint) -> {"artwork", "price_cents", "fee_cents", "royalty_cents"}
+set_artwork_price(p_request_id uuid, p_artwork_id uuid, p_ask_cents bigint) -> {"artwork"}   -- null = nicht verkaufen
+buy_artwork(p_request_id uuid, p_artwork_id uuid, p_price_cents bigint) -> {"artwork", "price_cents", "fee_cents",
+                                                                            "royalty_cents"}
+```
+
+Intern: `nft_ai_value_cents(id, now)` (Bewertung wie `nftAiValueCents` in `src/lib/sim/nfts.ts`),
+`nft_lowball_cents`, `nft_ai_ask_cents`, `nft_royalty_for`, `nft_pay_royalty`, `nft_sell` (Direktverkauf),
+`nft_after_sale`, `nft_chat_json`, `nfts_run_due(p_now)` (Cron `nexa-nfts`, jede Minute).

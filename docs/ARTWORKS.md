@@ -1,4 +1,4 @@
-# Artworks: Pixel-Kunst, Auktionen, Sammlungen
+# Artworks (jetzt NFTs): Pixel-Kunst, Auktionen, Sammlungen
 
 Konzept zu ADR-080. Kunstwerke sind die freiwillige Geldsenke des Spiels: Man gibt gern Geld aus, weil man etwas
 Einzigartiges besitzt, das andere sehen. Das Geld fließt an Staatskasse und Haushalte zurück, also wieder in den
@@ -19,7 +19,7 @@ Kreislauf.
 
 - **Freischaltung:** ab Level 8 (`artworks`). Finn erklärt den Tab kurz.
 - **Format:** Jedes Kunstwerk ist 32 × 32 Pixel mit bis zu 16 Farben.
-- **Einzigartig:** Jedes Kunstwerk gibt es genau einmal. Es hat eine Nummer (`ART-0042`), einen Titel und einen
+- **Einzigartig:** Jedes Kunstwerk gibt es genau einmal. Es hat eine Nummer (`NFT-0042`), einen Titel und einen
   Urheber.
 - **Herkunft:** Das Label unterscheidet immer „NEXA-Galerie“ (Werke des Spiels) und „von Spielername“
   (Werke von Spielern).
@@ -38,7 +38,7 @@ Kreislauf.
 
 - Im großen Kunst-Editor malt man 32 × 32 Pixel mit bis zu 16 Farben und gibt einen Titel.
 - Der Titel geht durch den Namensfilter, das Bild durch die Prüfung auf verbotene Symbole.
-- **Kosten:** Das erste Werk kostet 15.000 €, jedes weitere doppelt so viel wie das vorige (30.000 €, 60.000 €, …).
+- **Kosten:** Das erste Werk kostet 15.000 €, jedes weitere das 1,5-Fache des vorigen (22.500 €, 33.750 €, …; bis ADR-135 das Doppelte).
   So bleiben eigene Werke selten. Das Geld geht an die Staatskasse.
 - Ein neues Werk gehört seinem Maler. Er kann es behalten oder versteigern.
 
@@ -98,7 +98,7 @@ Alle Antworten sind JSON in `snake_case`. Ein Kunstwerk in Listen (`ARTWORK`):
 ```json
 {
   "id": "uuid",
-  "code": "ART-0042",
+  "code": "NFT-0042",
   "title": "Abendrot über der Börse",
   "origin": "game | player",
   "rarity": "common | rare | legendary | null",

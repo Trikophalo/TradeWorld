@@ -163,3 +163,7 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   nach hinten losgehen.
 - **Protestkampagnen (ADR-133):** Boykott, Shitstorm, Petition oder Protestmarsch gegen andere Firmen. Viele müssen
   mitmachen, die KI hilft, wirken tut es nur selten. Der letzte Quartalsabschluss steht im Dashboard jetzt ganz oben.
+- **NFTs statt Artworks (ADR-135):** Wer ein NFT prägt, bekommt bei jedem Weiterverkauf 10 %, auch wenn es ihm nicht
+  mehr gehört. Festpreis zum Sofortkaufen, ein Chat mit Preisangeboten unter jedem NFT, KI-Sammler kaufen nur zu
+  fairen Preisen, machen Lowball-Angebote und verkaufen weiter. Neue Rangliste „Top-Macher“, Sortierungen „Neu geprägt“
+  und „Heiß begehrt“, neun neue Missionen. Jedes weitere NFT kostet nur noch das 1,5-Fache.

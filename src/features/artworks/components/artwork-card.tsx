@@ -144,6 +144,16 @@ export function ArtworkCard({ artwork, onOpen, big }: { artwork: Artwork; onOpen
                 {a.myBidCents !== null && <span className="ml-1.5 text-gain">· {t("leading")}</span>}
               </p>
             </>
+          ) : artwork.askCents !== null ? (
+            <>
+              <p className="text-2xs text-gain">{t("forSale")}</p>
+              <p className="font-semibold text-fg-1">
+                <ShortMoney cents={artwork.askCents} />
+              </p>
+              {artwork.offers > 0 && (
+                <p className="text-2xs text-accent">{t("offersCount", { count: artwork.offers })}</p>
+              )}
+            </>
           ) : (
             <>
               <p className="text-2xs text-fg-3">{t("value")}</p>
@@ -154,6 +164,9 @@ export function ArtworkCard({ artwork, onOpen, big }: { artwork: Artwork; onOpen
                   <span className="text-fg-3">–</span>
                 )}
               </p>
+              {artwork.offers > 0 && (
+                <p className="text-2xs text-accent">{t("offersCount", { count: artwork.offers })}</p>
+              )}
             </>
           )}
         </div>
