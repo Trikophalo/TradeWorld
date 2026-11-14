@@ -5,7 +5,7 @@
  */
 import type { MoveBranch } from "./company-moves.ts";
 
-export type TaskGame = "pick" | "count" | "sort" | "order" | "seq" | "math";
+export type TaskGame = "pick" | "count" | "sort" | "order" | "seq" | "math" | "slider" | "rotate" | "match" | "path";
 export type TaskMathOp = "mul" | "add" | "sub" | "pct";
 
 export interface CompanyTaskConfig {
@@ -448,6 +448,32 @@ export const COMPANY_TASKS: readonly CompanyTaskConfig[] = [
     a: [3, 9],
     b: [45, 90],
   },
+  // ADR-144: hands-on games you drag, turn and draw (captcha style, solved by looking and thinking)
+  { key: "align_labels", product: "*", branch: "logistics", game: "slider", factor: 0.7, minutes: 40 },
+  { key: "fix_antenna", product: "*", branch: "it", game: "rotate", factor: 0.8, minutes: 40 },
+  { key: "file_documents", product: "*", branch: "management", game: "match", factor: 0.9, minutes: 45 },
+  { key: "office_route", product: "*", branch: "logistics", game: "path", factor: 0.8, minutes: 45 },
+  { key: "firewall_rules", product: "security_software", branch: "it", game: "match", factor: 1.1, minutes: 45 },
+  { key: "ui_align", product: "mobile_app", branch: "it", game: "slider", factor: 0.9, minutes: 40 },
+  { key: "cable_route", product: "cloud_platform", branch: "it", game: "path", factor: 1.1, minutes: 45 },
+  { key: "case_files", product: "legal_tech", branch: "law", game: "match", factor: 1.0, minutes: 45 },
+  { key: "vault_dials", product: "fintech", branch: "it", game: "rotate", factor: 1.0, minutes: 40 },
+  { key: "warehouse_bins", product: "online_shop", branch: "logistics", game: "match", factor: 1.0, minutes: 45 },
+  { key: "hem_length", product: "fashion", branch: "craft", game: "slider", factor: 0.9, minutes: 40 },
+  { key: "fridge_shelves", product: "delicatessen", branch: "logistics", game: "match", factor: 1.0, minutes: 45 },
+  { key: "sign_turn", product: "franchise", branch: "craft", game: "rotate", factor: 0.9, minutes: 40 },
+  { key: "panel_turn", product: "solar", branch: "craft", game: "rotate", factor: 1.1, minutes: 40 },
+  { key: "line_repair", product: "grid_service", branch: "craft", game: "path", factor: 1.2, minutes: 45 },
+  { key: "charge_level", product: "energy_storage", branch: "science", game: "slider", factor: 1.0, minutes: 40 },
+  { key: "grid_flow", product: "energy_trading", branch: "finance", game: "path", factor: 1.1, minutes: 45 },
+  { key: "pill_boxes", product: "generics", branch: "science", game: "match", factor: 1.0, minutes: 45 },
+  { key: "pipette", product: "biotech", branch: "science", game: "slider", factor: 1.1, minutes: 40 },
+  { key: "probe_turn", product: "medtech", branch: "craft", game: "rotate", factor: 1.0, minutes: 40 },
+  { key: "form_stack", product: "regulatory", branch: "law", game: "match", factor: 1.0, minutes: 45 },
+  { key: "bike_route", product: "courier", branch: "logistics", game: "path", factor: 1.1, minutes: 45 },
+  { key: "forklift_path", product: "warehouse", branch: "logistics", game: "path", factor: 1.0, minutes: 45 },
+  { key: "crane_turn", product: "freight", branch: "logistics", game: "rotate", factor: 1.0, minutes: 40 },
+  { key: "truck_space", product: "moving", branch: "logistics", game: "slider", factor: 0.9, minutes: 40 },
 ];
 
 /** Rules for company tasks (ADR-129). Money in cents, rates in basis points. */
@@ -466,6 +492,17 @@ export const COMPANY_TASK_RULES = {
     order: { seconds: 30, items: 5, min: 1, max: 99 },
     seq: { seconds: 25, length: 5, showSeconds: 4 },
     math: { seconds: 45 },
+    /** ADR-144: drag each piece into its gap (track 0..100); within the tolerance full marks, within 3× half. */
+    slider: { seconds: 30, sliders: 3, min: 20, max: 92, tolerance: 3 },
+    /** Turn each dial (steps of 360°/steps) until it points at its mark; one step off is half. */
+    rotate: { seconds: 30, dials: 3, steps: 8, minTurn: 2 },
+    /** Drag cards into the box their rule names; perBox of each box's 3 items, shuffled. */
+    match: { seconds: 40, boxes: 3, groupSize: 3, perBox: 2 },
+    /**
+     * Draw the shortest route from the left to the right edge of a size×size grid with walls; the walls always force
+     * a detour of at least minDetour steps. Every step more than the shortest route costs stepBps.
+     */
+    path: { seconds: 40, size: 5, minWalls: 6, maxWalls: 9, minDetour: 2, stepBps: 1_000 },
   },
   /** AI workers do delegated tasks, but slowly and less well. */
   ai: {

@@ -567,7 +567,14 @@ export interface JobBoard {
 }
 
 export type ApplicationStatus =
-  "pending" | "offered" | "rejected" | "declined" | "withdrawn" | "expired" | "signed" | "closed";
+  | "pending"
+  | "offered"
+  | "rejected"
+  | "declined"
+  | "withdrawn"
+  | "expired"
+  | "signed"
+  | "closed";
 
 export interface JobApplication {
   id: string;
@@ -743,7 +750,14 @@ export interface CryptoTradeResult {
 }
 
 export type CoinActionKey =
-  "smart_contract" | "audit" | "community" | "influencer" | "partnership" | "staking" | "bugfix" | "marketing_burn";
+  | "smart_contract"
+  | "audit"
+  | "community"
+  | "influencer"
+  | "partnership"
+  | "staking"
+  | "bugfix"
+  | "marketing_burn";
 
 export interface MyCoin extends CoinRow {
   id: string;
@@ -1176,7 +1190,7 @@ export interface CompanyMoves {
 }
 
 /** Company tasks with mini-games (ADR-129). */
-export type TaskGame = "pick" | "count" | "sort" | "order" | "seq" | "math";
+export type TaskGame = "pick" | "count" | "sort" | "order" | "seq" | "math" | "slider" | "rotate" | "match" | "path";
 export type TaskStatus = "open" | "assigned" | "playing" | "ai" | "success" | "failure" | "missed";
 
 export interface CompanyTask {

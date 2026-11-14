@@ -168,6 +168,12 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   Missionsjäger, Teamplayer, Bilanzprofi, Ehrgeiz), ein größerer Tresor (Panzertresor) und vieles für die eigene
   Firma (KI-Turbo, Glückshand, Werbeagentur, Krisenmanager …). Sie schalten sich zwischen Level 1 und 30 frei.
 
+- **Minispiele zum Anfassen (ADR-144):** Vier neue Firmenaufgaben-Spiele wie bei einem Captcha: Teile in ihre Lücke
+  schieben, Räder drehen, bis der Pfeil auf die Markierung zeigt, Karten in die richtige Box ziehen und den kürzesten
+  Weg um Hindernisse ziehen. Dazu 25 neue Aufgaben, mindestens eine für jedes Produkt. Beim Sortieren ziehst du die
+  Karte jetzt auf den Stapel, beim Rechnen helfen Knöpfe von −100 bis +100. Alles bleibt durch Hinsehen und Nachdenken
+  lösbar, Tippen geht weiterhin.
+
 - **Lebendiger NFT-Markt (ADR-141):** Die KI-Sammler handeln jetzt auch untereinander und bieten danach wieder an, so
   bewegen sich die Preise ständig. Beliebte NFTs mit vielen Likes, Angeboten und Verkäufen sind gefragter, und die
   Sammler zahlen dafür mehr. Mira heißt jetzt „Assistentin“ statt „KI“.

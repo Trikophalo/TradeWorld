@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Die Chefetage von Fundgrube Discount steht wegen einer Affäre in der Kritik. Anleger werden nervös. Sicher ist das nicht.",
-      "name": "Fundgrube Discount",
-      "due_at": "2026-11-14T21:10:01.419544+00:00",
+      "body": "Ein Gericht gibt dem Konkurrenten recht. Lizenzzahlungen drohen. Sicher ist das nicht.",
+      "name": "Methusalem Bio",
+      "due_at": "2026-11-14T21:26:42.835554+00:00",
       "status": "open",
-      "ticker": "FGD",
-      "headline": "Affäre erschüttert Fundgrube Discount",
+      "ticker": "MTH",
+      "headline": "Methusalem Bio verliert Patentstreit",
       "move_bps": null,
-      "strength": 2,
+      "strength": 1,
       "direction": "down",
-      "published_at": "2026-11-14T20:34:48.888797+00:00"
+      "published_at": "2026-11-14T20:53:56.511611+00:00"
     },
     {
       "id": 3,
-      "body": "Ein großer Konkurrent soll Interesse haben. Spekulanten könnten den Kurs spürbar treiben. Sicher ist das nicht.",
-      "name": "Luftpost Drohnen",
-      "due_at": "2026-11-14T19:34:48.884976+00:00",
-      "status": "confirmed",
-      "ticker": "DRN",
-      "headline": "Übernahmegerüchte um Luftpost Drohnen",
-      "move_bps": 616,
-      "strength": 2,
-      "direction": "up",
-      "published_at": "2026-11-14T19:34:48.884976+00:00"
+      "body": "Das Geschäft läuft schwächer als erwartet. Analysten rechnen mit einem deutlich fallenden Kurs. Sicher ist das nicht.",
+      "name": "Memeland Media",
+      "due_at": "2026-11-14T19:53:56.506652+00:00",
+      "status": "fizzled",
+      "ticker": "MEM",
+      "headline": "Memeland Media senkt die Prognose",
+      "move_bps": null,
+      "strength": 3,
+      "direction": "down",
+      "published_at": "2026-11-14T19:53:56.506652+00:00"
     }
   ],
   "reliability_bps": 7500

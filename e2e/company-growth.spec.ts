@@ -252,7 +252,8 @@ test("company tasks: take one, play the mini-game, the result lands in the news 
   await expect(game).toBeVisible();
   const kind = (await game.getAttribute("data-testid"))!.replace("game-", "");
   if (kind === "sort") {
-    for (let i = 0; i < 8; i++) await game.getByRole("button").first().click();
+    // the stack buttons stay as the tap fallback of the drag game (ADR-144)
+    for (let i = 0; i < 8; i++) await game.getByRole("button", { name: /←/ }).click();
   } else if (kind === "order") {
     const rows = game.locator("li button");
     for (let i = 0; i < 5; i++) await rows.nth(i).click();

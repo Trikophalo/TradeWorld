@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "b98c275a-3957-4726-9d51-d010a26ae9ba",
+    "id": "bc37ffb6-5c96-4893-a4a4-62f4b41160bf",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "d21331b8-a414-66aa-de07-f036108fc91d",
+      "id": "12ef4943-a830-a22b-a142-8a080f7be8be",
       "logo": null,
-      "name": "Nordlicht Logistik AG",
-      "color": "#7AA2F7",
+      "name": "Kaufrausch Märkte",
+      "color": "#FF6B8B",
       "is_ai": true,
-      "sector": "logistics",
-      "ticker": "NDL"
+      "sector": "retail",
+      "ticker": "KFR"
     },
     "presence": {
-      "fire_at": "2026-11-19T19:34:47.452802+00:00",
+      "fire_at": "2026-11-19T19:53:54.846117+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-14T19:34:47.452802+00:00"
+      "last_active_at": "2026-11-14T19:53:54.846117+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-14T19:34:47.549454+00:00",
+    "started_at": "2026-11-14T19:53:54.957629+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

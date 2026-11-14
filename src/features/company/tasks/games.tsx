@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import type { TaskGame } from "@/features/game/types";
 import { SPRING } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { DragSortGame, MatchGame, PathGame, RotateGame, SliderGame } from "./drag-games";
 import { useTaskText } from "./task-text";
 
 /*
- * The six task games (ADR-129). Small and quick: a phone, one thumb, under a minute. Each game only collects the
+ * The task games (ADR-129, ADR-144; the hands-on ones in drag-games.tsx). Small and quick: a phone, one thumb, under a minute. Each game only collects the
  * answer; the server grades it. Labels come from messages (companyTasks.items.<key>), the puzzle only holds indices.
  */
 export interface GameProps {
@@ -123,49 +124,6 @@ function Stepper({
   );
 }
 
-/** One item at a time into the left or the right box. */
-function SortGame({ taskKey, puzzle, disabled, onAnswer }: GameProps) {
-  const t = useTranslations("companyTasks.play");
-  const text = useTaskText();
-  const left = text.string(taskKey, "left");
-  const right = text.string(taskKey, "right");
-  const names = [...text.list(taskKey, "leftItems"), ...text.list(taskKey, "rightItems")];
-  const items = (puzzle.items as number[]) ?? [];
-  const [sides, setSides] = useState<number[]>([]);
-  const current = items[sides.length];
-  const put = (side: number) => {
-    const next = [...sides, side];
-    setSides(next);
-    if (next.length === items.length) onAnswer({ sides: next });
-  };
-  return (
-    <div className="space-y-4" data-testid="game-sort">
-      <p className="text-center text-2xs text-fg-3">{t("itemsLeft", { count: items.length - sides.length })}</p>
-      <div className="grid h-24 place-items-center">
-        {current !== undefined && (
-          <motion.div
-            key={sides.length}
-            initial={{ opacity: 0, y: 12, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={SPRING.snappy}
-            className="rounded-lg border-2 border-line-2 bg-surface-2 px-6 py-4 text-base font-semibold text-fg-1 shadow-1"
-          >
-            {names[current] ?? "?"}
-          </motion.div>
-        )}
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <Button variant="secondary" size="lg" disabled={disabled || current === undefined} onClick={() => put(0)}>
-          ← {left}
-        </Button>
-        <Button variant="secondary" size="lg" disabled={disabled || current === undefined} onClick={() => put(1)}>
-          {right} →
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 /** Tap the entries in order of their numbers. */
 function OrderGame({ taskKey, puzzle, disabled, onAnswer }: GameProps) {
   const t = useTranslations("companyTasks.play");
@@ -270,7 +228,10 @@ function SeqGame({ taskKey, puzzle, disabled, onAnswer }: GameProps) {
   );
 }
 
-/** A short business sum. */
+/** Steps of the math stepper, so a sum can be dialled in instead of typed. */
+const MATH_STEPS = [-100, -10, -1, 1, 10, 100] as const;
+
+/** A short business sum: type the result or dial it in. */
 function MathGame({ taskKey, puzzle, disabled, onAnswer }: GameProps) {
   const t = useTranslations("companyTasks.play");
   const text = useTaskText();
@@ -302,6 +263,20 @@ function MathGame({ taskKey, puzzle, disabled, onAnswer }: GameProps) {
           aria-label={t("mathLabel")}
         />
       </label>
+      <div className="grid grid-cols-6 gap-1" role="group" aria-label={t("mathLabel")}>
+        {MATH_STEPS.map((step) => (
+          <Button
+            key={step}
+            size="sm"
+            variant="secondary"
+            className="px-0 nums"
+            disabled={disabled}
+            onClick={() => setValue(String(Math.max(0, (Number.isFinite(parsed) ? parsed : 0) + step)))}
+          >
+            {step > 0 ? `+${step}` : `−${-step}`}
+          </Button>
+        ))}
+      </div>
       <Button type="submit" block disabled={disabled || value === ""}>
         {t("done")}
       </Button>
@@ -316,12 +291,20 @@ export function TaskGameView(props: GameProps & { game: TaskGame }) {
     case "count":
       return <CountGame {...props} />;
     case "sort":
-      return <SortGame {...props} />;
+      return <DragSortGame {...props} />;
     case "order":
       return <OrderGame {...props} />;
     case "seq":
       return <SeqGame {...props} />;
     case "math":
       return <MathGame {...props} />;
+    case "slider":
+      return <SliderGame {...props} />;
+    case "rotate":
+      return <RotateGame {...props} />;
+    case "match":
+      return <MatchGame {...props} />;
+    case "path":
+      return <PathGame {...props} />;
   }
 }

@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "a939a0d6-546b-47fc-a936-70f6e1883991",
+    "id": "f08fd9b7-d46d-47e4-b15f-8dcb00594d49",
     "tier": "junior",
     "title": null,
     "company": {
-      "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
+      "id": "833932bd-1586-776d-1f8f-f602682f7437",
       "logo": null,
-      "name": "QuantenSprung Labs",
-      "color": "#35D0BA",
+      "name": "Luftpost Drohnen",
+      "color": "#00B4D8",
       "is_ai": true,
-      "sector": "tech",
-      "ticker": "QSL"
+      "sector": "logistics",
+      "ticker": "DRN"
     },
     "presence": {
-      "fire_at": "2026-11-19T19:34:44.811036+00:00",
+      "fire_at": "2026-11-19T19:53:51.997688+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-14T19:34:44.811036+00:00"
+      "last_active_at": "2026-11-14T19:53:51.997688+00:00"
     },
     "required": [{ "branch": "it", "min_score": 2 }],
     "promotion": {
@@ -36,10 +36,10 @@
     "signature": "M2 14 C6 4 10 4 14 12 S22 18 26 8",
     "title_key": "it_junior",
     "rank_hours": 1.0,
-    "started_at": "2026-11-14T19:34:45.201273+00:00",
+    "started_at": "2026-11-14T19:53:52.461121+00:00",
     "pending_raise": null,
     "raise_max_bps": 0,
-    "notice_ends_at": "2026-11-15T19:34:45.258793+00:00",
+    "notice_ends_at": "2026-11-15T19:53:52.515172+00:00",
     "paid_hours_cap": 8,
     "pay_factor_bps": 10000,
     "work_task_open": false,
@@ -49,7 +49,7 @@
     "productivity_bps": 17400,
     "next_work_task_at": null,
     "earned_total_cents": 31700,
-    "raise_available_at": "2026-11-21T19:34:45.246623+00:00",
+    "raise_available_at": "2026-11-21T19:53:52.502485+00:00",
     "quit_now_cost_cents": 391812,
     "salary_cents_per_hour": 32651,
     "effective_salary_cents_per_hour": 32651

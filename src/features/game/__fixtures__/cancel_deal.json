@@ -1,5 +1,5 @@
 {
-  "id": "713dfbdd-a723-46d6-977f-feb5e3aae20f",
+  "id": "2727c8ae-d421-4d1e-88de-c76f092f8ab0",
   "kind": "loan",
   "terms": { "hours": 24, "interest_bps": 0, "principal_cents": 20000 },
   "status": "cancelled",
@@ -9,15 +9,15 @@
   "my_role": "lender",
   "progress": { "due_cents": 20000, "left_cents": 20000, "repaid_cents": 0 },
   "proposer": {
-    "tag": "XVTH",
+    "tag": "BL62",
     "level": 6,
     "trust": { "band": "blank", "score": 50 },
     "nickname": "Fixture_Lieferant",
     "avatar_key": "rookie"
   },
-  "closed_at": "2026-11-14T19:34:47.915249+00:00",
-  "created_at": "2026-11-14T19:34:47.911757+00:00",
-  "expires_at": "2026-11-16T19:34:47.911757+00:00",
+  "closed_at": "2026-11-14T19:53:55.380376+00:00",
+  "created_at": "2026-11-14T19:53:55.376649+00:00",
+  "expires_at": "2026-11-16T19:53:55.376649+00:00",
   "accepted_at": null,
   "is_proposer": true,
   "broken_by_me": false,

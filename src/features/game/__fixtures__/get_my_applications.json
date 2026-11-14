@@ -1,56 +1,56 @@
 {
   "applications": [
     {
-      "id": "1d109ecd-32b1-47ab-9fa7-58469a1a2c34",
+      "id": "b56dedf1-edeb-48ae-bea4-647d8c0bca2f",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "30962bd1-95c6-4783-9de5-17a854e0653f",
+        "id": "19bb0e81-20f4-4ab5-a100-88cc741f0745",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "d21331b8-a414-66aa-de07-f036108fc91d",
+          "id": "12ef4943-a830-a22b-a142-8a080f7be8be",
           "logo": null,
-          "name": "Nordlicht Logistik AG",
-          "color": "#7AA2F7",
+          "name": "Kaufrausch Märkte",
+          "color": "#FF6B8B",
           "is_ai": true,
-          "sector": "logistics",
-          "ticker": "NDL"
+          "sector": "retail",
+          "ticker": "KFR"
         },
-        "required": [{ "branch": "it", "min_score": 0 }],
-        "title_key": "it_intern",
+        "required": [{ "branch": "logistics", "min_score": 0 }],
+        "title_key": "logistics_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-14T19:34:45.193867+00:00",
-      "updated_at": "2026-11-14T19:34:45.197516+00:00",
-      "offer_expires_at": "2026-11-16T19:34:45.193867+00:00",
-      "salary_wish_cents_per_hour": 15900,
-      "offer_salary_cents_per_hour": 15900
+      "created_at": "2026-11-14T19:53:52.452848+00:00",
+      "updated_at": "2026-11-14T19:53:52.456319+00:00",
+      "offer_expires_at": "2026-11-16T19:53:52.452848+00:00",
+      "salary_wish_cents_per_hour": 15000,
+      "offer_salary_cents_per_hour": 15000
     },
     {
-      "id": "fe19e50f-96f0-4715-b2f5-9f775067cbff",
+      "id": "3c10646f-d1ad-4b1d-9e0e-a912aa17a827",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "3257b3f7-5779-4009-8469-fbc9525f2f95",
+        "id": "7c4af339-695b-4d1a-8291-75a5309a1305",
         "tier": "junior",
         "title": null,
         "company": {
-          "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
+          "id": "833932bd-1586-776d-1f8f-f602682f7437",
           "logo": null,
-          "name": "QuantenSprung Labs",
-          "color": "#35D0BA",
+          "name": "Luftpost Drohnen",
+          "color": "#00B4D8",
           "is_ai": true,
-          "sector": "tech",
-          "ticker": "QSL"
+          "sector": "logistics",
+          "ticker": "DRN"
         },
         "required": [{ "branch": "it", "min_score": 2 }],
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-14T19:34:45.188464+00:00",
-      "updated_at": "2026-11-14T19:34:45.188464+00:00",
-      "offer_expires_at": "2026-11-16T19:34:45.188464+00:00",
+      "created_at": "2026-11-14T19:53:52.447323+00:00",
+      "updated_at": "2026-11-14T19:53:52.447323+00:00",
+      "offer_expires_at": "2026-11-16T19:53:52.447323+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }
