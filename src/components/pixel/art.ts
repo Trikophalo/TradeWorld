@@ -1,3 +1,4 @@
+import { NEWS_ICON_ART } from "./news-art";
 import type { PixelArt } from "./pixel-icon";
 
 /*
@@ -1318,4 +1319,5 @@ export const ALL_PIXEL_ART: Record<string, PixelArt> = {
   ...Object.fromEntries(Object.entries(MIRA).map(([k, v]) => [`mira/${k}`, v])),
   ...Object.fromEntries(Object.entries(UI_ICONS).map(([k, v]) => [`ui/${k}`, v])),
   ...Object.fromEntries(Object.entries(COMPANY_BUILDINGS).map(([k, v]) => [`building/${k}`, v])),
+  ...NEWS_ICON_ART,
 };

@@ -6792,5 +6792,50 @@
         "backfire": "✘ Dein Auftrag ging nach hinten los."
       }
     }
+  },
+  "newsStudio": {
+    "show": "NEXA Nachrichten",
+    "anchor": "Mr. Doodle Dangle",
+    "brand": "NEXA-Vision",
+    "tvLabel": "Fernseher mit der Sendung „NEXA Nachrichten“",
+    "live": "Live",
+    "replay": "Wiederholung",
+    "viewers": "{count, plural, =0 {Noch keiner da} one {# schaut zu} other {# schauen zu}}",
+    "standbyTitle": "Gleich live",
+    "startsIn": "Die Sendung beginnt in",
+    "startsNow": "Jeden Moment geht es los",
+    "standbyHint": "Mr. Doodle Dangle sortiert noch seine Zettel.",
+    "standbyFinal": "Achtung, Sendung!",
+    "introTitle": "NEXA Nachrichten",
+    "introBy": "mit Mr. Doodle Dangle",
+    "introTagline": "Volle Stunde, volle Wahrheit.",
+    "introChip": "Jetzt live",
+    "outro": "Das war’s von mir. Kaufen Sie klug, verkaufen Sie klüger. Bis zur nächsten vollen Stunde!",
+    "outroHeadline": "Bis zur nächsten vollen Stunde!",
+    "noSignal": "Kein Signal",
+    "noSignalHint": "Die nächste Sendung kommt zur vollen Stunde.",
+    "segmentOf": "Meldung {index} von {count}",
+    "kinds": {
+      "intro": "Begrüßung",
+      "loser": "Pleite der Stunde",
+      "winner": "Gewinner der Stunde",
+      "scandal": "Skandal",
+      "hype": "Hype",
+      "stock": "Börse",
+      "sector": "Branche",
+      "world": "Weltlage",
+      "tasks": "Auftragslage",
+      "crypto": "Krypto",
+      "outro": "Schlusswort",
+      "other": "Eilmeldung"
+    },
+    "ticker": [
+      "Börse hat wieder geöffnet",
+      "Experten raten: billig kaufen, teuer verkaufen",
+      "Schnurrbart von Mr. Doodle Dangle weiterhin stabil",
+      "Spielgeld bleibt Spielgeld",
+      "Bulle und Bär streiten sich um den Kaffeeautomaten",
+      "Zur vollen Stunde: die nächste Sendung"
+    ]
   }
 }
