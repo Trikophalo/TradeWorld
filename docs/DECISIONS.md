@@ -1995,3 +1995,12 @@ viele mitmachen, auch die KI, und nur ganz selten hat das echte Auswirkungen.
   schon die Werbekampagnen (ADR-083) bezeichnet. Test `supabase/tests/99_protests.sql`.
 
 Dazu: Der letzte Quartalsabschluss steht im Firmen-Dashboard jetzt ganz oben, gleich unter der Produktion.
+
+### Nachtrag zu ADR-130: Gewinne passend zu den Startkursen
+
+Mehrere der zehn neuen KI-Firmen starteten weit über dem Wert, den ihre Gewinne hergeben (fairer Wert = Gewinn je
+Aktie × Branchen-KGV): Knusperkönig zu 0,74 € bei etwa 0,31 € fairem Wert, Memeland 0,51 € statt 0,19 €, Nordbrise
+und Orbitfracht etwa 40 % zu hoch. Die Simulation zieht Kurse zum fairen Wert, also fielen diese Aktien laufend, und
+wer kaufte, verlor. Migration `20261204000900_fix_new_ai_fundamentals.sql` setzt ihre Kosten so, dass der Startkurs
+genau dem Branchen-KGV entspricht, und stellt den fairen Wert aller zehn auf den Startkurs zurück. Firmen mit Verlust
+(Sonnenkern, Methusalem, Luftpost) bleiben spekulativ wie die bisherigen Pennystocks mit Verlust.
