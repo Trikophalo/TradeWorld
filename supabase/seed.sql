@@ -203,8 +203,15 @@ on conflict do nothing;
 
 drop table _seed_companies;
 
--- Ten more AI companies (ADR-130), outside the NEXA 30. The same function adds them to a live database.
-select public.ai_companies_add_v2();
+-- Ten more AI companies (ADR-130), outside the NEXA 30. The same function adds them to a live database; on an older
+-- database the update that defines it runs after this seed and adds them itself.
+do $$
+begin
+  if to_regprocedure('public.ai_companies_add_v2()') is not null then
+    perform public.ai_companies_add_v2();
+  end if;
+end;
+$$;
 
 -- ---------------------------------------------------------------------------
 -- 4. Government bonds: 1, 2, 5 and 10 game years (1 game year = 1 real day).

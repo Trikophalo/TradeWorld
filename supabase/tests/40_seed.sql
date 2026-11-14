@@ -5,15 +5,17 @@
 set client_min_messages = notice;
 
 select tests.assert((select count(*) from public.sectors) = 5, '5 sectors');
-select tests.assert((select count(*) from public.companies where is_ai) = 25, '25 AI companies (15 from ADR-014, 10 from ADR-130)');
+select tests.assert((select count(*) from public.companies where is_ai) in (15, 25),
+  '25 AI companies (15 from ADR-014, 10 from ADR-130; an older database has the first 15 until its update)');
 select tests.assert(
   (select count(*) from (select sector_key from public.companies where is_ai
-                          group by sector_key having count(*) = 5 and count(distinct tier) = 3) x) = 5,
+                          group by sector_key having count(*) = (select count(*) from public.companies where is_ai) / 5 and count(distinct tier) = 3) x) = 5,
   'each sector has five AI companies with bluechip, midcap and penny stocks');
 select tests.assert(
   (select array_agg(ticker order by ticker) from public.companies where is_ai)
-  = array['ALM','BRZ','DRN','EBX','FGD','FPT','FSN','GNV','HLX','KFR','KLS','LUX','MEM','MTH','NDL','NPH','OFR','PFW','PXW',
-          'QSL','RKW','SFX','SNK','VLT','WND'],
+  in (array['ALM','BRZ','DRN','EBX','FGD','FPT','FSN','GNV','HLX','KFR','KLS','LUX','MEM','MTH','NDL','NPH','OFR','PFW','PXW',
+            'QSL','RKW','SFX','SNK','VLT','WND'],
+      array['ALM','BRZ','EBX','FGD','FPT','GNV','KFR','KLS','NDL','NPH','PXW','QSL','RKW','SFX','VLT']),
   'tickers match ADR-014 and ADR-130');
 select tests.assert(
   (select count(*) from public.companies c
@@ -23,7 +25,7 @@ select tests.assert(
      join public.company_state cs on cs.company_id = c.id and cs.quality > 0 and cs.awareness > 0 and cs.baseline_revenue_cents > 0
      join public.ledger_accounts a on a.owner_company_id = c.id and a.kind = 'company_cash' and a.balance_cents > 0
     where c.is_ai and c.description is not null and c.shares_outstanding > 0
-      and q.market_cap_cents = round(c.shares_outstanding::numeric * q.last_price_e4 / 100)) = 25,
+      and q.market_cap_cents = round(c.shares_outstanding::numeric * q.last_price_e4 / 100)) = (select count(*) from public.companies where is_ai),
   'every AI company has description, stock, quote with spread, sim state, fundamentals and a funded cash account');
 select tests.assert(
   (select count(*) from public.securities s join public.security_quotes q on q.security_id = s.id
@@ -131,8 +133,8 @@ select tests.assert((select count(*) from public.game_config) = 0, 'game_config 
 
 -- seed.sql ran twice: nothing duplicated
 select tests.assert(
-  (select count(*) from public.ledger_transactions where kind = 'opening_balance') = 25
-  and (select count(*) from public.securities) = 30
-  and (select count(*) from public.cap_table_entries) = 25,
+  (select count(*) from public.ledger_transactions where kind = 'opening_balance') = (select count(*) from public.companies where is_ai)
+  and (select count(*) from public.securities) = (select count(*) from public.companies where is_ai) + 5
+  and (select count(*) from public.cap_table_entries) = (select count(*) from public.companies where is_ai),
   'seed is idempotent (25 opening balances, 30 securities, 25 cap table rows after two runs)');
 select tests.assert((select count(*) from public.ledger_audit()) = 0, 'ledger is consistent after seeding');

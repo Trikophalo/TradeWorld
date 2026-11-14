@@ -170,38 +170,40 @@ export function tycoonAvatar(id: string): string {
 }
 
 const POSTINGS: { posting: Omit<JobPosting, "maxSalaryCentsPerHour" | "matchScore" | "eligible" | "myApplication"> }[] =
-  [...DEMO_COMPANIES]
-    .sort((a, b) => a.ticker.localeCompare(b.ticker))
-    .flatMap((company, c) =>
-      Array.from({ length: jobs.aiPostingsPerCompany }, (_, i) => {
-        const spec = aiPostingSpec(company.sector, c, i, 0);
-        const employer: Employer = {
-          id: `demo-${company.ticker}`,
-          name: company.name,
-          ticker: company.ticker,
-          sector: company.sector,
-          color: company.color,
-          isAi: true,
-          logo: null,
-        };
-        return {
-          posting: {
-            id: `posting-${company.ticker}-${i}`,
-            company: employer,
-            tier: spec.tier as CareerTier,
-            titleKey: spec.titleKey,
-            title: null,
-            minLevel: spec.minLevel,
-            required: [...spec.required],
-            salaryCentsPerHour: spec.salaryCentsPerHour,
-            requiredSkills: [],
-            slotsOpen: jobs.aiSlotsOpen,
-            postedAt: iso(Date.UTC(2026, 10, 1)),
-            expiresAt: null,
-          },
-        };
-      }),
-    );
+  // The first 15 companies keep their places (postings and saved demo jobs refer to them); later ones follow.
+  [
+    ...DEMO_COMPANIES.slice(0, 15).sort((a, b) => a.ticker.localeCompare(b.ticker)),
+    ...DEMO_COMPANIES.slice(15).sort((a, b) => a.ticker.localeCompare(b.ticker)),
+  ].flatMap((company, c) =>
+    Array.from({ length: jobs.aiPostingsPerCompany }, (_, i) => {
+      const spec = aiPostingSpec(company.sector, c, i, 0);
+      const employer: Employer = {
+        id: `demo-${company.ticker}`,
+        name: company.name,
+        ticker: company.ticker,
+        sector: company.sector,
+        color: company.color,
+        isAi: true,
+        logo: null,
+      };
+      return {
+        posting: {
+          id: `posting-${company.ticker}-${i}`,
+          company: employer,
+          tier: spec.tier as CareerTier,
+          titleKey: spec.titleKey,
+          title: null,
+          minLevel: spec.minLevel,
+          required: [...spec.required],
+          salaryCentsPerHour: spec.salaryCentsPerHour,
+          requiredSkills: [],
+          slotsOpen: jobs.aiSlotsOpen,
+          postedAt: iso(Date.UTC(2026, 10, 1)),
+          expiresAt: null,
+        },
+      };
+    }),
+  );
 
 export function createCareerEngine(host: CareerHost) {
   const st = () => host.state();

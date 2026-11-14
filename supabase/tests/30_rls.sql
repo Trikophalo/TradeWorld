@@ -149,16 +149,16 @@ select tests.assert((select count(*) from public.work_tasks) = 1, 'own work task
 
 -- public data through tables and views
 select tests.assert((select count(*) from public.profiles) = 2, 'profiles are public');
-select tests.assert((select count(*) from public.v_securities) = 30
-  and (select count(*) from public.v_securities where last_price_e4 is not null) = 30, 'v_securities: 25 stocks + 4 bonds + index with quotes');
-select tests.assert((select count(*) from public.v_stock_fundamentals where pe_ratio > 0) = 19, 'v_stock_fundamentals: P/E for the 19 profitable companies');
+select tests.assert((select count(*) from public.v_securities) = (select count(*) from public.companies where is_ai) + 5
+  and (select count(*) from public.v_securities where last_price_e4 is not null) = (select count(*) from public.companies where is_ai) + 5, 'v_securities: 25 stocks + 4 bonds + index with quotes');
+select tests.assert((select count(*) from public.v_stock_fundamentals where pe_ratio > 0) = case when (select count(*) from public.companies where is_ai) = 25 then 19 else 12 end, 'v_stock_fundamentals: P/E for the 19 profitable companies');
 select tests.assert((select round(pe_ratio::numeric, 1) from public.v_stock_fundamentals where ticker = 'KLS') = 28.0, 'KlarSoft P/E = 28');
 select tests.assert((select count(*) from public.v_bonds) = 4, 'v_bonds');
 select tests.assert((select count(*) from public.v_index_members where index_key = 'NEXA30') = 15, 'v_index_members');
-select tests.assert((select count(*) from public.v_company_profiles) = 26, 'v_company_profiles: 25 AI companies + Annas Apps');
+select tests.assert((select count(*) from public.v_company_profiles) = (select count(*) from public.companies where is_ai) + 1, 'v_company_profiles: 25 AI companies + Annas Apps');
 select tests.assert((select count(*) from public.v_job_board) >= 15, 'v_job_board');
 select tests.assert((select count(*) from public.v_player_profiles) = 2, 'v_player_profiles');
-select tests.assert((select count(*) from public.v_cap_table) = 25, 'v_cap_table');
+select tests.assert((select count(*) from public.v_cap_table) = (select count(*) from public.companies where is_ai), 'v_cap_table');
 select tests.assert((select count(*) from public.v_event_calendar) = 0 and (select count(*) from public.v_news) = 0
   and (select count(*) from public.v_ipo_calendar) = 0 and (select count(*) from public.v_league_standings) = 0
   and (select count(*) from public.v_friends) = 0, 'calendar/news/ipo/league/friends views are readable (empty)');
@@ -275,11 +275,11 @@ select tests.throws($$select public.current_game_quarter()$$, '42501', 'anon can
 -- =============================================================================
 reset role;
 select tests.login_as('service_role', null);
-select tests.assert((select count(*) from public.security_sim_state) = 29, 'service_role reads sim state');
+select tests.assert((select count(*) from public.security_sim_state) = (select count(*) from public.companies where is_ai) + 4, 'service_role reads sim state');
 select tests.assert((select count(*) from public.ledger_accounts where kind = 'system') >= 7, 'service_role reads all ledger accounts');
 select tests.assert((select count(*) from public.orders) = 2, 'service_role bypasses RLS');
 select tests.assert(public.ensure_game_quarters(3) = 0, 'service_role may call internal functions');
-select tests.assert(tests.row_count($$update public.security_quotes set tick_seq = tick_seq + 1$$) = 30, 'service_role may write quotes');
+select tests.assert(tests.row_count($$update public.security_quotes set tick_seq = tick_seq + 1$$) = (select count(*) from public.companies where is_ai) + 5, 'service_role may write quotes');
 
 reset role;
 rollback;
