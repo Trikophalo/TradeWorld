@@ -825,6 +825,21 @@ export interface BalanceConfig {
   readonly companyTasks: typeof COMPANY_TASK_RULES & { readonly tasks: readonly CompanyTaskConfig[] };
   /** Funny news in the news tab (ADR-129). */
   readonly funNews: typeof FUN_NEWS;
+  /** Crises, scandals and a falling share price cut wages (ADR-131). */
+  readonly wageMood: {
+    /** Wage cut per severity level (1..3) of an open or running crisis. */
+    readonly crisisPerSeverityBps: number;
+    /** Extra cut for a scandal. */
+    readonly scandalBps: number;
+    readonly scandals: readonly string[];
+    /** Daily falls up to this are normal and cost nothing. */
+    readonly shareFallFreeBps: number;
+    /** Share of the rest of today's price fall that comes off the wage (fall 13 %: 10 % x 0.5 = 5 % less pay). */
+    readonly shareFallShare: number;
+    readonly maxShareBps: number;
+    /** The wage never falls below this share. */
+    readonly minBps: number;
+  };
 }
 
 export type PropertyTier = "flat" | "apartment" | "house" | "villa" | "luxury_villa";
@@ -2349,6 +2364,15 @@ export const BALANCE = {
   companyMoves: { ...COMPANY_MOVE_RULES, moves: COMPANY_MOVES },
   companyTasks: { ...COMPANY_TASK_RULES, tasks: COMPANY_TASKS },
   funNews: FUN_NEWS,
+  wageMood: {
+    crisisPerSeverityBps: 500,
+    scandalBps: 500,
+    scandals: ["quality_scandal", "data_breach", "protest", "bad_review", "strike"],
+    shareFallFreeBps: 300,
+    shareFallShare: 0.5,
+    maxShareBps: 2_000,
+    minBps: 6_000,
+  },
   stockNews: {
     everyMinutes: 12,
     leadMinMinutes: 10,

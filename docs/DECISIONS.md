@@ -1927,3 +1927,18 @@ lassen sich noch abholen. Dazu kommen 67 neue Vorlagen:
 Nebenbei: Der Cache der Marktübersicht (ADR-123) löschte mit `delete` ohne `where`. Supabase lehnt das bei
 API-Aufrufen ab (pg-safeupdate), deshalb schlug das Speichern eines Firmenlogos live fehl.
 Migration `20261204000300_fix_safe_delete.sql`.
+
+## ADR-131: Krisen, Skandale und fallende Kurse drücken die Löhne — `akzeptiert`
+
+Vorgabe: Skandale und sinkende Aktienkurse sollen direkt die Löhne der Mitarbeiter beeinflussen.
+
+- `company_pay_mood_bps(Firma)` ergibt einen Lohnfaktor, normal 100 %:
+  - Offene oder laufende **Krise** einer Spielerfirma: 5 % weniger je Schweregrad (1 bis 3).
+  - **Skandal** (Qualitätsskandal, Datenleck, Proteste, Verriss, Streik): weitere 5 % weniger.
+  - **Aktie fällt heute** (Spieler- und KI-Firmen an der Börse): Die ersten 3 % sind normale Schwankung. Vom Rest
+    geht die Hälfte vom Lohn ab, höchstens 20 %. Beispiel: 13 % im Minus bedeutet 5 % weniger Lohn.
+  - Nie unter 60 %.
+- Die Lohnabrechnung (`accrue_job_salary`) rechnet ihn bei jeder Auszahlung ein, für Spielerfirmen und KI-Arbeitgeber.
+  Mitarbeiter sehen die Kürzung als „Lohnfaktor“ auf ihrer Jobkarte, mit kurzer Erklärung.
+- Werte in `BALANCE.wageMood`. Die Datenbank-Tests schalten den Kursanteil am Anfang ab, weil Kurse mit jedem Takt
+  schwanken, und prüfen ihn gezielt in `supabase/tests/97_wage_mood.sql`.

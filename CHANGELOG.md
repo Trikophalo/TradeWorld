@@ -157,3 +157,4 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 - **Zehn neue KI-Firmen** an der Börse, von Glanz & Gloria (Luxus) bis Sonnenkern Fusion. Jede KI-Firma hat im Profil
   eigene Neuigkeiten.
 - **Fehler behoben:** Das Firmenlogo ließ sich live nicht speichern.
+- **Löhne mit Stimmung (ADR-131):** Krisen, Skandale und stark fallende Aktienkurse senken die Löhne der Mitarbeiter.

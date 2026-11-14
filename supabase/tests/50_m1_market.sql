@@ -9,6 +9,9 @@
 set client_min_messages = notice;
 
 \ir ../seeds/game_config.sql
+-- Wages follow the employer's share price (ADR-131); prices move with every tick, so the wage tests run without it.
+-- 97_wage_mood.sql switches it back on.
+update public.game_config set value = jsonb_set(value, '{maxShareBps}', '0') where key = 'wageMood';
 -- The game runs with market orders only (ADR-117); the tests keep exercising the whole order engine.
 update public.game_config set value = value || '{"limitOrders": true}'::jsonb where key = 'trading';
 -- The tests check the mechanics with the tuning they were written for: the game's stronger player impact

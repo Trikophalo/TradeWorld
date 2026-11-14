@@ -7185,3 +7185,12 @@ Migrationen `20261204000200_missions_ai_companies.sql` und `20261204000300_fix_s
 - `get_company_profile` liefert zusätzlich
   `"news": [{"headline", "body", "category", "published_at"}]` (höchstens 6, neueste zuerst).
 - `market_snapshot_invalidate()` löscht mit `where true` (pg-safeupdate).
+
+## Nachtrag: Lohnfaktor aus Krisen und Kursen (ADR-131)
+
+Migration `20261204000400_wage_mood.sql`, Test `supabase/tests/97_wage_mood.sql`.
+
+- `company_pay_mood_bps(p_company uuid) -> integer` (intern): 10 000 = voller Lohn; Krisen, Skandale und der
+  Tagesverlust der Aktie senken ihn (Konfiguration `game_config.wageMood`: `crisisPerSeverityBps`, `scandalBps`,
+  `scandals`, `shareFallFreeBps`, `shareFallShare`, `maxShareBps`, `minBps`).
+- `accrue_job_salary` multipliziert den Lohn damit; `player_jobs.pay_factor_bps` zeigt die Kürzung.

@@ -1659,7 +1659,8 @@
       "reduced": "Du warst länger weg: nur {percent} Lohn.",
       "rules": "Gearbeitet wird 8 Stunden am Tag, von selbst. Ab einem Tag ohne Besuch gibt es 75 % Lohn, ab zwei Tagen 50 %, ab drei Tagen 25 %. Nach fünf Tagen ohne Besuch wirst du gekündigt.",
       "comeBack": "Spätestens am {date} wieder vorbeischauen."
-    }
+    },
+    "payFactorWhy": "Weniger Lohn bei Krisen, Skandalen oder wenn die Aktie deines Arbeitgebers heute stark fällt. Auch wenn die Firma nicht genug verdient."
   },
   "jobs": {
     "title": "Jobportal",

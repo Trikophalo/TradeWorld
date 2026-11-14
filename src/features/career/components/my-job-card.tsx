@@ -121,7 +121,10 @@ export function ActiveJob({ job }: { job: MyJob }) {
             {t("perDay", { amount: formatMoney(job.effectiveSalaryCentsPerHour * cap, { whole: true }) })}
           </dd>
           {job.payFactorBps !== 10_000 && (
-            <dd className="mt-0.5 nums text-xs text-warn">{t("payFactor", { value: formatBps(job.payFactorBps) })}</dd>
+            <dd className="mt-0.5 nums text-xs text-warn" title={t("payFactorWhy")}>
+              {t("payFactor", { value: formatBps(job.payFactorBps) })}
+              <span className="block text-2xs text-pretty text-fg-3">{t("payFactorWhy")}</span>
+            </dd>
           )}
         </div>
         <div className="rounded-md bg-surface-2 px-3 py-2.5" title={t("productivityHint")}>
