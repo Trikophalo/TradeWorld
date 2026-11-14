@@ -1,8 +1,8 @@
 {
-  "now": "2026-11-14T22:39:38.632538+00:00",
+  "now": "2026-11-14T23:11:03.73202+00:00",
   "chat": [
     {
-      "at": "2026-11-14T22:39:38.629294+00:00",
+      "at": "2026-11-14T23:11:03.728916+00:00",
       "id": 3,
       "body": "Was für eine Sendung 💀📉",
       "mine": true,
@@ -12,54 +12,54 @@
   "show": {
     "id": 4,
     "writer": "mini",
-    "airs_at": "2026-11-14T22:00:00+00:00",
+    "airs_at": "2026-11-14T23:00:00+00:00",
     "segments": [
       {
         "kind": "scandal",
-        "text": "Das Netz zerreißt Stunden Werk. Ein Werbespot wurde versehentlich mit dem Ton einer Karaoke-Nacht veröffentlicht. Seitdem will niemand mehr „Apps für Uhrmacher“. Hanna_Stunde hat das Firmenhandy im Fluss versenkt.",
+        "text": "Das Netz zerreißt Taktgeber Strom. Die Jahresbilanz wurde mit Buntstiften erstellt, immerhin innerhalb der Linien. Seitdem will niemand mehr „Ideen für alle“. Hedi_Taktgeber hat das Firmenhandy im Fluss versenkt.",
         "effects": [{ "tone": "loss", "label": "Bekanntheit −10,3 %" }],
-        "headline": "Shitstorm über Stunden Werk"
+        "headline": "Shitstorm über Taktgeber Strom"
       },
       {
         "kind": "scandal",
-        "text": "Frida Fahrrad wollte heute groß rauskommen. Der Sicherheitsdienst hat sich selbst ausgesperrt und die Tür aufgebrochen. Frida_Upgrade erklärte, das gehöre zum Konzept. Die Kundschaft erklärte, sie sei dann mal weg.",
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −19,7 %" }],
-        "headline": "Frida Fahrrad blamiert sich bis auf die Knochen"
+        "text": "Peinlich für Gero_Garage: Ein Mitarbeiter hat die gesamte Kundendatei alphabetisch nach Vornamen des Haustiers sortiert. „Fahrräder reparieren“ klang auf dem Papier besser. Das Image von Gero Werkstatt ist im Eimer.",
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −20,9 %" }],
+        "headline": "Kunden fliehen vor Gero Werkstatt"
       },
       {
         "kind": "stock",
-        "text": "Der Sicherheitscode der Tresore lautete 1234 und stand auf einem Zettel am Tresor. Die Börse straft Glanz & Gloria mit 12,4 % Minus ab. Der Pressesprecher wurde zuletzt am Flughafen gesehen.",
-        "effects": [{ "tone": "loss", "label": "LUX −12,4 %" }],
-        "headline": "Katastrophe bei Glanz & Gloria"
+        "text": "Schlechte Nachrichten von Brotzeit Handel AG: Durch einen Fehler der Rechtsabteilung hat sich die Firma selbst verklagt und droht zu gewinnen. Minus 13,3 %, und der Tag ist noch jung.",
+        "effects": [{ "tone": "loss", "label": "BRZ −13,3 %" }],
+        "headline": "Brotzeit Handel AG im Sinkflug"
       },
       {
         "kind": "stock",
-        "text": "Schlechte Nachrichten von Alpenmed: Der Chef hat im Interview das eigene Produkt nicht erkannt und es „billigen Schrott“ genannt. Minus 13,5 %, und der Tag ist noch jung.",
-        "effects": [{ "tone": "loss", "label": "ALM −13,5 %" }],
-        "headline": "Alpenmed im Sinkflug"
+        "text": "Ein Hund hat auf der Hauptversammlung einen Antrag gestellt, und er wurde angenommen. Die Börse feiert: SolarFuchs steigt um 13,1 %. Wer nicht dabei ist, darf sich jetzt ärgern.",
+        "effects": [{ "tone": "gain", "label": "SFX +13,1 %" }],
+        "headline": "Kursrakete SolarFuchs"
       },
       {
-        "kind": "sector",
-        "text": "Die ganze Branche Pharma steigt um 4,6 %. Eine Zeitung hat sich vertippt, und niemand hat es gemerkt. So funktioniert Wirtschaft, liebe Kinder.",
-        "effects": [{ "tone": "gain", "label": "Pharma +4,6 %" }],
-        "headline": "Die Branche Pharma dreht durch"
+        "kind": "tasks",
+        "text": "Ein Fernsehkoch hat erklärt, man könne Geld auch behalten. Alle offenen Firmen-Aufgaben sind 38,3 % weniger wert. Die Chefs dürfen ruhig ein bisschen schwitzen.",
+        "effects": [{ "tone": "loss", "label": "Aufgaben −38,3 %" }],
+        "headline": "Kunden entdecken das Sparen"
       },
       {
         "kind": "winner",
-        "text": "Fixture_Neu ist heute um 1.076.312 € reicher, 10763,1 % rauf. Der Rest schaut zu und heult leise ins Depot.",
+        "text": "11389,3 % Plus, 1.138.930 € Gewinn: Fixture_Neu zeigt dem Rest, wie es geht. Alle anderen dürfen jetzt neidisch sein. Bitte der Reihe nach.",
         "effects": [],
-        "headline": "Glückspilz des Tages: Fixture_Neu"
+        "headline": "Fixture_Neu schwimmt im Geld"
       },
       {
         "kind": "tip",
-        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Knusperkönig geht bald nach unten. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
-        "effects": [{ "tone": "neutral", "label": "SNK ↓ Tipp" }],
-        "headline": "Der heiße Draht: Knusperkönig"
+        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Helix Robotik geht bald nach oben. Das Vögelchen lag bisher meistens richtig. Meistens.",
+        "effects": [{ "tone": "neutral", "label": "HLX ↑ Tipp" }],
+        "headline": "Der heiße Draht: Helix Robotik"
       }
     ],
-    "started_at": "2026-11-14T22:39:38.632538+00:00"
+    "started_at": "2026-11-14T23:11:03.73202+00:00"
   },
   "viewers": 3,
   "upcoming": null,
-  "next_airs_at": "2026-11-14T23:00:00+00:00"
+  "next_airs_at": "2026-11-15T00:00:00+00:00"
 }

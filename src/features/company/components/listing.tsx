@@ -20,7 +20,7 @@ import { engine, useGame } from "@/features/game/store";
 import type { MyCompany, Offer } from "@/features/game/types";
 import { CompanyLogo } from "@/features/market/components/company-logo";
 import { formatMoney, formatPrice, formatShares } from "@/lib/format";
-import { issuePriceCents } from "@/lib/sim/startup";
+import { aiTakeShare, issuePriceCents } from "@/lib/sim/startup";
 import { playSound } from "@/lib/sound";
 import { useCompanyRefresh } from "../hooks";
 import { useVisitTour } from "@/features/tutorial/use-visit-tour";
@@ -103,11 +103,15 @@ export function ListingCard({ company }: { company: MyCompany }) {
   );
 }
 
-/** Subscribed shares (players and AI investors) and the time left of the 10-minute window (ADR-146). */
+/**
+ * Subscribed shares (players and AI investors) and the time left of the window (ADR-146). The money is held back
+ * until the end: a full IPO pays it out, a failed one pays everybody back (ADR-151).
+ */
 function OfferProgress({ offer }: { offer: Offer }) {
   const t = useTranslations("listing");
   const taken = offer.sharesSubscribedE6 + offer.sharesAiE6;
   const share = taken / Math.max(1, offer.sharesOfferedE6);
+  const pledgedCents = Math.floor((taken * offer.priceCents) / 1_000_000);
   return (
     <div className="space-y-2 rounded-md bg-surface-2 px-3 py-3" data-testid="offer-progress">
       <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
@@ -125,7 +129,12 @@ function OfferProgress({ offer }: { offer: Offer }) {
           price: formatMoney(offer.priceCents),
         })}
       </p>
-      <p className="text-xs text-pretty text-fg-3">{t("fullHint")}</p>
+      <p className="text-xs text-pretty text-fg-3">{offer.kind === "ipo" ? t("fullHint") : t("increaseHint")}</p>
+      {offer.mine && (
+        <p className="rounded-md bg-info-soft px-3 py-2 text-xs text-pretty text-info" data-testid="offer-escrow">
+          {t(offer.kind === "ipo" ? "escrowIpo" : "escrowIncrease", { amount: money(pledgedCents) })}
+        </p>
+      )}
     </div>
   );
 }
@@ -158,6 +167,8 @@ function IssueSheet({
     : Math.round(((company.listing?.lastPriceE4 ?? 0) / 100) * ipo.capitalIncreaseDiscount);
   const total = isIpo ? ipo.sharesTotal : (company.listing?.sharesTotalE6 ?? 0) / 1_000_000;
   const shares = Math.floor((total * percent) / 100);
+  // AI investors take this part of an IPO (more with better quality); fellow players must take the rest (ADR-151).
+  const aiPercent = Math.floor(aiTakeShare(company.qualityBps / 10_000) * 100);
 
   const start = async () => {
     setState("loading");
@@ -210,8 +221,14 @@ function IssueSheet({
           <Row label={t("shares")} value={shares.toLocaleString("de-DE")} />
           <Row label={t("maxProceeds")} value={money(shares * price)} />
           {isIpo && <Row label={t("youKeep")} value={`${100 - percent} %`} />}
+          {isIpo && <Row label={t("aiPart")} value={`${aiPercent} %`} />}
+          {isIpo && <Row label={t("playersPart")} value={`${100 - aiPercent} %`} />}
         </dl>
-        <p className="text-xs text-pretty text-fg-3">{t("aiHint", { minutes: ipo.subscriptionMinutes })}</p>
+        <p className="text-xs text-pretty text-fg-3">
+          {isIpo
+            ? t("aiHint", { minutes: ipo.subscriptionMinutes })
+            : t("increaseAiHint", { minutes: ipo.subscriptionMinutes })}
+        </p>
       </div>
     </Sheet>
   );
@@ -237,18 +254,31 @@ export function OffersCard() {
   const t = useTranslations("listing");
   const offers = useOffers();
   const list = offers.data?.filter((o) => o.status === "open") ?? [];
-  if (list.length === 0) return null;
+  // IPOs the player had subscribed to and that failed: the money is back (ADR-151).
+  const failed = offers.data?.filter((o) => o.status === "failed" && o.myAmountCents > 0) ?? [];
+  if (list.length === 0 && failed.length === 0) return null;
   return (
     <Card padding="lg" className="space-y-4" data-testid="offers">
       <div>
         <p className="label-pixel text-fg-2">{t("offersTitle")}</p>
         <p className="mt-1 text-sm text-pretty text-fg-3">{t("offersIntro", { minutes: ipo.subscriptionMinutes })}</p>
       </div>
-      <ul className="space-y-5">
-        {list.map((o) => (
-          <OfferItem key={o.id} offer={o} />
-        ))}
-      </ul>
+      {failed.map((o) => (
+        <p
+          key={o.id}
+          className="rounded-md bg-info-soft px-3 py-2 text-sm text-pretty text-info"
+          data-testid="offer-refunded"
+        >
+          {t("refunded", { name: o.company.name, amount: formatMoney(o.myAmountCents) })}
+        </p>
+      ))}
+      {list.length > 0 && (
+        <ul className="space-y-5">
+          {list.map((o) => (
+            <OfferItem key={o.id} offer={o} />
+          ))}
+        </ul>
+      )}
     </Card>
   );
 }
@@ -320,7 +350,12 @@ function OfferItem({ offer }: { offer: Offer }) {
             })}
           </div>
           {offer.mySharesE6 > 0 && (
-            <p className="nums text-xs text-fg-2">{t("yourShares", { shares: formatShares(offer.mySharesE6) })}</p>
+            <p className="nums text-xs text-pretty text-fg-2" data-testid="offer-mine">
+              {t(offer.kind === "ipo" ? "yourSharesIpo" : "yourShares", {
+                shares: formatShares(offer.mySharesE6),
+                amount: formatMoney(offer.myAmountCents),
+              })}
+            </p>
           )}
           <p className="text-xs text-pretty text-fg-3">{t("risk")}</p>
         </>

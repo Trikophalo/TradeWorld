@@ -50,9 +50,10 @@ const offerSchema = z.object({
   shares_ai_e6: num.default(0),
   starts_at: iso.optional(),
   ends_at: iso,
-  status: z.enum(["open", "closed"]),
+  status: z.enum(["open", "closed", "failed"]),
   mine: z.boolean().default(false),
   my_shares_e6: num,
+  my_amount_cents: num.default(0),
   value_cents: num,
   last_quarter: z.object({ label: z.string(), revenue_cents: num, profit_cents: num }).nullable(),
 });
@@ -79,6 +80,7 @@ const toOffer = (o: z.infer<typeof offerSchema>): Offer => ({
   status: o.status,
   mine: o.mine,
   mySharesE6: o.my_shares_e6,
+  myAmountCents: o.my_amount_cents,
   valueCents: o.value_cents,
   lastQuarter: o.last_quarter
     ? {

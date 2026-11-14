@@ -1,10 +1,10 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 90, "gap_cents": 523 }, "rank": 91, "net_worth_cents": 1019477 },
-  "total": 206,
+  "me": { "next": { "name": "Vera", "rank": 93, "gap_cents": 650 }, "rank": 94, "net_worth_cents": 1019350 },
+  "total": 211,
   "entries": [
     {
       "id": "0f3f3f3f-0000-4000-8000-0000000000f1",
-      "tag": "RFMU",
+      "tag": "7CER",
       "kind": "player",
       "name": "Fenja_Firma",
       "rank": 1,
@@ -12,61 +12,61 @@
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 117678263,
+      "net_worth_cents": 126980499,
       "rank_change_24h": null
     },
     {
-      "id": "09e19e19-0000-4000-8000-0000000000f1",
-      "tag": "7B9J",
+      "id": "09a19a19-0000-4000-8000-0000000000f1",
+      "tag": "5D37",
       "kind": "player",
-      "name": "Pop_Frida",
+      "name": "Esc_Frida",
       "rank": 2,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 92312000,
+      "net_worth_cents": 107576000,
       "rank_change_24h": null
     },
     {
-      "id": "09e19e19-0000-4000-8000-0000000000f2",
-      "tag": "4AU4",
+      "id": "09e19e19-0000-4000-8000-0000000000f1",
+      "tag": "HVFM",
       "kind": "player",
-      "name": "Pop_Gero",
+      "name": "Pop_Frida",
       "rank": 3,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 84428000,
+      "net_worth_cents": 95304000,
+      "rank_change_24h": null
+    },
+    {
+      "id": "09e19e19-0000-4000-8000-0000000000f2",
+      "tag": "RJEH",
+      "kind": "player",
+      "name": "Pop_Gero",
+      "rank": 4,
+      "is_me": false,
+      "avatar_key": "rookie",
+      "description": null,
+      "change_24h_bps": null,
+      "net_worth_cents": 89022000,
       "rank_change_24h": null
     },
     {
       "id": "07170717-0000-4000-8000-0000000000a1",
-      "tag": "4E5U",
+      "tag": "AEMH",
       "kind": "player",
       "name": "Hanna_Haus",
-      "rank": 4,
+      "rank": 5,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
       "net_worth_cents": 69258200,
       "rank_change_24h": null
-    },
-    {
-      "id": "0e3e3e3e-0000-4000-8000-0000000000f1",
-      "tag": "NG9K",
-      "kind": "player",
-      "name": "Frieda_Format",
-      "rank": 5,
-      "is_me": false,
-      "avatar_key": "rookie",
-      "description": null,
-      "change_24h_bps": null,
-      "net_worth_cents": 55303750,
-      "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-14T22:39:32.96479+00:00"
+  "server_time": "2026-11-14T23:10:59.087893+00:00"
 }

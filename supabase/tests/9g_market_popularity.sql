@@ -66,20 +66,21 @@ select tests.assert(
   'get_market_snapshot(): a listed player company is in the stock list, marked as a player company');
 
 -- =============================================================================
--- B. Not filled: AI investors subscribe over the window, at the end it lists with what was subscribed
+-- B. AI investors subscribe over the window; the money waits until the company is listed (ADR-151)
 -- =============================================================================
 select tests.login_as('authenticated', :g);
 select public.found_company(gen_random_uuid(), 'Talwerk', 'Wanderkarten', 'retail', '#663399', 'garage') is not null as ok \gset
 select public.go_public(gen_random_uuid(), 30) -> 'company' -> 'listing' -> 'offer' ->> 'id' as offer2 \gset
 reset role;
 select tests.company_of(:g) as gco \gset
+select tests.company_cash(:'gco') as gc1 \gset
 select tests.login_as('authenticated', :b);
 select public.subscribe_offer(gen_random_uuid(), :'offer2', 10000) as sub2 \gset
 reset role;
 -- half of the window has passed
 update public.company_share_offers set created_at = now() - interval '30 minutes', ends_at = now() + interval '30 minutes'
  where id = :'offer2';
-select tests.company_cash(:'gco') as gc1 \gset
+select balance_cents as mk1 from public.ledger_accounts where system_key = 'market' \gset
 select public.close_due_offers() as closed_mid \gset
 select o.shares_ai_e6 as ai_mid, o.shares_offered_e6 as off2, o.price_cents as p2, pc.quality as q2
   from public.company_share_offers o join public.player_companies pc on pc.company_id = o.company_id where o.id = :'offer2' \gset
@@ -88,23 +89,27 @@ select tests.assert(
   and (select status = 'open' from public.company_share_offers where id = :'offer2')
   and :ai_mid::bigint > 0
   and abs(:ai_mid::bigint - floor(:off2::bigint * least(1, 0.6 + 0.4 * :q2::numeric)) * 0.875) <= :off2::bigint / 100
-  and tests.company_cash(:'gco') = :gc1::bigint + floor(:ai_mid::numeric * :p2::bigint / 1000000),
-  'close_due_offers(): AI investors subscribe most of their share early, 1 - (1 - t)^3 (aiSubscribedE6, ADR-149), paid by the market');
--- the window is over
+  and tests.company_cash(:'gco') = :gc1::bigint
+  and (select balance_cents from public.ledger_accounts where system_key = 'market') = :mk1::bigint,
+  'close_due_offers(): AI investors subscribe most of their share early, 1 - (1 - t)^3 (aiSubscribedE6, ADR-149); nothing is paid before the listing');
+-- the window is over; a top company is fully subscribed by the AI investors
+update public.player_companies set quality = 1 where company_id = :'gco';
 update public.company_share_offers set ends_at = now() - interval '1 second' where id = :'offer2';
 select public.close_due_offers() as closed_end \gset
+update public.player_companies set quality = :q2 where company_id = :'gco';
 select ticker as t2, shares_outstanding as so2 from public.companies where id = :'gco' \gset
 select tests.assert(
   :closed_end::int >= 1
-  and (select status = 'closed' and shares_ai_e6 = least(floor(:off2::bigint * least(1, 0.6 + 0.4 * :q2::numeric)), shares_offered_e6 - shares_subscribed_e6)
-         and shares_subscribed_e6 + shares_ai_e6 <= shares_offered_e6 from public.company_share_offers where id = :'offer2')
+  and (select status = 'closed' and shares_ai_e6 = shares_offered_e6 - shares_subscribed_e6 and escrow_cents = 0
+         from public.company_share_offers where id = :'offer2')
   and (select phase = 'listed' from public.companies where id = :'gco')
-  and :so2::bigint = (700000000000 + (select shares_subscribed_e6 + shares_ai_e6 from public.company_share_offers where id = :'offer2')) / 1000000
+  and :so2::bigint = 1000000
   and tests.qty_e6(:b, :'t2') = (:'sub2'::jsonb ->> 'shares_e6')::bigint
   and tests.qty_e6(:g, :'t2') = 700000000000
   and tests.company_cash(:'gco')
-      = :gc1::bigint + floor((select shares_ai_e6 from public.company_share_offers where id = :'offer2')::numeric * :p2::bigint / 1000000),
-  'end of the window: listed with what was subscribed, AI investors got their full share, the rest is not issued');
+      = :gc1::bigint + (:'sub2'::jsonb ->> 'amount_cents')::bigint
+        + floor((select shares_ai_e6 from public.company_share_offers where id = :'offer2')::numeric * :p2::bigint / 1000000),
+  'end of the window: full, so the company is listed and gets the money of the players and the AI investors in one go');
 
 -- =============================================================================
 -- C. Views: once per player and stock within the cooldown, never the founder's own stock

@@ -1,7 +1,7 @@
 {
   "job": null,
-  "tag": "JK33",
-  "rank": 135,
+  "tag": "VVBK",
+  "rank": 136,
   "level": 6,
   "trust": { "band": "shaky", "kept": 0, "score": 41, "broken": 1 },
   "company": { "name": "Fixture Lieferwerk", "ticker": null },
@@ -10,7 +10,7 @@
   "avatar_key": "rookie",
   "top_skills": [],
   "streak_days": 0,
-  "member_since": "2026-11-14T22:39:36.429733+00:00",
+  "member_since": "2026-11-14T23:11:01.902684+00:00",
   "branch_scores": {
     "it": 0,
     "law": 0,

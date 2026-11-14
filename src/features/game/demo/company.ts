@@ -14,6 +14,7 @@ import type { SectorKey } from "@/components/pixel/art";
 import { matchScore, productivityBps } from "@/lib/sim/skills";
 import {
   aiSubscribedE6,
+  ipoFilled,
   capacityCents,
   capitalIncreasePriceCents,
   closeStartupHour,
@@ -134,7 +135,7 @@ export interface DemoCompanyState {
   logo?: CompanyLogoData | null;
   /** Pixel banner (ADR-078). */
   banner?: CompanyLogoData | null;
-  /** Going public (ADR-067). In the demo AI investors are the only subscribers. */
+  /** Going public (ADR-067). In the demo AI investors and made-up fellow players subscribe. */
   listing?: {
     status: "subscription" | "listed";
     ticker: string;
@@ -541,7 +542,8 @@ export function createCompanyEngine(host: CompanyHost) {
   function catchUp(now = Date.now()) {
     const company = host.company();
     if (!company) return;
-    if (company.listing?.offer && company.listing.offer.endsAt <= now) resolveOffer(company);
+    if (company.listing?.offer && (company.listing.offer.endsAt <= now || offerFull(company, now)))
+      resolveOffer(company);
     // Hours first, the quarter when its hours are done; at most two days are caught up.
     let steps = 0;
     company.lastHourAt ??= company.lastClosedAt;
@@ -598,12 +600,33 @@ export function createCompanyEngine(host: CompanyHost) {
     );
   }
 
-  /** AI investors subscribe their share evenly over the window (ADR-146); in the demo they are the only subscribers. */
+  /** Fraction of the subscription window that has passed. */
+  function offerProgress(company: DemoCompanyState, at: number): number {
+    const offer = company.listing!.offer!;
+    const startsAt = offer.startsAt ?? offer.endsAt - SUBSCRIPTION_MS;
+    const window = offer.endsAt - startsAt;
+    return window <= 0 ? 1 : Math.min(1, Math.max(0, (at - startsAt) / window));
+  }
+
+  /** Made-up fellow players subscribe up to demoPlayersShare of the offer, evenly over the window (demo only). */
+  function playerShares(company: DemoCompanyState, at: number, final = false): number {
+    const offer = company.listing!.offer!;
+    const t = final ? 1 : offerProgress(company, at);
+    return Math.floor(offer.offered * startups.ipo.demoPlayersShare * t);
+  }
+
+  /** AI investors subscribe their share over the window, most of it early (ADR-146, ADR-149). */
   function aiShares(company: DemoCompanyState, at: number, final = false): number {
     const offer = company.listing!.offer!;
     const startsAt = offer.startsAt ?? offer.endsAt - SUBSCRIPTION_MS;
     const window = offer.endsAt - startsAt;
-    const e6 = aiSubscribedE6(offer.offered * 1_000_000, 0, company.quality, final ? window : at - startsAt, window);
+    const e6 = aiSubscribedE6(
+      offer.offered * 1_000_000,
+      playerShares(company, at, final) * 1_000_000,
+      company.quality,
+      final ? window : at - startsAt,
+      window,
+    );
     return Math.floor(e6 / 1_000_000);
   }
 
@@ -624,13 +647,14 @@ export function createCompanyEngine(host: CompanyHost) {
       ticker: company.listing!.status === "listed" ? company.listing!.ticker : null,
       priceCents: offer.priceCents,
       sharesOfferedE6: offer.offered * 1_000_000,
-      sharesSubscribedE6: 0,
+      sharesSubscribedE6: playerShares(company, Date.now()) * 1_000_000,
       sharesAiE6: aiShares(company, Date.now()) * 1_000_000,
       startsAt: new Date(offer.startsAt ?? offer.endsAt - SUBSCRIPTION_MS).toISOString(),
       endsAt: new Date(offer.endsAt).toISOString(),
       status: "open",
       mine: true,
       mySharesE6: 0,
+      myAmountCents: 0,
       valueCents: valueCents(company),
       lastQuarter: company.reports.at(-1)
         ? {
@@ -643,14 +667,27 @@ export function createCompanyEngine(host: CompanyHost) {
   }
 
   /**
-   * End of a subscription (ADR-146): full, or the 10 minutes are over. AI investors have their share, the company is
-   * listed with what was subscribed, the rest is not issued.
+   * End of a subscription (ADR-146, ADR-151): full, or the window is over. The money was held back until now. A full
+   * IPO lists the company and pays it out; an IPO that is not full fails, everybody gets the money back and the
+   * company stays private. A capital increase issues what was subscribed.
    */
   function resolveOffer(company: DemoCompanyState) {
     const listing = company.listing;
     const offer = listing?.offer;
     if (!listing || !offer) return;
-    const sold = aiShares(company, offer.endsAt, true);
+    const sold = Math.min(
+      offer.offered,
+      playerShares(company, offer.endsAt, true) + aiShares(company, offer.endsAt, true),
+    );
+    if (offer.kind === "ipo" && !ipoFilled(offer.offered, sold)) {
+      company.listing = null;
+      system(
+        company,
+        `Börsengang geplatzt: nur ${Math.floor((100 * sold) / offer.offered)} % der Aktien wurden gezeichnet. Alle Anleger haben ihr Geld zurück, die Firma bleibt privat. Du kannst es jederzeit noch einmal versuchen.`,
+      );
+      host.persist();
+      return;
+    }
     company.cashCents += sold * offer.priceCents;
     if (offer.kind === "ipo") {
       listing.sharesTotal = listing.founderShares + sold;
@@ -663,9 +700,15 @@ export function createCompanyEngine(host: CompanyHost) {
     listing.offer = null;
     system(
       company,
-      `Zeichnung beendet: ${sold.toLocaleString("de-DE")} Aktien zu ${formatMoney(offer.priceCents)} ausgegeben.`,
+      `Zeichnung beendet: ${sold.toLocaleString("de-DE")} Aktien zu ${formatMoney(offer.priceCents)} ausgegeben. ${formatMoney(sold * offer.priceCents, { whole: true })} sind in der Firmenkasse.`,
     );
     host.persist();
+  }
+
+  /** Every offered share is subscribed: the offer ends at once (ADR-146). */
+  function offerFull(company: DemoCompanyState, at: number): boolean {
+    const offer = company.listing?.offer;
+    return !!offer && playerShares(company, at) + aiShares(company, at) >= offer.offered;
   }
 
   /** Three letters from the name, not one of the demo market's tickers (the stock joins that list, ADR-145). */

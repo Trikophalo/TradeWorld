@@ -315,8 +315,12 @@ select public.subscribe_offer(gen_random_uuid(), :'fx_offer', 25000);
 select public.get_offers();
 \o
 reset role;
+-- a top company for a moment: AI investors take the rest, the IPO is full and lists (ADR-151)
+select quality as fx_q from public.player_companies where company_id = :'fco' \gset
+update public.player_companies set quality = 1 where company_id = :'fco';
 update public.company_share_offers set ends_at = now() - interval '1 second' where id = :'fx_offer';
 select public.close_due_offers() is not null as ok \gset
+update public.player_companies set quality = :fx_q where company_id = :'fco';
 select tests.login_as('authenticated', :p) is null as ok \gset
 \o :fixture_dir/get_my_company_listed.json
 select public.get_my_company();

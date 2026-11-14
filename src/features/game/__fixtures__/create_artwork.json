@@ -1,7 +1,7 @@
 {
   "xp": 200,
   "artwork": {
-    "id": "502ef91e-fe0e-4363-b1dc-1184f030045b",
+    "id": "8ef7111a-8c14-4c4c-8989-60414a221382",
     "hot": 0.353553,
     "code": "NFT-0045",
     "liked": false,
@@ -52,7 +52,7 @@
     "creator": "Fixture_Neu",
     "ai_owner": null,
     "ask_cents": null,
-    "created_at": "2026-11-14T22:39:34.370728+00:00",
+    "created_at": "2026-11-14T23:11:00.396316+00:00",
     "royalty_bps": 1000,
     "value_cents": null,
     "royalties_cents": 0,

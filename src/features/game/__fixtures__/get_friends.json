@@ -1,5 +1,5 @@
 {
-  "friends": [{ "tag": "NYRN", "level": 8, "since": "2026-11-14T22:39:35.593613+00:00", "nickname": "Fixture_Kunst" }],
-  "incoming": [{ "at": "2026-11-14T22:39:35.597913+00:00", "tag": "2HET", "level": 15, "nickname": "Fixture_Neu" }],
-  "outgoing": [{ "at": "2026-11-14T22:39:35.584833+00:00", "tag": "NYLR", "level": 14, "nickname": "Fixture_Heim" }]
+  "friends": [{ "tag": "RDDH", "level": 8, "since": "2026-11-14T23:11:01.289924+00:00", "nickname": "Fixture_Kunst" }],
+  "incoming": [{ "at": "2026-11-14T23:11:01.292614+00:00", "tag": "QSFN", "level": 15, "nickname": "Fixture_Neu" }],
+  "outgoing": [{ "at": "2026-11-14T23:11:01.284372+00:00", "tag": "Q7YB", "level": 14, "nickname": "Fixture_Heim" }]
 }

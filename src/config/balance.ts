@@ -1225,9 +1225,19 @@ export interface StartupsConfig {
     readonly minIssuePriceCents: number;
     /**
      * Subscription window (ADR-146): at most this long. Once every offered share is subscribed the company is listed
-     * at once; at the end it is listed with what was subscribed.
+     * at once.
      */
     readonly subscriptionMinutes: number;
+    /**
+     * An IPO needs this share of the offered shares (bps) at the end of the window (ADR-151). Below it fails: every
+     * subscriber gets the money back and the company stays private. Until the end the money waits in an escrow.
+     */
+    readonly minFillBps: number;
+    /**
+     * Offline demo only: made-up fellow players subscribe up to this share of the offer over the window, so an IPO
+     * succeeds there with decent quality and fails with poor quality.
+     */
+    readonly demoPlayersShare: number;
     /** One-tap amounts for subscribers (cents); "the rest" is offered as well. */
     readonly quickAmountsCents: readonly number[];
     /**
@@ -2307,6 +2317,8 @@ export const BALANCE = {
       maxSharePercent: 49,
       minIssuePriceCents: 100,
       subscriptionMinutes: 60,
+      minFillBps: 10_000,
+      demoPlayersShare: 0.35,
       quickAmountsCents: [10_000, 100_000, 1_000_000],
       aiTakeBase: 0.6,
       aiTakePerQuality: 0.4,

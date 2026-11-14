@@ -1603,10 +1603,13 @@ export interface Offer {
   sharesAiE6: number;
   startsAt: string;
   endsAt: string;
-  status: "open" | "closed";
+  /** failed: an IPO that was not fully subscribed; every subscriber got the money back (ADR-151). */
+  status: "open" | "closed" | "failed";
   /** The viewer founded the company (founders cannot subscribe). */
   mine: boolean;
   mySharesE6: number;
+  /** What the viewer paid in; it waits in an escrow until the offer ends (ADR-151). */
+  myAmountCents: number;
   valueCents: number;
   lastQuarter: { label: string; revenueCents: number; profitCents: number } | null;
 }

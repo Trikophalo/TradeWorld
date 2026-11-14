@@ -225,6 +225,14 @@ export function aiSubscribedE6(
   return Math.max(0, Math.min(Math.floor(target * fraction), offeredE6 - playersE6));
 }
 
+/**
+ * Whether an IPO succeeds at the end of its window (ADR-151): players and AI investors together hold at least
+ * minFillBps of the offered shares. Otherwise it fails and every subscriber gets the money back.
+ */
+export function ipoFilled(offeredE6: number, takenE6: number, cfg: StartupsConfig = BALANCE.startups): boolean {
+  return takenE6 * 10_000 >= offeredE6 * cfg.ipo.minFillBps;
+}
+
 /** Price of new shares in a capital increase (cents per share). */
 export function capitalIncreasePriceCents(marketPriceCents: number, cfg: StartupsConfig = BALANCE.startups): number {
   return Math.max(cfg.ipo.minIssuePriceCents, Math.round(marketPriceCents * cfg.ipo.capitalIncreaseDiscount));

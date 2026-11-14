@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "5659aedf-9f6a-485f-83ee-f539d823101c",
+    "id": "0442c247-d3c8-4598-8932-efe28cb41d29",
     "tier": "junior",
     "title": null,
     "company": {
-      "id": "833932bd-1586-776d-1f8f-f602682f7437",
+      "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
       "logo": null,
-      "name": "Luftpost Drohnen",
-      "color": "#00B4D8",
+      "name": "KlarSoft AG",
+      "color": "#4C8DFF",
       "is_ai": true,
-      "sector": "logistics",
-      "ticker": "DRN"
+      "sector": "tech",
+      "ticker": "KLS"
     },
     "presence": {
-      "fire_at": "2026-11-19T22:39:32.674845+00:00",
+      "fire_at": "2026-11-19T23:10:58.772019+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-14T22:39:32.674845+00:00"
+      "last_active_at": "2026-11-14T23:10:58.772019+00:00"
     },
     "required": [{ "branch": "it", "min_score": 2 }],
     "promotion": {
@@ -36,22 +36,22 @@
     "signature": "M2 14 C6 4 10 4 14 12 S22 18 26 8",
     "title_key": "it_junior",
     "rank_hours": 1.0,
-    "started_at": "2026-11-14T22:39:33.211022+00:00",
+    "started_at": "2026-11-14T23:10:59.261226+00:00",
     "pending_raise": null,
     "raise_max_bps": 300,
     "notice_ends_at": null,
     "paid_hours_cap": 8,
-    "pay_factor_bps": 10000,
+    "pay_factor_bps": 9974,
     "work_task_open": false,
     "quit_cost_cents": 0,
     "last_bonus_cents": 0,
     "paid_hours_today": 1.0,
     "productivity_bps": 17400,
     "next_work_task_at": null,
-    "earned_total_cents": 31700,
+    "earned_total_cents": 31620,
     "raise_available_at": null,
     "quit_now_cost_cents": 380400,
     "salary_cents_per_hour": 31700,
-    "effective_salary_cents_per_hour": 31700
+    "effective_salary_cents_per_hour": 31617
   }
 }

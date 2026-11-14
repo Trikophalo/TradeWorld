@@ -2400,3 +2400,21 @@ ihre Firmen, und mit echten, großen Folgen für Kurse, Firmen und Aufgaben.
 - **Markierung:** Der News-Tab zeigt „Gleich“ (5 Minuten vorher) und „Live“ (ab der vollen Stunde, solange eine
   Sendung starten oder laufen kann). Die letzte Sendung lässt sich 55 Minuten lang noch einmal ansehen.
 - Der Demo-Modus spielt dasselbe mit erfundenen Zuschauern im Chat; ein Demo-Knopf startet eine Sendung sofort.
+
+## ADR-151: Börsengang – voll oder Geld zurück, Auszahlung erst nach dem Börsenstart — `akzeptiert`
+
+- **Treuhand statt Firmenkasse.** Zeichnungen von Spielern gehen auf das Systemkonto `offer_escrow`
+  (`company_share_offers.escrow_cents`), nicht mehr in die Firmenkasse. KI-Investoren werden während der Zeichnung nur
+  gezählt und zahlen erst beim Erfolg. Der Gründer kann vor dem Börsenstart also nichts davon ausgeben oder auszahlen.
+- **Voll oder gar nicht.** Ein Börsengang braucht am Ende `startups.ipo.minFillBps` (10 000 = alle) der angebotenen
+  Aktien, Spieler und KI zusammen. Dann geht das Geld in einer Buchung an die Firma, und sie ist gelistet (sofort,
+  sobald alles gezeichnet ist, ADR-146). Sonst platzt er (`status 'failed'`): Jeder Spieler bekommt seinen Betrag
+  vollständig zurück, die Firma bleibt `private` und darf es jederzeit wieder versuchen.
+- **Warum das spannend ist:** KI-Investoren übernehmen 60 % plus 40 % × Qualität (ADR-149). Nur eine Top-Firma wird
+  allein von der KI voll; alle anderen brauchen Mitspieler, die den Rest zeichnen. Der Dialog zeigt beide Anteile.
+- **Kapitalerhöhung:** gibt weiterhin aus, was gezeichnet wurde, aber auch dieses Geld wartet bis zum Ende.
+- **Sonderfälle:** Wird die Firma während der Zeichnung aufgelöst, platzt das Angebot beim nächsten Minutenlauf und
+  alle bekommen ihr Geld zurück. Setzt ein Zeichner sein Konto zurück, fällt sein Betrag an den Staat, nicht an die
+  Firma. Angebote, die beim ersten Einspielen dieses Updates offen sind, enden nach den alten Regeln.
+- **Benachrichtigung** `ipo_result` (Pflicht) an alle Zeichner und den Gründer: geglückt oder geplatzt mit Betrag.
+- **Demo:** Erfundene Mitspieler zeichnen bis zu `demoPlayersShare` (35 %); mit schlechter Qualität platzt es auch dort.

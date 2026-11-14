@@ -11,7 +11,7 @@
       "minutes": 15,
       "chance_bps": 9000,
       "cost_cents": 900000,
-      "available_at": "2026-11-14T23:24:38.28282+00:00",
+      "available_at": "2026-11-14T23:56:03.37988+00:00",
       "payout_cents": 0,
       "refund_cents": 450000,
       "skill_bonus_bps": 0
@@ -176,14 +176,14 @@
     {
       "id": 4,
       "key": "pop_up_stand",
-      "gain": 0.02,
-      "status": "success",
+      "gain": 0,
+      "status": "failure",
       "cost_cents": 900000,
-      "resolved_at": "2026-11-15T00:39:38.303849+00:00",
-      "payout_cents": 0
+      "resolved_at": "2026-11-15T01:11:03.396112+00:00",
+      "payout_cents": 450000
     }
   ],
   "product": "security_software",
   "running": [],
-  "cash_cents": 10004586
+  "cash_cents": 10437742
 }

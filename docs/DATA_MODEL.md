@@ -7414,3 +7414,15 @@ at, mine}]}`; markiert den Aufrufer als Zuschauer und startet die Sendung dieser
 Intern: `news_show_build`, `news_show_start` (Folgen: `event_price_shock`, Bekanntheit, Aufgabenwerte, Trostpflaster
 per Ledger `random_event`, Hinweis in `stock_tips`), `news_show_run_due` (Cron `nexa-news-show`, jede Minute).
 Test `supabase/tests/9i_news_show.sql`.
+
+## Nachtrag: Börsengang mit Treuhand (ADR-151)
+
+Migration `20261204002100_ipo_escrow.sql`. Systemkonto `offer_escrow`; `company_share_offers.escrow_cents` (Geld der
+Spieler-Zeichnungen, 0 nach dem Ende) und `status 'open' | 'closed' | 'failed'`; Benachrichtigungstyp `ipo_result`.
+`subscribe_offer` bucht Spieler → `offer_escrow` (Fehler `offer_closed` auch bei aufgelöster Firma);
+`share_offer_ai_topup` zählt nur noch. `close_share_offer`: Börsengang unter `startups.ipo.minFillBps` oder Firma
+aufgelöst → `share_offer_cancel(p_offer_id, p_reason)` (alles zurück, Firma wieder `private`); sonst
+`offer_escrow` → Firmenkasse, Finanzmarkt → Firmenkasse für den KI-Anteil, Aktien ausliefern. Verwaiste Beträge
+(Zeichner hat sein Konto zurückgesetzt) gehen über `share_offer_escrow_rest` an den Staat. `close_due_offers` beendet
+auch Angebote aufgelöster Firmen. `offer_json` liefert zusätzlich `my_amount_cents` und den Status `failed`.
+Test `supabase/tests/9j_ipo_escrow.sql`.

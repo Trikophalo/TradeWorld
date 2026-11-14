@@ -91,6 +91,11 @@ test("market list: popular first, player companies only on request", async ({ pa
 test("going public takes at most an hour, the AI comes in early, then the stock is in the market list", async ({
   page,
 }) => {
+  test.setTimeout(60_000);
+  // The hour may cross midnight: the daily reward of the new day must not cover the page.
+  await page.addLocatorHandler(page.getByRole("dialog", { name: "Tägliche Belohnung" }), async (dialog) => {
+    await dialog.getByRole("button", { name: "Schließen" }).click();
+  });
   await page.clock.install();
   await unfoldCompany(page);
   await preparePlayer(page, { nickname: "Glockenspiel", cashCents: 30_000_000, xpTotal: 80_000 });
@@ -108,12 +113,17 @@ test("going public takes at most an hour, the AI comes in early, then the stock 
   await listing.getByRole("button", { name: "Börsengang" }).click();
   const ipo = page.getByRole("dialog", { name: "Börsengang" });
   await expect(ipo.getByText(/Bis zu 60 Minuten/)).toBeVisible();
+  // Full or money back (ADR-151): the sheet says which part fellow players must take.
+  await expect(ipo.getByText("Mitspieler müssen zeichnen")).toBeVisible();
+  await expect(ipo.getByText(/bekommen alle ihr Geld zurück/).first()).toBeVisible();
   await ipo.getByRole("button", { name: "Zeichnung starten" }).click();
   await expect(page.getByText("Börsengang gestartet")).toBeVisible();
 
   // One clear progress: subscribed shares and a countdown of at most an hour (ADR-149).
   const progress = listing.getByTestId("offer-progress");
   await expect(progress).toBeVisible();
+  // The money is held back until the company is listed.
+  await expect(listing.getByTestId("offer-escrow")).toContainText("Vorher kannst du nichts davon auszahlen");
   await expect(progress.locator("time")).toHaveText(/^(01:00:00|59:[0-5]\d)$/);
 
   // After ten minutes most AI investors are already in (front-loaded, ADR-149).

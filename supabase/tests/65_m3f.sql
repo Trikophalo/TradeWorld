@@ -195,8 +195,9 @@ select tests.assert(
   and exists (select 1 from jsonb_array_elements(:'offers'::jsonb -> 'offers') x where x ->> 'id' = :'offer')
   and (:'sub'::jsonb ->> 'shares_e6')::bigint = 500500000 and (:'sub'::jsonb ->> 'amount_cents')::bigint = 50050
   and (:'sub'::jsonb -> 'offer' ->> 'my_shares_e6')::bigint = 500500000
-  and tests.cash(:r2) = :r2c::bigint - 50050 and tests.company_cash(:'fco') = :cc0::bigint + 50050 + 20000,
-  'go_public(30 %): subscription at the issue price; subscribe_offer() buys fractional shares, the money goes to the company');
+  and tests.cash(:r2) = :r2c::bigint - 50050 and tests.company_cash(:'fco') = :cc0::bigint
+  and (select escrow_cents = 50050 + 20000 from public.company_share_offers where id = :'offer'),
+  'go_public(30 %): subscription at the issue price; subscribe_offer() buys fractional shares, the money waits in the escrow (ADR-151)');
 
 -- end of the subscription
 create or replace function tests.qty_e6(p_player uuid, p_ticker text) returns bigint language sql as $$
@@ -205,8 +206,12 @@ create or replace function tests.qty_e6(p_player uuid, p_ticker text) returns bi
 grant execute on function tests.qty_e6(uuid, text) to public;
 select (select price_cents from public.company_share_offers where id = :'offer') as iprice \gset
 select balance_cents as mk0 from public.ledger_accounts where system_key = 'market' \gset
+-- a top company: AI investors take every share that is left, so the IPO is full (ADR-151)
+select quality as fq from public.player_companies where company_id = :'fco' \gset
+update public.player_companies set quality = 1 where company_id = :'fco';
 update public.company_share_offers set ends_at = now() - interval '1 second' where id = :'offer';
 select public.close_due_offers() as closed \gset
+update public.player_companies set quality = :fq where company_id = :'fco';
 select security_id as sec, ticker as tkr, shares_outstanding as so from public.companies where id = :'fco' \gset
 select tests.login_as('authenticated', :r2);
 select tests.throws_key(format($$select public.subscribe_offer(gen_random_uuid(), %L, 10000)$$, :'offer'), 'offer_closed', 'subscribe_offer(): closed');
@@ -226,13 +231,17 @@ select tests.assert(
   and (select avg_entry_price_e4 = :iprice::bigint * 100 from public.positions where player_id = :r2 and security_id = :'sec')
   and (select balance_cents from public.ledger_accounts where system_key = 'market')
       = :mk0::bigint - floor((select shares_ai_e6 from public.company_share_offers where id = :'offer')::numeric * :iprice::bigint / 1000000)
+  and tests.company_cash(:'fco') = :cc0::bigint + 50050 + 20000
+      + floor((select shares_ai_e6 from public.company_share_offers where id = :'offer')::numeric * :iprice::bigint / 1000000)
+  and (select escrow_cents = 0 from public.company_share_offers where id = :'offer')
+  and (select balance_cents = 0 from public.ledger_accounts where system_key = 'offer_escrow')
   and :'listed'::jsonb -> 'listing' ->> 'status' = 'listed' and :'listed'::jsonb -> 'listing' ->> 'ticker' = :'tkr'
   and (:'listed'::jsonb -> 'listing' ->> 'founder_shares_e6')::bigint = 700000000000
   and (:'listed'::jsonb ->> 'can_capital_increase')::boolean
   and :'snap'::jsonb ->> 'company_kind' = 'player' and :'snap'::jsonb -> 'logo' -> 'palette' is not null
   and :'snap'::jsonb ->> 'size_class' = 'penny'
   and public.player_company_value_cents(:f) = 0,
-  'IPO end: AI investors take part of the rest (paid by the financial market), the stock is listed as a penny stock, subscribers and the founder get their shares');
+  'IPO end: full, so the escrow and the AI investors (financial market) pay the company, the stock is listed as a penny stock, subscribers and the founder get their shares');
 
 -- listed player stocks trade like any other
 select tests.login_as('authenticated', :r2);

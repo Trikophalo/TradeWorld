@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Ein wichtiger Zulieferer fällt aus. Die Produktion stockt. Sicher ist das nicht.",
-      "name": "KlarSoft AG",
-      "due_at": "2026-11-15T00:03:24.776398+00:00",
+      "body": "Die Belegschaft legt die Arbeit nieder. Lieferungen verzögern sich. Sicher ist das nicht.",
+      "name": "Pfotenwohl",
+      "due_at": "2026-11-15T00:21:43.355431+00:00",
       "status": "open",
-      "ticker": "KLS",
-      "headline": "Lieferkette reißt bei KlarSoft AG",
+      "ticker": "PFW",
+      "headline": "Streik legt Pfotenwohl lahm",
       "move_bps": null,
-      "strength": 1,
+      "strength": 3,
       "direction": "down",
-      "published_at": "2026-11-14T23:39:37.989619+00:00"
+      "published_at": "2026-11-15T00:11:03.186278+00:00"
     },
     {
       "id": 3,
-      "body": "Ein Vögelchen hat mir gezwitschert: Methusalem Bio dürfte in der kommenden Stunde nach oben gehen. Meine Quelle ist seriös, sie trägt immerhin eine Krawatte.",
-      "name": "Methusalem Bio",
-      "due_at": "2026-11-14T22:39:32.546989+00:00",
+      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Eilbote Express tut sich in der nächsten Stunde etwas, und zwar nach unten. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
+      "name": "Eilbote Express",
+      "due_at": "2026-11-14T23:10:58.154739+00:00",
       "status": "confirmed",
-      "ticker": "MTH",
-      "headline": "Vom Flurfunk: Methusalem Bio",
-      "move_bps": 1248,
+      "ticker": "EBX",
+      "headline": "Mr. Doodle Dangles Geheimtipp",
+      "move_bps": -1066,
       "strength": 2,
-      "direction": "up",
-      "published_at": "2026-11-14T22:39:32.546989+00:00"
+      "direction": "down",
+      "published_at": "2026-11-14T23:10:58.154739+00:00"
     }
   ],
   "reliability_bps": 7500

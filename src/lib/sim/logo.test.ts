@@ -6,6 +6,7 @@ import {
   aiTakeShare,
   capitalIncreasePriceCents,
   founderFactor,
+  ipoFilled,
   issuePriceCents,
   maxEmployees,
   needsFullTimeFounder,
@@ -70,6 +71,22 @@ describe("founder with a job and company growth (ADR-066, ADR-067)", () => {
     // never more than players left free
     expect(aiSubscribedE6(offered, 95_000_000_000, 0, window, window)).toBe(5_000_000_000);
     expect(aiSubscribedE6(offered, offered, 1, window, window)).toBe(0);
+  });
+});
+
+describe("IPO: full or money back (ADR-151)", () => {
+  it("succeeds only when the offered shares are fully subscribed", () => {
+    expect(BALANCE.startups.ipo.minFillBps).toBe(10_000);
+    const offered = 250_000_000_000;
+    expect(ipoFilled(offered, offered)).toBe(true);
+    expect(ipoFilled(offered, offered - 1)).toBe(false);
+    expect(ipoFilled(offered, 0)).toBe(false);
+  });
+
+  it("follows the configured share", () => {
+    const cfg = { ...BALANCE.startups, ipo: { ...BALANCE.startups.ipo, minFillBps: 8_000 } };
+    expect(ipoFilled(1_000_000, 800_000, cfg)).toBe(true);
+    expect(ipoFilled(1_000_000, 799_999, cfg)).toBe(false);
   });
 });
 
