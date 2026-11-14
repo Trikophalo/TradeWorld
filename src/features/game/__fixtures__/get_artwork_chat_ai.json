@@ -1,0 +1,70 @@
+{
+  "is_owner": true,
+  "messages": [
+    {
+      "ai": false,
+      "at": "2026-11-14T14:31:09.005227+00:00",
+      "id": 27,
+      "kind": "chat",
+      "mine": false,
+      "text": "Schönes Bild!",
+      "author": "Fixture_Kunst",
+      "expires_at": null,
+      "offer_cents": null,
+      "offer_status": null
+    },
+    {
+      "ai": false,
+      "at": "2026-11-14T14:31:09.00997+00:00",
+      "id": 28,
+      "kind": "offer",
+      "mine": false,
+      "text": "Wäre das ein Preis?",
+      "author": "Fixture_Kunst",
+      "expires_at": "2026-11-15T14:31:09.00997+00:00",
+      "offer_cents": 300000,
+      "offer_status": "accepted"
+    },
+    {
+      "ai": false,
+      "at": "2026-11-14T14:31:09.018684+00:00",
+      "id": 29,
+      "kind": "sale",
+      "mine": false,
+      "text": "Fixture_Kunst",
+      "author": null,
+      "expires_at": null,
+      "offer_cents": 300000,
+      "offer_status": null
+    },
+    {
+      "ai": false,
+      "at": "2026-11-14T14:31:09.032879+00:00",
+      "id": 30,
+      "kind": "sale",
+      "mine": false,
+      "text": "Fixture_Neu",
+      "author": null,
+      "expires_at": null,
+      "offer_cents": 450000,
+      "offer_status": null
+    },
+    {
+      "ai": true,
+      "at": "2026-11-14T14:31:09.043267+00:00",
+      "id": 31,
+      "kind": "offer",
+      "mine": false,
+      "text": "Hübsch! Wäre das ein fairer Preis?",
+      "author": "Sammler Sam",
+      "expires_at": "2026-11-15T14:31:09.043267+00:00",
+      "offer_cents": 1577200,
+      "offer_status": "open"
+    }
+  ],
+  "ask_cents": 90000000,
+  "artwork_id": "174f8f06-8d08-4596-8f2a-2b0ca82fa4ba",
+  "max_length": 200,
+  "my_offer_cents": null,
+  "min_offer_cents": 10000
+}

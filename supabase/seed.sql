@@ -337,7 +337,7 @@ insert into public.unlocks (key, level, title, description, icon_key, intro_miss
   ('jobs_intern',           2,  'Erster Job',              'Bewirb dich als Praktikant und verdiene ein Gehalt.',                           'unlock_job',       'intro_first_job',      20),
   ('limit_orders',          3,  'Limit-Order',             'Lege den Preis fest, zu dem du kaufen oder verkaufen willst.',                  'unlock_limit',     'intro_first_limit',    30),
   ('watchlist',             3,  'Watchlist',               'Behalte deine Lieblingsaktien im Blick.',                                       'unlock_watchlist', null,                   31),
-  ('artworks',              4,  'Artworks',                'Male eigene Pixel-Kunst, sammle Unikate und biete in Auktionen mit.',          'unlock_art',       null,                   40),
+  ('artworks',              4,  'NFTs',                    'Präge eigene Pixel-NFTs, sammle Unikate und verdiene an jedem Weiterverkauf.', 'unlock_art',       null,                   40),
   ('stop_loss',             5,  'Stop-Loss',               'Begrenze Verluste automatisch.',                                                'unlock_stop',      'intro_first_stop',     50),
   ('bonds',                 5,  'Staatsanleihen',          'Sichere Zinsen mit Laufzeiten von 1 bis 10 Spieljahren.',                       'unlock_bond',      'intro_first_bond',     51),
   ('jobs_junior',           5,  'Junior-Jobs',             'Besser bezahlte Jobs mit anspruchsvolleren Aufgaben.',                          'unlock_job',       null,                   52),

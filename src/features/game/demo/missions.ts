@@ -29,7 +29,8 @@ export type Metric =
   | "art_likes"
   | "art_bids"
   | "artworks_painted"
-  | "auctions_started";
+  | "auctions_started"
+  | "nft_offers";
 
 export interface MissionTemplate {
   key: string;
@@ -208,7 +209,7 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   {
     key: "q_like_art",
     kind: "quick",
-    title: "Gib einem Kunstwerk ein Herz",
+    title: "Gib einem NFT ein Herz",
     metric: "art_likes",
     target: 1,
     xp: q.minXp,
@@ -217,16 +218,25 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   {
     key: "q_like_art_3",
     kind: "quick",
-    title: "Gib 3 Kunstwerken ein Herz",
+    title: "Gib 3 NFTs ein Herz",
     metric: "art_likes",
     target: 3,
     xp: q.minXp + 20,
     requires: "artworks",
   },
   {
+    key: "q_nft_offer",
+    kind: "quick",
+    title: "Mach ein Preisangebot für ein NFT",
+    metric: "nft_offers",
+    target: 1,
+    xp: q.maxXp,
+    requires: "artworks",
+  },
+  {
     key: "q_bid",
     kind: "quick",
-    title: "Biete bei einer Kunstauktion mit",
+    title: "Biete bei einer NFT-Auktion mit",
     metric: "art_bids",
     target: 1,
     xp: q.maxXp,
@@ -262,7 +272,7 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   {
     key: "d_like_art_5",
     kind: "daily",
-    title: "Verteile heute 5 Herzen an Kunstwerke",
+    title: "Verteile heute 5 Herzen an NFTs",
     metric: "art_likes",
     target: 5,
     xp: d.minXp,
@@ -322,7 +332,7 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   {
     key: "w_bids_5",
     kind: "weekly",
-    title: "Biete diese Woche bei 5 Kunstauktionen",
+    title: "Biete diese Woche bei 5 NFT-Auktionen",
     metric: "art_bids",
     target: 5,
     xp: w.minXp + 200,
@@ -331,7 +341,7 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   {
     key: "w_auction",
     kind: "weekly",
-    title: "Versteigere ein Kunstwerk",
+    title: "Versteigere ein NFT",
     metric: "auctions_started",
     target: 1,
     xp: w.minXp + 300,
@@ -383,7 +393,7 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   {
     key: "m_first_art",
     kind: "milestone",
-    title: "Male dein erstes Kunstwerk",
+    title: "Präge dein erstes NFT",
     metric: "artworks_painted",
     target: 1,
     xp: m.minXp + 400,
@@ -392,7 +402,7 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   {
     key: "m_first_bid",
     kind: "milestone",
-    title: "Dein erstes Gebot bei einer Kunstauktion",
+    title: "Dein erstes Gebot bei einer NFT-Auktion",
     metric: "art_bids",
     target: 1,
     xp: m.minXp + 200,

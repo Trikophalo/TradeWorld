@@ -1,0 +1,22 @@
+{
+  "is_owner": false,
+  "messages": [
+    {
+      "ai": false,
+      "at": "2026-11-14T14:31:09.005227+00:00",
+      "id": 27,
+      "kind": "chat",
+      "mine": true,
+      "text": "Schönes Bild!",
+      "author": "Fixture_Kunst",
+      "expires_at": null,
+      "offer_cents": null,
+      "offer_status": null
+    }
+  ],
+  "ask_cents": 400000,
+  "artwork_id": "174f8f06-8d08-4596-8f2a-2b0ca82fa4ba",
+  "max_length": 200,
+  "my_offer_cents": null,
+  "min_offer_cents": 10000
+}

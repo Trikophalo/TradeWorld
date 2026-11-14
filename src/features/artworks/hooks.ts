@@ -47,6 +47,16 @@ export function useCollection(nickname: string | null) {
   });
 }
 
+/** The offer chat under an NFT (ADR-135); refreshed often, the AI collectors write too. */
+export function useArtworkChat(id: string | null) {
+  return useQuery({
+    queryKey: [...ART_KEYS.detail(id ?? ""), "chat"] as const,
+    queryFn: () => engine.artworkChat(id!),
+    enabled: Boolean(id),
+    refetchInterval: 8_000,
+  });
+}
+
 /** After any art action: everything art-related and the cash. */
 export function useArtRefresh() {
   const client = useQueryClient();

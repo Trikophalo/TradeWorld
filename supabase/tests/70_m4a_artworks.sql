@@ -52,15 +52,15 @@ select tests.assert(
   and (select bool_and(public.artwork_valid(pixels)) from public.artworks where origin = 'game'),
   'gallery: 36 valid artworks (25 common, 8 rare, 3 legendary) owned by the NEXA gallery, ART-0001..ART-0036 without gaps although the seed ran twice');
 select tests.assert(
-  public.artwork_code(42) = 'ART-0042' and public.artwork_code(12345) = 'ART-12345'
-  and public.artwork_create_cost_cents(0) = 1500000 and public.artwork_create_cost_cents(1) = 3000000
-  and public.artwork_create_cost_cents(3) = 12000000
+  public.artwork_code(42) = 'NFT-0042' and public.artwork_code(12345) = 'NFT-12345'
+  and public.artwork_create_cost_cents(0) = 1500000 and public.artwork_create_cost_cents(1) = 2250000
+  and public.artwork_create_cost_cents(3) = 5062500
   and public.artwork_min_bid_cents(500000, null) = 500000
   and public.artwork_min_bid_cents(500000, 500000) = 525000
   and public.artwork_min_bid_cents(100000, 105000) = 110300
   and abs(public.artwork_hot(0, 0, now(), now()) - 1 / power(2, 1.5)) < 1e-9
   and abs(public.artwork_hot(2, 1, now() - interval '2 hours', now()) - 6 / 8.0) < 1e-9,
-  'artworkCode, artworkCreateCostCents (doubling), minNextBidCents (+5 %, whole euros), hotScore as in src/lib/sim/artworks.ts');
+  'artworkCode (NFT-0042, ADR-135), artworkCreateCostCents (x1.5, ADR-135), minNextBidCents (+5 %, whole euros), hotScore as in src/lib/sim/artworks.ts');
 
 -- isValidArtwork
 select tests.assert(
@@ -96,11 +96,11 @@ select public.get_art_studio() as st_l \gset
 select public.get_artworks('hot', 'all', false, 5, 0) as list_l \gset
 reset role;
 select tests.assert(
-  :'st_l'::jsonb = '{"painted": 0, "next_cost_cents": 1500000, "unlocked": false}'::jsonb
+  :'st_l'::jsonb - 'royalty_bps' - 'mint_xp' = '{"painted": 0, "next_cost_cents": 1500000, "unlocked": false, "royalties_cents": 0}'::jsonb
   and (:'list_l'::jsonb ->> 'total')::int >= 36 and jsonb_array_length(:'list_l'::jsonb -> 'entries') = 5,
   'level 3: get_art_studio (unlocked false) and get_artworks can be read');
 select tests.assert(
-  exists (select 1 from public.unlocks where key = 'artworks' and level = 4 and title = 'Artworks')
+  exists (select 1 from public.unlocks where key = 'artworks' and level = 4 and title = 'NFTs')
   and public.unlock_level('artworks') = 4,
   'the unlock row "artworks" (level 4) exists for has_unlock() and the level-up');
 
@@ -132,14 +132,14 @@ reset role;
 select (:'p1'::jsonb #>> '{artwork,id}')::uuid as art1, (:'p2'::jsonb #>> '{artwork,id}')::uuid as art2 \gset
 select tests.assert(
   :'p1b'::jsonb = :'p1'::jsonb
-  and (:'p1'::jsonb ->> 'cost_cents')::bigint = 1500000 and (:'p1'::jsonb ->> 'next_cost_cents')::bigint = 3000000
-  and (:'p2'::jsonb ->> 'cost_cents')::bigint = 3000000 and (:'p2'::jsonb ->> 'next_cost_cents')::bigint = 6000000
-  and tests.cash(:a) = :a0 - 4500000 and tests.treasury() = :t0 + 4500000
-  and :'st_a'::jsonb = '{"painted": 2, "next_cost_cents": 6000000, "unlocked": true}'::jsonb,
-  'create_artwork(): 15.000 EUR, then 30.000 EUR (doubling) to the treasury; replay-safe; get_art_studio counts the paintings');
+  and (:'p1'::jsonb ->> 'cost_cents')::bigint = 1500000 and (:'p1'::jsonb ->> 'next_cost_cents')::bigint = 2250000
+  and (:'p2'::jsonb ->> 'cost_cents')::bigint = 2250000 and (:'p2'::jsonb ->> 'next_cost_cents')::bigint = 3375000
+  and tests.cash(:a) = :a0 - 3750000 and tests.treasury() = :t0 + 3750000
+  and :'st_a'::jsonb - 'royalty_bps' - 'mint_xp' = '{"painted": 2, "next_cost_cents": 3375000, "unlocked": true, "royalties_cents": 0}'::jsonb,
+  'create_artwork(): 15.000 EUR, then 22.500 EUR (x1.5, ADR-135) to the treasury; replay-safe; get_art_studio counts the paintings');
 select tests.assert(
   :'p1'::jsonb #>> '{artwork,title}' = 'Abendlicht am Kanal'
-  and :'p1'::jsonb #>> '{artwork,code}' = 'ART-0037' and :'p2'::jsonb #>> '{artwork,code}' = 'ART-0038'
+  and :'p1'::jsonb #>> '{artwork,code}' = 'NFT-0037' and :'p2'::jsonb #>> '{artwork,code}' = 'NFT-0038'
   and :'p1'::jsonb #>> '{artwork,origin}' = 'player' and :'p1'::jsonb #>> '{artwork,creator}' = 'Anna_Pinsel'
   and :'p1'::jsonb #>> '{artwork,owner}' = 'Anna_Pinsel' and (:'p1'::jsonb #> '{artwork,rarity}') = 'null'::jsonb
   and (:'p1'::jsonb #> '{artwork,value_cents}') = 'null'::jsonb and (:'p1'::jsonb #> '{artwork,auction}') = 'null'::jsonb
@@ -147,7 +147,7 @@ select tests.assert(
   and (:'p1'::jsonb #> '{artwork,pixels}') = tests.art()
   and (:'p1'::jsonb #> '{artwork}') ?& array['id', 'code', 'title', 'origin', 'rarity', 'creator', 'owner', 'pixels', 'value_cents',
                                              'likes', 'liked', 'created_at', 'hot', 'auction'],
-  'ARTWORK: trimmed title, code ART-0037 (after the gallery), origin player, creator = owner, no value, no auction');
+  'ARTWORK: trimmed title, code NFT-0037 (after the gallery), origin player, creator = owner, no value, no auction');
 select tests.login_as('authenticated', :c);
 select tests.throws_key(format('select public.create_artwork(gen_random_uuid(), %L, %L)', 'Kein Geld', tests.art()),
   'insufficient_funds', 'painting needs the cash (10.000 EUR start capital < 15.000 EUR)');

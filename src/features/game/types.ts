@@ -262,17 +262,28 @@ export interface ArtworkAuction {
 
 export interface Artwork {
   id: string;
-  /** Unique display code, e.g. "ART-0042". */
+  /** Unique display code, e.g. "NFT-0042" (ADR-135; was ART-). */
   code: string;
   title: string;
   origin: "game" | "player";
   rarity: "common" | "rare" | "legendary" | null;
   creator: string | null;
-  /** null = the NEXA gallery owns it. */
+  /** null = the NEXA gallery or an AI collector (aiOwner) owns it. */
   owner: string | null;
+  /** Name of the AI collector holding it (ADR-135). */
+  aiOwner: string | null;
   pixels: ArtworkPixels;
   /** Last sale price; null if never sold. */
   valueCents: number | null;
+  /** Fixed price ("Sofort kaufen"); null = not for sale (ADR-135). */
+  askCents: number | null;
+  /** The creator's share of every resale. */
+  royaltyBps: number;
+  /** Royalties this NFT has paid its creator so far. */
+  royaltiesCents: number;
+  /** Open price offers in the chat and the best of them. */
+  offers: number;
+  bestOfferCents: number | null;
   likes: number;
   liked: boolean;
   createdAt: string;
@@ -280,7 +291,8 @@ export interface Artwork {
   auction: ArtworkAuction | null;
 }
 
-export type ArtSort = "hot" | "price" | "new" | "ending";
+/** wanted: most offers first; for_sale: only fixed prices, cheapest first (ADR-135). */
+export type ArtSort = "hot" | "price" | "new" | "ending" | "wanted" | "for_sale";
 
 // ------------------------------------------------------------------ property (ADR-082, docs/PROPERTY.md)
 
@@ -325,14 +337,61 @@ export interface ArtworkList {
 
 export interface ArtworkDetail {
   artwork: Artwork;
-  sales: { at: string; priceCents: number; seller: string | null; buyer: string }[];
+  sales: {
+    at: string;
+    priceCents: number;
+    seller: string | null;
+    buyer: string;
+    kind: NftSaleKind;
+    royaltyCents: number;
+  }[];
   bids: { nickname: string; amountCents: number; at: string }[];
 }
+
+/** auction, fixed price (buy), accepted chat offer (offer) or bought by an AI collector (ai). */
+export type NftSaleKind = "auction" | "buy" | "offer" | "ai";
 
 export interface ArtStudio {
   painted: number;
   nextCostCents: number;
   unlocked: boolean;
+  /** Royalties all my NFTs have earned me (ADR-135). */
+  royaltiesCents: number;
+  royaltyBps: number;
+  mintXp: number;
+}
+
+/** One line in the offer chat under an NFT (ADR-135). */
+export interface NftMessage {
+  id: number;
+  /** Nickname, AI collector or null (sale note). */
+  author: string | null;
+  ai: boolean;
+  /** chat, offer, or sale (text = buyer, offerCents = price). */
+  kind: "chat" | "offer" | "sale";
+  text: string;
+  offerCents: number | null;
+  offerStatus: "open" | "accepted" | "declined" | "closed" | "expired" | null;
+  expiresAt: string | null;
+  at: string;
+  mine: boolean;
+}
+
+export interface NftChat {
+  artworkId: string;
+  isOwner: boolean;
+  askCents: number | null;
+  minOfferCents: number;
+  maxLength: number;
+  myOfferCents: number | null;
+  messages: NftMessage[];
+}
+
+export interface NftSale {
+  artwork: Artwork;
+  priceCents: number;
+  feeCents: number;
+  royaltyCents: number;
 }
 
 export interface ArtRankings {
@@ -345,12 +404,24 @@ export interface ArtRankings {
     isMe: boolean;
   }[];
   artworks: { rank: number; artwork: Artwork }[];
+  /** Creators by royalties earned (ADR-135). */
+  creators: {
+    rank: number;
+    nickname: string;
+    avatarKey: string | null;
+    count: number;
+    royaltiesCents: number;
+    isMe: boolean;
+  }[];
 }
 
 export interface ArtCollection {
   nickname: string;
   count: number;
   valueCents: number;
+  /** NFTs the player minted and the royalties they earned (ADR-135). */
+  created: number;
+  royaltiesCents: number;
   artworks: Artwork[];
 }
 
@@ -1793,6 +1864,11 @@ export const GAME_ERROR_KEYS = [
   "protest_joined",
   "protest_closed",
   "protest_own",
+  "nft_text_invalid",
+  "nft_offer_closed",
+  "nft_offer_unfunded",
+  "nft_not_for_sale",
+  "nft_price_changed",
   "move_busy",
   "move_resting",
   "friend_code_unknown",
@@ -1850,13 +1926,19 @@ export interface GameEngine {
     requestId: string,
     title: string,
     pixels: ArtworkPixels,
-  ): Promise<{ artwork: Artwork; costCents: number; nextCostCents: number }>;
+  ): Promise<{ artwork: Artwork; costCents: number; nextCostCents: number; xp: number }>;
   likeArtwork(requestId: string, artworkId: string, like: boolean): Promise<{ likes: number; liked: boolean }>;
   startAuction(requestId: string, artworkId: string, startCents: number, hours: number): Promise<Artwork>;
   cancelAuction(requestId: string, auctionId: string): Promise<Artwork>;
   bidArtwork(requestId: string, auctionId: string, amountCents: number): Promise<Artwork>;
   artRankings(limit: number): Promise<ArtRankings>;
   collection(nickname: string): Promise<ArtCollection>;
+  // NFTs: offer chat, fixed price (ADR-135)
+  artworkChat(artworkId: string): Promise<NftChat>;
+  postArtworkMessage(requestId: string, artworkId: string, text: string, offerCents: number | null): Promise<NftChat>;
+  acceptArtworkOffer(requestId: string, messageId: number): Promise<NftSale>;
+  setArtworkPrice(requestId: string, artworkId: string, askCents: number | null): Promise<Artwork>;
+  buyArtwork(requestId: string, artworkId: string, priceCents: number): Promise<NftSale>;
   // Property (ADR-082)
   property(nickname: string | null): Promise<PropertyState>;
   buyHome(requestId: string, tier: PropertyTier): Promise<PropertyState & { costCents: number }>;

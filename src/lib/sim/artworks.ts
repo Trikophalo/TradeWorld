@@ -67,7 +67,7 @@ export function hotScore(
   );
 }
 
-/** Display code of an artwork: "ART-0042". */
+/** Display code of an NFT: "NFT-0042" (ADR-135; was ART-0042). */
 export function artworkCode(serial: number): string {
-  return `ART-${String(serial).padStart(4, "0")}`;
+  return `NFT-${String(serial).padStart(4, "0")}`;
 }

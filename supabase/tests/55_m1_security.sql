@@ -62,8 +62,10 @@ select tests.assert(
           -- own strategies (98)
           || array['get_company_pitches', 'submit_company_pitch', 'company_pitch_context']
           -- protest campaigns (99)
-          || array['get_protests', 'start_protest', 'join_protest']) x),
-  'authenticated can execute exactly the 9 helpers and the RPCs up to the protest campaigns (99)');
+          || array['get_protests', 'start_protest', 'join_protest']
+          -- NFTs (9b)
+          || array['get_artwork_chat', 'post_artwork_message', 'accept_artwork_offer', 'set_artwork_price', 'buy_artwork']) x),
+  'authenticated can execute exactly the 9 helpers and the RPCs up to the NFTs (9b)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute') and p.proname <> 'check_nickname'),

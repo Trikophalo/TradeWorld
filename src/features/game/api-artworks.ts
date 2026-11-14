@@ -20,7 +20,7 @@ const auctionSchema = z.object({
   my_bid_cents: num.nullable(),
 });
 
-const artworkSchema = z.object({
+export const artworkSchema = z.object({
   id: z.string(),
   code: z.string(),
   title: z.string(),
@@ -28,8 +28,14 @@ const artworkSchema = z.object({
   rarity: z.enum(["common", "rare", "legendary"]).nullable(),
   creator: z.string().nullable(),
   owner: z.string().nullable(),
+  ai_owner: z.string().nullable(),
   pixels: z.object({ palette: z.array(z.string()), grid: z.array(z.string()) }),
   value_cents: num.nullable(),
+  ask_cents: num.nullable(),
+  royalty_bps: num,
+  royalties_cents: num,
+  offers: num,
+  best_offer_cents: num.nullable(),
   likes: num,
   liked: z.boolean(),
   created_at: iso,
@@ -42,11 +48,27 @@ export const ARTWORK_RPC_SCHEMAS = {
   get_artworks: z.object({ server_time: iso, total: num, entries: z.array(artworkSchema) }),
   get_artwork: z.object({
     artwork: artworkSchema,
-    sales: z.array(z.object({ at: iso, price_cents: num, seller: z.string().nullable(), buyer: z.string() })),
+    sales: z.array(
+      z.object({
+        at: iso,
+        price_cents: num,
+        seller: z.string().nullable(),
+        buyer: z.string(),
+        kind: z.enum(["auction", "buy", "offer", "ai"]),
+        royalty_cents: num,
+      }),
+    ),
     bids: z.array(z.object({ nickname: z.string(), amount_cents: num, at: iso })),
   }),
-  get_art_studio: z.object({ painted: num, next_cost_cents: num, unlocked: z.boolean() }),
-  create_artwork: z.object({ artwork: artworkSchema, cost_cents: num, next_cost_cents: num }),
+  get_art_studio: z.object({
+    painted: num,
+    next_cost_cents: num,
+    unlocked: z.boolean(),
+    royalties_cents: num,
+    royalty_bps: num,
+    mint_xp: num,
+  }),
+  create_artwork: z.object({ artwork: artworkSchema, cost_cents: num, next_cost_cents: num, xp: num }),
   check_artwork_title: z.object({ allowed: z.boolean(), reason: z.string().nullable() }),
   like_artwork: z.object({ likes: num, liked: z.boolean() }),
   start_auction: z.object({ artwork: artworkSchema }),
@@ -64,8 +86,25 @@ export const ARTWORK_RPC_SCHEMAS = {
       }),
     ),
     artworks: z.array(z.object({ rank: num, artwork: artworkSchema })),
+    creators: z.array(
+      z.object({
+        rank: num,
+        nickname: z.string(),
+        avatar_key: z.string().nullable(),
+        count: num,
+        royalties_cents: num,
+        is_me: z.boolean(),
+      }),
+    ),
   }),
-  get_collection: z.object({ nickname: z.string(), count: num, value_cents: num, artworks: z.array(artworkSchema) }),
+  get_collection: z.object({
+    nickname: z.string(),
+    count: num,
+    value_cents: num,
+    created: num,
+    royalties_cents: num,
+    artworks: z.array(artworkSchema),
+  }),
 };
 const S = ARTWORK_RPC_SCHEMAS;
 
@@ -78,8 +117,14 @@ export function toArtwork(a: ArtworkRow): Artwork {
     rarity: a.rarity,
     creator: a.creator,
     owner: a.owner,
+    aiOwner: a.ai_owner,
     pixels: a.pixels,
     valueCents: a.value_cents,
+    askCents: a.ask_cents,
+    royaltyBps: a.royalty_bps,
+    royaltiesCents: a.royalties_cents,
+    offers: a.offers,
+    bestOfferCents: a.best_offer_cents,
     likes: a.likes,
     liked: a.liked,
     createdAt: a.created_at,
@@ -128,13 +173,27 @@ export const liveArtEngine: ArtEngine = {
     const r = await rpc("get_artwork", { p_artwork_id: id }, S.get_artwork);
     return {
       artwork: toArtwork(r.artwork),
-      sales: r.sales.map((s) => ({ at: s.at, priceCents: s.price_cents, seller: s.seller, buyer: s.buyer })),
+      sales: r.sales.map((s) => ({
+        at: s.at,
+        priceCents: s.price_cents,
+        seller: s.seller,
+        buyer: s.buyer,
+        kind: s.kind,
+        royaltyCents: s.royalty_cents,
+      })),
       bids: r.bids.map((b) => ({ nickname: b.nickname, amountCents: b.amount_cents, at: b.at })),
     };
   },
   async artStudio() {
     const r = await rpc("get_art_studio", {}, S.get_art_studio);
-    return { painted: r.painted, nextCostCents: r.next_cost_cents, unlocked: r.unlocked };
+    return {
+      painted: r.painted,
+      nextCostCents: r.next_cost_cents,
+      unlocked: r.unlocked,
+      royaltiesCents: r.royalties_cents,
+      royaltyBps: r.royalty_bps,
+      mintXp: r.mint_xp,
+    };
   },
   async checkArtworkTitle(title) {
     const r = await rpc("check_artwork_title", { p_title: title }, S.check_artwork_title);
@@ -146,7 +205,7 @@ export const liveArtEngine: ArtEngine = {
       { p_request_id: requestId, p_title: title, p_pixels: pixels },
       S.create_artwork,
     );
-    return { artwork: toArtwork(r.artwork), costCents: r.cost_cents, nextCostCents: r.next_cost_cents };
+    return { artwork: toArtwork(r.artwork), costCents: r.cost_cents, nextCostCents: r.next_cost_cents, xp: r.xp };
   },
   async likeArtwork(requestId, artworkId, like) {
     return rpc("like_artwork", { p_request_id: requestId, p_artwork_id: artworkId, p_like: like }, S.like_artwork);
@@ -183,10 +242,25 @@ export const liveArtEngine: ArtEngine = {
         isMe: c.is_me,
       })),
       artworks: r.artworks.map((a) => ({ rank: a.rank, artwork: toArtwork(a.artwork) })),
+      creators: r.creators.map((c) => ({
+        rank: c.rank,
+        nickname: c.nickname,
+        avatarKey: c.avatar_key,
+        count: c.count,
+        royaltiesCents: c.royalties_cents,
+        isMe: c.is_me,
+      })),
     };
   },
   async collection(nickname) {
     const r = await rpc("get_collection", { p_nickname: nickname }, S.get_collection);
-    return { nickname: r.nickname, count: r.count, valueCents: r.value_cents, artworks: r.artworks.map(toArtwork) };
+    return {
+      nickname: r.nickname,
+      count: r.count,
+      valueCents: r.value_cents,
+      created: r.created,
+      royaltiesCents: r.royalties_cents,
+      artworks: r.artworks.map(toArtwork),
+    };
   },
 };

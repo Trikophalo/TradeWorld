@@ -1166,6 +1166,7 @@ const art = createArtEngine({
   addCash: (cents) => {
     p().cashCents += cents;
   },
+  addXp,
   collectors: () => TYCOONS.slice(0, 16).map((t) => t.name),
   // Titles may have spaces and punctuation: only the word filter applies.
   nameViolation: (title) => {

@@ -11,6 +11,7 @@ import { PROPERTY_RPC_SCHEMAS, livePropertyEngine } from "./api-property";
 import { TASK_RPC_SCHEMAS, liveTaskEngine } from "./api-tasks";
 import { PITCH_RPC_SCHEMAS, livePitchEngine } from "./api-pitches";
 import { PROTEST_RPC_SCHEMAS, liveProtestEngine } from "./api-protests";
+import { NFT_RPC_SCHEMAS, liveNftEngine } from "./api-nfts";
 import { rpc, toErrorKey } from "./rpc";
 import {
   type Candle,
@@ -478,6 +479,7 @@ export const RPC_SCHEMAS = {
   ...TASK_RPC_SCHEMAS,
   ...PITCH_RPC_SCHEMAS,
   ...PROTEST_RPC_SCHEMAS,
+  ...NFT_RPC_SCHEMAS,
   get_stock_news: stockNewsSchema,
   get_player_holdings: holdingsSchema,
   get_my_net_worth_history: netWorthHistorySchema,
@@ -498,6 +500,7 @@ export const liveEngine: GameEngine = {
   ...liveCareerEngine,
   ...liveCompanyEngine,
   ...liveArtEngine,
+  ...liveNftEngine,
   ...livePropertyEngine,
   ...liveFriendEngine,
   async companyMoves() {

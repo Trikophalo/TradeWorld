@@ -1107,3 +1107,44 @@ select public.join_protest(gen_random_uuid(), :fx_pr);
 select public.get_protests();
 \o
 reset role;
+
+-- NFTs (ADR-135): fixed price, offer chat with an accepted offer, a purchase, an AI collector's offer ----------------
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/set_artwork_price.json
+select public.set_artwork_price(gen_random_uuid(), :'fx_art2', 400000);
+\o
+reset role;
+select tests.login_as('authenticated', :fx_k) is null as ok \gset
+\o :fixture_dir/post_artwork_message.json
+select public.post_artwork_message(gen_random_uuid(), :'fx_art2', 'Schönes Bild!');
+\o :fixture_dir/post_artwork_message_offer.json
+select public.post_artwork_message(gen_random_uuid(), :'fx_art2', 'Wäre das ein Preis?', 300000);
+\o
+reset role;
+select id as fx_offer from public.artwork_messages where artwork_id = :'fx_art2' and author_id = :fx_k and offer_status = 'open' \gset
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/get_artwork_chat.json
+select public.get_artwork_chat(:'fx_art2');
+\o :fixture_dir/accept_artwork_offer.json
+select public.accept_artwork_offer(gen_random_uuid(), :fx_offer);
+\o
+reset role;
+select tests.login_as('authenticated', :fx_k) is null as ok \gset
+select public.set_artwork_price(gen_random_uuid(), :'fx_art2', 450000) is not null as ok \gset
+reset role;
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/buy_artwork.json
+select public.buy_artwork(gen_random_uuid(), :'fx_art2', 450000);
+\o
+select public.set_artwork_price(gen_random_uuid(), :'fx_art2', 90000000) is not null as ok \gset
+reset role;
+update public.game_config set value = jsonb_set(value, '{ai,listedOfferChanceBps}', '10000') where key = 'nfts';
+select public.nfts_run_due(now()) is not null as ok \gset
+update public.game_config set value = jsonb_set(value, '{ai,listedOfferChanceBps}', '800') where key = 'nfts';
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/get_artwork_chat_ai.json
+select public.get_artwork_chat(:'fx_art2');
+\o :fixture_dir/get_artworks_for_sale.json
+select public.get_artworks('for_sale', 'all', false, 6, 0);
+\o
+reset role;
