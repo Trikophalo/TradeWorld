@@ -2,6 +2,7 @@ import { COMPANY_EVENTS, type CompanyEventsConfig } from "./company-events.ts";
 import { COMPANY_MOVE_RULES, COMPANY_MOVES, type CompanyMoveConfig } from "./company-moves.ts";
 import { COMPANY_TASK_RULES, COMPANY_TASKS, FUN_NEWS, type CompanyTaskConfig } from "./company-tasks.ts";
 import { PITCH_RULES } from "./pitches.ts";
+import { PROTEST_RULES } from "./protests.ts";
 import { CRYPTO, type CryptoConfig } from "./crypto.ts";
 import { DEALS, TRUST, type DealsConfig, type TrustConfig } from "./deals.ts";
 import { SKILL_NODES, type SkillBranch, type SkillNodeConfig } from "./skills.ts";
@@ -828,6 +829,8 @@ export interface BalanceConfig {
   readonly funNews: typeof FUN_NEWS;
   /** Own strategies judged by Claude or the Mini-KI (ADR-132), values in pitches.ts. */
   readonly pitches: typeof PITCH_RULES;
+  /** Protest campaigns against other companies (ADR-133), values in protests.ts. */
+  readonly protests: typeof PROTEST_RULES;
   /** Crises, scandals and a falling share price cut wages (ADR-131). */
   readonly wageMood: {
     /** Wage cut per severity level (1..3) of an open or running crisis. */
@@ -2368,6 +2371,7 @@ export const BALANCE = {
   companyTasks: { ...COMPANY_TASK_RULES, tasks: COMPANY_TASKS },
   funNews: FUN_NEWS,
   pitches: PITCH_RULES,
+  protests: PROTEST_RULES,
   wageMood: {
     crisisPerSeverityBps: 500,
     scandalBps: 500,

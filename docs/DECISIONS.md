@@ -1976,3 +1976,22 @@ nach hinten losgehen. Dasselbe für eigene Geschäftszüge.
 - **Kosten für Claude:** ein Aufruf je eingereichter Idee, mit niedrigem Aufwand.
 - **Einrichtung:** dieselbe wie in ADR-091 (`ANTHROPIC_API_KEY` als GitHub-Secret); der Workflow spielt
   `strategy-judge` mit ein.
+
+## ADR-133: Protestkampagnen gegen Firmen, Quartalsbericht oben — `akzeptiert`
+
+Vorgabe: Spieler sollen Kampagnen gegen andere Unternehmen starten können (Hetzkampagnen und so weiter). Dafür müssen
+viele mitmachen, auch die KI, und nur ganz selten hat das echte Auswirkungen.
+
+- Vier feste Arten: Boykott-Aufruf, Shitstorm, Petition, Protestmarsch. Kein freier Text, damit niemand andere
+  Spieler beleidigen kann. Ziel kann jede Firma sein, nur nicht die eigene oder der eigene Arbeitgeber.
+- Starten kostet 500 €, Mitmachen ist kostenlos (ab Level 4). Je Ziel läuft höchstens eine Kampagne, jeder Spieler
+  startet höchstens eine in 6 Stunden. Die Zielfirma sieht die Kampagne.
+- **Viele müssen mitmachen:** 20 Unterstützer. KI-Unterstützer kommen von selbst dazu (jede Minute mit 30 %, ein bis
+  zwei), aber höchstens 16. Den Rest müssen Spieler stellen. Ohne Ziel nach 6 Stunden schläft die Kampagne ein.
+- **Selten mit Wirkung:** Am Ziel wirkt die Kampagne nur mit 6 % plus 3 % je mitmachendem Spieler, höchstens 35 %.
+  Dann fällt der Kurs einer börsennotierten Firma um 1,5 bis 4,5 %, eine Spielerfirma verliert zudem 3 Punkte
+  Bekanntheit. Sonst verpufft sie. Beides wird zur Marktmeldung im News-Tab.
+- Werte in `src/config/protests.ts` (`game_config.protests`). Tabellen und RPCs heißen „protest“, weil „campaign“
+  schon die Werbekampagnen (ADR-083) bezeichnet. Test `supabase/tests/99_protests.sql`.
+
+Dazu: Der letzte Quartalsabschluss steht im Firmen-Dashboard jetzt ganz oben, gleich unter der Produktion.

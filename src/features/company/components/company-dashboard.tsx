@@ -123,6 +123,10 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
                 document.getElementById("campaign")?.scrollIntoView({ behavior: "smooth", block: "center" })
               }
             />
+            {/* The last quarter right at the top: the most asked-for numbers (ADR-133) */}
+            <div id="quarter" className="scroll-mt-24">
+              <QuarterReceipt company={company} />
+            </div>
             <CompanyMovesCard />
             <PitchCard kind="move" />
             <SituationCard />
@@ -142,7 +146,6 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
             />
             <ExpansionCard company={company} />
             <CompanyNewsCard />
-            <QuarterReceipt company={company} />
             <HistoryCard company={company} />
           </div>
           <div className="space-y-5">

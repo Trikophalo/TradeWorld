@@ -161,3 +161,5 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 - **Eigene Strategien mit KI (ADR-132):** Bei Krisen, Chancen und als eigener Geschäftszug schreibst du selbst, was
   deine Firma tut. Claude beurteilt die Idee (ohne Schlüssel die Mini-KI), der Zufall entscheidet. Schönfärberei kann
   nach hinten losgehen.
+- **Protestkampagnen (ADR-133):** Boykott, Shitstorm, Petition oder Protestmarsch gegen andere Firmen. Viele müssen
+  mitmachen, die KI hilft, wirken tut es nur selten. Der letzte Quartalsabschluss steht im Dashboard jetzt ganz oben.

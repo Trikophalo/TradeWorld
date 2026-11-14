@@ -7221,3 +7221,23 @@ store_pitch_judgment(p_pitch_id, p_fit, p_backfire, p_verdict, p_success, p_fail
 
 Intern: `company_pitches_run_due(p_now)` (Cron `nexa-company-pitches`), `pitch_mini_judge(text, topic)`,
 `company_pitch_resolve(id, u, u2)`.
+
+## Nachtrag: Protestkampagnen (ADR-133)
+
+Migration `20261204000600_protests.sql`, Test `supabase/tests/99_protests.sql`.
+
+- Tabellen `company_protests` (`company_id`, `kind`, `started_by`, `created_at`, `ends_at`, `goal`, `ai_supporters`,
+  `status` `open`/`hit`/`fizzled`/`expired`, `effect_bps`, `resolved_at`) und `company_protest_supporters`
+  (`protest_id`, `player_id`, `joined_at`), beide intern.
+- Fehler `protest_busy` NX117, `protest_joined` NX118, `protest_closed` NX119, `protest_own` NX120.
+
+```
+get_protests() -> {"start_cost_cents", "min_level",
+                   "protests": [{"id","kind","company_id","company","ticker","status","goal","ai_supporters","players",
+                                 "joined","started_by","mine","against_me","effect_bps","created_at","ends_at",
+                                 "resolved_at"}]}
+start_protest(p_request_id uuid, p_company_id uuid, p_kind text) -> wie get_protests
+join_protest(p_request_id uuid, p_protest_id bigint) -> wie get_protests
+```
+
+Intern: `protest_check(id, u, u2)`, `protests_run_due(p_now)` (Cron `nexa-protests`).
