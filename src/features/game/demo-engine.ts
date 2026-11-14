@@ -39,6 +39,7 @@ import { createStockNewsEngine } from "./demo/stock-news";
 import { createCompanyMovesEngine, type DemoMoveRun } from "./demo/company-moves";
 import { createCompanyTasksEngine, type DemoTasksState } from "./demo/company-tasks";
 import { createPitchesEngine, type DemoPitch } from "./demo/pitches";
+import { createNewsShowEngine, type DemoNewsShowState } from "./demo/news-show";
 import { createProtestsEngine, type DemoProtest } from "./demo/protests";
 import { createSocialEngine, type DemoSocialState } from "./demo/social";
 import { createCompanyEventsEngine } from "./demo/company-events";
@@ -112,6 +113,8 @@ interface PlayerState {
   /** Business moves of the demo company (ADR-127). */
   companyMoves?: DemoMoveRun[];
   companyTasks?: DemoTasksState;
+  /** NEXA Nachrichten (ADR-150). */
+  newsShow?: DemoNewsShowState;
   pitches?: DemoPitch[];
   protests?: DemoProtest[];
   /** The friend code redeemed once (ADR-111). */
@@ -1424,6 +1427,57 @@ const pitches = createPitchesEngine({
   random: () => Math.random(),
 });
 
+const SECTOR_NAMES: Record<string, string> = {
+  tech: "Tech",
+  retail: "Handel",
+  energy: "Energie",
+  pharma: "Pharma",
+  logistics: "Logistik",
+};
+const newsShow = createNewsShowEngine({
+  state: () => p().newsShow,
+  setState: (s) => {
+    p().newsShow = s;
+    persist();
+  },
+  nickname: () => p().nickname,
+  stocks: () => DEMO_COMPANIES.map((c) => ({ ticker: c.ticker, name: c.name, sector: c.sector })),
+  sectorName: (key) => SECTOR_NAMES[key] ?? key,
+  shock: (ticker, moveBps) => {
+    const st = m();
+    const mid = st.mids.get(ticker);
+    if (mid) st.mids.set(ticker, Math.max(10, Math.round(mid * (1 + moveBps / 10_000))));
+  },
+  company: () => p().company ?? null,
+  // The demo keeps no net worth history: compared with the starting capital.
+  dayChange: () => {
+    const start = BALANCE.economy.startingCapitalCents;
+    if (start <= 0) return null;
+    const cents = netWorth() - start;
+    return { cents, bps: Math.round((cents * 10_000) / start) };
+  },
+  addCash: (cents) => {
+    p().cashCents += cents;
+    persist();
+  },
+  scaleOpenTasks: (bps) => {
+    const tasks = p().companyTasks;
+    if (!tasks) return;
+    for (const t of tasks.tasks)
+      if (t.status === "open" || t.status === "assigned")
+        t.valueCents = Math.max(100, Math.floor((t.valueCents * (10_000 + bps)) / 10_000));
+    persist();
+  },
+  idempotent,
+  now: () => Date.now(),
+  random: () => Math.random(),
+});
+
+/** Demo only (ADR-150): airs a news show in a few seconds, for trying it out and for tests. */
+export function demoStartNewsShow(inMs?: number): void {
+  newsShow.startNow(inMs);
+}
+
 const protests = createProtestsEngine({
   companies: () => DEMO_COMPANIES.map((c) => ({ id: `demo-company-${c.ticker}`, name: c.name, ticker: c.ticker })),
   nickname: () => p().nickname,
@@ -1449,6 +1503,8 @@ const protests = createProtestsEngine({
 });
 
 export const demoEngine: GameEngine = {
+  newsShow: newsShow.newsShow,
+  postNewsShowMessage: newsShow.postNewsShowMessage,
   // The demo keeps seen tours in the browser only (the tutorial store does that).
   seenTours: async () => [],
   markTourSeen: async () => [],

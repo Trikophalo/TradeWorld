@@ -7398,3 +7398,19 @@ Börsengang (ADR-146): `go_public` und `capital_increase` setzen `ends_at = jetz
 Schlüssel `offer-ai:<offer>:<shares_ai_e6>`, die Teilzahlungen summieren sich genau zu ⌊KI-Aktien × Preis⌋).
 `close_share_offer` ruft sie mit `final` auf und zahlt die KI nicht mehr selbst. Neue Config:
 `startups.ipo.subscriptionMinutes`, `startups.ipo.quickAmountsCents`, Abschnitt `marketPopularity`.
+
+## Nachtrag: NEXA Nachrichten (ADR-150)
+
+Tabellen (alle RLS, ohne Client-Rechte): `news_shows (id, airs_at unique, status scheduled|aired|cancelled, segments
+jsonb, writer mini|claude, ai_requested_at, started_at)`, `news_show_used (key, used_at)`, `news_show_messages (id,
+player_id, body, created_at)`, `news_show_viewers (player_id, seen_at)`. Ein Segment: `{kind, headline, text, effects:
+[{label, tone}], apply: [...intern], subject: {...intern}}`.
+
+RPCs (authenticated): `get_news_show()` → `{now, next_airs_at, viewers, upcoming {id, airs_at, needs_script} | null,
+show {id, airs_at, started_at, writer, segments [{kind, headline, text, effects}]} | null, chat [{id, nickname, body,
+at, mine}]}`; markiert den Aufrufer als Zuschauer und startet die Sendung dieser Stunde für den ersten Zuschauer.
+`post_news_show_message(p_request_id, p_body)` → `{chat}` (Fehler `chat_text_invalid` NX128, `rate_limited`).
+`news_show_claim_script(p_show_id)` → boolean. Service-Role: `news_show_script_context`, `store_news_show_script`.
+Intern: `news_show_build`, `news_show_start` (Folgen: `event_price_shock`, Bekanntheit, Aufgabenwerte, Trostpflaster
+per Ledger `random_event`, Hinweis in `stock_tips`), `news_show_run_due` (Cron `nexa-news-show`, jede Minute).
+Test `supabase/tests/9i_news_show.sql`.

@@ -1164,3 +1164,17 @@ select public.get_artwork_chat(:'fx_art2');
 select public.get_artworks('for_sale', 'all', false, 6, 0);
 \o
 reset role;
+
+-- NEXA Nachrichten (ADR-150): this hour's show starts for its first viewer, a chat line ------------------------------
+delete from public.news_shows;
+delete from public.news_show_messages;
+update public.game_config set value = jsonb_set(value, '{waitMinutes}', '60') where key = 'newsShow';
+insert into public.news_shows (airs_at, segments) values (date_trunc('hour', now()), public.news_show_build(now()));
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/post_news_show_message.json
+select public.post_news_show_message(gen_random_uuid(), 'Was für eine Sendung 💀📉');
+\o :fixture_dir/get_news_show.json
+select public.get_news_show();
+\o
+reset role;
+update public.game_config set value = jsonb_set(value, '{waitMinutes}', '10') where key = 'newsShow';

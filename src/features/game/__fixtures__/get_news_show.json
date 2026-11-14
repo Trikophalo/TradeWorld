@@ -1,0 +1,65 @@
+{
+  "now": "2026-11-14T22:39:38.632538+00:00",
+  "chat": [
+    {
+      "at": "2026-11-14T22:39:38.629294+00:00",
+      "id": 3,
+      "body": "Was für eine Sendung 💀📉",
+      "mine": true,
+      "nickname": "Fixture_Neu"
+    }
+  ],
+  "show": {
+    "id": 4,
+    "writer": "mini",
+    "airs_at": "2026-11-14T22:00:00+00:00",
+    "segments": [
+      {
+        "kind": "scandal",
+        "text": "Das Netz zerreißt Stunden Werk. Ein Werbespot wurde versehentlich mit dem Ton einer Karaoke-Nacht veröffentlicht. Seitdem will niemand mehr „Apps für Uhrmacher“. Hanna_Stunde hat das Firmenhandy im Fluss versenkt.",
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −10,3 %" }],
+        "headline": "Shitstorm über Stunden Werk"
+      },
+      {
+        "kind": "scandal",
+        "text": "Frida Fahrrad wollte heute groß rauskommen. Der Sicherheitsdienst hat sich selbst ausgesperrt und die Tür aufgebrochen. Frida_Upgrade erklärte, das gehöre zum Konzept. Die Kundschaft erklärte, sie sei dann mal weg.",
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −19,7 %" }],
+        "headline": "Frida Fahrrad blamiert sich bis auf die Knochen"
+      },
+      {
+        "kind": "stock",
+        "text": "Der Sicherheitscode der Tresore lautete 1234 und stand auf einem Zettel am Tresor. Die Börse straft Glanz & Gloria mit 12,4 % Minus ab. Der Pressesprecher wurde zuletzt am Flughafen gesehen.",
+        "effects": [{ "tone": "loss", "label": "LUX −12,4 %" }],
+        "headline": "Katastrophe bei Glanz & Gloria"
+      },
+      {
+        "kind": "stock",
+        "text": "Schlechte Nachrichten von Alpenmed: Der Chef hat im Interview das eigene Produkt nicht erkannt und es „billigen Schrott“ genannt. Minus 13,5 %, und der Tag ist noch jung.",
+        "effects": [{ "tone": "loss", "label": "ALM −13,5 %" }],
+        "headline": "Alpenmed im Sinkflug"
+      },
+      {
+        "kind": "sector",
+        "text": "Die ganze Branche Pharma steigt um 4,6 %. Eine Zeitung hat sich vertippt, und niemand hat es gemerkt. So funktioniert Wirtschaft, liebe Kinder.",
+        "effects": [{ "tone": "gain", "label": "Pharma +4,6 %" }],
+        "headline": "Die Branche Pharma dreht durch"
+      },
+      {
+        "kind": "winner",
+        "text": "Fixture_Neu ist heute um 1.076.312 € reicher, 10763,1 % rauf. Der Rest schaut zu und heult leise ins Depot.",
+        "effects": [],
+        "headline": "Glückspilz des Tages: Fixture_Neu"
+      },
+      {
+        "kind": "tip",
+        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Knusperkönig geht bald nach unten. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
+        "effects": [{ "tone": "neutral", "label": "SNK ↓ Tipp" }],
+        "headline": "Der heiße Draht: Knusperkönig"
+      }
+    ],
+    "started_at": "2026-11-14T22:39:38.632538+00:00"
+  },
+  "viewers": 3,
+  "upcoming": null,
+  "next_airs_at": "2026-11-14T23:00:00+00:00"
+}

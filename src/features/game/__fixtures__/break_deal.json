@@ -1,10 +1,10 @@
 {
-  "id": "d732efa4-4f99-4bd2-aa96-1e95ea0466f8",
+  "id": "daa670e5-752d-450a-8fa0-e7e591017c6b",
   "kind": "supply",
   "terms": { "hours": 24, "fee_bps": 5000, "prepay_bps": 2000, "volume_cents_per_hour": 30000 },
   "status": "broken",
   "company": null,
-  "ends_at": "2026-11-15T21:40:30.825449+00:00",
+  "ends_at": "2026-11-15T22:39:36.697511+00:00",
   "message": null,
   "my_role": "supplier",
   "progress": {
@@ -15,26 +15,26 @@
     "prepay_left_cents": 72000
   },
   "proposer": {
-    "tag": "KYHG",
+    "tag": "JK33",
     "level": 6,
     "trust": { "band": "shaky", "score": 41 },
     "nickname": "Fixture_Lieferant",
     "avatar_key": "rookie"
   },
-  "closed_at": "2026-11-14T21:40:30.84925+00:00",
-  "created_at": "2026-11-14T21:40:30.775379+00:00",
-  "expires_at": "2026-11-16T21:40:30.775379+00:00",
-  "accepted_at": "2026-11-14T21:40:30.825449+00:00",
+  "closed_at": "2026-11-14T22:39:36.728569+00:00",
+  "created_at": "2026-11-14T22:39:36.6438+00:00",
+  "expires_at": "2026-11-16T22:39:36.6438+00:00",
+  "accepted_at": "2026-11-14T22:39:36.697511+00:00",
   "is_proposer": true,
   "broken_by_me": true,
   "counterparty": {
-    "tag": "KTYA",
+    "tag": "GXSF",
     "level": 6,
     "trust": { "band": "blank", "score": 50 },
     "nickname": "Fixture_Abnehmer",
     "avatar_key": "rookie"
   },
-  "buyer_company": { "id": "bbc4210c-a113-42b3-a043-50e433933e27", "name": "Fixture Abnahme" },
+  "buyer_company": { "id": "b7cff973-2b47-42a2-8792-1b0956925e53", "name": "Fixture Abnahme" },
   "proposer_role": "supplier",
-  "supplier_company": { "id": "bc4105dc-45c1-4034-ba6f-a2d557067329", "name": "Fixture Lieferwerk" }
+  "supplier_company": { "id": "0022a6fe-ee51-4cb9-b147-09a7684f4ad0", "name": "Fixture Lieferwerk" }
 }

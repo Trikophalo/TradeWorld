@@ -70,7 +70,9 @@ select tests.assert(
           -- NFTs (9b)
           || array['get_artwork_chat', 'post_artwork_message', 'accept_artwork_offer', 'set_artwork_price', 'buy_artwork']
           -- popular stocks first (9g)
-          || array['record_security_view']) x),
+          || array['record_security_view']
+          -- NEXA Nachrichten (9i)
+          || array['get_news_show', 'post_news_show_message', 'news_show_claim_script']) x),
   'authenticated can execute exactly the 9 helpers and the RPCs up to the market popularity (9g)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace

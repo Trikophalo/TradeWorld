@@ -1,6 +1,6 @@
 {
-  "mine": { "rank": 38, "value_cents": 54108 },
-  "total": 41,
+  "mine": { "rank": 39, "value_cents": 54107 },
+  "total": 42,
   "entries": [
     {
       "kind": "player",
@@ -14,24 +14,8 @@
       "founder": "Lars_Kursrutsch",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "7f7f8a5f-8158-4142-a382-e850b0f4b7b8",
+      "company_id": "375a5ed8-1a8a-47a8-96f7-fe19dddec421",
       "value_cents": 959140000,
-      "revenue_cents": null
-    },
-    {
-      "kind": "player",
-      "logo": null,
-      "name": "Gipfelwerk",
-      "rank": 2,
-      "tier": "ag",
-      "color": "#336699",
-      "sector": "retail",
-      "ticker": "GIP",
-      "founder": "Pop_Frida",
-      "is_mine": false,
-      "team_size": 1,
-      "company_id": "1808e1e3-a373-4550-989d-2eab69c8be1f",
-      "value_cents": 99610000,
       "revenue_cents": null
     },
     {
@@ -58,7 +42,7 @@
         "palette": ["#112233", "#00ff00"]
       },
       "name": "Fenja Pixel",
-      "rank": 3,
+      "rank": 2,
       "tier": "ag",
       "color": "#123456",
       "sector": "tech",
@@ -66,9 +50,25 @@
       "founder": "Fenja_Firma",
       "is_mine": false,
       "team_size": 6,
-      "company_id": "0836ae25-c069-4fee-b177-75170d424d1a",
-      "value_cents": 97414679,
+      "company_id": "984e9274-d789-47c8-bc76-14e7df24440e",
+      "value_cents": 97482856,
       "revenue_cents": 0
+    },
+    {
+      "kind": "player",
+      "logo": null,
+      "name": "Gipfelwerk",
+      "rank": 3,
+      "tier": "ag",
+      "color": "#336699",
+      "sector": "retail",
+      "ticker": "GIP",
+      "founder": "Pop_Frida",
+      "is_mine": false,
+      "team_size": 1,
+      "company_id": "a4febf72-7d7a-477e-87f1-83050e231a79",
+      "value_cents": 88420000,
+      "revenue_cents": null
     },
     {
       "kind": "player",
@@ -82,8 +82,8 @@
       "founder": "Pop_Gero",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "fa12633f-91c3-4c1d-a949-f3ada9b910ad",
-      "value_cents": 91164717,
+      "company_id": "038fbd06-913f-4617-a7a5-05ddf6078dba",
+      "value_cents": 80334527,
       "revenue_cents": null
     },
     {
@@ -98,10 +98,10 @@
       "founder": "Frieda_Format",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "c6062e7a-2316-4c79-9500-c16c8a80b039",
+      "company_id": "a13c6d72-b6c5-48b2-ac90-deaf5e431b5f",
       "value_cents": 51553750,
       "revenue_cents": 1185000
     }
   ],
-  "server_time": "2026-11-14T21:40:28.167217+00:00"
+  "server_time": "2026-11-14T22:39:33.822818+00:00"
 }

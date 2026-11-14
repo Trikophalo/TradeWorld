@@ -4,6 +4,7 @@ import { NEWSPAPER } from "@/components/pixel/art";
 import { Page, PageHeader } from "@/components/layout/page";
 import { NewsFeed } from "@/features/news/news-feed";
 import { ProtestsCard } from "@/features/news/protests";
+import { NewsShow } from "@/features/news/show/news-show";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("newsTab");
@@ -17,6 +18,10 @@ export default async function NewsPage() {
   return (
     <Page>
       <PageHeader title={t("title")} intro={th("news")} art={NEWSPAPER} />
+      {/* The hourly live show with Mr. Doodle Dangle and its chat (ADR-150) */}
+      <div className="mx-auto mb-6 max-w-5xl">
+        <NewsShow />
+      </div>
       <div className="mx-auto max-w-2xl space-y-4">
         <ProtestsCard />
         <NewsFeed />

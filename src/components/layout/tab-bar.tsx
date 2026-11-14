@@ -10,6 +10,7 @@ import { UI_ICONS, type UiIconName } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { NAV_GROUPS, NAV_ITEMS, isActivePath, type NavItem } from "@/config/navigation";
 import { usePlayerLevel } from "@/features/game/store";
+import { ShowBadge } from "@/features/news/show/show-badge";
 import { isUnlocked, unlockLevel } from "@/lib/sim/progression";
 import { haptic } from "@/lib/haptics";
 import { playSound } from "@/lib/sound";
@@ -152,6 +153,7 @@ function MoreTab({ pathname }: { pathname: string }) {
         <span className="relative grid h-8 w-12 max-w-full place-items-center">
           {active && <span className="absolute inset-0 rounded-md bg-accent-soft" />}
           <span className="relative font-pixel text-base leading-none">•••</span>
+          <ShowBadge dotOnly className="absolute top-0.5 right-1.5" />
         </span>
         <span className="max-w-full truncate px-0.5 label-pixel text-[0.5625rem] leading-none tracking-normal">
           {t("short.more")}
@@ -177,6 +179,7 @@ function MoreTab({ pathname }: { pathname: string }) {
                     >
                       <PixelIcon {...UI_ICONS[entry.icon]} scale={2} />
                       <span className="min-w-0 flex-1 truncate">{entry.label}</span>
+                      {entry.key === "news" && <ShowBadge />}
                       {entry.lockedLevel !== null && (
                         <span className="flex items-center gap-1 nums text-2xs text-fg-3">
                           <PixelIcon {...UI_ICONS.lock} scale={1} />

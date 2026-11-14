@@ -1,6 +1,7 @@
 import { COMPANY_EVENTS, type CompanyEventsConfig } from "./company-events.ts";
 import { COMPANY_MOVE_RULES, COMPANY_MOVES, type CompanyMoveConfig } from "./company-moves.ts";
 import { COMPANY_TASK_RULES, COMPANY_TASKS, FUN_NEWS, type CompanyTaskConfig } from "./company-tasks.ts";
+import { NEWS_SHOW_RULES } from "./news-show.ts";
 import { PITCH_RULES } from "./pitches.ts";
 import { PROTEST_RULES } from "./protests.ts";
 import { NFT_RULES } from "./nfts.ts";
@@ -846,6 +847,8 @@ export interface BalanceConfig {
   readonly companyTasks: typeof COMPANY_TASK_RULES & { readonly tasks: readonly CompanyTaskConfig[] };
   /** Funny news in the news tab (ADR-129). */
   readonly funNews: typeof FUN_NEWS;
+  /** NEXA Nachrichten, the hourly live show (ADR-150), values and scripts in news-show.ts. */
+  readonly newsShow: typeof NEWS_SHOW_RULES;
   /** Own strategies judged by Claude or the Mini-KI (ADR-132), values in pitches.ts. */
   readonly pitches: typeof PITCH_RULES;
   /** Protest campaigns against other companies (ADR-133), values in protests.ts. */
@@ -2420,6 +2423,7 @@ export const BALANCE = {
   companyMoves: { ...COMPANY_MOVE_RULES, moves: COMPANY_MOVES },
   companyTasks: { ...COMPANY_TASK_RULES, tasks: COMPANY_TASKS },
   funNews: FUN_NEWS,
+  newsShow: NEWS_SHOW_RULES,
   pitches: PITCH_RULES,
   protests: PROTEST_RULES,
   nfts: NFT_RULES,

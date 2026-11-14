@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Ein bekannter Fonds hält die Aktie für überbewertet. Sicher ist das nicht.",
-      "name": "Methusalem Bio",
-      "due_at": "2026-11-14T23:01:11.629196+00:00",
+      "body": "Ein wichtiger Zulieferer fällt aus. Die Produktion stockt. Sicher ist das nicht.",
+      "name": "KlarSoft AG",
+      "due_at": "2026-11-15T00:03:24.776398+00:00",
       "status": "open",
-      "ticker": "MTH",
-      "headline": "Leerverkäufer wetten gegen Methusalem Bio",
+      "ticker": "KLS",
+      "headline": "Lieferkette reißt bei KlarSoft AG",
       "move_bps": null,
       "strength": 1,
       "direction": "down",
-      "published_at": "2026-11-14T22:40:31.864406+00:00"
+      "published_at": "2026-11-14T23:39:37.989619+00:00"
     },
     {
       "id": 3,
-      "body": "Mehrere Häuser heben ihr Kursziel leicht an. Sicher ist das nicht.",
-      "name": "Kaufrausch Märkte",
-      "due_at": "2026-11-14T21:40:31.860818+00:00",
+      "body": "Ein Vögelchen hat mir gezwitschert: Methusalem Bio dürfte in der kommenden Stunde nach oben gehen. Meine Quelle ist seriös, sie trägt immerhin eine Krawatte.",
+      "name": "Methusalem Bio",
+      "due_at": "2026-11-14T22:39:32.546989+00:00",
       "status": "confirmed",
-      "ticker": "KFR",
-      "headline": "Analysten-Upgrade: Kaufrausch Märkte jetzt Kaufempfehlung",
-      "move_bps": 337,
-      "strength": 1,
+      "ticker": "MTH",
+      "headline": "Vom Flurfunk: Methusalem Bio",
+      "move_bps": 1248,
+      "strength": 2,
       "direction": "up",
-      "published_at": "2026-11-14T21:40:31.860818+00:00"
+      "published_at": "2026-11-14T22:39:32.546989+00:00"
     }
   ],
   "reliability_bps": 7500

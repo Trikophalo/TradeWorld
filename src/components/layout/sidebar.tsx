@@ -12,6 +12,7 @@ import { useState } from "react";
 import { NAV_GROUPS, NAV_ITEMS, isActivePath, type NavItem } from "@/config/navigation";
 import { useGame, usePlayerLevel } from "@/features/game/store";
 import { LockBadge } from "@/components/ui/lock-badge";
+import { ShowBadge } from "@/features/news/show/show-badge";
 import { isUnlocked, unlockLevel } from "@/lib/sim/progression";
 import { SPRING } from "@/lib/motion";
 import { xpForNextLevel } from "@/lib/sim/progression";
@@ -149,6 +150,7 @@ function NavLink({ item, pathname, lockedLevel }: { item: NavItem; pathname: str
         className={cn("relative transition-colors duration-fast group-hover:animate-hop", active && "text-accent")}
       />
       <span className="relative truncate">{t(item.key)}</span>
+      {item.key === "news" && <ShowBadge className="relative ml-auto" />}
       {lockedLevel !== undefined && <LockBadge level={lockedLevel} className="relative ml-auto" />}
     </Link>
   );

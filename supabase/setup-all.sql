@@ -53794,6 +53794,758 @@ begin
 end;
 $$;
 
+-- ===== supabase/migrations/20261204002000_news_show.sql =====
+-- =============================================================================
+-- NEXA · 2000 · NEXA Nachrichten: the hourly live show with Mr. Doodle Dangle (ADR-150)
+-- =============================================================================
+-- Once an hour, at the full hour, the anchor Mr. Doodle Dangle reads the news live. A show has a handful of segments
+-- with real effects, decided by the server: the player who lost most gets roasted (and a small consolation), a
+-- player's company has a scandal or a hype (awareness, task momentum, share price), listed stocks and a whole sector
+-- jump, open company tasks get more or less valuable, and a hint for the coming hour ends the show.
+--
+-- A show only happens when a real player watches: it starts when the first viewer calls get_news_show() at the full
+-- hour or up to newsShow.waitMinutes after it (started_at); only then the effects apply. Without viewers it is
+-- cancelled and nothing happens. Every viewer computes the phase from started_at, so all see the same.
+--
+-- Scripts: the Mini-KI builds them from frames x reasons in game_config.newsShow.texts and remembers what it used
+-- (news_show_used), so nothing repeats for hundreds of shows. With a Claude key the edge function news-anchor rewrites
+-- the draft per company before the show (news_show_claim_script / news_show_script_context / store_news_show_script).
+--
+-- RPCs (authenticated):
+--   get_news_show() -> {"now", "next_airs_at", "viewers", "upcoming": {"id", "airs_at", "needs_script"} | null,
+--                       "show": SHOW | null, "chat": [{"id", "nickname", "body", "at", "mine"}]}
+--     SHOW = {"id", "airs_at", "started_at", "writer", "segments": [{"kind", "headline", "text",
+--             "effects": [{"label", "tone"}]}]}   -- the show of this hour once it started, replayable for a while
+--   post_news_show_message(p_request_id uuid, p_body text) -> {"chat": [...]}   -- errors chat_text_invalid, rate_limited
+--   news_show_claim_script(p_show_id bigint) -> boolean   -- true once: this caller may ask Claude
+-- Internal: news_show_run_due(p_now) (cron nexa-news-show, every minute).
+-- Idempotent: runs unchanged as supabase/updates/20261204002000_news_show.sql.
+
+create table if not exists public.news_shows (
+  id              bigint generated always as identity primary key,
+  airs_at         timestamptz not null unique,
+  status          text not null default 'scheduled' check (status in ('scheduled', 'aired', 'cancelled')),
+  segments        jsonb not null default '[]'::jsonb,
+  writer          text not null default 'mini' check (writer in ('mini', 'claude')),
+  ai_requested_at timestamptz,
+  started_at      timestamptz,
+  created_at      timestamptz not null default now()
+);
+alter table public.news_shows enable row level security;
+revoke all on public.news_shows from public, anon, authenticated;
+comment on table public.news_shows is
+  'NEXA Nachrichten (ADR-150): one show per full hour. segments carry the script, the public effect chips and the '
+  'internal apply list. Internal; read through get_news_show().';
+
+create table if not exists public.news_show_used (
+  key     text primary key,
+  used_at timestamptz not null default clock_timestamp()
+);
+alter table public.news_show_used enable row level security;
+revoke all on public.news_show_used from public, anon, authenticated;
+comment on table public.news_show_used is 'Scripts the Mini-KI used for a show (frame x reason), so news do not repeat. Internal.';
+
+create table if not exists public.news_show_messages (
+  id         bigint generated always as identity primary key,
+  player_id  uuid not null references public.profiles (id) on delete cascade,
+  body       text not null check (char_length(body) between 1 and 300),
+  created_at timestamptz not null default now()
+);
+alter table public.news_show_messages enable row level security;
+revoke all on public.news_show_messages from public, anon, authenticated;
+create index if not exists news_show_messages_created_idx on public.news_show_messages (created_at desc);
+create index if not exists news_show_messages_player_idx on public.news_show_messages (player_id, created_at desc);
+comment on table public.news_show_messages is 'Live chat beside the news show (ADR-150). Internal; read through get_news_show().';
+
+create table if not exists public.news_show_viewers (
+  player_id uuid primary key references public.profiles (id) on delete cascade,
+  seen_at   timestamptz not null default now()
+);
+alter table public.news_show_viewers enable row level security;
+revoke all on public.news_show_viewers from public, anon, authenticated;
+comment on table public.news_show_viewers is 'Who has the news stream open right now (ADR-150). Internal.';
+
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('news_show', 'social', 'In den Nachrichten', 'Mr. Doodle Dangle hat über dich oder deine Firma berichtet.',
+        'notif_bell', true, true, false, 299)
+on conflict (key) do nothing;
+
+-- Error key NX128 ------------------------------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.api_error(text)'::regprocedure);
+begin
+  if position('''chat_text_invalid''' in v_def) = 0 then
+    v_def := replace(v_def, $q$    when 'order_cooldown'             then 'NX127'
+$q$, $q$    when 'order_cooldown'             then 'NX127'
+    when 'chat_text_invalid'          then 'NX128'
+$q$);
+    if position('''chat_text_invalid''' in v_def) = 0 then
+      raise exception 'api_error() has an unexpected shape; add the news show error key by hand';
+    end if;
+    execute v_def;
+  end if;
+end;
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- Helpers
+-- ---------------------------------------------------------------------------
+create or replace function public.news_show_cfg()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select value from public.game_config where key = 'newsShow'), '{}'::jsonb);
+$$;
+
+-- "12,4 %" from basis points, always positive (movePercent in src/lib/sim/news-show.ts)
+create or replace function public.news_show_move(p_bps integer)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select regexp_replace(replace(to_char(round(abs(p_bps) / 100.0, 1), 'FM999990.0'), '.', ','), ',0$', '') || ' %';
+$$;
+
+-- {placeholders} from a jsonb object of texts (fillScript)
+create or replace function public.news_show_fill(p_text text, p_values jsonb)
+returns text
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v text := p_text;
+  r record;
+begin
+  for r in select key, value from jsonb_each_text(coalesce(p_values, '{}'::jsonb)) loop
+    v := replace(v, '{' || r.key || '}', coalesce(r.value, ''));
+  end loop;
+  return v;
+end;
+$$;
+
+-- A frame and a reason for a kind: the combination used longest ago, among those the reason used longest ago,
+-- then by chance (pickScript); remembers the pick. -> {"headline", "text"} with {reason} filled in
+create or replace function public.news_show_pick(p_kind text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  kit jsonb := public.news_show_cfg() -> 'texts' -> p_kind;
+  r   record;
+begin
+  select f.ord - 1 as f, x.ord - 1 as r, f.val ->> 'headline' as headline, f.val ->> 'text' as body, x.val as reason
+    into r
+    from jsonb_array_elements(coalesce(kit -> 'frames', '[]'::jsonb)) with ordinality f(val, ord)
+   cross join jsonb_array_elements_text(coalesce(kit -> 'reasons', '[]'::jsonb)) with ordinality x(val, ord)
+    left join public.news_show_used u on u.key = p_kind || ':' || (f.ord - 1) || ':' || (x.ord - 1)
+    left join public.news_show_used ur on ur.key = 'r:' || p_kind || ':' || (x.ord - 1)
+   order by u.used_at nulls first, ur.used_at nulls first, random()
+   limit 1;
+  if r.headline is null then
+    return null;
+  end if;
+  insert into public.news_show_used (key, used_at) values (p_kind || ':' || r.f || ':' || r.r, clock_timestamp())
+  on conflict (key) do update set used_at = excluded.used_at;
+  insert into public.news_show_used (key, used_at) values ('r:' || p_kind || ':' || r.r, clock_timestamp())
+  on conflict (key) do update set used_at = excluded.used_at;
+  return jsonb_build_object('headline', r.headline, 'text', replace(r.body, '{reason}', r.reason));
+end;
+$$;
+
+-- One segment: script of the kind with the values filled in, the public effect chips, the internal apply list and
+-- the facts for Claude.
+create or replace function public.news_show_segment(p_kind text, p_script text, p_values jsonb, p_effects jsonb, p_apply jsonb,
+                                                    p_subject jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  s jsonb := public.news_show_pick(p_script);
+begin
+  if s is null then
+    return null;
+  end if;
+  return jsonb_build_object(
+    'kind', p_kind,
+    'headline', public.news_show_fill(s ->> 'headline', p_values),
+    'text', public.news_show_fill(s ->> 'text', p_values),
+    'effects', coalesce(p_effects, '[]'::jsonb),
+    'apply', coalesce(p_apply, '[]'::jsonb),
+    'subject', coalesce(p_subject, '{}'::jsonb) || jsonb_build_object('values', p_values));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- The draft of a show
+-- ---------------------------------------------------------------------------
+create or replace function public.news_show_build(p_now timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg       jsonb := public.news_show_cfg();
+  v_segs    jsonb := '[]'::jsonb;
+  v_seg     jsonb;
+  v_tip     jsonb;
+  v_last    jsonb;
+  v_skip_p  uuid[];
+  v_skip_c  uuid[];
+  r         record;
+  v_bps     integer;
+  v_aw      integer;
+  v_dir     integer;
+  v_scandal boolean;
+  v_effects jsonb;
+  v_apply   jsonb;
+  v_max     integer := coalesce((cfg ->> 'maxSegments')::integer, 7);
+begin
+  -- who was in the last show: not again right away
+  select s.segments into v_last from public.news_shows s where s.status = 'aired' order by s.airs_at desc limit 1;
+  select coalesce(array_agg((x -> 'subject' ->> 'player_id')::uuid) filter (where x -> 'subject' ? 'player_id'), '{}'),
+         coalesce(array_agg((x -> 'subject' ->> 'company_id')::uuid) filter (where x -> 'subject' ? 'company_id'), '{}')
+    into v_skip_p, v_skip_c
+    from jsonb_array_elements(coalesce(v_last, '[]'::jsonb)) x;
+
+  -- 1. the loser of the day: roast and a consolation
+  select w.entity_id as player_id, p.nickname, w.first_nw - w.last_nw as loss,
+         ((w.first_nw - w.last_nw) * 10000 / w.first_nw)::integer as bps
+    into r
+    from (select l.entity_id, l.nw as last_nw, f.nw as first_nw
+            from (select distinct on (entity_id) entity_id, net_worth_cents as nw from public.rich_list_snapshots
+                   where entity_kind = 'player' and taken_at >= p_now - interval '45 minutes'
+                   order by entity_id, taken_at desc) l
+            join (select distinct on (entity_id) entity_id, net_worth_cents as nw from public.rich_list_snapshots
+                   where entity_kind = 'player'
+                     and taken_at >= p_now - make_interval(hours => coalesce((cfg #>> '{loser,windowHours}')::integer, 24))
+                   order by entity_id, taken_at asc) f using (entity_id)
+           where f.nw > 0) w
+    join public.profiles p on p.id = w.entity_id
+   where w.entity_id <> all (v_skip_p)
+     and (w.first_nw - w.last_nw) * 10000 / w.first_nw >= coalesce((cfg #>> '{loser,minLossBps}')::integer, 300)
+   order by (w.first_nw - w.last_nw) * 10000 / w.first_nw desc, random()
+   limit 1;
+  if r.player_id is not null then
+    v_bps := coalesce((cfg #>> '{loser,consolationCents}')::integer, 0);
+    v_seg := public.news_show_segment('loser', 'loser',
+      jsonb_build_object('name', r.nickname, 'amount', public.format_eur(r.loss), 'pct', public.news_show_move(r.bps)),
+      case when v_bps > 0 then jsonb_build_array(jsonb_build_object('label', '+' || public.format_eur(v_bps) || ' Trostpflaster', 'tone', 'gain'))
+           else '[]'::jsonb end,
+      case when v_bps > 0 then jsonb_build_array(jsonb_build_object('type', 'cash', 'player_id', r.player_id, 'cents', v_bps))
+           else '[]'::jsonb end,
+      jsonb_build_object('type', 'player', 'player_id', r.player_id, 'name', r.nickname));
+    if v_seg is not null then v_segs := v_segs || v_seg; end if;
+  end if;
+
+  -- 2. players' companies: a scandal or a hype
+  for r in select pc.company_id, c.name, left(coalesce(nullif(btrim(pc.idea), ''), 'irgendwas mit Zukunft'), 90) as idea,
+                  p.nickname as founder, pc.founder_id, sec.id as security_id, sec.ticker, c.sector_key
+             from public.player_companies pc
+             join public.companies c on c.id = pc.company_id
+             join public.profiles p on p.id = pc.founder_id
+             left join public.securities sec on sec.company_id = c.id and sec.kind = 'stock' and sec.status = 'listed'
+            where pc.status = 'active' and pc.company_id <> all (v_skip_c)
+            order by random()
+            limit coalesce((cfg #>> '{company,count}')::integer, 2) loop
+    v_scandal := random() * 10000 < coalesce((cfg #>> '{company,scandalShareBps}')::integer, 6000);
+    v_dir := case when v_scandal then -1 else 1 end;
+    v_aw := public.rand_between((cfg #>> '{company,awarenessMinBps}')::integer, (cfg #>> '{company,awarenessMaxBps}')::integer);
+    v_bps := public.rand_between((cfg #>> '{company,stockMinBps}')::integer, (cfg #>> '{company,stockMaxBps}')::integer);
+    v_effects := jsonb_build_array(jsonb_build_object(
+      'label', 'Bekanntheit ' || case when v_scandal then '−' else '+' end || public.news_show_move(v_aw),
+      'tone', case when v_scandal then 'loss' else 'gain' end));
+    v_apply := jsonb_build_array(jsonb_build_object('type', 'company', 'company_id', r.company_id, 'awareness_bps', v_dir * v_aw,
+                                                    'scandal', v_scandal));
+    if r.security_id is not null then
+      v_effects := v_effects || jsonb_build_object(
+        'label', r.ticker || ' ' || case when v_scandal then '−' else '+' end || public.news_show_move(v_bps),
+        'tone', case when v_scandal then 'loss' else 'gain' end);
+      v_apply := v_apply || jsonb_build_object('type', 'stock', 'security_id', r.security_id, 'bps', v_dir * v_bps);
+    end if;
+    v_seg := public.news_show_segment(case when v_scandal then 'scandal' else 'hype' end,
+      case when v_scandal then 'scandal' else 'hype' end,
+      jsonb_build_object('company', r.name, 'idea', r.idea, 'founder', r.founder),
+      v_effects, v_apply,
+      jsonb_build_object('type', 'company', 'company_id', r.company_id, 'player_id', r.founder_id, 'name', r.name,
+                         'idea', r.idea, 'founder', r.founder, 'sector', r.sector_key, 'scandal', v_scandal));
+    if v_seg is not null then v_segs := v_segs || v_seg; end if;
+  end loop;
+
+  -- 3. listed stocks of the AI companies
+  for r in select sec.id, sec.name, sec.ticker
+             from public.securities sec join public.companies c on c.id = sec.company_id
+            where sec.kind = 'stock' and sec.status = 'listed' and c.is_ai
+            order by random()
+            limit coalesce((cfg #>> '{stock,count}')::integer, 2) loop
+    v_dir := case when random() < 0.5 then 1 else -1 end;
+    v_bps := public.rand_between((cfg #>> '{stock,minBps}')::integer, (cfg #>> '{stock,maxBps}')::integer);
+    v_seg := public.news_show_segment('stock', case when v_dir > 0 then 'stockUp' else 'stockDown' end,
+      jsonb_build_object('stock', r.name, 'move', public.news_show_move(v_bps)),
+      jsonb_build_array(jsonb_build_object('label', r.ticker || ' ' || case when v_dir > 0 then '+' else '−' end || public.news_show_move(v_bps),
+                                           'tone', case when v_dir > 0 then 'gain' else 'loss' end)),
+      jsonb_build_array(jsonb_build_object('type', 'stock', 'security_id', r.id, 'bps', v_dir * v_bps)),
+      jsonb_build_object('type', 'stock', 'name', r.name, 'ticker', r.ticker, 'up', v_dir > 0));
+    if v_seg is not null then v_segs := v_segs || v_seg; end if;
+  end loop;
+
+  -- 4. the world: a whole sector, or the value of open company tasks
+  v_dir := case when random() < 0.5 then 1 else -1 end;
+  if random() < 0.5 then
+    select s.key, s.name into r from public.sectors s
+     where exists (select 1 from public.securities sec where sec.sector_key = s.key and sec.kind = 'stock' and sec.status = 'listed')
+     order by random() limit 1;
+    if r.key is not null then
+      v_bps := public.rand_between((cfg #>> '{sector,minBps}')::integer, (cfg #>> '{sector,maxBps}')::integer);
+      v_seg := public.news_show_segment('sector', case when v_dir > 0 then 'sectorUp' else 'sectorDown' end,
+        jsonb_build_object('sector', r.name, 'move', public.news_show_move(v_bps)),
+        jsonb_build_array(jsonb_build_object('label', r.name || ' ' || case when v_dir > 0 then '+' else '−' end || public.news_show_move(v_bps),
+                                             'tone', case when v_dir > 0 then 'gain' else 'loss' end)),
+        jsonb_build_array(jsonb_build_object('type', 'sector', 'sector_key', r.key, 'bps', v_dir * v_bps)),
+        jsonb_build_object('type', 'sector', 'name', r.name, 'up', v_dir > 0));
+      if v_seg is not null then v_segs := v_segs || v_seg; end if;
+    end if;
+  else
+    v_bps := public.rand_between((cfg #>> '{tasks,minBps}')::integer, (cfg #>> '{tasks,maxBps}')::integer);
+    v_seg := public.news_show_segment('tasks', case when v_dir > 0 then 'tasksUp' else 'tasksDown' end,
+      jsonb_build_object('move', public.news_show_move(v_bps)),
+      jsonb_build_array(jsonb_build_object('label', 'Aufgaben ' || case when v_dir > 0 then '+' else '−' end || public.news_show_move(v_bps),
+                                           'tone', case when v_dir > 0 then 'gain' else 'loss' end)),
+      jsonb_build_array(jsonb_build_object('type', 'tasks', 'bps', v_dir * v_bps)),
+      jsonb_build_object('type', 'tasks', 'up', v_dir > 0));
+    if v_seg is not null then v_segs := v_segs || v_seg; end if;
+  end if;
+
+  -- 5. the winner of the day
+  select w.entity_id as player_id, p.nickname, w.last_nw - w.first_nw as gain,
+         ((w.last_nw - w.first_nw) * 10000 / w.first_nw)::integer as bps
+    into r
+    from (select l.entity_id, l.nw as last_nw, f.nw as first_nw
+            from (select distinct on (entity_id) entity_id, net_worth_cents as nw from public.rich_list_snapshots
+                   where entity_kind = 'player' and taken_at >= p_now - interval '45 minutes'
+                   order by entity_id, taken_at desc) l
+            join (select distinct on (entity_id) entity_id, net_worth_cents as nw from public.rich_list_snapshots
+                   where entity_kind = 'player'
+                     and taken_at >= p_now - make_interval(hours => coalesce((cfg #>> '{winner,windowHours}')::integer, 24))
+                   order by entity_id, taken_at asc) f using (entity_id)
+           where f.nw > 0) w
+    join public.profiles p on p.id = w.entity_id
+   where w.entity_id <> all (v_skip_p)
+     and (w.last_nw - w.first_nw) * 10000 / w.first_nw >= coalesce((cfg #>> '{winner,minGainBps}')::integer, 300)
+   order by (w.last_nw - w.first_nw) * 10000 / w.first_nw desc, random()
+   limit 1;
+  if r.player_id is not null then
+    v_seg := public.news_show_segment('winner', 'winner',
+      jsonb_build_object('name', r.nickname, 'amount', public.format_eur(r.gain), 'pct', public.news_show_move(r.bps)),
+      '[]'::jsonb, '[]'::jsonb,
+      jsonb_build_object('type', 'player', 'player_id', r.player_id, 'name', r.nickname));
+    if v_seg is not null then v_segs := v_segs || v_seg; end if;
+  end if;
+
+  -- 6. the hint for the coming hour (settled by the stock news job, ADR-119)
+  if public.config_jsonb('stockNews') is not null then
+    select sec.id, sec.name, sec.ticker into r from public.securities sec
+     where sec.kind = 'stock' and sec.status = 'listed'
+       and not exists (select 1 from public.stock_tips x where x.security_id = sec.id and x.applied_at is null)
+     order by random() limit 1;
+    if r.id is not null then
+      v_dir := case when random() < 0.5 then 1 else -1 end;
+      v_bps := public.rand_between((cfg #>> '{tip,minBps}')::integer, (cfg #>> '{tip,maxBps}')::integer);
+      v_tip := public.news_show_segment('tip', 'tip',
+        jsonb_build_object('stock', r.name, 'move', cfg #>> array['tipWords', case when v_dir > 0 then 'up' else 'down' end]),
+        jsonb_build_array(jsonb_build_object('label', r.ticker || ' ' || case when v_dir > 0 then '↑' else '↓' end || ' Tipp', 'tone', 'neutral')),
+        jsonb_build_array(jsonb_build_object(
+          'type', 'tip', 'security_id', r.id, 'direction', v_dir, 'bps', v_bps,
+          'comes_true', random() * 10000 < coalesce((cfg #>> '{tip,reliabilityBps}')::integer, 7000),
+          'lead_minutes', public.rand_between((cfg #>> '{tip,leadMinMinutes}')::integer, (cfg #>> '{tip,leadMaxMinutes}')::integer))),
+        jsonb_build_object('type', 'tip', 'name', r.name, 'ticker', r.ticker, 'up', v_dir > 0));
+    end if;
+  end if;
+
+  if jsonb_array_length(v_segs) = 0 and v_tip is null then
+    v_seg := public.news_show_segment('world', 'filler', '{}'::jsonb, '[]'::jsonb, '[]'::jsonb, '{"type": "filler"}'::jsonb);
+    if v_seg is not null then v_segs := v_segs || v_seg; end if;
+  end if;
+  -- at most maxSegments, the hint always last
+  if v_tip is not null then
+    select coalesce(jsonb_agg(x order by ord), '[]'::jsonb) into v_segs
+      from jsonb_array_elements(v_segs) with ordinality t(x, ord) where ord <= v_max - 1;
+    v_segs := v_segs || v_tip;
+  else
+    select coalesce(jsonb_agg(x order by ord), '[]'::jsonb) into v_segs
+      from jsonb_array_elements(v_segs) with ordinality t(x, ord) where ord <= v_max;
+  end if;
+  return v_segs;
+end;
+$$;
+comment on function public.news_show_build(timestamptz) is
+  'Internal: the draft of a news show (ADR-150): loser, player companies, AI stocks, sector or tasks, winner, hint.';
+
+-- ---------------------------------------------------------------------------
+-- Preparing, starting (with the effects), cancelling
+-- ---------------------------------------------------------------------------
+create or replace function public.news_show_run_due(p_now timestamptz default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg       jsonb := public.news_show_cfg();
+  v_now     timestamptz := coalesce(p_now, public.game_now());
+  v_hour    timestamptz := date_trunc('hour', coalesce(p_now, public.game_now()));
+  v_slot    timestamptz;
+  v_made    integer := 0;
+  v_gone    integer;
+begin
+  if cfg = '{}'::jsonb then
+    return jsonb_build_object('skipped', 'no_config');
+  end if;
+  -- shows nobody came to
+  update public.news_shows set status = 'cancelled'
+   where status = 'scheduled' and airs_at + make_interval(mins => coalesce((cfg ->> 'waitMinutes')::integer, 10)) <= v_now;
+  get diagnostics v_gone = row_count;
+  -- the draft of the next show, a few minutes before the full hour (or still in time for this hour's)
+  v_slot := case when v_now < v_hour + make_interval(mins => coalesce((cfg ->> 'waitMinutes')::integer, 10)) then v_hour
+                 else v_hour + interval '1 hour' end;
+  if v_slot - make_interval(mins => coalesce((cfg ->> 'prepareMinutes')::integer, 10)) <= v_now
+     and not exists (select 1 from public.news_shows s where s.airs_at = v_slot) then
+    perform pg_advisory_xact_lock(7311014);
+    if not exists (select 1 from public.news_shows s where s.airs_at = v_slot) then
+      insert into public.news_shows (airs_at, segments) values (v_slot, public.news_show_build(v_now));
+      v_made := 1;
+    end if;
+  end if;
+  delete from public.news_show_messages m
+   where m.created_at < v_now - make_interval(hours => coalesce((cfg #>> '{chat,keepHours}')::integer, 24));
+  delete from public.news_shows s where s.airs_at < v_now - interval '3 days';
+  delete from public.news_show_viewers v where v.seen_at < v_now - interval '1 hour';
+  return jsonb_build_object('prepared', v_made, 'cancelled', v_gone);
+end;
+$$;
+comment on function public.news_show_run_due(timestamptz) is
+  'Internal (cron nexa-news-show, every minute): drafts the next show, cancels shows without viewers, cleans up (ADR-150).';
+
+-- The show starts: every effect applies now, once. Called from get_news_show() of the first viewer.
+create or replace function public.news_show_start(p_show_id bigint, p_now timestamptz)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.news_show_cfg();
+  s       public.news_shows;
+  seg     jsonb;
+  a       jsonb;
+  v_idx   integer := 0;
+  v_house uuid := public.ledger_system_account('households');
+  v_cash  bigint;
+  v_news  bigint;
+  v_sec   uuid;
+  r       record;
+begin
+  select * into s from public.news_shows where id = p_show_id for update;
+  if s.id is null or s.status <> 'scheduled' or p_now < s.airs_at
+     or p_now >= s.airs_at + make_interval(mins => coalesce((cfg ->> 'waitMinutes')::integer, 10)) then
+    return false;
+  end if;
+  for seg in select x from jsonb_array_elements(s.segments) x loop
+    v_idx := v_idx + 1;
+    v_sec := null;
+    for a in select x from jsonb_array_elements(coalesce(seg -> 'apply', '[]'::jsonb)) x loop
+      case a ->> 'type'
+        when 'stock' then
+          v_sec := (a ->> 'security_id')::uuid;
+          if exists (select 1 from public.securities sec where sec.id = v_sec and sec.status = 'listed') then
+            perform public.event_price_shock(v_sec, (a ->> 'bps')::integer, p_now);
+          end if;
+        when 'sector' then
+          for r in select sec.id from public.securities sec
+                    where sec.sector_key = a ->> 'sector_key' and sec.kind = 'stock' and sec.status = 'listed' loop
+            perform public.event_price_shock(r.id, (a ->> 'bps')::integer, p_now);
+          end loop;
+        when 'company' then
+          update public.player_companies pc
+             set awareness = least(1, greatest(0.05, pc.awareness * (10000 + (a ->> 'awareness_bps')::numeric) / 10000)),
+                 task_momentum = case when coalesce((a ->> 'scandal')::boolean, false)
+                                      then greatest(1.0, 1.0 + (coalesce(pc.task_momentum, 1.0) - 1.0)
+                                             * (1.0 - coalesce((cfg #>> '{company,momentumLossBps}')::numeric, 0) / 10000.0))
+                                      else pc.task_momentum end
+           where pc.company_id = (a ->> 'company_id')::uuid and pc.status = 'active';
+        when 'tasks' then
+          update public.company_tasks t
+             set value_cents = greatest(100, (t.value_cents * (10000 + (a ->> 'bps')::bigint)) / 10000)
+           where t.status in ('open', 'assigned');
+        when 'cash' then
+          select x.balance_cents into v_cash from public.ledger_accounts x where x.id = v_house for update;
+          if coalesce(v_cash, 0) >= (a ->> 'cents')::bigint
+             and exists (select 1 from public.profiles p where p.id = (a ->> 'player_id')::uuid) then
+            perform public.ledger_transfer(v_house, public.ledger_player_account((a ->> 'player_id')::uuid, 'player_cash'),
+                                           (a ->> 'cents')::bigint, 'random_event', 'NEXA Nachrichten: Trostpflaster',
+                                           'player', (a ->> 'player_id')::uuid,
+                                           'newsshow:' || s.id::text || ':' || v_idx::text, null,
+                                           jsonb_build_object('show_id', s.id));
+          end if;
+        when 'tip' then
+          v_sec := (a ->> 'security_id')::uuid;
+          if exists (select 1 from public.securities sec where sec.id = v_sec and sec.status = 'listed')
+             and not exists (select 1 from public.stock_tips x where x.security_id = v_sec and x.applied_at is null) then
+            insert into public.news_items (category, headline, body, importance, security_id, published_at)
+            values ('company', seg ->> 'headline', seg ->> 'text', 2, v_sec, p_now) returning id into v_news;
+            insert into public.stock_tips (security_id, news_item_id, direction, move_bps, strength, comes_true, headline, body,
+                                           published_at, due_at)
+            values (v_sec, v_news, (a ->> 'direction')::smallint, (a ->> 'bps')::integer, 2, (a ->> 'comes_true')::boolean,
+                    seg ->> 'headline', seg ->> 'text', p_now,
+                    p_now + make_interval(mins => (a ->> 'lead_minutes')::integer));
+          end if;
+        else
+          null;
+      end case;
+    end loop;
+    -- the news feed keeps what was said (the hint wrote its own item above)
+    if seg ->> 'kind' <> 'tip' then
+      insert into public.news_items (category, headline, body, importance, security_id, published_at)
+      values (case when seg ->> 'kind' in ('loser', 'winner') then 'player'
+                   when seg ->> 'kind' in ('scandal', 'hype', 'stock') then 'company' else 'market' end::public.news_category,
+              seg ->> 'headline', seg ->> 'text', 2, v_sec, p_now + make_interval(secs => v_idx));
+    end if;
+    -- whoever is talked about hears of it
+    if seg -> 'subject' ? 'player_id'
+       and exists (select 1 from public.profiles p where p.id = (seg -> 'subject' ->> 'player_id')::uuid) then
+      perform public.social_notify((seg -> 'subject' ->> 'player_id')::uuid, 'news_show',
+        'Mr. Doodle Dangle spricht über dich', seg ->> 'headline',
+        jsonb_build_object('show_id', s.id, 'kind', seg ->> 'kind'), '/news',
+        'news_show:' || s.id::text || ':' || v_idx::text);
+    end if;
+  end loop;
+  update public.news_shows set status = 'aired', started_at = p_now where id = s.id;
+  return true;
+end;
+$$;
+comment on function public.news_show_start(bigint, timestamptz) is
+  'Internal: starts a show for its first viewer and applies every effect once (ADR-150).';
+
+-- ---------------------------------------------------------------------------
+-- RPCs
+-- ---------------------------------------------------------------------------
+create or replace function public.news_show_chat_json(p_player uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object('id', m.id, 'nickname', m.nickname, 'body', m.body, 'at', m.created_at,
+                                               'mine', m.player_id = p_player) order by m.id), '[]'::jsonb)
+    from (select x.id, x.body, x.created_at, x.player_id, p.nickname
+            from public.news_show_messages x join public.profiles p on p.id = x.player_id
+           where x.created_at > public.game_now() - interval '75 minutes'
+           order by x.id desc
+           limit coalesce((public.news_show_cfg() #>> '{chat,history}')::integer, 60)) m;
+$$;
+
+create or replace function public.get_news_show()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.news_show_cfg();
+  v_player uuid := public.require_player();
+  v_now    timestamptz := public.game_now();
+  v_hour   timestamptz := date_trunc('hour', public.game_now());
+  v_wait   interval := make_interval(mins => coalesce((cfg ->> 'waitMinutes')::integer, 10));
+  s        public.news_shows;
+  u        public.news_shows;
+begin
+  -- I am watching
+  insert into public.news_show_viewers (player_id, seen_at) values (v_player, v_now)
+  on conflict (player_id) do update set seen_at = excluded.seen_at
+   where public.news_show_viewers.seen_at < excluded.seen_at - interval '4 seconds';
+  -- the draft may be missing when the job is late; this hour's show starts with its first viewer
+  if not exists (select 1 from public.news_shows x
+                  where x.airs_at = case when v_now < v_hour + v_wait then v_hour else v_hour + interval '1 hour' end) then
+    perform public.news_show_run_due(v_now);
+  end if;
+  select * into u from public.news_shows x where x.airs_at = v_hour and x.status = 'scheduled';
+  if u.id is not null and v_now < v_hour + v_wait then
+    perform public.news_show_start(u.id, v_now);
+  end if;
+  -- the show to watch: the last one that aired, while it can be replayed
+  select * into s from public.news_shows x
+   where x.status = 'aired'
+     and x.started_at > v_now - make_interval(mins => coalesce((cfg ->> 'replayMinutes')::integer, 55))
+   order by x.airs_at desc limit 1;
+  select * into u from public.news_shows x where x.status = 'scheduled' and x.airs_at > v_now order by x.airs_at limit 1;
+  return jsonb_build_object(
+    'now', v_now,
+    'next_airs_at', coalesce(u.airs_at, v_hour + interval '1 hour'),
+    'viewers', (select count(*) from public.news_show_viewers v where v.seen_at > v_now - interval '20 seconds'),
+    'upcoming', case when u.id is null then null else jsonb_build_object(
+                  'id', u.id, 'airs_at', u.airs_at,
+                  'needs_script', u.writer = 'mini' and u.ai_requested_at is null) end,
+    'show', case when s.id is null then null else jsonb_build_object(
+              'id', s.id, 'airs_at', s.airs_at, 'started_at', s.started_at, 'writer', s.writer,
+              'segments', coalesce((select jsonb_agg(jsonb_build_object('kind', x ->> 'kind', 'headline', x ->> 'headline',
+                                                                        'text', x ->> 'text', 'effects', x -> 'effects')
+                                                      order by ord)
+                                      from jsonb_array_elements(s.segments) with ordinality t(x, ord)), '[]'::jsonb)) end,
+    'chat', public.news_show_chat_json(v_player));
+end;
+$$;
+
+create or replace function public.post_news_show_message(p_request_id uuid, p_body text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.news_show_cfg();
+  v_player uuid;
+  v_replay jsonb;
+  v_text   text := btrim(coalesce(p_body, ''));
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  if char_length(v_text) < 1 or char_length(v_text) > coalesce((cfg #>> '{chat,maxLength}')::integer, 200)
+     or v_text ~ '[\x00-\x08\x0b-\x1f]' or public.text_has_profanity(v_text) then
+    perform public.api_error('chat_text_invalid');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'post_news_show_message');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  if (select count(*) from public.news_show_messages m
+       where m.player_id = v_player and m.created_at > public.game_now() - interval '1 minute')
+     >= coalesce((cfg #>> '{chat,perMinute}')::integer, 10) then
+    perform public.api_error('rate_limited');
+  end if;
+  insert into public.news_show_messages (player_id, body, created_at) values (v_player, v_text, public.game_now());
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('chat', public.news_show_chat_json(v_player)));
+end;
+$$;
+
+-- Claude polishes the draft (edge function news-anchor): one caller per show may ask
+create or replace function public.news_show_claim_script(p_show_id bigint)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  v_ok     boolean;
+begin
+  update public.news_shows set ai_requested_at = public.game_now()
+   where id = p_show_id and status = 'scheduled' and writer = 'mini' and ai_requested_at is null
+     and airs_at > public.game_now() + interval '20 seconds'
+  returning true into v_ok;
+  return coalesce(v_ok, false);
+end;
+$$;
+
+create or replace function public.news_show_script_context(p_show_id bigint)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'show_id', s.id, 'status', s.status, 'airs_at', s.airs_at,
+    'segments', coalesce((select jsonb_agg(jsonb_build_object(
+                             'kind', x ->> 'kind', 'headline', x ->> 'headline', 'text', x ->> 'text',
+                             'effects', (select coalesce(jsonb_agg(e ->> 'label'), '[]'::jsonb) from jsonb_array_elements(x -> 'effects') e),
+                             'facts', (x -> 'subject') - 'player_id' - 'company_id') order by ord)
+                            from jsonb_array_elements(s.segments) with ordinality t(x, ord)), '[]'::jsonb))
+    from public.news_shows s where s.id = p_show_id;
+$$;
+
+create or replace function public.store_news_show_script(p_show_id bigint, p_segments jsonb)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  s      public.news_shows;
+  v_new  jsonb;
+begin
+  select * into s from public.news_shows where id = p_show_id for update;
+  if s.id is null or s.status <> 'scheduled' or jsonb_typeof(p_segments) <> 'array'
+     or jsonb_array_length(p_segments) <> jsonb_array_length(s.segments) then
+    return false;
+  end if;
+  if exists (select 1 from jsonb_array_elements(p_segments) x
+              where not public.company_ai_text_ok(x ->> 'headline', 90, true)
+                 or not public.company_ai_text_ok(x ->> 'text', 420, true)) then
+    return false;
+  end if;
+  select jsonb_agg(o.x || jsonb_build_object('headline', btrim(n.x ->> 'headline'), 'text', btrim(n.x ->> 'text')) order by o.ord)
+    into v_new
+    from jsonb_array_elements(s.segments) with ordinality o(x, ord)
+    join jsonb_array_elements(p_segments) with ordinality n(x, ord) using (ord);
+  update public.news_shows set segments = v_new, writer = 'claude' where id = s.id;
+  return true;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Privileges and the job
+-- ---------------------------------------------------------------------------
+revoke all on function public.news_show_cfg() from public, anon, authenticated;
+revoke all on function public.news_show_move(integer) from public, anon, authenticated;
+revoke all on function public.news_show_fill(text, jsonb) from public, anon, authenticated;
+revoke all on function public.news_show_pick(text) from public, anon, authenticated;
+revoke all on function public.news_show_segment(text, text, jsonb, jsonb, jsonb, jsonb) from public, anon, authenticated;
+revoke all on function public.news_show_build(timestamptz) from public, anon, authenticated;
+revoke all on function public.news_show_run_due(timestamptz) from public, anon, authenticated;
+revoke all on function public.news_show_start(bigint, timestamptz) from public, anon, authenticated;
+revoke all on function public.news_show_chat_json(uuid) from public, anon, authenticated;
+revoke all on function public.news_show_script_context(bigint) from public, anon, authenticated;
+revoke all on function public.store_news_show_script(bigint, jsonb) from public, anon, authenticated;
+grant execute on function public.news_show_run_due(timestamptz) to service_role;
+grant execute on function public.news_show_script_context(bigint) to service_role;
+grant execute on function public.store_news_show_script(bigint, jsonb) to service_role;
+revoke all on function public.get_news_show() from public, anon;
+revoke all on function public.post_news_show_message(uuid, text) from public, anon;
+revoke all on function public.news_show_claim_script(bigint) from public, anon;
+grant execute on function public.get_news_show() to authenticated;
+grant execute on function public.post_news_show_message(uuid, text) to authenticated;
+grant execute on function public.news_show_claim_script(bigint) to authenticated;
+comment on function public.get_news_show() is
+  'RPC: the live news show (ADR-150): next air time, viewers, the show of this hour once it started, the chat. '
+  'Marks the caller as watching and starts this hour''s show for its first viewer.';
+comment on function public.post_news_show_message(uuid, text) is
+  'RPC: writes in the chat of the news show; errors chat_text_invalid (NX128), rate_limited (ADR-150).';
+comment on function public.news_show_claim_script(bigint) is
+  'RPC: true for the one caller who may ask Claude (edge function news-anchor) to polish a show''s draft (ADR-150).';
+
+do $do$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.unschedule(jobid) from cron.job where jobname = 'nexa-news-show';
+    perform cron.schedule('nexa-news-show', '* * * * *', 'select public.news_show_run_due()');
+  end if;
+end;
+$do$;
+
 -- ===== supabase/seed.sql =====
 -- =============================================================================
 -- NEXA · seed.sql · reference data
@@ -54457,6 +55209,7 @@ insert into public.game_config (key, value, description) values
   ('companyMoves', '{"costCentsByTier":{"garage":100000,"small_business":400000,"gmbh":1500000,"ag":6000000},"slotsByTier":{"garage":1,"small_business":2,"gmbh":3,"ag":4},"risk":{"safe":{"chanceBps":9000,"payoutBps":12000,"refundBps":5000,"gain":0.02},"normal":{"chanceBps":7000,"payoutBps":15000,"refundBps":3000,"gain":0.04},"risky":{"chanceBps":4000,"payoutBps":26000,"refundBps":1000,"gain":0.08}},"chancePerSkillBps":300,"maxSkillBonusBps":2500,"maxChanceBps":9500,"cooldownFactor":2,"historyLimit":12,"moves":[{"key":"pop_up_stand","product":"*","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.6,"minutes":15},{"key":"local_press","product":"*","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"team_workshop","product":"*","branch":"management","kind":"quality","risk":"safe","costFactor":0.8,"minutes":30},{"key":"bulk_purchase","product":"*","branch":"logistics","kind":"cash","risk":"safe","costFactor":1.2,"minutes":20},{"key":"investor_pitch","product":"*","branch":"finance","kind":"cash","risk":"risky","costFactor":1.5,"minutes":45},{"key":"tax_review","product":"*","branch":"law","kind":"cash","risk":"normal","costFactor":0.7,"minutes":30},{"key":"pentest_bank","product":"security_software","branch":"it","kind":"cash","risk":"normal","costFactor":1.5,"minutes":40},{"key":"security_audit_sme","product":"security_software","branch":"it","kind":"cash","risk":"safe","costFactor":1,"minutes":25},{"key":"bug_bounty","product":"security_software","branch":"it","kind":"cash","risk":"risky","costFactor":1,"minutes":35},{"key":"security_conference","product":"security_software","branch":"sales","kind":"awareness","risk":"normal","costFactor":1.3,"minutes":40},{"key":"certification","product":"security_software","branch":"law","kind":"quality","risk":"normal","costFactor":1.4,"minutes":50},{"key":"incident_response","product":"security_software","branch":"it","kind":"cash","risk":"risky","costFactor":2,"minutes":60},{"key":"app_store_feature","product":"mobile_app","branch":"sales","kind":"awareness","risk":"risky","costFactor":1.2,"minutes":40},{"key":"white_label_app","product":"mobile_app","branch":"it","kind":"cash","risk":"normal","costFactor":1.5,"minutes":45},{"key":"bugfix_sprint","product":"mobile_app","branch":"it","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"in_app_shop","product":"mobile_app","branch":"finance","kind":"cash","risk":"normal","costFactor":1.1,"minutes":30},{"key":"influencer_app","product":"mobile_app","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"hackathon","product":"mobile_app","branch":"it","kind":"cash","risk":"risky","costFactor":0.9,"minutes":35},{"key":"migrate_customer","product":"cloud_platform","branch":"it","kind":"cash","risk":"normal","costFactor":1.6,"minutes":50},{"key":"uptime_guarantee","product":"cloud_platform","branch":"management","kind":"quality","risk":"normal","costFactor":1.3,"minutes":45},{"key":"startup_credits","product":"cloud_platform","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.7,"minutes":20},{"key":"enterprise_deal","product":"cloud_platform","branch":"sales","kind":"cash","risk":"risky","costFactor":2.2,"minutes":60},{"key":"data_center_deal","product":"cloud_platform","branch":"finance","kind":"cash","risk":"safe","costFactor":1.2,"minutes":25},{"key":"ai_hosting","product":"cloud_platform","branch":"it","kind":"cash","risk":"risky","costFactor":1.8,"minutes":50},{"key":"flash_sale","product":"online_shop","branch":"sales","kind":"cash","risk":"safe","costFactor":1,"minutes":15},{"key":"marketplace_listing","product":"online_shop","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"same_day_delivery","product":"online_shop","branch":"logistics","kind":"quality","risk":"normal","costFactor":1.4,"minutes":45},{"key":"black_friday","product":"online_shop","branch":"sales","kind":"cash","risk":"risky","costFactor":1.6,"minutes":40},{"key":"returns_process","product":"online_shop","branch":"logistics","kind":"quality","risk":"safe","costFactor":0.7,"minutes":20},{"key":"b2b_shop","product":"online_shop","branch":"sales","kind":"cash","risk":"normal","costFactor":1.3,"minutes":35},{"key":"fashion_show","product":"fashion","branch":"sales","kind":"awareness","risk":"risky","costFactor":1.6,"minutes":50},{"key":"capsule_collection","product":"fashion","branch":"craft","kind":"cash","risk":"normal","costFactor":1.3,"minutes":40},{"key":"influencer_outfit","product":"fashion","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"sustainable_fabric","product":"fashion","branch":"science","kind":"quality","risk":"normal","costFactor":1.2,"minutes":45},{"key":"outlet_sale","product":"fashion","branch":"sales","kind":"cash","risk":"safe","costFactor":0.9,"minutes":20},{"key":"collab_brand","product":"fashion","branch":"management","kind":"cash","risk":"risky","costFactor":1.8,"minutes":55},{"key":"catering_job","product":"delicatessen","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.2,"minutes":35},{"key":"tasting_evening","product":"delicatessen","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.6,"minutes":20},{"key":"gift_baskets","product":"delicatessen","branch":"sales","kind":"cash","risk":"safe","costFactor":0.9,"minutes":20},{"key":"organic_label","product":"delicatessen","branch":"science","kind":"quality","risk":"normal","costFactor":1.2,"minutes":45},{"key":"restaurant_supply","product":"delicatessen","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"food_festival","product":"delicatessen","branch":"sales","kind":"cash","risk":"risky","costFactor":1.3,"minutes":45},{"key":"roof_installation","product":"solar","branch":"craft","kind":"cash","risk":"safe","costFactor":1.2,"minutes":30},{"key":"solar_park","product":"solar","branch":"craft","kind":"cash","risk":"risky","costFactor":2.4,"minutes":60},{"key":"subsidy_application","product":"solar","branch":"law","kind":"cash","risk":"normal","costFactor":0.8,"minutes":30},{"key":"installer_training","product":"solar","branch":"craft","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"energy_fair","product":"solar","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":35},{"key":"battery_bundle","product":"solar","branch":"sales","kind":"cash","risk":"normal","costFactor":1.3,"minutes":35},{"key":"peak_trading","product":"grid_service","branch":"finance","kind":"cash","risk":"risky","costFactor":1.6,"minutes":40},{"key":"grid_maintenance","product":"grid_service","branch":"craft","kind":"cash","risk":"safe","costFactor":1.1,"minutes":25},{"key":"smart_meter_rollout","product":"grid_service","branch":"it","kind":"cash","risk":"normal","costFactor":1.5,"minutes":45},{"key":"grid_upgrade","product":"grid_service","branch":"craft","kind":"quality","risk":"normal","costFactor":1.4,"minutes":50},{"key":"city_contract","product":"grid_service","branch":"law","kind":"cash","risk":"risky","costFactor":2,"minutes":60},{"key":"outage_hotline","product":"grid_service","branch":"management","kind":"awareness","risk":"safe","costFactor":0.6,"minutes":20},{"key":"home_storage","product":"energy_storage","branch":"sales","kind":"cash","risk":"normal","costFactor":1.3,"minutes":35},{"key":"battery_research","product":"energy_storage","branch":"science","kind":"quality","risk":"risky","costFactor":1.6,"minutes":55},{"key":"grid_battery","product":"energy_storage","branch":"finance","kind":"cash","risk":"risky","costFactor":2.2,"minutes":60},{"key":"recycling_program","product":"energy_storage","branch":"science","kind":"awareness","risk":"safe","costFactor":0.7,"minutes":25},{"key":"ev_fleet","product":"energy_storage","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"warranty_extension","product":"energy_storage","branch":"law","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"generic_launch","product":"generics","branch":"science","kind":"cash","risk":"normal","costFactor":1.4,"minutes":45},{"key":"pharmacy_contracts","product":"generics","branch":"sales","kind":"cash","risk":"safe","costFactor":1,"minutes":25},{"key":"gmp_audit","product":"generics","branch":"law","kind":"quality","risk":"normal","costFactor":1.2,"minutes":45},{"key":"tender_win","product":"generics","branch":"law","kind":"cash","risk":"risky","costFactor":1.8,"minutes":55},{"key":"doctor_visits","product":"generics","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.7,"minutes":20},{"key":"cost_cutting_lab","product":"generics","branch":"management","kind":"cash","risk":"safe","costFactor":0.9,"minutes":25},{"key":"trial_phase","product":"biotech","branch":"science","kind":"cash","risk":"risky","costFactor":2.4,"minutes":60},{"key":"license_deal","product":"biotech","branch":"law","kind":"cash","risk":"normal","costFactor":1.6,"minutes":45},{"key":"lab_upgrade","product":"biotech","branch":"science","kind":"quality","risk":"normal","costFactor":1.4,"minutes":45},{"key":"research_grant","product":"biotech","branch":"finance","kind":"cash","risk":"safe","costFactor":0.8,"minutes":30},{"key":"science_paper","product":"biotech","branch":"science","kind":"awareness","risk":"normal","costFactor":0.9,"minutes":35},{"key":"cro_service","product":"biotech","branch":"science","kind":"cash","risk":"safe","costFactor":1.1,"minutes":30},{"key":"hospital_order","product":"medtech","branch":"sales","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"ce_marking","product":"medtech","branch":"law","kind":"quality","risk":"normal","costFactor":1.2,"minutes":45},{"key":"device_service","product":"medtech","branch":"craft","kind":"cash","risk":"safe","costFactor":1,"minutes":25},{"key":"medical_fair","product":"medtech","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":35},{"key":"prototype","product":"medtech","branch":"science","kind":"quality","risk":"risky","costFactor":1.5,"minutes":55},{"key":"export_deal","product":"medtech","branch":"sales","kind":"cash","risk":"risky","costFactor":1.9,"minutes":55},{"key":"hospital_express","product":"courier","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.2,"minutes":30},{"key":"cargo_bike_fleet","product":"courier","branch":"logistics","kind":"quality","risk":"normal","costFactor":1.3,"minutes":40},{"key":"night_delivery","product":"courier","branch":"logistics","kind":"cash","risk":"safe","costFactor":1,"minutes":25},{"key":"restaurant_partner","product":"courier","branch":"sales","kind":"cash","risk":"normal","costFactor":1.1,"minutes":30},{"key":"courier_app","product":"courier","branch":"it","kind":"awareness","risk":"normal","costFactor":1,"minutes":35},{"key":"christmas_rush","product":"courier","branch":"management","kind":"cash","risk":"risky","costFactor":1.6,"minutes":45},{"key":"seasonal_storage","product":"warehouse","branch":"logistics","kind":"cash","risk":"safe","costFactor":1.1,"minutes":25},{"key":"automation_upgrade","product":"warehouse","branch":"it","kind":"quality","risk":"normal","costFactor":1.5,"minutes":50},{"key":"fulfillment_client","product":"warehouse","branch":"sales","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"cold_storage","product":"warehouse","branch":"science","kind":"cash","risk":"risky","costFactor":1.8,"minutes":50},{"key":"inventory_audit","product":"warehouse","branch":"finance","kind":"cash","risk":"safe","costFactor":0.8,"minutes":20},{"key":"open_day","product":"warehouse","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.5,"minutes":20},{"key":"international_route","product":"freight","branch":"logistics","kind":"cash","risk":"risky","costFactor":2,"minutes":55},{"key":"rail_partnership","product":"freight","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"fuel_hedge","product":"freight","branch":"finance","kind":"cash","risk":"normal","costFactor":1,"minutes":30},{"key":"driver_training","product":"freight","branch":"management","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"heavy_load","product":"freight","branch":"logistics","kind":"cash","risk":"risky","costFactor":1.7,"minutes":50},{"key":"logistics_fair","product":"freight","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":35},{"key":"contract_check_flat","product":"legal_tech","branch":"law","kind":"cash","risk":"safe","costFactor":1,"minutes":20},{"key":"class_action","product":"legal_tech","branch":"law","kind":"cash","risk":"risky","costFactor":2,"minutes":60},{"key":"startup_law_pack","product":"legal_tech","branch":"law","kind":"cash","risk":"normal","costFactor":1.3,"minutes":35},{"key":"legal_explainer","product":"legal_tech","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"lawyer_review","product":"legal_tech","branch":"law","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"data_privacy_audit","product":"legal_tech","branch":"it","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"free_account","product":"fintech","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.7,"minutes":20},{"key":"savings_plan","product":"fintech","branch":"finance","kind":"cash","risk":"normal","costFactor":1.2,"minutes":35},{"key":"crypto_feature","product":"fintech","branch":"finance","kind":"cash","risk":"risky","costFactor":1.8,"minutes":50},{"key":"banking_license","product":"fintech","branch":"law","kind":"quality","risk":"normal","costFactor":1.5,"minutes":55},{"key":"fraud_detection","product":"fintech","branch":"it","kind":"quality","risk":"safe","costFactor":0.9,"minutes":30},{"key":"merchant_payments","product":"fintech","branch":"sales","kind":"cash","risk":"safe","costFactor":1.1,"minutes":25},{"key":"new_partner","product":"franchise","branch":"management","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"flagship_store","product":"franchise","branch":"sales","kind":"awareness","risk":"risky","costFactor":1.8,"minutes":55},{"key":"partner_training","product":"franchise","branch":"management","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"central_purchasing","product":"franchise","branch":"logistics","kind":"cash","risk":"safe","costFactor":1.1,"minutes":25},{"key":"regional_ads","product":"franchise","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"master_franchise","product":"franchise","branch":"law","kind":"cash","risk":"risky","costFactor":2.2,"minutes":60},{"key":"spot_trade","product":"energy_trading","branch":"finance","kind":"cash","risk":"risky","costFactor":1.6,"minutes":30},{"key":"supply_contract","product":"energy_trading","branch":"sales","kind":"cash","risk":"safe","costFactor":1.2,"minutes":25},{"key":"green_tariff","product":"energy_trading","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"hedging","product":"energy_trading","branch":"finance","kind":"quality","risk":"normal","costFactor":1.3,"minutes":45},{"key":"industrial_customer","product":"energy_trading","branch":"sales","kind":"cash","risk":"normal","costFactor":1.6,"minutes":45},{"key":"market_analysis","product":"energy_trading","branch":"science","kind":"quality","risk":"safe","costFactor":0.7,"minutes":20},{"key":"approval_dossier","product":"regulatory","branch":"law","kind":"cash","risk":"normal","costFactor":1.5,"minutes":45},{"key":"fast_track","product":"regulatory","branch":"law","kind":"cash","risk":"risky","costFactor":2.2,"minutes":60},{"key":"label_check","product":"regulatory","branch":"science","kind":"cash","risk":"safe","costFactor":0.9,"minutes":20},{"key":"expert_panel","product":"regulatory","branch":"science","kind":"quality","risk":"normal","costFactor":1.2,"minutes":40},{"key":"pharma_congress","product":"regulatory","branch":"sales","kind":"awareness","risk":"normal","costFactor":1.1,"minutes":35},{"key":"eu_registration","product":"regulatory","branch":"law","kind":"cash","risk":"normal","costFactor":1.7,"minutes":50},{"key":"office_move","product":"moving","branch":"management","kind":"cash","risk":"normal","costFactor":1.5,"minutes":45},{"key":"student_move","product":"moving","branch":"logistics","kind":"cash","risk":"safe","costFactor":0.8,"minutes":15},{"key":"piano_move","product":"moving","branch":"craft","kind":"cash","risk":"risky","costFactor":1.4,"minutes":30},{"key":"moving_boxes","product":"moving","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.6,"minutes":20},{"key":"packing_training","product":"moving","branch":"management","kind":"quality","risk":"normal","costFactor":1,"minutes":30},{"key":"senior_move","product":"moving","branch":"management","kind":"cash","risk":"normal","costFactor":1.2,"minutes":35}]}'::jsonb, 'Defaults from src/config/balance.ts, section "companyMoves"'),
   ('companyTasks', '{"valueCentsByTier":{"garage":40000,"small_business":150000,"gmbh":500000,"ag":2000000},"penaltyBps":6000,"passScoreBps":8000,"graceSeconds":8,"games":{"pick":{"seconds":30,"tiles":12,"minTargets":3,"maxTargets":6},"count":{"seconds":25,"tiles":16,"minTargets":4,"maxTargets":9},"sort":{"seconds":35,"items":8},"order":{"seconds":30,"items":5,"min":1,"max":99},"seq":{"seconds":25,"length":5,"showSeconds":4},"math":{"seconds":45},"slider":{"seconds":30,"sliders":3,"min":20,"max":92,"tolerance":3},"rotate":{"seconds":30,"dials":3,"steps":8,"minTurn":2},"match":{"seconds":40,"boxes":3,"groupSize":3,"perBox":2},"path":{"seconds":40,"size":5,"minWalls":6,"maxWalls":9,"minDetour":2,"stepBps":1000}},"ai":{"minutes":12,"slowdownPerQueuedBps":5000,"chanceBps":7000,"skillBonusBps":1000,"valueBps":6000},"board":{"base":1,"membersPerTask":2,"max":6,"everyMinutes":4,"activeMinutes":20,"autoAiBeforeDueMinutes":15},"aiDelegateMinTier":"senior","xp":{"success":60,"failure":15},"momentum":{"perSolveBps":120,"perfectBonusBps":80,"penaltyBps":250,"aiBps":5000,"decayPerHourBps":300,"maxBps":6000},"historyLimit":15,"tasks":[{"key":"pay_invoices","product":"*","branch":"finance","game":"sort","factor":1,"minutes":45},{"key":"payroll_check","product":"*","branch":"finance","game":"math","factor":1.1,"minutes":45,"op":"mul","a":[3,9],"b":[12,28]},{"key":"coffee_order","product":"*","branch":"management","game":"count","factor":0.6,"minutes":40},{"key":"shift_plan","product":"*","branch":"management","game":"order","factor":1,"minutes":50,"asc":true,"range":[6,22]},{"key":"contract_review","product":"*","branch":"law","game":"pick","factor":1.2,"minutes":50},{"key":"password_reset","product":"*","branch":"it","game":"seq","factor":0.7,"minutes":40},{"key":"customer_mail","product":"*","branch":"sales","game":"sort","factor":0.8,"minutes":40},{"key":"office_supplies","product":"*","branch":"logistics","game":"math","factor":0.6,"minutes":40,"op":"add","a":[12,40],"b":[8,30]},{"key":"patch_servers","product":"security_software","branch":"it","game":"pick","factor":1.3,"minutes":45},{"key":"phishing_filter","product":"security_software","branch":"it","game":"sort","factor":1,"minutes":40},{"key":"alarm_codes","product":"security_software","branch":"it","game":"seq","factor":1.1,"minutes":40},{"key":"license_count","product":"security_software","branch":"sales","game":"math","factor":0.9,"minutes":45,"op":"mul","a":[4,12],"b":[5,25]},{"key":"crash_reports","product":"mobile_app","branch":"it","game":"count","factor":1,"minutes":40},{"key":"release_notes","product":"mobile_app","branch":"sales","game":"sort","factor":0.8,"minutes":45},{"key":"store_screens","product":"mobile_app","branch":"sales","game":"pick","factor":0.9,"minutes":40},{"key":"beta_testers","product":"mobile_app","branch":"management","game":"math","factor":0.8,"minutes":50,"op":"sub","a":[60,120],"b":[10,45]},{"key":"rack_servers","product":"cloud_platform","branch":"it","game":"order","factor":1.2,"minutes":45,"asc":false,"range":[18,45]},{"key":"backup_tapes","product":"cloud_platform","branch":"it","game":"pick","factor":1,"minutes":40},{"key":"cloud_bill","product":"cloud_platform","branch":"finance","game":"math","factor":1.1,"minutes":45,"op":"mul","a":[6,20],"b":[15,60]},{"key":"ddos_block","product":"cloud_platform","branch":"it","game":"pick","factor":1.3,"minutes":40},{"key":"deadline_files","product":"legal_tech","branch":"law","game":"order","factor":1,"minutes":40,"asc":true,"range":[1,30]},{"key":"template_check","product":"legal_tech","branch":"law","game":"pick","factor":1.1,"minutes":45},{"key":"chatbot_answers","product":"legal_tech","branch":"it","game":"sort","factor":0.9,"minutes":40},{"key":"fee_calc","product":"legal_tech","branch":"finance","game":"math","factor":1,"minutes":45,"op":"pct","a":[2000,9000],"b":[10,30]},{"key":"fraud_check","product":"fintech","branch":"finance","game":"pick","factor":1.3,"minutes":40},{"key":"kyc_docs","product":"fintech","branch":"law","game":"sort","factor":1,"minutes":45},{"key":"interest_calc","product":"fintech","branch":"finance","game":"math","factor":1,"minutes":45,"op":"pct","a":[1000,20000],"b":[2,6]},{"key":"tan_codes","product":"fintech","branch":"it","game":"seq","factor":0.8,"minutes":40},{"key":"pack_orders","product":"online_shop","branch":"logistics","game":"pick","factor":1.1,"minutes":40},{"key":"returns_sort","product":"online_shop","branch":"logistics","game":"sort","factor":0.9,"minutes":45},{"key":"price_update","product":"online_shop","branch":"sales","game":"math","factor":1,"minutes":40,"op":"pct","a":[20,200],"b":[10,40]},{"key":"stock_count_shop","product":"online_shop","branch":"logistics","game":"count","factor":0.8,"minutes":40},{"key":"pack_shirts","product":"fashion","branch":"logistics","game":"pick","factor":1.1,"minutes":40},{"key":"color_match","product":"fashion","branch":"craft","game":"sort","factor":1,"minutes":45},{"key":"runway_order","product":"fashion","branch":"sales","game":"seq","factor":0.9,"minutes":50},{"key":"size_count","product":"fashion","branch":"logistics","game":"count","factor":0.8,"minutes":40},{"key":"cheese_age","product":"delicatessen","branch":"science","game":"order","factor":1,"minutes":45,"asc":false,"range":[2,36]},{"key":"expiry_check","product":"delicatessen","branch":"logistics","game":"pick","factor":1.1,"minutes":40},{"key":"gift_basket","product":"delicatessen","branch":"sales","game":"math","factor":0.9,"minutes":45,"op":"mul","a":[5,25],"b":[18,45]},{"key":"cold_chain","product":"delicatessen","branch":"logistics","game":"sort","factor":1,"minutes":40},{"key":"partner_audit","product":"franchise","branch":"management","game":"pick","factor":1.2,"minutes":50},{"key":"royalty_calc","product":"franchise","branch":"finance","game":"math","factor":1.1,"minutes":45,"op":"pct","a":[10000,60000],"b":[4,9]},{"key":"opening_plan","product":"franchise","branch":"management","game":"order","factor":1,"minutes":50,"asc":true,"range":[1,26]},{"key":"recipe_steps","product":"franchise","branch":"management","game":"seq","factor":0.8,"minutes":40},{"key":"panel_check","product":"solar","branch":"craft","game":"pick","factor":1.1,"minutes":45},{"key":"roof_angle","product":"solar","branch":"craft","game":"order","factor":1,"minutes":45,"asc":false,"range":[200,1200]},{"key":"feed_in","product":"solar","branch":"finance","game":"math","factor":1,"minutes":45,"op":"mul","a":[300,900],"b":[8,13]},{"key":"cable_colors","product":"solar","branch":"craft","game":"seq","factor":0.9,"minutes":40},{"key":"outage_map","product":"grid_service","branch":"craft","game":"pick","factor":1.3,"minutes":40},{"key":"meter_read","product":"grid_service","branch":"it","game":"math","factor":0.9,"minutes":45,"op":"sub","a":[4000,9000],"b":[1000,3500]},{"key":"crew_dispatch","product":"grid_service","branch":"management","game":"order","factor":1,"minutes":45,"asc":true,"range":[5,60]},{"key":"safety_gear","product":"grid_service","branch":"law","game":"sort","factor":0.8,"minutes":40},{"key":"cell_test","product":"energy_storage","branch":"science","game":"pick","factor":1.2,"minutes":45},{"key":"charge_plan","product":"energy_storage","branch":"finance","game":"order","factor":1,"minutes":45,"asc":true,"range":[8,45]},{"key":"capacity_calc","product":"energy_storage","branch":"science","game":"math","factor":1,"minutes":45,"op":"mul","a":[8,24],"b":[5,15]},{"key":"thermal_watch","product":"energy_storage","branch":"science","game":"count","factor":1.1,"minutes":40},{"key":"buy_cheap","product":"energy_trading","branch":"finance","game":"order","factor":1.3,"minutes":40,"asc":true,"range":[30,150]},{"key":"contract_sort","product":"energy_trading","branch":"law","game":"sort","factor":1,"minutes":45},{"key":"margin_calc","product":"energy_trading","branch":"finance","game":"math","factor":1.1,"minutes":45,"op":"sub","a":[90,160],"b":[40,85]},{"key":"trade_signals","product":"energy_trading","branch":"finance","game":"seq","factor":0.9,"minutes":40},{"key":"batch_check","product":"generics","branch":"science","game":"pick","factor":1.2,"minutes":45},{"key":"dose_calc","product":"generics","branch":"science","game":"math","factor":1,"minutes":45,"op":"mul","a":[2,6],"b":[50,400]},{"key":"pharmacy_orders","product":"generics","branch":"logistics","game":"count","factor":0.9,"minutes":40},{"key":"label_sort","product":"generics","branch":"law","game":"sort","factor":0.8,"minutes":40},{"key":"petri_dishes","product":"biotech","branch":"science","game":"pick","factor":1.1,"minutes":45},{"key":"dna_sequence","product":"biotech","branch":"science","game":"seq","factor":1.2,"minutes":45},{"key":"lab_cleanup","product":"biotech","branch":"science","game":"sort","factor":1,"minutes":45},{"key":"grant_budget","product":"biotech","branch":"finance","game":"math","factor":1,"minutes":45,"op":"pct","a":[100000,500000],"b":[10,30]},{"key":"device_test","product":"medtech","branch":"craft","game":"pick","factor":1.2,"minutes":45},{"key":"sterile_sort","product":"medtech","branch":"science","game":"sort","factor":1,"minutes":40},{"key":"calibrate","product":"medtech","branch":"science","game":"math","factor":1,"minutes":40,"op":"sub","a":[150,190],"b":[110,145]},{"key":"hospital_route","product":"medtech","branch":"sales","game":"order","factor":0.9,"minutes":45,"asc":true,"range":[1,40]},{"key":"dossier_pages","product":"regulatory","branch":"law","game":"count","factor":1.2,"minutes":45},{"key":"deadline_agency","product":"regulatory","branch":"law","game":"order","factor":1.1,"minutes":45,"asc":true,"range":[3,60]},{"key":"side_effects","product":"regulatory","branch":"science","game":"sort","factor":1,"minutes":40},{"key":"translation_set","product":"regulatory","branch":"law","game":"pick","factor":0.8,"minutes":40},{"key":"route_order","product":"courier","branch":"logistics","game":"order","factor":1.1,"minutes":40,"asc":true,"range":[3,45]},{"key":"parcel_scan","product":"courier","branch":"logistics","game":"pick","factor":1,"minutes":40},{"key":"bike_check","product":"courier","branch":"craft","game":"seq","factor":0.8,"minutes":40},{"key":"tip_jar","product":"courier","branch":"finance","game":"math","factor":0.7,"minutes":45,"op":"add","a":[20,80],"b":[15,60]},{"key":"pick_list","product":"warehouse","branch":"logistics","game":"pick","factor":1.1,"minutes":40},{"key":"pallet_count","product":"warehouse","branch":"logistics","game":"count","factor":0.9,"minutes":40},{"key":"forklift_safety","product":"warehouse","branch":"management","game":"sort","factor":0.8,"minutes":45},{"key":"dock_plan","product":"warehouse","branch":"management","game":"order","factor":1,"minutes":45,"asc":true,"range":[5,20]},{"key":"customs_docs","product":"freight","branch":"law","game":"sort","factor":1.2,"minutes":45},{"key":"container_load","product":"freight","branch":"logistics","game":"math","factor":1.1,"minutes":45,"op":"mul","a":[6,18],"b":[12,30]},{"key":"ship_schedule","product":"freight","branch":"logistics","game":"order","factor":1,"minutes":50,"asc":true,"range":[2,40]},{"key":"seal_codes","product":"freight","branch":"logistics","game":"seq","factor":0.8,"minutes":40},{"key":"box_labels","product":"moving","branch":"logistics","game":"pick","factor":1,"minutes":40},{"key":"load_order","product":"moving","branch":"management","game":"seq","factor":1.1,"minutes":45},{"key":"fragile_sort","product":"moving","branch":"logistics","game":"sort","factor":0.9,"minutes":40},{"key":"moving_quote","product":"moving","branch":"finance","game":"math","factor":1,"minutes":45,"op":"mul","a":[3,9],"b":[45,90]},{"key":"align_labels","product":"*","branch":"logistics","game":"slider","factor":0.7,"minutes":40},{"key":"fix_antenna","product":"*","branch":"it","game":"rotate","factor":0.8,"minutes":40},{"key":"file_documents","product":"*","branch":"management","game":"match","factor":0.9,"minutes":45},{"key":"office_route","product":"*","branch":"logistics","game":"path","factor":0.8,"minutes":45},{"key":"firewall_rules","product":"security_software","branch":"it","game":"match","factor":1.1,"minutes":45},{"key":"ui_align","product":"mobile_app","branch":"it","game":"slider","factor":0.9,"minutes":40},{"key":"cable_route","product":"cloud_platform","branch":"it","game":"path","factor":1.1,"minutes":45},{"key":"case_files","product":"legal_tech","branch":"law","game":"match","factor":1,"minutes":45},{"key":"vault_dials","product":"fintech","branch":"it","game":"rotate","factor":1,"minutes":40},{"key":"warehouse_bins","product":"online_shop","branch":"logistics","game":"match","factor":1,"minutes":45},{"key":"hem_length","product":"fashion","branch":"craft","game":"slider","factor":0.9,"minutes":40},{"key":"fridge_shelves","product":"delicatessen","branch":"logistics","game":"match","factor":1,"minutes":45},{"key":"sign_turn","product":"franchise","branch":"craft","game":"rotate","factor":0.9,"minutes":40},{"key":"panel_turn","product":"solar","branch":"craft","game":"rotate","factor":1.1,"minutes":40},{"key":"line_repair","product":"grid_service","branch":"craft","game":"path","factor":1.2,"minutes":45},{"key":"charge_level","product":"energy_storage","branch":"science","game":"slider","factor":1,"minutes":40},{"key":"grid_flow","product":"energy_trading","branch":"finance","game":"path","factor":1.1,"minutes":45},{"key":"pill_boxes","product":"generics","branch":"science","game":"match","factor":1,"minutes":45},{"key":"pipette","product":"biotech","branch":"science","game":"slider","factor":1.1,"minutes":40},{"key":"probe_turn","product":"medtech","branch":"craft","game":"rotate","factor":1,"minutes":40},{"key":"form_stack","product":"regulatory","branch":"law","game":"match","factor":1,"minutes":45},{"key":"bike_route","product":"courier","branch":"logistics","game":"path","factor":1.1,"minutes":45},{"key":"forklift_path","product":"warehouse","branch":"logistics","game":"path","factor":1,"minutes":45},{"key":"crane_turn","product":"freight","branch":"logistics","game":"rotate","factor":1,"minutes":40},{"key":"truck_space","product":"moving","branch":"logistics","game":"slider","factor":0.9,"minutes":40}]}'::jsonb, 'Defaults from src/config/balance.ts, section "companyTasks"'),
   ('funNews', '{"everyMinutes":6,"repeatHours":8,"keepHours":48,"items":[{"key":"ceo_laptop_train","needs":"company"},{"key":"office_dog","needs":"company"},{"key":"coffee_machine","needs":"company"},{"key":"typo_press","needs":"company"},{"key":"ceo_marathon","needs":"company"},{"key":"printer_rebellion","needs":"company"},{"key":"parking_war","needs":"company"},{"key":"lucky_socks","needs":"company"},{"key":"annual_party","needs":"company"},{"key":"ai_slogan","needs":"company"},{"key":"mascot","needs":"company"},{"key":"intern_ceo","needs":"company"},{"key":"rename_rumor","needs":"company"},{"key":"plant_office","needs":"company"},{"key":"ticker_meme","needs":"company"},{"key":"yacht_sale","needs":"company"},{"key":"player_lambo","needs":"player"},{"key":"player_coffee","needs":"player"},{"key":"player_tip","needs":"player"},{"key":"player_office","needs":"player"},{"key":"player_chart","needs":"player"},{"key":"player_diet","needs":"player"},{"key":"player_motivation","needs":"player"},{"key":"player_haircut","needs":"player"},{"key":"weather_markets","needs":"none"},{"key":"pigeon_trader","needs":"none"},{"key":"monday_effect","needs":"none"},{"key":"broker_nap","needs":"none"},{"key":"bull_escape","needs":"none"},{"key":"bear_costume","needs":"none"},{"key":"calculator_strike","needs":"none"},{"key":"vending_machine","needs":"none"},{"key":"elevator_talk","needs":"none"},{"key":"index_birthday","needs":"none"},{"key":"cat_portfolio","needs":"none"},{"key":"headline_error","needs":"none"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "funNews"'),
+  ('newsShow', '{"prepareMinutes":10,"introSeconds":8,"segmentSeconds":22,"outroSeconds":6,"charsPerSecond":28,"maxSegments":7,"waitMinutes":10,"replayMinutes":55,"teaserMinutes":5,"chat":{"maxLength":200,"perMinute":10,"history":60,"keepHours":24,"emojis":["😂","💀","🔥","📉","📈","🤡","👏","😱","🍿","💸","🚀","😭"]},"loser":{"windowHours":24,"minLossBps":300,"consolationCents":50000},"winner":{"windowHours":24,"minGainBps":300},"company":{"count":2,"scandalShareBps":6000,"awarenessMinBps":1000,"awarenessMaxBps":2500,"stockMinBps":800,"stockMaxBps":2000,"momentumLossBps":5000},"stock":{"count":2,"minBps":600,"maxBps":1800},"sector":{"minBps":400,"maxBps":1000},"tasks":{"minBps":2000,"maxBps":4000},"tip":{"leadMinMinutes":15,"leadMaxMinutes":45,"minBps":500,"maxBps":1500,"reliabilityBps":7000},"texts":{"loser":{"frames":[{"headline":"{name} verbrennt {amount}","text":"Unser Verlierer des Tages: {name} hat {amount} versenkt, das sind {pct} des Vermögens. {reason} Die Redaktion schickt ein Trostpflaster."},{"headline":"Depot-Massaker bei {name}","text":"{name} hat heute {amount} verloren, {pct} einfach weg. {reason} Ein kleines Almosen ist unterwegs."},{"headline":"{name}: minus {pct} an einem Tag","text":"Eilmeldung aus der Abteilung Fremdscham: {name} hat {amount} in den Sand gesetzt. {reason} Wir spenden Trost, mehr können wir nicht tun."},{"headline":"Wo ist das Geld von {name}?","text":"{amount} futsch, {pct} Minus: {name} schreibt heute Börsengeschichte, leider die falsche. {reason} Das Trostpflaster kommt per Eilbote."}],"reasons":["Meine Großmutter handelt besser, und die ist seit 1987 tot.","Experten nennen die Strategie „Augen zu und hoffen“.","Wer so anlegt, braucht keine Feinde, nur jemanden, der ihm das Handy wegnimmt.","Wenn Dummheit Rendite brächte, wäre das hier ein Milliardär.","Das Motto lautet offenbar: teuer kaufen, billig verkaufen, laut heulen.","Ein Affe mit Dartpfeilen hätte heute besser abgeschnitten, wir haben es nachgerechnet.","Man kann auch mit Spielgeld scheitern, aber so gründlich schafft es nicht jeder.","Selbst der Tresor hat sich aus Scham kurz geschlossen.","Die Bank hat vorsorglich schon mal das Mitleid erhöht.","Im Lehrbuch steht das unter „Wie man es nicht macht“, Kapitel eins bis zwölf.","Das war kein Handel, das war eine Spende an den Markt.","Unsere Praktikantin wollte helfen, wir haben sie zurückgehalten.","Die Kurve des Depots sieht aus wie eine Rutsche, und zwar eine gute.","Angeblich war ein Plan vorhanden. Er wurde nie gefunden."]},"winner":{"frames":[{"headline":"{name} sahnt ab: plus {amount}","text":"Und nun zu jemandem, der es kann: {name} hat heute {amount} gemacht, {pct} im Plus. {reason}"},{"headline":"Glückspilz des Tages: {name}","text":"{name} ist heute um {amount} reicher, {pct} rauf. {reason}"},{"headline":"{name} schwimmt im Geld","text":"{pct} Plus, {amount} Gewinn: {name} zeigt dem Rest, wie es geht. {reason}"}],"reasons":["Ob das Können war oder pures Glück, klärt die Staatsanwaltschaft.","Alle anderen dürfen jetzt neidisch sein. Bitte der Reihe nach.","Der Rest schaut zu und heult leise ins Depot.","Wir gratulieren zähneknirschend.","Bitte nicht nachmachen, ihr könnt das nicht.","Insider vermuten eine Glaskugel im Keller.","Das Finanzamt hat bereits freundlich gewunken.","Neid ist die ehrlichste Form der Anerkennung, also bitte sehr.","Man munkelt von einem Pakt mit dem Teufel, der Teufel dementiert.","Wer jetzt um einen Kredit bittet, wird ausgelacht. Zu Recht."]},"scandal":{"frames":[{"headline":"Skandal bei {company}","text":"Ausgerechnet {company}, die Firma mit dem Motto „{idea}“: {reason} Die Kunden laufen davon."},{"headline":"{company}: Chef {founder} unter Beschuss","text":"Bei {company} brennt die Hütte. {reason} {founder} spricht von einem Missverständnis. Zur Erinnerung, das Geschäftsmodell lautet: „{idea}“."},{"headline":"Kunden fliehen vor {company}","text":"Peinlich für {founder}: {reason} „{idea}“ klang auf dem Papier besser. Das Image von {company} ist im Eimer."},{"headline":"{company} blamiert sich bis auf die Knochen","text":"{company} wollte heute groß rauskommen. {reason} {founder} erklärte, das gehöre zum Konzept. Die Kundschaft erklärte, sie sei dann mal weg."},{"headline":"Shitstorm über {company}","text":"Das Netz zerreißt {company}. {reason} Seitdem will niemand mehr „{idea}“. {founder} hat das Firmenhandy im Fluss versenkt."}],"reasons":["Im Lager wurde ein Praktikant gefunden, der seit drei Wochen vermisst war. Er hatte niemandem gefehlt.","Die Firmenkasse wurde offenbar mit dem Kicker-Budget verwechselt.","Ein Kunde hat das Produkt tatsächlich benutzt und das Ergebnis im Internet gezeigt.","Die Gewerbeaufsicht fand vierzig leere Pizzakartons, einen schlafenden Buchhalter und null Qualitätskontrolle.","Statt der Kundschaft kam heute die Feuerwehr.","Ein Werbespot wurde versehentlich mit dem Ton einer Karaoke-Nacht veröffentlicht.","Die Kundenhotline wurde seit Monaten von einem Papagei bedient, und der war noch der Freundlichste.","Das Qualitätssiegel an der Wand stellte sich als Kinderzeichnung heraus.","Auf der Weihnachtsfeier wurde versehentlich die halbe Belegschaft befördert, die andere Hälfte gefeuert.","Die Jahresbilanz wurde mit Buntstiften erstellt, immerhin innerhalb der Linien.","Ein Großkunde bekam statt der Ware eine Kiste mit Entschuldigungsbriefen.","Das Firmenmaskottchen hat gekündigt und packt in einem Buch aus.","Die Geschäftsführung hat das wichtigste Meeting des Jahres verschlafen, im Meetingraum.","Der Sicherheitsdienst hat sich selbst ausgesperrt und die Tür aufgebrochen.","Das neue Logo sieht aus wie etwas, das man Kindern nicht zeigen sollte.","Ein Mitarbeiter hat die gesamte Kundendatei alphabetisch nach Vornamen des Haustiers sortiert.","Die Kaffeekasse war die einzige Abteilung mit Gewinn.","Auf dem Firmenparkplatz wurde ein illegales Bobbycar-Rennen ausgehoben."]},"hype":{"frames":[{"headline":"Alle wollen {company}","text":"Unfassbar, aber wahr: {company} ist der Renner. {reason} „{idea}“ geht weg wie warme Semmeln. {founder} soll vor Freude geweint haben."},{"headline":"{company} geht viral","text":"{reason} Plötzlich will jeder „{idea}“. {founder} tut so, als sei das alles geplant gewesen. Wir tun so, als würden wir das glauben."},{"headline":"Ritterschlag für {company}","text":"{company} räumt ab. {reason} {founder} hängt sich das gerahmt ins Büro. Die Kundschaft rennt die Tür ein."}],"reasons":["Ein Video über die Firma hat heute das Internet geflutet.","Ein Testmagazin urteilt: „Besser als erwartet, und wir hatten nichts erwartet.“","Ein Promi wurde mit dem Produkt gesehen, vermutlich aus Versehen.","Eine Oma hat im Fernsehen geschworen, es habe ihr Leben verändert.","Die Konkurrenz hat aus Versehen Werbung für sie gemacht.","Ein Kind hat im Schulaufsatz darüber geschrieben, die Klasse war begeistert.","Die Warteschlange vor der Tür reicht bis zur nächsten Postleitzahl.","Selbst die Praktikanten wurden heute um Autogramme gebeten.","Ein Bürgermeister hat spontan eine Straße danach benannt.","Sogar die Steuerprüfung kam privat vorbei, um einzukaufen."]},"stockUp":{"frames":[{"headline":"{stock} schießt nach oben","text":"{stock} legt {move} zu. {reason} Analysten sind fassungslos."},{"headline":"Kursrakete {stock}","text":"{reason} Die Börse feiert: {stock} steigt um {move}. Wer nicht dabei ist, darf sich jetzt ärgern."},{"headline":"{stock}: Gerücht treibt den Kurs","text":"Neues von {stock}: {reason} Niemand weiß, ob es stimmt, alle kaufen trotzdem. Plus {move}."},{"headline":"Jubel bei {stock}","text":"{reason} Die Aktie von {stock} springt um {move}. Der Vorstand öffnet den guten Sekt, den für Besuch."}],"reasons":["Der Vorstand hat versehentlich etwas richtig gemacht.","Ein Hund hat auf der Hauptversammlung einen Antrag gestellt, und er wurde angenommen.","Angeblich wurde das Rad neu erfunden, diesmal eckig.","Hinter einem Sofa in der Zentrale wurden vergessene Millionen entdeckt.","Die Konkurrenz hat geschlossen Betriebsferien, niemand weiß warum.","Der neue Chef kann lesen, schreiben und rechnen, ein Novum.","Ein Tippfehler in der Bilanz macht aus Verlust Gewinn, niemand will ihn korrigieren.","Die Mitarbeiter haben einen Tag lang wirklich gearbeitet, nur so zum Spaß.","Ein Wahrsager auf dem Jahrmarkt hat der Firma eine goldene Zukunft vorausgesagt.","Das Produkt funktioniert plötzlich, die Ingenieure sind ratlos.","Ein Großinvestor hat die Firma mit einer anderen verwechselt und kräftig gekauft.","Die Kantine hat einen Stern bekommen, mehr brauchte es nicht.","Der Aufsichtsrat hat sich im Fahrstuhl eingeschlossen und kann nichts mehr kaputt machen.","Eine Brieftaube hat einen Großauftrag überbracht.","Im Keller wurde Öl gefunden, es war zwar Salatöl, aber die Stimmung ist prächtig.","Der Praktikant hat aus Versehen ein Patent angemeldet."]},"stockDown":{"frames":[{"headline":"{stock} stürzt ab","text":"{stock} verliert {move}. {reason} Die Anleger nehmen Reißaus."},{"headline":"Panik bei {stock}","text":"{reason} Der Kurs von {stock} sackt um {move} ab. Ein Krisenstab tagt."},{"headline":"{stock} im Sinkflug","text":"Schlechte Nachrichten von {stock}: {reason} Minus {move}, und der Tag ist noch jung."},{"headline":"Katastrophe bei {stock}","text":"{reason} Die Börse straft {stock} mit {move} Minus ab. Der Pressesprecher wurde zuletzt am Flughafen gesehen."}],"reasons":["Der Chef hat im Interview das eigene Produkt nicht erkannt und es „billigen Schrott“ genannt.","Die Kaffeemaschine ist ausgefallen, die Produktivität sank um neunzig Prozent.","Der gesamte Vorstand ist nach dem Betriebsausflug nicht zurückgekehrt. Letztes Lebenszeichen: ein Foto aus einer Karaoke-Bar.","Durch einen Fehler der Rechtsabteilung hat sich die Firma selbst verklagt und droht zu gewinnen.","Die Buchhaltung hat ein Jahr lang in der falschen Währung gerechnet, nämlich in Gummibärchen.","Das Hauptquartier wurde versehentlich bei einer Kleinanzeige mitverkauft.","Ein Mitarbeiter hat „Allen antworten“ gedrückt. Mit Anhang.","Der Firmenserver stand unter Wasser, weil jemand die Blumen gießen wollte.","Das neue Produkt wurde vorgestellt und sofort wieder eingepackt.","Der Finanzchef hat die Rücklagen in Rubbellose investiert.","Eine Möwe hat das Firmenlogo vom Dach gestohlen, die Aktionäre deuten das als Omen.","Der Sicherheitscode der Tresore lautete 1234 und stand auf einem Zettel am Tresor.","Die Geschäftszahlen wurden mit einem Würfel ermittelt, und selbst der hatte Pech.","Der Chef hat den Jahresbericht als Gedicht vorgetragen. Es reimte sich nicht.","Im Werk wurde drei Wochen lang das falsche Produkt gebaut, niemandem fiel es auf.","Die Firma hat ihren größten Kunden geghostet."]},"sectorUp":{"frames":[{"headline":"Die Branche {sector} dreht durch","text":"Die ganze Branche {sector} steigt um {move}. {reason} So funktioniert Wirtschaft, liebe Kinder."},{"headline":"Goldrausch in {sector}","text":"Plötzlich wollen alle {sector}. {reason} Die Kurse der Branche springen um {move}."}],"reasons":["Ein Influencer hat das Wort im Vorbeigehen erwähnt, mehr war nicht nötig.","Unsere Experten wissen nicht warum, aber sie nicken sehr überzeugend.","Ein Minister hat die Branche gelobt, er meinte allerdings eine andere.","Eine Zeitung hat sich vertippt, und niemand hat es gemerkt.","Das Horoskop hat es vorhergesagt.","Ein Schulkind hat in einem Referat behauptet, das sei die Zukunft.","Die Konkurrenzbranche hat geschlossen verschlafen.","Angeblich ist das jetzt wieder modern, sagt jemand, der es wissen muss."]},"sectorDown":{"frames":[{"headline":"{sector} im freien Fall","text":"Die Branche {sector} sackt um {move} ab. {reason} Bis das geklärt ist, verkaufen erst mal alle."},{"headline":"Katerstimmung in {sector}","text":"Schlechte Nachrichten für {sector}: {reason} Die Kurse geben um {move} nach."}],"reasons":["Ein Minister hat die Branche versehentlich mit etwas Verbotenem verwechselt.","Eine Studie zeigt, dass niemand weiß, was die Branche eigentlich macht.","Ein Fernsehmoderator hat schlecht geträumt und es live erzählt.","Die Branchenmesse fand statt, aber niemand ging hin, nicht einmal die Aussteller.","Ein Gerücht aus einem Friseursalon hat die Runde gemacht.","Das wichtigste Fachmagazin hat versehentlich einen Nachruf gedruckt.","Ein Orakel aus dem Frühstücksfernsehen hat den Daumen gesenkt.","Jemand hat laut gefragt, wofür man das eigentlich braucht."]},"tasksUp":{"frames":[{"headline":"Auftragsflut im ganzen Land","text":"{reason} Alle offenen Firmen-Aufgaben sind ab sofort {move} mehr wert. An die Arbeit, ihr faulen Säcke!"},{"headline":"Kunden zahlen jeden Preis","text":"{reason} Offene Aufgaben bringen {move} mehr. Wer jetzt Pause macht, ist selbst schuld."}],"reasons":["Die Kundschaft hat Geld und keine Ahnung, wohin damit.","Eine Massenhysterie sorgt dafür, dass heute jeder alles sofort will.","Der Staat hat versehentlich doppelt ausgezahlt und will es nicht zurück.","Ein Feiertag wurde abgesagt, alle haben Langeweile und Bargeld.","Die Leute haben gemerkt, dass Sparen keinen Spaß macht.","Ein Lottogewinner verteilt Geld in der Fußgängerzone."]},"tasksDown":{"frames":[{"headline":"Kunden entdecken das Sparen","text":"{reason} Alle offenen Firmen-Aufgaben sind {move} weniger wert. Die Chefs dürfen ruhig ein bisschen schwitzen."},{"headline":"Flaute bei den Aufträgen","text":"{reason} Offene Aufgaben bringen {move} weniger. Durchhalten, es wird auch wieder schlechter."}],"reasons":["Ein Fernsehkoch hat erklärt, man könne Geld auch behalten.","Das halbe Land ist kollektiv im Urlaub, natürlich unbezahlt.","Alle warten auf das Sonderangebot, das nie kommt.","Die Kundschaft hat ihre Geldbeutel verlegt, und zwar alle gleichzeitig.","Ein Sparfuchs hat ein Buch geschrieben, leider ist es gut.","Es regnet, und niemand hat Lust auf irgendwas."]},"tip":{"frames":[{"headline":"Mr. Doodle Dangles Geheimtipp","text":"Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei {stock} tut sich in der nächsten Stunde etwas, und zwar {move}. {reason}"},{"headline":"Vom Flurfunk: {stock}","text":"Ein Vögelchen hat mir gezwitschert: {stock} dürfte in der kommenden Stunde {move} gehen. {reason}"},{"headline":"Der heiße Draht: {stock}","text":"Aus gewöhnlich gut betrunkenen Kreisen höre ich: {stock} geht bald {move}. {reason}"}],"reasons":["Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.","Das Vögelchen lag bisher meistens richtig. Meistens.","Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.","Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.","Meine Quelle ist seriös, sie trägt immerhin eine Krawatte.","Ich selbst handle nie nach meinen Tipps, aus Gründen."]},"filler":{"frames":[{"headline":"Heute keine Katastrophen","text":"Es ist erschreckend ruhig. {reason} Strengt euch gefälligst an."},{"headline":"Nichts passiert, und das ist die Nachricht","text":"{reason} Ich bin persönlich enttäuscht von euch allen."}],"reasons":["Niemand hat sein Vermögen verzockt, keine Firma brennt.","Kein Skandal, keine Pleite, nicht einmal ein kleiner Betrug.","Die Redaktion hat drei Stunden gesucht und nur eine verlorene Socke gefunden.","Selbst die Gerüchteküche hat heute Ruhetag."]}},"tipWords":{"up":"nach oben","down":"nach unten"}}'::jsonb, 'Defaults from src/config/balance.ts, section "newsShow"'),
   ('pitches', '{"minChars":12,"maxChars":280,"judgeWaitSeconds":90,"eventMinutes":20,"moveMinutes":30,"orderCooldownMinutes":60,"chanceBaseBps":1000,"chancePerFitBps":80,"maxChanceBps":9000,"eventCostUnits":2,"moveCostFactor":1.2,"mitigationBase":0.35,"mitigationPerFit":0.005,"maxMitigation":0.9,"movePayoutBase":1.3,"movePayoutPerFit":0.012,"moveGainBase":0.02,"moveGainPerFit":0.0006,"moveRefundBps":2000,"backfireAwareness":0.05,"mini":{"fitBase":25,"fitPerHit":12,"maxHits":4,"longTextChars":60,"longTextBonus":10,"maxFit":85,"backfireBase":10,"backfirePerRisky":20,"maxBackfire":70,"risky":["imagefilm","werbung","werbekampagne","influencer","pr-","greenwashing","ignorieren","leugnen","abstreiten","lügen","vertuschen","schweigen","aussitzen","drohen","verklagen","entlassen","billiger","bestechen"],"good":{"regulation":["anwalt","recht","prüfen","anpassen","lobby","verband","gutachten","umstellen","dialog"],"special_tax":["steuer","berater","kalkul","preis","rohstoff","ersatz","sparen","lieferant"],"supply_shortage":["lieferant","lager","alternativ","vorrat","zweit","ersatz","vertrag","regional"],"quality_scandal":["rückruf","entschuldig","prüf","qualität","kontroll","ersetzen","transparen","entschädig"],"data_breach":["sicherheit","passwort","verschlüssel","melden","experten","informieren","update","audit"],"price_war":["qualität","service","treue","nische","kosten","bündel","mehrwert","marke"],"strike":["lohn","gehalt","verhandl","bonus","gespräch","kompromiss","zuhören","arbeitszeit","tarif"],"protest":["dialog","einladen","zuhören","ändern","nachhaltig","transparen","spenden","fair"],"patent_claim":["anwalt","patent","lizenz","einigung","gutachten","umgehen","vergleich","eigene"],"bad_review":["verbessern","test","feedback","kunden","nachbessern","qualität","gratis","update"],"viral_trend":["nachproduz","lager","social","video","aktion","schnell","limitiert","community"],"big_contract":["kapazität","personal","einstellen","termin","liefer","verhandl","vertrag","schicht"],"award":["pressemitteilung","werbung","feiern","kunden","messe","präsentieren","website","siegel"],"subsidy":["antrag","förder","investieren","forschung","berater","unterlagen","frist","projekt"],"partnership":["vertrag","gemeinsam","partner","teilen","kooperation","verhandl","netzwerk","vertrieb"],"cash":["verkauf","auftrag","kunden","rabatt","angebot","großkunde","export","abo","online"],"awareness":["werbung","messe","social","video","presse","influencer","sponsor","event","kampagne"],"quality":["schulung","test","prüfen","verbessern","material","zertifi","forschung","feedback"]}}}'::jsonb, 'Defaults from src/config/balance.ts, section "pitches"'),
   ('protests', '{"kinds":["boycott","shitstorm","petition","protest_march"],"startCostCents":50000,"goal":20,"aiMax":16,"aiJoinChanceBps":3000,"aiPerMinuteMax":2,"durationHours":6,"starterCooldownHours":6,"effectChanceBaseBps":600,"effectChancePerPlayerBps":300,"effectChanceMaxBps":3500,"priceHitMinBps":150,"priceHitMaxBps":450,"awarenessHit":0.03,"minLevel":4}'::jsonb, 'Defaults from src/config/balance.ts, section "protests"'),
   ('nfts', '{"royaltyBps":1000,"mintXp":100,"minAskCents":10000,"minOfferCents":10000,"chat":{"maxLength":200,"perMinute":6,"history":60,"offerHours":24},"ai":{"floorCents":100000,"likeBps":400,"maxLikes":40,"creatorSaleBps":300,"maxCreatorSales":10,"ageBpsPerDay":100,"maxAgeDays":30,"buyChanceBps":2500,"listedOfferChanceBps":800,"unlistedOfferChanceBps":80,"lowballMinBps":6500,"lowballMaxBps":9000,"maxBuysPerDay":20,"maxMessagesPerRun":4,"resaleMarkupBps":12500,"acceptBps":10500,"demand":{"offerBps":600,"maxOffers":6,"saleBps":500,"maxSales":6,"days":7},"trade":{"chanceBps":60,"likeWeightBps":1500,"offerWeightBps":4000,"saleWeightBps":2500,"maxChanceBps":1500,"minHoldMinutes":30,"perRun":2,"perDay":30,"tasteMinBps":8500,"tasteMaxBps":12500,"reversionBps":5000},"collectors":["Vera Vermeer","Konrad Kollektor","Pixel-Paula","Baron von Bit","Mia Mosaik","Otto Original","Gräfin Glitzer","Sammler Sam"],"lines":{"offer":["Schönes Stück. Mehr ist es mir aber nicht wert.","Für meine Sammlung würde ich so viel zahlen.","Mein Angebot. Überleg es dir nicht zu lange.","Hübsch! Wäre das ein fairer Preis?","Ich biete das. Nimm es, solange ich gute Laune habe."],"buy":["Gekauft! Das kommt in meine Sammlung.","Zu diesem Preis konnte ich nicht widerstehen.","Ein fairer Preis. Danke!"],"accept":["Abgemacht! Viel Freude damit.","Einverstanden, es gehört dir."],"trade":["Endlich gehört es mir! Das wollte ich schon lange.","Ich musste es einfach haben.","Gekauft von einer Kollegin. Jetzt steht es zum Verkauf, wer bietet mehr?","Ein Schnäppchen unter Sammlern.","Das Stück ist gefragt. Ich habe zugeschlagen."],"decline":["Nein danke, darunter verkaufe ich nicht.","Netter Versuch. Biete mehr.","Das ist zu wenig für dieses Stück."]}}}'::jsonb, 'Defaults from src/config/balance.ts, section "nfts"'),

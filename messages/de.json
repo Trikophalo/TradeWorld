@@ -791,6 +791,7 @@
     "nft_offer_unfunded": "Der Bieter hat inzwischen nicht mehr genug Geld.",
     "nft_not_for_sale": "Dieses NFT steht gerade nicht zum Verkauf.",
     "nft_price_changed": "Der Preis hat sich gerade geändert. Schau ihn dir noch einmal an.",
+    "chat_text_invalid": "Diese Nachricht geht so nicht. Bitte kurz und ohne Beleidigungen.",
     "order_cooldown": "Ein freier Auftrag pro Stunde. Der nächste geht bald wieder.",
     "assistant_busy": "Mira hat in dieser Stunde schon viel nachgedacht. Klare Befehle versteht sie weiter sofort."
   },
@@ -6792,5 +6793,22 @@
         "backfire": "✘ Dein Auftrag ging nach hinten los."
       }
     }
+  },
+  "newsShow": {
+    "title": "NEXA Nachrichten mit Mr. Doodle Dangle",
+    "standbyHint": "Jede volle Stunde live. Die Sendung läuft nur, wenn jemand zuschaut, und was er sagt, passiert wirklich.",
+    "liveHint": "Live! Alles, was Mr. Doodle Dangle meldet, trifft Kurse, Firmen und Aufgaben sofort.",
+    "replayHint": "Wiederholung der letzten Sendung. Die Folgen sind längst eingetreten.",
+    "replay": "Letzte Sendung ansehen",
+    "replayStop": "Wiederholung beenden",
+    "demoStart": "Demo: Sendung jetzt starten",
+    "badgeLive": "Live",
+    "badgeSoon": "Gleich",
+    "chatTitle": "Live-Chat",
+    "chatEmpty": "Noch ist es still. Schreib als Erster, was du von der Sendung hältst.",
+    "chatPlaceholder": "Schreib in den Chat …",
+    "chatSend": "Senden",
+    "emojis": "Emojis",
+    "viewers": "{count, plural, one {# schaut zu} other {# schauen zu}}"
   }
 }

@@ -11,6 +11,7 @@ import { PROPERTY_RPC_SCHEMAS, livePropertyEngine } from "./api-property";
 import { TASK_RPC_SCHEMAS, liveTaskEngine } from "./api-tasks";
 import { PITCH_RPC_SCHEMAS, livePitchEngine } from "./api-pitches";
 import { PROTEST_RPC_SCHEMAS, liveProtestEngine } from "./api-protests";
+import { NEWS_SHOW_RPC_SCHEMAS, liveNewsShowEngine } from "./api-news-show";
 import { TOUR_RPC_SCHEMAS, liveTourEngine } from "./api-tours";
 import { NFT_RPC_SCHEMAS, liveNftEngine } from "./api-nfts";
 import { rpc, toErrorKey } from "./rpc";
@@ -483,6 +484,7 @@ export const RPC_SCHEMAS = {
   ...PITCH_RPC_SCHEMAS,
   ...PROTEST_RPC_SCHEMAS,
   ...TOUR_RPC_SCHEMAS,
+  ...NEWS_SHOW_RPC_SCHEMAS,
   ...NFT_RPC_SCHEMAS,
   get_stock_news: stockNewsSchema,
   get_player_holdings: holdingsSchema,
@@ -502,6 +504,7 @@ export const liveEngine: GameEngine = {
   ...livePitchEngine,
   ...liveProtestEngine,
   ...liveTourEngine,
+  ...liveNewsShowEngine,
   ...liveCareerEngine,
   ...liveCompanyEngine,
   ...liveArtEngine,

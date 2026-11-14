@@ -2367,3 +2367,36 @@ und gleichmäßig verteilt. Gewünscht: bis zu einer Stunde Zeit, mehr KI-Invest
   Firma mit Top-Qualität füllen sie bis zum Ende allein.
 - Sie kommen früh: Anteil nach dem Zeitanteil t = 1 − (1 − t)^`aiPace` (3): nach 10 Minuten etwa 42 %, zur Hälfte
   87,5 % ihres Teils. Server (`share_offer_ai_topup`) und Demo (`aiSubscribedE6`) rechnen gleich.
+
+## ADR-150: NEXA Nachrichten – stündliche Live-Sendung mit Mr. Doodle Dangle — `akzeptiert`
+
+**Kontext:** Gewünscht ist ein großes, wiederkehrendes Ereignis, auf das sich alle freuen: einmal pro Stunde Nachrichten
+wie im Fernsehen, mit einem Sprecher im Pixel-Art-Studio, Live-Chat, bösen und lustigen Meldungen über Spieler und
+ihre Firmen, und mit echten, großen Folgen für Kurse, Firmen und Aufgaben.
+
+**Entscheidung:**
+
+- **Sendung zur vollen Stunde.** Der Entwurf entsteht 10 Minuten vorher (`news_show_build`). Die Sendung findet nur
+  statt, wenn ein echter Spieler zuschaut: Sie startet mit dem ersten Zuschauer zur vollen Stunde oder bis zu
+  10 Minuten danach (`waitMinutes`); ohne Zuschauer verfällt sie, und nichts passiert. Erst beim Start greifen alle
+  Folgen, einmal. Jeder Zuschauer errechnet den Stand aus der Startzeit des Servers, alle sehen dasselbe.
+- **Beiträge (höchstens 7):** der Verlierer des Tages (größter Vermögensverlust, bekommt ein Trostpflaster von
+  500 € aus den Haushalten), ein bis zwei Spielerfirmen mit Skandal oder Hype (Bekanntheit ±10 bis 25 %, Schwung,
+  Aktie ±8 bis 20 %), zwei KI-Aktien (±6 bis 18 %), eine ganze Branche (±4 bis 10 %) oder der Wert aller offenen
+  Firmen-Aufgaben (±20 bis 40 %), der Gewinner des Tages, und zum Schluss Mr. Doodle Dangles Geheimtipp (ein Hinweis
+  mit Vorlauf wie in ADR-119, trifft zu 70 % ein). Wer genannt wird, bekommt eine Benachrichtigung; die Meldungen
+  stehen danach im News-Feed.
+- **Keine Wiederholungen:** Die Mini-KI baut jeden Text aus Rahmen × Anlass (`newsShow.texts`, über 400 Kombinationen)
+  und merkt sich, was sie benutzt hat (`news_show_used`): Jede Kombination kommt einmal, bevor sich etwas wiederholt.
+  Wer in der letzten Sendung vorkam, kommt nicht sofort wieder dran.
+- **Claude** (Edge Function `news-anchor`, sobald ein Schlüssel hinterlegt ist) schreibt den Entwurf vor der Sendung
+  in Mr. Doodle Dangles Ton um, passend zur Idee und Branche jeder Firma. Die Folgen legt weiterhin der Server fest;
+  Claude ändert nur Schlagzeile und Text. Ein Aufrufer pro Sendung (`news_show_claim_script`).
+- **Ton:** derb, schadenfroh, übertrieben, aber nur über das, was im Spiel passiert ist (verzocktes Spielgeld,
+  gefloppte Firmen). Nichts über echte Eigenschaften von Menschen, keine echten Personen oder Marken.
+- **Kein Wissensvorsprung:** Die Folgen greifen beim Start, bevor der Sprecher sie vorliest. Wer zuschaut, kann also
+  nicht vor einem Kurssprung risikolos handeln; den Vorsprung gibt nur der Geheimtipp am Ende.
+- **Live-Chat** neben dem Fernseher: 200 Zeichen, Emojis, Wortfilter, höchstens 10 Nachrichten pro Minute; Zuschauerzahl.
+- **Markierung:** Der News-Tab zeigt „Gleich“ (5 Minuten vorher) und „Live“ (ab der vollen Stunde, solange eine
+  Sendung starten oder laufen kann). Die letzte Sendung lässt sich 55 Minuten lang noch einmal ansehen.
+- Der Demo-Modus spielt dasselbe mit erfundenen Zuschauern im Chat; ein Demo-Knopf startet eine Sendung sofort.

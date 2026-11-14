@@ -74,6 +74,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Die Zeichnung läuft jetzt bis zu einer Stunde. Deutlich mehr KI-Investoren steigen ein, und zwar gleich am Anfang. Sind alle Aktien gezeichnet, bist du sofort an der Börse.",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-686af2bc",
+        title: "NEXA Nachrichten mit Mr. Doodle Dangle",
+        text: "Jede volle Stunde gibt es Live-Nachrichten im News-Tab: ein Fernseher mit Sprecher im Pixel-Art-Studio, daneben ein Live-Chat mit Emojis. Mr. Doodle Dangle nimmt den Verlierer des Tages auseinander, packt Skandale bei euren Firmen aus und meldet Kursstürze, und alles, was er sagt, passiert wirklich: Kurse, Bekanntheit und Aufgabenwerte ändern sich sofort. Die Sendung läuft nur, wenn jemand zuschaut, und keine Meldung wiederholt sich. Am Ende gibt es seinen Geheimtipp für die nächste Stunde.",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-706f8ae2",
         title: "Mehr Verbesserungen",
         text: "22 neue Verbesserungen und zwei weitere Tresorstufen, in fünf Abschnitten. Mehr Geld (Tresorzinsen, Lohnbonus, Stammgast, Auftragsprofi, Dealmaker), mehr XP (Börsenprofi, Frühaufsteher, Missionsjäger, Teamplayer, Bilanzprofi, Ehrgeiz), ein größerer Tresor (Panzertresor) und vieles für die eigene Firma (KI-Turbo, Glückshand, Werbeagentur, Krisenmanager …). Sie schalten sich zwischen Level 1 und 30 frei.",

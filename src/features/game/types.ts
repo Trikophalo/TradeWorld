@@ -1883,6 +1883,7 @@ export const GAME_ERROR_KEYS = [
   "nft_price_changed",
   "assistant_busy",
   "order_cooldown",
+  "chat_text_invalid",
   "move_busy",
   "move_resting",
   "friend_code_unknown",
@@ -1899,7 +1900,41 @@ export class GameError extends Error {
 }
 
 /** Everything the game can do. Implemented by the live Supabase API and by the offline demo. */
+/** NEXA Nachrichten (ADR-150): the hourly live show with Mr. Doodle Dangle. */
+export interface NewsShowSegment {
+  kind: string;
+  headline: string;
+  text: string;
+  effects: { label: string; tone: "gain" | "loss" | "neutral" }[];
+}
+export interface NewsShowChatMessage {
+  id: number;
+  nickname: string;
+  body: string;
+  at: string;
+  mine: boolean;
+}
+export interface NewsShowState {
+  /** The server's clock when it answered; viewers stay in sync with it. */
+  now: string;
+  nextAirsAt: string;
+  viewers: number;
+  /** The scheduled next show; needsScript: nobody asked Claude yet. */
+  upcoming: { id: number; airsAt: string; needsScript: boolean } | null;
+  /** This hour's show once it started (replayable for a while). */
+  show: {
+    id: number;
+    airsAt: string;
+    startedAt: string;
+    writer: "mini" | "claude";
+    segments: NewsShowSegment[];
+  } | null;
+  chat: NewsShowChatMessage[];
+}
+
 export interface GameEngine {
+  newsShow(): Promise<NewsShowState>;
+  postNewsShowMessage(requestId: string, body: string): Promise<NewsShowChatMessage[]>;
   /** Finn's tours the player has seen (kept on the server, so a private window does not repeat them). */
   seenTours(): Promise<string[]>;
   markTourSeen(requestId: string, tour: string): Promise<string[]>;
