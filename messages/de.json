@@ -643,7 +643,7 @@
     "not_authenticated": "Du bist nicht angemeldet. Bitte melde dich neu an.",
     "unknown_security": "Dieses Wertpapier gibt es nicht.",
     "not_tradable": "Dieses Wertpapier ist gerade nicht handelbar.",
-    "invalid_quantity": "Gib eine ganze Stückzahl zwischen 1 und 100.000 ein.",
+    "invalid_quantity": "Diese Menge geht nicht. Kleine Aktien gibt es pro Order nur bis zu einer Grenze; teile große Käufe auf.",
     "invalid_price": "Der Limit-Preis ist ungültig.",
     "insufficient_funds": "Dafür reicht dein Guthaben nicht.",
     "insufficient_position": "So viele Stück hast du nicht im Depot.",

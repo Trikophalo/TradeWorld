@@ -1,6 +1,6 @@
 {
   "artwork": {
-    "id": "b2c83ea1-630e-4d4f-8cc8-8b95c1bd3757",
+    "id": "0949ce29-ddc2-4ac1-8e11-4ab624b975bb",
     "hot": 0.353553,
     "code": "ART-0043",
     "liked": false,
@@ -48,7 +48,7 @@
     "rarity": null,
     "auction": null,
     "creator": "Fixture_Neu",
-    "created_at": "2026-11-14T00:03:12.984768+00:00",
+    "created_at": "2026-11-14T00:18:25.947494+00:00",
     "value_cents": null
   },
   "cost_cents": 1500000,

@@ -1,12 +1,12 @@
 {
   "item": {
-    "id": 252,
+    "id": 251,
     "kind": "friends_now",
-    "actor": { "tag": "9XJK", "level": 15, "nickname": "Fixture_Neu", "avatar_key": "coder" },
+    "actor": { "tag": "M3GT", "level": 15, "nickname": "Fixture_Neu", "avatar_key": "coder" },
     "is_me": false,
     "payload": { "other_nickname": "Fixture_Gmbh" },
     "reacted": true,
     "reactions": 1,
-    "created_at": "2026-11-14T00:03:14.270173+00:00"
+    "created_at": "2026-11-14T00:18:27.037511+00:00"
   }
 }

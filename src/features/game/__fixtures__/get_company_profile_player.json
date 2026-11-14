@@ -2,31 +2,31 @@
   "facts": {
     "staff": 1,
     "stage": 0,
-    "period": "quarter",
-    "product": "courier",
+    "period": null,
+    "product": "security_software",
     "max_staff": 2,
     "ai_workers": 0,
-    "quality_bps": 2325,
-    "value_cents": 295007,
-    "profit_cents": -14993,
-    "awareness_bps": 355,
-    "revenue_cents": 219104
+    "quality_bps": null,
+    "value_cents": 250000,
+    "profit_cents": null,
+    "awareness_bps": null,
+    "revenue_cents": null
   },
   "company": {
-    "id": "2091471b-18bf-4b86-bdd1-f7a2fcfc46d3",
-    "idea": "Fahrräder reparieren",
+    "id": "efd9cc25-64cc-47d4-a372-e354b412b7cf",
+    "idea": "Zweiter Anlauf",
     "logo": null,
-    "name": "Gero Werkstatt",
+    "name": "Fiona Neu",
     "tier": "garage",
     "is_ai": false,
     "listed": false,
-    "sector": "logistics",
+    "sector": "tech",
     "ticker": null,
     "price_e4": null,
     "change_bps": null,
-    "founded_at": "2026-11-14T00:02:44.300853+00:00",
-    "brand_color": "#aa5500"
+    "founded_at": "2026-11-14T00:18:02.654334+00:00",
+    "brand_color": "#225588"
   },
-  "founder": { "tag": "VHZD", "nickname": "Gero_Garage", "avatar_key": "rookie" },
+  "founder": { "tag": "EJC7", "nickname": "Fiona_Fabrik", "avatar_key": "rookie" },
   "members": []
 }

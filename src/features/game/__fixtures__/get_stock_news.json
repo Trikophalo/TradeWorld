@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Ein wichtiger Zulieferer fällt aus. Die Produktion stockt. Sicher ist das nicht.",
-      "name": "Brotzeit Handel AG",
-      "due_at": "2026-11-14T01:40:39.687139+00:00",
+      "body": "Die Kasse ist voll. Aktionäre dürfen auf eine Extra-Ausschüttung hoffen. Sicher ist das nicht.",
+      "name": "Volta Energie AG",
+      "due_at": "2026-11-14T01:31:24.517664+00:00",
       "status": "open",
-      "ticker": "BRZ",
-      "headline": "Lieferkette reißt bei Brotzeit Handel AG",
+      "ticker": "VLT",
+      "headline": "Sonderdividende bei Volta Energie AG erwartet",
       "move_bps": null,
       "strength": 3,
-      "direction": "down",
-      "published_at": "2026-11-14T01:03:17.273713+00:00"
+      "direction": "up",
+      "published_at": "2026-11-14T01:18:29.13314+00:00"
     },
     {
       "id": 3,
-      "body": "Mehrere Häuser heben ihr Kursziel deutlich an. Sicher ist das nicht.",
-      "name": "Nordlicht Logistik AG",
-      "due_at": "2026-11-14T00:03:17.260706+00:00",
+      "body": "Ein fehlerhaftes Produkt muss zurück in die Werkstatt. Das wird teuer. Sicher ist das nicht.",
+      "name": "KlarSoft AG",
+      "due_at": "2026-11-14T00:18:29.129135+00:00",
       "status": "confirmed",
-      "ticker": "NDL",
-      "headline": "Analysten-Upgrade: Nordlicht Logistik AG jetzt Kaufempfehlung",
-      "move_bps": 1087,
-      "strength": 3,
-      "direction": "up",
-      "published_at": "2026-11-14T00:03:17.260706+00:00"
+      "ticker": "KLS",
+      "headline": "Rückruf bei KlarSoft AG",
+      "move_bps": -780,
+      "strength": 2,
+      "direction": "down",
+      "published_at": "2026-11-14T00:18:29.129135+00:00"
     }
   ],
   "reliability_bps": 7500

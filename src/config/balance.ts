@@ -1425,7 +1425,8 @@ export const BALANCE = {
       // a mid cap by 2 %, a blue chip by 0.5 %.
       depthCentsPer100Bps: { bluechip: 2_000_000, midcap: 500_000, penny: 100_000 },
       bondDepthCentsPer100Bps: 1_000_000,
-      maxHoldingsPremium: 0.9,
+      // Small on purpose (ADR-126): a premium the own holding creates must not pay for the own round trip.
+      maxHoldingsPremium: 0.15,
       premiumScaleDepths: 20,
     },
   },
