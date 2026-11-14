@@ -1,6 +1,6 @@
 {
   "company": {
-    "id": "ca7f05f6-8d8e-43c7-9121-0eebf23c10d3",
+    "id": "0193c992-a63e-4b6f-ba96-e55975a32ecc",
     "idea": "Werkzeuge für Bastler",
     "live": {
       "last_hour_at": "2026-11-14T13:00:00+00:00",
@@ -104,7 +104,7 @@
     "ai_workers": 0,
     "can_expand": false,
     "cash_cents": 250000,
-    "founded_at": "2026-11-14T13:22:46.927665+00:00",
+    "founded_at": "2026-11-14T13:53:29.289034+00:00",
     "can_upgrade": false,
     "logo_hidden": false,
     "price_level": "normal",
@@ -120,7 +120,7 @@
     "max_employees": 2,
     "open_postings": 0,
     "training_from": 5,
-    "campaign_costs": { "tv": 306600, "flyer": 34100, "online": 102200 },
+    "campaign_costs": { "tv": 20000, "flyer": 20000, "online": 20000 },
     "capacity_cents": 498000,
     "full_time_from": 5,
     "grace_quarters": 4,
@@ -131,10 +131,10 @@
     "quarters_active": 0,
     "ai_worker_skills": [],
     "distress_quarters": 0,
-    "estimate_low_cents": 5028103,
+    "estimate_low_cents": 23318,
     "founder_payout_bps": 0,
     "upgrade_cost_cents": 1250000,
-    "estimate_high_cents": 215417805,
+    "estimate_high_cents": 720834,
     "ai_worker_cost_cents": 72000,
     "can_capital_increase": false,
     "expansion_cost_cents": null,

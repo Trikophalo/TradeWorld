@@ -1,27 +1,27 @@
 {
-  "id": "513eb656-e339-41c5-b42d-474d44a98fdd",
+  "id": "9c50caa0-a578-40c0-b694-9b0c7b34c51b",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "1fc3e55d-054f-42a2-a5cc-adb1b525d232",
+    "id": "0e8feb45-71e1-4ddb-8a25-fa3de5532818",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "7ab1711b-b618-dcac-f2aa-97b46add6779",
+      "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
       "logo": null,
-      "name": "Nordbrise Offshore",
-      "color": "#6EC1E4",
+      "name": "QuantenSprung Labs",
+      "color": "#35D0BA",
       "is_ai": true,
-      "sector": "energy",
-      "ticker": "WND"
+      "sector": "tech",
+      "ticker": "QSL"
     },
-    "required": [{ "branch": "science", "min_score": 0 }],
-    "title_key": "science_intern",
+    "required": [{ "branch": "it", "min_score": 0 }],
+    "title_key": "it_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-14T13:22:46.776174+00:00",
-  "updated_at": "2026-11-14T13:22:46.780826+00:00",
-  "offer_expires_at": "2026-11-16T13:22:46.776174+00:00",
-  "salary_wish_cents_per_hour": 15000,
-  "offer_salary_cents_per_hour": 15000
+  "created_at": "2026-11-14T13:53:29.094849+00:00",
+  "updated_at": "2026-11-14T13:53:29.10074+00:00",
+  "offer_expires_at": "2026-11-16T13:53:29.094849+00:00",
+  "salary_wish_cents_per_hour": 15900,
+  "offer_salary_cents_per_hour": 15900
 }

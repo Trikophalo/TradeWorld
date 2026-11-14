@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { NEWSPAPER } from "@/components/pixel/art";
 import { Page, PageHeader } from "@/components/layout/page";
 import { NewsFeed } from "@/features/news/news-feed";
+import { ProtestsCard } from "@/features/news/protests";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("newsTab");
@@ -16,7 +17,10 @@ export default async function NewsPage() {
   return (
     <Page>
       <PageHeader title={t("title")} intro={th("news")} art={NEWSPAPER} />
-      <NewsFeed />
+      <div className="mx-auto max-w-2xl space-y-4">
+        <ProtestsCard />
+        <NewsFeed />
+      </div>
     </Page>
   );
 }

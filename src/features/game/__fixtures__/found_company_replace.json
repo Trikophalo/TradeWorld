@@ -1,6 +1,6 @@
 {
   "company": {
-    "id": "55dfaec6-01c5-417f-9258-a9884799c206",
+    "id": "4ab01127-7d52-4eef-bf55-30bb75ca8edb",
     "idea": "Zweite Idee",
     "live": {
       "last_hour_at": "2026-11-14T13:00:00+00:00",
@@ -64,7 +64,7 @@
     "ai_workers": 0,
     "can_expand": false,
     "cash_cents": 250000,
-    "founded_at": "2026-11-14T13:22:49.793991+00:00",
+    "founded_at": "2026-11-14T13:53:32.322159+00:00",
     "can_upgrade": false,
     "logo_hidden": false,
     "price_level": "normal",
@@ -91,10 +91,10 @@
     "quarters_active": 0,
     "ai_worker_skills": [],
     "distress_quarters": 0,
-    "estimate_low_cents": 67952,
+    "estimate_low_cents": 34018,
     "founder_payout_bps": 0,
     "upgrade_cost_cents": 1250000,
-    "estimate_high_cents": 1455874,
+    "estimate_high_cents": 1899141,
     "ai_worker_cost_cents": 72000,
     "can_capital_increase": false,
     "expansion_cost_cents": null,

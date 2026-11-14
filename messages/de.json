@@ -762,7 +762,11 @@
     "task_closed": "Diese Aufgabe ist schon erledigt oder abgelaufen.",
     "no_ai_workers": "Deine Firma hat keine KI-Kräfte. Stelle im Team eine ein.",
     "pitch_text_invalid": "Schreib deine Idee in 12 bis 280 Zeichen, ohne Beleidigungen.",
-    "pitch_busy": "Es läuft schon eine eigene Strategie. Warte, bis sie entschieden ist."
+    "pitch_busy": "Es läuft schon eine eigene Strategie. Warte, bis sie entschieden ist.",
+    "protest_busy": "Gegen diese Firma läuft schon eine Kampagne, oder du hast vor Kurzem selbst eine gestartet.",
+    "protest_joined": "Du machst bei dieser Kampagne schon mit.",
+    "protest_closed": "Diese Kampagne ist schon vorbei.",
+    "protest_own": "Gegen die eigene Firma oder den eigenen Arbeitgeber geht das nicht."
   },
   "locks": {
     "level": "Level {level}",
@@ -6119,5 +6123,44 @@
     },
     "history": "Deine Ideen",
     "yourIdea": "„{text}“"
+  },
+  "protests": {
+    "title": "Kampagnen",
+    "intro": "Boykott, Shitstorm oder Petition gegen eine Firma. Es müssen viele mitmachen, und selbst dann wirkt es nur selten.",
+    "empty": "Gerade läuft keine Kampagne.",
+    "emptyText": "Starte eine im Profil einer Firma.",
+    "kinds": {
+      "boycott": "Boykott-Aufruf",
+      "shitstorm": "Shitstorm",
+      "petition": "Petition",
+      "protest_march": "Protestmarsch"
+    },
+    "kindHints": {
+      "boycott": "Kunden sollen nicht mehr kaufen.",
+      "shitstorm": "Empörung im Netz, laut und schnell.",
+      "petition": "Unterschriften für eine Forderung.",
+      "protest_march": "Demo vor der Zentrale."
+    },
+    "against": "gegen {company}",
+    "supporters": "{count} von {goal} Unterstützern",
+    "players": "{players} Spieler, {ai} KI",
+    "join": "Mitmachen",
+    "joined": "Dabei",
+    "joinedToast": "Du machst mit",
+    "againstYou": "Gegen deine Firma",
+    "by": "gestartet von {name}",
+    "endsIn": "endet in",
+    "status": {
+      "open": "Läuft",
+      "hit": "Hat gewirkt",
+      "fizzled": "Verpufft",
+      "expired": "Eingeschlafen"
+    },
+    "hit": "Kurs {bps} gefallen",
+    "start": "Kampagne starten",
+    "startTitle": "Kampagne gegen {company}",
+    "startIntro": "Kostet {amount}. Du brauchst {goal} Unterstützer; KI-Unterstützer kommen von selbst, den Rest müssen Spieler stellen. Nur selten hat eine Kampagne echte Folgen.",
+    "started": "Kampagne gestartet",
+    "startedText": "Jetzt brauchst du Mitstreiter. Die Kampagne steht im News-Tab."
   }
 }

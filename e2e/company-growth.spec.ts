@@ -290,3 +290,15 @@ test("own business move: write an idea, the Mini-KI judges it (ADR-132)", async 
   await expect(row).toContainText("Mini-KI");
   await expect(row).toContainText("Chance");
 });
+
+test("protest campaign: start one against an AI company, it shows in the news tab (ADR-133)", async ({ page }) => {
+  await preparePlayer(page, "Aktivistin", 21_000, 2_000_000);
+  await page.goto("/companies/demo-company-KLS");
+  await page.getByTestId("start-protest").click();
+  await page.getByRole("button", { name: /Petition/ }).click();
+  await expect(page.getByText("Kampagne gestartet").first()).toBeVisible();
+  await page.goto("/news");
+  const card = page.getByTestId("protests");
+  await expect(card).toContainText("Petition gegen KlarSoft AG");
+  await expect(card.locator('[data-protest="open"]').first()).toContainText("von 20 Unterstützern");
+});

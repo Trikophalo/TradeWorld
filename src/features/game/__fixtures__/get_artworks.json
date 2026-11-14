@@ -2,8 +2,8 @@
   "total": 44,
   "entries": [
     {
-      "id": "fa9e2363-988b-45d1-aedf-35e35870fd45",
-      "hot": 1.767715,
+      "id": "1368c977-f3e2-430c-ab8e-6ba614421022",
+      "hot": 1.767711,
       "code": "ART-0043",
       "liked": false,
       "likes": 1,
@@ -49,23 +49,23 @@
       },
       "rarity": null,
       "auction": {
-        "id": "26ae09e1-ea0a-47ec-a462-491ab4d81bf9",
+        "id": "0301b100-068a-4cda-9796-58afa715b6f8",
         "bids": 1,
         "leader": "Fixture_Kunst",
         "seller": "Fixture_Neu",
-        "ends_at": "2026-11-15T13:22:47.868047+00:00",
+        "ends_at": "2026-11-15T13:53:30.322327+00:00",
         "start_cents": 50000,
         "my_bid_cents": null,
         "current_cents": 50000,
         "min_bid_cents": 52500
       },
       "creator": "Fixture_Neu",
-      "created_at": "2026-11-14T13:22:47.750143+00:00",
+      "created_at": "2026-11-14T13:53:30.197357+00:00",
       "value_cents": null
     },
     {
-      "id": "141ad73b-8893-4030-9896-58b17e59633b",
-      "hot": 1.37714,
+      "id": "3deb186e-f1a1-4ac4-965b-3984a2278ae4",
+      "hot": 1.37449,
       "code": "ART-0015",
       "liked": false,
       "likes": 0,
@@ -122,23 +122,23 @@
       },
       "rarity": "common",
       "auction": {
-        "id": "3ea8e6fe-81c2-4472-af1f-e9f73a6ffdb9",
+        "id": "ff05ff09-625e-465a-a279-d749b46a0023",
         "bids": 1,
         "leader": "Bruno_Bieter",
         "seller": "Carla_Kunst",
-        "ends_at": "2026-11-14T14:22:29.072824+00:00",
+        "ends_at": "2026-11-14T14:53:09.329573+00:00",
         "start_cents": 100000,
         "my_bid_cents": null,
         "current_cents": 100000,
         "min_bid_cents": 105000
       },
       "creator": null,
-      "created_at": "2026-11-14T13:20:39.243979+00:00",
+      "created_at": "2026-11-14T13:51:12.284391+00:00",
       "value_cents": 500000
     },
     {
-      "id": "66e08ec1-911b-42a1-946d-ffb746a5760d",
-      "hot": 1.056403,
+      "id": "4594f7dc-f615-4cf9-8876-fcc4c2df60a6",
+      "hot": 1.055925,
       "code": "ART-0037",
       "liked": false,
       "likes": 2,
@@ -185,12 +185,12 @@
       "rarity": null,
       "auction": null,
       "creator": "Anna_Pinsel",
-      "created_at": "2026-11-14T13:22:28.559662+00:00",
+      "created_at": "2026-11-14T13:53:08.837928+00:00",
       "value_cents": 100000
     },
     {
-      "id": "198b5448-1925-454d-bf40-fcdce3e68e8e",
-      "hot": 0.704328,
+      "id": "bc986a92-8919-48b7-a5e0-c4ad0624508e",
+      "hot": 0.704012,
       "code": "ART-0039",
       "liked": false,
       "likes": 1,
@@ -237,12 +237,12 @@
       "rarity": null,
       "auction": null,
       "creator": "Anna_Pinsel",
-      "created_at": "2026-11-14T13:22:28.966375+00:00",
+      "created_at": "2026-11-14T13:53:09.264343+00:00",
       "value_cents": null
     },
     {
-      "id": "2be4c629-1cdb-497b-8832-0102bc84bd26",
-      "hot": 0.70428,
+      "id": "48370f65-7571-4465-8fb6-4fe835d2728d",
+      "hot": 0.703962,
       "code": "ART-0038",
       "liked": false,
       "likes": 1,
@@ -288,23 +288,23 @@
       },
       "rarity": null,
       "auction": {
-        "id": "4677a296-7939-4303-aa80-1cb2451df904",
+        "id": "d05c94a8-5abc-48bb-9307-488049bb7320",
         "bids": 0,
         "leader": null,
         "seller": "Anna_Pinsel",
-        "ends_at": "2026-11-15T13:22:29.122802+00:00",
+        "ends_at": "2026-11-15T13:53:09.357825+00:00",
         "start_cents": 50000,
         "my_bid_cents": null,
         "current_cents": null,
         "min_bid_cents": 50000
       },
       "creator": "Anna_Pinsel",
-      "created_at": "2026-11-14T13:22:28.636649+00:00",
+      "created_at": "2026-11-14T13:53:08.921286+00:00",
       "value_cents": null
     },
     {
-      "id": "73ff85db-c32d-47fb-bef5-03c079c186aa",
-      "hot": 0.68857,
+      "id": "97786887-0be9-456a-95e7-9cac0ae532c1",
+      "hot": 0.687245,
       "code": "ART-0002",
       "liked": false,
       "likes": 1,
@@ -361,21 +361,11 @@
         ]
       },
       "rarity": "rare",
-      "auction": {
-        "id": "11c66dcf-65b4-44a9-bfeb-c01630f51342",
-        "bids": 0,
-        "leader": null,
-        "seller": null,
-        "ends_at": "2026-11-14T19:22:28.827714+00:00",
-        "start_cents": 2500000,
-        "my_bid_cents": null,
-        "current_cents": null,
-        "min_bid_cents": 2500000
-      },
+      "auction": null,
       "creator": null,
-      "created_at": "2026-11-14T13:20:39.243979+00:00",
+      "created_at": "2026-11-14T13:51:12.284391+00:00",
       "value_cents": null
     }
   ],
-  "server_time": "2026-11-14T13:22:47.890933+00:00"
+  "server_time": "2026-11-14T13:53:30.348813+00:00"
 }

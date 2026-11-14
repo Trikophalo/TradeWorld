@@ -1211,6 +1211,33 @@ export interface CompanyPitches {
   pitches: CompanyPitch[];
 }
 
+/** Protest campaigns against companies (ADR-133). */
+export type ProtestKind = "boycott" | "shitstorm" | "petition" | "protest_march";
+export interface Protest {
+  id: number;
+  kind: ProtestKind;
+  companyId: string;
+  company: string;
+  ticker: string | null;
+  status: "open" | "hit" | "fizzled" | "expired";
+  goal: number;
+  aiSupporters: number;
+  players: number;
+  joined: boolean;
+  startedBy: string | null;
+  mine: boolean;
+  againstMe: boolean;
+  effectBps: number | null;
+  createdAt: string;
+  endsAt: string;
+  resolvedAt: string | null;
+}
+export interface Protests {
+  startCostCents: number;
+  minLevel: number;
+  protests: Protest[];
+}
+
 /** One entry of the news tab (ADR-129). */
 export type NewsFeedKind = "all" | "stock" | "company" | "market" | "fun";
 export interface NewsFeedItem {
@@ -1762,6 +1789,10 @@ export const GAME_ERROR_KEYS = [
   "no_ai_workers",
   "pitch_text_invalid",
   "pitch_busy",
+  "protest_busy",
+  "protest_joined",
+  "protest_closed",
+  "protest_own",
   "move_busy",
   "move_resting",
   "friend_code_unknown",
@@ -1779,6 +1810,9 @@ export class GameError extends Error {
 
 /** Everything the game can do. Implemented by the live Supabase API and by the offline demo. */
 export interface GameEngine {
+  protests(): Promise<Protests>;
+  startProtest(requestId: string, companyId: string, kind: ProtestKind): Promise<Protests>;
+  joinProtest(requestId: string, protestId: number): Promise<Protests>;
   companyPitches(): Promise<CompanyPitches>;
   submitCompanyPitch(
     requestId: string,

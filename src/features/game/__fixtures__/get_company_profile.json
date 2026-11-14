@@ -1,16 +1,22 @@
 {
   "news": [
     {
-      "body": "KlarSoft AG meldet 473,4 Mio. € Umsatz und 72,9 Mio. € Gewinn im Q1 des Spieljahres 1. Analysten hatten weniger erwartet.",
-      "category": "earnings",
-      "headline": "KlarSoft AG steigert Gewinn um 53 %",
-      "published_at": "2026-11-14T13:22:35.485408+00:00"
+      "body": "Viele haben mitgemacht, doch Kunden und Anleger zucken nur mit den Schultern.",
+      "category": "market",
+      "headline": "Petition gegen KlarSoft AG verpufft",
+      "published_at": "2026-11-14T13:53:28.469386+00:00"
     },
     {
-      "body": "KlarSoft AG meldet 433,3 Mio. € Umsatz und 47,6 Mio. € Gewinn im Q1 des Spieljahres 2. Analysten hatten weniger erwartet.",
+      "body": "KlarSoft AG verfehlt im Q1 des Spieljahres 1 die Prognosen: 415,7 Mio. € Umsatz, 33,2 Mio. € Ergebnis.",
       "category": "earnings",
-      "headline": "KlarSoft AG steigert Gewinn um 27 %",
-      "published_at": "2026-11-14T13:22:35.43598+00:00"
+      "headline": "KlarSoft AG: Gewinn sinkt um 46 %",
+      "published_at": "2026-11-14T13:53:16.63602+00:00"
+    },
+    {
+      "body": "KlarSoft AG meldet 506,2 Mio. € Umsatz und 62,1 Mio. € Gewinn im Q1 des Spieljahres 2. Analysten hatten weniger erwartet.",
+      "category": "earnings",
+      "headline": "KlarSoft AG steigert Gewinn um 66 %",
+      "published_at": "2026-11-14T13:53:16.591331+00:00"
     }
   ],
   "facts": {
@@ -21,10 +27,10 @@
     "max_staff": 100000,
     "ai_workers": 0,
     "quality_bps": null,
-    "value_cents": 435063000000,
-    "profit_cents": 19291274054,
+    "value_cents": 435240500000,
+    "profit_cents": 16417219881,
     "awareness_bps": null,
-    "revenue_cents": 174339934654
+    "revenue_cents": 174037748054
   },
   "company": {
     "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
@@ -36,9 +42,9 @@
     "listed": true,
     "sector": "tech",
     "ticker": "KLS",
-    "price_e4": 870126,
-    "change_bps": 78,
-    "founded_at": "2026-11-14T13:20:39.068933+00:00",
+    "price_e4": 870481,
+    "change_bps": 13,
+    "founded_at": "2026-11-14T13:51:12.092624+00:00",
     "brand_color": "#4C8DFF"
   },
   "founder": null,

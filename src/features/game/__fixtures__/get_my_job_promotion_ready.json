@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "58aa96c2-a1bc-4a53-bfe1-fd81587f6a2f",
+    "id": "d64054a2-ac64-4052-8415-1d06e52a8962",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "7ab1711b-b618-dcac-f2aa-97b46add6779",
+      "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
       "logo": null,
-      "name": "Nordbrise Offshore",
-      "color": "#6EC1E4",
+      "name": "QuantenSprung Labs",
+      "color": "#35D0BA",
       "is_ai": true,
-      "sector": "energy",
-      "ticker": "WND"
+      "sector": "tech",
+      "ticker": "QSL"
     },
     "presence": {
-      "fire_at": "2026-11-19T13:22:49.090488+00:00",
+      "fire_at": "2026-11-19T13:53:31.490313+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-14T13:22:49.090488+00:00"
+      "last_active_at": "2026-11-14T13:53:31.490313+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-14T13:22:49.165841+00:00",
+    "started_at": "2026-11-14T13:53:31.612868+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

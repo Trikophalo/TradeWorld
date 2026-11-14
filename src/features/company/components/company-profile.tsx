@@ -15,6 +15,7 @@ import { PlayerTag } from "@/components/ui/player-tag";
 import { Skeleton } from "@/components/ui/skeleton";
 import { engine } from "@/features/game/store";
 import { CompanyLogo } from "@/features/market/components/company-logo";
+import { StartProtestButton } from "@/features/news/protests";
 import { formatMoney, formatPrice } from "@/lib/format";
 import { useClock } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
@@ -152,6 +153,10 @@ export function CompanyProfileView({ companyId }: { companyId: string }) {
           )}
         {facts.qualityBps !== null && fact(t("quality"), `${Math.round(facts.qualityBps / 100)} %`)}
         {facts.awarenessBps !== null && fact(t("awareness"), `${Math.round(facts.awarenessBps / 100)} %`)}
+      </div>
+
+      <div className="flex justify-end">
+        <StartProtestButton companyId={data.company.id} companyName={data.company.name} />
       </div>
 
       {(data.company.isAi || data.news.length > 0) && (

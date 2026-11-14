@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Kundendaten sind im Netz aufgetaucht. Die Aufsicht prüft. Sicher ist das nicht.",
-      "name": "QuantenSprung Labs",
-      "due_at": "2026-11-14T14:41:49.001338+00:00",
+      "body": "Ein Sparprogramm wirkt schneller als gedacht. Die Marge steigt. Sicher ist das nicht.",
+      "name": "Pixelwerk Studios",
+      "due_at": "2026-11-14T15:32:53.486118+00:00",
       "status": "open",
-      "ticker": "QSL",
-      "headline": "Datenleck bei QuantenSprung Labs",
+      "ticker": "PXW",
+      "headline": "Pixelwerk Studios senkt die Kosten deutlich",
       "move_bps": null,
-      "strength": 2,
-      "direction": "down",
-      "published_at": "2026-11-14T14:22:50.633199+00:00"
+      "strength": 3,
+      "direction": "up",
+      "published_at": "2026-11-14T14:53:33.188693+00:00"
     },
     {
       "id": 3,
-      "body": "Die Kasse ist voll. Aktionäre dürfen auf eine Extra-Ausschüttung hoffen. Sicher ist das nicht.",
-      "name": "Sonnenkern Fusion",
-      "due_at": "2026-11-14T13:22:50.628746+00:00",
+      "body": "Ein bekannter Kopf aus der Branche kommt an Bord. Anleger dürften das spürbar honorieren. Sicher ist das nicht.",
+      "name": "Kaufrausch Märkte",
+      "due_at": "2026-11-14T13:53:33.181116+00:00",
       "status": "confirmed",
-      "ticker": "FSN",
-      "headline": "Sonderdividende bei Sonnenkern Fusion erwartet",
-      "move_bps": 669,
+      "ticker": "KFR",
+      "headline": "Neuer Chef-Entwickler wechselt zu Kaufrausch Märkte",
+      "move_bps": 867,
       "strength": 2,
       "direction": "up",
-      "published_at": "2026-11-14T13:22:50.628746+00:00"
+      "published_at": "2026-11-14T13:53:33.181116+00:00"
     }
   ],
   "reliability_bps": 7500

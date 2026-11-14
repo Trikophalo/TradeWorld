@@ -1,0 +1,63 @@
+{
+  "protests": [
+    {
+      "id": 3,
+      "goal": 20,
+      "kind": "petition",
+      "mine": true,
+      "joined": true,
+      "status": "open",
+      "ticker": "KLS",
+      "company": "KlarSoft AG",
+      "ends_at": "2026-11-14T19:53:33.735639+00:00",
+      "players": 1,
+      "against_me": false,
+      "company_id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
+      "created_at": "2026-11-14T13:53:33.735639+00:00",
+      "effect_bps": null,
+      "started_by": "Fx_Tasknew",
+      "resolved_at": null,
+      "ai_supporters": 0
+    },
+    {
+      "id": 2,
+      "goal": 20,
+      "kind": "petition",
+      "mine": false,
+      "joined": false,
+      "status": "fizzled",
+      "ticker": "KLS",
+      "company": "KlarSoft AG",
+      "ends_at": "2026-11-14T19:53:28.465153+00:00",
+      "players": 1,
+      "against_me": false,
+      "company_id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
+      "created_at": "2026-11-14T13:53:28.465153+00:00",
+      "effect_bps": null,
+      "started_by": "Kampa_Bert",
+      "resolved_at": "2026-11-14T13:53:28.469386+00:00",
+      "ai_supporters": 19
+    },
+    {
+      "id": 1,
+      "goal": 20,
+      "kind": "shitstorm",
+      "mine": false,
+      "joined": false,
+      "status": "hit",
+      "ticker": null,
+      "company": "Zielscheibe",
+      "ends_at": "2026-11-14T19:53:28.444593+00:00",
+      "players": 2,
+      "against_me": false,
+      "company_id": "8712d66c-76a6-4c4a-b8dc-b933e555135d",
+      "created_at": "2026-11-14T13:53:28.444593+00:00",
+      "effect_bps": 300,
+      "started_by": "Kampa_Anna",
+      "resolved_at": "2026-11-14T13:53:28.461626+00:00",
+      "ai_supporters": 18
+    }
+  ],
+  "min_level": 4,
+  "start_cost_cents": 50000
+}

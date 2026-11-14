@@ -23,6 +23,7 @@ import { createStockNewsEngine } from "./demo/stock-news";
 import { createCompanyMovesEngine, type DemoMoveRun } from "./demo/company-moves";
 import { createCompanyTasksEngine, type DemoTasksState } from "./demo/company-tasks";
 import { createPitchesEngine, type DemoPitch } from "./demo/pitches";
+import { createProtestsEngine, type DemoProtest } from "./demo/protests";
 import { createSocialEngine, type DemoSocialState } from "./demo/social";
 import { createCompanyEventsEngine } from "./demo/company-events";
 import { createCryptoEngine, type DemoCryptoState } from "./demo/crypto";
@@ -96,6 +97,7 @@ interface PlayerState {
   companyMoves?: DemoMoveRun[];
   companyTasks?: DemoTasksState;
   pitches?: DemoPitch[];
+  protests?: DemoProtest[];
   /** The friend code redeemed once (ADR-111). */
   friendCode?: DemoFriendCode;
   /** Feed, notifications and league of the demo (ADR-088, ADR-089). */
@@ -1342,8 +1344,33 @@ const pitches = createPitchesEngine({
   random: () => Math.random(),
 });
 
+const protests = createProtestsEngine({
+  companies: () => DEMO_COMPANIES.map((c) => ({ id: `demo-company-${c.ticker}`, name: c.name, ticker: c.ticker })),
+  nickname: () => p().nickname,
+  level: () => level(),
+  cashCents: () => p().cashCents,
+  pay: (cents) => {
+    p().cashCents -= cents;
+    persist();
+  },
+  shock: (ticker, moveBps) => {
+    const st = m();
+    const mid = st.mids.get(ticker);
+    if (mid) st.mids.set(ticker, Math.max(10, Math.round(mid * (1 + moveBps / 10_000))));
+  },
+  protests: () => p().protests ?? [],
+  setProtests: (list) => {
+    p().protests = list;
+    persist();
+  },
+  idempotent,
+  now: () => Date.now(),
+  random: () => Math.random(),
+});
+
 export const demoEngine: GameEngine = {
   ...stockNews,
+  ...protests,
   ...companyMoves,
   ...companyTasks,
   ...pitches,

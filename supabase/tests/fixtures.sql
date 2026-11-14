@@ -1089,3 +1089,21 @@ select tests.login_as('authenticated', :fx_ta) is null as ok \gset
 select public.get_company_pitches();
 \o
 reset role;
+
+-- Protest campaigns (ADR-133) -------------------------------------------------------------------------------------
+select tests.set_level(:fx_tb, 6);
+select tests.fund(:fx_tc, 1000000, 'fixture:protest') is not null as ok \gset
+select c.id as fx_kls from public.companies c where c.ticker = 'KLS' \gset
+select tests.login_as('authenticated', :fx_tc) is null as ok \gset
+\o :fixture_dir/start_protest.json
+select public.start_protest(gen_random_uuid(), :'fx_kls', 'petition');
+\o
+reset role;
+select id as fx_pr from public.company_protests where company_id = :'fx_kls' and status = 'open' \gset
+select tests.login_as('authenticated', :fx_ta) is null as ok \gset
+\o :fixture_dir/join_protest.json
+select public.join_protest(gen_random_uuid(), :fx_pr);
+\o :fixture_dir/get_protests.json
+select public.get_protests();
+\o
+reset role;
