@@ -1,27 +1,27 @@
 {
-  "id": "65725c56-88ef-42e0-a3c8-4fed8891f88b",
+  "id": "1f269473-d138-4fdb-adf7-f4df0c797c4e",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "00c14fe5-44b5-49b9-bd61-a4df77f45f9a",
+    "id": "0cdd3ca7-e688-4e8b-8f53-4fc521d58b65",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "2fccb1cc-0894-a518-9538-769c751d9630",
+      "id": "60dd5582-1f7b-b751-df95-287e43ff8e82",
       "logo": null,
-      "name": "Memeland Media",
-      "color": "#FF4FD8",
+      "name": "Knusperkönig",
+      "color": "#FF9F1C",
       "is_ai": true,
-      "sector": "tech",
-      "ticker": "MEM"
+      "sector": "retail",
+      "ticker": "SNK"
     },
-    "required": [{ "branch": "it", "min_score": 0 }],
-    "title_key": "it_intern",
+    "required": [{ "branch": "finance", "min_score": 0 }],
+    "title_key": "finance_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-14T15:50:22.428526+00:00",
-  "updated_at": "2026-11-14T15:50:22.433008+00:00",
-  "offer_expires_at": "2026-11-16T15:50:22.428526+00:00",
-  "salary_wish_cents_per_hour": 15900,
-  "offer_salary_cents_per_hour": 15900
+  "created_at": "2026-11-14T17:10:24.320384+00:00",
+  "updated_at": "2026-11-14T17:10:24.323938+00:00",
+  "offer_expires_at": "2026-11-16T17:10:24.320384+00:00",
+  "salary_wish_cents_per_hour": 15000,
+  "offer_salary_cents_per_hour": 15000
 }

@@ -15,7 +15,7 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "e50a6ff5-8dbd-8c90-f94e-5ac06d3fe862",
-      "value_cents": 518426000000,
+      "value_cents": 520137000000,
       "revenue_cents": null
     },
     {
@@ -31,7 +31,7 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "2faf9e4c-3f0a-8a5b-1645-c669e9481771",
-      "value_cents": 430890600000,
+      "value_cents": 434119200000,
       "revenue_cents": null
     },
     {
@@ -47,7 +47,7 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
-      "value_cents": 419645500000,
+      "value_cents": 418829000000,
       "revenue_cents": null
     },
     {
@@ -63,7 +63,7 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "c76af3f2-dc09-a8cc-b107-a7c326ad5b09",
-      "value_cents": 388430400000,
+      "value_cents": 384814000000,
       "revenue_cents": null
     },
     {
@@ -79,9 +79,9 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "cbfac5fd-3475-2166-ea22-0a85cbb6f5c0",
-      "value_cents": 357047200000,
+      "value_cents": 350871200000,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-14T15:50:23.118785+00:00"
+  "server_time": "2026-11-14T17:10:24.923797+00:00"
 }

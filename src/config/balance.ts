@@ -840,6 +840,8 @@ export interface BalanceConfig {
     readonly maxTextLength: number;
     readonly briefingTasks: number;
     readonly busyTasks: number;
+    readonly urgentMinutes: number;
+    readonly historyTurns: number;
   };
   /** Crises, scandals and a falling share price cut wages (ADR-131). */
   readonly wageMood: {
@@ -2392,6 +2394,10 @@ export const BALANCE = {
     briefingTasks: 3,
     /** A person with this many open tasks counts as busy. */
     busyTasks: 2,
+    /** An open task with this many minutes left gets an alarm. */
+    urgentMinutes: 10,
+    /** Chat turns Claude gets as memory. */
+    historyTurns: 8,
   },
   wageMood: {
     crisisPerSeverityBps: 500,

@@ -1279,6 +1279,8 @@ export interface CompanyPitches {
   eventId: string | null;
   eventCostCents: number;
   moveCostCents: number;
+  /** When the next free order to Mira may start (ADR-139); null = now. */
+  nextOrderAt: string | null;
   pitches: CompanyPitch[];
 }
 
@@ -1870,6 +1872,7 @@ export const GAME_ERROR_KEYS = [
   "nft_not_for_sale",
   "nft_price_changed",
   "assistant_busy",
+  "order_cooldown",
   "move_busy",
   "move_resting",
   "friend_code_unknown",

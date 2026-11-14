@@ -87,6 +87,18 @@ select tests.assert(
   :'out3' = 'success' and (select result_cents > cost_cents from public.company_pitches where id = :p3),
   'own business move: success pays back more than the cost');
 
+-- free orders to Mira (ADR-139): one per hour, then again
+select tests.login_as('authenticated', :f);
+select tests.assert((public.get_company_pitches() ->> 'next_order_at') is not null, 'get_company_pitches(): names when the next order may start');
+select tests.throws_key(format('select public.submit_company_pitch(gen_random_uuid(), %L, %L, %L)', 'move', 'Wir starten eine Rabattaktion für Stammkunden.', 'cash'),
+  'order_cooldown', 'submit_company_pitch(): one free order per hour (NX127)');
+reset role;
+update public.company_pitches set created_at = created_at - interval '61 minutes' where id = :p3;
+select tests.login_as('authenticated', :f);
+select tests.assert((public.get_company_pitches() ->> 'next_order_at') is null, 'get_company_pitches(): after an hour the next order is free');
+select public.submit_company_pitch(gen_random_uuid(), 'move', 'Wir starten eine Rabattaktion für Stammkunden.', 'cash') is not null as ok \gset
+reset role;
+
 select tests.login_as('authenticated', :o);
 select tests.throws_key(format('select public.company_pitch_context(%s)', :p3), 'company_not_found',
   'company_pitch_context(): only for the founder');

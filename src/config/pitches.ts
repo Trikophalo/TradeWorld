@@ -11,6 +11,8 @@ export const PITCH_RULES = {
   /** Time from the judgment to the result. */
   eventMinutes: 20,
   moveMinutes: 30,
+  /** Free orders to Mira (ADR-139): one per company in this time; only an order that was carried out counts. */
+  orderCooldownMinutes: 60,
   /** Chance = base + fit (0..100) x perFit, at most max. Fit 50 -> 50 %, fit 90 -> 82 %. */
   chanceBaseBps: 1_000,
   chancePerFitBps: 80,

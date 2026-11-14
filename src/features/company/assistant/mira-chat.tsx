@@ -29,11 +29,17 @@ import { COMPANY_TASKS_KEY, PlaySheet, useCompanyTasks } from "../tasks/task-boa
 import { useTaskText } from "../tasks/task-text";
 import {
   adviseTask,
+  analysisTurn,
   briefings,
   describeAction,
   examples,
   fromClaude,
+  looksLikeOrder,
+  orderTurn,
   parseCommand,
+  planTurn,
+  resultTurns,
+  urgentTurns,
   validActions,
   warningFor,
   type ClaudeAction,
@@ -71,6 +77,8 @@ interface MiraStore {
   thinking: boolean;
   compose: "event" | "move" | null;
   goal: PitchMoveKind;
+  /** Results older than this are not reported (ms). */
+  startedAt: number;
   reset: (company: string) => void;
   push: (message: Omit<Message, "at">, briefingId?: string) => void;
   spend: (id: string) => void;
@@ -84,7 +92,9 @@ const useMira = create<MiraStore>((set, get) => ({
   thinking: false,
   compose: null,
   goal: "cash",
-  reset: (company) => set({ company, messages: [], posted: [], thinking: false, compose: null }),
+  startedAt: 0,
+  reset: (company) =>
+    set({ company, messages: [], posted: [], thinking: false, compose: null, startedAt: Date.now() - 60_000 }),
   push: (message, briefingId) => {
     if (briefingId && get().posted.includes(briefingId)) return;
     set((s) => ({
@@ -119,7 +129,8 @@ function useMiraState(applications: number): MiraState | null {
   const pitches = useCompanyPitches(founder);
   const now = useClock();
   return useMemo(() => {
-    if (!tasks.data || now === null) return null;
+    // The founder's Mira also needs the moves and the orders before she speaks.
+    if (!tasks.data || now === null || (founder && (!moves.data || !pitches.data))) return null;
     const e = event.data?.canAct && event.data.event?.status === "open" ? event.data.event : null;
     return {
       tasks: tasks.data,
@@ -132,6 +143,14 @@ function useMiraState(applications: number): MiraState | null {
         ) ??
           false),
       applications: founder ? applications : 0,
+      orders:
+        founder && pitches.data
+          ? {
+              costCents: pitches.data.moveCostCents,
+              nextOrderAt: pitches.data.nextOrderAt ? Date.parse(pitches.data.nextOrderAt) : null,
+              pitches: pitches.data.pitches,
+            }
+          : null,
       // a minute is precise enough for deadlines, and keeps the briefing ids stable
       now: Math.floor(now / 60_000) * 60_000,
     };
@@ -208,7 +227,29 @@ function useRunner(state: MiraState | null, names: MiraNames, onOpen: MiraOpen, 
           client.setQueryData(PITCHES_KEY, next);
           const fresh = next.pitches.find((p) => p.status === "judging");
           if (fresh) askJudge(fresh.id, () => void client.invalidateQueries({ queryKey: PITCHES_KEY }));
-          mira([{ key: action.kind === "event" ? "ok.pitchEvent" : "ok.pitchMove" }]);
+          mira([
+            action.kind === "event"
+              ? { key: "ok.pitchEvent" }
+              : { key: "ok.order", values: { minutes: pitchCfg.moveMinutes, wait: pitchCfg.orderCooldownMinutes } },
+          ]);
+          void playSound("success");
+          break;
+        }
+        case "plan": {
+          // One after the other: each hand-over is its own idempotent request.
+          let done = 0;
+          for (const step of action.actions) {
+            try {
+              client.setQueryData(
+                COMPANY_TASKS_KEY,
+                await engine.delegateCompanyTask(crypto.randomUUID(), step.taskId, step.to),
+              );
+              done += 1;
+            } catch {
+              // someone was faster or the task expired: the rest of the plan still runs
+            }
+          }
+          mira([{ key: "ok.plan", values: { done, count: action.actions.length } }]);
           break;
         }
         case "autoAi": {
@@ -242,18 +283,20 @@ async function askClaude(
   text: string,
   state: MiraState,
   names: MiraNames,
+  history: { from: "mira" | "me"; text: string }[],
 ): Promise<{ reply: string; actions: MiraAction[] } | { reason: string } | null> {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) return null;
   const tasks = Object.fromEntries(state.tasks.tasks.map((t) => [String(t.id), names.task(t.key)]));
   const moves = Object.fromEntries((state.moves?.moves ?? []).map((m) => [m.key, names.move(m.key)]));
+  const taskKeys = Object.fromEntries(state.tasks.history.map((h) => [h.key, names.task(h.key)]));
   try {
     const { data } = await supabase.functions.invoke<{
       ok?: boolean;
       reason?: string;
       reply?: string;
       actions?: ClaudeAction[];
-    }>("company-assistant", { body: { text, names: { tasks, moves } } });
+    }>("company-assistant", { body: { text, names: { tasks, moves, taskKeys }, history } });
     if (!data?.ok || !data.reply) return { reason: data?.reason ?? "no_answer" };
     return { reply: data.reply, actions: validActions(fromClaude(data.actions ?? []), state) };
   } catch {
@@ -278,6 +321,7 @@ export function MiraChat({
   className?: string;
 }) {
   const t = useTranslations("mira");
+  const line = (l: MiraLine) => t(l.key as Parameters<typeof t>[0], l.values as Record<string, string>);
   const state = useMiraState(applications);
   const names = useNames();
   const [playing, setPlaying] = useState<CompanyTask | null>(null);
@@ -285,7 +329,6 @@ export function MiraChat({
   const messages = useMira((s) => s.messages);
   const thinking = useMira((s) => s.thinking);
   const compose = useMira((s) => s.compose);
-  const goal = useMira((s) => s.goal);
   const [text, setText] = useState("");
   const [sendState, setSendState] = useState<ButtonState>("idle");
   const list = useRef<HTMLOListElement>(null);
@@ -308,10 +351,15 @@ export function MiraChat({
     }
   }, [companyId, state?.tasks.company.name]);
 
-  // Briefings: each new thing once.
+  // Briefings, alarms and results: each new thing once.
   useEffect(() => {
     if (!state || useMira.getState().company !== state.tasks.company.id) return;
-    for (const turn of briefings(state, names)) {
+    const since = useMira.getState().startedAt;
+    for (const turn of [
+      ...resultTurns(state, names, since),
+      ...urgentTurns(state, names),
+      ...briefings(state, names),
+    ]) {
       useMira.getState().push({ id: nextId(), from: "mira", lines: turn.lines, options: turn.options }, turn.id);
     }
   }, [state, names]);
@@ -357,13 +405,14 @@ export function MiraChat({
         return;
       }
       useMira.getState().set({ compose: null });
+      if (compose === "move") {
+        // A free order (ADR-139): Mira says what she makes of it; one tap carries it out.
+        const turn = orderTurn(body, state, names);
+        mira(turn.lines, turn.options);
+        return;
+      }
       await run(
-        {
-          type: "pitch",
-          kind: compose,
-          text: body.slice(0, pitchCfg.maxChars),
-          goal: compose === "move" ? goal : null,
-        },
+        { type: "pitch", kind: "event", text: body.slice(0, pitchCfg.maxChars), goal: null },
         { confirmed: true },
       );
       return;
@@ -384,6 +433,11 @@ export function MiraChat({
     if (intent.kind === "status") {
       const turns = briefings(state, names);
       for (const turn of turns) mira(turn.lines, turn.options);
+      return;
+    }
+    if (intent.kind === "plan" || intent.kind === "analysis") {
+      const turn = intent.kind === "plan" ? planTurn(state, names) : analysisTurn(state, names);
+      mira(turn.lines, turn.options);
       return;
     }
     if (intent.reason === "noTarget") {
@@ -411,7 +465,12 @@ export function MiraChat({
     // Free text: Claude, if the game has a key; otherwise Mini-Mira explains what she understands.
     setSendState("loading");
     useMira.getState().set({ thinking: true });
-    const answer = await askClaude(body, state, names);
+    const history = useMira
+      .getState()
+      .messages.slice(-cfg.historyTurns - 1, -1)
+      .map((m) => ({ from: m.from, text: (m.text ?? m.lines.map(line).join(" ")).slice(0, 400) }))
+      .filter((m) => m.text.length > 0);
+    const answer = await askClaude(body, state, names, history);
     useMira.getState().set({ thinking: false });
     setSendState("idle");
     if (answer && "reply" in answer) {
@@ -420,6 +479,12 @@ export function MiraChat({
         answer.actions.map((a) => describeAction(a, state, names)),
         answer.reply,
       );
+      return;
+    }
+    // Without Claude: something the company should do becomes a free order; anything else gets examples.
+    if (state.tasks.role === "founder" && looksLikeOrder(body)) {
+      const turn = orderTurn(body, state, names);
+      mira(turn.lines, turn.options);
       return;
     }
     mira([{ key: answer?.reason === "busy" ? "busy" : "unknown" }, { key: "brief.examples" }], examples(state, names));
@@ -462,23 +527,6 @@ export function MiraChat({
         {compose && (
           <div className="flex flex-wrap items-center gap-2" data-testid="mira-compose">
             <Badge tone="accent">{t(compose === "event" ? "compose.badgeEvent" : "compose.badgeMove")}</Badge>
-            {compose === "move" &&
-              (["cash", "awareness", "quality"] as const).map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  aria-pressed={goal === g}
-                  onClick={() => useMira.getState().set({ goal: g })}
-                  className={cn(
-                    "rounded-pill border px-2.5 py-1 text-2xs focus-ring transition-colors duration-fast",
-                    goal === g
-                      ? "border-accent bg-accent-soft text-fg-1"
-                      : "border-line-2 text-fg-3 hover:bg-surface-2",
-                  )}
-                >
-                  {t(`goals.${g}`)}
-                </button>
-              ))}
             <button
               type="button"
               onClick={() => useMira.getState().set({ compose: null })}

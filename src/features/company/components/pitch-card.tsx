@@ -19,6 +19,7 @@ import { formatMoney } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
 import { SPRING } from "@/lib/motion";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useClock } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
 import { useCompanyRefresh } from "../hooks";
 
@@ -61,6 +62,7 @@ export function PitchCard({ kind }: { kind: PitchKind }) {
   const [text, setText] = useState("");
   const [goal, setGoal] = useState<PitchMoveKind>("cash");
   const [state, setState] = useState<ButtonState>("idle");
+  const now = useClock();
   const data = query.data;
   if (!data) return <Skeleton className="h-40 w-full rounded-lg" />;
   if (kind === "event" && !data.eventId) return null;
@@ -69,6 +71,8 @@ export function PitchCard({ kind }: { kind: PitchKind }) {
   const busy = mine.some((p) => p.status === "judging" || p.status === "running");
   const cost = kind === "event" ? data.eventCostCents : data.moveCostCents;
   const length = text.trim().length;
+  // Own moves are free orders (ADR-139): one per hour.
+  const waiting = kind === "move" && data.nextOrderAt !== null && (now === null || Date.parse(data.nextOrderAt) > now);
 
   const submit = async () => {
     setState("loading");
@@ -126,9 +130,14 @@ export function PitchCard({ kind }: { kind: PitchKind }) {
             <span className="nums">{t("chars", { count: length, max: cfg.maxChars })}</span>
             <span className="nums">{t("cost", { amount: formatMoney(cost, { whole: true }) })}</span>
           </div>
-          <Button block state={state} disabled={length < cfg.minChars} onClick={() => void submit()}>
+          <Button block state={state} disabled={length < cfg.minChars || waiting} onClick={() => void submit()}>
             {t("submit")}
           </Button>
+          {waiting && data.nextOrderAt && (
+            <p className="text-center text-2xs text-fg-3" data-testid="order-wait">
+              {t("orderWait")} <Countdown target={Date.parse(data.nextOrderAt)} />
+            </p>
+          )}
         </div>
       )}
       {mine.length > 0 && (

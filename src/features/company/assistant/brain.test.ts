@@ -3,7 +3,15 @@ import type { CompanyMoves, CompanyTask, CompanyTasks } from "@/features/game/ty
 import {
   adviseTask,
   briefings,
+  analysisTurn,
   fromClaude,
+  inferGoal,
+  looksLikeOrder,
+  orderBlock,
+  orderTurn,
+  planTasks,
+  resultTurns,
+  urgentTurns,
   normalize,
   parseCommand,
   suggestMoves,
@@ -69,6 +77,7 @@ const state = (extra: Partial<MiraState> = {}): MiraState => ({
   event: null,
   eventPitched: false,
   applications: 0,
+  orders: { costCents: 120_000, nextOrderAt: null, pitches: [] },
   now: NOW,
   ...extra,
 });
@@ -243,5 +252,82 @@ describe("Mira reads commands", () => {
       state(),
     );
     expect(valid).toEqual([{ type: "delegate", taskId: 1, to: "Anna" }]);
+  });
+});
+
+describe("Mira's free orders, plan and reports", () => {
+  it("reads the goal of an order and tells orders from questions", () => {
+    expect(inferGoal("Wir machen eine Rabattaktion für Stammkunden")).toBe("cash");
+    expect(inferGoal("Wir drehen ein Video für Social Media")).toBe("awareness");
+    expect(inferGoal("Wir testen das Material und verbessern das Produkt")).toBe("quality");
+    expect(looksLikeOrder("Wir machen eine Rabattaktion")).toBe(true);
+    expect(looksLikeOrder("Was soll ich jetzt machen?")).toBe(false);
+    expect(looksLikeOrder("Hallo")).toBe(false);
+  });
+
+  it("offers an order once per hour, with the inferred goal first and a warning for whitewashing", () => {
+    const turn = orderTurn("Wir drehen ein Video für Social Media", state(), names);
+    expect(turn.options[0]).toMatchObject({ action: { type: "pitch", kind: "move", goal: "awareness" }, tone: "best" });
+    expect(turn.options).toHaveLength(3);
+    const risky = orderTurn("Wir drehen einen Imagefilm und leugnen alles", state(), names);
+    expect(risky.options[0]?.tone).toBe("warn");
+
+    const waiting = state({ orders: { costCents: 120_000, nextOrderAt: NOW + 25 * 60_000, pitches: [] } });
+    expect(orderBlock(waiting)).toEqual({ reason: "cooldown", minutes: 25 });
+    expect(orderTurn("Wir machen eine Rabattaktion", waiting, names).options).toEqual([]);
+    expect(orderBlock(state({ tasks: tasks({ role: "employee" }) }))).toEqual({ reason: "founder" });
+  });
+
+  it("plans all open tasks: free people first, then the AI, nobody overloaded", () => {
+    const many = tasks({
+      tasks: [task(1, "pack_shirts"), task(2, "inventory"), task(3, "pack_shirts"), task(4, "inventory")],
+    });
+    const plan = planTasks(state({ tasks: many }));
+    // Anna takes two (then she is busy), Bert is full, the AI takes the rest in time.
+    expect(plan).toEqual([
+      { taskId: 1, to: "Anna" },
+      { taskId: 2, to: "Anna" },
+      { taskId: 3, to: "ai" },
+      { taskId: 4, to: "ai" },
+    ]);
+    const tight = tasks({
+      tasks: [task(1, "pack_shirts", { dueAt: new Date(NOW + 5 * 60_000).toISOString() })],
+      people: [],
+    });
+    expect(planTasks(state({ tasks: tight }))).toEqual([]);
+  });
+
+  it("reports results once and raises the alarm for a task about to expire", () => {
+    const history = [
+      {
+        id: 7,
+        key: "inventory",
+        status: "success" as const,
+        resultCents: 40_000,
+        scoreBps: 10_000,
+        ai: false,
+        doneBy: "Anna",
+        resolvedAt: new Date(NOW - 30_000).toISOString(),
+      },
+      {
+        id: 6,
+        key: "inventory",
+        status: "missed" as const,
+        resultCents: -24_000,
+        scoreBps: null,
+        ai: false,
+        doneBy: null,
+        resolvedAt: new Date(NOW - 3_600_000).toISOString(),
+      },
+    ];
+    const s = state({ tasks: tasks({ history }) });
+    expect(resultTurns(s, names, NOW - 60_000).map((t) => t.id)).toEqual(["result:task:7"]);
+    expect(analysisTurn(s, names).lines.map((l) => l.key)).toContain("analysis.missed");
+
+    const soon = tasks({ tasks: [task(9, "inventory", { dueAt: new Date(NOW + 6 * 60_000).toISOString() })] });
+    const alarm = urgentTurns(state({ tasks: soon }), names);
+    expect(alarm[0]?.id).toBe("urgent:9");
+    // The AI would be too late: not offered in the alarm.
+    expect(alarm[0]?.options.some((o) => o.action.type === "delegate" && o.action.to === "ai")).toBe(false);
   });
 });

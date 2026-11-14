@@ -11,7 +11,7 @@
       "minutes": 15,
       "chance_bps": 9000,
       "cost_cents": 900000,
-      "available_at": "2026-11-14T16:35:27.124719+00:00",
+      "available_at": "2026-11-14T17:55:28.358079+00:00",
       "payout_cents": 0,
       "refund_cents": 450000,
       "skill_bonus_bps": 0
@@ -179,11 +179,11 @@
       "gain": 0.02,
       "status": "success",
       "cost_cents": 900000,
-      "resolved_at": "2026-11-14T17:50:27.145865+00:00",
+      "resolved_at": "2026-11-14T19:10:28.381654+00:00",
       "payout_cents": 0
     }
   ],
   "product": "security_software",
   "running": [],
-  "cash_cents": 10061625
+  "cash_cents": 9987818
 }

@@ -7339,3 +7339,10 @@ tier}, tasks (wie get_company_tasks), moves (wie get_company_moves, nur Gründer
 severity, headline} | null}`. Zählt einen Aufruf; über `companyAssistant.claudePerHour` pro Stunde NX126
 `assistant_busy`. Nur für die Edge Function `company-assistant`; Aktionen laufen über die bestehenden RPCs.
 Test `supabase/tests/9d_company_assistant.sql`.
+
+## Nachtrag: Freie Aufträge an Mira (ADR-139)
+
+`get_company_pitches()` / `submit_company_pitch()` liefern zusätzlich `next_order_at` (timestamptz | null): wann der
+nächste freie Auftrag (Pitch der Art `move`) starten darf. `submit_company_pitch(…, 'move', …)` wirft bis dahin NX127
+`order_cooldown` (`pitches.orderCooldownMinutes`, 60). `company_assistant_context()` liefert zusätzlich `orders`
+(wie `get_company_pitches`, nur Gründer) und `last_quarter {revenue_cents, profit_cents} | null`.

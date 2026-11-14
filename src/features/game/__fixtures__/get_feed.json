@@ -3,52 +3,52 @@
     {
       "id": 290,
       "kind": "league_won",
-      "actor": { "tag": "E6N3", "level": 15, "nickname": "Fixture_Gmbh", "avatar_key": "rookie" },
+      "actor": { "tag": "3D4W", "level": 15, "nickname": "Fixture_Gmbh", "avatar_key": "rookie" },
       "is_me": true,
-      "payload": { "growth_bps": 233, "week_start": "2026-11-02" },
+      "payload": { "growth_bps": 235, "week_start": "2026-11-02" },
       "reacted": false,
       "reactions": 0,
-      "created_at": "2026-11-14T15:50:24.821074+00:00"
+      "created_at": "2026-11-14T17:10:26.397015+00:00"
     },
     {
       "id": 289,
       "kind": "friends_now",
-      "actor": { "tag": "E6N3", "level": 15, "nickname": "Fixture_Gmbh", "avatar_key": "rookie" },
+      "actor": { "tag": "3D4W", "level": 15, "nickname": "Fixture_Gmbh", "avatar_key": "rookie" },
       "is_me": true,
       "payload": { "other_nickname": "Fixture_Neu" },
       "reacted": false,
       "reactions": 0,
-      "created_at": "2026-11-14T15:50:24.736705+00:00"
+      "created_at": "2026-11-14T17:10:26.322119+00:00"
     },
     {
       "id": 288,
       "kind": "friends_now",
-      "actor": { "tag": "NPQQ", "level": 15, "nickname": "Fixture_Neu", "avatar_key": "coder" },
+      "actor": { "tag": "VZ4F", "level": 15, "nickname": "Fixture_Neu", "avatar_key": "coder" },
       "is_me": false,
       "payload": { "other_nickname": "Fixture_Gmbh" },
       "reacted": false,
       "reactions": 0,
-      "created_at": "2026-11-14T15:50:24.736705+00:00"
+      "created_at": "2026-11-14T17:10:26.322119+00:00"
     },
     {
       "id": 287,
       "kind": "friends_now",
-      "actor": { "tag": "P4MQ", "level": 8, "nickname": "Fixture_Kunst", "avatar_key": "rookie" },
+      "actor": { "tag": "SM42", "level": 8, "nickname": "Fixture_Kunst", "avatar_key": "rookie" },
       "is_me": false,
       "payload": { "other_nickname": "Fixture_Gmbh" },
       "reacted": false,
       "reactions": 0,
-      "created_at": "2026-11-14T15:50:24.699295+00:00"
+      "created_at": "2026-11-14T17:10:26.288014+00:00"
     },
     {
       "id": 286,
       "kind": "friends_now",
-      "actor": { "tag": "E6N3", "level": 15, "nickname": "Fixture_Gmbh", "avatar_key": "rookie" },
+      "actor": { "tag": "3D4W", "level": 15, "nickname": "Fixture_Gmbh", "avatar_key": "rookie" },
       "is_me": true,
       "payload": { "other_nickname": "Fixture_Kunst" },
       "reacted": false,
       "reactions": 0,
-      "created_at": "2026-11-14T15:50:24.699295+00:00"
+      "created_at": "2026-11-14T17:10:26.288014+00:00"
     }
   ],
   "next_before": 286

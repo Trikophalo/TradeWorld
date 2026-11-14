@@ -15,6 +15,7 @@ const pitchesSchema = z.object({
     .number()
     .nullable()
     .transform((v) => v ?? 0),
+  next_order_at: z.string().nullish(),
   pitches: z.array(
     z.object({
       id: z.number(),
@@ -49,6 +50,7 @@ const toPitches = (r: z.infer<typeof pitchesSchema>): CompanyPitches => ({
   eventId: r.event_id,
   eventCostCents: r.event_cost_cents,
   moveCostCents: r.move_cost_cents,
+  nextOrderAt: r.next_order_at ?? null,
   pitches: r.pitches.map((p) => ({
     id: p.id,
     kind: p.kind,

@@ -113,7 +113,16 @@ export function createPitchesEngine(host: PitchesHost): Pick<GameEngine, "compan
 
   function state(): CompanyPitches {
     const { eventCost, moveCost } = base();
+    const lastOrder = Math.max(
+      0,
+      ...host
+        .pitches()
+        .filter((p) => p.kind === "move")
+        .map((p) => p.createdAt),
+    );
+    const next = lastOrder + cfg.orderCooldownMinutes * 60_000;
     return {
+      nextOrderAt: lastOrder > 0 && next > host.now() ? new Date(next).toISOString() : null,
       eventId: activeEvent()?.id ?? null,
       eventCostCents: eventCost,
       moveCostCents: moveCost,
@@ -151,6 +160,7 @@ export function createPitchesEngine(host: PitchesHost): Pick<GameEngine, "compan
             throw new GameError("pitch_busy");
           if (kind === "move" && list.some((p) => p.kind === "move" && p.status === "running"))
             throw new GameError("pitch_busy");
+          if (kind === "move" && state().nextOrderAt !== null) throw new GameError("order_cooldown");
           const cost = kind === "event" ? eventCost : moveCost;
           if (c.cashCents < cost) throw new GameError("insufficient_funds");
           host.addCompanyCash(-cost);

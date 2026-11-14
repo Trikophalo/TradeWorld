@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Eine wichtige Technologie ist jetzt geschützt. Der Vorsprung dürfte sich auszahlen. Sicher ist das nicht.",
-      "name": "Frachtpilot",
-      "due_at": "2026-11-14T17:20:32.977087+00:00",
+      "body": "Mehrere Häuser heben ihr Kursziel leicht an. Sicher ist das nicht.",
+      "name": "KlarSoft AG",
+      "due_at": "2026-11-14T18:25:29.849349+00:00",
       "status": "open",
-      "ticker": "FPT",
-      "headline": "Patent für Frachtpilot erteilt",
+      "ticker": "KLS",
+      "headline": "Analysten-Upgrade: KlarSoft AG jetzt Kaufempfehlung",
       "move_bps": null,
       "strength": 1,
       "direction": "up",
-      "published_at": "2026-11-14T16:50:26.840402+00:00"
+      "published_at": "2026-11-14T18:10:28.125984+00:00"
     },
     {
       "id": 3,
-      "body": "Ein Werk soll Grenzwerte überschritten haben. Bußgelder sind wahrscheinlich. Sicher ist das nicht.",
-      "name": "QuantenSprung Labs",
-      "due_at": "2026-11-14T15:50:26.835172+00:00",
+      "body": "Neue Aktien sollen ausgegeben werden. Das verwässert die Anteile, der Kurs dürfte leicht nachgeben. Sicher ist das nicht.",
+      "name": "Brotzeit Handel AG",
+      "due_at": "2026-11-14T17:10:28.121645+00:00",
       "status": "confirmed",
-      "ticker": "QSL",
-      "headline": "Umweltskandal bei QuantenSprung Labs",
-      "move_bps": -741,
-      "strength": 2,
+      "ticker": "BRZ",
+      "headline": "Brotzeit Handel AG plant Kapitalerhöhung",
+      "move_bps": -559,
+      "strength": 1,
       "direction": "down",
-      "published_at": "2026-11-14T15:50:26.835172+00:00"
+      "published_at": "2026-11-14T17:10:28.121645+00:00"
     }
   ],
   "reliability_bps": 7500

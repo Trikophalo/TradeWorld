@@ -784,6 +784,7 @@
     "nft_offer_unfunded": "Der Bieter hat inzwischen nicht mehr genug Geld.",
     "nft_not_for_sale": "Dieses NFT steht gerade nicht zum Verkauf.",
     "nft_price_changed": "Der Preis hat sich gerade geändert. Schau ihn dir noch einmal an.",
+    "order_cooldown": "Ein freier Auftrag pro Stunde. Der nächste geht bald wieder.",
     "assistant_busy": "Mira hat in dieser Stunde schon viel nachgedacht. Klare Befehle versteht sie weiter sofort."
   },
   "locks": {
@@ -6336,7 +6337,8 @@
       "backfire": "Nach hinten losgegangen"
     },
     "history": "Deine Ideen",
-    "yourIdea": "„{text}“"
+    "yourIdea": "„{text}“",
+    "orderWait": "Ein freier Auftrag pro Stunde. Der nächste geht in"
   },
   "protests": {
     "title": "Kampagnen",
@@ -6382,8 +6384,8 @@
     "badge": "KI",
     "subtitle": "Deine Assistentin bei {company}",
     "thinking": "Mira denkt nach",
-    "hello": "Hi, ich bin Mira! Ich behalte {company} im Blick: neue Aufgaben, Krisen, freie Geschäftszüge. Sag mir einfach, wer was machen soll, oder tipp auf einen Vorschlag.",
-    "placeholder": "Schreib Mira, z. B. „Gib das Packen an Anna“",
+    "hello": "Hi, ich bin Mira! Ich behalte {company} im Blick, verteile Aufgaben, rechne Chancen aus und melde dir, wie es ausgeht. Schreib mir einfach, was die Firma tun soll, oder tipp auf einen Vorschlag.",
+    "placeholder": "Schreib Mira, z. B. „Verteil alle Aufgaben“",
     "send": "Senden",
     "choices": "Vorschläge",
     "tip": "Tipp",
@@ -6397,13 +6399,13 @@
     },
     "compose": {
       "event": "Schreib mir in ein, zwei Sätzen, wie wir reagieren. Die Jury prüft, ob es zur Lage passt. Schönfärberei kann nach hinten losgehen.",
-      "move": "Beschreib deinen eigenen Geschäftszug in ein, zwei Sätzen und wähl ein Ziel. Die Jury schätzt die Chance.",
+      "move": "Schreib mir, was die Firma tun soll, z. B. „Wir machen eine Rabattaktion für Stammkunden“. Ich schätze die Chance und setze es um.",
       "short": "Etwas genauer bitte, mindestens {min} Zeichen.",
       "badgeEvent": "Strategie für die Lage",
-      "badgeMove": "Eigener Geschäftszug",
+      "badgeMove": "Freier Auftrag",
       "cancel": "Abbrechen",
       "placeholderEvent": "Wir …",
-      "placeholderMove": "Wir starten …"
+      "placeholderMove": "Wir machen …"
     },
     "goals": {
       "cash": "Geld",
@@ -6417,7 +6419,9 @@
       "pitchEvent": "Deine Strategie liegt bei der Jury. Ich sag dir Bescheid, wie es ausgeht.",
       "pitchMove": "Deine Idee liegt bei der Jury. Sie schätzt gleich die Chance.",
       "autoOn": "Okay: Die KI übernimmt ab jetzt offene Aufgaben automatisch, kurz bevor sie verfallen.",
-      "autoOff": "Okay: Die KI übernimmt nichts mehr von allein."
+      "autoOff": "Okay: Die KI übernimmt nichts mehr von allein.",
+      "order": "Auftrag läuft! Die Jury prüft ihn kurz, das Ergebnis kommt in etwa {minutes} Min. Der nächste freie Auftrag geht in {wait} Min.",
+      "plan": "Plan umgesetzt: {done} von {count} Aufgaben sind vergeben."
     },
     "brief": {
       "task": "Neue Aufgabe: „{task}“, wert {value}, noch {minutes} Min.",
@@ -6447,7 +6451,10 @@
       "pitchEvent": "Als Strategie einreichen",
       "pitchMove": "Als Geschäftszug einreichen",
       "autoOn": "KI automatisch an",
-      "autoOff": "KI automatisch aus"
+      "autoOff": "KI automatisch aus",
+      "freeOrder": "Freier Auftrag an mich",
+      "runPlan": "Plan ausführen ({count, plural, one {# Aufgabe} other {# Aufgaben}})",
+      "hire": "Team aufbauen"
     },
     "why": {
       "busy": "{name} hat schon {open} offene Aufgaben. Das könnte knapp werden.",
@@ -6469,7 +6476,67 @@
       "status": "„Was steht an?“",
       "free": "„{text}“",
       "autoOn": "„KI automatisch an“",
-      "autoOff": "„KI automatisch aus“"
+      "autoOff": "„KI automatisch aus“",
+      "plan": "„Verteil alle Aufgaben“",
+      "analysis": "„Wie läuft die Firma?“"
+    },
+    "plain": "{text}",
+    "urgent": "Achtung: „{task}“ verfällt in {minutes} Min. Sonst sind {amount} weg und es gibt eine Strafe.",
+    "order": {
+      "hint": "Du schreibst, was die Firma tun soll, ich setze es um. Einer pro Stunde.",
+      "waitShort": "Der nächste geht in {minutes} Min.",
+      "wait": "Pro Stunde kann ich nur einen freien Auftrag umsetzen. Der nächste geht in {minutes} Min.",
+      "meanwhile": "Bis dahin kann ich einen fertigen Geschäftszug starten:",
+      "noCash": "Dafür reicht die Firmenkasse nicht: Ein freier Auftrag kostet {cost}.",
+      "founderOnly": "Freie Aufträge für die ganze Firma kann nur die Gründerin oder der Gründer geben.",
+      "understood": "Verstanden: „{text}“",
+      "note": "Ich setze das als Auftrag um. Das Ergebnis kommt nach etwa {minutes} Min. Denk dran: nur ein Auftrag pro Stunde. Worauf soll er zielen?",
+      "riskyNote": "Vorsicht, das klingt nach Schönfärberei oder einem Risiko und kann nach hinten losgehen. Ergebnis nach etwa {minutes} Min., nur ein Auftrag pro Stunde. Trotzdem?",
+      "estimate": "Meine Schätzung: etwa {chance} % Chance.",
+      "estimateRisky": "Etwa {chance} % Chance, aber mit Risiko für einen Imageschaden.",
+      "go": {
+        "cash": "Umsetzen für mehr Geld ({cost})",
+        "awareness": "Umsetzen für mehr Bekanntheit ({cost})",
+        "quality": "Umsetzen für bessere Qualität ({cost})"
+      }
+    },
+    "plan": {
+      "intro": "Mein Plan: {count, plural, one {eine Aufgabe} other {# Aufgaben}} so verteilen, dass niemand überlastet ist und keine Frist reißt.",
+      "none": "Gerade kann ich nichts sinnvoll vergeben: Alle sind voll und die KI schafft die Fristen nicht.",
+      "nothing": "Es gibt gerade keine offene Aufgabe zu verteilen.",
+      "item": "• „{task}“ → {name}",
+      "itemAi": "• „{task}“ → KI",
+      "rest": "{count, plural, one {Eine Aufgabe bleibt} other {# Aufgaben bleiben}} übrig. Die machst du am besten selbst."
+    },
+    "analysis": {
+      "noHistory": "Noch keine erledigten Aufgaben, also noch keine Quote.",
+      "tasks": "Aufgaben: {ok} von {count} geschafft ({rate} %), unterm Strich {net}.",
+      "ai": "Die KI hat {ok} von {count} geschafft ({rate} %). Menschen bringen den vollen Wert.",
+      "missed": "{count, plural, one {Eine Aufgabe ist} other {# Aufgaben sind}} verfallen. Das kostet jedes Mal eine Strafe.",
+      "noStaff": "Du hast noch kein Team. Mit Leuten kannst du Aufgaben abgeben und mehr gleichzeitig schaffen.",
+      "team": "Team: {count} Leute, {idle} haben nichts zu tun, {busy} sind voll.",
+      "moves": "Kasse: {cash}. Geschäftszüge: {used} von {slots} Plätzen belegt.",
+      "moveHistory": "Geschäftszüge: {won} von {count} gelungen, unterm Strich {net}."
+    },
+    "result": {
+      "task": {
+        "success": "✔ {name} hat „{task}“ geschafft: +{amount}.",
+        "failure": "✘ „{task}“ ist {name} misslungen: −{amount}.",
+        "missed": "✘ „{task}“ ist verfallen: −{amount}.",
+        "successAi": "✔ Die KI hat „{task}“ geschafft: +{amount}.",
+        "failureAi": "✘ Die KI hat „{task}“ verpatzt: −{amount}.",
+        "missedAi": "✘ „{task}“ ist verfallen: −{amount}."
+      },
+      "move": {
+        "success": "✔ „{move}“ ist gelungen: unterm Strich {amount} gewonnen.",
+        "failure": "✘ „{move}“ hat nicht geklappt: {amount} verloren."
+      },
+      "verdict": "Die Jury zu deinem Auftrag: {verdict} Chance: {chance} %.",
+      "pitch": {
+        "success": "✔ Dein Auftrag ist gelungen!",
+        "failure": "✘ Dein Auftrag ist verpufft.",
+        "backfire": "✘ Dein Auftrag ging nach hinten los."
+      }
     }
   }
 }

@@ -2168,3 +2168,26 @@ ihr Team vergeben, statt nur Knöpfe zu drücken. Die Übersicht war zu unübers
 - Finns Firmen-Tour zeigt jetzt auf Mira statt auf den Wachstumspfad.
 - Nebenbei: Die JSON-Schemas der Edge Functions `strategy-judge` und `company-writer` enthielten Grenzen
   (`minimum`, `maxLength`, `minItems`), die strukturierte Ausgaben nicht kennen; die Grenzen prüft jetzt nur noch zod.
+
+## ADR-139: Mira denkt weiter – freie Aufträge (einer pro Stunde), Plan, Analyse, Rückmeldungen — `akzeptiert`
+
+**Kontext:** Mira (ADR-138) konnte Befehle ausführen und Vorschläge machen. Sie soll eine wirklich starke Assistentin
+sein, und freie Aufträge an sie sollen selten und wertvoll sein.
+
+**Entscheidung:**
+
+- **Freier Auftrag:** Die Gründerin schreibt frei, was die Firma tun soll („Wir machen eine Rabattaktion für
+  Stammkunden“). Mira liest das Ziel heraus (Geld, Bekanntheit, Qualität), schätzt die Chance, warnt bei
+  Schönfärberei und setzt den Auftrag nach einem Tipp um. Technisch ist das die eigene Idee aus ADR-132 (Jury aus
+  Claude oder Mini-KI, dann Würfel). **Pro Firma und Stunde nur einer** (`pitches.orderCooldownMinutes`, Fehler NX127
+  `order_cooldown`); es zählt nur ein Auftrag, der wirklich gestartet wurde. Ist er gesperrt, nennt Mira die Wartezeit
+  und bietet fertige Geschäftszüge an. Aufgaben vergeben und fertige Züge bleiben unbegrenzt.
+- **Plan:** „Verteil alle Aufgaben“ verteilt alle offenen Aufgaben auf einmal: das Dringendste zuerst, je an die Person
+  mit den wenigsten Aufgaben, die KI nur, wenn sie die Frist trotz ihrer Schlange schafft. Ein Tipp führt den Plan aus.
+- **Analyse:** „Wie läuft die Firma?“ zeigt Quote und Ertrag der Aufgaben, die Quote der KI, verfallene Aufgaben,
+  Auslastung des Teams, Kasse und Geschäftszüge, mit dem passenden nächsten Schritt.
+- **Rückmeldungen:** Mira meldet von selbst, wie Aufgaben, Geschäftszüge und Aufträge ausgegangen sind (mit dem
+  Urteil der Jury), und schlägt Alarm, wenn eine offene Aufgabe in 10 Minuten verfällt.
+- **Claude:** bekommt die letzten acht Nachrichten als Gedächtnis, die letzten Ergebnisse, das letzte Quartal und den
+  Stand der Aufträge; mittlerer Denkaufwand; ein genauerer Leitfaden (Erwartungswert, Fristen, Auslastung, ehrliche
+  Einschätzung von Ideen). Neue Aktion `order`. Ohne Schlüssel erkennt die Mini-Mira Aufträge an der Form des Satzes.

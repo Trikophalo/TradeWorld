@@ -63,12 +63,25 @@ test("Mira briefs the new task and runs the company through the chat", async ({ 
   await expect(page.getByTestId("play-sheet")).toBeVisible();
   await page.keyboard.press("Escape");
 
-  // Own idea for a business move: the writing mode, then the jury.
-  await mira.getByTestId("mira-option").filter({ hasText: "Eigene Idee" }).first().click();
-  await expect(mira.getByTestId("mira-compose")).toBeVisible();
-  await mira.getByTestId("mira-input").fill("Wir verkaufen unsere Shirts auf Festivals.");
+  // The plan: no team and no AI yet, so Mira says the task stays with the player.
+  await mira.getByTestId("mira-input").fill("Verteil alle Aufgaben");
   await mira.getByTestId("mira-send").click();
-  await expect(mira.getByText("Deine Idee liegt bei der Jury.")).toBeVisible();
+  await expect(mira.getByText(/Gerade kann ich nichts sinnvoll vergeben|Mein Plan:/)).toBeVisible();
+  await mira.getByTestId("mira-input").fill("Wie läuft die Firma?");
+  await mira.getByTestId("mira-send").click();
+  await expect(mira.getByText(/Du hast noch kein Team/)).toBeVisible();
+
+  // A free order (ADR-139): Mira reads the goal, estimates the chance and carries it out; one per hour.
+  await mira.getByTestId("mira-input").fill("Wir drehen ein lustiges Video für Social Media.");
+  await mira.getByTestId("mira-send").click();
+  await expect(mira.getByText(/Verstanden: „Wir drehen ein lustiges Video/)).toBeVisible();
+  const go = mira.getByTestId("mira-option").filter({ hasText: "Umsetzen für mehr Bekanntheit" });
+  await expect(go).toContainText("Tipp");
+  await go.click();
+  await expect(mira.getByText(/Auftrag läuft!/)).toBeVisible();
+  await mira.getByTestId("mira-input").fill("Wir machen eine Rabattaktion für Stammkunden.");
+  await mira.getByTestId("mira-send").click();
+  await expect(mira.getByText(/Pro Stunde kann ich nur einen freien Auftrag umsetzen/)).toBeVisible();
 
   // The overview folds into sections; the quarter is open, the rest opens on a tap.
   await page.getByRole("tab", { name: /Übersicht/ }).click();

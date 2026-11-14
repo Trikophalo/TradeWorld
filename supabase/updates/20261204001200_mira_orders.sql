@@ -1,0 +1,198 @@
+-- ===== idempotent copy of migrations/20261204001200_mira_orders.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 1200 · Free orders to Mira: one per hour (ADR-139)
+-- =============================================================================
+-- A founder writes Mira in free text what the company should do ("Mach eine Rabattaktion für Stammkunden"). Mira
+-- turns it into an order: the jury of ADR-132 (Claude or the Mini-KI) rates it, a roll decides, the result changes
+-- cash, awareness or quality. Technically an order is a pitch of kind 'move'. New: only one order per hour and
+-- company (pitches.orderCooldownMinutes); an order that was refused (no cash, bad text) does not count.
+-- company_pitches_state() gains next_order_at; company_assistant_context() gains orders and last_quarter.
+-- Error key NX127 order_cooldown.
+-- Idempotent: runs unchanged as supabase/updates/20261204001200_mira_orders.sql.
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.api_error(text)'::regprocedure);
+begin
+  if position('''order_cooldown''' in v_def) = 0 then
+    v_def := replace(v_def, $q$    when 'assistant_busy'             then 'NX126'
+$q$, $q$    when 'assistant_busy'             then 'NX126'
+    when 'order_cooldown'             then 'NX127'
+$q$);
+    if position('''order_cooldown''' in v_def) = 0 then
+      raise exception 'api_error() has an unexpected shape; add the order error key by hand';
+    end if;
+    execute v_def;
+  end if;
+end;
+$do$;
+
+create or replace function public.company_pitches_state(p_company uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'event_id', (select e.id from public.player_company_events e
+                  where e.company_id = p_company and e.status in ('open', 'in_force')
+                  order by e.started_at desc limit 1),
+    'event_cost_cents', public.company_event_unit_cents(p_company) * (public.pitches_cfg() ->> 'eventCostUnits')::integer,
+    'move_cost_cents', (select round((public.config_jsonb('companyMoves') -> 'costCentsByTier' ->> pc.tier::text)::numeric
+                                     * (public.pitches_cfg() ->> 'moveCostFactor')::numeric)::bigint
+                          from public.player_companies pc where pc.company_id = p_company),
+    -- when the next free order may start (ADR-139): null = now
+    'next_order_at', (select case when max(x.created_at) + make_interval(mins => coalesce((public.pitches_cfg() ->> 'orderCooldownMinutes')::integer, 60))
+                                       > public.game_now()
+                                  then max(x.created_at) + make_interval(mins => coalesce((public.pitches_cfg() ->> 'orderCooldownMinutes')::integer, 60)) end
+                        from public.company_pitches x where x.company_id = p_company and x.kind = 'move'),
+    'pitches', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'id', p.id, 'kind', p.kind, 'move_kind', p.move_kind, 'event_id', p.event_id, 'text', p.pitch_text,
+               'status', p.status, 'judge', p.judge, 'fit', p.fit, 'backfire', p.backfire, 'chance_bps', p.chance_bps,
+               'verdict', p.verdict, 'success_text', p.success_text, 'failure_text', p.failure_text,
+               'backfire_text', p.backfire_text, 'cost_cents', p.cost_cents, 'result_cents', p.result_cents,
+               'created_at', p.created_at, 'ends_at', p.ends_at, 'resolved_at', p.resolved_at)
+             order by p.created_at desc)
+        from (select * from public.company_pitches x where x.company_id = p_company
+               order by x.created_at desc limit 8) p), '[]'::jsonb));
+$$;
+
+create or replace function public.submit_company_pitch(p_request_id uuid, p_kind text, p_text text,
+                                                       p_move_kind text default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.pitches_cfg();
+  v_player uuid;
+  v_replay jsonb;
+  pc       public.player_companies;
+  v_text   text := btrim(coalesce(p_text, ''));
+  v_event  uuid;
+  v_cost   bigint;
+  v_cash   bigint;
+  v_state  jsonb;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_kind not in ('event', 'move')
+     or (p_kind = 'move' and coalesce(p_move_kind, '') not in ('cash', 'awareness', 'quality')) then
+    perform public.api_error('invalid_argument');
+  end if;
+  if length(v_text) < (cfg ->> 'minChars')::integer or length(v_text) > (cfg ->> 'maxChars')::integer
+     or v_text ~ '[\x00-\x08\x0b-\x1f]' or public.text_has_profanity(v_text) then
+    perform public.api_error('pitch_text_invalid');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'submit_company_pitch');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into pc from public.player_companies where founder_id = v_player and status = 'active' for update;
+  if pc.company_id is null then
+    perform public.api_error('company_not_found');
+  end if;
+  v_state := public.company_pitches_state(pc.company_id);
+  if p_kind = 'event' then
+    v_event := (v_state ->> 'event_id')::uuid;
+    if v_event is null then
+      perform public.api_error('event_closed');
+    end if;
+    if exists (select 1 from public.company_pitches p where p.event_id = v_event and p.status in ('judging', 'running')) then
+      perform public.api_error('pitch_busy');
+    end if;
+    v_cost := (v_state ->> 'event_cost_cents')::bigint;
+  else
+    -- own moves share the slots of the business moves (ADR-127)
+    if (select count(*) from public.company_moves m where m.company_id = pc.company_id and m.status = 'running')
+       + (select count(*) from public.company_pitches p where p.company_id = pc.company_id and p.kind = 'move'
+            and p.status in ('judging', 'running'))
+       >= (public.config_jsonb('companyMoves') -> 'slotsByTier' ->> pc.tier::text)::integer then
+      perform public.api_error('pitch_busy');
+    end if;
+    -- one free order per hour (ADR-139); only an order that was carried out counts
+    if (v_state ->> 'next_order_at') is not null then
+      perform public.api_error('order_cooldown');
+    end if;
+    v_cost := (v_state ->> 'move_cost_cents')::bigint;
+  end if;
+  select a.balance_cents into v_cash from public.ledger_accounts a
+   where a.id = public.company_cash_account(pc.company_id) for update;
+  if coalesce(v_cash, 0) < v_cost then
+    perform public.api_error('insufficient_funds');
+  end if;
+  if v_cost > 0 then
+    perform public.ledger_transfer(public.company_cash_account(pc.company_id), public.ledger_system_account('households'),
+                                   v_cost, 'company_costs', 'Eigene Strategie', 'company', pc.company_id,
+                                   'pitch:start:' || p_request_id::text, v_player, jsonb_build_object('kind', p_kind));
+  end if;
+  insert into public.company_pitches (company_id, event_id, kind, move_kind, pitch_text, cost_cents, created_by,
+                                      created_at, judge_due_at)
+  values (pc.company_id, v_event, p_kind, case when p_kind = 'move' then p_move_kind end, v_text, v_cost, v_player,
+          public.game_now(), public.game_now() + make_interval(secs => (cfg ->> 'judgeWaitSeconds')::integer));
+  return public.request_complete(v_player, p_request_id, public.company_pitches_state(pc.company_id));
+end;
+$$;
+
+create or replace function public.company_assistant_context(p_text text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg       jsonb := public.company_assistant_cfg();
+  v_player  uuid := public.require_player();
+  v_tasks   jsonb;
+  v_company uuid;
+  v_founder boolean;
+  v_moves   jsonb;
+  pc        public.player_companies;
+  c         public.companies;
+  e         public.player_company_events;
+begin
+  if p_text is null or char_length(btrim(p_text)) not between 1 and coalesce((cfg ->> 'maxTextLength')::int, 300) then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_tasks := public.company_tasks_state(v_player);  -- company_not_found without a company
+  v_company := (v_tasks -> 'company' ->> 'id')::uuid;
+  v_founder := v_tasks ->> 'role' = 'founder';
+
+  -- the hourly limit (serialised per player, so parallel calls cannot slip through)
+  perform pg_advisory_xact_lock(hashtextextended('company_assistant:' || v_player::text, 0));
+  if (select count(*) from public.company_assistant_calls a
+       where a.player_id = v_player and a.created_at > now() - interval '1 hour')
+     >= coalesce((cfg ->> 'claudePerHour')::int, 20) then
+    perform public.api_error('assistant_busy');
+  end if;
+  insert into public.company_assistant_calls (player_id) values (v_player);
+  delete from public.company_assistant_calls a where a.player_id = v_player and a.created_at < now() - interval '1 day';
+
+  select * into pc from public.player_companies where company_id = v_company;
+  select * into c from public.companies where id = v_company;
+  if v_founder then
+    v_moves := public.company_moves_state(v_company);
+    select * into e from public.player_company_events ev
+     where ev.company_id = v_company and ev.status = 'open'
+     order by ev.started_at desc limit 1;
+  end if;
+
+  return jsonb_build_object(
+    'text', btrim(p_text),
+    'role', v_tasks ->> 'role',
+    'company', jsonb_build_object('name', c.name, 'idea', pc.idea, 'product', pc.product_key, 'sector', c.sector_key,
+                                  'tier', pc.tier),
+    'tasks', v_tasks,
+    'moves', v_moves,
+    -- free orders (ADR-139): cost, when the next one may start, how the last ones went
+    'orders', case when v_founder then public.company_pitches_state(v_company) end,
+    'last_quarter', (select jsonb_build_object('revenue_cents', q.revenue_cents, 'profit_cents', q.net_income_cents)
+                       from public.company_quarter_reports q where q.company_id = v_company
+                      order by q.game_quarter_id desc limit 1),
+    'event', case when e.id is null then null else jsonb_build_object(
+               'archetype', e.archetype, 'polarity', e.polarity, 'severity', e.severity, 'headline', e.ai_headline) end);
+end;
+$$;
