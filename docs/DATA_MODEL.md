@@ -7328,3 +7328,14 @@ Intern: `nft_ai_value_cents(id, now)` (Bewertung wie `nftAiValueCents` in `src/l
 `player_seen_tours (player_id uuid → profiles, tour_key text ~ '^[a-z0-9_]{1,40}$', seen_at)`, PK
 `(player_id, tour_key)`, RLS ohne Client-Rechte. RPCs (authenticated): `get_seen_tours()` → `{"tours": [text]}`,
 `mark_tour_seen(p_request_id uuid, p_tour text)` → dieselbe Form. Test `supabase/tests/9c_seen_tours.sql`.
+
+## Nachtrag: Mira, die Firmen-Assistentin (ADR-138)
+
+`company_assistant_calls (id, player_id → profiles, created_at)`, RLS ohne Client-Rechte: Claude-Aufrufe für das
+Stundenlimit, älter als ein Tag wird beim nächsten Aufruf gelöscht.
+
+RPC (authenticated): `company_assistant_context(p_text text)` → `{text, role, company {name, idea, product, sector,
+tier}, tasks (wie get_company_tasks), moves (wie get_company_moves, nur Gründer), event {archetype, polarity,
+severity, headline} | null}`. Zählt einen Aufruf; über `companyAssistant.claudePerHour` pro Stunde NX126
+`assistant_busy`. Nur für die Edge Function `company-assistant`; Aktionen laufen über die bestehenden RPCs.
+Test `supabase/tests/9d_company_assistant.sql`.

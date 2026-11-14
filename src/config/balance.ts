@@ -834,6 +834,13 @@ export interface BalanceConfig {
   readonly protests: typeof PROTEST_RULES;
   /** NFTs: royalties, AI collectors, offer chat (ADR-135), values in nfts.ts. */
   readonly nfts: typeof NFT_RULES;
+  /** Mira, the company assistant (ADR-138). */
+  readonly companyAssistant: {
+    readonly claudePerHour: number;
+    readonly maxTextLength: number;
+    readonly briefingTasks: number;
+    readonly busyTasks: number;
+  };
   /** Crises, scandals and a falling share price cut wages (ADR-131). */
   readonly wageMood: {
     /** Wage cut per severity level (1..3) of an open or running crisis. */
@@ -2377,6 +2384,15 @@ export const BALANCE = {
   pitches: PITCH_RULES,
   protests: PROTEST_RULES,
   nfts: NFT_RULES,
+  /** Mira, the company assistant (ADR-138): Claude answers per player and hour, length of a message. */
+  companyAssistant: {
+    claudePerHour: 20,
+    maxTextLength: 300,
+    /** Open tasks Mira reports at once; more are on the task board. */
+    briefingTasks: 3,
+    /** A person with this many open tasks counts as busy. */
+    busyTasks: 2,
+  },
   wageMood: {
     crisisPerSeverityBps: 500,
     scandalBps: 500,

@@ -168,6 +168,12 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   Missionsjäger, Teamplayer, Bilanzprofi, Ehrgeiz), ein größerer Tresor (Panzertresor) und vieles für die eigene
   Firma (KI-Turbo, Glückshand, Werbeagentur, Krisenmanager …). Sie schalten sich zwischen Level 1 und 30 frei.
 
+- **Mira, deine Firmen-Assistentin (ADR-138):** Die Firma läuft jetzt über einen Chat. Mira meldet neue Aufgaben,
+  Krisen und freie Geschäftszüge, sagt, wer gerade Zeit hat, und warnt, wenn die KI zu langsam ist. Schreib ihr einfach
+  „Gib das Packen an Anna“ oder „Das mache ich selbst“; bei freiem Text denkt Claude mit und schlägt Schritte vor.
+  Eigene Strategien für Krisen und eigene Geschäftszüge schreibst du direkt in den Chat. Die Übersicht der Firma ist
+  in sieben Bereiche zum Aufklappen sortiert.
+
 - **Handy (ADR-136):** Finn merkt sich seine Touren jetzt auf dem Server, ein privates Fenster oder ein zweites Gerät
   startet sie nicht mehr neu. Die NFT-Details öffnen am Handy als Sheet von unten, der Angebots-Chat ist erreichbar.
 

@@ -1,6 +1,6 @@
 {
   "job": {
-    "id": "d24dc16a-270d-4d27-b0f9-e30632df9e0b",
+    "id": "3d631649-a6ad-4d9b-80e5-e269151ddd01",
     "tier": "intern",
     "title": null,
     "company": {
@@ -13,9 +13,9 @@
       "ticker": "MEM"
     },
     "presence": {
-      "fire_at": "2026-11-19T15:09:13.090611+00:00",
+      "fire_at": "2026-11-19T15:50:25.145436+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-14T15:09:13.090611+00:00"
+      "last_active_at": "2026-11-14T15:50:25.145436+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-14T15:09:13.179225+00:00",
+    "started_at": "2026-11-14T15:50:25.235138+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

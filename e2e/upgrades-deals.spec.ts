@@ -1,3 +1,4 @@
+import { showOverview, unfoldCompany } from "./company-helpers";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 /*
@@ -21,6 +22,7 @@ const TOURS = [
 const ZERO = { it: 0, finance: 0, law: 0, craft: 0, sales: 0, management: 0, science: 0, logistics: 0 };
 
 async function preparePlayer(page: Page, player: Record<string, unknown>) {
+  await unfoldCompany(page);
   await page.addInitScript(
     ({ player, tours }) => {
       if (window.sessionStorage.getItem("nexa-test-prepared")) return;
@@ -247,6 +249,7 @@ test("company: profit routes name the bottleneck, a campaign starts", async ({ p
   await expect(sheet.getByText("Name ist frei")).toBeVisible();
   await hold(page, page.getByRole("button", { name: /Gedrückt halten zum Gründen/ }));
   await expect(page.getByText("Firma gegründet!")).toBeVisible();
+  await showOverview(page);
 
   const routes = page.getByTestId("profit-routes");
   await expect(routes.getByTestId("bottleneck")).toHaveAttribute("data-kind", "waiting");

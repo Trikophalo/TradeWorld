@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Ein bekannter Anleger hat ein großes Paket gekauft. Andere könnten folgen. Sicher ist das nicht.",
-      "name": "Rheinkraft Werke",
-      "due_at": "2026-11-14T16:31:04.860937+00:00",
+      "body": "Eine wichtige Technologie ist jetzt geschützt. Der Vorsprung dürfte sich auszahlen. Sicher ist das nicht.",
+      "name": "Frachtpilot",
+      "due_at": "2026-11-14T17:20:32.977087+00:00",
       "status": "open",
-      "ticker": "RKW",
-      "headline": "Star-Investor steigt bei Rheinkraft Werke ein",
+      "ticker": "FPT",
+      "headline": "Patent für Frachtpilot erteilt",
       "move_bps": null,
       "strength": 1,
       "direction": "up",
-      "published_at": "2026-11-14T16:09:14.721761+00:00"
+      "published_at": "2026-11-14T16:50:26.840402+00:00"
     },
     {
       "id": 3,
-      "body": "Die Chefetage von Pfotenwohl steht wegen einer Affäre in der Kritik. Anleger werden nervös. Sicher ist das nicht.",
-      "name": "Pfotenwohl",
-      "due_at": "2026-11-14T15:09:14.718309+00:00",
+      "body": "Ein Werk soll Grenzwerte überschritten haben. Bußgelder sind wahrscheinlich. Sicher ist das nicht.",
+      "name": "QuantenSprung Labs",
+      "due_at": "2026-11-14T15:50:26.835172+00:00",
       "status": "confirmed",
-      "ticker": "PFW",
-      "headline": "Affäre erschüttert Pfotenwohl",
-      "move_bps": -662,
+      "ticker": "QSL",
+      "headline": "Umweltskandal bei QuantenSprung Labs",
+      "move_bps": -741,
       "strength": 2,
       "direction": "down",
-      "published_at": "2026-11-14T15:09:14.718309+00:00"
+      "published_at": "2026-11-14T15:50:26.835172+00:00"
     }
   ],
   "reliability_bps": 7500

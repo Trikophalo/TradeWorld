@@ -1,64 +1,64 @@
 {
   "items": [
     {
-      "id": "c5056883-0440-4f93-a7e4-2c87dba4a3c1",
+      "id": "194fd618-cad8-4cb0-8de8-27eb022d9b1a",
       "body": "Jetzt befreundet mit Fixture_Gmbh",
       "link": "/friends",
       "title": "Fixture_Gmbh gefällt dein Beitrag",
-      "payload": { "kind": "friends_now", "item_id": 286, "nickname": "Fixture_Gmbh" },
+      "payload": { "kind": "friends_now", "item_id": 288, "nickname": "Fixture_Gmbh" },
       "read_at": null,
       "type_key": "feed_reaction",
-      "created_at": "2026-11-14T15:09:12.916807+00:00"
+      "created_at": "2026-11-14T15:50:24.973471+00:00"
     },
     {
-      "id": "966247f1-d61b-4e3a-a0a2-ee6f65dc1292",
-      "body": "Platz 193 von 197 · +0,00 %",
+      "id": "67310bbe-9974-4b1c-a499-6898c76ef149",
+      "body": "Platz 195 von 199 · +0,00 %",
       "link": "/friends",
-      "title": "Wochenliga: Platz 193",
-      "payload": { "of": 197, "rank": 193, "growth_bps": 0, "week_start": "2026-11-02" },
+      "title": "Wochenliga: Platz 195",
+      "payload": { "of": 199, "rank": 195, "growth_bps": 0, "week_start": "2026-11-02" },
       "read_at": null,
       "type_key": "league_result",
-      "created_at": "2026-11-14T15:09:12.785374+00:00"
+      "created_at": "2026-11-14T15:50:24.821074+00:00"
     },
     {
-      "id": "1c9ed56e-e566-4fde-8bd3-6a13cb1ff644",
+      "id": "9f139710-4b59-427a-b5c9-9d5e763f8552",
       "body": "Fixture_Gmbh",
       "link": "/players/Fixture_Gmbh",
       "title": "Fixture_Gmbh hat deine Freundschaftsanfrage angenommen.",
       "payload": { "nickname": "Fixture_Gmbh" },
       "read_at": null,
       "type_key": "friend_accepted",
-      "created_at": "2026-11-14T15:09:12.715824+00:00"
+      "created_at": "2026-11-14T15:50:24.736705+00:00"
     },
     {
-      "id": "913a55e6-c6bb-40bf-82c8-a478970a81d2",
+      "id": "49de233b-695e-4aee-afb1-01a531c11dc2",
       "body": "Stelle: Werkstudium Daten",
       "link": "/company",
       "title": "Fixture_Chefin hat sich beworben",
       "payload": {
         "title": "Werkstudium Daten",
         "nickname": "Fixture_Chefin",
-        "posting_id": "3ab8bf51-17ca-4c72-ad38-49eb2fba715c",
-        "application_id": "12272902-e373-41cf-8bb7-7be8ade81117"
+        "posting_id": "f3de1183-aeaf-4425-bf48-d51f1c5ba1f4",
+        "application_id": "35b9205a-286a-42b3-a11a-e354f95f0a2f"
       },
       "read_at": null,
       "type_key": "job_application",
-      "created_at": "2026-11-14T15:09:11.214795+00:00"
+      "created_at": "2026-11-14T15:50:23.195756+00:00"
     },
     {
-      "id": "d4690747-25fb-407c-9113-5c8d7b9265f3",
+      "id": "3d06980d-818c-4cf3-827f-c9759c7096b9",
       "body": "Stelle: Werkstudium Software",
       "link": "/company",
       "title": "Fixture_Chefin hat sich beworben",
       "payload": {
         "title": "Werkstudium Software",
         "nickname": "Fixture_Chefin",
-        "posting_id": "1b6049cb-8948-4d18-a29d-abb2eb3d24fa",
-        "application_id": "87c9967a-ca41-4537-be11-d6093afdbdcd"
+        "posting_id": "0de91dda-8839-4db9-912e-b4c1fcea5b50",
+        "application_id": "1defd1a2-4d6a-464d-9968-2903a040f8f8"
       },
       "read_at": null,
       "type_key": "job_application",
-      "created_at": "2026-11-14T15:09:11.034086+00:00"
+      "created_at": "2026-11-14T15:50:22.948626+00:00"
     }
   ],
   "unread": 5

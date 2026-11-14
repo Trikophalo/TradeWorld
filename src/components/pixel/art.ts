@@ -800,6 +800,34 @@ export const FINN = {
 
 export type FinnMood = keyof typeof FINN;
 
+/*
+ * Mira, the company assistant (ADR-138): a friendly little screen-faced helper with an antenna. The light on the
+ * antenna uses the app accent; "think" lights up the eyes while Claude answers.
+ */
+const MIRA_PALETTE = { b: "#5b6cff", d: "#3442c4", s: "#dfe8ff", k: INK, t: "var(--accent)", g: "#7dffb2" } as const;
+const MIRA_BASE = [
+  ".....tt.....",
+  "......d.....",
+  "..bbbbbbbb..",
+  ".bddddddddb.",
+  ".bdssssssdb.",
+  ".bdskssksdb.",
+  ".bdssssssdb.",
+  ".bdsskkssdb.",
+  ".bddddddddb.",
+  "..bbbbbbbb..",
+  "...b....b...",
+  "..bb....bb..",
+] as const;
+function miraFrame(overrides: Record<number, string>): PixelArt {
+  return { palette: MIRA_PALETTE, grid: MIRA_BASE.map((row, index) => overrides[index] ?? row) };
+}
+export const MIRA = {
+  idle: miraFrame({}),
+  think: miraFrame({ 5: ".bdsgssgsdb.", 7: ".bdssssssdb." }),
+  happy: miraFrame({ 7: ".bdskkkksdb." }),
+} as const satisfies Record<string, PixelArt>;
+
 // ---------------------------------------------------------------- interface icons (12×12, single colour)
 
 const mono = { x: "currentColor" } as const;
@@ -1287,6 +1315,7 @@ export const ALL_PIXEL_ART: Record<string, PixelArt> = {
   bull: BULL,
   bear: BEAR,
   ...Object.fromEntries(Object.entries(FINN).map(([k, v]) => [`finn/${k}`, v])),
+  ...Object.fromEntries(Object.entries(MIRA).map(([k, v]) => [`mira/${k}`, v])),
   ...Object.fromEntries(Object.entries(UI_ICONS).map(([k, v]) => [`ui/${k}`, v])),
   ...Object.fromEntries(Object.entries(COMPANY_BUILDINGS).map(([k, v]) => [`building/${k}`, v])),
 };

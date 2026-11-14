@@ -1,10 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
+import { showOverview, unfoldCompany } from "./company-helpers";
 
 /*
  * Player companies in demo mode (ADR-057): found a garage startup, close quarters,
  * hire an AI worker, post a job. Level 6 player with 20.000 €.
  */
 async function preparePlayer(page: Page) {
+  await unfoldCompany(page);
   await page.addInitScript(() => {
     if (window.sessionStorage.getItem("nexa-test-prepared")) return;
     window.sessionStorage.setItem("nexa-test-prepared", "1");
@@ -75,6 +77,7 @@ test("found a garage startup, run quarters, hire and post a job", async ({ page 
   await expect(sheet.getByText("Name ist frei")).toBeVisible();
   await hold(page, /Gedrückt halten zum Gründen/);
   await expect(page.getByText("Firma gegründet!")).toBeVisible();
+  await showOverview(page);
 
   const header = page.getByTestId("company-header");
   await expect(header.getByText("Pixelbaecker")).toBeVisible();
@@ -164,6 +167,7 @@ test("company chat, then close the company voluntarily", async ({ page }) => {
   await expect(sheet.getByText("Name ist frei")).toBeVisible();
   await hold(page, /Gedrückt halten zum Gründen/);
   await expect(page.getByText("Firma gegründet!")).toBeVisible();
+  await showOverview(page);
 
   // The quarter close writes a system message into the chat.
   await page.getByTestId("company-header").getByText("Demo: Quartal jetzt abschließen").click();
@@ -230,6 +234,7 @@ test("draw a logo, keep a job as founder, go public", async ({ page }) => {
   await expect(sheet.getByText("Name ist frei")).toBeVisible();
   await hold(page, /Gedrückt halten zum Gründen/);
   await expect(page.getByText("Firma gegründet!")).toBeVisible();
+  await showOverview(page);
 
   // Pixel editor (ADR-076): offered right after founding, drawn once, forbidden symbols are blocked.
   await page.getByTestId("logo-prompt").getByRole("button", { name: "Logo zeichnen" }).click();

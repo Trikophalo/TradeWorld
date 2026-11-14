@@ -1,5 +1,6 @@
 "use client";
 
+import { MiraChat } from "@/features/company/assistant/mira-chat";
 import { TaskBoard } from "@/features/company/tasks/task-board";
 import { AiOrgChart, OrgChart } from "@/features/company/components/org-chart";
 import { CompanyNewsCard, SituationCard } from "@/features/company/components/situation";
@@ -73,7 +74,14 @@ export function JobView() {
         {/* Staff of a player company see its situation and news (ADR-091). */}
         {employer.data?.kind === "player" && (
           <>
-            <TaskBoard />
+            {/* Mira helps staff too: own tasks and work for their reports (ADR-138). */}
+            <MiraChat
+              className="h-[min(60dvh,520px)]"
+              onOpen={() => document.getElementById("task-board")?.scrollIntoView({ behavior: "smooth" })}
+            />
+            <div id="task-board" className="scroll-mt-24">
+              <TaskBoard />
+            </div>
             <SituationCard companyId={employer.data.company.id} />
             <CompanyNewsCard companyId={employer.data.company.id} title={tn("employeeTitle")} />
           </>

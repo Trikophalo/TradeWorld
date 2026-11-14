@@ -51480,6 +51480,117 @@ grant execute on function public.mark_tour_seen(uuid, text) to authenticated;
 comment on function public.get_seen_tours() is 'RPC: tours of Finn the player has seen.';
 comment on function public.mark_tour_seen(uuid, text) is 'RPC: remember that the player has seen a tour of Finn.';
 
+-- ===== supabase/migrations/20261204001100_company_assistant.sql =====
+-- =============================================================================
+-- NEXA · 1100 · Mira, the company assistant (ADR-138)
+-- =============================================================================
+-- The company tab works through a chat: Mira reports open tasks, crises and free slots for business moves, weighs the
+-- options and hands out work on the player's word. Clear commands ("Gib das Packen an Anna") are understood in the
+-- browser and run through the existing RPCs (delegate_company_task, start_company_move, submit_company_pitch, ...), so
+-- nothing new can change money here. Free text goes to Claude (edge function company-assistant), which only proposes
+-- actions; the player confirms each with a tap.
+-- This migration gives the edge function its context and limits the Claude calls per player and hour.
+-- RPC (authenticated): company_assistant_context(p_text text) -> context jsonb, counts one call (NX126 when used up).
+-- Idempotent: runs unchanged as supabase/updates/20261204001100_company_assistant.sql.
+
+create table if not exists public.company_assistant_calls (
+  id         bigint generated always as identity primary key,
+  player_id  uuid not null references public.profiles (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+create index if not exists company_assistant_calls_player_idx on public.company_assistant_calls (player_id, created_at desc);
+alter table public.company_assistant_calls enable row level security;
+revoke all on public.company_assistant_calls from public, anon, authenticated;
+comment on table public.company_assistant_calls is 'Claude calls of Mira, the company assistant (ADR-138), for the hourly limit. Internal.';
+
+-- Error key NX126 ------------------------------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.api_error(text)'::regprocedure);
+begin
+  if position('''assistant_busy''' in v_def) = 0 then
+    v_def := replace(v_def, $q$    when 'nft_price_changed'          then 'NX125'
+$q$, $q$    when 'nft_price_changed'          then 'NX125'
+    when 'assistant_busy'             then 'NX126'
+$q$);
+    if position('''assistant_busy''' in v_def) = 0 then
+      raise exception 'api_error() has an unexpected shape; add the assistant error key by hand';
+    end if;
+    execute v_def;
+  end if;
+end;
+$do$;
+
+create or replace function public.company_assistant_cfg()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select value from public.game_config where key = 'companyAssistant'), '{}'::jsonb);
+$$;
+
+create or replace function public.company_assistant_context(p_text text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg       jsonb := public.company_assistant_cfg();
+  v_player  uuid := public.require_player();
+  v_tasks   jsonb;
+  v_company uuid;
+  v_founder boolean;
+  v_moves   jsonb;
+  pc        public.player_companies;
+  c         public.companies;
+  e         public.player_company_events;
+begin
+  if p_text is null or char_length(btrim(p_text)) not between 1 and coalesce((cfg ->> 'maxTextLength')::int, 300) then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_tasks := public.company_tasks_state(v_player);  -- company_not_found without a company
+  v_company := (v_tasks -> 'company' ->> 'id')::uuid;
+  v_founder := v_tasks ->> 'role' = 'founder';
+
+  -- the hourly limit (serialised per player, so parallel calls cannot slip through)
+  perform pg_advisory_xact_lock(hashtextextended('company_assistant:' || v_player::text, 0));
+  if (select count(*) from public.company_assistant_calls a
+       where a.player_id = v_player and a.created_at > now() - interval '1 hour')
+     >= coalesce((cfg ->> 'claudePerHour')::int, 20) then
+    perform public.api_error('assistant_busy');
+  end if;
+  insert into public.company_assistant_calls (player_id) values (v_player);
+  delete from public.company_assistant_calls a where a.player_id = v_player and a.created_at < now() - interval '1 day';
+
+  select * into pc from public.player_companies where company_id = v_company;
+  select * into c from public.companies where id = v_company;
+  if v_founder then
+    v_moves := public.company_moves_state(v_company);
+    select * into e from public.player_company_events ev
+     where ev.company_id = v_company and ev.status = 'open'
+     order by ev.started_at desc limit 1;
+  end if;
+
+  return jsonb_build_object(
+    'text', btrim(p_text),
+    'role', v_tasks ->> 'role',
+    'company', jsonb_build_object('name', c.name, 'idea', pc.idea, 'product', pc.product_key, 'sector', c.sector_key,
+                                  'tier', pc.tier),
+    'tasks', v_tasks,
+    'moves', v_moves,
+    'event', case when e.id is null then null else jsonb_build_object(
+               'archetype', e.archetype, 'polarity', e.polarity, 'severity', e.severity, 'headline', e.ai_headline) end);
+end;
+$$;
+
+revoke all on function public.company_assistant_context(text) from public, anon;
+grant execute on function public.company_assistant_context(text) to authenticated;
+comment on function public.company_assistant_context(text) is
+  'RPC: what Mira, the company assistant, knows for a Claude answer (ADR-138); counts against the hourly limit.';
+
 -- ===== supabase/seed.sql =====
 -- =============================================================================
 -- NEXA · seed.sql · reference data
@@ -52146,6 +52257,7 @@ insert into public.game_config (key, value, description) values
   ('pitches', '{"minChars":12,"maxChars":280,"judgeWaitSeconds":90,"eventMinutes":20,"moveMinutes":30,"chanceBaseBps":1000,"chancePerFitBps":80,"maxChanceBps":9000,"eventCostUnits":2,"moveCostFactor":1.2,"mitigationBase":0.35,"mitigationPerFit":0.005,"maxMitigation":0.9,"movePayoutBase":1.3,"movePayoutPerFit":0.012,"moveGainBase":0.02,"moveGainPerFit":0.0006,"moveRefundBps":2000,"backfireAwareness":0.05,"mini":{"fitBase":25,"fitPerHit":12,"maxHits":4,"longTextChars":60,"longTextBonus":10,"maxFit":85,"backfireBase":10,"backfirePerRisky":20,"maxBackfire":70,"risky":["imagefilm","werbung","werbekampagne","influencer","pr-","greenwashing","ignorieren","leugnen","abstreiten","lügen","vertuschen","schweigen","aussitzen","drohen","verklagen","entlassen","billiger","bestechen"],"good":{"regulation":["anwalt","recht","prüfen","anpassen","lobby","verband","gutachten","umstellen","dialog"],"special_tax":["steuer","berater","kalkul","preis","rohstoff","ersatz","sparen","lieferant"],"supply_shortage":["lieferant","lager","alternativ","vorrat","zweit","ersatz","vertrag","regional"],"quality_scandal":["rückruf","entschuldig","prüf","qualität","kontroll","ersetzen","transparen","entschädig"],"data_breach":["sicherheit","passwort","verschlüssel","melden","experten","informieren","update","audit"],"price_war":["qualität","service","treue","nische","kosten","bündel","mehrwert","marke"],"strike":["lohn","gehalt","verhandl","bonus","gespräch","kompromiss","zuhören","arbeitszeit","tarif"],"protest":["dialog","einladen","zuhören","ändern","nachhaltig","transparen","spenden","fair"],"patent_claim":["anwalt","patent","lizenz","einigung","gutachten","umgehen","vergleich","eigene"],"bad_review":["verbessern","test","feedback","kunden","nachbessern","qualität","gratis","update"],"viral_trend":["nachproduz","lager","social","video","aktion","schnell","limitiert","community"],"big_contract":["kapazität","personal","einstellen","termin","liefer","verhandl","vertrag","schicht"],"award":["pressemitteilung","werbung","feiern","kunden","messe","präsentieren","website","siegel"],"subsidy":["antrag","förder","investieren","forschung","berater","unterlagen","frist","projekt"],"partnership":["vertrag","gemeinsam","partner","teilen","kooperation","verhandl","netzwerk","vertrieb"],"cash":["verkauf","auftrag","kunden","rabatt","angebot","großkunde","export","abo","online"],"awareness":["werbung","messe","social","video","presse","influencer","sponsor","event","kampagne"],"quality":["schulung","test","prüfen","verbessern","material","zertifi","forschung","feedback"]}}}'::jsonb, 'Defaults from src/config/balance.ts, section "pitches"'),
   ('protests', '{"kinds":["boycott","shitstorm","petition","protest_march"],"startCostCents":50000,"goal":20,"aiMax":16,"aiJoinChanceBps":3000,"aiPerMinuteMax":2,"durationHours":6,"starterCooldownHours":6,"effectChanceBaseBps":600,"effectChancePerPlayerBps":300,"effectChanceMaxBps":3500,"priceHitMinBps":150,"priceHitMaxBps":450,"awarenessHit":0.03,"minLevel":4}'::jsonb, 'Defaults from src/config/balance.ts, section "protests"'),
   ('nfts', '{"royaltyBps":1000,"mintXp":100,"minAskCents":10000,"minOfferCents":10000,"chat":{"maxLength":200,"perMinute":6,"history":60,"offerHours":24},"ai":{"floorCents":100000,"likeBps":400,"maxLikes":40,"creatorSaleBps":300,"maxCreatorSales":10,"ageBpsPerDay":100,"maxAgeDays":30,"buyChanceBps":2500,"listedOfferChanceBps":800,"unlistedOfferChanceBps":80,"lowballMinBps":6500,"lowballMaxBps":9000,"maxBuysPerDay":20,"maxMessagesPerRun":4,"resaleMarkupBps":12500,"acceptBps":10500,"collectors":["Vera Vermeer","Konrad Kollektor","Pixel-Paula","Baron von Bit","Mia Mosaik","Otto Original","Gräfin Glitzer","Sammler Sam"],"lines":{"offer":["Schönes Stück. Mehr ist es mir aber nicht wert.","Für meine Sammlung würde ich so viel zahlen.","Mein Angebot. Überleg es dir nicht zu lange.","Hübsch! Wäre das ein fairer Preis?","Ich biete das. Nimm es, solange ich gute Laune habe."],"buy":["Gekauft! Das kommt in meine Sammlung.","Zu diesem Preis konnte ich nicht widerstehen.","Ein fairer Preis. Danke!"],"accept":["Abgemacht! Viel Freude damit.","Einverstanden, es gehört dir."],"decline":["Nein danke, darunter verkaufe ich nicht.","Netter Versuch. Biete mehr.","Das ist zu wenig für dieses Stück."]}}}'::jsonb, 'Defaults from src/config/balance.ts, section "nfts"'),
+  ('companyAssistant', '{"claudePerHour":20,"maxTextLength":300,"briefingTasks":3,"busyTasks":2}'::jsonb, 'Defaults from src/config/balance.ts, section "companyAssistant"'),
   ('wageMood', '{"crisisPerSeverityBps":500,"scandalBps":500,"scandals":["quality_scandal","data_breach","protest","bad_review","strike"],"shareFallFreeBps":300,"shareFallShare":0.5,"maxShareBps":2000,"minBps":6000}'::jsonb, 'Defaults from src/config/balance.ts, section "wageMood"'),
   ('stockNews', '{"everyMinutes":12,"leadMinMinutes":10,"leadMaxMinutes":40,"minMoveBps":300,"maxMoveBps":1200,"reliabilityBps":7500,"keepHours":24}'::jsonb, 'Defaults from src/config/balance.ts, section "stockNews"'),
   ('social', '{"feed":{"pageSize":30,"bigTradeMinProfitCents":100000,"bigTradeMinBps":1500,"levelEvery":5,"artMinPriceCents":1000000,"carMinPriceCents":10000000,"streakMilestones":[7,30,100,365],"keepDays":30},"league":{"updateEveryMinutes":10,"podium":3,"minBaselineCents":1000000},"friendCode":{"bonusCents":500000}}'::jsonb, 'Defaults from src/config/balance.ts, section "social"'),

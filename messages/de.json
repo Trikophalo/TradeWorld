@@ -618,8 +618,8 @@
         "map": "Deine Skills: Oben steht, was du jetzt lernen kannst. Darunter ist jeder Bereich ein Pfad von den Grundlagen bis zur Meisterschaft. Unter „Karte“ siehst du alles auf einen Blick."
       },
       "visit_company": {
-        "dashboard": "Deine Firma! Jedes Quartal (6 Stunden) siehst du hier Umsatz und Gewinn.",
-        "growth": "Zum Wachsen brauchst du die richtigen Spezialisten. Hier steht, wer dir als Nächstes fehlt."
+        "dashboard": "Deine Firma! Unter „Übersicht“ siehst du jedes Quartal (6 Stunden) Umsatz und Gewinn, alles schön zum Aufklappen.",
+        "assistant": "Das ist Mira, deine KI-Assistentin. Sie meldet neue Aufgaben und Krisen. Schreib ihr einfach, wer was machen soll."
       },
       "visit_listing": {
         "listing": "Mit einem Börsengang holst du dir Geld von Investoren und kannst auf bis zu 100 Mitarbeiter wachsen."
@@ -771,7 +771,8 @@
     "nft_offer_closed": "Dieses Angebot gilt nicht mehr.",
     "nft_offer_unfunded": "Der Bieter hat inzwischen nicht mehr genug Geld.",
     "nft_not_for_sale": "Dieses NFT steht gerade nicht zum Verkauf.",
-    "nft_price_changed": "Der Preis hat sich gerade geändert. Schau ihn dir noch einmal an."
+    "nft_price_changed": "Der Preis hat sich gerade geändert. Schau ihn dir noch einmal an.",
+    "assistant_busy": "Mira hat in dieser Stunde schon viel nachgedacht. Klare Befehle versteht sie weiter sofort."
   },
   "locks": {
     "level": "Level {level}",
@@ -892,7 +893,7 @@
         "desc": "Rechner, Netze und die erste Zeile Code."
       },
       "it_programming": {
-        "name": "Program\u00admierung",
+        "name": "Program­mierung",
         "desc": "Software schreiben, die läuft."
       },
       "it_networks": {
@@ -900,11 +901,11 @@
         "desc": "Server und Verbindungen am Laufen halten."
       },
       "it_data": {
-        "name": "Daten\u00adanalyse",
+        "name": "Daten­analyse",
         "desc": "Aus Zahlen Erkenntnisse ziehen."
       },
       "it_architecture": {
-        "name": "Software\u00adarchi\u00adtektur",
+        "name": "Software­archi­tektur",
         "desc": "Große Systeme sauber planen."
       },
       "it_security": {
@@ -932,7 +933,7 @@
         "desc": "Einnahmen, Ausgaben, Zinsen."
       },
       "finance_accounting": {
-        "name": "Buch\u00adhaltung",
+        "name": "Buch­haltung",
         "desc": "Jeder Cent an seinem Platz."
       },
       "finance_investment": {
@@ -940,19 +941,19 @@
         "desc": "Geld anlegen mit Plan."
       },
       "finance_controlling": {
-        "name": "Control\u00adling",
+        "name": "Control­ling",
         "desc": "Kosten im Griff, Ziele im Blick."
       },
       "finance_balance": {
-        "name": "Bilan\u00adzierung",
+        "name": "Bilan­zierung",
         "desc": "Abschlüsse, die jede Prüfung bestehen."
       },
       "finance_portfolio": {
-        "name": "Portfolio\u00admanage\u00adment",
+        "name": "Portfolio­manage­ment",
         "desc": "Risiko streuen, Rendite steigern."
       },
       "finance_valuation": {
-        "name": "Unter\u00adnehmens\u00adbewertung",
+        "name": "Unter­nehmens­bewertung",
         "desc": "Was ist eine Firma wirklich wert?"
       },
       "finance_corporate": {
@@ -960,11 +961,11 @@
         "desc": "Kapital beschaffen, Wachstum finanzieren."
       },
       "finance_risk": {
-        "name": "Risiko\u00admanage\u00adment",
+        "name": "Risiko­manage­ment",
         "desc": "Krisen kommen, du bist vorbereitet."
       },
       "finance_mastery": {
-        "name": "Finanz\u00advirtuos:in",
+        "name": "Finanz­virtuos:in",
         "desc": "Geld arbeitet für dich, nicht umgekehrt."
       },
       "law_basics": {
@@ -972,19 +973,19 @@
         "desc": "Wie Gesetze und Gerichte funktionieren."
       },
       "law_contracts": {
-        "name": "Vertrags\u00adrecht",
+        "name": "Vertrags­recht",
         "desc": "Verträge lesen, schreiben, verhandeln."
       },
       "law_labor": {
-        "name": "Arbeits\u00adrecht",
+        "name": "Arbeits­recht",
         "desc": "Einstellen, kündigen, fair bleiben."
       },
       "law_tax": {
-        "name": "Steuer\u00adrecht",
+        "name": "Steuer­recht",
         "desc": "Abgaben verstehen und richtig planen."
       },
       "law_corporate": {
-        "name": "Gesell\u00adschafts\u00adrecht",
+        "name": "Gesell­schafts­recht",
         "desc": "GmbH, AG und alles dazwischen."
       },
       "law_compliance": {
@@ -992,15 +993,15 @@
         "desc": "Regeln einhalten, bevor es teuer wird."
       },
       "law_intltax": {
-        "name": "Inter\u00adnationales Steuer\u00adrecht",
+        "name": "Inter­nationales Steuer­recht",
         "desc": "Steuern über Grenzen hinweg."
       },
       "law_capital": {
-        "name": "Kapital\u00admarkt\u00adrecht",
+        "name": "Kapital­markt­recht",
         "desc": "Börsengänge und Prospekte rechtssicher."
       },
       "law_crime": {
-        "name": "Wirtschafts\u00adstraf\u00adrecht",
+        "name": "Wirtschafts­straf­recht",
         "desc": "Wo die Grauzone endet."
       },
       "law_mastery": {
@@ -1016,7 +1017,7 @@
         "desc": "Was sich bewegt, verstehst du."
       },
       "craft_electrical": {
-        "name": "Elektro\u00adtechnik",
+        "name": "Elektro­technik",
         "desc": "Strom, Schaltungen, Anlagen."
       },
       "craft_construction": {
@@ -1024,11 +1025,11 @@
         "desc": "Fundamente, Wände, Dächer."
       },
       "craft_engineering": {
-        "name": "Maschinen\u00adbau",
+        "name": "Maschinen­bau",
         "desc": "Maschinen entwerfen und verbessern."
       },
       "craft_automation": {
-        "name": "Automati\u00adsierung",
+        "name": "Automati­sierung",
         "desc": "Anlagen, die von selbst laufen."
       },
       "craft_site": {
@@ -1036,11 +1037,11 @@
         "desc": "Baustellen pünktlich und im Budget."
       },
       "craft_manufacturing": {
-        "name": "Fertigungs\u00adtechnik",
+        "name": "Fertigungs­technik",
         "desc": "Produktion schneller und günstiger."
       },
       "craft_energy": {
-        "name": "Energie\u00adtechnik",
+        "name": "Energie­technik",
         "desc": "Kraftwerke, Netze, Speicher."
       },
       "craft_mastery": {
@@ -1060,15 +1061,15 @@
         "desc": "Aufmerksamkeit gewinnen."
       },
       "sales_service": {
-        "name": "Kunden\u00adservice",
+        "name": "Kunden­service",
         "desc": "Aus Kunden werden Stammkunden."
       },
       "sales_negotiation": {
-        "name": "Verhand\u00adlung",
+        "name": "Verhand­lung",
         "desc": "Der bessere Preis auf beiden Seiten."
       },
       "sales_brand": {
-        "name": "Marken\u00adführung",
+        "name": "Marken­führung",
         "desc": "Eine Marke, die man wiedererkennt."
       },
       "sales_keyaccount": {
@@ -1076,7 +1077,7 @@
         "desc": "Die großen Kunden betreuen."
       },
       "sales_international": {
-        "name": "Inter\u00adnationaler Vertrieb",
+        "name": "Inter­nationaler Vertrieb",
         "desc": "Neue Märkte erobern."
       },
       "sales_growth": {
@@ -1084,7 +1085,7 @@
         "desc": "Wachstum mit kleinem Budget."
       },
       "sales_mastery": {
-        "name": "Verkaufs\u00adlegende",
+        "name": "Verkaufs­legende",
         "desc": "Du verkaufst Sand in der Wüste."
       },
       "management_basics": {
@@ -1092,11 +1093,11 @@
         "desc": "Ziele setzen, Aufgaben verteilen."
       },
       "management_team": {
-        "name": "Team\u00adführung",
+        "name": "Team­führung",
         "desc": "Menschen motivieren."
       },
       "management_projects": {
-        "name": "Projekt\u00admanage\u00adment",
+        "name": "Projekt­manage­ment",
         "desc": "Termine halten, Budgets einhalten."
       },
       "management_people": {
@@ -1120,7 +1121,7 @@
         "desc": "Wohin die Firma in fünf Jahren will."
       },
       "management_organization": {
-        "name": "Organi\u00adsations\u00adentwick\u00adlung",
+        "name": "Organi­sations­entwick­lung",
         "desc": "Strukturen, die mitwachsen."
       },
       "management_mastery": {
@@ -1128,7 +1129,7 @@
         "desc": "Andere folgen dir, weil sie wollen."
       },
       "science_basics": {
-        "name": "Wissen\u00adschafts-Grundlagen",
+        "name": "Wissen­schafts-Grundlagen",
         "desc": "Experimente, Daten, Methoden."
       },
       "science_chemistry": {
@@ -1144,11 +1145,11 @@
         "desc": "Diagnosen und Behandlungen."
       },
       "science_pharmacology": {
-        "name": "Pharma\u00adkologie",
+        "name": "Pharma­kologie",
         "desc": "Wie Wirkstoffe im Körper wirken."
       },
       "science_biotech": {
-        "name": "Bio\u00adtechno\u00adlogie",
+        "name": "Bio­techno­logie",
         "desc": "Lebende Systeme als Fabrik."
       },
       "science_clinical": {
@@ -1156,7 +1157,7 @@
         "desc": "Studien planen und auswerten."
       },
       "science_drugs": {
-        "name": "Wirkstoff\u00adentwick\u00adlung",
+        "name": "Wirkstoff­entwick­lung",
         "desc": "Vom Molekül zum Medikament."
       },
       "science_genetics": {
@@ -1164,7 +1165,7 @@
         "desc": "Erbgut lesen und verändern."
       },
       "science_mastery": {
-        "name": "Forschungs\u00adgenie",
+        "name": "Forschungs­genie",
         "desc": "Durchbrüche sind dein Alltag."
       },
       "logistics_basics": {
@@ -1172,7 +1173,7 @@
         "desc": "Waren, Wege, Zeiten."
       },
       "logistics_warehouse": {
-        "name": "Lager\u00adwirtschaft",
+        "name": "Lager­wirtschaft",
         "desc": "Alles da, wenn es gebraucht wird."
       },
       "logistics_transport": {
@@ -1188,11 +1189,11 @@
         "desc": "Lieferketten, die nicht reißen."
       },
       "logistics_fleet": {
-        "name": "Flotten\u00admanage\u00adment",
+        "name": "Flotten­manage­ment",
         "desc": "Fahrzeuge optimal einsetzen."
       },
       "logistics_strategic": {
-        "name": "Strate\u00adgischer Einkauf",
+        "name": "Strate­gischer Einkauf",
         "desc": "Lieferanten als Partner."
       },
       "logistics_global": {
@@ -1200,7 +1201,7 @@
         "desc": "Weltweit pünktlich."
       },
       "logistics_quality": {
-        "name": "Qualitäts\u00admanage\u00adment",
+        "name": "Qualitäts­manage­ment",
         "desc": "Fehler finden, bevor Kunden es tun."
       },
       "logistics_mastery": {
@@ -1212,7 +1213,7 @@
         "desc": "Software für Geld: Zahlungen, Trading, Banking."
       },
       "hybrid_business_law": {
-        "name": "Wirtschafts\u00adrecht",
+        "name": "Wirtschafts­recht",
         "desc": "Recht und Zahlen in einer Person."
       },
       "hybrid_industry40": {
@@ -1220,7 +1221,7 @@
         "desc": "Vernetzte Fabriken, die mitdenken."
       },
       "hybrid_pharma_sales": {
-        "name": "Pharma\u00advertrieb",
+        "name": "Pharma­vertrieb",
         "desc": "Medikamente erklären und verkaufen."
       },
       "hybrid_ecommerce": {
@@ -1232,7 +1233,7 @@
         "desc": "Mit Daten bessere Teams bauen."
       },
       "it_web": {
-        "name": "Web\u00adentwicklung",
+        "name": "Web­entwicklung",
         "desc": "Websites und Web-Apps, die jeder bedienen kann."
       },
       "it_mobile": {
@@ -1240,7 +1241,7 @@
         "desc": "Apps für Handy und Tablet."
       },
       "it_databases": {
-        "name": "Daten\u00adbanken",
+        "name": "Daten­banken",
         "desc": "Daten sicher speichern und schnell finden."
       },
       "it_devops": {
@@ -1248,7 +1249,7 @@
         "desc": "Software automatisch testen und ausliefern."
       },
       "it_testing": {
-        "name": "Software\u00adtests",
+        "name": "Software­tests",
         "desc": "Fehler finden, bevor Kunden sie finden."
       },
       "it_ux": {
@@ -1260,11 +1261,11 @@
         "desc": "Software in Geräten und Maschinen."
       },
       "it_crypto": {
-        "name": "Krypto\u00adgrafie",
+        "name": "Krypto­grafie",
         "desc": "Verschlüsselung, die hält."
       },
       "it_pentest": {
-        "name": "Pene\u00adtrations\u00adtests",
+        "name": "Pene­trations­tests",
         "desc": "Systeme angreifen, um sie zu schützen."
       },
       "it_bigdata": {
@@ -1276,11 +1277,11 @@
         "desc": "Konten, Kredite und Zahlungsverkehr."
       },
       "finance_tax_planning": {
-        "name": "Steuer\u00adplanung",
+        "name": "Steuer­planung",
         "desc": "Legal Steuern sparen."
       },
       "finance_budgeting": {
-        "name": "Budget\u00adplanung",
+        "name": "Budget­planung",
         "desc": "Geld planen, bevor es weg ist."
       },
       "finance_treasury": {
@@ -1300,35 +1301,35 @@
         "desc": "Firmen kaufen und zusammenführen."
       },
       "finance_vc": {
-        "name": "Wagnis\u00adkapital",
+        "name": "Wagnis­kapital",
         "desc": "In junge Firmen investieren."
       },
       "finance_audit": {
-        "name": "Wirtschafts\u00adprüfung",
+        "name": "Wirtschafts­prüfung",
         "desc": "Zahlen anderer kritisch prüfen."
       },
       "finance_insurance": {
-        "name": "Versiche\u00adrungen",
+        "name": "Versiche­rungen",
         "desc": "Risiken gegen Geld abgeben."
       },
       "finance_quant": {
-        "name": "Quanti\u00adtative Analyse",
+        "name": "Quanti­tative Analyse",
         "desc": "Märkte mit Mathematik verstehen."
       },
       "law_ip": {
-        "name": "Patent\u00adrecht",
+        "name": "Patent­recht",
         "desc": "Erfindungen und Marken schützen."
       },
       "law_privacy": {
-        "name": "Daten\u00adschutz",
+        "name": "Daten­schutz",
         "desc": "Mit Kundendaten richtig umgehen."
       },
       "law_competition": {
-        "name": "Wett\u00adbewerbs\u00adrecht",
+        "name": "Wett­bewerbs­recht",
         "desc": "Fair im Wettbewerb bleiben."
       },
       "law_consumer": {
-        "name": "Verbraucher\u00adrecht",
+        "name": "Verbraucher­recht",
         "desc": "Was Kunden zusteht."
       },
       "law_it": {
@@ -1336,19 +1337,19 @@
         "desc": "Lizenzen, Software und Internet."
       },
       "law_environment": {
-        "name": "Umwelt\u00adrecht",
+        "name": "Umwelt­recht",
         "desc": "Auflagen für Natur und Klima."
       },
       "law_medical": {
-        "name": "Medizin\u00adrecht",
+        "name": "Medizin­recht",
         "desc": "Zulassungen und Haftung in der Medizin."
       },
       "law_international": {
-        "name": "Inter\u00adnationales Recht",
+        "name": "Inter­nationales Recht",
         "desc": "Verträge über Grenzen hinweg."
       },
       "law_litigation": {
-        "name": "Prozess\u00adführung",
+        "name": "Prozess­führung",
         "desc": "Vor Gericht bestehen."
       },
       "law_mediation": {
@@ -1360,11 +1361,11 @@
         "desc": "Menschen begeistern und führen."
       },
       "management_communication": {
-        "name": "Kommuni\u00adkation",
+        "name": "Kommuni­kation",
         "desc": "Klar sagen, was Sache ist."
       },
       "management_finance_lead": {
-        "name": "Finanz\u00adführung",
+        "name": "Finanz­führung",
         "desc": "Budgets verantworten."
       },
       "management_operations": {
@@ -1372,7 +1373,7 @@
         "desc": "Abläufe, die funktionieren."
       },
       "management_innovation": {
-        "name": "Inno\u00advations\u00admanage\u00adment",
+        "name": "Inno­vations­manage­ment",
         "desc": "Neue Ideen ins Ziel bringen."
       },
       "management_coaching": {
@@ -1380,19 +1381,19 @@
         "desc": "Andere besser machen."
       },
       "management_risk": {
-        "name": "Krisen\u00admanage\u00adment",
+        "name": "Krisen­manage­ment",
         "desc": "Ruhig bleiben, wenn es brennt."
       },
       "management_international": {
-        "name": "Inter\u00adnationale Führung",
+        "name": "Inter­nationale Führung",
         "desc": "Teams in vielen Ländern."
       },
       "management_board": {
-        "name": "Aufsichts\u00adrat",
+        "name": "Aufsichts­rat",
         "desc": "Firmen kontrollieren und beraten."
       },
       "management_culture": {
-        "name": "Unter\u00adnehmens\u00adkultur",
+        "name": "Unter­nehmens­kultur",
         "desc": "Wie eine Firma tickt."
       },
       "sales_social": {
@@ -1404,19 +1405,19 @@
         "desc": "Inhalte, die verkaufen."
       },
       "sales_seo": {
-        "name": "Such\u00admaschinen\u00adoptimie\u00adrung",
+        "name": "Such­maschinen­optimie­rung",
         "desc": "Bei Google oben stehen."
       },
       "sales_ads": {
-        "name": "Werbe\u00adkampagnen",
+        "name": "Werbe­kampagnen",
         "desc": "Anzeigen, die wirken."
       },
       "sales_pricing": {
-        "name": "Preis\u00adgestaltung",
+        "name": "Preis­gestaltung",
         "desc": "Der richtige Preis zur richtigen Zeit."
       },
       "sales_retail": {
-        "name": "Einzel\u00adhandel",
+        "name": "Einzel­handel",
         "desc": "Verkaufen im Laden."
       },
       "sales_b2b": {
@@ -1424,11 +1425,11 @@
         "desc": "Verkaufen an Firmen."
       },
       "sales_crm": {
-        "name": "Kunden\u00adbezie\u00adhungen",
+        "name": "Kunden­bezie­hungen",
         "desc": "Kunden kennen und halten."
       },
       "sales_pr": {
-        "name": "Presse\u00adarbeit",
+        "name": "Presse­arbeit",
         "desc": "Gute Schlagzeilen machen."
       },
       "sales_events": {
@@ -1436,11 +1437,11 @@
         "desc": "Kunden live begeistern."
       },
       "logistics_inventory": {
-        "name": "Bestands\u00adführung",
+        "name": "Bestands­führung",
         "desc": "Immer genug, nie zu viel."
       },
       "logistics_distribution": {
-        "name": "Distri\u00adbution",
+        "name": "Distri­bution",
         "desc": "Waren zum Kunden bringen."
       },
       "logistics_customs": {
@@ -1448,15 +1449,15 @@
         "desc": "Waren über Grenzen bringen."
       },
       "logistics_shipping": {
-        "name": "See\u00adfracht",
+        "name": "See­fracht",
         "desc": "Container um die Welt schicken."
       },
       "logistics_air": {
-        "name": "Luft\u00adfracht",
+        "name": "Luft­fracht",
         "desc": "Schnell, aber teuer."
       },
       "logistics_rail": {
-        "name": "Schienen\u00adverkehr",
+        "name": "Schienen­verkehr",
         "desc": "Viel Fracht auf Schienen."
       },
       "logistics_lastmile": {
@@ -1468,11 +1469,11 @@
         "desc": "Frisch bis zum Ziel."
       },
       "logistics_planning": {
-        "name": "Touren\u00adplanung",
+        "name": "Touren­planung",
         "desc": "Die beste Route finden."
       },
       "logistics_automation": {
-        "name": "Lager\u00adautomati\u00adsierung",
+        "name": "Lager­automati­sierung",
         "desc": "Roboter im Lager."
       },
       "logistics_sustainability": {
@@ -1484,7 +1485,7 @@
         "desc": "Metall fest verbinden."
       },
       "craft_plumbing": {
-        "name": "Sanitär\u00adtechnik",
+        "name": "Sanitär­technik",
         "desc": "Wasser dahin, wo es hin soll."
       },
       "craft_hvac": {
@@ -1504,11 +1505,11 @@
         "desc": "Teile Schicht für Schicht."
       },
       "craft_vehicles": {
-        "name": "Fahrzeug\u00adtechnik",
+        "name": "Fahrzeug­technik",
         "desc": "Autos und Lkw verstehen."
       },
       "craft_solar": {
-        "name": "Solar\u00adtechnik",
+        "name": "Solar­technik",
         "desc": "Strom von der Sonne."
       },
       "craft_robotics": {
@@ -1516,7 +1517,7 @@
         "desc": "Roboter bauen und warten."
       },
       "craft_materials": {
-        "name": "Werkstoff\u00adkunde",
+        "name": "Werkstoff­kunde",
         "desc": "Das richtige Material wählen."
       },
       "science_physics": {
@@ -1524,7 +1525,7 @@
         "desc": "Wie die Welt funktioniert."
       },
       "science_lab": {
-        "name": "Labor\u00adpraxis",
+        "name": "Labor­praxis",
         "desc": "Sauber messen und experimentieren."
       },
       "science_statistics": {
@@ -1532,27 +1533,27 @@
         "desc": "Zufall von Wirkung trennen."
       },
       "science_microbiology": {
-        "name": "Mikro\u00adbiologie",
+        "name": "Mikro­biologie",
         "desc": "Bakterien, Viren und Pilze."
       },
       "science_nutrition": {
-        "name": "Ernährungs\u00adwissen\u00adschaft",
+        "name": "Ernährungs­wissen­schaft",
         "desc": "Was der Körper braucht."
       },
       "science_materials": {
-        "name": "Material\u00adforschung",
+        "name": "Material­forschung",
         "desc": "Neue Stoffe entdecken."
       },
       "science_environment": {
-        "name": "Umwelt\u00adwissen\u00adschaft",
+        "name": "Umwelt­wissen­schaft",
         "desc": "Klima und Ökosysteme."
       },
       "science_neuro": {
-        "name": "Neuro\u00adwissen\u00adschaft",
+        "name": "Neuro­wissen­schaft",
         "desc": "Wie das Gehirn arbeitet."
       },
       "science_devices": {
-        "name": "Medizin\u00adtechnik",
+        "name": "Medizin­technik",
         "desc": "Geräte, die heilen helfen."
       },
       "science_vaccines": {
@@ -2262,7 +2263,25 @@
       "save": "Auszahlung speichern",
       "saved": "Auszahlung gespeichert"
     },
-    "closeNext": "Danach kannst du sofort eine neue Firma gründen. Der Name deiner alten Firma ist dann wieder frei."
+    "closeNext": "Danach kannst du sofort eine neue Firma gründen. Der Name deiner alten Firma ist dann wieder frei.",
+    "tabMira": "Mira",
+    "sections": {
+      "money": "Quartal & Kasse",
+      "moneySummary": "Letztes Quartal: {amount}",
+      "moneyEmpty": "Noch kein Quartal abgeschlossen",
+      "moves": "Geschäftszüge",
+      "movesSummary": "Aktionen starten oder eine eigene Idee einreichen",
+      "situation": "Lage & Nachrichten",
+      "situationSummary": "Krisen, Chancen und was über euch berichtet wird",
+      "history": "Verlauf",
+      "historySummary": "Die letzten Quartale im Vergleich",
+      "business": "Produktion & Wachstum",
+      "businessSummary": "Was ihr herstellt, wer fehlt, wie ihr größer werdet",
+      "profit": "Gewinn-Hebel",
+      "profitSummary": "Strategie, Preise, Werbung und Einnahmequellen",
+      "boss": "Chefbüro",
+      "bossSummary": "Gehälter, KI-Kräfte und Einstellungen"
+    }
   },
   "debt": {
     "title": "Schulden",
@@ -6345,5 +6364,100 @@
     "startIntro": "Kostet {amount}. Du brauchst {goal} Unterstützer; KI-Unterstützer kommen von selbst, den Rest müssen Spieler stellen. Nur selten hat eine Kampagne echte Folgen.",
     "started": "Kampagne gestartet",
     "startedText": "Jetzt brauchst du Mitstreiter. Die Kampagne steht im News-Tab."
+  },
+  "mira": {
+    "name": "Mira",
+    "badge": "KI",
+    "subtitle": "Deine Assistentin bei {company}",
+    "thinking": "Mira denkt nach",
+    "hello": "Hi, ich bin Mira! Ich behalte {company} im Blick: neue Aufgaben, Krisen, freie Geschäftszüge. Sag mir einfach, wer was machen soll, oder tipp auf einen Vorschlag.",
+    "placeholder": "Schreib Mira, z. B. „Gib das Packen an Anna“",
+    "send": "Senden",
+    "choices": "Vorschläge",
+    "tip": "Tipp",
+    "error": "Das hat nicht geklappt:",
+    "busy": "Ich habe in dieser Stunde schon viel nachgedacht. Klare Befehle verstehe ich aber weiter sofort.",
+    "unknown": "Hm, das habe ich nicht ganz verstanden.",
+    "many": "Das sind {count} Aufgaben. Tipp an, was ich vergeben soll:",
+    "ask": {
+      "who": "Wer soll „{task}“ machen?",
+      "which": "Welche Aufgabe meinst du?"
+    },
+    "compose": {
+      "event": "Schreib mir in ein, zwei Sätzen, wie wir reagieren. Die Jury prüft, ob es zur Lage passt. Schönfärberei kann nach hinten losgehen.",
+      "move": "Beschreib deinen eigenen Geschäftszug in ein, zwei Sätzen und wähl ein Ziel. Die Jury schätzt die Chance.",
+      "short": "Etwas genauer bitte, mindestens {min} Zeichen.",
+      "badgeEvent": "Strategie für die Lage",
+      "badgeMove": "Eigener Geschäftszug",
+      "cancel": "Abbrechen",
+      "placeholderEvent": "Wir …",
+      "placeholderMove": "Wir starten …"
+    },
+    "goals": {
+      "cash": "Geld",
+      "awareness": "Bekanntheit",
+      "quality": "Qualität"
+    },
+    "ok": {
+      "ai": "Erledigt: Die KI kümmert sich um „{task}“. Sie braucht etwa {minutes} Min.",
+      "delegated": "Erledigt: {name} kümmert sich um „{task}“.",
+      "move": "Los geht’s: „{move}“ läuft, Ergebnis in {minutes} Min.",
+      "pitchEvent": "Deine Strategie liegt bei der Jury. Ich sag dir Bescheid, wie es ausgeht.",
+      "pitchMove": "Deine Idee liegt bei der Jury. Sie schätzt gleich die Chance.",
+      "autoOn": "Okay: Die KI übernimmt ab jetzt offene Aufgaben automatisch, kurz bevor sie verfallen.",
+      "autoOff": "Okay: Die KI übernimmt nichts mehr von allein."
+    },
+    "brief": {
+      "task": "Neue Aufgabe: „{task}“, wert {value}, noch {minutes} Min.",
+      "myTask": "Du hast eine Aufgabe: „{task}“, wert {value}, noch {minutes} Min.",
+      "recommend": "Mein Tipp:",
+      "crisis": "Achtung, Krise: {headline}",
+      "chance": "Eine Chance: {headline}",
+      "eventAsk": "Wie reagieren wir? Du kannst mir eine eigene Strategie schreiben oder dir die fertigen Wege ansehen.",
+      "moves": "{free, plural, one {Ein Platz für Geschäftszüge ist frei.} other {# Plätze für Geschäftszüge sind frei.}} Das würde ich jetzt machen:",
+      "applications": "{count, plural, one {Eine Bewerbung wartet} other {# Bewerbungen warten}} auf dich.",
+      "calm": "Gerade ist alles ruhig. Ich melde mich, sobald etwas ansteht.",
+      "examples": "Du kannst mir zum Beispiel schreiben:"
+    },
+    "options": {
+      "give": "An {name} geben",
+      "self": "Mach ich selbst",
+      "ai": "An die KI geben",
+      "anyway": "Trotzdem so machen",
+      "writeStrategy": "Eigene Strategie schreiben",
+      "showEvent": "Fertige Wege ansehen",
+      "move": "„{move}“ starten",
+      "ownMove": "Eigene Idee",
+      "openTeam": "Bewerbungen ansehen",
+      "aiTask": "„{task}“ an die KI",
+      "giveTask": "„{task}“ an {name}",
+      "selfTask": "„{task}“ selbst machen",
+      "pitchEvent": "Als Strategie einreichen",
+      "pitchMove": "Als Geschäftszug einreichen",
+      "autoOn": "KI automatisch an",
+      "autoOff": "KI automatisch aus"
+    },
+    "why": {
+      "busy": "{name} hat schon {open} offene Aufgaben. Das könnte knapp werden.",
+      "free": "{name} hat gerade nichts zu tun.",
+      "some": "{name} hat {open, plural, one {eine} other {#}} offene Aufgabe{open, plural, one {} other {n}}, das geht noch.",
+      "self": "Ein kurzes Minispiel, bringt den vollen Wert ({value}).",
+      "aiLate": "Die KI braucht etwa {minutes} Min. Das schafft sie vor der Frist nicht.",
+      "ai": "Braucht etwa {minutes} Min., schafft es in {chance} % der Fälle und bringt nur {share} % des Werts.",
+      "risky": "Das ist riskant.",
+      "moveCash": "{chance} % Chance, kostet {cost}, bringt {payout} in {minutes} Min.",
+      "moveGain": "{chance} % Chance, kostet {cost}, dauert {minutes} Min.",
+      "pitch": "„{text}“"
+    },
+    "warn": {
+      "better": "Besser wäre:",
+      "noBetter": "Willst du es trotzdem so?"
+    },
+    "examples": {
+      "status": "„Was steht an?“",
+      "free": "„{text}“",
+      "autoOn": "„KI automatisch an“",
+      "autoOff": "„KI automatisch aus“"
+    }
   }
 }

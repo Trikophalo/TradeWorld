@@ -56,12 +56,13 @@ const JUDGMENT_JSON_SCHEMA = {
   additionalProperties: false,
   required: ["fit", "backfire", "verdict", "success", "failure", "backfire_text"],
   properties: {
-    fit: { type: "integer", minimum: 0, maximum: 100 },
-    backfire: { type: "integer", minimum: 0, maximum: 100 },
-    verdict: { type: "string", maxLength: 200 },
-    success: { type: "string", maxLength: 280 },
-    failure: { type: "string", maxLength: 280 },
-    backfire_text: { type: "string", maxLength: 280 },
+    // Structured outputs take no numeric or length limits; zod checks them below.
+    fit: { type: "integer" },
+    backfire: { type: "integer" },
+    verdict: { type: "string" },
+    success: { type: "string" },
+    failure: { type: "string" },
+    backfire_text: { type: "string" },
   },
 };
 

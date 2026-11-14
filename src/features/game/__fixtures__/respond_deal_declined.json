@@ -1,5 +1,5 @@
 {
-  "id": "9b350fe4-e72c-47d3-9726-70dfb0379334",
+  "id": "41c0b70e-2115-4b2d-b1c9-0dab3950676c",
   "kind": "loan",
   "terms": { "hours": 24, "interest_bps": 0, "principal_cents": 20000 },
   "status": "declined",
@@ -9,20 +9,20 @@
   "my_role": "borrower",
   "progress": { "due_cents": 20000, "left_cents": 20000, "repaid_cents": 0 },
   "proposer": {
-    "tag": "M8NQ",
+    "tag": "Y4XY",
     "level": 6,
     "trust": { "band": "blank", "score": 50 },
     "nickname": "Fixture_Lieferant",
     "avatar_key": "rookie"
   },
-  "closed_at": "2026-11-14T15:09:13.61208+00:00",
-  "created_at": "2026-11-14T15:09:13.55713+00:00",
-  "expires_at": "2026-11-16T15:09:13.55713+00:00",
+  "closed_at": "2026-11-14T15:50:25.683567+00:00",
+  "created_at": "2026-11-14T15:50:25.638816+00:00",
+  "expires_at": "2026-11-16T15:50:25.638816+00:00",
   "accepted_at": null,
   "is_proposer": false,
   "broken_by_me": false,
   "counterparty": {
-    "tag": "6WQ4",
+    "tag": "EM7J",
     "level": 6,
     "trust": { "band": "blank", "score": 50 },
     "nickname": "Fixture_Abnehmer",

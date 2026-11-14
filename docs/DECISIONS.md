@@ -2108,3 +2108,34 @@ Chat darunter kaum erreichbar.
   werden einmal nachgereicht. Fällt der Server aus, bleibt die Browser-Liste gültig.
 - Der Fortschritt mitten im ersten Tutorial bleibt im Browser; ob es fertig ist, wusste der Server schon vorher.
 - Die NFT-Details öffnen unter 1024 px als Bottom-Sheet (Tastatur, sichere Ränder), darüber als großes Fenster.
+
+## ADR-138: Mira – die Firma läuft über einen Chat mit KI, die Übersicht klappt auf — `akzeptiert`
+
+**Kontext:** Der Firmen-Tab war eine lange Liste aus Karten und Knöpfen. Spieler sollen mehr mitdenken und Aufgaben an
+ihr Team vergeben, statt nur Knöpfe zu drücken. Die Übersicht war zu unübersichtlich.
+
+**Entscheidung:**
+
+- **Mira**, die KI-Assistentin, ist der erste Tab der Firma (und erscheint für Angestellte über dem Aufgabenbrett).
+  Sie meldet neue Aufgaben, eine Krise oder Chance, freie Plätze für Geschäftszüge und wartende Bewerbungen, je
+  einmal, und wägt ab: Wer hat Zeit (offene Aufgaben je Person), schafft die KI die Frist, was bringt ein Zug bei der
+  Kasse (Erwartungswert je Minute). Der beste Weg trägt „Tipp“, riskante sind markiert.
+- **Befehle im Chat:** „Gib das Packen an Anna“, „Inventur macht die KI“, „Das mache ich selbst“, „Alles an Anna“,
+  „Starte den Wochenmarkt“, „KI automatisch an“, „Was steht an?“. Der Browser versteht sie (Wortstämme der
+  Aufgaben- und Zugnamen, Spitznamen, „KI“, „ich“). Fehlt die Person oder die Aufgabe, fragt Mira zurück. Ist die Wahl
+  riskant (jemand hat schon zwei offene Aufgaben, die KI ist zu langsam), fragt sie nach und nennt die bessere Wahl.
+- **Freier Text** geht an Claude (Edge Function `company-assistant`, `claude-opus-5-5`, geringer Aufwand,
+  JSON-Schema). Claude schlägt höchstens drei Aktionen vor; der Browser prüft sie gegen den aktuellen Stand und zeigt
+  sie als Knöpfe. Nichts passiert ohne Tipp, und jede Aktion läuft über die bestehenden RPCs. Der Server bleibt die
+  Autorität. Eine eigene Strategie für eine Krise oder einen Geschäftszug schreibt man direkt in den Chat; sie geht an
+  die Jury aus ADR-132.
+- `company_assistant_context(p_text)` liefert Claude Firma, Team, Aufgaben, Züge und Lage und zählt den Aufruf:
+  höchstens 20 pro Spieler und Stunde (`companyAssistant.claudePerHour`, Fehler NX126 `assistant_busy`). Ohne
+  Schlüssel oder über dem Limit antwortet die Mini-Mira im Browser mit Beispielen.
+- Das Gespräch bleibt, solange die App offen ist; nach einem Neuladen meldet Mira den aktuellen Stand neu.
+- **Übersicht zum Aufklappen:** sieben Bereiche (Quartal & Kasse, Geschäftszüge, Lage & Nachrichten, Verlauf,
+  Produktion & Wachstum, Gewinn-Hebel, Chefbüro) mit einer Zeile Zusammenfassung. Offen ist am Anfang nur „Quartal &
+  Kasse“; der Browser merkt sich, was offen ist. Sprünge (z. B. vom Gewinn-Coach ins Chefbüro) öffnen den Bereich.
+- Finns Firmen-Tour zeigt jetzt auf Mira statt auf den Wachstumspfad.
+- Nebenbei: Die JSON-Schemas der Edge Functions `strategy-judge` und `company-writer` enthielten Grenzen
+  (`minimum`, `maxLength`, `minItems`), die strukturierte Ausgaben nicht kennen; die Grenzen prüft jetzt nur noch zod.

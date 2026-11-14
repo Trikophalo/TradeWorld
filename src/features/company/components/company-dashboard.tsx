@@ -2,11 +2,12 @@
 
 import { motion } from "motion/react";
 import { useTranslations } from "next-intl";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { COMPANY_BUILDINGS, UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Button, type ButtonState } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { HoldButton } from "@/components/ui/hold-button";
 import { Field } from "@/components/ui/input";
 import { LiveMoney, ShortMoney } from "@/components/ui/live-money";
@@ -24,7 +25,9 @@ import { haptic } from "@/lib/haptics";
 import { SPRING } from "@/lib/motion";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
+import { MiraChat } from "../assistant/mira-chat";
 import { useCompanyRefresh } from "../hooks";
+import { useCompanySections } from "../sections";
 import { CompanyChat } from "./company-chat";
 import { HireSheet, TeamView, type HireRequest } from "./employer";
 import { CompanyMovesCard } from "./company-moves";
@@ -41,7 +44,7 @@ import { ProductionCard } from "./production";
 import { CampaignCard, ProfitRoutes } from "./routes";
 import { CompanyNewsCard, SituationCard } from "./situation";
 
-type Tab = "overview" | "tasks" | "team" | "chat";
+type Tab = "mira" | "overview" | "tasks" | "team" | "chat";
 const factor = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
 const money = (cents: number) => formatMoney(cents, { whole: true });
 const NEXT_TIER = { garage: "small_business", small_business: "gmbh", gmbh: "ag", ag: null } as const;
@@ -50,7 +53,20 @@ const NEXT_TIER = { garage: "small_business", small_business: "gmbh", gmbh: "ag"
 export function CompanyDashboard({ company }: { company: MyCompany }) {
   const t = useTranslations("firm");
   const tl = useTranslations("logo");
-  const [tab, setTab] = useState<Tab>("overview");
+  const ts = useTranslations("firm.sections");
+  const [tab, setTab] = useState<Tab>("mira");
+  const sections = useCompanySections();
+  useEffect(() => useCompanySections.getState().load(), []);
+  const section = (id: string) => ({
+    id,
+    open: sections.open.includes(id),
+    onOpenChange: (open: boolean) => sections.toggle(id, open),
+  });
+  /** Show a section of the overview (from Mira or a shortcut) and scroll to it. */
+  const reveal = (id: string, target?: string) => {
+    setTab("overview");
+    sections.reveal(id, target);
+  };
   const tt = useTranslations("companyTasks");
   const tasks = useCompanyTasks();
   const openTasks = tasks.data?.tasks.filter((x) => x.status === "open").length ?? 0;
@@ -106,57 +122,118 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
         value={tab}
         onChange={setTab}
         tabs={[
+          { value: "mira", label: t("tabMira"), icon: "robot", badge: openTasks },
           { value: "overview", label: t("tabOverview"), icon: "home" },
-          { value: "tasks", label: tt("tab"), icon: "briefcase", badge: openTasks },
+          { value: "tasks", label: tt("tab"), icon: "briefcase" },
           { value: "team", label: t("tabTeam"), icon: "profile", badge: company.pendingApplications },
           { value: "chat", label: t("tabChat"), icon: "bell" },
         ]}
       />
 
+      {tab === "mira" && (
+        <MiraChat
+          applications={company.pendingApplications}
+          onOpen={(to, id) => {
+            if (to === "overview" && id) return reveal(id);
+            setTab(to);
+          }}
+        />
+      )}
       {tab === "overview" && (
-        <div className="grid gap-5 *:min-w-0 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6">
-          <div className="space-y-5">
-            <ProductionCard
-              company={company}
-              onTeam={() => setTab("team")}
-              onCampaign={() =>
-                document.getElementById("campaign")?.scrollIntoView({ behavior: "smooth", block: "center" })
+        <div className="grid items-start gap-4 *:min-w-0 lg:grid-cols-2 lg:gap-5" data-testid="company-overview">
+          <div className="space-y-4">
+            <CollapsibleSection
+              {...section("money")}
+              title={ts("money")}
+              summary={
+                company.lastQuarter
+                  ? ts("moneySummary", { amount: money(netProfit(company.lastQuarter)) })
+                  : ts("moneyEmpty")
               }
-            />
-            {/* The last quarter right at the top: the most asked-for numbers (ADR-133) */}
-            <div id="quarter" className="scroll-mt-24">
-              <QuarterReceipt company={company} />
-            </div>
-            <CompanyMovesCard />
-            <PitchCard kind="move" />
-            <SituationCard />
-            <PitchCard kind="event" />
-            <ProfitCoach
-              company={company}
-              onNavigate={(to) => {
-                if (to === "team") return setTab("team");
-                document.getElementById("company-controls")?.scrollIntoView({ behavior: "smooth", block: "center" });
-              }}
-            />
-            <ProfitRoutes company={company} />
-            <GrowthPath
-              company={company}
-              onFill={(skills) => setHire({ skills })}
-              onTrain={trainingOpen ? goTraining : undefined}
-            />
-            <ExpansionCard company={company} />
-            <CompanyNewsCard />
-            <HistoryCard company={company} />
+              icon={<PixelIcon {...UI_ICONS.portfolio} scale={2} />}
+            >
+              {/* The last quarter right at the top: the most asked-for numbers (ADR-133) */}
+              <div id="quarter" className="scroll-mt-24">
+                <QuarterReceipt company={company} />
+              </div>
+              <TreasuryCard company={company} />
+              <PayoutCard company={company} />
+            </CollapsibleSection>
+            <CollapsibleSection
+              {...section("moves")}
+              title={ts("moves")}
+              summary={ts("movesSummary")}
+              icon={<PixelIcon {...UI_ICONS.deal} scale={2} />}
+            >
+              <CompanyMovesCard />
+              <PitchCard kind="move" />
+            </CollapsibleSection>
+            <CollapsibleSection
+              {...section("situation")}
+              title={ts("situation")}
+              summary={ts("situationSummary")}
+              icon={<PixelIcon {...UI_ICONS.news} scale={2} />}
+            >
+              <SituationCard />
+              <PitchCard kind="event" />
+              <CompanyNewsCard />
+            </CollapsibleSection>
+            <CollapsibleSection
+              {...section("history")}
+              title={ts("history")}
+              summary={ts("historySummary")}
+              icon={<PixelIcon {...UI_ICONS.markets} scale={2} />}
+            >
+              <HistoryCard company={company} />
+            </CollapsibleSection>
           </div>
-          <div className="space-y-5">
-            <TreasuryCard company={company} />
-            <PayoutCard company={company} />
-            <StrategyCard company={company} />
-            <CampaignCard company={company} />
-            <MarketCard company={company} />
-            <div id="company-controls" className="scroll-mt-24">
-              <BossOffice company={company} onTeam={() => setTab("team")} />
-            </div>
+          <div className="space-y-4">
+            <CollapsibleSection
+              {...section("business")}
+              title={ts("business")}
+              summary={ts("businessSummary")}
+              icon={<PixelIcon {...UI_ICONS.briefcase} scale={2} />}
+            >
+              <ProductionCard
+                company={company}
+                onTeam={() => setTab("team")}
+                onCampaign={() => reveal("profit", "campaign")}
+              />
+              <GrowthPath
+                company={company}
+                onFill={(skills) => setHire({ skills })}
+                onTrain={trainingOpen ? goTraining : undefined}
+              />
+              <ExpansionCard company={company} />
+            </CollapsibleSection>
+            <CollapsibleSection
+              {...section("profit")}
+              title={ts("profit")}
+              summary={ts("profitSummary")}
+              icon={<PixelIcon {...UI_ICONS.star} scale={2} />}
+            >
+              <ProfitCoach
+                company={company}
+                onNavigate={(to) => {
+                  if (to === "team") return setTab("team");
+                  reveal("boss", "company-controls");
+                }}
+              />
+              <ProfitRoutes company={company} />
+              <StrategyCard company={company} />
+              <CampaignCard company={company} />
+              <MarketCard company={company} />
+            </CollapsibleSection>
+            <CollapsibleSection
+              {...section("boss")}
+              title={ts("boss")}
+              summary={ts("bossSummary")}
+              icon={<PixelIcon {...UI_ICONS.profile} scale={2} />}
+            >
+              <div id="company-controls" className="scroll-mt-24">
+                <BossOffice company={company} onTeam={() => setTab("team")} />
+              </div>
+            </CollapsibleSection>
           </div>
         </div>
       )}
@@ -181,7 +258,11 @@ function DepartmentTabs({
 }) {
   const t = useTranslations("firm");
   return (
-    <div role="tablist" aria-label={t("title")} className="grid grid-cols-4 gap-1.5 rounded-lg bg-surface-2 p-1.5">
+    <div
+      role="tablist"
+      aria-label={t("title")}
+      className="grid grid-cols-5 gap-1 rounded-lg bg-surface-2 p-1 sm:gap-1.5 sm:p-1.5"
+    >
       {tabs.map((tab) => {
         const active = tab.value === value;
         return (
@@ -197,7 +278,7 @@ function DepartmentTabs({
               onChange(tab.value);
             }}
             className={cn(
-              "relative flex items-center justify-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium focus-ring transition duration-fast active:scale-[0.97]",
+              "relative flex min-w-0 flex-col items-center justify-center gap-1 rounded-md px-1 py-2 text-2xs font-medium focus-ring transition duration-fast active:scale-[0.97] sm:flex-row sm:gap-2 sm:px-3 sm:py-2.5 sm:text-sm",
               active ? "text-fg-1" : "text-fg-3 hover:text-fg-1",
             )}
           >
@@ -209,9 +290,11 @@ function DepartmentTabs({
               />
             )}
             <PixelIcon {...UI_ICONS[tab.icon]} scale={1} className="relative" />
-            <span className="relative">{tab.label}</span>
+            <span className="relative max-w-full truncate">{tab.label}</span>
             {tab.badge ? (
-              <span className="relative rounded-pill bg-accent px-1.5 nums text-2xs text-on-accent">{tab.badge}</span>
+              <span className="absolute top-0.5 right-0.5 rounded-pill bg-accent px-1.5 nums text-2xs text-on-accent sm:relative sm:top-auto sm:right-auto">
+                {tab.badge}
+              </span>
             ) : null}
           </button>
         );

@@ -1869,6 +1869,7 @@ export const GAME_ERROR_KEYS = [
   "nft_offer_unfunded",
   "nft_not_for_sale",
   "nft_price_changed",
+  "assistant_busy",
   "move_busy",
   "move_resting",
   "friend_code_unknown",

@@ -1,6 +1,6 @@
 {
   "company": {
-    "id": "88028d85-3aec-49e1-bca6-3cfad0888f50",
+    "id": "c184b042-bd06-49b4-8877-aebccedae1b9",
     "idea": "Zweite Idee",
     "live": {
       "last_hour_at": "2026-11-14T15:00:00+00:00",
@@ -64,7 +64,7 @@
     "ai_workers": 0,
     "can_expand": false,
     "cash_cents": 250000,
-    "founded_at": "2026-11-14T15:09:13.862007+00:00",
+    "founded_at": "2026-11-14T15:50:25.921516+00:00",
     "can_upgrade": false,
     "logo_hidden": false,
     "price_level": "normal",
@@ -80,7 +80,7 @@
     "max_employees": 2,
     "open_postings": 0,
     "training_from": 5,
-    "campaign_costs": { "tv": 20000, "flyer": 20000, "online": 20000 },
+    "campaign_costs": { "tv": 23500, "flyer": 20000, "online": 20000 },
     "capacity_cents": 375000,
     "full_time_from": 5,
     "grace_quarters": 4,
@@ -91,10 +91,10 @@
     "quarters_active": 0,
     "ai_worker_skills": [],
     "distress_quarters": 0,
-    "estimate_low_cents": 47913,
+    "estimate_low_cents": 563664,
     "founder_payout_bps": 0,
     "upgrade_cost_cents": 1250000,
-    "estimate_high_cents": 337072,
+    "estimate_high_cents": 9978624,
     "ai_worker_cost_cents": 72000,
     "can_capital_increase": false,
     "expansion_cost_cents": null,

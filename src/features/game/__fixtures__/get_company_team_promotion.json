@@ -13,14 +13,14 @@
           { "key": "branch", "met": true, "have": 3, "need": 2, "branch": "it" },
           { "key": "hours", "met": true, "have": 12, "need": 12, "branch": null }
         ],
-        "pending_since": "2026-11-14T15:09:13.277776+00:00",
+        "pending_since": "2026-11-14T15:50:25.345669+00:00",
         "next_salary_cents_per_hour": 30000
       },
       "avatar_key": "rookie",
       "rank_hours": 12.5,
-      "started_at": "2026-11-14T15:09:13.264681+00:00",
+      "started_at": "2026-11-14T15:50:25.332417+00:00",
       "pending_raise": null,
-      "player_job_id": "8293ad9a-5a41-42ab-934b-b489adfce05f",
+      "player_job_id": "37ab9139-a06d-4a8b-884d-4dea8f46322b",
       "notice_ends_at": null,
       "productivity_bps": 16600,
       "salary_cents_per_hour": 20000

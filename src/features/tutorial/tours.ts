@@ -40,7 +40,7 @@ export const TOURS: Readonly<Record<string, readonly TutorialStep[]>> = {
   visit_skill_map: [{ id: "map", target: "skill-map", advance: { on: "next" }, mood: "happy" }],
   visit_company: [
     { id: "dashboard", advance: { on: "next" } },
-    { id: "growth", target: "growth", advance: { on: "next" }, mood: "happy" },
+    { id: "assistant", target: "assistant", advance: { on: "next" }, mood: "happy" },
   ],
   visit_listing: [{ id: "listing", target: "listing", advance: { on: "next" }, mood: "happy" }],
   bonds: [

@@ -327,7 +327,7 @@ function ChoiceRow({
 }
 
 /** Intro, the game with the clock, then the result. */
-function PlaySheet({ task, onClose }: { task: CompanyTask | null; onClose: () => void }) {
+export function PlaySheet({ task, onClose }: { task: CompanyTask | null; onClose: () => void }) {
   const t = useTranslations("companyTasks.play");
   const text = useTaskText();
   const client = useQueryClient();

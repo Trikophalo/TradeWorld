@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useRef, useState, type ReactNode } from "react";
 import { PageHeader } from "@/components/layout/page";
-import { ALL_PIXEL_ART, BEAR, BULL, COIN } from "@/components/pixel/art";
+import { ALL_PIXEL_ART, BEAR, BULL, COIN, MIRA } from "@/components/pixel/art";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { AVATAR_ART } from "@/components/pixel/avatars";
 import { Mascot } from "@/components/pixel/mascot";
 import { Avatar } from "@/components/ui/avatar";
@@ -785,6 +786,7 @@ export function Showcase() {
         <PayRoutes job={SAMPLE_JOB} />
         <CompanyMovesCard preview={SAMPLE_MOVES} />
         <TaskBoard preview={SAMPLE_TASKS} />
+        <ShowcaseSection />
         <UpgradeCard upgradeKey="vault" level={2} />
         <UpgradeCard upgradeKey="rhetoric" level={0} />
         <UpgradeCard upgradeKey="vault_interest" level={1} />
@@ -861,5 +863,22 @@ export function Showcase() {
         </Card>
       </Section>
     </>
+  );
+}
+
+/** A folding section of the company overview (ADR-138). Mira's chat needs a company and lives on /company. */
+function ShowcaseSection() {
+  const [open, setOpen] = useState(true);
+  return (
+    <CollapsibleSection
+      id="showcase"
+      title="Quartal & Kasse"
+      summary="Letztes Quartal: 1.240 €"
+      icon={<PixelIcon {...MIRA.idle} scale={2} />}
+      open={open}
+      onOpenChange={setOpen}
+    >
+      <p className="text-sm text-fg-2">Inhalt eines aufklappbaren Bereichs.</p>
+    </CollapsibleSection>
   );
 }

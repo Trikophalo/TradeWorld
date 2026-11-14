@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { showOverview, unfoldCompany } from "./company-helpers";
 
 /*
  * Profit levers, endless growth and friends in demo mode (ADR-083, ADR-084).
@@ -18,6 +19,7 @@ const TOURS = [
 ];
 
 async function preparePlayer(page: Page, nickname: string, xpTotal: number, cashCents: number) {
+  await unfoldCompany(page);
   await page.addInitScript(
     ({ nickname, xpTotal, cashCents, tours }) => {
       if (window.sessionStorage.getItem("nexa-test-prepared")) return;
@@ -63,6 +65,7 @@ async function found(page: Page, tier: string, name: string, idea = "Ein Produkt
   await expect(sheet.getByText("Name ist frei")).toBeVisible();
   await hold(page, /Gedrückt halten zum Gründen/);
   await expect(page.getByText("Firma gegründet!")).toBeVisible();
+  await showOverview(page);
 }
 
 test("profit coach, price strategy, contract work, IPO from the garage, staff open profiles", async ({ page }) => {

@@ -1,10 +1,10 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 80, "gap_cents": 557 }, "rank": 81, "net_worth_cents": 1019443 },
-  "total": 192,
+  "me": { "next": { "name": "Vera", "rank": 81, "gap_cents": 599 }, "rank": 82, "net_worth_cents": 1019401 },
+  "total": 194,
   "entries": [
     {
       "id": "0f3f3f3f-0000-4000-8000-0000000000f1",
-      "tag": "Z82V",
+      "tag": "VH7Z",
       "kind": "player",
       "name": "Fenja_Firma",
       "rank": 1,
@@ -12,12 +12,12 @@
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 102641991,
+      "net_worth_cents": 102228991,
       "rank_change_24h": null
     },
     {
       "id": "07170717-0000-4000-8000-0000000000a1",
-      "tag": "CHCA",
+      "tag": "WUKY",
       "kind": "player",
       "name": "Hanna_Haus",
       "rank": 2,
@@ -30,7 +30,7 @@
     },
     {
       "id": "0e3e3e3e-0000-4000-8000-0000000000f1",
-      "tag": "898E",
+      "tag": "7N2Z",
       "kind": "player",
       "name": "Frieda_Format",
       "rank": 3,
@@ -43,7 +43,7 @@
     },
     {
       "id": "08308308-0000-4000-8000-0000000000b1",
-      "tag": "N9CL",
+      "tag": "H49N",
       "kind": "player",
       "name": "Hugo_Heim",
       "rank": 4,
@@ -56,7 +56,7 @@
     },
     {
       "id": "09409409-0000-4000-8000-0000000000a1",
-      "tag": "76MH",
+      "tag": "WE7N",
       "kind": "player",
       "name": "Paul_Pumpe",
       "rank": 5,
@@ -68,5 +68,5 @@
       "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-14T15:09:10.410657+00:00"
+  "server_time": "2026-11-14T15:50:22.187996+00:00"
 }

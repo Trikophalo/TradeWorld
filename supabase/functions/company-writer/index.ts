@@ -49,7 +49,8 @@ const WORDS_JSON_SCHEMA = {
   additionalProperties: false,
   required: [...SLOTS],
   properties: Object.fromEntries(
-    SLOTS.map((s) => [s, { type: "array", items: { type: "string", maxLength: 40 }, minItems: 1, maxItems: 5 }]),
+    // Structured outputs take no length or count limits; the prompt asks for them and zod checks them.
+    SLOTS.map((s) => [s, { type: "array", items: { type: "string" } }]),
   ),
 };
 const EVENT_JSON_SCHEMA = {
@@ -57,9 +58,9 @@ const EVENT_JSON_SCHEMA = {
   additionalProperties: false,
   required: ["headline", "body", "cause"],
   properties: {
-    headline: { type: "string", maxLength: 120 },
-    body: { type: "string", maxLength: 600 },
-    cause: { type: "string", maxLength: 60 },
+    headline: { type: "string" },
+    body: { type: "string" },
+    cause: { type: "string" },
   },
 };
 

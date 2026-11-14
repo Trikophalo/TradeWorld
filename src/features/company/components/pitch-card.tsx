@@ -39,7 +39,7 @@ export function useCompanyPitches(enabled = true) {
 }
 
 /** Ask Claude to judge right away (live only); without a key the Mini-KI judges after a short wait. */
-function askJudge(pitchId: number, onDone: () => void) {
+export function askJudge(pitchId: number, onDone: () => void) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) return;
   void supabase.functions
