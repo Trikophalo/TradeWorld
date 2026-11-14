@@ -7433,3 +7433,12 @@ Migration `20261204002200_company_chat_notify.sql`: Benachrichtigungstyp `compan
 `post_company_message` benachrichtigt Gründer und aktive Mitarbeiter außer dem Autor über `social_notify` (Link
 `/career/chat`, Payload `{company_id, message_id, author_id}`); wer noch eine ungelesene Chat-Benachrichtigung dieser
 Firma hat, bekommt keine zweite. Test in `supabase/tests/63_m3d.sql`.
+
+## Nachtrag: NEXA Nachrichten 2 (ADR-152)
+
+Migration `20261204002300_news_show_v2.sql`. `news_show_messages.player_id` ist jetzt optional, neu `bot_name`
+(erfundene Zuschauer; ihre Zeilen dürfen in der nahen Zukunft liegen). Segmente tragen `mood`; neue Arten `gossip`,
+`nft`, `ramble`; `subject.ukey` (intern) merkt eine erzählte Tatsache. `get_news_show()` liefert je Segment zusätzlich
+`mood` und ruft nach dem Start `news_show_after_start(p_show_id, p_now)` (Tatsachen in `news_show_used`, Zeilen der
+Zuschauer). `news_show_chat_json` zeigt nur Zeilen bis jetzt, nach Zeit sortiert. `store_news_show_script` übernimmt
+ein bekanntes `mood` von Claude. Test `supabase/tests/9k_news_show_v2.sql`.

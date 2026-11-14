@@ -1,6 +1,6 @@
 {
   "company": {
-    "id": "8ab5a990-2372-493c-b2dd-f722be0a0cad",
+    "id": "d67e9df5-e708-4501-81ba-b7f0bf0da0f5",
     "idea": "Teile auf Abruf",
     "live": {
       "last_hour_at": "2026-11-14T23:00:00+00:00",
@@ -62,13 +62,13 @@
     "history": [],
     "listing": null,
     "campaign": {
-      "id": "2e3849ed-cab9-42be-a2f6-554fc11aa815",
+      "id": "b1e53909-3668-49d4-bd7a-5844038c0a2b",
       "kind": "flyer",
-      "ends_at": "2026-11-15T23:34:31.989001+00:00",
-      "resonance": "solid",
+      "ends_at": "2026-11-15T23:49:40.507665+00:00",
+      "resonance": "strong",
       "cost_cents": 20000,
-      "demand_bps": 1726,
-      "started_at": "2026-11-14T23:34:31.989001+00:00"
+      "demand_bps": 2292,
+      "started_at": "2026-11-14T23:49:40.507665+00:00"
     },
     "distress": false,
     "employees": 0,
@@ -76,7 +76,7 @@
     "ai_workers": 0,
     "can_expand": false,
     "cash_cents": 230000,
-    "founded_at": "2026-11-14T23:34:31.943769+00:00",
+    "founded_at": "2026-11-14T23:49:40.459168+00:00",
     "can_upgrade": false,
     "logo_hidden": false,
     "price_level": "normal",
@@ -92,7 +92,7 @@
     "max_employees": 2,
     "open_postings": 0,
     "training_from": 5,
-    "campaign_costs": { "tv": 20000, "flyer": 20000, "online": 20000 },
+    "campaign_costs": { "tv": 23600, "flyer": 20000, "online": 20000 },
     "capacity_cents": 450000,
     "full_time_from": 5,
     "grace_quarters": 4,
@@ -103,10 +103,10 @@
     "quarters_active": 0,
     "ai_worker_skills": [],
     "distress_quarters": 0,
-    "estimate_low_cents": 19694,
+    "estimate_low_cents": 156262,
     "founder_payout_bps": 0,
     "upgrade_cost_cents": 1250000,
-    "estimate_high_cents": 549667,
+    "estimate_high_cents": 13345348,
     "ai_worker_cost_cents": 72000,
     "can_capital_increase": false,
     "expansion_cost_cents": null,

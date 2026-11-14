@@ -5,7 +5,7 @@
   "running": [],
   "incoming": [
     {
-      "id": "b8b921f5-7109-483a-b7b0-0c797117dc69",
+      "id": "78e6f7e6-7e2f-4d7b-ae71-1d765a59e412",
       "kind": "loan",
       "terms": { "hours": 24, "interest_bps": 0, "principal_cents": 20000 },
       "status": "open",
@@ -15,20 +15,20 @@
       "my_role": "borrower",
       "progress": { "due_cents": 20000, "left_cents": 20000, "repaid_cents": 0 },
       "proposer": {
-        "tag": "4E2K",
+        "tag": "6S7T",
         "level": 6,
         "trust": { "band": "blank", "score": 50 },
         "nickname": "Fixture_Lieferant",
         "avatar_key": "rookie"
       },
       "closed_at": null,
-      "created_at": "2026-11-14T23:34:32.041545+00:00",
-      "expires_at": "2026-11-16T23:34:32.041545+00:00",
+      "created_at": "2026-11-14T23:49:40.558572+00:00",
+      "expires_at": "2026-11-16T23:49:40.558572+00:00",
       "accepted_at": null,
       "is_proposer": false,
       "broken_by_me": false,
       "counterparty": {
-        "tag": "ARSB",
+        "tag": "PRCY",
         "level": 6,
         "trust": { "band": "blank", "score": 50 },
         "nickname": "Fixture_Abnehmer",
@@ -39,7 +39,7 @@
       "supplier_company": null
     },
     {
-      "id": "e450d2c9-93d9-4bb5-b5f6-b47b12fb0940",
+      "id": "d3ecd191-dfda-4b20-82a4-700d761b1a44",
       "kind": "supply",
       "terms": { "hours": 24, "fee_bps": 5000, "prepay_bps": 2000, "volume_cents_per_hour": 30000 },
       "status": "open",
@@ -55,31 +55,31 @@
         "prepay_left_cents": 0
       },
       "proposer": {
-        "tag": "4E2K",
+        "tag": "6S7T",
         "level": 6,
         "trust": { "band": "blank", "score": 50 },
         "nickname": "Fixture_Lieferant",
         "avatar_key": "rookie"
       },
       "closed_at": null,
-      "created_at": "2026-11-14T23:34:32.030346+00:00",
-      "expires_at": "2026-11-16T23:34:32.030346+00:00",
+      "created_at": "2026-11-14T23:49:40.548182+00:00",
+      "expires_at": "2026-11-16T23:49:40.548182+00:00",
       "accepted_at": null,
       "is_proposer": false,
       "broken_by_me": false,
       "counterparty": {
-        "tag": "ARSB",
+        "tag": "PRCY",
         "level": 6,
         "trust": { "band": "blank", "score": 50 },
         "nickname": "Fixture_Abnehmer",
         "avatar_key": "rookie"
       },
-      "buyer_company": { "id": "31378895-e718-4026-9419-317787980e14", "name": "Fixture Abnahme" },
+      "buyer_company": { "id": "b9993e98-6c3f-48a6-b150-b04011e35004", "name": "Fixture Abnahme" },
       "proposer_role": "supplier",
-      "supplier_company": { "id": "8ab5a990-2372-493c-b2dd-f722be0a0cad", "name": "Fixture Lieferwerk" }
+      "supplier_company": { "id": "d67e9df5-e708-4501-81ba-b7f0bf0da0f5", "name": "Fixture Lieferwerk" }
     },
     {
-      "id": "e3c61e9f-cf57-4056-87da-1282ee69529e",
+      "id": "75dc0709-21ca-4f1b-8b8d-b52ae29bc915",
       "kind": "loan",
       "terms": { "hours": 48, "interest_bps": 1000, "principal_cents": 100000 },
       "status": "open",
@@ -89,20 +89,20 @@
       "my_role": "borrower",
       "progress": { "due_cents": 110000, "left_cents": 110000, "repaid_cents": 0 },
       "proposer": {
-        "tag": "4E2K",
+        "tag": "6S7T",
         "level": 6,
         "trust": { "band": "blank", "score": 50 },
         "nickname": "Fixture_Lieferant",
         "avatar_key": "rookie"
       },
       "closed_at": null,
-      "created_at": "2026-11-14T23:34:32.023011+00:00",
-      "expires_at": "2026-11-16T23:34:32.023011+00:00",
+      "created_at": "2026-11-14T23:49:40.54102+00:00",
+      "expires_at": "2026-11-16T23:49:40.54102+00:00",
       "accepted_at": null,
       "is_proposer": false,
       "broken_by_me": false,
       "counterparty": {
-        "tag": "ARSB",
+        "tag": "PRCY",
         "level": 6,
         "trust": { "band": "blank", "score": 50 },
         "nickname": "Fixture_Abnehmer",

@@ -1904,8 +1904,11 @@ export class GameError extends Error {
 
 /** Everything the game can do. Implemented by the live Supabase API and by the offline demo. */
 /** NEXA Nachrichten (ADR-150): the hourly live show with Mr. Doodle Dangle. */
+/** The anchor's face while he reads a segment (ADR-152). */
+export type NewsShowMood = "neutral" | "shocked" | "crying" | "laughing" | "angry" | "smug" | "confused" | "proud";
 export interface NewsShowSegment {
   kind: string;
+  mood?: NewsShowMood;
   headline: string;
   text: string;
   effects: { label: string; tone: "gain" | "loss" | "neutral" }[];

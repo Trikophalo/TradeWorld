@@ -2418,3 +2418,28 @@ ihre Firmen, und mit echten, großen Folgen für Kurse, Firmen und Aufgaben.
   Firma. Angebote, die beim ersten Einspielen dieses Updates offen sind, enden nach den alten Regeln.
 - **Benachrichtigung** `ipo_result` (Pflicht) an alle Zeichner und den Gründer: geglückt oder geplatzt mit Betrag.
 - **Demo:** Erfundene Mitspieler zeichnen bis zu `demoPlayersShare` (35 %); mit schlechter Qualität platzt es auch dort.
+
+## ADR-152: NEXA Nachrichten 2 – persönliche Meldungen, NFTs, Abschweifungen, Gesichter, Zuschauer im Chat — `akzeptiert`
+
+- **Gesichter:** Jeder Beitrag trägt ein `mood` (neutral, shocked, crying, laughing, angry, smug, confused, proud),
+  zufällig aus `newsShow.moods` je Skript; Claude darf ein anderes wählen. Das Studio zeigt Mimik und spielt einen
+  Laut dazu. Der Vorspann (12 Sekunden) ist eine kleine Montage über Mr. Doodle Dangle.
+- **Persönliche Meldungen (`gossip`, zwei je Sendung):** aus dem, was Spieler in den letzten 24 Stunden getan haben:
+  Feed-Einträge (Level, Beförderung, Job, Auto, Haus, Deal, Coin, Rug Pull, geplatzter Kredit), geplatzter
+  Börsengang, verlorener Job, seit Tagen nicht gesehen, Erster oder Letzter der Reichenliste. Gute Nachrichten gibt es
+  mit vergiftetem Lob, schlechte gnadenlos und mit 100 € Schmerzensgeld. Jede Tatsache wird einmal erzählt
+  (Schlüssel `fact:…` in `news_show_used`, gesetzt beim Start der Sendung).
+- **NFT-Meldung (`nft`):** der teuerste Verkauf der letzten 24 Stunden mit Titel, Künstler, Käufer und Preis.
+- **Abschweifung (`ramble`, 70 % der Sendungen):** zur Hälfte das Gerücht, eine Person des öffentlichen Lebens habe
+  in eine Aktie investiert (die Aktie steigt um 3 bis 9 %, Spielerfirmen bevorzugt), sonst reiner Unsinn ohne Folgen.
+- **Reihenfolge:** Menschen zuerst (Verlierer, Meldung, Firma, NFT, Gewinner, Meldung, Firma, Abschweifung, Welt),
+  die KI-Aktie zuletzt, der Geheimtipp am Ende; höchstens 10 Beiträge, nur noch eine KI-Aktie.
+- **Ton (ändert ADR-150):** Mr. Doodle Dangle ist ein Assi mit Krawatte und teilt deutlich härter aus. Über Spieler
+  weiterhin nur wegen dessen, was im Spiel passiert ist; nichts über Herkunft, Geschlecht, Religion, Sexualität,
+  Behinderung, Aussehen, Alter oder Familie. Echte Personen des öffentlichen Lebens dürfen nur in Abschweifungen
+  vorkommen, als offensichtlich absurde Satire und als Gerücht aus lächerlicher Quelle; keine Behauptungen über
+  Straftaten, Gesundheit oder Privatleben, keine Privatpersonen.
+- **Zuschauer im Chat:** Erfundene Zuschauer mit Alltagsnamen (`newsShow.chat.bots`) schreiben während der Sendung:
+  empört über den Sprecher, als glühende Fans oder über den, der gerade dran ist. Ihre Zeilen entstehen beim Start
+  für die ganze Sendung, jede mit ihrer Uhrzeit, und erscheinen erst dann (`news_show_after_start`).
+- **Live-Chat:** feste Höhe, scrollt innen, springt bei neuen Nachrichten ans Ende.

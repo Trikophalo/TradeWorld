@@ -1,22 +1,22 @@
 {
-  "company": { "id": "fb30cc7b-3934-4235-b634-322ea7824aa8", "name": "Fixture Mode", "tier": "garage" },
-  "founder": { "tag": "TLMT", "is_me": false, "nickname": "Fx_Taskboss", "avatar_key": "rookie" },
+  "company": { "id": "a7598a6f-e1e8-486c-9884-647b2253aba4", "name": "Fixture Mode", "tier": "garage" },
+  "founder": { "tag": "LM3F", "is_me": false, "nickname": "Fx_Taskboss", "avatar_key": "rookie" },
   "members": [
     {
-      "tag": "89VX",
+      "tag": "T4W4",
       "tier": "senior",
       "is_me": false,
-      "since": "2026-11-14T23:34:33.387338+00:00",
+      "since": "2026-11-14T23:49:42.008919+00:00",
       "title": "Werkstudium",
       "nickname": "Fx_Taskmid",
       "avatar_key": "rookie",
       "supervisor": null
     },
     {
-      "tag": "T85Y",
+      "tag": "3JXQ",
       "tier": "intern",
       "is_me": true,
-      "since": "2026-11-14T23:34:33.400397+00:00",
+      "since": "2026-11-14T23:49:42.020787+00:00",
       "title": "Werkstudium",
       "nickname": "Fx_Tasknew",
       "avatar_key": "rookie",

@@ -29,7 +29,11 @@ export function RichListBoard() {
   const list = useRichList(scope, 100);
   const track = useGame((state) => state.track);
 
-  useEffect(() => track("open_rich_list"), [track]);
+  // Counted once the list is there: then the player really saw it, and the session is ready (missions, ADR-055).
+  const seen = list.data !== undefined;
+  useEffect(() => {
+    if (seen) track("open_rich_list");
+  }, [seen, track]);
 
   const me = list.data?.me;
   const meVisible = list.data?.entries.some((e) => e.isMe);

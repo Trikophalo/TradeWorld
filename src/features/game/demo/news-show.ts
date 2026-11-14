@@ -6,6 +6,7 @@ import {
   GameError,
   type GameEngine,
   type NewsShowChatMessage,
+  type NewsShowMood,
   type NewsShowSegment,
   type NewsShowState,
 } from "../types";
@@ -45,6 +46,8 @@ export interface NewsShowHost {
   sectorName(key: string): string;
   shock(ticker: string, moveBps: number): void;
   company(): { name: string; idea: string; awareness: number; taskMomentum?: number } | null;
+  /** Personal facts about the player for the gossip ("Level 7 erreicht"); good ones praise, bad ones roast. */
+  facts?(): { good: boolean; what: string }[];
   /** The player's net worth change of the day, if known. */
   dayChange(): { cents: number; bps: number } | null;
   addCash(cents: number): void;
@@ -55,19 +58,7 @@ export interface NewsShowHost {
   random(): number;
 }
 
-const BOTS = ["Börsen-Bernd", "Dividenden-Doris", "Kurs-Kalle", "Hebel-Hanna", "Zocker-Zoe"] as const;
-const BOT_LINES = [
-  "💀💀💀",
-  "Der Mann ist eine Legende 😂",
-  "Ich hab's gewusst 📉",
-  "Hahaha, ausgerechnet die!",
-  "Mr. Doodle Dangle for President 👏",
-  "Mein Depot weint 😭",
-  "Kaufen, kaufen, kaufen 🚀",
-  "🍿 Beste Sendung des Tages",
-  "Wer hat das Skript geschrieben? 🤡",
-  "Autsch 💸",
-] as const;
+const bots = cfg.chat.bots;
 
 export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "newsShow" | "postNewsShowMessage"> & {
   startNow(inMs?: number): void;
@@ -79,7 +70,12 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
   function script(s: DemoNewsShowState, kind: NewsShowTextKey, values: Record<string, string | number>) {
     const pick = pickScript(kind, s.used, () => host.random());
     s.used = [...s.used, ...usedKeys(pick)].slice(-2_000);
-    return { headline: fillScript(pick.headline, values), text: fillScript(pick.text, values) };
+    const moods = cfg.moods[kind] as readonly NewsShowMood[];
+    return {
+      mood: moods[between(0, moods.length - 1)] ?? ("neutral" as const),
+      headline: fillScript(pick.headline, values),
+      text: fillScript(pick.text, values),
+    };
   }
 
   /** Writes the show and applies its effects, like news_show_build() and news_show_start(). */
@@ -100,6 +96,20 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
         effects: [
           { label: `+${formatMoney(cfg.loser.consolationCents, { whole: true })} Trostpflaster`, tone: "gain" },
         ],
+      });
+    }
+
+    // personal news: one fact about the player, each only once
+    const fact = (host.facts?.() ?? []).find((f) => !s.used.includes(`fact:${f.what}`));
+    if (fact) {
+      s.used = [...s.used, `fact:${fact.what}`];
+      if (!fact.good) host.addCash(cfg.gossip.hushMoneyCents);
+      segments.push({
+        kind: "gossip",
+        ...script(s, fact.good ? "gossipGood" : "gossipBad", { name: host.nickname(), what: fact.what }),
+        effects: fact.good
+          ? []
+          : [{ label: `+${formatMoney(cfg.gossip.hushMoneyCents, { whole: true })} Schmerzensgeld`, tone: "gain" }],
       });
     }
 
@@ -157,6 +167,24 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
       });
     }
 
+    // he digresses: a rumour about a public figure and a stock, or pure nonsense
+    if (host.random() * 10_000 < cfg.ramble.chanceBps) {
+      const target = stocks[0];
+      if (target && host.random() * 10_000 < cfg.ramble.investShareBps) {
+        const bps = between(cfg.ramble.minBps, cfg.ramble.maxBps);
+        host.shock(target.ticker, bps);
+        segments.push({
+          kind: "ramble",
+          ...script(s, "rambleInvest", {
+            person: cfg.ramble.people[between(0, cfg.ramble.people.length - 1)]!,
+            stock: target.name,
+            move: movePercent(bps),
+          }),
+          effects: [{ label: `${target.ticker} +${movePercent(bps)}`, tone: "gain" }],
+        });
+      } else segments.push({ kind: "ramble", ...script(s, "ramble", {}), effects: [] });
+    }
+
     if (change && change.bps >= cfg.winner.minGainBps) {
       segments.push({
         kind: "winner",
@@ -182,21 +210,23 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
     return { slot, startedAt, segments: kept };
   }
 
-  /** The made-up audience writes now and then while a show runs. */
-  function bots(s: DemoNewsShowState, now: number) {
+  /** The made-up audience writes now and then while a show runs: furious, worshipping, or about the player. */
+  function botsWrite(s: DemoNewsShowState, now: number) {
     const show = s.show;
     if (!show || now > show.startedAt + showDurationMs(show.segments.length)) return;
+    const pick = (lines: readonly string[]) => lines[between(0, lines.length - 1)]!;
     while (s.botUntil < now) {
-      s.botUntil = Math.max(s.botUntil, show.startedAt) + between(5, 11) * 1000;
+      s.botUntil = Math.max(s.botUntil, show.startedAt) + between(bots.everySecondsMin, bots.everySecondsMax) * 1000;
       if (s.botUntil > now) break;
+      const u = host.random() * 10_000;
+      const body =
+        u < bots.aboutShareBps
+          ? pick(bots.lines.about).replaceAll("{name}", host.nickname())
+          : u < bots.aboutShareBps + bots.angryShareBps
+            ? pick(bots.lines.angry)
+            : pick(bots.lines.glaze);
       s.seq += 1;
-      s.chat.push({
-        id: s.seq,
-        nickname: BOTS[between(0, BOTS.length - 1)]!,
-        body: BOT_LINES[between(0, BOT_LINES.length - 1)]!,
-        at: s.botUntil,
-        mine: false,
-      });
+      s.chat.push({ id: s.seq, nickname: pick(bots.names), body, at: s.botUntil, mine: false });
     }
     s.chat = s.chat.slice(-cfg.chat.history);
   }
@@ -217,7 +247,7 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
       s.doneSlot = hour;
     }
     if (s.show && now - s.show.startedAt > cfg.replayMinutes * 60_000) s.show = null;
-    bots(s, now);
+    botsWrite(s, now);
     host.setState(s);
     return s;
   }
@@ -233,7 +263,8 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
       return {
         now: new Date(now).toISOString(),
         nextAirsAt: new Date(next).toISOString(),
-        viewers: 1 + (s.show && now < s.show.startedAt + showDurationMs(s.show.segments.length) ? BOTS.length : 0),
+        viewers:
+          1 + (s.show && now < s.show.startedAt + showDurationMs(s.show.segments.length) ? bots.names.length : 0),
         upcoming: null,
         show: s.show && {
           id: s.show.slot,

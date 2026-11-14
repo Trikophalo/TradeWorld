@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "c41e4e37-a2cb-4b83-8c36-9bf7a94f9844",
+    "id": "a1efcd55-5c91-4271-b4c1-774399513052",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "cbfac5fd-3475-2166-ea22-0a85cbb6f5c0",
+      "id": "c76af3f2-dc09-a8cc-b107-a7c326ad5b09",
       "logo": null,
-      "name": "Brotzeit Handel AG",
-      "color": "#F2A93B",
+      "name": "Glanz & Gloria",
+      "color": "#D4AF37",
       "is_ai": true,
       "sector": "retail",
-      "ticker": "BRZ"
+      "ticker": "LUX"
     },
     "presence": {
-      "fire_at": "2026-11-19T23:34:31.567012+00:00",
+      "fire_at": "2026-11-19T23:49:40.040912+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-14T23:34:31.567012+00:00"
+      "last_active_at": "2026-11-14T23:49:40.040912+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-14T23:34:31.644678+00:00",
+    "started_at": "2026-11-14T23:49:40.146508+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

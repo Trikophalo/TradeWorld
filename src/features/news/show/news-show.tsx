@@ -194,9 +194,11 @@ function ShowChat({ chat, viewers, live }: { chat: NewsShowChatMessage[]; viewer
   const list = useRef<HTMLOListElement>(null);
   const last = chat.at(-1)?.id ?? 0;
 
+  // Always the newest line in view: the list scrolls inside its fixed box.
   useEffect(() => {
-    list.current?.scrollTo({ top: list.current.scrollHeight, behavior: "smooth" });
-  }, [last]);
+    const el = list.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [last, chat.length]);
 
   const send = async (event: FormEvent) => {
     event.preventDefault();
@@ -216,63 +218,69 @@ function ShowChat({ chat, viewers, live }: { chat: NewsShowChatMessage[]; viewer
   };
 
   return (
-    <Card padding="none" className="flex h-96 min-h-0 flex-col overflow-hidden lg:h-auto" data-testid="news-show-chat">
-      <header className="flex items-center gap-2 border-b border-line-1 px-4 py-3">
-        <p className="min-w-0 flex-1 truncate font-semibold text-fg-1">{t("chatTitle")}</p>
-        {live && <Badge tone="loss">{t("badgeLive")}</Badge>}
-        <span className="nums text-xs text-fg-3">{t("viewers", { count: viewers })}</span>
-      </header>
-      <ol ref={list} className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-3" aria-live="polite">
-        {chat.length === 0 && <li className="py-6 text-center text-sm text-pretty text-fg-3">{t("chatEmpty")}</li>}
-        {chat.map((m) => (
-          <motion.li
-            key={m.id}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: DURATION.base, ease: EASE.out }}
-            className={cn("flex", m.mine && "justify-end")}
-          >
-            <div className={cn("max-w-[88%] rounded-lg px-3 py-1.5", m.mine ? "bg-accent-soft" : "bg-surface-2")}>
-              <p className="flex items-baseline gap-2 text-2xs text-fg-3">
-                <span className="truncate font-medium text-fg-2">{m.nickname}</span>
-                <span className="nums">{time.format(new Date(m.at))}</span>
-              </p>
-              <p className="text-sm text-pretty break-words text-fg-1">{m.body}</p>
-            </div>
-          </motion.li>
-        ))}
-      </ol>
-      <form onSubmit={(event) => void send(event)} className="space-y-2 border-t border-line-1 p-3">
-        <div className="flex gap-1 overflow-x-auto" role="group" aria-label={t("emojis")}>
-          {cfg.chat.emojis.map((emoji) => (
-            <button
-              key={emoji}
-              type="button"
-              onClick={() => setText((v) => (v + emoji).slice(0, cfg.chat.maxLength))}
-              className="grid size-8 shrink-0 place-items-center rounded-md text-lg focus-ring transition duration-fast hover:bg-surface-2 active:scale-90"
-              aria-label={emoji}
+    <div className="relative h-96 lg:h-auto lg:min-h-96">
+      <Card
+        padding="none"
+        className="flex h-full min-h-0 flex-col overflow-hidden lg:absolute lg:inset-0"
+        data-testid="news-show-chat"
+      >
+        <header className="flex items-center gap-2 border-b border-line-1 px-4 py-3">
+          <p className="min-w-0 flex-1 truncate font-semibold text-fg-1">{t("chatTitle")}</p>
+          {live && <Badge tone="loss">{t("badgeLive")}</Badge>}
+          <span className="nums text-xs text-fg-3">{t("viewers", { count: viewers })}</span>
+        </header>
+        <ol ref={list} className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-3" aria-live="polite">
+          {chat.length === 0 && <li className="py-6 text-center text-sm text-pretty text-fg-3">{t("chatEmpty")}</li>}
+          {chat.map((m) => (
+            <motion.li
+              key={m.id}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: DURATION.base, ease: EASE.out }}
+              className={cn("flex", m.mine && "justify-end")}
             >
-              {emoji}
-            </button>
+              <div className={cn("max-w-[88%] rounded-lg px-3 py-1.5", m.mine ? "bg-accent-soft" : "bg-surface-2")}>
+                <p className="flex items-baseline gap-2 text-2xs text-fg-3">
+                  <span className="truncate font-medium text-fg-2">{m.nickname}</span>
+                  <span className="nums">{time.format(new Date(m.at))}</span>
+                </p>
+                <p className="text-sm text-pretty break-words text-fg-1">{m.body}</p>
+              </div>
+            </motion.li>
           ))}
-        </div>
-        <div className="flex items-end gap-2">
-          <label className="min-w-0 flex-1">
-            <span className="sr-only">{t("chatPlaceholder")}</span>
-            <input
-              value={text}
-              maxLength={cfg.chat.maxLength}
-              onChange={(event) => setText(event.target.value)}
-              placeholder={t("chatPlaceholder")}
-              className="h-11 w-full rounded-md border border-line-2 bg-surface-2 px-3 text-fg-1 focus-ring placeholder:text-fg-3"
-              data-testid="news-show-input"
-            />
-          </label>
-          <Button type="submit" state={state} disabled={!text.trim()} data-testid="news-show-send">
-            {t("chatSend")}
-          </Button>
-        </div>
-      </form>
-    </Card>
+        </ol>
+        <form onSubmit={(event) => void send(event)} className="space-y-2 border-t border-line-1 p-3">
+          <div className="flex gap-1 overflow-x-auto" role="group" aria-label={t("emojis")}>
+            {cfg.chat.emojis.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => setText((v) => (v + emoji).slice(0, cfg.chat.maxLength))}
+                className="grid size-8 shrink-0 place-items-center rounded-md text-lg focus-ring transition duration-fast hover:bg-surface-2 active:scale-90"
+                aria-label={emoji}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-end gap-2">
+            <label className="min-w-0 flex-1">
+              <span className="sr-only">{t("chatPlaceholder")}</span>
+              <input
+                value={text}
+                maxLength={cfg.chat.maxLength}
+                onChange={(event) => setText(event.target.value)}
+                placeholder={t("chatPlaceholder")}
+                className="h-11 w-full rounded-md border border-line-2 bg-surface-2 px-3 text-fg-1 focus-ring placeholder:text-fg-3"
+                data-testid="news-show-input"
+              />
+            </label>
+            <Button type="submit" state={state} disabled={!text.trim()} data-testid="news-show-send">
+              {t("chatSend")}
+            </Button>
+          </div>
+        </form>
+      </Card>
+    </div>
   );
 }

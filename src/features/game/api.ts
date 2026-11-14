@@ -941,8 +941,11 @@ export const liveEngine: GameEngine = {
   },
 
   async track(event, ref) {
-    await rpc("track_event", { p_kind: event, p_ref: ref ?? null }, z.object({ ok: z.boolean() })).catch(
-      () => undefined,
-    );
+    const send = () => rpc("track_event", { p_kind: event, p_ref: ref ?? null }, z.object({ ok: z.boolean() }));
+    // Right after a page load the session may not be ready yet: try once more a little later, then give up quietly.
+    await send().catch(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 2_500));
+      await send().catch(() => undefined);
+    });
   },
 };

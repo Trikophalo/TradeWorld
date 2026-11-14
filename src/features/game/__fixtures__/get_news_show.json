@@ -1,65 +1,93 @@
 {
-  "now": "2026-11-14T23:34:33.566531+00:00",
+  "now": "2026-11-14T23:49:42.18377+00:00",
   "chat": [
     {
-      "at": "2026-11-14T23:34:33.561875+00:00",
-      "id": 3,
+      "at": "2026-11-14T23:49:42.180175+00:00",
+      "id": 204,
       "body": "Was für eine Sendung 💀📉",
       "mine": true,
       "nickname": "Fixture_Neu"
     }
   ],
   "show": {
-    "id": 4,
+    "id": 6,
     "writer": "mini",
     "airs_at": "2026-11-14T23:00:00+00:00",
     "segments": [
       {
-        "kind": "scandal",
-        "text": "Das Netz zerreißt Ausbau Werke. Die Geschäftsführung hat das wichtigste Meeting des Jahres verschlafen, im Meetingraum. Seitdem will niemand mehr „Maschinen nach Maß“. Anke_Ausbau hat das Firmenhandy im Fluss versenkt.",
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −10,6 %" }],
-        "headline": "Shitstorm über Ausbau Werke"
+        "kind": "loser",
+        "mood": "smug",
+        "text": "61.120 € futsch, 5,7 % Minus: Esc_Frida schreibt heute Börsengeschichte, leider die falsche. Der Markt sagt danke, du Geldautomat auf zwei Beinen. Das Trostpflaster kommt per Eilbote.",
+        "effects": [{ "tone": "gain", "label": "+500 € Trostpflaster" }],
+        "headline": "Wo ist das Geld von Esc_Frida?"
+      },
+      {
+        "kind": "gossip",
+        "mood": "proud",
+        "text": "Ich fasse es nicht, aber es stimmt. Lars_Kursrutsch meldet: Kursrutsch Werke gegründet. Glückwunsch, und jetzt bloß nichts anfassen.",
+        "effects": [],
+        "headline": "Na so was: Lars_Kursrutsch"
       },
       {
         "kind": "scandal",
-        "text": "Das Netz zerreißt Fenja Pixel. Im Lager wurde ein Praktikant gefunden, der seit drei Wochen vermisst war. Er hatte niemandem gefehlt. Seitdem will niemand mehr „Logos für Vereine“. Fenja_Firma hat das Firmenhandy im Fluss versenkt.",
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −10,9 %" }],
-        "headline": "Shitstorm über Fenja Pixel"
+        "mood": "shocked",
+        "text": "Das Netz zerreißt Lieferwerk Anja. Die Kundenhotline wurde seit Monaten von einem Papagei bedient, und der war noch der Freundlichste. Seitdem will niemand mehr „Ideen für alle“. Anja_Lieferant hat das Firmenhandy im Fluss versenkt.",
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −20,4 %" }],
+        "headline": "Shitstorm über Lieferwerk Anja"
       },
       {
-        "kind": "stock",
-        "text": "Ein Hund hat auf der Hauptversammlung einen Antrag gestellt, und er wurde angenommen. Die Börse feiert: Sonnenkern Fusion steigt um 11,8 %. Wer nicht dabei ist, darf sich jetzt ärgern.",
-        "effects": [{ "tone": "gain", "label": "FSN +11,8 %" }],
-        "headline": "Kursrakete Sonnenkern Fusion"
-      },
-      {
-        "kind": "stock",
-        "text": "Eine Möwe hat das Firmenlogo vom Dach gestohlen, die Aktionäre deuten das als Omen. Der Kurs von SolarFuchs sackt um 7,9 % ab. Ein Krisenstab tagt.",
-        "effects": [{ "tone": "loss", "label": "SFX −7,9 %" }],
-        "headline": "Panik bei SolarFuchs"
-      },
-      {
-        "kind": "sector",
-        "text": "Die ganze Branche Einzelhandel steigt um 8,6 %. Das Horoskop hat es vorhergesagt. So funktioniert Wirtschaft, liebe Kinder.",
-        "effects": [{ "tone": "gain", "label": "Einzelhandel +8,6 %" }],
-        "headline": "Die Branche Einzelhandel dreht durch"
+        "kind": "nft",
+        "mood": "confused",
+        "text": "Kunstmarkt, oder was man dafür hält: „Neon Nacht“ von Nina_Neon ging für 30.000 € an Ben_Bieter. Kunst ist, wenn einer zahlt. Glückwunsch an alle Beteiligten.",
+        "effects": [],
+        "headline": "30.000 € für ein paar Pixel"
       },
       {
         "kind": "winner",
-        "text": "Und nun zu jemandem, der es kann: Fixture_Neu hat heute 1.139.620 € gemacht, 11396,2 % im Plus. Wir gratulieren zähneknirschend.",
+        "mood": "shocked",
+        "text": "Und nun zu jemandem, der es kann: Fixture_Neu hat heute 1.138.918 € gemacht, 11389,2 % im Plus. Der Rest schaut zu und heult leise ins Depot.",
         "effects": [],
-        "headline": "Fixture_Neu sahnt ab: plus 1.139.620 €"
+        "headline": "Fixture_Neu sahnt ab: plus 1.138.918 €"
+      },
+      {
+        "kind": "gossip",
+        "mood": "shocked",
+        "text": "Ich fasse es nicht, aber es stimmt. Pitch_Chefin meldet: Faire Schuhe gegründet. Ich bin fast stolz. Fast.",
+        "effects": [],
+        "headline": "Na so was: Pitch_Chefin"
+      },
+      {
+        "kind": "scandal",
+        "mood": "angry",
+        "text": "Fixture Leitern wollte heute groß rauskommen. Auf dem Firmenparkplatz wurde ein illegales Bobbycar-Rennen ausgehoben. Fixture_Chef erklärte, das gehöre zum Konzept. Die Kundschaft erklärte, sie sei dann mal weg.",
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −20,4 %" }],
+        "headline": "Fixture Leitern blamiert sich bis auf die Knochen"
+      },
+      {
+        "kind": "ramble",
+        "mood": "angry",
+        "text": "Bevor es weitergeht, etwas völlig anderes: Mein Nachbar grillt seit drei Tagen dasselbe Würstchen. Ich bewundere seine Geduld. Das musste raus.",
+        "effects": [],
+        "headline": "Kurze Durchsage in eigener Sache"
+      },
+      {
+        "kind": "sector",
+        "mood": "angry",
+        "text": "Schlechte Nachrichten für Tech/Software: Ein Minister hat die Branche versehentlich mit etwas Verbotenem verwechselt. Die Kurse geben um 7,4 % nach.",
+        "effects": [{ "tone": "loss", "label": "Tech/Software −7,4 %" }],
+        "headline": "Katerstimmung in Tech/Software"
       },
       {
         "kind": "tip",
-        "text": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei NeuroPharm AG tut sich in der nächsten Stunde etwas, und zwar nach unten. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
-        "effects": [{ "tone": "neutral", "label": "NPH ↓ Tipp" }],
-        "headline": "Mr. Doodle Dangles Geheimtipp"
+        "mood": "smug",
+        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: KlarSoft AG geht bald nach unten. Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.",
+        "effects": [{ "tone": "neutral", "label": "KLS ↓ Tipp" }],
+        "headline": "Der heiße Draht: KlarSoft AG"
       }
     ],
-    "started_at": "2026-11-14T23:34:33.566531+00:00"
+    "started_at": "2026-11-14T23:49:42.18377+00:00"
   },
-  "viewers": 3,
+  "viewers": 5,
   "upcoming": null,
   "next_airs_at": "2026-11-15T00:00:00+00:00"
 }

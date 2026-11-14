@@ -1,5 +1,5 @@
 {
-  "mine": { "rank": 40, "value_cents": 126008 },
+  "mine": { "rank": 40, "value_cents": 54107 },
   "total": 43,
   "entries": [
     {
@@ -14,8 +14,40 @@
       "founder": "Lars_Kursrutsch",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "9330001d-8bf1-4a9f-9b75-6568c8767d4b",
+      "company_id": "1df9f22c-228a-4b0c-988a-52d2c2348d4f",
       "value_cents": 959140000,
+      "revenue_cents": null
+    },
+    {
+      "kind": "player",
+      "logo": null,
+      "name": "Talwerk",
+      "rank": 2,
+      "tier": "ag",
+      "color": "#663399",
+      "sector": "retail",
+      "ticker": "TAL",
+      "founder": "Pop_Gero",
+      "is_mine": false,
+      "team_size": 1,
+      "company_id": "5f7c6150-cba7-44ac-bbc5-b5135b6d3b93",
+      "value_cents": 119000000,
+      "revenue_cents": null
+    },
+    {
+      "kind": "player",
+      "logo": null,
+      "name": "Gipfelwerk",
+      "rank": 3,
+      "tier": "ag",
+      "color": "#336699",
+      "sector": "retail",
+      "ticker": "GIP",
+      "founder": "Pop_Frida",
+      "is_mine": false,
+      "team_size": 1,
+      "company_id": "838c973c-dcb5-4945-acd9-326bae0ca7d5",
+      "value_cents": 110510000,
       "revenue_cents": null
     },
     {
@@ -42,7 +74,7 @@
         "palette": ["#112233", "#00ff00"]
       },
       "name": "Fenja Pixel",
-      "rank": 2,
+      "rank": 4,
       "tier": "ag",
       "color": "#123456",
       "sector": "tech",
@@ -50,15 +82,15 @@
       "founder": "Fenja_Firma",
       "is_mine": false,
       "team_size": 6,
-      "company_id": "55542654-06e1-44d7-a43a-88c13223f3b4",
-      "value_cents": 106664350,
+      "company_id": "f795b3d9-0d48-4fce-8304-2ff57fbaa314",
+      "value_cents": 106953094,
       "revenue_cents": 0
     },
     {
       "kind": "player",
       "logo": null,
       "name": "Wackelwerk",
-      "rank": 3,
+      "rank": 5,
       "tier": "ag",
       "color": "#336699",
       "sector": "retail",
@@ -66,42 +98,10 @@
       "founder": "Esc_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "2d899db0-e70f-49c1-a4cf-b8378d12e36b",
-      "value_cents": 106061208,
-      "revenue_cents": null
-    },
-    {
-      "kind": "player",
-      "logo": null,
-      "name": "Talwerk",
-      "rank": 4,
-      "tier": "ag",
-      "color": "#663399",
-      "sector": "retail",
-      "ticker": "TAL",
-      "founder": "Pop_Gero",
-      "is_mine": false,
-      "team_size": 1,
-      "company_id": "f76e2cac-abcc-43fe-b90e-8c60e6860c2b",
-      "value_cents": 81510000,
-      "revenue_cents": null
-    },
-    {
-      "kind": "player",
-      "logo": null,
-      "name": "Gipfelwerk",
-      "rank": 5,
-      "tier": "ag",
-      "color": "#336699",
-      "sector": "retail",
-      "ticker": "GIP",
-      "founder": "Pop_Frida",
-      "is_mine": false,
-      "team_size": 1,
-      "company_id": "1a8b3aed-773a-4583-ba79-9d38cba2f48f",
-      "value_cents": 81210000,
+      "company_id": "306672d0-dc66-43b2-bb34-82ab72133edd",
+      "value_cents": 106093020,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-14T23:34:29.80147+00:00"
+  "server_time": "2026-11-14T23:49:38.34284+00:00"
 }

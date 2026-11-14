@@ -177,6 +177,15 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   Missionsjäger, Teamplayer, Bilanzprofi, Ehrgeiz), ein größerer Tresor (Panzertresor) und vieles für die eigene
   Firma (KI-Turbo, Glückshand, Werbeagentur, Krisenmanager …). Sie schalten sich zwischen Level 1 und 30 frei.
 
+- **NEXA Nachrichten 2 (ADR-152):** Mr. Doodle Dangle hat jetzt Gesichter: Er erschrickt, heult, lacht sich kaputt,
+  wird wütend oder grinst selbstgefällig, alles mit Geräuschen. Die Sendung beginnt mit einem eigenen Vorspann nur
+  über ihn. Es geht viel mehr um euch: persönliche Meldungen über Spieler (Level, neuer Job, Rauswurf, geplatzter
+  Börsengang, Rug Pull, tagelang verschollen, Erster oder Letzter der Reichenliste), gute Nachrichten mit vergiftetem
+  Lob, schlechte gnadenlos, dafür mit Schmerzensgeld. Der teuerste NFT-Verkauf kommt in die Sendung. Zwischendurch
+  schweift er komplett ab, etwa mit dem Gerücht, ein Promi habe in eine Aktie investiert, die dann wirklich steigt.
+  Im Live-Chat schreiben erfundene Zuschauer mit, die ihn hassen oder vergöttern. Der Chat bleibt gleich groß und
+  scrollt von selbst mit.
+- **Mission „Wirf einen Blick auf die Reichenliste“:** zählt jetzt zuverlässig, auch wenn die Seite direkt geladen wird.
 - **Firmenchat:** Schreibt jemand in den Chat deiner Firma, bekommst du eine Benachrichtigung (eine, bis du sie
   gelesen hast; abschaltbar in den Einstellungen). Der Chat hat einen Zurück-Knopf zur Firmenseite, und die
   Escape-Taste führt ebenfalls zurück.

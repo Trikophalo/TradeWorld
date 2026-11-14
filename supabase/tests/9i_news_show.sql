@@ -35,6 +35,9 @@ delete from public.news_shows;
 delete from public.rich_list_snapshots where entity_kind = 'player';
 -- every player company of the test database gets a segment, so ours is among them
 select tests.set_cfg('newsShow', '{company,count}', '500');
+-- personal news and the made-up chat viewers have their own test (9k)
+select tests.set_cfg('newsShow', '{gossip,count}', '0');
+select tests.set_cfg('newsShow', '{chat,bots,names}', '[]');
 select tests.set_cfg('newsShow', '{maxSegments}', '600');
 insert into public.rich_list_snapshots (taken_at, entity_kind, entity_id, net_worth_cents, rank_all, rank_players)
 values (now() - interval '20 hours', 'player', :l, 1000000, 1, 1), (now() - interval '5 minutes', 'player', :l, 600000, 1, 1),
@@ -155,5 +158,6 @@ select tests.assert(
 
 select tests.set_cfg('newsShow', '{waitMinutes}', '10');
 select tests.set_cfg('newsShow', '{chat,perMinute}', '10');
+select tests.set_cfg('newsShow', '{gossip,count}', '2');
 delete from public.news_shows;
 delete from public.news_show_messages;

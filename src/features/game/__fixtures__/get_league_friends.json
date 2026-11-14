@@ -8,7 +8,7 @@
   },
   "entries": [
     {
-      "tag": "EC4F",
+      "tag": "GF5X",
       "rank": 1,
       "is_me": false,
       "level": 15,
@@ -17,7 +17,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "MHCF",
+      "tag": "7FRL",
       "rank": 2,
       "is_me": false,
       "level": 8,
@@ -26,7 +26,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "K4J3",
+      "tag": "6VAJ",
       "rank": 3,
       "is_me": true,
       "level": 15,
@@ -36,7 +36,7 @@
     }
   ],
   "last_winner": {
-    "tag": "K4J3",
+    "tag": "6VAJ",
     "nickname": "Fixture_Gmbh",
     "avatar_key": "rookie",
     "growth_bps": 235,

@@ -22,6 +22,10 @@ const showSchema = z.object({
       segments: z.array(
         z.object({
           kind: z.string(),
+          mood: z
+            .enum(["neutral", "shocked", "crying", "laughing", "angry", "smug", "confused", "proud"])
+            .optional()
+            .catch(undefined),
           headline: z.string(),
           text: z.string(),
           effects: z

@@ -1,10 +1,10 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 93, "gap_cents": 619 }, "rank": 94, "net_worth_cents": 1019381 },
-  "total": 211,
+  "me": { "next": { "name": "Vera", "rank": 93, "gap_cents": 500 }, "rank": 94, "net_worth_cents": 1019500 },
+  "total": 213,
   "entries": [
     {
       "id": "0f3f3f3f-0000-4000-8000-0000000000f1",
-      "tag": "T9D6",
+      "tag": "WY8K",
       "kind": "player",
       "name": "Fenja_Firma",
       "rank": 1,
@@ -12,51 +12,51 @@
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 126980499,
+      "net_worth_cents": 127169499,
       "rank_change_24h": null
     },
     {
-      "id": "09a19a19-0000-4000-8000-0000000000f1",
-      "tag": "QFR7",
+      "id": "09e19e19-0000-4000-8000-0000000000f2",
+      "tag": "AFBY",
       "kind": "player",
-      "name": "Esc_Frida",
+      "name": "Pop_Gero",
       "rank": 2,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 107576000,
+      "net_worth_cents": 114803000,
       "rank_change_24h": null
     },
     {
-      "id": "09e19e19-0000-4000-8000-0000000000f2",
-      "tag": "EE9Q",
+      "id": "09e19e19-0000-4000-8000-0000000000f1",
+      "tag": "VGEN",
       "kind": "player",
-      "name": "Pop_Gero",
+      "name": "Pop_Frida",
       "rank": 3,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 88714000,
+      "net_worth_cents": 109880000,
       "rank_change_24h": null
     },
     {
-      "id": "09e19e19-0000-4000-8000-0000000000f1",
-      "tag": "V6KZ",
+      "id": "09a19a19-0000-4000-8000-0000000000f1",
+      "tag": "K45Y",
       "kind": "player",
-      "name": "Pop_Frida",
+      "name": "Esc_Frida",
       "rank": 4,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 86576000,
+      "net_worth_cents": 107600000,
       "rank_change_24h": null
     },
     {
       "id": "07170717-0000-4000-8000-0000000000a1",
-      "tag": "Y9XB",
+      "tag": "3KHY",
       "kind": "player",
       "name": "Hanna_Haus",
       "rank": 5,
@@ -68,5 +68,5 @@
       "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-14T23:34:29.056911+00:00"
+  "server_time": "2026-11-14T23:49:37.635055+00:00"
 }

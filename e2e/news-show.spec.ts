@@ -41,10 +41,19 @@ test("the live news show: countdown, live segments with effects, chat with emoji
   // The chat: the audience writes, and so do I, with an emoji from the bar.
   const chat = page.getByTestId("news-show-chat");
   await expect(chat.getByText(/schauen zu|schaut zu/)).toBeVisible();
+  const height = (await chat.boundingBox())!.height;
   await chat.getByTestId("news-show-input").fill("stark ");
   await chat.getByRole("button", { name: "💀" }).click();
   await chat.getByTestId("news-show-send").click();
   await expect(chat.getByText("stark 💀")).toBeVisible();
+  // The chat keeps its size however much is written: it scrolls inside and stays at the newest line.
+  for (const line of ["eins", "zwei", "drei", "vier", "fünf", "sechs"]) {
+    await chat.getByTestId("news-show-input").fill(line);
+    await chat.getByTestId("news-show-send").click();
+    await expect(chat.getByText(line, { exact: true })).toBeVisible();
+  }
+  expect(Math.abs((await chat.boundingBox())!.height - height)).toBeLessThanOrEqual(1);
+  await expect(chat.getByText("sechs", { exact: true })).toBeInViewport();
 
   // What was said is in the feed's world now: no horizontal overflow on the page.
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);

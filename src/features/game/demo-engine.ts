@@ -1449,6 +1449,13 @@ const newsShow = createNewsShowEngine({
     if (mid) st.mids.set(ticker, Math.max(10, Math.round(mid * (1 + moveBps / 10_000))));
   },
   company: () => p().company ?? null,
+  // What the gossip can say about the demo player: the level (good), an empty purse (bad).
+  facts: () => [
+    { good: true, what: `Level ${levelFromTotalXp(p().xpTotal)} erreicht` },
+    ...(p().cashCents < BALANCE.newsShow.gossip.hushMoneyCents
+      ? [{ good: false, what: "keinen Cent mehr auf dem Konto" }]
+      : []),
+  ],
   // The demo keeps no net worth history: compared with the starting capital.
   dayChange: () => {
     const start = BALANCE.economy.startingCapitalCents;

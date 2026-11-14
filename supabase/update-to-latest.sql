@@ -50475,6 +50475,597 @@ end;
 $$;
 revoke all on function public.post_company_message(uuid, text) from public, anon;
 grant execute on function public.post_company_message(uuid, text) to authenticated, service_role;
+-- ===== idempotent copy of migrations/20261204002300_news_show_v2.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 2300 · NEXA Nachrichten 2: personal news, NFTs, digressions, moods, viewers in the chat (ADR-152)
+-- =============================================================================
+-- * Every segment carries a "mood" for the anchor's face (newsShow.moods, one at random per script).
+-- * New segments: "gossip" (personal news about real players from what they did: feed items, a failed IPO, a lost
+--   job, missing for days, first or last of the rich list; bad news pay hush money), "nft" (the most expensive NFT
+--   sale of the last hours) and "ramble" (he digresses; sometimes a rumour that a public figure bought a stock,
+--   which lifts it a little). A fact is told once: its key is stored in news_show_used when the show airs.
+-- * The order of a show puts people first: loser, gossip, company, NFT, winner, gossip, company, digression,
+--   world, AI stock, hint.
+-- * Made-up viewers with everyday names write in the live chat during a show (newsShow.chat.bots): their lines
+--   are written at the start with the times at which they appear.
+-- Idempotent: runs unchanged as supabase/updates/20261204002300_news_show_v2.sql.
+
+alter table public.news_show_messages alter column player_id drop not null;
+alter table public.news_show_messages add column if not exists bot_name text;
+alter table public.news_show_messages drop constraint if exists news_show_messages_author_check;
+alter table public.news_show_messages add constraint news_show_messages_author_check
+  check (player_id is not null or bot_name is not null);
+comment on column public.news_show_messages.bot_name is 'A made-up viewer (ADR-152); such rows have no player and may lie in the near future.';
+
+-- One segment: script of the kind with the values filled in, a mood for the anchor, the public effect chips, the
+-- internal apply list and the facts for Claude.
+create or replace function public.news_show_segment(p_kind text, p_script text, p_values jsonb, p_effects jsonb, p_apply jsonb,
+                                                    p_subject jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  s      jsonb := public.news_show_pick(p_script);
+  v_mood text;
+begin
+  if s is null then
+    return null;
+  end if;
+  select m into v_mood
+    from jsonb_array_elements_text(coalesce(public.news_show_cfg() -> 'moods' -> p_script, '[]'::jsonb)) m
+   order by random() limit 1;
+  return jsonb_build_object(
+    'kind', p_kind,
+    'mood', coalesce(v_mood, 'neutral'),
+    'headline', public.news_show_fill(s ->> 'headline', p_values),
+    'text', public.news_show_fill(s ->> 'text', p_values),
+    'effects', coalesce(p_effects, '[]'::jsonb),
+    'apply', coalesce(p_apply, '[]'::jsonb),
+    'subject', coalesce(p_subject, '{}'::jsonb) || jsonb_build_object('values', p_values));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- The draft of a show
+-- ---------------------------------------------------------------------------
+create or replace function public.news_show_build(p_now timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg       jsonb := public.news_show_cfg();
+  v_segs    jsonb := '[]'::jsonb;
+  v_seg     jsonb;
+  v_tip     jsonb;
+  v_last    jsonb;
+  v_skip_p  uuid[];
+  v_skip_c  uuid[];
+  r         record;
+  v_bps     integer;
+  v_aw      integer;
+  v_dir     integer;
+  v_scandal boolean;
+  v_effects jsonb;
+  v_apply   jsonb;
+  v_max     integer := coalesce((cfg ->> 'maxSegments')::integer, 7);
+  v_seen    uuid[] := '{}';
+  v_n       integer := 0;
+  v_win     interval;
+  v_person  text;
+begin
+  -- who was in the last show: not again right away
+  select s.segments into v_last from public.news_shows s where s.status = 'aired' order by s.airs_at desc limit 1;
+  select coalesce(array_agg((x -> 'subject' ->> 'player_id')::uuid) filter (where x -> 'subject' ? 'player_id'), '{}'),
+         coalesce(array_agg((x -> 'subject' ->> 'company_id')::uuid) filter (where x -> 'subject' ? 'company_id'), '{}')
+    into v_skip_p, v_skip_c
+    from jsonb_array_elements(coalesce(v_last, '[]'::jsonb)) x;
+
+  -- 1. the loser of the day: roast and a consolation
+  select w.entity_id as player_id, p.nickname, w.first_nw - w.last_nw as loss,
+         ((w.first_nw - w.last_nw) * 10000 / w.first_nw)::integer as bps
+    into r
+    from (select l.entity_id, l.nw as last_nw, f.nw as first_nw
+            from (select distinct on (entity_id) entity_id, net_worth_cents as nw from public.rich_list_snapshots
+                   where entity_kind = 'player' and taken_at >= p_now - interval '45 minutes'
+                   order by entity_id, taken_at desc) l
+            join (select distinct on (entity_id) entity_id, net_worth_cents as nw from public.rich_list_snapshots
+                   where entity_kind = 'player'
+                     and taken_at >= p_now - make_interval(hours => coalesce((cfg #>> '{loser,windowHours}')::integer, 24))
+                   order by entity_id, taken_at asc) f using (entity_id)
+           where f.nw > 0) w
+    join public.profiles p on p.id = w.entity_id
+   where w.entity_id <> all (v_skip_p)
+     and (w.first_nw - w.last_nw) * 10000 / w.first_nw >= coalesce((cfg #>> '{loser,minLossBps}')::integer, 300)
+   order by (w.first_nw - w.last_nw) * 10000 / w.first_nw desc, random()
+   limit 1;
+  if r.player_id is not null then
+    v_bps := coalesce((cfg #>> '{loser,consolationCents}')::integer, 0);
+    v_seg := public.news_show_segment('loser', 'loser',
+      jsonb_build_object('name', r.nickname, 'amount', public.format_eur(r.loss), 'pct', public.news_show_move(r.bps)),
+      case when v_bps > 0 then jsonb_build_array(jsonb_build_object('label', '+' || public.format_eur(v_bps) || ' Trostpflaster', 'tone', 'gain'))
+           else '[]'::jsonb end,
+      case when v_bps > 0 then jsonb_build_array(jsonb_build_object('type', 'cash', 'player_id', r.player_id, 'cents', v_bps))
+           else '[]'::jsonb end,
+      jsonb_build_object('type', 'player', 'player_id', r.player_id, 'name', r.nickname));
+    if v_seg is not null then v_segs := v_segs || (v_seg || jsonb_build_object('ord', 10)); end if;
+    v_seen := v_seen || r.player_id;
+  end if;
+
+  -- 2. players' companies: a scandal or a hype
+  for r in select pc.company_id, c.name, left(coalesce(nullif(btrim(pc.idea), ''), 'irgendwas mit Zukunft'), 90) as idea,
+                  p.nickname as founder, pc.founder_id, sec.id as security_id, sec.ticker, c.sector_key
+             from public.player_companies pc
+             join public.companies c on c.id = pc.company_id
+             join public.profiles p on p.id = pc.founder_id
+             left join public.securities sec on sec.company_id = c.id and sec.kind = 'stock' and sec.status = 'listed'
+            where pc.status = 'active' and pc.company_id <> all (v_skip_c)
+            order by random()
+            limit coalesce((cfg #>> '{company,count}')::integer, 2) loop
+    v_n := v_n + 1;
+    v_scandal := random() * 10000 < coalesce((cfg #>> '{company,scandalShareBps}')::integer, 6000);
+    v_dir := case when v_scandal then -1 else 1 end;
+    v_aw := public.rand_between((cfg #>> '{company,awarenessMinBps}')::integer, (cfg #>> '{company,awarenessMaxBps}')::integer);
+    v_bps := public.rand_between((cfg #>> '{company,stockMinBps}')::integer, (cfg #>> '{company,stockMaxBps}')::integer);
+    v_effects := jsonb_build_array(jsonb_build_object(
+      'label', 'Bekanntheit ' || case when v_scandal then '−' else '+' end || public.news_show_move(v_aw),
+      'tone', case when v_scandal then 'loss' else 'gain' end));
+    v_apply := jsonb_build_array(jsonb_build_object('type', 'company', 'company_id', r.company_id, 'awareness_bps', v_dir * v_aw,
+                                                    'scandal', v_scandal));
+    if r.security_id is not null then
+      v_effects := v_effects || jsonb_build_object(
+        'label', r.ticker || ' ' || case when v_scandal then '−' else '+' end || public.news_show_move(v_bps),
+        'tone', case when v_scandal then 'loss' else 'gain' end);
+      v_apply := v_apply || jsonb_build_object('type', 'stock', 'security_id', r.security_id, 'bps', v_dir * v_bps);
+    end if;
+    v_seg := public.news_show_segment(case when v_scandal then 'scandal' else 'hype' end,
+      case when v_scandal then 'scandal' else 'hype' end,
+      jsonb_build_object('company', r.name, 'idea', r.idea, 'founder', r.founder),
+      v_effects, v_apply,
+      jsonb_build_object('type', 'company', 'company_id', r.company_id, 'player_id', r.founder_id, 'name', r.name,
+                         'idea', r.idea, 'founder', r.founder, 'sector', r.sector_key, 'scandal', v_scandal));
+    if v_seg is not null then v_segs := v_segs || (v_seg || jsonb_build_object('ord', case when v_n = 1 then 30 else 70 end)); end if;
+  end loop;
+
+  -- 3. listed stocks of the AI companies
+  for r in select sec.id, sec.name, sec.ticker
+             from public.securities sec join public.companies c on c.id = sec.company_id
+            where sec.kind = 'stock' and sec.status = 'listed' and c.is_ai
+            order by random()
+            limit coalesce((cfg #>> '{stock,count}')::integer, 2) loop
+    v_dir := case when random() < 0.5 then 1 else -1 end;
+    v_bps := public.rand_between((cfg #>> '{stock,minBps}')::integer, (cfg #>> '{stock,maxBps}')::integer);
+    v_seg := public.news_show_segment('stock', case when v_dir > 0 then 'stockUp' else 'stockDown' end,
+      jsonb_build_object('stock', r.name, 'move', public.news_show_move(v_bps)),
+      jsonb_build_array(jsonb_build_object('label', r.ticker || ' ' || case when v_dir > 0 then '+' else '−' end || public.news_show_move(v_bps),
+                                           'tone', case when v_dir > 0 then 'gain' else 'loss' end)),
+      jsonb_build_array(jsonb_build_object('type', 'stock', 'security_id', r.id, 'bps', v_dir * v_bps)),
+      jsonb_build_object('type', 'stock', 'name', r.name, 'ticker', r.ticker, 'up', v_dir > 0));
+    if v_seg is not null then v_segs := v_segs || (v_seg || jsonb_build_object('ord', 100)); end if;
+  end loop;
+
+  -- 4. the world: a whole sector, or the value of open company tasks
+  v_dir := case when random() < 0.5 then 1 else -1 end;
+  if random() < 0.5 then
+    select s.key, s.name into r from public.sectors s
+     where exists (select 1 from public.securities sec where sec.sector_key = s.key and sec.kind = 'stock' and sec.status = 'listed')
+     order by random() limit 1;
+    if r.key is not null then
+      v_bps := public.rand_between((cfg #>> '{sector,minBps}')::integer, (cfg #>> '{sector,maxBps}')::integer);
+      v_seg := public.news_show_segment('sector', case when v_dir > 0 then 'sectorUp' else 'sectorDown' end,
+        jsonb_build_object('sector', r.name, 'move', public.news_show_move(v_bps)),
+        jsonb_build_array(jsonb_build_object('label', r.name || ' ' || case when v_dir > 0 then '+' else '−' end || public.news_show_move(v_bps),
+                                             'tone', case when v_dir > 0 then 'gain' else 'loss' end)),
+        jsonb_build_array(jsonb_build_object('type', 'sector', 'sector_key', r.key, 'bps', v_dir * v_bps)),
+        jsonb_build_object('type', 'sector', 'name', r.name, 'up', v_dir > 0));
+      if v_seg is not null then v_segs := v_segs || (v_seg || jsonb_build_object('ord', 90)); end if;
+    end if;
+  else
+    v_bps := public.rand_between((cfg #>> '{tasks,minBps}')::integer, (cfg #>> '{tasks,maxBps}')::integer);
+    v_seg := public.news_show_segment('tasks', case when v_dir > 0 then 'tasksUp' else 'tasksDown' end,
+      jsonb_build_object('move', public.news_show_move(v_bps)),
+      jsonb_build_array(jsonb_build_object('label', 'Aufgaben ' || case when v_dir > 0 then '+' else '−' end || public.news_show_move(v_bps),
+                                           'tone', case when v_dir > 0 then 'gain' else 'loss' end)),
+      jsonb_build_array(jsonb_build_object('type', 'tasks', 'bps', v_dir * v_bps)),
+      jsonb_build_object('type', 'tasks', 'up', v_dir > 0));
+    if v_seg is not null then v_segs := v_segs || (v_seg || jsonb_build_object('ord', 90)); end if;
+  end if;
+
+  -- 5. personal news about real players: what they did in the last hours, each fact only once (news_show_used)
+  v_win := make_interval(hours => coalesce((cfg #>> '{gossip,windowHours}')::integer, 24));
+  v_n := 0;
+  for r in
+    select q.player_id, q.nickname, q.grp, q.what, q.ukey
+      from (select distinct on (c.player_id) c.player_id, p.nickname, c.grp, c.what, c.ukey
+              from (
+                select f.actor_id as player_id,
+                       case when f.kind in ('rug_pull', 'loan_defaulted', 'deal_broken', 'coin_closed') then 'bad' else 'good' end as grp,
+                       public.feed_item_label(f.kind, f.payload) as what, 'fact:feed:' || f.id::text as ukey
+                  from public.feed_items f
+                 where f.created_at >= p_now - v_win
+                   and f.kind in ('level_up', 'promoted', 'league_won', 'streak', 'company_ipo', 'company_founded', 'company_upgraded',
+                                  'company_expanded', 'home_bought', 'car_bought', 'job_started', 'coin_launched', 'deal_signed',
+                                  'big_trade', 'rug_pull', 'loan_defaulted', 'deal_broken', 'coin_closed')
+                union all
+                select pc.founder_id, 'bad', 'Börsengang von ' || c2.name || ' geplatzt', 'fact:offer:' || o.id::text
+                  from public.company_share_offers o
+                  join public.player_companies pc on pc.company_id = o.company_id
+                  join public.companies c2 on c2.id = o.company_id
+                 where o.status = 'failed' and o.kind = 'ipo' and o.closed_at >= p_now - v_win
+                union all
+                select j.player_id, 'bad',
+                       case when j.end_reason = 'fired' then 'bei ' || c2.name || ' rausgeflogen' else 'Job bei ' || c2.name || ' hingeschmissen' end,
+                       'fact:job:' || j.id::text
+                  from public.player_jobs j join public.companies c2 on c2.id = j.company_id
+                 where j.status = 'ended' and j.ended_at >= p_now - v_win and j.end_reason in ('fired', 'quit')
+                union all
+                select p2.id, 'bad',
+                       'seit ' || floor(extract(epoch from (p_now - p2.last_active_at)) / 86400)::integer || ' Tagen nicht mehr gesehen',
+                       'fact:gone:' || p2.id::text || ':' || floor(extract(epoch from (p_now - p2.last_active_at)) / 86400)::integer
+                  from public.profiles p2
+                 where p2.last_active_at < p_now - make_interval(days => coalesce((cfg #>> '{gossip,absentDays}')::integer, 3))
+                   and p2.last_active_at > p_now - interval '30 days'
+                union all
+                select w.entity_id, case when w.pos = 1 then 'good' else 'bad' end,
+                       case when w.pos = 1 then 'Platz eins der Reichenliste mit ' else 'Schlusslicht der Reichenliste mit ' end
+                         || public.format_eur(w.nw),
+                       'fact:rank:' || w.entity_id::text || ':' || w.pos::text || ':' || (p_now at time zone 'Europe/Berlin')::date::text
+                  from (select l.entity_id, l.nw, row_number() over (order by l.nw desc) as pos, count(*) over () as n,
+                               row_number() over (order by l.nw asc) as rpos
+                          from (select distinct on (entity_id) entity_id, net_worth_cents as nw from public.rich_list_snapshots
+                                 where entity_kind = 'player' and taken_at >= p_now - interval '45 minutes'
+                                 order by entity_id, taken_at desc) l) w
+                 where w.n >= 3 and (w.pos = 1 or w.rpos = 1)
+              ) c
+              join public.profiles p on p.id = c.player_id and not p.is_deactivated
+             where c.player_id <> all (v_seen)
+               and not exists (select 1 from public.news_show_used u where u.key = c.ukey)
+             order by c.player_id, random()) q
+     order by (q.player_id = any (v_skip_p)), random()
+     limit coalesce((cfg #>> '{gossip,count}')::integer, 2) loop
+    v_n := v_n + 1;
+    v_bps := case when r.grp = 'bad' then coalesce((cfg #>> '{gossip,hushMoneyCents}')::integer, 0) else 0 end;
+    v_seg := public.news_show_segment('gossip', case when r.grp = 'bad' then 'gossipBad' else 'gossipGood' end,
+      jsonb_build_object('name', r.nickname, 'what', r.what),
+      case when v_bps > 0 then jsonb_build_array(jsonb_build_object('label', '+' || public.format_eur(v_bps) || ' Schmerzensgeld', 'tone', 'gain'))
+           else '[]'::jsonb end,
+      case when v_bps > 0 then jsonb_build_array(jsonb_build_object('type', 'cash', 'player_id', r.player_id, 'cents', v_bps))
+           else '[]'::jsonb end,
+      jsonb_build_object('type', 'player', 'player_id', r.player_id, 'name', r.nickname, 'what', r.what,
+                         'good', r.grp = 'good', 'ukey', r.ukey));
+    if v_seg is not null then v_segs := v_segs || (v_seg || jsonb_build_object('ord', case when v_n = 1 then 20 else 60 end)); end if;
+    v_seen := v_seen || r.player_id;
+  end loop;
+
+  -- 6. the NFT market: the most expensive sale of the last hours, every sale only once
+  select s.id, s.price_cents, a.title, a.creator_id, coalesce(cp.nickname, 'einem Unbekannten') as creator,
+         coalesce(bp.nickname, s.buyer_ai, 'ein Unbekannter') as buyer
+    into r
+    from public.artwork_sales s
+    join public.artworks a on a.id = s.artwork_id
+    left join public.profiles cp on cp.id = a.creator_id
+    left join public.profiles bp on bp.id = s.buyer_id
+   where s.at >= p_now - make_interval(hours => coalesce((cfg #>> '{nft,windowHours}')::integer, 24))
+     and not exists (select 1 from public.news_show_used u where u.key = 'fact:nft:' || s.id::text)
+   order by s.price_cents desc, s.id desc
+   limit 1;
+  if r.id is not null then
+    v_seg := public.news_show_segment('nft', 'nftSale',
+      jsonb_build_object('name', r.creator, 'title', r.title, 'amount', public.format_eur(r.price_cents), 'buyer', r.buyer),
+      '[]'::jsonb, '[]'::jsonb,
+      jsonb_strip_nulls(jsonb_build_object('type', 'nft', 'player_id', r.creator_id, 'name', r.creator, 'title', r.title,
+                                           'buyer', r.buyer, 'ukey', 'fact:nft:' || r.id::text)));
+    if v_seg is not null then v_segs := v_segs || (v_seg || jsonb_build_object('ord', 40)); end if;
+  end if;
+
+  -- 7. he digresses: a rumour about a public figure and a stock (lifts it a little), or pure nonsense
+  if random() * 10000 < coalesce((cfg #>> '{ramble,chanceBps}')::integer, 0) then
+    v_seg := null;
+    if random() * 10000 < coalesce((cfg #>> '{ramble,investShareBps}')::integer, 0)
+       and jsonb_array_length(coalesce(cfg #> '{ramble,people}', '[]'::jsonb)) > 0 then
+      select sec.id, sec.name, sec.ticker into r
+        from public.securities sec join public.companies c on c.id = sec.company_id
+       where sec.kind = 'stock' and sec.status = 'listed'
+       order by random() * case when c.is_ai then 1 else 0.5 end
+       limit 1;
+      if r.id is not null then
+        v_bps := public.rand_between((cfg #>> '{ramble,minBps}')::integer, (cfg #>> '{ramble,maxBps}')::integer);
+        v_person := cfg #> '{ramble,people}' ->> least(jsonb_array_length(cfg #> '{ramble,people}') - 1,
+                                                       floor(random() * jsonb_array_length(cfg #> '{ramble,people}'))::integer);
+        v_seg := public.news_show_segment('ramble', 'rambleInvest',
+          jsonb_build_object('person', v_person, 'stock', r.name, 'move', public.news_show_move(v_bps)),
+          jsonb_build_array(jsonb_build_object('label', r.ticker || ' +' || public.news_show_move(v_bps), 'tone', 'gain')),
+          jsonb_build_array(jsonb_build_object('type', 'stock', 'security_id', r.id, 'bps', v_bps)),
+          jsonb_build_object('type', 'ramble', 'person', v_person, 'name', r.name, 'ticker', r.ticker));
+      end if;
+    end if;
+    if v_seg is null then
+      v_seg := public.news_show_segment('ramble', 'ramble', '{}'::jsonb, '[]'::jsonb, '[]'::jsonb, '{"type": "ramble"}'::jsonb);
+    end if;
+    if v_seg is not null then v_segs := v_segs || (v_seg || jsonb_build_object('ord', 80)); end if;
+  end if;
+
+  -- 8. the winner of the day
+  select w.entity_id as player_id, p.nickname, w.last_nw - w.first_nw as gain,
+         ((w.last_nw - w.first_nw) * 10000 / w.first_nw)::integer as bps
+    into r
+    from (select l.entity_id, l.nw as last_nw, f.nw as first_nw
+            from (select distinct on (entity_id) entity_id, net_worth_cents as nw from public.rich_list_snapshots
+                   where entity_kind = 'player' and taken_at >= p_now - interval '45 minutes'
+                   order by entity_id, taken_at desc) l
+            join (select distinct on (entity_id) entity_id, net_worth_cents as nw from public.rich_list_snapshots
+                   where entity_kind = 'player'
+                     and taken_at >= p_now - make_interval(hours => coalesce((cfg #>> '{winner,windowHours}')::integer, 24))
+                   order by entity_id, taken_at asc) f using (entity_id)
+           where f.nw > 0) w
+    join public.profiles p on p.id = w.entity_id
+   where w.entity_id <> all (v_skip_p) and w.entity_id <> all (v_seen)
+     and (w.last_nw - w.first_nw) * 10000 / w.first_nw >= coalesce((cfg #>> '{winner,minGainBps}')::integer, 300)
+   order by (w.last_nw - w.first_nw) * 10000 / w.first_nw desc, random()
+   limit 1;
+  if r.player_id is not null then
+    v_seg := public.news_show_segment('winner', 'winner',
+      jsonb_build_object('name', r.nickname, 'amount', public.format_eur(r.gain), 'pct', public.news_show_move(r.bps)),
+      '[]'::jsonb, '[]'::jsonb,
+      jsonb_build_object('type', 'player', 'player_id', r.player_id, 'name', r.nickname));
+    if v_seg is not null then v_segs := v_segs || (v_seg || jsonb_build_object('ord', 50)); end if;
+  end if;
+
+  -- 9. the hint for the coming hour (settled by the stock news job, ADR-119)
+  if public.config_jsonb('stockNews') is not null then
+    select sec.id, sec.name, sec.ticker into r from public.securities sec
+     where sec.kind = 'stock' and sec.status = 'listed'
+       and not exists (select 1 from public.stock_tips x where x.security_id = sec.id and x.applied_at is null)
+     order by random() limit 1;
+    if r.id is not null then
+      v_dir := case when random() < 0.5 then 1 else -1 end;
+      v_bps := public.rand_between((cfg #>> '{tip,minBps}')::integer, (cfg #>> '{tip,maxBps}')::integer);
+      v_tip := public.news_show_segment('tip', 'tip',
+        jsonb_build_object('stock', r.name, 'move', cfg #>> array['tipWords', case when v_dir > 0 then 'up' else 'down' end]),
+        jsonb_build_array(jsonb_build_object('label', r.ticker || ' ' || case when v_dir > 0 then '↑' else '↓' end || ' Tipp', 'tone', 'neutral')),
+        jsonb_build_array(jsonb_build_object(
+          'type', 'tip', 'security_id', r.id, 'direction', v_dir, 'bps', v_bps,
+          'comes_true', random() * 10000 < coalesce((cfg #>> '{tip,reliabilityBps}')::integer, 7000),
+          'lead_minutes', public.rand_between((cfg #>> '{tip,leadMinMinutes}')::integer, (cfg #>> '{tip,leadMaxMinutes}')::integer))),
+        jsonb_build_object('type', 'tip', 'name', r.name, 'ticker', r.ticker, 'up', v_dir > 0));
+    end if;
+  end if;
+
+  if jsonb_array_length(v_segs) = 0 and v_tip is null then
+    v_seg := public.news_show_segment('world', 'filler', '{}'::jsonb, '[]'::jsonb, '[]'::jsonb, '{"type": "filler"}'::jsonb);
+    if v_seg is not null then v_segs := v_segs || (v_seg || jsonb_build_object('ord', 5)); end if;
+  end if;
+  -- the order of the show: people first, the AI stock last; then at most maxSegments, the hint always last
+  select coalesce(jsonb_agg((x - 'ord') order by coalesce((x ->> 'ord')::integer, 0), ord), '[]'::jsonb) into v_segs
+    from jsonb_array_elements(v_segs) with ordinality t(x, ord);
+  if v_tip is not null then
+    select coalesce(jsonb_agg(x order by ord), '[]'::jsonb) into v_segs
+      from jsonb_array_elements(v_segs) with ordinality t(x, ord) where ord <= v_max - 1;
+    v_segs := v_segs || v_tip;
+  else
+    select coalesce(jsonb_agg(x order by ord), '[]'::jsonb) into v_segs
+      from jsonb_array_elements(v_segs) with ordinality t(x, ord) where ord <= v_max;
+  end if;
+  return v_segs;
+end;
+$$;
+comment on function public.news_show_build(timestamptz) is
+  'Internal: the draft of a news show (ADR-150, ADR-152): loser, personal news, player companies, NFT, winner, digression, sector or tasks, AI stock, hint.';
+
+-- News about players stand under "Spieler" in the news feed (one line of news_show_start changes).
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.news_show_start(bigint, timestamptz)'::regprocedure);
+  v_old text := $t$when seg ->> 'kind' in ('loser', 'winner') then 'player'$t$;
+  v_new text := $t$when seg ->> 'kind' in ('loser', 'winner', 'gossip', 'nft') then 'player'$t$;
+begin
+  if position(v_old in v_def) > 0 then
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+-- After a show started: its facts count as told, and the made-up viewers get their lines for the whole show.
+create or replace function public.news_show_after_start(p_show_id bigint, p_now timestamptz)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.news_show_cfg();
+  bots    jsonb := public.news_show_cfg() #> '{chat,bots}';
+  s       public.news_shows;
+  v_intro numeric := coalesce((cfg ->> 'introSeconds')::numeric, 8);
+  v_seg   numeric := greatest(1, coalesce((cfg ->> 'segmentSeconds')::numeric, 22));
+  v_outro numeric := coalesce((cfg ->> 'outroSeconds')::numeric, 6);
+  v_count integer;
+  v_at    numeric;
+  v_end   numeric;
+  v_i     integer;
+  v_about text;
+  v_kind  text;
+  v_line  text;
+  v_u     double precision;
+  v_n     integer := 0;
+begin
+  select * into s from public.news_shows where id = p_show_id;
+  if s.id is null or s.status <> 'aired' then
+    return 0;
+  end if;
+  insert into public.news_show_used (key, used_at)
+  select distinct x -> 'subject' ->> 'ukey', clock_timestamp()
+    from jsonb_array_elements(s.segments) x where x -> 'subject' ->> 'ukey' is not null
+  on conflict (key) do update set used_at = excluded.used_at;
+
+  if bots is null or jsonb_array_length(coalesce(bots -> 'names', '[]'::jsonb)) = 0 then
+    return 0;
+  end if;
+  v_count := jsonb_array_length(s.segments);
+  v_end := v_intro + v_count * v_seg + v_outro;
+  v_at := 2 + random() * 3;
+  while v_at < v_end and v_n < 200 loop
+    v_i := floor((v_at - v_intro) / v_seg)::integer;
+    v_about := case when v_at >= v_intro and v_i < v_count then s.segments -> v_i -> 'subject' ->> 'name' end;
+    v_u := random() * 10000;
+    v_kind := case when v_about is not null and v_u < coalesce((bots ->> 'aboutShareBps')::integer, 0) then 'about'
+                   when v_u < coalesce((bots ->> 'aboutShareBps')::integer, 0) + coalesce((bots ->> 'angryShareBps')::integer, 5000) then 'angry'
+                   else 'glaze' end;
+    select replace(l, '{name}', coalesce(v_about, '')) into v_line
+      from jsonb_array_elements_text(coalesce(bots -> 'lines' -> v_kind, '[]'::jsonb)) l order by random() limit 1;
+    if v_line is not null and btrim(v_line) <> '' then
+      insert into public.news_show_messages (player_id, bot_name, body, created_at)
+      select null, n, left(v_line, 300), p_now + make_interval(secs => v_at::double precision)
+        from jsonb_array_elements_text(bots -> 'names') n order by random() limit 1;
+      v_n := v_n + 1;
+    end if;
+    v_at := v_at + public.rand_between(greatest(1, coalesce((bots ->> 'everySecondsMin')::integer, 6)),
+                                       greatest(1, coalesce((bots ->> 'everySecondsMax')::integer, 14)));
+  end loop;
+  return v_n;
+end;
+$$;
+comment on function public.news_show_after_start(bigint, timestamptz) is
+  'Internal: marks the facts of a started show as told and writes the lines of the made-up chat viewers (ADR-152).';
+
+-- The chat: players and made-up viewers; lines of the latter appear when their time has come.
+create or replace function public.news_show_chat_json(p_player uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object('id', m.id, 'nickname', m.nickname, 'body', m.body, 'at', m.created_at,
+                                               'mine', coalesce(m.player_id = p_player, false))
+                            order by m.created_at, m.id), '[]'::jsonb)
+    from (select x.id, x.body, x.created_at, x.player_id, coalesce(x.bot_name, p.nickname) as nickname
+            from public.news_show_messages x left join public.profiles p on p.id = x.player_id
+           where x.created_at > public.game_now() - interval '75 minutes' and x.created_at <= public.game_now()
+             and coalesce(x.bot_name, p.nickname) is not null
+           order by x.created_at desc, x.id desc
+           limit coalesce((public.news_show_cfg() #>> '{chat,history}')::integer, 60)) m;
+$$;
+
+create or replace function public.get_news_show()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.news_show_cfg();
+  v_player uuid := public.require_player();
+  v_now    timestamptz := public.game_now();
+  v_hour   timestamptz := date_trunc('hour', public.game_now());
+  v_wait   interval := make_interval(mins => coalesce((cfg ->> 'waitMinutes')::integer, 10));
+  s        public.news_shows;
+  u        public.news_shows;
+begin
+  -- I am watching
+  insert into public.news_show_viewers (player_id, seen_at) values (v_player, v_now)
+  on conflict (player_id) do update set seen_at = excluded.seen_at
+   where public.news_show_viewers.seen_at < excluded.seen_at - interval '4 seconds';
+  -- the draft may be missing when the job is late; this hour's show starts with its first viewer
+  if not exists (select 1 from public.news_shows x
+                  where x.airs_at = case when v_now < v_hour + v_wait then v_hour else v_hour + interval '1 hour' end) then
+    perform public.news_show_run_due(v_now);
+  end if;
+  select * into u from public.news_shows x where x.airs_at = v_hour and x.status = 'scheduled';
+  if u.id is not null and v_now < v_hour + v_wait then
+    if public.news_show_start(u.id, v_now) then
+      perform public.news_show_after_start(u.id, v_now);
+    end if;
+  end if;
+  -- the show to watch: the last one that aired, while it can be replayed
+  select * into s from public.news_shows x
+   where x.status = 'aired'
+     and x.started_at > v_now - make_interval(mins => coalesce((cfg ->> 'replayMinutes')::integer, 55))
+   order by x.airs_at desc limit 1;
+  select * into u from public.news_shows x where x.status = 'scheduled' and x.airs_at > v_now order by x.airs_at limit 1;
+  return jsonb_build_object(
+    'now', v_now,
+    'next_airs_at', coalesce(u.airs_at, v_hour + interval '1 hour'),
+    'viewers', (select count(*) from public.news_show_viewers v where v.seen_at > v_now - interval '20 seconds'),
+    'upcoming', case when u.id is null then null else jsonb_build_object(
+                  'id', u.id, 'airs_at', u.airs_at,
+                  'needs_script', u.writer = 'mini' and u.ai_requested_at is null) end,
+    'show', case when s.id is null then null else jsonb_build_object(
+              'id', s.id, 'airs_at', s.airs_at, 'started_at', s.started_at, 'writer', s.writer,
+              'segments', coalesce((select jsonb_agg(jsonb_build_object('kind', x ->> 'kind', 'mood', coalesce(x ->> 'mood', 'neutral'),
+                                                                        'headline', x ->> 'headline',
+                                                                        'text', x ->> 'text', 'effects', x -> 'effects')
+                                                      order by ord)
+                                      from jsonb_array_elements(s.segments) with ordinality t(x, ord)), '[]'::jsonb)) end,
+    'chat', public.news_show_chat_json(v_player));
+end;
+$$;
+
+-- Claude sees the mood and may choose another one of the known faces.
+create or replace function public.news_show_script_context(p_show_id bigint)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'show_id', s.id, 'status', s.status, 'airs_at', s.airs_at,
+    'segments', coalesce((select jsonb_agg(jsonb_build_object(
+                             'kind', x ->> 'kind', 'mood', coalesce(x ->> 'mood', 'neutral'),
+                             'headline', x ->> 'headline', 'text', x ->> 'text',
+                             'effects', (select coalesce(jsonb_agg(e ->> 'label'), '[]'::jsonb) from jsonb_array_elements(x -> 'effects') e),
+                             'facts', (x -> 'subject') - 'player_id' - 'company_id' - 'ukey') order by ord)
+                            from jsonb_array_elements(s.segments) with ordinality t(x, ord)), '[]'::jsonb))
+    from public.news_shows s where s.id = p_show_id;
+$$;
+
+create or replace function public.store_news_show_script(p_show_id bigint, p_segments jsonb)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  s      public.news_shows;
+  v_new  jsonb;
+begin
+  select * into s from public.news_shows where id = p_show_id for update;
+  if s.id is null or s.status <> 'scheduled' or jsonb_typeof(p_segments) <> 'array'
+     or jsonb_array_length(p_segments) <> jsonb_array_length(s.segments) then
+    return false;
+  end if;
+  if exists (select 1 from jsonb_array_elements(p_segments) x
+              where not public.company_ai_text_ok(x ->> 'headline', 90, true)
+                 or not public.company_ai_text_ok(x ->> 'text', 420, true)) then
+    return false;
+  end if;
+  select jsonb_agg(o.x || jsonb_build_object('headline', btrim(n.x ->> 'headline'), 'text', btrim(n.x ->> 'text'))
+                       || case when n.x ->> 'mood' in ('neutral', 'shocked', 'crying', 'laughing', 'angry', 'smug', 'confused', 'proud')
+                               then jsonb_build_object('mood', n.x ->> 'mood') else '{}'::jsonb end
+                   order by o.ord)
+    into v_new
+    from jsonb_array_elements(s.segments) with ordinality o(x, ord)
+    join jsonb_array_elements(p_segments) with ordinality n(x, ord) using (ord);
+  update public.news_shows set segments = v_new, writer = 'claude' where id = s.id;
+  return true;
+end;
+$$;
+
+revoke all on function public.news_show_segment(text, text, jsonb, jsonb, jsonb, jsonb) from public, anon, authenticated;
+revoke all on function public.news_show_build(timestamptz) from public, anon, authenticated;
+revoke all on function public.news_show_after_start(bigint, timestamptz) from public, anon, authenticated;
+revoke all on function public.news_show_chat_json(uuid) from public, anon, authenticated;
+revoke all on function public.news_show_script_context(bigint) from public, anon, authenticated;
+revoke all on function public.store_news_show_script(bigint, jsonb) from public, anon, authenticated;
+grant execute on function public.news_show_script_context(bigint) to service_role;
+grant execute on function public.store_news_show_script(bigint, jsonb) to service_role;
+revoke all on function public.get_news_show() from public, anon;
+grant execute on function public.get_news_show() to authenticated;
 
 -- ===== game_config (current values, overwriting older ones) =====
 -- GENERATED by scripts/gen-config-seed.ts from src/config/balance.ts. Do not edit by hand.
@@ -50518,7 +51109,7 @@ insert into public.game_config (key, value, description) values
   ('companyMoves', '{"costCentsByTier":{"garage":100000,"small_business":400000,"gmbh":1500000,"ag":6000000},"slotsByTier":{"garage":1,"small_business":2,"gmbh":3,"ag":4},"risk":{"safe":{"chanceBps":9000,"payoutBps":12000,"refundBps":5000,"gain":0.02},"normal":{"chanceBps":7000,"payoutBps":15000,"refundBps":3000,"gain":0.04},"risky":{"chanceBps":4000,"payoutBps":26000,"refundBps":1000,"gain":0.08}},"chancePerSkillBps":300,"maxSkillBonusBps":2500,"maxChanceBps":9500,"cooldownFactor":2,"historyLimit":12,"moves":[{"key":"pop_up_stand","product":"*","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.6,"minutes":15},{"key":"local_press","product":"*","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"team_workshop","product":"*","branch":"management","kind":"quality","risk":"safe","costFactor":0.8,"minutes":30},{"key":"bulk_purchase","product":"*","branch":"logistics","kind":"cash","risk":"safe","costFactor":1.2,"minutes":20},{"key":"investor_pitch","product":"*","branch":"finance","kind":"cash","risk":"risky","costFactor":1.5,"minutes":45},{"key":"tax_review","product":"*","branch":"law","kind":"cash","risk":"normal","costFactor":0.7,"minutes":30},{"key":"pentest_bank","product":"security_software","branch":"it","kind":"cash","risk":"normal","costFactor":1.5,"minutes":40},{"key":"security_audit_sme","product":"security_software","branch":"it","kind":"cash","risk":"safe","costFactor":1,"minutes":25},{"key":"bug_bounty","product":"security_software","branch":"it","kind":"cash","risk":"risky","costFactor":1,"minutes":35},{"key":"security_conference","product":"security_software","branch":"sales","kind":"awareness","risk":"normal","costFactor":1.3,"minutes":40},{"key":"certification","product":"security_software","branch":"law","kind":"quality","risk":"normal","costFactor":1.4,"minutes":50},{"key":"incident_response","product":"security_software","branch":"it","kind":"cash","risk":"risky","costFactor":2,"minutes":60},{"key":"app_store_feature","product":"mobile_app","branch":"sales","kind":"awareness","risk":"risky","costFactor":1.2,"minutes":40},{"key":"white_label_app","product":"mobile_app","branch":"it","kind":"cash","risk":"normal","costFactor":1.5,"minutes":45},{"key":"bugfix_sprint","product":"mobile_app","branch":"it","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"in_app_shop","product":"mobile_app","branch":"finance","kind":"cash","risk":"normal","costFactor":1.1,"minutes":30},{"key":"influencer_app","product":"mobile_app","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"hackathon","product":"mobile_app","branch":"it","kind":"cash","risk":"risky","costFactor":0.9,"minutes":35},{"key":"migrate_customer","product":"cloud_platform","branch":"it","kind":"cash","risk":"normal","costFactor":1.6,"minutes":50},{"key":"uptime_guarantee","product":"cloud_platform","branch":"management","kind":"quality","risk":"normal","costFactor":1.3,"minutes":45},{"key":"startup_credits","product":"cloud_platform","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.7,"minutes":20},{"key":"enterprise_deal","product":"cloud_platform","branch":"sales","kind":"cash","risk":"risky","costFactor":2.2,"minutes":60},{"key":"data_center_deal","product":"cloud_platform","branch":"finance","kind":"cash","risk":"safe","costFactor":1.2,"minutes":25},{"key":"ai_hosting","product":"cloud_platform","branch":"it","kind":"cash","risk":"risky","costFactor":1.8,"minutes":50},{"key":"flash_sale","product":"online_shop","branch":"sales","kind":"cash","risk":"safe","costFactor":1,"minutes":15},{"key":"marketplace_listing","product":"online_shop","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"same_day_delivery","product":"online_shop","branch":"logistics","kind":"quality","risk":"normal","costFactor":1.4,"minutes":45},{"key":"black_friday","product":"online_shop","branch":"sales","kind":"cash","risk":"risky","costFactor":1.6,"minutes":40},{"key":"returns_process","product":"online_shop","branch":"logistics","kind":"quality","risk":"safe","costFactor":0.7,"minutes":20},{"key":"b2b_shop","product":"online_shop","branch":"sales","kind":"cash","risk":"normal","costFactor":1.3,"minutes":35},{"key":"fashion_show","product":"fashion","branch":"sales","kind":"awareness","risk":"risky","costFactor":1.6,"minutes":50},{"key":"capsule_collection","product":"fashion","branch":"craft","kind":"cash","risk":"normal","costFactor":1.3,"minutes":40},{"key":"influencer_outfit","product":"fashion","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"sustainable_fabric","product":"fashion","branch":"science","kind":"quality","risk":"normal","costFactor":1.2,"minutes":45},{"key":"outlet_sale","product":"fashion","branch":"sales","kind":"cash","risk":"safe","costFactor":0.9,"minutes":20},{"key":"collab_brand","product":"fashion","branch":"management","kind":"cash","risk":"risky","costFactor":1.8,"minutes":55},{"key":"catering_job","product":"delicatessen","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.2,"minutes":35},{"key":"tasting_evening","product":"delicatessen","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.6,"minutes":20},{"key":"gift_baskets","product":"delicatessen","branch":"sales","kind":"cash","risk":"safe","costFactor":0.9,"minutes":20},{"key":"organic_label","product":"delicatessen","branch":"science","kind":"quality","risk":"normal","costFactor":1.2,"minutes":45},{"key":"restaurant_supply","product":"delicatessen","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"food_festival","product":"delicatessen","branch":"sales","kind":"cash","risk":"risky","costFactor":1.3,"minutes":45},{"key":"roof_installation","product":"solar","branch":"craft","kind":"cash","risk":"safe","costFactor":1.2,"minutes":30},{"key":"solar_park","product":"solar","branch":"craft","kind":"cash","risk":"risky","costFactor":2.4,"minutes":60},{"key":"subsidy_application","product":"solar","branch":"law","kind":"cash","risk":"normal","costFactor":0.8,"minutes":30},{"key":"installer_training","product":"solar","branch":"craft","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"energy_fair","product":"solar","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":35},{"key":"battery_bundle","product":"solar","branch":"sales","kind":"cash","risk":"normal","costFactor":1.3,"minutes":35},{"key":"peak_trading","product":"grid_service","branch":"finance","kind":"cash","risk":"risky","costFactor":1.6,"minutes":40},{"key":"grid_maintenance","product":"grid_service","branch":"craft","kind":"cash","risk":"safe","costFactor":1.1,"minutes":25},{"key":"smart_meter_rollout","product":"grid_service","branch":"it","kind":"cash","risk":"normal","costFactor":1.5,"minutes":45},{"key":"grid_upgrade","product":"grid_service","branch":"craft","kind":"quality","risk":"normal","costFactor":1.4,"minutes":50},{"key":"city_contract","product":"grid_service","branch":"law","kind":"cash","risk":"risky","costFactor":2,"minutes":60},{"key":"outage_hotline","product":"grid_service","branch":"management","kind":"awareness","risk":"safe","costFactor":0.6,"minutes":20},{"key":"home_storage","product":"energy_storage","branch":"sales","kind":"cash","risk":"normal","costFactor":1.3,"minutes":35},{"key":"battery_research","product":"energy_storage","branch":"science","kind":"quality","risk":"risky","costFactor":1.6,"minutes":55},{"key":"grid_battery","product":"energy_storage","branch":"finance","kind":"cash","risk":"risky","costFactor":2.2,"minutes":60},{"key":"recycling_program","product":"energy_storage","branch":"science","kind":"awareness","risk":"safe","costFactor":0.7,"minutes":25},{"key":"ev_fleet","product":"energy_storage","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"warranty_extension","product":"energy_storage","branch":"law","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"generic_launch","product":"generics","branch":"science","kind":"cash","risk":"normal","costFactor":1.4,"minutes":45},{"key":"pharmacy_contracts","product":"generics","branch":"sales","kind":"cash","risk":"safe","costFactor":1,"minutes":25},{"key":"gmp_audit","product":"generics","branch":"law","kind":"quality","risk":"normal","costFactor":1.2,"minutes":45},{"key":"tender_win","product":"generics","branch":"law","kind":"cash","risk":"risky","costFactor":1.8,"minutes":55},{"key":"doctor_visits","product":"generics","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.7,"minutes":20},{"key":"cost_cutting_lab","product":"generics","branch":"management","kind":"cash","risk":"safe","costFactor":0.9,"minutes":25},{"key":"trial_phase","product":"biotech","branch":"science","kind":"cash","risk":"risky","costFactor":2.4,"minutes":60},{"key":"license_deal","product":"biotech","branch":"law","kind":"cash","risk":"normal","costFactor":1.6,"minutes":45},{"key":"lab_upgrade","product":"biotech","branch":"science","kind":"quality","risk":"normal","costFactor":1.4,"minutes":45},{"key":"research_grant","product":"biotech","branch":"finance","kind":"cash","risk":"safe","costFactor":0.8,"minutes":30},{"key":"science_paper","product":"biotech","branch":"science","kind":"awareness","risk":"normal","costFactor":0.9,"minutes":35},{"key":"cro_service","product":"biotech","branch":"science","kind":"cash","risk":"safe","costFactor":1.1,"minutes":30},{"key":"hospital_order","product":"medtech","branch":"sales","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"ce_marking","product":"medtech","branch":"law","kind":"quality","risk":"normal","costFactor":1.2,"minutes":45},{"key":"device_service","product":"medtech","branch":"craft","kind":"cash","risk":"safe","costFactor":1,"minutes":25},{"key":"medical_fair","product":"medtech","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":35},{"key":"prototype","product":"medtech","branch":"science","kind":"quality","risk":"risky","costFactor":1.5,"minutes":55},{"key":"export_deal","product":"medtech","branch":"sales","kind":"cash","risk":"risky","costFactor":1.9,"minutes":55},{"key":"hospital_express","product":"courier","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.2,"minutes":30},{"key":"cargo_bike_fleet","product":"courier","branch":"logistics","kind":"quality","risk":"normal","costFactor":1.3,"minutes":40},{"key":"night_delivery","product":"courier","branch":"logistics","kind":"cash","risk":"safe","costFactor":1,"minutes":25},{"key":"restaurant_partner","product":"courier","branch":"sales","kind":"cash","risk":"normal","costFactor":1.1,"minutes":30},{"key":"courier_app","product":"courier","branch":"it","kind":"awareness","risk":"normal","costFactor":1,"minutes":35},{"key":"christmas_rush","product":"courier","branch":"management","kind":"cash","risk":"risky","costFactor":1.6,"minutes":45},{"key":"seasonal_storage","product":"warehouse","branch":"logistics","kind":"cash","risk":"safe","costFactor":1.1,"minutes":25},{"key":"automation_upgrade","product":"warehouse","branch":"it","kind":"quality","risk":"normal","costFactor":1.5,"minutes":50},{"key":"fulfillment_client","product":"warehouse","branch":"sales","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"cold_storage","product":"warehouse","branch":"science","kind":"cash","risk":"risky","costFactor":1.8,"minutes":50},{"key":"inventory_audit","product":"warehouse","branch":"finance","kind":"cash","risk":"safe","costFactor":0.8,"minutes":20},{"key":"open_day","product":"warehouse","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.5,"minutes":20},{"key":"international_route","product":"freight","branch":"logistics","kind":"cash","risk":"risky","costFactor":2,"minutes":55},{"key":"rail_partnership","product":"freight","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"fuel_hedge","product":"freight","branch":"finance","kind":"cash","risk":"normal","costFactor":1,"minutes":30},{"key":"driver_training","product":"freight","branch":"management","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"heavy_load","product":"freight","branch":"logistics","kind":"cash","risk":"risky","costFactor":1.7,"minutes":50},{"key":"logistics_fair","product":"freight","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":35},{"key":"contract_check_flat","product":"legal_tech","branch":"law","kind":"cash","risk":"safe","costFactor":1,"minutes":20},{"key":"class_action","product":"legal_tech","branch":"law","kind":"cash","risk":"risky","costFactor":2,"minutes":60},{"key":"startup_law_pack","product":"legal_tech","branch":"law","kind":"cash","risk":"normal","costFactor":1.3,"minutes":35},{"key":"legal_explainer","product":"legal_tech","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"lawyer_review","product":"legal_tech","branch":"law","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"data_privacy_audit","product":"legal_tech","branch":"it","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"free_account","product":"fintech","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.7,"minutes":20},{"key":"savings_plan","product":"fintech","branch":"finance","kind":"cash","risk":"normal","costFactor":1.2,"minutes":35},{"key":"crypto_feature","product":"fintech","branch":"finance","kind":"cash","risk":"risky","costFactor":1.8,"minutes":50},{"key":"banking_license","product":"fintech","branch":"law","kind":"quality","risk":"normal","costFactor":1.5,"minutes":55},{"key":"fraud_detection","product":"fintech","branch":"it","kind":"quality","risk":"safe","costFactor":0.9,"minutes":30},{"key":"merchant_payments","product":"fintech","branch":"sales","kind":"cash","risk":"safe","costFactor":1.1,"minutes":25},{"key":"new_partner","product":"franchise","branch":"management","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"flagship_store","product":"franchise","branch":"sales","kind":"awareness","risk":"risky","costFactor":1.8,"minutes":55},{"key":"partner_training","product":"franchise","branch":"management","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"central_purchasing","product":"franchise","branch":"logistics","kind":"cash","risk":"safe","costFactor":1.1,"minutes":25},{"key":"regional_ads","product":"franchise","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"master_franchise","product":"franchise","branch":"law","kind":"cash","risk":"risky","costFactor":2.2,"minutes":60},{"key":"spot_trade","product":"energy_trading","branch":"finance","kind":"cash","risk":"risky","costFactor":1.6,"minutes":30},{"key":"supply_contract","product":"energy_trading","branch":"sales","kind":"cash","risk":"safe","costFactor":1.2,"minutes":25},{"key":"green_tariff","product":"energy_trading","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"hedging","product":"energy_trading","branch":"finance","kind":"quality","risk":"normal","costFactor":1.3,"minutes":45},{"key":"industrial_customer","product":"energy_trading","branch":"sales","kind":"cash","risk":"normal","costFactor":1.6,"minutes":45},{"key":"market_analysis","product":"energy_trading","branch":"science","kind":"quality","risk":"safe","costFactor":0.7,"minutes":20},{"key":"approval_dossier","product":"regulatory","branch":"law","kind":"cash","risk":"normal","costFactor":1.5,"minutes":45},{"key":"fast_track","product":"regulatory","branch":"law","kind":"cash","risk":"risky","costFactor":2.2,"minutes":60},{"key":"label_check","product":"regulatory","branch":"science","kind":"cash","risk":"safe","costFactor":0.9,"minutes":20},{"key":"expert_panel","product":"regulatory","branch":"science","kind":"quality","risk":"normal","costFactor":1.2,"minutes":40},{"key":"pharma_congress","product":"regulatory","branch":"sales","kind":"awareness","risk":"normal","costFactor":1.1,"minutes":35},{"key":"eu_registration","product":"regulatory","branch":"law","kind":"cash","risk":"normal","costFactor":1.7,"minutes":50},{"key":"office_move","product":"moving","branch":"management","kind":"cash","risk":"normal","costFactor":1.5,"minutes":45},{"key":"student_move","product":"moving","branch":"logistics","kind":"cash","risk":"safe","costFactor":0.8,"minutes":15},{"key":"piano_move","product":"moving","branch":"craft","kind":"cash","risk":"risky","costFactor":1.4,"minutes":30},{"key":"moving_boxes","product":"moving","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.6,"minutes":20},{"key":"packing_training","product":"moving","branch":"management","kind":"quality","risk":"normal","costFactor":1,"minutes":30},{"key":"senior_move","product":"moving","branch":"management","kind":"cash","risk":"normal","costFactor":1.2,"minutes":35}]}'::jsonb, 'Defaults from src/config/balance.ts, section "companyMoves"'),
   ('companyTasks', '{"valueCentsByTier":{"garage":40000,"small_business":150000,"gmbh":500000,"ag":2000000},"penaltyBps":6000,"passScoreBps":8000,"graceSeconds":8,"games":{"pick":{"seconds":30,"tiles":12,"minTargets":3,"maxTargets":6},"count":{"seconds":25,"tiles":16,"minTargets":4,"maxTargets":9},"sort":{"seconds":35,"items":8},"order":{"seconds":30,"items":5,"min":1,"max":99},"seq":{"seconds":25,"length":5,"showSeconds":4},"math":{"seconds":45},"slider":{"seconds":30,"sliders":3,"min":20,"max":92,"tolerance":3},"rotate":{"seconds":30,"dials":3,"steps":8,"minTurn":2},"match":{"seconds":40,"boxes":3,"groupSize":3,"perBox":2},"path":{"seconds":40,"size":5,"minWalls":6,"maxWalls":9,"minDetour":2,"stepBps":1000}},"ai":{"minutes":12,"slowdownPerQueuedBps":5000,"chanceBps":7000,"skillBonusBps":1000,"valueBps":6000},"board":{"base":1,"membersPerTask":2,"max":6,"everyMinutes":4,"activeMinutes":20,"autoAiBeforeDueMinutes":15},"aiDelegateMinTier":"senior","xp":{"success":60,"failure":15},"momentum":{"perSolveBps":120,"perfectBonusBps":80,"penaltyBps":250,"aiBps":5000,"decayPerHourBps":300,"maxBps":6000},"historyLimit":15,"tasks":[{"key":"pay_invoices","product":"*","branch":"finance","game":"sort","factor":1,"minutes":45},{"key":"payroll_check","product":"*","branch":"finance","game":"math","factor":1.1,"minutes":45,"op":"mul","a":[3,9],"b":[12,28]},{"key":"coffee_order","product":"*","branch":"management","game":"count","factor":0.6,"minutes":40},{"key":"shift_plan","product":"*","branch":"management","game":"order","factor":1,"minutes":50,"asc":true,"range":[6,22]},{"key":"contract_review","product":"*","branch":"law","game":"pick","factor":1.2,"minutes":50},{"key":"password_reset","product":"*","branch":"it","game":"seq","factor":0.7,"minutes":40},{"key":"customer_mail","product":"*","branch":"sales","game":"sort","factor":0.8,"minutes":40},{"key":"office_supplies","product":"*","branch":"logistics","game":"math","factor":0.6,"minutes":40,"op":"add","a":[12,40],"b":[8,30]},{"key":"patch_servers","product":"security_software","branch":"it","game":"pick","factor":1.3,"minutes":45},{"key":"phishing_filter","product":"security_software","branch":"it","game":"sort","factor":1,"minutes":40},{"key":"alarm_codes","product":"security_software","branch":"it","game":"seq","factor":1.1,"minutes":40},{"key":"license_count","product":"security_software","branch":"sales","game":"math","factor":0.9,"minutes":45,"op":"mul","a":[4,12],"b":[5,25]},{"key":"crash_reports","product":"mobile_app","branch":"it","game":"count","factor":1,"minutes":40},{"key":"release_notes","product":"mobile_app","branch":"sales","game":"sort","factor":0.8,"minutes":45},{"key":"store_screens","product":"mobile_app","branch":"sales","game":"pick","factor":0.9,"minutes":40},{"key":"beta_testers","product":"mobile_app","branch":"management","game":"math","factor":0.8,"minutes":50,"op":"sub","a":[60,120],"b":[10,45]},{"key":"rack_servers","product":"cloud_platform","branch":"it","game":"order","factor":1.2,"minutes":45,"asc":false,"range":[18,45]},{"key":"backup_tapes","product":"cloud_platform","branch":"it","game":"pick","factor":1,"minutes":40},{"key":"cloud_bill","product":"cloud_platform","branch":"finance","game":"math","factor":1.1,"minutes":45,"op":"mul","a":[6,20],"b":[15,60]},{"key":"ddos_block","product":"cloud_platform","branch":"it","game":"pick","factor":1.3,"minutes":40},{"key":"deadline_files","product":"legal_tech","branch":"law","game":"order","factor":1,"minutes":40,"asc":true,"range":[1,30]},{"key":"template_check","product":"legal_tech","branch":"law","game":"pick","factor":1.1,"minutes":45},{"key":"chatbot_answers","product":"legal_tech","branch":"it","game":"sort","factor":0.9,"minutes":40},{"key":"fee_calc","product":"legal_tech","branch":"finance","game":"math","factor":1,"minutes":45,"op":"pct","a":[2000,9000],"b":[10,30]},{"key":"fraud_check","product":"fintech","branch":"finance","game":"pick","factor":1.3,"minutes":40},{"key":"kyc_docs","product":"fintech","branch":"law","game":"sort","factor":1,"minutes":45},{"key":"interest_calc","product":"fintech","branch":"finance","game":"math","factor":1,"minutes":45,"op":"pct","a":[1000,20000],"b":[2,6]},{"key":"tan_codes","product":"fintech","branch":"it","game":"seq","factor":0.8,"minutes":40},{"key":"pack_orders","product":"online_shop","branch":"logistics","game":"pick","factor":1.1,"minutes":40},{"key":"returns_sort","product":"online_shop","branch":"logistics","game":"sort","factor":0.9,"minutes":45},{"key":"price_update","product":"online_shop","branch":"sales","game":"math","factor":1,"minutes":40,"op":"pct","a":[20,200],"b":[10,40]},{"key":"stock_count_shop","product":"online_shop","branch":"logistics","game":"count","factor":0.8,"minutes":40},{"key":"pack_shirts","product":"fashion","branch":"logistics","game":"pick","factor":1.1,"minutes":40},{"key":"color_match","product":"fashion","branch":"craft","game":"sort","factor":1,"minutes":45},{"key":"runway_order","product":"fashion","branch":"sales","game":"seq","factor":0.9,"minutes":50},{"key":"size_count","product":"fashion","branch":"logistics","game":"count","factor":0.8,"minutes":40},{"key":"cheese_age","product":"delicatessen","branch":"science","game":"order","factor":1,"minutes":45,"asc":false,"range":[2,36]},{"key":"expiry_check","product":"delicatessen","branch":"logistics","game":"pick","factor":1.1,"minutes":40},{"key":"gift_basket","product":"delicatessen","branch":"sales","game":"math","factor":0.9,"minutes":45,"op":"mul","a":[5,25],"b":[18,45]},{"key":"cold_chain","product":"delicatessen","branch":"logistics","game":"sort","factor":1,"minutes":40},{"key":"partner_audit","product":"franchise","branch":"management","game":"pick","factor":1.2,"minutes":50},{"key":"royalty_calc","product":"franchise","branch":"finance","game":"math","factor":1.1,"minutes":45,"op":"pct","a":[10000,60000],"b":[4,9]},{"key":"opening_plan","product":"franchise","branch":"management","game":"order","factor":1,"minutes":50,"asc":true,"range":[1,26]},{"key":"recipe_steps","product":"franchise","branch":"management","game":"seq","factor":0.8,"minutes":40},{"key":"panel_check","product":"solar","branch":"craft","game":"pick","factor":1.1,"minutes":45},{"key":"roof_angle","product":"solar","branch":"craft","game":"order","factor":1,"minutes":45,"asc":false,"range":[200,1200]},{"key":"feed_in","product":"solar","branch":"finance","game":"math","factor":1,"minutes":45,"op":"mul","a":[300,900],"b":[8,13]},{"key":"cable_colors","product":"solar","branch":"craft","game":"seq","factor":0.9,"minutes":40},{"key":"outage_map","product":"grid_service","branch":"craft","game":"pick","factor":1.3,"minutes":40},{"key":"meter_read","product":"grid_service","branch":"it","game":"math","factor":0.9,"minutes":45,"op":"sub","a":[4000,9000],"b":[1000,3500]},{"key":"crew_dispatch","product":"grid_service","branch":"management","game":"order","factor":1,"minutes":45,"asc":true,"range":[5,60]},{"key":"safety_gear","product":"grid_service","branch":"law","game":"sort","factor":0.8,"minutes":40},{"key":"cell_test","product":"energy_storage","branch":"science","game":"pick","factor":1.2,"minutes":45},{"key":"charge_plan","product":"energy_storage","branch":"finance","game":"order","factor":1,"minutes":45,"asc":true,"range":[8,45]},{"key":"capacity_calc","product":"energy_storage","branch":"science","game":"math","factor":1,"minutes":45,"op":"mul","a":[8,24],"b":[5,15]},{"key":"thermal_watch","product":"energy_storage","branch":"science","game":"count","factor":1.1,"minutes":40},{"key":"buy_cheap","product":"energy_trading","branch":"finance","game":"order","factor":1.3,"minutes":40,"asc":true,"range":[30,150]},{"key":"contract_sort","product":"energy_trading","branch":"law","game":"sort","factor":1,"minutes":45},{"key":"margin_calc","product":"energy_trading","branch":"finance","game":"math","factor":1.1,"minutes":45,"op":"sub","a":[90,160],"b":[40,85]},{"key":"trade_signals","product":"energy_trading","branch":"finance","game":"seq","factor":0.9,"minutes":40},{"key":"batch_check","product":"generics","branch":"science","game":"pick","factor":1.2,"minutes":45},{"key":"dose_calc","product":"generics","branch":"science","game":"math","factor":1,"minutes":45,"op":"mul","a":[2,6],"b":[50,400]},{"key":"pharmacy_orders","product":"generics","branch":"logistics","game":"count","factor":0.9,"minutes":40},{"key":"label_sort","product":"generics","branch":"law","game":"sort","factor":0.8,"minutes":40},{"key":"petri_dishes","product":"biotech","branch":"science","game":"pick","factor":1.1,"minutes":45},{"key":"dna_sequence","product":"biotech","branch":"science","game":"seq","factor":1.2,"minutes":45},{"key":"lab_cleanup","product":"biotech","branch":"science","game":"sort","factor":1,"minutes":45},{"key":"grant_budget","product":"biotech","branch":"finance","game":"math","factor":1,"minutes":45,"op":"pct","a":[100000,500000],"b":[10,30]},{"key":"device_test","product":"medtech","branch":"craft","game":"pick","factor":1.2,"minutes":45},{"key":"sterile_sort","product":"medtech","branch":"science","game":"sort","factor":1,"minutes":40},{"key":"calibrate","product":"medtech","branch":"science","game":"math","factor":1,"minutes":40,"op":"sub","a":[150,190],"b":[110,145]},{"key":"hospital_route","product":"medtech","branch":"sales","game":"order","factor":0.9,"minutes":45,"asc":true,"range":[1,40]},{"key":"dossier_pages","product":"regulatory","branch":"law","game":"count","factor":1.2,"minutes":45},{"key":"deadline_agency","product":"regulatory","branch":"law","game":"order","factor":1.1,"minutes":45,"asc":true,"range":[3,60]},{"key":"side_effects","product":"regulatory","branch":"science","game":"sort","factor":1,"minutes":40},{"key":"translation_set","product":"regulatory","branch":"law","game":"pick","factor":0.8,"minutes":40},{"key":"route_order","product":"courier","branch":"logistics","game":"order","factor":1.1,"minutes":40,"asc":true,"range":[3,45]},{"key":"parcel_scan","product":"courier","branch":"logistics","game":"pick","factor":1,"minutes":40},{"key":"bike_check","product":"courier","branch":"craft","game":"seq","factor":0.8,"minutes":40},{"key":"tip_jar","product":"courier","branch":"finance","game":"math","factor":0.7,"minutes":45,"op":"add","a":[20,80],"b":[15,60]},{"key":"pick_list","product":"warehouse","branch":"logistics","game":"pick","factor":1.1,"minutes":40},{"key":"pallet_count","product":"warehouse","branch":"logistics","game":"count","factor":0.9,"minutes":40},{"key":"forklift_safety","product":"warehouse","branch":"management","game":"sort","factor":0.8,"minutes":45},{"key":"dock_plan","product":"warehouse","branch":"management","game":"order","factor":1,"minutes":45,"asc":true,"range":[5,20]},{"key":"customs_docs","product":"freight","branch":"law","game":"sort","factor":1.2,"minutes":45},{"key":"container_load","product":"freight","branch":"logistics","game":"math","factor":1.1,"minutes":45,"op":"mul","a":[6,18],"b":[12,30]},{"key":"ship_schedule","product":"freight","branch":"logistics","game":"order","factor":1,"minutes":50,"asc":true,"range":[2,40]},{"key":"seal_codes","product":"freight","branch":"logistics","game":"seq","factor":0.8,"minutes":40},{"key":"box_labels","product":"moving","branch":"logistics","game":"pick","factor":1,"minutes":40},{"key":"load_order","product":"moving","branch":"management","game":"seq","factor":1.1,"minutes":45},{"key":"fragile_sort","product":"moving","branch":"logistics","game":"sort","factor":0.9,"minutes":40},{"key":"moving_quote","product":"moving","branch":"finance","game":"math","factor":1,"minutes":45,"op":"mul","a":[3,9],"b":[45,90]},{"key":"align_labels","product":"*","branch":"logistics","game":"slider","factor":0.7,"minutes":40},{"key":"fix_antenna","product":"*","branch":"it","game":"rotate","factor":0.8,"minutes":40},{"key":"file_documents","product":"*","branch":"management","game":"match","factor":0.9,"minutes":45},{"key":"office_route","product":"*","branch":"logistics","game":"path","factor":0.8,"minutes":45},{"key":"firewall_rules","product":"security_software","branch":"it","game":"match","factor":1.1,"minutes":45},{"key":"ui_align","product":"mobile_app","branch":"it","game":"slider","factor":0.9,"minutes":40},{"key":"cable_route","product":"cloud_platform","branch":"it","game":"path","factor":1.1,"minutes":45},{"key":"case_files","product":"legal_tech","branch":"law","game":"match","factor":1,"minutes":45},{"key":"vault_dials","product":"fintech","branch":"it","game":"rotate","factor":1,"minutes":40},{"key":"warehouse_bins","product":"online_shop","branch":"logistics","game":"match","factor":1,"minutes":45},{"key":"hem_length","product":"fashion","branch":"craft","game":"slider","factor":0.9,"minutes":40},{"key":"fridge_shelves","product":"delicatessen","branch":"logistics","game":"match","factor":1,"minutes":45},{"key":"sign_turn","product":"franchise","branch":"craft","game":"rotate","factor":0.9,"minutes":40},{"key":"panel_turn","product":"solar","branch":"craft","game":"rotate","factor":1.1,"minutes":40},{"key":"line_repair","product":"grid_service","branch":"craft","game":"path","factor":1.2,"minutes":45},{"key":"charge_level","product":"energy_storage","branch":"science","game":"slider","factor":1,"minutes":40},{"key":"grid_flow","product":"energy_trading","branch":"finance","game":"path","factor":1.1,"minutes":45},{"key":"pill_boxes","product":"generics","branch":"science","game":"match","factor":1,"minutes":45},{"key":"pipette","product":"biotech","branch":"science","game":"slider","factor":1.1,"minutes":40},{"key":"probe_turn","product":"medtech","branch":"craft","game":"rotate","factor":1,"minutes":40},{"key":"form_stack","product":"regulatory","branch":"law","game":"match","factor":1,"minutes":45},{"key":"bike_route","product":"courier","branch":"logistics","game":"path","factor":1.1,"minutes":45},{"key":"forklift_path","product":"warehouse","branch":"logistics","game":"path","factor":1,"minutes":45},{"key":"crane_turn","product":"freight","branch":"logistics","game":"rotate","factor":1,"minutes":40},{"key":"truck_space","product":"moving","branch":"logistics","game":"slider","factor":0.9,"minutes":40}]}'::jsonb, 'Defaults from src/config/balance.ts, section "companyTasks"'),
   ('funNews', '{"everyMinutes":6,"repeatHours":8,"keepHours":48,"items":[{"key":"ceo_laptop_train","needs":"company"},{"key":"office_dog","needs":"company"},{"key":"coffee_machine","needs":"company"},{"key":"typo_press","needs":"company"},{"key":"ceo_marathon","needs":"company"},{"key":"printer_rebellion","needs":"company"},{"key":"parking_war","needs":"company"},{"key":"lucky_socks","needs":"company"},{"key":"annual_party","needs":"company"},{"key":"ai_slogan","needs":"company"},{"key":"mascot","needs":"company"},{"key":"intern_ceo","needs":"company"},{"key":"rename_rumor","needs":"company"},{"key":"plant_office","needs":"company"},{"key":"ticker_meme","needs":"company"},{"key":"yacht_sale","needs":"company"},{"key":"player_lambo","needs":"player"},{"key":"player_coffee","needs":"player"},{"key":"player_tip","needs":"player"},{"key":"player_office","needs":"player"},{"key":"player_chart","needs":"player"},{"key":"player_diet","needs":"player"},{"key":"player_motivation","needs":"player"},{"key":"player_haircut","needs":"player"},{"key":"weather_markets","needs":"none"},{"key":"pigeon_trader","needs":"none"},{"key":"monday_effect","needs":"none"},{"key":"broker_nap","needs":"none"},{"key":"bull_escape","needs":"none"},{"key":"bear_costume","needs":"none"},{"key":"calculator_strike","needs":"none"},{"key":"vending_machine","needs":"none"},{"key":"elevator_talk","needs":"none"},{"key":"index_birthday","needs":"none"},{"key":"cat_portfolio","needs":"none"},{"key":"headline_error","needs":"none"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "funNews"'),
-  ('newsShow', '{"prepareMinutes":10,"introSeconds":8,"segmentSeconds":22,"outroSeconds":6,"charsPerSecond":28,"maxSegments":7,"waitMinutes":10,"replayMinutes":55,"teaserMinutes":5,"chat":{"maxLength":200,"perMinute":10,"history":60,"keepHours":24,"emojis":["😂","💀","🔥","📉","📈","🤡","👏","😱","🍿","💸","🚀","😭"]},"loser":{"windowHours":24,"minLossBps":300,"consolationCents":50000},"winner":{"windowHours":24,"minGainBps":300},"company":{"count":2,"scandalShareBps":6000,"awarenessMinBps":1000,"awarenessMaxBps":2500,"stockMinBps":800,"stockMaxBps":2000,"momentumLossBps":5000},"stock":{"count":2,"minBps":600,"maxBps":1800},"sector":{"minBps":400,"maxBps":1000},"tasks":{"minBps":2000,"maxBps":4000},"tip":{"leadMinMinutes":15,"leadMaxMinutes":45,"minBps":500,"maxBps":1500,"reliabilityBps":7000},"texts":{"loser":{"frames":[{"headline":"{name} verbrennt {amount}","text":"Unser Verlierer des Tages: {name} hat {amount} versenkt, das sind {pct} des Vermögens. {reason} Die Redaktion schickt ein Trostpflaster."},{"headline":"Depot-Massaker bei {name}","text":"{name} hat heute {amount} verloren, {pct} einfach weg. {reason} Ein kleines Almosen ist unterwegs."},{"headline":"{name}: minus {pct} an einem Tag","text":"Eilmeldung aus der Abteilung Fremdscham: {name} hat {amount} in den Sand gesetzt. {reason} Wir spenden Trost, mehr können wir nicht tun."},{"headline":"Wo ist das Geld von {name}?","text":"{amount} futsch, {pct} Minus: {name} schreibt heute Börsengeschichte, leider die falsche. {reason} Das Trostpflaster kommt per Eilbote."}],"reasons":["Meine Großmutter handelt besser, und die ist seit 1987 tot.","Experten nennen die Strategie „Augen zu und hoffen“.","Wer so anlegt, braucht keine Feinde, nur jemanden, der ihm das Handy wegnimmt.","Wenn Dummheit Rendite brächte, wäre das hier ein Milliardär.","Das Motto lautet offenbar: teuer kaufen, billig verkaufen, laut heulen.","Ein Affe mit Dartpfeilen hätte heute besser abgeschnitten, wir haben es nachgerechnet.","Man kann auch mit Spielgeld scheitern, aber so gründlich schafft es nicht jeder.","Selbst der Tresor hat sich aus Scham kurz geschlossen.","Die Bank hat vorsorglich schon mal das Mitleid erhöht.","Im Lehrbuch steht das unter „Wie man es nicht macht“, Kapitel eins bis zwölf.","Das war kein Handel, das war eine Spende an den Markt.","Unsere Praktikantin wollte helfen, wir haben sie zurückgehalten.","Die Kurve des Depots sieht aus wie eine Rutsche, und zwar eine gute.","Angeblich war ein Plan vorhanden. Er wurde nie gefunden."]},"winner":{"frames":[{"headline":"{name} sahnt ab: plus {amount}","text":"Und nun zu jemandem, der es kann: {name} hat heute {amount} gemacht, {pct} im Plus. {reason}"},{"headline":"Glückspilz des Tages: {name}","text":"{name} ist heute um {amount} reicher, {pct} rauf. {reason}"},{"headline":"{name} schwimmt im Geld","text":"{pct} Plus, {amount} Gewinn: {name} zeigt dem Rest, wie es geht. {reason}"}],"reasons":["Ob das Können war oder pures Glück, klärt die Staatsanwaltschaft.","Alle anderen dürfen jetzt neidisch sein. Bitte der Reihe nach.","Der Rest schaut zu und heult leise ins Depot.","Wir gratulieren zähneknirschend.","Bitte nicht nachmachen, ihr könnt das nicht.","Insider vermuten eine Glaskugel im Keller.","Das Finanzamt hat bereits freundlich gewunken.","Neid ist die ehrlichste Form der Anerkennung, also bitte sehr.","Man munkelt von einem Pakt mit dem Teufel, der Teufel dementiert.","Wer jetzt um einen Kredit bittet, wird ausgelacht. Zu Recht."]},"scandal":{"frames":[{"headline":"Skandal bei {company}","text":"Ausgerechnet {company}, die Firma mit dem Motto „{idea}“: {reason} Die Kunden laufen davon."},{"headline":"{company}: Chef {founder} unter Beschuss","text":"Bei {company} brennt die Hütte. {reason} {founder} spricht von einem Missverständnis. Zur Erinnerung, das Geschäftsmodell lautet: „{idea}“."},{"headline":"Kunden fliehen vor {company}","text":"Peinlich für {founder}: {reason} „{idea}“ klang auf dem Papier besser. Das Image von {company} ist im Eimer."},{"headline":"{company} blamiert sich bis auf die Knochen","text":"{company} wollte heute groß rauskommen. {reason} {founder} erklärte, das gehöre zum Konzept. Die Kundschaft erklärte, sie sei dann mal weg."},{"headline":"Shitstorm über {company}","text":"Das Netz zerreißt {company}. {reason} Seitdem will niemand mehr „{idea}“. {founder} hat das Firmenhandy im Fluss versenkt."}],"reasons":["Im Lager wurde ein Praktikant gefunden, der seit drei Wochen vermisst war. Er hatte niemandem gefehlt.","Die Firmenkasse wurde offenbar mit dem Kicker-Budget verwechselt.","Ein Kunde hat das Produkt tatsächlich benutzt und das Ergebnis im Internet gezeigt.","Die Gewerbeaufsicht fand vierzig leere Pizzakartons, einen schlafenden Buchhalter und null Qualitätskontrolle.","Statt der Kundschaft kam heute die Feuerwehr.","Ein Werbespot wurde versehentlich mit dem Ton einer Karaoke-Nacht veröffentlicht.","Die Kundenhotline wurde seit Monaten von einem Papagei bedient, und der war noch der Freundlichste.","Das Qualitätssiegel an der Wand stellte sich als Kinderzeichnung heraus.","Auf der Weihnachtsfeier wurde versehentlich die halbe Belegschaft befördert, die andere Hälfte gefeuert.","Die Jahresbilanz wurde mit Buntstiften erstellt, immerhin innerhalb der Linien.","Ein Großkunde bekam statt der Ware eine Kiste mit Entschuldigungsbriefen.","Das Firmenmaskottchen hat gekündigt und packt in einem Buch aus.","Die Geschäftsführung hat das wichtigste Meeting des Jahres verschlafen, im Meetingraum.","Der Sicherheitsdienst hat sich selbst ausgesperrt und die Tür aufgebrochen.","Das neue Logo sieht aus wie etwas, das man Kindern nicht zeigen sollte.","Ein Mitarbeiter hat die gesamte Kundendatei alphabetisch nach Vornamen des Haustiers sortiert.","Die Kaffeekasse war die einzige Abteilung mit Gewinn.","Auf dem Firmenparkplatz wurde ein illegales Bobbycar-Rennen ausgehoben."]},"hype":{"frames":[{"headline":"Alle wollen {company}","text":"Unfassbar, aber wahr: {company} ist der Renner. {reason} „{idea}“ geht weg wie warme Semmeln. {founder} soll vor Freude geweint haben."},{"headline":"{company} geht viral","text":"{reason} Plötzlich will jeder „{idea}“. {founder} tut so, als sei das alles geplant gewesen. Wir tun so, als würden wir das glauben."},{"headline":"Ritterschlag für {company}","text":"{company} räumt ab. {reason} {founder} hängt sich das gerahmt ins Büro. Die Kundschaft rennt die Tür ein."}],"reasons":["Ein Video über die Firma hat heute das Internet geflutet.","Ein Testmagazin urteilt: „Besser als erwartet, und wir hatten nichts erwartet.“","Ein Promi wurde mit dem Produkt gesehen, vermutlich aus Versehen.","Eine Oma hat im Fernsehen geschworen, es habe ihr Leben verändert.","Die Konkurrenz hat aus Versehen Werbung für sie gemacht.","Ein Kind hat im Schulaufsatz darüber geschrieben, die Klasse war begeistert.","Die Warteschlange vor der Tür reicht bis zur nächsten Postleitzahl.","Selbst die Praktikanten wurden heute um Autogramme gebeten.","Ein Bürgermeister hat spontan eine Straße danach benannt.","Sogar die Steuerprüfung kam privat vorbei, um einzukaufen."]},"stockUp":{"frames":[{"headline":"{stock} schießt nach oben","text":"{stock} legt {move} zu. {reason} Analysten sind fassungslos."},{"headline":"Kursrakete {stock}","text":"{reason} Die Börse feiert: {stock} steigt um {move}. Wer nicht dabei ist, darf sich jetzt ärgern."},{"headline":"{stock}: Gerücht treibt den Kurs","text":"Neues von {stock}: {reason} Niemand weiß, ob es stimmt, alle kaufen trotzdem. Plus {move}."},{"headline":"Jubel bei {stock}","text":"{reason} Die Aktie von {stock} springt um {move}. Der Vorstand öffnet den guten Sekt, den für Besuch."}],"reasons":["Der Vorstand hat versehentlich etwas richtig gemacht.","Ein Hund hat auf der Hauptversammlung einen Antrag gestellt, und er wurde angenommen.","Angeblich wurde das Rad neu erfunden, diesmal eckig.","Hinter einem Sofa in der Zentrale wurden vergessene Millionen entdeckt.","Die Konkurrenz hat geschlossen Betriebsferien, niemand weiß warum.","Der neue Chef kann lesen, schreiben und rechnen, ein Novum.","Ein Tippfehler in der Bilanz macht aus Verlust Gewinn, niemand will ihn korrigieren.","Die Mitarbeiter haben einen Tag lang wirklich gearbeitet, nur so zum Spaß.","Ein Wahrsager auf dem Jahrmarkt hat der Firma eine goldene Zukunft vorausgesagt.","Das Produkt funktioniert plötzlich, die Ingenieure sind ratlos.","Ein Großinvestor hat die Firma mit einer anderen verwechselt und kräftig gekauft.","Die Kantine hat einen Stern bekommen, mehr brauchte es nicht.","Der Aufsichtsrat hat sich im Fahrstuhl eingeschlossen und kann nichts mehr kaputt machen.","Eine Brieftaube hat einen Großauftrag überbracht.","Im Keller wurde Öl gefunden, es war zwar Salatöl, aber die Stimmung ist prächtig.","Der Praktikant hat aus Versehen ein Patent angemeldet."]},"stockDown":{"frames":[{"headline":"{stock} stürzt ab","text":"{stock} verliert {move}. {reason} Die Anleger nehmen Reißaus."},{"headline":"Panik bei {stock}","text":"{reason} Der Kurs von {stock} sackt um {move} ab. Ein Krisenstab tagt."},{"headline":"{stock} im Sinkflug","text":"Schlechte Nachrichten von {stock}: {reason} Minus {move}, und der Tag ist noch jung."},{"headline":"Katastrophe bei {stock}","text":"{reason} Die Börse straft {stock} mit {move} Minus ab. Der Pressesprecher wurde zuletzt am Flughafen gesehen."}],"reasons":["Der Chef hat im Interview das eigene Produkt nicht erkannt und es „billigen Schrott“ genannt.","Die Kaffeemaschine ist ausgefallen, die Produktivität sank um neunzig Prozent.","Der gesamte Vorstand ist nach dem Betriebsausflug nicht zurückgekehrt. Letztes Lebenszeichen: ein Foto aus einer Karaoke-Bar.","Durch einen Fehler der Rechtsabteilung hat sich die Firma selbst verklagt und droht zu gewinnen.","Die Buchhaltung hat ein Jahr lang in der falschen Währung gerechnet, nämlich in Gummibärchen.","Das Hauptquartier wurde versehentlich bei einer Kleinanzeige mitverkauft.","Ein Mitarbeiter hat „Allen antworten“ gedrückt. Mit Anhang.","Der Firmenserver stand unter Wasser, weil jemand die Blumen gießen wollte.","Das neue Produkt wurde vorgestellt und sofort wieder eingepackt.","Der Finanzchef hat die Rücklagen in Rubbellose investiert.","Eine Möwe hat das Firmenlogo vom Dach gestohlen, die Aktionäre deuten das als Omen.","Der Sicherheitscode der Tresore lautete 1234 und stand auf einem Zettel am Tresor.","Die Geschäftszahlen wurden mit einem Würfel ermittelt, und selbst der hatte Pech.","Der Chef hat den Jahresbericht als Gedicht vorgetragen. Es reimte sich nicht.","Im Werk wurde drei Wochen lang das falsche Produkt gebaut, niemandem fiel es auf.","Die Firma hat ihren größten Kunden geghostet."]},"sectorUp":{"frames":[{"headline":"Die Branche {sector} dreht durch","text":"Die ganze Branche {sector} steigt um {move}. {reason} So funktioniert Wirtschaft, liebe Kinder."},{"headline":"Goldrausch in {sector}","text":"Plötzlich wollen alle {sector}. {reason} Die Kurse der Branche springen um {move}."}],"reasons":["Ein Influencer hat das Wort im Vorbeigehen erwähnt, mehr war nicht nötig.","Unsere Experten wissen nicht warum, aber sie nicken sehr überzeugend.","Ein Minister hat die Branche gelobt, er meinte allerdings eine andere.","Eine Zeitung hat sich vertippt, und niemand hat es gemerkt.","Das Horoskop hat es vorhergesagt.","Ein Schulkind hat in einem Referat behauptet, das sei die Zukunft.","Die Konkurrenzbranche hat geschlossen verschlafen.","Angeblich ist das jetzt wieder modern, sagt jemand, der es wissen muss."]},"sectorDown":{"frames":[{"headline":"{sector} im freien Fall","text":"Die Branche {sector} sackt um {move} ab. {reason} Bis das geklärt ist, verkaufen erst mal alle."},{"headline":"Katerstimmung in {sector}","text":"Schlechte Nachrichten für {sector}: {reason} Die Kurse geben um {move} nach."}],"reasons":["Ein Minister hat die Branche versehentlich mit etwas Verbotenem verwechselt.","Eine Studie zeigt, dass niemand weiß, was die Branche eigentlich macht.","Ein Fernsehmoderator hat schlecht geträumt und es live erzählt.","Die Branchenmesse fand statt, aber niemand ging hin, nicht einmal die Aussteller.","Ein Gerücht aus einem Friseursalon hat die Runde gemacht.","Das wichtigste Fachmagazin hat versehentlich einen Nachruf gedruckt.","Ein Orakel aus dem Frühstücksfernsehen hat den Daumen gesenkt.","Jemand hat laut gefragt, wofür man das eigentlich braucht."]},"tasksUp":{"frames":[{"headline":"Auftragsflut im ganzen Land","text":"{reason} Alle offenen Firmen-Aufgaben sind ab sofort {move} mehr wert. An die Arbeit, ihr faulen Säcke!"},{"headline":"Kunden zahlen jeden Preis","text":"{reason} Offene Aufgaben bringen {move} mehr. Wer jetzt Pause macht, ist selbst schuld."}],"reasons":["Die Kundschaft hat Geld und keine Ahnung, wohin damit.","Eine Massenhysterie sorgt dafür, dass heute jeder alles sofort will.","Der Staat hat versehentlich doppelt ausgezahlt und will es nicht zurück.","Ein Feiertag wurde abgesagt, alle haben Langeweile und Bargeld.","Die Leute haben gemerkt, dass Sparen keinen Spaß macht.","Ein Lottogewinner verteilt Geld in der Fußgängerzone."]},"tasksDown":{"frames":[{"headline":"Kunden entdecken das Sparen","text":"{reason} Alle offenen Firmen-Aufgaben sind {move} weniger wert. Die Chefs dürfen ruhig ein bisschen schwitzen."},{"headline":"Flaute bei den Aufträgen","text":"{reason} Offene Aufgaben bringen {move} weniger. Durchhalten, es wird auch wieder schlechter."}],"reasons":["Ein Fernsehkoch hat erklärt, man könne Geld auch behalten.","Das halbe Land ist kollektiv im Urlaub, natürlich unbezahlt.","Alle warten auf das Sonderangebot, das nie kommt.","Die Kundschaft hat ihre Geldbeutel verlegt, und zwar alle gleichzeitig.","Ein Sparfuchs hat ein Buch geschrieben, leider ist es gut.","Es regnet, und niemand hat Lust auf irgendwas."]},"tip":{"frames":[{"headline":"Mr. Doodle Dangles Geheimtipp","text":"Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei {stock} tut sich in der nächsten Stunde etwas, und zwar {move}. {reason}"},{"headline":"Vom Flurfunk: {stock}","text":"Ein Vögelchen hat mir gezwitschert: {stock} dürfte in der kommenden Stunde {move} gehen. {reason}"},{"headline":"Der heiße Draht: {stock}","text":"Aus gewöhnlich gut betrunkenen Kreisen höre ich: {stock} geht bald {move}. {reason}"}],"reasons":["Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.","Das Vögelchen lag bisher meistens richtig. Meistens.","Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.","Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.","Meine Quelle ist seriös, sie trägt immerhin eine Krawatte.","Ich selbst handle nie nach meinen Tipps, aus Gründen."]},"filler":{"frames":[{"headline":"Heute keine Katastrophen","text":"Es ist erschreckend ruhig. {reason} Strengt euch gefälligst an."},{"headline":"Nichts passiert, und das ist die Nachricht","text":"{reason} Ich bin persönlich enttäuscht von euch allen."}],"reasons":["Niemand hat sein Vermögen verzockt, keine Firma brennt.","Kein Skandal, keine Pleite, nicht einmal ein kleiner Betrug.","Die Redaktion hat drei Stunden gesucht und nur eine verlorene Socke gefunden.","Selbst die Gerüchteküche hat heute Ruhetag."]}},"tipWords":{"up":"nach oben","down":"nach unten"}}'::jsonb, 'Defaults from src/config/balance.ts, section "newsShow"'),
+  ('newsShow', '{"prepareMinutes":10,"introSeconds":12,"segmentSeconds":22,"outroSeconds":6,"charsPerSecond":28,"maxSegments":10,"waitMinutes":10,"replayMinutes":55,"teaserMinutes":5,"chat":{"maxLength":200,"perMinute":10,"history":60,"keepHours":24,"emojis":["😂","💀","🔥","📉","📈","🤡","👏","😱","🍿","💸","🚀","😭"],"bots":{"everySecondsMin":6,"everySecondsMax":14,"aboutShareBps":3000,"angryShareBps":3500,"names":["Jürgen Kowalski","Chantal Schröder","Dieter Brömmelkamp","Uschi Hoppenstedt","Kevin Pawlak","Renate Zielinski","Horst Kaczmarek","Mandy Wuttke","Günter Pototschnik","Jacqueline Meier","Rüdiger Fasselt","Sabine Dombrowski","Emre Yıldırım","Nadine Krüger","Wolfgang Stratmann","Tamara Nowak"],"lines":{"angry":["Wer hat diesem Mann ein Mikrofon gegeben?? 😤","Ich zahle keine Rundfunkgebühren für DAS.","Der Schnurrbart lügt. Ich sehe es ihm an.","Unverschämtheit! Ich schreibe einen Leserbrief!!","Mr. Doodle Dangle hat mal mein Fahrrad schlechtgeredet. Ich vergesse nie.","Früher waren Nachrichten noch seriös. Also vor diesem Kerl.","So redet man nicht über Leute, du Schnauzbartträger 😡","Abschalten. Sofort. Ich schaue natürlich weiter.","Der Mann ist eine Zumutung mit Krawatte.","Meine Frau sagt, ich soll mich nicht aufregen. ICH REGE MICH AUF.","Wer kontrolliert eigentlich diesen Sender??","Dangle raus!!! 👎","Das melde ich dem Presserat. Sobald ich weiß, was das ist.","Der hat doch selbst keine Ahnung von Aktien 🤡","Ich habe Puls. Wegen DIESEM Mann.","Schämen Sie sich, Herr Dangle! Und rasieren Sie sich!"],"glaze":["Mr. Doodle Dangle ist der einzige Mann, dem ich vertraue ❤️","Dieser Schnurrbart gehört ins Museum. Lebend.","KÖNIG. LEGENDE. VATERFIGUR. 👑","Ich habe mir sein Gesicht auf den Rücken tätowieren lassen.","Er hat immer recht. Auch wenn er falsch liegt.","Doodle Dangle for Bundeskanzler 🙏","Ich schaue nur wegen ihm. Meine Familie ist ausgezogen. Egal.","So ein schöner Mann. So eine schöne Stimme. 😍","Jedes Wort ein Geschenk.","Ich habe meinen Sohn nach ihm benannt. Er heißt jetzt Mister.","Der beste Journalist seit Erfindung des Schnurrbarts.","Bitte niemals aufhören zu senden 😭❤️","Ich würde ihm mein Depot anvertrauen. Und meine Niere.","Ein Gott unter Moderatoren 🔥","Ich habe geweint. Vor Ehrfurcht.","Wie er die Papiere hält. Meisterhaft."],"about":["{name} 💀💀💀","Arme Sau, {name}. Kleiner Scherz. Hahaha.","{name} erholt sich davon nie wieder 😂","Ich kenne {name} persönlich. Es ist alles wahr.","Lasst {name} in Ruhe!! ...oder macht weiter, ist lustig 🍿","{name}, falls du zuschaust: Kopf hoch. Oder auch nicht.","Team {name} 💪","Screenshot gemacht. Das bekommt {name} jetzt jeden Tag geschickt.","{name} hat das nicht verdient. Doch. Doch, hat {name}.","Wer ist {name} und warum lache ich so?"]}}},"loser":{"windowHours":24,"minLossBps":300,"consolationCents":50000},"winner":{"windowHours":24,"minGainBps":300},"company":{"count":2,"scandalShareBps":6000,"awarenessMinBps":1000,"awarenessMaxBps":2500,"stockMinBps":800,"stockMaxBps":2000,"momentumLossBps":5000},"stock":{"count":1,"minBps":600,"maxBps":1800},"sector":{"minBps":400,"maxBps":1000},"tasks":{"minBps":2000,"maxBps":4000},"gossip":{"count":2,"windowHours":24,"absentDays":3,"hushMoneyCents":10000},"nft":{"windowHours":24},"ramble":{"chanceBps":7000,"investShareBps":5000,"minBps":300,"maxBps":900,"people":["Friedrich Merz","Markus Söder","Elon Musk","Christian Lindner","Heidi Klum","Thomas Gottschalk","Dieter Bohlen","Robert Habeck","Günther Jauch","Donald Trump"]},"moods":{"loser":["laughing","smug"],"winner":["proud","shocked"],"scandal":["shocked","angry"],"hype":["proud","laughing"],"stockUp":["proud","smug"],"stockDown":["crying","shocked"],"sectorUp":["proud"],"sectorDown":["crying","angry"],"tasksUp":["laughing","proud"],"tasksDown":["angry","crying"],"tip":["smug"],"filler":["confused","angry"],"gossipBad":["laughing","smug","shocked"],"gossipGood":["shocked","proud"],"nftSale":["confused","shocked","laughing"],"ramble":["confused","angry","crying"],"rambleInvest":["shocked","smug"]},"tip":{"leadMinMinutes":15,"leadMaxMinutes":45,"minBps":500,"maxBps":1500,"reliabilityBps":7000},"texts":{"loser":{"frames":[{"headline":"{name} verbrennt {amount}","text":"Unser Verlierer des Tages: {name} hat {amount} versenkt, das sind {pct} des Vermögens. {reason} Die Redaktion schickt ein Trostpflaster."},{"headline":"Depot-Massaker bei {name}","text":"{name} hat heute {amount} verloren, {pct} einfach weg. {reason} Ein kleines Almosen ist unterwegs."},{"headline":"{name}: minus {pct} an einem Tag","text":"Eilmeldung aus der Abteilung Fremdscham: {name} hat {amount} in den Sand gesetzt. {reason} Wir spenden Trost, mehr können wir nicht tun."},{"headline":"Wo ist das Geld von {name}?","text":"{amount} futsch, {pct} Minus: {name} schreibt heute Börsengeschichte, leider die falsche. {reason} Das Trostpflaster kommt per Eilbote."}],"reasons":["Meine Großmutter handelt besser, und die ist seit 1987 tot.","Experten nennen die Strategie „Augen zu und hoffen“.","Wer so anlegt, braucht keine Feinde, nur jemanden, der ihm das Handy wegnimmt.","Wenn Dummheit Rendite brächte, wäre das hier ein Milliardär.","Das Motto lautet offenbar: teuer kaufen, billig verkaufen, laut heulen.","Ein Affe mit Dartpfeilen hätte heute besser abgeschnitten, wir haben es nachgerechnet.","Man kann auch mit Spielgeld scheitern, aber so gründlich schafft es nicht jeder.","Selbst der Tresor hat sich aus Scham kurz geschlossen.","Die Bank hat vorsorglich schon mal das Mitleid erhöht.","Im Lehrbuch steht das unter „Wie man es nicht macht“, Kapitel eins bis zwölf.","Das war kein Handel, das war eine Spende an den Markt.","Unsere Praktikantin wollte helfen, wir haben sie zurückgehalten.","Die Kurve des Depots sieht aus wie eine Rutsche, und zwar eine gute.","Angeblich war ein Plan vorhanden. Er wurde nie gefunden.","Was für ein Vollpfosten, und das meine ich wissenschaftlich.","Ich habe Mitleid. Kleiner Scherz, habe ich nicht.","Geh arbeiten, an der Börse wird das nichts mehr.","Der Markt sagt danke, du Geldautomat auf zwei Beinen.","So verbrennt man Geld, Kinder. Bitte nicht nachmachen, außer es ist seins.","Für so ein Depot muss man sich schon am frühen Morgen Mühe geben."]},"winner":{"frames":[{"headline":"{name} sahnt ab: plus {amount}","text":"Und nun zu jemandem, der es kann: {name} hat heute {amount} gemacht, {pct} im Plus. {reason}"},{"headline":"Glückspilz des Tages: {name}","text":"{name} ist heute um {amount} reicher, {pct} rauf. {reason}"},{"headline":"{name} schwimmt im Geld","text":"{pct} Plus, {amount} Gewinn: {name} zeigt dem Rest, wie es geht. {reason}"}],"reasons":["Ob das Können war oder pures Glück, klärt die Staatsanwaltschaft.","Alle anderen dürfen jetzt neidisch sein. Bitte der Reihe nach.","Der Rest schaut zu und heult leise ins Depot.","Wir gratulieren zähneknirschend.","Bitte nicht nachmachen, ihr könnt das nicht.","Insider vermuten eine Glaskugel im Keller.","Das Finanzamt hat bereits freundlich gewunken.","Neid ist die ehrlichste Form der Anerkennung, also bitte sehr.","Man munkelt von einem Pakt mit dem Teufel, der Teufel dementiert.","Wer jetzt um einen Kredit bittet, wird ausgelacht. Zu Recht."]},"scandal":{"frames":[{"headline":"Skandal bei {company}","text":"Ausgerechnet {company}, die Firma mit dem Motto „{idea}“: {reason} Die Kunden laufen davon."},{"headline":"{company}: Chef {founder} unter Beschuss","text":"Bei {company} brennt die Hütte. {reason} {founder} spricht von einem Missverständnis. Zur Erinnerung, das Geschäftsmodell lautet: „{idea}“."},{"headline":"Kunden fliehen vor {company}","text":"Peinlich für {founder}: {reason} „{idea}“ klang auf dem Papier besser. Das Image von {company} ist im Eimer."},{"headline":"{company} blamiert sich bis auf die Knochen","text":"{company} wollte heute groß rauskommen. {reason} {founder} erklärte, das gehöre zum Konzept. Die Kundschaft erklärte, sie sei dann mal weg."},{"headline":"Shitstorm über {company}","text":"Das Netz zerreißt {company}. {reason} Seitdem will niemand mehr „{idea}“. {founder} hat das Firmenhandy im Fluss versenkt."}],"reasons":["Im Lager wurde ein Praktikant gefunden, der seit drei Wochen vermisst war. Er hatte niemandem gefehlt.","Die Firmenkasse wurde offenbar mit dem Kicker-Budget verwechselt.","Ein Kunde hat das Produkt tatsächlich benutzt und das Ergebnis im Internet gezeigt.","Die Gewerbeaufsicht fand vierzig leere Pizzakartons, einen schlafenden Buchhalter und null Qualitätskontrolle.","Statt der Kundschaft kam heute die Feuerwehr.","Ein Werbespot wurde versehentlich mit dem Ton einer Karaoke-Nacht veröffentlicht.","Die Kundenhotline wurde seit Monaten von einem Papagei bedient, und der war noch der Freundlichste.","Das Qualitätssiegel an der Wand stellte sich als Kinderzeichnung heraus.","Auf der Weihnachtsfeier wurde versehentlich die halbe Belegschaft befördert, die andere Hälfte gefeuert.","Die Jahresbilanz wurde mit Buntstiften erstellt, immerhin innerhalb der Linien.","Ein Großkunde bekam statt der Ware eine Kiste mit Entschuldigungsbriefen.","Das Firmenmaskottchen hat gekündigt und packt in einem Buch aus.","Die Geschäftsführung hat das wichtigste Meeting des Jahres verschlafen, im Meetingraum.","Der Sicherheitsdienst hat sich selbst ausgesperrt und die Tür aufgebrochen.","Das neue Logo sieht aus wie etwas, das man Kindern nicht zeigen sollte.","Ein Mitarbeiter hat die gesamte Kundendatei alphabetisch nach Vornamen des Haustiers sortiert.","Die Kaffeekasse war die einzige Abteilung mit Gewinn.","Auf dem Firmenparkplatz wurde ein illegales Bobbycar-Rennen ausgehoben."]},"hype":{"frames":[{"headline":"Alle wollen {company}","text":"Unfassbar, aber wahr: {company} ist der Renner. {reason} „{idea}“ geht weg wie warme Semmeln. {founder} soll vor Freude geweint haben."},{"headline":"{company} geht viral","text":"{reason} Plötzlich will jeder „{idea}“. {founder} tut so, als sei das alles geplant gewesen. Wir tun so, als würden wir das glauben."},{"headline":"Ritterschlag für {company}","text":"{company} räumt ab. {reason} {founder} hängt sich das gerahmt ins Büro. Die Kundschaft rennt die Tür ein."}],"reasons":["Ein Video über die Firma hat heute das Internet geflutet.","Ein Testmagazin urteilt: „Besser als erwartet, und wir hatten nichts erwartet.“","Ein Promi wurde mit dem Produkt gesehen, vermutlich aus Versehen.","Eine Oma hat im Fernsehen geschworen, es habe ihr Leben verändert.","Die Konkurrenz hat aus Versehen Werbung für sie gemacht.","Ein Kind hat im Schulaufsatz darüber geschrieben, die Klasse war begeistert.","Die Warteschlange vor der Tür reicht bis zur nächsten Postleitzahl.","Selbst die Praktikanten wurden heute um Autogramme gebeten.","Ein Bürgermeister hat spontan eine Straße danach benannt.","Sogar die Steuerprüfung kam privat vorbei, um einzukaufen."]},"stockUp":{"frames":[{"headline":"{stock} schießt nach oben","text":"{stock} legt {move} zu. {reason} Analysten sind fassungslos."},{"headline":"Kursrakete {stock}","text":"{reason} Die Börse feiert: {stock} steigt um {move}. Wer nicht dabei ist, darf sich jetzt ärgern."},{"headline":"{stock}: Gerücht treibt den Kurs","text":"Neues von {stock}: {reason} Niemand weiß, ob es stimmt, alle kaufen trotzdem. Plus {move}."},{"headline":"Jubel bei {stock}","text":"{reason} Die Aktie von {stock} springt um {move}. Der Vorstand öffnet den guten Sekt, den für Besuch."}],"reasons":["Der Vorstand hat versehentlich etwas richtig gemacht.","Ein Hund hat auf der Hauptversammlung einen Antrag gestellt, und er wurde angenommen.","Angeblich wurde das Rad neu erfunden, diesmal eckig.","Hinter einem Sofa in der Zentrale wurden vergessene Millionen entdeckt.","Die Konkurrenz hat geschlossen Betriebsferien, niemand weiß warum.","Der neue Chef kann lesen, schreiben und rechnen, ein Novum.","Ein Tippfehler in der Bilanz macht aus Verlust Gewinn, niemand will ihn korrigieren.","Die Mitarbeiter haben einen Tag lang wirklich gearbeitet, nur so zum Spaß.","Ein Wahrsager auf dem Jahrmarkt hat der Firma eine goldene Zukunft vorausgesagt.","Das Produkt funktioniert plötzlich, die Ingenieure sind ratlos.","Ein Großinvestor hat die Firma mit einer anderen verwechselt und kräftig gekauft.","Die Kantine hat einen Stern bekommen, mehr brauchte es nicht.","Der Aufsichtsrat hat sich im Fahrstuhl eingeschlossen und kann nichts mehr kaputt machen.","Eine Brieftaube hat einen Großauftrag überbracht.","Im Keller wurde Öl gefunden, es war zwar Salatöl, aber die Stimmung ist prächtig.","Der Praktikant hat aus Versehen ein Patent angemeldet."]},"stockDown":{"frames":[{"headline":"{stock} stürzt ab","text":"{stock} verliert {move}. {reason} Die Anleger nehmen Reißaus."},{"headline":"Panik bei {stock}","text":"{reason} Der Kurs von {stock} sackt um {move} ab. Ein Krisenstab tagt."},{"headline":"{stock} im Sinkflug","text":"Schlechte Nachrichten von {stock}: {reason} Minus {move}, und der Tag ist noch jung."},{"headline":"Katastrophe bei {stock}","text":"{reason} Die Börse straft {stock} mit {move} Minus ab. Der Pressesprecher wurde zuletzt am Flughafen gesehen."}],"reasons":["Der Chef hat im Interview das eigene Produkt nicht erkannt und es „billigen Schrott“ genannt.","Die Kaffeemaschine ist ausgefallen, die Produktivität sank um neunzig Prozent.","Der gesamte Vorstand ist nach dem Betriebsausflug nicht zurückgekehrt. Letztes Lebenszeichen: ein Foto aus einer Karaoke-Bar.","Durch einen Fehler der Rechtsabteilung hat sich die Firma selbst verklagt und droht zu gewinnen.","Die Buchhaltung hat ein Jahr lang in der falschen Währung gerechnet, nämlich in Gummibärchen.","Das Hauptquartier wurde versehentlich bei einer Kleinanzeige mitverkauft.","Ein Mitarbeiter hat „Allen antworten“ gedrückt. Mit Anhang.","Der Firmenserver stand unter Wasser, weil jemand die Blumen gießen wollte.","Das neue Produkt wurde vorgestellt und sofort wieder eingepackt.","Der Finanzchef hat die Rücklagen in Rubbellose investiert.","Eine Möwe hat das Firmenlogo vom Dach gestohlen, die Aktionäre deuten das als Omen.","Der Sicherheitscode der Tresore lautete 1234 und stand auf einem Zettel am Tresor.","Die Geschäftszahlen wurden mit einem Würfel ermittelt, und selbst der hatte Pech.","Der Chef hat den Jahresbericht als Gedicht vorgetragen. Es reimte sich nicht.","Im Werk wurde drei Wochen lang das falsche Produkt gebaut, niemandem fiel es auf.","Die Firma hat ihren größten Kunden geghostet."]},"sectorUp":{"frames":[{"headline":"Die Branche {sector} dreht durch","text":"Die ganze Branche {sector} steigt um {move}. {reason} So funktioniert Wirtschaft, liebe Kinder."},{"headline":"Goldrausch in {sector}","text":"Plötzlich wollen alle {sector}. {reason} Die Kurse der Branche springen um {move}."}],"reasons":["Ein Influencer hat das Wort im Vorbeigehen erwähnt, mehr war nicht nötig.","Unsere Experten wissen nicht warum, aber sie nicken sehr überzeugend.","Ein Minister hat die Branche gelobt, er meinte allerdings eine andere.","Eine Zeitung hat sich vertippt, und niemand hat es gemerkt.","Das Horoskop hat es vorhergesagt.","Ein Schulkind hat in einem Referat behauptet, das sei die Zukunft.","Die Konkurrenzbranche hat geschlossen verschlafen.","Angeblich ist das jetzt wieder modern, sagt jemand, der es wissen muss."]},"sectorDown":{"frames":[{"headline":"{sector} im freien Fall","text":"Die Branche {sector} sackt um {move} ab. {reason} Bis das geklärt ist, verkaufen erst mal alle."},{"headline":"Katerstimmung in {sector}","text":"Schlechte Nachrichten für {sector}: {reason} Die Kurse geben um {move} nach."}],"reasons":["Ein Minister hat die Branche versehentlich mit etwas Verbotenem verwechselt.","Eine Studie zeigt, dass niemand weiß, was die Branche eigentlich macht.","Ein Fernsehmoderator hat schlecht geträumt und es live erzählt.","Die Branchenmesse fand statt, aber niemand ging hin, nicht einmal die Aussteller.","Ein Gerücht aus einem Friseursalon hat die Runde gemacht.","Das wichtigste Fachmagazin hat versehentlich einen Nachruf gedruckt.","Ein Orakel aus dem Frühstücksfernsehen hat den Daumen gesenkt.","Jemand hat laut gefragt, wofür man das eigentlich braucht."]},"tasksUp":{"frames":[{"headline":"Auftragsflut im ganzen Land","text":"{reason} Alle offenen Firmen-Aufgaben sind ab sofort {move} mehr wert. An die Arbeit, ihr faulen Säcke!"},{"headline":"Kunden zahlen jeden Preis","text":"{reason} Offene Aufgaben bringen {move} mehr. Wer jetzt Pause macht, ist selbst schuld."}],"reasons":["Die Kundschaft hat Geld und keine Ahnung, wohin damit.","Eine Massenhysterie sorgt dafür, dass heute jeder alles sofort will.","Der Staat hat versehentlich doppelt ausgezahlt und will es nicht zurück.","Ein Feiertag wurde abgesagt, alle haben Langeweile und Bargeld.","Die Leute haben gemerkt, dass Sparen keinen Spaß macht.","Ein Lottogewinner verteilt Geld in der Fußgängerzone."]},"tasksDown":{"frames":[{"headline":"Kunden entdecken das Sparen","text":"{reason} Alle offenen Firmen-Aufgaben sind {move} weniger wert. Die Chefs dürfen ruhig ein bisschen schwitzen."},{"headline":"Flaute bei den Aufträgen","text":"{reason} Offene Aufgaben bringen {move} weniger. Durchhalten, es wird auch wieder schlechter."}],"reasons":["Ein Fernsehkoch hat erklärt, man könne Geld auch behalten.","Das halbe Land ist kollektiv im Urlaub, natürlich unbezahlt.","Alle warten auf das Sonderangebot, das nie kommt.","Die Kundschaft hat ihre Geldbeutel verlegt, und zwar alle gleichzeitig.","Ein Sparfuchs hat ein Buch geschrieben, leider ist es gut.","Es regnet, und niemand hat Lust auf irgendwas."]},"tip":{"frames":[{"headline":"Mr. Doodle Dangles Geheimtipp","text":"Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei {stock} tut sich in der nächsten Stunde etwas, und zwar {move}. {reason}"},{"headline":"Vom Flurfunk: {stock}","text":"Ein Vögelchen hat mir gezwitschert: {stock} dürfte in der kommenden Stunde {move} gehen. {reason}"},{"headline":"Der heiße Draht: {stock}","text":"Aus gewöhnlich gut betrunkenen Kreisen höre ich: {stock} geht bald {move}. {reason}"}],"reasons":["Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.","Das Vögelchen lag bisher meistens richtig. Meistens.","Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.","Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.","Meine Quelle ist seriös, sie trägt immerhin eine Krawatte.","Ich selbst handle nie nach meinen Tipps, aus Gründen."]},"gossipBad":{"frames":[{"headline":"{name}: {what}","text":"Aus der Abteilung Privatsachen, die uns nichts angehen: {name}. Die Meldung: {what}. {reason} Die Redaktion überweist Schweigegeld und redet trotzdem weiter."},{"headline":"Peinlich, {name}","text":"Wir müssen über {name} reden. Stand heute: {what}. {reason} Ein kleines Schmerzensgeld ist unterwegs."},{"headline":"Das Tagebuch von {name}","text":"Liebes Tagebuch, schreibt {name} heute vermutlich: {what}. {reason} Wir legen etwas Schmerzensgeld bei."},{"headline":"Fremdschämen mit {name}","text":"{what}: Das ist die Tagesbilanz von {name}. {reason} Schmerzensgeld gibt es obendrauf, Würde leider nicht."}],"reasons":["Was für ein Lappen.","So eine Pfeife sehe ich sonst nur morgens im Spiegel, und ich bin wenigstens im Fernsehen.","Selbst mein Schnurrbart hat mehr Geschäftssinn.","Wir haben in der Redaktion gelacht, bis der Praktikant geweint hat.","Das ist kein Tiefpunkt, das ist ein Lebensstil.","Ich habe schon Topfpflanzen mit mehr Ehrgeiz gegossen.","Bitte einmal kollektiv auslachen, danke.","Manche lernen aus Fehlern. Andere sammeln sie.","Der Tresor zu Hause ist vermutlich auch nur ein Schuhkarton.","Wer so spielt, sollte das Handy sicherheitshalber im Fluss versenken.","Ich sage es ungern, aber ich sage es mit Vergnügen: erbärmlich.","Die Verwandtschaft tut ab heute so, als kenne sie dich nicht.","Hut ab, so konsequent scheitert sonst nur die Bahn.","Ich würde ja helfen, aber dann hätte ich nichts mehr zu lachen."]},"gossipGood":{"frames":[{"headline":"Na so was: {name}","text":"Ich fasse es nicht, aber es stimmt. {name} meldet: {what}. {reason}"},{"headline":"{name} hat es geschafft","text":"Gute Nachrichten, ausnahmsweise. Bei {name} heißt es: {what}. {reason}"},{"headline":"Applaus für {name}","text":"Bitte festhalten: {what}, und zwar bei {name}. {reason}"}],"reasons":["Ich bin fast stolz. Fast.","Auch ein blindes Huhn findet mal ein Korn, aber immerhin.","Glückwunsch, und jetzt bloß nichts anfassen.","Die Konkurrenz darf sich gern ein Beispiel nehmen, ihr Luschen.","Ich hätte keinen Cent darauf gewettet, und ich wette auf alles.","Meine Schwiegermutter hat es vorausgesagt, und die liegt sonst immer falsch.","Dafür gibt es von mir ein ehrliches Schulterklopfen, mit der Faust.","Genieß es, nächste Woche lachen wir wieder über dich.","So, und jetzt alle anderen: Schämt euch.","Das musste auch mal gesagt werden, ich fühle mich schon ganz schmutzig."]},"nftSale":{"frames":[{"headline":"{amount} für ein paar Pixel","text":"Kunstmarkt, oder was man dafür hält: „{title}“ von {name} ging für {amount} an {buyer}. {reason}"},{"headline":"NFT-Wahnsinn um „{title}“","text":"{buyer} zahlt {amount} für „{title}“, gemalt von {name}. {reason}"},{"headline":"„{title}“ wechselt den Besitzer","text":"Aus der Welt der bunten Kästchen: {buyer} hat sich „{title}“ von {name} für {amount} gegönnt. {reason}"}],"reasons":["Mein Enkel malt so etwas mit Fingerfarbe, und der will dafür nur ein Eis.","Früher bekam man dafür ein Haus, heute bekommt man ein Bild von einem Haus.","Ich habe mir das Werk angesehen. Ich habe Fragen. Viele.","Kunst ist, wenn einer zahlt. Glückwunsch an alle Beteiligten.","Der Käufer nennt es eine Wertanlage, sein Bankberater nennt es einen Hilferuf.","Ich verstehe es nicht, also muss es teuer sein.","Wer das kauft, kauft auch Luft in Dosen.","Das Bild hat sechzehn mal sechzehn Pixel. Ich habe nachgezählt, ich hatte Zeit.","Immerhin kann man es nicht fallen lassen.","Die Künstlerseele jubelt, der Geldbeutel des Käufers ruft die Polizei."]},"ramble":{"frames":[{"headline":"Mr. Doodle Dangle schweift ab","text":"Wo war ich? Egal. {reason} Zurück zu den Nachrichten, falls jemand weiß, wo sie liegen."},{"headline":"Kurze Durchsage in eigener Sache","text":"Bevor es weitergeht, etwas völlig anderes: {reason} Das musste raus."},{"headline":"Was ich noch sagen wollte","text":"Die Regie winkt, ich ignoriere sie. {reason} So. Weiter im Text."}],"reasons":["Friedrich Merz soll neulich sein Flugzeug mit Bargeld betankt haben. Sagt der Schwager meines Friseurs.","Markus Söder hat angeblich wieder eine Bratwurst fotografiert. Die Bratwurst wollte anonym bleiben.","Die Deutsche Bahn meldet, mein Zug von gestern komme heute. Ich warte seit Dienstag.","Elon Musk will angeblich den Mond kaufen, um darauf zu parken. Ich habe ihm meinen Stellplatz angeboten.","Mein Nachbar grillt seit drei Tagen dasselbe Würstchen. Ich bewundere seine Geduld.","Christian Lindner soll einen Sportwagen gesehen und kurz geweint haben. Vor Glück, sagt man.","Donald Trump will angeblich Zölle auf Pixel erheben. Ich habe vorsorglich zwei gehortet.","Meine Ex-Frau hat angerufen. Sie will den Schnurrbart zurück. Den bekommt sie nicht.","Der Berliner Flughafen funktioniert inzwischen. Ich traue dem Frieden nicht.","Heidi Klum hat heute leider kein Foto für mich. Ich hatte auch keins bestellt.","Die Butter kostet inzwischen mehr als mein erstes Auto. Das Auto war allerdings ein Fahrrad.","Robert Habeck soll eine Wärmepumpe gestreichelt haben. Die Pumpe schnurrte.","Mein Arzt sagt, ich soll weniger Kaffee trinken. Ich habe den Arzt gewechselt.","Thomas Gottschalk will angeblich mein Wohnzimmer moderieren. Ich habe abgeschlossen.","Dieter Bohlen hat meinen Schnurrbart bewertet. Es reicht nicht für den Recall.","Günther Jauch hat mich angerufen, ich war der Telefonjoker. Ich wusste es nicht."]},"rambleInvest":{"frames":[{"headline":"{person} steigt bei {stock} ein","text":"Völlig anderes Thema: {person} soll das Sparschwein geschlachtet und alles in {stock} gesteckt haben. {reason} Der Kurs macht {move} nach oben."},{"headline":"Promi-Alarm bei {stock}","text":"Ich habe es aus dritter Hand, also stimmt es: {person} hat angeblich heimlich {stock} gekauft. {reason} Die Anleger rennen hinterher, plus {move}."},{"headline":"Gerücht des Tages: {person} und {stock}","text":"Man erzählt sich, {person} habe bei {stock} zugeschlagen. {reason} Ob es stimmt, ist dem Kurs egal: {move} rauf."}],"reasons":["Quelle: der Schwager meines Friseurs, und der irrt sich nie zweimal am selben Tag.","Eine Bestätigung gibt es nicht, auf meine Brieftaube hat niemand geantwortet.","Ich habe es auf einer Raststätte gehört, zwischen Kaffee und Reue.","Mein Taxifahrer schwört es, und der kennt jemanden, der jemanden kennt.","Dementiert wurde es noch nicht, vermutlich weil niemand gefragt hat.","Falls es nicht stimmt, habe ich es nie gesagt.","Die Info stammt aus einer Gruppe, in die ich versehentlich eingeladen wurde.","Ich habe es geträumt, aber meine Träume sind börsennotiert."]},"filler":{"frames":[{"headline":"Heute keine Katastrophen","text":"Es ist erschreckend ruhig. {reason} Strengt euch gefälligst an."},{"headline":"Nichts passiert, und das ist die Nachricht","text":"{reason} Ich bin persönlich enttäuscht von euch allen."}],"reasons":["Niemand hat sein Vermögen verzockt, keine Firma brennt.","Kein Skandal, keine Pleite, nicht einmal ein kleiner Betrug.","Die Redaktion hat drei Stunden gesucht und nur eine verlorene Socke gefunden.","Selbst die Gerüchteküche hat heute Ruhetag."]}},"tipWords":{"up":"nach oben","down":"nach unten"}}'::jsonb, 'Defaults from src/config/balance.ts, section "newsShow"'),
   ('pitches', '{"minChars":12,"maxChars":280,"judgeWaitSeconds":90,"eventMinutes":20,"moveMinutes":30,"orderCooldownMinutes":60,"chanceBaseBps":1000,"chancePerFitBps":80,"maxChanceBps":9000,"eventCostUnits":2,"moveCostFactor":1.2,"mitigationBase":0.35,"mitigationPerFit":0.005,"maxMitigation":0.9,"movePayoutBase":1.3,"movePayoutPerFit":0.012,"moveGainBase":0.02,"moveGainPerFit":0.0006,"moveRefundBps":2000,"backfireAwareness":0.05,"mini":{"fitBase":25,"fitPerHit":12,"maxHits":4,"longTextChars":60,"longTextBonus":10,"maxFit":85,"backfireBase":10,"backfirePerRisky":20,"maxBackfire":70,"risky":["imagefilm","werbung","werbekampagne","influencer","pr-","greenwashing","ignorieren","leugnen","abstreiten","lügen","vertuschen","schweigen","aussitzen","drohen","verklagen","entlassen","billiger","bestechen"],"good":{"regulation":["anwalt","recht","prüfen","anpassen","lobby","verband","gutachten","umstellen","dialog"],"special_tax":["steuer","berater","kalkul","preis","rohstoff","ersatz","sparen","lieferant"],"supply_shortage":["lieferant","lager","alternativ","vorrat","zweit","ersatz","vertrag","regional"],"quality_scandal":["rückruf","entschuldig","prüf","qualität","kontroll","ersetzen","transparen","entschädig"],"data_breach":["sicherheit","passwort","verschlüssel","melden","experten","informieren","update","audit"],"price_war":["qualität","service","treue","nische","kosten","bündel","mehrwert","marke"],"strike":["lohn","gehalt","verhandl","bonus","gespräch","kompromiss","zuhören","arbeitszeit","tarif"],"protest":["dialog","einladen","zuhören","ändern","nachhaltig","transparen","spenden","fair"],"patent_claim":["anwalt","patent","lizenz","einigung","gutachten","umgehen","vergleich","eigene"],"bad_review":["verbessern","test","feedback","kunden","nachbessern","qualität","gratis","update"],"viral_trend":["nachproduz","lager","social","video","aktion","schnell","limitiert","community"],"big_contract":["kapazität","personal","einstellen","termin","liefer","verhandl","vertrag","schicht"],"award":["pressemitteilung","werbung","feiern","kunden","messe","präsentieren","website","siegel"],"subsidy":["antrag","förder","investieren","forschung","berater","unterlagen","frist","projekt"],"partnership":["vertrag","gemeinsam","partner","teilen","kooperation","verhandl","netzwerk","vertrieb"],"cash":["verkauf","auftrag","kunden","rabatt","angebot","großkunde","export","abo","online"],"awareness":["werbung","messe","social","video","presse","influencer","sponsor","event","kampagne"],"quality":["schulung","test","prüfen","verbessern","material","zertifi","forschung","feedback"]}}}'::jsonb, 'Defaults from src/config/balance.ts, section "pitches"'),
   ('protests', '{"kinds":["boycott","shitstorm","petition","protest_march"],"startCostCents":50000,"goal":20,"aiMax":16,"aiJoinChanceBps":3000,"aiPerMinuteMax":2,"durationHours":6,"starterCooldownHours":6,"effectChanceBaseBps":600,"effectChancePerPlayerBps":300,"effectChanceMaxBps":3500,"priceHitMinBps":150,"priceHitMaxBps":450,"awarenessHit":0.03,"minLevel":4}'::jsonb, 'Defaults from src/config/balance.ts, section "protests"'),
   ('nfts', '{"royaltyBps":1000,"mintXp":100,"minAskCents":10000,"minOfferCents":10000,"chat":{"maxLength":200,"perMinute":6,"history":60,"offerHours":24},"ai":{"floorCents":100000,"likeBps":400,"maxLikes":40,"creatorSaleBps":300,"maxCreatorSales":10,"ageBpsPerDay":100,"maxAgeDays":30,"buyChanceBps":2500,"listedOfferChanceBps":800,"unlistedOfferChanceBps":80,"lowballMinBps":6500,"lowballMaxBps":9000,"maxBuysPerDay":20,"maxMessagesPerRun":4,"resaleMarkupBps":12500,"acceptBps":10500,"demand":{"offerBps":600,"maxOffers":6,"saleBps":500,"maxSales":6,"days":7},"trade":{"chanceBps":60,"likeWeightBps":1500,"offerWeightBps":4000,"saleWeightBps":2500,"maxChanceBps":1500,"minHoldMinutes":30,"perRun":2,"perDay":30,"tasteMinBps":8500,"tasteMaxBps":12500,"reversionBps":5000},"collectors":["Vera Vermeer","Konrad Kollektor","Pixel-Paula","Baron von Bit","Mia Mosaik","Otto Original","Gräfin Glitzer","Sammler Sam"],"lines":{"offer":["Schönes Stück. Mehr ist es mir aber nicht wert.","Für meine Sammlung würde ich so viel zahlen.","Mein Angebot. Überleg es dir nicht zu lange.","Hübsch! Wäre das ein fairer Preis?","Ich biete das. Nimm es, solange ich gute Laune habe.","Mein Hund hat draufgebellt. Das heißt bei uns: kaufen.","Ich habe keine Ahnung, was das sein soll. Ich nehme es.","Meine Mutter sagt, ich soll aufhören, Pixel zu kaufen. Hier mein Angebot.","Ich wollte eigentlich Brot kaufen. Jetzt bin ich hier.","Das hängt später über meinem Klo. Ehrenplatz.","Mehr habe ich nicht, den Rest hat mein Wellensittich verzockt.","Ist das Kunst oder ist dein Bildschirm kaputt? Egal, Angebot steht.","Ich biete das und lege ein halbes Käsebrot drauf.","Mein Horoskop sagt: heute teuer einkaufen. Bitte sehr.","Ich habe das Bild meinem Zahnarzt gezeigt. Er hat geweint. Ich biete.","Angebot! Bitte schnell, mein Akku hat noch drei Prozent.","Ich sammle nur Dinge, die ich nicht verstehe. Passt perfekt.","Dafür verkaufe ich mein Fahrrad. Na gut, den Sattel.","Wusstest du, dass Otter Händchen halten? Jedenfalls: mein Angebot.","Ich habe gewürfelt. Das ist der Preis. Die Würfel lügen nicht.","Mein Steuerberater ist ohnmächtig geworden, also muss es gut sein.","Das erinnert mich an meinen Ex. Ich will es trotzdem.","Ich zahle in Spielgeld, weil ich nichts anderes habe.","Letztes Angebot. Also das erste. Aber auch das letzte. Vielleicht.","Ich kaufe das nur, damit Baron von Bit es nicht bekommt.","So viel für so wenige Pixel? Ich liebe es.","Meine Wand ist leer und mein Kopf auch. Nimm mein Geld.","Ich habe eine Lasagne im Ofen, bitte entscheide dich fix.","Das sieht aus wie mein Kontostand: wild. Angebot.","Ich habe mich verklickt, aber jetzt ziehe ich es durch."],"buy":["Gekauft! Das kommt in meine Sammlung.","Zu diesem Preis konnte ich nicht widerstehen.","Ein fairer Preis. Danke!","Gekauft. Fragt mich nicht, warum.","Meins! Jetzt muss ich nur noch herausfinden, was es ist.","Gekauft, bevor mein Verstand wach wird.","Das kommt neben den Toaster. Da ist das Licht am besten.","Ich habe es. Meine Erben werden mich hassen.","Zack, gekauft. Miete wird überbewertet.","Endlich etwas, das ich meiner Katze vererben kann.","Gekauft! Ich schreibe es als Arbeitskleidung ab.","Schnäppchen. Sagt jedenfalls die Stimme in meinem Kühlschrank.","Ich wollte nur gucken. Tja.","Gekauft. Der Pizzabote kann warten."],"accept":["Abgemacht! Viel Freude damit.","Einverstanden, es gehört dir.","Deal. Bitte nicht in der Sonne lagern.","Nimm es, bevor ich es mir anders überlege.","Verkauft! Ich brauche das Geld für Gartenzwerge.","Na gut. Aber du musst es jeden Tag anschauen. Versprich es.","Einverstanden. Es hat mich nachts sowieso angestarrt.","Deal! Grüß deine Oma von mir.","Okay, okay. Du verhandelst wie mein Schwager.","Abgemacht. Der Rahmen kostet extra. Es gibt keinen Rahmen."],"trade":["Endlich gehört es mir! Das wollte ich schon lange.","Ich musste es einfach haben.","Gekauft von einer Kollegin. Jetzt steht es zum Verkauf, wer bietet mehr?","Ein Schnäppchen unter Sammlern.","Das Stück ist gefragt. Ich habe zugeschlagen.","Ich habe es Otto Original abgeluchst. Er weint jetzt in sein Müsli.","Getauscht gegen ein Geheimnis und etwas Bargeld.","Gekauft beim Sammlerstammtisch. Es gab Mettbrötchen.","Ich weiß nicht, wem ich es abgekauft habe. Er trug einen Umhang.","Meins. Die anderen Sammler können sich gehackt legen.","Frisch erworben und schon wieder im Angebot. So bin ich.","Ich habe es im Tausch gegen meinen guten Ruf bekommen.","Sammler Sam wollte es auch. Sammler Sam war zu langsam.","Gekauft, dreimal angeschaut, gelangweilt. Wer will?","Das hing eben noch bei Gräfin Glitzer. Jetzt nicht mehr. Ha!"],"decline":["Nein danke, darunter verkaufe ich nicht.","Netter Versuch. Biete mehr.","Das ist zu wenig für dieses Stück.","Dafür bekommst du bei mir höchstens ein Foto vom Bild.","Hahaha. Nein.","Für den Preis male ich dir ein Strichmännchen. Ein schlechtes.","Mein Goldfisch bietet mehr, und der hat kein Konto.","Zu wenig. Ich habe schließlich eine Yacht aus Pappe zu unterhalten.","Nein. Und meine Katze sagt auch nein.","Bei dem Angebot ist mir kurz schwarz vor Augen geworden.","Ich frage kurz meinen Anwalt. Er lacht noch.","Leg eine Null dran, dann reden wir. Hinten, nicht vorne.","Das ist kein Angebot, das ist eine Beleidigung mit Komma.","Nö. Aber danke, dass du an mich gedacht hast.","Ich verkaufe nicht unter Wert. Außer montags. Heute ist nicht Montag. Glaube ich."]}}}'::jsonb, 'Defaults from src/config/balance.ts, section "nfts"'),

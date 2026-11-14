@@ -1,30 +1,43 @@
 {
   "items": [
     {
-      "id": 4,
-      "body": "Die Gründe sind unklar. Der Markt mag keine Unsicherheit. Sicher ist das nicht.",
-      "name": "Glanz & Gloria",
-      "due_at": "2026-11-15T00:58:49.593785+00:00",
+      "id": 5,
+      "body": "Die Kasse ist voll. Aktionäre dürfen auf eine Extra-Ausschüttung hoffen. Sicher ist das nicht.",
+      "name": "Methusalem Bio",
+      "due_at": "2026-11-15T01:12:23.639594+00:00",
       "status": "open",
-      "ticker": "LUX",
-      "headline": "Glanz & Gloria-Chef tritt überraschend zurück",
+      "ticker": "MTH",
+      "headline": "Sonderdividende bei Methusalem Bio erwartet",
       "move_bps": null,
-      "strength": 1,
+      "strength": 2,
+      "direction": "up",
+      "published_at": "2026-11-15T00:49:41.60512+00:00"
+    },
+    {
+      "id": 4,
+      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Wackelwerk tut sich in der nächsten Stunde etwas, und zwar nach unten. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
+      "name": "Wackelwerk",
+      "due_at": "2026-11-15T00:09:37.150175+00:00",
+      "status": "confirmed",
+      "ticker": "WAC",
+      "headline": "Mr. Doodle Dangles Geheimtipp",
+      "move_bps": -792,
+      "strength": 2,
       "direction": "down",
-      "published_at": "2026-11-15T00:34:33.031945+00:00"
+      "published_at": "2026-11-14T23:49:37.150175+00:00"
     },
     {
       "id": 3,
-      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Frachtpilot tut sich in der nächsten Stunde etwas, und zwar nach unten. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
-      "name": "Frachtpilot",
-      "due_at": "2026-11-14T23:34:27.982587+00:00",
-      "status": "fizzled",
-      "ticker": "FPT",
-      "headline": "Mr. Doodle Dangles Geheimtipp",
-      "move_bps": null,
+      "body": "Ein Vögelchen hat mir gezwitschert: GenoVita Biotech dürfte in der kommenden Stunde nach oben gehen. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
+      "name": "GenoVita Biotech",
+      "due_at": "2026-11-14T23:49:36.227463+00:00",
+      "status": "confirmed",
+      "ticker": "GNV",
+      "headline": "Vom Flurfunk: GenoVita Biotech",
+      "move_bps": 1343,
       "strength": 2,
-      "direction": "down",
-      "published_at": "2026-11-14T23:34:27.982587+00:00"
+      "direction": "up",
+      "published_at": "2026-11-14T23:49:36.227463+00:00"
     }
   ],
   "reliability_bps": 7500

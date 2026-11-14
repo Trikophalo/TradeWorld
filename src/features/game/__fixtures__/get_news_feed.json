@@ -1,8 +1,8 @@
 {
   "items": [
     {
-      "at": "2026-11-14T23:34:33.439884+00:00",
-      "id": "c158",
+      "at": "2026-11-14T23:49:42.058995+00:00",
+      "id": "c157",
       "kind": "company",
       "name": "Fixture Mode",
       "tier": "garage",
@@ -12,8 +12,8 @@
       "news_kind": "task_success"
     },
     {
-      "at": "2026-11-14T23:34:33.400397+00:00",
-      "id": "c157",
+      "at": "2026-11-14T23:49:42.020787+00:00",
+      "id": "c156",
       "kind": "company",
       "name": "Fixture Mode",
       "tier": "garage",
@@ -23,8 +23,8 @@
       "news_kind": "hired"
     },
     {
-      "at": "2026-11-14T23:34:33.387338+00:00",
-      "id": "c156",
+      "at": "2026-11-14T23:49:42.008919+00:00",
+      "id": "c155",
       "kind": "company",
       "name": "Fixture Mode",
       "tier": "garage",
@@ -34,8 +34,8 @@
       "news_kind": "hired"
     },
     {
-      "at": "2026-11-14T23:34:33.308925+00:00",
-      "id": "c155",
+      "at": "2026-11-14T23:49:41.929946+00:00",
+      "id": "c154",
       "kind": "company",
       "name": "Fixture Mode",
       "tier": "garage",
@@ -45,8 +45,8 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-14T23:34:32.248634+00:00",
-      "id": "c154",
+      "at": "2026-11-14T23:49:40.783155+00:00",
+      "id": "c153",
       "kind": "company",
       "name": "Fixture Zweitling",
       "tier": "garage",
@@ -56,8 +56,8 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-14T23:34:32.195103+00:00",
-      "id": "c153",
+      "at": "2026-11-14T23:49:40.718801+00:00",
+      "id": "c152",
       "kind": "company",
       "name": "Fixture Erstling",
       "tier": "garage",
@@ -67,8 +67,8 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-14T23:34:31.943769+00:00",
-      "id": "c151",
+      "at": "2026-11-14T23:49:40.459168+00:00",
+      "id": "c150",
       "kind": "company",
       "name": "Fixture Lieferwerk",
       "tier": "garage",
@@ -78,8 +78,8 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-14T23:34:31.897833+00:00",
-      "id": "c150",
+      "at": "2026-11-14T23:49:40.386881+00:00",
+      "id": "c149",
       "kind": "company",
       "name": "Fixture Abnahme",
       "tier": "garage",
@@ -89,8 +89,8 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-14T23:34:31.7766+00:00",
-      "id": "c149",
+      "at": "2026-11-14T23:49:40.243855+00:00",
+      "id": "c148",
       "kind": "company",
       "name": "Fixture Leitern",
       "tier": "garage",
@@ -100,8 +100,8 @@
       "news_kind": "hired"
     },
     {
-      "at": "2026-11-14T23:34:31.694344+00:00",
-      "id": "c148",
+      "at": "2026-11-14T23:49:40.182019+00:00",
+      "id": "c147",
       "kind": "company",
       "name": "Fixture Leitern",
       "tier": "garage",
@@ -111,8 +111,8 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-14T23:34:31.484489+00:00",
-      "id": "c142",
+      "at": "2026-11-14T23:49:39.923805+00:00",
+      "id": "c141",
       "kind": "company",
       "name": "Fixture Krisenstab",
       "tier": "garage",
@@ -122,8 +122,8 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-14T23:34:31.119411+00:00",
-      "id": "c141",
+      "at": "2026-11-14T23:49:39.556956+00:00",
+      "id": "c140",
       "kind": "company",
       "name": "Fixture Werke",
       "tier": "gmbh",
@@ -133,8 +133,8 @@
       "news_kind": "expanded"
     },
     {
-      "at": "2026-11-14T23:34:30.996966+00:00",
-      "id": "c140",
+      "at": "2026-11-14T23:49:39.398948+00:00",
+      "id": "c139",
       "kind": "company",
       "name": "Fixture Werke",
       "tier": "gmbh",
@@ -144,8 +144,8 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-14T23:34:30.11884+00:00",
-      "id": "c139",
+      "at": "2026-11-14T23:49:38.638043+00:00",
+      "id": "c138",
       "kind": "company",
       "name": "Fixture Labor",
       "tier": "ag",
@@ -155,8 +155,8 @@
       "news_kind": "ipo"
     },
     {
-      "at": "2026-11-14T23:34:29.881639+00:00",
-      "id": "c138",
+      "at": "2026-11-14T23:49:38.409072+00:00",
+      "id": "c137",
       "kind": "company",
       "name": "Fixture Labor",
       "tier": "ag",
@@ -166,8 +166,8 @@
       "news_kind": "hired"
     },
     {
-      "at": "2026-11-14T23:34:29.814826+00:00",
-      "id": "c137",
+      "at": "2026-11-14T23:49:38.353513+00:00",
+      "id": "c136",
       "kind": "company",
       "name": "Fixture Labor",
       "tier": "ag",
@@ -177,18 +177,7 @@
       "news_kind": "upgraded"
     },
     {
-      "at": "2026-11-14T23:34:29.758369+00:00",
-      "id": "c136",
-      "kind": "company",
-      "name": "Fixture Labor",
-      "tier": "ag",
-      "payload": { "hour_start": "2026-11-14T22:00:00+00:00", "profit_cents": 31399 },
-      "product": "security_software",
-      "headline": null,
-      "news_kind": "record_hour"
-    },
-    {
-      "at": "2026-11-14T23:34:29.698387+00:00",
+      "at": "2026-11-14T23:49:38.261253+00:00",
       "id": "c135",
       "kind": "company",
       "name": "Fixture Labor",
@@ -199,7 +188,7 @@
       "news_kind": "hired"
     },
     {
-      "at": "2026-11-14T23:34:29.387408+00:00",
+      "at": "2026-11-14T23:49:37.970103+00:00",
       "id": "c134",
       "kind": "company",
       "name": "Fixture Labor",
@@ -210,7 +199,17 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-14T23:34:28.482511+00:00",
+      "at": "2026-11-14T23:49:37.150175+00:00",
+      "id": "s4",
+      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Wackelwerk tut sich in der nächsten Stunde etwas, und zwar nach unten. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
+      "kind": "stock",
+      "name": "Wackelwerk",
+      "ticker": "WAC",
+      "headline": "Mr. Doodle Dangles Geheimtipp",
+      "direction": "down"
+    },
+    {
+      "at": "2026-11-14T23:49:36.726251+00:00",
       "id": "c133",
       "kind": "company",
       "name": "Kurzwerk",
@@ -221,7 +220,7 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-14T23:34:28.467621+00:00",
+      "at": "2026-11-14T23:49:36.712116+00:00",
       "id": "c132",
       "kind": "company",
       "name": "Wackelwerk",
@@ -232,7 +231,7 @@
       "news_kind": "ipo"
     },
     {
-      "at": "2026-11-14T23:34:28.239677+00:00",
+      "at": "2026-11-14T23:49:36.477888+00:00",
       "id": "c131",
       "kind": "company",
       "name": "Wackelwerk",
@@ -243,17 +242,17 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-14T23:34:27.982587+00:00",
+      "at": "2026-11-14T23:49:36.227463+00:00",
       "id": "s3",
-      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Frachtpilot tut sich in der nächsten Stunde etwas, und zwar nach unten. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
+      "body": "Ein Vögelchen hat mir gezwitschert: GenoVita Biotech dürfte in der kommenden Stunde nach oben gehen. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
       "kind": "stock",
-      "name": "Frachtpilot",
-      "ticker": "FPT",
-      "headline": "Mr. Doodle Dangles Geheimtipp",
-      "direction": "down"
+      "name": "GenoVita Biotech",
+      "ticker": "GNV",
+      "headline": "Vom Flurfunk: GenoVita Biotech",
+      "direction": "up"
     },
     {
-      "at": "2026-11-14T23:34:27.833216+00:00",
+      "at": "2026-11-14T23:49:36.014336+00:00",
       "id": "c130",
       "kind": "company",
       "name": "Sendeanstalt",
@@ -264,7 +263,7 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-14T23:34:27.705432+00:00",
+      "at": "2026-11-14T23:49:35.90082+00:00",
       "id": "c129",
       "kind": "company",
       "name": "Xp Werkstatt",
@@ -275,7 +274,7 @@
       "news_kind": "hired"
     },
     {
-      "at": "2026-11-14T23:34:27.627211+00:00",
+      "at": "2026-11-14T23:49:35.822637+00:00",
       "id": "c128",
       "kind": "company",
       "name": "Xp Werkstatt",
@@ -286,7 +285,7 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-14T23:34:27.472419+00:00",
+      "at": "2026-11-14T23:49:35.579459+00:00",
       "id": "c127",
       "kind": "company",
       "name": "Talwerk",
@@ -297,7 +296,7 @@
       "news_kind": "ipo"
     },
     {
-      "at": "2026-11-14T23:34:27.387139+00:00",
+      "at": "2026-11-14T23:49:35.490777+00:00",
       "id": "c126",
       "kind": "company",
       "name": "Talwerk",
@@ -308,7 +307,7 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-14T23:34:27.363885+00:00",
+      "at": "2026-11-14T23:49:35.465106+00:00",
       "id": "c125",
       "kind": "company",
       "name": "Gipfelwerk",
@@ -319,7 +318,7 @@
       "news_kind": "ipo"
     },
     {
-      "at": "2026-11-14T23:34:27.237995+00:00",
+      "at": "2026-11-14T23:49:35.356163+00:00",
       "id": "c124",
       "kind": "company",
       "name": "Gipfelwerk",
@@ -330,7 +329,7 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-14T23:34:27.125053+00:00",
+      "at": "2026-11-14T23:49:35.221489+00:00",
       "id": "c123",
       "kind": "company",
       "name": "Griff GmbH",
@@ -341,7 +340,18 @@
       "news_kind": "task_failure"
     },
     {
-      "at": "2026-11-14T23:34:26.263006+00:00",
+      "at": "2026-11-14T23:49:35.210637+00:00",
+      "id": "c122",
+      "kind": "company",
+      "name": "Griff GmbH",
+      "tier": "garage",
+      "payload": { "ai": false, "task": "warehouse_bins", "nickname": "Greta_Griff", "amount_cents": 40000 },
+      "product": "online_shop",
+      "headline": null,
+      "news_kind": "task_success"
+    },
+    {
+      "at": "2026-11-14T23:49:34.258469+00:00",
       "id": "m344",
       "body": "0 Spieler und 1 weitere Unterstützer machen mit. Das Thema ist in aller Munde.",
       "kind": "market",
@@ -350,7 +360,7 @@
       "headline": "Petition gegen KlarSoft AG zeigt Wirkung"
     },
     {
-      "at": "2026-11-14T23:34:26.263006+00:00",
+      "at": "2026-11-14T23:49:34.258469+00:00",
       "id": "m343",
       "body": "Viele haben mitgemacht, doch Kunden und Anleger zucken nur mit den Schultern.",
       "kind": "market",
@@ -359,7 +369,7 @@
       "headline": "Petition gegen KlarSoft AG verpufft"
     },
     {
-      "at": "2026-11-14T23:34:25.641392+00:00",
+      "at": "2026-11-14T23:49:33.60369+00:00",
       "id": "m342",
       "body": "Viele haben mitgemacht, doch Kunden und Anleger zucken nur mit den Schultern.",
       "kind": "market",
@@ -368,7 +378,7 @@
       "headline": "Petition gegen KlarSoft AG verpufft"
     },
     {
-      "at": "2026-11-14T23:34:25.634027+00:00",
+      "at": "2026-11-14T23:49:33.591879+00:00",
       "id": "m341",
       "body": "2 Spieler und 18 weitere Unterstützer machen mit. Das Thema ist in aller Munde.",
       "kind": "market",
@@ -377,139 +387,139 @@
       "headline": "Shitstorm gegen Zielscheibe zeigt Wirkung"
     },
     {
-      "at": "2026-11-14T23:34:24.950599+00:00",
+      "at": "2026-11-14T23:49:32.780852+00:00",
       "id": "f1",
       "kind": "fun",
-      "name": "SolarFuchs",
-      "ticker": "SFX",
-      "item_key": "ai_slogan",
-      "nickname": "Bodo_Kunde"
+      "name": "Rheinkraft Werke",
+      "ticker": "RKW",
+      "item_key": "office_dog",
+      "nickname": "Fred_Fabrik"
     },
     {
-      "at": "2026-11-14T23:34:15.366311+00:00",
+      "at": "2026-11-14T23:49:22.537254+00:00",
       "id": "m322",
-      "body": "KlarSoft AG verfehlt im Q2 des Spieljahres 1 die Prognosen: 370,5 Mio. € Umsatz, 19,6 Mio. € Ergebnis.",
+      "body": "KlarSoft AG meldet 504,1 Mio. € Umsatz und 55,2 Mio. € Gewinn im Q2 des Spieljahres 1. Analysten hatten weniger erwartet.",
       "kind": "market",
       "ticker": "KLS",
       "category": "earnings",
-      "headline": "KlarSoft AG: Gewinn sinkt um 22 %"
+      "headline": "KlarSoft AG steigert Gewinn um 147 %"
     },
     {
-      "at": "2026-11-14T23:34:15.366311+00:00",
+      "at": "2026-11-14T23:49:22.537254+00:00",
       "id": "m313",
-      "body": "Brotzeit Handel AG meldet 2,01 Mrd. € Umsatz und 74,5 Mio. € Gewinn im Q2 des Spieljahres 1. Analysten hatten weniger erwartet.",
+      "body": "Brotzeit Handel AG verfehlt im Q2 des Spieljahres 1 die Prognosen: 1,91 Mrd. € Umsatz, 41,7 Mio. € Ergebnis.",
       "kind": "market",
       "ticker": "BRZ",
       "category": "earnings",
-      "headline": "Brotzeit Handel AG steigert Gewinn um 47 %"
+      "headline": "Brotzeit Handel AG: Gewinn sinkt um 71 %"
     },
     {
-      "at": "2026-11-14T23:34:15.366311+00:00",
-      "id": "m317",
-      "body": "Frachtpilot verfehlt im Q2 des Spieljahres 1 die Prognosen: 8,3 Mio. € Umsatz, 146 Tsd. € Ergebnis.",
+      "at": "2026-11-14T23:49:22.537254+00:00",
+      "id": "m316",
+      "body": "Fundgrube Discount verfehlt im Q2 des Spieljahres 1 die Prognosen: 44,9 Mio. € Umsatz, 451 Tsd. € Ergebnis.",
       "kind": "market",
-      "ticker": "FPT",
+      "ticker": "FGD",
       "category": "earnings",
-      "headline": "Frachtpilot schreibt wieder schwarze Zahlen"
+      "headline": "Fundgrube Discount schreibt wieder schwarze Zahlen"
     },
     {
-      "at": "2026-11-14T23:34:15.366311+00:00",
+      "at": "2026-11-14T23:49:22.537254+00:00",
       "id": "m323",
-      "body": "Glanz & Gloria meldet 528,6 Mio. € Umsatz und 74,3 Mio. € Gewinn im Q2 des Spieljahres 1. Analysten hatten weniger erwartet.",
+      "body": "Glanz & Gloria verfehlt im Q2 des Spieljahres 1 die Prognosen: 513,4 Mio. € Umsatz, 62,5 Mio. € Ergebnis.",
       "kind": "market",
       "ticker": "LUX",
       "category": "earnings",
-      "headline": "Glanz & Gloria steigert Gewinn um 1 %"
+      "headline": "Glanz & Gloria: Gewinn sinkt um 23 %"
     },
     {
-      "at": "2026-11-14T23:34:15.366311+00:00",
+      "at": "2026-11-14T23:49:22.537254+00:00",
       "id": "m326",
-      "body": "Nordlicht Logistik AG meldet 893,3 Mio. € Umsatz und 55,4 Mio. € Gewinn im Q2 des Spieljahres 1. Analysten hatten weniger erwartet.",
+      "body": "Nordlicht Logistik AG verfehlt im Q2 des Spieljahres 1 die Prognosen: 832,6 Mio. € Umsatz, 39,2 Mio. € Ergebnis.",
       "kind": "market",
       "ticker": "NDL",
       "category": "earnings",
-      "headline": "Nordlicht Logistik AG steigert Gewinn um 79 %"
+      "headline": "Nordlicht Logistik AG: Gewinn sinkt um 26 %"
     },
     {
-      "at": "2026-11-14T23:34:15.366311+00:00",
+      "at": "2026-11-14T23:49:22.537254+00:00",
       "id": "m327",
-      "body": "NeuroPharm AG verfehlt im Q2 des Spieljahres 1 die Prognosen: 481,1 Mio. € Umsatz, 65,0 Mio. € Ergebnis.",
+      "body": "NeuroPharm AG meldet 554,7 Mio. € Umsatz und 109,9 Mio. € Gewinn im Q2 des Spieljahres 1. Analysten hatten weniger erwartet.",
       "kind": "market",
       "ticker": "NPH",
       "category": "earnings",
-      "headline": "NeuroPharm AG: Gewinn sinkt um 16 %"
+      "headline": "NeuroPharm AG steigert Gewinn um 32 %"
     },
     {
-      "at": "2026-11-14T23:34:15.366311+00:00",
+      "at": "2026-11-14T23:49:22.537254+00:00",
       "id": "m335",
-      "body": "Volta Energie AG verfehlt im Q2 des Spieljahres 1 die Prognosen: 1,38 Mrd. € Umsatz, 103,1 Mio. € Ergebnis.",
+      "body": "Volta Energie AG verfehlt im Q2 des Spieljahres 1 die Prognosen: 1,31 Mrd. € Umsatz, 116,8 Mio. € Ergebnis.",
       "kind": "market",
       "ticker": "VLT",
       "category": "earnings",
-      "headline": "Volta Energie AG: Gewinn sinkt um 10 %"
+      "headline": "Volta Energie AG: Gewinn sinkt um 5 %"
     },
     {
-      "at": "2026-11-14T23:34:15.322181+00:00",
+      "at": "2026-11-14T23:49:22.482987+00:00",
       "id": "m298",
-      "body": "Glanz & Gloria meldet 535,1 Mio. € Umsatz und 73,6 Mio. € Gewinn im Q1 des Spieljahres 2. Analysten hatten weniger erwartet.",
+      "body": "Glanz & Gloria meldet 551,4 Mio. € Umsatz und 81,0 Mio. € Gewinn im Q1 des Spieljahres 2. Analysten hatten weniger erwartet.",
       "kind": "market",
       "ticker": "LUX",
       "category": "earnings",
-      "headline": "Glanz & Gloria steigert Gewinn um 7 %"
+      "headline": "Glanz & Gloria steigert Gewinn um 18 %"
     },
     {
-      "at": "2026-11-14T23:34:15.322181+00:00",
+      "at": "2026-11-14T23:49:22.482987+00:00",
       "id": "m302",
-      "body": "NeuroPharm AG erreicht im Q1 des Spieljahres 2 483,2 Mio. € Umsatz und liegt damit im Rahmen der Erwartungen.",
+      "body": "NeuroPharm AG meldet 530,4 Mio. € Umsatz und 83,2 Mio. € Gewinn im Q1 des Spieljahres 2. Analysten hatten weniger erwartet.",
       "kind": "market",
       "ticker": "NPH",
       "category": "earnings",
-      "headline": "NeuroPharm AG steigert Gewinn um 1 %"
+      "headline": "NeuroPharm AG steigert Gewinn um 8 %"
     },
     {
-      "at": "2026-11-14T23:34:15.322181+00:00",
+      "at": "2026-11-14T23:49:22.482987+00:00",
       "id": "m310",
-      "body": "Volta Energie AG erreicht im Q1 des Spieljahres 2 1,25 Mrd. € Umsatz und liegt damit im Rahmen der Erwartungen.",
+      "body": "Volta Energie AG meldet 1,41 Mrd. € Umsatz und 123,5 Mio. € Gewinn im Q1 des Spieljahres 2. Analysten hatten weniger erwartet.",
       "kind": "market",
       "ticker": "VLT",
       "category": "earnings",
-      "headline": "Volta Energie AG: Gewinn sinkt um 2 %"
+      "headline": "Volta Energie AG steigert Gewinn um 5 %"
     },
     {
-      "at": "2026-11-14T23:34:15.322181+00:00",
+      "at": "2026-11-14T23:49:22.482987+00:00",
       "id": "m297",
-      "body": "KlarSoft AG verfehlt im Q1 des Spieljahres 2 die Prognosen: 369,6 Mio. € Umsatz, 25,1 Mio. € Ergebnis.",
+      "body": "KlarSoft AG verfehlt im Q1 des Spieljahres 2 die Prognosen: 390,8 Mio. € Umsatz, 22,3 Mio. € Ergebnis.",
       "kind": "market",
       "ticker": "KLS",
       "category": "earnings",
-      "headline": "KlarSoft AG: Gewinn sinkt um 33 %"
+      "headline": "KlarSoft AG: Gewinn sinkt um 40 %"
     },
     {
-      "at": "2026-11-14T23:34:15.322181+00:00",
-      "id": "m292",
-      "body": "Frachtpilot verfehlt im Q1 des Spieljahres 2 die Prognosen: 8,0 Mio. € Umsatz, -114 Tsd. € Ergebnis.",
+      "at": "2026-11-14T23:49:22.482987+00:00",
+      "id": "m291",
+      "body": "Fundgrube Discount verfehlt im Q1 des Spieljahres 2 die Prognosen: 43,6 Mio. € Umsatz, -154 Tsd. € Ergebnis.",
       "kind": "market",
-      "ticker": "FPT",
+      "ticker": "FGD",
       "category": "earnings",
-      "headline": "Frachtpilot rutscht in die Verlustzone"
+      "headline": "Fundgrube Discount rutscht in die Verlustzone"
     },
     {
-      "at": "2026-11-14T23:34:15.322181+00:00",
+      "at": "2026-11-14T23:49:22.482987+00:00",
       "id": "m288",
-      "body": "Brotzeit Handel AG verfehlt im Q1 des Spieljahres 2 die Prognosen: 2,00 Mrd. € Umsatz, 50,6 Mio. € Ergebnis.",
+      "body": "Brotzeit Handel AG meldet 2,07 Mrd. € Umsatz und 143,0 Mio. € Gewinn im Q1 des Spieljahres 2. Analysten hatten weniger erwartet.",
       "kind": "market",
       "ticker": "BRZ",
       "category": "earnings",
-      "headline": "Brotzeit Handel AG: Gewinn sinkt um 14 %"
+      "headline": "Brotzeit Handel AG steigert Gewinn um 143 %"
     },
     {
-      "at": "2026-11-14T23:34:15.322181+00:00",
+      "at": "2026-11-14T23:49:22.482987+00:00",
       "id": "m301",
-      "body": "Nordlicht Logistik AG verfehlt im Q1 des Spieljahres 2 die Prognosen: 823,0 Mio. € Umsatz, 31,0 Mio. € Ergebnis.",
+      "body": "Nordlicht Logistik AG erreicht im Q1 des Spieljahres 2 804,8 Mio. € Umsatz und liegt damit im Rahmen der Erwartungen.",
       "kind": "market",
       "ticker": "NDL",
       "category": "earnings",
-      "headline": "Nordlicht Logistik AG: Gewinn sinkt um 41 %"
+      "headline": "Nordlicht Logistik AG steigert Gewinn um 2 %"
     }
   ]
 }
