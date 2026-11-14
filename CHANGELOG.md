@@ -181,3 +181,5 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   mehr gehört. Festpreis zum Sofortkaufen, ein Chat mit Preisangeboten unter jedem NFT, KI-Sammler kaufen nur zu
   fairen Preisen, machen Lowball-Angebote und verkaufen weiter. Neue Rangliste „Top-Macher“, Sortierungen „Neu geprägt“
   und „Heiß begehrt“, neun neue Missionen. Jedes weitere NFT kostet nur noch das 1,5-Fache.
+- **Patchnotes (ADR-137):** Die Zeitung oben in der Leiste zeigt alle Änderungen, das Neueste zuerst und nach
+  Versionen geordnet. Ein blauer Punkt verrät, dass seit deinem letzten Blick etwas dazugekommen ist.

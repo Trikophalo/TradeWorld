@@ -66,6 +66,17 @@
     "missions": "Missionen",
     "missionsClaimable": "Missionen: {count, plural, one {# Belohnung} other {# Belohnungen}} abholbereit"
   },
+  "patchNotes": {
+    "label": "Patchnotes",
+    "labelUnseen": "Patchnotes: Neues seit deinem letzten Blick",
+    "title": "Patchnotes",
+    "intro": "Alles, was sich im Spiel geändert hat. Das Neueste steht oben.",
+    "count": "{count, plural, one {# Änderung} other {# Änderungen}}",
+    "fresh": "{count} neu",
+    "new": "Neu",
+    "emptyTitle": "Noch keine Patchnotes",
+    "emptyText": "Sobald sich im Spiel etwas ändert, steht es hier."
+  },
   "search": {
     "title": "Suche",
     "placeholder": "Aktie, Kürzel, Spieler oder #Tag",
@@ -456,7 +467,8 @@
     "motion": "Motion-Tokens",
     "mascot": "Maskottchen",
     "sounds": "Sounds",
-    "career": "Karriere"
+    "career": "Karriere",
+    "patchNotes": "Patchnotes"
   },
   "rules": {
     "title": "Spielregeln",
