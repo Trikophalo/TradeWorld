@@ -30,6 +30,8 @@ export const TV = {
   /** Station colour. */
   red: "#e2475d",
   gold: "#ffd15c",
+  /** The night sky above the city, at its darkest. */
+  sky: "#12173a",
 } as const;
 
 // ---------------------------------------------------------------- helpers
@@ -115,6 +117,10 @@ const ANCHOR_PALETTE = {
   o: "#4a1a26",
   p: "#e36d7c",
   y: "#ffd15c",
+  /** Tears and sweat. */
+  c: "#7fd8ff",
+  /** Skin of a face that has gone red with anger. */
+  a: "#e57e6a",
 } as const;
 
 const ANCHOR_BASE = [
@@ -159,7 +165,12 @@ const ANCHOR_BASE = [
 export type AnchorMouth = "closed" | "half" | "open";
 export type AnchorEyes = "open" | "blink" | "happy";
 export type AnchorBrows = "rest" | "raised" | "cocked";
-export type AnchorArm = "down" | "waveLeft" | "waveRight";
+/** "hanky" dabs his eye with a handkerchief; "twirl" and "twirlUp" are the two frames of twirling his moustache. */
+export type AnchorArm = "down" | "waveLeft" | "waveRight" | "hanky" | "twirl" | "twirlUp";
+
+/** What a story does to him. "neutral" is the newsreader's face; every other mood has its own face and mouths. */
+export const ANCHOR_MOODS = ["neutral", "shocked", "crying", "laughing", "angry", "smug", "confused", "proud"] as const;
+export type AnchorMood = (typeof ANCHOR_MOODS)[number];
 
 const MOUTH_PATCHES: Record<AnchorMouth, readonly PixelPatch[]> = {
   closed: [],
@@ -217,6 +228,19 @@ const WAVE_UPPER_ARM = [
   "jjjjjk",
 ] as const;
 
+/** The sleeve of an arm lifted to his face: a white cuff at (x, y), then the forearm slanting down to his side. */
+function raisedSleeve(x: number, y: number): PixelPatch {
+  const rows: string[] = [];
+  for (let row = y; row < ANCHOR_BASE.length; row++) {
+    const shift = Math.min(33 - x, Math.floor((row - y) / 2));
+    rows.push(" ".repeat(shift) + (row === y ? "kwwwwk" : "kjjjjk"));
+  }
+  return { x, y, rows };
+}
+
+/** The hand that twirls the tip of his moustache, 8×4. */
+const TWIRL_HAND = ["  kkkkk", " ksssssk", "ksssdssk", " kssssk"] as const;
+
 const ARM_PATCHES: Record<AnchorArm, readonly PixelPatch[]> = {
   down: [],
   waveLeft: [
@@ -229,36 +253,257 @@ const ARM_PATCHES: Record<AnchorArm, readonly PixelPatch[]> = {
     { x: 33, y: 10, rows: WAVE_FOREARM },
     { x: 32, y: 15, rows: WAVE_UPPER_ARM },
   ],
+  // A white handkerchief pressed to one eye, held by the hand above it.
+  hanky: [
+    raisedSleeve(28, 14),
+    {
+      x: 20,
+      y: 8,
+      rows: [
+        "  kkkkkk",
+        " kwwwwwwkkkk",
+        "kwwwwwwwksssk",
+        "kwwhwwwwksdsk",
+        "kwwwhwwwksssk",
+        "kwwwwhwwwkkk",
+        " kwwwwhwwk",
+        " kwwhwwwk",
+        "  kwwhwk",
+        "   kwwk",
+        "    kk",
+      ],
+    },
+  ],
+  twirl: [{ x: 25, y: 14, rows: TWIRL_HAND }, raisedSleeve(27, 18)],
+  twirlUp: [
+    // The tip of the moustache curls up between his fingers.
+    { x: 24, y: 14, rows: [" H", "HH"] },
+    { x: 25, y: 13, rows: TWIRL_HAND },
+    raisedSleeve(27, 17),
+  ],
 };
+
+interface MoodArt {
+  /** Brows and eyes. */
+  face: readonly PixelPatch[];
+  /** Closes the eyes of a face that has them open. */
+  blink?: readonly PixelPatch[];
+  /** The mouths he talks with in this mood. */
+  mouth: Record<AnchorMouth, readonly PixelPatch[]>;
+  /** The closed mouth on loop frame 1 (a wobbling lip). */
+  closedAlt?: readonly PixelPatch[];
+  /** Two loop frames on top of the face (tears running down). */
+  loop?: readonly [readonly PixelPatch[], readonly PixelPatch[]];
+  /** The peak of the reaction, drawn over everything else. */
+  react?: readonly PixelPatch[];
+  /** Shoulders and chest. */
+  body?: readonly PixelPatch[];
+  /** The whole face goes red. */
+  flush?: boolean;
+  /** The head tilts to one side. */
+  tilt?: boolean;
+}
+
+const BIG_EYE = [" ww ", "wwww", "wkkw", "wwww", " ww "] as const;
+
+const MOOD_ART: Record<Exclude<AnchorMood, "neutral">, MoodArt> = {
+  // Eyes like saucers, brows up in his hair, the mouth a round "o".
+  shocked: {
+    face: [
+      { x: 14, y: 7, rows: ["bbbb"] },
+      { x: 22, y: 7, rows: ["bbbb"] },
+      { x: 14, y: 9, rows: BIG_EYE },
+      { x: 22, y: 9, rows: BIG_EYE },
+    ],
+    mouth: {
+      closed: [{ x: 18, y: 18, rows: ["oooo", "soos"] }],
+      half: [{ x: 17, y: 18, rows: [" oooo ", "oooooo", " oooo "] }],
+      open: [{ x: 17, y: 18, rows: [" oooo ", "oooooo", "oppppo", " oooo "] }],
+    },
+    react: [
+      // The jaw drops and the tips of the moustache jump.
+      { x: 16, y: 18, rows: [" oooooo ", "oooooooo", "ooppppoo", " oooooo "] },
+      { x: 13, y: 18, rows: ["ss"] },
+      { x: 25, y: 18, rows: ["ss"] },
+      { x: 11, y: 14, rows: ["h", " hh"] },
+      { x: 26, y: 14, rows: ["  h", "hh"] },
+    ],
+  },
+  // Brows up in the middle, eyes squeezed shut, tears down both cheeks and a lip that wobbles.
+  crying: {
+    face: [
+      { x: 14, y: 8, rows: ["  bb", "bbss"] },
+      { x: 22, y: 8, rows: ["bb  ", "ssbb"] },
+      { x: 14, y: 10, rows: ["ssss", "kkkk"] },
+      { x: 22, y: 10, rows: ["ssss", "kkkk"] },
+    ],
+    mouth: {
+      closed: [{ x: 17, y: 18, rows: ["oossoo", "ssooss"] }],
+      half: [{ x: 17, y: 18, rows: ["soooos", "oppppo"] }],
+      open: [{ x: 17, y: 18, rows: ["soooos", "oppppo", "oooooo"] }],
+    },
+    closedAlt: [{ x: 17, y: 18, rows: ["ssooss", "oossoo"] }],
+    loop: [
+      [
+        { x: 11, y: 12, rows: [" cc", " wc", " cc", "cc", "wc", "cc", " c"] },
+        { x: 26, y: 12, rows: ["cc", "cw", "cc", " cc", " cw", " cc", " c"] },
+        { x: 10, y: 20, rows: ["c"] },
+        { x: 29, y: 20, rows: ["c"] },
+      ],
+      [
+        { x: 11, y: 12, rows: [" wc", " cc", " cc", "wc", "cc", "cc", " w"] },
+        { x: 26, y: 12, rows: ["cw", "cc", "cc", " cw", " cc", " cc", " w"] },
+        { x: 10, y: 22, rows: ["c"] },
+        { x: 29, y: 22, rows: ["c"] },
+      ],
+    ],
+  },
+  // Eyes shut with joy and a mouth full of teeth.
+  laughing: {
+    face: [...BROW_PATCHES.raised, ...EYE_PATCHES.happy],
+    mouth: {
+      closed: [{ x: 16, y: 18, rows: ["owwwwwwo", " oooooo "] }],
+      half: [{ x: 16, y: 18, rows: ["owwwwwwo", "oppppppo", " oooooo "] }],
+      open: [{ x: 16, y: 18, rows: ["owwwwwwo", "oooooooo", "oppppppo", " oooooo "] }],
+    },
+  },
+  // Brows down to the nose, a glare, a red face and bared teeth.
+  angry: {
+    face: [
+      { x: 13, y: 8, rows: ["kkk", "sskkk", "    kk"] },
+      { x: 21, y: 8, rows: ["   kkk", " kkks", "kk"] },
+      { x: 23, y: 10, rows: ["kw"] },
+    ],
+    blink: EYE_PATCHES.blink,
+    mouth: {
+      closed: [{ x: 17, y: 18, rows: ["soooos", "osssso"] }],
+      half: [{ x: 17, y: 18, rows: ["oooooo", "owwwwo", "oooooo"] }],
+      open: [{ x: 17, y: 18, rows: ["oooooo", "owwwwo", "oppppo", " oooo "] }],
+    },
+    flush: true,
+  },
+  // Heavy lids, a sideways look, one brow up and a smirk.
+  smug: {
+    face: [...BROW_PATCHES.cocked, { x: 14, y: 10, rows: ["kkkk", " wk "] }, { x: 22, y: 10, rows: ["kkkk", " wk "] }],
+    blink: [
+      { x: 15, y: 11, rows: ["ss"] },
+      { x: 23, y: 11, rows: ["ss"] },
+    ],
+    mouth: {
+      closed: [{ x: 17, y: 18, rows: ["sssssoo", "ooooos"] }],
+      half: [{ x: 17, y: 18, rows: ["ssooooo", "ooooos"] }],
+      open: [{ x: 17, y: 18, rows: ["ssooooo", "oppppo", " oooo"] }],
+    },
+  },
+  // One eye wide under a raised brow, the other one squinting, the mouth askew and the head to one side.
+  confused: {
+    face: [
+      { x: 14, y: 7, rows: ["bbbb", "ssss", "ssss"] },
+      { x: 15, y: 9, rows: ["ww", "wk", "kk"] },
+      { x: 22, y: 9, rows: ["sbbb"] },
+      { x: 21, y: 10, rows: ["bb"] },
+      { x: 23, y: 10, rows: ["ss"] },
+    ],
+    blink: [{ x: 15, y: 9, rows: ["ss", "ss"] }],
+    mouth: {
+      closed: [{ x: 18, y: 18, rows: ["ssooo"] }],
+      half: [{ x: 18, y: 18, rows: ["ssooo", "  ooo"] }],
+      open: [{ x: 18, y: 18, rows: ["ssooo", "  opo", "  ooo"] }],
+    },
+    tilt: true,
+  },
+  // Eyes closed in bliss, a broad smile, shoulders back and chest out.
+  proud: {
+    face: [...BROW_PATCHES.raised, { x: 14, y: 10, rows: ["kssk", "skks"] }, { x: 22, y: 10, rows: ["kssk", "skks"] }],
+    mouth: {
+      closed: [{ x: 17, y: 18, rows: ["osssso", "soooos"] }],
+      half: [{ x: 17, y: 18, rows: ["oooooo", "soooos"] }],
+      open: [{ x: 17, y: 18, rows: ["oooooo", "oppppo", " oooo "] }],
+    },
+    body: [
+      {
+        x: 0,
+        y: 22,
+        rows: [
+          "......kkkkkkkkkwwddddddwwkkkkkkkkk......",
+          "...kkkjjjjjjjjlwwwddddwwwljjjjjjjjkkk...",
+          ".kkjjjjjjjjjjjlwwwwttwwwwljjjjjjjjjjjkk.",
+          ".kjjjjjjjjjjjjllwwwttwwwlljjjjjjjjjjjjk.",
+          ".kjjjjjjjjjjjjjllwttttwlljjjjjjjjjjjjjk.",
+        ],
+      },
+    ],
+  },
+};
+
+/** Rows and columns of his face, for the flush of anger. */
+const FACE = { top: 6, bottom: 21, left: 10, right: 29 } as const;
+
+function flushFace(grid: string[]): string[] {
+  return grid.map((row, y) => {
+    if (y < FACE.top || y > FACE.bottom) return row;
+    const face = row.slice(FACE.left, FACE.right + 1).replace(/s/g, "a");
+    return row.slice(0, FACE.left) + face + row.slice(FACE.right + 1);
+  });
+}
+
+/** Tilts the head by shifting its upper rows sideways: two pixels at the hair, one at the eyes, none at the chin. */
+function tiltHead(grid: string[]): string[] {
+  return grid.map((row, y) => {
+    const shift = y <= 5 ? 2 : y <= 12 ? 1 : 0;
+    return shift === 0 ? row : ".".repeat(shift) + row.slice(0, row.length - shift);
+  });
+}
 
 export interface AnchorPose {
   mouth?: AnchorMouth;
+  /** In a mood only "blink" counts: the mood brings its own eyes and brows. */
   eyes?: AnchorEyes;
   brows?: AnchorBrows;
   arm?: AnchorArm;
+  mood?: AnchorMood;
+  /** Loop frame of the mood: tears run, the lip wobbles. */
+  frame?: 0 | 1;
+  /** The peak of the reaction (the dropped jaw of a shock). */
+  react?: boolean;
 }
 
 const anchorCache = new Map<string, PixelArt>();
 
 /** One frame of the anchor. Frames are cached, so the same pose always returns the same object. */
 export function anchorArt(pose: AnchorPose = {}): PixelArt {
-  const { mouth = "closed", eyes = "open", brows = "rest", arm = "down" } = pose;
-  const key = `${mouth}/${eyes}/${brows}/${arm}`;
+  const { mouth = "closed", eyes = "open", brows = "rest", arm = "down", mood = "neutral" } = pose;
+  const look = mood === "neutral" ? null : MOOD_ART[mood];
+  // Only what the mood can show counts, so equal pictures share one cache entry.
+  const frame = look && (look.loop || (look.closedAlt && mouth === "closed")) ? (pose.frame ?? 0) : 0;
+  const react = Boolean(look?.react && pose.react);
+  const blink = Boolean(look?.blink) && eyes === "blink";
+  const key = look ? `${mood}/${mouth}/${blink}/${arm}/${frame}/${react}` : `${mouth}/${eyes}/${brows}/${arm}`;
   let art = anchorCache.get(key);
   if (!art) {
-    art = {
-      palette: ANCHOR_PALETTE,
-      grid: patchGrid(ANCHOR_BASE, [
-        ...BROW_PATCHES[brows],
-        ...EYE_PATCHES[eyes],
-        ...MOUTH_PATCHES[mouth],
-        ...ARM_PATCHES[arm],
-      ]),
-    };
+    let grid: string[];
+    if (!look) {
+      grid = patchGrid(ANCHOR_BASE, [...BROW_PATCHES[brows], ...EYE_PATCHES[eyes], ...MOUTH_PATCHES[mouth]]);
+    } else {
+      grid = patchGrid(ANCHOR_BASE, [
+        ...(look.body ?? []),
+        ...look.face,
+        ...(blink ? (look.blink ?? []) : []),
+        ...(mouth === "closed" && frame === 1 && look.closedAlt ? look.closedAlt : look.mouth[mouth]),
+        ...(look.loop?.[frame] ?? []),
+        ...(react ? (look.react ?? []) : []),
+      ]);
+      if (look.flush) grid = flushFace(grid);
+      if (look.tilt) grid = tiltHead(grid);
+    }
+    art = { palette: ANCHOR_PALETTE, grid: patchGrid(grid, ARM_PATCHES[arm]) };
     anchorCache.set(key, art);
   }
   return art;
 }
+
+/** The arm he lifts at the peak of a reaction: a handkerchief for tears, a twirl of the moustache for a smirk. */
+export const REACTION_ARM: Partial<Record<AnchorMood, AnchorArm>> = { crying: "hanky", smug: "twirl" };
 
 export const ANCHOR_SIZE = { width: 40, height: 36 } as const;
 /** Row of the anchor sprite where the desk top begins. */
@@ -315,6 +560,96 @@ export const HANDS = {
       ".kkkkkkkkkkkkkkkkkkkkkkk..........",
     ],
   },
+  // Anger: the right hand goes up as a fist ...
+  fistUp: {
+    palette: HANDS_PALETTE,
+    grid: [
+      ".........................kkkkkk...",
+      "........................ksdsdsdk..",
+      "........................kssssssk..",
+      "..........kkkkkkkkkkkkkkkssssssk..",
+      ".........kwwwwwwwwwwwwwwkkwwwwk...",
+      ".kkkkkkkkkwggggggwwggggwk.kjjjjk..",
+      "kjjjwsssskwwwwwwwwwwwwwwk.kjjjjk..",
+      "kjjjwsssdkwgggggggwwgggwk.kjjjjk..",
+      "kjjjwssssskwwwwwwwwwwwwk..kjjjjk..",
+      ".kkkkkkkkkkkkkkkkkkkkkkk..kkkkkk..",
+    ],
+  },
+  // ... and comes down on the desk.
+  fistDown: {
+    palette: HANDS_PALETTE,
+    grid: [
+      HANDS_EMPTY,
+      HANDS_EMPTY,
+      HANDS_EMPTY,
+      "..........kkkkkkkkkkkkkk..........",
+      ".........kwwwwwwwwwwwwwwk.kkkkkk..",
+      ".kkkkkkkkkwggggggwwggggwkksdsdsdk.",
+      "kjjjwsssskwwwwwwwwwwwwwwkkssssssk.",
+      "kjjjwsssdkwgggggggwwgggwkkssssssk.",
+      "kjjjwssssskwwwwwwwwwwwwk.kddddddk.",
+      ".kkkkkkkkkkkkkkkkkkkkkkk..kkkkkk..",
+    ],
+  },
+} as const satisfies Record<string, PixelArt>;
+
+// ---------------------------------------------------------------- what floats around his head
+
+/** Pads a shape by one pixel and draws `char` around everything that is filled. */
+export function outlineGrid(shape: PixelGrid, char: string): string[] {
+  const height = shape.length + 2;
+  const width = (shape[0]?.length ?? 0) + 2;
+  const at = (x: number, y: number) => shape[y - 1]?.[x - 1] ?? ".";
+  return Array.from({ length: height }, (_, y) => {
+    let row = "";
+    for (let x = 0; x < width; x++) {
+      const own = at(x, y);
+      if (own !== ".") row += own;
+      else {
+        let edge = false;
+        for (let dy = -1; dy <= 1 && !edge; dy++) {
+          for (let dx = -1; dx <= 1; dx++) if (at(x + dx, y + dy) !== ".") edge = true;
+        }
+        row += edge ? char : ".";
+      }
+    }
+    return row;
+  });
+}
+
+const FX_PALETTE = { k: TV.ink, w: "#ffffff", y: TV.gold, t: TV.red, c: "#7fd8ff" } as const;
+
+/**
+ * Comic marks for his moods, drawn beside his head: "!" for a shock, "?" for confusion, the vein of anger, a drop
+ * of sweat, a sparkle in two sizes and the "HA" of a laugh.
+ */
+export const MOOD_FX = {
+  exclaim: {
+    palette: FX_PALETTE,
+    grid: outlineGrid(["tt", "tt", "tt", "tt", "tt", "tt", "..", "tt", "tt"], "w"),
+  },
+  question: {
+    palette: FX_PALETTE,
+    grid: outlineGrid(
+      [".yyyy.", "yyyyyy", "yy..yy", "....yy", "...yy.", "..yy..", "..yy..", "......", "..yy..", "..yy.."],
+      "k",
+    ),
+  },
+  anger: {
+    palette: FX_PALETTE,
+    grid: outlineGrid(["..t.t..", "..t.t..", "tt...tt", ".......", "tt...tt", "..t.t..", "..t.t.."], "w"),
+  },
+  sweat: { palette: FX_PALETTE, grid: [".c.", ".c.", "ccc", "cwc", "ccc", ".c."] },
+  sparkle: { palette: FX_PALETTE, grid: ["...w...", "...y...", "..yyy..", "wyywyyw", "..yyy..", "...y...", "...w..."] },
+  sparkleSmall: {
+    palette: FX_PALETTE,
+    grid: [".......", ".......", "...y...", "..ywy..", "...y...", ".......", "......."],
+  },
+  ha: {
+    palette: FX_PALETTE,
+    grid: outlineGrid(["w.w..w.", "w.w.w.w", "www.www", "w.w.w.w", "w.w.w.w"], "k"),
+  },
 } as const satisfies Record<string, PixelArt>;
 
 // ---------------------------------------------------------------- the studio
@@ -330,7 +665,7 @@ const BACKDROP_PALETTE = {
   V: "#161d38",
   f: "#3a4780",
   F: "#56659f",
-  a: "#12173a",
+  a: TV.sky,
   b: "#1a2150",
   c: "#262b66",
   e: "#3a367c",
@@ -477,7 +812,7 @@ export function deskArt(width: number): PixelArt {
 }
 export const DESK_HEIGHT = 18;
 
-/* A small and a big pixel alphabet, only the letters the desk sign needs. */
+/* A small and a big pixel alphabet, only the letters the desk sign and the title cards need. */
 const FONT_SMALL: Record<string, readonly string[]> = {
   N: ["x..x", "xx.x", "x.xx", "x..x", "x..x"],
   A: [".x.", "x.x", "xxx", "x.x", "x.x"],
@@ -487,12 +822,19 @@ const FONT_SMALL: Record<string, readonly string[]> = {
   I: ["x", "x", "x", "x", "x"],
   T: ["xxx", ".x.", ".x.", ".x.", ".x."],
   E: ["xxx", "x..", "xx.", "x..", "xxx"],
+  M: ["x...x", "xx.xx", "x.x.x", "x...x", "x...x"],
+  ".": [".", ".", ".", ".", "x"],
+  " ": [".", ".", ".", ".", "."],
 };
 const FONT_BIG: Record<string, readonly string[]> = {
   N: ["x...x", "xx..x", "xx..x", "x.x.x", "x..xx", "x..xx", "x...x"],
   E: ["xxxxx", "x....", "x....", "xxxx.", "x....", "x....", "xxxxx"],
   X: ["x...x", "x...x", ".x.x.", "..x..", ".x.x.", "x...x", "x...x"],
   A: [".xxx.", "x...x", "x...x", "xxxxx", "x...x", "x...x", "x...x"],
+  D: ["xxxx.", "x...x", "x...x", "x...x", "x...x", "x...x", "xxxx."],
+  O: [".xxx.", "x...x", "x...x", "x...x", "x...x", "x...x", ".xxx."],
+  L: ["x....", "x....", "x....", "x....", "x....", "x....", "xxxxx"],
+  G: [".xxx.", "x...x", "x....", "x.xxx", "x...x", "x...x", ".xxx."],
 };
 
 /** Draws `text` (each font pixel `zoom` art pixels big) and returns the column after its last pixel. */
@@ -557,6 +899,38 @@ function buildTitle(): { name: PixelArt; word: PixelArt } {
   };
 }
 export const SHOW_TITLE = buildTitle();
+
+/** One line of pixel text, cut to its width; with `shadow` it gets a drop shadow one pixel down and to the right. */
+function pixelText(
+  text: string,
+  font: Record<string, readonly string[]>,
+  zoom: number,
+  char: string,
+  shadow?: string,
+): string[] {
+  const height = (font[text[0] ?? ""]?.length ?? 0) * zoom + (shadow ? 1 : 0);
+  const rows = blank(text.length * 6 * zoom + 2, height, ".");
+  if (shadow) drawText(rows, text, font, 1, 1, shadow, zoom);
+  const end = drawText(rows, text, font, 0, 0, char, zoom) + (shadow ? 1 : 0);
+  return rows.map((row) => row.slice(0, end).join(""));
+}
+
+/**
+ * The closing card of the opener, all 71 wide or less: the show on one line ("NEXA NACHRICHTEN", 69×7), "MIT MR."
+ * (5 rows) and his name in double-size letters with a red drop shadow ("DOODLE" and "DANGLE", 71×15 each).
+ */
+function buildNameCard(): { show: PixelArt; mister: PixelArt; first: PixelArt; last: PixelArt } {
+  const show = blank(69, 7, ".");
+  const x = drawText(show, "NEXA", FONT_BIG, 0, 0, "w");
+  drawText(show, "NACHRICHTEN", FONT_SMALL, x + 3, 2, "y");
+  return {
+    show: { palette: { w: TV.paper, y: TV.gold }, grid: show.map((row) => row.join("")) },
+    mister: { palette: { m: TV.mist }, grid: pixelText("MIT MR.", FONT_SMALL, 1, "m") },
+    first: { palette: { w: TV.paper, r: TV.red }, grid: pixelText("DOODLE", FONT_BIG, 2, "w", "r") },
+    last: { palette: { y: TV.gold, r: TV.red }, grid: pixelText("DANGLE", FONT_BIG, 2, "y", "r") },
+  };
+}
+export const SHOW_NAME = buildNameCard();
 
 /** Monitor over the anchor's shoulder that shows the topic icon (16×16) of the story, 22×22. */
 export const TOPIC_SCREEN: PixelArt = {
@@ -651,6 +1025,132 @@ function buildSnow(seed: number): PixelArt {
   return { palette: { a: "#3a4060", b: "#8088a8", c: "#e6e9f5" }, grid: rows.map((row) => row.join("")) };
 }
 export const SNOW: readonly [PixelArt, PixelArt] = [buildSnow(7), buildSnow(1312)];
+
+// ---------------------------------------------------------------- the opener (a montage about the anchor)
+
+/** Cuts a rectangle out of a piece of art. */
+export function cropArt(art: PixelArt, x: number, y: number, width: number, height: number): PixelArt {
+  return { palette: art.palette, grid: art.grid.slice(y, y + height).map((row) => row.slice(x, x + width)) };
+}
+
+/** Draws `outline` on every filled pixel that touches an empty one (or the edge of the grid). */
+function traceEdge(rows: string[][], outline: string): void {
+  const filled = rows.map((row) => row.map((char) => char !== "."));
+  rows.forEach((row, y) => {
+    row.forEach((_, x) => {
+      if (!filled[y]![x]) return;
+      const open = (dx: number, dy: number) => !(filled[y + dy]?.[x + dx] ?? false);
+      if (open(-1, 0) || open(1, 0) || open(0, -1) || open(0, 1)) row[x] = outline;
+    });
+  });
+}
+
+/** His cape for the hero shot, 36×26, fixed at the left edge and flying to the right; two frames of wind. */
+function buildCape(frame: 0 | 1): PixelArt {
+  const width = 36;
+  const height = 26;
+  const rows = blank(width, height, ".");
+  const phase = frame * Math.PI;
+  for (let x = 0; x < width; x++) {
+    const far = x / width;
+    const top = Math.round(4 + far * 3 + Math.sin(x / 4.5 + phase) * 2.2 * far);
+    const taper = x > width - 6 ? (x - (width - 6)) * 2 : 0;
+    const bottom = Math.round(top + 9 + far * 8 - taper + Math.sin(x / 3.2 + phase + 1) * 1.8 * far);
+    for (let y = Math.max(0, top); y <= Math.min(height - 1, bottom); y++) {
+      // Folds: darker stripes that lean with the wind.
+      rows[y]![x] = (x + Math.floor((y - top) / 2) + frame * 3) % 8 === 5 && y > top + 1 ? "T" : "t";
+    }
+  }
+  traceEdge(rows, "k");
+  return { palette: { k: TV.ink, t: TV.red, T: "#a52d42" }, grid: rows.map((row) => row.join("")) };
+}
+
+/** Coffee that leaves the mug when it hits the desk, 27×12: three frames of drops flying apart. */
+function buildSplash(frame: number): PixelArt {
+  const width = 27;
+  const height = 12;
+  const rows = blank(width, height, ".");
+  for (let i = 0; i < 9; i++) {
+    const angle = (Math.PI * (i + 0.5)) / 9;
+    const reach = 2.5 + frame * 3 + (i % 3);
+    const x = Math.round(width / 2 + Math.cos(angle) * reach * 1.5);
+    const y = Math.round(height - 2 - Math.sin(angle) * reach + frame * frame * 0.6);
+    if (y < 0 || y >= height || x < 0 || x >= width) continue;
+    rows[y]![x] = i % 2 === 0 ? "o" : "p";
+    if (frame < 2 && y + 1 < height) rows[y + 1]![x] = "o";
+  }
+  return { palette: { o: "#6b3a1f", p: "#a8662f" }, grid: rows.map((row) => row.join("")) };
+}
+
+/** Pixel art of the opening montage. The close-ups are meant to be drawn at two or three times the studio scale. */
+export const INTRO_ART = {
+  /** His face from brows to chin, 22×16: before the comb (a sideways look) and after it (bliss). */
+  face: [cropArt(anchorArt({ mood: "smug" }), 9, 6, 22, 16), cropArt(anchorArt({ mood: "proud" }), 9, 6, 22, 16)],
+  comb: {
+    palette: { k: "#3b2408", y: TV.gold, d: "#e09a1f" },
+    grid: [
+      ".kkkkkkkkkkk.",
+      "kyyyyyyyyyyyk",
+      "kdddddddddddk",
+      "kdkdkdkdkdkdk",
+      "kdkdkdkdkdkdk",
+      "kdkdkdkdkdkdk",
+      ".k.k.k.k.k.k.",
+    ],
+  },
+  /**
+   * His hand, pointing straight at the camera, 17×15: the fist with the tip of the index finger in the middle, and
+   * behind it the cuff and the sleeve of the arm it comes out of.
+   */
+  point: {
+    palette: HANDS_PALETTE,
+    grid: [
+      ".........kkkkkk..",
+      "........kjjjjjjk.",
+      ".......kjjjjjjjjk",
+      "....kkkkwwwwjjjjk",
+      "..kkssssskwwwjjjk",
+      ".ksssssssskwwjjk.",
+      "kssdssssdsskwwk..",
+      "ksssskkkssskwk...",
+      "kssskssskssdk....",
+      "kssskswskssdk....",
+      "kssskssskssdk....",
+      "ksssskkksssdk....",
+      "kdsssssssssdk....",
+      ".kddsssssddk.....",
+      "..kkkkkkkkk......",
+    ],
+  },
+  /** The mug without its steam, 9×7, and the hand that brings it down, 14×7. */
+  mug: cropArt(MUG[0], 0, 4, 9, 7),
+  grip: {
+    palette: HANDS_PALETTE,
+    grid: [
+      "kkkkkkkkkkkkkk",
+      "ksssskwwjjjjjj",
+      "kdddskwwjjjjjj",
+      "ksssskwwjjjjjj",
+      "kdddskwwjjjjjj",
+      "ksssskwwjjjjjj",
+      "kkkkkkkkkkkkkk",
+    ],
+  },
+  splash: [buildSplash(0), buildSplash(1), buildSplash(2)],
+  banknote: {
+    palette: { k: "#0f5132", g: "#2fd98c", G: "#1f9d63", w: "#d9ffe9" },
+    grid: [
+      "kkkkkkkkkkkk",
+      "kGggggggggGk",
+      "kggggwwggggk",
+      "kgggwggwgggk",
+      "kggggwwggggk",
+      "kGggggggggGk",
+      "kkkkkkkkkkkk",
+    ],
+  },
+  cape: [buildCape(0), buildCape(1)],
+} as const;
 
 // ---------------------------------------------------------------- the TV set
 
@@ -957,6 +1457,75 @@ const hand: PixelArt = {
   ],
 };
 
+/** A framed pixel portrait: the NFT market. */
+const nftFrame: PixelArt = {
+  palette: { k: OUTLINE, y: "#ffd15c", c: "#62e0ff", p: "#ff8fb1" },
+  grid: [
+    "................",
+    ".kkkkkkkkkkkkkk.",
+    ".kyyyyyyyyyyyyk.",
+    ".kyccccccccccyk.",
+    ".kycckkkkkkccyk.",
+    ".kyckppppppkcyk.",
+    ".kyckpkppkpkcyk.",
+    ".kyckppppppkcyk.",
+    ".kyckpkkkkpkcyk.",
+    ".kyckppppppkcyk.",
+    ".kycckkkkkkccyk.",
+    ".kyccccccccccyk.",
+    ".kyyyyyyyyyyyyk.",
+    ".kkkkkkkkkkkkkk.",
+    "................",
+    "................",
+  ],
+};
+
+/** Two speech bubbles: gossip about a player. */
+const gossip: PixelArt = {
+  palette: { k: OUTLINE, w: "#f4f6fb", p: "#ff8fb1" },
+  grid: [
+    "................",
+    "..kkkkkkkkk.....",
+    ".kwwwwwwwwwk....",
+    ".kwwwwwwwwwk....",
+    ".kwkwwkwwkwk....",
+    ".kwwwwwwwwwk....",
+    ".kwwwwwwwwwk....",
+    "..kkkwkkkkk.....",
+    "....kwk.kkkkkkk.",
+    "....kk.kpppppppk",
+    ".......kppkpkppk",
+    ".......kpppppppk",
+    "........kkkkpkk.",
+    "...........kpk..",
+    "............kk..",
+    "................",
+  ],
+};
+
+/** A thought cloud with a tangle in it: he has lost his thread. */
+const tangle: PixelArt = {
+  palette: { k: OUTLINE, w: "#f4f6fb", y: "#e09a1f" },
+  grid: [
+    "................",
+    "....kkkk.kkk....",
+    "...kwwwwkwwwk...",
+    "..kwwwwwwwwwwk..",
+    ".kwwyywwwwwwwwk.",
+    ".kwywwywwyywwwk.",
+    ".kwwwwywywwywwk.",
+    ".kwwwwwyywwwwwk.",
+    "..kwwwwwwwwwwk..",
+    "...kkwwwwwwkk...",
+    ".....kkkkkk.....",
+    "...kk...........",
+    "..kwwk..........",
+    "...kk...........",
+    ".k..............",
+    "................",
+  ],
+};
+
 /** One icon per kind of story. Unknown kinds fall back to the newspaper from the main set. */
 export const NEWS_KIND_ICONS = {
   intro: mic,
@@ -969,6 +1538,9 @@ export const NEWS_KIND_ICONS = {
   world: globe,
   tasks: clipboard,
   crypto: cryptoCoin,
+  nft: nftFrame,
+  gossip,
+  ramble: tangle,
   outro: hand,
 } as const satisfies Record<string, PixelArt>;
 export type NewsKind = keyof typeof NEWS_KIND_ICONS;
@@ -988,10 +1560,21 @@ export const NEWS_STUDIO_ART: Record<string, PixelArt> = {
   "anchor/happy": anchorArt({ eyes: "happy" }),
   "anchor/wave-left": anchorArt({ eyes: "happy", arm: "waveLeft" }),
   "anchor/wave-right": anchorArt({ eyes: "happy", arm: "waveRight" }),
+  ...Object.fromEntries(
+    ANCHOR_MOODS.filter((mood) => mood !== "neutral").flatMap((mood) => [
+      [`anchor/${mood}`, anchorArt({ mood })],
+      [`anchor/${mood}-talk`, anchorArt({ mood, mouth: "open", frame: 1 })],
+      [`anchor/${mood}-react`, anchorArt({ mood, mouth: "open", react: true, arm: REACTION_ARM[mood] ?? "down" })],
+    ]),
+  ),
+  "anchor/twirl-up": anchorArt({ mood: "smug", arm: "twirlUp" }),
   "hands/rest": HANDS.rest,
   "hands/tap-up": HANDS.tapUp,
   "hands/tap-down": HANDS.tapDown,
   "hands/one": HANDS.one,
+  "hands/fist-up": HANDS.fistUp,
+  "hands/fist-down": HANDS.fistDown,
+  ...Object.fromEntries(Object.entries(MOOD_FX).map(([name, art]) => [`fx/${name}`, art])),
   "backdrop/0": BACKDROP[0],
   "backdrop/1": BACKDROP[1],
   "rig/on": LIGHT_RIG.on,
@@ -1001,6 +1584,22 @@ export const NEWS_STUDIO_ART: Record<string, PixelArt> = {
   "desk-sign/short": DESK_SIGN_SHORT,
   "title/name": SHOW_TITLE.name,
   "title/word": SHOW_TITLE.word,
+  "title/show": SHOW_NAME.show,
+  "title/mister": SHOW_NAME.mister,
+  "title/first": SHOW_NAME.first,
+  "title/last": SHOW_NAME.last,
+  "intro/face-0": INTRO_ART.face[0],
+  "intro/face-1": INTRO_ART.face[1],
+  "intro/comb": INTRO_ART.comb,
+  "intro/point": INTRO_ART.point,
+  "intro/mug": INTRO_ART.mug,
+  "intro/grip": INTRO_ART.grip,
+  "intro/splash-0": INTRO_ART.splash[0],
+  "intro/splash-1": INTRO_ART.splash[1],
+  "intro/splash-2": INTRO_ART.splash[2],
+  "intro/banknote": INTRO_ART.banknote,
+  "intro/cape-0": INTRO_ART.cape[0],
+  "intro/cape-1": INTRO_ART.cape[1],
   "topic-screen": TOPIC_SCREEN,
   "mug/0": MUG[0],
   "mug/1": MUG[1],
