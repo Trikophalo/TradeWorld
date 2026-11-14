@@ -4,18 +4,18 @@
     "tier": null,
     "stage": null,
     "company": {
-      "id": "2fccb1cc-0894-a518-9538-769c751d9630",
+      "id": "833932bd-1586-776d-1f8f-f602682f7437",
       "logo": null,
-      "name": "Memeland Media",
-      "color": "#FF4FD8",
+      "name": "Luftpost Drohnen",
+      "color": "#00B4D8",
       "is_ai": true,
-      "sector": "tech",
-      "ticker": "MEM"
+      "sector": "logistics",
+      "ticker": "DRN"
     },
     "founder": null,
     "team_size": 1,
     "product_key": null,
-    "last_quarter": { "label": "J2 Q1", "profit_cents": 37717816, "revenue_cents": 304653329 },
+    "last_quarter": { "label": "J2 Q1", "profit_cents": -24447143, "revenue_cents": 689671912 },
     "pay_factor_bps": 10000
   }
 }

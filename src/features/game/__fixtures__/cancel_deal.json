@@ -1,5 +1,5 @@
 {
-  "id": "2db675aa-a091-46e1-96a1-bc650601477f",
+  "id": "e78da8aa-7b72-4cb2-bcd7-e1e16f328f20",
   "kind": "loan",
   "terms": { "hours": 24, "interest_bps": 0, "principal_cents": 20000 },
   "status": "cancelled",
@@ -9,15 +9,15 @@
   "my_role": "lender",
   "progress": { "due_cents": 20000, "left_cents": 20000, "repaid_cents": 0 },
   "proposer": {
-    "tag": "WN84",
+    "tag": "PXZ7",
     "level": 6,
     "trust": { "band": "blank", "score": 50 },
     "nickname": "Fixture_Lieferant",
     "avatar_key": "rookie"
   },
-  "closed_at": "2026-11-14T20:24:01.018372+00:00",
-  "created_at": "2026-11-14T20:24:01.013935+00:00",
-  "expires_at": "2026-11-16T20:24:01.013935+00:00",
+  "closed_at": "2026-11-14T20:30:48.717427+00:00",
+  "created_at": "2026-11-14T20:30:48.713978+00:00",
+  "expires_at": "2026-11-16T20:30:48.713978+00:00",
   "accepted_at": null,
   "is_proposer": true,
   "broken_by_me": false,

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { ViewTransition } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Delta } from "@/components/ui/delta";
 import { NumberTicker } from "@/components/ui/number-ticker";
 import { useSecurity } from "@/features/game/store";
@@ -19,6 +20,7 @@ const format = (value: number) => formatPrice(Math.round(value));
  */
 export function SecurityRow({ ticker, shared = true }: { ticker: string; shared?: boolean }) {
   const t = useTranslations("sectors");
+  const tm = useTranslations("markets");
   const security = useSecurity(ticker);
   if (!security) return null;
 
@@ -39,7 +41,14 @@ export function SecurityRow({ ticker, shared = true }: { ticker: string; shared?
         logo
       )}
       <span className="min-w-0 flex-1 transition-transform duration-fast ease-out group-hover:translate-x-1">
-        <span className="block truncate font-medium text-fg-1">{security.name}</span>
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="truncate font-medium text-fg-1">{security.name}</span>
+          {security.companyKind === "player" && (
+            <Badge tone="accent" className="shrink-0" data-testid="player-badge">
+              {tm("playerBadge")}
+            </Badge>
+          )}
+        </span>
         <span className="label-pixel text-fg-3">
           {ticker}
           {security.sector && ` · ${t(security.sector)}`}

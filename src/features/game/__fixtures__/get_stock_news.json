@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Die Kasse ist voll. Aktionäre dürfen auf eine Extra-Ausschüttung hoffen. Sicher ist das nicht.",
-      "name": "GenoVita Biotech",
-      "due_at": "2026-11-14T21:54:20.249579+00:00",
+      "body": "Mehrere Häuser streichen ihre Kaufempfehlung und senken das Kursziel. Sicher ist das nicht.",
+      "name": "Fundgrube Discount",
+      "due_at": "2026-11-14T22:09:06.825753+00:00",
       "status": "open",
-      "ticker": "GNV",
-      "headline": "Sonderdividende bei GenoVita Biotech erwartet",
+      "ticker": "FGD",
+      "headline": "Analysten-Downgrade für Fundgrube Discount",
       "move_bps": null,
       "strength": 1,
-      "direction": "up",
-      "published_at": "2026-11-14T21:24:02.204261+00:00"
+      "direction": "down",
+      "published_at": "2026-11-14T21:30:49.807204+00:00"
     },
     {
       "id": 3,
-      "body": "Das Unternehmen wird für sein neues Produkt ausgezeichnet. Rückenwind für die Aktie erwartet. Sicher ist das nicht.",
-      "name": "Luftpost Drohnen",
-      "due_at": "2026-11-14T20:24:02.199744+00:00",
-      "status": "fizzled",
-      "ticker": "DRN",
-      "headline": "Luftpost Drohnen gewinnt Branchenpreis",
-      "move_bps": null,
+      "body": "Neue Aktien sollen ausgegeben werden. Das verwässert die Anteile, der Kurs dürfte leicht nachgeben. Sicher ist das nicht.",
+      "name": "GenoVita Biotech",
+      "due_at": "2026-11-14T20:30:49.801887+00:00",
+      "status": "confirmed",
+      "ticker": "GNV",
+      "headline": "GenoVita Biotech plant Kapitalerhöhung",
+      "move_bps": -351,
       "strength": 1,
-      "direction": "up",
-      "published_at": "2026-11-14T20:24:02.199744+00:00"
+      "direction": "down",
+      "published_at": "2026-11-14T20:30:49.801887+00:00"
     }
   ],
   "reliability_bps": 7500

@@ -13,7 +13,7 @@ import { SKILL_BRANCHES, type SkillBranch } from "@/config/skills";
 import type { SectorKey } from "@/components/pixel/art";
 import { matchScore, productivityBps } from "@/lib/sim/skills";
 import {
-  aiTakeShare,
+  aiSubscribedE6,
   capacityCents,
   capitalIncreasePriceCents,
   closeStartupHour,
@@ -37,6 +37,7 @@ import {
   type StartupTier,
 } from "@/lib/sim/startup";
 import { formatMoney } from "@/lib/format";
+import { DEMO_COMPANIES } from "@/lib/demo/market";
 import { dissolve, isInsolvent } from "@/lib/sim/insolvency";
 import { hasForbiddenSymbol, isValidBanner, isValidLogo, type CompanyLogoData } from "@/lib/sim/logo";
 import {
@@ -64,6 +65,7 @@ import {
 const { startups, company: companyCfg, jobs } = BALANCE;
 const HOUR_MS = 3_600_000;
 const QUARTER_MS = BALANCE.time.quarterHours * HOUR_MS;
+const SUBSCRIPTION_MS = startups.ipo.subscriptionMinutes * 60_000;
 const berlinDay = (at: number) => new Intl.DateTimeFormat("en-CA", { timeZone: BALANCE.time.timezone }).format(at);
 
 /** One operating hour of the demo company (ADR-072). */
@@ -139,7 +141,15 @@ export interface DemoCompanyState {
     sharesTotal: number;
     founderShares: number;
     lastPriceCents: number | null;
-    offer: { id: string; kind: "ipo" | "capital_increase"; priceCents: number; offered: number; endsAt: number } | null;
+    offer: {
+      id: string;
+      kind: "ipo" | "capital_increase";
+      priceCents: number;
+      offered: number;
+      /** Start of the subscription (older demo offers: derived from the end). */
+      startsAt?: number;
+      endsAt: number;
+    } | null;
   } | null;
   /** Quarter closes in a row with open bills (ADR-058). */
   distressQuarters?: number;
@@ -588,6 +598,15 @@ export function createCompanyEngine(host: CompanyHost) {
     );
   }
 
+  /** AI investors subscribe their share evenly over the window (ADR-146); in the demo they are the only subscribers. */
+  function aiShares(company: DemoCompanyState, at: number, final = false): number {
+    const offer = company.listing!.offer!;
+    const startsAt = offer.startsAt ?? offer.endsAt - SUBSCRIPTION_MS;
+    const window = offer.endsAt - startsAt;
+    const e6 = aiSubscribedE6(offer.offered * 1_000_000, 0, company.quality, final ? window : at - startsAt, window);
+    return Math.floor(e6 / 1_000_000);
+  }
+
   function offerView(company: DemoCompanyState): Offer {
     const offer = company.listing!.offer!;
     return {
@@ -606,8 +625,11 @@ export function createCompanyEngine(host: CompanyHost) {
       priceCents: offer.priceCents,
       sharesOfferedE6: offer.offered * 1_000_000,
       sharesSubscribedE6: 0,
+      sharesAiE6: aiShares(company, Date.now()) * 1_000_000,
+      startsAt: new Date(offer.startsAt ?? offer.endsAt - SUBSCRIPTION_MS).toISOString(),
       endsAt: new Date(offer.endsAt).toISOString(),
       status: "open",
+      mine: true,
       mySharesE6: 0,
       valueCents: valueCents(company),
       lastQuarter: company.reports.at(-1)
@@ -620,12 +642,15 @@ export function createCompanyEngine(host: CompanyHost) {
     };
   }
 
-  /** End of a subscription: AI investors take their share, the rest is not issued (ADR-067). */
+  /**
+   * End of a subscription (ADR-146): full, or the 10 minutes are over. AI investors have their share, the company is
+   * listed with what was subscribed, the rest is not issued.
+   */
   function resolveOffer(company: DemoCompanyState) {
     const listing = company.listing;
     const offer = listing?.offer;
     if (!listing || !offer) return;
-    const sold = Math.floor(offer.offered * aiTakeShare(company.quality));
+    const sold = aiShares(company, offer.endsAt, true);
     company.cashCents += sold * offer.priceCents;
     if (offer.kind === "ipo") {
       listing.sharesTotal = listing.founderShares + sold;
@@ -643,9 +668,15 @@ export function createCompanyEngine(host: CompanyHost) {
     host.persist();
   }
 
+  /** Three letters from the name, not one of the demo market's tickers (the stock joins that list, ADR-145). */
   function tickerFor(name: string): string {
-    const letters = name.toUpperCase().replace(/[^A-Z]/g, "");
-    return (letters.slice(0, 3) || "NEX").padEnd(3, "X");
+    const letters = (name.toUpperCase().replace(/[^A-Z]/g, "") || "NEX").padEnd(4, "X");
+    const taken = new Set(DEMO_COMPANIES.map((c) => c.ticker));
+    for (let i = 2; i < letters.length; i++) {
+      const candidate = letters.slice(0, 2) + letters[i];
+      if (!taken.has(candidate)) return candidate;
+    }
+    return letters.slice(0, 4);
   }
 
   function view(company: DemoCompanyState): MyCompany {
@@ -1154,10 +1185,14 @@ export function createCompanyEngine(host: CompanyHost) {
             kind: "ipo",
             priceCents: issuePriceCents(BigInt(valueCents(company))),
             offered,
-            endsAt: Date.now() + startups.ipo.subscriptionHours * 3_600_000,
+            startsAt: Date.now(),
+            endsAt: Date.now() + SUBSCRIPTION_MS,
           },
         };
-        system(company, `Börsengang gestartet: ${pct} % der Firma werden 12 Stunden lang gezeichnet.`);
+        system(
+          company,
+          `Börsengang gestartet: ${pct} % der Firma werden höchstens ${startups.ipo.subscriptionMinutes} Minuten lang gezeichnet.`,
+        );
       }),
 
     capitalIncrease: (requestId, sharePercent) =>
@@ -1171,7 +1206,8 @@ export function createCompanyEngine(host: CompanyHost) {
           kind: "capital_increase",
           priceCents: capitalIncreasePriceCents(listing.lastPriceCents ?? startups.ipo.minIssuePriceCents),
           offered: Math.floor((listing.sharesTotal * pct) / 100),
-          endsAt: Date.now() + startups.ipo.subscriptionHours * 3_600_000,
+          startsAt: Date.now(),
+          endsAt: Date.now() + SUBSCRIPTION_MS,
         };
       }),
 
@@ -1204,5 +1240,33 @@ export function createCompanyEngine(host: CompanyHost) {
       return company ? valueCents(company) : 0;
     },
     fixedCostCents,
+    /** The listed own company as a stock of the demo market (ADR-145), or null. */
+    listedStock: (): DemoListedStock | null => {
+      const company = host.company();
+      const listing = company?.listing;
+      if (!company || listing?.status !== "listed") return null;
+      const priceCents = listing.lastPriceCents ?? startups.ipo.minIssuePriceCents;
+      return {
+        companyId: company.id,
+        ticker: listing.ticker,
+        name: company.name,
+        sector: company.sector,
+        color: company.color,
+        logo: company.logo ?? null,
+        priceE4: priceCents * 100,
+        marketCapCents: listing.sharesTotal * priceCents,
+      };
+    },
   };
+}
+
+export interface DemoListedStock {
+  companyId: string;
+  ticker: string;
+  name: string;
+  sector: SectorKey;
+  color: string;
+  logo: CompanyLogoData | null;
+  priceE4: number;
+  marketCapCents: number;
 }

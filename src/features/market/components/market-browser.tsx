@@ -3,9 +3,10 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
-import { COIN, SECTOR_ICONS, type SectorKey } from "@/components/pixel/art";
+import { BULL, COIN, SECTOR_ICONS, type SectorKey } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { LockBadge } from "@/components/ui/lock-badge";
 import { Segmented } from "@/components/ui/segmented";
 import { useSecurities } from "@/features/game/hooks";
@@ -13,6 +14,7 @@ import { usePlayerLevel } from "@/features/game/store";
 import { LockedFeature } from "@/features/progression/components/locked-feature";
 import { emitTutorial } from "@/features/tutorial/store";
 import { SPRING } from "@/lib/motion";
+import { comparePopularity } from "@/lib/sim/popularity";
 import { isUnlocked, unlockLevel } from "@/lib/sim/progression";
 import { cn } from "@/lib/utils";
 import { BondList } from "./bond-list";
@@ -21,7 +23,8 @@ import { SecurityRow, SecurityRowSkeleton } from "./security-row";
 
 type AssetTab = "stocks" | "bonds" | "indices";
 type SectorFilter = SectorKey | "all";
-type SortKey = "name" | "movers";
+/** "players" keeps the popularity order and shows player companies only (ADR-145). */
+type SortKey = "popular" | "name" | "movers" | "players";
 
 const SECTORS = Object.keys(SECTOR_ICONS) as SectorKey[];
 const BOND_LEVEL = unlockLevel("bonds") ?? 1;
@@ -32,17 +35,20 @@ export function MarketBrowser() {
   const level = usePlayerLevel();
   const [tab, setTab] = useState<AssetTab>("stocks");
   const [sector, setSector] = useState<SectorFilter>("all");
-  const [sort, setSort] = useState<SortKey>("name");
+  const [sort, setSort] = useState<SortKey>("popular");
   const stocks = useSecurities("stock");
   const bondsUnlocked = isUnlocked("bonds", level);
 
   const tickers = useMemo(() => {
     if (!stocks) return null;
-    const list = sector === "all" ? stocks : stocks.filter((s) => s.sector === sector);
+    const bySector = sector === "all" ? stocks : stocks.filter((s) => s.sector === sector);
+    const list = sort === "players" ? bySector.filter((s) => s.companyKind === "player") : bySector;
     const sorted =
       sort === "movers"
         ? [...list].sort((a, b) => Math.abs(b.changeBps) - Math.abs(a.changeBps))
-        : [...list].sort((a, b) => a.name.localeCompare(b.name, "de"));
+        : sort === "name"
+          ? [...list].sort((a, b) => a.name.localeCompare(b.name, "de"))
+          : [...list].sort(comparePopularity);
     return sorted.map((s) => s.ticker);
   }, [stocks, sector, sort]);
 
@@ -100,19 +106,29 @@ export function MarketBrowser() {
           </div>
 
           <Card padding="lg">
-            <div className="mb-1 flex items-center justify-between gap-3">
+            <div className="mb-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
               <p className="label-pixel text-fg-3">{t("count", { count: tickers?.length ?? 0 })}</p>
               <Segmented
                 value={sort}
                 onValueChange={setSort}
                 label={t("sort")}
                 size="sm"
+                className="max-sm:w-full"
                 options={[
+                  { value: "popular", label: t("sortPopular") },
                   { value: "name", label: t("sortName") },
                   { value: "movers", label: t("sortMovers") },
+                  { value: "players", label: t("sortPlayers") },
                 ]}
               />
             </div>
+            {tickers?.length === 0 && (
+              <EmptyState
+                art={<PixelIcon {...BULL} scale={3} />}
+                title={sort === "players" ? t("playersEmptyTitle") : t("emptyTitle")}
+                description={sort === "players" ? t("playersEmptyText") : t("emptyText")}
+              />
+            )}
             <ul className="lg:grid lg:grid-cols-2 lg:gap-x-10">
               {tickers === null &&
                 Array.from({ length: 8 }, (_, i) => (

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BALANCE } from "../../config/balance.ts";
 import { floodFill, hasForbiddenSymbol, isValidBanner, isValidLogo, logoArt } from "./logo.ts";
 import {
+  aiSubscribedE6,
   aiTakeShare,
   capitalIncreasePriceCents,
   founderFactor,
@@ -52,6 +53,17 @@ describe("founder with a job and company growth (ADR-066, ADR-067)", () => {
     expect(capitalIncreasePriceCents(1_000)).toBe(900);
     expect(aiTakeShare(0)).toBeCloseTo(0.2);
     expect(aiTakeShare(1)).toBeCloseTo(0.7);
+  });
+
+  it("lets AI investors subscribe evenly over the 10-minute window (ADR-146)", () => {
+    const window = BALANCE.startups.ipo.subscriptionMinutes * 60_000;
+    const offered = 100_000_000_000;
+    expect(aiSubscribedE6(offered, 0, 0, 0, window)).toBe(0);
+    expect(aiSubscribedE6(offered, 0, 0, window / 2, window)).toBe(10_000_000_000);
+    expect(aiSubscribedE6(offered, 0, 0, window * 2, window)).toBe(20_000_000_000);
+    // never more than players left free
+    expect(aiSubscribedE6(offered, 95_000_000_000, 0, window, window)).toBe(5_000_000_000);
+    expect(aiSubscribedE6(offered, offered, 1, window, window)).toBe(0);
   });
 });
 

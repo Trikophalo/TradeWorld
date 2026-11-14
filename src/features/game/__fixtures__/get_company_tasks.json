@@ -7,12 +7,12 @@
       "game": "pick",
       "mine": true,
       "branch": "logistics",
-      "due_at": "2026-11-14T21:04:02.704992+00:00",
+      "due_at": "2026-11-14T21:10:50.374068+00:00",
       "status": "assigned",
       "assignee": "Fx_Taskmid",
       "opened_at": null,
       "ai_done_at": null,
-      "created_at": "2026-11-14T20:24:02.704992+00:00",
+      "created_at": "2026-11-14T20:30:50.374068+00:00",
       "assigned_by": "Fx_Taskboss",
       "assignee_ai": false,
       "value_cents": 44000,
@@ -24,12 +24,12 @@
       "game": "seq",
       "mine": false,
       "branch": "sales",
-      "due_at": "2026-11-14T21:04:02.704992+00:00",
+      "due_at": "2026-11-14T21:10:50.374068+00:00",
       "status": "ai",
       "assignee": null,
       "opened_at": null,
-      "ai_done_at": "2026-11-14T20:36:02.722194+00:00",
-      "created_at": "2026-11-14T20:24:02.704992+00:00",
+      "ai_done_at": "2026-11-14T20:42:50.39101+00:00",
+      "created_at": "2026-11-14T20:30:50.374068+00:00",
       "assigned_by": "Fx_Taskboss",
       "assignee_ai": true,
       "value_cents": 36000,
@@ -38,7 +38,7 @@
   ],
   "people": [
     {
-      "tag": "KZ4T",
+      "tag": "2N45",
       "tier": "senior",
       "is_me": true,
       "nickname": "Fx_Taskmid",
@@ -47,7 +47,7 @@
       "reports_to_me": false
     },
     {
-      "tag": "WZS2",
+      "tag": "8F3Y",
       "tier": "intern",
       "is_me": false,
       "nickname": "Fx_Tasknew",
@@ -58,7 +58,7 @@
   ],
   "auto_ai": false,
   "company": {
-    "id": "f3d0e228-3903-4602-8b34-b0509a5bf18c",
+    "id": "ecb27930-219d-4243-885e-128d42159365",
     "name": "Fixture Mode",
     "tier": "garage",
     "product": "fashion"
@@ -71,7 +71,7 @@
       "status": "success",
       "done_by": "Fx_Taskboss",
       "score_bps": 10000,
-      "resolved_at": "2026-11-14T20:24:02.739949+00:00",
+      "resolved_at": "2026-11-14T20:30:50.406117+00:00",
       "result_cents": 44000
     }
   ],

@@ -207,6 +207,23 @@ export function aiTakeShare(quality: number, cfg: StartupsConfig = BALANCE.start
   return Math.min(1, Math.max(0, cfg.ipo.aiTakeBase + cfg.ipo.aiTakePerQuality * quality));
 }
 
+/**
+ * Shares (e6) AI investors have subscribed after `elapsedMs` of a window of `windowMs` (ADR-146): their share of the
+ * offer, spread evenly over the window, never more than players left free.
+ */
+export function aiSubscribedE6(
+  offeredE6: number,
+  playersE6: number,
+  quality: number,
+  elapsedMs: number,
+  windowMs: number,
+  cfg: StartupsConfig = BALANCE.startups,
+): number {
+  const target = Math.floor(offeredE6 * aiTakeShare(quality, cfg));
+  const fraction = windowMs <= 0 ? 1 : Math.min(1, Math.max(0, elapsedMs / windowMs));
+  return Math.max(0, Math.min(Math.floor(target * fraction), offeredE6 - playersE6));
+}
+
 /** Price of new shares in a capital increase (cents per share). */
 export function capitalIncreasePriceCents(marketPriceCents: number, cfg: StartupsConfig = BALANCE.startups): number {
   return Math.max(cfg.ipo.minIssuePriceCents, Math.round(marketPriceCents * cfg.ipo.capitalIncreaseDiscount));

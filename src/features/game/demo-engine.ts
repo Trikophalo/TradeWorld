@@ -7,11 +7,12 @@ import {
   quantityE6ForProceeds,
   valueCents,
 } from "@/features/market/order-schema";
-import { DEMO_COMPANIES, DEMO_INDEX } from "@/lib/demo/market";
+import { DEMO_COMPANIES, DEMO_INDEX, type DemoCompany } from "@/lib/demo/market";
 import { bondPriceE4, bondYieldBps } from "@/lib/sim/bonds";
 import { withholdIncome } from "@/lib/sim/insolvency";
 import { anchoredFairValue, playerImpactReturn } from "@/lib/sim/player-influence";
 import { needsFullTimeFounder } from "@/lib/sim/startup";
+import { popularityScore, viewCounts } from "@/lib/sim/popularity";
 import {
   basicIncomeCentsPerHour,
   bonusCents,
@@ -44,7 +45,7 @@ import { createCompanyEventsEngine } from "./demo/company-events";
 import { createCryptoEngine, type DemoCryptoState } from "./demo/crypto";
 import { createDealEngine, initialDeals, type DemoDealsState } from "./demo/deals";
 import { tagFromUniform } from "@/lib/player-tag";
-import { createCompanyEngine, type DemoCompanyState, type DemoDissolution } from "./demo/company";
+import { createCompanyEngine, type DemoCompanyState, type DemoDissolution, type DemoListedStock } from "./demo/company";
 import { demoTycoons } from "./demo/tycoons";
 import {
   GameError,
@@ -134,6 +135,9 @@ interface PlayerState {
   /** Lifetime counters for missions. */
   counters: Partial<Record<Metric, number>>;
   viewedToday: string[];
+  /** Popularity (ADR-145): last counted view per ticker (ms) and counted views per "day:ticker". */
+  viewMarks?: Record<string, number>;
+  viewDays?: Record<string, number>;
   missions: PlayerMission[];
   missionSeq: number;
   checkInDay: string | null;
@@ -334,8 +338,56 @@ export function demoSession(now = new Date()): Session {
   return hour >= time.marketOpenHour && hour < time.marketCloseHour ? "regular" : "after_hours";
 }
 
+/** The own company once it is listed (set after the company part exists, ADR-145). */
+let listedStockRef: (() => DemoListedStock | null) | null = null;
+
+function ownStock(): DemoListedStock | null {
+  const own = listedStockRef?.() ?? null;
+  if (own && !m().mids.has(own.ticker)) {
+    const st = m();
+    for (const map of [st.mids, st.prevClose, st.dayHigh, st.dayLow]) map.set(own.ticker, own.priceE4);
+  }
+  return own;
+}
+
+/** The AI stocks plus the own listed company: one list, as on the server (ADR-145). */
+function stocks(): readonly DemoCompany[] {
+  const own = ownStock();
+  if (!own) return DEMO_COMPANIES;
+  return [
+    ...DEMO_COMPANIES,
+    {
+      ticker: own.ticker,
+      name: own.name,
+      sector: own.sector,
+      tier: "penny",
+      priceE4: own.priceE4,
+      changeBps: 0,
+      marketCapCents: own.marketCapCents,
+      color: own.color,
+    },
+  ];
+}
+
+/** Views and own buys of the last days (ADR-145); the own company's stock never counts for its founder. */
+function popularityOf(ticker: string): number {
+  if (ownStock()?.ticker === ticker) return 0;
+  const { windowDays } = BALANCE.marketPopularity;
+  const days = new Set(Array.from({ length: windowDays }, (_, i) => berlinDay(Date.now() - i * DAY)));
+  const views = Object.entries(p().viewDays ?? {})
+    .filter(([key]) => key.endsWith(`:${ticker}`) && days.has(key.slice(0, key.indexOf(":"))))
+    .reduce((sum, [, n]) => sum + n, 0);
+  const since = Date.now() - windowDays * DAY;
+  const bought = p().trades.filter((t) => t.ticker === ticker && t.side === "buy" && Date.parse(t.executedAt) > since);
+  return popularityScore(
+    views,
+    bought.length > 0 ? 1 : 0,
+    bought.reduce((sum, t) => sum + t.grossCents, 0),
+  );
+}
+
 function meta(ticker: string) {
-  const company = DEMO_COMPANIES.find((c) => c.ticker === ticker);
+  const company = stocks().find((c) => c.ticker === ticker);
   if (company) return { kind: "stock" as const, company, bond: null };
   const bond = BONDS.find((b) => b.ticker === ticker);
   if (bond) return { kind: "bond" as const, company: null, bond };
@@ -449,6 +501,7 @@ const delay = <T>(value: () => T) =>
 function securityOf(ticker: string): Security {
   const st = m();
   const info = meta(ticker);
+  const own = ownStock()?.ticker === ticker ? ownStock() : null;
   const q = quote(ticker);
   const prev = st.prevClose.get(ticker)!;
   return {
@@ -476,9 +529,11 @@ function securityOf(ticker: string): Security {
           faceValueCents: BALANCE.bonds.faceValueCents,
         }
       : null,
-    companyKind: "ai",
-    logo: null,
-    companyId: info.company ? `demo-company-${ticker}` : null,
+    companyKind: own ? "player" : "ai",
+    logo: own?.logo ?? null,
+    // The demo has no profile page for the own company; its stock links to the company tab instead.
+    companyId: info.company && !own ? `demo-company-${ticker}` : null,
+    popularity: info.company ? popularityOf(ticker) : 0,
   };
 }
 
@@ -498,7 +553,7 @@ function snapshotNow(): MarketSnapshot {
       prevCloseE4: prevIndex,
       changeBps: Math.round((st.indexValueE4 / prevIndex - 1) * 10_000),
     },
-    securities: [...DEMO_COMPANIES.map((c) => securityOf(c.ticker)), ...BONDS.map((b) => securityOf(b.ticker))],
+    securities: [...stocks().map((c) => securityOf(c.ticker)), ...BONDS.map((b) => securityOf(b.ticker))],
     economy: null,
   };
 }
@@ -512,7 +567,8 @@ export function demoTick(): void {
   st.tickSeq += 1;
   let indexMove = 0;
   const held = holdings();
-  for (const c of DEMO_COMPANIES) {
+  const own = ownStock()?.ticker;
+  for (const c of stocks()) {
     const mid = st.mids.get(c.ticker)!;
     const vol = { bluechip: 9, midcap: 20, penny: 60 }[c.tier];
     const noise = (Math.random() + Math.random() + Math.random() - 1.5) * vol;
@@ -526,7 +582,8 @@ export function demoTick(): void {
     st.mids.set(c.ticker, next);
     st.dayHigh.set(c.ticker, Math.max(st.dayHigh.get(c.ticker)!, next));
     st.dayLow.set(c.ticker, Math.min(st.dayLow.get(c.ticker)!, next));
-    indexMove += (moveBps * c.marketCapCents) / 1e14;
+    // The NEXA 30 holds the AI companies only.
+    if (c.ticker !== own) indexMove += (moveBps * c.marketCapCents) / 1e14;
   }
   st.indexValueE4 = Math.round(st.indexValueE4 * (1 + indexMove / 10_000));
   if (p().orders.length > 0) {
@@ -689,7 +746,7 @@ const INTERVAL_SECONDS: Record<CandleInterval, number> = {
 function demoCandles(ticker: string, interval: CandleInterval, limit: number): Candle[] {
   const isIndex = ticker === "NEXA30";
   const last = isIndex ? m().indexValueE4 : quote(ticker).mid;
-  const company = DEMO_COMPANIES.find((c) => c.ticker === ticker);
+  const company = stocks().find((c) => c.ticker === ticker);
   const baseVol = isIndex ? 0.6 : company ? { bluechip: 1, midcap: 2, penny: 6 }[company.tier] : 0.05;
   const step = INTERVAL_SECONDS[interval];
   const volPerBar = (baseVol / 100) * Math.sqrt(step / 3600);
@@ -810,7 +867,7 @@ function netWorth(): number {
 function sectorsHeld(): number {
   const sectors = new Set<string>();
   for (const [ticker] of holdings()) {
-    const company = DEMO_COMPANIES.find((c) => c.ticker === ticker);
+    const company = stocks().find((c) => c.ticker === ticker);
     if (company) sectors.add(company.sector);
   }
   return sectors.size;
@@ -1144,6 +1201,7 @@ const company = createCompanyEngine({
   },
   startFounderNotice: () => career.startNotice(),
 });
+listedStockRef = company.listedStock;
 
 const companyEvents = createCompanyEventsEngine({
   company: () => p().company ?? null,
@@ -1262,7 +1320,7 @@ const crypto = createCryptoEngine({
   itScore: () => career.branchScores().it ?? 0,
   feeDiscountBps: () => upgradeEffects(p().upgrades ?? {}).cryptoFeeDiscountBps,
   profane: (name) => nameViolation(name.replace(/[^A-Za-z0-9]/g, "")) === "name_profanity",
-  takenTickers: () => [...DEMO_COMPANIES.map((c) => c.ticker), ...BONDS.map((b) => b.ticker), "NEXA30"],
+  takenTickers: () => [...stocks().map((c) => c.ticker), ...BONDS.map((b) => b.ticker), "NEXA30"],
   rugPull: () => deals.rugPull(),
   feed: (kind, payload) => feedPost(kind, payload),
   idempotent,
@@ -1472,7 +1530,7 @@ export const demoEngine: GameEngine = {
           ticker: pos.ticker,
           name: pos.name,
           kind: pos.kind,
-          sector: DEMO_COMPANIES.find((c) => c.ticker === pos.ticker)?.sector ?? null,
+          sector: stocks().find((c) => c.ticker === pos.ticker)?.sector ?? null,
           quantityE6: pos.quantityE6,
           valueCents: pos.marketValueCents,
           shareBps: total > 0 ? Math.round((pos.marketValueCents * 10_000) / total) : 0,
@@ -1490,6 +1548,33 @@ export const demoEngine: GameEngine = {
   ...social.engine,
   ...companyEvents.engine,
   snapshot: () => Promise.resolve(snapshotNow()),
+
+  // Popularity (ADR-145): once per stock within the cooldown, at most maxViewsPerDay a day, never the own stock.
+  recordView: (_requestId, ticker) => {
+    const pl = p();
+    const now = Date.now();
+    const symbol = ticker.toUpperCase();
+    const isStock = stocks().some((c) => c.ticker === symbol);
+    if (!isStock || ownStock()?.ticker === symbol) return Promise.resolve(false);
+    const marks = (pl.viewMarks ??= {});
+    if (!viewCounts(marks[symbol] ?? null, now)) return Promise.resolve(false);
+    marks[symbol] = now;
+    const today = berlinDay(now);
+    const keep = new Set(
+      Array.from({ length: BALANCE.marketPopularity.windowDays }, (_, i) => berlinDay(now - i * DAY)),
+    );
+    const viewDays = Object.fromEntries(
+      Object.entries(pl.viewDays ?? {}).filter(([key]) => keep.has(key.slice(0, key.indexOf(":")))),
+    );
+    const countedToday = Object.entries(viewDays)
+      .filter(([key]) => key.startsWith(`${today}:`))
+      .reduce((sum, [, n]) => sum + n, 0);
+    if (countedToday >= BALANCE.marketPopularity.maxViewsPerDay) return Promise.resolve(false);
+    viewDays[`${today}:${symbol}`] = (viewDays[`${today}:${symbol}`] ?? 0) + 1;
+    pl.viewDays = viewDays;
+    persist();
+    return Promise.resolve(true);
+  },
 
   candles: (ticker, interval, limit) =>
     Promise.resolve(

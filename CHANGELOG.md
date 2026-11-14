@@ -113,6 +113,15 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Börsengang in 10 Minuten (ADR-146):** Die Zeichnung dauert höchstens 10 Minuten statt 12 Stunden. Sind alle
+  Aktien gezeichnet, ist die Firma sofort an der Börse; sonst nach Ablauf mit dem, was gezeichnet wurde. Ein Balken
+  zeigt, wie viel schon gezeichnet ist, ein Countdown die Restzeit. KI-Investoren zeichnen über die Zeit mit. Zeichnen
+  geht mit einem Tipp: 100 €, 1.000 €, 10.000 € oder gleich den ganzen Rest.
+- **Spielerfirmen am Aktienmarkt (ADR-145):** Börsennotierte Firmen von Spielern stehen in derselben Liste wie die
+  KI-Aktien, mit dem Schild „Spieler“. Neue Sortierung „Beliebt“ (Standard): Aktien, die oft angesehen werden und in
+  die viele investieren, stehen weiter oben. Mit „Spieler“ siehst du nur Spielerfirmen; „A–Z“ und „Bewegung“ gibt es
+  weiter.
+
 - **Ruhige Startseite (ADR-109):** Finn begrüßt, groß das Vermögen, genau eine nächste Aufgabe, der Tresor und drei
   Kacheln. Feed, Liga, Index und Termine stehen auf ihren eigenen Seiten.
 - **Währung zur Wahl (ADR-113):** Das Spiel zeigt Euro. Unter Profil → Einstellungen kannst du stattdessen Dollar

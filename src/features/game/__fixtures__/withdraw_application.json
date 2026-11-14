@@ -1,27 +1,27 @@
 {
-  "id": "8b9463eb-de46-467b-a438-7f309e7e5764",
+  "id": "49dac798-aa8d-4d2a-beca-c38e678ec3c4",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "073da723-51c7-439f-9861-f4b71049a1e0",
+    "id": "000cf0c5-8a21-4699-8246-2bcdf9a211f1",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "7ab1711b-b618-dcac-f2aa-97b46add6779",
+      "id": "1188056d-8ee9-0848-9146-e3115adc3792",
       "logo": null,
-      "name": "Nordbrise Offshore",
-      "color": "#6EC1E4",
+      "name": "Sonnenkern Fusion",
+      "color": "#FF5E5B",
       "is_ai": true,
       "sector": "energy",
-      "ticker": "WND"
+      "ticker": "FSN"
     },
-    "required": [{ "branch": "craft", "min_score": 0 }],
-    "title_key": "craft_intern",
+    "required": [{ "branch": "management", "min_score": 0 }],
+    "title_key": "management_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-14T20:23:57.332161+00:00",
-  "updated_at": "2026-11-14T20:23:57.337755+00:00",
-  "offer_expires_at": "2026-11-16T20:23:57.332161+00:00",
+  "created_at": "2026-11-14T20:30:45.685054+00:00",
+  "updated_at": "2026-11-14T20:30:45.688756+00:00",
+  "offer_expires_at": "2026-11-16T20:30:45.685054+00:00",
   "salary_wish_cents_per_hour": 15000,
   "offer_salary_cents_per_hour": 15000
 }
