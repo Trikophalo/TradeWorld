@@ -1,4 +1,5 @@
 import { COMPANY_EVENTS, type CompanyEventsConfig } from "./company-events.ts";
+import { COMPANY_MOVE_RULES, COMPANY_MOVES, type CompanyMoveConfig } from "./company-moves.ts";
 import { CRYPTO, type CryptoConfig } from "./crypto.ts";
 import { DEALS, TRUST, type DealsConfig, type TrustConfig } from "./deals.ts";
 import { SKILL_NODES, type SkillBranch, type SkillNodeConfig } from "./skills.ts";
@@ -817,6 +818,8 @@ export interface BalanceConfig {
   /** Cryptocurrencies and own coins (ADR-101), values in crypto.ts. */
   readonly crypto: CryptoConfig;
   readonly stockNews: StockNewsConfig;
+  /** Business moves of player companies (ADR-127), values in company-moves.ts. */
+  readonly companyMoves: typeof COMPANY_MOVE_RULES & { readonly moves: readonly CompanyMoveConfig[] };
 }
 
 export type PropertyTier = "flat" | "apartment" | "house" | "villa" | "luxury_villa";
@@ -2284,6 +2287,7 @@ export const BALANCE = {
   deals: DEALS,
   trust: TRUST,
   crypto: CRYPTO,
+  companyMoves: { ...COMPANY_MOVE_RULES, moves: COMPANY_MOVES },
   stockNews: {
     everyMinutes: 12,
     leadMinMinutes: 10,

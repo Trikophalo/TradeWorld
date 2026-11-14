@@ -17,6 +17,7 @@ import {
   type OrderResult,
   type Portfolio,
   type SecurityDetails,
+  type CompanyMoves,
 } from "./types";
 
 /*
@@ -271,6 +272,90 @@ const checkInSchema = z.object({
 });
 
 /** Response schemas per RPC, exported for the contract test against real database output. */
+const companyMovesSchema = z.object({
+  slots: z.number(),
+  used: z.number(),
+  cash_cents: z.number(),
+  tier: z.string(),
+  product: z.string().nullable(),
+  moves: z.array(
+    z.object({
+      key: z.string(),
+      kind: z.enum(["cash", "awareness", "quality"]),
+      risk: z.enum(["safe", "normal", "risky"]),
+      branch: z.string(),
+      minutes: z.number(),
+      cost_cents: z.number(),
+      chance_bps: z.number(),
+      skill_bonus_bps: z.number(),
+      payout_cents: z.number(),
+      refund_cents: z.number(),
+      gain: z.number(),
+      available_at: z.string().nullable(),
+    }),
+  ),
+  running: z.array(
+    z.object({
+      id: z.number(),
+      key: z.string(),
+      started_at: z.string(),
+      ends_at: z.string(),
+      cost_cents: z.number(),
+      chance_bps: z.number(),
+    }),
+  ),
+  history: z.array(
+    z.object({
+      id: z.number(),
+      key: z.string(),
+      status: z.enum(["success", "failure"]),
+      cost_cents: z.number(),
+      payout_cents: z.number(),
+      gain: z.number(),
+      resolved_at: z.string(),
+    }),
+  ),
+});
+
+const toMoves = (r: z.infer<typeof companyMovesSchema>): CompanyMoves => ({
+  slots: r.slots,
+  used: r.used,
+  cashCents: r.cash_cents,
+  tier: r.tier,
+  product: r.product,
+  moves: r.moves.map((m) => ({
+    key: m.key,
+    kind: m.kind,
+    risk: m.risk,
+    branch: m.branch,
+    minutes: m.minutes,
+    costCents: m.cost_cents,
+    chanceBps: m.chance_bps,
+    skillBonusBps: m.skill_bonus_bps,
+    payoutCents: m.payout_cents,
+    refundCents: m.refund_cents,
+    gain: m.gain,
+    availableAt: m.available_at,
+  })),
+  running: r.running.map((m) => ({
+    id: m.id,
+    key: m.key,
+    startedAt: m.started_at,
+    endsAt: m.ends_at,
+    costCents: m.cost_cents,
+    chanceBps: m.chance_bps,
+  })),
+  history: r.history.map((h) => ({
+    id: h.id,
+    key: h.key,
+    status: h.status,
+    costCents: h.cost_cents,
+    payoutCents: h.payout_cents,
+    gain: h.gain,
+    resolvedAt: h.resolved_at,
+  })),
+});
+
 const companyProfileSchema = z.object({
   company: z.object({
     id: z.string(),
@@ -381,6 +466,8 @@ export const RPC_SCHEMAS = {
   get_player_holdings: holdingsSchema,
   get_my_net_worth_history: netWorthHistorySchema,
   get_company_profile: companyProfileSchema,
+  get_company_moves: companyMovesSchema,
+  start_company_move: companyMovesSchema,
   ...FRIEND_RPC_SCHEMAS,
   ...SOCIAL_RPC_SCHEMAS,
   ...COMPANY_EVENT_RPC_SCHEMAS,
@@ -394,6 +481,12 @@ export const liveEngine: GameEngine = {
   ...liveArtEngine,
   ...livePropertyEngine,
   ...liveFriendEngine,
+  async companyMoves() {
+    return toMoves(await rpc("get_company_moves", {}, companyMovesSchema));
+  },
+  async startCompanyMove(requestId, key) {
+    return toMoves(await rpc("start_company_move", { p_request_id: requestId, p_key: key }, companyMovesSchema));
+  },
   async companyProfile(companyId) {
     const r = await rpc("get_company_profile", { p_company_id: companyId }, companyProfileSchema);
     const c = r.company;

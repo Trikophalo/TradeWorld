@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { useCompanyRefresh } from "../hooks";
 import { CompanyChat } from "./company-chat";
 import { HireSheet, TeamView, type HireRequest } from "./employer";
+import { CompanyMovesCard } from "./company-moves";
 import { GrowthPath } from "./growth-path";
 import { HeadquartersHero, netProfit } from "./headquarters";
 import { ListingCard, SideJobNotice } from "./listing";
@@ -116,6 +117,7 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
                 document.getElementById("campaign")?.scrollIntoView({ behavior: "smooth", block: "center" })
               }
             />
+            <CompanyMovesCard />
             <SituationCard />
             <ProfitCoach
               company={company}

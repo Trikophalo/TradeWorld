@@ -1066,6 +1066,42 @@ export interface PlayerSearchResult {
   avatarKey: string;
 }
 
+/** Business moves of the own company (ADR-127). */
+export interface CompanyMoveOption {
+  key: string;
+  kind: "cash" | "awareness" | "quality";
+  risk: "safe" | "normal" | "risky";
+  branch: string;
+  minutes: number;
+  costCents: number;
+  chanceBps: number;
+  skillBonusBps: number;
+  payoutCents: number;
+  refundCents: number;
+  gain: number;
+  /** While the move rests after the last run. */
+  availableAt: string | null;
+}
+
+export interface CompanyMoves {
+  slots: number;
+  used: number;
+  cashCents: number;
+  tier: string;
+  product: string | null;
+  moves: CompanyMoveOption[];
+  running: { id: number; key: string; startedAt: string; endsAt: string; costCents: number; chanceBps: number }[];
+  history: {
+    id: number;
+    key: string;
+    status: "success" | "failure";
+    costCents: number;
+    payoutCents: number;
+    gain: number;
+    resolvedAt: string;
+  }[];
+}
+
 /** The public profile of any company (ADR-125). */
 export interface CompanyProfile {
   company: {
@@ -1587,6 +1623,9 @@ export const GAME_ERROR_KEYS = [
   "coin_tech_too_low",
   "slippage_exceeded",
   "coin_not_launched",
+  "move_unknown",
+  "move_busy",
+  "move_resting",
   "friend_code_unknown",
   "friend_code_self",
   "friend_code_used",
@@ -1748,6 +1787,9 @@ export interface GameEngine {
   removeFriend(requestId: string, nickname: string): Promise<Friends>;
   /** Stock news with a lead (ADR-119). */
   stockNews(limit?: number): Promise<StockNews>;
+  /** Business moves of the own company (ADR-127). */
+  companyMoves(): Promise<CompanyMoves>;
+  startCompanyMove(requestId: string, key: string): Promise<CompanyMoves>;
   /** Public profile of any company (ADR-125). */
   companyProfile(companyId: string): Promise<CompanyProfile>;
   /** Own net worth over the last hours (ADR-124). */

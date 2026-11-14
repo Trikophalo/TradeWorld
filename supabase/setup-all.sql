@@ -45847,6 +45847,335 @@ begin
 end;
 $$;
 
+-- ===== supabase/migrations/20261203001500_company_moves.sql =====
+-- =============================================================================
+-- NEXA · 1500 · Business moves: many active ways to earn with a company (ADR-127)
+-- =============================================================================
+-- Every player company gets a choice of moves that fit its product (game_config.companyMoves.moves; product "*" =
+-- every company): a cost from the company cash, a duration, a chance and a result. Cash moves pay back the cost with
+-- profit on success (part of it on failure); awareness and quality moves make the company better for good. Skills
+-- of the move's area in the team raise the chance. Moves run in slots by company tier and rest a while afterwards.
+-- Money: cost to the households (company_costs), payouts from the households (company_revenue); closed system.
+-- Contract work ("Auftragsarbeit") is no longer a choice: free capacity is always sold.
+--
+-- Table company_moves (RLS, no client rights). RPCs (authenticated):
+--   get_company_moves() -> COMPANY_MOVES of the player's own company
+--   start_company_move(p_request_id uuid, p_key text) -> COMPANY_MOVES
+--   COMPANY_MOVES = {"slots", "used", "cash_cents", "tier", "product",
+--                    "moves": [{"key","kind","risk","branch","minutes","cost_cents","chance_bps","skill_bonus_bps",
+--                               "payout_cents","refund_cents","gain","available_at"}],
+--                    "running": [{"id","key","started_at","ends_at","cost_cents","chance_bps"}],
+--                    "history": [{"id","key","status","cost_cents","payout_cents","gain","resolved_at"}]}
+-- Internal: company_moves_run_due(p_now) (cron nexa-company-moves, every minute).
+-- Errors: move_unknown NX107, move_busy NX108, move_resting NX109, plus insufficient_funds, forbidden.
+-- Idempotent: runs unchanged as supabase/updates/20261203001500_company_moves.sql.
+
+create table if not exists public.company_moves (
+  id            bigint generated always as identity primary key,
+  company_id    uuid not null references public.companies (id) on delete cascade,
+  move_key      text not null,
+  started_by    uuid references public.profiles (id) on delete set null,
+  started_at    timestamptz not null default now(),
+  ends_at       timestamptz not null,
+  cost_cents    bigint not null check (cost_cents > 0),
+  chance_bps    integer not null check (chance_bps between 0 and 10000),
+  status        text not null default 'running' check (status in ('running', 'success', 'failure')),
+  payout_cents  bigint not null default 0 check (payout_cents >= 0),
+  gain          double precision not null default 0,
+  resolved_at   timestamptz
+);
+alter table public.company_moves enable row level security;
+revoke all on public.company_moves from public, anon, authenticated;
+create index if not exists company_moves_company_idx on public.company_moves (company_id, started_at desc);
+create index if not exists company_moves_due_idx on public.company_moves (ends_at) where status = 'running';
+create index if not exists company_moves_started_by_idx on public.company_moves (started_by);
+comment on table public.company_moves is 'Business moves of player companies (ADR-127). Internal; read through get_company_moves().';
+
+-- error keys (as in the friend code migration plus the moves)
+do $$
+declare
+  v_def text;
+begin
+  v_def := pg_get_functiondef('public.api_error(text)'::regprocedure);
+  if position('move_unknown' in v_def) = 0 then
+    v_def := replace(v_def, $q$    when 'friend_code_used'            then 'NX106'
+$q$, $q$    when 'friend_code_used'            then 'NX106'
+    when 'move_unknown'                then 'NX107'
+    when 'move_busy'                   then 'NX108'
+    when 'move_resting'                then 'NX109'
+$q$);
+    if position('move_unknown' in v_def) = 0 then
+      raise exception 'api_error() has an unexpected shape; add the move error keys by hand';
+    end if;
+    execute v_def;
+  end if;
+end;
+$$;
+
+-- contract work is always on (ADR-127)
+alter table public.player_companies alter column contract_work set default true;
+update public.player_companies set contract_work = true where not contract_work;
+
+create or replace function public.company_moves_cfg()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(public.config_jsonb('companyMoves'), '{}'::jsonb);
+$$;
+
+-- skills of an area in the team of a company (founder and employees)
+create or replace function public.company_move_skill_count(p_company uuid, p_branch text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select count(*)::integer from public.company_team_skills(p_company) t
+   where t.skill_key like p_branch || '\_%' or (t.skill_key like 'hybrid\_%' and exists (
+           select 1 from jsonb_array_elements(coalesce(public.config_jsonb('skills', '{tree}'), '[]'::jsonb)) n
+            where n ->> 'key' = t.skill_key and n -> 'branches' ? p_branch));
+$$;
+
+-- the moves of a company with their current numbers
+create or replace function public.company_moves_state(p_company uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_cfg   jsonb := public.company_moves_cfg();
+  pc      public.player_companies;
+  v_tier  text;
+  v_base  bigint;
+  v_slots integer;
+  v_now   timestamptz := public.game_now();
+  v_cash  bigint;
+begin
+  select * into pc from public.player_companies where company_id = p_company;
+  v_tier := case when pc.tier in ('garage', 'small_business', 'gmbh', 'ag') then pc.tier else 'ag' end;
+  v_base := coalesce((v_cfg #>> array['costCentsByTier', v_tier])::bigint, 100000);
+  v_slots := coalesce((v_cfg #>> array['slotsByTier', v_tier])::integer, 1);
+  select a.balance_cents into v_cash from public.ledger_accounts a where a.id = public.company_cash_account(p_company);
+  return jsonb_build_object(
+    'slots', v_slots,
+    'used', (select count(*) from public.company_moves m where m.company_id = p_company and m.status = 'running'),
+    'cash_cents', coalesce(v_cash, 0),
+    'tier', v_tier,
+    'product', pc.product_key,
+    'moves', coalesce((
+      select jsonb_agg(x.j order by x.ord) from (
+        select o.ord, jsonb_build_object(
+                 'key', mv ->> 'key', 'kind', mv ->> 'kind', 'risk', mv ->> 'risk', 'branch', mv ->> 'branch',
+                 'minutes', (mv ->> 'minutes')::integer,
+                 'cost_cents', round(v_base * (mv ->> 'costFactor')::numeric)::bigint,
+                 'chance_bps', least(coalesce((v_cfg ->> 'maxChanceBps')::integer, 9500),
+                                     (v_cfg #>> array['risk', mv ->> 'risk', 'chanceBps'])::integer + sb.bonus),
+                 'skill_bonus_bps', sb.bonus,
+                 'payout_cents', case when mv ->> 'kind' = 'cash'
+                                      then round(v_base * (mv ->> 'costFactor')::numeric
+                                                 * (v_cfg #>> array['risk', mv ->> 'risk', 'payoutBps'])::numeric / 10000)::bigint
+                                      else 0 end,
+                 'refund_cents', round(v_base * (mv ->> 'costFactor')::numeric
+                                       * (v_cfg #>> array['risk', mv ->> 'risk', 'refundBps'])::numeric / 10000)::bigint,
+                 'gain', case when mv ->> 'kind' = 'cash' then 0
+                              else (v_cfg #>> array['risk', mv ->> 'risk', 'gain'])::double precision end,
+                 'available_at', (select max(m.started_at + make_interval(mins => ((mv ->> 'minutes')::integer
+                                         * (1 + coalesce((v_cfg ->> 'cooldownFactor')::integer, 2)))))
+                                    from public.company_moves m where m.company_id = p_company and m.move_key = mv ->> 'key'
+                                     and m.started_at + make_interval(mins => ((mv ->> 'minutes')::integer
+                                         * (1 + coalesce((v_cfg ->> 'cooldownFactor')::integer, 2)))) > v_now)) as j
+          from jsonb_array_elements(coalesce(v_cfg -> 'moves', '[]'::jsonb)) with ordinality o(mv, ord)
+          cross join lateral (select least(coalesce((v_cfg ->> 'maxSkillBonusBps')::integer, 2500),
+                                           coalesce((v_cfg ->> 'chancePerSkillBps')::integer, 300)
+                                           * public.company_move_skill_count(p_company, o.mv ->> 'branch')) as bonus) sb
+         where o.mv ->> 'product' in ('*', coalesce(pc.product_key, ''))) x), '[]'::jsonb),
+    'running', coalesce((
+      select jsonb_agg(jsonb_build_object('id', m.id, 'key', m.move_key, 'started_at', m.started_at, 'ends_at', m.ends_at,
+                                          'cost_cents', m.cost_cents, 'chance_bps', m.chance_bps) order by m.ends_at)
+        from public.company_moves m where m.company_id = p_company and m.status = 'running'), '[]'::jsonb),
+    'history', coalesce((
+      select jsonb_agg(jsonb_build_object('id', h.id, 'key', h.move_key, 'status', h.status, 'cost_cents', h.cost_cents,
+                                          'payout_cents', h.payout_cents, 'gain', h.gain, 'resolved_at', h.resolved_at)
+                       order by h.resolved_at desc, h.id desc)
+        from (select m.* from public.company_moves m where m.company_id = p_company and m.status <> 'running'
+               order by m.resolved_at desc, m.id desc limit coalesce((v_cfg ->> 'historyLimit')::integer, 12)) h), '[]'::jsonb));
+end;
+$$;
+
+create or replace function public.get_company_moves()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid := public.require_player();
+  v_company uuid;
+begin
+  select pc.company_id into v_company from public.player_companies pc
+   where pc.founder_id = v_player and pc.status = 'active';
+  if v_company is null then
+    perform public.api_error('company_not_found');
+  end if;
+  return public.company_moves_state(v_company);
+end;
+$$;
+comment on function public.get_company_moves() is 'RPC: the business moves of the own company (ADR-127).';
+
+create or replace function public.start_company_move(p_request_id uuid, p_key text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid;
+  v_replay  jsonb;
+  pc        public.player_companies;
+  v_state   jsonb;
+  v_move    jsonb;
+  v_cash    bigint;
+  v_cost    bigint;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_key is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'start_company_move');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into pc from public.player_companies where founder_id = v_player and status = 'active' for update;
+  if pc.company_id is null then
+    perform public.api_error('company_not_found');
+  end if;
+  v_state := public.company_moves_state(pc.company_id);
+  select m into v_move from jsonb_array_elements(v_state -> 'moves') m where m ->> 'key' = p_key;
+  if v_move is null then
+    perform public.api_error('move_unknown');
+  end if;
+  if (v_state ->> 'used')::integer >= (v_state ->> 'slots')::integer then
+    perform public.api_error('move_busy');
+  end if;
+  if v_move ->> 'available_at' is not null and (v_move ->> 'available_at')::timestamptz > public.game_now() then
+    perform public.api_error('move_resting');
+  end if;
+  v_cost := (v_move ->> 'cost_cents')::bigint;
+  select a.balance_cents into v_cash from public.ledger_accounts a
+   where a.id = public.company_cash_account(pc.company_id) for update;
+  if coalesce(v_cash, 0) < v_cost then
+    perform public.api_error('insufficient_funds');
+  end if;
+  perform public.ledger_transfer(public.company_cash_account(pc.company_id), public.ledger_system_account('households'),
+                                 v_cost, 'company_costs', 'Geschäftszug: ' || p_key, 'company', pc.company_id,
+                                 'move:start:' || p_request_id::text, v_player, jsonb_build_object('move', p_key));
+  insert into public.company_moves (company_id, move_key, started_by, started_at, ends_at, cost_cents, chance_bps)
+  values (pc.company_id, p_key, v_player, public.game_now(),
+          public.game_now() + make_interval(mins => (v_move ->> 'minutes')::integer), v_cost, (v_move ->> 'chance_bps')::integer);
+  return public.request_complete(v_player, p_request_id, public.company_moves_state(pc.company_id));
+end;
+$$;
+comment on function public.start_company_move(uuid, text) is 'RPC: the founder starts a business move of the own company (ADR-127).';
+
+create or replace function public.company_moves_run_due(p_now timestamptz default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_cfg     jsonb := public.company_moves_cfg();
+  v_now     timestamptz := coalesce(p_now, public.game_now());
+  m         record;
+  v_kind    text;
+  v_risk    text;
+  v_ok      boolean;
+  v_pay     bigint;
+  v_gain    double precision;
+  v_hh      uuid := public.ledger_system_account('households');
+  v_hh_bal  bigint;
+  v_done    integer := 0;
+begin
+  for m in select x.* from public.company_moves x where x.status = 'running' and x.ends_at <= v_now
+            order by x.ends_at, x.id for update skip locked loop
+    select mv ->> 'kind', mv ->> 'risk' into v_kind, v_risk
+      from jsonb_array_elements(coalesce(v_cfg -> 'moves', '[]'::jsonb)) mv where mv ->> 'key' = m.move_key;
+    v_kind := coalesce(v_kind, 'cash');
+    v_risk := coalesce(v_risk, 'normal');
+    v_ok := random() * 10000 < m.chance_bps;
+    v_gain := 0;
+    if v_ok and v_kind = 'cash' then
+      v_pay := round(m.cost_cents * coalesce((v_cfg #>> array['risk', v_risk, 'payoutBps'])::numeric, 15000) / 10000)::bigint;
+    elsif v_ok then
+      v_pay := 0;
+      v_gain := coalesce((v_cfg #>> array['risk', v_risk, 'gain'])::double precision, 0.04);
+    else
+      v_pay := round(m.cost_cents * coalesce((v_cfg #>> array['risk', v_risk, 'refundBps'])::numeric, 3000) / 10000)::bigint;
+    end if;
+    if not exists (select 1 from public.player_companies pc where pc.company_id = m.company_id and pc.status = 'active') then
+      v_pay := 0;
+      v_gain := 0;
+    end if;
+    if v_pay > 0 then
+      select a.balance_cents into v_hh_bal from public.ledger_accounts a where a.id = v_hh for update;
+      v_pay := least(v_pay, greatest(0, coalesce(v_hh_bal, 0)));
+    end if;
+    if v_pay > 0 then
+      perform public.ledger_transfer(v_hh, public.company_cash_account(m.company_id), v_pay, 'company_revenue',
+                                     'Geschäftszug: ' || m.move_key, 'company', m.company_id,
+                                     'move:result:' || m.id::text, null, jsonb_build_object('move', m.move_key, 'success', v_ok));
+    end if;
+    if v_gain > 0 then
+      if v_kind = 'awareness' then
+        update public.player_companies set awareness = least(1, awareness + v_gain) where company_id = m.company_id;
+      else
+        update public.player_companies set quality = least(1, quality + v_gain) where company_id = m.company_id;
+      end if;
+    end if;
+    update public.company_moves set status = case when v_ok then 'success' else 'failure' end, payout_cents = v_pay,
+                                    gain = v_gain, resolved_at = v_now where id = m.id;
+    perform public.company_system_message(m.company_id,
+      case when v_ok and v_kind = 'cash' then 'Geschäftszug geschafft: ' || public.format_eur(v_pay) || ' eingenommen.'
+           when v_ok then 'Geschäftszug geschafft: die Firma ist jetzt '
+                          || case when v_kind = 'awareness' then 'bekannter' else 'besser' end || '.'
+           else 'Geschäftszug daneben gegangen, ' || public.format_eur(v_pay) || ' zurück.' end);
+    v_done := v_done + 1;
+  end loop;
+  return jsonb_build_object('resolved', v_done);
+end;
+$$;
+comment on function public.company_moves_run_due(timestamptz) is
+  'Internal, cron every minute (ADR-127): resolves due business moves (payout, refund or a lasting gain).';
+
+do $$
+declare
+  f text;
+begin
+  foreach f in array array['public.company_moves_cfg()', 'public.company_move_skill_count(uuid, text)',
+                           'public.company_moves_state(uuid)', 'public.company_moves_run_due(timestamptz)'] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+    execute format('grant execute on function %s to service_role', f);
+  end loop;
+  foreach f in array array['public.get_company_moves()', 'public.start_company_move(uuid, text)'] loop
+    execute format('revoke all on function %s from public, anon', f);
+    execute format('grant execute on function %s to authenticated, service_role', f);
+  end loop;
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    if exists (select 1 from cron.job where jobname = 'nexa-company-moves') then
+      perform cron.unschedule('nexa-company-moves');
+    end if;
+    perform cron.schedule('nexa-company-moves', '* * * * *', 'select public.company_moves_run_due()');
+  end if;
+end;
+$$;
+
 -- ===== supabase/seed.sql =====
 -- =============================================================================
 -- NEXA · seed.sql · reference data
@@ -46497,6 +46826,7 @@ insert into public.game_config (key, value, description) values
   ('deals', '{"minLevel":6,"sizeShareOfValueBps":5000,"minSizeCents":5000000,"offerValidHours":48,"maxOpenOffers":5,"maxActivePerKind":5,"loan":{"minPrincipalCents":10000,"maxPrincipalCentsPerLevel":2000000,"maxInterestBps":3000,"minHours":24,"maxHours":720,"defaultAfterHours":168},"supply":{"minVolumeCentsPerHour":1000,"minFeeBps":1000,"maxFeeBps":9500,"maxPrepayBps":5000,"minHours":24,"maxHours":336,"keptDeliveryBps":5000},"stake":{"minAmountCents":10000,"maxShareBps":3000,"maxTotalShareBps":5000,"minHours":24,"maxHours":720}}'::jsonb, 'Defaults from src/config/balance.ts, section "deals"'),
   ('trust', '{"start":50,"min":0,"max":100,"deltas":{"loanRepaidOnTime":4,"loanRepaidLate":2,"loanOverdue":-6,"loanDefaulted":-12,"loanLent":1,"loanForgiven":2,"supplyKept":3,"supplyShort":-4,"stakeKept":3,"dealBroken":-12,"rugPull":-20},"bands":[{"from":0,"key":"risky"},{"from":30,"key":"shaky"},{"from":45,"key":"blank"},{"from":60,"key":"reliable"},{"from":80,"key":"rock"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "trust"'),
   ('crypto', '{"minLevel":10,"createMinLevel":14,"tickSeconds":10,"categories":{"stable":{"sigmaDay":0.002,"beta":0,"feeBps":5,"pegPullPerHour":0.5},"major":{"sigmaDay":0.06,"beta":1,"feeBps":10,"pegPullPerHour":0},"alt":{"sigmaDay":0.14,"beta":1.3,"feeBps":30,"pegPullPerHour":0},"meme":{"sigmaDay":0.4,"beta":1.6,"feeBps":100,"pegPullPerHour":0},"player":{"sigmaDay":0.35,"beta":1.2,"feeBps":100,"pegPullPerHour":0}},"coins":[{"ticker":"EUS","name":"Eins-Stabil","category":"stable","priceE4":10000,"poolCents":5000000000,"color":"#4f8cff"},{"ticker":"NXS","name":"Nexa-Stable","category":"stable","priceE4":10000,"poolCents":3000000000,"color":"#7c5cff"},{"ticker":"ALGS","name":"Algostabil","category":"stable","priceE4":10000,"poolCents":800000000,"algorithmic":true,"color":"#2fd98c"},{"ticker":"GTL","name":"Goldtaler","category":"stable","priceE4":600000,"poolCents":1500000000,"color":"#f2c14e"},{"ticker":"KTL","name":"Kryptaler","category":"major","priceE4":420000000,"poolCents":10000000000,"color":"#ff9a52"},{"ticker":"NBC","name":"Nebula Chain","category":"major","priceE4":21000000,"poolCents":5000000000,"color":"#9b7bff"},{"ticker":"QTR","name":"Quantor","category":"major","priceE4":850000,"poolCents":2000000000,"color":"#2bc3d9"},{"ticker":"FLX","name":"Flux","category":"alt","priceE4":12000,"poolCents":300000000,"color":"#ef5b5b"},{"ticker":"ORB","name":"Orbit","category":"alt","priceE4":4500,"poolCents":150000000,"color":"#8e99ad"},{"ticker":"SNP","name":"Synapse","category":"alt","priceE4":120000,"poolCents":200000000,"color":"#c8553d"},{"ticker":"HMR","name":"Hamsterrakete","category":"meme","priceE4":420,"poolCents":30000000,"color":"#e0a92e"},{"ticker":"MKS","name":"Mondkeks","category":"meme","priceE4":690,"poolCents":15000000,"color":"#c9d2e0"},{"ticker":"LFR","name":"Laserfrosch","category":"meme","priceE4":1000,"poolCents":25000000,"color":"#2f7a4a"},{"ticker":"TBZ","name":"Turbobrezel","category":"meme","priceE4":2500,"poolCents":10000000,"color":"#a0612c"},{"ticker":"PPD","name":"Pixelpudel","category":"meme","priceE4":150,"poolCents":8000000,"color":"#f8bbd0"}],"regimes":{"bull":{"driftDay":0.03,"weight":0.3},"flat":{"driftDay":0,"weight":0.45},"bear":{"driftDay":-0.03,"weight":0.25}},"regimeHoursMin":24,"regimeHoursMax":72,"deadCoinReplaceHours":24,"deadPriceE4":2,"memeNames":["Katzenkanone","Wurstwal","Raketenrentner","Glitzergurke","Turbotoaster","Mondmaulwurf","Laserlama","Pixelpinguin","Bananenbank","Sockensaurus","Kometenkrabbe","Diamanthamster"],"events":[{"key":"hack","scope":["alt","meme","player"],"chanceBps":20,"shockMin":-0.9,"shockMax":-0.35,"tech":-10,"hype":-30,"poolLossShare":0.2},{"key":"bug","scope":["alt","meme","player"],"chanceBps":40,"shockMin":-0.25,"shockMax":-0.08,"tech":-5,"hype":-5},{"key":"influencer","scope":["alt","meme","player"],"chanceBps":60,"shockMin":0.25,"shockMax":1.2,"hype":20},{"key":"exchange_listing","scope":["alt","meme","player"],"chanceBps":25,"shockMin":0.2,"shockMax":0.6,"utility":10},{"key":"delisting_rumor","scope":["alt","meme","player"],"chanceBps":30,"shockMin":-0.35,"shockMax":-0.1,"hype":-10},{"key":"whale_buy","scope":["major","alt","meme","player"],"chanceBps":50,"shockMin":0.1,"shockMax":0.4},{"key":"whale_dump","scope":["major","alt","meme","player"],"chanceBps":50,"shockMin":-0.4,"shockMax":-0.1},{"key":"partnership","scope":["major","alt","player"],"chanceBps":30,"shockMin":0.1,"shockMax":0.35,"utility":15},{"key":"fud","scope":["major","alt","meme","player"],"chanceBps":60,"shockMin":-0.3,"shockMax":-0.05,"hype":-8},{"key":"network_upgrade","scope":["major","alt"],"chanceBps":20,"shockMin":0.05,"shockMax":0.2},{"key":"depeg","scope":["stable"],"chanceBps":3,"shockMin":-0.4,"shockMax":-0.03},{"key":"meme_wave","scope":["market"],"chanceBps":40,"shockMin":0.2,"shockMax":0.8},{"key":"regulation","scope":["market"],"chanceBps":25,"shockMin":-0.25,"shockMax":-0.05},{"key":"rug_pull","scope":["meme"],"chanceBps":12,"shockMin":-4.5,"shockMax":-2.5}],"create":{"costCents":2500000,"minLiquidityCents":500000,"startPriceOptionsE4":[100,1000,10000,100000],"teamShareMinBps":1000,"teamShareMaxBps":5000,"launchMinTech":20,"nameMinLength":3,"nameMaxLength":24,"tickerMinLength":3,"tickerMaxLength":5,"hypeDecayPerHour":0.97,"utilityDecayPerHour":0.995,"driftPerHype":0.2,"driftPerUtility":0.08,"driftBase":-0.06,"sigmaDay":0.35,"sigmaTechDamping":0.5,"itBpsPerScore":300,"actions":[{"key":"smart_contract","hours":6,"costCents":200000,"tech":15,"baseBps":5000},{"key":"audit","hours":24,"costCents":1500000,"tech":35},{"key":"community","hours":4,"costCents":50000,"hype":10},{"key":"influencer","hours":2,"costCents":800000,"hype":35,"baseBps":8500},{"key":"partnership","hours":12,"costCents":600000,"utility":20,"baseBps":7000,"afterLaunch":true},{"key":"staking","hours":12,"costCents":500000,"utility":15,"afterLaunch":true},{"key":"bugfix","hours":3,"costCents":100000,"tech":5},{"key":"marketing_burn","hours":1,"costCents":0,"hype":8,"afterLaunch":true}],"rugShareBps":2000,"rugWindowHours":24,"exposedHype":-20,"exposedShock":-0.1625,"burnMinBps":100}}'::jsonb, 'Defaults from src/config/balance.ts, section "crypto"'),
+  ('companyMoves', '{"costCentsByTier":{"garage":100000,"small_business":400000,"gmbh":1500000,"ag":6000000},"slotsByTier":{"garage":1,"small_business":2,"gmbh":3,"ag":4},"risk":{"safe":{"chanceBps":9000,"payoutBps":12000,"refundBps":5000,"gain":0.02},"normal":{"chanceBps":7000,"payoutBps":15000,"refundBps":3000,"gain":0.04},"risky":{"chanceBps":4000,"payoutBps":26000,"refundBps":1000,"gain":0.08}},"chancePerSkillBps":300,"maxSkillBonusBps":2500,"maxChanceBps":9500,"cooldownFactor":2,"historyLimit":12,"moves":[{"key":"pop_up_stand","product":"*","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.6,"minutes":15},{"key":"local_press","product":"*","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"team_workshop","product":"*","branch":"management","kind":"quality","risk":"safe","costFactor":0.8,"minutes":30},{"key":"bulk_purchase","product":"*","branch":"logistics","kind":"cash","risk":"safe","costFactor":1.2,"minutes":20},{"key":"investor_pitch","product":"*","branch":"finance","kind":"cash","risk":"risky","costFactor":1.5,"minutes":45},{"key":"tax_review","product":"*","branch":"law","kind":"cash","risk":"normal","costFactor":0.7,"minutes":30},{"key":"pentest_bank","product":"security_software","branch":"it","kind":"cash","risk":"normal","costFactor":1.5,"minutes":40},{"key":"security_audit_sme","product":"security_software","branch":"it","kind":"cash","risk":"safe","costFactor":1,"minutes":25},{"key":"bug_bounty","product":"security_software","branch":"it","kind":"cash","risk":"risky","costFactor":1,"minutes":35},{"key":"security_conference","product":"security_software","branch":"sales","kind":"awareness","risk":"normal","costFactor":1.3,"minutes":40},{"key":"certification","product":"security_software","branch":"law","kind":"quality","risk":"normal","costFactor":1.4,"minutes":50},{"key":"incident_response","product":"security_software","branch":"it","kind":"cash","risk":"risky","costFactor":2,"minutes":60},{"key":"app_store_feature","product":"mobile_app","branch":"sales","kind":"awareness","risk":"risky","costFactor":1.2,"minutes":40},{"key":"white_label_app","product":"mobile_app","branch":"it","kind":"cash","risk":"normal","costFactor":1.5,"minutes":45},{"key":"bugfix_sprint","product":"mobile_app","branch":"it","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"in_app_shop","product":"mobile_app","branch":"finance","kind":"cash","risk":"normal","costFactor":1.1,"minutes":30},{"key":"influencer_app","product":"mobile_app","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"hackathon","product":"mobile_app","branch":"it","kind":"cash","risk":"risky","costFactor":0.9,"minutes":35},{"key":"migrate_customer","product":"cloud_platform","branch":"it","kind":"cash","risk":"normal","costFactor":1.6,"minutes":50},{"key":"uptime_guarantee","product":"cloud_platform","branch":"management","kind":"quality","risk":"normal","costFactor":1.3,"minutes":45},{"key":"startup_credits","product":"cloud_platform","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.7,"minutes":20},{"key":"enterprise_deal","product":"cloud_platform","branch":"sales","kind":"cash","risk":"risky","costFactor":2.2,"minutes":60},{"key":"data_center_deal","product":"cloud_platform","branch":"finance","kind":"cash","risk":"safe","costFactor":1.2,"minutes":25},{"key":"ai_hosting","product":"cloud_platform","branch":"it","kind":"cash","risk":"risky","costFactor":1.8,"minutes":50},{"key":"flash_sale","product":"online_shop","branch":"sales","kind":"cash","risk":"safe","costFactor":1,"minutes":15},{"key":"marketplace_listing","product":"online_shop","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"same_day_delivery","product":"online_shop","branch":"logistics","kind":"quality","risk":"normal","costFactor":1.4,"minutes":45},{"key":"black_friday","product":"online_shop","branch":"sales","kind":"cash","risk":"risky","costFactor":1.6,"minutes":40},{"key":"returns_process","product":"online_shop","branch":"logistics","kind":"quality","risk":"safe","costFactor":0.7,"minutes":20},{"key":"b2b_shop","product":"online_shop","branch":"sales","kind":"cash","risk":"normal","costFactor":1.3,"minutes":35},{"key":"fashion_show","product":"fashion","branch":"sales","kind":"awareness","risk":"risky","costFactor":1.6,"minutes":50},{"key":"capsule_collection","product":"fashion","branch":"craft","kind":"cash","risk":"normal","costFactor":1.3,"minutes":40},{"key":"influencer_outfit","product":"fashion","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"sustainable_fabric","product":"fashion","branch":"science","kind":"quality","risk":"normal","costFactor":1.2,"minutes":45},{"key":"outlet_sale","product":"fashion","branch":"sales","kind":"cash","risk":"safe","costFactor":0.9,"minutes":20},{"key":"collab_brand","product":"fashion","branch":"management","kind":"cash","risk":"risky","costFactor":1.8,"minutes":55},{"key":"catering_job","product":"delicatessen","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.2,"minutes":35},{"key":"tasting_evening","product":"delicatessen","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.6,"minutes":20},{"key":"gift_baskets","product":"delicatessen","branch":"sales","kind":"cash","risk":"safe","costFactor":0.9,"minutes":20},{"key":"organic_label","product":"delicatessen","branch":"science","kind":"quality","risk":"normal","costFactor":1.2,"minutes":45},{"key":"restaurant_supply","product":"delicatessen","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"food_festival","product":"delicatessen","branch":"sales","kind":"cash","risk":"risky","costFactor":1.3,"minutes":45},{"key":"roof_installation","product":"solar","branch":"craft","kind":"cash","risk":"safe","costFactor":1.2,"minutes":30},{"key":"solar_park","product":"solar","branch":"craft","kind":"cash","risk":"risky","costFactor":2.4,"minutes":60},{"key":"subsidy_application","product":"solar","branch":"law","kind":"cash","risk":"normal","costFactor":0.8,"minutes":30},{"key":"installer_training","product":"solar","branch":"craft","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"energy_fair","product":"solar","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":35},{"key":"battery_bundle","product":"solar","branch":"sales","kind":"cash","risk":"normal","costFactor":1.3,"minutes":35},{"key":"peak_trading","product":"grid_service","branch":"finance","kind":"cash","risk":"risky","costFactor":1.6,"minutes":40},{"key":"grid_maintenance","product":"grid_service","branch":"craft","kind":"cash","risk":"safe","costFactor":1.1,"minutes":25},{"key":"smart_meter_rollout","product":"grid_service","branch":"it","kind":"cash","risk":"normal","costFactor":1.5,"minutes":45},{"key":"grid_upgrade","product":"grid_service","branch":"craft","kind":"quality","risk":"normal","costFactor":1.4,"minutes":50},{"key":"city_contract","product":"grid_service","branch":"law","kind":"cash","risk":"risky","costFactor":2,"minutes":60},{"key":"outage_hotline","product":"grid_service","branch":"management","kind":"awareness","risk":"safe","costFactor":0.6,"minutes":20},{"key":"home_storage","product":"energy_storage","branch":"sales","kind":"cash","risk":"normal","costFactor":1.3,"minutes":35},{"key":"battery_research","product":"energy_storage","branch":"science","kind":"quality","risk":"risky","costFactor":1.6,"minutes":55},{"key":"grid_battery","product":"energy_storage","branch":"finance","kind":"cash","risk":"risky","costFactor":2.2,"minutes":60},{"key":"recycling_program","product":"energy_storage","branch":"science","kind":"awareness","risk":"safe","costFactor":0.7,"minutes":25},{"key":"ev_fleet","product":"energy_storage","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"warranty_extension","product":"energy_storage","branch":"law","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"generic_launch","product":"generics","branch":"science","kind":"cash","risk":"normal","costFactor":1.4,"minutes":45},{"key":"pharmacy_contracts","product":"generics","branch":"sales","kind":"cash","risk":"safe","costFactor":1,"minutes":25},{"key":"gmp_audit","product":"generics","branch":"law","kind":"quality","risk":"normal","costFactor":1.2,"minutes":45},{"key":"tender_win","product":"generics","branch":"law","kind":"cash","risk":"risky","costFactor":1.8,"minutes":55},{"key":"doctor_visits","product":"generics","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.7,"minutes":20},{"key":"cost_cutting_lab","product":"generics","branch":"management","kind":"cash","risk":"safe","costFactor":0.9,"minutes":25},{"key":"trial_phase","product":"biotech","branch":"science","kind":"cash","risk":"risky","costFactor":2.4,"minutes":60},{"key":"license_deal","product":"biotech","branch":"law","kind":"cash","risk":"normal","costFactor":1.6,"minutes":45},{"key":"lab_upgrade","product":"biotech","branch":"science","kind":"quality","risk":"normal","costFactor":1.4,"minutes":45},{"key":"research_grant","product":"biotech","branch":"finance","kind":"cash","risk":"safe","costFactor":0.8,"minutes":30},{"key":"science_paper","product":"biotech","branch":"science","kind":"awareness","risk":"normal","costFactor":0.9,"minutes":35},{"key":"cro_service","product":"biotech","branch":"science","kind":"cash","risk":"safe","costFactor":1.1,"minutes":30},{"key":"hospital_order","product":"medtech","branch":"sales","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"ce_marking","product":"medtech","branch":"law","kind":"quality","risk":"normal","costFactor":1.2,"minutes":45},{"key":"device_service","product":"medtech","branch":"craft","kind":"cash","risk":"safe","costFactor":1,"minutes":25},{"key":"medical_fair","product":"medtech","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":35},{"key":"prototype","product":"medtech","branch":"science","kind":"quality","risk":"risky","costFactor":1.5,"minutes":55},{"key":"export_deal","product":"medtech","branch":"sales","kind":"cash","risk":"risky","costFactor":1.9,"minutes":55},{"key":"hospital_express","product":"courier","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.2,"minutes":30},{"key":"cargo_bike_fleet","product":"courier","branch":"logistics","kind":"quality","risk":"normal","costFactor":1.3,"minutes":40},{"key":"night_delivery","product":"courier","branch":"logistics","kind":"cash","risk":"safe","costFactor":1,"minutes":25},{"key":"restaurant_partner","product":"courier","branch":"sales","kind":"cash","risk":"normal","costFactor":1.1,"minutes":30},{"key":"courier_app","product":"courier","branch":"it","kind":"awareness","risk":"normal","costFactor":1,"minutes":35},{"key":"christmas_rush","product":"courier","branch":"management","kind":"cash","risk":"risky","costFactor":1.6,"minutes":45},{"key":"seasonal_storage","product":"warehouse","branch":"logistics","kind":"cash","risk":"safe","costFactor":1.1,"minutes":25},{"key":"automation_upgrade","product":"warehouse","branch":"it","kind":"quality","risk":"normal","costFactor":1.5,"minutes":50},{"key":"fulfillment_client","product":"warehouse","branch":"sales","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"cold_storage","product":"warehouse","branch":"science","kind":"cash","risk":"risky","costFactor":1.8,"minutes":50},{"key":"inventory_audit","product":"warehouse","branch":"finance","kind":"cash","risk":"safe","costFactor":0.8,"minutes":20},{"key":"open_day","product":"warehouse","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.5,"minutes":20},{"key":"international_route","product":"freight","branch":"logistics","kind":"cash","risk":"risky","costFactor":2,"minutes":55},{"key":"rail_partnership","product":"freight","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"fuel_hedge","product":"freight","branch":"finance","kind":"cash","risk":"normal","costFactor":1,"minutes":30},{"key":"driver_training","product":"freight","branch":"management","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"heavy_load","product":"freight","branch":"logistics","kind":"cash","risk":"risky","costFactor":1.7,"minutes":50},{"key":"logistics_fair","product":"freight","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":35}]}'::jsonb, 'Defaults from src/config/balance.ts, section "companyMoves"'),
   ('stockNews', '{"everyMinutes":12,"leadMinMinutes":10,"leadMaxMinutes":40,"minMoveBps":300,"maxMoveBps":1200,"reliabilityBps":7500,"keepHours":24}'::jsonb, 'Defaults from src/config/balance.ts, section "stockNews"'),
   ('social', '{"feed":{"pageSize":30,"bigTradeMinProfitCents":100000,"bigTradeMinBps":1500,"levelEvery":5,"artMinPriceCents":1000000,"carMinPriceCents":10000000,"streakMilestones":[7,30,100,365],"keepDays":30},"league":{"updateEveryMinutes":10,"podium":3,"minBaselineCents":1000000},"friendCode":{"bonusCents":500000}}'::jsonb, 'Defaults from src/config/balance.ts, section "social"'),
   ('property', '{"tiers":[{"key":"flat","priceCents":2500000,"width":8,"height":6,"garageSlots":0,"minLevel":8},{"key":"apartment","priceCents":10000000,"width":10,"height":8,"garageSlots":0,"minLevel":11},{"key":"house","priceCents":50000000,"width":13,"height":9,"garageSlots":2,"minLevel":14},{"key":"villa","priceCents":250000000,"width":16,"height":11,"garageSlots":4,"minLevel":22},{"key":"luxury_villa","priceCents":1500000000,"width":20,"height":13,"garageSlots":8,"minLevel":30}],"tradeInBps":5000,"resaleBps":4000,"floors":{"laminate":0,"carpet":150000,"tiles":400000,"parquet":600000,"stone":1500000,"marble":6000000,"gold":100000000},"wallColors":["#f3efe4","#ffffff","#d9d4c7","#8f9bb3","#3a4256","#1b1e2b","#c8e6c9","#2f7a4a","#bfe6ff","#2f5fd0","#ffe0b2","#ff9a52","#f8bbd0","#7a2f7a","#c8553d","#ffd15c"]}'::jsonb, 'Defaults from src/config/balance.ts, section "property"')

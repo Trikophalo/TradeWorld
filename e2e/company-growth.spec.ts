@@ -78,14 +78,12 @@ test("profit coach, price strategy, contract work, IPO from the garage, staff op
   await expect(coach.getByTestId("hour-flow")).toContainText("Auftragsarbeit");
   await expect(coach.locator("[data-tip]").first()).toBeVisible();
 
-  // Strategy: contract work is on by default; switching to budget prices is saved.
+  // Strategy: contract work runs on its own (ADR-127); switching to budget prices is saved.
   const strategy = page.getByTestId("strategy");
-  await expect(strategy.getByRole("switch", { name: "Auftragsarbeit" })).toBeChecked();
+  await expect(strategy.getByTestId("contract-auto")).toBeVisible();
   await strategy.getByRole("radio", { name: "Günstig" }).click();
   await expect(page.getByText("Strategie gespeichert").first()).toBeVisible();
   await expect(strategy.getByRole("radio", { name: "Günstig" })).toHaveAttribute("aria-checked", "true");
-  await strategy.getByRole("switch", { name: "Auftragsarbeit" }).click();
-  await expect(strategy.getByRole("switch", { name: "Auftragsarbeit" })).not.toBeChecked();
 
   // A garage cannot expand yet; going public is open from level 9 (ADR-083, ADR-099).
   await expect(page.getByTestId("expansion-locked")).toBeVisible();
@@ -203,4 +201,23 @@ test("company situation: a crisis or chance, a strategy, a step, the news", asyn
   const news = page.getByTestId("company-news");
   await expect(news.locator('[data-kind="event_started"]')).toHaveCount(1);
   await expect(news.locator('[data-kind="event_step_done"], [data-kind="event_step_failed"]').first()).toBeVisible();
+});
+
+test("business moves fit the product, cost company cash and run for minutes (ADR-127)", async ({ page }) => {
+  await preparePlayer(page, "Zugmeister", 21_000, 2_000_000);
+  await found(page, "garage", "Zugwerk");
+
+  const card = page.getByTestId("company-moves");
+  await card.scrollIntoViewIfNeeded();
+  await expect(card.getByText("Geschäftszüge")).toBeVisible();
+  // Six moves for every company plus six for the product.
+  await expect(card.locator('[data-testid^="move-"]')).toHaveCount(12);
+
+  await card.getByRole("radio", { name: "Geld" }).click();
+  const first = card.locator('[data-testid^="move-"]').first();
+  await first.getByRole("button", { name: "Starten" }).click();
+  await expect(page.getByText("Zug gestartet").first()).toBeVisible();
+  await expect(card.getByTestId("moves-running")).toBeVisible();
+  // A garage has one slot: every other move waits.
+  await expect(card.getByText("Alle Plätze belegt").first()).toBeVisible();
 });

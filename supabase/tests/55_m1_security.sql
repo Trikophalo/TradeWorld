@@ -53,8 +53,10 @@ select tests.assert(
           -- portfolio chart (92)
           || array['get_my_net_worth_history']
           -- company profile (93)
-          || array['get_company_profile']) x),
-  'authenticated can execute exactly the 9 helpers and the RPCs up to the company profile (93)');
+          || array['get_company_profile']
+          -- business moves (95)
+          || array['get_company_moves', 'start_company_move']) x),
+  'authenticated can execute exactly the 9 helpers and the RPCs up to the business moves (95)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute') and p.proname <> 'check_nickname'),

@@ -750,7 +750,10 @@
     "coin_not_launched": "Dein Coin ist noch nicht gestartet.",
     "friend_code_unknown": "Diesen Freundescode gibt es nicht. Schau noch mal genau hin.",
     "friend_code_self": "Das ist dein eigener Code. Gib ihn deinen Freunden.",
-    "friend_code_used": "Du hast schon einen Freundescode eingelöst. Das geht nur einmal."
+    "friend_code_used": "Du hast schon einen Freundescode eingelöst. Das geht nur einmal.",
+    "move_unknown": "Diesen Geschäftszug gibt es für deine Firma nicht.",
+    "move_busy": "Alle Plätze für Geschäftszüge sind belegt. Warte, bis einer fertig ist.",
+    "move_resting": "Dieser Zug braucht noch eine Pause."
   },
   "locks": {
     "level": "Level {level}",
@@ -2171,7 +2174,7 @@
         },
         "fixedHigh": {
           "title": "Fixkosten sind zu hoch",
-          "text": "Miete und Verwaltung kosten mehr, als nach Waren und Löhnen übrig bleibt. Mehr Kunden (Werbung, günstige Preise) und Auftragsarbeit helfen. Bekanntheit wächst mit der Zeit."
+          "text": "Miete und Verwaltung kosten mehr, als nach Waren und Löhnen übrig bleibt. Mehr Kunden (Werbung, günstige Preise) und Geschäftszüge helfen. Bekanntheit wächst mit der Zeit."
         },
         "upgrade": {
           "title": "Bereit für den nächsten Schritt",
@@ -2206,8 +2209,7 @@
         "awareness": "Mundpropaganda"
       },
       "lowQuality": "Deine Qualität liegt unter 50 %. Mit Premium kommt nur die Hälfte der Kunden.",
-      "contract": "Auftragsarbeit",
-      "contractHint": "{share} % der freien Kapazität arbeitet für andere Firmen, mit {margin} % Marge. So verdient auch ein leeres Büro etwas.",
+      "contractAuto": "Leerlauf verkauft deine Firma automatisch: {share} % der freien Kapazität arbeitet für andere Firmen. Mehr Gewinn holst du mit Geschäftszügen.",
       "contractNow": "Gerade {amount} pro Stunde aus Aufträgen",
       "saved": "Strategie gespeichert"
     },
@@ -3892,11 +3894,15 @@
       "items": [
         {
           "q": "Warum verdiene ich am Anfang so wenig?",
-          "a": "Eine neue Firma kennt kaum jemand (etwa 3 % Bekanntheit). Jedes Quartal wächst die Bekanntheit von selbst. Bis dahin bringt vor allem die Auftragsarbeit Geld."
+          "a": "Eine neue Firma kennt kaum jemand (etwa 3 % Bekanntheit). Jedes Quartal wächst die Bekanntheit von selbst. Bis dahin bringen vor allem Geschäftszüge Geld: Wähle sie oben in der Übersicht."
+        },
+        {
+          "q": "Was sind Geschäftszüge?",
+          "a": "Aktionen, die zu deinem Produkt passen: ein Großauftrag, eine Messe, ein Audit. Du zahlst aus der Firmenkasse und erfährst nach ein paar Minuten, ob es geklappt hat. Riskante Züge zahlen mehr, gehen aber öfter daneben. Know-how deines Teams im passenden Bereich hebt die Chance."
         },
         {
           "q": "Was ist Auftragsarbeit?",
-          "a": "Ein Teil der Ware, die deine Kunden nicht kaufen, geht an anonyme Abnehmer, mit kleiner Marge. Lass sie an, solange Kunden fehlen."
+          "a": "Ein Teil der Ware, die deine Kunden nicht kaufen, geht automatisch an anonyme Abnehmer, mit kleiner Marge. Darum musst du dich nicht kümmern."
         },
         {
           "q": "Lohnt sich eine KI-Kraft?",
@@ -4398,5 +4404,431 @@
     "stock": "Zur Aktie",
     "notFound": "Diese Firma gibt es nicht mehr.",
     "open": "Firma ansehen"
+  },
+  "companyMoves": {
+    "title": "Geschäftszüge",
+    "intro": "Aktiv Geld verdienen: Wähle einen Zug, der zu deiner Firma passt. Je mehr Know-how dein Team im passenden Bereich hat, desto besser die Chance.",
+    "all": "Alle",
+    "slots": "{used} von {slots} Zügen laufen",
+    "cost": "Kosten",
+    "duration": "{minutes} Min.",
+    "chance": "Chance {percent} %",
+    "rewardCash": "Bei Erfolg {amount}",
+    "rewardAwareness": "Bei Erfolg +{points} % Bekanntheit",
+    "rewardQuality": "Bei Erfolg +{points} % Qualität",
+    "refund": "Sonst {amount} zurück",
+    "risk": {
+      "safe": "Sicher",
+      "normal": "Normal",
+      "risky": "Riskant"
+    },
+    "kinds": {
+      "cash": "Geld",
+      "awareness": "Bekanntheit",
+      "quality": "Qualität"
+    },
+    "start": "Starten",
+    "started": "Zug gestartet",
+    "startedText": "{name}: Ergebnis in {minutes} Minuten.",
+    "running": "Läuft",
+    "readyIn": "fertig in {time}",
+    "resting": "wieder ab {time}",
+    "restingShort": "Pause noch",
+    "noSlot": "Alle Plätze belegt",
+    "noCash": "Zu wenig Geld in der Firmenkasse",
+    "history": "Letzte Ergebnisse",
+    "success": "Geschafft",
+    "failure": "Daneben",
+    "resultCash": "{amount} eingenommen",
+    "resultGain": "+{points} % {what}",
+    "resultRefund": "{amount} zurück",
+    "ownerOnly": "Nur die Gründerin oder der Gründer startet Geschäftszüge.",
+    "skillBonus": "+{percent} % durch dein Team",
+    "items": {
+      "pop_up_stand": {
+        "name": "Stand auf dem Wochenmarkt",
+        "desc": "Ein Tag Präsenz in der Innenstadt. Leute lernen euch kennen."
+      },
+      "local_press": {
+        "name": "Artikel in der Lokalzeitung",
+        "desc": "Eine Reporterin schreibt über euch, wenn die Geschichte gut ist."
+      },
+      "team_workshop": {
+        "name": "Team-Workshop",
+        "desc": "Ein Tag, an dem alle Abläufe besser werden."
+      },
+      "bulk_purchase": {
+        "name": "Großeinkauf mit Rabatt",
+        "desc": "Ihr kauft Material günstig auf Vorrat und spart beim Verkauf."
+      },
+      "investor_pitch": {
+        "name": "Pitch vor Investoren",
+        "desc": "Ein Investor zahlt viel für eine Beteiligung am nächsten Projekt, wenn er überzeugt ist."
+      },
+      "tax_review": {
+        "name": "Steuerberatung",
+        "desc": "Eine Prüfung findet Geld, das ihr zu viel bezahlt habt."
+      },
+      "pentest_bank": {
+        "name": "Penetrationstest für eine Bank",
+        "desc": "Ihr sucht Lücken im System einer Bank. Findet ihr welche, zahlt sie gut."
+      },
+      "security_audit_sme": {
+        "name": "Sicherheits-Check für Mittelständler",
+        "desc": "Routinejob: Firewall und Passwörter prüfen."
+      },
+      "bug_bounty": {
+        "name": "Bug-Bounty-Jagd",
+        "desc": "Wer eine schwere Lücke bei einem Konzern findet, bekommt die Prämie."
+      },
+      "security_conference": {
+        "name": "Vortrag auf der Security-Konferenz",
+        "desc": "Ein guter Vortrag macht euch in der Szene bekannt."
+      },
+      "certification": {
+        "name": "ISO-Zertifizierung",
+        "desc": "Mit Siegel vertrauen euch mehr Kunden."
+      },
+      "incident_response": {
+        "name": "Notfall-Einsatz nach Hackerangriff",
+        "desc": "Ein Kunde wurde gehackt und braucht euch sofort."
+      },
+      "app_store_feature": {
+        "name": "Bewerbung für ein App-Store-Feature",
+        "desc": "Werdet ihr vorgestellt, laden Tausende eure App."
+      },
+      "white_label_app": {
+        "name": "App für einen Bäcker bauen",
+        "desc": "Eine Kette will eine eigene Bestell-App mit eurem Gerüst."
+      },
+      "bugfix_sprint": {
+        "name": "Bugfix-Sprint",
+        "desc": "Eine Woche nur Fehler beheben. Die Bewertungen steigen."
+      },
+      "in_app_shop": {
+        "name": "In-App-Shop einführen",
+        "desc": "Zusatzfunktionen gegen Geld."
+      },
+      "influencer_app": {
+        "name": "Influencer testet eure App",
+        "desc": "Ein Video kann viele neue Nutzer bringen."
+      },
+      "hackathon": {
+        "name": "Hackathon gewinnen",
+        "desc": "Preisgeld für die beste App des Wochenendes."
+      },
+      "migrate_customer": {
+        "name": "Kunden in die Cloud umziehen",
+        "desc": "Ein Händler zieht seine Server zu euch."
+      },
+      "uptime_guarantee": {
+        "name": "Ausfallsicherheit ausbauen",
+        "desc": "Ein zweites Rechenzentrum macht euch zuverlässiger."
+      },
+      "startup_credits": {
+        "name": "Gratis-Kontingent für Startups",
+        "desc": "Junge Firmen lernen euch kennen und bleiben."
+      },
+      "enterprise_deal": {
+        "name": "Rahmenvertrag mit einem Konzern",
+        "desc": "Großer Vertrag, lange Verhandlung."
+      },
+      "data_center_deal": {
+        "name": "Günstiger Strom fürs Rechenzentrum",
+        "desc": "Neuer Stromvertrag senkt die Kosten."
+      },
+      "ai_hosting": {
+        "name": "KI-Modelle hosten",
+        "desc": "Rechenleistung für ein KI-Labor bereitstellen."
+      },
+      "flash_sale": {
+        "name": "Blitz-Rabattaktion",
+        "desc": "Ein Tag lang 20 % auf alles. Viel Umsatz, kleine Marge."
+      },
+      "marketplace_listing": {
+        "name": "Auf einem großen Marktplatz verkaufen",
+        "desc": "Mehr Sichtbarkeit, aber Gebühren."
+      },
+      "same_day_delivery": {
+        "name": "Lieferung am selben Tag",
+        "desc": "Schnelle Lieferung macht Kunden glücklich."
+      },
+      "black_friday": {
+        "name": "Black-Friday-Aktion",
+        "desc": "Riesige Nachfrage, wenn das Lager mitspielt."
+      },
+      "returns_process": {
+        "name": "Rücksendungen vereinfachen",
+        "desc": "Weniger Ärger, bessere Bewertungen."
+      },
+      "b2b_shop": {
+        "name": "Shop für Geschäftskunden",
+        "desc": "Büros bestellen in großen Mengen."
+      },
+      "fashion_show": {
+        "name": "Eigene Modenschau",
+        "desc": "Kommt die Kollektion an, spricht die ganze Stadt darüber."
+      },
+      "capsule_collection": {
+        "name": "Kleine Sonderkollektion",
+        "desc": "Limitierte Stücke, schnell ausverkauft."
+      },
+      "influencer_outfit": {
+        "name": "Outfit für eine Influencerin",
+        "desc": "Ein Foto mit eurem Label erreicht Tausende."
+      },
+      "sustainable_fabric": {
+        "name": "Nachhaltige Stoffe",
+        "desc": "Bessere Stoffe, besserer Ruf."
+      },
+      "outlet_sale": {
+        "name": "Lagerverkauf",
+        "desc": "Alte Kollektion günstig raus."
+      },
+      "collab_brand": {
+        "name": "Zusammenarbeit mit einer bekannten Marke",
+        "desc": "Eine gemeinsame Kollektion kann groß werden."
+      },
+      "catering_job": {
+        "name": "Catering für eine Firmenfeier",
+        "desc": "Ein großes Buffet für 200 Gäste."
+      },
+      "tasting_evening": {
+        "name": "Verkostungsabend",
+        "desc": "Leute probieren und kommen wieder."
+      },
+      "gift_baskets": {
+        "name": "Präsentkörbe zu Weihnachten",
+        "desc": "Firmen bestellen Geschenke für Kunden."
+      },
+      "organic_label": {
+        "name": "Bio-Siegel",
+        "desc": "Geprüfte Qualität zieht neue Kunden an."
+      },
+      "restaurant_supply": {
+        "name": "Restaurants beliefern",
+        "desc": "Feste Abnehmer für eure Spezialitäten."
+      },
+      "food_festival": {
+        "name": "Stand auf dem Food-Festival",
+        "desc": "Bei gutem Wetter ausverkauft."
+      },
+      "roof_installation": {
+        "name": "Dachanlage für ein Einfamilienhaus",
+        "desc": "Solide Arbeit, solider Gewinn."
+      },
+      "solar_park": {
+        "name": "Solarpark auf einer Wiese",
+        "desc": "Großes Projekt mit Genehmigungsrisiko."
+      },
+      "subsidy_application": {
+        "name": "Fördermittel beantragen",
+        "desc": "Der Staat zahlt einen Teil eurer Projekte."
+      },
+      "installer_training": {
+        "name": "Monteure schulen",
+        "desc": "Weniger Fehler auf dem Dach."
+      },
+      "energy_fair": {
+        "name": "Stand auf der Energiemesse",
+        "desc": "Hausbesitzer informieren sich über Solar."
+      },
+      "battery_bundle": {
+        "name": "Solar mit Speicher im Paket",
+        "desc": "Mehr Umsatz pro Kunde."
+      },
+      "peak_trading": {
+        "name": "Strom zur Spitzenzeit verkaufen",
+        "desc": "Hohe Preise, wenn der Plan aufgeht."
+      },
+      "grid_maintenance": {
+        "name": "Wartungsauftrag vom Netzbetreiber",
+        "desc": "Planbare Arbeit am Stromnetz."
+      },
+      "smart_meter_rollout": {
+        "name": "Smart-Meter einbauen",
+        "desc": "Viele Haushalte auf einmal."
+      },
+      "grid_upgrade": {
+        "name": "Leitungen modernisieren",
+        "desc": "Weniger Ausfälle, zufriedene Kunden."
+      },
+      "city_contract": {
+        "name": "Ausschreibung der Stadtwerke",
+        "desc": "Gewinnt ihr, habt ihr Arbeit für lange."
+      },
+      "outage_hotline": {
+        "name": "Störungs-Hotline einrichten",
+        "desc": "Schnelle Hilfe spricht sich herum."
+      },
+      "home_storage": {
+        "name": "Heimspeicher verkaufen",
+        "desc": "Hausbesitzer speichern ihren Solarstrom."
+      },
+      "battery_research": {
+        "name": "Neue Zellchemie testen",
+        "desc": "Ein Durchbruch macht eure Speicher deutlich besser."
+      },
+      "grid_battery": {
+        "name": "Großspeicher fürs Netz",
+        "desc": "Ein großes Projekt mit großem Gewinn."
+      },
+      "recycling_program": {
+        "name": "Altbatterien zurücknehmen",
+        "desc": "Gut für die Umwelt und den Ruf."
+      },
+      "ev_fleet": {
+        "name": "Ladepark für eine Busflotte",
+        "desc": "Ein Verkehrsbetrieb braucht Speicher."
+      },
+      "warranty_extension": {
+        "name": "Garantie verlängern",
+        "desc": "Mehr Vertrauen in eure Produkte."
+      },
+      "generic_launch": {
+        "name": "Neues Generikum auf den Markt",
+        "desc": "Ein Patent läuft aus, ihr seid bereit."
+      },
+      "pharmacy_contracts": {
+        "name": "Apotheken beliefern",
+        "desc": "Stetige Bestellungen."
+      },
+      "gmp_audit": {
+        "name": "Behördenprüfung bestehen",
+        "desc": "Saubere Produktion, mehr Vertrauen."
+      },
+      "tender_win": {
+        "name": "Ausschreibung der Krankenkassen",
+        "desc": "Gewinnt ihr, verkauft ihr riesige Mengen."
+      },
+      "doctor_visits": {
+        "name": "Ärzte besuchen",
+        "desc": "Praxen lernen eure Mittel kennen."
+      },
+      "cost_cutting_lab": {
+        "name": "Produktion verschlanken",
+        "desc": "Günstiger herstellen, mehr Gewinn."
+      },
+      "trial_phase": {
+        "name": "Klinische Studie",
+        "desc": "Klappt die Studie, steigt der Wert enorm."
+      },
+      "license_deal": {
+        "name": "Lizenz an einen Konzern",
+        "desc": "Ein Großer zahlt für eure Forschung."
+      },
+      "lab_upgrade": {
+        "name": "Labor ausbauen",
+        "desc": "Bessere Geräte, bessere Ergebnisse."
+      },
+      "research_grant": {
+        "name": "Forschungsförderung",
+        "desc": "Geld vom Staat für eure Forschung."
+      },
+      "science_paper": {
+        "name": "Studie veröffentlichen",
+        "desc": "Ein Artikel in einer Fachzeitschrift."
+      },
+      "cro_service": {
+        "name": "Laborleistungen für andere",
+        "desc": "Freie Laborzeit verkaufen."
+      },
+      "hospital_order": {
+        "name": "Geräte für eine Klinik",
+        "desc": "Ein Krankenhaus rüstet auf."
+      },
+      "ce_marking": {
+        "name": "CE-Zulassung",
+        "desc": "Erst mit Zulassung vertrauen euch Ärzte."
+      },
+      "device_service": {
+        "name": "Wartungsvertrag",
+        "desc": "Geräte warten, regelmäßig Geld."
+      },
+      "medical_fair": {
+        "name": "Stand auf der Medizinmesse",
+        "desc": "Ärzte aus ganz Europa."
+      },
+      "prototype": {
+        "name": "Neuen Prototyp entwickeln",
+        "desc": "Gelingt er, ist euer Produkt deutlich besser."
+      },
+      "export_deal": {
+        "name": "Export nach Übersee",
+        "desc": "Großer Markt, viel Papierkram."
+      },
+      "hospital_express": {
+        "name": "Express-Lieferung für eine Klinik",
+        "desc": "Proben und Medikamente, schnell und sicher."
+      },
+      "cargo_bike_fleet": {
+        "name": "Lastenrad-Flotte",
+        "desc": "Schneller durch die Stadt, kein Stau."
+      },
+      "night_delivery": {
+        "name": "Nachtlieferungen",
+        "desc": "Ruhige Straßen, pünktliche Ware."
+      },
+      "restaurant_partner": {
+        "name": "Lieferdienst für Restaurants",
+        "desc": "Essen ausfahren am Abend."
+      },
+      "courier_app": {
+        "name": "Sendungsverfolgung per App",
+        "desc": "Kunden sehen, wo ihr Paket ist."
+      },
+      "christmas_rush": {
+        "name": "Weihnachtsgeschäft",
+        "desc": "Doppelt so viele Pakete, wenn alle mitziehen."
+      },
+      "seasonal_storage": {
+        "name": "Saisonware einlagern",
+        "desc": "Händler brauchen Platz vor Weihnachten."
+      },
+      "automation_upgrade": {
+        "name": "Lager automatisieren",
+        "desc": "Roboter sortieren schneller."
+      },
+      "fulfillment_client": {
+        "name": "Versand für einen Online-Shop",
+        "desc": "Ihr packt und verschickt für andere."
+      },
+      "cold_storage": {
+        "name": "Kühllager eröffnen",
+        "desc": "Lebensmittel und Medikamente zahlen gut."
+      },
+      "inventory_audit": {
+        "name": "Inventur mit Fundstücken",
+        "desc": "Vergessene Ware wird verkauft."
+      },
+      "open_day": {
+        "name": "Tag der offenen Tür",
+        "desc": "Nachbarn und Händler schauen vorbei."
+      },
+      "international_route": {
+        "name": "Neue Route nach Osteuropa",
+        "desc": "Viel Fracht, lange Wege."
+      },
+      "rail_partnership": {
+        "name": "Güterzug statt Lkw",
+        "desc": "Günstiger über lange Strecken."
+      },
+      "fuel_hedge": {
+        "name": "Dieselpreis absichern",
+        "desc": "Spart Geld, wenn der Preis steigt."
+      },
+      "driver_training": {
+        "name": "Fahrer schulen",
+        "desc": "Weniger Unfälle, pünktlicher."
+      },
+      "heavy_load": {
+        "name": "Schwertransport",
+        "desc": "Ein Windrad-Flügel quer durchs Land."
+      },
+      "logistics_fair": {
+        "name": "Stand auf der Logistikmesse",
+        "desc": "Verlader suchen neue Partner."
+      }
+    }
   }
 }

@@ -118,7 +118,9 @@ select tests.assert(
            -- portfolio chart (ADR-124)
            'get_my_net_worth_history',
            -- company profile (ADR-125)
-           'get_company_profile']
+           'get_company_profile',
+           -- business moves (ADR-127)
+           'get_company_moves', 'start_company_move']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')
@@ -158,7 +160,7 @@ select tests.assert(
       'sim_rng_streams', 'sim_tick_log', 'job_runs', 'internal_settings', 'admin_users',
       'insider_violations', 'work_task_solutions', 'scheduled_event_secrets', 'macro_event_definitions',
       'random_event_definitions', 'news_templates', 'news_item_effects', 'league_entry_baselines',
-      'stock_tips', 'market_snapshot_cache',
+      'stock_tips', 'market_snapshot_cache', 'company_moves',
       'rate_limits', 'player_requests', 'player_login_events', 'push_deliveries', 'invite_code_redemptions',
       'price_ticks_default']) as t
      -- (a table from a later migration is not there yet on an older database)

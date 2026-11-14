@@ -1,6 +1,6 @@
 {
   "job": null,
-  "tag": "L48H",
+  "tag": "A42H",
   "rank": 122,
   "level": 6,
   "trust": { "band": "shaky", "kept": 0, "score": 41, "broken": 1 },
@@ -10,7 +10,7 @@
   "avatar_key": "rookie",
   "top_skills": [],
   "streak_days": 0,
-  "member_since": "2026-11-14T00:18:27.6998+00:00",
+  "member_since": "2026-11-14T00:52:31.679562+00:00",
   "branch_scores": {
     "it": 0,
     "law": 0,
@@ -22,5 +22,5 @@
     "management": 0
   },
   "skills_learned": 0,
-  "net_worth_cents": 5962001
+  "net_worth_cents": 5992001
 }

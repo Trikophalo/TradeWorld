@@ -1,13 +1,13 @@
 {
   "job": {
     "tier": "junior",
-    "since": "2026-11-14T00:18:24.816775+00:00",
+    "since": "2026-11-14T00:52:29.167288+00:00",
     "title": null,
     "title_key": "it_junior",
-    "company_name": "Eilbote Express"
+    "company_name": "KlarSoft AG"
   },
-  "tag": "M3GT",
-  "rank": 276,
+  "tag": "6AXC",
+  "rank": 279,
   "level": 6,
   "trust": { "band": "blank", "kept": 0, "score": 50, "broken": 0 },
   "company": null,
@@ -19,7 +19,7 @@
     { "key": "it_basics", "tier": 1 }
   ],
   "streak_days": 1,
-  "member_since": "2026-11-14T00:18:24.285985+00:00",
+  "member_since": "2026-11-14T00:52:28.772838+00:00",
   "branch_scores": {
     "it": 3,
     "law": 0,
@@ -31,5 +31,5 @@
     "management": 0
   },
   "skills_learned": 2,
-  "net_worth_cents": 1061183
+  "net_worth_cents": 1061188
 }

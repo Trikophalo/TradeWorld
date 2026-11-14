@@ -142,3 +142,6 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 - **Mehr Börsen-News:** 30 Ereignisse, gute wie schlechte.
 - **Benachrichtigungen:** Der Zähler verschwindet beim Öffnen sofort, Meldungen oben schließen sich per Tipp.
 - Laufende Limit-Missionen sind beendet.
+- **Geschäftszüge (ADR-127):** Firmen verdienen jetzt aktiv. 96 Züge, die zum Produkt passen (Klinik-Express,
+  Penetrationstest, Solarpark …), sicher bis riskant, mit Ergebnis nach 15 bis 60 Minuten. Know-how des
+  Teams hebt die Chance. Auftragsarbeit läuft automatisch, der Schalter ist weg.

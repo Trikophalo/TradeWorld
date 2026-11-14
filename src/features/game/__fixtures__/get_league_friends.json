@@ -8,7 +8,7 @@
   },
   "entries": [
     {
-      "tag": "M3GT",
+      "tag": "6AXC",
       "rank": 1,
       "is_me": false,
       "level": 15,
@@ -17,7 +17,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "ZE53",
+      "tag": "RTFE",
       "rank": 2,
       "is_me": false,
       "level": 8,
@@ -26,7 +26,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "PGEB",
+      "tag": "E3QU",
       "rank": 3,
       "is_me": true,
       "level": 15,
@@ -36,7 +36,7 @@
     }
   ],
   "last_winner": {
-    "tag": "PGEB",
+    "tag": "E3QU",
     "nickname": "Fixture_Gmbh",
     "avatar_key": "rookie",
     "growth_bps": 235,

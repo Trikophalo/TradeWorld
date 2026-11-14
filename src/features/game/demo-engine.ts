@@ -20,6 +20,7 @@ import { createArtEngine, type ArtState } from "./demo/artworks";
 import { createPropertyEngine, type HomeState } from "./demo/property";
 import { createFriendEngine, type DemoFriendCode } from "./demo/friends";
 import { createStockNewsEngine } from "./demo/stock-news";
+import { createCompanyMovesEngine, type DemoMoveRun } from "./demo/company-moves";
 import { createSocialEngine, type DemoSocialState } from "./demo/social";
 import { createCompanyEventsEngine } from "./demo/company-events";
 import { createCryptoEngine, type DemoCryptoState } from "./demo/crypto";
@@ -89,6 +90,8 @@ interface PlayerState {
   nickname: string;
   /** Permanent player tag (ADR-085); drawn once for older demo players. */
   tag?: string;
+  /** Business moves of the demo company (ADR-127). */
+  companyMoves?: DemoMoveRun[];
   /** The friend code redeemed once (ADR-111). */
   friendCode?: DemoFriendCode;
   /** Feed, notifications and league of the demo (ADR-088, ADR-089). */
@@ -1256,8 +1259,31 @@ const stockNews = createStockNewsEngine({
   random: () => Math.random(),
 });
 
+const companyMoves = createCompanyMovesEngine({
+  company: () => p().company ?? null,
+  addCompanyCash: (cents) => {
+    const c = p().company;
+    if (c) c.cashCents += cents;
+    persist();
+  },
+  improve: (kind, by) => {
+    const c = p().company;
+    if (c) c[kind] = Math.min(1, c[kind] + by);
+    persist();
+  },
+  runs: () => p().companyMoves ?? [],
+  setRuns: (runs) => {
+    p().companyMoves = runs;
+    persist();
+  },
+  idempotent,
+  now: () => Date.now(),
+  random: () => Math.random(),
+});
+
 export const demoEngine: GameEngine = {
   ...stockNews,
+  ...companyMoves,
   // AI companies of the demo (ADR-125): facts from the start values, no players work there.
   companyProfile: async (companyId) => {
     const ticker = companyId.replace(/^demo-company-/, "");

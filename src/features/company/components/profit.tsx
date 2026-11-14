@@ -12,7 +12,6 @@ import { HoldButton } from "@/components/ui/hold-button";
 import { ShortMoney } from "@/components/ui/live-money";
 import { Segmented } from "@/components/ui/segmented";
 import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/toast";
 import { BALANCE } from "@/config/balance";
 import { useGameErrorText } from "@/features/game/errors";
@@ -196,9 +195,9 @@ export function StrategyCard({ company }: { company: MyCompany }) {
   const act = useCompanyAction();
   const [saving, setSaving] = useState(false);
 
-  const save = async (priceLevel: PriceLevel, contractWork: boolean) => {
+  const save = async (priceLevel: PriceLevel) => {
     setSaving(true);
-    await act(() => engine.setCompanyStrategy(crypto.randomUUID(), priceLevel, contractWork), t("saved"), t("title"));
+    await act(() => engine.setCompanyStrategy(crypto.randomUUID(), priceLevel, true), t("saved"), t("title"));
     setSaving(false);
   };
   const p = cfg.pricing[company.priceLevel];
@@ -211,7 +210,7 @@ export function StrategyCard({ company }: { company: MyCompany }) {
         <p className="text-sm text-fg-2">{t("price")}</p>
         <Segmented
           value={company.priceLevel}
-          onValueChange={(v) => !saving && void save(v, company.contractWork)}
+          onValueChange={(v) => !saving && void save(v)}
           options={PRICE_LEVELS.map((level) => ({ value: level, label: t(`levels.${level}`) }))}
           label={t("price")}
           block
@@ -234,28 +233,15 @@ export function StrategyCard({ company }: { company: MyCompany }) {
         </div>
         {lowQuality && <p className="rounded-md bg-warn-soft px-3 py-2 text-xs text-warn">{t("lowQuality")}</p>}
       </div>
-      <label className="flex items-start gap-3 rounded-md border border-line-1 px-3 py-3">
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-medium text-fg-1">{t("contract")}</span>
-          <span className="block text-xs text-pretty text-fg-3">
-            {t("contractHint", {
-              share: Math.round(cfg.contractWork.shareOfFreeCapacity * 100),
-              margin: Math.round(cfg.contractWork.grossMargin * 100),
-            })}
+      {/* Free capacity is sold automatically since ADR-127; the active lever are the business moves. */}
+      <div className="rounded-md bg-surface-2 px-3 py-2.5 text-xs text-pretty text-fg-3" data-testid="contract-auto">
+        {t("contractAuto", { share: Math.round(cfg.contractWork.shareOfFreeCapacity * 100) })}
+        {company.live && company.live.contractRevenuePerHourCents > 0 && (
+          <span className="mt-1 block nums text-gain">
+            {t("contractNow", { amount: formatMoney(company.live.contractRevenuePerHourCents, { whole: true }) })}
           </span>
-          {company.live && company.live.contractRevenuePerHourCents > 0 && (
-            <span className="mt-1 block nums text-xs text-gain">
-              {t("contractNow", { amount: formatMoney(company.live.contractRevenuePerHourCents, { whole: true }) })}
-            </span>
-          )}
-        </span>
-        <Switch
-          checked={company.contractWork}
-          onCheckedChange={(on) => void save(company.priceLevel, on)}
-          label={t("contract")}
-          disabled={saving}
-        />
-      </label>
+        )}
+      </div>
     </Card>
   );
 }

@@ -1784,3 +1784,35 @@ Für Aktien rechnet der Ausführungspreis jetzt mit derselben Spieler-Tiefe wie 
 zahlt im Schnitt die Hälfte der Bewegung, die sie auslöst; wer gleich wieder verkauft, zahlt die Hälfte seiner eigenen
 Bewegung nach unten. Ein Hin und Her kostet Spread, Gebühren und etwas Schlupf. Wer eine Aktie hält, die andere
 kaufen, verdient weiter. Test `supabase/tests/94_no_round_trip_profit.sql`.
+
+## ADR-127: Geschäftszüge statt Auftragsprinzip — `akzeptiert`
+
+Anlass: Mit Firmen Geld zu verdienen hing fast nur an Stellschrauben, die erst nach einer Spielstunde wirken (Preis,
+Werbung, Auftragsarbeit an oder aus). Das war schwer zu verstehen und fühlte sich passiv an. Gewünscht: viele aktive
+Wege zum Gewinn, die immer zum Produkt der Firma passen.
+
+Entscheidung:
+
+- **Geschäftszüge** (`src/config/company-moves.ts`, zur Laufzeit `game_config.companyMoves`): 6 Züge für jede Firma
+  (Wochenmarkt, Lokalzeitung, Team-Workshop, Großeinkauf, Investoren-Pitch, Steuerprüfung) und 6 eigene für jedes
+  der 15 Produkte, zum Beispiel Klinik-Express für Kurierdienste, Penetrationstest für eine Bank bei Sicherheitssoftware oder
+  Solarpark auf einer Wiese für Solar. Zusammen 96 Züge.
+- Jeder Zug bringt **Geld**, **Bekanntheit** oder **Qualität**, ist **sicher**, **normal** oder **riskant** und dauert
+  15 bis 60 Minuten. Kosten: Grundpreis der Stufe (Garage 1.000 €, Kleinunternehmen 4.000 €, GmbH 15.000 €,
+  AG 60.000 €) mal Faktor des Zugs, bezahlt aus der Firmenkasse.
+- **Chance und Auszahlung** nach Risiko: sicher 90 % für 120 %, normal 70 % für 150 %, riskant 40 % für 260 % der
+  Kosten. Daneben gibt es 50 %, 30 % oder 10 % zurück. Im Schnitt bringt ein Zug 10 bis 14 % Gewinn; Bekanntheit und
+  Qualität steigen bei Erfolg um 2, 4 oder 8 Prozentpunkte.
+- **Team-Know-how zählt:** Jeder gelernte Skill der Belegschaft im Bereich des Zugs (zum Beispiel Logistik für den
+  Klinik-Express) hebt die Chance um 3 Punkte, höchstens 25, insgesamt höchstens 95 %.
+- **Plätze:** Garage 1, Kleinunternehmen 2, GmbH 3, AG 4 Züge gleichzeitig. Nach einem Zug ruht er doppelt so lange,
+  wie er lief. So lohnt es sich, verschiedene Züge zu nutzen.
+- Nur die Gründerin oder der Gründer startet Züge (`start_company_move`, idempotent). Abgerechnet wird jede Minute
+  (`company_moves_run_due`, Cron `nexa-company-moves`); Geld fließt als Ledger-Buchung von und zu den Haushalten,
+  höchstens so viel, wie die Haushalte haben. Das Ergebnis steht im Firmenchat.
+- **Auftragsarbeit** läuft jetzt immer automatisch (`contract_work = true`), der Schalter ist weg. Sie bleibt ein
+  stiller Grundertrag für freie Kapazität.
+
+Folgen: Firmen haben einen aktiven Takt im Minutenbereich, passend zu ihrem Produkt. Mit 4 Spielern hat jeder seine
+eigenen Züge; nichts davon nimmt anderen etwas weg. Tests: `supabase/tests/95_company_moves.sql`,
+`src/features/game/demo/company-moves.test.ts`, `e2e/company-growth.spec.ts`.

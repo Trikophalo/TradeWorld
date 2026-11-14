@@ -34,7 +34,8 @@ import { CRYPTO } from "@/config/crypto";
 import { StatBars } from "@/features/crypto/components/coin-detail";
 import { CoinLogo } from "@/features/crypto/components/coin-logo";
 import { SignaturePad } from "@/features/career/components/signature-pad";
-import type { MyJob, PlayerCard } from "@/features/game/types";
+import { CompanyMovesCard } from "@/features/company/components/company-moves";
+import type { CompanyMoves, MyJob, PlayerCard } from "@/features/game/types";
 import { SpeechBubble } from "@/features/tutorial/components/speech-bubble";
 import { useTutorial } from "@/features/tutorial/store";
 import { resetDemoPlayer } from "@/features/game/demo-engine";
@@ -81,6 +82,68 @@ const SAMPLE_CARD: PlayerCard = {
 };
 
 /** A junior in IT who is two IT points short of senior (ADR-094). */
+/** Business moves of a courier garage (ADR-127), one running and one done. */
+// Always 20 of 35 minutes left when the page loads, so the countdown looks real.
+const SAMPLE_END = Date.now() + 20 * 60_000;
+const SAMPLE_MOVES: CompanyMoves = {
+  slots: 2,
+  used: 1,
+  cashCents: 900_000,
+  tier: "small_business",
+  product: "courier",
+  moves: [
+    {
+      key: "hospital_express",
+      kind: "cash",
+      risk: "normal",
+      branch: "logistics",
+      minutes: 30,
+      costCents: 480_000,
+      chanceBps: 7_600,
+      skillBonusBps: 600,
+      payoutCents: 720_000,
+      refundCents: 144_000,
+      gain: 0,
+      availableAt: null,
+    },
+    {
+      key: "courier_app",
+      kind: "awareness",
+      risk: "normal",
+      branch: "it",
+      minutes: 35,
+      costCents: 400_000,
+      chanceBps: 7_000,
+      skillBonusBps: 0,
+      payoutCents: 0,
+      refundCents: 120_000,
+      gain: 0.04,
+      availableAt: null,
+    },
+  ],
+  running: [
+    {
+      id: 2,
+      key: "courier_app",
+      startedAt: new Date(SAMPLE_END - 35 * 60_000).toISOString(),
+      endsAt: new Date(SAMPLE_END).toISOString(),
+      costCents: 400_000,
+      chanceBps: 7_000,
+    },
+  ],
+  history: [
+    {
+      id: 1,
+      key: "hospital_express",
+      status: "success",
+      costCents: 480_000,
+      payoutCents: 720_000,
+      gain: 0,
+      resolvedAt: "2026-11-14T11:30:00.000Z",
+    },
+  ],
+};
+
 const SAMPLE_JOB: MyJob = {
   id: "job-sample",
   company: {
@@ -646,6 +709,7 @@ export function Showcase() {
         </Card>
         <CareerLadder job={SAMPLE_JOB} />
         <PayRoutes job={SAMPLE_JOB} />
+        <CompanyMovesCard preview={SAMPLE_MOVES} />
         <UpgradeCard upgradeKey="vault" level={2} />
         <UpgradeCard upgradeKey="rhetoric" level={0} />
         <Demo label="Krypto: Pixel-Coins der Markt-Coins (ADR-101)" className="flex-wrap justify-start gap-3">

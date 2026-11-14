@@ -995,3 +995,22 @@ select public.get_company_profile(:'fx_ai_company');
 select public.get_company_profile(:'fx_player_company');
 \o
 reset role;
+
+-- Business moves (ADR-127) -----------------------------------------------------------------------------------------
+select tests.fund(:fx_g, 5000000, 'fixture:moves') is not null as ok \gset
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+select public.company_deposit(gen_random_uuid(), 5000000) is not null as ok \gset
+\o :fixture_dir/get_company_moves.json
+select public.get_company_moves();
+\o
+select public.get_company_moves() -> 'moves' -> 0 ->> 'key' as fx_move \gset
+\o :fixture_dir/start_company_move.json
+select public.start_company_move(gen_random_uuid(), :'fx_move');
+\o
+reset role;
+select public.company_moves_run_due(now() + interval '2 hours') is not null as ok \gset
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/get_company_moves_history.json
+select public.get_company_moves();
+\o
+reset role;

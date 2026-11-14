@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Die Kasse ist voll. Aktionäre dürfen auf eine Extra-Ausschüttung hoffen. Sicher ist das nicht.",
-      "name": "Volta Energie AG",
-      "due_at": "2026-11-14T01:31:24.517664+00:00",
+      "body": "Eine wichtige Technologie ist jetzt geschützt. Der Vorsprung dürfte sich auszahlen. Sicher ist das nicht.",
+      "name": "Alpenmed",
+      "due_at": "2026-11-14T02:22:41.038895+00:00",
       "status": "open",
-      "ticker": "VLT",
-      "headline": "Sonderdividende bei Volta Energie AG erwartet",
+      "ticker": "ALM",
+      "headline": "Patent für Alpenmed erteilt",
       "move_bps": null,
-      "strength": 3,
+      "strength": 2,
       "direction": "up",
-      "published_at": "2026-11-14T01:18:29.13314+00:00"
+      "published_at": "2026-11-14T01:52:32.90361+00:00"
     },
     {
       "id": 3,
-      "body": "Ein fehlerhaftes Produkt muss zurück in die Werkstatt. Das wird teuer. Sicher ist das nicht.",
-      "name": "KlarSoft AG",
-      "due_at": "2026-11-14T00:18:29.129135+00:00",
+      "body": "Ehemalige Mitarbeiter erheben schwere Vorwürfe. Kunden kündigen erste Verträge. Sicher ist das nicht.",
+      "name": "Fundgrube Discount",
+      "due_at": "2026-11-14T00:52:32.900655+00:00",
       "status": "confirmed",
-      "ticker": "KLS",
-      "headline": "Rückruf bei KlarSoft AG",
-      "move_bps": -780,
-      "strength": 2,
+      "ticker": "FGD",
+      "headline": "Rassismus-Vorwürfe gegen Fundgrube Discount",
+      "move_bps": -1064,
+      "strength": 3,
       "direction": "down",
-      "published_at": "2026-11-14T00:18:29.129135+00:00"
+      "published_at": "2026-11-14T00:52:32.900655+00:00"
     }
   ],
   "reliability_bps": 7500

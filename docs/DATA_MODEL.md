@@ -7097,3 +7097,36 @@ Migration `20261203000700_friend_holdings.sql`, Test `supabase/tests/90_friend_h
 `{"visible": true, "total_cents", "positions": [{"ticker", "name", "kind", "sector", "quantity_e6", "value_cents",
 "share_bps"}]}` (größte zuerst), sonst `{"visible": false, "total_cents": null, "positions": []}`.
 Unbekannter Name: `player_not_found`.
+
+## Nachtrag: Geschäftszüge (ADR-127)
+
+Migration `20261203001500_company_moves.sql`, Test `supabase/tests/95_company_moves.sql`.
+
+**Tabelle `company_moves`** (intern, RLS ohne Policy, keine Client-Rechte): `id`, `company_id`, `move_key`,
+`started_by`, `started_at`, `ends_at`, `cost_cents`, `chance_bps`, `status` (`running`/`success`/`failure`),
+`payout_cents`, `gain`, `resolved_at`.
+
+`player_companies.contract_work` steht jetzt standardmäßig und für alle Firmen auf `true`.
+
+**Konfiguration** `game_config.companyMoves`: `costCentsByTier`, `slotsByTier`, `risk.{safe,normal,risky}`
+(`chanceBps`, `payoutBps`, `refundBps`, `gain`), `chancePerSkillBps`, `maxSkillBonusBps`, `maxChanceBps`,
+`cooldownFactor`, `historyLimit`, `moves[]` (`key`, `product`, `branch`, `kind`, `risk`, `costFactor`, `minutes`).
+
+**Fehler:** `move_unknown` (NX107), `move_busy` (NX108, alle Plätze belegt oder der Zug läuft), `move_resting` (NX109).
+
+**Funktionen:**
+
+- `get_company_moves()` (RPC, `authenticated`, nur Gründer, sonst `company_not_found`):
+
+```
+{"slots", "used", "cash_cents", "tier", "product",
+ "moves": [{"key", "kind", "risk", "branch", "minutes", "cost_cents", "chance_bps", "skill_bonus_bps",
+            "payout_cents", "refund_cents", "gain", "available_at"}],
+ "running": [{"id", "key", "started_at", "ends_at", "cost_cents", "chance_bps"}],
+ "history": [{"id", "key", "status", "cost_cents", "payout_cents", "gain", "resolved_at"}]}
+```
+
+- `start_company_move(p_request_id uuid, p_key text)` (RPC): bucht die Kosten von der Firmenkasse an die Haushalte
+  (`company_costs`) und gibt denselben Zustand zurück.
+- `company_moves_run_due(p_now)` (intern, Cron `nexa-company-moves` jede Minute): würfelt fällige Züge aus, zahlt
+  Erfolg oder Erstattung als `company_revenue` aus und schreibt eine Systemnachricht in den Firmenchat.
