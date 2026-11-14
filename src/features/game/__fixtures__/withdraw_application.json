@@ -1,27 +1,27 @@
 {
-  "id": "8c276f06-4ac3-428f-9374-d9f1bd3533df",
+  "id": "cf247caa-eebb-4a1f-9602-5b3504352339",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "18383ec5-91e2-40e3-943d-6a91331b8fea",
+    "id": "0d374a8a-39c9-4504-a681-d8e166891dd0",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "dc6cd683-c473-c0eb-8d8c-04ddf664b4d5",
+      "id": "db7c839c-c460-945e-1188-5e4a61db1e47",
       "logo": null,
-      "name": "Eilbote Express",
-      "color": "#F7768E",
+      "name": "Rheinkraft Werke",
+      "color": "#5BC0EB",
       "is_ai": true,
-      "sector": "logistics",
-      "ticker": "EBX"
+      "sector": "energy",
+      "ticker": "RKW"
     },
-    "required": [{ "branch": "management", "min_score": 0 }],
-    "title_key": "management_intern",
+    "required": [{ "branch": "craft", "min_score": 0 }],
+    "title_key": "craft_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-14T12:11:43.587838+00:00",
-  "updated_at": "2026-11-14T12:11:43.592321+00:00",
-  "offer_expires_at": "2026-11-16T12:11:43.587838+00:00",
+  "created_at": "2026-11-14T12:36:15.972736+00:00",
+  "updated_at": "2026-11-14T12:36:15.977578+00:00",
+  "offer_expires_at": "2026-11-16T12:36:15.972736+00:00",
   "salary_wish_cents_per_hour": 15000,
   "offer_salary_cents_per_hour": 15000
 }

@@ -5,8 +5,8 @@
     "owner": "Fixture_Heim",
     "width": 13,
     "garage": [
-      { "id": "c856320d-a911-4575-82db-f0cd485ed4aa", "slot": 0, "car_key": "car_electric" },
-      { "id": "10334055-4bc0-4430-b27c-96b0a7cbad2a", "slot": 1, "car_key": "car_city" }
+      { "id": "071c3038-950f-4212-ad09-43a9f3adbf31", "slot": 0, "car_key": "car_electric" },
+      { "id": "ef1ceef4-dfcf-4770-b886-716da47b549a", "slot": 1, "car_key": "car_city" }
     ],
     "height": 9,
     "placed": [],
@@ -18,9 +18,9 @@
   "inventory": {
     "cars": [],
     "furniture": [
-      { "id": "8e228049-fb9e-4b1a-a36c-fabc4d50d057", "item_key": "sofa_leather" },
-      { "id": "da6bf27c-9daf-4b5a-96d3-1cb658a5d835", "item_key": "rug_wool" },
-      { "id": "7e1ff51b-f072-44bb-83ab-7da2c65c7a29", "item_key": "plant_small" }
+      { "id": "46e90113-c6c7-46f4-bcb2-514d13ac8b97", "item_key": "sofa_leather" },
+      { "id": "dff212d9-07f3-4285-ae43-70a6004ba367", "item_key": "rug_wool" },
+      { "id": "8ad60921-48c0-4cb3-a77c-35e69cddaa18", "item_key": "plant_small" }
     ]
   },
   "refund_cents": 1200

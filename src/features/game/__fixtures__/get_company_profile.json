@@ -1,4 +1,12 @@
 {
+  "news": [
+    {
+      "body": "KlarSoft AG meldet 480,8 Mio. € Umsatz und 56,7 Mio. € Gewinn im Q1 des Spieljahres 2. Analysten hatten weniger erwartet.",
+      "category": "earnings",
+      "headline": "KlarSoft AG steigert Gewinn um 51 %",
+      "published_at": "2026-11-14T12:36:04.452668+00:00"
+    }
+  ],
   "facts": {
     "staff": 14500,
     "stage": null,
@@ -7,10 +15,10 @@
     "max_staff": 100000,
     "ai_workers": 0,
     "quality_bps": null,
-    "value_cents": 431468500000,
-    "profit_cents": 15015068078,
+    "value_cents": 434486500000,
+    "profit_cents": 16922407770,
     "awareness_bps": null,
-    "revenue_cents": 168023971403
+    "revenue_cents": 174080931264
   },
   "company": {
     "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
@@ -22,9 +30,9 @@
     "listed": true,
     "sector": "tech",
     "ticker": "KLS",
-    "price_e4": 862937,
-    "change_bps": -7,
-    "founded_at": "2026-11-14T12:09:49.19579+00:00",
+    "price_e4": 868973,
+    "change_bps": 71,
+    "founded_at": "2026-11-14T12:34:06.05631+00:00",
     "brand_color": "#4C8DFF"
   },
   "founder": null,

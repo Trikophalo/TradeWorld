@@ -209,6 +209,9 @@ on conflict do nothing;
 
 drop table _seed_companies;
 
+-- Ten more AI companies (ADR-130), outside the NEXA 30. The same function adds them to a live database.
+select public.ai_companies_add_v2();
+
 -- ---------------------------------------------------------------------------
 -- 4. Government bonds: 1, 2, 5 and 10 game years (1 game year = 1 real day).
 --    Price is quoted per 100 EUR face value; coupons track the 3 % policy rate.

@@ -1883,3 +1883,47 @@ Marktmeldungen und 36 kuriose Meldungen über KI-Firmen, Spieler und die Börse 
 
 Abgelöst: Die Arbeitsaufgaben aus ADR-059 bleiben abgeschaltet; die Firmenaufgaben sind ihr Ersatz.
 Tests: `supabase/tests/96_company_tasks.sql`, `src/lib/sim/company-tasks.test.ts`, `e2e/company-growth.spec.ts`.
+
+## ADR-130: Missionen aufgeräumt und erweitert, zehn neue KI-Firmen mit eigenen News — `akzeptiert`
+
+**Missionen.** ADR-117 hatte die Limit-Missionen abgeschaltet, aber nur die Metriken `limit_orders_placed` und
+`limit_orders_filled`. Vier Vorlagen aus M4a mit der Metrik `limit_order` (schnell, täglich, wöchentlich, Meilenstein)
+liefen weiter und waren nicht lösbar. Sie sind jetzt aus; laufende Missionen dieser Art enden, bereits geschaffte
+lassen sich noch abholen. Dazu kommen 67 neue Vorlagen:
+
+- Firmenaufgaben (ADR-129): erledigen, fehlerfrei lösen, delegieren. Neue Metriken `task_done`, `task_perfect`,
+  `task_delegated`; die neue Voraussetzung `team` gilt für Gründer und Mitarbeiter einer Spielerfirma.
+- Geschäftszüge (ADR-127): starten und erfolgreich abschließen (`move_started`, `move_success`, über einen Trigger auf
+  `company_moves`).
+- Mehr Börse (Käufe und Verkäufe, jede Branche einzeln, Gewinne, breite Depots, große Käufe), Arbeit, Kunst, Zuhause,
+  Anleihen sowie Meilensteine bis 500 Trades, Level 30 und 500.000 € Vermögen.
+- Wöchentliche Missionen und Meilensteine geben wie bisher einen Fähigkeitspunkt.
+
+**KI-Firmen.** Zehn neue Aktien, zwei je Branche, jede mit eigenem Charakter und anderen Zahlen:
+
+| Kürzel | Firma              | Branche  | Klasse     | Idee                                         |
+| ------ | ------------------ | -------- | ---------- | -------------------------------------------- |
+| HLX    | Helix Robotik      | Tech     | Midcap     | Haushaltsroboter                             |
+| MEM    | Memeland Media     | Tech     | Pennystock | Meme-App, die Aktie macht, was das Netz will |
+| LUX    | Glanz & Gloria     | Handel   | Bluechip   | Luxusuhren und Schmuck                       |
+| SNK    | Knusperkönig       | Handel   | Pennystock | Chips mit verrückten Sorten                  |
+| WND    | Nordbrise Offshore | Energie  | Midcap     | Windparks, Sturm gut, Flaute schlecht        |
+| FSN    | Sonnenkern Fusion  | Energie  | Pennystock | Kernfusion im Container                      |
+| MTH    | Methusalem Bio     | Pharma   | Pennystock | Pillen gegen das Altern                      |
+| PFW    | Pfotenwohl         | Pharma   | Midcap     | Tiermedizin                                  |
+| DRN    | Luftpost Drohnen   | Logistik | Pennystock | Paketdrohnen                                 |
+| OFR    | Orbitfracht        | Logistik | Midcap     | Raketenstarts und Fracht ins All             |
+
+- Eine Funktion (`ai_companies_add_v2`) legt sie an: auf einer neuen Datenbank aus `seed.sql`, auf der laufenden
+  durch die Migration. Sie stehen nicht im NEXA 30, damit Index und Teiler stabil bleiben.
+- Startkasse: ein Zehntel der Quartalskosten, vor der Geldschöpfung aus der Münze, danach von den Haushalten.
+  Die ersten 15 bekamen ein ganzes Quartal; mehr hätte den Finanzmarkt ausgetrocknet.
+- Auf einer laufenden Datenbank beginnen die neuen Kurse ohne Vorgeschichte; der Takt baut sie auf.
+
+**Eigene News.** Das Firmenprofil (ADR-125) zeigt „Neuigkeiten“: Börsenmeldungen zur Firma aus `news_items`
+(Quartalszahlen, Tipps) und für jede der 25 KI-Firmen eigene lustige und spannende Geschichten aus dem Firmenalltag
+(`messages/de.json`, `aiCompanyNews.<Kürzel>`), drei auf einmal, stündlich wechselnd.
+
+Nebenbei: Der Cache der Marktübersicht (ADR-123) löschte mit `delete` ohne `where`. Supabase lehnt das bei
+API-Aufrufen ab (pg-safeupdate), deshalb schlug das Speichern eines Firmenlogos live fehl.
+Migration `20261204000300_fix_safe_delete.sql`.

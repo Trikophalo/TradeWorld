@@ -4438,7 +4438,11 @@
     "teamEmpty": "Hier arbeiten noch keine Spieler.",
     "stock": "Zur Aktie",
     "notFound": "Diese Firma gibt es nicht mehr.",
-    "open": "Firma ansehen"
+    "open": "Firma ansehen",
+    "news": "Neuigkeiten",
+    "newsMarket": "Börse",
+    "newsInside": "Aus der Firma",
+    "newsAgo": "vor {hours, plural, =0 {kurzem} one {# Stunde} other {# Stunden}}"
   },
   "companyMoves": {
     "title": "Geschäftszüge",
@@ -5871,5 +5875,207 @@
     "openCompany": "Zur Firma",
     "ago": "vor {minutes, plural, =0 {wenigen Sekunden} one {# Minute} other {# Minuten}}",
     "agoHours": "vor {hours, plural, one {# Stunde} other {# Stunden}}"
+  },
+  "aiCompanyNews": {
+    "ALM": [
+      "Alpenmed bringt Bergkräuter-Hustensaft auf den Markt. Riecht nach Wanderurlaub.",
+      "Alpenmed liefert solide Zahlen. Wie immer. Analysten gähnen zufrieden.",
+      "Kühe auf dem Werksgelände von Alpenmed: Die Produktion stoppt für 20 Minuten.",
+      "Alpenmed gewinnt großen Generika-Vertrag mit Krankenkassen.",
+      "Rohstoffpreise steigen: Alpenmed muss Margen opfern.",
+      "Alpenmed-Chefin besteigt den höchsten Berg der Alpen. Mit einem Werbebanner."
+    ],
+    "BRZ": [
+      "Brotzeit senkt den Preis für Butter. Andere Supermärkte ziehen nach.",
+      "Brotzeit testet Kassen ohne Personal. Kunden scannen fleißig, auch ihre Hunde.",
+      "Rekord-Ostergeschäft bei Brotzeit: 4 Millionen Schokohasen in einer Woche.",
+      "Brotzeit-Filiale verkauft versehentlich Gurken für 1 Cent. Die Schlange reicht bis zum Bahnhof.",
+      "Lieferstreik trifft Brotzeit: Leere Regale bei Toilettenpapier.",
+      "Brotzeit plant 200 neue Filialen auf dem Land."
+    ],
+    "DRN": [
+      "Luftpost-Drohne liefert Pizza in 7 Minuten. Noch heiß.",
+      "Möwe greift Luftpost-Drohne an und erbeutet ein Paket Fischstäbchen.",
+      "Luftfahrtbehörde erlaubt Luftpost Drohnen den Flug über ganze Städte.",
+      "Sturm: Luftpost Drohnen müssen am Boden bleiben.",
+      "Luftpost gewinnt Apothekenkette als Großkunden.",
+      "Drohne von Luftpost landet versehentlich auf einem Hochzeitsfoto. Das Paar ist begeistert."
+    ],
+    "EBX": [
+      "Eilbote liefert eine Million Pakete an einem Tag. Rekord!",
+      "Eilbote-Bote stellt Paket in den Kühlschrank des Kunden. Mit dessen Erlaubnis, sagt er.",
+      "Lohnerhöhung bei Eilbote: Kosten steigen deutlich.",
+      "Eilbote testet Lieferroboter in der Innenstadt.",
+      "Vorweihnachtszeit: Eilbote stellt 3.000 Aushilfen ein.",
+      "Kunden beschweren sich: Eilbote klingelt nie, die Zettel kommen trotzdem."
+    ],
+    "FGD": [
+      "Fundgrube verkauft 40.000 Gartenzwerge aus einer Insolvenz. Restposten-Rekord!",
+      "Fundgrube-Chef im Interview: „Wir sind nicht billig, wir sind preiswert.“",
+      "Lieferant pleite: Fundgrube bleibt auf Weihnachtsdeko im Juni sitzen.",
+      "Fundgrube schreibt überraschend schwarze Zahlen. Grund: ein Container voller Fidget-Spinner.",
+      "Kunde findet bei Fundgrube eine echte Rolex für 4,99 €. Die Firma prüft den Vorgang.",
+      "Fundgrube muss sparen: Das Licht in den Filialen wird gedimmt."
+    ],
+    "FPT": [
+      "Frachtpilot-App vermittelt den 100.000. Auftrag.",
+      "Server-Ausfall: Frachtpilot-Lkw finden keine Ladung.",
+      "Frachtpilot führt Sterne für Fahrer ein. Der Beste heißt Horst und hat 4,99.",
+      "Großspedition testet Frachtpilot. Ein Durchbruch?",
+      "Frachtpilot muss Kosten senken: Büro zieht in eine Garage.",
+      "Frachtpilot gewinnt Gründerpreis."
+    ],
+    "FSN": [
+      "Sonnenkern Fusion hält Plasma für 3 Sekunden stabil. Jubel im Labor.",
+      "Sonnenkern braucht 200 Millionen für den nächsten Reaktor.",
+      "Sonnenkern-Reaktor erzeugt zum ersten Mal Strom. Genug für eine Glühbirne.",
+      "Forscher zweifeln an Sonnenkern-Daten. Die Firma kontert.",
+      "Energiekonzern beteiligt sich an Sonnenkern Fusion.",
+      "Sonnenkern-Chef verspricht Fusionsstrom „in zwei Jahren“. Wie jedes Jahr."
+    ],
+    "GNV": [
+      "GenoVita startet entscheidende Studie. Alles oder nichts.",
+      "Gerücht: Großkonzern interessiert sich für GenoVita.",
+      "GenoVita-Labor verliert eine Probe. Sie lag im Kühlschrank neben dem Joghurt.",
+      "Zwischenergebnisse bei GenoVita: „vielversprechend“. Die Aktie springt.",
+      "GenoVita muss Studie pausieren. Nebenwirkungen werden geprüft.",
+      "GenoVita sammelt Geld bei Privatanlegern. Die Nachfrage ist riesig."
+    ],
+    "HLX": [
+      "Helix-Roboter „Putzi 2“ saugt versehentlich den Teppich mit auf. Kunde ist trotzdem begeistert.",
+      "Helix Robotik bekommt Großauftrag von einer Hotelkette.",
+      "Helix-Roboter kocht erstmals ein Fünf-Gänge-Menü. Nur das Dessert brannte an.",
+      "Lieferengpass bei Chips: Helix kann weniger Roboter bauen.",
+      "Helix stellt Roboter vor, der Wäsche faltet. Die Socken bleiben ein Rätsel.",
+      "Datenschutzbehörde fragt nach: Was sieht die Helix-Kamera?"
+    ],
+    "KFR": [
+      "Kaufrausch eröffnet das größte Einkaufszentrum des Landes. Mit Rutsche.",
+      "Black Friday bei Kaufrausch: Server unter Last, Kunden unter Strom.",
+      "Kaufrausch-Onlineshop verschickt 500 Fernseher an dieselbe Adresse. Der Empfänger freut sich.",
+      "Kauflaune sinkt: Kaufrausch warnt vor einem schwachen Quartal.",
+      "Kaufrausch führt Ratenkauf für Kaugummi ein. Kritiker sind fassungslos.",
+      "Promi-Kollektion bei Kaufrausch in elf Minuten ausverkauft."
+    ],
+    "KLS": [
+      "KlarSoft-Update legt 3.000 Büros lahm: Die neue Version wollte erst einmal 14 Stunden lang Updates laden.",
+      "KlarSoft gewinnt Großauftrag der Bundesverwaltung. Die Faxgeräte bleiben trotzdem.",
+      "Gerüchte um eine KI-Offensive bei KlarSoft: Der Chef spricht im Interview elfmal von „Synergien“.",
+      "KlarSoft erhöht die Lizenzpreise um 9 %. Kunden murren, kündigen aber nicht.",
+      "Praktikant bei KlarSoft löscht versehentlich die Testumgebung. Es war doch die echte.",
+      "KlarSoft-Kantine führt Code-Review-Pizza ein: Wer einen Bug findet, isst gratis."
+    ],
+    "LUX": [
+      "Glanz & Gloria bringt Uhr für 250.000 € heraus. Ausverkauft in einer Stunde.",
+      "Glanz & Gloria eröffnet Boutique in Monaco.",
+      "Fälscher bieten Glanz-&-Gloria-Taschen an. Die echten sind trotzdem teurer.",
+      "Reiche Kundschaft hält sich zurück: Glanz & Gloria warnt vor schwächerem Quartal.",
+      "Glanz & Gloria erhöht die Preise um 12 %. Die Nachfrage steigt weiter.",
+      "Diamantlieferung von Glanz & Gloria verschwindet am Flughafen. Wieder aufgetaucht im Fundbüro."
+    ],
+    "MEM": [
+      "Memeland-Video mit tanzender Ente erreicht 400 Millionen Aufrufe.",
+      "Memeland-Aktie verdoppelt sich, nachdem ein Promi ein Hundebild postet.",
+      "Werbekunden springen ab: Memeland verliert Umsatz.",
+      "Memeland-Chef twittert nur noch in Emojis. Analysten rätseln.",
+      "Memeland führt Abo ohne Werbung ein. Kostet 1 Meme pro Monat.",
+      "Server-Absturz bei Memeland: Jugendliche müssen sich unterhalten."
+    ],
+    "MTH": [
+      "Methusalem-Maus feiert 4. Geburtstag. Für eine Maus ein Rekord.",
+      "Methusalem Bio startet erste Studie am Menschen.",
+      "Methusalem-Chef ist 72 und sieht aus wie 50. Ist es die Pille oder die Creme?",
+      "Studie bei Methusalem: kein messbarer Effekt. Die Aktie altert schlagartig.",
+      "Milliardär investiert in Methusalem Bio: „Ich will ewig leben.“",
+      "Methusalem braucht frisches Kapital für die nächste Studie."
+    ],
+    "NDL": [
+      "Nordlicht bestellt sechs neue Containerschiffe.",
+      "Kanal blockiert: Nordlicht-Schiffe stecken fest.",
+      "Nordlicht-Lkw fährt aus Versehen nach Rom statt nach Rostock. Navi war auf Italienisch.",
+      "Frachtraten steigen: Nordlicht verdient mehr pro Container.",
+      "Nordlicht testet Lkw mit Wasserstoff.",
+      "Streik im Hafen: Nordlicht-Lager laufen voll."
+    ],
+    "NPH": [
+      "NeuroPharm meldet Durchbruch in Studie gegen Vergesslichkeit. Die Pressemitteilung kam leider zweimal.",
+      "Patent auf Blockbuster läuft bald aus: NeuroPharm unter Druck.",
+      "NeuroPharm übernimmt kleines Biotech-Labor für 400 Millionen.",
+      "Behörde verlangt mehr Daten: NeuroPharm-Zulassung verzögert sich.",
+      "NeuroPharm-Forscher gewinnen Wissenschaftspreis.",
+      "Betriebsausflug bei NeuroPharm: Alle wussten noch, wo der Bus steht. Gutes Zeichen."
+    ],
+    "OFR": [
+      "Orbitfracht bringt 40 Satelliten ins All. Perfekter Start.",
+      "Fehlstart bei Orbitfracht: Rakete explodiert kurz nach dem Abheben.",
+      "Orbitfracht schickt eine Pizza ins All. Sie kam kalt zurück.",
+      "Raumfahrtagentur bucht zehn Starts bei Orbitfracht.",
+      "Orbitfracht testet wiederverwendbare Rakete. Landung gelungen!",
+      "Start verschoben: Ein Specht hat ein Loch in die Isolierung gehackt."
+    ],
+    "PFW": [
+      "Pfotenwohl bringt Zahnpasta für Hunde mit Speckgeschmack. Ausverkauft.",
+      "Pfotenwohl übernimmt eine Kette von Tierkliniken.",
+      "Katze testet neues Pfotenwohl-Futter und lässt es stehen. Die Entwicklung startet neu.",
+      "Mehr Haustiere als je zuvor: Pfotenwohl wächst zweistellig.",
+      "Rückruf bei Pfotenwohl: Etikett von Hamsterfutter auf Pferdefutter.",
+      "Pfotenwohl gewinnt Preis für das beste Tiermedikament."
+    ],
+    "PXW": [
+      "Pixelwerk kündigt „Ritter der Kühlschranktür 3“ an. Fans campen schon vor dem Studio.",
+      "Release verschoben: Pixelwerk braucht noch „ein paar Monate Feinschliff“. Die Aktie seufzt.",
+      "Bug im neuen Spiel lässt Pferde fliegen. Die Community liebt es, Pixelwerk patcht es nicht.",
+      "Pixelwerk-Spiel knackt eine Million Verkäufe in 48 Stunden.",
+      "Streamer zockt 72 Stunden am Stück ein Pixelwerk-Spiel und bricht einen Rekord.",
+      "Pixelwerk verhandelt angeblich über eine Verfilmung. Hauptrolle: ein Toaster."
+    ],
+    "QSL": [
+      "QuantenSprung meldet stabilen Qubit für 0,3 Sekunden. Rekord, sagen die Forscher.",
+      "QuantenSprung braucht frisches Geld: Kapitalerhöhung im Gespräch.",
+      "Laborkatze bei QuantenSprung gleichzeitig wach und schlafend gesichtet. Physiker skeptisch.",
+      "Großer Tech-Konzern testet Chips von QuantenSprung. Ergebnis: geheim.",
+      "QuantenSprung-Chefin: „In zehn Jahren hat jeder einen Quantencomputer.“ Das sagte sie vor zehn Jahren auch.",
+      "Stromausfall im Labor: QuantenSprung verliert eine Woche Rechenzeit."
+    ],
+    "RKW": [
+      "Rheinkraft meldet Rekord-Wasserstand. Die Turbinen laufen auf Hochtouren.",
+      "Niedrigwasser am Rhein: Rheinkraft produziert weniger Strom.",
+      "Biber blockiert Kraftwerkseinlauf von Rheinkraft. Er hat einen Namen bekommen: Volker.",
+      "Rheinkraft übernimmt kleine Stadtwerke im Süden.",
+      "Rheinkraft modernisiert drei Turbinen. Kosten höher als geplant.",
+      "Rheinkraft-Chef fährt jetzt mit dem Kanu zur Arbeit. PR oder Leidenschaft?"
+    ],
+    "SFX": [
+      "SolarFuchs gewinnt Ausschreibung für 3.000 Schuldächer.",
+      "Lieferengpass bei Modulen: SolarFuchs-Baustellen stehen still.",
+      "Fuchs zieht in Lager von SolarFuchs ein. Das Maskottchen ist jetzt echt.",
+      "SolarFuchs wächst um 80 %, verliert aber weiter Geld.",
+      "Sommer mit Rekordsonne: SolarFuchs-Kunden bekommen hohe Gutschriften.",
+      "SolarFuchs braucht Kapital: Investorensuche läuft."
+    ],
+    "SNK": [
+      "Knusperkönig bringt Sorte „Döner-Mango“. Das Internet ist gespalten.",
+      "Knusperkönig-Chips „Gurke-Vanille“ werden Kult. Die Fabrik läuft rund um die Uhr.",
+      "Rückruf: Bei Knusperkönig war zu viel Salz in einer Tüte. In allen Tüten.",
+      "Fußball-Großturnier: Knusperkönig verkauft dreimal so viel wie sonst.",
+      "Kartoffelernte schlecht: Knusperkönig zahlt mehr für Rohware.",
+      "Knusperkönig-Werbefigur, eine tanzende Kartoffel, bekommt eigene Serie."
+    ],
+    "VLT": [
+      "Volta erhöht die Dividende. Rentner jubeln.",
+      "Kraftwerksausfall bei Volta: Ersatzstrom wird teuer eingekauft.",
+      "Volta-Kundenmagazin verwechselt Tipps zum Stromsparen mit Rezepten. Der Strom-Kuchen wird ein Hit.",
+      "Gaspreis fällt: Volta könnte deutlich mehr verdienen.",
+      "Volta kündigt den Bau eines Speicherkraftwerks an.",
+      "Bürgerinitiative gegen neue Volta-Leitung gründet sich. Erste Sitzung im Volta-Gemeindesaal."
+    ],
+    "WND": [
+      "Sturmtief bringt Nordbrise einen Rekordtag.",
+      "Flaute seit zwei Wochen: Nordbrise produziert kaum Strom.",
+      "Robbenfamilie macht es sich auf einem Nordbrise-Windrad bequem. Wartung verschoben.",
+      "Nordbrise bekommt Zuschlag für einen neuen Windpark.",
+      "Kabel zum Festland gerissen: Nordbrise-Park liegt still.",
+      "Nordbrise erhöht die Dividende nach starkem Herbst."
+    ]
   }
 }

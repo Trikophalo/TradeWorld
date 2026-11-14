@@ -397,6 +397,16 @@ const companyProfileSchema = z.object({
       since: z.string(),
     }),
   ),
+  news: z
+    .array(
+      z.object({
+        headline: z.string(),
+        body: z.string().nullable(),
+        category: z.string(),
+        published_at: z.string(),
+      }),
+    )
+    .default([]),
 });
 
 const netWorthHistorySchema = z.object({
@@ -531,6 +541,12 @@ export const liveEngine: GameEngine = {
         tier: m.tier,
         title: m.title,
         since: m.since,
+      })),
+      news: r.news.map((n) => ({
+        headline: n.headline,
+        body: n.body,
+        category: n.category,
+        publishedAt: n.published_at,
       })),
     };
   },

@@ -1,32 +1,33 @@
 {
+  "news": [],
   "facts": {
     "staff": 1,
     "stage": 0,
-    "period": "quarter",
-    "product": "courier",
-    "max_staff": 2,
+    "period": null,
+    "product": "security_software",
+    "max_staff": 40,
     "ai_workers": 0,
-    "quality_bps": 2325,
-    "value_cents": 295011,
-    "profit_cents": -14989,
-    "awareness_bps": 355,
-    "revenue_cents": 219099
+    "quality_bps": null,
+    "value_cents": 7856750,
+    "profit_cents": null,
+    "awareness_bps": null,
+    "revenue_cents": null
   },
   "company": {
-    "id": "524623c4-d412-4921-a077-f3d3266374b2",
-    "idea": "Fahrräder reparieren",
+    "id": "cfc97bea-281e-43f5-ac41-1af396a9a8a8",
+    "idea": "Maschinen nach Maß",
     "logo": null,
-    "name": "Gero Werkstatt",
-    "tier": "garage",
+    "name": "Ausbau Werke",
+    "tier": "gmbh",
     "is_ai": false,
     "listed": false,
-    "sector": "logistics",
+    "sector": "tech",
     "ticker": null,
     "price_e4": null,
     "change_bps": null,
-    "founded_at": "2026-11-14T12:11:21.472384+00:00",
-    "brand_color": "#aa5500"
+    "founded_at": "2026-11-14T12:36:00.985511+00:00",
+    "brand_color": "#224466"
   },
-  "founder": { "tag": "TN62", "nickname": "Gero_Garage", "avatar_key": "rookie" },
+  "founder": { "tag": "XJMH", "nickname": "Anke_Ausbau", "avatar_key": "rookie" },
   "members": []
 }

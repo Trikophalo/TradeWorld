@@ -53,7 +53,7 @@ select tests.assert(true, 'daily range ' || cls || ': avg ' || round(avg(range_p
 select tests.assert((select min(min_price) > 0 from public._day_stats), 'prices stay above zero all day');
 select tests.assert(
   (select count(*) from public.security_quotes q join public.securities s on s.id = q.security_id
-    where s.kind in ('stock', 'bond') and s.status = 'listed' and q.bid_e4 < q.ask_e4 and q.bid_e4 > 0) = 19,
+    where s.kind in ('stock', 'bond') and s.status = 'listed' and q.bid_e4 < q.ask_e4 and q.bid_e4 > 0) = 29,
   'bid < ask for every stock and bond after a day');
 select tests.assert(
   (select avg(range_pct) between 0.5 and 6 from public._day_stats where cls = 'bluechip')
@@ -78,7 +78,7 @@ select tests.assert(
   and not exists (select 1 from public.candles c where c.high_e4 < greatest(c.open_e4, c.close_e4) or c.low_e4 > least(c.open_e4, c.close_e4)),
   'after a day of ticks: 1m candles contiguous from history into live data, OHLC consistent');
 select tests.assert(
-  (select count(*) from public.candles c where c.interval = '1y' and c.bucket_start > now()) = 20,
+  (select count(*) from public.candles c where c.interval = '1y' and c.bucket_start > now()) = 30,
   'the next game year (08:00 Berlin) opened a new 1y candle for every security');
 
 select tests.assert(

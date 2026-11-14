@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "34324e8b-a653-4b18-9b78-cb01fd31f88e",
+    "id": "f3508278-a925-4d44-85c3-936e24cd4b11",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "dc6cd683-c473-c0eb-8d8c-04ddf664b4d5",
+      "id": "db7c839c-c460-945e-1188-5e4a61db1e47",
       "logo": null,
-      "name": "Eilbote Express",
-      "color": "#F7768E",
+      "name": "Rheinkraft Werke",
+      "color": "#5BC0EB",
       "is_ai": true,
-      "sector": "logistics",
-      "ticker": "EBX"
+      "sector": "energy",
+      "ticker": "RKW"
     },
     "presence": {
-      "fire_at": "2026-11-19T12:11:46.04307+00:00",
+      "fire_at": "2026-11-19T12:36:18.730049+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-14T12:11:46.04307+00:00"
+      "last_active_at": "2026-11-14T12:36:18.730049+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-14T12:11:46.129801+00:00",
+    "started_at": "2026-11-14T12:36:18.81995+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

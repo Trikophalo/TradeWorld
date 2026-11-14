@@ -1,35 +1,35 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 191, "gap_cents": 564 }, "rank": 192, "net_worth_cents": 1019436 },
+  "me": { "next": { "name": "Vera", "rank": 190, "gap_cents": 663 }, "rank": 191, "net_worth_cents": 1019337 },
   "total": 295,
   "entries": [
     {
-      "id": "4d3914ff-c27c-496c-86aa-218725250f40",
+      "id": "4fb133f5-6c8b-4e44-b442-5b81a6446dc8",
       "tag": null,
       "kind": "tycoon",
       "name": "Henrike Achterberg",
       "rank": 1,
       "is_me": false,
-      "avatar_key": "punk",
+      "avatar_key": "rookie",
       "description": "Gründerin von NeuroPharm",
       "change_24h_bps": null,
-      "net_worth_cents": 75585461326,
+      "net_worth_cents": 76046048701,
       "rank_change_24h": null
     },
     {
-      "id": "6a056286-701b-43b0-a01f-0b0133816471",
+      "id": "0ab9064c-dbe8-44f2-82d4-fc7b38f50cb2",
       "tag": null,
       "kind": "tycoon",
       "name": "Jonas Hartwigsen",
       "rank": 2,
       "is_me": false,
-      "avatar_key": "seller",
+      "avatar_key": "analyst",
       "description": "Gründer von Volta Energie",
       "change_24h_bps": null,
-      "net_worth_cents": 15611645385,
+      "net_worth_cents": 15720200032,
       "rank_change_24h": null
     },
     {
-      "id": "731df79b-cefc-47c7-a633-6315ddda8554",
+      "id": "a3d923eb-8a4f-4fd0-b189-7291e72ed762",
       "tag": null,
       "kind": "tycoon",
       "name": "Dr. Clara Ostendorp",
@@ -38,35 +38,35 @@
       "avatar_key": "trucker",
       "description": "Gründerin von KlarSoft",
       "change_24h_bps": null,
-      "net_worth_cents": 10840293561,
+      "net_worth_cents": 10865051569,
       "rank_change_24h": null
     },
     {
-      "id": "66076b4d-ea85-4ac4-bab0-fd466abdd974",
-      "tag": null,
-      "kind": "tycoon",
-      "name": "Friedrich Nagelschmidt",
-      "rank": 4,
-      "is_me": false,
-      "avatar_key": "pilot",
-      "description": "Gründer von Alpenmed",
-      "change_24h_bps": null,
-      "net_worth_cents": 9240120682,
-      "rank_change_24h": null
-    },
-    {
-      "id": "a6de0e34-ee21-45c9-b229-51d396bf63a2",
+      "id": "f255f014-ab7c-445b-a3c3-d02aa7848135",
       "tag": null,
       "kind": "tycoon",
       "name": "Matthis Vosskamp",
+      "rank": 4,
+      "is_me": false,
+      "avatar_key": "chef",
+      "description": "Gründer von Glanz & Gloria",
+      "change_24h_bps": null,
+      "net_worth_cents": 7913119888,
+      "rank_change_24h": null
+    },
+    {
+      "id": "79710935-562c-491b-831a-9797a739e7ee",
+      "tag": null,
+      "kind": "tycoon",
+      "name": "Ida Vogtland",
       "rank": 5,
       "is_me": false,
-      "avatar_key": "founder",
-      "description": "Gründer von Brotzeit Handel",
+      "avatar_key": "astronaut",
+      "description": "Gründerin von Pfotenwohl",
       "change_24h_bps": null,
-      "net_worth_cents": 8265143711,
+      "net_worth_cents": 7776345490,
       "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-14T12:11:43.384235+00:00"
+  "server_time": "2026-11-14T12:36:15.704943+00:00"
 }

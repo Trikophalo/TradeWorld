@@ -1,7 +1,7 @@
 {
   "job": null,
-  "tag": "3FXA",
-  "rank": 129,
+  "tag": "EQTS",
+  "rank": 123,
   "level": 6,
   "trust": { "band": "shaky", "kept": 0, "score": 41, "broken": 1 },
   "company": { "name": "Fixture Lieferwerk", "ticker": null },
@@ -10,7 +10,7 @@
   "avatar_key": "rookie",
   "top_skills": [],
   "streak_days": 0,
-  "member_since": "2026-11-14T12:11:46.317305+00:00",
+  "member_since": "2026-11-14T12:36:18.990099+00:00",
   "branch_scores": {
     "it": 0,
     "law": 0,

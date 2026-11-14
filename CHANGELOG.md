@@ -152,3 +152,8 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   Sortieren, Reihenfolge, Merken, Rechnen). Gut gemacht bringt Geld, verpatzt oder liegen gelassen kostet es, und es
   steht in den Firmen-News. Vorgesetzte sind für ihr Team verantwortlich und delegieren; die KI hilft, aber langsam.
 - **News-Tab:** Börsen-Tipps, Firmen-Meldungen aller Spielerfirmen, Marktmeldungen und Kurioses.
+- **Missionen (ADR-130):** Limit-Missionen sind endgültig weg, 67 neue Missionen kommen dazu, auch für Firmenaufgaben
+  und Geschäftszüge.
+- **Zehn neue KI-Firmen** an der Börse, von Glanz & Gloria (Luxus) bis Sonnenkern Fusion. Jede KI-Firma hat im Profil
+  eigene Neuigkeiten.
+- **Fehler behoben:** Das Firmenlogo ließ sich live nicht speichern.

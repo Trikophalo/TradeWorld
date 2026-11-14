@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Ein bekannter Anleger hat ein großes Paket gekauft. Andere könnten folgen. Sicher ist das nicht.",
-      "name": "KlarSoft AG",
-      "due_at": "2026-11-14T13:22:42.952925+00:00",
+      "body": "Ein bekannter Fonds hält die Aktie für überbewertet. Sicher ist das nicht.",
+      "name": "GenoVita Biotech",
+      "due_at": "2026-11-14T13:58:28.278395+00:00",
       "status": "open",
-      "ticker": "KLS",
-      "headline": "Star-Investor steigt bei KlarSoft AG ein",
+      "ticker": "GNV",
+      "headline": "Leerverkäufer wetten gegen GenoVita Biotech",
       "move_bps": null,
       "strength": 1,
-      "direction": "up",
-      "published_at": "2026-11-14T13:11:47.60254+00:00"
+      "direction": "down",
+      "published_at": "2026-11-14T13:36:20.377968+00:00"
     },
     {
       "id": 3,
-      "body": "Der Start im Ausland läuft besser als geplant. Sicher ist das nicht.",
-      "name": "Fundgrube Discount",
-      "due_at": "2026-11-14T12:11:47.598341+00:00",
+      "body": "Das Geschäft läuft schwächer als erwartet. Analysten rechnen mit einem spürbar fallenden Kurs. Sicher ist das nicht.",
+      "name": "Pfotenwohl",
+      "due_at": "2026-11-14T12:36:20.372069+00:00",
       "status": "confirmed",
-      "ticker": "FGD",
-      "headline": "Fundgrube Discount erschließt neuen Markt",
-      "move_bps": 1111,
-      "strength": 3,
-      "direction": "up",
-      "published_at": "2026-11-14T12:11:47.598341+00:00"
+      "ticker": "PFW",
+      "headline": "Pfotenwohl senkt die Prognose",
+      "move_bps": -856,
+      "strength": 2,
+      "direction": "down",
+      "published_at": "2026-11-14T12:36:20.372069+00:00"
     }
   ],
   "reliability_bps": 7500

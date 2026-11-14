@@ -7172,3 +7172,16 @@ Rätsel und Antworten: `pick` `{tiles}` → `{picked}`, `count` `{tiles}` → `{
 `order` `{values}` → `{order}`, `seq` `{sequence, show_seconds}` → `{sequence}`, `math` `{a, b}` → `{value}`.
 Intern: `company_tasks_run_due(p_now)` (Cron `nexa-company-tasks`), `fun_news_run_due(p_now)` (Cron `nexa-fun-news`).
 `get_company_org` liefert je Mitglied zusätzlich `supervisor`.
+
+## Nachtrag: Missionen, neue KI-Firmen, Profil-News (ADR-130)
+
+Migrationen `20261204000200_missions_ai_companies.sql` und `20261204000300_fix_safe_delete.sql`.
+
+- `mission_templates`: Metriken `limit_order`, `limit_orders_placed`, `limit_orders_filled` inaktiv; 67 neue Vorlagen.
+  Neue Metriken `task_done`, `task_perfect`, `task_delegated`, `move_started`, `move_success`; `params.requires`
+  kennt zusätzlich `team`.
+- `ai_companies_add_v2()` (intern, idempotent): zehn KI-Firmen mit Wertpapier, Kurs, Simulationszustand, Streubesitz
+  und Kasse. 25 KI-Firmen, 30 Wertpapiere (25 Aktien, 4 Anleihen, NEXA 30 mit weiter 15 Mitgliedern).
+- `get_company_profile` liefert zusätzlich
+  `"news": [{"headline", "body", "category", "published_at"}]` (höchstens 6, neueste zuerst).
+- `market_snapshot_invalidate()` löscht mit `where true` (pg-safeupdate).

@@ -45,10 +45,10 @@ select tests.assert(
   and (:'q5'::jsonb ->> 'next_quarter_id')::bigint = (public.current_game_quarter()).id,
   'admin_close_quarter() x 5: five quarters closed, game time moved on, the next quarter is active');
 select tests.assert(
-  (select count(*) from public.company_quarter_reports r where r.game_quarter_id = (:'q1'::jsonb ->> 'closed_quarter_id')::bigint) = 15
-  and (select count(*) from public.news_items n where n.category = 'earnings' and n.game_quarter_id = (:'q1'::jsonb ->> 'closed_quarter_id')::bigint) = 15
+  (select count(*) from public.company_quarter_reports r where r.game_quarter_id = (:'q1'::jsonb ->> 'closed_quarter_id')::bigint) = 25
+  and (select count(*) from public.news_items n where n.category = 'earnings' and n.game_quarter_id = (:'q1'::jsonb ->> 'closed_quarter_id')::bigint) = 25
   and (select bool_and(fair_value_e4 > 0) from public.security_sim_state),
-  'every close publishes 15 quarterly reports and 15 earnings news; fair values stay positive');
+  'every close publishes 25 quarterly reports and 25 earnings news; fair values stay positive');
 select 'e.g. "' || headline || '" / ' || coalesce(body, '') as sample from public.news_items where category = 'earnings' order by id desc limit 1 \gset
 \echo '  ' :sample
 select tests.assert(
@@ -88,7 +88,7 @@ select tests.assert(
   'still exactly one listed bond per maturity (1, 2, 5, 10)');
 select tests.assert((select sum(amount_cents) from public.ledger_entries) = 0 and (select count(*) from public.ledger_audit()) = 0,
   'ledger balanced after coupons and redemption');
-select tests.assert((public.market_tick() ->> 'securities')::int = 19, 'the tick prices the new bond series');
+select tests.assert((public.market_tick() ->> 'securities')::int = 29, 'the tick prices the new bond series');
 rollback;
 
 -- =============================================================================

@@ -12,8 +12,8 @@ select tests.assert(
   (select count(*) from public.rich_tycoons) = 120
   and (select sum(cash_cents) from public.rich_tycoons) = (select balance_cents from public.ledger_accounts where system_key = 'tycoons')
   and (select count(distinct name) from public.rich_tycoons) = 120
-  and (select count(*) from public.rich_tycoons where founder_company_id is not null) = 15,
-  '120 AI tycoons, unique names, 15 founders, their cash is exactly the tycoon money (' ||
+  and (select count(*) from public.rich_tycoons where founder_company_id is not null) = 25,
+  '120 AI tycoons, unique names, 25 founders, their cash is exactly the tycoon money (' ||
   (select round(sum(cash_cents) / 100.0) from public.rich_tycoons) || ' EUR)');
 select tests.assert(
   not exists (select 1 from public.rich_tycoon_holdings h join public.securities s on s.id = h.security_id

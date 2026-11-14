@@ -1358,6 +1358,7 @@ export const demoEngine: GameEngine = {
         awarenessBps: null,
       },
       members: [],
+      news: [],
     };
   },
   // The demo keeps no history: a gentle line towards today's net worth (ADR-124).

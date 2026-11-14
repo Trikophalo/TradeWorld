@@ -1,5 +1,5 @@
 {
-  "id": "7b7324b7-bffb-428e-96ac-e351909eac0f",
+  "id": "fcf85d3f-4da4-439c-8d01-c68d675b573b",
   "kind": "loan",
   "terms": { "hours": 24, "interest_bps": 0, "principal_cents": 20000 },
   "status": "cancelled",
@@ -9,15 +9,15 @@
   "my_role": "lender",
   "progress": { "due_cents": 20000, "left_cents": 20000, "repaid_cents": 0 },
   "proposer": {
-    "tag": "3FXA",
+    "tag": "EQTS",
     "level": 6,
     "trust": { "band": "blank", "score": 50 },
     "nickname": "Fixture_Lieferant",
     "avatar_key": "rookie"
   },
-  "closed_at": "2026-11-14T12:11:46.574326+00:00",
-  "created_at": "2026-11-14T12:11:46.570211+00:00",
-  "expires_at": "2026-11-16T12:11:46.570211+00:00",
+  "closed_at": "2026-11-14T12:36:19.238382+00:00",
+  "created_at": "2026-11-14T12:36:19.233092+00:00",
+  "expires_at": "2026-11-16T12:36:19.233092+00:00",
   "accepted_at": null,
   "is_proposer": true,
   "broken_by_me": false,

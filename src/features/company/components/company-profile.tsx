@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { engine } from "@/features/game/store";
 import { CompanyLogo } from "@/features/market/components/company-logo";
 import { formatMoney, formatPrice } from "@/lib/format";
+import { useClock } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
 
 type TierKey = Parameters<ReturnType<typeof useTranslations<"careerTiers">>>[0];
@@ -153,6 +154,10 @@ export function CompanyProfileView({ companyId }: { companyId: string }) {
         {facts.awarenessBps !== null && fact(t("awareness"), `${Math.round(facts.awarenessBps / 100)} %`)}
       </div>
 
+      {(data.company.isAi || data.news.length > 0) && (
+        <CompanyNewsList ticker={data.company.isAi ? data.company.ticker : null} news={data.news} />
+      )}
+
       <Card padding="lg">
         <CardHeader>
           <CardTitle>{t("team")}</CardTitle>
@@ -179,5 +184,61 @@ export function CompanyProfileView({ companyId }: { companyId: string }) {
         )}
       </Card>
     </div>
+  );
+}
+
+/**
+ * News about a company (ADR-130): market news from the server (results, stock hints) and, for AI companies, their
+ * own stories from the company's everyday life (messages aiCompanyNews.<ticker>), a few at a time, changing hourly.
+ */
+function CompanyNewsList({
+  ticker,
+  news,
+}: {
+  ticker: string | null;
+  news: { headline: string; body: string | null; category: string; publishedAt: string }[];
+}) {
+  const t = useTranslations("companyProfile");
+  const tn = useTranslations("aiCompanyNews");
+  const now = useClock();
+  const stories =
+    ticker && tn.has(ticker as Parameters<typeof tn.has>[0])
+      ? (tn.raw(ticker as Parameters<typeof tn.raw>[0]) as string[])
+      : [];
+  const hour = now === null ? 0 : Math.floor(now / 3_600_000);
+  // three stories per hour, one, three and seven hours old
+  const inside = stories.length
+    ? [0, 1, 2].map((i) => ({ text: stories[(hour + i * 2) % stories.length]!, hoursAgo: [1, 3, 7][i]! }))
+    : [];
+  if (news.length === 0 && inside.length === 0) return null;
+  return (
+    <Card padding="lg" className="space-y-3" data-testid="company-profile-news">
+      <CardHeader>
+        <CardTitle>{t("news")}</CardTitle>
+      </CardHeader>
+      <ul className="space-y-3">
+        {news.map((n, i) => (
+          <li key={`m${i}`} className="space-y-0.5">
+            <p className="flex items-center gap-2 text-2xs text-fg-3">
+              <Badge tone="accent">{t("newsMarket")}</Badge>
+              {now !== null &&
+                t("newsAgo", { hours: Math.max(0, Math.floor((now - Date.parse(n.publishedAt)) / 3_600_000)) })}
+            </p>
+            <p className="text-sm font-semibold text-pretty text-fg-1">{n.headline}</p>
+            {n.body && <p className="text-xs text-pretty text-fg-2">{n.body}</p>}
+          </li>
+        ))}
+        {now !== null &&
+          inside.map((s, i) => (
+            <li key={`i${i}`} className="space-y-0.5">
+              <p className="flex items-center gap-2 text-2xs text-fg-3">
+                <Badge tone="warn">{t("newsInside")}</Badge>
+                {t("newsAgo", { hours: s.hoursAgo })}
+              </p>
+              <p className="text-sm text-pretty text-fg-1">{s.text}</p>
+            </li>
+          ))}
+      </ul>
+    </Card>
   );
 }

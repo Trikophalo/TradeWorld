@@ -1239,6 +1239,8 @@ export interface CompanyProfile {
     title: string | null;
     since: string;
   }[];
+  /** Latest market news about the company (ADR-130). */
+  news: { headline: string; body: string | null; category: string; publishedAt: string }[];
 }
 
 /** The own net worth over time (ADR-124), oldest first. */

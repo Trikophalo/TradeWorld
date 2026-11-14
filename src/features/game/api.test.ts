@@ -49,11 +49,11 @@ describe("RPC contract", () => {
     });
   }
 
-  it("the snapshot contains the 15 stocks, 4 bonds and the index", () => {
+  it("the snapshot contains the 25 stocks, 4 bonds and the index", () => {
     const snapshot = RPC_SCHEMAS.get_market_snapshot.parse(
       JSON.parse(readFileSync(dir + "get_market_snapshot.json", "utf8")),
     );
-    expect(snapshot.securities.filter((s) => s.kind === "stock")).toHaveLength(15);
+    expect(snapshot.securities.filter((s) => s.kind === "stock")).toHaveLength(25);
     expect(snapshot.securities.filter((s) => s.kind === "bond")).toHaveLength(4);
     expect(snapshot.index.ticker).toBe("NEXA30");
     for (const s of snapshot.securities) expect(s.bid_e4).toBeLessThan(s.ask_e4);

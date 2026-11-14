@@ -80,7 +80,7 @@ select tests.assert(
       and (select count(*) from public.candles c where c.security_id = s.id and c.interval = '5m') >= 576
       and (select count(*) from public.candles c where c.security_id = s.id and c.interval = '1h') >= 720
       and (select count(*) from public.candles c where c.security_id = s.id and c.interval = '1q') >= 120
-      and (select count(*) from public.candles c where c.security_id = s.id and c.interval = '1y') >= 365) = 20,
+      and (select count(*) from public.candles c where c.security_id = s.id and c.interval = '1y') >= 365) = 30,
   'backfill: every stock, bond and NEXA 30 has 6 h of 1m, 2 days of 5m, 30 days of 1h, 120 quarters and 365 game years');
 select 'candle rows per interval: ' || string_agg(i || '=' || n, ', ' order by i) as counts
   from (select interval::text as i, count(*) as n from public.candles group by 1) x \gset
@@ -120,7 +120,7 @@ select tests.assert(
   'the newest candle of every interval closes at the current price');
 select tests.assert(
   (select count(*) from public.security_quotes q join public.securities s on s.id = q.security_id
-    where s.status = 'listed' and q.prev_close_e4 > 0 and q.day_high_e4 >= q.last_price_e4 and q.day_low_e4 <= q.last_price_e4) = 20,
+    where s.status = 'listed' and q.prev_close_e4 > 0 and q.day_high_e4 >= q.last_price_e4 and q.day_low_e4 <= q.last_price_e4) = 30,
   'quotes have prev close and day high/low after bootstrap');
 select tests.assert(
   (select abs(q.last_price_e4 - i.base_value_e4) <= 1
@@ -137,11 +137,11 @@ select tests.assert((select r.tick_seq from public.sim_runtime r) = :seq0 + 3, '
 select tests.assert(
   (select count(*) from public.security_quotes q join public.securities s on s.id = q.security_id
     where s.status = 'listed' and s.kind in ('stock', 'bond') and q.last_price_e4 > 0 and q.bid_e4 > 0 and q.bid_e4 < q.ask_e4
-      and q.bid_e4 <= q.last_price_e4 and q.ask_e4 >= q.last_price_e4 and q.tick_seq = :seq0 + 3) = 19,
+      and q.bid_e4 <= q.last_price_e4 and q.ask_e4 >= q.last_price_e4 and q.tick_seq = :seq0 + 3) = 29,
   'after ticks: every stock and bond has price > 0 and bid < ask around the last price');
 select tests.assert(
-  (select count(*) from public.price_ticks where tick_seq = :seq0 + 3) = 20,
-  'one price tick per security (15 stocks, 4 bonds, NEXA 30) and tick');
+  (select count(*) from public.price_ticks where tick_seq = :seq0 + 3) = 30,
+  'one price tick per security (25 stocks, 4 bonds, NEXA 30) and tick');
 select tests.assert(
   (select count(*) from public.sim_tick_log where tick_seq > :seq0) = 3
   and (select max(duration_ms) from public.sim_tick_log where tick_seq > :seq0) < 1000,
@@ -189,7 +189,7 @@ select tests.assert(
   'after hours the spread of every stock is wider (multiplier 3)');
 select tests.assert(
   (select count(*) from public.security_quotes q join public.securities s on s.id = q.security_id
-    where s.status = 'listed' and q.day_volume_e6 >= 0 and q.day_open_e4 = q.last_price_e4) = 20,
+    where s.status = 'listed' and q.day_volume_e6 >= 0 and q.day_open_e4 = q.last_price_e4) = 30,
   'the new trading day opens at the first price after the bell');
 rollback;
 
@@ -203,7 +203,7 @@ select tests.assert(
   and (:'snap'::jsonb ->> 'session') in ('regular', 'after_hours'),
   'get_market_snapshot(): top-level contract, index NEXA30, policy rate 3 %');
 select tests.assert(
-  (select count(*) filter (where e ->> 'kind' = 'stock') = 15 and count(*) filter (where e ->> 'kind' = 'bond') = 4
+  (select count(*) filter (where e ->> 'kind' = 'stock') = 25 and count(*) filter (where e ->> 'kind' = 'bond') = 4
           and bool_and(e ?& array['id', 'ticker', 'name', 'kind', 'sector_key', 'size_class', 'last_price_e4', 'bid_e4', 'ask_e4',
                                   'prev_close_e4', 'change_bps', 'day_high_e4', 'day_low_e4', 'day_volume_e6', 'market_cap_cents',
                                   'term_game_years', 'coupon_bps', 'yield_bps', 'matures_at', 'face_value_cents'])
@@ -213,7 +213,7 @@ select tests.assert(
           and bool_and(e ->> 'kind' <> 'bond' or ((e ->> 'yield_bps')::int between 100 and 600
                                                    and (e ->> 'face_value_cents')::bigint = 10000 and e ->> 'size_class' is null))
      from jsonb_array_elements(:'snap'::jsonb -> 'securities') e),
-  'get_market_snapshot(): 15 stocks and 4 bonds with every contract field');
+  'get_market_snapshot(): 25 stocks and 4 bonds with every contract field');
 
 select public.get_candles('NEXA30', '1h', 10) as c \gset
 select tests.assert(

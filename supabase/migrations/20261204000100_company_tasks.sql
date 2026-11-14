@@ -334,6 +334,13 @@ begin
     v_status := case when p_score is null then 'missed' else 'failure' end;
     v_amount := -v_amount;
   end if;
+  -- missions (ADR-130): done right, done perfectly
+  if v_ok and t.done_by is not null and not p_by_ai then
+    perform public.mission_event(t.done_by, 'task_done', 1, t.id::text);
+    if p_score >= 10000 then
+      perform public.mission_event(t.done_by, 'task_perfect', 1, t.id::text);
+    end if;
+  end if;
   if t.done_by is not null and not p_by_ai then
     v_xp := public.grant_xp(t.done_by, 'work_task',
                             case when v_ok then (cfg -> 'xp' ->> 'success')::integer else (cfg -> 'xp' ->> 'failure')::integer end,
@@ -518,6 +525,7 @@ begin
       perform public.api_error('task_not_allowed');
     end if;
     perform public.company_task_to_ai(t.id, v_player);
+    perform public.mission_event(v_player, 'task_delegated', 1, t.id::text);
   else
     if p_to = 'me' then
       v_target := v_player;
@@ -540,6 +548,7 @@ begin
            assigned_at = public.game_now(), ai_done_at = null
      where id = t.id;
     if v_target <> v_player then
+      perform public.mission_event(v_player, 'task_delegated', 1, t.id::text);
       select p.nickname into v_me from public.profiles p where p.id = v_player;
       select p.nickname into v_tnick from public.profiles p where p.id = v_target;
       perform public.social_notify(v_target, 'company_task', v_me || ' gibt dir eine Aufgabe',
