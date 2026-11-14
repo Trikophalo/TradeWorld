@@ -1,18 +1,18 @@
 {
   "side": "sell",
   "ticker": "KTL",
-  "price_e4": 419487431,
+  "price_e4": 420130336,
   "rug_pull": false,
   "fee_cents": 150,
   "tax_cents": 0,
-  "cash_cents": 49748,
+  "cash_cents": 49749,
   "xp_awarded": 0,
-  "position_e6": 11895,
-  "quantity_e6": 11895,
-  "avg_price_e4": 419066835,
+  "position_e6": 11877,
+  "quantity_e6": 11877,
+  "avg_price_e4": 419710365,
   "slippage_bps": 10,
   "pool_fee_cents": 50,
   "order_fee_cents": 100,
-  "cash_after_cents": 5949748,
-  "realized_pnl_cents": -202
+  "cash_after_cents": 5949749,
+  "realized_pnl_cents": -201
 }

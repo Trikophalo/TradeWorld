@@ -1,27 +1,27 @@
 {
-  "id": "d29b7b5b-afc3-4e58-a800-8394e3a5bc5e",
+  "id": "13446fd2-5af3-491e-8920-33c21820a400",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "048bbca6-8c75-4798-b0e5-41f2041016e7",
+    "id": "03026dc2-93fe-4283-bdbc-2290190d62fb",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "12ef4943-a830-a22b-a142-8a080f7be8be",
+      "id": "e50a6ff5-8dbd-8c90-f94e-5ac06d3fe862",
       "logo": null,
-      "name": "Kaufrausch Märkte",
-      "color": "#FF6B8B",
+      "name": "Volta Energie AG",
+      "color": "#FFD23F",
       "is_ai": true,
-      "sector": "retail",
-      "ticker": "KFR"
+      "sector": "energy",
+      "ticker": "VLT"
     },
-    "required": [{ "branch": "management", "min_score": 0 }],
-    "title_key": "management_intern",
+    "required": [{ "branch": "law", "min_score": 0 }],
+    "title_key": "law_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-13T23:24:36.327723+00:00",
-  "updated_at": "2026-11-13T23:24:36.334633+00:00",
-  "offer_expires_at": "2026-11-15T23:24:36.327723+00:00",
+  "created_at": "2026-11-14T00:03:11.497813+00:00",
+  "updated_at": "2026-11-14T00:03:11.503534+00:00",
+  "offer_expires_at": "2026-11-16T00:03:11.497813+00:00",
   "salary_wish_cents_per_hour": 15000,
   "offer_salary_cents_per_hour": 15000
 }

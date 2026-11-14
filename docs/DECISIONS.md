@@ -1773,3 +1773,14 @@ Das Portfolio zeigt das eigene Vermögen über 24 Stunden oder 7 Tage, aus den M
 `/companies/[id]` zeigt jede Firma, KI oder Spieler: Gründer, Team, Produkt und Ausbaustufe, Umsatz und Gewinn des
 letzten Quartals (KI: letzte vier Quartale), Wert und Aktie. Kasse, Schulden und Pläne bleiben intern. Erreichbar
 über die Firmen-Rangliste und die Aktienseite. Das Organigramm ist für alle Spieler offen.
+
+## ADR-126: Eine Order zahlt ihre eigene Kursbewegung — `akzeptiert`
+
+Anlass: Seit ADR-120 hebt ein Kauf den Kurs im nächsten Takt stark an (10.000 € bei einem Pennystock um rund 10 %),
+der Käufer zahlte aber nur den alten, viel kleineren Aufschlag. „Kaufen, einen Takt warten, verkaufen" brachte so
+sicheren Gewinn.
+
+Für Aktien rechnet der Ausführungspreis jetzt mit derselben Spieler-Tiefe wie der Takt (`playerImpact`): Eine Order
+zahlt im Schnitt die Hälfte der Bewegung, die sie auslöst; wer gleich wieder verkauft, zahlt die Hälfte seiner eigenen
+Bewegung nach unten. Ein Hin und Her kostet Spread, Gebühren und etwas Schlupf. Wer eine Aktie hält, die andere
+kaufen, verdient weiter. Test `supabase/tests/94_no_round_trip_profit.sql`.

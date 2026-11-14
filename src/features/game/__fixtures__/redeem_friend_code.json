@@ -1,10 +1,10 @@
 {
-  "code": "NEXA-5KL5",
+  "code": "NEXA-SNWL",
   "invited": 0,
   "redeemed": true,
   "paid_cents": 500000,
   "bonus_cents": 500000,
-  "redeemed_at": "2026-11-13T23:24:42.184635+00:00",
-  "redeemed_from": { "tag": "NDBK", "nickname": "Fixture_Werber" },
+  "redeemed_at": "2026-11-14T00:03:17.24948+00:00",
+  "redeemed_from": { "tag": "PHUM", "nickname": "Fixture_Werber" },
   "cash_after_cents": 1500000
 }

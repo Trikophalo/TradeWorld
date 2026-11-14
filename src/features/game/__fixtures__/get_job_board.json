@@ -1,7 +1,7 @@
 {
   "postings": [
     {
-      "id": "42ffa603-6522-4c6b-ba64-a092a6e22df3",
+      "id": "2ab1cff1-5b6a-4961-8110-f139fce7794b",
       "tier": "junior",
       "title": "Backend-Entwicklung",
       "company": {
@@ -19,7 +19,7 @@
         { "branch": "management", "min_score": 0 }
       ],
       "min_level": 5,
-      "posted_at": "2026-11-13T23:24:00.088284+00:00",
+      "posted_at": "2026-11-14T00:02:37.128775+00:00",
       "title_key": null,
       "expires_at": null,
       "slots_open": 1,
@@ -30,11 +30,11 @@
       "max_salary_cents_per_hour": null
     },
     {
-      "id": "079013cc-779e-4321-94cb-95745789c1f3",
+      "id": "ddb9bb06-0fa9-4fc2-8fb1-123077941aa1",
       "tier": "intern",
       "title": "Werkstudium",
       "company": {
-        "id": "3b6bc72b-0365-4605-bea4-1fb5b8520776",
+        "id": "b680328d-88fe-4a6f-8fa1-bd6116be7328",
         "logo": null,
         "name": "Sven Teile",
         "color": "#335577",
@@ -45,7 +45,7 @@
       "eligible": true,
       "required": [{ "branch": "it", "min_score": 0 }],
       "min_level": 2,
-      "posted_at": "2026-11-13T23:24:32.913633+00:00",
+      "posted_at": "2026-11-14T00:03:08.044723+00:00",
       "title_key": null,
       "expires_at": null,
       "slots_open": 1,
@@ -56,11 +56,11 @@
       "max_salary_cents_per_hour": null
     },
     {
-      "id": "f7538499-d030-4b72-8e13-08eb6e359956",
+      "id": "60b76924-5510-4bb4-9981-f062a8694a8c",
       "tier": "intern",
       "title": "Werkstudium",
       "company": {
-        "id": "c2be8599-68ed-46b8-9d4b-0224775188fa",
+        "id": "2419b52a-2a7d-4e64-b7ef-15cf250682b8",
         "logo": null,
         "name": "Berta Bytes",
         "color": "#336699",
@@ -71,7 +71,7 @@
       "eligible": true,
       "required": [{ "branch": "it", "min_score": 0 }],
       "min_level": 2,
-      "posted_at": "2026-11-13T23:24:26.972201+00:00",
+      "posted_at": "2026-11-14T00:03:01.746515+00:00",
       "title_key": null,
       "expires_at": null,
       "slots_open": 0,
@@ -82,11 +82,11 @@
       "max_salary_cents_per_hour": null
     },
     {
-      "id": "edda629f-bcea-4b32-9a47-62b9adec1376",
+      "id": "a9177d0a-3d05-462c-90df-ccc590a93c4d",
       "tier": "intern",
       "title": "Werkstudium",
       "company": {
-        "id": "6f6c53f7-c508-4540-8c46-2c95e90f573d",
+        "id": "02a20937-5ee3-4c6e-8a37-13a6868b0454",
         "logo": null,
         "name": "Kunst Kontor",
         "color": "#336699",
@@ -97,7 +97,7 @@
       "eligible": true,
       "required": [{ "branch": "it", "min_score": 0 }],
       "min_level": 2,
-      "posted_at": "2026-11-13T23:24:16.735802+00:00",
+      "posted_at": "2026-11-14T00:02:51.307051+00:00",
       "title_key": null,
       "expires_at": null,
       "slots_open": 0,
@@ -108,11 +108,11 @@
       "max_salary_cents_per_hour": null
     },
     {
-      "id": "f379ea3f-eec2-42bc-816f-4ec5210a6411",
+      "id": "67aefd56-172d-4f0d-99b6-a549d64a35e6",
       "tier": "intern",
       "title": "Werkstudium",
       "company": {
-        "id": "a6556f5c-8cb7-4e07-ba50-4d0564fa4e37",
+        "id": "59b5f69f-e168-4b28-a398-34e6a3b00e9a",
         "logo": null,
         "name": "Stunden Werk",
         "color": "#225566",
@@ -123,7 +123,7 @@
       "eligible": true,
       "required": [{ "branch": "it", "min_score": 0 }],
       "min_level": 2,
-      "posted_at": "2026-11-13T23:24:13.988188+00:00",
+      "posted_at": "2026-11-14T00:02:48.884586+00:00",
       "title_key": null,
       "expires_at": null,
       "slots_open": 0,
@@ -134,11 +134,11 @@
       "max_salary_cents_per_hour": null
     },
     {
-      "id": "edaa7798-329d-4b1c-b7d7-988f90401bb1",
+      "id": "57caf729-03a1-45ae-90a9-ab50289687c0",
       "tier": "intern",
       "title": "Werkstudium Feed",
       "company": {
-        "id": "89880db2-787f-4605-8f2a-4b0e92701c3d",
+        "id": "b99c12f3-9072-4c87-b530-1c86c87cebb8",
         "logo": null,
         "name": "Feed Fabrik",
         "color": "#225588",
@@ -149,7 +149,7 @@
       "eligible": true,
       "required": [{ "branch": "it", "min_score": 0 }],
       "min_level": 2,
-      "posted_at": "2026-11-13T23:24:23.232077+00:00",
+      "posted_at": "2026-11-14T00:02:57.083485+00:00",
       "title_key": null,
       "expires_at": null,
       "slots_open": 1,
@@ -160,11 +160,11 @@
       "max_salary_cents_per_hour": null
     },
     {
-      "id": "a35b0cbf-02ae-40a8-a17e-3a98d483c925",
+      "id": "0d9a97eb-3699-49c6-acfe-61642f48f93b",
       "tier": "intern",
       "title": "Werkstudium",
       "company": {
-        "id": "44b08ddd-d32c-47a9-ac78-c1cb20050d27",
+        "id": "5e128c9a-ed78-4e77-a61d-5fdda26d757f",
         "logo": null,
         "name": "Banner Werk",
         "color": "#336699",
@@ -175,7 +175,7 @@
       "eligible": true,
       "required": [{ "branch": "it", "min_score": 0 }],
       "min_level": 2,
-      "posted_at": "2026-11-13T23:24:14.923524+00:00",
+      "posted_at": "2026-11-14T00:02:49.625064+00:00",
       "title_key": null,
       "expires_at": null,
       "slots_open": 0,
@@ -186,11 +186,11 @@
       "max_salary_cents_per_hour": null
     },
     {
-      "id": "569e3b8b-a49c-46ec-8e78-a3eb68ea8b2d",
+      "id": "eeade213-8146-48c3-9426-94deedf69623",
       "tier": "intern",
       "title": "Mobil-Entwicklung",
       "company": {
-        "id": "2b94cb1b-dade-4736-8f35-1ac9197feb21",
+        "id": "a27bc454-37ce-4e4e-9ca5-05b803072b07",
         "logo": null,
         "name": "Frieda Apps",
         "color": "#334455",
@@ -201,7 +201,7 @@
       "eligible": true,
       "required": [{ "branch": "it", "min_score": 0 }],
       "min_level": 2,
-      "posted_at": "2026-11-13T23:24:10.706365+00:00",
+      "posted_at": "2026-11-14T00:02:46.2159+00:00",
       "title_key": null,
       "expires_at": null,
       "slots_open": 1,
@@ -212,11 +212,11 @@
       "max_salary_cents_per_hour": null
     },
     {
-      "id": "01e23ddb-ba9f-48d3-94e4-f72247f27b76",
+      "id": "05e9ed34-88cb-4dc2-8a08-9bd0f6dc0761",
       "tier": "intern",
       "title": "Werkstudium App",
       "company": {
-        "id": "68f1d7b3-20de-467a-aca3-79bb5820ec3c",
+        "id": "f9c9dc92-0622-4ed2-881f-55327c442a2e",
         "logo": null,
         "name": "Garagen Code",
         "color": "#3366ff",
@@ -227,7 +227,7 @@
       "eligible": true,
       "required": [{ "branch": "it", "min_score": 0 }],
       "min_level": 2,
-      "posted_at": "2026-11-13T23:24:07.95494+00:00",
+      "posted_at": "2026-11-14T00:02:44.039111+00:00",
       "title_key": null,
       "expires_at": null,
       "slots_open": 1,
@@ -238,11 +238,11 @@
       "max_salary_cents_per_hour": null
     },
     {
-      "id": "d9092d6a-58ae-4cb1-b200-ea6ff12ac14f",
+      "id": "10d1145a-14fd-46a3-85f0-f6f6b869f35f",
       "tier": "intern",
       "title": "Werkstudium",
       "company": {
-        "id": "d22ad88f-7a7a-4926-83ad-0faf0054d261",
+        "id": "7344f503-75fb-46e0-8572-cd8c11fb5962",
         "logo": null,
         "name": "Gegenwind Energie",
         "color": "#335577",
@@ -253,7 +253,7 @@
       "eligible": true,
       "required": [{ "branch": "it", "min_score": 0 }],
       "min_level": 2,
-      "posted_at": "2026-11-13T23:24:25.809424+00:00",
+      "posted_at": "2026-11-14T00:03:00.263106+00:00",
       "title_key": null,
       "expires_at": null,
       "slots_open": 0,
@@ -264,91 +264,7 @@
       "max_salary_cents_per_hour": null
     },
     {
-      "id": "0b6c2841-ec85-4086-a2d8-fc89d090c3b6",
-      "tier": "c_level",
-      "title": null,
-      "company": {
-        "id": "7999d809-0066-66e2-e0ac-930c34a49626",
-        "logo": null,
-        "name": "Fundgrube Discount",
-        "color": "#C2C95B",
-        "is_ai": true,
-        "sector": "retail",
-        "ticker": "FGD"
-      },
-      "eligible": false,
-      "required": [
-        { "branch": "sales", "min_score": 20 },
-        { "branch": "management", "min_score": 10 }
-      ],
-      "min_level": 25,
-      "posted_at": "2026-11-13T19:00:00+00:00",
-      "title_key": "sales_c_level",
-      "expires_at": "2026-11-14T01:00:00+00:00",
-      "slots_open": 99,
-      "match_score": 0,
-      "my_application": null,
-      "required_skills": [],
-      "salary_cents_per_hour": 250000,
-      "max_salary_cents_per_hour": 250000
-    },
-    {
-      "id": "15f2210d-9459-4de5-ab6a-43e7fe874e11",
-      "tier": "c_level",
-      "title": null,
-      "company": {
-        "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
-        "logo": null,
-        "name": "QuantenSprung Labs",
-        "color": "#35D0BA",
-        "is_ai": true,
-        "sector": "tech",
-        "ticker": "QSL"
-      },
-      "eligible": false,
-      "required": [{ "branch": "management", "min_score": 20 }],
-      "min_level": 25,
-      "posted_at": "2026-11-13T19:00:00+00:00",
-      "title_key": "management_c_level",
-      "expires_at": "2026-11-14T01:00:00+00:00",
-      "slots_open": 99,
-      "match_score": 0,
-      "my_application": null,
-      "required_skills": [],
-      "salary_cents_per_hour": 250000,
-      "max_salary_cents_per_hour": 250000
-    },
-    {
-      "id": "1f51e36b-3818-48d2-9ca5-88e7a8ed5a5f",
-      "tier": "c_level",
-      "title": null,
-      "company": {
-        "id": "cbfac5fd-3475-2166-ea22-0a85cbb6f5c0",
-        "logo": null,
-        "name": "Brotzeit Handel AG",
-        "color": "#F2A93B",
-        "is_ai": true,
-        "sector": "retail",
-        "ticker": "BRZ"
-      },
-      "eligible": false,
-      "required": [
-        { "branch": "logistics", "min_score": 20 },
-        { "branch": "management", "min_score": 10 }
-      ],
-      "min_level": 25,
-      "posted_at": "2026-11-13T19:00:00+00:00",
-      "title_key": "logistics_c_level",
-      "expires_at": "2026-11-14T01:00:00+00:00",
-      "slots_open": 99,
-      "match_score": 0,
-      "my_application": null,
-      "required_skills": [],
-      "salary_cents_per_hour": 250000,
-      "max_salary_cents_per_hour": 250000
-    },
-    {
-      "id": "7f7e0cf7-186b-4843-a76d-9c8ec417b1ca",
+      "id": "75a52ccc-e1c2-4c89-a9f7-76e5c510d4d8",
       "tier": "c_level",
       "title": null,
       "company": {
@@ -377,7 +293,7 @@
       "max_salary_cents_per_hour": 250000
     },
     {
-      "id": "9cfd4b2b-1552-4b6d-abf9-68f16cbde2b8",
+      "id": "7e2e1c37-313b-41ec-8672-811f7c54f47b",
       "tier": "c_level",
       "title": null,
       "company": {
@@ -406,7 +322,62 @@
       "max_salary_cents_per_hour": 250000
     },
     {
-      "id": "db2b4393-2bcf-4e9f-b064-034bc73568a6",
+      "id": "8b0bfa84-7a63-4d64-97a7-b8cb3e6fc763",
+      "tier": "c_level",
+      "title": null,
+      "company": {
+        "id": "cbfac5fd-3475-2166-ea22-0a85cbb6f5c0",
+        "logo": null,
+        "name": "Brotzeit Handel AG",
+        "color": "#F2A93B",
+        "is_ai": true,
+        "sector": "retail",
+        "ticker": "BRZ"
+      },
+      "eligible": false,
+      "required": [
+        { "branch": "logistics", "min_score": 20 },
+        { "branch": "management", "min_score": 10 }
+      ],
+      "min_level": 25,
+      "posted_at": "2026-11-13T19:00:00+00:00",
+      "title_key": "logistics_c_level",
+      "expires_at": "2026-11-14T01:00:00+00:00",
+      "slots_open": 99,
+      "match_score": 0,
+      "my_application": null,
+      "required_skills": [],
+      "salary_cents_per_hour": 250000,
+      "max_salary_cents_per_hour": 250000
+    },
+    {
+      "id": "ab8a9cb5-14b5-4266-b641-e0a76e3d5a38",
+      "tier": "c_level",
+      "title": null,
+      "company": {
+        "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
+        "logo": null,
+        "name": "QuantenSprung Labs",
+        "color": "#35D0BA",
+        "is_ai": true,
+        "sector": "tech",
+        "ticker": "QSL"
+      },
+      "eligible": false,
+      "required": [{ "branch": "management", "min_score": 20 }],
+      "min_level": 25,
+      "posted_at": "2026-11-13T19:00:00+00:00",
+      "title_key": "management_c_level",
+      "expires_at": "2026-11-14T01:00:00+00:00",
+      "slots_open": 99,
+      "match_score": 0,
+      "my_application": null,
+      "required_skills": [],
+      "salary_cents_per_hour": 250000,
+      "max_salary_cents_per_hour": 250000
+    },
+    {
+      "id": "bb0c3566-1238-44eb-b8d7-9b846e9afd89",
       "tier": "c_level",
       "title": null,
       "company": {
@@ -435,8 +406,8 @@
       "max_salary_cents_per_hour": 250000
     },
     {
-      "id": "3d27ef84-93d2-4120-b511-699c6f7c690d",
-      "tier": "team_lead",
+      "id": "c3a28809-e942-4dec-91fc-cc14cd42cf07",
+      "tier": "c_level",
       "title": null,
       "company": {
         "id": "7999d809-0066-66e2-e0ac-930c34a49626",
@@ -448,133 +419,23 @@
         "ticker": "FGD"
       },
       "eligible": false,
-      "required": [{ "branch": "management", "min_score": 12 }],
-      "min_level": 20,
-      "posted_at": "2026-11-13T19:00:00+00:00",
-      "title_key": "management_team_lead",
-      "expires_at": "2026-11-14T01:00:00+00:00",
-      "slots_open": 99,
-      "match_score": 0,
-      "my_application": null,
-      "required_skills": [],
-      "salary_cents_per_hour": 130000,
-      "max_salary_cents_per_hour": 130000
-    },
-    {
-      "id": "7898b18b-a0f0-41fd-9819-c0770b5e8df7",
-      "tier": "team_lead",
-      "title": null,
-      "company": {
-        "id": "5aaeae39-c17e-272b-db4c-3beb46144cb5",
-        "logo": null,
-        "name": "GenoVita Biotech",
-        "color": "#E86AF0",
-        "is_ai": true,
-        "sector": "pharma",
-        "ticker": "GNV"
-      },
-      "eligible": false,
       "required": [
-        { "branch": "sales", "min_score": 12 },
-        { "branch": "management", "min_score": 6 }
+        { "branch": "sales", "min_score": 20 },
+        { "branch": "management", "min_score": 10 }
       ],
-      "min_level": 20,
+      "min_level": 25,
       "posted_at": "2026-11-13T19:00:00+00:00",
-      "title_key": "sales_team_lead",
+      "title_key": "sales_c_level",
       "expires_at": "2026-11-14T01:00:00+00:00",
       "slots_open": 99,
       "match_score": 0,
       "my_application": null,
       "required_skills": [],
-      "salary_cents_per_hour": 130000,
-      "max_salary_cents_per_hour": 130000
+      "salary_cents_per_hour": 250000,
+      "max_salary_cents_per_hour": 250000
     },
     {
-      "id": "a525b4ca-c9de-4b6b-8a66-1260dd6915c7",
-      "tier": "team_lead",
-      "title": null,
-      "company": {
-        "id": "804ea36e-103a-dd9b-f972-085cde561b79",
-        "logo": null,
-        "name": "Pixelwerk Studios",
-        "color": "#B36BFF",
-        "is_ai": true,
-        "sector": "tech",
-        "ticker": "PXW"
-      },
-      "eligible": false,
-      "required": [{ "branch": "management", "min_score": 12 }],
-      "min_level": 20,
-      "posted_at": "2026-11-13T19:00:00+00:00",
-      "title_key": "management_team_lead",
-      "expires_at": "2026-11-14T01:00:00+00:00",
-      "slots_open": 99,
-      "match_score": 0,
-      "my_application": null,
-      "required_skills": [],
-      "salary_cents_per_hour": 130000,
-      "max_salary_cents_per_hour": 130000
-    },
-    {
-      "id": "a8ad70ca-da0b-4eaf-803f-fe73d96ab685",
-      "tier": "team_lead",
-      "title": null,
-      "company": {
-        "id": "d21331b8-a414-66aa-de07-f036108fc91d",
-        "logo": null,
-        "name": "Nordlicht Logistik AG",
-        "color": "#7AA2F7",
-        "is_ai": true,
-        "sector": "logistics",
-        "ticker": "NDL"
-      },
-      "eligible": false,
-      "required": [
-        { "branch": "logistics", "min_score": 12 },
-        { "branch": "management", "min_score": 6 }
-      ],
-      "min_level": 20,
-      "posted_at": "2026-11-13T19:00:00+00:00",
-      "title_key": "logistics_team_lead",
-      "expires_at": "2026-11-14T01:00:00+00:00",
-      "slots_open": 99,
-      "match_score": 0,
-      "my_application": null,
-      "required_skills": [],
-      "salary_cents_per_hour": 130000,
-      "max_salary_cents_per_hour": 130000
-    },
-    {
-      "id": "b669bc8e-ac38-402c-9c7c-e75de1c77d39",
-      "tier": "team_lead",
-      "title": null,
-      "company": {
-        "id": "2f91e3a4-088a-0592-9f21-88b83cae7bd8",
-        "logo": null,
-        "name": "SolarFuchs",
-        "color": "#FF8C42",
-        "is_ai": true,
-        "sector": "energy",
-        "ticker": "SFX"
-      },
-      "eligible": false,
-      "required": [
-        { "branch": "science", "min_score": 12 },
-        { "branch": "management", "min_score": 6 }
-      ],
-      "min_level": 20,
-      "posted_at": "2026-11-13T19:00:00+00:00",
-      "title_key": "science_team_lead",
-      "expires_at": "2026-11-14T01:00:00+00:00",
-      "slots_open": 99,
-      "match_score": 0,
-      "my_application": null,
-      "required_skills": [],
-      "salary_cents_per_hour": 130000,
-      "max_salary_cents_per_hour": 130000
-    },
-    {
-      "id": "d87472de-6fab-4c6b-9902-4d71e9fd6e66",
+      "id": "7fbe1539-33e8-4b1d-9d6c-07bc9c0a6209",
       "tier": "team_lead",
       "title": null,
       "company": {
@@ -603,33 +464,146 @@
       "max_salary_cents_per_hour": 130000
     },
     {
-      "id": "09f29b7a-b77c-4a59-ab1f-cf7eb5258e9a",
-      "tier": "senior",
+      "id": "8276d566-d688-44bb-b016-e3851f3aab69",
+      "tier": "team_lead",
       "title": null,
       "company": {
-        "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
+        "id": "2f91e3a4-088a-0592-9f21-88b83cae7bd8",
         "logo": null,
-        "name": "KlarSoft AG",
-        "color": "#4C8DFF",
+        "name": "SolarFuchs",
+        "color": "#FF8C42",
         "is_ai": true,
-        "sector": "tech",
-        "ticker": "KLS"
+        "sector": "energy",
+        "ticker": "SFX"
       },
       "eligible": false,
-      "required": [{ "branch": "it", "min_score": 6 }],
-      "min_level": 12,
+      "required": [
+        { "branch": "science", "min_score": 12 },
+        { "branch": "management", "min_score": 6 }
+      ],
+      "min_level": 20,
       "posted_at": "2026-11-13T19:00:00+00:00",
-      "title_key": "it_senior",
+      "title_key": "science_team_lead",
       "expires_at": "2026-11-14T01:00:00+00:00",
       "slots_open": 99,
-      "match_score": 3,
+      "match_score": 0,
       "my_application": null,
       "required_skills": [],
-      "salary_cents_per_hour": 70000,
-      "max_salary_cents_per_hour": 76300
+      "salary_cents_per_hour": 130000,
+      "max_salary_cents_per_hour": 130000
     },
     {
-      "id": "4c4b106f-0676-4bba-9462-8ead9a3b1dd6",
+      "id": "87ea766d-6879-4371-bcff-20d1fbc4d644",
+      "tier": "team_lead",
+      "title": null,
+      "company": {
+        "id": "7999d809-0066-66e2-e0ac-930c34a49626",
+        "logo": null,
+        "name": "Fundgrube Discount",
+        "color": "#C2C95B",
+        "is_ai": true,
+        "sector": "retail",
+        "ticker": "FGD"
+      },
+      "eligible": false,
+      "required": [{ "branch": "management", "min_score": 12 }],
+      "min_level": 20,
+      "posted_at": "2026-11-13T19:00:00+00:00",
+      "title_key": "management_team_lead",
+      "expires_at": "2026-11-14T01:00:00+00:00",
+      "slots_open": 99,
+      "match_score": 0,
+      "my_application": null,
+      "required_skills": [],
+      "salary_cents_per_hour": 130000,
+      "max_salary_cents_per_hour": 130000
+    },
+    {
+      "id": "af74bb76-460a-43b9-8f07-7ed62d9bf45d",
+      "tier": "team_lead",
+      "title": null,
+      "company": {
+        "id": "5aaeae39-c17e-272b-db4c-3beb46144cb5",
+        "logo": null,
+        "name": "GenoVita Biotech",
+        "color": "#E86AF0",
+        "is_ai": true,
+        "sector": "pharma",
+        "ticker": "GNV"
+      },
+      "eligible": false,
+      "required": [
+        { "branch": "sales", "min_score": 12 },
+        { "branch": "management", "min_score": 6 }
+      ],
+      "min_level": 20,
+      "posted_at": "2026-11-13T19:00:00+00:00",
+      "title_key": "sales_team_lead",
+      "expires_at": "2026-11-14T01:00:00+00:00",
+      "slots_open": 99,
+      "match_score": 0,
+      "my_application": null,
+      "required_skills": [],
+      "salary_cents_per_hour": 130000,
+      "max_salary_cents_per_hour": 130000
+    },
+    {
+      "id": "dec976ed-cf51-4ce7-aa5d-2f0206c713b5",
+      "tier": "team_lead",
+      "title": null,
+      "company": {
+        "id": "804ea36e-103a-dd9b-f972-085cde561b79",
+        "logo": null,
+        "name": "Pixelwerk Studios",
+        "color": "#B36BFF",
+        "is_ai": true,
+        "sector": "tech",
+        "ticker": "PXW"
+      },
+      "eligible": false,
+      "required": [{ "branch": "management", "min_score": 12 }],
+      "min_level": 20,
+      "posted_at": "2026-11-13T19:00:00+00:00",
+      "title_key": "management_team_lead",
+      "expires_at": "2026-11-14T01:00:00+00:00",
+      "slots_open": 99,
+      "match_score": 0,
+      "my_application": null,
+      "required_skills": [],
+      "salary_cents_per_hour": 130000,
+      "max_salary_cents_per_hour": 130000
+    },
+    {
+      "id": "e161c049-ccaf-4d98-bfdc-4d3de61a09d2",
+      "tier": "team_lead",
+      "title": null,
+      "company": {
+        "id": "d21331b8-a414-66aa-de07-f036108fc91d",
+        "logo": null,
+        "name": "Nordlicht Logistik AG",
+        "color": "#7AA2F7",
+        "is_ai": true,
+        "sector": "logistics",
+        "ticker": "NDL"
+      },
+      "eligible": false,
+      "required": [
+        { "branch": "logistics", "min_score": 12 },
+        { "branch": "management", "min_score": 6 }
+      ],
+      "min_level": 20,
+      "posted_at": "2026-11-13T19:00:00+00:00",
+      "title_key": "logistics_team_lead",
+      "expires_at": "2026-11-14T01:00:00+00:00",
+      "slots_open": 99,
+      "match_score": 0,
+      "my_application": null,
+      "required_skills": [],
+      "salary_cents_per_hour": 130000,
+      "max_salary_cents_per_hour": 130000
+    },
+    {
+      "id": "90615c11-b41a-40d5-aed2-e4dc3e8f6c68",
       "tier": "senior",
       "title": null,
       "company": {
@@ -655,23 +629,23 @@
       "max_salary_cents_per_hour": 70000
     },
     {
-      "id": "739260fb-cdd1-4995-b56c-6f645fdcc33a",
+      "id": "aa77ce46-c09d-4d29-a9d6-1f740e9968b6",
       "tier": "senior",
       "title": null,
       "company": {
-        "id": "5aaeae39-c17e-272b-db4c-3beb46144cb5",
+        "id": "db7c839c-c460-945e-1188-5e4a61db1e47",
         "logo": null,
-        "name": "GenoVita Biotech",
-        "color": "#E86AF0",
+        "name": "Rheinkraft Werke",
+        "color": "#5BC0EB",
         "is_ai": true,
-        "sector": "pharma",
-        "ticker": "GNV"
+        "sector": "energy",
+        "ticker": "RKW"
       },
       "eligible": false,
-      "required": [{ "branch": "law", "min_score": 6 }],
+      "required": [{ "branch": "science", "min_score": 6 }],
       "min_level": 12,
       "posted_at": "2026-11-13T19:00:00+00:00",
-      "title_key": "law_senior",
+      "title_key": "science_senior",
       "expires_at": "2026-11-14T01:00:00+00:00",
       "slots_open": 99,
       "match_score": 0,
@@ -681,33 +655,7 @@
       "max_salary_cents_per_hour": 70000
     },
     {
-      "id": "a9497bd0-40b2-44db-895c-ae5fb8025ee5",
-      "tier": "senior",
-      "title": null,
-      "company": {
-        "id": "804ea36e-103a-dd9b-f972-085cde561b79",
-        "logo": null,
-        "name": "Pixelwerk Studios",
-        "color": "#B36BFF",
-        "is_ai": true,
-        "sector": "tech",
-        "ticker": "PXW"
-      },
-      "eligible": false,
-      "required": [{ "branch": "sales", "min_score": 6 }],
-      "min_level": 12,
-      "posted_at": "2026-11-13T19:00:00+00:00",
-      "title_key": "sales_senior",
-      "expires_at": "2026-11-14T01:00:00+00:00",
-      "slots_open": 99,
-      "match_score": 0,
-      "my_application": null,
-      "required_skills": [],
-      "salary_cents_per_hour": 70000,
-      "max_salary_cents_per_hour": 70000
-    },
-    {
-      "id": "b6fd1ff6-d617-4fb7-997b-c5b10d75359b",
+      "id": "afc8b3d1-d909-455b-9ca6-e513aa7266ba",
       "tier": "senior",
       "title": null,
       "company": {
@@ -733,23 +681,49 @@
       "max_salary_cents_per_hour": 70000
     },
     {
-      "id": "ee3358df-5ade-4a53-add8-3dd30eaa4c12",
+      "id": "be45b615-c01e-435e-b14c-c1e0099e36ee",
       "tier": "senior",
       "title": null,
       "company": {
-        "id": "db7c839c-c460-945e-1188-5e4a61db1e47",
+        "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
         "logo": null,
-        "name": "Rheinkraft Werke",
-        "color": "#5BC0EB",
+        "name": "KlarSoft AG",
+        "color": "#4C8DFF",
         "is_ai": true,
-        "sector": "energy",
-        "ticker": "RKW"
+        "sector": "tech",
+        "ticker": "KLS"
       },
       "eligible": false,
-      "required": [{ "branch": "science", "min_score": 6 }],
+      "required": [{ "branch": "it", "min_score": 6 }],
       "min_level": 12,
       "posted_at": "2026-11-13T19:00:00+00:00",
-      "title_key": "science_senior",
+      "title_key": "it_senior",
+      "expires_at": "2026-11-14T01:00:00+00:00",
+      "slots_open": 99,
+      "match_score": 3,
+      "my_application": null,
+      "required_skills": [],
+      "salary_cents_per_hour": 70000,
+      "max_salary_cents_per_hour": 76300
+    },
+    {
+      "id": "d1aa8553-a9a2-47b3-8d8c-9918bdd7f1b4",
+      "tier": "senior",
+      "title": null,
+      "company": {
+        "id": "5aaeae39-c17e-272b-db4c-3beb46144cb5",
+        "logo": null,
+        "name": "GenoVita Biotech",
+        "color": "#E86AF0",
+        "is_ai": true,
+        "sector": "pharma",
+        "ticker": "GNV"
+      },
+      "eligible": false,
+      "required": [{ "branch": "law", "min_score": 6 }],
+      "min_level": 12,
+      "posted_at": "2026-11-13T19:00:00+00:00",
+      "title_key": "law_senior",
       "expires_at": "2026-11-14T01:00:00+00:00",
       "slots_open": 99,
       "match_score": 0,
@@ -759,7 +733,33 @@
       "max_salary_cents_per_hour": 70000
     },
     {
-      "id": "14cade60-bb8c-463d-b13f-26673a98ea06",
+      "id": "f0da119f-9fa2-449b-a61b-f34ca6a69ae0",
+      "tier": "senior",
+      "title": null,
+      "company": {
+        "id": "804ea36e-103a-dd9b-f972-085cde561b79",
+        "logo": null,
+        "name": "Pixelwerk Studios",
+        "color": "#B36BFF",
+        "is_ai": true,
+        "sector": "tech",
+        "ticker": "PXW"
+      },
+      "eligible": false,
+      "required": [{ "branch": "sales", "min_score": 6 }],
+      "min_level": 12,
+      "posted_at": "2026-11-13T19:00:00+00:00",
+      "title_key": "sales_senior",
+      "expires_at": "2026-11-14T01:00:00+00:00",
+      "slots_open": 99,
+      "match_score": 0,
+      "my_application": null,
+      "required_skills": [],
+      "salary_cents_per_hour": 70000,
+      "max_salary_cents_per_hour": 70000
+    },
+    {
+      "id": "02f1dc3a-7c6c-409f-ac90-86ee936c184c",
       "tier": "junior",
       "title": null,
       "company": {
@@ -785,33 +785,7 @@
       "max_salary_cents_per_hour": 30000
     },
     {
-      "id": "1d71ca88-a4e3-4783-b87e-00ac930b6380",
-      "tier": "junior",
-      "title": null,
-      "company": {
-        "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
-        "logo": null,
-        "name": "Frachtpilot",
-        "color": "#9ECE6A",
-        "is_ai": true,
-        "sector": "logistics",
-        "ticker": "FPT"
-      },
-      "eligible": false,
-      "required": [{ "branch": "craft", "min_score": 2 }],
-      "min_level": 5,
-      "posted_at": "2026-11-13T19:00:00+00:00",
-      "title_key": "craft_junior",
-      "expires_at": "2026-11-14T01:00:00+00:00",
-      "slots_open": 99,
-      "match_score": 0,
-      "my_application": null,
-      "required_skills": [],
-      "salary_cents_per_hour": 30000,
-      "max_salary_cents_per_hour": 30000
-    },
-    {
-      "id": "248f6e1c-35ea-465b-8438-b64210da9605",
+      "id": "14b4810a-557b-47ad-b85c-a3e3faa122b4",
       "tier": "junior",
       "title": null,
       "company": {
@@ -837,33 +811,7 @@
       "max_salary_cents_per_hour": 32700
     },
     {
-      "id": "2736df7b-6747-41ec-9644-ddc6643ee576",
-      "tier": "junior",
-      "title": null,
-      "company": {
-        "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
-        "logo": null,
-        "name": "KlarSoft AG",
-        "color": "#4C8DFF",
-        "is_ai": true,
-        "sector": "tech",
-        "ticker": "KLS"
-      },
-      "eligible": false,
-      "required": [{ "branch": "management", "min_score": 2 }],
-      "min_level": 5,
-      "posted_at": "2026-11-13T19:00:00+00:00",
-      "title_key": "management_junior",
-      "expires_at": "2026-11-14T01:00:00+00:00",
-      "slots_open": 99,
-      "match_score": 0,
-      "my_application": null,
-      "required_skills": [],
-      "salary_cents_per_hour": 30000,
-      "max_salary_cents_per_hour": 30000
-    },
-    {
-      "id": "8c38c01f-602e-4e47-94f1-b21aa4851c17",
+      "id": "6b52befb-b9d1-4dbc-b345-90558b3dd5e8",
       "tier": "junior",
       "title": null,
       "company": {
@@ -889,23 +837,23 @@
       "max_salary_cents_per_hour": 32700
     },
     {
-      "id": "aadb9e0d-e674-449d-b195-4f175552f1ef",
+      "id": "9c2c2b47-8188-462b-8c68-84979b484d36",
       "tier": "junior",
       "title": null,
       "company": {
-        "id": "2faf9e4c-3f0a-8a5b-1645-c669e9481771",
+        "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
         "logo": null,
-        "name": "NeuroPharm AG",
-        "color": "#6EE7A0",
+        "name": "KlarSoft AG",
+        "color": "#4C8DFF",
         "is_ai": true,
-        "sector": "pharma",
-        "ticker": "NPH"
+        "sector": "tech",
+        "ticker": "KLS"
       },
       "eligible": false,
-      "required": [{ "branch": "sales", "min_score": 2 }],
+      "required": [{ "branch": "management", "min_score": 2 }],
       "min_level": 5,
       "posted_at": "2026-11-13T19:00:00+00:00",
-      "title_key": "sales_junior",
+      "title_key": "management_junior",
       "expires_at": "2026-11-14T01:00:00+00:00",
       "slots_open": 99,
       "match_score": 0,
@@ -915,7 +863,7 @@
       "max_salary_cents_per_hour": 30000
     },
     {
-      "id": "dd63ace0-fd53-4c2a-b640-7ff4f2c70f45",
+      "id": "a22cfac1-36a4-490c-b9b9-16eebaa59e38",
       "tier": "junior",
       "title": null,
       "company": {
@@ -941,33 +889,59 @@
       "max_salary_cents_per_hour": 30000
     },
     {
-      "id": "048bbca6-8c75-4798-b0e5-41f2041016e7",
-      "tier": "intern",
+      "id": "d979e840-f686-48a7-a2de-e74667e77c11",
+      "tier": "junior",
       "title": null,
       "company": {
-        "id": "12ef4943-a830-a22b-a142-8a080f7be8be",
+        "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
         "logo": null,
-        "name": "Kaufrausch Märkte",
-        "color": "#FF6B8B",
+        "name": "Frachtpilot",
+        "color": "#9ECE6A",
         "is_ai": true,
-        "sector": "retail",
-        "ticker": "KFR"
+        "sector": "logistics",
+        "ticker": "FPT"
       },
-      "eligible": true,
-      "required": [{ "branch": "management", "min_score": 0 }],
-      "min_level": 2,
+      "eligible": false,
+      "required": [{ "branch": "craft", "min_score": 2 }],
+      "min_level": 5,
       "posted_at": "2026-11-13T19:00:00+00:00",
-      "title_key": "management_intern",
+      "title_key": "craft_junior",
       "expires_at": "2026-11-14T01:00:00+00:00",
       "slots_open": 99,
       "match_score": 0,
       "my_application": null,
       "required_skills": [],
-      "salary_cents_per_hour": 15000,
-      "max_salary_cents_per_hour": 15000
+      "salary_cents_per_hour": 30000,
+      "max_salary_cents_per_hour": 30000
     },
     {
-      "id": "2def8ede-227f-4ad5-8f2c-752421063d3b",
+      "id": "f91de994-f35e-4a86-aacd-826d33f7c549",
+      "tier": "junior",
+      "title": null,
+      "company": {
+        "id": "2faf9e4c-3f0a-8a5b-1645-c669e9481771",
+        "logo": null,
+        "name": "NeuroPharm AG",
+        "color": "#6EE7A0",
+        "is_ai": true,
+        "sector": "pharma",
+        "ticker": "NPH"
+      },
+      "eligible": false,
+      "required": [{ "branch": "sales", "min_score": 2 }],
+      "min_level": 5,
+      "posted_at": "2026-11-13T19:00:00+00:00",
+      "title_key": "sales_junior",
+      "expires_at": "2026-11-14T01:00:00+00:00",
+      "slots_open": 99,
+      "match_score": 0,
+      "my_application": null,
+      "required_skills": [],
+      "salary_cents_per_hour": 30000,
+      "max_salary_cents_per_hour": 30000
+    },
+    {
+      "id": "03026dc2-93fe-4283-bdbc-2290190d62fb",
       "tier": "intern",
       "title": null,
       "company": {
@@ -993,23 +967,23 @@
       "max_salary_cents_per_hour": 15000
     },
     {
-      "id": "4967e8c5-5ee3-4c11-a8bc-3f3256bb0f5c",
+      "id": "4154d016-155b-402b-b85d-e9508f94df14",
       "tier": "intern",
       "title": null,
       "company": {
-        "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
+        "id": "12ef4943-a830-a22b-a142-8a080f7be8be",
         "logo": null,
-        "name": "Frachtpilot",
-        "color": "#9ECE6A",
+        "name": "Kaufrausch Märkte",
+        "color": "#FF6B8B",
         "is_ai": true,
-        "sector": "logistics",
-        "ticker": "FPT"
+        "sector": "retail",
+        "ticker": "KFR"
       },
       "eligible": true,
-      "required": [{ "branch": "logistics", "min_score": 0 }],
+      "required": [{ "branch": "management", "min_score": 0 }],
       "min_level": 2,
       "posted_at": "2026-11-13T19:00:00+00:00",
-      "title_key": "logistics_intern",
+      "title_key": "management_intern",
       "expires_at": "2026-11-14T01:00:00+00:00",
       "slots_open": 99,
       "match_score": 0,
@@ -1019,7 +993,7 @@
       "max_salary_cents_per_hour": 15000
     },
     {
-      "id": "5d316e3a-6767-4478-b01f-9fd55cc81296",
+      "id": "6a49140b-5b99-49c4-a281-67141f9aa93b",
       "tier": "intern",
       "title": null,
       "company": {
@@ -1045,7 +1019,33 @@
       "max_salary_cents_per_hour": 15000
     },
     {
-      "id": "eac039c5-72d2-4b1a-a1df-2261996741eb",
+      "id": "963d64de-07cf-4d03-9ce7-d5ee2742e3b3",
+      "tier": "intern",
+      "title": null,
+      "company": {
+        "id": "cbfac5fd-3475-2166-ea22-0a85cbb6f5c0",
+        "logo": null,
+        "name": "Brotzeit Handel AG",
+        "color": "#F2A93B",
+        "is_ai": true,
+        "sector": "retail",
+        "ticker": "BRZ"
+      },
+      "eligible": true,
+      "required": [{ "branch": "finance", "min_score": 0 }],
+      "min_level": 2,
+      "posted_at": "2026-11-13T19:00:00+00:00",
+      "title_key": "finance_intern",
+      "expires_at": "2026-11-14T01:00:00+00:00",
+      "slots_open": 99,
+      "match_score": 0,
+      "my_application": null,
+      "required_skills": [],
+      "salary_cents_per_hour": 15000,
+      "max_salary_cents_per_hour": 15000
+    },
+    {
+      "id": "9fb04b7a-8a7f-4067-a81a-1d86ed84b9fc",
       "tier": "intern",
       "title": null,
       "company": {
@@ -1071,23 +1071,23 @@
       "max_salary_cents_per_hour": 15900
     },
     {
-      "id": "f85a45ce-2bef-4204-a33d-5209ba36debe",
+      "id": "a97576e2-5346-495b-81e4-05be25a56668",
       "tier": "intern",
       "title": null,
       "company": {
-        "id": "cbfac5fd-3475-2166-ea22-0a85cbb6f5c0",
+        "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
         "logo": null,
-        "name": "Brotzeit Handel AG",
-        "color": "#F2A93B",
+        "name": "Frachtpilot",
+        "color": "#9ECE6A",
         "is_ai": true,
-        "sector": "retail",
-        "ticker": "BRZ"
+        "sector": "logistics",
+        "ticker": "FPT"
       },
       "eligible": true,
-      "required": [{ "branch": "finance", "min_score": 0 }],
+      "required": [{ "branch": "logistics", "min_score": 0 }],
       "min_level": 2,
       "posted_at": "2026-11-13T19:00:00+00:00",
-      "title_key": "finance_intern",
+      "title_key": "logistics_intern",
       "expires_at": "2026-11-14T01:00:00+00:00",
       "slots_open": 99,
       "match_score": 0,

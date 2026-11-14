@@ -7,13 +7,13 @@
     "max_staff": 2,
     "ai_workers": 0,
     "quality_bps": 2325,
-    "value_cents": 295006,
-    "profit_cents": -14994,
+    "value_cents": 295007,
+    "profit_cents": -14993,
     "awareness_bps": 355,
-    "revenue_cents": 219076
+    "revenue_cents": 219104
   },
   "company": {
-    "id": "8d15f33c-d7e8-4788-bb27-17871941a495",
+    "id": "2091471b-18bf-4b86-bdd1-f7a2fcfc46d3",
     "idea": "Fahrräder reparieren",
     "logo": null,
     "name": "Gero Werkstatt",
@@ -24,9 +24,9 @@
     "ticker": null,
     "price_e4": null,
     "change_bps": null,
-    "founded_at": "2026-11-13T23:24:08.171014+00:00",
+    "founded_at": "2026-11-14T00:02:44.300853+00:00",
     "brand_color": "#aa5500"
   },
-  "founder": { "tag": "WZ5A", "nickname": "Gero_Garage", "avatar_key": "rookie" },
+  "founder": { "tag": "VHZD", "nickname": "Gero_Garage", "avatar_key": "rookie" },
   "members": []
 }

@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "d814de61-4209-4629-8f37-82dda3592640",
+    "id": "21843cbf-7c5a-4461-a2b0-4dc25531dde0",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "12ef4943-a830-a22b-a142-8a080f7be8be",
+      "id": "e50a6ff5-8dbd-8c90-f94e-5ac06d3fe862",
       "logo": null,
-      "name": "Kaufrausch Märkte",
-      "color": "#FF6B8B",
+      "name": "Volta Energie AG",
+      "color": "#FFD23F",
       "is_ai": true,
-      "sector": "retail",
-      "ticker": "KFR"
+      "sector": "energy",
+      "ticker": "VLT"
     },
     "presence": {
-      "fire_at": "2026-11-18T23:24:39.672579+00:00",
+      "fire_at": "2026-11-19T00:03:14.781832+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-13T23:24:39.672579+00:00"
+      "last_active_at": "2026-11-14T00:03:14.781832+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-13T23:24:39.773888+00:00",
+    "started_at": "2026-11-14T00:03:14.923898+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,
