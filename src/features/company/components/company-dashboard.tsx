@@ -665,15 +665,23 @@ function BossOffice({ company, onTeam }: { company: MyCompany; onTeam: () => voi
         )}
 
       <details className="group rounded-md border border-line-1 px-3 py-2 text-sm">
-        <summary className="cursor-pointer list-none text-fg-3 focus-ring hover:text-fg-1">{t("moreSettings")}</summary>
+        <summary className="cursor-pointer list-none text-fg-3 focus-ring hover:text-fg-1">
+          {t("payFactorTitle")}
+        </summary>
         <div className="mt-3 space-y-2">
           <p className="text-fg-2">{t("payFactor", { value: formatBps(company.payFactorBps).replace("+", "") })}</p>
           <p className="text-xs text-pretty text-fg-3">{t("payFactorHint")}</p>
-          <Button size="sm" variant="danger" onClick={() => setClosing(true)}>
-            {t("closeTitle")}
-          </Button>
         </div>
       </details>
+
+      {/* The dissolve action stays plainly visible, not hidden away (ADR-147). */}
+      <div className="space-y-2 rounded-md border border-loss/40 bg-loss-soft px-3 py-3" data-testid="danger-zone">
+        <p className="label-pixel text-loss">{t("dangerZone")}</p>
+        <p className="text-xs text-pretty text-fg-3">{t("closeHint")}</p>
+        <Button size="sm" variant="danger" onClick={() => setClosing(true)} data-testid="close-company">
+          {t("closeTitle")}
+        </Button>
+      </div>
       <CloseSheet company={company} open={closing} onClose={() => setClosing(false)} />
     </Panel>
   );

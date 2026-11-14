@@ -180,8 +180,7 @@ test("company chat, then close the company voluntarily", async ({ page }) => {
 
   // Close: the cash comes back, the founding page shows the settlement.
   await page.getByText("Übersicht", { exact: true }).click();
-  await page.getByText("Lohnfaktor und Auflösen").click();
-  await page.getByRole("button", { name: "Firma auflösen" }).click();
+  await page.getByTestId("close-company").click();
   await expect(page.getByRole("dialog", { name: "Firma auflösen" })).toBeVisible();
   await page.waitForTimeout(500); // the panel slides in
   await hold(page, /Gedrückt halten zum Auflösen/);

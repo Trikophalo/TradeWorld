@@ -2107,7 +2107,6 @@
     "teamLine": "davon {ai, plural, =0 {keine KI-Kraft} one {# KI-Kraft} other {# KI-Kräfte}}",
     "stampProfit": "Gewinn",
     "stampLoss": "Verlust",
-    "moreSettings": "Lohnfaktor und Auflösen",
     "revenueToday": "Umsatz heute",
     "profitToday": "Gewinn heute",
     "live": "Live",
@@ -2294,7 +2293,10 @@
       "profitSummary": "Strategie, Preise, Werbung und Einnahmequellen",
       "boss": "Chefbüro",
       "bossSummary": "Gehälter, KI-Kräfte und Einstellungen"
-    }
+    },
+    "payFactorTitle": "Lohnfaktor",
+    "dangerZone": "Gefahrenzone",
+    "closeHint": "Die Firma wird endgültig aufgelöst. Das Firmengeld geht nach Abzug der Schulden an dich, alle Mitarbeiter verlieren ihren Job."
   },
   "debt": {
     "title": "Schulden",

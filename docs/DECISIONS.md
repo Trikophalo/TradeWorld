@@ -2252,3 +2252,12 @@ ein großes, zentrales Pop-up (`DelegatedTaskOverlay`, in der App-Hülle neben d
 ungelesene `company_task`-Benachrichtigung auftaucht. „Jetzt ansehen“ führt zum Job-Tab, „Später“ schließt es.
 Bereits gezeigte Pop-ups merkt sich der Browser (`localStorage`, nach der Hydration gelesen), damit es nach einem
 Neuladen nicht wiederkommt. Rein clientseitig; keine Schema-Änderung.
+
+## ADR-147: „Firma auflösen“ deutlich sichtbar — `akzeptiert`
+
+**Kontext:** Das Auflösen der Firma steckte im Chefbüro in einem zugeklappten Bereich „Lohnfaktor und Auflösen“ und
+war kaum zu finden.
+
+**Entscheidung:** Der Knopf „Firma auflösen“ steht jetzt in einer eigenen, immer sichtbaren „Gefahrenzone“ im Chefbüro
+(roter Rahmen, kurzer Hinweis, was passiert). Der Lohnfaktor bleibt im kleinen aufklappbaren Bereich. Rein
+oberflächlich; keine Server-Änderung.

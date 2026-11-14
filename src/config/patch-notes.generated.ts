@@ -54,6 +54,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Wenn dir in deiner Firma eine Aufgabe zugewiesen wird, erscheint jetzt ein großes Pop-up, damit du es nicht mehr übersiehst.",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-fcedda9c",
+        title: "Firma auflösen besser sichtbar",
+        text: "Der Knopf zum Auflösen der Firma steht jetzt in einer eigenen, deutlich sichtbaren Gefahrenzone im Chefbüro statt versteckt in einem Aufklapp-Menü.",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-706f8ae2",
         title: "Mehr Verbesserungen",
         text: "22 neue Verbesserungen und zwei weitere Tresorstufen, in fünf Abschnitten. Mehr Geld (Tresorzinsen, Lohnbonus, Stammgast, Auftragsprofi, Dealmaker), mehr XP (Börsenprofi, Frühaufsteher, Missionsjäger, Teamplayer, Bilanzprofi, Ehrgeiz), ein größerer Tresor (Panzertresor) und vieles für die eigene Firma (KI-Turbo, Glückshand, Werbeagentur, Krisenmanager …). Sie schalten sich zwischen Level 1 und 30 frei.",
