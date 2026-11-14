@@ -8,7 +8,7 @@
   },
   "entries": [
     {
-      "tag": "6AN8",
+      "tag": "6EWE",
       "rank": 1,
       "is_me": false,
       "level": 15,
@@ -17,7 +17,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "NUBX",
+      "tag": "UA7M",
       "rank": 2,
       "is_me": false,
       "level": 8,
@@ -26,7 +26,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "D3Y5",
+      "tag": "2VYL",
       "rank": 3,
       "is_me": true,
       "level": 15,
@@ -36,10 +36,10 @@
     }
   ],
   "last_winner": {
-    "tag": "D3Y5",
+    "tag": "2VYL",
     "nickname": "Fixture_Gmbh",
     "avatar_key": "rookie",
-    "growth_bps": 234,
+    "growth_bps": 233,
     "week_start": "2026-11-02"
   }
 }

@@ -2,8 +2,8 @@
   "total": 1,
   "entries": [
     {
-      "id": "174f8f06-8d08-4596-8f2a-2b0ca82fa4ba",
-      "hot": 0.353275,
+      "id": "3c8b9db9-328f-4887-8616-82e8b0e2a73b",
+      "hot": 0.353251,
       "code": "NFT-0046",
       "liked": false,
       "likes": 0,
@@ -53,12 +53,12 @@
       "creator": "Fixture_Neu",
       "ai_owner": null,
       "ask_cents": 90000000,
-      "created_at": "2026-11-14T14:31:05.265738+00:00",
+      "created_at": "2026-11-14T14:46:45.299653+00:00",
       "royalty_bps": 1000,
       "value_cents": 450000,
       "royalties_cents": 0,
-      "best_offer_cents": 1577200
+      "best_offer_cents": 2042700
     }
   ],
-  "server_time": "2026-11-14T14:31:09.0517+00:00"
+  "server_time": "2026-11-14T14:46:49.412593+00:00"
 }

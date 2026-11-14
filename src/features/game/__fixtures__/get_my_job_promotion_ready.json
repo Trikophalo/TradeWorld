@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "32ec05a9-fd40-4e51-b5ec-53b143d75415",
+    "id": "9a92b880-496a-4cb6-8889-5c309b24b336",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
+      "id": "833932bd-1586-776d-1f8f-f602682f7437",
       "logo": null,
-      "name": "QuantenSprung Labs",
-      "color": "#35D0BA",
+      "name": "Luftpost Drohnen",
+      "color": "#00B4D8",
       "is_ai": true,
-      "sector": "tech",
-      "ticker": "QSL"
+      "sector": "logistics",
+      "ticker": "DRN"
     },
     "presence": {
-      "fire_at": "2026-11-19T14:35:17.219169+00:00",
+      "fire_at": "2026-11-19T14:46:46.793876+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-14T14:35:17.219169+00:00"
+      "last_active_at": "2026-11-14T14:46:46.793876+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-14T14:35:17.324428+00:00",
+    "started_at": "2026-11-14T14:46:46.913984+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

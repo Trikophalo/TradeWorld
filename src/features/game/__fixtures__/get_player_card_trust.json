@@ -1,7 +1,7 @@
 {
   "job": null,
-  "tag": "GJNT",
-  "rank": 126,
+  "tag": "5XK7",
+  "rank": 128,
   "level": 6,
   "trust": { "band": "shaky", "kept": 0, "score": 41, "broken": 1 },
   "company": { "name": "Fixture Lieferwerk", "ticker": null },
@@ -10,7 +10,7 @@
   "avatar_key": "rookie",
   "top_skills": [],
   "streak_days": 0,
-  "member_since": "2026-11-14T14:35:17.52513+00:00",
+  "member_since": "2026-11-14T14:46:47.123344+00:00",
   "branch_scores": {
     "it": 0,
     "law": 0,

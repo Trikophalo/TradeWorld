@@ -1,48 +1,48 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 197, "gap_cents": 639 }, "rank": 198, "net_worth_cents": 1019361 },
-  "total": 306,
+  "me": { "next": { "name": "Vera", "rank": 200, "gap_cents": 489 }, "rank": 201, "net_worth_cents": 1019511 },
+  "total": 310,
   "entries": [
     {
-      "id": "33ad5099-d6a8-4637-950d-c48ea920223a",
+      "id": "45d8b8de-0cbb-44ee-a6a3-f2294cc8ce68",
       "tag": null,
       "kind": "tycoon",
       "name": "Henrike Achterberg",
       "rank": 1,
       "is_me": false,
-      "avatar_key": "rookie",
+      "avatar_key": "pilot",
       "description": "Gründerin von NeuroPharm",
       "change_24h_bps": null,
-      "net_worth_cents": 31524031405,
+      "net_worth_cents": 31472447096,
       "rank_change_24h": null
     },
     {
-      "id": "24296541-d77f-4a3b-a3f3-347998a95dfd",
+      "id": "d52507b7-ba72-40b2-a1c8-4aeea8ad8ade",
       "tag": null,
       "kind": "tycoon",
       "name": "Jonas Hartwigsen",
       "rank": 2,
       "is_me": false,
-      "avatar_key": "lawyer",
+      "avatar_key": "astronaut",
       "description": "Gründer von Volta Energie",
       "change_24h_bps": null,
-      "net_worth_cents": 15700842202,
+      "net_worth_cents": 15702437820,
       "rank_change_24h": null
     },
     {
-      "id": "2ce1451e-c6b0-42e1-8509-35d48809101f",
+      "id": "2629a463-3ea9-4d65-b5dd-626b39f8d1c5",
       "tag": null,
       "kind": "tycoon",
       "name": "Dr. Clara Ostendorp",
       "rank": 3,
       "is_me": false,
-      "avatar_key": "trader",
+      "avatar_key": "punk",
       "description": "Gründerin von KlarSoft",
       "change_24h_bps": null,
-      "net_worth_cents": 10620790627,
+      "net_worth_cents": 10699607406,
       "rank_change_24h": null
     },
     {
-      "id": "67b0c6bc-6749-43a7-89b5-4986a2e7de1c",
+      "id": "6d6874f7-5290-44cd-80d2-be92d221f29e",
       "tag": null,
       "kind": "tycoon",
       "name": "Matthis Vosskamp",
@@ -51,22 +51,22 @@
       "avatar_key": "coder",
       "description": "Gründer von Glanz & Gloria",
       "change_24h_bps": null,
-      "net_worth_cents": 7906858419,
+      "net_worth_cents": 7890070259,
       "rank_change_24h": null
     },
     {
-      "id": "8da20858-8a89-4349-a9c3-edd72663819f",
+      "id": "1b7d3b0f-edf0-46c7-92a3-cb2105a520a7",
       "tag": null,
       "kind": "tycoon",
       "name": "Lena Grotefend",
       "rank": 5,
       "is_me": false,
-      "avatar_key": "banker",
+      "avatar_key": "punk",
       "description": "Gründerin von Brotzeit Handel",
       "change_24h_bps": null,
-      "net_worth_cents": 6441831003,
+      "net_worth_cents": 6409208530,
       "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-14T14:35:14.521685+00:00"
+  "server_time": "2026-11-14T14:46:43.61393+00:00"
 }

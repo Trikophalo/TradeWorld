@@ -1,38 +1,38 @@
 {
   "applications": [
     {
-      "id": "ea454c30-f918-4594-83e9-d23b108dae3a",
+      "id": "69948f2b-4831-4284-a7d3-871d9cb1324a",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "0a16e304-9d52-47ad-8351-9bf45ff8928e",
+        "id": "22b79439-bf79-4349-af4a-96c755ca8a54",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
+          "id": "833932bd-1586-776d-1f8f-f602682f7437",
           "logo": null,
-          "name": "QuantenSprung Labs",
-          "color": "#35D0BA",
+          "name": "Luftpost Drohnen",
+          "color": "#00B4D8",
           "is_ai": true,
-          "sector": "tech",
-          "ticker": "QSL"
+          "sector": "logistics",
+          "ticker": "DRN"
         },
         "required": [{ "branch": "it", "min_score": 0 }],
         "title_key": "it_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-14T14:35:14.712622+00:00",
-      "updated_at": "2026-11-14T14:35:14.716486+00:00",
-      "offer_expires_at": "2026-11-16T14:35:14.712622+00:00",
+      "created_at": "2026-11-14T14:46:43.840133+00:00",
+      "updated_at": "2026-11-14T14:46:43.844987+00:00",
+      "offer_expires_at": "2026-11-16T14:46:43.840133+00:00",
       "salary_wish_cents_per_hour": 15900,
       "offer_salary_cents_per_hour": 15900
     },
     {
-      "id": "535d8cca-4093-4c27-ad7e-41d0bf7bb0e0",
+      "id": "f030b961-f5cd-49bf-9273-0a0d25c04092",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "8af970a3-3fc6-49e0-89f3-a2d37ff19831",
+        "id": "f2327666-e830-422d-9bad-4525987d36ff",
         "tier": "junior",
         "title": null,
         "company": {
@@ -48,9 +48,9 @@
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-14T14:35:14.706959+00:00",
-      "updated_at": "2026-11-14T14:35:14.706959+00:00",
-      "offer_expires_at": "2026-11-16T14:35:14.706959+00:00",
+      "created_at": "2026-11-14T14:46:43.833436+00:00",
+      "updated_at": "2026-11-14T14:46:43.833436+00:00",
+      "offer_expires_at": "2026-11-16T14:46:43.833436+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

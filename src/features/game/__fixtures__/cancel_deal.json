@@ -1,5 +1,5 @@
 {
-  "id": "380c8df5-2ee1-44d1-bb0b-2075643f30a6",
+  "id": "a63b563b-d5dc-4136-973c-562850b47a1a",
   "kind": "loan",
   "terms": { "hours": 24, "interest_bps": 0, "principal_cents": 20000 },
   "status": "cancelled",
@@ -9,15 +9,15 @@
   "my_role": "lender",
   "progress": { "due_cents": 20000, "left_cents": 20000, "repaid_cents": 0 },
   "proposer": {
-    "tag": "GJNT",
+    "tag": "5XK7",
     "level": 6,
     "trust": { "band": "blank", "score": 50 },
     "nickname": "Fixture_Lieferant",
     "avatar_key": "rookie"
   },
-  "closed_at": "2026-11-14T14:35:17.753001+00:00",
-  "created_at": "2026-11-14T14:35:17.749352+00:00",
-  "expires_at": "2026-11-16T14:35:17.749352+00:00",
+  "closed_at": "2026-11-14T14:46:47.44677+00:00",
+  "created_at": "2026-11-14T14:46:47.443401+00:00",
+  "expires_at": "2026-11-16T14:46:47.443401+00:00",
   "accepted_at": null,
   "is_proposer": true,
   "broken_by_me": false,

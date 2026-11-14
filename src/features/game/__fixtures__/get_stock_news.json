@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Der Start im Ausland läuft besser als geplant. Sicher ist das nicht.",
-      "name": "Volta Energie AG",
-      "due_at": "2026-11-14T15:47:52.646846+00:00",
+      "body": "Ein Gericht gibt dem Konkurrenten recht. Lizenzzahlungen drohen. Sicher ist das nicht.",
+      "name": "Memeland Media",
+      "due_at": "2026-11-14T16:22:38.540582+00:00",
       "status": "open",
-      "ticker": "VLT",
-      "headline": "Volta Energie AG erschließt neuen Markt",
+      "ticker": "MEM",
+      "headline": "Memeland Media verliert Patentstreit",
       "move_bps": null,
-      "strength": 1,
-      "direction": "up",
-      "published_at": "2026-11-14T15:35:19.109774+00:00"
+      "strength": 3,
+      "direction": "down",
+      "published_at": "2026-11-14T15:46:48.738851+00:00"
     },
     {
       "id": 3,
-      "body": "Das Geschäft läuft schwächer als erwartet. Analysten rechnen mit einem deutlich fallenden Kurs. Sicher ist das nicht.",
-      "name": "Brotzeit Handel AG",
-      "due_at": "2026-11-14T14:35:19.103136+00:00",
+      "body": "Ein wichtiger Zulieferer fällt aus. Die Produktion stockt. Sicher ist das nicht.",
+      "name": "Memeland Media",
+      "due_at": "2026-11-14T14:46:48.734451+00:00",
       "status": "confirmed",
-      "ticker": "BRZ",
-      "headline": "Brotzeit Handel AG senkt die Prognose",
-      "move_bps": -1024,
+      "ticker": "MEM",
+      "headline": "Lieferkette reißt bei Memeland Media",
+      "move_bps": -965,
       "strength": 3,
       "direction": "down",
-      "published_at": "2026-11-14T14:35:19.103136+00:00"
+      "published_at": "2026-11-14T14:46:48.734451+00:00"
     }
   ],
   "reliability_bps": 7500
