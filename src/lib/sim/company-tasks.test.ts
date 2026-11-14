@@ -65,5 +65,10 @@ describe("company task games", () => {
     expect(taskResultCents(44_000, null, false)).toBe(-26_400);
     expect(aiMinutes(0)).toBe(COMPANY_TASK_RULES.ai.minutes);
     expect(aiMinutes(2)).toBeGreaterThan(aiMinutes(1));
+    // ADR-134: task_pay, task_safety and ai_turbo of the founder
+    expect(taskResultCents(40_000, 10_000, false, COMPANY_TASK_RULES, { payBonusBps: 2_000 })).toBe(48_000);
+    expect(taskResultCents(44_000, null, false, COMPANY_TASK_RULES, { penaltyDiscountBps: 2_500 })).toBe(-19_800);
+    expect(aiMinutes(0, COMPANY_TASK_RULES, 3_000)).toBe(Math.ceil(COMPANY_TASK_RULES.ai.minutes * 0.7));
+    expect(aiMinutes(0, COMPANY_TASK_RULES, 10_000)).toBe(1);
   });
 });

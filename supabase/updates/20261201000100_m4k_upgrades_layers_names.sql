@@ -1,5 +1,6 @@
 -- ===== idempotent copy of migrations/20261201000100_m4k_upgrades_layers_names.sql =====
--- (the migration itself is written idempotently; keep both files identical below this line)
+-- (identical to the migration below this line, except section A: a replay keeps the wider key check of
+-- update 20261204000700, ADR-134, so rows with the newer upgrade keys do not break update-to-latest.sql)
 -- =============================================================================
 -- NEXA · M4k · 0100 · Upgrades with level stages, three furniture layers, unique names, deals with the company
 -- =============================================================================
@@ -37,9 +38,18 @@
 -- ---------------------------------------------------------------------------
 -- A. Schema
 -- ---------------------------------------------------------------------------
-alter table public.player_upgrades drop constraint if exists player_upgrades_key_check;
-alter table public.player_upgrades add constraint player_upgrades_key_check
-  check (key in ('vault', 'income', 'study', 'overtime', 'rhetoric', 'mentor', 'artist', 'efficiency', 'makler', 'crypto_wallet'));
+do $do$
+begin
+  -- update copy only: on a replay, keep the wider check of a later update (ADR-134)
+  if not exists (select 1 from pg_constraint c
+                  where c.conrelid = 'public.player_upgrades'::regclass and c.conname = 'player_upgrades_key_check'
+                    and pg_get_constraintdef(c.oid) like '%vault_xl%') then
+    alter table public.player_upgrades drop constraint if exists player_upgrades_key_check;
+    alter table public.player_upgrades add constraint player_upgrades_key_check
+      check (key in ('vault', 'income', 'study', 'overtime', 'rhetoric', 'mentor', 'artist', 'efficiency', 'makler', 'crypto_wallet'));
+  end if;
+end;
+$do$;
 comment on table public.player_upgrades is
   'Upgrades bought with game money (ADR-093, ADR-100): one row per player and key, level 0..upgrades.<key>.maxLevel. '
   'Owner read; written only by buy_upgrade.';

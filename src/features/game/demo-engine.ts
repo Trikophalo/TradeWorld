@@ -12,7 +12,15 @@ import { bondPriceE4, bondYieldBps } from "@/lib/sim/bonds";
 import { withholdIncome } from "@/lib/sim/insolvency";
 import { anchoredFairValue, playerImpactReturn } from "@/lib/sim/player-influence";
 import { needsFullTimeFounder } from "@/lib/sim/startup";
-import { basicIncomeCentsPerHour, upgradeCheck, upgradeCostCents, upgradeEffects } from "@/lib/sim/upgrades";
+import {
+  basicIncomeCentsPerHour,
+  bonusCents,
+  upgradeCheck,
+  upgradeCostCents,
+  upgradeEffects,
+  xpWithUpgrades,
+} from "@/lib/sim/upgrades";
+import type { UpgradeXpSource } from "@/config/upgrades";
 import { levelFromTotalXp, levelProgress, scaledXp, totalXpForLevel, unlockLevel } from "@/lib/sim/progression";
 import { MISSION_TEMPLATES, availableFor, missionXp, type Metric, type MissionTemplate } from "./demo/missions";
 import { createCareerEngine, initialCareer, tycoonAvatar, type CareerState } from "./demo/careers";
@@ -376,8 +384,9 @@ function requireLevel(key: string): void {
   if (needed !== null && level() < needed) throw new GameError("locked");
 }
 
-function addXp(base: number): number {
-  const amount = scaledXp(base);
+/** XP with the XP upgrades of the source (ADR-134; "*" = only the ones for every source) and the multiplier. */
+function addXp(base: number, source: UpgradeXpSource = "*"): number {
+  const amount = scaledXp(xpWithUpgrades(base, source, p().upgrades ?? {}));
   const before = levelFromTotalXp(p().xpTotal);
   p().xpTotal += amount;
   const after = levelFromTotalXp(p().xpTotal);
@@ -566,7 +575,7 @@ function tradeXp(grossCents: number): number {
     grossCents >= progression.xpSources.trade.minOrderValueCents
   ) {
     pl.tradesToday += 1;
-    return addXp(progression.xpSources.trade.xp);
+    return addXp(progression.xpSources.trade.xp, "trade");
   }
   return 0;
 }
@@ -998,7 +1007,10 @@ function doCheckIn() {
   if ((BALANCE.social.feed.streakMilestones as readonly number[]).includes(pl.streakDays))
     feedPost("streak", { days: pl.streakDays });
   const login = progression.xpSources.dailyLogin;
-  const xp = addXp(login.xp + Math.min(login.streakBonusCap, (pl.streakDays - 1) * login.streakBonusPerDay));
+  const xp = addXp(
+    login.xp + Math.min(login.streakBonusCap, (pl.streakDays - 1) * login.streakBonusPerDay),
+    "daily_login",
+  );
   return { xpAwarded: xp, level: level(), xpTotal: pl.xpTotal, streakDays: pl.streakDays, alreadyCheckedIn: false };
 }
 
@@ -1267,6 +1279,7 @@ const stockNews = createStockNewsEngine({
 
 const companyMoves = createCompanyMovesEngine({
   company: () => p().company ?? null,
+  upgrades: () => p().upgrades ?? {},
   addCompanyCash: (cents) => {
     const c = p().company;
     if (c) c.cashCents += cents;
@@ -1306,9 +1319,10 @@ const companyTasks = createCompanyTasksEngine({
   companyNews: () => p().company?.events?.news ?? [],
   stockNews: async (limit) => (await stockNews.stockNews(limit)).items,
   addXp: (xp) => {
-    addXp(xp);
+    addXp(xp, "work_task");
     persist();
   },
+  upgrades: () => p().upgrades ?? {},
   state: () => p().companyTasks,
   setState: (s) => {
     p().companyTasks = s;
@@ -1656,7 +1670,9 @@ export const demoEngine: GameEngine = {
         const hours = Math.min(vt.capHours, (now - pl.vaultClaimedAt) / HOUR);
         const claimed = Math.floor(hours * vt.rate);
         if (claimed < economy.vaultMinClaimCents) throw new GameError("nothing_to_claim");
-        const received = income(claimed);
+        // vault_interest (ADR-134): on top of the claim, from the treasury
+        const interest = Number(bonusCents(BigInt(claimed), upgradeEffects(pl.upgrades ?? {}).vaultInterestBps));
+        const received = income(claimed + interest);
         socialRef?.inflow(received);
         pl.vaultClaimedAt = now;
         bump("vault_claims");
@@ -1792,7 +1808,7 @@ export const demoEngine: GameEngine = {
         if (mission.status === "claimed") throw new GameError("mission_already_claimed");
         if (mission.status !== "completed") throw new GameError("mission_not_completed");
         mission.status = "claimed";
-        const xp = addXp(template(mission.key).xp);
+        const xp = addXp(template(mission.key).xp, "mission");
         return { xpAwarded: xp, level: level(), xpTotal: pl.xpTotal };
       }),
     ),

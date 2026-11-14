@@ -1,4 +1,5 @@
 import { BALANCE } from "@/config/balance";
+import { moveRestMs, upgradeEffects, withBonusCents, type UpgradeLevels } from "@/lib/sim/upgrades";
 import { GameError, type CompanyMoves, type GameEngine } from "../types";
 
 /*
@@ -27,6 +28,8 @@ export interface CompanyMovesHost {
   idempotent<T>(requestId: string, run: () => T): T;
   now(): number;
   random(): number;
+  /** The founder's upgrades (ADR-134: move_luck, dealmaker, move_tempo). */
+  upgrades?(): UpgradeLevels;
 }
 
 const cfg = BALANCE.companyMoves;
@@ -36,6 +39,9 @@ const tierOf = (tier: string): TierKey => (tier in cfg.costCentsByTier ? (tier a
 export function createCompanyMovesEngine(
   host: CompanyMovesHost,
 ): Pick<GameEngine, "companyMoves" | "startCompanyMove"> {
+  const effects = () => upgradeEffects(host.upgrades?.() ?? {});
+  const withDeal = (cents: number) => Number(withBonusCents(BigInt(cents), effects().movePayoutBonusBps));
+
   const resolve = () => {
     const now = host.now();
     const runs = host.runs().map((r) => ({ ...r }));
@@ -50,7 +56,8 @@ export function createCompanyMovesEngine(
         r.gain = risk.gain;
         host.improve(move.kind, risk.gain);
       } else {
-        r.payoutCents = Math.round((r.costCents * (ok ? risk.payoutBps : risk.refundBps)) / 10_000);
+        const base = Math.round((r.costCents * (ok ? risk.payoutBps : risk.refundBps)) / 10_000);
+        r.payoutCents = ok ? withDeal(base) : base;
         host.addCompanyCash(r.payoutCents);
       }
     }
@@ -65,6 +72,7 @@ export function createCompanyMovesEngine(
     const now = host.now();
     const runs = host.runs();
     const product = c.productKey ?? null;
+    const e = effects();
     return {
       slots: cfg.slotsByTier[tier],
       used: runs.filter((r) => r.status === "running").length,
@@ -76,7 +84,7 @@ export function createCompanyMovesEngine(
         .map((m) => {
           const risk = cfg.risk[m.risk];
           const cost = Math.round(base * m.costFactor);
-          const rest = m.minutes * (1 + cfg.cooldownFactor) * 60_000;
+          const rest = moveRestMs(m.minutes, cfg.cooldownFactor, e.moveRestDiscountBps);
           const last = runs.filter((r) => r.key === m.key).at(-1);
           const availableAt =
             last && last.startedAt + rest > now ? new Date(last.startedAt + rest).toISOString() : null;
@@ -87,9 +95,9 @@ export function createCompanyMovesEngine(
             branch: m.branch,
             minutes: m.minutes,
             costCents: cost,
-            chanceBps: risk.chanceBps,
+            chanceBps: Math.min(cfg.maxChanceBps, risk.chanceBps + e.moveChanceBps),
             skillBonusBps: 0,
-            payoutCents: m.kind === "cash" ? Math.round((cost * risk.payoutBps) / 10_000) : 0,
+            payoutCents: m.kind === "cash" ? withDeal(Math.round((cost * risk.payoutBps) / 10_000)) : 0,
             refundCents: Math.round((cost * risk.refundBps) / 10_000),
             gain: m.kind === "cash" ? 0 : risk.gain,
             availableAt,

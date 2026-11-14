@@ -3469,6 +3469,14 @@
     "failed": "Nicht gekauft",
     "cashLabel": "Dein Geld",
     "moneyNote": "Das Geld geht an die Staatskasse, aus der alle ihr Grundeinkommen bekommen.",
+    "groupCount": "{bought} von {total} Stufen",
+    "groups": {
+      "vault": "Tresor und Einkommen",
+      "work": "Job und Karriere",
+      "xp": "Erfahrung",
+      "company": "Deine Firma",
+      "life": "Leben und Märkte"
+    },
     "items": {
       "vault": {
         "name": "Tresor",
@@ -3519,6 +3527,116 @@
         "name": "Hardware-Wallet",
         "text": "Eigene Wallet: weniger Gebühren beim Krypto-Handel.",
         "value": "−{percent} Krypto-Gebühren"
+      },
+      "vault_xl": {
+        "name": "Panzertresor",
+        "text": "Ein zweiter, gepanzerter Tresorraum: noch mehr Platz für dein Grundeinkommen.",
+        "value": "{value} h Platz"
+      },
+      "vault_interest": {
+        "name": "Tresorzinsen",
+        "text": "Die Staatskasse legt beim Leeren des Tresors etwas obendrauf.",
+        "value": "+{percent} beim Leeren"
+      },
+      "daily_bonus": {
+        "name": "Stammgast",
+        "text": "Treue lohnt sich: Die tägliche Belohnung bringt mehr Geld.",
+        "value": "+{percent} Geld täglich"
+      },
+      "wage_bonus": {
+        "name": "Gehaltsverhandlung",
+        "text": "Du verhandelst einen Bonus: Zu jedem Lohn legt die Staatskasse etwas dazu.",
+        "value": "+{percent} Lohnbonus"
+      },
+      "wage_shield": {
+        "name": "Krisenfester Vertrag",
+        "text": "Steckt dein Arbeitgeber in der Krise, wird dein Lohn weniger gekürzt.",
+        "value": "−{percent} Lohnkürzung"
+      },
+      "trader": {
+        "name": "Börsenprofi",
+        "text": "Routine an der Börse: mehr XP für jeden Handel.",
+        "value": "+{percent} XP aus Handel"
+      },
+      "early_bird": {
+        "name": "Frühaufsteher",
+        "text": "Wer früh reinschaut, lernt mehr: mehr XP aus der täglichen Belohnung.",
+        "value": "+{percent} XP täglich"
+      },
+      "mission_hunter": {
+        "name": "Missionsjäger",
+        "text": "Du gehst Aufträge gezielter an: mehr XP aus Missionen.",
+        "value": "+{percent} XP aus Missionen"
+      },
+      "teamplayer": {
+        "name": "Teamplayer",
+        "text": "Du packst bei Aufgaben richtig mit an: mehr XP aus Aufgaben.",
+        "value": "+{percent} XP aus Aufgaben"
+      },
+      "balance_sheet": {
+        "name": "Bilanzprofi",
+        "text": "Du liest Zahlen wie ein Profi: mehr XP aus Quartalsgewinnen und dem Börsengang deiner Firma.",
+        "value": "+{percent} XP aus Bilanzen"
+      },
+      "ambition": {
+        "name": "Ehrgeiz",
+        "text": "Du willst nach ganz oben: mehr XP aus allem, was du tust.",
+        "value": "+{percent} auf alle XP"
+      },
+      "task_pay": {
+        "name": "Auftragsprofi",
+        "text": "Deine Firma verhandelt besser: Erledigte Firmenaufgaben bringen mehr Geld.",
+        "value": "+{percent} für Aufgaben"
+      },
+      "task_safety": {
+        "name": "Fehlerkultur",
+        "text": "Aus Fehlern lernen: Verpatzte oder verpasste Firmenaufgaben kosten weniger.",
+        "value": "−{percent} Strafe"
+      },
+      "crisis_manager": {
+        "name": "Krisenmanager",
+        "text": "Ruhe bewahren: Schritte gegen Krisen und für Chancen deiner Firma kosten weniger.",
+        "value": "−{percent} Krisenkosten"
+      },
+      "move_luck": {
+        "name": "Glückshand",
+        "text": "Ein gutes Gespür: Geschäftszüge deiner Firma gelingen öfter.",
+        "value": "+{percent} Chance"
+      },
+      "ad_agency": {
+        "name": "Werbeagentur",
+        "text": "Eine Agentur an deiner Seite: Marketing-Kampagnen werden günstiger.",
+        "value": "−{percent} Kampagnen"
+      },
+      "dealmaker": {
+        "name": "Dealmaker",
+        "text": "Du holst mehr raus: Gelungene Geldgeschäfte deiner Firma bringen mehr ein.",
+        "value": "+{percent} Gewinn"
+      },
+      "ai_turbo": {
+        "name": "KI-Turbo",
+        "text": "Schnellere Server: Deine KI-Mitarbeiter erledigen Aufgaben schneller.",
+        "value": "−{percent} KI-Zeit"
+      },
+      "ai_precision": {
+        "name": "KI-Feinschliff",
+        "text": "Besser trainiert: Deine KI-Mitarbeiter machen Aufgaben öfter richtig.",
+        "value": "+{percent} KI-Chance"
+      },
+      "strategist": {
+        "name": "Strategieberater",
+        "text": "Ein Profi prüft deine Ideen: Eigene Strategien gehen öfter auf.",
+        "value": "+{percent} Chance"
+      },
+      "move_tempo": {
+        "name": "Taktgeber",
+        "text": "Kurze Wege: Geschäftszüge sind schneller wieder bereit.",
+        "value": "−{percent} Pause"
+      },
+      "activist": {
+        "name": "Aktivist",
+        "text": "Du weißt, wie man Leute bewegt: Deine Kampagnen gegen Firmen wirken öfter.",
+        "value": "+{percent} Wirkung"
       }
     }
   },

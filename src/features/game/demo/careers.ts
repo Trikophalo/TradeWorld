@@ -37,7 +37,8 @@ import {
 } from "../types";
 import { createRng } from "@/lib/sim/rng";
 import { promotedSalaryCents, promotionCheck } from "@/lib/sim/promotion";
-import { upgradeEffects, type UpgradeLevels } from "@/lib/sim/upgrades";
+import { bonusCents, upgradeEffects, withBonusCents, type UpgradeLevels } from "@/lib/sim/upgrades";
+import type { UpgradeXpSource } from "@/config/upgrades";
 import { correctOption, generateWorkTask, gradeWorkTask, workTaskKind } from "@/lib/sim/work-tasks";
 
 /*
@@ -129,8 +130,8 @@ export interface CareerHost {
   /** League trophies (ADR-089). */
   trophies(): { gold: number; silver: number; bronze: number };
   level(): number;
-  /** Adds XP (multiplier applied) and returns the amount. */
-  addXp(base: number): number;
+  /** Adds XP (XP upgrades of the source and the multiplier applied, ADR-134) and returns the amount. */
+  addXp(base: number, source?: UpgradeXpSource): number;
   xpTotal(): number;
   cashCents(): number;
   addCash(cents: number): void;
@@ -319,7 +320,8 @@ export function createCareerEngine(host: CareerHost) {
     // Less pay the longer the player has been away (ADR-103), measured in the middle of the paid stretch.
     const presence = presencePayBps((job.lastPaidAt + now) / 2 / HOUR - lastActive / HOUR);
     const pay = Math.floor((job.salary * minutes * presence) / 60 / 10_000);
-    host.addCash(pay);
+    // wage_bonus (ADR-134): on top, from the treasury
+    host.addCash(pay + Number(bonusCents(BigInt(pay), effects.wageBonusBps)));
     job.earnedTotal += pay;
     job.paidMinutesToday += minutes;
     job.rankMinutes = (job.rankMinutes ?? 0) + minutes;
@@ -523,15 +525,19 @@ export function createCareerEngine(host: CareerHost) {
         const reward = dailyRewards.cycle[state.day - 1]!;
         const levelBefore = host.level();
         host.checkIn();
-        const xp = host.addXp(reward.xp);
-        host.addCash(reward.cashCents);
+        const xp = host.addXp(reward.xp, "daily_login");
+        // daily_bonus (ADR-134)
+        const cash = Number(
+          withBonusCents(BigInt(reward.cashCents), upgradeEffects(host.upgrades()).dailyCashBonusBps),
+        );
+        host.addCash(cash);
         s.bonusPoints += reward.skillPoints;
         s.dailyDay = state.day;
         s.dailyClaimedOn = host.day();
         return {
           day: state.day,
           xpAwarded: xp,
-          cashCents: reward.cashCents,
+          cashCents: cash,
           skillPoints: reward.skillPoints,
           streakDays: host.streakDays(),
           level: host.level(),
@@ -810,7 +816,7 @@ export function createCareerEngine(host: CareerHost) {
         const correct = choice === current.correctIndex;
         const grade = gradeWorkTask(correct, (Date.now() - started) / 1000);
         current.done = true;
-        const xp = host.addXp(grade.xp);
+        const xp = host.addXp(grade.xp, "work_task");
         const bonus = Math.round(grade.bonusShare * careers.workTask.bonusSalaryHours * job.salary);
         if (bonus > 0) host.addCash(bonus);
         return {

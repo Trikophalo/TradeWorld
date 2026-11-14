@@ -66,17 +66,26 @@ test("upgrades: buy a bigger vault, the vault card links to the shop", async ({ 
   }).toPass();
 
   const vault = page.getByTestId("upgrade-vault");
-  await expect(vault.getByTestId("upgrade-level")).toHaveText("Stufe 0 von 6");
+  await expect(vault.getByTestId("upgrade-level")).toHaveText("Stufe 0 von 8");
   await expect(vault.getByTestId("upgrade-effect")).toContainText("8 h Platz");
   await expect(vault.getByTestId("upgrade-effect")).toContainText("10 h Platz");
   await hold(page, vault.getByRole("button", { name: /3\.000 €/ }));
   await expect(page.getByText("Verbessert!").first()).toBeVisible();
-  await expect(vault.getByTestId("upgrade-level")).toHaveText("Stufe 1 von 6");
+  await expect(vault.getByTestId("upgrade-level")).toHaveText("Stufe 1 von 8");
   await expect(vault.getByRole("button", { name: /6\.000 €/ })).toBeVisible();
   await expect(page.getByTestId("upgrades-cash")).toHaveText(/17\.000,00/);
 
   // Overtime needs level 5: the player is level 6, rhetoric too; nothing is locked here.
   await expect(page.getByTestId("upgrade-overtime").getByText("Ab Level 5")).toHaveCount(0);
+
+  // ADR-134: more upgrades in groups; the trader gives more trade XP, ambition opens at level 18.
+  await expect(page.getByTestId("upgrade-group-xp")).toContainText("Erfahrung");
+  const trader = page.getByTestId("upgrade-trader");
+  await expect(trader.getByTestId("upgrade-effect")).toContainText(/\+10,00\s%\sXP aus Handel/);
+  await hold(page, trader.getByRole("button", { name: /2\.000 €/ }));
+  await expect(trader.getByTestId("upgrade-level")).toHaveText("Stufe 1 von 3");
+  await expect(page.getByTestId("upgrades-cash")).toHaveText(/15\.000,00/);
+  await expect(page.getByTestId("upgrade-ambition")).toContainText("Nächste Stufe ab Level 18");
 });
 
 test("career ladder: requirements, asking the boss, skill point guide", async ({ page }) => {
