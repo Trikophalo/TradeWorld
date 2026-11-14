@@ -145,3 +145,6 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 - **Geschäftszüge (ADR-127):** Firmen verdienen jetzt aktiv. 96 Züge, die zum Produkt passen (Klinik-Express,
   Penetrationstest, Solarpark …), sicher bis riskant, mit Ergebnis nach 15 bis 60 Minuten. Know-how des
   Teams hebt die Chance. Auftragsarbeit läuft automatisch, der Schalter ist weg.
+- **Firmen in jedem Bereich (ADR-128):** sechs neue Produkte, die mit Recht, Finanzen oder Führung beginnen
+  (Online-Rechtsberatung, Banking-App, Franchise-Kette, Stromhandel, Zulassungsberatung, Umzugsservice), jedes mit
+  eigenen Geschäftszügen.

@@ -16,6 +16,12 @@ select tests.set_level(:i, 5);
 -- 1. bond: buy, quarter closes until maturity, coupons net of tax, face value
 -- =============================================================================
 begin;
+-- The seeded NXB01 matures at the next 08:00 in Berlin, so how many quarter closes fit before it depends on the
+-- clock. Pin it to two and a half quarters after the current one: three coupons, then the redemption.
+update public.bonds b set issued_at = q.starts_at - interval '1 minute',
+       matures_at = q.ends_at + (q.ends_at - q.starts_at) * 2.5
+  from public.game_quarters q, public.securities s
+ where q.id = (public.current_game_quarter()).id and s.id = b.security_id and s.ticker = 'NXB01';
 select tests.cash(:i) as i_cash0 \gset
 select count(*) as closed0 from public.game_quarters where status = 'closed' \gset
 select tests.login_as('authenticated', :i);

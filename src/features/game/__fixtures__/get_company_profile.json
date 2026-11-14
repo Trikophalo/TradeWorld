@@ -7,10 +7,10 @@
     "max_staff": 100000,
     "ai_workers": 0,
     "quality_bps": null,
-    "value_cents": 433369000000,
-    "profit_cents": 15669318948,
+    "value_cents": 431325500000,
+    "profit_cents": 12067803380,
     "awareness_bps": null,
-    "revenue_cents": 171670720646
+    "revenue_cents": 161847944863
   },
   "company": {
     "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
@@ -22,9 +22,9 @@
     "listed": true,
     "sector": "tech",
     "ticker": "KLS",
-    "price_e4": 866738,
-    "change_bps": 15,
-    "founded_at": "2026-11-14T00:50:49.272285+00:00",
+    "price_e4": 862651,
+    "change_bps": -86,
+    "founded_at": "2026-11-14T01:06:43.516406+00:00",
     "brand_color": "#4C8DFF"
   },
   "founder": null,

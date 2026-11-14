@@ -1,6 +1,6 @@
 {
   "facts": {
-    "staff": 1,
+    "staff": 2,
     "stage": 0,
     "period": null,
     "product": "security_software",
@@ -13,10 +13,10 @@
     "revenue_cents": null
   },
   "company": {
-    "id": "196e4a8f-23e1-4f15-9a08-9111cbccd823",
-    "idea": "Neue Schrauben",
+    "id": "734e11f7-7611-419c-8cb5-3cf905dc6661",
+    "idea": "Leitern für jede Höhe",
     "logo": null,
-    "name": "Gleich Werk",
+    "name": "Fixture Leitern",
     "tier": "garage",
     "is_ai": false,
     "listed": false,
@@ -24,9 +24,18 @@
     "ticker": null,
     "price_e4": null,
     "change_bps": null,
-    "founded_at": "2026-11-14T00:52:23.66227+00:00",
-    "brand_color": "#553377"
+    "founded_at": "2026-11-14T01:08:18.842164+00:00",
+    "brand_color": "#447799"
   },
-  "founder": { "tag": "EB7Y", "nickname": "Kai_Kopie", "avatar_key": "rookie" },
-  "members": []
+  "founder": { "tag": "RAAP", "nickname": "Fixture_Chef", "avatar_key": "rookie" },
+  "members": [
+    {
+      "tag": "2W4A",
+      "tier": "junior",
+      "since": "2026-11-14T01:08:18.893889+00:00",
+      "title": "Werkstudium Leitern",
+      "nickname": "Fixture_Team",
+      "avatar_key": "rookie"
+    }
+  ]
 }

@@ -912,6 +912,24 @@ export const PRODUCTS = {
         ["finance_controlling", "management_operations"],
       ],
     },
+    {
+      key: "legal_tech",
+      stages: [
+        ["law_contracts"],
+        ["law_corporate", "it_programming"],
+        ["law_privacy", "it_web"],
+        ["law_it", "sales_growth"],
+      ],
+    },
+    {
+      key: "fintech",
+      stages: [
+        ["finance_accounting"],
+        ["finance_banking", "it_mobile"],
+        ["finance_portfolio", "law_compliance"],
+        ["finance_risk", "it_security"],
+      ],
+    },
   ],
   retail: [
     {
@@ -939,6 +957,15 @@ export const PRODUCTS = {
         ["sales_service", "logistics_distribution"],
         ["sales_retail", "science_nutrition"],
         ["logistics_cold", "law_consumer"],
+      ],
+    },
+    {
+      key: "franchise",
+      stages: [
+        ["management_team"],
+        ["management_people", "sales_selling"],
+        ["management_operations", "finance_controlling"],
+        ["management_strategy", "law_contracts"],
       ],
     },
   ],
@@ -970,6 +997,15 @@ export const PRODUCTS = {
         ["law_ip", "sales_international"],
       ],
     },
+    {
+      key: "energy_trading",
+      stages: [
+        ["finance_investment"],
+        ["finance_accounting", "craft_electrical"],
+        ["finance_trading", "law_compliance"],
+        ["finance_risk", "management_strategy"],
+      ],
+    },
   ],
   pharma: [
     {
@@ -999,6 +1035,15 @@ export const PRODUCTS = {
         ["science_devices", "it_embedded"],
       ],
     },
+    {
+      key: "regulatory",
+      stages: [
+        ["law_contracts"],
+        ["law_compliance", "science_pharmacology"],
+        ["law_ip", "science_clinical"],
+        ["law_medical", "finance_controlling"],
+      ],
+    },
   ],
   logistics: [
     {
@@ -1026,6 +1071,15 @@ export const PRODUCTS = {
         ["logistics_customs", "logistics_shipping"],
         ["logistics_global", "sales_international"],
         ["logistics_strategic", "finance_risk"],
+      ],
+    },
+    {
+      key: "moving",
+      stages: [
+        ["management_projects"],
+        ["logistics_transport", "management_team"],
+        ["logistics_distribution", "sales_service"],
+        ["management_operations", "logistics_planning"],
       ],
     },
   ],

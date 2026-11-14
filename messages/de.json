@@ -2355,6 +2355,30 @@
     "freight": {
       "name": "Spedition",
       "desc": "Fracht über Grenzen."
+    },
+    "legal_tech": {
+      "name": "Online-Rechtsberatung",
+      "desc": "Verträge und Rechtsfragen per App."
+    },
+    "fintech": {
+      "name": "Banking-App",
+      "desc": "Konto und Geldanlage auf dem Handy."
+    },
+    "franchise": {
+      "name": "Franchise-Kette",
+      "desc": "Läden nach einem Konzept, geführt von Partnern."
+    },
+    "energy_trading": {
+      "name": "Stromhandel",
+      "desc": "Strom günstig einkaufen und teurer weiterverkaufen."
+    },
+    "regulatory": {
+      "name": "Zulassungsberatung",
+      "desc": "Bringt Medikamente sicher durch die Zulassung."
+    },
+    "moving": {
+      "name": "Umzugsservice",
+      "desc": "Umzüge für Familien und Firmen, mit Plan."
     }
   },
   "jobTab": {
@@ -4828,6 +4852,150 @@
       "logistics_fair": {
         "name": "Stand auf der Logistikmesse",
         "desc": "Verlader suchen neue Partner."
+      },
+      "contract_check_flat": {
+        "name": "Mietvertrags-Check im Abo",
+        "desc": "Hunderte Mieter lassen ihre Verträge prüfen. Kleiner Betrag, sicher verdient."
+      },
+      "class_action": {
+        "name": "Sammelklage gegen eine Airline",
+        "desc": "Tausende Fluggäste wollen Entschädigung. Gewinnt ihr, bekommt ihr eine Provision."
+      },
+      "startup_law_pack": {
+        "name": "Gründungspaket für Startups",
+        "desc": "Satzung, Verträge, Anmeldung: alles aus einer Hand."
+      },
+      "legal_explainer": {
+        "name": "Erklärvideos zu Rechtsfragen",
+        "desc": "Kurze Videos, die viele teilen. Wer euch kennt, fragt euch."
+      },
+      "lawyer_review": {
+        "name": "Anwälte prüfen eure Vorlagen",
+        "desc": "Weniger Fehler in den Musterverträgen, mehr Vertrauen."
+      },
+      "data_privacy_audit": {
+        "name": "Datenschutz-Check für einen Onlineshop",
+        "desc": "Ein Shop will wissen, ob seine Seite den Regeln folgt."
+      },
+      "free_account": {
+        "name": "Gratis-Konto mit Startbonus",
+        "desc": "Neue Kunden bekommen 20 € zum Start und erzählen es weiter."
+      },
+      "savings_plan": {
+        "name": "Sparplan-Aktion",
+        "desc": "Kunden legen monatlich an, ihr verdient an jeder Ausführung."
+      },
+      "crypto_feature": {
+        "name": "Krypto-Handel freischalten",
+        "desc": "Viele wollen handeln. Wenn der Markt mitspielt, verdient ihr kräftig an Gebühren."
+      },
+      "banking_license": {
+        "name": "Volle Banklizenz beantragen",
+        "desc": "Mit Lizenz traut man euch mehr Geld an."
+      },
+      "fraud_detection": {
+        "name": "Betrugserkennung verbessern",
+        "desc": "Weniger gehackte Konten, bessere Bewertungen."
+      },
+      "merchant_payments": {
+        "name": "Kartenzahlung für Cafés",
+        "desc": "Kleine Läden nehmen eure Kartenleser und zahlen pro Buchung."
+      },
+      "new_partner": {
+        "name": "Neuen Franchise-Partner gewinnen",
+        "desc": "Ein Partner zahlt die Einstiegsgebühr für einen neuen Laden."
+      },
+      "flagship_store": {
+        "name": "Vorzeige-Laden in der Innenstadt",
+        "desc": "Teuer, aber wenn er läuft, will jeder einen eigenen."
+      },
+      "partner_training": {
+        "name": "Partner-Schulung",
+        "desc": "Alle Läden arbeiten nach demselben guten Standard."
+      },
+      "central_purchasing": {
+        "name": "Zentraleinkauf für alle Läden",
+        "desc": "Große Mengen, bessere Preise, ihr behaltet die Differenz."
+      },
+      "regional_ads": {
+        "name": "Regionale Werbekampagne",
+        "desc": "Plakate in der ganzen Region, für alle Läden auf einmal."
+      },
+      "master_franchise": {
+        "name": "Lizenz fürs Ausland verkaufen",
+        "desc": "Ein Investor will die Marke im Nachbarland aufbauen."
+      },
+      "spot_trade": {
+        "name": "Kurzfristig an der Strombörse handeln",
+        "desc": "Billig einkaufen, wenn der Wind weht, teuer verkaufen am Abend."
+      },
+      "supply_contract": {
+        "name": "Liefervertrag mit einer Bäckerei",
+        "desc": "Fester Preis, feste Abnahme, planbarer Gewinn."
+      },
+      "green_tariff": {
+        "name": "Ökostrom-Tarif starten",
+        "desc": "Ein grüner Tarif bringt euch in die Vergleichsportale."
+      },
+      "hedging": {
+        "name": "Preise absichern",
+        "desc": "Weniger Überraschungen für Kunden, wenn der Strompreis springt."
+      },
+      "industrial_customer": {
+        "name": "Fabrik als Großkunden gewinnen",
+        "desc": "Ein Werk braucht viel Strom und sucht einen neuen Anbieter."
+      },
+      "market_analysis": {
+        "name": "Wetterdaten auswerten",
+        "desc": "Wer den Wind von morgen kennt, kauft besser ein."
+      },
+      "approval_dossier": {
+        "name": "Zulassungsakte für ein Medikament",
+        "desc": "Ein Hersteller braucht die Unterlagen für die Behörde."
+      },
+      "fast_track": {
+        "name": "Eilzulassung durchbringen",
+        "desc": "Klappt die Eilzulassung, zahlt der Kunde eine dicke Prämie."
+      },
+      "label_check": {
+        "name": "Beipackzettel prüfen",
+        "desc": "Kleiner Auftrag, schnell erledigt."
+      },
+      "expert_panel": {
+        "name": "Fachbeirat aus Ärzten",
+        "desc": "Erfahrene Ärzte prüfen eure Gutachten."
+      },
+      "pharma_congress": {
+        "name": "Vortrag auf dem Pharma-Kongress",
+        "desc": "Hersteller lernen euch kennen."
+      },
+      "eu_registration": {
+        "name": "Registrierung in der ganzen EU",
+        "desc": "Ein Medikament soll in 27 Ländern auf den Markt."
+      },
+      "office_move": {
+        "name": "Büro-Umzug über das Wochenende",
+        "desc": "Eine Firma zieht um und am Montag muss alles laufen."
+      },
+      "student_move": {
+        "name": "Studenten-WG umziehen",
+        "desc": "Ein Transporter, vier Stockwerke, schnell verdient."
+      },
+      "piano_move": {
+        "name": "Flügel in den dritten Stock",
+        "desc": "Gut bezahlt, wenn nichts zerkratzt."
+      },
+      "moving_boxes": {
+        "name": "Gratis-Kartons verteilen",
+        "desc": "Auf jedem Karton steht euer Name."
+      },
+      "packing_training": {
+        "name": "Packprofi-Schulung",
+        "desc": "Weniger Scherben, bessere Bewertungen."
+      },
+      "senior_move": {
+        "name": "Umzug ins Seniorenheim begleiten",
+        "desc": "Mit Geduld und Plan. Familien empfehlen euch weiter."
       }
     }
   }

@@ -79,3 +79,18 @@ select tests.assert(
 select tests.assert((select count(*) from public.ledger_audit()) = 0 and tests.money_invariant() = 'ok',
   'closed money system after the business moves');
 select tests.throws($$select public.api_error('move_resting')$$, 'NX109', 'move_resting is NX109');
+
+-- ADR-128: every area of the skill map has products, e.g. an online legal service that starts with law.
+select tests.set_level(:b, 10);
+select tests.fund(:b, 20000000, 'test:moves:b');
+select tests.login_as('authenticated', :b);
+select public.found_company(gen_random_uuid(), 'Nora Recht', 'Verträge per App', 'tech', '#663399', 'garage', 'legal_tech')
+  is not null as ok \gset
+select public.get_company_moves() as mb \gset
+reset role;
+select tests.assert(
+  :'mb'::jsonb ->> 'product' = 'legal_tech'
+  and exists (select 1 from jsonb_array_elements(:'mb'::jsonb -> 'moves') x where x ->> 'key' = 'class_action')
+  and (select p.stages -> 0 ->> 0 = 'law_contracts' from jsonb_to_recordset(
+         public.config_jsonb('startups', array['products', 'tech'])) as p(key text, stages jsonb) where p.key = 'legal_tech'),
+  'found_company(): a legal-tech company starts with law and gets its own moves');

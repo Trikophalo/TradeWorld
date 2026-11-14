@@ -1,5 +1,5 @@
 {
-  "id": "616d18c7-8019-40db-aabb-4287af24c32a",
+  "id": "3592f91b-b55b-4716-964e-54225d1d4010",
   "logo": {
     "grid": [
       "................",
@@ -26,7 +26,7 @@
   "stats": { "hype": 0.0, "tech": 35.0, "utility": 0.0 },
   "action": null,
   "launch": {
-    "at": "2026-11-14T00:52:32.793878+00:00",
+    "at": "2026-11-14T01:08:20.09998+00:00",
     "start_price_e4": 1000,
     "team_share_bps": 2000,
     "liquidity_cents": 1000000
@@ -42,12 +42,12 @@
     { "key": "staking", "hours": 12, "available": true, "cost_cents": 500000, "success_bps": 10000 },
     { "key": "bugfix", "hours": 3, "available": true, "cost_cents": 100000, "success_bps": 10000 }
   ],
-  "creator": { "tag": "RNNH", "trust": { "band": "blank", "score": 50 }, "nickname": "Fixture_Coiner" },
+  "creator": { "tag": "CVAK", "trust": { "band": "blank", "score": 50 }, "nickname": "Fixture_Coiner" },
   "fee_bps": 100,
   "category": "player",
   "price_e4": 1000,
   "burn_hype": 8,
-  "created_at": "2026-11-14T00:52:32.724269+00:00",
+  "created_at": "2026-11-14T01:08:20.026128+00:00",
   "low_24h_e4": 1000,
   "pool_cents": 1000000,
   "burn_min_e6": 250000000,

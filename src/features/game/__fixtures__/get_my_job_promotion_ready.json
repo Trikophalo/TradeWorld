@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "332dac3d-910c-43aa-b0c3-94b45870bb3a",
+    "id": "e7bf8dfa-4482-4f0c-88ef-c3003a2a7f67",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
+      "id": "cbfac5fd-3475-2166-ea22-0a85cbb6f5c0",
       "logo": null,
-      "name": "QuantenSprung Labs",
-      "color": "#35D0BA",
+      "name": "Brotzeit Handel AG",
+      "color": "#F2A93B",
       "is_ai": true,
-      "sector": "tech",
-      "ticker": "QSL"
+      "sector": "retail",
+      "ticker": "BRZ"
     },
     "presence": {
-      "fire_at": "2026-11-19T00:52:31.458491+00:00",
+      "fire_at": "2026-11-19T01:08:18.729984+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-14T00:52:31.458491+00:00"
+      "last_active_at": "2026-11-14T01:08:18.729984+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-14T00:52:31.546699+00:00",
+    "started_at": "2026-11-14T01:08:18.811732+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

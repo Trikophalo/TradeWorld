@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Eine wichtige Technologie ist jetzt geschützt. Der Vorsprung dürfte sich auszahlen. Sicher ist das nicht.",
-      "name": "Alpenmed",
-      "due_at": "2026-11-14T02:22:41.038895+00:00",
+      "body": "Neue Aktien sollen ausgegeben werden. Das verwässert die Anteile, der Kurs dürfte deutlich nachgeben. Sicher ist das nicht.",
+      "name": "Volta Energie AG",
+      "due_at": "2026-11-14T02:38:11.829787+00:00",
       "status": "open",
-      "ticker": "ALM",
-      "headline": "Patent für Alpenmed erteilt",
+      "ticker": "VLT",
+      "headline": "Volta Energie AG plant Kapitalerhöhung",
       "move_bps": null,
-      "strength": 2,
-      "direction": "up",
-      "published_at": "2026-11-14T01:52:32.90361+00:00"
+      "strength": 3,
+      "direction": "down",
+      "published_at": "2026-11-14T02:08:20.20927+00:00"
     },
     {
       "id": 3,
-      "body": "Ehemalige Mitarbeiter erheben schwere Vorwürfe. Kunden kündigen erste Verträge. Sicher ist das nicht.",
-      "name": "Fundgrube Discount",
-      "due_at": "2026-11-14T00:52:32.900655+00:00",
+      "body": "Das Geschäft läuft schwächer als erwartet. Analysten rechnen mit einem deutlich fallenden Kurs. Sicher ist das nicht.",
+      "name": "Brotzeit Handel AG",
+      "due_at": "2026-11-14T01:08:20.206132+00:00",
       "status": "confirmed",
-      "ticker": "FGD",
-      "headline": "Rassismus-Vorwürfe gegen Fundgrube Discount",
-      "move_bps": -1064,
+      "ticker": "BRZ",
+      "headline": "Brotzeit Handel AG senkt die Prognose",
+      "move_bps": -1112,
       "strength": 3,
       "direction": "down",
-      "published_at": "2026-11-14T00:52:32.900655+00:00"
+      "published_at": "2026-11-14T01:08:20.206132+00:00"
     }
   ],
   "reliability_bps": 7500

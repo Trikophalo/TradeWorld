@@ -1816,3 +1816,29 @@ Entscheidung:
 Folgen: Firmen haben einen aktiven Takt im Minutenbereich, passend zu ihrem Produkt. Mit 4 Spielern hat jeder seine
 eigenen Züge; nichts davon nimmt anderen etwas weg. Tests: `supabase/tests/95_company_moves.sql`,
 `src/features/game/demo/company-moves.test.ts`, `e2e/company-growth.spec.ts`.
+
+## ADR-128: Firmen in jedem Bereich der Skill-Karte — `akzeptiert`
+
+Anlass: Bisher begann kein Produkt mit Recht, Finanzen oder Führung. Wer diese Bereiche gelernt hatte, fand keine
+passende Firma.
+
+Entscheidung: Sechs neue Produkte in den bestehenden Branchen, damit jeder der acht Bereiche ein Einstiegsprodukt hat:
+
+| Branche  | Produkt               | Einstieg (Stufe 1)         |
+| -------- | --------------------- | -------------------------- |
+| Tech     | Online-Rechtsberatung | Recht: Vertragsrecht       |
+| Tech     | Banking-App           | Finanzen: Buchhaltung      |
+| Handel   | Franchise-Kette       | Führung: Teamführung       |
+| Energie  | Stromhandel           | Finanzen: Investment       |
+| Pharma   | Zulassungsberatung    | Recht: Vertragsrecht       |
+| Logistik | Umzugsservice         | Führung: Projektmanagement |
+
+Jedes bekommt sechs eigene Geschäftszüge (ADR-127), zum Beispiel die Sammelklage gegen eine Airline oder den Flügel
+in den dritten Stock. Beim Gründen zeigt jedes Produkt, in welchem Bereich es beginnt.
+
+Keine neue Branche: Branchen hängen an Börse, KI-Firmen und Nachfrage. Neue Produkte brauchen nur Konfiguration
+(`startups.products`) und Texte; der Server liest sie aus `game_config`. Test in
+`supabase/tests/95_company_moves.sql`.
+
+Nebenbei: `53_m1_bonds_vault.sql` legt die Laufzeit von NXB01 im Test fest. Vorher hing die Zahl der Kupons von
+der Uhrzeit ab, und zwischen etwa 2 und 8 Uhr scheiterte die Prüfung (auch im Workflow vor dem Datenbank-Update).

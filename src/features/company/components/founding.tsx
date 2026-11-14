@@ -22,6 +22,7 @@ import { formatMoney } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
 import { playSound } from "@/lib/sound";
 import { useClock } from "@/lib/use-now";
+import { skillNode } from "@/lib/sim/skills";
 import { cn } from "@/lib/utils";
 import { COMPANY_COLORS, useCompanyRefresh } from "../hooks";
 import { useProductText } from "../product-name";
@@ -283,7 +284,10 @@ function FoundingSheet({ tier, onClose }: { tier: FoundableTier | null; onClose:
                   product === p.key ? "border-accent bg-accent-soft" : "border-line-1 hover:bg-surface-2",
                 )}
               >
-                <span className="block text-sm font-medium text-fg-1">{productText.name(p.key)}</span>
+                <span className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 text-sm font-medium text-fg-1">{productText.name(p.key)}</span>
+                  <StartBranch skill={p.stages[0]?.[0]} />
+                </span>
                 <span className="block text-xs text-fg-3">{productText.desc(p.key)}</span>
               </button>
             ))}
@@ -327,4 +331,12 @@ function FoundingSheet({ tier, onClose }: { tier: FoundableTier | null; onClose:
       </div>
     </Sheet>
   );
+}
+
+/** The skill area a product starts in (ADR-128): every area of the skill map has products. */
+function StartBranch({ skill }: { skill: string | undefined }) {
+  const t = useTranslations("skills.branches");
+  const branch = skill ? skillNode(skill)?.branches[0] : undefined;
+  if (!branch) return null;
+  return <Badge className="shrink-0">{t(`${branch}.name`)}</Badge>;
 }

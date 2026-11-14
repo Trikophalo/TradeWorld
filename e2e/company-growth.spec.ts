@@ -221,3 +221,14 @@ test("business moves fit the product, cost company cash and run for minutes (ADR
   // A garage has one slot: every other move waits.
   await expect(card.getByText("Alle Plätze belegt").first()).toBeVisible();
 });
+
+test("every area of the skill map has products, e.g. an online legal service (ADR-128)", async ({ page }) => {
+  await preparePlayer(page, "Rechtsfuchs", 21_000, 2_000_000);
+  await page.goto("/company");
+  await page.locator('[data-tier="garage"]').getByRole("button", { name: "Gründen" }).click();
+  const sheet = page.getByRole("dialog", { name: "Firma gründen" });
+  const legal = sheet.getByRole("radio", { name: /Online-Rechtsberatung/ });
+  await expect(legal).toContainText("Recht");
+  await legal.click();
+  await expect(legal).toHaveAttribute("aria-checked", "true");
+});
