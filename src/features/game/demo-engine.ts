@@ -21,7 +21,14 @@ import {
   xpWithUpgrades,
 } from "@/lib/sim/upgrades";
 import type { UpgradeXpSource } from "@/config/upgrades";
-import { levelFromTotalXp, levelProgress, scaledXp, totalXpForLevel, unlockLevel } from "@/lib/sim/progression";
+import {
+  levelFromTotalXp,
+  levelProgress,
+  missionBaseXp,
+  scaledXp,
+  totalXpForLevel,
+  unlockLevel,
+} from "@/lib/sim/progression";
 import { MISSION_TEMPLATES, availableFor, missionXp, type Metric, type MissionTemplate } from "./demo/missions";
 import { createCareerEngine, initialCareer, tycoonAvatar, type CareerState } from "./demo/careers";
 import { createArtEngine, type ArtState } from "./demo/artworks";
@@ -946,7 +953,7 @@ function missionGroups(): MissionGroup[] {
           description: null,
           progress,
           target: t.target,
-          xp: missionXp(t),
+          xp: missionXp(t, level()),
           status: mission.status,
           expiresAt: resets[kind],
         };
@@ -1812,7 +1819,7 @@ export const demoEngine: GameEngine = {
         if (mission.status === "claimed") throw new GameError("mission_already_claimed");
         if (mission.status !== "completed") throw new GameError("mission_not_completed");
         mission.status = "claimed";
-        const xp = addXp(template(mission.key).xp, "mission");
+        const xp = addXp(missionBaseXp(template(mission.key).xp, level()), "mission");
         return { xpAwarded: xp, level: level(), xpTotal: pl.xpTotal };
       }),
     ),

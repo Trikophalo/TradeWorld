@@ -106,3 +106,13 @@ export function dailyLoginXp(streakDays: number, cfg: ProgressionConfig = BALANC
 export function scaledXp(baseXp: number, cfg: ProgressionConfig = BALANCE.progression): number {
   return Math.max(0, Math.round(baseXp * cfg.xpMultiplier));
 }
+
+/** ADR-142: mission XP grow with the level: x min(max, 1 + perLevel x (level - 1)). */
+export function missionXpScale(level: number, cfg: ProgressionConfig = BALANCE.progression): number {
+  return Math.min(cfg.missionXpScaleMax, 1 + cfg.missionXpScalePerLevel * Math.max(0, level - 1));
+}
+
+/** Base XP of a mission for a player of this level (before the global multiplier). */
+export function missionBaseXp(baseXp: number, level: number, cfg: ProgressionConfig = BALANCE.progression): number {
+  return Math.round(baseXp * missionXpScale(level, cfg));
+}

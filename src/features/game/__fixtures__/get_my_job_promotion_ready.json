@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "b98c275a-3957-4726-9d51-d010a26ae9ba",
+    "id": "bf70cb33-3bce-4ebc-98ea-dda0371fb3c5",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "d21331b8-a414-66aa-de07-f036108fc91d",
+      "id": "1188056d-8ee9-0848-9146-e3115adc3792",
       "logo": null,
-      "name": "Nordlicht Logistik AG",
-      "color": "#7AA2F7",
+      "name": "Sonnenkern Fusion",
+      "color": "#FF5E5B",
       "is_ai": true,
-      "sector": "logistics",
-      "ticker": "NDL"
+      "sector": "energy",
+      "ticker": "FSN"
     },
     "presence": {
-      "fire_at": "2026-11-19T19:34:47.452802+00:00",
+      "fire_at": "2026-11-19T19:47:11.813558+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-14T19:34:47.452802+00:00"
+      "last_active_at": "2026-11-14T19:47:11.813558+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-14T19:34:47.549454+00:00",
+    "started_at": "2026-11-14T19:47:11.906685+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

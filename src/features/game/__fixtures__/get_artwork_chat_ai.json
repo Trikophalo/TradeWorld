@@ -3,8 +3,8 @@
   "messages": [
     {
       "ai": false,
-      "at": "2026-11-14T19:34:49.372417+00:00",
-      "id": 31,
+      "at": "2026-11-14T19:47:14.035643+00:00",
+      "id": 30,
       "kind": "chat",
       "mine": false,
       "text": "Schönes Bild!",
@@ -15,20 +15,20 @@
     },
     {
       "ai": false,
-      "at": "2026-11-14T19:34:49.375378+00:00",
-      "id": 32,
+      "at": "2026-11-14T19:47:14.038807+00:00",
+      "id": 31,
       "kind": "offer",
       "mine": false,
       "text": "Wäre das ein Preis?",
       "author": "Fixture_Kunst",
-      "expires_at": "2026-11-15T19:34:49.375378+00:00",
+      "expires_at": "2026-11-15T19:47:14.038807+00:00",
       "offer_cents": 300000,
       "offer_status": "accepted"
     },
     {
       "ai": false,
-      "at": "2026-11-14T19:34:49.381545+00:00",
-      "id": 33,
+      "at": "2026-11-14T19:47:14.044658+00:00",
+      "id": 32,
       "kind": "sale",
       "mine": false,
       "text": "Fixture_Kunst",
@@ -39,8 +39,8 @@
     },
     {
       "ai": false,
-      "at": "2026-11-14T19:34:49.390173+00:00",
-      "id": 34,
+      "at": "2026-11-14T19:47:14.052452+00:00",
+      "id": 33,
       "kind": "sale",
       "mine": false,
       "text": "Fixture_Neu",
@@ -51,19 +51,19 @@
     },
     {
       "ai": true,
-      "at": "2026-11-14T19:34:49.397774+00:00",
-      "id": 35,
+      "at": "2026-11-14T19:47:14.064113+00:00",
+      "id": 34,
       "kind": "offer",
       "mine": false,
       "text": "Für meine Sammlung würde ich so viel zahlen.",
       "author": "Gräfin Glitzer",
-      "expires_at": "2026-11-15T19:34:49.397774+00:00",
-      "offer_cents": 1975200,
+      "expires_at": "2026-11-15T19:47:14.064113+00:00",
+      "offer_cents": 1881200,
       "offer_status": "open"
     }
   ],
   "ask_cents": 90000000,
-  "artwork_id": "c7f81726-149f-44e1-96df-6deed4b113ef",
+  "artwork_id": "962a5ba1-cc1f-4e3a-b20a-68f96ee6a27a",
   "max_length": 200,
   "my_offer_cents": null,
   "min_offer_cents": 10000

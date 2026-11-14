@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Die Chefetage von Fundgrube Discount steht wegen einer Affäre in der Kritik. Anleger werden nervös. Sicher ist das nicht.",
-      "name": "Fundgrube Discount",
-      "due_at": "2026-11-14T21:10:01.419544+00:00",
+      "body": "Rheinkraft Werke gewinnt einen Großkunden. Der Auftrag dürfte den Umsatz deutlich anheben. Sicher ist das nicht.",
+      "name": "Rheinkraft Werke",
+      "due_at": "2026-11-14T21:11:21.808189+00:00",
       "status": "open",
-      "ticker": "FGD",
-      "headline": "Affäre erschüttert Fundgrube Discount",
+      "ticker": "RKW",
+      "headline": "Rekordauftrag für Rheinkraft Werke",
       "move_bps": null,
-      "strength": 2,
-      "direction": "down",
-      "published_at": "2026-11-14T20:34:48.888797+00:00"
+      "strength": 3,
+      "direction": "up",
+      "published_at": "2026-11-14T20:47:13.381587+00:00"
     },
     {
       "id": 3,
-      "body": "Ein großer Konkurrent soll Interesse haben. Spekulanten könnten den Kurs spürbar treiben. Sicher ist das nicht.",
-      "name": "Luftpost Drohnen",
-      "due_at": "2026-11-14T19:34:48.884976+00:00",
-      "status": "confirmed",
-      "ticker": "DRN",
-      "headline": "Übernahmegerüchte um Luftpost Drohnen",
-      "move_bps": 616,
+      "body": "Der Start im Ausland läuft besser als geplant. Sicher ist das nicht.",
+      "name": "SolarFuchs",
+      "due_at": "2026-11-14T19:47:13.373369+00:00",
+      "status": "fizzled",
+      "ticker": "SFX",
+      "headline": "SolarFuchs erschließt neuen Markt",
+      "move_bps": null,
       "strength": 2,
       "direction": "up",
-      "published_at": "2026-11-14T19:34:48.884976+00:00"
+      "published_at": "2026-11-14T19:47:13.373369+00:00"
     }
   ],
   "reliability_bps": 7500

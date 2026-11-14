@@ -4,7 +4,7 @@
     "floor": "parquet",
     "owner": "Fixture_Heim",
     "width": 13,
-    "garage": [{ "id": "f8b90151-90aa-4b1f-9c41-9c573023006a", "slot": 0, "car_key": "car_electric" }],
+    "garage": [{ "id": "732c4054-10ea-4ef1-b6a4-643f1e086ad9", "slot": 0, "car_key": "car_electric" }],
     "height": 9,
     "placed": [],
     "wall_color": "#2f5fd0",
@@ -15,9 +15,9 @@
   "inventory": {
     "cars": [],
     "furniture": [
-      { "id": "64651164-c795-403d-a21c-b47c30fbf1a6", "item_key": "sofa_leather" },
-      { "id": "62d56cab-bb9e-406e-91fa-f23f46f67bed", "item_key": "rug_wool" },
-      { "id": "9745f617-786b-4a77-a125-d2d45dad7646", "item_key": "plant_small" }
+      { "id": "e3ae5f26-38a6-4ccc-b4bb-3d2a5988486a", "item_key": "sofa_leather" },
+      { "id": "3075d596-603a-41a2-a1f8-13b3584aa56a", "item_key": "rug_wool" },
+      { "id": "d8dc5b06-21b7-4cb8-bae5-63f2d8bdbae4", "item_key": "plant_small" }
     ]
   },
   "refund_cents": 360000

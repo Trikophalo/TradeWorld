@@ -7,6 +7,8 @@ set client_min_messages = notice;
 \set x '''0f1f1f1f-0000-4000-8000-00000000001f'''
 select tests.signup(:x, 'Xaver') is not null as ok \gset
 update public.sim_runtime set is_paused = false;
+-- the milestone of ADR-142 (work for a real player) goes first; this test is about the original chain
+update public.mission_templates set is_active = false where key = 'm_work_for_player';
 
 select tests.assert(
   (select count(*) from public.mission_templates where mode is not null) >= 50
@@ -148,3 +150,4 @@ select tests.assert(
   (:'d5'::jsonb ->> 'streak_days')::int = 10 and (:'d5'::jsonb ->> 'freeze_used')::boolean
   and (:'pf2'::jsonb ->> 'streak_days')::int = 10,
   'one missed day is bridged by the weekly streak freeze; portfolio shows streak_days');
+update public.mission_templates set is_active = true where key = 'm_work_for_player';

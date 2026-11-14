@@ -1,27 +1,27 @@
 {
-  "id": "1d109ecd-32b1-47ab-9fa7-58469a1a2c34",
+  "id": "230b3561-7a38-426d-a51e-68e40f2ae36c",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "30962bd1-95c6-4783-9de5-17a854e0653f",
+    "id": "2812aa36-d9b3-425d-b544-4bdb1e6fb760",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "d21331b8-a414-66aa-de07-f036108fc91d",
+      "id": "1188056d-8ee9-0848-9146-e3115adc3792",
       "logo": null,
-      "name": "Nordlicht Logistik AG",
-      "color": "#7AA2F7",
+      "name": "Sonnenkern Fusion",
+      "color": "#FF5E5B",
       "is_ai": true,
-      "sector": "logistics",
-      "ticker": "NDL"
+      "sector": "energy",
+      "ticker": "FSN"
     },
-    "required": [{ "branch": "it", "min_score": 0 }],
-    "title_key": "it_intern",
+    "required": [{ "branch": "management", "min_score": 0 }],
+    "title_key": "management_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-14T19:34:45.193867+00:00",
-  "updated_at": "2026-11-14T19:34:45.197516+00:00",
-  "offer_expires_at": "2026-11-16T19:34:45.193867+00:00",
-  "salary_wish_cents_per_hour": 15900,
-  "offer_salary_cents_per_hour": 15900
+  "created_at": "2026-11-14T19:47:09.402386+00:00",
+  "updated_at": "2026-11-14T19:47:09.407704+00:00",
+  "offer_expires_at": "2026-11-16T19:47:09.402386+00:00",
+  "salary_wish_cents_per_hour": 15000,
+  "offer_salary_cents_per_hour": 15000
 }

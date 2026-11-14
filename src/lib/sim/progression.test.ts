@@ -136,3 +136,13 @@ describe("xp sources", () => {
     expect(xpForNextLevel(1)).toBe(100);
   });
 });
+
+describe("mission XP grow with the level (ADR-142)", () => {
+  it("scales 1 + 0.15 per level, capped", async () => {
+    const { missionXpScale, missionBaseXp } = await import("./progression.ts");
+    expect(missionXpScale(1)).toBe(1);
+    expect(missionXpScale(10)).toBeCloseTo(2.35);
+    expect(missionXpScale(200)).toBe(BALANCE.progression.missionXpScaleMax);
+    expect(missionBaseXp(200, 11)).toBe(500);
+  });
+});

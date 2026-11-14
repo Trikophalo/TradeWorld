@@ -2225,3 +2225,19 @@ Beliebtheit zählte nur über Likes.
 - Verkäufe unter Sammlern sind Art `ai` mit `seller_ai` und zählen nicht zum Tageslimit der Käufe von Spielern.
 - Nebenbei: Nach einem Verkauf setzt ein Sammler seinen Preis erst, nachdem die offenen Angebote geschlossen sind.
 - Mira trägt das Schild „Assistentin“ statt „KI“.
+
+## ADR-142: Mehr Missions-XP auf höheren Levels; einmal bei einem echten Spieler arbeiten — `akzeptiert`
+
+**Kontext:** Missionen zahlten auf jedem Level gleich viel XP, während die Level immer mehr XP brauchen. Spieler sollen
+außerdem einmal bei der Firma eines anderen Spielers arbeiten (Multiplayer).
+
+**Entscheidung:**
+
+- Missions-XP wachsen mit dem Level: mal `min(8, 1 + 0,15 × (Level − 1))` (Level 10: ×2,35, Level 30: ×5,35), festgelegt
+  beim Verteilen der Mission (`progression.missionXpScalePerLevel` / `missionXpScaleMax`). Vorlagen mit
+  `params.fixedXp` behalten ihre XP.
+- Neuer Meilenstein `m_work_for_player`: einen Job bei der Firma eines anderen echten Spielers annehmen. 1250 Basis-XP,
+  mit dem globalen Multiplikator 2500 XP, fest. Er kommt vor allen anderen Meilensteinen (Kette 0), sobald Jobs
+  freigeschaltet sind, damit ihn jeder bekommt. Metrik `player_job`: Jobstart bei einer Spielerfirma oder jede dort
+  gearbeitete Stunde (so zählt er auch für alle, die schon bei jemandem arbeiten). Im Demo-Modus gibt es keine anderen
+  Spieler, dort fehlt er.

@@ -1,5 +1,5 @@
 import { BALANCE } from "@/config/balance";
-import { scaledXp, unlockLevel } from "@/lib/sim/progression";
+import { scaledXp, unlockLevel, missionBaseXp } from "@/lib/sim/progression";
 import type { MissionKind } from "../types";
 
 /*
@@ -450,6 +450,7 @@ export function availableFor(template: MissionTemplate, level: number): boolean 
   return needed === null || level >= needed;
 }
 
-export function missionXp(template: MissionTemplate): number {
-  return scaledXp(template.xp);
+/** XP a mission pays at this level (ADR-142: more at higher levels). */
+export function missionXp(template: MissionTemplate, level = 1): number {
+  return scaledXp(missionBaseXp(template.xp, level));
 }

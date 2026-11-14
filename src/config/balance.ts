@@ -538,6 +538,9 @@ export interface ProgressionConfig {
   /** Money targets of missions grow with the level: × (1 + perLevel × (level − 1)), at most `max`. */
   readonly missionTargetScalePerLevel: number;
   readonly missionTargetScaleMax: number;
+  /** Mission XP grow with the level the same way (ADR-142); missions with params.fixedXp keep theirs. */
+  readonly missionXpScalePerLevel: number;
+  readonly missionXpScaleMax: number;
   /** From this level on, every `titleEveryLevels` levels brings a new prestige title. */
   readonly prestige: { readonly fromLevel: number; readonly titleEveryLevels: number };
   /**
@@ -1942,6 +1945,9 @@ export const BALANCE = {
     prestige: { fromLevel: 50, titleEveryLevels: 10 },
     missionTargetScalePerLevel: 0.2,
     missionTargetScaleMax: 5,
+    /** ADR-142: mission XP x (1 + perLevel x (level - 1)), at most max: level 10 = x2.35, level 30 = x5.35. */
+    missionXpScalePerLevel: 0.15,
+    missionXpScaleMax: 8,
     // Alpha bonus: all XP count double (owner decision). 1 = spec values.
     // Typed as `number` (not the literal 2) so that code may compare it with 1.
     xpMultiplier: 2 as number,

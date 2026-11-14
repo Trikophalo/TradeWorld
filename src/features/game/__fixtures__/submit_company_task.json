@@ -3,9 +3,9 @@
   "xp": 120,
   "key": "payroll_check",
   "late": false,
-  "answer": { "value": 161 },
+  "answer": { "value": 84 },
   "status": "success",
-  "solution": { "value": 161 },
+  "solution": { "value": 84 },
   "score_bps": 10000,
   "result_cents": 44000
 }
