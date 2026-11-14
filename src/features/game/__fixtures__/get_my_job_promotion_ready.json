@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "9a92b880-496a-4cb6-8889-5c309b24b336",
+    "id": "d24dc16a-270d-4d27-b0f9-e30632df9e0b",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "833932bd-1586-776d-1f8f-f602682f7437",
+      "id": "2fccb1cc-0894-a518-9538-769c751d9630",
       "logo": null,
-      "name": "Luftpost Drohnen",
-      "color": "#00B4D8",
+      "name": "Memeland Media",
+      "color": "#FF4FD8",
       "is_ai": true,
-      "sector": "logistics",
-      "ticker": "DRN"
+      "sector": "tech",
+      "ticker": "MEM"
     },
     "presence": {
-      "fire_at": "2026-11-19T14:46:46.793876+00:00",
+      "fire_at": "2026-11-19T15:09:13.090611+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-14T14:46:46.793876+00:00"
+      "last_active_at": "2026-11-14T15:09:13.090611+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-14T14:46:46.913984+00:00",
+    "started_at": "2026-11-14T15:09:13.179225+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

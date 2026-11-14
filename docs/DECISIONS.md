@@ -2092,3 +2092,19 @@ Gegenangebote und zahlen sehr wenig“.
 - Werte in `src/config/nfts.ts` (`game_config.nfts`), Formeln in `src/lib/sim/nfts.ts`. Test
   `supabase/tests/9b_nfts.sql`. Der Demo-Modus spielt dasselbe: KI-Sammler halten von Anfang an einige NFTs, antworten
   sofort auf Angebote und reagieren sofort auf einen Festpreis.
+
+## ADR-136: Finns Touren auf dem Server, NFT-Details am Handy als Sheet — `akzeptiert`
+
+**Kontext:** Finns kurze Touren (ADR-046) merkte sich nur der Browser (`localStorage`). In einem privaten Fenster oder
+auf einem zweiten Gerät startete jede Tour wieder von vorn. Das große NFT-Fenster (Modal) war am Handy zu hoch, der
+Chat darunter kaum erreichbar.
+
+**Entscheidung:**
+
+- Tabelle `player_seen_tours (player_id, tour_key)`, ohne Client-Rechte. RPCs `get_seen_tours()` und
+  `mark_tour_seen(p_request_id, p_tour)` (von Natur aus idempotent: eine Tour gilt einmal als gesehen).
+- Beim Laden holt das Tutorial die Liste vom Server, bevor es den Status verlässt („loading“), und mischt sie mit der
+  des Browsers. Jede neu gesehene Tour geht nebenbei an den Server; Touren, die der Browser schon vorher kannte,
+  werden einmal nachgereicht. Fällt der Server aus, bleibt die Browser-Liste gültig.
+- Der Fortschritt mitten im ersten Tutorial bleibt im Browser; ob es fertig ist, wusste der Server schon vorher.
+- Die NFT-Details öffnen unter 1024 px als Bottom-Sheet (Tastatur, sichere Ränder), darüber als großes Fenster.

@@ -1384,6 +1384,9 @@ const protests = createProtestsEngine({
 });
 
 export const demoEngine: GameEngine = {
+  // The demo keeps seen tours in the browser only (the tutorial store does that).
+  seenTours: async () => [],
+  markTourSeen: async () => [],
   ...stockNews,
   ...protests,
   ...companyMoves,

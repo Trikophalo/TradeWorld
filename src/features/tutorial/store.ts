@@ -25,6 +25,8 @@ interface TutorialState {
   /** A running unlock tour, if any. */
   tour: { key: string; step: number } | null;
   seenTours: string[];
+  /** Adds tours the server remembers (a private window or another device saw them). */
+  mergeTours: (tours: readonly string[]) => void;
   startTour: (key: string) => void;
   setTourStep: (step: number) => void;
   endTour: () => void;
@@ -84,6 +86,14 @@ export const useTutorial = create<TutorialState>((set, get) => ({
       // Nothing saved.
     }
     get().reset();
+  },
+  mergeTours: (tours) => {
+    const { seenTours, status, step, accountId } = get();
+    const extra = tours.filter((key) => !seenTours.includes(key));
+    if (extra.length === 0 || status === "loading") return;
+    const next = [...seenTours, ...extra];
+    save(accountId, { status, step, seenTours: next });
+    set({ seenTours: next });
   },
   restart: () => {
     save(get().accountId, { status: "active", step: 0, seenTours: [] });

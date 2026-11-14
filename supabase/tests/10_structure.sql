@@ -128,6 +128,8 @@ select tests.assert(
            'get_company_pitches', 'submit_company_pitch', 'company_pitch_context',
            -- protest campaigns (ADR-133)
            'get_protests', 'start_protest', 'join_protest',
+           -- Finn's tours on the server
+           'get_seen_tours', 'mark_tour_seen',
            -- NFTs: offer chat, fixed price (ADR-135)
            'get_artwork_chat', 'post_artwork_message', 'accept_artwork_offer', 'set_artwork_price', 'buy_artwork']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
@@ -169,7 +171,7 @@ select tests.assert(
       'sim_rng_streams', 'sim_tick_log', 'job_runs', 'internal_settings', 'admin_users',
       'insider_violations', 'work_task_solutions', 'scheduled_event_secrets', 'macro_event_definitions',
       'random_event_definitions', 'news_templates', 'news_item_effects', 'league_entry_baselines',
-      'stock_tips', 'market_snapshot_cache', 'company_moves', 'company_tasks', 'fun_news', 'company_pitches', 'company_protests', 'company_protest_supporters', 'artwork_messages',
+      'stock_tips', 'market_snapshot_cache', 'company_moves', 'company_tasks', 'fun_news', 'company_pitches', 'company_protests', 'company_protest_supporters', 'player_seen_tours', 'artwork_messages',
       'rate_limits', 'player_requests', 'player_login_events', 'push_deliveries', 'invite_code_redemptions',
       'price_ticks_default']) as t
      -- (a table from a later migration is not there yet on an older database)

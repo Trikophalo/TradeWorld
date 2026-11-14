@@ -7322,3 +7322,9 @@ buy_artwork(p_request_id uuid, p_artwork_id uuid, p_price_cents bigint) -> {"art
 Intern: `nft_ai_value_cents(id, now)` (Bewertung wie `nftAiValueCents` in `src/lib/sim/nfts.ts`),
 `nft_lowball_cents`, `nft_ai_ask_cents`, `nft_royalty_for`, `nft_pay_royalty`, `nft_sell` (Direktverkauf),
 `nft_after_sale`, `nft_chat_json`, `nfts_run_due(p_now)` (Cron `nexa-nfts`, jede Minute).
+
+## Nachtrag: Finns Touren (ADR-136)
+
+`player_seen_tours (player_id uuid → profiles, tour_key text ~ '^[a-z0-9_]{1,40}$', seen_at)`, PK
+`(player_id, tour_key)`, RLS ohne Client-Rechte. RPCs (authenticated): `get_seen_tours()` → `{"tours": [text]}`,
+`mark_tour_seen(p_request_id uuid, p_tour text)` → dieselbe Form. Test `supabase/tests/9c_seen_tours.sql`.

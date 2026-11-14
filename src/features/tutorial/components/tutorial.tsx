@@ -17,6 +17,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { TUTORIAL_STEPS, stepIndex, type TutorialStep } from "../steps";
 import { nextUnlockTour, TOURS } from "../tours";
+import { syncSeenTours } from "../server-tours";
 import { onTutorialEvent, useTutorial } from "../store";
 import { useTargetRect, type TargetRect } from "../use-target-rect";
 import { SpeechBubble } from "./speech-bubble";
@@ -60,17 +61,24 @@ export function Tutorial() {
   useEffect(() => {
     // Only on the first load: completing the tutorial later must not cut off its final step.
     if (!portfolioLoaded || useTutorial.getState().status !== "loading") return;
-    const { load, finish } = useTutorial.getState();
-    const apply = (accountId: string) => {
+    const { load, finish, mergeTours } = useTutorial.getState();
+    const apply = (accountId: string, serverTours: readonly string[] = []) => {
       load(accountId);
       if (serverCompleted) finish();
+      mergeTours(serverTours);
     };
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
       apply("demo");
       return;
     }
-    void supabase.auth.getUser().then(({ data }) => apply(data.user?.id ?? "demo"));
+    // Seen tours come from the server too, so a private window or a second device does not repeat them. The store
+    // stays "loading" until they are in, so no tour starts before.
+    void supabase.auth.getUser().then(async ({ data }) => {
+      const id = data.user?.id;
+      if (!id) return apply("demo");
+      apply(id, await syncSeenTours());
+    });
   }, [portfolioLoaded, serverCompleted]);
 
   // Keep the player on the page the step belongs to, and advance route steps.

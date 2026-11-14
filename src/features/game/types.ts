@@ -1886,6 +1886,9 @@ export class GameError extends Error {
 
 /** Everything the game can do. Implemented by the live Supabase API and by the offline demo. */
 export interface GameEngine {
+  /** Finn's tours the player has seen (kept on the server, so a private window does not repeat them). */
+  seenTours(): Promise<string[]>;
+  markTourSeen(requestId: string, tour: string): Promise<string[]>;
   protests(): Promise<Protests>;
   startProtest(requestId: string, companyId: string, kind: ProtestKind): Promise<Protests>;
   joinProtest(requestId: string, protestId: number): Promise<Protests>;

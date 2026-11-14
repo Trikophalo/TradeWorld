@@ -1108,6 +1108,15 @@ select public.get_protests();
 \o
 reset role;
 
+-- Finn's tours on the server --------------------------------------------------------------------------------------
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/mark_tour_seen.json
+select public.mark_tour_seen(gen_random_uuid(), 'visit_company');
+\o :fixture_dir/get_seen_tours.json
+select public.get_seen_tours();
+\o
+reset role;
+
 -- NFTs (ADR-135): fixed price, offer chat with an accepted offer, a purchase, an AI collector's offer ----------------
 select tests.login_as('authenticated', :p) is null as ok \gset
 \o :fixture_dir/set_artwork_price.json

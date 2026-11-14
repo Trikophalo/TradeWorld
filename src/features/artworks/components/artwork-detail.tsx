@@ -7,6 +7,8 @@ import { Button, type ButtonState } from "@/components/ui/button";
 import { Countdown } from "@/components/ui/countdown";
 import { Field } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import { Sheet } from "@/components/ui/sheet";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { Segmented } from "@/components/ui/segmented";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
@@ -31,8 +33,11 @@ export function ArtworkDetail({ id, onClose }: { id: string | null; onClose: () 
   const t = useTranslations("art");
   const detail = useArtwork(id);
   const art = detail.data?.artwork;
+  // Phones get the bottom sheet (touch, keyboard, safe areas); the large centred window is for desktops.
+  const desktop = useMediaQuery("(min-width: 1024px)");
+  const Frame = desktop ? Modal : Sheet;
   return (
-    <Modal
+    <Frame
       open={id !== null}
       onOpenChange={(open) => !open && onClose()}
       title={art ? t("detailTitle", { code: art.code, title: art.title }) : t("title")}
@@ -56,7 +61,7 @@ export function ArtworkDetail({ id, onClose }: { id: string | null; onClose: () 
           </div>
         </div>
       )}
-    </Modal>
+    </Frame>
   );
 }
 
