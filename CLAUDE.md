@@ -40,6 +40,7 @@ pnpm test:e2e       # Playwright (baut und startet die App selbst)
 pnpm db:config      # supabase/seeds/game_config.sql aus src/config/balance.ts erzeugen
 pnpm sounds         # 8-Bit-Sounds neu erzeugen
 pnpm icons          # App-Icons neu erzeugen
+pnpm patchnotes     # Patchnotes (src/config/patch-notes.generated.ts) aus CHANGELOG.md erzeugen, nach jeder Changelog-Änderung
 bash supabase/tests/verify_local.sh   # Schema, RLS und Seeds gegen lokales Postgres prüfen
 NEXA_FIXTURE_DIR=$PWD/src/features/game/__fixtures__ bash supabase/tests/verify_local.sh   # dazu RPC-Antworten für den Vertragstest neu schreiben
 ```
@@ -140,4 +141,5 @@ e2e                Playwright
   (Conventional Commits: `feat(market): …`, `fix(ui): …`, `docs: …`).
 - Sichtbare Änderungen mit Playwright-Screenshots auf 390 px und 1440 px prüfen, hell und dunkel.
 - Annahmen als ADR in `docs/DECISIONS.md` festhalten, Fortschritt in `docs/ROADMAP.md` abhaken.
-- Am Ende eines Meilensteins: Changelog-Notiz in `CHANGELOG.md`, dann auf Freigabe warten.
+- Am Ende eines Meilensteins: Changelog-Notiz in `CHANGELOG.md` (danach `pnpm patchnotes`, die Spieler sehen sie
+  als Patchnotes), dann auf Freigabe warten.

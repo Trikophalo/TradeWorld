@@ -19,6 +19,8 @@ export const DISCLOSURE = {
   profileFriends: 2,
   /** Link from the vault to the upgrades (ADR-093): not during the tutorial. */
   homeUpgrades: 2,
+  /** Patch notes button in the top bar (ADR-137): not during the tutorial. */
+  topbarPatchNotes: 2,
 } as const;
 
 export type DisclosureKey = keyof typeof DISCLOSURE;

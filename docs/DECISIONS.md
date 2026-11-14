@@ -2108,3 +2108,32 @@ Chat darunter kaum erreichbar.
   werden einmal nachgereicht. Fällt der Server aus, bleibt die Browser-Liste gültig.
 - Der Fortschritt mitten im ersten Tutorial bleibt im Browser; ob es fertig ist, wusste der Server schon vorher.
 - Die NFT-Details öffnen unter 1024 px als Bottom-Sheet (Tastatur, sichere Ränder), darüber als großes Fenster.
+
+## ADR-137: Patchnotes in der Leiste, erzeugt aus dem Changelog — `akzeptiert`
+
+**Kontext:** Spieler erfuhren von Änderungen nur zufällig. `CHANGELOG.md` beschreibt jede Änderung schon auf Deutsch,
+war im Spiel aber nicht zu sehen. Eine zweite, von Hand gepflegte Liste würde schnell veralten.
+
+**Entscheidung:**
+
+- **Eine Quelle:** `CHANGELOG.md`. `pnpm patchnotes` (`scripts/gen-patch-notes.ts`) liest sie mit
+  `src/features/patch-notes/changelog.ts` und schreibt `src/config/patch-notes.generated.ts` (mit Prettier
+  formatiert). Jede `## `-Überschrift ist eine Version (ein Datum am Ende wie `(2026-12-01)` wird erkannt), jeder
+  Spiegelstrich ein Eintrag mit fettem Titel (`**Titel:**`) und Text, andere Absätze sind Hinweise der Version.
+  Fett bleibt, Backticks und ADR-Verweise fallen weg, denn Spieler lesen die ADRs nicht.
+- **Reihenfolge:** Die Datei wächst nach unten, also stehen Versionen und Einträge umgekehrt, das Neueste oben.
+- **Prüfung:** `changelog.test.ts` vergleicht die erzeugte Datei mit dem Changelog. Wer den Changelog ändert und
+  `pnpm patchnotes` vergisst, bekommt einen roten Test.
+- **IDs:** Version als Slug, Eintrag als Slug plus FNV-1a-Hash seines Texts. Neue Einträge ändern alte IDs nicht;
+  wird ein Eintrag umformuliert, gilt er wieder als neu.
+- **Knopf in der Leiste:** Zeitung (`NEWSPAPER`) neben der Glocke, aussehen und Zustände wie der Missionen-Knopf
+  (ADR-102), Beschriftung erst ab `xl`. Ab Level 2 (`DISCLOSURE.topbarPatchNotes`), also nicht im Tutorial.
+  Damit bei 390 px nichts aus der Leiste rutscht, zeigt die Leiste unter `sm` nur noch die Münze statt „NEXA“
+  (`<Wordmark compact />`); der Link heißt weiter „NEXA“.
+- **Blauer Punkt:** Der Browser merkt sich die ID des neuesten gesehenen Eintrags (`nexa-patch-notes-seen`, erst nach
+  der Hydration gelesen). Ist der neueste Eintrag ein anderer, leuchtet der Punkt. Öffnen setzt ihn zurück; solange
+  das Fenster offen ist, tragen die Einträge seit dem letzten Blick einen blauen Punkt. Ohne gemerkte ID (erster
+  Besuch, Eintrag entfernt) leuchtet nur der Knopf, einzelne Einträge werden nicht markiert. Nur eine Bequemlichkeit,
+  daher kein Server.
+- **Fenster:** Am Handy Bottom-Sheet, ab 1024 px ein mittiges Fenster (wie ADR-136). Versionen als Akkordeon, nur
+  die neueste offen; geschlossene rendern nichts, die lange Liste bleibt schnell.

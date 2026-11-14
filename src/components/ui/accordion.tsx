@@ -17,9 +17,18 @@ export interface AccordionItem {
  * Expandable list. Content fades in; the height change itself is not
  * animated, in line with the motion rules (transform and opacity only).
  */
-export function Accordion({ items, className }: { items: readonly AccordionItem[]; className?: string }) {
+export function Accordion({
+  items,
+  className,
+  defaultOpen,
+}: {
+  items: readonly AccordionItem[];
+  className?: string;
+  /** Ids of the items that start open. Closed items do not render their content. */
+  defaultOpen?: string[];
+}) {
   return (
-    <RadixAccordion.Root type="multiple" className={cn("divide-y divide-line-1", className)}>
+    <RadixAccordion.Root type="multiple" defaultValue={defaultOpen} className={cn("divide-y divide-line-1", className)}>
       {items.map((item) => (
         <RadixAccordion.Item key={item.id} value={item.id} id={item.id} className="scroll-mt-20">
           <RadixAccordion.Header>

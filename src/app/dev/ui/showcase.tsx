@@ -43,6 +43,9 @@ import { resetDemoPlayer } from "@/features/game/demo-engine";
 import { FriendCodeCard } from "@/features/friends/components/friend-code";
 import { StockNewsCard } from "@/features/news/stock-news";
 import { LevelCard } from "@/features/progression/components/level-card";
+import { PatchNotesButton, PatchNotesList } from "@/features/patch-notes/components/patch-notes";
+import { usePatchNotesSeen } from "@/features/patch-notes/seen";
+import { PATCH_NOTES } from "@/config/patch-notes.generated";
 import { formatMoney, formatPrice } from "@/lib/format";
 import { DURATION, SPRING, fadeUp, staggerContainer } from "@/lib/motion";
 import { SOUND_NAMES, playSound } from "@/lib/sound";
@@ -269,6 +272,11 @@ const SAMPLE_JOB: MyJob = {
     nextSalaryCentsPerHour: 70_000,
   },
 };
+
+// Patch notes sample: the two newest releases, the two newest entries marked as new.
+const PATCH_SAMPLE = PATCH_NOTES.slice(0, 2);
+const PATCH_FRESH: ReadonlySet<string> = new Set(PATCH_NOTES[0]?.entries.slice(0, 2).map((entry) => entry.id));
+const NOTHING_FRESH: ReadonlySet<string> = new Set();
 
 const money = (value: number) => formatMoney(Math.round(value));
 const price = (value: number) => formatPrice(Math.round(value));
@@ -640,6 +648,21 @@ export function Showcase() {
           </div>
         </dl>
       </Sheet>
+
+      <Section id="patch-notes" title={t("patchNotes")} className="grid gap-4 lg:grid-cols-2">
+        <Demo label="Knopf in der Leiste: blauer Punkt bei Neuem, öffnet Sheet (Handy) oder Fenster (PC)">
+          <PatchNotesButton />
+          <Button variant="secondary" size="sm" onClick={() => usePatchNotesSeen.getState().markSeen("showcase")}>
+            Punkt wieder zeigen
+          </Button>
+        </Demo>
+        <Demo label="Leer" className="justify-center">
+          <PatchNotesList releases={[]} fresh={NOTHING_FRESH} />
+        </Demo>
+        <Demo label="Liste: neueste Version offen, neue Einträge mit Punkt" className="block lg:col-span-2">
+          <PatchNotesList releases={PATCH_SAMPLE} fresh={PATCH_FRESH} />
+        </Demo>
+      </Section>
 
       <Section id="forms" title={t("forms")} className="grid gap-4 lg:grid-cols-3">
         <Card padding="lg">
