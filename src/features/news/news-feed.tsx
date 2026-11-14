@@ -127,6 +127,7 @@ function useNewsText() {
         ticker: String(p.ticker ?? ""),
         nickname: String(p.nickname ?? ""),
         title: String(p.title ?? ""),
+        outcome: String(p.outcome ?? ""),
         profit: typeof p.profit_cents === "number" ? formatMoney(p.profit_cents, { whole: true }) : "",
       }),
       body: null,

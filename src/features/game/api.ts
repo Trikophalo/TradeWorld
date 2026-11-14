@@ -9,6 +9,7 @@ import { CRYPTO_RPC_SCHEMAS, liveCryptoEngine } from "./api-crypto";
 import { DEAL_RPC_SCHEMAS, liveDealEngine } from "./api-deals";
 import { PROPERTY_RPC_SCHEMAS, livePropertyEngine } from "./api-property";
 import { TASK_RPC_SCHEMAS, liveTaskEngine } from "./api-tasks";
+import { PITCH_RPC_SCHEMAS, livePitchEngine } from "./api-pitches";
 import { rpc, toErrorKey } from "./rpc";
 import {
   type Candle,
@@ -474,6 +475,7 @@ export const RPC_SCHEMAS = {
   ...ARTWORK_RPC_SCHEMAS,
   ...PROPERTY_RPC_SCHEMAS,
   ...TASK_RPC_SCHEMAS,
+  ...PITCH_RPC_SCHEMAS,
   get_stock_news: stockNewsSchema,
   get_player_holdings: holdingsSchema,
   get_my_net_worth_history: netWorthHistorySchema,
@@ -489,6 +491,7 @@ export const RPC_SCHEMAS = {
 
 export const liveEngine: GameEngine = {
   ...liveTaskEngine,
+  ...livePitchEngine,
   ...liveCareerEngine,
   ...liveCompanyEngine,
   ...liveArtEngine,

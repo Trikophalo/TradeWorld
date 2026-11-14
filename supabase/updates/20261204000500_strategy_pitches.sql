@@ -1,0 +1,477 @@
+-- ===== idempotent copy of migrations/20261204000500_strategy_pitches.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 0500 · Own strategies judged by Claude or the Mini-KI (ADR-132)
+-- =============================================================================
+-- The founder writes how the company answers a crisis or chance ("Ich mache einen Imagefilm"), or invents an own
+-- business move. Claude (edge function strategy-judge) rates the fit (0..100) and the risk of a backfire (0..100) and
+-- writes short texts for the three outcomes. Without an answer within pitches.judgeWaitSeconds the Mini-KI judges
+-- by keywords (game_config.pitches.mini). A random roll then decides:
+--   success:  chance = chanceBaseBps + fit x chancePerFitBps (at most maxChanceBps)
+--   backfire: of the failures, the share "backfire" (e.g. customers smell greenwashing)
+--   failure:  nothing happens (a crisis goes on; a move refunds moveRefundBps of its cost)
+-- Crisis or chance solved: the event ends as "solved" with a mitigation that grows with the fit. Own move: cash
+-- pays cost x (movePayoutBase + fit x movePayoutPerFit), awareness or quality grow. Backfire: awareness drops; for an
+-- event the company pays the cost once more. Claude only writes text and two numbers; the database checks both.
+-- Money: cost to the households (company_costs), payouts from them (company_revenue); closed system.
+--
+-- Table company_pitches (RLS, no client rights). RPCs (authenticated, founder):
+--   submit_company_pitch(p_request_id uuid, p_kind text, p_text text, p_move_kind text default null) -> PITCHES
+--   get_company_pitches() -> PITCHES
+--   company_pitch_context(p_pitch_id bigint) -> context for the edge function (founder only)
+-- service_role: store_pitch_judgment(p_pitch_id, p_fit, p_backfire, p_verdict, p_success, p_failure, p_backfire_text)
+-- Internal: company_pitches_run_due(p_now) (cron nexa-company-pitches, every minute).
+-- Errors: pitch_text_invalid NX115, pitch_busy NX116, plus event_closed, insufficient_funds, company_not_found.
+-- Idempotent: runs unchanged as supabase/updates/20261204000500_strategy_pitches.sql.
+
+create table if not exists public.company_pitches (
+  id              bigint generated always as identity primary key,
+  company_id      uuid not null references public.companies (id) on delete cascade,
+  event_id        uuid references public.player_company_events (id) on delete set null,
+  kind            text not null check (kind in ('event', 'move')),
+  move_kind       text check (move_kind in ('cash', 'awareness', 'quality')),
+  pitch_text      text not null check (length(pitch_text) between 1 and 400),
+  status          text not null default 'judging'
+                  check (status in ('judging', 'running', 'success', 'failure', 'backfire')),
+  judge           text check (judge in ('claude', 'mini')),
+  fit             integer check (fit between 0 and 100),
+  backfire        integer check (backfire between 0 and 100),
+  chance_bps      integer check (chance_bps between 0 and 10000),
+  verdict         text,
+  success_text    text,
+  failure_text    text,
+  backfire_text   text,
+  cost_cents      bigint not null check (cost_cents >= 0),
+  result_cents    bigint not null default 0,
+  created_by      uuid references public.profiles (id) on delete set null,
+  created_at      timestamptz not null default now(),
+  judge_due_at    timestamptz not null,
+  judged_at       timestamptz,
+  ends_at         timestamptz,
+  resolved_at     timestamptz
+);
+alter table public.company_pitches enable row level security;
+revoke all on public.company_pitches from public, anon, authenticated;
+create index if not exists company_pitches_company_idx on public.company_pitches (company_id, created_at desc);
+create index if not exists company_pitches_due_idx on public.company_pitches (status, judge_due_at, ends_at)
+  where status in ('judging', 'running');
+create index if not exists company_pitches_event_idx on public.company_pitches (event_id);
+create index if not exists company_pitches_created_by_idx on public.company_pitches (created_by);
+comment on table public.company_pitches is 'Own strategies of founders, judged by Claude or the Mini-KI (ADR-132). Internal.';
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.api_error(text)'::regprocedure);
+begin
+  if position('''pitch_busy''' in v_def) = 0 then
+    v_def := replace(v_def, $q$    when 'no_ai_workers'               then 'NX114'
+$q$, $q$    when 'no_ai_workers'               then 'NX114'
+    when 'pitch_text_invalid'          then 'NX115'
+    when 'pitch_busy'                  then 'NX116'
+$q$);
+    if position('''pitch_busy''' in v_def) = 0 then
+      raise exception 'api_error() has an unexpected shape; add the pitch error keys by hand';
+    end if;
+    execute v_def;
+  end if;
+end;
+$do$;
+
+create or replace function public.pitches_cfg()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select value from public.game_config where key = 'pitches'), '{}'::jsonb);
+$$;
+
+-- Chance from the fit
+create or replace function public.pitch_chance_bps(p_fit integer)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select least((c ->> 'maxChanceBps')::integer,
+               (c ->> 'chanceBaseBps')::integer + greatest(0, least(100, p_fit)) * (c ->> 'chancePerFitBps')::integer)
+    from (select public.pitches_cfg() as c) x;
+$$;
+
+-- Mini-KI: fit and backfire risk from keywords; the topic is the event's archetype or the move kind
+create or replace function public.pitch_mini_judge(p_text text, p_topic text)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  m       jsonb := public.pitches_cfg() -> 'mini';
+  v_text  text := lower(coalesce(p_text, ''));
+  v_hits  integer;
+  v_risky integer;
+  v_fit   integer;
+  v_back  integer;
+begin
+  select count(*) into v_hits from jsonb_array_elements_text(coalesce(m -> 'good' -> p_topic, '[]'::jsonb)) w
+   where position(w in v_text) > 0;
+  select count(*) into v_risky from jsonb_array_elements_text(coalesce(m -> 'risky', '[]'::jsonb)) w
+   where position(w in v_text) > 0;
+  v_fit := least((m ->> 'maxFit')::integer,
+                 (m ->> 'fitBase')::integer + least(v_hits, (m ->> 'maxHits')::integer) * (m ->> 'fitPerHit')::integer
+                 + case when length(v_text) >= (m ->> 'longTextChars')::integer then (m ->> 'longTextBonus')::integer else 0 end);
+  v_back := least((m ->> 'maxBackfire')::integer, (m ->> 'backfireBase')::integer + v_risky * (m ->> 'backfirePerRisky')::integer);
+  return jsonb_build_object('fit', v_fit, 'backfire', v_back, 'hits', v_hits, 'risky', v_risky);
+end;
+$$;
+
+create or replace function public.company_pitches_state(p_company uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'event_id', (select e.id from public.player_company_events e
+                  where e.company_id = p_company and e.status in ('open', 'in_force')
+                  order by e.started_at desc limit 1),
+    'event_cost_cents', public.company_event_unit_cents(p_company) * (public.pitches_cfg() ->> 'eventCostUnits')::integer,
+    'move_cost_cents', (select round((public.config_jsonb('companyMoves') -> 'costCentsByTier' ->> pc.tier::text)::numeric
+                                     * (public.pitches_cfg() ->> 'moveCostFactor')::numeric)::bigint
+                          from public.player_companies pc where pc.company_id = p_company),
+    'pitches', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'id', p.id, 'kind', p.kind, 'move_kind', p.move_kind, 'event_id', p.event_id, 'text', p.pitch_text,
+               'status', p.status, 'judge', p.judge, 'fit', p.fit, 'backfire', p.backfire, 'chance_bps', p.chance_bps,
+               'verdict', p.verdict, 'success_text', p.success_text, 'failure_text', p.failure_text,
+               'backfire_text', p.backfire_text, 'cost_cents', p.cost_cents, 'result_cents', p.result_cents,
+               'created_at', p.created_at, 'ends_at', p.ends_at, 'resolved_at', p.resolved_at)
+             order by p.created_at desc)
+        from (select * from public.company_pitches x where x.company_id = p_company
+               order by x.created_at desc limit 8) p), '[]'::jsonb));
+$$;
+
+-- ---------------------------------------------------------------------------
+-- RPCs
+-- ---------------------------------------------------------------------------
+create or replace function public.get_company_pitches()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  v_co     uuid;
+begin
+  select pc.company_id into v_co from public.player_companies pc where pc.founder_id = v_player and pc.status = 'active';
+  if v_co is null then
+    perform public.api_error('company_not_found');
+  end if;
+  return public.company_pitches_state(v_co);
+end;
+$$;
+
+create or replace function public.submit_company_pitch(p_request_id uuid, p_kind text, p_text text,
+                                                       p_move_kind text default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.pitches_cfg();
+  v_player uuid;
+  v_replay jsonb;
+  pc       public.player_companies;
+  v_text   text := btrim(coalesce(p_text, ''));
+  v_event  uuid;
+  v_cost   bigint;
+  v_cash   bigint;
+  v_state  jsonb;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_kind not in ('event', 'move')
+     or (p_kind = 'move' and coalesce(p_move_kind, '') not in ('cash', 'awareness', 'quality')) then
+    perform public.api_error('invalid_argument');
+  end if;
+  if length(v_text) < (cfg ->> 'minChars')::integer or length(v_text) > (cfg ->> 'maxChars')::integer
+     or v_text ~ '[\x00-\x08\x0b-\x1f]' or public.text_has_profanity(v_text) then
+    perform public.api_error('pitch_text_invalid');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'submit_company_pitch');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into pc from public.player_companies where founder_id = v_player and status = 'active' for update;
+  if pc.company_id is null then
+    perform public.api_error('company_not_found');
+  end if;
+  v_state := public.company_pitches_state(pc.company_id);
+  if p_kind = 'event' then
+    v_event := (v_state ->> 'event_id')::uuid;
+    if v_event is null then
+      perform public.api_error('event_closed');
+    end if;
+    if exists (select 1 from public.company_pitches p where p.event_id = v_event and p.status in ('judging', 'running')) then
+      perform public.api_error('pitch_busy');
+    end if;
+    v_cost := (v_state ->> 'event_cost_cents')::bigint;
+  else
+    -- own moves share the slots of the business moves (ADR-127)
+    if (select count(*) from public.company_moves m where m.company_id = pc.company_id and m.status = 'running')
+       + (select count(*) from public.company_pitches p where p.company_id = pc.company_id and p.kind = 'move'
+            and p.status in ('judging', 'running'))
+       >= (public.config_jsonb('companyMoves') -> 'slotsByTier' ->> pc.tier::text)::integer then
+      perform public.api_error('pitch_busy');
+    end if;
+    v_cost := (v_state ->> 'move_cost_cents')::bigint;
+  end if;
+  select a.balance_cents into v_cash from public.ledger_accounts a
+   where a.id = public.company_cash_account(pc.company_id) for update;
+  if coalesce(v_cash, 0) < v_cost then
+    perform public.api_error('insufficient_funds');
+  end if;
+  if v_cost > 0 then
+    perform public.ledger_transfer(public.company_cash_account(pc.company_id), public.ledger_system_account('households'),
+                                   v_cost, 'company_costs', 'Eigene Strategie', 'company', pc.company_id,
+                                   'pitch:start:' || p_request_id::text, v_player, jsonb_build_object('kind', p_kind));
+  end if;
+  insert into public.company_pitches (company_id, event_id, kind, move_kind, pitch_text, cost_cents, created_by,
+                                      created_at, judge_due_at)
+  values (pc.company_id, v_event, p_kind, case when p_kind = 'move' then p_move_kind end, v_text, v_cost, v_player,
+          public.game_now(), public.game_now() + make_interval(secs => (cfg ->> 'judgeWaitSeconds')::integer));
+  return public.request_complete(v_player, p_request_id, public.company_pitches_state(pc.company_id));
+end;
+$$;
+
+-- Everything the edge function needs, for the founder only
+create or replace function public.company_pitch_context(p_pitch_id bigint)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  p        public.company_pitches;
+  pc       public.player_companies;
+  c        public.companies;
+  e        public.player_company_events;
+begin
+  select * into p from public.company_pitches where id = p_pitch_id;
+  select * into pc from public.player_companies where company_id = p.company_id;
+  if p.id is null or pc.founder_id is distinct from v_player then
+    perform public.api_error('company_not_found');
+  end if;
+  select * into c from public.companies where id = p.company_id;
+  select * into e from public.player_company_events where id = p.event_id;
+  return jsonb_build_object(
+    'pitch_id', p.id, 'kind', p.kind, 'move_kind', p.move_kind, 'text', p.pitch_text, 'status', p.status,
+    'company', jsonb_build_object('name', c.name, 'idea', pc.idea, 'product', pc.product_key, 'sector', c.sector_key,
+                                  'tier', pc.tier),
+    'event', case when e.id is null then null else jsonb_build_object(
+               'archetype', e.archetype, 'polarity', e.polarity, 'severity', e.severity,
+               'headline', e.ai_headline, 'body', e.ai_body, 'cause', e.ai_cause) end);
+end;
+$$;
+
+-- Claude's judgment (service_role through the edge function); only once, only while still judging
+create or replace function public.store_pitch_judgment(p_pitch_id bigint, p_fit integer, p_backfire integer, p_verdict text,
+                                                       p_success text, p_failure text, p_backfire_text text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg jsonb := public.pitches_cfg();
+  p   public.company_pitches;
+begin
+  select * into p from public.company_pitches where id = p_pitch_id for update;
+  if p.id is null or p.status <> 'judging' or p_fit is null or p_backfire is null
+     or not public.company_ai_text_ok(p_verdict, 200, true) or not public.company_ai_text_ok(p_success, 280, true)
+     or not public.company_ai_text_ok(p_failure, 280, true) or not public.company_ai_text_ok(p_backfire_text, 280, true) then
+    return false;
+  end if;
+  update public.company_pitches
+     set judge = 'claude', fit = least(100, greatest(0, p_fit)), backfire = least(100, greatest(0, p_backfire)),
+         chance_bps = public.pitch_chance_bps(p_fit), verdict = p_verdict, success_text = p_success,
+         failure_text = p_failure, backfire_text = p_backfire_text, status = 'running', judged_at = public.game_now(),
+         ends_at = public.game_now() + make_interval(mins => (cfg ->> case when p.kind = 'event' then 'eventMinutes'
+                                                                          else 'moveMinutes' end)::integer)
+   where id = p.id;
+  return true;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Minute job: Mini-KI for unanswered pitches, results for finished ones
+-- ---------------------------------------------------------------------------
+create or replace function public.company_pitch_resolve(p_pitch_id bigint, p_u double precision, p_u2 double precision)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.pitches_cfg();
+  p        public.company_pitches;
+  v_out    text;
+  v_amount bigint := 0;
+  v_avail  bigint;
+  v_gain   double precision;
+  v_text   text;
+begin
+  select * into p from public.company_pitches where id = p_pitch_id for update;
+  if p.id is null or p.status <> 'running' then
+    return null;
+  end if;
+  v_out := case when p_u * 10000 < p.chance_bps then 'success'
+                when p_u2 * 100 < p.backfire then 'backfire'
+                else 'failure' end;
+  if v_out = 'success' then
+    if p.kind = 'event' then
+      update public.player_company_events
+         set status = 'solved', resolved_at = public.game_now(),
+             mitigation = least((cfg ->> 'maxMitigation')::double precision,
+                                (cfg ->> 'mitigationBase')::double precision + p.fit * (cfg ->> 'mitigationPerFit')::double precision)
+       where id = p.event_id and status in ('open', 'in_force');
+    elsif p.move_kind = 'cash' then
+      v_amount := round(p.cost_cents * ((cfg ->> 'movePayoutBase')::numeric + p.fit * (cfg ->> 'movePayoutPerFit')::numeric))::bigint;
+      select a.balance_cents into v_avail from public.ledger_accounts a
+       where a.id = public.ledger_system_account('households') for update;
+      v_amount := least(v_amount, greatest(coalesce(v_avail, 0), 0));
+      if v_amount > 0 then
+        perform public.ledger_transfer(public.ledger_system_account('households'), public.company_cash_account(p.company_id),
+                                       v_amount, 'company_revenue', 'Eigener Geschäftszug', 'company', p.company_id,
+                                       'pitch:result:' || p.id::text, p.created_by);
+      end if;
+    else
+      v_gain := (cfg ->> 'moveGainBase')::double precision + p.fit * (cfg ->> 'moveGainPerFit')::double precision;
+      if p.move_kind = 'awareness' then
+        update public.player_companies set awareness = least(1, awareness + v_gain) where company_id = p.company_id;
+      else
+        update public.player_companies set quality = least(1, quality + v_gain) where company_id = p.company_id;
+      end if;
+    end if;
+  elsif v_out = 'backfire' then
+    update public.player_companies
+       set awareness = greatest(0, awareness - (cfg ->> 'backfireAwareness')::double precision)
+     where company_id = p.company_id;
+    if p.kind = 'event' and p.cost_cents > 0 then
+      select a.balance_cents into v_avail from public.ledger_accounts a
+       where a.id = public.company_cash_account(p.company_id) for update;
+      v_amount := -least(p.cost_cents, greatest(coalesce(v_avail, 0), 0));
+      if v_amount < 0 then
+        perform public.ledger_transfer(public.company_cash_account(p.company_id), public.ledger_system_account('households'),
+                                       -v_amount, 'company_costs', 'Eigene Strategie ging nach hinten los', 'company',
+                                       p.company_id, 'pitch:result:' || p.id::text, p.created_by);
+      end if;
+    end if;
+  elsif p.kind = 'move' then
+    v_amount := (p.cost_cents * (cfg ->> 'moveRefundBps')::integer) / 10000;
+    select a.balance_cents into v_avail from public.ledger_accounts a
+     where a.id = public.ledger_system_account('households') for update;
+    v_amount := least(v_amount, greatest(coalesce(v_avail, 0), 0));
+    if v_amount > 0 then
+      perform public.ledger_transfer(public.ledger_system_account('households'), public.company_cash_account(p.company_id),
+                                     v_amount, 'company_revenue', 'Eigener Geschäftszug: Erstattung', 'company', p.company_id,
+                                     'pitch:result:' || p.id::text, p.created_by);
+    end if;
+  end if;
+  update public.company_pitches set status = v_out, result_cents = v_amount, resolved_at = public.game_now() where id = p.id;
+  v_text := case v_out when 'success' then p.success_text when 'backfire' then p.backfire_text else p.failure_text end;
+  perform public.company_news_add(p.company_id, 'pitch_' || v_out,
+    jsonb_build_object('outcome', v_text, 'pitch', left(p.pitch_text, 120), 'kind', p.kind, 'amount_cents', v_amount));
+  perform public.company_system_message(p.company_id, coalesce(v_text, 'Eigene Strategie: ' || v_out));
+  return v_out;
+end;
+$$;
+
+create or replace function public.company_pitches_run_due(p_now timestamptz default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.pitches_cfg();
+  v_now   timestamptz := coalesce(p_now, public.game_now());
+  r       record;
+  v_j     jsonb;
+  v_mini  integer := 0;
+  v_done  integer := 0;
+begin
+  if cfg = '{}'::jsonb then
+    return jsonb_build_object('skipped', 'no config');
+  end if;
+  for r in select p.*, e.archetype from public.company_pitches p
+             left join public.player_company_events e on e.id = p.event_id
+            where p.status = 'judging' and p.judge_due_at <= v_now
+            for update of p skip locked loop
+    v_j := public.pitch_mini_judge(r.pitch_text, case when r.kind = 'event' then r.archetype else r.move_kind end);
+    update public.company_pitches
+       set judge = 'mini', fit = (v_j ->> 'fit')::integer, backfire = (v_j ->> 'backfire')::integer,
+           chance_bps = public.pitch_chance_bps((v_j ->> 'fit')::integer),
+           verdict = case when (v_j ->> 'fit')::integer >= 60 then 'Klingt durchdacht und passt zur Lage.'
+                          when (v_j ->> 'fit')::integer >= 40 then 'Kann klappen, ist aber kein Selbstläufer.'
+                          else 'Passt kaum zur Lage. Das wird schwierig.' end
+                      || case when (v_j ->> 'risky')::integer > 0 then ' Vorsicht: Das könnte als Schönfärberei rüberkommen.'
+                              else '' end,
+           success_text = 'Die eigene Strategie geht auf.',
+           failure_text = 'Die eigene Strategie verpufft ohne Wirkung.',
+           backfire_text = 'Die eigene Strategie geht nach hinten los: Kunden fühlen sich veräppelt.',
+           status = 'running', judged_at = v_now,
+           ends_at = v_now + make_interval(mins => (cfg ->> case when r.kind = 'event' then 'eventMinutes'
+                                                               else 'moveMinutes' end)::integer)
+     where id = r.id;
+    v_mini := v_mini + 1;
+  end loop;
+  for r in select id from public.company_pitches where status = 'running' and ends_at <= v_now
+            order by ends_at for update skip locked loop
+    perform public.company_pitch_resolve(r.id, random(), random());
+    v_done := v_done + 1;
+  end loop;
+  return jsonb_build_object('mini', v_mini, 'resolved', v_done);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Rights and job
+-- ---------------------------------------------------------------------------
+revoke all on function public.pitches_cfg() from public, anon, authenticated;
+revoke all on function public.pitch_chance_bps(integer) from public, anon, authenticated;
+revoke all on function public.pitch_mini_judge(text, text) from public, anon, authenticated;
+revoke all on function public.company_pitches_state(uuid) from public, anon, authenticated;
+revoke all on function public.company_pitch_resolve(bigint, double precision, double precision) from public, anon, authenticated;
+revoke all on function public.company_pitches_run_due(timestamptz) from public, anon, authenticated;
+revoke all on function public.store_pitch_judgment(bigint, integer, integer, text, text, text, text) from public, anon, authenticated;
+grant execute on function public.store_pitch_judgment(bigint, integer, integer, text, text, text, text) to service_role;
+grant execute on function public.company_pitches_run_due(timestamptz) to service_role;
+revoke all on function public.get_company_pitches() from public, anon;
+revoke all on function public.submit_company_pitch(uuid, text, text, text) from public, anon;
+revoke all on function public.company_pitch_context(bigint) from public, anon;
+grant execute on function public.get_company_pitches() to authenticated;
+grant execute on function public.submit_company_pitch(uuid, text, text, text) to authenticated;
+grant execute on function public.company_pitch_context(bigint) to authenticated;
+comment on function public.get_company_pitches() is 'RPC: own strategies of the founder''s company (ADR-132).';
+comment on function public.submit_company_pitch(uuid, text, text, text) is 'RPC: write an own strategy for a crisis, a chance or a business move (ADR-132).';
+comment on function public.company_pitch_context(bigint) is 'RPC: context of a pitch for the strategy-judge edge function (ADR-132).';
+comment on function public.store_pitch_judgment(bigint, integer, integer, text, text, text, text) is
+  'service_role: Claude''s judgment of a pitch, validated (ADR-132).';
+
+do $do$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.unschedule(jobid) from cron.job where jobname = 'nexa-company-pitches';
+    perform cron.schedule('nexa-company-pitches', '* * * * *', 'select public.company_pitches_run_due()');
+  end if;
+end;
+$do$;

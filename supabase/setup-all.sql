@@ -47086,7 +47086,7 @@ begin
            join public.player_companies pc on pc.company_id = n.company_id
           where v_kind in ('all', 'company')
             and n.kind in ('task_success', 'task_failure', 'task_missed', 'founded', 'upgraded', 'expanded', 'ipo',
-                           'hired', 'record_hour')
+                           'hired', 'record_hour', 'pitch_success', 'pitch_failure', 'pitch_backfire')
           order by n.created_at desc limit v_limit)
         union all
         (select jsonb_build_object('id', 'm' || ni.id, 'kind', 'market', 'at', ni.published_at, 'headline', ni.headline,
@@ -47735,6 +47735,483 @@ begin
 end;
 $$;
 
+
+-- ===== supabase/migrations/20261204000500_strategy_pitches.sql =====
+-- =============================================================================
+-- NEXA · 0500 · Own strategies judged by Claude or the Mini-KI (ADR-132)
+-- =============================================================================
+-- The founder writes how the company answers a crisis or chance ("Ich mache einen Imagefilm"), or invents an own
+-- business move. Claude (edge function strategy-judge) rates the fit (0..100) and the risk of a backfire (0..100) and
+-- writes short texts for the three outcomes. Without an answer within pitches.judgeWaitSeconds the Mini-KI judges
+-- by keywords (game_config.pitches.mini). A random roll then decides:
+--   success:  chance = chanceBaseBps + fit x chancePerFitBps (at most maxChanceBps)
+--   backfire: of the failures, the share "backfire" (e.g. customers smell greenwashing)
+--   failure:  nothing happens (a crisis goes on; a move refunds moveRefundBps of its cost)
+-- Crisis or chance solved: the event ends as "solved" with a mitigation that grows with the fit. Own move: cash
+-- pays cost x (movePayoutBase + fit x movePayoutPerFit), awareness or quality grow. Backfire: awareness drops; for an
+-- event the company pays the cost once more. Claude only writes text and two numbers; the database checks both.
+-- Money: cost to the households (company_costs), payouts from them (company_revenue); closed system.
+--
+-- Table company_pitches (RLS, no client rights). RPCs (authenticated, founder):
+--   submit_company_pitch(p_request_id uuid, p_kind text, p_text text, p_move_kind text default null) -> PITCHES
+--   get_company_pitches() -> PITCHES
+--   company_pitch_context(p_pitch_id bigint) -> context for the edge function (founder only)
+-- service_role: store_pitch_judgment(p_pitch_id, p_fit, p_backfire, p_verdict, p_success, p_failure, p_backfire_text)
+-- Internal: company_pitches_run_due(p_now) (cron nexa-company-pitches, every minute).
+-- Errors: pitch_text_invalid NX115, pitch_busy NX116, plus event_closed, insufficient_funds, company_not_found.
+-- Idempotent: runs unchanged as supabase/updates/20261204000500_strategy_pitches.sql.
+
+create table if not exists public.company_pitches (
+  id              bigint generated always as identity primary key,
+  company_id      uuid not null references public.companies (id) on delete cascade,
+  event_id        uuid references public.player_company_events (id) on delete set null,
+  kind            text not null check (kind in ('event', 'move')),
+  move_kind       text check (move_kind in ('cash', 'awareness', 'quality')),
+  pitch_text      text not null check (length(pitch_text) between 1 and 400),
+  status          text not null default 'judging'
+                  check (status in ('judging', 'running', 'success', 'failure', 'backfire')),
+  judge           text check (judge in ('claude', 'mini')),
+  fit             integer check (fit between 0 and 100),
+  backfire        integer check (backfire between 0 and 100),
+  chance_bps      integer check (chance_bps between 0 and 10000),
+  verdict         text,
+  success_text    text,
+  failure_text    text,
+  backfire_text   text,
+  cost_cents      bigint not null check (cost_cents >= 0),
+  result_cents    bigint not null default 0,
+  created_by      uuid references public.profiles (id) on delete set null,
+  created_at      timestamptz not null default now(),
+  judge_due_at    timestamptz not null,
+  judged_at       timestamptz,
+  ends_at         timestamptz,
+  resolved_at     timestamptz
+);
+alter table public.company_pitches enable row level security;
+revoke all on public.company_pitches from public, anon, authenticated;
+create index if not exists company_pitches_company_idx on public.company_pitches (company_id, created_at desc);
+create index if not exists company_pitches_due_idx on public.company_pitches (status, judge_due_at, ends_at)
+  where status in ('judging', 'running');
+create index if not exists company_pitches_event_idx on public.company_pitches (event_id);
+create index if not exists company_pitches_created_by_idx on public.company_pitches (created_by);
+comment on table public.company_pitches is 'Own strategies of founders, judged by Claude or the Mini-KI (ADR-132). Internal.';
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.api_error(text)'::regprocedure);
+begin
+  if position('''pitch_busy''' in v_def) = 0 then
+    v_def := replace(v_def, $q$    when 'no_ai_workers'               then 'NX114'
+$q$, $q$    when 'no_ai_workers'               then 'NX114'
+    when 'pitch_text_invalid'          then 'NX115'
+    when 'pitch_busy'                  then 'NX116'
+$q$);
+    if position('''pitch_busy''' in v_def) = 0 then
+      raise exception 'api_error() has an unexpected shape; add the pitch error keys by hand';
+    end if;
+    execute v_def;
+  end if;
+end;
+$do$;
+
+create or replace function public.pitches_cfg()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select value from public.game_config where key = 'pitches'), '{}'::jsonb);
+$$;
+
+-- Chance from the fit
+create or replace function public.pitch_chance_bps(p_fit integer)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select least((c ->> 'maxChanceBps')::integer,
+               (c ->> 'chanceBaseBps')::integer + greatest(0, least(100, p_fit)) * (c ->> 'chancePerFitBps')::integer)
+    from (select public.pitches_cfg() as c) x;
+$$;
+
+-- Mini-KI: fit and backfire risk from keywords; the topic is the event's archetype or the move kind
+create or replace function public.pitch_mini_judge(p_text text, p_topic text)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  m       jsonb := public.pitches_cfg() -> 'mini';
+  v_text  text := lower(coalesce(p_text, ''));
+  v_hits  integer;
+  v_risky integer;
+  v_fit   integer;
+  v_back  integer;
+begin
+  select count(*) into v_hits from jsonb_array_elements_text(coalesce(m -> 'good' -> p_topic, '[]'::jsonb)) w
+   where position(w in v_text) > 0;
+  select count(*) into v_risky from jsonb_array_elements_text(coalesce(m -> 'risky', '[]'::jsonb)) w
+   where position(w in v_text) > 0;
+  v_fit := least((m ->> 'maxFit')::integer,
+                 (m ->> 'fitBase')::integer + least(v_hits, (m ->> 'maxHits')::integer) * (m ->> 'fitPerHit')::integer
+                 + case when length(v_text) >= (m ->> 'longTextChars')::integer then (m ->> 'longTextBonus')::integer else 0 end);
+  v_back := least((m ->> 'maxBackfire')::integer, (m ->> 'backfireBase')::integer + v_risky * (m ->> 'backfirePerRisky')::integer);
+  return jsonb_build_object('fit', v_fit, 'backfire', v_back, 'hits', v_hits, 'risky', v_risky);
+end;
+$$;
+
+create or replace function public.company_pitches_state(p_company uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'event_id', (select e.id from public.player_company_events e
+                  where e.company_id = p_company and e.status in ('open', 'in_force')
+                  order by e.started_at desc limit 1),
+    'event_cost_cents', public.company_event_unit_cents(p_company) * (public.pitches_cfg() ->> 'eventCostUnits')::integer,
+    'move_cost_cents', (select round((public.config_jsonb('companyMoves') -> 'costCentsByTier' ->> pc.tier::text)::numeric
+                                     * (public.pitches_cfg() ->> 'moveCostFactor')::numeric)::bigint
+                          from public.player_companies pc where pc.company_id = p_company),
+    'pitches', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'id', p.id, 'kind', p.kind, 'move_kind', p.move_kind, 'event_id', p.event_id, 'text', p.pitch_text,
+               'status', p.status, 'judge', p.judge, 'fit', p.fit, 'backfire', p.backfire, 'chance_bps', p.chance_bps,
+               'verdict', p.verdict, 'success_text', p.success_text, 'failure_text', p.failure_text,
+               'backfire_text', p.backfire_text, 'cost_cents', p.cost_cents, 'result_cents', p.result_cents,
+               'created_at', p.created_at, 'ends_at', p.ends_at, 'resolved_at', p.resolved_at)
+             order by p.created_at desc)
+        from (select * from public.company_pitches x where x.company_id = p_company
+               order by x.created_at desc limit 8) p), '[]'::jsonb));
+$$;
+
+-- ---------------------------------------------------------------------------
+-- RPCs
+-- ---------------------------------------------------------------------------
+create or replace function public.get_company_pitches()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  v_co     uuid;
+begin
+  select pc.company_id into v_co from public.player_companies pc where pc.founder_id = v_player and pc.status = 'active';
+  if v_co is null then
+    perform public.api_error('company_not_found');
+  end if;
+  return public.company_pitches_state(v_co);
+end;
+$$;
+
+create or replace function public.submit_company_pitch(p_request_id uuid, p_kind text, p_text text,
+                                                       p_move_kind text default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.pitches_cfg();
+  v_player uuid;
+  v_replay jsonb;
+  pc       public.player_companies;
+  v_text   text := btrim(coalesce(p_text, ''));
+  v_event  uuid;
+  v_cost   bigint;
+  v_cash   bigint;
+  v_state  jsonb;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_kind not in ('event', 'move')
+     or (p_kind = 'move' and coalesce(p_move_kind, '') not in ('cash', 'awareness', 'quality')) then
+    perform public.api_error('invalid_argument');
+  end if;
+  if length(v_text) < (cfg ->> 'minChars')::integer or length(v_text) > (cfg ->> 'maxChars')::integer
+     or v_text ~ '[\x00-\x08\x0b-\x1f]' or public.text_has_profanity(v_text) then
+    perform public.api_error('pitch_text_invalid');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'submit_company_pitch');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into pc from public.player_companies where founder_id = v_player and status = 'active' for update;
+  if pc.company_id is null then
+    perform public.api_error('company_not_found');
+  end if;
+  v_state := public.company_pitches_state(pc.company_id);
+  if p_kind = 'event' then
+    v_event := (v_state ->> 'event_id')::uuid;
+    if v_event is null then
+      perform public.api_error('event_closed');
+    end if;
+    if exists (select 1 from public.company_pitches p where p.event_id = v_event and p.status in ('judging', 'running')) then
+      perform public.api_error('pitch_busy');
+    end if;
+    v_cost := (v_state ->> 'event_cost_cents')::bigint;
+  else
+    -- own moves share the slots of the business moves (ADR-127)
+    if (select count(*) from public.company_moves m where m.company_id = pc.company_id and m.status = 'running')
+       + (select count(*) from public.company_pitches p where p.company_id = pc.company_id and p.kind = 'move'
+            and p.status in ('judging', 'running'))
+       >= (public.config_jsonb('companyMoves') -> 'slotsByTier' ->> pc.tier::text)::integer then
+      perform public.api_error('pitch_busy');
+    end if;
+    v_cost := (v_state ->> 'move_cost_cents')::bigint;
+  end if;
+  select a.balance_cents into v_cash from public.ledger_accounts a
+   where a.id = public.company_cash_account(pc.company_id) for update;
+  if coalesce(v_cash, 0) < v_cost then
+    perform public.api_error('insufficient_funds');
+  end if;
+  if v_cost > 0 then
+    perform public.ledger_transfer(public.company_cash_account(pc.company_id), public.ledger_system_account('households'),
+                                   v_cost, 'company_costs', 'Eigene Strategie', 'company', pc.company_id,
+                                   'pitch:start:' || p_request_id::text, v_player, jsonb_build_object('kind', p_kind));
+  end if;
+  insert into public.company_pitches (company_id, event_id, kind, move_kind, pitch_text, cost_cents, created_by,
+                                      created_at, judge_due_at)
+  values (pc.company_id, v_event, p_kind, case when p_kind = 'move' then p_move_kind end, v_text, v_cost, v_player,
+          public.game_now(), public.game_now() + make_interval(secs => (cfg ->> 'judgeWaitSeconds')::integer));
+  return public.request_complete(v_player, p_request_id, public.company_pitches_state(pc.company_id));
+end;
+$$;
+
+-- Everything the edge function needs, for the founder only
+create or replace function public.company_pitch_context(p_pitch_id bigint)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  p        public.company_pitches;
+  pc       public.player_companies;
+  c        public.companies;
+  e        public.player_company_events;
+begin
+  select * into p from public.company_pitches where id = p_pitch_id;
+  select * into pc from public.player_companies where company_id = p.company_id;
+  if p.id is null or pc.founder_id is distinct from v_player then
+    perform public.api_error('company_not_found');
+  end if;
+  select * into c from public.companies where id = p.company_id;
+  select * into e from public.player_company_events where id = p.event_id;
+  return jsonb_build_object(
+    'pitch_id', p.id, 'kind', p.kind, 'move_kind', p.move_kind, 'text', p.pitch_text, 'status', p.status,
+    'company', jsonb_build_object('name', c.name, 'idea', pc.idea, 'product', pc.product_key, 'sector', c.sector_key,
+                                  'tier', pc.tier),
+    'event', case when e.id is null then null else jsonb_build_object(
+               'archetype', e.archetype, 'polarity', e.polarity, 'severity', e.severity,
+               'headline', e.ai_headline, 'body', e.ai_body, 'cause', e.ai_cause) end);
+end;
+$$;
+
+-- Claude's judgment (service_role through the edge function); only once, only while still judging
+create or replace function public.store_pitch_judgment(p_pitch_id bigint, p_fit integer, p_backfire integer, p_verdict text,
+                                                       p_success text, p_failure text, p_backfire_text text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg jsonb := public.pitches_cfg();
+  p   public.company_pitches;
+begin
+  select * into p from public.company_pitches where id = p_pitch_id for update;
+  if p.id is null or p.status <> 'judging' or p_fit is null or p_backfire is null
+     or not public.company_ai_text_ok(p_verdict, 200, true) or not public.company_ai_text_ok(p_success, 280, true)
+     or not public.company_ai_text_ok(p_failure, 280, true) or not public.company_ai_text_ok(p_backfire_text, 280, true) then
+    return false;
+  end if;
+  update public.company_pitches
+     set judge = 'claude', fit = least(100, greatest(0, p_fit)), backfire = least(100, greatest(0, p_backfire)),
+         chance_bps = public.pitch_chance_bps(p_fit), verdict = p_verdict, success_text = p_success,
+         failure_text = p_failure, backfire_text = p_backfire_text, status = 'running', judged_at = public.game_now(),
+         ends_at = public.game_now() + make_interval(mins => (cfg ->> case when p.kind = 'event' then 'eventMinutes'
+                                                                          else 'moveMinutes' end)::integer)
+   where id = p.id;
+  return true;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Minute job: Mini-KI for unanswered pitches, results for finished ones
+-- ---------------------------------------------------------------------------
+create or replace function public.company_pitch_resolve(p_pitch_id bigint, p_u double precision, p_u2 double precision)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.pitches_cfg();
+  p        public.company_pitches;
+  v_out    text;
+  v_amount bigint := 0;
+  v_avail  bigint;
+  v_gain   double precision;
+  v_text   text;
+begin
+  select * into p from public.company_pitches where id = p_pitch_id for update;
+  if p.id is null or p.status <> 'running' then
+    return null;
+  end if;
+  v_out := case when p_u * 10000 < p.chance_bps then 'success'
+                when p_u2 * 100 < p.backfire then 'backfire'
+                else 'failure' end;
+  if v_out = 'success' then
+    if p.kind = 'event' then
+      update public.player_company_events
+         set status = 'solved', resolved_at = public.game_now(),
+             mitigation = least((cfg ->> 'maxMitigation')::double precision,
+                                (cfg ->> 'mitigationBase')::double precision + p.fit * (cfg ->> 'mitigationPerFit')::double precision)
+       where id = p.event_id and status in ('open', 'in_force');
+    elsif p.move_kind = 'cash' then
+      v_amount := round(p.cost_cents * ((cfg ->> 'movePayoutBase')::numeric + p.fit * (cfg ->> 'movePayoutPerFit')::numeric))::bigint;
+      select a.balance_cents into v_avail from public.ledger_accounts a
+       where a.id = public.ledger_system_account('households') for update;
+      v_amount := least(v_amount, greatest(coalesce(v_avail, 0), 0));
+      if v_amount > 0 then
+        perform public.ledger_transfer(public.ledger_system_account('households'), public.company_cash_account(p.company_id),
+                                       v_amount, 'company_revenue', 'Eigener Geschäftszug', 'company', p.company_id,
+                                       'pitch:result:' || p.id::text, p.created_by);
+      end if;
+    else
+      v_gain := (cfg ->> 'moveGainBase')::double precision + p.fit * (cfg ->> 'moveGainPerFit')::double precision;
+      if p.move_kind = 'awareness' then
+        update public.player_companies set awareness = least(1, awareness + v_gain) where company_id = p.company_id;
+      else
+        update public.player_companies set quality = least(1, quality + v_gain) where company_id = p.company_id;
+      end if;
+    end if;
+  elsif v_out = 'backfire' then
+    update public.player_companies
+       set awareness = greatest(0, awareness - (cfg ->> 'backfireAwareness')::double precision)
+     where company_id = p.company_id;
+    if p.kind = 'event' and p.cost_cents > 0 then
+      select a.balance_cents into v_avail from public.ledger_accounts a
+       where a.id = public.company_cash_account(p.company_id) for update;
+      v_amount := -least(p.cost_cents, greatest(coalesce(v_avail, 0), 0));
+      if v_amount < 0 then
+        perform public.ledger_transfer(public.company_cash_account(p.company_id), public.ledger_system_account('households'),
+                                       -v_amount, 'company_costs', 'Eigene Strategie ging nach hinten los', 'company',
+                                       p.company_id, 'pitch:result:' || p.id::text, p.created_by);
+      end if;
+    end if;
+  elsif p.kind = 'move' then
+    v_amount := (p.cost_cents * (cfg ->> 'moveRefundBps')::integer) / 10000;
+    select a.balance_cents into v_avail from public.ledger_accounts a
+     where a.id = public.ledger_system_account('households') for update;
+    v_amount := least(v_amount, greatest(coalesce(v_avail, 0), 0));
+    if v_amount > 0 then
+      perform public.ledger_transfer(public.ledger_system_account('households'), public.company_cash_account(p.company_id),
+                                     v_amount, 'company_revenue', 'Eigener Geschäftszug: Erstattung', 'company', p.company_id,
+                                     'pitch:result:' || p.id::text, p.created_by);
+    end if;
+  end if;
+  update public.company_pitches set status = v_out, result_cents = v_amount, resolved_at = public.game_now() where id = p.id;
+  v_text := case v_out when 'success' then p.success_text when 'backfire' then p.backfire_text else p.failure_text end;
+  perform public.company_news_add(p.company_id, 'pitch_' || v_out,
+    jsonb_build_object('outcome', v_text, 'pitch', left(p.pitch_text, 120), 'kind', p.kind, 'amount_cents', v_amount));
+  perform public.company_system_message(p.company_id, coalesce(v_text, 'Eigene Strategie: ' || v_out));
+  return v_out;
+end;
+$$;
+
+create or replace function public.company_pitches_run_due(p_now timestamptz default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.pitches_cfg();
+  v_now   timestamptz := coalesce(p_now, public.game_now());
+  r       record;
+  v_j     jsonb;
+  v_mini  integer := 0;
+  v_done  integer := 0;
+begin
+  if cfg = '{}'::jsonb then
+    return jsonb_build_object('skipped', 'no config');
+  end if;
+  for r in select p.*, e.archetype from public.company_pitches p
+             left join public.player_company_events e on e.id = p.event_id
+            where p.status = 'judging' and p.judge_due_at <= v_now
+            for update of p skip locked loop
+    v_j := public.pitch_mini_judge(r.pitch_text, case when r.kind = 'event' then r.archetype else r.move_kind end);
+    update public.company_pitches
+       set judge = 'mini', fit = (v_j ->> 'fit')::integer, backfire = (v_j ->> 'backfire')::integer,
+           chance_bps = public.pitch_chance_bps((v_j ->> 'fit')::integer),
+           verdict = case when (v_j ->> 'fit')::integer >= 60 then 'Klingt durchdacht und passt zur Lage.'
+                          when (v_j ->> 'fit')::integer >= 40 then 'Kann klappen, ist aber kein Selbstläufer.'
+                          else 'Passt kaum zur Lage. Das wird schwierig.' end
+                      || case when (v_j ->> 'risky')::integer > 0 then ' Vorsicht: Das könnte als Schönfärberei rüberkommen.'
+                              else '' end,
+           success_text = 'Die eigene Strategie geht auf.',
+           failure_text = 'Die eigene Strategie verpufft ohne Wirkung.',
+           backfire_text = 'Die eigene Strategie geht nach hinten los: Kunden fühlen sich veräppelt.',
+           status = 'running', judged_at = v_now,
+           ends_at = v_now + make_interval(mins => (cfg ->> case when r.kind = 'event' then 'eventMinutes'
+                                                               else 'moveMinutes' end)::integer)
+     where id = r.id;
+    v_mini := v_mini + 1;
+  end loop;
+  for r in select id from public.company_pitches where status = 'running' and ends_at <= v_now
+            order by ends_at for update skip locked loop
+    perform public.company_pitch_resolve(r.id, random(), random());
+    v_done := v_done + 1;
+  end loop;
+  return jsonb_build_object('mini', v_mini, 'resolved', v_done);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Rights and job
+-- ---------------------------------------------------------------------------
+revoke all on function public.pitches_cfg() from public, anon, authenticated;
+revoke all on function public.pitch_chance_bps(integer) from public, anon, authenticated;
+revoke all on function public.pitch_mini_judge(text, text) from public, anon, authenticated;
+revoke all on function public.company_pitches_state(uuid) from public, anon, authenticated;
+revoke all on function public.company_pitch_resolve(bigint, double precision, double precision) from public, anon, authenticated;
+revoke all on function public.company_pitches_run_due(timestamptz) from public, anon, authenticated;
+revoke all on function public.store_pitch_judgment(bigint, integer, integer, text, text, text, text) from public, anon, authenticated;
+grant execute on function public.store_pitch_judgment(bigint, integer, integer, text, text, text, text) to service_role;
+grant execute on function public.company_pitches_run_due(timestamptz) to service_role;
+revoke all on function public.get_company_pitches() from public, anon;
+revoke all on function public.submit_company_pitch(uuid, text, text, text) from public, anon;
+revoke all on function public.company_pitch_context(bigint) from public, anon;
+grant execute on function public.get_company_pitches() to authenticated;
+grant execute on function public.submit_company_pitch(uuid, text, text, text) to authenticated;
+grant execute on function public.company_pitch_context(bigint) to authenticated;
+comment on function public.get_company_pitches() is 'RPC: own strategies of the founder''s company (ADR-132).';
+comment on function public.submit_company_pitch(uuid, text, text, text) is 'RPC: write an own strategy for a crisis, a chance or a business move (ADR-132).';
+comment on function public.company_pitch_context(bigint) is 'RPC: context of a pitch for the strategy-judge edge function (ADR-132).';
+comment on function public.store_pitch_judgment(bigint, integer, integer, text, text, text, text) is
+  'service_role: Claude''s judgment of a pitch, validated (ADR-132).';
+
+do $do$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.unschedule(jobid) from cron.job where jobname = 'nexa-company-pitches';
+    perform cron.schedule('nexa-company-pitches', '* * * * *', 'select public.company_pitches_run_due()');
+  end if;
+end;
+$do$;
 
 -- ===== supabase/seed.sql =====
 -- =============================================================================
@@ -48399,6 +48876,7 @@ insert into public.game_config (key, value, description) values
   ('companyMoves', '{"costCentsByTier":{"garage":100000,"small_business":400000,"gmbh":1500000,"ag":6000000},"slotsByTier":{"garage":1,"small_business":2,"gmbh":3,"ag":4},"risk":{"safe":{"chanceBps":9000,"payoutBps":12000,"refundBps":5000,"gain":0.02},"normal":{"chanceBps":7000,"payoutBps":15000,"refundBps":3000,"gain":0.04},"risky":{"chanceBps":4000,"payoutBps":26000,"refundBps":1000,"gain":0.08}},"chancePerSkillBps":300,"maxSkillBonusBps":2500,"maxChanceBps":9500,"cooldownFactor":2,"historyLimit":12,"moves":[{"key":"pop_up_stand","product":"*","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.6,"minutes":15},{"key":"local_press","product":"*","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"team_workshop","product":"*","branch":"management","kind":"quality","risk":"safe","costFactor":0.8,"minutes":30},{"key":"bulk_purchase","product":"*","branch":"logistics","kind":"cash","risk":"safe","costFactor":1.2,"minutes":20},{"key":"investor_pitch","product":"*","branch":"finance","kind":"cash","risk":"risky","costFactor":1.5,"minutes":45},{"key":"tax_review","product":"*","branch":"law","kind":"cash","risk":"normal","costFactor":0.7,"minutes":30},{"key":"pentest_bank","product":"security_software","branch":"it","kind":"cash","risk":"normal","costFactor":1.5,"minutes":40},{"key":"security_audit_sme","product":"security_software","branch":"it","kind":"cash","risk":"safe","costFactor":1,"minutes":25},{"key":"bug_bounty","product":"security_software","branch":"it","kind":"cash","risk":"risky","costFactor":1,"minutes":35},{"key":"security_conference","product":"security_software","branch":"sales","kind":"awareness","risk":"normal","costFactor":1.3,"minutes":40},{"key":"certification","product":"security_software","branch":"law","kind":"quality","risk":"normal","costFactor":1.4,"minutes":50},{"key":"incident_response","product":"security_software","branch":"it","kind":"cash","risk":"risky","costFactor":2,"minutes":60},{"key":"app_store_feature","product":"mobile_app","branch":"sales","kind":"awareness","risk":"risky","costFactor":1.2,"minutes":40},{"key":"white_label_app","product":"mobile_app","branch":"it","kind":"cash","risk":"normal","costFactor":1.5,"minutes":45},{"key":"bugfix_sprint","product":"mobile_app","branch":"it","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"in_app_shop","product":"mobile_app","branch":"finance","kind":"cash","risk":"normal","costFactor":1.1,"minutes":30},{"key":"influencer_app","product":"mobile_app","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"hackathon","product":"mobile_app","branch":"it","kind":"cash","risk":"risky","costFactor":0.9,"minutes":35},{"key":"migrate_customer","product":"cloud_platform","branch":"it","kind":"cash","risk":"normal","costFactor":1.6,"minutes":50},{"key":"uptime_guarantee","product":"cloud_platform","branch":"management","kind":"quality","risk":"normal","costFactor":1.3,"minutes":45},{"key":"startup_credits","product":"cloud_platform","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.7,"minutes":20},{"key":"enterprise_deal","product":"cloud_platform","branch":"sales","kind":"cash","risk":"risky","costFactor":2.2,"minutes":60},{"key":"data_center_deal","product":"cloud_platform","branch":"finance","kind":"cash","risk":"safe","costFactor":1.2,"minutes":25},{"key":"ai_hosting","product":"cloud_platform","branch":"it","kind":"cash","risk":"risky","costFactor":1.8,"minutes":50},{"key":"flash_sale","product":"online_shop","branch":"sales","kind":"cash","risk":"safe","costFactor":1,"minutes":15},{"key":"marketplace_listing","product":"online_shop","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"same_day_delivery","product":"online_shop","branch":"logistics","kind":"quality","risk":"normal","costFactor":1.4,"minutes":45},{"key":"black_friday","product":"online_shop","branch":"sales","kind":"cash","risk":"risky","costFactor":1.6,"minutes":40},{"key":"returns_process","product":"online_shop","branch":"logistics","kind":"quality","risk":"safe","costFactor":0.7,"minutes":20},{"key":"b2b_shop","product":"online_shop","branch":"sales","kind":"cash","risk":"normal","costFactor":1.3,"minutes":35},{"key":"fashion_show","product":"fashion","branch":"sales","kind":"awareness","risk":"risky","costFactor":1.6,"minutes":50},{"key":"capsule_collection","product":"fashion","branch":"craft","kind":"cash","risk":"normal","costFactor":1.3,"minutes":40},{"key":"influencer_outfit","product":"fashion","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"sustainable_fabric","product":"fashion","branch":"science","kind":"quality","risk":"normal","costFactor":1.2,"minutes":45},{"key":"outlet_sale","product":"fashion","branch":"sales","kind":"cash","risk":"safe","costFactor":0.9,"minutes":20},{"key":"collab_brand","product":"fashion","branch":"management","kind":"cash","risk":"risky","costFactor":1.8,"minutes":55},{"key":"catering_job","product":"delicatessen","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.2,"minutes":35},{"key":"tasting_evening","product":"delicatessen","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.6,"minutes":20},{"key":"gift_baskets","product":"delicatessen","branch":"sales","kind":"cash","risk":"safe","costFactor":0.9,"minutes":20},{"key":"organic_label","product":"delicatessen","branch":"science","kind":"quality","risk":"normal","costFactor":1.2,"minutes":45},{"key":"restaurant_supply","product":"delicatessen","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"food_festival","product":"delicatessen","branch":"sales","kind":"cash","risk":"risky","costFactor":1.3,"minutes":45},{"key":"roof_installation","product":"solar","branch":"craft","kind":"cash","risk":"safe","costFactor":1.2,"minutes":30},{"key":"solar_park","product":"solar","branch":"craft","kind":"cash","risk":"risky","costFactor":2.4,"minutes":60},{"key":"subsidy_application","product":"solar","branch":"law","kind":"cash","risk":"normal","costFactor":0.8,"minutes":30},{"key":"installer_training","product":"solar","branch":"craft","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"energy_fair","product":"solar","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":35},{"key":"battery_bundle","product":"solar","branch":"sales","kind":"cash","risk":"normal","costFactor":1.3,"minutes":35},{"key":"peak_trading","product":"grid_service","branch":"finance","kind":"cash","risk":"risky","costFactor":1.6,"minutes":40},{"key":"grid_maintenance","product":"grid_service","branch":"craft","kind":"cash","risk":"safe","costFactor":1.1,"minutes":25},{"key":"smart_meter_rollout","product":"grid_service","branch":"it","kind":"cash","risk":"normal","costFactor":1.5,"minutes":45},{"key":"grid_upgrade","product":"grid_service","branch":"craft","kind":"quality","risk":"normal","costFactor":1.4,"minutes":50},{"key":"city_contract","product":"grid_service","branch":"law","kind":"cash","risk":"risky","costFactor":2,"minutes":60},{"key":"outage_hotline","product":"grid_service","branch":"management","kind":"awareness","risk":"safe","costFactor":0.6,"minutes":20},{"key":"home_storage","product":"energy_storage","branch":"sales","kind":"cash","risk":"normal","costFactor":1.3,"minutes":35},{"key":"battery_research","product":"energy_storage","branch":"science","kind":"quality","risk":"risky","costFactor":1.6,"minutes":55},{"key":"grid_battery","product":"energy_storage","branch":"finance","kind":"cash","risk":"risky","costFactor":2.2,"minutes":60},{"key":"recycling_program","product":"energy_storage","branch":"science","kind":"awareness","risk":"safe","costFactor":0.7,"minutes":25},{"key":"ev_fleet","product":"energy_storage","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"warranty_extension","product":"energy_storage","branch":"law","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"generic_launch","product":"generics","branch":"science","kind":"cash","risk":"normal","costFactor":1.4,"minutes":45},{"key":"pharmacy_contracts","product":"generics","branch":"sales","kind":"cash","risk":"safe","costFactor":1,"minutes":25},{"key":"gmp_audit","product":"generics","branch":"law","kind":"quality","risk":"normal","costFactor":1.2,"minutes":45},{"key":"tender_win","product":"generics","branch":"law","kind":"cash","risk":"risky","costFactor":1.8,"minutes":55},{"key":"doctor_visits","product":"generics","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.7,"minutes":20},{"key":"cost_cutting_lab","product":"generics","branch":"management","kind":"cash","risk":"safe","costFactor":0.9,"minutes":25},{"key":"trial_phase","product":"biotech","branch":"science","kind":"cash","risk":"risky","costFactor":2.4,"minutes":60},{"key":"license_deal","product":"biotech","branch":"law","kind":"cash","risk":"normal","costFactor":1.6,"minutes":45},{"key":"lab_upgrade","product":"biotech","branch":"science","kind":"quality","risk":"normal","costFactor":1.4,"minutes":45},{"key":"research_grant","product":"biotech","branch":"finance","kind":"cash","risk":"safe","costFactor":0.8,"minutes":30},{"key":"science_paper","product":"biotech","branch":"science","kind":"awareness","risk":"normal","costFactor":0.9,"minutes":35},{"key":"cro_service","product":"biotech","branch":"science","kind":"cash","risk":"safe","costFactor":1.1,"minutes":30},{"key":"hospital_order","product":"medtech","branch":"sales","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"ce_marking","product":"medtech","branch":"law","kind":"quality","risk":"normal","costFactor":1.2,"minutes":45},{"key":"device_service","product":"medtech","branch":"craft","kind":"cash","risk":"safe","costFactor":1,"minutes":25},{"key":"medical_fair","product":"medtech","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":35},{"key":"prototype","product":"medtech","branch":"science","kind":"quality","risk":"risky","costFactor":1.5,"minutes":55},{"key":"export_deal","product":"medtech","branch":"sales","kind":"cash","risk":"risky","costFactor":1.9,"minutes":55},{"key":"hospital_express","product":"courier","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.2,"minutes":30},{"key":"cargo_bike_fleet","product":"courier","branch":"logistics","kind":"quality","risk":"normal","costFactor":1.3,"minutes":40},{"key":"night_delivery","product":"courier","branch":"logistics","kind":"cash","risk":"safe","costFactor":1,"minutes":25},{"key":"restaurant_partner","product":"courier","branch":"sales","kind":"cash","risk":"normal","costFactor":1.1,"minutes":30},{"key":"courier_app","product":"courier","branch":"it","kind":"awareness","risk":"normal","costFactor":1,"minutes":35},{"key":"christmas_rush","product":"courier","branch":"management","kind":"cash","risk":"risky","costFactor":1.6,"minutes":45},{"key":"seasonal_storage","product":"warehouse","branch":"logistics","kind":"cash","risk":"safe","costFactor":1.1,"minutes":25},{"key":"automation_upgrade","product":"warehouse","branch":"it","kind":"quality","risk":"normal","costFactor":1.5,"minutes":50},{"key":"fulfillment_client","product":"warehouse","branch":"sales","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"cold_storage","product":"warehouse","branch":"science","kind":"cash","risk":"risky","costFactor":1.8,"minutes":50},{"key":"inventory_audit","product":"warehouse","branch":"finance","kind":"cash","risk":"safe","costFactor":0.8,"minutes":20},{"key":"open_day","product":"warehouse","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.5,"minutes":20},{"key":"international_route","product":"freight","branch":"logistics","kind":"cash","risk":"risky","costFactor":2,"minutes":55},{"key":"rail_partnership","product":"freight","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"fuel_hedge","product":"freight","branch":"finance","kind":"cash","risk":"normal","costFactor":1,"minutes":30},{"key":"driver_training","product":"freight","branch":"management","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"heavy_load","product":"freight","branch":"logistics","kind":"cash","risk":"risky","costFactor":1.7,"minutes":50},{"key":"logistics_fair","product":"freight","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":35},{"key":"contract_check_flat","product":"legal_tech","branch":"law","kind":"cash","risk":"safe","costFactor":1,"minutes":20},{"key":"class_action","product":"legal_tech","branch":"law","kind":"cash","risk":"risky","costFactor":2,"minutes":60},{"key":"startup_law_pack","product":"legal_tech","branch":"law","kind":"cash","risk":"normal","costFactor":1.3,"minutes":35},{"key":"legal_explainer","product":"legal_tech","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"lawyer_review","product":"legal_tech","branch":"law","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"data_privacy_audit","product":"legal_tech","branch":"it","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"free_account","product":"fintech","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.7,"minutes":20},{"key":"savings_plan","product":"fintech","branch":"finance","kind":"cash","risk":"normal","costFactor":1.2,"minutes":35},{"key":"crypto_feature","product":"fintech","branch":"finance","kind":"cash","risk":"risky","costFactor":1.8,"minutes":50},{"key":"banking_license","product":"fintech","branch":"law","kind":"quality","risk":"normal","costFactor":1.5,"minutes":55},{"key":"fraud_detection","product":"fintech","branch":"it","kind":"quality","risk":"safe","costFactor":0.9,"minutes":30},{"key":"merchant_payments","product":"fintech","branch":"sales","kind":"cash","risk":"safe","costFactor":1.1,"minutes":25},{"key":"new_partner","product":"franchise","branch":"management","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"flagship_store","product":"franchise","branch":"sales","kind":"awareness","risk":"risky","costFactor":1.8,"minutes":55},{"key":"partner_training","product":"franchise","branch":"management","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"central_purchasing","product":"franchise","branch":"logistics","kind":"cash","risk":"safe","costFactor":1.1,"minutes":25},{"key":"regional_ads","product":"franchise","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"master_franchise","product":"franchise","branch":"law","kind":"cash","risk":"risky","costFactor":2.2,"minutes":60},{"key":"spot_trade","product":"energy_trading","branch":"finance","kind":"cash","risk":"risky","costFactor":1.6,"minutes":30},{"key":"supply_contract","product":"energy_trading","branch":"sales","kind":"cash","risk":"safe","costFactor":1.2,"minutes":25},{"key":"green_tariff","product":"energy_trading","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"hedging","product":"energy_trading","branch":"finance","kind":"quality","risk":"normal","costFactor":1.3,"minutes":45},{"key":"industrial_customer","product":"energy_trading","branch":"sales","kind":"cash","risk":"normal","costFactor":1.6,"minutes":45},{"key":"market_analysis","product":"energy_trading","branch":"science","kind":"quality","risk":"safe","costFactor":0.7,"minutes":20},{"key":"approval_dossier","product":"regulatory","branch":"law","kind":"cash","risk":"normal","costFactor":1.5,"minutes":45},{"key":"fast_track","product":"regulatory","branch":"law","kind":"cash","risk":"risky","costFactor":2.2,"minutes":60},{"key":"label_check","product":"regulatory","branch":"science","kind":"cash","risk":"safe","costFactor":0.9,"minutes":20},{"key":"expert_panel","product":"regulatory","branch":"science","kind":"quality","risk":"normal","costFactor":1.2,"minutes":40},{"key":"pharma_congress","product":"regulatory","branch":"sales","kind":"awareness","risk":"normal","costFactor":1.1,"minutes":35},{"key":"eu_registration","product":"regulatory","branch":"law","kind":"cash","risk":"normal","costFactor":1.7,"minutes":50},{"key":"office_move","product":"moving","branch":"management","kind":"cash","risk":"normal","costFactor":1.5,"minutes":45},{"key":"student_move","product":"moving","branch":"logistics","kind":"cash","risk":"safe","costFactor":0.8,"minutes":15},{"key":"piano_move","product":"moving","branch":"craft","kind":"cash","risk":"risky","costFactor":1.4,"minutes":30},{"key":"moving_boxes","product":"moving","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.6,"minutes":20},{"key":"packing_training","product":"moving","branch":"management","kind":"quality","risk":"normal","costFactor":1,"minutes":30},{"key":"senior_move","product":"moving","branch":"management","kind":"cash","risk":"normal","costFactor":1.2,"minutes":35}]}'::jsonb, 'Defaults from src/config/balance.ts, section "companyMoves"'),
   ('companyTasks', '{"valueCentsByTier":{"garage":40000,"small_business":150000,"gmbh":500000,"ag":2000000},"penaltyBps":6000,"passScoreBps":8000,"graceSeconds":8,"games":{"pick":{"seconds":30,"tiles":12,"minTargets":3,"maxTargets":6},"count":{"seconds":25,"tiles":16,"minTargets":4,"maxTargets":9},"sort":{"seconds":35,"items":8},"order":{"seconds":30,"items":5,"min":1,"max":99},"seq":{"seconds":25,"length":5,"showSeconds":4},"math":{"seconds":45}},"ai":{"minutes":12,"slowdownPerQueuedBps":5000,"chanceBps":7000,"skillBonusBps":1000,"valueBps":6000},"board":{"base":1,"membersPerTask":2,"max":6,"everyMinutes":4,"activeMinutes":20,"autoAiBeforeDueMinutes":15},"aiDelegateMinTier":"senior","xp":{"success":60,"failure":15},"historyLimit":15,"tasks":[{"key":"pay_invoices","product":"*","branch":"finance","game":"sort","factor":1,"minutes":45},{"key":"payroll_check","product":"*","branch":"finance","game":"math","factor":1.1,"minutes":45,"op":"mul","a":[3,9],"b":[12,28]},{"key":"coffee_order","product":"*","branch":"management","game":"count","factor":0.6,"minutes":40},{"key":"shift_plan","product":"*","branch":"management","game":"order","factor":1,"minutes":50,"asc":true},{"key":"contract_review","product":"*","branch":"law","game":"pick","factor":1.2,"minutes":50},{"key":"password_reset","product":"*","branch":"it","game":"seq","factor":0.7,"minutes":40},{"key":"customer_mail","product":"*","branch":"sales","game":"sort","factor":0.8,"minutes":40},{"key":"office_supplies","product":"*","branch":"logistics","game":"math","factor":0.6,"minutes":40,"op":"add","a":[12,40],"b":[8,30]},{"key":"patch_servers","product":"security_software","branch":"it","game":"pick","factor":1.3,"minutes":45},{"key":"phishing_filter","product":"security_software","branch":"it","game":"sort","factor":1,"minutes":40},{"key":"alarm_codes","product":"security_software","branch":"it","game":"seq","factor":1.1,"minutes":40},{"key":"license_count","product":"security_software","branch":"sales","game":"math","factor":0.9,"minutes":45,"op":"mul","a":[4,12],"b":[5,25]},{"key":"crash_reports","product":"mobile_app","branch":"it","game":"count","factor":1,"minutes":40},{"key":"release_notes","product":"mobile_app","branch":"sales","game":"sort","factor":0.8,"minutes":45},{"key":"store_screens","product":"mobile_app","branch":"sales","game":"pick","factor":0.9,"minutes":40},{"key":"beta_testers","product":"mobile_app","branch":"management","game":"math","factor":0.8,"minutes":50,"op":"sub","a":[60,120],"b":[10,45]},{"key":"rack_servers","product":"cloud_platform","branch":"it","game":"order","factor":1.2,"minutes":45,"asc":false},{"key":"backup_tapes","product":"cloud_platform","branch":"it","game":"pick","factor":1,"minutes":40},{"key":"cloud_bill","product":"cloud_platform","branch":"finance","game":"math","factor":1.1,"minutes":45,"op":"mul","a":[6,20],"b":[15,60]},{"key":"ddos_block","product":"cloud_platform","branch":"it","game":"pick","factor":1.3,"minutes":40},{"key":"deadline_files","product":"legal_tech","branch":"law","game":"order","factor":1,"minutes":40,"asc":true},{"key":"template_check","product":"legal_tech","branch":"law","game":"pick","factor":1.1,"minutes":45},{"key":"chatbot_answers","product":"legal_tech","branch":"it","game":"sort","factor":0.9,"minutes":40},{"key":"fee_calc","product":"legal_tech","branch":"finance","game":"math","factor":1,"minutes":45,"op":"pct","a":[2000,9000],"b":[10,30]},{"key":"fraud_check","product":"fintech","branch":"finance","game":"pick","factor":1.3,"minutes":40},{"key":"kyc_docs","product":"fintech","branch":"law","game":"sort","factor":1,"minutes":45},{"key":"interest_calc","product":"fintech","branch":"finance","game":"math","factor":1,"minutes":45,"op":"pct","a":[1000,20000],"b":[2,6]},{"key":"tan_codes","product":"fintech","branch":"it","game":"seq","factor":0.8,"minutes":40},{"key":"pack_orders","product":"online_shop","branch":"logistics","game":"pick","factor":1.1,"minutes":40},{"key":"returns_sort","product":"online_shop","branch":"logistics","game":"sort","factor":0.9,"minutes":45},{"key":"price_update","product":"online_shop","branch":"sales","game":"math","factor":1,"minutes":40,"op":"pct","a":[20,200],"b":[10,40]},{"key":"stock_count_shop","product":"online_shop","branch":"logistics","game":"count","factor":0.8,"minutes":40},{"key":"pack_shirts","product":"fashion","branch":"logistics","game":"pick","factor":1.1,"minutes":40},{"key":"color_match","product":"fashion","branch":"craft","game":"sort","factor":1,"minutes":45},{"key":"runway_order","product":"fashion","branch":"sales","game":"seq","factor":0.9,"minutes":50},{"key":"size_count","product":"fashion","branch":"logistics","game":"count","factor":0.8,"minutes":40},{"key":"cheese_age","product":"delicatessen","branch":"science","game":"order","factor":1,"minutes":45,"asc":false},{"key":"expiry_check","product":"delicatessen","branch":"logistics","game":"pick","factor":1.1,"minutes":40},{"key":"gift_basket","product":"delicatessen","branch":"sales","game":"math","factor":0.9,"minutes":45,"op":"mul","a":[5,25],"b":[18,45]},{"key":"cold_chain","product":"delicatessen","branch":"logistics","game":"sort","factor":1,"minutes":40},{"key":"partner_audit","product":"franchise","branch":"management","game":"pick","factor":1.2,"minutes":50},{"key":"royalty_calc","product":"franchise","branch":"finance","game":"math","factor":1.1,"minutes":45,"op":"pct","a":[10000,60000],"b":[4,9]},{"key":"opening_plan","product":"franchise","branch":"management","game":"order","factor":1,"minutes":50,"asc":true},{"key":"recipe_steps","product":"franchise","branch":"management","game":"seq","factor":0.8,"minutes":40},{"key":"panel_check","product":"solar","branch":"craft","game":"pick","factor":1.1,"minutes":45},{"key":"roof_angle","product":"solar","branch":"craft","game":"order","factor":1,"minutes":45,"asc":false},{"key":"feed_in","product":"solar","branch":"finance","game":"math","factor":1,"minutes":45,"op":"mul","a":[300,900],"b":[8,13]},{"key":"cable_colors","product":"solar","branch":"craft","game":"seq","factor":0.9,"minutes":40},{"key":"outage_map","product":"grid_service","branch":"craft","game":"pick","factor":1.3,"minutes":40},{"key":"meter_read","product":"grid_service","branch":"it","game":"math","factor":0.9,"minutes":45,"op":"sub","a":[4000,9000],"b":[1000,3500]},{"key":"crew_dispatch","product":"grid_service","branch":"management","game":"order","factor":1,"minutes":45,"asc":true},{"key":"safety_gear","product":"grid_service","branch":"law","game":"sort","factor":0.8,"minutes":40},{"key":"cell_test","product":"energy_storage","branch":"science","game":"pick","factor":1.2,"minutes":45},{"key":"charge_plan","product":"energy_storage","branch":"finance","game":"order","factor":1,"minutes":45,"asc":true},{"key":"capacity_calc","product":"energy_storage","branch":"science","game":"math","factor":1,"minutes":45,"op":"mul","a":[8,24],"b":[5,15]},{"key":"thermal_watch","product":"energy_storage","branch":"science","game":"count","factor":1.1,"minutes":40},{"key":"buy_cheap","product":"energy_trading","branch":"finance","game":"order","factor":1.3,"minutes":40,"asc":true},{"key":"contract_sort","product":"energy_trading","branch":"law","game":"sort","factor":1,"minutes":45},{"key":"margin_calc","product":"energy_trading","branch":"finance","game":"math","factor":1.1,"minutes":45,"op":"sub","a":[90,160],"b":[40,85]},{"key":"trade_signals","product":"energy_trading","branch":"finance","game":"seq","factor":0.9,"minutes":40},{"key":"batch_check","product":"generics","branch":"science","game":"pick","factor":1.2,"minutes":45},{"key":"dose_calc","product":"generics","branch":"science","game":"math","factor":1,"minutes":45,"op":"mul","a":[2,6],"b":[50,400]},{"key":"pharmacy_orders","product":"generics","branch":"logistics","game":"count","factor":0.9,"minutes":40},{"key":"label_sort","product":"generics","branch":"law","game":"sort","factor":0.8,"minutes":40},{"key":"petri_dishes","product":"biotech","branch":"science","game":"pick","factor":1.1,"minutes":45},{"key":"dna_sequence","product":"biotech","branch":"science","game":"seq","factor":1.2,"minutes":45},{"key":"lab_cleanup","product":"biotech","branch":"science","game":"sort","factor":1,"minutes":45},{"key":"grant_budget","product":"biotech","branch":"finance","game":"math","factor":1,"minutes":45,"op":"pct","a":[100000,500000],"b":[10,30]},{"key":"device_test","product":"medtech","branch":"craft","game":"pick","factor":1.2,"minutes":45},{"key":"sterile_sort","product":"medtech","branch":"science","game":"sort","factor":1,"minutes":40},{"key":"calibrate","product":"medtech","branch":"science","game":"math","factor":1,"minutes":40,"op":"sub","a":[150,190],"b":[110,145]},{"key":"hospital_route","product":"medtech","branch":"sales","game":"order","factor":0.9,"minutes":45,"asc":true},{"key":"dossier_pages","product":"regulatory","branch":"law","game":"count","factor":1.2,"minutes":45},{"key":"deadline_agency","product":"regulatory","branch":"law","game":"order","factor":1.1,"minutes":45,"asc":true},{"key":"side_effects","product":"regulatory","branch":"science","game":"sort","factor":1,"minutes":40},{"key":"translation_set","product":"regulatory","branch":"law","game":"pick","factor":0.8,"minutes":40},{"key":"route_order","product":"courier","branch":"logistics","game":"order","factor":1.1,"minutes":40,"asc":true},{"key":"parcel_scan","product":"courier","branch":"logistics","game":"pick","factor":1,"minutes":40},{"key":"bike_check","product":"courier","branch":"craft","game":"seq","factor":0.8,"minutes":40},{"key":"tip_jar","product":"courier","branch":"finance","game":"math","factor":0.7,"minutes":45,"op":"add","a":[20,80],"b":[15,60]},{"key":"pick_list","product":"warehouse","branch":"logistics","game":"pick","factor":1.1,"minutes":40},{"key":"pallet_count","product":"warehouse","branch":"logistics","game":"count","factor":0.9,"minutes":40},{"key":"forklift_safety","product":"warehouse","branch":"management","game":"sort","factor":0.8,"minutes":45},{"key":"dock_plan","product":"warehouse","branch":"management","game":"order","factor":1,"minutes":45,"asc":true},{"key":"customs_docs","product":"freight","branch":"law","game":"sort","factor":1.2,"minutes":45},{"key":"container_load","product":"freight","branch":"logistics","game":"math","factor":1.1,"minutes":45,"op":"mul","a":[6,18],"b":[12,30]},{"key":"ship_schedule","product":"freight","branch":"logistics","game":"order","factor":1,"minutes":50,"asc":true},{"key":"seal_codes","product":"freight","branch":"logistics","game":"seq","factor":0.8,"minutes":40},{"key":"box_labels","product":"moving","branch":"logistics","game":"pick","factor":1,"minutes":40},{"key":"load_order","product":"moving","branch":"management","game":"seq","factor":1.1,"minutes":45},{"key":"fragile_sort","product":"moving","branch":"logistics","game":"sort","factor":0.9,"minutes":40},{"key":"moving_quote","product":"moving","branch":"finance","game":"math","factor":1,"minutes":45,"op":"mul","a":[3,9],"b":[45,90]}]}'::jsonb, 'Defaults from src/config/balance.ts, section "companyTasks"'),
   ('funNews', '{"everyMinutes":6,"repeatHours":8,"keepHours":48,"items":[{"key":"ceo_laptop_train","needs":"company"},{"key":"office_dog","needs":"company"},{"key":"coffee_machine","needs":"company"},{"key":"typo_press","needs":"company"},{"key":"ceo_marathon","needs":"company"},{"key":"printer_rebellion","needs":"company"},{"key":"parking_war","needs":"company"},{"key":"lucky_socks","needs":"company"},{"key":"annual_party","needs":"company"},{"key":"ai_slogan","needs":"company"},{"key":"mascot","needs":"company"},{"key":"intern_ceo","needs":"company"},{"key":"rename_rumor","needs":"company"},{"key":"plant_office","needs":"company"},{"key":"ticker_meme","needs":"company"},{"key":"yacht_sale","needs":"company"},{"key":"player_lambo","needs":"player"},{"key":"player_coffee","needs":"player"},{"key":"player_tip","needs":"player"},{"key":"player_office","needs":"player"},{"key":"player_chart","needs":"player"},{"key":"player_diet","needs":"player"},{"key":"player_motivation","needs":"player"},{"key":"player_haircut","needs":"player"},{"key":"weather_markets","needs":"none"},{"key":"pigeon_trader","needs":"none"},{"key":"monday_effect","needs":"none"},{"key":"broker_nap","needs":"none"},{"key":"bull_escape","needs":"none"},{"key":"bear_costume","needs":"none"},{"key":"calculator_strike","needs":"none"},{"key":"vending_machine","needs":"none"},{"key":"elevator_talk","needs":"none"},{"key":"index_birthday","needs":"none"},{"key":"cat_portfolio","needs":"none"},{"key":"headline_error","needs":"none"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "funNews"'),
+  ('pitches', '{"minChars":12,"maxChars":280,"judgeWaitSeconds":90,"eventMinutes":20,"moveMinutes":30,"chanceBaseBps":1000,"chancePerFitBps":80,"maxChanceBps":9000,"eventCostUnits":2,"moveCostFactor":1.2,"mitigationBase":0.35,"mitigationPerFit":0.005,"maxMitigation":0.9,"movePayoutBase":1.3,"movePayoutPerFit":0.012,"moveGainBase":0.02,"moveGainPerFit":0.0006,"moveRefundBps":2000,"backfireAwareness":0.05,"mini":{"fitBase":25,"fitPerHit":12,"maxHits":4,"longTextChars":60,"longTextBonus":10,"maxFit":85,"backfireBase":10,"backfirePerRisky":20,"maxBackfire":70,"risky":["imagefilm","werbung","werbekampagne","influencer","pr-","greenwashing","ignorieren","leugnen","abstreiten","lügen","vertuschen","schweigen","aussitzen","drohen","verklagen","entlassen","billiger","bestechen"],"good":{"regulation":["anwalt","recht","prüfen","anpassen","lobby","verband","gutachten","umstellen","dialog"],"special_tax":["steuer","berater","kalkul","preis","rohstoff","ersatz","sparen","lieferant"],"supply_shortage":["lieferant","lager","alternativ","vorrat","zweit","ersatz","vertrag","regional"],"quality_scandal":["rückruf","entschuldig","prüf","qualität","kontroll","ersetzen","transparen","entschädig"],"data_breach":["sicherheit","passwort","verschlüssel","melden","experten","informieren","update","audit"],"price_war":["qualität","service","treue","nische","kosten","bündel","mehrwert","marke"],"strike":["lohn","gehalt","verhandl","bonus","gespräch","kompromiss","zuhören","arbeitszeit","tarif"],"protest":["dialog","einladen","zuhören","ändern","nachhaltig","transparen","spenden","fair"],"patent_claim":["anwalt","patent","lizenz","einigung","gutachten","umgehen","vergleich","eigene"],"bad_review":["verbessern","test","feedback","kunden","nachbessern","qualität","gratis","update"],"viral_trend":["nachproduz","lager","social","video","aktion","schnell","limitiert","community"],"big_contract":["kapazität","personal","einstellen","termin","liefer","verhandl","vertrag","schicht"],"award":["pressemitteilung","werbung","feiern","kunden","messe","präsentieren","website","siegel"],"subsidy":["antrag","förder","investieren","forschung","berater","unterlagen","frist","projekt"],"partnership":["vertrag","gemeinsam","partner","teilen","kooperation","verhandl","netzwerk","vertrieb"],"cash":["verkauf","auftrag","kunden","rabatt","angebot","großkunde","export","abo","online"],"awareness":["werbung","messe","social","video","presse","influencer","sponsor","event","kampagne"],"quality":["schulung","test","prüfen","verbessern","material","zertifi","forschung","feedback"]}}}'::jsonb, 'Defaults from src/config/balance.ts, section "pitches"'),
   ('wageMood', '{"crisisPerSeverityBps":500,"scandalBps":500,"scandals":["quality_scandal","data_breach","protest","bad_review","strike"],"shareFallFreeBps":300,"shareFallShare":0.5,"maxShareBps":2000,"minBps":6000}'::jsonb, 'Defaults from src/config/balance.ts, section "wageMood"'),
   ('stockNews', '{"everyMinutes":12,"leadMinMinutes":10,"leadMaxMinutes":40,"minMoveBps":300,"maxMoveBps":1200,"reliabilityBps":7500,"keepHours":24}'::jsonb, 'Defaults from src/config/balance.ts, section "stockNews"'),
   ('social', '{"feed":{"pageSize":30,"bigTradeMinProfitCents":100000,"bigTradeMinBps":1500,"levelEvery":5,"artMinPriceCents":1000000,"carMinPriceCents":10000000,"streakMilestones":[7,30,100,365],"keepDays":30},"league":{"updateEveryMinutes":10,"podium":3,"minBaselineCents":1000000},"friendCode":{"bonusCents":500000}}'::jsonb, 'Defaults from src/config/balance.ts, section "social"'),

@@ -85,6 +85,7 @@ export function useCompanyStory(company: CompanyBrief | undefined, profileWords:
           ticker: String(p.ticker ?? ""),
           nickname: String(p.nickname ?? ""),
           title: String(p.title ?? ""),
+          outcome: String(p.outcome ?? ""),
           profit: typeof p.profit_cents === "number" ? formatMoney(p.profit_cents, { whole: true }) : "",
         };
         return fillTemplate(templates[seedOf(String(item.id)) % templates.length]!, values);

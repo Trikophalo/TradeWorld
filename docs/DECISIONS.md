@@ -1942,3 +1942,37 @@ Vorgabe: Skandale und sinkende Aktienkurse sollen direkt die Löhne der Mitarbei
   Mitarbeiter sehen die Kürzung als „Lohnfaktor“ auf ihrer Jobkarte, mit kurzer Erklärung.
 - Werte in `BALANCE.wageMood`. Die Datenbank-Tests schalten den Kursanteil am Anfang ab, weil Kurse mit jedem Takt
   schwanken, und prüfen ihn gezielt in `supabase/tests/97_wage_mood.sql`.
+
+## ADR-132: Eigene Strategien, beurteilt von Claude — `akzeptiert`
+
+Vorgabe: Bei Krisen und Chancen soll man selbst schreiben, was die Firma tut („Ich mache einen Imagefilm“). Eine KI
+beurteilt die Idee, ein Zufallsfaktor entscheidet. Bei schlechter Bezahlung kann ein Imagefilm als Schönfärberei
+nach hinten losgehen. Dasselbe für eigene Geschäftszüge.
+
+- **Eigene Strategie** (bei einer offenen oder laufenden Krise oder Chance) und **eigener Geschäftszug** (Ziel Geld,
+  Bekanntheit oder Qualität; teilt sich die Plätze mit den Geschäftszügen). 12 bis 280 Zeichen, Beleidigungen werden
+  abgelehnt. Kosten: zwei Kosteneinheiten der Firmen-Lagen beziehungsweise das 1,2-Fache eines Geschäftszugs.
+- **Claude urteilt** (Edge Function `strategy-judge`, Modell wie bei der KI-Redaktion, strukturierte JSON-Ausgabe):
+  - `fit` (0 bis 100): Wie gut trifft die Idee die Ursache, passend zum Produkt?
+  - `backfire` (0 bis 100): Wie wahrscheinlich geht sie nach hinten los (Schönfärberei, Täuschung, Drohungen)?
+  - Dazu ein Urteil in einem Satz und je eine Meldung für Erfolg, Verpuffen und Rückschlag.
+  - Der Spielertext gilt als Material, nicht als Anweisung. Wer Claude zu einer guten Bewertung überreden will,
+    bekommt einen niedrigen `fit`.
+  - Die Datenbank prüft Zahlen und Texte und speichert das Urteil nur einmal.
+- **Ohne Claude** (kein Schlüssel, keine Antwort binnen 90 Sekunden) urteilt die **Mini-KI**: passende Stichwörter je
+  Lage oder Ziel heben `fit`, riskante Wörter wie „Imagefilm“, „Werbung“, „leugnen“ heben `backfire`.
+- **Würfel** nach 20 Minuten (Lage) oder 30 Minuten (Zug):
+  - Chance = 10 % + `fit` × 0,8 %, höchstens 90 %.
+  - Scheitert die Idee, geht sie mit `backfire` % nach hinten los, sonst verpufft sie.
+- **Folgen:**
+  - Erfolg bei einer Lage: Die Lage gilt als gelöst; je besser die Idee, desto stärker gemildert (35 % bis 85 %).
+  - Erfolg bei einem Zug: Geld zahlt das 1,3- bis 2,5-Fache der Kosten. Bekanntheit oder Qualität steigen um 2 bis
+    8 Punkte.
+  - Rückschlag: 5 Punkte Bekanntheit weg, bei einer Lage zahlt die Firma die Kosten noch einmal.
+  - Verpuffen: Bei einem Zug kommen 20 % der Kosten zurück.
+  - Jedes Ergebnis steht mit Claudes Text in Firmen-News, Firmenchat und News-Tab.
+- Werte in `src/config/pitches.ts` (`game_config.pitches`).
+- Tests: `supabase/tests/98_strategy_pitches.sql`, `src/features/game/demo/pitches.test.ts`, `e2e/company-growth.spec.ts`.
+- **Kosten für Claude:** ein Aufruf je eingereichter Idee, mit niedrigem Aufwand.
+- **Einrichtung:** dieselbe wie in ADR-091 (`ANTHROPIC_API_KEY` als GitHub-Secret); der Workflow spielt
+  `strategy-judge` mit ein.

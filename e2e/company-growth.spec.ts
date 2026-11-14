@@ -274,3 +274,19 @@ test("company tasks: take one, play the mini-game, the result lands in the news 
   await feed.getByRole("radio", { name: "Firmen" }).click();
   await expect(feed.locator('[data-kind="company"]').first()).toContainText("Packwerk");
 });
+
+test("own business move: write an idea, the Mini-KI judges it (ADR-132)", async ({ page }) => {
+  await preparePlayer(page, "Ideenreich", 21_000, 2_000_000);
+  await found(page, "garage", "Ideenwerk");
+
+  const card = page.getByTestId("pitch-move");
+  await card.scrollIntoViewIfNeeded();
+  await card.getByRole("radio", { name: "Bekanntheit" }).click();
+  await card.getByLabel("Deine Idee").fill("Wir machen ein Video für Social Media und gehen auf eine Messe.");
+  await card.getByRole("button", { name: "Der KI vorlegen" }).click();
+  await expect(page.getByText("Idee eingereicht").first()).toBeVisible();
+  const row = card.locator("[data-pitch-status]").first();
+  await expect(row).toHaveAttribute("data-pitch-status", "running");
+  await expect(row).toContainText("Mini-KI");
+  await expect(row).toContainText("Chance");
+});

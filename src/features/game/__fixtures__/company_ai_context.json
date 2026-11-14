@@ -1,6 +1,6 @@
 {
   "company": {
-    "id": "5d9b44b7-d727-42f5-bc86-904fe564d21b",
+    "id": "cebc0378-6ccb-422f-8c0b-efd5597165b1",
     "idea": "Strom vom Dach",
     "name": "Fixture Krisenstab",
     "sector": "energy",
@@ -9,55 +9,55 @@
   "has_profile": true,
   "news_without_text": [
     {
-      "id": 119,
+      "id": 127,
       "kind": "event_step_done",
       "payload": {
         "idx": 0,
         "step": "study",
         "success": true,
-        "event_id": "119fb8aa-f86c-4f18-9c8c-dd696ec80580",
+        "event_id": "ba07b376-67af-4008-a7b9-d40c99bcbd7c",
         "strategy": "lobby",
         "archetype": "regulation"
       }
     },
     {
-      "id": 118,
+      "id": 126,
       "kind": "event_started",
       "payload": {
-        "event_id": "119fb8aa-f86c-4f18-9c8c-dd696ec80580",
+        "event_id": "ba07b376-67af-4008-a7b9-d40c99bcbd7c",
         "polarity": "crisis",
         "severity": 2,
         "archetype": "regulation",
-        "deadline_at": "2026-11-15T18:36:18.68793+00:00",
+        "deadline_at": "2026-11-15T19:22:49.05937+00:00",
         "share_shock_bps": null
       }
     },
     {
-      "id": 117,
+      "id": 124,
       "kind": "event_expired",
       "payload": {
-        "event_id": "27ea261f-f673-4d6f-945e-115fec96244c",
+        "event_id": "02b3cf61-f363-42ca-a242-8cf418ab59c9",
         "polarity": "chance",
         "severity": 1,
         "archetype": "viral_trend"
       }
     },
     {
-      "id": 116,
+      "id": 123,
       "kind": "event_started",
       "payload": {
-        "event_id": "27ea261f-f673-4d6f-945e-115fec96244c",
+        "event_id": "02b3cf61-f363-42ca-a242-8cf418ab59c9",
         "polarity": "chance",
         "severity": 1,
         "archetype": "viral_trend",
-        "deadline_at": "2026-11-14T11:36:18.681048+00:00",
+        "deadline_at": "2026-11-14T12:22:49.053614+00:00",
         "share_shock_bps": null
       }
     }
   ],
   "events_without_text": [
     {
-      "id": "27ea261f-f673-4d6f-945e-115fec96244c",
+      "id": "02b3cf61-f363-42ca-a242-8cf418ab59c9",
       "status": "expired",
       "polarity": "chance",
       "severity": 1,

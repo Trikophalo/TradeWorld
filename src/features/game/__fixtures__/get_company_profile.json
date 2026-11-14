@@ -1,10 +1,16 @@
 {
   "news": [
     {
-      "body": "KlarSoft AG meldet 480,8 Mio. € Umsatz und 56,7 Mio. € Gewinn im Q1 des Spieljahres 2. Analysten hatten weniger erwartet.",
+      "body": "KlarSoft AG meldet 473,4 Mio. € Umsatz und 72,9 Mio. € Gewinn im Q1 des Spieljahres 1. Analysten hatten weniger erwartet.",
       "category": "earnings",
-      "headline": "KlarSoft AG steigert Gewinn um 51 %",
-      "published_at": "2026-11-14T12:36:04.452668+00:00"
+      "headline": "KlarSoft AG steigert Gewinn um 53 %",
+      "published_at": "2026-11-14T13:22:35.485408+00:00"
+    },
+    {
+      "body": "KlarSoft AG meldet 433,3 Mio. € Umsatz und 47,6 Mio. € Gewinn im Q1 des Spieljahres 2. Analysten hatten weniger erwartet.",
+      "category": "earnings",
+      "headline": "KlarSoft AG steigert Gewinn um 27 %",
+      "published_at": "2026-11-14T13:22:35.43598+00:00"
     }
   ],
   "facts": {
@@ -15,10 +21,10 @@
     "max_staff": 100000,
     "ai_workers": 0,
     "quality_bps": null,
-    "value_cents": 434486500000,
-    "profit_cents": 16922407770,
+    "value_cents": 435063000000,
+    "profit_cents": 19291274054,
     "awareness_bps": null,
-    "revenue_cents": 174080931264
+    "revenue_cents": 174339934654
   },
   "company": {
     "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
@@ -30,9 +36,9 @@
     "listed": true,
     "sector": "tech",
     "ticker": "KLS",
-    "price_e4": 868973,
-    "change_bps": 71,
-    "founded_at": "2026-11-14T12:34:06.05631+00:00",
+    "price_e4": 870126,
+    "change_bps": 78,
+    "founded_at": "2026-11-14T13:20:39.068933+00:00",
     "brand_color": "#4C8DFF"
   },
   "founder": null,

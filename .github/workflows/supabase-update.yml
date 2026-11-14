@@ -70,6 +70,8 @@ jobs:
             exit 0
           fi
           npx --yes supabase@2.122.0 functions deploy company-writer --project-ref "$SUPABASE_PROJECT_REF"
+          # ADR-132: Claude judges own strategies of founders
+          npx --yes supabase@2.122.0 functions deploy strategy-judge --project-ref "$SUPABASE_PROJECT_REF"
           if [ -n "$ANTHROPIC_API_KEY" ]; then
             # The key goes through a private temp file, never through the command line or the log.
             umask 077

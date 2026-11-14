@@ -22,6 +22,7 @@ import { createFriendEngine, type DemoFriendCode } from "./demo/friends";
 import { createStockNewsEngine } from "./demo/stock-news";
 import { createCompanyMovesEngine, type DemoMoveRun } from "./demo/company-moves";
 import { createCompanyTasksEngine, type DemoTasksState } from "./demo/company-tasks";
+import { createPitchesEngine, type DemoPitch } from "./demo/pitches";
 import { createSocialEngine, type DemoSocialState } from "./demo/social";
 import { createCompanyEventsEngine } from "./demo/company-events";
 import { createCryptoEngine, type DemoCryptoState } from "./demo/crypto";
@@ -94,6 +95,7 @@ interface PlayerState {
   /** Business moves of the demo company (ADR-127). */
   companyMoves?: DemoMoveRun[];
   companyTasks?: DemoTasksState;
+  pitches?: DemoPitch[];
   /** The friend code redeemed once (ADR-111). */
   friendCode?: DemoFriendCode;
   /** Feed, notifications and league of the demo (ADR-088, ADR-089). */
@@ -1315,10 +1317,36 @@ const companyTasks = createCompanyTasksEngine({
   random: () => Math.random(),
 });
 
+const pitches = createPitchesEngine({
+  company: () => (p().company as unknown as ReturnType<Parameters<typeof createPitchesEngine>[0]["company"]>) ?? null,
+  addCompanyCash: (cents) => {
+    const c = p().company;
+    if (c) c.cashCents = Math.max(0, c.cashCents + cents);
+    persist();
+  },
+  news: (kind, payload) => {
+    const c = p().company;
+    if (!c) return;
+    const s = (c.events ??= { seq: 0, events: [], news: [] });
+    s.seq += 1;
+    s.news = [{ id: s.seq, kind, payload, createdAt: new Date().toISOString() }, ...s.news].slice(0, 50);
+    persist();
+  },
+  pitches: () => p().pitches ?? [],
+  setPitches: (list) => {
+    p().pitches = list;
+    persist();
+  },
+  idempotent,
+  now: () => Date.now(),
+  random: () => Math.random(),
+});
+
 export const demoEngine: GameEngine = {
   ...stockNews,
   ...companyMoves,
   ...companyTasks,
+  ...pitches,
   // AI companies of the demo (ADR-125): facts from the start values, no players work there.
   companyProfile: async (companyId) => {
     const ticker = companyId.replace(/^demo-company-/, "");

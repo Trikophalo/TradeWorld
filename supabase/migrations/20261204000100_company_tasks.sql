@@ -907,7 +907,7 @@ begin
            join public.player_companies pc on pc.company_id = n.company_id
           where v_kind in ('all', 'company')
             and n.kind in ('task_success', 'task_failure', 'task_missed', 'founded', 'upgraded', 'expanded', 'ipo',
-                           'hired', 'record_hour')
+                           'hired', 'record_hour', 'pitch_success', 'pitch_failure', 'pitch_backfire')
           order by n.created_at desc limit v_limit)
         union all
         (select jsonb_build_object('id', 'm' || ni.id, 'kind', 'market', 'at', ni.published_at, 'headline', ni.headline,

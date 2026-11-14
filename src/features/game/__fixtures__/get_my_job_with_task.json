@@ -1,10 +1,10 @@
 {
   "job": {
-    "id": "4b6224c5-1888-47cc-a748-f6e4a5673460",
+    "id": "c76ddd8d-5100-4531-a29b-7c895a334a95",
     "tier": "intern",
     "title": "Werkstudium Daten",
     "company": {
-      "id": "2aecc130-3e05-443b-9855-1659ae88c708",
+      "id": "ca7f05f6-8d8e-43c7-9121-0eebf23c10d3",
       "logo": {
         "grid": [
           "................",
@@ -33,9 +33,9 @@
       "ticker": null
     },
     "presence": {
-      "fire_at": "2026-11-19T12:36:16.077305+00:00",
+      "fire_at": "2026-11-19T13:22:46.864859+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-14T12:36:16.077305+00:00"
+      "last_active_at": "2026-11-14T13:22:46.864859+00:00"
     },
     "required": [{ "branch": "finance", "min_score": 0 }],
     "promotion": {
@@ -56,7 +56,7 @@
     "signature": "M2 2 L8 8",
     "title_key": null,
     "rank_hours": 0.0,
-    "started_at": "2026-11-14T12:36:16.762331+00:00",
+    "started_at": "2026-11-14T13:22:47.380729+00:00",
     "pending_raise": null,
     "raise_max_bps": 0,
     "notice_ends_at": null,

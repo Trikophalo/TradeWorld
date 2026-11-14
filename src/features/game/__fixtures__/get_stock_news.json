@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Ein bekannter Fonds hält die Aktie für überbewertet. Sicher ist das nicht.",
-      "name": "GenoVita Biotech",
-      "due_at": "2026-11-14T13:58:28.278395+00:00",
+      "body": "Kundendaten sind im Netz aufgetaucht. Die Aufsicht prüft. Sicher ist das nicht.",
+      "name": "QuantenSprung Labs",
+      "due_at": "2026-11-14T14:41:49.001338+00:00",
       "status": "open",
-      "ticker": "GNV",
-      "headline": "Leerverkäufer wetten gegen GenoVita Biotech",
+      "ticker": "QSL",
+      "headline": "Datenleck bei QuantenSprung Labs",
       "move_bps": null,
-      "strength": 1,
+      "strength": 2,
       "direction": "down",
-      "published_at": "2026-11-14T13:36:20.377968+00:00"
+      "published_at": "2026-11-14T14:22:50.633199+00:00"
     },
     {
       "id": 3,
-      "body": "Das Geschäft läuft schwächer als erwartet. Analysten rechnen mit einem spürbar fallenden Kurs. Sicher ist das nicht.",
-      "name": "Pfotenwohl",
-      "due_at": "2026-11-14T12:36:20.372069+00:00",
+      "body": "Die Kasse ist voll. Aktionäre dürfen auf eine Extra-Ausschüttung hoffen. Sicher ist das nicht.",
+      "name": "Sonnenkern Fusion",
+      "due_at": "2026-11-14T13:22:50.628746+00:00",
       "status": "confirmed",
-      "ticker": "PFW",
-      "headline": "Pfotenwohl senkt die Prognose",
-      "move_bps": -856,
+      "ticker": "FSN",
+      "headline": "Sonderdividende bei Sonnenkern Fusion erwartet",
+      "move_bps": 669,
       "strength": 2,
-      "direction": "down",
-      "published_at": "2026-11-14T12:36:20.372069+00:00"
+      "direction": "up",
+      "published_at": "2026-11-14T13:22:50.628746+00:00"
     }
   ],
   "reliability_bps": 7500

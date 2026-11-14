@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "f3508278-a925-4d44-85c3-936e24cd4b11",
+    "id": "58aa96c2-a1bc-4a53-bfe1-fd81587f6a2f",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "db7c839c-c460-945e-1188-5e4a61db1e47",
+      "id": "7ab1711b-b618-dcac-f2aa-97b46add6779",
       "logo": null,
-      "name": "Rheinkraft Werke",
-      "color": "#5BC0EB",
+      "name": "Nordbrise Offshore",
+      "color": "#6EC1E4",
       "is_ai": true,
       "sector": "energy",
-      "ticker": "RKW"
+      "ticker": "WND"
     },
     "presence": {
-      "fire_at": "2026-11-19T12:36:18.730049+00:00",
+      "fire_at": "2026-11-19T13:22:49.090488+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-14T12:36:18.730049+00:00"
+      "last_active_at": "2026-11-14T13:22:49.090488+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-14T12:36:18.81995+00:00",
+    "started_at": "2026-11-14T13:22:49.165841+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

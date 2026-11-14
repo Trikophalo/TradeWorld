@@ -7194,3 +7194,30 @@ Migration `20261204000400_wage_mood.sql`, Test `supabase/tests/97_wage_mood.sql`
   Tagesverlust der Aktie senken ihn (Konfiguration `game_config.wageMood`: `crisisPerSeverityBps`, `scandalBps`,
   `scandals`, `shareFallFreeBps`, `shareFallShare`, `maxShareBps`, `minBps`).
 - `accrue_job_salary` multipliziert den Lohn damit; `player_jobs.pay_factor_bps` zeigt die Kürzung.
+
+## Nachtrag: Eigene Strategien (ADR-132)
+
+Migration `20261204000500_strategy_pitches.sql`, Test `supabase/tests/98_strategy_pitches.sql`, Edge Function
+`supabase/functions/strategy-judge`.
+
+- **Tabelle `company_pitches`** (intern): `company_id`, `event_id`, `kind` (`event`/`move`), `move_kind`, `pitch_text`,
+  `status` (`judging`/`running`/`success`/`failure`/`backfire`), `judge` (`claude`/`mini`), `fit`, `backfire`,
+  `chance_bps`, `verdict`, `success_text`, `failure_text`, `backfire_text`, `cost_cents`, `result_cents`,
+  `created_by`, `created_at`, `judge_due_at`, `judged_at`, `ends_at`, `resolved_at`.
+- Fehler `pitch_text_invalid` NX115, `pitch_busy` NX116. Firmen-News `pitch_success`, `pitch_failure`,
+  `pitch_backfire` mit `{outcome, pitch, kind, amount_cents}`.
+
+```
+get_company_pitches() -> PITCHES
+submit_company_pitch(p_request_id uuid, p_kind text, p_text text, p_move_kind text default null) -> PITCHES
+  PITCHES = {"event_id", "event_cost_cents", "move_cost_cents",
+             "pitches": [{"id","kind","move_kind","event_id","text","status","judge","fit","backfire","chance_bps",
+                          "verdict","success_text","failure_text","backfire_text","cost_cents","result_cents",
+                          "created_at","ends_at","resolved_at"}]}
+company_pitch_context(p_pitch_id bigint) -> Kontext für die Edge Function (nur Gründer)
+store_pitch_judgment(p_pitch_id, p_fit, p_backfire, p_verdict, p_success, p_failure, p_backfire_text) -> boolean
+  -- nur service_role
+```
+
+Intern: `company_pitches_run_due(p_now)` (Cron `nexa-company-pitches`), `pitch_mini_judge(text, topic)`,
+`company_pitch_resolve(id, u, u2)`.

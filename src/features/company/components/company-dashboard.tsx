@@ -28,6 +28,7 @@ import { useCompanyRefresh } from "../hooks";
 import { CompanyChat } from "./company-chat";
 import { HireSheet, TeamView, type HireRequest } from "./employer";
 import { CompanyMovesCard } from "./company-moves";
+import { PitchCard } from "./pitch-card";
 import { GrowthPath } from "./growth-path";
 import { TaskBoard, useCompanyTasks } from "../tasks/task-board";
 import { HeadquartersHero, netProfit } from "./headquarters";
@@ -123,7 +124,9 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
               }
             />
             <CompanyMovesCard />
+            <PitchCard kind="move" />
             <SituationCard />
+            <PitchCard kind="event" />
             <ProfitCoach
               company={company}
               onNavigate={(to) => {

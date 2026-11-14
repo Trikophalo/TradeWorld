@@ -1,0 +1,28 @@
+{
+  "pitches": [
+    {
+      "id": 4,
+      "fit": 25,
+      "kind": "event",
+      "text": "Wir zahlen fairere Löhne und reden offen mit dem Team.",
+      "judge": "mini",
+      "status": "running",
+      "ends_at": "2026-11-14T13:44:51.102441+00:00",
+      "verdict": "Passt kaum zur Lage. Das wird schwierig.",
+      "backfire": 10,
+      "event_id": "cc553870-240b-4f26-a1e4-338df62749fc",
+      "move_kind": null,
+      "chance_bps": 3000,
+      "cost_cents": 40000,
+      "created_at": "2026-11-14T13:22:51.092568+00:00",
+      "resolved_at": null,
+      "failure_text": "Die eigene Strategie verpufft ohne Wirkung.",
+      "result_cents": 0,
+      "success_text": "Die eigene Strategie geht auf.",
+      "backfire_text": "Die eigene Strategie geht nach hinten los: Kunden fühlen sich veräppelt."
+    }
+  ],
+  "event_id": "cc553870-240b-4f26-a1e4-338df62749fc",
+  "move_cost_cents": 120000,
+  "event_cost_cents": 40000
+}

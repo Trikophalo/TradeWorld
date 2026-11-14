@@ -760,7 +760,9 @@
     "task_taken": "Jemand anderes kümmert sich schon um diese Aufgabe.",
     "task_not_allowed": "Diese Aufgabe darfst du so nicht vergeben. Vorgesetzte geben Aufgaben nur an ihr eigenes Team weiter.",
     "task_closed": "Diese Aufgabe ist schon erledigt oder abgelaufen.",
-    "no_ai_workers": "Deine Firma hat keine KI-Kräfte. Stelle im Team eine ein."
+    "no_ai_workers": "Deine Firma hat keine KI-Kräfte. Stelle im Team eine ein.",
+    "pitch_text_invalid": "Schreib deine Idee in 12 bis 280 Zeichen, ohne Beleidigungen.",
+    "pitch_busy": "Es läuft schon eine eigene Strategie. Warte, bis sie entschieden ist."
   },
   "locks": {
     "level": "Level {level}",
@@ -3433,7 +3435,10 @@
       ],
       "task_success": ["{task}"],
       "task_failure": ["{task}"],
-      "task_missed": ["{task}"]
+      "task_missed": ["{task}"],
+      "pitch_success": ["{outcome}"],
+      "pitch_failure": ["{outcome}"],
+      "pitch_backfire": ["{outcome}"]
     },
     "more": "Alle Meldungen",
     "less": "Weniger anzeigen"
@@ -6078,5 +6083,41 @@
       "Kabel zum Festland gerissen: Nordbrise-Park liegt still.",
       "Nordbrise erhöht die Dividende nach starkem Herbst."
     ]
+  },
+  "pitches": {
+    "eventTitle": "Eigene Strategie",
+    "eventIntro": "Schreib selbst, wie deine Firma reagiert. Die KI beurteilt deine Idee, dann entscheidet der Zufall. Gute Ideen treffen die Ursache, Schönfärberei kann nach hinten losgehen.",
+    "moveTitle": "Eigener Geschäftszug",
+    "moveIntro": "Erfinde einen eigenen Zug für deine Firma. Je besser er zu deinem Produkt passt, desto größer die Chance.",
+    "placeholderEvent": "Zum Beispiel: Wir zahlen fairere Löhne und reden offen mit dem Team.",
+    "placeholderMove": "Zum Beispiel: Wir verkaufen unsere Produkte im Abo an Vereine.",
+    "label": "Deine Idee",
+    "chars": "{count} / {max}",
+    "cost": "Kosten {amount}",
+    "submit": "Der KI vorlegen",
+    "submitted": "Idee eingereicht",
+    "submittedText": "Die KI schaut sich deine Idee an.",
+    "goal": "Ziel",
+    "goals": {
+      "cash": "Geld",
+      "awareness": "Bekanntheit",
+      "quality": "Qualität"
+    },
+    "judging": "Die KI denkt nach …",
+    "judgingHint": "Antwortet die KI nicht schnell, urteilt die eingebaute Mini-KI.",
+    "verdict": "Urteil",
+    "byClaude": "Claude",
+    "byMini": "Mini-KI",
+    "fit": "Passt zu {fit} %",
+    "chance": "Chance {percent} %",
+    "risk": "Risiko, dass es nach hinten losgeht: {percent} %",
+    "decidedIn": "Entscheidung in",
+    "status": {
+      "success": "Geklappt",
+      "failure": "Verpufft",
+      "backfire": "Nach hinten losgegangen"
+    },
+    "history": "Deine Ideen",
+    "yourIdea": "„{text}“"
   }
 }

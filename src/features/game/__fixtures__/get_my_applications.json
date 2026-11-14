@@ -1,38 +1,38 @@
 {
   "applications": [
     {
-      "id": "cf247caa-eebb-4a1f-9602-5b3504352339",
+      "id": "513eb656-e339-41c5-b42d-474d44a98fdd",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "0d374a8a-39c9-4504-a681-d8e166891dd0",
+        "id": "1fc3e55d-054f-42a2-a5cc-adb1b525d232",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "db7c839c-c460-945e-1188-5e4a61db1e47",
+          "id": "7ab1711b-b618-dcac-f2aa-97b46add6779",
           "logo": null,
-          "name": "Rheinkraft Werke",
-          "color": "#5BC0EB",
+          "name": "Nordbrise Offshore",
+          "color": "#6EC1E4",
           "is_ai": true,
           "sector": "energy",
-          "ticker": "RKW"
+          "ticker": "WND"
         },
-        "required": [{ "branch": "craft", "min_score": 0 }],
-        "title_key": "craft_intern",
+        "required": [{ "branch": "science", "min_score": 0 }],
+        "title_key": "science_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-14T12:36:15.972736+00:00",
-      "updated_at": "2026-11-14T12:36:15.977578+00:00",
-      "offer_expires_at": "2026-11-16T12:36:15.972736+00:00",
+      "created_at": "2026-11-14T13:22:46.776174+00:00",
+      "updated_at": "2026-11-14T13:22:46.780826+00:00",
+      "offer_expires_at": "2026-11-16T13:22:46.776174+00:00",
       "salary_wish_cents_per_hour": 15000,
       "offer_salary_cents_per_hour": 15000
     },
     {
-      "id": "61c4a84a-0e98-41db-ac33-30245d3f5a36",
+      "id": "a84d5099-2bc8-4014-b485-bfc5a965c6cf",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "84d1668a-d908-4296-b132-8173958ed4bd",
+        "id": "aff7d241-df78-4805-8dc7-cb18275a94ee",
         "tier": "junior",
         "title": null,
         "company": {
@@ -48,9 +48,9 @@
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-14T12:36:15.965048+00:00",
-      "updated_at": "2026-11-14T12:36:15.965048+00:00",
-      "offer_expires_at": "2026-11-16T12:36:15.965048+00:00",
+      "created_at": "2026-11-14T13:22:46.767945+00:00",
+      "updated_at": "2026-11-14T13:22:46.767945+00:00",
+      "offer_expires_at": "2026-11-16T13:22:46.767945+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

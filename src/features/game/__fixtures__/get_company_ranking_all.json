@@ -1,28 +1,12 @@
 {
-  "mine": { "rank": 54, "value_cents": 88718 },
-  "total": 57,
+  "mine": { "rank": 56, "value_cents": 84288 },
+  "total": 59,
   "entries": [
     {
       "kind": "ai",
       "logo": null,
-      "name": "NeuroPharm AG",
-      "rank": 1,
-      "tier": null,
-      "color": "#6EE7A0",
-      "sector": "pharma",
-      "ticker": "NPH",
-      "founder": null,
-      "is_mine": false,
-      "team_size": null,
-      "company_id": "2faf9e4c-3f0a-8a5b-1645-c669e9481771",
-      "value_cents": 1730574000000,
-      "revenue_cents": null
-    },
-    {
-      "kind": "ai",
-      "logo": null,
       "name": "Volta Energie AG",
-      "rank": 2,
+      "rank": 1,
       "tier": null,
       "color": "#FFD23F",
       "sector": "energy",
@@ -31,14 +15,14 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "e50a6ff5-8dbd-8c90-f94e-5ac06d3fe862",
-      "value_cents": 518226000000,
+      "value_cents": 519099000000,
       "revenue_cents": null
     },
     {
       "kind": "ai",
       "logo": null,
       "name": "KlarSoft AG",
-      "rank": 3,
+      "rank": 2,
       "tier": null,
       "color": "#4C8DFF",
       "sector": "tech",
@@ -47,14 +31,14 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
-      "value_cents": 433983000000,
+      "value_cents": 434463500000,
       "revenue_cents": null
     },
     {
       "kind": "ai",
       "logo": null,
       "name": "Glanz & Gloria",
-      "rank": 4,
+      "rank": 3,
       "tier": null,
       "color": "#D4AF37",
       "sector": "retail",
@@ -63,14 +47,14 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "c76af3f2-dc09-a8cc-b107-a7c326ad5b09",
-      "value_cents": 363045600000,
+      "value_cents": 360519200000,
       "revenue_cents": null
     },
     {
       "kind": "ai",
       "logo": null,
       "name": "Brotzeit Handel AG",
-      "rank": 5,
+      "rank": 4,
       "tier": null,
       "color": "#F2A93B",
       "sector": "retail",
@@ -79,9 +63,25 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "cbfac5fd-3475-2166-ea22-0a85cbb6f5c0",
-      "value_cents": 354303200000,
+      "value_cents": 356364000000,
+      "revenue_cents": null
+    },
+    {
+      "kind": "ai",
+      "logo": null,
+      "name": "Nordlicht Logistik AG",
+      "rank": 5,
+      "tier": null,
+      "color": "#7AA2F7",
+      "sector": "logistics",
+      "ticker": "NDL",
+      "founder": null,
+      "is_mine": false,
+      "team_size": null,
+      "company_id": "d21331b8-a414-66aa-de07-f036108fc91d",
+      "value_cents": 312722200000,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-14T12:36:16.694908+00:00"
+  "server_time": "2026-11-14T13:22:47.31906+00:00"
 }

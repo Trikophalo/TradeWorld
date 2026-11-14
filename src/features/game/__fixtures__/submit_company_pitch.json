@@ -1,0 +1,28 @@
+{
+  "pitches": [
+    {
+      "id": 4,
+      "fit": null,
+      "kind": "event",
+      "text": "Wir zahlen fairere Löhne und reden offen mit dem Team.",
+      "judge": null,
+      "status": "judging",
+      "ends_at": null,
+      "verdict": null,
+      "backfire": null,
+      "event_id": "cc553870-240b-4f26-a1e4-338df62749fc",
+      "move_kind": null,
+      "chance_bps": null,
+      "cost_cents": 40000,
+      "created_at": "2026-11-14T13:22:51.092568+00:00",
+      "resolved_at": null,
+      "failure_text": null,
+      "result_cents": 0,
+      "success_text": null,
+      "backfire_text": null
+    }
+  ],
+  "event_id": "cc553870-240b-4f26-a1e4-338df62749fc",
+  "move_cost_cents": 120000,
+  "event_cost_cents": 40000
+}

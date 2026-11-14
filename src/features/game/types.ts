@@ -1180,6 +1180,37 @@ export interface CompanyTaskResult {
   solution: Record<string, unknown>;
 }
 
+/** Own strategies judged by Claude or the Mini-KI (ADR-132). */
+export type PitchKind = "event" | "move";
+export type PitchMoveKind = "cash" | "awareness" | "quality";
+export interface CompanyPitch {
+  id: number;
+  kind: PitchKind;
+  moveKind: PitchMoveKind | null;
+  eventId: string | null;
+  text: string;
+  status: "judging" | "running" | "success" | "failure" | "backfire";
+  judge: "claude" | "mini" | null;
+  fit: number | null;
+  backfire: number | null;
+  chanceBps: number | null;
+  verdict: string | null;
+  successText: string | null;
+  failureText: string | null;
+  backfireText: string | null;
+  costCents: number;
+  resultCents: number;
+  createdAt: string;
+  endsAt: string | null;
+  resolvedAt: string | null;
+}
+export interface CompanyPitches {
+  eventId: string | null;
+  eventCostCents: number;
+  moveCostCents: number;
+  pitches: CompanyPitch[];
+}
+
 /** One entry of the news tab (ADR-129). */
 export type NewsFeedKind = "all" | "stock" | "company" | "market" | "fun";
 export interface NewsFeedItem {
@@ -1729,6 +1760,8 @@ export const GAME_ERROR_KEYS = [
   "task_not_allowed",
   "task_closed",
   "no_ai_workers",
+  "pitch_text_invalid",
+  "pitch_busy",
   "move_busy",
   "move_resting",
   "friend_code_unknown",
@@ -1746,6 +1779,13 @@ export class GameError extends Error {
 
 /** Everything the game can do. Implemented by the live Supabase API and by the offline demo. */
 export interface GameEngine {
+  companyPitches(): Promise<CompanyPitches>;
+  submitCompanyPitch(
+    requestId: string,
+    kind: PitchKind,
+    text: string,
+    moveKind: PitchMoveKind | null,
+  ): Promise<CompanyPitches>;
   companyTasks(): Promise<CompanyTasks>;
   delegateCompanyTask(requestId: string, taskId: number, to: string): Promise<CompanyTasks>;
   startCompanyTask(requestId: string, taskId: number): Promise<CompanyTaskPlay>;

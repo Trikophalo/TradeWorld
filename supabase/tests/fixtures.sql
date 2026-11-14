@@ -1074,3 +1074,18 @@ select public.get_news_feed('all', 30);
 select public.get_company_org(:'fx_tco');
 \o
 reset role;
+
+-- Own strategies (ADR-132) ----------------------------------------------------------------------------------------
+insert into public.player_company_events (company_id, archetype, polarity, severity, status, definition, started_at, deadline_at)
+values (:'fx_tco', 'strike', 'crisis', 1, 'open', '{"strategies": []}'::jsonb, now(), now() + interval '2 hours');
+select tests.login_as('authenticated', :fx_ta) is null as ok \gset
+\o :fixture_dir/submit_company_pitch.json
+select public.submit_company_pitch(gen_random_uuid(), 'event', 'Wir zahlen fairere Löhne und reden offen mit dem Team.');
+\o
+reset role;
+select public.company_pitches_run_due(now() + interval '2 minutes') is not null as ok \gset
+select tests.login_as('authenticated', :fx_ta) is null as ok \gset
+\o :fixture_dir/get_company_pitches.json
+select public.get_company_pitches();
+\o
+reset role;
