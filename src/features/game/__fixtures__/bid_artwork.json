@@ -1,7 +1,7 @@
 {
   "artwork": {
-    "id": "294487ae-1911-4647-b691-cc0f2048364a",
-    "hot": 1.767712,
+    "id": "bbfe9e7d-6d38-45ae-ade6-d1665658f0da",
+    "hot": 1.767709,
     "code": "NFT-0045",
     "liked": true,
     "likes": 1,
@@ -48,11 +48,11 @@
     },
     "rarity": null,
     "auction": {
-      "id": "70ffd414-de90-4f65-a660-202943cfcd37",
+      "id": "365ebd65-61aa-40a3-aafe-66d80e0decde",
       "bids": 1,
       "leader": "Fixture_Kunst",
       "seller": "Fixture_Neu",
-      "ends_at": "2026-11-15T18:55:29.968245+00:00",
+      "ends_at": "2026-11-15T19:34:46.371275+00:00",
       "start_cents": 50000,
       "my_bid_cents": 50000,
       "current_cents": 50000,
@@ -61,7 +61,7 @@
     "creator": "Fixture_Neu",
     "ai_owner": null,
     "ask_cents": null,
-    "created_at": "2026-11-14T18:55:29.833904+00:00",
+    "created_at": "2026-11-14T19:34:46.226849+00:00",
     "royalty_bps": 1000,
     "value_cents": null,
     "royalties_cents": 0,

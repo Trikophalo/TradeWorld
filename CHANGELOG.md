@@ -168,6 +168,10 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   Missionsjäger, Teamplayer, Bilanzprofi, Ehrgeiz), ein größerer Tresor (Panzertresor) und vieles für die eigene
   Firma (KI-Turbo, Glückshand, Werbeagentur, Krisenmanager …). Sie schalten sich zwischen Level 1 und 30 frei.
 
+- **Lebendiger NFT-Markt (ADR-141):** Die KI-Sammler handeln jetzt auch untereinander und bieten danach wieder an, so
+  bewegen sich die Preise ständig. Beliebte NFTs mit vielen Likes, Angeboten und Verkäufen sind gefragter, und die
+  Sammler zahlen dafür mehr. Mira heißt jetzt „Assistentin“ statt „KI“.
+
 - **Firmen-Minispiele mit Logik (ADR-140):** Jede Sortier-Aufgabe nennt jetzt ihre Regel, nichts muss mehr geraten
   werden. Beim Ordnen sind die Werte realistisch (Schichten zwischen 6 und 22 Uhr statt „73 Uhr“).
 

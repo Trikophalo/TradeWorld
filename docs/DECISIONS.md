@@ -2205,3 +2205,23 @@ sein, und freie Aufträge an sie sollen selten und wertvoll sein.
 - Jede Ordnen-Aufgabe hat einen eigenen, realistischen Wertebereich (`companyTasks.tasks[].range`, z. B. Schichtbeginn
   6 bis 22 Uhr, Reifezeit 2 bis 36 Monate). Server (`company_task_puzzle()`) und Demo nutzen ihn gleich.
 - Zählen, Antippen, Rechnen und Merken waren schon herleitbar und bleiben, wie sie sind.
+
+## ADR-141: Ein lebendiger NFT-Markt – KI-Sammler handeln untereinander, Beliebtes wird teurer — `akzeptiert`
+
+**Kontext:** Die KI-Sammler (ADR-135) kauften nur von Spielern und boten dann an. Ohne Spieler bewegte sich nichts;
+Beliebtheit zählte nur über Likes.
+
+**Entscheidung:**
+
+- **Nachfrage:** Offene Angebote (verschiedene Bieter) und Verkäufe der letzten 7 Tage erhöhen, was die Sammler zahlen
+  (`nfts.ai.demand`, je gedeckelt), zusätzlich zu Likes, Ruf und Alter. Prüft ein Sammler das Angebot eines Bieters,
+  zählt dessen eigenes Angebot nicht mit; sonst würde ein Angebot den Preis hochtreiben, den man schlagen muss.
+- **Handel unter Sammlern:** Jede Minute kauft ein anderer Sammler ein NFT, das ein Sammler hält, mit einer Chance,
+  die mit Likes, Angeboten und Verkäufen steigt (`nfts.ai.trade`). Ein neues NFT bleibt mindestens 30 Minuten beim
+  Käufer; höchstens 2 Händel pro Minute und 30 am Tag. Danach bietet der Käufer es wieder an.
+- **Preis:** Ziel des Käufers ist der faire Wert (Prägekosten oder Mindestwert mal Boni, ohne letzten Preis) mal
+  Geschmack (85 bis 125 %); der Preis geht die Hälfte des Weges vom letzten Preis dorthin. So schwanken Preise nach oben
+  und unten, statt endlos zu steigen. Das Geld bleibt bei den Haushalten; der Schöpfer bekommt die Lizenzgebühr.
+- Verkäufe unter Sammlern sind Art `ai` mit `seller_ai` und zählen nicht zum Tageslimit der Käufe von Spielern.
+- Nebenbei: Nach einem Verkauf setzt ein Sammler seinen Preis erst, nachdem die offenen Angebote geschlossen sind.
+- Mira trägt das Schild „Assistentin“ statt „KI“.

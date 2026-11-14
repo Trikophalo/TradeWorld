@@ -9,6 +9,10 @@ import {
   nftLowballCents,
   nftRoyaltyCents,
   nftSaleSplit,
+  nftAiTradeChanceBps,
+  nftAiTradePriceCents,
+  nftDemandBps,
+  nftFairCents,
 } from "./nfts.ts";
 
 const base = { lastSaleCents: null, mintCents: null, likes: 0, creatorSales: 0, ageDays: 0 };
@@ -73,5 +77,48 @@ describe("AI collectors' valuation", () => {
     const cost = artworkCreateCostCents(0);
     expect(artworkCreateCostCents(1)).toBe(2_250_000);
     expect(nftAiValueCents({ ...base, mintCents: cost, likes: 3, ageDays: 2 })).toBeGreaterThan(cost * 1.1);
+  });
+});
+
+describe("NFT market among collectors (ADR-141)", () => {
+  const base = { lastSaleCents: null, mintCents: 200_000, likes: 0, creatorSales: 0, ageDays: 0 };
+
+  it("demand: open offers and recent sales raise the value, capped", () => {
+    expect(nftDemandBps(0, 0)).toBe(0);
+    expect(nftDemandBps(2, 1)).toBe(2 * 600 + 500);
+    expect(nftDemandBps(99, 99)).toBe(6 * 600 + 6 * 500);
+    const hot = nftAiValueCents({ ...base, openOffers: 3, recentSales: 2 });
+    expect(hot).toBeGreaterThan(nftAiValueCents(base));
+  });
+
+  it("popular NFTs change hands more often, capped", () => {
+    expect(nftAiTradeChanceBps(0, 0, 0)).toBe(60);
+    expect(nftAiTradeChanceBps(10, 2, 1)).toBeGreaterThan(nftAiTradeChanceBps(1, 0, 0));
+    expect(nftAiTradeChanceBps(999, 99, 99)).toBe(1_500);
+  });
+
+  it("trade prices wander around the fair value instead of climbing for ever", () => {
+    const fair = nftFairCents({ ...base, likes: 10 });
+    let price: number | null = null;
+    let s = 3;
+    const rng = () => {
+      s = (s * 1_103_515_245 + 12_345) % 2_147_483_648;
+      return s / 2_147_483_648;
+    };
+    const seen: number[] = [];
+    for (let i = 0; i < 300; i++) {
+      price = nftAiTradePriceCents(price, fair, rng());
+      seen.push(price);
+    }
+    expect(Math.max(...seen)).toBeLessThanOrEqual(Math.ceil((fair * 1.25) / 100) * 100);
+    expect(Math.min(...seen)).toBeGreaterThanOrEqual(Math.floor((fair * 0.85) / 100) * 100 - 100);
+    // it goes both ways
+    const ups = seen.slice(1).filter((p, i) => p > seen[i]!).length;
+    const downs = seen.slice(1).filter((p, i) => p < seen[i]!).length;
+    expect(ups).toBeGreaterThan(50);
+    expect(downs).toBeGreaterThan(50);
+    // a price far above the fair value comes down step by step
+    expect(nftAiTradePriceCents(10_000_000, fair, 0.5)).toBeLessThan(10_000_000);
+    expect(nftAiTradePriceCents(null, 50_000, 0)).toBe(42_500);
   });
 });

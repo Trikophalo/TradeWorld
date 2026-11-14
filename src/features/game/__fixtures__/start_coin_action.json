@@ -1,5 +1,5 @@
 {
-  "id": "6fb5c5d5-adfa-4b5a-a64e-681572489c4f",
+  "id": "61c3b4e3-6459-45c7-88e5-b49a00ca6af3",
   "logo": {
     "grid": [
       "................",
@@ -26,8 +26,8 @@
   "stats": { "hype": 0.0, "tech": 0.0, "utility": 0.0 },
   "action": {
     "key": "audit",
-    "ends_at": "2026-11-15T18:55:33.190768+00:00",
-    "started_at": "2026-11-14T18:55:33.190768+00:00"
+    "ends_at": "2026-11-15T19:34:48.73735+00:00",
+    "started_at": "2026-11-14T19:34:48.73735+00:00"
   },
   "launch": null,
   "status": "draft",
@@ -41,12 +41,12 @@
     { "key": "staking", "hours": 12, "available": false, "cost_cents": 500000, "success_bps": 10000 },
     { "key": "bugfix", "hours": 3, "available": false, "cost_cents": 100000, "success_bps": 10000 }
   ],
-  "creator": { "tag": "S4Q2", "trust": { "band": "blank", "score": 50 }, "nickname": "Fixture_Coiner" },
+  "creator": { "tag": "8RUP", "trust": { "band": "blank", "score": 50 }, "nickname": "Fixture_Coiner" },
   "fee_bps": 100,
   "category": "player",
   "price_e4": null,
   "burn_hype": 8,
-  "created_at": "2026-11-14T18:55:33.148919+00:00",
+  "created_at": "2026-11-14T19:34:48.685217+00:00",
   "low_24h_e4": null,
   "pool_cents": 0,
   "burn_min_e6": 0,

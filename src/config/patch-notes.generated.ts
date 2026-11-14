@@ -39,6 +39,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Jede Sortier-Aufgabe nennt jetzt ihre Regel, nichts muss mehr geraten werden. Beim Ordnen sind die Werte realistisch (Schichten zwischen 6 und 22 Uhr statt „73 Uhr“).",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-6ac12a77",
+        title: "Lebendiger NFT-Markt",
+        text: "Die KI-Sammler handeln jetzt auch untereinander und bieten danach wieder an, so bewegen sich die Preise ständig. Beliebte NFTs mit vielen Likes, Angeboten und Verkäufen sind gefragter, und die Sammler zahlen dafür mehr. Mira heißt jetzt „Assistentin“ statt „KI“.",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-706f8ae2",
         title: "Mehr Verbesserungen",
         text: "22 neue Verbesserungen und zwei weitere Tresorstufen, in fünf Abschnitten. Mehr Geld (Tresorzinsen, Lohnbonus, Stammgast, Auftragsprofi, Dealmaker), mehr XP (Börsenprofi, Frühaufsteher, Missionsjäger, Teamplayer, Bilanzprofi, Ehrgeiz), ein größerer Tresor (Panzertresor) und vieles für die eigene Firma (KI-Turbo, Glückshand, Werbeagentur, Krisenmanager …). Sie schalten sich zwischen Level 1 und 30 frei.",

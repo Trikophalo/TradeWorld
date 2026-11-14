@@ -12,7 +12,10 @@ import {
 import {
   nftAiAccepts,
   nftAiAskCents,
+  nftAiTradeChanceBps,
+  nftAiTradePriceCents,
   nftAiValueCents,
+  nftFairCents,
   nftAiWouldBuy,
   nftLowballCents,
   nftSaleSplit,
@@ -109,6 +112,8 @@ export interface ArtState {
   /** Offer chats per NFT (ADR-135). */
   chats?: Record<string, DemoMessage[]>;
   msgSeq?: number;
+  /** Collector-to-collector trades simulated up to here (ADR-141). */
+  tradeUntil?: number;
   /** Royalties the player has earned. */
   royaltiesCents?: number;
 }
@@ -201,14 +206,25 @@ export function createArtEngine(host: ArtHost) {
           .filter((x) => x.creator === creator)
           .reduce((n, x) => n + x.sales.length, 0)
       : 0;
-  const valueOf = (w: DemoArtwork, now = Date.now()) =>
-    nftAiValueCents({
-      lastSaleCents: w.valueCents,
-      mintCents: w.mintCents ?? (w.origin === "game" ? cfg.gallery.startPriceCents[w.rarity ?? "common"] : null),
-      likes: likesOf(w),
-      creatorSales: creatorSales(w.creator),
-      ageDays: (now - w.createdAt) / DAY,
-    });
+  /** Demand (ADR-141): open offers and sales of the last days. */
+  const recentSales = (w: DemoArtwork, now: number) =>
+    w.sales.filter((x) => x.at >= now - nft.ai.demand.days * DAY).length;
+  /** `exclude`: a bidder whose own offer must not raise the price they have to beat. */
+  const valueInput = (w: DemoArtwork, now: number, exclude: string | null = null) => ({
+    lastSaleCents: w.valueCents,
+    mintCents: w.mintCents ?? (w.origin === "game" ? cfg.gallery.startPriceCents[w.rarity ?? "common"] : null),
+    likes: likesOf(w),
+    creatorSales: creatorSales(w.creator),
+    ageDays: (now - w.createdAt) / DAY,
+    openOffers: new Set(
+      openOffers(w.id, now)
+        .map((m) => m.author)
+        .filter((a) => a !== exclude),
+    ).size,
+    recentSales: recentSales(w, now),
+  });
+  const valueOf = (w: DemoArtwork, now = Date.now(), exclude: string | null = null) =>
+    nftAiValueCents(valueInput(w, now, exclude));
   /** The fixed price: set by the owner; an AI collector always offers its NFTs at valuation x markup. */
   const askOf = (w: DemoArtwork) => (isCollector(w.owner) ? nftAiAskCents(valueOf(w)) : (w.askCents ?? null));
 
@@ -309,11 +325,6 @@ export function createArtEngine(host: ArtHost) {
           roll < (ask !== null ? nft.ai.listedOfferChanceBps : nft.ai.unlistedOfferChanceBps * 10) / 10_000
         ) {
           offerFromAi(w, value, until);
-        } else if (resell && roll < 0.03) {
-          // The collectors trade the player's NFTs among themselves: royalties for the player.
-          const others = COLLECTORS.filter((c) => c !== w.owner);
-          sell(w, pick(others, unit(`${w.id}:${until}:buyer`)), askOf(w)!, "ai", null, until);
-          w = work(w.id)!;
         }
         if (w.owner !== me && !(isCollector(w.owner) && w.creator === me)) break;
       }
@@ -366,6 +377,41 @@ export function createArtEngine(host: ArtHost) {
     for (const a of s.auctions) simulate(a, now);
     for (const a of [...s.auctions]) if (a.endsAt <= now) close(a);
     collectorsLook(now);
+    collectorsTrade(now);
+  }
+
+  /**
+   * The collectors trade among themselves (ADR-141), in ten-minute steps: popular NFTs change hands more often; the
+   * price follows the buyer's taste around the fair value. Royalties go to the creator (the player, if it is theirs).
+   */
+  function collectorsTrade(now: number) {
+    const s = state();
+    let until = s.tradeUntil ?? now - STEP;
+    let today = 0;
+    while (until + STEP <= now) {
+      until += STEP;
+      let traded = 0;
+      for (const w of works()) {
+        if (!isCollector(w.owner) || openAuction(w.id) || traded >= nft.ai.trade.perRun) continue;
+        const last = w.sales.at(-1)?.at ?? w.createdAt;
+        if (last > until - nft.ai.trade.minHoldMinutes * 60_000) continue;
+        const input = valueInput(w, until);
+        // per minute chance, over ten minutes
+        const perMinute = nftAiTradeChanceBps(input.likes, input.openOffers, input.recentSales) / 10_000;
+        if (unit(`${w.id}:${until}:trade`) >= 1 - (1 - perMinute) ** 10) continue;
+        const buyer = pick(
+          COLLECTORS.filter((c) => c !== w.owner),
+          unit(`${w.id}:${until}:buyer`),
+        );
+        const price = nftAiTradePriceCents(w.valueCents, nftFairCents(input), unit(`${w.id}:${until}:taste`));
+        sell(w, buyer, price, "ai", null, until);
+        aiSay(w.id, buyer, nft.ai.lines.trade, until);
+        traded += 1;
+        today += 1;
+        if (today >= nft.ai.trade.perDay) break;
+      }
+    }
+    state().tradeUntil = until;
   }
 
   /** Tycoons: every ten minutes one of them may bid, until their ceiling. */
@@ -863,7 +909,7 @@ export function createArtEngine(host: ArtHost) {
             host.track("nft_offers");
             // The holder (an AI collector or a tycoon) answers at once: from 105 % of its valuation it sells.
             const holder = w.owner;
-            if (nftAiAccepts(offerCents, valueOf(w, now))) {
+            if (nftAiAccepts(offerCents, valueOf(w, now, host.nickname()))) {
               sell(w, me, offerCents, "offer", offer.id, now + 1);
               aiSay(artworkId, holder, nft.ai.lines.accept, now + 2);
             } else {

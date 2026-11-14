@@ -631,7 +631,7 @@
       },
       "visit_company": {
         "dashboard": "Deine Firma! Unter „Übersicht“ siehst du jedes Quartal (6 Stunden) Umsatz und Gewinn, alles schön zum Aufklappen.",
-        "assistant": "Das ist Mira, deine KI-Assistentin. Sie meldet neue Aufgaben und Krisen. Schreib ihr einfach, wer was machen soll."
+        "assistant": "Das ist Mira, deine Assistentin. Sie meldet neue Aufgaben und Krisen. Schreib ihr einfach, was die Firma tun soll."
       },
       "visit_listing": {
         "listing": "Mit einem Börsengang holst du dir Geld von Investoren und kannst auf bis zu 100 Mitarbeiter wachsen."
@@ -6381,7 +6381,7 @@
   },
   "mira": {
     "name": "Mira",
-    "badge": "KI",
+    "badge": "Assistentin",
     "subtitle": "Deine Assistentin bei {company}",
     "thinking": "Mira denkt nach",
     "hello": "Hi, ich bin Mira! Ich behalte {company} im Blick, verteile Aufgaben, rechne Chancen aus und melde dir, wie es ausgeht. Schreib mir einfach, was die Firma tun soll, oder tipp auf einen Vorschlag.",

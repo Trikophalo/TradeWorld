@@ -48,6 +48,41 @@ export const NFT_RULES = {
     resaleMarkupBps: 12_500,
     /** The AI accepts a player's offer on an NFT it holds from this share of its valuation. */
     acceptBps: 10_500,
+    /**
+     * Demand (ADR-141): open offers and recent sales make an NFT hot; the collectors then value it higher
+     * (on top of likes) and want it more often.
+     */
+    demand: {
+      offerBps: 600,
+      maxOffers: 6,
+      saleBps: 500,
+      maxSales: 6,
+      /** Sales of the last this many days count. */
+      days: 7,
+    },
+    /**
+     * The collectors trade among themselves (ADR-141): per minute and NFT a collector holds, another one buys it with
+     * a chance that grows with popularity. The price follows the buyer's taste around the fair value (mint cost x
+     * bonuses, not the last price) and moves only part of the way from the last price, so prices wander up and down
+     * instead of climbing for ever. The buyer offers it again at its markup.
+     */
+    trade: {
+      chanceBps: 60,
+      /** Popularity raises the chance: per like, per open offer, per recent sale (bps of the base chance). */
+      likeWeightBps: 1_500,
+      offerWeightBps: 4_000,
+      saleWeightBps: 2_500,
+      maxChanceBps: 1_500,
+      /** A collector keeps a new NFT at least this long. */
+      minHoldMinutes: 30,
+      perRun: 2,
+      perDay: 30,
+      /** Taste of the buying collector: fair value x 85 % .. 125 %. */
+      tasteMinBps: 8_500,
+      tasteMaxBps: 12_500,
+      /** The price moves this share of the way from the last price to the buyer's target. */
+      reversionBps: 5_000,
+    },
     collectors: [
       "Vera Vermeer",
       "Konrad Kollektor",
@@ -72,6 +107,13 @@ export const NFT_RULES = {
         "Ein fairer Preis. Danke!",
       ],
       accept: ["Abgemacht! Viel Freude damit.", "Einverstanden, es gehört dir."],
+      trade: [
+        "Endlich gehört es mir! Das wollte ich schon lange.",
+        "Ich musste es einfach haben.",
+        "Gekauft von einer Kollegin. Jetzt steht es zum Verkauf, wer bietet mehr?",
+        "Ein Schnäppchen unter Sammlern.",
+        "Das Stück ist gefragt. Ich habe zugeschlagen.",
+      ],
       decline: [
         "Nein danke, darunter verkaufe ich nicht.",
         "Netter Versuch. Biete mehr.",

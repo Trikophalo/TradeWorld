@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Die Partnerschaft soll beiden Seiten neue Kunden bringen. Sicher ist das nicht.",
-      "name": "Sonnenkern Fusion",
-      "due_at": "2026-11-14T20:35:07.775747+00:00",
+      "body": "Die Chefetage von Fundgrube Discount steht wegen einer Affäre in der Kritik. Anleger werden nervös. Sicher ist das nicht.",
+      "name": "Fundgrube Discount",
+      "due_at": "2026-11-14T21:10:01.419544+00:00",
       "status": "open",
-      "ticker": "FSN",
-      "headline": "Kooperation: Sonnenkern Fusion und ein Branchenriese",
+      "ticker": "FGD",
+      "headline": "Affäre erschüttert Fundgrube Discount",
       "move_bps": null,
       "strength": 2,
-      "direction": "up",
-      "published_at": "2026-11-14T19:55:33.405189+00:00"
+      "direction": "down",
+      "published_at": "2026-11-14T20:34:48.888797+00:00"
     },
     {
       "id": 3,
-      "body": "Mehrere Häuser heben ihr Kursziel deutlich an. Sicher ist das nicht.",
-      "name": "SolarFuchs",
-      "due_at": "2026-11-14T18:55:33.399108+00:00",
+      "body": "Ein großer Konkurrent soll Interesse haben. Spekulanten könnten den Kurs spürbar treiben. Sicher ist das nicht.",
+      "name": "Luftpost Drohnen",
+      "due_at": "2026-11-14T19:34:48.884976+00:00",
       "status": "confirmed",
-      "ticker": "SFX",
-      "headline": "Analysten-Upgrade: SolarFuchs jetzt Kaufempfehlung",
-      "move_bps": 1108,
-      "strength": 3,
+      "ticker": "DRN",
+      "headline": "Übernahmegerüchte um Luftpost Drohnen",
+      "move_bps": 616,
+      "strength": 2,
       "direction": "up",
-      "published_at": "2026-11-14T18:55:33.399108+00:00"
+      "published_at": "2026-11-14T19:34:48.884976+00:00"
     }
   ],
   "reliability_bps": 7500

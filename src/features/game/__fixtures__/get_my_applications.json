@@ -1,12 +1,39 @@
 {
   "applications": [
     {
-      "id": "8231ef45-c04a-45fe-b401-ccb70d284add",
+      "id": "1d109ecd-32b1-47ab-9fa7-58469a1a2c34",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "0ec1f686-86c6-4779-933e-1e2e17d732de",
+        "id": "30962bd1-95c6-4783-9de5-17a854e0653f",
         "tier": "intern",
+        "title": null,
+        "company": {
+          "id": "d21331b8-a414-66aa-de07-f036108fc91d",
+          "logo": null,
+          "name": "Nordlicht Logistik AG",
+          "color": "#7AA2F7",
+          "is_ai": true,
+          "sector": "logistics",
+          "ticker": "NDL"
+        },
+        "required": [{ "branch": "it", "min_score": 0 }],
+        "title_key": "it_intern",
+        "required_skills": []
+      },
+      "created_at": "2026-11-14T19:34:45.193867+00:00",
+      "updated_at": "2026-11-14T19:34:45.197516+00:00",
+      "offer_expires_at": "2026-11-16T19:34:45.193867+00:00",
+      "salary_wish_cents_per_hour": 15900,
+      "offer_salary_cents_per_hour": 15900
+    },
+    {
+      "id": "fe19e50f-96f0-4715-b2f5-9f775067cbff",
+      "status": "offered",
+      "message": "Ich lerne schnell.",
+      "posting": {
+        "id": "3257b3f7-5779-4009-8469-fbc9525f2f95",
+        "tier": "junior",
         "title": null,
         "company": {
           "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
@@ -17,40 +44,13 @@
           "sector": "tech",
           "ticker": "QSL"
         },
-        "required": [{ "branch": "it", "min_score": 0 }],
-        "title_key": "it_intern",
-        "required_skills": []
-      },
-      "created_at": "2026-11-14T18:55:28.648181+00:00",
-      "updated_at": "2026-11-14T18:55:28.652139+00:00",
-      "offer_expires_at": "2026-11-16T18:55:28.648181+00:00",
-      "salary_wish_cents_per_hour": 15900,
-      "offer_salary_cents_per_hour": 15900
-    },
-    {
-      "id": "00efbb15-93a6-472a-b4f9-0928f5ca3e6f",
-      "status": "offered",
-      "message": "Ich lerne schnell.",
-      "posting": {
-        "id": "0db1d9d2-29bd-4b8a-96b0-f61eaa67db5b",
-        "tier": "junior",
-        "title": null,
-        "company": {
-          "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
-          "logo": null,
-          "name": "KlarSoft AG",
-          "color": "#4C8DFF",
-          "is_ai": true,
-          "sector": "tech",
-          "ticker": "KLS"
-        },
         "required": [{ "branch": "it", "min_score": 2 }],
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-14T18:55:28.641998+00:00",
-      "updated_at": "2026-11-14T18:55:28.641998+00:00",
-      "offer_expires_at": "2026-11-16T18:55:28.641998+00:00",
+      "created_at": "2026-11-14T19:34:45.188464+00:00",
+      "updated_at": "2026-11-14T19:34:45.188464+00:00",
+      "offer_expires_at": "2026-11-16T19:34:45.188464+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

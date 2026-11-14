@@ -7346,3 +7346,11 @@ Test `supabase/tests/9d_company_assistant.sql`.
 nächste freie Auftrag (Pitch der Art `move`) starten darf. `submit_company_pitch(…, 'move', …)` wirft bis dahin NX127
 `order_cooldown` (`pitches.orderCooldownMinutes`, 60). `company_assistant_context()` liefert zusätzlich `orders`
 (wie `get_company_pitches`, nur Gründer) und `last_quarter {revenue_cents, profit_cents} | null`.
+
+## Nachtrag: NFT-Markt unter KI-Sammlern (ADR-141)
+
+Intern: `nft_demand_bps(artwork, now, exclude)`, `nft_ai_value_excluding(artwork, now, exclude)` (die Bewertung ohne die
+Nachfrage eines Bieters), `nft_fair_cents(artwork, now)`, `nft_ai_trade_price_cents(last, fair, u)`.
+`nft_ai_value_cents()` enthält jetzt die Nachfrage. `nfts_run_due()` handelt zusätzlich unter Sammlern (Rückgabe
+`traded`); solche Verkäufe sind `artwork_sales.kind = 'ai'` mit `seller_ai` und `buyer_ai`. Test
+`supabase/tests/9e_nft_market.sql`.
