@@ -839,7 +839,7 @@ export function Showcase() {
         <NewsStudioDemo />
         <Demo label="Mr. Doodle Dangle und sein Studio (große Sprites)" className="items-end gap-4">
           {Object.entries(NEWS_STUDIO_ART)
-            .filter(([name]) => /^(anchor|hands|mug|topic-screen|title|desk-sign)/.test(name))
+            .filter(([name]) => /^(anchor|hands|fx|mug|topic-screen|title|desk-sign|intro)/.test(name))
             .map(([name, art]) => (
               <figure key={name} className="flex flex-col items-center gap-2">
                 <span className="rounded-md bg-surface-2 p-2">
