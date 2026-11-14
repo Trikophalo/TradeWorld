@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "1c064cae-6b89-4b61-a175-4e6c6c74b28b",
+    "id": "c41e4e37-a2cb-4b83-8c36-9bf7a94f9844",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "d21331b8-a414-66aa-de07-f036108fc91d",
+      "id": "cbfac5fd-3475-2166-ea22-0a85cbb6f5c0",
       "logo": null,
-      "name": "Nordlicht Logistik AG",
-      "color": "#7AA2F7",
+      "name": "Brotzeit Handel AG",
+      "color": "#F2A93B",
       "is_ai": true,
-      "sector": "logistics",
-      "ticker": "NDL"
+      "sector": "retail",
+      "ticker": "BRZ"
     },
     "presence": {
-      "fire_at": "2026-11-19T23:11:01.66851+00:00",
+      "fire_at": "2026-11-19T23:34:31.567012+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-14T23:11:01.66851+00:00"
+      "last_active_at": "2026-11-14T23:34:31.567012+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-14T23:11:01.759031+00:00",
+    "started_at": "2026-11-14T23:34:31.644678+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

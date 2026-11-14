@@ -177,6 +177,12 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   Missionsjäger, Teamplayer, Bilanzprofi, Ehrgeiz), ein größerer Tresor (Panzertresor) und vieles für die eigene
   Firma (KI-Turbo, Glückshand, Werbeagentur, Krisenmanager …). Sie schalten sich zwischen Level 1 und 30 frei.
 
+- **Firmenchat:** Schreibt jemand in den Chat deiner Firma, bekommst du eine Benachrichtigung (eine, bis du sie
+  gelesen hast; abschaltbar in den Einstellungen). Der Chat hat einen Zurück-Knopf zur Firmenseite, und die
+  Escape-Taste führt ebenfalls zurück.
+- **KI-Sammler mit Dachschaden:** Bei NFT-Angeboten schreiben die KI-Sammler jetzt viel mehr und deutlich dümmere
+  Texte, vom Käsebrot als Zugabe bis zum ohnmächtigen Steuerberater.
+
 - **Börsengang: voll oder Geld zurück (ADR-151):** Das Geld der Zeichner wird jetzt verwahrt und kommt erst in die
   Firmenkasse, wenn die Firma an der Börse ist. Vorher kann der Gründer nichts davon auszahlen. Werden bis zum Ende
   nicht alle Aktien gezeichnet, platzt der Börsengang: Alle bekommen ihr Geld vollständig zurück, die Firma bleibt

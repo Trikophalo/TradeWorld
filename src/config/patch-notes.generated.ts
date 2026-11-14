@@ -84,6 +84,16 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Das Geld der Zeichner wird jetzt verwahrt und kommt erst in die Firmenkasse, wenn die Firma an der Börse ist. Vorher kann der Gründer nichts davon auszahlen. Werden bis zum Ende nicht alle Aktien gezeichnet, platzt der Börsengang: Alle bekommen ihr Geld vollständig zurück, die Firma bleibt privat und kann es noch einmal versuchen. KI-Investoren zeichnen je nach Qualität 60 bis 100 %, den Rest müssen Mitspieler übernehmen. Wer gezeichnet hat, bekommt eine Benachrichtigung über den Ausgang.",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-a8748525",
+        title: "KI-Sammler mit Dachschaden",
+        text: "Bei NFT-Angeboten schreiben die KI-Sammler jetzt viel mehr und deutlich dümmere Texte, vom Käsebrot als Zugabe bis zum ohnmächtigen Steuerberater.",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-584b69ca",
+        title: "Firmenchat",
+        text: "Schreibt jemand in den Chat deiner Firma, bekommst du eine Benachrichtigung (eine, bis du sie gelesen hast; abschaltbar in den Einstellungen). Der Chat hat einen Zurück-Knopf zur Firmenseite, und die Escape-Taste führt ebenfalls zurück.",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-706f8ae2",
         title: "Mehr Verbesserungen",
         text: "22 neue Verbesserungen und zwei weitere Tresorstufen, in fünf Abschnitten. Mehr Geld (Tresorzinsen, Lohnbonus, Stammgast, Auftragsprofi, Dealmaker), mehr XP (Börsenprofi, Frühaufsteher, Missionsjäger, Teamplayer, Bilanzprofi, Ehrgeiz), ein größerer Tresor (Panzertresor) und vieles für die eigene Firma (KI-Turbo, Glückshand, Werbeagentur, Krisenmanager …). Sie schalten sich zwischen Level 1 und 30 frei.",

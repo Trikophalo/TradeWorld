@@ -2,7 +2,7 @@
 
 import { motion } from "motion/react";
 import { useTranslations } from "next-intl";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { COMPANY_BUILDINGS, UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Button, type ButtonState } from "@/components/ui/button";
@@ -55,6 +55,7 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
   const tl = useTranslations("logo");
   const ts = useTranslations("firm.sections");
   const [tab, setTab] = useState<Tab>("mira");
+  const toStart = useCallback(() => setTab("mira"), []);
   const sections = useCompanySections();
   useEffect(() => useCompanySections.getState().load(), []);
   const section = (id: string) => ({
@@ -239,7 +240,7 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
       )}
       {tab === "tasks" && <TaskBoard />}
       {tab === "team" && <TeamView company={company} onHire={setHire} />}
-      {tab === "chat" && <CompanyChat />}
+      {tab === "chat" && <CompanyChat onBack={toStart} />}
 
       <HireSheet company={company} request={hire} onClose={() => setHire(null)} />
     </div>

@@ -178,6 +178,21 @@ test("company chat, then close the company voluntarily", async ({ page }) => {
   await page.getByRole("button", { name: "Senden" }).click();
   await expect(messages.getByText("Hallo Team!")).toBeVisible();
 
+  // Back to the company page: by button and by Escape.
+  await page.getByTestId("chat-back").click();
+  await expect(messages).toHaveCount(0);
+  await expect(page.getByTestId("mira")).toBeVisible();
+  await page.getByText("Chat", { exact: true }).click();
+  await expect(messages).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(messages).toHaveCount(0);
+  // The chat page of employees has the same way back.
+  await page.goto("/career/chat");
+  await expect(page.getByTestId("chat-messages")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page).toHaveURL("/company");
+  await showOverview(page);
+
   // Close: the cash comes back, the founding page shows the settlement.
   await page.getByText("Übersicht", { exact: true }).click();
   await page.getByTestId("close-company").click();

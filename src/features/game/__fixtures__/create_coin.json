@@ -1,5 +1,5 @@
 {
-  "id": "bf711de9-c572-4cca-9034-a7af4fc530a2",
+  "id": "7779a95d-1e88-4f2a-81f9-76d89824fd3b",
   "logo": {
     "grid": [
       "................",
@@ -37,12 +37,12 @@
     { "key": "staking", "hours": 12, "available": false, "cost_cents": 500000, "success_bps": 10000 },
     { "key": "bugfix", "hours": 3, "available": true, "cost_cents": 100000, "success_bps": 10000 }
   ],
-  "creator": { "tag": "JDPB", "trust": { "band": "blank", "score": 50 }, "nickname": "Fixture_Coiner" },
+  "creator": { "tag": "DL65", "trust": { "band": "blank", "score": 50 }, "nickname": "Fixture_Coiner" },
   "fee_bps": 100,
   "category": "player",
   "price_e4": null,
   "burn_hype": 8,
-  "created_at": "2026-11-14T23:11:02.999216+00:00",
+  "created_at": "2026-11-14T23:34:32.820189+00:00",
   "low_24h_e4": null,
   "pool_cents": 0,
   "burn_min_e6": 0,

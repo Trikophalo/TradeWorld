@@ -234,6 +234,24 @@ select count(*) as xsee from public.company_messages \gset
 select tests.throws_key($$select public.post_company_message(gen_random_uuid(), 'Hallo?')$$, 'not_in_company',
   'post_company_message(): only members');
 reset role;
+-- everybody else in the company is told, once until it is read
+select tests.assert(
+  (select count(*) = 1 from public.notifications n where n.player_id = :w and n.type_key = 'company_chat'
+      and n.body like '%Willkommen im Team!' and n.link = '/career/chat' and n.read_at is null)
+  and (select count(*) = 1 from public.notifications n where n.player_id = :f and n.type_key = 'company_chat' and n.body like '%: Danke!')
+  and not exists (select 1 from public.notifications n where n.player_id = :x and n.type_key = 'company_chat'),
+  'post_company_message(): the other members get a notification, the author and outsiders do not');
+select tests.login_as('authenticated', :f);
+select public.post_company_message(gen_random_uuid(), 'Noch etwas.') is not null as ok \gset
+reset role;
+select count(*) as wn1 from public.notifications n where n.player_id = :w and n.type_key = 'company_chat' \gset
+update public.notifications set read_at = now() where player_id = :w and type_key = 'company_chat';
+select tests.login_as('authenticated', :f);
+select public.post_company_message(gen_random_uuid(), 'Und noch etwas.') is not null as ok \gset
+reset role;
+select tests.assert(
+  :wn1::int = 1 and (select count(*) = 2 from public.notifications n where n.player_id = :w and n.type_key = 'company_chat'),
+  'post_company_message(): no second notification while the first is unread, a new one after reading');
 select tests.assert(
   :'m1'::jsonb ?& array['id', 'kind', 'author', 'avatar_key', 'is_me', 'is_founder', 'body', 'created_at']
   and :'m1'::jsonb ->> 'kind' = 'player' and (:'m1'::jsonb ->> 'is_me')::boolean and (:'m1'::jsonb ->> 'is_founder')::boolean

@@ -4,37 +4,37 @@
       "kind": "quick",
       "missions": [
         {
-          "id": "0f53edd3-cd61-4b12-ac7f-884b76ff3d80",
-          "xp": 210,
-          "key": "q_rank_up",
-          "title": "Verbessere dich um einen Platz auf der Reichenliste",
-          "status": "active",
-          "target": 1,
-          "progress": 0,
-          "expires_at": null,
-          "description": "Überhole irgendjemanden."
-        },
-        {
-          "id": "b48a390f-a14a-4835-aa7d-1a2c8ed0ee7e",
-          "xp": 204,
-          "key": "q_two_securities",
-          "title": "Handle 2 verschiedene Wertpapiere",
+          "id": "548df022-3f58-4003-9400-3f10f212e3d8",
+          "xp": 84,
+          "key": "q_buy",
+          "title": "Kaufe eine Aktie",
           "status": "completed",
-          "target": 2,
-          "progress": 2,
+          "target": 1,
+          "progress": 1,
           "expires_at": null,
-          "description": "Kauf oder Verkauf, egal welche."
+          "description": "Ein Bruchstück reicht schon."
         },
         {
-          "id": "f5e51f0f-d8d7-4818-86db-595007b17933",
+          "id": "abf5a9db-bbcd-46fa-a3cd-7ea45ccf0f11",
           "xp": 136,
-          "key": "q_buy_logistics",
-          "title": "Kaufe eine Logistik-Aktie",
+          "key": "q_nft_offer",
+          "title": "Mach ein Preisangebot für ein NFT",
           "status": "active",
           "target": 1,
           "progress": 0,
           "expires_at": null,
-          "description": "Pakete, Lager, Schiffe."
+          "description": "Im Chat unter dem NFT. Vielleicht nimmt der Besitzer an."
+        },
+        {
+          "id": "c64768aa-e613-4db1-acd7-378841a9f0a4",
+          "xp": 176,
+          "key": "q_trades_3",
+          "title": "Mach 3 Trades",
+          "status": "completed",
+          "target": 3,
+          "progress": 3,
+          "expires_at": null,
+          "description": "Kauf oder Verkauf, egal welches Wertpapier."
         }
       ],
       "resets_at": null
@@ -43,37 +43,37 @@
       "kind": "daily",
       "missions": [
         {
-          "id": "5bbc644d-7619-4f79-b217-a67550279d4b",
-          "xp": 816,
-          "key": "d_buys",
-          "title": "Kaufe heute 3-mal",
-          "status": "completed",
-          "target": 3,
-          "progress": 3,
+          "id": "0e36f72e-51a6-4a4c-965a-1feb3c892270",
+          "xp": 1056,
+          "key": "d_profit",
+          "title": "Erziele 100 € Gewinn mit einem Verkauf",
+          "status": "active",
+          "target": 10000,
+          "progress": 0,
           "expires_at": "2026-11-15T23:00:00+00:00",
-          "description": "Auch Bruchstücke zählen."
+          "description": "Gewinn nach Gebühren in einer Order."
         },
         {
-          "id": "85eea38a-e212-48b2-99c4-5f623fa3925b",
-          "xp": 1278,
+          "id": "65b7c900-5f61-48cc-a32a-01191afc01ba",
+          "xp": 938,
+          "key": "d_sells_3",
+          "title": "Verkaufe 3-mal",
+          "status": "active",
+          "target": 3,
+          "progress": 1,
+          "expires_at": "2026-11-15T23:00:00+00:00",
+          "description": "Nimm Gewinne mit."
+        },
+        {
+          "id": "d3577bb4-7700-4cf4-98b1-64c3939f0a3b",
+          "xp": 1392,
           "key": "d_profit_3",
           "title": "Mach 0 €-mal Gewinn",
           "status": "active",
-          "target": 2,
+          "target": 3,
           "progress": 0,
           "expires_at": "2026-11-15T23:00:00+00:00",
           "description": "Drei gute Verkäufe am Tag."
-        },
-        {
-          "id": "b41ac271-b590-4936-b4f1-9f8ef15a8730",
-          "xp": 960,
-          "key": "d_buy_logistics",
-          "title": "Kaufe 2 Aktien aus der Logistik",
-          "status": "active",
-          "target": 2,
-          "progress": 0,
-          "expires_at": "2026-11-15T23:00:00+00:00",
-          "description": "Zwei Käufe, auch derselben Aktie."
         }
       ],
       "resets_at": "2026-11-15T23:00:00+00:00"
@@ -82,37 +82,37 @@
       "kind": "weekly",
       "missions": [
         {
-          "id": "4d5a0442-fb84-4af8-8ae3-175b62f30a0d",
-          "xp": 4000,
-          "key": "w_profit_10",
-          "title": "Mach 0 €-mal Gewinn",
+          "id": "0e7d56f4-daf4-412c-9cd1-bcca1f13d702",
+          "xp": 2544,
+          "key": "w_trades",
+          "title": "Mach 23 Trades",
           "status": "active",
-          "target": 12,
+          "target": 23,
+          "progress": 4,
+          "expires_at": "2026-11-15T23:00:00+00:00",
+          "description": "Diese Woche."
+        },
+        {
+          "id": "24b43b11-547b-4165-8205-4543cf12b51d",
+          "xp": 3156,
+          "key": "w_days",
+          "title": "Handle an 5 verschiedenen Tagen",
+          "status": "active",
+          "target": 5,
+          "progress": 1,
+          "expires_at": "2026-11-15T23:00:00+00:00",
+          "description": "Mindestens ein Trade pro Tag."
+        },
+        {
+          "id": "4eb64bd4-f18d-43b5-abea-d04657053342",
+          "xp": 3476,
+          "key": "w_nft_royalty",
+          "title": "Verdiene 1 Lizenzgebühren",
+          "status": "active",
+          "target": 1,
           "progress": 0,
           "expires_at": "2026-11-15T23:00:00+00:00",
-          "description": "Eine Woche voller grüner Zahlen."
-        },
-        {
-          "id": "bd230a2f-dfc2-43df-9b9c-3f33789b7d2b",
-          "xp": 3296,
-          "key": "w_buy_value",
-          "title": "Kaufe in einer Order für mindestens 4.000 €",
-          "status": "active",
-          "target": 400000,
-          "progress": 30276,
-          "expires_at": "2026-11-15T23:00:00+00:00",
-          "description": "Eine einzige große Order."
-        },
-        {
-          "id": "d7d0b8cf-cae5-4e2a-acbc-4964dc3ba8f2",
-          "xp": 2472,
-          "key": "w_volume",
-          "title": "Handle für insgesamt 33.058 €",
-          "status": "active",
-          "target": 3305800,
-          "progress": 91507,
-          "expires_at": "2026-11-15T23:00:00+00:00",
-          "description": "Summe aller Käufe und Verkäufe der Woche."
+          "description": "Jedes Mal, wenn ein NFT von dir weiterverkauft wird."
         }
       ],
       "resets_at": "2026-11-15T23:00:00+00:00"
@@ -121,7 +121,7 @@
       "kind": "milestone",
       "missions": [
         {
-          "id": "c91108d1-c491-4528-9b4e-5a8ed1adf249",
+          "id": "b5e89ba0-61a3-45bf-b73f-ae89fff6cee8",
           "xp": 2500,
           "key": "m_work_for_player",
           "title": "Arbeite bei einem echten Spieler",
@@ -132,7 +132,7 @@
           "description": "Bewirb dich bei der Firma eines anderen Spielers und fang dort an. Gemeinsam wächst ihr schneller."
         },
         {
-          "id": "34339a8b-162a-4f7b-87e6-41ac2843c690",
+          "id": "8e4563b6-578c-4e88-9c55-67fb1c85ae5a",
           "xp": 350,
           "key": "m_first_trade",
           "title": "Dein erster Trade",
@@ -143,7 +143,7 @@
           "description": "Kaufe dein erstes Wertpapier."
         },
         {
-          "id": "73154e4c-df1c-4106-9d7c-ede77cf41adf",
+          "id": "0b4edaf0-b84a-43a9-8e39-58e486369ddf",
           "xp": 350,
           "key": "m_first_vault",
           "title": "Erstes Grundeinkommen",
@@ -157,5 +157,5 @@
       "resets_at": null
     }
   ],
-  "server_time": "2026-11-14T23:10:59.174864+00:00"
+  "server_time": "2026-11-14T23:34:29.160739+00:00"
 }

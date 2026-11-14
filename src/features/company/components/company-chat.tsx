@@ -32,8 +32,11 @@ export function useCompanyChat() {
   });
 }
 
-/** Company chat for the founder and all employees of a player company (ADR-060). */
-export function CompanyChat({ className }: { className?: string }) {
+/**
+ * Company chat for the founder and all employees of a player company (ADR-060). With `onBack` the header has a back
+ * button and Escape goes back as well (unless a dialog is open, which Escape closes first).
+ */
+export function CompanyChat({ className, onBack }: { className?: string; onBack?: () => void }) {
   const t = useTranslations("chat");
   const errorText = useGameErrorText();
   const chat = useCompanyChat();
@@ -46,6 +49,17 @@ export function CompanyChat({ className }: { className?: string }) {
   useEffect(() => {
     list.current?.scrollTo({ top: list.current.scrollHeight });
   }, [count]);
+
+  useEffect(() => {
+    if (!onBack) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (document.querySelector('[role="dialog"][data-state="open"]')) return;
+      onBack();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onBack]);
 
   if (chat.isPending) return <Skeleton className="h-96 w-full rounded-lg" />;
   if (!chat.data?.company) {
@@ -72,6 +86,11 @@ export function CompanyChat({ className }: { className?: string }) {
   return (
     <Card padding="none" className={cn("flex h-[min(70dvh,560px)] flex-col overflow-hidden", className)}>
       <header className="flex items-center gap-3 border-b border-line-1 px-4 py-3">
+        {onBack && (
+          <Button size="sm" variant="ghost" onClick={onBack} aria-keyshortcuts="Escape" data-testid="chat-back">
+            {t("back")}
+          </Button>
+        )}
         <span aria-hidden style={{ backgroundColor: chat.data.company.color }} className="size-6 shrink-0" />
         <div className="min-w-0">
           <p className="truncate font-semibold text-fg-1">{chat.data.company.name}</p>

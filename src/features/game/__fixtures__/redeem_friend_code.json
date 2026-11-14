@@ -1,10 +1,10 @@
 {
-  "code": "NEXA-BFRC",
+  "code": "NEXA-A4LK",
   "invited": 0,
   "redeemed": true,
   "paid_cents": 500000,
   "bonus_cents": 500000,
-  "redeemed_at": "2026-11-14T23:11:03.180272+00:00",
-  "redeemed_from": { "tag": "ETGB", "nickname": "Fixture_Werber" },
+  "redeemed_at": "2026-11-14T23:34:33.023185+00:00",
+  "redeemed_from": { "tag": "BDC3", "nickname": "Fixture_Werber" },
   "cash_after_cents": 1500000
 }

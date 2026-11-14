@@ -1,5 +1,5 @@
 {
-  "id": "ce334e4b-a16c-45da-b658-749a1f833855",
+  "id": "e3c61e9f-cf57-4056-87da-1282ee69529e",
   "kind": "loan",
   "terms": { "hours": 48, "interest_bps": 1000, "principal_cents": 100000 },
   "status": "open",
@@ -9,20 +9,20 @@
   "my_role": "lender",
   "progress": { "due_cents": 110000, "left_cents": 110000, "repaid_cents": 0 },
   "proposer": {
-    "tag": "VVBK",
+    "tag": "4E2K",
     "level": 6,
     "trust": { "band": "blank", "score": 50 },
     "nickname": "Fixture_Lieferant",
     "avatar_key": "rookie"
   },
   "closed_at": null,
-  "created_at": "2026-11-14T23:11:02.10403+00:00",
-  "expires_at": "2026-11-16T23:11:02.10403+00:00",
+  "created_at": "2026-11-14T23:34:32.023011+00:00",
+  "expires_at": "2026-11-16T23:34:32.023011+00:00",
   "accepted_at": null,
   "is_proposer": true,
   "broken_by_me": false,
   "counterparty": {
-    "tag": "TZVL",
+    "tag": "ARSB",
     "level": 6,
     "trust": { "band": "blank", "score": 50 },
     "nickname": "Fixture_Abnehmer",

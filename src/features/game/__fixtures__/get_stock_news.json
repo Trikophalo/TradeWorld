@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Die Belegschaft legt die Arbeit nieder. Lieferungen verzögern sich. Sicher ist das nicht.",
-      "name": "Pfotenwohl",
-      "due_at": "2026-11-15T00:21:43.355431+00:00",
+      "body": "Die Gründe sind unklar. Der Markt mag keine Unsicherheit. Sicher ist das nicht.",
+      "name": "Glanz & Gloria",
+      "due_at": "2026-11-15T00:58:49.593785+00:00",
       "status": "open",
-      "ticker": "PFW",
-      "headline": "Streik legt Pfotenwohl lahm",
+      "ticker": "LUX",
+      "headline": "Glanz & Gloria-Chef tritt überraschend zurück",
       "move_bps": null,
-      "strength": 3,
+      "strength": 1,
       "direction": "down",
-      "published_at": "2026-11-15T00:11:03.186278+00:00"
+      "published_at": "2026-11-15T00:34:33.031945+00:00"
     },
     {
       "id": 3,
-      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Eilbote Express tut sich in der nächsten Stunde etwas, und zwar nach unten. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
-      "name": "Eilbote Express",
-      "due_at": "2026-11-14T23:10:58.154739+00:00",
-      "status": "confirmed",
-      "ticker": "EBX",
+      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Frachtpilot tut sich in der nächsten Stunde etwas, und zwar nach unten. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
+      "name": "Frachtpilot",
+      "due_at": "2026-11-14T23:34:27.982587+00:00",
+      "status": "fizzled",
+      "ticker": "FPT",
       "headline": "Mr. Doodle Dangles Geheimtipp",
-      "move_bps": -1066,
+      "move_bps": null,
       "strength": 2,
       "direction": "down",
-      "published_at": "2026-11-14T23:10:58.154739+00:00"
+      "published_at": "2026-11-14T23:34:27.982587+00:00"
     }
   ],
   "reliability_bps": 7500

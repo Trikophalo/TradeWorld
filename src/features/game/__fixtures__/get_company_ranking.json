@@ -1,5 +1,5 @@
 {
-  "mine": { "rank": 40, "value_cents": 54108 },
+  "mine": { "rank": 40, "value_cents": 126008 },
   "total": 43,
   "entries": [
     {
@@ -14,7 +14,7 @@
       "founder": "Lars_Kursrutsch",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "0b011fdc-4c18-47fa-bf68-751e28e4ce5f",
+      "company_id": "9330001d-8bf1-4a9f-9b75-6568c8767d4b",
       "value_cents": 959140000,
       "revenue_cents": null
     },
@@ -50,7 +50,7 @@
       "founder": "Fenja_Firma",
       "is_mine": false,
       "team_size": 6,
-      "company_id": "2b440f2e-252c-4ce4-a34b-4a1e37e715e7",
+      "company_id": "55542654-06e1-44d7-a43a-88c13223f3b4",
       "value_cents": 106664350,
       "revenue_cents": 0
     },
@@ -66,31 +66,15 @@
       "founder": "Esc_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "60ec2dfc-4541-4f52-a0c7-8cdff4275164",
+      "company_id": "2d899db0-e70f-49c1-a4cf-b8378d12e36b",
       "value_cents": 106061208,
       "revenue_cents": null
     },
     {
       "kind": "player",
       "logo": null,
-      "name": "Gipfelwerk",
-      "rank": 4,
-      "tier": "ag",
-      "color": "#336699",
-      "sector": "retail",
-      "ticker": "GIP",
-      "founder": "Pop_Frida",
-      "is_mine": false,
-      "team_size": 1,
-      "company_id": "0d744e4e-4bc8-406f-b3e0-7a2f59442636",
-      "value_cents": 92180000,
-      "revenue_cents": null
-    },
-    {
-      "kind": "player",
-      "logo": null,
       "name": "Talwerk",
-      "rank": 5,
+      "rank": 4,
       "tier": "ag",
       "color": "#663399",
       "sector": "retail",
@@ -98,10 +82,26 @@
       "founder": "Pop_Gero",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "b9f9f55c-c090-4d3d-aa2d-30a4c3b05148",
-      "value_cents": 81950000,
+      "company_id": "f76e2cac-abcc-43fe-b90e-8c60e6860c2b",
+      "value_cents": 81510000,
+      "revenue_cents": null
+    },
+    {
+      "kind": "player",
+      "logo": null,
+      "name": "Gipfelwerk",
+      "rank": 5,
+      "tier": "ag",
+      "color": "#336699",
+      "sector": "retail",
+      "ticker": "GIP",
+      "founder": "Pop_Frida",
+      "is_mine": false,
+      "team_size": 1,
+      "company_id": "1a8b3aed-773a-4583-ba79-9d38cba2f48f",
+      "value_cents": 81210000,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-14T23:10:59.888353+00:00"
+  "server_time": "2026-11-14T23:34:29.80147+00:00"
 }

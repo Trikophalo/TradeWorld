@@ -1,8 +1,8 @@
 {
-  "bids": [{ "at": "2026-11-14T23:11:00.589873+00:00", "nickname": "Fixture_Kunst", "amount_cents": 500000 }],
+  "bids": [{ "at": "2026-11-14T23:34:30.436892+00:00", "nickname": "Fixture_Kunst", "amount_cents": 500000 }],
   "sales": [
     {
-      "at": "2026-11-14T23:11:00.59375+00:00",
+      "at": "2026-11-14T23:34:30.441206+00:00",
       "kind": "auction",
       "buyer": "Fixture_Kunst",
       "seller": null,
@@ -10,17 +10,17 @@
       "royalty_cents": 0
     },
     {
-      "at": "2026-11-14T23:10:57.09694+00:00",
+      "at": "2026-11-14T23:34:26.949638+00:00",
       "kind": "ai",
-      "buyer": "Gräfin Glitzer",
+      "buyer": "Baron von Bit",
       "seller": "Vera Vermeer",
-      "price_cents": 562700,
+      "price_cents": 572900,
       "royalty_cents": 0
     }
   ],
   "artwork": {
-    "id": "67e8a348-4189-4439-ab4d-0cf3d89db383",
-    "hot": 0.344046,
+    "id": "d8bc03f6-d730-4f15-893b-170a9132e95c",
+    "hot": 0.345018,
     "code": "NFT-0001",
     "liked": false,
     "likes": 0,
@@ -82,7 +82,7 @@
     "creator": null,
     "ai_owner": null,
     "ask_cents": null,
-    "created_at": "2026-11-14T23:08:48.556843+00:00",
+    "created_at": "2026-11-14T23:32:32.181092+00:00",
     "royalty_bps": 1000,
     "value_cents": 500000,
     "royalties_cents": 0,

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { SPEECH } from "@/components/pixel/art";
 import { Page, PageHeader } from "@/components/layout/page";
-import { CompanyChat } from "@/features/company/components/company-chat";
+import { ChatPageBody } from "@/features/company/components/chat-page";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("chat");
@@ -16,7 +16,7 @@ export default async function ChatPage() {
   return (
     <Page>
       <PageHeader title={t("title")} intro={th("careerChat")} art={SPEECH} />
-      <CompanyChat className="mx-auto max-w-2xl" />
+      <ChatPageBody />
     </Page>
   );
 }

@@ -2322,7 +2322,8 @@
     "system": "NEXA",
     "count": "{count}/{max}",
     "link": "Firmenchat",
-    "linkHint": "Mit deinem Team reden"
+    "linkHint": "Mit deinem Team reden",
+    "back": "← Zurück"
   },
   "workTask": {
     "title": "Arbeitsaufgabe",

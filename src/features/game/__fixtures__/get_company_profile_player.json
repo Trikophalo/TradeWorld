@@ -3,31 +3,31 @@
   "facts": {
     "staff": 1,
     "stage": 0,
-    "period": null,
-    "product": "security_software",
-    "max_staff": 40,
+    "period": "quarter",
+    "product": "courier",
+    "max_staff": 2,
     "ai_workers": 0,
-    "quality_bps": null,
-    "value_cents": 7856750,
-    "profit_cents": null,
-    "awareness_bps": null,
-    "revenue_cents": null
+    "quality_bps": 2325,
+    "value_cents": 295011,
+    "profit_cents": -14989,
+    "awareness_bps": 355,
+    "revenue_cents": 219116
   },
   "company": {
-    "id": "e8024535-8da1-444a-970b-d19cae8bb4d1",
-    "idea": "Maschinen nach Maß",
+    "id": "a63521ac-e564-4814-adbd-6cdbccf74d40",
+    "idea": "Fahrräder reparieren",
     "logo": null,
-    "name": "Ausbau Werke",
-    "tier": "gmbh",
+    "name": "Gero Werkstatt",
+    "tier": "garage",
     "is_ai": false,
     "listed": false,
-    "sector": "tech",
+    "sector": "logistics",
     "ticker": null,
     "price_e4": null,
     "change_bps": null,
-    "founded_at": "2026-11-14T23:10:40.52748+00:00",
-    "brand_color": "#224466"
+    "founded_at": "2026-11-14T23:34:04.344659+00:00",
+    "brand_color": "#aa5500"
   },
-  "founder": { "tag": "42GK", "nickname": "Anke_Ausbau", "avatar_key": "rookie" },
+  "founder": { "tag": "VZDX", "nickname": "Gero_Garage", "avatar_key": "rookie" },
   "members": []
 }

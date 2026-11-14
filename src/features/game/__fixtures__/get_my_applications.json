@@ -1,38 +1,38 @@
 {
   "applications": [
     {
-      "id": "b4c1c674-4a72-4c65-bf70-a751f6c6303a",
+      "id": "22a7d385-6b7d-461c-b814-f927baf66c46",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "0c8da36b-a52c-4629-a0a2-62119208bab1",
+        "id": "0d52c4a8-8375-4c2d-94f8-244288b009a9",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "d21331b8-a414-66aa-de07-f036108fc91d",
+          "id": "cbfac5fd-3475-2166-ea22-0a85cbb6f5c0",
           "logo": null,
-          "name": "Nordlicht Logistik AG",
-          "color": "#7AA2F7",
+          "name": "Brotzeit Handel AG",
+          "color": "#F2A93B",
           "is_ai": true,
-          "sector": "logistics",
-          "ticker": "NDL"
+          "sector": "retail",
+          "ticker": "BRZ"
         },
-        "required": [{ "branch": "it", "min_score": 0 }],
-        "title_key": "it_intern",
+        "required": [{ "branch": "finance", "min_score": 0 }],
+        "title_key": "finance_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-14T23:10:59.254406+00:00",
-      "updated_at": "2026-11-14T23:10:59.258063+00:00",
-      "offer_expires_at": "2026-11-16T23:10:59.254406+00:00",
-      "salary_wish_cents_per_hour": 15900,
-      "offer_salary_cents_per_hour": 15900
+      "created_at": "2026-11-14T23:34:29.249984+00:00",
+      "updated_at": "2026-11-14T23:34:29.253815+00:00",
+      "offer_expires_at": "2026-11-16T23:34:29.249984+00:00",
+      "salary_wish_cents_per_hour": 15000,
+      "offer_salary_cents_per_hour": 15000
     },
     {
-      "id": "4831c4dc-5014-43d0-9f54-ee37200fb5d3",
+      "id": "ac81c4ac-9f7d-441f-9cb7-6a17d9370617",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "0985b1ee-3e2f-49fc-b0d9-3627f5b49ade",
+        "id": "8e965e2d-eb9c-4a2c-ab39-864834664b4e",
         "tier": "junior",
         "title": null,
         "company": {
@@ -48,9 +48,9 @@
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-14T23:10:59.24844+00:00",
-      "updated_at": "2026-11-14T23:10:59.24844+00:00",
-      "offer_expires_at": "2026-11-16T23:10:59.24844+00:00",
+      "created_at": "2026-11-14T23:34:29.244458+00:00",
+      "updated_at": "2026-11-14T23:34:29.244458+00:00",
+      "offer_expires_at": "2026-11-16T23:34:29.244458+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

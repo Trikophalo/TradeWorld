@@ -7426,3 +7426,10 @@ aufgelöst → `share_offer_cancel(p_offer_id, p_reason)` (alles zurück, Firma 
 (Zeichner hat sein Konto zurückgesetzt) gehen über `share_offer_escrow_rest` an den Staat. `close_due_offers` beendet
 auch Angebote aufgelöster Firmen. `offer_json` liefert zusätzlich `my_amount_cents` und den Status `failed`.
 Test `supabase/tests/9j_ipo_escrow.sql`.
+
+## Nachtrag: Benachrichtigung im Firmenchat
+
+Migration `20261204002200_company_chat_notify.sql`: Benachrichtigungstyp `company_chat` (abschaltbar).
+`post_company_message` benachrichtigt Gründer und aktive Mitarbeiter außer dem Autor über `social_notify` (Link
+`/career/chat`, Payload `{company_id, message_id, author_id}`); wer noch eine ungelesene Chat-Benachrichtigung dieser
+Firma hat, bekommt keine zweite. Test in `supabase/tests/63_m3d.sql`.

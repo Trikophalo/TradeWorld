@@ -1,8 +1,8 @@
 {
-  "now": "2026-11-14T23:11:03.73202+00:00",
+  "now": "2026-11-14T23:34:33.566531+00:00",
   "chat": [
     {
-      "at": "2026-11-14T23:11:03.728916+00:00",
+      "at": "2026-11-14T23:34:33.561875+00:00",
       "id": 3,
       "body": "Was für eine Sendung 💀📉",
       "mine": true,
@@ -16,48 +16,48 @@
     "segments": [
       {
         "kind": "scandal",
-        "text": "Das Netz zerreißt Taktgeber Strom. Die Jahresbilanz wurde mit Buntstiften erstellt, immerhin innerhalb der Linien. Seitdem will niemand mehr „Ideen für alle“. Hedi_Taktgeber hat das Firmenhandy im Fluss versenkt.",
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −10,3 %" }],
-        "headline": "Shitstorm über Taktgeber Strom"
+        "text": "Das Netz zerreißt Ausbau Werke. Die Geschäftsführung hat das wichtigste Meeting des Jahres verschlafen, im Meetingraum. Seitdem will niemand mehr „Maschinen nach Maß“. Anke_Ausbau hat das Firmenhandy im Fluss versenkt.",
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −10,6 %" }],
+        "headline": "Shitstorm über Ausbau Werke"
       },
       {
         "kind": "scandal",
-        "text": "Peinlich für Gero_Garage: Ein Mitarbeiter hat die gesamte Kundendatei alphabetisch nach Vornamen des Haustiers sortiert. „Fahrräder reparieren“ klang auf dem Papier besser. Das Image von Gero Werkstatt ist im Eimer.",
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −20,9 %" }],
-        "headline": "Kunden fliehen vor Gero Werkstatt"
+        "text": "Das Netz zerreißt Fenja Pixel. Im Lager wurde ein Praktikant gefunden, der seit drei Wochen vermisst war. Er hatte niemandem gefehlt. Seitdem will niemand mehr „Logos für Vereine“. Fenja_Firma hat das Firmenhandy im Fluss versenkt.",
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −10,9 %" }],
+        "headline": "Shitstorm über Fenja Pixel"
       },
       {
         "kind": "stock",
-        "text": "Schlechte Nachrichten von Brotzeit Handel AG: Durch einen Fehler der Rechtsabteilung hat sich die Firma selbst verklagt und droht zu gewinnen. Minus 13,3 %, und der Tag ist noch jung.",
-        "effects": [{ "tone": "loss", "label": "BRZ −13,3 %" }],
-        "headline": "Brotzeit Handel AG im Sinkflug"
+        "text": "Ein Hund hat auf der Hauptversammlung einen Antrag gestellt, und er wurde angenommen. Die Börse feiert: Sonnenkern Fusion steigt um 11,8 %. Wer nicht dabei ist, darf sich jetzt ärgern.",
+        "effects": [{ "tone": "gain", "label": "FSN +11,8 %" }],
+        "headline": "Kursrakete Sonnenkern Fusion"
       },
       {
         "kind": "stock",
-        "text": "Ein Hund hat auf der Hauptversammlung einen Antrag gestellt, und er wurde angenommen. Die Börse feiert: SolarFuchs steigt um 13,1 %. Wer nicht dabei ist, darf sich jetzt ärgern.",
-        "effects": [{ "tone": "gain", "label": "SFX +13,1 %" }],
-        "headline": "Kursrakete SolarFuchs"
+        "text": "Eine Möwe hat das Firmenlogo vom Dach gestohlen, die Aktionäre deuten das als Omen. Der Kurs von SolarFuchs sackt um 7,9 % ab. Ein Krisenstab tagt.",
+        "effects": [{ "tone": "loss", "label": "SFX −7,9 %" }],
+        "headline": "Panik bei SolarFuchs"
       },
       {
-        "kind": "tasks",
-        "text": "Ein Fernsehkoch hat erklärt, man könne Geld auch behalten. Alle offenen Firmen-Aufgaben sind 38,3 % weniger wert. Die Chefs dürfen ruhig ein bisschen schwitzen.",
-        "effects": [{ "tone": "loss", "label": "Aufgaben −38,3 %" }],
-        "headline": "Kunden entdecken das Sparen"
+        "kind": "sector",
+        "text": "Die ganze Branche Einzelhandel steigt um 8,6 %. Das Horoskop hat es vorhergesagt. So funktioniert Wirtschaft, liebe Kinder.",
+        "effects": [{ "tone": "gain", "label": "Einzelhandel +8,6 %" }],
+        "headline": "Die Branche Einzelhandel dreht durch"
       },
       {
         "kind": "winner",
-        "text": "11389,3 % Plus, 1.138.930 € Gewinn: Fixture_Neu zeigt dem Rest, wie es geht. Alle anderen dürfen jetzt neidisch sein. Bitte der Reihe nach.",
+        "text": "Und nun zu jemandem, der es kann: Fixture_Neu hat heute 1.139.620 € gemacht, 11396,2 % im Plus. Wir gratulieren zähneknirschend.",
         "effects": [],
-        "headline": "Fixture_Neu schwimmt im Geld"
+        "headline": "Fixture_Neu sahnt ab: plus 1.139.620 €"
       },
       {
         "kind": "tip",
-        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Helix Robotik geht bald nach oben. Das Vögelchen lag bisher meistens richtig. Meistens.",
-        "effects": [{ "tone": "neutral", "label": "HLX ↑ Tipp" }],
-        "headline": "Der heiße Draht: Helix Robotik"
+        "text": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei NeuroPharm AG tut sich in der nächsten Stunde etwas, und zwar nach unten. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
+        "effects": [{ "tone": "neutral", "label": "NPH ↓ Tipp" }],
+        "headline": "Mr. Doodle Dangles Geheimtipp"
       }
     ],
-    "started_at": "2026-11-14T23:11:03.73202+00:00"
+    "started_at": "2026-11-14T23:34:33.566531+00:00"
   },
   "viewers": 3,
   "upcoming": null,
