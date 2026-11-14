@@ -1,12 +1,13 @@
 {
   "offers": [
     {
-      "id": "97e5a3b8-f2ee-4b39-acb1-ac1f824a22f7",
+      "id": "556049eb-b914-419c-88b6-071e176ae74b",
       "kind": "ipo",
+      "mine": false,
       "status": "open",
       "ticker": null,
       "company": {
-        "id": "af236097-7bec-4e98-8f88-2715690b3aba",
+        "id": "e88c9bf9-3cf9-43fa-b553-a2494a8cd8d1",
         "logo": null,
         "name": "Bodos Garage",
         "color": "#446622",
@@ -14,21 +15,24 @@
         "sector": "tech",
         "product_key": "security_software"
       },
-      "ends_at": "2026-11-15T07:34:30.077105+00:00",
+      "ends_at": "2026-11-14T20:03:05.131833+00:00",
+      "starts_at": "2026-11-14T19:53:05.131833+00:00",
       "price_cents": 100,
-      "value_cents": 307639,
+      "value_cents": 521519,
       "last_quarter": null,
       "my_shares_e6": 0,
+      "shares_ai_e6": 2138807333,
       "shares_offered_e6": 200000000000,
       "shares_subscribed_e6": 0
     },
     {
-      "id": "fe5aa8ba-5683-4e7b-ba71-2e090c69c325",
+      "id": "662c7e31-5654-4920-829c-cea271d7c685",
       "kind": "ipo",
+      "mine": false,
       "status": "open",
       "ticker": null,
       "company": {
-        "id": "b12c5bc4-5efd-4d9e-b4f5-294d8209e0d7",
+        "id": "cb4995aa-8f2f-400c-b34e-0376874d8f9f",
         "logo": {
           "grid": [
             "................",
@@ -56,21 +60,24 @@
         "sector": "tech",
         "product_key": "security_software"
       },
-      "ends_at": "2026-11-15T07:34:45.977338+00:00",
+      "ends_at": "2026-11-14T20:03:22.54013+00:00",
+      "starts_at": "2026-11-14T19:53:22.54013+00:00",
       "price_cents": 100,
-      "value_cents": 1112844,
+      "value_cents": 1127084,
       "last_quarter": { "label": "J1 Q2", "profit_cents": 0, "revenue_cents": 0 },
       "my_shares_e6": 250000000,
+      "shares_ai_e6": 0,
       "shares_offered_e6": 200000000000,
       "shares_subscribed_e6": 250000000
     },
     {
-      "id": "5b0c3caa-8aae-40db-8b65-3b98daf17fe3",
+      "id": "806551d8-691b-4f5d-9f17-abe3c8f8f134",
       "kind": "ipo",
+      "mine": false,
       "status": "closed",
       "ticker": "FEN",
       "company": {
-        "id": "56883cc4-4fd7-4401-92c1-c8c18ad7a177",
+        "id": "1484990f-1c49-4ac2-b70e-8fa0b99a257a",
         "logo": {
           "grid": [
             "................",
@@ -98,21 +105,24 @@
         "sector": "tech",
         "product_key": "security_software"
       },
-      "ends_at": "2026-11-14T19:34:22.592861+00:00",
+      "ends_at": "2026-11-14T19:52:57.4807+00:00",
+      "starts_at": "2026-11-14T19:52:58.42805+00:00",
       "price_cents": 100,
-      "value_cents": 18323991,
+      "value_cents": 18356896,
       "last_quarter": { "label": "J1 Q3", "profit_cents": 0, "revenue_cents": 0 },
       "my_shares_e6": 0,
+      "shares_ai_e6": 97500000000,
       "shares_offered_e6": 300000000000,
       "shares_subscribed_e6": 700500000
     },
     {
-      "id": "7f37b394-c7d8-41a7-9ef2-c5180d25f8b6",
+      "id": "f4046dab-9f30-438a-a223-85d2ce5d7976",
       "kind": "capital_increase",
+      "mine": false,
       "status": "closed",
       "ticker": "FEN",
       "company": {
-        "id": "56883cc4-4fd7-4401-92c1-c8c18ad7a177",
+        "id": "1484990f-1c49-4ac2-b70e-8fa0b99a257a",
         "logo": {
           "grid": [
             "................",
@@ -140,13 +150,65 @@
         "sector": "tech",
         "product_key": "security_software"
       },
-      "ends_at": "2026-11-14T19:34:22.718741+00:00",
+      "ends_at": "2026-11-14T19:52:57.671429+00:00",
+      "starts_at": "2026-11-14T19:52:58.606183+00:00",
       "price_cents": 100,
-      "value_cents": 18323991,
+      "value_cents": 18356896,
       "last_quarter": { "label": "J1 Q3", "profit_cents": 0, "revenue_cents": 0 },
       "my_shares_e6": 0,
-      "shares_offered_e6": 79797200000,
+      "shares_ai_e6": 25068468750,
+      "shares_offered_e6": 79820000000,
       "shares_subscribed_e6": 300000000
+    },
+    {
+      "id": "93edd1a5-ebb2-4993-a2b4-876f009e501a",
+      "kind": "ipo",
+      "mine": false,
+      "status": "closed",
+      "ticker": "TAL",
+      "company": {
+        "id": "207b650f-6d22-4080-9a9d-234b58fbe0c5",
+        "logo": null,
+        "name": "Talwerk",
+        "color": "#663399",
+        "stage": 0,
+        "sector": "retail",
+        "product_key": "online_shop"
+      },
+      "ends_at": "2026-11-14T19:53:20.172244+00:00",
+      "starts_at": "2026-11-14T19:48:21.166505+00:00",
+      "price_cents": 100,
+      "value_cents": 10010000,
+      "last_quarter": null,
+      "my_shares_e6": 0,
+      "shares_ai_e6": 97500000000,
+      "shares_offered_e6": 300000000000,
+      "shares_subscribed_e6": 100000000
+    },
+    {
+      "id": "9ff7113e-37ca-4808-90dc-dca9cb80cbdf",
+      "kind": "ipo",
+      "mine": false,
+      "status": "closed",
+      "ticker": "GIP",
+      "company": {
+        "id": "376b118d-4d45-4bcb-ad7b-04c30ef1748f",
+        "logo": null,
+        "name": "Gipfelwerk",
+        "color": "#336699",
+        "stage": 0,
+        "sector": "retail",
+        "product_key": "online_shop"
+      },
+      "ends_at": "2026-11-14T20:03:20.981121+00:00",
+      "starts_at": "2026-11-14T19:53:20.981121+00:00",
+      "price_cents": 100,
+      "value_cents": 20250000,
+      "last_quarter": null,
+      "my_shares_e6": 0,
+      "shares_ai_e6": 0,
+      "shares_offered_e6": 200000000000,
+      "shares_subscribed_e6": 200000000000
     }
   ]
 }

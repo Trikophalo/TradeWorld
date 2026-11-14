@@ -9,7 +9,6 @@ import { Button, type ButtonState } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Card } from "@/components/ui/card";
 import { Countdown } from "@/components/ui/countdown";
-import { Field } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Sheet } from "@/components/ui/sheet";
 import { Slider } from "@/components/ui/slider";
@@ -17,10 +16,9 @@ import { toast } from "@/components/ui/toast";
 import { BALANCE } from "@/config/balance";
 import { useMyJob } from "@/features/career/hooks";
 import { useGameErrorText } from "@/features/game/errors";
-import { engine } from "@/features/game/store";
+import { engine, useGame } from "@/features/game/store";
 import type { MyCompany, Offer } from "@/features/game/types";
 import { CompanyLogo } from "@/features/market/components/company-logo";
-import { parseEuroCents } from "@/features/market/order-schema";
 import { formatMoney, formatPrice, formatShares } from "@/lib/format";
 import { issuePriceCents } from "@/lib/sim/startup";
 import { playSound } from "@/lib/sound";
@@ -105,11 +103,13 @@ export function ListingCard({ company }: { company: MyCompany }) {
   );
 }
 
+/** Subscribed shares (players and AI investors) and the time left of the 10-minute window (ADR-146). */
 function OfferProgress({ offer }: { offer: Offer }) {
   const t = useTranslations("listing");
-  const share = offer.sharesSubscribedE6 / Math.max(1, offer.sharesOfferedE6);
+  const taken = offer.sharesSubscribedE6 + offer.sharesAiE6;
+  const share = taken / Math.max(1, offer.sharesOfferedE6);
   return (
-    <div className="space-y-2 rounded-md bg-surface-2 px-3 py-3">
+    <div className="space-y-2 rounded-md bg-surface-2 px-3 py-3" data-testid="offer-progress">
       <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
         <span className="text-fg-1">{offer.kind === "ipo" ? t("subscriptionIpo") : t("subscriptionIncrease")}</span>
         <span className="text-fg-3">
@@ -119,11 +119,13 @@ function OfferProgress({ offer }: { offer: Offer }) {
       <Progress value={share} label={t("subscribed")} tone="gain" />
       <p className="nums text-xs text-fg-3">
         {t("subscribedValue", {
-          subscribed: formatShares(offer.sharesSubscribedE6),
+          subscribed: formatShares(taken),
           offered: formatShares(offer.sharesOfferedE6),
+          percent: Math.floor(share * 100),
           price: formatMoney(offer.priceCents),
         })}
       </p>
+      <p className="text-xs text-pretty text-fg-3">{t("fullHint")}</p>
     </div>
   );
 }
@@ -164,7 +166,10 @@ function IssueSheet({
       else await engine.capitalIncrease(crypto.randomUUID(), percent);
       setState("success");
       void playSound("levelUp");
-      toast.success(isIpo ? t("ipoStarted") : t("increaseStarted"), t("startedText", { hours: ipo.subscriptionHours }));
+      toast.success(
+        isIpo ? t("ipoStarted") : t("increaseStarted"),
+        t("startedText", { minutes: ipo.subscriptionMinutes }),
+      );
       await refresh();
       window.setTimeout(onClose, 400);
     } catch (error) {
@@ -178,7 +183,11 @@ function IssueSheet({
       open={kind !== null}
       onOpenChange={(o) => !o && onClose()}
       title={isIpo ? t("goPublic") : t("capitalIncrease")}
-      description={isIpo ? t("ipoIntro") : t("increaseIntro")}
+      description={
+        isIpo
+          ? t("ipoIntro", { minutes: ipo.subscriptionMinutes })
+          : t("increaseIntro", { minutes: ipo.subscriptionMinutes })
+      }
       footer={
         <Button block size="lg" state={state} onClick={() => void start()}>
           {t("start")}
@@ -202,7 +211,7 @@ function IssueSheet({
           <Row label={t("maxProceeds")} value={money(shares * price)} />
           {isIpo && <Row label={t("youKeep")} value={`${100 - percent} %`} />}
         </dl>
-        <p className="text-xs text-pretty text-fg-3">{t("aiHint")}</p>
+        <p className="text-xs text-pretty text-fg-3">{t("aiHint", { minutes: ipo.subscriptionMinutes })}</p>
       </div>
     </Sheet>
   );
@@ -223,100 +232,99 @@ export function useOffers() {
   return useQuery({ queryKey: ["company", "offers"], queryFn: () => engine.offers(), refetchInterval: 30_000 });
 }
 
-/** New issues players can subscribe to (ADR-067), shown on the markets page. */
+/** New issues players can subscribe to (ADR-067, ADR-146), shown on the markets page: one tap per amount. */
 export function OffersCard() {
   const t = useTranslations("listing");
   const offers = useOffers();
-  const product = useProductText();
-  const [open, setOpen] = useState<Offer | null>(null);
   const list = offers.data?.filter((o) => o.status === "open") ?? [];
   if (list.length === 0) return null;
   return (
-    <Card padding="lg" className="space-y-3" data-testid="offers">
-      <p className="label-pixel text-fg-2">{t("offersTitle")}</p>
-      <ul className="space-y-3">
+    <Card padding="lg" className="space-y-4" data-testid="offers">
+      <div>
+        <p className="label-pixel text-fg-2">{t("offersTitle")}</p>
+        <p className="mt-1 text-sm text-pretty text-fg-3">{t("offersIntro", { minutes: ipo.subscriptionMinutes })}</p>
+      </div>
+      <ul className="space-y-5">
         {list.map((o) => (
-          <li key={o.id} className="flex items-center gap-3">
-            <CompanyLogo ticker={o.company.name} color={o.company.color} logo={o.company.logo} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-medium text-fg-1">{o.company.name}</p>
-              <p className="truncate text-xs text-fg-3">
-                {o.company.productKey ? product.name(o.company.productKey) : ""} · {formatMoney(o.priceCents)}{" "}
-                {t("perShare")}
-              </p>
-            </div>
-            <Button size="sm" onClick={() => setOpen(o)}>
-              {t("subscribe")}
-            </Button>
-          </li>
+          <OfferItem key={o.id} offer={o} />
         ))}
       </ul>
-      <SubscribeSheet offer={open} onClose={() => setOpen(null)} />
     </Card>
   );
 }
 
-function SubscribeSheet({ offer, onClose }: { offer: Offer | null; onClose: () => void }) {
+function OfferItem({ offer }: { offer: Offer }) {
   const t = useTranslations("listing");
+  const product = useProductText();
   const errorText = useGameErrorText();
   const refresh = useCompanyRefresh();
-  const [shown, setShown] = useState(offer);
-  const [text, setText] = useState("");
-  const [state, setState] = useState<ButtonState>("idle");
-  if (offer && offer !== shown) {
-    setShown(offer);
-    setText("");
-    setState("idle");
-  }
-  if (!shown) return null;
-  const cents = parseEuroCents(text);
-  const subscribe = async () => {
-    if (!cents) return;
-    setState("loading");
+  const offers = useOffers();
+  const cashCents = useGame((state) => state.portfolio?.cashCents ?? null);
+  const refreshPortfolio = useGame((state) => state.refreshPortfolio);
+  const [busy, setBusy] = useState<{ amount: number; state: ButtonState } | null>(null);
+  const freeE6 = Math.max(0, offer.sharesOfferedE6 - offer.sharesSubscribedE6 - offer.sharesAiE6);
+  const restCents = Math.ceil((freeE6 * offer.priceCents) / 1_000_000);
+  const amounts = [...ipo.quickAmountsCents.filter((a) => a < restCents), restCents].filter((a) => a > 0);
+
+  const subscribe = async (amountCents: number) => {
+    setBusy({ amount: amountCents, state: "loading" });
     try {
-      const r = await engine.subscribeOffer(crypto.randomUUID(), shown.id, cents);
-      setState("success");
+      const r = await engine.subscribeOffer(crypto.randomUUID(), offer.id, amountCents);
+      setBusy({ amount: amountCents, state: "success" });
       void playSound("buy");
       toast.success(
-        t("subscribedDone"),
+        r.completed ? t("listedNow", { name: offer.company.name }) : t("subscribedDone"),
         t("subscribedDoneText", { shares: formatShares(r.sharesE6), amount: formatMoney(r.amountCents) }),
       );
-      await refresh();
-      window.setTimeout(onClose, 400);
+      await Promise.all([refresh(), offers.refetch(), refreshPortfolio()]);
     } catch (error) {
-      setState("idle");
       toast.error(t("subscribe"), errorText(error));
+    } finally {
+      window.setTimeout(() => setBusy(null), 600);
     }
   };
+
   return (
-    <Sheet
-      open={offer !== null}
-      onOpenChange={(o) => !o && onClose()}
-      title={t("subscribeTitle", { name: shown.company.name })}
-      description={t("subscribeIntro")}
-      footer={
-        <Button block size="lg" state={state} disabled={!cents} onClick={() => void subscribe()}>
-          {t("subscribe")}
-        </Button>
-      }
-    >
-      <div className="space-y-4">
-        <OfferProgress offer={shown} />
-        {shown.lastQuarter && (
-          <p className="nums text-sm text-fg-2">
-            {shown.lastQuarter.label}: {t("revenue")} {money(shown.lastQuarter.revenueCents)} · {t("profit")}{" "}
-            {money(shown.lastQuarter.profitCents)}
+    <li className="space-y-3" data-testid="offer">
+      <div className="flex items-center gap-3">
+        <CompanyLogo ticker={offer.company.name} color={offer.company.color} logo={offer.company.logo} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium text-fg-1">{offer.company.name}</p>
+          <p className="truncate text-xs text-fg-3">
+            {offer.company.productKey ? `${product.name(offer.company.productKey)} · ` : ""}
+            {formatMoney(offer.priceCents)} {t("perShare")}
           </p>
-        )}
-        <Badge>{t("valueBadge", { value: money(shown.valueCents) })}</Badge>
-        <Field label={t("amount")} inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} />
-        {cents ? (
-          <p className="nums text-sm text-fg-2">
-            {t("youGet", { shares: Math.floor(cents / shown.priceCents).toLocaleString("de-DE") })}
-          </p>
-        ) : null}
-        <p className="text-xs text-pretty text-fg-3">{t("risk")}</p>
+        </div>
+        <Badge>{t("valueBadge", { value: money(offer.valueCents) })}</Badge>
       </div>
-    </Sheet>
+      <OfferProgress offer={offer} />
+      {offer.mine ? (
+        <p className="text-xs text-pretty text-fg-3">{t("ownOffer")}</p>
+      ) : (
+        <>
+          <div role="group" aria-label={t("amount")} className="flex flex-wrap gap-2">
+            {amounts.map((amount) => {
+              const isRest = amount === restCents;
+              return (
+                <Button
+                  key={amount}
+                  size="sm"
+                  variant={isRest ? "primary" : "secondary"}
+                  state={busy?.amount === amount ? busy.state : "idle"}
+                  disabled={(busy !== null && busy.amount !== amount) || (cashCents !== null && cashCents < amount)}
+                  onClick={() => void subscribe(amount)}
+                >
+                  {isRest ? t("subscribeRest", { amount: money(amount) }) : money(amount)}
+                </Button>
+              );
+            })}
+          </div>
+          {offer.mySharesE6 > 0 && (
+            <p className="nums text-xs text-fg-2">{t("yourShares", { shares: formatShares(offer.mySharesE6) })}</p>
+          )}
+          <p className="text-xs text-pretty text-fg-3">{t("risk")}</p>
+        </>
+      )}
+    </li>
   );
 }

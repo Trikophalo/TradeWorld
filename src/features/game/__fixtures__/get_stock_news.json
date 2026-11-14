@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Die Chefetage von Fundgrube Discount steht wegen einer Affäre in der Kritik. Anleger werden nervös. Sicher ist das nicht.",
-      "name": "Fundgrube Discount",
-      "due_at": "2026-11-14T21:10:01.419544+00:00",
+      "body": "Die Nachfrage übertrifft alle Erwartungen. Händler rechnen mit einem leicht steigenden Kurs. Sicher ist das nicht.",
+      "name": "Alpenmed",
+      "due_at": "2026-11-14T21:26:27.006418+00:00",
       "status": "open",
-      "ticker": "FGD",
-      "headline": "Affäre erschüttert Fundgrube Discount",
+      "ticker": "ALM",
+      "headline": "Alpenmed: Neues Produkt ausverkauft",
       "move_bps": null,
-      "strength": 2,
-      "direction": "down",
-      "published_at": "2026-11-14T20:34:48.888797+00:00"
+      "strength": 1,
+      "direction": "up",
+      "published_at": "2026-11-14T20:53:25.838228+00:00"
     },
     {
       "id": 3,
-      "body": "Ein großer Konkurrent soll Interesse haben. Spekulanten könnten den Kurs spürbar treiben. Sicher ist das nicht.",
-      "name": "Luftpost Drohnen",
-      "due_at": "2026-11-14T19:34:48.884976+00:00",
+      "body": "Ermittler durchsuchen die Zentrale wegen des Verdachts auf Bilanztricks. Sicher ist das nicht.",
+      "name": "Orbitfracht",
+      "due_at": "2026-11-14T19:53:25.829207+00:00",
       "status": "confirmed",
-      "ticker": "DRN",
-      "headline": "Übernahmegerüchte um Luftpost Drohnen",
-      "move_bps": 616,
-      "strength": 2,
-      "direction": "up",
-      "published_at": "2026-11-14T19:34:48.884976+00:00"
+      "ticker": "OFR",
+      "headline": "Razzia bei Orbitfracht",
+      "move_bps": -380,
+      "strength": 1,
+      "direction": "down",
+      "published_at": "2026-11-14T19:53:25.829207+00:00"
     }
   ],
   "reliability_bps": 7500

@@ -49,11 +49,15 @@ describe("RPC contract", () => {
     });
   }
 
-  it("the snapshot contains the 25 stocks, 4 bonds and the index", () => {
+  it("the snapshot contains the 25 AI stocks, the listed player companies, 4 bonds and the index", () => {
     const snapshot = RPC_SCHEMAS.get_market_snapshot.parse(
       JSON.parse(readFileSync(dir + "get_market_snapshot.json", "utf8")),
     );
-    expect(snapshot.securities.filter((s) => s.kind === "stock")).toHaveLength(25);
+    const stocks = snapshot.securities.filter((s) => s.kind === "stock");
+    expect(stocks.filter((s) => s.company_kind === "ai")).toHaveLength(25);
+    // Player companies stand in the same list (ADR-145), every stock with a popularity score.
+    expect(stocks.some((s) => s.company_kind === "player")).toBe(true);
+    for (const s of stocks) expect(s.popularity).toBeGreaterThanOrEqual(0);
     expect(snapshot.securities.filter((s) => s.kind === "bond")).toHaveLength(4);
     expect(snapshot.index.ticker).toBe("NEXA30");
     for (const s of snapshot.securities) expect(s.bid_e4).toBeLessThan(s.ask_e4);

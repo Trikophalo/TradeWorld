@@ -68,8 +68,10 @@ select tests.assert(
           -- Mira (ADR-138)
           || array['company_assistant_context']
           -- NFTs (9b)
-          || array['get_artwork_chat', 'post_artwork_message', 'accept_artwork_offer', 'set_artwork_price', 'buy_artwork']) x),
-  'authenticated can execute exactly the 9 helpers and the RPCs up to the NFTs (9b)');
+          || array['get_artwork_chat', 'post_artwork_message', 'accept_artwork_offer', 'set_artwork_price', 'buy_artwork']
+          -- popular stocks first (9g)
+          || array['record_security_view']) x),
+  'authenticated can execute exactly the 9 helpers and the RPCs up to the market popularity (9g)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute') and p.proname <> 'check_nickname'),

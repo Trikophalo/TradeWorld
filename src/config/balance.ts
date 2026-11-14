@@ -763,6 +763,20 @@ export interface SocialConfig {
   readonly friendCode: { readonly bonusCents: number };
 }
 
+/** Popular stocks first in the market list (ADR-145). */
+export interface MarketPopularityConfig {
+  /** Views and investments of this many days count. */
+  readonly windowDays: number;
+  /** A player's view of one stock counts again only after this pause. */
+  readonly viewCooldownMinutes: number;
+  /** At most this many counted views per player and day. */
+  readonly maxViewsPerDay: number;
+  /** The ranking is recomputed this often (with the market snapshot). */
+  readonly refreshMinutes: number;
+  /** score = views × view + investors × investor + floor(√(bought euros) × volume) */
+  readonly weights: { readonly view: number; readonly investor: number; readonly volume: number };
+}
+
 /** Stock news with a lead (ADR-119): hints that announce a price move. */
 export interface StockNewsConfig {
   /** A new hint this often. */
@@ -822,6 +836,7 @@ export interface BalanceConfig {
   /** Cryptocurrencies and own coins (ADR-101), values in crypto.ts. */
   readonly crypto: CryptoConfig;
   readonly stockNews: StockNewsConfig;
+  readonly marketPopularity: MarketPopularityConfig;
   /** Business moves of player companies (ADR-127), values in company-moves.ts. */
   readonly companyMoves: typeof COMPANY_MOVE_RULES & { readonly moves: readonly CompanyMoveConfig[] };
   /** Company tasks with mini-games (ADR-129), values in company-tasks.ts. */
@@ -1202,8 +1217,17 @@ export interface StartupsConfig {
     readonly maxSharePercent: number;
     /** Issue price = company value / shares, at least this (cents per share). */
     readonly minIssuePriceCents: number;
-    readonly subscriptionHours: number;
-    /** AI investors take this share of what players leave: base + perQuality × quality (0..1). */
+    /**
+     * Subscription window (ADR-146): at most this long. Once every offered share is subscribed the company is listed
+     * at once; at the end it is listed with what was subscribed.
+     */
+    readonly subscriptionMinutes: number;
+    /** One-tap amounts for subscribers (cents); "the rest" is offered as well. */
+    readonly quickAmountsCents: readonly number[];
+    /**
+     * AI investors subscribe this share of the offered shares, spread evenly over the window (ADR-146):
+     * base + perQuality × quality (0..1).
+     */
     readonly aiTakeBase: number;
     readonly aiTakePerQuality: number;
     /** Capital increase: new shares at this share of the market price, at most this many % per round. */
@@ -2268,7 +2292,8 @@ export const BALANCE = {
       minSharePercent: 10,
       maxSharePercent: 49,
       minIssuePriceCents: 100,
-      subscriptionHours: 12,
+      subscriptionMinutes: 10,
+      quickAmountsCents: [10_000, 100_000, 1_000_000],
       aiTakeBase: 0.2,
       aiTakePerQuality: 0.5,
       capitalIncreaseDiscount: 0.9,
@@ -2407,6 +2432,13 @@ export const BALANCE = {
     shareFallShare: 0.5,
     maxShareBps: 2_000,
     minBps: 6_000,
+  },
+  marketPopularity: {
+    windowDays: 3,
+    viewCooldownMinutes: 30,
+    maxViewsPerDay: 200,
+    refreshMinutes: 5,
+    weights: { view: 1, investor: 20, volume: 0.2 },
   },
   stockNews: {
     everyMinutes: 12,

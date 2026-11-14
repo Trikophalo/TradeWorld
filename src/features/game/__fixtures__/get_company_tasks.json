@@ -7,12 +7,12 @@
       "game": "pick",
       "mine": true,
       "branch": "logistics",
-      "due_at": "2026-11-14T20:14:49.298781+00:00",
+      "due_at": "2026-11-14T20:33:26.256871+00:00",
       "status": "assigned",
       "assignee": "Fx_Taskmid",
       "opened_at": null,
       "ai_done_at": null,
-      "created_at": "2026-11-14T19:34:49.298781+00:00",
+      "created_at": "2026-11-14T19:53:26.256871+00:00",
       "assigned_by": "Fx_Taskboss",
       "assignee_ai": false,
       "value_cents": 44000,
@@ -24,12 +24,12 @@
       "game": "seq",
       "mine": false,
       "branch": "sales",
-      "due_at": "2026-11-14T20:14:49.298781+00:00",
+      "due_at": "2026-11-14T20:33:26.256871+00:00",
       "status": "ai",
       "assignee": null,
       "opened_at": null,
-      "ai_done_at": "2026-11-14T19:46:49.310102+00:00",
-      "created_at": "2026-11-14T19:34:49.298781+00:00",
+      "ai_done_at": "2026-11-14T20:05:26.280188+00:00",
+      "created_at": "2026-11-14T19:53:26.256871+00:00",
       "assigned_by": "Fx_Taskboss",
       "assignee_ai": true,
       "value_cents": 36000,
@@ -38,7 +38,7 @@
   ],
   "people": [
     {
-      "tag": "TTCF",
+      "tag": "TLNA",
       "tier": "senior",
       "is_me": true,
       "nickname": "Fx_Taskmid",
@@ -47,7 +47,7 @@
       "reports_to_me": false
     },
     {
-      "tag": "UP65",
+      "tag": "DVVR",
       "tier": "intern",
       "is_me": false,
       "nickname": "Fx_Tasknew",
@@ -58,7 +58,7 @@
   ],
   "auto_ai": false,
   "company": {
-    "id": "d42ec504-50bc-46de-a6f5-b23792a85375",
+    "id": "07989a92-72ed-40ab-a694-631ca15e1005",
     "name": "Fixture Mode",
     "tier": "garage",
     "product": "fashion"
@@ -71,7 +71,7 @@
       "status": "success",
       "done_by": "Fx_Taskboss",
       "score_bps": 10000,
-      "resolved_at": "2026-11-14T19:34:49.322557+00:00",
+      "resolved_at": "2026-11-14T19:53:26.300444+00:00",
       "result_cents": 44000
     }
   ],

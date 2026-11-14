@@ -8,7 +8,7 @@
   },
   "entries": [
     {
-      "tag": "MC73",
+      "tag": "X8QC",
       "rank": 1,
       "is_me": false,
       "level": 15,
@@ -17,7 +17,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "JHFN",
+      "tag": "4H5L",
       "rank": 2,
       "is_me": false,
       "level": 8,
@@ -26,7 +26,7 @@
       "growth_bps": 0
     },
     {
-      "tag": "VCCM",
+      "tag": "V2VG",
       "rank": 3,
       "is_me": true,
       "level": 15,
@@ -36,10 +36,10 @@
     }
   ],
   "last_winner": {
-    "tag": "VCCM",
+    "tag": "V2VG",
     "nickname": "Fixture_Gmbh",
     "avatar_key": "rookie",
-    "growth_bps": 235,
+    "growth_bps": 234,
     "week_start": "2026-11-02"
   }
 }

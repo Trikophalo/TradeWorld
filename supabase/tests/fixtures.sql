@@ -1117,6 +1117,13 @@ select public.get_seen_tours();
 \o
 reset role;
 
+-- Popular stocks first (ADR-145) -----------------------------------------------------------------------------------
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/record_security_view.json
+select public.record_security_view(gen_random_uuid(), 'KLS');
+\o
+reset role;
+
 -- NFTs (ADR-135): fixed price, offer chat with an accepted offer, a purchase, an AI collector's offer ----------------
 select tests.login_as('authenticated', :p) is null as ok \gset
 \o :fixture_dir/set_artwork_price.json

@@ -4644,23 +4644,27 @@ shares_offered_e6, shares_subscribed_e6, shares_ai_e6, status, security_id, ends
   (`company_upgrade_unavailable`), Prozent zwischen `minSharePercent` und `maxSharePercent` (`invalid_argument`),
   noch nicht an der Börse und keine laufende Zeichnung (`already_listed`).
 - Angeboten werden `sharesTotal` × p % zu `issuePriceCents(Firmenwert)`, Zeichnung bis jetzt +
-  `subscriptionHours`. `companies.phase` wird `ipo`.
+  `subscriptionMinutes` (10, ADR-146; vorher `subscriptionHours`). `companies.phase` wird `ipo`.
 
 **`capital_increase(p_request_id, p_share_percent)` → `{ company }`:**
 
 - Nur börsennotiert und ohne laufendes Angebot; 1 bis `capitalIncreaseMaxPercent` % der ausgegebenen Aktien.
 - Preis = `capitalIncreasePriceCents(letzter Kurs)`.
 
-**`subscribe_offer(p_request_id, p_offer_id, p_amount_cents)` → `{ shares_e6, amount_cents, offer }`:**
+**`subscribe_offer(p_request_id, p_offer_id, p_amount_cents)` → `{ shares_e6, amount_cents, completed, offer }`:**
 
-- Aktien in Millionsteln = ⌊Betrag × 10⁶ / Preis⌋, höchstens der Rest. Bezahlt wird ⌈Aktien × Preis / 10⁶⌉ an die
-  Firmenkasse.
+- Aktien in Millionsteln = ⌊Betrag × 10⁶ / Preis⌋, höchstens der Rest (angeboten − Spieler − KI). Bezahlt wird
+  ⌈Aktien × Preis / 10⁶⌉ an die Firmenkasse.
+- Nimmt die Zeichnung die letzte Aktie, schließt das Angebot sofort (`close_share_offer`, `completed = true`): die Firma
+  ist an der Börse (ADR-146).
 - Fehler: `offer_closed`, `offer_sold_out`, `insufficient_funds`, `invalid_argument` (auch für den Gründer).
 
-**Ende der Zeichnung** (`close_due_offers()` in `run_due_jobs()`):
+**Während und am Ende der Zeichnung** (`close_due_offers()` jede Minute in `run_due_part`):
 
-- KI-Investoren übernehmen `aiTakeShare(Qualität)` des Rests aus dem Finanzmarkt-Topf; der Rest wird nicht
-  ausgegeben.
+- KI-Investoren zeichnen `aiTakeShare(Qualität)` des Angebots gleichmäßig über das Zeitfenster
+  (`share_offer_ai_topup`, `aiSubscribedE6`), nie mehr als frei ist, bezahlt aus dem Finanzmarkt-Topf
+  (`shares_ai_e6`). Volle Angebote schließen sofort, fällige am Ende des Fensters; dabei bekommen die KI-Investoren
+  den Rest ihres Anteils. Was dann niemand gezeichnet hat, wird nicht ausgegeben.
 - Beim Börsengang:
   - Neues Wertpapier (Aktie, Ticker aus 3–4 Großbuchstaben des Namens, eindeutig, Branche der Firma, gelistet).
   - Kurs = Ausgabepreis; Fair Value = Firmenwert / ausgegebene Aktien, bei jedem Quartalsabschluss neu.
@@ -4675,7 +4679,8 @@ shares_offered_e6, shares_subscribed_e6, shares_ai_e6, status, security_id, ends
 
 - `get_offers()` → `{ offers: [OFFER] }`: laufende Angebote und solche, die in den letzten 24 h geendet haben.
 - OFFER = `{ id, kind, company: { id, name, color, logo, sector, product_key, stage }, ticker, price_cents,
-shares_offered_e6, shares_subscribed_e6, ends_at, status, my_shares_e6, value_cents, last_quarter }`.
+shares_offered_e6, shares_subscribed_e6, shares_ai_e6, starts_at, ends_at, status, mine, my_shares_e6, value_cents,
+last_quarter }` (`shares_ai_e6`, `starts_at` und `mine` = Betrachter ist der Gründer seit ADR-146).
 - COMPANY liefert zusätzlich:
   - `listing`: null oder `{ status 'subscription' | 'listed', ticker, shares_total_e6, founder_shares_e6,
 offer, last_price_e4 }`
@@ -7354,3 +7359,37 @@ Nachfrage eines Bieters), `nft_fair_cents(artwork, now)`, `nft_ai_trade_price_ce
 `nft_ai_value_cents()` enthält jetzt die Nachfrage. `nfts_run_due()` handelt zusätzlich unter Sammlern (Rückgabe
 `traded`); solche Verkäufe sind `artwork_sales.kind = 'ai'` mit `seller_ai` und `buyer_ai`. Test
 `supabase/tests/9e_nft_market.sql`.
+
+## Nachtrag: Beliebte Aktien zuerst (ADR-145) und Börsengang in 10 Minuten (ADR-146)
+
+Migration `20261204001700_market_popularity_ipo.sql`, Test `supabase/tests/9g_market_popularity.sql`.
+
+Tabellen, alle mit RLS und ohne Client-Rechte:
+
+- `security_view_days (security_id → securities, day date, views)`, PK `(security_id, day)`: gezählte Aufrufe
+  einer Aktienseite je Tag (UTC). Tage außerhalb von `marketPopularity.windowDays` löscht die Neuberechnung.
+- `security_view_marks (player_id → profiles, security_id → securities, counted_at)`, PK `(player_id, security_id)`:
+  letzter gezählter Aufruf für die Sperrzeit; ältere als ein Tag löscht die Neuberechnung.
+- `security_popularity (security_id PK → securities, views, investors, bought_cents, score, refreshed_at)`: eine Zeile
+  je gelisteter Aktie.
+- `market_popularity_state (id true, refreshed_at)`: Zeitpunkt der letzten Neuberechnung.
+
+RPC (authenticated): `record_security_view(p_request_id uuid, p_ticker text)` → `{"counted": boolean}`. Zählt einen
+Aufruf, wenn die Aktie gelistet ist, der Spieler nicht ihr Gründer ist, sein letzter gezählter Aufruf dieser Aktie
+mindestens `viewCooldownMinutes` (30) her ist und er heute höchstens `maxViewsPerDay` (200) gezählte Aufrufe hat
+(`rate_limits`, Aktion `security_view`). Von Natur aus idempotent: Wiederholungen in der Sperrzeit ändern nichts.
+Fehler: `invalid_argument` ohne Request-ID.
+
+Intern: `security_popularity_score(views, investors, bought_cents)` = Aufrufe × `weights.view` + Investoren ×
+`weights.investor` + ⌊√(gekaufte Euro) × `weights.volume`⌋ (wie `popularityScore`). `refresh_security_popularity()`
+rechnet für jede gelistete Aktie die Aufrufe und die verschiedenen Käufer (Kauf-Trades und Zeichnungen, ohne den
+Gründer) samt Betrag der letzten `windowDays` Tage neu, je Aktie ein Index-Bereich. `get_market_snapshot()` ruft sie
+beim Bau eines Takts auf, wenn die letzte Berechnung älter als `refreshMinutes` (5) ist (ein Aufrufer zugleich, per
+Advisory-Lock), und liefert je Wertpapier zusätzlich `popularity` (Aktien: der Score, Anleihen 0). Der Zwischenspeicher
+pro Takt (ADR-123) bleibt.
+
+Börsengang (ADR-146): `go_public` und `capital_increase` setzen `ends_at = jetzt + startups.ipo.subscriptionMinutes`.
+`share_offer_ai_topup(offer, now, final)` lässt die KI-Investoren zeichnen (Ledger: Finanzmarkt → Firmenkasse,
+Schlüssel `offer-ai:<offer>:<shares_ai_e6>`, die Teilzahlungen summieren sich genau zu ⌊KI-Aktien × Preis⌋).
+`close_share_offer` ruft sie mit `final` auf und zahlt die KI nicht mehr selbst. Neue Config:
+`startups.ipo.subscriptionMinutes`, `startups.ipo.quickAmountsCents`, Abschnitt `marketPopularity`.

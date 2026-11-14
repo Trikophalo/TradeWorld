@@ -5,7 +5,7 @@
   "running": [],
   "incoming": [
     {
-      "id": "203fa249-fdfa-4cd7-b95c-ca90126b075a",
+      "id": "954f6cf0-fc23-4120-a2d1-461727100bd9",
       "kind": "loan",
       "terms": { "hours": 24, "interest_bps": 0, "principal_cents": 20000 },
       "status": "open",
@@ -15,20 +15,20 @@
       "my_role": "borrower",
       "progress": { "due_cents": 20000, "left_cents": 20000, "repaid_cents": 0 },
       "proposer": {
-        "tag": "XVTH",
+        "tag": "Q8P8",
         "level": 6,
         "trust": { "band": "blank", "score": 50 },
         "nickname": "Fixture_Lieferant",
         "avatar_key": "rookie"
       },
       "closed_at": null,
-      "created_at": "2026-11-14T19:34:47.907576+00:00",
-      "expires_at": "2026-11-16T19:34:47.907576+00:00",
+      "created_at": "2026-11-14T19:53:24.792141+00:00",
+      "expires_at": "2026-11-16T19:53:24.792141+00:00",
       "accepted_at": null,
       "is_proposer": false,
       "broken_by_me": false,
       "counterparty": {
-        "tag": "9TJN",
+        "tag": "43CN",
         "level": 6,
         "trust": { "band": "blank", "score": 50 },
         "nickname": "Fixture_Abnehmer",
@@ -39,7 +39,7 @@
       "supplier_company": null
     },
     {
-      "id": "c8de00c1-b0e7-4ce0-882f-26ca8899a657",
+      "id": "aff1ddf2-efcb-4e1b-a6a5-e6d84ae80534",
       "kind": "supply",
       "terms": { "hours": 24, "fee_bps": 5000, "prepay_bps": 2000, "volume_cents_per_hour": 30000 },
       "status": "open",
@@ -55,31 +55,31 @@
         "prepay_left_cents": 0
       },
       "proposer": {
-        "tag": "XVTH",
+        "tag": "Q8P8",
         "level": 6,
         "trust": { "band": "blank", "score": 50 },
         "nickname": "Fixture_Lieferant",
         "avatar_key": "rookie"
       },
       "closed_at": null,
-      "created_at": "2026-11-14T19:34:47.896334+00:00",
-      "expires_at": "2026-11-16T19:34:47.896334+00:00",
+      "created_at": "2026-11-14T19:53:24.772514+00:00",
+      "expires_at": "2026-11-16T19:53:24.772514+00:00",
       "accepted_at": null,
       "is_proposer": false,
       "broken_by_me": false,
       "counterparty": {
-        "tag": "9TJN",
+        "tag": "43CN",
         "level": 6,
         "trust": { "band": "blank", "score": 50 },
         "nickname": "Fixture_Abnehmer",
         "avatar_key": "rookie"
       },
-      "buyer_company": { "id": "6d4f5e7d-944f-4767-808c-7ac3cb99c2a5", "name": "Fixture Abnahme" },
+      "buyer_company": { "id": "89b793a4-cdea-4004-94a6-9c1eb183e4c3", "name": "Fixture Abnahme" },
       "proposer_role": "supplier",
-      "supplier_company": { "id": "5210b272-fd9c-480f-a574-438e9a25f341", "name": "Fixture Lieferwerk" }
+      "supplier_company": { "id": "f699ae06-a05a-4321-ae52-1d7b193257b1", "name": "Fixture Lieferwerk" }
     },
     {
-      "id": "574dc90c-ed9b-4a0a-a2ac-ef2e8caf0543",
+      "id": "4e484be4-9540-47e9-939d-9aed4f491727",
       "kind": "loan",
       "terms": { "hours": 48, "interest_bps": 1000, "principal_cents": 100000 },
       "status": "open",
@@ -89,20 +89,20 @@
       "my_role": "borrower",
       "progress": { "due_cents": 110000, "left_cents": 110000, "repaid_cents": 0 },
       "proposer": {
-        "tag": "XVTH",
+        "tag": "Q8P8",
         "level": 6,
         "trust": { "band": "blank", "score": 50 },
         "nickname": "Fixture_Lieferant",
         "avatar_key": "rookie"
       },
       "closed_at": null,
-      "created_at": "2026-11-14T19:34:47.888401+00:00",
-      "expires_at": "2026-11-16T19:34:47.888401+00:00",
+      "created_at": "2026-11-14T19:53:24.765192+00:00",
+      "expires_at": "2026-11-16T19:53:24.765192+00:00",
       "accepted_at": null,
       "is_proposer": false,
       "broken_by_me": false,
       "counterparty": {
-        "tag": "9TJN",
+        "tag": "43CN",
         "level": 6,
         "trust": { "band": "blank", "score": 50 },
         "nickname": "Fixture_Abnehmer",

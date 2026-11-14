@@ -1,6 +1,6 @@
 {
-  "mine": { "rank": 34, "value_cents": 54107 },
-  "total": 37,
+  "mine": { "rank": 36, "value_cents": 71139 },
+  "total": 39,
   "entries": [
     {
       "kind": "player",
@@ -14,8 +14,24 @@
       "founder": "Lars_Kursrutsch",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "80144c96-a2d7-4aab-9b94-878423e1d0d6",
+      "company_id": "43f42e71-897b-4588-b086-dd86250019f1",
       "value_cents": 959140000,
+      "revenue_cents": null
+    },
+    {
+      "kind": "player",
+      "logo": null,
+      "name": "Gipfelwerk",
+      "rank": 2,
+      "tier": "ag",
+      "color": "#336699",
+      "sector": "retail",
+      "ticker": "GIP",
+      "founder": "Pop_Frida",
+      "is_mine": false,
+      "team_size": 1,
+      "company_id": "376b118d-4d45-4bcb-ad7b-04c30ef1748f",
+      "value_cents": 99820000,
       "revenue_cents": null
     },
     {
@@ -42,7 +58,7 @@
         "palette": ["#112233", "#00ff00"]
       },
       "name": "Fenja Pixel",
-      "rank": 2,
+      "rank": 3,
       "tier": "ag",
       "color": "#123456",
       "sector": "tech",
@@ -50,15 +66,31 @@
       "founder": "Fenja_Firma",
       "is_mine": false,
       "team_size": 6,
-      "company_id": "56883cc4-4fd7-4401-92c1-c8c18ad7a177",
-      "value_cents": 82011069,
+      "company_id": "1484990f-1c49-4ac2-b70e-8fa0b99a257a",
+      "value_cents": 82175615,
       "revenue_cents": 0
     },
     {
       "kind": "player",
       "logo": null,
+      "name": "Talwerk",
+      "rank": 4,
+      "tier": "ag",
+      "color": "#663399",
+      "sector": "retail",
+      "ticker": "TAL",
+      "founder": "Pop_Gero",
+      "is_mine": false,
+      "team_size": 1,
+      "company_id": "207b650f-6d22-4080-9a9d-234b58fbe0c5",
+      "value_cents": 79895592,
+      "revenue_cents": null
+    },
+    {
+      "kind": "player",
+      "logo": null,
       "name": "Frieda Apps",
-      "rank": 3,
+      "rank": 5,
       "tier": "garage",
       "color": "#334455",
       "sector": "tech",
@@ -66,42 +98,10 @@
       "founder": "Frieda_Format",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "15eba8df-79fb-4904-b3ad-68d0d8bbc5be",
+      "company_id": "f032369b-d9de-4f54-ae59-3db4ad223176",
       "value_cents": 51553750,
       "revenue_cents": 1185000
-    },
-    {
-      "kind": "player",
-      "logo": null,
-      "name": "Frida Fahrrad",
-      "rank": 4,
-      "tier": "garage",
-      "color": "#336699",
-      "sector": "retail",
-      "ticker": null,
-      "founder": "Frida_Upgrade",
-      "is_mine": false,
-      "team_size": 2,
-      "company_id": "2e4e3489-d358-455c-b49e-fdf05643e1ff",
-      "value_cents": 20370600,
-      "revenue_cents": null
-    },
-    {
-      "kind": "player",
-      "logo": null,
-      "name": "Sven Teile",
-      "rank": 5,
-      "tier": "garage",
-      "color": "#335577",
-      "sector": "tech",
-      "ticker": null,
-      "founder": "Sven_Liefert",
-      "is_mine": false,
-      "team_size": 1,
-      "company_id": "40858ecb-2c93-47c3-b860-cd51e184a700",
-      "value_cents": 20253823,
-      "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-14T19:34:45.727671+00:00"
+  "server_time": "2026-11-14T19:53:22.3483+00:00"
 }

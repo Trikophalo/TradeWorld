@@ -264,4 +264,18 @@ test("draw a logo, keep a job as founder, go public", async ({ page }) => {
   await page.getByTestId("company-header").getByText("Demo: Quartal jetzt abschließen").click();
   await expect(listing.getByText(/An der Börse als PIX/)).toBeVisible();
   await expect(page.getByTestId("company-header").getByText("AG")).toBeVisible();
+
+  // The stock stands in the market list next to the AI stocks, marked as a player company (ADR-145).
+  await page.goto("/markets");
+  const players = page.getByRole("radiogroup", { name: "Sortierung" }).getByRole("radio", { name: "Spieler" });
+  await expect(async () => {
+    await players.click();
+    await expect(players).toHaveAttribute("aria-checked", "true", { timeout: 1_000 });
+  }).toPass();
+  const row = page.getByRole("link", { name: /Pixelwerft/ });
+  await expect(row.getByTestId("player-badge")).toBeVisible();
+  await expect(page.locator('[data-tour="stock-row"]')).toHaveCount(1);
+  await row.click();
+  await expect(page).toHaveURL("/markets/PIX");
+  await expect(page.getByRole("heading", { level: 1, name: "Pixelwerft" })).toBeVisible();
 });

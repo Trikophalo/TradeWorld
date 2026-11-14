@@ -58,6 +58,7 @@ const securitySchema = z.object({
   face_value_cents: nnum.optional(),
   company_kind: z.enum(["ai", "player"]).default("ai"),
   company_id: z.string().nullable().default(null),
+  popularity: num.default(0),
   logo: z
     .object({ palette: z.array(z.string()), grid: z.array(z.string()) })
     .nullable()
@@ -473,6 +474,7 @@ export const RPC_SCHEMAS = {
   claim_mission: progressSchema,
   daily_check_in: checkInSchema,
   track_event: z.object({ ok: z.boolean() }),
+  record_security_view: z.object({ counted: z.boolean() }),
   ...CAREER_RPC_SCHEMAS,
   ...COMPANY_RPC_SCHEMAS,
   ...ARTWORK_RPC_SCHEMAS,
@@ -605,6 +607,14 @@ export const liveEngine: GameEngine = {
   ...liveCompanyEventEngine,
   ...liveDealEngine,
   ...liveCryptoEngine,
+  async recordView(requestId, ticker) {
+    const r = await rpc(
+      "record_security_view",
+      { p_request_id: requestId, p_ticker: ticker },
+      z.object({ counted: z.boolean() }),
+    );
+    return r.counted;
+  },
   async snapshot(): Promise<MarketSnapshot> {
     const s = await rpc("get_market_snapshot", {}, snapshotSchema);
     return {
@@ -656,6 +666,7 @@ export const liveEngine: GameEngine = {
         companyKind: x.company_kind,
         logo: x.logo,
         companyId: x.company_id,
+        popularity: x.popularity,
       })),
     };
   },

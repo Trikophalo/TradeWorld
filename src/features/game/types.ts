@@ -46,6 +46,8 @@ export interface Security {
   logo: CompanyLogoData | null;
   /** The company behind a stock (ADR-125); null for bonds. */
   companyId: string | null;
+  /** Views and investments of the last days (ADR-145); higher is more popular. 0 for bonds. */
+  popularity: number;
 }
 
 export interface MarketSnapshot {
@@ -1593,9 +1595,15 @@ export interface Offer {
   ticker: string | null;
   priceCents: number;
   sharesOfferedE6: number;
+  /** Subscribed by players. */
   sharesSubscribedE6: number;
+  /** Subscribed by AI investors, evenly over the window (ADR-146). */
+  sharesAiE6: number;
+  startsAt: string;
   endsAt: string;
   status: "open" | "closed";
+  /** The viewer founded the company (founders cannot subscribe). */
+  mine: boolean;
   mySharesE6: number;
   valueCents: number;
   lastQuarter: { label: string; revenueCents: number; profitCents: number } | null;
@@ -1911,6 +1919,8 @@ export interface GameEngine {
   setCompanyTasksAutoAi(requestId: string, on: boolean): Promise<CompanyTasks>;
   newsFeed(kind: NewsFeedKind, limit: number): Promise<NewsFeedItem[]>;
   snapshot(): Promise<MarketSnapshot>;
+  /** A stock page was opened (ADR-145); counts once per stock within the cooldown. */
+  recordView(requestId: string, ticker: string): Promise<boolean>;
   candles(ticker: string, interval: CandleInterval, limit: number): Promise<Candle[]>;
   orderBook(ticker: string, levels: number): Promise<OrderBook>;
   details(ticker: string): Promise<SecurityDetails>;
@@ -2031,7 +2041,7 @@ export interface GameEngine {
     requestId: string,
     offerId: string,
     amountCents: number,
-  ): Promise<{ sharesE6: number; amountCents: number }>;
+  ): Promise<{ sharesE6: number; amountCents: number; completed: boolean }>;
   checkCompanyName(name: string): Promise<{ allowed: boolean; reason: GameErrorKey | null }>;
   foundCompany(input: FoundCompanyInput): Promise<MyCompany>;
   myCompany(): Promise<CompanyOverview>;

@@ -47,8 +47,11 @@ const offerSchema = z.object({
   price_cents: num,
   shares_offered_e6: num,
   shares_subscribed_e6: num,
+  shares_ai_e6: num.default(0),
+  starts_at: iso.optional(),
   ends_at: iso,
   status: z.enum(["open", "closed"]),
+  mine: z.boolean().default(false),
   my_shares_e6: num,
   value_cents: num,
   last_quarter: z.object({ label: z.string(), revenue_cents: num, profit_cents: num }).nullable(),
@@ -70,8 +73,11 @@ const toOffer = (o: z.infer<typeof offerSchema>): Offer => ({
   priceCents: o.price_cents,
   sharesOfferedE6: o.shares_offered_e6,
   sharesSubscribedE6: o.shares_subscribed_e6,
+  sharesAiE6: o.shares_ai_e6,
+  startsAt: o.starts_at ?? o.ends_at,
   endsAt: o.ends_at,
   status: o.status,
+  mine: o.mine,
   mySharesE6: o.my_shares_e6,
   valueCents: o.value_cents,
   lastQuarter: o.last_quarter
@@ -434,7 +440,12 @@ export const COMPANY_RPC_SCHEMAS = {
   go_public: wrapped,
   capital_increase: wrapped,
   get_offers: z.object({ offers: z.array(offerSchema) }),
-  subscribe_offer: z.object({ shares_e6: num, amount_cents: num, offer: offerSchema }),
+  subscribe_offer: z.object({
+    shares_e6: num,
+    amount_cents: num,
+    completed: z.boolean().default(false),
+    offer: offerSchema,
+  }),
   train_employee: z.object({ skill_key: z.string(), cost_cents: num, salary_cents_per_hour: num }),
 } as const;
 
@@ -1006,7 +1017,7 @@ export const liveCompanyEngine: CompanyEngine = {
       { p_request_id: requestId, p_offer_id: offerId, p_amount_cents: amountCents },
       S.subscribe_offer,
     );
-    return { sharesE6: r.shares_e6, amountCents: r.amount_cents };
+    return { sharesE6: r.shares_e6, amountCents: r.amount_cents, completed: r.completed };
   },
 
   async trainEmployee(requestId, playerJobId, skillKey) {

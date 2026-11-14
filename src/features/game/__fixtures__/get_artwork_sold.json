@@ -1,8 +1,8 @@
 {
-  "bids": [{ "at": "2026-11-14T19:34:46.388046+00:00", "nickname": "Fixture_Kunst", "amount_cents": 500000 }],
+  "bids": [{ "at": "2026-11-14T19:53:22.953693+00:00", "nickname": "Fixture_Kunst", "amount_cents": 500000 }],
   "sales": [
     {
-      "at": "2026-11-14T19:34:46.392145+00:00",
+      "at": "2026-11-14T19:53:22.959234+00:00",
       "kind": "auction",
       "buyer": "Fixture_Kunst",
       "seller": null,
@@ -10,17 +10,17 @@
       "royalty_cents": 0
     },
     {
-      "at": "2026-11-14T19:34:44.767144+00:00",
+      "at": "2026-11-14T19:53:20.683064+00:00",
       "kind": "ai",
-      "buyer": "Pixel-Paula",
+      "buyer": "Otto Original",
       "seller": "Vera Vermeer",
-      "price_cents": 491300,
+      "price_cents": 561900,
       "royalty_cents": 0
     }
   ],
   "artwork": {
-    "id": "9a375087-ea6a-4bac-8117-fdc7858c3e3e",
-    "hot": 0.344658,
+    "id": "37a91e5d-604c-4cc8-a4d6-14dcb7c252e0",
+    "hot": 0.34382,
     "code": "NFT-0001",
     "liked": false,
     "likes": 0,
@@ -82,7 +82,7 @@
     "creator": null,
     "ai_owner": null,
     "ask_cents": null,
-    "created_at": "2026-11-14T19:32:43.046211+00:00",
+    "created_at": "2026-11-14T19:51:07.712995+00:00",
     "royalty_bps": 1000,
     "value_cents": 500000,
     "royalties_cents": 0,

@@ -2225,3 +2225,54 @@ Beliebtheit zählte nur über Likes.
 - Verkäufe unter Sammlern sind Art `ai` mit `seller_ai` und zählen nicht zum Tageslimit der Käufe von Spielern.
 - Nebenbei: Nach einem Verkauf setzt ein Sammler seinen Preis erst, nachdem die offenen Angebote geschlossen sind.
 - Mira trägt das Schild „Assistentin“ statt „KI“.
+
+## ADR-145: Spielerfirmen in der Aktienliste, beliebte Aktien zuerst — `akzeptiert`
+
+**Vorgabe:** Börsennotierte Firmen von Spielern sollen dort stehen, wo die KI-Aktien stehen. Aktien, die oft
+aufgerufen werden und in die viel investiert wird, stehen weiter oben. Beim Sortieren lassen sich nur Spielerfirmen
+anzeigen.
+
+**Entscheidung:**
+
+- **Eine Liste:** Die Märkte-Seite zeigt KI- und Spieleraktien zusammen (`company_kind` aus `get_market_snapshot`,
+  schon seit ADR-067 im Snapshot). Spieleraktien tragen das Schild „Spieler“ in der Zeile und auf der Detailseite und
+  öffnen ihre Detailseite wie jede andere Aktie. Im Demo-Modus steht die eigene börsennotierte Firma ebenso in der
+  Liste und ist handelbar; sie zählt nicht zum NEXA 30.
+- **Sortierung:** „Beliebt“ (Standard), „A–Z“, „Bewegung“ und „Spieler“. „Spieler“ ist ein Filter in der Reihenfolge
+  „Beliebt“; ohne Spielerfirma erklärt ein leerer Zustand, warum die Liste leer ist. Gleichstand: größerer Börsenwert,
+  dann Name (`comparePopularity`).
+- **Beliebtheit:** Score = Aufrufe × 1 + Investoren × 20 + ⌊√(investierte Euro) × 0,2⌋ über die letzten 3 Tage
+  (`marketPopularity`, `popularityScore`). Investoren sind verschiedene Käufer (Kauf-Trades und Zeichnungen). Die
+  Wurzel hält einen einzelnen Großanleger davon ab, viele kleine zu überstimmen.
+- **Aufrufe zählen günstig und schwer manipulierbar:** Öffnet ein Spieler eine Aktienseite, ruft der Client
+  `record_security_view` auf. Gezählt wird je Spieler und Aktie höchstens alle 30 Minuten, höchstens 200 am Tag; die
+  eigene Firma zählt für den Gründer nie (Aufrufe und Käufe). Gespeichert wird nur ein Zähler je Aktie und Tag und
+  eine Marke je Spieler und Aktie.
+- **Kosten bei vielen Spielern:** Der Score wird nicht pro Abfrage berechnet. Der Bau des Snapshots (einmal pro Takt,
+  ADR-123) rechnet ihn höchstens alle 5 Minuten neu, über einen Index-Bereich je Aktie, und liest ihn sonst mit einem
+  Join aus `security_popularity`.
+
+## ADR-146: Börsengang in höchstens 10 Minuten — `akzeptiert`
+
+**Vorgabe:** Die Zeichnung zum Börsengang soll deutlich einfacher werden und innerhalb von 10 Minuten möglich sein.
+Wer die Aktien voll hat, ist an der Börse.
+
+**Entscheidung:**
+
+- **Zeitfenster:** Die Zeichnung (Börsengang und Kapitalerhöhung) läuft höchstens `startups.ipo.subscriptionMinutes`
+  = 10 Minuten statt 12 Stunden (ersetzt diesen Teil von ADR-067).
+- **Voll heißt börsennotiert:** Nimmt eine Zeichnung die letzte Aktie, schließt das Angebot sofort und die Firma ist an
+  der Börse, ohne auf den Minutenjob zu warten.
+- **Nicht voll:** Am Ende des Fensters geht die Firma trotzdem an die Börse, mit dem, was gezeichnet wurde; der Rest
+  wird nicht ausgegeben, der Gründer behält also mehr. Das ist die spielerfreundliche Variante: kein Scheitern, keine
+  Rückbuchungen, und das Geld der Zeichner ist sofort in Aktien angelegt. Ein Auffüllen durch die KI auf 100 % hätte
+  viel Geld aus dem Finanzmarkt in Spielerfirmen geschoben.
+- **KI-Investoren zeichnen mit:** Ihr Anteil `aiTakeShare(Qualität)` (20 bis 70 % des Angebots) kommt gleichmäßig über
+  das Fenster dazu, jede Minute ein Stück, nie mehr als frei ist, bezahlt über das Hauptbuch aus dem Finanzmarkt-Topf.
+  So bewegt sich der Fortschrittsbalken auch ohne andere Spieler, und Spieler können den Rest schneller füllen.
+- **Ein Tipp zum Zeichnen:** Auf der Märkte-Seite steht jedes Angebot mit Balken (Spieler und KI) und Countdown.
+  Zeichnen geht mit festen Beträgen (`startups.ipo.quickAmountsCents`: 100 €, 1.000 €, 10.000 €) oder „Rest“; kein
+  Eingabefeld, kein zweites Fenster. Jede Zeichnung trägt eine `request_id`. Gründer zeichnen nicht mit und sehen
+  stattdessen einen Hinweis.
+- **Demo:** Dieselben Regeln: 10 Minuten, die KI-Investoren zeichnen über das Fenster, danach ist die Firma an der
+  Börse und steht in der Aktienliste. „Quartal jetzt abschließen“ beendet eine laufende Zeichnung weiter sofort.

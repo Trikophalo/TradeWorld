@@ -76,6 +76,7 @@ describe("BALANCE", () => {
       "trust",
       "crypto",
       "stockNews",
+      "marketPopularity",
       "companyMoves",
       "companyTasks",
       "funNews",

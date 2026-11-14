@@ -15,7 +15,7 @@ import { NumberTicker } from "@/components/ui/number-ticker";
 import { Segmented } from "@/components/ui/segmented";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CHART_RANGES, useCandles, useSecurityDetails, type ChartRange } from "@/features/game/hooks";
-import { useGame, useMarketReady, useSecurity } from "@/features/game/store";
+import { engine, useGame, useMarketReady, useSecurity } from "@/features/game/store";
 import { Reveal } from "@/features/progression/components/reveal";
 import { isTutorialActive } from "@/features/tutorial/store";
 import { formatBps, formatMoney, formatPrice, formatShares } from "@/lib/format";
@@ -56,7 +56,10 @@ export function StockDetail({ ticker }: { ticker: string }) {
   // Counts for "look at 3 stocks" style quick missions.
   const track = useGame((state) => state.track);
   useEffect(() => {
-    if (security) track("view_security", ticker);
+    if (!security) return;
+    track("view_security", ticker);
+    // Popularity in the market list (ADR-145); the server counts a player once per stock within a pause.
+    if (security.kind === "stock") void engine.recordView(crypto.randomUUID(), ticker).catch(() => undefined);
     // Only once per page visit, not on every price tick.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticker, security !== undefined, track]);
@@ -126,7 +129,7 @@ export function StockDetail({ ticker }: { ticker: string }) {
 
       <header className="flex items-center gap-4">
         <ViewTransition name={`logo-${ticker}`} share="morph" default="none">
-          <CompanyLogo ticker={ticker} color={brandColor(ticker)} scale={4} />
+          <CompanyLogo ticker={ticker} color={brandColor(ticker)} logo={security?.logo} scale={4} />
         </ViewTransition>
         <div className="min-w-0 flex-1">
           {security ? (
@@ -136,6 +139,7 @@ export function StockDetail({ ticker }: { ticker: string }) {
           )}
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <Badge>{ticker}</Badge>
+            {security?.companyKind === "player" && <Badge tone="info">{t("playerBadge")}</Badge>}
             {security?.companyId && (
               <Link
                 href={`/companies/${encodeURIComponent(security.companyId)}`}

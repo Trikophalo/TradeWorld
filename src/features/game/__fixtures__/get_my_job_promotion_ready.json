@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "b98c275a-3957-4726-9d51-d010a26ae9ba",
+    "id": "154b368a-040f-40cb-8b15-90130a672fd2",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "d21331b8-a414-66aa-de07-f036108fc91d",
+      "id": "0e23c6f3-2c55-dff0-d773-3075ae4f54b1",
       "logo": null,
-      "name": "Nordlicht Logistik AG",
-      "color": "#7AA2F7",
+      "name": "Orbitfracht",
+      "color": "#5C6BC0",
       "is_ai": true,
       "sector": "logistics",
-      "ticker": "NDL"
+      "ticker": "OFR"
     },
     "presence": {
-      "fire_at": "2026-11-19T19:34:47.452802+00:00",
+      "fire_at": "2026-11-19T19:53:24.284114+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-14T19:34:47.452802+00:00"
+      "last_active_at": "2026-11-14T19:53:24.284114+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-14T19:34:47.549454+00:00",
+    "started_at": "2026-11-14T19:53:24.3844+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,
