@@ -492,6 +492,24 @@ export const COMPANY_TASK_RULES = {
   /** From this rank on employees may hand tasks to the AI; any supervisor may hand tasks to own reports. */
   aiDelegateMinTier: "senior",
   xp: { success: 60, failure: 15 },
+  /**
+   * Task momentum (ADR-148): solved tasks lift a demand multiplier, so the company earns more long term; it drifts
+   * back toward 1 every operating hour, so it must be kept up. maxBps 6000 = up to +60 % demand.
+   */
+  momentum: {
+    /** Per solved task, scaled by the score. */
+    perSolveBps: 120,
+    /** On top, for a perfect run. */
+    perfectBonusBps: 80,
+    /** Lowered by this on a failed or missed task. */
+    penaltyBps: 250,
+    /** The AI lifts it less than a person. */
+    aiBps: 5_000,
+    /** It loses this share of the distance to 1 every hour. */
+    decayPerHourBps: 300,
+    /** At most +60 % demand. */
+    maxBps: 6_000,
+  },
   historyLimit: 15,
 } as const;
 

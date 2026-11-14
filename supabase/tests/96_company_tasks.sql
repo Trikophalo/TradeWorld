@@ -194,3 +194,27 @@ select tests.assert(
             -> 'puzzle' -> 'values') x(v_text),
           lateral (select v_text::integer as v) y),
   'company_task_puzzle(): an order task keeps to its own range (ADR-140)');
+
+-- ADR-148: task momentum — a solved task lifts demand long term, a failed one lowers it, it is capped and decays
+select tests.set_cfg('companyTasks', '{momentum,perSolveBps}', '2000');
+select tests.set_cfg('companyTasks', '{momentum,maxBps}', '6000');
+
+select coalesce(task_momentum, 1.0) as m0 from public.player_companies where company_id = :'cid' \gset
+select public.company_task_momentum_apply(:'cid', 10000, false) is null as ok \gset
+select tests.assert(
+  (select task_momentum from public.player_companies where company_id = :'cid') > :m0::double precision,
+  'company_task_momentum_apply(): a perfect task lifts the company momentum (ADR-148)');
+-- capped at maxBps (1.6)
+select public.company_task_momentum_apply(:'cid', 10000, false);
+select public.company_task_momentum_apply(:'cid', 10000, false);
+select public.company_task_momentum_apply(:'cid', 10000, false);
+select tests.assert(
+  (select task_momentum from public.player_companies where company_id = :'cid') <= 1.6 + 1e-9,
+  'task momentum is capped at 1 + maxBps');
+-- a failed task lowers it, never below 1
+select public.company_task_momentum_apply(:'cid', 0, false);
+select tests.assert(
+  (select task_momentum from public.player_companies where company_id = :'cid') >= 1.0,
+  'a failed task lowers momentum but never below 1');
+select tests.set_cfg('companyTasks', '{momentum,perSolveBps}', '120');
+select tests.set_cfg('companyTasks', '{momentum,maxBps}', '6000');

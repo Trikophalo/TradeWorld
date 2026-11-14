@@ -1,38 +1,38 @@
 {
   "applications": [
     {
-      "id": "230b3561-7a38-426d-a51e-68e40f2ae36c",
+      "id": "7a0d7296-1cd8-4b24-8f1f-f810dc4d5a32",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "2812aa36-d9b3-425d-b544-4bdb1e6fb760",
+        "id": "0099def4-10b6-4c04-b59a-2724f1d31cfa",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "1188056d-8ee9-0848-9146-e3115adc3792",
+          "id": "7999d809-0066-66e2-e0ac-930c34a49626",
           "logo": null,
-          "name": "Sonnenkern Fusion",
-          "color": "#FF5E5B",
+          "name": "Fundgrube Discount",
+          "color": "#C2C95B",
           "is_ai": true,
-          "sector": "energy",
-          "ticker": "FSN"
+          "sector": "retail",
+          "ticker": "FGD"
         },
-        "required": [{ "branch": "management", "min_score": 0 }],
-        "title_key": "management_intern",
+        "required": [{ "branch": "sales", "min_score": 0 }],
+        "title_key": "sales_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-14T19:47:09.402386+00:00",
-      "updated_at": "2026-11-14T19:47:09.407704+00:00",
-      "offer_expires_at": "2026-11-16T19:47:09.402386+00:00",
+      "created_at": "2026-11-14T20:15:33.403194+00:00",
+      "updated_at": "2026-11-14T20:15:33.40709+00:00",
+      "offer_expires_at": "2026-11-16T20:15:33.403194+00:00",
       "salary_wish_cents_per_hour": 15000,
       "offer_salary_cents_per_hour": 15000
     },
     {
-      "id": "8f63d37b-1f54-4491-b02f-7cfcc278733a",
+      "id": "78bf934f-b353-4224-b007-184ff7464f28",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "96b98e0c-231e-4936-bba1-f2eb4f228810",
+        "id": "0f65a89d-f599-43fe-b985-e5e5efdbd5f6",
         "tier": "junior",
         "title": null,
         "company": {
@@ -48,9 +48,9 @@
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-14T19:47:09.395053+00:00",
-      "updated_at": "2026-11-14T19:47:09.395053+00:00",
-      "offer_expires_at": "2026-11-16T19:47:09.395053+00:00",
+      "created_at": "2026-11-14T20:15:33.397529+00:00",
+      "updated_at": "2026-11-14T20:15:33.397529+00:00",
+      "offer_expires_at": "2026-11-16T20:15:33.397529+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

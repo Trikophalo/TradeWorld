@@ -1,6 +1,6 @@
 {
   "job": {
-    "id": "26d44843-b069-47b2-ad36-18728df2ec65",
+    "id": "79f29bc2-4f01-49c4-b3ed-825c733a22da",
     "tier": "junior",
     "title": null,
     "company": {
@@ -13,9 +13,9 @@
       "ticker": "KLS"
     },
     "presence": {
-      "fire_at": "2026-11-19T19:47:08.940875+00:00",
+      "fire_at": "2026-11-19T20:15:32.881383+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-14T19:47:08.940875+00:00"
+      "last_active_at": "2026-11-14T20:15:32.881383+00:00"
     },
     "required": [{ "branch": "it", "min_score": 2 }],
     "promotion": {
@@ -36,22 +36,22 @@
     "signature": "M2 14 C6 4 10 4 14 12 S22 18 26 8",
     "title_key": "it_junior",
     "rank_hours": 1.0,
-    "started_at": "2026-11-14T19:47:09.412105+00:00",
+    "started_at": "2026-11-14T20:15:33.410257+00:00",
     "pending_raise": null,
     "raise_max_bps": 0,
-    "notice_ends_at": "2026-11-15T19:47:09.483505+00:00",
+    "notice_ends_at": "2026-11-15T20:15:33.476856+00:00",
     "paid_hours_cap": 8,
-    "pay_factor_bps": 9982,
+    "pay_factor_bps": 9996,
     "work_task_open": false,
     "quit_cost_cents": 0,
     "last_bonus_cents": 0,
     "paid_hours_today": 1.0,
     "productivity_bps": 17400,
     "next_work_task_at": null,
-    "earned_total_cents": 31646,
-    "raise_available_at": "2026-11-21T19:47:09.469567+00:00",
+    "earned_total_cents": 31690,
+    "raise_available_at": "2026-11-21T20:15:33.461191+00:00",
     "quit_now_cost_cents": 391812,
     "salary_cents_per_hour": 32651,
-    "effective_salary_cents_per_hour": 32592
+    "effective_salary_cents_per_hour": 32637
   }
 }

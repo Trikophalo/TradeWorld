@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Rheinkraft Werke gewinnt einen Großkunden. Der Auftrag dürfte den Umsatz deutlich anheben. Sicher ist das nicht.",
-      "name": "Rheinkraft Werke",
-      "due_at": "2026-11-14T21:11:21.808189+00:00",
+      "body": "Ein Sparprogramm wirkt schneller als gedacht. Die Marge steigt. Sicher ist das nicht.",
+      "name": "Volta Energie AG",
+      "due_at": "2026-11-14T21:31:10.872321+00:00",
       "status": "open",
-      "ticker": "RKW",
-      "headline": "Rekordauftrag für Rheinkraft Werke",
-      "move_bps": null,
-      "strength": 3,
-      "direction": "up",
-      "published_at": "2026-11-14T20:47:13.381587+00:00"
-    },
-    {
-      "id": 3,
-      "body": "Der Start im Ausland läuft besser als geplant. Sicher ist das nicht.",
-      "name": "SolarFuchs",
-      "due_at": "2026-11-14T19:47:13.373369+00:00",
-      "status": "fizzled",
-      "ticker": "SFX",
-      "headline": "SolarFuchs erschließt neuen Markt",
+      "ticker": "VLT",
+      "headline": "Volta Energie AG senkt die Kosten deutlich",
       "move_bps": null,
       "strength": 2,
       "direction": "up",
-      "published_at": "2026-11-14T19:47:13.373369+00:00"
+      "published_at": "2026-11-14T21:15:38.344066+00:00"
+    },
+    {
+      "id": 3,
+      "body": "Fundgrube Discount gewinnt einen Großkunden. Der Auftrag dürfte den Umsatz spürbar anheben. Sicher ist das nicht.",
+      "name": "Fundgrube Discount",
+      "due_at": "2026-11-14T20:15:38.340259+00:00",
+      "status": "fizzled",
+      "ticker": "FGD",
+      "headline": "Rekordauftrag für Fundgrube Discount",
+      "move_bps": null,
+      "strength": 2,
+      "direction": "up",
+      "published_at": "2026-11-14T20:15:38.340259+00:00"
     }
   ],
   "reliability_bps": 7500

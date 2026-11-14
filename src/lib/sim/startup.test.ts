@@ -467,3 +467,34 @@ describe("marketing campaign in the operating hour (ADR-097)", () => {
     expect(push.revenueCents).toBe(plain.revenueCents);
   });
 });
+
+describe("task momentum lifts demand (ADR-148)", () => {
+  const state = {
+    potentialAnnualCents: 100_000_000,
+    awareness: 1,
+    quality: 1,
+    quartersActive: 4,
+    cashCents: 100_000_000n,
+  };
+  const input = {
+    sector: "tech" as const,
+    tier: "garage" as const,
+    marketingCentsPerQuarter: 0n,
+    productivityBps: [10_000],
+    aiWorkers: 0,
+    stage: 0,
+    noise: 0,
+    playerWagesCents: 0,
+    priceLevel: "normal" as const,
+    contractWork: false,
+    expansionLevel: 0,
+  };
+  it("more momentum means more demand, 1 means unchanged", () => {
+    const base = closeStartupHour(state, input);
+    const hot = closeStartupHour(state, { ...input, taskMomentum: 1.5 });
+    expect(hot.demandCents).toBeGreaterThan(base.demandCents);
+    expect(closeStartupHour(state, { ...input, taskMomentum: 1 }).demandCents).toBe(base.demandCents);
+    // below 1 is ignored (floor at 1)
+    expect(closeStartupHour(state, { ...input, taskMomentum: 0.5 }).demandCents).toBe(base.demandCents);
+  });
+});

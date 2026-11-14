@@ -6041,7 +6041,8 @@
       "kicker": "Aufgabe erhalten",
       "go": "Jetzt ansehen",
       "later": "Später"
-    }
+    },
+    "momentum": "Schwung durch gelöste Aufgaben: +{percent} % Nachfrage"
   },
   "funNews": {
     "items": {

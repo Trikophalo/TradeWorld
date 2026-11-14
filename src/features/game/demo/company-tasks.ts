@@ -40,6 +40,8 @@ export interface CompanyTasksHost {
     productKey?: string;
     aiWorkers: number;
     aiWorkerSkills?: string[];
+    /** Task momentum (ADR-148), mutated in place; drifts toward 1 each hour. */
+    taskMomentum?: number;
   } | null;
   nickname(): string;
   addCompanyCash(cents: number): void;
@@ -80,6 +82,20 @@ export function createCompanyTasksEngine(
   };
   const defOf = (key: string) => cfg.tasks.find((t) => t.key === key);
   const effects = () => upgradeEffects(host.upgrades?.() ?? {});
+  /** A resolved task lifts or lowers the company's task momentum (ADR-148). */
+  function applyMomentum(score: number | null, byAi: boolean) {
+    const c = host.company();
+    if (!c) return;
+    const m = cfg.momentum;
+    let delta: number;
+    if (score !== null && score >= cfg.passScoreBps) {
+      delta = (m.perSolveBps * score) / 10_000 + (score >= 10_000 ? m.perfectBonusBps : 0);
+      if (byAi) delta = (delta * m.aiBps) / 10_000;
+    } else {
+      delta = -m.penaltyBps;
+    }
+    c.taskMomentum = Math.min(1 + m.maxBps / 10_000, Math.max(1, (c.taskMomentum ?? 1) + delta / 10_000));
+  }
 
   function resolve(s: DemoTasksState, t: DemoTask, score: number | null, byAi: boolean, now: number) {
     const e = effects();
@@ -91,6 +107,7 @@ export function createCompanyTasksEngine(
     t.scoreBps = score;
     t.resultCents = result;
     t.resolvedAt = now;
+    applyMomentum(score, byAi);
     host.addCompanyCash(result);
     host.news(`task_${t.status}`, {
       task: t.key,
@@ -185,6 +202,7 @@ export function createCompanyTasksEngine(
     return {
       role: "founder",
       company: { id: "demo-company", name: c.name, tier: c.tier, product: c.productKey ?? null },
+      momentum: c.taskMomentum ?? 1,
       myTier: "c_level",
       autoAi: s.autoAi,
       aiWorkers: c.aiWorkers,

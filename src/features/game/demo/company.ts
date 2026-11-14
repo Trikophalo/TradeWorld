@@ -108,6 +108,8 @@ export interface DemoCompanyState {
   potentialAnnualCents: number;
   awareness: number;
   quality: number;
+  /** Task momentum (ADR-148): demand multiplier from solved tasks, drifts toward 1 each hour. */
+  taskMomentum?: number;
   quartersActive: number;
   cashCents: number;
   unpaidCents: number;
@@ -322,6 +324,9 @@ export function createCompanyEngine(host: CompanyHost) {
 
   /** One operating hour: sell, pay players and AI workers with the same factor, book fixed costs and marketing. */
   function closeHour(company: DemoCompanyState, at: number) {
+    // Task momentum (ADR-148) drifts back toward 1 every hour, so it must be kept up.
+    const mom = BALANCE.companyTasks.momentum;
+    company.taskMomentum = Math.max(1, 1 + ((company.taskMomentum ?? 1) - 1) * (1 - mom.decayPerHourBps / 10_000));
     const r = closeStartupHour(
       {
         potentialAnnualCents: company.potentialAnnualCents,
@@ -344,6 +349,7 @@ export function createCompanyEngine(host: CompanyHost) {
         expansionLevel: company.expansionLevel ?? 0,
         event: host.eventModifiers?.(company, at),
         campaignFactor: campaignDemandFactor(company.campaign, at),
+        taskMomentum: company.taskMomentum ?? 1,
       },
     );
     const revenue = Number(r.revenueCents);

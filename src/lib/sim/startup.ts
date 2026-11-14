@@ -378,6 +378,8 @@ export interface StartupHourInput {
   readonly event?: { readonly demandFactor: number; readonly capacityFactor: number; readonly extraCostShare: number };
   /** Running marketing campaign (ADR-097): demand factor of this hour, default 1. */
   readonly campaignFactor?: number;
+  /** Task momentum (ADR-148): demand multiplier from solved tasks, default 1. */
+  readonly taskMomentum?: number;
 }
 
 export interface StartupHourResult {
@@ -420,7 +422,8 @@ export function closeStartupHour(
     Math.exp(sc.demandNoise * input.noise) *
     pricing.demand *
     (input.event?.demandFactor ?? 1) *
-    Math.max(0, input.campaignFactor ?? 1);
+    Math.max(0, input.campaignFactor ?? 1) *
+    Math.max(1, input.taskMomentum ?? 1);
   const capacity =
     (capacityCents(input.productivityBps, input.sector, sc) *
       (1 + sc.stages.capacityBonusPerStage * stage) *

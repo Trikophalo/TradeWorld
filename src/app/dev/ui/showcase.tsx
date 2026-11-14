@@ -155,6 +155,7 @@ const SAMPLE_MOVES: CompanyMoves = {
 const SAMPLE_TASKS: CompanyTasks = {
   role: "founder",
   company: { id: "demo", name: "Mona Moden", tier: "small_business", product: "fashion" },
+  momentum: 1.35,
   myTier: "c_level",
   autoAi: true,
   aiWorkers: 1,

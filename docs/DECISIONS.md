@@ -2261,3 +2261,16 @@ war kaum zu finden.
 **Entscheidung:** Der Knopf „Firma auflösen“ steht jetzt in einer eigenen, immer sichtbaren „Gefahrenzone“ im Chefbüro
 (roter Rahmen, kurzer Hinweis, was passiert). Der Lohnfaktor bleibt im kleinen aufklappbaren Bereich. Rein
 oberflächlich; keine Server-Änderung.
+
+## ADR-148: Gelöste Aufgaben steigern den Gewinn langfristig (Schwung) — `akzeptiert`
+
+**Kontext:** Firmen-Aufgaben (ADR-129) zahlten nur einmalig. Gutes Spielen sollte sich langfristig und wachsend
+auszahlen.
+
+**Entscheidung:** Jede Firma hat einen „Schwung“ (`player_companies.task_momentum`, Start 1), einen Nachfrage-Multiplikator
+auf alles andere. Jede gelöste Aufgabe hebt ihn (mehr bei perfekten Runs, weniger wenn die KI sie macht), eine
+verpatzte oder verfallene senkt ihn. Er driftet jede Betriebsstunde zurück Richtung 1
+(`companyTasks.momentum.decayPerHourBps`), deckelt bei +60 % (`maxBps`). Mehr Nachfrage heißt mehr Umsatz, der
+Ausbau und mehr Personal finanziert, die mehr Aufgaben lösen – gutes Spiel verstärkt sich also selbst. Server
+(`company_task_momentum_apply`, in `company_task_resolve`; Abbau und Multiplikator in `player_company_close_hour`)
+und Demo (`closeStartupHour` mit `taskMomentum`) rechnen gleich. Angezeigt im Aufgabenbrett als „Schwung +X %“.

@@ -1210,6 +1210,8 @@ export interface CompanyTaskPerson {
 export interface CompanyTasks {
   role: "founder" | "employee";
   company: { id: string; name: string; tier: string; product: string | null };
+  /** Demand multiplier from solved tasks (ADR-148), 1 = none. */
+  momentum: number;
   myTier: string;
   autoAi: boolean;
   aiWorkers: number;

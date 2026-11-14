@@ -11,6 +11,11 @@ const game = z.enum(["pick", "count", "sort", "order", "seq", "math"]);
 const tasksSchema = z.object({
   role: z.enum(["founder", "employee"]),
   company: z.object({ id: z.string(), name: z.string(), tier: z.string(), product: z.string().nullable() }),
+  momentum: z
+    .number()
+    .nullable()
+    .default(1)
+    .transform((v) => v ?? 1),
   my_tier: z.string(),
   auto_ai: z.boolean(),
   ai_workers: z.number(),
@@ -126,6 +131,7 @@ export const TASK_RPC_SCHEMAS = {
 export const toTasks = (r: z.infer<typeof tasksSchema>): CompanyTasks => ({
   role: r.role,
   company: r.company,
+  momentum: r.momentum,
   myTier: r.my_tier,
   autoAi: r.auto_ai,
   aiWorkers: r.ai_workers,

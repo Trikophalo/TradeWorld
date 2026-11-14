@@ -1,12 +1,12 @@
 {
-  "company": { "id": "18fb0e62-b1cb-4caf-b560-ccb54969e9ec", "name": "Fixture Leitern", "tier": "garage" },
-  "founder": { "tag": "RTAB", "is_me": true, "nickname": "Fixture_Chef", "avatar_key": "rookie" },
+  "company": { "id": "1fa98867-58ee-4462-8441-7c65d225019f", "name": "Fixture Leitern", "tier": "garage" },
+  "founder": { "tag": "NU4F", "is_me": true, "nickname": "Fixture_Chef", "avatar_key": "rookie" },
   "members": [
     {
-      "tag": "A6EJ",
+      "tag": "7GSQ",
       "tier": "junior",
       "is_me": false,
-      "since": "2026-11-14T19:47:12.004289+00:00",
+      "since": "2026-11-14T20:15:36.760319+00:00",
       "title": "Werkstudium Leitern",
       "nickname": "Fixture_Team",
       "avatar_key": "rookie",

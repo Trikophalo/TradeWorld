@@ -72,6 +72,15 @@ export function TaskBoard({ preview }: { preview?: CompanyTasks } = {}) {
           <p className="mt-1 text-sm text-pretty text-fg-3">
             {data.role === "founder" ? t("intro") : t("employeeIntro")}
           </p>
+          {data.momentum > 1.001 && (
+            <p
+              className="mt-2 inline-flex items-center gap-1.5 rounded-pill bg-gain-soft px-2.5 py-1 text-xs text-gain"
+              data-testid="task-momentum"
+            >
+              <span aria-hidden>▲</span>
+              {t("momentum", { percent: Math.round((data.momentum - 1) * 100) })}
+            </p>
+          )}
         </div>
         {data.tasks.length === 0 ? (
           <EmptyState
