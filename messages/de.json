@@ -5265,7 +5265,11 @@
       "sort": "Sortieren",
       "order": "Reihenfolge",
       "seq": "Merken",
-      "math": "Rechnen"
+      "math": "Rechnen",
+      "slider": "Einpassen",
+      "rotate": "Drehen",
+      "match": "Zuordnen",
+      "path": "Weg finden"
     },
     "doIt": "Erledigen",
     "take": "Übernehmen",
@@ -5312,7 +5316,18 @@
       "failureText": "Das kostet die Firma {amount}.",
       "late": "Zu langsam: Die Zeit war abgelaufen.",
       "score": "{percent} % richtig",
-      "close": "Schließen"
+      "close": "Schließen",
+      "sortHint": "Zieh die Karte auf den richtigen Stapel. Tippen geht auch.",
+      "sliderHint": "Zieh jedes Teil genau in seine Lücke.",
+      "rotateHint": "Dreh am Rad oder tippe die Pfeile, bis der Pfeil auf die Markierung zeigt.",
+      "rotateLeft": "{label} nach links drehen",
+      "rotateRight": "{label} nach rechts drehen",
+      "matchHint": "Zieh jede Karte in die passende Box. Oder tippe erst die Karte, dann die Box.",
+      "matchOpen": "Noch {count} Karten",
+      "pathHint": "Zieh mit dem Finger einen Weg vom Start zum Ziel, so kurz wie möglich. Felder antippen geht auch.",
+      "pathSteps": "{count} Schritte",
+      "pathCell": "Feld {row}-{col}",
+      "back": "Zurück"
     },
     "hierarchy": "Wer berichtet an wen",
     "hierarchyIntro": "Vorgesetzte sind für ihr Team verantwortlich und geben Aufgaben weiter. Eine Vorgesetzte oder ein Vorgesetzter braucht einen höheren Rang.",
@@ -6034,6 +6049,228 @@
         "ok": "{company} gewinnt den Auftrag mit einem fairen Angebot.",
         "fail": "{company} hat sich verrechnet und arbeitet umsonst.",
         "question": "{a} Helfer arbeiten je 1 Stunde zu {b} €. Was kostet der Umzug?"
+      },
+      "align_labels": {
+        "name": "Etiketten ausrichten",
+        "how": "Schieb jedes Etikett genau in seine Lücke auf dem Karton.",
+        "ok": "Bei {company} klebt jedes Etikett an der richtigen Stelle. Die Pakete kommen pünktlich an.",
+        "fail": "Schiefe Etiketten bei {company}: Pakete gingen an falsche Adressen.",
+        "labels": ["Karton A", "Karton B", "Karton C"]
+      },
+      "fix_antenna": {
+        "name": "WLAN-Antennen ausrichten",
+        "how": "Dreh jede Antenne, bis ihr Pfeil auf die Markierung zeigt.",
+        "ok": "Volles WLAN bei {company}: Alle Videocalls laufen ohne Ruckeln.",
+        "fail": "Funkloch bei {company}: Das wichtige Kundengespräch brach dreimal ab.",
+        "labels": ["Flur", "Büro", "Küche"]
+      },
+      "file_documents": {
+        "name": "Ablage machen",
+        "how": "Rechnungen gehören zu Finanzen, Verträge zu Recht und Bewerbungen zu Personal.",
+        "ok": "{company} findet jedes Papier in Sekunden wieder.",
+        "fail": "Suchaktion bei {company}: Ein wichtiger Vertrag lag im falschen Ordner.",
+        "boxes": ["Finanzen", "Recht", "Personal"],
+        "groups": [
+          ["Rechnung Strom", "Rechnung Miete", "Rechnung Server"],
+          ["Vertrag Lieferant", "Vertrag Büro", "Vertrag Kunde"],
+          ["Bewerbung Anna", "Bewerbung Ben", "Bewerbung Cem"]
+        ]
+      },
+      "office_route": {
+        "name": "Botengang im Büro",
+        "how": "Bring die Unterschriftenmappe auf dem kürzesten Weg zur Chefin, um die Tische herum.",
+        "ok": "Bei {company} ist alles rechtzeitig unterschrieben.",
+        "fail": "Die Mappe von {company} irrte durchs Büro, die Frist war vorbei.",
+        "start": "Post",
+        "goal": "Chefin",
+        "wall": "Tisch"
+      },
+      "firewall_rules": {
+        "name": "Firewall-Regeln",
+        "how": "Bekannte Partner werden erlaubt, Dateien mit .exe blockiert und unbekannte Absender kommen in Quarantäne.",
+        "ok": "{company} hält jeden Angriff draußen, die Partner kommen durch.",
+        "fail": "Löchrige Firewall bei {company}: Ein Virus hat sich eingeschlichen.",
+        "boxes": ["Erlauben", "Blockieren", "Quarantäne"],
+        "groups": [
+          ["Partner Bank", "Partner Cloud", "Partner Druckerei"],
+          ["rechnung.exe", "update.exe", "foto.exe"],
+          ["Unbekannt: Gewinnspiel", "Unbekannt: Paket", "Unbekannt: Lotto"]
+        ]
+      },
+      "ui_align": {
+        "name": "Knöpfe ausrichten",
+        "how": "Schieb jeden Knopf genau an seinen Platz im Layout.",
+        "ok": "Die App von {company} sieht aufgeräumt aus, die Bewertungen steigen.",
+        "fail": "Verrutschte Knöpfe in der App von {company}: Nutzer tippen daneben und beschweren sich.",
+        "labels": ["Login", "Kaufen", "Menü"]
+      },
+      "cable_route": {
+        "name": "Kabel verlegen",
+        "how": "Verleg das Kabel auf dem kürzesten Weg vom Router zum Server, an den Racks vorbei.",
+        "ok": "Das Rechenzentrum von {company} ist sauber verkabelt.",
+        "fail": "Kabelsalat bei {company}: Ein Server war stundenlang nicht erreichbar.",
+        "start": "Router",
+        "goal": "Server",
+        "wall": "Rack"
+      },
+      "case_files": {
+        "name": "Fälle zuordnen",
+        "how": "Alles rund um die Wohnung geht ins Mietrecht, alles rund um den Job ins Arbeitsrecht und alles rund um ein Erbe ins Erbrecht.",
+        "ok": "{company} gibt jede Anfrage gleich an die richtige Anwältin.",
+        "fail": "Bei {company} landete ein Fall beim falschen Team und blieb liegen.",
+        "boxes": ["Mietrecht", "Arbeitsrecht", "Erbrecht"],
+        "groups": [
+          ["Miete zu hoch", "Schimmel im Bad", "Nebenkosten falsch"],
+          ["Kündigung erhalten", "Überstunden unbezahlt", "Urlaub verweigert"],
+          ["Testament unklar", "Erbe aufteilen", "Erbschein beantragen"]
+        ]
+      },
+      "vault_dials": {
+        "name": "Tresor öffnen",
+        "how": "Dreh jedes Zahlenrad, bis sein Pfeil auf die Markierung zeigt.",
+        "ok": "{company} öffnet den Tresor im ersten Versuch.",
+        "fail": "Der Tresor von {company} hat sich für einen Tag gesperrt.",
+        "labels": ["Rad 1", "Rad 2", "Rad 3"]
+      },
+      "warehouse_bins": {
+        "name": "Ware einlagern",
+        "how": "Kleidung kommt in Regal A, Technik in Regal B und Bücher in Regal C.",
+        "ok": "Im Lager von {company} liegt alles am richtigen Platz.",
+        "fail": "Suchen statt Versenden bei {company}: Bestellungen kamen zu spät.",
+        "boxes": ["Regal A", "Regal B", "Regal C"],
+        "groups": [
+          ["Jeans", "Pullover", "Socken"],
+          ["Kopfhörer", "Ladekabel", "Tablet"],
+          ["Roman", "Kochbuch", "Atlas"]
+        ]
+      },
+      "hem_length": {
+        "name": "Säume abstecken",
+        "how": "Schieb jede Nadel genau an die Markierung am Saum.",
+        "ok": "Bei {company} sitzt jeder Saum perfekt.",
+        "fail": "Zu kurze Hosen bei {company}: Die halbe Kollektion ging zurück.",
+        "labels": ["Hose", "Rock", "Mantel"]
+      },
+      "fridge_shelves": {
+        "name": "Kühltheke einräumen",
+        "how": "Käse kommt ins Käsefach, Fisch auf Eis und Wurst ins Wurstfach.",
+        "ok": "Die Theke von {company} ist frisch und ordentlich.",
+        "fail": "Fisch im Käsefach: {company} musste Ware wegwerfen.",
+        "boxes": ["Käsefach", "Eis", "Wurstfach"],
+        "groups": [
+          ["Gouda", "Brie", "Parmesan"],
+          ["Lachs", "Forelle", "Garnelen"],
+          ["Salami", "Schinken", "Mortadella"]
+        ]
+      },
+      "sign_turn": {
+        "name": "Wegweiser aufstellen",
+        "how": "Dreh jeden Wegweiser, bis er auf die Markierung zur Filiale zeigt.",
+        "ok": "Die Kundschaft findet jede Filiale von {company} auf Anhieb.",
+        "fail": "Falsche Wegweiser: Kunden von {company} landeten bei der Konkurrenz.",
+        "labels": ["Bahnhof", "Markt", "Parkplatz"]
+      },
+      "panel_turn": {
+        "name": "Module zur Sonne drehen",
+        "how": "Dreh jedes Modul, bis sein Pfeil auf die Markierung zur Sonne zeigt.",
+        "ok": "Die Module von {company} holen heute das Maximum aus der Sonne.",
+        "fail": "Schief gestellte Module bei {company}: Der Ertrag brach ein.",
+        "labels": ["Dach Nord", "Dach Süd", "Carport"]
+      },
+      "line_repair": {
+        "name": "Störung erreichen",
+        "how": "Fahr auf dem kürzesten Weg vom Depot zur Störung, um die Baustellen herum.",
+        "ok": "{company} hat den Strom in Rekordzeit wieder an.",
+        "fail": "Der Trupp von {company} stand im Stau, das Viertel blieb lange dunkel.",
+        "start": "Depot",
+        "goal": "Störung",
+        "wall": "Baustelle"
+      },
+      "charge_level": {
+        "name": "Ladegrenzen setzen",
+        "how": "Schieb jeden Regler genau auf die markierte Ladegrenze.",
+        "ok": "Die Speicher von {company} laden schonend und genau richtig.",
+        "fail": "Überladen: Bei {company} mussten Speicher notabgeschaltet werden.",
+        "labels": ["Speicher 1", "Speicher 2", "Speicher 3"]
+      },
+      "grid_flow": {
+        "name": "Strom durchleiten",
+        "how": "Leite den Strom auf dem kürzesten Weg vom Kraftwerk zum Kunden, an überlasteten Leitungen vorbei.",
+        "ok": "{company} liefert den Strom ohne Verluste.",
+        "fail": "Umwege im Netz: {company} zahlte hohe Durchleitungsgebühren.",
+        "start": "Kraftwerk",
+        "goal": "Kunde",
+        "wall": "Überlast"
+      },
+      "pill_boxes": {
+        "name": "Tabletten einsortieren",
+        "how": "Schmerzmittel kommen in Fach 1, Allergiemittel in Fach 2 und Magenmittel in Fach 3.",
+        "ok": "Bei {company} liegt jede Packung im richtigen Fach.",
+        "fail": "Verwechslung bei {company}: Eine Apotheke bekam die falschen Tabletten.",
+        "boxes": ["Fach 1", "Fach 2", "Fach 3"],
+        "groups": [
+          ["Gegen Kopfweh", "Gegen Zahnschmerz", "Gegen Rückenschmerz"],
+          ["Gegen Heuschnupfen", "Gegen Juckreiz", "Gegen Pollen"],
+          ["Gegen Sodbrennen", "Gegen Übelkeit", "Gegen Magendrücken"]
+        ]
+      },
+      "pipette": {
+        "name": "Pipette einstellen",
+        "how": "Schieb jeden Regler genau auf die markierte Menge.",
+        "ok": "Die Versuchsreihe von {company} gelingt aufs Mikroliter genau.",
+        "fail": "Falsch pipettiert: {company} muss die Versuchsreihe wiederholen.",
+        "labels": ["Probe A", "Probe B", "Probe C"]
+      },
+      "probe_turn": {
+        "name": "Sonden ausrichten",
+        "how": "Dreh jede Ultraschallsonde, bis ihr Pfeil auf die Markierung zeigt.",
+        "ok": "Die Geräte von {company} liefern gestochen scharfe Bilder.",
+        "fail": "Unscharfe Bilder: Eine Klinik schickte die Geräte von {company} zurück.",
+        "labels": ["Sonde 1", "Sonde 2", "Sonde 3"]
+      },
+      "form_stack": {
+        "name": "Anträge zuordnen",
+        "how": "Alles zu Arzneien geht an das Arzneiamt, alles zu Geräten an die Gerätestelle und alles zu Lebensmitteln an das Lebensmittelamt.",
+        "ok": "{company} schickt jeden Antrag an die richtige Behörde.",
+        "fail": "Falsche Behörde: Ein Antrag von {company} kam nach Wochen zurück.",
+        "boxes": ["Arzneiamt", "Gerätestelle", "Lebensmittelamt"],
+        "groups": [
+          ["Hustensaft", "Schmerzmittel", "Impfstoff"],
+          ["Blutdruckmesser", "Hörgerät", "Rollstuhl"],
+          ["Babybrei", "Müsliriegel", "Vitaminsaft"]
+        ]
+      },
+      "bike_route": {
+        "name": "Schnellste Route",
+        "how": "Radle auf dem kürzesten Weg vom Lager zum Kunden, Baustellen sind gesperrt.",
+        "ok": "Die Kuriere von {company} sind schneller als versprochen.",
+        "fail": "Umweg mit dem Rad: Die Lieferung von {company} kam zu spät.",
+        "start": "Lager",
+        "goal": "Kunde",
+        "wall": "Baustelle"
+      },
+      "forklift_path": {
+        "name": "Stapler fahren",
+        "how": "Fahr den Stapler auf dem kürzesten Weg zum Tor, um die Regale herum.",
+        "ok": "Bei {company} läuft der Wareneingang wie am Schnürchen.",
+        "fail": "Stau in der Halle von {company}: Ein Laster wartete eine Stunde.",
+        "start": "Stapler",
+        "goal": "Tor",
+        "wall": "Regal"
+      },
+      "crane_turn": {
+        "name": "Kräne ausrichten",
+        "how": "Dreh jeden Kran, bis sein Ausleger auf die Markierung am Schiff zeigt.",
+        "ok": "{company} lädt das Schiff in Rekordzeit.",
+        "fail": "Kräne falsch gedreht: Das Schiff von {company} lief mit Verspätung aus.",
+        "labels": ["Kran 1", "Kran 2", "Kran 3"]
+      },
+      "truck_space": {
+        "name": "Möbel verladen",
+        "how": "Schieb jedes Möbelstück genau in die freie Lücke im Laster.",
+        "ok": "{company} bekommt den ganzen Umzug in eine Fahrt.",
+        "fail": "Nichts passte: {company} musste zweimal fahren.",
+        "labels": ["Sofa", "Schrank", "Kommode"]
       }
     },
     "delegatedPopup": {

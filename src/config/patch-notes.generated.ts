@@ -44,6 +44,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Die KI-Sammler handeln jetzt auch untereinander und bieten danach wieder an, so bewegen sich die Preise ständig. Beliebte NFTs mit vielen Likes, Angeboten und Verkäufen sind gefragter, und die Sammler zahlen dafür mehr. Mira heißt jetzt „Assistentin“ statt „KI“.",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-67828e31",
+        title: "Minispiele zum Anfassen",
+        text: "Vier neue Firmenaufgaben-Spiele wie bei einem Captcha: Teile in ihre Lücke schieben, Räder drehen, bis der Pfeil auf die Markierung zeigt, Karten in die richtige Box ziehen und den kürzesten Weg um Hindernisse ziehen. Dazu 25 neue Aufgaben, mindestens eine für jedes Produkt. Beim Sortieren ziehst du die Karte jetzt auf den Stapel, beim Rechnen helfen Knöpfe von −100 bis +100. Alles bleibt durch Hinsehen und Nachdenken lösbar, Tippen geht weiterhin.",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-c3ff6b27",
         title: "Mehr XP für Missionen",
         text: "Je höher dein Level, desto mehr XP bringen Missionen (Level 10 etwa das 2,3-Fache, Level 30 das 5-Fache). Neuer Meilenstein für alle: Arbeite einmal bei der Firma eines echten Spielers und bekomme 2500 XP.",

@@ -2253,6 +2253,34 @@ ungelesene `company_task`-Benachrichtigung auftaucht. „Jetzt ansehen“ führt
 Bereits gezeigte Pop-ups merkt sich der Browser (`localStorage`, nach der Hydration gelesen), damit es nach einem
 Neuladen nicht wiederkommt. Rein clientseitig; keine Schema-Änderung.
 
+## ADR-144: Firmen-Minispiele zum Anfassen – Schieben, Drehen, Zuordnen, Weg finden — `akzeptiert`
+
+**Kontext:** Die Firmenaufgaben (ADR-129) waren fast nur Tippen und Eintippen. Spieler wollten Spiele, bei denen man
+Dinge verschiebt, wie bei einem Captcha, und die trotzdem durch Hinsehen und Nachdenken lösbar sind (ADR-140), nie
+durch Raten.
+
+**Entscheidung:**
+
+- **Vier neue Spiele** (`companyTasks.games`), jedes vom Server aus Rätsel und Lösung bewertet, Teilpunkte in
+  Basispunkten:
+  - **Einpassen (`slider`):** Drei Teile in ihre sichtbare Lücke ziehen (Bahn 0 bis 100). Innerhalb von
+    `tolerance` (3) volle Punkte, innerhalb der dreifachen Toleranz die Hälfte, der Durchschnitt zählt.
+  - **Drehen (`rotate`):** Drei Räder (8 Stufen à 45°) drehen, bis der Pfeil auf die Markierung zeigt; Ziehen am Rad
+    oder Pfeiltasten. Jedes Rad startet mindestens zwei Stufen daneben. Eine Stufe daneben zählt halb.
+  - **Zuordnen (`match`):** Sechs Karten in drei Boxen ziehen; die Regel steht in der Anleitung („Rechnungen zu
+    Finanzen …“). Je Box zwei von drei Karten der Gruppe, gemischt. Bewertet wird je Karte.
+  - **Weg finden (`path`):** Auf einem 5×5-Feld mit 6 bis 9 Hindernissen den kürzesten Weg vom linken zum rechten
+    Rand ziehen. Die Hindernisse erzwingen immer einen Umweg von mindestens 2 Schritten. Der kürzeste Weg gibt volle
+    Punkte, jeder Schritt mehr kostet `stepBps` (10 %), ein unterbrochener Weg gibt nichts.
+- Die Lösung trägt alles, was die Bewertung braucht (Toleranz, Stufen, Feld, kürzeste Länge), so bleibt
+  `company_task_grade()` unveränderlich. Breitensuche in `company_task_path_length()` und `shortestPath()`.
+- **25 neue Aufgaben** mit diesen Spielen: vier für jede Firma, eine je Produkt. Bestehende Schlüssel bleiben
+  unverändert (Verlauf und offene Aufgaben hängen daran).
+- **Sortieren** ist jetzt Ziehen: Karte auf den Stapel ziehen oder wischen; die Knöpfe bleiben als Ersatz zum Tippen
+  und für die Tastatur. **Rechnen** hat zusätzlich Knöpfe −100 … +100.
+- Bedienung mit Pointer Events (Maus, Finger, Stift), Karten folgen per `transform`; jedes Spiel geht auch mit
+  Tippen oder Tastatur. Migration `20261204001600_task_games.sql`, Test `supabase/tests/9f_task_games.sql`.
+
 ## ADR-147: „Firma auflösen“ deutlich sichtbar — `akzeptiert`
 
 **Kontext:** Das Auflösen der Firma steckte im Chefbüro in einem zugeklappten Bereich „Lohnfaktor und Auflösen“ und

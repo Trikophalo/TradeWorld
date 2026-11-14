@@ -38,6 +38,7 @@ import { StatBars } from "@/features/crypto/components/coin-detail";
 import { CoinLogo } from "@/features/crypto/components/coin-logo";
 import { SignaturePad } from "@/features/career/components/signature-pad";
 import { CompanyMovesCard } from "@/features/company/components/company-moves";
+import { TaskGameView } from "@/features/company/tasks/games";
 import { TaskBoard } from "@/features/company/tasks/task-board";
 import type { CompanyMoves, CompanyTasks, MyJob, PlayerCard } from "@/features/game/types";
 import { SpeechBubble } from "@/features/tutorial/components/speech-bubble";
@@ -224,6 +225,36 @@ const SAMPLE_TASKS: CompanyTasks = {
     },
   ],
 };
+
+/** Hands-on task games (ADR-144) with fixed puzzles; answers only go to the toast. */
+const SAMPLE_GAMES = [
+  { game: "sort", taskKey: "pay_invoices", puzzle: { items: [5, 0, 3, 6, 1, 7, 2, 4] } },
+  { game: "slider", taskKey: "align_labels", puzzle: { targets: [34, 72, 55] } },
+  { game: "rotate", taskKey: "fix_antenna", puzzle: { start: [3, 6, 1], target: [0, 2, 5], steps: 8 } },
+  { game: "match", taskKey: "file_documents", puzzle: { items: [4, 0, 7, 2, 3, 8], boxes: 3 } },
+  { game: "path", taskKey: "office_route", puzzle: { size: 5, start: 10, goal: 9, walls: [1, 6, 11, 13, 18, 23, 8] } },
+  { game: "math", taskKey: "payroll_check", puzzle: { a: 6, b: 24 } },
+] as const;
+
+function SampleGame({ sample }: { sample: (typeof SAMPLE_GAMES)[number] }) {
+  const [round, setRound] = useState(0);
+  return (
+    <Card padding="lg" className="space-y-3 self-start">
+      <p className="label-pixel text-fg-3">Minispiel „{sample.game}“ (ADR-144)</p>
+      <TaskGameView
+        key={round}
+        game={sample.game}
+        taskKey={sample.taskKey}
+        puzzle={sample.puzzle as unknown as Record<string, unknown>}
+        disabled={false}
+        onAnswer={(answer) => {
+          toast.info(sample.game, JSON.stringify(answer));
+          setRound((r) => r + 1);
+        }}
+      />
+    </Card>
+  );
+}
 
 const SAMPLE_JOB: MyJob = {
   id: "job-sample",
@@ -816,6 +847,9 @@ export function Showcase() {
         <PayRoutes job={SAMPLE_JOB} />
         <CompanyMovesCard preview={SAMPLE_MOVES} />
         <TaskBoard preview={SAMPLE_TASKS} />
+        {SAMPLE_GAMES.map((sample) => (
+          <SampleGame key={sample.game} sample={sample} />
+        ))}
         <ShowcaseSection />
         <UpgradeCard upgradeKey="vault" level={2} />
         <UpgradeCard upgradeKey="rhetoric" level={0} />

@@ -1176,7 +1176,7 @@ export interface CompanyMoves {
 }
 
 /** Company tasks with mini-games (ADR-129). */
-export type TaskGame = "pick" | "count" | "sort" | "order" | "seq" | "math";
+export type TaskGame = "pick" | "count" | "sort" | "order" | "seq" | "math" | "slider" | "rotate" | "match" | "path";
 export type TaskStatus = "open" | "assigned" | "playing" | "ai" | "success" | "failure" | "missed";
 
 export interface CompanyTask {

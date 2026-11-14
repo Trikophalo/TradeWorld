@@ -21,6 +21,7 @@ export function useTaskText() {
     return {
       name: (key: string) => string(key, "name") || key,
       how: (key: string) => string(key, "how"),
+      raw,
       string,
       list: (key: string, field: string) => {
         const v = raw(key, field);

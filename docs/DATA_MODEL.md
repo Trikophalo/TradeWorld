@@ -7170,6 +7170,11 @@ get_news_feed(p_kind text default 'all', p_limit integer default 40)       -- al
 
 Rätsel und Antworten: `pick` `{tiles}` → `{picked}`, `count` `{tiles}` → `{count}`, `sort` `{items}` → `{sides}`,
 `order` `{values}` → `{order}`, `seq` `{sequence, show_seconds}` → `{sequence}`, `math` `{a, b}` → `{value}`.
+Seit ADR-144 (Migration `20261204001600_task_games.sql`, Test `supabase/tests/9f_task_games.sql`) zusätzlich:
+`slider` `{targets}` → `{positions}`, `rotate` `{start, target, steps}` → `{dials}`, `match` `{items, boxes}` →
+`{boxes}` (−1 = nicht zugeordnet), `path` `{size, start, goal, walls}` → `{path}` (Felder zeilenweise ab 0). Die
+Lösung trägt Toleranz, Stufen bzw. Feld und kürzeste Länge (`length`, `step_bps`). `company_tasks.game` erlaubt die
+vier neuen Spiele; intern `company_task_path_length(size, start, goal, walls)` (Breitensuche).
 Intern: `company_tasks_run_due(p_now)` (Cron `nexa-company-tasks`), `fun_news_run_due(p_now)` (Cron `nexa-fun-news`).
 `get_company_org` liefert je Mitglied zusätzlich `supervisor`.
 

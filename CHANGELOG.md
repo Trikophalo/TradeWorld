@@ -181,6 +181,11 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 - **Mehr XP für Missionen (ADR-142):** Je höher dein Level, desto mehr XP bringen Missionen (Level 10 etwa das
   2,3-Fache, Level 30 das 5-Fache). Neuer Meilenstein für alle: Arbeite einmal bei der Firma eines echten Spielers und
   bekomme 2500 XP.
+- **Minispiele zum Anfassen (ADR-144):** Vier neue Firmenaufgaben-Spiele wie bei einem Captcha: Teile in ihre Lücke
+  schieben, Räder drehen, bis der Pfeil auf die Markierung zeigt, Karten in die richtige Box ziehen und den kürzesten
+  Weg um Hindernisse ziehen. Dazu 25 neue Aufgaben, mindestens eine für jedes Produkt. Beim Sortieren ziehst du die
+  Karte jetzt auf den Stapel, beim Rechnen helfen Knöpfe von −100 bis +100. Alles bleibt durch Hinsehen und Nachdenken
+  lösbar, Tippen geht weiterhin.
 
 - **Lebendiger NFT-Markt (ADR-141):** Die KI-Sammler handeln jetzt auch untereinander und bieten danach wieder an, so
   bewegen sich die Preise ständig. Beliebte NFTs mit vielen Likes, Angeboten und Verkäufen sind gefragter, und die

@@ -6,7 +6,7 @@ import { rpc } from "./rpc";
  * Company tasks with mini-games and the news feed (ADR-129) against the server.
  */
 const tier = z.enum(["intern", "junior", "senior", "team_lead", "c_level"]);
-const game = z.enum(["pick", "count", "sort", "order", "seq", "math"]);
+const game = z.enum(["pick", "count", "sort", "order", "seq", "math", "slider", "rotate", "match", "path"]);
 
 const tasksSchema = z.object({
   role: z.enum(["founder", "employee"]),

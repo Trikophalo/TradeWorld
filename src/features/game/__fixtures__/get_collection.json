@@ -3,8 +3,8 @@
   "created": 0,
   "artworks": [
     {
-      "id": "c1702cf8-0afc-4052-bba5-8be40c8a6441",
-      "hot": 0.343781,
+      "id": "12dc7a0f-69d7-4e5b-9b0b-72bba3c445b2",
+      "hot": 0.34374,
       "code": "NFT-0001",
       "liked": false,
       "likes": 0,
@@ -66,7 +66,7 @@
       "creator": null,
       "ai_owner": null,
       "ask_cents": null,
-      "created_at": "2026-11-14T20:13:19.152443+00:00",
+      "created_at": "2026-11-14T20:21:42.83632+00:00",
       "royalty_bps": 1000,
       "value_cents": 500000,
       "royalties_cents": 0,

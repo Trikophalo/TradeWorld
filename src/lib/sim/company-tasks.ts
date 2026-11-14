@@ -1,6 +1,6 @@
 /**
- * Company task games (ADR-129): puzzles and grading. Mirrors company_task_puzzle() and company_task_grade() in
- * supabase/migrations/20261204000100_company_tasks.sql; the server is the authority, this runs the demo.
+ * Company task games (ADR-129, ADR-144): puzzles and grading. Mirrors company_task_puzzle() and company_task_grade()
+ * in supabase/migrations/20261204001600_task_games.sql; the server is the authority, this runs the demo.
  * Pure: randomness comes in as `rng` (0 ≤ x < 1).
  */
 import type { CompanyTaskConfig } from "../../config/company-tasks.ts";
@@ -12,7 +12,11 @@ export type TaskPuzzle =
   | { items: number[] }
   | { values: number[] }
   | { sequence: number[]; show_seconds: number }
-  | { a: number; b: number };
+  | { a: number; b: number }
+  | { targets: number[] }
+  | { start: number[]; target: number[]; steps: number }
+  | { items: number[]; boxes: number }
+  | { size: number; start: number; goal: number; walls: number[] };
 
 export type TaskSolution =
   | { targets: number[] }
@@ -20,7 +24,22 @@ export type TaskSolution =
   | { sides: number[] }
   | { order: number[] }
   | { sequence: number[] }
-  | { value: number };
+  | { value: number }
+  | { positions: number[]; tolerance: number }
+  | { dials: number[]; steps: number }
+  | { boxes: number[] }
+  | PathSolution;
+
+/** path (ADR-144): the grid again, so grading needs nothing but the solution. */
+export interface PathSolution {
+  size: number;
+  start: number;
+  goal: number;
+  walls: number[];
+  /** Moves of the shortest route. */
+  length: number;
+  step_bps: number;
+}
 
 export type TaskAnswer =
   | { picked: number[] }
@@ -28,7 +47,11 @@ export type TaskAnswer =
   | { sides: number[] }
   | { order: number[] }
   | { sequence: number[] }
-  | { value: number };
+  | { value: number }
+  | { positions: number[] }
+  | { dials: number[] }
+  | { boxes: number[] }
+  | { path: number[] };
 
 type Rules = typeof COMPANY_TASK_RULES;
 
@@ -101,7 +124,141 @@ export function generatePuzzle(
       }
       return { puzzle: { a, b }, solution: { value: mathValue(task.op ?? "add", a, b) } };
     }
+    case "slider": {
+      const c = g.slider;
+      const targets = Array.from({ length: c.sliders }, () => between(rng, c.min, c.max));
+      return { puzzle: { targets }, solution: { positions: targets, tolerance: c.tolerance } };
+    }
+    case "rotate": {
+      const c = g.rotate;
+      const target: number[] = [];
+      const start: number[] = [];
+      for (let i = 0; i < c.dials; i++) {
+        const t = between(rng, 0, c.steps - 1);
+        // turned away by minTurn .. steps - minTurn steps, so no dial starts (almost) right
+        const off = between(rng, c.minTurn, c.steps - c.minTurn);
+        target.push(t);
+        start.push((t + off) % c.steps);
+      }
+      return { puzzle: { start, target, steps: c.steps }, solution: { dials: target, steps: c.steps } };
+    }
+    case "match": {
+      const c = g.match;
+      const chosen: number[] = [];
+      for (let box = 0; box < c.boxes; box++) {
+        const group = shuffled(
+          Array.from({ length: c.groupSize }, (_, k) => box * c.groupSize + k),
+          rng,
+        );
+        chosen.push(...group.slice(0, c.perBox));
+      }
+      const items = shuffled(chosen, rng);
+      return {
+        puzzle: { items, boxes: c.boxes },
+        solution: { boxes: items.map((i) => Math.floor(i / c.groupSize)) },
+      };
+    }
+    case "path": {
+      const c = g.path;
+      const n = c.size * c.size;
+      for (let attempt = 0; attempt < 60; attempt++) {
+        const start = between(rng, 0, c.size - 1) * c.size;
+        const goal = between(rng, 0, c.size - 1) * c.size + c.size - 1;
+        const count = between(rng, c.minWalls, c.maxWalls);
+        const free = shuffled(
+          Array.from({ length: n }, (_, i) => i).filter((i) => i !== start && i !== goal),
+          rng,
+        );
+        const walls = free.slice(0, count).sort((x, y) => x - y);
+        const length = shortestPath(c.size, start, goal, walls);
+        if (length !== null && length >= manhattan(c.size, start, goal) + c.minDetour) {
+          return pathPuzzle(c.size, start, goal, walls, length, c.stepBps);
+        }
+      }
+      // fallback: a wall across the middle column
+      const mid = Math.floor(c.size / 2);
+      const start = mid * c.size;
+      const goal = mid * c.size + c.size - 1;
+      const walls = Array.from({ length: c.size - 2 }, (_, k) => (k + 1) * c.size + mid);
+      return pathPuzzle(c.size, start, goal, walls, shortestPath(c.size, start, goal, walls) ?? 0, c.stepBps);
+    }
   }
+}
+
+function pathPuzzle(size: number, start: number, goal: number, walls: number[], length: number, stepBps: number) {
+  return {
+    puzzle: { size, start, goal, walls },
+    solution: { size, start, goal, walls, length, step_bps: stepBps },
+  };
+}
+
+const manhattan = (size: number, a: number, b: number) =>
+  Math.abs(Math.floor(a / size) - Math.floor(b / size)) + Math.abs((a % size) - (b % size));
+
+/** Moves of the shortest route from start to goal around the walls, null if there is none. */
+export function shortestPath(size: number, start: number, goal: number, walls: readonly number[]): number | null {
+  const route = shortestRoute(size, start, goal, walls);
+  return route ? route.length - 1 : null;
+}
+
+/** One shortest route (cells from start to goal) around the walls, breadth-first; null if there is none. */
+export function shortestRoute(size: number, start: number, goal: number, walls: readonly number[]): number[] | null {
+  const prev = new Array<number>(size * size).fill(-2);
+  prev[start] = -1;
+  const queue = [start];
+  for (let head = 0; head < queue.length; head++) {
+    const cell = queue[head]!;
+    if (cell === goal) {
+      const route = [cell];
+      while (prev[route[0]!]! >= 0) route.unshift(prev[route[0]!]!);
+      return route;
+    }
+    const r = Math.floor(cell / size);
+    const col = cell % size;
+    const next = [
+      r > 0 ? cell - size : -1,
+      r < size - 1 ? cell + size : -1,
+      col > 0 ? cell - 1 : -1,
+      col < size - 1 ? cell + 1 : -1,
+    ];
+    for (const nb of next) {
+      if (nb >= 0 && prev[nb] === -2 && !walls.includes(nb)) {
+        prev[nb] = cell;
+        queue.push(nb);
+      }
+    }
+  }
+  return null;
+}
+
+/** Score of a drawn route: 0 unless it runs from start to goal in single steps, around walls, no cell twice. */
+function gradePath(sol: PathSolution, path: unknown): number {
+  if (!Array.isArray(path) || path.length < 2) return 0;
+  const cells = path as unknown[];
+  if (!cells.every((c) => typeof c === "number" && Number.isInteger(c) && c >= 0 && c < sol.size * sol.size)) return 0;
+  const route = cells as number[];
+  if (route[0] !== sol.start || route[route.length - 1] !== sol.goal) return 0;
+  if (new Set(route).size !== route.length || route.some((c) => sol.walls.includes(c))) return 0;
+  for (let i = 1; i < route.length; i++) if (manhattan(sol.size, route[i - 1]!, route[i]!) !== 1) return 0;
+  const extra = route.length - 1 - sol.length;
+  return Math.max(0, Math.min(10_000, 10_000 - extra * sol.step_bps));
+}
+
+/** Average of the parts: exact full marks, close (within `near`) half, else nothing. */
+function gradeParts(
+  want: number[],
+  got: unknown,
+  near: { exact: number; half: number },
+  diff: (a: number, b: number) => number,
+): number {
+  if (!Array.isArray(got)) return 0;
+  const parts = want.map((w, i) => {
+    const v = (got as unknown[])[i];
+    if (typeof v !== "number" || !Number.isFinite(v)) return 0;
+    const d = diff(v, w);
+    return d <= near.exact ? 10_000 : d <= near.half ? 5_000 : 0;
+  });
+  return Math.trunc(parts.reduce<number>((a, b) => a + b, 0) / Math.max(want.length, 1));
 }
 
 export function mathValue(op: NonNullable<CompanyTaskConfig["op"]>, a: number, b: number): number {
@@ -138,8 +295,23 @@ export function gradeAnswer(game: CompanyTaskConfig["game"], solution: TaskSolut
       const diff = Math.abs((ans[key] as number) - (sol[key] as number));
       return diff === 0 ? 10_000 : game === "count" && diff === 1 ? 5_000 : 0;
     }
+    case "slider": {
+      const tol = Number(sol.tolerance);
+      return gradeParts(sol.positions as number[], ans.positions, { exact: tol, half: 3 * tol }, (a, b) =>
+        Math.abs(a - b),
+      );
+    }
+    case "rotate": {
+      const steps = Number(sol.steps);
+      return gradeParts(sol.dials as number[], ans.dials, { exact: 0, half: 1 }, (a, b) => {
+        const d = Math.abs(a - b) % steps;
+        return Math.min(d, steps - d);
+      });
+    }
+    case "path":
+      return gradePath(solution as PathSolution, ans.path);
     default: {
-      const key = game === "sort" ? "sides" : game === "order" ? "order" : "sequence";
+      const key = game === "sort" ? "sides" : game === "order" ? "order" : game === "match" ? "boxes" : "sequence";
       const want = sol[key] as number[];
       if (!Array.isArray(ans[key])) return 0;
       const got = ans[key] as unknown[];

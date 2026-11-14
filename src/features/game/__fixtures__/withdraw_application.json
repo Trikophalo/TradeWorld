@@ -1,27 +1,27 @@
 {
-  "id": "7a0d7296-1cd8-4b24-8f1f-f810dc4d5a32",
+  "id": "8b9463eb-de46-467b-a438-7f309e7e5764",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "0099def4-10b6-4c04-b59a-2724f1d31cfa",
+    "id": "073da723-51c7-439f-9861-f4b71049a1e0",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "7999d809-0066-66e2-e0ac-930c34a49626",
+      "id": "7ab1711b-b618-dcac-f2aa-97b46add6779",
       "logo": null,
-      "name": "Fundgrube Discount",
-      "color": "#C2C95B",
+      "name": "Nordbrise Offshore",
+      "color": "#6EC1E4",
       "is_ai": true,
-      "sector": "retail",
-      "ticker": "FGD"
+      "sector": "energy",
+      "ticker": "WND"
     },
-    "required": [{ "branch": "sales", "min_score": 0 }],
-    "title_key": "sales_intern",
+    "required": [{ "branch": "craft", "min_score": 0 }],
+    "title_key": "craft_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-14T20:15:33.403194+00:00",
-  "updated_at": "2026-11-14T20:15:33.40709+00:00",
-  "offer_expires_at": "2026-11-16T20:15:33.403194+00:00",
+  "created_at": "2026-11-14T20:23:57.332161+00:00",
+  "updated_at": "2026-11-14T20:23:57.337755+00:00",
+  "offer_expires_at": "2026-11-16T20:23:57.332161+00:00",
   "salary_wish_cents_per_hour": 15000,
   "offer_salary_cents_per_hour": 15000
 }
