@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "50de12c7-d09c-4cf2-a893-0ba10013d7b5",
+    "id": "d3ec6a23-84d1-4528-9345-e83e63c6ddc2",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "1188056d-8ee9-0848-9146-e3115adc3792",
+      "id": "c76af3f2-dc09-a8cc-b107-a7c326ad5b09",
       "logo": null,
-      "name": "Sonnenkern Fusion",
-      "color": "#FF5E5B",
+      "name": "Glanz & Gloria",
+      "color": "#D4AF37",
       "is_ai": true,
-      "sector": "energy",
-      "ticker": "FSN"
+      "sector": "retail",
+      "ticker": "LUX"
     },
     "presence": {
-      "fire_at": "2026-11-19T20:30:48.211339+00:00",
+      "fire_at": "2026-11-19T21:40:30.168524+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-14T20:30:48.211339+00:00"
+      "last_active_at": "2026-11-14T21:40:30.168524+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-14T20:30:48.315565+00:00",
+    "started_at": "2026-11-14T21:40:30.315517+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

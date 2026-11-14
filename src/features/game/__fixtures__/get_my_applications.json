@@ -1,56 +1,56 @@
 {
   "applications": [
     {
-      "id": "49dac798-aa8d-4d2a-beca-c38e678ec3c4",
+      "id": "4a477694-71f7-45df-b3c9-23b01ed1c029",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "000cf0c5-8a21-4699-8246-2bcdf9a211f1",
+        "id": "0882019f-f6fd-4547-8abe-aa0c9e71841c",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "1188056d-8ee9-0848-9146-e3115adc3792",
+          "id": "c76af3f2-dc09-a8cc-b107-a7c326ad5b09",
           "logo": null,
-          "name": "Sonnenkern Fusion",
-          "color": "#FF5E5B",
+          "name": "Glanz & Gloria",
+          "color": "#D4AF37",
           "is_ai": true,
-          "sector": "energy",
-          "ticker": "FSN"
+          "sector": "retail",
+          "ticker": "LUX"
         },
-        "required": [{ "branch": "management", "min_score": 0 }],
-        "title_key": "management_intern",
+        "required": [{ "branch": "sales", "min_score": 0 }],
+        "title_key": "sales_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-14T20:30:45.685054+00:00",
-      "updated_at": "2026-11-14T20:30:45.688756+00:00",
-      "offer_expires_at": "2026-11-16T20:30:45.685054+00:00",
+      "created_at": "2026-11-14T21:40:27.56686+00:00",
+      "updated_at": "2026-11-14T21:40:27.57166+00:00",
+      "offer_expires_at": "2026-11-16T21:40:27.56686+00:00",
       "salary_wish_cents_per_hour": 15000,
       "offer_salary_cents_per_hour": 15000
     },
     {
-      "id": "28d6e6c7-ee47-4157-9f01-a0f06ab069d8",
+      "id": "f8e13ef6-82fe-4a68-b691-bfcaba001536",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "51eb389c-d6cc-4a5f-b5d5-c942c755a5f9",
+        "id": "285bc2a6-718d-4c93-8052-f26cb5b037ff",
         "tier": "junior",
         "title": null,
         "company": {
-          "id": "833932bd-1586-776d-1f8f-f602682f7437",
+          "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
           "logo": null,
-          "name": "Luftpost Drohnen",
-          "color": "#00B4D8",
+          "name": "QuantenSprung Labs",
+          "color": "#35D0BA",
           "is_ai": true,
-          "sector": "logistics",
-          "ticker": "DRN"
+          "sector": "tech",
+          "ticker": "QSL"
         },
         "required": [{ "branch": "it", "min_score": 2 }],
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-14T20:30:45.679309+00:00",
-      "updated_at": "2026-11-14T20:30:45.679309+00:00",
-      "offer_expires_at": "2026-11-16T20:30:45.679309+00:00",
+      "created_at": "2026-11-14T21:40:27.560783+00:00",
+      "updated_at": "2026-11-14T21:40:27.560783+00:00",
+      "offer_expires_at": "2026-11-16T21:40:27.560783+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

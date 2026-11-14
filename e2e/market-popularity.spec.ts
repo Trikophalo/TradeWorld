@@ -3,7 +3,7 @@ import { showOverview, unfoldCompany } from "./company-helpers";
 
 /*
  * The market list (ADR-145): popular stocks first, player companies in the same list, a filter for them only.
- * The IPO (ADR-146): the subscription takes at most 10 minutes, then the company is listed. Demo mode.
+ * The IPO (ADR-146): the subscription takes at most an hour (ADR-149), then the company is listed. Demo mode.
  */
 const TOURS = [
   "first_job",
@@ -88,7 +88,9 @@ test("market list: popular first, player companies only on request", async ({ pa
   await expect(rows(page).first()).not.toContainText("QuantenSprung Labs");
 });
 
-test("going public takes at most 10 minutes, then the stock is in the market list", async ({ page }) => {
+test("going public takes at most an hour, the AI comes in early, then the stock is in the market list", async ({
+  page,
+}) => {
   await page.clock.install();
   await unfoldCompany(page);
   await preparePlayer(page, { nickname: "Glockenspiel", cashCents: 30_000_000, xpTotal: 80_000 });
@@ -105,22 +107,22 @@ test("going public takes at most 10 minutes, then the stock is in the market lis
   const listing = page.getByTestId("listing");
   await listing.getByRole("button", { name: "Börsengang" }).click();
   const ipo = page.getByRole("dialog", { name: "Börsengang" });
-  await expect(ipo.getByText(/Bis zu 10 Minuten/)).toBeVisible();
+  await expect(ipo.getByText(/Bis zu 60 Minuten/)).toBeVisible();
   await ipo.getByRole("button", { name: "Zeichnung starten" }).click();
   await expect(page.getByText("Börsengang gestartet")).toBeVisible();
 
-  // One clear progress: subscribed shares and a countdown of at most 10 minutes.
+  // One clear progress: subscribed shares and a countdown of at most an hour (ADR-149).
   const progress = listing.getByTestId("offer-progress");
   await expect(progress).toBeVisible();
-  await expect(progress.locator("time")).toHaveText(/^(10:00|09:[0-5]\d)$/);
+  await expect(progress.locator("time")).toHaveText(/^(01:00:00|59:[0-5]\d)$/);
 
-  // Half way: the AI investors have subscribed part of it.
-  await page.clock.fastForward("05:00");
+  // After ten minutes most AI investors are already in (front-loaded, ADR-149).
+  await page.clock.fastForward("10:00");
   await expect(progress.getByRole("progressbar")).not.toHaveAttribute("aria-valuenow", "0", { timeout: 40_000 });
   await expect(listing.getByText(/An der Börse als/)).toHaveCount(0);
 
-  // After 10 minutes the company is listed.
-  await page.clock.fastForward("05:30");
+  // At the latest after an hour the company is listed.
+  await page.clock.fastForward("50:30");
   await expect(listing.getByText(/An der Börse als ZEH/)).toBeVisible({ timeout: 40_000 });
 
   await page.goto("/markets");

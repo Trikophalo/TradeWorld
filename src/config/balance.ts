@@ -1233,6 +1233,11 @@ export interface StartupsConfig {
      */
     readonly aiTakeBase: number;
     readonly aiTakePerQuality: number;
+    /**
+     * How fast the AI investors come in (ADR-149): share of their part after a fraction t of the window =
+     * 1 - (1 - t)^aiPace. 1 = evenly; 3 = about 42 % after a sixth, 88 % at half time.
+     */
+    readonly aiPace: number;
     /** Capital increase: new shares at this share of the market price, at most this many % per round. */
     readonly capitalIncreaseDiscount: number;
     readonly capitalIncreaseMaxPercent: number;
@@ -2298,10 +2303,11 @@ export const BALANCE = {
       minSharePercent: 10,
       maxSharePercent: 49,
       minIssuePriceCents: 100,
-      subscriptionMinutes: 10,
+      subscriptionMinutes: 60,
       quickAmountsCents: [10_000, 100_000, 1_000_000],
-      aiTakeBase: 0.2,
-      aiTakePerQuality: 0.5,
+      aiTakeBase: 0.6,
+      aiTakePerQuality: 0.4,
+      aiPace: 3,
       capitalIncreaseDiscount: 0.9,
       capitalIncreaseMaxPercent: 25,
     },

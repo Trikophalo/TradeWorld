@@ -1,13 +1,13 @@
 {
   "offers": [
     {
-      "id": "b45e17f9-9b02-4833-9a06-a1c9f61abd68",
+      "id": "f4feb52a-306c-41cb-bb31-4224546ac27e",
       "kind": "ipo",
       "mine": false,
       "status": "open",
       "ticker": null,
       "company": {
-        "id": "f8056105-7324-48f7-b2cc-b3024a03f6e4",
+        "id": "b4ad312f-2cd8-4f30-b68a-7d23e9a165c5",
         "logo": null,
         "name": "Bodos Garage",
         "color": "#446622",
@@ -15,24 +15,24 @@
         "sector": "tech",
         "product_key": "security_software"
       },
-      "ends_at": "2026-11-14T20:40:27.955706+00:00",
-      "starts_at": "2026-11-14T20:30:27.955706+00:00",
+      "ends_at": "2026-11-14T22:40:11.847944+00:00",
+      "starts_at": "2026-11-14T21:40:11.847944+00:00",
       "price_cents": 100,
-      "value_cents": 533060,
+      "value_cents": 495196,
       "last_quarter": null,
       "my_shares_e6": 0,
-      "shares_ai_e6": 2254213466,
+      "shares_ai_e6": 1875574944,
       "shares_offered_e6": 200000000000,
       "shares_subscribed_e6": 0
     },
     {
-      "id": "2d93adf1-7291-40df-8462-551a536f06ae",
+      "id": "2bcdcbbe-ba6e-4b8f-8853-afe687d74954",
       "kind": "ipo",
       "mine": false,
       "status": "open",
       "ticker": null,
       "company": {
-        "id": "d9c0bd9a-4baa-4d49-86ef-5cfb05001e48",
+        "id": "e61707fd-0c2f-48fe-b315-2b38afde0e1f",
         "logo": {
           "grid": [
             "................",
@@ -60,10 +60,10 @@
         "sector": "tech",
         "product_key": "security_software"
       },
-      "ends_at": "2026-11-14T20:40:46.655512+00:00",
-      "starts_at": "2026-11-14T20:30:46.655512+00:00",
+      "ends_at": "2026-11-14T22:40:28.433674+00:00",
+      "starts_at": "2026-11-14T21:40:28.433674+00:00",
       "price_cents": 100,
-      "value_cents": 1111746,
+      "value_cents": 1112856,
       "last_quarter": { "label": "J1 Q2", "profit_cents": 0, "revenue_cents": 0 },
       "my_shares_e6": 250000000,
       "shares_ai_e6": 0,
@@ -71,13 +71,13 @@
       "shares_subscribed_e6": 250000000
     },
     {
-      "id": "46273d0e-88c5-497d-9aab-741bb6eb2659",
+      "id": "a5254f8a-8cd5-4b84-ae1e-7c1dda24dbc0",
       "kind": "ipo",
       "mine": false,
       "status": "closed",
       "ticker": "FEN",
       "company": {
-        "id": "7c61f5c1-0c06-4577-9808-3a22ea9a8273",
+        "id": "0836ae25-c069-4fee-b177-75170d424d1a",
         "logo": {
           "grid": [
             "................",
@@ -105,24 +105,24 @@
         "sector": "tech",
         "product_key": "security_software"
       },
-      "ends_at": "2026-11-14T20:30:20.006557+00:00",
-      "starts_at": "2026-11-14T20:30:20.966236+00:00",
+      "ends_at": "2026-11-14T21:40:04.162499+00:00",
+      "starts_at": "2026-11-14T21:40:05.105529+00:00",
       "price_cents": 100,
-      "value_cents": 18356896,
+      "value_cents": 33395263,
       "last_quarter": { "label": "J1 Q3", "profit_cents": 0, "revenue_cents": 0 },
       "my_shares_e6": 0,
-      "shares_ai_e6": 97500000000,
+      "shares_ai_e6": 210000000000,
       "shares_offered_e6": 300000000000,
       "shares_subscribed_e6": 700500000
     },
     {
-      "id": "66ffcaab-0a95-461d-9cd3-96724b07e7a1",
+      "id": "70f68922-02d6-4618-940a-a34e5ea6e957",
       "kind": "capital_increase",
       "mine": false,
       "status": "closed",
       "ticker": "FEN",
       "company": {
-        "id": "7c61f5c1-0c06-4577-9808-3a22ea9a8273",
+        "id": "0836ae25-c069-4fee-b177-75170d424d1a",
         "logo": {
           "grid": [
             "................",
@@ -150,24 +150,24 @@
         "sector": "tech",
         "product_key": "security_software"
       },
-      "ends_at": "2026-11-14T20:30:20.116635+00:00",
-      "starts_at": "2026-11-14T20:30:21.079606+00:00",
+      "ends_at": "2026-11-14T21:40:04.297227+00:00",
+      "starts_at": "2026-11-14T21:40:05.255042+00:00",
       "price_cents": 100,
-      "value_cents": 18356896,
+      "value_cents": 33395263,
       "last_quarter": { "label": "J1 Q3", "profit_cents": 0, "revenue_cents": 0 },
       "my_shares_e6": 0,
-      "shares_ai_e6": 25068468750,
-      "shares_offered_e6": 79820000000,
+      "shares_ai_e6": 62952137499,
+      "shares_offered_e6": 91070000000,
       "shares_subscribed_e6": 300000000
     },
     {
-      "id": "461e7265-fb26-485a-8c98-12d78a617098",
+      "id": "f78c339e-91cf-40ad-ba03-b25b97594ba7",
       "kind": "ipo",
       "mine": false,
       "status": "closed",
       "ticker": "TAL",
       "company": {
-        "id": "1efd3ec2-2743-4a4c-9703-a12848acc4a4",
+        "id": "fa12633f-91c3-4c1d-a949-f3ada9b910ad",
         "logo": null,
         "name": "Talwerk",
         "color": "#663399",
@@ -175,24 +175,24 @@
         "sector": "retail",
         "product_key": "online_shop"
       },
-      "ends_at": "2026-11-14T20:30:43.861575+00:00",
-      "starts_at": "2026-11-14T20:25:44.855429+00:00",
+      "ends_at": "2026-11-14T21:40:25.71592+00:00",
+      "starts_at": "2026-11-14T21:10:26.71088+00:00",
       "price_cents": 100,
-      "value_cents": 10010000,
+      "value_cents": 21260000,
       "last_quarter": null,
       "my_shares_e6": 0,
-      "shares_ai_e6": 97500000000,
+      "shares_ai_e6": 210000000000,
       "shares_offered_e6": 300000000000,
       "shares_subscribed_e6": 100000000
     },
     {
-      "id": "d6bee6dd-d609-427d-8dc4-eed176702420",
+      "id": "922596c7-97fc-4b7a-9e00-eee88550ebdf",
       "kind": "ipo",
       "mine": false,
       "status": "closed",
       "ticker": "GIP",
       "company": {
-        "id": "c65afd79-c11b-47b9-a71e-46e382ede9ed",
+        "id": "1808e1e3-a373-4550-989d-2eab69c8be1f",
         "logo": null,
         "name": "Gipfelwerk",
         "color": "#336699",
@@ -200,8 +200,8 @@
         "sector": "retail",
         "product_key": "online_shop"
       },
-      "ends_at": "2026-11-14T20:40:44.728289+00:00",
-      "starts_at": "2026-11-14T20:30:44.728289+00:00",
+      "ends_at": "2026-11-14T22:40:26.564292+00:00",
+      "starts_at": "2026-11-14T21:40:26.564292+00:00",
       "price_cents": 100,
       "value_cents": 20250000,
       "last_quarter": null,

@@ -1,27 +1,27 @@
 {
-  "id": "49dac798-aa8d-4d2a-beca-c38e678ec3c4",
+  "id": "4a477694-71f7-45df-b3c9-23b01ed1c029",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "000cf0c5-8a21-4699-8246-2bcdf9a211f1",
+    "id": "0882019f-f6fd-4547-8abe-aa0c9e71841c",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "1188056d-8ee9-0848-9146-e3115adc3792",
+      "id": "c76af3f2-dc09-a8cc-b107-a7c326ad5b09",
       "logo": null,
-      "name": "Sonnenkern Fusion",
-      "color": "#FF5E5B",
+      "name": "Glanz & Gloria",
+      "color": "#D4AF37",
       "is_ai": true,
-      "sector": "energy",
-      "ticker": "FSN"
+      "sector": "retail",
+      "ticker": "LUX"
     },
-    "required": [{ "branch": "management", "min_score": 0 }],
-    "title_key": "management_intern",
+    "required": [{ "branch": "sales", "min_score": 0 }],
+    "title_key": "sales_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-14T20:30:45.685054+00:00",
-  "updated_at": "2026-11-14T20:30:45.688756+00:00",
-  "offer_expires_at": "2026-11-16T20:30:45.685054+00:00",
+  "created_at": "2026-11-14T21:40:27.56686+00:00",
+  "updated_at": "2026-11-14T21:40:27.57166+00:00",
+  "offer_expires_at": "2026-11-16T21:40:27.56686+00:00",
   "salary_wish_cents_per_hour": 15000,
   "offer_salary_cents_per_hour": 15000
 }

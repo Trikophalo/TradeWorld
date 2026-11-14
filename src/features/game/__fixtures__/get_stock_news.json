@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Mehrere Häuser streichen ihre Kaufempfehlung und senken das Kursziel. Sicher ist das nicht.",
-      "name": "Fundgrube Discount",
-      "due_at": "2026-11-14T22:09:06.825753+00:00",
+      "body": "Ein bekannter Fonds hält die Aktie für überbewertet. Sicher ist das nicht.",
+      "name": "Methusalem Bio",
+      "due_at": "2026-11-14T23:01:11.629196+00:00",
       "status": "open",
-      "ticker": "FGD",
-      "headline": "Analysten-Downgrade für Fundgrube Discount",
+      "ticker": "MTH",
+      "headline": "Leerverkäufer wetten gegen Methusalem Bio",
       "move_bps": null,
       "strength": 1,
       "direction": "down",
-      "published_at": "2026-11-14T21:30:49.807204+00:00"
+      "published_at": "2026-11-14T22:40:31.864406+00:00"
     },
     {
       "id": 3,
-      "body": "Neue Aktien sollen ausgegeben werden. Das verwässert die Anteile, der Kurs dürfte leicht nachgeben. Sicher ist das nicht.",
-      "name": "GenoVita Biotech",
-      "due_at": "2026-11-14T20:30:49.801887+00:00",
+      "body": "Mehrere Häuser heben ihr Kursziel leicht an. Sicher ist das nicht.",
+      "name": "Kaufrausch Märkte",
+      "due_at": "2026-11-14T21:40:31.860818+00:00",
       "status": "confirmed",
-      "ticker": "GNV",
-      "headline": "GenoVita Biotech plant Kapitalerhöhung",
-      "move_bps": -351,
+      "ticker": "KFR",
+      "headline": "Analysten-Upgrade: Kaufrausch Märkte jetzt Kaufempfehlung",
+      "move_bps": 337,
       "strength": 1,
-      "direction": "down",
-      "published_at": "2026-11-14T20:30:49.801887+00:00"
+      "direction": "up",
+      "published_at": "2026-11-14T21:40:31.860818+00:00"
     }
   ],
   "reliability_bps": 7500

@@ -2353,3 +2353,17 @@ verpatzte oder verfallene senkt ihn. Er driftet jede Betriebsstunde zurück Rich
 Ausbau und mehr Personal finanziert, die mehr Aufgaben lösen – gutes Spiel verstärkt sich also selbst. Server
 (`company_task_momentum_apply`, in `company_task_resolve`; Abbau und Multiplikator in `player_company_close_hour`)
 und Demo (`closeStartupHour` mit `taskMomentum`) rechnen gleich. Angezeigt im Aufgabenbrett als „Schwung +X %“.
+
+## ADR-149: Börsengang in höchstens einer Stunde, mehr KI-Investoren und schneller — `akzeptiert`
+
+**Kontext:** Der Börsengang aus ADR-146 dauerte höchstens 10 Minuten; die KI-Investoren zeichneten nur 20 bis 70 %
+und gleichmäßig verteilt. Gewünscht: bis zu einer Stunde Zeit, mehr KI-Investoren, die schneller einsteigen.
+
+**Entscheidung:**
+
+- Zeichnungsfenster höchstens 60 Minuten (`startups.ipo.subscriptionMinutes`). Sind alle Aktien gezeichnet, ist die
+  Firma sofort an der Börse (unverändert, ADR-146).
+- KI-Investoren nehmen 60 bis 100 % des Angebots (`aiTakeBase` 0,6 + `aiTakePerQuality` 0,4 × Qualität); eine
+  Firma mit Top-Qualität füllen sie bis zum Ende allein.
+- Sie kommen früh: Anteil nach dem Zeitanteil t = 1 − (1 − t)^`aiPace` (3): nach 10 Minuten etwa 42 %, zur Hälfte
+  87,5 % ihres Teils. Server (`share_offer_ai_topup`) und Demo (`aiSubscribedE6`) rechnen gleich.

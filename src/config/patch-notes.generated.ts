@@ -69,6 +69,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Jede erledigte Firmen-Aufgabe gibt deiner Firma „Schwung“ – mehr Nachfrage und damit mehr Umsatz, Stunde um Stunde. Der Schwung lässt nach, wenn ihr Aufgaben liegen lasst, und wächst, je besser ihr spielt. So wird aus gutem Spiel immer mehr Gewinn.",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-1c5f2d21",
+        title: "Börsengang: eine Stunde, mehr KI-Investoren",
+        text: "Die Zeichnung läuft jetzt bis zu einer Stunde. Deutlich mehr KI-Investoren steigen ein, und zwar gleich am Anfang. Sind alle Aktien gezeichnet, bist du sofort an der Börse.",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-706f8ae2",
         title: "Mehr Verbesserungen",
         text: "22 neue Verbesserungen und zwei weitere Tresorstufen, in fünf Abschnitten. Mehr Geld (Tresorzinsen, Lohnbonus, Stammgast, Auftragsprofi, Dealmaker), mehr XP (Börsenprofi, Frühaufsteher, Missionsjäger, Teamplayer, Bilanzprofi, Ehrgeiz), ein größerer Tresor (Panzertresor) und vieles für die eigene Firma (KI-Turbo, Glückshand, Werbeagentur, Krisenmanager …). Sie schalten sich zwischen Level 1 und 30 frei.",

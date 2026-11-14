@@ -177,6 +177,9 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   Missionsjäger, Teamplayer, Bilanzprofi, Ehrgeiz), ein größerer Tresor (Panzertresor) und vieles für die eigene
   Firma (KI-Turbo, Glückshand, Werbeagentur, Krisenmanager …). Sie schalten sich zwischen Level 1 und 30 frei.
 
+- **Börsengang: eine Stunde, mehr KI-Investoren (ADR-149):** Die Zeichnung läuft jetzt bis zu einer Stunde. Deutlich
+  mehr KI-Investoren steigen ein, und zwar gleich am Anfang. Sind alle Aktien gezeichnet, bist du sofort an der Börse.
+
 - **Gelöste Aufgaben lohnen sich langfristig (ADR-148):** Jede erledigte Firmen-Aufgabe gibt deiner Firma „Schwung“ –
   mehr Nachfrage und damit mehr Umsatz, Stunde um Stunde. Der Schwung lässt nach, wenn ihr Aufgaben liegen lasst, und
   wächst, je besser ihr spielt. So wird aus gutem Spiel immer mehr Gewinn.

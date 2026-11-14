@@ -51,16 +51,22 @@ describe("founder with a job and company growth (ADR-066, ADR-067)", () => {
     expect(issuePriceCents(BigInt(0))).toBe(BALANCE.startups.ipo.minIssuePriceCents);
     expect(issuePriceCents(BigInt(500_000_000))).toBe(500);
     expect(capitalIncreasePriceCents(1_000)).toBe(900);
-    expect(aiTakeShare(0)).toBeCloseTo(0.2);
-    expect(aiTakeShare(1)).toBeCloseTo(0.7);
+    expect(aiTakeShare(0)).toBeCloseTo(0.6);
+    expect(aiTakeShare(1)).toBeCloseTo(1);
   });
 
-  it("lets AI investors subscribe evenly over the 10-minute window (ADR-146)", () => {
+  it("lets more AI investors come in, most of them early, within the hour (ADR-146, ADR-149)", () => {
     const window = BALANCE.startups.ipo.subscriptionMinutes * 60_000;
+    expect(BALANCE.startups.ipo.subscriptionMinutes).toBe(60);
     const offered = 100_000_000_000;
     expect(aiSubscribedE6(offered, 0, 0, 0, window)).toBe(0);
-    expect(aiSubscribedE6(offered, 0, 0, window / 2, window)).toBe(10_000_000_000);
-    expect(aiSubscribedE6(offered, 0, 0, window * 2, window)).toBe(20_000_000_000);
+    // quality 0: 60 % of the offer; half time: 1 - 0.5^3 = 87.5 % of that
+    expect(aiSubscribedE6(offered, 0, 0, window / 2, window)).toBe(52_500_000_000);
+    // after 10 minutes already about 42 % of their part
+    expect(aiSubscribedE6(offered, 0, 0, window / 6, window)).toBeGreaterThan(24_000_000_000);
+    expect(aiSubscribedE6(offered, 0, 0, window * 2, window)).toBe(60_000_000_000);
+    // a top company is fully subscribed by the AI alone by the end of the hour
+    expect(aiSubscribedE6(offered, 0, 1, window, window)).toBe(offered);
     // never more than players left free
     expect(aiSubscribedE6(offered, 95_000_000_000, 0, window, window)).toBe(5_000_000_000);
     expect(aiSubscribedE6(offered, offered, 1, window, window)).toBe(0);

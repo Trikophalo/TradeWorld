@@ -7,14 +7,14 @@
       "text": "Wir zahlen fairere Löhne und reden offen mit dem Team.",
       "judge": "mini",
       "status": "running",
-      "ends_at": "2026-11-14T20:52:50.434842+00:00",
+      "ends_at": "2026-11-14T22:02:32.450388+00:00",
       "verdict": "Passt kaum zur Lage. Das wird schwierig.",
       "backfire": 10,
-      "event_id": "5f4bb9fb-9e38-4538-8f7d-ce7b0787232d",
+      "event_id": "3508c04c-a30a-40f5-89a6-2c2dfa93890d",
       "move_kind": null,
       "chance_bps": 3000,
       "cost_cents": 40000,
-      "created_at": "2026-11-14T20:30:50.423194+00:00",
+      "created_at": "2026-11-14T21:40:32.440246+00:00",
       "resolved_at": null,
       "failure_text": "Die eigene Strategie verpufft ohne Wirkung.",
       "result_cents": 0,
@@ -22,7 +22,7 @@
       "backfire_text": "Die eigene Strategie geht nach hinten los: Kunden fühlen sich veräppelt."
     }
   ],
-  "event_id": "5f4bb9fb-9e38-4538-8f7d-ce7b0787232d",
+  "event_id": "3508c04c-a30a-40f5-89a6-2c2dfa93890d",
   "next_order_at": null,
   "move_cost_cents": 120000,
   "event_cost_cents": 40000

@@ -29,10 +29,10 @@ select public.go_public(gen_random_uuid(), 20) -> 'company' -> 'listing' -> 'off
 reset role;
 select (:'o1'::jsonb ->> 'id') as offer1, tests.company_of(:f) as fco \gset
 select tests.assert(
-  (select ends_at - created_at = interval '10 minutes' and status = 'open' from public.company_share_offers where id = :'offer1')
+  (select ends_at - created_at = interval '60 minutes' and status = 'open' from public.company_share_offers where id = :'offer1')
   and (:'o1'::jsonb ->> 'mine')::boolean and (:'o1'::jsonb ->> 'shares_ai_e6')::bigint = 0
   and :'o1'::jsonb ?& array['starts_at', 'ends_at', 'shares_subscribed_e6', 'shares_ai_e6'],
-  'go_public(): the subscription runs startups.ipo.subscriptionMinutes (10) and shows the AI share');
+  'go_public(): the subscription runs startups.ipo.subscriptionMinutes (60, ADR-149) and shows the AI share');
 
 select (select price_cents from public.company_share_offers where id = :'offer1') as p1,
        (select shares_offered_e6 from public.company_share_offers where id = :'offer1') as off1 \gset
@@ -77,7 +77,7 @@ select tests.login_as('authenticated', :b);
 select public.subscribe_offer(gen_random_uuid(), :'offer2', 10000) as sub2 \gset
 reset role;
 -- half of the window has passed
-update public.company_share_offers set created_at = now() - interval '5 minutes', ends_at = now() + interval '5 minutes'
+update public.company_share_offers set created_at = now() - interval '30 minutes', ends_at = now() + interval '30 minutes'
  where id = :'offer2';
 select tests.company_cash(:'gco') as gc1 \gset
 select public.close_due_offers() as closed_mid \gset
@@ -87,17 +87,17 @@ select tests.assert(
   not (:'sub2'::jsonb ->> 'completed')::boolean
   and (select status = 'open' from public.company_share_offers where id = :'offer2')
   and :ai_mid::bigint > 0
-  and abs(:ai_mid::bigint - floor(:off2::bigint * least(1, 0.2 + 0.5 * :q2::numeric)) / 2) <= :off2::bigint / 100
+  and abs(:ai_mid::bigint - floor(:off2::bigint * least(1, 0.6 + 0.4 * :q2::numeric)) * 0.875) <= :off2::bigint / 100
   and tests.company_cash(:'gco') = :gc1::bigint + floor(:ai_mid::numeric * :p2::bigint / 1000000),
-  'close_due_offers(): AI investors subscribe their share evenly over the window (aiSubscribedE6), paid by the market');
+  'close_due_offers(): AI investors subscribe most of their share early, 1 - (1 - t)^3 (aiSubscribedE6, ADR-149), paid by the market');
 -- the window is over
 update public.company_share_offers set ends_at = now() - interval '1 second' where id = :'offer2';
 select public.close_due_offers() as closed_end \gset
 select ticker as t2, shares_outstanding as so2 from public.companies where id = :'gco' \gset
 select tests.assert(
   :closed_end::int >= 1
-  and (select status = 'closed' and shares_ai_e6 = floor(:off2::bigint * least(1, 0.2 + 0.5 * :q2::numeric))
-         and shares_subscribed_e6 + shares_ai_e6 < shares_offered_e6 from public.company_share_offers where id = :'offer2')
+  and (select status = 'closed' and shares_ai_e6 = least(floor(:off2::bigint * least(1, 0.6 + 0.4 * :q2::numeric)), shares_offered_e6 - shares_subscribed_e6)
+         and shares_subscribed_e6 + shares_ai_e6 <= shares_offered_e6 from public.company_share_offers where id = :'offer2')
   and (select phase = 'listed' from public.companies where id = :'gco')
   and :so2::bigint = (700000000000 + (select shares_subscribed_e6 + shares_ai_e6 from public.company_share_offers where id = :'offer2')) / 1000000
   and tests.qty_e6(:b, :'t2') = (:'sub2'::jsonb ->> 'shares_e6')::bigint

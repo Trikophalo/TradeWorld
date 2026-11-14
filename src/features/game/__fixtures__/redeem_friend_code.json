@@ -1,10 +1,10 @@
 {
-  "code": "NEXA-U8DR",
+  "code": "NEXA-AS89",
   "invited": 0,
   "redeemed": true,
   "paid_cents": 500000,
   "bonus_cents": 500000,
-  "redeemed_at": "2026-11-14T20:30:49.79261+00:00",
-  "redeemed_from": { "tag": "B7BZ", "nickname": "Fixture_Werber" },
+  "redeemed_at": "2026-11-14T21:40:31.855769+00:00",
+  "redeemed_from": { "tag": "MPC6", "nickname": "Fixture_Werber" },
   "cash_after_cents": 1500000
 }
