@@ -50,8 +50,11 @@ export const SOUNDS = {
   },
   /** Big profit / confetti sparkle (~0.75 s). */
   win: { src: ["/sounds/win.wav"], volume: 0.26, minIntervalMs: 500 },
-  /** NEXA Nachrichten: the jingle that opens the hourly show (~1.7 s). */
-  newsIntro: { src: ["/sounds/news-intro.wav"], volume: 0.62, minIntervalMs: 3000 },
+  /**
+   * NEXA Nachrichten: the jingle of the opening montage, seven bars with a hit on every cut (NEWS_INTRO_MS long).
+   * The studio plays it faster or slower, so it always fills the intro and the cuts stay on the beat.
+   */
+  newsIntro: { src: ["/sounds/news-intro.wav"], volume: 0.55, minIntervalMs: 3000 },
   /**
    * The anchor talking: one low, mumbly syllable (~70 ms), far below the mascot's blip. Call it while his text is
    * typed; the interval keeps it at a natural pace.
@@ -75,7 +78,24 @@ export const SOUNDS = {
   newsGood: { src: ["/sounds/news-good.wav"], volume: 0.25, minIntervalMs: 400 },
   /** One pip of the studio clock, for the last ten seconds before the show. */
   newsTick: { src: ["/sounds/news-tick.wav"], volume: 0.3, minIntervalMs: 500 },
+  /** The anchor is shocked: a sharp breath in. */
+  anchorGasp: { src: ["/sounds/anchor-gasp.wav"], volume: 0.32, minIntervalMs: 800 },
+  /** The anchor cries: three sobs that sink and wobble. */
+  anchorCry: { src: ["/sounds/anchor-cry.wav"], volume: 0.4, minIntervalMs: 800 },
+  /** The anchor laughs: a staccato "ha-ha-ha-ha". */
+  anchorLaugh: { src: ["/sounds/anchor-laugh.wav"], volume: 0.5, minIntervalMs: 800 },
+  /** The anchor is angry: a low growl and his fist on the desk. */
+  anchorGrumble: { src: ["/sounds/anchor-grumble.wav"], volume: 0.8, minIntervalMs: 800 },
+  /** The anchor is smug: a little "heh-heh". */
+  anchorSmug: { src: ["/sounds/anchor-smug.wav"], volume: 0.4, minIntervalMs: 800 },
+  /** The anchor is confused: a rising "huh?". */
+  anchorHuh: { src: ["/sounds/anchor-huh.wav"], volume: 0.55, minIntervalMs: 800 },
+  /** The anchor is proud: a tiny "ta-daa". */
+  anchorTada: { src: ["/sounds/anchor-tada.wav"], volume: 0.45, minIntervalMs: 800 },
 } as const satisfies Record<string, SoundSpec>;
+
+/** Length of the news jingle as rendered by `scripts/gen-sounds.ts` (seven bars of four at 140 BPM). */
+export const NEWS_INTRO_MS = 12_000;
 
 export type SoundName = keyof typeof SOUNDS;
 
@@ -85,6 +105,10 @@ let howlClass: Promise<typeof Howl> | undefined;
 const howls = new Map<string, Howl>();
 const lastPlayed = new Map<SoundName, number>();
 const lastVariant = new Map<SoundName, number>();
+/** The latest play of each sound, so a long one (the news jingle) can be stopped. */
+const lastVoice = new Map<SoundName, { howl: Howl; id: number }>();
+/** Counts the stops per sound: a play that was still loading when its sound was stopped never starts. */
+const stops = new Map<SoundName, number>();
 
 /** Howler is loaded on demand, so players who keep sound off never download it. */
 function loadHowler(): Promise<typeof Howl> {
@@ -117,6 +141,13 @@ function pickVariant(name: SoundName, count: number): number {
   return index;
 }
 
+export interface PlayOptions {
+  /** Playback rate (1 = as rendered); replaces the random jitter of the sound. */
+  rate?: number;
+  /** Start this far into the file, to join a long sound that is already under way. */
+  seekMs?: number;
+}
+
 /**
  * Play an effect. Resolves when playback has been started (or skipped); it never
  * throws, because audio is decoration. Respects the `sound` setting and drops
@@ -124,23 +155,45 @@ function pickVariant(name: SoundName, count: number): number {
  *
  * @param gain Optional extra gain (0–1) on top of the mix level, default 1.
  */
-export async function playSound(name: SoundName, gain = 1): Promise<void> {
+export async function playSound(name: SoundName, gain = 1, options: PlayOptions = {}): Promise<void> {
   if (typeof window === "undefined" || !useSettings.getState().sound) return;
   const spec: SoundSpec = SOUNDS[name];
   const now = performance.now();
   if (now - (lastPlayed.get(name) ?? -Infinity) < spec.minIntervalMs) return;
   lastPlayed.set(name, now);
+  const stopped = stops.get(name) ?? 0;
 
   try {
     const HowlCtor = await loadHowler();
+    if ((stops.get(name) ?? 0) !== stopped) return;
     const src = spec.src[pickVariant(name, spec.src.length)] ?? spec.src[0];
     if (!src) return;
     const howl = getHowl(HowlCtor, src, spec.volume);
     const id = howl.play();
+    lastVoice.set(name, { howl, id });
     if (gain !== 1) howl.volume(spec.volume * Math.min(1, Math.max(0, gain)), id);
-    if (spec.rateJitter) howl.rate(1 + (Math.random() * 2 - 1) * spec.rateJitter, id);
+    if (options.rate !== undefined) howl.rate(Math.min(4, Math.max(0.5, options.rate)), id);
+    else if (spec.rateJitter) howl.rate(1 + (Math.random() * 2 - 1) * spec.rateJitter, id);
+    if (options.seekMs !== undefined && options.seekMs > 0) howl.seek(options.seekMs / 1000, id);
   } catch {
     // Audio is decoration; a failure must never break an interaction.
+  }
+}
+
+/** Fades out the latest play of a sound and stops it. Does nothing when it is not playing; never throws. */
+export function stopSound(name: SoundName, fadeMs = 200): void {
+  stops.set(name, (stops.get(name) ?? 0) + 1);
+  const voice = lastVoice.get(name);
+  if (!voice) return;
+  lastVoice.delete(name);
+  try {
+    const { howl, id } = voice;
+    if (!howl.playing(id)) return;
+    const from = howl.volume(id);
+    howl.once("fade", () => howl.stop(id), id);
+    howl.fade(typeof from === "number" ? from : SOUNDS[name].volume, 0, fadeMs, id);
+  } catch {
+    // Audio is decoration.
   }
 }
 

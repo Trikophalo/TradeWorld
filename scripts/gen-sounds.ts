@@ -415,7 +415,8 @@ function master(input: Float64Array, opts: MasterOptions = {}): Float64Array {
     const y = a <= knee ? a : knee + (1 - knee) * Math.tanh((a - knee) / (1 - knee));
     return Math.sign(v) * y;
   });
-  x = x.map((v) => v * (target / peakOf(x)));
+  const limited = target / peakOf(x);
+  x = x.map((v) => v * limited);
 
   // Trim the silent tail (and any leading silence), then fade both ends.
   const threshold = dbToGain(SILENCE_DB);
@@ -445,7 +446,7 @@ function peakOf(x: Float64Array): number {
   return peak;
 }
 
-function encodeWav(x: Float64Array): Buffer {
+function encodeWav(x: Float64Array, rate = RATE): Buffer {
   const out = Buffer.alloc(44 + x.length * 2);
   out.write("RIFF", 0);
   out.writeUInt32LE(36 + x.length * 2, 4);
@@ -453,8 +454,8 @@ function encodeWav(x: Float64Array): Buffer {
   out.writeUInt32LE(16, 16);
   out.writeUInt16LE(1, 20); // PCM
   out.writeUInt16LE(1, 22); // mono
-  out.writeUInt32LE(RATE, 24);
-  out.writeUInt32LE(RATE * 2, 28); // byte rate
+  out.writeUInt32LE(rate, 24);
+  out.writeUInt32LE(rate * 2, 28); // byte rate
   out.writeUInt16LE(2, 32); // block align
   out.writeUInt16LE(16, 34); // bits per sample
   out.write("data", 36);
@@ -728,50 +729,177 @@ function timpani(mix: Mix, at: number, note: string, gain: number): void {
   noise(mix, at, 0.03, { type: "lp", cutoff: 500 }, 0.25 * gain, { a: 0.002, d: 0.05, r: 0.03 });
 }
 
+/** Length of the news jingle. Keep in sync with NEWS_INTRO_MS in src/lib/sound.ts. */
+const JINGLE_SECONDS = 12;
+/** Its 28 beats (seven bars of four, 140 BPM) are the beats of the montage: see src/features/news/show/intro.ts. */
+const JINGLE_BEATS = 28;
+
 /**
- * News jingle (~1.9 s): a teletype ticking on one note, three urgent pick-up notes, a fanfare up the chord
- * (C5 E5 G5) and a held C6+E6 over a kettle drum. Punchy, but the same warm chip voice as the rest.
+ * News jingle for the opening montage (12 s): seven bars over a teletype and a marching bass, with a swoosh and a
+ * kettle drum on every bar line, because the picture cuts there. Bars 1 to 5 belong to the five shots and carry
+ * their noises (the comb, the pointing finger, the mug on the desk, coins, the wind on the roof); bars 6 and 7 are
+ * the fanfare for the title card, ending on a held C6 chord. The studio plays the file faster when the intro is
+ * shorter, so everything here sits on beats, never on seconds.
  */
 function newsIntro(): Float64Array {
-  const m = new Mix(2.4, 41);
+  const beat = JINGLE_SECONDS / JINGLE_BEATS;
+  const m = new Mix(JINGLE_SECONDS + 0.5, 41);
+  const at = (bar: number, b: number) => (bar * 4 + b) * beat;
   const staccato = { d: 0.05, s: 0.3, r: 0.04 };
-  // Teletype: quiet sixteenths that run under the whole opening.
-  for (let i = 0; i < 12; i++) {
-    m.tone({
-      at: i * 0.0725,
-      note: "G6",
-      gate: 0.012,
-      wave: "pulse",
-      duty: 0.125,
-      gain: i % 4 === 0 ? 0.1 : 0.06,
-      env: { a: 0.002, d: 0.03, s: 0, r: 0.02 },
-      filter: { type: "lp", cutoff: 5000 },
+  const vibrato = { rate: 5.5, cents: 12, delay: 0.18 };
+
+  // Drums and teletype. The last bar is one hit that rings out.
+  for (let bar = 0; bar < 7; bar++) {
+    const beats = bar === 6 ? 1 : 4;
+    for (let b = 0; b < beats; b++) {
+      if (b % 2 === 0) timpani(m, at(bar, b), b === 0 ? "C3" : "G2", b === 0 ? 0.7 : 0.4);
+      else noise(m, at(bar, b), 0.05, { type: "bp", cutoff: 1900, q: 0.9 }, 0.16, { a: 0.002, d: 0.07, r: 0.04 });
+      for (let sixteenth = 0; sixteenth < 4; sixteenth++) {
+        m.tone({
+          at: at(bar, b + sixteenth / 4),
+          note: "G6",
+          gate: 0.012,
+          wave: "pulse",
+          duty: 0.125,
+          gain: sixteenth === 0 ? 0.07 : 0.04,
+          env: { a: 0.002, d: 0.03, s: 0, r: 0.02 },
+          filter: { type: "lp", cutoff: 5000 },
+        });
+      }
+    }
+    // The cut: a swoosh into the bar line and a short crash on it.
+    if (bar > 0) {
+      noise(m, at(bar, 0) - 0.14, 0.14, { type: "bp", cutoff: 900, to: 5200, sweep: 0.14, q: 1.3 }, 0.1, {
+        a: 0.08,
+        d: 0.2,
+        s: 0.6,
+        r: 0.03,
+      });
+    }
+    noise(m, at(bar, 0), 0.22, { type: "hp", cutoff: 6500 }, 0.045, { a: 0.003, d: 0.22, r: 0.1 });
+  }
+
+  // Bass: marching eighths, one root per bar.
+  ["C3", "A2", "C3", "G2", "A2", "C3"].forEach((root, bar) => {
+    for (let eighth = 0; eighth < 8; eighth++) {
+      const env = { a: 0.004, d: 0.08, s: 0.4, r: 0.04 };
+      const voice = { at: at(bar, eighth / 2), note: root, gate: beat * 0.3, env };
+      m.tone({ ...voice, wave: "pulse", duty: 0.5, gain: 0.2, filter: { type: "lp", cutoff: 800, q: 1 } });
+      m.tone({ ...voice, wave: "triangle", gain: 0.24 });
+    }
+  });
+
+  // Lead: [bar, beat, note, beats held].
+  const lead: [number, number, string, number][] = [
+    [0, 0, "G4", 0.3],
+    [0, 0.75, "G4", 0.3],
+    [0, 1.5, "G4", 0.3],
+    [0, 2, "C5", 0.7],
+    [0, 3, "E5", 0.3],
+    [0, 3.5, "D5", 0.3],
+    [1, 0, "C5", 0.7],
+    [1, 1, "A4", 0.3],
+    [1, 1.5, "G4", 0.7],
+    [1, 2.5, "A4", 0.3],
+    [1, 3, "C5", 0.7],
+    [2, 0, "G4", 0.3],
+    [2, 0.75, "G4", 0.3],
+    [2, 1.5, "G4", 0.3],
+    [2, 2, "D5", 0.7],
+    [2, 3, "G5", 0.3],
+    [2, 3.5, "E5", 0.3],
+    [3, 0, "D5", 0.7],
+    [3, 1, "C5", 0.3],
+    [3, 1.5, "D5", 0.7],
+    [3, 2.5, "E5", 0.3],
+    [3, 3, "G5", 0.3],
+    [3, 3.5, "A5", 0.3],
+    [4, 0, "E6", 1.6],
+    [4, 2, "D6", 0.8],
+    [4, 3, "C6", 0.3],
+    [4, 3.5, "D6", 0.3],
+    [5, 0, "C5", 0.3],
+    [5, 0.5, "E5", 0.3],
+    [5, 1, "G5", 0.3],
+    [5, 1.5, "C6", 0.8],
+    [5, 2.5, "G5", 0.3],
+    [5, 3, "C6", 0.3],
+    [5, 3.5, "E6", 0.3],
+  ];
+  for (const [bar, b, note, held] of lead) {
+    const long = held > 0.5;
+    chip(m, at(bar, b), note, held * beat * 0.8, {
+      env: long ? { d: 0.2, s: 0.5, r: 0.12 } : staccato,
+      gain: 0.95,
+      sub: note.endsWith("4") ? 0.2 : 0,
+      vibrato: held > 1 ? vibrato : undefined,
     });
   }
-  timpani(m, 0, "C3", 0.9);
-  chip(m, 0, "G4", 0.05, { env: staccato, gain: 0.8, sub: 0.2 });
-  chip(m, 0.145, "G4", 0.05, { env: staccato, gain: 0.7, sub: 0.2 });
-  chip(m, 0.29, "G4", 0.05, { env: staccato, gain: 0.8, sub: 0.2 });
-  timpani(m, 0.435, "G2", 0.7);
-  chip(m, 0.435, "C5", 0.09, { env: { d: 0.1, s: 0.4, r: 0.06 }, gain: 0.9, sub: 0.2 });
-  chip(m, 0.58, "E5", 0.07, { env: staccato, gain: 0.85 });
-  chip(m, 0.725, "G5", 0.07, { env: staccato, gain: 0.9 });
 
-  const at = 0.87;
-  const hold = 0.5;
-  const ring = { d: 0.35, s: 0.55, r: 0.4 };
-  const vibrato = { rate: 5.5, cents: 12, delay: 0.18 };
-  timpani(m, at, "C3", 1);
-  chip(m, at, "C6", hold, { env: ring, sparkle: 0.2, vibrato, gain: 0.9 });
-  chip(m, at, "E6", hold, { env: ring, vibrato, gain: 0.5, bright: 0.7 });
-  chip(m, at, "G5", hold, { env: ring, vibrato, gain: 0.5, bright: 0.8 });
-  m.tone({ at, note: "C4", gate: hold, wave: "triangle", gain: 0.28, env: ring });
-  m.tone({ at, note: "C3", gate: hold, wave: "triangle", gain: 0.22, env: ring });
-  noise(m, at, 0.5, { type: "hp", cutoff: 7000 }, 0.03, { a: 0.02, d: 0.5, r: 0.15 });
-  // Two last ticks of the teletype as the chord fades.
-  bell(m, at + 0.36, "G6", { gain: 0.16, decay: 0.12, index: 0.8 });
-  bell(m, at + 0.48, "C7", { gain: 0.14, decay: 0.16, index: 0.8 });
-  return master(m.buf, { room: { mix: 0.16, size: 0.9 }, maxSeconds: 2 });
+  // Shot 1, the comb: two zips through the moustache and a gleam at the end.
+  for (const b of [0.5, 2]) {
+    noise(m, at(0, b), 0.24, { type: "bp", cutoff: 1800, to: 6200, sweep: 0.24, q: 2 }, 0.07, {
+      a: 0.03,
+      d: 0.3,
+      s: 0.5,
+    });
+  }
+  bell(m, at(0, 3.25), "E7", { gain: 0.2, decay: 0.2, index: 0.8 });
+  // Shot 2, the finger: it comes closer on beats 2 and 3 and lands on beat 4 with a "ting".
+  chip(m, at(1, 1), "C6", 0.03, { env: staccato, gain: 0.3 });
+  chip(m, at(1, 2), "E6", 0.03, { env: staccato, gain: 0.35 });
+  bell(m, at(1, 3), "A6", { gain: 0.4, decay: 0.3, index: 1.1 });
+  bell(m, at(1, 3), "E7", { gain: 0.3, decay: 0.3, index: 0.9 });
+  // Shot 3, the mug: it hits the desk on beat 3, the coffee follows.
+  timpani(m, at(2, 2), "G2", 0.9);
+  bell(m, at(2, 2), "C4", { gain: 0.5, decay: 0.09, index: 2.2 });
+  noise(m, at(2, 2), 0.015, { type: "lp", cutoff: 1200 }, 0.35, { a: 0.002, r: 0.02 });
+  noise(m, at(2, 2) + 0.03, 0.2, { type: "bp", cutoff: 3200, q: 1 }, 0.06, { a: 0.02, d: 0.2, r: 0.08 });
+  // Shot 4, the money: coins on every eighth.
+  ["E6", "A6", "G6", "C7", "A6", "D7", "G6", "C7"].forEach((note, eighth) => {
+    bell(m, at(3, eighth / 2) + m.rand() * 0.02, note, { gain: 0.14 + m.rand() * 0.06, decay: 0.12, index: 1 });
+  });
+  // Shot 5, the hero: a chord under the long note and the wind in his cape.
+  const pad = { a: 0.03, d: 0.3, s: 0.6, r: 0.2 };
+  for (const [b, notes] of [
+    [0, ["A4", "C5", "E5"]],
+    [2, ["G4", "C5", "E5"]],
+  ] as const) {
+    for (const note of notes) {
+      m.tone({ at: at(4, b), note, gate: beat * 1.8, gain: 0.14, env: pad, vibrato });
+      m.tone({
+        at: at(4, b),
+        note,
+        gate: beat * 1.8,
+        wave: "pulse",
+        duty: 0.25,
+        gain: 0.06,
+        env: pad,
+        vibrato,
+        filter: { type: "lp", cutoff: 2600 },
+      });
+    }
+  }
+  noise(m, at(4, 0), beat * 3.5, { type: "bp", cutoff: 500, to: 1700, sweep: beat * 3.5, q: 0.9 }, 0.05, {
+    a: 0.5,
+    d: 2,
+    s: 0.7,
+    r: 0.3,
+  });
+
+  // The title card: the last chord, held over a kettle drum, and two ticks of the teletype as it fades.
+  const end = at(6, 0);
+  const hold = 0.8;
+  const ring = { d: 0.4, s: 0.5, r: 0.6 };
+  chip(m, end, "C6", hold, { env: ring, sparkle: 0.2, vibrato, gain: 0.7 });
+  chip(m, end, "E6", hold, { env: ring, vibrato, gain: 0.38, bright: 0.7 });
+  chip(m, end, "G5", hold, { env: ring, vibrato, gain: 0.38, bright: 0.8 });
+  m.tone({ at: end, note: "C4", gate: hold, wave: "triangle", gain: 0.2, env: ring });
+  m.tone({ at: end, note: "C3", gate: hold, wave: "triangle", gain: 0.16, env: ring });
+  noise(m, end, 0.5, { type: "hp", cutoff: 7000 }, 0.03, { a: 0.02, d: 0.5, r: 0.15 });
+  bell(m, end + beat, "G6", { gain: 0.16, decay: 0.12, index: 0.8 });
+  bell(m, end + beat * 1.5, "C7", { gain: 0.14, decay: 0.18, index: 0.8 });
+  return master(m.buf, { room: { mix: 0.14, size: 0.9 }, lowpass: 8000, maxSeconds: JINGLE_SECONDS });
 }
 
 /**
@@ -871,6 +999,155 @@ function newsTick(): Float64Array {
   return master(m.buf, { room: { mix: 0.08, size: 0.6 }, lowpass: 6000, maxSeconds: 0.16 });
 }
 
+// --- Mr. Doodle Dangle's moods: one short voice per reaction ------------------
+
+interface VoiceOptions {
+  /** Vowel: the centre of the first formant in Hz ("a" ≈ 850, "o" ≈ 550). */
+  formant?: number;
+  duty?: number;
+  gain?: number;
+  /** Seconds the pitch takes to slide to `to` (default: the whole note). */
+  glide?: number;
+  vibrato?: Tone["vibrato"];
+  env?: Partial<Envelope>;
+}
+
+/** The anchor's voice on a held note: the "mwuh" of anchorTalk, as long as it has to be. */
+function voice(
+  mix: Mix,
+  at: number,
+  note: string | number,
+  to: string | number,
+  gate: number,
+  opts: VoiceOptions = {},
+): void {
+  const formant = opts.formant ?? 700;
+  const duty = opts.duty ?? 0.3;
+  const gain = opts.gain ?? 1;
+  const env = { a: 0.008, d: 0.08, s: 0.5, r: 0.05, ...opts.env };
+  const base = { at, note, to, glide: opts.glide ?? gate, gate, env, vibrato: opts.vibrato };
+  mix.tone({ ...base, wave: "pulse", duty, gain: 0.6 * gain, filter: { type: "bp", cutoff: formant, q: 1.6 } });
+  mix.tone({ ...base, wave: "pulse", duty, gain: 0.22 * gain, filter: { type: "bp", cutoff: formant * 2.6, q: 2.2 } });
+  mix.tone({ ...base, wave: "triangle", gain: 0.35 * gain });
+}
+
+/** Shocked: a sharp breath in, the voice shooting up an octave and a half, and a tiny "!" on top. */
+function anchorGasp(): Float64Array {
+  const m = new Mix(0.8, 50);
+  noise(m, 0, 0.16, { type: "bp", cutoff: 900, to: 3800, sweep: 0.16, q: 1.2 }, 0.22, {
+    a: 0.07,
+    d: 0.2,
+    s: 0.6,
+    r: 0.03,
+  });
+  voice(m, 0.1, "A3", "E5", 0.16, {
+    formant: 1100,
+    glide: 0.09,
+    gain: 0.9,
+    env: { a: 0.01, d: 0.12, s: 0.4, r: 0.06 },
+  });
+  bell(m, 0.2, "A6", { gain: 0.22, decay: 0.14, index: 0.9 });
+  return master(m.buf, { room: { mix: 0.1, size: 0.7 }, lowpass: 5200, maxSeconds: 0.55 });
+}
+
+/** Crying: three sobs that sink, each one wobbling, with a sniff between them. */
+function anchorCry(): Float64Array {
+  const m = new Mix(1.3, 51);
+  const sob = (at: number, note: string, drop: number, gate: number, gain: number) => {
+    voice(m, at, note, hz(note) * 2 ** (-drop / 12), gate, {
+      formant: 620,
+      duty: 0.4,
+      gain,
+      vibrato: { rate: 9, cents: 70, delay: 0.02 },
+      env: { a: 0.02, d: 0.12, s: 0.55, r: 0.07 },
+    });
+  };
+  const sniff = (at: number) => noise(m, at, 0.05, { type: "bp", cutoff: 2600, q: 1.4 }, 0.05, { a: 0.02, r: 0.02 });
+  sob(0, "E4", 3, 0.16, 0.9);
+  sniff(0.2);
+  sob(0.27, "D4", 3, 0.16, 0.85);
+  sniff(0.47);
+  sob(0.54, "C4", 5, 0.28, 0.9);
+  return master(m.buf, { room: { mix: 0.1, size: 0.7 }, lowpass: 3600, maxSeconds: 0.98 });
+}
+
+/** Laughing: "ha-ha-ha-ha-ha", five staccato syllables down the scale, each with a breath in front. */
+function anchorLaugh(): Float64Array {
+  const m = new Mix(1, 52);
+  ["A3", "G3", "E3", "D3", "C3"].forEach((note, i) => {
+    const at = i * 0.115;
+    noise(m, at, 0.02, { type: "bp", cutoff: 1800, q: 0.8 }, 0.08, { a: 0.003, r: 0.012 });
+    voice(m, at + 0.012, note, hz(note) * 0.94, 0.055, {
+      formant: 850,
+      duty: 0.32,
+      gain: 0.95 - i * 0.07,
+      env: { a: 0.006, d: 0.05, s: 0.4, r: 0.035 },
+    });
+  });
+  return master(m.buf, { room: { mix: 0.1, size: 0.7 }, lowpass: 3600, maxSeconds: 0.72 });
+}
+
+/** Angry: a growl made of short grains that sinks, and his fist on the desk a moment after it starts. */
+function anchorGrumble(): Float64Array {
+  const m = new Mix(1, 53);
+  for (let i = 0; i < 14; i++) {
+    const f = hz("G2") * 2 ** (-i / 40);
+    voice(m, i * 0.038, f * 1.06, f, 0.026, {
+      formant: 520,
+      duty: 0.22,
+      gain: i < 3 ? 0.6 + 0.13 * i : 1 - (i - 3) * 0.04,
+      env: { a: 0.004, d: 0.03, s: 0.3, r: 0.014 },
+    });
+  }
+  timpani(m, 0.11, "C3", 0.9);
+  noise(m, 0.11, 0.02, { type: "lp", cutoff: 900 }, 0.3, { a: 0.002, r: 0.02 });
+  return master(m.buf, { room: { mix: 0.08, size: 0.6 }, lowpass: 3000, maxSeconds: 0.7 });
+}
+
+/** Smug: a little "heh-heh" and the "ting" of a twirled moustache. */
+function anchorSmug(): Float64Array {
+  const m = new Mix(0.9, 54);
+  const heh = (at: number, note: string, gain: number) => {
+    noise(m, at, 0.03, { type: "bp", cutoff: 1500, q: 0.7 }, 0.1, { a: 0.004, r: 0.015 });
+    voice(m, at + 0.02, note, hz(note) * 0.9, 0.06, {
+      formant: 600,
+      duty: 0.28,
+      gain,
+      env: { a: 0.008, d: 0.06, s: 0.35, r: 0.04 },
+    });
+  };
+  heh(0, "E3", 0.9);
+  heh(0.15, "C3", 0.8);
+  bell(m, 0.33, "E7", { gain: 0.2, decay: 0.2, index: 0.8 });
+  bell(m, 0.33, "A6", { gain: 0.1, decay: 0.16, index: 0.8 });
+  return master(m.buf, { room: { mix: 0.12, size: 0.8 }, lowpass: 6000, maxSeconds: 0.65 });
+}
+
+/** Confused: "hm?", a closed vowel that starts flat and then goes up like a question. */
+function anchorHuh(): Float64Array {
+  const m = new Mix(0.8, 55);
+  const env = { a: 0.015, d: 0.1, s: 0.6, r: 0.06 };
+  voice(m, 0, "G2", "A2", 0.1, { formant: 480, duty: 0.25, gain: 0.85, env });
+  voice(m, 0.11, "A2", "F3", 0.2, { formant: 560, duty: 0.3, glide: 0.24, gain: 0.95, env });
+  bell(m, 0.3, "D6", { gain: 0.12, decay: 0.12, index: 0.8 });
+  return master(m.buf, { room: { mix: 0.1, size: 0.7 }, lowpass: 3400, maxSeconds: 0.5 });
+}
+
+/** Proud: a tiny "ta-daa", a pick-up note into a C major chord with a sparkle. */
+function anchorTada(): Float64Array {
+  const m = new Mix(1.2, 56);
+  const ring = { d: 0.25, s: 0.5, r: 0.3 };
+  const vibrato = { rate: 5.5, cents: 10, delay: 0.12 };
+  chip(m, 0, "G4", 0.05, { env: { d: 0.05, s: 0.3, r: 0.04 }, gain: 0.8, sub: 0.2 });
+  timpani(m, 0.13, "C3", 0.7);
+  chip(m, 0.13, "C5", 0.22, { env: ring, gain: 0.8, sub: 0.2, vibrato });
+  chip(m, 0.13, "E5", 0.22, { env: ring, gain: 0.5, bright: 0.8, vibrato });
+  chip(m, 0.13, "G5", 0.22, { env: ring, gain: 0.6, sparkle: 0.2, vibrato });
+  bell(m, 0.3, "E7", { gain: 0.14, decay: 0.14, index: 0.8 });
+  bell(m, 0.4, "G7", { gain: 0.1, decay: 0.16, index: 0.8 });
+  return master(m.buf, { room: { mix: 0.16, size: 0.9 }, maxSeconds: 0.8 });
+}
+
 /** File name → renderer. The names are what src/lib/sound.ts references. */
 const RENDER: Record<string, () => Float64Array> = {
   tap,
@@ -896,7 +1173,29 @@ const RENDER: Record<string, () => Float64Array> = {
   "news-bad": newsBad,
   "news-good": newsGood,
   "news-tick": newsTick,
+  "anchor-gasp": anchorGasp,
+  "anchor-cry": anchorCry,
+  "anchor-laugh": anchorLaugh,
+  "anchor-grumble": anchorGrumble,
+  "anchor-smug": anchorSmug,
+  "anchor-huh": anchorHuh,
+  "anchor-tada": anchorTada,
 };
+
+/**
+ * Long sounds are written at half the sample rate to keep the download small; they are low-passed far below the
+ * new Nyquist frequency before every second sample is dropped.
+ */
+const HALF_RATE = new Set(["news-intro"]);
+
+function halve(x: Float64Array): Float64Array {
+  let y = x;
+  for (let pass = 0; pass < 3; pass++) y = filterBuffer(y, "lp", 8000);
+  const out = new Float64Array(Math.floor(y.length / 2));
+  for (let i = 0; i < out.length; i++) out[i] = y[i * 2] ?? 0;
+  const gain = dbToGain(TARGET_PEAK_DB) / peakOf(out);
+  return out.map((v) => v * gain);
+}
 
 // ---------------------------------------------------------------------------
 // Analysis (we cannot listen, so we measure)
@@ -1130,7 +1429,7 @@ function main(): void {
   const rendered = Object.entries(RENDER).map(([name, render]) => ({ name, samples: render() }));
   const stats: Stats[] = [];
   for (const { name, samples } of rendered) {
-    const file = encodeWav(samples);
+    const file = HALF_RATE.has(name) ? encodeWav(halve(samples), RATE / 2) : encodeWav(samples);
     writeFileSync(join(OUT_DIR, `${name}.wav`), file);
     stats.push(analyse(`${name}.wav`, file));
   }
