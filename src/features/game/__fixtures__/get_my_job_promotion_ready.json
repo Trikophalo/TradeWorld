@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "ce4b3339-0277-47dc-996a-ffa852265ae0",
+    "id": "139d8c45-13fc-4de6-a583-d4ced73692bd",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "60dd5582-1f7b-b751-df95-287e43ff8e82",
+      "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
       "logo": null,
-      "name": "Knusperkönig",
-      "color": "#FF9F1C",
+      "name": "QuantenSprung Labs",
+      "color": "#35D0BA",
       "is_ai": true,
-      "sector": "retail",
-      "ticker": "SNK"
+      "sector": "tech",
+      "ticker": "QSL"
     },
     "presence": {
-      "fire_at": "2026-11-19T17:10:26.728843+00:00",
+      "fire_at": "2026-11-19T18:55:31.337143+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-14T17:10:26.728843+00:00"
+      "last_active_at": "2026-11-14T18:55:31.337143+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-14T17:10:26.836028+00:00",
+    "started_at": "2026-11-14T18:55:31.47981+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

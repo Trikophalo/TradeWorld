@@ -10,14 +10,14 @@
       "creator": null,
       "fee_bps": 5,
       "category": "stable",
-      "price_e4": 10001,
-      "low_24h_e4": 9984,
-      "pool_cents": 5000276888,
-      "high_24h_e4": 10013,
-      "change_24h_bps": 11,
+      "price_e4": 10000,
+      "low_24h_e4": 9997,
+      "pool_cents": 4999900850,
+      "high_24h_e4": 10026,
+      "change_24h_bps": -25,
       "my_quantity_e6": 0,
-      "market_cap_cents": 5000223099,
-      "volume_24h_cents": 314096
+      "market_cap_cents": 5000099150,
+      "volume_24h_cents": 359352
     },
     {
       "logo": null,
@@ -30,13 +30,13 @@
       "fee_bps": 5,
       "category": "stable",
       "price_e4": 10000,
-      "low_24h_e4": 9980,
-      "pool_cents": 2999956161,
-      "high_24h_e4": 10010,
-      "change_24h_bps": -8,
+      "low_24h_e4": 9978,
+      "pool_cents": 3000003954,
+      "high_24h_e4": 10005,
+      "change_24h_bps": 15,
       "my_quantity_e6": 0,
-      "market_cap_cents": 3000043837,
-      "volume_24h_cents": 176137
+      "market_cap_cents": 2999996044,
+      "volume_24h_cents": 133724
     },
     {
       "logo": null,
@@ -48,14 +48,14 @@
       "creator": null,
       "fee_bps": 5,
       "category": "stable",
-      "price_e4": 600043,
-      "low_24h_e4": 598942,
-      "pool_cents": 1500054191,
-      "high_24h_e4": 600641,
-      "change_24h_bps": -8,
+      "price_e4": 599969,
+      "low_24h_e4": 599127,
+      "pool_cents": 1499961787,
+      "high_24h_e4": 600794,
+      "change_24h_bps": -5,
       "my_quantity_e6": 0,
-      "market_cap_cents": 1500053307,
-      "volume_24h_cents": 91633
+      "market_cap_cents": 1499960710,
+      "volume_24h_cents": 74375
     },
     {
       "logo": null,
@@ -68,13 +68,13 @@
       "fee_bps": 5,
       "category": "stable",
       "price_e4": 10000,
-      "low_24h_e4": 9997,
-      "pool_cents": 800004077,
-      "high_24h_e4": 10028,
-      "change_24h_bps": -23,
+      "low_24h_e4": 9975,
+      "pool_cents": 799987003,
+      "high_24h_e4": 10007,
+      "change_24h_bps": 18,
       "my_quantity_e6": 0,
-      "market_cap_cents": 799995922,
-      "volume_24h_cents": 43979
+      "market_cap_cents": 800012995,
+      "volume_24h_cents": 21225
     },
     {
       "logo": null,
@@ -86,14 +86,14 @@
       "creator": null,
       "fee_bps": 10,
       "category": "major",
-      "price_e4": 419250725,
-      "low_24h_e4": 390707871,
-      "pool_cents": 9991076171,
-      "high_24h_e4": 421736901,
-      "change_24h_bps": 587,
+      "price_e4": 419555935,
+      "low_24h_e4": 410091703,
+      "pool_cents": 9994712211,
+      "high_24h_e4": 455347799,
+      "change_24h_bps": -726,
       "my_quantity_e6": 0,
-      "market_cap_cents": 9991076182,
-      "volume_24h_cents": 11539059
+      "market_cap_cents": 9994712212,
+      "volume_24h_cents": 13875001
     },
     {
       "logo": null,
@@ -105,14 +105,14 @@
       "creator": null,
       "fee_bps": 10,
       "category": "major",
-      "price_e4": 20962536,
-      "low_24h_e4": 19441490,
-      "pool_cents": 4995537981,
-      "high_24h_e4": 21535566,
-      "change_24h_bps": 491,
+      "price_e4": 20977796,
+      "low_24h_e4": 19783932,
+      "pool_cents": 4997356005,
+      "high_24h_e4": 21597388,
+      "change_24h_bps": 475,
       "my_quantity_e6": 0,
-      "market_cap_cents": 4995538033,
-      "volume_24h_cents": 5669733
+      "market_cap_cents": 4997355928,
+      "volume_24h_cents": 6837701
     },
     {
       "logo": null,
@@ -124,14 +124,14 @@
       "creator": null,
       "fee_bps": 10,
       "category": "major",
-      "price_e4": 610826,
-      "low_24h_e4": 610826,
-      "pool_cents": 1695427736,
-      "high_24h_e4": 863494,
-      "change_24h_bps": -2098,
+      "price_e4": 849101,
+      "low_24h_e4": 762894,
+      "pool_cents": 1998942400,
+      "high_24h_e4": 865237,
+      "change_24h_bps": 1128,
       "my_quantity_e6": 0,
-      "market_cap_cents": 1695427784,
-      "volume_24h_cents": 304982148
+      "market_cap_cents": 1998941744,
+      "volume_24h_cents": 2735082
     },
     {
       "logo": null,
@@ -143,14 +143,14 @@
       "creator": null,
       "fee_bps": 30,
       "category": "alt",
-      "price_e4": 10812,
-      "low_24h_e4": 10650,
-      "pool_cents": 254698643,
-      "high_24h_e4": 17841,
-      "change_24h_bps": -612,
+      "price_e4": 10830,
+      "low_24h_e4": 9749,
+      "pool_cents": 254914981,
+      "high_24h_e4": 17849,
+      "change_24h_bps": 603,
       "my_quantity_e6": 0,
-      "market_cap_cents": 254701284,
-      "volume_24h_cents": 105015268
+      "market_cap_cents": 254908799,
+      "volume_24h_cents": 105183382
     },
     {
       "logo": null,
@@ -162,14 +162,14 @@
       "creator": null,
       "fee_bps": 30,
       "category": "alt",
-      "price_e4": 119498,
-      "low_24h_e4": 99304,
-      "pool_cents": 199581642,
-      "high_24h_e4": 120461,
-      "change_24h_bps": 826,
+      "price_e4": 119702,
+      "low_24h_e4": 100044,
+      "pool_cents": 199751161,
+      "high_24h_e4": 120648,
+      "change_24h_bps": 1104,
       "my_quantity_e6": 0,
-      "market_cap_cents": 199580812,
-      "volume_24h_cents": 530250
+      "market_cap_cents": 199751861,
+      "volume_24h_cents": 638525
     },
     {
       "logo": null,
@@ -181,14 +181,14 @@
       "creator": null,
       "fee_bps": 30,
       "category": "alt",
-      "price_e4": 4481,
-      "low_24h_e4": 4030,
-      "pool_cents": 149686231,
-      "high_24h_e4": 5034,
-      "change_24h_bps": 219,
+      "price_e4": 4489,
+      "low_24h_e4": 4280,
+      "pool_cents": 149813370,
+      "high_24h_e4": 5797,
+      "change_24h_bps": -1919,
       "my_quantity_e6": 0,
-      "market_cap_cents": 149679763,
-      "volume_24h_cents": 397689
+      "market_cap_cents": 149819736,
+      "volume_24h_cents": 478896
     },
     {
       "logo": null,
@@ -200,14 +200,14 @@
       "creator": null,
       "fee_bps": 100,
       "category": "meme",
-      "price_e4": 684,
-      "low_24h_e4": 353,
-      "pool_cents": 38284371,
-      "high_24h_e4": 686,
-      "change_24h_bps": 1958,
+      "price_e4": 546,
+      "low_24h_e4": 265,
+      "pool_cents": 34208308,
+      "high_24h_e4": 546,
+      "change_24h_bps": 4717,
       "my_quantity_e6": 0,
-      "market_cap_cents": 38284923,
-      "volume_24h_cents": 10376561
+      "market_cap_cents": 34202215,
+      "volume_24h_cents": 4598228
     },
     {
       "logo": null,
@@ -219,14 +219,14 @@
       "creator": null,
       "fee_bps": 100,
       "category": "meme",
-      "price_e4": 1723,
-      "low_24h_e4": 737,
-      "pool_cents": 32816769,
-      "high_24h_e4": 1728,
-      "change_24h_bps": 9403,
+      "price_e4": 1300,
+      "low_24h_e4": 685,
+      "pool_cents": 28506924,
+      "high_24h_e4": 1300,
+      "change_24h_bps": 3485,
       "my_quantity_e6": 0,
-      "market_cap_cents": 32814775,
-      "volume_24h_cents": 8179093
+      "market_cap_cents": 28501845,
+      "volume_24h_cents": 3831858
     },
     {
       "logo": null,
@@ -238,14 +238,14 @@
       "creator": null,
       "fee_bps": 100,
       "category": "meme",
-      "price_e4": 1189,
-      "low_24h_e4": 531,
-      "pool_cents": 19690060,
-      "high_24h_e4": 1192,
-      "change_24h_bps": 6961,
+      "price_e4": 897,
+      "low_24h_e4": 469,
+      "pool_cents": 17104153,
+      "high_24h_e4": 897,
+      "change_24h_bps": 4148,
       "my_quantity_e6": 0,
-      "market_cap_cents": 19691018,
-      "volume_24h_cents": 4907456
+      "market_cap_cents": 17101107,
+      "volume_24h_cents": 2299115
     },
     {
       "logo": null,
@@ -257,14 +257,14 @@
       "creator": null,
       "fee_bps": 100,
       "category": "meme",
-      "price_e4": 4308,
-      "low_24h_e4": 1556,
-      "pool_cents": 13126706,
-      "high_24h_e4": 4320,
-      "change_24h_bps": 7890,
+      "price_e4": 3251,
+      "low_24h_e4": 2343,
+      "pool_cents": 11402768,
+      "high_24h_e4": 5093,
+      "change_24h_bps": -2538,
       "my_quantity_e6": 0,
-      "market_cap_cents": 13127434,
-      "volume_24h_cents": 3271638
+      "market_cap_cents": 11404247,
+      "volume_24h_cents": 1532742
     },
     {
       "logo": null,
@@ -278,17 +278,17 @@
       "category": "meme",
       "price_e4": 150,
       "low_24h_e4": 150,
-      "pool_cents": 7994672,
+      "pool_cents": 8009171,
       "high_24h_e4": 150,
       "change_24h_bps": 0,
       "my_quantity_e6": 0,
-      "market_cap_cents": 8005331,
-      "volume_24h_cents": 18084
+      "market_cap_cents": 7990839,
+      "volume_24h_cents": 26603
     }
   ],
   "events": [
     {
-      "at": "2026-11-14T17:10:19.008321+00:00",
+      "at": "2026-11-14T18:55:22.68476+00:00",
       "key": "closed",
       "name": "Sternfisch",
       "ticker": "STFI",
@@ -296,7 +296,7 @@
       "shock_bps": null
     },
     {
-      "at": "2026-11-14T17:10:18.991679+00:00",
+      "at": "2026-11-14T18:55:22.664491+00:00",
       "key": "launch",
       "name": "Sternfisch",
       "ticker": "STFI",
@@ -304,7 +304,7 @@
       "shock_bps": null
     },
     {
-      "at": "2026-11-14T17:10:18.89641+00:00",
+      "at": "2026-11-14T18:55:22.551298+00:00",
       "key": "listed",
       "name": "Katzenkanone",
       "ticker": "KTZ",
@@ -312,15 +312,15 @@
       "shock_bps": null
     },
     {
-      "at": "2026-11-14T17:10:18.89641+00:00",
+      "at": "2026-11-14T18:55:22.551298+00:00",
       "key": "delisted",
       "name": "Pixelpudel",
       "ticker": "PPD",
-      "payload": { "holders": 1, "paid_cents": 379 },
+      "payload": { "holders": 1, "paid_cents": 503 },
       "shock_bps": null
     },
     {
-      "at": "2026-11-14T17:10:18.861386+00:00",
+      "at": "2026-11-14T18:55:22.539407+00:00",
       "key": "dead",
       "name": "Pixelpudel",
       "ticker": "PPD",
@@ -328,23 +328,23 @@
       "shock_bps": null
     },
     {
-      "at": "2026-11-14T17:10:18.830949+00:00",
+      "at": "2026-11-14T18:55:22.511507+00:00",
       "key": "meme_wave",
       "name": null,
       "ticker": null,
-      "payload": { "shock": 0.5561 },
-      "shock_bps": 7439
+      "payload": { "shock": 0.2697 },
+      "shock_bps": 3096
     },
     {
-      "at": "2026-11-14T17:10:18.818351+00:00",
+      "at": "2026-11-14T18:55:22.500061+00:00",
       "key": "hack",
       "name": "Flux",
       "ticker": "FLX",
-      "payload": { "shock": -0.5, "loss_cents": 73145127 },
+      "payload": { "shock": -0.5, "loss_cents": 73160843 },
       "shock_bps": -3935
     },
     {
-      "at": "2026-11-14T17:10:18.744013+00:00",
+      "at": "2026-11-14T18:55:22.420175+00:00",
       "key": "closed",
       "name": "Mondfisch",
       "ticker": "MOFI",
@@ -352,7 +352,7 @@
       "shock_bps": null
     },
     {
-      "at": "2026-11-14T17:10:18.731544+00:00",
+      "at": "2026-11-14T18:55:22.407213+00:00",
       "key": "burn",
       "name": "Mondfisch",
       "ticker": "MOFI",
@@ -360,7 +360,7 @@
       "shock_bps": null
     },
     {
-      "at": "2026-11-14T17:10:18.702429+00:00",
+      "at": "2026-11-14T18:55:22.378474+00:00",
       "key": "rug_pull",
       "name": "Mondfisch",
       "ticker": "MOFI",
@@ -368,7 +368,7 @@
       "shock_bps": null
     },
     {
-      "at": "2026-11-14T17:10:18.681983+00:00",
+      "at": "2026-11-14T18:55:22.354239+00:00",
       "key": "influencer",
       "name": "Mondfisch",
       "ticker": "MOFI",
@@ -376,7 +376,7 @@
       "shock_bps": 6493
     },
     {
-      "at": "2026-11-14T17:10:18.63541+00:00",
+      "at": "2026-11-14T18:55:22.299076+00:00",
       "key": "launch",
       "name": "Mondfisch",
       "ticker": "MOFI",
@@ -384,29 +384,13 @@
       "shock_bps": null
     },
     {
-      "at": "2026-11-14T17:10:18.292471+00:00",
+      "at": "2026-11-14T18:55:21.854117+00:00",
       "key": "whale_buy",
       "name": "Flux",
       "ticker": "FLX",
       "payload": { "shock": 0.4 },
-      "shock_bps": 4918
-    },
-    {
-      "at": "2026-11-14T17:10:09.900886+00:00",
-      "key": "fud",
-      "name": "Hamsterrakete",
-      "ticker": "HMR",
-      "payload": { "shock": -0.0564 },
-      "shock_bps": -548
-    },
-    {
-      "at": "2026-11-14T17:10:09.900886+00:00",
-      "key": "whale_dump",
-      "name": "Quantor",
-      "ticker": "QTR",
-      "payload": { "shock": -0.3286 },
-      "shock_bps": -2801
+      "shock_bps": 4919
     }
   ],
-  "regime": { "kind": "bull", "until": "2026-11-17T15:10:09.900886+00:00" }
+  "regime": { "kind": "bull", "until": "2026-11-16T09:55:13.854085+00:00" }
 }

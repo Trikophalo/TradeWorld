@@ -34,6 +34,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Schreib ihr frei, was die Firma tun soll („Wir machen eine Rabattaktion für Stammkunden“). Sie schätzt die Chance, warnt bei Schönfärberei und setzt es um. Davon geht **ein Auftrag pro Stunde**. „Verteil alle Aufgaben“ verteilt alles auf einmal, „Wie läuft die Firma?“ zeigt die Zahlen. Mira meldet von selbst, wie Aufgaben und Aufträge ausgegangen sind, und warnt, bevor eine Aufgabe verfällt.",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-69b5c056",
+        title: "Firmen-Minispiele mit Logik",
+        text: "Jede Sortier-Aufgabe nennt jetzt ihre Regel, nichts muss mehr geraten werden. Beim Ordnen sind die Werte realistisch (Schichten zwischen 6 und 22 Uhr statt „73 Uhr“).",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-706f8ae2",
         title: "Mehr Verbesserungen",
         text: "22 neue Verbesserungen und zwei weitere Tresorstufen, in fünf Abschnitten. Mehr Geld (Tresorzinsen, Lohnbonus, Stammgast, Auftragsprofi, Dealmaker), mehr XP (Börsenprofi, Frühaufsteher, Missionsjäger, Teamplayer, Bilanzprofi, Ehrgeiz), ein größerer Tresor (Panzertresor) und vieles für die eigene Firma (KI-Turbo, Glückshand, Werbeagentur, Krisenmanager …). Sie schalten sich zwischen Level 1 und 30 frei.",

@@ -184,3 +184,13 @@ select tests.assert(
 select tests.assert((select count(*) from public.ledger_audit()) = 0 and tests.money_invariant() = 'ok',
   'closed money system after the company tasks');
 select tests.throws($$select public.api_error('no_ai_workers')$$, 'NX114', 'no_ai_workers is NX114');
+
+-- ADR-140: order tasks use their own realistic range (a shift starts between 6 and 22 Uhr)
+select tests.assert(
+  (select bool_and(v between 6 and 22)
+     from generate_series(1, 20) g,
+          lateral jsonb_array_elements_text(public.company_task_puzzle(
+            (select t from jsonb_array_elements(public.company_tasks_cfg() -> 'tasks') t where t ->> 'key' = 'shift_plan'))
+            -> 'puzzle' -> 'values') x(v_text),
+          lateral (select v_text::integer as v) y),
+  'company_task_puzzle(): an order task keeps to its own range (ADR-140)');

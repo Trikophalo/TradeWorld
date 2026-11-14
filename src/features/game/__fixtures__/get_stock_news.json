@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Mehrere Häuser heben ihr Kursziel leicht an. Sicher ist das nicht.",
-      "name": "KlarSoft AG",
-      "due_at": "2026-11-14T18:25:29.849349+00:00",
+      "body": "Die Partnerschaft soll beiden Seiten neue Kunden bringen. Sicher ist das nicht.",
+      "name": "Sonnenkern Fusion",
+      "due_at": "2026-11-14T20:35:07.775747+00:00",
       "status": "open",
-      "ticker": "KLS",
-      "headline": "Analysten-Upgrade: KlarSoft AG jetzt Kaufempfehlung",
+      "ticker": "FSN",
+      "headline": "Kooperation: Sonnenkern Fusion und ein Branchenriese",
       "move_bps": null,
-      "strength": 1,
+      "strength": 2,
       "direction": "up",
-      "published_at": "2026-11-14T18:10:28.125984+00:00"
+      "published_at": "2026-11-14T19:55:33.405189+00:00"
     },
     {
       "id": 3,
-      "body": "Neue Aktien sollen ausgegeben werden. Das verwässert die Anteile, der Kurs dürfte leicht nachgeben. Sicher ist das nicht.",
-      "name": "Brotzeit Handel AG",
-      "due_at": "2026-11-14T17:10:28.121645+00:00",
+      "body": "Mehrere Häuser heben ihr Kursziel deutlich an. Sicher ist das nicht.",
+      "name": "SolarFuchs",
+      "due_at": "2026-11-14T18:55:33.399108+00:00",
       "status": "confirmed",
-      "ticker": "BRZ",
-      "headline": "Brotzeit Handel AG plant Kapitalerhöhung",
-      "move_bps": -559,
-      "strength": 1,
-      "direction": "down",
-      "published_at": "2026-11-14T17:10:28.121645+00:00"
+      "ticker": "SFX",
+      "headline": "Analysten-Upgrade: SolarFuchs jetzt Kaufempfehlung",
+      "move_bps": 1108,
+      "strength": 3,
+      "direction": "up",
+      "published_at": "2026-11-14T18:55:33.399108+00:00"
     }
   ],
   "reliability_bps": 7500

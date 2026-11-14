@@ -1,10 +1,10 @@
 {
-  "code": "NEXA-33FA",
+  "code": "NEXA-Q6P2",
   "invited": 0,
   "redeemed": true,
   "paid_cents": 500000,
   "bonus_cents": 500000,
-  "redeemed_at": "2026-11-14T17:10:28.116843+00:00",
-  "redeemed_from": { "tag": "SWCC", "nickname": "Fixture_Werber" },
+  "redeemed_at": "2026-11-14T18:55:33.391476+00:00",
+  "redeemed_from": { "tag": "NYDL", "nickname": "Fixture_Werber" },
   "cash_after_cents": 1500000
 }

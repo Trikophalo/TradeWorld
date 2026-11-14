@@ -71,8 +71,9 @@ export function generatePuzzle(
     }
     case "order": {
       const values: number[] = [];
+      const [lo, hi] = task.range ?? [g.order.min, g.order.max];
       while (values.length < g.order.items) {
-        const v = between(rng, g.order.min, g.order.max);
+        const v = between(rng, lo, hi);
         if (!values.includes(v)) values.push(v);
       }
       const asc = task.asc ?? true;

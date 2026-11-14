@@ -29,6 +29,21 @@ describe("company task games", () => {
     }
   });
 
+  it("order values stay in the task's realistic range and are all different", () => {
+    const rng = seeded(5);
+    for (const task of COMPANY_TASKS.filter((t) => t.game === "order")) {
+      expect(task.range, task.key).toBeDefined();
+      const [lo, hi] = task.range!;
+      expect(hi - lo + 1, task.key).toBeGreaterThanOrEqual(COMPANY_TASK_RULES.games.order.items * 2);
+      for (let k = 0; k < 10; k++) {
+        const { puzzle } = generatePuzzle(task, rng);
+        const values = (puzzle as { values: number[] }).values;
+        expect(new Set(values).size, task.key).toBe(values.length);
+        for (const v of values) expect(v >= lo && v <= hi, `${task.key} ${v}`).toBe(true);
+      }
+    }
+  });
+
   it("math answers are whole and never negative", () => {
     const rng = seeded(11);
     for (const task of COMPANY_TASKS.filter((t) => t.game === "math")) {

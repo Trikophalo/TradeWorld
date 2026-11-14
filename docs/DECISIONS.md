@@ -2191,3 +2191,17 @@ sein, und freie Aufträge an sie sollen selten und wertvoll sein.
 - **Claude:** bekommt die letzten acht Nachrichten als Gedächtnis, die letzten Ergebnisse, das letzte Quartal und den
   Stand der Aufträge; mittlerer Denkaufwand; ein genauerer Leitfaden (Erwartungswert, Fristen, Auslastung, ehrliche
   Einschätzung von Ideen). Neue Aktion `order`. Ohne Schlüssel erkennt die Mini-Mira Aufträge an der Form des Satzes.
+
+## ADR-140: Firmen-Minispiele lösbar durch Nachdenken, nicht durch Raten — `akzeptiert`
+
+**Kontext:** Bei einigen Sortier-Aufgaben war die richtige Seite nicht herleitbar (warum ist „Miete Mai“ bezahlt,
+„Strom Mai“ aber offen?). Beim Ordnen kamen alle Werte aus 1 bis 99, also Schichten um „73 Uhr“ oder Käse mit
+97 Monaten Reifezeit.
+
+**Entscheidung:**
+
+- Jede Sortier-Aufgabe nennt ihre Regel in der Anleitung („Bis einschließlich April ist alles bezahlt“, „Häufig heißt:
+  öfter als 1 von 100“, „Ware aus der EU ist zollfrei“). Begriffe, die nur Fachleute zuordnen können, sind ersetzt.
+- Jede Ordnen-Aufgabe hat einen eigenen, realistischen Wertebereich (`companyTasks.tasks[].range`, z. B. Schichtbeginn
+  6 bis 22 Uhr, Reifezeit 2 bis 36 Monate). Server (`company_task_puzzle()`) und Demo nutzen ihn gleich.
+- Zählen, Antippen, Rechnen und Merken waren schon herleitbar und bleiben, wie sie sind.

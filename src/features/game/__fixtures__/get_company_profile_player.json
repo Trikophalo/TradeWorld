@@ -5,29 +5,29 @@
     "stage": 0,
     "period": null,
     "product": "security_software",
-    "max_staff": 40,
+    "max_staff": 2,
     "ai_workers": 0,
     "quality_bps": null,
-    "value_cents": 7856750,
+    "value_cents": 250000,
     "profit_cents": null,
     "awareness_bps": null,
     "revenue_cents": null
   },
   "company": {
-    "id": "9666702b-5d42-4758-92cf-533043d408ac",
-    "idea": "Maschinen nach Maß",
+    "id": "85d4908c-8424-426c-b630-3cf9935b6e47",
+    "idea": "Neue Schrauben",
     "logo": null,
-    "name": "Ausbau Werke",
-    "tier": "gmbh",
+    "name": "Gleich Werk",
+    "tier": "garage",
     "is_ai": false,
     "listed": false,
     "sector": "tech",
     "ticker": null,
     "price_e4": null,
     "change_bps": null,
-    "founded_at": "2026-11-14T17:10:06.244468+00:00",
-    "brand_color": "#224466"
+    "founded_at": "2026-11-14T18:55:18.37796+00:00",
+    "brand_color": "#553377"
   },
-  "founder": { "tag": "5TKP", "nickname": "Anke_Ausbau", "avatar_key": "rookie" },
+  "founder": { "tag": "UFXS", "nickname": "Kai_Kopie", "avatar_key": "rookie" },
   "members": []
 }

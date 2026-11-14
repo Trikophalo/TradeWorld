@@ -5323,13 +5323,13 @@
     "items": {
       "pay_invoices": {
         "name": "Rechnungen sortieren",
-        "how": "Lege bezahlte und offene Rechnungen auf den richtigen Stapel.",
+        "how": "Bis einschließlich April ist alles bezahlt, ab Mai ist es offen. Lege jede Rechnung auf den richtigen Stapel.",
         "ok": "{company} hat die Buchhaltung im Griff: alle Rechnungen pünktlich bezahlt.",
         "fail": "Mahngebühren bei {company}: Offene Rechnungen sind liegen geblieben.",
         "left": "Bezahlt",
         "right": "Offen",
-        "leftItems": ["Miete Mai", "Strom April", "Server März", "Kaffee"],
-        "rightItems": ["Miete Juni", "Strom Mai", "Server April", "Druckerpapier"]
+        "leftItems": ["Miete April", "Strom März", "Server Februar", "Kaffee Januar"],
+        "rightItems": ["Miete Juni", "Strom Mai", "Server Juli", "Papier Mai"]
       },
       "payroll_check": {
         "name": "Stundenzettel prüfen",
@@ -5429,7 +5429,7 @@
         "fail": "Verwirrte Nutzer bei {company}: Der Update-Text war Unsinn.",
         "left": "Neu",
         "right": "Behoben",
-        "leftItems": ["Dunkelmodus", "Widgets", "Sprachsuche", "Teilen"],
+        "leftItems": ["Dunkelmodus", "Widgets", "Sprachsuche", "Teilen-Knopf"],
         "rightItems": ["Login-Fehler", "Absturz", "Akku-Fresser", "Tippfehler"]
       },
       "store_screens": {
@@ -5516,7 +5516,7 @@
       },
       "kyc_docs": {
         "name": "Ausweise prüfen",
-        "how": "Sortiere gültige und abgelaufene Ausweise.",
+        "how": "Wir haben 2026. Was vor 2026 abgelaufen ist, ist ungültig.",
         "ok": "{company} eröffnet hunderte Konten ohne Fehler.",
         "fail": "Bußgeld für {company}: Konten mit abgelaufenen Ausweisen eröffnet.",
         "left": "Gültig",
@@ -5547,7 +5547,7 @@
       },
       "returns_sort": {
         "name": "Retouren prüfen",
-        "how": "Sortiere die Retouren.",
+        "how": "Was wie neu ist, geht zurück in den Verkauf. Beschädigtes oder Unvollständiges wird aussortiert.",
         "ok": "{company} bringt Retouren schnell zurück ins Regal.",
         "fail": "{company} verkauft kaputte Ware weiter. Die Bewertungen stürzen ab.",
         "left": "Wieder verkaufen",
@@ -5578,7 +5578,7 @@
       },
       "color_match": {
         "name": "Stoffe prüfen",
-        "how": "Sortiere die Stoffe: passen sie zur Kollektion?",
+        "how": "Die Kollektion hat nur gedeckte Naturtöne. Alles Knallige passt nicht.",
         "ok": "Die neue Kollektion von {company} sieht aus wie aus einem Guss.",
         "fail": "Fehlproduktion bei {company}: Hunderte Teile in falscher Farbe.",
         "left": "Kollektion",
@@ -5624,7 +5624,7 @@
       },
       "cold_chain": {
         "name": "Lieferung einräumen",
-        "how": "Was gehört in die Kühlung, was ins Regal?",
+        "how": "Frische tierische Lebensmittel kommen in die Kühlung, Haltbares ins Regal.",
         "ok": "{company} hält die Kühlkette lückenlos.",
         "fail": "{company} muss verdorbene Ware wegwerfen. Teurer Tag.",
         "left": "Kühlen",
@@ -5719,7 +5719,7 @@
         "fail": "Arbeitsunfall bei {company}. Die Baustelle steht still.",
         "left": "Vorgeschrieben",
         "right": "Unnötig",
-        "leftItems": ["Helm", "Handschuhe", "Prüfer", "Erdung"],
+        "leftItems": ["Helm", "Handschuhe", "Spannungsprüfer", "Erdung"],
         "rightItems": ["Krawatte", "Sonnenhut", "Kopfhörer", "Laptop"]
       },
       "cell_test": {
@@ -5761,7 +5761,7 @@
       },
       "contract_sort": {
         "name": "Herkunft prüfen",
-        "how": "Sortiere die Lieferverträge nach Herkunft.",
+        "how": "Ökostrom kommt aus erneuerbaren Quellen, Graustrom aus fossilen Brennstoffen oder Atomkraft.",
         "ok": "{company} liefert nachweislich grünen Strom.",
         "fail": "Etikettenschwindel? {company} muss Ökostrom-Kunden entschädigen.",
         "left": "Ökostrom",
@@ -5806,12 +5806,12 @@
       },
       "label_sort": {
         "name": "Packungen kennzeichnen",
-        "how": "Was ist rezeptpflichtig?",
+        "how": "Starke Medikamente gibt es nur auf Rezept, leichte Mittel gegen Erkältung frei.",
         "ok": "{company} kennzeichnet alles korrekt.",
         "fail": "Abmahnung für {company}: falsche Kennzeichnung auf der Packung.",
         "left": "Rezeptpflichtig",
         "right": "Frei",
-        "leftItems": ["Antibiotikum", "Blutdrucksenker", "Insulin", "Cortison"],
+        "leftItems": ["Antibiotikum", "Blutdrucksenker", "Insulin", "Morphin"],
         "rightItems": ["Hustensaft", "Nasenspray", "Vitamin C", "Halstabletten"]
       },
       "petri_dishes": {
@@ -5894,13 +5894,13 @@
       },
       "side_effects": {
         "name": "Nebenwirkungen einordnen",
-        "how": "Sortiere die Nebenwirkungen nach Häufigkeit.",
+        "how": "Häufig heißt: öfter als 1 von 100 Leuten. Sortiere nach den Zahlen.",
         "ok": "Der Beipackzettel von {company} ist vorbildlich.",
         "fail": "Warnung der Behörde an {company}: Nebenwirkungen falsch eingestuft.",
         "left": "Häufig",
         "right": "Selten",
-        "leftItems": ["Kopfweh", "Müdigkeit", "Übelkeit", "Schwindel"],
-        "rightItems": ["Haarausfall", "Schluckauf", "Juckreiz", "Niesen"]
+        "leftItems": ["Kopfweh 1:10", "Müdigkeit 1:20", "Übelkeit 1:30", "Schwindel 1:50"],
+        "rightItems": ["Haarausfall 1:5000", "Schluckauf 1:2000", "Juckreiz 1:1000", "Niesen 1:800"]
       },
       "translation_set": {
         "name": "Unterlagen sortieren",
@@ -5972,13 +5972,13 @@
       },
       "customs_docs": {
         "name": "Zollpapiere",
-        "how": "Sortiere die Sendungen.",
+        "how": "Ware aus der EU ist zollfrei, alles von außerhalb muss verzollt werden.",
         "ok": "Die Container von {company} rollen ohne Halt durch den Zoll.",
         "fail": "Container von {company} hängt im Zoll fest. Strafe pro Tag.",
         "left": "Zollfrei",
         "right": "Verzollen",
-        "leftItems": ["EU-Ware", "Rücksendung", "Muster", "Ersatzteil EU"],
-        "rightItems": ["Ware China", "Ware USA", "Tabak", "Uhren Schweiz"]
+        "leftItems": ["Ware Italien", "Ware Polen", "Ware Spanien", "Ware Österreich"],
+        "rightItems": ["Ware China", "Ware USA", "Ware Japan", "Ware Kanada"]
       },
       "container_load": {
         "name": "Schiff beladen",
@@ -6018,7 +6018,7 @@
       },
       "fragile_sort": {
         "name": "Zerbrechliches markieren",
-        "how": "Sortiere die Sachen.",
+        "how": "Was beim Herunterfallen kaputtgeht, ist zerbrechlich.",
         "ok": "Nichts zerbrochen: {company} liefert alles heil.",
         "fail": "Scherben beim Umzug: {company} muss Schadenersatz zahlen.",
         "left": "Zerbrechlich",
