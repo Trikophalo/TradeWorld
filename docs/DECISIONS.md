@@ -2004,3 +2004,54 @@ und Orbitfracht etwa 40 % zu hoch. Die Simulation zieht Kurse zum fairen Wert, a
 wer kaufte, verlor. Migration `20261204000900_fix_new_ai_fundamentals.sql` setzt ihre Kosten so, dass der Startkurs
 genau dem Branchen-KGV entspricht, und stellt den fairen Wert aller zehn auf den Startkurs zurück. Firmen mit Verlust
 (Sonnenkern, Methusalem, Luftpost) bleiben spekulativ wie die bisherigen Pennystocks mit Verlust.
+
+## ADR-134: Mehr Verbesserungen — `akzeptiert`
+
+Vorgabe: Viel mehr Verbesserungen, um mehr Geld zu machen, XP zu verdienen, den Tresor zu erweitern und vieles mehr,
+mindestens 20 neue.
+
+- **22 neue Verbesserungen** und zwei weitere Tresorstufen. Jede wirkt auf dem Server, an genau einer Stelle (siehe
+  `docs/DATA_MODEL.md`, Nachtrag ADR-134). Werte in `src/config/upgrades.ts` (`game_config.upgrades`), Formeln in
+  `src/lib/sim/upgrades.ts`.
+- **Freischalten über die Zeit:** Erste Stufen ab Level 1 bis 18, jede weitere Stufe einige Level später (ADR-100).
+  Die letzte Stufe jeder Verbesserung ist spätestens mit Level 30 erreichbar.
+- **Geschlossenes Geldsystem:** Zusatzgeld kommt aus der Staatskasse (Tresorzinsen, Lohnbonus, tägliche Belohnung;
+  nur so viel, wie sie hat) oder von den Haushalten (Firmenaufgaben, Geschäftszüge), nie aus dem Nichts. Rabatte
+  senken nur, was an die Haushalte fließt. Firmen-Verbesserungen zählen für den Gründer der Firma.
+- **Die Seite** zeigt die Verbesserungen in fünf Abschnitten (Tresor und Einkommen, Job und Karriere, Erfahrung, Deine
+  Firma, Leben und Märkte) mit gekauften Stufen je Abschnitt. Gesperrte Karten zeigen, ab welchem Level es weitergeht.
+- **Demo:** listet und verkauft alle Verbesserungen; XP, Tresor, tägliche Belohnung, Lohnbonus, Firmenaufgaben und
+  Geschäftszüge rechnen mit. Lohnschutz, Strategien, Krisenkosten, Kampagnen und Protest wirken nur auf dem Server.
+
+| Schlüssel        | Name                 | Wirkung je Stufe                                                 | Stufen | Ab Level (je Stufe) | Preise                  |
+| ---------------- | -------------------- | ---------------------------------------------------------------- | ------ | ------------------- | ----------------------- |
+| `vault`          | Tresor (erweitert)   | +2 h Platz, jetzt 8 statt 6 Stufen (bis 24 h)                    | 8      | 1, 3, …, 13, 15     | 3.000 € bis 384.000 €   |
+| `vault_xl`       | Panzertresor         | +4 h Platz (zusätzlich zum Tresor, bis 36 h)                     | 3      | 14, 20, 26          | 100.000 € bis 400.000 € |
+| `vault_interest` | Tresorzinsen         | +5 % obendrauf beim Leeren des Tresors (Staatskasse)             | 4      | 3, 6, 9, 12         | 5.000 € bis 78.125 €    |
+| `daily_bonus`    | Stammgast            | +25 % Geld aus der täglichen Belohnung                           | 3      | 2, 6, 10            | 2.500 € bis 22.500 €    |
+| `wage_bonus`     | Gehaltsverhandlung   | +5 % Lohnbonus auf jede Lohnzahlung (Staatskasse)                | 3      | 3, 8, 13            | 6.000 € bis 54.000 €    |
+| `wage_shield`    | Krisenfester Vertrag | −25 % der Lohnkürzung durch Krisen und Kurse (ADR-131)           | 3      | 6, 11, 16           | 8.000 € bis 50.000 €    |
+| `trader`         | Börsenprofi          | +10 % XP aus Handel                                              | 3      | 1, 4, 7             | 2.000 € bis 12.500 €    |
+| `early_bird`     | Frühaufsteher        | +20 % XP aus täglicher Belohnung und Check-in                    | 3      | 1, 5, 9             | 1.500 € bis 13.500 €    |
+| `mission_hunter` | Missionsjäger        | +10 % XP aus Missionen                                           | 3      | 2, 6, 10            | 3.000 € bis 18.750 €    |
+| `teamplayer`     | Teamplayer           | +15 % XP aus Aufgaben (Firmen- und Arbeitsaufgaben)              | 3      | 6, 10, 14           | 8.000 € bis 50.000 €    |
+| `balance_sheet`  | Bilanzprofi          | +15 % XP aus Quartalsgewinn und Börsengang der eigenen Firma     | 3      | 9, 14, 19           | 15.000 € bis 93.750 €   |
+| `ambition`       | Ehrgeiz              | +5 % auf alle XP                                                 | 3      | 18, 24, 30          | 100.000 € bis 400.000 € |
+| `task_pay`       | Auftragsprofi        | +10 % Geld für erledigte Firmenaufgaben (Haushalte)              | 3      | 7, 11, 15           | 10.000 € bis 62.500 €   |
+| `task_safety`    | Fehlerkultur         | −25 % Strafe für verpatzte oder verpasste Firmenaufgaben         | 3      | 7, 12, 17           | 6.000 € bis 37.500 €    |
+| `crisis_manager` | Krisenmanager        | −10 % Kosten für Schritte bei Krisen und Chancen und Strategien  | 3      | 7, 12, 17           | 10.000 € bis 62.500 €   |
+| `move_luck`      | Glückshand           | +3 % Erfolgschance der Geschäftszüge (höchstens 95 %)            | 3      | 8, 12, 16           | 12.000 € bis 75.000 €   |
+| `ad_agency`      | Werbeagentur         | −10 % auf Marketing-Kampagnen                                    | 3      | 9, 13, 17           | 12.000 € bis 75.000 €   |
+| `dealmaker`      | Dealmaker            | +10 % Auszahlung gelungener Geld-Geschäftszüge (Haushalte)       | 3      | 10, 15, 20          | 20.000 € bis 125.000 €  |
+| `ai_turbo`       | KI-Turbo             | −15 % Zeit der KI-Mitarbeiter für Firmenaufgaben                 | 3      | 11, 15, 19          | 15.000 € bis 93.750 €   |
+| `ai_precision`   | KI-Feinschliff       | +5 % Erfolgschance der KI-Mitarbeiter (höchstens 95 %)           | 3      | 12, 17, 22          | 20.000 € bis 125.000 €  |
+| `strategist`     | Strategieberater     | +4 % Erfolgschance eigener Strategien (höchstens `maxChanceBps`) | 3      | 13, 18, 23          | 25.000 € bis 156.250 €  |
+| `move_tempo`     | Taktgeber            | −15 % Pause, bis ein Geschäftszug wieder bereit ist              | 3      | 16, 21, 26          | 40.000 € bis 250.000 €  |
+| `activist`       | Aktivist             | +5 % Wirkungschance eigener Kampagnen gegen Firmen (ADR-133)     | 3      | 4, 10, 16           | 4.000 € bis 25.000 €    |
+
+- Die XP-Verbesserungen nennen ihre XP-Quellen in `xpSources`; `grant_xp` addiert alle passenden Boni, bevor es
+  rundet. Neue XP-Verbesserungen brauchen darum keinen neuen Code.
+- Boni und Rabatte rechnen mit `apply_bps` („half even“). Rabatte und Boni sind je Verbesserung auf 100 % begrenzt.
+- Tests: `supabase/tests/9a_more_upgrades.sql` (XP, Tresor, Lohn, tägliche Belohnung, Firmenaufgaben,
+  Geschäftszüge, Kampagnen, Strategien, Protest, Ledger-Prüfung), `src/lib/sim/upgrades.test.ts`,
+  `src/lib/sim/company-tasks.test.ts`, `e2e/upgrades-deals.spec.ts`.

@@ -6015,7 +6015,7 @@ Regeln spiegeln `src/lib/sim/upgrades.ts` (`upgradeCostCents`, `upgradeEffects`,
 | Spalte                      | Typ           | Bedeutung                                                        |
 | --------------------------- | ------------- | ---------------------------------------------------------------- |
 | `player_id`                 | `uuid`        | Spieler (`profiles`, `on delete cascade`)                        |
-| `key`                       | `text`        | `vault`, `income`, `study`, `overtime` oder `rhetoric`           |
+| `key`                       | `text`        | Schlüssel aus `upgrade_keys()` (ADR-134: 32 Verbesserungen)      |
 | `level`                     | `integer ≥ 0` | Gekaufte Stufe; gelesen wird immer begrenzt auf 0 bis `maxLevel` |
 | `created_at` / `updated_at` | `timestamptz` | Zeitstempel (`set_updated_at`)                                   |
 
@@ -7241,3 +7241,45 @@ join_protest(p_request_id uuid, p_protest_id bigint) -> wie get_protests
 ```
 
 Intern: `protest_check(id, u, u2)`, `protests_run_due(p_now)` (Cron `nexa-protests`).
+
+## Nachtrag: Mehr Verbesserungen (ADR-134)
+
+Migration `20261204000700_more_upgrades.sql`, Test `supabase/tests/9a_more_upgrades.sql`. Keine neue Tabelle, kein neuer
+RPC, kein neuer Fehlerschlüssel.
+
+- `player_upgrades.key` erlaubt jetzt alle 32 Schlüssel aus `src/config/upgrades.ts` (`upgrade_keys()`). Neu:
+  `vault_xl`, `vault_interest`, `daily_bonus`, `wage_bonus`, `wage_shield`, `trader`, `early_bird`, `mission_hunter`,
+  `teamplayer`, `balance_sheet`, `ambition`, `task_pay`, `task_safety`, `crisis_manager`, `move_luck`, `ad_agency`,
+  `dealmaker`, `ai_turbo`, `ai_precision`, `strategist`, `move_tempo`, `activist`. Der Tresor (`vault`) hat 8 statt 6
+  Stufen.
+- `game_config.upgrades.<key>.xpSources` (nur XP-Verbesserungen): die XP-Quellen (`xp_source`), deren XP die
+  Verbesserung um `perLevel` bps je Stufe erhöht; `"*"` gilt für jede Quelle. `game_config.upgrades.groups` ordnet die
+  Seite in Abschnitte (nur für den Client).
+- `get_upgrades()` und `buy_upgrade()` liefern in `levels` alle 32 Schlüssel. `claim_vault()` liefert zusätzlich
+  `interest_cents`; `claimed_cents` enthält die Tresorzinsen.
+
+| Hilfsfunktion (intern)                    | Formel                                                                               |
+| ----------------------------------------- | ------------------------------------------------------------------------------------ |
+| `player_upgrade_bps(spieler, key)`        | Stufe × `perLevel`, begrenzt auf 0 bis 10 000                                        |
+| `company_upgrade_bps(firma, key)`         | dasselbe für den Gründer der Firma, 0 für KI-Firmen                                  |
+| `player_xp_bonus_bps(spieler, quelle)`    | Summe aller gekauften Verbesserungen, deren `xpSources` die Quelle oder `"*"` nennen |
+| `player_vault_cap_hours(spieler)`         | `economy.vaultCapHours` + `vault` × 2 h + `vault_xl` × 4 h                           |
+| `company_move_rest(zug, cfg, tempo)`      | Minuten × 60 s × (1 + `cooldownFactor` × (10 000 − `move_tempo`) / 10 000)           |
+| `pitch_chance_bps_for(fit, firma)`        | min(`maxChanceBps`, `pitch_chance_bps(fit)` + `strategist`)                          |
+| `company_campaign_cost_cents(firma, art)` | `campaign_cost_cents` − `ad_agency`-Anteil, auf ganze Euro gerundet                  |
+
+Wo die Wirkungen greifen (alle Boni und Rabatte mit `apply_bps`, kaufmännisch „half even“):
+
+| Funktion                                          | Verbesserung                                                                               |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `grant_xp`                                        | XP × (10 000 + `player_xp_bonus_bps`) / 10 000 vor der Rundung; `multiplier_bps` mit Bonus |
+| `claim_vault`                                     | `vault_interest`: Zinsen auf die Auszahlung aus der Staatskasse (`state_pay_partial`)      |
+| `claim_daily_reward`                              | `daily_bonus`: mehr Geld aus der Staatskasse                                               |
+| `accrue_job_salary`                               | `wage_bonus`: Lohnbonus aus der Staatskasse; `wage_shield`: kleinere Krisenkürzung         |
+| `company_task_resolve`                            | `task_pay`: mehr von den Haushalten; `task_safety`: kleinere Strafe                        |
+| `company_task_ai_minutes`, `company_task_to_ai`   | `ai_turbo`: weniger Minuten (mindestens 1); `ai_precision`: höhere Chance (höchstens 95 %) |
+| `company_moves_state`, `company_moves_run_due`    | `move_luck`, `dealmaker` (Auszahlung gelungener Geldzüge), `move_tempo` (Pause)            |
+| `store_pitch_judgment`, `company_pitches_run_due` | `strategist` über `pitch_chance_bps_for`                                                   |
+| `company_event_unit_cents`                        | `crisis_manager`: kleinere Kosteneinheit für Krisen- und Chancen-Schritte und Strategien   |
+| `company_campaign_costs`, `start_campaign`        | `ad_agency` über `company_campaign_cost_cents`                                             |
+| `protest_check`                                   | `activist` des Starters: höhere Wirkungschance, auch über `effectChanceMaxBps` hinaus      |

@@ -1,9 +1,9 @@
 {
-  "id": "9c50caa0-a578-40c0-b694-9b0c7b34c51b",
+  "id": "ea454c30-f918-4594-83e9-d23b108dae3a",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "0e8feb45-71e1-4ddb-8a25-fa3de5532818",
+    "id": "0a16e304-9d52-47ad-8351-9bf45ff8928e",
     "tier": "intern",
     "title": null,
     "company": {
@@ -19,9 +19,9 @@
     "title_key": "it_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-14T13:53:29.094849+00:00",
-  "updated_at": "2026-11-14T13:53:29.10074+00:00",
-  "offer_expires_at": "2026-11-16T13:53:29.094849+00:00",
+  "created_at": "2026-11-14T14:35:14.712622+00:00",
+  "updated_at": "2026-11-14T14:35:14.716486+00:00",
+  "offer_expires_at": "2026-11-16T14:35:14.712622+00:00",
   "salary_wish_cents_per_hour": 15900,
   "offer_salary_cents_per_hour": 15900
 }

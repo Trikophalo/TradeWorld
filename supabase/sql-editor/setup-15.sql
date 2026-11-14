@@ -813,6 +813,1199 @@ begin
 end;
 $do$;
 
+-- ===== supabase/migrations/20261204000700_more_upgrades.sql =====
+-- =============================================================================
+-- NEXA · 0700 · More upgrades: money, XP, a bigger vault (ADR-134)
+-- =============================================================================
+-- 22 new upgrades (src/config/upgrades.ts, game_config.upgrades) and two more vault stages (vault: 8 instead of 6).
+-- Mirrors src/lib/sim/upgrades.ts (upgradeEffects, xpBonusBps, xpWithUpgrades, withBonusCents, discountedCents,
+-- shieldedMoodBps, moveRestMs) and src/lib/sim/company-tasks.ts (taskResultCents, aiMinutes with upgrades).
+-- Every effect lives in one place on the server:
+--   XP        grant_xp(): + player_xp_bonus_bps(player, source), the sum of every bought upgrade whose
+--             upgrades.<key>.xpSources names the source or "*" (trader, early_bird, mission_hunter, teamplayer,
+--             balance_sheet, ambition)
+--   vault     player_vault_cap_hours(): + vault_xl hours; claim_vault(): vault_interest bps of the claim on top
+--   money     claim_daily_reward(): daily_bonus; accrue_job_salary(): wage_bonus on top of every wage payment,
+--             wage_shield shrinks the crisis wage cut (ADR-131)
+--   company   (always the upgrades of the company's founder, company_upgrade_bps)
+--             company_task_resolve(): task_pay, task_safety; company_task_ai_minutes(): ai_turbo;
+--             company_task_to_ai(): ai_precision; company_moves_state() / company_moves_run_due(): move_luck,
+--             dealmaker, move_tempo (company_move_rest); pitch_chance_bps_for() in store_pitch_judgment() and
+--             company_pitches_run_due(): strategist; company_event_unit_cents(): crisis_manager (every step of
+--             crises and chances and own strategies for them); company_campaign_cost_cents() in
+--             company_campaign_costs() and start_campaign(): ad_agency
+--   protests  protest_check(): activist of the starter
+-- Money stays a closed system: bonus money comes from the treasury (state_pay_partial, as far as it has the money)
+-- or the households (company tasks, business moves, as before); discounts only lower what flows to the households.
+-- New internal helpers: upgrade_keys(), player_upgrade_bps(), company_upgrade_bps(), player_xp_bonus_bps(),
+-- company_move_rest(), pitch_chance_bps_for(), company_campaign_cost_cents(). No new RPCs, no new error keys.
+-- claim_vault answers claimed_cents (with the interest) and interest_cents.
+-- Idempotent: runs unchanged as supabase/updates/20261204000700_more_upgrades.sql.
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- A. Schema: every key of src/config/upgrades.ts
+-- ---------------------------------------------------------------------------
+alter table public.player_upgrades drop constraint if exists player_upgrades_key_check;
+alter table public.player_upgrades add constraint player_upgrades_key_check
+  check (key in ('vault', 'vault_xl', 'vault_interest', 'income', 'daily_bonus', 'study', 'mentor', 'overtime',
+                 'rhetoric', 'wage_bonus', 'wage_shield', 'trader', 'early_bird', 'mission_hunter', 'teamplayer',
+                 'balance_sheet', 'ambition', 'efficiency', 'task_pay', 'task_safety', 'crisis_manager', 'move_luck',
+                 'ad_agency', 'dealmaker', 'ai_turbo', 'ai_precision', 'strategist', 'move_tempo', 'artist', 'activist',
+                 'makler', 'crypto_wallet'));
+comment on table public.player_upgrades is
+  'Upgrades bought with game money (ADR-093, ADR-100, ADR-134): one row per player and key, level '
+  '0..upgrades.<key>.maxLevel. Owner read; written only by buy_upgrade.';
+
+-- ---------------------------------------------------------------------------
+-- B. Upgrade rules: keys, defaults, levels
+-- ---------------------------------------------------------------------------
+-- All keys in the order of the upgrades page (UPGRADES.order)
+create or replace function public.upgrade_keys()
+returns text[]
+language sql
+immutable
+set search_path = ''
+as $$
+  select array['vault', 'vault_xl', 'vault_interest', 'income', 'daily_bonus', 'study', 'mentor', 'overtime', 'rhetoric',
+               'wage_bonus', 'wage_shield', 'trader', 'early_bird', 'mission_hunter', 'teamplayer', 'balance_sheet',
+               'ambition', 'efficiency', 'task_pay', 'task_safety', 'crisis_manager', 'move_luck', 'ad_agency',
+               'dealmaker', 'ai_turbo', 'ai_precision', 'strategist', 'move_tempo', 'artist', 'activist', 'makler',
+               'crypto_wallet'];
+$$;
+comment on function public.upgrade_keys() is 'Internal: every upgrade key (ADR-134), in the order of UPGRADES.order.';
+
+-- Config of one upgrade: the defaults of src/config/upgrades.ts, overridden by game_config upgrades.<key>; null for an
+-- unknown key.
+create or replace function public.upgrade_cfg(p_key text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select d.v || coalesce(case when jsonb_typeof(c.v) = 'object' then c.v end, '{}'::jsonb)
+    from (select '{"vault": {"maxLevel": 8, "minLevel": 1, "levelStep": 2, "baseCostCents": 300000, "costGrowth": 2, "perLevel": 2},
+"vault_xl": {"maxLevel": 3, "minLevel": 14, "levelStep": 6, "baseCostCents": 10000000, "costGrowth": 2, "perLevel": 4},
+"vault_interest": {"maxLevel": 4, "minLevel": 3, "levelStep": 3, "baseCostCents": 500000, "costGrowth": 2.5, "perLevel": 500},
+"income": {"maxLevel": 3, "minLevel": 3, "levelStep": 4, "baseCostCents": 400000, "costGrowth": 3, "perLevel": 1000},
+"daily_bonus": {"maxLevel": 3, "minLevel": 2, "levelStep": 4, "baseCostCents": 250000, "costGrowth": 3, "perLevel": 2500},
+"study": {"maxLevel": 3, "minLevel": 2, "levelStep": 4, "baseCostCents": 800000, "costGrowth": 3, "perLevel": 1},
+"mentor": {"maxLevel": 3, "minLevel": 4, "levelStep": 4, "baseCostCents": 600000, "costGrowth": 3, "perLevel": 1000},
+"overtime": {"maxLevel": 2, "minLevel": 5, "levelStep": 6, "baseCostCents": 2000000, "costGrowth": 3, "perLevel": 1},
+"rhetoric": {"maxLevel": 3, "minLevel": 5, "levelStep": 5, "baseCostCents": 1000000, "costGrowth": 2.5, "perLevel": 500},
+"wage_bonus": {"maxLevel": 3, "minLevel": 3, "levelStep": 5, "baseCostCents": 600000, "costGrowth": 3, "perLevel": 500},
+"wage_shield": {"maxLevel": 3, "minLevel": 6, "levelStep": 5, "baseCostCents": 800000, "costGrowth": 2.5, "perLevel": 2500},
+"trader": {"maxLevel": 3, "minLevel": 1, "levelStep": 3, "baseCostCents": 200000, "costGrowth": 2.5, "perLevel": 1000, "xpSources": ["trade"]},
+"early_bird": {"maxLevel": 3, "minLevel": 1, "levelStep": 4, "baseCostCents": 150000, "costGrowth": 3, "perLevel": 2000, "xpSources": ["daily_login", "streak_bonus"]},
+"mission_hunter": {"maxLevel": 3, "minLevel": 2, "levelStep": 4, "baseCostCents": 300000, "costGrowth": 2.5, "perLevel": 1000, "xpSources": ["mission"]},
+"teamplayer": {"maxLevel": 3, "minLevel": 6, "levelStep": 4, "baseCostCents": 800000, "costGrowth": 2.5, "perLevel": 1500, "xpSources": ["work_task"]},
+"balance_sheet": {"maxLevel": 3, "minLevel": 9, "levelStep": 5, "baseCostCents": 1500000, "costGrowth": 2.5, "perLevel": 1500, "xpSources": ["company_quarter_profit", "ipo_success"]},
+"ambition": {"maxLevel": 3, "minLevel": 18, "levelStep": 6, "baseCostCents": 10000000, "costGrowth": 2, "perLevel": 500, "xpSources": ["*"]},
+"efficiency": {"maxLevel": 3, "minLevel": 6, "levelStep": 4, "baseCostCents": 1200000, "costGrowth": 2.5, "perLevel": 500},
+"task_pay": {"maxLevel": 3, "minLevel": 7, "levelStep": 4, "baseCostCents": 1000000, "costGrowth": 2.5, "perLevel": 1000},
+"task_safety": {"maxLevel": 3, "minLevel": 7, "levelStep": 5, "baseCostCents": 600000, "costGrowth": 2.5, "perLevel": 2500},
+"crisis_manager": {"maxLevel": 3, "minLevel": 7, "levelStep": 5, "baseCostCents": 1000000, "costGrowth": 2.5, "perLevel": 1000},
+"move_luck": {"maxLevel": 3, "minLevel": 8, "levelStep": 4, "baseCostCents": 1200000, "costGrowth": 2.5, "perLevel": 300},
+"ad_agency": {"maxLevel": 3, "minLevel": 9, "levelStep": 4, "baseCostCents": 1200000, "costGrowth": 2.5, "perLevel": 1000},
+"dealmaker": {"maxLevel": 3, "minLevel": 10, "levelStep": 5, "baseCostCents": 2000000, "costGrowth": 2.5, "perLevel": 1000},
+"ai_turbo": {"maxLevel": 3, "minLevel": 11, "levelStep": 4, "baseCostCents": 1500000, "costGrowth": 2.5, "perLevel": 1500},
+"ai_precision": {"maxLevel": 3, "minLevel": 12, "levelStep": 5, "baseCostCents": 2000000, "costGrowth": 2.5, "perLevel": 500},
+"strategist": {"maxLevel": 3, "minLevel": 13, "levelStep": 5, "baseCostCents": 2500000, "costGrowth": 2.5, "perLevel": 400},
+"move_tempo": {"maxLevel": 3, "minLevel": 16, "levelStep": 5, "baseCostCents": 4000000, "costGrowth": 2.5, "perLevel": 1500},
+"artist": {"maxLevel": 3, "minLevel": 4, "levelStep": 3, "baseCostCents": 500000, "costGrowth": 2.5, "perLevel": 1000},
+"activist": {"maxLevel": 3, "minLevel": 4, "levelStep": 6, "baseCostCents": 400000, "costGrowth": 2.5, "perLevel": 500},
+"makler": {"maxLevel": 3, "minLevel": 8, "levelStep": 4, "baseCostCents": 1500000, "costGrowth": 2.5, "perLevel": 500},
+"crypto_wallet": {"maxLevel": 2, "minLevel": 10, "levelStep": 5, "baseCostCents": 2000000, "costGrowth": 3, "perLevel": 2500}}'::jsonb
+                 -> p_key as v) d
+   cross join lateral (select public.config_jsonb('upgrades', array[p_key]) as v) c
+   where d.v is not null;
+$$;
+comment on function public.upgrade_cfg(text) is 'Internal: game_config upgrades.<key> with the defaults of src/config/upgrades.ts.';
+
+-- all keys, always
+create or replace function public.player_upgrade_levels(p_player uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_object_agg(k, public.player_upgrade_level(p_player, k)) from unnest(public.upgrade_keys()) k;
+$$;
+comment on function public.player_upgrade_levels(uuid) is 'Internal: {<key>: level} of every upgrade key (ADR-134).';
+
+-- level x perLevel of a bonus or discount upgrade, 0..10 000 bps
+create or replace function public.player_upgrade_bps(p_player uuid, p_key text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when p_player is null then 0
+              else least(10000, greatest(0, round(public.player_upgrade_level(p_player, p_key)
+                                                  * coalesce(public.cfg_num(public.upgrade_cfg(p_key), '{perLevel}', 0), 0))))::integer end;
+$$;
+comment on function public.player_upgrade_bps(uuid, text) is
+  'Internal (ADR-134): level x perLevel of a player''s upgrade in bps (0..10 000), 0 for no player.';
+
+-- the same for the founder of a company (0 for AI companies)
+create or replace function public.company_upgrade_bps(p_company uuid, p_key text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select public.player_upgrade_bps(pc.founder_id, p_key) from public.player_companies pc
+                    where pc.company_id = p_company), 0);
+$$;
+comment on function public.company_upgrade_bps(uuid, text) is
+  'Internal (ADR-134): an upgrade of the company''s founder in bps; 0 for AI companies.';
+
+-- xpBonusBps: the sum over the bought upgrades whose xpSources name the source or "*"
+create or replace function public.player_xp_bonus_bps(p_player uuid, p_source text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(sum(least(10000, greatest(0, round(least(u.level, public.cfg_num(c.cfg, '{maxLevel}', 0))
+                                                       * public.cfg_num(c.cfg, '{perLevel}', 0))))), 0)::integer
+    from public.player_upgrades u
+   cross join lateral (select public.upgrade_cfg(u.key) as cfg) c
+   where u.player_id = p_player and u.level > 0 and c.cfg is not null
+     and jsonb_typeof(c.cfg -> 'xpSources') = 'array'
+     and (c.cfg -> 'xpSources' ? p_source or c.cfg -> 'xpSources' ? '*');
+$$;
+comment on function public.player_xp_bonus_bps(uuid, text) is
+  'Internal (ADR-134, xpBonusBps): extra XP of a source in bps from the XP upgrades of a player.';
+
+-- upgradeEffects().vaultCapHours: vault and vault_xl
+create or replace function public.player_vault_cap_hours(p_player uuid)
+returns double precision
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select public.config_double('economy', '{vaultCapHours}', 8)
+       + public.player_upgrade_level(p_player, 'vault') * public.cfg_num(public.upgrade_cfg('vault'), '{perLevel}', 2)
+       + public.player_upgrade_level(p_player, 'vault_xl') * public.cfg_num(public.upgrade_cfg('vault_xl'), '{perLevel}', 4);
+$$;
+
+create or replace function public.get_upgrades()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  return jsonb_build_object('levels', public.player_upgrade_levels(public.require_player()));
+end;
+$$;
+comment on function public.get_upgrades() is
+  'RPC: {levels: {<key>: level}} of the caller, every key of upgrade_keys() (ADR-093, ADR-100, ADR-134).';
+
+-- moveRestMs: a move can run again after its minutes plus minutes x cooldownFactor of rest, less move_tempo
+create or replace function public.company_move_rest(p_move jsonb, p_cfg jsonb, p_tempo_bps integer)
+returns interval
+language sql
+immutable
+set search_path = ''
+as $$
+  select make_interval(secs => (p_move ->> 'minutes')::integer * 60
+                               * (1 + coalesce((p_cfg ->> 'cooldownFactor')::integer, 2)
+                                      * (10000 - least(10000, greatest(0, coalesce(p_tempo_bps, 0)))) / 10000.0));
+$$;
+comment on function public.company_move_rest(jsonb, jsonb, integer) is
+  'Internal (ADR-127, ADR-134): time from the start of a business move until it can run again.';
+
+-- chance of an own strategy with the founder's strategist upgrade, at most pitches.maxChanceBps
+create or replace function public.pitch_chance_bps_for(p_fit integer, p_company uuid)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select least((public.pitches_cfg() ->> 'maxChanceBps')::integer,
+               public.pitch_chance_bps(p_fit) + public.company_upgrade_bps(p_company, 'strategist'));
+$$;
+comment on function public.pitch_chance_bps_for(integer, uuid) is
+  'Internal (ADR-132, ADR-134): pitch_chance_bps plus the founder''s strategist upgrade, at most maxChanceBps.';
+
+-- ---------------------------------------------------------------------------
+-- C. Company: crisis steps (crisis_manager), campaigns (ad_agency), AI minutes (ai_turbo)
+-- ---------------------------------------------------------------------------
+-- The cost unit of crisis and chance steps (and own strategies for them), less the founder's crisis_manager
+create or replace function public.company_event_unit_cents(p_company uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select y.u - public.apply_bps(y.u, public.company_upgrade_bps(p_company, 'crisis_manager'))
+    from (select greatest(public.cfg_num(c, '{costUnit,minUnitCents}', 20000)::bigint,
+                          round(public.company_fixed_cost_cents(pc.tier, pc.expansion_level)::numeric
+                                * public.cfg_num(c, '{costUnit,unitShareOfFixed}', 0.5)::numeric)::bigint) as u
+            from public.player_companies pc, (select public.company_events_cfg() as c) x
+           where pc.company_id = p_company) y;
+$$;
+
+-- campaign_cost_cents less the founder's ad_agency, in whole euros
+create or replace function public.company_campaign_cost_cents(p_company uuid, p_kind text)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select (round((x.c - public.apply_bps(x.c, public.company_upgrade_bps(p_company, 'ad_agency')))::numeric / 100) * 100)::bigint
+    from (select public.campaign_cost_cents(p_kind, public.company_campaign_base_cents(p_company)) as c) x;
+$$;
+comment on function public.company_campaign_cost_cents(uuid, text) is
+  'Internal (ADR-097, ADR-134): price of a marketing campaign of a company with the founder''s ad_agency upgrade.';
+
+-- COMPANY.campaign_costs: {flyer, online, tv}
+create or replace function public.company_campaign_costs(p_company uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_object_agg(k.kind, public.company_campaign_cost_cents(p_company, k.kind))
+    from (values ('flyer'), ('online'), ('tv')) k(kind);
+$$;
+
+-- Minutes the AI needs for a task right now: slower with every task it already works on, faster with ai_turbo
+create or replace function public.company_task_ai_minutes(p_company uuid)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select greatest(1, ceil((c -> 'ai' ->> 'minutes')::numeric
+              * (1 + (select count(*) from public.company_tasks t where t.company_id = p_company and t.status = 'ai')
+                   * (c -> 'ai' ->> 'slowdownPerQueuedBps')::numeric / 10000)
+              * (10000 - public.company_upgrade_bps(p_company, 'ai_turbo')) / 10000))::integer
+    from (select public.company_tasks_cfg() as c) x;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- D. Redefined functions (latest definitions plus the upgrade hooks, marked ADR-134)
+-- ---------------------------------------------------------------------------
+
+create or replace function public.buy_upgrade(p_request_id uuid, p_key text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid;
+  v_replay  jsonb;
+  v_level   integer;
+  v_cost    bigint;
+  v_cash    bigint;
+  v_old_cap double precision;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_key is null or not (p_key = any (public.upgrade_keys())) then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'buy_upgrade');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_cash := public.lock_player_accounts(v_player);
+  if p_key in ('vault', 'vault_xl') then
+    perform 1 from public.vaults where player_id = v_player for update;
+  end if;
+  v_level := public.player_upgrade_level(v_player, p_key);
+  v_cost := public.upgrade_cost_cents(p_key, v_level);
+  if v_cost is null then
+    perform public.api_error('upgrade_maxed');
+  end if;
+  -- every further stage needs a higher player level (ADR-100, upgradeStageLevel)
+  if coalesce((select p.level from public.profiles p where p.id = v_player), 0) < public.upgrade_stage_level(p_key, v_level) then
+    perform public.api_error('locked');
+  end if;
+  if v_cash < v_cost then
+    perform public.api_error('insufficient_funds');
+  end if;
+  v_old_cap := greatest(0, public.player_vault_cap_hours(v_player));
+  perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'), public.ledger_system_account('treasury'),
+                                 v_cost, 'upgrade_purchase', 'Verbesserung gekauft', 'upgrade', null,
+                                 'upgrade:' || v_player::text || ':' || p_key || ':' || p_request_id::text, v_player,
+                                 jsonb_build_object('key', p_key, 'level', v_level + 1));
+  insert into public.player_upgrades (player_id, key, level) values (v_player, p_key, v_level + 1)
+  on conflict (player_id, key) do update set level = excluded.level;
+  -- a bigger vault keeps what it holds and fills on from there: the time it stood full earns nothing afterwards
+  if p_key in ('vault', 'vault_xl') then
+    update public.vaults v
+       set accrual_started_at = greatest(v.accrual_started_at, public.game_now() - make_interval(secs => v_old_cap * 3600)),
+           full_notified_at = null
+     where v.player_id = v_player;
+  end if;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'key',        p_key,
+    'level',      v_level + 1,
+    'cost_cents', v_cost,
+    'levels',     public.player_upgrade_levels(v_player)));
+end;
+$$;
+
+create or replace function public.grant_xp(
+  p_player     uuid,
+  p_source     public.xp_source,
+  p_base_xp    integer,
+  p_dedupe_key text default null,
+  p_ref_type   text default null,
+  p_ref_id     uuid default null
+)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_prog   jsonb := coalesce(public.config_jsonb('progression'), '{}'::jsonb);
+  v_mult   double precision := public.cfg_num(v_prog, '{xpMultiplier}', 2);
+  v_day    date := (public.game_now() at time zone 'Europe/Berlin')::date;
+  v_amount integer;
+  v_cap    integer;
+  v_count  integer;
+  v_id     bigint;
+  v_total  bigint;
+  v_old    integer;
+  v_level  integer;
+  v_bonus  integer := 0;
+begin
+  if p_player is null or p_base_xp is null or p_base_xp <= 0 then
+    return 0;
+  end if;
+  -- ADR-134: XP upgrades of the source (trader, early_bird, mission_hunter, teamplayer, balance_sheet, ambition)
+  v_bonus := public.player_xp_bonus_bps(p_player, p_source::text);
+  v_amount := greatest(0, round(p_base_xp * v_mult * (10000 + v_bonus) / 10000.0))::integer;
+  if v_amount <= 0 then
+    return 0;
+  end if;
+
+  if p_source = 'trade' then
+    v_cap := public.cfg_num(v_prog, '{xpSources,trade,maxTradesPerDay}', 30)::integer;
+    select c.event_count into v_count
+      from public.xp_daily_counters c
+     where c.player_id = p_player and c.game_day = v_day and c.source = p_source
+       for update;
+    if coalesce(v_count, 0) >= v_cap then
+      return 0;
+    end if;
+  end if;
+
+  insert into public.xp_events (player_id, source, amount, multiplier_bps, ref_type, ref_id, dedupe_key, game_day)
+  values (p_player, p_source, v_amount, round(v_mult * (10000 + v_bonus))::integer, p_ref_type, p_ref_id, p_dedupe_key, v_day)
+  on conflict (player_id, dedupe_key) do nothing
+  returning id into v_id;
+  if v_id is null then
+    return 0;
+  end if;
+
+  insert into public.xp_daily_counters as c (player_id, game_day, source, event_count, xp_sum)
+  values (p_player, v_day, p_source, 1, v_amount)
+  on conflict (player_id, game_day, source)
+  do update set event_count = c.event_count + 1, xp_sum = c.xp_sum + excluded.xp_sum;
+
+  select p.level into v_old from public.profiles p where p.id = p_player for update;
+  update public.profiles p set xp_total = p.xp_total + v_amount where p.id = p_player
+  returning p.xp_total into v_total;
+  v_level := greatest(v_old, public.level_for_xp(v_total));
+  update public.profiles p set level = v_level where p.id = p_player and p.level <> v_level;
+  update public.xp_events e set level_after = v_level where e.id = v_id;
+
+  if v_level > v_old then
+    perform public.skill_points_ensure(p_player);
+    update public.player_skill_points
+       set free_points = free_points
+                       + (v_level - v_old) * greatest(0, public.config_double('skills', '{freePointsPerLevel}', 1))::integer
+     where player_id = p_player;
+  end if;
+
+  insert into public.player_unlocks (player_id, unlock_key)
+  select p_player, u.key from public.unlocks u where u.level <= v_level
+  on conflict do nothing;
+
+  return v_amount;
+end;
+$$;
+
+create or replace function public.claim_vault(p_request_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid;
+  v_replay  jsonb;
+  v_status  jsonb;
+  v_amount  bigint;
+  v_now     timestamptz := public.game_now();
+  v_tx      uuid;
+  v_total   integer;
+  v_counted integer;
+  v_hours   double precision;
+  v_bonus   bigint := 0;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'claim_vault');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  if not public.rate_limit_hit(v_player, 'player_action',
+           greatest(1, public.config_double('abuse', '{rateLimits,actionsPerMinute}', 60))::integer, 60) then
+    perform public.api_error('rate_limited');
+  end if;
+  perform public.lock_player_accounts(v_player);
+  perform 1 from public.vaults where player_id = v_player for update;
+  v_hours := greatest(0, public.player_vault_cap_hours(v_player));
+  v_status := public.vault_status(v_player);
+  v_amount := coalesce((v_status ->> 'accrued_cents')::bigint, 0);
+  if v_amount < greatest(1, public.config_bigint('economy', '{vaultMinClaimCents}', 100)) then
+    perform public.api_error('nothing_to_claim');
+  end if;
+
+  v_tx := public.state_payout(v_player, v_amount, 0, 'vault_claim', 'Grundeinkommen aus dem Tresor', 'vault', null,
+                              'vault:' || v_player::text || ':' || p_request_id::text);
+  perform public.loan_withhold(v_player, v_amount, 'vault:' || v_player::text || ':' || p_request_id::text);
+  -- ADR-134 vault_interest: bps of the claim on top, from the treasury (as far as it has the money)
+  v_bonus := public.state_pay_partial(v_player, public.apply_bps(v_amount, public.player_upgrade_bps(v_player, 'vault_interest')),
+                                      'vault_claim', 'Tresorzinsen (Verbesserung)',
+                                      'vault_interest:' || v_player::text || ':' || p_request_id::text);
+  perform public.loan_withhold(v_player, v_bonus, 'vault_interest:' || v_player::text || ':' || p_request_id::text);
+
+  select greatest(0, floor(extract(epoch from (v_now - v.accrual_started_at))))::integer into v_total
+    from public.vaults v where v.player_id = v_player;
+  v_counted := (v_status ->> 'accrued_seconds')::integer;
+  insert into public.vault_claims (player_id, request_id, amount_cents, accrued_seconds, forfeited_seconds, ledger_transaction_id)
+  values (v_player, p_request_id, v_amount, v_counted, greatest(0, v_total - v_counted), v_tx)
+  on conflict (player_id, request_id) do nothing;
+  update public.vaults
+     set accrual_started_at = v_now, last_claimed_at = v_now,
+         total_claimed_cents = total_claimed_cents + v_amount, full_notified_at = null
+   where player_id = v_player;
+  perform public.mission_event(v_player, 'vault_claim', 1, null);
+
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'claimed_cents', v_amount + v_bonus,
+    'interest_cents', v_bonus,
+    'cash_cents',    (select a.balance_cents from public.ledger_accounts a where a.owner_player_id = v_player and a.kind = 'player_cash'),
+    'full_at',       v_now + make_interval(secs => v_hours * 3600),
+    'factor_bps',    (v_status ->> 'factor_bps')::integer));
+end;
+$$;
+
+create or replace function public.claim_daily_reward(p_request_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid;
+  v_replay  jsonb;
+  v_today   date := (public.game_now() at time zone 'Europe/Berlin')::date;
+  v_monday  date;
+  v_next    jsonb;
+  v_day     integer;
+  v_cell    jsonb;
+  v_old_lvl integer;
+  v_xp      integer;
+  v_cash    bigint := 0;
+  v_sp      integer;
+  v_streak  integer;
+  v_freeze  boolean;
+  ls        public.login_streaks;
+  v_prof    public.profiles;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'claim_daily_reward');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_monday := v_today - (extract(isodow from v_today)::integer - 1);
+  perform public.lock_player_accounts(v_player);
+  insert into public.login_streaks (player_id) values (v_player) on conflict do nothing;
+  select * into ls from public.login_streaks where player_id = v_player for update;
+  if exists (select 1 from public.daily_reward_claims c where c.player_id = v_player and c.claim_day = v_today) then
+    perform public.api_error('daily_reward_claimed');
+  end if;
+
+  v_next := public.daily_reward_next(v_player);
+  v_day := (v_next ->> 'day')::integer;
+  v_freeze := (v_next ->> 'freeze_needed')::boolean;
+  if ls.freeze_granted_week is null or ls.freeze_granted_week < v_monday then
+    ls.freeze_tokens := public.config_double('dailyRewards', '{freezesPerWeek}', 1)::smallint;
+    ls.freeze_granted_week := v_monday;
+  end if;
+
+  -- daily check-in: streak and mission event (once per day, shared with daily_check_in)
+  if ls.last_login_day is distinct from v_today then
+    if ls.last_login_day = v_today - 1 then
+      v_streak := ls.current_streak + 1;
+    elsif ls.last_login_day = v_today - 2 and (v_freeze or ls.freeze_tokens > 0) then
+      v_streak := ls.current_streak + 1;
+      v_freeze := true;
+    else
+      v_streak := 1;
+    end if;
+    insert into public.daily_logins (player_id, login_day, streak_day, xp_awarded, freeze_used)
+    values (v_player, v_today, v_streak, 0, v_freeze)
+    on conflict do nothing;
+    perform public.mission_event(v_player, 'check_in', 1, v_today::text);
+  else
+    v_streak := ls.current_streak;
+  end if;
+  if v_freeze then
+    ls.freeze_tokens := greatest(0, ls.freeze_tokens - 1);
+  end if;
+  update public.login_streaks
+     set current_streak = v_streak, longest_streak = greatest(longest_streak, v_streak), last_login_day = v_today,
+         freeze_tokens = ls.freeze_tokens, freeze_granted_week = ls.freeze_granted_week,
+         reward_cycle_day = v_day, reward_last_day = v_today
+   where player_id = v_player;
+
+  -- rewards of the cycle day
+  v_cell := coalesce(public.config_jsonb('dailyRewards', '{cycle}'), '[]'::jsonb) -> (v_day - 1);
+  select p.level into v_old_lvl from public.profiles p where p.id = v_player;
+  v_xp := public.grant_xp(v_player, 'daily_login', coalesce((v_cell ->> 'xp')::integer, 0),
+                          'daily_reward:' || v_today::text, 'daily_reward', null);
+  -- ADR-134 daily_bonus: more cash, from the treasury as before
+  v_cash := public.state_pay_partial(v_player,
+                                     public.apply_bps(greatest(0, coalesce((v_cell ->> 'cashCents')::bigint, 0)),
+                                                      10000 + public.player_upgrade_bps(v_player, 'daily_bonus')),
+                                     'login_bonus',
+                                     'Tägliche Belohnung, Tag ' || v_day, 'daily_reward:' || v_player::text || ':' || v_today::text);
+  perform public.loan_withhold(v_player, v_cash, 'daily_reward:' || v_player::text || ':' || v_today::text);
+  v_sp := greatest(0, coalesce((v_cell ->> 'skillPoints')::integer, 0));
+  if v_sp > 0 then
+    perform public.skill_points_ensure(v_player);
+    update public.player_skill_points set free_points = free_points + v_sp where player_id = v_player;
+  end if;
+  insert into public.daily_reward_claims (player_id, claim_day, cycle_day, xp_awarded, cash_cents, skill_points, freeze_used)
+  values (v_player, v_today, v_day, v_xp, v_cash, v_sp, v_freeze);
+
+  select * into v_prof from public.profiles where id = v_player;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'day', v_day, 'xp', v_xp, 'cash_cents', v_cash, 'skill_points', v_sp, 'streak_days', v_streak,
+    'level', v_prof.level, 'xp_total', v_prof.xp_total, 'leveled_up', v_prof.level > v_old_lvl,
+    'freeze_used', v_freeze));
+end;
+$$;
+
+create or replace function public.accrue_job_salary(p_job_id uuid, p_now timestamptz default null)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now     timestamptz := coalesce(p_now, public.game_now());
+  j         public.player_jobs;
+  v_ai      boolean;
+  v_day     date := (coalesce(p_now, public.game_now()) at time zone 'Europe/Berlin')::date;
+  v_paid    integer;
+  v_elapsed integer;
+  v_minutes integer;
+  v_amount  bigint;
+  v_pay     bigint := 0;
+  v_company uuid;
+  v_bal     bigint;
+  v_tx      uuid;
+  v_xph     double precision;
+  v_hours   integer;
+  v_xp      integer := 0;
+  v_pres    integer := 10000;
+  v_hpp     double precision;
+  v_nb      integer;
+  v_share   integer;
+  v_bwm     jsonb;
+  v_base    bigint;
+  v_bp      jsonb;
+  v_before  integer;
+  v_full    bigint;
+  v_mood    integer := 10000;
+  v_bonus   bigint;
+  r         record;
+  k         integer := 0;
+begin
+  select * into j from public.player_jobs where id = p_job_id and status = 'active' for update;
+  if j.id is null then
+    return 0;
+  end if;
+  v_elapsed := floor(extract(epoch from (v_now - j.last_paid_at)) / 60)::integer;
+  if v_elapsed < 1 then
+    return 0;
+  end if;
+  v_hpp := greatest(1, public.player_work_hours_per_branch_point(j.player_id));
+  v_paid := case when j.paid_day = v_day then j.paid_minutes_today else 0 end;
+  v_minutes := least(v_elapsed, greatest(0, (public.player_paid_hours_cap(j.player_id) * 60)::integer - v_paid));
+  select c.is_ai into v_ai from public.companies c where c.id = j.company_id;
+
+  if v_minutes > 0 then
+    -- presence (ADR-103): the share of the wage for these minutes, from the hours the player had been away by then
+    -- (10 000 while active); it lowers the wage, the XP and what a player company pays
+    v_pres := public.presence_pay_bps_between(j.player_id, j.last_paid_at, v_minutes);
+    v_base := j.salary_cents_per_hour * v_minutes * v_pres / 600000;
+    -- player companies pay the contract wage x pay factor of the quarter (ADR-058)
+    v_amount := v_base * coalesce((select pc.pay_factor_bps from public.player_companies pc
+                                    where pc.company_id = j.company_id and pc.status = 'active'), 10000) / 10000;
+    -- ADR-131: crises, scandals and a falling share price cut the wage
+    v_full := v_amount;
+    v_mood := public.company_pay_mood_bps(j.company_id);
+    -- ADR-134 wage_shield: the cut shrinks by the shield's bps
+    v_mood := 10000 - (greatest(0, 10000 - v_mood) * (10000 - public.player_upgrade_bps(j.player_id, 'wage_shield'))) / 10000;
+    v_amount := v_amount * v_mood / 10000;
+    select a.id, a.balance_cents into v_company, v_bal
+      from public.ledger_accounts a where a.owner_company_id = j.company_id and a.kind = 'company_cash';
+    v_pay := least(v_amount, greatest(coalesce(v_bal, 0), 0));
+    if v_pay > 0 then
+      v_tx := public.ledger_transfer(v_company, public.ledger_player_account(j.player_id, 'player_cash'), v_pay, 'salary',
+                                     'Lohn', 'player_job', j.id,
+                                     'salary:' || j.id::text || ':' || to_char(v_now, 'YYYYMMDDHH24MISSUS'), j.player_id);
+      perform public.loan_withhold(j.player_id, v_pay, 'salary:' || j.id::text || ':' || to_char(v_now, 'YYYYMMDDHH24MISSUS'));
+      -- ADR-134 wage_bonus: bps of the wage on top, from the treasury (as far as it has the money)
+      v_bonus := public.state_pay_partial(j.player_id, public.apply_bps(v_pay, public.player_upgrade_bps(j.player_id, 'wage_bonus')),
+                                          'salary', 'Lohnbonus (Verbesserung)',
+                                          'salary_bonus:' || j.id::text || ':' || to_char(v_now, 'YYYYMMDDHH24MISSUS'));
+      perform public.loan_withhold(j.player_id, v_bonus,
+                                   'salary_bonus:' || j.id::text || ':' || to_char(v_now, 'YYYYMMDDHH24MISSUS'));
+    end if;
+    -- work XP per full paid hour (player companies: workHour.playerCompanyMultiplier)
+    v_xph := public.config_double('progression', '{xpSources,workHour,xp}', 40)
+           * case when v_ai then 1 else public.config_double('progression', '{xpSources,workHour,playerCompanyMultiplier}', 1.5) end;
+    v_hours := (j.experience_minutes + v_minutes) / 60 - j.experience_minutes / 60;
+    if v_hours > 0 then
+      -- mentor upgrade (ADR-100): work XP x workXpBps / 10 000; presence share as for the wage (ADR-103)
+      v_xp := public.grant_xp(j.player_id, 'work_hour',
+                              round(v_xph * v_hours * public.player_work_xp_bps(j.player_id) / 10000.0 * v_pres / 10000.0)::integer,
+                              'work:' || j.id::text || ':' || ((j.experience_minutes + v_minutes) / 60), 'player_job', j.id);
+    end if;
+    insert into public.salary_payouts (player_job_id, player_id, pay_day, period_start, period_end, minutes_paid, amount_cents,
+                                       xp_awarded, ledger_transaction_id, base_amount_cents)
+    values (j.id, j.player_id, v_day, j.last_paid_at, v_now, v_minutes, v_pay, v_xp, v_tx, v_base);
+
+    -- branch work minutes and branch points (work hours per point with the study upgrade)
+    perform public.skill_points_ensure(j.player_id);
+    select sp.branch_work_minutes, sp.branch_points into v_bwm, v_bp
+      from public.player_skill_points sp where sp.player_id = j.player_id for update;
+    v_nb := greatest(1, jsonb_array_length(j.required));
+    for r in select x ->> 'branch' as branch from jsonb_array_elements(j.required) x loop
+      v_share := v_minutes / v_nb + case when k = 0 then v_minutes % v_nb else 0 end;
+      v_before := coalesce((v_bwm ->> r.branch)::integer, 0);
+      v_bwm := jsonb_set(v_bwm, array[r.branch], to_jsonb(v_before + v_share));
+      v_bp := jsonb_set(v_bp, array[r.branch], to_jsonb(coalesce((v_bp ->> r.branch)::integer, 0)
+              + ((v_before + v_share) / (v_hpp * 60)::integer - v_before / (v_hpp * 60)::integer)));
+      k := k + 1;
+    end loop;
+    update public.player_skill_points set branch_work_minutes = v_bwm, branch_points = v_bp where player_id = j.player_id;
+  end if;
+
+  update public.player_jobs
+     set last_paid_at = last_paid_at + make_interval(mins => v_elapsed),
+         paid_day = v_day,
+         paid_minutes_today = v_paid + v_minutes,
+         experience_minutes = experience_minutes + v_minutes,
+         rank_minutes = least(2000000000::bigint, rank_minutes::bigint + v_minutes)::integer,
+         earned_total_cents = earned_total_cents + v_pay,
+         pay_factor_bps = case when v_minutes > 0 and v_full > 0 then (v_pay * 10000 / v_full)::integer else pay_factor_bps end
+   where id = j.id;
+  return v_pay;
+end;
+$$;
+
+create or replace function public.company_task_resolve(p_task_id bigint, p_score integer, p_by_ai boolean)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg       jsonb := public.company_tasks_cfg();
+  t         public.company_tasks;
+  v_ok      boolean;
+  v_amount  bigint := 0;
+  v_avail   bigint;
+  v_status  text;
+  v_xp      integer := 0;
+  v_nick    text;
+begin
+  select * into t from public.company_tasks where id = p_task_id for update;
+  if t.id is null or t.status in ('success', 'failure', 'missed') then
+    return null;
+  end if;
+  v_ok := p_score is not null and p_score >= (cfg ->> 'passScoreBps')::integer;
+  if v_ok then
+    v_amount := (t.value_cents * p_score) / 10000;
+    if p_by_ai then
+      v_amount := (v_amount * (cfg -> 'ai' ->> 'valueBps')::integer) / 10000;
+    end if;
+    -- ADR-134 task_pay of the founder
+    v_amount := v_amount + public.apply_bps(v_amount, public.company_upgrade_bps(t.company_id, 'task_pay'));
+    select a.balance_cents into v_avail from public.ledger_accounts a
+     where a.id = public.ledger_system_account('households') for update;
+    v_amount := least(v_amount, greatest(coalesce(v_avail, 0), 0));
+    if v_amount > 0 then
+      perform public.ledger_transfer(public.ledger_system_account('households'), public.company_cash_account(t.company_id),
+                                     v_amount, 'company_revenue', 'Aufgabe erledigt: ' || t.task_key, 'company', t.company_id,
+                                     'task:result:' || t.id::text, t.done_by, jsonb_build_object('task', t.task_key));
+    end if;
+    v_status := 'success';
+  else
+    v_amount := (t.value_cents * (cfg ->> 'penaltyBps')::integer) / 10000;
+    -- ADR-134 task_safety of the founder
+    v_amount := v_amount - public.apply_bps(v_amount, public.company_upgrade_bps(t.company_id, 'task_safety'));
+    select a.balance_cents into v_avail from public.ledger_accounts a
+     where a.id = public.company_cash_account(t.company_id) for update;
+    v_amount := least(v_amount, greatest(coalesce(v_avail, 0), 0));
+    if v_amount > 0 then
+      perform public.ledger_transfer(public.company_cash_account(t.company_id), public.ledger_system_account('households'),
+                                     v_amount, 'company_costs', 'Aufgabe verpatzt: ' || t.task_key, 'company', t.company_id,
+                                     'task:result:' || t.id::text, t.done_by, jsonb_build_object('task', t.task_key));
+    end if;
+    v_status := case when p_score is null then 'missed' else 'failure' end;
+    v_amount := -v_amount;
+  end if;
+  -- missions (ADR-130): done right, done perfectly
+  if v_ok and t.done_by is not null and not p_by_ai then
+    perform public.mission_event(t.done_by, 'task_done', 1, t.id::text);
+    if p_score >= 10000 then
+      perform public.mission_event(t.done_by, 'task_perfect', 1, t.id::text);
+    end if;
+  end if;
+  if t.done_by is not null and not p_by_ai then
+    v_xp := public.grant_xp(t.done_by, 'work_task',
+                            case when v_ok then (cfg -> 'xp' ->> 'success')::integer else (cfg -> 'xp' ->> 'failure')::integer end,
+                            'company_task:' || t.id::text, 'company_task', null);
+  end if;
+  update public.company_tasks
+     set status = v_status, score_bps = p_score, result_cents = v_amount, resolved_at = public.game_now()
+   where id = t.id;
+  select p.nickname into v_nick from public.profiles p where p.id = coalesce(t.done_by, t.assignee_id);
+  perform public.company_news_add(t.company_id, 'task_' || v_status,
+    jsonb_build_object('task', t.task_key, 'amount_cents', v_amount, 'nickname', v_nick, 'ai', p_by_ai));
+  return jsonb_build_object('status', v_status, 'score_bps', p_score, 'result_cents', v_amount, 'xp', v_xp);
+end;
+$$;
+
+create or replace function public.company_task_to_ai(p_task_id bigint, p_by uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.company_tasks_cfg();
+  t       public.company_tasks;
+  pc      public.player_companies;
+  v_bonus integer := 0;
+begin
+  select * into t from public.company_tasks where id = p_task_id for update;
+  select * into pc from public.player_companies where company_id = t.company_id;
+  if coalesce(pc.ai_workers, 0) <= 0 then
+    perform public.api_error('no_ai_workers');
+  end if;
+  if exists (select 1 from unnest(coalesce(pc.ai_worker_skills, '{}'::text[])) s where s like t.branch || '\_%') then
+    v_bonus := (cfg -> 'ai' ->> 'skillBonusBps')::integer;
+  end if;
+  update public.company_tasks
+     set status = 'ai', assignee_ai = true, assignee_id = null, assigned_by = p_by, assigned_at = public.game_now(),
+         ai_done_at = public.game_now() + make_interval(mins => public.company_task_ai_minutes(t.company_id)),
+         ai_chance_bps = least(9500, (cfg -> 'ai' ->> 'chanceBps')::integer + v_bonus
+                                    + public.company_upgrade_bps(t.company_id, 'ai_precision'))
+   where id = t.id;
+end;
+$$;
+
+create or replace function public.company_moves_state(p_company uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_cfg   jsonb := public.company_moves_cfg();
+  pc      public.player_companies;
+  v_tier  text;
+  v_base  bigint;
+  v_slots integer;
+  v_now   timestamptz := public.game_now();
+  v_cash  bigint;
+  v_luck  integer := public.company_upgrade_bps(p_company, 'move_luck');
+  v_deal  integer := public.company_upgrade_bps(p_company, 'dealmaker');
+  v_tempo integer := public.company_upgrade_bps(p_company, 'move_tempo');
+begin
+  select * into pc from public.player_companies where company_id = p_company;
+  v_tier := case when pc.tier in ('garage', 'small_business', 'gmbh', 'ag') then pc.tier else 'ag' end;
+  v_base := coalesce((v_cfg #>> array['costCentsByTier', v_tier])::bigint, 100000);
+  v_slots := coalesce((v_cfg #>> array['slotsByTier', v_tier])::integer, 1);
+  select a.balance_cents into v_cash from public.ledger_accounts a where a.id = public.company_cash_account(p_company);
+  return jsonb_build_object(
+    'slots', v_slots,
+    'used', (select count(*) from public.company_moves m where m.company_id = p_company and m.status = 'running'),
+    'cash_cents', coalesce(v_cash, 0),
+    'tier', v_tier,
+    'product', pc.product_key,
+    'moves', coalesce((
+      select jsonb_agg(x.j order by x.ord) from (
+        select o.ord, jsonb_build_object(
+                 'key', mv ->> 'key', 'kind', mv ->> 'kind', 'risk', mv ->> 'risk', 'branch', mv ->> 'branch',
+                 'minutes', (mv ->> 'minutes')::integer,
+                 'cost_cents', round(v_base * (mv ->> 'costFactor')::numeric)::bigint,
+                 'chance_bps', least(coalesce((v_cfg ->> 'maxChanceBps')::integer, 9500),
+                                     (v_cfg #>> array['risk', mv ->> 'risk', 'chanceBps'])::integer + sb.bonus + v_luck),
+                 'skill_bonus_bps', sb.bonus,
+                 'payout_cents', case when mv ->> 'kind' = 'cash'
+                                      then public.apply_bps(round(v_base * (mv ->> 'costFactor')::numeric
+                                                 * (v_cfg #>> array['risk', mv ->> 'risk', 'payoutBps'])::numeric / 10000)::bigint,
+                                                 10000 + v_deal)
+                                      else 0 end,
+                 'refund_cents', round(v_base * (mv ->> 'costFactor')::numeric
+                                       * (v_cfg #>> array['risk', mv ->> 'risk', 'refundBps'])::numeric / 10000)::bigint,
+                 'gain', case when mv ->> 'kind' = 'cash' then 0
+                              else (v_cfg #>> array['risk', mv ->> 'risk', 'gain'])::double precision end,
+                 'available_at', (select max(m.started_at + public.company_move_rest(mv, v_cfg, v_tempo))
+                                    from public.company_moves m where m.company_id = p_company and m.move_key = mv ->> 'key'
+                                     and m.started_at + public.company_move_rest(mv, v_cfg, v_tempo) > v_now)) as j
+          from jsonb_array_elements(coalesce(v_cfg -> 'moves', '[]'::jsonb)) with ordinality o(mv, ord)
+          cross join lateral (select least(coalesce((v_cfg ->> 'maxSkillBonusBps')::integer, 2500),
+                                           coalesce((v_cfg ->> 'chancePerSkillBps')::integer, 300)
+                                           * public.company_move_skill_count(p_company, o.mv ->> 'branch')) as bonus) sb
+         where o.mv ->> 'product' in ('*', coalesce(pc.product_key, ''))) x), '[]'::jsonb),
+    'running', coalesce((
+      select jsonb_agg(jsonb_build_object('id', m.id, 'key', m.move_key, 'started_at', m.started_at, 'ends_at', m.ends_at,
+                                          'cost_cents', m.cost_cents, 'chance_bps', m.chance_bps) order by m.ends_at)
+        from public.company_moves m where m.company_id = p_company and m.status = 'running'), '[]'::jsonb),
+    'history', coalesce((
+      select jsonb_agg(jsonb_build_object('id', h.id, 'key', h.move_key, 'status', h.status, 'cost_cents', h.cost_cents,
+                                          'payout_cents', h.payout_cents, 'gain', h.gain, 'resolved_at', h.resolved_at)
+                       order by h.resolved_at desc, h.id desc)
+        from (select m.* from public.company_moves m where m.company_id = p_company and m.status <> 'running'
+               order by m.resolved_at desc, m.id desc limit coalesce((v_cfg ->> 'historyLimit')::integer, 12)) h), '[]'::jsonb));
+end;
+$$;
+
+create or replace function public.company_moves_run_due(p_now timestamptz default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_cfg     jsonb := public.company_moves_cfg();
+  v_now     timestamptz := coalesce(p_now, public.game_now());
+  m         record;
+  v_kind    text;
+  v_risk    text;
+  v_ok      boolean;
+  v_pay     bigint;
+  v_gain    double precision;
+  v_hh      uuid := public.ledger_system_account('households');
+  v_hh_bal  bigint;
+  v_done    integer := 0;
+begin
+  for m in select x.* from public.company_moves x where x.status = 'running' and x.ends_at <= v_now
+            order by x.ends_at, x.id for update skip locked loop
+    select mv ->> 'kind', mv ->> 'risk' into v_kind, v_risk
+      from jsonb_array_elements(coalesce(v_cfg -> 'moves', '[]'::jsonb)) mv where mv ->> 'key' = m.move_key;
+    v_kind := coalesce(v_kind, 'cash');
+    v_risk := coalesce(v_risk, 'normal');
+    v_ok := random() * 10000 < m.chance_bps;
+    v_gain := 0;
+    if v_ok and v_kind = 'cash' then
+      v_pay := round(m.cost_cents * coalesce((v_cfg #>> array['risk', v_risk, 'payoutBps'])::numeric, 15000) / 10000)::bigint;
+      -- ADR-134 dealmaker of the founder
+      v_pay := public.apply_bps(v_pay, 10000 + public.company_upgrade_bps(m.company_id, 'dealmaker'));
+    elsif v_ok then
+      v_pay := 0;
+      v_gain := coalesce((v_cfg #>> array['risk', v_risk, 'gain'])::double precision, 0.04);
+    else
+      v_pay := round(m.cost_cents * coalesce((v_cfg #>> array['risk', v_risk, 'refundBps'])::numeric, 3000) / 10000)::bigint;
+    end if;
+    if not exists (select 1 from public.player_companies pc where pc.company_id = m.company_id and pc.status = 'active') then
+      v_pay := 0;
+      v_gain := 0;
+    end if;
+    if v_pay > 0 then
+      select a.balance_cents into v_hh_bal from public.ledger_accounts a where a.id = v_hh for update;
+      v_pay := least(v_pay, greatest(0, coalesce(v_hh_bal, 0)));
+    end if;
+    if v_pay > 0 then
+      perform public.ledger_transfer(v_hh, public.company_cash_account(m.company_id), v_pay, 'company_revenue',
+                                     'Geschäftszug: ' || m.move_key, 'company', m.company_id,
+                                     'move:result:' || m.id::text, null, jsonb_build_object('move', m.move_key, 'success', v_ok));
+    end if;
+    if v_gain > 0 then
+      if v_kind = 'awareness' then
+        update public.player_companies set awareness = least(1, awareness + v_gain) where company_id = m.company_id;
+      else
+        update public.player_companies set quality = least(1, quality + v_gain) where company_id = m.company_id;
+      end if;
+    end if;
+    update public.company_moves set status = case when v_ok then 'success' else 'failure' end, payout_cents = v_pay,
+                                    gain = v_gain, resolved_at = v_now where id = m.id;
+    perform public.company_system_message(m.company_id,
+      case when v_ok and v_kind = 'cash' then 'Geschäftszug geschafft: ' || public.format_eur(v_pay) || ' eingenommen.'
+           when v_ok then 'Geschäftszug geschafft: die Firma ist jetzt '
+                          || case when v_kind = 'awareness' then 'bekannter' else 'besser' end || '.'
+           else 'Geschäftszug daneben gegangen, ' || public.format_eur(v_pay) || ' zurück.' end);
+    v_done := v_done + 1;
+  end loop;
+  return jsonb_build_object('resolved', v_done);
+end;
+$$;
+
+create or replace function public.store_pitch_judgment(p_pitch_id bigint, p_fit integer, p_backfire integer, p_verdict text,
+                                                       p_success text, p_failure text, p_backfire_text text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg jsonb := public.pitches_cfg();
+  p   public.company_pitches;
+begin
+  select * into p from public.company_pitches where id = p_pitch_id for update;
+  if p.id is null or p.status <> 'judging' or p_fit is null or p_backfire is null
+     or not public.company_ai_text_ok(p_verdict, 200, true) or not public.company_ai_text_ok(p_success, 280, true)
+     or not public.company_ai_text_ok(p_failure, 280, true) or not public.company_ai_text_ok(p_backfire_text, 280, true) then
+    return false;
+  end if;
+  update public.company_pitches
+     set judge = 'claude', fit = least(100, greatest(0, p_fit)), backfire = least(100, greatest(0, p_backfire)),
+         chance_bps = public.pitch_chance_bps_for(p_fit, p.company_id), verdict = p_verdict, success_text = p_success,
+         failure_text = p_failure, backfire_text = p_backfire_text, status = 'running', judged_at = public.game_now(),
+         ends_at = public.game_now() + make_interval(mins => (cfg ->> case when p.kind = 'event' then 'eventMinutes'
+                                                                          else 'moveMinutes' end)::integer)
+   where id = p.id;
+  return true;
+end;
+$$;
+
+create or replace function public.company_pitches_run_due(p_now timestamptz default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.pitches_cfg();
+  v_now   timestamptz := coalesce(p_now, public.game_now());
+  r       record;
+  v_j     jsonb;
+  v_mini  integer := 0;
+  v_done  integer := 0;
+begin
+  if cfg = '{}'::jsonb then
+    return jsonb_build_object('skipped', 'no config');
+  end if;
+  for r in select p.*, e.archetype from public.company_pitches p
+             left join public.player_company_events e on e.id = p.event_id
+            where p.status = 'judging' and p.judge_due_at <= v_now
+            for update of p skip locked loop
+    v_j := public.pitch_mini_judge(r.pitch_text, case when r.kind = 'event' then r.archetype else r.move_kind end);
+    update public.company_pitches
+       set judge = 'mini', fit = (v_j ->> 'fit')::integer, backfire = (v_j ->> 'backfire')::integer,
+           chance_bps = public.pitch_chance_bps_for((v_j ->> 'fit')::integer, r.company_id),
+           verdict = case when (v_j ->> 'fit')::integer >= 60 then 'Klingt durchdacht und passt zur Lage.'
+                          when (v_j ->> 'fit')::integer >= 40 then 'Kann klappen, ist aber kein Selbstläufer.'
+                          else 'Passt kaum zur Lage. Das wird schwierig.' end
+                      || case when (v_j ->> 'risky')::integer > 0 then ' Vorsicht: Das könnte als Schönfärberei rüberkommen.'
+                              else '' end,
+           success_text = 'Die eigene Strategie geht auf.',
+           failure_text = 'Die eigene Strategie verpufft ohne Wirkung.',
+           backfire_text = 'Die eigene Strategie geht nach hinten los: Kunden fühlen sich veräppelt.',
+           status = 'running', judged_at = v_now,
+           ends_at = v_now + make_interval(mins => (cfg ->> case when r.kind = 'event' then 'eventMinutes'
+                                                               else 'moveMinutes' end)::integer)
+     where id = r.id;
+    v_mini := v_mini + 1;
+  end loop;
+  for r in select id from public.company_pitches where status = 'running' and ends_at <= v_now
+            order by ends_at for update skip locked loop
+    perform public.company_pitch_resolve(r.id, random(), random());
+    v_done := v_done + 1;
+  end loop;
+  return jsonb_build_object('mini', v_mini, 'resolved', v_done);
+end;
+$$;
+
+create or replace function public.start_campaign(p_request_id uuid, p_company_id uuid, p_kind text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  pc       public.player_companies;
+  v_now    timestamptz := public.game_now();
+  v_su     jsonb := coalesce(public.config_jsonb('startups'), '{}'::jsonb);
+  v_cost   bigint;
+  v_free   bigint;
+  v_luck   double precision;
+  v_factor double precision;
+  v_stage  integer;
+  v_cap    double precision;
+  v_aw     double precision;
+  v_id     uuid;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_company_id is null or coalesce(p_kind, '') not in ('flyer', 'online', 'tv') then
+    perform public.api_error('invalid_argument');
+  end if;
+  perform public.require_company_owner(p_company_id);
+  v_replay := public.request_begin(v_player, p_request_id, 'start_campaign');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into pc from public.player_companies where company_id = p_company_id and status = 'active' for update;
+  if pc.company_id is null then
+    perform public.api_error('company_not_found');
+  end if;
+  if exists (select 1 from public.company_campaigns x where x.company_id = p_company_id and x.ends_at > v_now) then
+    perform public.api_error('campaign_running');
+  end if;
+  -- ADR-134 ad_agency of the founder
+  v_cost := public.company_campaign_cost_cents(p_company_id, p_kind);
+  -- free cash: open bills come first (as expand_company and event steps)
+  select a.balance_cents - pc.unpaid_cents into v_free
+    from public.ledger_accounts a where a.owner_company_id = p_company_id and a.kind = 'company_cash' for update;
+  if coalesce(v_free, 0) < v_cost then
+    perform public.api_error('insufficient_funds');
+  end if;
+  if v_cost > 0 then
+    perform public.ledger_transfer(public.company_cash_account(p_company_id), public.ledger_system_account('households'), v_cost,
+                                   'company_costs', 'Marketing-Kampagne', 'company', p_company_id,
+                                   'campaign:' || p_company_id::text || ':' || p_request_id::text, v_player);
+  end if;
+  v_luck := public.campaign_luck(random());
+  v_factor := public.campaign_factor(p_kind, pc.quality, v_luck);
+  -- awareness at once, capped by the growth stage (ADR-062) as in the quarter close; never lowered
+  v_stage := least(greatest(coalesce(public.company_stage(p_company_id), 0), 0),
+                   greatest(jsonb_array_length(coalesce(v_su #> '{stages,awarenessCaps}', '[1]'::jsonb)) - 1, 0));
+  v_cap := greatest(public.cfg_num(v_su, '{awareness,min}', 0.01),
+                    coalesce((v_su #>> array['stages', 'awarenessCaps', v_stage::text])::double precision, 1));
+  v_aw := least(1, greatest(pc.awareness, least(v_cap, pc.awareness + public.campaign_kind_num(p_kind, 'awareness'))));
+  update public.player_companies set awareness = v_aw where company_id = p_company_id;
+  insert into public.company_campaigns (company_id, kind, cost_cents, luck, demand_factor, awareness_gain, started_at, ends_at,
+                                        created_by, request_id)
+  values (p_company_id, p_kind, v_cost, v_luck, v_factor, greatest(0, v_aw - pc.awareness), v_now,
+          v_now + make_interval(secs => greatest(1, public.campaign_kind_num(p_kind, 'hours')) * 3600), v_player, p_request_id)
+  returning id into v_id;
+  perform public.company_news_add(p_company_id, 'campaign_started',
+    jsonb_build_object('kind', p_kind, 'resonance', public.campaign_resonance(v_luck),
+                       'demand_bps', round(((v_factor - 1) * 10000)::numeric)::integer));
+  return public.request_complete(v_player, p_request_id, public.campaign_json(v_id));
+end;
+$$;
+
+create or replace function public.protest_check(p_protest_id bigint, p_u double precision, p_u2 double precision)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg       jsonb := public.protests_cfg();
+  k         public.company_protests;
+  c         public.companies;
+  v_players integer;
+  v_chance  integer;
+  v_bps     integer;
+  v_label   text;
+begin
+  select * into k from public.company_protests where id = p_protest_id for update;
+  if k.id is null or k.status <> 'open' then
+    return null;
+  end if;
+  select count(*) into v_players from public.company_protest_supporters s where s.protest_id = k.id;
+  if v_players + k.ai_supporters < k.goal then
+    return 'open';
+  end if;
+  select * into c from public.companies where id = k.company_id;
+  v_label := case k.kind when 'boycott' then 'Boykott-Aufruf' when 'shitstorm' then 'Shitstorm'
+                         when 'petition' then 'Petition' else 'Protestmarsch' end;
+  v_chance := least((cfg ->> 'effectChanceMaxBps')::integer,
+                    (cfg ->> 'effectChanceBaseBps')::integer + v_players * (cfg ->> 'effectChancePerPlayerBps')::integer)
+              -- ADR-134 activist of the starter, on top of the cap
+              + public.player_upgrade_bps(k.started_by, 'activist');
+  if p_u * 10000 < v_chance then
+    v_bps := (cfg ->> 'priceHitMinBps')::integer
+             + floor(p_u2 * ((cfg ->> 'priceHitMaxBps')::integer - (cfg ->> 'priceHitMinBps')::integer + 1))::integer;
+    if c.security_id is not null
+       and exists (select 1 from public.securities s where s.id = c.security_id and s.status = 'listed') then
+      perform public.event_price_shock(c.security_id, -v_bps, public.game_now());
+    end if;
+    update public.player_companies
+       set awareness = greatest(0, awareness - (cfg ->> 'awarenessHit')::double precision)
+     where company_id = c.id;
+    if exists (select 1 from public.player_companies pc where pc.company_id = c.id) then
+      perform public.company_news_add(c.id, 'protest_hit', jsonb_build_object('kind', k.kind, 'players', v_players));
+    end if;
+    update public.company_protests set status = 'hit', effect_bps = v_bps, resolved_at = public.game_now() where id = k.id;
+    insert into public.news_items (category, headline, body, importance, company_id, security_id, published_at)
+    values ('market', v_label || ' gegen ' || c.name || ' zeigt Wirkung',
+            v_players || ' Spieler und ' || k.ai_supporters || ' weitere Unterstützer machen mit. Das Thema ist in aller Munde.',
+            2, c.id, c.security_id, public.game_now());
+    return 'hit';
+  end if;
+  update public.company_protests set status = 'fizzled', resolved_at = public.game_now() where id = k.id;
+  insert into public.news_items (category, headline, body, importance, company_id, security_id, published_at)
+  values ('market', v_label || ' gegen ' || c.name || ' verpufft',
+          'Viele haben mitgemacht, doch Kunden und Anleger zucken nur mit den Schultern.', 1, c.id, c.security_id,
+          public.game_now());
+  return 'fizzled';
+end;
+$$;
+
+comment on function public.buy_upgrade(uuid, text) is
+  'RPC: buys the next stage of an upgrade (ADR-093, ADR-100, ADR-134) -> {key, level, cost_cents, levels}; errors '
+  'invalid_argument, upgrade_maxed, locked (player level below the stage''s level), insufficient_funds.';
+
+-- ---------------------------------------------------------------------------
+-- E. Grants: the new helpers are internal
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.upgrade_keys()', 'public.player_upgrade_bps(uuid, text)', 'public.company_upgrade_bps(uuid, text)',
+    'public.player_xp_bonus_bps(uuid, text)', 'public.company_move_rest(jsonb, jsonb, integer)',
+    'public.pitch_chance_bps_for(integer, uuid)', 'public.company_campaign_cost_cents(uuid, text)'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+    execute format('grant execute on function %s to service_role', f);
+  end loop;
+end;
+$$;
+
 -- ===== supabase/migrations/20261204000900_fix_new_ai_fundamentals.sql =====
 -- =============================================================================
 -- NEXA · 0900 · The ten new AI companies get earnings that fit their prices (fix for ADR-130)

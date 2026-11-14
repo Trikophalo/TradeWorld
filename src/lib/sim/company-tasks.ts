@@ -5,6 +5,7 @@
  */
 import type { CompanyTaskConfig } from "../../config/company-tasks.ts";
 import { COMPANY_TASK_RULES } from "../../config/company-tasks.ts";
+import { discountedCents, withBonusCents } from "./upgrades.ts";
 
 export type TaskPuzzle =
   | { tiles: number[] }
@@ -147,21 +148,37 @@ export function gradeAnswer(game: CompanyTaskConfig["game"], solution: TaskSolut
   }
 }
 
-/** Money of a finished task: success pays value × score (× AI share), failure costs value × penalty. */
+/** The founder's company task upgrades (ADR-134) in bps: task_pay, task_safety. */
+export interface TaskUpgradeBps {
+  readonly payBonusBps?: number;
+  readonly penaltyDiscountBps?: number;
+}
+
+/**
+ * Money of a finished task: success pays value × score (× AI share) plus task_pay, failure costs value × penalty
+ * less task_safety (ADR-134; the bonus and the discount rounded half even like apply_bps).
+ */
 export function taskResultCents(
   valueCents: number,
   scoreBps: number | null,
   byAi: boolean,
   rules: Rules = COMPANY_TASK_RULES,
+  upgrades: TaskUpgradeBps = {},
 ): number {
   if (scoreBps !== null && scoreBps >= rules.passScoreBps) {
     const earned = Math.trunc((valueCents * scoreBps) / 10_000);
-    return byAi ? Math.trunc((earned * rules.ai.valueBps) / 10_000) : earned;
+    const base = byAi ? Math.trunc((earned * rules.ai.valueBps) / 10_000) : earned;
+    return Number(withBonusCents(BigInt(base), upgrades.payBonusBps ?? 0));
   }
-  return -Math.trunc((valueCents * rules.penaltyBps) / 10_000);
+  const penalty = Math.trunc((valueCents * rules.penaltyBps) / 10_000);
+  return -Number(discountedCents(BigInt(penalty), upgrades.penaltyDiscountBps ?? 0));
 }
 
-/** Minutes the AI needs when it already works on `queued` tasks. */
-export function aiMinutes(queued: number, rules: Rules = COMPANY_TASK_RULES): number {
-  return Math.ceil(rules.ai.minutes * (1 + (queued * rules.ai.slowdownPerQueuedBps) / 10_000));
+/** Minutes the AI needs when it already works on `queued` tasks; ai_turbo (ADR-134) takes `timeDiscountBps` off. */
+export function aiMinutes(queued: number, rules: Rules = COMPANY_TASK_RULES, timeDiscountBps = 0): number {
+  const minutes =
+    (rules.ai.minutes * (10_000 + queued * rules.ai.slowdownPerQueuedBps) * (10_000 - timeDiscountBps)) /
+    10_000 /
+    10_000;
+  return Math.max(1, Math.ceil(minutes));
 }

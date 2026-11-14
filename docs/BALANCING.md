@@ -1188,3 +1188,19 @@ Alle Werte stehen in `src/config/upgrades.ts`, `src/config/deals.ts` und `src/co
   Bei 60 % Gebühr gewinnen Tech-Lieferanten 35 %, Handels-Lieferanten verlieren 5 %: Handel liefert nur teurer.
 - **Vertrauen:** Start 50. Ein pünktlicher Kredit +4, ein gebrochener Vertrag −12: Drei Brüche machen aus
   „Unbeschrieben“ „Riskant“, gut zehn gehaltene Deals „Felsenfest“.
+
+## Nachtrag: Mehr Verbesserungen (ADR-134)
+
+Werte in `src/config/upgrades.ts`, Tabelle in ADR-134.
+
+- **Preise:** Wachstum ×2 bis ×3 je Stufe wie bisher. Billig und früh (ab Level 1 bis 4) sind XP-Boni und kleine
+  Geldquellen (Börsenprofi 2.000 €, Frühaufsteher 1.500 €, Stammgast 2.500 €). Firmen-Verbesserungen kosten 6.000 € bis
+  40.000 € für die erste Stufe und kommen erst, wenn eine Firma läuft (Level 7 bis 16). Ehrgeiz und Panzertresor
+  (100.000 €, Level 14 bis 30) sind Langzeitziele.
+- **Geld:** Tresorzinsen +5 % je Stufe zahlen bei 100 €/h und vollem 24-h-Tresor 120 € je Stufe und Leerung: Stufe 1
+  (5.000 €) lohnt sich bei zwei Leerungen am Tag nach drei bis vier Wochen. Der Lohnbonus (+5 %) wirkt auf jeden
+  bezahlten Lohn, also stärker mit höherem Rang.
+- **Firma:** Boni wirken auf Firmenaufgaben und Geschäftszüge, die von den Haushalten bezahlt werden. Chancen bleiben bei
+  95 % gedeckelt, Strategien bei `pitches.maxChanceBps`.
+- **XP:** Alle XP-Boni einer Quelle addieren sich (zum Beispiel Börsenprofi 3 + Ehrgeiz 3 = +45 % Handels-XP). Der
+  tägliche Deckel für Handels-XP zählt weiter Handel, nicht XP.

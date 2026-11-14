@@ -1,6 +1,6 @@
 {
-  "mine": { "rank": 32, "value_cents": 54107 },
-  "total": 35,
+  "mine": { "rank": 33, "value_cents": 54107 },
+  "total": 36,
   "entries": [
     {
       "kind": "player",
@@ -14,7 +14,7 @@
       "founder": "Lars_Kursrutsch",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "cb18ee9d-919f-459c-bfbb-a7ea561db7b5",
+      "company_id": "fb81d228-7ebb-4b59-9af1-85428cbf991d",
       "value_cents": 959140000,
       "revenue_cents": null
     },
@@ -50,8 +50,8 @@
       "founder": "Fenja_Firma",
       "is_mine": false,
       "team_size": 6,
-      "company_id": "89cec41d-a315-4bc3-9e1d-5c05ced9da8c",
-      "value_cents": 81945210,
+      "company_id": "eaf158db-5626-4170-b85c-c584b3532ab2",
+      "value_cents": 82151020,
       "revenue_cents": 0
     },
     {
@@ -66,15 +66,31 @@
       "founder": "Frieda_Format",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "45acfdbc-8004-42d3-8a6d-082fa194585c",
+      "company_id": "3c60f3dc-e723-443b-8237-321c9eccbaac",
       "value_cents": 51553750,
       "revenue_cents": 1185000
     },
     {
       "kind": "player",
       "logo": null,
-      "name": "Sven Teile",
+      "name": "Frida Fahrrad",
       "rank": 4,
+      "tier": "garage",
+      "color": "#336699",
+      "sector": "retail",
+      "ticker": null,
+      "founder": "Frida_Upgrade",
+      "is_mine": false,
+      "team_size": 2,
+      "company_id": "9f5e42ed-e1ec-400f-96ea-9e11c49f391a",
+      "value_cents": 20370600,
+      "revenue_cents": null
+    },
+    {
+      "kind": "player",
+      "logo": null,
+      "name": "Sven Teile",
+      "rank": 5,
       "tier": "garage",
       "color": "#335577",
       "sector": "tech",
@@ -82,26 +98,10 @@
       "founder": "Sven_Liefert",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "bd03854d-615e-4e3f-8468-77f3d72140c3",
-      "value_cents": 20254528,
-      "revenue_cents": null
-    },
-    {
-      "kind": "player",
-      "logo": null,
-      "name": "Faire Schuhe",
-      "rank": 5,
-      "tier": "garage",
-      "color": "#447744",
-      "sector": "retail",
-      "ticker": null,
-      "founder": "Pitch_Chefin",
-      "is_mine": false,
-      "team_size": 1,
-      "company_id": "c326a927-3432-4655-ae53-e1643376d4e7",
-      "value_cents": 10236560,
+      "company_id": "683f8707-0703-48f9-a571-f6e1098970da",
+      "value_cents": 20253897,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-14T13:53:29.73254+00:00"
+  "server_time": "2026-11-14T14:35:15.269861+00:00"
 }

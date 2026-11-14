@@ -1,6 +1,6 @@
 {
   "job": {
-    "id": "d64054a2-ac64-4052-8415-1d06e52a8962",
+    "id": "32ec05a9-fd40-4e51-b5ec-53b143d75415",
     "tier": "intern",
     "title": null,
     "company": {
@@ -13,9 +13,9 @@
       "ticker": "QSL"
     },
     "presence": {
-      "fire_at": "2026-11-19T13:53:31.490313+00:00",
+      "fire_at": "2026-11-19T14:35:17.219169+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-14T13:53:31.490313+00:00"
+      "last_active_at": "2026-11-14T14:35:17.219169+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-14T13:53:31.612868+00:00",
+    "started_at": "2026-11-14T14:35:17.324428+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

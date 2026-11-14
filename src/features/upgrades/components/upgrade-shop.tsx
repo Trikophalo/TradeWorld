@@ -5,13 +5,31 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 import {
   ALARM_CLOCK,
+  BEAR,
   BOOK,
+  BRIEFCASE,
+  BULL,
+  CHESTS,
   COIN,
+  CONTRACT,
+  FINN,
+  FLASK,
   GEARS,
+  GEM,
+  GIFT,
+  GOLD_BAR,
   GRADUATE,
+  HEART,
   KEY,
+  MEGAPHONE,
+  MOON,
+  NEWSPAPER,
   PALETTE,
+  QUEST_BOARD,
+  SHIELD,
   SPEECH,
+  TROPHIES,
+  UI_ICONS,
   VAULT_DOOR,
   WALLET,
 } from "@/components/pixel/art";
@@ -44,6 +62,29 @@ const ICONS: Record<UpgradeKey, PixelArt> = {
   efficiency: GEARS,
   makler: KEY,
   crypto_wallet: WALLET,
+  // ADR-134
+  vault_xl: CHESTS.gold.closed,
+  vault_interest: GOLD_BAR,
+  daily_bonus: GIFT,
+  wage_bonus: CHESTS.wood.open,
+  wage_shield: CONTRACT,
+  trader: BULL,
+  early_bird: UI_ICONS.flame,
+  mission_hunter: QUEST_BOARD,
+  teamplayer: HEART,
+  balance_sheet: NEWSPAPER,
+  ambition: TROPHIES.gold,
+  task_pay: BRIEFCASE,
+  task_safety: FINN.happy,
+  crisis_manager: SHIELD,
+  move_luck: GEM,
+  ad_agency: MEGAPHONE,
+  dealmaker: UI_ICONS.deal,
+  ai_turbo: UI_ICONS.robot,
+  ai_precision: FLASK,
+  strategist: UI_ICONS.star,
+  move_tempo: MOON,
+  activist: BEAR,
 };
 
 const PIXEL_FRAME = "rounded-xs border-2 [box-shadow:0_4px_0_0_var(--line-2)]";
@@ -52,8 +93,8 @@ const PIXEL_FRAME = "rounded-xs border-2 [box-shadow:0_4px_0_0_var(--line-2)]";
 const iconScale = (art: PixelArt) => Math.max(1, Math.floor(48 / art.grid[0]!.length));
 
 /**
- * The upgrade shop (ADR-093): every upgrade shows what it does now and after the next level, its levels as pixel
- * pips and the price. Buying needs a short hold, so nothing is bought by accident.
+ * The upgrade shop (ADR-093, ADR-134): the upgrades in groups; every upgrade shows what it does now and after the next
+ * level, its levels as pixel pips and the price. Buying needs a short hold, so nothing is bought by accident.
  */
 export function UpgradeShop() {
   const t = useTranslations("upgrades");
@@ -76,13 +117,25 @@ export function UpgradeShop() {
           ))}
         </div>
       ) : (
-        <ul className="grid gap-4 lg:grid-cols-2">
-          {BALANCE.upgrades.order.map((key) => (
-            <li key={key}>
-              <UpgradeCard upgradeKey={key} level={upgrades.data?.levels[key] ?? 0} />
-            </li>
-          ))}
-        </ul>
+        BALANCE.upgrades.groups.map((group) => {
+          const bought = group.keys.reduce((sum, key) => sum + (upgrades.data?.levels[key] ?? 0), 0);
+          const total = group.keys.reduce((sum, key) => sum + BALANCE.upgrades[key].maxLevel, 0);
+          return (
+            <section key={group.key} className="space-y-3" data-testid={`upgrade-group-${group.key}`}>
+              <div className="flex items-baseline justify-between gap-3 px-1">
+                <h2 className="label-pixel text-fg-2">{t(`groups.${group.key}`)}</h2>
+                <p className="nums text-xs text-fg-3">{t("groupCount", { bought, total })}</p>
+              </div>
+              <ul className="grid gap-4 lg:grid-cols-2">
+                {group.keys.map((key) => (
+                  <li key={key}>
+                    <UpgradeCard upgradeKey={key} level={upgrades.data?.levels[key] ?? 0} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          );
+        })
       )}
     </div>
   );
@@ -94,7 +147,8 @@ function useValueText() {
     const value = upgradeValue(key, level);
     switch (key) {
       case "vault":
-        return t("vault.value", { value });
+      case "vault_xl":
+        return t(`${key}.value`, { value });
       case "income":
         return t("income.value", { amount: formatMoney(value, { whole: true }) });
       case "study":
@@ -103,11 +157,8 @@ function useValueText() {
         return t("overtime.value", { value });
       case "rhetoric":
         return t("rhetoric.value", { percent: formatBps(value) });
-      case "mentor":
-      case "artist":
-      case "efficiency":
-      case "makler":
-      case "crypto_wallet":
+      default:
+        // mentor and every bonus or discount in bps (ADR-134)
         return t(`${key}.value`, { percent: formatBps(value).replace("+", "") });
     }
   };
@@ -152,13 +203,13 @@ export function UpgradeCard({ upgradeKey: key, level }: { upgradeKey: UpgradeKey
     <Card padding="lg" className="flex h-full flex-col gap-4" data-testid={`upgrade-${key}`} data-level={level}>
       <div className="flex items-start gap-4">
         <div
-          className={cn(PIXEL_FRAME, "grid size-16 shrink-0 place-items-center border-line-2 bg-surface-2")}
+          className={cn(PIXEL_FRAME, "grid size-16 shrink-0 place-items-center border-line-2 bg-surface-2 text-fg-2")}
           aria-hidden
         >
           <PixelIcon {...art} scale={iconScale(art)} />
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="font-semibold text-fg-1">{ti(`${key}.name`)}</h2>
+          <h3 className="font-semibold text-fg-1">{ti(`${key}.name`)}</h3>
           <div className="mt-1.5 flex items-center gap-1" aria-label={t("levelOf", { level, max: cfg.maxLevel })}>
             {Array.from({ length: cfg.maxLevel }, (_, i) => (
               <motion.span

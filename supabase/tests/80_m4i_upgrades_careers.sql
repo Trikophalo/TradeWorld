@@ -61,8 +61,8 @@ select public.config_double('economy', '{vaultCapHours}', 8) as cap0,
 -- A. Rules (port of upgrades.ts)
 -- =============================================================================
 select tests.assert(
-  (select array_agg(public.upgrade_cost_cents('vault', l) order by l) from generate_series(0, 6) l)
-    = array[300000, 600000, 1200000, 2400000, 4800000, 9600000, null]::bigint[]
+  (select array_agg(public.upgrade_cost_cents('vault', l) order by l) from generate_series(0, 8) l)
+    = array[300000, 600000, 1200000, 2400000, 4800000, 9600000, 19200000, 38400000, null]::bigint[]
   and (select array_agg(public.upgrade_cost_cents('income', l) order by l) from generate_series(0, 3) l)
     = array[400000, 1200000, 3600000, null]::bigint[]
   and (select array_agg(public.upgrade_cost_cents('study', l) order by l) from generate_series(0, 3) l)
@@ -74,7 +74,7 @@ select tests.assert(
   and public.upgrade_cost_cents('jetpack', 0) is null,
   'upgradeCostCents: base x growth^level in whole euros (rhetoric 10.000 / 25.000 / 62.500 EUR), null when maxed');
 select tests.assert(
-  public.player_upgrade_levels(:u) = '{"vault": 0, "income": 0, "study": 0, "overtime": 0, "rhetoric": 0, "mentor": 0, "artist": 0, "efficiency": 0, "makler": 0, "crypto_wallet": 0}'::jsonb
+  public.player_upgrade_levels(:u) @> '{"vault": 0, "income": 0, "study": 0, "overtime": 0, "rhetoric": 0, "mentor": 0, "artist": 0, "efficiency": 0, "makler": 0, "crypto_wallet": 0}'::jsonb
   and public.player_vault_cap_hours(:u) = :cap0 and public.player_basic_income_cents_per_hour(:u) = :inc0
   and public.player_work_hours_per_branch_point(:u) = :hpp0 and public.player_paid_hours_cap(:u) = :paid0
   and public.player_promotion_bonus_bps(:u) = 0,
@@ -90,8 +90,8 @@ select tests.throws_key($$select public.buy_upgrade(gen_random_uuid(), 'jetpack'
 select tests.throws_key($$select public.buy_upgrade(gen_random_uuid(), null)$$, 'invalid_argument', 'buy_upgrade(): key required');
 select tests.throws_key($$select public.buy_upgrade(null, 'vault')$$, 'invalid_argument', 'buy_upgrade(): request_id required');
 reset role;
-select tests.assert(:'g0'::jsonb = '{"levels": {"vault": 0, "income": 0, "study": 0, "overtime": 0, "rhetoric": 0, "mentor": 0, "artist": 0, "efficiency": 0, "makler": 0, "crypto_wallet": 0}}'::jsonb,
-  'get_upgrades(): all ten keys (ADR-100) with level 0');
+select tests.assert(:'g0'::jsonb -> 'levels' @> '{"vault": 0, "income": 0, "study": 0, "overtime": 0, "rhetoric": 0, "mentor": 0, "artist": 0, "efficiency": 0, "makler": 0, "crypto_wallet": 0}'::jsonb,
+  'get_upgrades(): the ten keys of ADR-100 with level 0');
 
 -- Nina: level 2, 2.999 EUR
 select public.ledger_transfer(public.ledger_player_account(:n, 'player_cash'), public.ledger_system_account('households'),
@@ -105,7 +105,7 @@ select tests.throws($$select public.buy_upgrade(gen_random_uuid(), 'rhetoric')$$
 select tests.throws_key($$select public.buy_upgrade(gen_random_uuid(), 'vault')$$, 'insufficient_funds',
   'buy_upgrade(): 2.999 EUR are not enough for 3.000 EUR');
 reset role;
-insert into public.player_upgrades (player_id, key, level) values (:n, 'vault', 6);
+insert into public.player_upgrades (player_id, key, level) values (:n, 'vault', 8);
 select tests.login_as('authenticated', :n);
 select tests.throws_key($$select public.buy_upgrade(gen_random_uuid(), 'vault')$$, 'upgrade_maxed',
   'buy_upgrade(): maxed comes first (before level and cash)');
@@ -129,7 +129,7 @@ select tests.assert(
   and (select array_agg((x ->> 'cost_cents')::bigint order by i) from jsonb_array_elements(:'vb'::jsonb) with ordinality t(x, i))
       = array[300000, 600000, 1200000, 2400000, 4800000, 9600000]::bigint[]
   and (select bool_and(x ->> 'key' = 'vault') from jsonb_array_elements(:'vb'::jsonb) x)
-  and :'vb'::jsonb -> 5 -> 'levels' = '{"vault": 6, "income": 0, "study": 0, "overtime": 0, "rhetoric": 0, "mentor": 0, "artist": 0, "efficiency": 0, "makler": 0, "crypto_wallet": 0}'::jsonb
+  and :'vb'::jsonb -> 5 -> 'levels' @> '{"vault": 6, "income": 0, "study": 0, "overtime": 0, "rhetoric": 0, "mentor": 0, "artist": 0, "efficiency": 0, "makler": 0, "crypto_wallet": 0}'::jsonb
   and tests.cash(:u) = :uc0::bigint - 18900000 and tests.m4i_treasury() = :tr0::bigint + 18900000,
   'buy_upgrade(): six vault levels for 3.000 to 96.000 EUR (189.000 EUR), {key, level, cost_cents, levels}; paid to the treasury');
 select tests.assert(
@@ -144,8 +144,8 @@ select tests.assert(
   and not exists (select 1 from public.ledger_audit()),
   'buy_upgrade(): every purchase is one balanced transfer player_cash -> treasury (kind upgrade_purchase); ledger audit clean');
 select tests.login_as('authenticated', :u);
-select tests.throws($$select public.buy_upgrade(gen_random_uuid(), 'vault')$$, 'NX083',
-  'buy_upgrade(): a seventh vault level -> upgrade_maxed NX083');
+select tests.throws($$select public.buy_upgrade(gen_random_uuid(), 'vault')$$, 'NX018',
+  'buy_upgrade(): a seventh vault level needs level 13 (ADR-134) -> locked NX018');
 -- idempotent per request_id
 select public.buy_upgrade(:rq, 'income') as ib1 \gset
 select public.buy_upgrade(:rq, 'income') as ib2 \gset
@@ -154,7 +154,7 @@ reset role;
 select tests.assert(
   :'ib1'::jsonb = :'ib2'::jsonb and (:'ib1'::jsonb ->> 'level')::int = 1 and (:'ib1'::jsonb ->> 'cost_cents')::bigint = 400000
   and tests.cash(:u) = :uc0::bigint - 18900000 - 400000
-  and :'g1'::jsonb = '{"levels": {"vault": 6, "income": 1, "study": 0, "overtime": 0, "rhetoric": 0, "mentor": 0, "artist": 0, "efficiency": 0, "makler": 0, "crypto_wallet": 0}}'::jsonb
+  and :'g1'::jsonb -> 'levels' @> '{"vault": 6, "income": 1, "study": 0, "overtime": 0, "rhetoric": 0, "mentor": 0, "artist": 0, "efficiency": 0, "makler": 0, "crypto_wallet": 0}'::jsonb
   and (select count(*) from public.ledger_transactions where initiated_by = :u and kind = 'upgrade_purchase') = 7,
   'buy_upgrade(): the same request_id twice answers the same and charges once; get_upgrades() shows the levels');
 

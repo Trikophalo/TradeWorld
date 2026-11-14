@@ -71,7 +71,7 @@ grant execute on all functions in schema tests to public;
 -- A. Rules, schema, error key
 -- =============================================================================
 select tests.assert(
-  (select array_agg(public.upgrade_stage_level('vault', l) order by l) from generate_series(0, 6) l) = array[1, 3, 5, 7, 9, 11, null]
+  (select array_agg(public.upgrade_stage_level('vault', l) order by l) from generate_series(0, 8) l) = array[1, 3, 5, 7, 9, 11, 13, 15, null]
   and (select array_agg(public.upgrade_stage_level('income', l) order by l) from generate_series(0, 3) l) = array[3, 7, 11, null]
   and (select array_agg(public.upgrade_stage_level('study', l) order by l) from generate_series(0, 3) l) = array[2, 6, 10, null]
   and (select array_agg(public.upgrade_stage_level('mentor', l) order by l) from generate_series(0, 3) l) = array[4, 8, 12, null]
@@ -82,7 +82,7 @@ select tests.assert(
   and (select array_agg(public.upgrade_stage_level('makler', l) order by l) from generate_series(0, 3) l) = array[8, 12, 16, null]
   and (select array_agg(public.upgrade_stage_level('crypto_wallet', l) order by l) from generate_series(0, 2) l) = array[10, 15, null]
   and public.upgrade_stage_level('jetpack', 0) is null,
-  'upgradeStageLevel: stage n from minLevel + (n - 1) x levelStep (vault 1, 3, 5, 7, 9, 11; mentor 4, 8, 12; wallet 10, 15)');
+  'upgradeStageLevel: stage n from minLevel + (n - 1) x levelStep (vault 1, 3, ..., 15; mentor 4, 8, 12; wallet 10, 15)');
 select tests.assert(
   (select array_agg(public.upgrade_cost_cents('mentor', l) order by l) from generate_series(0, 3) l)
     = array[600000, 1800000, 5400000, null]::bigint[]
@@ -96,7 +96,7 @@ select tests.assert(
     = array[2000000, 6000000, null]::bigint[],
   'upgradeCostCents of the new upgrades (mentor 6.000 / 18.000 / 54.000 EUR, makler 15.000 / 37.500 / 93.750 EUR)');
 select tests.assert(
-  public.player_upgrade_levels(:u) = '{"vault": 0, "income": 0, "study": 0, "overtime": 0, "rhetoric": 0, "mentor": 0,
+  public.player_upgrade_levels(:u) @> '{"vault": 0, "income": 0, "study": 0, "overtime": 0, "rhetoric": 0, "mentor": 0,
                                        "artist": 0, "efficiency": 0, "makler": 0, "crypto_wallet": 0}'::jsonb
   and public.player_work_xp_bps(:u) = 10000 and public.player_art_discount_bps(:u) = 0
   and public.player_fixed_cost_discount_bps(:u) = 0 and public.player_property_discount_bps(:u) = 0,
@@ -159,11 +159,11 @@ reset role;
 select tests.assert(
   :v1::int = 1 and :v2::int = 2 and :'m1'::jsonb = :'m1b'::jsonb
   and (:'m1'::jsonb ->> 'level')::int = 1 and (:'m1'::jsonb ->> 'cost_cents')::bigint = 600000 and :a1::bigint = 500000
-  and :'gu'::jsonb = '{"levels": {"vault": 2, "income": 0, "study": 0, "overtime": 0, "rhetoric": 0, "mentor": 1, "artist": 1,
-                                  "efficiency": 0, "makler": 0, "crypto_wallet": 0}}'::jsonb
+  and :'gu'::jsonb -> 'levels' @> '{"vault": 2, "income": 0, "study": 0, "overtime": 0, "rhetoric": 0, "mentor": 1, "artist": 1,
+                                    "efficiency": 0, "makler": 0, "crypto_wallet": 0}'::jsonb
   and (:'m1'::jsonb #>> '{levels,mentor}')::int = 1 and (:'m1'::jsonb #>> '{levels,artist}')::int = 0,
   'buy_upgrade(): vault 1 and 2 at level 4 (stages from 1 and 3), mentor and artist from level 4, replay-safe; '
-  || 'get_upgrades() shows all ten keys');
+  || 'get_upgrades() shows the ten keys of ADR-100');
 select tests.set_level(:u, 10);
 select tests.m4k_buy(:u, 'crypto_wallet') ->> 'level' as cw \gset
 select tests.assert(

@@ -1,5 +1,6 @@
 import { BALANCE } from "@/config/balance";
 import { aiMinutes, generatePuzzle, gradeAnswer, taskResultCents, type TaskSolution } from "@/lib/sim/company-tasks";
+import { upgradeEffects, type UpgradeLevels } from "@/lib/sim/upgrades";
 import { GameError, type CompanyTasks, type GameEngine, type NewsFeedItem, type StockNewsItem } from "../types";
 
 /*
@@ -46,6 +47,8 @@ export interface CompanyTasksHost {
   companyNews(): { id: number; kind: string; payload: Record<string, unknown>; createdAt: string }[];
   stockNews(limit: number): Promise<StockNewsItem[]>;
   addXp(xp: number): void;
+  /** The founder's upgrades (ADR-134: task_pay, task_safety, ai_turbo, ai_precision). */
+  upgrades?(): UpgradeLevels;
   state(): DemoTasksState | undefined;
   setState(s: DemoTasksState): void;
   idempotent<T>(requestId: string, run: () => T): T;
@@ -76,9 +79,14 @@ export function createCompanyTasksEngine(
     return c;
   };
   const defOf = (key: string) => cfg.tasks.find((t) => t.key === key);
+  const effects = () => upgradeEffects(host.upgrades?.() ?? {});
 
   function resolve(s: DemoTasksState, t: DemoTask, score: number | null, byAi: boolean, now: number) {
-    const result = taskResultCents(t.valueCents, score, byAi);
+    const e = effects();
+    const result = taskResultCents(t.valueCents, score, byAi, cfg, {
+      payBonusBps: e.taskPayBonusBps,
+      penaltyDiscountBps: e.taskPenaltyDiscountBps,
+    });
     t.status = score !== null && score >= cfg.passScoreBps ? "success" : score === null ? "missed" : "failure";
     t.scoreBps = score;
     t.resultCents = result;
@@ -166,8 +174,9 @@ export function createCompanyTasksEngine(
     t.status = "ai";
     t.assigneeAi = true;
     t.mine = false;
-    t.aiDoneAt = now + aiMinutes(queued) * 60_000;
-    t.aiChanceBps = Math.min(9_500, cfg.ai.chanceBps + (trained ? cfg.ai.skillBonusBps : 0));
+    const e = effects();
+    t.aiDoneAt = now + aiMinutes(queued, cfg, e.aiTaskTimeDiscountBps) * 60_000;
+    t.aiChanceBps = Math.min(9_500, cfg.ai.chanceBps + (trained ? cfg.ai.skillBonusBps : 0) + e.aiTaskChanceBps);
   }
 
   function state(s: DemoTasksState): CompanyTasks {
@@ -179,7 +188,7 @@ export function createCompanyTasksEngine(
       myTier: "c_level",
       autoAi: s.autoAi,
       aiWorkers: c.aiWorkers,
-      aiMinutes: aiMinutes(s.tasks.filter((t) => t.status === "ai").length),
+      aiMinutes: aiMinutes(s.tasks.filter((t) => t.status === "ai").length, cfg, effects().aiTaskTimeDiscountBps),
       canUseAi: c.aiWorkers > 0,
       people: [],
       tasks: s.tasks

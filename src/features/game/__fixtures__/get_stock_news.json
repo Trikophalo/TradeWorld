@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Ein Sparprogramm wirkt schneller als gedacht. Die Marge steigt. Sicher ist das nicht.",
-      "name": "Pixelwerk Studios",
-      "due_at": "2026-11-14T15:32:53.486118+00:00",
+      "body": "Der Start im Ausland läuft besser als geplant. Sicher ist das nicht.",
+      "name": "Volta Energie AG",
+      "due_at": "2026-11-14T15:47:52.646846+00:00",
       "status": "open",
-      "ticker": "PXW",
-      "headline": "Pixelwerk Studios senkt die Kosten deutlich",
+      "ticker": "VLT",
+      "headline": "Volta Energie AG erschließt neuen Markt",
       "move_bps": null,
-      "strength": 3,
+      "strength": 1,
       "direction": "up",
-      "published_at": "2026-11-14T14:53:33.188693+00:00"
+      "published_at": "2026-11-14T15:35:19.109774+00:00"
     },
     {
       "id": 3,
-      "body": "Ein bekannter Kopf aus der Branche kommt an Bord. Anleger dürften das spürbar honorieren. Sicher ist das nicht.",
-      "name": "Kaufrausch Märkte",
-      "due_at": "2026-11-14T13:53:33.181116+00:00",
+      "body": "Das Geschäft läuft schwächer als erwartet. Analysten rechnen mit einem deutlich fallenden Kurs. Sicher ist das nicht.",
+      "name": "Brotzeit Handel AG",
+      "due_at": "2026-11-14T14:35:19.103136+00:00",
       "status": "confirmed",
-      "ticker": "KFR",
-      "headline": "Neuer Chef-Entwickler wechselt zu Kaufrausch Märkte",
-      "move_bps": 867,
-      "strength": 2,
-      "direction": "up",
-      "published_at": "2026-11-14T13:53:33.181116+00:00"
+      "ticker": "BRZ",
+      "headline": "Brotzeit Handel AG senkt die Prognose",
+      "move_bps": -1024,
+      "strength": 3,
+      "direction": "down",
+      "published_at": "2026-11-14T14:35:19.103136+00:00"
     }
   ],
   "reliability_bps": 7500

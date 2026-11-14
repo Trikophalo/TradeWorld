@@ -787,6 +787,8 @@ export function Showcase() {
         <TaskBoard preview={SAMPLE_TASKS} />
         <UpgradeCard upgradeKey="vault" level={2} />
         <UpgradeCard upgradeKey="rhetoric" level={0} />
+        <UpgradeCard upgradeKey="vault_interest" level={1} />
+        <UpgradeCard upgradeKey="ai_turbo" level={0} />
         <Demo label="Krypto: Pixel-Coins der Markt-Coins (ADR-101)" className="flex-wrap justify-start gap-3">
           {CRYPTO.coins.map((c) => (
             <CoinLogo key={c.ticker} coin={{ ...c, logo: null }} scale={3} />
