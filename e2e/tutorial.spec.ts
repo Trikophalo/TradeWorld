@@ -45,7 +45,13 @@ test("a new player is guided through the first session and cannot skip it", asyn
 
   await tour(page, "nav-markets").click();
   await expect(page).toHaveURL("/markets");
-  await tour(page, "stock-row").click();
+  // The market list rises in and its prices tick: click once the row has settled under Finn's highlight.
+  await expect(async () => {
+    const before = await tour(page, "stock-row").boundingBox();
+    await page.waitForTimeout(150);
+    expect(await tour(page, "stock-row").boundingBox()).toEqual(before);
+    await tour(page, "stock-row").click({ timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
   await expect(page).toHaveURL(/\/markets\/[A-Z]+$/);
   await expect(finn(page)).toContainText("aktuelle Kurs");
   await next(page);
