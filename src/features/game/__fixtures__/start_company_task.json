@@ -1,0 +1,10 @@
+{
+  "id": 48,
+  "key": "payroll_check",
+  "game": "math",
+  "due_at": "2026-11-14T12:51:47.96199+00:00",
+  "puzzle": { "a": 5, "b": 28 },
+  "seconds": 45,
+  "opened_at": "2026-11-14T12:11:47.982336+00:00",
+  "value_cents": 44000
+}

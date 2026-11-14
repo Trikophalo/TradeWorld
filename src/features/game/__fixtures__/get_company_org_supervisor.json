@@ -1,0 +1,28 @@
+{
+  "company": { "id": "8f496009-c4f0-4377-91d1-ca79109f330d", "name": "Fixture Mode", "tier": "garage" },
+  "founder": { "tag": "6MLM", "is_me": false, "nickname": "Fx_Taskboss", "avatar_key": "rookie" },
+  "members": [
+    {
+      "tag": "Q4Z3",
+      "tier": "senior",
+      "is_me": false,
+      "since": "2026-11-14T12:11:47.933802+00:00",
+      "title": "Werkstudium",
+      "nickname": "Fx_Taskmid",
+      "avatar_key": "rookie",
+      "supervisor": null
+    },
+    {
+      "tag": "2Q68",
+      "tier": "intern",
+      "is_me": true,
+      "since": "2026-11-14T12:11:47.946728+00:00",
+      "title": "Werkstudium",
+      "nickname": "Fx_Tasknew",
+      "avatar_key": "rookie",
+      "supervisor": "Fx_Taskmid"
+    }
+  ],
+  "ai_workers": 1,
+  "ai_worker_skills": []
+}

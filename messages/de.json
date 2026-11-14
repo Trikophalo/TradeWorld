@@ -31,7 +31,8 @@
       "friends": "Freunde",
       "upgrades": "Upgrades",
       "deals": "Deals",
-      "crypto": "Krypto"
+      "crypto": "Krypto",
+      "news": "News"
     },
     "property": "Grundstück",
     "more": "Mehr",
@@ -49,7 +50,8 @@
     "soon": "Bald frei",
     "soonNext": "{name} ab Level {level}",
     "soonOpen": "Alle zeigen",
-    "soonClose": "Weniger"
+    "soonClose": "Weniger",
+    "news": "News"
   },
   "topbar": {
     "search": "Aktien, Firmen, Spieler suchen",
@@ -753,7 +755,12 @@
     "friend_code_used": "Du hast schon einen Freundescode eingelöst. Das geht nur einmal.",
     "move_unknown": "Diesen Geschäftszug gibt es für deine Firma nicht.",
     "move_busy": "Alle Plätze für Geschäftszüge sind belegt. Warte, bis einer fertig ist.",
-    "move_resting": "Dieser Zug braucht noch eine Pause."
+    "move_resting": "Dieser Zug braucht noch eine Pause.",
+    "task_not_found": "Diese Aufgabe gibt es nicht (mehr).",
+    "task_taken": "Jemand anderes kümmert sich schon um diese Aufgabe.",
+    "task_not_allowed": "Diese Aufgabe darfst du so nicht vergeben. Vorgesetzte geben Aufgaben nur an ihr eigenes Team weiter.",
+    "task_closed": "Diese Aufgabe ist schon erledigt oder abgelaufen.",
+    "no_ai_workers": "Deine Firma hat keine KI-Kräfte. Stelle im Team eine ein."
   },
   "locks": {
     "level": "Level {level}",
@@ -3422,7 +3429,10 @@
       "record_hour": [
         "Rekordstunde bei {company}: {profit} Gewinn mit {product}.",
         "{company} verdient so viel wie nie: {profit} in einer Stunde."
-      ]
+      ],
+      "task_success": ["{task}"],
+      "task_failure": ["{task}"],
+      "task_missed": ["{task}"]
     },
     "more": "Alle Meldungen",
     "less": "Weniger anzeigen"
@@ -4383,7 +4393,8 @@
     "artworks": "Pixel-Kunst sammeln, selbst malen und versteigern.",
     "richList": "Wer hat am meisten? Hier steht es schwarz auf weiß.",
     "events": "Was heute an der Börse ansteht.",
-    "profile": "Dein Fortschritt, dein Aussehen, deine Einstellungen."
+    "profile": "Dein Fortschritt, dein Aussehen, deine Einstellungen.",
+    "news": "Börsen-Tipps, Firmen-Meldungen und das Kuriose aus der Spielwelt. Alles an einem Ort."
   },
   "stockNews": {
     "title": "Börsen-News",
@@ -4998,5 +5009,867 @@
         "desc": "Mit Geduld und Plan. Familien empfehlen euch weiter."
       }
     }
+  },
+  "companyTasks": {
+    "title": "Aufgaben",
+    "intro": "Kleine Jobs, die zu eurem Produkt passen. Wer sie gut und rechtzeitig erledigt, bringt Geld in die Kasse. Verpatzt oder liegen gelassen kostet es.",
+    "employeeIntro": "Aufgaben aus deiner Firma. Erledige deine eigenen und gib als Vorgesetzte oder Vorgesetzter Arbeit an dein Team weiter.",
+    "tab": "Aufgaben",
+    "empty": "Gerade keine Aufgaben",
+    "emptyText": "Neue Aufgaben kommen, solange jemand aus der Firma online ist.",
+    "value": "+{amount}",
+    "penalty": "Bei Fehler −{amount}",
+    "due": "Frist",
+    "status": {
+      "open": "Offen",
+      "assigned": "Bei {name}",
+      "assignedBy": "Bei {name}, von {by}",
+      "playing": "{name} ist dran",
+      "ai": "KI arbeitet, fertig in",
+      "mine": "Deine Aufgabe"
+    },
+    "games": {
+      "pick": "Tippen",
+      "count": "Zählen",
+      "sort": "Sortieren",
+      "order": "Reihenfolge",
+      "seq": "Merken",
+      "math": "Rechnen"
+    },
+    "doIt": "Erledigen",
+    "take": "Übernehmen",
+    "delegate": "Delegieren",
+    "delegateTitle": "Aufgabe vergeben",
+    "delegateIntro": "Wer soll „{name}“ erledigen?",
+    "delegateMe": "Selbst erledigen",
+    "delegateMeHint": "Du spielst die Aufgabe gleich selbst.",
+    "delegateAi": "KI-Kraft",
+    "delegateAiHint": "Braucht etwa {minutes} Min., schafft es in {chance} % der Fälle und bringt nur {share} % des Werts.",
+    "delegateAiLate": "Zu langsam für diese Frist.",
+    "delegateNobody": "Du hast noch niemanden im Team, an den du Aufgaben geben kannst.",
+    "delegatePersonHint": "{tier} · {open} offene Aufgaben",
+    "delegated": "Aufgabe vergeben",
+    "delegatedText": "{name} kümmert sich jetzt darum.",
+    "autoAi": "Liegengebliebenes an die KI",
+    "autoAiHint": "Offene Aufgaben gehen {minutes} Minuten vor der Frist an deine KI-Kräfte. Langsamer und schlechter, aber besser als nichts.",
+    "autoAiNone": "Ohne KI-Kräfte bleibt Liegengebliebenes liegen.",
+    "history": "Letzte Ergebnisse",
+    "result": {
+      "success": "Geschafft",
+      "failure": "Verpatzt",
+      "missed": "Verpasst"
+    },
+    "byAi": "KI",
+    "play": {
+      "start": "Los geht’s",
+      "ready": "Du hast {seconds} Sekunden. Die Zeit läuft ab dem Start.",
+      "time": "Zeit",
+      "done": "Fertig",
+      "reset": "Neu anfangen",
+      "left": "{label}",
+      "right": "{label}",
+      "remember": "Merke dir die Reihenfolge!",
+      "repeat": "Jetzt nachmachen",
+      "yourAnswer": "Deine Antwort",
+      "countLabel": "Anzahl",
+      "mathLabel": "Ergebnis",
+      "itemsLeft": "Noch {count}",
+      "orderHint": "Tippe die Einträge in der richtigen Reihenfolge an.",
+      "success": "Geschafft!",
+      "successText": "{amount} für die Firma. +{xp} XP.",
+      "failure": "Daneben",
+      "failureText": "Das kostet die Firma {amount}.",
+      "late": "Zu langsam: Die Zeit war abgelaufen.",
+      "score": "{percent} % richtig",
+      "close": "Schließen"
+    },
+    "hierarchy": "Wer berichtet an wen",
+    "hierarchyIntro": "Vorgesetzte sind für ihr Team verantwortlich und geben Aufgaben weiter. Eine Vorgesetzte oder ein Vorgesetzter braucht einen höheren Rang.",
+    "reportsTo": "Berichtet an",
+    "reportsToYou": "Direkt an dich",
+    "supervisorSet": "Gespeichert",
+    "noStaff": "Noch keine Mitarbeiter. Stelle jemanden ein, um Aufgaben zu verteilen.",
+    "yourTeam": "Dein Team",
+    "yourTeamEmpty": "Dir berichtet niemand. Die Gründerin oder der Gründer kann dir Leute zuordnen.",
+    "items": {
+      "pay_invoices": {
+        "name": "Rechnungen sortieren",
+        "how": "Lege bezahlte und offene Rechnungen auf den richtigen Stapel.",
+        "ok": "{company} hat die Buchhaltung im Griff: alle Rechnungen pünktlich bezahlt.",
+        "fail": "Mahngebühren bei {company}: Offene Rechnungen sind liegen geblieben.",
+        "left": "Bezahlt",
+        "right": "Offen",
+        "leftItems": ["Miete Mai", "Strom April", "Server März", "Kaffee"],
+        "rightItems": ["Miete Juni", "Strom Mai", "Server April", "Druckerpapier"]
+      },
+      "payroll_check": {
+        "name": "Stundenzettel prüfen",
+        "how": "Rechne die Arbeitsstunden der Woche zusammen.",
+        "ok": "{company} zahlt Löhne auf den Cent genau.",
+        "fail": "Ärger bei {company}: Die Lohnabrechnung war falsch und musste teuer korrigiert werden.",
+        "question": "{a} Leute arbeiten je {b} Stunden. Wie viele Stunden sind das zusammen?"
+      },
+      "coffee_order": {
+        "name": "Kaffee für das Meeting",
+        "how": "Zähle, wie viele Kaffee bestellt wurden.",
+        "ok": "Wache Köpfe bei {company}: Das Meeting war ein voller Erfolg.",
+        "fail": "Müde Gesichter bei {company}: Das wichtige Meeting endete ohne Ergebnis.",
+        "labels": ["Kaffee", "Tee", "Wasser"]
+      },
+      "shift_plan": {
+        "name": "Schichtplan erstellen",
+        "how": "Sortiere die Schichten nach Beginn, die früheste zuerst.",
+        "ok": "Bei {company} sitzt jede Schicht. Alles läuft rund.",
+        "fail": "Chaos bei {company}: Zwei Schichten blieben leer, Kunden standen vor verschlossener Tür.",
+        "items": ["Anna", "Ben", "Cem", "Dana", "Emil"],
+        "unit": "Uhr"
+      },
+      "contract_review": {
+        "name": "Vertrag prüfen",
+        "how": "Markiere jede Stelle, an der die riskante Klausel 7 steht.",
+        "ok": "{company} unterschreibt einen sauberen Vertrag ohne Fallstricke.",
+        "fail": "Teurer Fehler bei {company}: Eine riskante Klausel wurde übersehen.",
+        "labels": ["Klausel 7", "Klausel 3", "Klausel 5"]
+      },
+      "password_reset": {
+        "name": "Neues Passwort merken",
+        "how": "Merke dir die Farbfolge des neuen Passworts und gib sie ein.",
+        "ok": "{company} ist wieder drin: Alle Konten sind gesichert.",
+        "fail": "{company} hat sich ausgesperrt: Ein halber Tag ohne Zugang zu den Systemen.",
+        "symbols": ["Rot", "Blau", "Grün", "Gelb"]
+      },
+      "customer_mail": {
+        "name": "Kundenpost sortieren",
+        "how": "Sortiere die Kundenmails in Lob und Beschwerden.",
+        "ok": "{company} antwortet allen Kunden noch am selben Tag.",
+        "fail": "Shitstorm bei {company}: Beschwerden blieben tagelang liegen.",
+        "left": "Lob",
+        "right": "Beschwerde",
+        "leftItems": ["Super Service", "Schnell da", "Gerne wieder", "Tolle Ware"],
+        "rightItems": ["Kaputt", "Zu spät", "Falsche Farbe", "Unfreundlich"]
+      },
+      "office_supplies": {
+        "name": "Büromaterial bestellen",
+        "how": "Rechne aus, wie viel Material da ist.",
+        "ok": "Bei {company} fehlt kein Stift. Alles nachbestellt.",
+        "fail": "Bei {company} gehen Toner und Papier aus. Die Arbeit steht still.",
+        "question": "Im Schrank liegen {a} Stifte, geliefert werden {b}. Wie viele sind es dann?"
+      },
+      "patch_servers": {
+        "name": "Server patchen",
+        "how": "Tippe alle Server an, die noch die alte Version haben.",
+        "ok": "{company} schließt jede Lücke, bevor Angreifer sie finden.",
+        "fail": "Hackerangriff bei einem Kunden von {company}: Ein Server war nicht aktualisiert.",
+        "labels": ["Server alt", "Server neu", "Drucker"]
+      },
+      "phishing_filter": {
+        "name": "Phishing-Mails erkennen",
+        "how": "Sortiere echte Mails und Phishing.",
+        "ok": "{company} fängt eine ganze Phishing-Welle ab. Kunden sind begeistert.",
+        "fail": "Peinlich für {company}: Ein Kunde wurde trotz Filter gephisht.",
+        "left": "Echt",
+        "right": "Phishing",
+        "leftItems": ["Rechnung.pdf", "Teammeeting", "Urlaubsantrag", "Newsletter"],
+        "rightItems": ["Konto gesperrt!", "Gewinn!!!", "Passwort jetzt", "Paket.exe"]
+      },
+      "alarm_codes": {
+        "name": "Alarmcode eingeben",
+        "how": "Merke dir den Code für das Rechenzentrum.",
+        "ok": "{company} reagiert in Sekunden auf einen Alarm beim Kunden.",
+        "fail": "Fehlalarm bei {company}: Die Polizei rückte umsonst an, der Kunde zahlt nicht.",
+        "symbols": ["Alpha", "Bravo", "Charlie", "Delta"]
+      },
+      "license_count": {
+        "name": "Lizenzen abrechnen",
+        "how": "Rechne aus, wie viele Lizenzen der Kunde braucht.",
+        "ok": "{company} rechnet einen großen Lizenzvertrag sauber ab.",
+        "fail": "{company} hat zu wenig berechnet und verschenkt Umsatz.",
+        "question": "{a} Filialen brauchen je {b} Lizenzen. Wie viele Lizenzen sind das?"
+      },
+      "crash_reports": {
+        "name": "Absturzberichte zählen",
+        "how": "Zähle die Abstürze aus dem letzten Update.",
+        "ok": "{company} behebt alle Abstürze. Die App steht wieder bei 4,8 Sternen.",
+        "fail": "Ein-Stern-Flut für {company}: Die App stürzt nach dem Update ständig ab.",
+        "labels": ["Absturz", "Warnung", "Info"]
+      },
+      "release_notes": {
+        "name": "Update-Text schreiben",
+        "how": "Ordne die Punkte: neue Funktion oder behobener Fehler?",
+        "ok": "Das Update von {company} kommt super an.",
+        "fail": "Verwirrte Nutzer bei {company}: Der Update-Text war Unsinn.",
+        "left": "Neu",
+        "right": "Behoben",
+        "leftItems": ["Dunkelmodus", "Widgets", "Sprachsuche", "Teilen"],
+        "rightItems": ["Login-Fehler", "Absturz", "Akku-Fresser", "Tippfehler"]
+      },
+      "store_screens": {
+        "name": "App-Store-Bilder auswählen",
+        "how": "Tippe alle Bilder im Hochformat an.",
+        "ok": "Die neuen Store-Bilder von {company} bringen viele Downloads.",
+        "fail": "{company}s App-Store-Seite sieht kaputt aus. Downloads brechen ein.",
+        "labels": ["Handy hoch", "Handy quer", "Tablet"]
+      },
+      "beta_testers": {
+        "name": "Beta-Tester zählen",
+        "how": "Rechne aus, wie viele Tester bleiben.",
+        "ok": "{company} startet mit einer gut getesteten Version.",
+        "fail": "{company} hat sich verzählt: Das Update ging ungetestet raus.",
+        "question": "{a} Leute testen die Beta, {b} springen ab. Wie viele bleiben?"
+      },
+      "rack_servers": {
+        "name": "Heiße Server finden",
+        "how": "Sortiere die Racks nach Temperatur, das heißeste zuerst.",
+        "ok": "{company} kühlt rechtzeitig. Kein Kunde merkt etwas.",
+        "fail": "Ausfall bei {company}: Ein Rack ist überhitzt, Kunden waren stundenlang offline.",
+        "items": ["Rack A", "Rack B", "Rack C", "Rack D", "Rack E"],
+        "unit": "°C"
+      },
+      "backup_tapes": {
+        "name": "Backups prüfen",
+        "how": "Tippe alle Bänder mit gültigem Backup an.",
+        "ok": "{company} stellt verlorene Daten eines Kunden in Minuten wieder her.",
+        "fail": "Datenverlust bei {company}: Das Backup war veraltet.",
+        "labels": ["Backup ok", "Backup alt", "Leer"]
+      },
+      "cloud_bill": {
+        "name": "Cloud-Rechnung erstellen",
+        "how": "Rechne die Monatsrechnung aus.",
+        "ok": "{company} rechnet korrekt ab, der Kunde verlängert.",
+        "fail": "{company} hat falsch abgerechnet und muss Geld zurückzahlen.",
+        "question": "Ein Kunde nutzt {a} Server zu je {b} € im Monat. Wie hoch ist die Rechnung?"
+      },
+      "ddos_block": {
+        "name": "Angriff abwehren",
+        "how": "Blocke alle Bots, lass Kunden durch.",
+        "ok": "{company} wehrt einen Großangriff ab. Alle Dienste laufen.",
+        "fail": "Überlastung bei {company}: Ein Angriff legt die Plattform lahm.",
+        "labels": ["Bot", "Kunde", "Partner"]
+      },
+      "deadline_files": {
+        "name": "Fristen ordnen",
+        "how": "Sortiere die Akten nach Frist, die dringendste zuerst.",
+        "ok": "{company} hält jede Frist. Alle Mandanten sind zufrieden.",
+        "fail": "Frist verpasst bei {company}: Ein Mandant verliert seinen Fall und will Geld zurück.",
+        "items": ["Akte Huber", "Akte Kaya", "Akte Lenz", "Akte Moll", "Akte Nowak"],
+        "unit": "Tage"
+      },
+      "template_check": {
+        "name": "Veraltete Vorlagen finden",
+        "how": "Tippe alle veralteten Vertragsvorlagen an.",
+        "ok": "{company} bringt alle Vorlagen auf den neuesten Stand.",
+        "fail": "Abmahnung für {company}: Eine veraltete Vorlage war noch online.",
+        "labels": ["Alt (2019)", "Neu (2026)", "Entwurf"]
+      },
+      "chatbot_answers": {
+        "name": "Fragen zuordnen",
+        "how": "Ordne die Fragen dem richtigen Rechtsgebiet zu.",
+        "ok": "Der Rechts-Chatbot von {company} antwortet treffsicher.",
+        "fail": "Der Chatbot von {company} gab falschen Rat. Ärger mit der Anwaltskammer.",
+        "left": "Mietrecht",
+        "right": "Arbeitsrecht",
+        "leftItems": ["Nebenkosten", "Kaution", "Kündigung Wohnung", "Schimmel"],
+        "rightItems": ["Urlaub", "Überstunden", "Abmahnung Job", "Probezeit"]
+      },
+      "fee_calc": {
+        "name": "Gebühren berechnen",
+        "how": "Rechne die Gebühr aus.",
+        "ok": "{company} rechnet jede Gebühr korrekt ab.",
+        "fail": "{company} muss Gebühren erstatten: falsch berechnet.",
+        "question": "Streitwert {a} €, Gebühr {b} %. Wie hoch ist die Gebühr?"
+      },
+      "fraud_check": {
+        "name": "Betrug stoppen",
+        "how": "Tippe alle verdächtigen Buchungen an.",
+        "ok": "{company} stoppt einen Betrüger, bevor Geld verschwindet.",
+        "fail": "{company} haftet: Betrüger haben Kundenkonten leergeräumt.",
+        "labels": ["Verdächtig", "Normal", "Dauerauftrag"]
+      },
+      "kyc_docs": {
+        "name": "Ausweise prüfen",
+        "how": "Sortiere gültige und abgelaufene Ausweise.",
+        "ok": "{company} eröffnet hunderte Konten ohne Fehler.",
+        "fail": "Bußgeld für {company}: Konten mit abgelaufenen Ausweisen eröffnet.",
+        "left": "Gültig",
+        "right": "Abgelaufen",
+        "leftItems": ["Pass 2031", "Ausweis 2029", "Pass 2030", "Ausweis 2033"],
+        "rightItems": ["Pass 2021", "Ausweis 2019", "Pass 2024", "Ausweis 2022"]
+      },
+      "interest_calc": {
+        "name": "Zinsen ausrechnen",
+        "how": "Rechne die Jahreszinsen aus.",
+        "ok": "{company} zahlt Zinsen pünktlich und richtig aus.",
+        "fail": "Peinlich für {company}: falsche Zinsen auf tausenden Konten.",
+        "question": "{a} € Guthaben, {b} % Zinsen im Jahr. Wie viel Zinsen sind das?"
+      },
+      "tan_codes": {
+        "name": "TAN-Generator testen",
+        "how": "Merke dir die TAN und gib sie ein.",
+        "ok": "Die neue TAN-Funktion von {company} läuft fehlerfrei.",
+        "fail": "Login-Chaos bei {company}: Kunden kamen nicht an ihr Geld.",
+        "symbols": ["4", "7", "1", "9"]
+      },
+      "pack_orders": {
+        "name": "Bestellungen packen",
+        "how": "Pack alle bestellten Artikel ins Paket.",
+        "ok": "{company} verschickt alle Bestellungen noch am selben Tag.",
+        "fail": "{company} verliert Umsatz: Bestellungen wurden nicht rechtzeitig verschickt.",
+        "labels": ["Bestellt", "Retoure", "Muster"]
+      },
+      "returns_sort": {
+        "name": "Retouren prüfen",
+        "how": "Sortiere die Retouren.",
+        "ok": "{company} bringt Retouren schnell zurück ins Regal.",
+        "fail": "{company} verkauft kaputte Ware weiter. Die Bewertungen stürzen ab.",
+        "left": "Wieder verkaufen",
+        "right": "Aussortieren",
+        "leftItems": ["Originalverpackt", "Ungetragen", "Etikett dran", "Wie neu"],
+        "rightItems": ["Fleck", "Riss", "Kaputt", "Ohne Teile"]
+      },
+      "price_update": {
+        "name": "Sale-Preise setzen",
+        "how": "Rechne den Rabatt aus.",
+        "ok": "Der Sale bei {company} läuft. Die Kassen klingeln.",
+        "fail": "Falsche Preise bei {company}: Artikel wurden zu billig verkauft.",
+        "question": "Ein Artikel kostet {a} €. Im Sale gibt es {b} % Rabatt. Wie viel Rabatt in Euro?"
+      },
+      "stock_count_shop": {
+        "name": "Lager zählen",
+        "how": "Zähle die Kartons im Regal.",
+        "ok": "Bei {company} stimmt der Lagerbestand wieder.",
+        "fail": "{company} verkauft Ware, die gar nicht mehr da ist.",
+        "labels": ["Karton", "Tüte", "Palette"]
+      },
+      "pack_shirts": {
+        "name": "T-Shirts verpacken",
+        "how": "Pack alle T-Shirts in Größe M ein.",
+        "ok": "{company} verschickt alle T-Shirts pünktlich.",
+        "fail": "{company} macht Minus: Die T-Shirts gingen nicht rechtzeitig raus.",
+        "labels": ["Shirt M", "Shirt S", "Shirt L"]
+      },
+      "color_match": {
+        "name": "Stoffe prüfen",
+        "how": "Sortiere die Stoffe: passen sie zur Kollektion?",
+        "ok": "Die neue Kollektion von {company} sieht aus wie aus einem Guss.",
+        "fail": "Fehlproduktion bei {company}: Hunderte Teile in falscher Farbe.",
+        "left": "Kollektion",
+        "right": "Falsche Farbe",
+        "leftItems": ["Salbei", "Sand", "Creme", "Oliv"],
+        "rightItems": ["Neonpink", "Giftgrün", "Lila", "Orange"]
+      },
+      "runway_order": {
+        "name": "Laufsteg-Reihenfolge",
+        "how": "Merke dir die Reihenfolge der Looks für die Show.",
+        "ok": "Standing Ovations für {company}: Die Show war perfekt.",
+        "fail": "Durcheinander auf dem Laufsteg von {company}. Die Presse lacht.",
+        "symbols": ["Mantel", "Kleid", "Anzug", "Hut"]
+      },
+      "size_count": {
+        "name": "Größen nachzählen",
+        "how": "Zähle alle Teile in Größe S.",
+        "ok": "{company} hat jede Größe vorrätig.",
+        "fail": "{company} ist ausverkauft in S. Kundinnen kaufen woanders.",
+        "labels": ["Größe S", "Größe M", "Größe L"]
+      },
+      "cheese_age": {
+        "name": "Käse nach Reife sortieren",
+        "how": "Sortiere die Käse nach Reifezeit, den ältesten zuerst.",
+        "ok": "Die Käsetheke von {company} begeistert Feinschmecker.",
+        "fail": "Bei {company} wurde junger Käse als alter verkauft. Kunden beschweren sich.",
+        "items": ["Bergkäse", "Gouda", "Comté", "Pecorino", "Cheddar"],
+        "unit": "Monate"
+      },
+      "expiry_check": {
+        "name": "Haltbarkeit prüfen",
+        "how": "Nimm alles Abgelaufene aus dem Regal.",
+        "ok": "Bei {company} ist alles frisch. Das Gesundheitsamt lobt.",
+        "fail": "Bußgeld für {company}: Abgelaufene Ware im Regal.",
+        "labels": ["Abgelaufen", "Frisch", "Bald fällig"]
+      },
+      "gift_basket": {
+        "name": "Präsentkörbe abrechnen",
+        "how": "Rechne die Bestellung aus.",
+        "ok": "{company} liefert einen Großauftrag Präsentkörbe aus.",
+        "fail": "{company} hat sich verrechnet und liefert mit Verlust.",
+        "question": "Eine Firma bestellt {a} Präsentkörbe zu je {b} €. Wie hoch ist die Rechnung?"
+      },
+      "cold_chain": {
+        "name": "Lieferung einräumen",
+        "how": "Was gehört in die Kühlung, was ins Regal?",
+        "ok": "{company} hält die Kühlkette lückenlos.",
+        "fail": "{company} muss verdorbene Ware wegwerfen. Teurer Tag.",
+        "left": "Kühlen",
+        "right": "Regal",
+        "leftItems": ["Lachs", "Butter", "Burrata", "Schinken"],
+        "rightItems": ["Olivenöl", "Pasta", "Honig", "Gewürze"]
+      },
+      "partner_audit": {
+        "name": "Filialen besuchen",
+        "how": "Hake alle Filialen ab, die den Standard erfüllen.",
+        "ok": "Alle Filialen von {company} glänzen beim Testkauf.",
+        "fail": "Testkauf-Desaster bei einer Filiale von {company}. Die Marke leidet.",
+        "labels": ["Standard ok", "Abweichung", "Geschlossen"]
+      },
+      "royalty_calc": {
+        "name": "Lizenzgebühr berechnen",
+        "how": "Rechne die Gebühr der Filiale aus.",
+        "ok": "{company} kassiert alle Lizenzgebühren korrekt.",
+        "fail": "{company} hat zu wenig Gebühren verlangt und verliert Geld.",
+        "question": "Eine Filiale macht {a} € Umsatz, die Gebühr ist {b} %. Wie hoch ist die Gebühr?"
+      },
+      "opening_plan": {
+        "name": "Eröffnungen planen",
+        "how": "Sortiere die neuen Filialen nach Eröffnung, die erste zuerst.",
+        "ok": "{company} eröffnet planmäßig neue Filialen.",
+        "fail": "Bei {company} stehen neue Filialen leer: Planung verpatzt.",
+        "items": ["Köln", "Bonn", "Essen", "Kiel", "Ulm"],
+        "unit": "Wochen"
+      },
+      "recipe_steps": {
+        "name": "Rezept schulen",
+        "how": "Merke dir die Reihenfolge des Rezepts.",
+        "ok": "In jeder Filiale von {company} schmeckt es gleich gut.",
+        "fail": "Kunden bei {company} beschweren sich: Jede Filiale kocht anders.",
+        "symbols": ["Teig", "Soße", "Käse", "Ofen"]
+      },
+      "panel_check": {
+        "name": "Defekte Module finden",
+        "how": "Tippe alle defekten Solarmodule an.",
+        "ok": "Die Anlagen von {company} liefern Rekordstrom.",
+        "fail": "Ertragsverlust bei {company}: Defekte Module blieben unentdeckt.",
+        "labels": ["Defekt", "Ok", "Verschmutzt"]
+      },
+      "roof_angle": {
+        "name": "Beste Dächer wählen",
+        "how": "Sortiere die Dächer nach Ertrag, das beste zuerst.",
+        "ok": "{company} baut nur auf den besten Dächern. Kunden sparen viel.",
+        "fail": "Kunde von {company} enttäuscht: Die Anlage liefert kaum Strom.",
+        "items": ["Dach Nord", "Dach Ost", "Dach Süd", "Dach West", "Garage"],
+        "unit": "kWh"
+      },
+      "feed_in": {
+        "name": "Einspeisung abrechnen",
+        "how": "Rechne die Vergütung aus.",
+        "ok": "{company} rechnet die Einspeisung sauber ab.",
+        "fail": "{company} hat falsch abgerechnet. Kunden fordern Geld.",
+        "question": "Eine Anlage speist {a} kWh ein, je {b} Cent. Wie viele Cent sind das?"
+      },
+      "cable_colors": {
+        "name": "Kabel anschließen",
+        "how": "Merke dir die Reihenfolge der Kabel.",
+        "ok": "Sauber verkabelt: Die Anlage von {company} geht ans Netz.",
+        "fail": "Kurzschluss bei {company}: Kabel vertauscht, der Wechselrichter ist hin.",
+        "symbols": ["Braun", "Blau", "Schwarz", "Grau"]
+      },
+      "outage_map": {
+        "name": "Störungen finden",
+        "how": "Tippe alle gestörten Leitungen an.",
+        "ok": "{company} hat den Strom in Minuten wieder an.",
+        "fail": "Stundenlanger Stromausfall: {company} fand die Störung zu spät.",
+        "labels": ["Störung", "Normal", "Wartung"]
+      },
+      "meter_read": {
+        "name": "Zähler ablesen",
+        "how": "Rechne den Verbrauch aus.",
+        "ok": "{company} liest alle Zähler korrekt ab.",
+        "fail": "Falsche Stromrechnungen von {company}. Die Hotline glüht.",
+        "question": "Der Zähler zeigt {a} kWh, letztes Jahr {b} kWh. Wie viel wurde verbraucht?"
+      },
+      "crew_dispatch": {
+        "name": "Trupps einteilen",
+        "how": "Sortiere die Trupps nach Anfahrt, den nächsten zuerst.",
+        "ok": "{company} ist überall schnell vor Ort.",
+        "fail": "Lange Wartezeit bei {company}: Der falsche Trupp fuhr los.",
+        "items": ["Trupp 1", "Trupp 2", "Trupp 3", "Trupp 4", "Trupp 5"],
+        "unit": "Min. Anfahrt"
+      },
+      "safety_gear": {
+        "name": "Sicherheitscheck",
+        "how": "Was muss bei der Arbeit an der Leitung dabei sein?",
+        "ok": "Unfallfrei: {company} arbeitet vorbildlich sicher.",
+        "fail": "Arbeitsunfall bei {company}. Die Baustelle steht still.",
+        "left": "Vorgeschrieben",
+        "right": "Unnötig",
+        "leftItems": ["Helm", "Handschuhe", "Prüfer", "Erdung"],
+        "rightItems": ["Krawatte", "Sonnenhut", "Kopfhörer", "Laptop"]
+      },
+      "cell_test": {
+        "name": "Zellen testen",
+        "how": "Tippe alle schwachen Batteriezellen an.",
+        "ok": "Die Speicher von {company} halten, was sie versprechen.",
+        "fail": "Rückruf bei {company}: Schwache Zellen sind durchgerutscht.",
+        "labels": ["Schwach", "Voll", "Halb"]
+      },
+      "charge_plan": {
+        "name": "Ladeplan erstellen",
+        "how": "Sortiere die Uhrzeiten nach Strompreis, die günstigste zuerst.",
+        "ok": "{company} lädt günstig und verkauft teuer. Gute Marge.",
+        "fail": "{company} hat zum teuersten Zeitpunkt geladen. Minus.",
+        "items": ["0 Uhr", "6 Uhr", "12 Uhr", "18 Uhr", "21 Uhr"],
+        "unit": "Cent/kWh"
+      },
+      "capacity_calc": {
+        "name": "Speicher auslegen",
+        "how": "Rechne die Kapazität aus.",
+        "ok": "{company} liefert einen perfekt passenden Speicher.",
+        "fail": "Der Speicher von {company} ist zu klein. Der Kunde tritt zurück.",
+        "question": "{a} Module mit je {b} kWh. Wie groß ist der Speicher?"
+      },
+      "thermal_watch": {
+        "name": "Temperatur überwachen",
+        "how": "Zähle die überhitzten Zellen.",
+        "ok": "{company} kühlt rechtzeitig. Alles sicher.",
+        "fail": "Brandgefahr bei {company}: Ein Speicher musste abgeschaltet werden.",
+        "labels": ["Heiß", "Normal", "Kühl"]
+      },
+      "buy_cheap": {
+        "name": "Günstig einkaufen",
+        "how": "Sortiere die Angebote nach Preis, das günstigste zuerst.",
+        "ok": "{company} kauft günstig ein und verdient am Abend kräftig.",
+        "fail": "{company} hat zu teuer eingekauft und verliert am Strommarkt.",
+        "items": ["Wind Nord", "Solar Süd", "Wasser Alpen", "Gas West", "Kohle Ost"],
+        "unit": "€/MWh"
+      },
+      "contract_sort": {
+        "name": "Herkunft prüfen",
+        "how": "Sortiere die Lieferverträge nach Herkunft.",
+        "ok": "{company} liefert nachweislich grünen Strom.",
+        "fail": "Etikettenschwindel? {company} muss Ökostrom-Kunden entschädigen.",
+        "left": "Ökostrom",
+        "right": "Graustrom",
+        "leftItems": ["Windpark", "Solarfeld", "Wasserkraft", "Biogas"],
+        "rightItems": ["Kohle", "Gas", "Öl", "Atom"]
+      },
+      "margin_calc": {
+        "name": "Marge prüfen",
+        "how": "Rechne die Marge pro MWh aus.",
+        "ok": "{company} handelt mit sattem Gewinn.",
+        "fail": "{company} hat sich verrechnet und handelt mit Verlust.",
+        "question": "Verkauf zu {a} €/MWh, Einkauf zu {b} €/MWh. Wie groß ist die Marge?"
+      },
+      "trade_signals": {
+        "name": "Handelsplan merken",
+        "how": "Merke dir die Reihenfolge der Handelssignale.",
+        "ok": "{company} trifft jeden Schritt des Handelsplans.",
+        "fail": "Falscher Knopf: {company} verkauft zum Tiefstpreis.",
+        "symbols": ["Kaufen", "Halten", "Verkaufen", "Warten"]
+      },
+      "batch_check": {
+        "name": "Charge prüfen",
+        "how": "Tippe alle fehlerhaften Tabletten an.",
+        "ok": "Die Charge von {company} besteht jede Prüfung.",
+        "fail": "Rückruf bei {company}: Fehlerhafte Tabletten im Handel.",
+        "labels": ["Fehlerhaft", "Ok", "Muster"]
+      },
+      "dose_calc": {
+        "name": "Dosis berechnen",
+        "how": "Rechne die Gesamtdosis aus.",
+        "ok": "{company} liefert exakt dosierte Tabletten.",
+        "fail": "Falsche Dosis bei {company}: Die Charge wird vernichtet.",
+        "question": "{a} Tabletten zu je {b} mg. Wie viele mg sind das?"
+      },
+      "pharmacy_orders": {
+        "name": "Apotheken beliefern",
+        "how": "Zähle die bestellten Ibuprofen-Packungen.",
+        "ok": "Alle Apotheken bekommen ihre Lieferung von {company}.",
+        "fail": "Lieferengpass bei {company}: Apotheken bleiben leer.",
+        "labels": ["Ibuprofen", "Aspirin", "Paracetamol"]
+      },
+      "label_sort": {
+        "name": "Packungen kennzeichnen",
+        "how": "Was ist rezeptpflichtig?",
+        "ok": "{company} kennzeichnet alles korrekt.",
+        "fail": "Abmahnung für {company}: falsche Kennzeichnung auf der Packung.",
+        "left": "Rezeptpflichtig",
+        "right": "Frei",
+        "leftItems": ["Antibiotikum", "Blutdrucksenker", "Insulin", "Cortison"],
+        "rightItems": ["Hustensaft", "Nasenspray", "Vitamin C", "Halstabletten"]
+      },
+      "petri_dishes": {
+        "name": "Kulturen kontrollieren",
+        "how": "Tippe alle Schalen an, in denen die Kultur wächst.",
+        "ok": "Durchbruch im Labor von {company}: Die Kulturen gedeihen.",
+        "fail": "Wochen verloren: Bei {company} wurden die falschen Kulturen weggeworfen.",
+        "labels": ["Kultur wächst", "Leer", "Verunreinigt"]
+      },
+      "dna_sequence": {
+        "name": "DNA abschreiben",
+        "how": "Merke dir die Basenfolge und gib sie ein.",
+        "ok": "{company} entschlüsselt ein wichtiges Gen.",
+        "fail": "Tippfehler im Erbgut: Ein Experiment von {company} ist wertlos.",
+        "symbols": ["A", "C", "G", "T"]
+      },
+      "lab_cleanup": {
+        "name": "Labor aufräumen",
+        "how": "Proben in den Kühlschrank, Abfall in den Eimer.",
+        "ok": "Das Labor von {company} ist blitzsauber, die Proben sind sicher.",
+        "fail": "Bei {company} landete eine wichtige Probe im Müll. Wochen verloren.",
+        "left": "Probe",
+        "right": "Abfall",
+        "leftItems": ["Blutprobe", "Gewebe", "Zellkultur", "DNA-Probe"],
+        "rightItems": ["Handschuh", "Pipettenspitze", "Tuch", "Becher"]
+      },
+      "grant_budget": {
+        "name": "Fördergeld beantragen",
+        "how": "Rechne den geförderten Betrag aus.",
+        "ok": "{company} bekommt die volle Förderung.",
+        "fail": "Antrag abgelehnt: {company} hat falsch gerechnet.",
+        "question": "Eine Förderung von {a} € deckt {b} % der Kosten. Wie viel Euro sind das?"
+      },
+      "device_test": {
+        "name": "Geräte prüfen",
+        "how": "Tippe alle Geräte mit Fehler an.",
+        "ok": "Die Geräte von {company} sind in jeder Klinik zuverlässig.",
+        "fail": "Rückruf bei {company}: Ein fehlerhaftes Gerät wurde ausgeliefert.",
+        "labels": ["Fehler", "Bestanden", "Prüfung läuft"]
+      },
+      "sterile_sort": {
+        "name": "OP-Set packen",
+        "how": "Was kommt ins sterile OP-Set?",
+        "ok": "Die OP-Sets von {company} sind perfekt gepackt.",
+        "fail": "Klinik schickt OP-Sets an {company} zurück: nicht steril.",
+        "left": "Steril",
+        "right": "Unsteril",
+        "leftItems": ["Skalpell OP", "Katheter neu", "Kanüle", "Tupfer OP"],
+        "rightItems": ["Ladekabel", "Karton", "Kugelschreiber", "Handbuch"]
+      },
+      "calibrate": {
+        "name": "Gerät kalibrieren",
+        "how": "Rechne die Abweichung aus.",
+        "ok": "{company} liefert präzise gemessene Werte.",
+        "fail": "Falsche Messwerte: Kliniken stoppen Geräte von {company}.",
+        "question": "Das Gerät misst {a}, richtig wäre {b}. Um wie viel liegt es zu hoch?"
+      },
+      "hospital_route": {
+        "name": "Kliniken besuchen",
+        "how": "Sortiere die Kliniken nach Entfernung, die nächste zuerst.",
+        "ok": "{company} gewinnt drei neue Kliniken als Kunden.",
+        "fail": "{company} kam zu spät zum Termin. Der Auftrag ging an die Konkurrenz.",
+        "items": ["Charité", "Uniklinik", "St. Josef", "Kreisklinik", "Praxis Dr. Lee"],
+        "unit": "km"
+      },
+      "dossier_pages": {
+        "name": "Akte vervollständigen",
+        "how": "Zähle die Seiten, die noch fehlen.",
+        "ok": "{company} reicht eine lückenlose Zulassungsakte ein.",
+        "fail": "Behörde schickt Akte an {company} zurück: unvollständig.",
+        "labels": ["Fehlt", "Fertig", "Entwurf"]
+      },
+      "deadline_agency": {
+        "name": "Behördenfristen ordnen",
+        "how": "Sortiere die Fristen, die dringendste zuerst.",
+        "ok": "{company} hält jede Behördenfrist ein.",
+        "fail": "Frist verpasst: Ein Kunde von {company} verliert ein halbes Jahr.",
+        "items": ["EMA", "BfArM", "FDA", "Swissmedic", "MHRA"],
+        "unit": "Tage"
+      },
+      "side_effects": {
+        "name": "Nebenwirkungen einordnen",
+        "how": "Sortiere die Nebenwirkungen nach Häufigkeit.",
+        "ok": "Der Beipackzettel von {company} ist vorbildlich.",
+        "fail": "Warnung der Behörde an {company}: Nebenwirkungen falsch eingestuft.",
+        "left": "Häufig",
+        "right": "Selten",
+        "leftItems": ["Kopfweh", "Müdigkeit", "Übelkeit", "Schwindel"],
+        "rightItems": ["Haarausfall", "Schluckauf", "Juckreiz", "Niesen"]
+      },
+      "translation_set": {
+        "name": "Unterlagen sortieren",
+        "how": "Tippe alle deutschen Unterlagen an.",
+        "ok": "{company} reicht alles in der richtigen Sprache ein.",
+        "fail": "Die Behörde lehnt ab: {company} hat die falschen Unterlagen geschickt.",
+        "labels": ["Deutsch", "Englisch", "Französisch"]
+      },
+      "route_order": {
+        "name": "Tour planen",
+        "how": "Sortiere die Stopps nach Fahrzeit, den nächsten zuerst.",
+        "ok": "Alle Pakete von {company} kommen pünktlich an.",
+        "fail": "{company} kommt zu spät. Kunden stornieren ihre Aufträge.",
+        "items": ["Bäckerei", "Apotheke", "Büro 5", "Café", "Kanzlei"],
+        "unit": "Min."
+      },
+      "parcel_scan": {
+        "name": "Expresspakete finden",
+        "how": "Tippe alle Expresspakete an.",
+        "ok": "{company} liefert jedes Expresspaket in der Stunde.",
+        "fail": "Expresspakete bei {company} liegen geblieben. Kunden wollen Geld zurück.",
+        "labels": ["Express", "Standard", "Retoure"]
+      },
+      "bike_check": {
+        "name": "Räder checken",
+        "how": "Merke dir die Reihenfolge des Checks.",
+        "ok": "Die Flotte von {company} rollt ohne Panne.",
+        "fail": "Platten und kaputte Bremsen: Die Räder von {company} bleiben stehen.",
+        "symbols": ["Bremse", "Licht", "Reifen", "Kette"]
+      },
+      "tip_jar": {
+        "name": "Kasse zählen",
+        "how": "Rechne das Trinkgeld des Tages zusammen.",
+        "ok": "{company} feiert einen Rekordtag.",
+        "fail": "Kassensturz bei {company}: Es fehlt Geld.",
+        "question": "Trinkgeld heute: {a} € in der Früh, {b} € am Abend. Wie viel insgesamt?"
+      },
+      "pick_list": {
+        "name": "Kommissionieren",
+        "how": "Hol alle Artikel aus Regal B.",
+        "ok": "Im Lager von {company} läuft alles wie ein Uhrwerk.",
+        "fail": "Falsche Ware verschickt: {company} muss teuer nachliefern.",
+        "labels": ["Regal B", "Regal A", "Regal C"]
+      },
+      "pallet_count": {
+        "name": "Inventur",
+        "how": "Zähle die Paletten.",
+        "ok": "Die Inventur von {company} stimmt auf den Stück genau.",
+        "fail": "Inventur-Differenz bei {company}: Ware verschwunden.",
+        "labels": ["Palette", "Kiste", "Fass"]
+      },
+      "forklift_safety": {
+        "name": "Staplerschulung",
+        "how": "Was ist auf dem Stapler erlaubt?",
+        "ok": "Unfallfreies Jahr bei {company}.",
+        "fail": "Staplerunfall bei {company}: Ein Regal ist umgekippt.",
+        "left": "Erlaubt",
+        "right": "Verboten",
+        "leftItems": ["Weste tragen", "Hupe nutzen", "Langsam fahren", "Gabel unten"],
+        "rightItems": ["Mitfahren", "Handy am Steuer", "Rennen", "Gabel oben fahren"]
+      },
+      "dock_plan": {
+        "name": "Rampen belegen",
+        "how": "Sortiere die LKW nach Ankunft, den ersten zuerst.",
+        "ok": "Kein LKW wartet bei {company}.",
+        "fail": "Stau an den Rampen von {company}. Strafgebühren der Spedition.",
+        "items": ["LKW Rot", "LKW Blau", "LKW Grün", "LKW Gelb", "LKW Weiß"],
+        "unit": "Uhr"
+      },
+      "customs_docs": {
+        "name": "Zollpapiere",
+        "how": "Sortiere die Sendungen.",
+        "ok": "Die Container von {company} rollen ohne Halt durch den Zoll.",
+        "fail": "Container von {company} hängt im Zoll fest. Strafe pro Tag.",
+        "left": "Zollfrei",
+        "right": "Verzollen",
+        "leftItems": ["EU-Ware", "Rücksendung", "Muster", "Ersatzteil EU"],
+        "rightItems": ["Ware China", "Ware USA", "Tabak", "Uhren Schweiz"]
+      },
+      "container_load": {
+        "name": "Schiff beladen",
+        "how": "Rechne die Ladung aus.",
+        "ok": "Das Schiff von {company} legt voll beladen ab.",
+        "fail": "Überladen! Das Schiff von {company} darf nicht auslaufen.",
+        "question": "{a} Container mit je {b} Tonnen. Wie viele Tonnen insgesamt?"
+      },
+      "ship_schedule": {
+        "name": "Fahrplan erstellen",
+        "how": "Sortiere die Häfen nach Ankunft.",
+        "ok": "{company} liefert jeden Container fahrplanmäßig.",
+        "fail": "Verspätung bei {company}: Kunden zahlen Vertragsstrafe zurück.",
+        "items": ["Hamburg", "Rotterdam", "Antwerpen", "Genua", "Piräus"],
+        "unit": "Tage"
+      },
+      "seal_codes": {
+        "name": "Plomben prüfen",
+        "how": "Merke dir die Plombennummern in Reihenfolge.",
+        "ok": "Alle Container von {company} kommen versiegelt an.",
+        "fail": "Plombe gebrochen? {company} muss den Container prüfen lassen.",
+        "symbols": ["K7", "M2", "P9", "X4"]
+      },
+      "box_labels": {
+        "name": "Kartons beschriften",
+        "how": "Tippe alle Kartons für die Küche an.",
+        "ok": "Alles am richtigen Platz: Der Umzug von {company} war perfekt.",
+        "fail": "Teller im Bad, Handtücher in der Küche: Kunden von {company} sind sauer.",
+        "labels": ["Küche", "Bad", "Wohnzimmer"]
+      },
+      "load_order": {
+        "name": "LKW beladen",
+        "how": "Merke dir, in welcher Reihenfolge eingeladen wird.",
+        "ok": "{company} bekommt alles in einen LKW.",
+        "fail": "Zweite Fahrt nötig: {company} hat falsch geladen.",
+        "symbols": ["Schrank", "Sofa", "Bett", "Kisten"]
+      },
+      "fragile_sort": {
+        "name": "Zerbrechliches markieren",
+        "how": "Sortiere die Sachen.",
+        "ok": "Nichts zerbrochen: {company} liefert alles heil.",
+        "fail": "Scherben beim Umzug: {company} muss Schadenersatz zahlen.",
+        "left": "Zerbrechlich",
+        "right": "Robust",
+        "leftItems": ["Gläser", "Spiegel", "Vase", "Lampe"],
+        "rightItems": ["Bücher", "Kissen", "Töpfe", "Schuhe"]
+      },
+      "moving_quote": {
+        "name": "Angebot rechnen",
+        "how": "Rechne das Angebot aus.",
+        "ok": "{company} gewinnt den Auftrag mit einem fairen Angebot.",
+        "fail": "{company} hat sich verrechnet und arbeitet umsonst.",
+        "question": "{a} Helfer arbeiten je 1 Stunde zu {b} €. Was kostet der Umzug?"
+      }
+    }
+  },
+  "funNews": {
+    "items": {
+      "ceo_laptop_train": "CEO von {company} vergisst Laptop im Zug. Die Aktie {ticker} zuckt nicht einmal.",
+      "office_dog": "Bürohund bei {company} zum „Mitarbeiter des Monats“ gewählt. Betriebsrat prüft den Vorgang.",
+      "coffee_machine": "Kaffeemaschine bei {company} kaputt: Produktivität fällt um geschätzte 40 Prozent.",
+      "typo_press": "Pressemitteilung von {company} verspricht „Rekordverlutse“. Gemeint waren Rekordumsätze.",
+      "ceo_marathon": "Chefin von {company} läuft Marathon in Bestzeit. Analysten sehen „Ausdauer im Management“.",
+      "printer_rebellion": "Drucker bei {company} druckt seit drei Tagen nur noch Katzenbilder. IT spricht von „Feature“.",
+      "parking_war": "Streit um Parkplätze bei {company} eskaliert: Vorstand kommt jetzt mit dem Fahrrad.",
+      "lucky_socks": "Händler schwört auf Glückssocken: Seit er sie trägt, kauft er nur noch {ticker}.",
+      "annual_party": "Weihnachtsfeier bei {company} gerät außer Kontrolle: Abteilungsleiter singt Karaoke bis 4 Uhr.",
+      "ai_slogan": "KI erfindet neuen Werbespruch für {company}. Niemand versteht ihn, alle finden ihn gut.",
+      "mascot": "{company} stellt neues Maskottchen vor: eine Ente im Anzug. Die Börse ist gespalten.",
+      "intern_ceo": "Praktikant bei {company} beantwortet aus Versehen eine Mail an den Bundeskanzler.",
+      "rename_rumor": "Gerücht: {company} will sich umbenennen. Vorschläge aus dem Team: „Firma“ und „Firma 2“.",
+      "plant_office": "{company} stellt 300 Zimmerpflanzen ins Büro. Eine davon hat jetzt einen eigenen Account.",
+      "ticker_meme": "Das Kürzel {ticker} geht in sozialen Netzwerken viral. Keiner weiß warum.",
+      "yacht_sale": "Vorstand von {company} verkauft Yacht. „Zu viel Wellengang“, heißt es offiziell.",
+      "player_lambo": "{nickname} kauft sich angeblich den dritten Sportwagen. Nachbarn beschweren sich über den Lärm.",
+      "player_coffee": "{nickname} trinkt laut Insidern elf Kaffee am Tag. Die Börse dankt für die Liquidität.",
+      "player_tip": "{nickname} gibt einen heißen Börsentipp: „Kaufen, wenn es billig ist.“ Genial.",
+      "player_office": "{nickname} hängt ein Bild von sich selbst ins Büro. In Öl, zwei Meter hoch.",
+      "player_chart": "{nickname} starrt seit sechs Stunden auf einen Chart. Freunde machen sich Sorgen.",
+      "player_diet": "{nickname} schwört auf die Börsen-Diät: nur essen, wenn der Index steigt.",
+      "player_motivation": "{nickname} hält eine Motivationsrede vor dem Spiegel. Der Spiegel war beeindruckt.",
+      "player_haircut": "{nickname} lässt sich die Haare in Form eines Aktienkurses schneiden. Leider abwärts.",
+      "weather_markets": "Wetterdienst meldet Sonne. Eisdielen-Aktien hätten gern profitiert, gibt es aber nicht.",
+      "pigeon_trader": "Taube landet auf der Tastatur eines Händlers und kauft 400 Anleihen. Gewinn: 3 Euro.",
+      "monday_effect": "Studie: Montags sind alle schlechter gelaunt. Auch die Kurse.",
+      "broker_nap": "Börsenmakler schläft beim Handel ein und verpasst nichts. Der Markt war heute langweilig.",
+      "bull_escape": "Bronzener Bulle vor der Börse frisch poliert. Händler sehen darin ein Kaufsignal.",
+      "bear_costume": "Mann im Bärenkostüm demonstriert vor der Börse. Er wollte eigentlich zum Kindergeburtstag.",
+      "calculator_strike": "Taschenrechner in der Buchhaltung streiken. Alle rechnen wieder im Kopf. Es läuft erstaunlich gut.",
+      "vending_machine": "Snackautomat im Handelssaal erhöht Preise um 20 Prozent. Händler sprechen von Inflation.",
+      "elevator_talk": "Zwei Vorstände bleiben im Aufzug stecken und gründen eine neue Firma. Die Tür ging nach 10 Minuten auf.",
+      "index_birthday": "Der Leitindex feiert Geburtstag. Torte mit Kurskerzen: eine steigt, eine fällt.",
+      "cat_portfolio": "Katze wählt Aktien zufällig per Pfote und schlägt den Markt. Fondsmanager sind beleidigt.",
+      "headline_error": "Zeitung meldet „Börse geschlossen“. Gemeint war die Kantine."
+    }
+  },
+  "newsTab": {
+    "title": "News",
+    "subtitle": "Was an der Börse, in den Firmen und im Rest der Welt passiert.",
+    "filters": {
+      "all": "Alle",
+      "stock": "Börse",
+      "company": "Firmen",
+      "market": "Markt",
+      "fun": "Kurioses"
+    },
+    "kinds": {
+      "stock": "Börsen-Tipp",
+      "company": "Firma",
+      "market": "Markt",
+      "fun": "Kurioses"
+    },
+    "up": "Könnte steigen",
+    "down": "Könnte fallen",
+    "empty": "Noch keine Meldungen",
+    "emptyText": "Neue Meldungen kommen alle paar Minuten.",
+    "byAi": "von der KI",
+    "byPerson": "von {name}",
+    "openCompany": "Zur Firma",
+    "ago": "vor {minutes, plural, =0 {wenigen Sekunden} one {# Minute} other {# Minuten}}",
+    "agoHours": "vor {hours, plural, one {# Stunde} other {# Stunden}}"
   }
 }

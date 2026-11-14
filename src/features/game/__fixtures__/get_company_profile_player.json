@@ -1,41 +1,32 @@
 {
   "facts": {
-    "staff": 2,
+    "staff": 1,
     "stage": 0,
-    "period": null,
-    "product": "security_software",
+    "period": "quarter",
+    "product": "courier",
     "max_staff": 2,
     "ai_workers": 0,
-    "quality_bps": null,
-    "value_cents": 250000,
-    "profit_cents": null,
-    "awareness_bps": null,
-    "revenue_cents": null
+    "quality_bps": 2325,
+    "value_cents": 295011,
+    "profit_cents": -14989,
+    "awareness_bps": 355,
+    "revenue_cents": 219099
   },
   "company": {
-    "id": "734e11f7-7611-419c-8cb5-3cf905dc6661",
-    "idea": "Leitern für jede Höhe",
+    "id": "524623c4-d412-4921-a077-f3d3266374b2",
+    "idea": "Fahrräder reparieren",
     "logo": null,
-    "name": "Fixture Leitern",
+    "name": "Gero Werkstatt",
     "tier": "garage",
     "is_ai": false,
     "listed": false,
-    "sector": "tech",
+    "sector": "logistics",
     "ticker": null,
     "price_e4": null,
     "change_bps": null,
-    "founded_at": "2026-11-14T01:08:18.842164+00:00",
-    "brand_color": "#447799"
+    "founded_at": "2026-11-14T12:11:21.472384+00:00",
+    "brand_color": "#aa5500"
   },
-  "founder": { "tag": "RAAP", "nickname": "Fixture_Chef", "avatar_key": "rookie" },
-  "members": [
-    {
-      "tag": "2W4A",
-      "tier": "junior",
-      "since": "2026-11-14T01:08:18.893889+00:00",
-      "title": "Werkstudium Leitern",
-      "nickname": "Fixture_Team",
-      "avatar_key": "rookie"
-    }
-  ]
+  "founder": { "tag": "TN62", "nickname": "Gero_Garage", "avatar_key": "rookie" },
+  "members": []
 }

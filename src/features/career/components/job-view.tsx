@@ -1,5 +1,6 @@
 "use client";
 
+import { TaskBoard } from "@/features/company/tasks/task-board";
 import { AiOrgChart, OrgChart } from "@/features/company/components/org-chart";
 import { CompanyNewsCard, SituationCard } from "@/features/company/components/situation";
 import { useQuery } from "@tanstack/react-query";
@@ -72,6 +73,7 @@ export function JobView() {
         {/* Staff of a player company see its situation and news (ADR-091). */}
         {employer.data?.kind === "player" && (
           <>
+            <TaskBoard />
             <SituationCard companyId={employer.data.company.id} />
             <CompanyNewsCard companyId={employer.data.company.id} title={tn("employeeTitle")} />
           </>

@@ -704,6 +704,8 @@ export interface OrgMember extends OrgPerson {
   tier: CareerTier;
   title: string | null;
   since: string | null;
+  /** Direct supervisor (ADR-129); null = the founder. */
+  supervisor?: string | null;
 }
 
 export interface CompanyOrg {
@@ -1100,6 +1102,102 @@ export interface CompanyMoves {
     gain: number;
     resolvedAt: string;
   }[];
+}
+
+/** Company tasks with mini-games (ADR-129). */
+export type TaskGame = "pick" | "count" | "sort" | "order" | "seq" | "math";
+export type TaskStatus = "open" | "assigned" | "playing" | "ai" | "success" | "failure" | "missed";
+
+export interface CompanyTask {
+  id: number;
+  key: string;
+  game: TaskGame;
+  branch: string;
+  status: TaskStatus;
+  valueCents: number;
+  createdAt: string;
+  dueAt: string;
+  assignee: string | null;
+  assigneeAi: boolean;
+  assignedBy: string | null;
+  aiDoneAt: string | null;
+  openedAt: string | null;
+  mine: boolean;
+  canDelegate: boolean;
+}
+
+export interface CompanyTaskPerson {
+  nickname: string;
+  tag: string | null;
+  tier: CareerTier;
+  isMe: boolean;
+  supervisor: string | null;
+  reportsToMe: boolean;
+  openTasks: number;
+}
+
+export interface CompanyTasks {
+  role: "founder" | "employee";
+  company: { id: string; name: string; tier: string; product: string | null };
+  myTier: string;
+  autoAi: boolean;
+  aiWorkers: number;
+  aiMinutes: number;
+  canUseAi: boolean;
+  people: CompanyTaskPerson[];
+  tasks: CompanyTask[];
+  history: {
+    id: number;
+    key: string;
+    status: "success" | "failure" | "missed";
+    resultCents: number;
+    scoreBps: number | null;
+    ai: boolean;
+    doneBy: string | null;
+    resolvedAt: string;
+  }[];
+}
+
+export interface CompanyTaskPlay {
+  id: number;
+  key: string;
+  game: TaskGame;
+  puzzle: Record<string, unknown>;
+  openedAt: string;
+  seconds: number;
+  valueCents: number;
+  dueAt: string;
+}
+
+export interface CompanyTaskResult {
+  id: number;
+  key: string;
+  status: "success" | "failure" | "missed";
+  scoreBps: number | null;
+  resultCents: number;
+  xp: number;
+  late: boolean;
+  solution: Record<string, unknown>;
+}
+
+/** One entry of the news tab (ADR-129). */
+export type NewsFeedKind = "all" | "stock" | "company" | "market" | "fun";
+export interface NewsFeedItem {
+  id: string;
+  kind: "stock" | "company" | "market" | "fun";
+  at: string;
+  headline: string | null;
+  body: string | null;
+  ticker: string | null;
+  name: string | null;
+  direction: "up" | "down" | null;
+  newsKind: string | null;
+  payload: Record<string, unknown>;
+  product: string | null;
+  tier: string | null;
+  category: string | null;
+  itemKey: string | null;
+  nickname: string | null;
 }
 
 /** The public profile of any company (ADR-125). */
@@ -1624,6 +1722,11 @@ export const GAME_ERROR_KEYS = [
   "slippage_exceeded",
   "coin_not_launched",
   "move_unknown",
+  "task_not_found",
+  "task_taken",
+  "task_not_allowed",
+  "task_closed",
+  "no_ai_workers",
   "move_busy",
   "move_resting",
   "friend_code_unknown",
@@ -1641,6 +1744,13 @@ export class GameError extends Error {
 
 /** Everything the game can do. Implemented by the live Supabase API and by the offline demo. */
 export interface GameEngine {
+  companyTasks(): Promise<CompanyTasks>;
+  delegateCompanyTask(requestId: string, taskId: number, to: string): Promise<CompanyTasks>;
+  startCompanyTask(requestId: string, taskId: number): Promise<CompanyTaskPlay>;
+  submitCompanyTask(requestId: string, taskId: number, answer: Record<string, unknown>): Promise<CompanyTaskResult>;
+  setJobSupervisor(requestId: string, nickname: string, supervisor: string | null): Promise<CompanyTasks>;
+  setCompanyTasksAutoAi(requestId: string, on: boolean): Promise<CompanyTasks>;
+  newsFeed(kind: NewsFeedKind, limit: number): Promise<NewsFeedItem[]>;
   snapshot(): Promise<MarketSnapshot>;
   candles(ticker: string, interval: CandleInterval, limit: number): Promise<Candle[]>;
   orderBook(ticker: string, levels: number): Promise<OrderBook>;

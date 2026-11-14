@@ -1014,3 +1014,63 @@ select tests.login_as('authenticated', :fx_g) is null as ok \gset
 select public.get_company_moves();
 \o
 reset role;
+
+-- Company tasks, supervisors and the news feed (ADR-129) -------------------------------------------------------------
+\set fx_ta '''f1f1f1f1-0000-4000-8000-0000000007a1'''
+\set fx_tb '''f1f1f1f1-0000-4000-8000-0000000007b1'''
+\set fx_tc '''f1f1f1f1-0000-4000-8000-0000000007c1'''
+select tests.signup(:fx_ta, 'Fx_Taskboss') is not null and tests.signup(:fx_tb, 'Fx_Taskmid') is not null
+   and tests.signup(:fx_tc, 'Fx_Tasknew') is not null as ok \gset
+select tests.set_level(:fx_ta, 12);
+select tests.set_level(:fx_tb, 6);
+select tests.set_level(:fx_tc, 6);
+select tests.fund(:fx_ta, 20000000, 'fixture:tasks') is not null as ok \gset
+select tests.login_as('authenticated', :fx_ta) is null as ok \gset
+select public.found_company(gen_random_uuid(), 'Fixture Mode', 'Shirts', 'retail', '#aa3366', 'garage', 'fashion')
+  -> 'company' ->> 'id' as fx_tco \gset
+select public.company_deposit(gen_random_uuid(), 2000000) is not null as ok \gset
+reset role;
+select tests.hire(:fx_ta, :fx_tb, 20000) as fx_tbj \gset
+select tests.hire(:fx_ta, :fx_tc, 20000) as fx_tcj \gset
+update public.player_jobs set tier = 'senior' where id = :'fx_tbj';
+update public.player_jobs set tier = 'intern' where id = :'fx_tcj';
+update public.player_companies set ai_workers = 1 where company_id = :'fx_tco';
+insert into public.company_tasks (company_id, task_key, branch, game, value_cents, due_at)
+values (:'fx_tco', 'pack_shirts', 'logistics', 'pick', 44000, now() + interval '40 minutes'),
+       (:'fx_tco', 'payroll_check', 'finance', 'math', 44000, now() + interval '40 minutes'),
+       (:'fx_tco', 'runway_order', 'sales', 'seq', 36000, now() + interval '40 minutes');
+select id as fx_t1 from public.company_tasks where company_id = :'fx_tco' and task_key = 'pack_shirts' \gset
+select id as fx_t2 from public.company_tasks where company_id = :'fx_tco' and task_key = 'payroll_check' \gset
+select id as fx_t3 from public.company_tasks where company_id = :'fx_tco' and task_key = 'runway_order' \gset
+select tests.login_as('authenticated', :fx_ta) is null as ok \gset
+\o :fixture_dir/set_job_supervisor.json
+select public.set_job_supervisor(gen_random_uuid(), 'Fx_Tasknew', 'Fx_Taskmid');
+\o :fixture_dir/delegate_company_task.json
+select public.delegate_company_task(gen_random_uuid(), :fx_t1, 'Fx_Taskmid');
+\o :fixture_dir/delegate_company_task_ai.json
+select public.delegate_company_task(gen_random_uuid(), :fx_t3, 'ai');
+\o :fixture_dir/set_company_tasks_auto_ai.json
+select public.set_company_tasks_auto_ai(gen_random_uuid(), false);
+\o :fixture_dir/start_company_task.json
+select public.start_company_task(gen_random_uuid(), :fx_t2);
+\o
+reset role;
+select solution ->> 'value' as fx_tv from public.company_tasks where id = :fx_t2 \gset
+select tests.login_as('authenticated', :fx_ta) is null as ok \gset
+\o :fixture_dir/submit_company_task.json
+select public.submit_company_task(gen_random_uuid(), :fx_t2, jsonb_build_object('value', :'fx_tv'::int));
+\o
+reset role;
+select tests.login_as('authenticated', :fx_tb) is null as ok \gset
+\o :fixture_dir/get_company_tasks.json
+select public.get_company_tasks();
+\o
+reset role;
+select public.fun_news_run_due(now()) is not null as ok \gset
+select tests.login_as('authenticated', :fx_tc) is null as ok \gset
+\o :fixture_dir/get_news_feed.json
+select public.get_news_feed('all', 30);
+\o :fixture_dir/get_company_org_supervisor.json
+select public.get_company_org(:'fx_tco');
+\o
+reset role;

@@ -1,27 +1,27 @@
 {
-  "id": "52eeefb7-ef5c-4c1a-9be5-7dbeb3b58a0f",
+  "id": "f8099d67-ad36-42bf-bba6-79ac36237f7a",
   "status": "offered",
   "message": "Ich lerne schnell.",
   "posting": {
-    "id": "9b3996dc-4fc0-4b0d-a4f6-a5861c669d4b",
+    "id": "8d5ecc2b-536d-4892-a5fe-447c4302c40e",
     "tier": "junior",
     "title": null,
     "company": {
-      "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
+      "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
       "logo": null,
-      "name": "QuantenSprung Labs",
-      "color": "#35D0BA",
+      "name": "KlarSoft AG",
+      "color": "#4C8DFF",
       "is_ai": true,
       "sector": "tech",
-      "ticker": "QSL"
+      "ticker": "KLS"
     },
     "required": [{ "branch": "it", "min_score": 2 }],
     "title_key": "it_junior",
     "required_skills": []
   },
-  "created_at": "2026-11-14T01:08:16.332146+00:00",
-  "updated_at": "2026-11-14T01:08:16.332146+00:00",
-  "offer_expires_at": "2026-11-16T01:08:16.332146+00:00",
+  "created_at": "2026-11-14T12:11:43.581874+00:00",
+  "updated_at": "2026-11-14T12:11:43.581874+00:00",
+  "offer_expires_at": "2026-11-16T12:11:43.581874+00:00",
   "salary_wish_cents_per_hour": 32700,
   "offer_salary_cents_per_hour": 32700
 }

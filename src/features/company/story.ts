@@ -15,6 +15,7 @@ export function useCompanyStory(company: CompanyBrief | undefined, profileWords:
   const t = useTranslations("companyEvents");
   const tn = useTranslations("companyNews");
   const tf = useTranslations("firm.tiers");
+  const tk = useTranslations("companyTasks.items");
   const product = useProductText();
   const profile: CompanyProfile | null = useMemo(
     () =>
@@ -63,6 +64,11 @@ export function useCompanyStory(company: CompanyBrief | undefined, profileWords:
         const archetype = typeof p.archetype === "string" ? p.archetype : null;
         const eventId = typeof p.event_id === "string" ? p.event_id : String(item.id);
         if (item.kind === "event_started" && archetype) return headline(archetype, eventId);
+        // Task results (ADR-129): the task's own success or failure line
+        if (item.kind.startsWith("task_") && typeof p.task === "string") {
+          const path = `${p.task}.${item.kind === "task_success" ? "ok" : "fail"}` as Parameters<typeof tk>[0];
+          return tk.has(path) ? String(tk.raw(path)).replace("{company}", name) : "";
+        }
         const templates = (() => {
           const value = tn.raw(`kinds.${item.kind}` as "title") as unknown;
           return Array.isArray(value) ? (value as string[]) : [];
@@ -84,5 +90,5 @@ export function useCompanyStory(company: CompanyBrief | undefined, profileWords:
         return fillTemplate(templates[seedOf(String(item.id)) % templates.length]!, values);
       },
     };
-  }, [company, profile, raw, t, tn, tf]);
+  }, [company, profile, raw, t, tn, tf, tk]);
 }

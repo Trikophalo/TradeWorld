@@ -1,0 +1,398 @@
+{
+  "items": [
+    {
+      "at": "2026-11-14T12:11:47.9868+00:00",
+      "id": "c129",
+      "kind": "company",
+      "name": "Fixture Mode",
+      "tier": "garage",
+      "payload": { "ai": false, "task": "payroll_check", "nickname": "Fx_Taskboss", "amount_cents": 44000 },
+      "product": "fashion",
+      "headline": null,
+      "news_kind": "task_success"
+    },
+    {
+      "at": "2026-11-14T12:11:47.946728+00:00",
+      "id": "c128",
+      "kind": "company",
+      "name": "Fixture Mode",
+      "tier": "garage",
+      "payload": { "title": "Werkstudium", "nickname": "Fx_Tasknew" },
+      "product": "fashion",
+      "headline": null,
+      "news_kind": "hired"
+    },
+    {
+      "at": "2026-11-14T12:11:47.933802+00:00",
+      "id": "c127",
+      "kind": "company",
+      "name": "Fixture Mode",
+      "tier": "garage",
+      "payload": { "title": "Werkstudium", "nickname": "Fx_Taskmid" },
+      "product": "fashion",
+      "headline": null,
+      "news_kind": "hired"
+    },
+    {
+      "at": "2026-11-14T12:11:47.858522+00:00",
+      "id": "c126",
+      "kind": "company",
+      "name": "Fixture Mode",
+      "tier": "garage",
+      "payload": { "tier": "garage" },
+      "product": "fashion",
+      "headline": null,
+      "news_kind": "founded"
+    },
+    {
+      "at": "2026-11-14T12:11:47.598341+00:00",
+      "id": "s3",
+      "body": "Der Start im Ausland läuft besser als geplant. Sicher ist das nicht.",
+      "kind": "stock",
+      "name": "Fundgrube Discount",
+      "ticker": "FGD",
+      "headline": "Fundgrube Discount erschließt neuen Markt",
+      "direction": "up"
+    },
+    {
+      "at": "2026-11-14T12:11:46.814762+00:00",
+      "id": "c125",
+      "kind": "company",
+      "name": "Fixture Zweitling",
+      "tier": "garage",
+      "payload": { "tier": "garage" },
+      "product": "online_shop",
+      "headline": null,
+      "news_kind": "founded"
+    },
+    {
+      "at": "2026-11-14T12:11:46.742687+00:00",
+      "id": "c124",
+      "kind": "company",
+      "name": "Fixture Erstling",
+      "tier": "garage",
+      "payload": { "tier": "garage" },
+      "product": "security_software",
+      "headline": null,
+      "news_kind": "founded"
+    },
+    {
+      "at": "2026-11-14T12:11:46.440229+00:00",
+      "id": "c122",
+      "kind": "company",
+      "name": "Fixture Lieferwerk",
+      "tier": "garage",
+      "payload": { "tier": "garage" },
+      "product": "security_software",
+      "headline": null,
+      "news_kind": "founded"
+    },
+    {
+      "at": "2026-11-14T12:11:46.389138+00:00",
+      "id": "c121",
+      "kind": "company",
+      "name": "Fixture Abnahme",
+      "tier": "garage",
+      "payload": { "tier": "garage" },
+      "product": "online_shop",
+      "headline": null,
+      "news_kind": "founded"
+    },
+    {
+      "at": "2026-11-14T12:11:46.24857+00:00",
+      "id": "c120",
+      "kind": "company",
+      "name": "Fixture Leitern",
+      "tier": "garage",
+      "payload": { "title": "Werkstudium Leitern", "nickname": "Fixture_Team" },
+      "product": "security_software",
+      "headline": null,
+      "news_kind": "hired"
+    },
+    {
+      "at": "2026-11-14T12:11:46.16715+00:00",
+      "id": "c119",
+      "kind": "company",
+      "name": "Fixture Leitern",
+      "tier": "garage",
+      "payload": { "tier": "garage" },
+      "product": "security_software",
+      "headline": null,
+      "news_kind": "founded"
+    },
+    {
+      "at": "2026-11-14T12:11:45.924405+00:00",
+      "id": "c114",
+      "kind": "company",
+      "name": "Fixture Krisenstab",
+      "tier": "garage",
+      "payload": { "tier": "garage" },
+      "product": "solar",
+      "headline": "Fixture Krisenstab geht ans Netz",
+      "news_kind": "founded"
+    },
+    {
+      "at": "2026-11-14T12:11:45.550239+00:00",
+      "id": "c113",
+      "kind": "company",
+      "name": "Fixture Werke",
+      "tier": "gmbh",
+      "payload": { "level": 1 },
+      "product": "security_software",
+      "headline": null,
+      "news_kind": "expanded"
+    },
+    {
+      "at": "2026-11-14T12:11:45.41971+00:00",
+      "id": "c112",
+      "kind": "company",
+      "name": "Fixture Werke",
+      "tier": "gmbh",
+      "payload": { "tier": "gmbh" },
+      "product": "security_software",
+      "headline": null,
+      "news_kind": "founded"
+    },
+    {
+      "at": "2026-11-14T12:11:44.425692+00:00",
+      "id": "c111",
+      "kind": "company",
+      "name": "Fixture Labor",
+      "tier": "ag",
+      "payload": { "ticker": "FIX" },
+      "product": "security_software",
+      "headline": null,
+      "news_kind": "ipo"
+    },
+    {
+      "at": "2026-11-14T12:11:44.212044+00:00",
+      "id": "c110",
+      "kind": "company",
+      "name": "Fixture Labor",
+      "tier": "ag",
+      "payload": { "title": "Werkstudium Daten", "nickname": "Fixture_Chefin" },
+      "product": "security_software",
+      "headline": null,
+      "news_kind": "hired"
+    },
+    {
+      "at": "2026-11-14T12:11:44.159+00:00",
+      "id": "c109",
+      "kind": "company",
+      "name": "Fixture Labor",
+      "tier": "ag",
+      "payload": { "tier": "small_business" },
+      "product": "security_software",
+      "headline": null,
+      "news_kind": "upgraded"
+    },
+    {
+      "at": "2026-11-14T12:11:44.027804+00:00",
+      "id": "c108",
+      "kind": "company",
+      "name": "Fixture Labor",
+      "tier": "ag",
+      "payload": { "title": "Werkstudium Software", "nickname": "Fixture_Chefin" },
+      "product": "security_software",
+      "headline": null,
+      "news_kind": "hired"
+    },
+    {
+      "at": "2026-11-14T12:11:43.735837+00:00",
+      "id": "c107",
+      "kind": "company",
+      "name": "Fixture Labor",
+      "tier": "ag",
+      "payload": { "tier": "garage" },
+      "product": "security_software",
+      "headline": null,
+      "news_kind": "founded"
+    },
+    {
+      "at": "2026-11-14T12:11:43.138186+00:00",
+      "id": "f1",
+      "kind": "fun",
+      "name": "NeuroPharm AG",
+      "ticker": "NPH",
+      "item_key": "annual_party",
+      "nickname": "Vera"
+    },
+    {
+      "at": "2026-11-14T12:11:43.115883+00:00",
+      "id": "c106",
+      "kind": "company",
+      "name": "Mona Moden",
+      "tier": "garage",
+      "payload": { "ai": false, "task": "size_count", "nickname": null, "amount_cents": -19200 },
+      "product": "fashion",
+      "headline": null,
+      "news_kind": "task_missed"
+    },
+    {
+      "at": "2026-11-14T12:11:43.108616+00:00",
+      "id": "c105",
+      "kind": "company",
+      "name": "Mona Moden",
+      "tier": "garage",
+      "payload": { "ai": true, "task": "runway_order", "nickname": null, "amount_cents": 21600 },
+      "product": "fashion",
+      "headline": null,
+      "news_kind": "task_success"
+    },
+    {
+      "at": "2026-11-14T12:11:43.092778+00:00",
+      "id": "c104",
+      "kind": "company",
+      "name": "Mona Moden",
+      "tier": "garage",
+      "payload": { "ai": false, "task": "payroll_check", "nickname": "Mona_Mode", "amount_cents": -26400 },
+      "product": "fashion",
+      "headline": null,
+      "news_kind": "task_failure"
+    },
+    {
+      "at": "2026-11-14T12:11:43.081704+00:00",
+      "id": "c103",
+      "kind": "company",
+      "name": "Mona Moden",
+      "tier": "garage",
+      "payload": { "ai": false, "task": "pack_shirts", "nickname": "Ida_Intern", "amount_cents": 44000 },
+      "product": "fashion",
+      "headline": null,
+      "news_kind": "task_success"
+    },
+    {
+      "at": "2026-11-14T12:11:43.028113+00:00",
+      "id": "c102",
+      "kind": "company",
+      "name": "Mona Moden",
+      "tier": "garage",
+      "payload": { "title": "Werkstudium", "nickname": "Ida_Intern" },
+      "product": "fashion",
+      "headline": null,
+      "news_kind": "hired"
+    },
+    {
+      "at": "2026-11-14T12:11:43.009994+00:00",
+      "id": "c101",
+      "kind": "company",
+      "name": "Mona Moden",
+      "tier": "garage",
+      "payload": { "title": "Werkstudium", "nickname": "Sven_Senior" },
+      "product": "fashion",
+      "headline": null,
+      "news_kind": "hired"
+    },
+    {
+      "at": "2026-11-14T12:11:42.917903+00:00",
+      "id": "c100",
+      "kind": "company",
+      "name": "Mona Moden",
+      "tier": "garage",
+      "payload": { "tier": "garage" },
+      "product": "fashion",
+      "headline": null,
+      "news_kind": "founded"
+    },
+    {
+      "at": "2026-11-14T12:11:42.760586+00:00",
+      "id": "c99",
+      "kind": "company",
+      "name": "Nora Recht",
+      "tier": "garage",
+      "payload": { "tier": "garage" },
+      "product": "legal_tech",
+      "headline": null,
+      "news_kind": "founded"
+    },
+    {
+      "at": "2026-11-14T12:11:42.505808+00:00",
+      "id": "c98",
+      "kind": "company",
+      "name": "Kurt Kurierdienst",
+      "tier": "garage",
+      "payload": { "tier": "garage" },
+      "product": "courier",
+      "headline": null,
+      "news_kind": "founded"
+    },
+    {
+      "at": "2026-11-14T12:11:41.784108+00:00",
+      "id": "c97",
+      "kind": "company",
+      "name": "Fritz Fahrradwerk",
+      "tier": "garage",
+      "payload": { "tier": "garage" },
+      "product": "courier",
+      "headline": null,
+      "news_kind": "founded"
+    },
+    {
+      "at": "2026-11-14T12:11:40.031287+00:00",
+      "id": "c96",
+      "kind": "company",
+      "name": "Sven Teile",
+      "tier": "garage",
+      "payload": { "title": "Werkstudium", "nickname": "Eva_Team" },
+      "product": "security_software",
+      "headline": null,
+      "news_kind": "hired"
+    },
+    {
+      "at": "2026-11-14T12:11:39.929116+00:00",
+      "id": "c95",
+      "kind": "company",
+      "name": "Tina Laden",
+      "tier": "garage",
+      "payload": { "tier": "garage" },
+      "product": "online_shop",
+      "headline": null,
+      "news_kind": "founded"
+    },
+    {
+      "at": "2026-11-14T12:11:33.300946+00:00",
+      "id": "m163",
+      "body": "Brotzeit Handel AG meldet 2,04 Mrd. € Umsatz und 99,0 Mio. € Gewinn im Q1 des Spieljahres 2. Analysten hatten weniger erwartet.",
+      "kind": "market",
+      "ticker": "BRZ",
+      "category": "earnings",
+      "headline": "Brotzeit Handel AG steigert Gewinn um 68 %"
+    },
+    {
+      "at": "2026-11-14T12:11:33.300946+00:00",
+      "id": "m169",
+      "body": "KlarSoft AG erreicht im Q1 des Spieljahres 2 420,2 Mio. € Umsatz und liegt damit im Rahmen der Erwartungen.",
+      "kind": "market",
+      "ticker": "KLS",
+      "category": "earnings",
+      "headline": "KlarSoft AG hält den Gewinn stabil"
+    },
+    {
+      "at": "2026-11-14T12:11:33.300946+00:00",
+      "id": "m170",
+      "body": "Nordlicht Logistik AG meldet 911,0 Mio. € Umsatz und 66,6 Mio. € Gewinn im Q1 des Spieljahres 2. Analysten hatten weniger erwartet.",
+      "kind": "market",
+      "ticker": "NDL",
+      "category": "earnings",
+      "headline": "Nordlicht Logistik AG steigert Gewinn um 27 %"
+    },
+    {
+      "at": "2026-11-14T12:11:33.300946+00:00",
+      "id": "m171",
+      "body": "NeuroPharm AG verfehlt im Q1 des Spieljahres 2 die Prognosen: 456,6 Mio. € Umsatz, 66,4 Mio. € Ergebnis.",
+      "kind": "market",
+      "ticker": "NPH",
+      "category": "earnings",
+      "headline": "NeuroPharm AG: Gewinn sinkt um 13 %"
+    },
+    {
+      "at": "2026-11-14T12:11:33.300946+00:00",
+      "id": "m176",
+      "body": "Volta Energie AG meldet 1,37 Mrd. € Umsatz und 149,8 Mio. € Gewinn im Q1 des Spieljahres 2. Analysten hatten weniger erwartet.",
+      "kind": "market",
+      "ticker": "VLT",
+      "category": "earnings",
+      "headline": "Volta Energie AG steigert Gewinn um 27 %"
+    }
+  ]
+}

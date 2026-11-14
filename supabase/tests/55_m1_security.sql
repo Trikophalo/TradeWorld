@@ -55,8 +55,11 @@ select tests.assert(
           -- company profile (93)
           || array['get_company_profile']
           -- business moves (95)
-          || array['get_company_moves', 'start_company_move']) x),
-  'authenticated can execute exactly the 9 helpers and the RPCs up to the business moves (95)');
+          || array['get_company_moves', 'start_company_move']
+          -- company tasks and news feed (96)
+          || array['get_company_tasks', 'delegate_company_task', 'start_company_task', 'submit_company_task',
+                   'set_job_supervisor', 'set_company_tasks_auto_ai', 'get_news_feed']) x),
+  'authenticated can execute exactly the 9 helpers and the RPCs up to the company tasks (96)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute') and p.proname <> 'check_nickname'),

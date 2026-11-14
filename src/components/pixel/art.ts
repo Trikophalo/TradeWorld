@@ -625,6 +625,28 @@ export const BRIEFCASE: PixelArt = {
   ],
 };
 
+export const NEWSPAPER: PixelArt = {
+  palette: { k: INK, w: "#f4f1e6", g: "#c9c3ae", r: "#e0384f", d: "#8d8774" },
+  grid: [
+    "................",
+    "..kkkkkkkkkkkk..",
+    ".kwwwwwwwwwwwwk.",
+    ".kwrrrrrrrrrrwk.",
+    ".kwrrrrrrrrrrwk.",
+    ".kwwwwwwwwwwwwk.",
+    ".kwddddwgggggwk.",
+    ".kwddddwwwwwwwk.",
+    ".kwddddwgggggwk.",
+    ".kwddddwwwwwwwk.",
+    ".kwwwwwwgggggwk.",
+    ".kwgggggwwwwwwk.",
+    ".kwwwwwwgggggwk.",
+    ".kwgggggwwwwwwk.",
+    "..kkkkkkkkkkkk..",
+    "................",
+  ],
+};
+
 export const COTTAGE: PixelArt = {
   palette: { k: INK, r: "#d9483b", s: "#a8322a", w: "#f2e6c9", d: "#8a5a32", g: "#62b0ff" },
   grid: [
@@ -799,6 +821,23 @@ export const UI_ICONS = {
       "..xxx..xxx..",
       "..xxx..xxx..",
       "..xxx..xxx..",
+      "............",
+    ],
+  },
+  news: {
+    palette: mono,
+    grid: [
+      "............",
+      "xxxxxxxxxxx.",
+      "x.........xx",
+      "x.xxxxxxx.x.",
+      "x.........x.",
+      "x.xxx.xxx.x.",
+      "x.xxx.....x.",
+      "x.xxx.xxx.x.",
+      "x.........x.",
+      "x.xxxxxxx.x.",
+      "xxxxxxxxxxx.",
       "............",
     ],
   },
@@ -1241,6 +1280,7 @@ export const ALL_PIXEL_ART: Record<string, PixelArt> = {
   contract: CONTRACT,
   moon: MOON,
   briefcase: BRIEFCASE,
+  newspaper: NEWSPAPER,
   cottage: COTTAGE,
   heart: HEART,
   gift: GIFT,

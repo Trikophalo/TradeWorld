@@ -2,29 +2,29 @@
   "items": [
     {
       "id": 4,
-      "body": "Neue Aktien sollen ausgegeben werden. Das verwässert die Anteile, der Kurs dürfte deutlich nachgeben. Sicher ist das nicht.",
-      "name": "Volta Energie AG",
-      "due_at": "2026-11-14T02:38:11.829787+00:00",
+      "body": "Ein bekannter Anleger hat ein großes Paket gekauft. Andere könnten folgen. Sicher ist das nicht.",
+      "name": "KlarSoft AG",
+      "due_at": "2026-11-14T13:22:42.952925+00:00",
       "status": "open",
-      "ticker": "VLT",
-      "headline": "Volta Energie AG plant Kapitalerhöhung",
+      "ticker": "KLS",
+      "headline": "Star-Investor steigt bei KlarSoft AG ein",
       "move_bps": null,
-      "strength": 3,
-      "direction": "down",
-      "published_at": "2026-11-14T02:08:20.20927+00:00"
+      "strength": 1,
+      "direction": "up",
+      "published_at": "2026-11-14T13:11:47.60254+00:00"
     },
     {
       "id": 3,
-      "body": "Das Geschäft läuft schwächer als erwartet. Analysten rechnen mit einem deutlich fallenden Kurs. Sicher ist das nicht.",
-      "name": "Brotzeit Handel AG",
-      "due_at": "2026-11-14T01:08:20.206132+00:00",
+      "body": "Der Start im Ausland läuft besser als geplant. Sicher ist das nicht.",
+      "name": "Fundgrube Discount",
+      "due_at": "2026-11-14T12:11:47.598341+00:00",
       "status": "confirmed",
-      "ticker": "BRZ",
-      "headline": "Brotzeit Handel AG senkt die Prognose",
-      "move_bps": -1112,
+      "ticker": "FGD",
+      "headline": "Fundgrube Discount erschließt neuen Markt",
+      "move_bps": 1111,
       "strength": 3,
-      "direction": "down",
-      "published_at": "2026-11-14T01:08:20.206132+00:00"
+      "direction": "up",
+      "published_at": "2026-11-14T12:11:47.598341+00:00"
     }
   ],
   "reliability_bps": 7500

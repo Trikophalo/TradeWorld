@@ -1,5 +1,6 @@
 import { COMPANY_EVENTS, type CompanyEventsConfig } from "./company-events.ts";
 import { COMPANY_MOVE_RULES, COMPANY_MOVES, type CompanyMoveConfig } from "./company-moves.ts";
+import { COMPANY_TASK_RULES, COMPANY_TASKS, FUN_NEWS, type CompanyTaskConfig } from "./company-tasks.ts";
 import { CRYPTO, type CryptoConfig } from "./crypto.ts";
 import { DEALS, TRUST, type DealsConfig, type TrustConfig } from "./deals.ts";
 import { SKILL_NODES, type SkillBranch, type SkillNodeConfig } from "./skills.ts";
@@ -820,6 +821,10 @@ export interface BalanceConfig {
   readonly stockNews: StockNewsConfig;
   /** Business moves of player companies (ADR-127), values in company-moves.ts. */
   readonly companyMoves: typeof COMPANY_MOVE_RULES & { readonly moves: readonly CompanyMoveConfig[] };
+  /** Company tasks with mini-games (ADR-129), values in company-tasks.ts. */
+  readonly companyTasks: typeof COMPANY_TASK_RULES & { readonly tasks: readonly CompanyTaskConfig[] };
+  /** Funny news in the news tab (ADR-129). */
+  readonly funNews: typeof FUN_NEWS;
 }
 
 export type PropertyTier = "flat" | "apartment" | "house" | "villa" | "luxury_villa";
@@ -2342,6 +2347,8 @@ export const BALANCE = {
   trust: TRUST,
   crypto: CRYPTO,
   companyMoves: { ...COMPANY_MOVE_RULES, moves: COMPANY_MOVES },
+  companyTasks: { ...COMPANY_TASK_RULES, tasks: COMPANY_TASKS },
+  funNews: FUN_NEWS,
   stockNews: {
     everyMinutes: 12,
     leadMinMinutes: 10,

@@ -35,7 +35,8 @@ import { StatBars } from "@/features/crypto/components/coin-detail";
 import { CoinLogo } from "@/features/crypto/components/coin-logo";
 import { SignaturePad } from "@/features/career/components/signature-pad";
 import { CompanyMovesCard } from "@/features/company/components/company-moves";
-import type { CompanyMoves, MyJob, PlayerCard } from "@/features/game/types";
+import { TaskBoard } from "@/features/company/tasks/task-board";
+import type { CompanyMoves, CompanyTasks, MyJob, PlayerCard } from "@/features/game/types";
 import { SpeechBubble } from "@/features/tutorial/components/speech-bubble";
 import { useTutorial } from "@/features/tutorial/store";
 import { resetDemoPlayer } from "@/features/game/demo-engine";
@@ -140,6 +141,79 @@ const SAMPLE_MOVES: CompanyMoves = {
       payoutCents: 720_000,
       gain: 0,
       resolvedAt: "2026-11-14T11:30:00.000Z",
+    },
+  ],
+};
+
+/** Task board of a fashion label (ADR-129): one open task, one with the senior, a few results. */
+const SAMPLE_TASKS: CompanyTasks = {
+  role: "founder",
+  company: { id: "demo", name: "Mona Moden", tier: "small_business", product: "fashion" },
+  myTier: "c_level",
+  autoAi: true,
+  aiWorkers: 1,
+  aiMinutes: 12,
+  canUseAi: true,
+  people: [
+    { nickname: "Sven", tag: "A1B2", tier: "senior", isMe: false, supervisor: null, reportsToMe: true, openTasks: 1 },
+    { nickname: "Ida", tag: "C3D4", tier: "intern", isMe: false, supervisor: "Sven", reportsToMe: false, openTasks: 0 },
+  ],
+  tasks: [
+    {
+      id: 1,
+      key: "pack_shirts",
+      game: "pick",
+      branch: "logistics",
+      status: "open",
+      valueCents: 165_000,
+      createdAt: new Date(SAMPLE_END - 30 * 60_000).toISOString(),
+      dueAt: new Date(SAMPLE_END).toISOString(),
+      assignee: null,
+      assigneeAi: false,
+      assignedBy: null,
+      aiDoneAt: null,
+      openedAt: null,
+      mine: false,
+      canDelegate: true,
+    },
+    {
+      id: 2,
+      key: "runway_order",
+      game: "seq",
+      branch: "sales",
+      status: "assigned",
+      valueCents: 135_000,
+      createdAt: new Date(SAMPLE_END - 20 * 60_000).toISOString(),
+      dueAt: new Date(SAMPLE_END + 25 * 60_000).toISOString(),
+      assignee: "Sven",
+      assigneeAi: false,
+      assignedBy: "Mona",
+      aiDoneAt: null,
+      openedAt: null,
+      mine: false,
+      canDelegate: true,
+    },
+  ],
+  history: [
+    {
+      id: 3,
+      key: "color_match",
+      status: "success",
+      resultCents: 150_000,
+      scoreBps: 10_000,
+      ai: false,
+      doneBy: "Ida",
+      resolvedAt: "2026-11-14T11:30:00.000Z",
+    },
+    {
+      id: 4,
+      key: "size_count",
+      status: "missed",
+      resultCents: -72_000,
+      scoreBps: null,
+      ai: false,
+      doneBy: null,
+      resolvedAt: "2026-11-14T11:10:00.000Z",
     },
   ],
 };
@@ -710,6 +784,7 @@ export function Showcase() {
         <CareerLadder job={SAMPLE_JOB} />
         <PayRoutes job={SAMPLE_JOB} />
         <CompanyMovesCard preview={SAMPLE_MOVES} />
+        <TaskBoard preview={SAMPLE_TASKS} />
         <UpgradeCard upgradeKey="vault" level={2} />
         <UpgradeCard upgradeKey="rhetoric" level={0} />
         <Demo label="Krypto: Pixel-Coins der Markt-Coins (ADR-101)" className="flex-wrap justify-start gap-3">

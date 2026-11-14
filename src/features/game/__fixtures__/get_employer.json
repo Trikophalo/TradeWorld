@@ -4,18 +4,18 @@
     "tier": null,
     "stage": null,
     "company": {
-      "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
+      "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
       "logo": null,
-      "name": "QuantenSprung Labs",
-      "color": "#35D0BA",
+      "name": "KlarSoft AG",
+      "color": "#4C8DFF",
       "is_ai": true,
       "sector": "tech",
-      "ticker": "QSL"
+      "ticker": "KLS"
     },
     "founder": null,
     "team_size": 1,
     "product_key": null,
-    "last_quarter": { "label": "J2 Q1", "profit_cents": -45372260, "revenue_cents": 257437480 },
+    "last_quarter": { "label": "J2 Q1", "profit_cents": 3765068078, "revenue_cents": 42023971403 },
     "pay_factor_bps": 10000
   }
 }

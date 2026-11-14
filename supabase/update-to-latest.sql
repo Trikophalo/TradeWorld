@@ -41572,6 +41572,1023 @@ begin
   end if;
 end;
 $$;
+-- ===== idempotent copy of migrations/20261204000100_company_tasks.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 0100 · Company tasks, supervisors and the news feed (ADR-129)
+-- =============================================================================
+-- Every player company gets small tasks that fit its product (game_config.companyTasks.tasks; product "*" = every
+-- company), e.g. "pack every T-shirt in size M" for a fashion label. Someone has to do a task before its deadline
+-- with a tiny game (pick, count, sort, order, seq, math). The server builds the puzzle, keeps the solution and grades
+-- the answer; the time runs from opening. Success pays value x score from the households into the company cash,
+-- a wrong answer or a missed deadline costs value x penaltyBps (company_costs). Every result is company news.
+--
+-- Hierarchy: the founder assigns a supervisor (player_jobs.supervisor_id, a higher rank) to employees. The founder
+-- delegates any task; an employee may take open tasks and pass tasks of their own to their direct reports. From
+-- aiDelegateMinTier on, tasks may go to the AI workers: slower (and slower with every queued task), less valuable,
+-- not always right. With tasks_auto_ai the AI takes open tasks shortly before the deadline.
+--
+-- New tasks appear only while someone of the company was active recently, so a sleeping company does not bleed.
+--
+-- Tables (RLS, no client rights): company_tasks, fun_news. RPCs (authenticated):
+--   get_company_tasks() -> TASKS (founder or employee of a player company)
+--   delegate_company_task(p_request_id uuid, p_task_id bigint, p_to text) -> TASKS   p_to: 'me' | 'ai' | nickname
+--   start_company_task(p_request_id uuid, p_task_id bigint) -> PLAY {"id","key","game","puzzle","opened_at","seconds",...}
+--   submit_company_task(p_request_id uuid, p_task_id bigint, p_answer jsonb) -> RESULT
+--   set_job_supervisor(p_request_id uuid, p_nickname text, p_supervisor text) -> TASKS (founder)
+--   set_company_tasks_auto_ai(p_request_id uuid, p_on boolean) -> TASKS (founder)
+--   get_news_feed(p_kind text default 'all', p_limit integer default 40) -> {"items": [...]}
+-- Internal: company_tasks_run_due(p_now) (cron nexa-company-tasks), fun_news_run_due(p_now) (cron nexa-fun-news).
+-- Errors: task_not_found NX110, task_taken NX111, task_not_allowed NX112, task_closed NX113, no_ai_workers NX114.
+-- Idempotent: runs unchanged as supabase/updates/20261204000100_company_tasks.sql.
+
+-- ---------------------------------------------------------------------------
+-- A. Schema
+-- ---------------------------------------------------------------------------
+alter table public.player_jobs add column if not exists supervisor_id uuid references public.profiles (id) on delete set null;
+create index if not exists player_jobs_supervisor_idx on public.player_jobs (supervisor_id) where supervisor_id is not null;
+comment on column public.player_jobs.supervisor_id is 'Direct supervisor in a player company (ADR-129); null = the founder.';
+
+alter table public.player_companies add column if not exists tasks_auto_ai boolean not null default true;
+alter table public.player_companies add column if not exists tasks_last_created_at timestamptz;
+
+create table if not exists public.company_tasks (
+  id             bigint generated always as identity primary key,
+  company_id     uuid not null references public.companies (id) on delete cascade,
+  task_key       text not null,
+  branch         text not null,
+  game           text not null check (game in ('pick', 'count', 'sort', 'order', 'seq', 'math')),
+  status         text not null default 'open'
+                 check (status in ('open', 'assigned', 'playing', 'ai', 'success', 'failure', 'missed')),
+  value_cents    bigint not null check (value_cents > 0),
+  created_at     timestamptz not null default now(),
+  due_at         timestamptz not null,
+  assignee_id    uuid references public.profiles (id) on delete set null,
+  assignee_ai    boolean not null default false,
+  assigned_by    uuid references public.profiles (id) on delete set null,
+  assigned_at    timestamptz,
+  ai_done_at     timestamptz,
+  ai_chance_bps  integer,
+  opened_at      timestamptz,
+  puzzle         jsonb,
+  solution       jsonb,
+  answer         jsonb,
+  score_bps      integer,
+  result_cents   bigint not null default 0,
+  done_by        uuid references public.profiles (id) on delete set null,
+  resolved_at    timestamptz
+);
+alter table public.company_tasks enable row level security;
+revoke all on public.company_tasks from public, anon, authenticated;
+create index if not exists company_tasks_company_idx on public.company_tasks (company_id, created_at desc);
+create index if not exists company_tasks_active_idx on public.company_tasks (due_at)
+  where status in ('open', 'assigned', 'playing', 'ai');
+create index if not exists company_tasks_assignee_idx on public.company_tasks (assignee_id) where assignee_id is not null;
+create index if not exists company_tasks_assigned_by_idx on public.company_tasks (assigned_by);
+create index if not exists company_tasks_done_by_idx on public.company_tasks (done_by);
+comment on table public.company_tasks is 'Tasks of player companies with mini-games (ADR-129). Internal; read through get_company_tasks().';
+
+create table if not exists public.fun_news (
+  id          bigint generated always as identity primary key,
+  item_key    text not null check (item_key ~ '^[a-z0-9_]+$'),
+  company     text,
+  ticker      text,
+  nickname    text,
+  created_at  timestamptz not null default now()
+);
+alter table public.fun_news enable row level security;
+revoke all on public.fun_news from public, anon, authenticated;
+create index if not exists fun_news_created_idx on public.fun_news (created_at desc);
+comment on table public.fun_news is 'Funny filler news for the news tab (ADR-129); texts live in the client (funNews.items).';
+
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('company_task', 'company', 'Neue Aufgabe', 'Jemand hat dir in der Firma eine Aufgabe gegeben.',
+        'notif_company', true, true, false, 207)
+on conflict (key) do nothing;
+
+-- Error keys: patch api_error() after the last known key (same way as ADR-127)
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.api_error(text)'::regprocedure);
+begin
+  if position('''no_ai_workers''' in v_def) = 0 then
+    v_def := replace(v_def, $q$    when 'move_resting'                then 'NX109'
+$q$, $q$    when 'move_resting'                then 'NX109'
+    when 'task_not_found'              then 'NX110'
+    when 'task_taken'                  then 'NX111'
+    when 'task_not_allowed'            then 'NX112'
+    when 'task_closed'                 then 'NX113'
+    when 'no_ai_workers'               then 'NX114'
+$q$);
+    if position('''no_ai_workers''' in v_def) = 0 then
+      raise exception 'api_error() has an unexpected shape; add the task error keys by hand';
+    end if;
+    execute v_def;
+  end if;
+end;
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- B. Helpers
+-- ---------------------------------------------------------------------------
+create or replace function public.company_tasks_cfg()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select value from public.game_config where key = 'companyTasks'), '{}'::jsonb);
+$$;
+
+create or replace function public.job_tier_rank(p_tier text)
+returns integer
+language sql
+immutable
+set search_path = ''
+as $$
+  select case p_tier when 'c_level' then 5 when 'team_lead' then 4 when 'senior' then 3 when 'junior' then 2
+                     when 'intern' then 1 else 0 end;
+$$;
+
+-- Random integer in [lo, hi]
+create or replace function public.rand_between(p_lo integer, p_hi integer)
+returns integer
+language sql
+volatile
+set search_path = ''
+as $$
+  select p_lo + floor(random() * (p_hi - p_lo + 1))::integer;
+$$;
+
+-- Builds the puzzle of a task and its solution: {"puzzle": {...}, "solution": {...}}. Mirrors
+-- src/lib/sim/company-tasks.ts (generatePuzzle).
+create or replace function public.company_task_puzzle(p_task jsonb)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  g        jsonb := public.company_tasks_cfg() -> 'games' -> (p_task ->> 'game');
+  v_game   text := p_task ->> 'game';
+  v_n      integer;
+  v_tiles  jsonb;
+  v_sol    jsonb;
+  v_vals   integer[] := '{}';
+  v_v      integer;
+  a        integer;
+  b        integer;
+begin
+  if v_game in ('pick', 'count') then
+    v_n := public.rand_between((g ->> 'minTargets')::integer, (g ->> 'maxTargets')::integer);
+    with t as (
+      select i, case when i <= v_n then 0 else 1 + floor(random() * 2)::integer end as lab
+        from generate_series(1, (g ->> 'tiles')::integer) i),
+    s as (select lab, row_number() over (order by random()) - 1 as pos from t)
+    select jsonb_agg(lab order by pos), coalesce(jsonb_agg(pos order by pos) filter (where lab = 0), '[]'::jsonb)
+      into v_tiles, v_sol from s;
+    if v_game = 'pick' then
+      return jsonb_build_object('puzzle', jsonb_build_object('tiles', v_tiles), 'solution', jsonb_build_object('targets', v_sol));
+    end if;
+    return jsonb_build_object('puzzle', jsonb_build_object('tiles', v_tiles), 'solution', jsonb_build_object('count', v_n));
+  elsif v_game = 'sort' then
+    with s as (select i, row_number() over (order by random()) as pos from generate_series(0, (g ->> 'items')::integer - 1) i)
+    select jsonb_agg(i order by pos), jsonb_agg(case when i < (g ->> 'items')::integer / 2 then 0 else 1 end order by pos)
+      into v_tiles, v_sol from s;
+    return jsonb_build_object('puzzle', jsonb_build_object('items', v_tiles), 'solution', jsonb_build_object('sides', v_sol));
+  elsif v_game = 'order' then
+    while coalesce(array_length(v_vals, 1), 0) < (g ->> 'items')::integer loop
+      v_v := public.rand_between((g ->> 'min')::integer, (g ->> 'max')::integer);
+      if not v_v = any (v_vals) then
+        v_vals := v_vals || v_v;
+      end if;
+    end loop;
+    select jsonb_agg(i - 1 order by case when coalesce((p_task ->> 'asc')::boolean, true) then v else -v end)
+      into v_sol from unnest(v_vals) with ordinality as x(v, i);
+    return jsonb_build_object('puzzle', jsonb_build_object('values', to_jsonb(v_vals)),
+                              'solution', jsonb_build_object('order', v_sol));
+  elsif v_game = 'seq' then
+    select jsonb_agg(floor(random() * 4)::integer) into v_sol from generate_series(1, (g ->> 'length')::integer);
+    return jsonb_build_object('puzzle', jsonb_build_object('sequence', v_sol, 'show_seconds', (g ->> 'showSeconds')::integer),
+                              'solution', jsonb_build_object('sequence', v_sol));
+  elsif v_game = 'math' then
+    a := public.rand_between((p_task -> 'a' ->> 0)::integer, (p_task -> 'a' ->> 1)::integer);
+    b := public.rand_between((p_task -> 'b' ->> 0)::integer, (p_task -> 'b' ->> 1)::integer);
+    if p_task ->> 'op' = 'pct' then
+      -- whole results: big amounts in hundreds, small ones in tens with rates in tens
+      if (p_task -> 'a' ->> 1)::integer >= 1000 then
+        a := greatest(100, (a / 100) * 100);
+      else
+        a := greatest(10, (a / 10) * 10);
+        b := greatest(10, (b / 10) * 10);
+      end if;
+    end if;
+    v_v := case p_task ->> 'op' when 'mul' then a * b when 'add' then a + b when 'sub' then a - b
+                                when 'pct' then a * b / 100 end;
+    return jsonb_build_object('puzzle', jsonb_build_object('a', a, 'b', b), 'solution', jsonb_build_object('value', v_v));
+  end if;
+  raise exception 'unknown task game %', v_game;
+end;
+$$;
+
+-- Grades an answer: score in basis points (0..10000). Mirrors gradeAnswer in src/lib/sim/company-tasks.ts.
+create or replace function public.company_task_grade(p_game text, p_solution jsonb, p_answer jsonb)
+returns integer
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_hits    integer;
+  v_wrong   integer;
+  v_total   integer;
+  v_diff    integer;
+  v_key     text;
+begin
+  if p_answer is null or jsonb_typeof(p_answer) <> 'object' then
+    return 0;
+  end if;
+  if p_game = 'pick' then
+    if jsonb_typeof(p_answer -> 'picked') <> 'array' then
+      return 0;
+    end if;
+    v_total := jsonb_array_length(p_solution -> 'targets');
+    select count(*) filter (where p_solution -> 'targets' @> to_jsonb(x)),
+           count(*) filter (where not p_solution -> 'targets' @> to_jsonb(x))
+      into v_hits, v_wrong
+      from (select distinct x from jsonb_array_elements(p_answer -> 'picked') x) d;
+    return greatest(0, least(10000, ((v_hits - v_wrong) * 10000) / greatest(v_total, 1)));
+  elsif p_game in ('count', 'math') then
+    v_key := case p_game when 'count' then 'count' else 'value' end;
+    if jsonb_typeof(p_answer -> v_key) <> 'number' then
+      return 0;
+    end if;
+    v_diff := abs((p_answer ->> v_key)::numeric - (p_solution ->> v_key)::numeric);
+    return case when v_diff = 0 then 10000 when p_game = 'count' and v_diff = 1 then 5000 else 0 end;
+  else
+    v_key := case p_game when 'sort' then 'sides' when 'order' then 'order' else 'sequence' end;
+    if jsonb_typeof(p_answer -> v_key) <> 'array' then
+      return 0;
+    end if;
+    v_total := jsonb_array_length(p_solution -> v_key);
+    select count(*) into v_hits
+      from jsonb_array_elements(p_solution -> v_key) with ordinality s(v, i)
+      join jsonb_array_elements(p_answer -> v_key) with ordinality a(v, i) on a.i = s.i
+     where a.v = s.v;
+    return (v_hits * 10000) / greatest(v_total, 1);
+  end if;
+end;
+$$;
+
+-- The caller's place in a player company: founder or active employee
+create or replace function public.company_task_member(p_player uuid)
+returns table (company_id uuid, is_founder boolean, tier text, job_id uuid)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select pc.company_id, true, 'c_level'::text, null::uuid
+    from public.player_companies pc where pc.founder_id = p_player and pc.status = 'active'
+  union all
+  select j.company_id, false, j.tier::text, j.id
+    from public.player_jobs j
+    join public.player_companies pc on pc.company_id = j.company_id and pc.status = 'active'
+   where j.player_id = p_player and j.status = 'active'
+  limit 1;
+$$;
+
+-- Finishes a task: books the money, writes news, grants XP. p_score null = deadline missed.
+create or replace function public.company_task_resolve(p_task_id bigint, p_score integer, p_by_ai boolean)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg       jsonb := public.company_tasks_cfg();
+  t         public.company_tasks;
+  v_ok      boolean;
+  v_amount  bigint := 0;
+  v_avail   bigint;
+  v_status  text;
+  v_xp      integer := 0;
+  v_nick    text;
+begin
+  select * into t from public.company_tasks where id = p_task_id for update;
+  if t.id is null or t.status in ('success', 'failure', 'missed') then
+    return null;
+  end if;
+  v_ok := p_score is not null and p_score >= (cfg ->> 'passScoreBps')::integer;
+  if v_ok then
+    v_amount := (t.value_cents * p_score) / 10000;
+    if p_by_ai then
+      v_amount := (v_amount * (cfg -> 'ai' ->> 'valueBps')::integer) / 10000;
+    end if;
+    select a.balance_cents into v_avail from public.ledger_accounts a
+     where a.id = public.ledger_system_account('households') for update;
+    v_amount := least(v_amount, greatest(coalesce(v_avail, 0), 0));
+    if v_amount > 0 then
+      perform public.ledger_transfer(public.ledger_system_account('households'), public.company_cash_account(t.company_id),
+                                     v_amount, 'company_revenue', 'Aufgabe erledigt: ' || t.task_key, 'company', t.company_id,
+                                     'task:result:' || t.id::text, t.done_by, jsonb_build_object('task', t.task_key));
+    end if;
+    v_status := 'success';
+  else
+    v_amount := (t.value_cents * (cfg ->> 'penaltyBps')::integer) / 10000;
+    select a.balance_cents into v_avail from public.ledger_accounts a
+     where a.id = public.company_cash_account(t.company_id) for update;
+    v_amount := least(v_amount, greatest(coalesce(v_avail, 0), 0));
+    if v_amount > 0 then
+      perform public.ledger_transfer(public.company_cash_account(t.company_id), public.ledger_system_account('households'),
+                                     v_amount, 'company_costs', 'Aufgabe verpatzt: ' || t.task_key, 'company', t.company_id,
+                                     'task:result:' || t.id::text, t.done_by, jsonb_build_object('task', t.task_key));
+    end if;
+    v_status := case when p_score is null then 'missed' else 'failure' end;
+    v_amount := -v_amount;
+  end if;
+  if t.done_by is not null and not p_by_ai then
+    v_xp := public.grant_xp(t.done_by, 'work_task',
+                            case when v_ok then (cfg -> 'xp' ->> 'success')::integer else (cfg -> 'xp' ->> 'failure')::integer end,
+                            'company_task:' || t.id::text, 'company_task', null);
+  end if;
+  update public.company_tasks
+     set status = v_status, score_bps = p_score, result_cents = v_amount, resolved_at = public.game_now()
+   where id = t.id;
+  select p.nickname into v_nick from public.profiles p where p.id = coalesce(t.done_by, t.assignee_id);
+  perform public.company_news_add(t.company_id, 'task_' || v_status,
+    jsonb_build_object('task', t.task_key, 'amount_cents', v_amount, 'nickname', v_nick, 'ai', p_by_ai));
+  return jsonb_build_object('status', v_status, 'score_bps', p_score, 'result_cents', v_amount, 'xp', v_xp);
+end;
+$$;
+
+-- Minutes the AI needs for a task right now: slower with every task it already works on
+create or replace function public.company_task_ai_minutes(p_company uuid)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select ceil((c -> 'ai' ->> 'minutes')::numeric
+              * (1 + (select count(*) from public.company_tasks t where t.company_id = p_company and t.status = 'ai')
+                   * (c -> 'ai' ->> 'slowdownPerQueuedBps')::numeric / 10000))::integer
+    from (select public.company_tasks_cfg() as c) x;
+$$;
+
+create or replace function public.company_task_to_ai(p_task_id bigint, p_by uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.company_tasks_cfg();
+  t       public.company_tasks;
+  pc      public.player_companies;
+  v_bonus integer := 0;
+begin
+  select * into t from public.company_tasks where id = p_task_id for update;
+  select * into pc from public.player_companies where company_id = t.company_id;
+  if coalesce(pc.ai_workers, 0) <= 0 then
+    perform public.api_error('no_ai_workers');
+  end if;
+  if exists (select 1 from unnest(coalesce(pc.ai_worker_skills, '{}'::text[])) s where s like t.branch || '\_%') then
+    v_bonus := (cfg -> 'ai' ->> 'skillBonusBps')::integer;
+  end if;
+  update public.company_tasks
+     set status = 'ai', assignee_ai = true, assignee_id = null, assigned_by = p_by, assigned_at = public.game_now(),
+         ai_done_at = public.game_now() + make_interval(mins => public.company_task_ai_minutes(t.company_id)),
+         ai_chance_bps = least(9500, (cfg -> 'ai' ->> 'chanceBps')::integer + v_bonus)
+   where id = t.id;
+end;
+$$;
+
+-- State of the task board for one player
+create or replace function public.company_tasks_state(p_player uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.company_tasks_cfg();
+  m        record;
+  pc       public.player_companies;
+  c        public.companies;
+  v_ai_ok  boolean;
+begin
+  select * into m from public.company_task_member(p_player);
+  if m.company_id is null then
+    perform public.api_error('company_not_found');
+  end if;
+  select * into pc from public.player_companies where company_id = m.company_id;
+  select * into c from public.companies where id = m.company_id;
+  v_ai_ok := pc.ai_workers > 0
+             and (m.is_founder or public.job_tier_rank(m.tier) >= public.job_tier_rank(cfg ->> 'aiDelegateMinTier'));
+  return jsonb_build_object(
+    'role', case when m.is_founder then 'founder' else 'employee' end,
+    'company', jsonb_build_object('id', c.id, 'name', c.name, 'tier', pc.tier, 'product', pc.product_key),
+    'my_tier', m.tier,
+    'auto_ai', pc.tasks_auto_ai,
+    'ai_workers', pc.ai_workers,
+    'ai_minutes', public.company_task_ai_minutes(m.company_id),
+    'can_use_ai', v_ai_ok,
+    'people', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'nickname', p.nickname, 'tag', p.tag, 'tier', j.tier, 'is_me', j.player_id = p_player,
+               'supervisor', (select s.nickname from public.profiles s where s.id = j.supervisor_id),
+               'reports_to_me', case when m.is_founder then j.supervisor_id is null
+                                     else coalesce(j.supervisor_id = p_player, false) end,
+               'open_tasks', (select count(*) from public.company_tasks t
+                               where t.company_id = m.company_id and t.assignee_id = j.player_id
+                                 and t.status in ('assigned', 'playing')))
+             order by public.job_tier_rank(j.tier::text) desc, p.nickname)
+        from public.player_jobs j join public.profiles p on p.id = j.player_id
+       where j.company_id = m.company_id and j.status = 'active'), '[]'::jsonb),
+    'tasks', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'id', t.id, 'key', t.task_key, 'game', t.game, 'branch', t.branch, 'status', t.status,
+               'value_cents', t.value_cents, 'created_at', t.created_at, 'due_at', t.due_at,
+               'assignee', (select p.nickname from public.profiles p where p.id = t.assignee_id),
+               'assignee_ai', t.assignee_ai,
+               'assigned_by', (select p.nickname from public.profiles p where p.id = t.assigned_by),
+               'ai_done_at', t.ai_done_at, 'opened_at', t.opened_at,
+               'mine', coalesce(t.assignee_id = p_player, false),
+               'can_delegate', t.status in ('open', 'assigned')
+                               and (m.is_founder or t.status = 'open' or t.assignee_id = p_player))
+             order by t.due_at)
+        from public.company_tasks t
+       where t.company_id = m.company_id and t.status in ('open', 'assigned', 'playing', 'ai')), '[]'::jsonb),
+    'history', coalesce((
+      select jsonb_agg(h order by h ->> 'resolved_at' desc)
+        from (select jsonb_build_object('id', t.id, 'key', t.task_key, 'status', t.status, 'result_cents', t.result_cents,
+                                        'score_bps', t.score_bps, 'ai', t.assignee_ai, 'resolved_at', t.resolved_at,
+                                        'done_by', (select p.nickname from public.profiles p
+                                                     where p.id = coalesce(t.done_by, t.assignee_id))) as h
+                from public.company_tasks t
+               where t.company_id = m.company_id and t.status in ('success', 'failure', 'missed')
+               order by t.resolved_at desc
+               limit (cfg ->> 'historyLimit')::integer) x), '[]'::jsonb));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- C. RPCs
+-- ---------------------------------------------------------------------------
+create or replace function public.get_company_tasks()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  return public.company_tasks_state(public.require_player());
+end;
+$$;
+
+create or replace function public.delegate_company_task(p_request_id uuid, p_task_id bigint, p_to text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg       jsonb := public.company_tasks_cfg();
+  v_player  uuid;
+  v_replay  jsonb;
+  m         record;
+  t         public.company_tasks;
+  v_target  uuid;
+  v_tnick   text;
+  v_me      text;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_task_id is null or p_to is null or length(p_to) > 40 then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'delegate_company_task');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into m from public.company_task_member(v_player);
+  select * into t from public.company_tasks where id = p_task_id for update;
+  if t.id is null or m.company_id is null or t.company_id <> m.company_id then
+    perform public.api_error('task_not_found');
+  end if;
+  if t.status not in ('open', 'assigned') or t.due_at <= public.game_now() then
+    perform public.api_error('task_closed');
+  end if;
+  -- who may hand this task on: the founder always, others only open tasks or their own
+  if not m.is_founder and t.status = 'assigned' and t.assignee_id is distinct from v_player then
+    perform public.api_error('task_taken');
+  end if;
+
+  if p_to = 'ai' then
+    if not m.is_founder and public.job_tier_rank(m.tier) < public.job_tier_rank(cfg ->> 'aiDelegateMinTier') then
+      perform public.api_error('task_not_allowed');
+    end if;
+    perform public.company_task_to_ai(t.id, v_player);
+  else
+    if p_to = 'me' then
+      v_target := v_player;
+    else
+      select j.player_id into v_target
+        from public.player_jobs j join public.profiles p on p.id = j.player_id
+       where j.company_id = m.company_id and j.status = 'active' and lower(p.nickname) = lower(p_to);
+      if v_target is null then
+        perform public.api_error('task_not_allowed');
+      end if;
+      -- employees delegate only to their own direct reports
+      if not m.is_founder and not exists (select 1 from public.player_jobs j where j.player_id = v_target
+                                             and j.company_id = m.company_id and j.status = 'active'
+                                             and j.supervisor_id = v_player) then
+        perform public.api_error('task_not_allowed');
+      end if;
+    end if;
+    update public.company_tasks
+       set status = 'assigned', assignee_id = v_target, assignee_ai = false, assigned_by = v_player,
+           assigned_at = public.game_now(), ai_done_at = null
+     where id = t.id;
+    if v_target <> v_player then
+      select p.nickname into v_me from public.profiles p where p.id = v_player;
+      select p.nickname into v_tnick from public.profiles p where p.id = v_target;
+      perform public.social_notify(v_target, 'company_task', v_me || ' gibt dir eine Aufgabe',
+        'Erledige sie vor Ablauf der Frist im Job-Tab.', jsonb_build_object('task_id', t.id, 'task', t.task_key),
+        '/job', 'company_task:' || t.id::text || ':' || v_target::text);
+    end if;
+  end if;
+  return public.request_complete(v_player, p_request_id, public.company_tasks_state(v_player));
+end;
+$$;
+
+create or replace function public.company_task_play_json(t public.company_tasks)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object('id', t.id, 'key', t.task_key, 'game', t.game, 'puzzle', t.puzzle, 'opened_at', t.opened_at,
+                            'seconds', (public.company_tasks_cfg() -> 'games' -> t.game ->> 'seconds')::integer,
+                            'value_cents', t.value_cents, 'due_at', t.due_at);
+$$;
+
+create or replace function public.start_company_task(p_request_id uuid, p_task_id bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg       jsonb := public.company_tasks_cfg();
+  v_player  uuid;
+  v_replay  jsonb;
+  m         record;
+  t         public.company_tasks;
+  v_def     jsonb;
+  v_pz      jsonb;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_task_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'start_company_task');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into m from public.company_task_member(v_player);
+  select * into t from public.company_tasks where id = p_task_id for update;
+  if t.id is null or m.company_id is null or t.company_id <> m.company_id then
+    perform public.api_error('task_not_found');
+  end if;
+  if t.status = 'playing' and t.assignee_id = v_player then
+    return public.request_complete(v_player, p_request_id, public.company_task_play_json(t));
+  end if;
+  if t.status not in ('open', 'assigned') or t.due_at <= public.game_now() then
+    perform public.api_error('task_closed');
+  end if;
+  if t.status = 'assigned' and t.assignee_id is distinct from v_player then
+    perform public.api_error('task_taken');
+  end if;
+  select x into v_def from jsonb_array_elements(cfg -> 'tasks') x where x ->> 'key' = t.task_key;
+  if v_def is null then
+    perform public.api_error('task_not_found');
+  end if;
+  v_pz := public.company_task_puzzle(v_def);
+  update public.company_tasks
+     set status = 'playing', assignee_id = v_player, assignee_ai = false,
+         assigned_by = coalesce(assigned_by, v_player), assigned_at = coalesce(assigned_at, public.game_now()),
+         opened_at = public.game_now(), puzzle = v_pz -> 'puzzle', solution = v_pz -> 'solution'
+   where id = t.id
+  returning * into t;
+  return public.request_complete(v_player, p_request_id, public.company_task_play_json(t));
+end;
+$$;
+
+create or replace function public.submit_company_task(p_request_id uuid, p_task_id bigint, p_answer jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg       jsonb := public.company_tasks_cfg();
+  v_player  uuid;
+  v_replay  jsonb;
+  t         public.company_tasks;
+  v_limit   numeric;
+  v_score   integer;
+  v_res     jsonb;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_task_id is null or p_answer is null or length(p_answer::text) > 2000 then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'submit_company_task');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into t from public.company_tasks where id = p_task_id for update;
+  if t.id is null or t.assignee_id is distinct from v_player then
+    perform public.api_error('task_not_found');
+  end if;
+  if t.status <> 'playing' then
+    perform public.api_error('task_closed');
+  end if;
+  v_limit := (cfg -> 'games' -> t.game ->> 'seconds')::numeric + (cfg ->> 'graceSeconds')::numeric;
+  if extract(epoch from (public.game_now() - t.opened_at)) > v_limit then
+    v_score := 0;
+  else
+    v_score := public.company_task_grade(t.game, t.solution, p_answer);
+  end if;
+  update public.company_tasks set answer = p_answer, done_by = v_player where id = t.id;
+  v_res := public.company_task_resolve(t.id, v_score, false);
+  return public.request_complete(v_player, p_request_id,
+    v_res || jsonb_build_object('id', t.id, 'key', t.task_key, 'solution', t.solution, 'answer', p_answer,
+                                'late', v_score = 0 and extract(epoch from (public.game_now() - t.opened_at)) > v_limit));
+end;
+$$;
+
+create or replace function public.set_job_supervisor(p_request_id uuid, p_nickname text, p_supervisor text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid;
+  v_replay  jsonb;
+  pc        public.player_companies;
+  j         public.player_jobs;
+  s         public.player_jobs;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_nickname is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'set_job_supervisor');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into pc from public.player_companies where founder_id = v_player and status = 'active';
+  if pc.company_id is null then
+    perform public.api_error('company_not_found');
+  end if;
+  select x.* into j from public.player_jobs x join public.profiles p on p.id = x.player_id
+   where x.company_id = pc.company_id and x.status = 'active' and lower(p.nickname) = lower(p_nickname)
+   for update of x;
+  if j.id is null then
+    perform public.api_error('task_not_allowed');
+  end if;
+  if p_supervisor is null or p_supervisor = '' then
+    update public.player_jobs set supervisor_id = null where id = j.id;
+  else
+    select x.* into s from public.player_jobs x join public.profiles p on p.id = x.player_id
+     where x.company_id = pc.company_id and x.status = 'active' and lower(p.nickname) = lower(p_supervisor);
+    -- a supervisor has a higher rank, so the chain never loops
+    if s.id is null or s.id = j.id or public.job_tier_rank(s.tier::text) <= public.job_tier_rank(j.tier::text) then
+      perform public.api_error('task_not_allowed');
+    end if;
+    update public.player_jobs set supervisor_id = s.player_id where id = j.id;
+  end if;
+  return public.request_complete(v_player, p_request_id, public.company_tasks_state(v_player));
+end;
+$$;
+
+create or replace function public.set_company_tasks_auto_ai(p_request_id uuid, p_on boolean)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid;
+  v_replay  jsonb;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_on is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'set_company_tasks_auto_ai');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  update public.player_companies set tasks_auto_ai = p_on where founder_id = v_player and status = 'active';
+  if not found then
+    perform public.api_error('company_not_found');
+  end if;
+  return public.request_complete(v_player, p_request_id, public.company_tasks_state(v_player));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- D. Minute job: AI results, deadlines, auto AI, new tasks
+-- ---------------------------------------------------------------------------
+create or replace function public.company_tasks_run_due(p_now timestamptz default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg       jsonb := public.company_tasks_cfg();
+  v_now     timestamptz := coalesce(p_now, public.game_now());
+  r         record;
+  v_ai      integer := 0;
+  v_missed  integer := 0;
+  v_new     integer := 0;
+  v_target  integer;
+  v_open    integer;
+  v_def     jsonb;
+  b         jsonb := cfg -> 'board';
+begin
+  if cfg -> 'tasks' is null then
+    return jsonb_build_object('skipped', 'no config');
+  end if;
+  -- AI results; late is wrong
+  for r in select * from public.company_tasks where status = 'ai' and ai_done_at <= v_now order by ai_done_at for update skip locked loop
+    perform public.company_task_resolve(r.id,
+      case when r.ai_done_at <= r.due_at and random() * 10000 < r.ai_chance_bps then 10000 else 0 end, true);
+    v_ai := v_ai + 1;
+  end loop;
+  -- games opened and never answered
+  for r in select t.* from public.company_tasks t
+            where t.status = 'playing'
+              and t.opened_at + make_interval(secs => (cfg -> 'games' -> t.game ->> 'seconds')::integer
+                                                      + (cfg ->> 'graceSeconds')::integer + 60) <= v_now
+            for update skip locked loop
+    update public.company_tasks set done_by = assignee_id where id = r.id;
+    perform public.company_task_resolve(r.id, 0, false);
+  end loop;
+  -- auto AI shortly before the deadline
+  for r in select t.id, pc.founder_id from public.company_tasks t
+             join public.player_companies pc on pc.company_id = t.company_id
+            where t.status = 'open' and pc.tasks_auto_ai and pc.ai_workers > 0
+              and t.due_at - make_interval(mins => (b ->> 'autoAiBeforeDueMinutes')::integer) <= v_now and t.due_at > v_now
+            for update of t skip locked loop
+    perform public.company_task_to_ai(r.id, null);
+  end loop;
+  -- missed deadlines
+  for r in select * from public.company_tasks where status in ('open', 'assigned') and due_at <= v_now for update skip locked loop
+    perform public.company_task_resolve(r.id, null, false);
+    v_missed := v_missed + 1;
+  end loop;
+  -- new tasks for companies with someone active
+  for r in select pc.company_id, pc.tier, pc.product_key, pc.ai_workers,
+                  (select count(*) from public.player_jobs j where j.company_id = pc.company_id and j.status = 'active') as staff
+             from public.player_companies pc
+            where pc.status = 'active'
+              and (pc.tasks_last_created_at is null
+                   or pc.tasks_last_created_at <= v_now - make_interval(mins => (b ->> 'everyMinutes')::integer))
+              and exists (select 1 from public.profiles p
+                           where p.last_active_at > v_now - make_interval(mins => (b ->> 'activeMinutes')::integer)
+                             and (p.id = pc.founder_id
+                                  or exists (select 1 from public.player_jobs j where j.player_id = p.id
+                                               and j.company_id = pc.company_id and j.status = 'active')))
+  loop
+    v_target := least((b ->> 'max')::integer,
+                      (b ->> 'base')::integer + (1 + r.staff + coalesce(r.ai_workers, 0)) / (b ->> 'membersPerTask')::integer);
+    select count(*) into v_open from public.company_tasks t
+     where t.company_id = r.company_id and t.status in ('open', 'assigned', 'playing', 'ai');
+    continue when v_open >= v_target;
+    select x into v_def from jsonb_array_elements(cfg -> 'tasks') x
+     where (x ->> 'product' = '*' or x ->> 'product' = r.product_key)
+       and not exists (select 1 from public.company_tasks t where t.company_id = r.company_id and t.task_key = x ->> 'key'
+                         and t.status in ('open', 'assigned', 'playing', 'ai'))
+     order by case when x ->> 'product' = '*' then random() * 2 else random() end
+     limit 1;
+    continue when v_def is null;
+    insert into public.company_tasks (company_id, task_key, branch, game, value_cents, created_at, due_at)
+    values (r.company_id, v_def ->> 'key', v_def ->> 'branch', v_def ->> 'game',
+            greatest(1, round((cfg -> 'valueCentsByTier' ->> r.tier::text)::numeric * (v_def ->> 'factor')::numeric)::bigint),
+            v_now, v_now + make_interval(mins => (v_def ->> 'minutes')::integer));
+    update public.player_companies set tasks_last_created_at = v_now where company_id = r.company_id;
+    v_new := v_new + 1;
+  end loop;
+  delete from public.company_tasks where resolved_at < v_now - interval '3 days';
+  return jsonb_build_object('ai', v_ai, 'missed', v_missed, 'new', v_new);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- E. News feed: stock tips, company news of all player companies, market news and funny news
+-- ---------------------------------------------------------------------------
+create or replace function public.fun_news_run_due(p_now timestamptz default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := coalesce((select value from public.game_config where key = 'funNews'), '{}'::jsonb);
+  v_now   timestamptz := coalesce(p_now, public.game_now());
+  v_item  jsonb;
+  v_co    record;
+  v_nick  text;
+begin
+  if cfg -> 'items' is null then
+    return jsonb_build_object('skipped', 'no config');
+  end if;
+  if exists (select 1 from public.fun_news f where f.created_at > v_now - make_interval(mins => (cfg ->> 'everyMinutes')::integer)) then
+    return jsonb_build_object('skipped', 'too early');
+  end if;
+  select x into v_item from jsonb_array_elements(cfg -> 'items') x
+   where not exists (select 1 from public.fun_news f where f.item_key = x ->> 'key'
+                       and f.created_at > v_now - make_interval(hours => (cfg ->> 'repeatHours')::integer))
+   order by random() limit 1;
+  if v_item is null then
+    return jsonb_build_object('skipped', 'all used');
+  end if;
+  select c.name, s.ticker into v_co from public.companies c join public.securities s on s.company_id = c.id
+   where c.is_ai and s.status = 'listed' order by random() limit 1;
+  select p.nickname into v_nick from public.profiles p
+   where p.last_active_at > v_now - interval '1 day' and not p.is_deactivated order by random() limit 1;
+  if v_item ->> 'needs' = 'player' and v_nick is null then
+    return jsonb_build_object('skipped', 'no player');
+  end if;
+  insert into public.fun_news (item_key, company, ticker, nickname, created_at)
+  values (v_item ->> 'key', v_co.name, v_co.ticker, v_nick, v_now);
+  delete from public.fun_news where created_at < v_now - make_interval(hours => (cfg ->> 'keepHours')::integer);
+  return jsonb_build_object('created', v_item ->> 'key');
+end;
+$$;
+
+create or replace function public.get_news_feed(p_kind text default 'all', p_limit integer default 40)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  v_limit  integer := least(greatest(coalesce(p_limit, 40), 1), 80);
+  v_kind   text := coalesce(p_kind, 'all');
+begin
+  if v_kind not in ('all', 'stock', 'company', 'market', 'fun') then
+    perform public.api_error('invalid_argument');
+  end if;
+  return jsonb_build_object('items', coalesce((
+    select jsonb_agg(x.item order by x.at desc)
+      from (
+        (select jsonb_build_object('id', 's' || st.id, 'kind', 'stock', 'at', st.published_at, 'headline', st.headline,
+                                   'body', st.body, 'ticker', s.ticker, 'name', c.name,
+                                   'direction', case when st.direction > 0 then 'up' else 'down' end) as item,
+                st.published_at as at
+           from public.stock_tips st join public.securities s on s.id = st.security_id
+           join public.companies c on c.id = s.company_id
+          where v_kind in ('all', 'stock') and st.published_at <= public.game_now()
+          order by st.published_at desc limit v_limit)
+        union all
+        (select jsonb_build_object('id', 'c' || n.id, 'kind', 'company', 'at', n.created_at, 'news_kind', n.kind,
+                                   'payload', n.payload, 'name', c.name, 'product', pc.product_key, 'tier', pc.tier,
+                                   'headline', n.ai_headline),
+                n.created_at
+           from public.company_news n join public.companies c on c.id = n.company_id
+           join public.player_companies pc on pc.company_id = n.company_id
+          where v_kind in ('all', 'company')
+            and n.kind in ('task_success', 'task_failure', 'task_missed', 'founded', 'upgraded', 'expanded', 'ipo',
+                           'hired', 'record_hour')
+          order by n.created_at desc limit v_limit)
+        union all
+        (select jsonb_build_object('id', 'm' || ni.id, 'kind', 'market', 'at', ni.published_at, 'headline', ni.headline,
+                                   'body', ni.body, 'category', ni.category,
+                                   'ticker', (select s.ticker from public.securities s where s.id = ni.security_id)),
+                ni.published_at
+           from public.news_items ni
+          where v_kind in ('all', 'market') and ni.published_at <= public.game_now()
+            and ni.category in ('macro', 'central_bank', 'ipo', 'index', 'regulator', 'market', 'earnings')
+            and ni.importance >= case when ni.category = 'earnings' then 2 else 1 end
+          order by ni.published_at desc limit v_limit)
+        union all
+        (select jsonb_build_object('id', 'f' || f.id, 'kind', 'fun', 'at', f.created_at, 'item_key', f.item_key,
+                                   'name', f.company, 'ticker', f.ticker, 'nickname', f.nickname),
+                f.created_at
+           from public.fun_news f
+          where v_kind in ('all', 'fun')
+          order by f.created_at desc limit v_limit)
+      ) x
+     limit v_limit), '[]'::jsonb));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- F. Org chart: who reports to whom
+-- ---------------------------------------------------------------------------
+create or replace function public.get_company_org(p_company_id uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  pc       public.player_companies;
+  c        public.companies;
+begin
+  select * into pc from public.player_companies where company_id = p_company_id and status = 'active';
+  if pc.company_id is null then
+    perform public.api_error('company_not_found');
+  end if;
+  select * into c from public.companies where id = p_company_id;
+  -- open to every player (ADR-125): the org chart shows who works where, nothing more
+  return jsonb_build_object(
+    'company', jsonb_build_object('id', c.id, 'name', c.name, 'tier', pc.tier),
+    'founder', (select jsonb_build_object('nickname', p.nickname, 'tag', p.tag, 'avatar_key', p.avatar_key,
+                                          'is_me', p.id = v_player)
+                  from public.profiles p where p.id = pc.founder_id),
+    'members', coalesce((
+      select jsonb_agg(jsonb_build_object('nickname', p.nickname, 'tag', p.tag, 'avatar_key', p.avatar_key, 'tier', j.tier,
+                                          'title', coalesce(j.title, j.title_key), 'since', j.started_at,
+                                          'is_me', j.player_id = v_player,
+                                          'supervisor', (select s.nickname from public.profiles s where s.id = j.supervisor_id))
+                       order by case j.tier::text when 'c_level' then 5 when 'team_lead' then 4 when 'senior' then 3
+                                                  when 'junior' then 2 else 1 end desc, j.started_at, p.nickname)
+        from public.player_jobs j join public.profiles p on p.id = j.player_id
+       where j.company_id = p_company_id and j.status = 'active'), '[]'::jsonb),
+    'ai_workers', pc.ai_workers,
+    'ai_worker_skills', to_jsonb(coalesce(pc.ai_worker_skills, '{}'::text[])));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- G. Rights and jobs
+-- ---------------------------------------------------------------------------
+revoke all on function public.company_tasks_cfg() from public, anon, authenticated;
+revoke all on function public.job_tier_rank(text) from public, anon, authenticated;
+revoke all on function public.rand_between(integer, integer) from public, anon, authenticated;
+revoke all on function public.company_task_puzzle(jsonb) from public, anon, authenticated;
+revoke all on function public.company_task_grade(text, jsonb, jsonb) from public, anon, authenticated;
+revoke all on function public.company_task_member(uuid) from public, anon, authenticated;
+revoke all on function public.company_task_resolve(bigint, integer, boolean) from public, anon, authenticated;
+revoke all on function public.company_task_ai_minutes(uuid) from public, anon, authenticated;
+revoke all on function public.company_task_to_ai(bigint, uuid) from public, anon, authenticated;
+revoke all on function public.company_tasks_state(uuid) from public, anon, authenticated;
+revoke all on function public.company_task_play_json(public.company_tasks) from public, anon, authenticated;
+revoke all on function public.company_tasks_run_due(timestamptz) from public, anon, authenticated;
+revoke all on function public.fun_news_run_due(timestamptz) from public, anon, authenticated;
+grant execute on function public.company_tasks_run_due(timestamptz) to service_role;
+grant execute on function public.fun_news_run_due(timestamptz) to service_role;
+
+revoke all on function public.get_company_tasks() from public, anon;
+revoke all on function public.delegate_company_task(uuid, bigint, text) from public, anon;
+revoke all on function public.start_company_task(uuid, bigint) from public, anon;
+revoke all on function public.submit_company_task(uuid, bigint, jsonb) from public, anon;
+revoke all on function public.set_job_supervisor(uuid, text, text) from public, anon;
+revoke all on function public.set_company_tasks_auto_ai(uuid, boolean) from public, anon;
+revoke all on function public.get_news_feed(text, integer) from public, anon;
+grant execute on function public.get_company_tasks() to authenticated;
+grant execute on function public.delegate_company_task(uuid, bigint, text) to authenticated;
+grant execute on function public.start_company_task(uuid, bigint) to authenticated;
+grant execute on function public.submit_company_task(uuid, bigint, jsonb) to authenticated;
+grant execute on function public.set_job_supervisor(uuid, text, text) to authenticated;
+grant execute on function public.set_company_tasks_auto_ai(uuid, boolean) to authenticated;
+grant execute on function public.get_news_feed(text, integer) to authenticated;
+
+comment on function public.get_company_tasks() is 'RPC: task board of the own player company (ADR-129).';
+comment on function public.delegate_company_task(uuid, bigint, text) is 'RPC: take a task or hand it to a report or the AI (ADR-129).';
+comment on function public.start_company_task(uuid, bigint) is 'RPC: open a task game; the time runs from here (ADR-129).';
+comment on function public.submit_company_task(uuid, bigint, jsonb) is 'RPC: answer a task game; graded on the server (ADR-129).';
+comment on function public.set_job_supervisor(uuid, text, text) is 'RPC: the founder sets who an employee reports to (ADR-129).';
+comment on function public.set_company_tasks_auto_ai(uuid, boolean) is 'RPC: AI takes open tasks before the deadline (ADR-129).';
+comment on function public.get_news_feed(text, integer) is 'RPC: stock, company, market and funny news in one feed (ADR-129).';
+
+do $do$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.unschedule(jobid) from cron.job where jobname in ('nexa-company-tasks', 'nexa-fun-news');
+    perform cron.schedule('nexa-company-tasks', '* * * * *', 'select public.company_tasks_run_due()');
+    perform cron.schedule('nexa-fun-news', '* * * * *', 'select public.fun_news_run_due()');
+  end if;
+end;
+$do$;
 
 -- ===== game_config (current values, overwriting older ones) =====
 -- GENERATED by scripts/gen-config-seed.ts from src/config/balance.ts. Do not edit by hand.
@@ -41613,6 +42630,8 @@ insert into public.game_config (key, value, description) values
   ('trust', '{"start":50,"min":0,"max":100,"deltas":{"loanRepaidOnTime":4,"loanRepaidLate":2,"loanOverdue":-6,"loanDefaulted":-12,"loanLent":1,"loanForgiven":2,"supplyKept":3,"supplyShort":-4,"stakeKept":3,"dealBroken":-12,"rugPull":-20},"bands":[{"from":0,"key":"risky"},{"from":30,"key":"shaky"},{"from":45,"key":"blank"},{"from":60,"key":"reliable"},{"from":80,"key":"rock"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "trust"'),
   ('crypto', '{"minLevel":10,"createMinLevel":14,"tickSeconds":10,"categories":{"stable":{"sigmaDay":0.002,"beta":0,"feeBps":5,"pegPullPerHour":0.5},"major":{"sigmaDay":0.06,"beta":1,"feeBps":10,"pegPullPerHour":0},"alt":{"sigmaDay":0.14,"beta":1.3,"feeBps":30,"pegPullPerHour":0},"meme":{"sigmaDay":0.4,"beta":1.6,"feeBps":100,"pegPullPerHour":0},"player":{"sigmaDay":0.35,"beta":1.2,"feeBps":100,"pegPullPerHour":0}},"coins":[{"ticker":"EUS","name":"Eins-Stabil","category":"stable","priceE4":10000,"poolCents":5000000000,"color":"#4f8cff"},{"ticker":"NXS","name":"Nexa-Stable","category":"stable","priceE4":10000,"poolCents":3000000000,"color":"#7c5cff"},{"ticker":"ALGS","name":"Algostabil","category":"stable","priceE4":10000,"poolCents":800000000,"algorithmic":true,"color":"#2fd98c"},{"ticker":"GTL","name":"Goldtaler","category":"stable","priceE4":600000,"poolCents":1500000000,"color":"#f2c14e"},{"ticker":"KTL","name":"Kryptaler","category":"major","priceE4":420000000,"poolCents":10000000000,"color":"#ff9a52"},{"ticker":"NBC","name":"Nebula Chain","category":"major","priceE4":21000000,"poolCents":5000000000,"color":"#9b7bff"},{"ticker":"QTR","name":"Quantor","category":"major","priceE4":850000,"poolCents":2000000000,"color":"#2bc3d9"},{"ticker":"FLX","name":"Flux","category":"alt","priceE4":12000,"poolCents":300000000,"color":"#ef5b5b"},{"ticker":"ORB","name":"Orbit","category":"alt","priceE4":4500,"poolCents":150000000,"color":"#8e99ad"},{"ticker":"SNP","name":"Synapse","category":"alt","priceE4":120000,"poolCents":200000000,"color":"#c8553d"},{"ticker":"HMR","name":"Hamsterrakete","category":"meme","priceE4":420,"poolCents":30000000,"color":"#e0a92e"},{"ticker":"MKS","name":"Mondkeks","category":"meme","priceE4":690,"poolCents":15000000,"color":"#c9d2e0"},{"ticker":"LFR","name":"Laserfrosch","category":"meme","priceE4":1000,"poolCents":25000000,"color":"#2f7a4a"},{"ticker":"TBZ","name":"Turbobrezel","category":"meme","priceE4":2500,"poolCents":10000000,"color":"#a0612c"},{"ticker":"PPD","name":"Pixelpudel","category":"meme","priceE4":150,"poolCents":8000000,"color":"#f8bbd0"}],"regimes":{"bull":{"driftDay":0.03,"weight":0.3},"flat":{"driftDay":0,"weight":0.45},"bear":{"driftDay":-0.03,"weight":0.25}},"regimeHoursMin":24,"regimeHoursMax":72,"deadCoinReplaceHours":24,"deadPriceE4":2,"memeNames":["Katzenkanone","Wurstwal","Raketenrentner","Glitzergurke","Turbotoaster","Mondmaulwurf","Laserlama","Pixelpinguin","Bananenbank","Sockensaurus","Kometenkrabbe","Diamanthamster"],"events":[{"key":"hack","scope":["alt","meme","player"],"chanceBps":20,"shockMin":-0.9,"shockMax":-0.35,"tech":-10,"hype":-30,"poolLossShare":0.2},{"key":"bug","scope":["alt","meme","player"],"chanceBps":40,"shockMin":-0.25,"shockMax":-0.08,"tech":-5,"hype":-5},{"key":"influencer","scope":["alt","meme","player"],"chanceBps":60,"shockMin":0.25,"shockMax":1.2,"hype":20},{"key":"exchange_listing","scope":["alt","meme","player"],"chanceBps":25,"shockMin":0.2,"shockMax":0.6,"utility":10},{"key":"delisting_rumor","scope":["alt","meme","player"],"chanceBps":30,"shockMin":-0.35,"shockMax":-0.1,"hype":-10},{"key":"whale_buy","scope":["major","alt","meme","player"],"chanceBps":50,"shockMin":0.1,"shockMax":0.4},{"key":"whale_dump","scope":["major","alt","meme","player"],"chanceBps":50,"shockMin":-0.4,"shockMax":-0.1},{"key":"partnership","scope":["major","alt","player"],"chanceBps":30,"shockMin":0.1,"shockMax":0.35,"utility":15},{"key":"fud","scope":["major","alt","meme","player"],"chanceBps":60,"shockMin":-0.3,"shockMax":-0.05,"hype":-8},{"key":"network_upgrade","scope":["major","alt"],"chanceBps":20,"shockMin":0.05,"shockMax":0.2},{"key":"depeg","scope":["stable"],"chanceBps":3,"shockMin":-0.4,"shockMax":-0.03},{"key":"meme_wave","scope":["market"],"chanceBps":40,"shockMin":0.2,"shockMax":0.8},{"key":"regulation","scope":["market"],"chanceBps":25,"shockMin":-0.25,"shockMax":-0.05},{"key":"rug_pull","scope":["meme"],"chanceBps":12,"shockMin":-4.5,"shockMax":-2.5}],"create":{"costCents":2500000,"minLiquidityCents":500000,"startPriceOptionsE4":[100,1000,10000,100000],"teamShareMinBps":1000,"teamShareMaxBps":5000,"launchMinTech":20,"nameMinLength":3,"nameMaxLength":24,"tickerMinLength":3,"tickerMaxLength":5,"hypeDecayPerHour":0.97,"utilityDecayPerHour":0.995,"driftPerHype":0.2,"driftPerUtility":0.08,"driftBase":-0.06,"sigmaDay":0.35,"sigmaTechDamping":0.5,"itBpsPerScore":300,"actions":[{"key":"smart_contract","hours":6,"costCents":200000,"tech":15,"baseBps":5000},{"key":"audit","hours":24,"costCents":1500000,"tech":35},{"key":"community","hours":4,"costCents":50000,"hype":10},{"key":"influencer","hours":2,"costCents":800000,"hype":35,"baseBps":8500},{"key":"partnership","hours":12,"costCents":600000,"utility":20,"baseBps":7000,"afterLaunch":true},{"key":"staking","hours":12,"costCents":500000,"utility":15,"afterLaunch":true},{"key":"bugfix","hours":3,"costCents":100000,"tech":5},{"key":"marketing_burn","hours":1,"costCents":0,"hype":8,"afterLaunch":true}],"rugShareBps":2000,"rugWindowHours":24,"exposedHype":-20,"exposedShock":-0.1625,"burnMinBps":100}}'::jsonb, 'Defaults from src/config/balance.ts, section "crypto"'),
   ('companyMoves', '{"costCentsByTier":{"garage":100000,"small_business":400000,"gmbh":1500000,"ag":6000000},"slotsByTier":{"garage":1,"small_business":2,"gmbh":3,"ag":4},"risk":{"safe":{"chanceBps":9000,"payoutBps":12000,"refundBps":5000,"gain":0.02},"normal":{"chanceBps":7000,"payoutBps":15000,"refundBps":3000,"gain":0.04},"risky":{"chanceBps":4000,"payoutBps":26000,"refundBps":1000,"gain":0.08}},"chancePerSkillBps":300,"maxSkillBonusBps":2500,"maxChanceBps":9500,"cooldownFactor":2,"historyLimit":12,"moves":[{"key":"pop_up_stand","product":"*","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.6,"minutes":15},{"key":"local_press","product":"*","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"team_workshop","product":"*","branch":"management","kind":"quality","risk":"safe","costFactor":0.8,"minutes":30},{"key":"bulk_purchase","product":"*","branch":"logistics","kind":"cash","risk":"safe","costFactor":1.2,"minutes":20},{"key":"investor_pitch","product":"*","branch":"finance","kind":"cash","risk":"risky","costFactor":1.5,"minutes":45},{"key":"tax_review","product":"*","branch":"law","kind":"cash","risk":"normal","costFactor":0.7,"minutes":30},{"key":"pentest_bank","product":"security_software","branch":"it","kind":"cash","risk":"normal","costFactor":1.5,"minutes":40},{"key":"security_audit_sme","product":"security_software","branch":"it","kind":"cash","risk":"safe","costFactor":1,"minutes":25},{"key":"bug_bounty","product":"security_software","branch":"it","kind":"cash","risk":"risky","costFactor":1,"minutes":35},{"key":"security_conference","product":"security_software","branch":"sales","kind":"awareness","risk":"normal","costFactor":1.3,"minutes":40},{"key":"certification","product":"security_software","branch":"law","kind":"quality","risk":"normal","costFactor":1.4,"minutes":50},{"key":"incident_response","product":"security_software","branch":"it","kind":"cash","risk":"risky","costFactor":2,"minutes":60},{"key":"app_store_feature","product":"mobile_app","branch":"sales","kind":"awareness","risk":"risky","costFactor":1.2,"minutes":40},{"key":"white_label_app","product":"mobile_app","branch":"it","kind":"cash","risk":"normal","costFactor":1.5,"minutes":45},{"key":"bugfix_sprint","product":"mobile_app","branch":"it","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"in_app_shop","product":"mobile_app","branch":"finance","kind":"cash","risk":"normal","costFactor":1.1,"minutes":30},{"key":"influencer_app","product":"mobile_app","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"hackathon","product":"mobile_app","branch":"it","kind":"cash","risk":"risky","costFactor":0.9,"minutes":35},{"key":"migrate_customer","product":"cloud_platform","branch":"it","kind":"cash","risk":"normal","costFactor":1.6,"minutes":50},{"key":"uptime_guarantee","product":"cloud_platform","branch":"management","kind":"quality","risk":"normal","costFactor":1.3,"minutes":45},{"key":"startup_credits","product":"cloud_platform","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.7,"minutes":20},{"key":"enterprise_deal","product":"cloud_platform","branch":"sales","kind":"cash","risk":"risky","costFactor":2.2,"minutes":60},{"key":"data_center_deal","product":"cloud_platform","branch":"finance","kind":"cash","risk":"safe","costFactor":1.2,"minutes":25},{"key":"ai_hosting","product":"cloud_platform","branch":"it","kind":"cash","risk":"risky","costFactor":1.8,"minutes":50},{"key":"flash_sale","product":"online_shop","branch":"sales","kind":"cash","risk":"safe","costFactor":1,"minutes":15},{"key":"marketplace_listing","product":"online_shop","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"same_day_delivery","product":"online_shop","branch":"logistics","kind":"quality","risk":"normal","costFactor":1.4,"minutes":45},{"key":"black_friday","product":"online_shop","branch":"sales","kind":"cash","risk":"risky","costFactor":1.6,"minutes":40},{"key":"returns_process","product":"online_shop","branch":"logistics","kind":"quality","risk":"safe","costFactor":0.7,"minutes":20},{"key":"b2b_shop","product":"online_shop","branch":"sales","kind":"cash","risk":"normal","costFactor":1.3,"minutes":35},{"key":"fashion_show","product":"fashion","branch":"sales","kind":"awareness","risk":"risky","costFactor":1.6,"minutes":50},{"key":"capsule_collection","product":"fashion","branch":"craft","kind":"cash","risk":"normal","costFactor":1.3,"minutes":40},{"key":"influencer_outfit","product":"fashion","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"sustainable_fabric","product":"fashion","branch":"science","kind":"quality","risk":"normal","costFactor":1.2,"minutes":45},{"key":"outlet_sale","product":"fashion","branch":"sales","kind":"cash","risk":"safe","costFactor":0.9,"minutes":20},{"key":"collab_brand","product":"fashion","branch":"management","kind":"cash","risk":"risky","costFactor":1.8,"minutes":55},{"key":"catering_job","product":"delicatessen","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.2,"minutes":35},{"key":"tasting_evening","product":"delicatessen","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.6,"minutes":20},{"key":"gift_baskets","product":"delicatessen","branch":"sales","kind":"cash","risk":"safe","costFactor":0.9,"minutes":20},{"key":"organic_label","product":"delicatessen","branch":"science","kind":"quality","risk":"normal","costFactor":1.2,"minutes":45},{"key":"restaurant_supply","product":"delicatessen","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"food_festival","product":"delicatessen","branch":"sales","kind":"cash","risk":"risky","costFactor":1.3,"minutes":45},{"key":"roof_installation","product":"solar","branch":"craft","kind":"cash","risk":"safe","costFactor":1.2,"minutes":30},{"key":"solar_park","product":"solar","branch":"craft","kind":"cash","risk":"risky","costFactor":2.4,"minutes":60},{"key":"subsidy_application","product":"solar","branch":"law","kind":"cash","risk":"normal","costFactor":0.8,"minutes":30},{"key":"installer_training","product":"solar","branch":"craft","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"energy_fair","product":"solar","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":35},{"key":"battery_bundle","product":"solar","branch":"sales","kind":"cash","risk":"normal","costFactor":1.3,"minutes":35},{"key":"peak_trading","product":"grid_service","branch":"finance","kind":"cash","risk":"risky","costFactor":1.6,"minutes":40},{"key":"grid_maintenance","product":"grid_service","branch":"craft","kind":"cash","risk":"safe","costFactor":1.1,"minutes":25},{"key":"smart_meter_rollout","product":"grid_service","branch":"it","kind":"cash","risk":"normal","costFactor":1.5,"minutes":45},{"key":"grid_upgrade","product":"grid_service","branch":"craft","kind":"quality","risk":"normal","costFactor":1.4,"minutes":50},{"key":"city_contract","product":"grid_service","branch":"law","kind":"cash","risk":"risky","costFactor":2,"minutes":60},{"key":"outage_hotline","product":"grid_service","branch":"management","kind":"awareness","risk":"safe","costFactor":0.6,"minutes":20},{"key":"home_storage","product":"energy_storage","branch":"sales","kind":"cash","risk":"normal","costFactor":1.3,"minutes":35},{"key":"battery_research","product":"energy_storage","branch":"science","kind":"quality","risk":"risky","costFactor":1.6,"minutes":55},{"key":"grid_battery","product":"energy_storage","branch":"finance","kind":"cash","risk":"risky","costFactor":2.2,"minutes":60},{"key":"recycling_program","product":"energy_storage","branch":"science","kind":"awareness","risk":"safe","costFactor":0.7,"minutes":25},{"key":"ev_fleet","product":"energy_storage","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"warranty_extension","product":"energy_storage","branch":"law","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"generic_launch","product":"generics","branch":"science","kind":"cash","risk":"normal","costFactor":1.4,"minutes":45},{"key":"pharmacy_contracts","product":"generics","branch":"sales","kind":"cash","risk":"safe","costFactor":1,"minutes":25},{"key":"gmp_audit","product":"generics","branch":"law","kind":"quality","risk":"normal","costFactor":1.2,"minutes":45},{"key":"tender_win","product":"generics","branch":"law","kind":"cash","risk":"risky","costFactor":1.8,"minutes":55},{"key":"doctor_visits","product":"generics","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.7,"minutes":20},{"key":"cost_cutting_lab","product":"generics","branch":"management","kind":"cash","risk":"safe","costFactor":0.9,"minutes":25},{"key":"trial_phase","product":"biotech","branch":"science","kind":"cash","risk":"risky","costFactor":2.4,"minutes":60},{"key":"license_deal","product":"biotech","branch":"law","kind":"cash","risk":"normal","costFactor":1.6,"minutes":45},{"key":"lab_upgrade","product":"biotech","branch":"science","kind":"quality","risk":"normal","costFactor":1.4,"minutes":45},{"key":"research_grant","product":"biotech","branch":"finance","kind":"cash","risk":"safe","costFactor":0.8,"minutes":30},{"key":"science_paper","product":"biotech","branch":"science","kind":"awareness","risk":"normal","costFactor":0.9,"minutes":35},{"key":"cro_service","product":"biotech","branch":"science","kind":"cash","risk":"safe","costFactor":1.1,"minutes":30},{"key":"hospital_order","product":"medtech","branch":"sales","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"ce_marking","product":"medtech","branch":"law","kind":"quality","risk":"normal","costFactor":1.2,"minutes":45},{"key":"device_service","product":"medtech","branch":"craft","kind":"cash","risk":"safe","costFactor":1,"minutes":25},{"key":"medical_fair","product":"medtech","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":35},{"key":"prototype","product":"medtech","branch":"science","kind":"quality","risk":"risky","costFactor":1.5,"minutes":55},{"key":"export_deal","product":"medtech","branch":"sales","kind":"cash","risk":"risky","costFactor":1.9,"minutes":55},{"key":"hospital_express","product":"courier","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.2,"minutes":30},{"key":"cargo_bike_fleet","product":"courier","branch":"logistics","kind":"quality","risk":"normal","costFactor":1.3,"minutes":40},{"key":"night_delivery","product":"courier","branch":"logistics","kind":"cash","risk":"safe","costFactor":1,"minutes":25},{"key":"restaurant_partner","product":"courier","branch":"sales","kind":"cash","risk":"normal","costFactor":1.1,"minutes":30},{"key":"courier_app","product":"courier","branch":"it","kind":"awareness","risk":"normal","costFactor":1,"minutes":35},{"key":"christmas_rush","product":"courier","branch":"management","kind":"cash","risk":"risky","costFactor":1.6,"minutes":45},{"key":"seasonal_storage","product":"warehouse","branch":"logistics","kind":"cash","risk":"safe","costFactor":1.1,"minutes":25},{"key":"automation_upgrade","product":"warehouse","branch":"it","kind":"quality","risk":"normal","costFactor":1.5,"minutes":50},{"key":"fulfillment_client","product":"warehouse","branch":"sales","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"cold_storage","product":"warehouse","branch":"science","kind":"cash","risk":"risky","costFactor":1.8,"minutes":50},{"key":"inventory_audit","product":"warehouse","branch":"finance","kind":"cash","risk":"safe","costFactor":0.8,"minutes":20},{"key":"open_day","product":"warehouse","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.5,"minutes":20},{"key":"international_route","product":"freight","branch":"logistics","kind":"cash","risk":"risky","costFactor":2,"minutes":55},{"key":"rail_partnership","product":"freight","branch":"logistics","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"fuel_hedge","product":"freight","branch":"finance","kind":"cash","risk":"normal","costFactor":1,"minutes":30},{"key":"driver_training","product":"freight","branch":"management","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"heavy_load","product":"freight","branch":"logistics","kind":"cash","risk":"risky","costFactor":1.7,"minutes":50},{"key":"logistics_fair","product":"freight","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":35},{"key":"contract_check_flat","product":"legal_tech","branch":"law","kind":"cash","risk":"safe","costFactor":1,"minutes":20},{"key":"class_action","product":"legal_tech","branch":"law","kind":"cash","risk":"risky","costFactor":2,"minutes":60},{"key":"startup_law_pack","product":"legal_tech","branch":"law","kind":"cash","risk":"normal","costFactor":1.3,"minutes":35},{"key":"legal_explainer","product":"legal_tech","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"lawyer_review","product":"legal_tech","branch":"law","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"data_privacy_audit","product":"legal_tech","branch":"it","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"free_account","product":"fintech","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.7,"minutes":20},{"key":"savings_plan","product":"fintech","branch":"finance","kind":"cash","risk":"normal","costFactor":1.2,"minutes":35},{"key":"crypto_feature","product":"fintech","branch":"finance","kind":"cash","risk":"risky","costFactor":1.8,"minutes":50},{"key":"banking_license","product":"fintech","branch":"law","kind":"quality","risk":"normal","costFactor":1.5,"minutes":55},{"key":"fraud_detection","product":"fintech","branch":"it","kind":"quality","risk":"safe","costFactor":0.9,"minutes":30},{"key":"merchant_payments","product":"fintech","branch":"sales","kind":"cash","risk":"safe","costFactor":1.1,"minutes":25},{"key":"new_partner","product":"franchise","branch":"management","kind":"cash","risk":"normal","costFactor":1.4,"minutes":40},{"key":"flagship_store","product":"franchise","branch":"sales","kind":"awareness","risk":"risky","costFactor":1.8,"minutes":55},{"key":"partner_training","product":"franchise","branch":"management","kind":"quality","risk":"safe","costFactor":0.8,"minutes":25},{"key":"central_purchasing","product":"franchise","branch":"logistics","kind":"cash","risk":"safe","costFactor":1.1,"minutes":25},{"key":"regional_ads","product":"franchise","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"master_franchise","product":"franchise","branch":"law","kind":"cash","risk":"risky","costFactor":2.2,"minutes":60},{"key":"spot_trade","product":"energy_trading","branch":"finance","kind":"cash","risk":"risky","costFactor":1.6,"minutes":30},{"key":"supply_contract","product":"energy_trading","branch":"sales","kind":"cash","risk":"safe","costFactor":1.2,"minutes":25},{"key":"green_tariff","product":"energy_trading","branch":"sales","kind":"awareness","risk":"normal","costFactor":1,"minutes":30},{"key":"hedging","product":"energy_trading","branch":"finance","kind":"quality","risk":"normal","costFactor":1.3,"minutes":45},{"key":"industrial_customer","product":"energy_trading","branch":"sales","kind":"cash","risk":"normal","costFactor":1.6,"minutes":45},{"key":"market_analysis","product":"energy_trading","branch":"science","kind":"quality","risk":"safe","costFactor":0.7,"minutes":20},{"key":"approval_dossier","product":"regulatory","branch":"law","kind":"cash","risk":"normal","costFactor":1.5,"minutes":45},{"key":"fast_track","product":"regulatory","branch":"law","kind":"cash","risk":"risky","costFactor":2.2,"minutes":60},{"key":"label_check","product":"regulatory","branch":"science","kind":"cash","risk":"safe","costFactor":0.9,"minutes":20},{"key":"expert_panel","product":"regulatory","branch":"science","kind":"quality","risk":"normal","costFactor":1.2,"minutes":40},{"key":"pharma_congress","product":"regulatory","branch":"sales","kind":"awareness","risk":"normal","costFactor":1.1,"minutes":35},{"key":"eu_registration","product":"regulatory","branch":"law","kind":"cash","risk":"normal","costFactor":1.7,"minutes":50},{"key":"office_move","product":"moving","branch":"management","kind":"cash","risk":"normal","costFactor":1.5,"minutes":45},{"key":"student_move","product":"moving","branch":"logistics","kind":"cash","risk":"safe","costFactor":0.8,"minutes":15},{"key":"piano_move","product":"moving","branch":"craft","kind":"cash","risk":"risky","costFactor":1.4,"minutes":30},{"key":"moving_boxes","product":"moving","branch":"sales","kind":"awareness","risk":"safe","costFactor":0.6,"minutes":20},{"key":"packing_training","product":"moving","branch":"management","kind":"quality","risk":"normal","costFactor":1,"minutes":30},{"key":"senior_move","product":"moving","branch":"management","kind":"cash","risk":"normal","costFactor":1.2,"minutes":35}]}'::jsonb, 'Defaults from src/config/balance.ts, section "companyMoves"'),
+  ('companyTasks', '{"valueCentsByTier":{"garage":40000,"small_business":150000,"gmbh":500000,"ag":2000000},"penaltyBps":6000,"passScoreBps":8000,"graceSeconds":8,"games":{"pick":{"seconds":30,"tiles":12,"minTargets":3,"maxTargets":6},"count":{"seconds":25,"tiles":16,"minTargets":4,"maxTargets":9},"sort":{"seconds":35,"items":8},"order":{"seconds":30,"items":5,"min":1,"max":99},"seq":{"seconds":25,"length":5,"showSeconds":4},"math":{"seconds":45}},"ai":{"minutes":12,"slowdownPerQueuedBps":5000,"chanceBps":7000,"skillBonusBps":1000,"valueBps":6000},"board":{"base":1,"membersPerTask":2,"max":6,"everyMinutes":4,"activeMinutes":20,"autoAiBeforeDueMinutes":15},"aiDelegateMinTier":"senior","xp":{"success":60,"failure":15},"historyLimit":15,"tasks":[{"key":"pay_invoices","product":"*","branch":"finance","game":"sort","factor":1,"minutes":45},{"key":"payroll_check","product":"*","branch":"finance","game":"math","factor":1.1,"minutes":45,"op":"mul","a":[3,9],"b":[12,28]},{"key":"coffee_order","product":"*","branch":"management","game":"count","factor":0.6,"minutes":40},{"key":"shift_plan","product":"*","branch":"management","game":"order","factor":1,"minutes":50,"asc":true},{"key":"contract_review","product":"*","branch":"law","game":"pick","factor":1.2,"minutes":50},{"key":"password_reset","product":"*","branch":"it","game":"seq","factor":0.7,"minutes":40},{"key":"customer_mail","product":"*","branch":"sales","game":"sort","factor":0.8,"minutes":40},{"key":"office_supplies","product":"*","branch":"logistics","game":"math","factor":0.6,"minutes":40,"op":"add","a":[12,40],"b":[8,30]},{"key":"patch_servers","product":"security_software","branch":"it","game":"pick","factor":1.3,"minutes":45},{"key":"phishing_filter","product":"security_software","branch":"it","game":"sort","factor":1,"minutes":40},{"key":"alarm_codes","product":"security_software","branch":"it","game":"seq","factor":1.1,"minutes":40},{"key":"license_count","product":"security_software","branch":"sales","game":"math","factor":0.9,"minutes":45,"op":"mul","a":[4,12],"b":[5,25]},{"key":"crash_reports","product":"mobile_app","branch":"it","game":"count","factor":1,"minutes":40},{"key":"release_notes","product":"mobile_app","branch":"sales","game":"sort","factor":0.8,"minutes":45},{"key":"store_screens","product":"mobile_app","branch":"sales","game":"pick","factor":0.9,"minutes":40},{"key":"beta_testers","product":"mobile_app","branch":"management","game":"math","factor":0.8,"minutes":50,"op":"sub","a":[60,120],"b":[10,45]},{"key":"rack_servers","product":"cloud_platform","branch":"it","game":"order","factor":1.2,"minutes":45,"asc":false},{"key":"backup_tapes","product":"cloud_platform","branch":"it","game":"pick","factor":1,"minutes":40},{"key":"cloud_bill","product":"cloud_platform","branch":"finance","game":"math","factor":1.1,"minutes":45,"op":"mul","a":[6,20],"b":[15,60]},{"key":"ddos_block","product":"cloud_platform","branch":"it","game":"pick","factor":1.3,"minutes":40},{"key":"deadline_files","product":"legal_tech","branch":"law","game":"order","factor":1,"minutes":40,"asc":true},{"key":"template_check","product":"legal_tech","branch":"law","game":"pick","factor":1.1,"minutes":45},{"key":"chatbot_answers","product":"legal_tech","branch":"it","game":"sort","factor":0.9,"minutes":40},{"key":"fee_calc","product":"legal_tech","branch":"finance","game":"math","factor":1,"minutes":45,"op":"pct","a":[2000,9000],"b":[10,30]},{"key":"fraud_check","product":"fintech","branch":"finance","game":"pick","factor":1.3,"minutes":40},{"key":"kyc_docs","product":"fintech","branch":"law","game":"sort","factor":1,"minutes":45},{"key":"interest_calc","product":"fintech","branch":"finance","game":"math","factor":1,"minutes":45,"op":"pct","a":[1000,20000],"b":[2,6]},{"key":"tan_codes","product":"fintech","branch":"it","game":"seq","factor":0.8,"minutes":40},{"key":"pack_orders","product":"online_shop","branch":"logistics","game":"pick","factor":1.1,"minutes":40},{"key":"returns_sort","product":"online_shop","branch":"logistics","game":"sort","factor":0.9,"minutes":45},{"key":"price_update","product":"online_shop","branch":"sales","game":"math","factor":1,"minutes":40,"op":"pct","a":[20,200],"b":[10,40]},{"key":"stock_count_shop","product":"online_shop","branch":"logistics","game":"count","factor":0.8,"minutes":40},{"key":"pack_shirts","product":"fashion","branch":"logistics","game":"pick","factor":1.1,"minutes":40},{"key":"color_match","product":"fashion","branch":"craft","game":"sort","factor":1,"minutes":45},{"key":"runway_order","product":"fashion","branch":"sales","game":"seq","factor":0.9,"minutes":50},{"key":"size_count","product":"fashion","branch":"logistics","game":"count","factor":0.8,"minutes":40},{"key":"cheese_age","product":"delicatessen","branch":"science","game":"order","factor":1,"minutes":45,"asc":false},{"key":"expiry_check","product":"delicatessen","branch":"logistics","game":"pick","factor":1.1,"minutes":40},{"key":"gift_basket","product":"delicatessen","branch":"sales","game":"math","factor":0.9,"minutes":45,"op":"mul","a":[5,25],"b":[18,45]},{"key":"cold_chain","product":"delicatessen","branch":"logistics","game":"sort","factor":1,"minutes":40},{"key":"partner_audit","product":"franchise","branch":"management","game":"pick","factor":1.2,"minutes":50},{"key":"royalty_calc","product":"franchise","branch":"finance","game":"math","factor":1.1,"minutes":45,"op":"pct","a":[10000,60000],"b":[4,9]},{"key":"opening_plan","product":"franchise","branch":"management","game":"order","factor":1,"minutes":50,"asc":true},{"key":"recipe_steps","product":"franchise","branch":"management","game":"seq","factor":0.8,"minutes":40},{"key":"panel_check","product":"solar","branch":"craft","game":"pick","factor":1.1,"minutes":45},{"key":"roof_angle","product":"solar","branch":"craft","game":"order","factor":1,"minutes":45,"asc":false},{"key":"feed_in","product":"solar","branch":"finance","game":"math","factor":1,"minutes":45,"op":"mul","a":[300,900],"b":[8,13]},{"key":"cable_colors","product":"solar","branch":"craft","game":"seq","factor":0.9,"minutes":40},{"key":"outage_map","product":"grid_service","branch":"craft","game":"pick","factor":1.3,"minutes":40},{"key":"meter_read","product":"grid_service","branch":"it","game":"math","factor":0.9,"minutes":45,"op":"sub","a":[4000,9000],"b":[1000,3500]},{"key":"crew_dispatch","product":"grid_service","branch":"management","game":"order","factor":1,"minutes":45,"asc":true},{"key":"safety_gear","product":"grid_service","branch":"law","game":"sort","factor":0.8,"minutes":40},{"key":"cell_test","product":"energy_storage","branch":"science","game":"pick","factor":1.2,"minutes":45},{"key":"charge_plan","product":"energy_storage","branch":"finance","game":"order","factor":1,"minutes":45,"asc":true},{"key":"capacity_calc","product":"energy_storage","branch":"science","game":"math","factor":1,"minutes":45,"op":"mul","a":[8,24],"b":[5,15]},{"key":"thermal_watch","product":"energy_storage","branch":"science","game":"count","factor":1.1,"minutes":40},{"key":"buy_cheap","product":"energy_trading","branch":"finance","game":"order","factor":1.3,"minutes":40,"asc":true},{"key":"contract_sort","product":"energy_trading","branch":"law","game":"sort","factor":1,"minutes":45},{"key":"margin_calc","product":"energy_trading","branch":"finance","game":"math","factor":1.1,"minutes":45,"op":"sub","a":[90,160],"b":[40,85]},{"key":"trade_signals","product":"energy_trading","branch":"finance","game":"seq","factor":0.9,"minutes":40},{"key":"batch_check","product":"generics","branch":"science","game":"pick","factor":1.2,"minutes":45},{"key":"dose_calc","product":"generics","branch":"science","game":"math","factor":1,"minutes":45,"op":"mul","a":[2,6],"b":[50,400]},{"key":"pharmacy_orders","product":"generics","branch":"logistics","game":"count","factor":0.9,"minutes":40},{"key":"label_sort","product":"generics","branch":"law","game":"sort","factor":0.8,"minutes":40},{"key":"petri_dishes","product":"biotech","branch":"science","game":"pick","factor":1.1,"minutes":45},{"key":"dna_sequence","product":"biotech","branch":"science","game":"seq","factor":1.2,"minutes":45},{"key":"lab_cleanup","product":"biotech","branch":"science","game":"sort","factor":1,"minutes":45},{"key":"grant_budget","product":"biotech","branch":"finance","game":"math","factor":1,"minutes":45,"op":"pct","a":[100000,500000],"b":[10,30]},{"key":"device_test","product":"medtech","branch":"craft","game":"pick","factor":1.2,"minutes":45},{"key":"sterile_sort","product":"medtech","branch":"science","game":"sort","factor":1,"minutes":40},{"key":"calibrate","product":"medtech","branch":"science","game":"math","factor":1,"minutes":40,"op":"sub","a":[150,190],"b":[110,145]},{"key":"hospital_route","product":"medtech","branch":"sales","game":"order","factor":0.9,"minutes":45,"asc":true},{"key":"dossier_pages","product":"regulatory","branch":"law","game":"count","factor":1.2,"minutes":45},{"key":"deadline_agency","product":"regulatory","branch":"law","game":"order","factor":1.1,"minutes":45,"asc":true},{"key":"side_effects","product":"regulatory","branch":"science","game":"sort","factor":1,"minutes":40},{"key":"translation_set","product":"regulatory","branch":"law","game":"pick","factor":0.8,"minutes":40},{"key":"route_order","product":"courier","branch":"logistics","game":"order","factor":1.1,"minutes":40,"asc":true},{"key":"parcel_scan","product":"courier","branch":"logistics","game":"pick","factor":1,"minutes":40},{"key":"bike_check","product":"courier","branch":"craft","game":"seq","factor":0.8,"minutes":40},{"key":"tip_jar","product":"courier","branch":"finance","game":"math","factor":0.7,"minutes":45,"op":"add","a":[20,80],"b":[15,60]},{"key":"pick_list","product":"warehouse","branch":"logistics","game":"pick","factor":1.1,"minutes":40},{"key":"pallet_count","product":"warehouse","branch":"logistics","game":"count","factor":0.9,"minutes":40},{"key":"forklift_safety","product":"warehouse","branch":"management","game":"sort","factor":0.8,"minutes":45},{"key":"dock_plan","product":"warehouse","branch":"management","game":"order","factor":1,"minutes":45,"asc":true},{"key":"customs_docs","product":"freight","branch":"law","game":"sort","factor":1.2,"minutes":45},{"key":"container_load","product":"freight","branch":"logistics","game":"math","factor":1.1,"minutes":45,"op":"mul","a":[6,18],"b":[12,30]},{"key":"ship_schedule","product":"freight","branch":"logistics","game":"order","factor":1,"minutes":50,"asc":true},{"key":"seal_codes","product":"freight","branch":"logistics","game":"seq","factor":0.8,"minutes":40},{"key":"box_labels","product":"moving","branch":"logistics","game":"pick","factor":1,"minutes":40},{"key":"load_order","product":"moving","branch":"management","game":"seq","factor":1.1,"minutes":45},{"key":"fragile_sort","product":"moving","branch":"logistics","game":"sort","factor":0.9,"minutes":40},{"key":"moving_quote","product":"moving","branch":"finance","game":"math","factor":1,"minutes":45,"op":"mul","a":[3,9],"b":[45,90]}]}'::jsonb, 'Defaults from src/config/balance.ts, section "companyTasks"'),
+  ('funNews', '{"everyMinutes":6,"repeatHours":8,"keepHours":48,"items":[{"key":"ceo_laptop_train","needs":"company"},{"key":"office_dog","needs":"company"},{"key":"coffee_machine","needs":"company"},{"key":"typo_press","needs":"company"},{"key":"ceo_marathon","needs":"company"},{"key":"printer_rebellion","needs":"company"},{"key":"parking_war","needs":"company"},{"key":"lucky_socks","needs":"company"},{"key":"annual_party","needs":"company"},{"key":"ai_slogan","needs":"company"},{"key":"mascot","needs":"company"},{"key":"intern_ceo","needs":"company"},{"key":"rename_rumor","needs":"company"},{"key":"plant_office","needs":"company"},{"key":"ticker_meme","needs":"company"},{"key":"yacht_sale","needs":"company"},{"key":"player_lambo","needs":"player"},{"key":"player_coffee","needs":"player"},{"key":"player_tip","needs":"player"},{"key":"player_office","needs":"player"},{"key":"player_chart","needs":"player"},{"key":"player_diet","needs":"player"},{"key":"player_motivation","needs":"player"},{"key":"player_haircut","needs":"player"},{"key":"weather_markets","needs":"none"},{"key":"pigeon_trader","needs":"none"},{"key":"monday_effect","needs":"none"},{"key":"broker_nap","needs":"none"},{"key":"bull_escape","needs":"none"},{"key":"bear_costume","needs":"none"},{"key":"calculator_strike","needs":"none"},{"key":"vending_machine","needs":"none"},{"key":"elevator_talk","needs":"none"},{"key":"index_birthday","needs":"none"},{"key":"cat_portfolio","needs":"none"},{"key":"headline_error","needs":"none"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "funNews"'),
   ('stockNews', '{"everyMinutes":12,"leadMinMinutes":10,"leadMaxMinutes":40,"minMoveBps":300,"maxMoveBps":1200,"reliabilityBps":7500,"keepHours":24}'::jsonb, 'Defaults from src/config/balance.ts, section "stockNews"'),
   ('social', '{"feed":{"pageSize":30,"bigTradeMinProfitCents":100000,"bigTradeMinBps":1500,"levelEvery":5,"artMinPriceCents":1000000,"carMinPriceCents":10000000,"streakMilestones":[7,30,100,365],"keepDays":30},"league":{"updateEveryMinutes":10,"podium":3,"minBaselineCents":1000000},"friendCode":{"bonusCents":500000}}'::jsonb, 'Defaults from src/config/balance.ts, section "social"'),
   ('property', '{"tiers":[{"key":"flat","priceCents":2500000,"width":8,"height":6,"garageSlots":0,"minLevel":8},{"key":"apartment","priceCents":10000000,"width":10,"height":8,"garageSlots":0,"minLevel":11},{"key":"house","priceCents":50000000,"width":13,"height":9,"garageSlots":2,"minLevel":14},{"key":"villa","priceCents":250000000,"width":16,"height":11,"garageSlots":4,"minLevel":22},{"key":"luxury_villa","priceCents":1500000000,"width":20,"height":13,"garageSlots":8,"minLevel":30}],"tradeInBps":5000,"resaleBps":4000,"floors":{"laminate":0,"carpet":150000,"tiles":400000,"parquet":600000,"stone":1500000,"marble":6000000,"gold":100000000},"wallColors":["#f3efe4","#ffffff","#d9d4c7","#8f9bb3","#3a4256","#1b1e2b","#c8e6c9","#2f7a4a","#bfe6ff","#2f5fd0","#ffe0b2","#ff9a52","#f8bbd0","#7a2f7a","#c8553d","#ffd15c"]}'::jsonb, 'Defaults from src/config/balance.ts, section "property"')

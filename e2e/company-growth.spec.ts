@@ -232,3 +232,45 @@ test("every area of the skill map has products, e.g. an online legal service (AD
   await legal.click();
   await expect(legal).toHaveAttribute("aria-checked", "true");
 });
+
+test("company tasks: take one, play the mini-game, the result lands in the news (ADR-129)", async ({ page }) => {
+  await preparePlayer(page, "Aufgabenheld", 21_000, 2_000_000);
+  await found(page, "garage", "Packwerk");
+
+  await page.getByRole("tab", { name: /Aufgaben/ }).click();
+  const board = page.getByTestId("task-board");
+  const first = board.locator('[data-testid^="task-"]').first();
+  await expect(first).toBeVisible();
+  await first.getByRole("button", { name: "Übernehmen" }).click();
+
+  const sheet = page.getByTestId("play-sheet");
+  await sheet.getByRole("button", { name: "Los geht’s" }).click();
+  const game = sheet.locator('[data-testid^="game-"]');
+  await expect(game).toBeVisible();
+  const kind = (await game.getAttribute("data-testid"))!.replace("game-", "");
+  if (kind === "sort") {
+    for (let i = 0; i < 8; i++) await game.getByRole("button").first().click();
+  } else if (kind === "order") {
+    const rows = game.locator("li button");
+    for (let i = 0; i < 5; i++) await rows.nth(i).click();
+  } else if (kind === "seq") {
+    const first = game.getByRole("button").first();
+    await expect(first).toBeEnabled({ timeout: 8_000 });
+    for (let i = 0; i < 5; i++) await first.click();
+  } else if (kind === "math") {
+    await game.getByLabel("Ergebnis").fill("1");
+    await game.getByRole("button", { name: "Fertig" }).click();
+  } else {
+    await game.getByRole("button", { name: "Fertig" }).click();
+  }
+  const result = page.getByTestId("task-result");
+  await expect(result).toBeVisible();
+  await result.getByRole("button", { name: "Schließen" }).click();
+  await expect(page.getByTestId("task-history")).toBeVisible();
+
+  // The news tab shows company news of the task result.
+  await page.goto("/news");
+  const feed = page.getByTestId("news-feed");
+  await feed.getByRole("radio", { name: "Firmen" }).click();
+  await expect(feed.locator('[data-kind="company"]').first()).toContainText("Packwerk");
+});

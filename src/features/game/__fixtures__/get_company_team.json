@@ -18,9 +18,9 @@
       },
       "avatar_key": "rookie",
       "rank_hours": 0.0,
-      "started_at": "2026-11-14T01:08:16.75284+00:00",
-      "pending_raise": { "created_at": "2026-11-14T01:08:16.763158+00:00", "requested_bps": 200 },
-      "player_job_id": "42737efb-f089-4ed8-a455-efac5ce2a2a7",
+      "started_at": "2026-11-14T12:11:44.027804+00:00",
+      "pending_raise": { "created_at": "2026-11-14T12:11:44.040895+00:00", "requested_bps": 200 },
+      "player_job_id": "34853058-a1e7-44a9-a6f6-a4416e1a3e6a",
       "notice_ends_at": null,
       "productivity_bps": 15000,
       "salary_cents_per_hour": 19000

@@ -1,7 +1,7 @@
 {
   "job": null,
-  "tag": "688B",
-  "rank": 279,
+  "tag": "DZ5T",
+  "rank": 282,
   "level": 10,
   "trust": { "band": "blank", "kept": 0, "score": 50, "broken": 0 },
   "company": { "name": "Fixture Labor", "ticker": null },
@@ -13,7 +13,7 @@
     { "key": "it_basics", "tier": 1 }
   ],
   "streak_days": 1,
-  "member_since": "2026-11-14T01:08:15.935432+00:00",
+  "member_since": "2026-11-14T12:11:43.163935+00:00",
   "branch_scores": {
     "it": 3,
     "law": 0,
@@ -25,5 +25,5 @@
     "management": 0
   },
   "skills_learned": 2,
-  "net_worth_cents": 2423937
+  "net_worth_cents": 2425415
 }

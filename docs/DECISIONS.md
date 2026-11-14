@@ -1842,3 +1842,44 @@ Keine neue Branche: Branchen hängen an Börse, KI-Firmen und Nachfrage. Neue Pr
 
 Nebenbei: `53_m1_bonds_vault.sql` legt die Laufzeit von NXB01 im Test fest. Vorher hing die Zahl der Kupons von
 der Uhrzeit ab, und zwischen etwa 2 und 8 Uhr scheiterte die Prüfung (auch im Workflow vor dem Datenbank-Update).
+
+## ADR-129: Firmenaufgaben mit Minispielen, Vorgesetzte und ein News-Tab — `akzeptiert`
+
+Vorgabe: Mit mehreren Spielern sollen Firmen viel lebendiger werden. Mehr Wege, mit Mitarbeitern umzugehen, eine
+echte Hierarchie (Vorgesetzte sind für Praktikanten verantwortlich und delegieren), viele Aufgaben, die immer zum
+Produkt passen und für den Erfolg wichtig sind. KI erledigt delegierte Aufgaben, aber langsamer. Fehler kosten Geld
+und stehen in den Firmen-News. Dazu ein News-Tab mit lustigen und börsenrelevanten Meldungen.
+
+**Aufgaben** (`src/config/company-tasks.ts`, `game_config.companyTasks`):
+
+- 92 Aufgaben: 8 für jede Firma (Rechnungen sortieren, Schichtplan, Vertrag prüfen …) und 4 eigene für jedes der 21
+  Produkte (Modelabel: T-Shirts in Größe M verpacken, Stoffe nach Kollektion sortieren, Laufsteg-Reihenfolge merken,
+  Größen zählen).
+- Jede Aufgabe ist ein Minispiel unter einer Minute: **Tippen** (alle passenden Kacheln), **Zählen**, **Sortieren**
+  (links oder rechts), **Reihenfolge** (nach Zahlen), **Merken** (Folge aus vier Symbolen) und **Rechnen**. Der Server
+  baut das Rätsel, behält die Lösung und bewertet die Antwort; die Zeit läuft ab dem Öffnen.
+- Wert nach Stufe (Garage 400 €, Kleinunternehmen 1.500 €, GmbH 5.000 €, AG 20.000 €) mal Faktor der Aufgabe.
+  Ab 80 % richtig zahlt die Aufgabe Wert × Anteil in die Firmenkasse. Falsch, zu langsam oder nicht rechtzeitig
+  erledigt kostet 60 % des Werts. Jedes Ergebnis wird Firmen-News mit eigener Zeile („Mona Moden macht Minus: Die
+  T-Shirts gingen nicht rechtzeitig raus.“). Wer spielt, bekommt XP.
+- Neue Aufgaben kommen nur, solange jemand aus der Firma in den letzten 20 Minuten aktiv war: höchstens eine je
+  4 Minuten, so viele, dass es zur Teamgröße passt (1 + eine je 2 Köpfe, höchstens 6). Eine schlafende Firma
+  verliert so kein Geld.
+
+**Hierarchie und Delegieren:**
+
+- Die Gründerin oder der Gründer legt für jede Person fest, an wen sie berichtet (`player_jobs.supervisor_id`).
+  Vorgesetzte haben immer einen höheren Rang, deshalb gibt es keine Kreise.
+- Gründer vergeben jede Aufgabe an sich, an jede Person oder an die KI. Mitarbeiter übernehmen offene Aufgaben und
+  geben eigene Aufgaben an ihr direktes Team weiter. Ab Senior dürfen sie die KI einsetzen.
+- Wer eine Aufgabe bekommt, erhält eine Benachrichtigung.
+- **KI-Kräfte** brauchen 12 Minuten, mit jeder Aufgabe, an der sie schon arbeiten, 50 % länger. Sie schaffen es in
+  70 % der Fälle (80 % mit passendem Training) und bringen 60 % des Werts. Wird die KI nach der Frist fertig, gilt
+  die Aufgabe als verpatzt. Optional übernimmt die KI liegengebliebene Aufgaben 15 Minuten vor der Frist.
+- Das Organigramm zeigt, wer an wen berichtet.
+
+**News-Tab** (`/news`): Börsen-Tipps (ADR-119), Firmen-News aller Spielerfirmen (Aufgaben, Rekorde, Börsengänge),
+Marktmeldungen und 36 kuriose Meldungen über KI-Firmen, Spieler und die Börse (alle 6 Minuten eine). Filter nach Art.
+
+Abgelöst: Die Arbeitsaufgaben aus ADR-059 bleiben abgeschaltet; die Firmenaufgaben sind ihr Ersatz.
+Tests: `supabase/tests/96_company_tasks.sql`, `src/lib/sim/company-tasks.test.ts`, `e2e/company-growth.spec.ts`.

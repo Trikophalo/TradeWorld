@@ -148,3 +148,7 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 - **Firmen in jedem Bereich (ADR-128):** sechs neue Produkte, die mit Recht, Finanzen oder Führung beginnen
   (Online-Rechtsberatung, Banking-App, Franchise-Kette, Stromhandel, Zulassungsberatung, Umzugsservice), jedes mit
   eigenen Geschäftszügen.
+- **Firmenaufgaben (ADR-129):** 92 kleine Aufgaben, die zum Produkt passen, jede ein Minispiel (Tippen, Zählen,
+  Sortieren, Reihenfolge, Merken, Rechnen). Gut gemacht bringt Geld, verpatzt oder liegen gelassen kostet es, und es
+  steht in den Firmen-News. Vorgesetzte sind für ihr Team verantwortlich und delegieren; die KI hilft, aber langsam.
+- **News-Tab:** Börsen-Tipps, Firmen-Meldungen aller Spielerfirmen, Marktmeldungen und Kurioses.

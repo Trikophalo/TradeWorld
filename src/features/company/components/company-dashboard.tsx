@@ -29,6 +29,7 @@ import { CompanyChat } from "./company-chat";
 import { HireSheet, TeamView, type HireRequest } from "./employer";
 import { CompanyMovesCard } from "./company-moves";
 import { GrowthPath } from "./growth-path";
+import { TaskBoard, useCompanyTasks } from "../tasks/task-board";
 import { HeadquartersHero, netProfit } from "./headquarters";
 import { ListingCard, SideJobNotice } from "./listing";
 import { BannerEditor } from "./banner-editor";
@@ -39,7 +40,7 @@ import { ProductionCard } from "./production";
 import { CampaignCard, ProfitRoutes } from "./routes";
 import { CompanyNewsCard, SituationCard } from "./situation";
 
-type Tab = "overview" | "team" | "chat";
+type Tab = "overview" | "tasks" | "team" | "chat";
 const factor = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
 const money = (cents: number) => formatMoney(cents, { whole: true });
 const NEXT_TIER = { garage: "small_business", small_business: "gmbh", gmbh: "ag", ag: null } as const;
@@ -49,6 +50,9 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
   const t = useTranslations("firm");
   const tl = useTranslations("logo");
   const [tab, setTab] = useState<Tab>("overview");
+  const tt = useTranslations("companyTasks");
+  const tasks = useCompanyTasks();
+  const openTasks = tasks.data?.tasks.filter((x) => x.status === "open").length ?? 0;
   const [hire, setHire] = useState<HireRequest | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [bannerOpen, setBannerOpen] = useState(false);
@@ -102,6 +106,7 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
         onChange={setTab}
         tabs={[
           { value: "overview", label: t("tabOverview"), icon: "home" },
+          { value: "tasks", label: tt("tab"), icon: "briefcase", badge: openTasks },
           { value: "team", label: t("tabTeam"), icon: "profile", badge: company.pendingApplications },
           { value: "chat", label: t("tabChat"), icon: "bell" },
         ]}
@@ -149,6 +154,7 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
           </div>
         </div>
       )}
+      {tab === "tasks" && <TaskBoard />}
       {tab === "team" && <TeamView company={company} onHire={setHire} />}
       {tab === "chat" && <CompanyChat />}
 
@@ -169,7 +175,7 @@ function DepartmentTabs({
 }) {
   const t = useTranslations("firm");
   return (
-    <div role="tablist" aria-label={t("title")} className="grid grid-cols-3 gap-2 rounded-lg bg-surface-2 p-1.5">
+    <div role="tablist" aria-label={t("title")} className="grid grid-cols-4 gap-1.5 rounded-lg bg-surface-2 p-1.5">
       {tabs.map((tab) => {
         const active = tab.value === value;
         return (

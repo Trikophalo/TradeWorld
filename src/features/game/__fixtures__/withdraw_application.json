@@ -1,27 +1,27 @@
 {
-  "id": "203dd20a-e15a-4eac-acb5-fedf7a8f9a21",
+  "id": "8c276f06-4ac3-428f-9374-d9f1bd3533df",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "2697f2bd-5812-432d-bdd2-caa7f78cbed7",
+    "id": "18383ec5-91e2-40e3-943d-6a91331b8fea",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "cbfac5fd-3475-2166-ea22-0a85cbb6f5c0",
+      "id": "dc6cd683-c473-c0eb-8d8c-04ddf664b4d5",
       "logo": null,
-      "name": "Brotzeit Handel AG",
-      "color": "#F2A93B",
+      "name": "Eilbote Express",
+      "color": "#F7768E",
       "is_ai": true,
-      "sector": "retail",
-      "ticker": "BRZ"
+      "sector": "logistics",
+      "ticker": "EBX"
     },
-    "required": [{ "branch": "logistics", "min_score": 0 }],
-    "title_key": "logistics_intern",
+    "required": [{ "branch": "management", "min_score": 0 }],
+    "title_key": "management_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-14T01:08:16.337568+00:00",
-  "updated_at": "2026-11-14T01:08:16.341109+00:00",
-  "offer_expires_at": "2026-11-16T01:08:16.337568+00:00",
+  "created_at": "2026-11-14T12:11:43.587838+00:00",
+  "updated_at": "2026-11-14T12:11:43.592321+00:00",
+  "offer_expires_at": "2026-11-16T12:11:43.587838+00:00",
   "salary_wish_cents_per_hour": 15000,
   "offer_salary_cents_per_hour": 15000
 }

@@ -1,0 +1,11 @@
+{
+  "id": 48,
+  "xp": 120,
+  "key": "payroll_check",
+  "late": false,
+  "answer": { "value": 140 },
+  "status": "success",
+  "solution": { "value": 140 },
+  "score_bps": 10000,
+  "result_cents": 44000
+}

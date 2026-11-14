@@ -7130,3 +7130,45 @@ Migration `20261203001500_company_moves.sql`, Test `supabase/tests/95_company_mo
   (`company_costs`) und gibt denselben Zustand zurück.
 - `company_moves_run_due(p_now)` (intern, Cron `nexa-company-moves` jede Minute): würfelt fällige Züge aus, zahlt
   Erfolg oder Erstattung als `company_revenue` aus und schreibt eine Systemnachricht in den Firmenchat.
+
+## Nachtrag: Firmenaufgaben, Vorgesetzte und News-Feed (ADR-129)
+
+Migration `20261204000100_company_tasks.sql`, Test `supabase/tests/96_company_tasks.sql`.
+
+- `player_jobs.supervisor_id` (Profil, an das jemand berichtet; null = Gründer).
+- `player_companies.tasks_auto_ai` (Vorgabe true), `tasks_last_created_at`.
+- **Tabelle `company_tasks`** (intern): `id`, `company_id`, `task_key`, `branch`, `game`, `status`
+  (`open`/`assigned`/`playing`/`ai`/`success`/`failure`/`missed`), `value_cents`, `created_at`, `due_at`,
+  `assignee_id`, `assignee_ai`, `assigned_by`, `assigned_at`, `ai_done_at`, `ai_chance_bps`, `opened_at`, `puzzle`,
+  `solution` (verlässt den Server nur nach der Antwort), `answer`, `score_bps`, `result_cents` (+ verdient, − verloren),
+  `done_by`, `resolved_at`.
+- **Tabelle `fun_news`** (intern): `item_key`, `company`, `ticker`, `nickname`, `created_at`; Texte im Client.
+- Fehler: `task_not_found` NX110, `task_taken` NX111, `task_not_allowed` NX112, `task_closed` NX113,
+  `no_ai_workers` NX114. Benachrichtigungsart `company_task`. Firmen-News-Arten `task_success`, `task_failure`,
+  `task_missed` mit `{task, amount_cents, nickname, ai}`.
+
+RPCs (`authenticated`):
+
+```
+get_company_tasks() -> TASKS
+  {"role": "founder"|"employee", "company": {"id","name","tier","product"}, "my_tier", "auto_ai", "ai_workers",
+   "ai_minutes", "can_use_ai",
+   "people": [{"nickname","tag","tier","is_me","supervisor","reports_to_me","open_tasks"}],
+   "tasks": [{"id","key","game","branch","status","value_cents","created_at","due_at","assignee","assignee_ai",
+              "assigned_by","ai_done_at","opened_at","mine","can_delegate"}],
+   "history": [{"id","key","status","result_cents","score_bps","ai","done_by","resolved_at"}]}
+delegate_company_task(p_request_id uuid, p_task_id bigint, p_to text)   -- 'me' | 'ai' | Spitzname -> TASKS
+start_company_task(p_request_id uuid, p_task_id bigint)
+  -> {"id","key","game","puzzle","opened_at","seconds","value_cents","due_at"}
+submit_company_task(p_request_id uuid, p_task_id bigint, p_answer jsonb)
+  -> {"id","key","status","score_bps","result_cents","xp","late","solution","answer"}
+set_job_supervisor(p_request_id uuid, p_nickname text, p_supervisor text)   -- nur Gründer -> TASKS
+set_company_tasks_auto_ai(p_request_id uuid, p_on boolean)                  -- nur Gründer -> TASKS
+get_news_feed(p_kind text default 'all', p_limit integer default 40)       -- all|stock|company|market|fun
+  -> {"items": [{"id","kind","at", ...je nach Art}]}
+```
+
+Rätsel und Antworten: `pick` `{tiles}` → `{picked}`, `count` `{tiles}` → `{count}`, `sort` `{items}` → `{sides}`,
+`order` `{values}` → `{order}`, `seq` `{sequence, show_seconds}` → `{sequence}`, `math` `{a, b}` → `{value}`.
+Intern: `company_tasks_run_due(p_now)` (Cron `nexa-company-tasks`), `fun_news_run_due(p_now)` (Cron `nexa-fun-news`).
+`get_company_org` liefert je Mitglied zusätzlich `supervisor`.

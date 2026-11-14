@@ -1,0 +1,88 @@
+{
+  "role": "founder",
+  "tasks": [
+    {
+      "id": 49,
+      "key": "runway_order",
+      "game": "seq",
+      "mine": false,
+      "branch": "sales",
+      "due_at": "2026-11-14T12:51:47.96199+00:00",
+      "status": "ai",
+      "assignee": null,
+      "opened_at": null,
+      "ai_done_at": "2026-11-14T12:23:47.97447+00:00",
+      "created_at": "2026-11-14T12:11:47.96199+00:00",
+      "assigned_by": "Fx_Taskboss",
+      "assignee_ai": true,
+      "value_cents": 36000,
+      "can_delegate": false
+    },
+    {
+      "id": 48,
+      "key": "payroll_check",
+      "game": "math",
+      "mine": false,
+      "branch": "finance",
+      "due_at": "2026-11-14T12:51:47.96199+00:00",
+      "status": "open",
+      "assignee": null,
+      "opened_at": null,
+      "ai_done_at": null,
+      "created_at": "2026-11-14T12:11:47.96199+00:00",
+      "assigned_by": null,
+      "assignee_ai": false,
+      "value_cents": 44000,
+      "can_delegate": true
+    },
+    {
+      "id": 47,
+      "key": "pack_shirts",
+      "game": "pick",
+      "mine": false,
+      "branch": "logistics",
+      "due_at": "2026-11-14T12:51:47.96199+00:00",
+      "status": "assigned",
+      "assignee": "Fx_Taskmid",
+      "opened_at": null,
+      "ai_done_at": null,
+      "created_at": "2026-11-14T12:11:47.96199+00:00",
+      "assigned_by": "Fx_Taskboss",
+      "assignee_ai": false,
+      "value_cents": 44000,
+      "can_delegate": true
+    }
+  ],
+  "people": [
+    {
+      "tag": "Q4Z3",
+      "tier": "senior",
+      "is_me": false,
+      "nickname": "Fx_Taskmid",
+      "open_tasks": 1,
+      "supervisor": null,
+      "reports_to_me": true
+    },
+    {
+      "tag": "2Q68",
+      "tier": "intern",
+      "is_me": false,
+      "nickname": "Fx_Tasknew",
+      "open_tasks": 0,
+      "supervisor": "Fx_Taskmid",
+      "reports_to_me": false
+    }
+  ],
+  "auto_ai": true,
+  "company": {
+    "id": "8f496009-c4f0-4377-91d1-ca79109f330d",
+    "name": "Fixture Mode",
+    "tier": "garage",
+    "product": "fashion"
+  },
+  "history": [],
+  "my_tier": "c_level",
+  "ai_minutes": 18,
+  "ai_workers": 1,
+  "can_use_ai": true
+}

@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "e7bf8dfa-4482-4f0c-88ef-c3003a2a7f67",
+    "id": "34324e8b-a653-4b18-9b78-cb01fd31f88e",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "cbfac5fd-3475-2166-ea22-0a85cbb6f5c0",
+      "id": "dc6cd683-c473-c0eb-8d8c-04ddf664b4d5",
       "logo": null,
-      "name": "Brotzeit Handel AG",
-      "color": "#F2A93B",
+      "name": "Eilbote Express",
+      "color": "#F7768E",
       "is_ai": true,
-      "sector": "retail",
-      "ticker": "BRZ"
+      "sector": "logistics",
+      "ticker": "EBX"
     },
     "presence": {
-      "fire_at": "2026-11-19T01:08:18.729984+00:00",
+      "fire_at": "2026-11-19T12:11:46.04307+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-14T01:08:18.729984+00:00"
+      "last_active_at": "2026-11-14T12:11:46.04307+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-14T01:08:18.811732+00:00",
+    "started_at": "2026-11-14T12:11:46.129801+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,
