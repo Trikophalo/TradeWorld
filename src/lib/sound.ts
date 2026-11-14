@@ -50,6 +50,31 @@ export const SOUNDS = {
   },
   /** Big profit / confetti sparkle (~0.75 s). */
   win: { src: ["/sounds/win.wav"], volume: 0.26, minIntervalMs: 500 },
+  /** NEXA Nachrichten: the jingle that opens the hourly show (~1.7 s). */
+  newsIntro: { src: ["/sounds/news-intro.wav"], volume: 0.62, minIntervalMs: 3000 },
+  /**
+   * The anchor talking: one low, mumbly syllable (~70 ms), far below the mascot's blip. Call it while his text is
+   * typed; the interval keeps it at a natural pace.
+   */
+  anchorTalk: {
+    src: [
+      "/sounds/anchor-talk-1.wav",
+      "/sounds/anchor-talk-2.wav",
+      "/sounds/anchor-talk-3.wav",
+      "/sounds/anchor-talk-4.wav",
+    ],
+    volume: 0.3,
+    minIntervalMs: 85,
+    rateJitter: 0.08,
+  },
+  /** A new story starts. */
+  newsSting: { src: ["/sounds/news-sting.wav"], volume: 0.5, minIntervalMs: 400 },
+  /** Bad news for somebody: a soft "womp-womp". */
+  newsBad: { src: ["/sounds/news-bad.wav"], volume: 0.5, minIntervalMs: 400 },
+  /** Good news for somebody: a tiny cash register. */
+  newsGood: { src: ["/sounds/news-good.wav"], volume: 0.25, minIntervalMs: 400 },
+  /** One pip of the studio clock, for the last ten seconds before the show. */
+  newsTick: { src: ["/sounds/news-tick.wav"], volume: 0.3, minIntervalMs: 500 },
 } as const satisfies Record<string, SoundSpec>;
 
 export type SoundName = keyof typeof SOUNDS;
