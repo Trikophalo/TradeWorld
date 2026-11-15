@@ -36,6 +36,7 @@ import { PlayerFigure } from "@/components/ui/player-figure";
 import { FloorBubble } from "@/features/company/components/floor-bubble";
 import { OfficeScene } from "@/features/company/components/office-scene";
 import { ACCESSORIES } from "@/config/accessories";
+import { BattleShowcase } from "@/features/news/battle/showcase";
 import { FriendsPlaza } from "@/features/friends/components/plaza";
 import { RentalShowcase } from "@/features/property/components/rental-showcase";
 import { PokeButton } from "@/features/friends/components/poke";
@@ -897,6 +898,7 @@ export function Showcase() {
         </Demo>
         <OfficeScene />
         <RentalShowcase />
+        <BattleShowcase />
         <Card padding="lg">
           <SignaturePad onChange={() => undefined} />
         </Card>

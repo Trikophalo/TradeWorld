@@ -1,0 +1,1430 @@
+-- ===== idempotent copy of migrations/20261204004720_news_battles.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 4720 · News battles: lobby, mini-games, prizes (ADR-160)
+-- =============================================================================
+-- Players who watch the news (news_show_viewers) join a lobby; from battles.lobby.minPlayers (3) a countdown runs,
+-- with maxPlayers (10) or when it ends the battle starts. The server picks the game (never the last one twice), the
+-- prize (when the lobby opens, shown there) and the seed. There is always exactly one open or running battle; when
+-- it is over, the next lobby opens (lazily, with the next call).
+-- * Action games (floor, bulls, coins, sumo, potato, pump): deterministic lockstep. Every client sends its inputs
+--   (one character per tick, 20 ticks per second) to battle_sync and gets everyone else's back; a tick is final
+--   graceMs after it, missing inputs then count as "x". The server decides the winner by running the same
+--   simulation in SQL (battle_sim, 3700) over all inputs: when a client claims the end (at most once a second) or
+--   when the time is up.
+-- * Round games (quiz, estimate, bell): the answers, true values and bell times stay in battles.plan; answers count
+--   with the server's clock (first answer counts). The bell's reaction time runs from the moment the server first
+--   showed the ringing bell to this player.
+-- * Prizes (battles.prizes): XP (grant_xp, source battle), money from the households (ledger battle_prize), an
+--   exclusive accessory (battles.accessories, merged into accessories_cfg(); buy_accessory refuses them), or a
+--   gallery NFT without owner (reserved in the lobby; if gone another one, else money). At most dailyPrizeCap wins
+--   with a prize per player and day. Notification battle_won, feed item battle_won, a line in the show's chat.
+-- * Missions: metrics battle_join (at the start, every participant) and battle_win.
+--
+-- RPCs (authenticated):
+--   get_battle() -> {"now", "viewers", "battle": BATTLE | null, "recent": BATTLE | null}   (marks the caller watching)
+--   battle_join(p_request_id uuid) -> the same          errors locked, battle_not_viewer NX150, battle_full NX151,
+--                                                        battle_closed NX152
+--   battle_leave(p_request_id uuid) -> the same          (running: forfeits)
+--   battle_sync(p_battle_id bigint, p_from integer, p_inputs text, p_since integer, p_end_tick integer)
+--     -> {"now", "status", "final_tick", "streams": [{"slot", "data"}]}   (inputs only from participants; anyone
+--        may watch)  errors battle_unknown NX156
+--   battle_answer(p_request_id uuid, p_battle_id bigint, p_round integer, p_choice integer, p_value numeric)
+--     -> {"now", "viewers", "battle", "recent"}   errors battle_not_joined NX153, battle_round_closed NX154
+--   BATTLE = {"id", "status", "kind", "seed", "opened_at", "countdown_ends_at", "started_at", "ends_at",
+--             "finished_at", "min_players", "max_players", "params", "prize", "players": [{"slot", "nickname",
+--             "avatar_key", "accessories", "me", "left", "rank"}], "joined", "prize_wins_left", "rounds", "result"}
+-- Internal: battle_run_due() (cron nexa-battles, every minute) finishes battles nobody looks at any more.
+-- Errors: also accessory_exclusive NX155 (buy_accessory).
+-- Idempotent: runs unchanged as supabase/updates/20261204004720_news_battles.sql.
+
+-- ---------------------------------------------------------------------------
+-- A. Error keys, notification type
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.api_error(text)'::regprocedure);
+begin
+  if position('''battle_unknown''' in v_def) = 0 then
+    v_def := replace(v_def, $q$    when 'poke_daily_limit'           then 'NX136'
+$q$, $q$    when 'poke_daily_limit'           then 'NX136'
+    when 'battle_not_viewer'          then 'NX150'
+    when 'battle_full'                then 'NX151'
+    when 'battle_closed'              then 'NX152'
+    when 'battle_not_joined'          then 'NX153'
+    when 'battle_round_closed'        then 'NX154'
+    when 'accessory_exclusive'        then 'NX155'
+    when 'battle_unknown'             then 'NX156'
+$q$);
+    if position('''battle_unknown''' in v_def) = 0 then
+      raise exception 'api_error() has an unexpected shape; add the battle error keys by hand';
+    end if;
+    execute v_def;
+  end if;
+end;
+$do$;
+
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('battle_won', 'social', 'News-Battle gewonnen', 'Du hast ein News-Battle gewonnen und deinen Preis bekommen.',
+        'notif_bell', true, true, false, 301)
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- B. Tables (internal: read and written only by the RPCs below)
+-- ---------------------------------------------------------------------------
+create table if not exists public.battles (
+  id                bigint generated always as identity primary key,
+  status            text not null default 'open' check (status in ('open', 'running', 'finished', 'cancelled')),
+  kind              text check (kind is null or kind in ('floor', 'bulls', 'coins', 'sumo', 'potato', 'pump', 'quiz',
+                                                         'estimate', 'bell')),
+  seed              bigint not null check (seed between 0 and 4294967295),
+  params            jsonb not null default '{}'::jsonb,
+  plan              jsonb not null default '{}'::jsonb,
+  prize             jsonb not null default '{}'::jsonb,
+  artwork_id        uuid references public.artworks (id) on delete set null,
+  opened_at         timestamptz not null default now(),
+  countdown_ends_at timestamptz,
+  started_at        timestamptz,
+  ends_at           timestamptz,
+  checked_at        timestamptz,
+  finished_at       timestamptz,
+  winner_id         uuid references public.profiles (id) on delete set null,
+  result            jsonb
+);
+alter table public.battles enable row level security;
+revoke all on public.battles from public, anon, authenticated;
+create unique index if not exists battles_one_live_idx on public.battles ((true)) where status in ('open', 'running');
+create index if not exists battles_finished_idx on public.battles (finished_at desc) where status = 'finished';
+create index if not exists battles_winner_idx on public.battles (winner_id, finished_at desc) where winner_id is not null;
+create index if not exists battles_artwork_idx on public.battles (artwork_id) where artwork_id is not null;
+comment on table public.battles is
+  'News battles (ADR-160). plan holds the secret answers and bell times, params the game rules of this battle, '
+  'prize what the lobby shows, result the ranking and the paid prize. Internal; read through get_battle().';
+
+create table if not exists public.battle_players (
+  battle_id  bigint not null references public.battles (id) on delete cascade,
+  player_id  uuid not null references public.profiles (id) on delete cascade,
+  slot       smallint check (slot between 0 and 9),
+  joined_at  timestamptz not null default now(),
+  seen_at    timestamptz not null default now(),
+  active     boolean not null default true,
+  inputs     text not null default '' check (char_length(inputs) <= 4000),
+  left_at    timestamptz,
+  rank       smallint,
+  primary key (battle_id, player_id)
+);
+alter table public.battle_players enable row level security;
+revoke all on public.battle_players from public, anon, authenticated;
+create unique index if not exists battle_players_active_idx on public.battle_players (player_id) where active;
+create index if not exists battle_players_player_idx on public.battle_players (player_id);
+create unique index if not exists battle_players_slot_idx on public.battle_players (battle_id, slot) where slot is not null;
+comment on table public.battle_players is
+  'Who plays a news battle (ADR-160): slot from the start on, inputs = one character per tick (action games). '
+  'At most one active battle per player. Internal.';
+
+create table if not exists public.battle_answers (
+  battle_id   bigint not null references public.battles (id) on delete cascade,
+  round       smallint not null check (round between 0 and 99),
+  player_id   uuid not null references public.profiles (id) on delete cascade,
+  choice      smallint,
+  value_e4    bigint,
+  revealed_at timestamptz,
+  answered_at timestamptz,
+  primary key (battle_id, round, player_id)
+);
+alter table public.battle_answers enable row level security;
+create index if not exists battle_answers_player_idx on public.battle_answers (player_id);
+revoke all on public.battle_answers from public, anon, authenticated;
+comment on table public.battle_answers is
+  'Answers in the round games of a news battle (ADR-160) with the server time; revealed_at = when the server first '
+  'showed this player the ringing bell. Internal.';
+
+-- ---------------------------------------------------------------------------
+-- C. Helpers
+-- ---------------------------------------------------------------------------
+create or replace function public.battles_cfg()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select value from public.game_config where key = 'battles'), '{}'::jsonb);
+$$;
+
+-- Milliseconds from a to b
+create or replace function public.battle_ms(p_from timestamptz, p_to timestamptz)
+returns bigint
+language sql
+immutable
+set search_path = ''
+as $$
+  select floor(extract(epoch from (p_to - p_from)) * 1000)::bigint;
+$$;
+
+-- The server's stream rules (acceptChunk in src/lib/sim/battle/index.ts)
+create or replace function public.battle_accept_chunk(p_stream text, p_from integer, p_data text, p_final integer,
+                                                      p_now integer, p_ahead integer)
+returns text
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_out text := coalesce(p_stream, '');
+  v_ch  text;
+  t     integer;
+  k     integer;
+begin
+  if position('q' in v_out) > 0 or p_from is null or p_from < 0 then
+    return v_out;
+  end if;
+  if char_length(v_out) < p_from then
+    v_out := rpad(v_out, p_from, 'x');
+  end if;
+  for k in 0 .. coalesce(char_length(p_data), 0) - 1 loop
+    t := p_from + k;
+    continue when t < char_length(v_out);
+    exit when t > p_now + p_ahead;
+    v_ch := substr(p_data, k + 1, 1);
+    v_out := v_out || case when t < p_final then 'x' when v_ch ~ '^[0-9]$' then v_ch else '0' end;
+  end loop;
+  return v_out;
+end;
+$$;
+
+-- A player leaves: "q" at the tick (quitStream)
+create or replace function public.battle_quit_stream(p_stream text, p_tick integer)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when position('q' in coalesce(p_stream, '')) > 0 then p_stream
+              when char_length(coalesce(p_stream, '')) < p_tick then rpad(coalesce(p_stream, ''), p_tick, 'x') || 'q'
+              else coalesce(p_stream, '') || 'q' end;
+$$;
+
+create or replace function public.battle_is_tick(p_kind text)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select p_kind in ('floor', 'bulls', 'coins', 'sumo', 'potato', 'pump');
+$$;
+
+-- The player watches the news right now (get_news_show or get_battle in the last 20 seconds)
+create or replace function public.battle_is_viewer(p_player uuid, p_now timestamptz)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (select 1 from public.news_show_viewers v where v.player_id = p_player and v.seen_at > p_now - interval '20 seconds');
+$$;
+
+-- Prize wins today (Berlin) of a player
+create or replace function public.battle_prize_wins_today(p_player uuid, p_now timestamptz)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select count(*)::integer from public.battles b
+   where b.winner_id = p_player and b.status = 'finished' and coalesce((b.result ->> 'paid')::boolean, false)
+     and (b.finished_at at time zone 'Europe/Berlin')::date = (p_now at time zone 'Europe/Berlin')::date;
+$$;
+
+-- A gallery NFT nobody owns and nobody auctions
+create or replace function public.battle_free_artwork(p_except uuid default null)
+returns uuid
+language sql
+volatile
+security definer
+set search_path = ''
+as $$
+  select a.id from public.artworks a
+   where a.owner_id is null and a.ai_owner is null and a.gallery_key is not null
+     and (p_except is null or a.id <> p_except)
+     and not exists (select 1 from public.artwork_auctions x where x.artwork_id = a.id and x.status = 'open')
+     and not exists (select 1 from public.battles b where b.artwork_id = a.id and b.status in ('open', 'running'))
+   order by random()
+   limit 1;
+$$;
+
+-- What the prize of a battle is worth with n players (the lobby shows it, the payout uses it)
+create or replace function public.battle_prize_json(p_battle public.battles, p_players integer)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg  jsonb := public.battles_cfg() -> 'prizes';
+  v_n  integer := greatest(coalesce(p_players, 0), coalesce((public.battles_cfg() #>> '{lobby,minPlayers}')::integer, 3));
+  v_mult double precision := coalesce((public.config_jsonb('progression') ->> 'xpMultiplier')::double precision, 1);
+  a    public.artworks;
+begin
+  if p_battle.result ? 'prize' then
+    return p_battle.result -> 'prize';
+  end if;
+  case p_battle.prize ->> 'kind'
+    when 'xp' then
+      return jsonb_build_object('kind', 'xp', 'xp',
+        round(((cfg ->> 'xpBase')::integer + (cfg ->> 'xpPerPlayer')::integer * v_n) * v_mult)::integer);
+    when 'money' then
+      return jsonb_build_object('kind', 'money', 'cents',
+        (cfg ->> 'moneyBaseCents')::bigint + (cfg ->> 'moneyPerPlayerCents')::bigint * v_n);
+    when 'skin' then
+      return jsonb_build_object('kind', 'skin', 'accessories',
+        coalesce((select jsonb_agg(x ->> 'key') from jsonb_array_elements(public.battles_cfg() -> 'accessories') x), '[]'::jsonb));
+    when 'nft' then
+      select * into a from public.artworks x where x.id = p_battle.artwork_id;
+      if a.id is null then
+        return jsonb_build_object('kind', 'money', 'cents',
+          (cfg ->> 'moneyBaseCents')::bigint + (cfg ->> 'moneyPerPlayerCents')::bigint * v_n);
+      end if;
+      return jsonb_build_object('kind', 'nft', 'artwork',
+        jsonb_build_object('id', a.id, 'title', a.title, 'serial', a.serial, 'rarity', a.rarity, 'pixels', a.pixels));
+    else
+      return jsonb_build_object('kind', 'xp', 'xp', 0);
+  end case;
+end;
+$$;
+
+-- German label of a paid prize (notification, chat, feed)
+create or replace function public.battle_prize_label(p_prize jsonb)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case p_prize ->> 'kind'
+    when 'xp' then coalesce(p_prize ->> 'xp', '0') || ' XP'
+    when 'money' then public.format_eur((p_prize ->> 'cents')::bigint)
+    when 'skin' then 'das exklusive Accessoire „' || coalesce(p_prize ->> 'name', 'Battle-Skin') || '“'
+    when 'nft' then 'das NFT „' || coalesce(p_prize #>> '{artwork,title}', 'NFT') || '“'
+    else 'Ruhm und Ehre' end;
+$$;
+
+-- The game name for texts on the server
+create or replace function public.battle_game_name(p_kind text)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(public.battles_cfg() -> 'names' ->> p_kind, p_kind);
+$$;
+
+-- A line of Mr. Doodle Dangle in the live chat of the show
+create or replace function public.battle_chat(p_text text, p_now timestamptz)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if p_text is null or char_length(p_text) < 1 then
+    return;
+  end if;
+  insert into public.news_show_messages (player_id, bot_name, body, created_at)
+  values (null, 'Mr. Doodle Dangle', left(p_text, 300), p_now);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- D. Exclusive accessories: part of the catalogue, never for sale
+-- ---------------------------------------------------------------------------
+create or replace function public.accessories_cfg()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when a ? 'items' or jsonb_array_length(b) > 0
+              then jsonb_set(a, '{items}', coalesce(a -> 'items', '[]'::jsonb) || b)
+              else a end
+    from (select coalesce((select value from public.game_config where key = 'accessories'), '{}'::jsonb) as a,
+                 coalesce((select value -> 'accessories' from public.game_config where key = 'battles'), '[]'::jsonb) as b) x;
+$$;
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.buy_accessory(uuid, text)'::regprocedure);
+  v_old text := $t$  if coalesce((select p.level from public.profiles p where p.id = v_player), 1) < coalesce((v_item ->> 'minLevel')::integer, 1) then$t$;
+begin
+  if position('accessory_exclusive' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'buy_accessory() has an unexpected shape; add the exclusive check by hand';
+    end if;
+    execute replace(v_def, v_old, $t$  if coalesce((v_item ->> 'exclusive')::boolean, false) then
+    perform public.api_error('accessory_exclusive');
+  end if;
+$t$ || v_old);
+  end if;
+end;
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- E. The round games: plan and judging (src/lib/sim/battle/rounds.ts)
+-- ---------------------------------------------------------------------------
+create or replace function public.battle_plan(p_kind text, p_params jsonb)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.battles_cfg();
+  g       jsonb := p_params -> 'game';
+  v_list  jsonb := '[]'::jsonb;
+  q       jsonb;
+  v_opts  jsonb;
+  v_stock integer;
+  r       integer;
+  s       record;
+begin
+  if p_kind = 'quiz' then
+    for q in select x from jsonb_array_elements(cfg -> 'quiz') x order by random() limit (g ->> 'rounds')::integer loop
+      select jsonb_agg(o order by random()) into v_opts
+        from (select q ->> 'a' as o union all select jsonb_array_elements_text(q -> 'wrong')) z;
+      v_list := v_list || jsonb_build_array(jsonb_build_object(
+        'q', q ->> 'q', 'options', v_opts,
+        'correct', (select (i - 1)::integer from jsonb_array_elements_text(v_opts) with ordinality t(o, i) where o = q ->> 'a' limit 1)));
+    end loop;
+    return jsonb_build_object('questions', v_list);
+  elsif p_kind = 'estimate' then
+    v_stock := case when coalesce((g ->> 'stockRounds')::integer, 0) > 0
+                    then floor(random() * (g ->> 'rounds')::integer)::integer else -1 end;
+    r := 0;
+    for q in select x from jsonb_array_elements(cfg -> 'estimate') x order by random() limit (g ->> 'rounds')::integer loop
+      if r = v_stock then
+        select sec.ticker, sec.name, qu.last_price_e4 into s
+          from public.securities sec join public.security_quotes qu on qu.security_id = sec.id
+         where sec.kind = 'stock' and sec.status = 'listed'
+         order by random() limit 1;
+        if s.ticker is not null then
+          q := jsonb_build_object('q', 'Was kostet eine Aktie von ' || s.name || ' (' || s.ticker || ') gerade?',
+                                  'value', round(s.last_price_e4 / 10000.0, 2), 'unit', '€', 'decimals', 2);
+        end if;
+      end if;
+      v_list := v_list || jsonb_build_array(jsonb_build_object(
+        'q', q ->> 'q', 'value', (q ->> 'value')::numeric, 'unit', coalesce(q ->> 'unit', ''),
+        'decimals', coalesce((q ->> 'decimals')::integer, 0)));
+      r := r + 1;
+    end loop;
+    return jsonb_build_object('questions', v_list);
+  elsif p_kind = 'bell' then
+    return jsonb_build_object('waits', (select jsonb_agg((g ->> 'waitMinMs')::integer
+                                                         + floor(random() * ((g ->> 'waitMaxMs')::integer - (g ->> 'waitMinMs')::integer + 1))::integer)
+                                          from generate_series(1, (g ->> 'maxRounds')::integer)));
+  end if;
+  return '{}'::jsonb;
+end;
+$$;
+
+-- Round timing: [opens, closes, ends) in ms after started_at; for the bell, opens = the round's slot, closes = bell + window
+create or replace function public.battle_round_ms(p_battle public.battles, p_round integer)
+returns integer[]
+language plpgsql
+stable
+set search_path = ''
+as $$
+declare
+  g      jsonb := p_battle.params -> 'game';
+  v_slot integer;
+  v_bell integer;
+begin
+  if p_battle.kind in ('quiz', 'estimate') then
+    v_slot := p_round * ((g ->> 'answerMs')::integer + (g ->> 'revealMs')::integer);
+    return array[v_slot, v_slot + (g ->> 'answerMs')::integer, v_slot + (g ->> 'answerMs')::integer + (g ->> 'revealMs')::integer];
+  end if;
+  v_slot := p_round * ((g ->> 'readyMs')::integer + (g ->> 'waitMaxMs')::integer + (g ->> 'windowMs')::integer
+                       + (g ->> 'resultMs')::integer);
+  v_bell := v_slot + (g ->> 'readyMs')::integer + coalesce((p_battle.plan -> 'waits' ->> p_round)::integer, 0);
+  return array[v_slot, v_bell + (g ->> 'windowMs')::integer,
+               v_slot + (g ->> 'readyMs')::integer + (g ->> 'waitMaxMs')::integer + (g ->> 'windowMs')::integer
+               + (g ->> 'resultMs')::integer, v_bell];
+end;
+$$;
+
+-- Judges the closed rounds: {"closed", "hearts", "points", "time", "out", "results", "done", "finish_ms", "ranking"}
+create or replace function public.battle_rounds_eval(p_battle public.battles, p_now timestamptz)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  g        jsonb := p_battle.params -> 'game';
+  v_kind   text := p_battle.kind;
+  v_ms     bigint := public.battle_ms(p_battle.started_at, p_now);
+  n        integer;
+  v_rounds integer;
+  v_closed integer := 0;
+  v_hearts integer;
+  hearts integer[]; points integer[]; times bigint[]; outr integer[]; lft integer[];
+  v_alive  integer[];
+  v_losers integer[];
+  v_res    jsonb := '[]'::jsonb;
+  v_ans    jsonb;
+  v_lost   integer[];
+  v_done   boolean := false;
+  v_last   integer := -1;
+  v_finish bigint;
+  t        integer[];
+  r integer; i integer; k integer; v_slowest integer;
+  a        record;
+  v_right  boolean;
+  v_pts    integer;
+  v_truth  numeric;
+  v_err    bigint;
+  v_given  integer;
+  v_rank   integer;
+  v_factor integer;
+  v_bull   boolean;
+  k1 integer[]; k2 integer[]; k3 integer[];
+begin
+  select count(*)::integer into n from public.battle_players p where p.battle_id = p_battle.id and p.slot is not null;
+  v_rounds := case v_kind when 'bell' then (g ->> 'maxRounds')::integer
+                          else least((g ->> 'rounds')::integer, coalesce(jsonb_array_length(p_battle.plan -> 'questions'), 0)) end;
+  v_hearts := case v_kind when 'quiz' then (g ->> 'hearts')::integer
+                          when 'bell' then case when n <= (g ->> 'smallGroup')::integer then (g ->> 'heartsSmall')::integer
+                                                else (g ->> 'heartsLarge')::integer end
+                          else 1 end;
+  hearts := array_fill(v_hearts, array[greatest(n, 1)]);
+  points := array_fill(0, array[greatest(n, 1)]);
+  times := array_fill(0::bigint, array[greatest(n, 1)]);
+  outr := array_fill(-1, array[greatest(n, 1)]);
+  lft := array_fill(-1, array[greatest(n, 1)]);
+  -- the round a player left in
+  for a in select p.slot, p.left_at from public.battle_players p
+            where p.battle_id = p_battle.id and p.slot is not null and p.left_at is not null loop
+    k := 0;
+    while k < v_rounds - 1 and public.battle_ms(p_battle.started_at, a.left_at) >= (public.battle_round_ms(p_battle, k))[3] loop
+      k := k + 1;
+    end loop;
+    lft[a.slot + 1] := k;
+  end loop;
+  while v_closed < v_rounds and v_ms >= (public.battle_round_ms(p_battle, v_closed))[2] loop
+    v_closed := v_closed + 1;
+  end loop;
+  r := 0;
+  while r < v_closed and not v_done loop
+    t := public.battle_round_ms(p_battle, r);
+    for i in 1 .. n loop
+      if outr[i] < 0 and lft[i] >= 0 and lft[i] <= r then outr[i] := r; end if;
+    end loop;
+    v_alive := '{}';
+    for i in 1 .. n loop
+      if outr[i] < 0 then v_alive := v_alive || i; end if;
+    end loop;
+    v_losers := '{}';
+    v_ans := '[]'::jsonb;
+    v_lost := '{}';
+    if v_kind = 'quiz' then
+      foreach i in array v_alive loop
+        select x.choice, public.battle_ms(p_battle.started_at, x.answered_at) - t[1] as ms into a
+          from public.battle_answers x join public.battle_players p on p.battle_id = x.battle_id and p.player_id = x.player_id
+         where x.battle_id = p_battle.id and x.round = r and p.slot = i - 1 and x.answered_at is not null;
+        v_right := a.ms is not null and a.choice = (p_battle.plan -> 'questions' -> r ->> 'correct')::integer;
+        v_pts := case when v_right
+                      then (g ->> 'basePoints')::integer
+                           + ((g ->> 'speedPoints')::integer * greatest(0, least((g ->> 'answerMs')::integer, (g ->> 'answerMs')::integer - a.ms)))
+                             / (g ->> 'answerMs')::integer
+                      else 0 end;
+        points[i] := points[i] + v_pts;
+        times[i] := times[i] + case when a.ms is not null then least((g ->> 'answerMs')::integer, greatest(0, a.ms))
+                                    else (g ->> 'answerMs')::integer end;
+        if a.ms is not null then
+          v_ans := v_ans || jsonb_build_array(jsonb_build_object('slot', i - 1, 'choice', a.choice, 'ms', a.ms, 'points', v_pts,
+                                                                 'right', v_right));
+        end if;
+        if not v_right then v_losers := v_losers || i; end if;
+      end loop;
+    elsif v_kind = 'estimate' then
+      v_truth := (p_battle.plan -> 'questions' -> r ->> 'value')::numeric;
+      v_factor := case when r = v_rounds - 1 then (g ->> 'lastRoundFactor')::integer else 1 end;
+      select count(*)::integer into v_given
+        from public.battle_answers x join public.battle_players p on p.battle_id = x.battle_id and p.player_id = x.player_id
+       where x.battle_id = p_battle.id and x.round = r and x.value_e4 is not null and x.answered_at is not null
+         and p.slot + 1 = any (v_alive);
+      v_rank := 0;
+      for a in
+        select p.slot, x.value_e4 / 10000.0 as value,
+               public.battle_ms(p_battle.started_at, x.answered_at) - t[1] as ms,
+               case when v_truth = 0 then case when x.value_e4 = 0 then 0 else 1000000 end
+                    else least(1000000, floor(abs(x.value_e4 / 10000.0 - v_truth) * 10000 / abs(v_truth)))::bigint end as err
+          from public.battle_answers x join public.battle_players p on p.battle_id = x.battle_id and p.player_id = x.player_id
+         where x.battle_id = p_battle.id and x.round = r and x.value_e4 is not null and x.answered_at is not null
+           and p.slot + 1 = any (v_alive)
+         order by err, ms, p.slot
+      loop
+        v_bull := a.err <= (g ->> 'bullseyeBps')::integer;
+        v_pts := (v_given - v_rank + case when v_bull then (g ->> 'bullseyeBonus')::integer else 0 end) * v_factor;
+        points[a.slot + 1] := points[a.slot + 1] + v_pts;
+        times[a.slot + 1] := times[a.slot + 1] + a.err;
+        v_ans := v_ans || jsonb_build_array(jsonb_build_object('slot', a.slot, 'value', a.value, 'ms', a.ms, 'points', v_pts,
+                                                               'right', v_bull));
+        v_rank := v_rank + 1;
+      end loop;
+      foreach i in array v_alive loop
+        if not exists (select 1 from jsonb_array_elements(v_ans) z where (z ->> 'slot')::integer = i - 1) then
+          times[i] := times[i] + 1000000;
+        end if;
+      end loop;
+    else
+      -- the bell: t[4] = the bell (ms after the start)
+      for a in
+        select i0.i,
+               (select case when x.answered_at is null then null
+                            when public.battle_ms(p_battle.started_at, x.answered_at) < t[4]
+                              then public.battle_ms(p_battle.started_at, x.answered_at) - t[4]
+                            when x.revealed_at is not null and x.revealed_at <= x.answered_at
+                              then public.battle_ms(x.revealed_at, x.answered_at)
+                            else public.battle_ms(p_battle.started_at, x.answered_at) - t[4] end
+                  from public.battle_answers x join public.battle_players p on p.battle_id = x.battle_id and p.player_id = x.player_id
+                 where x.battle_id = p_battle.id and x.round = r and p.slot = i0.i - 1) as ms
+          from unnest(v_alive) i0(i)
+      loop
+        if a.ms is null or a.ms > (g ->> 'windowMs')::integer then
+          v_losers := v_losers || a.i;
+          times[a.i] := times[a.i] + (g ->> 'windowMs')::integer;
+          continue;
+        end if;
+        v_ans := v_ans || jsonb_build_array(jsonb_build_object('slot', a.i - 1, 'ms', a.ms, 'points', 0, 'right', a.ms >= 0));
+        if a.ms < 0 then
+          v_losers := v_losers || a.i;
+          times[a.i] := times[a.i] + (g ->> 'windowMs')::integer;
+        else
+          times[a.i] := times[a.i] + a.ms;
+        end if;
+      end loop;
+      if cardinality(v_losers) = 0
+         and (select count(*) from jsonb_array_elements(v_ans) z where (z ->> 'right')::boolean) > 1 then
+        v_slowest := least(case when cardinality(v_alive) > (g ->> 'smallGroup')::integer then 2 else 1 end,
+                           (select count(*)::integer from jsonb_array_elements(v_ans) z where (z ->> 'right')::boolean) - 1);
+        select array_agg(z.s + 1) into v_losers
+          from (select (y ->> 'slot')::integer as s, (y ->> 'ms')::integer as ms
+                  from jsonb_array_elements(v_ans) y where (y ->> 'right')::boolean
+                 order by (y ->> 'ms')::integer desc, public.battle_hash(p_battle.seed, 999, (y ->> 'slot')::integer) desc
+                 limit v_slowest) z;
+      end if;
+    end if;
+    -- hearts (not when that would be everyone still in)
+    if v_kind <> 'estimate' and cardinality(v_losers) > 0 and cardinality(v_losers) < cardinality(v_alive) then
+      foreach i in array v_losers loop
+        hearts[i] := hearts[i] - 1;
+        if hearts[i] <= 0 then outr[i] := r; end if;
+        v_lost := v_lost || (i - 1);
+      end loop;
+    end if;
+    v_res := v_res || jsonb_build_array(jsonb_build_object('round', r, 'answers', v_ans, 'lost', to_jsonb(v_lost)));
+    v_last := r;
+    if (select count(*) from unnest(outr) o where o < 0) <= 1 or r = v_rounds - 1 then v_done := true; end if;
+    r := r + 1;
+  end loop;
+  if n > 0 and (select count(*) from unnest(outr) o where o < 0) <= 1 then v_done := true; end if;
+  v_finish := case when v_last >= 0 then (public.battle_round_ms(p_battle, v_last))[3] else 0 end;
+  k1 := array_fill(0, array[greatest(n, 1)]); k2 := k1; k3 := k1;
+  for i in 1 .. n loop
+    if v_kind = 'estimate' then
+      k1[i] := case when outr[i] < 0 then 1 else 0 end;
+      k2[i] := points[i];
+    else
+      k1[i] := case when outr[i] < 0 then 1000000 else outr[i] end;
+      k2[i] := hearts[i] * 1000000 + case when v_kind = 'quiz' then points[i] else 0 end;
+    end if;
+    k3[i] := -least(times[i], 2000000000)::integer;
+  end loop;
+  return jsonb_build_object('closed', v_closed, 'hearts', to_jsonb(hearts[1:n]), 'points', to_jsonb(points[1:n]),
+                            'time', to_jsonb(times[1:n]), 'out', to_jsonb(outr[1:n]), 'results', v_res, 'done', v_done,
+                            'finish_ms', v_finish, 'ranking', to_jsonb(public.battle_rank(p_battle.seed, n, k1, k2, k3)));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- F. Lifecycle: open, start, finish (and the prize)
+-- ---------------------------------------------------------------------------
+create or replace function public.battle_open(p_now timestamptz)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg    jsonb := public.battles_cfg();
+  w      jsonb := cfg #> '{prizes,weights}';
+  v_tot  double precision;
+  v_roll double precision;
+  v_kind text := 'xp';
+  v_art  uuid;
+  v_id   bigint;
+  k      text;
+begin
+  perform pg_advisory_xact_lock(7311160);
+  if exists (select 1 from public.battles b where b.status in ('open', 'running')) then
+    return null;
+  end if;
+  select sum(value::double precision) into v_tot from jsonb_each_text(coalesce(w, '{}'::jsonb));
+  v_roll := random() * coalesce(v_tot, 0);
+  for k in select key from jsonb_each_text(coalesce(w, '{}'::jsonb)) order by key loop
+    v_roll := v_roll - (w ->> k)::double precision;
+    if v_roll < 0 then v_kind := k; exit; end if;
+  end loop;
+  if v_kind = 'nft' then
+    v_art := public.battle_free_artwork();
+    if v_art is null then v_kind := 'money'; end if;
+  elsif v_kind = 'skin' and coalesce(jsonb_array_length(cfg -> 'accessories'), 0) = 0 then
+    v_kind := 'xp';
+  end if;
+  insert into public.battles (status, seed, prize, artwork_id, opened_at)
+  values ('open', floor(random() * 4294967296)::bigint, jsonb_build_object('kind', v_kind), v_art, p_now)
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+
+-- The rules a battle of this kind runs with (copied into battles.params at the start; defaultSimParams in TypeScript)
+create or replace function public.battle_params(p_kind text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'w', (cfg #>> '{arena,w}')::integer, 'h', (cfg #>> '{arena,h}')::integer,
+    'stepTicks', (cfg #>> '{arena,stepTicks}')::integer, 'spawns', cfg #> '{arena,spawns}',
+    'disconnectTicks', (cfg #>> '{net,disconnectTicks}')::integer,
+    'tps', 1000 / (cfg #>> '{net,tickMs}')::integer, 'tickMs', (cfg #>> '{net,tickMs}')::integer,
+    'graceMs', (cfg #>> '{net,graceMs}')::integer, 'aheadTicks', (cfg #>> '{net,aheadTicks}')::integer,
+    'checkEveryMs', (cfg #>> '{net,checkEveryMs}')::integer, 'game', cfg -> 'games' -> p_kind)
+    from (select public.battles_cfg() as cfg) x;
+$$;
+
+create or replace function public.battle_start(p_id bigint, p_now timestamptz)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.battles_cfg();
+  b        public.battles;
+  v_n      integer;
+  v_kind   text;
+  v_last   text;
+  v_tot    double precision := 0;
+  v_roll   double precision;
+  v_params jsonb;
+  v_start  timestamptz;
+  v_ends   timestamptz;
+  v_ticks  integer;
+  g        jsonb;
+  k        text;
+  r        record;
+begin
+  select * into b from public.battles x where x.id = p_id for update;
+  if b.id is null or b.status <> 'open' then
+    return false;
+  end if;
+  select count(*)::integer into v_n from public.battle_players p where p.battle_id = p_id;
+  if not (v_n >= (cfg #>> '{lobby,maxPlayers}')::integer
+          or (v_n >= (cfg #>> '{lobby,minPlayers}')::integer and b.countdown_ends_at is not null and b.countdown_ends_at <= p_now)) then
+    return false;
+  end if;
+  update public.battle_players p set slot = (x.rn - 1)::smallint
+    from (select y.player_id, row_number() over (order by y.joined_at, y.player_id) as rn
+            from public.battle_players y where y.battle_id = p_id) x
+   where p.battle_id = p_id and p.player_id = x.player_id;
+  -- the game: weighted, never the last one twice
+  select x.kind into v_last from public.battles x where x.status = 'finished' order by x.id desc limit 1;
+  for k in select key from jsonb_each_text(cfg -> 'weights') where key is distinct from v_last loop
+    v_tot := v_tot + (cfg -> 'weights' ->> k)::double precision;
+  end loop;
+  v_roll := random() * v_tot;
+  for k in select key from jsonb_each_text(cfg -> 'weights') where key is distinct from v_last order by key loop
+    v_kind := k;
+    v_roll := v_roll - (cfg -> 'weights' ->> k)::double precision;
+    exit when v_roll < 0;
+  end loop;
+  v_kind := coalesce(v_kind, 'floor');
+  g := cfg -> 'games' -> v_kind;
+  v_params := public.battle_params(v_kind);
+  v_start := p_now + make_interval(secs => (cfg #>> '{lobby,introMs}')::integer / 1000.0);
+  if public.battle_is_tick(v_kind) then
+    v_ticks := coalesce((g ->> 'maxTicks')::integer, (g ->> 'durationTicks')::integer);
+    v_ends := v_start + make_interval(secs => (v_ticks * (v_params ->> 'tickMs')::integer + (v_params ->> 'graceMs')::integer + 500) / 1000.0);
+  elsif v_kind = 'bell' then
+    v_ends := v_start + make_interval(secs => (g ->> 'maxRounds')::integer
+              * ((g ->> 'readyMs')::integer + (g ->> 'waitMaxMs')::integer + (g ->> 'windowMs')::integer + (g ->> 'resultMs')::integer) / 1000.0);
+  else
+    v_ends := v_start + make_interval(secs => (g ->> 'rounds')::integer * ((g ->> 'answerMs')::integer + (g ->> 'revealMs')::integer) / 1000.0);
+  end if;
+  update public.battles set status = 'running', kind = v_kind, params = v_params, plan = public.battle_plan(v_kind, v_params),
+                            started_at = v_start, ends_at = v_ends, countdown_ends_at = null
+   where id = p_id;
+  for r in select p.player_id from public.battle_players p where p.battle_id = p_id loop
+    perform public.mission_event(r.player_id, 'battle_join', 1, v_kind);
+  end loop;
+  perform public.battle_chat(replace(replace(replace(cfg #>> '{doodle,chat,start}', '{count}', v_n::text),
+                                             '{game}', public.battle_game_name(v_kind)),
+                                     '{prize}', public.battle_prize_label(public.battle_prize_json(b, v_n))), p_now);
+  return true;
+end;
+$$;
+
+-- Pays the prize to the winner: {"kind", ...} as paid, null when the daily cap is reached
+create or replace function public.battle_pay(p_battle public.battles, p_winner uuid, p_players integer, p_now timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.battles_cfg();
+  v_prize jsonb := public.battle_prize_json(p_battle, p_players);
+  v_key   text;
+  v_name  text;
+  v_art   uuid;
+  v_xp    integer;
+  v_cents bigint;
+  a       public.artworks;
+begin
+  if p_winner is null
+     or public.battle_prize_wins_today(p_winner, p_now) >= coalesce((cfg #>> '{prizes,dailyPrizeCap}')::integer, 3) then
+    return null;
+  end if;
+  if v_prize ->> 'kind' = 'skin' then
+    select x ->> 'key', x ->> 'name' into v_key, v_name
+      from jsonb_array_elements(cfg -> 'accessories') x
+     where not exists (select 1 from public.player_accessories o where o.player_id = p_winner and o.accessory_key = x ->> 'key')
+     order by random() limit 1;
+    if v_key is null then
+      v_prize := jsonb_build_object('kind', 'money', 'cents',
+        (cfg #>> '{prizes,moneyBaseCents}')::bigint + (cfg #>> '{prizes,moneyPerPlayerCents}')::bigint
+          * greatest(p_players, (cfg #>> '{lobby,minPlayers}')::integer), 'fallback', true);
+    else
+      insert into public.player_accessories (player_id, accessory_key, price_paid_cents) values (p_winner, v_key, 0)
+      on conflict do nothing;
+      return jsonb_build_object('kind', 'skin', 'key', v_key, 'name', v_name);
+    end if;
+  elsif v_prize ->> 'kind' = 'nft' then
+    v_art := p_battle.artwork_id;
+    if not exists (select 1 from public.artworks x where x.id = v_art and x.owner_id is null and x.ai_owner is null
+                     and not exists (select 1 from public.artwork_auctions y where y.artwork_id = x.id and y.status = 'open')) then
+      v_art := public.battle_free_artwork(p_battle.artwork_id);
+    end if;
+    if v_art is null then
+      v_prize := jsonb_build_object('kind', 'money', 'cents',
+        (cfg #>> '{prizes,moneyBaseCents}')::bigint + (cfg #>> '{prizes,moneyPerPlayerCents}')::bigint
+          * greatest(p_players, (cfg #>> '{lobby,minPlayers}')::integer), 'fallback', true);
+    else
+      update public.artworks set owner_id = p_winner, ask_cents = null, listed_at = null where id = v_art
+      returning * into a;
+      return jsonb_build_object('kind', 'nft', 'artwork',
+        jsonb_build_object('id', a.id, 'title', a.title, 'serial', a.serial, 'rarity', a.rarity, 'pixels', a.pixels));
+    end if;
+  end if;
+  if v_prize ->> 'kind' = 'xp' then
+    v_xp := public.grant_xp(p_winner, 'battle'::public.xp_source,
+      (cfg #>> '{prizes,xpBase}')::integer + (cfg #>> '{prizes,xpPerPlayer}')::integer
+        * greatest(p_players, (cfg #>> '{lobby,minPlayers}')::integer),
+      'battle:' || p_battle.id, 'battle', null);
+    return jsonb_build_object('kind', 'xp', 'xp', v_xp);
+  end if;
+  v_cents := (v_prize ->> 'cents')::bigint;
+  if v_cents > 0 then
+    perform public.ledger_transfer(public.ledger_system_account('households'), public.ledger_player_account(p_winner, 'player_cash'),
+                                   v_cents, 'battle_prize'::public.ledger_tx_kind, 'News-Battle gewonnen', 'battle', null,
+                                   'battle:' || p_battle.id, p_winner, jsonb_build_object('battle_id', p_battle.id));
+  end if;
+  return v_prize;
+end;
+$$;
+
+-- Ends a running battle once its result is final (the game is over or its time is up). True when it ended now.
+create or replace function public.battle_finish(p_id bigint, p_now timestamptz)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.battles_cfg();
+  b        public.battles;
+  v_n      integer;
+  v_final  integer;
+  v_sim    jsonb;
+  v_rank   jsonb;
+  v_winner uuid;
+  v_nick   text;
+  v_prize  jsonb;
+  v_lines  jsonb;
+  v_end    integer := null;
+  r        record;
+begin
+  select * into b from public.battles x where x.id = p_id for update;
+  if b.id is null or b.status <> 'running' or p_now < b.started_at then
+    return false;
+  end if;
+  select count(*)::integer into v_n from public.battle_players p where p.battle_id = p_id and p.slot is not null;
+  if public.battle_is_tick(b.kind) then
+    v_final := greatest(0, ((public.battle_ms(b.started_at, p_now) - (b.params ->> 'graceMs')::integer)
+                            / (b.params ->> 'tickMs')::integer)::integer);
+    v_final := least(v_final, coalesce((b.params #>> '{game,maxTicks}')::integer, (b.params #>> '{game,durationTicks}')::integer));
+    v_sim := public.battle_sim(b.kind, b.seed, b.params,
+                               (select array_agg(p.inputs order by p.slot) from public.battle_players p
+                                 where p.battle_id = p_id and p.slot is not null), v_final);
+    if not coalesce((v_sim ->> 'done')::boolean, false) then
+      return false;
+    end if;
+    v_rank := v_sim -> 'ranking';
+    v_end := (v_sim ->> 'end_tick')::integer;
+  else
+    v_sim := public.battle_rounds_eval(b, p_now);
+    if not (coalesce((v_sim ->> 'done')::boolean, false)
+            and public.battle_ms(b.started_at, p_now) >= (v_sim ->> 'finish_ms')::bigint)
+       and p_now < b.ends_at then
+      return false;
+    end if;
+    v_rank := v_sim -> 'ranking';
+  end if;
+  for r in select (x.value)::integer as slot, x.ordinality as place from jsonb_array_elements_text(v_rank) with ordinality x loop
+    update public.battle_players p set rank = r.place::smallint where p.battle_id = p_id and p.slot = r.slot;
+  end loop;
+  update public.battle_players p set active = false where p.battle_id = p_id;
+  select p.player_id, pr.nickname into v_winner, v_nick
+    from public.battle_players p join public.profiles pr on pr.id = p.player_id
+   where p.battle_id = p_id and p.slot = (v_rank ->> 0)::integer;
+  v_prize := public.battle_pay(b, v_winner, v_n, p_now);
+  update public.battles
+     set status = 'finished', finished_at = p_now, winner_id = v_winner,
+         result = jsonb_build_object('ranking', v_rank, 'winner_slot', (v_rank ->> 0)::integer, 'end_tick', v_end,
+                                     'paid', v_prize is not null, 'capped', v_prize is null and v_winner is not null,
+                                     'prize', coalesce(v_prize, jsonb_build_object('kind', 'none')),
+                                     'score', coalesce(v_sim -> 'score', v_sim -> 'points'), 'out', v_sim -> 'out')
+   where id = p_id;
+  if v_winner is not null then
+    perform public.mission_event(v_winner, 'battle_win', 1, b.kind);
+    if v_prize is not null then
+      perform public.social_notify(v_winner, 'battle_won',
+        '🏆 Du hast „' || public.battle_game_name(b.kind) || '“ gewonnen!',
+        'Dein Preis: ' || public.battle_prize_label(v_prize) || '.', jsonb_build_object('battle_id', p_id, 'prize', v_prize),
+        '/news', 'battle:' || p_id);
+    end if;
+    perform public.feed_post(v_winner, 'battle_won',
+      jsonb_build_object('kind', b.kind, 'game', public.battle_game_name(b.kind), 'players', v_n,
+                         'prize', public.battle_prize_label(coalesce(v_prize, '{}'::jsonb))),
+      'battle:' || p_id);
+    perform public.battle_chat(replace(replace(replace(cfg #>> '{doodle,chat,win}', '{name}', coalesce(v_nick, '?')),
+                                               '{game}', public.battle_game_name(b.kind)),
+                                       '{prize}', public.battle_prize_label(coalesce(v_prize, '{}'::jsonb))), p_now);
+  end if;
+  return true;
+end;
+$$;
+
+-- Keeps the lobby going: opens one, drops idle players, runs the countdown, starts, finishes
+create or replace function public.battle_maintain(p_now timestamptz)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.battles_cfg();
+  b       public.battles;
+  v_count integer;
+  v_eval  jsonb;
+begin
+  if cfg = '{}'::jsonb then
+    return;
+  end if;
+  select * into b from public.battles x where x.status in ('open', 'running') order by x.id desc limit 1;
+  if b.id is null then
+    perform public.battle_open(p_now);
+    return;
+  end if;
+  if b.status = 'open' then
+    delete from public.battle_players p
+     where p.battle_id = b.id
+       and p.seen_at < p_now - make_interval(secs => coalesce((cfg #>> '{lobby,idleSeconds}')::integer, 15));
+    select count(*)::integer into v_count from public.battle_players p where p.battle_id = b.id;
+    if v_count >= (cfg #>> '{lobby,minPlayers}')::integer and b.countdown_ends_at is null then
+      update public.battles set countdown_ends_at = p_now + make_interval(secs => (cfg #>> '{lobby,countdownSeconds}')::integer)
+       where id = b.id and countdown_ends_at is null
+      returning * into b;
+    elsif v_count < (cfg #>> '{lobby,minPlayers}')::integer and b.countdown_ends_at is not null then
+      update public.battles set countdown_ends_at = null where id = b.id returning * into b;
+    end if;
+    if v_count >= (cfg #>> '{lobby,maxPlayers}')::integer
+       or (v_count >= (cfg #>> '{lobby,minPlayers}')::integer and b.countdown_ends_at is not null and b.countdown_ends_at <= p_now) then
+      perform public.battle_start(b.id, p_now);
+    end if;
+  elsif b.status = 'running' then
+    if p_now >= b.ends_at then
+      perform public.battle_finish(b.id, p_now);
+    elsif not public.battle_is_tick(b.kind) and p_now >= b.started_at then
+      v_eval := public.battle_rounds_eval(b, p_now);
+      if (v_eval ->> 'done')::boolean and public.battle_ms(b.started_at, p_now) >= (v_eval ->> 'finish_ms')::bigint then
+        perform public.battle_finish(b.id, p_now);
+      end if;
+    end if;
+  end if;
+end;
+$$;
+
+create or replace function public.battle_run_due(p_now timestamptz default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now timestamptz := coalesce(p_now, public.game_now());
+begin
+  perform public.battle_maintain(v_now);
+  -- an open lobby nobody looks at any more is simply left open; old battles are cleaned up
+  delete from public.battles b where b.status in ('finished', 'cancelled') and b.finished_at < v_now - interval '30 days';
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- G. What the client sees
+-- ---------------------------------------------------------------------------
+create or replace function public.battle_rounds_json(p_battle public.battles, p_viewer uuid, p_now timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_eval  jsonb := public.battle_rounds_eval(p_battle, p_now);
+  v_ms    bigint := public.battle_ms(p_battle.started_at, p_now);
+  v_list  jsonb := '[]'::jsonb;
+  v_count integer;
+  v_last  integer;
+  v_slot  integer;
+  t       integer[];
+  q       jsonb;
+  x       public.battle_answers;
+  r       integer;
+  v_item  jsonb;
+begin
+  select p.slot into v_slot from public.battle_players p where p.battle_id = p_battle.id and p.player_id = p_viewer;
+  v_count := case p_battle.kind when 'bell' then (p_battle.params #>> '{game,maxRounds}')::integer
+                                else coalesce(jsonb_array_length(p_battle.plan -> 'questions'), 0) end;
+  v_last := case when (v_eval ->> 'done')::boolean then jsonb_array_length(v_eval -> 'results') - 1 else v_count - 1 end;
+  for r in 0 .. least(v_count, v_last + 1) - 1 loop
+    t := public.battle_round_ms(p_battle, r);
+    exit when v_ms < t[1];
+    select * into x from public.battle_answers a where a.battle_id = p_battle.id and a.round = r and a.player_id = p_viewer;
+    if p_battle.kind = 'bell' then
+      -- the bell rang: from now on this player has seen it (when it was not pressed before)
+      if v_slot is not null and v_ms >= t[4] and p_battle.status = 'running' and x.revealed_at is null and x.answered_at is null then
+        insert into public.battle_answers (battle_id, round, player_id, revealed_at)
+        values (p_battle.id, r, p_viewer, p_now)
+        on conflict (battle_id, round, player_id) do update set revealed_at = coalesce(public.battle_answers.revealed_at, excluded.revealed_at)
+         where public.battle_answers.answered_at is null;
+      end if;
+      v_item := jsonb_build_object('round', r,
+        'opens_at', p_battle.started_at + make_interval(secs => t[1] / 1000.0),
+        'ends_at', p_battle.started_at + make_interval(secs => t[3] / 1000.0),
+        'bell_at', case when v_ms >= t[4] then p_battle.started_at + make_interval(secs => t[4] / 1000.0) end,
+        'closes_at', case when v_ms >= t[4] then p_battle.started_at + make_interval(secs => t[2] / 1000.0) end,
+        'mine', jsonb_build_object('pressed', x.answered_at is not null));
+    else
+      q := p_battle.plan -> 'questions' -> r;
+      v_item := jsonb_build_object('round', r,
+        'opens_at', p_battle.started_at + make_interval(secs => t[1] / 1000.0),
+        'closes_at', p_battle.started_at + make_interval(secs => t[2] / 1000.0),
+        'ends_at', p_battle.started_at + make_interval(secs => t[3] / 1000.0),
+        'question', q ->> 'q', 'options', q -> 'options', 'unit', q ->> 'unit', 'decimals', (q ->> 'decimals')::integer,
+        'mine', jsonb_build_object('pressed', x.answered_at is not null, 'choice', x.choice, 'value', x.value_e4 / 10000.0));
+      if v_ms >= t[2] then
+        v_item := v_item || jsonb_build_object('correct', (q ->> 'correct')::integer, 'value', q -> 'value');
+      end if;
+    end if;
+    if r < jsonb_array_length(v_eval -> 'results') then
+      v_item := v_item || jsonb_build_object('results', v_eval -> 'results' -> r -> 'answers',
+                                             'lost', v_eval -> 'results' -> r -> 'lost');
+    end if;
+    v_list := v_list || jsonb_build_array(v_item);
+  end loop;
+  return jsonb_build_object('list', v_list, 'hearts', v_eval -> 'hearts', 'points', v_eval -> 'points',
+                            'out', v_eval -> 'out', 'done', v_eval -> 'done');
+end;
+$$;
+
+create or replace function public.battle_json(p_battle public.battles, p_viewer uuid, p_now timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.battles_cfg();
+  v_n     integer;
+  v_open  boolean := p_battle.status = 'open';
+begin
+  if p_battle.id is null then
+    return null;
+  end if;
+  select count(*)::integer into v_n from public.battle_players p where p.battle_id = p_battle.id;
+  return jsonb_build_object(
+    'id', p_battle.id,
+    'status', p_battle.status,
+    'kind', case when v_open then null else p_battle.kind end,
+    'seed', case when v_open then null else p_battle.seed end,
+    'opened_at', p_battle.opened_at,
+    'countdown_ends_at', p_battle.countdown_ends_at,
+    'started_at', p_battle.started_at,
+    'ends_at', p_battle.ends_at,
+    'finished_at', p_battle.finished_at,
+    'min_players', (cfg #>> '{lobby,minPlayers}')::integer,
+    'max_players', (cfg #>> '{lobby,maxPlayers}')::integer,
+    'params', case when v_open then null else p_battle.params end,
+    'prize', public.battle_prize_json(p_battle, v_n),
+    'players', coalesce((select jsonb_agg(jsonb_build_object(
+                  'slot', p.slot, 'nickname', pr.nickname, 'avatar_key', pr.avatar_key,
+                  'accessories', public.player_worn_accessories(p.player_id), 'me', p.player_id = p_viewer,
+                  'left', p.left_at is not null, 'rank', p.rank) order by coalesce(p.slot, 99), p.joined_at, p.player_id)
+                  from public.battle_players p join public.profiles pr on pr.id = p.player_id
+                 where p.battle_id = p_battle.id), '[]'::jsonb),
+    'joined', exists (select 1 from public.battle_players p where p.battle_id = p_battle.id and p.player_id = p_viewer),
+    'prize_wins_left', greatest(0, coalesce((cfg #>> '{prizes,dailyPrizeCap}')::integer, 3)
+                                   - public.battle_prize_wins_today(p_viewer, p_now)),
+    'rounds', case when not v_open and p_battle.started_at is not null and not public.battle_is_tick(p_battle.kind)
+                   then public.battle_rounds_json(p_battle, p_viewer, p_now) end,
+    'result', p_battle.result);
+end;
+$$;
+
+create or replace function public.battle_state(p_player uuid, p_now timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  b public.battles;
+  f public.battles;
+begin
+  select * into b from public.battles x where x.status in ('open', 'running') order by x.id desc limit 1;
+  select * into f from public.battles x
+   where x.status = 'finished'
+     and x.finished_at > p_now - make_interval(secs => coalesce((public.battles_cfg() #>> '{lobby,recentSeconds}')::integer, 120))
+   order by x.finished_at desc limit 1;
+  return jsonb_build_object(
+    'now', p_now,
+    'viewers', (select count(*) from public.news_show_viewers v where v.seen_at > p_now - interval '20 seconds'),
+    'battle', public.battle_json(b, p_player, p_now),
+    'recent', public.battle_json(f, p_player, p_now));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- H. RPCs
+-- ---------------------------------------------------------------------------
+create or replace function public.get_battle()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  v_now    timestamptz := public.game_now();
+begin
+  -- the news page is open: watching
+  insert into public.news_show_viewers (player_id, seen_at) values (v_player, v_now)
+  on conflict (player_id) do update set seen_at = excluded.seen_at
+   where public.news_show_viewers.seen_at < excluded.seen_at - interval '4 seconds';
+  update public.battle_players p set seen_at = v_now
+   where p.player_id = v_player and p.active and p.seen_at < v_now - interval '2 seconds';
+  perform public.battle_maintain(v_now);
+  return public.battle_state(v_player, v_now);
+end;
+$$;
+
+create or replace function public.battle_join(p_request_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.battles_cfg();
+  v_player uuid;
+  v_replay jsonb;
+  v_now    timestamptz := public.game_now();
+  b        public.battles;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'battle_join');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  if coalesce((select p.level from public.profiles p where p.id = v_player), 1) < coalesce((cfg #>> '{lobby,minLevel}')::integer, 1) then
+    perform public.api_error('locked');
+  end if;
+  if not public.battle_is_viewer(v_player, v_now) then
+    perform public.api_error('battle_not_viewer');
+  end if;
+  perform public.battle_maintain(v_now);
+  select * into b from public.battles x where x.status = 'open' order by x.id desc limit 1 for update;
+  if b.id is null then
+    perform public.api_error('battle_closed');
+  end if;
+  if not exists (select 1 from public.battle_players p where p.battle_id = b.id and p.player_id = v_player) then
+    if exists (select 1 from public.battle_players p where p.player_id = v_player and p.active) then
+      perform public.api_error('battle_closed');
+    end if;
+    if (select count(*) from public.battle_players p where p.battle_id = b.id) >= (cfg #>> '{lobby,maxPlayers}')::integer then
+      perform public.api_error('battle_full');
+    end if;
+    insert into public.battle_players (battle_id, player_id, joined_at, seen_at) values (b.id, v_player, v_now, v_now);
+  end if;
+  perform public.battle_maintain(v_now);
+  return public.request_complete(v_player, p_request_id, public.battle_state(v_player, v_now));
+end;
+$$;
+
+create or replace function public.battle_leave(p_request_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  v_now    timestamptz := public.game_now();
+  b        public.battles;
+  p        public.battle_players;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'battle_leave');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select x.* into p from public.battle_players x where x.player_id = v_player and x.active for update;
+  if p.battle_id is not null then
+    select * into b from public.battles x where x.id = p.battle_id;
+    if b.status = 'open' then
+      delete from public.battle_players x where x.battle_id = b.id and x.player_id = v_player;
+    elsif b.status = 'running' then
+      update public.battle_players x
+         set left_at = v_now, active = false,
+             inputs = case when public.battle_is_tick(b.kind)
+                           then public.battle_quit_stream(x.inputs, greatest(0, (public.battle_ms(b.started_at, v_now)
+                                                                                / (b.params ->> 'tickMs')::integer)::integer))
+                           else x.inputs end
+       where x.battle_id = b.id and x.player_id = v_player;
+    end if;
+  end if;
+  perform public.battle_maintain(v_now);
+  return public.request_complete(v_player, p_request_id, public.battle_state(v_player, v_now));
+end;
+$$;
+
+-- Inputs of an action game (the tick index is the idempotency key: nothing is ever rewritten) and everyone's streams
+create or replace function public.battle_sync(p_battle_id bigint, p_from integer, p_inputs text, p_since integer,
+                                              p_end_tick integer default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  v_now    timestamptz := public.game_now();
+  b        public.battles;
+  v_ms     bigint;
+  v_final  integer;
+  v_tick   integer;
+  v_max    integer;
+  v_since  integer := greatest(0, coalesce(p_since, 0));
+begin
+  if p_battle_id is null or char_length(coalesce(p_inputs, '')) > 400 then
+    perform public.api_error('invalid_argument');
+  end if;
+  select * into b from public.battles x where x.id = p_battle_id;
+  if b.id is null or b.status not in ('running', 'finished') or not public.battle_is_tick(b.kind) then
+    perform public.api_error('battle_unknown');
+  end if;
+  v_ms := public.battle_ms(b.started_at, v_now);
+  v_max := coalesce((b.params #>> '{game,maxTicks}')::integer, (b.params #>> '{game,durationTicks}')::integer);
+  v_final := least(v_max, greatest(0, ((v_ms - (b.params ->> 'graceMs')::integer) / (b.params ->> 'tickMs')::integer)::integer));
+  v_tick := floor(v_ms::numeric / (b.params ->> 'tickMs')::integer)::integer;
+  if b.status = 'running' and p_from is not null and coalesce(p_inputs, '') <> '' then
+    update public.battle_players x
+       set inputs = public.battle_accept_chunk(x.inputs, p_from, p_inputs, v_final, least(v_tick, v_max - 1),
+                                               (b.params ->> 'aheadTicks')::integer),
+           seen_at = v_now
+     where x.battle_id = b.id and x.player_id = v_player and x.slot is not null and x.left_at is null;
+  end if;
+  -- the end of the game is checked at most once a second (it runs the whole simulation)
+  if b.status = 'running'
+     and ((p_end_tick is not null and p_end_tick < v_final) or v_now >= b.ends_at)
+     and exists (select 1 from public.battle_players x where x.battle_id = b.id and x.player_id = v_player) then
+    update public.battles set checked_at = v_now
+     where id = b.id and status = 'running'
+       and (checked_at is null or checked_at < v_now - make_interval(secs => (b.params ->> 'checkEveryMs')::integer / 1000.0))
+    returning * into b;
+    if found then
+      perform public.battle_finish(b.id, v_now);
+    end if;
+    select * into b from public.battles x where x.id = p_battle_id;
+  end if;
+  return jsonb_build_object(
+    'now', v_now,
+    'status', b.status,
+    'final_tick', v_final,
+    'streams', coalesce((select jsonb_agg(jsonb_build_object('slot', x.slot, 'data', substr(x.inputs, v_since + 1)) order by x.slot)
+                           from public.battle_players x where x.battle_id = b.id and x.slot is not null), '[]'::jsonb));
+end;
+$$;
+
+create or replace function public.battle_answer(p_request_id uuid, p_battle_id bigint, p_round integer, p_choice integer,
+                                                p_value numeric)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  v_now    timestamptz := public.game_now();
+  b        public.battles;
+  p        public.battle_players;
+  t        integer[];
+  v_ms     bigint;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_battle_id is null or p_round is null or p_round < 0 or p_round > 99 then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'battle_answer');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into b from public.battles x where x.id = p_battle_id;
+  if b.id is null or b.kind is null or public.battle_is_tick(b.kind) then
+    perform public.api_error('battle_unknown');
+  end if;
+  select * into p from public.battle_players x where x.battle_id = b.id and x.player_id = v_player and x.slot is not null;
+  if p.battle_id is null or p.left_at is not null then
+    perform public.api_error('battle_not_joined');
+  end if;
+  v_ms := public.battle_ms(b.started_at, v_now);
+  t := public.battle_round_ms(b, p_round);
+  if b.status <> 'running' or v_ms < t[1] or v_ms >= t[2]
+     or p_round >= (case b.kind when 'bell' then (b.params #>> '{game,maxRounds}')::integer
+                                else coalesce(jsonb_array_length(b.plan -> 'questions'), 0) end) then
+    perform public.api_error('battle_round_closed');
+  end if;
+  if b.kind = 'quiz' and (p_choice is null or p_choice < 0 or p_choice > 3) then
+    perform public.api_error('invalid_argument');
+  end if;
+  if b.kind = 'estimate' and (p_value is null or p_value < 0 or p_value > 1000000000000) then
+    perform public.api_error('invalid_argument');
+  end if;
+  insert into public.battle_answers (battle_id, round, player_id, choice, value_e4, answered_at)
+  values (b.id, p_round, v_player, case when b.kind = 'quiz' then p_choice end,
+          case when b.kind = 'estimate' then round(p_value * 10000)::bigint end, v_now)
+  on conflict (battle_id, round, player_id) do update
+     set choice = excluded.choice, value_e4 = excluded.value_e4, answered_at = excluded.answered_at
+   where public.battle_answers.answered_at is null;
+  return public.request_complete(v_player, p_request_id, public.battle_state(v_player, v_now));
+end;
+$$;
+
+comment on function public.get_battle() is
+  'RPC: the news battle lobby or the running battle, and the last finished one (ADR-160). Marks the caller watching.';
+comment on function public.battle_join(uuid) is
+  'RPC: joins the open battle lobby (ADR-160); errors locked, battle_not_viewer, battle_full, battle_closed.';
+comment on function public.battle_leave(uuid) is 'RPC: leaves the lobby, or forfeits the running battle (ADR-160).';
+comment on function public.battle_sync(bigint, integer, text, integer, integer) is
+  'RPC: sends inputs of an action game from tick p_from and returns every stream from p_since (ADR-160); '
+  'p_end_tick claims the end (checked at most once a second); errors battle_unknown.';
+comment on function public.battle_answer(uuid, bigint, integer, integer, numeric) is
+  'RPC: answers a round of a quiz, estimate or bell battle (ADR-160); errors battle_unknown, battle_not_joined, '
+  'battle_round_closed.';
+
+-- ---------------------------------------------------------------------------
+-- I. Missions, cron, grants
+-- ---------------------------------------------------------------------------
+insert into public.mission_templates
+  (key, kind, title, description, icon_key, metric, mode, params, target_min, target_max, xp_min, xp_max, min_level, chain_order,
+   scale_with_level, weight, reward_skill_points)
+values
+  ('w_battles', 'weekly', 'Spiel bei {target} News-Battles mit', 'Rein in die Arena unter dem Fernseher.', 'mission_bell', 'battle_join', 'count', '{}'::jsonb, 3, 3, 700, 1000, 2, 0, false, 30, 1),
+  ('m_battle_first', 'milestone', 'Dein erstes News-Battle', 'Spiel bei einem News-Battle mit.', 'mission_bell', 'battle_join', 'count', '{}'::jsonb, 1, 1, 300, 300, 2, 112, false, 100, 1),
+  ('m_battle_win', 'milestone', 'Gewinne ein News-Battle', 'Nur einer gewinnt. Diesmal du.', 'mission_bell', 'battle_win', 'count', '{}'::jsonb, 1, 1, 800, 800, 2, 114, false, 100, 1),
+  ('m_battle_win_10', 'milestone', '{target} News-Battles gewonnen', 'Champion der Arena.', 'mission_bell', 'battle_win', 'count', '{}'::jsonb, 10, 10, 3000, 3000, 2, 120, false, 100, 1)
+on conflict (key) do update
+   set kind = excluded.kind, title = excluded.title, description = excluded.description, icon_key = excluded.icon_key,
+       metric = excluded.metric, mode = excluded.mode, params = excluded.params, target_min = excluded.target_min,
+       target_max = excluded.target_max, xp_min = excluded.xp_min, xp_max = excluded.xp_max, min_level = excluded.min_level,
+       chain_order = excluded.chain_order, scale_with_level = excluded.scale_with_level, weight = excluded.weight,
+       reward_skill_points = excluded.reward_skill_points, is_active = true, updated_at = now();
+
+do $do$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.unschedule(jobid) from cron.job where jobname = 'nexa-battles';
+    perform cron.schedule('nexa-battles', '* * * * *', 'select public.battle_run_due()');
+  end if;
+end;
+$do$;
+
+do $do$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.battles_cfg()', 'public.battle_ms(timestamptz, timestamptz)',
+    'public.battle_accept_chunk(text, integer, text, integer, integer, integer)', 'public.battle_quit_stream(text, integer)',
+    'public.battle_is_tick(text)', 'public.battle_is_viewer(uuid, timestamptz)',
+    'public.battle_prize_wins_today(uuid, timestamptz)', 'public.battle_free_artwork(uuid)',
+    'public.battle_prize_json(public.battles, integer)', 'public.battle_prize_label(jsonb)', 'public.battle_game_name(text)',
+    'public.battle_chat(text, timestamptz)', 'public.battle_plan(text, jsonb)', 'public.battle_round_ms(public.battles, integer)',
+    'public.battle_rounds_eval(public.battles, timestamptz)', 'public.battle_open(timestamptz)',
+    'public.battle_params(text)', 'public.battle_start(bigint, timestamptz)', 'public.battle_pay(public.battles, uuid, integer, timestamptz)',
+    'public.battle_finish(bigint, timestamptz)', 'public.battle_maintain(timestamptz)', 'public.battle_run_due(timestamptz)',
+    'public.battle_rounds_json(public.battles, uuid, timestamptz)', 'public.battle_json(public.battles, uuid, timestamptz)',
+    'public.battle_state(uuid, timestamptz)']
+  loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+  end loop;
+  foreach f in array array[
+    'public.get_battle()', 'public.battle_join(uuid)', 'public.battle_leave(uuid)',
+    'public.battle_sync(bigint, integer, text, integer, integer)', 'public.battle_answer(uuid, bigint, integer, integer, numeric)']
+  loop
+    execute format('revoke all on function %s from public, anon', f);
+    execute format('grant execute on function %s to authenticated', f);
+  end loop;
+end;
+$do$;

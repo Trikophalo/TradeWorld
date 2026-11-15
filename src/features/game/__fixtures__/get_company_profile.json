@@ -4,31 +4,31 @@
       "body": "Viele haben mitgemacht, doch Kunden und Anleger zucken nur mit den Schultern.",
       "category": "market",
       "headline": "Petition gegen KlarSoft AG verpufft",
-      "published_at": "2026-11-15T19:18:15.86521+00:00"
+      "published_at": "2026-11-15T19:57:03.953838+00:00"
     },
     {
       "body": "0 Spieler und 1 weitere Unterstützer machen mit. Das Thema ist in aller Munde.",
       "category": "market",
       "headline": "Petition gegen KlarSoft AG zeigt Wirkung",
-      "published_at": "2026-11-15T19:18:15.86521+00:00"
+      "published_at": "2026-11-15T19:57:03.953838+00:00"
     },
     {
       "body": "Viele haben mitgemacht, doch Kunden und Anleger zucken nur mit den Schultern.",
       "category": "market",
       "headline": "Petition gegen KlarSoft AG verpufft",
-      "published_at": "2026-11-15T19:18:15.192536+00:00"
+      "published_at": "2026-11-15T19:57:03.450206+00:00"
     },
     {
-      "body": "KlarSoft AG meldet 512,0 Mio. € Umsatz und 69,2 Mio. € Gewinn im Q2 des Spieljahres 1. Analysten hatten weniger erwartet.",
+      "body": "KlarSoft AG meldet 448,7 Mio. € Umsatz und 48,9 Mio. € Gewinn im Q2 des Spieljahres 1. Analysten hatten weniger erwartet.",
       "category": "earnings",
-      "headline": "KlarSoft AG steigert Gewinn um 59 %",
-      "published_at": "2026-11-15T19:18:05.977171+00:00"
+      "headline": "KlarSoft AG steigert Gewinn um 12 %",
+      "published_at": "2026-11-15T19:56:54.840507+00:00"
     },
     {
-      "body": "KlarSoft AG meldet 438,2 Mio. € Umsatz und 43,6 Mio. € Gewinn im Q1 des Spieljahres 2. Analysten hatten weniger erwartet.",
+      "body": "KlarSoft AG meldet 455,6 Mio. € Umsatz und 43,6 Mio. € Gewinn im Q1 des Spieljahres 2. Analysten hatten weniger erwartet.",
       "category": "earnings",
       "headline": "KlarSoft AG steigert Gewinn um 16 %",
-      "published_at": "2026-11-15T19:18:05.935534+00:00"
+      "published_at": "2026-11-15T19:56:54.78622+00:00"
     }
   ],
   "facts": {
@@ -39,10 +39,10 @@
     "max_staff": 100000,
     "ai_workers": 0,
     "quality_bps": null,
-    "value_cents": 420636500000,
-    "profit_cents": 18630079755,
+    "value_cents": 362764000000,
+    "profit_cents": 16595172908,
     "awareness_bps": null,
-    "revenue_cents": 178561123545
+    "revenue_cents": 173541454165
   },
   "company": {
     "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
@@ -54,9 +54,9 @@
     "listed": true,
     "sector": "tech",
     "ticker": "KLS",
-    "price_e4": 841273,
-    "change_bps": -227,
-    "founded_at": "2026-11-15T19:16:36.776187+00:00",
+    "price_e4": 725528,
+    "change_bps": -1657,
+    "founded_at": "2026-11-15T19:55:28.496246+00:00",
     "brand_color": "#4C8DFF"
   },
   "founder": null,

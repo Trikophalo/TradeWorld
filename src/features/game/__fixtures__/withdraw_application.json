@@ -1,27 +1,27 @@
 {
-  "id": "ba17a93c-d85a-418a-a45a-77be5c6e718c",
+  "id": "04a3add5-72bc-4bd1-b8cb-70ce5eb1076f",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "127cbc0b-9735-44cd-bca9-9737bffd8915",
+    "id": "073f1b14-b8a3-40c8-b45c-7e13c3ca8e3a",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
+      "id": "2f91e3a4-088a-0592-9f21-88b83cae7bd8",
       "logo": null,
-      "name": "QuantenSprung Labs",
-      "color": "#35D0BA",
+      "name": "SolarFuchs",
+      "color": "#FF8C42",
       "is_ai": true,
-      "sector": "tech",
-      "ticker": "QSL"
+      "sector": "energy",
+      "ticker": "SFX"
     },
-    "required": [{ "branch": "management", "min_score": 0 }],
-    "title_key": "management_intern",
+    "required": [{ "branch": "law", "min_score": 0 }],
+    "title_key": "law_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-15T19:18:21.785393+00:00",
-  "updated_at": "2026-11-15T19:18:21.78926+00:00",
-  "offer_expires_at": "2026-11-17T19:18:21.785393+00:00",
+  "created_at": "2026-11-15T19:57:10.875326+00:00",
+  "updated_at": "2026-11-15T19:57:10.87795+00:00",
+  "offer_expires_at": "2026-11-17T19:57:10.875326+00:00",
   "salary_wish_cents_per_hour": 15000,
   "offer_salary_cents_per_hour": 15000
 }

@@ -1,5 +1,7 @@
-import { ACCESSORY_SLOTS, accessoryByKey, type AccessorySlot } from "../../config/accessories";
+import { catalogItemByKey } from "../../config/accessory-catalog";
+import { ACCESSORY_SLOTS, type AccessorySlot } from "../../config/accessories";
 import { ACCESSORY_ART, type AccessoryArt } from "./accessories";
+import { BATTLE_ACCESSORY_ART } from "./battle-accessories";
 import { avatarArt } from "./avatars";
 import type { PixelArt } from "./pixel-icon";
 
@@ -57,6 +59,9 @@ const FIGURE: readonly string[] = [
   "......kffffkkffffk......",
   "......kkkkkkkkkkkk......",
 ];
+
+/** Art of a shop accessory or of an exclusive battle accessory (ADR-160). */
+const artOf = (key: string): AccessoryArt | undefined => ACCESSORY_ART[key] ?? BATTLE_ACCESSORY_ART[key];
 
 /** The hand that holds things (x, y). */
 const GRIP: readonly (readonly [number, number])[] = [
@@ -161,8 +166,8 @@ function toArt(canvas: Canvas): PixelArt {
 export function orderWorn(worn: readonly string[]): string[] {
   const bySlot = new Map<AccessorySlot, string>();
   for (const key of worn) {
-    const item = accessoryByKey(key);
-    if (item && ACCESSORY_ART[key] && !bySlot.has(item.slot)) bySlot.set(item.slot, key);
+    const item = catalogItemByKey(key);
+    if (item && artOf(key) && !bySlot.has(item.slot)) bySlot.set(item.slot, key);
   }
   return ACCESSORY_SLOTS.flatMap((slot) => (bySlot.has(slot) ? [bySlot.get(slot)!] : []));
 }
@@ -176,10 +181,10 @@ export function playerFigure(avatarKey: string | null | undefined): PixelArt {
 export function dressedFigure(avatarKey: string | null | undefined, worn: readonly string[]): PixelArt {
   const colors = figureColors(avatarKey);
   const order = orderWorn(worn);
-  const layer = (slot: AccessorySlot) => order.find((key) => accessoryByKey(key)?.slot === slot);
+  const layer = (slot: AccessorySlot) => order.find((key) => catalogItemByKey(key)?.slot === slot);
   const canvas: Canvas = Array.from({ length: FIGURE_HEIGHT }, () => Array<string | null>(FIGURE_WIDTH).fill(null));
   const back = layer("back");
-  if (back) paint(canvas, ACCESSORY_ART[back]!, colors);
+  if (back) paint(canvas, artOf(back)!, colors);
   // the figure covers whatever is behind it
   bareFigure(avatarKey, colors).forEach((row, y) =>
     row.forEach((color, x) => {
@@ -188,17 +193,17 @@ export function dressedFigure(avatarKey: string | null | undefined, worn: readon
   );
   for (const slot of ["body", "face", "head"] as const) {
     const key = layer(slot);
-    if (key) paint(canvas, ACCESSORY_ART[key]!, colors);
+    if (key) paint(canvas, artOf(key)!, colors);
   }
   const hand = layer("hand");
   if (hand) {
     const grip = GRIP.map(([x, y]) => canvas[y]![x] ?? null);
-    paint(canvas, ACCESSORY_ART[hand]!, colors);
+    paint(canvas, artOf(hand)!, colors);
     GRIP.forEach(([x, y], i) => {
       canvas[y]![x] = grip[i] ?? null;
     });
   }
   const pet = layer("pet");
-  if (pet) paint(canvas, ACCESSORY_ART[pet]!, colors);
+  if (pet) paint(canvas, artOf(pet)!, colors);
   return toArt(canvas);
 }

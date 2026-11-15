@@ -1,0 +1,10 @@
+{
+  "now": "2026-11-15T19:57:14.936075+00:00",
+  "status": "running",
+  "streams": [
+    { "data": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx2222", "slot": 0 },
+    { "data": "", "slot": 1 },
+    { "data": "", "slot": 2 }
+  ],
+  "final_tick": 20
+}

@@ -1,3 +1,4 @@
+import { catalogItemByKey } from "@/config/accessory-catalog";
 import { ACCESSORY_RULES, ACCESSORY_SLOTS, accessoryByKey } from "@/config/accessories";
 import { GameError, type GameEngine, type Wardrobe } from "../types";
 
@@ -24,8 +25,8 @@ export interface AccessoryHost {
 
 /** Worn keys back to front, one per slot. */
 export function sortWorn(worn: readonly string[]): string[] {
-  const slotOf = (key: string) => ACCESSORY_SLOTS.indexOf(accessoryByKey(key)?.slot ?? "pet");
-  return [...new Set(worn)].filter((key) => accessoryByKey(key)).sort((a, b) => slotOf(a) - slotOf(b));
+  const slotOf = (key: string) => ACCESSORY_SLOTS.indexOf(catalogItemByKey(key)?.slot ?? "pet");
+  return [...new Set(worn)].filter((key) => catalogItemByKey(key)).sort((a, b) => slotOf(a) - slotOf(b));
 }
 
 export function createAccessoryEngine(
@@ -34,8 +35,8 @@ export function createAccessoryEngine(
   const st = (): DemoWardrobe => host.state() ?? { owned: [], worn: [] };
   const view = (): Wardrobe => ({ owned: [...st().owned], worn: sortWorn(st().worn), avatarKey: host.avatarKey() });
   const wear = (s: DemoWardrobe, key: string): DemoWardrobe => {
-    const slot = accessoryByKey(key)!.slot;
-    return { ...s, worn: sortWorn([...s.worn.filter((k) => accessoryByKey(k)?.slot !== slot), key]) };
+    const slot = catalogItemByKey(key)!.slot;
+    return { ...s, worn: sortWorn([...s.worn.filter((k) => catalogItemByKey(k)?.slot !== slot), key]) };
   };
   return {
     worn: () => sortWorn(st().worn),
@@ -45,6 +46,7 @@ export function createAccessoryEngine(
     buyAccessory: (requestId, key) =>
       Promise.resolve().then(() =>
         host.idempotent(requestId, () => {
+          if (catalogItemByKey(key) && !accessoryByKey(key)) throw new GameError("accessory_exclusive");
           const item = accessoryByKey(key);
           if (!item) throw new GameError("accessory_unknown");
           if (host.level() < item.minLevel) throw new GameError("accessory_locked");
@@ -61,7 +63,7 @@ export function createAccessoryEngine(
     wearAccessory: (requestId, key, on) =>
       Promise.resolve().then(() =>
         host.idempotent(requestId, () => {
-          if (!accessoryByKey(key)) throw new GameError("accessory_unknown");
+          if (!catalogItemByKey(key)) throw new GameError("accessory_unknown");
           const s = st();
           if (!s.owned.includes(key)) throw new GameError("accessory_not_owned");
           host.setState(on ? wear(s, key) : { ...s, worn: s.worn.filter((k) => k !== key) });

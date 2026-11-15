@@ -2613,3 +2613,59 @@ ihre Firmen, und mit echten, großen Folgen für Kurse, Firmen und Aufgaben.
 - Neue Metriken über Trigger, ohne RPCs umzuschreiben: `accessory_bought`, `accessory_legendary`, `accessory_worn`,
   `friend_poke`, `news_chat`, `company_chat`. `mission_doable` kennt ihre Voraussetzungen.
 - 19 neue Vorlagen; neue Meilensteine stehen in der Kette hinter den bisherigen.
+
+## ADR-160: News-Battles – Minispiele unter Zuschauern, eines gewinnt — `akzeptiert`
+
+**Kontext:** Wer die NEXA Nachrichten offen hat, soll gegen die anderen Zuschauer antreten können: ab 3 bis
+höchstens 10 Spieler, ein Minispiel, nur einer gewinnt, und der Gewinner bekommt etwas, das sich lohnt. Spieler
+steuern ihre angezogene Pixelfigur (ADR-155) mit WASD, Pfeiltasten oder einem Joystick auf dem Handy.
+
+**Entscheidung:**
+
+- **Lobby auf dem News-Tab.** Wer die Seite offen hat, zählt als Zuschauer (`news_show_viewers`, auch über
+  `get_battle`) und kann beitreten oder gehen. Ab `battles.minPlayers` (3) läuft ein Countdown
+  (`countdownSeconds`, 30 s); bei `maxPlayers` (10) oder am Ende des Countdowns startet das Battle. Wer 15 s nicht mehr
+  in der Lobby gesehen wurde, fliegt raus; fällt die Lobby unter 3, hält der Countdown an. Es gibt immer genau ein
+  offenes oder laufendes Battle; ist es vorbei, öffnet die nächste Lobby. Battles laufen jederzeit, nicht nur während
+  der Sendung. Mr. Doodle Dangle kommentiert in der Lobby und im Spiel und meldet Start und Sieger im Live-Chat der
+  Sendung (`news_show_messages`, Texte in `battles.doodle`).
+- **Server entscheidet:** Spiel (beim Start, nicht zweimal hintereinander dasselbe), Preis (beim Öffnen der Lobby,
+  dort sichtbar), Zufallszahl `seed`, Startzeit. Ein Spieler ist in höchstens einem Battle.
+- **Echtzeit-Spiele: deterministischer Lockstep mit Eingaben beim Server.** Alle Aktionsspiele sind reine
+  Ganzzahl-Simulationen auf einem Kachelraster mit 20 Takten pro Sekunde (`src/lib/sim/battle`). Was zählt, sind nur
+  die Eingaben: ein Zeichen pro Takt und Spieler (Richtung, Aktion). Jeder Client schickt seine Eingaben alle 250 ms an
+  `battle_input` und bekommt die der anderen zurück; über Supabase Realtime (Broadcast-Kanal `battle:<id>`) gehen sie
+  zusätzlich sofort an die Mitspieler, damit die Vorhersage stimmt. Ein Takt ist endgültig, sobald seine Frist
+  (`graceMs`, 1 s nach dem Takt) vorbei ist; was bis dahin fehlt, gilt als „keine Eingabe“ (`x`). Eingaben lassen sich
+  nicht nachträglich ändern, nicht für die Zukunft vorab senden und nicht mehr als 20 pro Sekunde abgeben. Den Sieger
+  rechnet der Server aus: Dieselbe Simulation steht als PL/pgSQL in der Datenbank (`battle_sim_*`) und rechnet das
+  Spiel aus allen Eingaben nach. Testvektoren mit gleichen Zufallseingaben prüfen TypeScript und SQL gegeneinander.
+  Clients zeigen den letzten endgültigen Stand plus eine Vorhersage bis jetzt und rechnen sie in jedem Bild neu.
+  - Warum so: Ein Server-Takt per RPC (jeder Zug ein Aufruf) wäre bei 10 Spielern mit 5 bis 20 Aufrufen pro Sekunde
+    und Spieler zu träge und zu teuer, Edge Functions kann der Betreiber nicht ausrollen (ADR-037). Gemeldete Punkte
+    oder Positionen ließen sich fälschen. Hier kann ein Betrüger höchstens gut spielen (ein Bot mit Menschentempo)
+    und seine Eingaben bis zu 1 s nach den anderen wählen; für Spielgeld reicht das.
+  - Wer 4 s lang keine Eingaben schickt (80 Takte `x` hintereinander) oder geht, scheidet aus. Bleibt nur einer übrig,
+    gewinnt er sofort.
+- **Quiz, Schätzen, Reaktion: vollständig auf dem Server.** Richtige Antworten, Lösungswerte und Glockenzeiten
+  liegen nur in `battles.plan` (nie an den Client); Antworten zählen mit der Serverzeit, die erste zählt. Die
+  Reaktionszeit misst der Server vom ersten Zeigen der Glocke an diesen Spieler bis zum Druck (inklusive Netz; ein
+  Frühstart scheidet aus).
+- **Spiele (9, je 30 bis 90 s, 3 bis 10 Spieler, ein Sieger):** Kurssturz (Boden aus Kerzen bricht in Wellen weg,
+  Stillstehen lässt die Kachel reißen, Letzter gewinnt), Bullenreiten (Bullen stürmen über Reihen und Spalten,
+  3 Herzen), Geldregen (Münzen und Goldbarren fangen, fallende Bären betäuben und kosten Münzen), Sumo am Parkett
+  (rempeln, der Ring schrumpft), Giftaktie (heiße Kartoffel: wer sie beim Knall hält, fliegt), Aktie pumpen (Tippen
+  nur bei Grün, Tippen im Crash kostet ein Viertel), Börsenquiz (2 Herzen, schnell und richtig zählt mehr), Schätz den
+  Kurs (echte Kurse und Schätzfragen, am nächsten dran gewinnt), Die Glocke (Reaktionsduell, Frühstart raus, der
+  Langsamste raus). Gleichstand entscheidet das Spiel selbst (Rempler, früher erreicht, Fehler); erst danach das Los
+  aus dem `seed`.
+- **Preise (`battles.prizes`):** dicke XP (`grant_xp`, Quelle `battle`), Geld von den Haushalten (Ledger, Art
+  `battle_prize`), ein exklusives Accessoire, das es nur hier gibt (`battles.accessories`, `exclusive`, kein Preis;
+  `buy_accessory` lehnt es mit `accessory_exclusive` ab; der Sieger bekommt eines, das er noch nicht hat), oder ein NFT
+  aus der Galerie ohne Besitzer (in der Lobby reserviert; ist es weg, ein anderes, sonst Geld). XP und Geld wachsen
+  mit der Spielerzahl. Höchstens `dailyPrizeCap` (3) Gewinne mit Preis pro Spieler und Tag; danach gibt es nur noch
+  die Ehre. Benachrichtigung `battle_won`, Feed-Eintrag `battle_won`, Nachricht im Live-Chat.
+- **Missionen:** Battle mitspielen, Battle gewinnen, 10 Battles gewinnen (`mission_event` aus den RPCs,
+  Metriken `battle_join` und `battle_win`).
+- **Demo:** Erfundene Gegner treten bei, spielen mit einfachen Bots (Schatten meiden, Münzen jagen, rempeln) und
+  beantworten Quizfragen; der Demo-Modus kann jedes Spiel gezielt starten.

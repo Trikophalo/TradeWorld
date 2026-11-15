@@ -1,0 +1,101 @@
+"use client";
+
+import { useTranslations } from "next-intl";
+import { useEffect, useRef } from "react";
+import { BATTLE_ACCESSORIES } from "@/config/battle-accessories";
+import { BATTLE_KINDS, BATTLE_RULES, type TickKind } from "@/config/battles";
+import { PlayerFigure } from "@/components/ui/player-figure";
+import { battleParamsFor } from "@/features/game/demo/battles";
+import { initBattle, stepBattle, tickInputs } from "@/lib/sim/battle";
+import { botStream } from "@/lib/sim/battle/vectors";
+import { prefersReducedMotion } from "@/stores/settings";
+import { DoodleSays, GameIcon, Hearts, PrizeView } from "./parts";
+import { createArenaRenderer } from "./render/arena";
+import { TouchPad } from "./touch-pad";
+
+const SAMPLE_PLAYERS = BATTLE_RULES.demoBots.slice(0, 5).map((b, slot) => ({
+  slot,
+  nickname: b.nickname,
+  avatarKey: b.avatarKey,
+  accessories: [...b.accessories],
+  me: slot === 0,
+}));
+
+/** An arena running by itself with made-up players (the showcase on /dev/ui, ADR-160). */
+export function ArenaPreview({ kind, seed = 3 }: { kind: Exclude<TickKind, "pump">; seed?: number }) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const el = canvas.current;
+    if (!el) return;
+    const params = battleParamsFor(kind);
+    const renderer = createArenaRenderer(el, {
+      kind,
+      params,
+      players: SAMPLE_PLAYERS,
+      reducedMotion: prefersReducedMotion(),
+      onShake: () => undefined,
+      onSound: () => undefined,
+    });
+    renderer.resize(el.parentElement?.clientWidth ?? 352, 400);
+    const streams = SAMPLE_PLAYERS.map((p) => botStream(seed, kind, p.slot, 2000));
+    let state = initBattle(kind, seed, SAMPLE_PLAYERS.length, params as never);
+    const start = performance.now();
+    let frame = 0;
+    const loop = () => {
+      const exact = (performance.now() - start) / params.tickMs;
+      if (state.done) state = initBattle(kind, seed, SAMPLE_PLAYERS.length, params as never);
+      while (!state.done && state.tick <= exact % 1200)
+        stepBattle(kind, state, tickInputs(streams, state.tick), params as never);
+      renderer.draw({ state, tick: state.tick, alpha: exact % 1 }, performance.now());
+      frame = requestAnimationFrame(loop);
+    };
+    frame = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(frame);
+  }, [kind, seed]);
+  return <canvas ref={canvas} className="block pixelated" aria-hidden />;
+}
+
+/** The parts of the news battles for the UI showcase. */
+export function BattleShowcase() {
+  const t = useTranslations("battle");
+  return (
+    <>
+      <div className="space-y-3 rounded-lg border border-line-1 bg-surface-1 p-4">
+        <p className="label-pixel text-fg-3">{t("showcase")}: Spiele</p>
+        <ul className="flex flex-wrap gap-3">
+          {BATTLE_KINDS.map((k) => (
+            <li key={k} className="flex items-center gap-1.5 text-xs text-fg-2">
+              <GameIcon kind={k} scale={2} />
+              {t(`games.${k}.name`)}
+            </li>
+          ))}
+        </ul>
+        <DoodleSays text={BATTLE_RULES.doodle.lobby[0]!} compact />
+        <Hearts count={2} max={3} />
+      </div>
+      <div className="space-y-3 rounded-lg border border-line-1 bg-surface-1 p-4">
+        <p className="label-pixel text-fg-3">{t("showcase")}: Preise</p>
+        <PrizeView prize={{ kind: "xp", xp: 2900 }} />
+        <PrizeView prize={{ kind: "money", cents: 600_000 }} />
+        <PrizeView prize={{ kind: "skin" }} />
+        <div className="flex flex-wrap gap-2">
+          {BATTLE_ACCESSORIES.map((a) => (
+            <PlayerFigure key={a.key} avatarKey="rookie" accessories={[a.key]} scale={2} title={a.name} />
+          ))}
+        </div>
+      </div>
+      {(["floor", "bulls", "coins", "sumo", "potato"] as const).map((k) => (
+        <div key={k} className="space-y-2 rounded-lg border border-line-1 bg-surface-1 p-4">
+          <p className="label-pixel text-fg-3">
+            {t("showcase")}: {t(`games.${k}.name`)}
+          </p>
+          <ArenaPreview kind={k} />
+        </div>
+      ))}
+      <div className="space-y-2 rounded-lg border border-line-1 bg-surface-1 p-4">
+        <p className="label-pixel text-fg-3">{t("showcase")}: Touch</p>
+        <TouchPad onChange={() => undefined} action={t("controls.actionButton")} />
+      </div>
+    </>
+  );
+}

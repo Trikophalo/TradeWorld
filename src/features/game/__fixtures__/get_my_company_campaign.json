@@ -1,6 +1,6 @@
 {
   "company": {
-    "id": "2223f81d-9a7f-4dca-8ff8-86391351baa6",
+    "id": "8cac2fe5-2c5a-4d6b-9d74-7fd8bbd48457",
     "idea": "Teile auf Abruf",
     "live": {
       "last_hour_at": "2026-11-15T19:00:00+00:00",
@@ -62,13 +62,13 @@
     "history": [],
     "listing": null,
     "campaign": {
-      "id": "036e2f26-4b77-4f03-ac10-24b56eb8d484",
+      "id": "8a9c80c4-7789-4a8f-9d11-6299fb3a5707",
       "kind": "flyer",
-      "ends_at": "2026-11-16T19:18:24.454053+00:00",
-      "resonance": "weak",
+      "ends_at": "2026-11-16T19:57:13.285822+00:00",
+      "resonance": "solid",
       "cost_cents": 20000,
-      "demand_bps": 677,
-      "started_at": "2026-11-15T19:18:24.454053+00:00"
+      "demand_bps": 1586,
+      "started_at": "2026-11-15T19:57:13.285822+00:00"
     },
     "distress": false,
     "employees": 0,
@@ -76,7 +76,7 @@
     "ai_workers": 0,
     "can_expand": false,
     "cash_cents": 230000,
-    "founded_at": "2026-11-15T19:18:24.414857+00:00",
+    "founded_at": "2026-11-15T19:57:13.243866+00:00",
     "can_upgrade": false,
     "logo_hidden": false,
     "price_level": "normal",
@@ -103,10 +103,10 @@
     "quarters_active": 0,
     "ai_worker_skills": [],
     "distress_quarters": 0,
-    "estimate_low_cents": 27208,
+    "estimate_low_cents": 140227,
     "founder_payout_bps": 0,
     "upgrade_cost_cents": 1250000,
-    "estimate_high_cents": 603111,
+    "estimate_high_cents": 2682679,
     "ai_worker_cost_cents": 72000,
     "can_capital_increase": false,
     "expansion_cost_cents": null,

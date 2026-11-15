@@ -4,18 +4,18 @@
     "tier": null,
     "stage": null,
     "company": {
-      "id": "2fccb1cc-0894-a518-9538-769c751d9630",
+      "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
       "logo": null,
-      "name": "Memeland Media",
-      "color": "#FF4FD8",
+      "name": "QuantenSprung Labs",
+      "color": "#35D0BA",
       "is_ai": true,
       "sector": "tech",
-      "ticker": "MEM"
+      "ticker": "QSL"
     },
     "founder": null,
     "team_size": 1,
     "product_key": null,
-    "last_quarter": { "label": "J2 Q1", "profit_cents": 41908768, "revenue_cents": 284040980 },
+    "last_quarter": { "label": "J2 Q1", "profit_cents": -50168198, "revenue_cents": 257523353 },
     "pay_factor_bps": 10000
   }
 }

@@ -1,0 +1,208 @@
+{
+  "now": "2026-11-15T19:57:14.926963+00:00",
+  "battle": {
+    "id": 12,
+    "kind": "estimate",
+    "seed": 3946827290,
+    "prize": { "kind": "money", "cents": 525000 },
+    "joined": true,
+    "params": {
+      "h": 9,
+      "w": 11,
+      "tps": 20,
+      "game": {
+        "rounds": 4,
+        "answerMs": 12000,
+        "revealMs": 4000,
+        "bullseyeBps": 100,
+        "stockRounds": 1,
+        "bullseyeBonus": 2,
+        "lastRoundFactor": 2
+      },
+      "spawns": [
+        [1, 1],
+        [9, 7],
+        [9, 1],
+        [1, 7],
+        [5, 1],
+        [5, 7],
+        [1, 4],
+        [9, 4],
+        [3, 4],
+        [7, 4]
+      ],
+      "tickMs": 50,
+      "graceMs": 1000,
+      "stepTicks": 4,
+      "aheadTicks": 10,
+      "checkEveryMs": 1000,
+      "disconnectTicks": 80
+    },
+    "result": null,
+    "rounds": {
+      "out": [-1, -1, -1],
+      "done": false,
+      "list": [
+        {
+          "lost": [],
+          "mine": { "value": null, "choice": null, "pressed": false },
+          "unit": "kg",
+          "round": 0,
+          "value": 6000,
+          "correct": null,
+          "ends_at": "2026-11-15T19:57:13.920764+00:00",
+          "options": null,
+          "results": [],
+          "decimals": 0,
+          "opens_at": "2026-11-15T19:56:57.920764+00:00",
+          "question": "Wie viel wiegt ein erwachsener Afrikanischer Elefant in kg (etwa)?",
+          "closes_at": "2026-11-15T19:57:09.920764+00:00"
+        },
+        {
+          "mine": { "value": null, "choice": 2, "pressed": true },
+          "unit": "€",
+          "round": 1,
+          "ends_at": "2026-11-15T19:57:29.920764+00:00",
+          "options": null,
+          "decimals": 2,
+          "opens_at": "2026-11-15T19:57:13.920764+00:00",
+          "question": "Was kostet eine Aktie von Eilbote Express (EBX) gerade?",
+          "closes_at": "2026-11-15T19:57:25.920764+00:00"
+        }
+      ],
+      "hearts": [1, 1, 1],
+      "points": [0, 0, 0]
+    },
+    "status": "running",
+    "ends_at": "2026-11-15T19:58:44.908376+00:00",
+    "players": [
+      {
+        "me": true,
+        "left": false,
+        "rank": null,
+        "slot": 0,
+        "nickname": "Fixture_Neu",
+        "avatar_key": "coder",
+        "accessories": ["party_hat"]
+      },
+      {
+        "me": false,
+        "left": false,
+        "rank": null,
+        "slot": 1,
+        "nickname": "Fixture_Bat1",
+        "avatar_key": "rookie",
+        "accessories": []
+      },
+      {
+        "me": false,
+        "left": false,
+        "rank": null,
+        "slot": 2,
+        "nickname": "Fixture_Bat2",
+        "avatar_key": "rookie",
+        "accessories": []
+      }
+    ],
+    "opened_at": "2026-11-15T19:57:14.880402+00:00",
+    "started_at": "2026-11-15T19:56:57.920764+00:00",
+    "finished_at": null,
+    "max_players": 10,
+    "min_players": 3,
+    "prize_wins_left": 3,
+    "countdown_ends_at": null
+  },
+  "recent": {
+    "id": 11,
+    "kind": "pump",
+    "seed": 3072276091,
+    "prize": { "key": "battle_crown", "kind": "skin", "name": "Battle-Krone" },
+    "joined": false,
+    "params": {
+      "h": 9,
+      "w": 11,
+      "tps": 20,
+      "game": {
+        "redMin": 20,
+        "greenMin": 40,
+        "goldEvery": 4,
+        "goldTicks": 20,
+        "goldValue": 3,
+        "redJitter": 20,
+        "bustLossBps": 2500,
+        "greenJitter": 60,
+        "yellowTicks": 12,
+        "durationTicks": 600,
+        "bustFreezeTicks": 20
+      },
+      "spawns": [
+        [1, 1],
+        [9, 7],
+        [9, 1],
+        [1, 7],
+        [5, 1],
+        [5, 7],
+        [1, 4],
+        [9, 4],
+        [3, 4],
+        [7, 4]
+      ],
+      "tickMs": 50,
+      "graceMs": 1000,
+      "stepTicks": 4,
+      "aheadTicks": 10,
+      "checkEveryMs": 1000,
+      "disconnectTicks": 80
+    },
+    "result": {
+      "out": [79, 79, -1],
+      "paid": true,
+      "prize": { "key": "battle_crown", "kind": "skin", "name": "Battle-Krone" },
+      "score": [0, 0, 33],
+      "capped": false,
+      "ranking": [2, 0, 1],
+      "end_tick": 79,
+      "winner_slot": 2
+    },
+    "rounds": null,
+    "status": "finished",
+    "ends_at": "2026-11-15T19:57:09.409294+00:00",
+    "players": [
+      {
+        "me": false,
+        "left": false,
+        "rank": 2,
+        "slot": 0,
+        "nickname": "Bat_Bruno",
+        "avatar_key": "rookie",
+        "accessories": []
+      },
+      {
+        "me": false,
+        "left": false,
+        "rank": 3,
+        "slot": 1,
+        "nickname": "Bat_Clara",
+        "avatar_key": "rookie",
+        "accessories": []
+      },
+      {
+        "me": false,
+        "left": false,
+        "rank": 1,
+        "slot": 2,
+        "nickname": "Bat_Emil",
+        "avatar_key": "rookie",
+        "accessories": []
+      }
+    ],
+    "opened_at": "2026-11-15T19:57:10.395613+00:00",
+    "started_at": "2026-11-15T19:56:30.409294+00:00",
+    "finished_at": "2026-11-15T19:57:10.410673+00:00",
+    "max_players": 10,
+    "min_players": 3,
+    "prize_wins_left": 3,
+    "countdown_ends_at": null
+  },
+  "viewers": 19
+}

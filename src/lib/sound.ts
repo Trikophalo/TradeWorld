@@ -94,6 +94,23 @@ export const SOUNDS = {
   poke: { src: ["/sounds/poke.wav"], volume: 0.4, minIntervalMs: 300 },
   /** The anchor is proud: a tiny "ta-daa". */
   anchorTada: { src: ["/sounds/anchor-tada.wav"], volume: 0.45, minIntervalMs: 800 },
+  /** News battles (ADR-160): countdown pip, the start, and the events of the mini-games. */
+  battleCountdown: { src: ["/sounds/battle-countdown.wav"], volume: 0.35, minIntervalMs: 300 },
+  battleGo: { src: ["/sounds/battle-go.wav"], volume: 0.45, minIntervalMs: 800 },
+  battleCrack: { src: ["/sounds/battle-crack.wav"], volume: 0.25, minIntervalMs: 120, rateJitter: 0.1 },
+  battleFall: { src: ["/sounds/battle-fall.wav"], volume: 0.4, minIntervalMs: 250 },
+  battleHit: { src: ["/sounds/battle-hit.wav"], volume: 0.5, minIntervalMs: 120, rateJitter: 0.08 },
+  battleCoin: { src: ["/sounds/battle-coin.wav"], volume: 0.3, minIntervalMs: 60, rateJitter: 0.05 },
+  battleGold: { src: ["/sounds/battle-gold.wav"], volume: 0.35, minIntervalMs: 200 },
+  battlePush: { src: ["/sounds/battle-push.wav"], volume: 0.4, minIntervalMs: 100, rateJitter: 0.1 },
+  battlePass: { src: ["/sounds/battle-pass.wav"], volume: 0.4, minIntervalMs: 150 },
+  battleFuse: { src: ["/sounds/battle-fuse.wav"], volume: 0.3, minIntervalMs: 400 },
+  battleBang: { src: ["/sounds/battle-bang.wav"], volume: 0.6, minIntervalMs: 400 },
+  battleBell: { src: ["/sounds/battle-bell.wav"], volume: 0.55, minIntervalMs: 600 },
+  battlePump: { src: ["/sounds/battle-pump.wav"], volume: 0.18, minIntervalMs: 45, rateJitter: 0.12 },
+  battleBust: { src: ["/sounds/battle-bust.wav"], volume: 0.45, minIntervalMs: 400 },
+  battleFanfare: { src: ["/sounds/battle-fanfare.wav"], volume: 0.45, minIntervalMs: 2000 },
+  battleJoin: { src: ["/sounds/battle-join.wav"], volume: 0.35, minIntervalMs: 300 },
 } as const satisfies Record<string, SoundSpec>;
 
 /** Length of the news jingle as rendered by `scripts/gen-sounds.ts` (seven bars of four at 140 BPM). */

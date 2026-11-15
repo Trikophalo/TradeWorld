@@ -324,6 +324,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Deine Spielfigur steht jetzt in voller Größe da und lässt sich anziehen: 51 verrückte Accessoires vom Cowboyhut über Bananenkostüm, Haikostüm und…",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-322fb2ff",
+        title: "News-Battles",
+        text: "Unter den Nachrichten treten jetzt 3 bis 10 Zuschauer gegeneinander an, nur einer gewinnt dicke XP, Geld, ein NFT oder einen Skin, den es nirgends…",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-5105821f",
         title: "Studiopublikum bei den NEXA Nachrichten",
         text: "Unter dem Fernseher sitzt jetzt das Publikum auf dem Studiosofa: alle, die gerade zuschauen, als angezogene Pixelfigur, du selbst und deine Freunde…",

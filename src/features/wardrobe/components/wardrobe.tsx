@@ -15,13 +15,8 @@ import { PlazaGround } from "@/components/ui/plaza-ground";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/toast";
-import {
-  ACCESSORIES,
-  ACCESSORY_RARITIES,
-  accessoryByKey,
-  type AccessoryItem,
-  type AccessoryRarity,
-} from "@/config/accessories";
+import { ACCESSORIES, ACCESSORY_RARITIES, type AccessoryItem, type AccessoryRarity } from "@/config/accessories";
+import { catalogItemByKey } from "@/config/accessory-catalog";
 import { useGameErrorText } from "@/features/game/errors";
 import { engine, useGame, usePlayerLevel } from "@/features/game/store";
 import { formatMoney } from "@/lib/format";
@@ -40,9 +35,10 @@ import {
   type WardrobeSort,
 } from "../filter";
 import { previewWorn, useSetWardrobe, useWardrobe } from "../hooks";
+import { BattleSkins } from "./battle-skins";
 import { RARITY_STYLE } from "./rarity";
 
-const slotOf = (key: string) => accessoryByKey(key)?.slot;
+const slotOf = (key: string) => catalogItemByKey(key)?.slot;
 /** Rarities a purchase is celebrated louder for. */
 const BIG_RARITIES: readonly AccessoryRarity[] = ["epic", "legendary", "mythic"];
 
@@ -100,7 +96,7 @@ export function WardrobeView() {
     }
   };
 
-  const wear = async (item: AccessoryItem, on: boolean) => {
+  const wear = async (item: Pick<AccessoryItem, "key" | "slot">, on: boolean) => {
     setAction(item.key, "loading");
     try {
       setWardrobe(await engine.wearAccessory(crypto.randomUUID(), item.key, on));
@@ -178,7 +174,7 @@ export function WardrobeView() {
               ) : (
                 <ul className="mt-1.5 flex flex-wrap gap-1.5" data-testid="wardrobe-worn">
                   {worn.map((key) => {
-                    const item = accessoryByKey(key);
+                    const item = catalogItemByKey(key);
                     if (!item) return null;
                     return (
                       <li key={key} className={cn("rounded-xs px-1.5 py-0.5 text-xs", RARITY_STYLE[item.rarity].soft)}>
@@ -241,6 +237,14 @@ export function WardrobeView() {
         ) : (
           <ItemGrid>{items.map(renderItem)}</ItemGrid>
         )}
+        {/* Only won in news battles (ADR-160) */}
+        <BattleSkins
+          avatarKey={figureKey}
+          owned={owned}
+          worn={worn}
+          actions={actions}
+          onWear={(item, on) => void wear(item, on)}
+        />
       </div>
     </div>
   );

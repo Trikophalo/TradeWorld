@@ -143,7 +143,9 @@ select tests.assert(
            -- the company floor (ADR-156)
            'get_company_floor',
            -- renting out places in the home (ADR-158)
-           'get_rentals', 'get_rental_market', 'set_rental_offer', 'rent_home', 'end_tenancy']
+           'get_rentals', 'get_rental_market', 'set_rental_offer', 'rent_home', 'end_tenancy',
+           -- news battles (ADR-160)
+           'get_battle', 'battle_join', 'battle_leave', 'battle_sync', 'battle_answer']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')
@@ -186,6 +188,7 @@ select tests.assert(
       'stock_tips', 'market_snapshot_cache', 'company_moves', 'company_tasks', 'fun_news', 'company_pitches', 'company_protests', 'company_protest_supporters', 'player_seen_tours', 'company_assistant_calls', 'artwork_messages', 'security_view_days', 'security_view_marks', 'security_popularity', 'market_popularity_state', 'news_shows', 'news_show_used', 'news_show_messages', 'news_show_viewers',
       'player_accessories', 'player_accessories_worn', 'friend_pokes',
       'rental_offers', 'rental_tenancies', 'rental_payments',
+      'battles', 'battle_players', 'battle_answers',
       'rate_limits', 'player_requests', 'player_login_events', 'push_deliveries', 'invite_code_redemptions',
       'price_ticks_default']) as t
      -- (a table from a later migration is not there yet on an older database)

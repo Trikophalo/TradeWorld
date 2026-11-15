@@ -1177,6 +1177,251 @@ function poke(): Float64Array {
   return master(m.buf, { room: { mix: 0.08, size: 0.5 }, maxSeconds: 0.38 });
 }
 
+// --- News battles (ADR-160) ----------------------------------------------------
+
+/** Countdown pip ("3", "2", "1"): a short square beep, like an arcade cabinet. */
+function battleCountdown(): Float64Array {
+  const m = new Mix(0.35, 61);
+  chip(m, 0, "C5", 0.09, { gain: 0.9, duty: 0.5, env: { d: 0.06, s: 0.5, r: 0.06 }, sub: 0.2 });
+  return master(m.buf, { room: { mix: 0.08, size: 0.5 }, maxSeconds: 0.3 });
+}
+
+/** "LOS!": a rising power chord with a cymbal. */
+function battleGo(): Float64Array {
+  const m = new Mix(1, 62);
+  chip(m, 0, "C5", 0.06, { gain: 0.7, duty: 0.5, env: { d: 0.05, s: 0.4, r: 0.04 } });
+  for (const note of ["C6", "G5", "E5"])
+    chip(m, 0.07, note, 0.3, { gain: 0.6, duty: 0.25, sparkle: 0.2, env: { d: 0.2, s: 0.5, r: 0.25 } });
+  timpani(m, 0.07, "C3", 0.9);
+  noise(m, 0.07, 0.35, { type: "hp", cutoff: 5000 }, 0.12, { a: 0.002, d: 0.35, r: 0.2 });
+  return master(m.buf, { room: { mix: 0.16, size: 0.9 } });
+}
+
+/** A floor tile cracks: a dry little snap. */
+function battleCrack(): Float64Array {
+  const m = new Mix(0.25, 63);
+  noise(m, 0, 0.015, { type: "bp", cutoff: 3200, q: 1.5 }, 0.8, { a: 0.001, r: 0.02 });
+  noise(m, 0.03, 0.02, { type: "bp", cutoff: 1800, q: 1.2 }, 0.5, { a: 0.001, r: 0.03 });
+  m.tone({
+    at: 0,
+    note: "A4",
+    to: "D4",
+    glide: 0.05,
+    gate: 0.04,
+    wave: "pulse",
+    duty: 0.12,
+    gain: 0.15,
+    env: { d: 0.04, s: 0, r: 0.03 },
+  });
+  return master(m.buf, { lowpass: 7000, maxSeconds: 0.22 });
+}
+
+/** Somebody falls: the classic falling whistle that sinks an octave and a half. */
+function battleFall(): Float64Array {
+  const m = new Mix(0.8, 64);
+  const env = { a: 0.005, d: 0.4, s: 0.6, r: 0.12 };
+  m.tone({
+    at: 0,
+    note: "A5",
+    to: "C4",
+    glide: 0.55,
+    gate: 0.55,
+    wave: "pulse",
+    duty: 0.3,
+    gain: 0.45,
+    env,
+    filter: { type: "lp", cutoff: 3600 },
+  });
+  m.tone({ at: 0, note: "A5", to: "C4", glide: 0.55, gate: 0.55, gain: 0.35, env });
+  timpani(m, 0.58, "G2", 0.6);
+  return master(m.buf, { room: { mix: 0.12, size: 0.7 }, maxSeconds: 0.8 });
+}
+
+/** A hit: a punchy thud with a crunch on top. */
+function battleHit(): Float64Array {
+  const m = new Mix(0.4, 65);
+  m.tone({
+    at: 0,
+    note: "E3",
+    to: "A1",
+    glide: 0.08,
+    gate: 0.06,
+    gain: 0.9,
+    env: { a: 0.001, d: 0.12, s: 0, r: 0.08 },
+  });
+  noise(m, 0, 0.04, { type: "lp", cutoff: 2400 }, 0.6, { a: 0.001, d: 0.06, r: 0.04 });
+  m.tone({
+    at: 0.01,
+    note: "C4",
+    to: "G3",
+    glide: 0.05,
+    gate: 0.05,
+    wave: "pulse",
+    duty: 0.2,
+    gain: 0.25,
+    env: { d: 0.05, s: 0, r: 0.04 },
+  });
+  return master(m.buf, { lowpass: 6000, maxSeconds: 0.35 });
+}
+
+/** One coin caught: two quick notes up. */
+function battleCoin(): Float64Array {
+  const m = new Mix(0.3, 66);
+  chip(m, 0, "B5", 0.04, { gain: 0.7, duty: 0.5, env: { d: 0.04, s: 0.3, r: 0.03 } });
+  chip(m, 0.05, "E6", 0.12, { gain: 0.8, duty: 0.5, sparkle: 0.3, env: { d: 0.1, s: 0.3, r: 0.12 } });
+  return master(m.buf, { room: { mix: 0.06, size: 0.4 }, maxSeconds: 0.3 });
+}
+
+/** A gold bar: the coin plus a shining arpeggio. */
+function battleGold(): Float64Array {
+  const m = new Mix(0.6, 67);
+  ["C6", "E6", "G6", "C7"].forEach((note, i) =>
+    chip(m, i * 0.05, note, 0.06, { gain: 0.6, duty: 0.5, sparkle: 0.2, env: { d: 0.06, s: 0.3, r: 0.08 } }),
+  );
+  bell(m, 0.22, "E7", { gain: 0.35, decay: 0.2, index: 0.8 });
+  return master(m.buf, { room: { mix: 0.12, size: 0.6 } });
+}
+
+/** A shove in the sumo ring: a whoosh and a rubbery boing. */
+function battlePush(): Float64Array {
+  const m = new Mix(0.45, 68);
+  noise(m, 0, 0.08, { type: "bp", cutoff: 900, to: 3200, sweep: 0.08, q: 0.9 }, 0.5, { a: 0.01, d: 0.08, r: 0.04 });
+  m.tone({
+    at: 0.05,
+    note: "G3",
+    to: "D4",
+    glide: 0.04,
+    gate: 0.12,
+    wave: "pulse",
+    duty: 0.3,
+    gain: 0.35,
+    vibrato: { rate: 20, cents: 60 },
+    env: { d: 0.12, s: 0.2, r: 0.08 },
+    filter: { type: "lp", cutoff: 2600 },
+  });
+  return master(m.buf, { lowpass: 6000, maxSeconds: 0.4 });
+}
+
+/** The toxic stock changes hands: a quick "zip" up. */
+function battlePass(): Float64Array {
+  const m = new Mix(0.3, 69);
+  m.tone({
+    at: 0,
+    note: "C5",
+    to: "C6",
+    glide: 0.08,
+    gate: 0.08,
+    wave: "pulse",
+    duty: 0.25,
+    gain: 0.5,
+    env: { d: 0.08, s: 0.3, r: 0.05 },
+    filter: { type: "lp", cutoff: 5000 },
+  });
+  bell(m, 0.08, "G6", { gain: 0.3, decay: 0.1 });
+  return master(m.buf, { maxSeconds: 0.28 });
+}
+
+/** A fuse is lit: a hiss with a tick. */
+function battleFuse(): Float64Array {
+  const m = new Mix(0.6, 70);
+  noise(m, 0, 0.45, { type: "hp", cutoff: 4000 }, 0.35, { a: 0.02, d: 0.45, r: 0.1 });
+  m.tone({ at: 0, note: "E6", gate: 0.015, wave: "pulse", duty: 0.5, gain: 0.3, env: { d: 0.02, s: 0, r: 0.02 } });
+  return master(m.buf, { lowpass: 8000, maxSeconds: 0.55 });
+}
+
+/** The bang: a low boom with crackling debris. */
+function battleBang(): Float64Array {
+  const m = new Mix(1.2, 71);
+  m.tone({ at: 0, note: "G2", to: "C1", glide: 0.3, gate: 0.2, gain: 1, env: { a: 0.001, d: 0.5, s: 0, r: 0.3 } });
+  noise(m, 0, 0.5, { type: "lp", cutoff: 1800, to: 300, sweep: 0.5 }, 0.9, { a: 0.001, d: 0.6, r: 0.3 });
+  for (let i = 0; i < 8; i++)
+    noise(
+      m,
+      0.08 + i * 0.07 + m.rand() * 0.04,
+      0.01,
+      { type: "bp", cutoff: 2500 + m.rand() * 2000, q: 1.5 },
+      0.25 * (1 - i / 9),
+      { a: 0.001, r: 0.02 },
+    );
+  return master(m.buf, { room: { mix: 0.18, size: 1 }, lowpass: 5000 });
+}
+
+/** Die Glocke: a big brass bell. */
+function battleBell(): Float64Array {
+  const m = new Mix(1.6, 72);
+  bell(m, 0, "G5", { gain: 0.9, decay: 0.9, index: 2.2 });
+  bell(m, 0, "D6", { gain: 0.35, decay: 0.6, index: 1.6 });
+  bell(m, 0, "G4", { gain: 0.4, decay: 1.1, index: 1.2 });
+  noise(m, 0, 0.01, { type: "bp", cutoff: 3000, q: 1 }, 0.3, { a: 0.001, r: 0.01 });
+  return master(m.buf, { room: { mix: 0.25, size: 1 } });
+}
+
+/** One pump of the stock: a short rising blip. */
+function battlePump(): Float64Array {
+  const m = new Mix(0.15, 73);
+  m.tone({
+    at: 0,
+    note: "E5",
+    to: "A5",
+    glide: 0.03,
+    gate: 0.03,
+    wave: "pulse",
+    duty: 0.4,
+    gain: 0.5,
+    env: { d: 0.03, s: 0.2, r: 0.02 },
+    filter: { type: "lp", cutoff: 4000 },
+  });
+  return master(m.buf, { maxSeconds: 0.1 });
+}
+
+/** A tap in the crash: a buzzer and a sad slide. */
+function battleBust(): Float64Array {
+  const m = new Mix(0.7, 74);
+  const env = { a: 0.005, d: 0.2, s: 0.7, r: 0.08 };
+  for (const note of ["A2", "A#2"])
+    m.tone({
+      at: 0,
+      note,
+      gate: 0.25,
+      wave: "pulse",
+      duty: 0.5,
+      gain: note === "A2" ? 0.55 : 0.4,
+      env,
+      filter: { type: "lp", cutoff: 1400 },
+    });
+  m.tone({ at: 0.28, note: "E4", to: "A3", glide: 0.3, gate: 0.3, gain: 0.35, env: { d: 0.3, s: 0.4, r: 0.1 } });
+  return master(m.buf, { lowpass: 5000, maxSeconds: 0.7 });
+}
+
+/** The winner: a short victory fanfare (C major, three hits and two held chords with sparkles). */
+function battleFanfare(): Float64Array {
+  const m = new Mix(2.2, 75);
+  const hit = { d: 0.08, s: 0.5, r: 0.08 };
+  const vibrato = { rate: 5.5, cents: 12, delay: 0.15 };
+  ["G4", "G4", "G4"].forEach((note, i) =>
+    chip(m, i * 0.13, note, 0.08, { gain: 0.7, duty: 0.25, env: hit, sub: 0.25 }),
+  );
+  chip(m, 0.39, "E5", 0.5, { gain: 0.8, duty: 0.25, env: { d: 0.3, s: 0.6, r: 0.4 }, vibrato });
+  chip(m, 0.39, "C5", 0.5, { gain: 0.6, duty: 0.25, env: { d: 0.3, s: 0.6, r: 0.4 }, sub: 0.3 });
+  chip(m, 0.95, "G5", 0.6, { gain: 0.8, duty: 0.25, sparkle: 0.3, env: { d: 0.4, s: 0.6, r: 0.5 }, vibrato });
+  chip(m, 0.95, "C6", 0.6, { gain: 0.6, duty: 0.25, env: { d: 0.4, s: 0.6, r: 0.5 } });
+  timpani(m, 0, "C3", 0.6);
+  timpani(m, 0.39, "C3", 0.8);
+  timpani(m, 0.95, "G2", 0.9);
+  ["E6", "G6", "C7", "E7", "G7"].forEach((note, i) =>
+    bell(m, 1.0 + i * 0.08, note, { gain: 0.3, decay: 0.2, index: 0.8 }),
+  );
+  return master(m.buf, { room: { mix: 0.2, size: 1 } });
+}
+
+/** Joining the lobby: a friendly "plopp" up. */
+function battleJoin(): Float64Array {
+  const m = new Mix(0.35, 76);
+  chip(m, 0, "G5", 0.05, { gain: 0.6, duty: 0.4, env: { d: 0.05, s: 0.3, r: 0.04 } });
+  chip(m, 0.06, "C6", 0.1, { gain: 0.7, duty: 0.4, sparkle: 0.2, env: { d: 0.08, s: 0.3, r: 0.1 } });
+  return master(m.buf, { room: { mix: 0.08, size: 0.5 }, maxSeconds: 0.32 });
+}
+
 /** File name → renderer. The names are what src/lib/sound.ts references. */
 const RENDER: Record<string, () => Float64Array> = {
   tap,
@@ -1210,6 +1455,22 @@ const RENDER: Record<string, () => Float64Array> = {
   "anchor-huh": anchorHuh,
   "anchor-tada": anchorTada,
   poke,
+  "battle-countdown": battleCountdown,
+  "battle-go": battleGo,
+  "battle-crack": battleCrack,
+  "battle-fall": battleFall,
+  "battle-hit": battleHit,
+  "battle-coin": battleCoin,
+  "battle-gold": battleGold,
+  "battle-push": battlePush,
+  "battle-pass": battlePass,
+  "battle-fuse": battleFuse,
+  "battle-bang": battleBang,
+  "battle-bell": battleBell,
+  "battle-pump": battlePump,
+  "battle-bust": battleBust,
+  "battle-fanfare": battleFanfare,
+  "battle-join": battleJoin,
 };
 
 /**

@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { PlayerFigure } from "@/components/ui/player-figure";
 import { PlazaGround } from "@/components/ui/plaza-ground";
 import { Skeleton } from "@/components/ui/skeleton";
-import { accessoryByKey } from "@/config/accessories";
+import { catalogItemByKey } from "@/config/accessory-catalog";
 import { useGame } from "@/features/game/store";
 import { cn } from "@/lib/utils";
 import { useWardrobe } from "../hooks";
@@ -32,7 +32,7 @@ export function FigureCard({
   action?: ReactNode;
 }) {
   const t = useTranslations("wardrobe");
-  const items = accessories.map((key) => accessoryByKey(key)).filter((item) => item !== undefined);
+  const items = accessories.map((key) => catalogItemByKey(key)).filter((item) => item !== undefined);
   return (
     <Card padding="none" className="overflow-hidden" data-testid="figure-card">
       <div className="flex items-stretch">

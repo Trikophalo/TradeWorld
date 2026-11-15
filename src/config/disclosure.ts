@@ -19,6 +19,8 @@ export const DISCLOSURE = {
   profileFriends: 2,
   /** Wardrobe with accessories for the pixel figure (ADR-155): after the tutorial, like the friends. */
   profileWardrobe: 2,
+  /** News battles under the TV (ADR-160): after the tutorial, like the friends (battles.lobby.minLevel). */
+  newsBattle: 2,
   /** Link from the vault to the upgrades (ADR-093): not during the tutorial. */
   homeUpgrades: 2,
   /** Patch notes button in the top bar (ADR-137): not during the tutorial. */

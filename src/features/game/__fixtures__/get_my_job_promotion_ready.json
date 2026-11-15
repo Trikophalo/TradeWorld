@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "099cd1b9-5836-44dc-9efe-71cd1b6ca7fe",
+    "id": "cb8fcc79-fb49-4c05-9cd1-a8973c498247",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
+      "id": "2f91e3a4-088a-0592-9f21-88b83cae7bd8",
       "logo": null,
-      "name": "QuantenSprung Labs",
-      "color": "#35D0BA",
+      "name": "SolarFuchs",
+      "color": "#FF8C42",
       "is_ai": true,
-      "sector": "tech",
-      "ticker": "QSL"
+      "sector": "energy",
+      "ticker": "SFX"
     },
     "presence": {
-      "fire_at": "2026-11-20T19:18:24.095885+00:00",
+      "fire_at": "2026-11-20T19:57:12.969741+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-15T19:18:24.095885+00:00"
+      "last_active_at": "2026-11-15T19:57:12.969741+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-15T19:18:24.174524+00:00",
+    "started_at": "2026-11-15T19:57:13.044046+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

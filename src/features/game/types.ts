@@ -6,6 +6,7 @@
  * Plain `number` is safe for each value; products of quantity and price are
  * computed with BigInt (src/features/market/order-schema.ts).
  */
+import type { BattleEngine } from "./battle-types";
 import type { SectorKey } from "@/components/pixel/art";
 import type { FloorMaterial, PropertyTier } from "@/config/balance";
 import type { SkillBranch } from "@/config/skills";
@@ -2046,6 +2047,13 @@ export const GAME_ERROR_KEYS = [
   "rental_full",
   "already_renting",
   "tenancy_not_found",
+  "battle_not_viewer",
+  "battle_full",
+  "battle_closed",
+  "battle_not_joined",
+  "battle_round_closed",
+  "accessory_exclusive",
+  "battle_unknown",
   "move_busy",
   "move_resting",
   "friend_code_unknown",
@@ -2114,7 +2122,7 @@ export interface NewsShowState {
   chat: NewsShowChatMessage[];
 }
 
-export interface GameEngine {
+export interface GameEngine extends BattleEngine {
   newsShow(): Promise<NewsShowState>;
   postNewsShowMessage(requestId: string, body: string): Promise<NewsShowChatMessage[]>;
   /** Finn's tours the player has seen (kept on the server, so a private window does not repeat them). */

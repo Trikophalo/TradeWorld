@@ -1024,5 +1024,26 @@ export function createArtEngine(host: ArtHost) {
   /** Value of the player's artworks, for the net worth. */
   const myArtValueCents = () => collectionOf(host.nickname()).valueCents;
 
-  return { engine, tick, myArtValueCents };
+  /** News battles (ADR-160): a gallery NFT nobody owns or auctions, to be won. */
+  function freeGalleryWork(): {
+    id: string;
+    title: string;
+    serial: number;
+    rarity: string | null;
+    pixels: ArtworkPixels;
+  } | null {
+    const free = works().filter((w) => w.origin === "game" && w.owner === null && !openAuction(w.id));
+    const w = free[Math.floor(Math.random() * free.length)];
+    return w ? { id: w.id, title: w.title, serial: w.serial, rarity: w.rarity, pixels: w.pixels } : null;
+  }
+  /** Hands a free gallery NFT to the player (a battle prize); false when it is gone. */
+  function giveGalleryWork(id: string): boolean {
+    const w = work(id);
+    if (!w || w.origin !== "game" || w.owner !== null || openAuction(w.id)) return false;
+    save({ ...w, owner: host.nickname(), askCents: null });
+    host.persist();
+    return true;
+  }
+
+  return { engine, tick, myArtValueCents, freeGalleryWork, giveGalleryWork };
 }

@@ -140,6 +140,12 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   Live-Chat schreibt, bekommt eine Sprechblase über dem Kopf, auch die schrägen Stammzuschauer mit ihren eigenen
   Outfits. Und geht es in einer Meldung um dich, zeigt Mr. Doodle Dangle dein Bild, im aktuellen Outfit und mit
   passender Unterschrift von „Gewinner der Stunde“ bis „Gesucht“.
+
+- **News-Battles (ADR-160):** Unter den Nachrichten treten jetzt 3 bis 10 Zuschauer gegeneinander an, nur einer
+  gewinnt dicke XP, Geld, ein NFT oder einen Skin, den es nirgends zu kaufen gibt. Neun Minispiele: Kurssturz,
+  Bullenreiten, Geldregen, Sumo am Parkett, Giftaktie und Aktie pumpen mit WASD oder Joystick, dazu Börsenquiz,
+  Schätz den Kurs und Die Glocke.
+
 - **Kleiderschrank und Freunde-Platz (ADR-155):** Deine Spielfigur steht jetzt in voller Größe da und lässt sich
   anziehen: 51 verrückte Accessoires vom Cowboyhut über Bananenkostüm, Haikostüm und Laseraugen bis zu Papagei,
   Jetpack und goldener Klobürste. Unter Profil → Kleiderschrank probierst du alles an und kaufst mit Spielgeld, von

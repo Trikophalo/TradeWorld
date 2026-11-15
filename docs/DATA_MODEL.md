@@ -7548,3 +7548,35 @@ Migration `20261204003200_news_audience.sql`, keine neuen Tabellen.
   `figure: {nickname, avatar_key, accessories}`, beim Abruf gelesen. `news_show_chat_json` markiert Zeilen
   erfundener Zuschauer mit `bot: true`.
 - Test `supabase/tests/9o_news_audience.sql`.
+
+## Nachtrag: News-Battles (ADR-160)
+
+Migrationen `20261204004700_battle_enums.sql` (`xp_source` `battle`, `ledger_tx_kind` `battle_prize`),
+`20261204004710_battle_sims.sql` (die Aktionsspiele als PL/pgSQL: `battle_hash`, `battle_sim` und je Spiel
+`battle_sim_floor|bulls|coins|sumo|potato|pump`, gleiche Regeln wie `src/lib/sim/battle`) und
+`20261204004720_news_battles.sql`. Konfiguration in `game_config.battles` (`src/config/battles.ts`); die exklusiven
+Accessoires (`battles.accessories`, `exclusive: true`, ohne Preis) mischt `accessories_cfg()` in den Katalog.
+
+- **Tabellen (intern, nur über RPCs):** `battles` (`status` open/running/finished/cancelled, `kind`, `seed`,
+  `params` = Spielregeln bei Start, `plan` = geheime Antworten und Glockenzeiten, `prize` = Preisart der Lobby,
+  `artwork_id` = reserviertes Galerie-NFT, `countdown_ends_at`, `started_at` = Takt 0, `ends_at`, `checked_at`,
+  `winner_id`, `result`); höchstens ein offenes oder laufendes Battle (Teilindex). `battle_players` (PK
+  `battle_id, player_id`, `slot` ab dem Start, `inputs` = ein Zeichen je Takt, `seen_at`, `left_at`, `rank`,
+  `active`; höchstens ein aktives Battle je Spieler). `battle_answers` (PK `battle_id, round, player_id`, `choice`,
+  `value_e4`, `revealed_at`, `answered_at`).
+- **RPCs:** `get_battle()` → `{now, viewers, battle, recent}` (zählt als Zuschauer, öffnet bei Bedarf die Lobby,
+  startet und beendet fällige Battles); `battle_join(p_request_id)`, `battle_leave(p_request_id)` (laufend:
+  Aufgabe, `q` im Eingabestrom); `battle_sync(p_battle_id, p_from, p_inputs, p_since, p_end_tick)` →
+  `{now, status, final_tick, streams}` (Eingaben nur von Mitspielern, der Takt ist der Idempotenzschlüssel: nichts
+  wird überschrieben, Takte nach ihrer Frist werden `x`, höchstens `aheadTicks` voraus; `p_end_tick` lässt den Server
+  höchstens einmal je Sekunde nachrechnen); `battle_answer(p_request_id, p_battle_id, p_round, p_choice, p_value)`.
+- **Ende und Preis:** `battle_finish` rechnet die Aktionsspiele mit `battle_sim` aus allen Eingaben nach bzw. wertet die
+  Runden mit `battle_rounds_eval` aus, setzt Ränge, zahlt über `battle_pay` (XP per `grant_xp`, Geld als
+  `battle_prize` von `households`, Skin in `player_accessories`, NFT per `owner_id`; Tagesgrenze
+  `prizes.dailyPrizeCap`) und schreibt Benachrichtigung `battle_won`, Feed `battle_won` und eine Zeile von
+  Mr. Doodle Dangle in `news_show_messages`. Cron `nexa-battles` (jede Minute) ruft `battle_run_due()`.
+- **Missionen:** Metriken `battle_join` (beim Start) und `battle_win`; Vorlagen `w_battles`, `m_battle_first`,
+  `m_battle_win`, `m_battle_win_10`.
+- **Fehler:** `battle_not_viewer` NX150, `battle_full` NX151, `battle_closed` NX152, `battle_not_joined` NX153,
+  `battle_round_closed` NX154, `accessory_exclusive` NX155, `battle_unknown` NX156.
+- Test `supabase/tests/9s_battles.sql` (mit Testvektoren gegen die TypeScript-Simulation).
