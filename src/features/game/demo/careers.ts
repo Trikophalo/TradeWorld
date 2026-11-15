@@ -861,6 +861,7 @@ export function createCareerEngine(host: CareerHost) {
         company: host.ownCompany(),
         memberSince: iso(Date.now() - 3 * DAY),
         trust: host.trust?.() ?? null,
+        accessories: [],
       };
     },
   };

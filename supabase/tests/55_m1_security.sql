@@ -72,7 +72,9 @@ select tests.assert(
           -- popular stocks first (9g)
           || array['record_security_view']
           -- NEXA Nachrichten (9i)
-          || array['get_news_show', 'post_news_show_message', 'news_show_claim_script']) x),
+          || array['get_news_show', 'post_news_show_message', 'news_show_claim_script']
+          -- accessories and poking friends (9m)
+          || array['get_accessories', 'buy_accessory', 'wear_accessory', 'poke_friend']) x),
   'authenticated can execute exactly the 9 helpers and the RPCs up to the market popularity (9g)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace

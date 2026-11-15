@@ -953,6 +953,8 @@ export interface PlayerCard {
   memberSince: string;
   /** Trust from kept and broken deals (ADR-098); null on servers before M4j. */
   trust: TrustInfo | null;
+  /** Worn accessories, back to front (ADR-155). */
+  accessories: string[];
 }
 
 // ------------------------------------------------------------------ player companies (ADR-057)
@@ -969,6 +971,28 @@ export interface FriendEntry {
   at: string;
   /** Friends only: used the game in the last few minutes. */
   online?: boolean;
+  /** Friends only (ADR-155): portrait and worn accessories, for the figure on the friends plaza. */
+  avatarKey?: string;
+  accessories?: string[];
+}
+
+/** The own wardrobe (ADR-155): owned and worn accessory keys (worn back to front). */
+export interface Wardrobe {
+  owned: string[];
+  worn: string[];
+  avatarKey: string;
+}
+
+export interface WardrobeBought extends Wardrobe {
+  paidCents: number;
+}
+
+/** A poke sent to a friend (ADR-155): the same friend again from nextAt. */
+export interface PokeResult {
+  nickname: string;
+  pokedAt: string;
+  nextAt: string;
+  leftToday: number;
 }
 // ------------------------------------------------------------------ social (ADR-088, ADR-089) and events (ADR-090)
 
@@ -1890,6 +1914,13 @@ export const GAME_ERROR_KEYS = [
   "order_cooldown",
   "chat_text_invalid",
   "no_shares_left",
+  "accessory_unknown",
+  "accessory_locked",
+  "accessory_owned",
+  "accessory_not_owned",
+  "not_friends",
+  "poke_too_soon",
+  "poke_daily_limit",
   "move_busy",
   "move_resting",
   "friend_code_unknown",
@@ -2116,6 +2147,12 @@ export interface GameEngine {
   sendFriendRequest(requestId: string, nickname: string): Promise<Friends>;
   respondFriendRequest(requestId: string, nickname: string, accept: boolean): Promise<Friends>;
   removeFriend(requestId: string, nickname: string): Promise<Friends>;
+  /** Poke a friend: they get a notification (ADR-155). */
+  pokeFriend(requestId: string, nickname: string): Promise<PokeResult>;
+  /** Accessories for the pixel figure (ADR-155). */
+  accessories(): Promise<Wardrobe>;
+  buyAccessory(requestId: string, key: string): Promise<WardrobeBought>;
+  wearAccessory(requestId: string, key: string, wear: boolean): Promise<Wardrobe>;
   /** Stock news with a lead (ADR-119). */
   stockNews(limit?: number): Promise<StockNews>;
   /** Business moves of the own company (ADR-127). */

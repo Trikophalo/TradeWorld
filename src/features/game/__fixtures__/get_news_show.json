@@ -1,8 +1,8 @@
 {
-  "now": "2026-11-15T11:58:25.148959+00:00",
+  "now": "2026-11-15T12:42:14.578024+00:00",
   "chat": [
     {
-      "at": "2026-11-15T11:58:25.145378+00:00",
+      "at": "2026-11-15T12:42:14.572397+00:00",
       "id": 204,
       "body": "Was für eine Sendung 💀📉",
       "mine": true,
@@ -10,77 +10,84 @@
     }
   ],
   "show": {
-    "id": 7,
+    "id": 6,
     "writer": "mini",
-    "airs_at": "2026-11-15T11:00:00+00:00",
+    "airs_at": "2026-11-15T12:00:00+00:00",
     "segments": [
       {
         "kind": "gossip",
-        "mood": "shocked",
-        "text": "Bitte festhalten: Level 10 erreicht, und zwar bei Fixture_Heim. Glückwunsch, und jetzt bloß nichts anfassen.",
-        "effects": [],
-        "headline": "Applaus für Fixture_Heim"
-      },
-      {
-        "kind": "scandal",
-        "mood": "shocked",
-        "text": "Das Netz zerreißt Stunden Werk. Auf der Weihnachtsfeier wurde versehentlich die halbe Belegschaft befördert, die andere Hälfte gefeuert. Seitdem will niemand mehr „Apps für Uhrmacher“. Hanna_Stunde hat das Firmenhandy im Fluss versenkt.",
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −17,4 %" }],
-        "headline": "Shitstorm über Stunden Werk"
-      },
-      {
-        "kind": "nft",
-        "mood": "shocked",
-        "text": "Aus der Welt der bunten Kästchen: Ben_Bieter hat sich „Neon Nacht“ von Nina_Neon für 30.000 € gegönnt. Wer das kauft, kauft auch Luft in Dosen.",
-        "effects": [],
-        "headline": "„Neon Nacht“ wechselt den Besitzer"
-      },
-      {
-        "kind": "winner",
-        "mood": "shocked",
-        "text": "Fixture_Neu ist heute um 1.138.922 € reicher, 11389,2 % rauf. Man munkelt von einem Pakt mit dem Teufel, der Teufel dementiert.",
-        "effects": [],
-        "headline": "Glückspilz des Tages: Fixture_Neu"
-      },
-      {
-        "kind": "gossip",
-        "mood": "shocked",
-        "text": "Ich fasse es nicht, aber es stimmt. Fritz_Gegenwind meldet: Gegenwind Energie aufgestiegen. Auch ein blindes Huhn findet mal ein Korn, aber immerhin.",
-        "effects": [],
-        "headline": "Na so was: Fritz_Gegenwind"
+        "mood": "smug",
+        "text": "Liebes Tagebuch, schreibt Anja_Lieferant heute vermutlich: Deal mit Bodo_Kunde gebrochen. Ich würde ja helfen, aber dann hätte ich nichts mehr zu lachen. Wir legen etwas Schmerzensgeld bei.",
+        "effects": [{ "tone": "gain", "label": "+100 € Schmerzensgeld" }],
+        "headline": "Das Tagebuch von Anja_Lieferant"
       },
       {
         "kind": "scandal",
         "mood": "angry",
-        "text": "Bei Feed Fabrik brennt die Hütte. Die Gewerbeaufsicht fand vierzig leere Pizzakartons, einen schlafenden Buchhalter und null Qualitätskontrolle. Feli_Feed spricht von einem Missverständnis. Zur Erinnerung, das Geschäftsmodell lautet: „Neuigkeiten am Fließband“.",
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −24,4 %" }],
-        "headline": "Feed Fabrik: Chef Feli_Feed unter Beschuss"
+        "text": "Ausgerechnet Rang Laden, die Firma mit dem Motto „Tee aus der Region“: Auf der Weihnachtsfeier wurde versehentlich die halbe Belegschaft befördert, die andere Hälfte gefeuert. Die Kunden laufen davon.",
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −21,1 %" }],
+        "headline": "Skandal bei Rang Laden"
+      },
+      {
+        "kind": "nft",
+        "mood": "confused",
+        "text": "Kunstmarkt, oder was man dafür hält: „Neon Nacht“ von Nina_Neon ging für 30.000 € an Ben_Bieter. Ich verstehe es nicht, also muss es teuer sein.",
+        "effects": [],
+        "headline": "30.000 € für ein paar Pixel"
+      },
+      {
+        "kind": "winner",
+        "mood": "shocked",
+        "text": "11389,2 % Plus, 1.138.925 € Gewinn: Fixture_Neu zeigt dem Rest, wie es geht. Wer jetzt um einen Kredit bittet, wird ausgelacht. Zu Recht.",
+        "effects": [],
+        "headline": "Fixture_Neu schwimmt im Geld"
+      },
+      {
+        "kind": "gossip",
+        "mood": "laughing",
+        "text": "Job bei Frieda Apps hingeschmissen: Das ist die Tagesbilanz von Walter_Weg. So eine Pfeife sehe ich sonst nur morgens im Spiegel, und ich bin wenigstens im Fernsehen. Schmerzensgeld gibt es obendrauf, Würde leider nicht.",
+        "effects": [{ "tone": "gain", "label": "+100 € Schmerzensgeld" }],
+        "headline": "Fremdschämen mit Walter_Weg"
+      },
+      {
+        "kind": "scandal",
+        "mood": "angry",
+        "text": "Bei Fixture Werke brennt die Hütte. Die Geschäftsführung hat das wichtigste Meeting des Jahres verschlafen, im Meetingraum. Fixture_Gmbh spricht von einem Missverständnis. Zur Erinnerung, das Geschäftsmodell lautet: „Maschinen nach Maß“.",
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −13,4 %" }],
+        "headline": "Fixture Werke: Chef Fixture_Gmbh unter Beschuss"
+      },
+      {
+        "kind": "ramble",
+        "mood": "smug",
+        "text": "Man erzählt sich, Friedrich Merz habe bei Kaufrausch Märkte zugeschlagen. Ich habe es auf einer Raststätte gehört, zwischen Kaffee und Reue. Ob es stimmt, ist dem Kurs egal: 6,7 % rauf.",
+        "effects": [{ "tone": "gain", "label": "KFR +6,7 %" }],
+        "headline": "Gerücht des Tages: Friedrich Merz und Kaufrausch Märkte"
       },
       {
         "kind": "tasks",
-        "mood": "proud",
-        "text": "Ein Feiertag wurde abgesagt, alle haben Langeweile und Bargeld. Alle offenen Firmen-Aufgaben sind ab sofort 33,4 % mehr wert. An die Arbeit, ihr faulen Säcke!",
-        "effects": [{ "tone": "gain", "label": "Aufgaben +33,4 %" }],
-        "headline": "Auftragsflut im ganzen Land"
+        "mood": "crying",
+        "text": "Das halbe Land ist kollektiv im Urlaub, natürlich unbezahlt. Alle offenen Firmen-Aufgaben sind 27,1 % weniger wert. Die Chefs dürfen ruhig ein bisschen schwitzen.",
+        "effects": [{ "tone": "loss", "label": "Aufgaben −27,1 %" }],
+        "headline": "Kunden entdecken das Sparen"
       },
       {
         "kind": "stock",
-        "mood": "proud",
-        "text": "Der Praktikant hat aus Versehen ein Patent angemeldet. Die Aktie von KlarSoft AG springt um 13,2 %. Der Vorstand öffnet den guten Sekt, den für Besuch.",
-        "effects": [{ "tone": "gain", "label": "KLS +13,2 %" }],
-        "headline": "Jubel bei KlarSoft AG"
+        "mood": "shocked",
+        "text": "Das Hauptquartier wurde versehentlich bei einer Kleinanzeige mitverkauft. Der Kurs von Methusalem Bio sackt um 11,3 % ab. Ein Krisenstab tagt.",
+        "effects": [{ "tone": "loss", "label": "MTH −11,3 %" }],
+        "headline": "Panik bei Methusalem Bio"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: SolarFuchs geht bald nach oben. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
-        "effects": [{ "tone": "neutral", "label": "SFX ↑ Tipp" }],
-        "headline": "Der heiße Draht: SolarFuchs"
+        "text": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Methusalem Bio tut sich in der nächsten Stunde etwas, und zwar nach unten. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
+        "effects": [{ "tone": "neutral", "label": "MTH ↓ Tipp" }],
+        "headline": "Mr. Doodle Dangles Geheimtipp"
       }
     ],
-    "started_at": "2026-11-15T11:58:25.148959+00:00"
+    "started_at": "2026-11-15T12:42:14.578024+00:00"
   },
   "viewers": 5,
   "upcoming": null,
-  "next_airs_at": "2026-11-15T12:00:00+00:00"
+  "next_airs_at": "2026-11-15T13:00:00+00:00"
 }

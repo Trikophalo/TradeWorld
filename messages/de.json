@@ -794,7 +794,14 @@
     "chat_text_invalid": "Diese Nachricht geht so nicht. Bitte kurz und ohne Beleidigungen.",
     "no_shares_left": "Von dieser Aktie ist gerade keine mehr frei. Kaufen geht wieder, sobald jemand verkauft oder die Firma neue Aktien ausgibt.",
     "order_cooldown": "Ein freier Auftrag pro Stunde. Der nächste geht bald wieder.",
-    "assistant_busy": "Mira hat in dieser Stunde schon viel nachgedacht. Klare Befehle versteht sie weiter sofort."
+    "assistant_busy": "Mira hat in dieser Stunde schon viel nachgedacht. Klare Befehle versteht sie weiter sofort.",
+    "accessory_unknown": "Dieses Accessoire gibt es nicht (mehr).",
+    "accessory_locked": "Dieses Accessoire schaltest du erst mit einem höheren Level frei.",
+    "accessory_owned": "Das hast du schon. Schau in deinen Kleiderschrank.",
+    "accessory_not_owned": "Das musst du erst kaufen, bevor du es anziehen kannst.",
+    "not_friends": "Das geht nur bei Freunden.",
+    "poke_too_soon": "Nicht so stürmisch! Denselben Freund kannst du erst in ein paar Minuten wieder anstupsen.",
+    "poke_daily_limit": "Genug gestupst für heute. Morgen geht es weiter."
   },
   "locks": {
     "level": "Level {level}",
@@ -2929,7 +2936,19 @@
     "send": "Anfrage schicken",
     "addHint": "Du kannst auch den Tag eingeben, z. B. #K7Q2. Sobald die Person annimmt, steht sie in deiner Liste.",
     "openProfile": "Profil von {name} öffnen",
-    "notYourself": "Das bist du selbst. Such dir jemand anderen aus."
+    "notYourself": "Das bist du selbst. Such dir jemand anderen aus.",
+    "poke": "Anstupsen",
+    "pokeLabel": "{name} anstupsen",
+    "pokeDone": "{name} angestupst! 👉",
+    "pokeDoneText": "{name} bekommt eine Benachrichtigung.",
+    "plaza": {
+      "title": "Freunde-Platz",
+      "summary": "{count, plural, one {# Freund} other {# Freunde}} · {online} online",
+      "emptyTitle": "Der Platz ist noch leer",
+      "emptyText": "Sobald du Freunde hast, stehen sie hier. Tipp auf eine Figur für ihr Profil oder stups sie an.",
+      "hint": "Tipp auf eine Figur für ihr Profil. Mit 👉 stupst du jemanden an.",
+      "label": "Freunde-Platz mit {count, plural, one {# Freund} other {# Freunden}}"
+    }
   },
   "playerTag": {
     "title": "Spieler-Tag: damit findet man dich in der Suche",
@@ -3006,7 +3025,8 @@
         "loan_defaulted": "hat einen Kredit von {other} platzen lassen.",
         "coin_launched": "hat einen eigenen Coin gestartet: {name} ({ticker}).",
         "rug_pull": "hat bei {name} ({ticker}) die Team-Coins abgestoßen. Rug Pull!",
-        "coin_closed": "hat den Coin {name} ({ticker}) eingestellt."
+        "coin_closed": "hat den Coin {name} ({ticker}) eingestellt.",
+        "accessory_bought": "trägt jetzt etwas Legendäres: {name}."
       }
     },
     "notifications": {
@@ -6879,5 +6899,49 @@
       "Bulle und Bär streiten sich um den Kaffeeautomaten",
       "Zur vollen Stunde: die nächste Sendung"
     ]
+  },
+  "wardrobe": {
+    "title": "Kleiderschrank",
+    "intro": "Hüte, Kostüme, Haustiere und mehr für deine Pixelfigur. Deine Freunde sehen, was du trägst.",
+    "linkHint": "Accessoires für deine Figur: Cowboyhut, Bananenkostüm, Papagei …",
+    "open": "Kleiderschrank",
+    "back": "Profil",
+    "figure": "Deine Figur",
+    "figureOf": "Figur von {name}",
+    "wearing": "Trägt",
+    "wearingNothing": "Noch ganz ohne Accessoires.",
+    "collected": "{owned} von {total} gesammelt",
+    "slotsLabel": "Bereich",
+    "filterAll": "Alle",
+    "slots": {
+      "head": "Kopf",
+      "face": "Gesicht",
+      "body": "Kostüm",
+      "hand": "Hand",
+      "pet": "Haustier",
+      "back": "Rücken"
+    },
+    "rarities": {
+      "common": "Gewöhnlich",
+      "rare": "Selten",
+      "epic": "Episch",
+      "legendary": "Legendär"
+    },
+    "tryOn": "Anprobieren",
+    "trying": "Anprobe",
+    "previewHint": "Anprobe: So sähe es aus. Dir gehört es erst nach dem Kauf.",
+    "previewReset": "Anprobe beenden",
+    "buy": "Kaufen",
+    "buyLabel": "{name} für {price} kaufen",
+    "tooExpensive": "Zu teuer",
+    "locked": "Ab Level {level}",
+    "wear": "Anziehen",
+    "takeOff": "Ausziehen",
+    "worn": "Angezogen",
+    "owned": "Im Schrank",
+    "bought": "{name} gehört dir!",
+    "boughtText": "Steht dir hervorragend. Du trägst es schon.",
+    "putOn": "{name} angezogen",
+    "tookOff": "{name} ausgezogen"
   }
 }

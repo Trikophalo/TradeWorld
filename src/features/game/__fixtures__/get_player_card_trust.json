@@ -1,7 +1,7 @@
 {
   "job": null,
-  "tag": "VJLV",
-  "rank": 143,
+  "tag": "5LDG",
+  "rank": 145,
   "level": 6,
   "trust": { "band": "shaky", "kept": 0, "score": 41, "broken": 1 },
   "company": { "name": "Fixture Lieferwerk", "ticker": null },
@@ -9,8 +9,9 @@
   "trophies": { "gold": 0, "bronze": 0, "silver": 0 },
   "avatar_key": "rookie",
   "top_skills": [],
+  "accessories": [],
   "streak_days": 0,
-  "member_since": "2026-11-15T11:58:22.598158+00:00",
+  "member_since": "2026-11-15T12:42:11.813222+00:00",
   "branch_scores": {
     "it": 0,
     "law": 0,

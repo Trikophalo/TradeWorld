@@ -13,6 +13,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PlayerTag } from "@/components/ui/player-tag";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
+import { ACCESSORY_ART } from "@/components/pixel/accessories";
+import { accessoryByKey } from "@/config/accessories";
 import { CARS } from "@/config/furniture";
 import { useGameErrorText } from "@/features/game/errors";
 import { engine } from "@/features/game/store";
@@ -48,6 +50,7 @@ const ICONS: Record<string, PixelArt> = {
   coin_launched: UI_ICONS.crypto,
   rug_pull: UI_ICONS.crypto,
   coin_closed: UI_ICONS.crypto,
+  accessory_bought: { grid: ACCESSORY_ART.crown!.grid, palette: ACCESSORY_ART.crown!.palette },
 };
 
 const str = (v: unknown) => (typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
@@ -117,6 +120,8 @@ function useFeedText() {
         const known = ["intern", "junior", "senior", "team_lead", "c_level"].includes(tier);
         return t("promoted", { tier: known ? tc(tier as "junior") : tier, company: str(p.company) });
       }
+      case "accessory_bought":
+        return t("accessory_bought", { name: accessoryByKey(str(p.key))?.name ?? str(p.name) });
       default:
         return t("other");
     }

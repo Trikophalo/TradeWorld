@@ -90,6 +90,8 @@ export const SOUNDS = {
   anchorSmug: { src: ["/sounds/anchor-smug.wav"], volume: 0.4, minIntervalMs: 800 },
   /** The anchor is confused: a rising "huh?". */
   anchorHuh: { src: ["/sounds/anchor-huh.wav"], volume: 0.55, minIntervalMs: 800 },
+  /** Poking a friend (ADR-155): a short rubbery "boing". */
+  poke: { src: ["/sounds/poke.wav"], volume: 0.4, minIntervalMs: 300 },
   /** The anchor is proud: a tiny "ta-daa". */
   anchorTada: { src: ["/sounds/anchor-tada.wav"], volume: 0.45, minIntervalMs: 800 },
 } as const satisfies Record<string, SoundSpec>;

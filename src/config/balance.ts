@@ -5,6 +5,7 @@ import { NEWS_SHOW_RULES } from "./news-show.ts";
 import { PITCH_RULES } from "./pitches.ts";
 import { PROTEST_RULES } from "./protests.ts";
 import { NFT_RULES } from "./nfts.ts";
+import { ACCESSORY_RULES } from "./accessories.ts";
 import { CRYPTO, type CryptoConfig } from "./crypto.ts";
 import { DEALS, TRUST, type DealsConfig, type TrustConfig } from "./deals.ts";
 import { SKILL_NODES, type SkillBranch, type SkillNodeConfig } from "./skills.ts";
@@ -765,6 +766,8 @@ export interface SocialConfig {
   };
   /** Friend code (ADR-111): what a player gets once for entering a friend's code. */
   readonly friendCode: { readonly bonusCents: number };
+  /** Poking a friend (ADR-155): the same friend again after cooldownMinutes, at most dailyCap pokes in 24 hours. */
+  readonly poke: { readonly cooldownMinutes: number; readonly dailyCap: number };
 }
 
 /** Popular stocks first in the market list (ADR-145). */
@@ -855,6 +858,8 @@ export interface BalanceConfig {
   readonly protests: typeof PROTEST_RULES;
   /** NFTs: royalties, AI collectors, offer chat (ADR-135), values in nfts.ts. */
   readonly nfts: typeof NFT_RULES;
+  /** Accessories for the pixel figure (ADR-155). */
+  readonly accessories: typeof ACCESSORY_RULES;
   /** Mira, the company assistant (ADR-138). */
   readonly companyAssistant: {
     readonly claudePerHour: number;
@@ -2439,6 +2444,7 @@ export const BALANCE = {
   pitches: PITCH_RULES,
   protests: PROTEST_RULES,
   nfts: NFT_RULES,
+  accessories: ACCESSORY_RULES,
   /** Mira, the company assistant (ADR-138): Claude answers per player and hour, length of a message. */
   companyAssistant: {
     claudePerHour: 20,
@@ -2490,6 +2496,7 @@ export const BALANCE = {
     },
     league: { updateEveryMinutes: 10, podium: 3, minBaselineCents: 1_000_000 },
     friendCode: { bonusCents: 500_000 },
+    poke: { cooldownMinutes: 10, dailyCap: 30 },
   },
   property: {
     tiers: [

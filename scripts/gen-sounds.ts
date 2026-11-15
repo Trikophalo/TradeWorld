@@ -1148,6 +1148,35 @@ function anchorTada(): Float64Array {
   return master(m.buf, { room: { mix: 0.16, size: 0.9 }, maxSeconds: 0.8 });
 }
 
+/** Poking a friend (ADR-155): a short rubbery "boing", up and back down with a wobble. */
+function poke(): Float64Array {
+  const m = new Mix(0.45, 57);
+  m.tone({
+    at: 0,
+    note: "C5",
+    to: "G5",
+    glide: 0.05,
+    gate: 0.05,
+    wave: "pulse",
+    duty: 0.3,
+    gain: 0.3,
+    env: { a: 0.003, d: 0.06, s: 0.3, r: 0.05 },
+    filter: { type: "lp", cutoff: 3200 },
+  });
+  m.tone({
+    at: 0.055,
+    note: "G5",
+    to: "D5",
+    glide: 0.14,
+    gate: 0.12,
+    gain: 0.65,
+    vibrato: { rate: 24, cents: 70 },
+    env: { a: 0.003, d: 0.14, s: 0.2, r: 0.1 },
+  });
+  noise(m, 0, 0.006, { type: "bp", cutoff: 2600, q: 0.9 }, 0.12, { a: 0.003, r: 0.01 });
+  return master(m.buf, { room: { mix: 0.08, size: 0.5 }, maxSeconds: 0.38 });
+}
+
 /** File name → renderer. The names are what src/lib/sound.ts references. */
 const RENDER: Record<string, () => Float64Array> = {
   tap,
@@ -1180,6 +1209,7 @@ const RENDER: Record<string, () => Float64Array> = {
   "anchor-smug": anchorSmug,
   "anchor-huh": anchorHuh,
   "anchor-tada": anchorTada,
+  poke,
 };
 
 /**

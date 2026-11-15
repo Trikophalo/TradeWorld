@@ -1,27 +1,27 @@
 {
-  "id": "cf55e592-a1de-4a92-b64b-8572fea097b0",
+  "id": "6debd37a-e276-4bb2-be69-e49c7e5c2119",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "4562dbe8-90b3-4d57-88d1-d68cca29ab75",
+    "id": "1d28603a-751e-4275-bc23-801c96810a6d",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "2faf9e4c-3f0a-8a5b-1645-c669e9481771",
+      "id": "533f0569-8570-a8f1-ebc9-07f9808291c9",
       "logo": null,
-      "name": "NeuroPharm AG",
-      "color": "#6EE7A0",
+      "name": "Alpenmed",
+      "color": "#8FD3F4",
       "is_ai": true,
       "sector": "pharma",
-      "ticker": "NPH"
+      "ticker": "ALM"
     },
-    "required": [{ "branch": "management", "min_score": 0 }],
-    "title_key": "management_intern",
+    "required": [{ "branch": "science", "min_score": 0 }],
+    "title_key": "science_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-15T11:58:19.101019+00:00",
-  "updated_at": "2026-11-15T11:58:19.105299+00:00",
-  "offer_expires_at": "2026-11-17T11:58:19.101019+00:00",
+  "created_at": "2026-11-15T12:42:08.124017+00:00",
+  "updated_at": "2026-11-15T12:42:08.128733+00:00",
+  "offer_expires_at": "2026-11-17T12:42:08.124017+00:00",
   "salary_wish_cents_per_hour": 15000,
   "offer_salary_cents_per_hour": 15000
 }

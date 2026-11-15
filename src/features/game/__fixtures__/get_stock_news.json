@@ -2,42 +2,42 @@
   "items": [
     {
       "id": 5,
-      "body": "Ein Gericht gibt dem Konkurrenten recht. Lizenzzahlungen drohen. Sicher ist das nicht.",
-      "name": "Knusperkönig",
-      "due_at": "2026-11-15T13:26:02.340404+00:00",
+      "body": "Mehrere Häuser streichen ihre Kaufempfehlung und senken das Kursziel. Sicher ist das nicht.",
+      "name": "Volta Energie AG",
+      "due_at": "2026-11-15T13:55:54.916496+00:00",
       "status": "open",
-      "ticker": "SNK",
-      "headline": "Knusperkönig verliert Patentstreit",
+      "ticker": "VLT",
+      "headline": "Analysten-Downgrade für Volta Energie AG",
       "move_bps": null,
-      "strength": 1,
+      "strength": 2,
       "direction": "down",
-      "published_at": "2026-11-15T12:58:24.364872+00:00"
+      "published_at": "2026-11-15T13:42:13.666972+00:00"
     },
     {
       "id": 4,
-      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Nordbrise Offshore tut sich in der nächsten Stunde etwas, und zwar nach oben. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
-      "name": "Nordbrise Offshore",
-      "due_at": "2026-11-15T12:30:17.595865+00:00",
+      "body": "Ein Vögelchen hat mir gezwitschert: GenoVita Biotech dürfte in der kommenden Stunde nach unten gehen. Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.",
+      "name": "GenoVita Biotech",
+      "due_at": "2026-11-15T13:27:06.271014+00:00",
       "status": "confirmed",
-      "ticker": "WND",
-      "headline": "Mr. Doodle Dangles Geheimtipp",
-      "move_bps": 839,
+      "ticker": "GNV",
+      "headline": "Vom Flurfunk: GenoVita Biotech",
+      "move_bps": -1155,
       "strength": 2,
-      "direction": "up",
-      "published_at": "2026-11-15T11:58:17.595865+00:00"
+      "direction": "down",
+      "published_at": "2026-11-15T12:42:06.271014+00:00"
     },
     {
       "id": 3,
-      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Luftpost Drohnen tut sich in der nächsten Stunde etwas, und zwar nach oben. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
-      "name": "Luftpost Drohnen",
-      "due_at": "2026-11-15T11:58:16.487224+00:00",
-      "status": "confirmed",
-      "ticker": "DRN",
-      "headline": "Mr. Doodle Dangles Geheimtipp",
-      "move_bps": 861,
+      "body": "Ein Vögelchen hat mir gezwitschert: Helix Robotik dürfte in der kommenden Stunde nach oben gehen. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
+      "name": "Helix Robotik",
+      "due_at": "2026-11-15T12:42:05.098998+00:00",
+      "status": "fizzled",
+      "ticker": "HLX",
+      "headline": "Vom Flurfunk: Helix Robotik",
+      "move_bps": null,
       "strength": 2,
       "direction": "up",
-      "published_at": "2026-11-15T11:58:16.487224+00:00"
+      "published_at": "2026-11-15T12:42:05.098998+00:00"
     }
   ],
   "reliability_bps": 7500

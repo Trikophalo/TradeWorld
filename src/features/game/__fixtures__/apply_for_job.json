@@ -1,9 +1,9 @@
 {
-  "id": "49b84ea8-e29f-42b8-9046-127bcf089934",
+  "id": "c2aa0b07-0cbd-4964-b1f0-0a984502752f",
   "status": "offered",
   "message": "Ich lerne schnell.",
   "posting": {
-    "id": "0f0027fe-f1de-49f0-a7ad-3e8e2c2e5724",
+    "id": "17622ea7-8e52-439d-bc08-e1d79c590333",
     "tier": "junior",
     "title": null,
     "company": {
@@ -19,9 +19,9 @@
     "title_key": "it_junior",
     "required_skills": []
   },
-  "created_at": "2026-11-15T11:58:19.093938+00:00",
-  "updated_at": "2026-11-15T11:58:19.093938+00:00",
-  "offer_expires_at": "2026-11-17T11:58:19.093938+00:00",
+  "created_at": "2026-11-15T12:42:08.118616+00:00",
+  "updated_at": "2026-11-15T12:42:08.118616+00:00",
+  "offer_expires_at": "2026-11-17T12:42:08.118616+00:00",
   "salary_wish_cents_per_hour": 32700,
   "offer_salary_cents_per_hour": 32700
 }

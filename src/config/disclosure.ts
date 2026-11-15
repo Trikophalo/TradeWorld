@@ -17,6 +17,8 @@ export const DISCLOSURE = {
   profileCareer: 2,
   /** Friends (ADR-084): after the tutorial, when the game has a first shape. */
   profileFriends: 2,
+  /** Wardrobe with accessories for the pixel figure (ADR-155): after the tutorial, like the friends. */
+  profileWardrobe: 2,
   /** Link from the vault to the upgrades (ADR-093): not during the tutorial. */
   homeUpgrades: 2,
   /** Patch notes button in the top bar (ADR-137): not during the tutorial. */

@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "0a9a58fa-bff2-45da-b7fb-a08bfe0fda5d",
+    "id": "143e44d3-c6c9-4b4b-a3ac-c3f775f817fe",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "2faf9e4c-3f0a-8a5b-1645-c669e9481771",
+      "id": "533f0569-8570-a8f1-ebc9-07f9808291c9",
       "logo": null,
-      "name": "NeuroPharm AG",
-      "color": "#6EE7A0",
+      "name": "Alpenmed",
+      "color": "#8FD3F4",
       "is_ai": true,
       "sector": "pharma",
-      "ticker": "NPH"
+      "ticker": "ALM"
     },
     "presence": {
-      "fire_at": "2026-11-20T11:58:22.215435+00:00",
+      "fire_at": "2026-11-20T12:42:11.420705+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-15T11:58:22.215435+00:00"
+      "last_active_at": "2026-11-15T12:42:11.420705+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-15T11:58:22.369197+00:00",
+    "started_at": "2026-11-15T12:42:11.586544+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

@@ -1,0 +1,26 @@
+{
+  "friends": [
+    {
+      "tag": "BLTM",
+      "level": 8,
+      "since": "2026-11-15T12:42:10.723856+00:00",
+      "online": true,
+      "nickname": "Fixture_Kunst",
+      "avatar_key": "rookie",
+      "accessories": [],
+      "last_active_at": "2026-11-15T12:42:09.435304+00:00"
+    },
+    {
+      "tag": "VAX2",
+      "level": 15,
+      "since": "2026-11-15T12:42:10.870469+00:00",
+      "online": true,
+      "nickname": "Fixture_Neu",
+      "avatar_key": "coder",
+      "accessories": ["party_hat"],
+      "last_active_at": "2026-11-15T12:42:07.567301+00:00"
+    }
+  ],
+  "incoming": [],
+  "outgoing": []
+}
