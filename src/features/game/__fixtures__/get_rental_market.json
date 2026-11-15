@@ -2,16 +2,99 @@
   "offers": [
     {
       "free": 2,
+      "tier": "apartment",
+      "owner": "Wanda_Wohnt",
+      "period": "hour",
+      "places": 2,
+      "tenants": [],
+      "property": {
+        "tier": "apartment",
+        "floor": "laminate",
+        "owner": "Wanda_Wohnt",
+        "width": 10,
+        "garage": [],
+        "height": 8,
+        "placed": [
+          {
+            "x": 4,
+            "y": 0,
+            "id": "436f0a45-f0d8-42d7-9311-18ad552ae9ac",
+            "rot": 0,
+            "item_key": "chair_wood",
+            "value_cents": 8000
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "id": "9f96c701-b5cb-4041-bd07-b8d4f56cad69",
+            "rot": 0,
+            "item_key": "sofa_leather",
+            "value_cents": 300000
+          },
+          {
+            "x": 9,
+            "y": 7,
+            "id": "25f84abc-583a-41c5-9cd8-da50f7a6c0e6",
+            "rot": 0,
+            "item_key": "shower",
+            "value_cents": 137500
+          },
+          {
+            "x": 0,
+            "y": 3,
+            "id": "b821f1b9-4cef-4707-81a2-79cc7b7b7134",
+            "rot": 0,
+            "item_key": "bed_double",
+            "value_cents": 187500
+          },
+          {
+            "x": 5,
+            "y": 3,
+            "id": "c1a3ff76-831a-432a-874d-d19e3faf9da4",
+            "rot": 0,
+            "item_key": "table_oak",
+            "value_cents": 175000
+          },
+          {
+            "x": 5,
+            "y": 5,
+            "id": "e2e72d69-9d53-4082-9ab9-17abdb73d9df",
+            "rot": 0,
+            "item_key": "rug_wool",
+            "value_cents": 81250
+          },
+          {
+            "x": 9,
+            "y": 0,
+            "id": "f20686b1-19a4-4cbd-8205-f3c405ea5af5",
+            "rot": 0,
+            "item_key": "kitchen_fridge",
+            "value_cents": 87500
+          }
+        ],
+        "wall_color": "#f3efe4",
+        "value_cents": 5589050,
+        "floors_owned": ["laminate"],
+        "garage_slots": 0,
+        "furnishing_cents": 586050
+      },
+      "wohnwert": 59,
+      "avatar_key": "rookie",
+      "accessories": [],
+      "price_cents": 6000
+    },
+    {
+      "free": 2,
       "tier": "house",
       "owner": "Fixture_Heim",
       "period": "hour",
       "places": 3,
       "tenants": [
         {
-          "id": "c6848072-721b-47aa-ba7d-f06f5174bfee",
+          "id": "082aa97d-5b3e-4075-8573-0f3d7ed304e8",
           "name": "Mia F.",
           "is_ai": true,
-          "since": "2026-11-15T19:57:14.816972+00:00",
+          "since": "2026-11-15T20:05:45.782773+00:00",
           "avatar_key": null,
           "accessories": []
         }
@@ -21,18 +104,33 @@
         "floor": "parquet",
         "owner": "Fixture_Heim",
         "width": 13,
-        "garage": [{ "id": "0bfef2ce-afb0-49ea-9e2c-65d52453ff91", "slot": 0, "car_key": "car_electric" }],
+        "garage": [{ "id": "ad1d6b75-f07f-453f-957e-7fd4383b73a0", "slot": 0, "car_key": "car_electric" }],
         "height": 9,
         "placed": [
-          { "x": 2, "y": 2, "id": "33b77668-50cd-4ee5-85ec-eb346658876f", "rot": 0, "item_key": "table_oak" },
-          { "x": 3, "y": 3, "id": "722c25be-530d-40f4-ab23-681c21f02b73", "rot": 0, "item_key": "laptop" }
+          {
+            "x": 2,
+            "y": 2,
+            "id": "e782191c-6e49-4426-8453-4b224afcfe43",
+            "rot": 0,
+            "item_key": "table_oak",
+            "value_cents": 210000
+          },
+          {
+            "x": 3,
+            "y": 3,
+            "id": "1ea6af60-fe76-4cc1-acac-b52ef5157e31",
+            "rot": 0,
+            "item_key": "laptop",
+            "value_cents": 210000
+          }
         ],
         "wall_color": "#2f5fd0",
-        "value_cents": 27955200,
+        "value_cents": 28095200,
         "floors_owned": ["laminate", "parquet"],
-        "garage_slots": 2
+        "garage_slots": 2,
+        "furnishing_cents": 252000
       },
-      "wohnwert": 19,
+      "wohnwert": 20,
       "avatar_key": "rookie",
       "accessories": [],
       "price_cents": 1000

@@ -2669,3 +2669,51 @@ steuern ihre angezogene Pixelfigur (ADR-155) mit WASD, Pfeiltasten oder einem Jo
   Metriken `battle_join` und `battle_win`).
 - **Demo:** Erfundene Gegner treten bei, spielen mit einfachen Bots (Schatten meiden, Münzen jagen, rempeln) und
   beantworten Quizfragen; der Demo-Modus kann jedes Spiel gezielt starten.
+
+## ADR-161: Wohnbonus, Möbelpreise nach Zuhause, Einrichtung im Wert, freie Mietpreise — `Annahme`
+
+Wunsch: Wer wohnt, bekommt Bonus-XP und Bonus-Geld, mehr in größeren Wohnungen; die Einrichtung wird teurer, je größer
+die Wohnung, und steigert ihren Wert; die Miete legt der Besitzer selbst fest.
+
+- **Wohnbonus jede Stunde** (`src/lib/sim/living.ts`, gleiche Rechnung in `living_bonus_owner()`/`_tenant()`): Wer ein
+  eigenes Zuhause hat oder zur Miete wohnt, bekommt Geld und XP. Voller Bonus des Besitzers bei Wohnwert 100 je
+  Stunde: Wohnung 20 € und 3 Basis-XP, Apartment 50 € und 4, Haus 120 € und 6, Villa 300 € und 8, Luxusvilla 800 € und
+  10 XP (mit dem Alpha-Faktor doppelt). Bei Wohnwert 0 gibt es 40 %, linear bis 100 % bei Wohnwert 100: Größe und
+  Einrichtung zählen beide.
+- **Mieter** bekommen 50 % des Bonus des Zuhauses, in dem sie wohnen, als Geld aber **höchstens ihre Miete je
+  Stunde**. So lohnt Mieten für den Bonus allein nie, und ein Freundschaftspreis von 1 € bringt keinen Villa-Bonus
+  auf Kosten der Haushalte. Die Wohlfühl-XP aus ADR-158 bleiben dazu.
+- **Ein Bonus je Spieler und Stunde:** Wer ein eigenes Zuhause hat und woanders mietet, bekommt den besseren der beiden
+  (mehr Geld, dann mehr XP, bei Gleichstand das eigene). Gezahlt wird nur an Spieler, die in den letzten 3 Tagen
+  gespielt haben (`last_active_at`); so sammeln verlassene Konten nichts an, wie der Tresor mit seiner Kappe.
+- **Auszahlung:** Job `living_bonus_run_due()` jede Minute (pg_cron `nexa-living-bonus`), bezahlt die laufende Stunde
+  einmal je Spieler (`living_bonus_payments`, Primärschlüssel Spieler + Stundenbeginn), verpasste Stunden eines
+  ausgefallenen Jobs werden nicht nachgeholt. Geld als Ledger-Buchung `living_bonus` von den Haushalten auf das Konto
+  (haben die Haushalte zu wenig, nur XP); ein Zwangskredit behält wie bei Lohn und Miete seinen Anteil ein. XP über
+  `grant_xp` mit der Quelle `home_living`. Ein eigener Job und kein Teil von `run_due_part`, damit Miete, Löhne und
+  ihre Tests unberührt bleiben. Einmal am Tag eine Meldung „Wohnbonus gestern“ statt einer je Stunde.
+- **Fairness:** Der Bonus läuft rund um die Uhr, Lohn höchstens 8 Stunden am Tag. Eine Wohnung bringt höchstens 480 €
+  am Tag (weniger als ein Praktikantentag, 1.200 €), eine Luxusvilla 19.200 € (ein C-Level-Tag sind 20.000 €). Bezogen
+  auf den Kaufpreis ist das 1,9 % (Wohnung) bis 0,13 % (Luxusvilla) am Tag: ein Bonus fürs Wohnen, keine Anlage, die
+  die Miete (ADR-158) oder das Grundeinkommen (100 € je Stunde im Tresor) überholt.
+- **Möbelpreise nach Zuhause:** Möbel kosten den Katalogpreis × Faktor des Zuhauses, in dem der Käufer beim Kauf wohnt:
+  Wohnung (und ohne Bleibe) ×1, Apartment ×1,25, Haus ×1,5, Villa ×2, Luxusvilla ×3. Der Makler-Rabatt geht davon ab.
+  Jedes Stück merkt sich diesen Listenpreis (`player_furniture.list_cents`, alte Stücke: Katalogpreis), der Wohnwert
+  zählt ihn statt des Katalogpreises. Erwogen: eigene Möbellinien je Stufe (viel Pixel-Art, kein Mehrwert) und ein
+  Faktor auf den Wohnwert nach dem aktuellen Zuhause (dann lohnte es, in der Wohnung billig zu kaufen und mitzunehmen).
+  So misst der Wert-Teil des Wohnwerts weiter Geld gegen den Kaufpreis der Stufe, und wer billig vor dem Umzug kauft,
+  spart Geld, bekommt aber weniger Wohnwert.
+- **Einrichtung im Wert des Zuhauses:** Aufgestellte Möbel gehören zum Zuhause und zählen mit 60 % des bezahlten
+  Preises (statt 40 % im Inventar) im Wert des Zuhauses, also im Vermögen und in der Reichenliste
+  (`player_property_value_cents`). Der Wiederverkauf bleibt bei 40 %, der Umzug rechnet weiter nur das Zuhause an
+  (Möbel ziehen mit). Die Grundstücksseite zeigt „davon Einrichtung“.
+- **Freie Mietpreise:** Die Spanne aus ADR-158 (5 % der Richtmiete bis 150 % der fairen Miete) entfällt. Der Besitzer
+  gibt den Preis je Platz frei ein, mindestens 1 € je Stunde (24 € je Tag), höchstens 100.000 € je Stunde als
+  Sicherheitsgrenze. Die faire Miete bleibt als Hinweis und Schnellwahl (½, fair, 1,5×, 2×). KI-Mieter reagieren wie
+  bisher: Chance × (2 − Preis/fair), ab dem doppelten fairen Preis zieht keiner mehr ein. Spieler sehen den Preis im
+  Mietmarkt und entscheiden selbst; laufende Verträge behalten ihren Preis.
+- **Sehen:** Grundstück: Karte „Wohnbonus: +X € und +Y XP pro Stunde“ mit dem, was ihn erhöht (Wohnwert 100, größeres
+  Zuhause, eigenes statt gemietetes). Tresor: Einnahmequelle „Wohnbonus“. Möbelhaus: Preise für das eigene Zuhause
+  mit dem Faktor.
+- **Demo:** rechnet dieselben Formeln, zahlt beim Anschauen die laufende Stunde und holt verpasste Stunden bis zu
+  3 Tage nach (wie der Server, der aktive Spieler auch offline bezahlt).

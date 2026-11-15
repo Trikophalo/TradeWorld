@@ -3,25 +3,25 @@
   "past": [],
   "offer": null,
   "renting": {
-    "id": "01cf7077-6433-4be6-b434-d24d433c5e9f",
+    "id": "6c5e3c16-865e-4290-9578-8b0c69012e2a",
     "tier": "house",
     "owner": "Fixture_Heim",
     "period": "hour",
     "ends_at": null,
     "tenants": [
       {
-        "id": "c6848072-721b-47aa-ba7d-f06f5174bfee",
+        "id": "082aa97d-5b3e-4075-8573-0f3d7ed304e8",
         "name": "Mia F.",
         "is_ai": true,
-        "since": "2026-11-15T19:57:14.816972+00:00",
+        "since": "2026-11-15T20:05:45.782773+00:00",
         "avatar_key": null,
         "accessories": []
       },
       {
-        "id": "01cf7077-6433-4be6-b434-d24d433c5e9f",
+        "id": "6c5e3c16-865e-4290-9578-8b0c69012e2a",
         "name": "Fixture_Neu",
         "is_ai": false,
-        "since": "2026-11-15T19:57:14.823367+00:00",
+        "since": "2026-11-15T20:05:45.791654+00:00",
         "avatar_key": "coder",
         "accessories": ["party_hat"]
       }
@@ -31,23 +31,38 @@
       "floor": "parquet",
       "owner": "Fixture_Heim",
       "width": 13,
-      "garage": [{ "id": "0bfef2ce-afb0-49ea-9e2c-65d52453ff91", "slot": 0, "car_key": "car_electric" }],
+      "garage": [{ "id": "ad1d6b75-f07f-453f-957e-7fd4383b73a0", "slot": 0, "car_key": "car_electric" }],
       "height": 9,
       "placed": [
-        { "x": 2, "y": 2, "id": "33b77668-50cd-4ee5-85ec-eb346658876f", "rot": 0, "item_key": "table_oak" },
-        { "x": 3, "y": 3, "id": "722c25be-530d-40f4-ab23-681c21f02b73", "rot": 0, "item_key": "laptop" }
+        {
+          "x": 2,
+          "y": 2,
+          "id": "e782191c-6e49-4426-8453-4b224afcfe43",
+          "rot": 0,
+          "item_key": "table_oak",
+          "value_cents": 210000
+        },
+        {
+          "x": 3,
+          "y": 3,
+          "id": "1ea6af60-fe76-4cc1-acac-b52ef5157e31",
+          "rot": 0,
+          "item_key": "laptop",
+          "value_cents": 210000
+        }
       ],
       "wall_color": "#2f5fd0",
-      "value_cents": 27955200,
+      "value_cents": 28095200,
       "floors_owned": ["laminate", "parquet"],
-      "garage_slots": 2
+      "garage_slots": 2,
+      "furnishing_cents": 252000
     },
-    "wohnwert": 19,
-    "xp_total": 0,
+    "wohnwert": 20,
+    "xp_total": 2,
     "notice_by": null,
     "paid_cents": 1000,
-    "started_at": "2026-11-15T19:57:14.823367+00:00",
-    "next_due_at": "2026-11-15T20:57:14.823367+00:00",
+    "started_at": "2026-11-15T20:05:45.791654+00:00",
+    "next_due_at": "2026-11-15T21:05:45.791654+00:00",
     "price_cents": 1000,
     "owner_avatar_key": "rookie",
     "owner_accessories": []

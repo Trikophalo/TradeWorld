@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FURNITURE } from "@/config/furniture";
+import { ownerLivingBonus, tenantLivingBonus } from "@/lib/sim/living";
 import { invalidPlacements, rotated, tierConfig } from "@/lib/sim/property";
 import { autoLayout, createRentalsEngine, type DemoRentalsState, type RentalsHost } from "./rentals";
 
@@ -26,7 +27,7 @@ function host(over: Partial<RentalsHost> = {}) {
     setState: (v) => {
       state = v;
     },
-    home: () => ({ tier: "flat", floor: "laminate", itemKeys: FLAT }),
+    home: () => ({ tier: "flat", floor: "laminate", items: FLAT }),
     nickname: () => "Demo",
     avatarKey: () => "coder",
     accessories: () => [],
@@ -57,6 +58,43 @@ function host(over: Partial<RentalsHost> = {}) {
   };
 }
 
+describe("demo living bonus (ADR-161)", () => {
+  it("pays the running hour once, then every new hour, as living_bonus_run_due() does", async () => {
+    const t = host();
+    const r = createRentalsEngine(t.h);
+    const bonus = ownerLivingBonus("flat", 90);
+    expect(r.propertyRental().livingBonus).toEqual({
+      ...bonus,
+      source: "own",
+      tier: "flat",
+      wohnwert: 90,
+      owner: null,
+    });
+    expect(t.cash()).toBe(1_000_000 + bonus.cents);
+    r.propertyRental();
+    expect(t.cash()).toBe(1_000_000 + bonus.cents);
+    t.advance(3 * 3_600_000);
+    r.propertyRental();
+    expect(t.cash()).toBe(1_000_000 + 4 * bonus.cents);
+  });
+
+  it("nothing for a player who lives nowhere", () => {
+    const t = host({ home: () => ({ tier: null, floor: "laminate", items: [] }) });
+    const r = createRentalsEngine(t.h);
+    expect(r.propertyRental().livingBonus).toBeNull();
+    expect(t.cash()).toBe(1_000_000);
+  });
+
+  it("furniture bought in a bigger home counts its list price for the Wohnwert", () => {
+    const t = host({
+      home: () => ({ tier: "flat", floor: "laminate", items: [{ itemKey: "sofa_leather", valueCents: 600_000 }] }),
+    });
+    const cheap = host({ home: () => ({ tier: "flat", floor: "laminate", items: ["sofa_leather"] }) });
+    const dear = createRentalsEngine(t.h).propertyRental().wohnwert;
+    expect(dear).toBeGreaterThan(createRentalsEngine(cheap.h).propertyRental().wohnwert);
+  });
+});
+
 describe("demo rentals (ADR-158)", () => {
   it("lays out the made-up homes without overlaps and keeps the middle row free for walking", () => {
     const placed = autoLayout("apartment", ["bed_double", "sofa_leather", "table_oak", "lamp_table", "rug_wool"], "x");
@@ -81,10 +119,13 @@ describe("demo rentals (ADR-158)", () => {
     const r = createRentalsEngine(t.h);
     const state = await r.engine.rentals();
     expect(state.home?.wohnwert.total).toBe(90);
+    // the living bonus of the running hour came with the first look (ADR-161)
+    const bonus = ownerLivingBonus("flat", 90).cents;
+    expect(t.cash()).toBe(1_000_000 + bonus);
     const min = state.home!.limits.hour.minCents;
     const after = await r.engine.setRentalOffer("r1", "hour", min, true);
     expect(after.tenants).toHaveLength(1);
-    expect(t.cash()).toBe(1_000_000 + min);
+    expect(t.cash()).toBe(1_000_000 + bonus + min);
     expect(t.counters.tenants_found).toBe(1);
     expect(t.notes[0]).toMatch(/^rental_new_tenant:/);
     t.advance(3_600_000);
@@ -107,7 +148,7 @@ describe("demo rentals (ADR-158)", () => {
   });
 
   it("renting at a made-up landlord: paid at once, XP, one place at a time, out when the money is gone", async () => {
-    const t = host({ home: () => ({ tier: null, floor: "laminate", itemKeys: [] }) });
+    const t = host({ home: () => ({ tier: null, floor: "laminate", items: [] }) });
     const r = createRentalsEngine(t.h);
     const market = await r.engine.rentalMarket();
     expect(market.length).toBeGreaterThan(0);
@@ -116,6 +157,11 @@ describe("demo rentals (ADR-158)", () => {
     expect(s.renting?.owner).toBe("Lena_Loft");
     expect(s.renting?.tenants.some((x) => !x.isAi && x.name === "Demo")).toBe(true);
     expect(t.cash()).toBe(1_000_000 - offer.priceCents);
+    // the next look pays the living bonus of the running hour as a tenant (ADR-161)
+    expect(r.propertyRental().livingBonus?.source).toBe("tenant");
+    expect(t.cash()).toBe(
+      1_000_000 - offer.priceCents + tenantLivingBonus("apartment", offer.wohnwert, offer.priceCents).cents,
+    );
     expect(s.renting!.xpTotal).toBeGreaterThan(0);
     await expect(r.engine.rentHome("r2", "Vicky_Villa")).rejects.toMatchObject({ key: "already_renting" });
     t.h.addCash(-t.cash());

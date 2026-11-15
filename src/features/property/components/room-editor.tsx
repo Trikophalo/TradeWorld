@@ -54,6 +54,13 @@ export function RoomEditor({
     for (const f of inventory.furniture) m.set(f.id, f.itemKey);
     return m;
   }, [property.placed, inventory.furniture]);
+  // ADR-161: the list price each piece was bought at (bigger homes, dearer furniture); the Wohnwert counts it
+  const valueOf = useMemo(() => {
+    const m = new Map<string, number | undefined>();
+    for (const p of property.placed) m.set(p.id, p.valueCents);
+    for (const f of inventory.furniture) m.set(f.id, f.valueCents);
+    return m;
+  }, [property.placed, inventory.furniture]);
 
   const initial = (): Layout => new Map(property.placed.map((p) => [p.id, { x: p.x, y: p.y, rot: p.rot }]));
   const [layout, setLayout] = useState<Layout>(initial);
@@ -238,7 +245,7 @@ export function RoomEditor({
     ? layoutWohnwert(
         property.tier,
         floor,
-        [...layout.keys()].map((id) => keyOf.get(id) ?? ""),
+        [...layout.keys()].map((id) => ({ itemKey: keyOf.get(id) ?? "", valueCents: valueOf.get(id) })),
       )
     : null;
 

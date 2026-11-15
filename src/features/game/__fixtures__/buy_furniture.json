@@ -1,5 +1,12 @@
 {
-  "rental": { "places": 1, "renting": null, "tenants": [], "wohnwert": 0, "offer_open": false },
+  "rental": {
+    "places": 1,
+    "renting": null,
+    "tenants": [],
+    "wohnwert": 0,
+    "offer_open": false,
+    "living_bonus": { "xp": 1, "tier": "flat", "cents": 800, "owner": null, "source": "own", "wohnwert": 0 }
+  },
   "property": {
     "tier": "flat",
     "floor": "laminate",
@@ -11,10 +18,11 @@
     "wall_color": "#f3efe4",
     "value_cents": 1346000,
     "floors_owned": ["laminate"],
-    "garage_slots": 0
+    "garage_slots": 0,
+    "furnishing_cents": 0
   },
   "inventory": {
     "cars": [],
-    "furniture": [{ "id": "9e656f19-ede3-442a-9831-8d4f384bd356", "item_key": "sofa_leather" }]
+    "furniture": [{ "id": "79aacfe2-55e3-4428-8744-f771d2fa604f", "item_key": "sofa_leather", "value_cents": 240000 }]
   }
 }

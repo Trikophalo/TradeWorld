@@ -1,6 +1,8 @@
 import { BALANCE, type FloorMaterial, type PropertyTier } from "@/config/balance";
 import { CARS, FURNITURE } from "@/config/furniture";
 import {
+  furnishedValueCents,
+  furniturePriceCents,
   invalidPlacements,
   propertyValueCents,
   resaleCents,
@@ -20,7 +22,13 @@ export interface HomeState {
   wallColor: string;
   floor: FloorMaterial;
   floorsOwned: FloorMaterial[];
-  furniture: { id: string; itemKey: string; placed: { x: number; y: number; rot: 0 | 90 } | null }[];
+  furniture: {
+    id: string;
+    itemKey: string;
+    placed: { x: number; y: number; rot: 0 | 90 } | null;
+    /** List price paid (ADR-161: dearer in bigger homes); older demo saves: the catalogue price. */
+    listCents?: number;
+  }[];
   cars: { id: string; carKey: string; slot: number }[];
   seq: number;
 }
@@ -58,16 +66,18 @@ export function createPropertyEngine(host: PropertyHost) {
     return s;
   };
   const itemPrice = (key: string) => FURNITURE.find((f) => f.key === key)?.priceCents ?? 0;
+  const pieceValue = (f: HomeState["furniture"][number]) => f.listCents ?? itemPrice(f.itemKey);
   const carPrice = (key: string) => CARS.find((c) => c.key === key)?.priceCents ?? 0;
 
   function view(): PropertyState {
     const s = state();
     const t = s.tier ? tierConfig(s.tier) : null;
     const prices = [
-      ...s.furniture.map((f) => itemPrice(f.itemKey)),
+      ...s.furniture.filter((f) => !f.placed).map(pieceValue),
       ...s.cars.map((c) => carPrice(c.carKey)),
       ...s.floorsOwned.map((f) => cfg.floors[f]),
     ];
+    const placedPrices = s.furniture.filter((f) => f.placed).map(pieceValue);
     return {
       property: {
         owner: host.nickname(),
@@ -80,12 +90,15 @@ export function createPropertyEngine(host: PropertyHost) {
         floorsOwned: [...s.floorsOwned],
         placed: s.furniture
           .filter((f) => f.placed)
-          .map((f): PlacedItem => ({ id: f.id, itemKey: f.itemKey, ...f.placed! })),
+          .map((f): PlacedItem => ({ id: f.id, itemKey: f.itemKey, ...f.placed!, valueCents: pieceValue(f) })),
         garage: s.cars.map((c) => ({ ...c })),
-        valueCents: propertyValueCents(s.tier, prices),
+        valueCents: propertyValueCents(s.tier, prices, cfg, placedPrices),
+        furnishingCents: placedPrices.reduce((sum, p) => sum + furnishedValueCents(p), 0),
       },
       inventory: {
-        furniture: s.furniture.filter((f) => !f.placed).map((f) => ({ id: f.id, itemKey: f.itemKey })),
+        furniture: s.furniture
+          .filter((f) => !f.placed)
+          .map((f) => ({ id: f.id, itemKey: f.itemKey, valueCents: pieceValue(f) })),
         cars: [],
       },
       rental: host.rental(),
@@ -135,11 +148,13 @@ export function createPropertyEngine(host: PropertyHost) {
           requireUnlocked(cfg.tiers[0]!.minLevel);
           const item = FURNITURE.find((f) => f.key === itemKey);
           if (!item || !Number.isInteger(count) || count < 1 || count > 20) throw new GameError("item_not_found");
-          pay(item.priceCents * count);
           const s = state();
+          // ADR-161: bigger homes, dearer furniture
+          const listCents = furniturePriceCents(item.priceCents, s.tier);
+          pay(listCents * count);
           for (let i = 0; i < count; i++) {
             s.seq += 1;
-            s.furniture.push({ id: `f-${s.seq}`, itemKey, placed: null });
+            s.furniture.push({ id: `f-${s.seq}`, itemKey, placed: null, listCents });
           }
           return done(view());
         }),
@@ -212,7 +227,7 @@ export function createPropertyEngine(host: PropertyHost) {
           } else {
             const f = s.furniture.find((x) => x.id === id && !x.placed);
             if (!f) throw new GameError("item_not_found");
-            refund = resaleCents(itemPrice(f.itemKey));
+            refund = resaleCents(pieceValue(f));
             s.furniture = s.furniture.filter((x) => x.id !== id);
           }
           host.addCash(refund);

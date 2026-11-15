@@ -1,8 +1,8 @@
 {
-  "now": "2026-11-15T19:57:14.775113+00:00",
+  "now": "2026-11-15T20:05:45.724273+00:00",
   "chat": [
     {
-      "at": "2026-11-15T19:57:14.772462+00:00",
+      "at": "2026-11-15T20:05:45.719601+00:00",
       "id": 218,
       "bot": false,
       "body": "Was für eine Sendung 💀📉",
@@ -11,38 +11,38 @@
     }
   ],
   "show": {
-    "id": 9,
+    "id": 8,
     "writer": "mini",
-    "airs_at": "2026-11-15T19:00:00+00:00",
+    "airs_at": "2026-11-15T20:00:00+00:00",
     "segments": [
       {
         "kind": "gossip",
         "mood": "shocked",
-        "text": "Bitte festhalten: Level 10 erreicht, und zwar bei Esc_Frida. Meine Schwiegermutter hat es vorausgesagt, und die liegt sonst immer falsch.",
-        "figure": { "nickname": "Esc_Frida", "avatar_key": "rookie", "accessories": [] },
+        "text": "Gute Nachrichten, ausnahmsweise. Bei Ada_Krisenfest heißt es: Level 5 erreicht. Meine Schwiegermutter hat es vorausgesagt, und die liegt sonst immer falsch.",
+        "figure": { "nickname": "Ada_Krisenfest", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Applaus für Esc_Frida"
+        "headline": "Ada_Krisenfest hat es geschafft"
       },
       {
-        "kind": "scandal",
-        "mood": "angry",
-        "text": "Billig Laden wollte heute groß rauskommen. Die Gewerbeaufsicht fand vierzig leere Pizzakartons, einen schlafenden Buchhalter und null Qualitätskontrolle. Dirk_Billig erklärte, das gehöre zum Konzept. Die Kundschaft erklärte, sie sei dann mal weg.",
-        "figure": { "nickname": "Dirk_Billig", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −19,2 %" }],
-        "headline": "Billig Laden blamiert sich bis auf die Knochen"
+        "kind": "hype",
+        "mood": "laughing",
+        "text": "Unfassbar, aber wahr: Sendeanstalt ist der Renner. Ein Kind hat im Schulaufsatz darüber geschrieben, die Klasse war begeistert. „Fernseher für Hunde“ geht weg wie warme Semmeln. Show_Chefin soll vor Freude geweint haben.",
+        "figure": { "nickname": "Show_Chefin", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "gain", "label": "Bekanntheit +21,6 %" }],
+        "headline": "Alle wollen Sendeanstalt"
       },
       {
         "kind": "nft",
-        "mood": "confused",
-        "text": "Aus der Welt der bunten Kästchen: Ben_Bieter hat sich „Neon Nacht“ von Nina_Neon für 30.000 € gegönnt. Immerhin kann man es nicht fallen lassen.",
+        "mood": "laughing",
+        "text": "Ben_Bieter zahlt 30.000 € für „Neon Nacht“, gemalt von Nina_Neon. Wer das kauft, kauft auch Luft in Dosen.",
         "figure": { "nickname": "Nina_Neon", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "„Neon Nacht“ wechselt den Besitzer"
+        "headline": "NFT-Wahnsinn um „Neon Nacht“"
       },
       {
         "kind": "winner",
         "mood": "proud",
-        "text": "11393,4 % Plus, 1.139.338 € Gewinn: Fixture_Neu zeigt dem Rest, wie es geht. Das Finanzamt hat bereits freundlich gewunken.",
+        "text": "11393,8 % Plus, 1.139.380 € Gewinn: Fixture_Neu zeigt dem Rest, wie es geht. Neid ist die ehrlichste Form der Anerkennung, also bitte sehr.",
         "figure": { "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] },
         "effects": [],
         "headline": "Fixture_Neu schwimmt im Geld"
@@ -50,49 +50,42 @@
       {
         "kind": "gossip",
         "mood": "proud",
-        "text": "Ich fasse es nicht, aber es stimmt. Fiona_Fabrik meldet: Fiona Werke gegründet. So, und jetzt alle anderen: Schämt euch.",
-        "figure": { "nickname": "Fiona_Fabrik", "avatar_key": "rookie", "accessories": [] },
+        "text": "Bitte festhalten: Level 5 erreicht, und zwar bei Fixture_Lieferant. Die Konkurrenz darf sich gern ein Beispiel nehmen, ihr Luschen.",
+        "figure": { "nickname": "Fixture_Lieferant", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Na so was: Fiona_Fabrik"
+        "headline": "Applaus für Fixture_Lieferant"
       },
       {
-        "kind": "hype",
+        "kind": "scandal",
+        "mood": "shocked",
+        "text": "Bei Banner Werk brennt die Hütte. Ein Kunde hat das Produkt tatsächlich benutzt und das Ergebnis im Internet gezeigt. Bea_Banner spricht von einem Missverständnis. Zur Erinnerung, das Geschäftsmodell lautet: „Fahnen für Vereine“.",
+        "figure": { "nickname": "Bea_Banner", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −19,1 %" }],
+        "headline": "Banner Werk: Chef Bea_Banner unter Beschuss"
+      },
+      {
+        "kind": "sector",
         "mood": "proud",
-        "text": "Rang Laden räumt ab. Ein Promi wurde mit dem Produkt gesehen, vermutlich aus Versehen. Carla_Rang hängt sich das gerahmt ins Büro. Die Kundschaft rennt die Tür ein.",
-        "figure": { "nickname": "Carla_Rang", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "gain", "label": "Bekanntheit +19,1 %" }],
-        "headline": "Ritterschlag für Rang Laden"
-      },
-      {
-        "kind": "ramble",
-        "mood": "smug",
-        "text": "Ich habe es aus dritter Hand, also stimmt es: Donald Trump hat angeblich heimlich Helix Robotik gekauft. Quelle: der Schwager meines Friseurs, und der irrt sich nie zweimal am selben Tag. Die Anleger rennen hinterher, plus 5,2 %.",
-        "effects": [{ "tone": "gain", "label": "HLX +5,2 %" }],
-        "headline": "Promi-Alarm bei Helix Robotik"
-      },
-      {
-        "kind": "tasks",
-        "mood": "angry",
-        "text": "Ein Fernsehkoch hat erklärt, man könne Geld auch behalten. Offene Aufgaben bringen 27,5 % weniger. Durchhalten, es wird auch wieder schlechter.",
-        "effects": [{ "tone": "loss", "label": "Aufgaben −27,5 %" }],
-        "headline": "Flaute bei den Aufträgen"
+        "text": "Die ganze Branche Einzelhandel steigt um 9,3 %. Ein Minister hat die Branche gelobt, er meinte allerdings eine andere. So funktioniert Wirtschaft, liebe Kinder.",
+        "effects": [{ "tone": "gain", "label": "Einzelhandel +9,3 %" }],
+        "headline": "Die Branche Einzelhandel dreht durch"
       },
       {
         "kind": "stock",
-        "mood": "smug",
-        "text": "Neues von Methusalem Bio: Ein Wahrsager auf dem Jahrmarkt hat der Firma eine goldene Zukunft vorausgesagt. Niemand weiß, ob es stimmt, alle kaufen trotzdem. Plus 6,8 %.",
-        "effects": [{ "tone": "gain", "label": "MTH +6,8 %" }],
-        "headline": "Methusalem Bio: Gerücht treibt den Kurs"
+        "mood": "proud",
+        "text": "Ein Wahrsager auf dem Jahrmarkt hat der Firma eine goldene Zukunft vorausgesagt. Die Börse feiert: Orbitfracht steigt um 11,7 %. Wer nicht dabei ist, darf sich jetzt ärgern.",
+        "effects": [{ "tone": "gain", "label": "OFR +11,7 %" }],
+        "headline": "Kursrakete Orbitfracht"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Ein Vögelchen hat mir gezwitschert: SolarFuchs dürfte in der kommenden Stunde nach oben gehen. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
-        "effects": [{ "tone": "neutral", "label": "SFX ↑ Tipp" }],
-        "headline": "Vom Flurfunk: SolarFuchs"
+        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Volta Energie AG geht bald nach unten. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
+        "effects": [{ "tone": "neutral", "label": "VLT ↓ Tipp" }],
+        "headline": "Der heiße Draht: Volta Energie AG"
       }
     ],
-    "started_at": "2026-11-15T19:57:14.775113+00:00"
+    "started_at": "2026-11-15T20:05:45.724273+00:00"
   },
   "viewers": 17,
   "audience": [
@@ -110,5 +103,5 @@
     { "me": false, "friend": false, "nickname": "Bat_Crowd6", "avatar_key": "rookie", "accessories": [] }
   ],
   "upcoming": null,
-  "next_airs_at": "2026-11-15T20:00:00+00:00"
+  "next_airs_at": "2026-11-15T21:00:00+00:00"
 }

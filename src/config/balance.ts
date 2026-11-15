@@ -836,6 +836,7 @@ export interface BalanceConfig {
   readonly property: PropertyConfig;
   /** Renting out places in the own home, Wohnwert (ADR-158), formulas in src/lib/sim/rentals.ts. */
   readonly rentals: RentalsConfig;
+  readonly livingBonus: LivingBonusConfig;
   readonly social: SocialConfig;
   /** Crises and chances of player companies (ADR-091), catalog in company-events.ts. */
   readonly companyEvents: CompanyEventsConfig;
@@ -911,6 +912,13 @@ export interface PropertyConfig {
   readonly tradeInBps: number;
   /** Furniture and cars can be sold back for this share of the price. */
   readonly resaleBps: number;
+  /**
+   * Furniture costs more in bigger homes (ADR-161): catalogue price x this share, by the home the player lives in
+   * when buying (no home: the flat). The piece keeps this list price; the Wohnwert counts it.
+   */
+  readonly furniturePriceBps: Readonly<Record<PropertyTier, number>>;
+  /** Placed furniture is part of the home: it counts at this share of the price paid in the home's value (ADR-161). */
+  readonly furnishedValueBps: number;
   /** Floor materials are bought once, then usable in every home. */
   readonly floors: Readonly<Record<FloorMaterial, number>>;
   /** Wall colours (free to choose). */
@@ -927,11 +935,12 @@ export interface RentalsConfig {
   readonly baseRentCentsPerHour: Readonly<Record<PropertyTier, number>>;
   /** The fair rent at Wohnwert 0, as a share of the reference rent (linear up to 100 % at Wohnwert 100). */
   readonly fairMinShareBps: number;
-  /** The owner's price per hour: at least this share of the reference rent (and at least minPriceCents) ... */
-  readonly minPriceBps: number;
+  /**
+   * The owner sets the price freely (ADR-161): per hour at least minPriceCents and at most maxPriceCentsPerHour
+   * (a safety limit, far above any fair rent). A day costs 24 hours.
+   */
   readonly minPriceCents: number;
-  /** ... and at most this share of the fair rent. A day costs 24 hours. */
-  readonly maxPriceBps: number;
+  readonly maxPriceCentsPerHour: number;
   readonly periods: readonly RentPeriod[];
   /** Every tenancy runs at least this long; notice ends it at the first period end after noticeHours. */
   readonly minHours: number;
@@ -977,6 +986,21 @@ export interface RentalsConfig {
     readonly styleMinPieces: number;
     readonly floorPoints: Readonly<Record<FloorMaterial, number>>;
   };
+}
+
+/** Bonus for living in a home, every hour (ADR-161). */
+export interface LivingBonusConfig {
+  /** Money per hour for the owner at Wohnwert 100. */
+  readonly centsPerHour: Readonly<Record<PropertyTier, number>>;
+  /** Base XP per hour for the owner at Wohnwert 100 (the XP factor applies on top). */
+  readonly xpPerHour: Readonly<Record<PropertyTier, number>>;
+  /** At Wohnwert 0 the bonus is this share of the full bonus, rising linearly to 100 % at Wohnwert 100. */
+  readonly minShareBps: number;
+  /** A tenant gets this share of the bonus of the home he lives in, and never more money than his rent per hour. */
+  readonly tenantShareBps: number;
+  /** Only players who used the game in the last days get the bonus. */
+  readonly activeDays: number;
+  readonly paymentsKeepDays: number;
 }
 
 /** Pixel artworks, gallery and auctions (ADR-080, docs/ARTWORKS.md). */
@@ -2594,6 +2618,8 @@ export const BALANCE = {
     ],
     tradeInBps: 5_000,
     resaleBps: 4_000,
+    furniturePriceBps: { flat: 10_000, apartment: 12_500, house: 15_000, villa: 20_000, luxury_villa: 30_000 },
+    furnishedValueBps: 6_000,
     floors: {
       laminate: 0,
       carpet: 150_000,
@@ -2626,9 +2652,8 @@ export const BALANCE = {
     places: { flat: 1, apartment: 2, house: 3, villa: 4, luxury_villa: 6 },
     baseRentCentsPerHour: { flat: 3_000, apartment: 6_000, house: 15_000, villa: 40_000, luxury_villa: 100_000 },
     fairMinShareBps: 2_000,
-    minPriceBps: 500,
     minPriceCents: 100,
-    maxPriceBps: 15_000,
+    maxPriceCentsPerHour: 10_000_000,
     periods: ["hour", "day"],
     minHours: 24,
     noticeHours: 12,
@@ -2679,6 +2704,14 @@ export const BALANCE = {
       styleMinPieces: 6,
       floorPoints: { laminate: 0, carpet: 3, tiles: 4, parquet: 6, stone: 7, marble: 9, gold: 10 },
     },
+  },
+  livingBonus: {
+    centsPerHour: { flat: 2_000, apartment: 5_000, house: 12_000, villa: 30_000, luxury_villa: 80_000 },
+    xpPerHour: { flat: 3, apartment: 4, house: 6, villa: 8, luxury_villa: 10 },
+    minShareBps: 4_000,
+    tenantShareBps: 5_000,
+    activeDays: 3,
+    paymentsKeepDays: 30,
   },
 } as const satisfies BalanceConfig;
 

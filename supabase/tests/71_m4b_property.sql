@@ -96,7 +96,7 @@ select tests.assert(
   (:'d_view'::jsonb - 'rental') = jsonb_build_object(
     'property', jsonb_build_object('owner', 'Neo_Neuling', 'tier', null, 'width', 0, 'height', 0, 'garage_slots', 0,
                                    'wall_color', '#f3efe4', 'floor', 'laminate', 'floors_owned', '["laminate"]'::jsonb,
-                                   'placed', '[]'::jsonb, 'garage', '[]'::jsonb, 'value_cents', 0),
+                                   'placed', '[]'::jsonb, 'garage', '[]'::jsonb, 'value_cents', 0, 'furnishing_cents', 0),
     'inventory', '{"furniture": [], "cars": []}'::jsonb)
   and not exists (select 1 from public.player_homes where player_id = :d),
   'get_property(): a player without a home: tier null, 0 x 0, laminate, first wall colour, empty inventory (no row written)');
@@ -130,7 +130,8 @@ select tests.assert(
   and tests.cash(:a) = :a0 - 2500000 and tests.households() = :h0 + 2500000
   and :'flat1'::jsonb -> 'property' = jsonb_build_object('owner', 'Hanna_Haus', 'tier', 'flat', 'width', 8, 'height', 6, 'garage_slots', 0,
                                    'wall_color', '#f3efe4', 'floor', 'laminate', 'floors_owned', '["laminate"]'::jsonb,
-                                   'placed', '[]'::jsonb, 'garage', '[]'::jsonb, 'value_cents', 1250000)
+                                   'placed', '[]'::jsonb, 'garage', '[]'::jsonb, 'value_cents', 1250000,
+                                   'furnishing_cents', 0)
   and :'flat1'::jsonb -> 'inventory' = '{"furniture": [], "cars": []}'::jsonb
   and (select count(*) from public.ledger_transactions t where t.kind = 'lifestyle_purchase' and t.initiated_by = :a) = 1,
   'buy_home(flat): 25.000 EUR to the households (once, replay-safe), 8 x 6, value = 50 % trade-in');
@@ -216,7 +217,7 @@ select tests.assert(
   and :'lay1'::jsonb #>> '{property,wall_color}' = '#2f5fd0'
   and (select x = 7 and y = 0 and rot = 90 and placed from public.player_furniture where id = :'sofa2')
   and exists (select 1 from jsonb_array_elements(:'lay1'::jsonb #> '{property,placed}') e
-               where e = jsonb_build_object('id', :'rug', 'item_key', 'rug_wool', 'x', 0, 'y', 0, 'rot', 0))
+               where e = jsonb_build_object('id', :'rug', 'item_key', 'rug_wool', 'x', 0, 'y', 0, 'rot', 0, 'value_cents', 65000))
   and not exists (select 1 from jsonb_array_elements(:'lay1'::jsonb #> '{inventory,furniture}') e where e ->> 'id' in (:'sofa1', :'bed')),
   'save_layout(): rug under the sofa is fine, rotation 90 swaps the size, wall colour stored in lower case; placed pieces leave the inventory');
 -- the next layout replaces the old one completely
@@ -254,9 +255,13 @@ select tests.assert(
   and :'fl2'::jsonb #> '{property,floors_owned}' = '["laminate", "parquet"]'::jsonb
   and :'fl3'::jsonb #> '{property,floors_owned}' = '["laminate", "parquet"]'::jsonb
   and :'lay3'::jsonb #>> '{property,floor}' = 'parquet' and :'lay3'::jsonb #>> '{property,wall_color}' = '#ffd15c'
-  and (:'lay3'::jsonb #>> '{property,value_cents}')::bigint = (:'fl3'::jsonb #>> '{property,value_cents}')::bigint
-  and (:'fl1'::jsonb #>> '{property,value_cents}')::bigint - (:'bf'::jsonb #>> '{property,value_cents}')::bigint = 240000,
-  'buy_floor(): parquet costs 6.000 EUR once (replay and second purchase free), laminate is free; the floor can be used; value + 40 %');
+  -- ADR-161: placed pieces count at 60 % instead of 40 % of their price in the home value: lay2 placed rug, sofas and
+  -- tables (825.000 cents, + 165.000), lay3 adds the bed (150.000 cents, + 30.000)
+  and (:'lay3'::jsonb #>> '{property,value_cents}')::bigint = (:'fl3'::jsonb #>> '{property,value_cents}')::bigint + 30000
+  and (:'lay3'::jsonb #>> '{property,furnishing_cents}')::bigint = 585000
+  and (:'fl3'::jsonb #>> '{property,furnishing_cents}')::bigint = 495000
+  and (:'fl1'::jsonb #>> '{property,value_cents}')::bigint - (:'bf'::jsonb #>> '{property,value_cents}')::bigint = 240000 + 165000,
+  'buy_floor(): parquet costs 6.000 EUR once (replay and second purchase free), laminate is free; the floor can be used; value + 40 %; placed furniture adds 60 %');
 
 -- =============================================================================
 -- G. Selling: inventory only, 40 % back from the households

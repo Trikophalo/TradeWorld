@@ -10,12 +10,13 @@ import { Card } from "@/components/ui/card";
 import { Countdown } from "@/components/ui/countdown";
 import { PlayerFigure } from "@/components/ui/player-figure";
 import { Segmented } from "@/components/ui/segmented";
+import { Field } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Slider } from "@/components/ui/slider";
 import { toast } from "@/components/ui/toast";
 import { BALANCE } from "@/config/balance";
 import { TILE } from "@/config/furniture";
 import { useGameErrorText } from "@/features/game/errors";
+import { parseEuroCents } from "@/features/market/order-schema";
 import { engine } from "@/features/game/store";
 import type { OwnTenancy, RentalsState, RentPeriodKey } from "@/features/game/types";
 import { formatMoney } from "@/lib/format";
@@ -28,20 +29,30 @@ import { tenantLook } from "../tenants";
 import { RoomView } from "./room-view";
 import { WohnwertMeter } from "./wohnwert-meter";
 
-const STEP_CENTS = 100;
 const REASONS = ["notice_tenant", "notice_owner", "unpaid", "ai_left", "ai_unhappy", "account_reset"] as const;
 type Reason = (typeof REASONS)[number];
 
-/** Rounds a slider position to whole euros inside the allowed range. */
-function priceAt(ratio: number, min: number, max: number): number {
-  if (max <= min) return min;
-  const raw = min + ratio * (max - min);
-  return Math.min(max, Math.max(min, Math.round(raw / STEP_CENTS) * STEP_CENTS));
+/** Quick picks as a share of the fair rent (bps); the owner may type any price (ADR-161). */
+const QUICK = [
+  { key: "half", bps: 5_000 },
+  { key: "fair", bps: 10_000 },
+  { key: "more", bps: 15_000 },
+  { key: "double", bps: 20_000 },
+] as const;
+
+/** Cents as an editable euro amount ("41,40"). */
+const euros = (cents: number) =>
+  (cents / 100).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false });
+
+/** A quick pick: a share of the fair rent, inside the allowed range. */
+function quickPrice(fairCents: number, bps: number, min: number, max: number): number {
+  const raw = Math.round((fairCents * bps) / 10_000);
+  return Math.min(max, Math.max(min, raw));
 }
 
 /**
- * Renting out places in the own home (ADR-158): the Wohnwert, the offer (per hour or per day, price within the
- * limits), the AI demand it creates, the tenants with notice, and what came in.
+ * Renting out places in the own home (ADR-158): the Wohnwert, the offer (per hour or per day, the price set freely by
+ * the owner, ADR-161), the AI demand it creates, the tenants with notice, and what came in.
  */
 export function RentalsPanel() {
   const t = useTranslations("rentals");
@@ -79,15 +90,16 @@ function OfferCard({ rentals }: { rentals: RentalsState }) {
   const offer = rentals.offer;
   const [period, setPeriod] = useState<RentPeriodKey>(offer?.period ?? "hour");
   const limits = home.limits[period];
-  const initialRatio = (p: RentPeriodKey) => {
+  const initialText = (p: RentPeriodKey) => {
     const l = home.limits[p];
-    const price = offer && offer.period === p ? offer.priceCents : l.fairCents;
-    return l.maxCents > l.minCents ? (price - l.minCents) / (l.maxCents - l.minCents) : 0;
+    return euros(offer && offer.period === p ? offer.priceCents : Math.max(l.minCents, l.fairCents));
   };
-  const [ratio, setRatio] = useState(() => initialRatio(period));
+  const [text, setText] = useState(() => initialText(period));
   const [state, setState] = useState<ButtonState>("idle");
-  const price = priceAt(ratio, limits.minCents, limits.maxCents);
-  const chance = aiTenantChanceBps(home.tier, home.wohnwert.total, hourlyPrice(price, period));
+  const parsed = parseEuroCents(text);
+  const valid = parsed !== null && parsed >= limits.minCents && parsed <= limits.maxCents;
+  const price = valid ? parsed : limits.minCents;
+  const chance = valid ? aiTenantChanceBps(home.tier, home.wohnwert.total, hourlyPrice(price, period)) : 0;
   const demand = demandLevel(chance);
   const open = offer?.isOpen ?? false;
   const changed = !offer || offer.period !== period || offer.priceCents !== price;
@@ -124,7 +136,7 @@ function OfferCard({ rentals }: { rentals: RentalsState }) {
             value={period}
             onValueChange={(p) => {
               setPeriod(p);
-              setRatio(initialRatio(p));
+              setText(initialText(p));
             }}
             options={BALANCE.rentals.periods.map((p) => ({ value: p, label: t(`periods.${p}`) }))}
             label={t("periodLabel")}
@@ -132,33 +144,46 @@ function OfferCard({ rentals }: { rentals: RentalsState }) {
             block
           />
           <div className="space-y-2">
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="label-pixel text-fg-2">{t("priceLabel")}</span>
-              <span className="nums text-lg font-semibold text-fg-1" data-testid="offer-price">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="min-w-40 flex-1">
+                <Field
+                  label={t("priceInput")}
+                  inputMode="decimal"
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  error={
+                    valid
+                      ? undefined
+                      : t("priceInvalid", { min: formatMoney(limits.minCents), max: formatMoney(limits.maxCents) })
+                  }
+                  data-testid="offer-price-input"
+                />
+              </div>
+              <span className="pb-3 nums text-lg font-semibold text-fg-1" data-testid="offer-price">
                 {formatMoney(price)} <span className="text-sm font-normal text-fg-3">{t(`per.${period}`)}</span>
               </span>
             </div>
-            <Slider
-              value={ratio}
-              onValueChange={setRatio}
-              label={t("priceLabel")}
-              valueText={formatMoney(price)}
-              marks={[0.5]}
-            />
-            <div className="flex flex-wrap justify-between gap-x-3 nums text-2xs text-fg-3">
-              <span>{formatMoney(limits.minCents)}</span>
-              <button
-                type="button"
-                className="rounded-xs text-accent focus-ring hover:underline"
-                onClick={() => {
-                  const l = home.limits[period];
-                  setRatio(l.maxCents > l.minCents ? (l.fairCents - l.minCents) / (l.maxCents - l.minCents) : 0);
-                }}
-              >
-                {t("fair", { amount: formatMoney(limits.fairCents) })}
-              </button>
-              <span>{formatMoney(limits.maxCents)}</span>
+            <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t("quickLabel")}>
+              {QUICK.map((q) => {
+                const cents = quickPrice(limits.fairCents, q.bps, limits.minCents, limits.maxCents);
+                return (
+                  <button
+                    key={q.key}
+                    type="button"
+                    onClick={() => setText(euros(cents))}
+                    aria-pressed={valid && price === cents}
+                    className={cn(
+                      "rounded-pill px-3 py-1.5 nums text-xs focus-ring transition duration-fast active:scale-95",
+                      valid && price === cents ? "bg-accent text-on-accent" : "bg-surface-2 text-fg-2 hover:text-fg-1",
+                    )}
+                    data-testid={`offer-quick-${q.key}`}
+                  >
+                    {q.key === "fair" ? t("fair", { amount: formatMoney(cents) }) : t(`quick.${q.key}`)}
+                  </button>
+                );
+              })}
             </div>
+            <p className="text-xs text-pretty text-fg-3">{t("priceFree", { min: formatMoney(limits.minCents) })}</p>
           </div>
           <p className="text-sm text-fg-2" data-testid="ai-demand" data-demand={demand}>
             {t("demandLabel")}{" "}
@@ -174,7 +199,7 @@ function OfferCard({ rentals }: { rentals: RentalsState }) {
           </p>
           <div className="flex flex-wrap gap-2">
             {(!open || changed) && (
-              <Button state={state} onClick={() => void submit(true)} data-testid="offer-submit">
+              <Button state={state} disabled={!valid} onClick={() => void submit(true)} data-testid="offer-submit">
                 {open ? t("savePrice") : t("offer")}
               </Button>
             )}

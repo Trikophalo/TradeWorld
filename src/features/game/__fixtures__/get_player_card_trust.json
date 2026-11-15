@@ -1,7 +1,7 @@
 {
   "job": null,
-  "tag": "RLJ7",
-  "rank": 142,
+  "tag": "FENL",
+  "rank": 143,
   "level": 6,
   "trust": { "band": "shaky", "kept": 0, "score": 41, "broken": 1 },
   "company": { "name": "Fixture Lieferwerk", "ticker": null },
@@ -11,7 +11,7 @@
   "top_skills": [],
   "accessories": [],
   "streak_days": 0,
-  "member_since": "2026-11-15T19:57:13.149175+00:00",
+  "member_since": "2026-11-15T20:05:44.141189+00:00",
   "branch_scores": {
     "it": 0,
     "law": 0,

@@ -157,7 +157,7 @@
     "close": "Tresor schließen",
     "sourcesTitle": "Deine Einnahmequellen",
     "perHour": "{amount}/Std.",
-    "sourcesHint": "Grundeinkommen sammelt sich im Tresor. Lohn und CEO-Auszahlung gehen jede Stunde direkt auf dein Konto.",
+    "sourcesHint": "Grundeinkommen sammelt sich im Tresor. Lohn, CEO-Auszahlung und Wohnbonus gehen jede Stunde direkt auf dein Konto.",
     "sources": {
       "basic": "Grundeinkommen",
       "basicDetail": "Sammelt sich hier, bis zu {hours} Stunden",
@@ -166,7 +166,11 @@
       "ceo": "CEO-Auszahlung",
       "ceoNone": "Mit einer eigenen Firma zahlst du dir einen Anteil vom Gewinn aus.",
       "ceoOff": "{name}: Auszahlung steht auf 0 %. Stell sie in der Firma ein.",
-      "ceoOn": "{name}: {percent} % vom Gewinn · heute {today}"
+      "ceoOn": "{name}: {percent} % vom Gewinn · heute {today}",
+      "home": "Wohnbonus",
+      "homeOwn": "{tier} · Wohnwert {wohnwert}",
+      "homeTenant": "Zur Miete bei {owner} · Wohnwert {wohnwert}",
+      "homeNone": "Mit einem Zuhause oder zur Miete: jede Stunde Geld und XP."
     },
     "upgrade": "Tresor vergrößern"
   },
@@ -802,7 +806,7 @@
     "not_friends": "Das geht nur bei Freunden.",
     "poke_too_soon": "Nicht so stürmisch! Denselben Freund kannst du erst in ein paar Minuten wieder anstupsen.",
     "poke_daily_limit": "Genug gestupst für heute. Morgen geht es weiter.",
-    "rent_price_out_of_range": "Dieser Preis liegt außerhalb der erlaubten Spanne für dein Zuhause.",
+    "rent_price_out_of_range": "Diese Miete geht nicht: Sie muss über 0 liegen und unter der Sicherheitsgrenze bleiben.",
     "rent_own_home": "Im eigenen Zuhause kannst du nicht zur Miete wohnen.",
     "rental_not_offered": "Dieses Zuhause wird gerade nicht vermietet.",
     "rental_full": "Alle Plätze sind schon vergeben.",
@@ -2849,6 +2853,8 @@
     "lockedText": "Mit diesem Level kaufst du deine erste Wohnung und richtest sie ein.",
     "yourHome": "Dein Zuhause",
     "value": "Wert",
+    "furnishingValue": "davon Einrichtung {amount}",
+    "valueHint": "Aufgestellte Möbel zählen mit {percent} % ihres Preises zum Wert deines Zuhauses, Möbel im Inventar mit {resale} %.",
     "size": "{w} × {h} Felder",
     "garageSlots": "{count, plural, one {Garage für # Auto} other {Garage für # Autos}}",
     "noGarage": "Keine Garage",
@@ -2896,6 +2902,8 @@
     },
     "shopTitle": "Möbelhaus",
     "shopIntro": "Alles, was eine Wohnung braucht – und vieles, was sie nicht braucht. Gekauftes landet im Inventar.",
+    "shopPriceBase": "Grundpreise. Je größer dein Zuhause, desto teurer die Möbel: bis zum {max}-Fachen in der {top}. Dafür zählen teurere Stücke mehr für den Wohnwert.",
+    "shopPriceFactor": "Preise in deinem Zuhause ({tier}): das {factor}-Fache des Grundpreises. Je größer das Zuhause, desto teurer die Einrichtung; dafür zählen die Stücke mehr für den Wohnwert.",
     "category": "Kategorie",
     "categories": {
       "all": "Alles",
@@ -7071,13 +7079,23 @@
     "statusOpen": "Angebot offen",
     "statusClosed": "Geschlossen",
     "statusNone": "Noch kein Angebot",
-    "offerIntro": "Dein Zuhause hat {places, plural, one {einen Platz} other {# Plätze}} für Mieter, du wohnst weiter selbst dort. Je schöner eingerichtet, desto schneller ziehen KI-Mieter ein und desto mehr darfst du verlangen.",
+    "offerIntro": "Dein Zuhause hat {places, plural, one {einen Platz} other {# Plätze}} für Mieter, du wohnst weiter selbst dort. Den Preis legst du selbst fest. Je schöner eingerichtet und je günstiger, desto schneller ziehen KI-Mieter ein.",
     "periods": {
       "hour": "Pro Stunde",
       "day": "Pro Tag"
     },
     "periodLabel": "Abrechnung",
     "priceLabel": "Miete je Platz",
+    "priceInput": "Miete je Platz in €",
+    "priceFree": "Du entscheidest frei, ab {min}. Teurer als fair heißt weniger KI-Mieter; ab dem Doppelten zieht keiner mehr ein. Spieler sehen den Preis und entscheiden selbst.",
+    "priceInvalid": "Bitte eine Miete zwischen {min} und {max} eingeben.",
+    "quickLabel": "Schnellwahl",
+    "quick": {
+      "half": "½ fair",
+      "fair": "Fair",
+      "more": "1,5 × fair",
+      "double": "2 × fair"
+    },
     "per": {
       "hour": "pro Stunde",
       "day": "pro Tag"
@@ -7313,5 +7331,18 @@
       "takeOff": "Ausziehen",
       "locked": "Nur im Battle zu gewinnen"
     }
+  },
+  "living": {
+    "title": "Wohnbonus",
+    "perHour": "+{amount} und +{xp} XP pro Stunde",
+    "own": "Für dein Zuhause ({tier}, Wohnwert {wohnwert}).",
+    "tenant": "Als Mieter bei {owner} ({tier}, Wohnwert {wohnwert}): {share} % des Bonus, höchstens deine Miete pro Stunde.",
+    "paid": "Kommt jede volle Stunde direkt auf dein Konto, auch offline, solange du in den letzten {days} Tagen gespielt hast.",
+    "raiseTitle": "So steigt dein Wohnbonus",
+    "raiseWohnwert": "Richte schöner ein: Bei Wohnwert 100 gibt es hier +{amount} und +{xp} XP pro Stunde.",
+    "raiseTier": "Zieh größer: Ein Zuhause der Stufe {tier} bringt bis zu +{amount} und +{xp} XP pro Stunde.",
+    "raiseOwn": "Ein eigenes Zuhause bringt den vollen Bonus statt {share} %.",
+    "max": "Mehr geht nicht: größtes Zuhause, voller Wohnwert.",
+    "none": "Wer ein Zuhause hat oder zur Miete wohnt, bekommt jede Stunde Geld und XP. Je größer und schöner, desto mehr."
   }
 }

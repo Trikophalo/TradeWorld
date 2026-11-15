@@ -3195,19 +3195,18 @@ begin
 end;
 $do$;
 
--- ===== supabase/migrations/20261204004700_battle_enums.sql =====
+-- ===== supabase/migrations/20261204004200_living_bonus_enum.sql =====
 -- =============================================================================
--- NEXA · 4700 · Enum values for the news battles (ADR-160)
+-- NEXA · 4200 · Enum values for the living bonus (ADR-161)
 -- =============================================================================
--- A new enum value cannot be used in the transaction that adds it (SQLSTATE 55P04). The values live in their own
--- migration file; 20261204004720_news_battles.sql uses them only inside PL/pgSQL bodies, so update-to-latest.sql
--- (one transaction for everything) works as well.
---   xp_source      'battle'        XP prize of a news battle
---   ledger_tx_kind 'battle_prize'  money prize: households -> winner
+-- A new enum value cannot be used in the transaction that adds it (SQLSTATE 55P04), so the values get their own file
+-- before 20261204004300_living_bonus.sql, which uses them only inside PL/pgSQL bodies.
+--   ledger_tx_kind 'living_bonus'  households -> player cash, every hour a player lives in a home
+--   xp_source      'home_living'   XP of the living bonus
 -- Idempotent (identical copy in supabase/updates/).
 -- =============================================================================
 
-alter type public.xp_source add value if not exists 'battle';
-alter type public.ledger_tx_kind add value if not exists 'battle_prize';
+alter type public.ledger_tx_kind add value if not exists 'living_bonus';
+alter type public.xp_source add value if not exists 'home_living';
 
 commit;

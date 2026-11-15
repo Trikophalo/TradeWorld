@@ -1338,7 +1338,7 @@ const rentals = createRentalsEngine({
     return {
       tier: h?.tier ?? null,
       floor: h?.floor ?? "laminate",
-      itemKeys: (h?.furniture ?? []).filter((f) => f.placed).map((f) => f.itemKey),
+      items: (h?.furniture ?? []).filter((f) => f.placed).map((f) => ({ itemKey: f.itemKey, valueCents: f.listCents })),
     };
   },
   nickname: () => p().nickname,

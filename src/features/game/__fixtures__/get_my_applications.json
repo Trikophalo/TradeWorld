@@ -1,56 +1,56 @@
 {
   "applications": [
     {
-      "id": "04a3add5-72bc-4bd1-b8cb-70ce5eb1076f",
+      "id": "902075ba-4cf8-4736-bbde-17c54ee7ea00",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "073f1b14-b8a3-40c8-b45c-7e13c3ca8e3a",
+        "id": "27c7e7ae-7c08-4ed5-ba41-701af2fdaed1",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "2f91e3a4-088a-0592-9f21-88b83cae7bd8",
+          "id": "d21331b8-a414-66aa-de07-f036108fc91d",
           "logo": null,
-          "name": "SolarFuchs",
-          "color": "#FF8C42",
+          "name": "Nordlicht Logistik AG",
+          "color": "#7AA2F7",
           "is_ai": true,
-          "sector": "energy",
-          "ticker": "SFX"
+          "sector": "logistics",
+          "ticker": "NDL"
         },
-        "required": [{ "branch": "law", "min_score": 0 }],
-        "title_key": "law_intern",
+        "required": [{ "branch": "it", "min_score": 0 }],
+        "title_key": "it_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-15T19:57:10.875326+00:00",
-      "updated_at": "2026-11-15T19:57:10.87795+00:00",
-      "offer_expires_at": "2026-11-17T19:57:10.875326+00:00",
-      "salary_wish_cents_per_hour": 15000,
-      "offer_salary_cents_per_hour": 15000
+      "created_at": "2026-11-15T20:05:41.873104+00:00",
+      "updated_at": "2026-11-15T20:05:41.876288+00:00",
+      "offer_expires_at": "2026-11-17T20:05:41.873104+00:00",
+      "salary_wish_cents_per_hour": 15900,
+      "offer_salary_cents_per_hour": 15900
     },
     {
-      "id": "f6ba2a69-ef15-4eba-a800-ae59c9a9f8f0",
+      "id": "5dd9a64c-e088-4b6e-909f-58c6f8d2ca56",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "1efecafa-f81f-45ee-bc42-1bb590b22949",
+        "id": "62683b94-bd66-4774-b922-9a5d36d75485",
         "tier": "junior",
         "title": null,
         "company": {
-          "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
+          "id": "2fccb1cc-0894-a518-9538-769c751d9630",
           "logo": null,
-          "name": "QuantenSprung Labs",
-          "color": "#35D0BA",
+          "name": "Memeland Media",
+          "color": "#FF4FD8",
           "is_ai": true,
           "sector": "tech",
-          "ticker": "QSL"
+          "ticker": "MEM"
         },
         "required": [{ "branch": "it", "min_score": 2 }],
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-15T19:57:10.871093+00:00",
-      "updated_at": "2026-11-15T19:57:10.871093+00:00",
-      "offer_expires_at": "2026-11-17T19:57:10.871093+00:00",
+      "created_at": "2026-11-15T20:05:41.867992+00:00",
+      "updated_at": "2026-11-15T20:05:41.867992+00:00",
+      "offer_expires_at": "2026-11-17T20:05:41.867992+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

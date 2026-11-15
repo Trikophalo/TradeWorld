@@ -3,31 +3,31 @@
   "facts": {
     "staff": 1,
     "stage": 0,
-    "period": null,
-    "product": "courier",
+    "period": "quarter",
+    "product": "security_software",
     "max_staff": 2,
     "ai_workers": 0,
-    "quality_bps": null,
+    "quality_bps": 4125,
     "value_cents": 250000,
-    "profit_cents": null,
-    "awareness_bps": null,
-    "revenue_cents": null
+    "profit_cents": 0,
+    "awareness_bps": 3772,
+    "revenue_cents": 0
   },
   "company": {
-    "id": "b2510863-bbe7-44df-859b-849a933f3829",
-    "idea": "Fahrräder reparieren",
+    "id": "47dc3e33-a8f5-49e1-85aa-5515d1e7fce0",
+    "idea": "Günstige Kabel",
     "logo": null,
-    "name": "Fritz Fahrradwerk",
+    "name": "Billig Laden",
     "tier": "garage",
     "is_ai": false,
     "listed": false,
-    "sector": "logistics",
+    "sector": "tech",
     "ticker": null,
     "price_e4": null,
     "change_bps": null,
-    "founded_at": "2026-11-15T19:57:01.842355+00:00",
-    "brand_color": "#aa5500"
+    "founded_at": "2026-11-15T20:05:22.50614+00:00",
+    "brand_color": "#552211"
   },
-  "founder": { "tag": "DQUZ", "nickname": "Fritz_Firma", "avatar_key": "rookie" },
+  "founder": { "tag": "DJAF", "nickname": "Dirk_Billig", "avatar_key": "rookie" },
   "members": []
 }

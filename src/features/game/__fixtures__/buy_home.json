@@ -1,5 +1,12 @@
 {
-  "rental": { "places": 1, "renting": null, "tenants": [], "wohnwert": 0, "offer_open": false },
+  "rental": {
+    "places": 1,
+    "renting": null,
+    "tenants": [],
+    "wohnwert": 0,
+    "offer_open": false,
+    "living_bonus": { "xp": 1, "tier": "flat", "cents": 800, "owner": null, "source": "own", "wohnwert": 0 }
+  },
   "property": {
     "tier": "flat",
     "floor": "laminate",
@@ -11,7 +18,8 @@
     "wall_color": "#f3efe4",
     "value_cents": 1250000,
     "floors_owned": ["laminate"],
-    "garage_slots": 0
+    "garage_slots": 0,
+    "furnishing_cents": 0
   },
   "inventory": { "cars": [], "furniture": [] },
   "cost_cents": 2500000

@@ -44,8 +44,9 @@ grant execute on all functions in schema tests to public;
 select tests.assert(
   public.rental_fair_hour_cents('flat', 0) = 600 and public.rental_fair_hour_cents('flat', 50) = 1800
   and public.rental_fair_hour_cents('flat', 90) = 2760 and public.rental_fair_hour_cents('luxury_villa', 100) = 100000
-  and public.rental_limits('flat', 90, 'hour') = '{"min_cents": 150, "max_cents": 4140, "fair_cents": 2760}'::jsonb
-  and public.rental_limits('flat', 90, 'day') = '{"min_cents": 3600, "max_cents": 99360, "fair_cents": 66240}'::jsonb
+  -- ADR-161: the owner sets the price freely between 1 EUR per hour and the safety maximum
+  and public.rental_limits('flat', 90, 'hour') = '{"min_cents": 100, "max_cents": 10000000, "fair_cents": 2760}'::jsonb
+  and public.rental_limits('flat', 90, 'day') = '{"min_cents": 2400, "max_cents": 240000000, "fair_cents": 66240}'::jsonb
   and public.rental_ai_chance_bps('flat', 24, 100) = 0 and public.rental_ai_chance_bps('flat', 50, 1800) = 3000
   and public.rental_ai_chance_bps('flat', 100, 3000) = 6000 and public.rental_ai_chance_bps('flat', 100, 4500) = 3000
   and public.rental_ai_chance_bps('flat', 90, 150) = 10000
@@ -109,7 +110,7 @@ select tests.assert(
   and (:'r1'::jsonb #>> '{home,wohnwert,value_cents}')::bigint = 806000
   and (:'r1'::jsonb #>> '{home,wohnwert,coverage_bps}')::int = 3958
   and (:'r1'::jsonb #>> '{home,wohnwert,categories}')::int = 8
-  and :'r1'::jsonb #> '{home,limits,hour}' = '{"min_cents": 150, "max_cents": 4140, "fair_cents": 2760}'::jsonb
+  and :'r1'::jsonb #> '{home,limits,hour}' = '{"min_cents": 100, "max_cents": 10000000, "fair_cents": 2760}'::jsonb
   and (:'saved'::jsonb #>> '{rental,wohnwert}')::int = 90
   and tests.r9q_status(:o, 'm_wohnwert_60') = 'completed:60',
   'home_wohnwert(): empty 0, the furnished flat 90 with the same parts as wohnwert() in TS; the save completes "Wohnwert 60"');
@@ -132,10 +133,10 @@ select tests.throws_key($$select public.set_rental_offer(gen_random_uuid(), 'hou
   'set_rental_offer(): only from the property level');
 reset role;
 select tests.login_as('authenticated', :o);
-select tests.throws_key($$select public.set_rental_offer(gen_random_uuid(), 'hour', 149, true)$$, 'rent_price_out_of_range',
-  'set_rental_offer(): not below 5 % of the reference rent (NX140)');
-select tests.throws_key($$select public.set_rental_offer(gen_random_uuid(), 'hour', 4141, true)$$, 'rent_price_out_of_range',
-  'set_rental_offer(): not above 150 % of the fair rent');
+select tests.throws_key($$select public.set_rental_offer(gen_random_uuid(), 'hour', 99, true)$$, 'rent_price_out_of_range',
+  'set_rental_offer(): not below 1 EUR per hour (NX140, ADR-161)');
+select tests.throws_key($$select public.set_rental_offer(gen_random_uuid(), 'hour', 10000001, true)$$, 'rent_price_out_of_range',
+  'set_rental_offer(): not above the safety maximum (ADR-161)');
 select tests.throws_key($$select public.set_rental_offer(gen_random_uuid(), 'week', 500, true)$$, 'invalid_argument',
   'set_rental_offer(): per hour or per day only');
 select public.set_rental_offer(:rq, 'hour', 4140, true) as off1 \gset
@@ -147,7 +148,7 @@ select tests.assert(
   and :'off1b'::jsonb = :'off1'::jsonb
   and tests.r9q_status(:o, 'm_rent_offer') = 'completed:1'
   and not public.mission_doable(:o, 'm_rent_offer', 'rental_offered'),
-  'set_rental_offer(): 41,40 € per hour (the maximum), AI chance 27 %, replayed per request; "first offer" done');
+  'set_rental_offer(): 41,40 € per hour (150 % of the fair rent), AI chance 27 %, replayed per request; "first offer" done');
 
 -- =============================================================================
 -- D. AI tenants: chance per free place, paid by the households, then every period

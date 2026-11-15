@@ -4,7 +4,15 @@
     "renting": { "tier": "house", "owner": "Fixture_Heim" },
     "tenants": [],
     "wohnwert": 0,
-    "offer_open": false
+    "offer_open": false,
+    "living_bonus": {
+      "xp": 1,
+      "tier": "house",
+      "cents": 1000,
+      "owner": "Fixture_Heim",
+      "source": "tenant",
+      "wohnwert": 20
+    }
   },
   "property": {
     "tier": null,
@@ -17,7 +25,8 @@
     "wall_color": "#f3efe4",
     "value_cents": 0,
     "floors_owned": ["laminate"],
-    "garage_slots": 0
+    "garage_slots": 0,
+    "furnishing_cents": 0
   },
   "inventory": { "cars": [], "furniture": [] }
 }

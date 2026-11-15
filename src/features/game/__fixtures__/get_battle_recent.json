@@ -1,10 +1,10 @@
 {
-  "now": "2026-11-15T19:57:14.944595+00:00",
+  "now": "2026-11-15T20:05:45.937865+00:00",
   "battle": {
     "id": 13,
     "kind": null,
     "seed": null,
-    "prize": { "kind": "money", "cents": 525000 },
+    "prize": { "xp": 2900, "kind": "xp" },
     "joined": false,
     "params": null,
     "result": null,
@@ -12,7 +12,7 @@
     "status": "open",
     "ends_at": null,
     "players": [],
-    "opened_at": "2026-11-15T19:57:14.944595+00:00",
+    "opened_at": "2026-11-15T20:05:45.937865+00:00",
     "started_at": null,
     "finished_at": null,
     "max_players": 10,
@@ -23,7 +23,7 @@
   "recent": {
     "id": 12,
     "kind": "floor",
-    "seed": 3946827290,
+    "seed": 559157339,
     "prize": { "kind": "money", "cents": 525000 },
     "joined": true,
     "params": {
@@ -68,13 +68,13 @@
       "prize": { "kind": "money", "cents": 525000 },
       "score": [1, 0, 0],
       "capped": false,
-      "ranking": [0, 1, 2],
+      "ranking": [0, 2, 1],
       "end_tick": 73,
       "winner_slot": 0
     },
     "rounds": null,
     "status": "finished",
-    "ends_at": "2026-11-15T19:57:13.937327+00:00",
+    "ends_at": "2026-11-15T20:05:44.928333+00:00",
     "players": [
       {
         "me": true,
@@ -88,7 +88,7 @@
       {
         "me": false,
         "left": false,
-        "rank": 2,
+        "rank": 3,
         "slot": 1,
         "nickname": "Fixture_Bat1",
         "avatar_key": "rookie",
@@ -97,16 +97,16 @@
       {
         "me": false,
         "left": false,
-        "rank": 3,
+        "rank": 2,
         "slot": 2,
         "nickname": "Fixture_Bat2",
         "avatar_key": "rookie",
         "accessories": []
       }
     ],
-    "opened_at": "2026-11-15T19:57:14.880402+00:00",
-    "started_at": "2026-11-15T19:55:54.937327+00:00",
-    "finished_at": "2026-11-15T19:57:14.937737+00:00",
+    "opened_at": "2026-11-15T20:05:45.854273+00:00",
+    "started_at": "2026-11-15T20:04:25.928333+00:00",
+    "finished_at": "2026-11-15T20:05:45.928785+00:00",
     "max_players": 10,
     "min_players": 3,
     "prize_wins_left": 2,

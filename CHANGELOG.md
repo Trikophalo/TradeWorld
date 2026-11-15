@@ -113,6 +113,10 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Wohnen lohnt sich (ADR-161):** Wer ein Zuhause hat oder zur Miete wohnt, bekommt jede Stunde einen Wohnbonus in Geld
+  und XP, mehr in größeren und schöner eingerichteten Zuhausen. Möbel kosten in größeren Zuhausen mehr, aufgestellt
+  steigern sie den Wert deines Zuhauses. Die Miete legst du jetzt frei fest.
+
 - **Das Büro lebt (ADR-156):** Auf deiner Job-Seite und auf der Seite deiner Firma stehen jetzt alle Kollegen als ihre
   angezogenen Spielfiguren am Schreibtisch, mit Namen. Wer gerade online ist, wippt, wer weg ist, schläft (zzz). Tipp
   auf eine Figur für das Profil. Unter dem Büro schreibst du „Sag was ins Büro …“: Deine Worte stehen zwei Minuten als

@@ -1,24 +1,32 @@
 {
-  "rental": { "places": 3, "renting": null, "tenants": [], "wohnwert": 6, "offer_open": false },
+  "rental": {
+    "places": 3,
+    "renting": null,
+    "tenants": [],
+    "wohnwert": 6,
+    "offer_open": false,
+    "living_bonus": { "xp": 2, "tier": "house", "cents": 5232, "owner": null, "source": "own", "wohnwert": 6 }
+  },
   "property": {
     "tier": "house",
     "floor": "parquet",
     "owner": "Fixture_Heim",
     "width": 13,
-    "garage": [{ "id": "0bfef2ce-afb0-49ea-9e2c-65d52453ff91", "slot": 0, "car_key": "car_electric" }],
+    "garage": [{ "id": "ad1d6b75-f07f-453f-957e-7fd4383b73a0", "slot": 0, "car_key": "car_electric" }],
     "height": 9,
     "placed": [],
     "wall_color": "#2f5fd0",
     "value_cents": 27843200,
     "floors_owned": ["laminate", "parquet"],
-    "garage_slots": 2
+    "garage_slots": 2,
+    "furnishing_cents": 0
   },
   "inventory": {
     "cars": [],
     "furniture": [
-      { "id": "9e656f19-ede3-442a-9831-8d4f384bd356", "item_key": "sofa_leather" },
-      { "id": "44e27e72-9111-45b7-9933-d7cebafb2136", "item_key": "rug_wool" },
-      { "id": "6c358fbe-06e9-41c8-943f-28b6ae5ea540", "item_key": "plant_small" }
+      { "id": "79aacfe2-55e3-4428-8744-f771d2fa604f", "item_key": "sofa_leather", "value_cents": 240000 },
+      { "id": "1bdd30d3-0665-433a-8a5e-107440c7c4f6", "item_key": "rug_wool", "value_cents": 65000 },
+      { "id": "e66d6eda-ecac-43ba-ad69-e6051b14c116", "item_key": "plant_small", "value_cents": 3000 }
     ]
   }
 }

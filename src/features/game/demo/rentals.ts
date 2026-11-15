@@ -1,6 +1,7 @@
 import { BALANCE, type FloorMaterial, type PropertyTier } from "@/config/balance";
 import { FURNITURE } from "@/config/furniture";
-import { layoutWohnwert } from "@/features/property/wohnwert";
+import { layoutWohnwert, type LayoutPiece } from "@/features/property/wohnwert";
+import { livingBonus, type LivingSituation } from "@/lib/sim/living";
 import { invalidPlacements, rotated, tierConfig, tierIndex, type Placement } from "@/lib/sim/property";
 import {
   aiStayHours,
@@ -55,12 +56,15 @@ export interface DemoRentalsState {
   earnedTotalCents: number;
   /** The demo player's own place at a made-up landlord. */
   renting: (DemoTenancy & { owner: string; xpTotal: number }) | null;
+  /** Living bonus (ADR-161): the last hour (start, ms) that is settled. */
+  livingHour?: number;
 }
 
 export interface RentalsHost {
   state(): DemoRentalsState | undefined;
   setState(value: DemoRentalsState): void;
-  home(): { tier: PropertyTier | null; floor: FloorMaterial; itemKeys: string[] };
+  /** The own home with the placed pieces (key and list price, ADR-161). */
+  home(): { tier: PropertyTier | null; floor: FloorMaterial; items: LayoutPiece[] };
   nickname(): string;
   avatarKey(): string;
   accessories(): string[];
@@ -220,6 +224,7 @@ function landlordProperty(l: Landlord): Property {
     placed: landlordLayout(l),
     garage: [],
     valueCents: 0,
+    furnishingCents: 0,
   };
 }
 
@@ -264,7 +269,7 @@ export function createRentalsEngine(host: RentalsHost) {
   };
   const W = () => {
     const h = host.home();
-    return h.tier ? layoutWohnwert(h.tier, h.floor, h.itemKeys) : null;
+    return h.tier ? layoutWohnwert(h.tier, h.floor, h.items) : null;
   };
   const rngFor = (s: DemoRentalsState, ...parts: (string | number)[]) => {
     s.seq += 1;
@@ -369,9 +374,53 @@ export function createRentalsEngine(host: RentalsHost) {
       }
       changed = true;
     }
+    if (payLivingBonus(s, now)) changed = true;
     const weekAgo = now - 7 * 24 * HOUR;
     s.payments = s.payments.filter((p) => p.at > weekAgo);
     if (changed) host.persist();
+  }
+
+  /** Where the demo player lives: the own home and the place rented at a made-up landlord (ADR-161). */
+  function situation(s: DemoRentalsState): LivingSituation {
+    const h = host.home();
+    const w = W();
+    const r = s.renting;
+    const landlord = r ? LANDLORDS.find((l) => l.owner === r.owner) : undefined;
+    return {
+      own: h.tier && w ? { tier: h.tier, wohnwert: w.total } : null,
+      rented:
+        r && landlord
+          ? {
+              tier: landlord.tier,
+              wohnwert: landlordWohnwert(landlord),
+              rentCentsPerHour: hourlyPrice(r.priceCents, r.period),
+            }
+          : null,
+    };
+  }
+
+  /**
+   * The living bonus as living_bonus_run_due() pays it: the running hour once, and the hours since the last look
+   * (as the server pays an active player every hour), at most livingBonus.activeDays back.
+   */
+  function payLivingBonus(s: DemoRentalsState, now: number): boolean {
+    const hour = Math.floor(now / HOUR) * HOUR;
+    const bonus = livingBonus(situation(s));
+    if (!bonus) {
+      // settled up to the previous hour: moving in pays the running hour at once, as on the server
+      s.livingHour = hour - HOUR;
+      return false;
+    }
+    const oldest = hour - (BALANCE.livingBonus.activeDays * 24 - 1) * HOUR;
+    let next = s.livingHour === undefined ? hour : Math.max(s.livingHour + HOUR, oldest);
+    let paid = false;
+    for (; next <= hour; next += HOUR) {
+      if (bonus.cents > 0) host.addCash(bonus.cents);
+      if (bonus.xp > 0) host.addXp(bonus.xp);
+      paid = true;
+    }
+    s.livingHour = hour;
+    return paid;
   }
 
   const me = (): Tenant => ({
@@ -475,6 +524,17 @@ export function createRentalsEngine(host: RentalsHost) {
       offerOpen: s.offer?.isOpen ?? false,
       tenants: s.tenancies.map((t) => aiTenant(t.name, t.startedAt, t.id)),
       renting: r && landlord ? { owner: r.owner, tier: landlord.tier } : null,
+      livingBonus: (() => {
+        const b = livingBonus(situation(s));
+        if (!b) return null;
+        const own = b.source === "own";
+        return {
+          ...b,
+          tier: own ? h.tier! : landlord!.tier,
+          wohnwert: own ? (W()?.total ?? 0) : landlordWohnwert(landlord!),
+          owner: own ? null : r!.owner,
+        };
+      })(),
     };
   }
 

@@ -1219,3 +1219,28 @@ Werte in `BALANCE.rentals`.
   Preises, sicher bei sehr günstigem Preis und Wohnwert ab etwa 86. Unter Wohnwert 25 niemand.
 - **Mieter-XP:** 5 Basis-XP je Stunde bei Wohnwert 100 (mit dem XP-Faktor 10), also höchstens 240 XP am Tag: etwa so
   viel wie eine Tagesmission, und es kostet Miete.
+
+## Nachtrag: Wohnbonus, Möbelpreise, Einrichtung im Wert, freie Miete (ADR-161)
+
+Werte in `BALANCE.livingBonus`, `BALANCE.property.furniturePriceBps`, `BALANCE.property.furnishedValueBps` und
+`BALANCE.rentals.minPriceCents`/`maxPriceCentsPerHour`.
+
+| Zuhause    | Preis       | Bonus je Stunde (Wohnwert 100) | bei Wohnwert 0 | am Tag (voll) | Möbelfaktor |
+| ---------- | ----------- | ------------------------------ | -------------- | ------------- | ----------- |
+| Wohnung    | 25.000 €    | 20 € + 3 XP                    | 8 € + 1 XP     | 480 €         | ×1          |
+| Apartment  | 100.000 €   | 50 € + 4 XP                    | 20 € + 1 XP    | 1.200 €       | ×1,25       |
+| Haus       | 500.000 €   | 120 € + 6 XP                   | 48 € + 2 XP    | 2.880 €       | ×1,5        |
+| Villa      | 2.500.000 € | 300 € + 8 XP                   | 120 € + 3 XP   | 7.200 €       | ×2          |
+| Luxusvilla | 15 Mio. €   | 800 € + 10 XP                  | 320 € + 4 XP   | 19.200 €      | ×3          |
+
+- XP sind Basis-XP, mit dem Alpha-Faktor zählen sie doppelt (Luxusvilla höchstens 480 XP am Tag, etwa anderthalb
+  Arbeitstage zu je 8 × 40 Basis-XP).
+- **Vergleich:** Grundeinkommen 100 € je Stunde (Tresor, 8 Stunden Kappe), Praktikant 150 €, Junior 300 €, C-Level
+  2.500 € je Stunde für höchstens 8 Stunden am Tag. Der Bonus läuft 24 Stunden, bleibt aber unter einem Arbeitstag der
+  passenden Stufe. Bezogen auf den Kaufpreis: Wohnung 1,9 % am Tag (52 Tage), Luxusvilla 0,13 % (gut zwei Jahre).
+- **Mieter:** 50 % des Bonus des gemieteten Zuhauses, als Geld höchstens die eigene Miete je Stunde.
+- **Nur aktive Spieler:** gespielt in den letzten 3 Tagen.
+- **Einrichtung im Wert:** aufgestellte Möbel 60 % des bezahlten Preises, Inventar, Autos und Böden 40 %, das Zuhause
+  50 % des Kaufpreises.
+- **Miete:** frei von 1 € bis 100.000 € je Platz und Stunde (ein Tag kostet 24 Stunden). Die faire Miete aus ADR-158
+  bleibt der Maßstab der KI-Mieter.

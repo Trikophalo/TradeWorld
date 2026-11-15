@@ -2,42 +2,42 @@
   "items": [
     {
       "id": 5,
-      "body": "Ehemalige Mitarbeiter erheben schwere Vorwürfe. Kunden kündigen erste Verträge. Sicher ist das nicht.",
-      "name": "Sonnenkern Fusion",
-      "due_at": "2026-11-15T21:28:24.521413+00:00",
+      "body": "Ein bekannter Kopf aus der Branche kommt an Bord. Anleger dürften das leicht honorieren. Sicher ist das nicht.",
+      "name": "Wackelwerk",
+      "due_at": "2026-11-15T21:27:36.333569+00:00",
       "status": "open",
-      "ticker": "FSN",
-      "headline": "Rassismus-Vorwürfe gegen Sonnenkern Fusion",
+      "ticker": "WAC",
+      "headline": "Neuer Chef-Entwickler wechselt zu Wackelwerk",
       "move_bps": null,
       "strength": 1,
-      "direction": "down",
-      "published_at": "2026-11-15T20:57:14.325265+00:00"
+      "direction": "up",
+      "published_at": "2026-11-15T21:05:45.183386+00:00"
     },
     {
       "id": 4,
-      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Frachtpilot tut sich in der nächsten Stunde etwas, und zwar nach unten. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
-      "name": "Frachtpilot",
-      "due_at": "2026-11-15T20:24:06.499856+00:00",
+      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Gipfelwerk tut sich in der nächsten Stunde etwas, und zwar nach oben. Meine Quelle ist seriös, sie trägt immerhin eine Krawatte.",
+      "name": "Gipfelwerk",
+      "due_at": "2026-11-15T20:22:36.161215+00:00",
       "status": "confirmed",
-      "ticker": "FPT",
+      "ticker": "GIP",
       "headline": "Mr. Doodle Dangles Geheimtipp",
-      "move_bps": -1133,
+      "move_bps": 916,
       "strength": 2,
-      "direction": "down",
-      "published_at": "2026-11-15T19:57:06.499856+00:00"
+      "direction": "up",
+      "published_at": "2026-11-15T20:05:36.161215+00:00"
     },
     {
       "id": 3,
-      "body": "Ein Vögelchen hat mir gezwitschert: Glanz & Gloria dürfte in der kommenden Stunde nach unten gehen. Meine Quelle ist seriös, sie trägt immerhin eine Krawatte.",
-      "name": "Glanz & Gloria",
-      "due_at": "2026-11-15T19:57:05.6473+00:00",
-      "status": "fizzled",
-      "ticker": "LUX",
-      "headline": "Vom Flurfunk: Glanz & Gloria",
-      "move_bps": null,
+      "body": "Ein Vögelchen hat mir gezwitschert: Frachtpilot dürfte in der kommenden Stunde nach unten gehen. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
+      "name": "Frachtpilot",
+      "due_at": "2026-11-15T20:05:35.423521+00:00",
+      "status": "confirmed",
+      "ticker": "FPT",
+      "headline": "Vom Flurfunk: Frachtpilot",
+      "move_bps": -1368,
       "strength": 2,
       "direction": "down",
-      "published_at": "2026-11-15T19:57:05.6473+00:00"
+      "published_at": "2026-11-15T20:05:35.423521+00:00"
     }
   ],
   "reliability_bps": 7500

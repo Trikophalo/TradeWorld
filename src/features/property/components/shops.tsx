@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Segmented } from "@/components/ui/segmented";
 import { toast } from "@/components/ui/toast";
+import { BALANCE, type PropertyTier } from "@/config/balance";
 import { CARS, FURNITURE, type FurnitureCategory, type FurnitureTier } from "@/config/furniture";
 import { useGameErrorText } from "@/features/game/errors";
 import { engine, useGame } from "@/features/game/store";
@@ -14,6 +15,7 @@ import type { Property } from "@/features/game/types";
 import { formatMoney } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
 import { logoArt } from "@/lib/sim/logo";
+import { furniturePriceCents } from "@/lib/sim/property";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { usePropertyRefresh } from "../hooks";
@@ -31,6 +33,8 @@ const CATEGORIES: (FurnitureCategory | "all")[] = [
   "tech",
   "fun",
 ];
+const TOP_TIER = BALANCE.property.tiers[BALANCE.property.tiers.length - 1]!.key;
+const MAX_FACTOR_BPS = BALANCE.property.furniturePriceBps[TOP_TIER];
 const TIERS: (FurnitureTier | "all")[] = ["all", "budget", "standard", "premium", "luxury", "ultra"];
 export const TIER_STYLE: Record<FurnitureTier, string> = {
   budget: "bg-surface-3 text-fg-2",
@@ -40,9 +44,22 @@ export const TIER_STYLE: Record<FurnitureTier, string> = {
   ultra: "bg-loss-soft text-loss",
 };
 
-/** The furniture store (ADR-082): every piece in five price classes, from cheap to ultra. */
-export function FurnitureShop({ open, onClose }: { open: boolean; onClose: () => void }) {
+/**
+ * The furniture store (ADR-082): every piece in five price classes, from cheap to ultra. Prices follow the home the
+ * player lives in (ADR-161): the bigger the home, the dearer the furniture.
+ */
+export function FurnitureShop({
+  open,
+  onClose,
+  homeTier = null,
+}: {
+  open: boolean;
+  onClose: () => void;
+  homeTier?: PropertyTier | null;
+}) {
   const t = useTranslations("estate");
+  const factorBps = BALANCE.property.furniturePriceBps[homeTier ?? "flat"];
+  const priceOf = (catalogCents: number) => furniturePriceCents(catalogCents, homeTier);
   const errorText = useGameErrorText();
   const refresh = usePropertyRefresh();
   const cash = useGame((state) => state.portfolio?.cashCents ?? 0);
@@ -72,6 +89,17 @@ export function FurnitureShop({ open, onClose }: { open: boolean; onClose: () =>
   return (
     <Modal open={open} onOpenChange={(o) => !o && onClose()} title={t("shopTitle")} description={t("shopIntro")}>
       <div className="space-y-4">
+        <p className="rounded-md bg-surface-2 px-3 py-2 text-xs text-pretty text-fg-2" data-testid="shop-price-factor">
+          {factorBps > 10_000 && homeTier
+            ? t("shopPriceFactor", {
+                tier: t(`tierNames.${homeTier}`),
+                factor: (factorBps / 10_000).toLocaleString("de-DE", { maximumFractionDigits: 2 }),
+              })
+            : t("shopPriceBase", {
+                max: (MAX_FACTOR_BPS / 10_000).toLocaleString("de-DE", { maximumFractionDigits: 2 }),
+                top: t(`tierNames.${TOP_TIER}`),
+              })}
+        </p>
         <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={t("category")}>
           {CATEGORIES.map((c) => (
             <button
@@ -130,11 +158,12 @@ export function FurnitureShop({ open, onClose }: { open: boolean; onClose: () =>
               <Button
                 size="sm"
                 className="mt-auto"
-                disabled={cash < f.priceCents || busy !== null}
+                disabled={cash < priceOf(f.priceCents) || busy !== null}
                 state={busy === f.key ? "loading" : "idle"}
-                onClick={() => void buy(f.key, f.name, f.priceCents)}
+                onClick={() => void buy(f.key, f.name, priceOf(f.priceCents))}
+                data-testid="shop-price"
               >
-                {formatMoney(f.priceCents, { whole: true })}
+                {formatMoney(priceOf(f.priceCents), { whole: true })}
               </Button>
             </li>
           ))}

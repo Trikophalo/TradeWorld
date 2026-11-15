@@ -104,12 +104,37 @@ export function invalidPlacements(
   return [...bad];
 }
 
-/** Value of a home for the net worth: trade-in of the home plus resale of everything bought for it. */
+/**
+ * List price of a piece of furniture bought while living in `tier` (ADR-161): the catalogue price times the factor of
+ * the home (no home: the flat's). The makler discount comes off this price; the Wohnwert counts the list price.
+ */
+export function furniturePriceCents(
+  catalogCents: number,
+  tier: PropertyTier | null,
+  cfg: PropertyConfig = BALANCE.property,
+): number {
+  return Math.floor((catalogCents * cfg.furniturePriceBps[tier ?? "flat"]) / 10_000);
+}
+
+/** What a placed piece adds to the value of the home (ADR-161): a share of the price paid. */
+export function furnishedValueCents(paidCents: number, cfg: PropertyConfig = BALANCE.property): number {
+  return Math.floor((paidCents * cfg.furnishedValueBps) / 10_000);
+}
+
+/**
+ * Value of a home for the net worth: trade-in of the home, the placed furniture at furnishedValueBps of the price paid
+ * (it is part of the home, ADR-161) and the resale value of everything else bought for it (inventory, cars, floors).
+ */
 export function propertyValueCents(
   tier: PropertyTier | null,
   itemPricesCents: readonly number[],
   cfg: PropertyConfig = BALANCE.property,
+  placedPricesCents: readonly number[] = [],
 ): number {
   const home = tier ? Math.floor((tierConfig(tier, cfg).priceCents * cfg.tradeInBps) / 10_000) : 0;
-  return home + itemPricesCents.reduce((sum, p) => sum + resaleCents(p, cfg), 0);
+  return (
+    home +
+    itemPricesCents.reduce((sum, p) => sum + resaleCents(p, cfg), 0) +
+    placedPricesCents.reduce((sum, p) => sum + furnishedValueCents(p, cfg), 0)
+  );
 }

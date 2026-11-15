@@ -14,31 +14,15 @@
       "founder": "Lars_Kursrutsch",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "0fe34e09-249a-492a-aacc-6b4fe1695021",
+      "company_id": "581f9c9a-3313-4339-b021-e7323f419fe4",
       "value_cents": 959140000,
       "revenue_cents": null
     },
     {
       "kind": "player",
       "logo": null,
-      "name": "Gipfelwerk",
-      "rank": 2,
-      "tier": "ag",
-      "color": "#336699",
-      "sector": "retail",
-      "ticker": "GIP",
-      "founder": "Pop_Frida",
-      "is_mine": false,
-      "team_size": 1,
-      "company_id": "32b0cebe-207b-4cc9-82e5-0d3b03b9365c",
-      "value_cents": 111240000,
-      "revenue_cents": null
-    },
-    {
-      "kind": "player",
-      "logo": null,
       "name": "Knappwerk",
-      "rank": 3,
+      "rank": 2,
       "tier": "ag",
       "color": "#336699",
       "sector": "retail",
@@ -46,8 +30,24 @@
       "founder": "Float_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "ab416d55-749a-4686-8dc1-2ba689048628",
+      "company_id": "5d6c5e40-c7ba-4a5b-aa45-dab448a5698e",
       "value_cents": 110000000,
+      "revenue_cents": null
+    },
+    {
+      "kind": "player",
+      "logo": null,
+      "name": "Talwerk",
+      "rank": 3,
+      "tier": "ag",
+      "color": "#663399",
+      "sector": "retail",
+      "ticker": "TAL",
+      "founder": "Pop_Gero",
+      "is_mine": false,
+      "team_size": 1,
+      "company_id": "0a7f6175-3fc3-4dd2-9de8-c9da181b9272",
+      "value_cents": 108880000,
       "revenue_cents": null
     },
     {
@@ -82,8 +82,8 @@
       "founder": "Fenja_Firma",
       "is_mine": false,
       "team_size": 6,
-      "company_id": "5f1628b9-366c-4724-8859-bf21c8fe6bc1",
-      "value_cents": 107445029,
+      "company_id": "03fbee3d-6d9b-41a7-91ed-27bee65def7f",
+      "value_cents": 106503936,
       "revenue_cents": 0
     },
     {
@@ -98,10 +98,10 @@
       "founder": "Esc_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "f528f847-7862-402d-81cb-1ed0a3acf1e1",
-      "value_cents": 105859732,
+      "company_id": "59b53dee-f736-4568-92c1-2c65690655d5",
+      "value_cents": 105562820,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-15T19:57:11.267224+00:00"
+  "server_time": "2026-11-15T20:05:42.3273+00:00"
 }

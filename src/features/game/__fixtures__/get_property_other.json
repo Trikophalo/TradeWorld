@@ -1,17 +1,25 @@
 {
-  "rental": { "places": 3, "renting": null, "tenants": [], "wohnwert": 6, "offer_open": false },
+  "rental": {
+    "places": 3,
+    "renting": null,
+    "tenants": [],
+    "wohnwert": 6,
+    "offer_open": false,
+    "living_bonus": { "xp": 2, "tier": "house", "cents": 5232, "owner": null, "source": "own", "wohnwert": 6 }
+  },
   "property": {
     "tier": "house",
     "floor": "parquet",
     "owner": "Fixture_Heim",
     "width": 13,
-    "garage": [{ "id": "0bfef2ce-afb0-49ea-9e2c-65d52453ff91", "slot": 0, "car_key": "car_electric" }],
+    "garage": [{ "id": "ad1d6b75-f07f-453f-957e-7fd4383b73a0", "slot": 0, "car_key": "car_electric" }],
     "height": 9,
     "placed": [],
     "wall_color": "#2f5fd0",
     "value_cents": 27843200,
     "floors_owned": ["laminate", "parquet"],
-    "garage_slots": 2
+    "garage_slots": 2,
+    "furnishing_cents": 0
   },
   "inventory": null
 }

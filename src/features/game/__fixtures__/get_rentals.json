@@ -2,18 +2,18 @@
   "home": {
     "tier": "house",
     "limits": {
-      "day": { "max_cents": 190080, "min_cents": 18000, "fair_cents": 126720 },
-      "hour": { "max_cents": 7920, "min_cents": 750, "fair_cents": 5280 }
+      "day": { "max_cents": 240000000, "min_cents": 2400, "fair_cents": 129600 },
+      "hour": { "max_cents": 10000000, "min_cents": 100, "fair_cents": 5400 }
     },
     "places": 3,
     "wohnwert": {
       "rugs": 0,
       "tops": 1,
-      "parts": { "fill": 2, "floor": 6, "style": 1, "value": 0, "layers": 5, "variety": 5 },
-      "total": 19,
+      "parts": { "fill": 2, "floor": 6, "style": 1, "value": 1, "layers": 5, "variety": 5 },
+      "total": 20,
       "pieces": 2,
       "categories": 2,
-      "value_cents": 280000,
+      "value_cents": 420000,
       "coverage_bps": 341,
       "target_cents": 10000000
     }
@@ -23,27 +23,27 @@
     "period": "hour",
     "is_open": true,
     "chance_bps": 0,
-    "ai_check_at": "2026-11-15T19:57:14.80966+00:00",
+    "ai_check_at": "2026-11-15T20:05:45.777634+00:00",
     "price_cents": 1000
   },
   "renting": null,
   "tenants": [
     {
-      "id": "c6848072-721b-47aa-ba7d-f06f5174bfee",
+      "id": "082aa97d-5b3e-4075-8573-0f3d7ed304e8",
       "name": "Mia F.",
       "is_ai": true,
       "period": "hour",
-      "ends_at": "2026-11-17T19:57:14.816972+00:00",
+      "ends_at": "2026-11-17T20:05:45.782773+00:00",
       "notice_by": null,
       "avatar_key": null,
       "paid_cents": 0,
-      "started_at": "2026-11-15T19:57:14.816972+00:00",
+      "started_at": "2026-11-15T20:05:45.782773+00:00",
       "accessories": [],
-      "next_due_at": "2026-11-15T20:57:14.816972+00:00",
+      "next_due_at": "2026-11-15T21:05:45.782773+00:00",
       "price_cents": 1000
     },
     {
-      "id": "01cf7077-6433-4be6-b434-d24d433c5e9f",
+      "id": "6c5e3c16-865e-4290-9578-8b0c69012e2a",
       "name": "Fixture_Neu",
       "is_ai": false,
       "period": "hour",
@@ -51,9 +51,9 @@
       "notice_by": null,
       "avatar_key": "coder",
       "paid_cents": 1000,
-      "started_at": "2026-11-15T19:57:14.823367+00:00",
+      "started_at": "2026-11-15T20:05:45.791654+00:00",
       "accessories": ["party_hat"],
-      "next_due_at": "2026-11-15T20:57:14.823367+00:00",
+      "next_due_at": "2026-11-15T21:05:45.791654+00:00",
       "price_cents": 1000
     }
   ],

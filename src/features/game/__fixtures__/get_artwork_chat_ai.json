@@ -3,7 +3,7 @@
   "messages": [
     {
       "ai": false,
-      "at": "2026-11-15T19:57:14.710198+00:00",
+      "at": "2026-11-15T20:05:45.63573+00:00",
       "id": 32,
       "kind": "chat",
       "mine": false,
@@ -15,19 +15,19 @@
     },
     {
       "ai": false,
-      "at": "2026-11-15T19:57:14.712814+00:00",
+      "at": "2026-11-15T20:05:45.639875+00:00",
       "id": 33,
       "kind": "offer",
       "mine": false,
       "text": "Wäre das ein Preis?",
       "author": "Fixture_Kunst",
-      "expires_at": "2026-11-16T19:57:14.712814+00:00",
+      "expires_at": "2026-11-16T20:05:45.639875+00:00",
       "offer_cents": 300000,
       "offer_status": "accepted"
     },
     {
       "ai": false,
-      "at": "2026-11-15T19:57:14.718551+00:00",
+      "at": "2026-11-15T20:05:45.65145+00:00",
       "id": 34,
       "kind": "sale",
       "mine": false,
@@ -39,7 +39,7 @@
     },
     {
       "ai": false,
-      "at": "2026-11-15T19:57:14.72613+00:00",
+      "at": "2026-11-15T20:05:45.662119+00:00",
       "id": 35,
       "kind": "sale",
       "mine": false,
@@ -51,19 +51,19 @@
     },
     {
       "ai": true,
-      "at": "2026-11-15T19:57:14.733289+00:00",
+      "at": "2026-11-15T20:05:45.671767+00:00",
       "id": 36,
       "kind": "offer",
       "mine": false,
-      "text": "Ich habe gewürfelt. Das ist der Preis. Die Würfel lügen nicht.",
-      "author": "Sammler Sam",
-      "expires_at": "2026-11-16T19:57:14.733289+00:00",
-      "offer_cents": 1897200,
+      "text": "Ich sammle nur Dinge, die ich nicht verstehe. Passt perfekt.",
+      "author": "Gräfin Glitzer",
+      "expires_at": "2026-11-16T20:05:45.671767+00:00",
+      "offer_cents": 1916200,
       "offer_status": "open"
     }
   ],
   "ask_cents": 90000000,
-  "artwork_id": "f7156301-6fc8-417a-b364-af73ee952bf4",
+  "artwork_id": "71e51226-1852-4a57-817b-009354a92369",
   "max_length": 200,
   "my_offer_cents": null,
   "min_offer_cents": 10000

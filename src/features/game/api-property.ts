@@ -20,13 +20,21 @@ const propertySchema = z.object({
   floor,
   floors_owned: z.array(floor),
   placed: z.array(
-    z.object({ id: z.string(), item_key: z.string(), x: num, y: num, rot: z.union([z.literal(0), z.literal(90)]) }),
+    z.object({
+      id: z.string(),
+      item_key: z.string(),
+      x: num,
+      y: num,
+      rot: z.union([z.literal(0), z.literal(90)]),
+      value_cents: num,
+    }),
   ),
   garage: z.array(z.object({ id: z.string(), car_key: z.string(), slot: num })),
   value_cents: num,
+  furnishing_cents: num,
 });
 const inventorySchema = z.object({
-  furniture: z.array(z.object({ id: z.string(), item_key: z.string() })),
+  furniture: z.array(z.object({ id: z.string(), item_key: z.string(), value_cents: num })),
   cars: z.array(z.object({ id: z.string(), car_key: z.string() })).default([]),
 });
 export const tenantSchema = z.object({
@@ -43,6 +51,16 @@ const rentalSchema = z.object({
   offer_open: z.boolean(),
   tenants: z.array(tenantSchema),
   renting: z.object({ owner: z.string(), tier: tier.nullable() }).nullable(),
+  living_bonus: z
+    .object({
+      source: z.enum(["own", "tenant"]),
+      cents: num,
+      xp: num,
+      tier,
+      wohnwert: num,
+      owner: z.string().nullable(),
+    })
+    .nullable(),
 });
 const stateSchema = z.object({
   property: propertySchema,
@@ -71,9 +89,17 @@ export function toProperty(p: z.infer<typeof propertySchema>): Property {
     wallColor: p.wall_color,
     floor: p.floor as FloorMaterial,
     floorsOwned: p.floors_owned as FloorMaterial[],
-    placed: p.placed.map((x) => ({ id: x.id, itemKey: x.item_key, x: x.x, y: x.y, rot: x.rot })),
+    placed: p.placed.map((x) => ({
+      id: x.id,
+      itemKey: x.item_key,
+      x: x.x,
+      y: x.y,
+      rot: x.rot,
+      valueCents: x.value_cents,
+    })),
     garage: p.garage.map((g) => ({ id: g.id, carKey: g.car_key, slot: g.slot })),
     valueCents: p.value_cents,
+    furnishingCents: p.furnishing_cents,
   };
 }
 
@@ -99,10 +125,20 @@ function toState(r: z.infer<typeof stateSchema>): PropertyState {
       renting: r.rental.renting
         ? { owner: r.rental.renting.owner, tier: r.rental.renting.tier as PropertyTier | null }
         : null,
+      livingBonus: r.rental.living_bonus
+        ? {
+            source: r.rental.living_bonus.source,
+            cents: r.rental.living_bonus.cents,
+            xp: r.rental.living_bonus.xp,
+            tier: r.rental.living_bonus.tier as PropertyTier,
+            wohnwert: r.rental.living_bonus.wohnwert,
+            owner: r.rental.living_bonus.owner,
+          }
+        : null,
     },
     inventory: r.inventory
       ? {
-          furniture: r.inventory.furniture.map((f) => ({ id: f.id, itemKey: f.item_key })),
+          furniture: r.inventory.furniture.map((f) => ({ id: f.id, itemKey: f.item_key, valueCents: f.value_cents })),
           cars: r.inventory.cars.map((c) => ({ id: c.id, carKey: c.car_key })),
         }
       : null,

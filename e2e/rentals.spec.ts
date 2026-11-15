@@ -85,10 +85,8 @@ test("the Wohnwert of a furnished flat, an offer, an AI tenant moves in, walks a
   await expect(editor.getByTestId("wohnwert-tips")).toBeVisible();
   await page.keyboard.press("Escape");
 
-  // the lowest price: an AI tenant moves in at once and pays the first hour
-  const slider = panel.getByRole("slider");
-  await slider.focus();
-  await page.keyboard.press("Home");
+  // the lowest price (1 EUR, ADR-161): an AI tenant moves in at once and pays the first hour
+  await panel.getByTestId("offer-price-input").fill("1");
   await expect(panel.getByTestId("ai-demand")).toHaveAttribute("data-demand", "high");
   await panel.getByTestId("offer-submit").click();
   await expect(panel.getByTestId("offer-status")).toHaveText("Angebot offen");

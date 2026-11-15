@@ -305,6 +305,8 @@ export interface PlacedItem {
   x: number;
   y: number;
   rot: 0 | 90;
+  /** List price the piece was bought at (ADR-161); the Wohnwert counts it. Absent in layouts being sent. */
+  valueCents?: number;
 }
 
 export interface Property {
@@ -318,11 +320,14 @@ export interface Property {
   floorsOwned: FloorMaterial[];
   placed: PlacedItem[];
   garage: { id: string; carKey: string; slot: number }[];
+  /** Value of the home with everything in it (net worth). */
   valueCents: number;
+  /** What the placed furniture adds to it (ADR-161). */
+  furnishingCents: number;
 }
 
 export interface PropertyInventory {
-  furniture: { id: string; itemKey: string }[];
+  furniture: { id: string; itemKey: string; valueCents: number }[];
   cars: { id: string; carKey: string }[];
 }
 
@@ -350,6 +355,20 @@ export interface PropertyRental {
   tenants: Tenant[];
   /** Where the player rents a place, if anywhere. */
   renting: { owner: string; tier: PropertyTier | null } | null;
+  /** Bonus per hour for living there (ADR-161): from the own home or the rented place; null if living nowhere. */
+  livingBonus: LivingBonusState | null;
+}
+
+export interface LivingBonusState {
+  source: "own" | "tenant";
+  /** Money per hour. */
+  cents: number;
+  /** Base XP per hour (the XP factor comes on top). */
+  xp: number;
+  tier: PropertyTier;
+  wohnwert: number;
+  /** The landlord, when living as a tenant. */
+  owner: string | null;
 }
 
 export type RentPeriodKey = "hour" | "day";
