@@ -1,14 +1,16 @@
 {
   "friends": [
     {
-      "tag": "GEK3",
+      "tag": "PZ6W",
       "level": 8,
-      "since": "2026-11-15T11:12:03.358085+00:00",
+      "since": "2026-11-15T12:32:54.873466+00:00",
       "online": true,
       "nickname": "Fixture_Kunst",
-      "last_active_at": "2026-11-15T11:12:02.343918+00:00"
+      "avatar_key": "rookie",
+      "accessories": [],
+      "last_active_at": "2026-11-15T12:32:53.457046+00:00"
     }
   ],
-  "incoming": [{ "at": "2026-11-15T11:12:03.361877+00:00", "tag": "UVDA", "level": 15, "nickname": "Fixture_Neu" }],
+  "incoming": [{ "at": "2026-11-15T12:32:54.87753+00:00", "tag": "XVWW", "level": 15, "nickname": "Fixture_Neu" }],
   "outgoing": []
 }

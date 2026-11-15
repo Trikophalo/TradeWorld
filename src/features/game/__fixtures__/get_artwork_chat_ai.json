@@ -3,7 +3,7 @@
   "messages": [
     {
       "ai": false,
-      "at": "2026-11-15T11:12:06.271238+00:00",
+      "at": "2026-11-15T12:32:58.399512+00:00",
       "id": 30,
       "kind": "chat",
       "mine": false,
@@ -15,19 +15,19 @@
     },
     {
       "ai": false,
-      "at": "2026-11-15T11:12:06.276745+00:00",
+      "at": "2026-11-15T12:32:58.409889+00:00",
       "id": 31,
       "kind": "offer",
       "mine": false,
       "text": "Wäre das ein Preis?",
       "author": "Fixture_Kunst",
-      "expires_at": "2026-11-16T11:12:06.276745+00:00",
+      "expires_at": "2026-11-16T12:32:58.409889+00:00",
       "offer_cents": 300000,
       "offer_status": "accepted"
     },
     {
       "ai": false,
-      "at": "2026-11-15T11:12:06.286123+00:00",
+      "at": "2026-11-15T12:32:58.421152+00:00",
       "id": 32,
       "kind": "sale",
       "mine": false,
@@ -39,7 +39,7 @@
     },
     {
       "ai": false,
-      "at": "2026-11-15T11:12:06.301805+00:00",
+      "at": "2026-11-15T12:32:58.440762+00:00",
       "id": 33,
       "kind": "sale",
       "mine": false,
@@ -51,19 +51,19 @@
     },
     {
       "ai": true,
-      "at": "2026-11-15T11:12:06.31428+00:00",
+      "at": "2026-11-15T12:32:58.492543+00:00",
       "id": 34,
       "kind": "offer",
       "mine": false,
-      "text": "Ist das Kunst oder ist dein Bildschirm kaputt? Egal, Angebot steht.",
-      "author": "Mia Mosaik",
-      "expires_at": "2026-11-16T11:12:06.31428+00:00",
-      "offer_cents": 1974900,
+      "text": "Dafür verkaufe ich mein Fahrrad. Na gut, den Sattel.",
+      "author": "Otto Original",
+      "expires_at": "2026-11-16T12:32:58.492543+00:00",
+      "offer_cents": 2096000,
       "offer_status": "open"
     }
   ],
   "ask_cents": 90000000,
-  "artwork_id": "4f8970ad-fe25-4633-9f9c-c5485c153f34",
+  "artwork_id": "257f586f-0441-4a67-8e20-6086fed79dab",
   "max_length": 200,
   "my_offer_cents": null,
   "min_offer_cents": 10000

@@ -1,0 +1,26 @@
+{
+  "friends": [
+    {
+      "tag": "PZ6W",
+      "level": 8,
+      "since": "2026-11-15T12:32:54.873466+00:00",
+      "online": true,
+      "nickname": "Fixture_Kunst",
+      "avatar_key": "rookie",
+      "accessories": [],
+      "last_active_at": "2026-11-15T12:32:53.457046+00:00"
+    },
+    {
+      "tag": "XVWW",
+      "level": 15,
+      "since": "2026-11-15T12:32:54.912588+00:00",
+      "online": true,
+      "nickname": "Fixture_Neu",
+      "avatar_key": "coder",
+      "accessories": ["party_hat"],
+      "last_active_at": "2026-11-15T12:32:51.168401+00:00"
+    }
+  ],
+  "incoming": [],
+  "outgoing": []
+}

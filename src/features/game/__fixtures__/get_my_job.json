@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "c8a8e40e-cf35-49b8-bbb6-763c758eac8c",
+    "id": "b4d08023-3fb9-44c8-87ad-f4c9570ce307",
     "tier": "junior",
     "title": null,
     "company": {
-      "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
+      "id": "cf34ff89-8f9e-1e07-d83e-bdcb034244bd",
       "logo": null,
-      "name": "KlarSoft AG",
-      "color": "#4C8DFF",
+      "name": "Helix Robotik",
+      "color": "#3DDC97",
       "is_ai": true,
       "sector": "tech",
-      "ticker": "KLS"
+      "ticker": "HLX"
     },
     "presence": {
-      "fire_at": "2026-11-20T11:12:00.792225+00:00",
+      "fire_at": "2026-11-20T12:32:51.168401+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-15T11:12:00.792225+00:00"
+      "last_active_at": "2026-11-15T12:32:51.168401+00:00"
     },
     "required": [{ "branch": "it", "min_score": 2 }],
     "promotion": {
@@ -36,22 +36,22 @@
     "signature": "M2 14 C6 4 10 4 14 12 S22 18 26 8",
     "title_key": "it_junior",
     "rank_hours": 1.0,
-    "started_at": "2026-11-15T11:12:01.267836+00:00",
+    "started_at": "2026-11-15T12:32:52.007758+00:00",
     "pending_raise": null,
     "raise_max_bps": 300,
     "notice_ends_at": null,
     "paid_hours_cap": 8,
-    "pay_factor_bps": 9723,
+    "pay_factor_bps": 10000,
     "work_task_open": false,
     "quit_cost_cents": 0,
     "last_bonus_cents": 0,
     "paid_hours_today": 1.0,
     "productivity_bps": 17400,
     "next_work_task_at": null,
-    "earned_total_cents": 30825,
+    "earned_total_cents": 31700,
     "raise_available_at": null,
     "quit_now_cost_cents": 380400,
     "salary_cents_per_hour": 31700,
-    "effective_salary_cents_per_hour": 30821
+    "effective_salary_cents_per_hour": 31700
   }
 }

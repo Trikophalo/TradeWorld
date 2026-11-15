@@ -14,24 +14,24 @@
       "founder": "Lars_Kursrutsch",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "0080e6fe-c34d-4dc9-a08f-31f2a06ed667",
+      "company_id": "640556ef-f8f7-4134-9c13-0a3978cd994a",
       "value_cents": 959140000,
       "revenue_cents": null
     },
     {
       "kind": "player",
       "logo": null,
-      "name": "Wackelwerk",
+      "name": "Gipfelwerk",
       "rank": 2,
       "tier": "ag",
       "color": "#336699",
       "sector": "retail",
-      "ticker": "WAC",
-      "founder": "Esc_Frida",
+      "ticker": "GIP",
+      "founder": "Pop_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "686f9608-ed95-493f-8788-222069c229bf",
-      "value_cents": 111479852,
+      "company_id": "42763064-c5d1-4cc2-8102-1652f18e551a",
+      "value_cents": 116020000,
       "revenue_cents": null
     },
     {
@@ -46,7 +46,7 @@
       "founder": "Float_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "636a5961-f852-4716-93a2-1bff54046377",
+      "company_id": "73edd26b-6e5c-4f36-afe0-c40852017706",
       "value_cents": 110000000,
       "revenue_cents": null
     },
@@ -82,26 +82,26 @@
       "founder": "Fenja_Firma",
       "is_mine": false,
       "team_size": 6,
-      "company_id": "1d1916de-8ee0-4762-97bf-6e65975a3016",
-      "value_cents": 107412947,
+      "company_id": "0e456143-5e58-45e7-b420-42e2d18b4063",
+      "value_cents": 106536019,
       "revenue_cents": 0
     },
     {
       "kind": "player",
       "logo": null,
-      "name": "Gipfelwerk",
+      "name": "Wackelwerk",
       "rank": 5,
       "tier": "ag",
       "color": "#336699",
       "sector": "retail",
-      "ticker": "GIP",
-      "founder": "Pop_Frida",
+      "ticker": "WAC",
+      "founder": "Esc_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "a159cfdf-a5c2-4886-9ff1-b7ff5335e46d",
-      "value_cents": 93270000,
+      "company_id": "5eaf9e6b-3109-44c9-87b8-24ec21a75591",
+      "value_cents": 105923356,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-15T11:12:01.847221+00:00"
+  "server_time": "2026-11-15T12:32:52.797608+00:00"
 }

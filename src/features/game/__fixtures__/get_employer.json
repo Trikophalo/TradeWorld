@@ -4,18 +4,18 @@
     "tier": null,
     "stage": null,
     "company": {
-      "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
+      "id": "cf34ff89-8f9e-1e07-d83e-bdcb034244bd",
       "logo": null,
-      "name": "KlarSoft AG",
-      "color": "#4C8DFF",
+      "name": "Helix Robotik",
+      "color": "#3DDC97",
       "is_ai": true,
       "sector": "tech",
-      "ticker": "KLS"
+      "ticker": "HLX"
     },
     "founder": null,
     "team_size": 1,
     "product_key": null,
-    "last_quarter": { "label": "J2 Q1", "profit_cents": 1141604127, "revenue_cents": 37695259728 },
+    "last_quarter": { "label": "J2 Q1", "profit_cents": 455175114, "revenue_cents": 5992605623 },
     "pay_factor_bps": 10000
   }
 }

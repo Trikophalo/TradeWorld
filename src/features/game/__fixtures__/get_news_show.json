@@ -1,8 +1,8 @@
 {
-  "now": "2026-11-15T11:12:06.377133+00:00",
+  "now": "2026-11-15T12:32:58.582673+00:00",
   "chat": [
     {
-      "at": "2026-11-15T11:12:06.371844+00:00",
+      "at": "2026-11-15T12:32:58.562308+00:00",
       "id": 204,
       "body": "Was für eine Sendung 💀📉",
       "mine": true,
@@ -12,75 +12,82 @@
   "show": {
     "id": 6,
     "writer": "mini",
-    "airs_at": "2026-11-15T11:00:00+00:00",
+    "airs_at": "2026-11-15T12:00:00+00:00",
     "segments": [
       {
         "kind": "gossip",
-        "mood": "proud",
-        "text": "Bitte festhalten: Level 5 erreicht, und zwar bei Dirk_Billig. Glückwunsch, und jetzt bloß nichts anfassen.",
-        "effects": [],
-        "headline": "Applaus für Dirk_Billig"
+        "mood": "shocked",
+        "text": "Liebes Tagebuch, schreibt Anja_Lieferant heute vermutlich: Deal mit Bodo_Kunde gebrochen. So eine Pfeife sehe ich sonst nur morgens im Spiegel, und ich bin wenigstens im Fernsehen. Wir legen etwas Schmerzensgeld bei.",
+        "effects": [{ "tone": "gain", "label": "+100 € Schmerzensgeld" }],
+        "headline": "Das Tagebuch von Anja_Lieferant"
       },
       {
         "kind": "scandal",
-        "mood": "angry",
-        "text": "Das Netz zerreißt Sven Teile. Statt der Kundschaft kam heute die Feuerwehr. Seitdem will niemand mehr „Teile auf Abruf“. Sven_Liefert hat das Firmenhandy im Fluss versenkt.",
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −12,7 %" }],
-        "headline": "Shitstorm über Sven Teile"
+        "mood": "shocked",
+        "text": "Griff GmbH wollte heute groß rauskommen. Die Kundenhotline wurde seit Monaten von einem Papagei bedient, und der war noch der Freundlichste. Greta_Griff erklärte, das gehöre zum Konzept. Die Kundschaft erklärte, sie sei dann mal weg.",
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −23,8 %" }],
+        "headline": "Griff GmbH blamiert sich bis auf die Knochen"
       },
       {
         "kind": "nft",
-        "mood": "laughing",
-        "text": "Ben_Bieter zahlt 30.000 € für „Neon Nacht“, gemalt von Nina_Neon. Ich verstehe es nicht, also muss es teuer sein.",
+        "mood": "confused",
+        "text": "Ben_Bieter zahlt 30.000 € für „Neon Nacht“, gemalt von Nina_Neon. Wer das kauft, kauft auch Luft in Dosen.",
         "effects": [],
         "headline": "NFT-Wahnsinn um „Neon Nacht“"
       },
       {
         "kind": "winner",
-        "mood": "proud",
-        "text": "Fixture_Neu ist heute um 1.138.930 € reicher, 11389,3 % rauf. Alle anderen dürfen jetzt neidisch sein. Bitte der Reihe nach.",
+        "mood": "shocked",
+        "text": "Und nun zu jemandem, der es kann: Fixture_Neu hat heute 1.138.932 € gemacht, 11389,3 % im Plus. Das Finanzamt hat bereits freundlich gewunken.",
         "effects": [],
-        "headline": "Glückspilz des Tages: Fixture_Neu"
+        "headline": "Fixture_Neu sahnt ab: plus 1.138.932 €"
       },
       {
         "kind": "gossip",
-        "mood": "proud",
-        "text": "Ich fasse es nicht, aber es stimmt. Fixture_Kunst meldet: Level 5 erreicht. Die Konkurrenz darf sich gern ein Beispiel nehmen, ihr Luschen.",
+        "mood": "shocked",
+        "text": "Bitte festhalten: Kunst Kontor gegründet, und zwar bei Fiona_Firma. Das musste auch mal gesagt werden, ich fühle mich schon ganz schmutzig.",
         "effects": [],
-        "headline": "Na so was: Fixture_Kunst"
+        "headline": "Applaus für Fiona_Firma"
       },
       {
         "kind": "scandal",
         "mood": "angry",
-        "text": "Ausgerechnet Kundenladen Bodo, die Firma mit dem Motto „Ideen für alle“: Die Kaffeekasse war die einzige Abteilung mit Gewinn. Die Kunden laufen davon.",
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −17,4 %" }],
-        "headline": "Skandal bei Kundenladen Bodo"
+        "text": "Bei Gleich Werk brennt die Hütte. Im Lager wurde ein Praktikant gefunden, der seit drei Wochen vermisst war. Er hatte niemandem gefehlt. Kai_Kopie spricht von einem Missverständnis. Zur Erinnerung, das Geschäftsmodell lautet: „Neue Schrauben“.",
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −16,1 %" }],
+        "headline": "Gleich Werk: Chef Kai_Kopie unter Beschuss"
+      },
+      {
+        "kind": "ramble",
+        "mood": "crying",
+        "text": "Bevor es weitergeht, etwas völlig anderes: Donald Trump will angeblich Zölle auf Pixel erheben. Ich habe vorsorglich zwei gehortet. Das musste raus.",
+        "effects": [],
+        "headline": "Kurze Durchsage in eigener Sache"
       },
       {
         "kind": "sector",
-        "mood": "crying",
-        "text": "Die Branche Energie sackt um 9,6 % ab. Die Branchenmesse fand statt, aber niemand ging hin, nicht einmal die Aussteller. Bis das geklärt ist, verkaufen erst mal alle.",
-        "effects": [{ "tone": "loss", "label": "Energie −9,6 %" }],
-        "headline": "Energie im freien Fall"
+        "mood": "proud",
+        "text": "Plötzlich wollen alle Pharma. Ein Schulkind hat in einem Referat behauptet, das sei die Zukunft. Die Kurse der Branche springen um 6 %.",
+        "effects": [{ "tone": "gain", "label": "Pharma +6 %" }],
+        "headline": "Goldrausch in Pharma"
       },
       {
         "kind": "stock",
         "mood": "proud",
-        "text": "Neues von Helix Robotik: Der Aufsichtsrat hat sich im Fahrstuhl eingeschlossen und kann nichts mehr kaputt machen. Niemand weiß, ob es stimmt, alle kaufen trotzdem. Plus 13,2 %.",
-        "effects": [{ "tone": "gain", "label": "HLX +13,2 %" }],
-        "headline": "Helix Robotik: Gerücht treibt den Kurs"
+        "text": "Angeblich wurde das Rad neu erfunden, diesmal eckig. Die Börse feiert: Pfotenwohl steigt um 12 %. Wer nicht dabei ist, darf sich jetzt ärgern.",
+        "effects": [{ "tone": "gain", "label": "PFW +12 %" }],
+        "headline": "Kursrakete Pfotenwohl"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Eilbote Express geht bald nach unten. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
-        "effects": [{ "tone": "neutral", "label": "EBX ↓ Tipp" }],
-        "headline": "Der heiße Draht: Eilbote Express"
+        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Wackelwerk geht bald nach oben. Meine Quelle ist seriös, sie trägt immerhin eine Krawatte.",
+        "effects": [{ "tone": "neutral", "label": "WAC ↑ Tipp" }],
+        "headline": "Der heiße Draht: Wackelwerk"
       }
     ],
-    "started_at": "2026-11-15T11:12:06.377133+00:00"
+    "started_at": "2026-11-15T12:32:58.582673+00:00"
   },
   "viewers": 5,
   "upcoming": null,
-  "next_airs_at": "2026-11-15T12:00:00+00:00"
+  "next_airs_at": "2026-11-15T13:00:00+00:00"
 }

@@ -51221,6 +51221,457 @@ begin
   end if;
 end;
 $do$;
+-- ===== idempotent copy of migrations/20261204002800_accessories_pokes.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 2800 · Accessories for the pixel figure, the friends plaza, poking friends (ADR-154)
+-- =============================================================================
+-- * Accessories: catalogue in game_config.accessories (src/config/accessories.ts: key, name, slot, rarity,
+--   priceCents, minLevel). A player buys each one once (money to the households, like furniture) and wears at most
+--   one per slot. Tables player_accessories (owned) and player_accessories_worn (one row per slot); both internal.
+--   RPCs get_accessories(), buy_accessory(request, key) (wears it right away), wear_accessory(request, key, wear).
+--   A legendary purchase is news for the friends (feed kind accessory_bought).
+-- * Others see it: get_player_card() and friends_json() return the worn keys ("accessories", back to front) and
+--   friends_json() also each friend's avatar_key, so the friends plaza can draw the dressed figures.
+-- * Poking: poke_friend(request, nickname) between accepted friends sends the notification friend_poke. The same
+--   friend again after social.poke.cooldownMinutes (10), at most social.poke.dailyCap (30) pokes in 24 hours.
+-- * Errors: accessory_unknown NX130, accessory_locked NX131, accessory_owned NX132, accessory_not_owned NX133,
+--   not_friends NX134, poke_too_soon NX135, poke_daily_limit NX136.
+-- Idempotent: runs unchanged as supabase/updates/20261204002800_accessories_pokes.sql.
+
+-- ---------------------------------------------------------------------------
+-- A. Error keys
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.api_error(text)'::regprocedure);
+begin
+  if position('''poke_daily_limit''' in v_def) = 0 then
+    v_def := replace(v_def, $q$    when 'no_shares_left'             then 'NX129'
+$q$, $q$    when 'no_shares_left'             then 'NX129'
+    when 'accessory_unknown'          then 'NX130'
+    when 'accessory_locked'           then 'NX131'
+    when 'accessory_owned'            then 'NX132'
+    when 'accessory_not_owned'        then 'NX133'
+    when 'not_friends'                then 'NX134'
+    when 'poke_too_soon'              then 'NX135'
+    when 'poke_daily_limit'           then 'NX136'
+$q$);
+    if position('''poke_daily_limit''' in v_def) = 0 then
+      raise exception 'api_error() has an unexpected shape; add the accessory and poke error keys by hand';
+    end if;
+    execute v_def;
+  end if;
+end;
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- B. Notification type
+-- ---------------------------------------------------------------------------
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('friend_poke', 'social', 'Angestupst', 'Ein Freund hat dich angestupst.', 'notif_friend', true, false, false, 276)
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- C. Tables (internal: read and written only by the RPCs below)
+-- ---------------------------------------------------------------------------
+create table if not exists public.player_accessories (
+  player_id        uuid not null references public.profiles (id) on delete cascade,
+  accessory_key    text not null check (char_length(accessory_key) between 1 and 64),
+  price_paid_cents bigint not null check (price_paid_cents >= 0),
+  bought_at        timestamptz not null default now(),
+  primary key (player_id, accessory_key)
+);
+alter table public.player_accessories enable row level security;
+revoke all on public.player_accessories from public, anon, authenticated;
+grant all on public.player_accessories to service_role;
+comment on table public.player_accessories is
+  'Accessories a player bought (ADR-154), each once. Internal (RPCs get_accessories, buy_accessory).';
+
+create table if not exists public.player_accessories_worn (
+  player_id     uuid not null,
+  slot          text not null check (slot in ('back', 'body', 'face', 'head', 'hand', 'pet')),
+  accessory_key text not null,
+  worn_at       timestamptz not null default now(),
+  primary key (player_id, slot),
+  foreign key (player_id, accessory_key) references public.player_accessories (player_id, accessory_key) on delete cascade
+);
+create index if not exists player_accessories_worn_key_idx on public.player_accessories_worn (player_id, accessory_key);
+alter table public.player_accessories_worn enable row level security;
+revoke all on public.player_accessories_worn from public, anon, authenticated;
+grant all on public.player_accessories_worn to service_role;
+comment on table public.player_accessories_worn is
+  'The accessory a player wears per slot (ADR-154): only owned ones, one per slot. Internal (RPC wear_accessory).';
+
+create table if not exists public.friend_pokes (
+  id         bigint generated always as identity primary key,
+  poker_id   uuid not null references public.profiles (id) on delete cascade,
+  target_id  uuid not null references public.profiles (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+create index if not exists friend_pokes_poker_idx on public.friend_pokes (poker_id, created_at desc);
+create index if not exists friend_pokes_target_idx on public.friend_pokes (target_id);
+alter table public.friend_pokes enable row level security;
+revoke all on public.friend_pokes from public, anon, authenticated;
+grant all on public.friend_pokes to service_role;
+comment on table public.friend_pokes is
+  'Pokes between friends (ADR-154), for the pause per friend and the daily cap; older than two days is deleted. Internal.';
+
+-- ---------------------------------------------------------------------------
+-- D. Helpers
+-- ---------------------------------------------------------------------------
+create or replace function public.accessories_cfg()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select value from public.game_config where key = 'accessories'), '{}'::jsonb);
+$$;
+
+-- One catalogue entry by key; null if unknown
+create or replace function public.accessory_item(p_key text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select x from jsonb_array_elements(coalesce(public.accessories_cfg() -> 'items', '[]'::jsonb)) x
+   where x ->> 'key' = p_key
+   limit 1;
+$$;
+
+-- Worn keys of a player, back to front (the order of accessories.slots)
+create or replace function public.player_worn_accessories(p_player uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(jsonb_agg(w.accessory_key order by coalesce(s.ord, 99), w.slot), '[]'::jsonb)
+    from public.player_accessories_worn w
+    left join lateral (select x.ord from jsonb_array_elements_text(coalesce(public.accessories_cfg() -> 'slots', '[]'::jsonb))
+                                          with ordinality as x(slot, ord)
+                        where x.slot = w.slot) s on true
+   where w.player_id = p_player;
+$$;
+
+-- The wardrobe of a player: owned keys (oldest first), worn keys, the portrait
+create or replace function public.accessories_state(p_player uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'owned', coalesce((select jsonb_agg(a.accessory_key order by a.bought_at, a.accessory_key)
+                         from public.player_accessories a where a.player_id = p_player), '[]'::jsonb),
+    'worn', public.player_worn_accessories(p_player),
+    'avatar_key', (select p.avatar_key from public.profiles p where p.id = p_player));
+$$;
+
+-- ---------------------------------------------------------------------------
+-- E. RPCs: accessories
+-- ---------------------------------------------------------------------------
+create or replace function public.get_accessories()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  return public.accessories_state(public.require_player());
+end;
+$$;
+comment on function public.get_accessories() is 'RPC: the own wardrobe (ADR-154): owned and worn accessories.';
+
+create or replace function public.buy_accessory(p_request_id uuid, p_key text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  v_item   jsonb;
+  v_price  bigint;
+  v_cash   bigint;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_key is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'buy_accessory');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_item := public.accessory_item(p_key);
+  if v_item is null then
+    perform public.api_error('accessory_unknown');
+  end if;
+  if coalesce((select p.level from public.profiles p where p.id = v_player), 1) < coalesce((v_item ->> 'minLevel')::integer, 1) then
+    perform public.api_error('accessory_locked');
+  end if;
+  v_price := (v_item ->> 'priceCents')::bigint;
+  if v_price is null or v_price < 0 then
+    perform public.api_error('accessory_unknown');
+  end if;
+  v_cash := public.lock_player_accounts(v_player);
+  if exists (select 1 from public.player_accessories a where a.player_id = v_player and a.accessory_key = p_key) then
+    perform public.api_error('accessory_owned');
+  end if;
+  if v_cash < v_price then
+    perform public.api_error('insufficient_funds');
+  end if;
+  if v_price > 0 then
+    perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'), public.ledger_system_account('households'),
+                                   v_price, 'lifestyle_purchase', 'Accessoire gekauft: ' || coalesce(v_item ->> 'name', p_key),
+                                   'accessory', null, 'accessory:' || v_player::text || ':' || p_request_id::text, v_player,
+                                   jsonb_build_object('accessory_key', p_key, 'price_cents', v_price));
+  end if;
+  insert into public.player_accessories (player_id, accessory_key, price_paid_cents) values (v_player, p_key, v_price);
+  -- bought to be worn: it goes on right away (replacing what was in the slot)
+  insert into public.player_accessories_worn (player_id, slot, accessory_key)
+  values (v_player, v_item ->> 'slot', p_key)
+  on conflict (player_id, slot) do update set accessory_key = excluded.accessory_key, worn_at = now();
+  if coalesce(public.accessories_cfg() -> 'feedRarities', '[]'::jsonb) ? (v_item ->> 'rarity') then
+    perform public.feed_post(v_player, 'accessory_bought',
+                             jsonb_build_object('key', p_key, 'name', v_item ->> 'name', 'rarity', v_item ->> 'rarity',
+                                                'price_cents', v_price),
+                             'accessory:' || v_player::text || ':' || p_key);
+  end if;
+  return public.request_complete(v_player, p_request_id,
+    public.accessories_state(v_player) || jsonb_build_object('paid_cents', v_price));
+end;
+$$;
+comment on function public.buy_accessory(uuid, text) is
+  'RPC: buys an accessory once (money to the households) and wears it (ADR-154); errors invalid_argument, '
+  'accessory_unknown, accessory_locked, accessory_owned, insufficient_funds.';
+
+create or replace function public.wear_accessory(p_request_id uuid, p_key text, p_wear boolean)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  v_item   jsonb;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_key is null or p_wear is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'wear_accessory');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_item := public.accessory_item(p_key);
+  if v_item is null then
+    perform public.api_error('accessory_unknown');
+  end if;
+  if not exists (select 1 from public.player_accessories a where a.player_id = v_player and a.accessory_key = p_key) then
+    perform public.api_error('accessory_not_owned');
+  end if;
+  if p_wear then
+    insert into public.player_accessories_worn (player_id, slot, accessory_key)
+    values (v_player, v_item ->> 'slot', p_key)
+    on conflict (player_id, slot) do update set accessory_key = excluded.accessory_key, worn_at = now();
+  else
+    delete from public.player_accessories_worn w where w.player_id = v_player and w.accessory_key = p_key;
+  end if;
+  return public.request_complete(v_player, p_request_id, public.accessories_state(v_player));
+end;
+$$;
+comment on function public.wear_accessory(uuid, text, boolean) is
+  'RPC: puts an owned accessory on (replacing the one in its slot) or takes it off (ADR-154); errors invalid_argument, '
+  'accessory_unknown, accessory_not_owned.';
+
+-- ---------------------------------------------------------------------------
+-- F. RPC: poke a friend
+-- ---------------------------------------------------------------------------
+create or replace function public.poke_friend(p_request_id uuid, p_nickname text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  v_other  uuid;
+  v_me     text;
+  v_them   text;
+  v_cool   integer := greatest(0, coalesce(public.config_double('social', '{poke,cooldownMinutes}', 10), 10)::integer);
+  v_cap    integer := greatest(1, coalesce(public.config_double('social', '{poke,dailyCap}', 30), 30)::integer);
+  v_last   timestamptz;
+  v_count  integer;
+  v_id     bigint;
+  v_lines  text[] := array[
+    'Stups zurück, bevor es peinlich wird.',
+    'Das war ein freundschaftlicher Stups. Vermutlich.',
+    'Schau mal vorbei, dein Depot vermisst dich.',
+    'Pssst! Jemand denkt an dich.',
+    'Stups! Du bist dran.'];
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'poke_friend');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_other := public.friend_target(v_player, p_nickname);
+  if not exists (select 1 from public.friendships f
+                  where f.status = 'accepted'
+                    and least(f.requester_id, f.addressee_id) = least(v_player, v_other)
+                    and greatest(f.requester_id, f.addressee_id) = greatest(v_player, v_other)) then
+    perform public.api_error('not_friends');
+  end if;
+  -- one poke of the same player at a time
+  select p.nickname into v_me from public.profiles p where p.id = v_player for update;
+  select p.nickname into v_them from public.profiles p where p.id = v_other;
+  select max(x.created_at) into v_last from public.friend_pokes x where x.poker_id = v_player and x.target_id = v_other;
+  if v_last is not null and v_last > now() - make_interval(mins => v_cool) then
+    perform public.api_error('poke_too_soon');
+  end if;
+  select count(*) into v_count from public.friend_pokes x where x.poker_id = v_player and x.created_at > now() - interval '24 hours';
+  if v_count >= v_cap then
+    perform public.api_error('poke_daily_limit');
+  end if;
+  insert into public.friend_pokes (poker_id, target_id) values (v_player, v_other) returning id into v_id;
+  delete from public.friend_pokes x where x.poker_id = v_player and x.created_at < now() - interval '2 days';
+  perform public.social_notify(v_other, 'friend_poke', v_me || ' hat dich angestupst! 👉',
+                               v_lines[1 + floor(random() * array_length(v_lines, 1))::integer],
+                               jsonb_build_object('nickname', v_me), '/players/' || v_me, 'poke:' || v_id::text);
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'nickname', v_them,
+    'poked_at', now(),
+    'next_at', now() + make_interval(mins => v_cool),
+    'left_today', greatest(0, v_cap - v_count - 1)));
+end;
+$$;
+comment on function public.poke_friend(uuid, text) is
+  'RPC: pokes a friend (ADR-154): notification friend_poke with a link to the own profile; errors invalid_argument, '
+  'player_not_found, not_friends, poke_too_soon, poke_daily_limit.';
+
+-- ---------------------------------------------------------------------------
+-- G. Others see the figure: friends list and player card
+-- ---------------------------------------------------------------------------
+create or replace function public.friends_json(p_player uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'friends', coalesce((
+      select jsonb_agg(jsonb_build_object('nickname', p.nickname, 'tag', p.tag, 'level', p.level,
+                                          'since', coalesce(f.responded_at, f.updated_at),
+                                          'online', coalesce(p.last_active_at > public.game_now() - make_interval(
+                                                      mins => coalesce(public.config_double('social', '{onlineMinutes}', 10), 10)::integer), false),
+                                          'last_active_at', p.last_active_at,
+                                          'avatar_key', p.avatar_key,
+                                          'accessories', public.player_worn_accessories(p.id))
+                       order by coalesce(p.last_active_at > public.game_now() - make_interval(
+                                  mins => coalesce(public.config_double('social', '{onlineMinutes}', 10), 10)::integer), false) desc,
+                                lower(p.nickname), p.id)
+        from public.friendships f
+        join public.profiles p on p.id = case when f.requester_id = p_player then f.addressee_id else f.requester_id end
+       where f.status = 'accepted' and p_player in (f.requester_id, f.addressee_id) and not p.is_deactivated), '[]'::jsonb),
+    'incoming', coalesce((
+      select jsonb_agg(jsonb_build_object('nickname', p.nickname, 'tag', p.tag, 'level', p.level, 'at', f.updated_at)
+                       order by f.updated_at desc, p.id)
+        from public.friendships f join public.profiles p on p.id = f.requester_id
+       where f.status = 'pending' and f.addressee_id = p_player and not p.is_deactivated), '[]'::jsonb),
+    'outgoing', coalesce((
+      select jsonb_agg(jsonb_build_object('nickname', p.nickname, 'tag', p.tag, 'level', p.level, 'at', f.updated_at)
+                       order by f.updated_at desc, p.id)
+        from public.friendships f join public.profiles p on p.id = f.addressee_id
+       where f.status = 'pending' and f.requester_id = p_player and not p.is_deactivated), '[]'::jsonb));
+$$;
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.get_player_card(text)'::regprocedure);
+  v_old text := $t$    'trust',           public.player_trust(p.id));$t$;
+  v_new text := $t$    'accessories',     public.player_worn_accessories(p.id),
+    'trust',           public.player_trust(p.id));$t$;
+begin
+  if position('player_worn_accessories' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'get_player_card() has an unexpected shape; add the accessories by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- H. Account reset and deletion forget the wardrobe and the pokes; the feed names the purchase
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.account_wipe(uuid, text)'::regprocedure);
+  v_old text := $t$('player_homes', 'player_id'), ('trust_events', 'player_id')$t$;
+  v_new text := $t$('player_homes', 'player_id'), ('trust_events', 'player_id'),
+             ('player_accessories_worn', 'player_id'), ('player_accessories', 'player_id'), ('friend_pokes', 'poker_id')$t$;
+begin
+  if position('player_accessories_worn' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'account_wipe() has an unexpected shape; add the accessory tables by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.feed_item_label(text, jsonb)'::regprocedure);
+  v_old text := $t$    when 'car_bought' then 'Neues Auto'$t$;
+  v_new text := $t$    when 'car_bought' then 'Neues Auto'
+    when 'accessory_bought' then coalesce(p_payload ->> 'name', 'Accessoire') || ' gekauft'$t$;
+begin
+  if position('accessory_bought' in v_def) = 0 and position(v_old in v_def) > 0 then
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- I. Grants
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.accessories_cfg()', 'public.accessory_item(text)', 'public.player_worn_accessories(uuid)',
+    'public.accessories_state(uuid)', 'public.get_accessories()', 'public.buy_accessory(uuid, text)',
+    'public.wear_accessory(uuid, text, boolean)', 'public.poke_friend(uuid, text)', 'public.friends_json(uuid)'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+    execute format('grant execute on function %s to service_role', f);
+  end loop;
+  foreach f in array array[
+    'public.get_accessories()', 'public.buy_accessory(uuid, text)', 'public.wear_accessory(uuid, text, boolean)',
+    'public.poke_friend(uuid, text)'
+  ] loop
+    execute format('grant execute on function %s to authenticated', f);
+  end loop;
+end;
+$$;
 
 -- ===== game_config (current values, overwriting older ones) =====
 -- GENERATED by scripts/gen-config-seed.ts from src/config/balance.ts. Do not edit by hand.
@@ -51268,11 +51719,12 @@ insert into public.game_config (key, value, description) values
   ('pitches', '{"minChars":12,"maxChars":280,"judgeWaitSeconds":90,"eventMinutes":20,"moveMinutes":30,"orderCooldownMinutes":60,"chanceBaseBps":1000,"chancePerFitBps":80,"maxChanceBps":9000,"eventCostUnits":2,"moveCostFactor":1.2,"mitigationBase":0.35,"mitigationPerFit":0.005,"maxMitigation":0.9,"movePayoutBase":1.3,"movePayoutPerFit":0.012,"moveGainBase":0.02,"moveGainPerFit":0.0006,"moveRefundBps":2000,"backfireAwareness":0.05,"mini":{"fitBase":25,"fitPerHit":12,"maxHits":4,"longTextChars":60,"longTextBonus":10,"maxFit":85,"backfireBase":10,"backfirePerRisky":20,"maxBackfire":70,"risky":["imagefilm","werbung","werbekampagne","influencer","pr-","greenwashing","ignorieren","leugnen","abstreiten","lügen","vertuschen","schweigen","aussitzen","drohen","verklagen","entlassen","billiger","bestechen"],"good":{"regulation":["anwalt","recht","prüfen","anpassen","lobby","verband","gutachten","umstellen","dialog"],"special_tax":["steuer","berater","kalkul","preis","rohstoff","ersatz","sparen","lieferant"],"supply_shortage":["lieferant","lager","alternativ","vorrat","zweit","ersatz","vertrag","regional"],"quality_scandal":["rückruf","entschuldig","prüf","qualität","kontroll","ersetzen","transparen","entschädig"],"data_breach":["sicherheit","passwort","verschlüssel","melden","experten","informieren","update","audit"],"price_war":["qualität","service","treue","nische","kosten","bündel","mehrwert","marke"],"strike":["lohn","gehalt","verhandl","bonus","gespräch","kompromiss","zuhören","arbeitszeit","tarif"],"protest":["dialog","einladen","zuhören","ändern","nachhaltig","transparen","spenden","fair"],"patent_claim":["anwalt","patent","lizenz","einigung","gutachten","umgehen","vergleich","eigene"],"bad_review":["verbessern","test","feedback","kunden","nachbessern","qualität","gratis","update"],"viral_trend":["nachproduz","lager","social","video","aktion","schnell","limitiert","community"],"big_contract":["kapazität","personal","einstellen","termin","liefer","verhandl","vertrag","schicht"],"award":["pressemitteilung","werbung","feiern","kunden","messe","präsentieren","website","siegel"],"subsidy":["antrag","förder","investieren","forschung","berater","unterlagen","frist","projekt"],"partnership":["vertrag","gemeinsam","partner","teilen","kooperation","verhandl","netzwerk","vertrieb"],"cash":["verkauf","auftrag","kunden","rabatt","angebot","großkunde","export","abo","online"],"awareness":["werbung","messe","social","video","presse","influencer","sponsor","event","kampagne"],"quality":["schulung","test","prüfen","verbessern","material","zertifi","forschung","feedback"]}}}'::jsonb, 'Defaults from src/config/balance.ts, section "pitches"'),
   ('protests', '{"kinds":["boycott","shitstorm","petition","protest_march"],"startCostCents":50000,"goal":20,"aiMax":16,"aiJoinChanceBps":3000,"aiPerMinuteMax":2,"durationHours":6,"starterCooldownHours":6,"visibleAfterMinutes":60,"effectChanceBaseBps":600,"effectChancePerPlayerBps":300,"effectChanceMaxBps":3500,"priceHitMinBps":150,"priceHitMaxBps":450,"awarenessHit":0.03,"minLevel":4}'::jsonb, 'Defaults from src/config/balance.ts, section "protests"'),
   ('nfts', '{"royaltyBps":1000,"mintXp":100,"minAskCents":10000,"minOfferCents":10000,"chat":{"maxLength":200,"perMinute":6,"history":60,"offerHours":24},"ai":{"floorCents":100000,"likeBps":400,"maxLikes":40,"creatorSaleBps":300,"maxCreatorSales":10,"ageBpsPerDay":100,"maxAgeDays":30,"buyChanceBps":2500,"listedOfferChanceBps":800,"unlistedOfferChanceBps":80,"lowballMinBps":6500,"lowballMaxBps":9000,"maxBuysPerDay":20,"maxMessagesPerRun":4,"resaleMarkupBps":12500,"acceptBps":10500,"demand":{"offerBps":600,"maxOffers":6,"saleBps":500,"maxSales":6,"days":7},"trade":{"chanceBps":60,"likeWeightBps":1500,"offerWeightBps":4000,"saleWeightBps":2500,"maxChanceBps":1500,"minHoldMinutes":30,"perRun":2,"perDay":30,"tasteMinBps":8500,"tasteMaxBps":12500,"reversionBps":5000},"collectors":["Vera Vermeer","Konrad Kollektor","Pixel-Paula","Baron von Bit","Mia Mosaik","Otto Original","Gräfin Glitzer","Sammler Sam"],"lines":{"offer":["Schönes Stück. Mehr ist es mir aber nicht wert.","Für meine Sammlung würde ich so viel zahlen.","Mein Angebot. Überleg es dir nicht zu lange.","Hübsch! Wäre das ein fairer Preis?","Ich biete das. Nimm es, solange ich gute Laune habe.","Mein Hund hat draufgebellt. Das heißt bei uns: kaufen.","Ich habe keine Ahnung, was das sein soll. Ich nehme es.","Meine Mutter sagt, ich soll aufhören, Pixel zu kaufen. Hier mein Angebot.","Ich wollte eigentlich Brot kaufen. Jetzt bin ich hier.","Das hängt später über meinem Klo. Ehrenplatz.","Mehr habe ich nicht, den Rest hat mein Wellensittich verzockt.","Ist das Kunst oder ist dein Bildschirm kaputt? Egal, Angebot steht.","Ich biete das und lege ein halbes Käsebrot drauf.","Mein Horoskop sagt: heute teuer einkaufen. Bitte sehr.","Ich habe das Bild meinem Zahnarzt gezeigt. Er hat geweint. Ich biete.","Angebot! Bitte schnell, mein Akku hat noch drei Prozent.","Ich sammle nur Dinge, die ich nicht verstehe. Passt perfekt.","Dafür verkaufe ich mein Fahrrad. Na gut, den Sattel.","Wusstest du, dass Otter Händchen halten? Jedenfalls: mein Angebot.","Ich habe gewürfelt. Das ist der Preis. Die Würfel lügen nicht.","Mein Steuerberater ist ohnmächtig geworden, also muss es gut sein.","Das erinnert mich an meinen Ex. Ich will es trotzdem.","Ich zahle in Spielgeld, weil ich nichts anderes habe.","Letztes Angebot. Also das erste. Aber auch das letzte. Vielleicht.","Ich kaufe das nur, damit Baron von Bit es nicht bekommt.","So viel für so wenige Pixel? Ich liebe es.","Meine Wand ist leer und mein Kopf auch. Nimm mein Geld.","Ich habe eine Lasagne im Ofen, bitte entscheide dich fix.","Das sieht aus wie mein Kontostand: wild. Angebot.","Ich habe mich verklickt, aber jetzt ziehe ich es durch."],"buy":["Gekauft! Das kommt in meine Sammlung.","Zu diesem Preis konnte ich nicht widerstehen.","Ein fairer Preis. Danke!","Gekauft. Fragt mich nicht, warum.","Meins! Jetzt muss ich nur noch herausfinden, was es ist.","Gekauft, bevor mein Verstand wach wird.","Das kommt neben den Toaster. Da ist das Licht am besten.","Ich habe es. Meine Erben werden mich hassen.","Zack, gekauft. Miete wird überbewertet.","Endlich etwas, das ich meiner Katze vererben kann.","Gekauft! Ich schreibe es als Arbeitskleidung ab.","Schnäppchen. Sagt jedenfalls die Stimme in meinem Kühlschrank.","Ich wollte nur gucken. Tja.","Gekauft. Der Pizzabote kann warten."],"accept":["Abgemacht! Viel Freude damit.","Einverstanden, es gehört dir.","Deal. Bitte nicht in der Sonne lagern.","Nimm es, bevor ich es mir anders überlege.","Verkauft! Ich brauche das Geld für Gartenzwerge.","Na gut. Aber du musst es jeden Tag anschauen. Versprich es.","Einverstanden. Es hat mich nachts sowieso angestarrt.","Deal! Grüß deine Oma von mir.","Okay, okay. Du verhandelst wie mein Schwager.","Abgemacht. Der Rahmen kostet extra. Es gibt keinen Rahmen."],"trade":["Endlich gehört es mir! Das wollte ich schon lange.","Ich musste es einfach haben.","Gekauft von einer Kollegin. Jetzt steht es zum Verkauf, wer bietet mehr?","Ein Schnäppchen unter Sammlern.","Das Stück ist gefragt. Ich habe zugeschlagen.","Ich habe es Otto Original abgeluchst. Er weint jetzt in sein Müsli.","Getauscht gegen ein Geheimnis und etwas Bargeld.","Gekauft beim Sammlerstammtisch. Es gab Mettbrötchen.","Ich weiß nicht, wem ich es abgekauft habe. Er trug einen Umhang.","Meins. Die anderen Sammler können sich gehackt legen.","Frisch erworben und schon wieder im Angebot. So bin ich.","Ich habe es im Tausch gegen meinen guten Ruf bekommen.","Sammler Sam wollte es auch. Sammler Sam war zu langsam.","Gekauft, dreimal angeschaut, gelangweilt. Wer will?","Das hing eben noch bei Gräfin Glitzer. Jetzt nicht mehr. Ha!"],"decline":["Nein danke, darunter verkaufe ich nicht.","Netter Versuch. Biete mehr.","Das ist zu wenig für dieses Stück.","Dafür bekommst du bei mir höchstens ein Foto vom Bild.","Hahaha. Nein.","Für den Preis male ich dir ein Strichmännchen. Ein schlechtes.","Mein Goldfisch bietet mehr, und der hat kein Konto.","Zu wenig. Ich habe schließlich eine Yacht aus Pappe zu unterhalten.","Nein. Und meine Katze sagt auch nein.","Bei dem Angebot ist mir kurz schwarz vor Augen geworden.","Ich frage kurz meinen Anwalt. Er lacht noch.","Leg eine Null dran, dann reden wir. Hinten, nicht vorne.","Das ist kein Angebot, das ist eine Beleidigung mit Komma.","Nö. Aber danke, dass du an mich gedacht hast.","Ich verkaufe nicht unter Wert. Außer montags. Heute ist nicht Montag. Glaube ich."]}}}'::jsonb, 'Defaults from src/config/balance.ts, section "nfts"'),
+  ('accessories', '{"slots":["back","body","face","head","hand","pet"],"feedRarities":["legendary"],"items":[{"key":"party_hat","name":"Partyhütchen","description":"Jeder Tag ist ein Feiertag, wenn das Depot grün ist.","slot":"head","rarity":"common","priceCents":25000,"minLevel":1},{"key":"paper_crown","name":"Pappkrone","description":"Vom Burgerladen. Fühlt sich trotzdem königlich an.","slot":"head","rarity":"common","priceCents":45000,"minLevel":1},{"key":"beanie","name":"Bommelmütze","description":"Hält warm, wenn der Markt eiskalt ist.","slot":"head","rarity":"common","priceCents":60000,"minLevel":1},{"key":"traffic_cone","name":"Leitkegel","description":"Vom Heimweg mitgenommen. Niemand fragt nach.","slot":"head","rarity":"common","priceCents":80000,"minLevel":1},{"key":"propeller_cap","name":"Propellermütze","description":"Dreht sich bei jedem Kursanstieg ein bisschen schneller.","slot":"head","rarity":"rare","priceCents":250000,"minLevel":2},{"key":"chef_hat","name":"Kochmütze","description":"Für alle, die ihr Depot nach Gefühl würzen.","slot":"head","rarity":"rare","priceCents":300000,"minLevel":2},{"key":"bunny_ears","name":"Hasenohren","description":"Hört Gerüchte schon, bevor sie in den Nachrichten sind.","slot":"head","rarity":"rare","priceCents":400000,"minLevel":3},{"key":"cowboy_hat","name":"Cowboyhut","description":"Yeehaw! Der Wilde Westen heißt jetzt Börse.","slot":"head","rarity":"rare","priceCents":650000,"minLevel":3},{"key":"pirate_hat","name":"Piratenhut","description":"Arrr! Für Leute, die Dividenden lieber entern.","slot":"head","rarity":"epic","priceCents":3500000,"minLevel":5},{"key":"viking_helmet","name":"Wikingerhelm","description":"Plündert keine Dörfer, nur Short-Positionen.","slot":"head","rarity":"epic","priceCents":6000000,"minLevel":6},{"key":"top_hat","name":"Zylinder","description":"Ab hier redet man nur noch über Rendite und Pferde.","slot":"head","rarity":"epic","priceCents":15000000,"minLevel":10},{"key":"halo","name":"Heiligenschein","description":"Garantiert nie Insiderhandel betrieben. Ehrlich.","slot":"head","rarity":"legendary","priceCents":75000000,"minLevel":15},{"key":"crown","name":"Goldkrone","description":"Massives Pixelgold mit echten Fake-Diamanten.","slot":"head","rarity":"legendary","priceCents":500000000,"minLevel":25},{"key":"clown_nose","name":"Clownsnase","description":"Macht jeden Verlust ein bisschen lustiger. Hupt nicht.","slot":"face","rarity":"common","priceCents":25000,"minLevel":1},{"key":"sunglasses","name":"Sonnenbrille","description":"Die Zukunft ist so hell, man braucht eine.","slot":"face","rarity":"common","priceCents":35000,"minLevel":1},{"key":"fake_moustache","name":"Falscher Schnurrbart","description":"Perfekte Tarnung. Niemand erkennt dich. Wirklich niemand.","slot":"face","rarity":"common","priceCents":40000,"minLevel":1},{"key":"heart_glasses","name":"Herzchenbrille","description":"Verliebt in jede Aktie, die man gerade gekauft hat.","slot":"face","rarity":"rare","priceCents":180000,"minLevel":2},{"key":"glasses_3d","name":"3D-Brille","description":"Endlich sieht man den Kurs auch in die Tiefe fallen.","slot":"face","rarity":"rare","priceCents":220000,"minLevel":3},{"key":"monocle","name":"Monokel","description":"Ein Auge auf den Markt, das andere auf den Butler.","slot":"face","rarity":"epic","priceCents":4500000,"minLevel":7},{"key":"vr_goggles","name":"VR-Brille","description":"Lebt halb im Metaversum, halb im Minus.","slot":"face","rarity":"epic","priceCents":12000000,"minLevel":8},{"key":"deal_shades","name":"Pixel-Sonnenbrille","description":"Fällt aus dem Nichts ins Gesicht. Deal with it.","slot":"face","rarity":"epic","priceCents":8000000,"minLevel":6},{"key":"laser_eyes","name":"Laseraugen","description":"Nur echt mit mindestens einem Coin, der zum Mond fliegt.","slot":"face","rarity":"legendary","priceCents":250000000,"minLevel":20},{"key":"bathrobe","name":"Bademantel","description":"Homeoffice-Uniform. Trading geht auch im Liegen.","slot":"body","rarity":"common","priceCents":50000,"minLevel":1},{"key":"tracksuit","name":"Trainingsanzug","description":"Raschelt bei jeder Bewegung. Sehr sportlich, nie gejoggt.","slot":"body","rarity":"common","priceCents":70000,"minLevel":1},{"key":"hawaiian_shirt","name":"Hawaiihemd","description":"Urlaubsmodus an, Depot läuft trotzdem.","slot":"body","rarity":"common","priceCents":90000,"minLevel":2},{"key":"banana_costume","name":"Bananenkostüm","description":"Krumm, gelb und immer ein Hingucker. Nicht ausrutschen.","slot":"body","rarity":"rare","priceCents":500000,"minLevel":2},{"key":"hotdog_costume","name":"Hotdog-Kostüm","description":"Mit extra Senf. Riecht zum Glück nur nach Stoff.","slot":"body","rarity":"rare","priceCents":750000,"minLevel":3},{"key":"tuxedo","name":"Smoking","description":"Für Börsengänge, Galas und das Abendessen zu Hause.","slot":"body","rarity":"rare","priceCents":1200000,"minLevel":4},{"key":"shark_costume","name":"Haikostüm","description":"Für echte Finanzhaie. Beißt nur bei Leerverkäufen.","slot":"body","rarity":"epic","priceCents":4000000,"minLevel":5},{"key":"dino_onesie","name":"Dino-Onesie","description":"Rawr! Uralte Anlagestrategie, extrem kuschelig.","slot":"body","rarity":"epic","priceCents":5500000,"minLevel":6},{"key":"astronaut_suit","name":"Raumanzug","description":"Wer zum Mond will, muss sich passend anziehen.","slot":"body","rarity":"epic","priceCents":20000000,"minLevel":12},{"key":"gold_suit","name":"Goldanzug","description":"Glänzt so sehr, dass die Konkurrenz eine Sonnenbrille braucht.","slot":"body","rarity":"legendary","priceCents":300000000,"minLevel":20},{"key":"balloon","name":"Luftballon","description":"Steigt wie deine Lieblingsaktie. Platzt hoffentlich nicht.","slot":"hand","rarity":"common","priceCents":15000,"minLevel":1},{"key":"baguette","name":"Baguette","description":"Knusprig, französisch, als Zeigestab bestens geeignet.","slot":"hand","rarity":"common","priceCents":20000,"minLevel":1},{"key":"rubber_chicken","name":"Gummihuhn","description":"Quietscht bei jedem Verlust. Also oft.","slot":"hand","rarity":"common","priceCents":30000,"minLevel":1},{"key":"ice_cream","name":"Eistüte","description":"Drei Kugeln: Gewinn, Verlust und Pistazie.","slot":"hand","rarity":"common","priceCents":25000,"minLevel":1},{"key":"foam_finger","name":"Schaumstoffhand","description":"Nummer eins! Zumindest in der eigenen Wochenliga.","slot":"hand","rarity":"rare","priceCents":150000,"minLevel":2},{"key":"megaphone","name":"Megafon","description":"KAUFEN! VERKAUFEN! Hauptsache laut.","slot":"hand","rarity":"rare","priceCents":350000,"minLevel":3},{"key":"money_bag","name":"Geldsack","description":"Mit Dollarzeichen drauf, damit es auch jeder versteht.","slot":"hand","rarity":"rare","priceCents":999900,"minLevel":4},{"key":"laser_sword","name":"Laserschwert","description":"Schneidet Gebühren und Spreads in der Mitte durch.","slot":"hand","rarity":"epic","priceCents":7000000,"minLevel":8},{"key":"golden_toilet_brush","name":"Goldene Klobürste","description":"Wahrer Reichtum zeigt sich im Badezimmer.","slot":"hand","rarity":"legendary","priceCents":150000000,"minLevel":18},{"key":"rubber_duck","name":"Quietscheente","description":"Hört zu, wenn du deine Trades erklärst. Urteilt nie.","slot":"pet","rarity":"common","priceCents":40000,"minLevel":1},{"key":"hamster","name":"Hamster","description":"Hamstert alles, besonders Dividenden.","slot":"pet","rarity":"rare","priceCents":120000,"minLevel":2},{"key":"parrot","name":"Papagei","description":"Plappert jeden Börsentipp nach. Auch die schlechten.","slot":"pet","rarity":"rare","priceCents":800000,"minLevel":4},{"key":"pug","name":"Mops","description":"Schnauft beim Laden der Kurse. Bester Freund an der Börse.","slot":"pet","rarity":"epic","priceCents":3000000,"minLevel":5},{"key":"mini_dragon","name":"Minidrache","description":"Bewacht deinen Goldschatz und röstet Marshmallows.","slot":"pet","rarity":"legendary","priceCents":400000000,"minLevel":22},{"key":"superhero_cape","name":"Superheldenumhang","description":"Rettet Depots, aber leider nur die eigenen.","slot":"back","rarity":"rare","priceCents":450000,"minLevel":2},{"key":"butterfly_wings","name":"Schmetterlingsflügel","description":"Ein Flügelschlag hier, ein Kurssturz in Tokio.","slot":"back","rarity":"rare","priceCents":900000,"minLevel":3},{"key":"bat_wings","name":"Fledermausflügel","description":"Für Nachteulen, die nachbörslich handeln.","slot":"back","rarity":"epic","priceCents":7500000,"minLevel":7},{"key":"angel_wings","name":"Engelsflügel","description":"Himmlische Renditen, garantiert ohne Garantie.","slot":"back","rarity":"epic","priceCents":25000000,"minLevel":12},{"key":"jetpack","name":"Jetpack","description":"To the moon! Tank voll, Sicherheitsgurt optional.","slot":"back","rarity":"legendary","priceCents":100000000,"minLevel":15}]}'::jsonb, 'Defaults from src/config/balance.ts, section "accessories"'),
   ('companyAssistant', '{"claudePerHour":20,"maxTextLength":300,"briefingTasks":3,"busyTasks":2,"urgentMinutes":10,"historyTurns":8}'::jsonb, 'Defaults from src/config/balance.ts, section "companyAssistant"'),
   ('wageMood', '{"crisisPerSeverityBps":500,"scandalBps":500,"scandals":["quality_scandal","data_breach","protest","bad_review","strike"],"shareFallFreeBps":300,"shareFallShare":0.5,"maxShareBps":2000,"minBps":6000}'::jsonb, 'Defaults from src/config/balance.ts, section "wageMood"'),
   ('marketPopularity', '{"windowDays":3,"viewCooldownMinutes":30,"maxViewsPerDay":200,"refreshMinutes":5,"weights":{"view":1,"investor":20,"volume":0.2}}'::jsonb, 'Defaults from src/config/balance.ts, section "marketPopularity"'),
   ('stockNews', '{"everyMinutes":12,"leadMinMinutes":10,"leadMaxMinutes":40,"minMoveBps":300,"maxMoveBps":1200,"reliabilityBps":7500,"keepHours":24}'::jsonb, 'Defaults from src/config/balance.ts, section "stockNews"'),
-  ('social', '{"feed":{"pageSize":30,"bigTradeMinProfitCents":100000,"bigTradeMinBps":1500,"levelEvery":5,"artMinPriceCents":1000000,"carMinPriceCents":10000000,"streakMilestones":[7,30,100,365],"keepDays":30},"league":{"updateEveryMinutes":10,"podium":3,"minBaselineCents":1000000},"friendCode":{"bonusCents":500000}}'::jsonb, 'Defaults from src/config/balance.ts, section "social"'),
+  ('social', '{"feed":{"pageSize":30,"bigTradeMinProfitCents":100000,"bigTradeMinBps":1500,"levelEvery":5,"artMinPriceCents":1000000,"carMinPriceCents":10000000,"streakMilestones":[7,30,100,365],"keepDays":30},"league":{"updateEveryMinutes":10,"podium":3,"minBaselineCents":1000000},"friendCode":{"bonusCents":500000},"poke":{"cooldownMinutes":10,"dailyCap":30}}'::jsonb, 'Defaults from src/config/balance.ts, section "social"'),
   ('property', '{"tiers":[{"key":"flat","priceCents":2500000,"width":8,"height":6,"garageSlots":0,"minLevel":8},{"key":"apartment","priceCents":10000000,"width":10,"height":8,"garageSlots":0,"minLevel":11},{"key":"house","priceCents":50000000,"width":13,"height":9,"garageSlots":2,"minLevel":14},{"key":"villa","priceCents":250000000,"width":16,"height":11,"garageSlots":4,"minLevel":22},{"key":"luxury_villa","priceCents":1500000000,"width":20,"height":13,"garageSlots":8,"minLevel":30}],"tradeInBps":5000,"resaleBps":4000,"floors":{"laminate":0,"carpet":150000,"tiles":400000,"parquet":600000,"stone":1500000,"marble":6000000,"gold":100000000},"wallColors":["#f3efe4","#ffffff","#d9d4c7","#8f9bb3","#3a4256","#1b1e2b","#c8e6c9","#2f7a4a","#bfe6ff","#2f5fd0","#ffe0b2","#ff9a52","#f8bbd0","#7a2f7a","#c8553d","#ffd15c"]}'::jsonb, 'Defaults from src/config/balance.ts, section "property"')
 on conflict (key) do update set value = excluded.value, description = excluded.description, updated_at = now();
 

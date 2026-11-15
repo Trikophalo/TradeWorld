@@ -1,10 +1,10 @@
 {
-  "code": "NEXA-5PJ9",
+  "code": "NEXA-9H4Y",
   "invited": 0,
   "redeemed": true,
   "paid_cents": 500000,
   "bonus_cents": 500000,
-  "redeemed_at": "2026-11-15T11:12:05.551981+00:00",
-  "redeemed_from": { "tag": "CZKQ", "nickname": "Fixture_Werber" },
+  "redeemed_at": "2026-11-15T12:32:57.485278+00:00",
+  "redeemed_from": { "tag": "M83K", "nickname": "Fixture_Werber" },
   "cash_after_cents": 1500000
 }

@@ -1182,3 +1182,24 @@ select public.get_news_show();
 \o
 reset role;
 update public.game_config set value = jsonb_set(value, '{waitMinutes}', '10') where key = 'newsShow';
+
+-- Accessories and poking friends (ADR-154) ---------------------------------------------------------------------------
+select tests.fund(:p, 5000000, 'fixture:accessories');
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/buy_accessory.json
+select public.buy_accessory(gen_random_uuid(), 'party_hat');
+\o
+select public.buy_accessory(gen_random_uuid(), 'sunglasses') is not null as ok \gset
+\o :fixture_dir/wear_accessory.json
+select public.wear_accessory(gen_random_uuid(), 'sunglasses', false);
+\o :fixture_dir/get_accessories.json
+select public.get_accessories();
+\o
+reset role;
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/poke_friend.json
+select public.poke_friend(gen_random_uuid(), 'Fixture_Kunst');
+\o :fixture_dir/get_friends_dressed.json
+select public.get_friends();
+\o
+reset role;

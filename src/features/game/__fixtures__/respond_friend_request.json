@@ -1,12 +1,14 @@
 {
   "friends": [
     {
-      "tag": "7W9X",
+      "tag": "YCFR",
       "level": 15,
-      "since": "2026-11-15T11:12:03.358085+00:00",
+      "since": "2026-11-15T12:32:54.873466+00:00",
       "online": true,
       "nickname": "Fixture_Gmbh",
-      "last_active_at": "2026-11-15T11:12:03.087974+00:00"
+      "avatar_key": "rookie",
+      "accessories": [],
+      "last_active_at": "2026-11-15T12:32:54.456551+00:00"
     }
   ],
   "incoming": [],

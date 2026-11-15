@@ -1,6 +1,6 @@
 {
   "job": {
-    "id": "5ca5e091-c432-4f83-983d-81c8e8a067b3",
+    "id": "42bbfa98-71b5-4fa2-87af-1139b6153e49",
     "tier": "intern",
     "title": null,
     "company": {
@@ -13,9 +13,9 @@
       "ticker": "FPT"
     },
     "presence": {
-      "fire_at": "2026-11-20T11:12:03.77179+00:00",
+      "fire_at": "2026-11-20T12:32:55.465071+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-15T11:12:03.77179+00:00"
+      "last_active_at": "2026-11-15T12:32:55.465071+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-15T11:12:03.911209+00:00",
+    "started_at": "2026-11-15T12:32:55.637461+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

@@ -1,33 +1,42 @@
 {
   "news": [],
   "facts": {
-    "staff": 1,
+    "staff": 2,
     "stage": 0,
     "period": null,
-    "product": "security_software",
-    "max_staff": 40,
+    "product": "online_shop",
+    "max_staff": 2,
     "ai_workers": 0,
     "quality_bps": null,
-    "value_cents": 7856750,
+    "value_cents": 20370600,
     "profit_cents": null,
     "awareness_bps": null,
     "revenue_cents": null
   },
   "company": {
-    "id": "462c0f1b-095e-4bd0-90c2-dfa9c1f70535",
-    "idea": "Maschinen nach Maß",
+    "id": "a70ef1e1-7a9a-4c55-b508-3362f0cfca9d",
+    "idea": "Lastenräder für alle",
     "logo": null,
-    "name": "Ausbau Werke",
-    "tier": "gmbh",
+    "name": "Frida Fahrrad",
+    "tier": "garage",
     "is_ai": false,
     "listed": false,
-    "sector": "tech",
+    "sector": "retail",
     "ticker": null,
     "price_e4": null,
     "change_bps": null,
-    "founded_at": "2026-11-15T11:11:41.013325+00:00",
-    "brand_color": "#224466"
+    "founded_at": "2026-11-15T12:32:44.938057+00:00",
+    "brand_color": "#336699"
   },
-  "founder": { "tag": "BX4F", "nickname": "Anke_Ausbau", "avatar_key": "rookie" },
-  "members": []
+  "founder": { "tag": "YQNB", "nickname": "Frida_Upgrade", "avatar_key": "rookie" },
+  "members": [
+    {
+      "tag": "UA9C",
+      "tier": "intern",
+      "since": "2026-11-15T12:32:45.068138+00:00",
+      "title": "Werkstudium",
+      "nickname": "Willi_Bonus",
+      "avatar_key": "rookie"
+    }
+  ]
 }
