@@ -2,7 +2,7 @@
 
 import { motion } from "motion/react";
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { COMPANY_BUILDINGS, UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Button, type ButtonState } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import { BALANCE } from "@/config/balance";
 import { useGameErrorText } from "@/features/game/errors";
 import { engine, useGame } from "@/features/game/store";
 import type { MyCompany } from "@/features/game/types";
+import type { HealthFactorKey } from "@/lib/sim/company-health";
 import { parseEuroCents } from "@/features/market/order-schema";
 import { useVisitTour } from "@/features/tutorial/use-visit-tour";
 import { formatBps, formatMoney } from "@/lib/format";
@@ -25,7 +26,8 @@ import { haptic } from "@/lib/haptics";
 import { SPRING } from "@/lib/motion";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
-import { MiraChat } from "../assistant/mira-chat";
+import { askMira, MiraChat } from "../assistant/mira-chat";
+import { useCompanyHealth } from "../health";
 import { useCompanyRefresh } from "../hooks";
 import { useCompanySections } from "../sections";
 import { CompanyChat } from "./company-chat";
@@ -39,6 +41,7 @@ import { ListingCard, SideJobNotice } from "./listing";
 import { BannerEditor } from "./banner-editor";
 import { LogoEditor } from "./logo-editor";
 import { OfficeScene } from "./office-scene";
+import { HealthCompact, HealthPanel } from "./health-panel";
 import { ExpansionCard, PayoutCard, ProfitCoach, StrategyCard } from "./profit";
 import { ProductionCard } from "./production";
 import { CampaignCard, ProfitRoutes } from "./routes";
@@ -80,6 +83,26 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
   const goTraining = () => {
     setTab("team");
     window.setTimeout(() => document.getElementById("training")?.scrollIntoView({ behavior: "smooth" }), 50);
+  };
+
+  // Where the company loses money (ADR-162): always on top of the overview; every factor goes to Mira.
+  const health = useCompanyHealth(company);
+  const miraHealth = useMemo(
+    () => ({
+      result: health,
+      priceLevel: company.priceLevel,
+      contractWork: company.contractWork,
+      marketingCentsPerQuarter: company.marketingCentsPerQuarter,
+      aiWageCentsPerHour: company.aiWageCentsPerHour,
+    }),
+    [health, company.priceLevel, company.contractWork, company.marketingCentsPerQuarter, company.aiWageCentsPerHour],
+  );
+  const questions = useTranslations("companyHealth.questions");
+  const askAbout = (factor: HealthFactorKey) => {
+    haptic("tap");
+    askMira(questions(factor));
+    setTab("mira");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (
@@ -132,14 +155,20 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
       />
 
       {tab === "mira" && (
-        <MiraChat
-          applications={company.pendingApplications}
-          onOpen={(to, id) => {
-            if (to === "overview" && id) return reveal(id);
-            setTab(to);
-          }}
-        />
+        <div className="space-y-4">
+          <HealthCompact health={health} onAsk={askAbout} onShowAll={() => setTab("overview")} />
+          <MiraChat
+            applications={company.pendingApplications}
+            health={miraHealth}
+            onOpen={(to, id) => {
+              if (to === "overview" && id) return reveal(id);
+              if (to === "team" && id === "training") return goTraining();
+              setTab(to);
+            }}
+          />
+        </div>
       )}
+      {tab === "overview" && <HealthPanel health={health} onAsk={askAbout} />}
       {tab === "overview" && (
         <div className="grid items-start gap-4 *:min-w-0 lg:grid-cols-2 lg:gap-5" data-testid="company-overview">
           <div className="space-y-4">

@@ -17,9 +17,14 @@ import {
   suggestMoves,
   validActions,
   warningFor,
+  healthSteps,
+  healthTopic,
+  healthTurn,
+  type MiraAction,
   type MiraNames,
   type MiraState,
 } from "./brain";
+import { HEALTH_FACTORS, type CompanyHealth, type HealthFactor, type HealthFactorKey } from "@/lib/sim/company-health";
 
 const NOW = Date.parse("2026-11-14T12:00:00Z");
 const NAMES: Record<string, string> = { pack_shirts: "T-Shirts packen", inventory: "Inventur zählen" };
@@ -329,5 +334,212 @@ describe("Mira's free orders, plan and reports", () => {
     expect(alarm[0]?.id).toBe("urgent:9");
     // The AI would be too late: not offered in the alarm.
     expect(alarm[0]?.options.some((o) => o.action.type === "delegate" && o.action.to === "ai")).toBe(false);
+  });
+});
+
+// ---- Company health (ADR-162) ---------------------------------------------------------------------------------------
+
+function factorOf(key: HealthFactorKey, extra: Partial<HealthFactor> = {}): HealthFactor {
+  return {
+    key,
+    score: 90,
+    status: "good",
+    reason: { key: `${key}.x`, values: {} },
+    impactCents: 0,
+    levers: [],
+    ...extra,
+  };
+}
+
+function health(
+  weak: Partial<Record<HealthFactorKey, Partial<HealthFactor>>> = {},
+  weakest: HealthFactorKey = "awareness",
+) {
+  const result: CompanyHealth = {
+    factors: HEALTH_FACTORS.map((k) => factorOf(k, weak[k])),
+    weakest,
+    profitPerHourCents: -5_000,
+    score: 70,
+    estimated: false,
+  };
+  return {
+    result,
+    priceLevel: "normal" as const,
+    contractWork: false,
+    marketingCentsPerQuarter: 0,
+    aiWageCentsPerHour: 12_000,
+  };
+}
+
+const healthNames: MiraNames = {
+  ...names,
+  health: { factor: (k) => `F:${k}`, reason: (f) => `R:${f.reason.key}`, skill: (k) => `S:${k}` },
+};
+
+const weakAwareness = health({
+  awareness: {
+    score: 20,
+    status: "critical",
+    impactCents: 8_000,
+    levers: [
+      { kind: "marketing", cents: 60_000 },
+      { kind: "campaign", campaign: "flyer", costCents: 10_000 },
+      { kind: "move", goal: "awareness" },
+    ],
+  },
+});
+
+describe("Mira and the company's health", () => {
+  it("reads which factor a question is about", () => {
+    expect(healthTopic("Wie steigere ich die Bekanntheit?")).toBe("awareness");
+    expect(healthTopic("Wie bringe ich die Menge passend zur Nachfrage?")).toBe("capacity");
+    expect(healthTopic("Wie verbessere ich die Qualität?")).toBe("quality");
+    expect(healthTopic("Wie bringe ich unser Image in Ordnung?")).toBe("image");
+    expect(healthTopic("Welcher Preis bringt am meisten?")).toBe("price");
+    expect(healthTopic("Was fehlt meinem Team?")).toBe("team");
+    expect(healthTopic("Wie bringe ich die Kasse in Ordnung?")).toBe("cash");
+    expect(healthTopic("Wie bekomme ich mehr Schwung?")).toBe("momentum");
+    expect(healthTopic("Wo verliere ich Geld?")).toBe("any");
+    expect(healthTopic("Verteil alle Aufgaben")).toBeNull();
+    expect(healthTopic("Gib T-Shirts packen an Anna")).toBeNull();
+  });
+
+  it("turns the question into a health intent before the hand-over words ('ich')", () => {
+    const s = state({ health: weakAwareness });
+    expect(parseCommand("Wie steigere ich die Bekanntheit?", s, healthNames)).toEqual({
+      kind: "health",
+      factor: "awareness",
+    });
+    expect(parseCommand("Was ist meine größte Schwachstelle?", s, healthNames)).toEqual({
+      kind: "health",
+      factor: null,
+    });
+    // Hand-overs still work.
+    expect(parseCommand("Gib T-Shirts packen an Anna", s, healthNames).kind).toBe("actions");
+  });
+
+  it("offers concrete steps with existing actions: marketing, a campaign, a business move", () => {
+    const moves: CompanyMoves = {
+      slots: 2,
+      used: 0,
+      cashCents: 100_000,
+      tier: "garage",
+      product: "fashion",
+      running: [],
+      history: [],
+      moves: [
+        {
+          key: "flyer",
+          kind: "awareness",
+          risk: "safe",
+          branch: "marketing",
+          minutes: 30,
+          costCents: 5_000,
+          chanceBps: 7_000,
+          skillBonusBps: 0,
+          payoutCents: 0,
+          refundCents: 0,
+          gain: 0.1,
+          availableAt: null,
+        },
+      ],
+    };
+    const s = state({ health: weakAwareness, moves });
+    const steps = healthSteps("awareness", s, healthNames);
+    expect(steps.map((o) => o.action)).toEqual([
+      { type: "marketing", cents: 60_000 },
+      { type: "campaign", kind: "flyer" },
+      { type: "move", key: "flyer" },
+    ]);
+    expect(steps[0]?.tone).toBe("best");
+    expect(
+      validActions(
+        steps.map((o) => o.action),
+        s,
+      ),
+    ).toHaveLength(3);
+  });
+
+  it("answers with the reason, the hourly gain and the steps", () => {
+    const turn = healthTurn("awareness", state({ health: weakAwareness }), healthNames);
+    expect(turn.lines[0]).toEqual({
+      key: "health.intro",
+      values: { factor: "F:awareness", score: 20, reason: "R:awareness.x" },
+    });
+    expect(turn.lines[1]).toEqual({ key: "health.gain", values: { amount: "80 €" } });
+    expect(turn.options.length).toBeGreaterThanOrEqual(2);
+    // "Where do I lose money?" goes to the weakest factor.
+    expect(healthTurn(null, state({ health: weakAwareness }), healthNames).lines[0]).toEqual({
+      key: "health.weakest",
+      values: { factor: "F:awareness" },
+    });
+    expect(healthTurn("awareness", state({ tasks: tasks({ role: "employee" }) }), healthNames).lines[0]?.key).toBe(
+      "health.founderOnly",
+    );
+  });
+
+  it("turns price, contract work, AI workers, skills and tasks into buttons", () => {
+    const h = health(
+      {
+        capacity: {
+          status: "weak",
+          score: 40,
+          impactCents: 3_000,
+          levers: [{ kind: "contractWork" }, { kind: "dismissAi", count: 2 }],
+        },
+        price: { status: "weak", score: 50, impactCents: 2_000, levers: [{ kind: "price", level: "premium" }] },
+        team: { status: "weak", score: 40, levers: [{ kind: "skill", skill: "sales" }, { kind: "train" }] },
+        momentum: { status: "critical", score: 30, impactCents: 1_000, levers: [{ kind: "tasks", open: 2 }] },
+      },
+      "capacity",
+    );
+    const s = state({ health: h });
+    expect(healthSteps("capacity", s, healthNames).map((o) => o.action)).toEqual([
+      { type: "strategy", priceLevel: "normal", contractWork: true },
+      { type: "dismissAi", count: 2 },
+    ]);
+    expect(healthSteps("price", s, healthNames)[0]?.action).toEqual({
+      type: "strategy",
+      priceLevel: "premium",
+      contractWork: false,
+    });
+    expect(healthSteps("team", s, healthNames).map((o) => o.action)).toEqual([
+      { type: "hireAi", count: 1, skill: "sales" },
+      { type: "open", tab: "team" },
+      { type: "open", tab: "team", section: "training" },
+    ]);
+    expect(healthSteps("momentum", s, healthNames).map((o) => o.action.type)).toEqual(["plan", "play", "autoAi"]);
+  });
+
+  it("briefs the weakest factor once it is weak or critical, with a stable id", () => {
+    const turn = briefings(state({ health: weakAwareness }), healthNames).find((t) => t.id.startsWith("health:"));
+    expect(turn?.id).toBe("health:awareness:critical");
+    expect(turn?.lines[0]).toEqual({
+      key: "health.brief",
+      values: { factor: "F:awareness", reason: "R:awareness.x" },
+    });
+    expect(turn?.options[0]?.action).toEqual({ type: "marketing", cents: 60_000 });
+    const quiet = (s: MiraState) => briefings(s, healthNames).some((t) => t.id.startsWith("health:"));
+    expect(quiet(state({ health: health() }))).toBe(false);
+    expect(quiet(state({ health: weakAwareness, tasks: tasks({ role: "employee" }) }))).toBe(false);
+  });
+
+  it("mentions the health in the analysis", () => {
+    const turn = analysisTurn(state({ health: weakAwareness }), healthNames);
+    expect(turn.lines).toContainEqual({ key: "health.summary", values: { score: 70, factor: "F:awareness" } });
+    expect(turn.options[0]?.action).toEqual({ type: "marketing", cents: 60_000 });
+  });
+
+  it("only lets the founder pull the company levers", () => {
+    const actions: MiraAction[] = [
+      { type: "marketing", cents: 10_000 },
+      { type: "strategy", priceLevel: "budget", contractWork: true },
+      { type: "campaign", kind: "tv" },
+      { type: "hireAi", count: 1, skill: null },
+      { type: "dismissAi", count: 1 },
+    ];
+    expect(validActions(actions, state())).toHaveLength(5);
+    expect(validActions(actions, state({ tasks: tasks({ role: "employee" }) }))).toHaveLength(0);
+    expect(validActions([{ type: "hireAi", count: 0, skill: null }], state())).toHaveLength(0);
   });
 });

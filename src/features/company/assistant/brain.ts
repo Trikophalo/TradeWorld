@@ -7,13 +7,16 @@
 import { BALANCE } from "@/config/balance";
 import { miniJudge, pitchChanceBps } from "@/features/game/demo/pitches";
 import type {
+  CampaignKind,
   CompanyMoveOption,
   CompanyMoves,
   CompanyPitch,
   CompanyTask,
   CompanyTasks,
   PitchMoveKind,
+  PriceLevel,
 } from "@/features/game/types";
+import type { CompanyHealth, HealthFactor, HealthFactorKey, HealthLever } from "@/lib/sim/company-health";
 
 const cfg = BALANCE.companyAssistant;
 const taskCfg = BALANCE.companyTasks;
@@ -30,7 +33,13 @@ export type MiraAction =
   | { type: "plan"; actions: { taskId: number; to: string }[] }
   | { type: "open"; tab: "overview" | "tasks" | "team"; section?: string }
   /** Fills the input with an example. */
-  | { type: "suggest"; text: string };
+  | { type: "suggest"; text: string }
+  /** Company levers (ADR-162), each one existing RPC: marketing budget per quarter, price and contract work. */
+  | { type: "marketing"; cents: number }
+  | { type: "strategy"; priceLevel: PriceLevel; contractWork: boolean }
+  | { type: "campaign"; kind: CampaignKind }
+  | { type: "hireAi"; count: number; skill: string | null }
+  | { type: "dismissAi"; count: number };
 
 export interface MiraLine {
   key: string;
@@ -58,6 +67,21 @@ export interface MiraNames {
   task: (key: string) => string;
   move: (key: string) => string;
   money: (cents: number) => string;
+  /** Company health (ADR-162): factor names, their reason as a sentence and skill names. */
+  health?: {
+    factor: (key: HealthFactorKey) => string;
+    reason: (factor: HealthFactor) => string;
+    skill: (key: string) => string;
+  };
+}
+
+/** What Mira knows about the company's health (ADR-162), for the founder. */
+export interface MiraHealth {
+  result: CompanyHealth;
+  priceLevel: PriceLevel;
+  contractWork: boolean;
+  marketingCentsPerQuarter: number;
+  aiWageCentsPerHour: number;
 }
 
 export interface MiraState {
@@ -69,6 +93,8 @@ export interface MiraState {
   applications: number;
   /** Free orders (ADR-139): cost, when the next one may start (ms, null = now), the last ones. Founder only. */
   orders: { costCents: number; nextOrderAt: number | null; pitches: CompanyPitch[] } | null;
+  /** The eight factors of the company (ADR-162); null for employees or while loading. */
+  health?: MiraHealth | null;
   now: number;
 }
 
@@ -249,6 +275,9 @@ export function briefings(state: MiraState, names: MiraNames): MiraTurn[] {
     }
   }
 
+  const health = healthBriefing(state, names);
+  if (health) turns.push(health);
+
   if (state.applications > 0) {
     turns.push({
       id: `apps:${state.applications}`,
@@ -295,6 +324,8 @@ export type MiraIntent =
   | { kind: "status" }
   | { kind: "plan" }
   | { kind: "analysis" }
+  /** A question about one of the eight factors (ADR-162); null = where the company loses the most. */
+  | { kind: "health"; factor: HealthFactorKey | null }
   | { kind: "unknown"; reason: "nothing" }
   /** A person or the AI was named, but not which task. */
   | { kind: "unknown"; reason: "noTask"; to: string }
@@ -396,6 +427,10 @@ export function parseCommand(text: string, state: MiraState, names: MiraNames): 
   const open = state.tasks.tasks.filter((t) => t.status === "open" && t.canDelegate);
   const mine = state.tasks.tasks.filter((t) => t.mine && t.status === "assigned");
   const person = state.tasks.people.find((p) => !p.isMe && list.includes(normalize(p.nickname)));
+
+  // "Wie steigere ich die Bekanntheit?": a question about a factor of the company, not a hand-over.
+  const topic = person ? null : healthTopic(text);
+  if (topic !== null) return { kind: "health", factor: topic === "any" ? null : topic };
   const toAi = list.some((w) => AI_WORDS.has(w));
   const toMe = list.some((w) => ME_WORDS.has(w));
   const all = /\b(alle|alles|jede|jeden)\b/.test(norm);
@@ -457,6 +492,14 @@ export function validActions(actions: readonly MiraAction[], state: MiraState): 
         return state.tasks.role === "founder";
       case "plan":
         return a.actions.length > 0;
+      case "marketing":
+        return state.tasks.role === "founder" && Number.isInteger(a.cents) && a.cents >= 0;
+      case "strategy":
+      case "campaign":
+        return state.tasks.role === "founder";
+      case "hireAi":
+      case "dismissAi":
+        return state.tasks.role === "founder" && Number.isInteger(a.count) && a.count > 0;
       default:
         return true;
     }
@@ -492,6 +535,28 @@ export function describeAction(action: MiraAction, state: MiraState, names: Mira
       return { action, label: { key: action.tab === "team" ? "options.openTeam" : "options.showEvent" } };
     case "suggest":
       return { action, label: { key: "examples.free", values: { text: action.text } } };
+    case "marketing":
+      return action.cents > 0
+        ? { action, label: { key: "health.options.marketing", values: { amount: names.money(action.cents) } } }
+        : { action, label: { key: "health.options.marketingStop" } };
+    case "strategy":
+      return state.health && action.contractWork && !state.health.contractWork
+        ? { action, label: { key: "health.options.contractOn" } }
+        : { action, label: { key: "health.options.price", values: { level: action.priceLevel } } };
+    case "campaign":
+      return { action, label: { key: "health.options.campaign", values: { kind: action.kind } } };
+    case "hireAi":
+      return action.skill
+        ? {
+            action,
+            label: {
+              key: "health.options.hireAiSkill",
+              values: { skill: names.health?.skill(action.skill) ?? action.skill },
+            },
+          }
+        : { action, label: { key: "health.options.hireAi", values: { count: action.count } } };
+    case "dismissAi":
+      return { action, label: { key: "health.options.dismissAi", values: { count: action.count } } };
   }
 }
 
@@ -774,6 +839,10 @@ export function analysisTurn(state: MiraState, names: MiraNames): MiraTurn {
     if (pick) options.push(describeAction({ type: "move", key: pick.key }, state, names));
   }
   if (state.orders && orderBlock(state) === null) options.push(orderOption(state));
+  if (state.health && state.tasks.role === "founder") {
+    lines.push(...healthSummary(state, names));
+    options.unshift(...healthSteps(state.health.result.weakest, state, names).slice(0, 1));
+  }
   if (state.tasks.tasks.some((t) => t.status === "open" && t.canDelegate))
     options.push({ action: { type: "suggest", text: "Verteil alle Aufgaben" }, label: { key: "examples.plan" } });
   return { id: `analysis:${state.now}`, lines, options };
@@ -850,4 +919,277 @@ export function urgentTurns(state: MiraState, names: MiraNames): MiraTurn[] {
       ],
       options: adviseTask(t, state, names).filter((o) => o.tone !== "warn"),
     }));
+}
+
+// ---- Company health (ADR-162): where the company loses money and what to do about it -------------------------------
+
+/** Words that point at one of the eight factors (normalized: umlauts spelled out). */
+const TOPICS: readonly [HealthFactorKey, RegExp][] = [
+  ["awareness", /\b(bekannt\w*|reichweite|marketing|werbung|kunden|kundschaft)\b/],
+  ["capacity", /\b(menge\w*|kapazitaet\w*|ausverkauft|auslastung|ausgelastet|leerlauf|liefer\w*|produktion)\b/],
+  ["quality", /\b(qualitaet\w*)\b/],
+  ["image", /\b(image|ruf|krise\w*|skandal\w*|kampagne\w*)\b/],
+  ["price", /\b(preis\w*|premium|budget)\b/],
+  ["team", /\b(team\w*|personal|mitarbeiter\w*|loehne|lohn\w*|faehigkeit\w*|stufe\w*|schulung\w*)\b/],
+  ["cash", /\b(kasse|schulden|rechnung\w*|kosten|insolvenz|pleite)\b/],
+  ["momentum", /\b(schwung|momentum)\b/],
+];
+const HEALTH_ASK =
+  /\b(wie|was|warum|wieso|steiger\w*|verbesser\w*|erhoeh\w*|mehr|fehl\w*|hilf\w*|angehen|besser|senk\w*|bring\w*|welche\w*)\b/;
+const HEALTH_ANY = /\b(verlust\w*|verlier\w*|schwachstelle\w*|schwaechste\w*|gesundheit|wo fehlt\w*|was fehlt)\b/;
+
+/** Which factor a question is about, "any" for "where do I lose money", null when it is about none. */
+export function healthTopic(text: string): HealthFactorKey | "any" | null {
+  const norm = ` ${normalize(text)} `;
+  const topic = TOPICS.find(([, re]) => re.test(norm))?.[0] ?? null;
+  if (topic && HEALTH_ASK.test(norm)) return topic;
+  if (HEALTH_ANY.test(norm)) return "any";
+  return null;
+}
+
+const factorName = (key: HealthFactorKey, names: MiraNames) => names.health?.factor(key) ?? key;
+
+/** The best ready business move of a kind, as an option, or the free order when there is none. */
+function moveFor(goal: PitchMoveKind, state: MiraState, names: MiraNames): MiraOption[] {
+  const moves = state.moves;
+  if (moves && moves.used < moves.slots) {
+    const value = (m: CompanyMoveOption) => (m.chanceBps * Math.max(1, m.gain)) / Math.max(1, m.costCents);
+    const best = moves.moves
+      .filter(
+        (m) =>
+          m.kind === goal &&
+          m.costCents <= moves.cashCents &&
+          (m.availableAt === null || Date.parse(m.availableAt) <= state.now),
+      )
+      .sort((a, b) => value(b) - value(a))[0];
+    if (best)
+      return [
+        {
+          action: { type: "move", key: best.key },
+          label: { key: "options.move", values: { move: names.move(best.key) } },
+          hint: {
+            key: best.kind === "cash" ? "why.moveCash" : "why.moveGain",
+            values: {
+              chance: Math.round(best.chanceBps / 100),
+              cost: names.money(best.costCents),
+              payout: names.money(best.payoutCents),
+              minutes: best.minutes,
+            },
+          },
+        },
+      ];
+  }
+  return state.orders && orderBlock(state) === null ? [orderOption(state)] : [];
+}
+
+/** One lever of a factor as Mira's buttons: each runs an existing RPC or opens the place where it is done. */
+function leverOptions(lever: HealthLever, factor: HealthFactor, state: MiraState, names: MiraNames): MiraOption[] {
+  const h = state.health!;
+  const amount = names.money(factor.impactCents);
+  const option = (action: MiraAction, hint: MiraLine): MiraOption => ({
+    ...describeAction(action, state, names),
+    hint,
+  });
+  switch (lever.kind) {
+    case "marketing":
+      return [
+        option(
+          { type: "marketing", cents: lever.cents },
+          lever.cents > 0
+            ? { key: "health.why.marketing", values: { now: names.money(h.marketingCentsPerQuarter) } }
+            : { key: "health.why.marketingStop", values: { amount } },
+        ),
+      ];
+    case "campaign":
+      return [
+        option(
+          { type: "campaign", kind: lever.campaign },
+          { key: "health.why.campaign", values: { cost: names.money(lever.costCents) } },
+        ),
+      ];
+    case "price":
+      return [
+        option(
+          { type: "strategy", priceLevel: lever.level, contractWork: h.contractWork },
+          factor.key === "price" ? { key: "health.why.price", values: { amount } } : { key: "health.why.priceQuality" },
+        ),
+      ];
+    case "contractWork":
+      return [
+        option(
+          { type: "strategy", priceLevel: h.priceLevel, contractWork: true },
+          { key: "health.why.contract", values: { amount } },
+        ),
+      ];
+    case "hireAi":
+      return [
+        option(
+          { type: "hireAi", count: lever.count, skill: null },
+          { key: "health.why.hireAi", values: { wage: names.money(h.aiWageCentsPerHour) } },
+        ),
+      ];
+    case "dismissAi":
+      return [option({ type: "dismissAi", count: lever.count }, { key: "health.why.dismissAi", values: { amount } })];
+    case "skill":
+      return [
+        option(
+          { type: "hireAi", count: 1, skill: lever.skill },
+          { key: "health.why.skillAi", values: { wage: names.money(h.aiWageCentsPerHour) } },
+        ),
+        {
+          action: { type: "open", tab: "team" },
+          label: {
+            key: "health.options.findPlayer",
+            values: { skill: names.health?.skill(lever.skill) ?? lever.skill },
+          },
+          hint: { key: "health.why.skillPlayer" },
+        },
+      ];
+    case "train":
+      return [
+        {
+          action: { type: "open", tab: "team", section: "training" },
+          label: { key: "health.options.train" },
+          hint: { key: "health.why.train" },
+        },
+      ];
+    case "expand":
+      return [
+        {
+          action: { type: "open", tab: "overview", section: "business" },
+          label: { key: "health.options.expand" },
+          hint: { key: "health.why.expand" },
+        },
+      ];
+    case "upgrade":
+      return [
+        {
+          action: { type: "open", tab: "overview", section: "boss" },
+          label: { key: "health.options.upgrade" },
+          hint: { key: "health.why.upgrade" },
+        },
+      ];
+    case "tasks": {
+      const out: MiraOption[] = [];
+      const plan = planTasks(state);
+      if (plan.length > 0) out.push(option({ type: "plan", actions: plan }, { key: "health.why.tasks" }));
+      const first = state.tasks.tasks.find((t) => t.status === "open" || (t.mine && t.status === "assigned"));
+      if (first)
+        out.push(
+          option(
+            { type: "play", taskId: first.id },
+            { key: "why.self", values: { value: names.money(first.valueCents) } },
+          ),
+        );
+      if (state.tasks.canUseAi && !state.tasks.autoAi)
+        out.push(option({ type: "autoAi", on: true }, { key: "health.why.autoAi" }));
+      if (out.length === 0)
+        out.push({
+          action: { type: "open", tab: "tasks" },
+          label: { key: "health.options.openTasks" },
+          hint: { key: "health.why.tasks" },
+        });
+      return out;
+    }
+    case "event": {
+      const out: MiraOption[] = [];
+      if (state.event && !state.eventPitched)
+        out.push({ action: { type: "compose", kind: "event" }, label: { key: "options.writeStrategy" } });
+      out.push({
+        action: { type: "open", tab: "overview", section: "situation" },
+        label: { key: "health.options.event" },
+        hint: { key: "health.why.event" },
+      });
+      return out;
+    }
+    case "deposit":
+      return [
+        {
+          action: { type: "open", tab: "overview", section: "money" },
+          label: { key: "health.options.deposit" },
+          hint: { key: "health.why.deposit", values: { amount: names.money(lever.cents) } },
+        },
+      ];
+    case "move":
+      return moveFor(lever.goal, state, names);
+  }
+}
+
+/** Concrete steps for one factor, most effective first; the first one is Mira's tip. At most four. */
+export function healthSteps(key: HealthFactorKey, state: MiraState, names: MiraNames): MiraOption[] {
+  const factor = state.health?.result.factors.find((f) => f.key === key);
+  if (!factor || state.tasks.role !== "founder") return [];
+  const seen = new Set<string>();
+  const out: MiraOption[] = [];
+  for (const lever of factor.levers) {
+    for (const option of leverOptions(lever, factor, state, names)) {
+      const id = JSON.stringify(option.action);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      out.push(option);
+    }
+  }
+  const steps = out.slice(0, 4);
+  if (steps[0] && steps[0].tone !== "warn") steps[0] = { ...steps[0], tone: "best" };
+  return steps;
+}
+
+/** Mira's answer to "Wie steigere ich die Bekanntheit?": the factor in numbers, what fixing it brings, the steps. */
+export function healthTurn(key: HealthFactorKey | null, state: MiraState, names: MiraNames): MiraTurn {
+  const id = `health:ask:${key ?? "any"}:${state.now}`;
+  if (state.tasks.role !== "founder") return { id, lines: [{ key: "health.founderOnly" }], options: [] };
+  const h = state.health;
+  if (!h) return { id, lines: [{ key: "health.loading" }], options: [] };
+  const k = key ?? h.result.weakest;
+  const factor = h.result.factors.find((f) => f.key === k)!;
+  const steps = healthSteps(k, state, names);
+  const lines: MiraLine[] = [
+    ...(key === null ? [{ key: "health.weakest", values: { factor: factorName(k, names) } }] : []),
+    {
+      key: "health.intro",
+      values: { factor: factorName(k, names), score: factor.score, reason: names.health?.reason(factor) ?? "" },
+    },
+    factor.impactCents > 0
+      ? { key: "health.gain", values: { amount: names.money(factor.impactCents) } }
+      : factor.status === "good" || factor.status === "ok"
+        ? { key: "health.fine" }
+        : { key: "health.noGain" },
+    { key: steps.length > 0 ? "health.steps" : "health.noSteps" },
+  ];
+  return { id, lines, options: steps };
+}
+
+/** Mira raises the weakest point on her own once it is weak or critical (once per factor and status). */
+export function healthBriefing(state: MiraState, names: MiraNames): MiraTurn | null {
+  const h = state.health;
+  if (!h || state.tasks.role !== "founder") return null;
+  const factor = h.result.factors.find((f) => f.key === h.result.weakest);
+  if (!factor || (factor.status !== "weak" && factor.status !== "critical")) return null;
+  return {
+    id: `health:${factor.key}:${factor.status}`,
+    lines: [
+      {
+        key: "health.brief",
+        values: { factor: factorName(factor.key, names), reason: names.health?.reason(factor) ?? "" },
+      },
+      factor.impactCents > 0
+        ? { key: "health.briefGain", values: { amount: names.money(factor.impactCents) } }
+        : { key: "health.briefSteps" },
+    ],
+    options: healthSteps(factor.key, state, names).slice(0, 3),
+  };
+}
+
+/** The overall score and the weak points, weakest first, for the analysis. */
+export function healthSummary(state: MiraState, names: MiraNames): MiraLine[] {
+  const h = state.health;
+  if (!h) return [];
+  const weak = [...h.result.factors]
+    .filter((f) => f.status === "weak" || f.status === "critical")
+    .sort((a, b) => a.score - b.score)
+    .slice(0, 3);
+  return [
+    { key: "health.summary", values: { score: h.result.score, factor: factorName(h.result.weakest, names) } },
+    ...weak.map((f) => ({ key: "health.summaryItem", values: { factor: factorName(f.key, names), score: f.score } })),
+  ];
 }
