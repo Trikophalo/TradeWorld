@@ -7481,3 +7481,17 @@ Migration `20261204002800_accessories_pokes.sql`. Katalog in `game_config.access
 - **Fehler:** `accessory_unknown` NX130, `accessory_locked` NX131, `accessory_owned` NX132, `accessory_not_owned`
   NX133, `not_friends` NX134, `poke_too_soon` NX135, `poke_daily_limit` NX136.
 - Test `supabase/tests/9m_accessories_friends.sql`.
+
+## Nachtrag: Studiopublikum der NEXA Nachrichten (ADR-157)
+
+Migration `20261204003200_news_audience.sql`, keine neuen Tabellen.
+
+- `player_figure_json(p_player)` (intern) → `{nickname, avatar_key, accessories}` oder `null` (unbekannt,
+  deaktiviert); gemeinsamer Baustein für das Aussehen eines Spielers, nie mit ID.
+- `news_show_audience_json(p_player)` (intern): Zuschauer der letzten 20 Sekunden als Figur mit `friend` und `me`,
+  der Aufrufer zuerst, dann Freunde, dann die anderen nach Namen, höchstens `newsShow.audience.max`.
+- `get_news_show()` liefert zusätzlich `audience: [{nickname, avatar_key, accessories, friend, me}]` und je Segment
+  über einen Spieler (`subject.player_id`: loser, winner, gossip, scandal/hype des Gründers, nft des Künstlers)
+  `figure: {nickname, avatar_key, accessories}`, beim Abruf gelesen. `news_show_chat_json` markiert Zeilen
+  erfundener Zuschauer mit `bot: true`.
+- Test `supabase/tests/9o_news_audience.sql`.

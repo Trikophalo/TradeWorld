@@ -303,6 +303,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Kleiderschrank und Freunde-Platz",
         text: "Deine Spielfigur steht jetzt in voller Größe da und lässt sich anziehen: 51 verrückte Accessoires vom Cowboyhut über Bananenkostüm, Haikostüm und Laseraugen bis zu Papagei, Jetpack und goldener Klobürste. Unter Profil → Kleiderschrank probierst du alles an und kaufst mit Spielgeld, von 150 € bis 5 Mio. €. Im Freunde-Tab stehen alle deine Freunde als Figuren auf einem Platz, wer online ist, hat ein grünes Schild über dem Kopf. Tipp auf eine Figur für das Profil, oder stups sie mit 👉 an: Sie bekommt eine Benachrichtigung.",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-5105821f",
+        title: "Studiopublikum bei den NEXA Nachrichten",
+        text: "Unter dem Fernseher sitzt jetzt das Publikum auf dem Studiosofa: alle, die gerade zuschauen, als angezogene Pixelfigur, du selbst und deine Freunde vorn. Wer im Live-Chat schreibt, bekommt eine Sprechblase über dem Kopf, auch die schrägen Stammzuschauer mit ihren eigenen Outfits. Und geht es in einer Meldung um dich, zeigt Mr. Doodle Dangle dein Bild, im aktuellen Outfit und mit passender Unterschrift von „Gewinner der Stunde“ bis „Gesucht“.",
+      },
     ],
   },
   {

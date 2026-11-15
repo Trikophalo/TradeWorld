@@ -2490,3 +2490,29 @@ ihre Firmen, und mit echten, großen Folgen für Kurse, Firmen und Aufgaben.
   angestupst! 👉“ mit Link auf das Profil; sie lässt sich in den Einstellungen abschalten.
 - **Demo:** Ohne Mitspieler startet die Demo weiter ohne Freunde; ein gespeicherter Demo-Zustand (`friendList`) kann
   erfundene Freunde mitbringen (Tests, Vorführung).
+
+## ADR-157: Studiopublikum und Spieler im Bild bei den NEXA Nachrichten — `akzeptiert`
+
+- **Publikum:** Unter dem Fernseher steht ein Studiopublikum auf einem Sofa: alle, die die Sendung gerade schauen
+  (`news_show_viewers` der letzten 20 Sekunden), als angezogene Figur (ADR-155). Man sieht sich selbst („Du“), dann
+  Freunde (Herz), dann die anderen, nach Namen sortiert, damit niemand herumspringt. Der Server schickt höchstens
+  `newsShow.audience.max` (12) Spieler; wer nicht auf die Bühne passt, steht als „+N“ daneben. Auf dem Handy rücken
+  die Figuren zusammen, nichts scrollt waagerecht.
+- **Erfundene Zuschauer** (ADR-152) kommen ins Studio, sobald sie schreiben, und bleiben `botMinutes` (8) lang. Sie
+  bekommen ein Porträt und bis zu drei Accessoires aus dem Katalog, abgeleitet aus dem Namen (Hash, gemischt nach
+  Fisher-Yates): Dieselbe Person sieht überall und bei jedem gleich aus. Sie zählen bei „x schauen zu“ mit. Der Chat
+  markiert ihre Zeilen (`bot`).
+- **Sprechblasen:** Wer im Live-Chat schreibt, bekommt zusätzlich eine Pixel-Sprechblase über seiner Figur,
+  `bubbleSeconds` (6) lang. Höchstens `bubblesAtOnce` (2) zugleich auf eigenen Höhen mit Stiel zum Sprecher; weitere
+  warten, aber nicht länger als `bubbleMaxDelaySeconds` (12), danach steht die Zeile nur im Chat. Eine neue Zeile
+  derselben Person ersetzt ihre Blase sofort. Alles folgt aus Chat und Serveruhr, also sehen alle dasselbe.
+- **Spieler im Bild:** Geht es in einer Meldung um einen Spieler (Pleite, Gewinner, Klatsch, Skandal und Hype seiner
+  Firma, Künstler eines NFTs), zeigt der Themenbildschirm hinter Mr. Doodle Dangle dessen Figur mit Bildunterschrift
+  („Pleitegeier“, „Gewinner der Stunde“, „Gesucht“ auf Steckbrief-Papier, „Held der Stunde“, „Gesichtet“, „Künstler
+  der Stunde“). Der Server liest das Aussehen beim Abruf (`player_figure_json`), es ist also immer das aktuelle;
+  Spieler-IDs verlassen den Server nie.
+- **Wiederverwendbar:** `src/components/ui/figure-bubble.tsx` (`SpeechBubble`, `FigureBubble`) für Figuren, die
+  sprechen; `player_figure_json(p_player)` als gemeinsamer SQL-Baustein für das Aussehen eines Spielers.
+- **Demo:** Der Demo-Spieler steht im Publikum, Online-Freunde aus `friendList` schauen mit und schreiben ab und zu,
+  erfundene Zuschauer kommen dazu; in Meldungen über den Spieler steht seine Figur im Bild. Dabei behoben: Die
+  erfundenen Zuschauer der Demo schrieben nie, weil ihre nächste Zeile stets in der Zukunft lag.

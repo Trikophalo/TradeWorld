@@ -113,6 +113,11 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Studiopublikum bei den NEXA Nachrichten (ADR-157):** Unter dem Fernseher sitzt jetzt das Publikum auf dem
+  Studiosofa: alle, die gerade zuschauen, als angezogene Pixelfigur, du selbst und deine Freunde vorn. Wer im
+  Live-Chat schreibt, bekommt eine Sprechblase über dem Kopf, auch die schrägen Stammzuschauer mit ihren eigenen
+  Outfits. Und geht es in einer Meldung um dich, zeigt Mr. Doodle Dangle dein Bild, im aktuellen Outfit und mit
+  passender Unterschrift von „Gewinner der Stunde“ bis „Gesucht“.
 - **Kleiderschrank und Freunde-Platz (ADR-155):** Deine Spielfigur steht jetzt in voller Größe da und lässt sich
   anziehen: 51 verrückte Accessoires vom Cowboyhut über Bananenkostüm, Haikostüm und Laseraugen bis zu Papagei,
   Jetpack und goldener Klobürste. Unter Profil → Kleiderschrank probierst du alles an und kaufst mit Spielgeld, von
