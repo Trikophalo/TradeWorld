@@ -24,7 +24,10 @@ export function RoomView({
   );
   const ordered = drawOrder(property.placed, (p) => furnitureItem(p.itemKey)?.layer);
   return (
-    <div className="relative mx-auto w-fit overflow-hidden rounded-md shadow-2 ring-1 ring-line-2" data-testid="room">
+    <div
+      className="relative isolate mx-auto w-fit overflow-hidden rounded-md shadow-2 ring-1 ring-line-2"
+      data-testid="room"
+    >
       <PixelIcon {...logoArt(backdrop)} scale={scale} />
       {ordered.map((p) => {
         const sprite = furnitureSprite(p.itemKey, p.rot);
