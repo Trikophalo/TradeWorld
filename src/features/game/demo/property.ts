@@ -8,7 +8,7 @@ import {
   tierIndex,
   upgradeCostCents,
 } from "@/lib/sim/property";
-import { GameError, type GameEngine, type PlacedItem, type PropertyState } from "../types";
+import { GameError, type GameEngine, type PlacedItem, type PropertyRental, type PropertyState } from "../types";
 
 /*
  * Own home in the offline demo (ADR-082). Everything lives in the demo player's localStorage.
@@ -26,6 +26,8 @@ export interface HomeState {
 }
 
 export interface PropertyHost {
+  /** Wohnwert, places and tenants (demo/rentals.ts, ADR-158). */
+  rental(): PropertyRental;
   home(): HomeState | undefined;
   setHome(state: HomeState): void;
   nickname(): string;
@@ -86,6 +88,7 @@ export function createPropertyEngine(host: PropertyHost) {
         furniture: s.furniture.filter((f) => !f.placed).map((f) => ({ id: f.id, itemKey: f.itemKey })),
         cars: [],
       },
+      rental: host.rental(),
     };
   }
 

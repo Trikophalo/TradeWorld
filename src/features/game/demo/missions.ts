@@ -30,7 +30,12 @@ export type Metric =
   | "art_bids"
   | "artworks_painted"
   | "auctions_started"
-  | "nft_offers";
+  | "nft_offers"
+  | "rentals_offered"
+  | "tenants_found"
+  | "rent_cents"
+  | "homes_rented"
+  | "wohnwert";
 
 export interface MissionTemplate {
   key: string;
@@ -441,6 +446,70 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
     metric: "net_worth_cents",
     target: 2_500_000,
     xp: m.maxXp,
+  },
+  // renting out places in the home (ADR-158)
+  {
+    key: "m_rent_offer",
+    kind: "milestone",
+    title: "Biete einen Platz zur Miete an",
+    metric: "rentals_offered",
+    target: 1,
+    xp: 400,
+    requires: "property",
+  },
+  {
+    key: "m_rent_tenant",
+    kind: "milestone",
+    title: "Dein erster Mieter",
+    metric: "tenants_found",
+    target: 1,
+    xp: 600,
+    requires: "property",
+  },
+  {
+    key: "m_wohnwert_60",
+    kind: "milestone",
+    title: "Wohnwert 60",
+    metric: "wohnwert",
+    target: 60,
+    xp: 700,
+    requires: "property",
+  },
+  {
+    key: "m_wohnwert_90",
+    kind: "milestone",
+    title: "Wohnwert 90",
+    metric: "wohnwert",
+    target: 90,
+    xp: 1500,
+    requires: "property",
+  },
+  {
+    key: "m_rent_home",
+    kind: "milestone",
+    title: "Wohne zur Miete",
+    metric: "homes_rented",
+    target: 1,
+    xp: 500,
+    requires: "property",
+  },
+  {
+    key: "d_rent_earn",
+    kind: "daily",
+    title: "Nimm 300 € Miete ein",
+    metric: "rent_cents",
+    target: 30_000,
+    xp: d.minXp + 50,
+    requires: "property",
+  },
+  {
+    key: "w_rent_earn",
+    kind: "weekly",
+    title: "Nimm 3.000 € Miete ein",
+    metric: "rent_cents",
+    target: 300_000,
+    xp: w.minXp + 200,
+    requires: "property",
   },
 ];
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { FloorMaterial, PropertyTier } from "@/config/balance";
-import type { GameEngine, PropertyState } from "./types";
+import type { GameEngine, Property, PropertyState, Tenant } from "./types";
 import { rpc } from "./rpc";
 
 /*
@@ -29,7 +29,53 @@ const inventorySchema = z.object({
   furniture: z.array(z.object({ id: z.string(), item_key: z.string() })),
   cars: z.array(z.object({ id: z.string(), car_key: z.string() })).default([]),
 });
-const stateSchema = z.object({ property: propertySchema, inventory: inventorySchema.nullable() });
+export const tenantSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  is_ai: z.boolean(),
+  avatar_key: z.string().nullable(),
+  accessories: z.array(z.string()),
+  since: z.string(),
+});
+const rentalSchema = z.object({
+  wohnwert: num,
+  places: num,
+  offer_open: z.boolean(),
+  tenants: z.array(tenantSchema),
+  renting: z.object({ owner: z.string(), tier: tier.nullable() }).nullable(),
+});
+const stateSchema = z.object({
+  property: propertySchema,
+  inventory: inventorySchema.nullable(),
+  rental: rentalSchema,
+});
+
+export { propertySchema };
+
+export const toTenant = (t: z.infer<typeof tenantSchema>): Tenant => ({
+  id: t.id,
+  name: t.name,
+  isAi: t.is_ai,
+  avatarKey: t.avatar_key,
+  accessories: t.accessories,
+  since: t.since,
+});
+
+export function toProperty(p: z.infer<typeof propertySchema>): Property {
+  return {
+    owner: p.owner,
+    tier: p.tier as PropertyTier | null,
+    width: p.width,
+    height: p.height,
+    garageSlots: p.garage_slots,
+    wallColor: p.wall_color,
+    floor: p.floor as FloorMaterial,
+    floorsOwned: p.floors_owned as FloorMaterial[],
+    placed: p.placed.map((x) => ({ id: x.id, itemKey: x.item_key, x: x.x, y: x.y, rot: x.rot })),
+    garage: p.garage.map((g) => ({ id: g.id, carKey: g.car_key, slot: g.slot })),
+    valueCents: p.value_cents,
+  };
+}
 
 export const PROPERTY_RPC_SCHEMAS = {
   get_property: stateSchema,
@@ -43,20 +89,16 @@ export const PROPERTY_RPC_SCHEMAS = {
 const S = PROPERTY_RPC_SCHEMAS;
 
 function toState(r: z.infer<typeof stateSchema>): PropertyState {
-  const p = r.property;
   return {
-    property: {
-      owner: p.owner,
-      tier: p.tier as PropertyTier | null,
-      width: p.width,
-      height: p.height,
-      garageSlots: p.garage_slots,
-      wallColor: p.wall_color,
-      floor: p.floor as FloorMaterial,
-      floorsOwned: p.floors_owned as FloorMaterial[],
-      placed: p.placed.map((x) => ({ id: x.id, itemKey: x.item_key, x: x.x, y: x.y, rot: x.rot })),
-      garage: p.garage.map((g) => ({ id: g.id, carKey: g.car_key, slot: g.slot })),
-      valueCents: p.value_cents,
+    property: toProperty(r.property),
+    rental: {
+      wohnwert: r.rental.wohnwert,
+      places: r.rental.places,
+      offerOpen: r.rental.offer_open,
+      tenants: r.rental.tenants.map(toTenant),
+      renting: r.rental.renting
+        ? { owner: r.rental.renting.owner, tier: r.rental.renting.tier as PropertyTier | null }
+        : null,
     },
     inventory: r.inventory
       ? {
