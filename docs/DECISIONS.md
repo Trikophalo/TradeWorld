@@ -2454,3 +2454,28 @@ ihre Firmen, und mit echten, großen Folgen für Kurse, Firmen und Aufgaben.
 - **Mehr Aktien** gibt es nur über den Gründer: Kapitalerhöhung (ADR-067). Verkäufe geben Aktien wieder frei.
 - Gilt für alle Aktien (KI-Firmen haben 15 bis 100 Mio. Stück, dort spielt es praktisch keine Rolle), nicht für
   Anleihen und Krypto. Bestehende Depots über dem Bestand bleiben; sie sperren nur weitere Käufe, bis genug verkauft ist.
+
+## ADR-154: Accessoires für die Pixelfigur, Freunde-Platz und Anstupsen — `akzeptiert`
+
+- **Figur:** Neben dem Porträt (ADR-054) hat jeder Spieler eine Ganzkörperfigur (24×32) in den Farben seines
+  Porträts (Haut, Haare, Outfit, Akzent). Sie zeigt Profil, Freunde-Platz und Kleiderschrank.
+- **Accessoires:** 51 Teile in sechs Slots (Kopf, Gesicht, Kostüm, Hand, Haustier, Rücken), vom Luftballon
+  (150 €) bis zur Goldkrone (5 Mio. €), in vier Seltenheiten. Jede Seltenheit ist teurer als jedes Teil der Stufe
+  darunter; Gewöhnliches kostet weniger als ein Zehntel des Startkapitals, Legendäres ab 750.000 € als Statussymbol.
+  Manche Teile brauchen ein Level. Katalog in `src/config/accessories.ts`, Pixel-Art als Daten in
+  `src/components/pixel/accessories.ts`; Paletteneinträge `$s`, `$h` … übernehmen die Farben des Trägers.
+- **Kauf:** einmal je Teil, bezahlt an die Haushalte wie Möbel (`lifestyle_purchase`), kein Wiederverkauf, zählt nicht
+  zum Vermögen. Gekauftes wird sofort angezogen. Getragen wird höchstens ein Teil je Slot; gezeichnet von hinten nach
+  vorn (Rücken, Figur, Kostüm, Gesicht, Kopf, Hand, Haustier), die haltende Hand liegt über dem Gegenstand.
+  Anprobieren geht ohne Kauf, nur in der Ansicht. Legendäre Käufe erscheinen im Freundes-Feed.
+- **Getrennt von `cosmetic_items`:** Die alten kosmetischen Tabellen sind ausdrücklich ohne Geldbezug (Freischaltung
+  über Level und Erfolge); Accessoires kosten Spielgeld und bekommen eigene Tabellen.
+- **Freunde-Platz:** Oben auf `/friends` (über den Reitern) stehen alle Freunde als angezogene Figuren auf einem
+  gepflasterten Platz mit Brunnen, Bäumen, Laternen und Bänken; über Online-Freunden ein grünes „online“, sie hüpfen
+  leicht (nicht bei reduzierten Animationen). Ein Tipp auf die Figur öffnet das Profil. Viele Freunde brechen in
+  Zeilen um und scrollen innerhalb des Platzes.
+- **Anstupsen:** 👉 auf dem Platz oder auf dem Profil eines Freundes. Nur unter Freunden, denselben Freund erst nach
+  10 Minuten wieder, höchstens 30 Stupser in 24 Stunden. Der Freund bekommt die Benachrichtigung „… hat dich
+  angestupst! 👉“ mit Link auf das Profil; sie lässt sich in den Einstellungen abschalten.
+- **Demo:** Ohne Mitspieler startet die Demo weiter ohne Freunde; ein gespeicherter Demo-Zustand (`friendList`) kann
+  erfundene Freunde mitbringen (Tests, Vorführung).
