@@ -649,7 +649,7 @@
       },
       "visit_artworks": {
         "market": "Der Marktplatz zeigt oben die beliebtesten NFTs. Gefällt dir eins, gib ihm ein Herz – das macht es berühmter und wertvoller.",
-        "studio": "Im Atelier prägst du eigene NFTs. Das erste kostet 15.000 €, jedes weitere das 1,5-Fache. Dafür verdienst du an jedem Weiterverkauf mit."
+        "studio": "Im Atelier prägst du eigene NFTs. Das erste am Tag kostet 15.000 €, jedes weitere am selben Tag das 1,5-Fache; um Mitternacht startet der Preis neu. Dafür verdienst du an jedem Weiterverkauf mit."
       },
       "property": {
         "intro": "Neu: dein eigenes Zuhause! Kauf eine Wohnung, richte sie Stück für Stück ein und zieh später in eine Villa.",
@@ -2748,6 +2748,10 @@
     "hours": "{count, plural, one {# Stunde} other {# Stunden}}",
     "auctionFee": "Nach dem Verkauf bekommst du den Preis minus 10 % Gebühr. Hast du das NFT nicht selbst geprägt, gehen weitere 10 % an den Macher.",
     "auctionCancel": "Auktion abbrechen",
+    "auctionSellNow": "Jetzt verkaufen",
+    "auctionSellNowFor": "Jetzt für {amount} verkaufen",
+    "auctionSellNowHint": "Beendet die Auktion sofort und verkauft an das höchste Gebot.",
+    "auctionSoldNow": "Verkauft an das höchste Gebot!",
     "auctionCancelled": "Auktion abgebrochen",
     "salesTitle": "Verkäufe",
     "salesEmpty": "Noch nie verkauft.",
@@ -2810,7 +2814,7 @@
     "studioCost": "Nächstes NFT: {amount}",
     "studioXp": "+{xp} XP",
     "studioRoyalties": "Lizenzgebühren verdient: {amount}",
-    "studioPainted": "{count, plural, =0 {Noch kein eigenes NFT} one {# eigenes NFT} other {# eigene NFTs}}",
+    "studioPainted": "{count, plural, =0 {Heute noch kein NFT} one {Heute # NFT geprägt} other {Heute # NFTs geprägt}}",
     "studioButton": "NFT prägen",
     "editorTitle": "NFT prägen",
     "editorIntro": "32 × 32 Pixel, bis zu 16 Farben. Jedes NFT gibt es nur einmal.",

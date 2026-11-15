@@ -1,5 +1,5 @@
 {
-  "id": "43a70b33-3eea-4bc0-aafd-7784d4f38ebe",
+  "id": "014d91a8-c6c5-4f8b-975d-3c66c41f848b",
   "logo": {
     "grid": [
       "................",
@@ -37,12 +37,12 @@
     { "key": "staking", "hours": 12, "available": false, "cost_cents": 500000, "success_bps": 10000 },
     { "key": "bugfix", "hours": 3, "available": true, "cost_cents": 100000, "success_bps": 10000 }
   ],
-  "creator": { "tag": "YCTC", "trust": { "band": "blank", "score": 50 }, "nickname": "Fixture_Coiner" },
+  "creator": { "tag": "SBTK", "trust": { "band": "blank", "score": 50 }, "nickname": "Fixture_Coiner" },
   "fee_bps": 100,
   "category": "player",
   "price_e4": null,
   "burn_hype": 8,
-  "created_at": "2026-11-15T18:42:34.918655+00:00",
+  "created_at": "2026-11-15T19:18:25.316164+00:00",
   "low_24h_e4": null,
   "pool_cents": 0,
   "burn_min_e6": 0,

@@ -424,6 +424,12 @@ select public.get_collection('Fixture_Kunst');
 select public.get_collection(null);
 \o
 reset role;
+-- the owner sells to the highest bid at once
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/accept_auction.json
+select public.accept_auction(gen_random_uuid(), :'fx_au1');
+\o
+reset role;
 
 -- M4b: property (ADR-082): a player without a home, a flat with a layout, the move to a house,
 -- a car, a sale, and another player's view (no inventory)

@@ -2166,6 +2166,8 @@ export interface GameEngine {
   likeArtwork(requestId: string, artworkId: string, like: boolean): Promise<{ likes: number; liked: boolean }>;
   startAuction(requestId: string, artworkId: string, startCents: number, hours: number): Promise<Artwork>;
   cancelAuction(requestId: string, auctionId: string): Promise<Artwork>;
+  /** The seller ends an auction with bids now and sells to the highest bid. */
+  acceptAuction(requestId: string, auctionId: string): Promise<Artwork>;
   bidArtwork(requestId: string, auctionId: string, amountCents: number): Promise<Artwork>;
   artRankings(limit: number): Promise<ArtRankings>;
   collection(nickname: string): Promise<ArtCollection>;

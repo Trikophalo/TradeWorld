@@ -1,5 +1,5 @@
 {
-  "id": "36c60086-c03f-4570-b687-a2e729b83222",
+  "id": "e3c5e205-bb9c-477b-a280-3da3d2eb5e5e",
   "kind": "loan",
   "terms": { "hours": 24, "interest_bps": 0, "principal_cents": 20000 },
   "status": "cancelled",
@@ -9,15 +9,15 @@
   "my_role": "lender",
   "progress": { "due_cents": 20000, "left_cents": 20000, "repaid_cents": 0 },
   "proposer": {
-    "tag": "4GEV",
+    "tag": "4UKL",
     "level": 6,
     "trust": { "band": "blank", "score": 50 },
     "nickname": "Fixture_Lieferant",
     "avatar_key": "rookie"
   },
-  "closed_at": "2026-11-15T18:42:34.291945+00:00",
-  "created_at": "2026-11-15T18:42:34.289665+00:00",
-  "expires_at": "2026-11-17T18:42:34.289665+00:00",
+  "closed_at": "2026-11-15T19:18:24.502007+00:00",
+  "created_at": "2026-11-15T19:18:24.499457+00:00",
+  "expires_at": "2026-11-17T19:18:24.499457+00:00",
   "accepted_at": null,
   "is_proposer": true,
   "broken_by_me": false,

@@ -2,42 +2,42 @@
   "items": [
     {
       "id": 5,
-      "body": "Mehrere Häuser streichen ihre Kaufempfehlung und senken das Kursziel. Sicher ist das nicht.",
-      "name": "Fundgrube Discount",
-      "due_at": "2026-11-15T19:55:20.51157+00:00",
+      "body": "Ein Gericht gibt dem Konkurrenten recht. Lizenzzahlungen drohen. Sicher ist das nicht.",
+      "name": "Helix Robotik",
+      "due_at": "2026-11-15T20:51:00.879106+00:00",
       "status": "open",
-      "ticker": "FGD",
-      "headline": "Analysten-Downgrade für Fundgrube Discount",
+      "ticker": "HLX",
+      "headline": "Helix Robotik verliert Patentstreit",
       "move_bps": null,
-      "strength": 1,
+      "strength": 2,
       "direction": "down",
-      "published_at": "2026-11-15T19:42:35.058608+00:00"
+      "published_at": "2026-11-15T20:18:25.469906+00:00"
     },
     {
       "id": 4,
-      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Orbitfracht tut sich in der nächsten Stunde etwas, und zwar nach oben. Das Vögelchen lag bisher meistens richtig. Meistens.",
-      "name": "Orbitfracht",
-      "due_at": "2026-11-15T19:21:28.898989+00:00",
-      "status": "fizzled",
-      "ticker": "OFR",
-      "headline": "Mr. Doodle Dangles Geheimtipp",
-      "move_bps": null,
+      "body": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: QuantenSprung Labs geht bald nach unten. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
+      "name": "QuantenSprung Labs",
+      "due_at": "2026-11-15T19:33:18.288574+00:00",
+      "status": "confirmed",
+      "ticker": "QSL",
+      "headline": "Der heiße Draht: QuantenSprung Labs",
+      "move_bps": -580,
       "strength": 2,
-      "direction": "up",
-      "published_at": "2026-11-15T18:42:28.898989+00:00"
+      "direction": "down",
+      "published_at": "2026-11-15T19:18:18.288574+00:00"
     },
     {
       "id": 3,
-      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei SolarFuchs tut sich in der nächsten Stunde etwas, und zwar nach oben. Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.",
-      "name": "SolarFuchs",
-      "due_at": "2026-11-15T18:42:28.047162+00:00",
-      "status": "confirmed",
-      "ticker": "SFX",
+      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Brotzeit Handel AG tut sich in der nächsten Stunde etwas, und zwar nach unten. Das Vögelchen lag bisher meistens richtig. Meistens.",
+      "name": "Brotzeit Handel AG",
+      "due_at": "2026-11-15T19:18:17.489043+00:00",
+      "status": "fizzled",
+      "ticker": "BRZ",
       "headline": "Mr. Doodle Dangles Geheimtipp",
-      "move_bps": 1158,
+      "move_bps": null,
       "strength": 2,
-      "direction": "up",
-      "published_at": "2026-11-15T18:42:28.047162+00:00"
+      "direction": "down",
+      "published_at": "2026-11-15T19:18:17.489043+00:00"
     }
   ],
   "reliability_bps": 7500

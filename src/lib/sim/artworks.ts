@@ -29,7 +29,7 @@ export function isValidArtwork(art: unknown, cfg: ArtworksConfig = BALANCE.artwo
   return grid.join("").replace(/\./g, "").length >= 16;
 }
 
-/** Cost of painting the next artwork: base × factor ^ artworks already painted. */
+/** Cost of minting the next NFT: base × factor ^ NFTs already minted today (the price starts again every day). */
 export function artworkCreateCostCents(alreadyPainted: number, cfg: ArtworksConfig = BALANCE.artworks): number {
   return Math.round(cfg.createBaseCostCents * Math.pow(cfg.createCostFactor, Math.max(0, alreadyPainted)));
 }

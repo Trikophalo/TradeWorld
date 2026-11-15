@@ -144,6 +144,16 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Unter jeder Figur im Studiopublikum der Nachrichten steht jetzt ihr Name; im Studio sitzen nur echte Spieler, die erfundenen Zuschauer schreiben nur…",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-b0f0ae56",
+        title: "NFT-Preis jeden Tag neu",
+        text: "Das erste NFT am Tag kostet wieder 15.000 €, erst weitere am selben Tag werden teurer.",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-92e47de7",
+        title: "NFT sofort verkaufen",
+        text: "Hat deine Auktion ein Gebot, kannst du sie sofort beenden und an das höchste Gebot verkaufen.",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-706f8ae2",
         title: "Mehr Verbesserungen",
         text: "22 neue Verbesserungen und zwei weitere Tresorstufen, in fünf Abschnitten.",

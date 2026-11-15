@@ -73,6 +73,7 @@ export const ARTWORK_RPC_SCHEMAS = {
   like_artwork: z.object({ likes: num, liked: z.boolean() }),
   start_auction: z.object({ artwork: artworkSchema }),
   cancel_auction: z.object({ artwork: artworkSchema }),
+  accept_auction: z.object({ artwork: artworkSchema, price_cents: z.number() }),
   bid_artwork: z.object({ artwork: artworkSchema }),
   get_art_rankings: z.object({
     collections: z.array(
@@ -155,6 +156,7 @@ type ArtEngine = Pick<
   | "likeArtwork"
   | "startAuction"
   | "cancelAuction"
+  | "acceptAuction"
   | "bidArtwork"
   | "artRankings"
   | "collection"
@@ -216,6 +218,10 @@ export const liveArtEngine: ArtEngine = {
       { p_request_id: requestId, p_artwork_id: artworkId, p_start_cents: startCents, p_hours: hours },
       S.start_auction,
     );
+    return toArtwork(r.artwork);
+  },
+  async acceptAuction(requestId, auctionId) {
+    const r = await rpc("accept_auction", { p_request_id: requestId, p_auction_id: auctionId }, S.accept_auction);
     return toArtwork(r.artwork);
   },
   async cancelAuction(requestId, auctionId) {

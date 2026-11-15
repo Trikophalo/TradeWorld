@@ -211,6 +211,8 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   Missionsjäger, Teamplayer, Bilanzprofi, Ehrgeiz), ein größerer Tresor (Panzertresor) und vieles für die eigene
   Firma (KI-Turbo, Glückshand, Werbeagentur, Krisenmanager …). Sie schalten sich zwischen Level 1 und 30 frei.
 
+- **NFT sofort verkaufen:** Hat deine Auktion ein Gebot, kannst du sie sofort beenden und an das höchste Gebot verkaufen.
+- **NFT-Preis jeden Tag neu:** Das erste NFT am Tag kostet wieder 15.000 €, erst weitere am selben Tag werden teurer.
 - **Namen im Studio:** Unter jeder Figur im Studiopublikum der Nachrichten steht jetzt ihr Name; im Studio sitzen nur
   echte Spieler, die erfundenen Zuschauer schreiben nur noch im Chat.
 - **Schwerere Missionen, neue Missionen (ADR-159):** Tages- und Wochenmissionen werden mit dem Level anspruchsvoller

@@ -315,6 +315,20 @@ function OwnAuction({ artwork }: { artwork: Artwork }) {
   const errorText = useGameErrorText();
   const refresh = useArtRefresh();
   const a = artwork.auction!;
+  const [selling, setSelling] = useState<ButtonState>("idle");
+  const sellNow = async () => {
+    setSelling("loading");
+    try {
+      await engine.acceptAuction(crypto.randomUUID(), a.id);
+      setSelling("success");
+      void playSound("success");
+      toast.success(t("auctionSoldNow"), undefined, { silent: true });
+      await refresh();
+    } catch (error) {
+      setSelling("idle");
+      toast.error(t("auctionSellNow"), errorText(error));
+    }
+  };
   const cancel = async () => {
     try {
       await engine.cancelAuction(crypto.randomUUID(), a.id);
@@ -328,10 +342,19 @@ function OwnAuction({ artwork }: { artwork: Artwork }) {
     <section className="space-y-3 rounded-lg border border-line-2 p-4">
       <AuctionHead artwork={artwork} />
       <p className="text-sm text-fg-2">{t("ownAuction")}</p>
-      {a.bids === 0 && (
+      {a.bids === 0 ? (
         <Button size="sm" variant="ghost" onClick={() => void cancel()}>
           {t("auctionCancel")}
         </Button>
+      ) : (
+        a.currentCents !== null && (
+          <div className="space-y-1">
+            <Button state={selling} onClick={() => void sellNow()} data-testid="auction-sell-now">
+              {t("auctionSellNowFor", { amount: formatMoney(a.currentCents, { whole: true }) })}
+            </Button>
+            <p className="text-xs text-pretty text-fg-3">{t("auctionSellNowHint")}</p>
+          </div>
+        )
       )}
     </section>
   );

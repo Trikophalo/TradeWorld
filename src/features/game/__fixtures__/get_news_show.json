@@ -1,8 +1,8 @@
 {
-  "now": "2026-11-15T18:42:35.488329+00:00",
+  "now": "2026-11-15T19:18:25.979473+00:00",
   "chat": [
     {
-      "at": "2026-11-15T18:42:35.484485+00:00",
+      "at": "2026-11-15T19:18:25.976523+00:00",
       "id": 208,
       "bot": false,
       "body": "Was für eine Sendung 💀📉",
@@ -13,88 +13,89 @@
   "show": {
     "id": 7,
     "writer": "mini",
-    "airs_at": "2026-11-15T18:00:00+00:00",
+    "airs_at": "2026-11-15T19:00:00+00:00",
     "segments": [
       {
         "kind": "gossip",
         "mood": "proud",
-        "text": "Ich fasse es nicht, aber es stimmt. Frieda_Format meldet: Frieda Apps gegründet. Glückwunsch, und jetzt bloß nichts anfassen.",
-        "figure": { "nickname": "Frieda_Format", "avatar_key": "rookie", "accessories": [] },
+        "text": "Gute Nachrichten, ausnahmsweise. Bei Fixture_Neustart heißt es: Fixture Zweitling gegründet. Glückwunsch, und jetzt bloß nichts anfassen.",
+        "figure": { "nickname": "Fixture_Neustart", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Na so was: Frieda_Format"
+        "headline": "Fixture_Neustart hat es geschafft"
       },
       {
-        "kind": "hype",
-        "mood": "laughing",
-        "text": "Unfassbar, aber wahr: Talwerk ist der Renner. Ein Bürgermeister hat spontan eine Straße danach benannt. „Wanderkarten“ geht weg wie warme Semmeln. Pop_Gero soll vor Freude geweint haben.",
-        "figure": { "nickname": "Pop_Gero", "avatar_key": "rookie", "accessories": [] },
-        "effects": [
-          { "tone": "gain", "label": "Bekanntheit +24,9 %" },
-          { "tone": "gain", "label": "TAL +12,1 %" }
-        ],
-        "headline": "Alle wollen Talwerk"
+        "kind": "scandal",
+        "mood": "angry",
+        "text": "Gero Werkstatt wollte heute groß rauskommen. Das Firmenmaskottchen hat gekündigt und packt in einem Buch aus. Gero_Garage erklärte, das gehöre zum Konzept. Die Kundschaft erklärte, sie sei dann mal weg.",
+        "figure": { "nickname": "Gero_Garage", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −17,8 %" }],
+        "headline": "Gero Werkstatt blamiert sich bis auf die Knochen"
       },
       {
         "kind": "nft",
-        "mood": "laughing",
-        "text": "Ben_Bieter zahlt 30.000 € für „Neon Nacht“, gemalt von Nina_Neon. Das Bild hat sechzehn mal sechzehn Pixel. Ich habe nachgezählt, ich hatte Zeit.",
+        "mood": "shocked",
+        "text": "Kunstmarkt, oder was man dafür hält: „Neon Nacht“ von Nina_Neon ging für 30.000 € an Ben_Bieter. Mein Enkel malt so etwas mit Fingerfarbe, und der will dafür nur ein Eis.",
         "figure": { "nickname": "Nina_Neon", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "NFT-Wahnsinn um „Neon Nacht“"
+        "headline": "30.000 € für ein paar Pixel"
       },
       {
         "kind": "winner",
         "mood": "shocked",
-        "text": "Und nun zu jemandem, der es kann: Fixture_Neu hat heute 1.138.906 € gemacht, 11389,1 % im Plus. Das Finanzamt hat bereits freundlich gewunken.",
+        "text": "Und nun zu jemandem, der es kann: Fixture_Neu hat heute 1.139.381 € gemacht, 11393,8 % im Plus. Das Finanzamt hat bereits freundlich gewunken.",
         "figure": { "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] },
         "effects": [],
-        "headline": "Fixture_Neu sahnt ab: plus 1.138.906 €"
+        "headline": "Fixture_Neu sahnt ab: plus 1.139.381 €"
       },
       {
         "kind": "gossip",
         "mood": "shocked",
-        "text": "Ich fasse es nicht, aber es stimmt. Fixture_Chef meldet: Fixture Leitern gegründet. Dafür gibt es von mir ein ehrliches Schulterklopfen, mit der Faust.",
-        "figure": { "nickname": "Fixture_Chef", "avatar_key": "rookie", "accessories": [] },
+        "text": "Ich fasse es nicht, aber es stimmt. Fred_Fabrik meldet: Fred Fabrik gegründet. Auch ein blindes Huhn findet mal ein Korn, aber immerhin.",
+        "figure": { "nickname": "Fred_Fabrik", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Na so was: Fixture_Chef"
+        "headline": "Na so was: Fred_Fabrik"
       },
       {
         "kind": "scandal",
-        "mood": "shocked",
-        "text": "Peinlich für Esc_Frida: Ein Großkunde bekam statt der Ware eine Kiste mit Entschuldigungsbriefen. „Stühle mit drei Beinen“ klang auf dem Papier besser. Das Image von Wackelwerk ist im Eimer.",
-        "figure": { "nickname": "Esc_Frida", "avatar_key": "rookie", "accessories": [] },
-        "effects": [
-          { "tone": "loss", "label": "Bekanntheit −10,1 %" },
-          { "tone": "loss", "label": "WAC −12,5 %" }
-        ],
-        "headline": "Kunden fliehen vor Wackelwerk"
+        "mood": "angry",
+        "text": "Das Netz zerreißt Lieferwerk Anja. Im Lager wurde ein Praktikant gefunden, der seit drei Wochen vermisst war. Er hatte niemandem gefehlt. Seitdem will niemand mehr „Ideen für alle“. Anja_Lieferant hat das Firmenhandy im Fluss versenkt.",
+        "figure": { "nickname": "Anja_Lieferant", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −13,9 %" }],
+        "headline": "Shitstorm über Lieferwerk Anja"
       },
       {
-        "kind": "tasks",
+        "kind": "ramble",
+        "mood": "shocked",
+        "text": "Ich habe es aus dritter Hand, also stimmt es: Heidi Klum hat angeblich heimlich Wackelwerk gekauft. Ich habe es geträumt, aber meine Träume sind börsennotiert. Die Anleger rennen hinterher, plus 4,5 %.",
+        "effects": [{ "tone": "gain", "label": "WAC +4,5 %" }],
+        "headline": "Promi-Alarm bei Wackelwerk"
+      },
+      {
+        "kind": "sector",
         "mood": "angry",
-        "text": "Ein Fernsehkoch hat erklärt, man könne Geld auch behalten. Alle offenen Firmen-Aufgaben sind 38,7 % weniger wert. Die Chefs dürfen ruhig ein bisschen schwitzen.",
-        "effects": [{ "tone": "loss", "label": "Aufgaben −38,7 %" }],
-        "headline": "Kunden entdecken das Sparen"
+        "text": "Schlechte Nachrichten für Pharma: Ein Orakel aus dem Frühstücksfernsehen hat den Daumen gesenkt. Die Kurse geben um 4,6 % nach.",
+        "effects": [{ "tone": "loss", "label": "Pharma −4,6 %" }],
+        "headline": "Katerstimmung in Pharma"
       },
       {
         "kind": "stock",
-        "mood": "shocked",
-        "text": "GenoVita Biotech verliert 10,4 %. Der gesamte Vorstand ist nach dem Betriebsausflug nicht zurückgekehrt. Letztes Lebenszeichen: ein Foto aus einer Karaoke-Bar. Die Anleger nehmen Reißaus.",
-        "effects": [{ "tone": "loss", "label": "GNV −10,4 %" }],
-        "headline": "GenoVita Biotech stürzt ab"
+        "mood": "smug",
+        "text": "Die Konkurrenz hat geschlossen Betriebsferien, niemand weiß warum. Die Börse feiert: Knusperkönig steigt um 8,4 %. Wer nicht dabei ist, darf sich jetzt ärgern.",
+        "effects": [{ "tone": "gain", "label": "SNK +8,4 %" }],
+        "headline": "Kursrakete Knusperkönig"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Knusperkönig geht bald nach unten. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
-        "effects": [{ "tone": "neutral", "label": "SNK ↓ Tipp" }],
-        "headline": "Der heiße Draht: Knusperkönig"
+        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Luftpost Drohnen geht bald nach oben. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
+        "effects": [{ "tone": "neutral", "label": "DRN ↑ Tipp" }],
+        "headline": "Der heiße Draht: Luftpost Drohnen"
       }
     ],
-    "started_at": "2026-11-15T18:42:35.488329+00:00"
+    "started_at": "2026-11-15T19:18:25.979473+00:00"
   },
   "viewers": 1,
   "audience": [{ "me": true, "friend": false, "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] }],
   "upcoming": null,
-  "next_airs_at": "2026-11-15T19:00:00+00:00"
+  "next_airs_at": "2026-11-15T20:00:00+00:00"
 }

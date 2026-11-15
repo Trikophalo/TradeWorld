@@ -12,7 +12,7 @@ select tests.assert(
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute'))
   = (select array_agg(x order by x collate "C") from unnest(array['admin_close_quarter', 'admin_run_tick', 'admin_set_paused', 'apply_for_job', 'are_friends', 'bid_artwork', 'buy_car', 'buy_floor', 'buy_furniture', 'buy_home',
-          'can_read_ledger_transaction', 'cancel_auction', 'cancel_order', 'cancel_quit', 'capital_increase', 'change_nickname',
+          'accept_auction', 'can_read_ledger_transaction', 'cancel_auction', 'cancel_order', 'cancel_quit', 'capital_increase', 'change_nickname',
           'check_company_name', 'check_nickname', 'claim_daily_reward', 'claim_mission', 'claim_vault',
           'close_company', 'close_job_posting', 'company_deposit', 'company_withdraw', 'complete_tutorial',
           'counter_offer', 'create_artwork', 'create_job_posting', 'current_game_quarter', 'daily_check_in', 'delete_account', 'dismiss_ai_worker', 'expand_company', 'fire_employee',

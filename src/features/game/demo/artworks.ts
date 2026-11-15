@@ -105,7 +105,9 @@ export interface ArtState {
   works: DemoArtwork[];
   auctions: DemoAuction[];
   likes: string[];
+  /** NFTs minted on `paintedDay` (the mint price starts again every day). */
   painted: number;
+  paintedDay?: string;
   /** Day keys for which the gallery auctions were started. */
   galleryDays: string[];
   seq: number;
@@ -347,6 +349,15 @@ export function createArtEngine(host: ArtHost) {
   }
 
   /** The gallery opens its daily auctions; the tycoons bid; due auctions end; collectors look around. */
+  /** The Berlin day of `now`: the mint price starts again every day. */
+  const mintDay = (now = Date.now()) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: BALANCE.time.timezone }).format(now);
+  /** NFTs minted today. */
+  function mintedToday(): number {
+    const s = state();
+    return s.paintedDay === mintDay() ? s.painted : 0;
+  }
+
   function tick(now = Date.now()) {
     const s = state();
     const today = host.day(now);
@@ -604,6 +615,7 @@ export function createArtEngine(host: ArtHost) {
     | "likeArtwork"
     | "startAuction"
     | "cancelAuction"
+    | "acceptAuction"
     | "bidArtwork"
     | "artRankings"
     | "collection"
@@ -659,8 +671,8 @@ export function createArtEngine(host: ArtHost) {
 
     async artStudio() {
       return {
-        painted: state().painted,
-        nextCostCents: artworkCreateCostCents(state().painted),
+        painted: mintedToday(),
+        nextCostCents: artworkCreateCostCents(mintedToday()),
         unlocked: unlocked(),
         royaltiesCents: state().royaltiesCents ?? 0,
         royaltyBps: nft.royaltyBps,
@@ -685,10 +697,11 @@ export function createArtEngine(host: ArtHost) {
           if (!isValidArtwork(pixels)) throw new GameError("invalid_argument");
           if (hasForbiddenSymbol(pixels)) throw new GameError("logo_forbidden");
           const s = state();
-          const cost = artworkCreateCostCents(s.painted);
+          const cost = artworkCreateCostCents(mintedToday());
           if (host.cashCents() < cost) throw new GameError("insufficient_funds");
           host.addCash(-cost);
-          s.painted += 1;
+          s.painted = mintedToday() + 1;
+          s.paintedDay = mintDay();
           host.track("artworks_painted");
           s.seq += 1;
           const me = host.nickname();
@@ -769,6 +782,20 @@ export function createArtEngine(host: ArtHost) {
           });
           host.persist();
           return view(work(artworkId)!);
+        }),
+      ),
+
+    acceptAuction: (requestId, auctionId) =>
+      Promise.resolve(
+        host.idempotent(requestId, () => {
+          tick();
+          const a = findAuction(auctionId);
+          if (a.seller !== host.nickname()) throw new GameError("auction_not_found");
+          if (a.bids.length === 0) throw new GameError("invalid_argument");
+          a.endsAt = Date.now() - 1;
+          tick();
+          host.persist();
+          return view(work(a.artworkId)!);
         }),
       ),
 
