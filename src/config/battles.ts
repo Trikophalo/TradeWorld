@@ -233,7 +233,7 @@ export const BATTLE_RULES = {
      */
     bear: {
       maxTicks: 1_600,
-      bearTicks: [40, 360, 720, 1_080] as readonly number[],
+      bearTicks: [60, 380, 740, 1_100] as readonly number[],
       /** Ticks per step of a bear: stepStart, one less every speedEvery ticks, at least stepMin (a player: 4). */
       stepStart: 7,
       stepMin: 4,
@@ -267,12 +267,12 @@ export const BATTLE_RULES = {
      */
     dash: {
       maxTicks: 1_200,
-      target: 8,
+      target: 15,
       firstCoin: 20,
       /** Coins on the field: 1 + floor(players / coinsPerPlayers), at most coinsMax. */
-      coinsPerPlayers: 3,
-      coinsMax: 4,
-      spawnDelay: 14,
+      coinsPerPlayers: 4,
+      coinsMax: 3,
+      spawnDelay: 24,
       goldEvery: 5,
       goldValue: 2,
       tackleStun: 24,
@@ -325,12 +325,12 @@ export const BATTLE_RULES = {
       countGrowEvery: 4,
       countMax: 3,
       /** Beams of one wave come this many ticks apart. */
-      staggerTicks: 14,
+      staggerTicks: 20,
       warnTicks: 24,
       ticksPerTile: 2,
       gapPct: 35,
       jumpTicks: 8,
-      jumpCool: 8,
+      jumpCool: 6,
       invulnTicks: 16,
     },
     /**

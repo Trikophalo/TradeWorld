@@ -250,7 +250,7 @@ declare
   mv integer[]; stun integer[]; xr integer[]; outt integer[]; steps integer[];
   code integer[]; want integer[]; tx integer[]; ty integer[]; go integer[];
   score integer[]; reach integer[]; cool integer[];
-  hi integer[]; hj integer[];
+  hi integer[]; hj integer[]; rk bigint[];
   ct integer[]; ca integer[]; cn integer[];
   occ integer[];
   v_count  integer;
@@ -269,6 +269,7 @@ begin
   select sx, sy into px, py from public.battle_spawns(p_seed, n, p_params -> 'spawns');
   mv := array_fill(0, array[n]); stun := mv; xr := mv; steps := mv; code := mv; want := mv; tx := mv; ty := mv; go := mv;
   score := mv; reach := mv; cool := mv;
+  rk := array_fill(0::bigint, array[n]);
   outt := array_fill(-1, array[n]);
   occ := array_fill(0, array[w * h]);
   for i in 1 .. n loop
@@ -314,6 +315,10 @@ begin
         tx[i] := nx; ty[i] := ny; want[i] := 1;
       end if;
     end loop;
+    -- a tile two want goes to the one with fewer dividends, then by lot (walkContested)
+    for i in 1 .. n loop
+      rk[i] := case when want[i] = 1 then score[i]::bigint * 4294967296 + public.battle_hash(p_seed, 7000 + t, i - 1) else 0 end;
+    end loop;
     for i in 1 .. n loop
       go[i] := want[i];
       continue when want[i] = 0;
@@ -322,7 +327,7 @@ begin
         if px[j] = tx[i] and py[j] = ty[i] then
           go[i] := 0;
           if code[i] >= 5 and cool[i] = 0 then hi := hi || i; hj := hj || j; end if;
-        elsif want[j] = 1 and tx[j] = tx[i] and ty[j] = ty[i] then go[i] := 0;
+        elsif want[j] = 1 and tx[j] = tx[i] and ty[j] = ty[i] and rk[j] < rk[i] then go[i] := 0;
         end if;
       end loop;
     end loop;
@@ -402,7 +407,7 @@ declare
   px integer[]; py integer[];
   mv integer[]; stun integer[]; xr integer[]; outt integer[]; steps integer[];
   code integer[]; want integer[]; tx integer[]; ty integer[]; go integer[];
-  dist integer[]; safe integer[]; occ integer[]; failing integer[];
+  dist integer[]; safe integer[]; occ integer[]; failing integer[]; rk bigint[];
   v_round  integer := 0;
   v_call   integer := -1;
   v_nextr  integer := (g ->> 'firstRound')::integer;
@@ -421,6 +426,7 @@ begin
   select sx, sy into px, py from public.battle_spawns(p_seed, n, p_params -> 'spawns');
   mv := array_fill(0, array[n]); stun := mv; xr := mv; steps := mv; code := mv; want := mv; tx := mv; ty := mv; go := mv;
   dist := mv;
+  rk := array_fill(0::bigint, array[n]);
   outt := array_fill(-1, array[n]);
   safe := array_fill(0, array[w * h]);
   while not done and t < p_until loop
@@ -452,13 +458,17 @@ begin
         tx[i] := nx; ty[i] := ny; want[i] := 1;
       end if;
     end loop;
+    -- a tile two want goes to one of them by lot (walkContested)
+    for i in 1 .. n loop
+      rk[i] := case when want[i] = 1 then public.battle_hash(p_seed, 5000 + t, i - 1) else 0 end;
+    end loop;
     for i in 1 .. n loop
       go[i] := want[i];
       continue when want[i] = 0;
       for j in 1 .. n loop
         continue when j = i or outt[j] >= 0;
         if px[j] = tx[i] and py[j] = ty[i] then go[i] := 0;
-        elsif want[j] = 1 and tx[j] = tx[i] and ty[j] = ty[i] then go[i] := 0;
+        elsif want[j] = 1 and tx[j] = tx[i] and ty[j] = ty[i] and rk[j] < rk[i] then go[i] := 0;
         end if;
       end loop;
     end loop;

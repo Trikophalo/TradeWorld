@@ -2,6 +2,7 @@
  * Dividenden-Dash (ADR-160): a few dividend coins lie on free tiles; whoever steps on one first takes it, and a new
  * one appears elsewhere (it can be taken after spawnDelay). Every goldEvery-th coin is a special dividend. Walking
  * into someone with the action held tackles them: they cannot move for tackleStun, the tackler waits tackleCool.
+ * When several want the same free tile, the one with fewer dividends gets it (then the lot): no standoffs.
  * First to `target` wins at once; else the most at the end, at a draw who got there first. Mirrored by
  * public.battle_sim_dash.
  */
@@ -16,7 +17,7 @@ import {
   rankByKeys,
   readInputs,
   spawnPlayers,
-  walk,
+  walkContested,
   type GridBase,
   type SimParams,
 } from "./core.ts";
@@ -104,11 +105,13 @@ export function dashStep(s: DashState, inputs: string, params: SimParams<DashPar
   advance(p);
   for (let i = 0; i < p.n; i++) if (p.out[i]! < 0 && s.cool[i]! > 0) s.cool[i]! -= 1;
   const hits: [number, number][] = [];
-  walk(
+  // a tile two want goes to the one with fewer dividends, then by lot
+  walkContested(
     p,
     codes,
     (x, y) => inBounds(s.w, s.h, x, y),
-    () => params.stepTicks,
+    params.stepTicks,
+    (i) => s.score[i]! * 4_294_967_296 + battleHash(s.seed, 7000 + t, i),
     (i, j) => {
       if (actOf(codes[i]!) && s.cool[i] === 0) hits.push([i, j]);
     },

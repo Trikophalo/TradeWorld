@@ -16,7 +16,7 @@ import {
   rankByKeys,
   readInputs,
   spawnPlayers,
-  walk,
+  walkContested,
   type GridBase,
   type SimParams,
 } from "./core.ts";
@@ -72,11 +72,13 @@ export function marginStep(s: MarginState, inputs: string, params: SimParams<Mar
   const p = s.p;
   const codes = readInputs(p, inputs, t, params.disconnectTicks);
   advance(p);
-  walk(
+  // a tile two want goes to one of them by lot (musical chairs, not a standoff)
+  walkContested(
     p,
     codes,
     (x, y) => inBounds(s.w, s.h, x, y),
-    () => params.stepTicks,
+    params.stepTicks,
+    (i) => battleHash(s.seed, 5000 + t, i),
   );
   if (t === s.nextRound) {
     const count = Math.max(1, aliveCount(p) - 1 + Math.max(0, g.warmupRounds - s.round));

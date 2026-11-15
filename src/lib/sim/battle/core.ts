@@ -229,6 +229,59 @@ export function walk(
   }
 }
 
+/**
+ * walk() for games with a prize on a tile (Dividenden-Dash, Margin Call): when several players want the same free
+ * tile, the one with the lowest `rank` gets it instead of nobody (else they would block each other forever).
+ * Everything else as in walk().
+ */
+export function walkContested(
+  p: Players,
+  codes: readonly number[],
+  passable: (x: number, y: number) => boolean,
+  stepTicks: number,
+  rank: (i: number) => number,
+  onBump?: (i: number, j: number) => void,
+): void {
+  const n = p.n;
+  const tx = fill(n, 0);
+  const ty = fill(n, 0);
+  const want = fill(n, 0);
+  for (let i = 0; i < n; i++) {
+    if (p.out[i]! >= 0 || p.mv[i]! > 0 || p.stun[i]! > 0) continue;
+    const d = dirOf(codes[i]!);
+    if (d === 0) continue;
+    p.face[i] = d;
+    const nx = p.x[i]! + DX[d]!;
+    const ny = p.y[i]! + DY[d]!;
+    if (!passable(nx, ny)) continue;
+    tx[i] = nx;
+    ty[i] = ny;
+    want[i] = 1;
+  }
+  const go = [...want];
+  const ranks = Array.from({ length: n }, (_, i) => (want[i] ? rank(i) : 0));
+  for (let i = 0; i < n; i++) {
+    if (!want[i]) continue;
+    for (let j = 0; j < n; j++) {
+      if (j === i || p.out[j]! >= 0) continue;
+      if (p.x[j] === tx[i] && p.y[j] === ty[i]) {
+        go[i] = 0;
+        onBump?.(i, j);
+      } else if (want[j] && tx[j] === tx[i] && ty[j] === ty[i] && ranks[j]! < ranks[i]!) go[i] = 0;
+    }
+  }
+  for (let i = 0; i < n; i++) {
+    if (!go[i]) continue;
+    p.fx[i] = p.x[i]!;
+    p.fy[i] = p.y[i]!;
+    p.x[i] = tx[i]!;
+    p.y[i] = ty[i]!;
+    p.mv[i] = stepTicks;
+    p.st[i] = stepTicks;
+    p.steps[i]! += 1;
+  }
+}
+
 /** Counts how long everyone stands still (after the moves of the tick). */
 export function countIdle(p: Players): void {
   for (let i = 0; i < p.n; i++) {
