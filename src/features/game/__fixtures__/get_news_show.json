@@ -1,93 +1,101 @@
 {
-  "now": "2026-11-15T12:42:14.578024+00:00",
+  "now": "2026-11-15T18:30:01.404233+00:00",
   "chat": [
     {
-      "at": "2026-11-15T12:42:14.572397+00:00",
-      "id": 204,
+      "at": "2026-11-15T18:30:01.400864+00:00",
+      "id": 206,
+      "bot": false,
       "body": "Was für eine Sendung 💀📉",
       "mine": true,
       "nickname": "Fixture_Neu"
     }
   ],
   "show": {
-    "id": 6,
+    "id": 7,
     "writer": "mini",
-    "airs_at": "2026-11-15T12:00:00+00:00",
+    "airs_at": "2026-11-15T18:00:00+00:00",
     "segments": [
       {
         "kind": "gossip",
-        "mood": "smug",
-        "text": "Liebes Tagebuch, schreibt Anja_Lieferant heute vermutlich: Deal mit Bodo_Kunde gebrochen. Ich würde ja helfen, aber dann hätte ich nichts mehr zu lachen. Wir legen etwas Schmerzensgeld bei.",
-        "effects": [{ "tone": "gain", "label": "+100 € Schmerzensgeld" }],
-        "headline": "Das Tagebuch von Anja_Lieferant"
+        "mood": "shocked",
+        "text": "Bitte festhalten: Fixture Werke erweitert, und zwar bei Fixture_Gmbh. Dafür gibt es von mir ein ehrliches Schulterklopfen, mit der Faust.",
+        "figure": { "nickname": "Fixture_Gmbh", "avatar_key": "rookie", "accessories": [] },
+        "effects": [],
+        "headline": "Applaus für Fixture_Gmbh"
       },
       {
         "kind": "scandal",
-        "mood": "angry",
-        "text": "Ausgerechnet Rang Laden, die Firma mit dem Motto „Tee aus der Region“: Auf der Weihnachtsfeier wurde versehentlich die halbe Belegschaft befördert, die andere Hälfte gefeuert. Die Kunden laufen davon.",
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −21,1 %" }],
-        "headline": "Skandal bei Rang Laden"
+        "mood": "shocked",
+        "text": "Bei Fred Fabrik brennt die Hütte. Der Sicherheitsdienst hat sich selbst ausgesperrt und die Tür aufgebrochen. Fred_Fabrik spricht von einem Missverständnis. Zur Erinnerung, das Geschäftsmodell lautet: „Teile aus Stahl“.",
+        "figure": { "nickname": "Fred_Fabrik", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −17,3 %" }],
+        "headline": "Fred Fabrik: Chef Fred_Fabrik unter Beschuss"
       },
       {
         "kind": "nft",
         "mood": "confused",
-        "text": "Kunstmarkt, oder was man dafür hält: „Neon Nacht“ von Nina_Neon ging für 30.000 € an Ben_Bieter. Ich verstehe es nicht, also muss es teuer sein.",
+        "text": "Aus der Welt der bunten Kästchen: Ben_Bieter hat sich „Neon Nacht“ von Nina_Neon für 30.000 € gegönnt. Ich verstehe es nicht, also muss es teuer sein.",
+        "figure": { "nickname": "Nina_Neon", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "30.000 € für ein paar Pixel"
+        "headline": "„Neon Nacht“ wechselt den Besitzer"
       },
       {
         "kind": "winner",
         "mood": "shocked",
-        "text": "11389,2 % Plus, 1.138.925 € Gewinn: Fixture_Neu zeigt dem Rest, wie es geht. Wer jetzt um einen Kredit bittet, wird ausgelacht. Zu Recht.",
+        "text": "Fixture_Neu ist heute um 1.138.931 € reicher, 11389,3 % rauf. Das Finanzamt hat bereits freundlich gewunken.",
+        "figure": { "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] },
         "effects": [],
-        "headline": "Fixture_Neu schwimmt im Geld"
+        "headline": "Glückspilz des Tages: Fixture_Neu"
       },
       {
         "kind": "gossip",
-        "mood": "laughing",
-        "text": "Job bei Frieda Apps hingeschmissen: Das ist die Tagesbilanz von Walter_Weg. So eine Pfeife sehe ich sonst nur morgens im Spiegel, und ich bin wenigstens im Fernsehen. Schmerzensgeld gibt es obendrauf, Würde leider nicht.",
-        "effects": [{ "tone": "gain", "label": "+100 € Schmerzensgeld" }],
-        "headline": "Fremdschämen mit Walter_Weg"
+        "mood": "proud",
+        "text": "Gute Nachrichten, ausnahmsweise. Bei Nora_Nobiz heißt es: Level 10 erreicht. Die Konkurrenz darf sich gern ein Beispiel nehmen, ihr Luschen.",
+        "figure": { "nickname": "Nora_Nobiz", "avatar_key": "rookie", "accessories": [] },
+        "effects": [],
+        "headline": "Nora_Nobiz hat es geschafft"
       },
       {
         "kind": "scandal",
-        "mood": "angry",
-        "text": "Bei Fixture Werke brennt die Hütte. Die Geschäftsführung hat das wichtigste Meeting des Jahres verschlafen, im Meetingraum. Fixture_Gmbh spricht von einem Missverständnis. Zur Erinnerung, das Geschäftsmodell lautet: „Maschinen nach Maß“.",
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −13,4 %" }],
-        "headline": "Fixture Werke: Chef Fixture_Gmbh unter Beschuss"
+        "mood": "shocked",
+        "text": "Bei Miras Laden brennt die Hütte. Ein Großkunde bekam statt der Ware eine Kiste mit Entschuldigungsbriefen. Mira_Anna spricht von einem Missverständnis. Zur Erinnerung, das Geschäftsmodell lautet: „Bunte Socken im Abo“.",
+        "figure": { "nickname": "Mira_Anna", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −13 %" }],
+        "headline": "Miras Laden: Chef Mira_Anna unter Beschuss"
       },
       {
         "kind": "ramble",
-        "mood": "smug",
-        "text": "Man erzählt sich, Friedrich Merz habe bei Kaufrausch Märkte zugeschlagen. Ich habe es auf einer Raststätte gehört, zwischen Kaffee und Reue. Ob es stimmt, ist dem Kurs egal: 6,7 % rauf.",
-        "effects": [{ "tone": "gain", "label": "KFR +6,7 %" }],
-        "headline": "Gerücht des Tages: Friedrich Merz und Kaufrausch Märkte"
+        "mood": "angry",
+        "text": "Die Regie winkt, ich ignoriere sie. Thomas Gottschalk will angeblich mein Wohnzimmer moderieren. Ich habe abgeschlossen. So. Weiter im Text.",
+        "effects": [],
+        "headline": "Was ich noch sagen wollte"
       },
       {
-        "kind": "tasks",
-        "mood": "crying",
-        "text": "Das halbe Land ist kollektiv im Urlaub, natürlich unbezahlt. Alle offenen Firmen-Aufgaben sind 27,1 % weniger wert. Die Chefs dürfen ruhig ein bisschen schwitzen.",
-        "effects": [{ "tone": "loss", "label": "Aufgaben −27,1 %" }],
-        "headline": "Kunden entdecken das Sparen"
+        "kind": "sector",
+        "mood": "proud",
+        "text": "Die ganze Branche Pharma steigt um 7,1 %. Die Konkurrenzbranche hat geschlossen verschlafen. So funktioniert Wirtschaft, liebe Kinder.",
+        "effects": [{ "tone": "gain", "label": "Pharma +7,1 %" }],
+        "headline": "Die Branche Pharma dreht durch"
       },
       {
         "kind": "stock",
         "mood": "shocked",
-        "text": "Das Hauptquartier wurde versehentlich bei einer Kleinanzeige mitverkauft. Der Kurs von Methusalem Bio sackt um 11,3 % ab. Ein Krisenstab tagt.",
-        "effects": [{ "tone": "loss", "label": "MTH −11,3 %" }],
-        "headline": "Panik bei Methusalem Bio"
+        "text": "Ein Mitarbeiter hat „Allen antworten“ gedrückt. Mit Anhang. Die Börse straft Knusperkönig mit 9,9 % Minus ab. Der Pressesprecher wurde zuletzt am Flughafen gesehen.",
+        "effects": [{ "tone": "loss", "label": "SNK −9,9 %" }],
+        "headline": "Katastrophe bei Knusperkönig"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Methusalem Bio tut sich in der nächsten Stunde etwas, und zwar nach unten. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
-        "effects": [{ "tone": "neutral", "label": "MTH ↓ Tipp" }],
-        "headline": "Mr. Doodle Dangles Geheimtipp"
+        "text": "Ein Vögelchen hat mir gezwitschert: Kaufrausch Märkte dürfte in der kommenden Stunde nach oben gehen. Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.",
+        "effects": [{ "tone": "neutral", "label": "KFR ↑ Tipp" }],
+        "headline": "Vom Flurfunk: Kaufrausch Märkte"
       }
     ],
-    "started_at": "2026-11-15T12:42:14.578024+00:00"
+    "started_at": "2026-11-15T18:30:01.404233+00:00"
   },
-  "viewers": 5,
+  "viewers": 1,
+  "audience": [{ "me": true, "friend": false, "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] }],
   "upcoming": null,
-  "next_airs_at": "2026-11-15T13:00:00+00:00"
+  "next_airs_at": "2026-11-15T19:00:00+00:00"
 }

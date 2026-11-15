@@ -29,6 +29,25 @@ export const NEWS_SHOW_RULES = {
   replayMinutes: 55,
   /** The News tab is marked this long before the show. */
   teaserMinutes: 5,
+  /**
+   * The studio audience under the TV (ADR-157): everyone watching right now stands there as their dressed figure
+   * (friends first), the made-up chat viewers too while they write. What someone writes pops up as a speech bubble
+   * above their figure.
+   */
+  audience: {
+    /** Players the server sends; on the stage at most this many figures, the rest as "+N". */
+    max: 12,
+    /** A speech bubble stays this long. */
+    bubbleSeconds: 6,
+    /** Bubbles shown at once; later ones wait for a free place. */
+    bubblesAtOnce: 2,
+    /** A bubble that waited longer than this is dropped (the chat still has the line). */
+    bubbleMaxDelaySeconds: 12,
+    /** A made-up viewer stands in the audience this long after their last line. */
+    botMinutes: 8,
+    /** Accessories a made-up viewer wears at most (picked from the catalogue, seeded by the name). */
+    botAccessoriesMax: 3,
+  },
   chat: {
     maxLength: 200,
     perMinute: 10,
