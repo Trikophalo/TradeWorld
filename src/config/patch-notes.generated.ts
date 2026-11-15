@@ -303,6 +303,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Kleiderschrank und Freunde-Platz",
         text: "Deine Spielfigur steht jetzt in voller Größe da und lässt sich anziehen: 51 verrückte Accessoires vom Cowboyhut über Bananenkostüm, Haikostüm und Laseraugen bis zu Papagei, Jetpack und goldener Klobürste. Unter Profil → Kleiderschrank probierst du alles an und kaufst mit Spielgeld, von 150 € bis 5 Mio. €. Im Freunde-Tab stehen alle deine Freunde als Figuren auf einem Platz, wer online ist, hat ein grünes Schild über dem Kopf. Tipp auf eine Figur für das Profil, oder stups sie mit 👉 an: Sie bekommt eine Benachrichtigung.",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-37807b7d",
+        title: "Kleiderschrank: zweite Kollektion",
+        text: "74 neue Teile, jetzt 125 insgesamt, in zwölf Sets: Piraten mit Augenklappe und Säbel, Raumfahrt mit Strahlenpistole und Mini-UFO, Ritterhelm und Rüstung, Zauberhut, Zauberbart und Eule, E-Gitarre, Goldpokal, Weihnachtspulli und Kürbiskopf, Büro & Börse mit Geldkoffer und Bärenmarkt-Bär, dazu Völlig Absurdes wie Klopapierkrone, Aluhut, Gartenzwergkostüm, Entchen-Schwimmring, Pümpel, Einkaufswagen voller Klopapier, Haustierstein und Discokugel. Neu ist die Seltenheit **Mythisch**: Phönixflügel, Königsmantel, Zepter, Diamantmonokel, Geldregenwolke und der Goldene Bulle für 150 bis 900 Mio. €. Alles ist deutlich teurer geworden (Gewöhnliches ab 450 €, Legendäres bis 75 Mio. €). Damit man den Überblick behält: Suche, Filter nach Bereich und Seltenheit, Sortieren nach Preis, „Nur bezahlbare“ und die Ansicht „Nach Sets“.",
+      },
     ],
   },
   {

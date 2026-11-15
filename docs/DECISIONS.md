@@ -2490,3 +2490,11 @@ ihre Firmen, und mit echten, großen Folgen für Kurse, Firmen und Aufgaben.
   angestupst! 👉“ mit Link auf das Profil; sie lässt sich in den Einstellungen abschalten.
 - **Demo:** Ohne Mitspieler startet die Demo weiter ohne Freunde; ein gespeicherter Demo-Zustand (`friendList`) kann
   erfundene Freunde mitbringen (Tests, Vorführung).
+- **Nachtrag (zweite Kollektion):** 74 neue Teile, zusammen 125, in zwölf Themen-Sets (Piraten, Raumfahrt, Ritter,
+  Zauberei, Küche, Rockstar, Sport, Tierisch, Feiertage, Büro & Börse, Völlig absurd, Prunk & Protz); `set` ist ein
+  optionales Feld nur für die Gruppierung. Neue fünfte Seltenheit „Mythisch“ (Farbe `loss` mit Verlauf), eine je Slot,
+  150 bis 900 Mio. € ab Level 35 bis 50, erscheint wie Legendäres im Feed. Alle Preise grob verdreifacht (gewöhnlich,
+  450 bis 2.800 €, jedes Teil mit dem Startkapital bezahlbar) bis verzehnfacht (legendär 7,5 bis 75 Mio. €), selten
+  6.000 bis 77.000 €, episch 0,2 bis 1,75 Mio. €. Der Kleiderschrank bekommt Suche, Filter nach Slot und Seltenheit,
+  Sortierung nach Preis oder Seltenheit, „Nur bezahlbare“ und die Ansicht „Nach Sets“. Der Server liest Preise aus
+  `game_config`, eine Migration war nicht nötig. Pixel-Art der neuen Teile in `src/components/pixel/accessories-second.ts`.

@@ -7465,14 +7465,16 @@ lässt unmögliche aktive Missionen ohne Fortschritt verfallen. Test `supabase/t
 ## Nachtrag: Accessoires, Freunde-Platz, Anstupsen (ADR-155)
 
 Migration `20261204002800_accessories_pokes.sql`. Katalog in `game_config.accessories` (`slots`, `feedRarities`,
-`items` mit `key`, `name`, `slot`, `rarity`, `priceCents`, `minLevel`; aus `src/config/accessories.ts`).
+`items` mit `key`, `name`, `slot`, `rarity`, `priceCents`, `minLevel`, optional `set`; aus `src/config/accessories.ts`).
+Seltenheiten `common` bis `mythic`; `set` dient nur der Gruppierung im Kleiderschrank, der Server liest es nicht.
 
 - **Tabellen (intern, nur über RPCs):** `player_accessories` (PK `player_id, accessory_key`, `price_paid_cents`,
   `bought_at`), `player_accessories_worn` (PK `player_id, slot`; FK auf `player_accessories`, also nur Gekauftes,
   eins je Slot), `friend_pokes` (`poker_id`, `target_id`, `created_at`; älter als zwei Tage wird gelöscht).
 - **RPCs:** `get_accessories()` → `{owned, worn, avatar_key}` (`worn` von hinten nach vorn);
   `buy_accessory(p_request_id, p_key)` bucht `lifestyle_purchase` vom Bargeld an `households`, zieht das Teil gleich
-  an und liefert den Zustand mit `paid_cents`; legendäre Käufe posten `accessory_bought` in den Feed.
+  an und liefert den Zustand mit `paid_cents`; Käufe der `feedRarities` (legendär, mythisch) posten
+  `accessory_bought` in den Feed.
   `wear_accessory(p_request_id, p_key, p_wear)` an/aus. `poke_friend(p_request_id, p_nickname)` →
   `{nickname, poked_at, next_at, left_today}` und Benachrichtigung `friend_poke` (Link aufs eigene Profil);
   Pause je Freund `social.poke.cooldownMinutes` (10), höchstens `social.poke.dailyCap` (30) in 24 Stunden.
