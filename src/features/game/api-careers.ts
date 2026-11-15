@@ -271,6 +271,7 @@ const cardSchema = z.object({
   company: z.object({ name: z.string(), ticker: z.string().nullable() }).nullable(),
   member_since: iso,
   trust: trustSchema.nullable().default(null),
+  accessories: z.array(z.string()).default([]),
 });
 
 export const CAREER_RPC_SCHEMAS = {
@@ -626,6 +627,7 @@ export const liveCareerEngine: CareerEngine = {
       company: c.company,
       memberSince: c.member_since,
       trust: c.trust ? toTrust(c.trust) : null,
+      accessories: c.accessories,
       tag: c.tag,
       trophies: c.trophies,
     };

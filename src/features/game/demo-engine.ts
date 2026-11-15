@@ -34,7 +34,8 @@ import { MISSION_TEMPLATES, availableFor, missionXp, type Metric, type MissionTe
 import { createCareerEngine, initialCareer, tycoonAvatar, type CareerState } from "./demo/careers";
 import { createArtEngine, type ArtState } from "./demo/artworks";
 import { createPropertyEngine, type HomeState } from "./demo/property";
-import { createFriendEngine, type DemoFriendCode } from "./demo/friends";
+import { createFriendEngine, demoFriendCard, type DemoFriend, type DemoFriendCode } from "./demo/friends";
+import { createAccessoryEngine, type DemoWardrobe } from "./demo/accessories";
 import { createStockNewsEngine } from "./demo/stock-news";
 import { createCompanyMovesEngine, type DemoMoveRun } from "./demo/company-moves";
 import { createCompanyTasksEngine, type DemoTasksState } from "./demo/company-tasks";
@@ -119,6 +120,11 @@ interface PlayerState {
   protests?: DemoProtest[];
   /** The friend code redeemed once (ADR-111). */
   friendCode?: DemoFriendCode;
+  /** Made-up friends and the own pokes (ADR-154). */
+  friendList?: DemoFriend[];
+  pokes?: { nickname: string; at: number }[];
+  /** Bought and worn accessories (ADR-154). */
+  wardrobe?: DemoWardrobe;
   /** Feed, notifications and league of the demo (ADR-088, ADR-089). */
   social?: DemoSocialState;
   /** Deals with the demo's trading partners and the trust log (ADR-098). */
@@ -1285,6 +1291,26 @@ const friends = createFriendEngine({
     p().cashCents += cents;
   },
   now: () => new Date(),
+  friendList: () => p().friendList ?? [],
+  pokes: () => p().pokes ?? [],
+  setPokes: (value) => {
+    p().pokes = value;
+  },
+});
+
+const wardrobe = createAccessoryEngine({
+  state: () => p().wardrobe,
+  setState: (value) => {
+    p().wardrobe = value;
+  },
+  level,
+  avatarKey: () => career.avatarKey(),
+  cashCents: () => p().cashCents,
+  pay: (cents) => {
+    p().cashCents -= cents;
+  },
+  feed: feedPost,
+  idempotent,
 });
 
 const home = createPropertyEngine({
@@ -1608,6 +1634,13 @@ export const demoEngine: GameEngine = {
   ...art.engine,
   ...home.engine,
   ...friends,
+  ...wardrobe,
+  /** Own card with the worn accessories; the made-up friends have one too (ADR-154). */
+  async playerCard(nickname) {
+    const friend = (p().friendList ?? []).find((f) => f.nickname.toLowerCase() === nickname.trim().toLowerCase());
+    if (friend) return demoFriendCard(friend);
+    return { ...(await career.engine.playerCard(nickname)), accessories: wardrobe.worn() };
+  },
   ...social.engine,
   ...companyEvents.engine,
   snapshot: () => Promise.resolve(snapshotNow()),
