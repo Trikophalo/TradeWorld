@@ -58,7 +58,7 @@ import { introShot } from "./intro";
 import { IntroMontage } from "./intro-montage";
 import { MOOD_REACTION, segmentMood, speechDelayMs } from "./mood";
 
-export type { AnchorMood } from "@/components/pixel/news-art";
+export { ANCHOR_MOODS, type AnchorMood } from "@/components/pixel/news-art";
 export { INTRO_SHOTS, introShot, type IntroFrame, type IntroShotId } from "./intro";
 export { MOOD_REACTION, defaultMood, isAnchorMood, segmentMood, speechDelayMs } from "./mood";
 
