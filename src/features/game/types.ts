@@ -967,6 +967,8 @@ export interface FriendEntry {
   level: number;
   /** Friends since / request sent at. */
   at: string;
+  /** Friends only: used the game in the last few minutes. */
+  online?: boolean;
 }
 // ------------------------------------------------------------------ social (ADR-088, ADR-089) and events (ADR-090)
 

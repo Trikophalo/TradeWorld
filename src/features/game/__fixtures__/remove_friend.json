@@ -1,5 +1,14 @@
 {
-  "friends": [{ "tag": "ZNGX", "level": 8, "since": "2026-11-15T00:02:59.279466+00:00", "nickname": "Fixture_Kunst" }],
-  "incoming": [{ "at": "2026-11-15T00:02:59.281944+00:00", "tag": "KNHT", "level": 15, "nickname": "Fixture_Neu" }],
+  "friends": [
+    {
+      "tag": "GEK3",
+      "level": 8,
+      "since": "2026-11-15T11:12:03.358085+00:00",
+      "online": true,
+      "nickname": "Fixture_Kunst",
+      "last_active_at": "2026-11-15T11:12:02.343918+00:00"
+    }
+  ],
+  "incoming": [{ "at": "2026-11-15T11:12:03.361877+00:00", "tag": "UVDA", "level": 15, "nickname": "Fixture_Neu" }],
   "outgoing": []
 }

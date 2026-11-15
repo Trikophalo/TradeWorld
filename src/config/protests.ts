@@ -17,6 +17,8 @@ export const PROTEST_RULES = {
   durationHours: 6,
   /** One open campaign per target; a player starts at most one per this many hours. */
   starterCooldownHours: 6,
+  /** A finished campaign stays in the news this long, then it disappears. */
+  visibleAfterMinutes: 60,
   /** At the goal: chance of a real effect = base + per player supporter, at most max. */
   effectChanceBaseBps: 600,
   effectChancePerPlayerBps: 300,

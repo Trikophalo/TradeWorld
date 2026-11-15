@@ -14,7 +14,7 @@
     "revenue_cents": null
   },
   "company": {
-    "id": "a9334cf5-49c8-4f43-a945-40c43f43256d",
+    "id": "462c0f1b-095e-4bd0-90c2-dfa9c1f70535",
     "idea": "Maschinen nach Maß",
     "logo": null,
     "name": "Ausbau Werke",
@@ -25,9 +25,9 @@
     "ticker": null,
     "price_e4": null,
     "change_bps": null,
-    "founded_at": "2026-11-15T00:02:39.097959+00:00",
+    "founded_at": "2026-11-15T11:11:41.013325+00:00",
     "brand_color": "#224466"
   },
-  "founder": { "tag": "L76P", "nickname": "Anke_Ausbau", "avatar_key": "rookie" },
+  "founder": { "tag": "BX4F", "nickname": "Anke_Ausbau", "avatar_key": "rookie" },
   "members": []
 }

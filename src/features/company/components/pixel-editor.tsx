@@ -10,19 +10,56 @@ import { cn } from "@/lib/utils";
 /** Palette index as one character: 0-9, then a-f for artworks with up to 16 colours. */
 const IDX = "0123456789abcdef";
 /** Colours to start from (data, like the company colours). */
+/** 48 colours to pick from (as many as the NFT studio offers); any other colour via the colour field. */
 const SWATCHES = [
   "#111318",
-  "#ffffff",
-  "#ffd15c",
-  "#ff9a52",
-  "#ff6170",
-  "#c03fb8",
-  "#8f7bff",
-  "#4f8cff",
-  "#62e0ff",
-  "#2fd98c",
-  "#9a6b3c",
+  "#3a3f4b",
+  "#6b7385",
   "#8f9bb3",
+  "#c4ccd9",
+  "#ffffff",
+  "#5c1a1a",
+  "#a8323e",
+  "#ff6170",
+  "#ff9aa2",
+  "#ffd6dc",
+  "#7a2e12",
+  "#c4511f",
+  "#ff9a52",
+  "#ffc08a",
+  "#5a3d10",
+  "#a8741c",
+  "#ffd15c",
+  "#fff1a8",
+  "#3d4a12",
+  "#7da12a",
+  "#b8e05a",
+  "#0f4a2e",
+  "#1f8a55",
+  "#2fd98c",
+  "#a8f5cf",
+  "#0d4a52",
+  "#1f9aa8",
+  "#62e0ff",
+  "#c2f4ff",
+  "#14244f",
+  "#2b4fb3",
+  "#4f8cff",
+  "#a8c4ff",
+  "#2e1a5c",
+  "#5b3cc4",
+  "#8f7bff",
+  "#cfc4ff",
+  "#4a1747",
+  "#c03fb8",
+  "#ff7ae8",
+  "#ffc8f2",
+  "#3b2414",
+  "#6e4527",
+  "#9a6b3c",
+  "#c79a6b",
+  "#e8c9a0",
+  "#f5e6d0",
 ];
 export type PixelTool = "pen" | "eraser" | "fill" | "line";
 type Cell = { x: number; y: number };
@@ -134,6 +171,7 @@ export function PixelEditor({
     return x >= 0 && y >= 0 && x < width && y < height ? { x, y } : null;
   };
 
+  const [custom, setCustom] = useState("#4f8cff");
   const onDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === "mouse" && event.button !== 0 && event.button !== 2) return;
     event.preventDefault();
@@ -298,7 +336,7 @@ export function PixelEditor({
           {value.palette.length < maxColors && (
             <>
               <p className="mt-3 mb-1.5 text-xs text-fg-3">{t("addColorHint")}</p>
-              <div className="grid grid-cols-6 gap-1.5">
+              <div className="grid grid-cols-8 gap-1.5 sm:grid-cols-12">
                 {SWATCHES.filter((c) => !value.palette.includes(c)).map((c) => (
                   <button
                     key={c}
@@ -309,6 +347,24 @@ export function PixelEditor({
                     className="aspect-square rounded-sm border border-line-2 opacity-85 focus-ring transition duration-fast hover:scale-110 hover:opacity-100"
                   />
                 ))}
+              </div>
+              <div className="mt-2 flex items-center gap-2 text-xs text-fg-3">
+                <input
+                  type="color"
+                  value={custom}
+                  onChange={(event) => setCustom(event.target.value.toLowerCase())}
+                  aria-label={t("customColor")}
+                  className="h-8 w-10 cursor-pointer rounded-sm border border-line-2 bg-surface-2 focus-ring"
+                  data-testid="custom-color"
+                />
+                <button
+                  type="button"
+                  onClick={() => addColor(custom)}
+                  disabled={value.palette.includes(custom)}
+                  className="rounded-md bg-surface-2 px-3 py-1.5 text-fg-2 focus-ring transition duration-fast hover:text-fg-1 active:scale-95 disabled:opacity-50"
+                >
+                  {t("customColorAdd")}
+                </button>
               </div>
             </>
           )}

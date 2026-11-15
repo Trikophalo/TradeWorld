@@ -227,8 +227,14 @@ function PersonRow({ entry, hint, children }: { entry: FriendEntry; hint: string
         className="group flex min-w-0 flex-1 items-center gap-3 rounded-sm focus-ring"
         aria-label={t("openProfile", { name: entry.nickname })}
       >
-        <span className="grid size-9 shrink-0 place-items-center rounded-md bg-accent-soft font-pixel text-xs text-accent">
+        <span className="relative grid size-9 shrink-0 place-items-center rounded-md bg-accent-soft font-pixel text-xs text-accent">
           {entry.nickname.slice(0, 2).toUpperCase()}
+          {entry.online && (
+            <span
+              className="absolute -right-0.5 -bottom-0.5 size-3 rounded-full bg-gain ring-2 ring-surface-1"
+              aria-hidden
+            />
+          )}
         </span>
         <span className="min-w-0">
           <span className="flex min-w-0 items-center gap-2">
@@ -236,6 +242,7 @@ function PersonRow({ entry, hint, children }: { entry: FriendEntry; hint: string
             <PlayerTag tag={entry.tag} />
           </span>
           <span className="block text-xs text-fg-3">
+            {entry.online && <span className="font-medium text-gain">{t("online")} · </span>}
             Level {entry.level} · {hint}
           </span>
         </span>

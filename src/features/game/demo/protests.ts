@@ -71,6 +71,7 @@ export function createProtestsEngine(
     startCostCents: cfg.startCostCents,
     minLevel: cfg.minLevel,
     protests: [...list]
+      .filter((p) => p.resolvedAt === null || host.now() - p.resolvedAt < cfg.visibleAfterMinutes * 60_000)
       .sort((a, b) => Number(b.status === "open") - Number(a.status === "open") || b.createdAt - a.createdAt)
       .map((p) => ({
         ...p,

@@ -83,3 +83,21 @@ select tests.assert(
 select tests.assert(tests.money_invariant() = 'ok', 'money invariant holds');
 -- keep the market snapshot of the fixtures at the AI stocks
 update public.securities set status = 'delisted', delisted_at = now() where id = :'sec';
+
+-- =============================================================================
+-- Friends online; finished campaigns leave the news after an hour
+-- =============================================================================
+insert into public.friendships (requester_id, addressee_id, status, responded_at) values (:a, :b, 'accepted', now());
+update public.profiles set last_active_at = public.game_now() where id = :b;
+update public.profiles set last_active_at = public.game_now() - interval '2 hours' where id = :f;
+insert into public.friendships (requester_id, addressee_id, status, responded_at) values (:a, :f, 'accepted', now());
+select tests.login_as('authenticated', :a);
+select public.get_friends() -> 'friends' as fr \gset
+reset role;
+select tests.assert(
+  :'fr'::jsonb -> 0 ->> 'nickname' = 'Float_Berta' and (:'fr'::jsonb -> 0 ->> 'online')::boolean
+  and :'fr'::jsonb -> 1 ->> 'nickname' = 'Float_Frida' and not (:'fr'::jsonb -> 1 ->> 'online')::boolean,
+  'get_friends(): who is online, online friends first');
+select tests.assert(
+  position('visibleAfterMinutes' in pg_get_functiondef('public.protests_state(uuid)'::regprocedure)) > 0,
+  'protests_state(): finished campaigns stay protests.visibleAfterMinutes, not a day');

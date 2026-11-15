@@ -11,6 +11,7 @@ const entry = z.object({
   level: z.number(),
   since: z.string().optional(),
   at: z.string().optional(),
+  online: z.boolean().optional(),
 });
 const friendsSchema = z.object({
   friends: z.array(entry),
@@ -66,6 +67,7 @@ const toEntry = (e: z.infer<typeof entry>) => ({
   tag: e.tag,
   level: e.level,
   at: e.since ?? e.at ?? "",
+  ...(e.online === undefined ? {} : { online: e.online }),
 });
 const toFriends = (r: z.infer<typeof friendsSchema>): Friends => ({
   friends: r.friends.map(toEntry),

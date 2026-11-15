@@ -177,6 +177,12 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   Missionsjäger, Teamplayer, Bilanzprofi, Ehrgeiz), ein größerer Tresor (Panzertresor) und vieles für die eigene
   Firma (KI-Turbo, Glückshand, Werbeagentur, Krisenmanager …). Sie schalten sich zwischen Level 1 und 30 frei.
 
+- **Freunde online:** Ein grüner Punkt zeigt, welcher Freund gerade spielt; online stehen sie oben in der Liste, und
+  neben „Freunde“ in der Leiste steht, wie viele gerade da sind.
+- **Mehr Farben:** Logo, Banner und Coin-Logo dürfen jetzt wie NFTs bis zu 16 Farben haben; dazu 48 Farbfelder und
+  eine frei wählbare eigene Farbe.
+- **Kampagnen** verschwinden eine Stunde nach ihrem Ende aus den News.
+- **Firmen-Minispiele:** Beim Ziehen schließt sich das Fenster nicht mehr.
 - **Aktien haben einen Bestand (ADR-153):** Von einer Aktie kann niemand mehr kaufen, als es gibt. Sind alle Aktien
   einer Firma bei Spielern, ist Schluss, bis jemand verkauft oder der Gründer mit einer Kapitalerhöhung neue Aktien
   ausgibt. Eine größere Order bekommt genau das, was noch frei ist.

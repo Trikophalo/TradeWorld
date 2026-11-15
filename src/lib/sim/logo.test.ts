@@ -21,7 +21,11 @@ describe("company logo (ADR-065)", () => {
     expect(isValidLogo({ ...logo, grid: logo.grid.slice(1) })).toBe(false);
     expect(isValidLogo({ ...logo, grid: [row("2222"), ...logo.grid.slice(1)] })).toBe(false);
     expect(isValidLogo({ ...logo, palette: ["red"] })).toBe(false);
-    expect(isValidLogo({ ...logo, palette: Array(7).fill("#000000") })).toBe(false);
+    expect(isValidLogo({ ...logo, palette: Array(17).fill("#000000") })).toBe(false);
+    // up to 16 colours, indices 0-9 then a-f
+    const sixteen = Array(16).fill("#000000");
+    expect(isValidLogo({ palette: sixteen, grid: [row("fedcba98"), ...logo.grid.slice(1)] })).toBe(true);
+    expect(isValidLogo({ palette: sixteen.slice(0, 12), grid: [row("fedcba98"), ...logo.grid.slice(1)] })).toBe(false);
     expect(isValidLogo({ ...logo, grid: Array(16).fill(row("")) })).toBe(false);
   });
 

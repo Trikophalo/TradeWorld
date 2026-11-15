@@ -393,7 +393,8 @@ export function PlaySheet({ task, onClose }: { task: CompanyTask | null; onClose
 
   return (
     <Sheet open onOpenChange={(open) => !open && close()} title={text.name(task.key)} description={text.how(task.key)}>
-      <div ref={setAnchor} className="space-y-4 px-5 pb-6" data-testid="play-sheet">
+      {/* Drag games: dragging must move the pieces, never swipe the sheet shut. */}
+      <div ref={setAnchor} className="space-y-4 px-5 pb-6" data-testid="play-sheet" data-vaul-no-drag>
         {result ? (
           <ResultView result={result} onClose={close} />
         ) : play ? (

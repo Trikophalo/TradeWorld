@@ -2511,7 +2511,7 @@
   },
   "logo": {
     "title": "Logo zeichnen",
-    "intro": "16 × 16 Pixel, bis zu 6 Farben. Mit Spiegeln wird dein Logo symmetrisch.",
+    "intro": "16 × 16 Pixel, bis zu 16 Farben. Mit Spiegeln wird dein Logo symmetrisch.",
     "preview": "Vorschau",
     "tool": "Werkzeug",
     "pen": "Stift",
@@ -2647,6 +2647,8 @@
     "colors": "Farben {count}/{max}",
     "colorsLabel": "Farben",
     "addColorHint": "Farbe hinzufügen:",
+    "customColor": "Eigene Farbe",
+    "customColorAdd": "+ Eigene Farbe",
     "addColor": "Farbe {color} hinzufügen",
     "mirror": "Spiegeln",
     "undo": "Rückgängig",
@@ -2899,6 +2901,8 @@
     }
   },
   "friends": {
+    "online": "online",
+    "onlineCount": "{count, plural, one {# Freund online} other {# Freunde online}}",
     "title": "Freunde",
     "intro": "Füge Mitspieler hinzu und sieh dir ihre Profile, Firmen, NFTs und ihr Zuhause an.",
     "add": "Als Freund hinzufügen",

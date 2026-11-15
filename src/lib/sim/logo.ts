@@ -12,6 +12,8 @@ export interface CompanyLogoData {
 }
 
 const HEX = /^#[0-9a-f]{6}$/;
+/** Grid characters of the palette indices: 0-9, then a-f (up to 16 colours). */
+const INDEX = "0123456789abcdef";
 
 export function isValidLogo(logo: unknown, cfg: StartupsConfig = BALANCE.startups): logo is CompanyLogoData {
   if (!logo || typeof logo !== "object") return false;
@@ -19,7 +21,7 @@ export function isValidLogo(logo: unknown, cfg: StartupsConfig = BALANCE.startup
   if (!Array.isArray(palette) || palette.length < 1 || palette.length > cfg.logo.maxColors) return false;
   if (!palette.every((c) => typeof c === "string" && HEX.test(c))) return false;
   if (!Array.isArray(grid) || grid.length !== cfg.logo.size) return false;
-  const allowed = new RegExp(`^[.0-${palette.length - 1}]{${cfg.logo.size}}$`);
+  const allowed = new RegExp(`^[.${INDEX.slice(0, palette.length)}]{${cfg.logo.size}}$`);
   if (!grid.every((row) => typeof row === "string" && allowed.test(row))) return false;
   // At least a few pixels, so an empty logo does not replace the colour tile.
   return grid.join("").replace(/\./g, "").length >= 8;
@@ -107,7 +109,7 @@ export function isValidBanner(banner: unknown, cfg: StartupsConfig = BALANCE.sta
   if (!Array.isArray(palette) || palette.length < 1 || palette.length > cfg.banner.maxColors) return false;
   if (!palette.every((c) => typeof c === "string" && HEX.test(c))) return false;
   if (!Array.isArray(grid) || grid.length !== cfg.banner.height) return false;
-  const allowed = new RegExp(`^[.0-${palette.length - 1}]{${cfg.banner.width}}$`);
+  const allowed = new RegExp(`^[.${INDEX.slice(0, palette.length)}]{${cfg.banner.width}}$`);
   return grid.every((row) => typeof row === "string" && allowed.test(row));
 }
 

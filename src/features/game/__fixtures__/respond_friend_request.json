@@ -1,5 +1,14 @@
 {
-  "friends": [{ "tag": "FHT8", "level": 15, "since": "2026-11-15T00:02:59.279466+00:00", "nickname": "Fixture_Gmbh" }],
+  "friends": [
+    {
+      "tag": "7W9X",
+      "level": 15,
+      "since": "2026-11-15T11:12:03.358085+00:00",
+      "online": true,
+      "nickname": "Fixture_Gmbh",
+      "last_active_at": "2026-11-15T11:12:03.087974+00:00"
+    }
+  ],
   "incoming": [],
   "outgoing": []
 }

@@ -1,5 +1,5 @@
 {
-  "mine": { "rank": 41, "value_cents": 69170 },
+  "mine": { "rank": 41, "value_cents": 54108 },
   "total": 44,
   "entries": [
     {
@@ -14,15 +14,31 @@
       "founder": "Lars_Kursrutsch",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "cb35e65a-b5a9-4622-a35e-7319fbeb1913",
+      "company_id": "0080e6fe-c34d-4dc9-a08f-31f2a06ed667",
       "value_cents": 959140000,
       "revenue_cents": null
     },
     {
       "kind": "player",
       "logo": null,
-      "name": "Knappwerk",
+      "name": "Wackelwerk",
       "rank": 2,
+      "tier": "ag",
+      "color": "#336699",
+      "sector": "retail",
+      "ticker": "WAC",
+      "founder": "Esc_Frida",
+      "is_mine": false,
+      "team_size": 1,
+      "company_id": "686f9608-ed95-493f-8788-222069c229bf",
+      "value_cents": 111479852,
+      "revenue_cents": null
+    },
+    {
+      "kind": "player",
+      "logo": null,
+      "name": "Knappwerk",
+      "rank": 3,
       "tier": "ag",
       "color": "#336699",
       "sector": "retail",
@@ -30,7 +46,7 @@
       "founder": "Float_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "444e5ee7-92b0-4843-ac6e-6b983e3add2a",
+      "company_id": "636a5961-f852-4716-93a2-1bff54046377",
       "value_cents": 110000000,
       "revenue_cents": null
     },
@@ -58,7 +74,7 @@
         "palette": ["#112233", "#00ff00"]
       },
       "name": "Fenja Pixel",
-      "rank": 3,
+      "rank": 4,
       "tier": "ag",
       "color": "#123456",
       "sector": "tech",
@@ -66,25 +82,9 @@
       "founder": "Fenja_Firma",
       "is_mine": false,
       "team_size": 6,
-      "company_id": "45a39ad3-0245-4f39-b719-7c408a95f8ff",
-      "value_cents": 106621573,
+      "company_id": "1d1916de-8ee0-4762-97bf-6e65975a3016",
+      "value_cents": 107412947,
       "revenue_cents": 0
-    },
-    {
-      "kind": "player",
-      "logo": null,
-      "name": "Wackelwerk",
-      "rank": 4,
-      "tier": "ag",
-      "color": "#336699",
-      "sector": "retail",
-      "ticker": "WAC",
-      "founder": "Esc_Frida",
-      "is_mine": false,
-      "team_size": 1,
-      "company_id": "d50e7c53-e55a-4e66-9615-48d17b93a339",
-      "value_cents": 105891544,
-      "revenue_cents": null
     },
     {
       "kind": "player",
@@ -98,10 +98,10 @@
       "founder": "Pop_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "f5d26092-3998-4f61-90ae-2d1fb863f5fa",
-      "value_cents": 89940000,
+      "company_id": "a159cfdf-a5c2-4886-9ff1-b7ff5335e46d",
+      "value_cents": 93270000,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-15T00:02:57.777011+00:00"
+  "server_time": "2026-11-15T11:12:01.847221+00:00"
 }

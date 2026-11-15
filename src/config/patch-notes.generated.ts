@@ -109,6 +109,26 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Von einer Aktie kann niemand mehr kaufen, als es gibt. Sind alle Aktien einer Firma bei Spielern, ist Schluss, bis jemand verkauft oder der Gründer mit einer Kapitalerhöhung neue Aktien ausgibt. Eine größere Order bekommt genau das, was noch frei ist.",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-2bf9dd3f",
+        title: "Firmen-Minispiele",
+        text: "Beim Ziehen schließt sich das Fenster nicht mehr.",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-e8203fdd",
+        title: null,
+        text: "**Kampagnen** verschwinden eine Stunde nach ihrem Ende aus den News.",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-723e6a28",
+        title: "Mehr Farben",
+        text: "Logo, Banner und Coin-Logo dürfen jetzt wie NFTs bis zu 16 Farben haben; dazu 48 Farbfelder und eine frei wählbare eigene Farbe.",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-b3b2ebc5",
+        title: "Freunde online",
+        text: "Ein grüner Punkt zeigt, welcher Freund gerade spielt; online stehen sie oben in der Liste, und neben „Freunde“ in der Leiste steht, wie viele gerade da sind.",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-706f8ae2",
         title: "Mehr Verbesserungen",
         text: "22 neue Verbesserungen und zwei weitere Tresorstufen, in fünf Abschnitten. Mehr Geld (Tresorzinsen, Lohnbonus, Stammgast, Auftragsprofi, Dealmaker), mehr XP (Börsenprofi, Frühaufsteher, Missionsjäger, Teamplayer, Bilanzprofi, Ehrgeiz), ein größerer Tresor (Panzertresor) und vieles für die eigene Firma (KI-Turbo, Glückshand, Werbeagentur, Krisenmanager …). Sie schalten sich zwischen Level 1 und 30 frei.",

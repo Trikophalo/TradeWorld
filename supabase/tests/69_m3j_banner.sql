@@ -67,7 +67,7 @@ select tests.assert(
 select tests.assert(
   public.banner_valid(:'b1') and public.banner_valid(:'b2')
   and public.banner_valid(jsonb_build_object('palette', '["#000000"]'::jsonb, 'grid', tests.banner())),
-  'banner_valid(): 48 x 12 with 1..6 colours, an empty banner is allowed');
+  'banner_valid(): 48 x 12 with 1..16 colours, an empty banner is allowed');
 select tests.assert(
   not public.banner_valid(jsonb_set(:'b1', '{grid}', (:'b1'::jsonb -> 'grid') - 11))
   and not public.banner_valid(jsonb_set(:'b1', '{grid}', (:'b1'::jsonb -> 'grid') || '["000000000000000000000000000000000000000000000000"]'))
@@ -75,7 +75,7 @@ select tests.assert(
   and not public.banner_valid(jsonb_set(:'b1', '{grid,3}', to_jsonb(repeat('0', 49))))
   and not public.banner_valid(jsonb_set(:'b1', '{grid,3}', to_jsonb(repeat('2', 48))))
   and not public.banner_valid(jsonb_set(:'b1', '{palette,0}', '"#AABBCC"'))
-  and not public.banner_valid(jsonb_set(:'b1', '{palette}', '["#000000", "#111111", "#222222", "#333333", "#444444", "#555555", "#666666"]'))
+  and not public.banner_valid(jsonb_set(:'b1', '{palette}', (select jsonb_agg(format('#0000%s', lpad(to_hex(n), 2, '0'))) from generate_series(0, 16) n)))
   and not public.banner_valid(jsonb_set(:'b1', '{palette}', '[]'))
   and not public.banner_valid(jsonb_build_object('palette', '["#112233"]'::jsonb, 'grid', tests.draw(:plus, 1, 0, 0)))
   and not public.banner_valid('[]') and not public.banner_valid('{"palette": ["#112233"]}'),

@@ -28,12 +28,14 @@ select tests.fund(:r3, 5000000, 'test:m3f:r3');
 select tests.assert(
   public.logo_valid(:logo::jsonb)
   and not public.logo_valid(jsonb_set(:logo::jsonb, '{palette,0}', '"#AABBCC"'))
-  and not public.logo_valid(jsonb_set(:logo::jsonb, '{palette}', '["#000000","#000001","#000002","#000003","#000004","#000005","#000006"]'))
+  and not public.logo_valid(jsonb_set(:logo::jsonb, '{palette}', (select jsonb_agg(format('#0000%s', lpad(to_hex(n), 2, '0'))) from generate_series(0, 16) n)))
+  and public.logo_valid(jsonb_set(jsonb_set(:logo::jsonb, '{palette}', (select jsonb_agg(format('#0000%s', lpad(to_hex(n), 2, '0'))) from generate_series(0, 15) n)),
+                                  '{grid,6}', '"....fedcba98...."'))
   and not public.logo_valid(jsonb_set(:logo::jsonb, '{grid,0}', '"..............."'))
   and not public.logo_valid(jsonb_set(:logo::jsonb, '{grid,0}', '"2..............."'))
   and not public.logo_valid(jsonb_set(:logo::jsonb, '{grid}', (select jsonb_agg(case when n = 3 then '....0000000.....' else '................' end) from generate_series(1, 16) n)))
   and not public.logo_valid('{"palette": ["#112233"]}'),
-  'logo_valid(): like isValidLogo (lowercase hex, at most 6 colours, 16 x 16, indices of the palette, at least 8 pixels)');
+  'logo_valid(): like isValidLogo (lowercase hex, at most 16 colours, indices 0-9 then a-f, 16 x 16, indices of the palette, at least 8 pixels)');
 
 -- =============================================================================
 -- C. Founders with a job (ADR-066)

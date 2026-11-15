@@ -1,8 +1,8 @@
 {
-  "now": "2026-11-15T00:03:01.833296+00:00",
+  "now": "2026-11-15T11:12:06.377133+00:00",
   "chat": [
     {
-      "at": "2026-11-15T00:03:01.83038+00:00",
+      "at": "2026-11-15T11:12:06.371844+00:00",
       "id": 204,
       "body": "Was für eine Sendung 💀📉",
       "mine": true,
@@ -10,77 +10,77 @@
     }
   ],
   "show": {
-    "id": 7,
+    "id": 6,
     "writer": "mini",
-    "airs_at": "2026-11-15T00:00:00+00:00",
+    "airs_at": "2026-11-15T11:00:00+00:00",
     "segments": [
       {
         "kind": "gossip",
-        "mood": "shocked",
-        "text": "Ich fasse es nicht, aber es stimmt. Mona_Mode meldet: Level 10 erreicht. Ich bin fast stolz. Fast.",
+        "mood": "proud",
+        "text": "Bitte festhalten: Level 5 erreicht, und zwar bei Dirk_Billig. Glückwunsch, und jetzt bloß nichts anfassen.",
         "effects": [],
-        "headline": "Na so was: Mona_Mode"
+        "headline": "Applaus für Dirk_Billig"
       },
       {
         "kind": "scandal",
-        "mood": "shocked",
-        "text": "Peinlich für Cleo_Klein: Die Firmenkasse wurde offenbar mit dem Kicker-Budget verwechselt. „Kleine Roboter“ klang auf dem Papier besser. Das Image von Cleos Garage ist im Eimer.",
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −15,4 %" }],
-        "headline": "Kunden fliehen vor Cleos Garage"
+        "mood": "angry",
+        "text": "Das Netz zerreißt Sven Teile. Statt der Kundschaft kam heute die Feuerwehr. Seitdem will niemand mehr „Teile auf Abruf“. Sven_Liefert hat das Firmenhandy im Fluss versenkt.",
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −12,7 %" }],
+        "headline": "Shitstorm über Sven Teile"
       },
       {
         "kind": "nft",
-        "mood": "confused",
-        "text": "Ben_Bieter zahlt 30.000 € für „Neon Nacht“, gemalt von Nina_Neon. Ich habe mir das Werk angesehen. Ich habe Fragen. Viele.",
+        "mood": "laughing",
+        "text": "Ben_Bieter zahlt 30.000 € für „Neon Nacht“, gemalt von Nina_Neon. Ich verstehe es nicht, also muss es teuer sein.",
         "effects": [],
         "headline": "NFT-Wahnsinn um „Neon Nacht“"
       },
       {
         "kind": "winner",
-        "mood": "shocked",
-        "text": "Und nun zu jemandem, der es kann: Fixture_Neu hat heute 1.139.052 € gemacht, 11390,5 % im Plus. Das Finanzamt hat bereits freundlich gewunken.",
+        "mood": "proud",
+        "text": "Fixture_Neu ist heute um 1.138.930 € reicher, 11389,3 % rauf. Alle anderen dürfen jetzt neidisch sein. Bitte der Reihe nach.",
         "effects": [],
-        "headline": "Fixture_Neu sahnt ab: plus 1.139.052 €"
+        "headline": "Glückspilz des Tages: Fixture_Neu"
       },
       {
         "kind": "gossip",
-        "mood": "shocked",
-        "text": "Bitte festhalten: Fixture Mode gegründet, und zwar bei Fx_Taskboss. Genieß es, nächste Woche lachen wir wieder über dich.",
+        "mood": "proud",
+        "text": "Ich fasse es nicht, aber es stimmt. Fixture_Kunst meldet: Level 5 erreicht. Die Konkurrenz darf sich gern ein Beispiel nehmen, ihr Luschen.",
         "effects": [],
-        "headline": "Applaus für Fx_Taskboss"
+        "headline": "Na so was: Fixture_Kunst"
       },
       {
         "kind": "scandal",
         "mood": "angry",
-        "text": "Peinlich für Lohn_Chefin: Die Jahresbilanz wurde mit Buntstiften erstellt, immerhin innerhalb der Linien. „Schrauben“ klang auf dem Papier besser. Das Image von Lohnwerk ist im Eimer.",
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −15,2 %" }],
-        "headline": "Kunden fliehen vor Lohnwerk"
+        "text": "Ausgerechnet Kundenladen Bodo, die Firma mit dem Motto „Ideen für alle“: Die Kaffeekasse war die einzige Abteilung mit Gewinn. Die Kunden laufen davon.",
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −17,4 %" }],
+        "headline": "Skandal bei Kundenladen Bodo"
       },
       {
-        "kind": "tasks",
-        "mood": "proud",
-        "text": "Der Staat hat versehentlich doppelt ausgezahlt und will es nicht zurück. Alle offenen Firmen-Aufgaben sind ab sofort 26,1 % mehr wert. An die Arbeit, ihr faulen Säcke!",
-        "effects": [{ "tone": "gain", "label": "Aufgaben +26,1 %" }],
-        "headline": "Auftragsflut im ganzen Land"
+        "kind": "sector",
+        "mood": "crying",
+        "text": "Die Branche Energie sackt um 9,6 % ab. Die Branchenmesse fand statt, aber niemand ging hin, nicht einmal die Aussteller. Bis das geklärt ist, verkaufen erst mal alle.",
+        "effects": [{ "tone": "loss", "label": "Energie −9,6 %" }],
+        "headline": "Energie im freien Fall"
       },
       {
         "kind": "stock",
-        "mood": "crying",
-        "text": "Luftpost Drohnen verliert 10 %. Der Finanzchef hat die Rücklagen in Rubbellose investiert. Die Anleger nehmen Reißaus.",
-        "effects": [{ "tone": "loss", "label": "DRN −10 %" }],
-        "headline": "Luftpost Drohnen stürzt ab"
+        "mood": "proud",
+        "text": "Neues von Helix Robotik: Der Aufsichtsrat hat sich im Fahrstuhl eingeschlossen und kann nichts mehr kaputt machen. Niemand weiß, ob es stimmt, alle kaufen trotzdem. Plus 13,2 %.",
+        "effects": [{ "tone": "gain", "label": "HLX +13,2 %" }],
+        "headline": "Helix Robotik: Gerücht treibt den Kurs"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Ein Vögelchen hat mir gezwitschert: Pfotenwohl dürfte in der kommenden Stunde nach unten gehen. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
-        "effects": [{ "tone": "neutral", "label": "PFW ↓ Tipp" }],
-        "headline": "Vom Flurfunk: Pfotenwohl"
+        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Eilbote Express geht bald nach unten. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
+        "effects": [{ "tone": "neutral", "label": "EBX ↓ Tipp" }],
+        "headline": "Der heiße Draht: Eilbote Express"
       }
     ],
-    "started_at": "2026-11-15T00:03:01.833296+00:00"
+    "started_at": "2026-11-15T11:12:06.377133+00:00"
   },
   "viewers": 5,
   "upcoming": null,
-  "next_airs_at": "2026-11-15T01:00:00+00:00"
+  "next_airs_at": "2026-11-15T12:00:00+00:00"
 }

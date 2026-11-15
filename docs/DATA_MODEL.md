@@ -7448,3 +7448,11 @@ ein bekanntes `mood` von Claude. Test `supabase/tests/9k_news_show_v2.sql`.
 Migration `20261204002400_share_supply.sql`: `security_free_float_e6(p_security)` → frei kaufbare Aktien (e6) oder
 `null` (ohne Grenze); `place_order` begrenzt Käufe von Aktien darauf, Fehler `no_shares_left` (NX129).
 Test `supabase/tests/9l_share_supply.sql`.
+
+## Nachtrag: Freunde online, Kampagnen, Logo-Farben
+
+`20261204002500_more_logo_colors.sql`: `logo_valid`/`banner_valid` akzeptieren die Indexzeichen 0-9 und a-f, bis zu
+16 Farben (`startups.logo.maxColors`, `startups.banner.maxColors`). `20261204002600_friends_online_protests.sql`:
+`friends_json` liefert je Freund `online` (aktiv in den letzten `social.onlineMinutes`, Standard 10) und
+`last_active_at`, Online-Freunde zuerst; beendete Kampagnen zeigt `protests_state` nur noch
+`protests.visibleAfterMinutes` (60) lang.
