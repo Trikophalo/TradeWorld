@@ -2443,3 +2443,14 @@ ihre Firmen, und mit echten, großen Folgen für Kurse, Firmen und Aufgaben.
   empört über den Sprecher, als glühende Fans oder über den, der gerade dran ist. Ihre Zeilen entstehen beim Start
   für die ganze Sendung, jede mit ihrer Uhrzeit, und erscheinen erst dann (`news_show_after_start`).
 - **Live-Chat:** feste Höhe, scrollt innen, springt bei neuen Nachrichten ans Ende.
+
+## ADR-153: Aktien haben einen Bestand — `akzeptiert`
+
+- **Problem:** Der Markt verkaufte beliebig viele Aktien. Ein Spieler hielt 1,004 Mio. Aktien einer Firma mit 1 Mio.
+- **Regel:** Ein Kauf bekommt höchstens den freien Bestand: Aktien der Firma (`companies.shares_outstanding`) minus
+  alles, was Spieler halten, minus die offenen Reste ihrer Kauforders (`security_free_float_e6`). Ist nichts mehr
+  frei, scheitert der Kauf mit `no_shares_left` (NX129); eine größere Order bekommt genau den Rest. Käufer derselben
+  Aktie kommen nacheinander dran (Sperre auf dem Wertpapier), der Bestand kann nicht überverkauft werden.
+- **Mehr Aktien** gibt es nur über den Gründer: Kapitalerhöhung (ADR-067). Verkäufe geben Aktien wieder frei.
+- Gilt für alle Aktien (KI-Firmen haben 15 bis 100 Mio. Stück, dort spielt es praktisch keine Rolle), nicht für
+  Anleihen und Krypto. Bestehende Depots über dem Bestand bleiben; sie sperren nur weitere Käufe, bis genug verkauft ist.

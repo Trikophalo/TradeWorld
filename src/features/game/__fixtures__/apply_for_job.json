@@ -1,27 +1,27 @@
 {
-  "id": "ec4f5373-8ae7-4beb-8730-a89d12856bb8",
+  "id": "57d2b47f-5472-4773-936b-9c9e306732b8",
   "status": "offered",
   "message": "Ich lerne schnell.",
   "posting": {
-    "id": "5b899158-88fb-4a53-89e7-d311d72b33ac",
+    "id": "81365670-6787-4ba5-a1ab-2152c5661952",
     "tier": "junior",
     "title": null,
     "company": {
-      "id": "2fccb1cc-0894-a518-9538-769c751d9630",
+      "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
       "logo": null,
-      "name": "Memeland Media",
-      "color": "#FF4FD8",
+      "name": "KlarSoft AG",
+      "color": "#4C8DFF",
       "is_ai": true,
       "sector": "tech",
-      "ticker": "MEM"
+      "ticker": "KLS"
     },
     "required": [{ "branch": "it", "min_score": 2 }],
     "title_key": "it_junior",
     "required_skills": []
   },
-  "created_at": "2026-11-14T23:49:37.808284+00:00",
-  "updated_at": "2026-11-14T23:49:37.808284+00:00",
-  "offer_expires_at": "2026-11-16T23:49:37.808284+00:00",
+  "created_at": "2026-11-15T00:02:57.178545+00:00",
+  "updated_at": "2026-11-15T00:02:57.178545+00:00",
+  "offer_expires_at": "2026-11-17T00:02:57.178545+00:00",
   "salary_wish_cents_per_hour": 32700,
   "offer_salary_cents_per_hour": 32700
 }

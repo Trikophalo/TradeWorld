@@ -1,10 +1,10 @@
 {
   "job": {
-    "id": "8ef2ddb2-7541-4625-9acd-d7a554e7fc40",
+    "id": "8ee62515-6d7e-4ddd-a22c-e17d1a6bc39c",
     "tier": "intern",
     "title": "Werkstudium Leitern",
     "company": {
-      "id": "c259e6c7-6e05-44d8-b90b-51e9b9621b79",
+      "id": "25b6922d-42b7-4bd4-bcd4-7c6940d849c5",
       "logo": null,
       "name": "Fixture Leitern",
       "color": "#447799",
@@ -13,9 +13,9 @@
       "ticker": null
     },
     "presence": {
-      "fire_at": "2026-11-19T23:49:40.040912+00:00",
+      "fire_at": "2026-11-20T00:02:59.749884+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-14T23:49:40.040912+00:00"
+      "last_active_at": "2026-11-15T00:02:59.749884+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -30,13 +30,13 @@
         { "key": "branch", "met": true, "have": 3, "need": 2, "branch": "it" },
         { "key": "hours", "met": true, "have": 12, "need": 12, "branch": null }
       ],
-      "pending_since": "2026-11-14T23:49:40.256768+00:00",
+      "pending_since": "2026-11-15T00:02:59.922397+00:00",
       "next_salary_cents_per_hour": 30000
     },
     "signature": "M1 1 L6 6",
     "title_key": null,
     "rank_hours": 12.5,
-    "started_at": "2026-11-14T23:49:40.243855+00:00",
+    "started_at": "2026-11-15T00:02:59.912767+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

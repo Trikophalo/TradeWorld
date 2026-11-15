@@ -177,6 +177,9 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   Missionsjäger, Teamplayer, Bilanzprofi, Ehrgeiz), ein größerer Tresor (Panzertresor) und vieles für die eigene
   Firma (KI-Turbo, Glückshand, Werbeagentur, Krisenmanager …). Sie schalten sich zwischen Level 1 und 30 frei.
 
+- **Aktien haben einen Bestand (ADR-153):** Von einer Aktie kann niemand mehr kaufen, als es gibt. Sind alle Aktien
+  einer Firma bei Spielern, ist Schluss, bis jemand verkauft oder der Gründer mit einer Kapitalerhöhung neue Aktien
+  ausgibt. Eine größere Order bekommt genau das, was noch frei ist.
 - **NEXA Nachrichten 2 (ADR-152):** Mr. Doodle Dangle hat jetzt Gesichter: Er erschrickt, heult, lacht sich kaputt,
   wird wütend oder grinst selbstgefällig, alles mit Geräuschen. Die Sendung beginnt mit einem eigenen Vorspann nur
   über ihn. Es geht viel mehr um euch: persönliche Meldungen über Spieler (Level, neuer Job, Rauswurf, geplatzter

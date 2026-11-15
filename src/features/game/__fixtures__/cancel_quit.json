@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "b6c66352-6ec5-4619-b006-49525c669c23",
+    "id": "07ccafe7-a3e1-4c32-ad5e-e389dd4cc60e",
     "tier": "junior",
     "title": null,
     "company": {
-      "id": "2fccb1cc-0894-a518-9538-769c751d9630",
+      "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
       "logo": null,
-      "name": "Memeland Media",
-      "color": "#FF4FD8",
+      "name": "KlarSoft AG",
+      "color": "#4C8DFF",
       "is_ai": true,
       "sector": "tech",
-      "ticker": "MEM"
+      "ticker": "KLS"
     },
     "presence": {
-      "fire_at": "2026-11-19T23:49:37.33616+00:00",
+      "fire_at": "2026-11-20T00:02:56.740143+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-14T23:49:37.33616+00:00"
+      "last_active_at": "2026-11-15T00:02:56.740143+00:00"
     },
     "required": [{ "branch": "it", "min_score": 2 }],
     "promotion": {
@@ -36,22 +36,22 @@
     "signature": "M2 14 C6 4 10 4 14 12 S22 18 26 8",
     "title_key": "it_junior",
     "rank_hours": 1.0,
-    "started_at": "2026-11-14T23:49:37.821559+00:00",
+    "started_at": "2026-11-15T00:02:57.195732+00:00",
     "pending_raise": null,
     "raise_max_bps": 0,
     "notice_ends_at": null,
     "paid_hours_cap": 8,
-    "pay_factor_bps": 9648,
+    "pay_factor_bps": 10000,
     "work_task_open": false,
     "quit_cost_cents": 0,
     "last_bonus_cents": 0,
     "paid_hours_today": 1.0,
     "productivity_bps": 17400,
     "next_work_task_at": null,
-    "earned_total_cents": 30587,
-    "raise_available_at": "2026-11-21T23:49:37.871042+00:00",
+    "earned_total_cents": 31700,
+    "raise_available_at": "2026-11-22T00:02:57.260371+00:00",
     "quit_now_cost_cents": 391812,
     "salary_cents_per_hour": 32651,
-    "effective_salary_cents_per_hour": 31501
+    "effective_salary_cents_per_hour": 32651
   }
 }

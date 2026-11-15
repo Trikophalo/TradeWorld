@@ -792,6 +792,7 @@
     "nft_not_for_sale": "Dieses NFT steht gerade nicht zum Verkauf.",
     "nft_price_changed": "Der Preis hat sich gerade geändert. Schau ihn dir noch einmal an.",
     "chat_text_invalid": "Diese Nachricht geht so nicht. Bitte kurz und ohne Beleidigungen.",
+    "no_shares_left": "Von dieser Aktie ist gerade keine mehr frei. Kaufen geht wieder, sobald jemand verkauft oder die Firma neue Aktien ausgibt.",
     "order_cooldown": "Ein freier Auftrag pro Stunde. Der nächste geht bald wieder.",
     "assistant_busy": "Mira hat in dieser Stunde schon viel nachgedacht. Klare Befehle versteht sie weiter sofort."
   },

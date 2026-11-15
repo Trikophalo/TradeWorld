@@ -3,7 +3,7 @@
   "messages": [
     {
       "ai": false,
-      "at": "2026-11-14T23:49:42.111504+00:00",
+      "at": "2026-11-15T00:03:01.770485+00:00",
       "id": 30,
       "kind": "chat",
       "mine": false,
@@ -15,19 +15,19 @@
     },
     {
       "ai": false,
-      "at": "2026-11-14T23:49:42.11467+00:00",
+      "at": "2026-11-15T00:03:01.773149+00:00",
       "id": 31,
       "kind": "offer",
       "mine": false,
       "text": "Wäre das ein Preis?",
       "author": "Fixture_Kunst",
-      "expires_at": "2026-11-15T23:49:42.11467+00:00",
+      "expires_at": "2026-11-16T00:03:01.773149+00:00",
       "offer_cents": 300000,
       "offer_status": "accepted"
     },
     {
       "ai": false,
-      "at": "2026-11-14T23:49:42.120827+00:00",
+      "at": "2026-11-15T00:03:01.778406+00:00",
       "id": 32,
       "kind": "sale",
       "mine": false,
@@ -39,7 +39,7 @@
     },
     {
       "ai": false,
-      "at": "2026-11-14T23:49:42.129869+00:00",
+      "at": "2026-11-15T00:03:01.78652+00:00",
       "id": 33,
       "kind": "sale",
       "mine": false,
@@ -51,19 +51,19 @@
     },
     {
       "ai": true,
-      "at": "2026-11-14T23:49:42.137823+00:00",
+      "at": "2026-11-15T00:03:01.793845+00:00",
       "id": 34,
       "kind": "offer",
       "mine": false,
-      "text": "Ich habe das Bild meinem Zahnarzt gezeigt. Er hat geweint. Ich biete.",
-      "author": "Sammler Sam",
-      "expires_at": "2026-11-15T23:49:42.137823+00:00",
-      "offer_cents": 1887000,
+      "text": "Ich habe gewürfelt. Das ist der Preis. Die Würfel lügen nicht.",
+      "author": "Konrad Kollektor",
+      "expires_at": "2026-11-16T00:03:01.793845+00:00",
+      "offer_cents": 1715500,
       "offer_status": "open"
     }
   ],
   "ask_cents": 90000000,
-  "artwork_id": "7224d76f-2463-44b5-a7dc-b9aa00cb70f6",
+  "artwork_id": "b4cff5a6-bd6e-4eef-a3d5-d9dfc6e276ca",
   "max_length": 200,
   "my_offer_cents": null,
   "min_offer_cents": 10000

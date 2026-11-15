@@ -104,6 +104,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Mr. Doodle Dangle hat jetzt Gesichter: Er erschrickt, heult, lacht sich kaputt, wird wütend oder grinst selbstgefällig, alles mit Geräuschen. Die Sendung beginnt mit einem eigenen Vorspann nur über ihn. Es geht viel mehr um euch: persönliche Meldungen über Spieler (Level, neuer Job, Rauswurf, geplatzter Börsengang, Rug Pull, tagelang verschollen, Erster oder Letzter der Reichenliste), gute Nachrichten mit vergiftetem Lob, schlechte gnadenlos, dafür mit Schmerzensgeld. Der teuerste NFT-Verkauf kommt in die Sendung. Zwischendurch schweift er komplett ab, etwa mit dem Gerücht, ein Promi habe in eine Aktie investiert, die dann wirklich steigt. Im Live-Chat schreiben erfundene Zuschauer mit, die ihn hassen oder vergöttern. Der Chat bleibt gleich groß und scrollt von selbst mit.",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-1d54f803",
+        title: "Aktien haben einen Bestand",
+        text: "Von einer Aktie kann niemand mehr kaufen, als es gibt. Sind alle Aktien einer Firma bei Spielern, ist Schluss, bis jemand verkauft oder der Gründer mit einer Kapitalerhöhung neue Aktien ausgibt. Eine größere Order bekommt genau das, was noch frei ist.",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-706f8ae2",
         title: "Mehr Verbesserungen",
         text: "22 neue Verbesserungen und zwei weitere Tresorstufen, in fünf Abschnitten. Mehr Geld (Tresorzinsen, Lohnbonus, Stammgast, Auftragsprofi, Dealmaker), mehr XP (Börsenprofi, Frühaufsteher, Missionsjäger, Teamplayer, Bilanzprofi, Ehrgeiz), ein größerer Tresor (Panzertresor) und vieles für die eigene Firma (KI-Turbo, Glückshand, Werbeagentur, Krisenmanager …). Sie schalten sich zwischen Level 1 und 30 frei.",

@@ -7442,3 +7442,9 @@ Migration `20261204002300_news_show_v2.sql`. `news_show_messages.player_id` ist 
 `mood` und ruft nach dem Start `news_show_after_start(p_show_id, p_now)` (Tatsachen in `news_show_used`, Zeilen der
 Zuschauer). `news_show_chat_json` zeigt nur Zeilen bis jetzt, nach Zeit sortiert. `store_news_show_script` übernimmt
 ein bekanntes `mood` von Claude. Test `supabase/tests/9k_news_show_v2.sql`.
+
+## Nachtrag: Aktienbestand (ADR-153)
+
+Migration `20261204002400_share_supply.sql`: `security_free_float_e6(p_security)` → frei kaufbare Aktien (e6) oder
+`null` (ohne Grenze); `place_order` begrenzt Käufe von Aktien darauf, Fehler `no_shares_left` (NX129).
+Test `supabase/tests/9l_share_supply.sql`.

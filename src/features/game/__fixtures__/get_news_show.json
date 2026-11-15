@@ -1,8 +1,8 @@
 {
-  "now": "2026-11-14T23:49:42.18377+00:00",
+  "now": "2026-11-15T00:03:01.833296+00:00",
   "chat": [
     {
-      "at": "2026-11-14T23:49:42.180175+00:00",
+      "at": "2026-11-15T00:03:01.83038+00:00",
       "id": 204,
       "body": "Was für eine Sendung 💀📉",
       "mine": true,
@@ -10,84 +10,77 @@
     }
   ],
   "show": {
-    "id": 6,
+    "id": 7,
     "writer": "mini",
-    "airs_at": "2026-11-14T23:00:00+00:00",
+    "airs_at": "2026-11-15T00:00:00+00:00",
     "segments": [
       {
-        "kind": "loser",
-        "mood": "smug",
-        "text": "61.120 € futsch, 5,7 % Minus: Esc_Frida schreibt heute Börsengeschichte, leider die falsche. Der Markt sagt danke, du Geldautomat auf zwei Beinen. Das Trostpflaster kommt per Eilbote.",
-        "effects": [{ "tone": "gain", "label": "+500 € Trostpflaster" }],
-        "headline": "Wo ist das Geld von Esc_Frida?"
-      },
-      {
         "kind": "gossip",
-        "mood": "proud",
-        "text": "Ich fasse es nicht, aber es stimmt. Lars_Kursrutsch meldet: Kursrutsch Werke gegründet. Glückwunsch, und jetzt bloß nichts anfassen.",
+        "mood": "shocked",
+        "text": "Ich fasse es nicht, aber es stimmt. Mona_Mode meldet: Level 10 erreicht. Ich bin fast stolz. Fast.",
         "effects": [],
-        "headline": "Na so was: Lars_Kursrutsch"
+        "headline": "Na so was: Mona_Mode"
       },
       {
         "kind": "scandal",
         "mood": "shocked",
-        "text": "Das Netz zerreißt Lieferwerk Anja. Die Kundenhotline wurde seit Monaten von einem Papagei bedient, und der war noch der Freundlichste. Seitdem will niemand mehr „Ideen für alle“. Anja_Lieferant hat das Firmenhandy im Fluss versenkt.",
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −20,4 %" }],
-        "headline": "Shitstorm über Lieferwerk Anja"
+        "text": "Peinlich für Cleo_Klein: Die Firmenkasse wurde offenbar mit dem Kicker-Budget verwechselt. „Kleine Roboter“ klang auf dem Papier besser. Das Image von Cleos Garage ist im Eimer.",
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −15,4 %" }],
+        "headline": "Kunden fliehen vor Cleos Garage"
       },
       {
         "kind": "nft",
         "mood": "confused",
-        "text": "Kunstmarkt, oder was man dafür hält: „Neon Nacht“ von Nina_Neon ging für 30.000 € an Ben_Bieter. Kunst ist, wenn einer zahlt. Glückwunsch an alle Beteiligten.",
+        "text": "Ben_Bieter zahlt 30.000 € für „Neon Nacht“, gemalt von Nina_Neon. Ich habe mir das Werk angesehen. Ich habe Fragen. Viele.",
         "effects": [],
-        "headline": "30.000 € für ein paar Pixel"
+        "headline": "NFT-Wahnsinn um „Neon Nacht“"
       },
       {
         "kind": "winner",
         "mood": "shocked",
-        "text": "Und nun zu jemandem, der es kann: Fixture_Neu hat heute 1.138.918 € gemacht, 11389,2 % im Plus. Der Rest schaut zu und heult leise ins Depot.",
+        "text": "Und nun zu jemandem, der es kann: Fixture_Neu hat heute 1.139.052 € gemacht, 11390,5 % im Plus. Das Finanzamt hat bereits freundlich gewunken.",
         "effects": [],
-        "headline": "Fixture_Neu sahnt ab: plus 1.138.918 €"
+        "headline": "Fixture_Neu sahnt ab: plus 1.139.052 €"
       },
       {
         "kind": "gossip",
         "mood": "shocked",
-        "text": "Ich fasse es nicht, aber es stimmt. Pitch_Chefin meldet: Faire Schuhe gegründet. Ich bin fast stolz. Fast.",
+        "text": "Bitte festhalten: Fixture Mode gegründet, und zwar bei Fx_Taskboss. Genieß es, nächste Woche lachen wir wieder über dich.",
         "effects": [],
-        "headline": "Na so was: Pitch_Chefin"
+        "headline": "Applaus für Fx_Taskboss"
       },
       {
         "kind": "scandal",
         "mood": "angry",
-        "text": "Fixture Leitern wollte heute groß rauskommen. Auf dem Firmenparkplatz wurde ein illegales Bobbycar-Rennen ausgehoben. Fixture_Chef erklärte, das gehöre zum Konzept. Die Kundschaft erklärte, sie sei dann mal weg.",
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −20,4 %" }],
-        "headline": "Fixture Leitern blamiert sich bis auf die Knochen"
+        "text": "Peinlich für Lohn_Chefin: Die Jahresbilanz wurde mit Buntstiften erstellt, immerhin innerhalb der Linien. „Schrauben“ klang auf dem Papier besser. Das Image von Lohnwerk ist im Eimer.",
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −15,2 %" }],
+        "headline": "Kunden fliehen vor Lohnwerk"
       },
       {
-        "kind": "ramble",
-        "mood": "angry",
-        "text": "Bevor es weitergeht, etwas völlig anderes: Mein Nachbar grillt seit drei Tagen dasselbe Würstchen. Ich bewundere seine Geduld. Das musste raus.",
-        "effects": [],
-        "headline": "Kurze Durchsage in eigener Sache"
+        "kind": "tasks",
+        "mood": "proud",
+        "text": "Der Staat hat versehentlich doppelt ausgezahlt und will es nicht zurück. Alle offenen Firmen-Aufgaben sind ab sofort 26,1 % mehr wert. An die Arbeit, ihr faulen Säcke!",
+        "effects": [{ "tone": "gain", "label": "Aufgaben +26,1 %" }],
+        "headline": "Auftragsflut im ganzen Land"
       },
       {
-        "kind": "sector",
-        "mood": "angry",
-        "text": "Schlechte Nachrichten für Tech/Software: Ein Minister hat die Branche versehentlich mit etwas Verbotenem verwechselt. Die Kurse geben um 7,4 % nach.",
-        "effects": [{ "tone": "loss", "label": "Tech/Software −7,4 %" }],
-        "headline": "Katerstimmung in Tech/Software"
+        "kind": "stock",
+        "mood": "crying",
+        "text": "Luftpost Drohnen verliert 10 %. Der Finanzchef hat die Rücklagen in Rubbellose investiert. Die Anleger nehmen Reißaus.",
+        "effects": [{ "tone": "loss", "label": "DRN −10 %" }],
+        "headline": "Luftpost Drohnen stürzt ab"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: KlarSoft AG geht bald nach unten. Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.",
-        "effects": [{ "tone": "neutral", "label": "KLS ↓ Tipp" }],
-        "headline": "Der heiße Draht: KlarSoft AG"
+        "text": "Ein Vögelchen hat mir gezwitschert: Pfotenwohl dürfte in der kommenden Stunde nach unten gehen. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
+        "effects": [{ "tone": "neutral", "label": "PFW ↓ Tipp" }],
+        "headline": "Vom Flurfunk: Pfotenwohl"
       }
     ],
-    "started_at": "2026-11-14T23:49:42.18377+00:00"
+    "started_at": "2026-11-15T00:03:01.833296+00:00"
   },
   "viewers": 5,
   "upcoming": null,
-  "next_airs_at": "2026-11-15T00:00:00+00:00"
+  "next_airs_at": "2026-11-15T01:00:00+00:00"
 }

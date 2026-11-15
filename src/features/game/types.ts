@@ -1887,6 +1887,7 @@ export const GAME_ERROR_KEYS = [
   "assistant_busy",
   "order_cooldown",
   "chat_text_invalid",
+  "no_shares_left",
   "move_busy",
   "move_resting",
   "friend_code_unknown",
