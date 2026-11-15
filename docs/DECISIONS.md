@@ -2490,3 +2490,59 @@ ihre Firmen, und mit echten, großen Folgen für Kurse, Firmen und Aufgaben.
   angestupst! 👉“ mit Link auf das Profil; sie lässt sich in den Einstellungen abschalten.
 - **Demo:** Ohne Mitspieler startet die Demo weiter ohne Freunde; ein gespeicherter Demo-Zustand (`friendList`) kann
   erfundene Freunde mitbringen (Tests, Vorführung).
+
+## ADR-158: Wohnwert und Vermieten – Mieter wohnen sichtbar im eigenen Grundstück — `Annahme`
+
+- **Wohnwert (0–100):** reine Formel aus der Einrichtung (`src/lib/sim/rentals.ts`, gleiche Rechnung in
+  `home_wohnwert()`). Sechs Teile: **Wert** 30 (Katalogpreise der aufgestellten Stücke gegen 20 % des Kaufpreises der
+  Stufe; eine Villa braucht also viel mehr als eine Wohnung), **Vielfalt** 20 (verschiedene Kategorien, voll ab 7),
+  **Füllung** 20 (Anteil der Bodenfläche unter Möbeln: voll zwischen 30 % und 55 %, darunter anteilig, darüber
+  abnehmend bis 0 bei 85 %, denn Mieter brauchen Platz zum Laufen), **Ebenen** 10 (5 für einen Teppich, 5 für etwas
+  auf einer Ablage), **Stil** 10 (Anteil der Stücke in der häufigsten Möbelstufe, voll erst ab 6 Stücken),
+  **Boden** 10 (Laminat 0 bis Gold 10). Gezählt wird nur Aufgestelltes; der Makler-Rabatt ändert nichts. Der
+  Raum-Editor zeigt den Wohnwert der gerade bearbeiteten Einrichtung live mit den Teilen und den drei Tipps, die am
+  meisten bringen.
+- **Kein zweites Grundstück:** Erwogen wurden zusätzliche Mietobjekte als Anlage. Das hieße mehrere Grundrisse, einen
+  Editor je Objekt und ein Inventar je Objekt. Entschieden: Jeder Spieler behält **ein** Grundstück und vermietet
+  darin **Plätze** (WG-Prinzip, der Besitzer wohnt weiter dort): Wohnung 1, Apartment 2, Haus 3, Villa 4,
+  Luxusvilla 6. Ein Umzug nach oben bringt mehr Plätze; die Mietverhältnisse ziehen mit.
+- **Angebot:** Ab dem Grundstücks-Level (8) mit eigener Bleibe. Der Besitzer wählt **pro Stunde** oder **pro Tag**
+  und einen Preis je Platz. Richtmiete je Platz und Stunde bei Wohnwert 100: 30 € (Wohnung), 60 €, 150 €, 400 €,
+  1.000 € (Luxusvilla). Die faire Miete steigt linear von 20 % der Richtmiete (Wohnwert 0) bis 100 % (Wohnwert 100).
+  Erlaubt sind 5 % der Richtmiete (mindestens 1 €) bis 150 % der fairen Miete; ein Tag kostet 24 Stunden. Der Preis
+  gilt für neue Mieter; laufende Verträge behalten ihren Preis. Das Angebot lässt sich schließen, laufende Verträge
+  bleiben.
+- **KI-Mieter:** zahlen aus dem Systemkonto der Haushalte (wie der Gegenpart beim Möbelkauf). Unter Wohnwert 25
+  zieht niemand ein. Sonst würfelt der Server je freiem Platz alle 60 Minuten (beim Öffnen sofort):
+  Chance = 60 % × Wohnwert/100 × (2 − Preis/fair), höchstens 100 %. Eine schöne, günstige Wohnung ist also sofort
+  voll, eine teure, karge findet niemanden. KI-Mieter bleiben 1 bis 5 Tage (in ganzen Perioden) und ziehen aus,
+  wenn der Wohnwert bei einer Zahlung unter 25 gefallen ist. Ihre Namen kommen aus einer festen Liste, ihr Aussehen
+  (Porträt-Farben und bis zu drei Accessoires) folgt stabil aus dem Namen.
+- **Zahlung:** im Voraus je Periode, sofort beim Einzug und danach zu jedem Periodenbeginn, als Ledger-Buchung vom
+  Mieter (Spieler oder Haushalte) an den Besitzer (Art `rent`); ein offener Zwangskredit des Besitzers behält wie bei
+  Lohn seinen Anteil ein. Der Job `rentals_run_due()` läuft jede Minute (pg_cron `nexa-rentals`) und holt
+  verpasste Perioden nach.
+- **Laufzeit:** mindestens 24 Stunden. Kündigen können Mieter und Besitzer jederzeit; der Vertrag endet am ersten
+  Periodenende, das mindestens 12 Stunden entfernt ist und nach der Mindestlaufzeit liegt. Bezahlt ist immer bis
+  dahin, erstattet wird nichts. Kann ein Spieler eine fällige Miete nicht zahlen, endet der Vertrag sofort.
+- **Was Spieler-Mieter bekommen:** Sie **wohnen** dort: Ihre Grundstücksseite zeigt das gemietete Zuhause mit allen
+  Mitbewohnern, ihr Profil „wohnt bei …“, und sie laufen dort als ihre angezogene Figur herum. Dazu
+  **Wohlfühl-XP** je bezahlter Stunde: 5 Basis-XP × Wohnwert/100 (mit dem XP-Faktor bis 10 XP je Stunde). Möbel
+  stellen dürfen sie nicht: Die Einrichtung bleibt Sache des Besitzers. Ein Spieler mietet höchstens einen Platz
+  zur Zeit, nie im eigenen Zuhause; mieten geht auch ohne eigene Bleibe (günstiger Einstieg ab Level 8).
+- **Sehen:** Im Zimmer (eigene Ansicht, Profil eines anderen, Mietmarkt) laufen alle Mieter als Pixelfiguren mit
+  Namensschild von freiem Feld zu freiem Feld (nur Feldern ohne Möbel; Teppiche sind begehbar). Bewegung nur über
+  `transform`, bei reduzierten Animationen stehen sie still an einem festen Platz.
+- **Mietmarkt** (`/property/rentals`): offene Angebote anderer Spieler mit freiem Platz, nach Wohnwert sortiert,
+  höchstens 30. Jede Karte zeigt das Zimmer mit seinen Bewohnern, Stufe, Wohnwert, Preis, freie Plätze und die Figur
+  des Besitzers. Einmieten per Halten.
+- **Meldungen:** Neuer Mieter (Besitzer), Mieter zieht aus und Vertrag beendet (beide Seiten, mit Grund), einmal am
+  Tag die Mieteinnahmen des Vortags. Mietet ein Spieler eine Villa oder Luxusvilla, steht das im Freundes-Feed.
+- **Missionen:** erstes Angebot und erster Mieter (Meilensteine), Wohnwert 60 und 90 (Meilensteine), Miete
+  einnehmen (täglich, wöchentlich), zur Miete wohnen (Meilenstein). `mission_doable` verlangt dafür eine Bleibe bzw.
+  ein freies Angebot.
+- **Grenzen für 4 Spieler und viele KI-Mieter:** Plätze je Stufe (höchstens 6 je Zuhause), ein KI-Wurf je Angebot und
+  Stunde, höchstens 30 Angebote im Mietmarkt, Zahlungen werden 30 Tage aufbewahrt. Konto zurücksetzen beendet alle
+  Verträge des Spielers (als Mieter mit Nachricht an den Besitzer) und löscht Angebot und Mieter.
+- **Demo:** Die Demo rechnet dieselben Formeln im Browser, würfelt beim Anschauen nach und bringt drei erfundene
+  Vermieter mit eingerichteten Wohnungen für den Mietmarkt mit.

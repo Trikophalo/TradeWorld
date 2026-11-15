@@ -7481,3 +7481,32 @@ Migration `20261204002800_accessories_pokes.sql`. Katalog in `game_config.access
 - **Fehler:** `accessory_unknown` NX130, `accessory_locked` NX131, `accessory_owned` NX132, `accessory_not_owned`
   NX133, `not_friends` NX134, `poke_too_soon` NX135, `poke_daily_limit` NX136.
 - Test `supabase/tests/9m_accessories_friends.sql`.
+
+## Nachtrag: Wohnwert und Vermieten (ADR-158)
+
+Migrationen `20261204003400_rentals_enum.sql` (`ledger_tx_kind` `rent`, `xp_source` `home_rent`) und
+`20261204003450_rentals.sql`. Werte in `game_config.rentals` (aus `src/config/balance.ts`, Formeln in
+`src/lib/sim/rentals.ts`).
+
+- **Tabellen (intern, nur über RPCs):** `rental_offers` (PK `owner_id`; `period` `hour|day`, `price_cents` je Platz,
+  `is_open`, `ai_check_at`), `rental_tenancies` (`owner_id`, `tenant_id` oder `is_ai` mit `tenant_name`, `period`,
+  `price_cents`, `started_at`, `next_due_at`, `ends_at`, `notice_by`, `status` `active|ended`, `end_reason`,
+  `paid_cents`, `xp_total`), `rental_payments` (eine Zeile je Vertrag und Periode, `unique (tenancy_id,
+period_start)`; 30 Tage aufbewahrt).
+- **Wohnwert:** `home_wohnwert(p_player)` → `{total, parts {value, variety, fill, layers, style, floor}, value_cents,
+target_cents, categories, coverage_bps, rugs, tops, pieces}` aus den aufgestellten Möbeln (Katalogpreise), der Stufe
+  und dem Boden; `null` ohne Bleibe.
+- **RPCs:** `get_rentals()` → RENTALS `{home {tier, places, wohnwert, limits {hour, day}}, offer, tenants, past,
+earned_7d_cents, earned_total_cents, renting}`; `get_rental_market()` → `{offers [...]}` (offene Angebote anderer
+  mit freiem Platz, je mit `property` und `tenants`); `set_rental_offer(p_request_id, p_period, p_price_cents,
+p_open)`, `rent_home(p_request_id, p_owner)`, `end_tenancy(p_request_id, p_tenancy_id)` → RENTALS.
+  `get_property()` liefert zusätzlich `rental {wohnwert, places, offer_open, tenants, renting}`.
+- **Job:** `rentals_run_due(p_now)` jede Minute (pg_cron `nexa-rentals`): fällige Miete (Ledger `rent`, Spieler →
+  Besitzer oder `households` → Besitzer, Zwangskredit-Einbehalt, Wohlfühl-XP), Vertragsende, KI-Einzüge je Angebot
+  alle `ai.checkEveryMinutes`, einmal am Tag `rental_rent_summary`.
+- **Meldungen:** `rental_new_tenant`, `rental_ended`, `rental_rent_summary`; Feed `home_rented` ab `feedMinTier`.
+- **Missionen:** Metriken `rental_offered`, `tenant_found`, `rent_earned` (Geld), `wohnwert` (max), `home_rented`;
+  `mission_doable` kennt sie. `save_layout` meldet den Wohnwert, `account_wipe` ruft `rentals_wipe_player`.
+- **Fehler:** `rent_price_out_of_range` NX140, `rent_own_home` NX141, `rental_not_offered` NX142, `rental_full`
+  NX143, `already_renting` NX144, `tenancy_not_found` NX145.
+- Test `supabase/tests/9q_rentals.sql`.

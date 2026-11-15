@@ -1204,3 +1204,18 @@ Werte in `src/config/upgrades.ts`, Tabelle in ADR-134.
   95 % gedeckelt, Strategien bei `pitches.maxChanceBps`.
 - **XP:** Alle XP-Boni einer Quelle addieren sich (zum Beispiel Börsenprofi 3 + Ehrgeiz 3 = +45 % Handels-XP). Der
   tägliche Deckel für Handels-XP zählt weiter Handel, nicht XP.
+
+## Nachtrag: Vermieten (ADR-158)
+
+Werte in `BALANCE.rentals`.
+
+- **Richtmiete je Platz und Stunde bei Wohnwert 100:** Wohnung 30 €, Apartment 60 € (2 Plätze), Haus 150 € (3),
+  Villa 400 € (4), Luxusvilla 1.000 € (6). Voll vermietet zu fairer Miete bringt eine schön eingerichtete Wohnung
+  720 € am Tag, also den Kaufpreis (25.000 €) in gut fünf Wochen zurück; eine Luxusvilla 144.000 € am Tag (gut
+  100 Tage). Zum Vergleich: Grundeinkommen 100 € je Stunde, Junior-Lohn 300 € je Stunde.
+- **Wohnwert:** Der Möbelwert zählt voll ab 20 % des Kaufpreises (Wohnung 5.000 €, Villa 500.000 €). Wer einfach nur
+  teuer kauft, kommt ohne Vielfalt, Teppich, Kleinkram und Boden auf höchstens 30 + Füllung + Stil.
+- **KI-Nachfrage:** 60 % je freiem Platz und Stunde bei Wohnwert 100 und fairem Preis, halbe Chance bei 150 % des fairen
+  Preises, sicher bei sehr günstigem Preis und Wohnwert ab etwa 86. Unter Wohnwert 25 niemand.
+- **Mieter-XP:** 5 Basis-XP je Stunde bei Wohnwert 100 (mit dem XP-Faktor 10), also höchstens 240 XP am Tag: etwa so
+  viel wie eine Tagesmission, und es kostet Miete.
