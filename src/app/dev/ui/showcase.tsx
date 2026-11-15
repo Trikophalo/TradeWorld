@@ -35,6 +35,7 @@ import { BusinessCard } from "@/features/career/components/business-card";
 import { PlayerFigure } from "@/components/ui/player-figure";
 import { ACCESSORIES } from "@/config/accessories";
 import { FriendsPlaza } from "@/features/friends/components/plaza";
+import { RentalShowcase } from "@/features/property/components/rental-showcase";
 import { PokeButton } from "@/features/friends/components/poke";
 import { FigureCard } from "@/features/wardrobe/components/figure-card";
 import { CareerLadder, PayRoutes } from "@/features/career/components/career-ladder";
@@ -879,6 +880,7 @@ export function Showcase() {
           ))}
         </Demo>
         <FriendsPlaza />
+        <RentalShowcase />
         <Card padding="lg">
           <SignaturePad onChange={() => undefined} />
         </Card>

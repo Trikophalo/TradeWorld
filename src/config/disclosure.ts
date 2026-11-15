@@ -23,6 +23,8 @@ export const DISCLOSURE = {
   homeUpgrades: 2,
   /** Patch notes button in the top bar (ADR-137): not during the tutorial. */
   topbarPatchNotes: 2,
+  /** Renting out places in the home and the rental market (ADR-158): with the property unlock (level 8). */
+  propertyRentals: 8,
 } as const;
 
 export type DisclosureKey = keyof typeof DISCLOSURE;
