@@ -1,5 +1,12 @@
 {
-  "rental": { "places": 1, "renting": null, "tenants": [], "wohnwert": 0, "offer_open": false },
+  "rental": {
+    "places": 1,
+    "renting": null,
+    "tenants": [],
+    "wohnwert": 0,
+    "offer_open": false,
+    "living_bonus": { "xp": 1, "tier": "flat", "cents": 800, "owner": null, "source": "own", "wohnwert": 0 }
+  },
   "property": {
     "tier": "flat",
     "floor": "laminate",
@@ -11,15 +18,16 @@
     "wall_color": "#f3efe4",
     "value_cents": 1614400,
     "floors_owned": ["laminate", "parquet"],
-    "garage_slots": 0
+    "garage_slots": 0,
+    "furnishing_cents": 0
   },
   "inventory": {
     "cars": [],
     "furniture": [
-      { "id": "95effbbf-5352-471b-a119-176fedec81e4", "item_key": "sofa_leather" },
-      { "id": "f457b973-3c1a-4693-9bf0-e6b906f59dbb", "item_key": "rug_wool" },
-      { "id": "149bb279-6630-4bbd-8da2-adcef5c426fa", "item_key": "plant_small" },
-      { "id": "9ac68a5d-998d-4d02-b35b-ea43884b6898", "item_key": "plant_small" }
+      { "id": "d63ffe68-c41a-4d6f-afb9-9612ee9f464e", "item_key": "sofa_leather", "value_cents": 240000 },
+      { "id": "493080fd-22fc-46ec-9d31-4defa75d4a15", "item_key": "rug_wool", "value_cents": 65000 },
+      { "id": "501293c4-0c70-4cec-ae13-17bc2b96c866", "item_key": "plant_small", "value_cents": 3000 },
+      { "id": "f3e59cca-9e4d-4a76-ab85-5d00d9b66a3a", "item_key": "plant_small", "value_cents": 3000 }
     ]
   }
 }

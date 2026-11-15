@@ -1,27 +1,49 @@
 {
-  "rental": { "places": 3, "renting": null, "tenants": [], "wohnwert": 19, "offer_open": false },
+  "rental": {
+    "places": 3,
+    "renting": null,
+    "tenants": [],
+    "wohnwert": 20,
+    "offer_open": false,
+    "living_bonus": { "xp": 3, "tier": "house", "cents": 6240, "owner": null, "source": "own", "wohnwert": 20 }
+  },
   "property": {
     "tier": "house",
     "floor": "parquet",
     "owner": "Fixture_Heim",
     "width": 13,
-    "garage": [{ "id": "a1056bcd-f432-4abc-b421-1e8f87127871", "slot": 0, "car_key": "car_electric" }],
+    "garage": [{ "id": "90005798-7358-4c5c-b71d-d4d7d2f88d84", "slot": 0, "car_key": "car_electric" }],
     "height": 9,
     "placed": [
-      { "x": 2, "y": 2, "id": "f6f5ea13-d782-457e-af2c-bacfb4bc30aa", "rot": 0, "item_key": "table_oak" },
-      { "x": 3, "y": 3, "id": "c9beb9de-cc4f-4271-a540-e212e42281a2", "rot": 0, "item_key": "laptop" }
+      {
+        "x": 2,
+        "y": 2,
+        "id": "c0bc8ed5-1168-41fd-84ec-78dfe3bf17d6",
+        "rot": 0,
+        "item_key": "table_oak",
+        "value_cents": 210000
+      },
+      {
+        "x": 3,
+        "y": 3,
+        "id": "97364e08-e37b-4b0f-90b2-756ef636ce80",
+        "rot": 0,
+        "item_key": "laptop",
+        "value_cents": 210000
+      }
     ],
     "wall_color": "#2f5fd0",
-    "value_cents": 27955200,
+    "value_cents": 28095200,
     "floors_owned": ["laminate", "parquet"],
-    "garage_slots": 2
+    "garage_slots": 2,
+    "furnishing_cents": 252000
   },
   "inventory": {
     "cars": [],
     "furniture": [
-      { "id": "95effbbf-5352-471b-a119-176fedec81e4", "item_key": "sofa_leather" },
-      { "id": "f457b973-3c1a-4693-9bf0-e6b906f59dbb", "item_key": "rug_wool" },
-      { "id": "9ac68a5d-998d-4d02-b35b-ea43884b6898", "item_key": "plant_small" }
+      { "id": "d63ffe68-c41a-4d6f-afb9-9612ee9f464e", "item_key": "sofa_leather", "value_cents": 240000 },
+      { "id": "493080fd-22fc-46ec-9d31-4defa75d4a15", "item_key": "rug_wool", "value_cents": 65000 },
+      { "id": "f3e59cca-9e4d-4a76-ab85-5d00d9b66a3a", "item_key": "plant_small", "value_cents": 3000 }
     ]
   }
 }

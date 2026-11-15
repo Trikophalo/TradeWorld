@@ -11,7 +11,7 @@ export interface WohnwertPiece {
   readonly category: string;
   /** Furniture tier (budget ... ultra), the "style" of a piece. */
   readonly tier: string;
-  /** Catalogue price (not the price paid: the makler discount does not change the Wohnwert). */
+  /** List price: catalogue price x the home factor at purchase (ADR-161); the makler discount does not count. */
   readonly priceCents: number;
   readonly w: number;
   readonly h: number;
@@ -131,7 +131,10 @@ export function fairRentCentsPerHour(tier: PropertyTier, wohnwertTotal: number, 
   return Math.floor((base * (c.fairMinShareBps * 100 + (10_000 - c.fairMinShareBps) * w)) / 1_000_000);
 }
 
-/** The price range an owner may ask per period, and the fair rent per period. */
+/**
+ * The price range an owner may ask per period, and the fair rent per period. The owner decides freely (ADR-161):
+ * only a minimum above zero and a high safety maximum remain; the fair rent is a hint and steers the AI tenants.
+ */
 export function rentLimits(
   tier: PropertyTier,
   wohnwertTotal: number,
@@ -141,8 +144,8 @@ export function rentLimits(
   const c = cfgOf(cfg);
   const hours = periodHours(period);
   const fair = fairRentCentsPerHour(tier, wohnwertTotal, c);
-  const min = Math.max(c.minPriceCents, Math.floor((c.baseRentCentsPerHour[tier] * c.minPriceBps) / 10_000));
-  const max = Math.max(min, Math.floor((fair * c.maxPriceBps) / 10_000));
+  const min = Math.max(1, c.minPriceCents);
+  const max = Math.max(min, c.maxPriceCentsPerHour);
   return { minCents: min * hours, maxCents: max * hours, fairCents: fair * hours };
 }
 

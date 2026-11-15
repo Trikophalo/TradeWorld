@@ -70,6 +70,7 @@ describe("BALANCE", () => {
       "artworks",
       "property",
       "rentals",
+      "livingBonus",
       "social",
       "companyEvents",
       "upgrades",

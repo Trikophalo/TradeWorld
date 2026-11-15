@@ -18,6 +18,7 @@ import { useMyJob } from "@/features/career/hooks";
 import { useMyCompany } from "@/features/company/hooks";
 import { useGameErrorText } from "@/features/game/errors";
 import { useGame } from "@/features/game/store";
+import { useProperty } from "@/features/property/hooks";
 import { emitTutorial } from "@/features/tutorial/store";
 import { formatCountdown, formatMoney } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
@@ -33,7 +34,7 @@ const HOUR_MS = 3_600_000;
 const DOOR_SCALE = 5;
 
 interface Source {
-  key: "basic" | "job" | "ceo";
+  key: "basic" | "job" | "ceo" | "home";
   art: PixelArt;
   name: string;
   detail: string;
@@ -45,7 +46,8 @@ interface Source {
 
 /**
  * The vault (ADR-086): a heavy pixel door that swings open. Inside lie gold bars and coins by how full it is, and
- * every income source flows in as a live stream: basic income, job and the automatic CEO payout. Emptying it sends
+ * every income source flows in as a live stream: basic income, job, the automatic CEO payout and, from the property
+ * level, the living bonus (ADR-161). Emptying it sends
  * the coins to the cash balance in the top bar; the server books the amount (`claim_vault`).
  */
 export function VaultCard() {
@@ -56,6 +58,9 @@ export function VaultCard() {
   const now = useClock();
   const vault = useGame((state) => state.portfolio?.vault);
   const level = useGame((state) => state.portfolio?.level ?? 1);
+  const homeShown = isDisclosed("livingBonus", level);
+  const home = useProperty(null, homeShown);
+  const te = useTranslations("estate");
   const skew = useGame((state) => state.clockSkewMs);
   const claim = useGame((state) => state.claimVault);
   const errorText = useGameErrorText();
@@ -117,6 +122,22 @@ export function VaultCard() {
       tone: "bg-gain",
     },
   ];
+  const living = home.data?.rental.livingBonus ?? null;
+  if (homeShown) {
+    sources.push({
+      key: "home",
+      art: UI_ICONS.home,
+      name: t("sources.home"),
+      detail: !living
+        ? t("sources.homeNone")
+        : living.source === "own"
+          ? t("sources.homeOwn", { tier: te(`tierNames.${living.tier}`), wohnwert: living.wohnwert })
+          : t("sources.homeTenant", { owner: living.owner ?? "", wohnwert: living.wohnwert }),
+      perHourCents: living?.cents ?? 0,
+      href: "/property",
+      tone: "bg-info",
+    });
+  }
   const totalPerHour = sources.reduce((sum, s) => sum + s.perHourCents, 0);
 
   const toggle = () => {

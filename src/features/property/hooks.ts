@@ -18,11 +18,12 @@ export const RENTAL_KEYS = {
 /** Tenants come and go on the server's clock (ADR-158), so the home is looked at again now and then. */
 const REFRESH_MS = 30_000;
 
-export function useProperty(nickname: string | null) {
+export function useProperty(nickname: string | null, enabled = true) {
   return useQuery({
     queryKey: PROPERTY_KEYS.of(nickname),
     queryFn: () => engine.property(nickname),
     refetchInterval: REFRESH_MS,
+    enabled,
   });
 }
 

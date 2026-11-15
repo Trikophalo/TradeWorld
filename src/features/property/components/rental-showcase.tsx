@@ -4,8 +4,10 @@ import { Card } from "@/components/ui/card";
 import { TILE } from "@/config/furniture";
 import type { Property, Tenant } from "@/features/game/types";
 import { useFitScale } from "../hooks";
+import { ownerLivingBonus } from "@/lib/sim/living";
 import { layoutWohnwert } from "../wohnwert";
 import { RoomView } from "./room-view";
+import { LivingBonusCard } from "./living-bonus";
 import { WohnwertMeter } from "./wohnwert-meter";
 
 /** The furnished flat of the SQL and e2e tests (Wohnwert 90). */
@@ -33,6 +35,7 @@ const SAMPLE_FLAT: Property = {
   ).map(([itemKey, x, y], i) => ({ id: `s-${i}`, itemKey, x, y, rot: 0 as const })),
   garage: [],
   valueCents: 0,
+  furnishingCents: 0,
 };
 
 const SAMPLE_TENANTS: Tenant[] = [
@@ -61,6 +64,15 @@ export function RentalShowcase() {
         <RoomView property={SAMPLE_FLAT} scale={scale} tenants={SAMPLE_TENANTS} />
       </div>
       <WohnwertMeter wohnwert={wohnwert} />
+      <LivingBonusCard
+        bonus={{
+          source: "own",
+          ...ownerLivingBonus("flat", wohnwert.total),
+          tier: "flat",
+          wohnwert: wohnwert.total,
+          owner: null,
+        }}
+      />
     </Card>
   );
 }

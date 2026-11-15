@@ -31,6 +31,7 @@ import { useFitScale, useProperty, usePropertyRefresh } from "../hooks";
 import { RentalsPanel } from "./rentals-panel";
 import { RoomEditor } from "./room-editor";
 import { RoomView } from "./room-view";
+import { LivingBonusCard } from "./living-bonus";
 import { CarDealer, FurnitureShop } from "./shops";
 
 const UNLOCK = BALANCE.progression.unlocks.find((u) => u.key === "property")?.level ?? 4;
@@ -67,6 +68,9 @@ export function PropertyHub() {
             <RentalsPanel />
           </Reveal>
         )}
+        <Reveal feature="livingBonus">
+          <LivingBonusCard bonus={rental.livingBonus} />
+        </Reveal>
         <p className="text-pretty text-fg-2">{t("intro")}</p>
         <TierLadder property={property} />
         <Button variant="secondary" onClick={() => setShopping(true)}>
@@ -77,7 +81,7 @@ export function PropertyHub() {
             <RentalsPanel />
           </Reveal>
         )}
-        <FurnitureShop open={shopping} onClose={() => setShopping(false)} />
+        <FurnitureShop open={shopping} onClose={() => setShopping(false)} homeTier={null} />
       </div>
     );
   }
@@ -85,6 +89,9 @@ export function PropertyHub() {
   return (
     <div className="space-y-5">
       <HomeHeader property={property} onMove={() => setMoving(true)} />
+      <Reveal feature="livingBonus">
+        <LivingBonusCard bonus={rental.livingBonus} />
+      </Reveal>
       <Card padding="md" className="space-y-4" data-tour="home-room">
         <FittedRoom property={property} tenants={rental.tenants} />
         <div className="flex flex-wrap gap-2">
@@ -109,7 +116,7 @@ export function PropertyHub() {
       {inventory && (
         <RoomEditor open={editing} property={property} inventory={inventory} onClose={() => setEditing(false)} />
       )}
-      <FurnitureShop open={shopping} onClose={() => setShopping(false)} />
+      <FurnitureShop open={shopping} onClose={() => setShopping(false)} homeTier={property.tier} />
       <CarDealer open={dealer} property={property} onClose={() => setDealer(false)} />
       <Modal
         open={moving}
@@ -148,9 +155,21 @@ function HomeHeader({ property, onMove }: { property: Property; onMove: () => vo
           {property.garageSlots > 0 && ` · ${t("garageSlots", { count: property.garageSlots })}`}
         </p>
       </div>
-      <div className="text-right">
+      <div
+        className="text-right"
+        title={t("valueHint", {
+          percent: Math.round(BALANCE.property.furnishedValueBps / 100),
+          resale: Math.round(BALANCE.property.resaleBps / 100),
+        })}
+        data-testid="home-value"
+      >
         <p className="label-pixel text-fg-3">{t("value")}</p>
         <ShortMoney cents={property.valueCents} className="text-lg font-semibold text-fg-1" />
+        {property.furnishingCents > 0 && (
+          <p className="nums text-2xs text-fg-3" data-testid="home-furnishing">
+            {t("furnishingValue", { amount: formatMoney(property.furnishingCents, { whole: true }) })}
+          </p>
+        )}
       </div>
       {canMove && (
         <Button variant="secondary" onClick={onMove}>

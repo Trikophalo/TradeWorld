@@ -25,6 +25,8 @@ export const DISCLOSURE = {
   topbarPatchNotes: 2,
   /** Renting out places in the home and the rental market (ADR-158): with the property unlock (level 8). */
   propertyRentals: 8,
+  /** Living bonus for the own or rented home (ADR-161): with the property unlock (level 8). */
+  livingBonus: 8,
 } as const;
 
 export type DisclosureKey = keyof typeof DISCLOSURE;

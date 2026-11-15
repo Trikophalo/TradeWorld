@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { BALANCE } from "../../config/balance.ts";
-import { invalidPlacements, nextTier, propertyValueCents, resaleCents, rotated, upgradeCostCents } from "./property.ts";
+import {
+  furnishedValueCents,
+  furniturePriceCents,
+  invalidPlacements,
+  nextTier,
+  propertyValueCents,
+  resaleCents,
+  rotated,
+  upgradeCostCents,
+} from "./property.ts";
 
 const sizes: Record<string, { w: number; h: number; layer: "floor" | "object" | "top"; surface?: boolean }> = {
   sofa: { w: 3, h: 1, layer: "object" },
@@ -28,6 +37,22 @@ describe("property (ADR-082)", () => {
   it("selling brings 40 % back", () => {
     expect(resaleCents(100_000)).toBe(40_000);
     expect(propertyValueCents("flat", [100_000])).toBe(1_250_000 + 40_000);
+  });
+
+  it("furniture costs more in bigger homes (ADR-161)", () => {
+    expect(furniturePriceCents(100_000, null)).toBe(100_000);
+    expect(furniturePriceCents(100_000, "flat")).toBe(100_000);
+    expect(furniturePriceCents(100_000, "apartment")).toBe(125_000);
+    expect(furniturePriceCents(100_000, "house")).toBe(150_000);
+    expect(furniturePriceCents(100_000, "villa")).toBe(200_000);
+    expect(furniturePriceCents(100_000, "luxury_villa")).toBe(300_000);
+    expect(furniturePriceCents(1_999, "apartment")).toBe(2_498);
+  });
+
+  it("placed furniture is part of the home: 60 % of the price paid instead of 40 % (ADR-161)", () => {
+    expect(furnishedValueCents(100_000)).toBe(60_000);
+    expect(propertyValueCents("flat", [100_000], undefined, [200_000])).toBe(1_250_000 + 40_000 + 120_000);
+    expect(propertyValueCents(null, [], undefined, [])).toBe(0);
   });
 
   it("rotation swaps width and height", () => {

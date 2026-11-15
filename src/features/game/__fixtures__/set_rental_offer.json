@@ -2,18 +2,18 @@
   "home": {
     "tier": "house",
     "limits": {
-      "day": { "max_cents": 190080, "min_cents": 18000, "fair_cents": 126720 },
-      "hour": { "max_cents": 7920, "min_cents": 750, "fair_cents": 5280 }
+      "day": { "max_cents": 240000000, "min_cents": 2400, "fair_cents": 129600 },
+      "hour": { "max_cents": 10000000, "min_cents": 100, "fair_cents": 5400 }
     },
     "places": 3,
     "wohnwert": {
       "rugs": 0,
       "tops": 1,
-      "parts": { "fill": 2, "floor": 6, "style": 1, "value": 0, "layers": 5, "variety": 5 },
-      "total": 19,
+      "parts": { "fill": 2, "floor": 6, "style": 1, "value": 1, "layers": 5, "variety": 5 },
+      "total": 20,
       "pieces": 2,
       "categories": 2,
-      "value_cents": 280000,
+      "value_cents": 420000,
       "coverage_bps": 341,
       "target_cents": 10000000
     }
@@ -23,7 +23,7 @@
     "period": "hour",
     "is_open": true,
     "chance_bps": 0,
-    "ai_check_at": "2026-11-15T19:18:26.009278+00:00",
+    "ai_check_at": "2026-11-15T19:44:43.524703+00:00",
     "price_cents": 1000
   },
   "renting": null,

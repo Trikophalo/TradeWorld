@@ -98,9 +98,10 @@ describe("rent (ADR-158)", () => {
     expect(fairRentCentsPerHour("luxury_villa", 100)).toBe(100_000);
   });
 
-  it("the owner's price lies between 5 % of the reference and 150 % of the fair rent; a day costs 24 hours", () => {
-    expect(rentLimits("flat", 90, "hour")).toEqual({ minCents: 150, maxCents: 4_140, fairCents: 2_760 });
-    expect(rentLimits("flat", 90, "day")).toEqual({ minCents: 3_600, maxCents: 99_360, fairCents: 66_240 });
+  it("the owner sets the price freely between 1 € and the safety maximum (ADR-161); a day costs 24 hours", () => {
+    expect(rentLimits("flat", 90, "hour")).toEqual({ minCents: 100, maxCents: 10_000_000, fairCents: 2_760 });
+    expect(rentLimits("flat", 90, "day")).toEqual({ minCents: 2_400, maxCents: 240_000_000, fairCents: 66_240 });
+    expect(rentLimits("luxury_villa", 0, "hour").maxCents).toBe(BALANCE.rentals.maxPriceCentsPerHour);
     expect(hourlyPrice(99_360, "day")).toBe(4_140);
     expect(hourlyPrice(1_000, "hour")).toBe(1_000);
   });
