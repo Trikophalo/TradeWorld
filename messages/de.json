@@ -6838,6 +6838,13 @@
     "introBy": "mit Mr. Doodle Dangle",
     "introTagline": "Volle Stunde, volle Wahrheit.",
     "introChip": "Jetzt live",
+    "introShots": {
+      "comb": "Der Schnurrbart",
+      "point": "Der Zeigefinger",
+      "mug": "Der Kaffee",
+      "money": "Das Geschäft",
+      "hero": "Die Legende"
+    },
     "outro": "Das war’s von mir. Kaufen Sie klug, verkaufen Sie klüger. Bis zur nächsten vollen Stunde!",
     "outroHeadline": "Bis zur nächsten vollen Stunde!",
     "noSignal": "Kein Signal",
@@ -6854,6 +6861,9 @@
       "world": "Weltlage",
       "tasks": "Auftragslage",
       "crypto": "Krypto",
+      "nft": "NFT-Markt",
+      "gossip": "Klatsch",
+      "ramble": "Abgeschweift",
       "outro": "Schlusswort",
       "other": "Eilmeldung"
     },

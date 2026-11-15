@@ -14,7 +14,7 @@ import {
   type JSX,
   type ReactNode,
 } from "react";
-import { COIN, NEWSPAPER } from "@/components/pixel/art";
+import { NEWSPAPER } from "@/components/pixel/art";
 import {
   ANCHOR_DESK_ROW,
   ANCHOR_SIZE,
@@ -27,12 +27,12 @@ import {
   HANDS,
   KNOB,
   LIGHT_RIG,
+  MOOD_FX,
   MUG,
   NEWS_KIND_ICONS,
   SCENE_DESK_ROW,
   SCENE_HEIGHT,
   SCENE_MAX_WIDTH,
-  SHOW_TITLE,
   SNOW,
   TOPIC_SCREEN,
   TOPIC_SCREEN_INSET,
@@ -43,15 +43,24 @@ import {
   type AnchorArm,
   type AnchorBrows,
   type AnchorEyes,
+  type AnchorMood,
   type AnchorMouth,
   type NewsKind,
 } from "@/components/pixel/news-art";
 import { PixelIcon, type PixelArt } from "@/components/pixel/pixel-icon";
+import { BALANCE } from "@/config/balance";
 import { formatCountdown, localizeMoneyDeep } from "@/lib/format";
 import { DURATION, EASE, SPRING, STAGGER } from "@/lib/motion";
-import { playSound } from "@/lib/sound";
+import { NEWS_INTRO_MS, playSound, stopSound, type SoundName } from "@/lib/sound";
 import { useClock } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
+import { introShot } from "./intro";
+import { IntroMontage } from "./intro-montage";
+import { MOOD_REACTION, segmentMood, speechDelayMs } from "./mood";
+
+export { ANCHOR_MOODS, type AnchorMood } from "@/components/pixel/news-art";
+export { INTRO_SHOTS, introShot, type IntroFrame, type IntroShotId } from "./intro";
+export { MOOD_REACTION, defaultMood, isAnchorMood, segmentMood, speechDelayMs } from "./mood";
 
 export interface StudioEffect {
   label: string;
@@ -63,12 +72,18 @@ export interface StudioSegment {
   headline: string;
   text: string;
   effects: StudioEffect[];
+  /**
+   * The face he reads this story with. Left out, it follows from the kind and the effects (`defaultMood`). Every
+   * mood but "neutral" begins with a short reaction (`MOOD_REACTION`), and the typewriter waits for it.
+   */
+  mood?: AnchorMood;
 }
 
 export interface NewsStudioProps {
   /**
-   * standby: before the show (dimmed studio, "Gleich live" and the countdown); intro: opening jingle and title card;
-   * live: the anchor reads `segment`; outro: he waves goodbye; off: no show data yet (TV snow).
+   * standby: before the show (dimmed studio, "Gleich live" and the countdown); intro: the jingle and a montage about
+   * the anchor that ends on the title card; live: the anchor reads `segment`; outro: he waves goodbye; off: no show
+   * data yet (TV snow).
    */
   mode: "off" | "standby" | "intro" | "live" | "outro";
   /** standby: when the show starts (ms epoch), for the big countdown on the TV. */
@@ -78,10 +93,13 @@ export interface NewsStudioProps {
   segmentIndex?: number;
   segmentCount?: number;
   /**
-   * ms since the current segment (or intro/outro) started. Drives the typewriter, so late joiners are in sync:
-   * shown characters = floor(elapsedMs / 1000 * charsPerSecond). Left out, everything is shown complete.
+   * ms since the current segment (or intro/outro) started. Drives the typewriter, the reaction of a mood and the
+   * shots of the intro, so late joiners are in sync: shown characters = floor((elapsedMs - speechDelayMs(mood)) /
+   * 1000 * charsPerSecond). Left out, everything is shown complete.
    */
   elapsedMs?: number;
+  /** Length of the intro in ms; the montage and its jingle stretch to it. Default: `BALANCE.newsShow.introSeconds`. */
+  introMs?: number;
   /** Default 28. */
   charsPerSecond?: number;
   /** "x schauen zu". */
@@ -244,50 +262,91 @@ function useMouth(typing: boolean, shown: number, char: string): AnchorMouth {
   return typing ? mouth : "closed";
 }
 
+const MOOD_SOUNDS: Record<Exclude<AnchorMood, "neutral">, SoundName> = {
+  shocked: "anchorGasp",
+  crying: "anchorCry",
+  laughing: "anchorLaugh",
+  angry: "anchorGrumble",
+  smug: "anchorSmug",
+  confused: "anchorHuh",
+  proud: "anchorTada",
+};
+
+/** How much faster or slower than rendered the jingle may be played to fit the intro. */
+const JINGLE_RATE = { min: 0.6, max: 1.8 } as const;
+/** Arriving with less than this left of the intro, the jingle is not worth starting. */
+const JINGLE_MIN_LEFT_MS = 1500;
+
 interface SoundCues {
   mode: NewsStudioProps["mode"];
   segmentKey: string | null;
-  segmentIndex: number;
   /** The effect chips are on screen. */
   chipsShown: boolean;
   /** What the chips mean for the people in the story. */
   verdict: "gain" | "loss" | null;
-  /** The intro or the first story has only just begun. */
-  early: boolean;
+  mood: AnchorMood;
+  /** The reaction of the mood is under way. */
+  moodCue: boolean;
+  /** ms into the intro (or the segment), for joining the jingle where the picture is. */
+  elapsed: number;
+  introMs: number;
   replay: boolean;
 }
 
 /**
- * Jingle, stings and the verdict sounds. Everything here reacts to a change while the TV is on screen; arriving in
- * the middle of a show (or opening a replay) stays silent, except for the jingle at the very top of a live show.
+ * Jingle, stings, the voices of his moods and the verdict sounds. Everything here reacts to a change while the TV
+ * is on screen; arriving in the middle of a show (or opening a replay) stays silent, except for the jingle of a live
+ * intro, which joins where the picture is.
  */
-function useShowSounds({ mode, segmentKey, segmentIndex, chipsShown, verdict, early, replay }: SoundCues): void {
-  const previous = useRef<{ mode: SoundCues["mode"]; segmentKey: string | null; chipsShown: boolean } | null>(null);
-  const jinglePlayed = useRef(false);
+function useShowSounds({
+  mode,
+  segmentKey,
+  chipsShown,
+  verdict,
+  mood,
+  moodCue,
+  elapsed,
+  introMs,
+  replay,
+}: SoundCues): void {
+  const previous = useRef<Pick<SoundCues, "mode" | "segmentKey" | "chipsShown" | "moodCue"> | null>(null);
+  const clock = useRef({ elapsed, introMs });
+  useEffect(() => {
+    clock.current = { elapsed, introMs };
+  });
 
   useEffect(() => {
     const before = previous.current;
-    previous.current = { mode, segmentKey, chipsShown };
-    if (mode === "standby" || mode === "off") jinglePlayed.current = false;
+    previous.current = { mode, segmentKey, chipsShown, moodCue };
+    const left = clock.current.introMs - clock.current.elapsed;
     const jingle = () => {
-      jinglePlayed.current = true;
-      void playSound("newsIntro");
+      // The jingle has a hit on every cut: played as fast as the intro is long, it stays on the picture.
+      const rate = Math.min(JINGLE_RATE.max, Math.max(JINGLE_RATE.min, NEWS_INTRO_MS / clock.current.introMs));
+      void playSound("newsIntro", 1, { rate, seekMs: Math.max(0, clock.current.elapsed) * rate });
     };
 
     if (!before) {
-      if (!replay && early && (mode === "intro" || (mode === "live" && segmentIndex === 0))) jingle();
+      if (mode === "intro" && !replay && left > JINGLE_MIN_LEFT_MS) jingle();
       return;
     }
     if (before.mode !== mode) {
-      if (mode === "intro") jingle();
-      else if (mode === "live" && segmentIndex === 0 && early && !jinglePlayed.current) jingle();
+      if (before.mode === "intro") stopSound("newsIntro");
+      if (mode === "intro" && left > JINGLE_MIN_LEFT_MS) jingle();
       else if (mode === "outro") void playSound("newsSting");
-      return;
+    } else if (mode === "live" && before.segmentKey !== segmentKey) {
+      void playSound("newsSting");
     }
     if (mode !== "live") return;
-    if (before.segmentKey !== segmentKey) void playSound("newsSting");
-    else if (chipsShown && !before.chipsShown && verdict) void playSound(verdict === "loss" ? "newsBad" : "newsGood");
-  }, [mode, segmentKey, segmentIndex, chipsShown, verdict, early, replay]);
+    const sameStory = before.mode === mode && before.segmentKey === segmentKey;
+    if (moodCue && !(sameStory && before.moodCue)) {
+      if (mood !== "neutral") void playSound(MOOD_SOUNDS[mood]);
+    } else if (sameStory && chipsShown && !before.chipsShown && verdict) {
+      void playSound(verdict === "loss" ? "newsBad" : "newsGood");
+    }
+  }, [mode, segmentKey, chipsShown, verdict, mood, moodCue, replay]);
+
+  // Leaving the page cuts the jingle off.
+  useEffect(() => () => stopSound("newsIntro"), []);
 }
 
 /** One pip per second for the last ten seconds before the show. */
@@ -334,6 +393,9 @@ const KIND_TONES: Record<NewsKind, KindTone> = {
   world: "accent",
   tasks: "warn",
   crypto: "warn",
+  nft: "info",
+  gossip: "accent",
+  ramble: "warn",
   outro: "accent",
 };
 
@@ -423,6 +485,134 @@ const TubeGlass = memo(function TubeGlass({ alive }: { alive: boolean }) {
   );
 });
 
+// ---------------------------------------------------------------- moods
+
+/** A comic mark beside his head; the position is in art pixels from the corner of his sprite. */
+interface MoodMark {
+  key: string;
+  art: PixelArt;
+  x: number;
+  y: number;
+  /** Pops in when it appears. */
+  pop?: boolean;
+  dim?: boolean;
+}
+
+/** What a mood does to the picture besides his face. */
+interface MoodStage {
+  /** His mouth at the peak of the reaction; null while he talks. */
+  mouth: AnchorMouth | null;
+  arm: AnchorArm;
+  hands: keyof typeof HANDS;
+  /** How far he moves, in art pixels. */
+  dx: number;
+  dy: number;
+  /** The mug jumps when his fist lands. */
+  mugHop: number;
+  marks: MoodMark[];
+}
+
+const REACT_FRAME_MS = 110;
+const CALM: MoodStage = { mouth: null, arm: "down", hands: "rest", dx: 0, dy: 0, mugHop: 0, marks: [] };
+
+/**
+ * The pose of a mood. `frame` counts the frames of the reaction and is null once it is over; `beat` is the idle beat
+ * for what keeps looping while he reads; `still` (reduced motion) freezes everything in one readable pose.
+ */
+function moodStage(mood: AnchorMood, frame: number | null, beat: number, still: boolean): MoodStage {
+  const reacting = frame !== null;
+  const f = frame ?? 0;
+  switch (mood) {
+    case "shocked":
+      // He jumps, an exclamation mark pops up, and the sweat stays while he reads.
+      return {
+        ...CALM,
+        mouth: reacting ? "open" : null,
+        dy: reacting ? Math.min(0, f - 3) : 0,
+        marks: [
+          ...(reacting || still ? [{ key: "exclaim", art: MOOD_FX.exclaim, x: 33, y: 0, pop: true }] : []),
+          { key: "sweat", art: MOOD_FX.sweat, x: 4, y: reacting || still ? 2 : 3 + (beat % 2) },
+        ],
+      };
+    case "crying":
+      // Sobs into his handkerchief, then reads on with a sniff now and then.
+      return reacting
+        ? { ...CALM, mouth: f % 2 === 0 ? "open" : "half", arm: "hanky", hands: "one", dy: f % 2 }
+        : { ...CALM, dy: !still && beat % 6 === 0 ? 1 : 0 };
+    case "laughing": {
+      // "Ha" left, "ha" right, shoulders shaking; while he reads, a chuckle every few beats.
+      const chuckle = !reacting && !still && beat % 8 < 2;
+      const ha = reacting ? f % 4 : chuckle ? (beat % 2) * 2 : still ? 0 : -1;
+      return {
+        ...CALM,
+        mouth: reacting ? (f % 2 === 0 ? "open" : "half") : null,
+        dy: reacting ? (f % 2) - 1 : chuckle ? -(beat % 2) : 0,
+        marks:
+          ha < 0
+            ? []
+            : ha < 2
+              ? [{ key: "ha-left", art: MOOD_FX.ha, x: -1, y: 3, pop: true }]
+              : [{ key: "ha-right", art: MOOD_FX.ha, x: 31, y: 7, pop: true }],
+      };
+    }
+    case "angry":
+      // The fist goes up and comes down, the desk shakes and the mug jumps; the vein keeps throbbing.
+      return {
+        ...CALM,
+        mouth: reacting ? (f < 5 ? "open" : "half") : null,
+        hands: reacting && f === 0 ? "fistUp" : "fistDown",
+        dx: reacting && f >= 1 && f <= 4 ? (f % 2 === 0 ? -1 : 1) : 0,
+        mugHop: reacting ? (f === 1 ? -2 : f === 2 ? -1 : 0) : 0,
+        marks:
+          reacting && f === 0
+            ? []
+            : [
+                {
+                  key: "anger",
+                  art: MOOD_FX.anger,
+                  x: 31,
+                  y: 0,
+                  pop: true,
+                  dim: !reacting && !still && beat % 2 === 1,
+                },
+              ],
+      };
+    case "smug":
+      // A twirl of the moustache and a little "ting".
+      return reacting
+        ? {
+            ...CALM,
+            mouth: "closed",
+            arm: Math.floor(f / 2) % 2 === 0 ? "twirl" : "twirlUp",
+            hands: "one",
+            marks:
+              f >= 3 ? [{ key: "ting", art: f % 2 === 1 ? MOOD_FX.sparkle : MOOD_FX.sparkleSmall, x: 33, y: 5 }] : [],
+          }
+        : CALM;
+    case "confused":
+      return {
+        ...CALM,
+        mouth: reacting ? "half" : null,
+        marks: [{ key: "question", art: MOOD_FX.question, x: 32, y: reacting || still ? 0 : beat % 2, pop: true }],
+      };
+    case "proud": {
+      // Chest out, a little taller, and he sparkles.
+      const twinkle = still ? 0 : reacting ? f % 2 : beat % 2;
+      return {
+        ...CALM,
+        mouth: reacting ? "closed" : null,
+        dy: reacting && f < 2 ? -2 : -1,
+        marks: [
+          { key: "sparkle-left", art: twinkle === 0 ? MOOD_FX.sparkle : MOOD_FX.sparkleSmall, x: 1, y: 2 },
+          { key: "sparkle-right", art: twinkle === 0 ? MOOD_FX.sparkleSmall : MOOD_FX.sparkle, x: 33, y: 6 },
+        ],
+      };
+    }
+    default:
+      return CALM;
+  }
+}
+
 // ---------------------------------------------------------------- the TV
 
 const TV_VARS = {
@@ -434,18 +624,19 @@ const TV_VARS = {
   "--tv-mist": TV.mist,
   "--tv-red": TV.red,
   "--tv-gold": TV.gold,
+  "--tv-sky": TV.sky,
 } as CSSProperties;
 
-const INTRO_STEPS = { coin: 0, name: 250, word: 550, rule: 850, anchor: 1100, tagline: 1700 } as const;
 /** Share of the text after which the effect chips pop in. */
 const CHIPS_AT = 0.6;
 const TAP_MS = 640;
 
 /**
  * The hourly news show on a retro TV: Mr. Doodle Dangle in his studio, a speech bubble with his text and the
- * captions around it. Presentational and pure with respect to the show clock: what is typed, which chips are out and
- * where the title card stands all follow from `elapsedMs`; only idle life (blinking, the flapping mouth, steam, the
- * city, the tube) runs on its own. Static with reduced motion: the whole text at once, no frames, no flicker.
+ * captions around it. Presentational and pure with respect to the show clock: what is typed, which chips are out,
+ * how far the reaction of his mood is and which shot of the intro is on all follow from `elapsedMs`; only idle life
+ * (blinking, the flapping mouth, tears, steam, the city, the tube) runs on its own. Static with reduced motion: the
+ * whole text at once, the mood as one still pose, the title card instead of the montage, no frames, no flicker.
  */
 export function NewsStudio({
   mode,
@@ -455,6 +646,7 @@ export function NewsStudio({
   segmentCount = 0,
   elapsedMs,
   charsPerSecond = 28,
+  introMs = BALANCE.newsShow.introSeconds * 1000,
   viewers,
   replay = false,
   className,
@@ -478,7 +670,14 @@ export function NewsStudio({
   const speech = mode === "live" ? (story?.text ?? "") : mode === "outro" ? (script?.text ?? t("outro")) : "";
   const chars = useMemo(() => Array.from(speech), [speech]);
   const total = chars.length;
-  const shown = reduced ? total : Math.min(total, Math.floor((elapsed / 1000) * charsPerSecond));
+  // ---- how he takes it: a short reaction first, then he reads
+  const waving = mode === "outro" || story?.kind === "outro";
+  const mood: AnchorMood = story && !waving ? segmentMood(story) : "neutral";
+  const moody = mood !== "neutral";
+  const reactionOn = moody && elapsed >= MOOD_REACTION.startMs;
+  const moodCue = reactionOn && elapsed < MOOD_REACTION.endMs;
+  const spoken = Math.max(0, elapsed - (reduced ? 0 : speechDelayMs(mood)));
+  const shown = reduced ? total : Math.min(total, Math.floor((spoken / 1000) * charsPerSecond));
   const typing = shown < total;
   const segmentKey = story ? `${segmentIndex}:${story.headline}` : null;
   const effects = story?.effects ?? [];
@@ -498,10 +697,12 @@ export function NewsStudio({
   useShowSounds({
     mode,
     segmentKey,
-    segmentIndex,
     chipsShown: chipsShown && effects.length > 0,
     verdict,
-    early: elapsed < (mode === "intro" ? 2500 : 1500),
+    mood,
+    moodCue,
+    elapsed,
+    introMs,
     replay,
   });
   useCountdownPips(secondsLeft);
@@ -514,7 +715,6 @@ export function NewsStudio({
 
   // ---- his pose, from the props
   const inStudio = mode === "live" || mode === "outro" || (mode === "standby" && finalCountdown);
-  const waving = mode === "outro" || story?.kind === "outro";
   const recent = chars.slice(Math.max(0, shown - 5), shown).join("");
   const emphasis = typing && /[!?]/.test(recent);
   const chipMoment = chipsShown && effects.length > 0 && shown < Math.ceil(total * (CHIPS_AT + 0.12));
@@ -527,11 +727,34 @@ export function NewsStudio({
   const pleased = !reduced && chipMoment && verdict === "gain";
   const eyes: AnchorEyes = waving || pleased ? "happy" : blink ? "blink" : "open";
   const arm: AnchorArm = !waving ? "down" : reduced || beat % 2 === 0 ? "waveLeft" : "waveRight";
-  const anchor = anchorArt({ mouth, eyes, brows, arm });
-  const tapping = !reduced && ((mode === "live" && elapsed < TAP_MS) || (mode === "standby" && finalCountdown));
+  // The mood shows from the moment the reaction hits; with reduced motion it is there from the start.
+  const felt = moody && (reduced || reactionOn);
+  const reactFrame = moodCue && !reduced ? Math.floor((elapsed - MOOD_REACTION.startMs) / REACT_FRAME_MS) : null;
+  const stage = felt ? moodStage(mood, reactFrame, beat, reduced) : CALM;
+  const anchor = felt
+    ? anchorArt({
+        mood,
+        mouth: stage.mouth ?? mouth,
+        eyes: blink ? "blink" : "open",
+        arm: stage.arm,
+        frame: reduced || beat % 2 === 0 ? 0 : 1,
+        react: reactFrame !== null,
+      })
+    : anchorArt({ mouth, eyes, brows, arm });
+  const tapping =
+    !reduced &&
+    ((mode === "live" && elapsed < (moody ? MOOD_REACTION.startMs : TAP_MS)) || (mode === "standby" && finalCountdown));
   const tapFrame = mode === "live" ? Math.floor(elapsed / 160) % 2 : beat % 2;
-  const hands = waving ? HANDS.one : tapping ? (tapFrame === 0 ? HANDS.tapUp : HANDS.tapDown) : HANDS.rest;
-  const lift = brows === "raised" ? -1 : 0;
+  const hands = waving
+    ? HANDS.one
+    : stage.hands !== "rest"
+      ? HANDS[stage.hands]
+      : tapping
+        ? tapFrame === 0
+          ? HANDS.tapUp
+          : HANDS.tapDown
+        : HANDS.rest;
+  const lift = felt ? stage.dy : brows === "raised" ? -1 : 0;
 
   // ---- the set, cut to the width of the picture
   const cityFrame = Math.floor(beat / 6) % 2;
@@ -588,7 +811,7 @@ export function NewsStudio({
   const long = total > (wide ? 220 : 150);
   const speechSize = wide && scale >= 7 ? (long ? "text-lg" : "text-xl") : long ? "text-sm" : "text-base";
 
-  const introAt = (step: keyof typeof INTRO_STEPS) => reduced || elapsed >= INTRO_STEPS[step];
+  const introFrame = mode === "intro" ? introShot(elapsed, introMs) : null;
   const tickerItems = t.raw("ticker") as string[];
 
   const liveBadge = replay ? (
@@ -644,6 +867,9 @@ export function NewsStudio({
       aria-label={t("tvLabel")}
       data-testid="news-studio"
       data-mode={mode}
+      data-mood={mood}
+      data-reacting={reactFrame !== null ? "true" : undefined}
+      data-intro-shot={introFrame ? (reduced ? "title" : introFrame.id) : undefined}
       data-layout={wide ? "wide" : "compact"}
       className={cn("mx-auto w-full max-w-(--content-max)", className)}
       style={TV_VARS}
@@ -706,12 +932,29 @@ export function NewsStudio({
                         <motion.div
                           className="absolute top-0 left-0"
                           initial={mode === "standby" && !reduced ? { y: ANCHOR_SIZE.height * scale } : false}
-                          animate={{ y: lift * scale }}
+                          animate={{ x: stage.dx * scale, y: lift * scale }}
                           transition={lift === 0 && mode === "standby" ? SPRING.bouncy : { duration: 0 }}
                         >
                           <Sprite art={anchor} x={anchorX} y={ANCHOR_TOP} scale={scale} />
                         </motion.div>
                       )}
+                      {inStudio &&
+                        stage.marks.map((mark) => (
+                          <div
+                            key={`${segmentKey}:${mark.key}`}
+                            className={cn("absolute top-0 left-0", mark.dim && "opacity-50")}
+                            style={{
+                              transform: `translate(${(anchorX + mark.x) * scale}px, ${(ANCHOR_TOP + mark.y) * scale}px)`,
+                            }}
+                            data-testid="news-mood-mark"
+                          >
+                            <PixelIcon
+                              {...mark.art}
+                              scale={scale}
+                              className={cn("block", mark.pop && !reduced && "animate-pop")}
+                            />
+                          </div>
+                        ))}
                       <Sprite art={desk} x={0} y={SCENE_DESK_ROW} scale={scale} />
                       <Sprite
                         art={sign}
@@ -719,12 +962,17 @@ export function NewsStudio({
                         y={SCENE_DESK_ROW + DESK_SIGN_ROW}
                         scale={scale}
                       />
-                      <Sprite
-                        art={MUG[reduced ? 0 : Math.floor(beat / 2) % 2 === 0 ? 0 : 1]}
-                        x={Math.max(0, anchorX - 11)}
-                        y={SCENE_DESK_ROW - 10}
-                        scale={scale}
-                      />
+                      <div
+                        className="absolute top-0 left-0"
+                        style={stage.mugHop === 0 ? undefined : { transform: `translateY(${stage.mugHop * scale}px)` }}
+                      >
+                        <Sprite
+                          art={MUG[reduced ? 0 : Math.floor(beat / 2) % 2 === 0 ? 0 : 1]}
+                          x={Math.max(0, anchorX - 11)}
+                          y={SCENE_DESK_ROW - 10}
+                          scale={scale}
+                        />
+                      </div>
                       {inStudio && <Sprite art={hands} x={anchorX + 3} y={SCENE_DESK_ROW - 8} scale={scale} />}
                     </div>
                     {mode === "standby" && (
@@ -815,99 +1063,15 @@ export function NewsStudio({
                       )}
                     </div>
 
-                    {mode === "intro" && (
-                      <div
-                        className="absolute inset-0 z-20 flex items-center justify-center overflow-hidden bg-(--tv-bar) bg-[repeating-linear-gradient(135deg,transparent_0_14px,var(--tv-wall)_14px_28px)]"
-                        data-testid="news-intro"
-                      >
-                        <motion.div
-                          aria-hidden
-                          className="absolute inset-x-0 top-0 h-2 origin-left bg-(--tv-red)"
-                          initial={{ scaleX: 0 }}
-                          animate={{ scaleX: introAt("coin") ? 1 : 0 }}
-                          transition={{ duration: DURATION.slower, ease: EASE.out }}
-                        />
-                        <motion.div
-                          aria-hidden
-                          className="absolute inset-x-0 bottom-0 h-2 origin-right bg-(--tv-gold)"
-                          initial={{ scaleX: 0 }}
-                          animate={{ scaleX: introAt("coin") ? 1 : 0 }}
-                          transition={{ duration: DURATION.slower, ease: EASE.out }}
-                        />
-                        <div className={cn("relative flex items-center", wide ? "gap-10" : "flex-col")}>
-                          <div className="flex flex-col items-center text-center">
-                            <motion.div
-                              aria-hidden
-                              initial={{ scale: 0, opacity: 0 }}
-                              animate={introAt("coin") ? { scale: 1, opacity: 1 } : { scale: 0, opacity: 0 }}
-                              transition={SPRING.bouncy}
-                            >
-                              <PixelIcon {...COIN} scale={Math.max(3, scale)} />
-                            </motion.div>
-                            <h3 className="sr-only">{t("introTitle")}</h3>
-                            <motion.div
-                              aria-hidden
-                              className="mt-3"
-                              initial={{ opacity: 0, y: -24 }}
-                              animate={introAt("name") ? { opacity: 1, y: 0 } : { opacity: 0, y: -24 }}
-                              transition={SPRING.bouncy}
-                            >
-                              <PixelIcon {...SHOW_TITLE.name} scale={scale} className="block" />
-                            </motion.div>
-                            <motion.div
-                              aria-hidden
-                              className="mt-2"
-                              initial={{ opacity: 0, x: 40 }}
-                              animate={introAt("word") ? { opacity: 1, x: 0 } : { opacity: 0, x: 40 }}
-                              transition={SPRING.smooth}
-                            >
-                              <PixelIcon {...SHOW_TITLE.word} scale={scale} className="block" />
-                            </motion.div>
-                            <motion.div
-                              aria-hidden
-                              className="mt-2 h-1 w-full origin-left bg-(--tv-red)"
-                              initial={{ scaleX: 0 }}
-                              animate={{ scaleX: introAt("rule") ? 1 : 0 }}
-                              transition={{ duration: DURATION.slow, ease: EASE.out }}
-                            />
-                            <motion.p
-                              className={cn(
-                                "mt-2 font-semibold text-(color:--tv-paper)",
-                                wide ? "text-xl" : "text-base",
-                              )}
-                              initial={{ opacity: 0, y: 8 }}
-                              animate={introAt("anchor") ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
-                              transition={{ duration: DURATION.slow, ease: EASE.out }}
-                            >
-                              {t("introBy")}
-                            </motion.p>
-                            <motion.p
-                              className="mt-1 label-pixel text-(color:--tv-mist)"
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: introAt("tagline") ? 1 : 0 }}
-                              transition={{ duration: DURATION.slow }}
-                            >
-                              {t("introTagline")}
-                            </motion.p>
-                          </div>
-                          <motion.div
-                            aria-hidden
-                            className={cn("shrink-0", !wide && "mt-3 -mb-6")}
-                            initial={{ opacity: 0, y: 60 }}
-                            animate={introAt("anchor") ? { opacity: 1, y: 0 } : { opacity: 0, y: 60 }}
-                            transition={SPRING.bouncy}
-                          >
-                            <PixelIcon
-                              {...anchorArt({
-                                eyes: "happy",
-                                arm: reduced || beat % 2 === 0 ? "waveLeft" : "waveRight",
-                              })}
-                              scale={wide ? scale : Math.max(2, scale - 1)}
-                              className="block"
-                            />
-                          </motion.div>
-                        </div>
-                      </div>
+                    {introFrame && (
+                      <IntroMontage
+                        frame={introFrame}
+                        scale={scale}
+                        cols={cols}
+                        wide={wide}
+                        reduced={reduced}
+                        wave={reduced || beat % 2 === 0 ? 0 : 1}
+                      />
                     )}
                   </>
                 )}
