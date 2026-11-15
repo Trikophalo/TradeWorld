@@ -877,6 +877,29 @@ export interface BalanceConfig {
     readonly urgentMinutes: number;
     readonly historyTurns: number;
   };
+  /** Company health (ADR-162): eight factors of a player company, each 0..100 against what profit needs. */
+  readonly companyHealth: {
+    /** Score from which a factor counts as good, ok or weak; below weak it is critical. */
+    readonly status: { readonly good: number; readonly ok: number; readonly weak: number };
+    /** Quality a company should reach (0..1); premium needs at least startups.pricing.premiumMinQuality. */
+    readonly qualityTarget: number;
+    /** Momentum worth keeping up: this share of companyTasks.momentum.maxBps. */
+    readonly momentumTargetShare: number;
+    /** Momentum score at 1 (no solved tasks), 0..1. */
+    readonly momentumFloor: number;
+    /** Image score without crisis or campaign, 0..1. */
+    readonly imageCalm: number;
+    /** Image score lost per share of demand, capacity or cost a crisis takes (0.2 × 3 = 0.6). */
+    readonly imageHitWeight: number;
+    /** Team score with no skill of the next stage covered, 0..1. */
+    readonly teamFloor: number;
+    /** A losing company should have cash for this many hours. */
+    readonly runwayTargetHours: number;
+    /** Even a profitable company should keep this many hours of fixed costs and marketing in cash. */
+    readonly reserveHours: number;
+    /** A fix worth less than this per hour does not count as a loss. */
+    readonly minImpactCents: number;
+  };
   /** Crises, scandals and a falling share price cut wages (ADR-131). */
   readonly wageMood: {
     /** Wage cut per severity level (1..3) of an open or running crisis. */
@@ -2567,6 +2590,19 @@ export const BALANCE = {
     urgentMinutes: 10,
     /** Chat turns Claude gets as memory. */
     historyTurns: 8,
+  },
+  /** Company health (ADR-162). */
+  companyHealth: {
+    status: { good: 80, ok: 60, weak: 35 },
+    qualityTarget: 0.7,
+    momentumTargetShare: 0.5,
+    momentumFloor: 0.4,
+    imageCalm: 0.85,
+    imageHitWeight: 3,
+    teamFloor: 0.4,
+    runwayTargetHours: 48,
+    reserveHours: 6,
+    minImpactCents: 100,
   },
   wageMood: {
     crisisPerSeverityBps: 500,

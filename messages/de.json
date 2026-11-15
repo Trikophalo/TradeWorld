@@ -6871,6 +6871,67 @@
         "failure": "✘ Dein Auftrag ist verpufft.",
         "backfire": "✘ Dein Auftrag ging nach hinten los."
       }
+    },
+    "health": {
+      "brief": "Hier verlierst du gerade am meisten: {factor}. {reason}",
+      "briefGain": "Behoben bringt das etwa +{amount} pro Stunde. So gehen wir es an:",
+      "briefSteps": "So gehen wir es an:",
+      "weakest": "Am meisten verlierst du gerade bei: {factor}.",
+      "intro": "{factor} ({score} von 100): {reason}",
+      "gain": "Wenn wir das beheben, sind etwa +{amount} pro Stunde drin.",
+      "fine": "Das sieht gut aus. Hier ist nichts Dringendes zu tun.",
+      "noGain": "Das kostet gerade kein Geld, bremst dich aber.",
+      "steps": "Das kannst du jetzt tun:",
+      "noSteps": "Dafür habe ich gerade keinen Knopf. Schau dir den Bereich in der Übersicht an.",
+      "founderOnly": "Wie es der Firma geht, steuert die Gründerin oder der Gründer.",
+      "loading": "Die Firmenwerte lade ich noch. Frag gleich noch einmal.",
+      "summary": "Gesamt {score} von 100. Am meisten verlierst du bei: {factor}.",
+      "summaryItem": "{factor}: {score} von 100",
+      "options": {
+        "marketing": "Marketing auf {amount} pro Quartal",
+        "marketingStop": "Marketing stoppen",
+        "price": "Preis auf „{level, select, budget {Budget} premium {Premium} other {Normal}}“ stellen",
+        "contractOn": "Auftragsarbeit einschalten",
+        "campaign": "Kampagne „{kind, select, flyer {Flyer} online {Online} other {TV-Spot}}“ starten",
+        "hireAi": "{count, plural, one {Eine KI-Kraft} other {# KI-Kräfte}} einstellen",
+        "hireAiSkill": "KI-Kraft für {skill} einstellen",
+        "dismissAi": "{count, plural, one {Eine KI-Kraft} other {# KI-Kräfte}} entlassen",
+        "findPlayer": "Mitspieler für {skill} suchen",
+        "train": "Team schulen",
+        "expand": "Firma ausbauen",
+        "upgrade": "Nächste Rechtsform ansehen",
+        "openTasks": "Aufgaben ansehen",
+        "event": "Krise in der Übersicht ansehen",
+        "deposit": "Geld in die Firma einzahlen"
+      },
+      "why": {
+        "marketing": "Mehr Leute lernen dich kennen, über das ganze Quartal. Bisher: {now}.",
+        "marketingStop": "Spart etwa {amount} pro Stunde, mehr Bekanntheit geht gerade nicht.",
+        "campaign": "Schub für ein paar Stunden, solange du Kapazität frei hast. Kostet {cost}.",
+        "price": "Etwa +{amount} pro Stunde.",
+        "priceQuality": "Die Kundschaft kommt zurück, bis die Qualität für Premium reicht.",
+        "contract": "Freie Kapazität wird zu Geld: etwa +{amount} pro Stunde.",
+        "hireAi": "Mehr Kapazität für {wage} Lohn pro Stunde je Kraft.",
+        "dismissAi": "Sie haben nichts zu tun: spart etwa {amount} pro Stunde.",
+        "skillAi": "Deckt die Fähigkeit sofort ab, für {wage} pro Stunde. KI-Kräfte drücken die Qualität ein wenig.",
+        "skillPlayer": "Ein Mensch mit der Fähigkeit hebt auch die Qualität.",
+        "train": "Fähigkeiten im eigenen Team: bessere Qualität und die nächste Stufe.",
+        "expand": "Mehr Plätze, mehr Markt, mehr Kapazität.",
+        "upgrade": "Eine größere Rechtsform bringt mehr Plätze und einen größeren Markt.",
+        "tasks": "Jede gelöste Aufgabe hebt die Nachfrage.",
+        "autoAi": "Keine Aufgabe verfällt mehr, das hält den Schwung.",
+        "event": "Mit der richtigen Strategie wird die Krise kleiner.",
+        "deposit": "Begleicht offene Rechnungen ({amount}), bevor es zur Insolvenz kommt."
+      },
+      "ok": {
+        "marketing": "Erledigt: Marketing läuft jetzt mit {amount} pro Quartal.",
+        "marketingStop": "Erledigt: Kein Marketing mehr, das spart Geld.",
+        "price": "Erledigt: Der Preis steht jetzt auf „{level, select, budget {Budget} premium {Premium} other {Normal}}“.",
+        "contract": "Erledigt: Freie Kapazität geht jetzt in Auftragsarbeit.",
+        "campaign": "Die Kampagne „{kind, select, flyer {Flyer} online {Online} other {TV-Spot}}“ läuft! Wie sie ankommt, siehst du in der Übersicht.",
+        "hireAi": "Erledigt: {count, plural, one {Eine KI-Kraft ist} other {# KI-Kräfte sind}} an Bord.",
+        "dismissAi": "Erledigt: {count, plural, one {Eine KI-Kraft} other {# KI-Kräfte}} weniger."
+      }
     }
   },
   "newsShow": {
@@ -7348,5 +7409,105 @@
     "raiseOwn": "Ein eigenes Zuhause bringt den vollen Bonus statt {share} %.",
     "max": "Mehr geht nicht: größtes Zuhause, voller Wohnwert.",
     "none": "Wer ein Zuhause hat oder zur Miete wohnt, bekommt jede Stunde Geld und XP. Je größer und schöner, desto mehr."
+  },
+  "companyHealth": {
+    "title": "Wo es fehlt",
+    "intro": "Acht Punkte entscheiden, ob deine Firma Gewinn macht. Je weiter außen, desto besser.",
+    "estimated": "Noch geschätzt: Sobald die erste Betriebsstunde vorbei ist, rechne ich mit echten Zahlen.",
+    "profitNow": "Gewinn pro Stunde",
+    "lossNow": "Verlust pro Stunde",
+    "perHour": "{amount}/h",
+    "score": "Gesamt {score} von 100",
+    "listLabel": "Die acht Punkte deiner Firma",
+    "chartLabel": "Netzdiagramm der acht Punkte, 0 bis 100",
+    "weakest": "Hier verlierst du am meisten:",
+    "weakestShort": "Hier verlierst du am meisten:",
+    "weakestGain": "Behoben bringt das etwa +{amount} pro Stunde.",
+    "weakestNoGain": "Kostet gerade kein Geld, ist aber dein schwächster Punkt.",
+    "allGood": "Alles im grünen Bereich. Weiter so!",
+    "impact": "+{amount}/h möglich",
+    "ask": "Mit Mira angehen",
+    "showAll": "Alle 8 Punkte",
+    "status": {
+      "good": "gut",
+      "ok": "ok",
+      "weak": "schwach",
+      "critical": "kritisch"
+    },
+    "factors": {
+      "awareness": "Bekanntheit",
+      "capacity": "Menge",
+      "quality": "Qualität",
+      "image": "Image",
+      "price": "Preis",
+      "team": "Team",
+      "cash": "Kasse",
+      "momentum": "Schwung"
+    },
+    "questions": {
+      "awareness": "Wie steigere ich die Bekanntheit?",
+      "capacity": "Wie bringe ich die Menge passend zur Nachfrage?",
+      "quality": "Wie verbessere ich die Qualität?",
+      "image": "Wie bringe ich unser Image in Ordnung?",
+      "price": "Welcher Preis bringt am meisten?",
+      "team": "Was fehlt meinem Team?",
+      "cash": "Wie bringe ich die Kasse in Ordnung?",
+      "momentum": "Wie bekomme ich mehr Schwung?"
+    },
+    "reasons": {
+      "awareness": {
+        "enough": "{awarenessPct} % kennen dich: Die Nachfrage ({demandCents}/h) reicht für alles, was du schaffst ({capacityCents}/h).",
+        "low": "Nachfrage {demandCents}/h, du könntest {capacityCents}/h liefern. Bekanntheit {awarenessPct} %, nötig wären {neededPct} %.",
+        "capped": "Bekanntheit {awarenessPct} %: Mehr geht auf Stufe {stage} nicht (Grenze {capPct} %). Erst die nächste Stufe hebt die Grenze."
+      },
+      "capacity": {
+        "soldOut": "Nachfrage {demandCents}/h, du schaffst nur {capacityCents}/h. {count, plural, one {Eine Kraft mehr reicht} other {# Kräfte mehr reichen}}.",
+        "soldOutFull": "Nachfrage {demandCents}/h, du schaffst nur {capacityCents}/h. Dafür bräuchtest du {count} Kräfte mehr, frei {free, plural, =0 {ist kein Platz} one {ist ein Platz} other {sind # Plätze}}: Die Firma muss wachsen.",
+        "idle": "Nur {utilizationPct} % ausgelastet: {idleCents}/h Kapazität liegen brach und kosten Geld.",
+        "fits": "{utilizationPct} % ausgelastet, ohne bezahlten Leerlauf."
+      },
+      "quality": {
+        "low": "Qualität {qualityPct} %, gut wären {neededPct} %: Bessere Produkte verkaufen mehr.",
+        "good": "Qualität {qualityPct} %: Die Kundschaft ist zufrieden.",
+        "premium": "Premium mit nur {qualityPct} % Qualität: Unter {neededPct} % bleibt die Hälfte der Kundschaft weg."
+      },
+      "image": {
+        "crisis": "Eine Krise (Stufe {severity}) kostet dich bis zu {hitPct} %. Reagiere, bevor sie voll durchschlägt.",
+        "chance": "Eine Chance wartet: bis zu +{gainPct} % Nachfrage, wenn du zugreifst.",
+        "chanceWon": "Die genutzte Chance bringt +{gainPct} % Nachfrage.",
+        "campaign": "Deine Kampagne läuft: +{gainPct} % Nachfrage.",
+        "calm": "Keine Krise, kein Skandal. Eine Kampagne würde dein Image noch heben."
+      },
+      "price": {
+        "better": {
+          "budget": "Mit Budget-Preisen würdest du gerade etwa {gainCents}/h mehr verdienen.",
+          "normal": "Mit dem normalen Preis würdest du gerade etwa {gainCents}/h mehr verdienen.",
+          "premium": "Mit Premium-Preisen würdest du gerade etwa {gainCents}/h mehr verdienen."
+        },
+        "fits": {
+          "budget": "Der Budget-Preis bringt gerade am meisten.",
+          "normal": "Der normale Preis bringt gerade am meisten.",
+          "premium": "Der Premium-Preis bringt gerade am meisten."
+        }
+      },
+      "team": {
+        "unpaid": "Die Stunde zahlt nur {payPct} % der Löhne ({wagesCents}/h fällig): Das Team kostet mehr, als es einbringt.",
+        "missing": "Für Stufe {stage} {count, plural, one {fehlt noch eine Fähigkeit} other {fehlen noch # Fähigkeiten}}.",
+        "ready": "Alle Fähigkeiten für Stufe {stage} sind da.",
+        "complete": "Alle Stufen erreicht: Dein Team ist komplett."
+      },
+      "cash": {
+        "unpaid": "Offene Rechnungen über {unpaidCents}: noch {quarters, plural, one {ein Quartal} other {# Quartale}} bis zur Insolvenz.",
+        "burn": "Bei {lossCents}/h Verlust reicht die Kasse ({cashCents}) noch {hours} h.",
+        "thin": "Nur {cashCents} in der Kasse: Das deckt keine {hours} h Fixkosten.",
+        "fine": "{cashCents} in der Kasse, die Stunden tragen sich.",
+        "marketingWasted": "{marketingCents}/h Marketing verpuffen: Die Bekanntheit steckt an der Grenze deiner Stufe."
+      },
+      "momentum": {
+        "high": "Schwung: +{boostPct} % Nachfrage durch gelöste Aufgaben. Dranbleiben!",
+        "open": "Schwung +{boostPct} % (bis +{maxPct} % möglich). {open, plural, one {Eine Aufgabe wartet} other {# Aufgaben warten}}.",
+        "low": "Schwung +{boostPct} % (bis +{maxPct} % möglich): Jede gelöste Aufgabe hebt die Nachfrage."
+      }
+    }
   }
 }

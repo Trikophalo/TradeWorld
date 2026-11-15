@@ -2718,3 +2718,45 @@ die Wohnung, und steigert ihren Wert; die Miete legt der Besitzer selbst fest.
   mit dem Faktor.
 - **Demo:** rechnet dieselben Formeln, zahlt beim Anschauen die laufende Stunde und holt verpasste Stunden bis zu
   3 Tage nach (wie der Server, der aktive Spieler auch offline bezahlt).
+
+## ADR-162: Firmen-Gesundheit – acht Punkte, wo es fehlt, mit Mira angehen — `Annahme`
+
+Wunsch: Bei Firmen soll immer grafisch zu sehen sein, wo es noch fehlt, damit man keinen Verlust macht (Bekanntheit,
+Menge, Image …), acht sinnvolle Punkte, die man mit Mira angehen kann.
+
+- **Rechnung** (`src/lib/sim/company-health.ts`, rein, getestet): `companyHealth(company, cfg, extras)` baut die letzte
+  Betriebsstunde aus `MyCompany` nach (Nachfrage, Kapazität, Umsatz, Wareneinsatz, Löhne, Fixkosten, Marketing wie
+  `closeStartupHour`) und zerlegt die Nachfrage in Bekanntheit, Qualität, Preis, Ereignis, Kampagne und Schwung. So
+  lässt sich jeder Punkt einzeln „reparieren“ und die Stunde neu rechnen. Ohne erste Stunde dient die Mitte der
+  Marktschätzung als Marktgröße (`estimated`). Kein Server-Feld nötig: Alles steht schon in `MyCompany`, im
+  Aufgaben-Schwung (`CompanyTasks.momentum`) und im aktuellen Ereignis.
+- **Die acht Punkte** (Wert 0–100, Status gut ≥ 80, ok ≥ 60, schwach ≥ 35, sonst kritisch; Grenzen in
+  `companyHealth` der Balance):
+  1. **Bekanntheit:** Nachfrage gegen Kapazität. Wert = Bekanntheit / nötige Bekanntheit, um die Kapazität zu füllen
+     (höchstens die Grenze der Stufe). An der Grenze hilft nur die nächste Stufe.
+  2. **Menge:** ausverkauft: Kapazität / Nachfrage, Fix = so viele KI-Kräfte, wie Plätze frei sind (sonst wachsen);
+     Leerlauf: 1 − (Gewinn aus Auftragsarbeit oder Entlassen untätiger KI-Kräfte) / (Löhne + Fixkosten).
+  3. **Qualität:** Qualität / Ziel (70 %); Premium unter 50 % Qualität ist kritisch.
+  4. **Image:** Ruhe 85, laufende Kampagne 100, Krise 85 − 3 × größter Einbruch (Nachfrage, Kapazität oder Kosten,
+     beim offenen Ereignis der volle drohende Effekt); eine offene Chance zeigt den möglichen Gewinn.
+  5. **Preis:** die drei Preisstufen durchgerechnet; Wert = Rohertrag jetzt / Rohertrag der besten Stufe.
+  6. **Team:** Minimum aus Lohnquote der Stunde und 40 + 60 × Anteil der abgedeckten Fähigkeiten der nächsten Stufe;
+     Fix = nächste Stufe (Kapazität, Qualität, Grenze der Bekanntheit) gegen die Löhne der fehlenden Kräfte.
+  7. **Kasse:** offene Rechnungen ≤ 25 (je nach verbleibenden Quartalen bis zur Insolvenz), bei Verlust Reichweite
+     der Kasse gegen 48 h, knappe Reserve 70; Marketing an der Grenze der Stufe gilt als verpufft (Fix = Marketing 0).
+  8. **Schwung:** 40 + 60 × (Schwung − 1) / (Ziel − 1), Ziel = halbes Maximum (+30 %).
+- **Kosten eines Punktes:** `impactCents` = Gewinn der nachgerechneten Stunde mit behobenem Punkt minus Gewinn jetzt
+  (ab 1 €/h). Der teuerste Punkt ist „Hier verlierst du am meisten“; kostet nichts Geld, der mit dem kleinsten Wert.
+  Zusätzlich liefert jeder Punkt `levers`: konkrete Schritte (Marketing-Budget, Kampagne, Preis, Auftragsarbeit,
+  KI-Kräfte einstellen/entlassen, Fähigkeit besetzen, schulen, ausbauen, Aufgaben, Krise, Einzahlung, Geschäftszug).
+- **Grafik:** oben in der Übersicht immer sichtbar: Netzdiagramm mit acht Achsen (reines SVG, Tokens, Einblenden über
+  `scale`/`opacity`), der schwächste Punkt markiert, darunter acht Balken mit Status-Farbe, Grund in Zahlen und
+  möglichem Gewinn pro Stunde. Auf dem Mira-Tab eine kleine Fassung.
+- **Mira:** Jeder Punkt hat „Mit Mira angehen“: Der Mira-Tab öffnet sich und die Frage („Wie steigere ich die
+  Bekanntheit?“) geht wie getippt hinein. `healthTopic` erkennt solche Fragen, `healthTurn`/`healthSteps` antworten
+  mit Grund, möglichem Gewinn und bis zu vier Knöpfen. Neue Mira-Aktionen nutzen nur bestehende RPCs
+  (`setCompanyMarketing`, `setCompanyStrategy`, `startCampaign`, `hireAiWorkers`, `dismissAiWorker`), nur für die
+  Gründerin. Ihr Briefing meldet den schwächsten Punkt von selbst, sobald er schwach oder kritisch ist (einmal je
+  Punkt und Status), die Analyse nennt den Gesamtwert.
+- **Grenzen:** Die Rechnung ist eine Momentaufnahme der letzten Stunde (mit deren Zufall), keine Prognose. Langfristige
+  Effekte (Bekanntheit wächst über Quartale, Budget-Preise beschleunigen Mundpropaganda) zählen nicht in den Gewinn.

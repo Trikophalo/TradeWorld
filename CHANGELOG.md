@@ -113,6 +113,10 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Wo es fehlt (ADR-162):** Oben in der Firmenübersicht zeigt ein Netzdiagramm acht Punkte (Bekanntheit, Menge,
+  Qualität, Image, Preis, Team, Kasse, Schwung), wo du gerade am meisten verlierst und was ein Fix pro Stunde bringt.
+  „Mit Mira angehen“ fragt Mira, und sie antwortet mit Knöpfen, die es gleich erledigen.
+
 - **Wohnen lohnt sich (ADR-161):** Wer ein Zuhause hat oder zur Miete wohnt, bekommt jede Stunde einen Wohnbonus in Geld
   und XP, mehr in größeren und schöner eingerichteten Zuhausen. Möbel kosten in größeren Zuhausen mehr, aufgestellt
   steigern sie den Wert deines Zuhauses. Die Miete legst du jetzt frei fest.

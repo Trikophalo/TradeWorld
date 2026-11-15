@@ -31,6 +31,7 @@ import { Sheet } from "@/components/ui/sheet";
 import { Skeleton, SkeletonRow } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/toast";
+import { BALANCE } from "@/config/balance";
 import { BusinessCard } from "@/features/career/components/business-card";
 import { PlayerFigure } from "@/components/ui/player-figure";
 import { FloorBubble } from "@/features/company/components/floor-bubble";
@@ -48,6 +49,8 @@ import { StatBars } from "@/features/crypto/components/coin-detail";
 import { CoinLogo } from "@/features/crypto/components/coin-logo";
 import { SignaturePad } from "@/features/career/components/signature-pad";
 import { CompanyMovesCard } from "@/features/company/components/company-moves";
+import { HealthCompact, HealthPanel } from "@/features/company/components/health-panel";
+import { companyHealth, type HealthCompany } from "@/lib/sim/company-health";
 import { TaskGameView } from "@/features/company/tasks/games";
 import { TaskBoard } from "@/features/company/tasks/task-board";
 import type { CompanyMoves, CompanyTasks, MyJob, PlayerCard } from "@/features/game/types";
@@ -904,6 +907,7 @@ export function Showcase() {
         </Card>
         <CareerLadder job={SAMPLE_JOB} />
         <PayRoutes job={SAMPLE_JOB} />
+        <HealthShowcase />
         <CompanyMovesCard preview={SAMPLE_MOVES} />
         <TaskBoard preview={SAMPLE_TASKS} />
         {SAMPLE_GAMES.map((sample) => (
@@ -985,6 +989,65 @@ export function Showcase() {
           </div>
         </Card>
       </Section>
+    </>
+  );
+}
+
+/** A company that loses money: few customers, idle AI workers, premium without the quality (ADR-162). */
+const SAMPLE_HEALTH_COMPANY: HealthCompany = {
+  sector: "retail",
+  tier: "small_business",
+  priceLevel: "premium",
+  contractWork: false,
+  expansionLevel: 0,
+  stage: 1,
+  stages: [1, 2, 3, 4].map((stage) => ({
+    stage,
+    reached: stage <= 1,
+    skills: [{ key: "sales", coveredBy: stage <= 1 ? "Mona" : null, coveredByAi: false }],
+  })),
+  awarenessBps: 900,
+  qualityBps: 4_200,
+  marketingCentsPerQuarter: 0,
+  aiWorkers: 2,
+  aiWageCentsPerHour: 12_000,
+  headcount: 2,
+  maxEmployees: 5,
+  capacityCents: 1_050_000,
+  cashCents: 180_000,
+  unpaidCents: 0,
+  distress: false,
+  distressQuarters: 0,
+  graceQuarters: 4,
+  estimateLowCents: 6_000_000,
+  estimateHighCents: 12_000_000,
+  payFactorBps: 10_000,
+  campaign: null,
+  campaignCosts: { flyer: 10_000, online: 30_000, tv: 90_000 },
+  canExpand: false,
+  canUpgrade: false,
+  live: {
+    revenuePerHourCents: 26_000,
+    profitPerHourCents: -9_800,
+    payFactorBps: 10_000,
+    contractRevenuePerHourCents: 0,
+    demandPerHourCents: 20_000,
+    capacityPerHourCents: 218_750,
+    fixedPerHourCents: 2_500,
+    aiWagesPerHourCents: 24_000,
+    marketingPerHourCents: 0,
+  },
+  lastQuarter: null,
+};
+
+/** Company health (ADR-162): the panel of the overview and the compact one of the Mira tab. */
+function HealthShowcase() {
+  const health = companyHealth(SAMPLE_HEALTH_COMPANY, BALANCE, { momentum: 1.04, openTasks: 2 });
+  const ask = (factor: string) => toast.info("Mit Mira angehen", factor);
+  return (
+    <>
+      <HealthPanel health={health} onAsk={ask} />
+      <HealthCompact health={health} onAsk={ask} onShowAll={() => undefined} />
     </>
   );
 }

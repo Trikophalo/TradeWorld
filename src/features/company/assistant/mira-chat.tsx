@@ -3,7 +3,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { useTranslations } from "next-intl";
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState, type FormEvent } from "react";
 import { create } from "zustand";
 import { MIRA } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
@@ -22,6 +22,7 @@ import { playSound } from "@/lib/sound";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useClock } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
+import { useHealthText } from "../health";
 import { useCompanyEvent, useCompanyRefresh } from "../hooks";
 import { COMPANY_MOVES_KEY } from "../components/company-moves";
 import { PITCHES_KEY, askJudge, useCompanyPitches } from "../components/pitch-card";
@@ -34,6 +35,7 @@ import {
   describeAction,
   examples,
   fromClaude,
+  healthTurn,
   looksLikeOrder,
   orderTurn,
   parseCommand,
@@ -44,6 +46,7 @@ import {
   warningFor,
   type ClaudeAction,
   type MiraAction,
+  type MiraHealth,
   type MiraLine,
   type MiraNames,
   type MiraOption,
@@ -109,6 +112,16 @@ const useMira = create<MiraStore>((set, get) => ({
 let counter = 0;
 const nextId = () => `m${Date.now()}-${counter++}`;
 
+/** A question for Mira from elsewhere on the company page ("Mit Mira angehen", ADR-162); the chat sends it. */
+const useMiraAsk = create<{ text: string | null; set: (text: string | null) => void }>((set) => ({
+  text: null,
+  set: (text) => set({ text }),
+}));
+
+export function askMira(text: string) {
+  useMiraAsk.getState().set(text);
+}
+
 /** Mira writes: lines with message keys, maybe options. */
 function mira(lines: MiraLine[], options: MiraOption[] = [], text?: string) {
   useMira.getState().push({ id: nextId(), from: "mira", lines, options, text });
@@ -116,7 +129,7 @@ function mira(lines: MiraLine[], options: MiraOption[] = [], text?: string) {
 
 // ---- State Mira looks at --------------------------------------------------------------------------------------------
 
-function useMiraState(applications: number): MiraState | null {
+function useMiraState(applications: number, health: MiraHealth | null): MiraState | null {
   const tasks = useCompanyTasks();
   const founder = tasks.data?.role === "founder";
   const moves = useQuery({
@@ -151,15 +164,18 @@ function useMiraState(applications: number): MiraState | null {
               pitches: pitches.data.pitches,
             }
           : null,
+      health: founder ? health : null,
       // a minute is precise enough for deadlines, and keeps the briefing ids stable
       now: Math.floor(now / 60_000) * 60_000,
     };
-  }, [tasks.data, moves.data, event.data, pitches.data, founder, applications, now]);
+  }, [tasks.data, moves.data, event.data, pitches.data, founder, applications, health, now]);
 }
 
 function useNames(): MiraNames {
   const text = useTaskText();
   const tm = useTranslations("companyMoves");
+  const tn = useTranslations("skills.nodes");
+  const health = useHealthText();
   return useMemo(
     () => ({
       task: text.name,
@@ -168,8 +184,15 @@ function useNames(): MiraNames {
         return tm.has(path) ? tm(path) : key;
       },
       money: (cents: number) => formatMoney(cents, { whole: true }),
+      health: {
+        ...health,
+        skill: (key: string) => {
+          const path = `${key}.name` as Parameters<typeof tn>[0];
+          return tn.has(path) ? tn(path) : key;
+        },
+      },
     }),
-    [text, tm],
+    [text, tm, tn, health],
   );
 }
 
@@ -267,6 +290,40 @@ function useRunner(state: MiraState | null, names: MiraNames, onOpen: MiraOpen, 
           return;
         case "suggest":
           return;
+        // Company levers (ADR-162): the same RPCs as the controls on the overview.
+        case "marketing": {
+          await engine.setCompanyMarketing(crypto.randomUUID(), action.cents);
+          mira([
+            action.cents > 0
+              ? { key: "health.ok.marketing", values: { amount: names.money(action.cents) } }
+              : { key: "health.ok.marketingStop" },
+          ]);
+          break;
+        }
+        case "strategy": {
+          const contract = action.contractWork && state.health?.contractWork === false;
+          await engine.setCompanyStrategy(crypto.randomUUID(), action.priceLevel, action.contractWork);
+          mira([
+            contract ? { key: "health.ok.contract" } : { key: "health.ok.price", values: { level: action.priceLevel } },
+          ]);
+          break;
+        }
+        case "campaign": {
+          await engine.startCampaign(crypto.randomUUID(), state.tasks.company.id, action.kind);
+          mira([{ key: "health.ok.campaign", values: { kind: action.kind } }]);
+          void playSound("success");
+          break;
+        }
+        case "hireAi": {
+          await engine.hireAiWorkers(crypto.randomUUID(), action.count, action.skill);
+          mira([{ key: "health.ok.hireAi", values: { count: action.count } }]);
+          break;
+        }
+        case "dismissAi": {
+          for (let i = 0; i < action.count; i++) await engine.dismissAiWorker(crypto.randomUUID(), null);
+          mira([{ key: "health.ok.dismissAi", values: { count: action.count } }]);
+          break;
+        }
       }
       haptic("success");
       void refresh();
@@ -313,16 +370,19 @@ async function askClaude(
  */
 export function MiraChat({
   applications = 0,
+  health = null,
   onOpen,
   className,
 }: {
   applications?: number;
+  /** The company's eight factors (ADR-162), for the founder. */
+  health?: MiraHealth | null;
   onOpen: MiraOpen;
   className?: string;
 }) {
   const t = useTranslations("mira");
   const line = (l: MiraLine) => t(l.key as Parameters<typeof t>[0], l.values as Record<string, string>);
-  const state = useMiraState(applications);
+  const state = useMiraState(applications, health);
   const names = useNames();
   const [playing, setPlaying] = useState<CompanyTask | null>(null);
   const run = useRunner(state, names, onOpen, setPlaying);
@@ -368,17 +428,6 @@ export function MiraChat({
     list.current?.scrollTo({ top: list.current.scrollHeight, behavior: "smooth" });
   }, [messages.length, thinking]);
 
-  if (!state) {
-    return (
-      <Card padding="lg" className={cn("space-y-3", className)} aria-hidden>
-        <Skeleton className="h-6 w-40" />
-        <Skeleton className="h-16 w-3/4 rounded-lg" />
-        <Skeleton className="h-16 w-2/3 rounded-lg" />
-        <Skeleton className="h-11 w-full rounded-md" />
-      </Card>
-    );
-  }
-
   const choose = (message: Message, option: MiraOption) => {
     if (option.action.type === "suggest") {
       setText(option.action.text);
@@ -395,6 +444,11 @@ export function MiraChat({
     const body = text.trim().slice(0, cfg.maxTextLength);
     if (!body || sendState === "loading") return;
     setText("");
+    await submit(body);
+  };
+
+  async function submit(body: string) {
+    if (!state) return;
     void playSound("tap");
     useMira.getState().push({ id: nextId(), from: "me", lines: [], text: body, options: [] });
 
@@ -437,6 +491,11 @@ export function MiraChat({
     }
     if (intent.kind === "plan" || intent.kind === "analysis") {
       const turn = intent.kind === "plan" ? planTurn(state, names) : analysisTurn(state, names);
+      mira(turn.lines, turn.options);
+      return;
+    }
+    if (intent.kind === "health") {
+      const turn = healthTurn(intent.factor, state, names);
       mira(turn.lines, turn.options);
       return;
     }
@@ -488,7 +547,28 @@ export function MiraChat({
       return;
     }
     mira([{ key: answer?.reason === "busy" ? "busy" : "unknown" }, { key: "brief.examples" }], examples(state, names));
-  };
+  }
+
+  // "Mit Mira angehen" on the overview (ADR-162): the question arrives here and is sent like a typed one.
+  const pending = useMiraAsk((s) => s.text);
+  const ready = state !== null;
+  const sendPending = useEffectEvent((body: string) => void submit(body));
+  useEffect(() => {
+    if (!pending || !ready) return;
+    useMiraAsk.getState().set(null);
+    sendPending(pending);
+  }, [pending, ready]);
+
+  if (!state) {
+    return (
+      <Card padding="lg" className={cn("space-y-3", className)} aria-hidden>
+        <Skeleton className="h-6 w-40" />
+        <Skeleton className="h-16 w-3/4 rounded-lg" />
+        <Skeleton className="h-16 w-2/3 rounded-lg" />
+        <Skeleton className="h-11 w-full rounded-md" />
+      </Card>
+    );
+  }
 
   return (
     <Card
