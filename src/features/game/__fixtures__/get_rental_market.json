@@ -8,10 +8,10 @@
       "places": 3,
       "tenants": [
         {
-          "id": "5abfd5b3-c09a-43e9-8142-1364974e8459",
+          "id": "0c932fd6-e45d-4274-913b-36ef31efc57d",
           "name": "Mia F.",
           "is_ai": true,
-          "since": "2026-11-15T18:35:47.104053+00:00",
+          "since": "2026-11-15T18:42:35.529134+00:00",
           "avatar_key": null,
           "accessories": []
         }
@@ -21,11 +21,11 @@
         "floor": "parquet",
         "owner": "Fixture_Heim",
         "width": 13,
-        "garage": [{ "id": "813db617-3e47-4d3c-9d30-6eee62a2f2d9", "slot": 0, "car_key": "car_electric" }],
+        "garage": [{ "id": "41d399db-54aa-492d-83cf-7bf4fcb96cc2", "slot": 0, "car_key": "car_electric" }],
         "height": 9,
         "placed": [
-          { "x": 2, "y": 2, "id": "da95d50f-da27-44f7-9298-8ddca97beea1", "rot": 0, "item_key": "table_oak" },
-          { "x": 3, "y": 3, "id": "95d8b217-5cc6-4641-b4cb-a5d48ef6cfa6", "rot": 0, "item_key": "laptop" }
+          { "x": 2, "y": 2, "id": "92f798dc-0212-4615-b4e9-4d3fd7b1ba8d", "rot": 0, "item_key": "table_oak" },
+          { "x": 3, "y": 3, "id": "e870e1b2-6240-44ea-bbce-3cdd39c86a8c", "rot": 0, "item_key": "laptop" }
         ],
         "wall_color": "#2f5fd0",
         "value_cents": 27955200,

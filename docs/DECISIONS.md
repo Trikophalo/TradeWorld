@@ -2491,15 +2491,6 @@ ihre Firmen, und mit echten, großen Folgen für Kurse, Firmen und Aufgaben.
 - **Demo:** Ohne Mitspieler startet die Demo weiter ohne Freunde; ein gespeicherter Demo-Zustand (`friendList`) kann
   erfundene Freunde mitbringen (Tests, Vorführung).
 
-## ADR-159: Schwerere Missionen mit dem Level, Missionen für die neuen Funktionen — `akzeptiert`
-
-- Gezählte Tages- und Wochenmissionen (und Schnellmissionen ab 2) skalieren ihr Ziel mit
-  `1 + progression.missionCountScalePerLevel (0,04) × (Level − 1)`, höchstens `missionCountScaleMax` (3). Geldziele und
-  XP behalten ihre eigene Skalierung (ADR-142). Ziele mit begrenzter Auswahl (`distinct`) skalieren nicht.
-- Neue Metriken über Trigger, ohne RPCs umzuschreiben: `accessory_bought`, `accessory_legendary`, `accessory_worn`,
-  `friend_poke`, `news_chat`, `company_chat`. `mission_doable` kennt ihre Voraussetzungen.
-- 19 neue Vorlagen; neue Meilensteine stehen in der Kette hinter den bisherigen.
-
 ## ADR-156: Das Büro mit allen Figuren und Sprechblasen — `akzeptiert`
 
 - **Wo:** Auf der Job-Seite (`/job`) eines Angestellten und auf der Firmenseite des Gründers steht das Büro
@@ -2531,6 +2522,32 @@ ihre Firmen, und mit echten, großen Folgen für Kurse, Firmen und Aufgaben.
   6.000 bis 77.000 €, episch 0,2 bis 1,75 Mio. €. Der Kleiderschrank bekommt Suche, Filter nach Slot und Seltenheit,
   Sortierung nach Preis oder Seltenheit, „Nur bezahlbare“ und die Ansicht „Nach Sets“. Der Server liest Preise aus
   `game_config`, eine Migration war nicht nötig. Pixel-Art der neuen Teile in `src/components/pixel/accessories-second.ts`.
+
+## ADR-157: Studiopublikum und Spieler im Bild bei den NEXA Nachrichten — `akzeptiert`
+
+- **Publikum:** Unter dem Fernseher steht ein Studiopublikum auf einem Sofa: alle, die die Sendung gerade schauen
+  (`news_show_viewers` der letzten 20 Sekunden), als angezogene Figur (ADR-155). Man sieht sich selbst („Du“), dann
+  Freunde (Herz), dann die anderen, nach Namen sortiert, damit niemand herumspringt. Der Server schickt höchstens
+  `newsShow.audience.max` (12) Spieler; wer nicht auf die Bühne passt, steht als „+N“ daneben. Auf dem Handy rücken
+  die Figuren zusammen, nichts scrollt waagerecht.
+- **Erfundene Zuschauer** (ADR-152) kommen ins Studio, sobald sie schreiben, und bleiben `botMinutes` (8) lang. Sie
+  bekommen ein Porträt und bis zu drei Accessoires aus dem Katalog, abgeleitet aus dem Namen (Hash, gemischt nach
+  Fisher-Yates): Dieselbe Person sieht überall und bei jedem gleich aus. Sie zählen bei „x schauen zu“ mit. Der Chat
+  markiert ihre Zeilen (`bot`).
+- **Sprechblasen:** Wer im Live-Chat schreibt, bekommt zusätzlich eine Pixel-Sprechblase über seiner Figur,
+  `bubbleSeconds` (6) lang. Höchstens `bubblesAtOnce` (2) zugleich auf eigenen Höhen mit Stiel zum Sprecher; weitere
+  warten, aber nicht länger als `bubbleMaxDelaySeconds` (12), danach steht die Zeile nur im Chat. Eine neue Zeile
+  derselben Person ersetzt ihre Blase sofort. Alles folgt aus Chat und Serveruhr, also sehen alle dasselbe.
+- **Spieler im Bild:** Geht es in einer Meldung um einen Spieler (Pleite, Gewinner, Klatsch, Skandal und Hype seiner
+  Firma, Künstler eines NFTs), zeigt der Themenbildschirm hinter Mr. Doodle Dangle dessen Figur mit Bildunterschrift
+  („Pleitegeier“, „Gewinner der Stunde“, „Gesucht“ auf Steckbrief-Papier, „Held der Stunde“, „Gesichtet“, „Künstler
+  der Stunde“). Der Server liest das Aussehen beim Abruf (`player_figure_json`), es ist also immer das aktuelle;
+  Spieler-IDs verlassen den Server nie.
+- **Wiederverwendbar:** `src/components/ui/figure-bubble.tsx` (`SpeechBubble`, `FigureBubble`) für Figuren, die
+  sprechen; `player_figure_json(p_player)` als gemeinsamer SQL-Baustein für das Aussehen eines Spielers.
+- **Demo:** Der Demo-Spieler steht im Publikum, Online-Freunde aus `friendList` schauen mit und schreiben ab und zu,
+  erfundene Zuschauer kommen dazu; in Meldungen über den Spieler steht seine Figur im Bild. Dabei behoben: Die
+  erfundenen Zuschauer der Demo schrieben nie, weil ihre nächste Zeile stets in der Zukunft lag.
 
 ## ADR-158: Wohnwert und Vermieten – Mieter wohnen sichtbar im eigenen Grundstück — `Annahme`
 
@@ -2587,3 +2604,12 @@ ihre Firmen, und mit echten, großen Folgen für Kurse, Firmen und Aufgaben.
   Verträge des Spielers (als Mieter mit Nachricht an den Besitzer) und löscht Angebot und Mieter.
 - **Demo:** Die Demo rechnet dieselben Formeln im Browser, würfelt beim Anschauen nach und bringt drei erfundene
   Vermieter mit eingerichteten Wohnungen für den Mietmarkt mit.
+
+## ADR-159: Schwerere Missionen mit dem Level, Missionen für die neuen Funktionen — `akzeptiert`
+
+- Gezählte Tages- und Wochenmissionen (und Schnellmissionen ab 2) skalieren ihr Ziel mit
+  `1 + progression.missionCountScalePerLevel (0,04) × (Level − 1)`, höchstens `missionCountScaleMax` (3). Geldziele und
+  XP behalten ihre eigene Skalierung (ADR-142). Ziele mit begrenzter Auswahl (`distinct`) skalieren nicht.
+- Neue Metriken über Trigger, ohne RPCs umzuschreiben: `accessory_bought`, `accessory_legendary`, `accessory_worn`,
+  `friend_poke`, `news_chat`, `company_chat`. `mission_doable` kennt ihre Voraussetzungen.
+- 19 neue Vorlagen; neue Meilensteine stehen in der Kette hinter den bisherigen.

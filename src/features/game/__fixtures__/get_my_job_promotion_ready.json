@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "13c38414-f673-4713-bf1f-00f7effdaffa",
+    "id": "466e7bef-15d8-4396-b782-d83531129f86",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "7999d809-0066-66e2-e0ac-930c34a49626",
+      "id": "d21331b8-a414-66aa-de07-f036108fc91d",
       "logo": null,
-      "name": "Fundgrube Discount",
-      "color": "#C2C95B",
+      "name": "Nordlicht Logistik AG",
+      "color": "#7AA2F7",
       "is_ai": true,
-      "sector": "retail",
-      "ticker": "FGD"
+      "sector": "logistics",
+      "ticker": "NDL"
     },
     "presence": {
-      "fire_at": "2026-11-20T18:35:45.250943+00:00",
+      "fire_at": "2026-11-20T18:42:33.922474+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-15T18:35:45.250943+00:00"
+      "last_active_at": "2026-11-15T18:42:33.922474+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-15T18:35:45.334581+00:00",
+    "started_at": "2026-11-15T18:42:33.999158+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

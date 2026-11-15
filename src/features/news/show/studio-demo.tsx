@@ -34,6 +34,7 @@ const SEGMENTS: StudioSegment[] = [
       { label: "BRZ −12 %", tone: "loss" },
       { label: "Boersenfuchs_7 −12.400 €", tone: "loss" },
     ],
+    figure: { nickname: "Boersenfuchs_7", avatarKey: "trader", accessories: ["party_hat"] },
   },
   {
     kind: "hype",
@@ -80,6 +81,7 @@ const EXTRAS = {
     headline: "Aus gut unterrichteten Kreisen: Dax_Dieter zieht um",
     text: "Unter uns: Dax_Dieter hat sich eine Villa gekauft, obwohl sein Depot seit Tagen rot leuchtet. Woher das Geld kommt? Mein Schnurrbart hat da eine Vermutung, aber der redet nicht mit der Presse.",
     effects: [{ label: "Dax_Dieter: neue Adresse", tone: "neutral" }],
+    figure: { nickname: "Dax_Dieter", avatarKey: "punk", accessories: [] },
   },
   ramble: {
     kind: "ramble",

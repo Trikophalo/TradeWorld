@@ -135,6 +135,11 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   anderen Spielern ein und bekommst Wohlfühl-XP. Alle Mieter laufen als Pixelfiguren mit Namensschild durch den Raum,
   auch auf dem Profil. Neue Missionen, Meldungen bei Ein- und Auszug und einmal am Tag die Mieteinnahmen.
 
+- **Studiopublikum bei den NEXA Nachrichten (ADR-157):** Unter dem Fernseher sitzt jetzt das Publikum auf dem
+  Studiosofa: alle, die gerade zuschauen, als angezogene Pixelfigur, du selbst und deine Freunde vorn. Wer im
+  Live-Chat schreibt, bekommt eine Sprechblase über dem Kopf, auch die schrägen Stammzuschauer mit ihren eigenen
+  Outfits. Und geht es in einer Meldung um dich, zeigt Mr. Doodle Dangle dein Bild, im aktuellen Outfit und mit
+  passender Unterschrift von „Gewinner der Stunde“ bis „Gesucht“.
 - **Kleiderschrank und Freunde-Platz (ADR-155):** Deine Spielfigur steht jetzt in voller Größe da und lässt sich
   anziehen: 51 verrückte Accessoires vom Cowboyhut über Bananenkostüm, Haikostüm und Laseraugen bis zu Papagei,
   Jetpack und goldener Klobürste. Unter Profil → Kleiderschrank probierst du alles an und kaufst mit Spielgeld, von

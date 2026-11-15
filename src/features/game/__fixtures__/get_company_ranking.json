@@ -1,5 +1,5 @@
 {
-  "mine": { "rank": 44, "value_cents": 54107 },
+  "mine": { "rank": 44, "value_cents": 54231 },
   "total": 47,
   "entries": [
     {
@@ -14,31 +14,15 @@
       "founder": "Lars_Kursrutsch",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "a3797b96-c682-4ed4-93fd-9e73383fa2f0",
+      "company_id": "a06911a4-024b-4f29-8c43-2b325d8343bb",
       "value_cents": 959140000,
       "revenue_cents": null
     },
     {
       "kind": "player",
       "logo": null,
-      "name": "Talwerk",
-      "rank": 2,
-      "tier": "ag",
-      "color": "#663399",
-      "sector": "retail",
-      "ticker": "TAL",
-      "founder": "Pop_Gero",
-      "is_mine": false,
-      "team_size": 1,
-      "company_id": "e55aa533-cd04-4a19-8c73-82f940a573ee",
-      "value_cents": 117430000,
-      "revenue_cents": null
-    },
-    {
-      "kind": "player",
-      "logo": null,
       "name": "Knappwerk",
-      "rank": 3,
+      "rank": 2,
       "tier": "ag",
       "color": "#336699",
       "sector": "retail",
@@ -46,8 +30,24 @@
       "founder": "Float_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "f3548760-12e2-4aae-a6d7-98af24ea334e",
+      "company_id": "75e7506b-c7d4-4ce5-9911-ae97cbc47976",
       "value_cents": 110000000,
+      "revenue_cents": null
+    },
+    {
+      "kind": "player",
+      "logo": null,
+      "name": "Talwerk",
+      "rank": 3,
+      "tier": "ag",
+      "color": "#663399",
+      "sector": "retail",
+      "ticker": "TAL",
+      "founder": "Pop_Gero",
+      "is_mine": false,
+      "team_size": 1,
+      "company_id": "c4d0a12d-a937-4add-9daf-8c1f95ed53fb",
+      "value_cents": 109140000,
       "revenue_cents": null
     },
     {
@@ -82,8 +82,8 @@
       "founder": "Fenja_Firma",
       "is_mine": false,
       "team_size": 6,
-      "company_id": "05c268ba-3d68-4d8d-bc54-cb74adbd38fb",
-      "value_cents": 106610879,
+      "company_id": "3360e72f-2554-4abd-b87a-8e4080d2072d",
+      "value_cents": 106910317,
       "revenue_cents": 0
     },
     {
@@ -98,10 +98,10 @@
       "founder": "Esc_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "56245a4b-ed48-44c8-a89f-31c9e1583dad",
-      "value_cents": 105902148,
+      "company_id": "b6ed6b22-ee2f-4a41-a6a8-14fb268c7e90",
+      "value_cents": 105955168,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-15T18:35:43.196858+00:00"
+  "server_time": "2026-11-15T18:42:32.380369+00:00"
 }

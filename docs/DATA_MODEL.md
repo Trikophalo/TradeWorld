@@ -7534,3 +7534,17 @@ p_open)`, `rent_home(p_request_id, p_owner)`, `end_tenancy(p_request_id, p_tenan
 - **Fehler:** `rent_price_out_of_range` NX140, `rent_own_home` NX141, `rental_not_offered` NX142, `rental_full`
   NX143, `already_renting` NX144, `tenancy_not_found` NX145.
 - Test `supabase/tests/9q_rentals.sql`.
+
+## Nachtrag: Studiopublikum der NEXA Nachrichten (ADR-157)
+
+Migration `20261204003200_news_audience.sql`, keine neuen Tabellen.
+
+- `player_figure_json(p_player)` (intern) → `{nickname, avatar_key, accessories}` oder `null` (unbekannt,
+  deaktiviert); gemeinsamer Baustein für das Aussehen eines Spielers, nie mit ID.
+- `news_show_audience_json(p_player)` (intern): Zuschauer der letzten 20 Sekunden als Figur mit `friend` und `me`,
+  der Aufrufer zuerst, dann Freunde, dann die anderen nach Namen, höchstens `newsShow.audience.max`.
+- `get_news_show()` liefert zusätzlich `audience: [{nickname, avatar_key, accessories, friend, me}]` und je Segment
+  über einen Spieler (`subject.player_id`: loser, winner, gossip, scandal/hype des Gründers, nft des Künstlers)
+  `figure: {nickname, avatar_key, accessories}`, beim Abruf gelesen. `news_show_chat_json` markiert Zeilen
+  erfundener Zuschauer mit `bot: true`.
+- Test `supabase/tests/9o_news_audience.sql`.

@@ -1,7 +1,7 @@
 {
   "job": null,
-  "tag": "YBC8",
-  "rank": 140,
+  "tag": "4GEV",
+  "rank": 141,
   "level": 6,
   "trust": { "band": "shaky", "kept": 0, "score": 41, "broken": 1 },
   "company": { "name": "Fixture Lieferwerk", "ticker": null },
@@ -11,7 +11,7 @@
   "top_skills": [],
   "accessories": [],
   "streak_days": 0,
-  "member_since": "2026-11-15T18:35:45.468441+00:00",
+  "member_since": "2026-11-15T18:42:34.101916+00:00",
   "branch_scores": {
     "it": 0,
     "law": 0,

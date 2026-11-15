@@ -1,93 +1,100 @@
 {
-  "now": "2026-11-15T18:35:47.069582+00:00",
+  "now": "2026-11-15T18:42:35.488329+00:00",
   "chat": [
     {
-      "at": "2026-11-15T18:35:47.066647+00:00",
-      "id": 206,
+      "at": "2026-11-15T18:42:35.484485+00:00",
+      "id": 208,
+      "bot": false,
       "body": "Was für eine Sendung 💀📉",
       "mine": true,
       "nickname": "Fixture_Neu"
     }
   ],
   "show": {
-    "id": 6,
+    "id": 7,
     "writer": "mini",
     "airs_at": "2026-11-15T18:00:00+00:00",
     "segments": [
       {
         "kind": "gossip",
         "mood": "proud",
-        "text": "Gute Nachrichten, ausnahmsweise. Bei Fixture_Neustart heißt es: Fixture Zweitling gegründet. Ich hätte keinen Cent darauf gewettet, und ich wette auf alles.",
+        "text": "Ich fasse es nicht, aber es stimmt. Frieda_Format meldet: Frieda Apps gegründet. Glückwunsch, und jetzt bloß nichts anfassen.",
+        "figure": { "nickname": "Frieda_Format", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Fixture_Neustart hat es geschafft"
+        "headline": "Na so was: Frieda_Format"
       },
       {
         "kind": "hype",
         "mood": "laughing",
-        "text": "Sogar die Steuerprüfung kam privat vorbei, um einzukaufen. Plötzlich will jeder „Turnschuhe aus Hanf“. Pitch_Chefin tut so, als sei das alles geplant gewesen. Wir tun so, als würden wir das glauben.",
-        "effects": [{ "tone": "gain", "label": "Bekanntheit +13,7 %" }],
-        "headline": "Faire Schuhe geht viral"
+        "text": "Unfassbar, aber wahr: Talwerk ist der Renner. Ein Bürgermeister hat spontan eine Straße danach benannt. „Wanderkarten“ geht weg wie warme Semmeln. Pop_Gero soll vor Freude geweint haben.",
+        "figure": { "nickname": "Pop_Gero", "avatar_key": "rookie", "accessories": [] },
+        "effects": [
+          { "tone": "gain", "label": "Bekanntheit +24,9 %" },
+          { "tone": "gain", "label": "TAL +12,1 %" }
+        ],
+        "headline": "Alle wollen Talwerk"
       },
       {
         "kind": "nft",
-        "mood": "confused",
-        "text": "Kunstmarkt, oder was man dafür hält: „Neon Nacht“ von Nina_Neon ging für 30.000 € an Ben_Bieter. Ich habe mir das Werk angesehen. Ich habe Fragen. Viele.",
+        "mood": "laughing",
+        "text": "Ben_Bieter zahlt 30.000 € für „Neon Nacht“, gemalt von Nina_Neon. Das Bild hat sechzehn mal sechzehn Pixel. Ich habe nachgezählt, ich hatte Zeit.",
+        "figure": { "nickname": "Nina_Neon", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "30.000 € für ein paar Pixel"
+        "headline": "NFT-Wahnsinn um „Neon Nacht“"
       },
       {
         "kind": "winner",
         "mood": "shocked",
-        "text": "Und nun zu jemandem, der es kann: Fixture_Neu hat heute 1.138.888 € gemacht, 11388,9 % im Plus. Das Finanzamt hat bereits freundlich gewunken.",
+        "text": "Und nun zu jemandem, der es kann: Fixture_Neu hat heute 1.138.906 € gemacht, 11389,1 % im Plus. Das Finanzamt hat bereits freundlich gewunken.",
+        "figure": { "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] },
         "effects": [],
-        "headline": "Fixture_Neu sahnt ab: plus 1.138.888 €"
+        "headline": "Fixture_Neu sahnt ab: plus 1.138.906 €"
       },
       {
         "kind": "gossip",
         "mood": "shocked",
-        "text": "Ich fasse es nicht, aber es stimmt. Hanna_Stunde meldet: Stunden Werk gegründet. Ich bin fast stolz. Fast.",
+        "text": "Ich fasse es nicht, aber es stimmt. Fixture_Chef meldet: Fixture Leitern gegründet. Dafür gibt es von mir ein ehrliches Schulterklopfen, mit der Faust.",
+        "figure": { "nickname": "Fixture_Chef", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Na so was: Hanna_Stunde"
+        "headline": "Na so was: Fixture_Chef"
       },
       {
-        "kind": "hype",
-        "mood": "laughing",
-        "text": "Bodos Garage räumt ab. Ein Kind hat im Schulaufsatz darüber geschrieben, die Klasse war begeistert. Bodo_Garage hängt sich das gerahmt ins Büro. Die Kundschaft rennt die Tür ein.",
-        "effects": [{ "tone": "gain", "label": "Bekanntheit +22,5 %" }],
-        "headline": "Ritterschlag für Bodos Garage"
+        "kind": "scandal",
+        "mood": "shocked",
+        "text": "Peinlich für Esc_Frida: Ein Großkunde bekam statt der Ware eine Kiste mit Entschuldigungsbriefen. „Stühle mit drei Beinen“ klang auf dem Papier besser. Das Image von Wackelwerk ist im Eimer.",
+        "figure": { "nickname": "Esc_Frida", "avatar_key": "rookie", "accessories": [] },
+        "effects": [
+          { "tone": "loss", "label": "Bekanntheit −10,1 %" },
+          { "tone": "loss", "label": "WAC −12,5 %" }
+        ],
+        "headline": "Kunden fliehen vor Wackelwerk"
       },
       {
-        "kind": "ramble",
+        "kind": "tasks",
         "mood": "angry",
-        "text": "Die Regie winkt, ich ignoriere sie. Die Deutsche Bahn meldet, mein Zug von gestern komme heute. Ich warte seit Dienstag. So. Weiter im Text.",
-        "effects": [],
-        "headline": "Was ich noch sagen wollte"
-      },
-      {
-        "kind": "sector",
-        "mood": "crying",
-        "text": "Die Branche Pharma sackt um 8,1 % ab. Ein Fernsehmoderator hat schlecht geträumt und es live erzählt. Bis das geklärt ist, verkaufen erst mal alle.",
-        "effects": [{ "tone": "loss", "label": "Pharma −8,1 %" }],
-        "headline": "Pharma im freien Fall"
+        "text": "Ein Fernsehkoch hat erklärt, man könne Geld auch behalten. Alle offenen Firmen-Aufgaben sind 38,7 % weniger wert. Die Chefs dürfen ruhig ein bisschen schwitzen.",
+        "effects": [{ "tone": "loss", "label": "Aufgaben −38,7 %" }],
+        "headline": "Kunden entdecken das Sparen"
       },
       {
         "kind": "stock",
-        "mood": "crying",
-        "text": "Ein Mitarbeiter hat „Allen antworten“ gedrückt. Mit Anhang. Der Kurs von Glanz & Gloria sackt um 17,4 % ab. Ein Krisenstab tagt.",
-        "effects": [{ "tone": "loss", "label": "LUX −17,4 %" }],
-        "headline": "Panik bei Glanz & Gloria"
+        "mood": "shocked",
+        "text": "GenoVita Biotech verliert 10,4 %. Der gesamte Vorstand ist nach dem Betriebsausflug nicht zurückgekehrt. Letztes Lebenszeichen: ein Foto aus einer Karaoke-Bar. Die Anleger nehmen Reißaus.",
+        "effects": [{ "tone": "loss", "label": "GNV −10,4 %" }],
+        "headline": "GenoVita Biotech stürzt ab"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Volta Energie AG geht bald nach oben. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
-        "effects": [{ "tone": "neutral", "label": "VLT ↑ Tipp" }],
-        "headline": "Der heiße Draht: Volta Energie AG"
+        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Knusperkönig geht bald nach unten. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
+        "effects": [{ "tone": "neutral", "label": "SNK ↓ Tipp" }],
+        "headline": "Der heiße Draht: Knusperkönig"
       }
     ],
-    "started_at": "2026-11-15T18:35:47.069582+00:00"
+    "started_at": "2026-11-15T18:42:35.488329+00:00"
   },
-  "viewers": 5,
+  "viewers": 1,
+  "audience": [{ "me": true, "friend": false, "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] }],
   "upcoming": null,
   "next_airs_at": "2026-11-15T19:00:00+00:00"
 }

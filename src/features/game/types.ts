@@ -2065,12 +2065,25 @@ export class GameError extends Error {
 /** NEXA Nachrichten (ADR-150): the hourly live show with Mr. Doodle Dangle. */
 /** The anchor's face while he reads a segment (ADR-152). */
 export type NewsShowMood = "neutral" | "shocked" | "crying" | "laughing" | "angry" | "smug" | "confused" | "proud";
+/** How a player looks to others (ADR-157): portrait and worn accessories, for the dressed figure. */
+export interface NewsShowFigure {
+  nickname: string;
+  avatarKey: string | null;
+  accessories: string[];
+}
+/** Someone watching the show right now (ADR-157). */
+export interface NewsShowAudienceMember extends NewsShowFigure {
+  friend: boolean;
+  me: boolean;
+}
 export interface NewsShowSegment {
   kind: string;
   mood?: NewsShowMood;
   headline: string;
   text: string;
   effects: { label: string; tone: "gain" | "loss" | "neutral" }[];
+  /** The player the story is about, in their current look (ADR-157). */
+  figure?: NewsShowFigure;
 }
 export interface NewsShowChatMessage {
   id: number;
@@ -2078,12 +2091,16 @@ export interface NewsShowChatMessage {
   body: string;
   at: string;
   mine: boolean;
+  /** A made-up viewer (ADR-152); they get a figure seeded by the name (ADR-157). */
+  bot: boolean;
 }
 export interface NewsShowState {
   /** The server's clock when it answered; viewers stay in sync with it. */
   now: string;
   nextAirsAt: string;
   viewers: number;
+  /** Players watching right now as figures: me first, then friends, then the others (at most audience.max). */
+  audience: NewsShowAudienceMember[];
   /** The scheduled next show; needsScript: nobody asked Claude yet. */
   upcoming: { id: number; airsAt: string; needsScript: boolean } | null;
   /** This hour's show once it started (replayable for a while). */

@@ -6868,7 +6868,16 @@
     "chatPlaceholder": "Schreib in den Chat …",
     "chatSend": "Senden",
     "emojis": "Emojis",
-    "viewers": "{count, plural, one {# schaut zu} other {# schauen zu}}"
+    "viewers": "{count, plural, one {# schaut zu} other {# schauen zu}}",
+    "audienceTitle": "Im Studio",
+    "audienceLabel": "Publikum im Studio",
+    "audienceList": "Wer gerade zuschaut",
+    "applause": "Applaus",
+    "audienceMe": "Du",
+    "audienceMeName": "{name} (du)",
+    "audienceFriendName": "{name} (befreundet)",
+    "audienceMore": "+{count}",
+    "audienceMoreLabel": "{count, plural, one {# weitere Person schaut zu} other {# weitere schauen zu}}"
   },
   "newsStudio": {
     "show": "NEXA Nachrichten",
@@ -6899,6 +6908,16 @@
     "noSignal": "Kein Signal",
     "noSignalHint": "Die nächste Sendung kommt zur vollen Stunde.",
     "segmentOf": "Meldung {index} von {count}",
+    "frames": {
+      "loser": "Pleitegeier",
+      "winner": "Gewinner der Stunde",
+      "scandal": "Gesucht",
+      "hype": "Held der Stunde",
+      "gossip": "Gesichtet",
+      "nft": "Künstler der Stunde",
+      "other": "Im Bild"
+    },
+    "figureLabel": "Im Bild: {name}",
     "kinds": {
       "intro": "Begrüßung",
       "loser": "Pleite der Stunde",

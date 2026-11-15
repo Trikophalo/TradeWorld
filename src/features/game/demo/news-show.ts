@@ -6,6 +6,7 @@ import {
   GameError,
   type GameEngine,
   type NewsShowChatMessage,
+  type NewsShowFigure,
   type NewsShowMood,
   type NewsShowSegment,
   type NewsShowState,
@@ -33,7 +34,8 @@ export interface DemoNewsShowState {
   doneSlot: number;
   /** A show asked for with the demo button: starts at this time. */
   forcedAt: number | null;
-  chat: (Omit<NewsShowChatMessage, "at"> & { at: number })[];
+  /** `bot` is missing in states saved before ADR-157: then every line that is not mine was a made-up viewer's. */
+  chat: (Omit<NewsShowChatMessage, "at" | "bot"> & { at: number; bot?: boolean })[];
   seq: number;
   botUntil: number;
 }
@@ -42,6 +44,10 @@ export interface NewsShowHost {
   state(): DemoNewsShowState | undefined;
   setState(s: DemoNewsShowState): void;
   nickname(): string;
+  /** The player's look right now (ADR-157): portrait and worn accessories. */
+  figure?(): Omit<NewsShowFigure, "nickname">;
+  /** Friends who are online: they watch along while a show runs and now and then write a line. */
+  friendsOnline?(): NewsShowFigure[];
   stocks(): { ticker: string; name: string; sector: string }[];
   sectorName(key: string): string;
   shock(ticker: string, moveBps: number): void;
@@ -59,6 +65,8 @@ export interface NewsShowHost {
 }
 
 const bots = cfg.chat.bots;
+/** Stories about a person: in the demo always the player, shown on the TV in their current look (ADR-157). */
+const PLAYER_KINDS = new Set(["loser", "winner", "gossip", "scandal", "hype", "nft"]);
 
 export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "newsShow" | "postNewsShowMessage"> & {
   startNow(inMs?: number): void;
@@ -215,9 +223,11 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
     const show = s.show;
     if (!show || now > show.startedAt + showDurationMs(show.segments.length)) return;
     const pick = (lines: readonly string[]) => lines[between(0, lines.length - 1)]!;
+    const end = show.startedAt + showDurationMs(show.segments.length);
+    // the next line is written ahead (the chat shows it once its time has come), like the server does
     while (s.botUntil < now) {
       s.botUntil = Math.max(s.botUntil, show.startedAt) + between(bots.everySecondsMin, bots.everySecondsMax) * 1000;
-      if (s.botUntil > now) break;
+      if (s.botUntil > end) break;
       const u = host.random() * 10_000;
       const body =
         u < bots.aboutShareBps
@@ -226,7 +236,17 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
             ? pick(bots.lines.angry)
             : pick(bots.lines.glaze);
       s.seq += 1;
-      s.chat.push({ id: s.seq, nickname: pick(bots.names), body, at: s.botUntil, mine: false });
+      // now and then a friend who watches along says something instead of a made-up viewer
+      const friends = host.friendsOnline?.() ?? [];
+      const friend = friends.length > 0 && host.random() < 0.25 ? pick(friends.map((f) => f.nickname)) : null;
+      s.chat.push({
+        id: s.seq,
+        nickname: friend ?? pick(bots.names),
+        body,
+        at: s.botUntil,
+        mine: false,
+        bot: friend === null,
+      });
     }
     s.chat = s.chat.slice(-cfg.chat.history);
   }
@@ -253,25 +273,45 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
   }
 
   const chatOf = (s: DemoNewsShowState): NewsShowChatMessage[] =>
-    s.chat.filter((m) => m.at <= host.now()).map((m) => ({ ...m, at: new Date(m.at).toISOString() }));
+    s.chat
+      .filter((m) => m.at <= host.now())
+      .map((m) => ({ ...m, at: new Date(m.at).toISOString(), bot: m.bot ?? !m.mine }));
+
+  /** The player's current look; in the demo every story about a person is about the player. */
+  const myFigure = (): NewsShowFigure => ({
+    nickname: host.nickname(),
+    avatarKey: host.figure?.().avatarKey ?? null,
+    accessories: host.figure?.().accessories ?? [],
+  });
 
   return {
     async newsShow(): Promise<NewsShowState> {
       const s = tick();
       const now = host.now();
       const next = s.forcedAt ?? Math.max(showSlot(now), s.doneSlot + HOUR);
+      const running = s.show !== null && now < s.show.startedAt + showDurationMs(s.show.segments.length);
+      // friends watch along while the show runs (the made-up viewers stand in the audience while they write)
+      const friends = running ? (host.friendsOnline?.() ?? []) : [];
+      const me = myFigure();
       return {
         now: new Date(now).toISOString(),
         nextAirsAt: new Date(next).toISOString(),
-        viewers:
-          1 + (s.show && now < s.show.startedAt + showDurationMs(s.show.segments.length) ? bots.names.length : 0),
+        viewers: 1 + friends.length,
+        audience: [
+          { ...me, friend: false, me: true },
+          ...[...friends]
+            .sort((a, b) => a.nickname.localeCompare(b.nickname))
+            .map((f) => ({ ...f, friend: true, me: false })),
+        ],
         upcoming: null,
         show: s.show && {
           id: s.show.slot,
           airsAt: new Date(s.show.slot).toISOString(),
           startedAt: new Date(s.show.startedAt).toISOString(),
           writer: "mini",
-          segments: s.show.segments,
+          segments: s.show.segments.map((segment) =>
+            PLAYER_KINDS.has(segment.kind) ? { ...segment, figure: me } : segment,
+          ),
         },
         chat: chatOf(s),
       };

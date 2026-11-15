@@ -2,42 +2,42 @@
   "items": [
     {
       "id": 5,
-      "body": "Die Gründe sind unklar. Der Markt mag keine Unsicherheit. Sicher ist das nicht.",
-      "name": "QuantenSprung Labs",
-      "due_at": "2026-11-15T19:53:41.897893+00:00",
+      "body": "Mehrere Häuser streichen ihre Kaufempfehlung und senken das Kursziel. Sicher ist das nicht.",
+      "name": "Fundgrube Discount",
+      "due_at": "2026-11-15T19:55:20.51157+00:00",
       "status": "open",
-      "ticker": "QSL",
-      "headline": "QuantenSprung Labs-Chef tritt überraschend zurück",
+      "ticker": "FGD",
+      "headline": "Analysten-Downgrade für Fundgrube Discount",
       "move_bps": null,
-      "strength": 2,
+      "strength": 1,
       "direction": "down",
-      "published_at": "2026-11-15T19:35:46.596008+00:00"
+      "published_at": "2026-11-15T19:42:35.058608+00:00"
     },
     {
       "id": 4,
-      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Luftpost Drohnen tut sich in der nächsten Stunde etwas, und zwar nach oben. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
-      "name": "Luftpost Drohnen",
-      "due_at": "2026-11-15T19:05:39.647241+00:00",
-      "status": "confirmed",
-      "ticker": "DRN",
+      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Orbitfracht tut sich in der nächsten Stunde etwas, und zwar nach oben. Das Vögelchen lag bisher meistens richtig. Meistens.",
+      "name": "Orbitfracht",
+      "due_at": "2026-11-15T19:21:28.898989+00:00",
+      "status": "fizzled",
+      "ticker": "OFR",
       "headline": "Mr. Doodle Dangles Geheimtipp",
-      "move_bps": 571,
+      "move_bps": null,
       "strength": 2,
       "direction": "up",
-      "published_at": "2026-11-15T18:35:39.647241+00:00"
+      "published_at": "2026-11-15T18:42:28.898989+00:00"
     },
     {
       "id": 3,
-      "body": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: KlarSoft AG geht bald nach unten. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
-      "name": "KlarSoft AG",
-      "due_at": "2026-11-15T18:35:38.939587+00:00",
+      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei SolarFuchs tut sich in der nächsten Stunde etwas, und zwar nach oben. Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.",
+      "name": "SolarFuchs",
+      "due_at": "2026-11-15T18:42:28.047162+00:00",
       "status": "confirmed",
-      "ticker": "KLS",
-      "headline": "Der heiße Draht: KlarSoft AG",
-      "move_bps": -1438,
+      "ticker": "SFX",
+      "headline": "Mr. Doodle Dangles Geheimtipp",
+      "move_bps": 1158,
       "strength": 2,
-      "direction": "down",
-      "published_at": "2026-11-15T18:35:38.939587+00:00"
+      "direction": "up",
+      "published_at": "2026-11-15T18:42:28.047162+00:00"
     }
   ],
   "reliability_bps": 7500

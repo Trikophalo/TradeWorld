@@ -309,6 +309,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Deine Spielfigur steht jetzt in voller Größe da und lässt sich anziehen: 51 verrückte Accessoires vom Cowboyhut über Bananenkostüm, Haikostüm und…",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-5105821f",
+        title: "Studiopublikum bei den NEXA Nachrichten",
+        text: "Unter dem Fernseher sitzt jetzt das Publikum auf dem Studiosofa: alle, die gerade zuschauen, als angezogene Pixelfigur, du selbst und deine Freunde…",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-760a66c5",
         title: "Vermieten und Wohnwert",
         text: "Dein Zuhause hat jetzt einen **Wohnwert** von 0 bis 100.",

@@ -54,6 +54,7 @@ import { SpeechBubble } from "@/features/tutorial/components/speech-bubble";
 import { useTutorial } from "@/features/tutorial/store";
 import { resetDemoPlayer } from "@/features/game/demo-engine";
 import { FriendCodeCard } from "@/features/friends/components/friend-code";
+import { NewsAudienceDemo } from "@/features/news/show/audience-demo";
 import { NewsStudioDemo } from "@/features/news/show/studio-demo";
 import { StockNewsCard } from "@/features/news/stock-news";
 import { LevelCard } from "@/features/progression/components/level-card";
@@ -846,6 +847,7 @@ export function Showcase() {
 
       <Section id="news-studio" title="NEXA Nachrichten: Studio" className="space-y-4">
         <NewsStudioDemo />
+        <NewsAudienceDemo />
         <Demo label="Mr. Doodle Dangle und sein Studio (große Sprites)" className="items-end gap-4">
           {Object.entries(NEWS_STUDIO_ART)
             .filter(([name]) => /^(anchor|hands|fx|mug|topic-screen|title|desk-sign|intro)/.test(name))

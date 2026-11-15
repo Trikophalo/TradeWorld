@@ -1,7 +1,7 @@
 {
   "job": null,
-  "tag": "XS6A",
-  "rank": 339,
+  "tag": "NL3S",
+  "rank": 341,
   "level": 10,
   "trust": { "band": "blank", "kept": 0, "score": 50, "broken": 0 },
   "company": { "name": "Fixture Labor", "ticker": null },
@@ -14,7 +14,7 @@
   ],
   "accessories": [],
   "streak_days": 1,
-  "member_since": "2026-11-15T18:35:42.337938+00:00",
+  "member_since": "2026-11-15T18:42:31.550579+00:00",
   "branch_scores": {
     "it": 3,
     "law": 0,
@@ -26,5 +26,5 @@
     "management": 0
   },
   "skills_learned": 2,
-  "net_worth_cents": 2423961
+  "net_worth_cents": 2424079
 }

@@ -1511,6 +1511,11 @@ const newsShow = createNewsShowEngine({
     persist();
   },
   nickname: () => p().nickname,
+  figure: () => ({ avatarKey: career.avatarKey(), accessories: wardrobe.worn() }),
+  friendsOnline: () =>
+    (p().friendList ?? [])
+      .filter((f) => f.online)
+      .map((f) => ({ nickname: f.nickname, avatarKey: f.avatarKey, accessories: f.accessories })),
   stocks: () => DEMO_COMPANIES.map((c) => ({ ticker: c.ticker, name: c.name, sector: c.sector })),
   sectorName: (key) => SECTOR_NAMES[key] ?? key,
   shock: (ticker, moveBps) => {

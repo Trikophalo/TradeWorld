@@ -14,7 +14,7 @@
     "revenue_cents": 0
   },
   "company": {
-    "id": "e3746cfd-6496-499e-89b9-62d8bdef8352",
+    "id": "adc14619-6be6-4a09-8fdd-846570f1dc37",
     "idea": "Günstige Kabel",
     "logo": null,
     "name": "Billig Laden",
@@ -25,9 +25,9 @@
     "ticker": null,
     "price_e4": null,
     "change_bps": null,
-    "founded_at": "2026-11-15T18:35:24.911963+00:00",
+    "founded_at": "2026-11-15T18:42:14.39616+00:00",
     "brand_color": "#552211"
   },
-  "founder": { "tag": "C2X3", "nickname": "Dirk_Billig", "avatar_key": "rookie" },
+  "founder": { "tag": "37H3", "nickname": "Dirk_Billig", "avatar_key": "rookie" },
   "members": []
 }
