@@ -453,7 +453,8 @@ export function createArenaRenderer(canvas: HTMLCanvasElement, opts: ArenaRender
     if (kind === "potato" && (s as PotatoState).holder === i) {
       rect(pos.x - 9, pos.y - 2, 18, 4, ARENA.toxic, 0.35 + Math.sin(now / 90) * 0.1);
     }
-    const stunned = s.p.stun[i]! > 0;
+    // in Sumo the shover recovers (stun), that is no daze
+    const stunned = s.p.stun[i]! > 0 && kind !== "sumo";
     const blink =
       (kind === "bulls" && (s as BullsState).inv[i]! > 0 && Math.floor(now / 80) % 2 === 0) ||
       (stunned && Math.floor(now / 70) % 3 === 0);
