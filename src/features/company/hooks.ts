@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { engine, useGame } from "@/features/game/store";
 
 /** Player company data (ADR-057). Mutations invalidate everything under ["company"] and ["career"]. */
@@ -34,6 +34,27 @@ export function useCompanyTeam(companyId: string | undefined) {
     enabled: Boolean(companyId),
     refetchInterval: 60_000,
   });
+}
+
+/** The workplace as a pixel scene with speech bubbles (ADR-156); polled like the chat. */
+export function useCompanyFloor(enabled = true) {
+  return useQuery({
+    queryKey: ["company", "floor"],
+    queryFn: () => engine.companyFloor(),
+    enabled,
+    refetchInterval: 10_000,
+    staleTime: 2_000,
+  });
+}
+
+/** Portrait and worn accessories per nickname of the people at the own workplace, for dressed figures elsewhere. */
+export function useFloorLooks(): ReadonlyMap<string, { avatarKey: string; accessories: string[] }> {
+  const floor = useCompanyFloor();
+  const members = floor.data?.members;
+  return useMemo(
+    () => new Map((members ?? []).map((m) => [m.nickname, { avatarKey: m.avatarKey, accessories: m.accessories }])),
+    [members],
+  );
 }
 
 export function useCompanyRefresh() {

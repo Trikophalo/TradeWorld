@@ -1368,6 +1368,10 @@ export interface StartupsConfig {
     readonly maxMessageLength: number;
     readonly historyLimit: number;
     readonly maxMessagesPerMinute: number;
+    /** How long the newest message of a member stands as a speech bubble over their figure (ADR-156). */
+    readonly bubbleSeconds: number;
+    /** At most this many players on the floor of an AI company (the caller included, ADR-156). */
+    readonly floorMaxMembers: number;
   };
 }
 
@@ -2390,7 +2394,13 @@ export const BALANCE = {
       weakBelow: 0.8,
       strongFrom: 1.2,
     },
-    chat: { maxMessageLength: 300, historyLimit: 100, maxMessagesPerMinute: 10 },
+    chat: {
+      maxMessageLength: 300,
+      historyLimit: 100,
+      maxMessagesPerMinute: 10,
+      bubbleSeconds: 120,
+      floorMaxMembers: 24,
+    },
   },
 
   // ------------------------------------------------------- avatars (ADR-053)

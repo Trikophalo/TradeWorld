@@ -1,8 +1,8 @@
 {
-  "now": "2026-11-15T17:40:17.003121+00:00",
+  "now": "2026-11-15T18:02:48.703624+00:00",
   "chat": [
     {
-      "at": "2026-11-15T17:40:16.999524+00:00",
+      "at": "2026-11-15T18:02:48.700016+00:00",
       "id": 206,
       "body": "Was für eine Sendung 💀📉",
       "mine": true,
@@ -10,84 +10,77 @@
     }
   ],
   "show": {
-    "id": 6,
+    "id": 7,
     "writer": "mini",
-    "airs_at": "2026-11-15T17:00:00+00:00",
+    "airs_at": "2026-11-15T18:00:00+00:00",
     "segments": [
       {
         "kind": "gossip",
         "mood": "shocked",
-        "text": "Ich fasse es nicht, aber es stimmt. Sven_Small meldet: Sven Handel gegründet. Genieß es, nächste Woche lachen wir wieder über dich.",
+        "text": "Ich fasse es nicht, aber es stimmt. Stufe_Gross meldet: Level 30 erreicht. Ich bin fast stolz. Fast.",
         "effects": [],
-        "headline": "Na so was: Sven_Small"
+        "headline": "Na so was: Stufe_Gross"
       },
       {
         "kind": "hype",
         "mood": "laughing",
-        "text": "Unfassbar, aber wahr: Gero Werkstatt ist der Renner. Ein Video über die Firma hat heute das Internet geflutet. „Fahrräder reparieren“ geht weg wie warme Semmeln. Gero_Garage soll vor Freude geweint haben.",
-        "effects": [{ "tone": "gain", "label": "Bekanntheit +10,6 %" }],
-        "headline": "Alle wollen Gero Werkstatt"
+        "text": "Unfassbar, aber wahr: Sven Handel ist der Renner. Ein Kind hat im Schulaufsatz darüber geschrieben, die Klasse war begeistert. „Regionale Lebensmittel“ geht weg wie warme Semmeln. Sven_Small soll vor Freude geweint haben.",
+        "effects": [{ "tone": "gain", "label": "Bekanntheit +20,6 %" }],
+        "headline": "Alle wollen Sven Handel"
       },
       {
         "kind": "nft",
         "mood": "shocked",
-        "text": "Kunstmarkt, oder was man dafür hält: „Neon Nacht“ von Nina_Neon ging für 30.000 € an Ben_Bieter. Kunst ist, wenn einer zahlt. Glückwunsch an alle Beteiligten.",
+        "text": "Kunstmarkt, oder was man dafür hält: „Neon Nacht“ von Nina_Neon ging für 30.000 € an Ben_Bieter. Der Käufer nennt es eine Wertanlage, sein Bankberater nennt es einen Hilferuf.",
         "effects": [],
         "headline": "30.000 € für ein paar Pixel"
       },
       {
         "kind": "winner",
         "mood": "proud",
-        "text": "11389,2 % Plus, 1.138.921 € Gewinn: Fixture_Neu zeigt dem Rest, wie es geht. Ob das Können war oder pures Glück, klärt die Staatsanwaltschaft.",
+        "text": "11389,3 % Plus, 1.138.928 € Gewinn: Fixture_Neu zeigt dem Rest, wie es geht. Der Rest schaut zu und heult leise ins Depot.",
         "effects": [],
         "headline": "Fixture_Neu schwimmt im Geld"
       },
       {
         "kind": "gossip",
         "mood": "shocked",
-        "text": "Ich fasse es nicht, aber es stimmt. Acc_Bruno meldet: Level 30 erreicht. Ich hätte keinen Cent darauf gewettet, und ich wette auf alles.",
+        "text": "Bitte festhalten: Level 5 erreicht, und zwar bei Fritz_Gegenwind. Auch ein blindes Huhn findet mal ein Korn, aber immerhin.",
         "effects": [],
-        "headline": "Na so was: Acc_Bruno"
+        "headline": "Applaus für Fritz_Gegenwind"
       },
       {
         "kind": "scandal",
         "mood": "shocked",
-        "text": "Das Netz zerreißt Kurt Kurierdienst. Im Lager wurde ein Praktikant gefunden, der seit drei Wochen vermisst war. Er hatte niemandem gefehlt. Seitdem will niemand mehr „Pakete mit dem Rad“. Kurt_Kurier hat das Firmenhandy im Fluss versenkt.",
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −19,9 %" }],
-        "headline": "Shitstorm über Kurt Kurierdienst"
+        "text": "Stunden Werk wollte heute groß rauskommen. Auf dem Firmenparkplatz wurde ein illegales Bobbycar-Rennen ausgehoben. Hanna_Stunde erklärte, das gehöre zum Konzept. Die Kundschaft erklärte, sie sei dann mal weg.",
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −22,7 %" }],
+        "headline": "Stunden Werk blamiert sich bis auf die Knochen"
       },
       {
-        "kind": "ramble",
+        "kind": "sector",
         "mood": "crying",
-        "text": "Wo war ich? Egal. Mein Nachbar grillt seit drei Tagen dasselbe Würstchen. Ich bewundere seine Geduld. Zurück zu den Nachrichten, falls jemand weiß, wo sie liegen.",
-        "effects": [],
-        "headline": "Mr. Doodle Dangle schweift ab"
-      },
-      {
-        "kind": "tasks",
-        "mood": "proud",
-        "text": "Die Leute haben gemerkt, dass Sparen keinen Spaß macht. Offene Aufgaben bringen 33,3 % mehr. Wer jetzt Pause macht, ist selbst schuld.",
-        "effects": [{ "tone": "gain", "label": "Aufgaben +33,3 %" }],
-        "headline": "Kunden zahlen jeden Preis"
+        "text": "Die Branche Tech/Software sackt um 7,1 % ab. Jemand hat laut gefragt, wofür man das eigentlich braucht. Bis das geklärt ist, verkaufen erst mal alle.",
+        "effects": [{ "tone": "loss", "label": "Tech/Software −7,1 %" }],
+        "headline": "Tech/Software im freien Fall"
       },
       {
         "kind": "stock",
         "mood": "proud",
-        "text": "Im Keller wurde Öl gefunden, es war zwar Salatöl, aber die Stimmung ist prächtig. Die Börse feiert: Pfotenwohl steigt um 17 %. Wer nicht dabei ist, darf sich jetzt ärgern.",
-        "effects": [{ "tone": "gain", "label": "PFW +17 %" }],
-        "headline": "Kursrakete Pfotenwohl"
+        "text": "Orbitfracht legt 17 % zu. Die Mitarbeiter haben einen Tag lang wirklich gearbeitet, nur so zum Spaß. Analysten sind fassungslos.",
+        "effects": [{ "tone": "gain", "label": "OFR +17 %" }],
+        "headline": "Orbitfracht schießt nach oben"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Orbitfracht geht bald nach unten. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
-        "effects": [{ "tone": "neutral", "label": "OFR ↓ Tipp" }],
-        "headline": "Der heiße Draht: Orbitfracht"
+        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Kaufrausch Märkte geht bald nach oben. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
+        "effects": [{ "tone": "neutral", "label": "KFR ↑ Tipp" }],
+        "headline": "Der heiße Draht: Kaufrausch Märkte"
       }
     ],
-    "started_at": "2026-11-15T17:40:17.003121+00:00"
+    "started_at": "2026-11-15T18:02:48.703624+00:00"
   },
   "viewers": 5,
   "upcoming": null,
-  "next_airs_at": "2026-11-15T18:00:00+00:00"
+  "next_airs_at": "2026-11-15T19:00:00+00:00"
 }

@@ -1,6 +1,6 @@
 {
   "artwork": {
-    "id": "12b376b9-a0e0-4912-bd88-531c8bc02bdf",
+    "id": "a7732102-66aa-49a8-8e52-206bab0c6b35",
     "hot": 0.353549,
     "code": "NFT-0046",
     "liked": false,
@@ -51,7 +51,7 @@
     "creator": "Fixture_Neu",
     "ai_owner": null,
     "ask_cents": null,
-    "created_at": "2026-11-15T17:40:13.426779+00:00",
+    "created_at": "2026-11-15T18:02:45.775286+00:00",
     "royalty_bps": 1000,
     "value_cents": null,
     "royalties_cents": 0,

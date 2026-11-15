@@ -6,6 +6,7 @@ import { useState, type ReactNode } from "react";
 import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Avatar } from "@/components/ui/avatar";
+import { PlayerFigure } from "@/components/ui/player-figure";
 import { Badge } from "@/components/ui/badge";
 import { Button, type ButtonState } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -33,7 +34,7 @@ import { isDemoMode } from "@/lib/supabase/env";
 import { playSound } from "@/lib/sound";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
-import { useCompanyApplications, useCompanyPostings, useCompanyRefresh, useCompanyTeam } from "../hooks";
+import { useCompanyApplications, useCompanyPostings, useCompanyRefresh, useCompanyTeam, useFloorLooks } from "../hooks";
 
 type BranchKey = Parameters<ReturnType<typeof useTranslations<"skills.branches">>>[0];
 const TIERS = BALANCE.careers.tiers.map((t) => t.id) as CareerTier[];
@@ -867,6 +868,8 @@ function AiWorkerRow({ company, skill }: { company: MyCompany; skill: string | n
 }
 
 function MemberRow({ member, companyId, onFire }: { member: TeamMember; companyId: string; onFire: () => void }) {
+  // The dressed figure of the employee, as on the office floor (ADR-156).
+  const look = useFloorLooks().get(member.nickname);
   const tn = useTranslations("skills.nodes");
   const t = useTranslations("firm");
   const errorText = useGameErrorText();
@@ -886,7 +889,11 @@ function MemberRow({ member, companyId, onFire }: { member: TeamMember; companyI
   return (
     <Card padding="md" className="h-full">
       <div className="flex items-start gap-3">
-        <Avatar avatarKey={member.avatarKey} size="sm" />
+        {look ? (
+          <PlayerFigure avatarKey={look.avatarKey} accessories={look.accessories} scale={2} className="-my-1" />
+        ) : (
+          <Avatar avatarKey={member.avatarKey} size="sm" />
+        )}
         <div className="min-w-0 flex-1">
           <Link
             href={`/players/${encodeURIComponent(member.nickname)}`}

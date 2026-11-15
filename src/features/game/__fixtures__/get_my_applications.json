@@ -1,38 +1,38 @@
 {
   "applications": [
     {
-      "id": "fe62349c-5e58-4320-983a-393cc9f9d9e7",
+      "id": "924d5372-983c-45a6-9af5-e915ad82d67a",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "09cf82d0-ed5b-4aab-b87d-ffd3f29ab143",
+        "id": "0d0bb574-4a98-4056-8471-8e71ddb77436",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "7999d809-0066-66e2-e0ac-930c34a49626",
+          "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
           "logo": null,
-          "name": "Fundgrube Discount",
-          "color": "#C2C95B",
+          "name": "QuantenSprung Labs",
+          "color": "#35D0BA",
           "is_ai": true,
-          "sector": "retail",
-          "ticker": "FGD"
+          "sector": "tech",
+          "ticker": "QSL"
         },
-        "required": [{ "branch": "logistics", "min_score": 0 }],
-        "title_key": "logistics_intern",
+        "required": [{ "branch": "it", "min_score": 0 }],
+        "title_key": "it_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-15T17:40:12.593296+00:00",
-      "updated_at": "2026-11-15T17:40:12.596068+00:00",
-      "offer_expires_at": "2026-11-17T17:40:12.593296+00:00",
-      "salary_wish_cents_per_hour": 15000,
-      "offer_salary_cents_per_hour": 15000
+      "created_at": "2026-11-15T18:02:44.636165+00:00",
+      "updated_at": "2026-11-15T18:02:44.643591+00:00",
+      "offer_expires_at": "2026-11-17T18:02:44.636165+00:00",
+      "salary_wish_cents_per_hour": 15900,
+      "offer_salary_cents_per_hour": 15900
     },
     {
-      "id": "fdf89a09-0090-4f77-ab3d-4157286d87c1",
+      "id": "fca5d1e6-e5aa-437d-9ad8-f58161c4bd81",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "b75a83f8-4a4d-45b1-a986-da151e17677f",
+        "id": "7c7a1538-1d27-44d0-9e75-7a5bcf389dbf",
         "tier": "junior",
         "title": null,
         "company": {
@@ -48,9 +48,9 @@
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-15T17:40:12.589406+00:00",
-      "updated_at": "2026-11-15T17:40:12.589406+00:00",
-      "offer_expires_at": "2026-11-17T17:40:12.589406+00:00",
+      "created_at": "2026-11-15T18:02:44.630826+00:00",
+      "updated_at": "2026-11-15T18:02:44.630826+00:00",
+      "offer_expires_at": "2026-11-17T18:02:44.630826+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

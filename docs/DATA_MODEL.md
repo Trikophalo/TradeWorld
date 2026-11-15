@@ -7488,3 +7488,18 @@ Migration `20261204002800_accessories_pokes.sql`. Katalog in `game_config.access
 `mission_doable` und `mission_requirement_ok('accessory')` erweitert, Trigger `mission_feature_events` auf
 `player_accessories`, `player_accessories_worn`, `friend_pokes`, `news_show_messages`, `company_messages`.
 Test `supabase/tests/9r_missions_level_features.sql`.
+
+## Nachtrag: Das Büro mit Figuren und Sprechblasen (ADR-156)
+
+Migration `20261204003300_company_floor.sql`, keine neue Tabelle.
+
+- **RPC:** `get_company_floor()` → `{company: {name, color, kind: 'player'|'ai', logo} | null, chat, ai_workers,
+bubble_seconds, members: [{nickname, avatar_key, accessories, role: 'founder'|'employee', title, online, me,
+last_message: {body, at} | null}]}`. Spielerfirma (`chat_company_of`): Gründer zuerst, dann die aktiven Angestellten
+  nach Namen; `last_message` ist die neueste eigene Spielernachricht (`company_messages.kind = 'player'`) der letzten
+  `startups.chat.bubbleSeconds` (120). KI-Firma (aktiver Job): der Aufrufer und bis zu `startups.chat.floorMaxMembers`
+  (24) Mitspieler mit Job dort, online zuerst, `chat = false`, nie Blasen. Sonst `company = null`, `members = []`.
+  `online` wie bei `friends_json` (`social.onlineMinutes`). Keine IDs.
+- **Intern:** `company_floor_member_json(player, viewer, role, title, company, bubbles)` (nur `service_role`).
+- Geschrieben wird weiter über `post_company_message()`.
+- Test `supabase/tests/9p_company_floor.sql`.

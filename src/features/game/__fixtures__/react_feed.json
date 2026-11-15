@@ -1,12 +1,12 @@
 {
   "item": {
-    "id": 323,
+    "id": 329,
     "kind": "friends_now",
-    "actor": { "tag": "B2SR", "level": 15, "nickname": "Fixture_Neu", "avatar_key": "coder" },
+    "actor": { "tag": "AUJY", "level": 15, "nickname": "Fixture_Neu", "avatar_key": "coder" },
     "is_me": false,
     "payload": { "other_nickname": "Fixture_Gmbh" },
     "reacted": true,
     "reactions": 1,
-    "created_at": "2026-11-15T17:40:14.455034+00:00"
+    "created_at": "2026-11-15T18:02:46.583591+00:00"
   }
 }

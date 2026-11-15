@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "b94aa9ae-cbba-4594-a614-4342cc500399",
+    "id": "09c6258e-4399-4ce2-9964-5820e52b130d",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "7999d809-0066-66e2-e0ac-930c34a49626",
+      "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
       "logo": null,
-      "name": "Fundgrube Discount",
-      "color": "#C2C95B",
+      "name": "QuantenSprung Labs",
+      "color": "#35D0BA",
       "is_ai": true,
-      "sector": "retail",
-      "ticker": "FGD"
+      "sector": "tech",
+      "ticker": "QSL"
     },
     "presence": {
-      "fire_at": "2026-11-20T17:40:14.900157+00:00",
+      "fire_at": "2026-11-20T18:02:46.907516+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-15T17:40:14.900157+00:00"
+      "last_active_at": "2026-11-15T18:02:46.907516+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-15T17:40:14.986889+00:00",
+    "started_at": "2026-11-15T18:02:46.989203+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

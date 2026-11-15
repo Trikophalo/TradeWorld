@@ -3,6 +3,7 @@
 import { MiraChat } from "@/features/company/assistant/mira-chat";
 import { TaskBoard } from "@/features/company/tasks/task-board";
 import { AiOrgChart, OrgChart } from "@/features/company/components/org-chart";
+import { OfficeScene } from "@/features/company/components/office-scene";
 import { CompanyNewsCard, SituationCard } from "@/features/company/components/situation";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
@@ -64,6 +65,8 @@ export function JobView() {
     <div className="grid items-start gap-5 *:min-w-0 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-6">
       <div className="space-y-5">
         <WorkerCard job={job.data} />
+        {/* Everybody at the workplace as their dressed figure, with speech bubbles (ADR-156). */}
+        <OfficeScene />
         <ActiveJob job={job.data} />
         <CareerLadder job={job.data} />
         {employer.data?.kind === "player" ? (

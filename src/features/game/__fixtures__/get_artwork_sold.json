@@ -1,8 +1,8 @@
 {
-  "bids": [{ "at": "2026-11-15T17:40:13.498401+00:00", "nickname": "Fixture_Kunst", "amount_cents": 500000 }],
+  "bids": [{ "at": "2026-11-15T18:02:45.850862+00:00", "nickname": "Fixture_Kunst", "amount_cents": 500000 }],
   "sales": [
     {
-      "at": "2026-11-15T17:40:13.501255+00:00",
+      "at": "2026-11-15T18:02:45.854804+00:00",
       "kind": "auction",
       "buyer": "Fixture_Kunst",
       "seller": null,
@@ -10,7 +10,7 @@
       "royalty_cents": 0
     },
     {
-      "at": "2026-11-15T17:40:10.744531+00:00",
+      "at": "2026-11-15T18:02:42.534448+00:00",
       "kind": "ai",
       "buyer": "Vera Vermeer",
       "seller": null,
@@ -18,17 +18,17 @@
       "royalty_cents": 0
     },
     {
-      "at": "2026-11-15T17:40:09.02248+00:00",
+      "at": "2026-11-15T18:02:40.920751+00:00",
       "kind": "ai",
-      "buyer": "Konrad Kollektor",
+      "buyer": "Gräfin Glitzer",
       "seller": "Vera Vermeer",
-      "price_cents": 549800,
+      "price_cents": 507300,
       "royalty_cents": 0
     }
   ],
   "artwork": {
-    "id": "233be4ec-2758-4e1e-9069-17a718dd1a44",
-    "hot": 0.345493,
+    "id": "c781f8eb-daea-4a24-b386-76fdcb5e9b79",
+    "hot": 0.345339,
     "code": "NFT-0001",
     "liked": false,
     "likes": 0,
@@ -90,7 +90,7 @@
     "creator": null,
     "ai_owner": null,
     "ask_cents": null,
-    "created_at": "2026-11-15T17:38:21.950537+00:00",
+    "created_at": "2026-11-15T18:00:52.132499+00:00",
     "royalty_bps": 1000,
     "value_cents": 500000,
     "royalties_cents": 0,

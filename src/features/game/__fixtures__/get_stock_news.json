@@ -2,42 +2,42 @@
   "items": [
     {
       "id": 5,
-      "body": "Ein fehlerhaftes Produkt muss zurück in die Werkstatt. Das wird teuer. Sicher ist das nicht.",
-      "name": "QuantenSprung Labs",
-      "due_at": "2026-11-15T19:15:28.204784+00:00",
+      "body": "Eine wichtige Technologie ist jetzt geschützt. Der Vorsprung dürfte sich auszahlen. Sicher ist das nicht.",
+      "name": "GenoVita Biotech",
+      "due_at": "2026-11-15T19:16:18.866436+00:00",
       "status": "open",
-      "ticker": "QSL",
-      "headline": "Rückruf bei QuantenSprung Labs",
+      "ticker": "GNV",
+      "headline": "Patent für GenoVita Biotech erteilt",
       "move_bps": null,
-      "strength": 3,
-      "direction": "down",
-      "published_at": "2026-11-15T18:40:16.412416+00:00"
+      "strength": 1,
+      "direction": "up",
+      "published_at": "2026-11-15T19:02:48.246092+00:00"
     },
     {
       "id": 4,
-      "body": "Ein Vögelchen hat mir gezwitschert: Fundgrube Discount dürfte in der kommenden Stunde nach unten gehen. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
-      "name": "Fundgrube Discount",
-      "due_at": "2026-11-15T18:03:10.936112+00:00",
-      "status": "fizzled",
-      "ticker": "FGD",
-      "headline": "Vom Flurfunk: Fundgrube Discount",
-      "move_bps": null,
+      "body": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Frachtpilot geht bald nach unten. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
+      "name": "Frachtpilot",
+      "due_at": "2026-11-15T18:46:42.681821+00:00",
+      "status": "confirmed",
+      "ticker": "FPT",
+      "headline": "Der heiße Draht: Frachtpilot",
+      "move_bps": -1221,
       "strength": 2,
       "direction": "down",
-      "published_at": "2026-11-15T17:40:10.936112+00:00"
+      "published_at": "2026-11-15T18:02:42.681821+00:00"
     },
     {
       "id": 3,
-      "body": "Ein Vögelchen hat mir gezwitschert: Alpenmed dürfte in der kommenden Stunde nach unten gehen. Das Vögelchen lag bisher meistens richtig. Meistens.",
-      "name": "Alpenmed",
-      "due_at": "2026-11-15T17:40:10.117845+00:00",
-      "status": "confirmed",
-      "ticker": "ALM",
-      "headline": "Vom Flurfunk: Alpenmed",
-      "move_bps": -1227,
+      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Memeland Media tut sich in der nächsten Stunde etwas, und zwar nach oben. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
+      "name": "Memeland Media",
+      "due_at": "2026-11-15T18:02:41.929723+00:00",
+      "status": "fizzled",
+      "ticker": "MEM",
+      "headline": "Mr. Doodle Dangles Geheimtipp",
+      "move_bps": null,
       "strength": 2,
-      "direction": "down",
-      "published_at": "2026-11-15T17:40:10.117845+00:00"
+      "direction": "up",
+      "published_at": "2026-11-15T18:02:41.929723+00:00"
     }
   ],
   "reliability_bps": 7500

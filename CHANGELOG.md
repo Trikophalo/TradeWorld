@@ -113,6 +113,11 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Das Büro lebt (ADR-156):** Auf deiner Job-Seite und auf der Seite deiner Firma stehen jetzt alle Kollegen als ihre
+  angezogenen Spielfiguren am Schreibtisch, mit Namen. Wer gerade online ist, wippt, wer weg ist, schläft (zzz). Tipp
+  auf eine Figur für das Profil. Unter dem Büro schreibst du „Sag was ins Büro …“: Deine Worte stehen zwei Minuten als
+  Sprechblase über deiner Figur und landen im Firmenchat. Auch Organigramm und Teamliste zeigen die Figuren.
+
 - **Kleiderschrank und Freunde-Platz (ADR-155):** Deine Spielfigur steht jetzt in voller Größe da und lässt sich
   anziehen: 51 verrückte Accessoires vom Cowboyhut über Bananenkostüm, Haikostüm und Laseraugen bis zu Papagei,
   Jetpack und goldener Klobürste. Unter Profil → Kleiderschrank probierst du alles an und kaufst mit Spielgeld, von

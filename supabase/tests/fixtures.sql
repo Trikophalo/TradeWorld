@@ -298,6 +298,8 @@ select tests.login_as('authenticated', :p) is null as ok \gset
 select public.post_company_message(gen_random_uuid(), 'Willkommen an Bord.') is not null as ok \gset
 \o :fixture_dir/get_company_chat.json
 select public.get_company_chat();
+\o :fixture_dir/get_company_floor.json
+select public.get_company_floor();
 \o
 reset role;
 -- M3f: IPO with subscription and a capital increase (level 15, small business)
@@ -343,6 +345,8 @@ select public.get_my_portfolio();
 select tests.login_as('authenticated', :boss) is null as ok \gset
 \o :fixture_dir/get_company_chat_none.json
 select public.get_company_chat();
+\o :fixture_dir/get_company_floor_none.json
+select public.get_company_floor();
 \o
 reset role;
 

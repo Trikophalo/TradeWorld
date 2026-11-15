@@ -308,6 +308,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Kleiderschrank und Freunde-Platz",
         text: "Deine Spielfigur steht jetzt in voller Größe da und lässt sich anziehen: 51 verrückte Accessoires vom Cowboyhut über Bananenkostüm, Haikostüm und…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-8075d8e8",
+        title: "Das Büro lebt",
+        text: "Auf deiner Job-Seite und auf der Seite deiner Firma stehen jetzt alle Kollegen als ihre angezogenen Spielfiguren am Schreibtisch, mit Namen.",
+      },
     ],
   },
   {

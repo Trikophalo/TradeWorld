@@ -36,6 +36,7 @@ import { createArtEngine, type ArtState } from "./demo/artworks";
 import { createPropertyEngine, type HomeState } from "./demo/property";
 import { createFriendEngine, demoFriendCard, type DemoFriend, type DemoFriendCode } from "./demo/friends";
 import { createAccessoryEngine, type DemoWardrobe } from "./demo/accessories";
+import { demoCoworkerMembers, demoCoworkers, type DemoCoworker } from "./demo/floor";
 import { createStockNewsEngine } from "./demo/stock-news";
 import { createCompanyMovesEngine, type DemoMoveRun } from "./demo/company-moves";
 import { createCompanyTasksEngine, type DemoTasksState } from "./demo/company-tasks";
@@ -1298,6 +1299,13 @@ const friends = createFriendEngine({
   },
 });
 
+/** Made-up colleagues at the demo player's AI employer (ADR-156); none without a job or with an own company. */
+async function coworkersNow(): Promise<DemoCoworker[]> {
+  if (p().company) return [];
+  const job = await career.engine.myJob();
+  return job ? demoCoworkers(job.company.name, p().nickname) : [];
+}
+
 const wardrobe = createAccessoryEngine({
   state: () => p().wardrobe,
   setState: (value) => {
@@ -1635,11 +1643,66 @@ export const demoEngine: GameEngine = {
   ...home.engine,
   ...friends,
   ...wardrobe,
-  /** Own card with the worn accessories; the made-up friends have one too (ADR-155). */
+  /** Own card with the worn accessories; the made-up friends and colleagues have one too (ADR-155, ADR-156). */
   async playerCard(nickname) {
-    const friend = (p().friendList ?? []).find((f) => f.nickname.toLowerCase() === nickname.trim().toLowerCase());
+    const name = nickname.trim().toLowerCase();
+    const friend = (p().friendList ?? []).find((f) => f.nickname.toLowerCase() === name);
     if (friend) return demoFriendCard(friend);
+    const colleague = (await coworkersNow()).find((c) => c.nickname.toLowerCase() === name);
+    if (colleague) {
+      return demoFriendCard({
+        ...colleague,
+        tag: "D3M0",
+        level: 4,
+        since: new Date(Date.UTC(2026, 10, 1)).toISOString(),
+      });
+    }
     return { ...(await career.engine.playerCard(nickname)), accessories: wardrobe.worn() };
+  },
+  // The company floor (ADR-156): the own company with the own bubble, or the AI employer with made-up colleagues.
+  async companyFloor() {
+    const now = Date.now();
+    const bubbleSeconds = BALANCE.startups.chat.bubbleSeconds;
+    const own = {
+      nickname: p().nickname,
+      avatarKey: career.avatarKey(),
+      accessories: wardrobe.worn(),
+      online: true,
+      me: true,
+    };
+    const chat = await company.engine.companyChat();
+    const state = p().company;
+    if (chat.company && state) {
+      const mine = [...chat.messages]
+        .reverse()
+        .find((m) => m.kind === "player" && m.isMe && now - Date.parse(m.createdAt) < bubbleSeconds * 1000);
+      return {
+        company: { name: state.name, color: state.color, kind: "player" as const, logo: state.logo ?? null },
+        chat: true,
+        aiWorkers: state.aiWorkers,
+        bubbleSeconds,
+        members: [
+          {
+            ...own,
+            role: "founder" as const,
+            title: null,
+            lastMessage: mine ? { body: mine.body, at: mine.createdAt } : null,
+          },
+        ],
+      };
+    }
+    const job = await career.engine.myJob();
+    if (!job) return { company: null, chat: false, aiWorkers: 0, bubbleSeconds, members: [] };
+    return {
+      company: { name: job.company.name, color: job.company.color ?? null, kind: "ai" as const, logo: null },
+      chat: false,
+      aiWorkers: 0,
+      bubbleSeconds,
+      members: [
+        { ...own, role: "employee" as const, title: job.title, lastMessage: null },
+        ...demoCoworkerMembers(await coworkersNow(), now),
+      ],
+    };
   },
   ...social.engine,
   ...companyEvents.engine,

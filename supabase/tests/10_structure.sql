@@ -139,7 +139,9 @@ select tests.assert(
            -- NEXA Nachrichten (ADR-150)
            'get_news_show', 'post_news_show_message', 'news_show_claim_script',
            -- accessories and poking friends (ADR-155)
-           'get_accessories', 'buy_accessory', 'wear_accessory', 'poke_friend']
+           'get_accessories', 'buy_accessory', 'wear_accessory', 'poke_friend',
+           -- the company floor (ADR-156)
+           'get_company_floor']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')
