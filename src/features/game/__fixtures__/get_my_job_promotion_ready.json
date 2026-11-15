@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "5ca5e091-c432-4f83-983d-81c8e8a067b3",
+    "id": "0a9a58fa-bff2-45da-b7fb-a08bfe0fda5d",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
+      "id": "2faf9e4c-3f0a-8a5b-1645-c669e9481771",
       "logo": null,
-      "name": "Frachtpilot",
-      "color": "#9ECE6A",
+      "name": "NeuroPharm AG",
+      "color": "#6EE7A0",
       "is_ai": true,
-      "sector": "logistics",
-      "ticker": "FPT"
+      "sector": "pharma",
+      "ticker": "NPH"
     },
     "presence": {
-      "fire_at": "2026-11-20T11:12:03.77179+00:00",
+      "fire_at": "2026-11-20T11:58:22.215435+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-15T11:12:03.77179+00:00"
+      "last_active_at": "2026-11-15T11:58:22.215435+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-15T11:12:03.911209+00:00",
+    "started_at": "2026-11-15T11:58:22.369197+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

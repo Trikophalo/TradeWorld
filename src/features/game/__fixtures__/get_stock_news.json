@@ -2,42 +2,42 @@
   "items": [
     {
       "id": 5,
-      "body": "Alpenmed gewinnt einen Großkunden. Der Auftrag dürfte den Umsatz leicht anheben. Sicher ist das nicht.",
-      "name": "Alpenmed",
-      "due_at": "2026-11-15T12:43:04.804507+00:00",
+      "body": "Ein Gericht gibt dem Konkurrenten recht. Lizenzzahlungen drohen. Sicher ist das nicht.",
+      "name": "Knusperkönig",
+      "due_at": "2026-11-15T13:26:02.340404+00:00",
       "status": "open",
-      "ticker": "ALM",
-      "headline": "Rekordauftrag für Alpenmed",
+      "ticker": "SNK",
+      "headline": "Knusperkönig verliert Patentstreit",
       "move_bps": null,
       "strength": 1,
-      "direction": "up",
-      "published_at": "2026-11-15T12:12:05.561971+00:00"
+      "direction": "down",
+      "published_at": "2026-11-15T12:58:24.364872+00:00"
     },
     {
       "id": 4,
-      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei KlarSoft AG tut sich in der nächsten Stunde etwas, und zwar nach oben. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
-      "name": "KlarSoft AG",
-      "due_at": "2026-11-15T11:28:00.1495+00:00",
+      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Nordbrise Offshore tut sich in der nächsten Stunde etwas, und zwar nach oben. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
+      "name": "Nordbrise Offshore",
+      "due_at": "2026-11-15T12:30:17.595865+00:00",
       "status": "confirmed",
-      "ticker": "KLS",
+      "ticker": "WND",
       "headline": "Mr. Doodle Dangles Geheimtipp",
-      "move_bps": 893,
+      "move_bps": 839,
       "strength": 2,
       "direction": "up",
-      "published_at": "2026-11-15T11:12:00.1495+00:00"
+      "published_at": "2026-11-15T11:58:17.595865+00:00"
     },
     {
       "id": 3,
-      "body": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Volta Energie AG geht bald nach unten. Das Vögelchen lag bisher meistens richtig. Meistens.",
-      "name": "Volta Energie AG",
-      "due_at": "2026-11-15T11:11:59.102413+00:00",
+      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Luftpost Drohnen tut sich in der nächsten Stunde etwas, und zwar nach oben. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
+      "name": "Luftpost Drohnen",
+      "due_at": "2026-11-15T11:58:16.487224+00:00",
       "status": "confirmed",
-      "ticker": "VLT",
-      "headline": "Der heiße Draht: Volta Energie AG",
-      "move_bps": -806,
+      "ticker": "DRN",
+      "headline": "Mr. Doodle Dangles Geheimtipp",
+      "move_bps": 861,
       "strength": 2,
-      "direction": "down",
-      "published_at": "2026-11-15T11:11:59.102413+00:00"
+      "direction": "up",
+      "published_at": "2026-11-15T11:58:16.487224+00:00"
     }
   ],
   "reliability_bps": 7500

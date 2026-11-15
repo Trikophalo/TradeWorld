@@ -2454,3 +2454,14 @@ ihre Firmen, und mit echten, großen Folgen für Kurse, Firmen und Aufgaben.
 - **Mehr Aktien** gibt es nur über den Gründer: Kapitalerhöhung (ADR-067). Verkäufe geben Aktien wieder frei.
 - Gilt für alle Aktien (KI-Firmen haben 15 bis 100 Mio. Stück, dort spielt es praktisch keine Rolle), nicht für
   Anleihen und Krypto. Bestehende Depots über dem Bestand bleiben; sie sperren nur weitere Käufe, bis genug verkauft ist.
+
+## ADR-154: Missionen sind immer machbar — `akzeptiert`
+
+- `mission_doable(spieler, vorlage, metrik)` prüft, ob eine Mission noch zu schaffen ist: Einstellen und Stellen
+  ausschreiben nur mit freiem Platz in der eigenen Firma; „erste …“-Meilensteine (KI-Kraft, Stellenanzeige, Fähigkeit,
+  Geschäftszug, Trade, NFT, Anleihe) nur, wenn man es noch nie getan hat; Bleibe kaufen nur ohne Bleibe, umziehen nur
+  unter der höchsten Stufe, Auto nur mit freiem Garagenplatz, Möbel nur mit Bleibe.
+- `missions_assign` verteilt nur machbare Missionen. Aktive Schnell- und Meilenstein-Missionen ohne Fortschritt, die
+  unmöglich geworden sind, verfallen und machen Platz.
+- „Kauf dir ein Grundstück“ (`m_home_first`): einmalig, feste 2.500 Basis-XP (mit dem XP-Faktor 5.000), als erster
+  Meilenstein, sobald Grundstücke freigeschaltet sind.

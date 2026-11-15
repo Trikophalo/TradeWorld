@@ -1,6 +1,6 @@
 {
-  "mine": { "rank": 41, "value_cents": 54108 },
-  "total": 44,
+  "mine": { "rank": 42, "value_cents": 54108 },
+  "total": 45,
   "entries": [
     {
       "kind": "player",
@@ -14,24 +14,24 @@
       "founder": "Lars_Kursrutsch",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "0080e6fe-c34d-4dc9-a08f-31f2a06ed667",
+      "company_id": "6529d75c-6267-4178-bcd0-91318beebef3",
       "value_cents": 959140000,
       "revenue_cents": null
     },
     {
       "kind": "player",
       "logo": null,
-      "name": "Wackelwerk",
+      "name": "Talwerk",
       "rank": 2,
       "tier": "ag",
-      "color": "#336699",
+      "color": "#663399",
       "sector": "retail",
-      "ticker": "WAC",
-      "founder": "Esc_Frida",
+      "ticker": "TAL",
+      "founder": "Pop_Gero",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "686f9608-ed95-493f-8788-222069c229bf",
-      "value_cents": 111479852,
+      "company_id": "e0d07a50-1fd9-472f-836f-0fb9e54e97d8",
+      "value_cents": 119040000,
       "revenue_cents": null
     },
     {
@@ -46,7 +46,7 @@
       "founder": "Float_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "636a5961-f852-4716-93a2-1bff54046377",
+      "company_id": "696a6aa8-36fb-4c49-b45c-41dd525d8469",
       "value_cents": 110000000,
       "revenue_cents": null
     },
@@ -82,26 +82,26 @@
       "founder": "Fenja_Firma",
       "is_mine": false,
       "team_size": 6,
-      "company_id": "1d1916de-8ee0-4762-97bf-6e65975a3016",
-      "value_cents": 107412947,
+      "company_id": "b96b6526-6750-46e5-b4ec-b79a3adbdda6",
+      "value_cents": 106856846,
       "revenue_cents": 0
     },
     {
       "kind": "player",
       "logo": null,
-      "name": "Gipfelwerk",
+      "name": "Wackelwerk",
       "rank": 5,
       "tier": "ag",
       "color": "#336699",
       "sector": "retail",
-      "ticker": "GIP",
-      "founder": "Pop_Frida",
+      "ticker": "WAC",
+      "founder": "Esc_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "a159cfdf-a5c2-4886-9ff1-b7ff5335e46d",
-      "value_cents": 93270000,
+      "company_id": "6c213772-3254-487e-9260-e489eb133e69",
+      "value_cents": 105785504,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-15T11:12:01.847221+00:00"
+  "server_time": "2026-11-15T11:58:19.757448+00:00"
 }

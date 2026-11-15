@@ -1,27 +1,27 @@
 {
-  "id": "e97aae68-836b-4dd1-a699-ccf3fde3de02",
+  "id": "49b84ea8-e29f-42b8-9046-127bcf089934",
   "status": "offered",
   "message": "Ich lerne schnell.",
   "posting": {
-    "id": "66f4fc4e-922b-4102-aa9c-4944e294241b",
+    "id": "0f0027fe-f1de-49f0-a7ad-3e8e2c2e5724",
     "tier": "junior",
     "title": null,
     "company": {
-      "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
+      "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
       "logo": null,
-      "name": "KlarSoft AG",
-      "color": "#4C8DFF",
+      "name": "Frachtpilot",
+      "color": "#9ECE6A",
       "is_ai": true,
-      "sector": "tech",
-      "ticker": "KLS"
+      "sector": "logistics",
+      "ticker": "FPT"
     },
     "required": [{ "branch": "it", "min_score": 2 }],
     "title_key": "it_junior",
     "required_skills": []
   },
-  "created_at": "2026-11-15T11:12:01.253943+00:00",
-  "updated_at": "2026-11-15T11:12:01.253943+00:00",
-  "offer_expires_at": "2026-11-17T11:12:01.253943+00:00",
+  "created_at": "2026-11-15T11:58:19.093938+00:00",
+  "updated_at": "2026-11-15T11:58:19.093938+00:00",
+  "offer_expires_at": "2026-11-17T11:58:19.093938+00:00",
   "salary_wish_cents_per_hour": 32700,
   "offer_salary_cents_per_hour": 32700
 }

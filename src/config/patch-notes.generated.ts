@@ -129,6 +129,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Ein grüner Punkt zeigt, welcher Freund gerade spielt; online stehen sie oben in der Liste, und neben „Freunde“ in der Leiste steht, wie viele gerade da sind.",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-49f7a935",
+        title: "Missionen sind immer machbar",
+        text: "Du bekommst keine Mission mehr, die du nicht schaffen kannst, etwa „Stelle eine KI-Kraft ein“ bei voller Firma oder „Deine erste KI-Kraft“, wenn du schon eine hast. Eine solche Mission ohne Fortschritt macht Platz für eine neue. Neu: einmalig **„Kauf dir ein Grundstück“ für 5.000 XP**.",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-706f8ae2",
         title: "Mehr Verbesserungen",
         text: "22 neue Verbesserungen und zwei weitere Tresorstufen, in fünf Abschnitten. Mehr Geld (Tresorzinsen, Lohnbonus, Stammgast, Auftragsprofi, Dealmaker), mehr XP (Börsenprofi, Frühaufsteher, Missionsjäger, Teamplayer, Bilanzprofi, Ehrgeiz), ein größerer Tresor (Panzertresor) und vieles für die eigene Firma (KI-Turbo, Glückshand, Werbeagentur, Krisenmanager …). Sie schalten sich zwischen Level 1 und 30 frei.",

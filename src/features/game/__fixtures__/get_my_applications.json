@@ -1,12 +1,39 @@
 {
   "applications": [
     {
-      "id": "e39fb1c3-cec1-45ca-8c76-4ac6fb144372",
+      "id": "cf55e592-a1de-4a92-b64b-8572fea097b0",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "1cf983c9-35d1-48d2-ba3b-cd3367ea3d03",
+        "id": "4562dbe8-90b3-4d57-88d1-d68cca29ab75",
         "tier": "intern",
+        "title": null,
+        "company": {
+          "id": "2faf9e4c-3f0a-8a5b-1645-c669e9481771",
+          "logo": null,
+          "name": "NeuroPharm AG",
+          "color": "#6EE7A0",
+          "is_ai": true,
+          "sector": "pharma",
+          "ticker": "NPH"
+        },
+        "required": [{ "branch": "management", "min_score": 0 }],
+        "title_key": "management_intern",
+        "required_skills": []
+      },
+      "created_at": "2026-11-15T11:58:19.101019+00:00",
+      "updated_at": "2026-11-15T11:58:19.105299+00:00",
+      "offer_expires_at": "2026-11-17T11:58:19.101019+00:00",
+      "salary_wish_cents_per_hour": 15000,
+      "offer_salary_cents_per_hour": 15000
+    },
+    {
+      "id": "49b84ea8-e29f-42b8-9046-127bcf089934",
+      "status": "offered",
+      "message": "Ich lerne schnell.",
+      "posting": {
+        "id": "0f0027fe-f1de-49f0-a7ad-3e8e2c2e5724",
+        "tier": "junior",
         "title": null,
         "company": {
           "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
@@ -17,40 +44,13 @@
           "sector": "logistics",
           "ticker": "FPT"
         },
-        "required": [{ "branch": "craft", "min_score": 0 }],
-        "title_key": "craft_intern",
-        "required_skills": []
-      },
-      "created_at": "2026-11-15T11:12:01.260351+00:00",
-      "updated_at": "2026-11-15T11:12:01.264395+00:00",
-      "offer_expires_at": "2026-11-17T11:12:01.260351+00:00",
-      "salary_wish_cents_per_hour": 15000,
-      "offer_salary_cents_per_hour": 15000
-    },
-    {
-      "id": "e97aae68-836b-4dd1-a699-ccf3fde3de02",
-      "status": "offered",
-      "message": "Ich lerne schnell.",
-      "posting": {
-        "id": "66f4fc4e-922b-4102-aa9c-4944e294241b",
-        "tier": "junior",
-        "title": null,
-        "company": {
-          "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
-          "logo": null,
-          "name": "KlarSoft AG",
-          "color": "#4C8DFF",
-          "is_ai": true,
-          "sector": "tech",
-          "ticker": "KLS"
-        },
         "required": [{ "branch": "it", "min_score": 2 }],
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-15T11:12:01.253943+00:00",
-      "updated_at": "2026-11-15T11:12:01.253943+00:00",
-      "offer_expires_at": "2026-11-17T11:12:01.253943+00:00",
+      "created_at": "2026-11-15T11:58:19.093938+00:00",
+      "updated_at": "2026-11-15T11:58:19.093938+00:00",
+      "offer_expires_at": "2026-11-17T11:58:19.093938+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

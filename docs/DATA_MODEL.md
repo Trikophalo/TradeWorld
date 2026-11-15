@@ -7456,3 +7456,8 @@ Test `supabase/tests/9l_share_supply.sql`.
 `friends_json` liefert je Freund `online` (aktiv in den letzten `social.onlineMinutes`, Standard 10) und
 `last_active_at`, Online-Freunde zuerst; beendete Kampagnen zeigt `protests_state` nur noch
 `protests.visibleAfterMinutes` (60) lang.
+
+## Nachtrag: machbare Missionen (ADR-154)
+
+`20261204002700_missions_doable.sql`: `mission_doable(p_player, p_key, p_metric)`; `missions_assign` filtert damit und
+lässt unmögliche aktive Missionen ohne Fortschritt verfallen. Test `supabase/tests/9n_missions_doable.sql`.

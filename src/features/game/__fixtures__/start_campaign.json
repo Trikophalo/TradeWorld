@@ -1,9 +1,9 @@
 {
-  "id": "373f5237-ca4e-415b-a5c1-50a2f0eddce6",
+  "id": "7707b564-e6ae-45f0-8c66-abeb8dd6b89d",
   "kind": "flyer",
-  "ends_at": "2026-11-16T11:12:04.32308+00:00",
+  "ends_at": "2026-11-16T11:58:22.808392+00:00",
   "resonance": "solid",
   "cost_cents": 20000,
-  "demand_bps": 1460,
-  "started_at": "2026-11-15T11:12:04.32308+00:00"
+  "demand_bps": 1558,
+  "started_at": "2026-11-15T11:58:22.808392+00:00"
 }

@@ -1,14 +1,14 @@
 {
   "friends": [
     {
-      "tag": "GEK3",
+      "tag": "EWF8",
       "level": 8,
-      "since": "2026-11-15T11:12:03.358085+00:00",
+      "since": "2026-11-15T11:58:21.706851+00:00",
       "online": true,
       "nickname": "Fixture_Kunst",
-      "last_active_at": "2026-11-15T11:12:02.343918+00:00"
+      "last_active_at": "2026-11-15T11:58:20.381599+00:00"
     }
   ],
-  "incoming": [{ "at": "2026-11-15T11:12:03.361877+00:00", "tag": "UVDA", "level": 15, "nickname": "Fixture_Neu" }],
+  "incoming": [{ "at": "2026-11-15T11:58:21.710487+00:00", "tag": "TAHC", "level": 15, "nickname": "Fixture_Neu" }],
   "outgoing": []
 }
