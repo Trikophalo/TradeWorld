@@ -43,13 +43,15 @@ export function AudienceStage({ figures, hidden, bubbles, watching, live, classN
   const figureWidth = 24 * scale;
   const figureHeight = 32 * scale;
   const slots = figures.length + (hidden > 0 ? 1 : 0);
-  const spacing = Math.max(16, Math.min(figureWidth + 2 * scale, Math.floor((width - 2 * SIDE) / Math.max(1, slots))));
+  const spacing = Math.max(16, Math.min(figureWidth + 10 * scale, Math.floor((width - 2 * SIDE) / Math.max(1, slots))));
   const start = Math.round((width - slots * spacing) / 2);
   const centerOf = (i: number) => start + i * spacing + spacing / 2;
   const bubbleWidth = Math.min(scale === 3 ? 220 : 172, width - 2 * SIDE);
   const lanes = cfg.bubblesAtOnce;
   const top = lanes * LANE + 12;
-  const height = top + figureHeight + 22;
+  // name tags: when the figures stand close, every second tag drops a line so names stay readable
+  const crowded = spacing < 56;
+  const height = top + figureHeight + (crowded ? 40 : 26);
   const index = new Map(figures.map((f, i) => [f.nickname, i]));
 
   return (
@@ -118,14 +120,25 @@ export function AudienceStage({ figures, hidden, bubbles, watching, live, classN
                   title={f.nickname}
                   className="block"
                 />
-                <span aria-hidden className="absolute inset-x-0 top-full mt-0.5 flex justify-center">
-                  {f.me ? (
-                    <span className="rounded-xs bg-accent px-1 text-2xs leading-4 font-semibold text-on-accent">
-                      {t("audienceMe")}
-                    </span>
-                  ) : f.friend ? (
-                    <PixelIcon {...HEART} scale={1} className="block" />
-                  ) : null}
+                {/* the name tag under the figure; "Du" for me, a heart for friends */}
+                <span
+                  aria-hidden
+                  className="absolute top-full left-1/2 flex -translate-x-1/2 items-center justify-center gap-0.5"
+                  style={{
+                    width: crowded ? spacing * 2 - 4 : Math.max(figureWidth, spacing - 2),
+                    marginTop: crowded && i % 2 === 1 ? 16 : 2,
+                  }}
+                  data-testid="audience-name"
+                >
+                  {f.friend && !f.me && <PixelIcon {...HEART} scale={1} className="block shrink-0" />}
+                  <span
+                    className={cn(
+                      "min-w-0 truncate rounded-xs px-1 text-2xs leading-4 font-semibold",
+                      f.me ? "bg-accent text-on-accent" : "bg-surface-1/80 text-fg-1",
+                    )}
+                  >
+                    {f.me ? t("audienceMe") : f.nickname}
+                  </span>
                 </span>
               </motion.li>
             );

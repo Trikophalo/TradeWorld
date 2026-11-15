@@ -211,6 +211,7 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   Missionsjäger, Teamplayer, Bilanzprofi, Ehrgeiz), ein größerer Tresor (Panzertresor) und vieles für die eigene
   Firma (KI-Turbo, Glückshand, Werbeagentur, Krisenmanager …). Sie schalten sich zwischen Level 1 und 30 frei.
 
+- **Namen im Studio:** Unter jeder Figur im Studiopublikum der Nachrichten steht jetzt ihr Name.
 - **Schwerere Missionen, neue Missionen (ADR-159):** Tages- und Wochenmissionen werden mit dem Level anspruchsvoller
   (Level 10 etwa ×1,4, Level 30 etwa ×2,2). 19 neue Missionen rund um Kleiderschrank, Anstupsen, den Live-Chat der
   Nachrichten und den Büro-Chat, darunter „Ein legendäres Accessoire“.

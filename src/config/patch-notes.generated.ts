@@ -139,6 +139,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Tages- und Wochenmissionen werden mit dem Level anspruchsvoller (Level 10 etwa ×1,4, Level 30 etwa ×2,2).",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-267db88b",
+        title: "Namen im Studio",
+        text: "Unter jeder Figur im Studiopublikum der Nachrichten steht jetzt ihr Name.",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-706f8ae2",
         title: "Mehr Verbesserungen",
         text: "22 neue Verbesserungen und zwei weitere Tresorstufen, in fünf Abschnitten.",
