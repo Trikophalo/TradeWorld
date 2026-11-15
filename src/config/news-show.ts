@@ -44,6 +44,8 @@ export const NEWS_SHOW_RULES = {
     /** A bubble that waited longer than this is dropped (the chat still has the line). */
     bubbleMaxDelaySeconds: 12,
     /** A made-up viewer stands in the audience this long after their last line. */
+    /** The made-up chat viewers stand in the studio too (owner: no, only real players are on the stage). */
+    botsOnStage: false,
     botMinutes: 8,
     /** Accessories a made-up viewer wears at most (picked from the catalogue, seeded by the name). */
     botAccessoriesMax: 3,

@@ -10,7 +10,9 @@ import type { NewsShowAudienceMember, NewsShowChatMessage } from "@/features/gam
  * replaces the old one). Everything follows from the chat and the server clock, so every viewer sees the same.
  */
 
-export type AudienceRules = Record<keyof typeof BALANCE.newsShow.audience, number>;
+export type AudienceRules = Record<Exclude<keyof typeof BALANCE.newsShow.audience, "botsOnStage">, number> & {
+  botsOnStage: boolean;
+};
 
 const RULES: AudienceRules = BALANCE.newsShow.audience;
 
@@ -93,15 +95,15 @@ export function botFigure(
 }
 
 /**
- * Who stands on the stage: me, friends, the other players (as the server sends them), then the made-up viewers who
- * wrote within `botMinutes`, in the order they first spoke, so nobody jumps around. At most `max` figures.
+ * Who stands on the stage: me, friends, the other players (as the server sends them), then (only with `botsOnStage`)
+ * the made-up viewers who wrote within `botMinutes`, in the order they first spoke, so nobody jumps around. At most `max` figures.
  */
 export function stageAudience(
   audience: readonly NewsShowAudienceMember[],
   chat: readonly NewsShowChatMessage[],
   viewers: number,
   now: number,
-  rules: Pick<AudienceRules, "max" | "botMinutes" | "botAccessoriesMax"> = RULES,
+  rules: Pick<AudienceRules, "max" | "botMinutes" | "botAccessoriesMax" | "botsOnStage"> = RULES,
 ): Stage {
   const players: StageFigure[] = audience.map((a) => ({
     nickname: a.nickname,
@@ -116,7 +118,7 @@ export function stageAudience(
   const bots: StageFigure[] = [];
   for (const m of [...chat].sort((a, b) => Date.parse(a.at) - Date.parse(b.at) || a.id - b.id)) {
     const at = Date.parse(m.at);
-    if (!m.bot || taken.has(m.nickname) || at < since || at > now) continue;
+    if (!rules.botsOnStage || !m.bot || taken.has(m.nickname) || at < since || at > now) continue;
     taken.add(m.nickname);
     bots.push({ nickname: m.nickname, ...botFigure(m.nickname, rules), me: false, friend: false, bot: true });
   }

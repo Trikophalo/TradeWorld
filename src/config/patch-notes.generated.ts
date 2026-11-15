@@ -139,9 +139,9 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Tages- und Wochenmissionen werden mit dem Level anspruchsvoller (Level 10 etwa ×1,4, Level 30 etwa ×2,2).",
       },
       {
-        id: "startseite-waehrung-zur-wahl-freundescode-267db88b",
+        id: "startseite-waehrung-zur-wahl-freundescode-02c76cbd",
         title: "Namen im Studio",
-        text: "Unter jeder Figur im Studiopublikum der Nachrichten steht jetzt ihr Name.",
+        text: "Unter jeder Figur im Studiopublikum der Nachrichten steht jetzt ihr Name; im Studio sitzen nur echte Spieler, die erfundenen Zuschauer schreiben nur…",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-706f8ae2",

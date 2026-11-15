@@ -91,10 +91,9 @@ test("the studio audience: my figure, speech bubbles, and me on the TV in a stor
   const bubble = audience.locator('[data-testid="audience-bubble"][data-nickname="Zuschauerin"]');
   await expect(bubble).toContainText("Winke winke 👋");
 
-  // The made-up viewers come into the studio as they write
-  await expect(audience.locator('[data-testid="audience-figure"][data-bot="true"]').first()).toBeVisible({
-    timeout: 30_000,
-  });
+  // Only real players sit in the studio: the made-up viewers write in the chat, but never stand on the stage
+  await expect(page.getByTestId("news-show-chat").locator("li").nth(2)).toBeVisible({ timeout: 30_000 });
+  await expect(audience.locator('[data-testid="audience-figure"][data-bot="true"]')).toHaveCount(0);
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);

@@ -1,3 +1,4 @@
+import { BALANCE } from "@/config/balance";
 import { describe, expect, it } from "vitest";
 import { accessoryByKey } from "@/config/accessories";
 import type { NewsShowAudienceMember, NewsShowChatMessage } from "@/features/game/types";
@@ -11,6 +12,7 @@ const RULES: AudienceRules = {
   bubbleMaxDelaySeconds: 10,
   botMinutes: 8,
   botAccessoriesMax: 3,
+  botsOnStage: true,
 };
 
 let seq = 0;
@@ -80,6 +82,14 @@ describe("stageAudience", () => {
     ]);
     expect(stage.bots).toBe(2);
     expect(stage.hidden).toBe(0);
+  });
+
+  it("keeps the made-up viewers off the stage when botsOnStage is off (the default)", () => {
+    expect(BALANCE.newsShow.audience.botsOnStage).toBe(false);
+    const chat = [line("Horst", 1, true), line("Mila", 2, false)];
+    const stage = stageAudience([member("Mila", { me: true })], chat, 1, T0 + 60_000, { ...RULES, botsOnStage: false });
+    expect(stage.figures.map((f) => f.nickname)).toEqual(["Mila"]);
+    expect(stage.bots).toBe(0);
   });
 
   it("ignores lines from the future and caps the stage, counting the rest", () => {
