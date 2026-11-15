@@ -99,6 +99,10 @@ export class Lockstep {
       if (this.kind === "pump") {
         this.local += this.pendingTaps > 0 ? "1" : "0";
         if (this.pendingTaps > 0) this.pendingTaps -= 1;
+      } else if (this.kind === "laser" && this.pendingTaps > 0) {
+        // a jump: a tap shorter than a tick still gets one tick with the action
+        this.local += String((Number(this.held) % 5) + 5);
+        this.pendingTaps -= 1;
       } else this.local += this.held;
     }
   }

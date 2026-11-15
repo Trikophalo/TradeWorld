@@ -147,6 +147,8 @@ export function useBattleKeys(lockstep: Lockstep | null, onTap?: () => void) {
   }, [lockstep, onTap]);
   return {
     setTouch(dir: number, act: boolean) {
+      // a press of the touch action counts even when it is shorter than a tick (Laserschranke)
+      if (act && !touch.current.action) lockstep?.tap();
       touch.current = { dir, action: act };
       apply();
     },

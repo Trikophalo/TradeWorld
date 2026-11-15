@@ -154,8 +154,8 @@ export function RodeoGame({
     const wobble = dir > 0 && !hit ? BUCK[dir]! : BUCK[0]!;
     const k = big ? 1.6 : 1;
     // phones: a smaller star, and the others small once there are many
-    const figure = big ? (coarse ? 2 : 3) : coarse && others.length > 4 ? 1 : 2;
-    const bull = big ? (coarse ? 4 : 6) : coarse && others.length > 4 ? 2 : 3;
+    const figure = big ? (coarse ? 2 : 3) : coarse && others.length > 2 ? 1 : 2;
+    const bull = big ? (coarse ? 3 : 6) : coarse && others.length > 2 ? 2 : 3;
     return (
       <li
         key={slot}
@@ -178,7 +178,7 @@ export function RodeoGame({
           </div>
           <PixelIcon {...BULL} scale={bull} />
           <AnimatePresence>
-            {hit && (
+            {hit && big && (
               <motion.span
                 key={`hit-${view?.cue}`}
                 initial={{ y: 0, opacity: 0, scale: 0.6 }}
@@ -231,7 +231,7 @@ export function RodeoGame({
         className="relative isolate w-full shrink-0 overflow-hidden rounded-md border-2 border-line-2 bg-surface-1 shadow-2"
       >
         {/* the cue: a big arrow and the window running down */}
-        <div className="relative grid h-28 w-full place-items-center bg-spotlight">
+        <div className="relative grid h-16 w-full place-items-center bg-spotlight sm:h-28">
           <AnimatePresence mode="popLayout">
             {dir > 0 ? (
               <motion.div
@@ -243,7 +243,7 @@ export function RodeoGame({
                 data-testid="rodeo-cue"
               >
                 <div style={{ transform: `rotate(${TURN[dir]}deg)` }}>
-                  <PixelIcon {...CUE_ARROW} scale={5} title={t(`rodeo.${DIR_KEYS[dir - 1]!}`)} />
+                  <PixelIcon {...CUE_ARROW} scale={coarse ? 3 : 5} title={t(`rodeo.${DIR_KEYS[dir - 1]!}`)} />
                 </div>
               </motion.div>
             ) : (
@@ -281,7 +281,7 @@ export function RodeoGame({
           <div aria-hidden className="absolute inset-x-0 top-11 bottom-0 -z-10 bg-warn-soft" />
           {star && <ul className="flex justify-center pt-6 pb-2">{rider(star, true)}</ul>}
           <ul
-            className={cn("flex flex-wrap items-end justify-center gap-x-3 gap-y-3 px-2 pb-3", star ? "pt-1" : "pt-8")}
+            className={cn("flex flex-wrap items-end justify-center gap-x-3 gap-y-2 px-2 pb-2", star ? "pt-1" : "pt-8")}
           >
             {others.map((p) => rider(p, false))}
           </ul>
@@ -312,7 +312,7 @@ export function ArrowPad({ onChange, className }: { onChange: (dir: number) => v
       type="button"
       aria-label={t(DIR_KEYS[d - 1]!)}
       className={cn(
-        "grid size-16 touch-none place-items-center rounded-md border-2 shadow-2 focus-ring select-none",
+        "grid size-14 touch-none place-items-center rounded-md border-2 shadow-2 focus-ring select-none sm:size-16",
         "transition-transform duration-instant",
         held === d ? "scale-90 border-gold bg-warn-soft" : "border-line-2 bg-surface-2",
         area,

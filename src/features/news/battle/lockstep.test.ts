@@ -17,6 +17,23 @@ describe("Lockstep (client of ADR-160)", () => {
     expect(ls.chunk()).toEqual({ from: 0, data: "222888" });
   });
 
+  it("a tap shorter than a tick still jumps in Laserschranke", () => {
+    const ls = new Lockstep({
+      kind: "laser",
+      seed: 7,
+      n: 2,
+      mySlot: 0,
+      params: battleParamsFor("laser"),
+      startedAtMs: 10_000,
+    });
+    ls.setHeld(2, false);
+    ls.record(10_000 + 60);
+    // pressed and released between two frames
+    ls.tap();
+    ls.record(10_000 + 160);
+    expect(ls.chunk()).toEqual({ from: 0, data: "2272" });
+  });
+
   it("confirms only the server's final ticks and fills what is missing there with x", () => {
     const ls = make();
     ls.applySync(
