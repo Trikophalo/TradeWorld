@@ -1681,6 +1681,27 @@ export interface CompanyChat {
   messages: ChatMessage[];
 }
 
+/** A member on the company floor (ADR-156): figure, role, presence and the speech bubble, never an id. */
+export interface FloorMember {
+  nickname: string;
+  avatarKey: string;
+  accessories: string[];
+  role: "founder" | "employee";
+  title: string | null;
+  online: boolean;
+  me: boolean;
+  lastMessage: { body: string; at: string } | null;
+}
+
+/** The workplace of the caller as a pixel scene (ADR-156): a player company with chat or an AI company without. */
+export interface CompanyFloor {
+  company: { name: string; color: string | null; kind: "player" | "ai"; logo: CompanyLogoData | null } | null;
+  chat: boolean;
+  aiWorkers: number;
+  bubbleSeconds: number;
+  members: FloorMember[];
+}
+
 // ------------------------------------------------------------------ work tasks (ADR-059)
 
 export type WorkTask =
@@ -2125,6 +2146,8 @@ export interface GameEngine {
   closeCompany(requestId: string): Promise<CloseCompanyResult>;
   companyChat(beforeId?: number): Promise<CompanyChat>;
   postCompanyMessage(requestId: string, body: string): Promise<ChatMessage>;
+  /** Everybody at the caller's workplace as figures with speech bubbles (ADR-156). */
+  companyFloor(): Promise<CompanyFloor>;
   workTask(): Promise<{ task: WorkTask | null; nextTaskAt: string | null }>;
   submitWorkTask(requestId: string, taskId: string, choice: number): Promise<WorkTaskResult>;
   setCompanyMarketing(requestId: string, marketingCents: number): Promise<MyCompany>;
