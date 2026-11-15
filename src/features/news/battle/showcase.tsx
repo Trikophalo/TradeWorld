@@ -3,14 +3,18 @@
 import { useTranslations } from "next-intl";
 import { useEffect, useRef } from "react";
 import { BATTLE_ACCESSORIES } from "@/config/battle-accessories";
-import { BATTLE_KINDS, BATTLE_RULES, type TickKind } from "@/config/battles";
+import { BULL, CUE_ARROW, GAVEL } from "@/components/pixel/battle-art";
+import { PixelIcon } from "@/components/pixel/pixel-icon";
+import { BATTLE_KINDS, BATTLE_RULES } from "@/config/battles";
 import { PlayerFigure } from "@/components/ui/player-figure";
 import { battleParamsFor } from "@/features/game/demo/battles";
 import { initBattle, stepBattle, tickInputs } from "@/lib/sim/battle";
 import { botStream } from "@/lib/sim/battle/vectors";
 import { prefersReducedMotion } from "@/stores/settings";
 import { DoodleSays, GameIcon, Hearts, PrizeView } from "./parts";
-import { createArenaRenderer } from "./render/arena";
+import { createArenaRenderer, type ArenaKind } from "./render/arena";
+import { ArrowPad } from "./rodeo-game";
+import { Candles } from "./round-games-more";
 import { TouchPad } from "./touch-pad";
 
 const SAMPLE_PLAYERS = BATTLE_RULES.demoBots.slice(0, 5).map((b, slot) => ({
@@ -22,7 +26,7 @@ const SAMPLE_PLAYERS = BATTLE_RULES.demoBots.slice(0, 5).map((b, slot) => ({
 }));
 
 /** An arena running by itself with made-up players (the showcase on /dev/ui, ADR-160). */
-export function ArenaPreview({ kind, seed = 3 }: { kind: Exclude<TickKind, "pump">; seed?: number }) {
+export function ArenaPreview({ kind, seed = 3 }: { kind: ArenaKind; seed?: number }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const el = canvas.current;
@@ -84,14 +88,42 @@ export function BattleShowcase() {
           ))}
         </div>
       </div>
-      {(["floor", "bulls", "coins", "sumo", "potato"] as const).map((k) => (
-        <div key={k} className="space-y-2 rounded-lg border border-line-1 bg-surface-1 p-4">
-          <p className="label-pixel text-fg-3">
-            {t("showcase")}: {t(`games.${k}.name`)}
-          </p>
-          <ArenaPreview kind={k} />
+      {(["floor", "bulls", "coins", "sumo", "potato", "bear", "dash", "margin", "elevator", "laser"] as const).map(
+        (k) => (
+          <div key={k} className="space-y-2 rounded-lg border border-line-1 bg-surface-1 p-4">
+            <p className="label-pixel text-fg-3">
+              {t("showcase")}: {t(`games.${k}.name`)}
+            </p>
+            <ArenaPreview kind={k} />
+          </div>
+        ),
+      )}
+      <div className="space-y-3 rounded-lg border border-line-1 bg-surface-1 p-4">
+        <p className="label-pixel text-fg-3">
+          {t("showcase")}: {t("games.rodeo.name")}
+        </p>
+        <div className="flex flex-wrap items-end gap-4">
+          {SAMPLE_PLAYERS.slice(0, 3).map((p) => (
+            <div key={p.slot} className="flex flex-col items-center">
+              <div className="-mb-3">
+                <PlayerFigure avatarKey={p.avatarKey} accessories={p.accessories} scale={2} />
+              </div>
+              <PixelIcon {...BULL} scale={3} />
+            </div>
+          ))}
+          <PixelIcon {...CUE_ARROW} scale={5} />
         </div>
-      ))}
+        <ArrowPad onChange={() => undefined} className="w-fit" />
+      </div>
+      <div className="space-y-3 rounded-lg border border-line-1 bg-surface-1 p-4">
+        <p className="label-pixel text-fg-3">
+          {t("showcase")}: {t("games.higher.name")} · {t("games.auction.name")}
+        </p>
+        <div className="rounded-md bg-surface-2 p-2">
+          <Candles chart={[100, 102, 101, 104, 107, 106, 109, 113, 111, 115]} next={118} className="h-32 w-full" />
+        </div>
+        <PixelIcon {...GAVEL} scale={3} />
+      </div>
       <div className="space-y-2 rounded-lg border border-line-1 bg-surface-1 p-4">
         <p className="label-pixel text-fg-3">{t("showcase")}: Touch</p>
         <TouchPad onChange={() => undefined} action={t("controls.actionButton")} />

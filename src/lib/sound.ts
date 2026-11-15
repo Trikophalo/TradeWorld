@@ -111,6 +111,18 @@ export const SOUNDS = {
   battleBust: { src: ["/sounds/battle-bust.wav"], volume: 0.45, minIntervalMs: 400 },
   battleFanfare: { src: ["/sounds/battle-fanfare.wav"], volume: 0.45, minIntervalMs: 2000 },
   battleJoin: { src: ["/sounds/battle-join.wav"], volume: 0.35, minIntervalMs: 300 },
+  /** The games of the addendum to ADR-160. */
+  battleRoar: { src: ["/sounds/battle-roar.wav"], volume: 0.5, minIntervalMs: 600 },
+  battleChomp: { src: ["/sounds/battle-chomp.wav"], volume: 0.5, minIntervalMs: 250 },
+  battleGong: { src: ["/sounds/battle-gong.wav"], volume: 0.55, minIntervalMs: 600 },
+  battleZap: { src: ["/sounds/battle-zap.wav"], volume: 0.45, minIntervalMs: 120, rateJitter: 0.08 },
+  battleJump: { src: ["/sounds/battle-jump.wav"], volume: 0.3, minIntervalMs: 80, rateJitter: 0.1 },
+  battleLaser: { src: ["/sounds/battle-laser.wav"], volume: 0.25, minIntervalMs: 200, rateJitter: 0.06 },
+  battleWhoosh: { src: ["/sounds/battle-whoosh.wav"], volume: 0.3, minIntervalMs: 150, rateJitter: 0.1 },
+  battleBuck: { src: ["/sounds/battle-buck.wav"], volume: 0.4, minIntervalMs: 200, rateJitter: 0.08 },
+  battleClick: { src: ["/sounds/battle-click.wav"], volume: 0.3, minIntervalMs: 40, rateJitter: 0.1 },
+  battleUnlock: { src: ["/sounds/battle-unlock.wav"], volume: 0.5, minIntervalMs: 500 },
+  battleGavel: { src: ["/sounds/battle-gavel.wav"], volume: 0.55, minIntervalMs: 500 },
 } as const satisfies Record<string, SoundSpec>;
 
 /** Length of the news jingle as rendered by `scripts/gen-sounds.ts` (seven bars of four at 140 BPM). */

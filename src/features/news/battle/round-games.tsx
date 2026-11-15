@@ -35,19 +35,19 @@ export function useServerNow(offsetMs: number): number | null {
 }
 
 /** The round on screen: the last one that opened. */
-function currentRound(battle: Battle, now: number): BattleRound | null {
+export function currentRound(battle: Battle, now: number): BattleRound | null {
   const list = battle.rounds?.list ?? [];
   for (let i = list.length - 1; i >= 0; i--) if (Date.parse(list[i]!.opensAt) <= now) return list[i]!;
   return null;
 }
 
-interface RoundProps {
+export interface RoundProps {
   battle: Battle;
   offsetMs: number;
   onState: (state: BattleState) => void;
 }
 
-function useAnswer(battle: Battle, onState: (s: BattleState) => void) {
+export function useAnswer(battle: Battle, onState: (s: BattleState) => void) {
   const errorText = useGameErrorText();
   const [state, setState] = useState<ButtonState>("idle");
   return {
@@ -92,7 +92,7 @@ export function PlayerStrip({ battle, points = true }: { battle: Battle; points?
                 {p.me ? t("you") : p.nickname}
               </span>
               <span className="flex items-center gap-1.5">
-                {battle.kind !== "estimate" && (
+                {(battle.kind === "quiz" || battle.kind === "bell" || battle.kind === "higher") && (
                   <Hearts count={rounds?.hearts[slot] ?? maxHearts} max={maxHearts} scale={1} />
                 )}
                 {points && <span className="nums text-2xs text-fg-3">{rounds?.points[slot] ?? 0}</span>}
@@ -105,7 +105,7 @@ export function PlayerStrip({ battle, points = true }: { battle: Battle; points?
   );
 }
 
-function Timer({ from, to, now }: { from: number; to: number; now: number }) {
+export function Timer({ from, to, now }: { from: number; to: number; now: number }) {
   const share = Math.max(0, Math.min(1, (to - now) / Math.max(1, to - from)));
   return (
     <div className="h-2 w-full overflow-hidden rounded-pill bg-surface-2" aria-hidden>
@@ -513,7 +513,7 @@ export function BellGame({ battle, offsetMs, onState }: RoundProps) {
   );
 }
 
-function Waiting() {
+export function Waiting() {
   const t = useTranslations("battle");
   return <p className="py-10 text-center font-pixel text-fg-2">{t("intro.ready")}</p>;
 }

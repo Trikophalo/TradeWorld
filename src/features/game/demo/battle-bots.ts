@@ -1,6 +1,12 @@
 import type { TickKind } from "@/config/battles";
+import type { BearState } from "@/lib/sim/battle/bear";
 import { bullAt, bullLength, type BullsState } from "@/lib/sim/battle/bulls";
 import { BEAR, type CoinsState } from "@/lib/sim/battle/coins";
+import type { DashState } from "@/lib/sim/battle/dash";
+import { elevatorSolid, type ElevatorState } from "@/lib/sim/battle/elevator";
+import { laserLength, type LaserState } from "@/lib/sim/battle/laser";
+import type { MarginState } from "@/lib/sim/battle/margin";
+import { RODEO_NONE, type RodeoState } from "@/lib/sim/battle/rodeo";
 import { DX, DY, inBounds, playerAt, type GridBase } from "@/lib/sim/battle/core";
 import { floorGone, type FloorState } from "@/lib/sim/battle/floor";
 import type { AnyBattleState, SimParams } from "@/lib/sim/battle";
@@ -218,6 +224,153 @@ function pumpBot(s: PumpState, _i: number, m: BotMemory, _params: Params, random
   return random() < rate ? 1 : 0;
 }
 
+// ------------------------------------------------------------------ the games of the addendum to ADR-160
+
+/** Bärenjagd: keep away from the bears, but not into a corner; slow thumbs react later. */
+function bearBot(s: BearState, i: number, m: BotMemory, _params: Params, random: () => number): number {
+  const x = s.p.x[i]!;
+  const y = s.p.y[i]!;
+  const ok = (a: number, b: number) => inBounds(s.w, s.h, a, b) && !s.wall[b * s.w + a] && playerAt(s.p, a, b) < 0;
+  if (s.bears === 0) return random() < 0.06 ? randomDir(s, i, ok, random) : 0;
+  const danger = (a: number, b: number) => {
+    let d = 99;
+    for (let k = 0; k < s.bears; k++) d = Math.min(d, dist(a, b, s.bx[k]!, s.by[k]!));
+    return d;
+  };
+  const here = danger(x, y);
+  if (here > 3 + Math.round(m.skill * 3) && random() < 0.85) return random() < 0.04 ? randomDir(s, i, ok, random) : 0;
+  if (s.tick < m.wakeAt) return m.dir;
+  m.wakeAt = s.tick + Math.round((1 - m.skill) * 8);
+  const room = (a: number, b: number) => [1, 2, 3, 4].filter((d) => ok(a + DX[d]!, b + DY[d]!)).length;
+  const options = [1, 2, 3, 4].filter((d) => ok(x + DX[d]!, y + DY[d]!));
+  options.sort((a, b) => {
+    const score = (d: number) =>
+      danger(x + DX[d]!, y + DY[d]!) * 2 + room(x + DX[d]!, y + DY[d]!) * m.skill + random() * (1.6 - m.skill) * 2;
+    return score(b) - score(a);
+  });
+  return options[0] ?? 0;
+}
+
+/** Dividenden-Dash: run for the closest coin; tackle whoever is in the way now and then. */
+function dashBot(s: DashState, i: number, m: BotMemory, params: Params, random: () => number): number {
+  const x = s.p.x[i]!;
+  const y = s.p.y[i]!;
+  const t = s.tick;
+  if (t < m.wakeAt) return m.dir;
+  m.wakeAt = t + Math.round((1 - m.skill) * 5 * random());
+  let best = -1;
+  let bestScore = 0;
+  for (let c = 0; c < s.ct.length; c++) {
+    if (s.ct[c]! < 0 || s.ca[c]! - t > 12) continue;
+    const d = dist(x, y, s.ct[c]! % s.w, Math.floor(s.ct[c]! / s.w)) + random() * (1 - m.skill) * 6;
+    if (best < 0 || d < bestScore) {
+      best = c;
+      bestScore = d;
+    }
+  }
+  if (best < 0) return random() < 0.05 ? randomDir(s, i, (a, b) => inBounds(s.w, s.h, a, b), random) : 0;
+  const tx = s.ct[best]! % s.w;
+  const ty = Math.floor(s.ct[best]! / s.w);
+  const free = (a: number, b: number) => inBounds(s.w, s.h, a, b) && playerAt(s.p, a, b) < 0;
+  const d = towards(s, i, tx, ty, free);
+  if (d) return d;
+  // somebody is in the way: tackle them (when rested), else round them
+  const step = towards(s, i, tx, ty, (a, b) => inBounds(s.w, s.h, a, b));
+  const cool = num(params, "tackleCool", 40);
+  if (step && s.cool[i] === 0 && random() < 0.3 + m.skill * 0.5 && cool > 0) return step + 5;
+  return randomDir(s, i, free, random);
+}
+
+/** Margin Call: when the tiles light up, run to the closest free one (after a moment of shock). */
+function marginBot(s: MarginState, i: number, m: BotMemory, _params: Params, random: () => number): number {
+  const x = s.p.x[i]!;
+  const y = s.p.y[i]!;
+  const t = s.tick;
+  if (s.call < 0) return random() < 0.04 ? randomDir(s, i, (a, b) => inBounds(s.w, s.h, a, b), random) : 0;
+  if (t < s.shown + Math.round(4 + (1 - m.skill) * 22)) return 0;
+  if (s.safe[y * s.w + x] === 1) return 0;
+  let best = -1;
+  let bestD = 99;
+  for (let tile = 0; tile < s.safe.length; tile++) {
+    if (s.safe[tile] !== 1) continue;
+    const tx = tile % s.w;
+    const ty = Math.floor(tile / s.w);
+    const other = playerAt(s.p, tx, ty);
+    if (other >= 0 && other !== i) continue;
+    const d = dist(x, y, tx, ty) + random() * (1 - m.skill) * 4;
+    if (d < bestD) {
+      best = tile;
+      bestD = d;
+    }
+  }
+  if (best < 0) return 0;
+  return (
+    towards(s, i, best % s.w, Math.floor(best / s.w), (a, b) => inBounds(s.w, s.h, a, b) && playerAt(s.p, a, b) < 0) ||
+    randomDir(s, i, (a, b) => inBounds(s.w, s.h, a, b) && playerAt(s.p, a, b) < 0, random)
+  );
+}
+
+/** Fahrstuhl zum Mond: up where it is free, else sideways to the closest gap of the bar above. */
+function elevatorBot(s: ElevatorState, i: number, m: BotMemory, _params: Params, random: () => number): number {
+  const x = s.p.x[i]!;
+  const y = s.p.y[i]!;
+  if (random() < (1 - m.skill) * 0.25) return 0;
+  const ok = (a: number, b: number) =>
+    a >= 0 && a < s.w && b <= s.h - 1 && b >= -s.cam && !elevatorSolid(s, a, b) && playerAt(s.p, a, b) < 0;
+  // no hurry while far above the bottom edge
+  const margin = s.h - 1 - s.cam - y;
+  if (margin > 5 + m.skill * 2 && random() < 0.5) return 0;
+  if (ok(x, y - 1)) return 1;
+  let best = -1;
+  for (let a = 0; a < s.w; a++)
+    if (!elevatorSolid(s, a, y - 1) && (best < 0 || Math.abs(a - x) < Math.abs(best - x))) best = a;
+  if (best < 0) return 0;
+  const d = best > x ? 2 : best < x ? 4 : 0;
+  return d && ok(x + DX[d]!, y) ? d : randomDir(s, i, ok, random);
+}
+
+/** Laserschranke: jump a few ticks before a beam reaches the own tile (skill decides how exactly). */
+function laserJump(s: LaserState, i: number, m: BotMemory, params: Params, random: () => number): boolean {
+  if (s.air[i]! > 0 || s.jcool[i]! > 0) return false;
+  const tpt = num(params, "ticksPerTile", 2);
+  const t = s.tick;
+  for (let k = s.first; k < s.lasers.length; k++) {
+    const l = s.lasers[k]!;
+    const len = laserLength(s, l);
+    const across = l.line === 0 ? s.p.y[i]! : s.p.x[i]!;
+    const along = l.line === 0 ? s.p.x[i]! : s.p.y[i]!;
+    if (along === l.gap) continue;
+    const step = l.dir > 0 ? across : len - 1 - across;
+    const hit = l.t0 + step * tpt;
+    if (m.wakeAt !== hit) {
+      // plan once per beam: how many ticks early this rider jumps
+      if (hit - t > 12 || hit < t) continue;
+      m.wakeAt = hit;
+      m.dir = Math.round(3 + (random() - 0.5) * (1 - m.skill) * 8);
+    }
+    if (hit - t === Math.max(0, m.dir)) return true;
+  }
+  return false;
+}
+
+function laserBot(s: LaserState, i: number, m: BotMemory, _params: Params, random: () => number): number {
+  // walk to a gap now and then, else stand
+  return random() < 0.03 ? randomDir(s, i, (a, b) => inBounds(s.w, s.h, a, b) && playerAt(s.p, a, b) < 0, random) : 0;
+}
+
+/** Bullen-Rodeo: press the cued direction after a reaction time; sometimes the wrong one. */
+function rodeoBot(s: RodeoState, i: number, m: BotMemory, _params: Params, random: () => number): number {
+  if (s.cueStart < 0) {
+    m.wakeAt = -1;
+    return 0;
+  }
+  if (s.resp[i] !== RODEO_NONE) return 0;
+  if (m.wakeAt < 0) m.wakeAt = s.cueStart + Math.round(5 + (1 - m.skill) * 9 + random() * 7);
+  if (s.tick < m.wakeAt) return 0;
+  if (random() < 0.06 + (1 - m.skill) * 0.1) return 1 + ((s.cueDir + Math.floor(random() * 3)) % 4);
+  return s.cueDir;
+}
+
 /** The input character of a bot for the tick the state is at. */
 export function botInput(
   kind: TickKind,
@@ -228,8 +381,13 @@ export function botInput(
   random: () => number,
 ): string {
   if (state.p.out[slot]! >= 0) return "0";
+  if (kind === "rodeo") return String(rodeoBot(state as RodeoState, slot, memory, params, random));
+  // a jump over a laser beam comes whatever the legs do
+  if (kind === "laser" && laserJump(state as LaserState, slot, memory, params, random))
+    return String((state.p.mv[slot]! > 1 ? 0 : laserBot(state as LaserState, slot, memory, params, random)) + 5);
   // A step (or stun) that ends this tick lets the bot act now: decide afresh instead of repeating the last direction.
-  if (kind !== "pump" && (state.p.mv[slot]! > 1 || state.p.stun[slot]! > 1)) return String(memory.dir || 0);
+  if (kind !== "pump" && (state.p.mv[slot]! > 1 || state.p.stun[slot]! > 1))
+    return String(kind === "laser" ? 0 : memory.dir || 0);
   let code = 0;
   switch (kind) {
     case "floor":
@@ -250,7 +408,23 @@ export function botInput(
     case "pump":
       code = pumpBot(state as PumpState, slot, memory, params, random);
       break;
+    case "bear":
+      code = bearBot(state as BearState, slot, memory, params, random);
+      break;
+    case "dash":
+      code = dashBot(state as DashState, slot, memory, params, random);
+      break;
+    case "margin":
+      code = marginBot(state as MarginState, slot, memory, params, random);
+      break;
+    case "elevator":
+      code = elevatorBot(state as ElevatorState, slot, memory, params, random);
+      break;
+    case "laser":
+      code = laserBot(state as LaserState, slot, memory, params, random);
+      break;
   }
-  if (kind !== "pump") memory.dir = code % 5;
+  // (Laserschranke keeps its jump plan in memory.dir)
+  if (kind !== "pump" && kind !== "laser") memory.dir = code % 5;
   return String(code);
 }

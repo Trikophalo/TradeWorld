@@ -49,6 +49,29 @@ export const ARENA = {
   toxicDark: "#2f9a3a",
   spark: "#ffb02e",
   smoke: "#8a90a6",
+  // the games of the addendum to ADR-160
+  marble: "#3b4566",
+  marbleDark: "#333c5a",
+  marbleVein: "#4a557a",
+  bank: "#25443a",
+  bankDark: "#1f3a31",
+  bankLine: "#356150",
+  lossFloor: "#3a1f2c",
+  lossFloorDark: "#311a26",
+  lossLine: "#4d2838",
+  safe: "#2fd98c",
+  safeDark: "#1b8c5a",
+  safeGlow: "#b8ffd9",
+  sky: "#16224a",
+  skyHigh: "#0b0f24",
+  star: "#e8ecff",
+  chartGrid: "#26305a",
+  labFloor: "#121a33",
+  labFloorDark: "#0f162c",
+  labGrid: "#1f3a5c",
+  beam: "#ff2a4a",
+  beamGlow: "#ff7a8c",
+  beamCore: "#fff0f2",
 } as const;
 
 export const BULL: PixelArt = {
@@ -255,6 +278,45 @@ export const DEN: PixelArt = {
 export const EMITTER: PixelArt = {
   palette: { k: "#151722", s: "#6b7390", S: "#9aa3bf", r: "#ff4d5e", w: "#ffd0d6" },
   grid: ["kkkkk...", "kSSSkk..", "kSssrrk.", "kSsrwwrk", "kSsrwwrk", "kSssrrk.", "kSSSkk..", "kkkkk..."],
+};
+
+/** The big arrow of Bullen-Rodeo (points up; turned in whole quarter turns for the other directions). */
+export const CUE_ARROW: PixelArt = {
+  palette: { y: "#ffd84a", Y: "#c9971a", w: "#fff6c8", k: "#3a2a10" },
+  grid: [
+    "......kk......",
+    ".....kwyk.....",
+    "....kwyyYk....",
+    "...kwyyyyYk...",
+    "..kwyyyyyyYk..",
+    ".kwyyyyyyyyYk.",
+    "kkkkkyyyYkkkkk",
+    "....kwyyYk....",
+    "....kwyyYk....",
+    "....kwyyYk....",
+    "....kwyyYk....",
+    "....kwyyYk....",
+    "....kYYYYk....",
+    "....kkkkkk....",
+  ],
+};
+
+/** A piece of the rodeo fence (tiles side by side). */
+export const FENCE: PixelArt = {
+  palette: { w: "#c48a5a", W: "#a8724c", k: "#6e4429" },
+  grid: [
+    ".kk.....",
+    "kwWk....",
+    "kwWkkkkk",
+    "kwWwwwwW",
+    "kwWkkkkk",
+    "kwWk....",
+    "kwWkkkkk",
+    "kwWwwwwW",
+    "kwWkkkkk",
+    "kwWk....",
+    "kkkk....",
+  ],
 };
 
 /** The gavel of Wer bietet mehr?. */
@@ -546,10 +608,10 @@ export const BATTLE_ICONS: Readonly<Record<BattleKind, PixelArt>> = {
   elevator: {
     palette: { r: "#ff4d5e", w: "#eef0f6", b: "#4f8cff", o: "#ffb02e", y: "#ffd84a", g: "#2fd98c" },
     grid: [
-      "............yy..",
-      "...........yyyy.",
-      "...........yyyy.",
-      "............yy..",
+      "...........yyy..",
+      "..........yy....",
+      "..........yy....",
+      "...........yyy..",
       "......rr........",
       ".....rwwr.......",
       ".....wbbw.......",
