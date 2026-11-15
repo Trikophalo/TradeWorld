@@ -44,6 +44,8 @@ function pollMs(data: BattleState | undefined, stage: boolean): number {
  * News battles (ADR-160) on the news page: the lobby under the TV with the joined players as their dressed figures,
  * the prize and the countdown; the battle itself opens on the whole screen.
  */
+const hourTime = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" });
+
 export function NewsBattle() {
   const t = useTranslations("battle");
   const client = useQueryClient();
@@ -114,7 +116,22 @@ export function NewsBattle() {
           <RunningBanner battle={battle} onWatch={() => setWatch(battle.id)} />
         ) : battle ? (
           <Lobby battle={battle} now={data.now} offset={offset} action={action} onJoin={join} onLeave={leave} />
-        ) : null}
+        ) : (
+          <div className="space-y-1 px-4 py-5 text-center" data-testid="battle-hour-done">
+            <p className="font-semibold text-fg-1">{t("hourDone", { count: data.perHour })}</p>
+            <p className="text-sm text-pretty text-fg-3">
+              {t("nextRound", { time: hourTime.format(new Date(data.nextRoundAt)) })}
+            </p>
+          </div>
+        )}
+        {battle && (
+          <p className="border-t border-line-1 px-4 py-2 text-2xs text-fg-3" data-testid="battle-of-hour">
+            {t("roundOfHour", {
+              round: Math.min(data.perHour, data.playedThisHour + (battle.status === "open" ? 1 : 0)),
+              count: data.perHour,
+            })}
+          </p>
+        )}
         {recent?.result && battle?.status !== "running" && (
           <p className="border-t border-line-1 px-4 py-2 text-2xs text-fg-3" data-testid="battle-last-winner">
             {t("lastWinner", {

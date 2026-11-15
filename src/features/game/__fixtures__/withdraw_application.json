@@ -1,27 +1,27 @@
 {
-  "id": "902075ba-4cf8-4736-bbde-17c54ee7ea00",
+  "id": "e2b6976c-d311-43e9-ab76-7da3b2c7738d",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "27c7e7ae-7c08-4ed5-ba41-701af2fdaed1",
+    "id": "1bcc19d7-2a4b-4cb1-a1d8-6253abce6fe7",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "d21331b8-a414-66aa-de07-f036108fc91d",
+      "id": "7999d809-0066-66e2-e0ac-930c34a49626",
       "logo": null,
-      "name": "Nordlicht Logistik AG",
-      "color": "#7AA2F7",
+      "name": "Fundgrube Discount",
+      "color": "#C2C95B",
       "is_ai": true,
-      "sector": "logistics",
-      "ticker": "NDL"
+      "sector": "retail",
+      "ticker": "FGD"
     },
-    "required": [{ "branch": "it", "min_score": 0 }],
-    "title_key": "it_intern",
+    "required": [{ "branch": "sales", "min_score": 0 }],
+    "title_key": "sales_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-15T20:05:41.873104+00:00",
-  "updated_at": "2026-11-15T20:05:41.876288+00:00",
-  "offer_expires_at": "2026-11-17T20:05:41.873104+00:00",
-  "salary_wish_cents_per_hour": 15900,
-  "offer_salary_cents_per_hour": 15900
+  "created_at": "2026-11-15T20:41:10.456413+00:00",
+  "updated_at": "2026-11-15T20:41:10.460183+00:00",
+  "offer_expires_at": "2026-11-17T20:41:10.456413+00:00",
+  "salary_wish_cents_per_hour": 15000,
+  "offer_salary_cents_per_hour": 15000
 }

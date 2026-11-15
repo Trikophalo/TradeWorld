@@ -124,6 +124,10 @@ export interface BattleState {
   battle: Battle | null;
   /** The last finished battle, for a while (podium). */
   recent: Battle | null;
+  /** Battles of this hour that started, of perHour; after that the next round begins at nextRoundAt. */
+  playedThisHour: number;
+  perHour: number;
+  nextRoundAt: string;
 }
 
 export interface BattleSync {

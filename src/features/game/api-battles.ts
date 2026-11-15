@@ -120,6 +120,9 @@ const stateSchema = z.object({
   viewers: z.number(),
   battle: battleSchema.nullable(),
   recent: battleSchema.nullable(),
+  played_this_hour: z.number().default(0),
+  per_hour: z.number().default(3),
+  next_round_at: z.string().optional(),
 });
 const syncSchema = z.object({
   now: z.string(),
@@ -203,6 +206,9 @@ const toState = (r: z.infer<typeof stateSchema>): BattleState => ({
   viewers: r.viewers,
   battle: toBattle(r.battle),
   recent: toBattle(r.recent),
+  playedThisHour: r.played_this_hour,
+  perHour: r.per_hour,
+  nextRoundAt: r.next_round_at ?? new Date(Math.ceil(Date.parse(r.now) / 3_600_000) * 3_600_000).toISOString(),
 });
 
 export const liveBattleEngine: BattleEngine = {

@@ -1,56 +1,56 @@
 {
   "applications": [
     {
-      "id": "902075ba-4cf8-4736-bbde-17c54ee7ea00",
+      "id": "e2b6976c-d311-43e9-ab76-7da3b2c7738d",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "27c7e7ae-7c08-4ed5-ba41-701af2fdaed1",
+        "id": "1bcc19d7-2a4b-4cb1-a1d8-6253abce6fe7",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "d21331b8-a414-66aa-de07-f036108fc91d",
+          "id": "7999d809-0066-66e2-e0ac-930c34a49626",
           "logo": null,
-          "name": "Nordlicht Logistik AG",
-          "color": "#7AA2F7",
+          "name": "Fundgrube Discount",
+          "color": "#C2C95B",
           "is_ai": true,
-          "sector": "logistics",
-          "ticker": "NDL"
+          "sector": "retail",
+          "ticker": "FGD"
         },
-        "required": [{ "branch": "it", "min_score": 0 }],
-        "title_key": "it_intern",
+        "required": [{ "branch": "sales", "min_score": 0 }],
+        "title_key": "sales_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-15T20:05:41.873104+00:00",
-      "updated_at": "2026-11-15T20:05:41.876288+00:00",
-      "offer_expires_at": "2026-11-17T20:05:41.873104+00:00",
-      "salary_wish_cents_per_hour": 15900,
-      "offer_salary_cents_per_hour": 15900
+      "created_at": "2026-11-15T20:41:10.456413+00:00",
+      "updated_at": "2026-11-15T20:41:10.460183+00:00",
+      "offer_expires_at": "2026-11-17T20:41:10.456413+00:00",
+      "salary_wish_cents_per_hour": 15000,
+      "offer_salary_cents_per_hour": 15000
     },
     {
-      "id": "5dd9a64c-e088-4b6e-909f-58c6f8d2ca56",
+      "id": "b1579df1-746e-46a5-960a-99f9fe704a40",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "62683b94-bd66-4774-b922-9a5d36d75485",
+        "id": "0120eeca-3259-492c-9609-a09501acba4e",
         "tier": "junior",
         "title": null,
         "company": {
-          "id": "2fccb1cc-0894-a518-9538-769c751d9630",
+          "id": "833932bd-1586-776d-1f8f-f602682f7437",
           "logo": null,
-          "name": "Memeland Media",
-          "color": "#FF4FD8",
+          "name": "Luftpost Drohnen",
+          "color": "#00B4D8",
           "is_ai": true,
-          "sector": "tech",
-          "ticker": "MEM"
+          "sector": "logistics",
+          "ticker": "DRN"
         },
         "required": [{ "branch": "it", "min_score": 2 }],
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-15T20:05:41.867992+00:00",
-      "updated_at": "2026-11-15T20:05:41.867992+00:00",
-      "offer_expires_at": "2026-11-17T20:05:41.867992+00:00",
+      "created_at": "2026-11-15T20:41:10.450602+00:00",
+      "updated_at": "2026-11-15T20:41:10.450602+00:00",
+      "offer_expires_at": "2026-11-17T20:41:10.450602+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

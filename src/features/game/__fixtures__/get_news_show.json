@@ -1,8 +1,8 @@
 {
-  "now": "2026-11-15T20:05:45.724273+00:00",
+  "now": "2026-11-15T20:41:14.544947+00:00",
   "chat": [
     {
-      "at": "2026-11-15T20:05:45.719601+00:00",
+      "at": "2026-11-15T20:41:14.537904+00:00",
       "id": 218,
       "bot": false,
       "body": "Was für eine Sendung 💀📉",
@@ -11,81 +11,81 @@
     }
   ],
   "show": {
-    "id": 8,
+    "id": 7,
     "writer": "mini",
     "airs_at": "2026-11-15T20:00:00+00:00",
     "segments": [
       {
         "kind": "gossip",
-        "mood": "shocked",
-        "text": "Gute Nachrichten, ausnahmsweise. Bei Ada_Krisenfest heißt es: Level 5 erreicht. Meine Schwiegermutter hat es vorausgesagt, und die liegt sonst immer falsch.",
-        "figure": { "nickname": "Ada_Krisenfest", "avatar_key": "rookie", "accessories": [] },
+        "mood": "proud",
+        "text": "Gute Nachrichten, ausnahmsweise. Bei Wim_Weg heißt es: Neuer Job bei Fundgrube Discount. Ich hätte keinen Cent darauf gewettet, und ich wette auf alles.",
+        "figure": { "nickname": "Wim_Weg", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Ada_Krisenfest hat es geschafft"
+        "headline": "Wim_Weg hat es geschafft"
       },
       {
-        "kind": "hype",
-        "mood": "laughing",
-        "text": "Unfassbar, aber wahr: Sendeanstalt ist der Renner. Ein Kind hat im Schulaufsatz darüber geschrieben, die Klasse war begeistert. „Fernseher für Hunde“ geht weg wie warme Semmeln. Show_Chefin soll vor Freude geweint haben.",
-        "figure": { "nickname": "Show_Chefin", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "gain", "label": "Bekanntheit +21,6 %" }],
-        "headline": "Alle wollen Sendeanstalt"
+        "kind": "scandal",
+        "mood": "angry",
+        "text": "Das Netz zerreißt Xp Werkstatt. Auf dem Firmenparkplatz wurde ein illegales Bobbycar-Rennen ausgehoben. Seitdem will niemand mehr „Fahrräder reparieren“. Xp_Chefin hat das Firmenhandy im Fluss versenkt.",
+        "figure": { "nickname": "Xp_Chefin", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −11,3 %" }],
+        "headline": "Shitstorm über Xp Werkstatt"
       },
       {
         "kind": "nft",
-        "mood": "laughing",
-        "text": "Ben_Bieter zahlt 30.000 € für „Neon Nacht“, gemalt von Nina_Neon. Wer das kauft, kauft auch Luft in Dosen.",
+        "mood": "shocked",
+        "text": "Ben_Bieter zahlt 30.000 € für „Neon Nacht“, gemalt von Nina_Neon. Ich verstehe es nicht, also muss es teuer sein.",
         "figure": { "nickname": "Nina_Neon", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
         "headline": "NFT-Wahnsinn um „Neon Nacht“"
       },
       {
         "kind": "winner",
-        "mood": "proud",
-        "text": "11393,8 % Plus, 1.139.380 € Gewinn: Fixture_Neu zeigt dem Rest, wie es geht. Neid ist die ehrlichste Form der Anerkennung, also bitte sehr.",
+        "mood": "shocked",
+        "text": "Und nun zu jemandem, der es kann: Fixture_Neu hat heute 1.139.395 € gemacht, 11394 % im Plus. Bitte nicht nachmachen, ihr könnt das nicht.",
         "figure": { "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] },
         "effects": [],
-        "headline": "Fixture_Neu schwimmt im Geld"
+        "headline": "Fixture_Neu sahnt ab: plus 1.139.395 €"
       },
       {
         "kind": "gossip",
         "mood": "proud",
-        "text": "Bitte festhalten: Level 5 erreicht, und zwar bei Fixture_Lieferant. Die Konkurrenz darf sich gern ein Beispiel nehmen, ihr Luschen.",
-        "figure": { "nickname": "Fixture_Lieferant", "avatar_key": "rookie", "accessories": [] },
+        "text": "Bitte festhalten: Level 10 erreicht, und zwar bei Lohn_Chefin. Genieß es, nächste Woche lachen wir wieder über dich.",
+        "figure": { "nickname": "Lohn_Chefin", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Applaus für Fixture_Lieferant"
+        "headline": "Applaus für Lohn_Chefin"
       },
       {
         "kind": "scandal",
-        "mood": "shocked",
-        "text": "Bei Banner Werk brennt die Hütte. Ein Kunde hat das Produkt tatsächlich benutzt und das Ergebnis im Internet gezeigt. Bea_Banner spricht von einem Missverständnis. Zur Erinnerung, das Geschäftsmodell lautet: „Fahnen für Vereine“.",
-        "figure": { "nickname": "Bea_Banner", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −19,1 %" }],
-        "headline": "Banner Werk: Chef Bea_Banner unter Beschuss"
+        "mood": "angry",
+        "text": "Ausgerechnet Fixture Lieferwerk, die Firma mit dem Motto „Teile auf Abruf“: Das neue Logo sieht aus wie etwas, das man Kindern nicht zeigen sollte. Die Kunden laufen davon.",
+        "figure": { "nickname": "Fixture_Lieferant", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −15,1 %" }],
+        "headline": "Skandal bei Fixture Lieferwerk"
       },
       {
         "kind": "sector",
-        "mood": "proud",
-        "text": "Die ganze Branche Einzelhandel steigt um 9,3 %. Ein Minister hat die Branche gelobt, er meinte allerdings eine andere. So funktioniert Wirtschaft, liebe Kinder.",
-        "effects": [{ "tone": "gain", "label": "Einzelhandel +9,3 %" }],
-        "headline": "Die Branche Einzelhandel dreht durch"
+        "mood": "crying",
+        "text": "Die Branche Pharma sackt um 5,9 % ab. Ein Fernsehmoderator hat schlecht geträumt und es live erzählt. Bis das geklärt ist, verkaufen erst mal alle.",
+        "effects": [{ "tone": "loss", "label": "Pharma −5,9 %" }],
+        "headline": "Pharma im freien Fall"
       },
       {
         "kind": "stock",
-        "mood": "proud",
-        "text": "Ein Wahrsager auf dem Jahrmarkt hat der Firma eine goldene Zukunft vorausgesagt. Die Börse feiert: Orbitfracht steigt um 11,7 %. Wer nicht dabei ist, darf sich jetzt ärgern.",
-        "effects": [{ "tone": "gain", "label": "OFR +11,7 %" }],
-        "headline": "Kursrakete Orbitfracht"
+        "mood": "crying",
+        "text": "Knusperkönig verliert 16,2 %. Im Werk wurde drei Wochen lang das falsche Produkt gebaut, niemandem fiel es auf. Die Anleger nehmen Reißaus.",
+        "effects": [{ "tone": "loss", "label": "SNK −16,2 %" }],
+        "headline": "Knusperkönig stürzt ab"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Volta Energie AG geht bald nach unten. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
-        "effects": [{ "tone": "neutral", "label": "VLT ↓ Tipp" }],
-        "headline": "Der heiße Draht: Volta Energie AG"
+        "text": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Fundgrube Discount tut sich in der nächsten Stunde etwas, und zwar nach oben. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
+        "effects": [{ "tone": "neutral", "label": "FGD ↑ Tipp" }],
+        "headline": "Mr. Doodle Dangles Geheimtipp"
       }
     ],
-    "started_at": "2026-11-15T20:05:45.724273+00:00"
+    "started_at": "2026-11-15T20:41:14.544947+00:00"
   },
   "viewers": 17,
   "audience": [

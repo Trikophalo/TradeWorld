@@ -1246,6 +1246,8 @@ select public.end_tenancy(gen_random_uuid(), :'fx_ten');
 select public.get_rentals();
 \o
 reset role;
+-- many battles in one hour here: no hourly limit for the fixtures
+update public.game_config set value = jsonb_set(value, '{lobby,perHour}', '1000') where key = 'battles';
 -- News battles (ADR-160): the lobby, a quiz, an estimate, the bell, an action game, the podium ------------------------
 \set fb1 '''f1f1f1f1-0000-4000-8000-0000000000b1'''
 \set fb2 '''f1f1f1f1-0000-4000-8000-0000000000b2'''

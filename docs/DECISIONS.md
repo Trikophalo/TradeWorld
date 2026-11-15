@@ -2669,6 +2669,7 @@ steuern ihre angezogene Pixelfigur (ADR-155) mit WASD, Pfeiltasten oder einem Jo
   Metriken `battle_join` und `battle_win`).
 - **Demo:** Erfundene Gegner treten bei, spielen mit einfachen Bots (Schatten meiden, Münzen jagen, rempeln) und
   beantworten Quizfragen; der Demo-Modus kann jedes Spiel gezielt starten.
+- **Nachtrag (Inhaber):** Pro voller Stunde starten genau `lobby.perHour` (3) Battles, jedes mit Preis, nacheinander nach der Sendung. Danach öffnet bis zur nächsten vollen Stunde keine Lobby (`battles_started_this_hour`, Migration 4800). `get_battle()` liefert `played_this_hour`, `per_hour`, `next_round_at`.
 
 ## ADR-161: Wohnbonus, Möbelpreise nach Zuhause, Einrichtung im Wert, freie Mietpreise — `Annahme`
 

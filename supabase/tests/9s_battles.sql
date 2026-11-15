@@ -26,6 +26,8 @@ create or replace function tests.households() returns bigint language sql as $$
   select balance_cents from public.ledger_accounts where system_key = 'households';
 $$;
 grant execute on all functions in schema tests to public;
+-- this file plays many battles in one hour: no hourly limit here (9v tests the limit)
+select tests.set_cfg('battles', '{lobby,perHour}', '1000');
 
 -- =============================================================================
 -- A. The simulations in SQL give the same results as in TypeScript (vectors.test.ts)
@@ -518,3 +520,4 @@ select tests.assert(
   and (select progress from public.player_missions where player_id = :e and template_key = 'm_battle_win') = 1,
   'mission_event battle_win for the winner');
 select tests.battle_reset();
+select tests.set_cfg('battles', '{lobby,perHour}', '3');

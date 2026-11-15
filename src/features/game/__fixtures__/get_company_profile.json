@@ -1,34 +1,40 @@
 {
   "news": [
     {
+      "body": "Ein Vögelchen hat mir gezwitschert: KlarSoft AG dürfte in der kommenden Stunde nach oben gehen. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
+      "category": "company",
+      "headline": "Vom Flurfunk: KlarSoft AG",
+      "published_at": "2026-11-15T20:41:03.628637+00:00"
+    },
+    {
       "body": "Viele haben mitgemacht, doch Kunden und Anleger zucken nur mit den Schultern.",
       "category": "market",
       "headline": "Petition gegen KlarSoft AG verpufft",
-      "published_at": "2026-11-15T20:05:33.953576+00:00"
+      "published_at": "2026-11-15T20:41:01.948532+00:00"
     },
     {
       "body": "0 Spieler und 1 weitere Unterstützer machen mit. Das Thema ist in aller Munde.",
       "category": "market",
       "headline": "Petition gegen KlarSoft AG zeigt Wirkung",
-      "published_at": "2026-11-15T20:05:33.953576+00:00"
+      "published_at": "2026-11-15T20:41:01.948532+00:00"
     },
     {
       "body": "Viele haben mitgemacht, doch Kunden und Anleger zucken nur mit den Schultern.",
       "category": "market",
       "headline": "Petition gegen KlarSoft AG verpufft",
-      "published_at": "2026-11-15T20:05:33.358545+00:00"
+      "published_at": "2026-11-15T20:41:01.391798+00:00"
     },
     {
-      "body": "KlarSoft AG verfehlt im Q2 des Spieljahres 1 die Prognosen: 360,5 Mio. € Umsatz, 17,7 Mio. € Ergebnis.",
+      "body": "KlarSoft AG meldet 466,0 Mio. € Umsatz und 41,7 Mio. € Gewinn im Q2 des Spieljahres 1. Analysten hatten weniger erwartet.",
       "category": "earnings",
-      "headline": "KlarSoft AG: Gewinn sinkt um 36 %",
-      "published_at": "2026-11-15T20:05:24.849931+00:00"
+      "headline": "KlarSoft AG steigert Gewinn um 29 %",
+      "published_at": "2026-11-15T20:40:52.022287+00:00"
     },
     {
-      "body": "KlarSoft AG verfehlt im Q1 des Spieljahres 2 die Prognosen: 439,6 Mio. € Umsatz, 27,6 Mio. € Ergebnis.",
+      "body": "KlarSoft AG verfehlt im Q1 des Spieljahres 2 die Prognosen: 405,6 Mio. € Umsatz, 32,2 Mio. € Ergebnis.",
       "category": "earnings",
-      "headline": "KlarSoft AG: Gewinn sinkt um 27 %",
-      "published_at": "2026-11-15T20:05:24.804225+00:00"
+      "headline": "KlarSoft AG: Gewinn sinkt um 14 %",
+      "published_at": "2026-11-15T20:40:51.968199+00:00"
     }
   ],
   "facts": {
@@ -39,10 +45,10 @@
     "max_staff": 100000,
     "ai_workers": 0,
     "quality_bps": null,
-    "value_cents": 417214000000,
-    "profit_cents": 12274484131,
+    "value_cents": 477285500000,
+    "profit_cents": 15016625883,
     "awareness_bps": null,
-    "revenue_cents": 163513491584
+    "revenue_cents": 171512680672
   },
   "company": {
     "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
@@ -54,9 +60,9 @@
     "listed": true,
     "sector": "tech",
     "ticker": "KLS",
-    "price_e4": 834428,
-    "change_bps": -385,
-    "founded_at": "2026-11-15T20:03:53.804245+00:00",
+    "price_e4": 954571,
+    "change_bps": 976,
+    "founded_at": "2026-11-15T20:39:21.301863+00:00",
     "brand_color": "#4C8DFF"
   },
   "founder": null,

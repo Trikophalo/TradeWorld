@@ -1,16 +1,16 @@
 {
   "friends": [
     {
-      "tag": "Y8S2",
+      "tag": "N37X",
       "level": 8,
-      "since": "2026-11-15T20:05:43.549025+00:00",
+      "since": "2026-11-15T20:41:12.090041+00:00",
       "online": true,
       "nickname": "Fixture_Kunst",
       "avatar_key": "rookie",
       "accessories": [],
-      "last_active_at": "2026-11-15T20:05:42.700253+00:00"
+      "last_active_at": "2026-11-15T20:41:11.271832+00:00"
     }
   ],
-  "incoming": [{ "at": "2026-11-15T20:05:43.551892+00:00", "tag": "R2QT", "level": 15, "nickname": "Fixture_Neu" }],
+  "incoming": [{ "at": "2026-11-15T20:41:12.092511+00:00", "tag": "B85V", "level": 15, "nickname": "Fixture_Neu" }],
   "outgoing": []
 }

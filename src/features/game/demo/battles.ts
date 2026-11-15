@@ -167,6 +167,8 @@ export function createBattleEngine(host: BattleHost): BattleEngine & {
   let recent: DemoBattle | null = null;
   let lastKind: BattleKind | null = null;
   let forced: BattleKind | null = null;
+  /** Start times of the battles (for the hourly limit). */
+  let startedAt: number[] = [];
   let nextId = 1;
 
   const meIndex = (b: DemoBattle) => b.players.findIndex((p) => !p.bot);
@@ -297,6 +299,7 @@ export function createBattleEngine(host: BattleHost): BattleEngine & {
   }
 
   function start(b: DemoBattle, now: number): void {
+    startedAt = [...startedAt.filter((t) => t > now - 7_200_000), now];
     const players = present(b, now);
     b.players = players;
     players.forEach((p, i) => {
@@ -482,8 +485,18 @@ export function createBattleEngine(host: BattleHost): BattleEngine & {
     current = null;
   }
 
+  /** Battles of the hour `now` lies in that started (three per hour, like the server). */
+  const startedThisHour = (now: number) => {
+    const hour = Math.floor(now / 3_600_000) * 3_600_000;
+    return startedAt.filter((t) => t >= hour).length;
+  };
+
   function maintain(now: number): void {
-    if (current === null) current = open(now);
+    if (current === null) {
+      // in the demo the made-up opponents are always there: the limit holds unless a game was picked by hand
+      if (startedThisHour(now) >= cfg.lobby.perHour && forced === null) return;
+      current = open(now);
+    }
     const b = current;
     if (b.status === "open") {
       const count = present(b, now).length;
@@ -619,6 +632,9 @@ export function createBattleEngine(host: BattleHost): BattleEngine & {
       viewers: 1 + (current?.players.filter((p) => p.bot && p.joinAt <= now).length ?? 0),
       battle: view(current, now),
       recent: view(recent, now),
+      playedThisHour: startedThisHour(now),
+      perHour: cfg.lobby.perHour,
+      nextRoundAt: iso(Math.floor(now / 3_600_000) * 3_600_000 + 3_600_000)!,
     };
   }
 
