@@ -5,6 +5,8 @@ import { Page, PageHeader } from "@/components/layout/page";
 import { NewsFeed } from "@/features/news/news-feed";
 import { ProtestsCard } from "@/features/news/protests";
 import { NewsShow } from "@/features/news/show/news-show";
+import { NewsBattle } from "@/features/news/battle/news-battle";
+import { Reveal } from "@/features/progression/components/reveal";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("newsTab");
@@ -22,6 +24,12 @@ export default async function NewsPage() {
       <div className="mx-auto mb-6 max-w-5xl">
         <NewsShow />
       </div>
+      {/* News battles among the viewers (ADR-160) */}
+      <Reveal feature="newsBattle">
+        <div className="mx-auto mb-6 max-w-5xl">
+          <NewsBattle />
+        </div>
+      </Reveal>
       <div className="mx-auto max-w-2xl space-y-4">
         <ProtestsCard />
         <NewsFeed />

@@ -13,7 +13,8 @@ import { PlayerFigure } from "@/components/ui/player-figure";
 import { PlazaGround } from "@/components/ui/plaza-ground";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
-import { ACCESSORIES, accessoryByKey, type AccessoryItem, type AccessorySlot } from "@/config/accessories";
+import { catalogItemByKey } from "@/config/accessory-catalog";
+import { ACCESSORIES, type AccessoryItem, type AccessorySlot } from "@/config/accessories";
 import { useGameErrorText } from "@/features/game/errors";
 import { engine, useGame, usePlayerLevel } from "@/features/game/store";
 import { formatMoney } from "@/lib/format";
@@ -27,7 +28,7 @@ import { RARITY_STYLE } from "./rarity";
 type Filter = "all" | AccessorySlot;
 /** Shop order of the slots: what people look at first. */
 const SHOP_SLOTS: readonly AccessorySlot[] = ["head", "face", "body", "hand", "pet", "back"];
-const slotOf = (key: string) => accessoryByKey(key)?.slot;
+const slotOf = (key: string) => catalogItemByKey(key)?.slot;
 const shopOrder = (a: AccessoryItem, b: AccessoryItem) =>
   SHOP_SLOTS.indexOf(a.slot) - SHOP_SLOTS.indexOf(b.slot) || a.priceCents - b.priceCents;
 
@@ -134,7 +135,7 @@ export function WardrobeView() {
               ) : (
                 <ul className="mt-1.5 flex flex-wrap gap-1.5" data-testid="wardrobe-worn">
                   {worn.map((key) => {
-                    const item = accessoryByKey(key);
+                    const item = catalogItemByKey(key);
                     if (!item) return null;
                     return (
                       <li key={key} className={cn("rounded-xs px-1.5 py-0.5 text-xs", RARITY_STYLE[item.rarity].soft)}>

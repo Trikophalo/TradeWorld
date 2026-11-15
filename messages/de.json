@@ -801,7 +801,14 @@
     "accessory_not_owned": "Das musst du erst kaufen, bevor du es anziehen kannst.",
     "not_friends": "Das geht nur bei Freunden.",
     "poke_too_soon": "Nicht so stürmisch! Denselben Freund kannst du erst in ein paar Minuten wieder anstupsen.",
-    "poke_daily_limit": "Genug gestupst für heute. Morgen geht es weiter."
+    "poke_daily_limit": "Genug gestupst für heute. Morgen geht es weiter.",
+    "battle_not_viewer": "Mitmachen kann nur, wer gerade die Nachrichten schaut. Bleib auf dieser Seite.",
+    "battle_full": "Das Battle ist voll. Beim nächsten bist du dabei!",
+    "battle_closed": "Dieses Battle läuft schon. Gleich öffnet die nächste Lobby.",
+    "battle_not_joined": "Du spielst in diesem Battle nicht mit.",
+    "battle_round_closed": "Zu spät, diese Runde ist schon vorbei.",
+    "accessory_exclusive": "Das gibt es nicht zu kaufen. Gewinn es in einem News-Battle!",
+    "battle_unknown": "Dieses Battle gibt es nicht (mehr)."
   },
   "locks": {
     "level": "Level {level}",
@@ -3026,7 +3033,8 @@
         "coin_launched": "hat einen eigenen Coin gestartet: {name} ({ticker}).",
         "rug_pull": "hat bei {name} ({ticker}) die Team-Coins abgestoßen. Rug Pull!",
         "coin_closed": "hat den Coin {name} ({ticker}) eingestellt.",
-        "accessory_bought": "trägt jetzt etwas Legendäres: {name}."
+        "accessory_bought": "trägt jetzt etwas Legendäres: {name}.",
+        "battle_won": "hat das News-Battle „{game}“ gewonnen 🏆"
       }
     },
     "notifications": {
@@ -6943,5 +6951,175 @@
     "boughtText": "Steht dir hervorragend. Du trägst es schon.",
     "putOn": "{name} angezogen",
     "tookOff": "{name} ausgezogen"
+  },
+  "battle": {
+    "title": "News-Battle",
+    "subtitle": "Zuschauer gegen Zuschauer. Nur einer gewinnt.",
+    "lobbyHint": "Ab {min} Spielern geht es los, höchstens {max}.",
+    "players": "{count} / {max} Spieler",
+    "waiting": "Warte auf Mitspieler …",
+    "waitingMore": "{count, plural, one {Noch # Spieler, dann geht's los} other {Noch # Spieler, dann geht's los}}",
+    "startsIn": "Start in {time}",
+    "join": "Mitmachen",
+    "leave": "Aussteigen",
+    "joined": "Du bist dabei!",
+    "joinedToast": "Du bist in der Lobby",
+    "joinError": "Mitmachen hat nicht geklappt",
+    "emptySlot": "frei",
+    "you": "Du",
+    "prizeTitle": "Preis für den Sieger",
+    "prize": {
+      "xp": "{xp} XP",
+      "money": "{amount}",
+      "skin": "Exklusiver Skin",
+      "skinHint": "Gibt es nur hier",
+      "nft": "NFT „{title}“",
+      "none": "Ruhm und Ehre",
+      "fallback": "(statt des Preises, der vergeben war)"
+    },
+    "prizeWinsLeft": "{count, plural, =0 {Heute keine Preise mehr: Du spielst um die Ehre.} one {Noch # Sieg mit Preis heute} other {Noch # Siege mit Preis heute}}",
+    "running": "Battle läuft: {game}",
+    "runningHint": "Gleich öffnet die nächste Lobby.",
+    "watch": "Zuschauen",
+    "open": "Zurück ins Battle",
+    "close": "Schließen",
+    "minimize": "Verkleinern",
+    "lastWinner": "Letzter Sieger: {name} in „{game}“",
+    "doodle": "Mr. Doodle Dangle",
+    "demoPick": "Demo: nächstes Spiel",
+    "demoRandom": "Zufall",
+    "games": {
+      "floor": {
+        "name": "Kurssturz",
+        "tagline": "Der Kurs stürzt, der Boden auch.",
+        "rules": "Kacheln reißen und fallen weg. Wer stillsteht, bricht ein. Bleib in Bewegung, der Letzte auf dem Parkett gewinnt."
+      },
+      "bulls": {
+        "name": "Bullenreiten",
+        "tagline": "Die Bullen sind los!",
+        "rules": "Rote Pfeile warnen: Gleich stürmt ein Bulle durch Reihe oder Spalte. Weich aus! Drei Herzen, der Letzte gewinnt."
+      },
+      "coins": {
+        "name": "Geldregen",
+        "tagline": "Es regnet Geld. Und Bären.",
+        "rules": "Stell dich unter die Schatten und fang Münzen (1) und Goldbarren (3). Fallende Bären betäuben und kosten 2 Münzen. Die meisten Münzen gewinnen."
+      },
+      "sumo": {
+        "name": "Sumo am Parkett",
+        "tagline": "Rempeln erlaubt.",
+        "rules": "Lauf in andere hinein, um sie wegzuschubsen; mit Aktion zwei Felder weit. Der Ring schrumpft. Wer runterfällt, ist raus."
+      },
+      "potato": {
+        "name": "Giftaktie",
+        "tagline": "Heiße Kartoffel mit Lunte.",
+        "rules": "Wer die Giftaktie hat, ist schneller. Lauf in jemanden hinein, um sie loszuwerden. Wer sie beim Knall hält, fliegt raus."
+      },
+      "pump": {
+        "name": "Aktie pumpen",
+        "tagline": "Tippen bis zum Umfallen.",
+        "rules": "Tippe, so schnell du kannst, solange die Ampel grün ist; Gold zählt dreifach. Tippst du im Crash (Rot), verlierst du ein Viertel."
+      },
+      "quiz": {
+        "name": "Börsenquiz",
+        "tagline": "Schnell und richtig gewinnt.",
+        "rules": "Zwei Herzen. Falsch oder zu spät kostet eins. Je schneller richtig, desto mehr Punkte. Der Letzte mit Herzen gewinnt."
+      },
+      "estimate": {
+        "name": "Schätz den Kurs",
+        "tagline": "Bauchgefühl gegen Fakten.",
+        "rules": "Vier Fragen, eine Zahl. Wer am nächsten dran ist, bekommt die meisten Punkte, die letzte Runde zählt doppelt."
+      },
+      "bell": {
+        "name": "Die Glocke",
+        "tagline": "Wer zuerst drückt, wenn sie läutet.",
+        "rules": "Drück, sobald die Glocke läutet. Zu früh oder als Langsamster verlierst du ein Herz. Wer übrig bleibt, gewinnt."
+      }
+    },
+    "controls": {
+      "keys": "WASD oder Pfeiltasten",
+      "action": "Leertaste: Rempler",
+      "tapKeys": "Leertaste oder Tippen",
+      "touch": "Joystick links, Aktion rechts",
+      "touchTap": "Tipp auf den großen Knopf",
+      "clickAnswer": "Tippen oder Tasten 1 bis 4",
+      "typeNumber": "Zahl eingeben, Enter",
+      "bellKey": "Leertaste oder Knopf",
+      "joystick": "Steuerkreuz",
+      "actionButton": "Aktion"
+    },
+    "intro": {
+      "battle": "News-Battle #{id}",
+      "game": "Das Spiel",
+      "ready": "Bereit?",
+      "go": "LOS!",
+      "players": "{count} Spieler"
+    },
+    "hud": {
+      "time": "Zeit",
+      "alive": "{count} übrig",
+      "coins": "{count} 🪙",
+      "hearts": "Herzen",
+      "pushes": "{count} Rempler",
+      "you": "Du",
+      "out": "Raus!",
+      "spectating": "Du schaust zu",
+      "eliminated": "Du bist raus! Schau zu, wer gewinnt.",
+      "result": "Der Server rechnet nach …",
+      "holder": "Giftaktie: {name}",
+      "pass": "Weitergeben!",
+      "warn": "Achtung!"
+    },
+    "pump": {
+      "green": "Pumpen!",
+      "yellow": "Vorsicht …",
+      "red": "CRASH! Finger weg!",
+      "gold": "GOLD! ×3",
+      "busted": "Panikverkauf! −25 %",
+      "tap": "PUMPEN"
+    },
+    "quiz": {
+      "round": "Frage {n} von {total}",
+      "right": "Richtig!",
+      "wrong": "Falsch!",
+      "none": "Keine Antwort",
+      "points": "+{points}",
+      "answered": "Antwort abgegeben",
+      "everyoneWrong": "Alle falsch, niemand verliert ein Herz.",
+      "lostHeart": "{names} verliert ein Herz"
+    },
+    "estimate": {
+      "round": "Frage {n} von {total}",
+      "placeholder": "Deine Schätzung",
+      "send": "Abgeben",
+      "sent": "Abgegeben: {value}",
+      "truth": "Richtig: {value}",
+      "closest": "Am nächsten dran",
+      "bullseye": "Volltreffer!",
+      "doubleRound": "Letzte Runde: doppelte Punkte!"
+    },
+    "bell": {
+      "round": "Runde {n}",
+      "ready": "Achtung …",
+      "wait": "Noch nicht drücken!",
+      "now": "JETZT!",
+      "early": "Zu früh!",
+      "press": "DRÜCKEN",
+      "pressed": "Gedrückt!",
+      "reaction": "{ms} ms",
+      "slowest": "Am langsamsten",
+      "network": "Gemessen auf dem Server, mit Netz."
+    },
+    "podium": {
+      "title": "Sieger!",
+      "youWon": "Du hast gewonnen!",
+      "winner": "{name} gewinnt!",
+      "place": "{place}.",
+      "yourPlace": "Du bist {place}. von {count}",
+      "prize": "Gewinn",
+      "capped": "Tagesgrenze erreicht: Diesmal gab es nur Ruhm und Ehre.",
+      "again": "Zur nächsten Lobby",
+      "score": "{score} Punkte"
+    },
+    "showcase": "News-Battle"
   }
 }
