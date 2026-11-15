@@ -30,7 +30,9 @@ export type Metric =
   | "art_bids"
   | "artworks_painted"
   | "auctions_started"
-  | "nft_offers";
+  | "nft_offers"
+  | "battle_joins"
+  | "battle_wins";
 
 export interface MissionTemplate {
   key: string;
@@ -158,8 +160,40 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
     xp: w.minXp,
     requires: "bonds",
   },
+  {
+    key: "w_battles",
+    kind: "weekly",
+    title: "Spiel bei 3 News-Battles mit",
+    metric: "battle_joins",
+    target: 3,
+    xp: w.minXp + 100,
+  },
   // milestones: a story along the way
   { key: "m_first_trade", kind: "milestone", title: "Dein erster Trade", metric: "trades", target: 1, xp: m.minXp },
+  {
+    key: "m_battle_first",
+    kind: "milestone",
+    title: "Dein erstes News-Battle",
+    metric: "battle_joins",
+    target: 1,
+    xp: m.minXp + 200,
+  },
+  {
+    key: "m_battle_win",
+    kind: "milestone",
+    title: "Gewinne ein News-Battle",
+    metric: "battle_wins",
+    target: 1,
+    xp: 800,
+  },
+  {
+    key: "m_battle_win_10",
+    kind: "milestone",
+    title: "10 News-Battles gewonnen",
+    metric: "battle_wins",
+    target: 10,
+    xp: m.maxXp,
+  },
   {
     key: "m_first_profit",
     kind: "milestone",

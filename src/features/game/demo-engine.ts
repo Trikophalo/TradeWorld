@@ -41,6 +41,7 @@ import { createCompanyMovesEngine, type DemoMoveRun } from "./demo/company-moves
 import { createCompanyTasksEngine, type DemoTasksState } from "./demo/company-tasks";
 import { createPitchesEngine, type DemoPitch } from "./demo/pitches";
 import { createNewsShowEngine, type DemoNewsShowState } from "./demo/news-show";
+import { createBattleEngine } from "./demo/battles";
 import { createProtestsEngine, type DemoProtest } from "./demo/protests";
 import { createSocialEngine, type DemoSocialState } from "./demo/social";
 import { createCompanyEventsEngine } from "./demo/company-events";
@@ -125,6 +126,8 @@ interface PlayerState {
   pokes?: { nickname: string; at: number }[];
   /** Bought and worn accessories (ADR-155). */
   wardrobe?: DemoWardrobe;
+  /** Battle wins with a prize today (ADR-160, daily cap). */
+  battleWins?: { day: string; count: number };
   /** Feed, notifications and league of the demo (ADR-088, ADR-089). */
   social?: DemoSocialState;
   /** Deals with the demo's trading partners and the trust log (ADR-098). */
@@ -1506,6 +1509,55 @@ const newsShow = createNewsShowEngine({
   random: () => Math.random(),
 });
 
+/** News battles with made-up opponents (ADR-160). */
+const battles = createBattleEngine({
+  me: () => ({ nickname: p().nickname, avatarKey: career.avatarKey(), accessories: wardrobe.worn() }),
+  level,
+  addXp: (base) => {
+    const xp = addXp(base);
+    persist();
+    return xp;
+  },
+  addCash: (cents) => {
+    p().cashCents += cents;
+    persist();
+  },
+  ownedAccessories: () => p().wardrobe?.owned ?? [],
+  giveAccessory: (key) => {
+    const w = p().wardrobe ?? { owned: [], worn: [] };
+    if (!w.owned.includes(key)) p().wardrobe = { ...w, owned: [...w.owned, key] };
+    persist();
+  },
+  freeArtwork: () => art.freeGalleryWork(),
+  giveArtwork: (id) => art.giveGalleryWork(id),
+  stockQuote: () => {
+    const c = DEMO_COMPANIES[Math.floor(Math.random() * DEMO_COMPANIES.length)];
+    const mid = c && m().mids.get(c.ticker);
+    return c && mid ? { ticker: c.ticker, name: c.name, priceE4: mid } : null;
+  },
+  bump: (metric) => {
+    bump(metric);
+    persist();
+  },
+  prizeWinsToday: () => (p().battleWins?.day === berlinDay() ? p().battleWins!.count : 0),
+  countPrizeWin: () => {
+    const day = berlinDay();
+    const w = p().battleWins;
+    p().battleWins = { day, count: w?.day === day ? w.count + 1 : 1 };
+    persist();
+  },
+  feed: feedPost,
+  idempotent,
+  now: () => Date.now(),
+  random: () => Math.random(),
+});
+
+/** Demo only (ADR-160): the next battle plays this game (null: random), for trying every game and for tests. */
+export function demoForceBattleKind(kind: Parameters<typeof battles.forceKind>[0]): void {
+  battles.forceKind(kind);
+}
+export const demoForcedBattleKind = () => battles.forcedKind();
+
 /** Demo only (ADR-150): airs a news show in a few seconds, for trying it out and for tests. */
 export function demoStartNewsShow(inMs?: number): void {
   newsShow.startNow(inMs);
@@ -1536,6 +1588,11 @@ const protests = createProtestsEngine({
 });
 
 export const demoEngine: GameEngine = {
+  battle: battles.battle,
+  joinBattle: battles.joinBattle,
+  leaveBattle: battles.leaveBattle,
+  syncBattle: battles.syncBattle,
+  answerBattle: battles.answerBattle,
   newsShow: newsShow.newsShow,
   postNewsShowMessage: newsShow.postNewsShowMessage,
   // The demo keeps seen tours in the browser only (the tutorial store does that).

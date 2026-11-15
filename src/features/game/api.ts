@@ -15,6 +15,7 @@ import { PROTEST_RPC_SCHEMAS, liveProtestEngine } from "./api-protests";
 import { NEWS_SHOW_RPC_SCHEMAS, liveNewsShowEngine } from "./api-news-show";
 import { TOUR_RPC_SCHEMAS, liveTourEngine } from "./api-tours";
 import { NFT_RPC_SCHEMAS, liveNftEngine } from "./api-nfts";
+import { BATTLE_RPC_SCHEMAS, liveBattleEngine } from "./api-battles";
 import { rpc, toErrorKey } from "./rpc";
 import {
   type Candle,
@@ -487,6 +488,7 @@ export const RPC_SCHEMAS = {
   ...TOUR_RPC_SCHEMAS,
   ...NEWS_SHOW_RPC_SCHEMAS,
   ...NFT_RPC_SCHEMAS,
+  ...BATTLE_RPC_SCHEMAS,
   get_stock_news: stockNewsSchema,
   get_player_holdings: holdingsSchema,
   get_my_net_worth_history: netWorthHistorySchema,
@@ -507,6 +509,7 @@ export const liveEngine: GameEngine = {
   ...liveProtestEngine,
   ...liveTourEngine,
   ...liveNewsShowEngine,
+  ...liveBattleEngine,
   ...liveCareerEngine,
   ...liveCompanyEngine,
   ...liveArtEngine,
