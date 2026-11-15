@@ -138,6 +138,133 @@ const VECTORS: Vector[] = [
     },
   ],
   ["pump", 2026, 4, 100, { end: 599, ranking: [2, 0, 1, 3], out: [-1, -1, -1, 179], score: [58, 53, 62, 27] }],
+  // the games of the addendum to ADR-160 (supabase/tests/9x_battle_games.sql)
+  ["bear", 42, 3, -1, { end: 170, ranking: [2, 1, 0], out: [110, 170, -1], score: [23, 32, 22] }],
+  [
+    "bear",
+    7,
+    6,
+    -1,
+    { end: 288, ranking: [0, 5, 4, 2, 1, 3], out: [-1, 136, 146, 75, 239, 288], score: [53, 27, 25, 16, 43, 44] },
+  ],
+  [
+    "bear",
+    99,
+    10,
+    -1,
+    {
+      end: 421,
+      ranking: [8, 0, 7, 6, 2, 5, 9, 3, 4, 1],
+      out: [421, 47, 259, 110, 84, 194, 314, 380, -1, 136],
+      score: [69, 6, 47, 20, 14, 28, 58, 53, 78, 23],
+    },
+  ],
+  ["bear", 2026, 4, 100, { end: 179, ranking: [0, 3, 2, 1], out: [-1, 75, 147, 179], score: [33, 12, 25, 14] }],
+  ["dash", 42, 3, -1, { end: 1199, ranking: [2, 1, 0], out: [-1, -1, -1], score: [0, 0, 5] }],
+  [
+    "dash",
+    7,
+    6,
+    -1,
+    { end: 1199, ranking: [5, 1, 0, 2, 3, 4], out: [-1, -1, -1, -1, -1, -1], score: [4, 5, 3, 3, 1, 5] },
+  ],
+  [
+    "dash",
+    99,
+    10,
+    -1,
+    {
+      end: 1016,
+      ranking: [4, 1, 5, 7, 6, 9, 2, 8, 3, 0],
+      out: [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+      score: [2, 6, 4, 3, 8, 6, 5, 5, 4, 5],
+    },
+  ],
+  ["dash", 2026, 4, 100, { end: 1199, ranking: [0, 2, 1, 3], out: [-1, -1, -1, 179], score: [3, 0, 0, 0] }],
+  ["margin", 42, 3, -1, { end: 1799, ranking: [0, 2, 1], out: [-1, -1, -1], score: [0, 0, 0] }],
+  [
+    "margin",
+    7,
+    6,
+    -1,
+    { end: 1078, ranking: [2, 3, 5, 1, 0, 4], out: [130, 130, -1, 1078, 130, 130], score: [3, 2, 0, 5, 5, 1] },
+  ],
+  [
+    "margin",
+    99,
+    10,
+    -1,
+    {
+      end: 130,
+      ranking: [8, 4, 1, 7, 5, 0, 2, 6, 9, 3],
+      out: [130, 130, 130, 130, 130, 130, 130, 130, -1, 130],
+      score: [1, 1, 2, 3, 1, 1, 2, 1, 0, 2],
+    },
+  ],
+  ["margin", 2026, 4, 100, { end: 1468, ranking: [2, 0, 1, 3], out: [1468, 1468, -1, 179], score: [2, 5, 0, 0] }],
+  ["elevator", 42, 3, -1, { end: 119, ranking: [2, 1, 0], out: [72, 119, -1], score: [1, 4, -1] }],
+  [
+    "elevator",
+    7,
+    6,
+    -1,
+    { end: 188, ranking: [2, 1, 3, 5, 4, 0], out: [64, 188, -1, 182, 76, 115], score: [6, 0, -1, 1, 6, 0] },
+  ],
+  [
+    "elevator",
+    99,
+    10,
+    -1,
+    {
+      end: 284,
+      ranking: [1, 3, 5, 0, 2, 6, 9, 8, 7, 4],
+      out: [204, -1, 176, 284, 112, 258, 176, 119, 119, 144],
+      score: [0, -4, 1, -3, 0, 0, 3, 6, 3, 3],
+    },
+  ],
+  ["elevator", 2026, 4, 100, { end: 204, ranking: [2, 0, 1, 3], out: [204, 82, -1, 74], score: [1, 4, 0, 5] }],
+  ["laser", 42, 3, -1, { end: 340, ranking: [1, 0, 2], out: [340, -1, 336], score: [0, 1, 0] }],
+  [
+    "laser",
+    7,
+    6,
+    -1,
+    { end: 324, ranking: [3, 5, 0, 2, 1, 4], out: [272, 258, 262, -1, 208, 324], score: [0, 0, 0, 1, 0, 0] },
+  ],
+  [
+    "laser",
+    99,
+    10,
+    -1,
+    {
+      end: 326,
+      ranking: [4, 2, 6, 5, 1, 8, 9, 0, 7, 3],
+      out: [208, 264, 326, 200, -1, 266, 318, 204, 216, 212],
+      score: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+    },
+  ],
+  ["laser", 2026, 4, 100, { end: 254, ranking: [1, 0, 2, 3], out: [254, -1, 204, 179], score: [0, 3, 0, 2] }],
+  ["rodeo", 42, 3, -1, { end: 328, ranking: [0, 2, 1], out: [-1, 328, 328], score: [41, 14, 19] }],
+  [
+    "rodeo",
+    7,
+    6,
+    -1,
+    { end: 346, ranking: [4, 0, 5, 2, 3, 1], out: [346, 181, 216, 216, -1, 286], score: [52, 0, 24, 21, 73, 25] },
+  ],
+  [
+    "rodeo",
+    99,
+    10,
+    -1,
+    {
+      end: 270,
+      ranking: [4, 2, 1, 6, 9, 0, 3, 7, 8, 5],
+      out: [169, 169, 270, 169, -1, 138, 169, 169, 138, 169],
+      score: [19, 23, 25, 18, 57, 0, 23, 13, 0, 19],
+    },
+  ],
+  ["rodeo", 2026, 4, 100, { end: 268, ranking: [1, 2, 0, 3], out: [192, -1, 268, 179], score: [18, 61, 40, 47] }],
 ];
 
 function scoreOf(kind: TickKind, state: ReturnType<typeof simulateBattle>): number[] {
@@ -146,6 +273,10 @@ function scoreOf(kind: TickKind, state: ReturnType<typeof simulateBattle>): numb
   if (kind === "bulls") return s.hearts!;
   if (kind === "sumo") return s.pushes!;
   if (kind === "potato") return s.held!;
+  if (kind === "dash" || kind === "rodeo") return s.score!;
+  if (kind === "margin") return s.dist!;
+  if (kind === "elevator") return s.best!;
+  if (kind === "laser") return s.hearts!;
   return state.p.steps;
 }
 

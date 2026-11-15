@@ -7221,6 +7221,36 @@
         "tagline": "Tippen bis zum Umfallen.",
         "rules": "Tippe, so schnell du kannst, solange die Ampel grün ist; Gold zählt dreifach. Tippst du im Crash (Rot), verlierst du ein Viertel."
       },
+      "bear": {
+        "name": "Bärenjagd",
+        "tagline": "Die Bären haben Hunger.",
+        "rules": "Bären kommen aus ihrer Höhle und jagen immer den, der ihnen am nächsten ist. Lauf um die Säulen und lock sie zu den anderen. Wer erwischt wird, ist raus. Die Bären werden schneller."
+      },
+      "dash": {
+        "name": "Dividenden-Dash",
+        "tagline": "Wer zuerst kommt, kassiert.",
+        "rules": "Dividenden-Münzen tauchen auf, wer zuerst drauf steht, kassiert; jede fünfte ist eine Sonderdividende (2). Lauf mit Aktion in jemanden hinein, dann steht er kurz still. Wer zuerst 8 hat, gewinnt."
+      },
+      "margin": {
+        "name": "Margin Call",
+        "tagline": "Ab ins Grüne, bevor der Gong kommt.",
+        "rules": "Grüne Felder leuchten auf, dann kommt der Gong. Wer nicht auf einem grünen Feld steht, wird glattgestellt. Bald gibt es eins weniger, als Spieler übrig sind, und die Zeit wird knapper."
+      },
+      "elevator": {
+        "name": "Fahrstuhl zum Mond",
+        "tagline": "Die Aktie steigt. Du hoffentlich mit.",
+        "rules": "Der Bildschirm klettert den Kurs hinauf, immer schneller. Lauf nach oben durch die Lücken der Kerzenbalken. Wer unten aus dem Bild fällt, ist raus. Wer am höchsten kommt, gewinnt."
+      },
+      "laser": {
+        "name": "Laserschranke",
+        "tagline": "Spring, wenn der Strahl kommt.",
+        "rules": "Laserstrahlen fegen über Reihen und Spalten, Ausweichen hilft nicht. Drück Aktion genau, wenn der Strahl dich erreicht, dann springst du drüber. Nur die Lücke im Strahl ist sicher. Drei Herzen."
+      },
+      "rodeo": {
+        "name": "Bullen-Rodeo",
+        "tagline": "Festhalten! Der Bulle bockt.",
+        "rules": "Der Bulle bockt in eine Richtung, drück sie sofort. Neu drücken, Festhalten zählt nicht. Falsch oder zu spät kostet Halt. Je schneller, desto mehr Punkte. Wer am längsten oben bleibt, gewinnt."
+      },
       "quiz": {
         "name": "Börsenquiz",
         "tagline": "Schnell und richtig gewinnt.",
@@ -7235,6 +7265,26 @@
         "name": "Die Glocke",
         "tagline": "Wer zuerst drückt, wenn sie läutet.",
         "rules": "Drück, sobald die Glocke läutet. Zu früh oder als Langsamster verlierst du ein Herz. Wer übrig bleibt, gewinnt."
+      },
+      "vault": {
+        "name": "Tresorknacker",
+        "tagline": "Drei Ziffern trennen dich vom Gold.",
+        "rules": "Knack den Code aus drei verschiedenen Ziffern von 1 bis 6. Nach jedem Versuch zeigt der Tresor, wie viele Ziffern richtig sitzen (grün) und wie viele woanders hingehören (gelb). Schnell und mit wenigen Versuchen gibt es die meisten Punkte."
+      },
+      "ticker": {
+        "name": "Ticker-Tippen",
+        "tagline": "Finde das Kürzel auf dem Laufband.",
+        "rules": "Oben steht eine Firma, unten läuft das Börsenband mit Tickersymbolen. Tipp schnell auf das richtige Kürzel oder tipp es ein. Falsch kostet 300 Punkte. Die meisten Punkte gewinnen."
+      },
+      "higher": {
+        "name": "Mehr oder Weniger",
+        "tagline": "Steigt die nächste Kerze oder fällt sie?",
+        "rules": "Schau dir den Chart an und tipp: schließt die nächste Kerze höher oder tiefer? Trends halten oft an. Falsch oder keine Antwort kostet ein Herz, liegen alle falsch, verliert keiner."
+      },
+      "auction": {
+        "name": "Wer bietet mehr?",
+        "tagline": "Geheime Gebote, nur einer bekommt den Zuschlag.",
+        "rules": "Jeder hat 1.000 Taler Spielgeld. In jeder Runde kommt ein Schatz mit Punkten unter den Hammer. Biete geheim: Das höchste Gebot bekommt die Punkte und zahlt. Wer am Ende die meisten Punkte hat, gewinnt."
       }
     },
     "controls": {
@@ -7247,7 +7297,17 @@
       "typeNumber": "Zahl eingeben, Enter",
       "bellKey": "Leertaste oder Knopf",
       "joystick": "Steuerkreuz",
-      "actionButton": "Aktion"
+      "actionButton": "Aktion",
+      "dashAction": "Leertaste: Tackle",
+      "laserAction": "Leertaste: Springen",
+      "tackleButton": "Tackle",
+      "jumpButton": "Springen",
+      "rodeoKeys": "WASD oder Pfeiltasten, sofort drücken",
+      "rodeoTouch": "Tipp auf den passenden Pfeil",
+      "vaultKeys": "Tasten 1 bis 6, Enter zum Probieren",
+      "tickerKeys": "Tippen oder das Kürzel eintippen",
+      "higherKeys": "Pfeil hoch oder runter, oder tippen",
+      "auctionKeys": "Gebot wählen und abgeben"
     },
     "intro": {
       "battle": "News-Battle #{id}",
@@ -7269,7 +7329,16 @@
       "result": "Der Server rechnet nach …",
       "holder": "Giftaktie: {name}",
       "pass": "Weitergeben!",
-      "warn": "Achtung!"
+      "warn": "Achtung!",
+      "bears": "{count, plural, one {# Bär} other {# Bären}}",
+      "bearComing": "Ein Bär kommt!",
+      "dividends": "{count} / {target}",
+      "call": "Gong in {seconds} s",
+      "callNow": "Ab ins Grüne!",
+      "called": "Gong!",
+      "height": "{rows} m",
+      "jump": "Spring!",
+      "laserComing": "Laser!"
     },
     "pump": {
       "green": "Pumpen!",
@@ -7331,6 +7400,71 @@
       "wear": "Anziehen",
       "takeOff": "Ausziehen",
       "locked": "Nur im Battle zu gewinnen"
+    },
+    "rodeo": {
+      "ready": "Gleich bockt er …",
+      "now": "JETZT!",
+      "hit": "Gehalten!",
+      "miss": "Daneben!",
+      "grip": "Halt",
+      "thrown": "Abgeworfen!",
+      "points": "{points} Punkte",
+      "up": "Hoch",
+      "right": "Rechts",
+      "down": "Runter",
+      "left": "Links"
+    },
+    "vault": {
+      "round": "Tresor {n} von {total}",
+      "tries": "{count, plural, one {# Versuch} other {# Versuche}}",
+      "triesLeft": "Noch {count} von {max}",
+      "try": "Probieren",
+      "clear": "Löschen",
+      "hits": "{count} richtig",
+      "near": "{count} woanders",
+      "cracked": "Geknackt!",
+      "crackedBy": "geknackt",
+      "locked": "Keine Versuche mehr",
+      "code": "Der Code war {code}",
+      "legend": "Grün: richtige Ziffer am richtigen Platz. Gelb: richtige Ziffer, falscher Platz.",
+      "distinct": "Jede Ziffer nur einmal"
+    },
+    "ticker": {
+      "round": "Runde {n} von {total}",
+      "find": "Finde das Kürzel von",
+      "typed": "Eingetippt: {text}",
+      "right": "Treffer!",
+      "wrong": "Falsches Kürzel!",
+      "none": "Zu langsam",
+      "was": "Richtig war {ticker}"
+    },
+    "higher": {
+      "round": "Kerze {n} von {total}",
+      "question": "Schließt die nächste Kerze höher oder tiefer?",
+      "up": "Höher",
+      "down": "Tiefer",
+      "now": "Jetzt: {price}",
+      "next": "Nächste Kerze: {price}",
+      "right": "Richtig!",
+      "wrong": "Falsch!",
+      "none": "Keine Antwort",
+      "chosen": "Getippt: {choice}",
+      "everyoneWrong": "Alle lagen falsch, niemand verliert ein Herz."
+    },
+    "auction": {
+      "round": "Los {n} von {total}",
+      "worth": "{points} Punkte",
+      "budget": "Dein Spielgeld: {amount} Taler",
+      "taler": "{amount} Taler",
+      "bid": "Bieten",
+      "pass": "Passen",
+      "sent": "Geheimes Gebot: {amount} Taler",
+      "passed": "Du passt diese Runde",
+      "sold": "Zuschlag für {name}!",
+      "soldYou": "Zuschlag für dich!",
+      "nobody": "Niemand hat geboten.",
+      "points": "{points} P.",
+      "max": "Alles"
     }
   },
   "living": {

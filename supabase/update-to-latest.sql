@@ -56787,6 +56787,1565 @@ begin
   end loop;
 end;
 $do$;
+-- ===== idempotent copy of migrations/20261204004900_battle_sims_more.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 4900 · News battles: six more action games as PL/pgSQL (ADR-160, addendum)
+-- =============================================================================
+-- Bärenjagd (bear), Dividenden-Dash (dash), Margin Call (margin), Fahrstuhl zum Mond (elevator), Laserschranke
+-- (laser) and Bullen-Rodeo (rodeo): the same integer simulations as src/lib/sim/battle/{bear,dash,margin,elevator,
+-- laser,rodeo}.ts, with the same arguments and answer as the games of 4710 (battle_sim_floor ...). A change to the
+-- TypeScript rules must be made here too; supabase/tests/9x_battle_games.sql and src/lib/sim/battle/vectors.test.ts
+-- run both against the same inputs and expect the same results.
+--   battle_sim(kind, seed, params, streams, until)   redefined with all twelve games
+--   battle_is_tick(kind)                            patched (replace): the new games are action games
+--   battles.kind                                    the check takes the new games
+-- Internal helpers: no grants. Idempotent: runs unchanged as supabase/updates/20261204004900_battle_sims_more.sql.
+
+-- ---------------------------------------------------------------------------
+-- Bärenjagd (src/lib/sim/battle/bear.ts)
+-- ---------------------------------------------------------------------------
+create or replace function public.battle_sim_bear(p_seed bigint, p_params jsonb, p_streams text[], p_until integer)
+returns jsonb
+language plpgsql
+immutable
+as $$
+declare
+  g        jsonb := p_params -> 'game';
+  w        integer := (p_params ->> 'w')::integer;
+  h        integer := (p_params ->> 'h')::integer;
+  st       integer := (p_params ->> 'stepTicks')::integer;
+  disc     integer := (p_params ->> 'disconnectTicks')::integer;
+  n        integer := coalesce(array_length(p_streams, 1), 0);
+  len      integer := greatest(p_until, 1);
+  g_max    integer := (g ->> 'maxTicks')::integer;
+  g_sstart integer := (g ->> 'stepStart')::integer;
+  g_smin   integer := (g ->> 'stepMin')::integer;
+  g_severy integer := (g ->> 'speedEvery')::integer;
+  g_eat    integer := (g ->> 'eatTicks')::integer;
+  den_x    integer := (g #>> '{den,0}')::integer;
+  den_y    integer := (g #>> '{den,1}')::integer;
+  btick    integer[];
+  nbt      integer;
+  dx       integer[] := array[0, 0, 1, 0, -1];
+  dy       integer[] := array[0, -1, 0, 1, 0];
+  v_in     bytea;
+  px integer[]; py integer[]; ox integer[]; oy integer[];
+  mv integer[]; stun integer[]; xr integer[]; outt integer[]; steps integer[];
+  code integer[]; want integer[]; tx integer[]; ty integer[]; go integer[];
+  lot      bigint[];
+  wall     boolean[];
+  nb       integer := 0;
+  bear_x integer[]; bear_y integer[]; bear_fx integer[]; bear_fy integer[]; bnext integer[]; beat integer[]; bmoved boolean[];
+  cx integer[]; cy integer[];
+  t        integer := 0;
+  done     boolean := false;
+  endt     integer := -1;
+  i integer; j integer; d integer; b integer; k integer; c integer; nx integer; ny integer; alive integer;
+  v_target integer; v_bd integer; v_bl bigint; v_d integer; v_dx integer; v_dy integer; v_sx integer; v_sy integer;
+  v_flip integer; v_step integer; v_taken boolean; v_on boolean; v_swap boolean;
+  k1 integer[]; k2 integer[]; k3 integer[];
+begin
+  if n = 0 then
+    return jsonb_build_object('done', true, 'end_tick', -1, 'tick', 0, 'ranking', '[]'::jsonb, 'out', '[]'::jsonb, 'score', '[]'::jsonb);
+  end if;
+  v_in := public.battle_stream_bytes(p_streams, n, len);
+  select sx, sy into px, py from public.battle_spawns(p_seed, n, coalesce(g -> 'spawns', p_params -> 'spawns'));
+  mv := array_fill(0, array[n]); stun := mv; xr := mv; steps := mv; code := mv; want := mv; tx := mv; ty := mv; go := mv;
+  outt := array_fill(-1, array[n]);
+  select array_agg(public.battle_hash(p_seed, 601, s) order by s) into lot from generate_series(0, n - 1) s;
+  select array_agg(x::integer order by o) into btick from jsonb_array_elements_text(g -> 'bearTicks') with ordinality z(x, o);
+  nbt := coalesce(array_length(btick, 1), 0);
+  wall := array_fill(false, array[w * h]);
+  for k in 0 .. coalesce(jsonb_array_length(g -> 'pillars'), 0) - 1 loop
+    wall[(g -> 'pillars' -> k ->> 1)::integer * w + (g -> 'pillars' -> k ->> 0)::integer + 1] := true;
+  end loop;
+  bear_x := array_fill(den_x, array[greatest(nbt, 1)]); bear_y := array_fill(den_y, array[greatest(nbt, 1)]);
+  bear_fx := bear_x; bear_fy := bear_y;
+  bnext := array_fill(0, array[greatest(nbt, 1)]); beat := bnext;
+  while not done and t < p_until loop
+    -- inputs
+    for i in 1 .. n loop
+      code[i] := -1;
+      continue when outt[i] >= 0;
+      b := get_byte(v_in, (i - 1) * len + t);
+      if b = 113 then outt[i] := t; continue; end if;
+      if b between 48 and 57 then
+        xr[i] := 0; code[i] := b - 48;
+      else
+        xr[i] := xr[i] + 1;
+        if xr[i] >= disc then outt[i] := t; end if;
+      end if;
+    end loop;
+    -- advance
+    for i in 1 .. n loop
+      if outt[i] < 0 then
+        if mv[i] > 0 then mv[i] := mv[i] - 1; end if;
+        if stun[i] > 0 then stun[i] := stun[i] - 1; end if;
+      end if;
+    end loop;
+    ox := px; oy := py;
+    -- walk (not through pillars; into a bear: caught)
+    for i in 1 .. n loop
+      want[i] := 0;
+      continue when outt[i] >= 0 or mv[i] > 0 or stun[i] > 0 or code[i] <= 0;
+      d := code[i] % 5;
+      continue when d = 0;
+      nx := px[i] + dx[d + 1]; ny := py[i] + dy[d + 1];
+      if nx >= 0 and ny >= 0 and nx < w and ny < h and not wall[ny * w + nx + 1] then
+        tx[i] := nx; ty[i] := ny; want[i] := 1;
+      end if;
+    end loop;
+    for i in 1 .. n loop
+      go[i] := want[i];
+      continue when want[i] = 0;
+      for j in 1 .. n loop
+        continue when j = i or outt[j] >= 0;
+        if px[j] = tx[i] and py[j] = ty[i] then go[i] := 0;
+        elsif want[j] = 1 and tx[j] = tx[i] and ty[j] = ty[i] then go[i] := 0;
+        end if;
+      end loop;
+    end loop;
+    for i in 1 .. n loop
+      if go[i] = 1 then px[i] := tx[i]; py[i] := ty[i]; mv[i] := st; steps[i] := steps[i] + 1; end if;
+    end loop;
+    -- a new bear leaves the den
+    if nb < nbt and t >= btick[nb + 1] then
+      nb := nb + 1;
+      bear_x[nb] := den_x; bear_y[nb] := den_y; bear_fx[nb] := den_x; bear_fy[nb] := den_y;
+      bnext[nb] := t + g_sstart;
+    end if;
+    bmoved := array_fill(false, array[greatest(nbt, 1)]);
+    for k in 1 .. nb loop
+      continue when t < bnext[k] or t < beat[k];
+      v_target := 0;
+      for i in 1 .. n loop
+        continue when outt[i] >= 0;
+        v_d := abs(px[i] - bear_x[k]) + abs(py[i] - bear_y[k]);
+        if v_target = 0 or v_d < v_bd or (v_d = v_bd and lot[i] < v_bl) then
+          v_target := i; v_bd := v_d; v_bl := lot[i];
+        end if;
+      end loop;
+      continue when v_target = 0;
+      v_dx := px[v_target] - bear_x[k]; v_dy := py[v_target] - bear_y[k];
+      v_sx := case when v_dx > 0 then 1 when v_dx < 0 then -1 else 0 end;
+      v_sy := case when v_dy > 0 then 1 when v_dy < 0 then -1 else 0 end;
+      v_flip := case when public.battle_hash(p_seed, 602, t) % 2 = 1 then -1 else 1 end;
+      cx := '{}'; cy := '{}';
+      if abs(v_dx) >= abs(v_dy) then
+        if v_sx <> 0 then cx := cx || v_sx; cy := cy || 0; end if;
+        if v_sy <> 0 then cx := cx || 0; cy := cy || v_sy; end if;
+        cx := cx || array[0, 0]; cy := cy || array[v_flip, -v_flip];
+      else
+        if v_sy <> 0 then cx := cx || 0; cy := cy || v_sy; end if;
+        if v_sx <> 0 then cx := cx || v_sx; cy := cy || 0; end if;
+        cx := cx || array[v_flip, -v_flip]; cy := cy || array[0, 0];
+      end if;
+      v_step := greatest(g_smin, g_sstart - t / g_severy);
+      bnext[k] := t + v_step;
+      for c in 1 .. array_length(cx, 1) loop
+        nx := bear_x[k] + cx[c]; ny := bear_y[k] + cy[c];
+        continue when nx < 0 or ny < 0 or nx >= w or ny >= h or wall[ny * w + nx + 1];
+        v_taken := false;
+        for j in 1 .. nb loop
+          if j <> k and bear_x[j] = nx and bear_y[j] = ny then v_taken := true; end if;
+        end loop;
+        continue when v_taken;
+        bear_fx[k] := bear_x[k]; bear_fy[k] := bear_y[k]; bear_x[k] := nx; bear_y[k] := ny; bmoved[k] := true;
+        exit;
+      end loop;
+    end loop;
+    -- caught: on the bear's tile, or swapped tiles with it
+    for k in 1 .. nb loop
+      for i in 1 .. n loop
+        continue when outt[i] >= 0;
+        v_on := px[i] = bear_x[k] and py[i] = bear_y[k];
+        v_swap := bmoved[k] and (ox[i] <> px[i] or oy[i] <> py[i]) and ox[i] = bear_x[k] and oy[i] = bear_y[k]
+                  and px[i] = bear_fx[k] and py[i] = bear_fy[k];
+        continue when not v_on and not v_swap;
+        outt[i] := t;
+        beat[k] := t + g_eat;
+      end loop;
+    end loop;
+    alive := 0;
+    for i in 1 .. n loop
+      if outt[i] < 0 then alive := alive + 1; end if;
+    end loop;
+    if (n >= 2 and alive <= 1) or alive = 0 or t + 1 >= g_max then done := true; endt := t; end if;
+    t := t + 1;
+  end loop;
+  k1 := array_fill(0, array[n]); k2 := k1; k3 := k1;
+  for i in 1 .. n loop
+    k1[i] := case when outt[i] < 0 then 1000000 else outt[i] end;
+    k2[i] := steps[i];
+  end loop;
+  return jsonb_build_object('done', done, 'end_tick', endt, 'tick', t,
+                            'ranking', to_jsonb(public.battle_rank(p_seed, n, k1, k2, k3)),
+                            'out', to_jsonb(outt), 'score', to_jsonb(steps));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Dividenden-Dash (src/lib/sim/battle/dash.ts)
+-- ---------------------------------------------------------------------------
+-- A free tile for coin number p_index: from the drawn tile on, the first without an alive player or a coin
+create or replace function public.battle_dash_tile(p_seed bigint, p_index integer, p_size integer, p_occ integer[],
+                                                   p_coins integer[])
+returns integer
+language plpgsql
+immutable
+as $$
+declare
+  v_start integer := (public.battle_hash(p_seed, 700, p_index) % p_size)::integer;
+  v_tile  integer;
+  k       integer;
+begin
+  for k in 0 .. p_size - 1 loop
+    v_tile := (v_start + k) % p_size;
+    continue when p_occ[v_tile + 1] > 0 or v_tile = any (coalesce(p_coins, '{}'));
+    return v_tile;
+  end loop;
+  return v_start;
+end;
+$$;
+
+create or replace function public.battle_sim_dash(p_seed bigint, p_params jsonb, p_streams text[], p_until integer)
+returns jsonb
+language plpgsql
+immutable
+as $$
+declare
+  g        jsonb := p_params -> 'game';
+  w        integer := (p_params ->> 'w')::integer;
+  h        integer := (p_params ->> 'h')::integer;
+  st       integer := (p_params ->> 'stepTicks')::integer;
+  disc     integer := (p_params ->> 'disconnectTicks')::integer;
+  n        integer := coalesce(array_length(p_streams, 1), 0);
+  len      integer := greatest(p_until, 1);
+  g_max    integer := (g ->> 'maxTicks')::integer;
+  g_target integer := (g ->> 'target')::integer;
+  g_first  integer := (g ->> 'firstCoin')::integer;
+  g_per    integer := (g ->> 'coinsPerPlayers')::integer;
+  g_cmax   integer := (g ->> 'coinsMax')::integer;
+  g_delay  integer := (g ->> 'spawnDelay')::integer;
+  g_gevery integer := (g ->> 'goldEvery')::integer;
+  g_gval   integer := (g ->> 'goldValue')::integer;
+  g_stun   integer := (g ->> 'tackleStun')::integer;
+  g_cool   integer := (g ->> 'tackleCool')::integer;
+  dx       integer[] := array[0, 0, 1, 0, -1];
+  dy       integer[] := array[0, -1, 0, 1, 0];
+  v_in     bytea;
+  px integer[]; py integer[];
+  mv integer[]; stun integer[]; xr integer[]; outt integer[]; steps integer[];
+  code integer[]; want integer[]; tx integer[]; ty integer[]; go integer[];
+  score integer[]; reach integer[]; cool integer[];
+  hi integer[]; hj integer[];
+  ct integer[]; ca integer[]; cn integer[];
+  occ integer[];
+  v_count  integer;
+  v_next   integer := 0;
+  t        integer := 0;
+  done     boolean := false;
+  endt     integer := -1;
+  i integer; j integer; d integer; b integer; c integer; nx integer; ny integer; alive integer; v_tile integer;
+  v_won boolean;
+  k1 integer[]; k2 integer[]; k3 integer[];
+begin
+  if n = 0 then
+    return jsonb_build_object('done', true, 'end_tick', -1, 'tick', 0, 'ranking', '[]'::jsonb, 'out', '[]'::jsonb, 'score', '[]'::jsonb);
+  end if;
+  v_in := public.battle_stream_bytes(p_streams, n, len);
+  select sx, sy into px, py from public.battle_spawns(p_seed, n, p_params -> 'spawns');
+  mv := array_fill(0, array[n]); stun := mv; xr := mv; steps := mv; code := mv; want := mv; tx := mv; ty := mv; go := mv;
+  score := mv; reach := mv; cool := mv;
+  outt := array_fill(-1, array[n]);
+  occ := array_fill(0, array[w * h]);
+  for i in 1 .. n loop
+    occ[py[i] * w + px[i] + 1] := 1;
+  end loop;
+  v_count := least(g_cmax, 1 + n / g_per);
+  ct := '{}'; ca := '{}'; cn := '{}';
+  for c in 1 .. v_count loop
+    ct := ct || public.battle_dash_tile(p_seed, v_next, w * h, occ, ct);
+    ca := ca || g_first;
+    cn := cn || v_next;
+    v_next := v_next + 1;
+  end loop;
+  while not done and t < p_until loop
+    for i in 1 .. n loop
+      code[i] := -1;
+      continue when outt[i] >= 0;
+      b := get_byte(v_in, (i - 1) * len + t);
+      if b = 113 then outt[i] := t; continue; end if;
+      if b between 48 and 57 then
+        xr[i] := 0; code[i] := b - 48;
+      else
+        xr[i] := xr[i] + 1;
+        if xr[i] >= disc then outt[i] := t; end if;
+      end if;
+    end loop;
+    for i in 1 .. n loop
+      if outt[i] < 0 then
+        if mv[i] > 0 then mv[i] := mv[i] - 1; end if;
+        if stun[i] > 0 then stun[i] := stun[i] - 1; end if;
+        if cool[i] > 0 then cool[i] := cool[i] - 1; end if;
+      end if;
+    end loop;
+    -- walk; walking into someone with the action held is a tackle
+    hi := '{}'; hj := '{}';
+    for i in 1 .. n loop
+      want[i] := 0;
+      continue when outt[i] >= 0 or mv[i] > 0 or stun[i] > 0 or code[i] <= 0;
+      d := code[i] % 5;
+      continue when d = 0;
+      nx := px[i] + dx[d + 1]; ny := py[i] + dy[d + 1];
+      if nx >= 0 and ny >= 0 and nx < w and ny < h then
+        tx[i] := nx; ty[i] := ny; want[i] := 1;
+      end if;
+    end loop;
+    for i in 1 .. n loop
+      go[i] := want[i];
+      continue when want[i] = 0;
+      for j in 1 .. n loop
+        continue when j = i or outt[j] >= 0;
+        if px[j] = tx[i] and py[j] = ty[i] then
+          go[i] := 0;
+          if code[i] >= 5 and cool[i] = 0 then hi := hi || i; hj := hj || j; end if;
+        elsif want[j] = 1 and tx[j] = tx[i] and ty[j] = ty[i] then go[i] := 0;
+        end if;
+      end loop;
+    end loop;
+    for i in 1 .. n loop
+      if go[i] = 1 then px[i] := tx[i]; py[i] := ty[i]; mv[i] := st; steps[i] := steps[i] + 1; end if;
+    end loop;
+    for c in 1 .. coalesce(array_length(hi, 1), 0) loop
+      stun[hj[c]] := greatest(stun[hj[c]], g_stun);
+      cool[hi[c]] := g_cool;
+    end loop;
+    -- coins
+    occ := array_fill(0, array[w * h]);
+    for i in 1 .. n loop
+      if outt[i] < 0 then occ[py[i] * w + px[i] + 1] := i; end if;
+    end loop;
+    for c in 1 .. v_count loop
+      continue when t < ca[c];
+      v_tile := ct[c];
+      j := occ[v_tile + 1];
+      continue when j = 0;
+      score[j] := score[j] + case when (cn[c] + 1) % g_gevery = 0 then g_gval else 1 end;
+      reach[j] := t;
+      ct[c] := -1;
+      ct[c] := public.battle_dash_tile(p_seed, v_next, w * h, occ, ct);
+      ca[c] := t + g_delay;
+      cn[c] := v_next;
+      v_next := v_next + 1;
+    end loop;
+    v_won := false;
+    alive := 0;
+    for i in 1 .. n loop
+      if outt[i] < 0 then
+        alive := alive + 1;
+        if score[i] >= g_target then v_won := true; end if;
+      end if;
+    end loop;
+    if v_won or (n >= 2 and alive <= 1) or alive = 0 or t + 1 >= g_max then done := true; endt := t; end if;
+    t := t + 1;
+  end loop;
+  k1 := array_fill(0, array[n]); k2 := k1; k3 := k1;
+  for i in 1 .. n loop
+    k1[i] := case when outt[i] < 0 then 1 else 0 end;
+    k2[i] := score[i];
+    k3[i] := case when score[i] > 0 then -reach[i] else 0 end;
+  end loop;
+  return jsonb_build_object('done', done, 'end_tick', endt, 'tick', t,
+                            'ranking', to_jsonb(public.battle_rank(p_seed, n, k1, k2, k3)),
+                            'out', to_jsonb(outt), 'score', to_jsonb(score));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Margin Call (src/lib/sim/battle/margin.ts)
+-- ---------------------------------------------------------------------------
+create or replace function public.battle_sim_margin(p_seed bigint, p_params jsonb, p_streams text[], p_until integer)
+returns jsonb
+language plpgsql
+immutable
+as $$
+declare
+  g        jsonb := p_params -> 'game';
+  w        integer := (p_params ->> 'w')::integer;
+  h        integer := (p_params ->> 'h')::integer;
+  st       integer := (p_params ->> 'stepTicks')::integer;
+  disc     integer := (p_params ->> 'disconnectTicks')::integer;
+  n        integer := coalesce(array_length(p_streams, 1), 0);
+  len      integer := greatest(p_until, 1);
+  g_max    integer := (g ->> 'maxTicks')::integer;
+  g_show   integer := (g ->> 'showTicks')::integer;
+  g_smin   integer := (g ->> 'showMin')::integer;
+  g_sstep  integer := (g ->> 'showStep')::integer;
+  g_pause  integer := (g ->> 'pauseTicks')::integer;
+  g_warm   integer := (g ->> 'warmupRounds')::integer;
+  dx       integer[] := array[0, 0, 1, 0, -1];
+  dy       integer[] := array[0, -1, 0, 1, 0];
+  v_in     bytea;
+  px integer[]; py integer[];
+  mv integer[]; stun integer[]; xr integer[]; outt integer[]; steps integer[];
+  code integer[]; want integer[]; tx integer[]; ty integer[]; go integer[];
+  dist integer[]; safe integer[]; occ integer[]; failing integer[];
+  v_round  integer := 0;
+  v_call   integer := -1;
+  v_nextr  integer := (g ->> 'firstRound')::integer;
+  v_count  integer;
+  v_best   integer;
+  t        integer := 0;
+  done     boolean := false;
+  endt     integer := -1;
+  i integer; j integer; d integer; b integer; nx integer; ny integer; alive integer; v_tile integer;
+  k1 integer[]; k2 integer[]; k3 integer[];
+begin
+  if n = 0 then
+    return jsonb_build_object('done', true, 'end_tick', -1, 'tick', 0, 'ranking', '[]'::jsonb, 'out', '[]'::jsonb, 'score', '[]'::jsonb);
+  end if;
+  v_in := public.battle_stream_bytes(p_streams, n, len);
+  select sx, sy into px, py from public.battle_spawns(p_seed, n, p_params -> 'spawns');
+  mv := array_fill(0, array[n]); stun := mv; xr := mv; steps := mv; code := mv; want := mv; tx := mv; ty := mv; go := mv;
+  dist := mv;
+  outt := array_fill(-1, array[n]);
+  safe := array_fill(0, array[w * h]);
+  while not done and t < p_until loop
+    for i in 1 .. n loop
+      code[i] := -1;
+      continue when outt[i] >= 0;
+      b := get_byte(v_in, (i - 1) * len + t);
+      if b = 113 then outt[i] := t; continue; end if;
+      if b between 48 and 57 then
+        xr[i] := 0; code[i] := b - 48;
+      else
+        xr[i] := xr[i] + 1;
+        if xr[i] >= disc then outt[i] := t; end if;
+      end if;
+    end loop;
+    for i in 1 .. n loop
+      if outt[i] < 0 then
+        if mv[i] > 0 then mv[i] := mv[i] - 1; end if;
+        if stun[i] > 0 then stun[i] := stun[i] - 1; end if;
+      end if;
+    end loop;
+    for i in 1 .. n loop
+      want[i] := 0;
+      continue when outt[i] >= 0 or mv[i] > 0 or stun[i] > 0 or code[i] <= 0;
+      d := code[i] % 5;
+      continue when d = 0;
+      nx := px[i] + dx[d + 1]; ny := py[i] + dy[d + 1];
+      if nx >= 0 and ny >= 0 and nx < w and ny < h then
+        tx[i] := nx; ty[i] := ny; want[i] := 1;
+      end if;
+    end loop;
+    for i in 1 .. n loop
+      go[i] := want[i];
+      continue when want[i] = 0;
+      for j in 1 .. n loop
+        continue when j = i or outt[j] >= 0;
+        if px[j] = tx[i] and py[j] = ty[i] then go[i] := 0;
+        elsif want[j] = 1 and tx[j] = tx[i] and ty[j] = ty[i] then go[i] := 0;
+        end if;
+      end loop;
+    end loop;
+    for i in 1 .. n loop
+      if go[i] = 1 then px[i] := tx[i]; py[i] := ty[i]; mv[i] := st; steps[i] := steps[i] + 1; end if;
+    end loop;
+    -- a round: safe tiles on free tiles, drawn from the seed
+    if t = v_nextr then
+      alive := 0;
+      occ := array_fill(0, array[w * h]);
+      for i in 1 .. n loop
+        if outt[i] < 0 then alive := alive + 1; occ[py[i] * w + px[i] + 1] := 1; end if;
+      end loop;
+      v_count := greatest(1, alive - 1 + greatest(0, g_warm - v_round));
+      safe := array_fill(0, array[w * h]);
+      for v_tile in
+        select z.ti from (select s.ti, public.battle_hash(p_seed, 800 + v_round, s.ti) as hh
+                            from generate_series(0, w * h - 1) s(ti) where occ[s.ti + 1] = 0) z
+         order by z.hh, z.ti limit v_count
+      loop
+        safe[v_tile + 1] := 1;
+      end loop;
+      v_call := t + greatest(g_smin, g_show - v_round * g_sstep);
+      v_nextr := -1;
+    end if;
+    -- the gong
+    if t = v_call then
+      alive := 0;
+      failing := '{}';
+      for i in 1 .. n loop
+        continue when outt[i] >= 0;
+        alive := alive + 1;
+        if safe[py[i] * w + px[i] + 1] <> 1 then failing := failing || i; end if;
+      end loop;
+      if coalesce(array_length(failing, 1), 0) < alive then
+        foreach i in array failing loop
+          v_best := 1000;
+          for v_tile in 0 .. w * h - 1 loop
+            if safe[v_tile + 1] = 1 then
+              v_best := least(v_best, abs(v_tile % w - px[i]) + abs(v_tile / w - py[i]));
+            end if;
+          end loop;
+          outt[i] := t;
+          dist[i] := v_best;
+        end loop;
+      end if;
+      v_round := v_round + 1;
+      v_call := -1;
+      v_nextr := t + g_pause;
+    end if;
+    alive := 0;
+    for i in 1 .. n loop
+      if outt[i] < 0 then alive := alive + 1; end if;
+    end loop;
+    if (n >= 2 and alive <= 1) or alive = 0 or t + 1 >= g_max then done := true; endt := t; end if;
+    t := t + 1;
+  end loop;
+  k1 := array_fill(0, array[n]); k2 := k1; k3 := k1;
+  for i in 1 .. n loop
+    k1[i] := case when outt[i] < 0 then 1000000 else outt[i] end;
+    k2[i] := -dist[i];
+    k3[i] := steps[i];
+  end loop;
+  return jsonb_build_object('done', done, 'end_tick', endt, 'tick', t,
+                            'ranking', to_jsonb(public.battle_rank(p_seed, n, k1, k2, k3)),
+                            'out', to_jsonb(outt), 'score', to_jsonb(dist));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Fahrstuhl zum Mond (src/lib/sim/battle/elevator.ts)
+-- ---------------------------------------------------------------------------
+-- The gaps of barrier row r as a bit mask over the columns (0: no barrier)
+create or replace function public.battle_elevator_mask(p_seed bigint, p_game jsonb, p_w integer, p_r integer)
+returns integer
+language plpgsql
+immutable
+as $$
+declare
+  v_count integer;
+  v_mask  integer := 0;
+  x       integer;
+begin
+  if p_r <= 0 or p_r % (p_game ->> 'barrierEvery')::integer <> 0 then
+    return 0;
+  end if;
+  v_count := greatest((p_game ->> 'gapMin')::integer,
+                      (p_game ->> 'gapStart')::integer - p_r / (p_game ->> 'gapShrinkEvery')::integer);
+  for x in select c from generate_series(0, p_w - 1) c order by public.battle_hash(p_seed, 900 + p_r, c), c limit v_count loop
+    v_mask := v_mask | (1 << x);
+  end loop;
+  return v_mask;
+end;
+$$;
+
+create or replace function public.battle_sim_elevator(p_seed bigint, p_params jsonb, p_streams text[], p_until integer)
+returns jsonb
+language plpgsql
+immutable
+as $$
+declare
+  g        jsonb := p_params -> 'game';
+  w        integer := (p_params ->> 'w')::integer;
+  h        integer := (p_params ->> 'h')::integer;
+  st       integer := (p_params ->> 'stepTicks')::integer;
+  disc     integer := (p_params ->> 'disconnectTicks')::integer;
+  n        integer := coalesce(array_length(p_streams, 1), 0);
+  len      integer := greatest(p_until, 1);
+  g_max    integer := (g ->> 'maxTicks')::integer;
+  g_rstart integer := (g ->> 'riseStart')::integer;
+  g_rmin   integer := (g ->> 'riseMin')::integer;
+  g_rstep  integer := (g ->> 'riseStep')::integer;
+  g_revery integer := (g ->> 'riseStepEvery')::integer;
+  dx       integer[] := array[0, 0, 1, 0, -1];
+  dy       integer[] := array[0, -1, 0, 1, 0];
+  v_in     bytea;
+  px integer[]; py integer[];
+  mv integer[]; stun integer[]; xr integer[]; outt integer[]; steps integer[];
+  code integer[]; want integer[]; tx integer[]; ty integer[]; go integer[];
+  best integer[];
+  masks    integer[] := '{}';
+  cam      integer := 0;
+  rises    integer := 0;
+  nextr    integer := (g ->> 'firstRise')::integer;
+  t        integer := 0;
+  done     boolean := false;
+  endt     integer := -1;
+  i integer; j integer; d integer; b integer; nx integer; ny integer; alive integer; v_mask integer;
+  k1 integer[]; k2 integer[]; k3 integer[];
+begin
+  if n = 0 then
+    return jsonb_build_object('done', true, 'end_tick', -1, 'tick', 0, 'ranking', '[]'::jsonb, 'out', '[]'::jsonb, 'score', '[]'::jsonb);
+  end if;
+  v_in := public.battle_stream_bytes(p_streams, n, len);
+  select sx, sy into px, py from public.battle_spawns(p_seed, n, p_params -> 'spawns');
+  mv := array_fill(0, array[n]); stun := mv; xr := mv; steps := mv; code := mv; want := mv; tx := mv; ty := mv; go := mv;
+  outt := array_fill(-1, array[n]);
+  best := py;
+  while coalesce(array_length(masks, 1), 0) < cam + h loop
+    masks := masks || public.battle_elevator_mask(p_seed, g, w, coalesce(array_length(masks, 1), 0));
+  end loop;
+  while not done and t < p_until loop
+    for i in 1 .. n loop
+      code[i] := -1;
+      continue when outt[i] >= 0;
+      b := get_byte(v_in, (i - 1) * len + t);
+      if b = 113 then outt[i] := t; continue; end if;
+      if b between 48 and 57 then
+        xr[i] := 0; code[i] := b - 48;
+      else
+        xr[i] := xr[i] + 1;
+        if xr[i] >= disc then outt[i] := t; end if;
+      end if;
+    end loop;
+    for i in 1 .. n loop
+      if outt[i] < 0 then
+        if mv[i] > 0 then mv[i] := mv[i] - 1; end if;
+        if stun[i] > 0 then stun[i] := stun[i] - 1; end if;
+      end if;
+    end loop;
+    -- walk: inside the screen, not into a candle of a bar (row r = h - 1 - y)
+    for i in 1 .. n loop
+      want[i] := 0;
+      continue when outt[i] >= 0 or mv[i] > 0 or stun[i] > 0 or code[i] <= 0;
+      d := code[i] % 5;
+      continue when d = 0;
+      nx := px[i] + dx[d + 1]; ny := py[i] + dy[d + 1];
+      continue when nx < 0 or nx >= w or ny > h - 1 or ny < -cam;
+      v_mask := coalesce(masks[h - 1 - ny + 1], 0);
+      if v_mask = 0 or (v_mask & (1 << nx)) <> 0 then
+        tx[i] := nx; ty[i] := ny; want[i] := 1;
+      end if;
+    end loop;
+    for i in 1 .. n loop
+      go[i] := want[i];
+      continue when want[i] = 0;
+      for j in 1 .. n loop
+        continue when j = i or outt[j] >= 0;
+        if px[j] = tx[i] and py[j] = ty[i] then go[i] := 0;
+        elsif want[j] = 1 and tx[j] = tx[i] and ty[j] = ty[i] then go[i] := 0;
+        end if;
+      end loop;
+    end loop;
+    for i in 1 .. n loop
+      if go[i] = 1 then px[i] := tx[i]; py[i] := ty[i]; mv[i] := st; steps[i] := steps[i] + 1; end if;
+    end loop;
+    if t = nextr then
+      cam := cam + 1;
+      rises := rises + 1;
+      nextr := t + greatest(g_rmin, g_rstart - (rises / g_revery) * g_rstep);
+      while coalesce(array_length(masks, 1), 0) < cam + h loop
+        masks := masks || public.battle_elevator_mask(p_seed, g, w, coalesce(array_length(masks, 1), 0));
+      end loop;
+    end if;
+    for i in 1 .. n loop
+      continue when outt[i] >= 0;
+      if py[i] > h - 1 - cam then outt[i] := t; else best[i] := least(best[i], py[i]); end if;
+    end loop;
+    alive := 0;
+    for i in 1 .. n loop
+      if outt[i] < 0 then alive := alive + 1; end if;
+    end loop;
+    if (n >= 2 and alive <= 1) or alive = 0 or t + 1 >= g_max then done := true; endt := t; end if;
+    t := t + 1;
+  end loop;
+  k1 := array_fill(0, array[n]); k2 := k1; k3 := k1;
+  for i in 1 .. n loop
+    k1[i] := case when outt[i] < 0 then 1000000 else outt[i] end;
+    k2[i] := -best[i];
+    k3[i] := steps[i];
+  end loop;
+  return jsonb_build_object('done', done, 'end_tick', endt, 'tick', t,
+                            'ranking', to_jsonb(public.battle_rank(p_seed, n, k1, k2, k3)),
+                            'out', to_jsonb(outt), 'score', to_jsonb(best));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Laserschranke (src/lib/sim/battle/laser.ts)
+-- ---------------------------------------------------------------------------
+create or replace function public.battle_sim_laser(p_seed bigint, p_params jsonb, p_streams text[], p_until integer)
+returns jsonb
+language plpgsql
+immutable
+as $$
+declare
+  g        jsonb := p_params -> 'game';
+  w        integer := (p_params ->> 'w')::integer;
+  h        integer := (p_params ->> 'h')::integer;
+  st       integer := (p_params ->> 'stepTicks')::integer;
+  disc     integer := (p_params ->> 'disconnectTicks')::integer;
+  n        integer := coalesce(array_length(p_streams, 1), 0);
+  len      integer := greatest(p_until, 1);
+  g_max    integer := (g ->> 'maxTicks')::integer;
+  g_hearts integer := (g ->> 'hearts')::integer;
+  g_every  integer := (g ->> 'spawnEvery')::integer;
+  g_emin   integer := (g ->> 'spawnEveryMin')::integer;
+  g_estep  integer := (g ->> 'spawnEveryStep')::integer;
+  g_grow   integer := (g ->> 'countGrowEvery')::integer;
+  g_cmax   integer := (g ->> 'countMax')::integer;
+  g_stag   integer := (g ->> 'staggerTicks')::integer;
+  g_warn   integer := (g ->> 'warnTicks')::integer;
+  g_tpt    integer := (g ->> 'ticksPerTile')::integer;
+  g_gap    integer := (g ->> 'gapPct')::integer;
+  g_jump   integer := (g ->> 'jumpTicks')::integer;
+  g_jcool  integer := (g ->> 'jumpCool')::integer;
+  g_inv    integer := (g ->> 'invulnTicks')::integer;
+  dx       integer[] := array[0, 0, 1, 0, -1];
+  dy       integer[] := array[0, -1, 0, 1, 0];
+  v_in     bytea;
+  px integer[]; py integer[];
+  mv integer[]; stun integer[]; xr integer[]; outt integer[]; steps integer[];
+  code integer[]; want integer[]; tx integer[]; ty integer[]; go integer[];
+  hearts integer[]; inv integer[]; air integer[]; jcool integer[]; held integer[];
+  ll integer[] := '{}'; ld integer[] := '{}'; lg integer[] := '{}'; lt integer[] := '{}';
+  nl       integer := 0;
+  lfirst   integer := 1;
+  spawn    integer := 0;
+  nexts    integer := (g ->> 'firstSpawn')::integer;
+  t        integer := 0;
+  done     boolean := false;
+  endt     integer := -1;
+  i integer; j integer; d integer; b integer; k integer; nx integer; ny integer; alive integer;
+  r bigint; v_line integer; v_len integer; v_cnt integer; v_kk integer; v_at integer; v_act boolean;
+  k1 integer[]; k2 integer[]; k3 integer[];
+begin
+  if n = 0 then
+    return jsonb_build_object('done', true, 'end_tick', -1, 'tick', 0, 'ranking', '[]'::jsonb, 'out', '[]'::jsonb, 'score', '[]'::jsonb);
+  end if;
+  v_in := public.battle_stream_bytes(p_streams, n, len);
+  select sx, sy into px, py from public.battle_spawns(p_seed, n, p_params -> 'spawns');
+  mv := array_fill(0, array[n]); stun := mv; xr := mv; steps := mv; code := mv; want := mv; tx := mv; ty := mv; go := mv;
+  inv := mv; air := mv; jcool := mv; held := mv;
+  hearts := array_fill(g_hearts, array[n]);
+  outt := array_fill(-1, array[n]);
+  while not done and t < p_until loop
+    for i in 1 .. n loop
+      code[i] := -1;
+      continue when outt[i] >= 0;
+      b := get_byte(v_in, (i - 1) * len + t);
+      if b = 113 then outt[i] := t; continue; end if;
+      if b between 48 and 57 then
+        xr[i] := 0; code[i] := b - 48;
+      else
+        xr[i] := xr[i] + 1;
+        if xr[i] >= disc then outt[i] := t; end if;
+      end if;
+    end loop;
+    for i in 1 .. n loop
+      if outt[i] < 0 then
+        if mv[i] > 0 then mv[i] := mv[i] - 1; end if;
+        if stun[i] > 0 then stun[i] := stun[i] - 1; end if;
+      end if;
+    end loop;
+    -- jumps: a new press of the action, on the ground and rested
+    for i in 1 .. n loop
+      continue when outt[i] >= 0;
+      if inv[i] > 0 then inv[i] := inv[i] - 1; end if;
+      if air[i] > 0 then
+        air[i] := air[i] - 1;
+        if air[i] = 0 then jcool[i] := g_jcool; end if;
+      elsif jcool[i] > 0 then
+        jcool[i] := jcool[i] - 1;
+      end if;
+      v_act := code[i] >= 5;
+      if v_act and held[i] = 0 and air[i] = 0 and jcool[i] = 0 then air[i] := g_jump; end if;
+      held[i] := case when v_act then 1 else 0 end;
+    end loop;
+    for i in 1 .. n loop
+      want[i] := 0;
+      continue when outt[i] >= 0 or mv[i] > 0 or stun[i] > 0 or code[i] <= 0;
+      d := code[i] % 5;
+      continue when d = 0;
+      nx := px[i] + dx[d + 1]; ny := py[i] + dy[d + 1];
+      if nx >= 0 and ny >= 0 and nx < w and ny < h then
+        tx[i] := nx; ty[i] := ny; want[i] := 1;
+      end if;
+    end loop;
+    for i in 1 .. n loop
+      go[i] := want[i];
+      continue when want[i] = 0;
+      for j in 1 .. n loop
+        continue when j = i or outt[j] >= 0;
+        if px[j] = tx[i] and py[j] = ty[i] then go[i] := 0;
+        elsif want[j] = 1 and tx[j] = tx[i] and ty[j] = ty[i] then go[i] := 0;
+        end if;
+      end loop;
+    end loop;
+    for i in 1 .. n loop
+      if go[i] = 1 then px[i] := tx[i]; py[i] := ty[i]; mv[i] := st; steps[i] := steps[i] + 1; end if;
+    end loop;
+    -- a wave of beams
+    if t = nexts then
+      v_cnt := least(g_cmax, 1 + spawn / g_grow);
+      for k in 0 .. v_cnt - 1 loop
+        r := public.battle_hash(p_seed, 1000 + spawn, k);
+        v_line := (r % 2)::integer;
+        ll := ll || v_line;
+        ld := ld || case when (r / 2) % 2 = 0 then 1 else -1 end;
+        lg := lg || case when ((r / 4) % 100)::integer < g_gap then ((r / 400) % (case when v_line = 0 then w else h end))::integer else -1 end;
+        lt := lt || (t + g_warn + k * g_stag);
+        nl := nl + 1;
+      end loop;
+      spawn := spawn + 1;
+      nexts := t + greatest(g_emin, g_every - spawn * g_estep);
+    end if;
+    while lfirst <= nl loop
+      exit when t < lt[lfirst] + (case when ll[lfirst] = 0 then h else w end) * g_tpt;
+      lfirst := lfirst + 1;
+    end loop;
+    for k in lfirst .. nl loop
+      continue when t < lt[k];
+      v_len := case when ll[k] = 0 then h else w end;
+      v_kk := (t - lt[k]) / g_tpt;
+      continue when v_kk >= v_len;
+      v_at := case when ld[k] > 0 then v_kk else v_len - 1 - v_kk end;
+      for i in 1 .. n loop
+        continue when outt[i] >= 0 or inv[i] > 0 or air[i] > 0;
+        continue when (case when ll[k] = 0 then py[i] else px[i] end) <> v_at;
+        continue when (case when ll[k] = 0 then px[i] else py[i] end) = lg[k];
+        hearts[i] := hearts[i] - 1;
+        inv[i] := g_inv;
+        if hearts[i] <= 0 then outt[i] := t; end if;
+      end loop;
+    end loop;
+    alive := 0;
+    for i in 1 .. n loop
+      if outt[i] < 0 then alive := alive + 1; end if;
+    end loop;
+    if (n >= 2 and alive <= 1) or alive = 0 or t + 1 >= g_max then done := true; endt := t; end if;
+    t := t + 1;
+  end loop;
+  k1 := array_fill(0, array[n]); k2 := k1; k3 := k1;
+  for i in 1 .. n loop
+    k1[i] := case when outt[i] < 0 then 1000000 else outt[i] end;
+    k2[i] := hearts[i];
+    k3[i] := steps[i];
+  end loop;
+  return jsonb_build_object('done', done, 'end_tick', endt, 'tick', t,
+                            'ranking', to_jsonb(public.battle_rank(p_seed, n, k1, k2, k3)),
+                            'out', to_jsonb(outt), 'score', to_jsonb(hearts));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Bullen-Rodeo (src/lib/sim/battle/rodeo.ts)
+-- ---------------------------------------------------------------------------
+create or replace function public.battle_sim_rodeo(p_seed bigint, p_params jsonb, p_streams text[], p_until integer)
+returns jsonb
+language plpgsql
+immutable
+as $$
+declare
+  g        jsonb := p_params -> 'game';
+  disc     integer := (p_params ->> 'disconnectTicks')::integer;
+  n        integer := coalesce(array_length(p_streams, 1), 0);
+  len      integer := greatest(p_until, 1);
+  g_max    integer := (g ->> 'maxTicks')::integer;
+  g_grip   integer := (g ->> 'grip')::integer;
+  g_wstart integer := (g ->> 'windowStart')::integer;
+  g_wmin   integer := (g ->> 'windowMin')::integer;
+  g_wstep  integer := (g ->> 'windowStep')::integer;
+  g_gmin   integer := (g ->> 'gapMin')::integer;
+  g_gjit   integer := (g ->> 'gapJitter')::integer;
+  v_in     bytea;
+  xr integer[]; outt integer[]; code integer[];
+  grip integer[]; score integer[]; prev integer[]; resp integer[];
+  v_cue    integer := 0;
+  v_start  integer := -1;
+  v_dir    integer := 0;
+  v_win    integer := 0;
+  v_next   integer := (g ->> 'firstCue')::integer;
+  v_losers integer[];
+  t        integer := 0;
+  done     boolean := false;
+  endt     integer := -1;
+  i integer; b integer; d integer; alive integer;
+  k1 integer[]; k2 integer[]; k3 integer[];
+begin
+  if n = 0 then
+    return jsonb_build_object('done', true, 'end_tick', -1, 'tick', 0, 'ranking', '[]'::jsonb, 'out', '[]'::jsonb, 'score', '[]'::jsonb);
+  end if;
+  v_in := public.battle_stream_bytes(p_streams, n, len);
+  xr := array_fill(0, array[n]); code := xr; score := xr; prev := xr; resp := xr;
+  grip := array_fill(g_grip, array[n]);
+  outt := array_fill(-1, array[n]);
+  while not done and t < p_until loop
+    for i in 1 .. n loop
+      code[i] := -1;
+      continue when outt[i] >= 0;
+      b := get_byte(v_in, (i - 1) * len + t);
+      if b = 113 then outt[i] := t; continue; end if;
+      if b between 48 and 57 then
+        xr[i] := 0; code[i] := b - 48;
+      else
+        xr[i] := xr[i] + 1;
+        if xr[i] >= disc then outt[i] := t; end if;
+      end if;
+    end loop;
+    if t = v_next then
+      v_start := t;
+      v_dir := 1 + (public.battle_hash(p_seed, 1100, v_cue) % 4)::integer;
+      v_win := greatest(g_wmin, g_wstart - v_cue * g_wstep);
+      resp := array_fill(0, array[n]);
+      v_next := -1;
+    end if;
+    -- the first new press in the window counts
+    for i in 1 .. n loop
+      continue when outt[i] >= 0;
+      d := case when code[i] > 0 then code[i] % 5 else 0 end;
+      if v_start >= 0 and resp[i] = 0 and d > 0 and d <> prev[i] then
+        if d = v_dir then
+          resp[i] := 1;
+          score[i] := score[i] + v_win - (t - v_start);
+        else
+          resp[i] := 2;
+        end if;
+      end if;
+      prev[i] := d;
+    end loop;
+    -- the end of the window: a grip off for every miss, unless everyone missed
+    if v_start >= 0 and t = v_start + v_win - 1 then
+      alive := 0;
+      v_losers := '{}';
+      for i in 1 .. n loop
+        continue when outt[i] >= 0;
+        alive := alive + 1;
+        if resp[i] <> 1 then v_losers := v_losers || i; end if;
+      end loop;
+      if coalesce(array_length(v_losers, 1), 0) < alive then
+        foreach i in array v_losers loop
+          grip[i] := grip[i] - 1;
+          if grip[i] <= 0 then outt[i] := t; end if;
+        end loop;
+      end if;
+      v_cue := v_cue + 1;
+      v_start := -1;
+      v_next := t + 1 + g_gmin + (public.battle_hash(p_seed, 1101, v_cue) % g_gjit)::integer;
+    end if;
+    alive := 0;
+    for i in 1 .. n loop
+      if outt[i] < 0 then alive := alive + 1; end if;
+    end loop;
+    if (n >= 2 and alive <= 1) or alive = 0 or t + 1 >= g_max then done := true; endt := t; end if;
+    t := t + 1;
+  end loop;
+  k1 := array_fill(0, array[n]); k2 := k1; k3 := k1;
+  for i in 1 .. n loop
+    k1[i] := case when outt[i] < 0 then 1000000 else outt[i] end;
+    k2[i] := grip[i];
+    k3[i] := score[i];
+  end loop;
+  return jsonb_build_object('done', done, 'end_tick', endt, 'tick', t,
+                            'ranking', to_jsonb(public.battle_rank(p_seed, n, k1, k2, k3)),
+                            'out', to_jsonb(outt), 'score', to_jsonb(score));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- One entry for all games (the definition of 4710 with the six new games)
+-- ---------------------------------------------------------------------------
+create or replace function public.battle_sim(p_kind text, p_seed bigint, p_params jsonb, p_streams text[], p_until integer)
+returns jsonb
+language plpgsql
+immutable
+as $$
+begin
+  return case p_kind
+    when 'floor' then public.battle_sim_floor(p_seed, p_params, p_streams, p_until)
+    when 'bulls' then public.battle_sim_bulls(p_seed, p_params, p_streams, p_until)
+    when 'coins' then public.battle_sim_coins(p_seed, p_params, p_streams, p_until)
+    when 'sumo' then public.battle_sim_sumo(p_seed, p_params, p_streams, p_until)
+    when 'potato' then public.battle_sim_potato(p_seed, p_params, p_streams, p_until)
+    when 'pump' then public.battle_sim_pump(p_seed, p_params, p_streams, p_until)
+    when 'bear' then public.battle_sim_bear(p_seed, p_params, p_streams, p_until)
+    when 'dash' then public.battle_sim_dash(p_seed, p_params, p_streams, p_until)
+    when 'margin' then public.battle_sim_margin(p_seed, p_params, p_streams, p_until)
+    when 'elevator' then public.battle_sim_elevator(p_seed, p_params, p_streams, p_until)
+    when 'laser' then public.battle_sim_laser(p_seed, p_params, p_streams, p_until)
+    when 'rodeo' then public.battle_sim_rodeo(p_seed, p_params, p_streams, p_until)
+    else null end;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- The new games are action games; battles takes their kinds
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.battle_is_tick(text)'::regprocedure);
+begin
+  if position('''rodeo''' in v_def) = 0 then
+    v_def := replace(v_def, $q$'pump')$q$, $q$'pump', 'bear', 'dash', 'margin', 'elevator', 'laser', 'rodeo')$q$);
+    if position('''rodeo''' in v_def) = 0 then
+      raise exception 'battle_is_tick() has an unexpected shape; add the new action games by hand';
+    end if;
+    execute v_def;
+  end if;
+end;
+$do$;
+
+alter table public.battles drop constraint if exists battles_kind_check;
+alter table public.battles add constraint battles_kind_check check (kind is null or kind in (
+  'floor', 'bulls', 'coins', 'sumo', 'potato', 'pump', 'bear', 'dash', 'margin', 'elevator', 'laser', 'rodeo',
+  'quiz', 'estimate', 'bell', 'vault', 'ticker', 'higher', 'auction'));
+
+revoke all on function public.battle_sim_bear(bigint, jsonb, text[], integer) from public, anon, authenticated;
+revoke all on function public.battle_dash_tile(bigint, integer, integer, integer[], integer[]) from public, anon, authenticated;
+revoke all on function public.battle_sim_dash(bigint, jsonb, text[], integer) from public, anon, authenticated;
+revoke all on function public.battle_sim_margin(bigint, jsonb, text[], integer) from public, anon, authenticated;
+revoke all on function public.battle_elevator_mask(bigint, jsonb, integer, integer) from public, anon, authenticated;
+revoke all on function public.battle_sim_elevator(bigint, jsonb, text[], integer) from public, anon, authenticated;
+revoke all on function public.battle_sim_laser(bigint, jsonb, text[], integer) from public, anon, authenticated;
+revoke all on function public.battle_sim_rodeo(bigint, jsonb, text[], integer) from public, anon, authenticated;
+revoke all on function public.battle_sim(text, bigint, jsonb, text[], integer) from public, anon, authenticated;
+-- ===== idempotent copy of migrations/20261204004910_more_battle_games.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 4910 · News battles: four more round games (ADR-160, addendum)
+-- =============================================================================
+-- Tresorknacker (vault), Ticker-Tippen (ticker), Mehr oder Weniger (higher) and Wer bietet mehr? (auction), judged
+-- on the server like Börsenquiz (src/lib/sim/battle/rounds-more.ts is the same judging for the demo and the tests):
+-- * vault: the codes stay in battles.plan; every try goes through battle_answer (p_choice = the digits, e.g. 352)
+--   into battle_guesses, the server answers with how many digits are in place and how many elsewhere. Cracked =
+--   a row in battle_answers (choice = tries). At most maxTries tries, nothing after cracking.
+-- * ticker: like the quiz with `options` tickers (listed stocks, else battles.tickers); a wrong tap costs points.
+-- * higher: a chart with trends (battles.plan.series, prices in cents); choice 0 higher, 1 lower; hearts as in the
+--   bell. The client sees the chart only up to the current candle, the next one after the round closed.
+-- * auction: sealed bids (p_value, whole play money, at most what is left: the server checks); the highest bid wins
+--   the item's points and pays it. Bids are shown after the gavel.
+-- Patched by replace (other migrations may patch the same functions): battle_plan, battle_round_ms,
+-- battle_rounds_eval, battle_rounds_json, battle_answer. New: battle_plan_more, battle_rounds_eval_more,
+-- battle_round_extra, battle_answer_more, table battle_guesses.
+-- Round JSON adds: vault {"digits", "symbols", "guesses": [{"code", "hits", "near"}] (own), "progress": [{"slot",
+-- "tries", "cracked"}], "code" (after the round)}; higher {"chart": [price, ...]}; auction {"item_points", "icon",
+-- "budget" (own), "budgets": [per slot]}.
+-- Idempotent: runs unchanged as supabase/updates/20261204004910_more_battle_games.sql.
+
+-- ---------------------------------------------------------------------------
+-- A. The tries of Tresorknacker
+-- ---------------------------------------------------------------------------
+create table if not exists public.battle_guesses (
+  battle_id  bigint not null references public.battles (id) on delete cascade,
+  round      smallint not null check (round between 0 and 99),
+  player_id  uuid not null references public.profiles (id) on delete cascade,
+  n          smallint not null check (n between 1 and 99),
+  code       text not null check (code ~ '^[1-9]{1,9}$'),
+  hits       smallint not null,
+  near       smallint not null,
+  guessed_at timestamptz not null,
+  primary key (battle_id, round, player_id, n)
+);
+alter table public.battle_guesses enable row level security;
+revoke all on public.battle_guesses from public, anon, authenticated;
+create index if not exists battle_guesses_player_idx on public.battle_guesses (player_id);
+comment on table public.battle_guesses is
+  'Tries in Tresorknacker (news battles, ADR-160) with the server''s answer (hits in place, near elsewhere) and the '
+  'server time. Internal; the code stays in battles.plan.';
+
+-- ---------------------------------------------------------------------------
+-- B. Plans: codes, tickers, the chart, the items
+-- ---------------------------------------------------------------------------
+create or replace function public.battle_plan_more(p_kind text, p_params jsonb)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.battles_cfg();
+  g        jsonb := p_params -> 'game';
+  v_rounds integer := (g ->> 'rounds')::integer;
+  v_list   jsonb := '[]'::jsonb;
+  v_pool   jsonb;
+  v_opts   jsonb;
+  v_target jsonb;
+  v_code   text;
+  v_series integer[];
+  v_dir    integer;
+  v_bps    integer;
+  v_move   integer;
+  v_next   integer;
+  v_hist   integer;
+  v_name   text;
+  q        jsonb;
+  r        integer;
+begin
+  if p_kind = 'vault' then
+    for r in 1 .. v_rounds loop
+      select string_agg(z.d::text, '' order by z.o) into v_code
+        from (select d, random() as o from generate_series(1, (g ->> 'symbols')::integer) d
+               order by 2 limit (g ->> 'digits')::integer) z;
+      v_list := v_list || jsonb_build_array(jsonb_build_object('q', 'Tresor ' || r, 'code', v_code));
+    end loop;
+    return jsonb_build_object('questions', v_list);
+  elsif p_kind = 'ticker' then
+    select jsonb_agg(jsonb_build_object('ticker', s.ticker, 'name', s.name) order by s.o) into v_pool
+      from (select sec.ticker, sec.name, random() as o from public.securities sec
+             where sec.kind = 'stock' and sec.status = 'listed' and sec.ticker is not null and sec.name is not null) s;
+    if coalesce(jsonb_array_length(v_pool), 0) < (g ->> 'options')::integer + v_rounds then
+      select jsonb_agg(x order by random()) into v_pool from jsonb_array_elements(cfg -> 'tickers') x;
+    end if;
+    for r in 0 .. v_rounds - 1 loop
+      v_target := v_pool -> (r % jsonb_array_length(v_pool));
+      select jsonb_agg(z.t order by random()) into v_opts
+        from (select v_target ->> 'ticker' as t
+              union all
+              (select y ->> 'ticker' from jsonb_array_elements(v_pool) y
+                where y ->> 'ticker' <> v_target ->> 'ticker' order by random() limit (g ->> 'options')::integer - 1)) z;
+      v_list := v_list || jsonb_build_array(jsonb_build_object(
+        'q', v_target ->> 'name', 'options', v_opts,
+        'correct', (select (i - 1)::integer from jsonb_array_elements_text(v_opts) with ordinality o(t, i)
+                     where t = v_target ->> 'ticker' limit 1)));
+    end loop;
+    return jsonb_build_object('questions', v_list);
+  elsif p_kind = 'higher' then
+    -- a chart with trends (higherSeries in rounds-more.ts): a move goes on with trendPct %, never flat
+    v_hist := (g ->> 'history')::integer;
+    v_series := array[5000 + floor(random() * 15001)::integer];
+    v_dir := case when random() < 0.5 then 1 else -1 end;
+    while cardinality(v_series) < v_hist + v_rounds + 1 loop
+      if random() * 100 >= (g ->> 'trendPct')::integer then v_dir := -v_dir; end if;
+      v_bps := (g ->> 'moveMinBps')::integer
+               + floor(random() * ((g ->> 'moveMaxBps')::integer - (g ->> 'moveMinBps')::integer + 1))::integer;
+      v_move := greatest(1, round(v_series[cardinality(v_series)] * v_bps / 10000.0)::integer);
+      v_next := v_series[cardinality(v_series)] + v_dir * v_move;
+      if v_next < 100 then
+        v_dir := 1;
+        v_next := v_series[cardinality(v_series)] + v_move;
+      end if;
+      v_series := v_series || v_next;
+    end loop;
+    select sec.name into v_name from public.securities sec where sec.kind = 'stock' and sec.status = 'listed'
+     order by random() limit 1;
+    v_name := coalesce(v_name, 'NEXA-Index');
+    for r in 0 .. v_rounds - 1 loop
+      v_list := v_list || jsonb_build_array(jsonb_build_object(
+        'q', v_name,
+        'correct', case when v_series[v_hist + r + 2] > v_series[v_hist + r + 1] then 0 else 1 end,
+        'value', round(v_series[v_hist + r + 2] / 100.0, 2), 'unit', '€', 'decimals', 2));
+    end loop;
+    return jsonb_build_object('questions', v_list, 'series', to_jsonb(v_series));
+  elsif p_kind = 'auction' then
+    for q in select x from jsonb_array_elements(cfg -> 'auctionItems') x order by random() limit v_rounds loop
+      v_list := v_list || jsonb_build_array(jsonb_build_object('q', q ->> 'name', 'points', (q ->> 'points')::integer,
+                                                               'icon', q ->> 'icon'));
+    end loop;
+    return jsonb_build_object('questions', v_list);
+  end if;
+  return '{}'::jsonb;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- C. Judging (vaultEval, tickerEval, higherEval, auctionEval in rounds-more.ts)
+-- ---------------------------------------------------------------------------
+-- {"closed", "hearts", "points", "time", "out", "results", "done", "finish_ms", "ranking", "budget"}
+create or replace function public.battle_rounds_eval_more(p_battle public.battles, p_now timestamptz)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  g        jsonb := p_battle.params -> 'game';
+  v_kind   text := p_battle.kind;
+  v_ms     bigint := public.battle_ms(p_battle.started_at, p_now);
+  v_answer integer := (g ->> 'answerMs')::integer;
+  n        integer;
+  v_rounds integer;
+  v_closed integer := 0;
+  v_hearts integer;
+  hearts integer[]; points integer[]; times bigint[]; outr integer[]; lft integer[]; budget integer[];
+  v_alive  integer[];
+  v_losers integer[];
+  v_res    jsonb := '[]'::jsonb;
+  v_ans    jsonb;
+  v_lost   integer[];
+  v_done   boolean := false;
+  v_last   integer := -1;
+  v_finish bigint;
+  t        integer[];
+  r integer; i integer; k integer;
+  a        record;
+  v_right  boolean;
+  v_pts    integer;
+  v_code   text;
+  v_tries  integer;
+  v_crack  integer;
+  v_cms    bigint;
+  v_lms    bigint;
+  v_first  boolean;
+  v_items  integer;
+  k1 integer[]; k2 integer[]; k3 integer[];
+begin
+  select count(*)::integer into n from public.battle_players p where p.battle_id = p_battle.id and p.slot is not null;
+  v_rounds := least((g ->> 'rounds')::integer, coalesce(jsonb_array_length(p_battle.plan -> 'questions'), 0));
+  v_hearts := case when v_kind = 'higher'
+                   then case when n <= (g ->> 'smallGroup')::integer then (g ->> 'heartsSmall')::integer
+                             else (g ->> 'heartsLarge')::integer end
+                   else 1 end;
+  hearts := array_fill(v_hearts, array[greatest(n, 1)]);
+  points := array_fill(0, array[greatest(n, 1)]);
+  times := array_fill(0::bigint, array[greatest(n, 1)]);
+  outr := array_fill(-1, array[greatest(n, 1)]);
+  lft := array_fill(-1, array[greatest(n, 1)]);
+  budget := array_fill(coalesce((g ->> 'budget')::integer, 0), array[greatest(n, 1)]);
+  -- the round a player left in
+  for a in select p.slot, p.left_at from public.battle_players p
+            where p.battle_id = p_battle.id and p.slot is not null and p.left_at is not null loop
+    k := 0;
+    while k < v_rounds - 1 and public.battle_ms(p_battle.started_at, a.left_at) >= (public.battle_round_ms(p_battle, k))[3] loop
+      k := k + 1;
+    end loop;
+    lft[a.slot + 1] := k;
+  end loop;
+  while v_closed < v_rounds and v_ms >= (public.battle_round_ms(p_battle, v_closed))[2] loop
+    v_closed := v_closed + 1;
+  end loop;
+  r := 0;
+  while r < v_closed and not v_done loop
+    t := public.battle_round_ms(p_battle, r);
+    for i in 1 .. n loop
+      if outr[i] < 0 and lft[i] >= 0 and lft[i] <= r then outr[i] := r; end if;
+    end loop;
+    v_alive := '{}';
+    for i in 1 .. n loop
+      if outr[i] < 0 then v_alive := v_alive || i; end if;
+    end loop;
+    v_losers := '{}';
+    v_ans := '[]'::jsonb;
+    v_lost := '{}';
+    if v_kind = 'vault' then
+      v_code := p_battle.plan -> 'questions' -> r ->> 'code';
+      foreach i in array v_alive loop
+        select count(*)::integer, min(z.n) filter (where z.code = v_code), max(z.ms)
+          into v_tries, v_crack, v_lms
+          from (select x.n, x.code, public.battle_ms(p_battle.started_at, x.guessed_at) - t[1] as ms
+                  from public.battle_guesses x join public.battle_players p on p.battle_id = x.battle_id and p.player_id = x.player_id
+                 where x.battle_id = p_battle.id and x.round = r and p.slot = i - 1
+                 order by x.n limit (g ->> 'maxTries')::integer) z;
+        v_cms := null;
+        if v_crack is not null then
+          select public.battle_ms(p_battle.started_at, x.guessed_at) - t[1] into v_cms
+            from public.battle_guesses x join public.battle_players p on p.battle_id = x.battle_id and p.player_id = x.player_id
+           where x.battle_id = p_battle.id and x.round = r and p.slot = i - 1 and x.n = v_crack;
+        end if;
+        v_pts := case when v_cms is not null
+                      then (g ->> 'basePoints')::integer
+                           + ((g ->> 'speedPoints')::integer * greatest(0, least(v_answer, v_answer - v_cms))) / v_answer
+                           + (g ->> 'tryBonus')::integer * greatest(0, (g ->> 'maxTries')::integer - v_crack)
+                      else 0 end;
+        points[i] := points[i] + v_pts;
+        times[i] := times[i] + case when v_cms is not null then least(v_answer, greatest(0, v_cms)) else v_answer end;
+        if v_tries > 0 then
+          v_ans := v_ans || jsonb_build_array(jsonb_build_object('slot', i - 1, 'choice', coalesce(v_crack, v_tries),
+            'ms', coalesce(v_cms, v_lms), 'points', v_pts, 'right', v_cms is not null));
+        end if;
+      end loop;
+    elsif v_kind in ('ticker', 'higher') then
+      foreach i in array v_alive loop
+        select x.choice, public.battle_ms(p_battle.started_at, x.answered_at) - t[1] as ms into a
+          from public.battle_answers x join public.battle_players p on p.battle_id = x.battle_id and p.player_id = x.player_id
+         where x.battle_id = p_battle.id and x.round = r and p.slot = i - 1 and x.answered_at is not null;
+        v_right := a.ms is not null and a.choice = (p_battle.plan -> 'questions' -> r ->> 'correct')::integer;
+        v_pts := case when v_right
+                      then (g ->> 'basePoints')::integer
+                           + ((g ->> 'speedPoints')::integer * greatest(0, least(v_answer, v_answer - a.ms))) / v_answer
+                      when v_kind = 'ticker' and a.ms is not null then -(g ->> 'wrongPoints')::integer
+                      else 0 end;
+        points[i] := points[i] + v_pts;
+        if v_kind = 'ticker' then
+          times[i] := times[i] + case when v_right then least(v_answer, greatest(0, a.ms)) else v_answer end;
+        else
+          times[i] := times[i] + case when a.ms is not null then least(v_answer, greatest(0, a.ms)) else v_answer end;
+        end if;
+        if a.ms is not null then
+          v_ans := v_ans || jsonb_build_array(jsonb_build_object('slot', i - 1, 'choice', a.choice, 'ms', a.ms,
+                                                                 'points', v_pts, 'right', v_right));
+        end if;
+        if not v_right then v_losers := v_losers || i; end if;
+      end loop;
+      -- hearts in Mehr oder Weniger (not when that would be everyone still in)
+      if v_kind = 'higher' and cardinality(v_losers) > 0 and cardinality(v_losers) < cardinality(v_alive) then
+        foreach i in array v_losers loop
+          hearts[i] := hearts[i] - 1;
+          if hearts[i] <= 0 then outr[i] := r; end if;
+          v_lost := v_lost || (i - 1);
+        end loop;
+      end if;
+    else
+      -- the auction: the highest bid above zero wins (then the earlier one, then the lot)
+      v_items := (p_battle.plan -> 'questions' -> r ->> 'points')::integer;
+      v_first := true;
+      for a in
+        select p.slot, (x.value_e4 / 10000)::integer as bid, public.battle_ms(p_battle.started_at, x.answered_at) - t[1] as ms
+          from public.battle_answers x join public.battle_players p on p.battle_id = x.battle_id and p.player_id = x.player_id
+         where x.battle_id = p_battle.id and x.round = r and x.value_e4 is not null and x.answered_at is not null
+           and p.slot + 1 = any (v_alive) and x.value_e4 >= 0 and x.value_e4 / 10000 <= budget[p.slot + 1]
+         order by x.value_e4 desc, 3, public.battle_hash(p_battle.seed, 999, p.slot)
+      loop
+        v_right := v_first and a.bid > 0;
+        v_first := false;
+        if v_right then
+          points[a.slot + 1] := points[a.slot + 1] + v_items;
+          budget[a.slot + 1] := budget[a.slot + 1] - a.bid;
+        end if;
+        times[a.slot + 1] := times[a.slot + 1] + least(v_answer, greatest(0, a.ms));
+        v_ans := v_ans || jsonb_build_array(jsonb_build_object('slot', a.slot, 'value', a.bid, 'ms', a.ms,
+                                                               'points', case when v_right then v_items else 0 end,
+                                                               'right', v_right));
+      end loop;
+    end if;
+    v_res := v_res || jsonb_build_array(jsonb_build_object('round', r, 'answers', v_ans, 'lost', to_jsonb(v_lost)));
+    v_last := r;
+    if (select count(*) from unnest(outr) o where o < 0) <= 1 or r = v_rounds - 1 then v_done := true; end if;
+    r := r + 1;
+  end loop;
+  if n > 0 and (select count(*) from unnest(outr) o where o < 0) <= 1 then v_done := true; end if;
+  v_finish := case when v_last >= 0 then (public.battle_round_ms(p_battle, v_last))[3] else 0 end;
+  k1 := array_fill(0, array[greatest(n, 1)]); k2 := k1; k3 := k1;
+  for i in 1 .. n loop
+    if v_kind = 'higher' then
+      k1[i] := case when outr[i] < 0 then 1000000 else outr[i] end;
+      k2[i] := hearts[i] * 1000000 + points[i];
+    elsif v_kind = 'auction' then
+      k1[i] := case when outr[i] < 0 then 1 else 0 end;
+      k2[i] := points[i] * 10000 + budget[i];
+    else
+      k1[i] := case when outr[i] < 0 then 1 else 0 end;
+      k2[i] := points[i];
+    end if;
+    k3[i] := -least(times[i], 2000000000)::integer;
+  end loop;
+  return jsonb_build_object('closed', v_closed, 'hearts', to_jsonb(hearts[1:n]), 'points', to_jsonb(points[1:n]),
+                            'time', to_jsonb(times[1:n]), 'out', to_jsonb(outr[1:n]), 'results', v_res, 'done', v_done,
+                            'finish_ms', v_finish, 'budget', to_jsonb(budget[1:n]),
+                            'ranking', to_jsonb(public.battle_rank(p_battle.seed, n, k1, k2, k3)));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- D. What the client sees of a round beyond the quiz fields
+-- ---------------------------------------------------------------------------
+create or replace function public.battle_round_extra(p_battle public.battles, p_round integer, p_viewer uuid,
+                                                     p_slot integer, p_closed boolean, p_eval jsonb)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  g jsonb := p_battle.params -> 'game';
+  q jsonb := p_battle.plan -> 'questions' -> p_round;
+begin
+  if p_battle.kind = 'vault' then
+    return jsonb_build_object(
+      'digits', (g ->> 'digits')::integer, 'symbols', (g ->> 'symbols')::integer,
+      'guesses', coalesce((select jsonb_agg(jsonb_build_object('code', x.code, 'hits', x.hits, 'near', x.near) order by x.n)
+                             from public.battle_guesses x
+                            where x.battle_id = p_battle.id and x.round = p_round and x.player_id = p_viewer), '[]'::jsonb),
+      'progress', coalesce((select jsonb_agg(jsonb_build_object(
+                              'slot', p.slot,
+                              'tries', (select count(*) from public.battle_guesses x
+                                         where x.battle_id = p_battle.id and x.round = p_round and x.player_id = p.player_id),
+                              'cracked', exists (select 1 from public.battle_answers x
+                                                  where x.battle_id = p_battle.id and x.round = p_round
+                                                    and x.player_id = p.player_id and x.answered_at is not null))
+                              order by p.slot)
+                             from public.battle_players p where p.battle_id = p_battle.id and p.slot is not null), '[]'::jsonb),
+      'code', case when p_closed then q ->> 'code' end);
+  elsif p_battle.kind = 'higher' then
+    return jsonb_build_object('chart', (select jsonb_agg(round(x::numeric / 100, 2) order by o)
+                                          from jsonb_array_elements_text(p_battle.plan -> 'series') with ordinality s(x, o)
+                                         where o <= (g ->> 'history')::integer + p_round + 1));
+  elsif p_battle.kind = 'auction' then
+    return jsonb_build_object('item_points', (q ->> 'points')::integer, 'icon', q ->> 'icon',
+                              'budget', case when p_slot is not null then p_eval -> 'budget' -> p_slot end,
+                              'budgets', p_eval -> 'budget');
+  end if;
+  return '{}'::jsonb;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- E. Answers: checked here, after battle_answer checked the battle, the player and the open round
+-- ---------------------------------------------------------------------------
+create or replace function public.battle_answer_more(p_battle public.battles, p_player uuid, p_slot integer,
+                                                     p_round integer, p_choice integer, p_value numeric,
+                                                     p_now timestamptz)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  g       jsonb := p_battle.params -> 'game';
+  v_code  text;
+  v_guess text;
+  v_tries integer;
+  v_hits  integer := 0;
+  v_near  integer := 0;
+  v_eval  jsonb;
+  k       integer;
+begin
+  if p_battle.kind = 'vault' then
+    v_guess := p_choice::text;
+    if p_choice is null or p_choice <= 0
+       or v_guess !~ ('^[1-' || (g ->> 'symbols') || ']{' || (g ->> 'digits') || '}$')
+       or (select count(distinct c) from regexp_split_to_table(v_guess, '') c) <> (g ->> 'digits')::integer then
+      perform public.api_error('invalid_argument');
+    end if;
+    -- one try after the other per player
+    perform 1 from public.battle_players x where x.battle_id = p_battle.id and x.player_id = p_player for update;
+    if exists (select 1 from public.battle_answers x where x.battle_id = p_battle.id and x.round = p_round
+                  and x.player_id = p_player and x.answered_at is not null) then
+      perform public.api_error('battle_round_closed');
+    end if;
+    select count(*)::integer into v_tries from public.battle_guesses x
+     where x.battle_id = p_battle.id and x.round = p_round and x.player_id = p_player;
+    if v_tries >= (g ->> 'maxTries')::integer then
+      perform public.api_error('battle_round_closed');
+    end if;
+    v_code := p_battle.plan -> 'questions' -> p_round ->> 'code';
+    for k in 1 .. char_length(v_guess) loop
+      if substr(v_guess, k, 1) = substr(v_code, k, 1) then v_hits := v_hits + 1;
+      elsif position(substr(v_guess, k, 1) in v_code) > 0 then v_near := v_near + 1;
+      end if;
+    end loop;
+    insert into public.battle_guesses (battle_id, round, player_id, n, code, hits, near, guessed_at)
+    values (p_battle.id, p_round, p_player, v_tries + 1, v_guess, v_hits, v_near, p_now);
+    if v_hits = char_length(v_code) then
+      insert into public.battle_answers (battle_id, round, player_id, choice, answered_at)
+      values (p_battle.id, p_round, p_player, v_tries + 1, p_now)
+      on conflict (battle_id, round, player_id) do nothing;
+    end if;
+    return;
+  end if;
+  if p_battle.kind = 'ticker' and (p_choice is null or p_choice < 0 or p_choice >= (g ->> 'options')::integer) then
+    perform public.api_error('invalid_argument');
+  end if;
+  if p_battle.kind = 'higher' and (p_choice is null or p_choice not in (0, 1)) then
+    perform public.api_error('invalid_argument');
+  end if;
+  if p_battle.kind = 'auction' then
+    if p_value is null or p_value < 0 or p_value <> trunc(p_value) then
+      perform public.api_error('invalid_argument');
+    end if;
+    -- never more than what is left
+    v_eval := public.battle_rounds_eval_more(p_battle, p_now);
+    if p_value > coalesce((v_eval -> 'budget' ->> p_slot)::integer, 0) then
+      perform public.api_error('invalid_argument');
+    end if;
+  end if;
+  insert into public.battle_answers (battle_id, round, player_id, choice, value_e4, answered_at)
+  values (p_battle.id, p_round, p_player, case when p_battle.kind <> 'auction' then p_choice end,
+          case when p_battle.kind = 'auction' then (p_value * 10000)::bigint end, p_now)
+  on conflict (battle_id, round, player_id) do update
+     set choice = excluded.choice, value_e4 = excluded.value_e4, answered_at = excluded.answered_at
+   where public.battle_answers.answered_at is null;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- F. Wiring into the round games of 4720 (patched by replace, so other patches of these functions stay)
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  v_def text;
+begin
+  -- the plan
+  v_def := pg_get_functiondef('public.battle_plan(text, jsonb)'::regprocedure);
+  if position('battle_plan_more' in v_def) = 0 then
+    v_def := replace(v_def, $q$begin
+  if p_kind = 'quiz' then$q$, $q$begin
+  if p_kind in ('vault', 'ticker', 'higher', 'auction') then
+    return public.battle_plan_more(p_kind, p_params);
+  end if;
+  if p_kind = 'quiz' then$q$);
+    if position('battle_plan_more' in v_def) = 0 then
+      raise exception 'battle_plan() has an unexpected shape; add the new round games by hand';
+    end if;
+    execute v_def;
+  end if;
+  -- the timing: like the quiz
+  v_def := pg_get_functiondef('public.battle_round_ms(public.battles, integer)'::regprocedure);
+  if position('''auction''' in v_def) = 0 then
+    v_def := replace(v_def, $q$if p_battle.kind in ('quiz', 'estimate') then$q$,
+                     $q$if p_battle.kind in ('quiz', 'estimate', 'vault', 'ticker', 'higher', 'auction') then$q$);
+    if position('''auction''' in v_def) = 0 then
+      raise exception 'battle_round_ms() has an unexpected shape; add the new round games by hand';
+    end if;
+    execute v_def;
+  end if;
+  -- the judging
+  v_def := pg_get_functiondef('public.battle_rounds_eval(public.battles, timestamptz)'::regprocedure);
+  if position('battle_rounds_eval_more' in v_def) = 0 then
+    v_def := replace(v_def, $q$begin
+  select count(*)::integer into n from public.battle_players p where p.battle_id = p_battle.id and p.slot is not null;
+  v_rounds := case v_kind when 'bell'$q$, $q$begin
+  if v_kind in ('vault', 'ticker', 'higher', 'auction') then
+    return public.battle_rounds_eval_more(p_battle, p_now);
+  end if;
+  select count(*)::integer into n from public.battle_players p where p.battle_id = p_battle.id and p.slot is not null;
+  v_rounds := case v_kind when 'bell'$q$);
+    if position('battle_rounds_eval_more' in v_def) = 0 then
+      raise exception 'battle_rounds_eval() has an unexpected shape; add the new round games by hand';
+    end if;
+    execute v_def;
+  end if;
+  -- what the client sees
+  v_def := pg_get_functiondef('public.battle_rounds_json(public.battles, uuid, timestamptz)'::regprocedure);
+  if position('battle_round_extra' in v_def) = 0 then
+    v_def := replace(v_def, $q$    if r < jsonb_array_length(v_eval -> 'results') then$q$,
+                     $q$    v_item := v_item || public.battle_round_extra(p_battle, r, p_viewer, v_slot, v_ms >= t[2], v_eval);
+    if r < jsonb_array_length(v_eval -> 'results') then$q$);
+    if position('battle_round_extra' in v_def) = 0 then
+      raise exception 'battle_rounds_json() has an unexpected shape; add the new round games by hand';
+    end if;
+    execute v_def;
+  end if;
+  -- the answers
+  v_def := pg_get_functiondef('public.battle_answer(uuid, bigint, integer, integer, numeric)'::regprocedure);
+  if position('battle_answer_more' in v_def) = 0 then
+    v_def := replace(v_def, $q$  if b.kind = 'quiz' and (p_choice is null or p_choice < 0 or p_choice > 3) then$q$,
+                     $q$  if b.kind in ('vault', 'ticker', 'higher', 'auction') then
+    perform public.battle_answer_more(b, v_player, p.slot, p_round, p_choice, p_value, v_now);
+    return public.request_complete(v_player, p_request_id, public.battle_state(v_player, v_now));
+  end if;
+  if b.kind = 'quiz' and (p_choice is null or p_choice < 0 or p_choice > 3) then$q$);
+    if position('battle_answer_more' in v_def) = 0 then
+      raise exception 'battle_answer() has an unexpected shape; add the new round games by hand';
+    end if;
+    execute v_def;
+  end if;
+end;
+$do$;
+
+do $do$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.battle_plan_more(text, jsonb)', 'public.battle_rounds_eval_more(public.battles, timestamptz)',
+    'public.battle_round_extra(public.battles, integer, uuid, integer, boolean, jsonb)',
+    'public.battle_answer_more(public.battles, uuid, integer, integer, integer, numeric, timestamptz)',
+    'public.battle_plan(text, jsonb)', 'public.battle_round_ms(public.battles, integer)',
+    'public.battle_rounds_eval(public.battles, timestamptz)', 'public.battle_rounds_json(public.battles, uuid, timestamptz)']
+  loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+  end loop;
+  execute 'revoke all on function public.battle_answer(uuid, bigint, integer, integer, numeric) from public, anon';
+  execute 'grant execute on function public.battle_answer(uuid, bigint, integer, integer, numeric) to authenticated';
+end;
+$do$;
 
 -- ===== game_config (current values, overwriting older ones) =====
 -- GENERATED by scripts/gen-config-seed.ts from src/config/balance.ts. Do not edit by hand.
@@ -56835,7 +58394,7 @@ insert into public.game_config (key, value, description) values
   ('protests', '{"kinds":["boycott","shitstorm","petition","protest_march"],"startCostCents":50000,"goal":20,"aiMax":16,"aiJoinChanceBps":3000,"aiPerMinuteMax":2,"durationHours":6,"starterCooldownHours":6,"visibleAfterMinutes":60,"effectChanceBaseBps":600,"effectChancePerPlayerBps":300,"effectChanceMaxBps":3500,"priceHitMinBps":150,"priceHitMaxBps":450,"awarenessHit":0.03,"minLevel":4}'::jsonb, 'Defaults from src/config/balance.ts, section "protests"'),
   ('nfts', '{"royaltyBps":1000,"mintXp":100,"minAskCents":10000,"minOfferCents":10000,"chat":{"maxLength":200,"perMinute":6,"history":60,"offerHours":24},"ai":{"floorCents":100000,"likeBps":400,"maxLikes":40,"creatorSaleBps":300,"maxCreatorSales":10,"ageBpsPerDay":100,"maxAgeDays":30,"buyChanceBps":2500,"listedOfferChanceBps":800,"unlistedOfferChanceBps":80,"lowballMinBps":6500,"lowballMaxBps":9000,"maxBuysPerDay":20,"maxMessagesPerRun":4,"resaleMarkupBps":12500,"acceptBps":10500,"demand":{"offerBps":600,"maxOffers":6,"saleBps":500,"maxSales":6,"days":7},"trade":{"chanceBps":60,"likeWeightBps":1500,"offerWeightBps":4000,"saleWeightBps":2500,"maxChanceBps":1500,"minHoldMinutes":30,"perRun":2,"perDay":30,"tasteMinBps":8500,"tasteMaxBps":12500,"reversionBps":5000},"collectors":["Vera Vermeer","Konrad Kollektor","Pixel-Paula","Baron von Bit","Mia Mosaik","Otto Original","Gräfin Glitzer","Sammler Sam"],"lines":{"offer":["Schönes Stück. Mehr ist es mir aber nicht wert.","Für meine Sammlung würde ich so viel zahlen.","Mein Angebot. Überleg es dir nicht zu lange.","Hübsch! Wäre das ein fairer Preis?","Ich biete das. Nimm es, solange ich gute Laune habe.","Mein Hund hat draufgebellt. Das heißt bei uns: kaufen.","Ich habe keine Ahnung, was das sein soll. Ich nehme es.","Meine Mutter sagt, ich soll aufhören, Pixel zu kaufen. Hier mein Angebot.","Ich wollte eigentlich Brot kaufen. Jetzt bin ich hier.","Das hängt später über meinem Klo. Ehrenplatz.","Mehr habe ich nicht, den Rest hat mein Wellensittich verzockt.","Ist das Kunst oder ist dein Bildschirm kaputt? Egal, Angebot steht.","Ich biete das und lege ein halbes Käsebrot drauf.","Mein Horoskop sagt: heute teuer einkaufen. Bitte sehr.","Ich habe das Bild meinem Zahnarzt gezeigt. Er hat geweint. Ich biete.","Angebot! Bitte schnell, mein Akku hat noch drei Prozent.","Ich sammle nur Dinge, die ich nicht verstehe. Passt perfekt.","Dafür verkaufe ich mein Fahrrad. Na gut, den Sattel.","Wusstest du, dass Otter Händchen halten? Jedenfalls: mein Angebot.","Ich habe gewürfelt. Das ist der Preis. Die Würfel lügen nicht.","Mein Steuerberater ist ohnmächtig geworden, also muss es gut sein.","Das erinnert mich an meinen Ex. Ich will es trotzdem.","Ich zahle in Spielgeld, weil ich nichts anderes habe.","Letztes Angebot. Also das erste. Aber auch das letzte. Vielleicht.","Ich kaufe das nur, damit Baron von Bit es nicht bekommt.","So viel für so wenige Pixel? Ich liebe es.","Meine Wand ist leer und mein Kopf auch. Nimm mein Geld.","Ich habe eine Lasagne im Ofen, bitte entscheide dich fix.","Das sieht aus wie mein Kontostand: wild. Angebot.","Ich habe mich verklickt, aber jetzt ziehe ich es durch."],"buy":["Gekauft! Das kommt in meine Sammlung.","Zu diesem Preis konnte ich nicht widerstehen.","Ein fairer Preis. Danke!","Gekauft. Fragt mich nicht, warum.","Meins! Jetzt muss ich nur noch herausfinden, was es ist.","Gekauft, bevor mein Verstand wach wird.","Das kommt neben den Toaster. Da ist das Licht am besten.","Ich habe es. Meine Erben werden mich hassen.","Zack, gekauft. Miete wird überbewertet.","Endlich etwas, das ich meiner Katze vererben kann.","Gekauft! Ich schreibe es als Arbeitskleidung ab.","Schnäppchen. Sagt jedenfalls die Stimme in meinem Kühlschrank.","Ich wollte nur gucken. Tja.","Gekauft. Der Pizzabote kann warten."],"accept":["Abgemacht! Viel Freude damit.","Einverstanden, es gehört dir.","Deal. Bitte nicht in der Sonne lagern.","Nimm es, bevor ich es mir anders überlege.","Verkauft! Ich brauche das Geld für Gartenzwerge.","Na gut. Aber du musst es jeden Tag anschauen. Versprich es.","Einverstanden. Es hat mich nachts sowieso angestarrt.","Deal! Grüß deine Oma von mir.","Okay, okay. Du verhandelst wie mein Schwager.","Abgemacht. Der Rahmen kostet extra. Es gibt keinen Rahmen."],"trade":["Endlich gehört es mir! Das wollte ich schon lange.","Ich musste es einfach haben.","Gekauft von einer Kollegin. Jetzt steht es zum Verkauf, wer bietet mehr?","Ein Schnäppchen unter Sammlern.","Das Stück ist gefragt. Ich habe zugeschlagen.","Ich habe es Otto Original abgeluchst. Er weint jetzt in sein Müsli.","Getauscht gegen ein Geheimnis und etwas Bargeld.","Gekauft beim Sammlerstammtisch. Es gab Mettbrötchen.","Ich weiß nicht, wem ich es abgekauft habe. Er trug einen Umhang.","Meins. Die anderen Sammler können sich gehackt legen.","Frisch erworben und schon wieder im Angebot. So bin ich.","Ich habe es im Tausch gegen meinen guten Ruf bekommen.","Sammler Sam wollte es auch. Sammler Sam war zu langsam.","Gekauft, dreimal angeschaut, gelangweilt. Wer will?","Das hing eben noch bei Gräfin Glitzer. Jetzt nicht mehr. Ha!"],"decline":["Nein danke, darunter verkaufe ich nicht.","Netter Versuch. Biete mehr.","Das ist zu wenig für dieses Stück.","Dafür bekommst du bei mir höchstens ein Foto vom Bild.","Hahaha. Nein.","Für den Preis male ich dir ein Strichmännchen. Ein schlechtes.","Mein Goldfisch bietet mehr, und der hat kein Konto.","Zu wenig. Ich habe schließlich eine Yacht aus Pappe zu unterhalten.","Nein. Und meine Katze sagt auch nein.","Bei dem Angebot ist mir kurz schwarz vor Augen geworden.","Ich frage kurz meinen Anwalt. Er lacht noch.","Leg eine Null dran, dann reden wir. Hinten, nicht vorne.","Das ist kein Angebot, das ist eine Beleidigung mit Komma.","Nö. Aber danke, dass du an mich gedacht hast.","Ich verkaufe nicht unter Wert. Außer montags. Heute ist nicht Montag. Glaube ich."]}}}'::jsonb, 'Defaults from src/config/balance.ts, section "nfts"'),
   ('accessories', '{"slots":["back","body","face","head","hand","pet"],"feedRarities":["legendary","mythic"],"items":[{"key":"party_hat","name":"Partyhütchen","description":"Jeder Tag ist ein Feiertag, wenn das Depot grün ist.","slot":"head","rarity":"common","priceCents":75000,"minLevel":1,"set":"holidays"},{"key":"paper_crown","name":"Pappkrone","description":"Vom Burgerladen. Fühlt sich trotzdem königlich an.","slot":"head","rarity":"common","priceCents":135000,"minLevel":1},{"key":"beanie","name":"Bommelmütze","description":"Hält warm, wenn der Markt eiskalt ist.","slot":"head","rarity":"common","priceCents":180000,"minLevel":1},{"key":"traffic_cone","name":"Leitkegel","description":"Vom Heimweg mitgenommen. Niemand fragt nach.","slot":"head","rarity":"common","priceCents":240000,"minLevel":1,"set":"absurd"},{"key":"propeller_cap","name":"Propellermütze","description":"Dreht sich bei jedem Kursanstieg ein bisschen schneller.","slot":"head","rarity":"rare","priceCents":1250000,"minLevel":2,"set":"absurd"},{"key":"chef_hat","name":"Kochmütze","description":"Für alle, die ihr Depot nach Gefühl würzen.","slot":"head","rarity":"rare","priceCents":1500000,"minLevel":2,"set":"chef"},{"key":"bunny_ears","name":"Hasenohren","description":"Hört Gerüchte schon, bevor sie in den Nachrichten sind.","slot":"head","rarity":"rare","priceCents":2000000,"minLevel":3,"set":"zoo"},{"key":"cowboy_hat","name":"Cowboyhut","description":"Yeehaw! Der Wilde Westen heißt jetzt Börse.","slot":"head","rarity":"rare","priceCents":3250000,"minLevel":3},{"key":"pirate_hat","name":"Piratenhut","description":"Arrr! Für Leute, die Dividenden lieber entern.","slot":"head","rarity":"epic","priceCents":24500000,"minLevel":5,"set":"pirate"},{"key":"viking_helmet","name":"Wikingerhelm","description":"Plündert keine Dörfer, nur Short-Positionen.","slot":"head","rarity":"epic","priceCents":42000000,"minLevel":6,"set":"knight"},{"key":"top_hat","name":"Zylinder","description":"Ab hier redet man nur noch über Rendite und Pferde.","slot":"head","rarity":"epic","priceCents":105000000,"minLevel":10,"set":"royal"},{"key":"halo","name":"Heiligenschein","description":"Garantiert nie Insiderhandel betrieben. Ehrlich.","slot":"head","rarity":"legendary","priceCents":750000000,"minLevel":15},{"key":"crown","name":"Goldkrone","description":"Massives Pixelgold mit echten Fake-Diamanten.","slot":"head","rarity":"legendary","priceCents":5000000000,"minLevel":25,"set":"royal"},{"key":"clown_nose","name":"Clownsnase","description":"Macht jeden Verlust ein bisschen lustiger. Hupt nicht.","slot":"face","rarity":"common","priceCents":75000,"minLevel":1,"set":"absurd"},{"key":"sunglasses","name":"Sonnenbrille","description":"Die Zukunft ist so hell, man braucht eine.","slot":"face","rarity":"common","priceCents":105000,"minLevel":1,"set":"rock"},{"key":"fake_moustache","name":"Falscher Schnurrbart","description":"Perfekte Tarnung. Niemand erkennt dich. Wirklich niemand.","slot":"face","rarity":"common","priceCents":120000,"minLevel":1,"set":"absurd"},{"key":"heart_glasses","name":"Herzchenbrille","description":"Verliebt in jede Aktie, die man gerade gekauft hat.","slot":"face","rarity":"rare","priceCents":900000,"minLevel":2},{"key":"glasses_3d","name":"3D-Brille","description":"Endlich sieht man den Kurs auch in die Tiefe fallen.","slot":"face","rarity":"rare","priceCents":1100000,"minLevel":3},{"key":"monocle","name":"Monokel","description":"Ein Auge auf den Markt, das andere auf den Butler.","slot":"face","rarity":"epic","priceCents":31500000,"minLevel":7,"set":"royal"},{"key":"vr_goggles","name":"VR-Brille","description":"Lebt halb im Metaversum, halb im Minus.","slot":"face","rarity":"epic","priceCents":84000000,"minLevel":8},{"key":"deal_shades","name":"Pixel-Sonnenbrille","description":"Fällt aus dem Nichts ins Gesicht. Deal with it.","slot":"face","rarity":"epic","priceCents":56000000,"minLevel":6,"set":"rock"},{"key":"laser_eyes","name":"Laseraugen","description":"Nur echt mit mindestens einem Coin, der zum Mond fliegt.","slot":"face","rarity":"legendary","priceCents":2500000000,"minLevel":20},{"key":"bathrobe","name":"Bademantel","description":"Homeoffice-Uniform. Trading geht auch im Liegen.","slot":"body","rarity":"common","priceCents":150000,"minLevel":1,"set":"office"},{"key":"tracksuit","name":"Trainingsanzug","description":"Raschelt bei jeder Bewegung. Sehr sportlich, nie gejoggt.","slot":"body","rarity":"common","priceCents":210000,"minLevel":1,"set":"sports"},{"key":"hawaiian_shirt","name":"Hawaiihemd","description":"Urlaubsmodus an, Depot läuft trotzdem.","slot":"body","rarity":"common","priceCents":270000,"minLevel":2},{"key":"banana_costume","name":"Bananenkostüm","description":"Krumm, gelb und immer ein Hingucker. Nicht ausrutschen.","slot":"body","rarity":"rare","priceCents":2500000,"minLevel":2,"set":"absurd"},{"key":"hotdog_costume","name":"Hotdog-Kostüm","description":"Mit extra Senf. Riecht zum Glück nur nach Stoff.","slot":"body","rarity":"rare","priceCents":3750000,"minLevel":3,"set":"absurd"},{"key":"tuxedo","name":"Smoking","description":"Für Börsengänge, Galas und das Abendessen zu Hause.","slot":"body","rarity":"rare","priceCents":6000000,"minLevel":4,"set":"royal"},{"key":"shark_costume","name":"Haikostüm","description":"Für echte Finanzhaie. Beißt nur bei Leerverkäufen.","slot":"body","rarity":"epic","priceCents":28000000,"minLevel":5,"set":"zoo"},{"key":"dino_onesie","name":"Dino-Onesie","description":"Rawr! Uralte Anlagestrategie, extrem kuschelig.","slot":"body","rarity":"epic","priceCents":38500000,"minLevel":6,"set":"zoo"},{"key":"astronaut_suit","name":"Raumanzug","description":"Wer zum Mond will, muss sich passend anziehen.","slot":"body","rarity":"epic","priceCents":140000000,"minLevel":12,"set":"space"},{"key":"gold_suit","name":"Goldanzug","description":"Glänzt so sehr, dass die Konkurrenz eine Sonnenbrille braucht.","slot":"body","rarity":"legendary","priceCents":3000000000,"minLevel":20,"set":"royal"},{"key":"balloon","name":"Luftballon","description":"Steigt wie deine Lieblingsaktie. Platzt hoffentlich nicht.","slot":"hand","rarity":"common","priceCents":45000,"minLevel":1,"set":"holidays"},{"key":"baguette","name":"Baguette","description":"Knusprig, französisch, als Zeigestab bestens geeignet.","slot":"hand","rarity":"common","priceCents":60000,"minLevel":1,"set":"chef"},{"key":"rubber_chicken","name":"Gummihuhn","description":"Quietscht bei jedem Verlust. Also oft.","slot":"hand","rarity":"common","priceCents":90000,"minLevel":1,"set":"absurd"},{"key":"ice_cream","name":"Eistüte","description":"Drei Kugeln: Gewinn, Verlust und Pistazie.","slot":"hand","rarity":"common","priceCents":75000,"minLevel":1,"set":"chef"},{"key":"foam_finger","name":"Schaumstoffhand","description":"Nummer eins! Zumindest in der eigenen Wochenliga.","slot":"hand","rarity":"rare","priceCents":750000,"minLevel":2,"set":"sports"},{"key":"megaphone","name":"Megafon","description":"KAUFEN! VERKAUFEN! Hauptsache laut.","slot":"hand","rarity":"rare","priceCents":1750000,"minLevel":3,"set":"office"},{"key":"money_bag","name":"Geldsack","description":"Mit Dollarzeichen drauf, damit es auch jeder versteht.","slot":"hand","rarity":"rare","priceCents":4999900,"minLevel":4,"set":"office"},{"key":"laser_sword","name":"Laserschwert","description":"Schneidet Gebühren und Spreads in der Mitte durch.","slot":"hand","rarity":"epic","priceCents":49000000,"minLevel":8,"set":"space"},{"key":"golden_toilet_brush","name":"Goldene Klobürste","description":"Wahrer Reichtum zeigt sich im Badezimmer.","slot":"hand","rarity":"legendary","priceCents":1500000000,"minLevel":18,"set":"absurd"},{"key":"rubber_duck","name":"Quietscheente","description":"Hört zu, wenn du deine Trades erklärst. Urteilt nie.","slot":"pet","rarity":"common","priceCents":120000,"minLevel":1,"set":"zoo"},{"key":"hamster","name":"Hamster","description":"Hamstert alles, besonders Dividenden.","slot":"pet","rarity":"rare","priceCents":600000,"minLevel":2,"set":"zoo"},{"key":"parrot","name":"Papagei","description":"Plappert jeden Börsentipp nach. Auch die schlechten.","slot":"pet","rarity":"rare","priceCents":4000000,"minLevel":4,"set":"pirate"},{"key":"pug","name":"Mops","description":"Schnauft beim Laden der Kurse. Bester Freund an der Börse.","slot":"pet","rarity":"epic","priceCents":21000000,"minLevel":5,"set":"zoo"},{"key":"mini_dragon","name":"Minidrache","description":"Bewacht deinen Goldschatz und röstet Marshmallows.","slot":"pet","rarity":"legendary","priceCents":4000000000,"minLevel":22,"set":"wizard"},{"key":"superhero_cape","name":"Superheldenumhang","description":"Rettet Depots, aber leider nur die eigenen.","slot":"back","rarity":"rare","priceCents":2250000,"minLevel":2},{"key":"butterfly_wings","name":"Schmetterlingsflügel","description":"Ein Flügelschlag hier, ein Kurssturz in Tokio.","slot":"back","rarity":"rare","priceCents":4500000,"minLevel":3,"set":"zoo"},{"key":"bat_wings","name":"Fledermausflügel","description":"Für Nachteulen, die nachbörslich handeln.","slot":"back","rarity":"epic","priceCents":52500000,"minLevel":7,"set":"holidays"},{"key":"angel_wings","name":"Engelsflügel","description":"Himmlische Renditen, garantiert ohne Garantie.","slot":"back","rarity":"epic","priceCents":175000000,"minLevel":12},{"key":"jetpack","name":"Jetpack","description":"To the moon! Tank voll, Sicherheitsgurt optional.","slot":"back","rarity":"legendary","priceCents":1000000000,"minLevel":15,"set":"space"},{"key":"toilet_paper_crown","name":"Klopapierkrone","description":"Krisensicher angelegt. Hält drei Lockdowns und einen Crash.","slot":"head","rarity":"common","priceCents":99000,"minLevel":1,"set":"absurd"},{"key":"tinfoil_hat","name":"Aluhut","description":"Schirmt Kursmanipulation ab. Und WLAN. Und Vernunft.","slot":"head","rarity":"common","priceCents":150000,"minLevel":1,"set":"absurd"},{"key":"santa_hat","name":"Weihnachtsmütze","description":"Ho ho ho! Die Jahresendrallye kommt bestimmt.","slot":"head","rarity":"common","priceCents":165000,"minLevel":1,"set":"holidays"},{"key":"cat_ears","name":"Katzenohren","description":"In deiner Haarfarbe. Hören Dividenden schon von Weitem schnurren.","slot":"head","rarity":"common","priceCents":195000,"minLevel":1,"set":"zoo"},{"key":"tie_headband","name":"Krawatte als Stirnband","description":"Nach der Weihnachtsfeier der Investmentbank. Nicht fragen.","slot":"head","rarity":"common","priceCents":225000,"minLevel":2,"set":"office"},{"key":"alien_antennae","name":"Alien-Fühler","description":"Empfangen Börsentipps aus einer fernen Galaxie. Meist falsche.","slot":"head","rarity":"common","priceCents":260000,"minLevel":2,"set":"space"},{"key":"frog_hat","name":"Froschmütze","description":"Quak! Springt von Aktie zu Aktie und landet meist im Teich.","slot":"head","rarity":"rare","priceCents":1800000,"minLevel":2,"set":"zoo"},{"key":"reindeer_antlers","name":"Rentiergeweih","description":"Zieht den Schlitten voller Gewinne. Rudolph ist neidisch.","slot":"head","rarity":"rare","priceCents":2400000,"minLevel":3,"set":"holidays"},{"key":"sombrero","name":"Sombrero","description":"Spendet Schatten für den ganzen Handelsraum. Olé!","slot":"head","rarity":"rare","priceCents":2900000,"minLevel":3},{"key":"jester_hat","name":"Narrenkappe","description":"Für alle, die zum Höchstkurs gekauft haben. Klingelt beim Verkaufen.","slot":"head","rarity":"rare","priceCents":3600000,"minLevel":4,"set":"absurd"},{"key":"graduation_cap","name":"Doktorhut","description":"Dr. rer. pol. in Kaffeesatzlesen. Mit Auszeichnung.","slot":"head","rarity":"rare","priceCents":4500000,"minLevel":4,"set":"office"},{"key":"pumpkin_head","name":"Kürbiskopf","description":"Gruselig wie ein Depot im Oktober.","slot":"head","rarity":"epic","priceCents":33000000,"minLevel":7,"set":"holidays"},{"key":"knight_helmet","name":"Ritterhelm","description":"Schützt vor Gegenwind, Kritik und Margin Calls.","slot":"head","rarity":"epic","priceCents":68000000,"minLevel":9,"set":"knight"},{"key":"wizard_hat","name":"Zauberhut","description":"Zaubert Gewinne herbei. Behauptet zumindest der Prospekt.","slot":"head","rarity":"epic","priceCents":90000000,"minLevel":10,"set":"wizard"},{"key":"unicorn_horn","name":"Einhorn-Horn","description":"Für Gründer mit Milliardenbewertung und ohne Umsatz.","slot":"head","rarity":"epic","priceCents":125000000,"minLevel":12,"set":"zoo"},{"key":"disco_ball","name":"Discokugel","description":"Die Party geht weiter, solange der Kurs steigt.","slot":"head","rarity":"legendary","priceCents":1900000000,"minLevel":19,"set":"absurd"},{"key":"money_cloud","name":"Geldregenwolke","description":"Der Wetterbericht für Superreiche: Es regnet Scheine.","slot":"head","rarity":"mythic","priceCents":75000000000,"minLevel":40,"set":"royal"},{"key":"bubblegum","name":"Kaugummiblase","description":"Wie eine Spekulationsblase, nur leckerer. Platzt auch.","slot":"face","rarity":"common","priceCents":65000,"minLevel":1,"set":"absurd"},{"key":"eye_patch","name":"Augenklappe","description":"Ein Auge auf den Markt reicht völlig, sagt der Kapitän.","slot":"face","rarity":"common","priceCents":85000,"minLevel":1,"set":"pirate"},{"key":"facepaint","name":"Fan-Schminke","description":"In den Farben des Teams mit der besten Rendite. Wechselt wöchentlich.","slot":"face","rarity":"common","priceCents":95000,"minLevel":1,"set":"sports"},{"key":"nerd_glasses","name":"Hornbrille","description":"Mit Klebeband geflickt. Hat schon jede Tabellenkalkulation gesehen.","slot":"face","rarity":"common","priceCents":110000,"minLevel":1,"set":"office"},{"key":"snorkel_mask","name":"Taucherbrille","description":"Bestens gerüstet für den nächsten Kurstaucher.","slot":"face","rarity":"rare","priceCents":1400000,"minLevel":2},{"key":"star_glasses","name":"Sternchenbrille","description":"Rockstar-Look für alle, die den Depotauszug nicht sehen wollen.","slot":"face","rarity":"rare","priceCents":2200000,"minLevel":3,"set":"rock"},{"key":"hero_mask","name":"Superheldenmaske","description":"Geheime Identität: Kleinanleger. Superkraft: Durchhalten.","slot":"face","rarity":"rare","priceCents":3900000,"minLevel":4},{"key":"wizard_beard","name":"Zauberbart","description":"Hundert Jahre Börsenerfahrung. Oder zwei Wochen sehr viel Stress.","slot":"face","rarity":"epic","priceCents":64000000,"minLevel":10,"set":"wizard"},{"key":"diamond_grill","name":"Diamant-Grillz","description":"Ein Lächeln wie ein Tresor: glänzend, hart und sehr teuer.","slot":"face","rarity":"legendary","priceCents":2100000000,"minLevel":21,"set":"royal"},{"key":"diamond_monocle","name":"Diamantmonokel","description":"Sieht alles. Besonders gern das eigene Spiegelbild.","slot":"face","rarity":"mythic","priceCents":25000000000,"minLevel":35,"set":"royal"},{"key":"barrel","name":"Pleite-Fass","description":"Das Outfit nach dem Margin Call. Hosenträger gibt es gratis dazu.","slot":"body","rarity":"common","priceCents":49000,"minLevel":1,"set":"office"},{"key":"chef_apron","name":"Kochschürze","description":"Hier werden keine Bilanzen gekocht. Nur Nudeln.","slot":"body","rarity":"common","priceCents":125000,"minLevel":1,"set":"chef"},{"key":"duck_float","name":"Entchen-Schwimmring","description":"Hält dich über Wasser, wenn das Depot absäuft.","slot":"body","rarity":"common","priceCents":145000,"minLevel":1,"set":"absurd"},{"key":"jersey","name":"Trikot Nr. 1","description":"Die Nummer eins im Depot-Derby. Steht ja drauf.","slot":"body","rarity":"common","priceCents":240000,"minLevel":2,"set":"sports"},{"key":"xmas_sweater","name":"Weihnachtspulli","description":"Hässlich, kratzig und trotzdem jedes Jahr wieder dabei.","slot":"body","rarity":"rare","priceCents":1900000,"minLevel":2,"set":"holidays"},{"key":"leather_jacket","name":"Lederjacke","description":"Rock ''n'' Roll im Depot: laut, wild und sehr volatil.","slot":"body","rarity":"rare","priceCents":5500000,"minLevel":4,"set":"rock"},{"key":"pirate_coat","name":"Piratenmantel","description":"Mit Goldknöpfen aus erbeuteten Dividenden.","slot":"body","rarity":"rare","priceCents":6500000,"minLevel":5,"set":"pirate"},{"key":"garden_gnome","name":"Gartenzwergkostüm","description":"Steht stoisch im Vorgarten und wartet auf die Erholung.","slot":"body","rarity":"rare","priceCents":7700000,"minLevel":5,"set":"absurd"},{"key":"pinstripe_suit","name":"Nadelstreifenanzug","description":"Riecht nach Bonus, Espresso und Überstunden.","slot":"body","rarity":"epic","priceCents":72000000,"minLevel":8,"set":"office"},{"key":"knight_armor","name":"Ritterrüstung","description":"Panzert gegen Kursstürze. Rostet leider bei Regen.","slot":"body","rarity":"epic","priceCents":115000000,"minLevel":11,"set":"knight"},{"key":"wizard_robe","name":"Zaubermantel","description":"Mit Sternen bestickt und Geheimtaschen für Geheimformeln.","slot":"body","rarity":"epic","priceCents":150000000,"minLevel":12,"set":"wizard"},{"key":"ermine_robe","name":"Königsmantel","description":"Hermelin, Samt und Gold. Untertanen sind nicht im Preis enthalten.","slot":"body","rarity":"mythic","priceCents":60000000000,"minLevel":45,"set":"royal"},{"key":"sparkler","name":"Wunderkerze","description":"Funkelt kurz und hell. Wie mancher Börsengang.","slot":"hand","rarity":"common","priceCents":50000,"minLevel":1,"set":"holidays"},{"key":"candy_cane","name":"Zuckerstange","description":"Rot-weiß gestreift wie ein Chart an einem nervösen Tag.","slot":"hand","rarity":"common","priceCents":55000,"minLevel":1,"set":"holidays"},{"key":"frying_pan","name":"Bratpfanne","description":"Mit Spiegelei. Frühstück und Selbstverteidigung in einem.","slot":"hand","rarity":"common","priceCents":70000,"minLevel":1,"set":"chef"},{"key":"coffee_mug","name":"Kaffeebecher","description":"Treibstoff für den Börsenstart um neun. Und den um zehn.","slot":"hand","rarity":"common","priceCents":80000,"minLevel":1,"set":"office"},{"key":"plunger","name":"Pümpel","description":"Für verstopfte Orderbücher und andere Notfälle.","slot":"hand","rarity":"common","priceCents":99900,"minLevel":1,"set":"absurd"},{"key":"tennis_racket","name":"Tennisschläger","description":"Schlägt jeden Aufschlag zurück. Nur keine Gebühren.","slot":"hand","rarity":"common","priceCents":200000,"minLevel":2,"set":"sports"},{"key":"shopping_cart","name":"Einkaufswagen","description":"Randvoll mit Klopapier. Die sicherste Anlage überhaupt.","slot":"hand","rarity":"rare","priceCents":1600000,"minLevel":2,"set":"absurd"},{"key":"magic_wand","name":"Zauberstab","description":"Ein Schwung, und das Minus ist weg. Leider nur im Traum.","slot":"hand","rarity":"rare","priceCents":2700000,"minLevel":3,"set":"wizard"},{"key":"cutlass","name":"Säbel","description":"Entert jede Hauptversammlung. Arrr!","slot":"hand","rarity":"rare","priceCents":4200000,"minLevel":4,"set":"pirate"},{"key":"ray_gun","name":"Strahlenpistole","description":"Pew, pew! Schießt Kurse in die Umlaufbahn.","slot":"hand","rarity":"rare","priceCents":4800000,"minLevel":4,"set":"space"},{"key":"electric_guitar","name":"E-Gitarre","description":"Spielt im Plus nur Dur. Im Minus Blues.","slot":"hand","rarity":"epic","priceCents":47000000,"minLevel":8,"set":"rock"},{"key":"broadsword","name":"Ritterschwert","description":"Für epische Duelle in der Börsenliga.","slot":"hand","rarity":"epic","priceCents":60000000,"minLevel":9,"set":"knight"},{"key":"trophy","name":"Goldpokal","description":"Für den ersten Platz. Selbst gekauft zählt auch.","slot":"hand","rarity":"epic","priceCents":99000000,"minLevel":11,"set":"sports"},{"key":"briefcase_money","name":"Geldkoffer","description":"Prall gefüllt und ganz sicher nicht aus dunklen Geschäften. Fast.","slot":"hand","rarity":"legendary","priceCents":1250000000,"minLevel":17,"set":"office"},{"key":"sceptre","name":"Zepter","description":"Wer das hält, bestimmt den Leitzins. Zumindest auf dem Platz.","slot":"hand","rarity":"mythic","priceCents":40000000000,"minLevel":38,"set":"royal"},{"key":"pet_rock","name":"Haustierstein","description":"Frisst nichts, bellt nicht und schwankt nie im Kurs.","slot":"pet","rarity":"common","priceCents":49900,"minLevel":1,"set":"absurd"},{"key":"snail","name":"Turbo-Schnecke","description":"Schneller als jede Überweisung am Wochenende.","slot":"pet","rarity":"common","priceCents":135000,"minLevel":1,"set":"zoo"},{"key":"cat","name":"Katze","description":"Läuft über die Tastatur und kauft dabei zufällig Aktien.","slot":"pet","rarity":"common","priceCents":280000,"minLevel":2,"set":"zoo"},{"key":"goldfish","name":"Goldfisch im Glas","description":"Vergisst jeden Verlust nach drei Sekunden. Ein Vorbild.","slot":"pet","rarity":"rare","priceCents":1200000,"minLevel":2,"set":"zoo"},{"key":"lobster","name":"Hummer","description":"Kneift bei schlechten Trades. Also ziemlich oft.","slot":"pet","rarity":"rare","priceCents":2600000,"minLevel":3,"set":"chef"},{"key":"ghost","name":"Gespenst","description":"Der Geist vergangener Verluste. Buh!","slot":"pet","rarity":"rare","priceCents":3100000,"minLevel":3,"set":"holidays"},{"key":"owl","name":"Eule","description":"Weise Anlagetipps, aber nur nach Mitternacht.","slot":"pet","rarity":"rare","priceCents":3400000,"minLevel":4,"set":"wizard"},{"key":"penguin","name":"Pinguin","description":"Trägt immer Frack. Perfekt für die Hauptversammlung.","slot":"pet","rarity":"rare","priceCents":5000000,"minLevel":4,"set":"zoo"},{"key":"bear","name":"Bärenmarkt-Bär","description":"Kuschelig, aber jeder Kurs fällt, wenn er brummt.","slot":"pet","rarity":"epic","priceCents":25000000,"minLevel":6,"set":"office"},{"key":"robo_dog","name":"Robohund","description":"Holt die Zeitung, liest sie und handelt sofort.","slot":"pet","rarity":"epic","priceCents":88000000,"minLevel":10,"set":"space"},{"key":"ufo","name":"Mini-UFO","description":"Entführt Kühe. Und manchmal Aktien in ungeahnte Höhen.","slot":"pet","rarity":"legendary","priceCents":3500000000,"minLevel":24,"set":"space"},{"key":"golden_bull","name":"Goldener Bulle","description":"Das Wappentier der Hausse. Massiv vergoldet, schnaubt Optimismus.","slot":"pet","rarity":"mythic","priceCents":90000000000,"minLevel":50,"set":"royal"},{"key":"school_bag","name":"Schulranzen","description":"Für den ersten Schultag an der Börse. Pausenbrot inklusive.","slot":"back","rarity":"common","priceCents":115000,"minLevel":1},{"key":"bee_wings","name":"Bienenflügel","description":"Fleißig wie eine Biene. Summt beim Sparen.","slot":"back","rarity":"common","priceCents":185000,"minLevel":2,"set":"zoo"},{"key":"turtle_shell","name":"Schildkrötenpanzer","description":"Langsam, aber sicher: die Strategie für Geduldige.","slot":"back","rarity":"rare","priceCents":2300000,"minLevel":3,"set":"zoo"},{"key":"surfboard","name":"Surfbrett","description":"Reitet jede Welle. Auch die nach unten.","slot":"back","rarity":"rare","priceCents":3000000,"minLevel":3},{"key":"knight_shield","name":"Ritterschild","description":"Hält Anrufe von Anlageberatern zuverlässig ab.","slot":"back","rarity":"rare","priceCents":5200000,"minLevel":5,"set":"knight"},{"key":"peacock_tail","name":"Pfauenrad","description":"Schlägt ein Rad, sobald der Kontostand stimmt.","slot":"back","rarity":"epic","priceCents":160000000,"minLevel":13,"set":"royal"},{"key":"dragon_wings","name":"Drachenflügel","description":"Für Flüge über den eigenen Goldschatz. Feuer inklusive.","slot":"back","rarity":"legendary","priceCents":7500000000,"minLevel":26,"set":"wizard"},{"key":"phoenix_wings","name":"Phönixflügel","description":"Steigt aus der Asche jedes Crashs wieder auf.","slot":"back","rarity":"mythic","priceCents":15000000000,"minLevel":42,"set":"royal"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "accessories"'),
-  ('battles', '{"lobby":{"minLevel":2,"minPlayers":3,"maxPlayers":10,"countdownSeconds":30,"idleSeconds":15,"introMs":6000,"recentSeconds":120},"demo":{"countdownSeconds":6,"botsMin":3,"botsMax":5},"weights":{"floor":12,"bulls":12,"coins":12,"sumo":12,"potato":12,"pump":10,"quiz":12,"estimate":8,"bell":10},"net":{"tickMs":50,"graceMs":1000,"aheadTicks":10,"disconnectTicks":80,"sendEveryMs":250,"checkEveryMs":1000},"arena":{"w":11,"h":9,"stepTicks":4,"spawns":[[1,1],[9,7],[9,1],[1,7],[5,1],[5,7],[1,4],[9,4],[3,4],[7,4]]},"games":{"floor":{"maxTicks":1400,"firstWave":60,"waveEvery":50,"waveEveryMin":18,"waveEveryStep":2,"crackStart":3,"crackMax":9,"crackGrowEvery":2,"warnTicks":24,"stompTicks":50,"endgameTiles":8},"bulls":{"maxTicks":1300,"hearts":3,"firstSpawn":40,"spawnEvery":50,"spawnEveryMin":14,"spawnEveryStep":2,"countGrowEvery":5,"countMax":4,"warnTicks":26,"ticksPerTile":2,"stunTicks":16,"invulnTicks":40},"coins":{"durationTicks":900,"firstDrop":20,"dropEvery":6,"dropEveryMin":3,"fallTicks":16,"lifeTicks":80,"bearPct":12,"goldPct":8,"goldValue":3,"bearStunTicks":30,"bearLoss":2,"jackpotTicks":200,"jackpotGoldPct":25},"sumo":{"maxTicks":1500,"firstShrink":300,"shrinkEvery":220,"warnTicks":40,"stunTicks":0,"recoverTicks":7,"powerCooldown":40,"cornerCut":8,"spawns":[[2,2],[8,6],[8,2],[2,6],[5,1],[5,7],[2,4],[8,4],[4,3],[6,5]]},"potato":{"maxTicks":1800,"firstRound":40,"pauseTicks":40,"holderStepTicks":3,"passBackTicks":20,"receiverStunTicks":8,"fuseBaseSeconds":13,"fuseMinSeconds":4,"fuseJitterSeconds":4,"walls":[[2,2],[8,2],[2,6],[8,6],[5,4]]},"pump":{"durationTicks":600,"greenMin":40,"greenJitter":60,"yellowTicks":12,"redMin":20,"redJitter":20,"goldEvery":4,"goldTicks":20,"goldValue":3,"bustFreezeTicks":20,"bustLossBps":2500},"quiz":{"rounds":7,"answerMs":8000,"revealMs":3000,"hearts":2,"basePoints":500,"speedPoints":500},"estimate":{"rounds":4,"answerMs":12000,"revealMs":4000,"bullseyeBps":100,"bullseyeBonus":2,"lastRoundFactor":2,"stockRounds":1},"bell":{"maxRounds":9,"readyMs":1000,"waitMinMs":1500,"waitMaxMs":4500,"windowMs":2000,"resultMs":2500,"smallGroup":5,"heartsSmall":2,"heartsLarge":1}},"prizes":{"weights":{"xp":30,"money":30,"skin":20,"nft":20},"xpBase":1000,"xpPerPlayer":150,"moneyBaseCents":300000,"moneyPerPlayerCents":75000,"dailyPrizeCap":3},"accessories":[{"key":"battle_crown","name":"Battle-Krone","description":"Gewonnen, nicht gekauft. Samt, Gold und ein Rubin so groß wie dein Ego.","slot":"head","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"laurel_wreath","name":"Lorbeerkranz","description":"Wie bei den alten Griechen, nur mit mehr Aktien.","slot":"head","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"champion_belt","name":"Champion-Gürtel","description":"Schwergewichtsmeister im Kurssturz-Springen.","slot":"body","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"victory_cape","name":"Siegerumhang","description":"Flattert dramatisch, auch wenn kein Wind weht.","slot":"back","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"star_shades","name":"Siegerbrille","description":"Wer gewinnt, muss die Blicke der Verlierer nicht sehen.","slot":"face","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"golden_joystick","name":"Goldener Joystick","description":"WASD in purem Gold. Nicht zum Zocken, zum Angeben.","slot":"hand","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"winner_trophy","name":"Siegerpokal","description":"Glänzt. Wiegt. Wird jeden Abend poliert.","slot":"hand","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"mini_bull","name":"Mini-Bulle","description":"Ein Bulle, der dich nicht über den Haufen rennt. Meistens.","slot":"pet","rarity":"legendary","exclusive":true,"minLevel":1}],"doodle":{"lobby":["Na, ihr Sofa-Börsianer? Wer traut sich in die Arena?","Ich brauche drei Mutige. Oder drei Ahnungslose. Geht beides.","Kommt rein, kommt rein! Hier gewinnt nur einer, die anderen weinen live.","Meine Mutter würde sofort mitmachen. Und gewinnen.","Ein Preis, ein Sieger, null Mitleid. Willkommen im Battle!"],"countdown":["Gleich geht''s los! Letzte Chance, noch feige wegzurennen.","Die Arena wird gewischt. Gleich fließen Tränen.","Ich habe Popcorn. Ihr habt keine Chance."],"intro":{"floor":"Der Kurs stürzt, der Boden auch! Bleibt in Bewegung, sonst geht''s abwärts!","bulls":"Die Bullen sind los! Wer stehen bleibt, wird zum Teppich.","coins":"Es regnet Geld! Vorsicht vor den Bären, die beißen.","sumo":"Rempeln erlaubt, Weinen auch. Wer rausfliegt, fliegt raus!","potato":"Wer die Giftaktie hält, wenn es knallt, ist raus. Weitergeben!","pump":"Pumpt die Aktie! Aber wehe, ihr tippt im Crash.","quiz":"Quizzeit! Zwei Herzen, null Ahnung. Zeigt, was ihr wisst!","estimate":"Schätzt mal! Wer am nächsten dran ist, kriegt die Punkte.","bell":"Wenn die Glocke läutet, drückt ihr. Vorher drücken? Raus!"},"win":["{name} gewinnt! Ich habe es immer gewusst. Also seit gerade eben.","Applaus für {name}! Die anderen dürfen jetzt heimlich weinen.","{name} räumt ab! Das schreibe ich mir auf die Krawatte.","Was für ein Battle! {name} ist der Champion des Tages.","{name} siegt, die Börse bebt, mein Schnurrbart zittert!"],"out":["Und weg ist {name}! Tschüss, war nett.","{name} fliegt raus. Ich habe nichts gesehen. Doch, alles.","Autsch, {name}! Das gibt einen blauen Fleck im Depot."],"chat":{"start":"🏟️ BATTLE! {count} Zuschauer kämpfen jetzt in „{game}“ um {prize}. Viel Glück, ihr Pfeifen!","win":"🏆 {name} gewinnt „{game}“ und kassiert {prize}! Glückwunsch, du Glückspilz."}},"names":{"floor":"Kurssturz","bulls":"Bullenreiten","coins":"Geldregen","sumo":"Sumo am Parkett","potato":"Giftaktie","pump":"Aktie pumpen","quiz":"Börsenquiz","estimate":"Schätz den Kurs","bell":"Die Glocke"},"demoBots":[{"nickname":"Bärbel Bärenmarkt","avatarKey":"seller","accessories":["cowboy_hat"]},{"nickname":"Kalle Kursrakete","avatarKey":"punk","accessories":["sunglasses","superhero_cape"]},{"nickname":"Dividenden-Dieter","avatarKey":"analyst","accessories":["top_hat"]},{"nickname":"Moni Moneymaker","avatarKey":"scientist","accessories":["party_hat","balloon"]},{"nickname":"Börsen-Bernd","avatarKey":"rookie","accessories":["beanie","hamster"]},{"nickname":"Lisa Leerverkauf","avatarKey":"finn_fan","accessories":["bunny_ears"]},{"nickname":"Hedge-Horst","avatarKey":"rookie","accessories":["viking_helmet","pug"]},{"nickname":"Penny Stock","avatarKey":"seller","accessories":["heart_glasses"]},{"nickname":"Ralf Rendite","avatarKey":"analyst","accessories":["chef_hat","baguette"]}],"quiz":[{"q":"Wie viel Startkapital bekommt man bei NEXA?","a":"10.000 €","wrong":["1.000 €","50.000 €","100.000 €"]},{"q":"Wer moderiert die NEXA Nachrichten?","a":"Mr. Doodle Dangle","wrong":["Finn","Mira","Dr. Dax"]},{"q":"Wann laufen die NEXA Nachrichten?","a":"Zu jeder vollen Stunde","wrong":["Einmal am Tag","Nur sonntags","Alle 5 Minuten"]},{"q":"Was ist ein Bullenmarkt?","a":"Steigende Kurse","wrong":["Fallende Kurse","Ein Viehmarkt","Ein Markt ohne Händler"]},{"q":"Was ist ein Bärenmarkt?","a":"Fallende Kurse","wrong":["Steigende Kurse","Ein Zoo","Ein Honigmarkt"]},{"q":"Was ist eine Dividende?","a":"Gewinnanteil für Aktionäre","wrong":["Eine Gebühr","Ein Kredit","Eine Steuer"]},{"q":"Was ist ein IPO?","a":"Ein Börsengang","wrong":["Eine Insolvenz","Ein Aktiensplit","Eine Fusion"]},{"q":"Was bedeutet Leerverkauf?","a":"Auf fallende Kurse wetten","wrong":["Alles verkaufen","Ohne Gebühr kaufen","Eine leere Order"]},{"q":"Was ist eine Anleihe?","a":"Ein Schuldpapier mit Zinsen","wrong":["Ein Firmenanteil","Eine Kryptowährung","Ein Sparbuch"]},{"q":"Was misst ein Aktienindex?","a":"Die Entwicklung vieler Aktien","wrong":["Den Goldpreis","Die Inflation","Nur eine Aktie"]},{"q":"Was ist eine Limit-Order?","a":"Kauf oder Verkauf zu einem Wunschpreis","wrong":["Ein Kauf ohne Geld","Eine Order mit Zeitlimit","Ein Verbot zu handeln"]},{"q":"Was ist ein Stop-Loss?","a":"Automatischer Verkauf bei Verlust","wrong":["Ein Handelsverbot","Eine Gewinnsteuer","Ein Börsenfeiertag"]},{"q":"Was ist Market Cap?","a":"Börsenwert einer Firma","wrong":["Die Kappe des Händlers","Der Tageshöchstkurs","Die Anzahl der Mitarbeiter"]},{"q":"Was passiert bei einem Aktiensplit?","a":"Mehr Aktien zum kleineren Preis","wrong":["Die Firma teilt sich","Die Aktie wird gelöscht","Der Kurs verdoppelt sich"]},{"q":"Was ist Volatilität?","a":"Wie stark ein Kurs schwankt","wrong":["Wie alt eine Firma ist","Ein Börsenfeiertag","Die Höhe der Dividende"]},{"q":"Welches Tier steht für steigende Kurse?","a":"Bulle","wrong":["Bär","Hase","Schildkröte"]},{"q":"Was ist ein NFT bei NEXA?","a":"Ein einzigartiges Pixel-Kunstwerk","wrong":["Eine Aktie","Eine Kreditkarte","Ein Firmenlogo"]},{"q":"Wie viele Spieler braucht ein News-Battle mindestens?","a":"3","wrong":["1","2","5"]},{"q":"Wie viele Spieler passen höchstens in ein News-Battle?","a":"10","wrong":["4","8","20"]},{"q":"Was bekommt der Sieger eines News-Battles?","a":"XP, Geld, einen Skin oder ein NFT","wrong":["Nur ein Lob","Eine echte Aktie","Einen Kredit"]},{"q":"Was ist ein Rug Pull?","a":"Die Macher hauen mit dem Geld ab","wrong":["Ein Teppichverkauf","Ein Kurssprung","Eine Gratis-Aktie"]},{"q":"Was ist Inflation?","a":"Steigende Preise, sinkende Kaufkraft","wrong":["Sinkende Preise","Ein Luftballon","Eine Börsenregel"]},{"q":"Was heißt „Buy the Dip“?","a":"Nach einem Kursrutsch kaufen","wrong":["Chips kaufen","Alles verkaufen","Nur Anleihen kaufen"]},{"q":"Was ist ein Portfolio?","a":"Alle eigenen Anlagen zusammen","wrong":["Eine Aktentasche","Ein Börsenticker","Ein Kredit"]},{"q":"Was ist ein Ticker?","a":"Das Kürzel einer Aktie","wrong":["Eine Uhr","Ein Händler","Eine Gebühr"]},{"q":"Wie heißt die Hauptstadt von Australien?","a":"Canberra","wrong":["Sydney","Melbourne","Perth"]},{"q":"Wie viele Beine hat eine Spinne?","a":"8","wrong":["6","10","12"]},{"q":"Welcher Planet ist der Sonne am nächsten?","a":"Merkur","wrong":["Venus","Mars","Erde"]},{"q":"Wie viele Minuten hat ein Tag?","a":"1.440","wrong":["1.200","2.400","960"]},{"q":"Welche Farbe entsteht aus Blau und Gelb?","a":"Grün","wrong":["Lila","Orange","Braun"]},{"q":"Was ist das größte Säugetier der Welt?","a":"Blauwal","wrong":["Elefant","Giraffe","Pottwal"]},{"q":"Wie viele Seiten hat ein Würfel?","a":"6","wrong":["4","8","12"]},{"q":"In welchem Land steht der Eiffelturm?","a":"Frankreich","wrong":["Italien","Belgien","Spanien"]},{"q":"Was ist H₂O?","a":"Wasser","wrong":["Wasserstoff","Sauerstoff","Salz"]},{"q":"Wie viele Spieler hat eine Fußballmannschaft auf dem Feld?","a":"11","wrong":["9","10","12"]},{"q":"Welches Tier legt Eier und ist ein Säugetier?","a":"Schnabeltier","wrong":["Pinguin","Delfin","Fledermaus"]},{"q":"Wie viele Kontinente gibt es?","a":"7","wrong":["5","6","8"]},{"q":"Wer hat die Glühbirne bekannt gemacht?","a":"Thomas Edison","wrong":["Albert Einstein","Isaac Newton","Nikola Tesla"]},{"q":"Was ist die Wurzel aus 144?","a":"12","wrong":["14","11","16"]},{"q":"Welche Sprache hat die meisten Muttersprachler?","a":"Chinesisch (Mandarin)","wrong":["Englisch","Spanisch","Hindi"]},{"q":"Wie heißt der längste Fluss Europas?","a":"Wolga","wrong":["Donau","Rhein","Elbe"]},{"q":"Was zeigt ein grüner Kurs bei NEXA?","a":"Der Kurs ist gestiegen","wrong":["Der Kurs ist gefallen","Die Börse ist zu","Ein Fehler"]},{"q":"Was kostet es, eine Order bei NEXA aufzugeben?","a":"Eine kleine Gebühr","wrong":["Nichts, niemals","Die Hälfte des Werts","Ein Level"]},{"q":"Was passiert, wenn eine Firma insolvent ist?","a":"Sie kann ihre Schulden nicht zahlen","wrong":["Sie geht an die Börse","Sie zahlt Dividende","Sie wird verdoppelt"]},{"q":"Wie viele Zähne hat ein erwachsener Mensch normalerweise?","a":"32","wrong":["28","30","36"]},{"q":"Welches Gas atmen Pflanzen ein?","a":"Kohlendioxid","wrong":["Sauerstoff","Stickstoff","Helium"]}],"estimate":[{"q":"Wie hoch ist der Eiffelturm (mit Antenne) in Metern?","value":330,"unit":"m"},{"q":"Wie viele Knochen hat ein erwachsener Mensch?","value":206,"unit":"Knochen"},{"q":"Wie viele Tasten hat ein Klavier?","value":88,"unit":"Tasten"},{"q":"Wie viele Länder gibt es in der EU?","value":27,"unit":"Länder"},{"q":"Wie schnell fährt ein ICE höchstens (km/h)?","value":300,"unit":"km/h"},{"q":"Wie viele Herzschläge hat ein Mensch in Ruhe pro Minute (etwa)?","value":70,"unit":"Schläge"},{"q":"Wie tief ist der Marianengraben in Metern (etwa)?","value":11000,"unit":"m"},{"q":"Wie viele Einwohner hat Berlin (in Tausend, etwa)?","value":3850,"unit":"Tsd."},{"q":"Wie viel wiegt ein erwachsener Afrikanischer Elefant in kg (etwa)?","value":6000,"unit":"kg"},{"q":"Wie lang ist die Chinesische Mauer in km (etwa)?","value":21000,"unit":"km"},{"q":"Wie viele Stunden hat ein Jahr (kein Schaltjahr)?","value":8760,"unit":"Stunden"},{"q":"Wie hoch ist die Zugspitze in Metern?","value":2962,"unit":"m"},{"q":"Wie viele Felder hat ein Schachbrett?","value":64,"unit":"Felder"},{"q":"Wie viele Kilometer ist der Mond von der Erde entfernt (in Tausend, etwa)?","value":384,"unit":"Tsd. km"},{"q":"Wie viele Liter Blut hat ein erwachsener Mensch (etwa)?","value":5,"unit":"Liter"},{"q":"Wie viele Kalorien hat eine Tafel Vollmilchschokolade (100 g, etwa)?","value":535,"unit":"kcal"},{"q":"Wie viele Spiele hat eine Bundesliga-Saison pro Team?","value":34,"unit":"Spiele"},{"q":"Wie viele Sekunden hat ein Tag?","value":86400,"unit":"Sekunden"},{"q":"Wie alt wurde Johann Wolfgang von Goethe?","value":82,"unit":"Jahre"},{"q":"Wie viele Stockwerke hat der Burj Khalifa (etwa)?","value":163,"unit":"Stockwerke"},{"q":"Wie viele Zähne hat ein Hai im Leben (etwa, in Tausend)?","value":30,"unit":"Tsd."},{"q":"Wie heiß ist die Oberfläche der Sonne in °C (etwa)?","value":5500,"unit":"°C"},{"q":"Wie viele Kaffeebohnen braucht ein Espresso (etwa)?","value":50,"unit":"Bohnen"},{"q":"Wie viele Wörter spricht ein Mensch am Tag (etwa, in Tausend)?","value":16,"unit":"Tsd."}]}'::jsonb, 'Defaults from src/config/balance.ts, section "battles"'),
+  ('battles', '{"lobby":{"minLevel":2,"minPlayers":3,"maxPlayers":10,"countdownSeconds":30,"idleSeconds":15,"introMs":6000,"recentSeconds":120},"demo":{"countdownSeconds":6,"botsMin":3,"botsMax":5},"weights":{"floor":12,"bulls":12,"coins":12,"sumo":12,"potato":12,"pump":10,"quiz":12,"estimate":8,"bell":10,"bear":12,"dash":12,"margin":12,"elevator":10,"laser":12,"rodeo":10,"vault":8,"ticker":10,"higher":10,"auction":8},"net":{"tickMs":50,"graceMs":1000,"aheadTicks":10,"disconnectTicks":80,"sendEveryMs":250,"checkEveryMs":1000},"arena":{"w":11,"h":9,"stepTicks":4,"spawns":[[1,1],[9,7],[9,1],[1,7],[5,1],[5,7],[1,4],[9,4],[3,4],[7,4]]},"games":{"floor":{"maxTicks":1400,"firstWave":60,"waveEvery":50,"waveEveryMin":18,"waveEveryStep":2,"crackStart":3,"crackMax":9,"crackGrowEvery":2,"warnTicks":24,"stompTicks":50,"endgameTiles":8},"bulls":{"maxTicks":1300,"hearts":3,"firstSpawn":40,"spawnEvery":50,"spawnEveryMin":14,"spawnEveryStep":2,"countGrowEvery":5,"countMax":4,"warnTicks":26,"ticksPerTile":2,"stunTicks":16,"invulnTicks":40},"coins":{"durationTicks":900,"firstDrop":20,"dropEvery":6,"dropEveryMin":3,"fallTicks":16,"lifeTicks":80,"bearPct":12,"goldPct":8,"goldValue":3,"bearStunTicks":30,"bearLoss":2,"jackpotTicks":200,"jackpotGoldPct":25},"sumo":{"maxTicks":1500,"firstShrink":300,"shrinkEvery":220,"warnTicks":40,"stunTicks":0,"recoverTicks":7,"powerCooldown":40,"cornerCut":8,"spawns":[[2,2],[8,6],[8,2],[2,6],[5,1],[5,7],[2,4],[8,4],[4,3],[6,5]]},"potato":{"maxTicks":1800,"firstRound":40,"pauseTicks":40,"holderStepTicks":3,"passBackTicks":20,"receiverStunTicks":8,"fuseBaseSeconds":13,"fuseMinSeconds":4,"fuseJitterSeconds":4,"walls":[[2,2],[8,2],[2,6],[8,6],[5,4]]},"pump":{"durationTicks":600,"greenMin":40,"greenJitter":60,"yellowTicks":12,"redMin":20,"redJitter":20,"goldEvery":4,"goldTicks":20,"goldValue":3,"bustFreezeTicks":20,"bustLossBps":2500},"bear":{"maxTicks":1600,"bearTicks":[40,360,720,1080],"stepStart":7,"stepMin":4,"speedEvery":280,"eatTicks":30,"den":[5,4],"pillars":[[3,3],[7,3],[3,5],[7,5]],"spawns":[[1,1],[9,7],[9,1],[1,7],[5,1],[5,7],[1,4],[9,4],[3,1],[7,7]]},"dash":{"maxTicks":1200,"target":8,"firstCoin":20,"coinsPerPlayers":3,"coinsMax":4,"spawnDelay":14,"goldEvery":5,"goldValue":2,"tackleStun":24,"tackleCool":40},"margin":{"maxTicks":1800,"firstRound":30,"showTicks":100,"showMin":44,"showStep":8,"pauseTicks":34,"warmupRounds":3},"elevator":{"maxTicks":1600,"firstRise":60,"riseStart":30,"riseMin":9,"riseStep":1,"riseStepEvery":2,"barrierEvery":3,"gapStart":4,"gapMin":1,"gapShrinkEvery":12},"laser":{"maxTicks":1400,"hearts":3,"firstSpawn":50,"spawnEvery":64,"spawnEveryMin":26,"spawnEveryStep":2,"countGrowEvery":4,"countMax":3,"staggerTicks":14,"warnTicks":24,"ticksPerTile":2,"gapPct":35,"jumpTicks":8,"jumpCool":8,"invulnTicks":16},"rodeo":{"maxTicks":1400,"grip":3,"firstCue":40,"windowStart":26,"windowMin":9,"windowStep":1,"gapMin":8,"gapJitter":18},"quiz":{"rounds":7,"answerMs":8000,"revealMs":3000,"hearts":2,"basePoints":500,"speedPoints":500},"estimate":{"rounds":4,"answerMs":12000,"revealMs":4000,"bullseyeBps":100,"bullseyeBonus":2,"lastRoundFactor":2,"stockRounds":1},"bell":{"maxRounds":9,"readyMs":1000,"waitMinMs":1500,"waitMaxMs":4500,"windowMs":2000,"resultMs":2500,"smallGroup":5,"heartsSmall":2,"heartsLarge":1},"vault":{"rounds":3,"answerMs":24000,"revealMs":4000,"digits":3,"symbols":6,"maxTries":8,"basePoints":400,"speedPoints":600,"tryBonus":25},"ticker":{"rounds":8,"answerMs":6000,"revealMs":2500,"options":6,"basePoints":200,"speedPoints":800,"wrongPoints":300},"higher":{"rounds":10,"answerMs":5000,"revealMs":2500,"smallGroup":5,"heartsSmall":3,"heartsLarge":2,"history":14,"trendPct":65,"moveMinBps":80,"moveMaxBps":450,"basePoints":100,"speedPoints":100},"auction":{"rounds":6,"answerMs":10000,"revealMs":3500,"budget":1000}},"prizes":{"weights":{"xp":30,"money":30,"skin":20,"nft":20},"xpBase":1000,"xpPerPlayer":150,"moneyBaseCents":300000,"moneyPerPlayerCents":75000,"dailyPrizeCap":3},"accessories":[{"key":"battle_crown","name":"Battle-Krone","description":"Gewonnen, nicht gekauft. Samt, Gold und ein Rubin so groß wie dein Ego.","slot":"head","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"laurel_wreath","name":"Lorbeerkranz","description":"Wie bei den alten Griechen, nur mit mehr Aktien.","slot":"head","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"champion_belt","name":"Champion-Gürtel","description":"Schwergewichtsmeister im Kurssturz-Springen.","slot":"body","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"victory_cape","name":"Siegerumhang","description":"Flattert dramatisch, auch wenn kein Wind weht.","slot":"back","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"star_shades","name":"Siegerbrille","description":"Wer gewinnt, muss die Blicke der Verlierer nicht sehen.","slot":"face","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"golden_joystick","name":"Goldener Joystick","description":"WASD in purem Gold. Nicht zum Zocken, zum Angeben.","slot":"hand","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"winner_trophy","name":"Siegerpokal","description":"Glänzt. Wiegt. Wird jeden Abend poliert.","slot":"hand","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"mini_bull","name":"Mini-Bulle","description":"Ein Bulle, der dich nicht über den Haufen rennt. Meistens.","slot":"pet","rarity":"legendary","exclusive":true,"minLevel":1}],"doodle":{"lobby":["Na, ihr Sofa-Börsianer? Wer traut sich in die Arena?","Ich brauche drei Mutige. Oder drei Ahnungslose. Geht beides.","Kommt rein, kommt rein! Hier gewinnt nur einer, die anderen weinen live.","Meine Mutter würde sofort mitmachen. Und gewinnen.","Ein Preis, ein Sieger, null Mitleid. Willkommen im Battle!"],"countdown":["Gleich geht''s los! Letzte Chance, noch feige wegzurennen.","Die Arena wird gewischt. Gleich fließen Tränen.","Ich habe Popcorn. Ihr habt keine Chance."],"intro":{"floor":"Der Kurs stürzt, der Boden auch! Bleibt in Bewegung, sonst geht''s abwärts!","bulls":"Die Bullen sind los! Wer stehen bleibt, wird zum Teppich.","coins":"Es regnet Geld! Vorsicht vor den Bären, die beißen.","sumo":"Rempeln erlaubt, Weinen auch. Wer rausfliegt, fliegt raus!","potato":"Wer die Giftaktie hält, wenn es knallt, ist raus. Weitergeben!","pump":"Pumpt die Aktie! Aber wehe, ihr tippt im Crash.","quiz":"Quizzeit! Zwei Herzen, null Ahnung. Zeigt, was ihr wisst!","estimate":"Schätzt mal! Wer am nächsten dran ist, kriegt die Punkte.","bell":"Wenn die Glocke läutet, drückt ihr. Vorher drücken? Raus!","bear":"Die Bären haben Hunger! Lauft, und zwar weg von ihnen, nicht hin.","dash":"Dividende für alle! Also für den Schnellsten. Rempeln ist ausdrücklich erwünscht.","margin":"Margin Call! Wer beim Gong nicht im Grünen steht, wird glattgestellt.","elevator":"Diese Aktie kennt nur eine Richtung: nach oben. Wer unten bleibt, bleibt unten.","laser":"Die Laserschranke! Springt im richtigen Moment, sonst gibt''s gegrillte Börsianer.","rodeo":"Haltet euch fest! Der Bulle bockt, und er hat heute richtig schlechte Laune.","vault":"Der Tresor der Zentralbank! Knackt den Code, bevor die Polizei kommt. War ein Witz. Oder?","ticker":"Kürzel-Alarm! Wer das richtige Tickersymbol zuerst erwischt, ist der Börsenprofi.","higher":"Höher oder tiefer? Mein Schnurrbart sagt höher. Mein Schnurrbart lag noch nie richtig.","auction":"Wer bietet mehr? Spielgeld weg, Punkte her! Nur nicht alles für eine Gummiente ausgeben."},"win":["{name} gewinnt! Ich habe es immer gewusst. Also seit gerade eben.","Applaus für {name}! Die anderen dürfen jetzt heimlich weinen.","{name} räumt ab! Das schreibe ich mir auf die Krawatte.","Was für ein Battle! {name} ist der Champion des Tages.","{name} siegt, die Börse bebt, mein Schnurrbart zittert!"],"out":["Und weg ist {name}! Tschüss, war nett.","{name} fliegt raus. Ich habe nichts gesehen. Doch, alles.","Autsch, {name}! Das gibt einen blauen Fleck im Depot."],"chat":{"start":"🏟️ BATTLE! {count} Zuschauer kämpfen jetzt in „{game}“ um {prize}. Viel Glück, ihr Pfeifen!","win":"🏆 {name} gewinnt „{game}“ und kassiert {prize}! Glückwunsch, du Glückspilz."}},"names":{"floor":"Kurssturz","bulls":"Bullenreiten","coins":"Geldregen","sumo":"Sumo am Parkett","potato":"Giftaktie","pump":"Aktie pumpen","quiz":"Börsenquiz","estimate":"Schätz den Kurs","bell":"Die Glocke","bear":"Bärenjagd","dash":"Dividenden-Dash","margin":"Margin Call","elevator":"Fahrstuhl zum Mond","laser":"Laserschranke","rodeo":"Bullen-Rodeo","vault":"Tresorknacker","ticker":"Ticker-Tippen","higher":"Mehr oder Weniger","auction":"Wer bietet mehr?"},"demoBots":[{"nickname":"Bärbel Bärenmarkt","avatarKey":"seller","accessories":["cowboy_hat"]},{"nickname":"Kalle Kursrakete","avatarKey":"punk","accessories":["sunglasses","superhero_cape"]},{"nickname":"Dividenden-Dieter","avatarKey":"analyst","accessories":["top_hat"]},{"nickname":"Moni Moneymaker","avatarKey":"scientist","accessories":["party_hat","balloon"]},{"nickname":"Börsen-Bernd","avatarKey":"rookie","accessories":["beanie","hamster"]},{"nickname":"Lisa Leerverkauf","avatarKey":"finn_fan","accessories":["bunny_ears"]},{"nickname":"Hedge-Horst","avatarKey":"rookie","accessories":["viking_helmet","pug"]},{"nickname":"Penny Stock","avatarKey":"seller","accessories":["heart_glasses"]},{"nickname":"Ralf Rendite","avatarKey":"analyst","accessories":["chef_hat","baguette"]}],"quiz":[{"q":"Wie viel Startkapital bekommt man bei NEXA?","a":"10.000 €","wrong":["1.000 €","50.000 €","100.000 €"]},{"q":"Wer moderiert die NEXA Nachrichten?","a":"Mr. Doodle Dangle","wrong":["Finn","Mira","Dr. Dax"]},{"q":"Wann laufen die NEXA Nachrichten?","a":"Zu jeder vollen Stunde","wrong":["Einmal am Tag","Nur sonntags","Alle 5 Minuten"]},{"q":"Was ist ein Bullenmarkt?","a":"Steigende Kurse","wrong":["Fallende Kurse","Ein Viehmarkt","Ein Markt ohne Händler"]},{"q":"Was ist ein Bärenmarkt?","a":"Fallende Kurse","wrong":["Steigende Kurse","Ein Zoo","Ein Honigmarkt"]},{"q":"Was ist eine Dividende?","a":"Gewinnanteil für Aktionäre","wrong":["Eine Gebühr","Ein Kredit","Eine Steuer"]},{"q":"Was ist ein IPO?","a":"Ein Börsengang","wrong":["Eine Insolvenz","Ein Aktiensplit","Eine Fusion"]},{"q":"Was bedeutet Leerverkauf?","a":"Auf fallende Kurse wetten","wrong":["Alles verkaufen","Ohne Gebühr kaufen","Eine leere Order"]},{"q":"Was ist eine Anleihe?","a":"Ein Schuldpapier mit Zinsen","wrong":["Ein Firmenanteil","Eine Kryptowährung","Ein Sparbuch"]},{"q":"Was misst ein Aktienindex?","a":"Die Entwicklung vieler Aktien","wrong":["Den Goldpreis","Die Inflation","Nur eine Aktie"]},{"q":"Was ist eine Limit-Order?","a":"Kauf oder Verkauf zu einem Wunschpreis","wrong":["Ein Kauf ohne Geld","Eine Order mit Zeitlimit","Ein Verbot zu handeln"]},{"q":"Was ist ein Stop-Loss?","a":"Automatischer Verkauf bei Verlust","wrong":["Ein Handelsverbot","Eine Gewinnsteuer","Ein Börsenfeiertag"]},{"q":"Was ist Market Cap?","a":"Börsenwert einer Firma","wrong":["Die Kappe des Händlers","Der Tageshöchstkurs","Die Anzahl der Mitarbeiter"]},{"q":"Was passiert bei einem Aktiensplit?","a":"Mehr Aktien zum kleineren Preis","wrong":["Die Firma teilt sich","Die Aktie wird gelöscht","Der Kurs verdoppelt sich"]},{"q":"Was ist Volatilität?","a":"Wie stark ein Kurs schwankt","wrong":["Wie alt eine Firma ist","Ein Börsenfeiertag","Die Höhe der Dividende"]},{"q":"Welches Tier steht für steigende Kurse?","a":"Bulle","wrong":["Bär","Hase","Schildkröte"]},{"q":"Was ist ein NFT bei NEXA?","a":"Ein einzigartiges Pixel-Kunstwerk","wrong":["Eine Aktie","Eine Kreditkarte","Ein Firmenlogo"]},{"q":"Wie viele Spieler braucht ein News-Battle mindestens?","a":"3","wrong":["1","2","5"]},{"q":"Wie viele Spieler passen höchstens in ein News-Battle?","a":"10","wrong":["4","8","20"]},{"q":"Was bekommt der Sieger eines News-Battles?","a":"XP, Geld, einen Skin oder ein NFT","wrong":["Nur ein Lob","Eine echte Aktie","Einen Kredit"]},{"q":"Was ist ein Rug Pull?","a":"Die Macher hauen mit dem Geld ab","wrong":["Ein Teppichverkauf","Ein Kurssprung","Eine Gratis-Aktie"]},{"q":"Was ist Inflation?","a":"Steigende Preise, sinkende Kaufkraft","wrong":["Sinkende Preise","Ein Luftballon","Eine Börsenregel"]},{"q":"Was heißt „Buy the Dip“?","a":"Nach einem Kursrutsch kaufen","wrong":["Chips kaufen","Alles verkaufen","Nur Anleihen kaufen"]},{"q":"Was ist ein Portfolio?","a":"Alle eigenen Anlagen zusammen","wrong":["Eine Aktentasche","Ein Börsenticker","Ein Kredit"]},{"q":"Was ist ein Ticker?","a":"Das Kürzel einer Aktie","wrong":["Eine Uhr","Ein Händler","Eine Gebühr"]},{"q":"Wie heißt die Hauptstadt von Australien?","a":"Canberra","wrong":["Sydney","Melbourne","Perth"]},{"q":"Wie viele Beine hat eine Spinne?","a":"8","wrong":["6","10","12"]},{"q":"Welcher Planet ist der Sonne am nächsten?","a":"Merkur","wrong":["Venus","Mars","Erde"]},{"q":"Wie viele Minuten hat ein Tag?","a":"1.440","wrong":["1.200","2.400","960"]},{"q":"Welche Farbe entsteht aus Blau und Gelb?","a":"Grün","wrong":["Lila","Orange","Braun"]},{"q":"Was ist das größte Säugetier der Welt?","a":"Blauwal","wrong":["Elefant","Giraffe","Pottwal"]},{"q":"Wie viele Seiten hat ein Würfel?","a":"6","wrong":["4","8","12"]},{"q":"In welchem Land steht der Eiffelturm?","a":"Frankreich","wrong":["Italien","Belgien","Spanien"]},{"q":"Was ist H₂O?","a":"Wasser","wrong":["Wasserstoff","Sauerstoff","Salz"]},{"q":"Wie viele Spieler hat eine Fußballmannschaft auf dem Feld?","a":"11","wrong":["9","10","12"]},{"q":"Welches Tier legt Eier und ist ein Säugetier?","a":"Schnabeltier","wrong":["Pinguin","Delfin","Fledermaus"]},{"q":"Wie viele Kontinente gibt es?","a":"7","wrong":["5","6","8"]},{"q":"Wer hat die Glühbirne bekannt gemacht?","a":"Thomas Edison","wrong":["Albert Einstein","Isaac Newton","Nikola Tesla"]},{"q":"Was ist die Wurzel aus 144?","a":"12","wrong":["14","11","16"]},{"q":"Welche Sprache hat die meisten Muttersprachler?","a":"Chinesisch (Mandarin)","wrong":["Englisch","Spanisch","Hindi"]},{"q":"Wie heißt der längste Fluss Europas?","a":"Wolga","wrong":["Donau","Rhein","Elbe"]},{"q":"Was zeigt ein grüner Kurs bei NEXA?","a":"Der Kurs ist gestiegen","wrong":["Der Kurs ist gefallen","Die Börse ist zu","Ein Fehler"]},{"q":"Was kostet es, eine Order bei NEXA aufzugeben?","a":"Eine kleine Gebühr","wrong":["Nichts, niemals","Die Hälfte des Werts","Ein Level"]},{"q":"Was passiert, wenn eine Firma insolvent ist?","a":"Sie kann ihre Schulden nicht zahlen","wrong":["Sie geht an die Börse","Sie zahlt Dividende","Sie wird verdoppelt"]},{"q":"Wie viele Zähne hat ein erwachsener Mensch normalerweise?","a":"32","wrong":["28","30","36"]},{"q":"Welches Gas atmen Pflanzen ein?","a":"Kohlendioxid","wrong":["Sauerstoff","Stickstoff","Helium"]}],"tickers":[{"ticker":"BULL","name":"Bullen & Söhne AG"},{"ticker":"BAER","name":"Bärenbräu Holding"},{"ticker":"MOND","name":"Mondfahrt Raketen"},{"ticker":"GOLD","name":"Goldgrube Minen"},{"ticker":"PIZZ","name":"Pizza Pronto Gruppe"},{"ticker":"KAFE","name":"Kaffeekanne Kontor"},{"ticker":"NXA","name":"NEXA Börse"},{"ticker":"ROBO","name":"Robo Rasenmäher"},{"ticker":"DUCK","name":"Gummiente International"},{"ticker":"SOFA","name":"Sofa-Börsianer e. V."},{"ticker":"ZUGI","name":"Zugspitz Seilbahnen"},{"ticker":"KRAK","name":"Krakenkabel Telekom"}],"auctionItems":[{"name":"Goldbarren aus dem Tresor","points":300,"icon":"gold_bar"},{"name":"Signierte Bullen-Statue","points":250,"icon":"bull"},{"name":"Mondticket erster Klasse","points":220,"icon":"moon"},{"name":"Koffer voller Aktien","points":200,"icon":"briefcase"},{"name":"Glücksmünze von Mr. Doodle Dangle","points":180,"icon":"coin"},{"name":"Edelstein des Vorstands","points":160,"icon":"gem"},{"name":"Geheimer Insider-Tipp (ganz legal)","points":140,"icon":"key"},{"name":"Geschenkbox mit Überraschung","points":120,"icon":"gift"},{"name":"Ausgestopfter Bärenmarkt-Bär","points":100,"icon":"bear"},{"name":"Vergilbte Zeitung von 1929","points":80,"icon":"newspaper"},{"name":"Wecker für Frühaufsteher","points":60,"icon":"alarm_clock"},{"name":"Herz eines Börsianers","points":50,"icon":"heart"}],"estimate":[{"q":"Wie hoch ist der Eiffelturm (mit Antenne) in Metern?","value":330,"unit":"m"},{"q":"Wie viele Knochen hat ein erwachsener Mensch?","value":206,"unit":"Knochen"},{"q":"Wie viele Tasten hat ein Klavier?","value":88,"unit":"Tasten"},{"q":"Wie viele Länder gibt es in der EU?","value":27,"unit":"Länder"},{"q":"Wie schnell fährt ein ICE höchstens (km/h)?","value":300,"unit":"km/h"},{"q":"Wie viele Herzschläge hat ein Mensch in Ruhe pro Minute (etwa)?","value":70,"unit":"Schläge"},{"q":"Wie tief ist der Marianengraben in Metern (etwa)?","value":11000,"unit":"m"},{"q":"Wie viele Einwohner hat Berlin (in Tausend, etwa)?","value":3850,"unit":"Tsd."},{"q":"Wie viel wiegt ein erwachsener Afrikanischer Elefant in kg (etwa)?","value":6000,"unit":"kg"},{"q":"Wie lang ist die Chinesische Mauer in km (etwa)?","value":21000,"unit":"km"},{"q":"Wie viele Stunden hat ein Jahr (kein Schaltjahr)?","value":8760,"unit":"Stunden"},{"q":"Wie hoch ist die Zugspitze in Metern?","value":2962,"unit":"m"},{"q":"Wie viele Felder hat ein Schachbrett?","value":64,"unit":"Felder"},{"q":"Wie viele Kilometer ist der Mond von der Erde entfernt (in Tausend, etwa)?","value":384,"unit":"Tsd. km"},{"q":"Wie viele Liter Blut hat ein erwachsener Mensch (etwa)?","value":5,"unit":"Liter"},{"q":"Wie viele Kalorien hat eine Tafel Vollmilchschokolade (100 g, etwa)?","value":535,"unit":"kcal"},{"q":"Wie viele Spiele hat eine Bundesliga-Saison pro Team?","value":34,"unit":"Spiele"},{"q":"Wie viele Sekunden hat ein Tag?","value":86400,"unit":"Sekunden"},{"q":"Wie alt wurde Johann Wolfgang von Goethe?","value":82,"unit":"Jahre"},{"q":"Wie viele Stockwerke hat der Burj Khalifa (etwa)?","value":163,"unit":"Stockwerke"},{"q":"Wie viele Zähne hat ein Hai im Leben (etwa, in Tausend)?","value":30,"unit":"Tsd."},{"q":"Wie heiß ist die Oberfläche der Sonne in °C (etwa)?","value":5500,"unit":"°C"},{"q":"Wie viele Kaffeebohnen braucht ein Espresso (etwa)?","value":50,"unit":"Bohnen"},{"q":"Wie viele Wörter spricht ein Mensch am Tag (etwa, in Tausend)?","value":16,"unit":"Tsd."}]}'::jsonb, 'Defaults from src/config/balance.ts, section "battles"'),
   ('companyAssistant', '{"claudePerHour":20,"maxTextLength":300,"briefingTasks":3,"busyTasks":2,"urgentMinutes":10,"historyTurns":8}'::jsonb, 'Defaults from src/config/balance.ts, section "companyAssistant"'),
   ('wageMood', '{"crisisPerSeverityBps":500,"scandalBps":500,"scandals":["quality_scandal","data_breach","protest","bad_review","strike"],"shareFallFreeBps":300,"shareFallShare":0.5,"maxShareBps":2000,"minBps":6000}'::jsonb, 'Defaults from src/config/balance.ts, section "wageMood"'),
   ('marketPopularity', '{"windowDays":3,"viewCooldownMinutes":30,"maxViewsPerDay":200,"refreshMinutes":5,"weights":{"view":1,"investor":20,"volume":0.2}}'::jsonb, 'Defaults from src/config/balance.ts, section "marketPopularity"'),

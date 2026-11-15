@@ -51,6 +51,17 @@ const roundSchema = z.object({
   results: z.array(answerSchema).nullish(),
   lost: z.array(z.number()).nullish(),
   mine: z.object({ pressed: z.boolean(), choice: z.number().nullish(), value: z.number().nullish() }),
+  // the games of the addendum to ADR-160
+  digits: z.number().nullish(),
+  symbols: z.number().nullish(),
+  guesses: z.array(z.object({ code: z.string(), hits: z.number(), near: z.number() })).nullish(),
+  progress: z.array(z.object({ slot: z.number(), tries: z.number(), cracked: z.boolean() })).nullish(),
+  code: z.string().nullish(),
+  chart: z.array(z.number()).nullish(),
+  item_points: z.number().nullish(),
+  icon: z.string().nullish(),
+  budget: z.number().nullish(),
+  budgets: z.array(z.number()).nullish(),
 });
 const battleSchema = z.object({
   id: z.number(),
@@ -179,6 +190,21 @@ function toBattle(b: z.infer<typeof battleSchema> | null): Battle | null {
         results: r.results ?? null,
         lost: r.lost ?? null,
         mine: { pressed: r.mine.pressed, choice: r.mine.choice ?? null, value: r.mine.value ?? null },
+        vault:
+          r.digits != null && r.symbols != null
+            ? {
+                digits: r.digits,
+                symbols: r.symbols,
+                guesses: r.guesses ?? [],
+                progress: r.progress ?? [],
+                code: r.code ?? null,
+              }
+            : undefined,
+        chart: r.chart ?? undefined,
+        auction:
+          r.item_points != null
+            ? { points: r.item_points, icon: r.icon ?? "gift", budget: r.budget ?? null, budgets: r.budgets ?? [] }
+            : undefined,
       })),
       hearts: b.rounds.hearts,
       points: b.rounds.points,
