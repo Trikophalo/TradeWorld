@@ -22,6 +22,8 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { isDemoMode } from "@/lib/supabase/env";
 import { useClock } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
+import { bubblesAt, stageAudience } from "./audience";
+import { AudienceStage } from "./audience-stage";
 import { NewsStudio, type NewsStudioProps } from "./studio";
 
 const cfg = BALANCE.newsShow;
@@ -110,19 +112,45 @@ export function NewsShow() {
     if (data?.upcoming?.needsScript) askAnchor(data.upcoming.id);
   }, [data?.upcoming]);
 
-  if (!data || !view) {
+  // The studio audience (ADR-157): who stands there and who says something right now, by the server's clock.
+  const crowd = useMemo(
+    () => (data && serverNow !== null ? stageAudience(data.audience, data.chat, data.viewers, serverNow) : null),
+    [data, serverNow],
+  );
+  const bubbles = useMemo(
+    () =>
+      data && crowd && serverNow !== null
+        ? bubblesAt(data.chat, new Set(crowd.figures.map((f) => f.nickname)), serverNow)
+        : [],
+    [data, crowd, serverNow],
+  );
+
+  if (!data || !view || !crowd) {
     return (
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]" aria-hidden>
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_340px]" aria-hidden>
         <Skeleton className="aspect-[4/3] w-full rounded-lg" />
         <Skeleton className="h-80 w-full rounded-lg lg:h-auto" />
       </div>
     );
   }
 
+  // the made-up viewers in the audience count as watching
+  const watching = data.viewers + crowd.bots;
+
   return (
-    <section className="grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_340px]" data-testid="news-show">
+    <section
+      className="grid grid-cols-[minmax(0,1fr)] items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_340px]"
+      data-testid="news-show"
+    >
       <Card padding="none" className="overflow-hidden" data-show-mode={view.mode} data-show-live={view.live}>
-        <NewsStudio {...view} viewers={data.viewers} charsPerSecond={cfg.charsPerSecond} />
+        <NewsStudio {...view} viewers={watching} charsPerSecond={cfg.charsPerSecond} />
+        <AudienceStage
+          figures={crowd.figures}
+          hidden={crowd.hidden}
+          bubbles={bubbles}
+          watching={watching}
+          live={view.live}
+        />
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line-1 px-4 py-3">
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-fg-1">{t("title")}</p>
@@ -164,7 +192,7 @@ export function NewsShow() {
           )}
         </div>
       </Card>
-      <ShowChat chat={data.chat} viewers={data.viewers} live={view.live} />
+      <ShowChat chat={data.chat} viewers={watching} live={view.live} />
     </section>
   );
 }
@@ -207,7 +235,11 @@ function ShowChat({ chat, viewers, live }: { chat: NewsShowChatMessage[]; viewer
     setState("loading");
     try {
       const next = await engine.postNewsShowMessage(crypto.randomUUID(), body);
-      client.setQueryData<NewsShowState>(NEWS_SHOW_KEY, (d) => (d ? { ...d, chat: next } : d));
+      // The answer is fresh: the own new line carries the server's clock of this moment (keeps the bubble in sync).
+      const sentAt = next.findLast((m) => m.mine)?.at;
+      client.setQueryData<NewsShowState>(NEWS_SHOW_KEY, (d) =>
+        d ? { ...d, chat: next, now: sentAt && Date.parse(sentAt) > Date.parse(d.now) ? sentAt : d.now } : d,
+      );
       setText("");
       void playSound("tap");
     } catch (error) {

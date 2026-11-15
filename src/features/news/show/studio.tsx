@@ -48,6 +48,7 @@ import {
   type NewsKind,
 } from "@/components/pixel/news-art";
 import { PixelIcon, type PixelArt } from "@/components/pixel/pixel-icon";
+import { PlayerFigure } from "@/components/ui/player-figure";
 import { BALANCE } from "@/config/balance";
 import { formatCountdown, localizeMoneyDeep } from "@/lib/format";
 import { DURATION, EASE, SPRING, STAGGER } from "@/lib/motion";
@@ -67,11 +68,20 @@ export interface StudioEffect {
   tone: "gain" | "loss" | "neutral";
 }
 
+/** The player a story is about, in their current look (ADR-157). */
+export interface StudioFigure {
+  nickname: string;
+  avatarKey: string | null;
+  accessories: readonly string[];
+}
+
 export interface StudioSegment {
   kind: string;
   headline: string;
   text: string;
   effects: StudioEffect[];
+  /** Shown on the topic screen instead of the icon, like a news photo with a caption ("Gesucht", …). */
+  figure?: StudioFigure | null;
   /**
    * The face he reads this story with. Left out, it follows from the kind and the effects (`defaultMood`). Every
    * mood but "neutral" begins with a short reaction (`MOOD_REACTION`), and the typewriter waits for it.
@@ -117,6 +127,10 @@ const ANCHOR_TOP = SCENE_DESK_ROW - ANCHOR_DESK_ROW;
 const MOUTH_ROW = ANCHOR_TOP + 18;
 const TOPIC_TOP = 5;
 const TOPIC_WIDTH = 22;
+/** The inside of the topic screen (art pixels), where a player's figure stands. */
+const TOPIC_INNER = { x: 2, y: 4, width: 18, height: 16 } as const;
+/** Row (from the top of the topic screen) where the caption under a player's photo begins. */
+const CAPTION_ROW = 20;
 /** From this picture width on, the speech bubble stands beside the anchor instead of above him. */
 const WIDE_FROM = 720;
 /** Width the picture has until it has been measured: a 390 px phone. */
@@ -153,7 +167,7 @@ function studioLayout(available: number): Layout {
 }
 
 /** Width of an element's content box; null until it is mounted. */
-function useElementWidth<T extends HTMLElement>(): [(node: T | null) => void, number | null] {
+export function useElementWidth<T extends HTMLElement>(): [(node: T | null) => void, number | null] {
   const [node, setNode] = useState<T | null>(null);
   const subscribe = useCallback(
     (notify: () => void) => {
@@ -406,6 +420,25 @@ const TONE_CLASS: Record<KindTone, string> = {
   warn: "bg-warn text-on-semantic",
   info: "bg-info text-on-semantic",
 };
+
+/** The caption over a player's photo on the topic screen: what they are in this story. */
+const FRAME_KINDS = ["loser", "winner", "scandal", "hype", "gossip", "nft"] as const;
+type FrameKind = (typeof FRAME_KINDS)[number] | "other";
+const FRAME_CLASS: Record<FrameKind, string> = {
+  loser: "bg-loss text-on-semantic",
+  scandal: "bg-loss text-on-semantic",
+  winner: "bg-gain text-on-semantic",
+  hype: "bg-gain text-on-semantic",
+  gossip: "bg-accent text-on-accent",
+  nft: "bg-info text-on-semantic",
+  other: "bg-accent text-on-accent",
+};
+/** Wanted posters have paper behind the figure. */
+const POSTER_KINDS = new Set<FrameKind>(["loser", "scandal"]);
+
+function frameKind(kind: string | undefined): FrameKind {
+  return (FRAME_KINDS as readonly string[]).includes(kind ?? "") ? (kind as FrameKind) : "other";
+}
 
 const EFFECT_CLASS: Record<StudioEffect["tone"], string> = {
   gain: "bg-gain text-on-semantic",
@@ -773,6 +806,10 @@ export function NewsStudio({
   const desk = useMemo(() => deskArt(cols), [cols]);
   const sign = (DESK_SIGN.grid[0]?.length ?? 0) + 4 <= cols ? DESK_SIGN : DESK_SIGN_SHORT;
   const signWidth = sign.grid[0]?.length ?? 0;
+  // A story about a player shows them on the topic screen (half the scale, so the whole figure fits inside).
+  const figure = mode === "live" ? (story?.figure ?? null) : null;
+  const figureScale = Math.max(1, Math.floor(scale / 2));
+  const frame = frameKind(story?.kind);
   const topicIcon = kind
     ? NEWS_KIND_ICONS[kind]
     : mode === "live" && story
@@ -918,16 +955,69 @@ export function NewsStudio({
                     >
                       <Sprite art={backdrop} x={0} y={0} scale={scale} />
                       <Sprite art={TOPIC_SCREEN} x={topicX} y={TOPIC_TOP} scale={scale} />
-                      <div
-                        key={segmentKey ?? mode}
-                        className={cn("absolute", !reduced && "animate-pop")}
-                        style={{
-                          left: (topicX + TOPIC_SCREEN_INSET.x) * scale,
-                          top: (TOPIC_TOP + TOPIC_SCREEN_INSET.y) * scale,
-                        }}
-                      >
-                        <PixelIcon {...topicIcon} scale={scale} className="block" />
-                      </div>
+                      {figure ? (
+                        <div
+                          key={segmentKey ?? mode}
+                          className={cn(
+                            "absolute flex items-end justify-center overflow-hidden",
+                            POSTER_KINDS.has(frame) && "bg-(--tv-paper)",
+                            !reduced && "animate-pop",
+                          )}
+                          style={{
+                            left: (topicX + TOPIC_INNER.x) * scale,
+                            top: (TOPIC_TOP + TOPIC_INNER.y) * scale,
+                            width: TOPIC_INNER.width * scale,
+                            height: TOPIC_INNER.height * scale,
+                          }}
+                        >
+                          <PlayerFigure
+                            avatarKey={figure.avatarKey}
+                            accessories={figure.accessories}
+                            scale={figureScale}
+                            className="block"
+                          />
+                        </div>
+                      ) : (
+                        <div
+                          key={segmentKey ?? mode}
+                          className={cn("absolute", !reduced && "animate-pop")}
+                          style={{
+                            left: (topicX + TOPIC_SCREEN_INSET.x) * scale,
+                            top: (TOPIC_TOP + TOPIC_SCREEN_INSET.y) * scale,
+                          }}
+                        >
+                          <PixelIcon {...topicIcon} scale={scale} className="block" />
+                        </div>
+                      )}
+                      {figure && (
+                        <div
+                          key={`${segmentKey}:caption`}
+                          className={cn(
+                            "absolute flex flex-col items-center gap-px text-center",
+                            !reduced && "animate-pop",
+                          )}
+                          style={{
+                            left: (topicX - 1) * scale,
+                            top: (TOPIC_TOP + CAPTION_ROW) * scale,
+                            width: (TOPIC_WIDTH + 2) * scale,
+                          }}
+                          data-testid="news-figure"
+                          data-nickname={figure.nickname}
+                          data-frame={frame}
+                        >
+                          <span
+                            className={cn(
+                              "max-w-full rounded-xs px-1 label-pixel text-balance shadow-[2px_2px_0_0_var(--tv-ink)]",
+                              FRAME_CLASS[frame],
+                            )}
+                          >
+                            {t(`frames.${frame}`)}
+                          </span>
+                          <span className="max-w-full truncate rounded-xs bg-(--tv-ink) px-1 text-2xs leading-4 font-semibold text-(color:--tv-paper)">
+                            {figure.nickname}
+                          </span>
+                        </div>
+                      )}
                       {inStudio && (
                         <motion.div
                           className="absolute top-0 left-0"
