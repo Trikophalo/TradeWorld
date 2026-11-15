@@ -33,6 +33,8 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/toast";
 import { BusinessCard } from "@/features/career/components/business-card";
 import { PlayerFigure } from "@/components/ui/player-figure";
+import { FloorBubble } from "@/features/company/components/floor-bubble";
+import { OfficeScene } from "@/features/company/components/office-scene";
 import { ACCESSORIES } from "@/config/accessories";
 import { FriendsPlaza } from "@/features/friends/components/plaza";
 import { PokeButton } from "@/features/friends/components/poke";
@@ -879,6 +881,18 @@ export function Showcase() {
           ))}
         </Demo>
         <FriendsPlaza />
+        <Demo label="Büro: Sprechblasen über den Figuren (ADR-156)" className="flex-wrap items-end justify-start gap-4">
+          {[
+            { key: "a", text: "Kaffee ist fertig", mine: true, avatar: "rookie", worn: ["cowboy_hat"] },
+            { key: "b", text: "Die Zahlen sehen gut aus!", mine: false, avatar: "seller", worn: [] },
+          ].map((s) => (
+            <div key={s.key} className="flex w-24 flex-col items-center">
+              <FloorBubble text={s.text} mine={s.mine} className="w-full" />
+              <PlayerFigure avatarKey={s.avatar} accessories={s.worn} scale={2} />
+            </div>
+          ))}
+        </Demo>
+        <OfficeScene />
         <Card padding="lg">
           <SignaturePad onChange={() => undefined} />
         </Card>

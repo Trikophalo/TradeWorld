@@ -7481,3 +7481,18 @@ Migration `20261204002800_accessories_pokes.sql`. Katalog in `game_config.access
 - **Fehler:** `accessory_unknown` NX130, `accessory_locked` NX131, `accessory_owned` NX132, `accessory_not_owned`
   NX133, `not_friends` NX134, `poke_too_soon` NX135, `poke_daily_limit` NX136.
 - Test `supabase/tests/9m_accessories_friends.sql`.
+
+## Nachtrag: Das Büro mit Figuren und Sprechblasen (ADR-156)
+
+Migration `20261204003300_company_floor.sql`, keine neue Tabelle.
+
+- **RPC:** `get_company_floor()` → `{company: {name, color, kind: 'player'|'ai', logo} | null, chat, ai_workers,
+bubble_seconds, members: [{nickname, avatar_key, accessories, role: 'founder'|'employee', title, online, me,
+last_message: {body, at} | null}]}`. Spielerfirma (`chat_company_of`): Gründer zuerst, dann die aktiven Angestellten
+  nach Namen; `last_message` ist die neueste eigene Spielernachricht (`company_messages.kind = 'player'`) der letzten
+  `startups.chat.bubbleSeconds` (120). KI-Firma (aktiver Job): der Aufrufer und bis zu `startups.chat.floorMaxMembers`
+  (24) Mitspieler mit Job dort, online zuerst, `chat = false`, nie Blasen. Sonst `company = null`, `members = []`.
+  `online` wie bei `friends_json` (`social.onlineMinutes`). Keine IDs.
+- **Intern:** `company_floor_member_json(player, viewer, role, title, company, bubbles)` (nur `service_role`).
+- Geschrieben wird weiter über `post_company_message()`.
+- Test `supabase/tests/9p_company_floor.sql`.

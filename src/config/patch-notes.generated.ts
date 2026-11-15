@@ -303,6 +303,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Kleiderschrank und Freunde-Platz",
         text: "Deine Spielfigur steht jetzt in voller Größe da und lässt sich anziehen: 51 verrückte Accessoires vom Cowboyhut über Bananenkostüm, Haikostüm und Laseraugen bis zu Papagei, Jetpack und goldener Klobürste. Unter Profil → Kleiderschrank probierst du alles an und kaufst mit Spielgeld, von 150 € bis 5 Mio. €. Im Freunde-Tab stehen alle deine Freunde als Figuren auf einem Platz, wer online ist, hat ein grünes Schild über dem Kopf. Tipp auf eine Figur für das Profil, oder stups sie mit 👉 an: Sie bekommt eine Benachrichtigung.",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-8075d8e8",
+        title: "Das Büro lebt",
+        text: "Auf deiner Job-Seite und auf der Seite deiner Firma stehen jetzt alle Kollegen als ihre angezogenen Spielfiguren am Schreibtisch, mit Namen. Wer gerade online ist, wippt, wer weg ist, schläft (zzz). Tipp auf eine Figur für das Profil. Unter dem Büro schreibst du „Sag was ins Büro …“: Deine Worte stehen zwei Minuten als Sprechblase über deiner Figur und landen im Firmenchat. Auch Organigramm und Teamliste zeigen die Figuren.",
+      },
     ],
   },
   {

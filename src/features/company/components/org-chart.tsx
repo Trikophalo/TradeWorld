@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Avatar } from "@/components/ui/avatar";
+import { PlayerFigure } from "@/components/ui/player-figure";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BALANCE } from "@/config/balance";
@@ -14,6 +15,7 @@ import { engine } from "@/features/game/store";
 import type { CareerTier, CompanyOrg, MyJob, OrgPerson } from "@/features/game/types";
 import { SPRING, STAGGER } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { useFloorLooks } from "../hooks";
 
 /** Ranks from the top, below the founder (ADR-104). */
 const RANKS: readonly CareerTier[] = [...BALANCE.careers.tiers.map((t) => t.id)].reverse();
@@ -141,6 +143,8 @@ function PersonCard({
   link: boolean;
 }) {
   const t = useTranslations("org");
+  // Colleagues at the own workplace appear as their dressed figure (ADR-156).
+  const look = useFloorLooks().get(person.nickname);
   const className = cn(
     "relative flex w-28 flex-col items-center gap-1 rounded-lg border px-2 py-2 text-center",
     link && "focus-ring transition duration-fast hover:-translate-y-0.5 hover:bg-surface-2",
@@ -157,7 +161,11 @@ function PersonCard({
           {t("you")}
         </span>
       )}
-      <Avatar avatarKey={person.avatarKey} size="xs" />
+      {look ? (
+        <PlayerFigure avatarKey={look.avatarKey} accessories={look.accessories} scale={2} />
+      ) : (
+        <Avatar avatarKey={person.avatarKey} size="xs" />
+      )}
       <span className="w-full truncate text-xs font-medium text-fg-1">{person.nickname}</span>
       {person.title && <span className="w-full truncate text-2xs text-fg-3">{person.title}</span>}
     </>

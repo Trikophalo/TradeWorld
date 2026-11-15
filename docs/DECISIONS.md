@@ -2490,3 +2490,26 @@ ihre Firmen, und mit echten, großen Folgen für Kurse, Firmen und Aufgaben.
   angestupst! 👉“ mit Link auf das Profil; sie lässt sich in den Einstellungen abschalten.
 - **Demo:** Ohne Mitspieler startet die Demo weiter ohne Freunde; ein gespeicherter Demo-Zustand (`friendList`) kann
   erfundene Freunde mitbringen (Tests, Vorführung).
+
+## ADR-156: Das Büro mit allen Figuren und Sprechblasen — `akzeptiert`
+
+- **Wo:** Auf der Job-Seite (`/job`) eines Angestellten und auf der Firmenseite des Gründers steht das Büro
+  (`OfficeScene`): Gründer und alle aktiven Angestellten als angezogene Pixelfiguren (ADR-155) am Schreibtisch, mit
+  Namen. KI-Kräfte bleiben Roboter im Firmen-T-Shirt, freie Plätze (nur beim Gründer) bleiben leere Tische. Viele
+  Leute brechen in zentrierte Zeilen um und scrollen innerhalb des Büros, nie seitwärts.
+- **Anwesenheit:** Wer in den letzten `social.onlineMinutes` (10) aktiv war, wippt leicht und hat einen grünen Punkt;
+  die anderen sind gedimmt und schlafen („zzz“). Ein Tipp auf eine Figur öffnet das Profil.
+- **Sprechblasen:** Unter dem Büro „Sag was ins Büro …“. Das schreibt in den Firmenchat (`post_company_message`,
+  dieselben Regeln, Filter und Limits), es gibt keinen zweiten Kanal. Die neueste eigene Nachricht jedes Mitglieds
+  steht `startups.chat.bubbleSeconds` (120) lang als Pixel-Sprechblase über seiner Figur; Systemzeilen bekommen
+  keine. Abgefragt wird wie beim Chat alle 10 Sekunden; die Blase verschwindet nach der Uhr des Geräts.
+- **Server:** `get_company_floor()` liefert Firma (Name, Farbe, Art, Logo), `chat`, `ai_workers`, `bubble_seconds`
+  und `members` (Spitzname, Porträt, getragene Accessoires, Rolle, Jobtitel, online, ich, letzte Nachricht), nie IDs.
+- **KI-Arbeitgeber:** Wer bei einer KI-Firma arbeitet, sieht dort die Mitspieler mit Job bei derselben Firma (höchstens
+  `startups.chat.floorMaxMembers`, 24, online zuerst), aber ohne Eingabe und ohne Blasen: Den Firmenchat gibt es nur
+  in Spielerfirmen (ADR-060), und ein Chat mit Hunderten Fremden wäre etwas anderes.
+- **Auch anderswo:** Organigramm und Teamliste zeigen Kollegen am eigenen Arbeitsplatz als angezogene Figur statt
+  Porträt (Daten aus demselben Aufruf).
+- **Demo:** Der Gründer sieht sich selbst mit seiner Blase. Bei einem KI-Arbeitgeber stehen drei erfundene Kollegen
+  mit Accessoires (fest aus dem Namen abgeleitet) daneben, eine schläft; in jedem Blasenfenster sagt einer von ihnen
+  etwas. Ihr Profil lässt sich öffnen.
