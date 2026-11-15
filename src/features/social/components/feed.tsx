@@ -14,6 +14,7 @@ import { PlayerTag } from "@/components/ui/player-tag";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 import { ACCESSORY_ART } from "@/components/pixel/accessories";
+import { BATTLE_ICONS } from "@/components/pixel/battle-art";
 import { accessoryByKey } from "@/config/accessories";
 import { CARS } from "@/config/furniture";
 import { useGameErrorText } from "@/features/game/errors";
@@ -51,6 +52,7 @@ const ICONS: Record<string, PixelArt> = {
   rug_pull: UI_ICONS.crypto,
   coin_closed: UI_ICONS.crypto,
   accessory_bought: { grid: ACCESSORY_ART.crown!.grid, palette: ACCESSORY_ART.crown!.palette },
+  battle_won: BATTLE_ICONS.bell,
 };
 
 const str = (v: unknown) => (typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
@@ -122,6 +124,8 @@ function useFeedText() {
       }
       case "accessory_bought":
         return t("accessory_bought", { name: accessoryByKey(str(p.key))?.name ?? str(p.name) });
+      case "battle_won":
+        return t("battle_won", { game: str(p.game) });
       default:
         return t("other");
     }

@@ -7120,6 +7120,15 @@
       "again": "Zur nächsten Lobby",
       "score": "{score} Punkte"
     },
-    "showcase": "News-Battle"
+    "showcase": "News-Battle",
+    "skins": {
+      "title": "Exklusiv aus News-Battles",
+      "hint": "Nicht zu kaufen. Wer ein News-Battle gewinnt, bekommt vielleicht eines davon.",
+      "won": "{won} / {total} gewonnen",
+      "worn": "An",
+      "wear": "Anziehen",
+      "takeOff": "Ausziehen",
+      "locked": "Nur im Battle zu gewinnen"
+    }
   }
 }

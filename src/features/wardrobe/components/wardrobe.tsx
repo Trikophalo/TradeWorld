@@ -23,6 +23,7 @@ import { DURATION, EASE, SPRING } from "@/lib/motion";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { previewWorn, useSetWardrobe, useWardrobe } from "../hooks";
+import { BattleSkins } from "./battle-skins";
 import { RARITY_STYLE } from "./rarity";
 
 type Filter = "all" | AccessorySlot;
@@ -77,7 +78,7 @@ export function WardrobeView() {
     }
   };
 
-  const wear = async (item: AccessoryItem, on: boolean) => {
+  const wear = async (item: Pick<AccessoryItem, "key" | "slot">, on: boolean) => {
     setAction(item.key, "loading");
     try {
       setWardrobe(await engine.wearAccessory(crypto.randomUUID(), item.key, on));
@@ -199,6 +200,14 @@ export function WardrobeView() {
             />
           ))}
         </ul>
+        {/* Only won in news battles (ADR-160) */}
+        <BattleSkins
+          avatarKey={figureKey}
+          owned={owned}
+          worn={worn}
+          actions={actions}
+          onWear={(item, on) => void wear(item, on)}
+        />
       </div>
     </div>
   );

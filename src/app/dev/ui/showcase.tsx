@@ -34,6 +34,7 @@ import { toast } from "@/components/ui/toast";
 import { BusinessCard } from "@/features/career/components/business-card";
 import { PlayerFigure } from "@/components/ui/player-figure";
 import { ACCESSORIES } from "@/config/accessories";
+import { BattleShowcase } from "@/features/news/battle/showcase";
 import { FriendsPlaza } from "@/features/friends/components/plaza";
 import { PokeButton } from "@/features/friends/components/poke";
 import { FigureCard } from "@/features/wardrobe/components/figure-card";
@@ -879,6 +880,7 @@ export function Showcase() {
           ))}
         </Demo>
         <FriendsPlaza />
+        <BattleShowcase />
         <Card padding="lg">
           <SignaturePad onChange={() => undefined} />
         </Card>
