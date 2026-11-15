@@ -23,7 +23,7 @@ test.beforeEach(async ({ page }) => {
       JSON.stringify({
         nickname: "Modefuchs",
         tag: "K7Q2",
-        cashCents: 2_000_000,
+        cashCents: 5_000_000,
         xpTotal: 7_000,
         tutorialCompleted: true,
         curveVersion: 2,
@@ -82,6 +82,46 @@ test("wardrobe: try on, buy, wear and see it on the own profile", async ({ page 
 
   await page.goto("/players/Modefuchs");
   await expect(page.getByTestId("figure-card").getByTestId("figure-worn")).toContainText("Cowboyhut");
+});
+
+test("wardrobe: search, filter by slot and rarity, only affordable, sets", async ({ page }) => {
+  await page.goto("/profile/wardrobe");
+  const items = page.getByTestId("accessory");
+  await expect(page.getByTestId("wardrobe-count")).toContainText("Teile");
+  await expect(items.first()).toBeVisible();
+  const total = await items.count();
+  expect(total).toBeGreaterThanOrEqual(120);
+
+  // Search ignores case and umlauts.
+  await page.getByTestId("wardrobe-search").fill("kurbis");
+  await expect(items).toHaveCount(1);
+  await expect(items.first()).toHaveAttribute("data-key", "pumpkin_head");
+  await page.getByTestId("wardrobe-reset").click();
+  await expect(items).toHaveCount(total);
+
+  // Mythic showpieces, the most expensive first.
+  await page.getByTestId("wardrobe-rarities").getByRole("radio", { name: "Mythisch" }).click();
+  await expect(items).toHaveCount(6);
+  await page.getByTestId("wardrobe-sort").selectOption("priceDesc");
+  await expect(items.first()).toHaveAttribute("data-key", "golden_bull");
+  await page.getByRole("radiogroup", { name: "Bereich" }).getByRole("radio", { name: "Haustier" }).click();
+  await expect(items).toHaveCount(1);
+  await page.getByTestId("wardrobe-reset").click();
+
+  // Only what the starting player can buy right now: every buy button works.
+  await page.getByRole("switch", { name: "Nur bezahlbare" }).click();
+  await expect(page.getByTestId("wardrobe-reset")).toBeVisible();
+  const affordable = await items.count();
+  expect(affordable).toBeGreaterThan(10);
+  expect(affordable).toBeLessThan(total);
+  await expect(page.locator('[data-testid="accessory-buy"]:disabled')).toHaveCount(0);
+  await page.getByRole("switch", { name: "Nur bezahlbare" }).click();
+
+  // Grouped by themed sets.
+  await page.getByRole("switch", { name: "Nach Sets" }).click();
+  await expect(page.locator('[data-testid="wardrobe-set"][data-set="pirate"]')).toContainText("Piraten");
+  await expect(page.locator('[data-testid="wardrobe-set"][data-set="pirate"] [data-key="eye_patch"]')).toBeVisible();
+  await expect(items).toHaveCount(total);
 });
 
 test("friends plaza: every friend on the square, online sign, profile, poke", async ({ page }) => {
