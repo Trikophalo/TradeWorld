@@ -358,6 +358,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Wohnen lohnt sich",
         text: "Wer ein Zuhause hat oder zur Miete wohnt, bekommt jede Stunde einen Wohnbonus in Geld und XP, mehr in größeren und schöner eingerichteten Zuhausen.",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-a02c10f3",
+        title: "Wo es fehlt",
+        text: "Oben in der Firmenübersicht zeigt ein Netzdiagramm acht Punkte (Bekanntheit, Menge, Qualität, Image, Preis, Team, Kasse, Schwung), wo du gerade am…",
+      },
     ],
   },
   {
