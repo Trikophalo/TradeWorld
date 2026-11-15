@@ -26,6 +26,21 @@ import {
   type RoundAnswer,
   type RoundsState,
 } from "@/lib/sim/battle/rounds";
+import {
+  auctionEval,
+  auctionRanking,
+  higherEval,
+  higherRanking,
+  higherSeries,
+  pointsRanking,
+  roundTimes,
+  tickerEval,
+  vaultEval,
+  vaultFeedback,
+  vaultValid,
+  type AuctionState,
+  type VaultTry,
+} from "@/lib/sim/battle/rounds-more";
 import type {
   Battle,
   BattleArtwork,
@@ -90,6 +105,11 @@ interface MyAnswer {
   revealedAt: number | null;
 }
 
+/** The round games of the addendum to ADR-160 (they all follow the quiz timing). */
+const MORE_ROUNDS = ["vault", "ticker", "higher", "auction"] as const;
+type MoreRound = (typeof MORE_ROUNDS)[number];
+const isMoreRound = (kind: string | null): kind is MoreRound => (MORE_ROUNDS as readonly string[]).includes(kind ?? "");
+
 interface DemoBattle {
   id: number;
   status: Battle["status"];
@@ -108,7 +128,21 @@ interface DemoBattle {
   sim: AnyBattleState | null;
   streams: string[];
   // round games
-  questions: { q: string; options?: string[]; correct?: number; value?: number; unit?: string; decimals?: number }[];
+  questions: {
+    q: string;
+    options?: string[];
+    correct?: number;
+    value?: number;
+    unit?: string;
+    decimals?: number;
+    code?: string;
+    points?: number;
+    icon?: string;
+  }[];
+  /** Mehr oder Weniger: the chart (cents). */
+  series: number[];
+  /** Tresorknacker: every try of the round (bots planned, mine as they come), with ms after the round opened. */
+  tries: Map<number, VaultTry[]>;
   waits: number[];
   botAnswers: Map<number, RoundAnswer[]>;
   mine: Map<number, MyAnswer>;
@@ -197,6 +231,8 @@ export function createBattleEngine(host: BattleHost): BattleEngine & {
       sim: null,
       streams: [],
       questions: [],
+      series: [],
+      tries: new Map(),
       waits: [],
       botAnswers: new Map(),
       mine: new Map(),
@@ -278,6 +314,112 @@ export function createBattleEngine(host: BattleHost): BattleEngine & {
           }),
         ),
       );
+    } else if (kind === "vault") {
+      const gv = g.vault;
+      b.questions = Array.from({ length: gv.rounds }, (_, r) => ({
+        q: `Tresor ${r + 1}`,
+        code: shuffle(
+          Array.from({ length: gv.symbols }, (_, i) => String(i + 1)),
+          random,
+        )
+          .slice(0, gv.digits)
+          .join(""),
+      }));
+      // the made-up opponents crack it like a person: a try that fits all answers so far, a few seconds apart
+      const all: string[] = [];
+      const build = (prefix: string) => {
+        if (prefix.length === gv.digits) return void all.push(prefix);
+        for (let d = 1; d <= gv.symbols; d++) if (!prefix.includes(String(d))) build(prefix + d);
+      };
+      build("");
+      b.questions.forEach((q, r) => {
+        const list: VaultTry[] = [];
+        for (const slot of bots) {
+          const m = b.players[slot]!.memory;
+          let left = all;
+          let ms = 1_500 + random() * 2_000;
+          for (let k = 0; k < gv.maxTries && ms < gv.answerMs; k++) {
+            const sloppy = random() < (1 - m.skill) * 0.35;
+            const guess = (sloppy ? all : left)[Math.floor(random() * (sloppy ? all : left).length)]!;
+            list.push({ slot, code: guess, ms: Math.round(ms) });
+            if (guess === q.code) break;
+            const fb = vaultFeedback(q.code!, guess);
+            left = left.filter((c) => {
+              const x = vaultFeedback(c, guess);
+              return x.hits === fb.hits && x.near === fb.near;
+            });
+            ms += 1_800 + random() * 2_600 * (1.4 - m.skill);
+          }
+        }
+        b.tries.set(
+          r,
+          list.sort((a, c) => a.ms - c.ms),
+        );
+      });
+    } else if (kind === "ticker") {
+      const gt = g.ticker;
+      const pool = shuffle(cfg.tickers, random);
+      b.questions = Array.from({ length: gt.rounds }, (_, r) => {
+        const target = pool[r % pool.length]!;
+        const others = shuffle(
+          pool.filter((x) => x.ticker !== target.ticker),
+          random,
+        ).slice(0, gt.options - 1);
+        const options = shuffle([target, ...others], random).map((x) => x.ticker);
+        return { q: target.name, options, correct: options.indexOf(target.ticker) };
+      });
+      b.questions.forEach((q, r) =>
+        b.botAnswers.set(
+          r,
+          bots.flatMap((slot) => {
+            const m = b.players[slot]!.memory;
+            if (random() < 0.06) return [];
+            const right = random() < 0.55 + m.skill * 0.4;
+            const wrong = [0, 1, 2, 3, 4, 5].filter((k) => k !== q.correct && k < gt.options);
+            return [
+              {
+                slot,
+                choice: right ? q.correct : wrong[Math.floor(random() * wrong.length)],
+                ms: Math.round(900 + random() * (gt.answerMs - 2_000) * (1.25 - m.skill)),
+              },
+            ];
+          }),
+        ),
+      );
+    } else if (kind === "higher") {
+      const gh = g.higher;
+      b.series = higherSeries(gh.history + gh.rounds + 1, gh, random);
+      const quote = host.stockQuote();
+      b.questions = Array.from({ length: gh.rounds }, (_, r) => {
+        const now = b.series[gh.history + r]!;
+        const next = b.series[gh.history + r + 1]!;
+        return {
+          q: quote?.name ?? "NEXA-Index",
+          correct: next > now ? 0 : 1,
+          value: next / 100,
+          unit: "€",
+          decimals: 2,
+        };
+      });
+      b.questions.forEach((_, r) =>
+        b.botAnswers.set(
+          r,
+          bots.flatMap((slot) => {
+            const m = b.players[slot]!.memory;
+            if (random() < 0.05) return [];
+            // follow the trend, the better ones more often
+            const a = b.series[gh.history + r - 1]!;
+            const c = b.series[gh.history + r]!;
+            const trend = c >= a ? 0 : 1;
+            const choice = random() < 0.5 + m.skill * 0.35 ? trend : 1 - trend;
+            return [{ slot, choice, ms: Math.round(700 + random() * (gh.answerMs - 1_500) * (1.2 - m.skill)) }];
+          }),
+        ),
+      );
+    } else if (kind === "auction") {
+      b.questions = shuffle(cfg.auctionItems, random)
+        .slice(0, g.auction.rounds)
+        .map((x) => ({ q: x.name, points: x.points, icon: x.icon }));
     } else if (kind === "bell") {
       b.waits = Array.from(
         { length: g.bell.maxRounds },
@@ -318,12 +460,15 @@ export function createBattleEngine(host: BattleHost): BattleEngine & {
     } else {
       plan(b, kind);
       const rounds = kind === "bell" ? cfg.games.bell.maxRounds : b.questions.length;
+      const timing = isMoreRound(kind) ? cfg.games[kind] : null;
       const roundMs =
         kind === "bell"
           ? bellRoundMs(cfg.games.bell)
-          : kind === "quiz"
-            ? cfg.games.quiz.answerMs + cfg.games.quiz.revealMs
-            : cfg.games.estimate.answerMs + cfg.games.estimate.revealMs;
+          : timing
+            ? timing.answerMs + timing.revealMs
+            : kind === "quiz"
+              ? cfg.games.quiz.answerMs + cfg.games.quiz.revealMs
+              : cfg.games.estimate.answerMs + cfg.games.estimate.revealMs;
       b.endsAt = b.startedAt + rounds * roundMs;
     }
     host.bump("battle_joins");
@@ -340,6 +485,7 @@ export function createBattleEngine(host: BattleHost): BattleEngine & {
       while (r < rounds - 1 && p.leftAt >= endOf(b, r)) r++;
       return r;
     });
+    if (b.kind === "auction") auctionBids(b, now);
     const answers = (r: number): RoundAnswer[] => {
       const list = [...(b.botAnswers.get(r) ?? [])];
       const mine = b.mine.get(r);
@@ -349,10 +495,7 @@ export function createBattleEngine(host: BattleHost): BattleEngine & {
           const ms = mine.at < bell ? mine.at - bell : mine.at - (mine.revealedAt ?? bell);
           list.push({ slot: me, ms });
         } else {
-          const opens = (
-            b.kind === "quiz" ? quizTimes(start0, r, cfg.games.quiz) : estimateTimes(start0, r, cfg.games.estimate)
-          ).opens;
-          list.push({ slot: me, choice: mine.choice, value: mine.value, ms: mine.at - opens });
+          list.push({ slot: me, choice: mine.choice, value: mine.value, ms: mine.at - opensOf(b, r) });
         }
       }
       return list;
@@ -361,32 +504,133 @@ export function createBattleEngine(host: BattleHost): BattleEngine & {
     const total = b.kind === "bell" ? cfg.games.bell.maxRounds : b.questions.length;
     while (closed < total && now >= closesOf(b, closed)) closed++;
     const all = Array.from({ length: total }, (_, r) => answers(r));
+    const more = isMoreRound(b.kind) ? b.kind : null;
     const state =
-      b.kind === "quiz"
-        ? quizEval(
+      more === "vault"
+        ? vaultEval(
             n,
-            b.questions.map((q) => q.correct ?? 0),
-            all,
+            b.questions.map((q) => q.code ?? ""),
+            Array.from({ length: total }, (_, r) => vaultTries(b, r)),
             left,
             closed,
-            cfg.games.quiz,
+            cfg.games.vault,
           )
-        : b.kind === "estimate"
-          ? estimateEval(
+        : more === "ticker"
+          ? tickerEval(
               n,
-              b.questions.map((q) => q.value ?? 0),
+              b.questions.map((q) => q.correct ?? 0),
               all,
               left,
               closed,
-              cfg.games.estimate,
+              cfg.games.ticker,
             )
-          : bellEval(b.seed, n, all, left, closed, cfg.games.bell);
+          : more === "higher"
+            ? higherEval(
+                n,
+                b.questions.map((q) => q.correct ?? 0),
+                all,
+                left,
+                closed,
+                cfg.games.higher,
+              )
+            : more === "auction"
+              ? auctionEval(
+                  b.seed,
+                  n,
+                  b.questions.map((q) => q.points ?? 0),
+                  all,
+                  left,
+                  closed,
+                  cfg.games.auction,
+                )
+              : b.kind === "quiz"
+                ? quizEval(
+                    n,
+                    b.questions.map((q) => q.correct ?? 0),
+                    all,
+                    left,
+                    closed,
+                    cfg.games.quiz,
+                  )
+                : b.kind === "estimate"
+                  ? estimateEval(
+                      n,
+                      b.questions.map((q) => q.value ?? 0),
+                      all,
+                      left,
+                      closed,
+                      cfg.games.estimate,
+                    )
+                  : bellEval(b.seed, n, all, left, closed, cfg.games.bell);
     const last = state.results.length - 1;
     return { state, closed, finishAt: last >= 0 ? endOf(b, last) : start0 };
   }
 
+  /** Tresorknacker: the tries of round r, the bots' and mine, with ms after the round opened. */
+  function vaultTries(b: DemoBattle, r: number): VaultTry[] {
+    const me = meIndex(b);
+    const opens = opensOf(b, r);
+    const now = host.now();
+    const bots = (b.tries.get(r) ?? []).filter((x) => x.slot !== me && opens + x.ms <= now);
+    const mine = (b.tries.get(r) ?? []).filter((x) => x.slot === me);
+    return [...bots, ...mine].sort((a, c) => a.ms - c.ms);
+  }
+
+  /**
+   * Wer bietet mehr?: the made-up opponents bid when a round opens, by what the item is worth to them and what
+   * they have left (their budgets come from the rounds before).
+   */
+  function auctionBids(b: DemoBattle, now: number): void {
+    const g = cfg.games.auction;
+    for (let r = 0; r < b.questions.length; r++) {
+      if (now < opensOf(b, r) || b.botAnswers.has(r)) continue;
+      const before = auctionEval(
+        b.seed,
+        b.players.length,
+        b.questions.map((q) => q.points ?? 0),
+        Array.from({ length: r }, (_, k) => [...(b.botAnswers.get(k) ?? []), ...myAnswer(b, k)]),
+        b.players.map(() => -1),
+        r,
+        g,
+      );
+      const points = b.questions[r]!.points ?? 0;
+      const roundsLeft = b.questions.length - r;
+      b.botAnswers.set(
+        r,
+        b.players.flatMap((p, slot) => {
+          if (!p.bot) return [];
+          const m = p.memory;
+          const budget = before.budget[slot]!;
+          if (host.random() < 0.12) return [{ slot, value: 0, ms: Math.round(2_000 + host.random() * 5_000) }];
+          const fair = (budget / Math.max(1, roundsLeft)) * (points / 160);
+          const value = Math.max(
+            0,
+            Math.min(budget, Math.round((fair * (0.6 + host.random() * 0.9 * m.skill)) / 10) * 10),
+          );
+          return [{ slot, value, ms: Math.round(1_500 + host.random() * (g.answerMs - 3_000)) }];
+        }),
+      );
+    }
+  }
+
+  function myAnswer(b: DemoBattle, r: number): RoundAnswer[] {
+    const me = meIndex(b);
+    const mine = b.mine.get(r);
+    if (me < 0 || !mine || mine.at === null) return [];
+    return [{ slot: me, choice: mine.choice, value: mine.value, ms: mine.at - opensOf(b, r) }];
+  }
+
+  function opensOf(b: DemoBattle, r: number): number {
+    const s = b.startedAt!;
+    if (isMoreRound(b.kind)) return roundTimes(s, r, cfg.games[b.kind]).opens;
+    if (b.kind === "quiz") return quizTimes(s, r, cfg.games.quiz).opens;
+    if (b.kind === "estimate") return estimateTimes(s, r, cfg.games.estimate).opens;
+    return bellTimes(s, r, b.waits[r] ?? 0, cfg.games.bell).slot;
+  }
+
   function closesOf(b: DemoBattle, r: number): number {
     const s = b.startedAt!;
+    if (isMoreRound(b.kind)) return roundTimes(s, r, cfg.games[b.kind]).closes;
     if (b.kind === "quiz") return quizTimes(s, r, cfg.games.quiz).closes;
     if (b.kind === "estimate") return estimateTimes(s, r, cfg.games.estimate).closes;
     return bellTimes(s, r, b.waits[r] ?? 0, cfg.games.bell).closes;
@@ -394,6 +638,7 @@ export function createBattleEngine(host: BattleHost): BattleEngine & {
 
   function endOf(b: DemoBattle, r: number): number {
     const s = b.startedAt!;
+    if (isMoreRound(b.kind)) return roundTimes(s, r, cfg.games[b.kind]).ends;
     if (b.kind === "quiz") return quizTimes(s, r, cfg.games.quiz).ends;
     if (b.kind === "estimate") return estimateTimes(s, r, cfg.games.estimate).ends;
     return bellTimes(s, r, b.waits[r] ?? 0, cfg.games.bell).ends;
@@ -526,7 +771,13 @@ export function createBattleEngine(host: BattleHost): BattleEngine & {
           ? quizRanking(b.seed, state)
           : b.kind === "estimate"
             ? estimateRanking(b.seed, state)
-            : bellRanking(b.seed, state);
+            : b.kind === "vault" || b.kind === "ticker"
+              ? pointsRanking(b.seed, state)
+              : b.kind === "higher"
+                ? higherRanking(b.seed, state)
+                : b.kind === "auction"
+                  ? auctionRanking(b.seed, state as AuctionState)
+                  : bellRanking(b.seed, state);
       finish(b, now, ranking, null, { score: state.points, out: state.out });
     }
   }
@@ -566,10 +817,39 @@ export function createBattleEngine(host: BattleHost): BattleEngine & {
         });
         continue;
       }
-      const times = b.kind === "quiz" ? quizTimes(s, r, cfg.games.quiz) : estimateTimes(s, r, cfg.games.estimate);
+      const times = isMoreRound(b.kind)
+        ? roundTimes(s, r, cfg.games[b.kind])
+        : b.kind === "quiz"
+          ? quizTimes(s, r, cfg.games.quiz)
+          : estimateTimes(s, r, cfg.games.estimate);
       if (now < times.opens) break;
       const q = b.questions[r]!;
       const closed = now >= times.closes;
+      const extra: Partial<BattleRound> = {};
+      if (b.kind === "vault") {
+        const gv = cfg.games.vault;
+        const tries = vaultTries(b, r);
+        extra.vault = {
+          digits: gv.digits,
+          symbols: gv.symbols,
+          guesses: tries.filter((x) => x.slot === me).map((x) => ({ code: x.code, ...vaultFeedback(q.code!, x.code) })),
+          progress: b.players.map((_, slot) => {
+            const list = tries.filter((x) => x.slot === slot).slice(0, gv.maxTries);
+            return { slot, tries: list.length, cracked: list.some((x) => x.code === q.code) };
+          }),
+          code: closed ? q.code! : null,
+        };
+      } else if (b.kind === "higher") {
+        extra.chart = b.series.slice(0, cfg.games.higher.history + r + 1).map((c) => c / 100);
+      } else if (b.kind === "auction") {
+        const budgets = (state as AuctionState).budget ?? [];
+        extra.auction = {
+          points: q.points ?? 0,
+          icon: q.icon ?? "gift",
+          budget: me >= 0 ? budgets[me]! : null,
+          budgets,
+        };
+      }
       list.push({
         round: r,
         opensAt: iso(times.opens)!,
@@ -584,7 +864,15 @@ export function createBattleEngine(host: BattleHost): BattleEngine & {
         value: closed ? (q.value ?? null) : null,
         results: state.results[r]?.answers ?? null,
         lost: state.results[r]?.lost ?? null,
-        mine: { pressed: mine?.at != null, choice: mine?.choice ?? null, value: mine?.value ?? null },
+        mine: {
+          pressed:
+            b.kind === "vault"
+              ? (extra.vault?.guesses.some((x) => x.hits === cfg.games.vault.digits) ?? false)
+              : mine?.at != null,
+          choice: mine?.choice ?? null,
+          value: mine?.value ?? null,
+        },
+        ...extra,
       });
     }
     return { list, hearts: state.hearts, points: state.points, out: state.out, done: state.done };
@@ -744,22 +1032,38 @@ export function createBattleEngine(host: BattleHost): BattleEngine & {
           const me = meIndex(b);
           if (me < 0 || b.players[me]!.left) throw new GameError("battle_not_joined");
           const total = b.kind === "bell" ? cfg.games.bell.maxRounds : b.questions.length;
-          const opens =
-            b.kind === "bell"
-              ? bellTimes(b.startedAt, round, b.waits[round] ?? 0, cfg.games.bell).slot
-              : (b.kind === "quiz"
-                  ? quizTimes(b.startedAt, round, cfg.games.quiz)
-                  : estimateTimes(b.startedAt, round, cfg.games.estimate)
-                ).opens;
+          const opens = opensOf(b, round);
           if (b.status !== "running" || round >= total || now < opens || now >= closesOf(b, round))
             throw new GameError("battle_round_closed");
+          if (b.kind === "vault") {
+            // like battle_answer_more: a valid try, not after cracking, at most maxTries
+            const gv = cfg.games.vault;
+            const code = String(choice ?? "");
+            if (!vaultValid(code, gv)) throw new GameError("invalid_argument");
+            const list = b.tries.get(round) ?? [];
+            const mineTries = list.filter((x) => x.slot === me);
+            if (mineTries.length >= gv.maxTries || mineTries.some((x) => x.code === b.questions[round]!.code))
+              throw new GameError("battle_round_closed");
+            list.push({ slot: me, code, ms: now - opens });
+            b.tries.set(round, list);
+            return state(now);
+          }
+          if (b.kind === "ticker" && (choice === null || choice < 0 || choice >= cfg.games.ticker.options))
+            throw new GameError("invalid_argument");
+          if (b.kind === "higher" && choice !== 0 && choice !== 1) throw new GameError("invalid_argument");
+          if (b.kind === "auction") {
+            const left = (roundsState(b, now).state as AuctionState).budget[me] ?? 0;
+            if (value === null || value < 0 || !Number.isInteger(value) || value > left)
+              throw new GameError("invalid_argument");
+          }
           const m = b.mine.get(round) ?? { at: null, revealedAt: null };
           if (m.at === null)
             b.mine.set(round, {
               ...m,
               at: now,
-              choice: b.kind === "quiz" ? (choice ?? undefined) : undefined,
-              value: b.kind === "estimate" ? (value ?? undefined) : undefined,
+              choice:
+                b.kind === "quiz" || b.kind === "ticker" || b.kind === "higher" ? (choice ?? undefined) : undefined,
+              value: b.kind === "estimate" || b.kind === "auction" ? (value ?? undefined) : undefined,
             });
           return state(now);
         }),

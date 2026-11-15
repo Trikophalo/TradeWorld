@@ -2,42 +2,42 @@
   "items": [
     {
       "id": 5,
-      "body": "Die Partnerschaft soll beiden Seiten neue Kunden bringen. Sicher ist das nicht.",
-      "name": "SolarFuchs",
-      "due_at": "2026-11-15T22:44:45.989642+00:00",
+      "body": "Ehemalige Mitarbeiter erheben schwere Vorwürfe. Kunden kündigen erste Verträge. Sicher ist das nicht.",
+      "name": "Pixelwerk Studios",
+      "due_at": "2026-11-15T23:20:24.542113+00:00",
       "status": "open",
-      "ticker": "SFX",
-      "headline": "Kooperation: SolarFuchs und ein Branchenriese",
+      "ticker": "PXW",
+      "headline": "Rassismus-Vorwürfe gegen Pixelwerk Studios",
       "move_bps": null,
       "strength": 2,
-      "direction": "up",
-      "published_at": "2026-11-15T22:17:23.489964+00:00"
+      "direction": "down",
+      "published_at": "2026-11-15T22:52:22.57378+00:00"
     },
     {
       "id": 4,
-      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Fundgrube Discount tut sich in der nächsten Stunde etwas, und zwar nach unten. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
-      "name": "Fundgrube Discount",
-      "due_at": "2026-11-15T21:57:12.523232+00:00",
+      "body": "Ein Vögelchen hat mir gezwitschert: Nordlicht Logistik AG dürfte in der kommenden Stunde nach unten gehen. Meine Quelle ist seriös, sie trägt immerhin eine Krawatte.",
+      "name": "Nordlicht Logistik AG",
+      "due_at": "2026-11-15T22:11:12.262417+00:00",
       "status": "confirmed",
-      "ticker": "FGD",
-      "headline": "Mr. Doodle Dangles Geheimtipp",
-      "move_bps": -1463,
+      "ticker": "NDL",
+      "headline": "Vom Flurfunk: Nordlicht Logistik AG",
+      "move_bps": -1012,
       "strength": 2,
       "direction": "down",
-      "published_at": "2026-11-15T21:17:12.523232+00:00"
+      "published_at": "2026-11-15T21:52:12.262417+00:00"
     },
     {
       "id": 3,
-      "body": "Ein Vögelchen hat mir gezwitschert: Luftpost Drohnen dürfte in der kommenden Stunde nach oben gehen. Das Vögelchen lag bisher meistens richtig. Meistens.",
-      "name": "Luftpost Drohnen",
-      "due_at": "2026-11-15T21:17:11.451143+00:00",
-      "status": "confirmed",
-      "ticker": "DRN",
-      "headline": "Vom Flurfunk: Luftpost Drohnen",
-      "move_bps": 1490,
+      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Orbitfracht tut sich in der nächsten Stunde etwas, und zwar nach oben. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
+      "name": "Orbitfracht",
+      "due_at": "2026-11-15T21:52:11.444959+00:00",
+      "status": "fizzled",
+      "ticker": "OFR",
+      "headline": "Mr. Doodle Dangles Geheimtipp",
+      "move_bps": null,
       "strength": 2,
       "direction": "up",
-      "published_at": "2026-11-15T21:17:11.451143+00:00"
+      "published_at": "2026-11-15T21:52:11.444959+00:00"
     }
   ],
   "reliability_bps": 7500

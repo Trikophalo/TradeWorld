@@ -3,31 +3,31 @@
   "facts": {
     "staff": 1,
     "stage": 0,
-    "period": "quarter",
-    "product": "security_software",
+    "period": null,
+    "product": "solar",
     "max_staff": 2,
     "ai_workers": 0,
-    "quality_bps": 4125,
-    "value_cents": 250000,
-    "profit_cents": 0,
-    "awareness_bps": 3772,
-    "revenue_cents": 0
+    "quality_bps": null,
+    "value_cents": 1150000,
+    "profit_cents": null,
+    "awareness_bps": null,
+    "revenue_cents": null
   },
   "company": {
-    "id": "9654e93a-0c80-43e3-bbec-019c938d6ce6",
-    "idea": "Günstige Kabel",
+    "id": "ed1fad22-6e75-4ec4-b307-ceb5ad5db94f",
+    "idea": "Ideen für alle",
     "logo": null,
-    "name": "Billig Laden",
+    "name": "Kursrutsch Werke",
     "tier": "garage",
     "is_ai": false,
     "listed": false,
-    "sector": "tech",
-    "ticker": null,
+    "sector": "energy",
+    "ticker": "KRSWX",
     "price_e4": null,
     "change_bps": null,
-    "founded_at": "2026-11-15T21:16:58.49336+00:00",
-    "brand_color": "#552211"
+    "founded_at": "2026-11-15T21:52:00.91912+00:00",
+    "brand_color": "#335577"
   },
-  "founder": { "tag": "KBNE", "nickname": "Dirk_Billig", "avatar_key": "rookie" },
+  "founder": { "tag": "TACG", "nickname": "Lars_Kursrutsch", "avatar_key": "rookie" },
   "members": []
 }

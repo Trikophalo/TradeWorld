@@ -1,6 +1,6 @@
 {
   "company": {
-    "id": "bc7e2dd3-5ff9-4fb3-a4ef-771ac1467657",
+    "id": "c754d7af-b42a-400e-a8ab-16fb82fea1b3",
     "idea": "Maschinen nach Maß",
     "live": {
       "last_hour_at": "2026-11-15T21:00:00+00:00",
@@ -68,7 +68,7 @@
     "ai_workers": 0,
     "can_expand": true,
     "cash_cents": 6000000,
-    "founded_at": "2026-11-15T21:17:21.608087+00:00",
+    "founded_at": "2026-11-15T21:52:20.740455+00:00",
     "can_upgrade": false,
     "logo_hidden": false,
     "price_level": "premium",
@@ -84,7 +84,7 @@
     "max_employees": 30,
     "open_postings": 0,
     "training_from": 5,
-    "campaign_costs": { "tv": 210500, "flyer": 23400, "online": 70200 },
+    "campaign_costs": { "tv": 1989300, "flyer": 221000, "online": 663100 },
     "capacity_cents": 495000,
     "full_time_from": 5,
     "grace_quarters": 4,
@@ -95,10 +95,10 @@
     "quarters_active": 0,
     "ai_worker_skills": [],
     "distress_quarters": 0,
-    "estimate_low_cents": 1036764,
+    "estimate_low_cents": 12339350,
     "founder_payout_bps": 2500,
     "upgrade_cost_cents": null,
-    "estimate_high_cents": 19210354,
+    "estimate_high_cents": 163125937,
     "ai_worker_cost_cents": 72000,
     "can_capital_increase": false,
     "expansion_cost_cents": 18000000,

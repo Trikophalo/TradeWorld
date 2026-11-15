@@ -19,6 +19,23 @@ import { DoodleSays, GameIcon, PopNumber, PrizeView, fill } from "./parts";
  * then 3-2-1-LOS! And the end: the podium with confetti, the fanfare and the prize.
  */
 
+/** The line about the action key on the intro card. */
+const ACTION_KEYS: Partial<Record<BattleKind, "action" | "dashAction" | "laserAction">> = {
+  sumo: "action",
+  dash: "dashAction",
+  laser: "laserAction",
+};
+/** How the round games are played. */
+const ROUND_CONTROLS = {
+  quiz: "clickAnswer",
+  estimate: "typeNumber",
+  bell: "bellKey",
+  vault: "vaultKeys",
+  ticker: "tickerKeys",
+  higher: "higherKeys",
+  auction: "auctionKeys",
+} as const;
+
 export function IntroCard({ battle, msToStart }: { battle: Battle; msToStart: number }) {
   const t = useTranslations("battle");
   const kind = battle.kind as BattleKind;
@@ -34,17 +51,18 @@ export function IntroCard({ battle, msToStart }: { battle: Battle; msToStart: nu
     if (count <= 0) void playSound("battleGo");
   }, [count]);
   const touch = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
+  const actionKey = ACTION_KEYS[kind];
   const controls = isTickKind(kind)
     ? kind === "pump"
       ? t("controls.tapKeys")
-      : touch
-        ? t("controls.touch")
-        : `${t("controls.keys")}${kind === "sumo" ? ` · ${t("controls.action")}` : ""}`
-    : kind === "quiz"
-      ? t("controls.clickAnswer")
-      : kind === "estimate"
-        ? t("controls.typeNumber")
-        : t("controls.bellKey");
+      : kind === "rodeo"
+        ? touch
+          ? t("controls.rodeoTouch")
+          : t("controls.rodeoKeys")
+        : touch
+          ? t("controls.touch")
+          : `${t("controls.keys")}${actionKey ? ` · ${t(`controls.${actionKey}`)}` : ""}`
+    : t(`controls.${ROUND_CONTROLS[kind as keyof typeof ROUND_CONTROLS] ?? "bellKey"}`);
   return (
     <motion.div
       initial={{ opacity: 0 }}

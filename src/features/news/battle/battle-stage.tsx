@@ -12,7 +12,9 @@ import { ArenaGame } from "./arena-game";
 import { IntroCard, Podium } from "./intro-podium";
 import { GameIcon } from "./parts";
 import { PumpGame } from "./pump-game";
+import { RodeoGame } from "./rodeo-game";
 import { BellGame, EstimateGame, QuizGame } from "./round-games";
+import { AuctionGame, HigherGame, TickerGame, VaultGame } from "./round-games-more";
 
 /*
  * The battle on the whole screen (ADR-160): intro, the game, then the podium. Players are taken here when their
@@ -102,6 +104,8 @@ export function BattleStage({
         ) : isTickKind(kind) ? (
           kind === "pump" ? (
             <PumpGame key={battle.id} {...props} />
+          ) : kind === "rodeo" ? (
+            <RodeoGame key={battle.id} {...props} />
           ) : (
             <ArenaGame key={battle.id} {...props} />
           )
@@ -109,6 +113,14 @@ export function BattleStage({
           <QuizGame battle={battle} offsetMs={offsetMs} onState={onState} />
         ) : kind === "estimate" ? (
           <EstimateGame battle={battle} offsetMs={offsetMs} onState={onState} />
+        ) : kind === "vault" ? (
+          <VaultGame battle={battle} offsetMs={offsetMs} onState={onState} />
+        ) : kind === "ticker" ? (
+          <TickerGame battle={battle} offsetMs={offsetMs} onState={onState} />
+        ) : kind === "higher" ? (
+          <HigherGame battle={battle} offsetMs={offsetMs} onState={onState} />
+        ) : kind === "auction" ? (
+          <AuctionGame battle={battle} offsetMs={offsetMs} onState={onState} />
         ) : (
           <BellGame battle={battle} offsetMs={offsetMs} onState={onState} />
         )}

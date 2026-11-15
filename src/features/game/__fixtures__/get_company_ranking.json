@@ -1,5 +1,5 @@
 {
-  "mine": { "rank": 44, "value_cents": 54108 },
+  "mine": { "rank": 44, "value_cents": 54107 },
   "total": 47,
   "entries": [
     {
@@ -14,24 +14,24 @@
       "founder": "Lars_Kursrutsch",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "c84dc3d8-8132-49e5-9a6e-222230f52e97",
+      "company_id": "ed1fad22-6e75-4ec4-b307-ceb5ad5db94f",
       "value_cents": 959140000,
       "revenue_cents": null
     },
     {
       "kind": "player",
       "logo": null,
-      "name": "Talwerk",
+      "name": "Gipfelwerk",
       "rank": 2,
       "tier": "ag",
-      "color": "#663399",
+      "color": "#336699",
       "sector": "retail",
-      "ticker": "TAL",
-      "founder": "Pop_Gero",
+      "ticker": "GIP",
+      "founder": "Pop_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "b4dbb84b-e341-4b9a-b7da-5d0b8a2b53b5",
-      "value_cents": 111700000,
+      "company_id": "630926f3-f4a8-48e3-8349-fac9caf3a78d",
+      "value_cents": 117370000,
       "revenue_cents": null
     },
     {
@@ -46,7 +46,7 @@
       "founder": "Float_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "569fd054-5869-4920-a38e-5a417116824f",
+      "company_id": "703680f3-d503-4018-8f31-dfdaae48c2c8",
       "value_cents": 110000000,
       "revenue_cents": null
     },
@@ -82,8 +82,8 @@
       "founder": "Fenja_Firma",
       "is_mine": false,
       "team_size": 6,
-      "company_id": "d3b42e12-6442-4aac-9ccc-16e12ccb6513",
-      "value_cents": 106888929,
+      "company_id": "f2beb266-79b4-4ce8-a06f-023db371bf8b",
+      "value_cents": 106846152,
       "revenue_cents": 0
     },
     {
@@ -98,10 +98,10 @@
       "founder": "Esc_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "a8285cd4-d8a3-4948-9bd8-008a45602f91",
-      "value_cents": 105997584,
+      "company_id": "ab96249c-4ca4-4a2e-891b-9334c15a2415",
+      "value_cents": 105955168,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-15T21:17:20.524472+00:00"
+  "server_time": "2026-11-15T21:52:19.661667+00:00"
 }

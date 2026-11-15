@@ -24,6 +24,7 @@ import type { PotatoState } from "@/lib/sim/battle/potato";
 import type { SumoState } from "@/lib/sim/battle/sumo";
 import type { SoundName } from "@/lib/sound";
 import type { LockstepView } from "../lockstep";
+import { createMoreKinds, isMoreKind } from "./arena-more";
 import { figureArt, sprite, token, type Sprite } from "./sprites";
 
 /*
@@ -71,8 +72,10 @@ interface Death {
   dy: number;
 }
 
+export type ArenaKind = Exclude<TickKind, "pump" | "rodeo">;
+
 export interface ArenaRendererOptions {
-  kind: Exclude<TickKind, "pump">;
+  kind: ArenaKind;
   params: BattleParams;
   players: RenderPlayer[];
   reducedMotion: boolean;
@@ -125,6 +128,14 @@ export function createArenaRenderer(canvas: HTMLCanvasElement, opts: ArenaRender
   const accent = token("--accent", "#7b5cff");
   const tagBg = "rgba(11, 15, 30, 0.78)";
 
+  /** A sprite at a whole multiple of its size (the bears of Bärenjagd are twice as big). */
+  const pxScaled = (s: Sprite, x: number, y: number, scale: number, alpha = 1) => {
+    if (alpha <= 0) return;
+    b.globalAlpha = Math.min(1, alpha);
+    b.imageSmoothingEnabled = false;
+    b.drawImage(s.canvas, Math.round(x), Math.round(y), s.w * scale, s.h * scale);
+    b.globalAlpha = 1;
+  };
   const px = (s: Sprite, x: number, y: number, alpha = 1) => {
     if (alpha <= 0) return;
     b.globalAlpha = Math.min(1, alpha);
@@ -164,9 +175,31 @@ export function createArenaRenderer(canvas: HTMLCanvasElement, opts: ArenaRender
     const st = Math.max(1, p.st[i]!);
     const progress = p.mv[i]! > 0 ? Math.min(1, (st - p.mv[i]! + alpha) / st) : 1;
     const x = p.fx[i]! + (p.x[i]! - p.fx[i]!) * progress;
-    const y = p.fy[i]! + (p.y[i]! - p.fy[i]!) * progress;
+    const y = p.fy[i]! + (p.y[i]! - p.fy[i]!) * progress + (isMoreKind(kind) ? more.shiftY(kind, s, alpha) : 0);
     return { x: x * TILE + TILE / 2, y: HEAD + y * TILE + TILE - 2, moving: progress < 1 };
   };
+
+  /** The games of the addendum to ADR-160 draw through this (render/arena-more.ts). */
+  const more = createMoreKinds({
+    W,
+    H,
+    tile: TILE,
+    head: HEAD,
+    params,
+    reducedMotion: opts.reducedMotion,
+    rect,
+    px,
+    pxScaled,
+    burst,
+    say,
+    shake: (strength) => opts.onShake(strength),
+    sound: (name) => opts.onSound(name),
+    flash: (until) => {
+      flashUntil = Math.max(flashUntil, until);
+    },
+    tileBase: (...args) => tileBase(...args),
+    posOf: (s, i, alpha) => posOf(s, i, alpha),
+  });
 
   // ------------------------------------------------------------------ floors
 
@@ -432,14 +465,14 @@ export function createArenaRenderer(canvas: HTMLCanvasElement, opts: ArenaRender
     if (death) {
       const age = (now - death.at) / 900;
       if (age >= 1) return;
-      if (kind === "floor") {
+      if (kind === "floor" || kind === "margin" || kind === "elevator") {
         y += age * age * 30;
         px(fig, x, y, 1 - age);
       } else if (kind === "sumo") {
         x += death.dx * age * 22;
         y += death.dy * age * 22 + age * age * 26;
         px(fig, x, y, 1 - age);
-      } else if (kind === "bulls") {
+      } else if (kind === "bulls" || kind === "laser") {
         y -= age * 40;
         x += death.dx * age * 18;
         px(sprite(figureArt(info.avatarKey, info.accessories), Math.floor(now / 60) % 2 ? "white" : ""), x, y, 1 - age);
@@ -448,8 +481,9 @@ export function createArenaRenderer(canvas: HTMLCanvasElement, opts: ArenaRender
       }
       return;
     }
-    const bob = pos.moving && !opts.reducedMotion ? (Math.floor(now / 110) % 2 ? -1 : 0) : 0;
-    rect(pos.x - 6, pos.y - 1, 12, 3, ARENA.shadow, 0.35);
+    const lift = isMoreKind(kind) ? more.lift(kind, s, i, alpha) : 0;
+    const bob = (pos.moving && !opts.reducedMotion ? (Math.floor(now / 110) % 2 ? -1 : 0) : 0) - lift;
+    rect(pos.x - 6 + Math.round(lift / 4), pos.y - 1, 12 - Math.round(lift / 2), 3, ARENA.shadow, 0.35 - lift * 0.015);
     if (kind === "potato" && (s as PotatoState).holder === i) {
       rect(pos.x - 9, pos.y - 2, 18, 4, ARENA.toxic, 0.35 + Math.sin(now / 90) * 0.1);
     }
@@ -466,10 +500,11 @@ export function createArenaRenderer(canvas: HTMLCanvasElement, opts: ArenaRender
       rect(pos.x - 1, ay + 1, 3, 1, accent);
       rect(pos.x, ay + 2, 1, 1, accent);
     }
-    if (kind === "bulls") {
-      const hearts = (s as BullsState).hearts[i]!;
+    if (kind === "bulls" || kind === "laser") {
+      const hearts = kind === "bulls" ? (s as BullsState).hearts[i]! : more.hearts(kind, s, i);
       const heart = sprite(HEART);
-      for (let h = 0; h < hearts; h++) px(heart, pos.x - (hearts * 8) / 2 + h * 8, y - 14);
+      const hy = kind === "laser" ? Math.max(1, y - 9 + bob) : y - 14 + bob;
+      for (let h = 0; h < hearts; h++) px(heart, pos.x - (hearts * 8) / 2 + h * 8, hy);
     }
     if (kind === "potato" && (s as PotatoState).holder === i) {
       const st = s as PotatoState;
@@ -507,6 +542,19 @@ export function createArenaRenderer(canvas: HTMLCanvasElement, opts: ArenaRender
           flashUntil = now + 140;
           opts.onShake(6);
           opts.onSound("battleBang");
+        } else if (kind === "bear") {
+          burst(pos.x, pos.y - 12, 26, [ARENA.loss, ARENA.sandDark, ARENA.white, ARENA.smoke], 1.8);
+          flashUntil = now + 90;
+          opts.onShake(5);
+          opts.onSound("battleChomp");
+        } else if (kind === "laser") {
+          burst(pos.x, pos.y - 12, 26, [ARENA.beam, ARENA.white, ARENA.spark, ARENA.smoke], 1.8);
+          opts.onShake(4);
+          opts.onSound("battleZap");
+        } else if (kind === "margin") {
+          burst(pos.x, pos.y - 8, 18, [ARENA.loss, ARENA.chartRedDim, ARENA.smoke], 1.2);
+          opts.onShake(3);
+          opts.onSound("battleFall");
         } else if (kind === "bulls") {
           burst(pos.x, pos.y - 12, 22, [ARENA.loss, ARENA.white, ARENA.sandLight], 1.6);
           opts.onShake(4);
@@ -516,7 +564,13 @@ export function createArenaRenderer(canvas: HTMLCanvasElement, opts: ArenaRender
           opts.onShake(2);
           opts.onSound("battleFall");
         }
-        say(`${name}: RAUS!`, pos.x, pos.y - 34, ARENA.loss, now);
+        say(
+          kind === "bear" ? `${name}: GEFRESSEN!` : kind === "margin" ? `${name}: GLATTGESTELLT!` : `${name}: RAUS!`,
+          pos.x,
+          pos.y - 34,
+          ARENA.loss,
+          now,
+        );
       }
       if (s.p.out[i]! >= 0) continue;
       if (kind === "bulls") {
@@ -581,6 +635,7 @@ export function createArenaRenderer(canvas: HTMLCanvasElement, opts: ArenaRender
       const c = s as PotatoState;
       if (c.holder >= 0 && a.holder < 0) opts.onSound("battleFuse");
     }
+    if (isMoreKind(kind)) more.events(kind, p0, s, now, alpha);
   }
 
   // ------------------------------------------------------------------ a frame
@@ -599,6 +654,7 @@ export function createArenaRenderer(canvas: HTMLCanvasElement, opts: ArenaRender
       drawParquet(s.w, s.h);
       drawDrops(s as CoinsState, now, view.alpha, "ground");
     } else if (kind === "sumo") drawSumo(s as SumoState, view.alpha, now);
+    else if (isMoreKind(kind)) more.floor(kind, s, now, view.alpha);
     else drawOffice(s as PotatoState);
 
     // walls, players and bulls back to front
@@ -619,8 +675,10 @@ export function createArenaRenderer(canvas: HTMLCanvasElement, opts: ArenaRender
       order.push({ y: pos.y, draw: () => drawPlayer(s, i, view.alpha, now) });
     }
     if (kind === "bulls") order.push({ y: H + 1, draw: () => drawBulls(s as BullsState, now, view.alpha, "bulls") });
+    if (isMoreKind(kind)) more.things(kind, s, now, view.alpha, order);
     order.sort((a, c) => a.y - c.y).forEach((o) => o.draw());
     if (kind === "coins") drawDrops(s as CoinsState, now, view.alpha, "air");
+    if (isMoreKind(kind)) more.overlay(kind, s, now, view.alpha);
 
     // particles
     for (let i = particles.length - 1; i >= 0; i--) {
@@ -676,7 +734,8 @@ export function createArenaRenderer(canvas: HTMLCanvasElement, opts: ArenaRender
       }
       out.globalAlpha = 1 - age * age;
       out.fillStyle = "#151722";
-      const fx = f.x * k;
+      const half = out.measureText(f.text).width / 2 + 4;
+      const fx = Math.max(half, Math.min(canvas.width - half, f.x * k));
       const fy = (f.y - age * 14) * k;
       out.fillText(f.text, fx + 2, fy + 2);
       out.fillStyle = f.color;

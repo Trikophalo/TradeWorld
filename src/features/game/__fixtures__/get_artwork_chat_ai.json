@@ -3,7 +3,7 @@
   "messages": [
     {
       "ai": false,
-      "at": "2026-11-15T21:17:23.960988+00:00",
+      "at": "2026-11-15T21:52:22.983699+00:00",
       "id": 32,
       "kind": "chat",
       "mine": false,
@@ -15,19 +15,19 @@
     },
     {
       "ai": false,
-      "at": "2026-11-15T21:17:23.969548+00:00",
+      "at": "2026-11-15T21:52:22.986435+00:00",
       "id": 33,
       "kind": "offer",
       "mine": false,
       "text": "Wäre das ein Preis?",
       "author": "Fixture_Kunst",
-      "expires_at": "2026-11-16T21:17:23.969548+00:00",
+      "expires_at": "2026-11-16T21:52:22.986435+00:00",
       "offer_cents": 300000,
       "offer_status": "accepted"
     },
     {
       "ai": false,
-      "at": "2026-11-15T21:17:23.974678+00:00",
+      "at": "2026-11-15T21:52:22.991758+00:00",
       "id": 34,
       "kind": "sale",
       "mine": false,
@@ -39,7 +39,7 @@
     },
     {
       "ai": false,
-      "at": "2026-11-15T21:17:23.983367+00:00",
+      "at": "2026-11-15T21:52:22.999264+00:00",
       "id": 35,
       "kind": "sale",
       "mine": false,
@@ -51,19 +51,19 @@
     },
     {
       "ai": true,
-      "at": "2026-11-15T21:17:23.989025+00:00",
+      "at": "2026-11-15T21:52:23.005137+00:00",
       "id": 36,
       "kind": "offer",
       "mine": false,
-      "text": "Meine Mutter sagt, ich soll aufhören, Pixel zu kaufen. Hier mein Angebot.",
-      "author": "Mia Mosaik",
-      "expires_at": "2026-11-16T21:17:23.989025+00:00",
-      "offer_cents": 1806700,
+      "text": "Angebot! Bitte schnell, mein Akku hat noch drei Prozent.",
+      "author": "Otto Original",
+      "expires_at": "2026-11-16T21:52:23.005137+00:00",
+      "offer_cents": 2374600,
       "offer_status": "open"
     }
   ],
   "ask_cents": 90000000,
-  "artwork_id": "5ec1f1b6-e548-42ff-927f-8c89e251b49c",
+  "artwork_id": "9afde07b-1d7d-41bd-a75d-98c3a7aec0fb",
   "max_length": 200,
   "my_offer_cents": null,
   "min_offer_cents": 10000

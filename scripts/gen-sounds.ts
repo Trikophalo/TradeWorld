@@ -1422,6 +1422,180 @@ function battleJoin(): Float64Array {
   return master(m.buf, { room: { mix: 0.08, size: 0.5 }, maxSeconds: 0.32 });
 }
 
+// --- News battles, the games of the addendum (ADR-160) -------------------------------
+
+/** Bärenjagd: a bear comes out: a low, wobbling growl that rises and falls. */
+function battleRoar(): Float64Array {
+  const m = new Mix(0.9, 77);
+  m.tone({
+    at: 0,
+    note: "A1",
+    to: "D2",
+    glide: 0.25,
+    gate: 0.55,
+    wave: "pulse",
+    duty: 0.35,
+    gain: 0.6,
+    vibrato: { rate: 24, cents: 90 },
+    env: { a: 0.04, d: 0.3, s: 0.7, r: 0.25 },
+    filter: { type: "lp", cutoff: 900, to: 500, sweep: 0.5 },
+  });
+  noise(m, 0, 0.6, { type: "bp", cutoff: 400, q: 1.2 }, 0.45, { a: 0.05, d: 0.5, r: 0.2 });
+  m.tone({ at: 0.45, note: "D2", to: "G1", glide: 0.3, gate: 0.3, gain: 0.5, env: { d: 0.3, s: 0.3, r: 0.12 } });
+  return master(m.buf, { room: { mix: 0.12, size: 0.7 }, lowpass: 3000 });
+}
+
+/** Bärenjagd: caught: two quick chomps. */
+function battleChomp(): Float64Array {
+  const m = new Mix(0.4, 78);
+  for (const at of [0, 0.12]) {
+    m.tone({
+      at,
+      note: "G3",
+      to: "C3",
+      glide: 0.05,
+      gate: 0.05,
+      wave: "pulse",
+      duty: 0.4,
+      gain: 0.6,
+      env: { d: 0.06, s: 0, r: 0.03 },
+    });
+    noise(m, at, 0.03, { type: "lp", cutoff: 1800 }, 0.5, { a: 0.001, r: 0.02 });
+  }
+  return master(m.buf, { lowpass: 5000, maxSeconds: 0.35 });
+}
+
+/** Margin Call: the gong. */
+function battleGong(): Float64Array {
+  const m = new Mix(1.8, 79);
+  bell(m, 0, "C3", { gain: 0.9, decay: 1.2, index: 3 });
+  bell(m, 0, "G3", { gain: 0.35, decay: 0.9, index: 2 });
+  bell(m, 0, 98, { gain: 0.5, decay: 1.4, index: 1.2 });
+  noise(m, 0, 0.02, { type: "bp", cutoff: 1200, q: 1 }, 0.4, { a: 0.001, r: 0.02 });
+  return master(m.buf, { room: { mix: 0.3, size: 1 } });
+}
+
+/** Laserschranke: a beam burns you: a sizzling zap down. */
+function battleZap(): Float64Array {
+  const m = new Mix(0.4, 80);
+  m.tone({
+    at: 0,
+    note: "C7",
+    to: "C4",
+    glide: 0.18,
+    gate: 0.18,
+    wave: "pulse",
+    duty: 0.15,
+    gain: 0.5,
+    env: { d: 0.18, s: 0.2, r: 0.06 },
+  });
+  noise(m, 0, 0.2, { type: "hp", cutoff: 3000 }, 0.35, { a: 0.002, d: 0.2, r: 0.05 });
+  return master(m.buf, { lowpass: 9000, maxSeconds: 0.35 });
+}
+
+/** Laserschranke: a jump: the classic "boing" up. */
+function battleJump(): Float64Array {
+  const m = new Mix(0.25, 81);
+  m.tone({
+    at: 0,
+    note: "C5",
+    to: "C6",
+    glide: 0.12,
+    gate: 0.12,
+    wave: "pulse",
+    duty: 0.5,
+    gain: 0.45,
+    env: { d: 0.12, s: 0.3, r: 0.05 },
+    filter: { type: "lp", cutoff: 4500 },
+  });
+  return master(m.buf, { maxSeconds: 0.22 });
+}
+
+/** Laserschranke: a beam switches on: a rising hum. */
+function battleLaser(): Float64Array {
+  const m = new Mix(0.45, 82);
+  m.tone({
+    at: 0,
+    note: "A4",
+    to: "A5",
+    glide: 0.3,
+    gate: 0.3,
+    wave: "pulse",
+    duty: 0.25,
+    gain: 0.35,
+    vibrato: { rate: 30, cents: 30 },
+    env: { a: 0.01, d: 0.3, s: 0.6, r: 0.1 },
+    filter: { type: "lp", cutoff: 3500 },
+  });
+  return master(m.buf, { room: { mix: 0.08, size: 0.4 }, maxSeconds: 0.45 });
+}
+
+/** A swoosh (Margin Call lights up, the elevator gets faster, a rodeo hit). */
+function battleWhoosh(): Float64Array {
+  const m = new Mix(0.35, 83);
+  noise(m, 0, 0.25, { type: "bp", cutoff: 600, to: 4000, sweep: 0.22, q: 0.8 }, 0.6, { a: 0.03, d: 0.2, r: 0.08 });
+  return master(m.buf, { maxSeconds: 0.35 });
+}
+
+/** Bullen-Rodeo: the bull bucks: a snort and a thud. */
+function battleBuck(): Float64Array {
+  const m = new Mix(0.4, 84);
+  noise(m, 0, 0.08, { type: "bp", cutoff: 700, q: 1.4 }, 0.5, { a: 0.005, d: 0.08, r: 0.04 });
+  m.tone({
+    at: 0.06,
+    note: "D3",
+    to: "G1",
+    glide: 0.1,
+    gate: 0.08,
+    gain: 0.8,
+    env: { a: 0.001, d: 0.12, s: 0, r: 0.06 },
+  });
+  chip(m, 0.06, "A4", 0.04, { gain: 0.25, duty: 0.5, env: { d: 0.04, s: 0, r: 0.03 } });
+  return master(m.buf, { lowpass: 5000, maxSeconds: 0.38 });
+}
+
+/** Tresorknacker: a digit: the click of the dial. */
+function battleClick(): Float64Array {
+  const m = new Mix(0.1, 85);
+  noise(m, 0, 0.006, { type: "bp", cutoff: 4200, q: 2 }, 0.8, { a: 0.001, r: 0.01 });
+  m.tone({ at: 0, note: "E6", gate: 0.01, wave: "pulse", duty: 0.5, gain: 0.25, env: { d: 0.02, s: 0, r: 0.01 } });
+  return master(m.buf, { maxSeconds: 0.08 });
+}
+
+/** Tresorknacker: cracked: the bolts slide back, a chord of gold. */
+function battleUnlock(): Float64Array {
+  const m = new Mix(1.1, 86);
+  for (let i = 0; i < 3; i++)
+    noise(m, i * 0.06, 0.02, { type: "bp", cutoff: 2600, q: 1.6 }, 0.5, { a: 0.001, r: 0.02 });
+  m.tone({
+    at: 0.2,
+    note: "G3",
+    to: "C4",
+    glide: 0.08,
+    gate: 0.1,
+    wave: "pulse",
+    duty: 0.3,
+    gain: 0.4,
+    env: { d: 0.1, s: 0.2, r: 0.06 },
+  });
+  ["C5", "E5", "G5", "C6"].forEach((note, i) =>
+    chip(m, 0.32 + i * 0.07, note, 0.12, { gain: 0.55, duty: 0.25, sparkle: 0.25, env: { d: 0.1, s: 0.4, r: 0.18 } }),
+  );
+  return master(m.buf, { room: { mix: 0.16, size: 0.8 } });
+}
+
+/** Wer bietet mehr?: the gavel: two knocks of wood and a "sold" chime. */
+function battleGavel(): Float64Array {
+  const m = new Mix(0.9, 87);
+  for (const at of [0, 0.16]) {
+    noise(m, at, 0.02, { type: "bp", cutoff: 900, q: 2 }, 0.8, { a: 0.001, r: 0.03 });
+    m.tone({ at, note: "A2", to: "E2", glide: 0.04, gate: 0.04, gain: 0.7, env: { a: 0.001, d: 0.08, s: 0, r: 0.04 } });
+  }
+  bell(m, 0.32, "E6", { gain: 0.4, decay: 0.3, index: 1 });
+  bell(m, 0.4, "A6", { gain: 0.35, decay: 0.35, index: 1 });
+  return master(m.buf, { room: { mix: 0.14, size: 0.7 } });
+}
+
 /** File name → renderer. The names are what src/lib/sound.ts references. */
 const RENDER: Record<string, () => Float64Array> = {
   tap,
@@ -1471,6 +1645,17 @@ const RENDER: Record<string, () => Float64Array> = {
   "battle-bust": battleBust,
   "battle-fanfare": battleFanfare,
   "battle-join": battleJoin,
+  "battle-roar": battleRoar,
+  "battle-chomp": battleChomp,
+  "battle-gong": battleGong,
+  "battle-zap": battleZap,
+  "battle-jump": battleJump,
+  "battle-laser": battleLaser,
+  "battle-whoosh": battleWhoosh,
+  "battle-buck": battleBuck,
+  "battle-click": battleClick,
+  "battle-unlock": battleUnlock,
+  "battle-gavel": battleGavel,
 };
 
 /**

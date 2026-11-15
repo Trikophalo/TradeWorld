@@ -1,27 +1,27 @@
 {
-  "id": "c935cbf6-6567-420b-b48b-24275cfd6495",
+  "id": "a7c7864e-5b38-43af-842a-56cb94cf3bd9",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "07cfbcc3-178a-4bda-bd91-23c8315badd2",
+    "id": "12875c35-07f4-4c62-8f79-43fcbad086ee",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "c76af3f2-dc09-a8cc-b107-a7c326ad5b09",
+      "id": "2f91e3a4-088a-0592-9f21-88b83cae7bd8",
       "logo": null,
-      "name": "Glanz & Gloria",
-      "color": "#D4AF37",
+      "name": "SolarFuchs",
+      "color": "#FF8C42",
       "is_ai": true,
-      "sector": "retail",
-      "ticker": "LUX"
+      "sector": "energy",
+      "ticker": "SFX"
     },
-    "required": [{ "branch": "sales", "min_score": 0 }],
-    "title_key": "sales_intern",
+    "required": [{ "branch": "law", "min_score": 0 }],
+    "title_key": "law_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-15T21:17:19.958366+00:00",
-  "updated_at": "2026-11-15T21:17:19.965568+00:00",
-  "offer_expires_at": "2026-11-17T21:17:19.958366+00:00",
+  "created_at": "2026-11-15T21:52:19.240511+00:00",
+  "updated_at": "2026-11-15T21:52:19.244583+00:00",
+  "offer_expires_at": "2026-11-17T21:52:19.240511+00:00",
   "salary_wish_cents_per_hour": 15000,
   "offer_salary_cents_per_hour": 15000
 }

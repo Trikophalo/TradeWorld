@@ -1,13 +1,13 @@
 {
   "job": {
     "tier": "junior",
-    "since": "2026-11-15T21:17:19.968375+00:00",
+    "since": "2026-11-15T21:52:19.247226+00:00",
     "title": null,
     "title_key": "it_junior",
     "company_name": "Luftpost Drohnen"
   },
-  "tag": "VCCS",
-  "rank": 364,
+  "tag": "7GUC",
+  "rank": 368,
   "level": 6,
   "trust": { "band": "blank", "kept": 0, "score": 50, "broken": 0 },
   "company": null,
@@ -20,7 +20,7 @@
   ],
   "accessories": [],
   "streak_days": 1,
-  "member_since": "2026-11-15T21:17:19.369317+00:00",
+  "member_since": "2026-11-15T21:52:18.76082+00:00",
   "branch_scores": {
     "it": 3,
     "law": 0,
@@ -32,5 +32,5 @@
     "management": 0
   },
   "skills_learned": 2,
-  "net_worth_cents": 1061159
+  "net_worth_cents": 1061130
 }

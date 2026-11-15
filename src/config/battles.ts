@@ -9,10 +9,43 @@
  */
 import { BATTLE_ACCESSORIES } from "./battle-accessories.ts";
 
-export const BATTLE_KINDS = ["floor", "bulls", "coins", "sumo", "potato", "pump", "quiz", "estimate", "bell"] as const;
+export const BATTLE_KINDS = [
+  "floor",
+  "bulls",
+  "coins",
+  "sumo",
+  "potato",
+  "pump",
+  "bear",
+  "dash",
+  "margin",
+  "elevator",
+  "laser",
+  "rodeo",
+  "quiz",
+  "estimate",
+  "bell",
+  "vault",
+  "ticker",
+  "higher",
+  "auction",
+] as const;
 export type BattleKind = (typeof BATTLE_KINDS)[number];
 /** Games driven by inputs per tick (simulated); the others are rounds the server judges. */
-export const TICK_KINDS = ["floor", "bulls", "coins", "sumo", "potato", "pump"] as const;
+export const TICK_KINDS = [
+  "floor",
+  "bulls",
+  "coins",
+  "sumo",
+  "potato",
+  "pump",
+  "bear",
+  "dash",
+  "margin",
+  "elevator",
+  "laser",
+  "rodeo",
+] as const;
 export type TickKind = (typeof TICK_KINDS)[number];
 export type RoundKind = Exclude<BattleKind, TickKind>;
 
@@ -50,7 +83,27 @@ export const BATTLE_RULES = {
   /** The offline demo: made-up opponents join within a few seconds, a short countdown. */
   demo: { countdownSeconds: 6, botsMin: 3, botsMax: 5 },
   /** How often the server picks each game. The last game is never picked twice in a row. */
-  weights: { floor: 12, bulls: 12, coins: 12, sumo: 12, potato: 12, pump: 10, quiz: 12, estimate: 8, bell: 10 },
+  weights: {
+    floor: 12,
+    bulls: 12,
+    coins: 12,
+    sumo: 12,
+    potato: 12,
+    pump: 10,
+    quiz: 12,
+    estimate: 8,
+    bell: 10,
+    bear: 12,
+    dash: 12,
+    margin: 12,
+    elevator: 10,
+    laser: 12,
+    rodeo: 10,
+    vault: 8,
+    ticker: 10,
+    higher: 10,
+    auction: 8,
+  },
   net: {
     tickMs: 50,
     /** A tick is final this long after it; missing inputs then count as "x" (none). */
@@ -176,6 +229,126 @@ export const BATTLE_RULES = {
       bustFreezeTicks: 20,
       bustLossBps: 2_500,
     },
+    /**
+     * Bärenjagd: bears come out of their den in the middle one after another and chase the closest player (a step
+     * towards them, around the pillars); caught is out. They get faster; the last one standing wins.
+     */
+    bear: {
+      maxTicks: 1_600,
+      bearTicks: [60, 380, 740, 1_100] as readonly number[],
+      /** Ticks per step of a bear: stepStart, one less every speedEvery ticks, at least stepMin (a player: 4). */
+      stepStart: 7,
+      stepMin: 4,
+      speedEvery: 280,
+      /** A bear that caught someone sits and eats this long. */
+      eatTicks: 30,
+      den: [5, 4] as readonly number[],
+      pillars: [
+        [3, 3],
+        [7, 3],
+        [3, 5],
+        [7, 5],
+      ] as readonly (readonly [number, number])[],
+      spawns: [
+        [1, 1],
+        [9, 7],
+        [9, 1],
+        [1, 7],
+        [5, 1],
+        [5, 7],
+        [1, 4],
+        [9, 4],
+        [3, 1],
+        [7, 7],
+      ] as readonly (readonly [number, number])[],
+    },
+    /**
+     * Dividenden-Dash: dividend coins appear on free tiles; whoever gets there first takes it (every goldEvery-th is a
+     * special dividend worth goldValue). Walking into someone with the action tackles them (stunned). First to
+     * `target` wins, else the most at the end.
+     */
+    dash: {
+      maxTicks: 1_200,
+      target: 15,
+      firstCoin: 20,
+      /** Coins on the field: 1 + floor(players / coinsPerPlayers), at most coinsMax. */
+      coinsPerPlayers: 4,
+      coinsMax: 3,
+      spawnDelay: 24,
+      goldEvery: 5,
+      goldValue: 2,
+      tackleStun: 24,
+      tackleCool: 40,
+    },
+    /**
+     * Margin Call: green safe tiles light up, then the gong; whoever is not on one is out. First a few rounds with
+     * enough tiles for everyone (warmupRounds), then one fewer than players; the time to get there shrinks. When
+     * nobody makes it, nobody is out.
+     */
+    margin: {
+      maxTicks: 1_800,
+      firstRound: 30,
+      showTicks: 100,
+      showMin: 44,
+      showStep: 8,
+      pauseTicks: 34,
+      /** Round r has (players - 1) + max(0, warmupRounds - r) safe tiles. */
+      warmupRounds: 3,
+    },
+    /**
+     * Fahrstuhl zum Mond: the chart climbs, the screen with it. Every barrierEvery-th row is a bar of candles with
+     * gaps (fewer higher up); who falls below the bottom edge is out. The screen climbs ever faster.
+     */
+    elevator: {
+      maxTicks: 1_600,
+      firstRise: 60,
+      /** Ticks between two rises: riseStart, riseStep less every riseStepEvery rises, at least riseMin. */
+      riseStart: 30,
+      riseMin: 9,
+      riseStep: 1,
+      riseStepEvery: 2,
+      barrierEvery: 3,
+      /** Gaps of row r: max(gapMin, gapStart - floor(r / gapShrinkEvery)). */
+      gapStart: 4,
+      gapMin: 1,
+      gapShrinkEvery: 12,
+    },
+    /**
+     * Laserschranke: laser beams sweep across rows and columns (some with a gap); jump with the action at the right
+     * moment, or lose a heart. A jump lasts jumpTicks, then you need jumpCool to jump again. Three hearts.
+     */
+    laser: {
+      maxTicks: 1_400,
+      hearts: 3,
+      firstSpawn: 50,
+      spawnEvery: 64,
+      spawnEveryMin: 26,
+      spawnEveryStep: 2,
+      countGrowEvery: 4,
+      countMax: 3,
+      /** Beams of one wave come this many ticks apart. */
+      staggerTicks: 20,
+      warnTicks: 24,
+      ticksPerTile: 2,
+      gapPct: 35,
+      jumpTicks: 8,
+      jumpCool: 6,
+      invulnTicks: 16,
+    },
+    /**
+     * Bullen-Rodeo: the bull bucks in a direction; press that direction (a new press) within the window. Wrong or
+     * too late costs a grip; when everyone misses, nobody does. Faster is more points. The windows shrink.
+     */
+    rodeo: {
+      maxTicks: 1_400,
+      grip: 3,
+      firstCue: 40,
+      windowStart: 26,
+      windowMin: 9,
+      windowStep: 1,
+      gapMin: 8,
+      gapJitter: 18,
+    },
     /** Börsenquiz: two hearts; wrong or no answer costs one; fast right answers score more. */
     quiz: { rounds: 7, answerMs: 8_000, revealMs: 3_000, hearts: 2, basePoints: 500, speedPoints: 500 },
     /** Schätz den Kurs: closest guess gets the most points; the last round counts double. */
@@ -202,6 +375,56 @@ export const BATTLE_RULES = {
       heartsSmall: 2,
       heartsLarge: 1,
     },
+    /**
+     * Tresorknacker: crack a code of `digits` different digits 1..symbols. Each try shows how many are right and in
+     * place and how many are right but elsewhere (only the server knows the code). Faster and with fewer tries is
+     * more points.
+     */
+    vault: {
+      rounds: 3,
+      answerMs: 24_000,
+      revealMs: 4_000,
+      digits: 3,
+      symbols: 6,
+      maxTries: 8,
+      basePoints: 400,
+      speedPoints: 600,
+      tryBonus: 25,
+    },
+    /** Ticker-Tippen: the company is named, its ticker runs past on the tape with others. A wrong tap costs points. */
+    ticker: {
+      rounds: 8,
+      answerMs: 6_000,
+      revealMs: 2_500,
+      options: 6,
+      basePoints: 200,
+      speedPoints: 800,
+      wrongPoints: 300,
+    },
+    /**
+     * Mehr oder Weniger: will the next candle close higher or lower? The chart has trends (a move goes on with
+     * trendPct %). Wrong or none costs a heart (not when everyone is wrong); hearts as in Die Glocke.
+     */
+    higher: {
+      rounds: 10,
+      answerMs: 5_000,
+      revealMs: 2_500,
+      smallGroup: 5,
+      heartsSmall: 3,
+      heartsLarge: 2,
+      history: 14,
+      trendPct: 65,
+      moveMinBps: 80,
+      moveMaxBps: 450,
+      basePoints: 100,
+      speedPoints: 100,
+    },
+    /**
+     * Wer bietet mehr?: everyone has the same budget of play money; an item with points is auctioned per round, the
+     * bids are secret until the gavel. The highest bid wins the points and pays its bid (the earlier one at a draw).
+     * Most points wins, then the most money left.
+     */
+    auction: { rounds: 6, answerMs: 10_000, revealMs: 3_500, budget: 1_000 },
   },
   prizes: {
     weights: { xp: 30, money: 30, skin: 20, nft: 20 },
@@ -242,6 +465,16 @@ export const BATTLE_RULES = {
       quiz: "Quizzeit! Zwei Herzen, null Ahnung. Zeigt, was ihr wisst!",
       estimate: "Schätzt mal! Wer am nächsten dran ist, kriegt die Punkte.",
       bell: "Wenn die Glocke läutet, drückt ihr. Vorher drücken? Raus!",
+      bear: "Die Bären haben Hunger! Lauft, und zwar weg von ihnen, nicht hin.",
+      dash: "Dividende für alle! Also für den Schnellsten. Rempeln ist ausdrücklich erwünscht.",
+      margin: "Margin Call! Wer beim Gong nicht im Grünen steht, wird glattgestellt.",
+      elevator: "Diese Aktie kennt nur eine Richtung: nach oben. Wer unten bleibt, bleibt unten.",
+      laser: "Die Laserschranke! Springt im richtigen Moment, sonst gibt's gegrillte Börsianer.",
+      rodeo: "Haltet euch fest! Der Bulle bockt, und er hat heute richtig schlechte Laune.",
+      vault: "Der Tresor der Zentralbank! Knackt den Code, bevor die Polizei kommt. War ein Witz. Oder?",
+      ticker: "Kürzel-Alarm! Wer das richtige Tickersymbol zuerst erwischt, ist der Börsenprofi.",
+      higher: "Höher oder tiefer? Mein Schnurrbart sagt höher. Mein Schnurrbart lag noch nie richtig.",
+      auction: "Wer bietet mehr? Spielgeld weg, Punkte her! Nur nicht alles für eine Gummiente ausgeben.",
     },
     win: [
       "{name} gewinnt! Ich habe es immer gewusst. Also seit gerade eben.",
@@ -271,6 +504,16 @@ export const BATTLE_RULES = {
     quiz: "Börsenquiz",
     estimate: "Schätz den Kurs",
     bell: "Die Glocke",
+    bear: "Bärenjagd",
+    dash: "Dividenden-Dash",
+    margin: "Margin Call",
+    elevator: "Fahrstuhl zum Mond",
+    laser: "Laserschranke",
+    rodeo: "Bullen-Rodeo",
+    vault: "Tresorknacker",
+    ticker: "Ticker-Tippen",
+    higher: "Mehr oder Weniger",
+    auction: "Wer bietet mehr?",
   },
   /** Made-up opponents of the demo. */
   demoBots: [
@@ -428,6 +671,36 @@ export const BATTLE_RULES = {
     { q: "Wie viele Zähne hat ein erwachsener Mensch normalerweise?", a: "32", wrong: ["28", "30", "36"] },
     { q: "Welches Gas atmen Pflanzen ein?", a: "Kohlendioxid", wrong: ["Sauerstoff", "Stickstoff", "Helium"] },
   ],
+  /** Ticker-Tippen without enough listed securities (demo, an empty market): made-up companies. */
+  tickers: [
+    { ticker: "BULL", name: "Bullen & Söhne AG" },
+    { ticker: "BAER", name: "Bärenbräu Holding" },
+    { ticker: "MOND", name: "Mondfahrt Raketen" },
+    { ticker: "GOLD", name: "Goldgrube Minen" },
+    { ticker: "PIZZ", name: "Pizza Pronto Gruppe" },
+    { ticker: "KAFE", name: "Kaffeekanne Kontor" },
+    { ticker: "NXA", name: "NEXA Börse" },
+    { ticker: "ROBO", name: "Robo Rasenmäher" },
+    { ticker: "DUCK", name: "Gummiente International" },
+    { ticker: "SOFA", name: "Sofa-Börsianer e. V." },
+    { ticker: "ZUGI", name: "Zugspitz Seilbahnen" },
+    { ticker: "KRAK", name: "Krakenkabel Telekom" },
+  ],
+  /** Wer bietet mehr?: what is auctioned (points = what it is worth in the game; icon: a key of ALL_PIXEL_ART). */
+  auctionItems: [
+    { name: "Goldbarren aus dem Tresor", points: 300, icon: "gold_bar" },
+    { name: "Signierte Bullen-Statue", points: 250, icon: "bull" },
+    { name: "Mondticket erster Klasse", points: 220, icon: "moon" },
+    { name: "Koffer voller Aktien", points: 200, icon: "briefcase" },
+    { name: "Glücksmünze von Mr. Doodle Dangle", points: 180, icon: "coin" },
+    { name: "Edelstein des Vorstands", points: 160, icon: "gem" },
+    { name: "Geheimer Insider-Tipp (ganz legal)", points: 140, icon: "key" },
+    { name: "Geschenkbox mit Überraschung", points: 120, icon: "gift" },
+    { name: "Ausgestopfter Bärenmarkt-Bär", points: 100, icon: "bear" },
+    { name: "Vergilbte Zeitung von 1929", points: 80, icon: "newspaper" },
+    { name: "Wecker für Frühaufsteher", points: 60, icon: "alarm_clock" },
+    { name: "Herz eines Börsianers", points: 50, icon: "heart" },
+  ],
   /** Schätz den Kurs: a question with a true value; `unit` is shown after the input. */
   estimate: [
     { q: "Wie hoch ist der Eiffelturm (mit Antenne) in Metern?", value: 330, unit: "m" },
@@ -467,6 +740,16 @@ export type PumpParams = BattleRules["games"]["pump"];
 export type QuizParams = BattleRules["games"]["quiz"];
 export type EstimateParams = BattleRules["games"]["estimate"];
 export type BellParams = BattleRules["games"]["bell"];
+export type BearParams = BattleRules["games"]["bear"];
+export type DashParams = BattleRules["games"]["dash"];
+export type MarginParams = BattleRules["games"]["margin"];
+export type ElevatorParams = BattleRules["games"]["elevator"];
+export type LaserParams = BattleRules["games"]["laser"];
+export type RodeoParams = BattleRules["games"]["rodeo"];
+export type VaultParams = BattleRules["games"]["vault"];
+export type TickerParams = BattleRules["games"]["ticker"];
+export type HigherParams = BattleRules["games"]["higher"];
+export type AuctionParams = BattleRules["games"]["auction"];
 
 export function isTickKind(kind: string): kind is TickKind {
   return (TICK_KINDS as readonly string[]).includes(kind);

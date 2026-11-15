@@ -1303,6 +1303,37 @@ select tests.login_as('authenticated', :p) is null as ok \gset
 select public.get_battle();
 \o
 reset role;
+-- the round games of the addendum to ADR-160: a try at the vault, the chart, a sealed bid
+delete from public.battle_answers where battle_id = :fx_bid;
+update public.battles set kind = 'vault', params = public.battle_params('vault'),
+                          plan = public.battle_plan('vault', public.battle_params('vault')), started_at = now() - interval '2 seconds'
+ where status = 'running';
+select tests.login_as('authenticated', :p) is null as ok \gset
+select public.battle_answer(gen_random_uuid(), :fx_bid, 0, 123, null) is not null as ok \gset
+\o :fixture_dir/get_battle_vault.json
+select public.get_battle();
+\o
+reset role;
+delete from public.battle_answers where battle_id = :fx_bid;
+update public.battles set kind = 'higher', params = public.battle_params('higher'),
+                          plan = public.battle_plan('higher', public.battle_params('higher')), started_at = now() - interval '9 seconds'
+ where status = 'running';
+select tests.login_as('authenticated', :p) is null as ok \gset
+select public.battle_answer(gen_random_uuid(), :fx_bid, 1, 0, null) is not null as ok \gset
+\o :fixture_dir/get_battle_higher.json
+select public.get_battle();
+\o
+reset role;
+delete from public.battle_answers where battle_id = :fx_bid;
+update public.battles set kind = 'auction', params = public.battle_params('auction'),
+                          plan = public.battle_plan('auction', public.battle_params('auction')), started_at = now() - interval '15 seconds'
+ where status = 'running';
+select tests.login_as('authenticated', :p) is null as ok \gset
+select public.battle_answer(gen_random_uuid(), :fx_bid, 1, null, 120) is not null as ok \gset
+\o :fixture_dir/get_battle_auction.json
+select public.get_battle();
+\o
+reset role;
 update public.battles set kind = 'floor', params = public.battle_params('floor'), plan = '{}',
                           started_at = now() - interval '2 seconds', ends_at = now() + interval '70 seconds'
  where status = 'running';

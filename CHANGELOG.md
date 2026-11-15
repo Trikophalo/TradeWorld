@@ -117,6 +117,9 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   Qualität, Image, Preis, Team, Kasse, Schwung), wo du gerade am meisten verlierst und was ein Fix pro Stunde bringt.
   „Mit Mira angehen“ fragt Mira, und sie antwortet mit Knöpfen, die es gleich erledigen.
 
+- **Zehn neue News-Battles (ADR-160):** Bärenjagd, Dividenden-Dash, Margin Call, Fahrstuhl zum Mond, Laserschranke
+  und Bullen-Rodeo zum Steuern, dazu Tresorknacker, Ticker-Tippen, Mehr oder Weniger und Wer bietet mehr?.
+
 - **Wohnen lohnt sich (ADR-161):** Wer ein Zuhause hat oder zur Miete wohnt, bekommt jede Stunde einen Wohnbonus in Geld
   und XP, mehr in größeren und schöner eingerichteten Zuhausen. Möbel kosten in größeren Zuhausen mehr, aufgestellt
   steigern sie den Wert deines Zuhauses. Die Miete legst du jetzt frei fest.

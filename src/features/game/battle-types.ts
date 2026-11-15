@@ -75,6 +75,19 @@ export interface BattleRound {
   results: BattleRoundAnswer[] | null;
   lost: number[] | null;
   mine: { pressed: boolean; choice: number | null; value: number | null };
+  /** Tresorknacker: the code's length and digits, my tries with the server's answer, how far everyone is. */
+  vault?: {
+    digits: number;
+    symbols: number;
+    guesses: { code: string; hits: number; near: number }[];
+    progress: { slot: number; tries: number; cracked: boolean }[];
+    /** After the round. */
+    code: string | null;
+  };
+  /** Mehr oder Weniger: the chart up to the current candle (euros). */
+  chart?: number[];
+  /** Wer bietet mehr?: what the item is worth, its icon, my play money left and everyone's. */
+  auction?: { points: number; icon: string; budget: number | null; budgets: number[] };
 }
 
 export interface BattleRounds {

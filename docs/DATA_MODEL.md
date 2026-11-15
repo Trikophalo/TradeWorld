@@ -7580,6 +7580,18 @@ Accessoires (`battles.accessories`, `exclusive: true`, ohne Preis) mischt `acces
 - **Fehler:** `battle_not_viewer` NX150, `battle_full` NX151, `battle_closed` NX152, `battle_not_joined` NX153,
   `battle_round_closed` NX154, `accessory_exclusive` NX155, `battle_unknown` NX156.
 - Test `supabase/tests/9s_battles.sql` (mit Testvektoren gegen die TypeScript-Simulation).
+- **Zehn weitere Spiele (Nachtrag zu ADR-160):** `20261204004900_battle_sims_more.sql` (`battle_sim_bear`,
+  `_dash`, `_margin`, `_elevator`, `_laser`, `_rodeo`, Helfer `battle_dash_tile`, `battle_elevator_mask`; `battle_sim` neu mit allen zwölf
+  Aktionsspielen, `battle_is_tick` per `replace` ergänzt, Check auf `battles.kind` mit allen 19 Spielen) und
+  `20261204004910_more_battle_games.sql` (Rundenspiele `vault`, `ticker`, `higher`, `auction`). Neue interne Tabelle
+  `battle_guesses` (PK `battle_id, round, player_id, n`, `code`, `hits`, `near`, `guessed_at`; RLS ohne Policy, keine
+  Rechte): die Versuche im Tresorknacker. Geknackt = Zeile in `battle_answers` (`choice` = Versuche). Gebote der
+  Auktion stehen als ganze Taler in `battle_answers.value_e4`. Die Runden-JSON von `get_battle` bekommt je nach Spiel
+  `digits`, `symbols`, `guesses` (nur die eigenen), `progress` (`slot`, `tries`, `cracked` aller), `code` (nach der
+  Runde); `chart` (Kurse bis zur aktuellen Kerze); `item_points`, `icon`, `budget` (eigenes Restgeld), `budgets`.
+  `battle_answer` prüft dazu: gültiger Code, höchstens `maxTries`, nichts nach dem Knacken; Option 0 bis 5 bzw. 0/1;
+  Gebot ganzzahlig, nicht negativ, höchstens das Restgeld (sonst `invalid_argument` bzw. `battle_round_closed`).
+  Test `supabase/tests/9x_battle_games.sql`.
 
 ## Nachtrag: Wohnbonus, Möbelpreise nach Zuhause, Einrichtung im Wert, freie Miete (ADR-161)
 

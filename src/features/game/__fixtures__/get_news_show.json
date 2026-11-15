@@ -1,9 +1,9 @@
 {
-  "now": "2026-11-15T21:17:24.025092+00:00",
+  "now": "2026-11-15T21:52:23.039124+00:00",
   "chat": [
     {
-      "at": "2026-11-15T21:17:24.022055+00:00",
-      "id": 218,
+      "at": "2026-11-15T21:52:23.035982+00:00",
+      "id": 223,
       "bot": false,
       "body": "Was für eine Sendung 💀📉",
       "mine": true,
@@ -11,41 +11,38 @@
     }
   ],
   "show": {
-    "id": 7,
+    "id": 9,
     "writer": "mini",
     "airs_at": "2026-11-15T21:00:00+00:00",
     "segments": [
       {
         "kind": "gossip",
-        "mood": "proud",
-        "text": "Bitte festhalten: Deal mit Fixture_Lieferant per Handschlag, und zwar bei Fixture_Abnehmer. Meine Schwiegermutter hat es vorausgesagt, und die liegt sonst immer falsch.",
-        "figure": { "nickname": "Fixture_Abnehmer", "avatar_key": "rookie", "accessories": [] },
+        "mood": "shocked",
+        "text": "Gute Nachrichten, ausnahmsweise. Bei Float_Frida heißt es: Level 10 erreicht. So, und jetzt alle anderen: Schämt euch.",
+        "figure": { "nickname": "Float_Frida", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Applaus für Fixture_Abnehmer"
+        "headline": "Float_Frida hat es geschafft"
       },
       {
-        "kind": "hype",
-        "mood": "laughing",
-        "text": "Wackelwerk räumt ab. Sogar die Steuerprüfung kam privat vorbei, um einzukaufen. Esc_Frida hängt sich das gerahmt ins Büro. Die Kundschaft rennt die Tür ein.",
-        "figure": { "nickname": "Esc_Frida", "avatar_key": "rookie", "accessories": [] },
-        "effects": [
-          { "tone": "gain", "label": "Bekanntheit +20 %" },
-          { "tone": "gain", "label": "WAC +8,2 %" }
-        ],
-        "headline": "Ritterschlag für Wackelwerk"
+        "kind": "scandal",
+        "mood": "angry",
+        "text": "Fenja Pixel wollte heute groß rauskommen. Der Sicherheitsdienst hat sich selbst ausgesperrt und die Tür aufgebrochen. Fenja_Firma erklärte, das gehöre zum Konzept. Die Kundschaft erklärte, sie sei dann mal weg.",
+        "figure": { "nickname": "Fenja_Firma", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −15,7 %" }],
+        "headline": "Fenja Pixel blamiert sich bis auf die Knochen"
       },
       {
         "kind": "nft",
-        "mood": "confused",
-        "text": "Ben_Bieter zahlt 30.000 € für „Neon Nacht“, gemalt von Nina_Neon. Mein Enkel malt so etwas mit Fingerfarbe, und der will dafür nur ein Eis.",
+        "mood": "laughing",
+        "text": "Kunstmarkt, oder was man dafür hält: „Neon Nacht“ von Nina_Neon ging für 30.000 € an Ben_Bieter. Das Bild hat sechzehn mal sechzehn Pixel. Ich habe nachgezählt, ich hatte Zeit.",
         "figure": { "nickname": "Nina_Neon", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "NFT-Wahnsinn um „Neon Nacht“"
+        "headline": "30.000 € für ein paar Pixel"
       },
       {
         "kind": "winner",
         "mood": "shocked",
-        "text": "Und nun zu jemandem, der es kann: Fixture_Neu hat heute 1.139.380 € gemacht, 11393,8 % im Plus. Bitte nicht nachmachen, ihr könnt das nicht.",
+        "text": "Und nun zu jemandem, der es kann: Fixture_Neu hat heute 1.139.380 € gemacht, 11393,8 % im Plus. Wir gratulieren zähneknirschend.",
         "figure": { "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] },
         "effects": [],
         "headline": "Fixture_Neu sahnt ab: plus 1.139.380 €"
@@ -53,51 +50,44 @@
       {
         "kind": "gossip",
         "mood": "proud",
-        "text": "Bitte festhalten: Level 5 erreicht, und zwar bei Berta_Chefin. Glückwunsch, und jetzt bloß nichts anfassen.",
-        "figure": { "nickname": "Berta_Chefin", "avatar_key": "rookie", "accessories": [] },
+        "text": "Ich fasse es nicht, aber es stimmt. Hugo_Heim meldet: Level 10 erreicht. Die Konkurrenz darf sich gern ein Beispiel nehmen, ihr Luschen.",
+        "figure": { "nickname": "Hugo_Heim", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Applaus für Berta_Chefin"
+        "headline": "Na so was: Hugo_Heim"
       },
       {
-        "kind": "scandal",
+        "kind": "hype",
+        "mood": "laughing",
+        "text": "Unfassbar, aber wahr: Fred Fabrik ist der Renner. Die Warteschlange vor der Tür reicht bis zur nächsten Postleitzahl. „Teile aus Stahl“ geht weg wie warme Semmeln. Fred_Fabrik soll vor Freude geweint haben.",
+        "figure": { "nickname": "Fred_Fabrik", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "gain", "label": "Bekanntheit +20,4 %" }],
+        "headline": "Alle wollen Fred Fabrik"
+      },
+      {
+        "kind": "tasks",
         "mood": "angry",
-        "text": "Billig Laden wollte heute groß rauskommen. Die Geschäftsführung hat das wichtigste Meeting des Jahres verschlafen, im Meetingraum. Dirk_Billig erklärte, das gehöre zum Konzept. Die Kundschaft erklärte, sie sei dann mal weg.",
-        "figure": { "nickname": "Dirk_Billig", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −19,5 %" }],
-        "headline": "Billig Laden blamiert sich bis auf die Knochen"
-      },
-      {
-        "kind": "ramble",
-        "mood": "angry",
-        "text": "Die Regie winkt, ich ignoriere sie. Die Butter kostet inzwischen mehr als mein erstes Auto. Das Auto war allerdings ein Fahrrad. So. Weiter im Text.",
-        "effects": [],
-        "headline": "Was ich noch sagen wollte"
-      },
-      {
-        "kind": "sector",
-        "mood": "crying",
-        "text": "Die Branche Pharma sackt um 8,8 % ab. Jemand hat laut gefragt, wofür man das eigentlich braucht. Bis das geklärt ist, verkaufen erst mal alle.",
-        "effects": [{ "tone": "loss", "label": "Pharma −8,8 %" }],
-        "headline": "Pharma im freien Fall"
+        "text": "Das halbe Land ist kollektiv im Urlaub, natürlich unbezahlt. Offene Aufgaben bringen 29,3 % weniger. Durchhalten, es wird auch wieder schlechter.",
+        "effects": [{ "tone": "loss", "label": "Aufgaben −29,3 %" }],
+        "headline": "Flaute bei den Aufträgen"
       },
       {
         "kind": "stock",
         "mood": "shocked",
-        "text": "Im Werk wurde drei Wochen lang das falsche Produkt gebaut, niemandem fiel es auf. Die Börse straft Kaufrausch Märkte mit 10 % Minus ab. Der Pressesprecher wurde zuletzt am Flughafen gesehen.",
-        "effects": [{ "tone": "loss", "label": "KFR −10 %" }],
-        "headline": "Katastrophe bei Kaufrausch Märkte"
+        "text": "Der gesamte Vorstand ist nach dem Betriebsausflug nicht zurückgekehrt. Letztes Lebenszeichen: ein Foto aus einer Karaoke-Bar. Die Börse straft KlarSoft AG mit 15,5 % Minus ab. Der Pressesprecher wurde zuletzt am Flughafen gesehen.",
+        "effects": [{ "tone": "loss", "label": "KLS −15,5 %" }],
+        "headline": "Katastrophe bei KlarSoft AG"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Glanz & Gloria geht bald nach oben. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
-        "effects": [{ "tone": "neutral", "label": "LUX ↑ Tipp" }],
-        "headline": "Der heiße Draht: Glanz & Gloria"
+        "text": "Ein Vögelchen hat mir gezwitschert: Glanz & Gloria dürfte in der kommenden Stunde nach unten gehen. Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.",
+        "effects": [{ "tone": "neutral", "label": "LUX ↓ Tipp" }],
+        "headline": "Vom Flurfunk: Glanz & Gloria"
       }
     ],
-    "started_at": "2026-11-15T21:17:24.025092+00:00"
+    "started_at": "2026-11-15T21:52:23.039124+00:00"
   },
-  "viewers": 17,
+  "viewers": 18,
   "audience": [
     { "me": true, "friend": false, "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] },
     { "me": false, "friend": false, "nickname": "Bat_Anna", "avatar_key": "rookie", "accessories": ["laurel_wreath"] },

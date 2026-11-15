@@ -3,12 +3,18 @@
  * server keeps (public.battle_input). Pure: no clock, no randomness; everything comes from the seed and the inputs.
  */
 import { BATTLE_RULES, type TickKind } from "../../../config/battles.ts";
+import { bearClone, bearInit, bearRanking, bearStep, type BearState } from "./bear.ts";
 import { bullsClone, bullsInit, bullsRanking, bullsStep, type BullsState } from "./bulls.ts";
 import { coinsClone, coinsInit, coinsRanking, coinsStep, type CoinsState } from "./coins.ts";
 import type { SimParams } from "./core.ts";
+import { dashClone, dashInit, dashRanking, dashStep, type DashState } from "./dash.ts";
+import { elevatorClone, elevatorInit, elevatorRanking, elevatorStep, type ElevatorState } from "./elevator.ts";
 import { floorClone, floorInit, floorRanking, floorStep, type FloorState } from "./floor.ts";
+import { laserClone, laserInit, laserRanking, laserStep, type LaserState } from "./laser.ts";
+import { marginClone, marginInit, marginRanking, marginStep, type MarginState } from "./margin.ts";
 import { potatoClone, potatoInit, potatoRanking, potatoStep, type PotatoState } from "./potato.ts";
 import { pumpClone, pumpInit, pumpRanking, pumpStep, type PumpState } from "./pump.ts";
+import { rodeoClone, rodeoInit, rodeoRanking, rodeoStep, type RodeoState } from "./rodeo.ts";
 import { sumoClone, sumoInit, sumoRanking, sumoStep, type SumoState } from "./sumo.ts";
 
 export type { SimParams } from "./core.ts";
@@ -20,6 +26,12 @@ export interface StateOf {
   sumo: SumoState;
   potato: PotatoState;
   pump: PumpState;
+  bear: BearState;
+  dash: DashState;
+  margin: MarginState;
+  elevator: ElevatorState;
+  laser: LaserState;
+  rodeo: RodeoState;
 }
 export type AnyBattleState = StateOf[TickKind];
 
@@ -70,6 +82,36 @@ const GAMES: { [K in TickKind]: Game<StateOf[K], (typeof BATTLE_RULES.games)[K]>
     clone: pumpClone,
     ranking: pumpRanking,
     maxTicks: (p) => p.game.durationTicks,
+  },
+  bear: { init: bearInit, step: bearStep, clone: bearClone, ranking: bearRanking, maxTicks: (p) => p.game.maxTicks },
+  dash: { init: dashInit, step: dashStep, clone: dashClone, ranking: dashRanking, maxTicks: (p) => p.game.maxTicks },
+  margin: {
+    init: marginInit,
+    step: marginStep,
+    clone: marginClone,
+    ranking: marginRanking,
+    maxTicks: (p) => p.game.maxTicks,
+  },
+  elevator: {
+    init: elevatorInit,
+    step: elevatorStep,
+    clone: elevatorClone,
+    ranking: elevatorRanking,
+    maxTicks: (p) => p.game.maxTicks,
+  },
+  laser: {
+    init: laserInit,
+    step: laserStep,
+    clone: laserClone,
+    ranking: laserRanking,
+    maxTicks: (p) => p.game.maxTicks,
+  },
+  rodeo: {
+    init: rodeoInit,
+    step: rodeoStep,
+    clone: rodeoClone,
+    ranking: rodeoRanking,
+    maxTicks: (p) => p.game.maxTicks,
   },
 };
 

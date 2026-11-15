@@ -1,55 +1,10 @@
 {
-  "now": "2026-11-15T21:17:24.153379+00:00",
+  "now": "2026-11-15T21:52:23.158752+00:00",
   "battle": {
-    "id": 16,
+    "id": 26,
     "kind": null,
     "seed": null,
-    "prize": {
-      "kind": "nft",
-      "artwork": {
-        "id": "e2983ae3-c5cc-4c63-a76c-b4712ab346df",
-        "title": "Segel im Wind",
-        "pixels": {
-          "grid": [
-            "00000000000000000000000000000000",
-            "00000000000000000000000000000000",
-            "00000000000000000000000000000000",
-            "00000000000000000000000666000000",
-            "00000000000000000000006666600000",
-            "00000000000000000000066666660000",
-            "11111111111111111111166666661111",
-            "11111111111111111111166666661111",
-            "11111111111111111111116666611111",
-            "11111111111111755511111666111111",
-            "11111111111111755111111111111111",
-            "11111111111111751111111111111111",
-            "55222222222222725555522222222222",
-            "52222222222222755552222222222222",
-            "22222222222277777722222222222225",
-            "22222222225577777722222222222555",
-            "22222222555555222222222222255555",
-            "22222225555522222222222225555552",
-            "33333222223333333333333322222333",
-            "33322222333333333333332222233333",
-            "33222233333333333333222223333333",
-            "22222333333333333332222333333333",
-            "22233333333333333222223333333333",
-            "23333333333333322222333333333333",
-            "33333333333332222233333333333333",
-            "44444444444433334444444444444443",
-            "44444444443333444444444444444333",
-            "44444444333344444444444444433334",
-            "44444443334444444444444443333444",
-            "44444333344444444444444433344444",
-            "44433334444444444444443333444444",
-            "43333444444444444444333344444444"
-          ],
-          "palette": ["#d8f3ff", "#9ad8ff", "#4f8cff", "#2f5fd0", "#1d3a8a", "#ffffff", "#ffd15c", "#0f2050"]
-        },
-        "rarity": "rare",
-        "serial": 22
-      }
-    },
+    "prize": { "kind": "money", "cents": 525000 },
     "joined": true,
     "params": null,
     "result": null,
@@ -67,7 +22,7 @@
         "accessories": ["party_hat"]
       }
     ],
-    "opened_at": "2026-11-15T21:17:24.14547+00:00",
+    "opened_at": "2026-11-15T21:52:23.14979+00:00",
     "started_at": null,
     "finished_at": null,
     "max_players": 10,
@@ -75,9 +30,139 @@
     "prize_wins_left": 3,
     "countdown_ends_at": null
   },
-  "recent": null,
-  "viewers": 17,
+  "recent": {
+    "id": 25,
+    "kind": "auction",
+    "seed": 17,
+    "prize": { "xp": 2900, "kind": "xp" },
+    "joined": false,
+    "params": {
+      "h": 9,
+      "w": 11,
+      "tps": 20,
+      "game": { "budget": 1000, "rounds": 2, "answerMs": 10000, "revealMs": 3500 },
+      "spawns": [
+        [1, 1],
+        [9, 7],
+        [9, 1],
+        [1, 7],
+        [5, 1],
+        [5, 7],
+        [1, 4],
+        [9, 4],
+        [3, 4],
+        [7, 4]
+      ],
+      "tickMs": 50,
+      "graceMs": 1000,
+      "stepTicks": 4,
+      "aheadTicks": 10,
+      "checkEveryMs": 1000,
+      "disconnectTicks": 80
+    },
+    "result": {
+      "out": [-1, -1, -1],
+      "paid": true,
+      "prize": { "xp": 2900, "kind": "xp" },
+      "score": [400, 0, 0],
+      "capped": false,
+      "ranking": [0, 2, 1],
+      "end_tick": null,
+      "winner_slot": 0
+    },
+    "rounds": {
+      "out": [-1, -1, -1],
+      "done": true,
+      "list": [
+        {
+          "icon": "gold_bar",
+          "lost": [],
+          "mine": { "value": null, "choice": null, "pressed": false },
+          "unit": null,
+          "round": 0,
+          "value": null,
+          "budget": null,
+          "budgets": [0, 1000, 1000],
+          "correct": null,
+          "ends_at": "2026-11-15T21:52:04.221872+00:00",
+          "options": null,
+          "results": [
+            { "ms": 1, "slot": 0, "right": true, "value": 400, "points": 300 },
+            { "ms": 1005, "slot": 1, "right": false, "value": 400, "points": 0 }
+          ],
+          "decimals": null,
+          "opens_at": "2026-11-15T21:51:50.721872+00:00",
+          "question": "Goldbarren",
+          "closes_at": "2026-11-15T21:52:00.721872+00:00",
+          "item_points": 300
+        },
+        {
+          "icon": "duck",
+          "lost": [],
+          "mine": { "value": null, "choice": null, "pressed": false },
+          "unit": null,
+          "round": 1,
+          "value": null,
+          "budget": null,
+          "budgets": [0, 1000, 1000],
+          "correct": null,
+          "ends_at": "2026-11-15T21:52:17.721872+00:00",
+          "options": null,
+          "results": [
+            { "ms": 514, "slot": 0, "right": true, "value": 600, "points": 100 },
+            { "ms": 518, "slot": 1, "right": false, "value": 0, "points": 0 }
+          ],
+          "decimals": null,
+          "opens_at": "2026-11-15T21:52:04.221872+00:00",
+          "question": "Gummiente",
+          "closes_at": "2026-11-15T21:52:14.221872+00:00",
+          "item_points": 100
+        }
+      ],
+      "hearts": [1, 1, 1],
+      "points": [400, 0, 0]
+    },
+    "status": "finished",
+    "ends_at": "2026-11-15T21:54:50.721872+00:00",
+    "players": [
+      {
+        "me": false,
+        "left": false,
+        "rank": 1,
+        "slot": 0,
+        "nickname": "Bg_Anna",
+        "avatar_key": "rookie",
+        "accessories": []
+      },
+      {
+        "me": false,
+        "left": false,
+        "rank": 3,
+        "slot": 1,
+        "nickname": "Bg_Bruno",
+        "avatar_key": "rookie",
+        "accessories": []
+      },
+      {
+        "me": false,
+        "left": false,
+        "rank": 2,
+        "slot": 2,
+        "nickname": "Bg_Clara",
+        "avatar_key": "rookie",
+        "accessories": []
+      }
+    ],
+    "opened_at": "2026-11-15T21:52:18.721872+00:00",
+    "started_at": "2026-11-15T21:51:50.721872+00:00",
+    "finished_at": "2026-11-15T21:52:18.745077+00:00",
+    "max_players": 10,
+    "min_players": 3,
+    "prize_wins_left": 3,
+    "countdown_ends_at": null
+  },
+  "viewers": 18,
   "per_hour": 1000,
   "next_round_at": "2026-11-15T22:00:00+00:00",
-  "played_this_hour": 0
+  "played_this_hour": 5
 }
