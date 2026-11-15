@@ -3,17 +3,25 @@
 import { AnimatePresence, motion, useReducedMotionConfig } from "motion/react";
 import { useTranslations } from "next-intl";
 import { ToggleGroup } from "radix-ui";
-import { useRef, useState } from "react";
+import { useDeferredValue, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button, type ButtonState } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { burstConfetti } from "@/components/ui/effects";
+import { EmptyState } from "@/components/ui/empty-state";
 import { LockBadge } from "@/components/ui/lock-badge";
 import { PlayerFigure } from "@/components/ui/player-figure";
 import { PlazaGround } from "@/components/ui/plaza-ground";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/toast";
-import { ACCESSORIES, accessoryByKey, type AccessoryItem, type AccessorySlot } from "@/config/accessories";
+import {
+  ACCESSORIES,
+  ACCESSORY_RARITIES,
+  accessoryByKey,
+  type AccessoryItem,
+  type AccessoryRarity,
+} from "@/config/accessories";
 import { useGameErrorText } from "@/features/game/errors";
 import { engine, useGame, usePlayerLevel } from "@/features/game/store";
 import { formatMoney } from "@/lib/format";
@@ -21,15 +29,22 @@ import { haptic } from "@/lib/haptics";
 import { DURATION, EASE, SPRING } from "@/lib/motion";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
+import {
+  DEFAULT_WARDROBE_FILTER,
+  SHOP_SLOTS,
+  WARDROBE_SORTS,
+  filterAccessories,
+  groupBySet,
+  isFiltered,
+  type WardrobeFilter,
+  type WardrobeSort,
+} from "../filter";
 import { previewWorn, useSetWardrobe, useWardrobe } from "../hooks";
 import { RARITY_STYLE } from "./rarity";
 
-type Filter = "all" | AccessorySlot;
-/** Shop order of the slots: what people look at first. */
-const SHOP_SLOTS: readonly AccessorySlot[] = ["head", "face", "body", "hand", "pet", "back"];
 const slotOf = (key: string) => accessoryByKey(key)?.slot;
-const shopOrder = (a: AccessoryItem, b: AccessoryItem) =>
-  SHOP_SLOTS.indexOf(a.slot) - SHOP_SLOTS.indexOf(b.slot) || a.priceCents - b.priceCents;
+/** Rarities a purchase is celebrated louder for. */
+const BIG_RARITIES: readonly AccessoryRarity[] = ["epic", "legendary", "mythic"];
 
 /**
  * The wardrobe and accessory shop (ADR-155): the own figure large on a stage, every accessory to try on, buy,
@@ -44,16 +59,24 @@ export function WardrobeView() {
   const level = usePlayerLevel();
   const cash = useGame((state) => state.portfolio?.cashCents ?? 0);
   const avatarKey = useGame((state) => state.portfolio?.avatarKey ?? null);
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<WardrobeFilter>(DEFAULT_WARDROBE_FILTER);
+  const [bySets, setBySets] = useState(false);
+  const query = useDeferredValue(filter.query);
   const [preview, setPreview] = useState<string | null>(null);
   const [actions, setActions] = useState<Record<string, ButtonState>>({});
   const stage = useRef<HTMLDivElement>(null);
 
+  const owned = useMemo(() => wardrobe.data?.owned ?? [], [wardrobe.data]);
+  const items = useMemo(
+    () => filterAccessories(ACCESSORIES, { ...filter, query }, { owned, level, cashCents: cash }),
+    [filter, query, owned, level, cash],
+  );
+
   if (!wardrobe.data) return <WardrobeSkeleton />;
-  const { owned, worn } = wardrobe.data;
+  const { worn } = wardrobe.data;
   const shown = previewWorn(worn, preview, slotOf);
-  const items = ACCESSORIES.filter((a) => filter === "all" || a.slot === filter).toSorted(shopOrder);
   const figureKey = wardrobe.data.avatarKey || avatarKey;
+  const patch = (next: Partial<WardrobeFilter>) => setFilter((current) => ({ ...current, ...next }));
 
   const setAction = (key: string, state: ButtonState) => setActions((all) => ({ ...all, [key]: state }));
 
@@ -66,9 +89,10 @@ export function WardrobeView() {
       void useGame.getState().refreshPortfolio();
       setAction(item.key, "success");
       window.setTimeout(() => setAction(item.key, "idle"), 900);
-      void playSound(item.rarity === "legendary" || item.rarity === "epic" ? "levelUp" : "win");
+      void playSound(BIG_RARITIES.includes(item.rarity) ? "levelUp" : "win");
       haptic("success");
-      if (stage.current) burstConfetti(stage.current, item.rarity === "legendary" ? 48 : 28);
+      if (stage.current)
+        burstConfetti(stage.current, item.rarity === "mythic" ? 72 : item.rarity === "legendary" ? 48 : 28);
       toast.success(t("bought", { name: item.name }), t("boughtText"), { silent: true });
     } catch (error) {
       setAction(item.key, "idle");
@@ -89,6 +113,26 @@ export function WardrobeView() {
       toast.error(t("title"), errorText(error));
     }
   };
+
+  const renderItem = (item: AccessoryItem) => (
+    <ItemCard
+      key={item.key}
+      item={item}
+      avatarKey={figureKey}
+      owned={owned.includes(item.key)}
+      worn={worn.includes(item.key)}
+      trying={preview === item.key}
+      locked={level < item.minLevel}
+      affordable={cash >= item.priceCents}
+      state={actions[item.key] ?? "idle"}
+      onTry={() => {
+        setPreview((current) => (current === item.key ? null : item.key));
+        void playSound("tap");
+      }}
+      onBuy={() => void buy(item)}
+      onWear={(on) => void wear(item, on)}
+    />
+  );
 
   return (
     <div className="grid gap-5 *:min-w-0 lg:grid-cols-[340px_minmax(0,1fr)] lg:gap-6">
@@ -150,54 +194,208 @@ export function WardrobeView() {
       </div>
 
       <div className="space-y-4">
-        <ToggleGroup.Root
-          type="single"
-          value={filter}
-          onValueChange={(next) => {
-            if (!next) return;
-            setFilter(next as Filter);
-            void playSound("tap");
-          }}
-          aria-label={t("slotsLabel")}
-          className="flex flex-wrap gap-1.5"
-        >
-          {(["all", ...SHOP_SLOTS] as const).map((value) => (
-            <ToggleGroup.Item
-              key={value}
-              value={value}
-              className={cn(
-                "h-8 rounded-sm border-2 px-3 label-pixel focus-ring transition duration-fast ease-standard active:scale-95",
-                filter === value
-                  ? "border-accent bg-accent-soft text-accent"
-                  : "border-line-1 bg-surface-1 text-fg-2 hover:border-line-2 hover:text-fg-1",
-              )}
-            >
-              {value === "all" ? t("filterAll") : t(`slots.${value}`)}
-            </ToggleGroup.Item>
-          ))}
-        </ToggleGroup.Root>
+        <ShopFilters
+          filter={filter}
+          onChange={patch}
+          bySets={bySets}
+          onBySets={setBySets}
+          count={items.length}
+          onReset={() => setFilter(DEFAULT_WARDROBE_FILTER)}
+        />
 
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-4" data-testid="wardrobe-items">
-          {items.map((item) => (
-            <ItemCard
-              key={item.key}
-              item={item}
-              avatarKey={figureKey}
-              owned={owned.includes(item.key)}
-              worn={worn.includes(item.key)}
-              trying={preview === item.key}
-              locked={level < item.minLevel}
-              affordable={cash >= item.priceCents}
-              state={actions[item.key] ?? "idle"}
-              onTry={() => {
-                setPreview((current) => (current === item.key ? null : item.key));
-                void playSound("tap");
-              }}
-              onBuy={() => void buy(item)}
-              onWear={(on) => void wear(item, on)}
+        {items.length === 0 ? (
+          <Card padding="none">
+            <EmptyState
+              art={<PlayerFigure avatarKey={figureKey} accessories={["tinfoil_hat"]} scale={2} />}
+              title={t("emptyTitle")}
+              description={t("emptyText")}
+              action={
+                <Button size="sm" variant="secondary" onClick={() => setFilter(DEFAULT_WARDROBE_FILTER)}>
+                  {t("resetFilters")}
+                </Button>
+              }
             />
-          ))}
-        </ul>
+          </Card>
+        ) : bySets ? (
+          <div className="space-y-6" data-testid="wardrobe-sets">
+            {groupBySet(items).map((group) => {
+              const all = ACCESSORIES.filter((a) => a.set === (group.set ?? undefined));
+              return (
+                <section key={group.set ?? "none"} data-testid="wardrobe-set" data-set={group.set ?? "none"}>
+                  <div className="mb-2 flex items-baseline justify-between gap-3">
+                    <h2 className="font-pixel text-sm text-fg-1 uppercase">
+                      {group.set ? t(`sets.${group.set}`) : t("singles")}
+                    </h2>
+                    <span className="nums text-2xs text-fg-3">
+                      {t("setOwned", {
+                        owned: all.filter((a) => owned.includes(a.key)).length,
+                        total: all.length,
+                      })}
+                    </span>
+                  </div>
+                  <ItemGrid>{group.items.map(renderItem)}</ItemGrid>
+                </section>
+              );
+            })}
+          </div>
+        ) : (
+          <ItemGrid>{items.map(renderItem)}</ItemGrid>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ItemGrid({ children }: { children: ReactNode }) {
+  return (
+    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-4" data-testid="wardrobe-items">
+      {children}
+    </ul>
+  );
+}
+
+const chip = (active: boolean) =>
+  cn(
+    "h-8 shrink-0 rounded-sm border-2 px-3 label-pixel focus-ring transition duration-fast ease-standard active:scale-95",
+    active
+      ? "border-accent bg-accent-soft text-accent"
+      : "border-line-1 bg-surface-1 text-fg-2 hover:border-line-2 hover:text-fg-1",
+  );
+
+/** Search, slot and rarity chips, sorting and the two switches above the shop (ADR-155 addendum). */
+function ShopFilters({
+  filter,
+  onChange,
+  bySets,
+  onBySets,
+  count,
+  onReset,
+}: {
+  filter: WardrobeFilter;
+  onChange: (next: Partial<WardrobeFilter>) => void;
+  bySets: boolean;
+  onBySets: (on: boolean) => void;
+  count: number;
+  onReset: () => void;
+}) {
+  const t = useTranslations("wardrobe");
+  const id = useId();
+  return (
+    <div className="space-y-3" data-testid="wardrobe-filters">
+      <div className="relative">
+        <svg
+          viewBox="0 0 7 7"
+          width="14"
+          height="14"
+          shapeRendering="crispEdges"
+          aria-hidden
+          className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-3"
+        >
+          <path fill="currentColor" d="M1 0h3v1H1zM0 1h1v3H0zM4 1h1v3H4zM1 4h3v1H1zM4 4h1v1H4zM5 5h1v1H5zM6 6h1v1H6z" />
+        </svg>
+        <input
+          type="search"
+          value={filter.query}
+          onChange={(event) => onChange({ query: event.target.value })}
+          placeholder={t("searchPlaceholder")}
+          aria-label={t("searchLabel")}
+          data-testid="wardrobe-search"
+          className={cn(
+            "h-11 w-full rounded-md border-2 border-line-2 bg-surface-2 pr-3 pl-9 text-base text-fg-1 sunken placeholder:text-fg-3",
+            "transition-colors duration-fast ease-standard hover:border-fg-3",
+            "outline-2 outline-offset-0 outline-transparent focus:border-accent focus:outline-accent-soft",
+          )}
+        />
+      </div>
+
+      <ToggleGroup.Root
+        type="single"
+        value={filter.slot}
+        onValueChange={(next) => {
+          if (!next) return;
+          onChange({ slot: next as WardrobeFilter["slot"] });
+          void playSound("tap");
+        }}
+        aria-label={t("slotsLabel")}
+        className="flex flex-wrap gap-1.5"
+      >
+        {(["all", ...SHOP_SLOTS] as const).map((value) => (
+          <ToggleGroup.Item key={value} value={value} className={chip(filter.slot === value)}>
+            {value === "all" ? t("filterAll") : t(`slots.${value}`)}
+          </ToggleGroup.Item>
+        ))}
+      </ToggleGroup.Root>
+
+      <ToggleGroup.Root
+        type="single"
+        value={filter.rarity}
+        onValueChange={(next) => {
+          if (!next) return;
+          onChange({ rarity: next as WardrobeFilter["rarity"] });
+          void playSound("tap");
+        }}
+        aria-label={t("raritiesLabel")}
+        className="flex flex-wrap gap-1.5"
+        data-testid="wardrobe-rarities"
+      >
+        {(["all", ...ACCESSORY_RARITIES] as const).map((value) => (
+          <ToggleGroup.Item
+            key={value}
+            value={value}
+            className={cn(
+              chip(filter.rarity === value),
+              value !== "all" && filter.rarity !== value && RARITY_STYLE[value].text,
+            )}
+          >
+            {value === "all" ? t("filterAllRarities") : t(`rarities.${value}`)}
+          </ToggleGroup.Item>
+        ))}
+      </ToggleGroup.Root>
+
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <label className="flex items-center gap-2 text-xs text-fg-2">
+          {t("sortLabel")}
+          <select
+            value={filter.sort}
+            onChange={(event) => onChange({ sort: event.target.value as WardrobeSort })}
+            className="h-9 rounded-sm border-2 border-line-1 bg-surface-1 px-2 text-xs text-fg-1 focus-ring hover:border-line-2"
+            data-testid="wardrobe-sort"
+          >
+            {WARDROBE_SORTS.map((sort) => (
+              <option key={sort} value={sort}>
+                {t(`sort.${sort}`)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <span className="flex items-center gap-2">
+          <Switch
+            id={`${id}-affordable`}
+            checked={filter.affordableOnly}
+            onCheckedChange={(on) => onChange({ affordableOnly: on })}
+            label={t("affordableOnly")}
+          />
+          <label htmlFor={`${id}-affordable`} className="text-xs text-fg-2">
+            {t("affordableOnly")}
+          </label>
+        </span>
+        <span className="flex items-center gap-2">
+          <Switch id={`${id}-sets`} checked={bySets} onCheckedChange={onBySets} label={t("groupSets")} />
+          <label htmlFor={`${id}-sets`} className="text-xs text-fg-2">
+            {t("groupSets")}
+          </label>
+        </span>
+      </div>
+
+      <div className="flex min-h-8 items-center justify-between gap-3">
+        <p className="nums text-xs text-fg-3" aria-live="polite" data-testid="wardrobe-count">
+          {t("results", { count })}
+        </p>
+        {isFiltered(filter) && (
+          <Button size="sm" variant="ghost" onClick={onReset} data-testid="wardrobe-reset">
+            {t("resetFilters")}
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -316,7 +514,7 @@ function ItemCard({
                   <Button
                     block
                     size="sm"
-                    variant={item.rarity === "legendary" ? "gain" : "primary"}
+                    variant={item.rarity === "legendary" || item.rarity === "mythic" ? "gain" : "primary"}
                     state={state}
                     disabled={!affordable}
                     title={affordable ? undefined : t("tooExpensive")}

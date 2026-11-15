@@ -1,38 +1,38 @@
 {
   "applications": [
     {
-      "id": "924d5372-983c-45a6-9af5-e915ad82d67a",
+      "id": "c8a77b37-d516-4c43-9648-56f1fab39c19",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "0d0bb574-4a98-4056-8471-8e71ddb77436",
+        "id": "079fcbed-8780-4cb3-9b6c-419c7350f0ff",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
+          "id": "60dd5582-1f7b-b751-df95-287e43ff8e82",
           "logo": null,
-          "name": "QuantenSprung Labs",
-          "color": "#35D0BA",
+          "name": "Knusperkönig",
+          "color": "#FF9F1C",
           "is_ai": true,
-          "sector": "tech",
-          "ticker": "QSL"
+          "sector": "retail",
+          "ticker": "SNK"
         },
-        "required": [{ "branch": "it", "min_score": 0 }],
-        "title_key": "it_intern",
+        "required": [{ "branch": "finance", "min_score": 0 }],
+        "title_key": "finance_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-15T18:02:44.636165+00:00",
-      "updated_at": "2026-11-15T18:02:44.643591+00:00",
-      "offer_expires_at": "2026-11-17T18:02:44.636165+00:00",
-      "salary_wish_cents_per_hour": 15900,
-      "offer_salary_cents_per_hour": 15900
+      "created_at": "2026-11-15T18:19:58.93164+00:00",
+      "updated_at": "2026-11-15T18:19:58.934471+00:00",
+      "offer_expires_at": "2026-11-17T18:19:58.93164+00:00",
+      "salary_wish_cents_per_hour": 15000,
+      "offer_salary_cents_per_hour": 15000
     },
     {
-      "id": "fca5d1e6-e5aa-437d-9ad8-f58161c4bd81",
+      "id": "ddf0e5e5-57c6-4fde-bf4d-889f67d4105b",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "7c7a1538-1d27-44d0-9e75-7a5bcf389dbf",
+        "id": "8fc645d9-17a6-420f-a940-796863ff7a88",
         "tier": "junior",
         "title": null,
         "company": {
@@ -48,9 +48,9 @@
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-15T18:02:44.630826+00:00",
-      "updated_at": "2026-11-15T18:02:44.630826+00:00",
-      "offer_expires_at": "2026-11-17T18:02:44.630826+00:00",
+      "created_at": "2026-11-15T18:19:58.927289+00:00",
+      "updated_at": "2026-11-15T18:19:58.927289+00:00",
+      "offer_expires_at": "2026-11-17T18:19:58.927289+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

@@ -1,25 +1,34 @@
 {
   "logo": null,
   "name": "Kryptaler",
-  "pool": { "tokens_e6": 2381086714, "cash_cents": 9999436181 },
+  "pool": { "tokens_e6": 2616119460, "cash_cents": 9101084675 },
   "color": "#ff9a52",
   "stats": null,
-  "events": [],
+  "events": [
+    {
+      "at": "2026-11-15T18:19:45.147251+00:00",
+      "key": "fud",
+      "name": "Kryptaler",
+      "ticker": "KTL",
+      "payload": { "shock": -0.1851 },
+      "shock_bps": -1690
+    }
+  ],
   "status": "listed",
   "ticker": "KTL",
   "creator": null,
   "fee_bps": 10,
   "holders": 1,
   "category": "major",
-  "price_e4": 419952626,
-  "supply_e6": 2381098596,
-  "low_24h_e4": 416872961,
-  "pool_cents": 9999436181,
-  "high_24h_e4": 451089442,
-  "my_position": { "quantity_e6": 11882, "value_cents": 49899, "avg_price_e4": 420383774 },
-  "change_24h_bps": -242,
-  "my_quantity_e6": 11882,
+  "price_e4": 347884904,
+  "supply_e6": 2616133804,
+  "low_24h_e4": 347641689,
+  "pool_cents": 9101084675,
+  "high_24h_e4": 463758187,
+  "my_position": { "quantity_e6": 14344, "value_cents": 49901, "avg_price_e4": 348243168 },
+  "change_24h_bps": -2483,
+  "my_quantity_e6": 14344,
   "team_tokens_e6": null,
-  "market_cap_cents": 9999486082,
-  "volume_24h_cents": 11465945
+  "market_cap_cents": 9101134573,
+  "volume_24h_cents": 907336185
 }

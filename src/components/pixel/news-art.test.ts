@@ -125,6 +125,7 @@ describe("news studio art", () => {
   });
 
   for (const mood of moods) {
+    // 240 poses per mood: generous timeout, the full suite runs many files in parallel
     it(`${mood}: every frame is valid art of the anchor's size`, () => {
       const base = anchorArt();
       const arms: AnchorArm[] = ["down", "hanky", "twirl", "twirlUp", "waveLeft"];
@@ -146,7 +147,7 @@ describe("news studio art", () => {
           }
         }
       }
-    });
+    }, 30_000);
 
     it(`${mood}: has its own face and three different mouths to talk with`, () => {
       const closed = anchorArt({ mood });

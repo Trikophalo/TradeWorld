@@ -5,7 +5,7 @@
   "running": [],
   "incoming": [
     {
-      "id": "6bae75f1-dc66-49df-9517-8f79811ddb1f",
+      "id": "77fbb095-62ac-46fd-b7cf-376401e2af26",
       "kind": "loan",
       "terms": { "hours": 24, "interest_bps": 0, "principal_cents": 20000 },
       "status": "open",
@@ -15,20 +15,20 @@
       "my_role": "borrower",
       "progress": { "due_cents": 20000, "left_cents": 20000, "repaid_cents": 0 },
       "proposer": {
-        "tag": "HGGT",
+        "tag": "CRUA",
         "level": 6,
         "trust": { "band": "blank", "score": 50 },
         "nickname": "Fixture_Lieferant",
         "avatar_key": "rookie"
       },
       "closed_at": null,
-      "created_at": "2026-11-15T18:02:47.314848+00:00",
-      "expires_at": "2026-11-17T18:02:47.314848+00:00",
+      "created_at": "2026-11-15T18:20:01.429829+00:00",
+      "expires_at": "2026-11-17T18:20:01.429829+00:00",
       "accepted_at": null,
       "is_proposer": false,
       "broken_by_me": false,
       "counterparty": {
-        "tag": "NBGV",
+        "tag": "AAMN",
         "level": 6,
         "trust": { "band": "blank", "score": 50 },
         "nickname": "Fixture_Abnehmer",
@@ -39,7 +39,7 @@
       "supplier_company": null
     },
     {
-      "id": "b2fcb2b1-28e9-4bcc-b089-3acb0336c8bd",
+      "id": "11585f23-d8d2-434c-ae31-237eb76c26f5",
       "kind": "supply",
       "terms": { "hours": 24, "fee_bps": 5000, "prepay_bps": 2000, "volume_cents_per_hour": 30000 },
       "status": "open",
@@ -55,31 +55,31 @@
         "prepay_left_cents": 0
       },
       "proposer": {
-        "tag": "HGGT",
+        "tag": "CRUA",
         "level": 6,
         "trust": { "band": "blank", "score": 50 },
         "nickname": "Fixture_Lieferant",
         "avatar_key": "rookie"
       },
       "closed_at": null,
-      "created_at": "2026-11-15T18:02:47.304648+00:00",
-      "expires_at": "2026-11-17T18:02:47.304648+00:00",
+      "created_at": "2026-11-15T18:20:01.42135+00:00",
+      "expires_at": "2026-11-17T18:20:01.42135+00:00",
       "accepted_at": null,
       "is_proposer": false,
       "broken_by_me": false,
       "counterparty": {
-        "tag": "NBGV",
+        "tag": "AAMN",
         "level": 6,
         "trust": { "band": "blank", "score": 50 },
         "nickname": "Fixture_Abnehmer",
         "avatar_key": "rookie"
       },
-      "buyer_company": { "id": "fc09186a-f8c9-4c17-9fa4-0e27b65697a9", "name": "Fixture Abnahme" },
+      "buyer_company": { "id": "9b8e4ebc-95b8-4ee1-8d0d-3df60357580b", "name": "Fixture Abnahme" },
       "proposer_role": "supplier",
-      "supplier_company": { "id": "e785c09d-4aed-4cff-a4c8-f9a0cd66ce11", "name": "Fixture Lieferwerk" }
+      "supplier_company": { "id": "de51fd46-3b79-4b25-b98f-9d38c0983af5", "name": "Fixture Lieferwerk" }
     },
     {
-      "id": "6198ec96-9966-48a7-958c-3f61d0ffcc2d",
+      "id": "c702b26d-0079-407e-854d-98ce062d3c40",
       "kind": "loan",
       "terms": { "hours": 48, "interest_bps": 1000, "principal_cents": 100000 },
       "status": "open",
@@ -89,20 +89,20 @@
       "my_role": "borrower",
       "progress": { "due_cents": 110000, "left_cents": 110000, "repaid_cents": 0 },
       "proposer": {
-        "tag": "HGGT",
+        "tag": "CRUA",
         "level": 6,
         "trust": { "band": "blank", "score": 50 },
         "nickname": "Fixture_Lieferant",
         "avatar_key": "rookie"
       },
       "closed_at": null,
-      "created_at": "2026-11-15T18:02:47.297171+00:00",
-      "expires_at": "2026-11-17T18:02:47.297171+00:00",
+      "created_at": "2026-11-15T18:20:01.415774+00:00",
+      "expires_at": "2026-11-17T18:20:01.415774+00:00",
       "accepted_at": null,
       "is_proposer": false,
       "broken_by_me": false,
       "counterparty": {
-        "tag": "NBGV",
+        "tag": "AAMN",
         "level": 6,
         "trust": { "band": "blank", "score": 50 },
         "nickname": "Fixture_Abnehmer",

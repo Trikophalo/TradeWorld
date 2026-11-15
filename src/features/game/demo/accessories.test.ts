@@ -3,7 +3,7 @@ import { accessoryByKey } from "@/config/accessories";
 import { GameError } from "../types";
 import { createAccessoryEngine, sortWorn, type DemoWardrobe } from "./accessories";
 
-function setup(level = 5, cash = 1_000_000) {
+function setup(level = 5, cash = 10_000_000) {
   const state = { cash, level, wardrobe: undefined as DemoWardrobe | undefined, feed: [] as string[] };
   const requests = new Map<string, unknown>();
   const engine = createAccessoryEngine({
@@ -41,7 +41,7 @@ describe("accessories in the demo (ADR-155)", () => {
     const bought = await engine.buyAccessory("r1", "cowboy_hat");
     expect(bought).toEqual({ owned: ["cowboy_hat"], worn: ["cowboy_hat"], avatarKey: "rookie", paidCents: price });
     expect(await engine.buyAccessory("r1", "cowboy_hat")).toEqual(bought);
-    expect(state.cash).toBe(1_000_000 - price);
+    expect(state.cash).toBe(10_000_000 - price);
     expect(await key(engine.buyAccessory("r2", "cowboy_hat"))).toBe("accessory_owned");
     expect(await key(engine.buyAccessory("r3", "flux"))).toBe("accessory_unknown");
     expect(await key(engine.buyAccessory("r4", "crown"))).toBe("accessory_locked");
@@ -71,7 +71,7 @@ describe("accessories in the demo (ADR-155)", () => {
   });
 
   it("a legendary purchase is news for the friends", async () => {
-    const { engine, state } = setup(30, 1_000_000_000);
+    const { engine, state } = setup(30, 10_000_000_000);
     await engine.buyAccessory("l1", "crown");
     expect(state.feed).toEqual(["accessory_bought:crown"]);
   });

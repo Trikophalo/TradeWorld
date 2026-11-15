@@ -118,6 +118,15 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   auf eine Figur für das Profil. Unter dem Büro schreibst du „Sag was ins Büro …“: Deine Worte stehen zwei Minuten als
   Sprechblase über deiner Figur und landen im Firmenchat. Auch Organigramm und Teamliste zeigen die Figuren.
 
+- **Kleiderschrank: zweite Kollektion (ADR-155):** 74 neue Teile, jetzt 125 insgesamt, in zwölf Sets: Piraten mit
+  Augenklappe und Säbel, Raumfahrt mit Strahlenpistole und Mini-UFO, Ritterhelm und Rüstung, Zauberhut, Zauberbart und
+  Eule, E-Gitarre, Goldpokal, Weihnachtspulli und Kürbiskopf, Büro & Börse mit Geldkoffer und Bärenmarkt-Bär, dazu
+  Völlig Absurdes wie Klopapierkrone, Aluhut, Gartenzwergkostüm, Entchen-Schwimmring, Pümpel, Einkaufswagen voller
+  Klopapier, Haustierstein und Discokugel. Neu ist die Seltenheit **Mythisch**: Phönixflügel, Königsmantel, Zepter,
+  Diamantmonokel, Geldregenwolke und der Goldene Bulle für 150 bis 900 Mio. €. Alles ist deutlich teurer geworden
+  (Gewöhnliches ab 450 €, Legendäres bis 75 Mio. €). Damit man den Überblick behält: Suche, Filter nach Bereich und
+  Seltenheit, Sortieren nach Preis, „Nur bezahlbare“ und die Ansicht „Nach Sets“.
+
 - **Kleiderschrank und Freunde-Platz (ADR-155):** Deine Spielfigur steht jetzt in voller Größe da und lässt sich
   anziehen: 51 verrückte Accessoires vom Cowboyhut über Bananenkostüm, Haikostüm und Laseraugen bis zu Papagei,
   Jetpack und goldener Klobürste. Unter Profil → Kleiderschrank probierst du alles an und kaufst mit Spielgeld, von

@@ -1,8 +1,8 @@
 {
-  "now": "2026-11-15T18:02:48.703624+00:00",
+  "now": "2026-11-15T18:20:02.75608+00:00",
   "chat": [
     {
-      "at": "2026-11-15T18:02:48.700016+00:00",
+      "at": "2026-11-15T18:20:02.753235+00:00",
       "id": 206,
       "body": "Was für eine Sendung 💀📉",
       "mine": true,
@@ -10,75 +10,78 @@
     }
   ],
   "show": {
-    "id": 7,
+    "id": 6,
     "writer": "mini",
     "airs_at": "2026-11-15T18:00:00+00:00",
     "segments": [
       {
         "kind": "gossip",
-        "mood": "shocked",
-        "text": "Ich fasse es nicht, aber es stimmt. Stufe_Gross meldet: Level 30 erreicht. Ich bin fast stolz. Fast.",
+        "mood": "proud",
+        "text": "Ich fasse es nicht, aber es stimmt. Bea_Banner meldet: Banner Werk gegründet. Ich bin fast stolz. Fast.",
         "effects": [],
-        "headline": "Na so was: Stufe_Gross"
+        "headline": "Na so was: Bea_Banner"
       },
       {
         "kind": "hype",
         "mood": "laughing",
-        "text": "Unfassbar, aber wahr: Sven Handel ist der Renner. Ein Kind hat im Schulaufsatz darüber geschrieben, die Klasse war begeistert. „Regionale Lebensmittel“ geht weg wie warme Semmeln. Sven_Small soll vor Freude geweint haben.",
-        "effects": [{ "tone": "gain", "label": "Bekanntheit +20,6 %" }],
-        "headline": "Alle wollen Sven Handel"
+        "text": "Fiona Neu räumt ab. Ein Testmagazin urteilt: „Besser als erwartet, und wir hatten nichts erwartet.“ Fiona_Fabrik hängt sich das gerahmt ins Büro. Die Kundschaft rennt die Tür ein.",
+        "effects": [{ "tone": "gain", "label": "Bekanntheit +18,8 %" }],
+        "headline": "Ritterschlag für Fiona Neu"
       },
       {
         "kind": "nft",
-        "mood": "shocked",
-        "text": "Kunstmarkt, oder was man dafür hält: „Neon Nacht“ von Nina_Neon ging für 30.000 € an Ben_Bieter. Der Käufer nennt es eine Wertanlage, sein Bankberater nennt es einen Hilferuf.",
+        "mood": "laughing",
+        "text": "Kunstmarkt, oder was man dafür hält: „Neon Nacht“ von Nina_Neon ging für 30.000 € an Ben_Bieter. Ich habe mir das Werk angesehen. Ich habe Fragen. Viele.",
         "effects": [],
         "headline": "30.000 € für ein paar Pixel"
       },
       {
         "kind": "winner",
         "mood": "proud",
-        "text": "11389,3 % Plus, 1.138.928 € Gewinn: Fixture_Neu zeigt dem Rest, wie es geht. Der Rest schaut zu und heult leise ins Depot.",
+        "text": "11389,1 % Plus, 1.138.912 € Gewinn: Fixture_Neu zeigt dem Rest, wie es geht. Man munkelt von einem Pakt mit dem Teufel, der Teufel dementiert.",
         "effects": [],
         "headline": "Fixture_Neu schwimmt im Geld"
       },
       {
         "kind": "gossip",
         "mood": "shocked",
-        "text": "Bitte festhalten: Level 5 erreicht, und zwar bei Fritz_Gegenwind. Auch ein blindes Huhn findet mal ein Korn, aber immerhin.",
+        "text": "Ich fasse es nicht, aber es stimmt. Float_Frida meldet: Knappwerk gegründet. Glückwunsch, und jetzt bloß nichts anfassen.",
         "effects": [],
-        "headline": "Applaus für Fritz_Gegenwind"
+        "headline": "Na so was: Float_Frida"
       },
       {
         "kind": "scandal",
-        "mood": "shocked",
-        "text": "Stunden Werk wollte heute groß rauskommen. Auf dem Firmenparkplatz wurde ein illegales Bobbycar-Rennen ausgehoben. Hanna_Stunde erklärte, das gehöre zum Konzept. Die Kundschaft erklärte, sie sei dann mal weg.",
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −22,7 %" }],
-        "headline": "Stunden Werk blamiert sich bis auf die Knochen"
+        "mood": "angry",
+        "text": "Peinlich für Pop_Gero: Ein Werbespot wurde versehentlich mit dem Ton einer Karaoke-Nacht veröffentlicht. „Wanderkarten“ klang auf dem Papier besser. Das Image von Talwerk ist im Eimer.",
+        "effects": [
+          { "tone": "loss", "label": "Bekanntheit −11,8 %" },
+          { "tone": "loss", "label": "TAL −19 %" }
+        ],
+        "headline": "Kunden fliehen vor Talwerk"
       },
       {
-        "kind": "sector",
-        "mood": "crying",
-        "text": "Die Branche Tech/Software sackt um 7,1 % ab. Jemand hat laut gefragt, wofür man das eigentlich braucht. Bis das geklärt ist, verkaufen erst mal alle.",
-        "effects": [{ "tone": "loss", "label": "Tech/Software −7,1 %" }],
-        "headline": "Tech/Software im freien Fall"
+        "kind": "tasks",
+        "mood": "angry",
+        "text": "Ein Fernsehkoch hat erklärt, man könne Geld auch behalten. Offene Aufgaben bringen 27,8 % weniger. Durchhalten, es wird auch wieder schlechter.",
+        "effects": [{ "tone": "loss", "label": "Aufgaben −27,8 %" }],
+        "headline": "Flaute bei den Aufträgen"
       },
       {
         "kind": "stock",
-        "mood": "proud",
-        "text": "Orbitfracht legt 17 % zu. Die Mitarbeiter haben einen Tag lang wirklich gearbeitet, nur so zum Spaß. Analysten sind fassungslos.",
-        "effects": [{ "tone": "gain", "label": "OFR +17 %" }],
-        "headline": "Orbitfracht schießt nach oben"
+        "mood": "crying",
+        "text": "Schlechte Nachrichten von Sonnenkern Fusion: Im Werk wurde drei Wochen lang das falsche Produkt gebaut, niemandem fiel es auf. Minus 15,8 %, und der Tag ist noch jung.",
+        "effects": [{ "tone": "loss", "label": "FSN −15,8 %" }],
+        "headline": "Sonnenkern Fusion im Sinkflug"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Kaufrausch Märkte geht bald nach oben. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
-        "effects": [{ "tone": "neutral", "label": "KFR ↑ Tipp" }],
-        "headline": "Der heiße Draht: Kaufrausch Märkte"
+        "text": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Glanz & Gloria tut sich in der nächsten Stunde etwas, und zwar nach oben. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
+        "effects": [{ "tone": "neutral", "label": "LUX ↑ Tipp" }],
+        "headline": "Mr. Doodle Dangles Geheimtipp"
       }
     ],
-    "started_at": "2026-11-15T18:02:48.703624+00:00"
+    "started_at": "2026-11-15T18:20:02.75608+00:00"
   },
   "viewers": 5,
   "upcoming": null,

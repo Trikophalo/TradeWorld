@@ -20,12 +20,12 @@ select tests.fund(:a, 20000000, 'test:9m:a');
 -- A. The catalogue comes from game_config (src/config/accessories.ts)
 -- =============================================================================
 select tests.assert(
-  jsonb_array_length(public.accessories_cfg() -> 'items') >= 40
+  jsonb_array_length(public.accessories_cfg() -> 'items') >= 120
   and public.accessory_item('cowboy_hat') ->> 'slot' = 'head'
-  and (public.accessory_item('cowboy_hat') ->> 'priceCents')::bigint = 650000
+  and (public.accessory_item('cowboy_hat') ->> 'priceCents')::bigint = 3250000
   and public.accessory_item('nope') is null
   and public.accessories_cfg() -> 'slots' = '["back", "body", "face", "head", "hand", "pet"]'::jsonb,
-  'accessories_cfg(): at least 40 items with slot and price, six slots back to front');
+  'accessories_cfg(): at least 120 items with slot and price, six slots back to front');
 
 -- =============================================================================
 -- B. Buying: paid to the households, worn at once, idempotent; errors
@@ -48,13 +48,13 @@ reset role;
 select tests.assert(
   :'s0'::jsonb = jsonb_build_object('owned', '[]'::jsonb, 'worn', '[]'::jsonb, 'avatar_key', (select avatar_key from public.profiles where id = :a))
   and :'s1'::jsonb -> 'owned' = '["cowboy_hat"]'::jsonb and :'s1'::jsonb -> 'worn' = '["cowboy_hat"]'::jsonb
-  and (:'s1'::jsonb ->> 'paid_cents')::bigint = 650000
+  and (:'s1'::jsonb ->> 'paid_cents')::bigint = 3250000
   and :'s1b'::jsonb = :'s1'::jsonb
-  and tests.cash(:a) = :cash0::bigint - 650000
-  and tests.households() = :hh0::bigint + 650000
+  and tests.cash(:a) = :cash0::bigint - 3250000
+  and tests.households() = :hh0::bigint + 3250000
   and (select count(*) from public.ledger_transactions where idempotency_key = 'accessory:' || :a || ':' || :rq) = 1
   and (select count(*) from public.player_accessories where player_id = :a) = 1,
-  'buy_accessory(): 6.500 € to the households, owned and worn at once, the same request id replays');
+  'buy_accessory(): 32.500 € to the households, owned and worn at once, the same request id replays');
 select tests.assert(tests.money_invariant() = 'ok', 'ledger invariant holds after accessory purchases');
 
 -- not enough money: a player with the starting capital cannot buy a jetpack
@@ -108,7 +108,7 @@ select tests.assert(
   'get_player_card() and friends_json() carry the worn accessories, the friend''s portrait, online and last_active_at');
 
 select tests.set_level(:a, 16);
-select tests.fund(:a, 80000000, 'test:9m:a2');
+select tests.fund(:a, 800000000, 'test:9m:a2');
 select tests.login_as('authenticated', :a);
 select public.buy_accessory(gen_random_uuid(), 'halo') is not null as ok \gset
 reset role;
@@ -118,6 +118,22 @@ select tests.assert(
   and public.feed_item_label('accessory_bought', '{"name": "Heiligenschein"}') = 'Heiligenschein gekauft'
   and tests.money_invariant() = 'ok',
   'a legendary accessory is news for the friends (feed accessory_bought), common ones are not');
+
+-- the mythic showpieces (ADR-155 addendum) cost hundreds of millions and are news too
+select tests.set_level(:a, 45);
+select tests.fund(:a, 15000000000, 'test:9m:a3');
+select tests.cash(:a) as cash_m \gset
+select tests.login_as('authenticated', :a);
+select public.buy_accessory(gen_random_uuid(), 'phoenix_wings') as sm \gset
+reset role;
+select tests.assert(
+  public.accessory_item('phoenix_wings') ->> 'rarity' = 'mythic'
+  and (:'sm'::jsonb ->> 'paid_cents')::bigint = 15000000000
+  and tests.cash(:a) = :cash_m::bigint - 15000000000
+  and (select count(*) from public.feed_items where actor_id = :a and kind = 'accessory_bought'
+         and payload ->> 'key' = 'phoenix_wings' and payload ->> 'rarity' = 'mythic') = 1
+  and tests.money_invariant() = 'ok',
+  'a mythic accessory (150 Mio. €) is paid in full and is news for the friends');
 
 -- =============================================================================
 -- E. Poking: only friends, a pause per friend, a daily cap, the notification arrives

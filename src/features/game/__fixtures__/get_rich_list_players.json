@@ -1,10 +1,10 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 100, "gap_cents": 602 }, "rank": 101, "net_worth_cents": 1019398 },
+  "me": { "next": { "name": "Vera", "rank": 101, "gap_cents": 623 }, "rank": 102, "net_worth_cents": 1019377 },
   "total": 229,
   "entries": [
     {
       "id": "0f3f3f3f-0000-4000-8000-0000000000f1",
-      "tag": "2ED7",
+      "tag": "9ZL7",
       "kind": "player",
       "name": "Fenja_Firma",
       "rank": 1,
@@ -12,15 +12,28 @@
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 127176499,
+      "net_worth_cents": 127596499,
+      "rank_change_24h": null
+    },
+    {
+      "id": "09e19e19-0000-4000-8000-0000000000f2",
+      "tag": "5LER",
+      "kind": "player",
+      "name": "Pop_Gero",
+      "rank": 2,
+      "is_me": false,
+      "avatar_key": "rookie",
+      "description": null,
+      "change_24h_bps": null,
+      "net_worth_cents": 114229000,
       "rank_change_24h": null
     },
     {
       "id": "09c19c19-0000-4000-8000-0000000000f1",
-      "tag": "98JW",
+      "tag": "QSQS",
       "kind": "player",
       "name": "Float_Frida",
-      "rank": 2,
+      "rank": 3,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
@@ -29,21 +42,8 @@
       "rank_change_24h": null
     },
     {
-      "id": "09e19e19-0000-4000-8000-0000000000f1",
-      "tag": "M3DC",
-      "kind": "player",
-      "name": "Pop_Frida",
-      "rank": 3,
-      "is_me": false,
-      "avatar_key": "rookie",
-      "description": null,
-      "change_24h_bps": null,
-      "net_worth_cents": 110688000,
-      "rank_change_24h": null
-    },
-    {
       "id": "09a19a19-0000-4000-8000-0000000000f1",
-      "tag": "MMND",
+      "tag": "SGCF",
       "kind": "player",
       "name": "Esc_Frida",
       "rank": 4,
@@ -51,22 +51,22 @@
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 107400000,
+      "net_worth_cents": 107664000,
       "rank_change_24h": null
     },
     {
-      "id": "09e19e19-0000-4000-8000-0000000000f2",
-      "tag": "YGZY",
+      "id": "09c19c19-0000-4000-8000-0000000000b1",
+      "tag": "E7NS",
       "kind": "player",
-      "name": "Pop_Gero",
+      "name": "Float_Berta",
       "rank": 5,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 93992000,
+      "net_worth_cents": 90996900,
       "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-15T18:02:44.451722+00:00"
+  "server_time": "2026-11-15T18:19:58.790543+00:00"
 }
