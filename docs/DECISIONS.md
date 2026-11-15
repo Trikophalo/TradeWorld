@@ -2670,6 +2670,45 @@ steuern ihre angezogene Pixelfigur (ADR-155) mit WASD, Pfeiltasten oder einem Jo
 - **Demo:** Erfundene Gegner treten bei, spielen mit einfachen Bots (Schatten meiden, Münzen jagen, rempeln) und
   beantworten Quizfragen; der Demo-Modus kann jedes Spiel gezielt starten.
 
+**Nachtrag: zehn weitere Spiele (19 insgesamt).** Gleiches Fairness-Modell wie oben: Aktionsspiele als Ganzzahl-
+Simulation im Lockstep mit SQL-Spiegel (`20261204004900_battle_sims_more.sql`, Testvektoren TS/SQL), Rundenspiele mit
+geheimen Lösungen in `battles.plan` und Serverzeit (`20261204004910_more_battle_games.sql`). Jedes Spiel steht in
+`battles.weights` (Auswahl wie bisher gewichtet, nie zweimal hintereinander), dauert 30 bis 90 s und hat einen Sieger.
+
+- **Bärenjagd** (`bear`): Bären kommen nacheinander aus der Höhle in der Mitte und laufen auf den nächsten Spieler zu
+  (die größere Entfernung zuerst, um Säulen und andere Bären herum; Gleichstand per Los aus dem `seed`). Wer erwischt
+  wird oder mit dem Bären die Kachel tauscht, ist raus; der Bär frisst danach kurz. Bären werden schneller.
+- **Dividenden-Dash** (`dash`): Münzen erscheinen auf freien Kacheln (Ort aus dem `seed`), wer zuerst draufsteht,
+  kassiert; jede fünfte zählt doppelt. Mit Aktion in jemanden laufen ist ein Tackle (kurz betäubt, Abklingzeit). Wer
+  zuerst 15 hat, gewinnt, sonst die meisten. Wollen mehrere dieselbe freie Kachel, bekommt sie der mit weniger
+  Dividenden, dann das Los (`walkContested`): Ohne diese Regel blockieren sich vier Spieler um eine Münze für immer.
+- **Margin Call** (`margin`): Grüne Felder leuchten auf freien Kacheln auf, dann kommt der Gong; wer nicht darauf
+  steht, ist raus. Drei Aufwärmrunden mit Reservefeldern, danach eins weniger als Spieler, die Zeit bis zum Gong
+  schrumpft. Schafft es niemand, fliegt niemand. Umkämpfte Kachel: Los. Gleichstand: wer näher dran war.
+- **Fahrstuhl zum Mond** (`elevator`): Der Bildschirm klettert immer schneller einen Chart hinauf; jede dritte Reihe
+  ist ein Kerzenbalken mit Lücken (weiter oben weniger). Wer unten aus dem Bild fällt, ist raus; danach zählt die
+  Höhe.
+- **Laserschranke** (`laser`): Strahlen fegen nach einer Warnung über Reihen und Spalten, manche mit Lücke.
+  Ausweichen geht nicht, nur springen: ein neuer Druck auf Aktion, dann eine kurze Pause (Gedrückthalten springt
+  nicht erneut). Drei Herzen.
+- **Bullen-Rodeo** (`rodeo`): Der Bulle bockt für alle gleich in eine Richtung (aus dem `seed`); zählt nur ein
+  neuer Druck im Fenster. Richtig gibt die restlichen Takte als Punkte, falsch oder zu spät kostet Halt, außer alle
+  lagen daneben. Die Fenster schrumpfen.
+- **Tresorknacker** (`vault`): Code aus drei verschiedenen Ziffern 1 bis 6, nur der Server kennt ihn. Jeder Versuch
+  geht über `battle_answer` (`p_choice` = die Ziffern) in `battle_guesses`, die Antwort (an der richtigen Stelle /
+  woanders) rechnet der Server. Höchstens 8 Versuche, nach dem Knacken keine mehr; Punkte nach Zeit und Versuchen.
+- **Ticker-Tippen** (`ticker`): Firmenname, sechs Tickersymbole auf dem Laufband (gelistete Aktien, sonst
+  `battles.tickers`); die erste Antwort zählt, falsch kostet Punkte.
+- **Mehr oder Weniger** (`higher`): Chart mit Trends (eine Bewegung hält mit `trendPct` %), der Client sieht ihn nur
+  bis zur aktuellen Kerze; höher oder tiefer, falsch kostet ein Herz (nicht wenn alle falsch liegen).
+- **Wer bietet mehr?** (`auction`): Jeder hat 1.000 Taler Spielgeld; geheime Gebote, höchstens das Restgeld (prüft
+  der Server). Das höchste Gebot (bei Gleichstand das frühere) bekommt die Punkte des Loses und zahlt; die meisten
+  Punkte gewinnen, dann das meiste Restgeld. Gebote erst nach dem Zuschlag sichtbar.
+- **Umsetzung:** Bestehende Funktionen werden per `replace` ergänzt (`battle_plan`, `battle_round_ms`,
+  `battle_rounds_eval`, `battle_rounds_json`, `battle_answer`, `battle_is_tick`), damit parallele Änderungen daran
+  erhalten bleiben; neu sind `battle_plan_more`, `battle_rounds_eval_more`, `battle_round_extra`,
+  `battle_answer_more`. Werte in `battles.games.*`, Bots der Demo spielen alle zehn mit Können-Streuung.
+
 ## ADR-161: Wohnbonus, Möbelpreise nach Zuhause, Einrichtung im Wert, freie Mietpreise — `Annahme`
 
 Wunsch: Wer wohnt, bekommt Bonus-XP und Bonus-Geld, mehr in größeren Wohnungen; die Einrichtung wird teurer, je größer
