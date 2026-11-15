@@ -10,7 +10,7 @@ export interface PatchNoteEntry {
   id: string;
   /** The bold lead-in ("**Krypto:** …") without the colon, or null for entries without one. */
   title: string | null;
-  /** Plain text; `**bold**` is kept for the renderer, backticks and ADR references are removed. */
+  /** The first sentence, at most SUMMARY_MAX characters; `**bold**` kept, backticks and ADR references removed. */
   text: string;
 }
 
@@ -62,10 +62,39 @@ export function hashText(text: string): string {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
-function toEntry(raw: string): Omit<PatchNoteEntry, "id"> {
+/** Patch notes stay short: at most this many characters per entry. */
+export const SUMMARY_MAX = 150;
+const ABBREVIATIONS =
+  /(?:(?:^|[\s(])[a-zA-Z]|z\.\s?B|d\.\s?h|u\.\s?a|bzw|ca|etc|evtl|ggf|inkl|max|min|Mio|Mrd|Nr|usw|vgl|Std|Min|Dr|Mr)\.$/;
+
+/**
+ * The gist of an entry: its first sentence (abbreviations like "z. B." do not end one), cut at a word boundary with
+ * "…" when it is still longer than `max`.
+ */
+export function summarize(text: string, max = SUMMARY_MAX): string {
+  let end = -1;
+  const sentence = /[.!?](?=\s+["„(]?[A-ZÄÖÜ0-9])/g;
+  for (let m = sentence.exec(text); m; m = sentence.exec(text)) {
+    if (!ABBREVIATIONS.test(text.slice(Math.max(0, m.index - 6), m.index + 1))) {
+      end = m.index + 1;
+      break;
+    }
+  }
+  const first = end > 0 ? text.slice(0, end) : text;
+  if (first.length <= max) return first;
+  const cut = first.slice(0, max - 1);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > max / 2 ? cut.slice(0, space) : cut).replace(/[\s,;:–-]+$/, "")}…`;
+}
+
+function toEntry(raw: string): Omit<PatchNoteEntry, "id"> & { full: string } {
   const lead = LEAD_IN.exec(raw);
-  if (!lead) return { title: null, text: cleanInline(raw) };
-  return { title: cleanInline(lead[1] ?? ""), text: cleanInline(raw.slice(lead[0].length)) };
+  if (!lead) {
+    const full = cleanInline(raw);
+    return { title: null, text: summarize(full), full };
+  }
+  const full = cleanInline(raw.slice(lead[0].length));
+  return { title: cleanInline(lead[1] ?? ""), text: summarize(full), full };
 }
 
 /**
@@ -123,14 +152,16 @@ export function parseChangelog(markdown: string): PatchNoteRelease[] {
     const entries = release.bullets
       .map(toEntry)
       .reverse()
-      .map((entry) => {
-        const base = `${id}-${hashText(`${entry.title ?? ""}\n${entry.text}`)}`;
+      .map(({ full, ...entry }) => {
+        // the id follows the full text, so shortening the notes does not mark old entries as new
+        const base = `${id}-${hashText(`${entry.title ?? ""}\n${full}`)}`;
         let entryId = base;
         for (let n = 2; used.has(entryId); n++) entryId = `${base}-${n}`;
         used.add(entryId);
         return { id: entryId, ...entry };
       });
-    return { id, title: release.title, date: release.date, notes: release.notes, entries };
+    // compact: the release's prose paragraphs stay in the changelog, the notes show the entries only
+    return { id, title: release.title, date: release.date, notes: [], entries };
   });
 }
 

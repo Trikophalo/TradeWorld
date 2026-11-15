@@ -11,47 +11,47 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
       {
         id: "startseite-waehrung-zur-wahl-freundescode-c3618f85",
         title: "Patchnotes",
-        text: "Die Zeitung oben in der Leiste zeigt alle Änderungen, das Neueste zuerst und nach Versionen geordnet. Ein blauer Punkt verrät, dass seit deinem letzten Blick etwas dazugekommen ist.",
+        text: "Die Zeitung oben in der Leiste zeigt alle Änderungen, das Neueste zuerst und nach Versionen geordnet.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-01c2e510",
         title: "NFTs statt Artworks",
-        text: "Wer ein NFT prägt, bekommt bei jedem Weiterverkauf 10 %, auch wenn es ihm nicht mehr gehört. Festpreis zum Sofortkaufen, ein Chat mit Preisangeboten unter jedem NFT, KI-Sammler kaufen nur zu fairen Preisen, machen Lowball-Angebote und verkaufen weiter. Neue Rangliste „Top-Macher“, Sortierungen „Neu geprägt“ und „Heiß begehrt“, neun neue Missionen. Jedes weitere NFT kostet nur noch das 1,5-Fache.",
+        text: "Wer ein NFT prägt, bekommt bei jedem Weiterverkauf 10 %, auch wenn es ihm nicht mehr gehört.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-4f102c27",
         title: "Handy",
-        text: "Finn merkt sich seine Touren jetzt auf dem Server, ein privates Fenster oder ein zweites Gerät startet sie nicht mehr neu. Die NFT-Details öffnen am Handy als Sheet von unten, der Angebots-Chat ist erreichbar.",
+        text: "Finn merkt sich seine Touren jetzt auf dem Server, ein privates Fenster oder ein zweites Gerät startet sie nicht mehr neu.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-8234bd3b",
         title: "Mira, deine Firmen-Assistentin",
-        text: "Die Firma läuft jetzt über einen Chat. Mira meldet neue Aufgaben, Krisen und freie Geschäftszüge, sagt, wer gerade Zeit hat, und warnt, wenn die KI zu langsam ist. Schreib ihr einfach „Gib das Packen an Anna“ oder „Das mache ich selbst“; bei freiem Text denkt Claude mit und schlägt Schritte vor. Eigene Strategien für Krisen und eigene Geschäftszüge schreibst du direkt in den Chat. Die Übersicht der Firma ist in sieben Bereiche zum Aufklappen sortiert.",
+        text: "Die Firma läuft jetzt über einen Chat.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-bfb40c71",
         title: "Mira kann jetzt richtig was",
-        text: "Schreib ihr frei, was die Firma tun soll („Wir machen eine Rabattaktion für Stammkunden“). Sie schätzt die Chance, warnt bei Schönfärberei und setzt es um. Davon geht **ein Auftrag pro Stunde**. „Verteil alle Aufgaben“ verteilt alles auf einmal, „Wie läuft die Firma?“ zeigt die Zahlen. Mira meldet von selbst, wie Aufgaben und Aufträge ausgegangen sind, und warnt, bevor eine Aufgabe verfällt.",
+        text: "Schreib ihr frei, was die Firma tun soll („Wir machen eine Rabattaktion für Stammkunden“).",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-69b5c056",
         title: "Firmen-Minispiele mit Logik",
-        text: "Jede Sortier-Aufgabe nennt jetzt ihre Regel, nichts muss mehr geraten werden. Beim Ordnen sind die Werte realistisch (Schichten zwischen 6 und 22 Uhr statt „73 Uhr“).",
+        text: "Jede Sortier-Aufgabe nennt jetzt ihre Regel, nichts muss mehr geraten werden.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-6ac12a77",
         title: "Lebendiger NFT-Markt",
-        text: "Die KI-Sammler handeln jetzt auch untereinander und bieten danach wieder an, so bewegen sich die Preise ständig. Beliebte NFTs mit vielen Likes, Angeboten und Verkäufen sind gefragter, und die Sammler zahlen dafür mehr. Mira heißt jetzt „Assistentin“ statt „KI“.",
+        text: "Die KI-Sammler handeln jetzt auch untereinander und bieten danach wieder an, so bewegen sich die Preise ständig.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-67828e31",
         title: "Minispiele zum Anfassen",
-        text: "Vier neue Firmenaufgaben-Spiele wie bei einem Captcha: Teile in ihre Lücke schieben, Räder drehen, bis der Pfeil auf die Markierung zeigt, Karten in die richtige Box ziehen und den kürzesten Weg um Hindernisse ziehen. Dazu 25 neue Aufgaben, mindestens eine für jedes Produkt. Beim Sortieren ziehst du die Karte jetzt auf den Stapel, beim Rechnen helfen Knöpfe von −100 bis +100. Alles bleibt durch Hinsehen und Nachdenken lösbar, Tippen geht weiterhin.",
+        text: "Vier neue Firmenaufgaben-Spiele wie bei einem Captcha: Teile in ihre Lücke schieben, Räder drehen, bis der Pfeil auf die Markierung zeigt, Karten in…",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-c3ff6b27",
         title: "Mehr XP für Missionen",
-        text: "Je höher dein Level, desto mehr XP bringen Missionen (Level 10 etwa das 2,3-Fache, Level 30 das 5-Fache). Neuer Meilenstein für alle: Arbeite einmal bei der Firma eines echten Spielers und bekomme 2500 XP.",
+        text: "Je höher dein Level, desto mehr XP bringen Missionen (Level 10 etwa das 2,3-Fache, Level 30 das 5-Fache).",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-028da4d8",
@@ -66,22 +66,22 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
       {
         id: "startseite-waehrung-zur-wahl-freundescode-d8f0be3a",
         title: "Gelöste Aufgaben lohnen sich langfristig",
-        text: "Jede erledigte Firmen-Aufgabe gibt deiner Firma „Schwung“ – mehr Nachfrage und damit mehr Umsatz, Stunde um Stunde. Der Schwung lässt nach, wenn ihr Aufgaben liegen lasst, und wächst, je besser ihr spielt. So wird aus gutem Spiel immer mehr Gewinn.",
+        text: "Jede erledigte Firmen-Aufgabe gibt deiner Firma „Schwung“ – mehr Nachfrage und damit mehr Umsatz, Stunde um Stunde.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-1c5f2d21",
         title: "Börsengang: eine Stunde, mehr KI-Investoren",
-        text: "Die Zeichnung läuft jetzt bis zu einer Stunde. Deutlich mehr KI-Investoren steigen ein, und zwar gleich am Anfang. Sind alle Aktien gezeichnet, bist du sofort an der Börse.",
+        text: "Die Zeichnung läuft jetzt bis zu einer Stunde.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-686af2bc",
         title: "NEXA Nachrichten mit Mr. Doodle Dangle",
-        text: "Jede volle Stunde gibt es Live-Nachrichten im News-Tab: ein Fernseher mit Sprecher im Pixel-Art-Studio, daneben ein Live-Chat mit Emojis. Mr. Doodle Dangle nimmt den Verlierer des Tages auseinander, packt Skandale bei euren Firmen aus und meldet Kursstürze, und alles, was er sagt, passiert wirklich: Kurse, Bekanntheit und Aufgabenwerte ändern sich sofort. Die Sendung läuft nur, wenn jemand zuschaut, und keine Meldung wiederholt sich. Am Ende gibt es seinen Geheimtipp für die nächste Stunde.",
+        text: "Jede volle Stunde gibt es Live-Nachrichten im News-Tab: ein Fernseher mit Sprecher im Pixel-Art-Studio, daneben ein Live-Chat mit Emojis.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-fc921990",
         title: "Börsengang: voll oder Geld zurück",
-        text: "Das Geld der Zeichner wird jetzt verwahrt und kommt erst in die Firmenkasse, wenn die Firma an der Börse ist. Vorher kann der Gründer nichts davon auszahlen. Werden bis zum Ende nicht alle Aktien gezeichnet, platzt der Börsengang: Alle bekommen ihr Geld vollständig zurück, die Firma bleibt privat und kann es noch einmal versuchen. KI-Investoren zeichnen je nach Qualität 60 bis 100 %, den Rest müssen Mitspieler übernehmen. Wer gezeichnet hat, bekommt eine Benachrichtigung über den Ausgang.",
+        text: "Das Geld der Zeichner wird jetzt verwahrt und kommt erst in die Firmenkasse, wenn die Firma an der Börse ist.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-a8748525",
@@ -91,7 +91,7 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
       {
         id: "startseite-waehrung-zur-wahl-freundescode-584b69ca",
         title: "Firmenchat",
-        text: "Schreibt jemand in den Chat deiner Firma, bekommst du eine Benachrichtigung (eine, bis du sie gelesen hast; abschaltbar in den Einstellungen). Der Chat hat einen Zurück-Knopf zur Firmenseite, und die Escape-Taste führt ebenfalls zurück.",
+        text: "Schreibt jemand in den Chat deiner Firma, bekommst du eine Benachrichtigung (eine, bis du sie gelesen hast; abschaltbar in den Einstellungen).",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-8010ce21",
@@ -101,12 +101,12 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
       {
         id: "startseite-waehrung-zur-wahl-freundescode-4b14dbc6",
         title: "NEXA Nachrichten 2",
-        text: "Mr. Doodle Dangle hat jetzt Gesichter: Er erschrickt, heult, lacht sich kaputt, wird wütend oder grinst selbstgefällig, alles mit Geräuschen. Die Sendung beginnt mit einem eigenen Vorspann nur über ihn. Es geht viel mehr um euch: persönliche Meldungen über Spieler (Level, neuer Job, Rauswurf, geplatzter Börsengang, Rug Pull, tagelang verschollen, Erster oder Letzter der Reichenliste), gute Nachrichten mit vergiftetem Lob, schlechte gnadenlos, dafür mit Schmerzensgeld. Der teuerste NFT-Verkauf kommt in die Sendung. Zwischendurch schweift er komplett ab, etwa mit dem Gerücht, ein Promi habe in eine Aktie investiert, die dann wirklich steigt. Im Live-Chat schreiben erfundene Zuschauer mit, die ihn hassen oder vergöttern. Der Chat bleibt gleich groß und scrollt von selbst mit.",
+        text: "Mr. Doodle Dangle hat jetzt Gesichter: Er erschrickt, heult, lacht sich kaputt, wird wütend oder grinst selbstgefällig, alles mit Geräuschen.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-1d54f803",
         title: "Aktien haben einen Bestand",
-        text: "Von einer Aktie kann niemand mehr kaufen, als es gibt. Sind alle Aktien einer Firma bei Spielern, ist Schluss, bis jemand verkauft oder der Gründer mit einer Kapitalerhöhung neue Aktien ausgibt. Eine größere Order bekommt genau das, was noch frei ist.",
+        text: "Von einer Aktie kann niemand mehr kaufen, als es gibt.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-2bf9dd3f",
@@ -126,32 +126,32 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
       {
         id: "startseite-waehrung-zur-wahl-freundescode-b3b2ebc5",
         title: "Freunde online",
-        text: "Ein grüner Punkt zeigt, welcher Freund gerade spielt; online stehen sie oben in der Liste, und neben „Freunde“ in der Leiste steht, wie viele gerade da sind.",
+        text: "Ein grüner Punkt zeigt, welcher Freund gerade spielt; online stehen sie oben in der Liste, und neben „Freunde“ in der Leiste steht, wie viele gerade…",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-49f7a935",
         title: "Missionen sind immer machbar",
-        text: "Du bekommst keine Mission mehr, die du nicht schaffen kannst, etwa „Stelle eine KI-Kraft ein“ bei voller Firma oder „Deine erste KI-Kraft“, wenn du schon eine hast. Eine solche Mission ohne Fortschritt macht Platz für eine neue. Neu: einmalig **„Kauf dir ein Grundstück“ für 5.000 XP**.",
+        text: "Du bekommst keine Mission mehr, die du nicht schaffen kannst, etwa „Stelle eine KI-Kraft ein“ bei voller Firma oder „Deine erste KI-Kraft“, wenn du…",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-8686e38c",
         title: "Schwerere Missionen, neue Missionen",
-        text: "Tages- und Wochenmissionen werden mit dem Level anspruchsvoller (Level 10 etwa ×1,4, Level 30 etwa ×2,2). 19 neue Missionen rund um Kleiderschrank, Anstupsen, den Live-Chat der Nachrichten und den Büro-Chat, darunter „Ein legendäres Accessoire“.",
+        text: "Tages- und Wochenmissionen werden mit dem Level anspruchsvoller (Level 10 etwa ×1,4, Level 30 etwa ×2,2).",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-706f8ae2",
         title: "Mehr Verbesserungen",
-        text: "22 neue Verbesserungen und zwei weitere Tresorstufen, in fünf Abschnitten. Mehr Geld (Tresorzinsen, Lohnbonus, Stammgast, Auftragsprofi, Dealmaker), mehr XP (Börsenprofi, Frühaufsteher, Missionsjäger, Teamplayer, Bilanzprofi, Ehrgeiz), ein größerer Tresor (Panzertresor) und vieles für die eigene Firma (KI-Turbo, Glückshand, Werbeagentur, Krisenmanager …). Sie schalten sich zwischen Level 1 und 30 frei.",
+        text: "22 neue Verbesserungen und zwei weitere Tresorstufen, in fünf Abschnitten.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-7c926b16",
         title: "Protestkampagnen",
-        text: "Boykott, Shitstorm, Petition oder Protestmarsch gegen andere Firmen. Viele müssen mitmachen, die KI hilft, wirken tut es nur selten. Der letzte Quartalsabschluss steht im Dashboard jetzt ganz oben.",
+        text: "Boykott, Shitstorm, Petition oder Protestmarsch gegen andere Firmen.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-1a79ceba",
         title: "Eigene Strategien mit KI",
-        text: "Bei Krisen, Chancen und als eigener Geschäftszug schreibst du selbst, was deine Firma tut. Claude beurteilt die Idee (ohne Schlüssel die Mini-KI), der Zufall entscheidet. Schönfärberei kann nach hinten losgehen.",
+        text: "Bei Krisen, Chancen und als eigener Geschäftszug schreibst du selbst, was deine Firma tut.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-7918def8",
@@ -166,7 +166,7 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
       {
         id: "startseite-waehrung-zur-wahl-freundescode-cb8f5f51",
         title: null,
-        text: "**Zehn neue KI-Firmen** an der Börse, von Glanz & Gloria (Luxus) bis Sonnenkern Fusion. Jede KI-Firma hat im Profil eigene Neuigkeiten.",
+        text: "**Zehn neue KI-Firmen** an der Börse, von Glanz & Gloria (Luxus) bis Sonnenkern Fusion.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-721819bf",
@@ -181,17 +181,17 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
       {
         id: "startseite-waehrung-zur-wahl-freundescode-85c9cc63",
         title: "Firmenaufgaben",
-        text: "92 kleine Aufgaben, die zum Produkt passen, jede ein Minispiel (Tippen, Zählen, Sortieren, Reihenfolge, Merken, Rechnen). Gut gemacht bringt Geld, verpatzt oder liegen gelassen kostet es, und es steht in den Firmen-News. Vorgesetzte sind für ihr Team verantwortlich und delegieren; die KI hilft, aber langsam.",
+        text: "92 kleine Aufgaben, die zum Produkt passen, jede ein Minispiel (Tippen, Zählen, Sortieren, Reihenfolge, Merken, Rechnen).",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-ad6d2396",
         title: "Firmen in jedem Bereich",
-        text: "sechs neue Produkte, die mit Recht, Finanzen oder Führung beginnen (Online-Rechtsberatung, Banking-App, Franchise-Kette, Stromhandel, Zulassungsberatung, Umzugsservice), jedes mit eigenen Geschäftszügen.",
+        text: "sechs neue Produkte, die mit Recht, Finanzen oder Führung beginnen (Online-Rechtsberatung, Banking-App, Franchise-Kette, Stromhandel…",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-67d7e39d",
         title: "Geschäftszüge",
-        text: "Firmen verdienen jetzt aktiv. 96 Züge, die zum Produkt passen (Klinik-Express, Penetrationstest, Solarpark …), sicher bis riskant, mit Ergebnis nach 15 bis 60 Minuten. Know-how des Teams hebt die Chance. Auftragsarbeit läuft automatisch, der Schalter ist weg.",
+        text: "Firmen verdienen jetzt aktiv.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-fda78377",
@@ -251,7 +251,7 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
       {
         id: "startseite-waehrung-zur-wahl-freundescode-fa65d4cb",
         title: "Börsen-News",
-        text: "Auf der Märkte-Seite kündigen Meldungen an, welche Aktie bald steigen oder fallen dürfte. Etwa drei von vier treffen ein.",
+        text: "Auf der Märkte-Seite kündigen Meldungen an, welche Aktie bald steigen oder fallen dürfte.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-8fac312d",
@@ -271,7 +271,7 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
       {
         id: "startseite-waehrung-zur-wahl-freundescode-0f6f771d",
         title: "Skills der Reihe nach",
-        text: "Jeder Skill hat eine Voraussetzung, zum Beispiel Programmierung erst nach den IT-Grundlagen. Die Karte ist immer zu sehen und neu gezeichnet: ruhige Kacheln ohne Farbstreifen, Linien zeigen den Weg, Namen sind ausgeschrieben.",
+        text: "Jeder Skill hat eine Voraussetzung, zum Beispiel Programmierung erst nach den IT-Grundlagen.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-c7825c87",
@@ -281,32 +281,32 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
       {
         id: "startseite-waehrung-zur-wahl-freundescode-53dbe32a",
         title: "Freundescode",
-        text: "Im Profil steht dein Code (z. B. NEXA-K7Q2) zum Kopieren und Teilen. Wer den Code eines Freundes dort einträgt, bekommt einmalig 5.000 €; der Freund erfährt es per Benachrichtigung.",
+        text: "Im Profil steht dein Code (z. B. NEXA-K7Q2) zum Kopieren und Teilen.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-ecba0b66",
         title: "Währung zur Wahl",
-        text: "Das Spiel zeigt Euro. Unter Profil → Einstellungen kannst du stattdessen Dollar oder NX wählen. Es ändert sich nur das Zeichen, alle Beträge bleiben gleich. Der Stablecoin heißt jetzt „Eins-Stabil“.",
+        text: "Das Spiel zeigt Euro.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-b86ebbfa",
         title: "Ruhige Startseite",
-        text: "Finn begrüßt, groß das Vermögen, genau eine nächste Aufgabe, der Tresor und drei Kacheln. Feed, Liga, Index und Termine stehen auf ihren eigenen Seiten.",
+        text: "Finn begrüßt, groß das Vermögen, genau eine nächste Aufgabe, der Tresor und drei Kacheln.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-8435b506",
         title: "Spielerfirmen am Aktienmarkt",
-        text: "Börsennotierte Firmen von Spielern stehen in derselben Liste wie die KI-Aktien, mit dem Schild „Spieler“. Neue Sortierung „Beliebt“ (Standard): Aktien, die oft angesehen werden und in die viele investieren, stehen weiter oben. Mit „Spieler“ siehst du nur Spielerfirmen; „A–Z“ und „Bewegung“ gibt es weiter.",
+        text: "Börsennotierte Firmen von Spielern stehen in derselben Liste wie die KI-Aktien, mit dem Schild „Spieler“.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-e2375ea0",
         title: "Börsengang in 10 Minuten",
-        text: "Die Zeichnung dauert höchstens 10 Minuten statt 12 Stunden. Sind alle Aktien gezeichnet, ist die Firma sofort an der Börse; sonst nach Ablauf mit dem, was gezeichnet wurde. Ein Balken zeigt, wie viel schon gezeichnet ist, ein Countdown die Restzeit. KI-Investoren zeichnen über die Zeit mit. Zeichnen geht mit einem Tipp: 100 €, 1.000 €, 10.000 € oder gleich den ganzen Rest.",
+        text: "Die Zeichnung dauert höchstens 10 Minuten statt 12 Stunden.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-b3252543",
         title: "Kleiderschrank und Freunde-Platz",
-        text: "Deine Spielfigur steht jetzt in voller Größe da und lässt sich anziehen: 51 verrückte Accessoires vom Cowboyhut über Bananenkostüm, Haikostüm und Laseraugen bis zu Papagei, Jetpack und goldener Klobürste. Unter Profil → Kleiderschrank probierst du alles an und kaufst mit Spielgeld, von 150 € bis 5 Mio. €. Im Freunde-Tab stehen alle deine Freunde als Figuren auf einem Platz, wer online ist, hat ein grünes Schild über dem Kopf. Tipp auf eine Figur für das Profil, oder stups sie mit 👉 an: Sie bekommt eine Benachrichtigung.",
+        text: "Deine Spielfigur steht jetzt in voller Größe da und lässt sich anziehen: 51 verrückte Accessoires vom Cowboyhut über Bananenkostüm, Haikostüm und…",
       },
     ],
   },
@@ -367,7 +367,7 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
       {
         id: "nach-m5a-ruhigeres-menue-boerse-rund-um-die-uhr-68a0136d",
         title: "Menü in Gruppen",
-        text: "Investieren (mit Krypto), Arbeit, Unternehmen, Besitz, Du. Gesperrtes steht gesammelt unter „Bald frei“, das Profil auf dem Profilbild oben rechts.",
+        text: "Investieren (mit Krypto), Arbeit, Unternehmen, Besitz, Du.",
       },
       {
         id: "nach-m5a-ruhigeres-menue-boerse-rund-um-die-uhr-e4decba1",
@@ -415,12 +415,12 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
       {
         id: "m4k-und-m5a-krypto-stufen-ebenen-eindeutige-namen-anwesenheit-745e3d6a",
         title: null,
-        text: "**Eigener Coin ab Level 14** im Coin-Studio: Name, Kürzel und Pixel-Logo, Aufgaben fürs Team (Technik, Hype, Nutzen), Start mit eigenem Geld im Topf und Team-Anteil, Coins verbrennen, Rug-Pull-Warnung, Einstellen mit Auszahlung an alle Halter.",
+        text: "**Eigener Coin ab Level 14** im Coin-Studio: Name, Kürzel und Pixel-Logo, Aufgaben fürs Team (Technik, Hype, Nutzen), Start mit eigenem Geld im Topf…",
       },
       {
         id: "m4k-und-m5a-krypto-stufen-ebenen-eindeutige-namen-anwesenheit-ff13a8be",
         title: null,
-        text: "**Kryptowährungen ab Level 10** unter „Krypto“: 15 Coins von Stablecoins bis Memecoins, rund um die Uhr, jeder Kauf bewegt den Kurs über einen Topf aus Geld und Coins. Krypto-Wetter (Bullen-, Bären-, Seitwärtsmarkt), Ereignisse wie Hacks, Wale, Influencer und Rug Pulls, tote Memecoins werden ersetzt. Handelsmaske mit Gebühr, Kursrutsch-Vorschau und Grenze.",
+        text: "**Kryptowährungen ab Level 10** unter „Krypto“: 15 Coins von Stablecoins bis Memecoins, rund um die Uhr, jeder Kauf bewegt den Kurs über einen Topf…",
       },
     ],
   },
@@ -433,12 +433,12 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
       {
         id: "m4i-und-m4j-aufstieg-verbesserungen-und-vertrauen-2691dae8",
         title: "Deals unter Spielern",
-        text: "Kredite, Lieferverträge (freie Kapazität gegen Gebühr) und Teilhaber, an einen Spieler oder offen auf der Deal-Börse. Wer Wort hält, gewinnt Vertrauen; wer zu spät zahlt oder bricht, verliert es, und alle sehen es auf der Visitenkarte.",
+        text: "Kredite, Lieferverträge (freie Kapazität gegen Gebühr) und Teilhaber, an einen Spieler oder offen auf der Deal-Börse.",
       },
       {
         id: "m4i-und-m4j-aufstieg-verbesserungen-und-vertrauen-5c111948",
         title: "Gewinnwege",
-        text: "Die Firmenseite nennt den Engpass (Kunden oder Leute) und schätzt für jeden Hebel, was er pro Stunde bringt. Neu: Marketing-Kampagnen mit Glück im Ergebnis.",
+        text: "Die Firmenseite nennt den Engpass (Kunden oder Leute) und schätzt für jeden Hebel, was er pro Stunde bringt.",
       },
       {
         id: "m4i-und-m4j-aufstieg-verbesserungen-und-vertrauen-bc700a4b",
@@ -448,12 +448,12 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
       {
         id: "m4i-und-m4j-aufstieg-verbesserungen-und-vertrauen-50b873a9",
         title: "Karriereleiter",
-        text: "Praktikum, Junior, Senior, Teamleitung, Vorstand. Für jede Stufe steht da, was fehlt: Level, Punkte im Hauptfach, ab Teamleitung Management, Stunden im Rang. KI-Chefs sagen mit einer Chance Ja, die mit jedem Punkt über der Anforderung steigt; Spieler-Chefs entscheiden selbst. Eine Beförderung bringt mindestens 15 % oder den Lohn des neuen Rangs.",
+        text: "Praktikum, Junior, Senior, Teamleitung, Vorstand.",
       },
       {
         id: "m4i-und-m4j-aufstieg-verbesserungen-und-vertrauen-f73064e6",
         title: "Verbesserungen",
-        text: "Für Spielgeld wird der Tresor größer (8 bis 20 Stunden), das Grundeinkommen etwas höher (bis +30 %), Fachpunkte kommen schneller, es gibt bis zu 14 bezahlte Stunden am Tag und bessere Beförderungschancen. Jede Stufe zeigt „jetzt → danach“.",
+        text: "Für Spielgeld wird der Tresor größer (8 bis 20 Stunden), das Grundeinkommen etwas höher (bis +30 %), Fachpunkte kommen schneller, es gibt bis zu 14…",
       },
     ],
   },
@@ -491,7 +491,7 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
       {
         id: "nach-m1-wettbewerb-und-fortschritt-72b935d2",
         title: "Geschlossener Geldkreislauf",
-        text: "Die Spielwelt hat einmalig 10 Mrd. €, danach entsteht kein Geld mehr. Grundeinkommen und Startkapital kommen aus der Staatskasse, Steuern und Gebühren fließen zurück.",
+        text: "Die Spielwelt hat einmalig 10 Mrd. €, danach entsteht kein Geld mehr.",
       },
       {
         id: "nach-m1-wettbewerb-und-fortschritt-daaea97e",
@@ -524,7 +524,7 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
       {
         id: "m1-markt-4a3e4602",
         title: "Oberfläche",
-        text: "Kerzen- oder Linienchart mit live wachsender Kerze, Orderbuch, Kennzahlen, Portfolio mit Gewinn/Verlust, offenen Orders und Historie, Level-up-Fenster mit Finn.",
+        text: "Kerzen- oder Linienchart mit live wachsender Kerze, Orderbuch, Kennzahlen, Portfolio mit Gewinn/Verlust, offenen Orders und Historie…",
       },
       {
         id: "m1-markt-41230458",
@@ -544,12 +544,12 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
       {
         id: "m1-markt-3d38b00d",
         title: "Handeln",
-        text: "Sofort- und Limit-Orders, Kauf per Stückzahl oder Geldbetrag, 1 € Gebühr, 25 % Steuer mit Verlusttopf, große Orders bewegen den Kurs. Doppelklicks erzeugen keine doppelten Orders.",
+        text: "Sofort- und Limit-Orders, Kauf per Stückzahl oder Geldbetrag, 1 € Gebühr, 25 % Steuer mit Verlusttopf, große Orders bewegen den Kurs.",
       },
       {
         id: "m1-markt-4baf141f",
         title: "Live-Markt in der Datenbank",
-        text: "Die 15 KI-Firmen, vier Staatsanleihen und der NEXA 30 bewegen sich alle 5 Sekunden, auch wenn niemand online ist. Kursanker ist der faire Wert aus den Firmenzahlen, dazu Marktmacher, Value-Fonds, Momentum-Trader und Kleinanleger. Blue Chips schwanken am Tag um etwa 3 %, Pennystocks um 15 bis 20 %. Nachbörslich (22 bis 8 Uhr) ist der Spread dreimal so groß.",
+        text: "Die 15 KI-Firmen, vier Staatsanleihen und der NEXA 30 bewegen sich alle 5 Sekunden, auch wenn niemand online ist.",
       },
     ],
   },
@@ -577,12 +577,12 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
       {
         id: "nach-m0-einstieg-fuer-neue-spieler-54f4b3bb",
         title: "Ruhigerer Anfang",
-        text: "Neue Spieler sehen nur Vermögen, Tresor, nächstes Ziel und Aktien. Index, Missionen, Events, Nachrichten, Orderbuch, Anleihen und der Firmen-Tab erscheinen mit steigendem Level.",
+        text: "Neue Spieler sehen nur Vermögen, Tresor, nächstes Ziel und Aktien.",
       },
       {
         id: "nach-m0-einstieg-fuer-neue-spieler-a0c790c1",
         title: "Tutorial mit Finn, dem Börsenfuchs",
-        text: "13 kurze Schritte direkt nach dem ersten Start, nicht überspringbar, mit Sprechblase, Spotlight und echten Aktionen (Tresor leeren, Aktie öffnen, kaufen). Abschluss: 100 XP, Level 2.",
+        text: "13 kurze Schritte direkt nach dem ersten Start, nicht überspringbar, mit Sprechblase, Spotlight und echten Aktionen (Tresor leeren, Aktie öffnen…",
       },
     ],
   },
@@ -590,10 +590,7 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
     id: "m0-fundament",
     title: "M0 Fundament",
     date: null,
-    notes: [
-      "Erste, navigierbare Fassung ohne Spiellogik.",
-      "Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Projekt.",
-    ],
+    notes: [],
     entries: [
       {
         id: "m0-fundament-cb39755a",
@@ -608,17 +605,17 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
       {
         id: "m0-fundament-04cad579",
         title: null,
-        text: "Datenbank: vollständiges Schema (132 Tabellen) mit RLS, Ledger in doppelter Buchführung, Registrierungs-Trigger und Stammdaten (15 KI-Firmen, Anleihen, Index, Jobs, Erfolge). Lokal gegen Postgres 16 geprüft.",
+        text: "Datenbank: vollständiges Schema (132 Tabellen) mit RLS, Ledger in doppelter Buchführung, Registrierungs-Trigger und Stammdaten (15 KI-Firmen…",
       },
       {
         id: "m0-fundament-17d46521",
         title: null,
-        text: "App: fünf Tabs (Start, Portfolio, Märkte, Firma, Profil) mit Seitenleiste am PC und Tab-Leiste am Handy, Suche, Aktien-Detail mit Order-Vorschau, Anmeldung und Registrierung, Einstellungen, PWA-Grundlage. Ohne Supabase-Zugangsdaten läuft alles im Demo-Modus mit Beispieldaten.",
+        text: "App: fünf Tabs (Start, Portfolio, Märkte, Firma, Profil) mit Seitenleiste am PC und Tab-Leiste am Handy, Suche, Aktien-Detail mit Order-Vorschau…",
       },
       {
         id: "m0-fundament-ad98c1cc",
         title: null,
-        text: "Design: Tokens für Farben, Schrift, Radien, Motion und Ebenen in dunklem und hellem Theme mit fünf Akzentfarben; Komponentenbibliothek mit Showcase unter /dev/ui; erstes Pixel-Art-Set.",
+        text: "Design: Tokens für Farben, Schrift, Radien, Motion und Ebenen in dunklem und hellem Theme mit fünf Akzentfarben; Komponentenbibliothek mit Showcase…",
       },
       {
         id: "m0-fundament-4ef402d3",

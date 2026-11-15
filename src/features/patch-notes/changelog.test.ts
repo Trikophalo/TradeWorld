@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import { PATCH_NOTES } from "../../config/patch-notes.generated";
 import {
   cleanInline,
+  summarize,
+  SUMMARY_MAX,
   entryIds,
   inlineRuns,
   parseChangelog,
@@ -56,7 +58,7 @@ describe("patch notes", () => {
     expect(graphics.entries).toEqual([
       { id: expect.stringMatching(/^grafik-update-handgemacht-/), title: "Farben", text: "neu." },
     ]);
-    expect(m0.notes).toEqual(["Erste Fassung.", "Noch offen: Deploy."]);
+    expect(m0.notes).toEqual([]);
     expect(m0.entries.map(({ title, text }) => ({ title, text }))).toEqual([
       { title: null, text: "Ohne Titel, aber **fett**." },
       { title: "Projekt", text: "Next.js, pnpm, Vitest." },
@@ -87,5 +89,19 @@ describe("patch notes", () => {
       { text: " c", bold: false },
     ]);
     expect(slugify("Nach M5a: Ruhigeres Menü, Börse")).toBe("nach-m5a-ruhigeres-menue-boerse");
+  });
+});
+
+describe("compact patch notes", () => {
+  it("keeps the first sentence and at most SUMMARY_MAX characters", () => {
+    expect(summarize("Neu: der Chat. Er scrollt jetzt von selbst.")).toBe("Neu: der Chat.");
+    expect(summarize("Etwa z. B. ein Hut. Und mehr.")).toBe("Etwa z. B. ein Hut.");
+    expect(summarize("Preise ab 1.000 € steigen. Rest.")).toBe("Preise ab 1.000 € steigen.");
+    const long = "Wort ".repeat(60).trim() + ".";
+    const short = summarize(long);
+    expect(short.length).toBeLessThanOrEqual(SUMMARY_MAX);
+    expect(short.endsWith("…")).toBe(true);
+    for (const release of PATCH_NOTES)
+      for (const entry of release.entries) expect(entry.text.length).toBeLessThanOrEqual(SUMMARY_MAX);
   });
 });
