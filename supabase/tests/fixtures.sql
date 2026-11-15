@@ -1203,3 +1203,36 @@ select public.poke_friend(gen_random_uuid(), 'Fixture_Kunst');
 select public.get_friends();
 \o
 reset role;
+
+-- Renting out places in the home (ADR-158): Fixture_Heim offers its house, an AI tenant and the fixture player move in
+select tests.login_as('authenticated', :fx_h) is null as ok \gset
+\o :fixture_dir/set_rental_offer.json
+select public.set_rental_offer(gen_random_uuid(), 'hour', 1000, true);
+\o
+reset role;
+insert into public.rental_tenancies (owner_id, is_ai, tenant_name, period, price_cents, started_at, next_due_at, ends_at)
+values (:fx_h, true, 'Mia F.', 'hour', 1000, now(), now() + interval '1 hour', now() + interval '2 days');
+select tests.set_level(:p, greatest(10, (select level from public.profiles where id = :p)));
+select tests.fund(:p, 1000000, 'fixture:rentals');
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/get_rental_market.json
+select public.get_rental_market();
+\o :fixture_dir/rent_home.json
+select public.rent_home(gen_random_uuid(), 'Fixture_Heim');
+\o :fixture_dir/get_property_renting.json
+select public.get_property(null);
+\o
+reset role;
+select tests.login_as('authenticated', :fx_h) is null as ok \gset
+\o :fixture_dir/get_rentals.json
+select public.get_rentals();
+\o
+reset role;
+select r.id as fx_ten from public.rental_tenancies r where r.tenant_id = :p and r.status = 'active' \gset
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/end_tenancy.json
+select public.end_tenancy(gen_random_uuid(), :'fx_ten');
+\o :fixture_dir/get_rentals_tenant.json
+select public.get_rentals();
+\o
+reset role;

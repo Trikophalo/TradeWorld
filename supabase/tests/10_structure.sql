@@ -139,7 +139,9 @@ select tests.assert(
            -- NEXA Nachrichten (ADR-150)
            'get_news_show', 'post_news_show_message', 'news_show_claim_script',
            -- accessories and poking friends (ADR-155)
-           'get_accessories', 'buy_accessory', 'wear_accessory', 'poke_friend']
+           'get_accessories', 'buy_accessory', 'wear_accessory', 'poke_friend',
+           -- renting out places in the home (ADR-158)
+           'get_rentals', 'get_rental_market', 'set_rental_offer', 'rent_home', 'end_tenancy']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')
@@ -181,6 +183,7 @@ select tests.assert(
       'random_event_definitions', 'news_templates', 'news_item_effects', 'league_entry_baselines',
       'stock_tips', 'market_snapshot_cache', 'company_moves', 'company_tasks', 'fun_news', 'company_pitches', 'company_protests', 'company_protest_supporters', 'player_seen_tours', 'company_assistant_calls', 'artwork_messages', 'security_view_days', 'security_view_marks', 'security_popularity', 'market_popularity_state', 'news_shows', 'news_show_used', 'news_show_messages', 'news_show_viewers',
       'player_accessories', 'player_accessories_worn', 'friend_pokes',
+      'rental_offers', 'rental_tenancies', 'rental_payments',
       'rate_limits', 'player_requests', 'player_login_events', 'push_deliveries', 'invite_code_redemptions',
       'price_ticks_default']) as t
      -- (a table from a later migration is not there yet on an older database)
