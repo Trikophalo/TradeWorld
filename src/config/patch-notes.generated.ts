@@ -154,6 +154,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Hat deine Auktion ein Gebot, kannst du sie sofort beenden und an das höchste Gebot verkaufen.",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-1f6abc57",
+        title: "Nach den Nachrichten zum Battle",
+        text: "Ist die stündliche Sendung vorbei, führt ein Knopf unter dem Fernseher direkt in die Battle-Lobby.",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-706f8ae2",
         title: "Mehr Verbesserungen",
         text: "22 neue Verbesserungen und zwei weitere Tresorstufen, in fünf Abschnitten.",

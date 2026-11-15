@@ -26,7 +26,7 @@ export default async function NewsPage() {
       </div>
       {/* News battles among the viewers (ADR-160) */}
       <Reveal feature="newsBattle">
-        <div className="mx-auto mb-6 max-w-5xl">
+        <div id="news-battle" className="mx-auto mb-6 max-w-5xl scroll-mt-20">
           <NewsBattle />
         </div>
       </Reveal>

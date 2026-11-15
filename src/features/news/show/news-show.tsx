@@ -24,6 +24,7 @@ import { useClock } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
 import { bubblesAt, stageAudience } from "./audience";
 import { AudienceStage } from "./audience-stage";
+import { useDisclosed } from "@/features/progression/components/reveal";
 import { NewsStudio, type NewsStudioProps } from "./studio";
 
 const cfg = BALANCE.newsShow;
@@ -68,6 +69,7 @@ function askAnchor(showId: number) {
  * from the server's start time). Afterwards it can be watched again for a while.
  */
 export function NewsShow() {
+  const battleOpen = useDisclosed("newsBattle");
   const t = useTranslations("newsShow");
   const client = useQueryClient();
   const [replayAt, setReplayAt] = useState<number | null>(null);
@@ -169,6 +171,20 @@ export function NewsShow() {
               data-testid="news-show-replay"
             >
               {t("replay")}
+            </Button>
+          )}
+          {/* after the hourly show: straight into the news battle (ADR-160) */}
+          {battleOpen && !view.replay && (view.over || view.mode === "outro") && (
+            <Button
+              size="sm"
+              onClick={() => {
+                haptic("tap");
+                document.getElementById("news-battle")?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+              className="w-full sm:w-auto"
+              data-testid="news-show-to-battle"
+            >
+              {t("toBattle")}
             </Button>
           )}
           {view.replay && (
