@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Reveal } from "@/features/progression/components/reveal";
 import { FriendCodeCard } from "@/features/friends/components/friend-code";
 import { MyTagCard } from "@/features/friends/components/my-tag";
+import { MyFigureCard } from "@/features/wardrobe/components/figure-card";
 import { LevelCard } from "@/features/progression/components/level-card";
 import { UnlockList } from "@/features/progression/components/unlock-list";
 import { AccountReset } from "@/features/settings/components/account-reset";
@@ -29,6 +30,9 @@ export default async function ProfilePage() {
       <div className="grid gap-5 *:min-w-0 lg:grid-cols-2 lg:gap-6">
         <div className="space-y-5 lg:space-y-6">
           <LevelCard />
+          <Reveal feature="profileWardrobe">
+            <MyFigureCard />
+          </Reveal>
           <MyTagCard />
           <FriendCodeCard />
           <Reveal feature="profileCareer">

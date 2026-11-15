@@ -424,6 +424,15 @@
   background-size: 4px 4px;
 }
 
+/* Spotlight on the wardrobe stage (ADR-154): a soft cone of the accent colour from above. */
+@utility bg-spotlight {
+  background-image: radial-gradient(
+    ellipse 60% 85% at 50% 0%,
+    color-mix(in srgb, var(--accent) 22%, transparent),
+    transparent 70%
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* Route and shared-element transitions (React <ViewTransition>)        */
 /* ------------------------------------------------------------------ */

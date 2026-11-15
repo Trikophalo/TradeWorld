@@ -293,6 +293,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Börsengang in 10 Minuten",
         text: "Die Zeichnung dauert höchstens 10 Minuten statt 12 Stunden. Sind alle Aktien gezeichnet, ist die Firma sofort an der Börse; sonst nach Ablauf mit dem, was gezeichnet wurde. Ein Balken zeigt, wie viel schon gezeichnet ist, ein Countdown die Restzeit. KI-Investoren zeichnen über die Zeit mit. Zeichnen geht mit einem Tipp: 100 €, 1.000 €, 10.000 € oder gleich den ganzen Rest.",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-b3252543",
+        title: "Kleiderschrank und Freunde-Platz",
+        text: "Deine Spielfigur steht jetzt in voller Größe da und lässt sich anziehen: 51 verrückte Accessoires vom Cowboyhut über Bananenkostüm, Haikostüm und Laseraugen bis zu Papagei, Jetpack und goldener Klobürste. Unter Profil → Kleiderschrank probierst du alles an und kaufst mit Spielgeld, von 150 € bis 5 Mio. €. Im Freunde-Tab stehen alle deine Freunde als Figuren auf einem Platz, wer online ist, hat ein grünes Schild über dem Kopf. Tipp auf eine Figur für das Profil, oder stups sie mit 👉 an: Sie bekommt eine Benachrichtigung.",
+      },
     ],
   },
   {

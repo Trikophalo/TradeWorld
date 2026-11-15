@@ -1,6 +1,10 @@
 "use client";
 
 import { FriendButton } from "@/features/friends/components/friends";
+import { PokeButton } from "@/features/friends/components/poke";
+import { friendStatus, useFriends } from "@/features/friends/hooks";
+import { FigureCard } from "@/features/wardrobe/components/figure-card";
+import type { PlayerCard } from "@/features/game/types";
 import { ProfileHoldings } from "@/features/friends/components/holdings";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -37,6 +41,8 @@ export function PlayerProfile({ nickname }: { nickname: string }) {
       {card.data ? (
         <>
           <BusinessCard card={card.data} />
+          {/* The dressed pixel figure; friends can be poked (ADR-154) */}
+          <ProfileFigure card={card.data} />
           {/* Friends (ADR-084) */}
           <FriendButton nickname={card.data.nickname} />
           {/* What they are invested in, for friends (ADR-121) */}
@@ -61,5 +67,20 @@ export function PlayerProfile({ nickname }: { nickname: string }) {
         <Skeleton className="h-72 w-full rounded-xl" />
       )}
     </div>
+  );
+}
+
+function ProfileFigure({ card }: { card: PlayerCard }) {
+  const me = useGame((state) => state.portfolio?.nickname ?? "");
+  const friends = useFriends();
+  const status = friendStatus(friends.data, card.nickname, me);
+  return (
+    <FigureCard
+      nickname={card.nickname}
+      avatarKey={card.avatarKey}
+      accessories={card.accessories}
+      own={status === "self"}
+      action={status === "friends" ? <PokeButton nickname={card.nickname} /> : undefined}
+    />
   );
 }

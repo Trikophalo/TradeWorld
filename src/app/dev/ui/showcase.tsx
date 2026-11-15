@@ -32,6 +32,11 @@ import { Skeleton, SkeletonRow } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/toast";
 import { BusinessCard } from "@/features/career/components/business-card";
+import { PlayerFigure } from "@/components/ui/player-figure";
+import { ACCESSORIES } from "@/config/accessories";
+import { FriendsPlaza } from "@/features/friends/components/plaza";
+import { PokeButton } from "@/features/friends/components/poke";
+import { FigureCard } from "@/features/wardrobe/components/figure-card";
 import { CareerLadder, PayRoutes } from "@/features/career/components/career-ladder";
 import { UpgradeCard } from "@/features/upgrades/components/upgrade-shop";
 import { CRYPTO } from "@/config/crypto";
@@ -89,6 +94,7 @@ const SAMPLE_CARD: PlayerCard = {
   company: null,
   memberSince: "2026-09-01T00:00:00Z",
   trust: { score: 72, band: "reliable", kept: 6, broken: 0 },
+  accessories: ["superhero_cape", "tuxedo", "sunglasses", "top_hat", "money_bag", "parrot"],
 };
 
 /** A junior in IT who is two IT points short of senior (ADR-094). */
@@ -860,6 +866,19 @@ export function Showcase() {
           ))}
         </Demo>
         <BusinessCard card={SAMPLE_CARD} />
+        <FigureCard
+          nickname={SAMPLE_CARD.nickname}
+          avatarKey={SAMPLE_CARD.avatarKey}
+          accessories={SAMPLE_CARD.accessories}
+          own={false}
+          action={<PokeButton nickname={SAMPLE_CARD.nickname} />}
+        />
+        <Demo label="Accessoires an der Pixelfigur (ADR-154)" className="flex-wrap justify-start gap-2">
+          {ACCESSORIES.map((a) => (
+            <PlayerFigure key={a.key} avatarKey="rookie" accessories={[a.key]} scale={2} title={a.name} />
+          ))}
+        </Demo>
+        <FriendsPlaza />
         <Card padding="lg">
           <SignaturePad onChange={() => undefined} />
         </Card>
