@@ -1,56 +1,56 @@
 {
   "applications": [
     {
-      "id": "6debd37a-e276-4bb2-be69-e49c7e5c2119",
+      "id": "fe62349c-5e58-4320-983a-393cc9f9d9e7",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "1d28603a-751e-4275-bc23-801c96810a6d",
+        "id": "09cf82d0-ed5b-4aab-b87d-ffd3f29ab143",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "533f0569-8570-a8f1-ebc9-07f9808291c9",
+          "id": "7999d809-0066-66e2-e0ac-930c34a49626",
           "logo": null,
-          "name": "Alpenmed",
-          "color": "#8FD3F4",
+          "name": "Fundgrube Discount",
+          "color": "#C2C95B",
           "is_ai": true,
-          "sector": "pharma",
-          "ticker": "ALM"
+          "sector": "retail",
+          "ticker": "FGD"
         },
-        "required": [{ "branch": "science", "min_score": 0 }],
-        "title_key": "science_intern",
+        "required": [{ "branch": "logistics", "min_score": 0 }],
+        "title_key": "logistics_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-15T12:42:08.124017+00:00",
-      "updated_at": "2026-11-15T12:42:08.128733+00:00",
-      "offer_expires_at": "2026-11-17T12:42:08.124017+00:00",
+      "created_at": "2026-11-15T17:40:12.593296+00:00",
+      "updated_at": "2026-11-15T17:40:12.596068+00:00",
+      "offer_expires_at": "2026-11-17T17:40:12.593296+00:00",
       "salary_wish_cents_per_hour": 15000,
       "offer_salary_cents_per_hour": 15000
     },
     {
-      "id": "c2aa0b07-0cbd-4964-b1f0-0a984502752f",
+      "id": "fdf89a09-0090-4f77-ab3d-4157286d87c1",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "17622ea7-8e52-439d-bc08-e1d79c590333",
+        "id": "b75a83f8-4a4d-45b1-a986-da151e17677f",
         "tier": "junior",
         "title": null,
         "company": {
-          "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
+          "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
           "logo": null,
-          "name": "Frachtpilot",
-          "color": "#9ECE6A",
+          "name": "KlarSoft AG",
+          "color": "#4C8DFF",
           "is_ai": true,
-          "sector": "logistics",
-          "ticker": "FPT"
+          "sector": "tech",
+          "ticker": "KLS"
         },
         "required": [{ "branch": "it", "min_score": 2 }],
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-15T12:42:08.118616+00:00",
-      "updated_at": "2026-11-15T12:42:08.118616+00:00",
-      "offer_expires_at": "2026-11-17T12:42:08.118616+00:00",
+      "created_at": "2026-11-15T17:40:12.589406+00:00",
+      "updated_at": "2026-11-15T17:40:12.589406+00:00",
+      "offer_expires_at": "2026-11-17T17:40:12.589406+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

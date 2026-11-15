@@ -1,9 +1,9 @@
 {
-  "now": "2026-11-15T12:42:14.578024+00:00",
+  "now": "2026-11-15T17:40:17.003121+00:00",
   "chat": [
     {
-      "at": "2026-11-15T12:42:14.572397+00:00",
-      "id": 204,
+      "at": "2026-11-15T17:40:16.999524+00:00",
+      "id": 206,
       "body": "Was für eine Sendung 💀📉",
       "mine": true,
       "nickname": "Fixture_Neu"
@@ -12,82 +12,82 @@
   "show": {
     "id": 6,
     "writer": "mini",
-    "airs_at": "2026-11-15T12:00:00+00:00",
+    "airs_at": "2026-11-15T17:00:00+00:00",
     "segments": [
       {
         "kind": "gossip",
-        "mood": "smug",
-        "text": "Liebes Tagebuch, schreibt Anja_Lieferant heute vermutlich: Deal mit Bodo_Kunde gebrochen. Ich würde ja helfen, aber dann hätte ich nichts mehr zu lachen. Wir legen etwas Schmerzensgeld bei.",
-        "effects": [{ "tone": "gain", "label": "+100 € Schmerzensgeld" }],
-        "headline": "Das Tagebuch von Anja_Lieferant"
+        "mood": "shocked",
+        "text": "Ich fasse es nicht, aber es stimmt. Sven_Small meldet: Sven Handel gegründet. Genieß es, nächste Woche lachen wir wieder über dich.",
+        "effects": [],
+        "headline": "Na so was: Sven_Small"
       },
       {
-        "kind": "scandal",
-        "mood": "angry",
-        "text": "Ausgerechnet Rang Laden, die Firma mit dem Motto „Tee aus der Region“: Auf der Weihnachtsfeier wurde versehentlich die halbe Belegschaft befördert, die andere Hälfte gefeuert. Die Kunden laufen davon.",
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −21,1 %" }],
-        "headline": "Skandal bei Rang Laden"
+        "kind": "hype",
+        "mood": "laughing",
+        "text": "Unfassbar, aber wahr: Gero Werkstatt ist der Renner. Ein Video über die Firma hat heute das Internet geflutet. „Fahrräder reparieren“ geht weg wie warme Semmeln. Gero_Garage soll vor Freude geweint haben.",
+        "effects": [{ "tone": "gain", "label": "Bekanntheit +10,6 %" }],
+        "headline": "Alle wollen Gero Werkstatt"
       },
       {
         "kind": "nft",
-        "mood": "confused",
-        "text": "Kunstmarkt, oder was man dafür hält: „Neon Nacht“ von Nina_Neon ging für 30.000 € an Ben_Bieter. Ich verstehe es nicht, also muss es teuer sein.",
+        "mood": "shocked",
+        "text": "Kunstmarkt, oder was man dafür hält: „Neon Nacht“ von Nina_Neon ging für 30.000 € an Ben_Bieter. Kunst ist, wenn einer zahlt. Glückwunsch an alle Beteiligten.",
         "effects": [],
         "headline": "30.000 € für ein paar Pixel"
       },
       {
         "kind": "winner",
-        "mood": "shocked",
-        "text": "11389,2 % Plus, 1.138.925 € Gewinn: Fixture_Neu zeigt dem Rest, wie es geht. Wer jetzt um einen Kredit bittet, wird ausgelacht. Zu Recht.",
+        "mood": "proud",
+        "text": "11389,2 % Plus, 1.138.921 € Gewinn: Fixture_Neu zeigt dem Rest, wie es geht. Ob das Können war oder pures Glück, klärt die Staatsanwaltschaft.",
         "effects": [],
         "headline": "Fixture_Neu schwimmt im Geld"
       },
       {
         "kind": "gossip",
-        "mood": "laughing",
-        "text": "Job bei Frieda Apps hingeschmissen: Das ist die Tagesbilanz von Walter_Weg. So eine Pfeife sehe ich sonst nur morgens im Spiegel, und ich bin wenigstens im Fernsehen. Schmerzensgeld gibt es obendrauf, Würde leider nicht.",
-        "effects": [{ "tone": "gain", "label": "+100 € Schmerzensgeld" }],
-        "headline": "Fremdschämen mit Walter_Weg"
+        "mood": "shocked",
+        "text": "Ich fasse es nicht, aber es stimmt. Acc_Bruno meldet: Level 30 erreicht. Ich hätte keinen Cent darauf gewettet, und ich wette auf alles.",
+        "effects": [],
+        "headline": "Na so was: Acc_Bruno"
       },
       {
         "kind": "scandal",
-        "mood": "angry",
-        "text": "Bei Fixture Werke brennt die Hütte. Die Geschäftsführung hat das wichtigste Meeting des Jahres verschlafen, im Meetingraum. Fixture_Gmbh spricht von einem Missverständnis. Zur Erinnerung, das Geschäftsmodell lautet: „Maschinen nach Maß“.",
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −13,4 %" }],
-        "headline": "Fixture Werke: Chef Fixture_Gmbh unter Beschuss"
+        "mood": "shocked",
+        "text": "Das Netz zerreißt Kurt Kurierdienst. Im Lager wurde ein Praktikant gefunden, der seit drei Wochen vermisst war. Er hatte niemandem gefehlt. Seitdem will niemand mehr „Pakete mit dem Rad“. Kurt_Kurier hat das Firmenhandy im Fluss versenkt.",
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −19,9 %" }],
+        "headline": "Shitstorm über Kurt Kurierdienst"
       },
       {
         "kind": "ramble",
-        "mood": "smug",
-        "text": "Man erzählt sich, Friedrich Merz habe bei Kaufrausch Märkte zugeschlagen. Ich habe es auf einer Raststätte gehört, zwischen Kaffee und Reue. Ob es stimmt, ist dem Kurs egal: 6,7 % rauf.",
-        "effects": [{ "tone": "gain", "label": "KFR +6,7 %" }],
-        "headline": "Gerücht des Tages: Friedrich Merz und Kaufrausch Märkte"
+        "mood": "crying",
+        "text": "Wo war ich? Egal. Mein Nachbar grillt seit drei Tagen dasselbe Würstchen. Ich bewundere seine Geduld. Zurück zu den Nachrichten, falls jemand weiß, wo sie liegen.",
+        "effects": [],
+        "headline": "Mr. Doodle Dangle schweift ab"
       },
       {
         "kind": "tasks",
-        "mood": "crying",
-        "text": "Das halbe Land ist kollektiv im Urlaub, natürlich unbezahlt. Alle offenen Firmen-Aufgaben sind 27,1 % weniger wert. Die Chefs dürfen ruhig ein bisschen schwitzen.",
-        "effects": [{ "tone": "loss", "label": "Aufgaben −27,1 %" }],
-        "headline": "Kunden entdecken das Sparen"
+        "mood": "proud",
+        "text": "Die Leute haben gemerkt, dass Sparen keinen Spaß macht. Offene Aufgaben bringen 33,3 % mehr. Wer jetzt Pause macht, ist selbst schuld.",
+        "effects": [{ "tone": "gain", "label": "Aufgaben +33,3 %" }],
+        "headline": "Kunden zahlen jeden Preis"
       },
       {
         "kind": "stock",
-        "mood": "shocked",
-        "text": "Das Hauptquartier wurde versehentlich bei einer Kleinanzeige mitverkauft. Der Kurs von Methusalem Bio sackt um 11,3 % ab. Ein Krisenstab tagt.",
-        "effects": [{ "tone": "loss", "label": "MTH −11,3 %" }],
-        "headline": "Panik bei Methusalem Bio"
+        "mood": "proud",
+        "text": "Im Keller wurde Öl gefunden, es war zwar Salatöl, aber die Stimmung ist prächtig. Die Börse feiert: Pfotenwohl steigt um 17 %. Wer nicht dabei ist, darf sich jetzt ärgern.",
+        "effects": [{ "tone": "gain", "label": "PFW +17 %" }],
+        "headline": "Kursrakete Pfotenwohl"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Methusalem Bio tut sich in der nächsten Stunde etwas, und zwar nach unten. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
-        "effects": [{ "tone": "neutral", "label": "MTH ↓ Tipp" }],
-        "headline": "Mr. Doodle Dangles Geheimtipp"
+        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Orbitfracht geht bald nach unten. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
+        "effects": [{ "tone": "neutral", "label": "OFR ↓ Tipp" }],
+        "headline": "Der heiße Draht: Orbitfracht"
       }
     ],
-    "started_at": "2026-11-15T12:42:14.578024+00:00"
+    "started_at": "2026-11-15T17:40:17.003121+00:00"
   },
   "viewers": 5,
   "upcoming": null,
-  "next_airs_at": "2026-11-15T13:00:00+00:00"
+  "next_airs_at": "2026-11-15T18:00:00+00:00"
 }

@@ -2490,3 +2490,12 @@ ihre Firmen, und mit echten, großen Folgen für Kurse, Firmen und Aufgaben.
   angestupst! 👉“ mit Link auf das Profil; sie lässt sich in den Einstellungen abschalten.
 - **Demo:** Ohne Mitspieler startet die Demo weiter ohne Freunde; ein gespeicherter Demo-Zustand (`friendList`) kann
   erfundene Freunde mitbringen (Tests, Vorführung).
+
+## ADR-159: Schwerere Missionen mit dem Level, Missionen für die neuen Funktionen — `akzeptiert`
+
+- Gezählte Tages- und Wochenmissionen (und Schnellmissionen ab 2) skalieren ihr Ziel mit
+  `1 + progression.missionCountScalePerLevel (0,04) × (Level − 1)`, höchstens `missionCountScaleMax` (3). Geldziele und
+  XP behalten ihre eigene Skalierung (ADR-142). Ziele mit begrenzter Auswahl (`distinct`) skalieren nicht.
+- Neue Metriken über Trigger, ohne RPCs umzuschreiben: `accessory_bought`, `accessory_legendary`, `accessory_worn`,
+  `friend_poke`, `news_chat`, `company_chat`. `mission_doable` kennt ihre Voraussetzungen.
+- 19 neue Vorlagen; neue Meilensteine stehen in der Kette hinter den bisherigen.

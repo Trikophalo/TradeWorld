@@ -543,6 +543,8 @@ export interface ProgressionConfig {
   /** Mission XP grow with the level the same way (ADR-142); missions with params.fixedXp keep theirs. */
   readonly missionXpScalePerLevel: number;
   readonly missionXpScaleMax: number;
+  readonly missionCountScalePerLevel: number;
+  readonly missionCountScaleMax: number;
   /** From this level on, every `titleEveryLevels` levels brings a new prestige title. */
   readonly prestige: { readonly fromLevel: number; readonly titleEveryLevels: number };
   /**
@@ -1995,6 +1997,12 @@ export const BALANCE = {
     /** ADR-142: mission XP x (1 + perLevel x (level - 1)), at most max: level 10 = x2.35, level 30 = x5.35. */
     missionXpScalePerLevel: 0.15,
     missionXpScaleMax: 8,
+    /**
+     * ADR-159: counted missions get harder with the level: targets of daily and weekly missions (and quick missions
+     * that count more than one) x (1 + perLevel x (level - 1)), at most max. Level 10 = x1.36, level 30 = x2.16.
+     */
+    missionCountScalePerLevel: 0.04,
+    missionCountScaleMax: 3,
     // Alpha bonus: all XP count double (owner decision). 1 = spec values.
     // Typed as `number` (not the literal 2) so that code may compare it with 1.
     xpMultiplier: 2 as number,

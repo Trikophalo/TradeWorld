@@ -134,6 +134,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Du bekommst keine Mission mehr, die du nicht schaffen kannst, etwa „Stelle eine KI-Kraft ein“ bei voller Firma oder „Deine erste KI-Kraft“, wenn du schon eine hast. Eine solche Mission ohne Fortschritt macht Platz für eine neue. Neu: einmalig **„Kauf dir ein Grundstück“ für 5.000 XP**.",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-8686e38c",
+        title: "Schwerere Missionen, neue Missionen",
+        text: "Tages- und Wochenmissionen werden mit dem Level anspruchsvoller (Level 10 etwa ×1,4, Level 30 etwa ×2,2). 19 neue Missionen rund um Kleiderschrank, Anstupsen, den Live-Chat der Nachrichten und den Büro-Chat, darunter „Ein legendäres Accessoire“.",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-706f8ae2",
         title: "Mehr Verbesserungen",
         text: "22 neue Verbesserungen und zwei weitere Tresorstufen, in fünf Abschnitten. Mehr Geld (Tresorzinsen, Lohnbonus, Stammgast, Auftragsprofi, Dealmaker), mehr XP (Börsenprofi, Frühaufsteher, Missionsjäger, Teamplayer, Bilanzprofi, Ehrgeiz), ein größerer Tresor (Panzertresor) und vieles für die eigene Firma (KI-Turbo, Glückshand, Werbeagentur, Krisenmanager …). Sie schalten sich zwischen Level 1 und 30 frei.",

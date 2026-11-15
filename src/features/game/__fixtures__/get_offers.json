@@ -1,13 +1,13 @@
 {
   "offers": [
     {
-      "id": "c96988a2-21d8-40ca-ba90-594ccee1a2f6",
+      "id": "b1d65eb8-870a-4d1e-80ea-e870e9d3e860",
       "kind": "ipo",
       "mine": false,
       "status": "failed",
       "ticker": "WAC",
       "company": {
-        "id": "ddaca995-1c74-4340-9aee-08dc31c4d439",
+        "id": "c4514916-f56d-492b-89c5-80845dd2f83c",
         "logo": null,
         "name": "Wackelwerk",
         "color": "#336699",
@@ -15,8 +15,8 @@
         "sector": "retail",
         "product_key": "online_shop"
       },
-      "ends_at": "2026-11-15T12:42:04.547275+00:00",
-      "starts_at": "2026-11-15T12:12:05.542964+00:00",
+      "ends_at": "2026-11-15T17:40:09.444182+00:00",
+      "starts_at": "2026-11-15T17:10:10.442001+00:00",
       "price_cents": 100,
       "value_cents": 26290000,
       "last_quarter": null,
@@ -27,13 +27,13 @@
       "shares_subscribed_e6": 8500000000
     },
     {
-      "id": "0deb5502-5b64-437d-9695-44176aa0005b",
+      "id": "33124b6a-8a41-467e-ac30-03bfe2ffb238",
       "kind": "ipo",
       "mine": false,
       "status": "open",
       "ticker": null,
       "company": {
-        "id": "a8b438cf-65f2-4b92-bf65-80bcbbee10b7",
+        "id": "da5212bf-07fd-4e4b-96f1-a1aec9fa71fe",
         "logo": null,
         "name": "Bodos Garage",
         "color": "#446622",
@@ -41,25 +41,25 @@
         "sector": "tech",
         "product_key": "security_software"
       },
-      "ends_at": "2026-11-15T13:41:46.243985+00:00",
-      "starts_at": "2026-11-15T12:41:46.243985+00:00",
+      "ends_at": "2026-11-15T18:39:55.435154+00:00",
+      "starts_at": "2026-11-15T17:39:55.435154+00:00",
       "price_cents": 100,
       "value_cents": 307639,
       "last_quarter": null,
       "my_shares_e6": 0,
-      "shares_ai_e6": 2587877582,
+      "shares_ai_e6": 2037440527,
       "my_amount_cents": 0,
       "shares_offered_e6": 200000000000,
       "shares_subscribed_e6": 0
     },
     {
-      "id": "6c5d9406-e395-47cd-aa42-7bc72af1aa15",
+      "id": "ccc60a3f-37e1-4d66-b299-ceb70dc16559",
       "kind": "ipo",
       "mine": false,
       "status": "failed",
       "ticker": null,
       "company": {
-        "id": "eac3b059-abd6-4133-9839-e63e8cf7c4ba",
+        "id": "702d01be-074a-470e-b204-54b6e7106251",
         "logo": null,
         "name": "Kurzwerk",
         "color": "#663399",
@@ -67,8 +67,8 @@
         "sector": "retail",
         "product_key": "online_shop"
       },
-      "ends_at": "2026-11-15T13:42:05.780155+00:00",
-      "starts_at": "2026-11-15T12:42:05.780155+00:00",
+      "ends_at": "2026-11-15T18:40:10.55933+00:00",
+      "starts_at": "2026-11-15T17:40:10.55933+00:00",
       "price_cents": 100,
       "value_cents": 0,
       "last_quarter": null,
@@ -79,13 +79,13 @@
       "shares_subscribed_e6": 800000000
     },
     {
-      "id": "d15f1f2c-e948-4a20-968d-69ed6e10a35a",
+      "id": "8c5db82a-e44e-4d78-9c35-a16161621d5b",
       "kind": "ipo",
       "mine": false,
       "status": "open",
       "ticker": null,
       "company": {
-        "id": "dce19e1f-1152-418b-8eb3-d9dc942e6e63",
+        "id": "9f1e2d7e-48a5-476c-a24c-51bed9ea831c",
         "logo": {
           "grid": [
             "................",
@@ -113,11 +113,11 @@
         "sector": "tech",
         "product_key": "security_software"
       },
-      "ends_at": "2026-11-15T13:42:09.145505+00:00",
-      "starts_at": "2026-11-15T12:42:09.145505+00:00",
+      "ends_at": "2026-11-15T18:40:13.191638+00:00",
+      "starts_at": "2026-11-15T17:40:13.191638+00:00",
       "price_cents": 100,
-      "value_cents": 1087368,
-      "last_quarter": { "label": "J4 Q4", "profit_cents": 0, "revenue_cents": 0 },
+      "value_cents": 1087066,
+      "last_quarter": { "label": "J1 Q1", "profit_cents": 0, "revenue_cents": 0 },
       "my_shares_e6": 250000000,
       "shares_ai_e6": 0,
       "my_amount_cents": 25000,
@@ -125,13 +125,13 @@
       "shares_subscribed_e6": 250000000
     },
     {
-      "id": "34fb7800-1f98-4ac9-970f-4be10e731fb1",
+      "id": "71084292-9433-4036-8750-4b5c6c135c9d",
       "kind": "ipo",
       "mine": false,
       "status": "closed",
       "ticker": "FEN",
       "company": {
-        "id": "c59d965d-0001-4091-95bc-b35c530a6223",
+        "id": "1a447b8f-6cb7-4409-84dc-f019a41d95a5",
         "logo": {
           "grid": [
             "................",
@@ -159,11 +159,11 @@
         "sector": "tech",
         "product_key": "security_software"
       },
-      "ends_at": "2026-11-15T12:41:37.29758+00:00",
-      "starts_at": "2026-11-15T12:41:38.238615+00:00",
+      "ends_at": "2026-11-15T17:39:48.444842+00:00",
+      "starts_at": "2026-11-15T17:39:49.407128+00:00",
       "price_cents": 100,
       "value_cents": 42942499,
-      "last_quarter": { "label": "J1 Q1", "profit_cents": 0, "revenue_cents": 0 },
+      "last_quarter": { "label": "J1 Q2", "profit_cents": 0, "revenue_cents": 0 },
       "my_shares_e6": 0,
       "shares_ai_e6": 299299500000,
       "my_amount_cents": 0,
@@ -171,13 +171,13 @@
       "shares_subscribed_e6": 700500000
     },
     {
-      "id": "293cc246-79d2-4415-be69-75ae45eccbcb",
+      "id": "ecad214c-9c35-4157-b68a-9f9a7a40a0d0",
       "kind": "capital_increase",
       "mine": false,
       "status": "closed",
       "ticker": "FEN",
       "company": {
-        "id": "c59d965d-0001-4091-95bc-b35c530a6223",
+        "id": "1a447b8f-6cb7-4409-84dc-f019a41d95a5",
         "logo": {
           "grid": [
             "................",
@@ -205,11 +205,11 @@
         "sector": "tech",
         "product_key": "security_software"
       },
-      "ends_at": "2026-11-15T12:41:37.479447+00:00",
-      "starts_at": "2026-11-15T12:41:38.419875+00:00",
+      "ends_at": "2026-11-15T17:39:48.548671+00:00",
+      "starts_at": "2026-11-15T17:39:49.515077+00:00",
       "price_cents": 100,
       "value_cents": 42942499,
-      "last_quarter": { "label": "J1 Q1", "profit_cents": 0, "revenue_cents": 0 },
+      "last_quarter": { "label": "J1 Q2", "profit_cents": 0, "revenue_cents": 0 },
       "my_shares_e6": 0,
       "shares_ai_e6": 69124999999,
       "my_amount_cents": 0,
@@ -217,13 +217,13 @@
       "shares_subscribed_e6": 300000000
     },
     {
-      "id": "c15dabed-4feb-4dcf-97c4-02520b1b69fb",
+      "id": "f9630f8c-b6e0-4872-be46-f77e922a9a5a",
       "kind": "ipo",
       "mine": false,
       "status": "closed",
       "ticker": "TAL",
       "company": {
-        "id": "5412d134-3b39-412b-926f-d9f98cb47397",
+        "id": "990e7014-e6fb-4735-8454-2d4f88ef3f02",
         "logo": null,
         "name": "Talwerk",
         "color": "#663399",
@@ -231,8 +231,8 @@
         "sector": "retail",
         "product_key": "online_shop"
       },
-      "ends_at": "2026-11-15T12:42:03.489074+00:00",
-      "starts_at": "2026-11-15T12:12:04.484472+00:00",
+      "ends_at": "2026-11-15T17:40:08.682063+00:00",
+      "starts_at": "2026-11-15T17:10:09.678774+00:00",
       "price_cents": 100,
       "value_cents": 30250000,
       "last_quarter": null,
@@ -243,13 +243,13 @@
       "shares_subscribed_e6": 100000000
     },
     {
-      "id": "46e17870-79fc-4a15-a35e-1378a25450c8",
+      "id": "bd03133a-109a-47f5-97f0-857dabbf1bab",
       "kind": "capital_increase",
       "mine": false,
       "status": "closed",
       "ticker": "WAC",
       "company": {
-        "id": "ddaca995-1c74-4340-9aee-08dc31c4d439",
+        "id": "c4514916-f56d-492b-89c5-80845dd2f83c",
         "logo": null,
         "name": "Wackelwerk",
         "color": "#336699",
@@ -257,8 +257,8 @@
         "sector": "retail",
         "product_key": "online_shop"
       },
-      "ends_at": "2026-11-15T12:42:04.889058+00:00",
-      "starts_at": "2026-11-15T12:42:05.829358+00:00",
+      "ends_at": "2026-11-15T17:40:09.659426+00:00",
+      "starts_at": "2026-11-15T17:40:10.602994+00:00",
       "price_cents": 100,
       "value_cents": 26290000,
       "last_quarter": null,
@@ -269,13 +269,13 @@
       "shares_subscribed_e6": 400000000
     },
     {
-      "id": "613187fb-18eb-4c04-8598-e896263c6ab6",
+      "id": "95f1fe36-4ae6-4d94-87f7-bbc860e462fc",
       "kind": "capital_increase",
       "mine": false,
       "status": "closed",
       "ticker": "KNA",
       "company": {
-        "id": "4035fa82-f4da-4a6b-a607-910e4bf4b9d8",
+        "id": "1a612f79-c951-4118-b822-b5232d32980b",
         "logo": null,
         "name": "Knappwerk",
         "color": "#336699",
@@ -283,8 +283,8 @@
         "sector": "retail",
         "product_key": "online_shop"
       },
-      "ends_at": "2026-11-15T12:42:05.790787+00:00",
-      "starts_at": "2026-11-15T12:42:06.760076+00:00",
+      "ends_at": "2026-11-15T17:40:10.592178+00:00",
+      "starts_at": "2026-11-15T17:40:11.565601+00:00",
       "price_cents": 100,
       "value_cents": 30250000,
       "last_quarter": null,
@@ -295,13 +295,13 @@
       "shares_subscribed_e6": 0
     },
     {
-      "id": "fccaa807-af45-420d-a30c-46cf92588cf9",
+      "id": "a86beabe-d036-4cdf-b7b9-a2f109043668",
       "kind": "ipo",
       "mine": false,
       "status": "closed",
       "ticker": "GIP",
       "company": {
-        "id": "94a2850f-f4cf-4424-993e-066ed3bc3209",
+        "id": "7d7b1df6-13ab-4971-936d-0e0814d477f7",
         "logo": null,
         "name": "Gipfelwerk",
         "color": "#336699",
@@ -309,8 +309,8 @@
         "sector": "retail",
         "product_key": "online_shop"
       },
-      "ends_at": "2026-11-15T13:42:04.288056+00:00",
-      "starts_at": "2026-11-15T12:42:04.288056+00:00",
+      "ends_at": "2026-11-15T18:40:09.560946+00:00",
+      "starts_at": "2026-11-15T17:40:09.560946+00:00",
       "price_cents": 100,
       "value_cents": 20250000,
       "last_quarter": null,
@@ -321,13 +321,13 @@
       "shares_subscribed_e6": 200000000000
     },
     {
-      "id": "0d789f43-9b33-48bf-9bbe-f11e003b2180",
+      "id": "bca33d72-f79f-4eef-bc20-3a92cc800858",
       "kind": "ipo",
       "mine": false,
       "status": "closed",
       "ticker": "WAC",
       "company": {
-        "id": "ddaca995-1c74-4340-9aee-08dc31c4d439",
+        "id": "c4514916-f56d-492b-89c5-80845dd2f83c",
         "logo": null,
         "name": "Wackelwerk",
         "color": "#336699",
@@ -335,8 +335,8 @@
         "sector": "retail",
         "product_key": "online_shop"
       },
-      "ends_at": "2026-11-15T13:42:05.631319+00:00",
-      "starts_at": "2026-11-15T12:42:05.631319+00:00",
+      "ends_at": "2026-11-15T18:40:10.482728+00:00",
+      "starts_at": "2026-11-15T17:40:10.482728+00:00",
       "price_cents": 100,
       "value_cents": 26290000,
       "last_quarter": null,
@@ -347,13 +347,13 @@
       "shares_subscribed_e6": 200000000000
     },
     {
-      "id": "a9e0b11f-b589-41e8-b3fe-c28626b5aca8",
+      "id": "bc5cd7be-3826-4855-a75a-5a83f1b0ffbf",
       "kind": "ipo",
       "mine": false,
       "status": "closed",
       "ticker": "KNA",
       "company": {
-        "id": "4035fa82-f4da-4a6b-a607-910e4bf4b9d8",
+        "id": "1a612f79-c951-4118-b822-b5232d32980b",
         "logo": null,
         "name": "Knappwerk",
         "color": "#336699",
@@ -361,8 +361,8 @@
         "sector": "retail",
         "product_key": "online_shop"
       },
-      "ends_at": "2026-11-15T13:42:06.679251+00:00",
-      "starts_at": "2026-11-15T12:42:06.679251+00:00",
+      "ends_at": "2026-11-15T18:40:11.492093+00:00",
+      "starts_at": "2026-11-15T17:40:11.492093+00:00",
       "price_cents": 100,
       "value_cents": 30250000,
       "last_quarter": null,

@@ -184,6 +184,9 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   Missionsjäger, Teamplayer, Bilanzprofi, Ehrgeiz), ein größerer Tresor (Panzertresor) und vieles für die eigene
   Firma (KI-Turbo, Glückshand, Werbeagentur, Krisenmanager …). Sie schalten sich zwischen Level 1 und 30 frei.
 
+- **Schwerere Missionen, neue Missionen (ADR-159):** Tages- und Wochenmissionen werden mit dem Level anspruchsvoller
+  (Level 10 etwa ×1,4, Level 30 etwa ×2,2). 19 neue Missionen rund um Kleiderschrank, Anstupsen, den Live-Chat der
+  Nachrichten und den Büro-Chat, darunter „Ein legendäres Accessoire“.
 - **Missionen sind immer machbar (ADR-154):** Du bekommst keine Mission mehr, die du nicht schaffen kannst, etwa
   „Stelle eine KI-Kraft ein“ bei voller Firma oder „Deine erste KI-Kraft“, wenn du schon eine hast. Eine solche
   Mission ohne Fortschritt macht Platz für eine neue. Neu: einmalig **„Kauf dir ein Grundstück“ für 5.000 XP**.

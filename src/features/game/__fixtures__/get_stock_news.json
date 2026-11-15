@@ -2,42 +2,42 @@
   "items": [
     {
       "id": 5,
-      "body": "Mehrere Häuser streichen ihre Kaufempfehlung und senken das Kursziel. Sicher ist das nicht.",
-      "name": "Volta Energie AG",
-      "due_at": "2026-11-15T13:55:54.916496+00:00",
+      "body": "Ein fehlerhaftes Produkt muss zurück in die Werkstatt. Das wird teuer. Sicher ist das nicht.",
+      "name": "QuantenSprung Labs",
+      "due_at": "2026-11-15T19:15:28.204784+00:00",
       "status": "open",
-      "ticker": "VLT",
-      "headline": "Analysten-Downgrade für Volta Energie AG",
+      "ticker": "QSL",
+      "headline": "Rückruf bei QuantenSprung Labs",
       "move_bps": null,
-      "strength": 2,
+      "strength": 3,
       "direction": "down",
-      "published_at": "2026-11-15T13:42:13.666972+00:00"
+      "published_at": "2026-11-15T18:40:16.412416+00:00"
     },
     {
       "id": 4,
-      "body": "Ein Vögelchen hat mir gezwitschert: GenoVita Biotech dürfte in der kommenden Stunde nach unten gehen. Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.",
-      "name": "GenoVita Biotech",
-      "due_at": "2026-11-15T13:27:06.271014+00:00",
-      "status": "confirmed",
-      "ticker": "GNV",
-      "headline": "Vom Flurfunk: GenoVita Biotech",
-      "move_bps": -1155,
+      "body": "Ein Vögelchen hat mir gezwitschert: Fundgrube Discount dürfte in der kommenden Stunde nach unten gehen. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
+      "name": "Fundgrube Discount",
+      "due_at": "2026-11-15T18:03:10.936112+00:00",
+      "status": "fizzled",
+      "ticker": "FGD",
+      "headline": "Vom Flurfunk: Fundgrube Discount",
+      "move_bps": null,
       "strength": 2,
       "direction": "down",
-      "published_at": "2026-11-15T12:42:06.271014+00:00"
+      "published_at": "2026-11-15T17:40:10.936112+00:00"
     },
     {
       "id": 3,
-      "body": "Ein Vögelchen hat mir gezwitschert: Helix Robotik dürfte in der kommenden Stunde nach oben gehen. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
-      "name": "Helix Robotik",
-      "due_at": "2026-11-15T12:42:05.098998+00:00",
-      "status": "fizzled",
-      "ticker": "HLX",
-      "headline": "Vom Flurfunk: Helix Robotik",
-      "move_bps": null,
+      "body": "Ein Vögelchen hat mir gezwitschert: Alpenmed dürfte in der kommenden Stunde nach unten gehen. Das Vögelchen lag bisher meistens richtig. Meistens.",
+      "name": "Alpenmed",
+      "due_at": "2026-11-15T17:40:10.117845+00:00",
+      "status": "confirmed",
+      "ticker": "ALM",
+      "headline": "Vom Flurfunk: Alpenmed",
+      "move_bps": -1227,
       "strength": 2,
-      "direction": "up",
-      "published_at": "2026-11-15T12:42:05.098998+00:00"
+      "direction": "down",
+      "published_at": "2026-11-15T17:40:10.117845+00:00"
     }
   ],
   "reliability_bps": 7500

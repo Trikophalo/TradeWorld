@@ -7481,3 +7481,10 @@ Migration `20261204002800_accessories_pokes.sql`. Katalog in `game_config.access
 - **Fehler:** `accessory_unknown` NX130, `accessory_locked` NX131, `accessory_owned` NX132, `accessory_not_owned`
   NX133, `not_friends` NX134, `poke_too_soon` NX135, `poke_daily_limit` NX136.
 - Test `supabase/tests/9m_accessories_friends.sql`.
+
+## Nachtrag: Missionen mit dem Level (ADR-159)
+
+`20261204003500_missions_level_features.sql`: `missions_assign` mit Ziel-Skalierung für gezählte Missionen,
+`mission_doable` und `mission_requirement_ok('accessory')` erweitert, Trigger `mission_feature_events` auf
+`player_accessories`, `player_accessories_worn`, `friend_pokes`, `news_show_messages`, `company_messages`.
+Test `supabase/tests/9r_missions_level_features.sql`.
