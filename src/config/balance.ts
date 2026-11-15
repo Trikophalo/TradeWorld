@@ -6,6 +6,7 @@ import { PITCH_RULES } from "./pitches.ts";
 import { PROTEST_RULES } from "./protests.ts";
 import { NFT_RULES } from "./nfts.ts";
 import { ACCESSORY_RULES } from "./accessories.ts";
+import { BATTLE_RULES } from "./battles.ts";
 import { CRYPTO, type CryptoConfig } from "./crypto.ts";
 import { DEALS, TRUST, type DealsConfig, type TrustConfig } from "./deals.ts";
 import { SKILL_NODES, type SkillBranch, type SkillNodeConfig } from "./skills.ts";
@@ -862,6 +863,8 @@ export interface BalanceConfig {
   readonly nfts: typeof NFT_RULES;
   /** Accessories for the pixel figure (ADR-155). */
   readonly accessories: typeof ACCESSORY_RULES;
+  /** News battles: mini-games among the viewers of the news (ADR-160), values in battles.ts. */
+  readonly battles: typeof BATTLE_RULES;
   /** Mira, the company assistant (ADR-138). */
   readonly companyAssistant: {
     readonly claudePerHour: number;
@@ -2453,6 +2456,7 @@ export const BALANCE = {
   protests: PROTEST_RULES,
   nfts: NFT_RULES,
   accessories: ACCESSORY_RULES,
+  battles: BATTLE_RULES,
   /** Mira, the company assistant (ADR-138): Claude answers per player and hour, length of a message. */
   companyAssistant: {
     claudePerHour: 20,
