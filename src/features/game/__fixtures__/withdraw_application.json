@@ -1,27 +1,27 @@
 {
-  "id": "fe62349c-5e58-4320-983a-393cc9f9d9e7",
+  "id": "6e41cb85-e95f-4561-a3f1-d3e215f7b835",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "09cf82d0-ed5b-4aab-b87d-ffd3f29ab143",
+    "id": "27dfc3bd-a881-4c36-8837-b272b6f22ded",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "7999d809-0066-66e2-e0ac-930c34a49626",
+      "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
       "logo": null,
-      "name": "Fundgrube Discount",
-      "color": "#C2C95B",
+      "name": "QuantenSprung Labs",
+      "color": "#35D0BA",
       "is_ai": true,
-      "sector": "retail",
-      "ticker": "FGD"
+      "sector": "tech",
+      "ticker": "QSL"
     },
-    "required": [{ "branch": "logistics", "min_score": 0 }],
-    "title_key": "logistics_intern",
+    "required": [{ "branch": "management", "min_score": 0 }],
+    "title_key": "management_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-15T17:40:12.593296+00:00",
-  "updated_at": "2026-11-15T17:40:12.596068+00:00",
-  "offer_expires_at": "2026-11-17T17:40:12.593296+00:00",
+  "created_at": "2026-11-15T19:23:47.7274+00:00",
+  "updated_at": "2026-11-15T19:23:47.731367+00:00",
+  "offer_expires_at": "2026-11-17T19:23:47.7274+00:00",
   "salary_wish_cents_per_hour": 15000,
   "offer_salary_cents_per_hour": 15000
 }

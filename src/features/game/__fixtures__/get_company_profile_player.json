@@ -3,31 +3,31 @@
   "facts": {
     "staff": 1,
     "stage": 0,
-    "period": null,
-    "product": "security_software",
+    "period": "quarter",
+    "product": "courier",
     "max_staff": 2,
     "ai_workers": 0,
-    "quality_bps": null,
-    "value_cents": 250000,
-    "profit_cents": null,
-    "awareness_bps": null,
-    "revenue_cents": null
+    "quality_bps": 2325,
+    "value_cents": 295008,
+    "profit_cents": -14992,
+    "awareness_bps": 355,
+    "revenue_cents": 219132
   },
   "company": {
-    "id": "b4f0efd6-a686-492c-8f94-61423703328a",
-    "idea": "Zweiter Anlauf",
+    "id": "8ca19807-128e-4798-b838-2124e787c129",
+    "idea": "Fahrräder reparieren",
     "logo": null,
-    "name": "Fiona Neu",
+    "name": "Gero Werkstatt",
     "tier": "garage",
     "is_ai": false,
     "listed": false,
-    "sector": "tech",
+    "sector": "logistics",
     "ticker": null,
     "price_e4": null,
     "change_bps": null,
-    "founded_at": "2026-11-15T17:39:48.495476+00:00",
-    "brand_color": "#225588"
+    "founded_at": "2026-11-15T19:23:22.127545+00:00",
+    "brand_color": "#aa5500"
   },
-  "founder": { "tag": "JPLN", "nickname": "Fiona_Fabrik", "avatar_key": "rookie" },
+  "founder": { "tag": "LKBG", "nickname": "Gero_Garage", "avatar_key": "rookie" },
   "members": []
 }

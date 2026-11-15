@@ -10,11 +10,11 @@
       "ends_at": null,
       "verdict": null,
       "backfire": null,
-      "event_id": "8c998545-75ac-41f6-be4a-f920a0dac5bb",
+      "event_id": "1fbade44-2194-4c3c-842a-86abf193c0b2",
       "move_kind": null,
       "chance_bps": null,
       "cost_cents": 40000,
-      "created_at": "2026-11-15T17:40:16.859665+00:00",
+      "created_at": "2026-11-15T19:23:51.816283+00:00",
       "resolved_at": null,
       "failure_text": null,
       "result_cents": 0,
@@ -22,7 +22,7 @@
       "backfire_text": null
     }
   ],
-  "event_id": "8c998545-75ac-41f6-be4a-f920a0dac5bb",
+  "event_id": "1fbade44-2194-4c3c-842a-86abf193c0b2",
   "next_order_at": null,
   "move_cost_cents": 120000,
   "event_cost_cents": 40000

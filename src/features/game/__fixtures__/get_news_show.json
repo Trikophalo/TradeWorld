@@ -1,9 +1,9 @@
 {
-  "now": "2026-11-15T17:40:17.003121+00:00",
+  "now": "2026-11-15T19:23:51.904122+00:00",
   "chat": [
     {
-      "at": "2026-11-15T17:40:16.999524+00:00",
-      "id": 206,
+      "at": "2026-11-15T19:23:51.901082+00:00",
+      "id": 216,
       "body": "Was für eine Sendung 💀📉",
       "mine": true,
       "nickname": "Fixture_Neu"
@@ -12,82 +12,75 @@
   "show": {
     "id": 6,
     "writer": "mini",
-    "airs_at": "2026-11-15T17:00:00+00:00",
+    "airs_at": "2026-11-15T19:00:00+00:00",
     "segments": [
       {
         "kind": "gossip",
-        "mood": "shocked",
-        "text": "Ich fasse es nicht, aber es stimmt. Sven_Small meldet: Sven Handel gegründet. Genieß es, nächste Woche lachen wir wieder über dich.",
+        "mood": "proud",
+        "text": "Ich fasse es nicht, aber es stimmt. Fixture_Lieferant meldet: Fixture Lieferwerk gegründet. Ich bin fast stolz. Fast.",
         "effects": [],
-        "headline": "Na so was: Sven_Small"
+        "headline": "Na so was: Fixture_Lieferant"
       },
       {
         "kind": "hype",
-        "mood": "laughing",
-        "text": "Unfassbar, aber wahr: Gero Werkstatt ist der Renner. Ein Video über die Firma hat heute das Internet geflutet. „Fahrräder reparieren“ geht weg wie warme Semmeln. Gero_Garage soll vor Freude geweint haben.",
-        "effects": [{ "tone": "gain", "label": "Bekanntheit +10,6 %" }],
-        "headline": "Alle wollen Gero Werkstatt"
+        "mood": "proud",
+        "text": "Ein Kind hat im Schulaufsatz darüber geschrieben, die Klasse war begeistert. Plötzlich will jeder „Neue Schrauben“. Kai_Kopie tut so, als sei das alles geplant gewesen. Wir tun so, als würden wir das glauben.",
+        "effects": [{ "tone": "gain", "label": "Bekanntheit +19,7 %" }],
+        "headline": "Gleich Werk geht viral"
       },
       {
         "kind": "nft",
-        "mood": "shocked",
-        "text": "Kunstmarkt, oder was man dafür hält: „Neon Nacht“ von Nina_Neon ging für 30.000 € an Ben_Bieter. Kunst ist, wenn einer zahlt. Glückwunsch an alle Beteiligten.",
+        "mood": "laughing",
+        "text": "Ben_Bieter zahlt 30.000 € für „Neon Nacht“, gemalt von Nina_Neon. Der Käufer nennt es eine Wertanlage, sein Bankberater nennt es einen Hilferuf.",
         "effects": [],
-        "headline": "30.000 € für ein paar Pixel"
+        "headline": "NFT-Wahnsinn um „Neon Nacht“"
       },
       {
         "kind": "winner",
-        "mood": "proud",
-        "text": "11389,2 % Plus, 1.138.921 € Gewinn: Fixture_Neu zeigt dem Rest, wie es geht. Ob das Können war oder pures Glück, klärt die Staatsanwaltschaft.",
+        "mood": "shocked",
+        "text": "Und nun zu jemandem, der es kann: Fixture_Neu hat heute 1.138.924 € gemacht, 11389,2 % im Plus. Insider vermuten eine Glaskugel im Keller.",
         "effects": [],
-        "headline": "Fixture_Neu schwimmt im Geld"
+        "headline": "Fixture_Neu sahnt ab: plus 1.138.924 €"
       },
       {
         "kind": "gossip",
-        "mood": "shocked",
-        "text": "Ich fasse es nicht, aber es stimmt. Acc_Bruno meldet: Level 30 erreicht. Ich hätte keinen Cent darauf gewettet, und ich wette auf alles.",
+        "mood": "proud",
+        "text": "Gute Nachrichten, ausnahmsweise. Bei Kira_Kollege heißt es: Kira Apps gegründet. Meine Schwiegermutter hat es vorausgesagt, und die liegt sonst immer falsch.",
         "effects": [],
-        "headline": "Na so was: Acc_Bruno"
+        "headline": "Kira_Kollege hat es geschafft"
       },
       {
-        "kind": "scandal",
-        "mood": "shocked",
-        "text": "Das Netz zerreißt Kurt Kurierdienst. Im Lager wurde ein Praktikant gefunden, der seit drei Wochen vermisst war. Er hatte niemandem gefehlt. Seitdem will niemand mehr „Pakete mit dem Rad“. Kurt_Kurier hat das Firmenhandy im Fluss versenkt.",
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −19,9 %" }],
-        "headline": "Shitstorm über Kurt Kurierdienst"
-      },
-      {
-        "kind": "ramble",
-        "mood": "crying",
-        "text": "Wo war ich? Egal. Mein Nachbar grillt seit drei Tagen dasselbe Würstchen. Ich bewundere seine Geduld. Zurück zu den Nachrichten, falls jemand weiß, wo sie liegen.",
-        "effects": [],
-        "headline": "Mr. Doodle Dangle schweift ab"
+        "kind": "hype",
+        "mood": "proud",
+        "text": "Sogar die Steuerprüfung kam privat vorbei, um einzukaufen. Plötzlich will jeder „Shirts mit Haltung“. Mona_Mode tut so, als sei das alles geplant gewesen. Wir tun so, als würden wir das glauben.",
+        "effects": [{ "tone": "gain", "label": "Bekanntheit +13,4 %" }],
+        "headline": "Mona Moden geht viral"
       },
       {
         "kind": "tasks",
-        "mood": "proud",
-        "text": "Die Leute haben gemerkt, dass Sparen keinen Spaß macht. Offene Aufgaben bringen 33,3 % mehr. Wer jetzt Pause macht, ist selbst schuld.",
-        "effects": [{ "tone": "gain", "label": "Aufgaben +33,3 %" }],
-        "headline": "Kunden zahlen jeden Preis"
+        "mood": "laughing",
+        "text": "Die Leute haben gemerkt, dass Sparen keinen Spaß macht. Alle offenen Firmen-Aufgaben sind ab sofort 30,5 % mehr wert. An die Arbeit, ihr faulen Säcke!",
+        "effects": [{ "tone": "gain", "label": "Aufgaben +30,5 %" }],
+        "headline": "Auftragsflut im ganzen Land"
       },
       {
         "kind": "stock",
-        "mood": "proud",
-        "text": "Im Keller wurde Öl gefunden, es war zwar Salatöl, aber die Stimmung ist prächtig. Die Börse feiert: Pfotenwohl steigt um 17 %. Wer nicht dabei ist, darf sich jetzt ärgern.",
-        "effects": [{ "tone": "gain", "label": "PFW +17 %" }],
-        "headline": "Kursrakete Pfotenwohl"
+        "mood": "shocked",
+        "text": "QuantenSprung Labs verliert 10,2 %. Die Geschäftszahlen wurden mit einem Würfel ermittelt, und selbst der hatte Pech. Die Anleger nehmen Reißaus.",
+        "effects": [{ "tone": "loss", "label": "QSL −10,2 %" }],
+        "headline": "QuantenSprung Labs stürzt ab"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Orbitfracht geht bald nach unten. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
-        "effects": [{ "tone": "neutral", "label": "OFR ↓ Tipp" }],
-        "headline": "Der heiße Draht: Orbitfracht"
+        "text": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Volta Energie AG tut sich in der nächsten Stunde etwas, und zwar nach oben. Das Vögelchen lag bisher meistens richtig. Meistens.",
+        "effects": [{ "tone": "neutral", "label": "VLT ↑ Tipp" }],
+        "headline": "Mr. Doodle Dangles Geheimtipp"
       }
     ],
-    "started_at": "2026-11-15T17:40:17.003121+00:00"
+    "started_at": "2026-11-15T19:23:51.904122+00:00"
   },
-  "viewers": 5,
+  "viewers": 21,
   "upcoming": null,
-  "next_airs_at": "2026-11-15T18:00:00+00:00"
+  "next_airs_at": "2026-11-15T20:00:00+00:00"
 }

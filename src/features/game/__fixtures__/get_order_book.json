@@ -1,18 +1,18 @@
 {
   "asks": [
-    { "players": 0, "price_e4": 825105, "quantity_e6": 9484000000 },
-    { "players": 0, "price_e4": 825931, "quantity_e6": 9432000000 },
-    { "players": 0, "price_e4": 826756, "quantity_e6": 10153000000 },
-    { "players": 0, "price_e4": 827581, "quantity_e6": 9485000000 },
-    { "players": 0, "price_e4": 828406, "quantity_e6": 10202000000 },
-    { "players": 0, "price_e4": 829231, "quantity_e6": 9224000000 }
+    { "players": 0, "price_e4": 844624, "quantity_e6": 9484000000 },
+    { "players": 0, "price_e4": 845469, "quantity_e6": 9432000000 },
+    { "players": 0, "price_e4": 846314, "quantity_e6": 10153000000 },
+    { "players": 0, "price_e4": 847158, "quantity_e6": 9485000000 },
+    { "players": 0, "price_e4": 848003, "quantity_e6": 10202000000 },
+    { "players": 0, "price_e4": 848848, "quantity_e6": 9224000000 }
   ],
   "bids": [
-    { "players": 0, "price_e4": 822083, "quantity_e6": 11709000000 },
-    { "players": 0, "price_e4": 821260, "quantity_e6": 8337000000 },
-    { "players": 0, "price_e4": 820438, "quantity_e6": 10915000000 },
-    { "players": 0, "price_e4": 819616, "quantity_e6": 8698000000 },
-    { "players": 0, "price_e4": 818794, "quantity_e6": 11498000000 },
-    { "players": 0, "price_e4": 817972, "quantity_e6": 11598000000 }
+    { "players": 0, "price_e4": 841756, "quantity_e6": 11709000000 },
+    { "players": 0, "price_e4": 840914, "quantity_e6": 8337000000 },
+    { "players": 0, "price_e4": 840072, "quantity_e6": 10915000000 },
+    { "players": 0, "price_e4": 839230, "quantity_e6": 8698000000 },
+    { "players": 0, "price_e4": 838388, "quantity_e6": 11498000000 },
+    { "players": 0, "price_e4": 837547, "quantity_e6": 11598000000 }
   ]
 }

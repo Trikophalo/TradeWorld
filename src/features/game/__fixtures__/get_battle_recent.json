@@ -1,0 +1,128 @@
+{
+  "now": "2026-11-15T19:23:52.049268+00:00",
+  "battle": {
+    "id": 13,
+    "kind": null,
+    "seed": null,
+    "prize": {
+      "kind": "skin",
+      "accessories": [
+        "battle_crown",
+        "laurel_wreath",
+        "champion_belt",
+        "victory_cape",
+        "star_shades",
+        "golden_joystick",
+        "winner_trophy",
+        "mini_bull"
+      ]
+    },
+    "joined": false,
+    "params": null,
+    "result": null,
+    "rounds": null,
+    "status": "open",
+    "ends_at": null,
+    "players": [],
+    "opened_at": "2026-11-15T19:23:52.049268+00:00",
+    "started_at": null,
+    "finished_at": null,
+    "max_players": 10,
+    "min_players": 3,
+    "prize_wins_left": 2,
+    "countdown_ends_at": null
+  },
+  "recent": {
+    "id": 12,
+    "kind": "floor",
+    "seed": 2525991653,
+    "prize": { "kind": "money", "cents": 525000 },
+    "joined": true,
+    "params": {
+      "h": 9,
+      "w": 11,
+      "tps": 20,
+      "game": {
+        "crackMax": 9,
+        "maxTicks": 1400,
+        "firstWave": 60,
+        "warnTicks": 24,
+        "waveEvery": 50,
+        "crackStart": 3,
+        "stompTicks": 50,
+        "endgameTiles": 8,
+        "waveEveryMin": 18,
+        "waveEveryStep": 2,
+        "crackGrowEvery": 2
+      },
+      "spawns": [
+        [1, 1],
+        [9, 7],
+        [9, 1],
+        [1, 7],
+        [5, 1],
+        [5, 7],
+        [1, 4],
+        [9, 4],
+        [3, 4],
+        [7, 4]
+      ],
+      "tickMs": 50,
+      "graceMs": 1000,
+      "stepTicks": 4,
+      "aheadTicks": 10,
+      "checkEveryMs": 1000,
+      "disconnectTicks": 80
+    },
+    "result": {
+      "out": [-1, 73, 73],
+      "paid": true,
+      "prize": { "kind": "money", "cents": 525000 },
+      "score": [1, 0, 0],
+      "capped": false,
+      "ranking": [0, 1, 2],
+      "end_tick": 73,
+      "winner_slot": 0
+    },
+    "rounds": null,
+    "status": "finished",
+    "ends_at": "2026-11-15T19:23:51.041018+00:00",
+    "players": [
+      {
+        "me": true,
+        "left": false,
+        "rank": 1,
+        "slot": 0,
+        "nickname": "Fixture_Neu",
+        "avatar_key": "coder",
+        "accessories": ["party_hat"]
+      },
+      {
+        "me": false,
+        "left": false,
+        "rank": 2,
+        "slot": 1,
+        "nickname": "Fixture_Bat1",
+        "avatar_key": "rookie",
+        "accessories": []
+      },
+      {
+        "me": false,
+        "left": false,
+        "rank": 3,
+        "slot": 2,
+        "nickname": "Fixture_Bat2",
+        "avatar_key": "rookie",
+        "accessories": []
+      }
+    ],
+    "opened_at": "2026-11-15T19:23:51.977851+00:00",
+    "started_at": "2026-11-15T19:22:32.041018+00:00",
+    "finished_at": "2026-11-15T19:23:52.041483+00:00",
+    "max_players": 10,
+    "min_players": 3,
+    "prize_wins_left": 2,
+    "countdown_ends_at": null
+  },
+  "viewers": 23
+}

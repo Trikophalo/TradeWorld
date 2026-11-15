@@ -1,5 +1,5 @@
 {
-  "id": "91b35a2b-30e7-4f66-a28b-137813a2bfa6",
+  "id": "6c557e7f-b6c3-4b93-a913-ad4f2485d89e",
   "kind": "loan",
   "terms": { "hours": 24, "interest_bps": 0, "principal_cents": 20000 },
   "status": "cancelled",
@@ -9,15 +9,15 @@
   "my_role": "lender",
   "progress": { "due_cents": 20000, "left_cents": 20000, "repaid_cents": 0 },
   "proposer": {
-    "tag": "3HV7",
+    "tag": "JXUX",
     "level": 6,
     "trust": { "band": "blank", "score": 50 },
     "nickname": "Fixture_Lieferant",
     "avatar_key": "rookie"
   },
-  "closed_at": "2026-11-15T17:40:15.434807+00:00",
-  "created_at": "2026-11-15T17:40:15.432264+00:00",
-  "expires_at": "2026-11-17T17:40:15.432264+00:00",
+  "closed_at": "2026-11-15T19:23:50.45725+00:00",
+  "created_at": "2026-11-15T19:23:50.454402+00:00",
+  "expires_at": "2026-11-17T19:23:50.454402+00:00",
   "accepted_at": null,
   "is_proposer": true,
   "broken_by_me": false,

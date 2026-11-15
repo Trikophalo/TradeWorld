@@ -1203,3 +1203,74 @@ select public.poke_friend(gen_random_uuid(), 'Fixture_Kunst');
 select public.get_friends();
 \o
 reset role;
+
+-- News battles (ADR-160): the lobby, a quiz, an estimate, the bell, an action game, the podium ------------------------
+\set fb1 '''f1f1f1f1-0000-4000-8000-0000000000b1'''
+\set fb2 '''f1f1f1f1-0000-4000-8000-0000000000b2'''
+update public.invite_codes set max_uses = max_uses + 2 where code = 'M1-TESTS';
+select tests.signup(:fb1, 'Fixture_Bat1') is not null and tests.signup(:fb2, 'Fixture_Bat2') is not null as ok \gset
+update public.profiles set level = 3, xp_total = public.xp_total_for_level(3) where id in (:fb1, :fb2);
+update public.battle_players set active = false where active;
+update public.battles set status = 'cancelled', finished_at = now() where status in ('open', 'running');
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/get_battle.json
+select public.get_battle();
+\o :fixture_dir/battle_join.json
+select public.battle_join(gen_random_uuid());
+\o :fixture_dir/battle_leave.json
+select public.battle_leave(gen_random_uuid());
+\o
+select public.battle_join(gen_random_uuid()) is not null as ok \gset
+reset role;
+select tests.login_as('authenticated', :fb1) is null as ok \gset
+select public.get_battle() is not null and public.battle_join(gen_random_uuid()) is not null as ok \gset
+reset role;
+select tests.login_as('authenticated', :fb2) is null as ok \gset
+select public.get_battle() is not null and public.battle_join(gen_random_uuid()) is not null as ok \gset
+reset role;
+update public.battles set countdown_ends_at = now() - interval '1 second', prize = '{"kind":"money"}' where status = 'open';
+select public.battle_maintain(now()) is null as ok \gset
+update public.battles set kind = 'quiz', params = public.battle_params('quiz'), plan = public.battle_plan('quiz', public.battle_params('quiz')),
+                          started_at = now() - interval '12 seconds', ends_at = now() + interval '90 seconds'
+ where status = 'running';
+select id as fx_bid from public.battles where status = 'running' \gset
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/battle_answer.json
+select public.battle_answer(gen_random_uuid(), :fx_bid, 1, 2, null);
+\o :fixture_dir/get_battle_quiz.json
+select public.get_battle();
+\o
+reset role;
+update public.battles set kind = 'estimate', params = public.battle_params('estimate'),
+                          plan = public.battle_plan('estimate', public.battle_params('estimate')),
+                          started_at = now() - interval '17 seconds'
+ where status = 'running';
+select tests.login_as('authenticated', :p) is null as ok \gset
+select public.battle_answer(gen_random_uuid(), :fx_bid, 1, null, 123.45) is not null as ok \gset
+\o :fixture_dir/get_battle_estimate.json
+select public.get_battle();
+\o
+reset role;
+update public.battles set kind = 'bell', params = public.battle_params('bell'),
+                          plan = '{"waits":[1500,2000,2500,3000,3500,4000,1500,2000,2500]}', started_at = now() - interval '3500 milliseconds'
+ where status = 'running';
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/get_battle_bell.json
+select public.get_battle();
+\o
+reset role;
+update public.battles set kind = 'floor', params = public.battle_params('floor'), plan = '{}',
+                          started_at = now() - interval '2 seconds', ends_at = now() + interval '70 seconds'
+ where status = 'running';
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/battle_sync.json
+select public.battle_sync(:fx_bid, 30, '2222', 0, null);
+\o
+reset role;
+update public.battles set started_at = now() - interval '80 seconds', ends_at = now() - interval '1 second' where status = 'running';
+select public.battle_maintain(now()) is null as ok \gset
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/get_battle_recent.json
+select public.get_battle();
+\o
+reset role;

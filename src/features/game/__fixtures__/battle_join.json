@@ -1,0 +1,182 @@
+{
+  "now": "2026-11-15T19:23:51.982974+00:00",
+  "battle": {
+    "id": 12,
+    "kind": null,
+    "seed": null,
+    "prize": {
+      "kind": "nft",
+      "artwork": {
+        "id": "a56db73d-e36c-482d-9c1b-58af0cefff01",
+        "title": "Skyline im Mondlicht",
+        "pixels": {
+          "grid": [
+            "00000000000000000000000000000000",
+            "00000000000000000000040000000000",
+            "00000000080000000000000000000000",
+            "00000000800000008000000044400000",
+            "00000000004000000080000444440008",
+            "00000000400040000000004444444000",
+            "00000000000000000000004444444000",
+            "00000000008000000000004444444000",
+            "00000000000000800000000444440000",
+            "00008000000000000000040044400000",
+            "11111111111118118111111111111118",
+            "11111411111111111111111118111111",
+            "11111111111111811111111111114111",
+            "11111111181111111111111111111111",
+            "11111555555511811111111111111111",
+            "81111555555511811181111111118111",
+            "11111535357566611111111111111111",
+            "11111555555566611111111111111111",
+            "11111535553563611111115555511111",
+            "11111555555566655555555555511111",
+            "55555555355563655555555555555552",
+            "55555555555566655535355555555552",
+            "57555535353567655555555753555552",
+            "55555555555566653575555555555556",
+            "53535535555566655555555353555556",
+            "55555555555566657535355555555556",
+            "55555575355567655555555555553556",
+            "55555555555566655555555555555556",
+            "55535555553563655555555555555556",
+            "55555555555566653555355555555556",
+            "53535575555567655555555553555556",
+            "55555555555566655555555555555556"
+          ],
+          "palette": [
+            "#0b0e1f",
+            "#15193a",
+            "#232a57",
+            "#ffe9a3",
+            "#fff6d8",
+            "#2b2f45",
+            "#3c425e",
+            "#ffcf4d",
+            "#9ad8ff",
+            "#5d6679"
+          ]
+        },
+        "rarity": "common",
+        "serial": 12
+      }
+    },
+    "joined": true,
+    "params": null,
+    "result": null,
+    "rounds": null,
+    "status": "open",
+    "ends_at": null,
+    "players": [
+      {
+        "me": true,
+        "left": false,
+        "rank": null,
+        "slot": null,
+        "nickname": "Fixture_Neu",
+        "avatar_key": "coder",
+        "accessories": ["party_hat"]
+      }
+    ],
+    "opened_at": "2026-11-15T19:23:51.977851+00:00",
+    "started_at": null,
+    "finished_at": null,
+    "max_players": 10,
+    "min_players": 3,
+    "prize_wins_left": 3,
+    "countdown_ends_at": null
+  },
+  "recent": {
+    "id": 11,
+    "kind": "pump",
+    "seed": 3879046088,
+    "prize": { "xp": 2900, "kind": "xp" },
+    "joined": false,
+    "params": {
+      "h": 9,
+      "w": 11,
+      "tps": 20,
+      "game": {
+        "redMin": 20,
+        "greenMin": 40,
+        "goldEvery": 4,
+        "goldTicks": 20,
+        "goldValue": 3,
+        "redJitter": 20,
+        "bustLossBps": 2500,
+        "greenJitter": 60,
+        "yellowTicks": 12,
+        "durationTicks": 600,
+        "bustFreezeTicks": 20
+      },
+      "spawns": [
+        [1, 1],
+        [9, 7],
+        [9, 1],
+        [1, 7],
+        [5, 1],
+        [5, 7],
+        [1, 4],
+        [9, 4],
+        [3, 4],
+        [7, 4]
+      ],
+      "tickMs": 50,
+      "graceMs": 1000,
+      "stepTicks": 4,
+      "aheadTicks": 10,
+      "checkEveryMs": 1000,
+      "disconnectTicks": 80
+    },
+    "result": {
+      "out": [79, 79, -1],
+      "paid": true,
+      "prize": { "xp": 2900, "kind": "xp" },
+      "score": [0, 0, 80],
+      "capped": false,
+      "ranking": [2, 0, 1],
+      "end_tick": 79,
+      "winner_slot": 2
+    },
+    "rounds": null,
+    "status": "finished",
+    "ends_at": "2026-11-15T19:23:46.244061+00:00",
+    "players": [
+      {
+        "me": false,
+        "left": false,
+        "rank": 2,
+        "slot": 0,
+        "nickname": "Bat_Bruno",
+        "avatar_key": "rookie",
+        "accessories": []
+      },
+      {
+        "me": false,
+        "left": false,
+        "rank": 3,
+        "slot": 1,
+        "nickname": "Bat_Clara",
+        "avatar_key": "rookie",
+        "accessories": []
+      },
+      {
+        "me": false,
+        "left": false,
+        "rank": 1,
+        "slot": 2,
+        "nickname": "Bat_Emil",
+        "avatar_key": "rookie",
+        "accessories": []
+      }
+    ],
+    "opened_at": "2026-11-15T19:23:47.227321+00:00",
+    "started_at": "2026-11-15T19:23:07.244061+00:00",
+    "finished_at": "2026-11-15T19:23:47.245603+00:00",
+    "max_players": 10,
+    "min_players": 3,
+    "prize_wins_left": 3,
+    "countdown_ends_at": null
+  },
+  "viewers": 21
+}
