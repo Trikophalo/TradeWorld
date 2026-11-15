@@ -6,4 +6,5 @@ export const RARITY_STYLE: Readonly<Record<AccessoryRarity, { text: string; soft
   rare: { text: "text-info", soft: "bg-info-soft", ring: "ring-info" },
   epic: { text: "text-accent", soft: "bg-accent-soft", ring: "ring-accent" },
   legendary: { text: "text-gold", soft: "bg-gold/15", ring: "ring-gold" },
+  mythic: { text: "text-loss", soft: "bg-linear-to-br from-loss-soft via-accent-soft to-gold/20", ring: "ring-loss" },
 };

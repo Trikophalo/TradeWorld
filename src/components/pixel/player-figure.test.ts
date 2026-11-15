@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ACCESSORIES, ACCESSORY_RARITIES, ACCESSORY_SLOTS, accessoryByKey } from "@/config/accessories";
+import { ACCESSORIES, ACCESSORY_RARITIES, ACCESSORY_SETS, ACCESSORY_SLOTS, accessoryByKey } from "@/config/accessories";
 import { BALANCE } from "@/config/balance";
 import { ACCESSORY_ART } from "./accessories";
 import { AVATAR_ART } from "./avatars";
@@ -10,8 +10,8 @@ const at = (art: { grid: readonly string[]; palette: Readonly<Record<string, str
   art.palette[art.grid[y]![x]!] ?? null;
 
 describe("accessory catalogue (ADR-155)", () => {
-  it("has at least 40 accessories with unique keys, every slot and rarity", () => {
-    expect(ACCESSORIES.length).toBeGreaterThanOrEqual(40);
+  it("has well over 100 accessories with unique keys, every slot and rarity", () => {
+    expect(ACCESSORIES.length).toBeGreaterThanOrEqual(120);
     expect(new Set(ACCESSORIES.map((a) => a.key)).size).toBe(ACCESSORIES.length);
     for (const slot of ACCESSORY_SLOTS)
       expect(
@@ -43,9 +43,30 @@ describe("accessory catalogue (ADR-155)", () => {
         Math.max(...range(ACCESSORY_RARITIES[i - 1]!)),
       );
     }
-    // common ones are affordable from the starting capital, legendary ones are status items in the millions
-    expect(Math.max(...range("common"))).toBeLessThan(BALANCE.economy.startingCapitalCents / 10);
-    expect(Math.min(...range("legendary"))).toBeGreaterThanOrEqual(50_000_000);
+    // common ones are affordable from the starting capital (several of them), legendary ones cost millions,
+    // the mythic showpieces hundreds of millions
+    expect(Math.max(...range("common"))).toBeLessThan(BALANCE.economy.startingCapitalCents / 3);
+    expect(Math.min(...range("common"))).toBeLessThan(BALANCE.economy.startingCapitalCents / 10);
+    expect(Math.min(...range("legendary"))).toBeGreaterThanOrEqual(500_000_000);
+    expect(Math.min(...range("mythic"))).toBeGreaterThanOrEqual(10_000_000_000);
+    for (const a of ACCESSORIES) expect(Number.isSafeInteger(a.priceCents), a.key).toBe(true);
+  });
+
+  it("every slot has something for new players and a rare-or-better piece", () => {
+    for (const slot of ACCESSORY_SLOTS) {
+      const inSlot = ACCESSORIES.filter((a) => a.slot === slot);
+      expect(
+        inSlot.some((a) => a.rarity === "common" && a.minLevel === 1),
+        slot,
+      ).toBe(true);
+      expect(inSlot.length, slot).toBeGreaterThanOrEqual(12);
+    }
+  });
+
+  it("themed sets are known and have at least four pieces", () => {
+    for (const a of ACCESSORIES) if (a.set) expect(ACCESSORY_SETS, a.key).toContain(a.set);
+    for (const set of ACCESSORY_SETS)
+      expect(ACCESSORIES.filter((a) => a.set === set).length, set).toBeGreaterThanOrEqual(4);
   });
 });
 

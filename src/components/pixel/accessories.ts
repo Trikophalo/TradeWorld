@@ -5,6 +5,8 @@
  * Pure data. Keys are those of src/config/accessories.ts.
  */
 
+import { SECOND_ACCESSORY_ART } from "./accessories-second";
+
 export interface AccessoryArt {
   readonly x: number;
   readonly y: number;
@@ -12,7 +14,7 @@ export interface AccessoryArt {
   readonly palette: Readonly<Record<string, string>>;
 }
 
-export const ACCESSORY_ART: Readonly<Record<string, AccessoryArt>> = {
+const FIRST_ACCESSORY_ART: Readonly<Record<string, AccessoryArt>> = {
   party_hat: {
     x: 8,
     y: 0,
@@ -852,4 +854,10 @@ export const ACCESSORY_ART: Readonly<Record<string, AccessoryArt>> = {
       "..o..................o..",
     ],
   },
+};
+
+/** All accessory sprites by key: the first collection above and the second one (ADR-155 addendum). */
+export const ACCESSORY_ART: Readonly<Record<string, AccessoryArt>> = {
+  ...FIRST_ACCESSORY_ART,
+  ...SECOND_ACCESSORY_ART,
 };
