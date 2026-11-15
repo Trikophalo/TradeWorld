@@ -24,10 +24,10 @@
   "inventory": {
     "cars": [],
     "furniture": [
-      { "id": "5c6d9c4d-0d45-41b5-8b4e-51cbe5b0cfaf", "item_key": "sofa_leather", "value_cents": 240000 },
-      { "id": "5dc29afc-d038-4157-8761-22f895b788d8", "item_key": "rug_wool", "value_cents": 65000 },
-      { "id": "37d60f61-5437-4e00-b185-d9a0505f9844", "item_key": "plant_small", "value_cents": 3000 },
-      { "id": "722cc0f1-1015-461c-b355-90b66e2ed453", "item_key": "plant_small", "value_cents": 3000 }
+      { "id": "6888db01-bbc0-440b-a993-5772e27e30df", "item_key": "sofa_leather", "value_cents": 240000 },
+      { "id": "d5f64425-3c8d-43ed-ae11-654df7478d4f", "item_key": "rug_wool", "value_cents": 65000 },
+      { "id": "25df4539-9d4f-4053-9e73-d32d6dfb10c8", "item_key": "plant_small", "value_cents": 3000 },
+      { "id": "bfcc86c1-3a9e-470a-8618-364753be3801", "item_key": "plant_small", "value_cents": 3000 }
     ]
   },
   "cost_cents": 48750000

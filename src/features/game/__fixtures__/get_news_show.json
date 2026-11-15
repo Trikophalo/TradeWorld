@@ -1,8 +1,8 @@
 {
-  "now": "2026-11-15T20:41:14.544947+00:00",
+  "now": "2026-11-15T21:17:24.025092+00:00",
   "chat": [
     {
-      "at": "2026-11-15T20:41:14.537904+00:00",
+      "at": "2026-11-15T21:17:24.022055+00:00",
       "id": 218,
       "bot": false,
       "body": "Was für eine Sendung 💀📉",
@@ -13,28 +13,31 @@
   "show": {
     "id": 7,
     "writer": "mini",
-    "airs_at": "2026-11-15T20:00:00+00:00",
+    "airs_at": "2026-11-15T21:00:00+00:00",
     "segments": [
       {
         "kind": "gossip",
         "mood": "proud",
-        "text": "Gute Nachrichten, ausnahmsweise. Bei Wim_Weg heißt es: Neuer Job bei Fundgrube Discount. Ich hätte keinen Cent darauf gewettet, und ich wette auf alles.",
-        "figure": { "nickname": "Wim_Weg", "avatar_key": "rookie", "accessories": [] },
+        "text": "Bitte festhalten: Deal mit Fixture_Lieferant per Handschlag, und zwar bei Fixture_Abnehmer. Meine Schwiegermutter hat es vorausgesagt, und die liegt sonst immer falsch.",
+        "figure": { "nickname": "Fixture_Abnehmer", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Wim_Weg hat es geschafft"
+        "headline": "Applaus für Fixture_Abnehmer"
       },
       {
-        "kind": "scandal",
-        "mood": "angry",
-        "text": "Das Netz zerreißt Xp Werkstatt. Auf dem Firmenparkplatz wurde ein illegales Bobbycar-Rennen ausgehoben. Seitdem will niemand mehr „Fahrräder reparieren“. Xp_Chefin hat das Firmenhandy im Fluss versenkt.",
-        "figure": { "nickname": "Xp_Chefin", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −11,3 %" }],
-        "headline": "Shitstorm über Xp Werkstatt"
+        "kind": "hype",
+        "mood": "laughing",
+        "text": "Wackelwerk räumt ab. Sogar die Steuerprüfung kam privat vorbei, um einzukaufen. Esc_Frida hängt sich das gerahmt ins Büro. Die Kundschaft rennt die Tür ein.",
+        "figure": { "nickname": "Esc_Frida", "avatar_key": "rookie", "accessories": [] },
+        "effects": [
+          { "tone": "gain", "label": "Bekanntheit +20 %" },
+          { "tone": "gain", "label": "WAC +8,2 %" }
+        ],
+        "headline": "Ritterschlag für Wackelwerk"
       },
       {
         "kind": "nft",
-        "mood": "shocked",
-        "text": "Ben_Bieter zahlt 30.000 € für „Neon Nacht“, gemalt von Nina_Neon. Ich verstehe es nicht, also muss es teuer sein.",
+        "mood": "confused",
+        "text": "Ben_Bieter zahlt 30.000 € für „Neon Nacht“, gemalt von Nina_Neon. Mein Enkel malt so etwas mit Fingerfarbe, und der will dafür nur ein Eis.",
         "figure": { "nickname": "Nina_Neon", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
         "headline": "NFT-Wahnsinn um „Neon Nacht“"
@@ -42,50 +45,57 @@
       {
         "kind": "winner",
         "mood": "shocked",
-        "text": "Und nun zu jemandem, der es kann: Fixture_Neu hat heute 1.139.395 € gemacht, 11394 % im Plus. Bitte nicht nachmachen, ihr könnt das nicht.",
+        "text": "Und nun zu jemandem, der es kann: Fixture_Neu hat heute 1.139.380 € gemacht, 11393,8 % im Plus. Bitte nicht nachmachen, ihr könnt das nicht.",
         "figure": { "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] },
         "effects": [],
-        "headline": "Fixture_Neu sahnt ab: plus 1.139.395 €"
+        "headline": "Fixture_Neu sahnt ab: plus 1.139.380 €"
       },
       {
         "kind": "gossip",
         "mood": "proud",
-        "text": "Bitte festhalten: Level 10 erreicht, und zwar bei Lohn_Chefin. Genieß es, nächste Woche lachen wir wieder über dich.",
-        "figure": { "nickname": "Lohn_Chefin", "avatar_key": "rookie", "accessories": [] },
+        "text": "Bitte festhalten: Level 5 erreicht, und zwar bei Berta_Chefin. Glückwunsch, und jetzt bloß nichts anfassen.",
+        "figure": { "nickname": "Berta_Chefin", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Applaus für Lohn_Chefin"
+        "headline": "Applaus für Berta_Chefin"
       },
       {
         "kind": "scandal",
         "mood": "angry",
-        "text": "Ausgerechnet Fixture Lieferwerk, die Firma mit dem Motto „Teile auf Abruf“: Das neue Logo sieht aus wie etwas, das man Kindern nicht zeigen sollte. Die Kunden laufen davon.",
-        "figure": { "nickname": "Fixture_Lieferant", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −15,1 %" }],
-        "headline": "Skandal bei Fixture Lieferwerk"
+        "text": "Billig Laden wollte heute groß rauskommen. Die Geschäftsführung hat das wichtigste Meeting des Jahres verschlafen, im Meetingraum. Dirk_Billig erklärte, das gehöre zum Konzept. Die Kundschaft erklärte, sie sei dann mal weg.",
+        "figure": { "nickname": "Dirk_Billig", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −19,5 %" }],
+        "headline": "Billig Laden blamiert sich bis auf die Knochen"
+      },
+      {
+        "kind": "ramble",
+        "mood": "angry",
+        "text": "Die Regie winkt, ich ignoriere sie. Die Butter kostet inzwischen mehr als mein erstes Auto. Das Auto war allerdings ein Fahrrad. So. Weiter im Text.",
+        "effects": [],
+        "headline": "Was ich noch sagen wollte"
       },
       {
         "kind": "sector",
         "mood": "crying",
-        "text": "Die Branche Pharma sackt um 5,9 % ab. Ein Fernsehmoderator hat schlecht geträumt und es live erzählt. Bis das geklärt ist, verkaufen erst mal alle.",
-        "effects": [{ "tone": "loss", "label": "Pharma −5,9 %" }],
+        "text": "Die Branche Pharma sackt um 8,8 % ab. Jemand hat laut gefragt, wofür man das eigentlich braucht. Bis das geklärt ist, verkaufen erst mal alle.",
+        "effects": [{ "tone": "loss", "label": "Pharma −8,8 %" }],
         "headline": "Pharma im freien Fall"
       },
       {
         "kind": "stock",
-        "mood": "crying",
-        "text": "Knusperkönig verliert 16,2 %. Im Werk wurde drei Wochen lang das falsche Produkt gebaut, niemandem fiel es auf. Die Anleger nehmen Reißaus.",
-        "effects": [{ "tone": "loss", "label": "SNK −16,2 %" }],
-        "headline": "Knusperkönig stürzt ab"
+        "mood": "shocked",
+        "text": "Im Werk wurde drei Wochen lang das falsche Produkt gebaut, niemandem fiel es auf. Die Börse straft Kaufrausch Märkte mit 10 % Minus ab. Der Pressesprecher wurde zuletzt am Flughafen gesehen.",
+        "effects": [{ "tone": "loss", "label": "KFR −10 %" }],
+        "headline": "Katastrophe bei Kaufrausch Märkte"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Fundgrube Discount tut sich in der nächsten Stunde etwas, und zwar nach oben. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
-        "effects": [{ "tone": "neutral", "label": "FGD ↑ Tipp" }],
-        "headline": "Mr. Doodle Dangles Geheimtipp"
+        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Glanz & Gloria geht bald nach oben. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
+        "effects": [{ "tone": "neutral", "label": "LUX ↑ Tipp" }],
+        "headline": "Der heiße Draht: Glanz & Gloria"
       }
     ],
-    "started_at": "2026-11-15T20:41:14.544947+00:00"
+    "started_at": "2026-11-15T21:17:24.025092+00:00"
   },
   "viewers": 17,
   "audience": [
@@ -103,5 +113,5 @@
     { "me": false, "friend": false, "nickname": "Bat_Crowd6", "avatar_key": "rookie", "accessories": [] }
   ],
   "upcoming": null,
-  "next_airs_at": "2026-11-15T21:00:00+00:00"
+  "next_airs_at": "2026-11-15T22:00:00+00:00"
 }

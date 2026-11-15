@@ -8,11 +8,11 @@
         "idx": 0,
         "step": "study",
         "success": true,
-        "event_id": "e021625d-014d-4d1a-8de9-79e8ed490ad9",
+        "event_id": "4ddd208b-f4f1-4a45-8190-e2080baa4eb4",
         "strategy": "lobby",
         "archetype": "regulation"
       },
-      "created_at": "2026-11-15T20:41:12.512745+00:00",
+      "created_at": "2026-11-15T21:17:22.193249+00:00",
       "ai_headline": null
     },
     {
@@ -20,14 +20,14 @@
       "kind": "event_started",
       "ai_body": null,
       "payload": {
-        "event_id": "e021625d-014d-4d1a-8de9-79e8ed490ad9",
+        "event_id": "4ddd208b-f4f1-4a45-8190-e2080baa4eb4",
         "polarity": "crisis",
         "severity": 2,
         "archetype": "regulation",
-        "deadline_at": "2026-11-17T02:41:12.488986+00:00",
+        "deadline_at": "2026-11-17T03:17:22.169614+00:00",
         "share_shock_bps": null
       },
-      "created_at": "2026-11-15T20:41:12.488986+00:00",
+      "created_at": "2026-11-15T21:17:22.169614+00:00",
       "ai_headline": null
     },
     {
@@ -35,12 +35,12 @@
       "kind": "event_expired",
       "ai_body": null,
       "payload": {
-        "event_id": "adbcd0ef-ce34-48aa-b8cb-c2f1a575b2f7",
+        "event_id": "8eb8b210-3578-4849-9af1-a3f062706844",
         "polarity": "chance",
         "severity": 1,
         "archetype": "viral_trend"
       },
-      "created_at": "2026-11-15T20:41:12.486024+00:00",
+      "created_at": "2026-11-15T21:17:22.165879+00:00",
       "ai_headline": null
     },
     {
@@ -48,14 +48,14 @@
       "kind": "event_started",
       "ai_body": null,
       "payload": {
-        "event_id": "adbcd0ef-ce34-48aa-b8cb-c2f1a575b2f7",
+        "event_id": "8eb8b210-3578-4849-9af1-a3f062706844",
         "polarity": "chance",
         "severity": 1,
         "archetype": "viral_trend",
-        "deadline_at": "2026-11-15T19:41:12.483361+00:00",
+        "deadline_at": "2026-11-15T20:17:22.163217+00:00",
         "share_shock_bps": null
       },
-      "created_at": "2026-11-15T20:41:12.483361+00:00",
+      "created_at": "2026-11-15T21:17:22.163217+00:00",
       "ai_headline": null
     },
     {
@@ -63,12 +63,12 @@
       "kind": "founded",
       "ai_body": "Strom vom Dach, gebaut in der Garage.",
       "payload": { "tier": "garage" },
-      "created_at": "2026-11-15T20:41:12.440155+00:00",
+      "created_at": "2026-11-15T21:17:22.121089+00:00",
       "ai_headline": "Fixture Krisenstab geht ans Netz"
     }
   ],
   "company": {
-    "id": "40107f68-d4a3-4800-988c-29ac07305808",
+    "id": "26e67844-c888-4019-8bb2-5245ff0e60cf",
     "idea": "Strom vom Dach",
     "name": "Fixture Krisenstab",
     "tier": "garage",

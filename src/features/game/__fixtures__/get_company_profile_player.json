@@ -1,23 +1,23 @@
 {
   "news": [],
   "facts": {
-    "staff": 2,
+    "staff": 1,
     "stage": 0,
-    "period": null,
+    "period": "quarter",
     "product": "security_software",
     "max_staff": 2,
     "ai_workers": 0,
-    "quality_bps": null,
+    "quality_bps": 4125,
     "value_cents": 250000,
-    "profit_cents": null,
-    "awareness_bps": null,
-    "revenue_cents": null
+    "profit_cents": 0,
+    "awareness_bps": 3772,
+    "revenue_cents": 0
   },
   "company": {
-    "id": "a2c16a18-3b64-4dba-9b98-189bc9a44b97",
-    "idea": "Software für Bäckereien",
+    "id": "9654e93a-0c80-43e3-bbec-019c938d6ce6",
+    "idea": "Günstige Kabel",
     "logo": null,
-    "name": "Berta Bytes",
+    "name": "Billig Laden",
     "tier": "garage",
     "is_ai": false,
     "listed": false,
@@ -25,18 +25,9 @@
     "ticker": null,
     "price_e4": null,
     "change_bps": null,
-    "founded_at": "2026-11-15T20:40:53.848954+00:00",
-    "brand_color": "#336699"
+    "founded_at": "2026-11-15T21:16:58.49336+00:00",
+    "brand_color": "#552211"
   },
-  "founder": { "tag": "EVMN", "nickname": "Berta_Chefin", "avatar_key": "rookie" },
-  "members": [
-    {
-      "tag": "BVRU",
-      "tier": "junior",
-      "since": "2026-11-15T20:40:53.93315+00:00",
-      "title": "Werkstudium",
-      "nickname": "Wim_Werkbank",
-      "avatar_key": "rookie"
-    }
-  ]
+  "founder": { "tag": "KBNE", "nickname": "Dirk_Billig", "avatar_key": "rookie" },
+  "members": []
 }

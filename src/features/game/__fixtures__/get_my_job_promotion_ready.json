@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "69c333ba-8086-4c40-ba25-dbda1214af02",
+    "id": "83c0dd2a-659b-49d9-b278-83043b219c68",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "7999d809-0066-66e2-e0ac-930c34a49626",
+      "id": "c76af3f2-dc09-a8cc-b107-a7c326ad5b09",
       "logo": null,
-      "name": "Fundgrube Discount",
-      "color": "#C2C95B",
+      "name": "Glanz & Gloria",
+      "color": "#D4AF37",
       "is_ai": true,
       "sector": "retail",
-      "ticker": "FGD"
+      "ticker": "LUX"
     },
     "presence": {
-      "fire_at": "2026-11-20T20:41:12.527477+00:00",
+      "fire_at": "2026-11-20T21:17:22.204894+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-15T20:41:12.527477+00:00"
+      "last_active_at": "2026-11-15T21:17:22.204894+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-15T20:41:12.635292+00:00",
+    "started_at": "2026-11-15T21:17:22.285597+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

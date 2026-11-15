@@ -1,6 +1,6 @@
 {
   "event": {
-    "id": "e021625d-014d-4d1a-8de9-79e8ed490ad9",
+    "id": "4ddd208b-f4f1-4a45-8190-e2080baa4eb4",
     "next": null,
     "steps": [
       {
@@ -8,10 +8,10 @@
         "key": "study",
         "retry": false,
         "status": "running",
-        "ends_at": "2026-11-15T23:41:12.502978+00:00",
+        "ends_at": "2026-11-16T00:17:22.184031+00:00",
         "strategy": "lobby",
         "cost_cents": 50000,
-        "started_at": "2026-11-15T20:41:12.502978+00:00",
+        "started_at": "2026-11-15T21:17:22.184031+00:00",
         "success_bps": 8300
       }
     ],
@@ -29,14 +29,14 @@
     "strategy": "lobby",
     "archetype": "regulation",
     "mitigation": 0,
-    "started_at": "2026-11-15T20:41:12.488986+00:00",
+    "started_at": "2026-11-15T21:17:22.169614+00:00",
     "ai_headline": "Neue Bauordnung bremst Solardächer",
-    "deadline_at": "2026-11-17T02:41:12.488986+00:00",
+    "deadline_at": "2026-11-17T03:17:22.169614+00:00",
     "resolved_at": null
   },
   "can_act": true,
   "company": {
-    "id": "40107f68-d4a3-4800-988c-29ac07305808",
+    "id": "26e67844-c888-4019-8bb2-5245ff0e60cf",
     "idea": "Strom vom Dach",
     "name": "Fixture Krisenstab",
     "tier": "garage",
@@ -45,12 +45,12 @@
   },
   "history": [
     {
-      "id": "adbcd0ef-ce34-48aa-b8cb-c2f1a575b2f7",
+      "id": "8eb8b210-3578-4849-9af1-a3f062706844",
       "status": "expired",
       "polarity": "chance",
       "severity": 1,
       "archetype": "viral_trend",
-      "started_at": "2026-11-15T07:41:12.483361+00:00",
+      "started_at": "2026-11-15T08:17:22.163217+00:00",
       "resolved_at": null
     }
   ],

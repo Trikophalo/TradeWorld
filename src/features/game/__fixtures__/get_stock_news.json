@@ -2,42 +2,42 @@
   "items": [
     {
       "id": 5,
-      "body": "Das Unternehmen wird für sein neues Produkt ausgezeichnet. Rückenwind für die Aktie erwartet. Sicher ist das nicht.",
-      "name": "Sonnenkern Fusion",
-      "due_at": "2026-11-15T22:18:39.240032+00:00",
+      "body": "Die Partnerschaft soll beiden Seiten neue Kunden bringen. Sicher ist das nicht.",
+      "name": "SolarFuchs",
+      "due_at": "2026-11-15T22:44:45.989642+00:00",
       "status": "open",
-      "ticker": "FSN",
-      "headline": "Sonnenkern Fusion gewinnt Branchenpreis",
+      "ticker": "SFX",
+      "headline": "Kooperation: SolarFuchs und ein Branchenriese",
       "move_bps": null,
-      "strength": 3,
+      "strength": 2,
       "direction": "up",
-      "published_at": "2026-11-15T21:41:14.028591+00:00"
+      "published_at": "2026-11-15T22:17:23.489964+00:00"
     },
     {
       "id": 4,
-      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Helix Robotik tut sich in der nächsten Stunde etwas, und zwar nach unten. Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.",
-      "name": "Helix Robotik",
-      "due_at": "2026-11-15T21:23:04.405545+00:00",
-      "status": "fizzled",
-      "ticker": "HLX",
+      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Fundgrube Discount tut sich in der nächsten Stunde etwas, und zwar nach unten. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
+      "name": "Fundgrube Discount",
+      "due_at": "2026-11-15T21:57:12.523232+00:00",
+      "status": "confirmed",
+      "ticker": "FGD",
       "headline": "Mr. Doodle Dangles Geheimtipp",
-      "move_bps": null,
+      "move_bps": -1463,
       "strength": 2,
       "direction": "down",
-      "published_at": "2026-11-15T20:41:04.405545+00:00"
+      "published_at": "2026-11-15T21:17:12.523232+00:00"
     },
     {
       "id": 3,
-      "body": "Ein Vögelchen hat mir gezwitschert: KlarSoft AG dürfte in der kommenden Stunde nach oben gehen. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
-      "name": "KlarSoft AG",
-      "due_at": "2026-11-15T20:41:03.628637+00:00",
+      "body": "Ein Vögelchen hat mir gezwitschert: Luftpost Drohnen dürfte in der kommenden Stunde nach oben gehen. Das Vögelchen lag bisher meistens richtig. Meistens.",
+      "name": "Luftpost Drohnen",
+      "due_at": "2026-11-15T21:17:11.451143+00:00",
       "status": "confirmed",
-      "ticker": "KLS",
-      "headline": "Vom Flurfunk: KlarSoft AG",
-      "move_bps": 1312,
+      "ticker": "DRN",
+      "headline": "Vom Flurfunk: Luftpost Drohnen",
+      "move_bps": 1490,
       "strength": 2,
       "direction": "up",
-      "published_at": "2026-11-15T20:41:03.628637+00:00"
+      "published_at": "2026-11-15T21:17:11.451143+00:00"
     }
   ],
   "reliability_bps": 7500

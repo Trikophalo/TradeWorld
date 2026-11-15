@@ -1,38 +1,38 @@
 {
   "applications": [
     {
-      "id": "e2b6976c-d311-43e9-ab76-7da3b2c7738d",
+      "id": "c935cbf6-6567-420b-b48b-24275cfd6495",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "1bcc19d7-2a4b-4cb1-a1d8-6253abce6fe7",
+        "id": "07cfbcc3-178a-4bda-bd91-23c8315badd2",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "7999d809-0066-66e2-e0ac-930c34a49626",
+          "id": "c76af3f2-dc09-a8cc-b107-a7c326ad5b09",
           "logo": null,
-          "name": "Fundgrube Discount",
-          "color": "#C2C95B",
+          "name": "Glanz & Gloria",
+          "color": "#D4AF37",
           "is_ai": true,
           "sector": "retail",
-          "ticker": "FGD"
+          "ticker": "LUX"
         },
         "required": [{ "branch": "sales", "min_score": 0 }],
         "title_key": "sales_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-15T20:41:10.456413+00:00",
-      "updated_at": "2026-11-15T20:41:10.460183+00:00",
-      "offer_expires_at": "2026-11-17T20:41:10.456413+00:00",
+      "created_at": "2026-11-15T21:17:19.958366+00:00",
+      "updated_at": "2026-11-15T21:17:19.965568+00:00",
+      "offer_expires_at": "2026-11-17T21:17:19.958366+00:00",
       "salary_wish_cents_per_hour": 15000,
       "offer_salary_cents_per_hour": 15000
     },
     {
-      "id": "b1579df1-746e-46a5-960a-99f9fe704a40",
+      "id": "0da1bacc-88d3-4158-bd85-3f3cbe8350e0",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "0120eeca-3259-492c-9609-a09501acba4e",
+        "id": "6f8a8dca-1781-48a4-9be3-7e662b963ccd",
         "tier": "junior",
         "title": null,
         "company": {
@@ -48,9 +48,9 @@
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-15T20:41:10.450602+00:00",
-      "updated_at": "2026-11-15T20:41:10.450602+00:00",
-      "offer_expires_at": "2026-11-17T20:41:10.450602+00:00",
+      "created_at": "2026-11-15T21:17:19.953947+00:00",
+      "updated_at": "2026-11-15T21:17:19.953947+00:00",
+      "offer_expires_at": "2026-11-17T21:17:19.953947+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

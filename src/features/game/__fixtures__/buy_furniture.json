@@ -23,6 +23,6 @@
   },
   "inventory": {
     "cars": [],
-    "furniture": [{ "id": "5c6d9c4d-0d45-41b5-8b4e-51cbe5b0cfaf", "item_key": "sofa_leather", "value_cents": 240000 }]
+    "furniture": [{ "id": "6888db01-bbc0-440b-a993-5772e27e30df", "item_key": "sofa_leather", "value_cents": 240000 }]
   }
 }

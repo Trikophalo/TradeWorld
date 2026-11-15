@@ -1,5 +1,5 @@
 {
-  "id": "1dbf493c-8e04-4f4e-9f08-9668e1fb9c29",
+  "id": "8b57d3fb-d819-42fc-b4f8-fcf277219dc9",
   "logo": {
     "grid": [
       "................",
@@ -26,7 +26,7 @@
   "stats": { "hype": 0.0, "tech": 35.0, "utility": 0.0 },
   "action": null,
   "launch": {
-    "at": "2026-11-15T20:41:13.930011+00:00",
+    "at": "2026-11-15T21:17:23.391353+00:00",
     "start_price_e4": 1000,
     "team_share_bps": 2000,
     "liquidity_cents": 1000000
@@ -42,12 +42,12 @@
     { "key": "staking", "hours": 12, "available": true, "cost_cents": 500000, "success_bps": 10000 },
     { "key": "bugfix", "hours": 3, "available": true, "cost_cents": 100000, "success_bps": 10000 }
   ],
-  "creator": { "tag": "DNDW", "trust": { "band": "blank", "score": 50 }, "nickname": "Fixture_Coiner" },
+  "creator": { "tag": "6SQ5", "trust": { "band": "blank", "score": 50 }, "nickname": "Fixture_Coiner" },
   "fee_bps": 100,
   "category": "player",
   "price_e4": 1000,
   "burn_hype": 8,
-  "created_at": "2026-11-15T20:41:13.879226+00:00",
+  "created_at": "2026-11-15T21:17:23.339572+00:00",
   "low_24h_e4": 1000,
   "pool_cents": 1000000,
   "burn_min_e6": 250000000,

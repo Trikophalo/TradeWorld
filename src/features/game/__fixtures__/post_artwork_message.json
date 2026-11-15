@@ -3,7 +3,7 @@
   "messages": [
     {
       "ai": false,
-      "at": "2026-11-15T20:41:14.457039+00:00",
+      "at": "2026-11-15T21:17:23.960988+00:00",
       "id": 32,
       "kind": "chat",
       "mine": true,
@@ -15,7 +15,7 @@
     }
   ],
   "ask_cents": 400000,
-  "artwork_id": "65a8859b-d629-4855-bdef-fc905bb3a1e4",
+  "artwork_id": "5ec1f1b6-e548-42ff-927f-8c89e251b49c",
   "max_length": 200,
   "my_offer_cents": null,
   "min_offer_cents": 10000
