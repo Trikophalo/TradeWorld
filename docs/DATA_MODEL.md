@@ -7548,3 +7548,29 @@ Migration `20261204003200_news_audience.sql`, keine neuen Tabellen.
   `figure: {nickname, avatar_key, accessories}`, beim Abruf gelesen. `news_show_chat_json` markiert Zeilen
   erfundener Zuschauer mit `bot: true`.
 - Test `supabase/tests/9o_news_audience.sql`.
+
+## Nachtrag: Wohnbonus, Möbelpreise nach Zuhause, Einrichtung im Wert, freie Miete (ADR-161)
+
+Migrationen `20261204004200_living_bonus_enum.sql` (`ledger_tx_kind` `living_bonus`, `xp_source` `home_living`) und
+`20261204004300_living_bonus.sql`. Werte in `game_config.livingBonus`, `game_config.property`
+(`furniturePriceBps`, `furnishedValueBps`) und `game_config.rentals` (`minPriceCents`, `maxPriceCentsPerHour`;
+`minPriceBps` und `maxPriceBps` entfallen). Formeln in `src/lib/sim/living.ts` und `src/lib/sim/property.ts`.
+
+- **`player_furniture.list_cents`** (`bigint not null`, ≥ 0): Listenpreis beim Kauf (Katalogpreis × Faktor des
+  Zuhauses), vorhandene Stücke mit dem Katalogpreis; ein Trigger setzt ihn für Zeilen ohne Angabe. Der Wohnwert
+  (`home_wohnwert`) zählt `list_cents` der aufgestellten Stücke.
+- **`living_bonus_payments`** (intern, RLS ohne Policies): `player_id`, `hour_start` (PK zusammen), `source`
+  `own|tenant`, `tier`, `wohnwert`, `cents`, `xp`, `created_at`; 30 Tage aufbewahrt.
+- **Funktionen:** `living_bonus_owner(tier, wohnwert)`, `living_bonus_tenant(tier, wohnwert, rent_hour_cents)` →
+  `{cents, xp}`; `player_living_bonus(player)` → `{source, cents, xp, tier, wohnwert, owner}` oder `null`;
+  `property_furniture_list_cents(catalog, tier)`, `player_furnishing_value_cents(player)`.
+  `player_property_value_cents` zählt aufgestellte Möbel mit `furnishedValueBps`, damit auch
+  `player_net_worth_cents` und `rich_list_entries`.
+- **Job:** `living_bonus_run_due(p_now)` jede Minute (pg_cron `nexa-living-bonus`): je Spieler mit Bleibe oder Mietplatz,
+  aktiv in den letzten `activeDays`, einmal je Stunde Ledger `living_bonus` (`households` → `player_cash`,
+  Zwangskredit-Einbehalt) und `grant_xp(…, 'home_living', …)`; einmal am Tag die Meldung `living_bonus_summary`.
+  `rentals_wipe_player` löscht die Zahlungen mit.
+- **Antworten:** PROPERTY bekommt `furnishing_cents` und je Stück `value_cents` (in `placed` und im Inventar);
+  `rental` in `get_property()` bekommt `living_bonus`. `buy_furniture` bucht den Listenpreis des Zuhauses (Metadaten
+  `list_cents`, `home_tier`). `rental_limits` liefert `min_cents` = 1 € und `max_cents` = Sicherheitsgrenze je Periode.
+- Test `supabase/tests/9u_living_bonus.sql`.

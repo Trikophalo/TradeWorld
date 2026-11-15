@@ -343,6 +343,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Das Büro lebt",
         text: "Auf deiner Job-Seite und auf der Seite deiner Firma stehen jetzt alle Kollegen als ihre angezogenen Spielfiguren am Schreibtisch, mit Namen.",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-71e1c19d",
+        title: "Wohnen lohnt sich",
+        text: "Wer ein Zuhause hat oder zur Miete wohnt, bekommt jede Stunde einen Wohnbonus in Geld und XP, mehr in größeren und schöner eingerichteten Zuhausen.",
+      },
     ],
   },
   {
