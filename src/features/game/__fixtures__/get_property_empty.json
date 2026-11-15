@@ -1,4 +1,5 @@
 {
+  "rental": { "places": 0, "renting": null, "tenants": [], "wohnwert": 0, "offer_open": false },
   "property": {
     "tier": null,
     "floor": "laminate",

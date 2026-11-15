@@ -1,27 +1,27 @@
 {
-  "id": "c8a77b37-d516-4c43-9648-56f1fab39c19",
+  "id": "3a0ee289-7a2e-495f-9f1f-9a0ae2b22cbc",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "079fcbed-8780-4cb3-9b6c-419c7350f0ff",
+    "id": "07ce17c6-6df9-4e40-a44a-71ceb647834f",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "60dd5582-1f7b-b751-df95-287e43ff8e82",
+      "id": "7999d809-0066-66e2-e0ac-930c34a49626",
       "logo": null,
-      "name": "Knusperkönig",
-      "color": "#FF9F1C",
+      "name": "Fundgrube Discount",
+      "color": "#C2C95B",
       "is_ai": true,
       "sector": "retail",
-      "ticker": "SNK"
+      "ticker": "FGD"
     },
-    "required": [{ "branch": "finance", "min_score": 0 }],
-    "title_key": "finance_intern",
+    "required": [{ "branch": "logistics", "min_score": 0 }],
+    "title_key": "logistics_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-15T18:19:58.93164+00:00",
-  "updated_at": "2026-11-15T18:19:58.934471+00:00",
-  "offer_expires_at": "2026-11-17T18:19:58.93164+00:00",
+  "created_at": "2026-11-15T18:35:42.730829+00:00",
+  "updated_at": "2026-11-15T18:35:42.733669+00:00",
+  "offer_expires_at": "2026-11-17T18:35:42.730829+00:00",
   "salary_wish_cents_per_hour": 15000,
   "offer_salary_cents_per_hour": 15000
 }

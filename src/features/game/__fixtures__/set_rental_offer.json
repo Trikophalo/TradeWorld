@@ -1,0 +1,33 @@
+{
+  "home": {
+    "tier": "house",
+    "limits": {
+      "day": { "max_cents": 190080, "min_cents": 18000, "fair_cents": 126720 },
+      "hour": { "max_cents": 7920, "min_cents": 750, "fair_cents": 5280 }
+    },
+    "places": 3,
+    "wohnwert": {
+      "rugs": 0,
+      "tops": 1,
+      "parts": { "fill": 2, "floor": 6, "style": 1, "value": 0, "layers": 5, "variety": 5 },
+      "total": 19,
+      "pieces": 2,
+      "categories": 2,
+      "value_cents": 280000,
+      "coverage_bps": 341,
+      "target_cents": 10000000
+    }
+  },
+  "past": [],
+  "offer": {
+    "period": "hour",
+    "is_open": true,
+    "chance_bps": 0,
+    "ai_check_at": "2026-11-15T18:35:47.097261+00:00",
+    "price_cents": 1000
+  },
+  "renting": null,
+  "tenants": [],
+  "earned_7d_cents": 0,
+  "earned_total_cents": 0
+}

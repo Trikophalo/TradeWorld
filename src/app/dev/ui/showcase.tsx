@@ -37,6 +37,7 @@ import { FloorBubble } from "@/features/company/components/floor-bubble";
 import { OfficeScene } from "@/features/company/components/office-scene";
 import { ACCESSORIES } from "@/config/accessories";
 import { FriendsPlaza } from "@/features/friends/components/plaza";
+import { RentalShowcase } from "@/features/property/components/rental-showcase";
 import { PokeButton } from "@/features/friends/components/poke";
 import { FigureCard } from "@/features/wardrobe/components/figure-card";
 import { CareerLadder, PayRoutes } from "@/features/career/components/career-ladder";
@@ -893,6 +894,7 @@ export function Showcase() {
           ))}
         </Demo>
         <OfficeScene />
+        <RentalShowcase />
         <Card padding="lg">
           <SignaturePad onChange={() => undefined} />
         </Card>

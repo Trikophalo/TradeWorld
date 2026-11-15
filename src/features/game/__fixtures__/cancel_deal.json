@@ -1,5 +1,5 @@
 {
-  "id": "08a0ac09-08f7-40f4-a569-5f4309012bbc",
+  "id": "84060bea-112d-4aa7-add8-6aa20e3d7af8",
   "kind": "loan",
   "terms": { "hours": 24, "interest_bps": 0, "principal_cents": 20000 },
   "status": "cancelled",
@@ -9,15 +9,15 @@
   "my_role": "lender",
   "progress": { "due_cents": 20000, "left_cents": 20000, "repaid_cents": 0 },
   "proposer": {
-    "tag": "CRUA",
+    "tag": "YBC8",
     "level": 6,
     "trust": { "band": "blank", "score": 50 },
     "nickname": "Fixture_Lieferant",
     "avatar_key": "rookie"
   },
-  "closed_at": "2026-11-15T18:20:01.435562+00:00",
-  "created_at": "2026-11-15T18:20:01.433079+00:00",
-  "expires_at": "2026-11-17T18:20:01.433079+00:00",
+  "closed_at": "2026-11-15T18:35:45.676578+00:00",
+  "created_at": "2026-11-15T18:35:45.673497+00:00",
+  "expires_at": "2026-11-17T18:35:45.673497+00:00",
   "accepted_at": null,
   "is_proposer": true,
   "broken_by_me": false,

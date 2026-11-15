@@ -34,6 +34,7 @@ import { MISSION_TEMPLATES, availableFor, missionXp, type Metric, type MissionTe
 import { createCareerEngine, initialCareer, tycoonAvatar, type CareerState } from "./demo/careers";
 import { createArtEngine, type ArtState } from "./demo/artworks";
 import { createPropertyEngine, type HomeState } from "./demo/property";
+import { createRentalsEngine, type DemoRentalsState } from "./demo/rentals";
 import { createFriendEngine, demoFriendCard, type DemoFriend, type DemoFriendCode } from "./demo/friends";
 import { createAccessoryEngine, type DemoWardrobe } from "./demo/accessories";
 import { demoCoworkerMembers, demoCoworkers, type DemoCoworker } from "./demo/floor";
@@ -168,6 +169,8 @@ interface PlayerState {
   art?: ArtState;
   /** Own home, furniture, cars (demo/property.ts, ADR-082). */
   home?: HomeState;
+  /** Renting out places in the home, the own place elsewhere (demo/rentals.ts, ADR-158). */
+  rentals?: DemoRentalsState;
   /** Crypto market, positions and the own coin (demo/crypto.ts, ADR-101). */
   crypto?: DemoCryptoState;
 }
@@ -888,11 +891,12 @@ function metricValue(metric: Metric): number {
   if (metric === "net_worth_cents") return netWorth();
   if (metric === "level") return level();
   if (metric === "sectors_held") return sectorsHeld();
+  if (metric === "wohnwert") return rentals.propertyRental().wohnwert;
   return p().counters[metric] ?? 0;
 }
 
 /** Metrics that count from assignment; the others are states (reached or not). */
-const STATE_METRICS: readonly Metric[] = ["net_worth_cents", "level", "sectors_held"];
+const STATE_METRICS: readonly Metric[] = ["net_worth_cents", "level", "sectors_held", "wohnwert"];
 
 function richListNow(scope: "all" | "players"): RichList {
   const pl = p();
@@ -1321,7 +1325,39 @@ const wardrobe = createAccessoryEngine({
   idempotent,
 });
 
+const rentals = createRentalsEngine({
+  state: () => p().rentals,
+  setState: (value) => {
+    p().rentals = value;
+  },
+  home: () => {
+    const h = p().home;
+    return {
+      tier: h?.tier ?? null,
+      floor: h?.floor ?? "laminate",
+      itemKeys: (h?.furniture ?? []).filter((f) => f.placed).map((f) => f.itemKey),
+    };
+  },
+  nickname: () => p().nickname,
+  avatarKey: () => career.avatarKey(),
+  accessories: () => wardrobe.worn(),
+  level,
+  cashCents: () => p().cashCents,
+  addCash: (cents) => {
+    if (cents > 0) income(cents);
+    else p().cashCents += cents;
+  },
+  addXp: (base) => addXp(base),
+  notify: (typeKey, title, body, link) => social.notify(typeKey, title, body, link),
+  feed: feedPost,
+  track: (metric, by = 1) => bump(metric, by),
+  idempotent,
+  persist,
+  now: () => Date.now(),
+});
+
 const home = createPropertyEngine({
+  rental: () => rentals.propertyRental(),
   home: () => p().home,
   setHome: (value) => {
     p().home = value;
@@ -1641,6 +1677,7 @@ export const demoEngine: GameEngine = {
   ...company.engine,
   ...art.engine,
   ...home.engine,
+  ...rentals.engine,
   ...friends,
   ...wardrobe,
   /** Own card with the worn accessories; the made-up friends and colleagues have one too (ADR-155, ADR-156). */

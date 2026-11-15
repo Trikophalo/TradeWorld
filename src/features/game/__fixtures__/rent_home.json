@@ -1,0 +1,58 @@
+{
+  "home": null,
+  "past": [],
+  "offer": null,
+  "renting": {
+    "id": "e70ddcf5-d385-4fb4-b8f3-625f4a3afd7f",
+    "tier": "house",
+    "owner": "Fixture_Heim",
+    "period": "hour",
+    "ends_at": null,
+    "tenants": [
+      {
+        "id": "5abfd5b3-c09a-43e9-8142-1364974e8459",
+        "name": "Mia F.",
+        "is_ai": true,
+        "since": "2026-11-15T18:35:47.104053+00:00",
+        "avatar_key": null,
+        "accessories": []
+      },
+      {
+        "id": "e70ddcf5-d385-4fb4-b8f3-625f4a3afd7f",
+        "name": "Fixture_Neu",
+        "is_ai": false,
+        "since": "2026-11-15T18:35:47.114934+00:00",
+        "avatar_key": "coder",
+        "accessories": ["party_hat"]
+      }
+    ],
+    "property": {
+      "tier": "house",
+      "floor": "parquet",
+      "owner": "Fixture_Heim",
+      "width": 13,
+      "garage": [{ "id": "813db617-3e47-4d3c-9d30-6eee62a2f2d9", "slot": 0, "car_key": "car_electric" }],
+      "height": 9,
+      "placed": [
+        { "x": 2, "y": 2, "id": "da95d50f-da27-44f7-9298-8ddca97beea1", "rot": 0, "item_key": "table_oak" },
+        { "x": 3, "y": 3, "id": "95d8b217-5cc6-4641-b4cb-a5d48ef6cfa6", "rot": 0, "item_key": "laptop" }
+      ],
+      "wall_color": "#2f5fd0",
+      "value_cents": 27955200,
+      "floors_owned": ["laminate", "parquet"],
+      "garage_slots": 2
+    },
+    "wohnwert": 19,
+    "xp_total": 0,
+    "notice_by": null,
+    "paid_cents": 1000,
+    "started_at": "2026-11-15T18:35:47.114934+00:00",
+    "next_due_at": "2026-11-15T19:35:47.114934+00:00",
+    "price_cents": 1000,
+    "owner_avatar_key": "rookie",
+    "owner_accessories": []
+  },
+  "tenants": [],
+  "earned_7d_cents": 0,
+  "earned_total_cents": 0
+}

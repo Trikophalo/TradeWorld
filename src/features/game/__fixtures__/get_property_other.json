@@ -1,10 +1,11 @@
 {
+  "rental": { "places": 3, "renting": null, "tenants": [], "wohnwert": 6, "offer_open": false },
   "property": {
     "tier": "house",
     "floor": "parquet",
     "owner": "Fixture_Heim",
     "width": 13,
-    "garage": [{ "id": "572b0e9b-fd76-44c5-b45d-64da30e60b38", "slot": 0, "car_key": "car_electric" }],
+    "garage": [{ "id": "813db617-3e47-4d3c-9d30-6eee62a2f2d9", "slot": 0, "car_key": "car_electric" }],
     "height": 9,
     "placed": [],
     "wall_color": "#2f5fd0",

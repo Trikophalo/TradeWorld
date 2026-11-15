@@ -3,7 +3,7 @@
   "messages": [
     {
       "ai": false,
-      "at": "2026-11-15T18:20:02.704512+00:00",
+      "at": "2026-11-15T18:35:47.012503+00:00",
       "id": 30,
       "kind": "chat",
       "mine": true,
@@ -15,19 +15,19 @@
     },
     {
       "ai": false,
-      "at": "2026-11-15T18:20:02.707095+00:00",
+      "at": "2026-11-15T18:35:47.015452+00:00",
       "id": 31,
       "kind": "offer",
       "mine": true,
       "text": "Wäre das ein Preis?",
       "author": "Fixture_Kunst",
-      "expires_at": "2026-11-16T18:20:02.707095+00:00",
+      "expires_at": "2026-11-16T18:35:47.015452+00:00",
       "offer_cents": 300000,
       "offer_status": "open"
     }
   ],
   "ask_cents": 400000,
-  "artwork_id": "11eb096f-bee9-4dfa-8262-b239753a8ffa",
+  "artwork_id": "42553d4d-4417-4b79-8620-41e62fe05d25",
   "max_length": 200,
   "my_offer_cents": 300000,
   "min_offer_cents": 10000

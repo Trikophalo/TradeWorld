@@ -38,6 +38,7 @@ const ICONS: Record<string, PixelArt> = {
   art_won: UI_ICONS.art,
   art_created: UI_ICONS.art,
   home_bought: UI_ICONS.home,
+  home_rented: UI_ICONS.home,
   car_bought: logoArt(CARS[0]!.sprite),
   job_started: UI_ICONS.briefcase,
   streak: UI_ICONS.flame,
@@ -90,6 +91,11 @@ function useFeedText() {
         const tier = str(p.tier);
         const known = ["flat", "apartment", "house", "villa", "luxury_villa"].includes(tier);
         return t("home_bought", { home: known ? te(tier as "flat") : tier });
+      }
+      case "home_rented": {
+        const tier = str(p.tier);
+        const known = ["flat", "apartment", "house", "villa", "luxury_villa"].includes(tier);
+        return t("home_rented", { home: known ? te(tier as "flat") : tier, owner: str(p.owner) });
       }
       case "car_bought": {
         const car = CARS.find((c) => c.key === str(p.car_key));

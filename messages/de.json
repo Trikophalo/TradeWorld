@@ -801,7 +801,13 @@
     "accessory_not_owned": "Das musst du erst kaufen, bevor du es anziehen kannst.",
     "not_friends": "Das geht nur bei Freunden.",
     "poke_too_soon": "Nicht so stürmisch! Denselben Freund kannst du erst in ein paar Minuten wieder anstupsen.",
-    "poke_daily_limit": "Genug gestupst für heute. Morgen geht es weiter."
+    "poke_daily_limit": "Genug gestupst für heute. Morgen geht es weiter.",
+    "rent_price_out_of_range": "Dieser Preis liegt außerhalb der erlaubten Spanne für dein Zuhause.",
+    "rent_own_home": "Im eigenen Zuhause kannst du nicht zur Miete wohnen.",
+    "rental_not_offered": "Dieses Zuhause wird gerade nicht vermietet.",
+    "rental_full": "Alle Plätze sind schon vergeben.",
+    "already_renting": "Du wohnst schon zur Miete. Kündige erst den alten Vertrag.",
+    "tenancy_not_found": "Diesen Mietvertrag gibt es nicht (mehr)."
   },
   "locks": {
     "level": "Level {level}",
@@ -3044,7 +3050,8 @@
         "coin_launched": "hat einen eigenen Coin gestartet: {name} ({ticker}).",
         "rug_pull": "hat bei {name} ({ticker}) die Team-Coins abgestoßen. Rug Pull!",
         "coin_closed": "hat den Coin {name} ({ticker}) eingestellt.",
-        "accessory_bought": "trägt jetzt etwas Legendäres: {name}."
+        "accessory_bought": "trägt jetzt etwas Legendäres: {name}.",
+        "home_rented": "wohnt jetzt in einer {home} bei {owner}."
       }
     },
     "notifications": {
@@ -6995,5 +7002,106 @@
     "boughtText": "Steht dir hervorragend. Du trägst es schon.",
     "putOn": "{name} angezogen",
     "tookOff": "{name} ausgezogen"
+  },
+  "rentals": {
+    "playerTag": "{name}",
+    "wohnwert": {
+      "title": "Wohnwert",
+      "belowAi": "Unter Wohnwert {min} zieht kein KI-Mieter ein. Richte weiter ein!",
+      "partsLabel": "Woraus sich der Wohnwert zusammensetzt",
+      "parts": {
+        "value": "Wert",
+        "variety": "Vielfalt",
+        "fill": "Füllung",
+        "layers": "Ebenen",
+        "style": "Stil",
+        "floor": "Boden"
+      },
+      "tipsTitle": "So steigt dein Wohnwert",
+      "tips": {
+        "value": "Stell wertvollere Möbel auf: Voll zählt es ab {target} Möbelwert.",
+        "variety": "Mehr Abwechslung: {categories} von {goal} Kategorien stehen schon da, etwa Bett, Küche, Bad oder Pflanzen.",
+        "fillLow": "Der Raum wirkt leer. Stell mehr Möbel auf (ideal: ein Drittel bis die Hälfte des Bodens).",
+        "fillHigh": "Zu vollgestellt: Mieter brauchen Platz zum Laufen. Räum etwas weg.",
+        "rug": "Leg einen Teppich aus.",
+        "top": "Stell etwas Kleines auf einen Tisch oder eine Ablage.",
+        "style": "Bleib bei einem Stil: Möbel aus derselben Preisklasse passen besser zusammen.",
+        "floor": "Ein edlerer Boden macht viel her, von Teppichboden bis Marmor."
+      }
+    },
+    "marketTitle": "Mietmarkt",
+    "marketIntro": "Miete dich bei anderen Spielern ein: wohnen, Wohlfühl-XP sammeln, Mitbewohner treffen.",
+    "marketTeaser": "Wohn doch mal woanders: Im Mietmarkt bieten andere ihre Zimmer an.",
+    "marketTeaserNoHome": "Noch keine eigene Bleibe? Miete dich günstig bei anderen Spielern ein und sammle Wohlfühl-XP.",
+    "openMarket": "Zum Mietmarkt",
+    "offerTitle": "Vermieten",
+    "offered": "Angebot steht",
+    "closed": "Angebot geschlossen",
+    "statusOpen": "Angebot offen",
+    "statusClosed": "Geschlossen",
+    "statusNone": "Noch kein Angebot",
+    "offerIntro": "Dein Zuhause hat {places, plural, one {einen Platz} other {# Plätze}} für Mieter, du wohnst weiter selbst dort. Je schöner eingerichtet, desto schneller ziehen KI-Mieter ein und desto mehr darfst du verlangen.",
+    "periods": {
+      "hour": "Pro Stunde",
+      "day": "Pro Tag"
+    },
+    "periodLabel": "Abrechnung",
+    "priceLabel": "Miete je Platz",
+    "per": {
+      "hour": "pro Stunde",
+      "day": "pro Tag"
+    },
+    "fair": "Fair: {amount}",
+    "demandLabel": "KI-Nachfrage:",
+    "demand": {
+      "none": "keine",
+      "low": "gering",
+      "medium": "mittel",
+      "high": "hoch"
+    },
+    "demandNone": "ab Wohnwert {min}",
+    "savePrice": "Preis speichern",
+    "offer": "Anbieten",
+    "close": "Angebot schließen",
+    "tenantsTitle": "Mieter {count} / {places}",
+    "earned": "7 Tage: {week} · insgesamt: {total}",
+    "waiting": "Noch niemand eingezogen. KI-Mieter schauen etwa einmal pro Stunde vorbei.",
+    "noTenants": "Biete deine Plätze an, dann ziehen Mieter ein.",
+    "pastTitle": "Frühere Mieter",
+    "reasons": {
+      "notice_tenant": "hat gekündigt",
+      "notice_owner": "von dir gekündigt",
+      "unpaid": "konnte nicht zahlen",
+      "ai_left": "Mietzeit vorbei",
+      "ai_unhappy": "zu ungemütlich",
+      "account_reset": "Konto zurückgesetzt"
+    },
+    "noticeGiven": "{name} ist gekündigt",
+    "notice": "Kündigen",
+    "ai": "KI",
+    "player": "Spieler",
+    "endsIn": "Endet in",
+    "noticeOwn": "Gekündigt. Bis zum Ende ist alles bezahlt.",
+    "rentingKicker": "Du wohnst zur Miete",
+    "rentingTitle": "{tier} bei {owner}",
+    "wohnwertShort": "Wohnwert {value}",
+    "xpSoFar": "{xp} XP bisher",
+    "rentingHint": "Je bezahlter Stunde bekommst du Wohlfühl-XP nach dem Wohnwert. Die Miete wird im Voraus abgebucht; reicht dein Geld nicht, endet der Vertrag.",
+    "lockedTitle": "Ab Level {level}",
+    "lockedText": "Mit diesem Level kannst du dich bei anderen einmieten und selbst vermieten.",
+    "marketRenting": "Du wohnst schon bei {owner}. Für einen Umzug kündige erst dort.",
+    "toMyPlace": "Zu meiner Bleibe",
+    "marketEmptyTitle": "Gerade ist nichts frei",
+    "marketEmptyText": "Niemand bietet im Moment einen Platz an. Richte dein eigenes Zuhause schön ein und vermiete selbst.",
+    "offerOwn": "Selbst vermieten",
+    "rented": "Eingezogen bei {owner}",
+    "rentTitle": "Einmieten",
+    "from": "bei",
+    "freePlaces": "{free} von {places} frei",
+    "xpPer": "{xp} XP {period}",
+    "alreadyRenting": "Du wohnst schon woanders",
+    "rentFor": "Einmieten für {amount}",
+    "livesAt": "Wohnt zur Miete: {tier} bei {owner}",
+    "showcaseTenants": "{count, plural, one {Ein Mieter wohnt} other {# Mieter wohnen}} hier."
   }
 }

@@ -1,5 +1,5 @@
 {
-  "id": "df9f14bc-5bcb-4e02-86df-e1dd65e5888d",
+  "id": "61e44a50-3689-4e62-95f8-7503503b23f8",
   "logo": {
     "grid": [
       "................",
@@ -26,7 +26,7 @@
   "stats": { "hype": 8.0, "tech": 35.0, "utility": 0.0 },
   "action": null,
   "launch": {
-    "at": "2026-11-15T18:20:02.16007+00:00",
+    "at": "2026-11-15T18:35:46.49515+00:00",
     "start_price_e4": 1000,
     "team_share_bps": 2000,
     "liquidity_cents": 1000000
@@ -42,12 +42,12 @@
     { "key": "staking", "hours": 12, "available": false, "cost_cents": 500000, "success_bps": 10000 },
     { "key": "bugfix", "hours": 3, "available": false, "cost_cents": 100000, "success_bps": 10000 }
   ],
-  "creator": { "tag": "M23A", "trust": { "band": "shaky", "score": 30 }, "nickname": "Fixture_Coiner" },
+  "creator": { "tag": "FBHY", "trust": { "band": "shaky", "score": 30 }, "nickname": "Fixture_Coiner" },
   "fee_bps": 100,
   "category": "player",
   "price_e4": null,
   "burn_hype": 8,
-  "created_at": "2026-11-15T18:20:02.107473+00:00",
+  "created_at": "2026-11-15T18:35:46.439009+00:00",
   "low_24h_e4": null,
   "pool_cents": 0,
   "burn_min_e6": 0,
@@ -58,7 +58,7 @@
   "team_tokens_e6": 0,
   "market_cap_cents": 0,
   "volume_24h_cents": 0,
-  "burn_available_at": "2026-11-15T19:20:02.182198+00:00",
+  "burn_available_at": "2026-11-15T19:35:46.523303+00:00",
   "team_at_launch_e6": 25000000000,
   "team_sold_window_e6": 7500000000
 }

@@ -9,6 +9,7 @@ import { COMPANY_EVENT_RPC_SCHEMAS, liveCompanyEventEngine } from "./api-company
 import { CRYPTO_RPC_SCHEMAS, liveCryptoEngine } from "./api-crypto";
 import { DEAL_RPC_SCHEMAS, liveDealEngine } from "./api-deals";
 import { PROPERTY_RPC_SCHEMAS, livePropertyEngine } from "./api-property";
+import { RENTAL_RPC_SCHEMAS, liveRentalEngine } from "./api-rentals";
 import { TASK_RPC_SCHEMAS, liveTaskEngine } from "./api-tasks";
 import { PITCH_RPC_SCHEMAS, livePitchEngine } from "./api-pitches";
 import { PROTEST_RPC_SCHEMAS, liveProtestEngine } from "./api-protests";
@@ -482,6 +483,7 @@ export const RPC_SCHEMAS = {
   ...COMPANY_RPC_SCHEMAS,
   ...ARTWORK_RPC_SCHEMAS,
   ...PROPERTY_RPC_SCHEMAS,
+  ...RENTAL_RPC_SCHEMAS,
   ...TASK_RPC_SCHEMAS,
   ...PITCH_RPC_SCHEMAS,
   ...PROTEST_RPC_SCHEMAS,
@@ -515,6 +517,7 @@ export const liveEngine: GameEngine = {
   ...liveNftEngine,
   ...liveFloorEngine,
   ...livePropertyEngine,
+  ...liveRentalEngine,
   ...liveFriendEngine,
   ...liveAccessoryEngine,
   async companyMoves() {

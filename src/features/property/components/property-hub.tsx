@@ -18,7 +18,8 @@ import { BALANCE, type PropertyTier } from "@/config/balance";
 import { CARS, TILE } from "@/config/furniture";
 import { useGameErrorText } from "@/features/game/errors";
 import { engine, useGame, usePlayerLevel } from "@/features/game/store";
-import type { Property } from "@/features/game/types";
+import type { Property, Tenant } from "@/features/game/types";
+import { Reveal } from "@/features/progression/components/reveal";
 import { useVisitTour } from "@/features/tutorial/use-visit-tour";
 import { formatMoney } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
@@ -27,6 +28,7 @@ import { tierIndex, upgradeCostCents } from "@/lib/sim/property";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { useFitScale, useProperty, usePropertyRefresh } from "../hooks";
+import { RentalsPanel } from "./rentals-panel";
 import { RoomEditor } from "./room-editor";
 import { RoomView } from "./room-view";
 import { CarDealer, FurnitureShop } from "./shops";
@@ -54,16 +56,27 @@ export function PropertyHub() {
     );
   }
   if (!state.data) return <Skeleton className="h-96 w-full rounded-lg" />;
-  const { property, inventory } = state.data;
+  const { property, inventory, rental } = state.data;
 
   if (!property.tier) {
     return (
       <div className="space-y-5">
+        {/* a tenant sees the rented home first (ADR-158) */}
+        {rental.renting && (
+          <Reveal feature="propertyRentals">
+            <RentalsPanel />
+          </Reveal>
+        )}
         <p className="text-pretty text-fg-2">{t("intro")}</p>
         <TierLadder property={property} />
         <Button variant="secondary" onClick={() => setShopping(true)}>
           {t("shopTitle")}
         </Button>
+        {!rental.renting && (
+          <Reveal feature="propertyRentals">
+            <RentalsPanel />
+          </Reveal>
+        )}
         <FurnitureShop open={shopping} onClose={() => setShopping(false)} />
       </div>
     );
@@ -73,7 +86,7 @@ export function PropertyHub() {
     <div className="space-y-5">
       <HomeHeader property={property} onMove={() => setMoving(true)} />
       <Card padding="md" className="space-y-4" data-tour="home-room">
-        <FittedRoom property={property} />
+        <FittedRoom property={property} tenants={rental.tenants} />
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => setEditing(true)} data-testid="furnish">
             ✎ {t("furnish")}
@@ -88,6 +101,9 @@ export function PropertyHub() {
           )}
         </div>
       </Card>
+      <Reveal feature="propertyRentals">
+        <RentalsPanel />
+      </Reveal>
       <Garage property={property} onDealer={() => setDealer(true)} />
 
       {inventory && (
@@ -107,11 +123,11 @@ export function PropertyHub() {
   );
 }
 
-function FittedRoom({ property }: { property: Property }) {
+function FittedRoom({ property, tenants }: { property: Property; tenants?: readonly Tenant[] }) {
   const { ref, scale } = useFitScale(property.width * TILE, 4);
   return (
     <div ref={ref} className="w-full overflow-x-auto">
-      <RoomView property={property} scale={scale} />
+      <RoomView property={property} scale={scale} tenants={tenants} />
     </div>
   );
 }
@@ -268,16 +284,35 @@ export function Garage({ property, onDealer }: { property: Property; onDealer?: 
 /** Someone else's home on their profile: the flex (ADR-082). */
 export function PropertyShowcase({ nickname }: { nickname: string }) {
   const t = useTranslations("estate");
+  const tr = useTranslations("rentals");
   const state = useProperty(nickname);
   const property = state.data?.property;
-  if (!property?.tier) return null;
+  const rental = state.data?.rental;
+  const renting = rental?.renting ? (
+    <p className="text-sm text-fg-2" data-testid="showcase-renting">
+      {tr("livesAt", {
+        tier: rental.renting.tier ? t(`tierNames.${rental.renting.tier}`) : "",
+        owner: rental.renting.owner,
+      })}
+    </p>
+  ) : null;
+  if (!property?.tier) return renting ? <Card padding="md">{renting}</Card> : null;
   return (
     <Card padding="lg" className="space-y-3" data-testid="property-showcase">
-      <div className="flex items-baseline justify-between gap-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
         <p className="label-pixel text-fg-2">{t(`tierNames.${property.tier}`)}</p>
-        <ShortMoney cents={property.valueCents} className="text-sm font-semibold text-fg-1" />
+        <div className="flex items-baseline gap-3">
+          {rental && rental.wohnwert > 0 && (
+            <span className="nums text-xs text-fg-3">{tr("wohnwertShort", { value: rental.wohnwert })}</span>
+          )}
+          <ShortMoney cents={property.valueCents} className="text-sm font-semibold text-fg-1" />
+        </div>
       </div>
-      <FittedRoom property={property} />
+      <FittedRoom property={property} tenants={rental?.tenants} />
+      {rental && rental.tenants.length > 0 && (
+        <p className="text-xs text-fg-3">{tr("showcaseTenants", { count: rental.tenants.length })}</p>
+      )}
+      {renting}
       <Garage property={property} />
     </Card>
   );

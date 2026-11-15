@@ -1,8 +1,8 @@
 {
-  "now": "2026-11-15T18:20:02.75608+00:00",
+  "now": "2026-11-15T18:35:47.069582+00:00",
   "chat": [
     {
-      "at": "2026-11-15T18:20:02.753235+00:00",
+      "at": "2026-11-15T18:35:47.066647+00:00",
       "id": 206,
       "body": "Was für eine Sendung 💀📉",
       "mine": true,
@@ -17,71 +17,75 @@
       {
         "kind": "gossip",
         "mood": "proud",
-        "text": "Ich fasse es nicht, aber es stimmt. Bea_Banner meldet: Banner Werk gegründet. Ich bin fast stolz. Fast.",
+        "text": "Gute Nachrichten, ausnahmsweise. Bei Fixture_Neustart heißt es: Fixture Zweitling gegründet. Ich hätte keinen Cent darauf gewettet, und ich wette auf alles.",
         "effects": [],
-        "headline": "Na so was: Bea_Banner"
+        "headline": "Fixture_Neustart hat es geschafft"
       },
       {
         "kind": "hype",
         "mood": "laughing",
-        "text": "Fiona Neu räumt ab. Ein Testmagazin urteilt: „Besser als erwartet, und wir hatten nichts erwartet.“ Fiona_Fabrik hängt sich das gerahmt ins Büro. Die Kundschaft rennt die Tür ein.",
-        "effects": [{ "tone": "gain", "label": "Bekanntheit +18,8 %" }],
-        "headline": "Ritterschlag für Fiona Neu"
+        "text": "Sogar die Steuerprüfung kam privat vorbei, um einzukaufen. Plötzlich will jeder „Turnschuhe aus Hanf“. Pitch_Chefin tut so, als sei das alles geplant gewesen. Wir tun so, als würden wir das glauben.",
+        "effects": [{ "tone": "gain", "label": "Bekanntheit +13,7 %" }],
+        "headline": "Faire Schuhe geht viral"
       },
       {
         "kind": "nft",
-        "mood": "laughing",
+        "mood": "confused",
         "text": "Kunstmarkt, oder was man dafür hält: „Neon Nacht“ von Nina_Neon ging für 30.000 € an Ben_Bieter. Ich habe mir das Werk angesehen. Ich habe Fragen. Viele.",
         "effects": [],
         "headline": "30.000 € für ein paar Pixel"
       },
       {
         "kind": "winner",
-        "mood": "proud",
-        "text": "11389,1 % Plus, 1.138.912 € Gewinn: Fixture_Neu zeigt dem Rest, wie es geht. Man munkelt von einem Pakt mit dem Teufel, der Teufel dementiert.",
+        "mood": "shocked",
+        "text": "Und nun zu jemandem, der es kann: Fixture_Neu hat heute 1.138.888 € gemacht, 11388,9 % im Plus. Das Finanzamt hat bereits freundlich gewunken.",
         "effects": [],
-        "headline": "Fixture_Neu schwimmt im Geld"
+        "headline": "Fixture_Neu sahnt ab: plus 1.138.888 €"
       },
       {
         "kind": "gossip",
         "mood": "shocked",
-        "text": "Ich fasse es nicht, aber es stimmt. Float_Frida meldet: Knappwerk gegründet. Glückwunsch, und jetzt bloß nichts anfassen.",
+        "text": "Ich fasse es nicht, aber es stimmt. Hanna_Stunde meldet: Stunden Werk gegründet. Ich bin fast stolz. Fast.",
         "effects": [],
-        "headline": "Na so was: Float_Frida"
+        "headline": "Na so was: Hanna_Stunde"
       },
       {
-        "kind": "scandal",
-        "mood": "angry",
-        "text": "Peinlich für Pop_Gero: Ein Werbespot wurde versehentlich mit dem Ton einer Karaoke-Nacht veröffentlicht. „Wanderkarten“ klang auf dem Papier besser. Das Image von Talwerk ist im Eimer.",
-        "effects": [
-          { "tone": "loss", "label": "Bekanntheit −11,8 %" },
-          { "tone": "loss", "label": "TAL −19 %" }
-        ],
-        "headline": "Kunden fliehen vor Talwerk"
+        "kind": "hype",
+        "mood": "laughing",
+        "text": "Bodos Garage räumt ab. Ein Kind hat im Schulaufsatz darüber geschrieben, die Klasse war begeistert. Bodo_Garage hängt sich das gerahmt ins Büro. Die Kundschaft rennt die Tür ein.",
+        "effects": [{ "tone": "gain", "label": "Bekanntheit +22,5 %" }],
+        "headline": "Ritterschlag für Bodos Garage"
       },
       {
-        "kind": "tasks",
+        "kind": "ramble",
         "mood": "angry",
-        "text": "Ein Fernsehkoch hat erklärt, man könne Geld auch behalten. Offene Aufgaben bringen 27,8 % weniger. Durchhalten, es wird auch wieder schlechter.",
-        "effects": [{ "tone": "loss", "label": "Aufgaben −27,8 %" }],
-        "headline": "Flaute bei den Aufträgen"
+        "text": "Die Regie winkt, ich ignoriere sie. Die Deutsche Bahn meldet, mein Zug von gestern komme heute. Ich warte seit Dienstag. So. Weiter im Text.",
+        "effects": [],
+        "headline": "Was ich noch sagen wollte"
+      },
+      {
+        "kind": "sector",
+        "mood": "crying",
+        "text": "Die Branche Pharma sackt um 8,1 % ab. Ein Fernsehmoderator hat schlecht geträumt und es live erzählt. Bis das geklärt ist, verkaufen erst mal alle.",
+        "effects": [{ "tone": "loss", "label": "Pharma −8,1 %" }],
+        "headline": "Pharma im freien Fall"
       },
       {
         "kind": "stock",
         "mood": "crying",
-        "text": "Schlechte Nachrichten von Sonnenkern Fusion: Im Werk wurde drei Wochen lang das falsche Produkt gebaut, niemandem fiel es auf. Minus 15,8 %, und der Tag ist noch jung.",
-        "effects": [{ "tone": "loss", "label": "FSN −15,8 %" }],
-        "headline": "Sonnenkern Fusion im Sinkflug"
+        "text": "Ein Mitarbeiter hat „Allen antworten“ gedrückt. Mit Anhang. Der Kurs von Glanz & Gloria sackt um 17,4 % ab. Ein Krisenstab tagt.",
+        "effects": [{ "tone": "loss", "label": "LUX −17,4 %" }],
+        "headline": "Panik bei Glanz & Gloria"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Glanz & Gloria tut sich in der nächsten Stunde etwas, und zwar nach oben. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
-        "effects": [{ "tone": "neutral", "label": "LUX ↑ Tipp" }],
-        "headline": "Mr. Doodle Dangles Geheimtipp"
+        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Volta Energie AG geht bald nach oben. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
+        "effects": [{ "tone": "neutral", "label": "VLT ↑ Tipp" }],
+        "headline": "Der heiße Draht: Volta Energie AG"
       }
     ],
-    "started_at": "2026-11-15T18:20:02.75608+00:00"
+    "started_at": "2026-11-15T18:35:47.069582+00:00"
   },
   "viewers": 5,
   "upcoming": null,

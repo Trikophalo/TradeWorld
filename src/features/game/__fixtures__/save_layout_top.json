@@ -1,14 +1,15 @@
 {
+  "rental": { "places": 3, "renting": null, "tenants": [], "wohnwert": 19, "offer_open": false },
   "property": {
     "tier": "house",
     "floor": "parquet",
     "owner": "Fixture_Heim",
     "width": 13,
-    "garage": [{ "id": "572b0e9b-fd76-44c5-b45d-64da30e60b38", "slot": 0, "car_key": "car_electric" }],
+    "garage": [{ "id": "813db617-3e47-4d3c-9d30-6eee62a2f2d9", "slot": 0, "car_key": "car_electric" }],
     "height": 9,
     "placed": [
-      { "x": 2, "y": 2, "id": "9c0ce8f5-d93b-46d6-bab5-b46994d089c7", "rot": 0, "item_key": "table_oak" },
-      { "x": 3, "y": 3, "id": "4e0160b9-fe43-4a5c-8b2c-67124b4dde9c", "rot": 0, "item_key": "laptop" }
+      { "x": 2, "y": 2, "id": "da95d50f-da27-44f7-9298-8ddca97beea1", "rot": 0, "item_key": "table_oak" },
+      { "x": 3, "y": 3, "id": "95d8b217-5cc6-4641-b4cb-a5d48ef6cfa6", "rot": 0, "item_key": "laptop" }
     ],
     "wall_color": "#2f5fd0",
     "value_cents": 27955200,
@@ -18,9 +19,9 @@
   "inventory": {
     "cars": [],
     "furniture": [
-      { "id": "f8f16097-bb92-473e-94b5-d5b9ee62cfbd", "item_key": "sofa_leather" },
-      { "id": "7eb83781-491b-4f5e-a32b-8aa13b912fd6", "item_key": "rug_wool" },
-      { "id": "f3cb18b5-264f-4aaf-bf58-5d74b24536eb", "item_key": "plant_small" }
+      { "id": "85619551-e87c-48d3-8376-70dcc37b3a23", "item_key": "sofa_leather" },
+      { "id": "a501e863-38a5-49c0-9adf-609b4a61a03e", "item_key": "rug_wool" },
+      { "id": "787bf7e7-6d5a-4c71-b199-18908ca59217", "item_key": "plant_small" }
     ]
   }
 }

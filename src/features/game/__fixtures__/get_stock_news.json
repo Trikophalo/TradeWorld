@@ -2,42 +2,42 @@
   "items": [
     {
       "id": 5,
-      "body": "Ein mehrjähriger Vertrag mit der öffentlichen Hand ist unterschrieben. Sicher ist das nicht.",
-      "name": "Pixelwerk Studios",
-      "due_at": "2026-11-15T19:58:41.579457+00:00",
+      "body": "Die Gründe sind unklar. Der Markt mag keine Unsicherheit. Sicher ist das nicht.",
+      "name": "QuantenSprung Labs",
+      "due_at": "2026-11-15T19:53:41.897893+00:00",
       "status": "open",
-      "ticker": "PXW",
-      "headline": "Staatlicher Großauftrag für Pixelwerk Studios",
-      "move_bps": null,
-      "strength": 2,
-      "direction": "up",
-      "published_at": "2026-11-15T19:20:02.247544+00:00"
-    },
-    {
-      "id": 4,
-      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Methusalem Bio tut sich in der nächsten Stunde etwas, und zwar nach unten. Meine Quelle ist seriös, sie trägt immerhin eine Krawatte.",
-      "name": "Methusalem Bio",
-      "due_at": "2026-11-15T18:48:57.068503+00:00",
-      "status": "fizzled",
-      "ticker": "MTH",
-      "headline": "Mr. Doodle Dangles Geheimtipp",
+      "ticker": "QSL",
+      "headline": "QuantenSprung Labs-Chef tritt überraschend zurück",
       "move_bps": null,
       "strength": 2,
       "direction": "down",
-      "published_at": "2026-11-15T18:19:57.068503+00:00"
+      "published_at": "2026-11-15T19:35:46.596008+00:00"
+    },
+    {
+      "id": 4,
+      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Luftpost Drohnen tut sich in der nächsten Stunde etwas, und zwar nach oben. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
+      "name": "Luftpost Drohnen",
+      "due_at": "2026-11-15T19:05:39.647241+00:00",
+      "status": "confirmed",
+      "ticker": "DRN",
+      "headline": "Mr. Doodle Dangles Geheimtipp",
+      "move_bps": 571,
+      "strength": 2,
+      "direction": "up",
+      "published_at": "2026-11-15T18:35:39.647241+00:00"
     },
     {
       "id": 3,
-      "body": "Ein Vögelchen hat mir gezwitschert: Sonnenkern Fusion dürfte in der kommenden Stunde nach oben gehen. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
-      "name": "Sonnenkern Fusion",
-      "due_at": "2026-11-15T18:19:56.303852+00:00",
-      "status": "fizzled",
-      "ticker": "FSN",
-      "headline": "Vom Flurfunk: Sonnenkern Fusion",
-      "move_bps": null,
+      "body": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: KlarSoft AG geht bald nach unten. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
+      "name": "KlarSoft AG",
+      "due_at": "2026-11-15T18:35:38.939587+00:00",
+      "status": "confirmed",
+      "ticker": "KLS",
+      "headline": "Der heiße Draht: KlarSoft AG",
+      "move_bps": -1438,
       "strength": 2,
-      "direction": "up",
-      "published_at": "2026-11-15T18:19:56.303852+00:00"
+      "direction": "down",
+      "published_at": "2026-11-15T18:35:38.939587+00:00"
     }
   ],
   "reliability_bps": 7500

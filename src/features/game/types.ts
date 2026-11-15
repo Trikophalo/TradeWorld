@@ -328,6 +328,104 @@ export interface PropertyInventory {
 export interface PropertyState {
   property: Property;
   inventory: PropertyInventory | null;
+  /** Wohnwert, places and tenants of the home, where the player rents (ADR-158). */
+  rental: PropertyRental;
+}
+
+/** Someone living in a home as a tenant (ADR-158): AI tenants have no portrait, their look follows from the name. */
+export interface Tenant {
+  id: string;
+  name: string;
+  isAi: boolean;
+  avatarKey: string | null;
+  accessories: string[];
+  since: string;
+}
+
+export interface PropertyRental {
+  wohnwert: number;
+  places: number;
+  offerOpen: boolean;
+  tenants: Tenant[];
+  /** Where the player rents a place, if anywhere. */
+  renting: { owner: string; tier: PropertyTier | null } | null;
+}
+
+export type RentPeriodKey = "hour" | "day";
+
+export interface WohnwertState {
+  total: number;
+  parts: { value: number; variety: number; fill: number; layers: number; style: number; floor: number };
+  valueCents: number;
+  targetCents: number;
+  categories: number;
+  coverageBps: number;
+  rugs: number;
+  tops: number;
+  pieces: number;
+}
+
+export interface RentLimits {
+  minCents: number;
+  maxCents: number;
+  fairCents: number;
+}
+
+export interface OwnTenancy extends Tenant {
+  period: RentPeriodKey;
+  priceCents: number;
+  startedAt: string;
+  nextDueAt: string;
+  endsAt: string | null;
+  noticeBy: "tenant" | "owner" | null;
+  paidCents: number;
+}
+
+/** RENTALS (ADR-158): the own home's Wohnwert and offer, its tenants, and the place rented elsewhere. */
+export interface RentalsState {
+  home: {
+    tier: PropertyTier;
+    places: number;
+    wohnwert: WohnwertState;
+    limits: Record<RentPeriodKey, RentLimits>;
+  } | null;
+  offer: { period: RentPeriodKey; priceCents: number; isOpen: boolean; aiCheckAt: string; chanceBps: number } | null;
+  tenants: OwnTenancy[];
+  past: { id: string; name: string; isAi: boolean; endedAt: string; endReason: string | null; paidCents: number }[];
+  earned7dCents: number;
+  earnedTotalCents: number;
+  renting: {
+    id: string;
+    owner: string;
+    ownerAvatarKey: string | null;
+    ownerAccessories: string[];
+    tier: PropertyTier | null;
+    wohnwert: number;
+    period: RentPeriodKey;
+    priceCents: number;
+    startedAt: string;
+    nextDueAt: string;
+    endsAt: string | null;
+    noticeBy: "tenant" | "owner" | null;
+    paidCents: number;
+    xpTotal: number;
+    property: Property;
+    tenants: Tenant[];
+  } | null;
+}
+
+export interface RentalOffer {
+  owner: string;
+  avatarKey: string | null;
+  accessories: string[];
+  tier: PropertyTier;
+  wohnwert: number;
+  period: RentPeriodKey;
+  priceCents: number;
+  places: number;
+  free: number;
+  property: Property;
+  tenants: Tenant[];
 }
 export type ArtOrigin = "all" | "game" | "player";
 
@@ -1942,6 +2040,12 @@ export const GAME_ERROR_KEYS = [
   "not_friends",
   "poke_too_soon",
   "poke_daily_limit",
+  "rent_price_out_of_range",
+  "rent_own_home",
+  "rental_not_offered",
+  "rental_full",
+  "already_renting",
+  "tenancy_not_found",
   "move_busy",
   "move_resting",
   "friend_code_unknown",
@@ -2067,6 +2171,12 @@ export interface GameEngine {
   ): Promise<PropertyState>;
   buyCar(requestId: string, carKey: string): Promise<PropertyState>;
   sellItem(requestId: string, kind: "furniture" | "car", id: string): Promise<PropertyState & { refundCents: number }>;
+  // Renting out places in the home (ADR-158)
+  rentals(): Promise<RentalsState>;
+  rentalMarket(): Promise<RentalOffer[]>;
+  setRentalOffer(requestId: string, period: RentPeriodKey, priceCents: number, open: boolean): Promise<RentalsState>;
+  rentHome(requestId: string, owner: string): Promise<RentalsState>;
+  endTenancy(requestId: string, tenancyId: string): Promise<RentalsState>;
   checkNickname(nickname: string): Promise<{ allowed: boolean; reason: GameErrorKey | null }>;
   changeNickname(requestId: string, nickname: string): Promise<{ nickname: string; nextChangeAt: string }>;
   /** Starts over as a new player; `confirm` is the current nickname (ADR-070). */

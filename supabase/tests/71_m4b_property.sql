@@ -93,7 +93,7 @@ select tests.throws_key($$select public.buy_furniture(gen_random_uuid(), 'chair_
 select tests.throws_key($$select public.buy_floor(gen_random_uuid(), 'carpet')$$, 'property_locked', 'level 3: buy_floor is locked');
 reset role;
 select tests.assert(
-  :'d_view'::jsonb = jsonb_build_object(
+  (:'d_view'::jsonb - 'rental') = jsonb_build_object(
     'property', jsonb_build_object('owner', 'Neo_Neuling', 'tier', null, 'width', 0, 'height', 0, 'garage_slots', 0,
                                    'wall_color', '#f3efe4', 'floor', 'laminate', 'floors_owned', '["laminate"]'::jsonb,
                                    'placed', '[]'::jsonb, 'garage', '[]'::jsonb, 'value_cents', 0),

@@ -1,4 +1,5 @@
 {
+  "rental": { "places": 1, "renting": null, "tenants": [], "wohnwert": 0, "offer_open": false },
   "property": {
     "tier": "flat",
     "floor": "laminate",
@@ -14,6 +15,6 @@
   },
   "inventory": {
     "cars": [],
-    "furniture": [{ "id": "f8f16097-bb92-473e-94b5-d5b9ee62cfbd", "item_key": "sofa_leather" }]
+    "furniture": [{ "id": "85619551-e87c-48d3-8376-70dcc37b3a23", "item_key": "sofa_leather" }]
   }
 }

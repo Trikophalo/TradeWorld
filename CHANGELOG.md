@@ -127,6 +127,14 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   (Gewöhnliches ab 450 €, Legendäres bis 75 Mio. €). Damit man den Überblick behält: Suche, Filter nach Bereich und
   Seltenheit, Sortieren nach Preis, „Nur bezahlbare“ und die Ansicht „Nach Sets“.
 
+- **Vermieten und Wohnwert (ADR-158):** Dein Zuhause hat jetzt einen **Wohnwert** von 0 bis 100. Er steigt mit
+  wertvollen Möbeln, Abwechslung, einem gut gefüllten (aber nicht vollgestellten) Raum, Teppichen, Kleinkram auf dem
+  Tisch, einem einheitlichen Stil und einem edlen Boden; der Raum-Editor zeigt ihn live mit Tipps. Ab Level 8
+  vermietest du Plätze in deinem Zuhause, pro Stunde oder pro Tag: KI-Mieter ziehen umso schneller ein, je schöner es
+  ist und je fairer der Preis, und zahlen jede Periode im Voraus. Im neuen **Mietmarkt** mietest du dich selbst bei
+  anderen Spielern ein und bekommst Wohlfühl-XP. Alle Mieter laufen als Pixelfiguren mit Namensschild durch den Raum,
+  auch auf dem Profil. Neue Missionen, Meldungen bei Ein- und Auszug und einmal am Tag die Mieteinnahmen.
+
 - **Kleiderschrank und Freunde-Platz (ADR-155):** Deine Spielfigur steht jetzt in voller Größe da und lässt sich
   anziehen: 51 verrückte Accessoires vom Cowboyhut über Bananenkostüm, Haikostüm und Laseraugen bis zu Papagei,
   Jetpack und goldener Klobürste. Unter Profil → Kleiderschrank probierst du alles an und kaufst mit Spielgeld, von

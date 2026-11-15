@@ -76,7 +76,9 @@ select tests.assert(
           -- accessories and poking friends (9m)
           || array['get_accessories', 'buy_accessory', 'wear_accessory', 'poke_friend']
           -- the company floor (9p)
-          || array['get_company_floor']) x),
+          || array['get_company_floor']
+          -- renting out places in the home (9q)
+          || array['get_rentals', 'get_rental_market', 'set_rental_offer', 'rent_home', 'end_tenancy']) x),
   'authenticated can execute exactly the 9 helpers and the RPCs up to the market popularity (9g)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace

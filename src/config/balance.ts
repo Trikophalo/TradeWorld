@@ -833,6 +833,8 @@ export interface BalanceConfig {
   readonly startups: StartupsConfig;
   readonly artworks: ArtworksConfig;
   readonly property: PropertyConfig;
+  /** Renting out places in the own home, Wohnwert (ADR-158), formulas in src/lib/sim/rentals.ts. */
+  readonly rentals: RentalsConfig;
   readonly social: SocialConfig;
   /** Crises and chances of player companies (ADR-091), catalog in company-events.ts. */
   readonly companyEvents: CompanyEventsConfig;
@@ -910,6 +912,68 @@ export interface PropertyConfig {
   readonly floors: Readonly<Record<FloorMaterial, number>>;
   /** Wall colours (free to choose). */
   readonly wallColors: readonly string[];
+}
+
+export type RentPeriod = "hour" | "day";
+
+/** Renting out places in the own home and the Wohnwert (ADR-158). */
+export interface RentalsConfig {
+  /** Places for tenants per tier (the owner keeps living there). */
+  readonly places: Readonly<Record<PropertyTier, number>>;
+  /** Reference rent per place and hour at Wohnwert 100. */
+  readonly baseRentCentsPerHour: Readonly<Record<PropertyTier, number>>;
+  /** The fair rent at Wohnwert 0, as a share of the reference rent (linear up to 100 % at Wohnwert 100). */
+  readonly fairMinShareBps: number;
+  /** The owner's price per hour: at least this share of the reference rent (and at least minPriceCents) ... */
+  readonly minPriceBps: number;
+  readonly minPriceCents: number;
+  /** ... and at most this share of the fair rent. A day costs 24 hours. */
+  readonly maxPriceBps: number;
+  readonly periods: readonly RentPeriod[];
+  /** Every tenancy runs at least this long; notice ends it at the first period end after noticeHours. */
+  readonly minHours: number;
+  readonly noticeHours: number;
+  /** AI tenants (paid by the households). */
+  readonly ai: {
+    /** Below this Wohnwert no AI tenant moves in, and AI tenants move out at the next payment. */
+    readonly minWohnwert: number;
+    /** Chance per free place and check at Wohnwert 100 and the fair price. */
+    readonly chanceBps: number;
+    /** Price factor: 20 000 - price/fair (bps), between 0 and this. */
+    readonly maxPriceFactorBps: number;
+    readonly checkEveryMinutes: number;
+    readonly stayMinHours: number;
+    readonly stayMaxHours: number;
+    readonly names: readonly string[];
+  };
+  /** Player tenants get this base XP per paid hour at Wohnwert 100 (proportional below). */
+  readonly tenantXpPerHour: number;
+  /** A player rents at most this many places at a time. */
+  readonly maxTenanciesAsTenant: number;
+  /** Renting a home of this tier or higher is news for the friends. */
+  readonly feedMinTier: PropertyTier;
+  readonly paymentsKeepDays: number;
+  /** Rental market: at most this many offers in the list. */
+  readonly marketLimit: number;
+  readonly wohnwert: {
+    /** Furniture value (catalogue prices of placed pieces) that counts fully: this share of the home price. */
+    readonly valueTargetBps: number;
+    readonly points: {
+      readonly value: number;
+      readonly variety: number;
+      readonly fill: number;
+      readonly layers: number;
+      readonly style: number;
+      readonly floor: number;
+    };
+    /** Distinct furniture categories for full variety points. */
+    readonly varietyTarget: number;
+    /** Share of the floor covered by furniture (object layer): full points between idealMin and idealMax. */
+    readonly fill: { readonly idealMinBps: number; readonly idealMaxBps: number; readonly zeroAtBps: number };
+    /** Style: share of the pieces in the most common furniture tier; full only from this many pieces. */
+    readonly styleMinPieces: number;
+    readonly floorPoints: Readonly<Record<FloorMaterial, number>>;
+  };
 }
 
 /** Pixel artworks, gallery and auctions (ADR-080, docs/ARTWORKS.md). */
@@ -2553,6 +2617,64 @@ export const BALANCE = {
       "#c8553d",
       "#ffd15c",
     ],
+  },
+  rentals: {
+    places: { flat: 1, apartment: 2, house: 3, villa: 4, luxury_villa: 6 },
+    baseRentCentsPerHour: { flat: 3_000, apartment: 6_000, house: 15_000, villa: 40_000, luxury_villa: 100_000 },
+    fairMinShareBps: 2_000,
+    minPriceBps: 500,
+    minPriceCents: 100,
+    maxPriceBps: 15_000,
+    periods: ["hour", "day"],
+    minHours: 24,
+    noticeHours: 12,
+    ai: {
+      minWohnwert: 25,
+      chanceBps: 6_000,
+      maxPriceFactorBps: 20_000,
+      checkEveryMinutes: 60,
+      stayMinHours: 24,
+      stayMaxHours: 120,
+      names: [
+        "Anja K.",
+        "Ben S.",
+        "Carla M.",
+        "Deniz Y.",
+        "Elif A.",
+        "Finn H.",
+        "Greta W.",
+        "Hannes B.",
+        "Ida L.",
+        "Jonas P.",
+        "Kira T.",
+        "Luca R.",
+        "Mia F.",
+        "Nils O.",
+        "Olga V.",
+        "Paul D.",
+        "Rosa N.",
+        "Sami E.",
+        "Tilda G.",
+        "Udo Z.",
+        "Vera C.",
+        "Willi J.",
+        "Yara I.",
+        "Zoe Q.",
+      ],
+    },
+    tenantXpPerHour: 5,
+    maxTenanciesAsTenant: 1,
+    feedMinTier: "villa",
+    paymentsKeepDays: 30,
+    marketLimit: 30,
+    wohnwert: {
+      valueTargetBps: 2_000,
+      points: { value: 30, variety: 20, fill: 20, layers: 10, style: 10, floor: 10 },
+      varietyTarget: 7,
+      fill: { idealMinBps: 3_000, idealMaxBps: 5_500, zeroAtBps: 8_500 },
+      styleMinPieces: 6,
+      floorPoints: { laminate: 0, carpet: 3, tiles: 4, parquet: 6, stone: 7, marble: 9, gold: 10 },
+    },
   },
 } as const satisfies BalanceConfig;
 

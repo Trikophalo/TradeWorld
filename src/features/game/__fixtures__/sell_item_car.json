@@ -1,10 +1,11 @@
 {
+  "rental": { "places": 3, "renting": null, "tenants": [], "wohnwert": 6, "offer_open": false },
   "property": {
     "tier": "house",
     "floor": "parquet",
     "owner": "Fixture_Heim",
     "width": 13,
-    "garage": [{ "id": "572b0e9b-fd76-44c5-b45d-64da30e60b38", "slot": 0, "car_key": "car_electric" }],
+    "garage": [{ "id": "813db617-3e47-4d3c-9d30-6eee62a2f2d9", "slot": 0, "car_key": "car_electric" }],
     "height": 9,
     "placed": [],
     "wall_color": "#2f5fd0",
@@ -15,9 +16,9 @@
   "inventory": {
     "cars": [],
     "furniture": [
-      { "id": "f8f16097-bb92-473e-94b5-d5b9ee62cfbd", "item_key": "sofa_leather" },
-      { "id": "7eb83781-491b-4f5e-a32b-8aa13b912fd6", "item_key": "rug_wool" },
-      { "id": "f3cb18b5-264f-4aaf-bf58-5d74b24536eb", "item_key": "plant_small" }
+      { "id": "85619551-e87c-48d3-8376-70dcc37b3a23", "item_key": "sofa_leather" },
+      { "id": "a501e863-38a5-49c0-9adf-609b4a61a03e", "item_key": "rug_wool" },
+      { "id": "787bf7e7-6d5a-4c71-b199-18908ca59217", "item_key": "plant_small" }
     ]
   },
   "refund_cents": 360000

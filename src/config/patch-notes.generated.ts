@@ -309,6 +309,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Deine Spielfigur steht jetzt in voller Größe da und lässt sich anziehen: 51 verrückte Accessoires vom Cowboyhut über Bananenkostüm, Haikostüm und…",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-760a66c5",
+        title: "Vermieten und Wohnwert",
+        text: "Dein Zuhause hat jetzt einen **Wohnwert** von 0 bis 100.",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-37807b7d",
         title: "Kleiderschrank: zweite Kollektion",
         text: "74 neue Teile, jetzt 125 insgesamt, in zwölf Sets: Piraten mit Augenklappe und Säbel, Raumfahrt mit Strahlenpistole und Mini-UFO, Ritterhelm und…",

@@ -20,6 +20,8 @@ import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { useFitScale, usePropertyRefresh } from "../hooks";
 import { drawOrder, furnitureItem, furnitureSprite, roomBackdrop, WALL, type FurnitureLayer } from "../room";
+import { layoutWohnwert } from "../wohnwert";
+import { WohnwertMeter } from "./wohnwert-meter";
 
 type Layout = Map<string, { x: number; y: number; rot: 0 | 90 }>;
 interface Carry {
@@ -231,6 +233,14 @@ export function RoomEditor({
   };
 
   const ordered = drawOrder(placements(layout), (p) => footprint(p.id)?.layer);
+  // ADR-158: the Wohnwert of the layout being edited, live
+  const liveWohnwert = property.tier
+    ? layoutWohnwert(
+        property.tier,
+        floor,
+        [...layout.keys()].map((id) => keyOf.get(id) ?? ""),
+      )
+    : null;
 
   return (
     <Modal
@@ -360,7 +370,14 @@ export function RoomEditor({
           </div>
         </div>
 
-        <div className="space-y-5">
+        <div className="flex flex-col gap-5">
+          {/* on phones below the inventory (the room stays in reach while placing), on wide screens on top */}
+          {liveWohnwert && (
+            <WohnwertMeter
+              wohnwert={liveWohnwert}
+              className="order-last rounded-lg bg-surface-2/60 p-3 lg:order-first"
+            />
+          )}
           <section>
             <p className="mb-2 label-pixel text-fg-2">{t("inventory")}</p>
             {groups.size === 0 ? (

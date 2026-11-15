@@ -1,4 +1,5 @@
 {
+  "rental": { "places": 1, "renting": null, "tenants": [], "wohnwert": 41, "offer_open": false },
   "property": {
     "tier": "flat",
     "floor": "parquet",
@@ -7,8 +8,8 @@
     "garage": [],
     "height": 6,
     "placed": [
-      { "x": 1, "y": 1, "id": "f8f16097-bb92-473e-94b5-d5b9ee62cfbd", "rot": 0, "item_key": "sofa_leather" },
-      { "x": 1, "y": 1, "id": "7eb83781-491b-4f5e-a32b-8aa13b912fd6", "rot": 0, "item_key": "rug_wool" }
+      { "x": 1, "y": 1, "id": "85619551-e87c-48d3-8376-70dcc37b3a23", "rot": 0, "item_key": "sofa_leather" },
+      { "x": 1, "y": 1, "id": "a501e863-38a5-49c0-9adf-609b4a61a03e", "rot": 0, "item_key": "rug_wool" }
     ],
     "wall_color": "#2f5fd0",
     "value_cents": 1614400,
@@ -18,8 +19,8 @@
   "inventory": {
     "cars": [],
     "furniture": [
-      { "id": "82276192-af66-4985-91d9-d14c1196a0b5", "item_key": "plant_small" },
-      { "id": "f3cb18b5-264f-4aaf-bf58-5d74b24536eb", "item_key": "plant_small" }
+      { "id": "2cd13970-2cff-4a7d-b5ff-3fbc0e795b34", "item_key": "plant_small" },
+      { "id": "787bf7e7-6d5a-4c71-b199-18908ca59217", "item_key": "plant_small" }
     ]
   }
 }

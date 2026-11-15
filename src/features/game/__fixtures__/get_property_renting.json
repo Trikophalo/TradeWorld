@@ -1,0 +1,23 @@
+{
+  "rental": {
+    "places": 0,
+    "renting": { "tier": "house", "owner": "Fixture_Heim" },
+    "tenants": [],
+    "wohnwert": 0,
+    "offer_open": false
+  },
+  "property": {
+    "tier": null,
+    "floor": "laminate",
+    "owner": "Fixture_Neu",
+    "width": 0,
+    "garage": [],
+    "height": 0,
+    "placed": [],
+    "wall_color": "#f3efe4",
+    "value_cents": 0,
+    "floors_owned": ["laminate"],
+    "garage_slots": 0
+  },
+  "inventory": { "cars": [], "furniture": [] }
+}
