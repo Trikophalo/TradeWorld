@@ -1,0 +1,62 @@
+{
+  "home": {
+    "tier": "house",
+    "limits": {
+      "day": { "max_cents": 190080, "min_cents": 18000, "fair_cents": 126720 },
+      "hour": { "max_cents": 7920, "min_cents": 750, "fair_cents": 5280 }
+    },
+    "places": 3,
+    "wohnwert": {
+      "rugs": 0,
+      "tops": 1,
+      "parts": { "fill": 2, "floor": 6, "style": 1, "value": 0, "layers": 5, "variety": 5 },
+      "total": 19,
+      "pieces": 2,
+      "categories": 2,
+      "value_cents": 280000,
+      "coverage_bps": 341,
+      "target_cents": 10000000
+    }
+  },
+  "past": [],
+  "offer": {
+    "period": "hour",
+    "is_open": true,
+    "chance_bps": 0,
+    "ai_check_at": "2026-11-15T18:28:10.131176+00:00",
+    "price_cents": 1000
+  },
+  "renting": null,
+  "tenants": [
+    {
+      "id": "7358d8a1-ba34-43be-9c90-a0b752a30ce2",
+      "name": "Mia F.",
+      "is_ai": true,
+      "period": "hour",
+      "ends_at": "2026-11-17T18:28:10.137384+00:00",
+      "notice_by": null,
+      "avatar_key": null,
+      "paid_cents": 0,
+      "started_at": "2026-11-15T18:28:10.137384+00:00",
+      "accessories": [],
+      "next_due_at": "2026-11-15T19:28:10.137384+00:00",
+      "price_cents": 1000
+    },
+    {
+      "id": "b4cb1eb6-f6ca-4a3c-a793-2ba8fdb5c1ca",
+      "name": "Fixture_Neu",
+      "is_ai": false,
+      "period": "hour",
+      "ends_at": null,
+      "notice_by": null,
+      "avatar_key": "coder",
+      "paid_cents": 1000,
+      "started_at": "2026-11-15T18:28:10.143578+00:00",
+      "accessories": ["party_hat"],
+      "next_due_at": "2026-11-15T19:28:10.143578+00:00",
+      "price_cents": 1000
+    }
+  ],
+  "earned_7d_cents": 1000,
+  "earned_total_cents": 1000
+}

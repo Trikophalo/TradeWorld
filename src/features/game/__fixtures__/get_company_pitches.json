@@ -1,1 +1,29 @@
-{"pitches": [{"id": 5, "fit": 25, "kind": "event", "text": "Wir zahlen fairere Löhne und reden offen mit dem Team.", "judge": "mini", "status": "running", "ends_at": "2026-11-15T18:21:58.086469+00:00", "verdict": "Passt kaum zur Lage. Das wird schwierig.", "backfire": 10, "event_id": "ce591299-5e4f-4243-b344-8de66fce215a", "move_kind": null, "chance_bps": 3000, "cost_cents": 40000, "created_at": "2026-11-15T17:59:58.078821+00:00", "resolved_at": null, "failure_text": "Die eigene Strategie verpufft ohne Wirkung.", "result_cents": 0, "success_text": "Die eigene Strategie geht auf.", "backfire_text": "Die eigene Strategie geht nach hinten los: Kunden fühlen sich veräppelt."}], "event_id": "ce591299-5e4f-4243-b344-8de66fce215a", "next_order_at": null, "move_cost_cents": 120000, "event_cost_cents": 40000}
+{
+  "pitches": [
+    {
+      "id": 5,
+      "fit": 25,
+      "kind": "event",
+      "text": "Wir zahlen fairere Löhne und reden offen mit dem Team.",
+      "judge": "mini",
+      "status": "running",
+      "ends_at": "2026-11-15T18:50:10.02652+00:00",
+      "verdict": "Passt kaum zur Lage. Das wird schwierig.",
+      "backfire": 10,
+      "event_id": "e4e2957e-ed6e-4b64-8b23-ab86dabfd123",
+      "move_kind": null,
+      "chance_bps": 3000,
+      "cost_cents": 40000,
+      "created_at": "2026-11-15T18:28:10.017797+00:00",
+      "resolved_at": null,
+      "failure_text": "Die eigene Strategie verpufft ohne Wirkung.",
+      "result_cents": 0,
+      "success_text": "Die eigene Strategie geht auf.",
+      "backfire_text": "Die eigene Strategie geht nach hinten los: Kunden fühlen sich veräppelt."
+    }
+  ],
+  "event_id": "e4e2957e-ed6e-4b64-8b23-ab86dabfd123",
+  "next_order_at": null,
+  "move_cost_cents": 120000,
+  "event_cost_cents": 40000
+}

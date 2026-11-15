@@ -1,7 +1,7 @@
 {
   "job": null,
-  "tag": "5LDG",
-  "rank": 145,
+  "tag": "KRUL",
+  "rank": 140,
   "level": 6,
   "trust": { "band": "shaky", "kept": 0, "score": 41, "broken": 1 },
   "company": { "name": "Fixture Lieferwerk", "ticker": null },
@@ -11,7 +11,7 @@
   "top_skills": [],
   "accessories": [],
   "streak_days": 0,
-  "member_since": "2026-11-15T12:42:11.813222+00:00",
+  "member_since": "2026-11-15T18:28:08.503989+00:00",
   "branch_scores": {
     "it": 0,
     "law": 0,
