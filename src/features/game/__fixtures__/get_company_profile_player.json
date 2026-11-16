@@ -1,12 +1,12 @@
 {
   "news": [],
   "facts": {
-    "staff": 1,
+    "staff": 5,
     "stage": 0,
     "period": null,
     "product": "security_software",
     "max_staff": 2,
-    "ai_workers": 0,
+    "ai_workers": 2,
     "quality_bps": null,
     "value_cents": 250000,
     "profit_cents": null,
@@ -14,10 +14,10 @@
     "revenue_cents": null
   },
   "company": {
-    "id": "1baf7e53-f906-4b26-81eb-14f143e4f1bc",
-    "idea": "Neue Schrauben",
+    "id": "5e11474c-75dc-4497-a046-2d974dca7d61",
+    "idea": "Teppiche für Büros",
     "logo": null,
-    "name": "Gleich Werk",
+    "name": "Bodenständig",
     "tier": "garage",
     "is_ai": false,
     "listed": false,
@@ -25,9 +25,26 @@
     "ticker": null,
     "price_e4": null,
     "change_bps": null,
-    "founded_at": "2026-11-16T17:32:00.918803+00:00",
-    "brand_color": "#553377"
+    "founded_at": "2026-11-16T17:55:17.845927+00:00",
+    "brand_color": "#3366ff"
   },
-  "founder": { "tag": "VVJW", "nickname": "Kai_Kopie", "avatar_key": "rookie" },
-  "members": []
+  "founder": { "tag": "ZWJP", "nickname": "Floor_Frida", "avatar_key": "rookie" },
+  "members": [
+    {
+      "tag": "22SC",
+      "tier": "intern",
+      "since": "2026-11-16T17:55:18.049698+00:00",
+      "title": "Werkstudium",
+      "nickname": "Floor_Willi",
+      "avatar_key": "rookie"
+    },
+    {
+      "tag": "TGRC",
+      "tier": "intern",
+      "since": "2026-11-16T17:55:18.077876+00:00",
+      "title": "Werkstudium",
+      "nickname": "Floor_Vera",
+      "avatar_key": "rookie"
+    }
+  ]
 }

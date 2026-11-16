@@ -154,7 +154,11 @@ select tests.assert(
            'list_nexamon_card', 'unlist_nexamon_card', 'buy_nexamon_listing', 'sell_nexamon_to_ai', 'grade_nexamon_card',
            'crack_nexamon_slab',
            -- mission reset (ADR-166)
-           'reset_missions']
+           'reset_missions',
+           -- listed companies (ADR-167)
+           'get_listed_company', 'company_invest', 'company_invest_stop', 'company_declare_dividend',
+           'company_books_close', 'company_tax_pay', 'company_tax_advisor', 'get_company_accounting',
+           'get_company_board', 'board_propose', 'board_vote']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')
@@ -202,6 +206,8 @@ select tests.assert(
       'nexamon_cards', 'nexamon_copies', 'nexamon_listings', 'nexamon_sales', 'nexamon_packs', 'nexamon_value_points',
       'nexamon_set_state', 'nexamon_meta',
       'mission_resets',
+      'listed_companies', 'company_investments', 'listed_company_hours', 'company_budgets', 'company_dividends',
+      'board_motions', 'board_votes', 'company_tax_periods',
       'rate_limits', 'player_requests', 'player_login_events', 'push_deliveries', 'invite_code_redemptions',
       'price_ticks_default']) as t
      -- (a table from a later migration is not there yet on an older database)

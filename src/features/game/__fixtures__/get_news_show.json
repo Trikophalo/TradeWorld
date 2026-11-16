@@ -1,8 +1,8 @@
 {
-  "now": "2026-11-16T17:32:36.821153+00:00",
+  "now": "2026-11-16T17:55:41.008352+00:00",
   "chat": [
     {
-      "at": "2026-11-16T17:32:36.799575+00:00",
+      "at": "2026-11-16T17:55:41.00431+00:00",
       "id": 223,
       "bot": false,
       "body": "Was für eine Sendung 💀📉",
@@ -11,91 +11,88 @@
     }
   ],
   "show": {
-    "id": 7,
+    "id": 9,
     "writer": "mini",
     "airs_at": "2026-11-16T17:00:00+00:00",
     "segments": [
       {
         "kind": "gossip",
-        "mood": "smug",
-        "text": "Liebes Tagebuch, schreibt Willi_Werk heute vermutlich: Job bei KlarSoft AG hingeschmissen. Manche lernen aus Fehlern. Andere sammeln sie. Wir legen etwas Schmerzensgeld bei.",
-        "figure": { "nickname": "Willi_Werk", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "gain", "label": "+100 € Schmerzensgeld" }],
-        "headline": "Das Tagebuch von Willi_Werk"
+        "mood": "shocked",
+        "text": "Bitte festhalten: Level 5 erreicht, und zwar bei Ben_Borgt. Meine Schwiegermutter hat es vorausgesagt, und die liegt sonst immer falsch.",
+        "figure": { "nickname": "Ben_Borgt", "avatar_key": "rookie", "accessories": [] },
+        "effects": [],
+        "headline": "Applaus für Ben_Borgt"
       },
       {
-        "kind": "scandal",
-        "mood": "angry",
-        "text": "Peinlich für Pop_Frida: Die Gewerbeaufsicht fand vierzig leere Pizzakartons, einen schlafenden Buchhalter und null Qualitätskontrolle. „Bergschuhe nach Maß“ klang auf dem Papier besser. Das Image von Gipfelwerk ist im Eimer.",
-        "figure": { "nickname": "Pop_Frida", "avatar_key": "rookie", "accessories": [] },
-        "effects": [
-          { "tone": "loss", "label": "Bekanntheit −17 %" },
-          { "tone": "loss", "label": "GIP −10,8 %" }
-        ],
-        "headline": "Kunden fliehen vor Gipfelwerk"
+        "kind": "hype",
+        "mood": "laughing",
+        "text": "Selbst die Praktikanten wurden heute um Autogramme gebeten. Plötzlich will jeder „Alles ausgebucht“. Doable_Frida tut so, als sei das alles geplant gewesen. Wir tun so, als würden wir das glauben.",
+        "figure": { "nickname": "Doable_Frida", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "gain", "label": "Bekanntheit +13,2 %" }],
+        "headline": "Vollhaus geht viral"
       },
       {
         "kind": "nft",
-        "mood": "shocked",
-        "text": "Ben_Bieter zahlt 30.000 € für „Neon Nacht“, gemalt von Nina_Neon. Ich verstehe es nicht, also muss es teuer sein.",
+        "mood": "confused",
+        "text": "Kunstmarkt, oder was man dafür hält: „Neon Nacht“ von Nina_Neon ging für 30.000 € an Ben_Bieter. Wer das kauft, kauft auch Luft in Dosen.",
         "figure": { "nickname": "Nina_Neon", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "NFT-Wahnsinn um „Neon Nacht“"
+        "headline": "30.000 € für ein paar Pixel"
       },
       {
         "kind": "winner",
         "mood": "proud",
-        "text": "Fixture_Neu ist heute um 1.139.376 € reicher, 11393,8 % rauf. Alle anderen dürfen jetzt neidisch sein. Bitte der Reihe nach.",
+        "text": "11377,6 % Plus, 1.137.762 € Gewinn: Fixture_Neu zeigt dem Rest, wie es geht. Man munkelt von einem Pakt mit dem Teufel, der Teufel dementiert.",
         "figure": { "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] },
         "effects": [],
-        "headline": "Glückspilz des Tages: Fixture_Neu"
+        "headline": "Fixture_Neu schwimmt im Geld"
       },
       {
         "kind": "gossip",
-        "mood": "proud",
-        "text": "Ich fasse es nicht, aber es stimmt. Hanno_Haftung meldet: Hanno Handel gegründet. So, und jetzt alle anderen: Schämt euch.",
-        "figure": { "nickname": "Hanno_Haftung", "avatar_key": "rookie", "accessories": [] },
+        "mood": "shocked",
+        "text": "Gute Nachrichten, ausnahmsweise. Bei Pop_Gero heißt es: Talwerk gegründet. Ich hätte keinen Cent darauf gewettet, und ich wette auf alles.",
+        "figure": { "nickname": "Pop_Gero", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Na so was: Hanno_Haftung"
+        "headline": "Pop_Gero hat es geschafft"
       },
       {
-        "kind": "hype",
-        "mood": "proud",
-        "text": "Ein Promi wurde mit dem Produkt gesehen, vermutlich aus Versehen. Plötzlich will jeder „Fahrräder reparieren“. Gero_Garage tut so, als sei das alles geplant gewesen. Wir tun so, als würden wir das glauben.",
-        "figure": { "nickname": "Gero_Garage", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "gain", "label": "Bekanntheit +24,1 %" }],
-        "headline": "Gero Werkstatt geht viral"
+        "kind": "scandal",
+        "mood": "shocked",
+        "text": "Bei Lieferwerk Anja brennt die Hütte. Ein Mitarbeiter hat die gesamte Kundendatei alphabetisch nach Vornamen des Haustiers sortiert. Anja_Lieferant spricht von einem Missverständnis. Zur Erinnerung, das Geschäftsmodell lautet: „Ideen für alle“.",
+        "figure": { "nickname": "Anja_Lieferant", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −23,3 %" }],
+        "headline": "Lieferwerk Anja: Chef Anja_Lieferant unter Beschuss"
       },
       {
         "kind": "ramble",
-        "mood": "smug",
-        "text": "Völlig anderes Thema: Dieter Bohlen soll das Sparschwein geschlachtet und alles in Knusperkönig gesteckt haben. Mein Taxifahrer schwört es, und der kennt jemanden, der jemanden kennt. Der Kurs macht 7,4 % nach oben.",
-        "effects": [{ "tone": "gain", "label": "SNK +7,4 %" }],
-        "headline": "Dieter Bohlen steigt bei Knusperkönig ein"
+        "mood": "crying",
+        "text": "Die Regie winkt, ich ignoriere sie. Christian Lindner soll einen Sportwagen gesehen und kurz geweint haben. Vor Glück, sagt man. So. Weiter im Text.",
+        "effects": [],
+        "headline": "Was ich noch sagen wollte"
       },
       {
         "kind": "tasks",
-        "mood": "crying",
-        "text": "Die Kundschaft hat ihre Geldbeutel verlegt, und zwar alle gleichzeitig. Alle offenen Firmen-Aufgaben sind 24,2 % weniger wert. Die Chefs dürfen ruhig ein bisschen schwitzen.",
-        "effects": [{ "tone": "loss", "label": "Aufgaben −24,2 %" }],
-        "headline": "Kunden entdecken das Sparen"
+        "mood": "laughing",
+        "text": "Die Kundschaft hat Geld und keine Ahnung, wohin damit. Alle offenen Firmen-Aufgaben sind ab sofort 38,7 % mehr wert. An die Arbeit, ihr faulen Säcke!",
+        "effects": [{ "tone": "gain", "label": "Aufgaben +38,7 %" }],
+        "headline": "Auftragsflut im ganzen Land"
       },
       {
         "kind": "stock",
-        "mood": "smug",
-        "text": "Der neue Chef kann lesen, schreiben und rechnen, ein Novum. Die Börse feiert: Volta Energie AG steigt um 13,1 %. Wer nicht dabei ist, darf sich jetzt ärgern.",
-        "effects": [{ "tone": "gain", "label": "VLT +13,1 %" }],
-        "headline": "Kursrakete Volta Energie AG"
+        "mood": "shocked",
+        "text": "Der Chef hat den Jahresbericht als Gedicht vorgetragen. Es reimte sich nicht. Der Kurs von Methusalem Bio sackt um 13,2 % ab. Ein Krisenstab tagt.",
+        "effects": [{ "tone": "loss", "label": "MTH −13,2 %" }],
+        "headline": "Panik bei Methusalem Bio"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Wackelwerk tut sich in der nächsten Stunde etwas, und zwar nach oben. Das Vögelchen lag bisher meistens richtig. Meistens.",
-        "effects": [{ "tone": "neutral", "label": "WAC ↑ Tipp" }],
-        "headline": "Mr. Doodle Dangles Geheimtipp"
+        "text": "Ein Vögelchen hat mir gezwitschert: GenoVita Biotech dürfte in der kommenden Stunde nach unten gehen. Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.",
+        "effects": [{ "tone": "neutral", "label": "GNV ↓ Tipp" }],
+        "headline": "Vom Flurfunk: GenoVita Biotech"
       }
     ],
-    "started_at": "2026-11-16T17:32:36.821153+00:00"
+    "started_at": "2026-11-16T17:55:41.008352+00:00"
   },
   "viewers": 18,
   "audience": [

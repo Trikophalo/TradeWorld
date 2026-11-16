@@ -384,6 +384,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Unter Freunde → Chats schreibst du Freunden direkt (💬 an ihrer Figur auf dem Platz) oder gründest Gruppen mit bis zu 20 Leuten, mit Emojis…",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-27702571",
+        title: "Börsennotierte Firmen werden ernst",
+        text: "Ab dem Börsengang gibt es Forschung, neue Produkte, Märkte, Maschinen und Zukäufe, dazu Mitarbeiterzufriedenheit mit Benefits (vom Obstkorb bis zur…",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-86b3c63c",
         title: "Firma, Fehlerbehebungen",
         text: "Geschäftszüge zeigen groß, wann sie wieder möglich sind, laufende Kampagnen ihre Restlaufzeit (auch als Zeile über den Abteilungen).",

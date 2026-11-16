@@ -1298,3 +1298,45 @@ Werte in `BALANCE.nexamon` (`src/config/nexamon-rules.ts`), Startpreise im Katal
   `ai.gradedBuyMaxBps`, `ai.packsPerHour`, `grading.valueBps`, `quickSell.bps` und die Startpreise im Katalog. Mit den
   Platzhalter-Preisen (gleichmäßig über die Spannen) liegt der Inhalt eines Boosters rechnerisch über seinem Preis;
   die begrenzte KI-Nachfrage und der Sofortverkauf zu 50 % halten den tatsächlichen Erlös darunter.
+
+## Nachtrag: Börsennotierte Spielerfirmen (ADR-167)
+
+Alle Werte in `src/config/listed.ts` (`BALANCE.listed`, `game_config.listed`).
+
+| Wert                               | Schlüssel                                              | Stand                                                                                  |
+| ---------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| Referenzumsatz                     | `refRevenue`                                           | 24 Stunden, mindestens 200 €                                                           |
+| Zufriedenheit: Start, Basis, Tempo | `satisfaction.start/base/adjustPerHour`                | 60, 50, 15 % je Stunde                                                                 |
+| Zonen                              | `satisfaction.green/red`                               | grün ab 60, rot unter 35                                                               |
+| Benefits höchstens                 | `satisfaction.benefitsMax`                             | +40                                                                                    |
+| Wirkung                            | `satisfaction.effect`                                  | bis −30 % Kapazität, −15 Punkte Qualität, +6 % Kapazität ab 90                         |
+| Kündigungen                        | `satisfaction.quits`                                   | jede 3. rote Stunde eine KI-Kraft                                                      |
+| Ruf: Start, Tempo, Fenster         | `reputation.*`                                         | 50, 8 % je Stunde, 24 Stunden                                                          |
+| Gier                               | `reputation.greed`                                     | frei bis 30 % des Gewinns, −35 bei 100 %                                               |
+| Reinvestition, Dividende           | `reputation.reinvest/dividend`                         | +12 ab 50 % bzw. 20 % des Gewinns, Serie bis +6                                        |
+| Wirkung des Rufs                   | `demandMaxEffect`, `priceMaxEffect`                    | ±20 % Nachfrage, ±25 % fairer Kurs                                                     |
+| Dividende                          | `dividends`                                            | 1 je Tag, höchstens 50 % der freien Kasse, mindestens 100 €                            |
+| Geschäftsrat                       | `board`                                                | über 20 %, 12 h Abstimmung, Quorum 30 %, 2 offene Anträge, 6 h Pause, höchstens 7 Tage |
+| Steuersatz                         | `taxes.rateBps/minRateBps`                             | 15 %, nie unter 8 %                                                                    |
+| Fristen Bücher                     | `taxes.*AfterHours`                                    | Erinnerung 30 h, Zuschlag 42 h, Schätzung 60 h                                         |
+| Zuschläge                          | `taxes.lateFee/estimate/latePaymentBps/enforcementBps` | 0,5 % (min. 50 €); 25 % Marge + 25 %; 5 %; 10 %                                        |
+| Zahlungsfrist                      | `taxes.payWithinHours/enforceAfterHours`               | 24 h, Vollstreckung nach weiteren 48 h                                                 |
+| Belege                             | `taxes.check`                                          | 3 Belege, 5 % Rabatt                                                                   |
+| Steuerberater                      | `taxes.advisor`                                        | max(40 €, 1 % des Referenzumsatzes) je Stunde, 8 % Rabatt                              |
+
+**Katalog** (66 Posten): Forschung 4 Stufen je Zweig zu 6 / 18 / 48 / 120 Stunden Referenzumsatz (mindestens 1.000 /
+5.000 / 25.000 / 150.000 €), Dauer 1 / 3 / 8 / 24 h. Produkte 8–80 h, laufend 1–5 %. Regionen 20–200 h, laufend 2–6 %.
+Maschinen 10–14 h je Stufe (× 1,6–1,8), laufend 0,5–0,6 % je Stufe. Zukäufe 90–130 h, laufend 2–2,5 %. Lizenzen
+10–15 h, laufend 0,5–1,2 %. Benefits 0–5.000 € einmalig und 0,10–9 € je Kopf und Stunde für +2 … +10 Punkte.
+Aktionen 50–1.000 € + 15–500 € je Kopf für +3 … +15 Punkte sofort.
+
+**Rechenbeispiele** (Tech-AG, 10 KI-Kräfte, 5.000 € Umsatz je Stunde, 1.000 € Gewinn):
+
+- Steuer am Tag: 24.000 € × 15 % = 3.600 €, mit sauberen Büchern 3.420 €, mit Steuerberater 3.312 € (er kostet
+  50 € je Stunde, also 1.200 € am Tag: lohnt sich nur für Bequeme und große Firmen).
+- Forschung Stufe 3 (48 h × 5.000 € = 240.000 €) braucht 10 Tagesgewinne oder eine Kapitalerhöhung, senkt aber als
+  Betriebsausgabe die Steuer um bis zu 36.000 €.
+- Stimmung grün halten: Obstkorb, Kaffee, Homeoffice (+11) kosten bei 10 Köpfen 19 € je Stunde; zusammen mit einer
+  Gewinnstunde (+3) liegt das Ziel bei 64.
+- Gier: 100 % Auszahlung → Ruf 15 → Nachfrage −14 %; bei 5.000 € Umsatz sind das 700 € je Stunde, mehr als die
+  Auszahlung über die freien 30 % hinaus einbringt, sobald die Marge unter 50 % liegt.

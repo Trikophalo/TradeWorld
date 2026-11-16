@@ -3013,6 +3013,183 @@ können.
   (`affordableFor`).
 - Fehler: `mission_reset_used` NX176, `mission_reset_nothing` NX177.
 
+## ADR-167: Börsennotierte Spielerfirmen – Forschung, Mitarbeiterzufriedenheit, Ruf, Geschäftsrat, Buchhaltung und Steuern — `Annahme`
+
+Wunsch: Sobald eine Firma an der Börse ist, soll sie viel tiefer und realistischer werden: viel mehr Ausgaben und Wege
+zu wachsen (damit Kapital von außen Sinn ergibt), ein Ruf, der unter gierigen Gründern leidet, Mitarbeiterzufriedenheit,
+die Geld kostet, ein Geschäftsrat der Großaktionäre, Buchhaltung und Steuern mit Finanzamt. **Alles hier gilt nur,
+solange `companies.phase = 'listed'`**; private Firmen bleiben so einfach wie bisher (jede Funktion liefert für sie den
+neutralen Wert, jede RPC den Fehler `not_listed`). Regeln rein in `src/lib/sim/listed.ts` (getestet), dieselben in
+PL/pgSQL (`listed_*`), alle Werte in `src/config/listed.ts` → `game_config.listed`.
+
+### 1. Betriebsstunde bleibt die Basis
+
+Die Stunde (`closeStartupHour`, `player_company_close_hour`) bekommt für notierte Firmen sechs Terme und einen
+Kostenblock, sonst ändert sich nichts:
+
+- Bekanntheit der Stunde = min(1, Bekanntheit + `awarenessAdd`), Qualität der Stunde = Qualität + `qualityAdd` (0…1);
+  beide wirken auch auf die Preisregel (Premium braucht Qualität).
+- Nachfrage × `demandFactor` = (1 + Nachfrage-Effekte) × (1 + Markt-Effekte) × Ruf-Faktor.
+- Kapazität × `capacityFactor` = max(0,1; 1 + Kapazitäts-Effekte) × Stimmungs-Faktor.
+- Wareneinsatz × `cogsFactor` = max(0,5; 1 − Margen-Effekte), Fixkosten × `fixedFactor` = max(0,5; 1 + Fixkosten-Effekte).
+- Laufende Kosten (Produkte, Regionen, Maschinen, Zukäufe, Lizenzen, Benefits, Steuerberater) werden nach den
+  Fixkosten aus der Kasse an die Haushalte gebucht, je Kategorie eine Buchung (`company_costs`, `metadata.cat`), und
+  zählen in `fixed_cents` und damit in den Gewinn der Stunde. Reicht die Kasse für einen Posten nicht, **pausiert** er
+  (keine Wirkung, keine Schulden) und läuft weiter, sobald er wieder bezahlt wird.
+- So bleiben `player_company_hours`, die Firmen-Gesundheit (ADR-162) und alle Zahlen der Firmenseite erklärbar:
+  Umsatz − Wareneinsatz − Löhne − Fixkosten − Marketing = Gewinn.
+
+**Größe der Firma:** Preise folgen dem Referenzumsatz = Durchschnittsumsatz je Stunde der letzten 24 Betriebsstunden,
+mindestens 200 €. Einmalpreis = max(Mindestpreis, `costHours` × Referenzumsatz) × `costGrowth`^Stufe (+ Betrag je Kopf),
+laufend = `upkeepBps` des Referenzumsatzes je Stufe und Stunde (+ Betrag je Kopf und Stunde). Kleine Garagen-AGs zahlen
+die Mindestpreise, große Firmen entsprechend mehr; die Wirkungen sind Prozente und wachsen mit.
+
+### 2. Mehr Ausgaben, mehr Wege zu wachsen (66 Posten, ein Mechanismus)
+
+Ein Katalog (`listed.items`), eine Tabelle (`company_investments`), eine RPC (`company_invest`). Jeder Posten hat
+Art, Zweck (für Budgets des Geschäftsrats), Preis, Dauer, Voraussetzungen, laufende Kosten und Wirkung:
+
+| Art                            | Posten                                                                                                                                                                                        | Preis (Stunden Referenzumsatz / Minimum)                             | Dauer            | Wirkung                                                                        |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------------ |
+| Forschung, 7 Zweige × 4 Stufen | Qualität, Effizienz, Marke, Automatisierung, Logistik, Nachhaltigkeit, Finanzen                                                                                                               | 6 h / 1.000 € · 18 h / 5.000 € · 48 h / 25.000 € · 120 h / 150.000 € | 1 · 3 · 8 · 24 h | dauerhaft, keine laufenden Kosten; Stufe 4 braucht Stufe 2 eines Nachbarzweigs |
+| Produkte (6)                   | Zweitprodukt, Sparlinie, Premium-Linie, Abo, Fanartikel, Großkunden-Lösung                                                                                                                    | 8–80 h / 2.000–60.000 €                                              | 2–16 h           | Nachfrage +4 % … +30 %, laufend 1–5 % des Referenzumsatzes; einstellbar        |
+| Regionen (5)                   | Süddeutschland → DACH → Europa → Nordamerika → Asien                                                                                                                                          | 20–200 h / 6.000–300.000 €                                           | 4–36 h           | Markt +10 % … +50 %, laufend 2–6 %                                             |
+| Maschinen (3, mehrstufig)      | Maschinenpark (5), Rechenzentrum (3), Showroom (3)                                                                                                                                            | 10–14 h, × 1,6–1,8 je Stufe                                          | 2–3 h            | Kapazität, Marge, Bekanntheit je Stufe                                         |
+| Zukäufe (3)                    | Kleinhirn KI, Datenkrake GmbH, Robo-Butze                                                                                                                                                     | 90–130 h / 80.000–120.000 €                                          | 6–8 h            | Kapazität +10 %, Nachfrage +15 %, Marge +6 %                                   |
+| Lizenzen (3)                   | Patent, Marke, Export (Voraussetzung für Europa)                                                                                                                                              | 10–15 h                                                              | 1–2 h            | Qualität +5 Punkte, Nachfrage +6 %                                             |
+| Benefits (14)                  | Obstkorb, Kaffeeflatrate, Tischkicker, Bürohund, Massagesessel, Jobrad, Fitnessstudio, Homeoffice, Weiterbildung, Feelgood-Manager, Betriebsrente, Betriebskita, Bonusprogramm, Viertagewoche | 0–5.000 € einmalig                                                   | sofort           | Zufriedenheit +2 … +10, laufend 0,10–9 € je Kopf und Stunde                    |
+| Aktionen (4)                   | Pizza für alle, Teamevent, Firmenfeier, Sonderbonus                                                                                                                                           | 50–1.000 € + 15–500 € je Kopf                                        | sofort           | Zufriedenheit springt um 3 … 15, Wartezeit 6–72 h                              |
+
+Forschungs-Wirkungen je Zweig (Summe aller vier Stufen): Qualität +28 Punkte und Nachfrage +4 %; Effizienz Marge
++18 %, Kapazität +5 %; Marke Bekanntheit +15 Punkte, Nachfrage +8 %; Automatisierung Kapazität +45 %, Marge +3 %;
+Logistik Kapazität +3 %, Marge +3 %, Markt +15 %, Fixkosten −5 %; Nachhaltigkeit Ruf +13, Zufriedenheit +3, Marge +1 %,
+Nachfrage +5 %; Finanzen Steuersatz −4 Punkte, Fixkosten −3 %, Marge +3 %. Ein kompletter Zweig kostet mindestens
+181.000 €, bei 5.000 € Umsatz je Stunde 960.000 €: Das ist der Grund für Kapitalerhöhungen.
+
+Einstellen (`company_invest_stop`): Produkte, Regionen, Lizenzen und Benefits können beendet werden (kein Geld zurück;
+ein gestrichener Benefit kostet sofort so viele Zufriedenheitspunkte, wie er brachte). Forschung, Maschinen und Zukäufe
+bleiben.
+
+### 3. Ruf: Wer sich immer selbst auszahlt, verliert Kunden
+
+`listed_companies.reputation` (0–100, Start 50) wandert jede Stunde 8 % des Abstands zu einem Ziel:
+
+- Ziel = 50 + Forschung (Nachhaltigkeit) − **Gier** + **Reinvestition** + **Dividenden** − Skandal (5).
+- Gier: Auszahlungsquote = (CEO-Auszahlungen + Entnahmen der letzten 24 h) / max(Gewinn der letzten 24 h, 5 % des
+  Umsatzes). Bis 30 % frei, darüber linear bis −35 Punkte bei 100 %.
+- Reinvestition: einmalige Investitionen (Abschnitt 2) der letzten 24 h / Gewinn; +12 Punkte ab 50 %.
+- Dividenden: Ausschüttungen der letzten 24 h / Gewinn; +12 Punkte ab 20 %, dazu +1 je Tag in Folge mit Dividende
+  (höchstens +6).
+- Wirkung: Nachfrage × (1 + 0,20 × (Ruf − 50) / 50), also −20 % … +20 %; der faire Aktienkurs (`fair_value_e4`)
+  × (1 + 0,25 × (Ruf − 50) / 50), stündlich und beim Quartalsabschluss. Strafen des Finanzamts senken den Ruf
+  einmalig um 3 / 6 / 8 Punkte.
+- Beispiel: Wer dauerhaft 50 % auszahlt, landet bei Ruf 40 (Nachfrage −4 %); wer alles auszahlt, bei 15 (−14 %) und
+  die Zufriedenheit sinkt um weitere 10 Punkte. Wer 20 % als Dividende ausschüttet und investiert, kommt auf 74+
+  (Nachfrage +10 %).
+
+**Dividenden** (`company_declare_dividend`, neu): Der Gründer (oder ein Beschluss des Geschäftsrats) schüttet einen
+Gesamtbetrag aus der freien Kasse aus, höchstens einmal je Berliner Tag und höchstens 50 % der freien Kasse. Jeder
+Spieler mit Aktien bekommt Betrag × eigene Aktien / alle Aktien (abgerundet, Buchung `dividend` Firmenkasse →
+Spielerkonto), der Rest steht dem KI-Streubesitz zu und geht an das Systemkonto `market`. Der Gründer bekommt seinen
+Anteil wie jeder Aktionär.
+
+### 4. Mitarbeiterzufriedenheit
+
+`listed_companies.satisfaction` (0–100, Start 60: die erste Stunde nach dem Börsengang ist neutral), jede Stunde 15 % des Abstands zum Ziel, Verlauf in
+`listed_company_hours`:
+
+- Ziel = **50** (Basis, also unter Grün: ohne Ausgaben sinkt sie dorthin) + Benefits (höchstens +40) − unbezahlte
+  Löhne (bis −25 mit dem Lohnfaktor) − Lohnkürzung durch Krise oder Kurssturz (bis −10, ADR-131) − Überlast (ab 95 %
+  Auslastung linear bis −12 bei 150 %) oder Leerlauf (unter 35 %: −4) − Krise (4 je Schwere, Skandal +6) −
+  Entlassungen (3 je entlassener KI-Kraft oder gekündigtem Spieler, höchstens 15, verblasst 8 % je Stunde) − Gier
+  (bis −10, wie beim Ruf) + Erfolg (Gewinnstunde +3, Verluststunde −3).
+- Zonen: **grün ab 60**, gelb 35–60, **rot unter 35**. Unter Grün sinken Kapazität (bis −30 % bei 0) und Qualität
+  (bis −15 Punkte bei 0) linear; von 60 bis 90 gibt es bis zu +6 % Kapazität.
+- Im roten Bereich kündigt alle 3 Stunden eine KI-Kraft von selbst (zählt nicht als Entlassung). Angestellte Spieler
+  werden nicht hinausgeworfen, sie bekommen höchstens einmal am Tag eine Benachrichtigung „Stimmung im Keller“. Ab 3
+  Kündigungen an einem Tag gibt es die Meldung „Kündigungswelle“.
+- Beispiel: Gewinnstunde (+3) + Obstkorb, Kaffee, Homeoffice (+11) = 64, grün. Bei 20 Köpfen kostet das 38 € je
+  Stunde (bei 2.400 € Löhnen).
+
+### 5. Geschäftsrat
+
+- **Einberufen** (`board_propose`): jeder Spieler mit **mehr als 20 %** aller Aktien der Firma (der Gründer mit
+  seinem eigenen Paket zählt genauso). Höchstens 2 offene Anträge je Firma, 6 Stunden Pause je Antragsteller.
+- **Antragsarten:** `earmark` (Betrag der Firmenkasse für einen Zweck reservieren: Forschung, Produkte, Ausbau,
+  Benefits, Marketing; höchstens 80 % der Kasse), `release` (Budget wieder freigeben), `dividend` (Gesamtbetrag
+  ausschütten), `payout_cap` (CEO-Auszahlung für N Tage auf X % deckeln), `withdraw_ban` (Entnahmen N Tage verbieten),
+  `price_level` (Preisstrategie N Tage festlegen), `debt` (offene Steuern und Rechnungen bis zu einem Betrag sofort
+  begleichen). N höchstens 7 Tage.
+- **Abstimmung** (`board_vote`): 12 Stunden, nach Aktien. Stimmberechtigt ist jeder Spieler mit Aktien; es zählt der
+  Bestand beim Auszählen. Der Antragsteller stimmt automatisch zu. Der **KI-Streubesitz enthält sich**, außer der
+  Ruf ist unter 40: Dann stimmt er bei `payout_cap`, `withdraw_ban` und `dividend` mit Ja (Aktionärsschutz gegen
+  gierige Gründer). Beschlussfähig ab 30 % aller Aktien an abgegebenen Stimmen, angenommen bei mehr Ja als Nein.
+  Hat eine Seite mehr als die Hälfte aller Aktien, endet die Abstimmung sofort.
+- **Bindend:** Reserviertes Geld (`company_budgets`) zählt nicht zur freien Kasse: `company_withdraw`, die
+  automatische CEO-Auszahlung, Gewinnanteile stiller Teilhaber und Dividenden können es nicht anfassen, und
+  `company_invest` darf für einen Posten nur das Budget seines Zwecks und die freie Kasse nutzen (Budget zuerst;
+  laufende Benefit-Kosten zehren zuerst das Benefit-Budget auf). Löhne, Wareneinsatz, Fixkosten und Steuern gehen
+  vor: Sinkt die Kasse unter die Reserve, schrumpft, was vom Budget noch ausgegeben werden kann. Der Deckel wirkt in
+  `set_founder_payout` (Fehler `payout_capped`) und in der Stunde, das Verbot in `company_withdraw`
+  (`withdraw_blocked`), die Preisbindung in `set_company_strategy` (`strategy_locked`).
+- Benachrichtigung `board` an alle Aktionäre bei Antrag und Ergebnis; Verlauf der Anträge in `get_company_board`.
+  Ein Beschluss gegen die Stimme (oder ohne die Stimme) des Gründers erscheint als „Aufstand im Geschäftsrat“ im Feed.
+
+### 6. Buchhaltung und Steuern
+
+- **Kontobuch** (`get_company_accounting`): alle echten Buchungen des Firmenkontos, in Kategorien: Umsatz,
+  Wareneinsatz, Löhne, Fixkosten, Forschung, Produkte, Ausbau, Benefits, Steuerberater, Sonstiges (betrieblich) sowie
+  Kapital, Auszahlung, Dividende, Steuer, Strafe, Umbuchung (nicht betrieblich); Tagessummen und Einzelposten.
+- **Bücher machen** (`company_books_close`): einmal je Berliner Tag, sobald seit dem letzten Abschluss Umsatz
+  gebucht wurde. Die Periode reicht vom letzten Abschluss bis jetzt. Der Server zeigt die Aufstellung und drei Belege
+  (z. B. „Rechnung Obstkorb“), der Spieler ordnet jeden einer Kategorie zu. Alle drei richtig: 5 % Rabatt auf die
+  Steuer („saubere Bücher“); Fehler kosten nichts außer dem Rabatt. Ein Klick, 20 Sekunden.
+- **Körperschaftsteuer:** 15 % (Forschung senkt bis 11 %, nie unter 8 %) auf den **betrieblichen Gewinn der
+  Periode nach Verlustvortrag**. Investitionen aus Abschnitt 2 sind Betriebsausgaben und mindern die Steuer;
+  Auszahlungen, Dividenden, Steuern und Strafen nicht. Fällig binnen 24 Stunden (`company_tax_pay`, auf Wunsch gleich
+  beim Abschluss), Buchung `tax` an die Staatskasse (`treasury`).
+- **Finanzamt** (stündlich): 30 h nach Beginn einer Periode mit Umsatz Erinnerung; nach 42 h Verspätungszuschlag
+  (0,5 % des Umsatzes der Periode, mindestens 50 €, Ruf −3); nach 60 h **Schätzung**: Das Finanzamt macht die Bücher
+  selbst, setzt mindestens 25 % Marge an, ignoriert den Verlustvortrag, schlägt 25 % auf die Steuer auf, Ruf −6, und
+  schickt eine **Betriebsprüfung** (Firmen-Ereignis `tax_audit`, Krise, ADR-091). Steuer nicht bezahlt: nach der
+  Frist 5 % Säumniszuschlag, nach weiteren 24 h Vollstreckung (10 % Zuschlag, Einzug aus der Kasse, soweit vorhanden,
+  Ruf −8, Betriebsprüfung). Alle Strafen als `fine` an die Staatskasse.
+- **Steuerberater** (`company_tax_advisor`): kostet je Stunde max(40 €, 1 % des Referenzumsatzes), macht die Bücher
+  täglich von selbst, zahlt die Steuer sofort (soweit die freie Kasse reicht) und holt 8 % Rabatt heraus. Angestellte
+  Spieler als Buchhalter sind nicht umgesetzt (offener Punkt).
+- **Fair:** Beispiel 5.000 € Umsatz und 1.000 € Gewinn je Stunde: 24.000 € Tagesgewinn → 3.600 € Steuer (3.420 € mit
+  sauberen Büchern), 15 % des Gewinns. Eine 25.000-€-Forschung an dem Tag: Gewinn 0, keine Steuer, 1.000 €
+  Verlustvortrag. Wer zwei Tage nichts macht, zahlt etwa 600 € Zuschlag; nach 60 h bei 20 % echter Marge rund ein
+  Drittel mehr Steuer plus Zuschlag. Nie ruinös, aber spürbar.
+
+### 7. Rundherum
+
+- **Mira** (`brain.ts`, `listedBriefings`): erinnert an offene Bücher, fällige Steuern, schlechte Stimmung, offene
+  Abstimmungen, fertige Forschung und gierige Auszahlungen; Aktionen Bücher öffnen, Steuer zahlen, günstigsten Benefit
+  buchen, Aktion starten, Tab öffnen.
+- **Missionen:** 26 neue Vorlagen (Voraussetzung `listed`), Metriken `research_started`, `research_done`,
+  `product_launched`, `region_opened`, `benefit_added`, `team_action`, `satisfaction_green` (Stunden im grünen
+  Bereich), `dividend_paid`, `dividend_cents`, `books_done`, `books_streak`, `tax_paid`, `board_motion`, `board_vote`,
+  `audit_survived`, `listed_invested`.
+- **Nachrichten:** Feed-Arten `tax_penalty`, `tax_audit`, `greedy_founder`, `mass_quit`, `record_dividend`,
+  `board_revolt`, `research_done` mit Texten in `feed_item_label`; die ersten sechs stehen in der Klatsch-Quelle von
+  `news_show_build` (die ersten vier als „schlechte“ Nachricht).
+- **Auflösung und Konto zurücksetzen:** Vor der Auflösung zahlt die Firma offene Steuern aus der Kasse, offene Anträge
+  enden, Budgets verfallen; die Tabellen hängen an `companies`/`profiles` (`on delete cascade`).
+- **Demo:** dieselben Regeln lokal (`demo/listed.ts`), der Geschäftsrat mit einem erfundenen Großaktionär.
+- **Fehler:** `not_listed` NX190, `item_unknown` NX191, `item_locked` NX192, `item_running` NX193, `budget_reserved`
+  NX194, `withdraw_blocked` NX195, `payout_capped` NX196, `strategy_locked` NX197, `books_nothing` NX198,
+  `tax_nothing_due` NX199, `dividend_limit` NX200, `board_no_right` NX201, `board_motion_unknown` NX202, `board_limit`
+  NX203, `board_not_shareholder` NX204.
+
+### Bewusste Vereinfachungen
+
+- Reserviert statt eigenes Konto: Budgets sind Vormerkungen auf der Firmenkasse, kein zweites Ledger-Konto. Vorteil:
+  Firmenwert, Auflösung und alle bestehenden Buchungen bleiben unverändert.
+- Produkte sind generische Linien mit eigener Nachfrage, keine zweite Simulation mit eigenem Markt.
+- Die Quartalsregeln (Wachstum der Bekanntheit, Qualitätsziel) bleiben unberührt; Effekte wirken in der Stunde.
+- Stimmrecht nach aktuellem Bestand beim Auszählen, kein Stichtag; Leerverkäufe und Hebel zählen nicht.
+
 ## ADR-168: Firmen-Fehlerbehebungen – robuste Stundenabrechnung, sichtbare Timer, echte Fehlertexte — `Annahme`
 
 - **Anlass:** Meldungen vom Live-Server (GmbH): „Wo es fehlt“ zeigt falsche Werte, Ausbau trotz GmbH gesperrt, Banner

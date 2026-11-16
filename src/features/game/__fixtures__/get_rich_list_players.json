@@ -1,10 +1,10 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 113, "gap_cents": 562 }, "rank": 114, "net_worth_cents": 1019438 },
-  "total": 277,
+  "me": { "next": { "name": "Vera", "rank": 116, "gap_cents": 682 }, "rank": 117, "net_worth_cents": 1019318 },
+  "total": 281,
   "entries": [
     {
       "id": "0e7a3000-0000-4000-8000-0000000000b1",
-      "tag": "LEMX",
+      "tag": "XGCG",
       "kind": "player",
       "name": "Nx_Bruno",
       "rank": 1,
@@ -16,11 +16,24 @@
       "rank_change_24h": null
     },
     {
+      "id": "0a30a30a-0000-4000-8000-0000000000b1",
+      "tag": "X8HM",
+      "kind": "player",
+      "name": "Berta_Klein",
+      "rank": 2,
+      "is_me": false,
+      "avatar_key": "rookie",
+      "description": null,
+      "change_24h_bps": null,
+      "net_worth_cents": 900652000,
+      "rank_change_24h": null
+    },
+    {
       "id": "0e170001-0000-4000-8000-0000000001a1",
-      "tag": "UFXY",
+      "tag": "DGRL",
       "kind": "player",
       "name": "Wanda_Wohnt",
-      "rank": 2,
+      "rank": 3,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
@@ -30,43 +43,30 @@
     },
     {
       "id": "0f3f3f3f-0000-4000-8000-0000000000f1",
-      "tag": "TWEG",
+      "tag": "BZNN",
       "kind": "player",
       "name": "Fenja_Firma",
-      "rank": 3,
-      "is_me": false,
-      "avatar_key": "rookie",
-      "description": null,
-      "change_24h_bps": null,
-      "net_worth_cents": 127088499,
-      "rank_change_24h": null
-    },
-    {
-      "id": "09e19e19-0000-4000-8000-0000000000f1",
-      "tag": "MPQ7",
-      "kind": "player",
-      "name": "Pop_Frida",
       "rank": 4,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 117584000,
+      "net_worth_cents": 127540499,
       "rank_change_24h": null
     },
     {
-      "id": "09c19c19-0000-4000-8000-0000000000f1",
-      "tag": "3PPE",
+      "id": "0a30a30a-0000-4000-8000-0000000000f1",
+      "tag": "9P3G",
       "kind": "player",
-      "name": "Float_Frida",
+      "name": "Lisa_Listed",
       "rank": 5,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 111600000,
+      "net_worth_cents": 118562075,
       "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-16T17:32:29.711413+00:00"
+  "server_time": "2026-11-16T17:55:34.313715+00:00"
 }

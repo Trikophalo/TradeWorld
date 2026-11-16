@@ -90,7 +90,11 @@ select tests.assert(
                    'list_nexamon_card', 'unlist_nexamon_card', 'buy_nexamon_listing', 'sell_nexamon_to_ai',
                    'grade_nexamon_card', 'crack_nexamon_slab']
           -- mission reset (a2)
-          || array['reset_missions']) x),
+          || array['reset_missions']
+          -- listed companies (a3)
+          || array['get_listed_company', 'company_invest', 'company_invest_stop', 'company_declare_dividend',
+                   'company_books_close', 'company_tax_pay', 'company_tax_advisor', 'get_company_accounting',
+                   'get_company_board', 'board_propose', 'board_vote']) x),
   'authenticated can execute exactly the 9 helpers and the RPCs up to the market popularity (9g)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace

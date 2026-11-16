@@ -1,9 +1,9 @@
 {
-  "now": "2026-11-16T17:32:37.281034+00:00",
+  "now": "2026-11-16T17:55:41.280124+00:00",
   "battle": {
     "id": 26,
     "kind": "vault",
-    "seed": 1754278778,
+    "seed": 3953515301,
     "prize": { "kind": "money", "cents": 525000 },
     "joined": true,
     "params": {
@@ -51,26 +51,26 @@
           "unit": null,
           "round": 0,
           "digits": 3,
-          "ends_at": "2026-11-16T17:33:03.260573+00:00",
+          "ends_at": "2026-11-16T17:56:07.269655+00:00",
           "guesses": [{ "code": "123", "hits": 0, "near": 1 }],
           "options": null,
           "symbols": 6,
           "decimals": null,
-          "opens_at": "2026-11-16T17:32:35.260573+00:00",
+          "opens_at": "2026-11-16T17:55:39.269655+00:00",
           "progress": [
             { "slot": 0, "tries": 1, "cracked": false },
             { "slot": 1, "tries": 0, "cracked": false },
             { "slot": 2, "tries": 0, "cracked": false }
           ],
           "question": "Tresor 1",
-          "closes_at": "2026-11-16T17:32:59.260573+00:00"
+          "closes_at": "2026-11-16T17:56:03.269655+00:00"
         }
       ],
       "hearts": [1, 1, 1],
       "points": [0, 0, 0]
     },
     "status": "running",
-    "ends_at": "2026-11-16T17:34:07.181088+00:00",
+    "ends_at": "2026-11-16T17:57:11.224209+00:00",
     "players": [
       {
         "me": true,
@@ -100,8 +100,8 @@
         "accessories": []
       }
     ],
-    "opened_at": "2026-11-16T17:32:37.070248+00:00",
-    "started_at": "2026-11-16T17:32:35.260573+00:00",
+    "opened_at": "2026-11-16T17:55:41.160542+00:00",
+    "started_at": "2026-11-16T17:55:39.269655+00:00",
     "finished_at": null,
     "max_players": 10,
     "min_players": 3,
@@ -162,16 +162,16 @@
           "budget": null,
           "budgets": [0, 1000, 1000],
           "correct": null,
-          "ends_at": "2026-11-16T17:32:09.645106+00:00",
+          "ends_at": "2026-11-16T17:55:11.643064+00:00",
           "options": null,
           "results": [
-            { "ms": 2, "slot": 0, "right": true, "value": 400, "points": 300 },
-            { "ms": 1011, "slot": 1, "right": false, "value": 400, "points": 0 }
+            { "ms": 9, "slot": 0, "right": true, "value": 400, "points": 300 },
+            { "ms": 1026, "slot": 1, "right": false, "value": 400, "points": 0 }
           ],
           "decimals": null,
-          "opens_at": "2026-11-16T17:31:56.145106+00:00",
+          "opens_at": "2026-11-16T17:54:58.143064+00:00",
           "question": "Goldbarren",
-          "closes_at": "2026-11-16T17:32:06.145106+00:00",
+          "closes_at": "2026-11-16T17:55:08.143064+00:00",
           "item_points": 300
         },
         {
@@ -184,16 +184,16 @@
           "budget": null,
           "budgets": [0, 1000, 1000],
           "correct": null,
-          "ends_at": "2026-11-16T17:32:23.145106+00:00",
+          "ends_at": "2026-11-16T17:55:25.143064+00:00",
           "options": null,
           "results": [
-            { "ms": 526, "slot": 0, "right": true, "value": 600, "points": 100 },
-            { "ms": 532, "slot": 1, "right": false, "value": 0, "points": 0 }
+            { "ms": 551, "slot": 0, "right": true, "value": 600, "points": 100 },
+            { "ms": 564, "slot": 1, "right": false, "value": 0, "points": 0 }
           ],
           "decimals": null,
-          "opens_at": "2026-11-16T17:32:09.645106+00:00",
+          "opens_at": "2026-11-16T17:55:11.643064+00:00",
           "question": "Gummiente",
-          "closes_at": "2026-11-16T17:32:19.645106+00:00",
+          "closes_at": "2026-11-16T17:55:21.643064+00:00",
           "item_points": 100
         }
       ],
@@ -201,7 +201,7 @@
       "points": [400, 0, 0]
     },
     "status": "finished",
-    "ends_at": "2026-11-16T17:34:56.145106+00:00",
+    "ends_at": "2026-11-16T17:57:58.143064+00:00",
     "players": [
       {
         "me": false,
@@ -231,9 +231,9 @@
         "accessories": []
       }
     ],
-    "opened_at": "2026-11-16T17:32:24.145106+00:00",
-    "started_at": "2026-11-16T17:31:56.145106+00:00",
-    "finished_at": "2026-11-16T17:32:24.184298+00:00",
+    "opened_at": "2026-11-16T17:55:26.143064+00:00",
+    "started_at": "2026-11-16T17:54:58.143064+00:00",
+    "finished_at": "2026-11-16T17:55:26.214435+00:00",
     "max_players": 10,
     "min_players": 3,
     "prize_wins_left": 3,

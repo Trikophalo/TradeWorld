@@ -512,4 +512,3007 @@ grant execute on function public.reset_missions(uuid) to authenticated, service_
 comment on function public.reset_missions(uuid) is
   'Swaps the open quick, daily and weekly missions for new ones, progression.missionResetsPerDay times per Berlin day (ADR-166).';
 
+-- ===== supabase/updates/20261204005400_listed_companies.sql =====
+-- ===== idempotent copy of migrations/20261204005400_listed_companies.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 5400 · Listed player companies: research, satisfaction, reputation, the hour (ADR-167)
+-- =============================================================================
+-- Everything here applies only while companies.phase = 'listed'; private companies get the neutral value from every
+-- function. Values: game_config.listed (src/config/listed.ts), formulas: src/lib/sim/listed.ts.
+-- * Tables (internal, RPC only): listed_companies (reputation, satisfaction, books, restrictions),
+--   company_investments (research, products, regions, machines, acquisitions, licences, benefits, actions),
+--   listed_company_hours (history), company_budgets (money earmarked by the board), company_dividends,
+--   board_motions, board_votes, company_tax_periods.
+-- * The operating hour: player_company_close_hour() is patched (not redefined) at eight places: listed_hour_effect()
+--   gives awareness/quality add-ons and factors for demand, capacity, goods and fixed costs; listed_hour_costs() pays
+--   the running costs (they count as fixed costs); the payout honours the board's cap and never touches earmarked
+--   money; listed_hour_after() moves satisfaction and reputation, lets AI workers quit, finishes projects, runs the
+--   tax office and the board.
+-- * Patched by replace as well: company_withdraw (earmarked money, withdrawal ban), set_founder_payout (cap),
+--   set_company_strategy (price lock), company_dissolve (taxes first, clean-up), player_company_close_quarter (the
+--   fair share price follows the reputation), account_wipe, api_error (NX190 to NX204).
+-- Idempotent: runs unchanged as supabase/updates/20261204005400_listed_companies.sql.
+
+-- ---------------------------------------------------------------------------
+-- A. Error keys, notification types
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.api_error(text)'::regprocedure);
+begin
+  if position('''board_not_shareholder''' in v_def) = 0 then
+    v_def := replace(v_def, $q$    when 'chat_already_member'        then 'NX162'
+$q$, $q$    when 'chat_already_member'        then 'NX162'
+    when 'not_listed'                 then 'NX190'
+    when 'item_unknown'               then 'NX191'
+    when 'item_locked'                then 'NX192'
+    when 'item_running'               then 'NX193'
+    when 'budget_reserved'            then 'NX194'
+    when 'withdraw_blocked'           then 'NX195'
+    when 'payout_capped'              then 'NX196'
+    when 'strategy_locked'            then 'NX197'
+    when 'books_nothing'              then 'NX198'
+    when 'tax_nothing_due'            then 'NX199'
+    when 'dividend_limit'             then 'NX200'
+    when 'board_no_right'             then 'NX201'
+    when 'board_motion_unknown'       then 'NX202'
+    when 'board_limit'                then 'NX203'
+    when 'board_not_shareholder'      then 'NX204'
+$q$);
+    if position('''board_not_shareholder''' in v_def) = 0 then
+      raise exception 'api_error() has an unexpected shape; add the listed company error keys (NX190 to NX204) by hand';
+    end if;
+    execute v_def;
+  end if;
+end;
+$do$;
+
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('tax_office', 'company', 'Finanzamt', 'Bücher, Steuern, Mahnungen und Strafen deiner börsennotierten Firma.',
+        'notif_company', true, true, true, 206),
+       ('team_mood', 'company', 'Stimmung im Team', 'Die Mitarbeiterzufriedenheit ist schlecht oder jemand hat gekündigt.',
+        'notif_company', true, true, false, 207),
+       ('board', 'company', 'Geschäftsrat', 'Ein Antrag im Geschäftsrat einer Firma, an der du Aktien hältst.',
+        'notif_company', true, true, false, 208),
+       ('company_dividend', 'market', 'Dividende', 'Eine Firma, an der du Aktien hältst, hat eine Dividende gezahlt.',
+        'notif_bell', true, false, false, 299),
+       ('company_project', 'company', 'Projekt fertig', 'Eine Forschung, ein Produkt oder ein Ausbau deiner Firma ist fertig.',
+        'notif_company', true, false, false, 209)
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- B. Tables (internal)
+-- ---------------------------------------------------------------------------
+create table if not exists public.listed_companies (
+  company_id           uuid primary key references public.companies (id) on delete cascade,
+  reputation           double precision not null default 50 check (reputation between 0 and 100),
+  satisfaction         double precision not null default 60 check (satisfaction between 0 and 100),
+  price_factor         double precision not null default 1 check (price_factor > 0),
+  ref_revenue_cents    bigint not null default 0 check (ref_revenue_cents >= 0),
+  layoff_heat          double precision not null default 0 check (layoff_heat >= 0),
+  layoff_checked_at    timestamptz,
+  ai_workers_seen      integer,
+  red_hours            integer not null default 0,
+  quits_day            date,
+  quits_today          integer not null default 0,
+  mood_notified_at     timestamptz,
+  last_upkeep          jsonb not null default '{}'::jsonb,
+  books_until          timestamptz not null default now(),
+  books_day            date,
+  books_streak         integer not null default 0,
+  books_stage          smallint not null default 0,
+  loss_carry_cents     bigint not null default 0 check (loss_carry_cents >= 0),
+  advisor              boolean not null default false,
+  payout_cap_bps       integer check (payout_cap_bps between 0 and 10000),
+  payout_cap_until     timestamptz,
+  withdraw_block_until timestamptz,
+  price_lock           text check (price_lock in ('budget', 'normal', 'premium')),
+  price_lock_until     timestamptz,
+  dividend_day         date,
+  dividend_streak      integer not null default 0,
+  best_dividend_cents  bigint not null default 0,
+  created_at           timestamptz not null default now()
+);
+alter table public.listed_companies enable row level security;
+comment on table public.listed_companies is
+  'Listed player companies (ADR-167): reputation, employee satisfaction, bookkeeping state and the board''s restrictions. Internal (RPCs).';
+
+create table if not exists public.company_investments (
+  company_id   uuid not null references public.companies (id) on delete cascade,
+  key          text not null check (key ~ '^[a-z0-9_]+$'),
+  kind         text not null,
+  status       text not null check (status in ('running', 'active', 'paused', 'retired')),
+  level        integer not null default 0 check (level >= 0),
+  ready_at     timestamptz,
+  last_used_at timestamptz,
+  spent_cents  bigint not null default 0,
+  started_at   timestamptz not null default now(),
+  primary key (company_id, key)
+);
+alter table public.company_investments enable row level security;
+comment on table public.company_investments is
+  'What a listed company bought from game_config.listed.items (ADR-167): level counts the finished levels, ready_at the one in work. Internal.';
+
+create table if not exists public.listed_company_hours (
+  company_id      uuid not null references public.companies (id) on delete cascade,
+  hour_start      timestamptz not null,
+  satisfaction    double precision not null,
+  sat_target      double precision not null,
+  reputation      double precision not null,
+  rep_target      double precision not null,
+  demand_factor   double precision not null,
+  capacity_factor double precision not null,
+  upkeep_cents    bigint not null default 0,
+  upkeep          jsonb not null default '{}'::jsonb,
+  drivers         jsonb not null default '{}'::jsonb,
+  primary key (company_id, hour_start)
+);
+alter table public.listed_company_hours enable row level security;
+comment on table public.listed_company_hours is 'Hourly history of a listed company: mood, reputation, factors, running costs (ADR-167). Internal.';
+
+create table if not exists public.company_budgets (
+  company_id   uuid not null references public.companies (id) on delete cascade,
+  purpose      text not null,
+  amount_cents bigint not null check (amount_cents >= 0),
+  updated_at   timestamptz not null default now(),
+  primary key (company_id, purpose)
+);
+alter table public.company_budgets enable row level security;
+drop trigger if exists set_updated_at on public.company_budgets;
+create trigger set_updated_at before update on public.company_budgets for each row execute function public.set_updated_at();
+comment on table public.company_budgets is
+  'Company cash earmarked by the board for a purpose (ADR-167): not free cash, the founder cannot withdraw it. Internal.';
+
+create table if not exists public.company_dividends (
+  id            bigint generated always as identity primary key,
+  company_id    uuid not null references public.companies (id) on delete cascade,
+  source        text not null check (source in ('founder', 'board')),
+  total_cents   bigint not null check (total_cents > 0),
+  players_cents bigint not null,
+  float_cents   bigint not null,
+  shares_e6     bigint not null,
+  holders       integer not null,
+  paid_at       timestamptz not null default now()
+);
+alter table public.company_dividends enable row level security;
+create index if not exists company_dividends_company_idx on public.company_dividends (company_id, id desc);
+comment on table public.company_dividends is 'Dividends a listed player company paid (ADR-167). Internal.';
+
+create table if not exists public.board_motions (
+  id           bigint generated always as identity primary key,
+  company_id   uuid not null references public.companies (id) on delete cascade,
+  proposer_id  uuid references public.profiles (id) on delete set null,
+  kind         text not null,
+  params       jsonb not null default '{}'::jsonb,
+  status       text not null default 'open' check (status in ('open', 'passed', 'rejected', 'no_quorum', 'cancelled')),
+  created_at   timestamptz not null default now(),
+  closes_at    timestamptz not null,
+  closed_at    timestamptz,
+  yes_e6       bigint not null default 0,
+  no_e6        bigint not null default 0,
+  ai_e6        bigint not null default 0,
+  total_e6     bigint not null default 0,
+  result       jsonb not null default '{}'::jsonb
+);
+alter table public.board_motions enable row level security;
+create index if not exists board_motions_company_idx on public.board_motions (company_id, id desc);
+create index if not exists board_motions_proposer_idx on public.board_motions (proposer_id) where proposer_id is not null;
+comment on table public.board_motions is 'Motions of the board of a listed company (ADR-167). Internal.';
+
+create table if not exists public.board_votes (
+  motion_id bigint not null references public.board_motions (id) on delete cascade,
+  player_id uuid not null references public.profiles (id) on delete cascade,
+  yes       boolean not null,
+  voted_at  timestamptz not null default now(),
+  primary key (motion_id, player_id)
+);
+alter table public.board_votes enable row level security;
+create index if not exists board_votes_player_idx on public.board_votes (player_id);
+comment on table public.board_votes is 'One vote per shareholder and motion; the weight is the holding when the motion is counted (ADR-167). Internal.';
+
+create table if not exists public.company_tax_periods (
+  id              bigint generated always as identity primary key,
+  company_id      uuid not null references public.companies (id) on delete cascade,
+  kind            text not null default 'books' check (kind in ('books', 'late_fee')),
+  period_start    timestamptz not null,
+  period_end      timestamptz not null,
+  revenue_cents   bigint not null default 0,
+  costs_cents     bigint not null default 0,
+  profit_cents    bigint not null default 0,
+  loss_used_cents bigint not null default 0,
+  taxable_cents   bigint not null default 0,
+  rate_bps        integer not null default 0,
+  discount_cents  bigint not null default 0,
+  tax_cents       bigint not null default 0 check (tax_cents >= 0),
+  penalty_cents   bigint not null default 0 check (penalty_cents >= 0),
+  paid_cents      bigint not null default 0 check (paid_cents >= 0),
+  status          text not null default 'due' check (status in ('due', 'paid')),
+  closed_by       text not null check (closed_by in ('founder', 'advisor', 'finanzamt')),
+  check_correct   smallint,
+  stage           smallint not null default 0,
+  due_at          timestamptz not null,
+  paid_at         timestamptz,
+  created_at      timestamptz not null default now()
+);
+alter table public.company_tax_periods enable row level security;
+create index if not exists company_tax_periods_company_idx on public.company_tax_periods (company_id, id desc);
+comment on table public.company_tax_periods is
+  'Closed bookkeeping periods of a listed company with the corporate tax and penalties due (ADR-167). Internal.';
+
+do $$
+declare
+  t text;
+begin
+  foreach t in array array['listed_companies', 'company_investments', 'listed_company_hours', 'company_budgets',
+                           'company_dividends', 'board_motions', 'board_votes', 'company_tax_periods'] loop
+    execute format('revoke all on public.%I from public, anon, authenticated', t);
+    execute format('grant all on public.%I to service_role', t);
+  end loop;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- C. Config and formulas (the same as src/lib/sim/listed.ts)
+-- ---------------------------------------------------------------------------
+create or replace function public.listed_cfg()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select value from public.game_config where key = 'listed'), '{}'::jsonb);
+$$;
+
+create or replace function public.listed_item(p_key text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select t.x from jsonb_array_elements(coalesce(public.listed_cfg() -> 'items', '[]'::jsonb)) t(x)
+   where t.x ->> 'key' = p_key limit 1;
+$$;
+
+-- Whether the company is an active player company at the stock exchange
+create or replace function public.listed_is(p_company uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (select 1 from public.companies c join public.player_companies pc on pc.company_id = c.id
+                  where c.id = p_company and c.phase = 'listed' and pc.status = 'active');
+$$;
+
+-- The listed row of a company, created on first use; null for private companies
+create or replace function public.listed_ensure(p_company uuid)
+returns public.listed_companies
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  l   public.listed_companies;
+  cfg jsonb := public.listed_cfg();
+begin
+  if not public.listed_is(p_company) then
+    return null;
+  end if;
+  select * into l from public.listed_companies where company_id = p_company;
+  if l.company_id is null then
+    insert into public.listed_companies (company_id, reputation, satisfaction, books_until, ai_workers_seen)
+    values (p_company, public.cfg_num(cfg, '{reputation,start}', 50), public.cfg_num(cfg, '{satisfaction,start}', 60), now(),
+            (select pc.ai_workers from public.player_companies pc where pc.company_id = p_company))
+    on conflict (company_id) do nothing;
+    select * into l from public.listed_companies where company_id = p_company;
+  end if;
+  return l;
+end;
+$$;
+
+-- refRevenueCents: average revenue per hour of the last hours, never below the minimum
+create or replace function public.listed_ref_revenue(p_company uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select greatest(public.cfg_num(public.listed_cfg(), '{refRevenue,minCents}', 20000)::bigint,
+                  coalesce((select round(avg(h.revenue_cents))::bigint
+                              from (select x.revenue_cents from public.player_company_hours x
+                                     where x.company_id = p_company order by x.hour_start desc
+                                     limit greatest(1, public.cfg_num(public.listed_cfg(), '{refRevenue,windowHours}', 24)::integer)) h), 0));
+$$;
+
+-- itemCostCents: max(minCostCents, costHours x reference revenue) x costGrowth^level + costPerHeadCents x heads
+create or replace function public.listed_item_cost(p_item jsonb, p_level integer, p_ref bigint, p_heads integer)
+returns bigint
+language sql
+immutable
+set search_path = ''
+as $$
+  select round((greatest(public.cfg_num(p_item, '{minCostCents}', 0), public.cfg_num(p_item, '{costHours}', 0) * p_ref)
+                * power(public.cfg_num(p_item, '{costGrowth}', 1), greatest(0, coalesce(p_level, 0))))::numeric)::bigint
+       + public.cfg_num(p_item, '{costPerHeadCents}', 0)::bigint * greatest(1, coalesce(p_heads, 0));
+$$;
+
+-- itemUpkeepCents: round(upkeepBps x reference revenue / 10 000) x level + upkeepPerHeadCents x heads
+create or replace function public.listed_item_upkeep(p_item jsonb, p_level integer, p_ref bigint, p_heads integer)
+returns bigint
+language sql
+immutable
+set search_path = ''
+as $$
+  select round(public.cfg_num(p_item, '{upkeepBps}', 0)::numeric * p_ref / 10000)::bigint * greatest(1, coalesce(p_level, 1))
+       + public.cfg_num(p_item, '{upkeepPerHeadCents}', 0)::bigint * greatest(1, coalesce(p_heads, 0));
+$$;
+
+-- The books category of an item kind
+create or replace function public.listed_kind_category(p_kind text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case p_kind when 'research' then 'research' when 'product' then 'product'
+                     when 'benefit' then 'benefit' when 'action' then 'benefit' else 'expansion' end;
+$$;
+
+-- sumEffects: effects of all active items, per level
+create or replace function public.listed_effects(p_company uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'demandBps', coalesce(sum(public.cfg_num(i.x, '{effects,demandBps}', 0) * i.lv), 0),
+    'marketBps', coalesce(sum(public.cfg_num(i.x, '{effects,marketBps}', 0) * i.lv), 0),
+    'capacityBps', coalesce(sum(public.cfg_num(i.x, '{effects,capacityBps}', 0) * i.lv), 0),
+    'qualityBps', coalesce(sum(public.cfg_num(i.x, '{effects,qualityBps}', 0) * i.lv), 0),
+    'awarenessBps', coalesce(sum(public.cfg_num(i.x, '{effects,awarenessBps}', 0) * i.lv), 0),
+    'marginBps', coalesce(sum(public.cfg_num(i.x, '{effects,marginBps}', 0) * i.lv), 0),
+    'fixedCostBps', coalesce(sum(public.cfg_num(i.x, '{effects,fixedCostBps}', 0) * i.lv), 0),
+    'taxRateBps', coalesce(sum(public.cfg_num(i.x, '{effects,taxRateBps}', 0) * i.lv), 0),
+    'satisfaction', coalesce(sum(public.cfg_num(i.x, '{effects,satisfaction}', 0) * i.lv), 0),
+    'reputation', coalesce(sum(public.cfg_num(i.x, '{effects,reputation}', 0) * i.lv), 0))
+    from (select public.listed_item(ci.key) as x, greatest(1, ci.level) as lv
+            from public.company_investments ci
+           where ci.company_id = p_company and ci.status = 'active' and ci.level > 0) i
+   where i.x is not null;
+$$;
+
+-- greedShare: 0 up to freeRatioBps, 1 from fullRatioBps
+create or replace function public.listed_greed_share(p_ratio_bps double precision)
+returns double precision
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select least(1.0, greatest(0.0,
+           (p_ratio_bps - public.cfg_num(public.listed_cfg(), '{reputation,greed,freeRatioBps}', 3000))
+           / greatest(1.0, public.cfg_num(public.listed_cfg(), '{reputation,greed,fullRatioBps}', 10000)
+                           - public.cfg_num(public.listed_cfg(), '{reputation,greed,freeRatioBps}', 3000))));
+$$;
+
+-- payoutRatioBps: founder payouts and withdrawals / max(profit, share of the revenue, 1)
+create or replace function public.listed_payout_ratio_bps(p_payout bigint, p_profit bigint, p_revenue bigint)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when coalesce(p_payout, 0) <= 0 then 0
+              else round(p_payout * 10000.0
+                         / greatest(p_profit, p_revenue * public.cfg_num(public.listed_cfg(), '{reputation,minProfitShareOfRevenue}', 0.05), 1))::integer
+         end;
+$$;
+
+-- satisfactionTarget: where the mood is heading this hour, with its drivers
+create or replace function public.listed_satisfaction_target(p_benefits double precision, p_pay_factor_bps integer,
+  p_pay_mood_bps integer, p_utilization double precision, p_crisis integer, p_scandal boolean, p_layoff_heat double precision,
+  p_payout_ratio_bps integer, p_profit bigint)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  s      jsonb := coalesce(public.listed_cfg() -> 'satisfaction', '{}'::jsonb);
+  v_over double precision;
+  d      jsonb;
+  v_sum  double precision;
+begin
+  v_over := least(1.0, greatest(0.0, (p_utilization - public.cfg_num(s, '{workload,overFrom}', 0.95))
+                                     / greatest(0.0001, public.cfg_num(s, '{workload,overFull}', 1.5)
+                                                        - public.cfg_num(s, '{workload,overFrom}', 0.95))));
+  d := jsonb_build_object(
+    'base', public.cfg_num(s, '{base}', 50),
+    'benefits', least(public.cfg_num(s, '{benefitsMax}', 40), greatest(0, p_benefits)),
+    'wages', -public.cfg_num(s, '{wages,unpaidMaxLoss}', 25) * (1 - least(10000, greatest(0, p_pay_factor_bps)) / 10000.0)
+             - public.cfg_num(s, '{wages,moodMaxLoss}', 10) * (1 - least(10000, greatest(0, p_pay_mood_bps)) / 10000.0),
+    'workload', case when v_over > 0 then -public.cfg_num(s, '{workload,overMaxLoss}', 12) * v_over
+                     when p_utilization < public.cfg_num(s, '{workload,underBelow}', 0.35) then -public.cfg_num(s, '{workload,underLoss}', 4)
+                     else 0 end,
+    'crisis', case when coalesce(p_crisis, 0) > 0
+                   then -(public.cfg_num(s, '{crisis,perSeverity}', 4) * least(3, p_crisis)
+                          + case when p_scandal then public.cfg_num(s, '{crisis,scandal}', 6) else 0 end)
+                   else 0 end,
+    'layoffs', -least(public.cfg_num(s, '{layoffs,max}', 15), greatest(0, p_layoff_heat)),
+    'greed', -public.cfg_num(s, '{greedMaxLoss}', 10) * public.listed_greed_share(p_payout_ratio_bps),
+    'success', case when p_profit > 0 then public.cfg_num(s, '{success,profitHour}', 3)
+                    when p_profit < 0 then public.cfg_num(s, '{success,lossHour}', -3) else 0 end);
+  select sum(v::double precision) into v_sum from jsonb_each_text(d) x(k, v);
+  return jsonb_build_object('target', least(100.0, greatest(0.0, v_sum)), 'drivers', d);
+end;
+$$;
+
+-- satisfactionEffect: capacity factor and quality add-on (never positive) of the mood
+create or replace function public.listed_satisfaction_effect(p_value double precision)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  s       jsonb := coalesce(public.listed_cfg() -> 'satisfaction', '{}'::jsonb);
+  v       double precision := least(100.0, greatest(0.0, coalesce(p_value, 0)));
+  v_green double precision := public.cfg_num(s, '{green}', 60);
+  v_x     double precision;
+begin
+  if v >= v_green then
+    v_x := least(1.0, greatest(0.0, (v - v_green) / greatest(1.0, public.cfg_num(s, '{effect,highFull}', 90) - v_green)));
+    return jsonb_build_object('capacity_factor', 1 + public.cfg_num(s, '{effect,highCapacityMaxGain}', 0.06) * v_x, 'quality_add', 0);
+  end if;
+  v_x := (v_green - v) / v_green;
+  return jsonb_build_object('capacity_factor', 1 - public.cfg_num(s, '{effect,lowCapacityMaxLoss}', 0.3) * v_x,
+                            'quality_add', -public.cfg_num(s, '{effect,lowQualityMaxLoss}', 0.15) * v_x);
+end;
+$$;
+
+-- reputationTarget: where the reputation is heading, with its drivers
+create or replace function public.listed_reputation_target(p_items double precision, p_payout bigint, p_profit bigint,
+  p_revenue bigint, p_invested bigint, p_dividends bigint, p_streak integer, p_scandal boolean)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  r       jsonb := coalesce(public.listed_cfg() -> 'reputation', '{}'::jsonb);
+  v_base  double precision := greatest(p_profit, p_revenue * public.cfg_num(r, '{minProfitShareOfRevenue}', 0.05), 1);
+  v_ratio integer := public.listed_payout_ratio_bps(p_payout, p_profit, p_revenue);
+  d       jsonb;
+  v_sum   double precision;
+begin
+  d := jsonb_build_object(
+    'base', public.cfg_num(r, '{base}', 50),
+    'items', coalesce(p_items, 0),
+    'greed', -public.cfg_num(r, '{greed,maxLoss}', 35) * public.listed_greed_share(v_ratio),
+    'reinvest', public.cfg_num(r, '{reinvest,maxGain}', 12)
+                * least(1.0, greatest(0.0, greatest(0, p_invested) * 10000.0 / v_base / public.cfg_num(r, '{reinvest,fullRatioBps}', 5000))),
+    'dividends', public.cfg_num(r, '{dividend,maxGain}', 12)
+                 * least(1.0, greatest(0.0, greatest(0, p_dividends) * 10000.0 / v_base / public.cfg_num(r, '{dividend,fullRatioBps}', 2000)))
+                 + least(public.cfg_num(r, '{dividend,streakMax}', 6), greatest(0, coalesce(p_streak, 0)))
+                   * public.cfg_num(r, '{dividend,streakPerDay}', 1),
+    'scandal', case when p_scandal then -public.cfg_num(r, '{scandalLoss}', 5) else 0 end);
+  select sum(v::double precision) into v_sum from jsonb_each_text(d) x(k, v);
+  return jsonb_build_object('target', least(100.0, greatest(0.0, v_sum)), 'drivers', d, 'payout_ratio_bps', v_ratio);
+end;
+$$;
+
+-- listedHourEffect: items, mood and reputation as the terms of the hourly close
+create or replace function public.listed_hour_effect_calc(p_effects jsonb, p_satisfaction double precision, p_reputation double precision)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg   jsonb := public.listed_cfg();
+  v_sat jsonb := public.listed_satisfaction_effect(p_satisfaction);
+  v_x   double precision := (least(100.0, greatest(0.0, coalesce(p_reputation, 50))) - 50) / 50.0;
+begin
+  return jsonb_build_object(
+    'awareness_add', public.cfg_num(p_effects, '{awarenessBps}', 0) / 10000.0,
+    'quality_add', public.cfg_num(p_effects, '{qualityBps}', 0) / 10000.0 + (v_sat ->> 'quality_add')::double precision,
+    'demand_factor', (1 + public.cfg_num(p_effects, '{demandBps}', 0) / 10000.0) * (1 + public.cfg_num(p_effects, '{marketBps}', 0) / 10000.0)
+                     * (1 + public.cfg_num(cfg, '{reputation,demandMaxEffect}', 0.2) * v_x),
+    'capacity_factor', greatest(0.1, 1 + public.cfg_num(p_effects, '{capacityBps}', 0) / 10000.0) * (v_sat ->> 'capacity_factor')::double precision,
+    'cogs_factor', greatest(0.5, 1 - public.cfg_num(p_effects, '{marginBps}', 0) / 10000.0),
+    'fixed_factor', greatest(0.5, 1 + public.cfg_num(p_effects, '{fixedCostBps}', 0) / 10000.0));
+end;
+$$;
+
+-- Money earmarked by the board (0 for every company without budgets)
+create or replace function public.listed_reserved_cents(p_company uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select sum(b.amount_cents) from public.company_budgets b where b.company_id = p_company), 0)::bigint;
+$$;
+
+-- Free cash: company cash minus open bills minus earmarked money
+create or replace function public.listed_free_cash(p_company uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select a.balance_cents from public.ledger_accounts a where a.owner_company_id = p_company and a.kind = 'company_cash'), 0)
+       - coalesce((select pc.unpaid_cents from public.player_companies pc where pc.company_id = p_company), 0)
+       - public.listed_reserved_cents(p_company);
+$$;
+
+-- The founder's payout share is capped while a board decision holds (10 000 = no cap)
+create or replace function public.listed_payout_cap_bps(p_company uuid, p_at timestamptz)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select l.payout_cap_bps from public.listed_companies l
+                    where l.company_id = p_company and l.payout_cap_bps is not null and l.payout_cap_until > coalesce(p_at, now())
+                      and public.listed_is(p_company)), 10000);
+$$;
+
+-- Factor on the fair share price from the reputation (1 for private companies)
+create or replace function public.listed_price_factor(p_company uuid)
+returns double precision
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select l.price_factor from public.listed_companies l
+                    where l.company_id = p_company and public.listed_is(p_company)), 1.0);
+$$;
+
+-- One-off drop (or gain) of the reputation
+create or replace function public.listed_reputation_bump(p_company uuid, p_points double precision)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  update public.listed_companies set reputation = least(100.0, greatest(0.0, reputation + coalesce(p_points, 0)))
+   where company_id = p_company;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- D. The operating hour
+-- ---------------------------------------------------------------------------
+-- Terms of the hour; neutral for private companies
+create or replace function public.listed_hour_effect(p_company uuid, p_hour_start timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  l public.listed_companies;
+begin
+  l := public.listed_ensure(p_company);
+  if l.company_id is null then
+    return jsonb_build_object('awareness_add', 0, 'quality_add', 0, 'demand_factor', 1, 'capacity_factor', 1,
+                              'cogs_factor', 1, 'fixed_factor', 1, 'listed', false);
+  end if;
+  return public.listed_hour_effect_calc(public.listed_effects(p_company), l.satisfaction, l.reputation)
+         || jsonb_build_object('listed', true);
+end;
+$$;
+
+-- Hourly wage of the tax advisor
+create or replace function public.listed_advisor_wage(p_ref bigint)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select greatest(public.cfg_num(public.listed_cfg(), '{taxes,advisor,minWageCentsPerHour}', 4000)::bigint,
+                  round(p_ref::numeric * public.cfg_num(public.listed_cfg(), '{taxes,advisor,revenueBps}', 100)::numeric / 10000)::bigint);
+$$;
+
+-- Running costs of the hour: every active item is paid from the cash (one booking per category); what the cash
+-- cannot pay pauses until it can. Returns what was paid (it counts as fixed costs of the hour).
+create or replace function public.listed_hour_costs(p_company uuid, p_hour_start timestamptz, p_key text)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  l        public.listed_companies;
+  pc       public.player_companies;
+  v_acc    uuid;
+  v_hh     uuid := public.ledger_system_account('households');
+  v_ref    bigint;
+  v_heads  integer;
+  v_left   bigint;
+  v_up     bigint;
+  v_cat    text;
+  v_sums   jsonb := '{}'::jsonb;
+  v_total  bigint := 0;
+  v_amount bigint;
+  r        record;
+begin
+  l := public.listed_ensure(p_company);
+  if l.company_id is null then
+    return 0;
+  end if;
+  select * into pc from public.player_companies where company_id = p_company;
+  v_acc := public.company_cash_account(p_company);
+  v_ref := public.listed_ref_revenue(p_company);
+  v_heads := public.company_headcount(p_company);
+  select greatest(0, a.balance_cents) into v_left from public.ledger_accounts a where a.id = v_acc;
+  for r in select ci.key, ci.kind, ci.level, ci.status from public.company_investments ci
+            where ci.company_id = p_company and ci.status in ('active', 'paused') and ci.level > 0 and ci.kind <> 'action'
+            order by array_position(array['product', 'region', 'machine', 'acquisition', 'licence', 'research', 'benefit'], ci.kind), ci.key loop
+    v_up := public.listed_item_upkeep(public.listed_item(r.key), r.level, v_ref, v_heads);
+    continue when public.listed_item(r.key) is null;
+    if v_up <= v_left then
+      v_left := v_left - v_up;
+      if v_up > 0 then
+        v_cat := public.listed_kind_category(r.kind);
+        v_sums := v_sums || jsonb_build_object(v_cat, coalesce((v_sums ->> v_cat)::bigint, 0) + v_up);
+      end if;
+      if r.status = 'paused' then
+        update public.company_investments set status = 'active' where company_id = p_company and key = r.key;
+      end if;
+    elsif r.status = 'active' then
+      update public.company_investments set status = 'paused' where company_id = p_company and key = r.key;
+    end if;
+  end loop;
+  -- the tax advisor leaves when the wage cannot be paid
+  if l.advisor then
+    v_up := public.listed_advisor_wage(v_ref);
+    if v_up <= v_left then
+      v_left := v_left - v_up;
+      v_sums := v_sums || jsonb_build_object('advisor', v_up);
+    else
+      update public.listed_companies set advisor = false where company_id = p_company;
+      perform public.social_notify(pc.founder_id, 'tax_office', 'Steuerberater hat gekündigt',
+        'Die Kasse reichte nicht für das Honorar. Du machst die Bücher wieder selbst.',
+        jsonb_build_object('company_id', p_company), '/company', 'advisor-gone:' || p_key);
+    end if;
+  end if;
+  for v_cat, v_amount in select k, v::bigint from jsonb_each_text(v_sums) x(k, v) loop
+    perform public.ledger_transfer(v_acc, v_hh, v_amount, 'company_costs',
+      case v_cat when 'product' then 'Produkte: laufende Kosten' when 'expansion' then 'Standorte und Anlagen: laufende Kosten'
+                 when 'benefit' then 'Benefits fürs Team' when 'advisor' then 'Steuerberater' else 'Laufende Kosten' end,
+      'company', p_company, p_key || ':lx:' || v_cat, pc.founder_id, jsonb_build_object('cat', v_cat));
+    v_total := v_total + v_amount;
+    if v_cat = 'benefit' then
+      update public.company_budgets set amount_cents = greatest(0, amount_cents - v_amount), updated_at = now()
+       where company_id = p_company and purpose = 'benefits';
+    end if;
+  end loop;
+  update public.listed_companies set last_upkeep = v_sums, ref_revenue_cents = v_ref where company_id = p_company;
+  return v_total;
+end;
+$$;
+
+-- After the hour: finished projects, mood, reputation, quits, history, fair value, tax office, board.
+create or replace function public.listed_hour_after(p_company uuid, p_hour_start timestamptz, p_demand double precision,
+  p_capacity double precision, p_revenue bigint, p_profit bigint, p_pay_factor_bps integer, p_payout bigint)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg       jsonb := public.listed_cfg();
+  l         public.listed_companies;
+  pc        public.player_companies;
+  c         public.companies;
+  v_end     timestamptz := p_hour_start + interval '1 hour';
+  v_win     interval;
+  v_fx      jsonb;
+  v_eff     jsonb;
+  v_acc     uuid;
+  v_fired   integer;
+  v_gone    integer;
+  v_heat    double precision;
+  v_profit  bigint;
+  v_rev     bigint;
+  v_pay     bigint;
+  v_inv     bigint;
+  v_div     bigint;
+  v_ratio   integer;
+  v_sev     integer;
+  v_scandal boolean;
+  v_st      jsonb;
+  v_rt      jsonb;
+  v_sat     double precision;
+  v_rep     double precision;
+  v_red     integer;
+  v_quit    boolean := false;
+  v_today   date := (now() at time zone 'Europe/Berlin')::date;
+  v_quits   integer;
+  v_pf      double precision;
+  v_streak  integer;
+  r         record;
+begin
+  l := public.listed_ensure(p_company);
+  if l.company_id is null then
+    return;
+  end if;
+  select * into l from public.listed_companies where company_id = p_company for update;
+  select * into pc from public.player_companies where company_id = p_company;
+  select * into c from public.companies where id = p_company;
+  v_acc := public.company_cash_account(p_company);
+
+  -- projects whose time is up become active (research, products, regions, machine levels)
+  perform public.listed_finish_due(p_company, greatest(v_end, now()));
+
+  v_fx := public.listed_effects(p_company);
+  v_eff := public.listed_hour_effect_calc(v_fx, l.satisfaction, l.reputation);
+
+  -- dismissals: AI workers gone since the last hour (own quits were already counted out), players fired
+  select count(*) into v_fired from public.player_jobs j
+   where j.company_id = p_company and j.status = 'ended' and j.end_reason = 'fired'
+     and j.ended_at > coalesce(l.layoff_checked_at, now() - interval '1 hour');
+  v_gone := greatest(0, coalesce(l.ai_workers_seen, pc.ai_workers) - pc.ai_workers) + coalesce(v_fired, 0);
+  v_heat := greatest(0, l.layoff_heat) * (1 - public.cfg_num(cfg, '{satisfaction,layoffs,decayPerHour}', 0.08))
+          + v_gone * public.cfg_num(cfg, '{satisfaction,layoffs,perHead}', 3);
+
+  -- the reputation window: profit and revenue of the hours, payouts, withdrawals, investments, dividends
+  v_win := make_interval(hours => greatest(1, public.cfg_num(cfg, '{reputation,windowHours}', 24)::integer));
+  select coalesce(sum(h.profit_cents), 0), coalesce(sum(h.revenue_cents), 0), coalesce(sum(h.founder_payout_cents), 0)
+    into v_profit, v_rev, v_pay
+    from public.player_company_hours h where h.company_id = p_company and h.hour_start > v_end - v_win;
+  v_pay := v_pay + coalesce((
+    select sum(-e.amount_cents) from public.ledger_entries e join public.ledger_transactions t on t.id = e.transaction_id
+     where e.account_id = v_acc and e.amount_cents < 0 and e.created_at > now() - v_win
+       and t.idempotency_key like 'withdraw:%'), 0);
+  select coalesce(sum(-e.amount_cents), 0) into v_inv
+    from public.ledger_entries e join public.ledger_transactions t on t.id = e.transaction_id
+   where e.account_id = v_acc and e.amount_cents < 0 and e.created_at > now() - v_win
+     and t.metadata ->> 'one_off' = 'true';
+  select coalesce(sum(d.total_cents), 0) into v_div from public.company_dividends d
+   where d.company_id = p_company and d.paid_at > now() - v_win;
+  v_ratio := public.listed_payout_ratio_bps(v_pay, v_profit, v_rev);
+
+  select max(e.severity), bool_or(coalesce(cfg #> '{satisfaction,crisis,scandals}', '[]'::jsonb) ? e.archetype)
+    into v_sev, v_scandal
+    from public.player_company_events e
+   where e.company_id = p_company and e.polarity = 'crisis' and e.status in ('open', 'in_force');
+
+  -- mood
+  v_st := public.listed_satisfaction_target(public.cfg_num(v_fx, '{satisfaction}', 0), p_pay_factor_bps,
+            public.company_pay_mood_bps(p_company), case when p_capacity > 0 then p_demand / p_capacity else 1 end,
+            coalesce(v_sev, 0), coalesce(v_scandal, false), v_heat, v_ratio, p_profit);
+  v_sat := least(100.0, greatest(0.0, l.satisfaction + public.cfg_num(cfg, '{satisfaction,adjustPerHour}', 0.15)
+                                                       * ((v_st ->> 'target')::double precision - l.satisfaction)));
+  v_red := case when v_sat < public.cfg_num(cfg, '{satisfaction,red}', 35) then l.red_hours + 1 else 0 end;
+  v_quits := case when l.quits_day = v_today then l.quits_today else 0 end;
+  if v_red > 0 then
+    -- an AI worker leaves every N-th hour in a row in the red zone
+    if pc.ai_workers > 0 and v_red % greatest(1, public.cfg_num(cfg, '{satisfaction,quits,everyRedHours}', 3)::integer) = 0 then
+      update public.player_companies set ai_workers = ai_workers - 1 where company_id = p_company and ai_workers > 0;
+      pc.ai_workers := pc.ai_workers - 1;
+      v_quit := true;
+      v_quits := v_quits + 1;
+      perform public.social_notify(pc.founder_id, 'team_mood', 'Kündigung bei ' || c.name,
+        'Eine KI-Kraft hat hingeschmissen: Die Stimmung ist im Keller.',
+        jsonb_build_object('company_id', p_company), '/company', 'quit:' || p_company::text || ':' || p_hour_start::text);
+      perform public.company_system_message(p_company, 'Eine KI-Kraft hat gekündigt. Die Stimmung im Team ist schlecht.');
+      if v_quits = greatest(1, public.cfg_num(cfg, '{satisfaction,quits,massQuitFrom}', 3)::integer) then
+        perform public.feed_post(pc.founder_id, 'mass_quit', jsonb_build_object('company', c.name, 'count', v_quits),
+                                 'mass_quit:' || p_company::text || ':' || v_today::text);
+      end if;
+    end if;
+    -- players are not forced out: they are told, at most once per interval
+    if l.mood_notified_at is null
+       or l.mood_notified_at < now() - make_interval(hours => greatest(1, public.cfg_num(cfg, '{satisfaction,quits,notifyEveryHours}', 24)::integer)) then
+      for r in select j.player_id from public.player_jobs j where j.company_id = p_company and j.status = 'active' loop
+        perform public.social_notify(r.player_id, 'team_mood', 'Miese Stimmung bei ' || c.name,
+          'Die Zufriedenheit im Team ist im roten Bereich. Vielleicht ist ein anderer Job besser für dich.',
+          jsonb_build_object('company_id', p_company), '/career', 'mood:' || p_company::text || ':' || v_today::text);
+      end loop;
+      perform public.social_notify(pc.founder_id, 'team_mood', 'Stimmung im Keller',
+        'Die Mitarbeiterzufriedenheit bei ' || c.name || ' ist im roten Bereich. Kapazität und Qualität sinken.',
+        jsonb_build_object('company_id', p_company), '/company', 'mood-f:' || p_company::text || ':' || v_today::text);
+      l.mood_notified_at := now();
+    end if;
+  end if;
+
+  -- reputation
+  v_streak := case when l.dividend_day is not null and l.dividend_day >= v_today - 1 then l.dividend_streak else 0 end;
+  v_rt := public.listed_reputation_target(public.cfg_num(v_fx, '{reputation}', 0), v_pay, v_profit, v_rev, v_inv, v_div,
+                                          v_streak, coalesce(v_scandal, false));
+  v_rep := least(100.0, greatest(0.0, l.reputation + public.cfg_num(cfg, '{reputation,adjustPerHour}', 0.08)
+                                                     * ((v_rt ->> 'target')::double precision - l.reputation)));
+  if v_rep < public.cfg_num(cfg, '{reputation,greed,feedBelow}', 35)
+     and v_ratio >= public.cfg_num(cfg, '{reputation,greed,fullRatioBps}', 10000) * 0.8 then
+    perform public.feed_post(pc.founder_id, 'greedy_founder', jsonb_build_object('company', c.name, 'ratio_bps', v_ratio),
+                             'greedy:' || p_company::text || ':' || v_today::text);
+  end if;
+
+  -- the fair share price follows the reputation
+  v_pf := 1 + public.cfg_num(cfg, '{reputation,priceMaxEffect}', 0.25) * (v_rep - 50) / 50.0;
+  if c.security_id is not null and v_pf <> l.price_factor then
+    update public.security_sim_state
+       set fair_value_e4 = greatest(1, round(fair_value_e4 / l.price_factor * v_pf))::bigint
+     where security_id = c.security_id;
+  end if;
+
+  update public.listed_companies
+     set satisfaction = v_sat, reputation = v_rep, price_factor = v_pf, layoff_heat = v_heat, layoff_checked_at = now(),
+         ai_workers_seen = pc.ai_workers, red_hours = v_red, quits_day = v_today, quits_today = v_quits,
+         mood_notified_at = l.mood_notified_at, dividend_streak = v_streak
+   where company_id = p_company;
+  insert into public.listed_company_hours (company_id, hour_start, satisfaction, sat_target, reputation, rep_target, demand_factor,
+                                           capacity_factor, upkeep_cents, upkeep, drivers)
+  values (p_company, p_hour_start, v_sat, (v_st ->> 'target')::double precision, v_rep, (v_rt ->> 'target')::double precision,
+          (v_eff ->> 'demand_factor')::double precision, (v_eff ->> 'capacity_factor')::double precision,
+          coalesce((select sum(v::bigint) from jsonb_each_text(l.last_upkeep) x(k, v)), 0), l.last_upkeep,
+          jsonb_build_object('satisfaction', v_st -> 'drivers', 'reputation', v_rt -> 'drivers', 'payout_ratio_bps', v_ratio,
+                             'ai_quit', v_quit))
+  on conflict (company_id, hour_start) do nothing;
+  delete from public.listed_company_hours h
+   where h.company_id = p_company
+     and h.hour_start < p_hour_start - make_interval(hours => greatest(24, public.cfg_num(cfg, '{historyHours}', 72)::integer) * 2);
+
+  -- missions: an hour in the green zone
+  if v_sat >= public.cfg_num(cfg, '{satisfaction,green}', 60) then
+    perform public.mission_event(pc.founder_id, 'satisfaction_green', 1, p_hour_start::text);
+  end if;
+
+  -- the tax advisor, the tax office, the board
+  perform public.listed_tax_office(p_company);
+  perform public.board_close_due(p_company);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- E. Patches of existing functions (replace on the current definition; clear errors when the shape changed)
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.player_company_close_hour(uuid, timestamptz)'::regprocedure);
+  v_old text[];
+  v_new text[];
+  i     integer;
+begin
+  if position('listed_hour_effect' in v_def) > 0 then
+    return;
+  end if;
+  v_old := array[
+    -- 1. variables
+    $t$  v_momentum double precision;$t$,
+    -- 2. terms of the hour, right after the campaign: awareness and quality of this hour
+    $t$  v_camp := public.company_campaign_at(p_company, v_start);$t$,
+    -- 3. demand
+    $t$            * coalesce(pc.task_momentum, 1.0);$t$,
+    -- 4. capacity
+    $t$         * (v_ev ->> 'capacity_factor')::double precision / v_hours;$t$,
+    -- 5. goods
+    $t$v_sold * (1 - public.cfg_num(v_su, array['grossMargin', c.sector_key], 0.5))$t$,
+    -- 6. fixed costs
+    $t$  v_mk := round((pc.marketing_cents_per_quarter / v_hours)::numeric)::bigint;$t$,
+    -- 7. running costs, part of the fixed costs and of the profit
+    $t$  v_profit := v_rev - v_cogs - v_ppaid - v_aipaid - v_fixed - v_mk;$t$,
+    -- 8. the board's payout cap
+    $t$  v_bps := least(10000, greatest(0, coalesce(pc.founder_payout_bps, 0)));$t$,
+    -- 9. earmarked money is not free cash (stakes and payout)
+    $t$select a.balance_cents - v_owed into v_free from public.ledger_accounts a where a.id = v_acc;$t$,
+    -- 10. after the hour
+    $t$  return jsonb_build_object('company_id', p_company, 'hour_start', v_start, 'quarter_id', v_qid, 'revenue_cents', v_rev,$t$];
+  v_new := array[
+    $t$  v_momentum double precision;
+  v_lx      jsonb;
+  v_lxc     bigint := 0;$t$,
+    $t$  v_camp := public.company_campaign_at(p_company, v_start);
+  -- listed companies (ADR-167): research, products, regions, benefits, mood and reputation as terms of the hour
+  v_lx := public.listed_hour_effect(p_company, v_start);
+  pc.awareness := least(1.0, pc.awareness + (v_lx ->> 'awareness_add')::double precision);
+  pc.quality := least(1.0, greatest(0.0, pc.quality + (v_lx ->> 'quality_add')::double precision));$t$,
+    $t$            * coalesce(pc.task_momentum, 1.0)
+            * (v_lx ->> 'demand_factor')::double precision;$t$,
+    $t$         * (v_ev ->> 'capacity_factor')::double precision
+         * (v_lx ->> 'capacity_factor')::double precision / v_hours;$t$,
+    $t$v_sold * (1 - public.cfg_num(v_su, array['grossMargin', c.sector_key], 0.5)) * (v_lx ->> 'cogs_factor')::double precision$t$,
+    $t$  v_fixed := round(v_fixed * (v_lx ->> 'fixed_factor')::double precision)::bigint;  -- ADR-167
+  v_mk := round((pc.marketing_cents_per_quarter / v_hours)::numeric)::bigint;$t$,
+    $t$  -- listed companies (ADR-167): running costs of products, regions, machines, benefits and the tax advisor
+  v_lxc := public.listed_hour_costs(p_company, v_start, k);
+  v_fixed := v_fixed + v_lxc;
+  v_paid := v_paid + v_lxc;
+  v_profit := v_rev - v_cogs - v_ppaid - v_aipaid - v_fixed - v_mk;$t$,
+    $t$  v_bps := least(10000, greatest(0, least(coalesce(pc.founder_payout_bps, 0), public.listed_payout_cap_bps(p_company, v_start))));$t$,
+    $t$select a.balance_cents - v_owed - public.listed_reserved_cents(p_company) into v_free from public.ledger_accounts a where a.id = v_acc;$t$,
+    $t$  perform public.listed_hour_after(p_company, v_start, v_demand, v_cap, v_rev, v_profit, v_factor, v_payout);  -- ADR-167
+  return jsonb_build_object('company_id', p_company, 'hour_start', v_start, 'quarter_id', v_qid, 'revenue_cents', v_rev,$t$];
+  for i in 1 .. array_length(v_old, 1) loop
+    if position(v_old[i] in v_def) = 0 then
+      raise exception 'player_company_close_hour() has an unexpected shape: anchor % of the listed company hooks (ADR-167) is missing: %',
+        i, v_old[i];
+    end if;
+    v_def := replace(v_def, v_old[i], v_new[i]);
+  end loop;
+  execute v_def;
+end;
+$do$;
+
+-- company_withdraw: earmarked money is not free, the board can forbid withdrawals
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.company_withdraw(uuid, bigint)'::regprocedure);
+  v_a   text := $t$  select a.balance_cents - pc.unpaid_cents into v_free$t$;
+  v_b   text := $t$  perform 1 from public.player_companies pc where pc.company_id = v_company for update;$t$;
+begin
+  if position('listed_withdraw_check' in v_def) > 0 then
+    return;
+  end if;
+  if position(v_a in v_def) = 0 or position(v_b in v_def) = 0 then
+    raise exception 'company_withdraw() has an unexpected shape; add the checks of the listed company (ADR-167) by hand';
+  end if;
+  v_def := replace(v_def, v_b, v_b || $t$
+  perform public.listed_withdraw_check(v_company, p_amount_cents);  -- ADR-167$t$);
+  v_def := replace(v_def, v_a, $t$  select a.balance_cents - pc.unpaid_cents - public.listed_reserved_cents(v_company) into v_free$t$);
+  execute v_def;
+end;
+$do$;
+
+-- A withdrawal of a listed company: forbidden while the board's ban holds; money earmarked by the board is not free
+create or replace function public.listed_withdraw_check(p_company uuid, p_amount_cents bigint)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_free bigint;
+begin
+  if not public.listed_is(p_company) then
+    return;
+  end if;
+  if exists (select 1 from public.listed_companies l where l.company_id = p_company and l.withdraw_block_until > now()) then
+    perform public.api_error('withdraw_blocked');
+  end if;
+  if public.listed_reserved_cents(p_company) > 0 then
+    select a.balance_cents - pc.unpaid_cents into v_free
+      from public.ledger_accounts a join public.player_companies pc on pc.company_id = a.owner_company_id
+     where a.owner_company_id = p_company and a.kind = 'company_cash';
+    if coalesce(v_free, 0) >= p_amount_cents and public.listed_free_cash(p_company) < p_amount_cents then
+      perform public.api_error('budget_reserved');
+    end if;
+  end if;
+end;
+$$;
+
+-- set_founder_payout: not above the board's cap
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.set_founder_payout(uuid, integer)'::regprocedure);
+  v_a   text := $t$  update public.player_companies set founder_payout_bps = p_bps where company_id = v_company;$t$;
+begin
+  if position('listed_payout_cap_bps' in v_def) > 0 then
+    return;
+  end if;
+  if position(v_a in v_def) = 0 then
+    raise exception 'set_founder_payout() has an unexpected shape; add the payout cap of the board (ADR-167) by hand';
+  end if;
+  execute replace(v_def, v_a, $t$  if p_bps > public.listed_payout_cap_bps(v_company, now()) then
+    perform public.api_error('payout_capped');  -- ADR-167
+  end if;
+$t$ || v_a);
+end;
+$do$;
+
+-- set_company_strategy: the board can fix the price level
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.set_company_strategy(uuid, text, boolean)'::regprocedure);
+  v_a   text := $t$  update public.player_companies set price_level = p_price_level, contract_work = p_contract_work where company_id = v_company;$t$;
+begin
+  if position('strategy_locked' in v_def) > 0 then
+    return;
+  end if;
+  if position(v_a in v_def) = 0 then
+    raise exception 'set_company_strategy() has an unexpected shape; add the price lock of the board (ADR-167) by hand';
+  end if;
+  execute replace(v_def, v_a, $t$  if exists (select 1 from public.listed_companies l
+              where l.company_id = v_company and l.price_lock is not null and l.price_lock_until > now()
+                and l.price_lock <> p_price_level and public.listed_is(v_company)) then
+    perform public.api_error('strategy_locked');  -- ADR-167
+  end if;
+$t$ || v_a);
+end;
+$do$;
+
+-- company_dissolve: open taxes are paid from the cash first, motions end, budgets go
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.company_dissolve(uuid, text)'::regprocedure);
+  v_a   text := $t$  k := 'dissolve:' || p_company::text;$t$;
+begin
+  if position('listed_before_dissolve' in v_def) > 0 then
+    return;
+  end if;
+  if position(v_a in v_def) = 0 then
+    raise exception 'company_dissolve() has an unexpected shape; add listed_before_dissolve (ADR-167) by hand';
+  end if;
+  execute replace(v_def, v_a, v_a || $t$
+  perform public.listed_before_dissolve(p_company);  -- ADR-167$t$);
+end;
+$do$;
+
+-- player_company_close_quarter: the fair value per share follows the reputation
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.player_company_close_quarter(uuid, bigint)'::regprocedure);
+  v_a   text := $t$       set fair_value_e4 = greatest(1, public.company_value_cents(p_company) * 100 / greatest(c.shares_outstanding, 1))$t$;
+begin
+  if position('listed_price_factor' in v_def) > 0 then
+    return;
+  end if;
+  if position(v_a in v_def) = 0 then
+    raise exception 'player_company_close_quarter() has an unexpected shape; add listed_price_factor (ADR-167) by hand';
+  end if;
+  execute replace(v_def, v_a, $t$       set fair_value_e4 = greatest(1, round(public.company_value_cents(p_company) * 100 / greatest(c.shares_outstanding, 1)
+                                                * public.listed_price_factor(p_company))::bigint)$t$);
+end;
+$do$;
+
+-- account_wipe: the player's votes and open motions go
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.account_wipe(uuid, text)'::regprocedure);
+  v_old text := $t$  perform public.deals_wipe_player(p_player, p_key);$t$;
+begin
+  if position('listed_wipe_player' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'account_wipe() has an unexpected shape; add listed_wipe_player (ADR-167) by hand';
+    end if;
+    execute replace(v_def, v_old, v_old || $t$
+
+  -- board of listed companies (ADR-167): the player's votes and open motions go
+  perform public.listed_wipe_player(p_player);$t$);
+  end if;
+end;
+$do$;
+
+create or replace function public.listed_wipe_player(p_player uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  delete from public.board_votes v where v.player_id = p_player;
+  update public.board_motions set status = 'cancelled', closed_at = now()
+   where proposer_id = p_player and status = 'open';
+end;
+$$;
+
+do $$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.listed_cfg()', 'public.listed_item(text)', 'public.listed_is(uuid)', 'public.listed_ensure(uuid)',
+    'public.listed_ref_revenue(uuid)', 'public.listed_item_cost(jsonb, integer, bigint, integer)',
+    'public.listed_item_upkeep(jsonb, integer, bigint, integer)', 'public.listed_kind_category(text)',
+    'public.listed_effects(uuid)', 'public.listed_greed_share(double precision)',
+    'public.listed_payout_ratio_bps(bigint, bigint, bigint)',
+    'public.listed_satisfaction_target(double precision, integer, integer, double precision, integer, boolean, double precision, integer, bigint)',
+    'public.listed_satisfaction_effect(double precision)',
+    'public.listed_reputation_target(double precision, bigint, bigint, bigint, bigint, bigint, integer, boolean)',
+    'public.listed_hour_effect_calc(jsonb, double precision, double precision)', 'public.listed_reserved_cents(uuid)',
+    'public.listed_free_cash(uuid)', 'public.listed_payout_cap_bps(uuid, timestamptz)', 'public.listed_price_factor(uuid)',
+    'public.listed_reputation_bump(uuid, double precision)', 'public.listed_hour_effect(uuid, timestamptz)',
+    'public.listed_advisor_wage(bigint)', 'public.listed_hour_costs(uuid, timestamptz, text)',
+    'public.listed_hour_after(uuid, timestamptz, double precision, double precision, bigint, bigint, integer, bigint)',
+    'public.listed_withdraw_check(uuid, bigint)', 'public.listed_wipe_player(uuid)'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+    execute format('grant execute on function %s to service_role', f);
+  end loop;
+end;
+$$;
+
+-- ===== supabase/updates/20261204005410_listed_actions.sql =====
+-- ===== idempotent copy of migrations/20261204005410_listed_actions.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 5410 · Listed player companies: investments, dividends, board, books and taxes (ADR-167)
+-- =============================================================================
+-- RPCs (all with request_id where they write, all founder-only unless noted):
+--   get_listed_company()                               -> {listed: LISTED | null}
+--   company_invest(request_id, key)                    -> {listed}   research, product, region, machine, ..., benefit, action
+--   company_invest_stop(request_id, key)               -> {listed}   retire a product, region, licence or benefit
+--   company_declare_dividend(request_id, total_cents)  -> {listed, dividend}
+--   company_books_close(request_id, answers, pay)      -> {listed, period}
+--   company_tax_pay(request_id)                        -> {listed, paid_cents}
+--   company_tax_advisor(request_id, hire)              -> {listed}
+--   get_company_accounting(days, before)               -> {cash_cents, days, totals, entries, next_before}
+--   get_company_board(company_id)                      -> {board}    every shareholder and the founder
+--   board_propose(request_id, company_id, kind, params)-> {board}    shareholders with more than board.minShareBps
+--   board_vote(request_id, motion_id, yes)             -> {board}    every shareholder
+-- Errors: not_listed, item_unknown, item_locked, item_running, budget_reserved, books_nothing, tax_nothing_due,
+-- dividend_limit, board_no_right, board_motion_unknown, board_limit, board_not_shareholder, insufficient_funds,
+-- invalid_argument, company_not_found.
+-- Idempotent: runs unchanged as supabase/updates/20261204005410_listed_actions.sql.
+
+-- ---------------------------------------------------------------------------
+-- A. Investments
+-- ---------------------------------------------------------------------------
+-- Projects whose time is up: the level in work becomes active
+create or replace function public.listed_finish_due(p_company uuid, p_at timestamptz)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  r         record;
+  v_founder uuid;
+  v_name    text;
+  v_n       integer := 0;
+begin
+  select pc.founder_id, c.name into v_founder, v_name
+    from public.player_companies pc join public.companies c on c.id = pc.company_id where pc.company_id = p_company;
+  for r in update public.company_investments ci
+              set level = ci.level + 1, status = 'active', ready_at = null
+            where ci.company_id = p_company and ci.ready_at is not null and ci.ready_at <= coalesce(p_at, now())
+              and ci.status in ('running', 'active', 'paused')
+        returning ci.key, ci.kind, ci.level loop
+    v_n := v_n + 1;
+    if r.kind = 'research' then
+      perform public.mission_event(v_founder, 'research_done', 1, r.key);
+      if public.cfg_num(public.listed_item(r.key), '{tier}', 0) >= 4 then
+        perform public.feed_post(v_founder, 'research_done', jsonb_build_object('company', v_name, 'item', r.key),
+                                 'research:' || p_company::text || ':' || r.key);
+      end if;
+    elsif r.kind = 'product' then
+      perform public.mission_event(v_founder, 'product_launched', 1, r.key);
+    elsif r.kind = 'region' then
+      perform public.mission_event(v_founder, 'region_opened', 1, r.key);
+    end if;
+    perform public.social_notify(v_founder, 'company_project', 'Fertig bei ' || v_name,
+      case r.kind when 'research' then 'Eine Forschung ist abgeschlossen.' when 'product' then 'Ein neues Produkt ist am Markt.'
+                  when 'region' then 'Ein neuer Markt ist eröffnet.' else 'Ein Ausbau ist fertig.' end,
+      jsonb_build_object('company_id', p_company, 'item', r.key, 'kind', r.kind, 'level', r.level), '/company',
+      'project:' || p_company::text || ':' || r.key || ':' || r.level::text);
+  end loop;
+  return v_n;
+end;
+$$;
+
+-- The caller's own listed company, or the error not_listed
+create or replace function public.listed_require()
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid := public.require_own_company();
+begin
+  if not public.listed_is(v_company) then
+    perform public.api_error('not_listed');
+  end if;
+  perform public.listed_ensure(v_company);
+  return v_company;
+end;
+$$;
+
+create or replace function public.company_invest(p_request_id uuid, p_key text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid;
+  v_player  uuid;
+  v_replay  jsonb;
+  v_item    jsonb;
+  ci        public.company_investments;
+  v_kind    text;
+  v_level   integer;
+  v_cost    bigint;
+  v_budget  bigint;
+  v_cash    bigint;
+  v_unpaid  bigint;
+  v_hours   double precision;
+  v_owned   boolean;
+begin
+  v_company := public.listed_require();
+  v_player := public.require_player();
+  if p_request_id is null or p_key is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'company_invest');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  perform 1 from public.listed_companies l where l.company_id = v_company for update;
+  perform public.listed_finish_due(v_company, now());
+  v_item := public.listed_item(p_key);
+  if v_item is null then
+    perform public.api_error('item_unknown');
+  end if;
+  v_kind := v_item ->> 'kind';
+  select * into ci from public.company_investments x where x.company_id = v_company and x.key = p_key for update;
+  v_owned := ci.key is not null and ci.status in ('active', 'paused') and ci.level > 0;
+  if exists (select 1 from jsonb_array_elements_text(coalesce(v_item -> 'requires', '[]'::jsonb)) q(k)
+              where not exists (select 1 from public.company_investments x
+                                 where x.company_id = v_company and x.key = q.k and x.status in ('active', 'paused') and x.level > 0)) then
+    perform public.api_error('item_locked');
+  end if;
+  if v_kind = 'action' then
+    if ci.last_used_at is not null
+       and ci.last_used_at + make_interval(secs => public.cfg_num(v_item, '{cooldownHours}', 0) * 3600) > now() then
+      perform public.api_error('item_running');
+    end if;
+    v_level := 0;
+  else
+    if ci.ready_at is not null or (v_owned and ci.level >= public.cfg_num(v_item, '{maxLevel}', 1)) then
+      perform public.api_error('item_running');
+    end if;
+    v_level := case when v_owned then ci.level else 0 end;
+  end if;
+
+  -- the price: from the budget of the item's purpose first, then from the free cash
+  v_cost := public.listed_item_cost(v_item, v_level, public.listed_ref_revenue(v_company), public.company_headcount(v_company));
+  select coalesce((select b.amount_cents from public.company_budgets b
+                    where b.company_id = v_company and b.purpose = v_item ->> 'purpose'), 0) into v_budget;
+  select a.balance_cents, pc.unpaid_cents into v_cash, v_unpaid
+    from public.ledger_accounts a join public.player_companies pc on pc.company_id = a.owner_company_id
+   where a.owner_company_id = v_company and a.kind = 'company_cash';
+  if v_cost > v_cash - v_unpaid - (public.listed_reserved_cents(v_company) - v_budget) then
+    perform public.api_error(case when v_cost <= v_cash - v_unpaid then 'budget_reserved' else 'insufficient_funds' end);
+  end if;
+  if v_cost > 0 then
+    perform public.ledger_transfer(public.company_cash_account(v_company), public.ledger_system_account('households'), v_cost,
+      'company_costs',
+      case v_kind when 'research' then 'Forschung' when 'product' then 'Produktentwicklung' when 'region' then 'Neuer Markt'
+                  when 'machine' then 'Maschinen und Anlagen' when 'acquisition' then 'Firmenkauf' when 'licence' then 'Lizenz'
+                  when 'benefit' then 'Benefit einrichten' else 'Aktion fürs Team' end || ': ' || p_key,
+      'company', v_company, 'invest:' || p_request_id::text, v_player,
+      jsonb_build_object('cat', public.listed_kind_category(v_kind), 'item', p_key, 'one_off', true));
+    update public.company_budgets set amount_cents = amount_cents - least(amount_cents, v_cost), updated_at = now()
+     where company_id = v_company and purpose = v_item ->> 'purpose';
+  end if;
+
+  v_hours := public.cfg_num(v_item, '{hours}', 0);
+  if v_kind = 'action' then
+    insert into public.company_investments (company_id, key, kind, status, level, last_used_at, spent_cents)
+    values (v_company, p_key, v_kind, 'active', 0, now(), v_cost)
+    on conflict (company_id, key) do update set last_used_at = now(), spent_cents = public.company_investments.spent_cents + v_cost;
+    update public.listed_companies
+       set satisfaction = least(100.0, satisfaction + public.cfg_num(v_item, '{boost}', 0))
+     where company_id = v_company;
+    perform public.mission_event(v_player, 'team_action', 1, p_key);
+  else
+    insert into public.company_investments (company_id, key, kind, status, level, ready_at, spent_cents)
+    values (v_company, p_key, v_kind, case when v_hours > 0 then 'running' else 'active' end, case when v_hours > 0 then 0 else 1 end,
+            case when v_hours > 0 then now() + make_interval(secs => v_hours * 3600) end, v_cost)
+    on conflict (company_id, key) do update
+      set status = case when v_hours > 0 and not v_owned then 'running' when v_hours > 0 then public.company_investments.status else 'active' end,
+          level = case when v_hours > 0 then v_level else v_level + 1 end,
+          ready_at = case when v_hours > 0 then now() + make_interval(secs => v_hours * 3600) end,
+          spent_cents = public.company_investments.spent_cents + v_cost;
+    if v_kind = 'research' then
+      perform public.mission_event(v_player, 'research_started', 1, p_key);
+    elsif v_kind = 'benefit' then
+      perform public.mission_event(v_player, 'benefit_added', 1, p_key);
+    end if;
+  end if;
+  perform public.mission_event(v_player, 'listed_invested', 1, p_key);
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('listed', public.listed_state(v_company)));
+end;
+$$;
+comment on function public.company_invest(uuid, text) is
+  'RPC (founder, listed company): buys or starts an item of game_config.listed.items (ADR-167); errors not_listed, '
+  'item_unknown, item_locked, item_running, budget_reserved, insufficient_funds.';
+
+create or replace function public.company_invest_stop(p_request_id uuid, p_key text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid;
+  v_player  uuid;
+  v_replay  jsonb;
+  v_item    jsonb;
+  ci        public.company_investments;
+begin
+  v_company := public.listed_require();
+  v_player := public.require_player();
+  if p_request_id is null or p_key is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'company_invest_stop');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_item := public.listed_item(p_key);
+  select * into ci from public.company_investments x where x.company_id = v_company and x.key = p_key for update;
+  if v_item is null or ci.key is null or ci.status = 'retired'
+     or v_item ->> 'kind' not in ('product', 'region', 'licence', 'benefit') then
+    perform public.api_error('item_unknown');
+  end if;
+  -- nothing that is still in use may depend on it
+  if exists (select 1 from public.company_investments x
+              where x.company_id = v_company and x.status <> 'retired' and x.key <> p_key
+                and coalesce(public.listed_item(x.key) -> 'requires', '[]'::jsonb) ? p_key) then
+    perform public.api_error('item_locked');
+  end if;
+  if v_item ->> 'kind' = 'benefit' and ci.status = 'active' then
+    -- a benefit taken away hurts at once
+    update public.listed_companies
+       set satisfaction = greatest(0.0, satisfaction - public.cfg_num(v_item, '{effects,satisfaction}', 0))
+     where company_id = v_company;
+  end if;
+  update public.company_investments set status = 'retired', level = 0, ready_at = null
+   where company_id = v_company and key = p_key;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('listed', public.listed_state(v_company)));
+end;
+$$;
+comment on function public.company_invest_stop(uuid, text) is
+  'RPC (founder, listed company): retires a product, region, licence or benefit, no money back (ADR-167); errors '
+  'not_listed, item_unknown, item_locked.';
+
+-- ---------------------------------------------------------------------------
+-- B. Shareholders and dividends
+-- ---------------------------------------------------------------------------
+create or replace function public.board_holdings(p_company uuid)
+returns table (player_id uuid, qty_e6 bigint)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select p.player_id, sum(p.quantity_e6)::bigint
+    from public.positions p join public.companies c on c.security_id = p.security_id
+   where c.id = p_company and p.status = 'open' and p.side = 'long' and p.quantity_e6 > 0
+   group by p.player_id;
+$$;
+
+-- All shares (e6): the shares outstanding, or what players hold when that is more (old positions, ADR-153)
+create or replace function public.board_total_e6(p_company uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select greatest(coalesce((select c.shares_outstanding from public.companies c where c.id = p_company), 0) * 1000000,
+                  coalesce((select sum(h.qty_e6) from public.board_holdings(p_company) h), 0), 1)::bigint;
+$$;
+
+create or replace function public.board_my_e6(p_company uuid, p_player uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select h.qty_e6 from public.board_holdings(p_company) h where h.player_id = p_player), 0)::bigint;
+$$;
+
+-- Pays a dividend from the company cash: every player holding gets its share (rounded down), the AI float the rest
+create or replace function public.listed_pay_dividend(p_company uuid, p_total bigint, p_source text, p_by uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  c         public.companies;
+  pc        public.player_companies;
+  l         public.listed_companies;
+  v_acc     uuid := public.company_cash_account(p_company);
+  v_total6  bigint := public.board_total_e6(p_company);
+  v_uid     text := gen_random_uuid()::text;
+  v_players bigint := 0;
+  v_n       integer := 0;
+  v_amt     bigint;
+  v_float   bigint;
+  v_id      bigint;
+  v_today   date := (now() at time zone 'Europe/Berlin')::date;
+  h         record;
+begin
+  select * into c from public.companies where id = p_company;
+  select * into pc from public.player_companies where company_id = p_company;
+  select * into l from public.listed_companies where company_id = p_company for update;
+  for h in select x.player_id, x.qty_e6 from public.board_holdings(p_company) x order by x.player_id loop
+    v_amt := floor(p_total::numeric * h.qty_e6 / v_total6)::bigint;
+    continue when v_amt <= 0;
+    perform public.lock_player_accounts(h.player_id);
+    perform public.ledger_transfer(v_acc, public.ledger_player_account(h.player_id, 'player_cash'), v_amt, 'dividend',
+                                   'Dividende ' || c.name, 'company', p_company, 'dividend:' || v_uid || ':' || h.player_id::text,
+                                   p_by, jsonb_build_object('cat', 'dividend'));
+    perform public.loan_withhold(h.player_id, v_amt, 'dividend:' || v_uid || ':' || h.player_id::text);
+    perform public.social_notify(h.player_id, 'company_dividend', 'Dividende von ' || c.name,
+      public.format_eur(v_amt) || ' für deine Aktien.', jsonb_build_object('company_id', p_company, 'amount_cents', v_amt),
+      '/portfolio', 'dividend:' || v_uid);
+    v_players := v_players + v_amt;
+    v_n := v_n + 1;
+  end loop;
+  v_float := p_total - v_players;
+  if v_float > 0 then
+    perform public.ledger_transfer(v_acc, public.ledger_system_account('market'), v_float, 'dividend',
+                                   'Dividende ' || c.name || ' (Streubesitz)', 'company', p_company, 'dividend:' || v_uid || ':float',
+                                   p_by, jsonb_build_object('cat', 'dividend'));
+  end if;
+  insert into public.company_dividends (company_id, source, total_cents, players_cents, float_cents, shares_e6, holders)
+  values (p_company, p_source, p_total, v_players, v_float, v_total6, v_n)
+  returning id into v_id;
+  if p_total > l.best_dividend_cents then
+    perform public.feed_post(pc.founder_id, 'record_dividend', jsonb_build_object('company', c.name, 'amount_cents', p_total),
+                             'record_dividend:' || v_id::text);
+  end if;
+  update public.listed_companies
+     set dividend_streak = case when dividend_day = v_today then dividend_streak
+                                when dividend_day = v_today - 1 then dividend_streak + 1 else 1 end,
+         dividend_day = v_today, best_dividend_cents = greatest(best_dividend_cents, p_total)
+   where company_id = p_company;
+  perform public.company_system_message(p_company, 'Dividende: ' || public.format_eur(p_total) || ' an die Aktionäre ausgeschüttet.');
+  return jsonb_build_object('id', v_id, 'total_cents', p_total, 'players_cents', v_players, 'float_cents', v_float, 'holders', v_n);
+end;
+$$;
+
+create or replace function public.company_declare_dividend(p_request_id uuid, p_total_cents bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg       jsonb := public.listed_cfg();
+  v_company uuid;
+  v_player  uuid;
+  v_replay  jsonb;
+  v_free    bigint;
+  v_div     jsonb;
+begin
+  v_company := public.listed_require();
+  v_player := public.require_player();
+  if p_request_id is null or p_total_cents is null or p_total_cents < public.cfg_num(cfg, '{dividends,minTotalCents}', 10000) then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'company_declare_dividend');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  perform 1 from public.player_companies pc where pc.company_id = v_company for update;
+  if (select count(*) from public.company_dividends d
+       where d.company_id = v_company and d.source = 'founder'
+         and (d.paid_at at time zone 'Europe/Berlin')::date = (now() at time zone 'Europe/Berlin')::date)
+     >= public.cfg_num(cfg, '{dividends,perDay}', 1) then
+    perform public.api_error('dividend_limit');
+  end if;
+  v_free := greatest(0, public.listed_free_cash(v_company));
+  if p_total_cents > v_free then
+    perform public.api_error('insufficient_funds');
+  end if;
+  if p_total_cents > v_free * public.cfg_num(cfg, '{dividends,maxShareOfFreeCashBps}', 5000)::bigint / 10000 then
+    perform public.api_error('dividend_limit');
+  end if;
+  v_div := public.listed_pay_dividend(v_company, p_total_cents, 'founder', v_player);
+  perform public.mission_event(v_player, 'dividend_paid', 1, v_div ->> 'id');
+  perform public.mission_event(v_player, 'dividend_cents', p_total_cents, v_div ->> 'id');
+  return public.request_complete(v_player, p_request_id,
+    jsonb_build_object('listed', public.listed_state(v_company), 'dividend', v_div));
+end;
+$$;
+comment on function public.company_declare_dividend(uuid, bigint) is
+  'RPC (founder, listed company): pays a dividend of p_total_cents from the free cash to all shareholders, at most '
+  'dividends.perDay per Berlin day and maxShareOfFreeCashBps of the free cash (ADR-167); errors not_listed, '
+  'invalid_argument, dividend_limit, insufficient_funds.';
+
+-- ---------------------------------------------------------------------------
+-- C. Books and taxes
+-- ---------------------------------------------------------------------------
+-- The category of a booking on the company cash account
+create or replace function public.listed_ledger_category(p_kind text, p_key text, p_meta jsonb)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case
+    when coalesce(p_meta, '{}'::jsonb) ? 'cat' then p_meta ->> 'cat'
+    when p_kind = 'company_revenue' then 'revenue'
+    when p_kind in ('salary', 'payroll', 'work_bonus') then 'wages'
+    when p_kind = 'company_costs' and coalesce(p_key, '') like '%:goods' then 'goods'
+    when p_kind = 'company_costs' and (coalesce(p_key, '') like '%:costs' or coalesce(p_key, '') like '%:settle') then 'fixed'
+    when p_kind = 'company_costs' then 'costs'
+    when p_kind in ('tax', 'tax_refund') then 'tax'
+    when p_kind = 'fine' then 'penalty'
+    when p_kind = 'dividend' then 'dividend'
+    when p_kind = 'transfer' and (coalesce(p_key, '') like 'withdraw:%' or coalesce(p_key, '') like '%:payout') then 'payout'
+    when p_kind = 'transfer' and coalesce(p_key, '') like 'offer-%' then 'capital'
+    when p_kind in ('capital_injection', 'company_founding', 'company_conversion', 'ipo_proceeds', 'capital_increase',
+                    'angel_investment', 'ipo_subscription', 'ipo_refund') then 'capital'
+    when p_kind in ('transfer', 'loan_disbursement', 'loan_repayment', 'loan_interest', 'insolvency_distribution',
+                    'reversal', 'admin_adjustment') then 'transfer'
+    else 'costs' end;
+$$;
+
+create or replace function public.listed_is_operating(p_category text)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select p_category in ('revenue', 'goods', 'wages', 'fixed', 'research', 'product', 'expansion', 'benefit', 'advisor', 'costs');
+$$;
+
+-- Revenue, operating costs and the net amount per category of the bookings in (p_from, p_to]
+create or replace function public.listed_period_sums(p_company uuid, p_from timestamptz, p_to timestamptz)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with e as (
+    select public.listed_ledger_category(t.kind::text, t.idempotency_key, t.metadata) as cat, e.amount_cents
+      from public.ledger_entries e join public.ledger_transactions t on t.id = e.transaction_id
+     where e.account_id = public.company_cash_account(p_company) and e.created_at > p_from and e.created_at <= p_to
+  )
+  select jsonb_build_object(
+    'revenue_cents', coalesce((select sum(amount_cents) from e where cat = 'revenue'), 0)::bigint,
+    'costs_cents', coalesce((select -sum(amount_cents) from e where public.listed_is_operating(cat) and cat <> 'revenue'), 0)::bigint,
+    'by_category', coalesce((select jsonb_object_agg(x.cat, x.s) from (select cat, sum(amount_cents)::bigint as s from e group by cat) x),
+                            '{}'::jsonb));
+$$;
+
+-- The receipts of the open period: picked from the templates by the company and the period, with their category
+create or replace function public.listed_books_receipts(p_company uuid, p_from timestamptz)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object('id', q.pos, 'key', q.x ->> 'key', 'category', q.x ->> 'category',
+                                               'amount_cents', 1000 + (hashtext(p_company::text || p_from::text || (q.x ->> 'key'))::bigint & 2147483647) % 49000)
+                            order by q.pos), '[]'::jsonb)
+    from (select t.x, row_number() over (order by md5(p_company::text || p_from::text || t.ord::text)) as pos
+            from jsonb_array_elements(coalesce(public.listed_cfg() #> '{taxes,receipts}', '[]'::jsonb)) with ordinality t(x, ord)) q
+   where q.pos <= greatest(0, public.cfg_num(public.listed_cfg(), '{taxes,check,receipts}', 3)::integer);
+$$;
+
+create or replace function public.listed_tax_rate_bps(p_company uuid)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select greatest(public.cfg_num(public.listed_cfg(), '{taxes,minRateBps}', 800),
+                  public.cfg_num(public.listed_cfg(), '{taxes,rateBps}', 1500)
+                  + public.cfg_num(public.listed_effects(p_company), '{taxRateBps}', 0))::integer;
+$$;
+
+-- The open bookkeeping period as the founder sees it
+create or replace function public.listed_books_preview(p_company uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.listed_cfg();
+  l       public.listed_companies;
+  s       jsonb;
+  v_rev   bigint;
+  v_costs bigint;
+  v_hours double precision;
+  v_today date := (now() at time zone 'Europe/Berlin')::date;
+  v_done  boolean;
+  v_rate  integer := public.listed_tax_rate_bps(p_company);
+begin
+  select * into l from public.listed_companies where company_id = p_company;
+  s := public.listed_period_sums(p_company, l.books_until, now());
+  v_rev := (s ->> 'revenue_cents')::bigint;
+  v_costs := (s ->> 'costs_cents')::bigint;
+  v_hours := extract(epoch from (now() - l.books_until)) / 3600.0;
+  v_done := l.books_day is not null and l.books_day >= v_today;
+  return jsonb_build_object(
+    'period_start', l.books_until,
+    'revenue_cents', v_rev,
+    'costs_cents', v_costs,
+    'profit_cents', v_rev - v_costs,
+    'by_category', s -> 'by_category',
+    'loss_carry_cents', l.loss_carry_cents,
+    'rate_bps', v_rate,
+    'estimated_tax_cents', greatest(0, (greatest(0, v_rev - v_costs - l.loss_carry_cents) * v_rate) / 10000),
+    'receipts', (select coalesce(jsonb_agg(r - 'category' order by (r ->> 'id')::integer), '[]'::jsonb)
+                   from jsonb_array_elements(public.listed_books_receipts(p_company, l.books_until)) r),
+    'receipt_categories', coalesce(cfg #> '{taxes,receiptCategories}', '[]'::jsonb),
+    'can_close', v_rev > 0 and not v_done,
+    'done_today', v_done,
+    'hours_open', round(v_hours::numeric, 2),
+    'stage', case when v_rev <= 0 then 'none'
+                  when v_hours >= public.cfg_num(cfg, '{taxes,estimateAfterHours}', 60) then 'estimate'
+                  when v_hours >= public.cfg_num(cfg, '{taxes,lateFeeAfterHours}', 42) then 'late'
+                  when v_hours >= public.cfg_num(cfg, '{taxes,reminderAfterHours}', 30) then 'reminder'
+                  else 'open' end,
+    'reminder_at', l.books_until + make_interval(secs => public.cfg_num(cfg, '{taxes,reminderAfterHours}', 30) * 3600),
+    'late_fee_at', l.books_until + make_interval(secs => public.cfg_num(cfg, '{taxes,lateFeeAfterHours}', 42) * 3600),
+    'estimate_at', l.books_until + make_interval(secs => public.cfg_num(cfg, '{taxes,estimateAfterHours}', 60) * 3600),
+    'streak', l.books_streak,
+    'last_day', l.books_day);
+end;
+$$;
+
+-- Closes the open period: by the founder (p_correct receipts right), the advisor or the tax office (estimate)
+create or replace function public.listed_books_do(p_company uuid, p_by text, p_correct integer)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.listed_cfg();
+  l        public.listed_companies;
+  s        jsonb;
+  v_rev    bigint;
+  v_costs  bigint;
+  v_profit bigint;
+  v_rate   integer := public.listed_tax_rate_bps(p_company);
+  v_carry  bigint;
+  v_used   bigint := 0;
+  v_tax_on bigint := 0;
+  v_gross  bigint := 0;
+  v_disc   bigint := 0;
+  v_tax    bigint := 0;
+  v_pen    bigint := 0;
+  v_bps    integer;
+  v_today  date := (now() at time zone 'Europe/Berlin')::date;
+  v_streak integer;
+  v_id     bigint;
+  v_owner  uuid;
+begin
+  select * into l from public.listed_companies where company_id = p_company for update;
+  if l.company_id is null then
+    return null;
+  end if;
+  s := public.listed_period_sums(p_company, l.books_until, now());
+  v_rev := (s ->> 'revenue_cents')::bigint;
+  v_costs := (s ->> 'costs_cents')::bigint;
+  v_profit := v_rev - v_costs;
+  v_carry := l.loss_carry_cents;
+  if p_by = 'finanzamt' then
+    -- estimateTax: at least a margin on the revenue, no loss carried, a surcharge on the tax
+    v_tax_on := greatest(v_profit, (v_rev * public.cfg_num(cfg, '{taxes,estimate,marginBps}', 2500)::bigint) / 10000, 0);
+    v_tax := (v_tax_on * v_rate) / 10000;
+    v_pen := (v_tax * public.cfg_num(cfg, '{taxes,estimate,surchargeBps}', 2500)::bigint) / 10000;
+  elsif v_profit <= 0 then
+    v_carry := v_carry - v_profit;
+  else
+    -- booksTax: the carried loss first, the tax rounded down, the discount off the tax
+    v_used := least(v_carry, v_profit);
+    v_tax_on := v_profit - v_used;
+    v_carry := v_carry - v_used;
+    v_gross := (v_tax_on * v_rate) / 10000;
+    v_bps := case when p_by = 'advisor' then public.cfg_num(cfg, '{taxes,advisor,discountBps}', 800)::integer
+                  when coalesce(p_correct, 0) >= public.cfg_num(cfg, '{taxes,check,receipts}', 3)
+                  then public.cfg_num(cfg, '{taxes,check,discountBps}', 500)::integer else 0 end;
+    v_disc := (v_gross * v_bps) / 10000;
+    v_tax := v_gross - v_disc;
+  end if;
+  insert into public.company_tax_periods (company_id, kind, period_start, period_end, revenue_cents, costs_cents, profit_cents,
+                                          loss_used_cents, taxable_cents, rate_bps, discount_cents, tax_cents, penalty_cents, status,
+                                          closed_by, check_correct, due_at, paid_at)
+  values (p_company, 'books', l.books_until, now(), v_rev, v_costs, v_profit, v_used, v_tax_on, v_rate, v_disc, v_tax, v_pen,
+          case when v_tax + v_pen = 0 then 'paid' else 'due' end, p_by, p_correct,
+          now() + make_interval(secs => public.cfg_num(cfg, '{taxes,payWithinHours}', 24) * 3600),
+          case when v_tax + v_pen = 0 then now() end)
+  returning id into v_id;
+  v_streak := case when p_by = 'finanzamt' then 0
+                   when l.books_day = v_today then greatest(1, l.books_streak)
+                   when l.books_day = v_today - 1 then l.books_streak + 1 else 1 end;
+  update public.listed_companies
+     set books_until = now(), books_day = v_today, books_stage = 0, loss_carry_cents = v_carry, books_streak = v_streak
+   where company_id = p_company;
+  if p_by <> 'finanzamt' then
+    select pc.founder_id into v_owner from public.player_companies pc where pc.company_id = p_company;
+    perform public.mission_event(v_owner, 'books_done', 1, v_id::text);
+    perform public.mission_event(v_owner, 'books_streak', v_streak, v_id::text);
+  end if;
+  return v_id;
+end;
+$$;
+
+-- Pays due taxes and penalties from the company cash to the treasury, oldest first. Voluntary: whole periods only,
+-- up to p_limit. Forced (tax office): whatever the cash holds.
+create or replace function public.listed_tax_collect(p_company uuid, p_limit bigint, p_force boolean)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_acc   uuid := public.company_cash_account(p_company);
+  v_tre   uuid := public.ledger_system_account('treasury');
+  v_owner uuid;
+  v_avail bigint;
+  v_rest  bigint;
+  v_pay   bigint;
+  v_taxp  bigint;
+  v_done  bigint := 0;
+  p       record;
+begin
+  select pc.founder_id into v_owner from public.player_companies pc where pc.company_id = p_company;
+  select greatest(0, a.balance_cents) into v_avail from public.ledger_accounts a where a.id = v_acc;
+  v_avail := least(coalesce(v_avail, 0), coalesce(p_limit, v_avail));
+  for p in select * from public.company_tax_periods x where x.company_id = p_company and x.status = 'due'
+            order by x.id for update loop
+    v_rest := p.tax_cents + p.penalty_cents - p.paid_cents;
+    v_pay := least(v_rest, v_avail);
+    exit when v_pay <= 0 or (not p_force and v_pay < v_rest);
+    v_taxp := least(v_pay, greatest(0, p.tax_cents - p.paid_cents));
+    if v_taxp > 0 then
+      perform public.ledger_transfer(v_acc, v_tre, v_taxp, 'tax', 'Körperschaftsteuer', 'company', p_company,
+                                     'ctax:' || p.id::text || ':' || p.paid_cents::text, v_owner, jsonb_build_object('cat', 'tax'));
+    end if;
+    if v_pay - v_taxp > 0 then
+      perform public.ledger_transfer(v_acc, v_tre, v_pay - v_taxp, 'fine', 'Zuschläge des Finanzamts', 'company', p_company,
+                                     'cfine:' || p.id::text || ':' || p.paid_cents::text, v_owner, jsonb_build_object('cat', 'penalty'));
+    end if;
+    update public.company_tax_periods
+       set paid_cents = paid_cents + v_pay,
+           status = case when v_pay = v_rest then 'paid' else 'due' end,
+           paid_at = case when v_pay = v_rest then now() else paid_at end
+     where id = p.id;
+    if v_pay = v_rest and p.kind = 'books' and p.closed_by <> 'finanzamt' and p.tax_cents > 0 and p.stage = 0 and now() <= p.due_at then
+      perform public.mission_event(v_owner, 'tax_paid', 1, p.id::text);
+    end if;
+    v_avail := v_avail - v_pay;
+    v_done := v_done + v_pay;
+  end loop;
+  return v_done;
+end;
+$$;
+
+create or replace function public.listed_tax_due_cents(p_company uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select sum(x.tax_cents + x.penalty_cents - x.paid_cents) from public.company_tax_periods x
+                    where x.company_id = p_company and x.status = 'due'), 0)::bigint;
+$$;
+
+create or replace function public.company_books_close(p_request_id uuid, p_answers text[] default null, p_pay boolean default false)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid;
+  v_player  uuid;
+  v_replay  jsonb;
+  l         public.listed_companies;
+  v_correct integer;
+  v_id      bigint;
+  v_paid    bigint := 0;
+begin
+  v_company := public.listed_require();
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'company_books_close');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into l from public.listed_companies where company_id = v_company for update;
+  if not (public.listed_books_preview(v_company) ->> 'can_close')::boolean then
+    perform public.api_error('books_nothing');
+  end if;
+  -- gradeReceipts: how many receipts are in the right category
+  select count(*) into v_correct
+    from jsonb_array_elements(public.listed_books_receipts(v_company, l.books_until)) r
+   where (coalesce(p_answers, '{}'::text[]))[(r ->> 'id')::integer] = r ->> 'category';
+  v_id := public.listed_books_do(v_company, 'founder', v_correct);
+  if coalesce(p_pay, false) and public.listed_tax_due_cents(v_company) > 0 then
+    v_paid := public.listed_tax_collect(v_company, null, false);
+  end if;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'listed', public.listed_state(v_company), 'paid_cents', v_paid,
+    'period', (select public.listed_tax_period_json(x) from public.company_tax_periods x where x.id = v_id)));
+end;
+$$;
+comment on function public.company_books_close(uuid, text[], boolean) is
+  'RPC (founder, listed company): closes the books of the open period, once per Berlin day with revenue (ADR-167). '
+  'p_answers: the category of every receipt in order (all right: tax discount); p_pay pays what is due at once when '
+  'the cash allows. Errors not_listed, books_nothing.';
+
+create or replace function public.listed_tax_period_json(p public.company_tax_periods)
+returns jsonb
+language sql
+immutable
+set search_path = ''
+as $$
+  select jsonb_build_object('id', p.id, 'kind', p.kind, 'period_start', p.period_start, 'period_end', p.period_end,
+                            'revenue_cents', p.revenue_cents, 'costs_cents', p.costs_cents, 'profit_cents', p.profit_cents,
+                            'loss_used_cents', p.loss_used_cents, 'taxable_cents', p.taxable_cents, 'rate_bps', p.rate_bps,
+                            'discount_cents', p.discount_cents, 'tax_cents', p.tax_cents, 'penalty_cents', p.penalty_cents,
+                            'paid_cents', p.paid_cents, 'status', p.status, 'closed_by', p.closed_by,
+                            'check_correct', p.check_correct, 'stage', p.stage, 'due_at', p.due_at, 'paid_at', p.paid_at);
+$$;
+
+create or replace function public.company_tax_pay(p_request_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid;
+  v_player  uuid;
+  v_replay  jsonb;
+  v_due     bigint;
+  v_paid    bigint;
+begin
+  v_company := public.listed_require();
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'company_tax_pay');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  perform 1 from public.player_companies pc where pc.company_id = v_company for update;
+  v_due := public.listed_tax_due_cents(v_company);
+  if v_due <= 0 then
+    perform public.api_error('tax_nothing_due');
+  end if;
+  if coalesce((select a.balance_cents from public.ledger_accounts a where a.id = public.company_cash_account(v_company)), 0) < v_due then
+    perform public.api_error('insufficient_funds');
+  end if;
+  v_paid := public.listed_tax_collect(v_company, null, false);
+  return public.request_complete(v_player, p_request_id,
+    jsonb_build_object('listed', public.listed_state(v_company), 'paid_cents', v_paid));
+end;
+$$;
+comment on function public.company_tax_pay(uuid) is
+  'RPC (founder, listed company): pays all due taxes and penalties from the company cash to the treasury (ADR-167); '
+  'errors not_listed, tax_nothing_due, insufficient_funds.';
+
+create or replace function public.company_tax_advisor(p_request_id uuid, p_hire boolean)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid;
+  v_player  uuid;
+  v_replay  jsonb;
+begin
+  v_company := public.listed_require();
+  v_player := public.require_player();
+  if p_request_id is null or p_hire is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'company_tax_advisor');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  update public.listed_companies set advisor = p_hire where company_id = v_company;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('listed', public.listed_state(v_company)));
+end;
+$$;
+comment on function public.company_tax_advisor(uuid, boolean) is
+  'RPC (founder, listed company): hires or dismisses the tax advisor, who is paid by the hour, closes the books every '
+  'day and pays the tax (ADR-167); error not_listed.';
+
+-- The tax office sends an audit: a company event of the crisis system (no second event while one is running)
+create or replace function public.listed_audit(p_company uuid, p_severity integer)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_owner uuid;
+  v_name  text;
+begin
+  select pc.founder_id, c.name into v_owner, v_name
+    from public.player_companies pc join public.companies c on c.id = pc.company_id where pc.company_id = p_company;
+  perform public.company_event_start(p_company, coalesce(public.listed_cfg() #>> '{taxes,auditArchetype}', 'tax_audit'),
+                                     least(3, greatest(1, p_severity)));
+  perform public.feed_post(v_owner, 'tax_audit', jsonb_build_object('company', v_name),
+                           'tax_audit:' || p_company::text || ':' || (now() at time zone 'Europe/Berlin')::date::text);
+end;
+$$;
+
+-- Every hour: the advisor closes the books of a new day and pays; otherwise the tax office reminds, charges a late
+-- fee and finally estimates. Unpaid taxes get a surcharge and are collected by force.
+create or replace function public.listed_tax_office(p_company uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.listed_cfg();
+  l       public.listed_companies;
+  v_owner uuid;
+  v_name  text;
+  v_rev   bigint;
+  v_hours double precision;
+  v_today date := (now() at time zone 'Europe/Berlin')::date;
+  v_fee   bigint;
+  v_add   bigint;
+  v_force boolean := false;
+  p       record;
+begin
+  select * into l from public.listed_companies where company_id = p_company for update;
+  if l.company_id is null then
+    return;
+  end if;
+  select pc.founder_id, c.name into v_owner, v_name
+    from public.player_companies pc join public.companies c on c.id = pc.company_id where pc.company_id = p_company;
+  v_rev := (public.listed_period_sums(p_company, l.books_until, now()) ->> 'revenue_cents')::bigint;
+  v_hours := extract(epoch from (now() - l.books_until)) / 3600.0;
+  if l.advisor then
+    if v_rev > 0 and (l.books_day is null or l.books_day < v_today) then
+      perform public.listed_books_do(p_company, 'advisor', 0);
+    end if;
+    perform public.listed_tax_collect(p_company, greatest(0, public.listed_free_cash(p_company)), false);
+  elsif v_rev > 0 then
+    if v_hours >= public.cfg_num(cfg, '{taxes,estimateAfterHours}', 60) then
+      perform public.listed_books_do(p_company, 'finanzamt', 0);
+      perform public.listed_reputation_bump(p_company, -public.cfg_num(cfg, '{reputation,penalty,estimate}', 6));
+      perform public.social_notify(v_owner, 'tax_office', 'Finanzamt: Steuer geschätzt',
+        'Du hast die Bücher von ' || v_name || ' nicht gemacht. Das Finanzamt hat geschätzt und schlägt einen Zuschlag auf.',
+        jsonb_build_object('company_id', p_company), '/company', 'tax-est:' || p_company::text || ':' || l.books_until::text);
+      perform public.feed_post(v_owner, 'tax_penalty', jsonb_build_object('company', v_name, 'reason', 'estimate'),
+                               'tax_penalty:est:' || p_company::text || ':' || l.books_until::text);
+      perform public.listed_audit(p_company, 1);
+    elsif v_hours >= public.cfg_num(cfg, '{taxes,lateFeeAfterHours}', 42) and l.books_stage < 2 then
+      v_fee := greatest(public.cfg_num(cfg, '{taxes,lateFee,minCents}', 5000)::bigint,
+                        (v_rev * public.cfg_num(cfg, '{taxes,lateFee,revenueBps}', 50)::bigint) / 10000);
+      insert into public.company_tax_periods (company_id, kind, period_start, period_end, penalty_cents, closed_by, due_at)
+      values (p_company, 'late_fee', l.books_until, now(), v_fee, 'finanzamt',
+              now() + make_interval(secs => public.cfg_num(cfg, '{taxes,payWithinHours}', 24) * 3600));
+      update public.listed_companies set books_stage = 2 where company_id = p_company;
+      perform public.listed_reputation_bump(p_company, -public.cfg_num(cfg, '{reputation,penalty,lateFee}', 3));
+      perform public.social_notify(v_owner, 'tax_office', 'Finanzamt: Verspätungszuschlag',
+        'Die Bücher von ' || v_name || ' sind überfällig: ' || public.format_eur(v_fee) || ' Zuschlag. Mach sie jetzt, sonst schätzt das Finanzamt.',
+        jsonb_build_object('company_id', p_company, 'amount_cents', v_fee), '/company',
+        'tax-fee:' || p_company::text || ':' || l.books_until::text);
+      perform public.feed_post(v_owner, 'tax_penalty', jsonb_build_object('company', v_name, 'reason', 'late_fee', 'amount_cents', v_fee),
+                               'tax_penalty:fee:' || p_company::text || ':' || l.books_until::text);
+    elsif v_hours >= public.cfg_num(cfg, '{taxes,reminderAfterHours}', 30) and l.books_stage < 1 then
+      update public.listed_companies set books_stage = 1 where company_id = p_company;
+      perform public.social_notify(v_owner, 'tax_office', 'Finanzamt: Bücher fällig',
+        'Mach die Bücher von ' || v_name || '. Sonst kommt ein Verspätungszuschlag.',
+        jsonb_build_object('company_id', p_company), '/company', 'tax-rem:' || p_company::text || ':' || l.books_until::text);
+    end if;
+  end if;
+
+  -- unpaid taxes: a surcharge after the deadline, then collection by force
+  for p in select * from public.company_tax_periods x where x.company_id = p_company and x.status = 'due'
+            order by x.id for update loop
+    if p.stage = 0 and now() > p.due_at then
+      v_add := (greatest(0, p.tax_cents - p.paid_cents) * public.cfg_num(cfg, '{taxes,latePaymentBps}', 500)::bigint) / 10000;
+      update public.company_tax_periods set stage = 1, penalty_cents = penalty_cents + v_add where id = p.id;
+      perform public.social_notify(v_owner, 'tax_office', 'Finanzamt: Steuer überfällig',
+        'Die Steuer von ' || v_name || ' ist nicht bezahlt. Säumniszuschlag: ' || public.format_eur(v_add) || '.',
+        jsonb_build_object('company_id', p_company, 'amount_cents', v_add), '/company', 'tax-late:' || p.id::text);
+    elsif p.stage = 1
+          and now() > p.due_at + make_interval(secs => public.cfg_num(cfg, '{taxes,enforceAfterHours}', 48) * 3600) then
+      v_add := (greatest(0, p.tax_cents - p.paid_cents) * public.cfg_num(cfg, '{taxes,enforcementBps}', 1000)::bigint) / 10000;
+      update public.company_tax_periods set stage = 2, penalty_cents = penalty_cents + v_add where id = p.id;
+      perform public.listed_reputation_bump(p_company, -public.cfg_num(cfg, '{reputation,penalty,enforcement}', 8));
+      perform public.social_notify(v_owner, 'tax_office', 'Finanzamt: Vollstreckung',
+        'Das Finanzamt holt sich die Steuer von ' || v_name || ' jetzt direkt aus der Kasse.',
+        jsonb_build_object('company_id', p_company), '/company', 'tax-force:' || p.id::text);
+      perform public.feed_post(v_owner, 'tax_penalty', jsonb_build_object('company', v_name, 'reason', 'enforcement'),
+                               'tax_penalty:force:' || p.id::text);
+      perform public.listed_audit(p_company, 2);
+      v_force := true;
+    elsif p.stage >= 2 then
+      v_force := true;
+    end if;
+  end loop;
+  if v_force then
+    perform public.listed_tax_collect(p_company, null, true);
+  end if;
+end;
+$$;
+
+-- The books: bookings of the company cash account by category, per day and one by one
+create or replace function public.get_company_accounting(p_days integer default 7, p_before bigint default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid := public.listed_require();
+  v_acc     uuid := public.company_cash_account(v_company);
+  v_days    integer := least(30, greatest(1, coalesce(p_days, 7)));
+  v_page    integer := greatest(1, public.cfg_num(public.listed_cfg(), '{accountingPageSize}', 50)::integer);
+  v_from    timestamptz;
+  v_entries jsonb;
+begin
+  v_from := (((now() at time zone 'Europe/Berlin')::date - (v_days - 1))::timestamp) at time zone 'Europe/Berlin';
+  select coalesce(jsonb_agg(x.j order by x.id desc), '[]'::jsonb) into v_entries
+    from (select e.id, jsonb_build_object('id', e.id, 'at', e.created_at, 'amount_cents', e.amount_cents,
+                   'balance_after_cents', e.balance_after_cents, 'description', t.description, 'kind', t.kind,
+                   'category', public.listed_ledger_category(t.kind::text, t.idempotency_key, t.metadata),
+                   'item', t.metadata ->> 'item') as j
+            from public.ledger_entries e join public.ledger_transactions t on t.id = e.transaction_id
+           where e.account_id = v_acc and (p_before is null or e.id < p_before)
+           order by e.id desc limit v_page) x;
+  return jsonb_build_object(
+    'cash_cents', (select a.balance_cents from public.ledger_accounts a where a.id = v_acc),
+    'from', v_from,
+    'days', coalesce((
+      select jsonb_agg(jsonb_build_object('day', d.day, 'in_cents', d.inc, 'out_cents', d.outc, 'operating_cents', d.op,
+                                          'by_category', d.cats) order by d.day desc)
+        from (select q.day, coalesce(sum(q.s) filter (where q.s > 0), 0)::bigint as inc, coalesce(-sum(q.s) filter (where q.s < 0), 0)::bigint as outc,
+                     coalesce(sum(q.s) filter (where public.listed_is_operating(q.cat)), 0)::bigint as op,
+                     jsonb_object_agg(q.cat, q.s) as cats
+                from (select (e.created_at at time zone 'Europe/Berlin')::date as day,
+                             public.listed_ledger_category(t.kind::text, t.idempotency_key, t.metadata) as cat,
+                             sum(e.amount_cents)::bigint as s
+                        from public.ledger_entries e join public.ledger_transactions t on t.id = e.transaction_id
+                       where e.account_id = v_acc and e.created_at >= v_from
+                       group by 1, 2) q
+               group by q.day) d), '[]'::jsonb),
+    'totals', coalesce((
+      select jsonb_object_agg(q.cat, q.s)
+        from (select public.listed_ledger_category(t.kind::text, t.idempotency_key, t.metadata) as cat, sum(e.amount_cents)::bigint as s
+                from public.ledger_entries e join public.ledger_transactions t on t.id = e.transaction_id
+               where e.account_id = v_acc and e.created_at >= v_from
+               group by 1) q), '{}'::jsonb),
+    'entries', v_entries,
+    'next_before', case when jsonb_array_length(v_entries) >= v_page then (v_entries -> -1 ->> 'id')::bigint end);
+end;
+$$;
+comment on function public.get_company_accounting(integer, bigint) is
+  'RPC (founder, listed company): the books (ADR-167). Real bookings of the company cash account by category: sums '
+  'per Berlin day for the last p_days (1 to 30), and the single bookings, newest first, paged by p_before. Error not_listed.';
+
+-- ---------------------------------------------------------------------------
+-- D. The board
+-- ---------------------------------------------------------------------------
+-- What a passed motion does
+create or replace function public.board_execute(p_motion bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  m        public.board_motions;
+  v_amt    bigint;
+  v_until  timestamptz;
+  v_paid   bigint := 0;
+  v_cash   bigint;
+  v_unpaid bigint;
+  v_owner  uuid;
+begin
+  select * into m from public.board_motions where id = p_motion;
+  v_until := now() + make_interval(days => coalesce((m.params ->> 'days')::integer, 1));
+  select pc.founder_id into v_owner from public.player_companies pc where pc.company_id = m.company_id;
+  if m.kind = 'earmark' then
+    v_amt := least((m.params ->> 'amount_cents')::bigint, greatest(0, public.listed_free_cash(m.company_id)));
+    if v_amt > 0 then
+      insert into public.company_budgets (company_id, purpose, amount_cents) values (m.company_id, m.params ->> 'purpose', v_amt)
+      on conflict (company_id, purpose) do update
+        set amount_cents = public.company_budgets.amount_cents + excluded.amount_cents, updated_at = now();
+    end if;
+    return jsonb_build_object('amount_cents', v_amt);
+  elsif m.kind = 'release' then
+    delete from public.company_budgets b where b.company_id = m.company_id and b.purpose = m.params ->> 'purpose'
+    returning b.amount_cents into v_amt;
+    return jsonb_build_object('amount_cents', coalesce(v_amt, 0));
+  elsif m.kind = 'dividend' then
+    v_amt := least((m.params ->> 'amount_cents')::bigint, greatest(0, public.listed_free_cash(m.company_id)));
+    if v_amt > 0 then
+      return public.listed_pay_dividend(m.company_id, v_amt, 'board', m.proposer_id);
+    end if;
+    return jsonb_build_object('total_cents', 0);
+  elsif m.kind = 'payout_cap' then
+    update public.listed_companies set payout_cap_bps = (m.params ->> 'bps')::integer, payout_cap_until = v_until
+     where company_id = m.company_id;
+    update public.player_companies set founder_payout_bps = least(founder_payout_bps, (m.params ->> 'bps')::integer)
+     where company_id = m.company_id;
+    return jsonb_build_object('until', v_until);
+  elsif m.kind = 'withdraw_ban' then
+    update public.listed_companies set withdraw_block_until = v_until where company_id = m.company_id;
+    return jsonb_build_object('until', v_until);
+  elsif m.kind = 'price_level' then
+    update public.listed_companies set price_lock = m.params ->> 'price_level', price_lock_until = v_until
+     where company_id = m.company_id;
+    update public.player_companies set price_level = m.params ->> 'price_level' where company_id = m.company_id;
+    return jsonb_build_object('until', v_until);
+  elsif m.kind = 'debt' then
+    -- taxes and penalties first, then open bills
+    v_amt := (m.params ->> 'amount_cents')::bigint;
+    v_paid := public.listed_tax_collect(m.company_id, v_amt, true);
+    select greatest(0, a.balance_cents), pc.unpaid_cents into v_cash, v_unpaid
+      from public.ledger_accounts a join public.player_companies pc on pc.company_id = a.owner_company_id
+     where a.owner_company_id = m.company_id and a.kind = 'company_cash';
+    v_amt := least(v_amt - v_paid, v_cash, v_unpaid);
+    if v_amt > 0 then
+      perform public.ledger_transfer(public.company_cash_account(m.company_id), public.ledger_system_account('households'), v_amt,
+                                     'company_costs', 'Offene Rechnungen (Geschäftsrat)', 'company', m.company_id,
+                                     'board-debt:' || m.id::text, v_owner, jsonb_build_object('cat', 'fixed'));
+      update public.player_companies set unpaid_cents = unpaid_cents - v_amt, distress = unpaid_cents - v_amt > 0
+       where company_id = m.company_id;
+      v_paid := v_paid + v_amt;
+    end if;
+    return jsonb_build_object('amount_cents', v_paid);
+  end if;
+  return '{}'::jsonb;
+end;
+$$;
+
+-- Counts a motion: by shares held now; the AI float votes yes on shareholder protection while the reputation is
+-- low. Ends it when the time is up (p_final) or one side holds more than half of all shares.
+create or replace function public.board_tally(p_motion bigint, p_final boolean)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.listed_cfg();
+  m        public.board_motions;
+  v_total  bigint;
+  v_yes    bigint;
+  v_no     bigint;
+  v_float  bigint;
+  v_ai     bigint := 0;
+  v_rep    double precision;
+  v_status text;
+  v_result jsonb := '{}'::jsonb;
+  v_owner  uuid;
+  v_name   text;
+  r        record;
+begin
+  select * into m from public.board_motions where id = p_motion for update;
+  if m.id is null or m.status <> 'open' then
+    return m.status;
+  end if;
+  v_total := public.board_total_e6(m.company_id);
+  select coalesce(sum(h.qty_e6) filter (where v.yes), 0), coalesce(sum(h.qty_e6) filter (where not v.yes), 0)
+    into v_yes, v_no
+    from public.board_votes v join public.board_holdings(m.company_id) h on h.player_id = v.player_id
+   where v.motion_id = m.id;
+  v_float := greatest(0, v_total - coalesce((select sum(h.qty_e6) from public.board_holdings(m.company_id) h), 0));
+  select l.reputation into v_rep from public.listed_companies l where l.company_id = m.company_id;
+  if coalesce(cfg #> '{board,aiVote,kinds}', '[]'::jsonb) ? m.kind
+     and coalesce(v_rep, 50) < public.cfg_num(cfg, '{board,aiVote,reputationBelow}', 40) then
+    v_ai := v_float;
+  end if;
+  if not (coalesce(p_final, false) or (v_yes + v_ai) * 2 > v_total or v_no * 2 >= v_total) then
+    update public.board_motions set yes_e6 = v_yes, no_e6 = v_no, ai_e6 = v_ai, total_e6 = v_total where id = m.id;
+    return 'open';
+  end if;
+  v_status := case when (v_yes + v_ai + v_no)::numeric * 10000 < v_total::numeric * public.cfg_num(cfg, '{board,quorumBps}', 3000) then 'no_quorum'
+                   when v_yes + v_ai > v_no then 'passed' else 'rejected' end;
+  update public.board_motions
+     set status = v_status, closed_at = now(), yes_e6 = v_yes, no_e6 = v_no, ai_e6 = v_ai, total_e6 = v_total
+   where id = m.id;
+  select pc.founder_id, c.name into v_owner, v_name
+    from public.player_companies pc join public.companies c on c.id = pc.company_id where pc.company_id = m.company_id;
+  if v_status = 'passed' then
+    v_result := public.board_execute(m.id);
+    update public.board_motions set result = v_result where id = m.id;
+    -- a decision without the founder's yes is a revolt
+    if m.proposer_id is distinct from v_owner
+       and not exists (select 1 from public.board_votes v where v.motion_id = m.id and v.player_id = v_owner and v.yes) then
+      perform public.feed_post(coalesce(m.proposer_id, v_owner), 'board_revolt',
+                               jsonb_build_object('company', v_name, 'kind', m.kind), 'board_revolt:' || m.id::text);
+    end if;
+  end if;
+  for r in select h.player_id from public.board_holdings(m.company_id) h
+           union select v_owner loop
+    perform public.social_notify(r.player_id, 'board',
+      'Geschäftsrat ' || v_name || ': ' || case v_status when 'passed' then 'Antrag angenommen'
+                                                when 'rejected' then 'Antrag abgelehnt' else 'Antrag ohne Mehrheit' end,
+      public.board_motion_label(m.kind, m.params),
+      jsonb_build_object('company_id', m.company_id, 'motion_id', m.id, 'status', v_status),
+      '/company?board=' || m.company_id::text, 'board-result:' || m.id::text);
+  end loop;
+  perform public.company_system_message(m.company_id, 'Geschäftsrat: ' || public.board_motion_label(m.kind, m.params) || ' – '
+    || case v_status when 'passed' then 'angenommen.' when 'rejected' then 'abgelehnt.' else 'nicht beschlussfähig.' end);
+  return v_status;
+end;
+$$;
+
+-- Short German description of a motion (notifications, company chat)
+create or replace function public.board_motion_label(p_kind text, p_params jsonb)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case p_kind
+    when 'earmark' then public.format_eur((p_params ->> 'amount_cents')::bigint) || ' reservieren für '
+                        || case p_params ->> 'purpose' when 'research' then 'Forschung' when 'products' then 'Produkte'
+                                                       when 'expansion' then 'Ausbau' when 'benefits' then 'Benefits'
+                                                       else 'Marketing' end
+    when 'release' then 'Budget freigeben: '
+                        || case p_params ->> 'purpose' when 'research' then 'Forschung' when 'products' then 'Produkte'
+                                                       when 'expansion' then 'Ausbau' when 'benefits' then 'Benefits'
+                                                       else 'Marketing' end
+    when 'dividend' then 'Dividende von ' || public.format_eur((p_params ->> 'amount_cents')::bigint)
+    when 'payout_cap' then 'CEO-Auszahlung höchstens ' || ((p_params ->> 'bps')::integer / 100) || ' % für '
+                           || (p_params ->> 'days') || ' Tage'
+    when 'withdraw_ban' then 'Keine Entnahmen für ' || (p_params ->> 'days') || ' Tage'
+    when 'price_level' then 'Preisstrategie ' || case p_params ->> 'price_level' when 'budget' then 'günstig'
+                                                   when 'premium' then 'Premium' else 'normal' end
+                            || ' für ' || (p_params ->> 'days') || ' Tage'
+    when 'debt' then 'Schulden tilgen bis ' || public.format_eur((p_params ->> 'amount_cents')::bigint)
+    else p_kind end;
+$$;
+
+create or replace function public.board_close_due(p_company uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  r   record;
+  v_n integer := 0;
+begin
+  for r in select m.id, m.closes_at <= now() as due from public.board_motions m
+            where m.company_id = p_company and m.status = 'open' order by m.id loop
+    if public.board_tally(r.id, r.due) <> 'open' then
+      v_n := v_n + 1;
+    end if;
+  end loop;
+  return v_n;
+end;
+$$;
+
+create or replace function public.board_motion_json(m public.board_motions, p_viewer uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'id', m.id, 'kind', m.kind, 'params', m.params, 'status', m.status, 'label', public.board_motion_label(m.kind, m.params),
+    'proposer', (select p.nickname from public.profiles p where p.id = m.proposer_id),
+    'mine', m.proposer_id is not distinct from p_viewer,
+    'created_at', m.created_at, 'closes_at', m.closes_at, 'closed_at', m.closed_at,
+    'yes_e6', m.yes_e6, 'no_e6', m.no_e6, 'ai_e6', m.ai_e6, 'total_e6', m.total_e6,
+    'my_vote', (select case when v.yes then 'yes' else 'no' end from public.board_votes v
+                 where v.motion_id = m.id and v.player_id = p_viewer),
+    'votes', coalesce((select jsonb_agg(jsonb_build_object('nickname', p.nickname, 'yes', v.yes) order by v.voted_at)
+                         from public.board_votes v join public.profiles p on p.id = v.player_id where v.motion_id = m.id), '[]'::jsonb),
+    'result', m.result);
+$$;
+
+create or replace function public.board_state(p_company uuid, p_viewer uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.listed_cfg();
+  c       public.companies;
+  pc      public.player_companies;
+  l       public.listed_companies;
+  v_total bigint := public.board_total_e6(p_company);
+  v_mine  bigint := public.board_my_e6(p_company, p_viewer);
+  v_held  bigint;
+begin
+  select * into c from public.companies where id = p_company;
+  select * into pc from public.player_companies where company_id = p_company;
+  select * into l from public.listed_companies where company_id = p_company;
+  select coalesce(sum(h.qty_e6), 0) into v_held from public.board_holdings(p_company) h;
+  return jsonb_build_object(
+    'company', jsonb_build_object('id', c.id, 'name', c.name, 'ticker', c.ticker, 'color', c.brand_color),
+    'is_founder', pc.founder_id = p_viewer,
+    'total_e6', v_total,
+    'my_e6', v_mine,
+    'my_share_bps', (v_mine::numeric * 10000 / v_total)::integer,
+    'float_e6', greatest(0, v_total - v_held),
+    'min_share_bps', public.cfg_num(cfg, '{board,minShareBps}', 2000)::integer,
+    'can_convene', v_mine::numeric * 10000 > v_total::numeric * public.cfg_num(cfg, '{board,minShareBps}', 2000)
+                   and (select count(*) from public.board_motions m where m.company_id = p_company and m.status = 'open')
+                       < public.cfg_num(cfg, '{board,maxOpen}', 2)
+                   and not exists (select 1 from public.board_motions m
+                                    where m.company_id = p_company and m.proposer_id = p_viewer
+                                      and m.created_at > now() - make_interval(secs => public.cfg_num(cfg, '{board,cooldownHours}', 6) * 3600)),
+    'can_vote', v_mine > 0,
+    'reputation', round(coalesce(l.reputation, 50)::numeric, 1),
+    'ai_votes', coalesce(l.reputation, 50) < public.cfg_num(cfg, '{board,aiVote,reputationBelow}', 40),
+    'cash_cents', (select a.balance_cents from public.ledger_accounts a where a.owner_company_id = p_company and a.kind = 'company_cash'),
+    'free_cash_cents', public.listed_free_cash(p_company),
+    'holders', coalesce((select jsonb_agg(jsonb_build_object('nickname', p.nickname, 'share_bps', (h.qty_e6::numeric * 10000 / v_total)::integer,
+                                                             'is_founder', h.player_id = pc.founder_id, 'me', h.player_id = p_viewer)
+                                          order by h.qty_e6 desc)
+                           from public.board_holdings(p_company) h join public.profiles p on p.id = h.player_id), '[]'::jsonb),
+    'budgets', coalesce((select jsonb_agg(jsonb_build_object('purpose', b.purpose, 'amount_cents', b.amount_cents) order by b.purpose)
+                           from public.company_budgets b where b.company_id = p_company and b.amount_cents > 0), '[]'::jsonb),
+    'restrictions', jsonb_build_object(
+      'payout_cap_bps', case when l.payout_cap_until > now() then l.payout_cap_bps end,
+      'payout_cap_until', case when l.payout_cap_until > now() then l.payout_cap_until end,
+      'withdraw_block_until', case when l.withdraw_block_until > now() then l.withdraw_block_until end,
+      'price_lock', case when l.price_lock_until > now() then l.price_lock end,
+      'price_lock_until', case when l.price_lock_until > now() then l.price_lock_until end),
+    'founder_payout_bps', pc.founder_payout_bps,
+    'motions', coalesce((select jsonb_agg(public.board_motion_json(m, p_viewer) order by m.id desc)
+                           from public.board_motions m where m.company_id = p_company and m.status = 'open'), '[]'::jsonb),
+    'history', coalesce((select jsonb_agg(public.board_motion_json(x, p_viewer) order by x.id desc)
+                           from (select * from public.board_motions m where m.company_id = p_company and m.status <> 'open'
+                                  order by m.id desc limit greatest(1, public.cfg_num(cfg, '{board,historyLimit}', 20)::integer)) x),
+                        '[]'::jsonb));
+end;
+$$;
+
+-- The company whose board the caller may see: a listed company where the caller is the founder or holds shares
+create or replace function public.board_require(p_company uuid, p_player uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid := coalesce(p_company, (select pc.company_id from public.player_companies pc
+                                          where pc.founder_id = p_player and pc.status = 'active'));
+begin
+  if v_company is null then
+    perform public.api_error('company_not_found');
+  end if;
+  if not public.listed_is(v_company) then
+    perform public.api_error('not_listed');
+  end if;
+  if public.board_my_e6(v_company, p_player) <= 0
+     and not exists (select 1 from public.player_companies pc where pc.company_id = v_company and pc.founder_id = p_player) then
+    perform public.api_error('board_not_shareholder');
+  end if;
+  perform public.listed_ensure(v_company);
+  return v_company;
+end;
+$$;
+
+create or replace function public.get_company_board(p_company_id uuid default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid := public.require_player();
+  v_company uuid := public.board_require(p_company_id, v_player);
+begin
+  perform public.board_close_due(v_company);
+  return jsonb_build_object('board', public.board_state(v_company, v_player));
+end;
+$$;
+comment on function public.get_company_board(uuid) is
+  'RPC (founder or shareholder of a listed company; null = own company): the board with holders, budgets, '
+  'restrictions, open motions and their history (ADR-167). Errors company_not_found, not_listed, board_not_shareholder.';
+
+create or replace function public.board_propose(p_request_id uuid, p_company_id uuid, p_kind text, p_params jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg       jsonb := public.listed_cfg();
+  v_player  uuid := public.require_player();
+  v_company uuid;
+  v_replay  jsonb;
+  v_params  jsonb := '{}'::jsonb;
+  v_days    integer;
+  v_amount  bigint;
+  v_bps     integer;
+  v_id      bigint;
+  v_name    text;
+  r         record;
+begin
+  v_company := public.board_require(p_company_id, v_player);
+  if p_request_id is null or p_kind is null or not coalesce(cfg #> '{board,kinds}', '[]'::jsonb) ? p_kind then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'board_propose');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  perform 1 from public.listed_companies l where l.company_id = v_company for update;
+  perform public.board_close_due(v_company);
+  -- more than board.minShareBps of all shares
+  if not (public.board_my_e6(v_company, v_player)::numeric * 10000
+          > public.board_total_e6(v_company)::numeric * public.cfg_num(cfg, '{board,minShareBps}', 2000)) then
+    perform public.api_error('board_no_right');
+  end if;
+  if (select count(*) from public.board_motions m where m.company_id = v_company and m.status = 'open')
+       >= public.cfg_num(cfg, '{board,maxOpen}', 2)
+     or exists (select 1 from public.board_motions m
+                 where m.company_id = v_company and m.proposer_id = v_player
+                   and m.created_at > now() - make_interval(secs => public.cfg_num(cfg, '{board,cooldownHours}', 6) * 3600)) then
+    perform public.api_error('board_limit');
+  end if;
+
+  v_days := (p_params ->> 'days')::integer;
+  v_amount := (p_params ->> 'amount_cents')::bigint;
+  if p_kind in ('payout_cap', 'withdraw_ban', 'price_level')
+     and (v_days is null or v_days < 1 or v_days > public.cfg_num(cfg, '{board,maxDays}', 7)) then
+    perform public.api_error('invalid_argument');
+  end if;
+  if p_kind in ('earmark', 'dividend', 'debt') and (v_amount is null or v_amount < 1) then
+    perform public.api_error('invalid_argument');
+  end if;
+  if p_kind in ('earmark', 'release') and not coalesce(cfg #> '{board,purposes}', '[]'::jsonb) ? coalesce(p_params ->> 'purpose', '') then
+    perform public.api_error('invalid_argument');
+  end if;
+  if p_kind = 'earmark' then
+    if v_amount > (select greatest(0, a.balance_cents) from public.ledger_accounts a
+                    where a.owner_company_id = v_company and a.kind = 'company_cash')
+                  * public.cfg_num(cfg, '{board,earmarkMaxShareOfCashBps}', 8000)::bigint / 10000 then
+      perform public.api_error('insufficient_funds');
+    end if;
+    v_params := jsonb_build_object('purpose', p_params ->> 'purpose', 'amount_cents', v_amount);
+  elsif p_kind = 'release' then
+    v_params := jsonb_build_object('purpose', p_params ->> 'purpose');
+  elsif p_kind = 'dividend' then
+    if v_amount < public.cfg_num(cfg, '{dividends,minTotalCents}', 10000) then
+      perform public.api_error('invalid_argument');
+    end if;
+    v_params := jsonb_build_object('amount_cents', v_amount);
+  elsif p_kind = 'payout_cap' then
+    v_bps := (p_params ->> 'bps')::integer;
+    if v_bps is null or v_bps < 0 or v_bps > 10000
+       or v_bps % greatest(1, public.cfg_num(cfg, '{board,payoutCapStepBps}', 500)::integer) <> 0 then
+      perform public.api_error('invalid_argument');
+    end if;
+    v_params := jsonb_build_object('bps', v_bps, 'days', v_days);
+  elsif p_kind = 'withdraw_ban' then
+    v_params := jsonb_build_object('days', v_days);
+  elsif p_kind = 'price_level' then
+    if coalesce(p_params ->> 'price_level', '') not in ('budget', 'normal', 'premium') then
+      perform public.api_error('invalid_argument');
+    end if;
+    v_params := jsonb_build_object('price_level', p_params ->> 'price_level', 'days', v_days);
+  else
+    v_params := jsonb_build_object('amount_cents', v_amount);
+  end if;
+
+  insert into public.board_motions (company_id, proposer_id, kind, params, closes_at)
+  values (v_company, v_player, p_kind, v_params, now() + make_interval(secs => public.cfg_num(cfg, '{board,voteHours}', 12) * 3600))
+  returning id into v_id;
+  insert into public.board_votes (motion_id, player_id, yes) values (v_id, v_player, true);
+  select c.name into v_name from public.companies c where c.id = v_company;
+  for r in select h.player_id from public.board_holdings(v_company) h
+           union select pc.founder_id from public.player_companies pc where pc.company_id = v_company loop
+    continue when r.player_id = v_player;
+    perform public.social_notify(r.player_id, 'board', 'Geschäftsrat ' || v_name || ': neuer Antrag',
+      public.board_motion_label(p_kind, v_params) || '. Stimme mit deinen Aktien ab.',
+      jsonb_build_object('company_id', v_company, 'motion_id', v_id), '/company?board=' || v_company::text,
+      'board-new:' || v_id::text);
+  end loop;
+  perform public.mission_event(v_player, 'board_motion', 1, v_id::text);
+  perform public.board_tally(v_id, false);
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('board', public.board_state(v_company, v_player)));
+end;
+$$;
+comment on function public.board_propose(uuid, uuid, text, jsonb) is
+  'RPC (shareholder with more than board.minShareBps of a listed company, the founder included): convenes the board '
+  'with a motion (ADR-167). kind: earmark {purpose, amount_cents} | release {purpose} | dividend {amount_cents} | '
+  'payout_cap {bps, days} | withdraw_ban {days} | price_level {price_level, days} | debt {amount_cents}. Errors '
+  'not_listed, board_not_shareholder, board_no_right, board_limit, invalid_argument, insufficient_funds.';
+
+create or replace function public.board_vote(p_request_id uuid, p_motion_id bigint, p_yes boolean)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid := public.require_player();
+  v_replay  jsonb;
+  m         public.board_motions;
+begin
+  if p_request_id is null or p_motion_id is null or p_yes is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'board_vote');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into m from public.board_motions where id = p_motion_id for update;
+  if m.id is null or not public.listed_is(m.company_id) then
+    perform public.api_error('board_motion_unknown');
+  end if;
+  if public.board_my_e6(m.company_id, v_player) <= 0 then
+    perform public.api_error('board_not_shareholder');
+  end if;
+  if m.status <> 'open' or m.closes_at <= now() then
+    perform public.board_close_due(m.company_id);
+    perform public.api_error('board_motion_unknown');
+  end if;
+  insert into public.board_votes (motion_id, player_id, yes) values (m.id, v_player, p_yes)
+  on conflict (motion_id, player_id) do update set yes = excluded.yes, voted_at = now();
+  perform public.mission_event(v_player, 'board_vote', 1, m.id::text);
+  perform public.board_tally(m.id, false);
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('board', public.board_state(m.company_id, v_player)));
+end;
+$$;
+comment on function public.board_vote(uuid, bigint, boolean) is
+  'RPC (shareholder): votes yes or no on an open motion; the weight is the holding when it is counted, a vote can be '
+  'changed until then (ADR-167). Errors board_motion_unknown, board_not_shareholder.';
+
+-- ---------------------------------------------------------------------------
+-- E. The state of a listed company (founder)
+-- ---------------------------------------------------------------------------
+create or replace function public.listed_state(p_company uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.listed_cfg();
+  c        public.companies;
+  pc       public.player_companies;
+  l        public.listed_companies;
+  h        public.listed_company_hours;
+  v_fx     jsonb := public.listed_effects(p_company);
+  v_ref    bigint := public.listed_ref_revenue(p_company);
+  v_heads  integer := public.company_headcount(p_company);
+  v_cash   bigint;
+  v_free   bigint := public.listed_free_cash(p_company);
+  v_sat    jsonb;
+  v_today  date := (now() at time zone 'Europe/Berlin')::date;
+  v_green  double precision;
+  v_red    double precision;
+  v_total  bigint := public.board_total_e6(p_company);
+  v_mine   bigint;
+begin
+  select * into c from public.companies where id = p_company;
+  select * into pc from public.player_companies where company_id = p_company;
+  select * into l from public.listed_companies where company_id = p_company;
+  if l.company_id is null then
+    return null;
+  end if;
+  select * into h from public.listed_company_hours x where x.company_id = p_company order by x.hour_start desc limit 1;
+  select a.balance_cents into v_cash from public.ledger_accounts a where a.owner_company_id = p_company and a.kind = 'company_cash';
+  v_sat := public.listed_satisfaction_effect(l.satisfaction);
+  v_green := public.cfg_num(cfg, '{satisfaction,green}', 60);
+  v_red := public.cfg_num(cfg, '{satisfaction,red}', 35);
+  v_mine := public.board_my_e6(p_company, pc.founder_id);
+  return jsonb_build_object(
+    'company_id', p_company, 'name', c.name, 'ticker', c.ticker,
+    'cash_cents', v_cash, 'unpaid_cents', pc.unpaid_cents, 'reserved_cents', public.listed_reserved_cents(p_company),
+    'free_cash_cents', v_free, 'ref_revenue_cents', v_ref, 'headcount', v_heads,
+    'founder_payout_bps', pc.founder_payout_bps,
+    'reputation', jsonb_build_object(
+      'value', round(l.reputation::numeric, 2), 'target', round(coalesce(h.rep_target, l.reputation)::numeric, 2),
+      'demand_factor', round((1 + public.cfg_num(cfg, '{reputation,demandMaxEffect}', 0.2) * (l.reputation - 50) / 50.0)::numeric, 4),
+      'price_factor', round(l.price_factor::numeric, 4),
+      'payout_ratio_bps', coalesce((h.drivers ->> 'payout_ratio_bps')::integer, 0),
+      'drivers', coalesce(h.drivers -> 'reputation', '{}'::jsonb)),
+    'satisfaction', jsonb_build_object(
+      'value', round(l.satisfaction::numeric, 2), 'target', round(coalesce(h.sat_target, l.satisfaction)::numeric, 2),
+      'zone', case when l.satisfaction >= v_green then 'green' when l.satisfaction >= v_red then 'yellow' else 'red' end,
+      'green', v_green, 'red', v_red,
+      'capacity_factor', round((v_sat ->> 'capacity_factor')::numeric, 4),
+      'quality_add_bps', round((v_sat ->> 'quality_add')::numeric * 10000)::integer,
+      'red_hours', l.red_hours,
+      'drivers', coalesce(h.drivers -> 'satisfaction', '{}'::jsonb)),
+    'effects', v_fx,
+    'hour', public.listed_hour_effect_calc(v_fx, l.satisfaction, l.reputation),
+    'upkeep', l.last_upkeep,
+    'upkeep_per_hour_cents', coalesce((
+      select sum(public.listed_item_upkeep(public.listed_item(ci.key), ci.level, v_ref, v_heads))
+        from public.company_investments ci
+       where ci.company_id = p_company and ci.status = 'active' and ci.level > 0 and ci.kind <> 'action'), 0)::bigint
+      + case when l.advisor then public.listed_advisor_wage(v_ref) else 0 end,
+    'items', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'key', t.x ->> 'key', 'kind', t.x ->> 'kind',
+               'status', case when ci.key is null or ci.status = 'retired' or (t.x ->> 'kind' = 'action') then 'none'
+                              when ci.ready_at is not null and ci.level = 0 then 'running' else ci.status end,
+               'level', coalesce(case when ci.status <> 'retired' then ci.level end, 0),
+               'max_level', public.cfg_num(t.x, '{maxLevel}', 1)::integer,
+               'ready_at', case when ci.status <> 'retired' then ci.ready_at end,
+               'cooldown_until', case when t.x ->> 'kind' = 'action' and ci.last_used_at is not null
+                                           and ci.last_used_at + make_interval(secs => public.cfg_num(t.x, '{cooldownHours}', 0) * 3600) > now()
+                                      then ci.last_used_at + make_interval(secs => public.cfg_num(t.x, '{cooldownHours}', 0) * 3600) end,
+               'cost_cents', public.listed_item_cost(t.x, case when t.x ->> 'kind' = 'action' or ci.key is null or ci.status = 'retired' then 0 else ci.level end, v_ref, v_heads),
+               'upkeep_cents', public.listed_item_upkeep(t.x, greatest(1, coalesce(case when ci.status <> 'retired' then ci.level end, 1)), v_ref, v_heads),
+               'missing', coalesce((select jsonb_agg(q.k) from jsonb_array_elements_text(coalesce(t.x -> 'requires', '[]'::jsonb)) q(k)
+                                     where not exists (select 1 from public.company_investments r
+                                                        where r.company_id = p_company and r.key = q.k
+                                                          and r.status in ('active', 'paused') and r.level > 0)), '[]'::jsonb))
+             order by t.ord)
+        from jsonb_array_elements(coalesce(cfg -> 'items', '[]'::jsonb)) with ordinality t(x, ord)
+        left join public.company_investments ci on ci.company_id = p_company and ci.key = t.x ->> 'key'), '[]'::jsonb),
+    'budgets', coalesce((select jsonb_agg(jsonb_build_object('purpose', b.purpose, 'amount_cents', b.amount_cents) order by b.purpose)
+                           from public.company_budgets b where b.company_id = p_company and b.amount_cents > 0), '[]'::jsonb),
+    'restrictions', jsonb_build_object(
+      'payout_cap_bps', case when l.payout_cap_until > now() then l.payout_cap_bps end,
+      'payout_cap_until', case when l.payout_cap_until > now() then l.payout_cap_until end,
+      'withdraw_block_until', case when l.withdraw_block_until > now() then l.withdraw_block_until end,
+      'price_lock', case when l.price_lock_until > now() then l.price_lock end,
+      'price_lock_until', case when l.price_lock_until > now() then l.price_lock_until end),
+    'dividends', jsonb_build_object(
+      'max_cents', greatest(0, v_free) * public.cfg_num(cfg, '{dividends,maxShareOfFreeCashBps}', 5000)::bigint / 10000,
+      'min_cents', public.cfg_num(cfg, '{dividends,minTotalCents}', 10000)::bigint,
+      'can_declare', (select count(*) from public.company_dividends d
+                       where d.company_id = p_company and d.source = 'founder'
+                         and (d.paid_at at time zone 'Europe/Berlin')::date = v_today) < public.cfg_num(cfg, '{dividends,perDay}', 1),
+      'streak', case when l.dividend_day >= v_today - 1 then l.dividend_streak else 0 end,
+      'total_e6', v_total,
+      'founder_share_bps', (v_mine::numeric * 10000 / v_total)::integer,
+      'last', coalesce((select jsonb_agg(jsonb_build_object('id', d.id, 'source', d.source, 'total_cents', d.total_cents,
+                                                            'players_cents', d.players_cents, 'float_cents', d.float_cents,
+                                                            'holders', d.holders, 'paid_at', d.paid_at) order by d.id desc)
+                          from (select * from public.company_dividends x where x.company_id = p_company order by x.id desc
+                                 limit greatest(1, public.cfg_num(cfg, '{dividends,historyLimit}', 20)::integer)) d), '[]'::jsonb)),
+    'books', public.listed_books_preview(p_company),
+    'taxes', jsonb_build_object(
+      'due_cents', public.listed_tax_due_cents(p_company),
+      'rate_bps', public.listed_tax_rate_bps(p_company),
+      'loss_carry_cents', l.loss_carry_cents,
+      'advisor', l.advisor,
+      'advisor_wage_cents', public.listed_advisor_wage(v_ref),
+      'advisor_discount_bps', public.cfg_num(cfg, '{taxes,advisor,discountBps}', 800)::integer,
+      'periods', coalesce((select jsonb_agg(public.listed_tax_period_json(x) order by x.id desc)
+                             from (select * from public.company_tax_periods p where p.company_id = p_company order by p.id desc
+                                    limit greatest(1, public.cfg_num(cfg, '{taxes,historyLimit}', 30)::integer)) x), '[]'::jsonb)),
+    'history', coalesce((select jsonb_agg(jsonb_build_object('at', x.hour_start, 'satisfaction', round(x.satisfaction::numeric, 2),
+                                                             'reputation', round(x.reputation::numeric, 2),
+                                                             'demand_factor', round(x.demand_factor::numeric, 4),
+                                                             'capacity_factor', round(x.capacity_factor::numeric, 4),
+                                                             'upkeep_cents', x.upkeep_cents) order by x.hour_start)
+                           from (select * from public.listed_company_hours y where y.company_id = p_company
+                                  order by y.hour_start desc limit greatest(1, public.cfg_num(cfg, '{historyHours}', 72)::integer)) x),
+                        '[]'::jsonb),
+    'board', jsonb_build_object(
+      'open_motions', (select count(*) from public.board_motions m where m.company_id = p_company and m.status = 'open'),
+      'to_vote', (select count(*) from public.board_motions m
+                   where m.company_id = p_company and m.status = 'open'
+                     and not exists (select 1 from public.board_votes v where v.motion_id = m.id and v.player_id = pc.founder_id)),
+      'my_share_bps', (v_mine::numeric * 10000 / v_total)::integer,
+      'can_convene', v_mine::numeric * 10000 > v_total::numeric * public.cfg_num(cfg, '{board,minShareBps}', 2000)));
+end;
+$$;
+
+create or replace function public.get_listed_company()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid := public.require_own_company();
+begin
+  if not public.listed_is(v_company) then
+    return jsonb_build_object('listed', null);
+  end if;
+  perform public.listed_ensure(v_company);
+  perform public.listed_finish_due(v_company, now());
+  perform public.board_close_due(v_company);
+  return jsonb_build_object('listed', public.listed_state(v_company));
+end;
+$$;
+comment on function public.get_listed_company() is
+  'RPC (founder): everything a listed company adds (ADR-167): reputation, satisfaction, items with prices, budgets, '
+  'dividends, books, taxes, history. {listed: null} while the company is private. Error company_not_found.';
+
+-- Before a listed company is dissolved: taxes are paid from the cash as far as it goes, motions end, budgets go
+create or replace function public.listed_before_dissolve(p_company uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not exists (select 1 from public.listed_companies l where l.company_id = p_company) then
+    return;
+  end if;
+  perform public.listed_tax_collect(p_company, null, true);
+  update public.company_tax_periods set status = 'paid', paid_at = now() where company_id = p_company and status = 'due';
+  update public.board_motions set status = 'cancelled', closed_at = now() where company_id = p_company and status = 'open';
+  delete from public.company_budgets where company_id = p_company;
+  update public.listed_companies
+     set advisor = false, payout_cap_until = null, withdraw_block_until = null, price_lock_until = null
+   where company_id = p_company;
+end;
+$$;
+
+-- Missions: a tax audit that was solved
+create or replace function public.listed_audit_mission()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.archetype = 'tax_audit' and new.status = 'solved' and old.status is distinct from new.status then
+    perform public.mission_event((select pc.founder_id from public.player_companies pc where pc.company_id = new.company_id),
+                                 'audit_survived', 1, new.id::text);
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists listed_audit_mission on public.player_company_events;
+create trigger listed_audit_mission after update of status on public.player_company_events
+  for each row execute function public.listed_audit_mission();
+
+-- ---------------------------------------------------------------------------
+-- F. Grants
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.listed_finish_due(uuid, timestamptz)', 'public.listed_require()', 'public.company_invest(uuid, text)',
+    'public.company_invest_stop(uuid, text)', 'public.board_holdings(uuid)', 'public.board_total_e6(uuid)',
+    'public.board_my_e6(uuid, uuid)', 'public.listed_pay_dividend(uuid, bigint, text, uuid)',
+    'public.company_declare_dividend(uuid, bigint)', 'public.listed_ledger_category(text, text, jsonb)',
+    'public.listed_is_operating(text)', 'public.listed_period_sums(uuid, timestamptz, timestamptz)',
+    'public.listed_books_receipts(uuid, timestamptz)', 'public.listed_tax_rate_bps(uuid)', 'public.listed_books_preview(uuid)',
+    'public.listed_books_do(uuid, text, integer)', 'public.listed_tax_collect(uuid, bigint, boolean)',
+    'public.listed_tax_due_cents(uuid)', 'public.company_books_close(uuid, text[], boolean)',
+    'public.listed_tax_period_json(public.company_tax_periods)', 'public.company_tax_pay(uuid)',
+    'public.company_tax_advisor(uuid, boolean)', 'public.listed_audit(uuid, integer)', 'public.listed_tax_office(uuid)',
+    'public.get_company_accounting(integer, bigint)', 'public.board_execute(bigint)', 'public.board_tally(bigint, boolean)',
+    'public.board_motion_label(text, jsonb)', 'public.board_close_due(uuid)',
+    'public.board_motion_json(public.board_motions, uuid)', 'public.board_state(uuid, uuid)',
+    'public.board_require(uuid, uuid)', 'public.get_company_board(uuid)', 'public.board_propose(uuid, uuid, text, jsonb)',
+    'public.board_vote(uuid, bigint, boolean)', 'public.listed_state(uuid)', 'public.get_listed_company()',
+    'public.listed_before_dissolve(uuid)', 'public.listed_audit_mission()'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+    execute format('grant execute on function %s to service_role', f);
+  end loop;
+  foreach f in array array[
+    'public.get_listed_company()', 'public.company_invest(uuid, text)', 'public.company_invest_stop(uuid, text)',
+    'public.company_declare_dividend(uuid, bigint)', 'public.company_books_close(uuid, text[], boolean)',
+    'public.company_tax_pay(uuid)', 'public.company_tax_advisor(uuid, boolean)',
+    'public.get_company_accounting(integer, bigint)', 'public.get_company_board(uuid)',
+    'public.board_propose(uuid, uuid, text, jsonb)', 'public.board_vote(uuid, bigint, boolean)'
+  ] loop
+    execute format('grant execute on function %s to authenticated', f);
+  end loop;
+end;
+$$;
+
+-- ===== supabase/updates/20261204005420_listed_missions_news.sql =====
+-- ===== idempotent copy of migrations/20261204005420_listed_missions_news.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 5420 · Listed player companies: missions, feed and news hooks (ADR-167)
+-- =============================================================================
+-- * Missions: requirement "listed" (founder of a company at the stock exchange), mission_doable() knows what the
+--   new metrics need, dividend_cents counts as money, 26 templates.
+-- * Feed: labels for tax_penalty, tax_audit, greedy_founder, mass_quit, record_dividend, board_revolt, research_done.
+-- * NEXA Nachrichten: the first six are personal news the show can pick up (the first four as bad news).
+-- Idempotent: runs unchanged as supabase/updates/20261204005420_listed_missions_news.sql.
+
+-- requirement "listed": founder of an active company at the stock exchange
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.mission_requirement_ok(uuid, text)'::regprocedure);
+  v_old text := $t$           else false end;$t$;
+  v_new text := $t$           when 'listed' then exists (select 1 from public.player_companies pc join public.companies c on c.id = pc.company_id
+                                       where pc.founder_id = p_player and pc.status = 'active' and c.phase = 'listed')
+           else false end;$t$;
+begin
+  if position('''listed''' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'mission_requirement_ok() has an unexpected shape; add the requirement "listed" (ADR-167) by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+-- What a listed mission needs right now
+create or replace function public.listed_mission_doable(p_player uuid, p_key text, p_metric text)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid;
+  l         public.listed_companies;
+begin
+  select pc.company_id into v_company
+    from public.player_companies pc join public.companies c on c.id = pc.company_id
+   where pc.founder_id = p_player and pc.status = 'active' and c.phase = 'listed';
+  if p_metric = 'board_vote' then
+    -- an open motion the player has not voted on, in any company whose shares the player holds
+    return exists (select 1 from public.board_motions m
+                    where m.status = 'open' and public.board_my_e6(m.company_id, p_player) > 0
+                      and not exists (select 1 from public.board_votes v where v.motion_id = m.id and v.player_id = p_player));
+  end if;
+  if v_company is null then
+    return false;
+  end if;
+  select * into l from public.listed_companies where company_id = v_company;
+  return case
+    when p_metric in ('research_started', 'research_done') then
+      exists (select 1 from jsonb_array_elements(coalesce(public.listed_cfg() -> 'items', '[]'::jsonb)) t(x)
+               where t.x ->> 'kind' = 'research'
+                 and not exists (select 1 from public.company_investments ci
+                                  where ci.company_id = v_company and ci.key = t.x ->> 'key' and ci.status = 'active'))
+    when p_metric = 'benefit_added' then
+      exists (select 1 from jsonb_array_elements(coalesce(public.listed_cfg() -> 'items', '[]'::jsonb)) t(x)
+               where t.x ->> 'kind' = 'benefit'
+                 and not exists (select 1 from public.company_investments ci
+                                  where ci.company_id = v_company and ci.key = t.x ->> 'key' and ci.status in ('active', 'paused')))
+    when p_metric = 'board_motion' then
+      public.board_my_e6(v_company, p_player)::numeric * 10000
+        > public.board_total_e6(v_company)::numeric * public.cfg_num(public.listed_cfg(), '{board,minShareBps}', 2000)
+    when p_metric = 'audit_survived' then
+      exists (select 1 from public.player_company_events e
+               where e.company_id = v_company and e.archetype = 'tax_audit' and e.status in ('open', 'accepted', 'in_force'))
+    when p_key = 'm_first_dividend' then not exists (select 1 from public.company_dividends d where d.company_id = v_company)
+    when p_key = 'm_first_books' then not exists (select 1 from public.company_tax_periods x
+                                                   where x.company_id = v_company and x.closed_by = 'founder')
+    else true end;
+end;
+$$;
+revoke all on function public.listed_mission_doable(uuid, text, text) from public, anon, authenticated;
+grant execute on function public.listed_mission_doable(uuid, text, text) to service_role;
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.mission_doable(uuid, text, text)'::regprocedure);
+  v_old text := $t$    -- "your first ..." only for who has not done it yet$t$;
+  v_new text := $t$    -- listed companies (ADR-167)
+    when p_metric in ('research_started', 'research_done', 'product_launched', 'region_opened', 'benefit_added', 'team_action',
+                      'satisfaction_green', 'dividend_paid', 'dividend_cents', 'books_done', 'books_streak', 'tax_paid',
+                      'board_motion', 'board_vote', 'audit_survived', 'listed_invested') then
+      public.listed_mission_doable(p_player, p_key, p_metric)
+    -- "your first ..." only for who has not done it yet$t$;
+begin
+  if position('listed_mission_doable' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'mission_doable() has an unexpected shape; add the listed company metrics (ADR-167) by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+-- dividends count as money in mission texts ("{target}" in euros)
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.mission_is_money_metric(text)'::regprocedure);
+begin
+  if position('dividend_cents' in v_def) = 0 then
+    if position($t$'art_collection_value'$t$ in v_def) = 0 then
+      raise exception 'mission_is_money_metric() has an unexpected shape; add dividend_cents (ADR-167) by hand';
+    end if;
+    execute replace(v_def, $t$'art_collection_value'$t$, $t$'art_collection_value', 'dividend_cents'$t$);
+  end if;
+end;
+$do$;
+
+insert into public.mission_templates
+  (key, kind, title, description, icon_key, metric, mode, params, target_min, target_max, xp_min, xp_max, min_level, chain_order,
+   scale_with_level, weight, reward_skill_points)
+values
+  ('q_listed_books', 'quick', 'Mach die Bücher', 'Einmal am Tag: Belege sortieren, Abschluss bestätigen.', 'mission_company', 'books_done', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 1, 1, 50, 70, 9, null, false, 70, 0),
+  ('q_listed_benefit', 'quick', 'Gönn dem Team einen Benefit', 'Obstkorb, Kaffeeflatrate, Tischkicker: Hauptsache, die Laune steigt.', 'mission_company', 'benefit_added', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 1, 1, 40, 60, 9, null, false, 50, 0),
+  ('q_listed_action', 'quick', 'Starte eine Aktion fürs Team', 'Pizza für alle oder gleich ein Teamevent.', 'mission_company', 'team_action', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 1, 1, 40, 60, 9, null, false, 50, 0),
+  ('q_listed_research', 'quick', 'Starte eine Forschung', 'Such dir einen Zweig aus und leg los.', 'mission_company', 'research_started', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 1, 1, 50, 70, 9, null, false, 50, 0),
+  ('q_board_vote', 'quick', 'Stimm im Geschäftsrat ab', 'Ein Antrag wartet auf deine Aktien.', 'mission_company', 'board_vote', 'count', '{"unlock":"ipo"}'::jsonb, 1, 1, 40, 60, 9, null, false, 80, 0),
+  ('d_listed_green', 'daily', '{target} Stunden gute Stimmung', 'Halte die Mitarbeiterzufriedenheit im grünen Bereich.', 'mission_company', 'satisfaction_green', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 4, 6, 250, 350, 9, null, false, 60, 0),
+  ('d_listed_tax', 'daily', 'Zahl deine Steuer pünktlich', 'Bücher machen, Steuer überweisen, Ruhe vor dem Finanzamt.', 'mission_company', 'tax_paid', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 1, 1, 250, 350, 9, null, false, 60, 0),
+  ('d_listed_invest', 'daily', 'Investiere {target}-mal in deine Firma', 'Forschung, Produkte, Maschinen, Benefits: alles zählt.', 'mission_company', 'listed_invested', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 2, 3, 250, 350, 9, null, false, 60, 0),
+  ('d_listed_dividend', 'daily', 'Schütte eine Dividende aus', 'Deine Aktionäre freuen sich, dein Ruf auch.', 'mission_company', 'dividend_paid', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 1, 1, 250, 400, 9, null, false, 40, 0),
+  ('w_listed_research', 'weekly', 'Schließe {target} Forschungen ab', 'Wer forscht, wächst.', 'mission_company', 'research_done', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 2, 3, 800, 1200, 9, null, false, 50, 1),
+  ('w_listed_books', 'weekly', 'Mach an {target} Tagen die Bücher', 'Jeden Tag ein paar Sekunden, dann bleibt das Finanzamt freundlich.', 'mission_company', 'books_done', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 4, 5, 800, 1200, 9, null, false, 50, 1),
+  ('w_listed_green', 'weekly', '{target} Stunden gute Stimmung', 'Eine Woche, in der das Team gern zur Arbeit kommt.', 'mission_company', 'satisfaction_green', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 40, 60, 800, 1200, 9, null, false, 40, 1),
+  ('w_listed_dividends', 'weekly', 'Schütte an {target} Tagen Dividende aus', 'Verlässliche Dividenden machen eine Aktie beliebt.', 'mission_company', 'dividend_paid', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 3, 4, 800, 1200, 9, null, false, 30, 1),
+  ('m_first_research', 'milestone', 'Deine erste Forschung', 'Schließe ein Forschungsprojekt ab.', 'mission_company', 'research_done', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 1, 1, 800, 800, 9, 70, false, 100, 1),
+  ('m_research_10', 'milestone', '{target} Forschungen abgeschlossen', 'Dein Labor läuft auf Hochtouren.', 'mission_company', 'research_done', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 10, 10, 3000, 3000, 9, 112, false, 100, 1),
+  ('m_research_28', 'milestone', 'Der ganze Forschungsbaum', 'Alle {target} Projekte erforscht. Mehr geht nicht.', 'mission_company', 'research_done', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 28, 28, 10000, 10000, 9, 130, false, 100, 1),
+  ('m_first_product', 'milestone', 'Ein zweites Standbein', 'Bring ein neues Produkt auf den Markt.', 'mission_company', 'product_launched', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 1, 1, 1000, 1000, 9, 72, false, 100, 1),
+  ('m_products_4', 'milestone', '{target} Produkte am Markt', 'Ein richtiges Sortiment.', 'mission_company', 'product_launched', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 4, 4, 3500, 3500, 9, 114, false, 100, 1),
+  ('m_first_region', 'milestone', 'Raus aus der Heimat', 'Eröffne deinen ersten neuen Markt.', 'mission_company', 'region_opened', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 1, 1, 1200, 1200, 9, 74, false, 100, 1),
+  ('m_regions_5', 'milestone', 'Weltkonzern', 'Von Süddeutschland bis Asien: alle {target} Märkte eröffnet.', 'mission_company', 'region_opened', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 5, 5, 8000, 8000, 9, 128, false, 100, 1),
+  ('m_first_dividend', 'milestone', 'Deine erste Dividende', 'Teile den Gewinn mit deinen Aktionären.', 'mission_company', 'dividend_paid', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 1, 1, 800, 800, 9, 71, false, 100, 1),
+  ('m_dividend_big', 'milestone', '{target} € Dividende ausgeschüttet', 'Eine Aktie, auf die man sich verlassen kann.', 'mission_company', 'dividend_cents', 'sum', '{"unlock":"ipo","requires":"listed"}'::jsonb, 10000000, 10000000, 4000, 4000, 9, 116, false, 100, 1),
+  ('m_first_books', 'milestone', 'Ordnung muss sein', 'Mach zum ersten Mal die Bücher deiner AG.', 'mission_company', 'books_done', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 1, 1, 500, 500, 9, 69, false, 100, 1),
+  ('m_books_streak_7', 'milestone', '{target} Tage saubere Bücher', 'Sieben Tage in Folge die Bücher gemacht.', 'mission_company', 'books_streak', 'max', '{"unlock":"ipo","requires":"listed"}'::jsonb, 7, 7, 3000, 3000, 9, 113, false, 100, 1),
+  ('m_first_motion', 'milestone', 'Geschäftsrat einberufen', 'Bring mit über 20 % der Aktien einen Antrag ein.', 'mission_company', 'board_motion', 'count', '{"unlock":"ipo"}'::jsonb, 1, 1, 1000, 1000, 9, 76, false, 100, 1),
+  ('m_audit', 'milestone', 'Betriebsprüfung überstanden', 'Das Finanzamt war da. Du hast es geregelt.', 'mission_company', 'audit_survived', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 1, 1, 2000, 2000, 9, 118, false, 100, 1)
+on conflict (key) do update
+   set kind = excluded.kind, title = excluded.title, description = excluded.description, icon_key = excluded.icon_key,
+       metric = excluded.metric, mode = excluded.mode, params = excluded.params, target_min = excluded.target_min,
+       target_max = excluded.target_max, xp_min = excluded.xp_min, xp_max = excluded.xp_max, min_level = excluded.min_level,
+       chain_order = excluded.chain_order, scale_with_level = excluded.scale_with_level, weight = excluded.weight,
+       reward_skill_points = excluded.reward_skill_points, is_active = true, updated_at = now();
+
+-- the feed names what happened at listed companies
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.feed_item_label(text, jsonb)'::regprocedure);
+  v_old text := $t$    when 'car_bought' then 'Neues Auto'$t$;
+  v_new text := $t$    when 'car_bought' then 'Neues Auto'
+    when 'tax_penalty' then 'Strafe vom Finanzamt für ' || coalesce(p_payload ->> 'company', '?')
+    when 'tax_audit' then 'Betriebsprüfung bei ' || coalesce(p_payload ->> 'company', '?')
+    when 'greedy_founder' then 'zahlt sich bei ' || coalesce(p_payload ->> 'company', '?') || ' fast den ganzen Gewinn selbst aus'
+    when 'mass_quit' then 'Kündigungswelle bei ' || coalesce(p_payload ->> 'company', '?')
+    when 'record_dividend' then 'Rekorddividende bei ' || coalesce(p_payload ->> 'company', '?')
+    when 'board_revolt' then 'Aufstand im Geschäftsrat von ' || coalesce(p_payload ->> 'company', '?')
+    when 'research_done' then 'Forschungsdurchbruch bei ' || coalesce(p_payload ->> 'company', '?')$t$;
+begin
+  if position('greedy_founder' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'feed_item_label() has an unexpected shape; add the listed company feed kinds (ADR-167) by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+-- NEXA Nachrichten: personal news from listed companies
+do $do$
+declare
+  v_def  text := pg_get_functiondef('public.news_show_build(timestamptz)'::regprocedure);
+  v_bad  text := $t$when f.kind in ('rug_pull', 'loan_defaulted', 'deal_broken', 'coin_closed')$t$;
+  -- anchored without 'big_trade': the Nexamon migration puts 'nexamon_pull' between it and 'rug_pull'
+  v_list text := $t$'rug_pull', 'loan_defaulted', 'deal_broken', 'coin_closed')$t$;
+begin
+  if position('greedy_founder' in v_def) = 0 then
+    if position(v_bad in v_def) = 0 or position(v_list in v_def) = 0 then
+      raise exception 'news_show_build() has an unexpected shape; add the listed company feed kinds (ADR-167) to the gossip source by hand';
+    end if;
+    v_def := replace(v_def, v_bad,
+      $t$when f.kind in ('rug_pull', 'loan_defaulted', 'deal_broken', 'coin_closed', 'tax_penalty', 'tax_audit', 'greedy_founder', 'mass_quit')$t$);
+    v_def := replace(v_def, v_list,
+      $t$'rug_pull', 'loan_defaulted', 'deal_broken', 'coin_closed',
+                                  'tax_penalty', 'tax_audit', 'greedy_founder', 'mass_quit', 'record_dividend', 'board_revolt')$t$);
+    execute v_def;
+  end if;
+end;
+$do$;
+
 commit;

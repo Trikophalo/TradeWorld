@@ -3,6 +3,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { useTranslations } from "next-intl";
+import { LISTED_COMPANY_KEY } from "@/features/game/listed-types";
 import { useEffect, useEffectEvent, useMemo, useRef, useState, type FormEvent } from "react";
 import { create } from "zustand";
 import { MIRA } from "@/components/pixel/art";
@@ -140,6 +141,13 @@ function useMiraState(applications: number, health: MiraHealth | null): MiraStat
   });
   const event = useCompanyEvent();
   const pitches = useCompanyPitches(founder);
+  // Listed companies (ADR-167): books, taxes, mood and the board; null while the company is private.
+  const listed = useQuery({
+    queryKey: LISTED_COMPANY_KEY,
+    queryFn: () => engine.listedCompany(),
+    refetchInterval: 60_000,
+    enabled: founder,
+  });
   const now = useClock();
   return useMemo(() => {
     // The founder's Mira also needs the moves and the orders before she speaks.
@@ -165,16 +173,18 @@ function useMiraState(applications: number, health: MiraHealth | null): MiraStat
             }
           : null,
       health: founder ? health : null,
+      listed: founder ? (listed.data ?? null) : null,
       // a minute is precise enough for deadlines, and keeps the briefing ids stable
       now: Math.floor(now / 60_000) * 60_000,
     };
-  }, [tasks.data, moves.data, event.data, pitches.data, founder, applications, health, now]);
+  }, [tasks.data, moves.data, event.data, pitches.data, listed.data, founder, applications, health, now]);
 }
 
 function useNames(): MiraNames {
   const text = useTaskText();
   const tm = useTranslations("companyMoves");
   const tn = useTranslations("skills.nodes");
+  const tl = useTranslations("listed.items");
   const health = useHealthText();
   return useMemo(
     () => ({
@@ -191,8 +201,14 @@ function useNames(): MiraNames {
           return tn.has(path) ? tn(path) : key;
         },
       },
+      listed: {
+        item: (key: string) => {
+          const path = `${key}.name` as Parameters<typeof tl>[0];
+          return tl.has(path) ? tl(path) : key;
+        },
+      },
     }),
-    [text, tm, tn, health],
+    [text, tm, tn, tl, health],
   );
 }
 
@@ -322,6 +338,23 @@ function useRunner(state: MiraState | null, names: MiraNames, onOpen: MiraOpen, 
         case "dismissAi": {
           for (let i = 0; i < action.count; i++) await engine.dismissAiWorker(crypto.randomUUID(), null);
           mira([{ key: "health.ok.dismissAi", values: { count: action.count } }]);
+          break;
+        }
+        // Listed companies (ADR-167): the same RPCs as the controls of the company page.
+        case "invest": {
+          client.setQueryData(LISTED_COMPANY_KEY, await engine.companyInvest(crypto.randomUUID(), action.key));
+          mira([{ key: "listed.ok.invest", values: { item: names.listed?.item(action.key) ?? action.key } }]);
+          break;
+        }
+        case "payTax": {
+          const r = await engine.payCompanyTax(crypto.randomUUID());
+          client.setQueryData(LISTED_COMPANY_KEY, r.listed);
+          mira([{ key: "listed.ok.payTax", values: { amount: names.money(r.paidCents) } }]);
+          break;
+        }
+        case "advisor": {
+          client.setQueryData(LISTED_COMPANY_KEY, await engine.setTaxAdvisor(crypto.randomUUID(), action.hire));
+          mira([{ key: action.hire ? "listed.ok.hireAdvisor" : "listed.ok.fireAdvisor" }]);
           break;
         }
       }

@@ -1,7 +1,7 @@
 {
   "job": null,
-  "tag": "5CUK",
-  "rank": 147,
+  "tag": "4CS4",
+  "rank": 151,
   "level": 6,
   "trust": { "band": "shaky", "kept": 0, "score": 41, "broken": 1 },
   "company": { "name": "Fixture Lieferwerk", "ticker": null },
@@ -11,7 +11,7 @@
   "top_skills": [],
   "accessories": [],
   "streak_days": 0,
-  "member_since": "2026-11-16T17:32:34.306108+00:00",
+  "member_since": "2026-11-16T17:55:38.62681+00:00",
   "branch_scores": {
     "it": 0,
     "law": 0,

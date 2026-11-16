@@ -55,6 +55,14 @@ const ICONS: Record<string, PixelArt> = {
   coin_closed: UI_ICONS.crypto,
   accessory_bought: { grid: ACCESSORY_ART.crown!.grid, palette: ACCESSORY_ART.crown!.palette },
   battle_won: BATTLE_ICONS.bell,
+  // listed companies (ADR-167)
+  tax_penalty: UI_ICONS.company,
+  tax_audit: UI_ICONS.company,
+  greedy_founder: UI_ICONS.company,
+  mass_quit: UI_ICONS.briefcase,
+  record_dividend: UI_ICONS.markets,
+  board_revolt: UI_ICONS.markets,
+  research_done: UI_ICONS.upgrade,
 };
 
 const str = (v: unknown) => (typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
@@ -135,6 +143,14 @@ function useFeedText() {
         return t("battle_won", { game: str(p.game) });
       case "nexamon_pull":
         return t("nexamon_pull", { name: nexamonCard(str(p.card_key))?.name ?? str(p.card_key), serial: n(p.serial) });
+      case "tax_penalty":
+      case "tax_audit":
+      case "greedy_founder":
+      case "mass_quit":
+      case "record_dividend":
+      case "board_revolt":
+      case "research_done":
+        return t(item.kind, { company: str(p.company) });
       default:
         return t("other");
     }

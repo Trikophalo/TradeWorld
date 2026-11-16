@@ -406,6 +406,20 @@ export interface StartupHourInput {
   readonly campaignFactor?: number;
   /** Task momentum (ADR-148): demand multiplier from solved tasks, default 1. */
   readonly taskMomentum?: number;
+  /**
+   * Listed companies only (ADR-167, see listedHourEffect in listed.ts): research, products, regions, machines,
+   * benefits, employee satisfaction and reputation as terms of the hour, plus the hour's running costs of all that
+   * (they count as fixed costs). Private companies pass nothing.
+   */
+  readonly listed?: {
+    readonly awarenessAdd: number;
+    readonly qualityAdd: number;
+    readonly demandFactor: number;
+    readonly capacityFactor: number;
+    readonly cogsFactor: number;
+    readonly fixedFactor: number;
+    readonly costsCents: number;
+  };
 }
 
 export interface StartupHourResult {
@@ -416,7 +430,10 @@ export interface StartupHourResult {
   /** Part of the revenue from contract work (ADR-083). */
   readonly contractRevenueCents: bigint;
   readonly cogsCents: bigint;
+  /** Fixed costs of the hour; for listed companies including listedCostsCents (ADR-167). */
   readonly fixedCents: bigint;
+  /** Listed: running costs of products, regions, machines, benefits and the tax advisor (part of fixedCents). */
+  readonly listedCostsCents: bigint;
   readonly marketingCents: bigint;
   /** Share of the wages paid this hour: never more than revenue minus goods (ADR-072). */
   readonly payFactorBps: number;
@@ -438,23 +455,29 @@ export function closeStartupHour(
   const sc = cfg.startups;
   const hours = cfg.time.quarterHours;
   const stage = clamp(Math.floor(input.stage), 0, sc.stages.awarenessCaps.length - 1);
-  const pricing = priceEffect(input.priceLevel, state.quality, sc);
+  // Listed companies (ADR-167): research and mood move the awareness and quality this hour sells with.
+  const lx = input.listed;
+  const awareness = lx ? Math.min(1, state.awareness + lx.awarenessAdd) : state.awareness;
+  const quality = lx ? clamp(state.quality + lx.qualityAdd, 0, 1) : state.quality;
+  const pricing = priceEffect(input.priceLevel, quality, sc);
   const potential = effectivePotentialCents(state.potentialAnnualCents, input.tier, input.expansionLevel, sc);
   // Demand and capacity count in units at the normal price (see closeStartupQuarter).
   const demand =
     (potential / 4 / hours) *
-    state.awareness *
-    (0.5 + 0.5 * state.quality) *
+    awareness *
+    (0.5 + 0.5 * quality) *
     Math.exp(sc.demandNoise * input.noise) *
     pricing.demand *
     (input.event?.demandFactor ?? 1) *
     Math.max(0, input.campaignFactor ?? 1) *
-    Math.max(1, input.taskMomentum ?? 1);
+    Math.max(1, input.taskMomentum ?? 1) *
+    (lx?.demandFactor ?? 1);
   const capacity =
     (capacityCents(input.productivityBps, input.sector, sc) *
       (1 + sc.stages.capacityBonusPerStage * stage) *
       expansionCapacityFactor(input.expansionLevel, sc) *
-      (input.event?.capacityFactor ?? 1)) /
+      (input.event?.capacityFactor ?? 1) *
+      (lx?.capacityFactor ?? 1)) /
     hours;
   const sold = Math.min(demand, capacity);
   const contract = input.contractWork ? (capacity - sold) * sc.contractWork.shareOfFreeCapacity : 0;
@@ -464,7 +487,7 @@ export function closeStartupHour(
   // An event's extra costs (or savings) move with the revenue; goods never cost less than nothing.
   const eventCost = Number(ownRevenueCents) * (input.event?.extraCostShare ?? 0);
   const cogsCents =
-    roundToBigInt(Math.max(0, sold * (1 - sc.grossMargin[input.sector]) + eventCost)) +
+    roundToBigInt(Math.max(0, sold * (1 - sc.grossMargin[input.sector]) * (lx?.cogsFactor ?? 1) + eventCost)) +
     roundToBigInt(contract * (1 - sc.contractWork.grossMargin));
   const gross = Number(revenueCents - cogsCents);
 
@@ -474,7 +497,10 @@ export function closeStartupHour(
   const aiWagesPaidCents = BigInt(Math.floor((aiDue * payFactorBps) / 10_000));
   const playerWagesPaidCents = BigInt(Math.floor((Math.max(0, input.playerWagesCents) * payFactorBps) / 10_000));
 
-  const fixedCents = BigInt(Math.round(fixedCostCents(input.tier, cfg, input.expansionLevel) / hours));
+  const baseFixed = Math.round(fixedCostCents(input.tier, cfg, input.expansionLevel) / hours);
+  // Listed: research can lower the fixed costs; the running costs of products, regions and benefits come on top.
+  const listedCostsCents = BigInt(Math.max(0, Math.round(lx?.costsCents ?? 0)));
+  const fixedCents = BigInt(lx ? Math.round(baseFixed * lx.fixedFactor) : baseFixed) + listedCostsCents;
   const marketingCents = BigInt(Math.round(Number(input.marketingCentsPerQuarter) / hours));
   return {
     demandCents: roundToBigInt(demand),
@@ -483,6 +509,7 @@ export function closeStartupHour(
     contractRevenueCents,
     cogsCents,
     fixedCents,
+    listedCostsCents,
     marketingCents,
     payFactorBps,
     playerWagesPaidCents,

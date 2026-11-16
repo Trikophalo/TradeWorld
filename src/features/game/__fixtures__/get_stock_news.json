@@ -2,42 +2,42 @@
   "items": [
     {
       "id": 5,
-      "body": "Die Geschäfte laufen besser als geplant. Analysten erwarten einen leicht steigenden Kurs. Sicher ist das nicht.",
-      "name": "QuantenSprung Labs",
-      "due_at": "2026-11-16T18:50:18.115975+00:00",
+      "body": "Ein bekannter Kopf aus der Branche kommt an Bord. Anleger dürften das leicht honorieren. Sicher ist das nicht.",
+      "name": "Methusalem Bio",
+      "due_at": "2026-11-16T19:24:51.584669+00:00",
       "status": "open",
-      "ticker": "QSL",
-      "headline": "QuantenSprung Labs hebt die Prognose an",
+      "ticker": "MTH",
+      "headline": "Neuer Chef-Entwickler wechselt zu Methusalem Bio",
       "move_bps": null,
       "strength": 1,
       "direction": "up",
-      "published_at": "2026-11-16T18:32:36.017816+00:00"
+      "published_at": "2026-11-16T18:55:40.203616+00:00"
     },
     {
       "id": 4,
-      "body": "Ein Vögelchen hat mir gezwitschert: Nordlicht Logistik AG dürfte in der kommenden Stunde nach unten gehen. Meine Quelle ist seriös, sie trägt immerhin eine Krawatte.",
-      "name": "Nordlicht Logistik AG",
-      "due_at": "2026-11-16T17:52:14.684892+00:00",
+      "body": "Ein Vögelchen hat mir gezwitschert: Eilbote Express dürfte in der kommenden Stunde nach unten gehen. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
+      "name": "Eilbote Express",
+      "due_at": "2026-11-16T18:10:15.804291+00:00",
       "status": "fizzled",
-      "ticker": "NDL",
-      "headline": "Vom Flurfunk: Nordlicht Logistik AG",
+      "ticker": "EBX",
+      "headline": "Vom Flurfunk: Eilbote Express",
       "move_bps": null,
       "strength": 2,
       "direction": "down",
-      "published_at": "2026-11-16T17:32:14.684892+00:00"
+      "published_at": "2026-11-16T17:55:15.804291+00:00"
     },
     {
       "id": 3,
-      "body": "Ein Vögelchen hat mir gezwitschert: Luftpost Drohnen dürfte in der kommenden Stunde nach oben gehen. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
-      "name": "Luftpost Drohnen",
-      "due_at": "2026-11-16T17:32:13.491453+00:00",
+      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Rheinkraft Werke tut sich in der nächsten Stunde etwas, und zwar nach oben. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
+      "name": "Rheinkraft Werke",
+      "due_at": "2026-11-16T17:55:14.617472+00:00",
       "status": "confirmed",
-      "ticker": "DRN",
-      "headline": "Vom Flurfunk: Luftpost Drohnen",
-      "move_bps": 1439,
+      "ticker": "RKW",
+      "headline": "Mr. Doodle Dangles Geheimtipp",
+      "move_bps": 1289,
       "strength": 2,
       "direction": "up",
-      "published_at": "2026-11-16T17:32:13.491453+00:00"
+      "published_at": "2026-11-16T17:55:14.617472+00:00"
     }
   ],
   "reliability_bps": 7500

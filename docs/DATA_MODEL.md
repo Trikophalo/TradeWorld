@@ -7758,3 +7758,60 @@ Migration `20261204005350_mission_reset.sql`.
   Geldziele, von `missions_assign` angewandt.
 - Konfiguration: `progression.missionResetsPerDay`, `progression.missionAfford`.
 - Test `supabase/tests/a2_mission_reset.sql` (`verify_local.sh` führt jetzt auch `a[0-9]*.sql` aus).
+
+## Nachtrag: Börsennotierte Spielerfirmen (ADR-167)
+
+Migrationen `20261204005400_listed_companies.sql`, `…5410_listed_actions.sql`, `…5420_listed_missions_news.sql`. Alles
+gilt nur, solange `companies.phase = 'listed'` und die Spielerfirma aktiv ist (`listed_is`). Werte in
+`game_config.listed` (aus `src/config/listed.ts`), Formeln wie `src/lib/sim/listed.ts`.
+
+**Tabellen** (alle intern: RLS an, keine Policy, keine Rechte für `authenticated`; nur über RPCs):
+
+| Tabelle                        | Inhalt                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `listed_companies`             | je notierter Firma: `reputation`, `satisfaction` (0–100), `price_factor`, `ref_revenue_cents`, `layoff_heat`, `red_hours`, Bücher (`books_until`, `books_day`, `books_streak`, `books_stage`, `loss_carry_cents`), `advisor`, Beschlüsse des Geschäftsrats (`payout_cap_bps/until`, `withdraw_block_until`, `price_lock/until`), Dividenden-Serie. Entsteht beim ersten Zugriff (`listed_ensure`). |
+| `company_investments`          | (`company_id`, `key`) aus dem Katalog: `kind`, `status` (`running`, `active`, `paused`, `retired`), `level` (fertige Stufen), `ready_at` (Stufe in Arbeit), `last_used_at` (Aktionen), `spent_cents`.                                                                                                                                                                                              |
+| `listed_company_hours`         | Verlauf je Stunde: Zufriedenheit, Ruf, ihre Ziele, Nachfrage- und Kapazitätsfaktor, laufende Kosten je Kategorie, Treiber (`drivers`).                                                                                                                                                                                                                                                             |
+| `company_budgets`              | (`company_id`, `purpose`) → `amount_cents`: vom Geschäftsrat reserviertes Geld (kein eigenes Konto).                                                                                                                                                                                                                                                                                               |
+| `company_dividends`            | gezahlte Dividenden: Quelle (`founder`, `board`), Gesamt, Anteil Spieler, Anteil Streubesitz, Halter.                                                                                                                                                                                                                                                                                              |
+| `board_motions`, `board_votes` | Anträge (`kind`, `params`, `status` `open/passed/rejected/no_quorum/cancelled`, Stimmen in Aktien e6) und eine Stimme je Aktionär.                                                                                                                                                                                                                                                                 |
+| `company_tax_periods`          | abgeschlossene Buchungsperioden (`kind` `books`) und Verspätungszuschläge (`late_fee`): Umsatz, Kosten, Gewinn, Verlustverrechnung, Steuer, Zuschläge, bezahlt, `closed_by` (`founder`, `advisor`, `finanzamt`), `stage`, Frist.                                                                                                                                                                   |
+
+**RPCs** (schreibende mit `request_id`, idempotent; Gründer, wenn nicht anders vermerkt):
+
+| RPC                                                         | Antwort                                                      | Fehler                                                                                               |
+| ----------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `get_listed_company()`                                      | `{listed: LISTED \| null}` (null bei privater Firma)         | `company_not_found`                                                                                  |
+| `company_invest(request_id, key)`                           | `{listed}`                                                   | `not_listed`, `item_unknown`, `item_locked`, `item_running`, `budget_reserved`, `insufficient_funds` |
+| `company_invest_stop(request_id, key)`                      | `{listed}` (Produkt, Region, Lizenz, Benefit)                | `item_unknown`, `item_locked`                                                                        |
+| `company_declare_dividend(request_id, total_cents)`         | `{listed, dividend}`                                         | `invalid_argument`, `dividend_limit`, `insufficient_funds`                                           |
+| `company_books_close(request_id, answers text[], pay bool)` | `{listed, period, paid_cents}`                               | `books_nothing`                                                                                      |
+| `company_tax_pay(request_id)`                               | `{listed, paid_cents}`                                       | `tax_nothing_due`, `insufficient_funds`                                                              |
+| `company_tax_advisor(request_id, hire bool)`                | `{listed}`                                                   | `not_listed`                                                                                         |
+| `get_company_accounting(days, before)`                      | `{cash_cents, from, days[], totals, entries[], next_before}` | `not_listed`                                                                                         |
+| `get_company_board(company_id)`                             | `{board}`; Gründer oder Aktionär, `null` = eigene Firma      | `not_listed`, `board_not_shareholder`                                                                |
+| `board_propose(request_id, company_id, kind, params)`       | `{board}`; Aktionär mit mehr als 20 %                        | `board_no_right`, `board_limit`, `invalid_argument`, `insufficient_funds`                            |
+| `board_vote(request_id, motion_id, yes)`                    | `{board}`; jeder Aktionär                                    | `board_motion_unknown`, `board_not_shareholder`                                                      |
+
+`LISTED` enthält: Kasse (`cash_cents`, `unpaid_cents`, `reserved_cents`, `free_cash_cents`), `ref_revenue_cents`,
+`headcount`, `reputation` und `satisfaction` (Wert, Ziel, Faktoren, Treiber), `effects` (Summe aller aktiven Posten),
+`hour` (Terme der nächsten Stunde), `upkeep`, `upkeep_per_hour_cents`, `items[]` (jeder Katalogposten mit `status`,
+`level`, `ready_at`, `cooldown_until`, `cost_cents`, `upkeep_cents`, `missing[]`), `budgets[]`, `restrictions`,
+`dividends`, `books` (offene Periode mit Belegen), `taxes` (fällig, Satz, Verlustvortrag, Berater, Perioden),
+`history[]` (72 Stunden) und `board` (offene Anträge, eigener Anteil). Antworten enthalten Nicknames, keine
+Spieler-IDs.
+
+**Buchungen:** laufende Kosten und Investitionen `company_costs` Firmenkasse → `households` mit
+`metadata.cat` (`research`, `product`, `expansion`, `benefit`, `advisor`), Investitionen zusätzlich `one_off: true`
+und `item`; Dividenden `dividend` Firmenkasse → Spielerkonten und `market` (Streubesitz); Steuer `tax` und Zuschläge
+`fine` Firmenkasse → `treasury`. `listed_ledger_category(kind, key, metadata)` ordnet jede Buchung des Firmenkontos
+einer von 16 Kategorien zu; die zehn betrieblichen ergeben den steuerlichen Gewinn.
+
+**Geänderte Funktionen** (per `replace` auf der aktuellen Definition, mit klarer Fehlermeldung, wenn die Stelle
+fehlt): `player_company_close_hour` (zehn Stellen: Terme, laufende Kosten, Deckel, Reserve, Nachlauf),
+`company_withdraw`, `set_founder_payout`, `set_company_strategy`, `company_dissolve`,
+`player_company_close_quarter` (fairer Wert × Ruf-Faktor), `account_wipe`, `api_error` (NX190–NX204),
+`mission_requirement_ok` (`listed`), `mission_doable`, `mission_is_money_metric`, `feed_item_label`,
+`news_show_build`. Neu: Benachrichtigungsarten `tax_office` (Pflicht), `team_mood`, `board`, `company_dividend`,
+`company_project`; Trigger `listed_audit_mission` auf `player_company_events`; Firmen-Ereignis `tax_audit`
+(Gewicht 0, nur vom Finanzamt).

@@ -78,6 +78,7 @@ export const PITCH_RULES = {
         "transparen",
         "entschädig",
       ],
+      tax_audit: ["unterlagen", "beleg", "steuerberater", "anwalt", "kooper", "offen", "nachzahl", "ordnung"],
       data_breach: ["sicherheit", "passwort", "verschlüssel", "melden", "experten", "informieren", "update", "audit"],
       price_war: ["qualität", "service", "treue", "nische", "kosten", "bündel", "mehrwert", "marke"],
       strike: ["lohn", "gehalt", "verhandl", "bonus", "gespräch", "kompromiss", "zuhören", "arbeitszeit", "tarif"],

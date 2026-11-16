@@ -1,38 +1,38 @@
 {
   "applications": [
     {
-      "id": "7a79413d-775f-4a6f-98d2-4cc739b45f6f",
+      "id": "898c75f7-d01b-47e3-ac7e-9b57bc290eda",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "321cb98a-1e59-406d-a0e2-65e11489d9f8",
+        "id": "06d75cdb-11ce-4d29-bb7b-3d1bf390d197",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "d21331b8-a414-66aa-de07-f036108fc91d",
+          "id": "60dd5582-1f7b-b751-df95-287e43ff8e82",
           "logo": null,
-          "name": "Nordlicht Logistik AG",
-          "color": "#7AA2F7",
+          "name": "Knusperkönig",
+          "color": "#FF9F1C",
           "is_ai": true,
-          "sector": "logistics",
-          "ticker": "NDL"
+          "sector": "retail",
+          "ticker": "SNK"
         },
-        "required": [{ "branch": "management", "min_score": 0 }],
-        "title_key": "management_intern",
+        "required": [{ "branch": "finance", "min_score": 0 }],
+        "title_key": "finance_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-16T17:32:30.017468+00:00",
-      "updated_at": "2026-11-16T17:32:30.021631+00:00",
-      "offer_expires_at": "2026-11-18T17:32:30.017468+00:00",
+      "created_at": "2026-11-16T17:55:34.572276+00:00",
+      "updated_at": "2026-11-16T17:55:34.576341+00:00",
+      "offer_expires_at": "2026-11-18T17:55:34.572276+00:00",
       "salary_wish_cents_per_hour": 15000,
       "offer_salary_cents_per_hour": 15000
     },
     {
-      "id": "5fa1dede-57cd-49f0-a5ff-5b930aa206fa",
+      "id": "e699f7d9-a0df-480b-8083-61ab10db1065",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "56fb93c9-1227-4450-ac3d-348550dca603",
+        "id": "59d0e4d2-5f44-44eb-bdc5-934a9fcdf429",
         "tier": "junior",
         "title": null,
         "company": {
@@ -48,9 +48,9 @@
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-16T17:32:30.006994+00:00",
-      "updated_at": "2026-11-16T17:32:30.006994+00:00",
-      "offer_expires_at": "2026-11-18T17:32:30.006994+00:00",
+      "created_at": "2026-11-16T17:55:34.566871+00:00",
+      "updated_at": "2026-11-16T17:55:34.566871+00:00",
+      "offer_expires_at": "2026-11-18T17:55:34.566871+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

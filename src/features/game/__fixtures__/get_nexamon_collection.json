@@ -2,27 +2,27 @@
   "cards": [
     {
       "set": "mystic_energy",
-      "owned": 0,
+      "owned": 1,
       "listed": 4,
       "number": 1,
       "rarity": "common",
       "card_key": "me-001",
       "cap_cents": 1260,
       "change_bps": 0,
-      "population": 6,
+      "population": 7,
       "floor_cents": 84,
       "start_cents": 420,
       "value_cents": 420,
-      "popularity_bps": 3491
+      "popularity_bps": 3489
     },
     {
       "set": "mystic_energy",
-      "owned": 0,
+      "owned": 1,
       "listed": 4,
       "number": 2,
       "rarity": "common",
       "card_key": "me-002",
-      "cap_cents": 781,
+      "cap_cents": 780,
       "change_bps": 0,
       "population": 7,
       "floor_cents": 52,
@@ -39,11 +39,11 @@
       "card_key": "me-003",
       "cap_cents": 1350,
       "change_bps": 0,
-      "population": 8,
+      "population": 7,
       "floor_cents": 90,
       "start_cents": 450,
       "value_cents": 450,
-      "popularity_bps": 3488
+      "popularity_bps": 3489
     },
     {
       "set": "mystic_energy",
@@ -84,11 +84,11 @@
       "card_key": "me-006",
       "cap_cents": 750,
       "change_bps": 0,
-      "population": 7,
+      "population": 6,
       "floor_cents": 50,
       "start_cents": 250,
       "value_cents": 250,
-      "popularity_bps": 3489
+      "popularity_bps": 3491
     },
     {
       "set": "mystic_energy",
@@ -99,11 +99,11 @@
       "card_key": "me-007",
       "cap_cents": 540,
       "change_bps": 0,
-      "population": 6,
+      "population": 8,
       "floor_cents": 36,
       "start_cents": 180,
       "value_cents": 180,
-      "popularity_bps": 3491
+      "popularity_bps": 3488
     },
     {
       "set": "mystic_energy",
@@ -129,40 +129,40 @@
       "card_key": "me-009",
       "cap_cents": 450,
       "change_bps": 0,
-      "population": 6,
+      "population": 7,
       "floor_cents": 30,
       "start_cents": 150,
       "value_cents": 150,
-      "popularity_bps": 3491
+      "popularity_bps": 3489
     },
     {
       "set": "mystic_energy",
-      "owned": 1,
+      "owned": 0,
       "listed": 3,
       "number": 10,
       "rarity": "common",
       "card_key": "me-010",
       "cap_cents": 693,
       "change_bps": 209,
-      "population": 8,
+      "population": 7,
       "floor_cents": 46,
       "start_cents": 230,
       "value_cents": 235,
-      "popularity_bps": 3488
+      "popularity_bps": 3489
     },
     {
       "set": "mystic_energy",
-      "owned": 0,
+      "owned": 1,
       "listed": 4,
       "number": 11,
       "rarity": "common",
       "card_key": "me-011",
       "cap_cents": 390,
-      "change_bps": -49,
+      "change_bps": -25,
       "population": 8,
       "floor_cents": 26,
       "start_cents": 130,
-      "value_cents": 129,
+      "value_cents": 130,
       "popularity_bps": 3488
     },
     {
@@ -189,11 +189,11 @@
       "card_key": "me-013",
       "cap_cents": 480,
       "change_bps": 0,
-      "population": 7,
+      "population": 9,
       "floor_cents": 32,
       "start_cents": 160,
       "value_cents": 160,
-      "popularity_bps": 3489
+      "popularity_bps": 3486
     },
     {
       "set": "mystic_energy",
@@ -204,11 +204,11 @@
       "card_key": "me-014",
       "cap_cents": 810,
       "change_bps": 0,
-      "population": 6,
+      "population": 8,
       "floor_cents": 54,
       "start_cents": 270,
       "value_cents": 270,
-      "popularity_bps": 3491
+      "popularity_bps": 3488
     },
     {
       "set": "mystic_energy",
@@ -219,26 +219,26 @@
       "card_key": "me-015",
       "cap_cents": 420,
       "change_bps": 0,
-      "population": 6,
+      "population": 7,
       "floor_cents": 28,
       "start_cents": 140,
       "value_cents": 140,
-      "popularity_bps": 3491
+      "popularity_bps": 3489
     },
     {
       "set": "mystic_energy",
-      "owned": 1,
+      "owned": 0,
       "listed": 4,
       "number": 16,
       "rarity": "common",
       "card_key": "me-016",
       "cap_cents": 690,
       "change_bps": 0,
-      "population": 7,
+      "population": 6,
       "floor_cents": 46,
       "start_cents": 230,
       "value_cents": 230,
-      "popularity_bps": 3489
+      "popularity_bps": 3491
     },
     {
       "set": "mystic_energy",
@@ -279,11 +279,11 @@
       "card_key": "me-019",
       "cap_cents": 570,
       "change_bps": 0,
-      "population": 7,
+      "population": 6,
       "floor_cents": 38,
       "start_cents": 190,
       "value_cents": 190,
-      "popularity_bps": 3489
+      "popularity_bps": 3491
     },
     {
       "set": "mystic_energy",
@@ -294,26 +294,26 @@
       "card_key": "me-020",
       "cap_cents": 840,
       "change_bps": 0,
-      "population": 6,
+      "population": 7,
       "floor_cents": 56,
       "start_cents": 280,
       "value_cents": 280,
-      "popularity_bps": 3491
+      "popularity_bps": 3489
     },
     {
       "set": "mystic_energy",
-      "owned": 1,
+      "owned": 0,
       "listed": 4,
       "number": 21,
       "rarity": "common",
       "card_key": "me-021",
       "cap_cents": 510,
       "change_bps": 0,
-      "population": 8,
+      "population": 7,
       "floor_cents": 34,
       "start_cents": 170,
       "value_cents": 170,
-      "popularity_bps": 3488
+      "popularity_bps": 3489
     },
     {
       "set": "mystic_energy",
@@ -324,26 +324,26 @@
       "card_key": "me-022",
       "cap_cents": 720,
       "change_bps": 0,
-      "population": 8,
+      "population": 6,
       "floor_cents": 48,
       "start_cents": 240,
       "value_cents": 240,
-      "popularity_bps": 3488
+      "popularity_bps": 3491
     },
     {
       "set": "mystic_energy",
-      "owned": 1,
+      "owned": 0,
       "listed": 4,
       "number": 23,
       "rarity": "common",
       "card_key": "me-023",
       "cap_cents": 990,
       "change_bps": 0,
-      "population": 7,
+      "population": 6,
       "floor_cents": 66,
       "start_cents": 330,
       "value_cents": 330,
-      "popularity_bps": 3489
+      "popularity_bps": 3491
     },
     {
       "set": "mystic_energy",
@@ -354,11 +354,11 @@
       "card_key": "me-024",
       "cap_cents": 870,
       "change_bps": 0,
-      "population": 6,
+      "population": 7,
       "floor_cents": 58,
       "start_cents": 290,
       "value_cents": 290,
-      "popularity_bps": 3491
+      "popularity_bps": 3489
     },
     {
       "set": "mystic_energy",
@@ -369,11 +369,11 @@
       "card_key": "me-025",
       "cap_cents": 450,
       "change_bps": 0,
-      "population": 8,
+      "population": 6,
       "floor_cents": 30,
       "start_cents": 150,
       "value_cents": 150,
-      "popularity_bps": 3488
+      "popularity_bps": 3491
     },
     {
       "set": "mystic_energy",
@@ -384,41 +384,41 @@
       "card_key": "me-026",
       "cap_cents": 750,
       "change_bps": 0,
-      "population": 8,
+      "population": 6,
       "floor_cents": 50,
       "start_cents": 250,
       "value_cents": 250,
-      "popularity_bps": 3488
+      "popularity_bps": 3491
     },
     {
       "set": "mystic_energy",
-      "owned": 1,
+      "owned": 0,
       "listed": 4,
       "number": 27,
       "rarity": "common",
       "card_key": "me-027",
       "cap_cents": 2850,
       "change_bps": 0,
-      "population": 8,
+      "population": 6,
       "floor_cents": 190,
       "start_cents": 950,
       "value_cents": 950,
-      "popularity_bps": 3488
+      "popularity_bps": 3491
     },
     {
       "set": "mystic_energy",
-      "owned": 0,
+      "owned": 1,
       "listed": 4,
       "number": 28,
       "rarity": "common",
       "card_key": "me-028",
       "cap_cents": 2100,
       "change_bps": 0,
-      "population": 6,
+      "population": 7,
       "floor_cents": 140,
       "start_cents": 700,
       "value_cents": 700,
-      "popularity_bps": 3491
+      "popularity_bps": 3489
     },
     {
       "set": "mystic_energy",
@@ -467,18 +467,18 @@
     },
     {
       "set": "mystic_energy",
-      "owned": 1,
+      "owned": 0,
       "listed": 4,
       "number": 32,
       "rarity": "common",
       "card_key": "me-032",
       "cap_cents": 900,
       "change_bps": 0,
-      "population": 8,
+      "population": 6,
       "floor_cents": 60,
       "start_cents": 300,
       "value_cents": 300,
-      "popularity_bps": 3488
+      "popularity_bps": 3491
     },
     {
       "set": "mystic_energy",
@@ -497,18 +497,18 @@
     },
     {
       "set": "mystic_energy",
-      "owned": 0,
+      "owned": 1,
       "listed": 4,
       "number": 34,
       "rarity": "common",
       "card_key": "me-034",
-      "cap_cents": 630,
+      "cap_cents": 631,
       "change_bps": 0,
-      "population": 6,
+      "population": 9,
       "floor_cents": 42,
       "start_cents": 210,
       "value_cents": 210,
-      "popularity_bps": 3491
+      "popularity_bps": 3486
     },
     {
       "set": "mystic_energy",
@@ -594,11 +594,11 @@
       "card_key": "me-040",
       "cap_cents": 930,
       "change_bps": 0,
-      "population": 6,
+      "population": 7,
       "floor_cents": 62,
       "start_cents": 310,
       "value_cents": 310,
-      "popularity_bps": 3491
+      "popularity_bps": 3489
     },
     {
       "set": "mystic_energy",
@@ -608,7 +608,7 @@
       "rarity": "common",
       "card_key": "me-041",
       "cap_cents": 510,
-      "change_bps": 0,
+      "change_bps": -25,
       "population": 7,
       "floor_cents": 34,
       "start_cents": 170,
@@ -654,11 +654,11 @@
       "card_key": "me-044",
       "cap_cents": 1020,
       "change_bps": 0,
-      "population": 6,
+      "population": 7,
       "floor_cents": 68,
       "start_cents": 340,
       "value_cents": 340,
-      "popularity_bps": 3491
+      "popularity_bps": 3489
     },
     {
       "set": "mystic_energy",
@@ -684,11 +684,11 @@
       "card_key": "me-046",
       "cap_cents": 1740,
       "change_bps": 0,
-      "population": 7,
+      "population": 6,
       "floor_cents": 116,
       "start_cents": 580,
       "value_cents": 580,
-      "popularity_bps": 3489
+      "popularity_bps": 3491
     },
     {
       "set": "mystic_energy",
@@ -699,11 +699,11 @@
       "card_key": "me-047",
       "cap_cents": 1680,
       "change_bps": 0,
-      "population": 6,
+      "population": 7,
       "floor_cents": 112,
       "start_cents": 560,
       "value_cents": 560,
-      "popularity_bps": 3491
+      "popularity_bps": 3489
     },
     {
       "set": "mystic_energy",
@@ -729,11 +729,11 @@
       "card_key": "me-049",
       "cap_cents": 2640,
       "change_bps": 0,
-      "population": 7,
+      "population": 6,
       "floor_cents": 176,
       "start_cents": 880,
       "value_cents": 880,
-      "popularity_bps": 3489
+      "popularity_bps": 3491
     },
     {
       "set": "mystic_energy",
@@ -767,18 +767,18 @@
     },
     {
       "set": "mystic_energy",
-      "owned": 0,
+      "owned": 1,
       "listed": 3,
       "number": 52,
       "rarity": "rare",
       "card_key": "me-052",
       "cap_cents": 5710,
       "change_bps": 90,
-      "population": 4,
+      "population": 5,
       "floor_cents": 380,
       "start_cents": 1900,
       "value_cents": 1917,
-      "popularity_bps": 4485
+      "popularity_bps": 4481
     },
     {
       "set": "mystic_energy",
@@ -1134,7 +1134,7 @@
       "card_key": "me-076",
       "cap_cents": 52500000,
       "change_bps": 0,
-      "population": 3,
+      "population": 1,
       "floor_cents": 3500000,
       "start_cents": 17500000,
       "value_cents": 17500000,
@@ -1149,7 +1149,7 @@
       "card_key": "me-077",
       "cap_cents": 44400000,
       "change_bps": 0,
-      "population": 2,
+      "population": 4,
       "floor_cents": 2960000,
       "start_cents": 14800000,
       "value_cents": 14800000,
@@ -1158,109 +1158,109 @@
   ],
   "copies": [
     {
-      "id": "e45b2b3d-fb49-4982-a6db-70314b8ae810",
+      "id": "e378ae02-3cf2-42d9-9ed2-1c87f552f91b",
       "grade": null,
       "state": "raw",
       "serial": 7,
       "listing": null,
-      "card_key": "me-004",
-      "condition": "mint",
+      "card_key": "me-001",
+      "condition": "near_mint",
       "graded_at": null,
-      "acquired_at": "2026-11-16T17:32:37.561026+00:00",
-      "value_cents": 240,
+      "acquired_at": "2026-11-16T17:55:41.384026+00:00",
+      "value_cents": 420,
       "grading_until": null
     },
     {
-      "id": "a7c7410b-2390-486d-b3fa-252783ce6a50",
+      "id": "1ca88fa1-6348-4261-a560-f43ddf1e512f",
+      "grade": null,
+      "state": "raw",
+      "serial": 7,
+      "listing": null,
+      "card_key": "me-002",
+      "condition": "near_mint",
+      "graded_at": null,
+      "acquired_at": "2026-11-16T17:55:41.384026+00:00",
+      "value_cents": 260,
+      "grading_until": null
+    },
+    {
+      "id": "ea044d3f-133a-43e5-bd15-139ebc01dde8",
+      "grade": 7,
+      "state": "graded",
+      "serial": 7,
+      "listing": null,
+      "card_key": "me-004",
+      "condition": "good",
+      "graded_at": "2026-11-16T17:55:41.456512+00:00",
+      "acquired_at": "2026-11-16T17:55:41.396856+00:00",
+      "value_cents": 216,
+      "grading_until": null
+    },
+    {
+      "id": "932fcc48-a927-4220-bee0-28055d73c49f",
       "grade": null,
       "state": "raw",
       "serial": 8,
       "listing": null,
-      "card_key": "me-010",
+      "card_key": "me-011",
       "condition": "near_mint",
       "graded_at": null,
-      "acquired_at": "2026-11-16T17:32:37.561026+00:00",
-      "value_cents": 235,
+      "acquired_at": "2026-11-16T17:55:41.384026+00:00",
+      "value_cents": 130,
       "grading_until": null
     },
     {
-      "id": "4acb536a-9c6c-46a8-8196-e9f5b7ea5192",
+      "id": "3da48e92-918b-4f1a-a12c-a3a772f09f59",
       "grade": null,
       "state": "raw",
-      "serial": 7,
+      "serial": 9,
       "listing": null,
       "card_key": "me-013",
       "condition": "near_mint",
       "graded_at": null,
-      "acquired_at": "2026-11-16T17:32:37.561026+00:00",
+      "acquired_at": "2026-11-16T17:55:41.396856+00:00",
       "value_cents": 160,
       "grading_until": null
     },
     {
-      "id": "31c9f6ec-e2dd-4c1f-baff-4cfd1c077ac5",
+      "id": "2ea0dc52-07ee-4ddf-935c-a93d99e52545",
       "grade": null,
       "state": "raw",
       "serial": 7,
       "listing": null,
-      "card_key": "me-016",
+      "card_key": "me-028",
       "condition": "near_mint",
       "graded_at": null,
-      "acquired_at": "2026-11-16T17:32:37.561026+00:00",
-      "value_cents": 230,
+      "acquired_at": "2026-11-16T17:55:41.384026+00:00",
+      "value_cents": 700,
       "grading_until": null
     },
     {
-      "id": "6d8a7d2e-91c6-4e66-ac71-f1c4d50ce15c",
+      "id": "0066f48a-74cc-47a7-811f-5fc09f61a305",
       "grade": null,
       "state": "raw",
       "serial": 8,
       "listing": null,
-      "card_key": "me-021",
-      "condition": "good",
-      "graded_at": null,
-      "acquired_at": "2026-11-16T17:32:37.58125+00:00",
-      "value_cents": 170,
-      "grading_until": null
-    },
-    {
-      "id": "5cb23b8e-7120-459f-bf06-990097b3eced",
-      "grade": null,
-      "state": "raw",
-      "serial": 7,
-      "listing": null,
-      "card_key": "me-023",
-      "condition": "good",
-      "graded_at": null,
-      "acquired_at": "2026-11-16T17:32:37.561026+00:00",
-      "value_cents": 330,
-      "grading_until": null
-    },
-    {
-      "id": "9e275968-8d44-4a99-be1d-b0ae4398c8b4",
-      "grade": 7,
-      "state": "graded",
-      "serial": 8,
-      "listing": null,
-      "card_key": "me-027",
-      "condition": "good",
-      "graded_at": "2026-11-16T17:32:37.705042+00:00",
-      "acquired_at": "2026-11-16T17:32:37.58125+00:00",
-      "value_cents": 855,
-      "grading_until": null
-    },
-    {
-      "id": "557b5395-11b4-427d-b8c9-416926226c6d",
-      "grade": null,
-      "state": "raw",
-      "serial": 8,
-      "listing": null,
-      "card_key": "me-032",
+      "card_key": "me-034",
       "condition": "near_mint",
       "graded_at": null,
-      "acquired_at": "2026-11-16T17:32:37.58125+00:00",
-      "value_cents": 300,
+      "acquired_at": "2026-11-16T17:55:41.384026+00:00",
+      "value_cents": 210,
+      "grading_until": null
+    },
+    {
+      "id": "395e141d-017f-4ca9-a4e7-2a73a1deed0e",
+      "grade": null,
+      "state": "raw",
+      "serial": 5,
+      "listing": null,
+      "card_key": "me-052",
+      "condition": "good",
+      "graded_at": null,
+      "acquired_at": "2026-11-16T17:55:41.396856+00:00",
+      "value_cents": 1917,
       "grading_until": null
     }
   ],
-  "server_time": "2026-11-16T17:32:37.705042+00:00"
+  "server_time": "2026-11-16T17:55:41.456512+00:00"
 }
