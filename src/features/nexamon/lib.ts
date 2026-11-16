@@ -49,6 +49,21 @@ export const isBlackLabel = (grade: number | null | undefined): boolean => grade
 /** The number printed on the label: a Black Label is a 10. */
 export const gradeNumber = (grade: number): number => Math.min(10, clampGrade(grade));
 
+/** How big the moment of a grade is: below 8, 8 and 9, a 10, the Black Label. */
+export type GradeTier = "low" | "good" | "ten" | "black";
+export const gradeTier = (grade: number): GradeTier =>
+  isBlackLabel(grade) ? "black" : grade >= 10 ? "ten" : grade >= 8 ? "good" : "low";
+
+/**
+ * The grade reveal counts up from 1; this is the pause before a step in milliseconds: short at the bottom, longer
+ * and longer towards the top, so the last numbers are the suspense.
+ */
+export function gradeStepPauseMs(step: number): number {
+  const s = Math.min(10, Math.max(1, Math.round(step)));
+  if (s <= 5) return 170 + s * 25;
+  return [420, 560, 780, 1_050, 1_400][s - 6]!;
+}
+
 /** Serial number on the label of a slab: eight digits, zero-padded. */
 export function formatSerial(serial: number | string): string {
   const digits = String(serial).replace(/\D/g, "");

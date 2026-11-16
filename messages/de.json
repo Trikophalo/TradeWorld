@@ -8433,6 +8433,9 @@
       "note": "Innerhalb einer Seltenheit ist jede Karte des Sets gleich wahrscheinlich. Bezahlt wird nur mit Spielgeld."
     },
     "contents": {
+      "value": "Marktwert:",
+      "valueLoading": "wird geladen …",
+      "cardLabel": "{name}, Marktwert {value}",
       "title": "Das kann drin sein",
       "intro": "Alle Karten dieses Sets nach Seltenheit, mit der Chance je Booster. Karten, die du schon hast, sind farbig.",
       "slots": "Platz 4: {slot4} · Platz 5: {slot5}",
@@ -8643,10 +8646,10 @@
       "intro": "ASP bewertet lose Karten mit Noten von 1 bis 10 und versiegelt sie im Slab. Das kostet {rate} vom Wert der Kopie und dauert {minutes} Minuten. Eine 10 ist {best} wert. Ganz selten bekommt eine Mint-Karte das Black Label: Das ist {black} wert. Schicken kannst du jede lose Karte aus deiner Sammlung.",
       "running": "Bei ASP",
       "slots": "{count} / {max}",
-      "waiting": "Aufdecken",
+      "waiting": "Pakete",
       "slabs": "Slabs",
       "backTitle": "Zurück von ASP",
-      "revealAll": "Alle aufdecken",
+      "revealAll": "Alle ohne Show öffnen",
       "queueTitle": "In Arbeit",
       "emptyTitle": "Nichts bei ASP",
       "emptyText": "Öffne eine lose Karte in deiner Sammlung und tippe auf „Zu ASP“.",
@@ -8657,7 +8660,28 @@
       "historyNote": "Verkaufte oder aufgebrochene Slabs stehen hier nicht mehr.",
       "factor": "{factor} vom Marktwert",
       "toCard": "Zur Karte",
-      "reveal": "Note aufdecken"
+      "reveal": "Paket öffnen",
+      "sealed": "Versiegeltes Paket"
+    },
+    "reveal": {
+      "title": "Paket von ASP",
+      "packLabel": "Versiegeltes Paket von ASP",
+      "tearHint": "Zieh oben quer über das Paket, um es aufzureißen.",
+      "openButton": "Paket aufreißen",
+      "rising": "ASP hat entschieden …",
+      "counting": "Die Note …",
+      "cover": "ASP · ? ? ?",
+      "skip": "Überspringen",
+      "close": "Schließen",
+      "next": "{count, plural, one {Nächstes Paket (noch #)} other {Nächstes Paket (noch #)}}",
+      "safe": "Der Slab gehört dir schon. Schließt du das Fenster, wartet das Paket weiter auf dich.",
+      "blackText": "Nur {chance} aller Mint-Karten bekommen das Black Label. Glückwunsch!",
+      "tier": {
+        "low": "Leider keine Top-Note",
+        "good": "Starke Note!",
+        "ten": "Gem Mint: die 10!",
+        "black": "Black Label!!!"
+      }
     }
   }
 }

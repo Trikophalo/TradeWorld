@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, type ButtonState } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip } from "@/components/ui/tooltip";
 import type {
   NexamonCollection,
   NexamonPackResult,
@@ -212,6 +213,11 @@ function Actions({ children }: { children: ReactNode }) {
 function SetContents({ set, collection }: { set: NexamonSetKey; collection: NexamonCollection | undefined }) {
   const t = useTranslations("nexamon");
   const groups = useMemo(() => setContents(set, collection?.copies ?? []), [set, collection]);
+  // What every card is worth right now: the collection read the page already has.
+  const values = useMemo(
+    () => new Map((collection?.cards ?? []).map((stats) => [stats.cardKey, stats.valueCents])),
+    [collection],
+  );
   return (
     <section className="w-full space-y-5 border-t-2 border-line-1 pt-5" data-testid="set-contents">
       <div>
@@ -246,11 +252,45 @@ function SetContents({ set, collection }: { set: NexamonSetKey; collection: Nexa
             </span>
           </div>
           <ul className="grid grid-cols-[repeat(auto-fill,72px)] justify-between gap-1.5">
-            {group.cards.map(({ card, owned }) => (
-              <li key={card.key} data-card={card.key} data-owned={owned > 0} title={card.name}>
-                <CardThumb card={card} scale={1} dimmed={collection !== undefined && owned === 0} />
-              </li>
-            ))}
+            {group.cards.map(({ card, owned }) => {
+              const value = values.get(card.key);
+              return (
+                <li key={card.key} data-card={card.key} data-owned={owned > 0}>
+                  <Tooltip
+                    testId="contents-tip"
+                    content={
+                      <span className="flex flex-col items-start gap-1">
+                        <span className="font-semibold text-fg-1">{card.name}</span>
+                        <RarityBadge rarity={card.rarity} short />
+                        <span className="nums text-fg-2">
+                          {t("contents.value")}{" "}
+                          {value !== undefined ? (
+                            <span className="font-semibold text-fg-1" data-testid="contents-tip-value">
+                              {formatMoney(value)}
+                            </span>
+                          ) : (
+                            t("contents.valueLoading")
+                          )}
+                        </span>
+                      </span>
+                    }
+                  >
+                    <button
+                      type="button"
+                      aria-label={
+                        value !== undefined
+                          ? t("contents.cardLabel", { name: card.name, value: formatMoney(value) })
+                          : card.name
+                      }
+                      className="block rounded-xs focus-ring"
+                      data-testid="contents-card"
+                    >
+                      <CardThumb card={card} scale={1} dimmed={collection !== undefined && owned === 0} />
+                    </button>
+                  </Tooltip>
+                </li>
+              );
+            })}
           </ul>
         </div>
       ))}

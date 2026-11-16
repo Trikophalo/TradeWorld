@@ -1273,7 +1273,10 @@ Werte in `BALANCE.nexamon` (`src/config/nexamon-rules.ts`), Startpreise im Katal
   | Mint       | 0   | 0    | 0    | 0    | 0    | 0    | 0    | 2 %  | 8 %   | 90 %  |
   | Wertfaktor | 0,3 | 0,4  | 0,5  | 0,6  | 0,7  | 0,8  | 0,9  | 1,2  | 1,6   | 3     |
 
-  Erwarteter Faktor nach dem Grading: Mint 2,85, Near Mint 2,36, Good 1,28, Poor 0,67. Abzüglich der Gebühr (0,5)
+  **Black Label** (`grading.blackLabel`): nur Mint, 1 % der Mint-Gradings (aus den 90 % für die 10 genommen: Mint
+  hat damit 1 % Black Label, 89 % 10, 8 % 9, 2 % 8), Wertfaktor 10. Alle anderen Zustände: 0 %.
+
+  Erwarteter Faktor nach dem Grading: Mint 2,92 (ohne Black Label wären es 2,85), Near Mint 2,36, Good 1,28, Poor 0,67. Abzüglich der Gebühr (0,5)
   lohnt sich Grading im Schnitt für Mint und Near Mint, nicht für Good und Poor (dort ist es eine Wette auf die 10).
 
 - **Marktwert** (ein Wert je Karte): Schritt je gezähltem Verkauf 20 % des Weges zum Preis je Karte, höchstens 2 %,

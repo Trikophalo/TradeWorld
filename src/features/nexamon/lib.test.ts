@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   gradeNumber,
+  gradeStepPauseMs,
+  gradeTier,
   isBlackLabel,
   clampGrade,
   estimatePixelTextWidth,
@@ -58,6 +60,22 @@ describe("grades", () => {
     expect(clampGrade(8.6)).toBe(9);
     expect(clampGrade(Number.NaN)).toBe(1);
     expect(gradeWordKey(99)).toBe("gemMint");
+  });
+});
+
+describe("grade reveal", () => {
+  it("sorts a grade into its tier", () => {
+    expect([1, 7, 8, 9, 10, 11].map(gradeTier)).toEqual(["low", "low", "good", "good", "ten", "black"]);
+  });
+
+  it("pauses longer before every step, most before the top grades", () => {
+    for (let step = 2; step <= 10; step++) expect(gradeStepPauseMs(step)).toBeGreaterThan(gradeStepPauseMs(step - 1));
+    expect(gradeStepPauseMs(10)).toBeGreaterThanOrEqual(5 * gradeStepPauseMs(1));
+    // the whole count to 10 stays a show, not a wait
+    let total = 0;
+    for (let step = 1; step <= 10; step++) total += gradeStepPauseMs(step);
+    expect(total).toBeGreaterThan(4_000);
+    expect(total).toBeLessThan(8_000);
   });
 });
 

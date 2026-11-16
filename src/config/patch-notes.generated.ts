@@ -408,6 +408,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Collectibles",
         text: "Unter „Collectibles“ wählst du ein Booster, siehst alle Karten des Sets mit ihren Chancen und reißt die Folie nach dem Kauf selbst auf, mit eigenen…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-75a667b8",
+        title: "Black Label und ASP-Paket",
+        text: "Über der ASP 10 steht jetzt das Black Label: Nur 1 % der Mint-Karten bekommen es, der Slab ist das 10-Fache der Karte wert.",
+      },
     ],
   },
   {
