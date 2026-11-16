@@ -654,6 +654,8 @@ select tests.assert(
 select public.nexamon_finish_gradings(null, public.game_now() + interval '58 minutes') as early \gset
 select tests.set_cfg('nexamon', '{grading,gradeWeightsBps,mint}', '[0, 0, 0, 0, 0, 0, 0, 0, 0, 10000]');
 select tests.set_cfg('nexamon', '{grading,gradeWeightsBps,poor}', '[0, 0, 10000, 0, 0, 0, 0, 0, 0, 0]');
+-- no Black Label here (1 % of the mint gradings; its own tests are in a6_black_label.sql)
+select tests.set_cfg('nexamon', '{grading,blackLabel,chanceBps}', '0');
 select public.nexamon_finish_gradings(null, public.game_now() + interval '61 minutes') as done \gset
 select tests.assert(
   :early = 0 and :done = 1
@@ -868,7 +870,7 @@ select tests.assert(
 -- Q. Missions, notification types, privileges; the config goes back
 -- =============================================================================
 select tests.assert(
-  (select count(*) from public.mission_templates where key like '%nexamon%' and params ->> 'unlock' = 'nexamon' and is_active) = 8
+  (select count(*) from public.mission_templates where key like '%nexamon%' and params ->> 'unlock' = 'nexamon' and is_active) = 9
   and (select count(*) from public.notification_types where key in ('nexamon_sale', 'nexamon_graded')) = 2
   and not has_function_privilege('authenticated', 'public.nexamon_run_due(timestamptz)', 'execute')
   and not has_function_privilege('authenticated', 'public.nexamon_sell(uuid, uuid, text, text, timestamptz)', 'execute')

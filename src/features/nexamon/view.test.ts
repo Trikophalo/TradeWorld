@@ -233,10 +233,18 @@ describe("copies", () => {
     const mint = gradingQuote({ condition: "mint", valueCents: 10_000 });
     expect(mint.feeCents).toBe(5_000);
     expect(mint.minutes).toBe(BALANCE.nexamon.grading.minutes);
-    expect(mint.chances.map((c) => c.grade)).toEqual([10, 9, 8]);
-    expect(mint.chances[0]).toEqual({ grade: 10, chanceBps: 9_000, factorBps: 30_000 });
+    // Mint is the one condition with a Black Label (grade 11): 1 %, worth ten times the card.
+    expect(mint.chances.map((c) => c.grade)).toEqual([11, 10, 9, 8]);
+    expect(mint.chances[0]).toEqual({ grade: 11, chanceBps: 100, factorBps: 100_000 });
+    expect(mint.chances[1]).toEqual({ grade: 10, chanceBps: 8_900, factorBps: 30_000 });
+    expect(mint.blackLabel).toEqual({ grade: 11, chanceBps: 100, factorBps: 100_000, condition: "mint" });
     expect(mint.betterBps).toBe(10_000);
-    expect(mint.expectedFactorBps).toBe(Math.round((9_000 * 30_000 + 800 * 16_000 + 200 * 12_000) / 10_000));
+    expect(mint.expectedFactorBps).toBe(
+      Math.round((100 * 100_000 + 8_900 * 30_000 + 800 * 16_000 + 200 * 12_000) / 10_000),
+    );
+    const nearMint = gradingQuote({ condition: "near_mint", valueCents: 10_000 });
+    expect(nearMint.chances.map((c) => c.grade)).toEqual([10, 9, 8, 7, 6]);
+    expect(nearMint.blackLabel.chanceBps).toBe(0);
     const poor = gradingQuote({ condition: "poor", valueCents: 100 });
     expect(poor.feeCents).toBe(BALANCE.nexamon.grading.minFeeCents);
     expect(poor.chances).toHaveLength(10);

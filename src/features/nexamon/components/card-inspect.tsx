@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { nexamonCard, NEXAMON_CARDS, type NexamonCard as CardData } from "@/config/nexamon";
 import { NEXAMON_CONDITIONS } from "@/config/nexamon-rules";
+import { BALANCE } from "@/config/balance";
 import { DISCLOSURE } from "@/config/disclosure";
 import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
@@ -18,6 +19,7 @@ import { PriceChart } from "@/features/market/components/price-chart";
 import { LockedFeature } from "@/features/progression/components/locked-feature";
 import { useDisclosed } from "@/features/progression/components/reveal";
 import { formatInteger, formatMoney } from "@/lib/format";
+import { NEXAMON_BLACK_LABEL_GRADE, nexamonGradeChanceBps } from "@/lib/sim/nexamon";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
 import { formatCardNumber } from "../lib";
@@ -27,6 +29,7 @@ import {
   conditionFactorBps,
   copyStatus,
   formatChance,
+  formatFactor,
   historyCandles,
   sortCopiesBestFirst,
 } from "../view";
@@ -276,7 +279,7 @@ function Inspect({ card, details }: { card: CardData; details: NexamonCardDetail
               <CardHeader>
                 <CardTitle>{t("inspect.graded")}</CardTitle>
               </CardHeader>
-              <GradedPopulation graded={details.graded} />
+              <GradedPopulation graded={details.graded} blackLabels={details.blackLabels} />
             </Card>
 
             <Card padding="lg" data-testid="inspect-sales">
@@ -372,6 +375,7 @@ function CopyRow({
 /** What the condition of a raw copy means for its value. */
 function ConditionNote() {
   const t = useTranslations("nexamon");
+  const tc = useTranslations("nexamonCards");
   return (
     <div className="mt-4 rounded-md bg-surface-2 p-3">
       <p className="text-xs text-pretty text-fg-2">{t("inspect.conditionNote")}</p>
@@ -383,29 +387,53 @@ function ConditionNote() {
           </li>
         ))}
       </ul>
+      <p
+        className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-pretty text-fg-2"
+        data-testid="black-label-note"
+      >
+        <GradeChip grade={NEXAMON_BLACK_LABEL_GRADE} short />
+        <span className="min-w-0 flex-1 basis-48">
+          {t("blackLabel.note", {
+            chance: formatChance(BALANCE.nexamon.grading.blackLabel.chanceBps),
+            condition: tc(`condition.${BALANCE.nexamon.grading.blackLabel.condition}`),
+            factor: formatFactor(BALANCE.nexamon.grading.blackLabel.valueBps),
+          })}
+        </span>
+      </p>
+      <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5" data-testid="black-label-chances">
+        {[...NEXAMON_CONDITIONS].reverse().map((condition) => (
+          <li key={condition} className="flex items-center gap-1.5 nums text-xs text-fg-1" data-condition={condition}>
+            <ConditionBadge condition={condition} />
+            {formatChance(nexamonGradeChanceBps(condition, NEXAMON_BLACK_LABEL_GRADE))}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
 
 /** Slabs per grade, 10 on top, as bars against the most common grade. */
-function GradedPopulation({ graded }: { graded: readonly number[] }) {
+function GradedPopulation({ graded, blackLabels }: { graded: readonly number[]; blackLabels: number }) {
   const t = useTranslations("nexamon");
-  const total = graded.reduce((sum, n) => sum + n, 0);
+  const total = graded.reduce((sum, n) => sum + n, 0) + blackLabels;
   if (total === 0) return <p className="text-sm text-pretty text-fg-3">{t("inspect.noGraded")}</p>;
-  const most = Math.max(...graded, 1);
+  const most = Math.max(...graded, blackLabels, 1);
   return (
-    <ul className="space-y-1.5" aria-label={t("inspect.graded")}>
-      {graded
+    <ul className="space-y-1.5" aria-label={t("inspect.graded")} data-black-labels={blackLabels}>
+      {[...graded, blackLabels]
         .map((count, i) => ({ grade: i + 1, count }))
         .reverse()
         .map(({ grade, count }) => (
           <li key={grade} className="flex items-center gap-2" data-grade={grade}>
-            <span className="w-14 shrink-0">
+            <span className="w-24 shrink-0">
               <GradeChip grade={grade} short />
             </span>
             <span className="h-2 flex-1 overflow-hidden rounded-xs bg-surface-3">
               <span
-                className={cn("block h-full origin-left", grade === 10 ? "bg-gold" : "bg-accent")}
+                className={cn(
+                  "block h-full origin-left",
+                  grade === 11 ? "bg-black-label-edge" : grade === 10 ? "bg-gold" : "bg-accent",
+                )}
                 style={{ transform: `scaleX(${count / most})` }}
               />
             </span>

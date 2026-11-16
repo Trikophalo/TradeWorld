@@ -132,6 +132,13 @@ export const SOUNDS = {
   pullUltra: { src: ["/sounds/pull-ultra.wav"], volume: 0.42, minIntervalMs: 300 },
   pullPrisma: { src: ["/sounds/pull-prisma.wav"], volume: 0.45, minIntervalMs: 500 },
   pullLegendary: { src: ["/sounds/pull-legendary.wav"], volume: 0.5, minIntervalMs: 800 },
+  /** The ASP package (ADR-165): the drum roll while the slab rises, the grade counting up, and the result by tier. */
+  gradeDrum: { src: ["/sounds/grade-drum.wav"], volume: 0.34, minIntervalMs: 800 },
+  gradeTick: { src: ["/sounds/grade-tick.wav"], volume: 0.3, minIntervalMs: 60 },
+  gradeLow: { src: ["/sounds/grade-low.wav"], volume: 0.32, minIntervalMs: 400 },
+  gradeGood: { src: ["/sounds/grade-good.wav"], volume: 0.42, minIntervalMs: 400 },
+  gradeTen: { src: ["/sounds/grade-ten.wav"], volume: 0.5, minIntervalMs: 800 },
+  blackLabel: { src: ["/sounds/black-label.wav"], volume: 0.55, minIntervalMs: 1200 },
 } as const satisfies Record<string, SoundSpec>;
 
 /** Length of the news jingle as rendered by `scripts/gen-sounds.ts` (seven bars of four at 140 BPM). */

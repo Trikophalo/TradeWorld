@@ -105,6 +105,7 @@ export function GradingDesk({
             rate: formatChance(cfg.feeBps),
             minutes: cfg.minutes,
             best: formatFactor(cfg.valueBps[9]),
+            black: formatFactor(cfg.blackLabel.valueBps),
           })}
         </p>
         <div className="mt-3 grid grid-cols-3 gap-2">

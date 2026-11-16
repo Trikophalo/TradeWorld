@@ -15,7 +15,10 @@ export function formatCardNumber(number: number, total: number = NEXAMON_SET_SIZ
 export const NEXAMON_CONDITIONS = ["poor", "good", "near_mint", "mint"] as const;
 export type NexamonCondition = (typeof NEXAMON_CONDITIONS)[number];
 
-/** Grades of the grading company, 1 (worst) to 10 (best), with the key of their word in the messages. */
+/**
+ * Grades of the grading company, 1 (worst) to 10 (best), with the key of their word in the messages. 11 is the
+ * Black Label, the tier above a 10: its label still says 10.
+ */
 export const GRADE_WORDS = {
   1: "poor",
   2: "good",
@@ -27,17 +30,24 @@ export const GRADE_WORDS = {
   8: "nearMintMint",
   9: "mint",
   10: "gemMint",
+  11: "blackLabel",
 } as const;
 export type NexamonGrade = keyof typeof GRADE_WORDS;
 export type GradeWordKey = (typeof GRADE_WORDS)[NexamonGrade];
 
-/** Any number as a valid grade: rounded and held between 1 and 10. */
+/** Any number as a valid grade: rounded and held between 1 and 10; exactly 11 is the Black Label. */
 export function clampGrade(grade: number): NexamonGrade {
   const whole = Number.isFinite(grade) ? Math.round(grade) : 1;
+  if (whole === 11) return 11;
   return Math.min(10, Math.max(1, whole)) as NexamonGrade;
 }
 
 export const gradeWordKey = (grade: number): GradeWordKey => GRADE_WORDS[clampGrade(grade)];
+
+/** The Black Label: the tier above a 10. */
+export const isBlackLabel = (grade: number | null | undefined): boolean => grade != null && clampGrade(grade) === 11;
+/** The number printed on the label: a Black Label is a 10. */
+export const gradeNumber = (grade: number): number => Math.min(10, clampGrade(grade));
 
 /** Serial number on the label of a slab: eight digits, zero-padded. */
 export function formatSerial(serial: number | string): string {

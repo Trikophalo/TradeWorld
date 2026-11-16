@@ -43,6 +43,7 @@ export type Metric =
   | "nexamon_ultras"
   | "nexamon_sold"
   | "nexamon_tens"
+  | "nexamon_black_labels"
   | "listed_invests"
   | "listed_research"
   | "listed_benefits"
@@ -673,6 +674,15 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
     metric: "nexamon_tens",
     target: 1,
     xp: 1500,
+    requires: "nexamon",
+  },
+  {
+    key: "m_nexamon_first_black_label",
+    kind: "milestone",
+    title: "Das erste Black Label",
+    metric: "nexamon_black_labels",
+    target: 1,
+    xp: 3000,
     requires: "nexamon",
   },
 ];

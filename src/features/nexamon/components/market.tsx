@@ -35,10 +35,10 @@ import { BuySheet, DealNote, ListingRow } from "./listing-row";
 import { CopyQuality, CopyVisual, SelectField } from "./parts";
 
 export type MarketView = "all" | "mine";
-type Graded = "all" | "raw" | "slab";
+type Graded = "all" | "raw" | "slab" | "black";
 const SORTS: readonly NexamonMarketSort[] = ["new", "price_asc", "price_desc", "deal", "value", "number"];
 const SELLERS: readonly NexamonMarketSeller[] = ["all", "players", "ai", "mine"];
-const GRADED: readonly Graded[] = ["all", "raw", "slab"];
+const GRADED: readonly Graded[] = ["all", "raw", "slab", "black"];
 
 const dateTime = new Intl.DateTimeFormat("de-DE", {
   day: "2-digit",
@@ -107,7 +107,8 @@ function Listings({ cardKey, onCardChange }: Pick<MarketProps, "cardKey" | "onCa
       set: set === "all" ? null : set,
       rarity: rarity === "all" ? null : rarity,
       seller,
-      graded: graded === "all" ? null : graded === "slab",
+      graded: graded === "all" || graded === "black" ? null : graded === "slab",
+      blackLabel: graded === "black" ? true : null,
       cardKey,
       sort,
       page,

@@ -120,7 +120,10 @@ export function nexamonCopyFactorBps(
   grade: number | null,
   cfg: Config = BALANCE.nexamon,
 ): number {
-  if (grade !== null) return cfg.grading.valueBps[Math.min(Math.max(Math.round(grade), 1), 10) - 1]!;
+  if (grade !== null) {
+    if (nexamonIsBlackLabel(grade)) return cfg.grading.blackLabel.valueBps;
+    return cfg.grading.valueBps[Math.min(Math.max(Math.round(grade), 1), 10) - 1]!;
+  }
   return nexamonConditionBps(condition, cfg);
 }
 
@@ -162,23 +165,48 @@ export function nexamonGradingFeeCents(copyValueCents: number, cfg: Config = BAL
   return Math.max(cfg.grading.minFeeCents, mulDivRound(copyValueCents, cfg.grading.feeBps, 10_000));
 }
 
-/** Chance of a grade (1..10) for a condition, in basis points. */
+/**
+ * The Black Label (ADR-165): the tier above a 10. It is stored as grade 11 and shown as "ASP 10 Black Label".
+ */
+export const NEXAMON_BLACK_LABEL_GRADE = 11;
+export const nexamonIsBlackLabel = (grade: number | null): boolean =>
+  grade !== null && Math.round(grade) >= NEXAMON_BLACK_LABEL_GRADE;
+/** The number on the label: a Black Label is a 10. */
+export const nexamonGradeNumber = (grade: number): number => Math.min(Math.max(Math.round(grade), 1), 10);
+
+/** Chance of a Black Label for a condition: `blackLabel.chanceBps` out of the chance for a 10, only for its condition. */
+function blackLabelChanceBps(condition: NexamonCondition, cfg: Config): number {
+  const b = cfg.grading.blackLabel;
+  if (condition !== b.condition) return 0;
+  return Math.min(Math.max(0, b.chanceBps), cfg.grading.gradeWeightsBps[condition][9] ?? 0);
+}
+
+/** Chance of a grade (1..10, 11 = Black Label) for a condition, in basis points. */
 export function nexamonGradeChanceBps(
   condition: NexamonCondition,
   grade: number,
   cfg: Config = BALANCE.nexamon,
 ): number {
-  return cfg.grading.gradeWeightsBps[condition][grade - 1] ?? 0;
+  const black = blackLabelChanceBps(condition, cfg);
+  if (grade === NEXAMON_BLACK_LABEL_GRADE) return black;
+  const weight = cfg.grading.gradeWeightsBps[condition][grade - 1] ?? 0;
+  return grade === 10 ? weight - black : weight;
 }
 
-/** The grade (1..10) ASP gives a copy of this condition for the roll `u`; low grades take the low numbers. */
+/**
+ * The grade (1..10, 11 = Black Label) ASP gives a copy of this condition for the roll `u`; low grades take the low
+ * numbers, the Black Label the highest ones of the 10.
+ */
 export function nexamonRollGrade(condition: NexamonCondition, u: number, cfg: Config = BALANCE.nexamon): number {
   const weights = cfg.grading.gradeWeightsBps[condition];
   const n = Math.floor(clampUnit(u) * 10_000);
   let edge = 0;
   for (let grade = 1; grade <= 10; grade++) {
     edge += weights[grade - 1]!;
-    if (n < edge) return grade;
+    if (n < edge) {
+      const black = grade === 10 && n >= edge - blackLabelChanceBps(condition, cfg);
+      return black ? NEXAMON_BLACK_LABEL_GRADE : grade;
+    }
   }
   return 10;
 }

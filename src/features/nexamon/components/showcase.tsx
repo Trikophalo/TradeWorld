@@ -163,6 +163,31 @@ export function NexamonShowcase() {
         </div>
       </Block>
 
+      <Block label="Black Label: die Stufe über der ASP 10 (nur Mint, 1 %, Wert ×10)" testId="nexamon-black-label">
+        <div className="flex flex-wrap items-start justify-center gap-6">
+          <NexamonSlab
+            card={NEXAMON_SAMPLE_CARDS[4]!}
+            art={art[NEXAMON_SAMPLE_CARDS[4]!.key]}
+            grade={11}
+            serial={1}
+            scale={3}
+          />
+          <NexamonSlab
+            card={NEXAMON_SAMPLE_CARDS[4]!}
+            art={art[NEXAMON_SAMPLE_CARDS[4]!.key]}
+            grade={10}
+            serial={2}
+            scale={3}
+          />
+          <div className="flex flex-col items-start gap-2">
+            <GradeChip grade={11} />
+            <GradeChip grade={11} short />
+            <GradeChip grade={10} />
+            <CopyVisual card={REAL_CARDS[2]!} grade={11} serial={3} scale={1} />
+          </div>
+        </div>
+      </Block>
+
       <div className="grid gap-4 lg:grid-cols-2">
         <Block label="Booster: ein Design je Set" testId="nexamon-packs">
           <div className="flex flex-wrap items-end justify-center gap-4">
