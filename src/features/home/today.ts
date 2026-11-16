@@ -87,4 +87,5 @@ export const NEW_FEATURES: readonly { unlock: string; key: string; href: string 
   { unlock: "deals", key: "deals", href: "/deals" },
   { unlock: "property", key: "property", href: "/property" },
   { unlock: "crypto", key: "crypto", href: "/crypto" },
+  { unlock: "nexamon", key: "nexamon", href: "/nexamon" },
 ];
