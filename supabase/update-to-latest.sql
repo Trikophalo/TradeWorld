@@ -64942,6 +64942,99 @@ begin
   on conflict (id) do update set catalogue_hash = null, peak_scaled_at = excluded.peak_scaled_at;
 end
 $$;
+-- ===== idempotent copy of migrations/20261204005800_nexamon_profile.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 5800 · Nexamon: a player's collectibles on their profile (ADR-165)
+-- =============================================================================
+-- get_player_nexamon(p_nickname, p_limit) is the public view of a collection, like get_collection() for artworks
+-- and get_property() for the home: every signed-in player may read it, by nickname (null = the caller's own).
+-- It returns the collection in numbers (copies, different cards, value, slabs, tens incl. Black Label), the progress per set and one
+-- row per card the player owns with its best copy (the most valuable one: condition, grade, serial, value) and
+-- the number of copies, most valuable first. p_limit caps the rows (1..500, default all); the numbers always
+-- cover the whole collection. A player below the Nexamon level has nothing to show (unlocked false, no cards).
+-- Listings, prices asked and gradings in progress stay private: a copy at ASP shows as the raw card it still is.
+-- Read only: nothing is written, so the function is STABLE.
+-- Idempotent: runs unchanged as supabase/updates/20261204005800_nexamon_profile.sql.
+
+create or replace function public.get_player_nexamon(p_nickname text default null, p_limit integer default null)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg        jsonb := public.nexamon_cfg();
+  v_player   uuid := public.require_player();
+  v_target   uuid;
+  v_nick     text;
+  v_unlocked boolean;
+  v_limit    integer := least(greatest(coalesce(p_limit, 500), 1), 500);
+  v_summary  jsonb;
+  v_sets     jsonb;
+  v_cards    jsonb;
+begin
+  if p_nickname is null then
+    v_target := v_player;
+  else
+    select p.id into v_target from public.profiles p where lower(p.nickname) = lower(btrim(p_nickname));
+  end if;
+  select p.nickname into v_nick from public.profiles p where p.id = v_target;
+  if v_nick is null then
+    perform public.api_error('player_not_found');
+  end if;
+  v_unlocked := public.nexamon_unlocked(v_target);
+
+  with own as (
+    select c.card_key, c.serial, c.condition, c.grade, k.set_key, k.number, k.rarity,
+           public.nexamon_copy_value_cents(k.value_e4, c.condition, c.grade) as value_cents
+      from public.nexamon_copies c join public.nexamon_cards k on k.card_key = c.card_key
+     where c.owner_id = v_target and v_unlocked
+  ), per_card as (
+    -- the best copy of every card: the most valuable, then the higher grade, then the lower serial
+    select distinct on (o.card_key)
+           o.card_key, o.set_key, o.number, o.rarity, o.serial, o.condition, o.grade, o.value_cents,
+           count(*) over (partition by o.card_key) as copies,
+           (sum(o.value_cents) over (partition by o.card_key))::bigint as total_cents
+      from own o
+     order by o.card_key, o.value_cents desc, o.grade desc nulls last, o.serial
+  )
+  select jsonb_build_object(
+           'copies', (select count(*) from own),
+           'distinct', (select count(*) from per_card),
+           'total', (select count(*) from public.nexamon_cards k where k.in_catalogue),
+           'value_cents', (select coalesce(sum(o.value_cents), 0)::bigint from own o),
+           'graded', (select count(*) from own o where o.grade is not null),
+           'tens', (select count(*) from own o where o.grade >= 10)),
+         (select coalesce(jsonb_agg(jsonb_build_object(
+                   'key', s.set_key, 'cards', s.cards,
+                   'distinct', (select count(*) from per_card p where p.set_key = s.set_key),
+                   'copies', (select count(*) from own o where o.set_key = s.set_key))
+                   order by (cfg #>> array['sets', s.set_key, 'packPriceCents'])::bigint nulls last, s.set_key), '[]'::jsonb)
+            from (select k.set_key, count(*) as cards from public.nexamon_cards k where k.in_catalogue group by k.set_key) s),
+         (select coalesce(jsonb_agg(jsonb_build_object(
+                   'card_key', x.card_key, 'set', x.set_key, 'number', x.number, 'rarity', x.rarity, 'copies', x.copies,
+                   'serial', x.serial, 'condition', x.condition, 'grade', x.grade, 'value_cents', x.value_cents,
+                   'total_cents', x.total_cents)
+                   order by x.value_cents desc, x.set_key, x.number), '[]'::jsonb)
+            from (select p.* from per_card p order by p.value_cents desc, p.set_key, p.number limit v_limit) x)
+    into v_summary, v_sets, v_cards;
+
+  return jsonb_build_object(
+    'nickname', v_nick, 'is_me', v_target = v_player, 'unlocked', v_unlocked,
+    'summary', v_summary, 'sets', v_sets, 'cards', v_cards, 'server_time', public.game_now());
+end;
+$$;
+comment on function public.get_player_nexamon(text, integer) is
+  'RPC: the Nexamon collection of a player by nickname (null = the caller) for their profile (ADR-165): '
+  '{nickname, is_me, unlocked, summary: {copies, distinct, total, value_cents, graded, tens}, sets: [{key, cards, '
+  'distinct, copies}], cards: [{card_key, set, number, rarity, copies, serial, condition, grade, value_cents, '
+  'total_cents}] (best copy per card, most valuable first, at most p_limit, 1..500), server_time}. Empty for a '
+  'player below the Nexamon level; error player_not_found.';
+
+revoke all on function public.get_player_nexamon(text, integer) from public, anon;
+grant execute on function public.get_player_nexamon(text, integer) to authenticated, service_role;
 -- ===== idempotent copy of migrations/20261204005850_nexamon_black_label.sql =====
 -- (the migration itself is written idempotently; keep both files identical below this line)
 -- =============================================================================
@@ -65264,6 +65357,59 @@ begin
   return coalesce((cfg #>> array['conditions', 'valueBps', p_condition])::integer, 10000);
 end;
 $$;
+-- ===== idempotent copy of migrations/20261204005960_nexamon_graded_quiet.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 5960 · Nexamon: the ASP notification does not spoil the grade (ADR-165)
+-- =============================================================================
+-- Owner's wish: a card back from ASP comes as a sealed package that the player opens; the notification (in-app and
+-- push) only says the package is waiting. Neither title, text nor payload carries the grade. The Black Label feed
+-- item (friends' feed, gossip for NEXA Nachrichten) is no longer posted when the grading finishes: the server does
+-- not know when the owner opens the package (that happens on the device), so it would come before the reveal.
+-- Mission events stay as they were. Replaces nexamon_finish_gradings() of 5850 entirely (create or replace).
+-- Idempotent: runs unchanged as supabase/updates/20261204005960_nexamon_graded_quiet.sql.
+
+create or replace function public.nexamon_finish_gradings(p_player uuid default null, p_now timestamptz default null)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now   timestamptz := coalesce(p_now, public.game_now());
+  v_n     integer := 0;
+  v_grade integer;
+  r       record;
+begin
+  for r in select c.id, c.owner_id, c.card_key, c.condition, c.serial from public.nexamon_copies c
+            where c.grading_until is not null and c.grading_until <= v_now
+              and (p_player is null or c.owner_id = p_player)
+            order by c.grading_until, c.id limit 200
+            for update skip locked loop
+    v_grade := public.nexamon_roll_grade(r.condition, random());
+    update public.nexamon_copies set grade = v_grade, graded_at = v_now, grading_until = null where id = r.id;
+    if r.owner_id is not null then
+      -- the grade stays a surprise: only the waiting package is announced
+      perform public.social_notify(r.owner_id, 'nexamon_graded', 'Paket von ASP',
+        'Deine Nexamon-Karte ist zurück von ASP. Das versiegelte Paket wartet darauf, dass du es öffnest.',
+        jsonb_build_object('copy_id', r.id, 'card_key', r.card_key, 'serial', r.serial),
+        '/nexamon', 'nexamon_graded:' || r.id::text || ':' || extract(epoch from v_now)::bigint::text);
+      perform public.mission_event(r.owner_id, 'nexamon_graded', 1, null);
+      if v_grade >= 10 then
+        perform public.mission_event(r.owner_id, 'nexamon_ten', 1, null);
+      end if;
+      if v_grade >= 11 then
+        perform public.mission_event(r.owner_id, 'nexamon_black_label', 1, null);
+      end if;
+    end if;
+    v_n := v_n + 1;
+  end loop;
+  return v_n;
+end;
+$$;
+comment on function public.nexamon_finish_gradings(uuid, timestamptz) is
+  'Finishes due ASP gradings (ADR-165): rolls the grade, notifies the owner without the grade (sealed package), '
+  'mission events. No feed item (the reveal happens on the device).';
 -- ===== idempotent copy of migrations/20261204006100_stock_pump.sql =====
 -- (the migration itself is written idempotently; keep both files identical below this line)
 -- =============================================================================

@@ -21,7 +21,8 @@ export default async function NewsPage() {
     <Page>
       <PageHeader title={t("title")} intro={th("news")} art={NEWSPAPER} />
       {/* The hourly live show with Mr. Doodle Dangle and its chat (ADR-150) */}
-      <div className="mx-auto mb-6 max-w-5xl">
+      {/* `isolate`: the TV's layers stack inside it and never paint over the sticky top bar */}
+      <div className="isolate mx-auto mb-6 max-w-5xl">
         <NewsShow />
       </div>
       {/* News battles among the viewers (ADR-160) */}

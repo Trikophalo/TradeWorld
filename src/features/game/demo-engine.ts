@@ -1404,6 +1404,9 @@ const nexamon = createNexamonEngine({
   idempotent,
   now: () => Date.now(),
   random: Math.random,
+  // made-up friends have a level; everybody else the demo cannot show
+  playerLevel: (nickname) =>
+    (p().friendList ?? []).find((f) => f.nickname.toLowerCase() === nickname.toLowerCase())?.level ?? null,
 });
 
 /** Made-up colleagues at the demo player's AI employer (ADR-156); none without a job or with an own company. */

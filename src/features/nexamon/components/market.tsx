@@ -28,7 +28,7 @@ import type {
 } from "@/features/game/nexamon-types";
 import { formatInteger, formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { useNexamonMarket } from "../hooks";
+import { useNexamonMarket, useRememberedFilters } from "../hooks";
 import { ownListings } from "../view";
 import { CopyActions } from "./copy-actions";
 import { BuySheet, DealNote, ListingRow } from "./listing-row";
@@ -36,6 +36,22 @@ import { CopyQuality, CopyVisual, SelectField } from "./parts";
 
 export type MarketView = "all" | "mine";
 type Graded = "all" | "raw" | "slab" | "black";
+
+interface MarketFilters {
+  set: NexamonSetKey | "all";
+  rarity: NexamonRarity | "all";
+  seller: NexamonMarketSeller;
+  graded: Graded;
+  sort: NexamonMarketSort;
+}
+const MARKET_DEFAULTS: MarketFilters = { set: "all", rarity: "all", seller: "all", graded: "all", sort: "new" };
+const MARKET_ALLOWED = {
+  set: ["all", ...NEXAMON_SETS],
+  rarity: ["all", ...NEXAMON_RARITIES],
+  seller: ["all", "players", "ai", "mine"],
+  graded: ["all", "raw", "slab", "black"],
+  sort: ["new", "price_asc", "price_desc", "deal", "value", "number"],
+} as const;
 const SORTS: readonly NexamonMarketSort[] = ["new", "price_asc", "price_desc", "deal", "value", "number"];
 const SELLERS: readonly NexamonMarketSeller[] = ["all", "players", "ai", "mine"];
 const GRADED: readonly Graded[] = ["all", "raw", "slab", "black"];
@@ -93,11 +109,14 @@ function Listings({ cardKey, onCardChange }: Pick<MarketProps, "cardKey" | "onCa
   const t = useTranslations("nexamon");
   const tc = useTranslations("nexamonCards");
   const listId = useId();
-  const [set, setSet] = useState<NexamonSetKey | "all">("all");
-  const [rarity, setRarity] = useState<NexamonRarity | "all">("all");
-  const [seller, setSeller] = useState<NexamonMarketSeller>("all");
-  const [graded, setGraded] = useState<Graded>("all");
-  const [sort, setSort] = useState<NexamonMarketSort>("new");
+  // remembered per browser (ADR-165): the filters are back on the next visit
+  const [filters, patchFilters] = useRememberedFilters<MarketFilters>("market", MARKET_DEFAULTS, MARKET_ALLOWED);
+  const { set, rarity, seller, graded, sort } = filters;
+  const setSet = (value: NexamonSetKey | "all") => patchFilters({ set: value });
+  const setRarity = (value: NexamonRarity | "all") => patchFilters({ rarity: value });
+  const setSeller = (value: NexamonMarketSeller) => patchFilters({ seller: value });
+  const setGraded = (value: Graded) => patchFilters({ graded: value });
+  const setSort = (value: NexamonMarketSort) => patchFilters({ sort: value });
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [buying, setBuying] = useState<NexamonListing | null>(null);
