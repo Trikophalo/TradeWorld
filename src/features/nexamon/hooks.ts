@@ -1,7 +1,7 @@
 "use client";
 
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { ButtonState } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { useGameErrorText } from "@/features/game/errors";
@@ -218,4 +218,68 @@ export function useRevealedSlabs() {
     writeStorage(REVEALED_KEY, JSON.stringify(next));
   }, []);
   return [revealed, mark] as const;
+}
+
+// ------------------------------------------------------------------------------------- remembered filters
+
+const FILTERS_KEY = "nexa-nexamon-filters";
+
+/**
+ * Picks the remembered values that are still allowed: anything unknown (an old version, a hand edit) falls back
+ * to the default, field by field.
+ */
+export function restoreFilters<T extends { [K in keyof T]: string }>(
+  raw: unknown,
+  defaults: T,
+  allowed: { readonly [K in keyof T]: readonly string[] },
+): T {
+  const result = { ...defaults };
+  if (raw === null || typeof raw !== "object") return result;
+  for (const key of Object.keys(defaults) as (keyof T)[]) {
+    const value = (raw as Record<string, unknown>)[key as string];
+    if (typeof value === "string" && allowed[key].includes(value)) result[key] = value as T[keyof T];
+  }
+  return result;
+}
+
+/**
+ * Filters of a Nexamon page that this browser remembers (binder, market, the last tab). Read after hydration
+ * (the server and the first render see the defaults); a blocked storage only means nothing is remembered.
+ */
+export function useRememberedFilters<T extends { [K in keyof T]: string }>(
+  name: string,
+  defaults: T,
+  allowed: { readonly [K in keyof T]: readonly string[] },
+): [T, (patch: Partial<T>) => void] {
+  const raw = useSyncExternalStore(
+    subscribe,
+    () => readStorage(FILTERS_KEY),
+    () => null,
+  );
+  // defaults and allowed are module constants at every call site
+  const value = useMemo(() => {
+    let all: unknown = null;
+    try {
+      all = raw ? (JSON.parse(raw) as unknown) : null;
+    } catch {
+      all = null;
+    }
+    const mine = all && typeof all === "object" ? (all as Record<string, unknown>)[name] : null;
+    return restoreFilters(mine, defaults, allowed);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [raw, name]);
+  const set = useCallback(
+    (patch: Partial<T>) => {
+      let all: Record<string, unknown> = {};
+      try {
+        const parsed: unknown = JSON.parse(readStorage(FILTERS_KEY) ?? "{}");
+        if (parsed && typeof parsed === "object") all = parsed as Record<string, unknown>;
+      } catch {
+        all = {};
+      }
+      writeStorage(FILTERS_KEY, JSON.stringify({ ...all, [name]: { ...value, ...patch } }));
+    },
+    [name, value],
+  );
+  return [value, set];
 }

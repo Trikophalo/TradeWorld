@@ -320,24 +320,14 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine {
         c.grade = nexamonRollGrade(c.condition, host.random());
         c.gradedAt = now;
         c.gradingUntil = null;
-        if (nexamonIsBlackLabel(c.grade)) {
-          host.notify(
-            "nexamon_graded",
-            "Black Label!",
-            `Deine Nexamon-Karte ist zurück von ASP: Note 10 mit dem Black Label. Der Slab ist jetzt das ${
-              cfg.grading.blackLabel.valueBps / 10_000
-            }-Fache der Karte wert.`,
-            "/nexamon",
-          );
-          host.feed("nexamon_black_label", { card_key: c.cardKey, serial: c.serial, condition: c.condition });
-          host.track("nexamon_black_labels");
-        } else
-          host.notify(
-            "nexamon_graded",
-            `ASP-Note: ${c.grade}`,
-            `Deine Nexamon-Karte ist zurück von ASP, Note ${c.grade} von 10.`,
-            "/nexamon",
-          );
+        // The grade stays a surprise until the package is opened; no feed item before the reveal.
+        host.notify(
+          "nexamon_graded",
+          "Paket von ASP",
+          "Deine Nexamon-Karte ist zurück von ASP. Das versiegelte Paket wartet darauf, dass du es öffnest.",
+          "/nexamon",
+        );
+        if (nexamonIsBlackLabel(c.grade)) host.track("nexamon_black_labels");
         if (c.grade >= 10) host.track("nexamon_tens");
       }
     }

@@ -424,7 +424,7 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Über der ASP 10 steht jetzt das Black Label: Nur 1 % der Mint-Karten bekommen es, der Slab ist das 10-Fache der Karte wert.",
       },
       {
-        id: "startseite-waehrung-zur-wahl-freundescode-71f72908",
+        id: "startseite-waehrung-zur-wahl-freundescode-606c18b5",
         title: "Collectibles auf dem Profil",
         text: "Auf jedem Profil siehst du die wertvollsten Karten eines Spielers und über „Ganze Sammlung ansehen“ seinen ganzen Binder; dein eigenes Profil zeigt…",
       },

@@ -8475,7 +8475,9 @@
         "all": "Alle",
         "listed": "Zum Verkauf",
         "kept": "Nicht zum Verkauf"
-      }
+      },
+      "listedTag": "Im Markt",
+      "listedHint": "{count, plural, one {Steht im Markt für {price}} other {# Kopien im Markt, ab {price}}}"
     },
     "filter": {
       "set": "Set",

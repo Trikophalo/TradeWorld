@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { NEXAMON_RARITIES, NEXAMON_SETS, type NexamonRarity, type NexamonSetKey } from "@/config/nexamon";
 import { COIN } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
@@ -13,6 +13,7 @@ import type { NexamonCollection } from "@/features/game/nexamon-types";
 import { formatMoney, formatMoneyShort } from "@/lib/format";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
+import { useRememberedFilters } from "../hooks";
 import { formatCardNumber } from "../lib";
 import {
   BINDER_OWNERSHIPS,
@@ -32,6 +33,14 @@ import {
 import { SetIcon } from "./badges";
 import { CopyVisual, GradeChip, SelectField, Stat } from "./parts";
 
+const BINDER_ALLOWED = {
+  set: ["all", ...NEXAMON_SETS],
+  rarity: ["all", ...NEXAMON_RARITIES],
+  ownership: BINDER_OWNERSHIPS,
+  sort: BINDER_SORTS,
+  sale: BINDER_SALES,
+} as const;
+
 /**
  * The binder (ADR-165): every card of the three sets in number order. Owned cards show their best copy (a slab
  * once graded), missing ones stay grey with their number. Filters narrow it down, a tap opens the card.
@@ -39,7 +48,7 @@ import { CopyVisual, GradeChip, SelectField, Stat } from "./parts";
 export function Binder({ collection }: { collection: NexamonCollection | undefined }) {
   const t = useTranslations("nexamon");
   const tc = useTranslations("nexamonCards");
-  const [filter, setFilter] = useState<BinderFilter>(DEFAULT_BINDER_FILTER);
+  const [filter, patch] = useRememberedFilters<BinderFilter>("binder", DEFAULT_BINDER_FILTER, BINDER_ALLOWED);
   const wide = useMediaQuery("(min-width: 1024px)");
   const scale = wide ? 2 : 1;
   const entries = useMemo(
@@ -47,7 +56,6 @@ export function Binder({ collection }: { collection: NexamonCollection | undefin
     [collection, filter],
   );
   const groups = useMemo(() => groupBySet(entries, filter.sort), [entries, filter.sort]);
-  const patch = (next: Partial<BinderFilter>) => setFilter((current) => ({ ...current, ...next }));
 
   if (!collection) {
     return (
@@ -179,6 +187,8 @@ function BinderTile({ entry, scale }: { entry: BinderEntry; scale: number }) {
   const t = useTranslations("nexamon");
   const owned = entry.copies.length;
   const best = entry.copies[0];
+  // Copies on the market right now: a small tag on the tile, the price on hover.
+  const listed = entry.copies.filter((c) => c.listing !== null);
   return (
     <li data-card={entry.stats.cardKey} data-owned={owned > 0} data-testid="binder-tile">
       <Link
@@ -200,6 +210,18 @@ function BinderTile({ entry, scale }: { entry: BinderEntry; scale: number }) {
               data-testid="tile-count"
             >
               ×{owned}
+            </span>
+          )}
+          {listed.length > 0 && (
+            <span
+              className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-pill bg-info px-1.5 font-pixel text-2xs whitespace-nowrap text-on-semantic uppercase shadow-1"
+              title={t("binder.listedHint", {
+                count: listed.length,
+                price: formatMoney(Math.min(...listed.map((c) => c.listing!.priceCents))),
+              })}
+              data-testid="tile-listed"
+            >
+              {t("binder.listedTag")}
             </span>
           )}
         </span>

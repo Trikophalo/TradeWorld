@@ -189,3 +189,32 @@ test("missions about Nexamon lead to the Nexamon page", async ({ page }) => {
   await expect(page).toHaveURL(/\/nexamon$/);
   await expect(page.getByTestId("nexamon-hub")).toBeVisible();
 });
+
+test("the collection remembers its filters and tab, and marks cards in the market", async ({ page }) => {
+  await preparePlayer(page);
+  await page.goto("/nexamon?tab=shop");
+  await page.getByTestId("buy-mystic_energy").click();
+  await page.getByTestId("confirm-buy").click();
+  await expect(page.getByTestId("pack-overlay")).toHaveAttribute("data-stage", /sealed|opening/);
+
+  await page.goto("/nexamon?tab=collection");
+  await page.getByTestId("binder-sort").selectOption("value");
+  await page.getByTestId("binder-set").selectOption("mystic_energy");
+  // List one card: the copy and its tile carry the market tag, with the price on hover.
+  const tile = page.locator('[data-testid="binder-tile"][data-owned="true"]').first();
+  const key = await tile.getAttribute("data-card");
+  await tile.getByRole("link").click();
+  await expect(page).toHaveURL(new RegExp(`/nexamon/${key}$`));
+  await page.getByTestId("copy-sell").first().click();
+  await page.getByTestId("sell-confirm").click();
+  await expect(page.getByTestId("copy-status").first()).toContainText("Im Markt");
+
+  // Without a tab in the address the last one comes back, with the filters.
+  await page.goto("/nexamon");
+  await expect(page.getByTestId("nexamon-hub")).toHaveAttribute("data-tab", "collection");
+  await expect(page.getByTestId("binder-sort")).toHaveValue("value");
+  await expect(page.getByTestId("binder-set")).toHaveValue("mystic_energy");
+  const listed = page.locator(`[data-testid="binder-tile"][data-card="${key}"]`).getByTestId("tile-listed");
+  await expect(listed).toHaveText("Im Markt");
+  await expect(listed).toHaveAttribute("title", /Steht im Markt für/);
+});

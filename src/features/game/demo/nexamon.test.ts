@@ -286,7 +286,8 @@ describe("Nexamon in the demo (ADR-165)", () => {
     expect(Math.abs(slab.valueCents - details.card.valueCents * 10)).toBeLessThanOrEqual(5);
     expect(details.blackLabels).toBe(1);
     expect(details.graded).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-    expect(world.feed).toEqual([`nexamon_black_label:${ultra.cardKey}`]);
+    // the grade stays a surprise until the package is opened: no feed item
+    expect(world.feed).toEqual([]);
     expect(world.tracked.nexamon_black_labels).toBe(1);
     // a Black Label is a 10 for the mission of the first 10 as well
     expect(world.tracked.nexamon_tens).toBe(2);

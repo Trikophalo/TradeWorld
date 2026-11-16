@@ -2971,6 +2971,17 @@ Menge, Image …), acht sinnvolle Punkte, die man mit Mira angehen kann.
   **Nicht umgesetzt:** Kartenwerte zählen nicht zum Vermögen und zur Rangliste. Das wäre kein kleiner Eingriff
   (`player_net_worth_cents`, `rich_list_entries`, Vermögensverlauf, Demo) und Kartenwerte lassen sich in Grenzen
   bewegen; das braucht eine eigene Entscheidung.
+- **Nachtrag Überraschung, Markt-Marke, gemerkte Filter:** (1) Die Benachrichtigung `nexamon_graded` (in der App und
+  als Push) verrät die Note nicht mehr: „Paket von ASP“ / „Das versiegelte Paket wartet darauf, dass du es öffnest.“,
+  ohne `grade` und `black_label` im Payload (Migration `20261204005960_nexamon_graded_quiet.sql` ersetzt
+  `nexamon_finish_gradings()`; die Demo ebenso). Der Feed-Eintrag `nexamon_black_label` (Freunde, Klatsch in den NEXA
+  Nachrichten) entfällt beim Abschluss des Gradings: Ob das Paket geöffnet ist, weiß nur das Gerät (`useRevealedSlabs`,
+  localStorage), der Server nicht. Ihn erst nach dem Öffnen zu posten, bräuchte ein RPC „Paket geöffnet“; bis dahin
+  gibt es keinen Black-Label-Eintrag (Beschriftung und Klatsch-Quelle bleiben bestehen). (2) Kopien im Markt tragen
+  im Binder die Marke „Im Markt“ (Preis beim Drüberfahren) und auf der Kartenseite „Im Markt · Preis“. (3) Filter
+  von Binder (Set, Seltenheit, Besitz, Sortierung, Verkauf) und Markt (Set, Seltenheit, Verkäufer, Slab, Sortierung)
+  und der letzte Tab bleiben je Browser erhalten (`nexa-nexamon-filters` im localStorage, nach der Hydration gelesen,
+  unbekannte Werte fallen auf den Standard zurück); ein Tab in der Adresse geht vor.
 - **Nachtrag Black Label:** Über der ASP 10 gibt es eine elfte Stufe, das Black Label (Wunsch des Besitzers: „über
   ASP 10, nur 1 % aller Karten, nur im Mint-Zustand, Kartenwert mal 10“).
   - **Regel** (`grading.blackLabel = {condition: "mint", chanceBps: 100, valueBps: 100_000}`): Nur eine Kopie im
