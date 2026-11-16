@@ -1385,3 +1385,54 @@ select public.get_chat(:fx_dm);
 select public.mark_chat_read(:fx_dm);
 \o
 reset role;
+
+-- Nexamon collectible cards (ADR-165): Fixture_Gmbh opens a pack, lists, grades and sells; Fixture_Heim buys
+select tests.fund(:fx_g, 50000000, 'fixture:nexamon:g') is null as ok \gset
+select tests.fund(:fx_h, 50000000, 'fixture:nexamon:h') is null as ok \gset
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/buy_nexamon_pack.json
+select public.buy_nexamon_pack(gen_random_uuid(), 'mystic_energy');
+\o
+select public.buy_nexamon_pack(gen_random_uuid(), 'mystic_energy') -> 'cards' as fx_nx \gset
+select :'fx_nx'::jsonb #>> '{0,copy_id}' as fx_nx1 \gset
+select :'fx_nx'::jsonb #>> '{1,copy_id}' as fx_nx2 \gset
+select :'fx_nx'::jsonb #>> '{2,copy_id}' as fx_nx3 \gset
+select :'fx_nx'::jsonb #>> '{0,card_key}' as fx_nxk \gset
+select (:'fx_nx'::jsonb #>> '{0,value_cents}')::bigint as fx_nxv \gset
+\o :fixture_dir/get_nexamon.json
+select public.get_nexamon();
+\o :fixture_dir/list_nexamon_card.json
+select public.list_nexamon_card(gen_random_uuid(), :'fx_nx1', :fx_nxv);
+\o
+reset role;
+select id as fx_nxl from public.nexamon_listings where copy_id = :'fx_nx1' \gset
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/unlist_nexamon_card.json
+select public.unlist_nexamon_card(gen_random_uuid(), :'fx_nxl');
+\o
+select public.list_nexamon_card(gen_random_uuid(), :'fx_nx1', :fx_nxv) #>> '{listing,id}' as fx_nxl \gset
+\o :fixture_dir/grade_nexamon_card.json
+select public.grade_nexamon_card(gen_random_uuid(), :'fx_nx2');
+\o :fixture_dir/sell_nexamon_to_ai.json
+select public.sell_nexamon_to_ai(gen_random_uuid(), array[:'fx_nx3']::uuid[]);
+\o
+reset role;
+update public.nexamon_copies set grading_until = public.game_now() - interval '1 second' where id = :'fx_nx2';
+select tests.login_as('authenticated', :fx_h) is null as ok \gset
+\o :fixture_dir/get_nexamon_market.json
+select public.get_nexamon_market(p_set => 'mystic_energy', p_sort => 'price_asc');
+\o :fixture_dir/get_nexamon_market_players.json
+select public.get_nexamon_market(p_seller => 'players');
+\o :fixture_dir/buy_nexamon_listing.json
+select public.buy_nexamon_listing(gen_random_uuid(), :'fx_nxl', :fx_nxv);
+\o :fixture_dir/get_nexamon_card.json
+select public.get_nexamon_card(:'fx_nxk');
+\o
+reset role;
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/get_nexamon_collection.json
+select public.get_nexamon_collection('mystic_energy');
+\o :fixture_dir/crack_nexamon_slab.json
+select public.crack_nexamon_slab(gen_random_uuid(), :'fx_nx2');
+\o
+reset role;

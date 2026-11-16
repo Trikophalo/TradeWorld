@@ -59327,6 +59327,1915 @@ on conflict (key) do update
        target_max = excluded.target_max, xp_min = excluded.xp_min, xp_max = excluded.xp_max, min_level = excluded.min_level,
        chain_order = excluded.chain_order, scale_with_level = excluded.scale_with_level, weight = excluded.weight,
        reward_skill_points = excluded.reward_skill_points, is_active = true, updated_at = now();
+-- ===== idempotent copy of migrations/20261204005200_nexamon_enum.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 5200 · Enum values for the Nexamon collectible cards (ADR-165)
+-- =============================================================================
+-- A new enum value cannot be used in the transaction that adds it (SQLSTATE 55P04), so the values get their own file
+-- before 20261204005210_nexamon.sql, which uses them only inside PL/pgSQL bodies.
+--   ledger_tx_kind 'nexamon_pack'     player cash -> households (a booster pack)
+--   ledger_tx_kind 'nexamon_sale'     buyer (player cash or the households) -> seller's cash, fee -> households
+--   ledger_tx_kind 'nexamon_grading'  player cash -> households (ASP's fee)
+-- Idempotent (identical copy in supabase/updates/).
+-- =============================================================================
+
+alter type public.ledger_tx_kind add value if not exists 'nexamon_pack';
+alter type public.ledger_tx_kind add value if not exists 'nexamon_sale';
+alter type public.ledger_tx_kind add value if not exists 'nexamon_grading';
+-- ===== idempotent copy of migrations/20261204005210_nexamon.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 5210 · Nexamon: collectible cards with booster packs, grading and a card market (ADR-165)
+-- =============================================================================
+-- * Catalogue: game_config.nexamon_cards (key, set, number, rarity, startPriceCents of 231 cards, written by
+--   `pnpm db:config` from src/config/nexamon), rules in game_config.nexamon (src/config/nexamon-rules.ts).
+--   nexamon_sync() mirrors the catalogue into nexamon_cards (idempotent, by a hash) and gives the AI sellers their
+--   starting stock. A card's start price always follows the catalogue, its market value only while it never moved.
+-- * Units: a card's market value is a price (value_e4 = euros x 10 000); money is cents, rounded half to even once
+--   (nexamon_copy_value_cents). A copy is worth value x condition factor, in a slab value x grade factor.
+-- * Packs: buy_nexamon_pack() takes the pack price to the households and pulls 5 cards. Slots 1 to 3 are commons,
+--   slot 4 rolls ultra/rare/common, slot 5 legendary/prisma/ultra/rare/common (odds in parts of 3600). Every pull
+--   raises the card's population by one; the copy carries that number (serial) and a rolled condition.
+-- * Market: one copy per listing at a free price; the seller pays market.feeBps to the households. AI sellers offer
+--   their stock at the copy's value + 10 % and follow the value; AI collectors buy player listings only up to the
+--   copy's value (households money), limited per card and week and per set and day.
+-- * Value: sales near the value move it a bounded step (nexamon_sell), supply against demand moves it once per hour
+--   (nexamon_pressure_step); floor, cap and a corridor per Berlin day (nexamon_set_value). Anti-manipulation: only
+--   prices within the band count, one counted sale per pair of players, card and day, three per buyer and day.
+-- * Grading by "ASP": 50 % of the copy's value, one hour, grade 1..10 rolled at the end by the copy's condition;
+--   crack_nexamon_slab() returns the raw card without a refund.
+-- * Job nexamon_run_due() (cron nexa-nexamon, every minute): finishes gradings, AI packs, AI purchases, AI listings,
+--   the hourly value step. Port of src/lib/sim/nexamon.ts.
+--
+-- RPCs (authenticated): get_nexamon(), buy_nexamon_pack(p_request_id, p_set), get_nexamon_collection(p_set),
+--   get_nexamon_card(p_key), get_nexamon_market(p_set, p_rarity, p_sort, p_page, p_seller, p_card_key, p_graded),
+--   list_nexamon_card(p_request_id, p_copy_id, p_price_cents), unlist_nexamon_card(p_request_id, p_listing_id),
+--   buy_nexamon_listing(p_request_id, p_listing_id, p_price_cents), sell_nexamon_to_ai(p_request_id, p_copy_ids),
+--   grade_nexamon_card(p_request_id, p_copy_id), crack_nexamon_slab(p_request_id, p_copy_id).
+-- Errors: nexamon_locked NX163, nexamon_unknown NX164, nexamon_not_owner NX165, nexamon_listed NX166,
+--   nexamon_not_listed NX167, nexamon_price_changed NX168, nexamon_listing_limit NX169, nexamon_grading NX170,
+--   nexamon_not_raw NX171, nexamon_not_graded NX172, nexamon_not_sellable NX173, nexamon_own_listing NX174,
+--   nexamon_grading_limit NX175.
+-- Idempotent: runs unchanged as supabase/updates/20261204005210_nexamon.sql.
+
+-- ---------------------------------------------------------------------------
+-- A. Error keys, notification types
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.api_error(text)'::regprocedure);
+begin
+  if position('''nexamon_grading_limit''' in v_def) = 0 then
+    v_def := replace(v_def, $q$    when 'chat_already_member'        then 'NX162'
+$q$, $q$    when 'chat_already_member'        then 'NX162'
+    when 'nexamon_locked'             then 'NX163'
+    when 'nexamon_unknown'            then 'NX164'
+    when 'nexamon_not_owner'          then 'NX165'
+    when 'nexamon_listed'             then 'NX166'
+    when 'nexamon_not_listed'         then 'NX167'
+    when 'nexamon_price_changed'      then 'NX168'
+    when 'nexamon_listing_limit'      then 'NX169'
+    when 'nexamon_grading'            then 'NX170'
+    when 'nexamon_not_raw'            then 'NX171'
+    when 'nexamon_not_graded'         then 'NX172'
+    when 'nexamon_not_sellable'       then 'NX173'
+    when 'nexamon_own_listing'        then 'NX174'
+    when 'nexamon_grading_limit'      then 'NX175'
+$q$);
+    if position('''nexamon_grading_limit''' in v_def) = 0 then
+      raise exception 'api_error() has an unexpected shape; add the Nexamon error keys by hand';
+    end if;
+    execute v_def;
+  end if;
+end;
+$do$;
+
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('nexamon_sale', 'social', 'Nexamon-Karte verkauft', 'Jemand hat eine deiner Nexamon-Karten gekauft.', 'notif_bell',
+        true, true, false, 299),
+       ('nexamon_graded', 'social', 'Grading fertig', 'ASP hat deine Nexamon-Karte bewertet.', 'notif_bell',
+        true, true, false, 300)
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- B. Tables (internal: read and written only by the functions below)
+-- ---------------------------------------------------------------------------
+create table if not exists public.nexamon_cards (
+  card_key        text primary key check (char_length(card_key) between 1 and 32),
+  set_key         text not null check (char_length(set_key) between 1 and 32),
+  number          integer not null check (number > 0),
+  rarity          text not null check (rarity in ('common', 'rare', 'ultra', 'prisma', 'legendary')),
+  start_e4        bigint not null check (start_e4 > 0),
+  value_e4        bigint not null check (value_e4 > 0),
+  population      bigint not null default 0 check (population >= 0),
+  counted_trades  bigint not null default 0 check (counted_trades >= 0),
+  day_ref_e4      bigint not null check (day_ref_e4 > 0),
+  day_ref_on      date not null,
+  moved_at        timestamptz,
+  first_pulled_at timestamptz,
+  pressure_at     timestamptz,
+  seeded          boolean not null default false,
+  in_catalogue    boolean not null default true,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now(),
+  unique (set_key, number)
+);
+create index if not exists nexamon_cards_set_rarity_idx on public.nexamon_cards (set_key, rarity);
+create index if not exists nexamon_cards_pressure_idx on public.nexamon_cards (pressure_at nulls first);
+drop trigger if exists set_updated_at on public.nexamon_cards;
+create trigger set_updated_at before update on public.nexamon_cards for each row execute function public.set_updated_at();
+alter table public.nexamon_cards enable row level security;
+revoke all on public.nexamon_cards from public, anon, authenticated;
+grant all on public.nexamon_cards to service_role;
+comment on table public.nexamon_cards is
+  'Nexamon cards (ADR-165): one row per card of the catalogue with its market value (value_e4 = euros x 10 000), '
+  'population, counted trades and the day''s reference value. moved_at null = the value still follows the catalogue. '
+  'Internal (nexamon_sync, RPCs).';
+
+create table if not exists public.nexamon_copies (
+  id                uuid primary key default gen_random_uuid(),
+  card_key          text not null references public.nexamon_cards (card_key),
+  serial            bigint not null check (serial > 0),
+  owner_id          uuid references public.profiles (id) on delete cascade,
+  ai_owner          text check (ai_owner is null or char_length(ai_owner) between 1 and 40),
+  condition         text not null check (condition in ('poor', 'good', 'near_mint', 'mint')),
+  grade             smallint check (grade is null or grade between 1 and 10),
+  graded_at         timestamptz,
+  grading_until     timestamptz,
+  grading_fee_cents bigint check (grading_fee_cents is null or grading_fee_cents >= 0),
+  source            text not null check (source in ('pack', 'ai_pack', 'seed')),
+  pack_id           uuid,
+  acquired_at       timestamptz not null default now(),
+  created_at        timestamptz not null default now(),
+  constraint nexamon_copies_owner_check check ((owner_id is null) <> (ai_owner is null)),
+  constraint nexamon_copies_grading_check check (grading_until is null or grade is null),
+  unique (card_key, serial)
+);
+create index if not exists nexamon_copies_owner_idx on public.nexamon_copies (owner_id, card_key) where owner_id is not null;
+create index if not exists nexamon_copies_ai_idx on public.nexamon_copies (card_key) where ai_owner is not null;
+create index if not exists nexamon_copies_grading_idx on public.nexamon_copies (grading_until) where grading_until is not null;
+alter table public.nexamon_copies enable row level security;
+revoke all on public.nexamon_copies from public, anon, authenticated;
+grant all on public.nexamon_copies to service_role;
+comment on table public.nexamon_copies is
+  'Nexamon copies (ADR-165): every pulled card with its population number (serial), condition, owner (a player or an '
+  'AI seller) and, after grading by ASP, its grade. grading_until = at ASP until then. Internal (RPCs).';
+
+create table if not exists public.nexamon_listings (
+  id          uuid primary key default gen_random_uuid(),
+  copy_id     uuid not null unique references public.nexamon_copies (id) on delete cascade,
+  card_key    text not null references public.nexamon_cards (card_key),
+  seller_id   uuid references public.profiles (id) on delete cascade,
+  seller_ai   text check (seller_ai is null or char_length(seller_ai) between 1 and 40),
+  price_cents bigint not null check (price_cents > 0),
+  created_at  timestamptz not null default now(),
+  constraint nexamon_listings_seller_check check ((seller_id is null) <> (seller_ai is null))
+);
+create index if not exists nexamon_listings_card_idx on public.nexamon_listings (card_key, price_cents);
+create index if not exists nexamon_listings_seller_idx on public.nexamon_listings (seller_id) where seller_id is not null;
+create index if not exists nexamon_listings_new_idx on public.nexamon_listings (created_at desc);
+alter table public.nexamon_listings enable row level security;
+revoke all on public.nexamon_listings from public, anon, authenticated;
+grant all on public.nexamon_listings to service_role;
+comment on table public.nexamon_listings is
+  'Open listings of the Nexamon market (ADR-165): one copy at a price, by a player or an AI seller. A row disappears '
+  'when the copy is sold or taken back. Internal (RPCs).';
+
+create table if not exists public.nexamon_sales (
+  id              bigint generated always as identity primary key,
+  card_key        text not null references public.nexamon_cards (card_key),
+  copy_id         uuid references public.nexamon_copies (id) on delete set null,
+  seller_id       uuid references public.profiles (id) on delete set null,
+  seller_ai       text,
+  buyer_id        uuid references public.profiles (id) on delete set null,
+  buyer_ai        text,
+  price_cents     bigint not null check (price_cents >= 0),
+  fee_cents       bigint not null default 0 check (fee_cents >= 0),
+  condition       text not null,
+  grade           smallint,
+  factor_bps      integer not null,
+  kind            text not null check (kind in ('market', 'ai_buy', 'quick')),
+  counted         boolean not null default false,
+  value_before_e4 bigint not null,
+  value_after_e4  bigint not null,
+  at              timestamptz not null default now()
+);
+create index if not exists nexamon_sales_card_idx on public.nexamon_sales (card_key, at desc);
+create index if not exists nexamon_sales_buyer_idx on public.nexamon_sales (buyer_id, card_key, at) where buyer_id is not null;
+create index if not exists nexamon_sales_ai_idx on public.nexamon_sales (at) where kind = 'ai_buy';
+create index if not exists nexamon_sales_copy_idx on public.nexamon_sales (copy_id) where copy_id is not null;
+create index if not exists nexamon_sales_seller_idx on public.nexamon_sales (seller_id, card_key, at) where seller_id is not null;
+alter table public.nexamon_sales enable row level security;
+revoke all on public.nexamon_sales from public, anon, authenticated;
+grant all on public.nexamon_sales to service_role;
+comment on table public.nexamon_sales is
+  'Sales of Nexamon copies (ADR-165): kind market (a listing bought by a player), ai_buy (an AI collector bought a '
+  'player''s listing), quick (instant sale to the AI). counted = the sale moved the card''s value. Internal (RPCs).';
+
+create table if not exists public.nexamon_packs (
+  id          uuid primary key default gen_random_uuid(),
+  player_id   uuid not null references public.profiles (id) on delete cascade,
+  set_key     text not null,
+  price_cents bigint not null check (price_cents >= 0),
+  cards       jsonb not null,
+  opened_at   timestamptz not null default now()
+);
+create index if not exists nexamon_packs_player_idx on public.nexamon_packs (player_id, opened_at desc);
+alter table public.nexamon_packs enable row level security;
+revoke all on public.nexamon_packs from public, anon, authenticated;
+grant all on public.nexamon_packs to service_role;
+comment on table public.nexamon_packs is
+  'Booster packs players opened (ADR-165) with the five pulls. The AI''s packs are only counted in '
+  'nexamon_set_state. Internal (RPC buy_nexamon_pack).';
+
+create table if not exists public.nexamon_value_points (
+  card_key text not null references public.nexamon_cards (card_key) on delete cascade,
+  at       timestamptz not null,
+  value_e4 bigint not null check (value_e4 > 0),
+  primary key (card_key, at)
+);
+alter table public.nexamon_value_points enable row level security;
+revoke all on public.nexamon_value_points from public, anon, authenticated;
+grant all on public.nexamon_value_points to service_role;
+comment on table public.nexamon_value_points is
+  'Value history of the Nexamon cards (ADR-165): the last value of every hour in which it changed. Internal.';
+
+create table if not exists public.nexamon_set_state (
+  set_key             text primary key,
+  ai_packs_at         timestamptz not null default now(),
+  ai_packs_opened     bigint not null default 0,
+  player_packs_opened bigint not null default 0
+);
+alter table public.nexamon_set_state enable row level security;
+revoke all on public.nexamon_set_state from public, anon, authenticated;
+grant all on public.nexamon_set_state to service_role;
+comment on table public.nexamon_set_state is
+  'Per Nexamon set (ADR-165): until when the AI''s packs are opened and how many packs were opened. Internal.';
+
+create table if not exists public.nexamon_meta (
+  id             boolean primary key default true check (id),
+  catalogue_hash text,
+  synced_at      timestamptz
+);
+alter table public.nexamon_meta enable row level security;
+revoke all on public.nexamon_meta from public, anon, authenticated;
+grant all on public.nexamon_meta to service_role;
+comment on table public.nexamon_meta is
+  'One row (ADR-165): hash of the catalogue nexamon_sync() mirrored last. Internal.';
+
+-- ---------------------------------------------------------------------------
+-- C. Rules (port of src/lib/sim/nexamon.ts; fallbacks as in src/config/nexamon-rules.ts)
+-- ---------------------------------------------------------------------------
+create or replace function public.nexamon_cfg()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select value from public.game_config where key = 'nexamon'), '{}'::jsonb);
+$$;
+
+create or replace function public.nexamon_catalogue()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select value from public.game_config where key = 'nexamon_cards'), '[]'::jsonb);
+$$;
+
+-- nexamonSlotRarity: slots 1..3 common; slot 4 and slot 5 roll in parts of odds.denominator, best rarity first
+create or replace function public.nexamon_slot_rarity(p_slot integer, p_u double precision)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  o      jsonb := public.nexamon_cfg() -> 'odds';
+  t      jsonb;
+  v_den  integer := coalesce((public.nexamon_cfg() #>> '{odds,denominator}')::integer, 3600);
+  v_n    integer;
+  v_edge integer := 0;
+  r      text;
+begin
+  t := case when p_slot = 5 then o -> 'slot5' when p_slot = 4 then o -> 'slot4' end;
+  if t is null then
+    return 'common';
+  end if;
+  v_n := floor(least(greatest(coalesce(p_u, 0), 0), 0.999999999) * v_den)::integer;
+  foreach r in array array['legendary', 'prisma', 'ultra', 'rare'] loop
+    v_edge := v_edge + coalesce((t ->> r)::integer, 0);
+    if v_n < v_edge then
+      return r;
+    end if;
+  end loop;
+  return 'common';
+end;
+$$;
+
+-- nexamonRollCondition: conditions.order, worst first, weights in basis points
+create or replace function public.nexamon_roll_condition(p_u double precision)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  c      jsonb := public.nexamon_cfg() -> 'conditions';
+  v_n    integer := floor(least(greatest(coalesce(p_u, 0), 0), 0.999999999) * 10000)::integer;
+  v_edge integer := 0;
+  v_last text := 'near_mint';
+  r      text;
+begin
+  for r in select x from jsonb_array_elements_text(coalesce(c -> 'order', '[]'::jsonb)) with ordinality t(x, ord) order by ord loop
+    v_edge := v_edge + coalesce((c -> 'weightBps' ->> r)::integer, 0);
+    v_last := r;
+    if v_n < v_edge then
+      return r;
+    end if;
+  end loop;
+  return v_last;
+end;
+$$;
+
+-- nexamonRollGrade: grading.gradeWeightsBps[condition], index 0 = grade 1
+create or replace function public.nexamon_roll_grade(p_condition text, p_u double precision)
+returns integer
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  w      jsonb := public.nexamon_cfg() #> array['grading', 'gradeWeightsBps', p_condition];
+  v_n    integer := floor(least(greatest(coalesce(p_u, 0), 0), 0.999999999) * 10000)::integer;
+  v_edge integer := 0;
+  g      integer;
+begin
+  for g in 1 .. 10 loop
+    v_edge := v_edge + coalesce((w ->> (g - 1))::integer, 0);
+    if v_n < v_edge then
+      return g;
+    end if;
+  end loop;
+  return 10;
+end;
+$$;
+
+-- nexamonCopyFactorBps: the grade's factor in a slab, else 100 % from "good" upwards, minus a step per condition below
+create or replace function public.nexamon_copy_factor_bps(p_condition text, p_grade integer)
+returns integer
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.nexamon_cfg();
+  v_good  integer;
+  v_this  integer;
+begin
+  if p_grade is not null then
+    return coalesce((cfg #>> array['grading', 'valueBps', (least(greatest(p_grade, 1), 10) - 1)::text])::integer, 10000);
+  end if;
+  select max(ord) filter (where x = 'good'), max(ord) filter (where x = p_condition) into v_good, v_this
+    from jsonb_array_elements_text(coalesce(cfg #> '{conditions,order}', '[]'::jsonb)) with ordinality t(x, ord);
+  return greatest(0, 10000 - greatest(0, coalesce(v_good, 0) - coalesce(v_this, coalesce(v_good, 0)))
+                               * coalesce((cfg #>> '{conditions,belowGoodStepBps}')::integer, 500));
+end;
+$$;
+
+-- nexamonCopyValueCents: the one place where a card's price becomes money (half to even)
+create or replace function public.nexamon_copy_value_cents(p_value_e4 bigint, p_condition text, p_grade integer)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select public.div_round_half_even(p_value_e4::numeric * public.nexamon_copy_factor_bps(p_condition, p_grade), 1000000);
+$$;
+
+-- nexamonAiAskCents: the copy's value + 10 %
+create or replace function public.nexamon_ai_ask_cents(p_copy_value bigint)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select greatest(coalesce((public.nexamon_cfg() #>> '{market,minPriceCents}')::bigint, 10),
+                  public.div_round_half_even(p_copy_value::numeric * coalesce((public.nexamon_cfg() #>> '{ai,askBps}')::integer, 11000),
+                                             10000));
+$$;
+
+-- nexamonPopularityBps: rarity plus a bonus for a low population
+create or replace function public.nexamon_popularity_bps(p_rarity text, p_population bigint)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select least(10000,
+           coalesce((p -> 'rarityBps' ->> p_rarity)::integer, 0)
+           + floor(coalesce((p ->> 'scarceBonusBps')::numeric, 0) * coalesce((p -> 'popRef' ->> p_rarity)::numeric, 1)
+                   / (coalesce((p -> 'popRef' ->> p_rarity)::numeric, 1) + greatest(0, coalesce(p_population, 0))))::integer)
+    from (select coalesce(public.nexamon_cfg() #> '{value,popularity}', '{}'::jsonb) as p) c;
+$$;
+
+-- nexamonDemandMilli: want x (popRef + seed) / (popRef + population) + recent purchases, in thousandths of a copy
+create or replace function public.nexamon_demand_milli(p_rarity text, p_population bigint, p_recent_buys bigint)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select floor(1000 * coalesce((cfg #>> array['value', 'pressure', 'want', p_rarity])::numeric, 1)
+               * (coalesce((cfg #>> array['value', 'popularity', 'popRef', p_rarity])::numeric, 1)
+                  + coalesce((cfg #>> array['ai', 'seedCopies', p_rarity])::numeric, 0))
+               / (coalesce((cfg #>> array['value', 'popularity', 'popRef', p_rarity])::numeric, 1) + greatest(0, coalesce(p_population, 0))))::bigint
+       + coalesce((cfg #>> '{value,pressure,buyWeightMilli}')::bigint, 0)
+         * least(greatest(0, coalesce(p_recent_buys, 0)), coalesce((cfg #>> '{value,pressure,maxBuys}')::bigint, 0))
+    from (select public.nexamon_cfg() as cfg) c;
+$$;
+
+-- nexamonPressureBps: (demand - supply) / want, -10 000 .. +10 000; a card nobody pulled yet stands still
+create or replace function public.nexamon_pressure_bps(p_rarity text, p_population bigint, p_supply bigint, p_recent_buys bigint)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when coalesce(p_population, 0) <= 0 then 0
+              else least(10000, greatest(-10000,
+                     trunc((public.nexamon_demand_milli(p_rarity, p_population, p_recent_buys) - 1000 * greatest(0, coalesce(p_supply, 0)))::numeric
+                           * 10 / coalesce((public.nexamon_cfg() #>> array['value', 'pressure', 'want', p_rarity])::numeric, 1))))::integer
+         end;
+$$;
+
+-- nexamonCapBps and nexamonValueBounds: floor and cap of a card's value in e4
+create or replace function public.nexamon_bounds(p_start_e4 bigint, p_first_pulled timestamptz, p_trades bigint, p_now timestamptz,
+                                                 out floor_e4 bigint, out cap_e4 bigint)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v      jsonb := public.nexamon_cfg() -> 'value';
+  v_days bigint := greatest(0, floor(extract(epoch from (p_now - coalesce(p_first_pulled, p_now))) / 86400))::bigint;
+  v_cap  bigint;
+begin
+  v_cap := least(coalesce((v ->> 'capMaxBps')::bigint, 200000),
+                 coalesce((v ->> 'capBaseBps')::bigint, 30000) + coalesce((v ->> 'capPerDayBps')::bigint, 0) * v_days
+                 + coalesce((v ->> 'capPerTradeBps')::bigint, 0) * greatest(0, coalesce(p_trades, 0)));
+  floor_e4 := public.div_round_half_even(p_start_e4::numeric * coalesce((v ->> 'floorBps')::bigint, 2000), 10000);
+  cap_e4 := public.div_round_half_even(p_start_e4::numeric * v_cap, 10000);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- D. Unlock, catalogue sync, minting, AI listings, the value
+-- ---------------------------------------------------------------------------
+create or replace function public.nexamon_unlocked(p_player uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select p.level from public.profiles p where p.id = p_player), 1) >= public.unlock_level('nexamon');
+$$;
+
+create or replace function public.nexamon_require_unlock(p_player uuid)
+returns void
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.nexamon_unlocked(p_player) then
+    perform public.api_error('nexamon_locked');
+  end if;
+end;
+$$;
+
+-- A new copy: the card's population goes up by one, the copy carries that number.
+create or replace function public.nexamon_mint_copy(p_card text, p_owner uuid, p_ai text, p_condition text, p_source text,
+                                                    p_pack uuid, p_now timestamptz)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_serial bigint;
+  v_id     uuid;
+begin
+  update public.nexamon_cards
+     set population = population + 1, first_pulled_at = coalesce(first_pulled_at, p_now), updated_at = p_now
+   where card_key = p_card
+  returning population into v_serial;
+  if v_serial is null then
+    perform public.api_error('nexamon_unknown');
+  end if;
+  insert into public.nexamon_copies (card_key, serial, owner_id, ai_owner, condition, source, pack_id, acquired_at, created_at)
+  values (p_card, v_serial, p_owner, p_ai, p_condition, p_source, p_pack, p_now, p_now)
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+
+-- The AI sellers offer up to ai.listedPerCard copies of a card from their stock (p_extra more, for a legendary).
+create or replace function public.nexamon_ai_restock(p_card text, p_now timestamptz, p_extra integer default 0)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  k        public.nexamon_cards;
+  v_limit  integer;
+  v_listed integer;
+  v_n      integer := 0;
+  r        record;
+begin
+  select * into k from public.nexamon_cards where card_key = p_card;
+  if k.card_key is null then
+    return 0;
+  end if;
+  v_limit := coalesce((public.nexamon_cfg() #>> array['ai', 'listedPerCard', k.rarity])::integer, 0) + greatest(0, coalesce(p_extra, 0));
+  select count(*) into v_listed from public.nexamon_listings l where l.card_key = p_card and l.seller_ai is not null;
+  for r in select c.id, c.ai_owner, c.condition, c.grade from public.nexamon_copies c
+            where c.card_key = p_card and c.ai_owner is not null
+              and not exists (select 1 from public.nexamon_listings l where l.copy_id = c.id)
+            order by c.acquired_at, c.serial
+            limit greatest(0, v_limit - v_listed) loop
+    insert into public.nexamon_listings (copy_id, card_key, seller_ai, price_cents, created_at)
+    values (r.id, p_card, r.ai_owner,
+            public.nexamon_ai_ask_cents(public.nexamon_copy_value_cents(k.value_e4, r.condition, r.grade)), p_now);
+    v_n := v_n + 1;
+  end loop;
+  return v_n;
+end;
+$$;
+
+-- Sets a card's value inside its bounds (nexamonClampValue): the corridor of the Berlin day, then floor and cap.
+-- The AI's listings follow at once, the hour's point of the value history is written. -> the new value
+create or replace function public.nexamon_set_value(p_card text, p_value_e4 bigint, p_now timestamptz, p_counted boolean default false)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v       jsonb := public.nexamon_cfg() -> 'value';
+  k       public.nexamon_cards;
+  v_day   date := (p_now at time zone 'Europe/Berlin')::date;
+  v_ref   bigint;
+  v_trades bigint;
+  b       record;
+  v_new   bigint;
+begin
+  select * into k from public.nexamon_cards where card_key = p_card for update;
+  if k.card_key is null then
+    return null;
+  end if;
+  v_ref := case when k.day_ref_on = v_day then k.day_ref_e4 else k.value_e4 end;
+  v_trades := k.counted_trades + case when p_counted then 1 else 0 end;
+  select * into b from public.nexamon_bounds(k.start_e4, k.first_pulled_at, v_trades, p_now);
+  v_new := least(greatest(p_value_e4,
+                          public.div_round_half_even(v_ref::numeric * (10000 - coalesce((v ->> 'dayMaxFallBps')::bigint, 2000)), 10000)),
+                 public.div_round_half_even(v_ref::numeric * (10000 + coalesce((v ->> 'dayMaxRiseBps')::bigint, 1500)), 10000));
+  v_new := greatest(1, greatest(b.floor_e4, least(b.cap_e4, v_new)));
+  update public.nexamon_cards
+     set value_e4 = v_new, day_ref_e4 = v_ref, day_ref_on = v_day, counted_trades = v_trades,
+         moved_at = case when v_new <> k.value_e4 then p_now else moved_at end, updated_at = p_now
+   where card_key = p_card;
+  if v_new <> k.value_e4 then
+    update public.nexamon_listings l
+       set price_cents = public.nexamon_ai_ask_cents(public.nexamon_copy_value_cents(v_new, c.condition, c.grade))
+      from public.nexamon_copies c
+     where l.card_key = p_card and l.seller_ai is not null and c.id = l.copy_id;
+    insert into public.nexamon_value_points (card_key, at, value_e4)
+    values (p_card, date_trunc('hour', p_now), v_new)
+    on conflict (card_key, at) do update set value_e4 = excluded.value_e4;
+  end if;
+  return v_new;
+end;
+$$;
+
+-- Mirrors the catalogue (game_config.nexamon_cards) into nexamon_cards and gives the AI sellers their starting stock.
+-- Cheap when nothing changed (hash). -> number of cards written
+create or replace function public.nexamon_sync(p_now timestamptz default null)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.nexamon_cfg();
+  v_cat   jsonb := public.nexamon_catalogue();
+  v_now   timestamptz := coalesce(p_now, public.game_now());
+  v_hash  text;
+  v_n     integer := 0;
+  v_names jsonb := coalesce(public.nexamon_cfg() #> '{ai,sellers}', '[]'::jsonb);
+  v_seed  integer;
+  r       record;
+  i       integer;
+begin
+  if jsonb_typeof(v_cat) <> 'array' or jsonb_array_length(v_cat) = 0 or cfg = '{}'::jsonb then
+    return 0;
+  end if;
+  v_hash := md5(v_cat::text || coalesce((cfg #> '{ai,seedCopies}')::text, '') || coalesce(cfg #>> '{ai,seedPrismaCards}', '')
+                || coalesce((cfg -> 'sets')::text, '') || v_names::text);
+  if exists (select 1 from public.nexamon_meta m where m.catalogue_hash = v_hash) then
+    return 0;
+  end if;
+  perform pg_advisory_xact_lock(7311650);
+  if exists (select 1 from public.nexamon_meta m where m.catalogue_hash = v_hash) then
+    return 0;
+  end if;
+
+  insert into public.nexamon_cards (card_key, set_key, number, rarity, start_e4, value_e4, day_ref_e4, day_ref_on, created_at, updated_at)
+  select x ->> 'key', x ->> 'set', (x ->> 'number')::integer, x ->> 'rarity', (x ->> 'startPriceCents')::bigint * 100,
+         (x ->> 'startPriceCents')::bigint * 100, (x ->> 'startPriceCents')::bigint * 100,
+         (v_now at time zone 'Europe/Berlin')::date, v_now, v_now
+    from jsonb_array_elements(v_cat) x
+   where (x ->> 'startPriceCents')::bigint > 0
+  on conflict (card_key) do update
+     set set_key = excluded.set_key, number = excluded.number, rarity = excluded.rarity, start_e4 = excluded.start_e4,
+         -- a card that never moved follows the catalogue's start price
+         value_e4 = case when public.nexamon_cards.moved_at is null then excluded.start_e4 else public.nexamon_cards.value_e4 end,
+         day_ref_e4 = case when public.nexamon_cards.moved_at is null then excluded.start_e4 else public.nexamon_cards.day_ref_e4 end,
+         in_catalogue = true, updated_at = excluded.updated_at;
+  get diagnostics v_n = row_count;
+  update public.nexamon_cards k set in_catalogue = false
+   where k.in_catalogue and not exists (select 1 from jsonb_array_elements(v_cat) x where x ->> 'key' = k.card_key);
+  -- the AI's listings of cards that never moved follow the new start price
+  update public.nexamon_listings l
+     set price_cents = public.nexamon_ai_ask_cents(public.nexamon_copy_value_cents(k.value_e4, c.condition, c.grade))
+    from public.nexamon_copies c, public.nexamon_cards k
+   where l.seller_ai is not null and c.id = l.copy_id and k.card_key = l.card_key and k.moved_at is null;
+
+  insert into public.nexamon_set_state (set_key, ai_packs_at)
+  select s.key, v_now from jsonb_each(coalesce(cfg -> 'sets', '{}'::jsonb)) s
+  on conflict (set_key) do nothing;
+
+  -- starting stock of the AI sellers: no legendary, prismas only for the cheapest cards of a set
+  if jsonb_array_length(v_names) > 0 then
+    for r in select k.card_key, k.rarity, k.number,
+                    row_number() over (partition by k.set_key, k.rarity order by k.start_e4, k.number) - 1 as price_rank
+               from public.nexamon_cards k where not k.seeded and k.in_catalogue order by k.set_key, k.number loop
+      v_seed := coalesce((cfg #>> array['ai', 'seedCopies', r.rarity])::integer, 0);
+      if r.rarity = 'prisma' and r.price_rank >= coalesce((cfg #>> '{ai,seedPrismaCards}')::integer, 0) then
+        v_seed := 0;
+      end if;
+      for i in 1 .. v_seed loop
+        perform public.nexamon_mint_copy(r.card_key, null, v_names ->> ((r.number + i) % jsonb_array_length(v_names)),
+                                         public.nexamon_roll_condition(random()), 'seed', null, v_now);
+      end loop;
+      update public.nexamon_cards set seeded = true where card_key = r.card_key;
+      perform public.nexamon_ai_restock(r.card_key, v_now);
+    end loop;
+  end if;
+
+  insert into public.nexamon_meta (id, catalogue_hash, synced_at) values (true, v_hash, v_now)
+  on conflict (id) do update set catalogue_hash = excluded.catalogue_hash, synced_at = excluded.synced_at;
+  return v_n;
+end;
+$$;
+comment on function public.nexamon_sync(timestamptz) is
+  'Internal: mirrors game_config.nexamon_cards into nexamon_cards and seeds the AI sellers'' stock (ADR-165). '
+  'Idempotent; does nothing while the catalogue hash is unchanged.';
+
+-- Opens one pack of a set for a player or an AI seller (nexamonOpenPack). -> the pulls in slot order
+create or replace function public.nexamon_open_pack(p_set text, p_owner uuid, p_ai text, p_pack uuid, p_now timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.nexamon_cfg();
+  v_size   integer := coalesce((public.nexamon_cfg() ->> 'packSize')::integer, 5);
+  v_used   text[] := '{}';
+  v_out    jsonb := '[]'::jsonb;
+  v_rarity text;
+  v_key    text;
+  v_cond   text;
+  v_new    boolean;
+  v_copy   uuid;
+  k        public.nexamon_cards;
+  s        integer;
+begin
+  for s in 1 .. v_size loop
+    v_rarity := case when s >= 4 then public.nexamon_slot_rarity(s, random()) else 'common' end;
+    select c.card_key into v_key from public.nexamon_cards c
+     where c.set_key = p_set and c.rarity = v_rarity and c.in_catalogue
+       and (v_rarity <> 'common' or c.card_key <> all (v_used))
+     order by random() limit 1;
+    if v_key is null then
+      perform public.api_error('nexamon_unknown');
+    end if;
+    v_used := v_used || v_key;
+    v_cond := public.nexamon_roll_condition(random());
+    v_new := p_owner is not null
+             and not exists (select 1 from public.nexamon_copies x where x.owner_id = p_owner and x.card_key = v_key);
+    v_copy := public.nexamon_mint_copy(v_key, p_owner, p_ai, v_cond, case when p_owner is null then 'ai_pack' else 'pack' end,
+                                       p_pack, p_now);
+    select * into k from public.nexamon_cards where card_key = v_key;
+    v_out := v_out || jsonb_build_object(
+      'slot', s, 'copy_id', v_copy, 'card_key', v_key, 'rarity', v_rarity, 'condition', v_cond, 'is_new', v_new,
+      'serial', k.population, 'population', k.population,
+      'value_cents', public.nexamon_copy_value_cents(k.value_e4, v_cond, null));
+    if p_owner is not null and coalesce(cfg -> 'feedRarities', '[]'::jsonb) ? v_rarity then
+      perform public.feed_post(p_owner, 'nexamon_pull',
+                               jsonb_build_object('card_key', v_key, 'set', p_set, 'rarity', v_rarity, 'serial', k.population,
+                                                  'condition', v_cond),
+                               'nexamon:pull:' || v_copy::text);
+    end if;
+  end loop;
+  return v_out;
+end;
+$$;
+
+-- A listing is sold to a player (p_buyer) or an AI collector (p_buyer_ai): the buyer pays the price, a selling player
+-- gets it minus the fee (an AI seller's or a frozen seller's part goes to the households). The sale moves the card's
+-- value if it counts (nexamonSaleCounts, nexamonValueAfterSale, nexamonValueAfterAiBuy).
+create or replace function public.nexamon_sell(p_listing uuid, p_buyer uuid, p_buyer_ai text, p_key text, p_now timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg       jsonb := public.nexamon_cfg();
+  t         jsonb := public.nexamon_cfg() #> '{value,trade}';
+  l         public.nexamon_listings;
+  c         public.nexamon_copies;
+  k         public.nexamon_cards;
+  v_house   uuid := public.ledger_system_account('households');
+  v_from    uuid;
+  v_to      uuid;
+  v_fee     bigint;
+  v_raw     jsonb;
+  v_entries jsonb;
+  v_factor  integer;
+  v_norm    bigint;
+  v_diff    bigint;
+  v_step    bigint;
+  v_pop     integer;
+  v_pair    bigint := 0;
+  v_today   bigint := 0;
+  v_counted boolean := false;
+  v_target  bigint;
+  v_after   bigint;
+  v_kind    text := case when p_buyer_ai is not null then 'ai_buy' else 'market' end;
+  v_day     timestamptz := ((p_now at time zone 'Europe/Berlin')::date)::timestamp at time zone 'Europe/Berlin';
+  v_name    text;
+begin
+  select * into l from public.nexamon_listings where id = p_listing for update;
+  if l.id is null then
+    perform public.api_error('nexamon_not_listed');
+  end if;
+  if (p_buyer is null) = (p_buyer_ai is null) or p_buyer = l.seller_id then
+    perform public.api_error('invalid_argument');
+  end if;
+  select * into c from public.nexamon_copies where id = l.copy_id for update;
+  select * into k from public.nexamon_cards where card_key = l.card_key for update;
+
+  -- money
+  v_from := case when p_buyer is not null then public.ledger_player_account(p_buyer, 'player_cash') else v_house end;
+  if l.seller_id is not null then
+    select x.id into v_to from public.ledger_accounts x
+     where x.owner_player_id = l.seller_id and x.kind = 'player_cash' and not x.is_frozen;
+  end if;
+  if v_to is null then
+    v_fee := l.price_cents;
+    v_raw := jsonb_build_array(jsonb_build_object('account_id', v_from, 'amount_cents', -l.price_cents),
+                               jsonb_build_object('account_id', v_house, 'amount_cents', l.price_cents));
+  else
+    v_fee := floor(l.price_cents::numeric * coalesce((cfg #>> '{market,feeBps}')::integer, 500) / 10000)::bigint;
+    v_raw := jsonb_build_array(jsonb_build_object('account_id', v_from, 'amount_cents', -l.price_cents),
+                               jsonb_build_object('account_id', v_to, 'amount_cents', l.price_cents - v_fee),
+                               jsonb_build_object('account_id', v_house, 'amount_cents', v_fee));
+  end if;
+  -- one entry per account (the households can be buyer and fee receiver at once)
+  select coalesce(jsonb_agg(jsonb_build_object('account_id', x.acc, 'amount_cents', x.amt) order by x.acc), '[]'::jsonb)
+    into v_entries
+    from (select (e ->> 'account_id')::uuid as acc, sum((e ->> 'amount_cents')::bigint)::bigint as amt
+            from jsonb_array_elements(v_raw) e group by 1 having sum((e ->> 'amount_cents')::bigint) <> 0) x;
+  begin
+    if jsonb_array_length(v_entries) >= 2 then
+      perform public.ledger_post('nexamon_sale', v_entries, 'Nexamon-Karte verkauft', 'nexamon_copy', c.id, p_key, p_buyer,
+                                 jsonb_build_object('card_key', k.card_key, 'serial', c.serial, 'price_cents', l.price_cents,
+                                                    'fee_cents', v_fee, 'kind', v_kind, 'buyer_ai', p_buyer_ai,
+                                                    'seller_ai', l.seller_ai));
+    end if;
+  exception when sqlstate 'NX001' then
+    perform public.api_error('insufficient_funds');
+  end;
+  if v_to is not null then
+    perform public.loan_withhold(l.seller_id, l.price_cents - v_fee, p_key);
+  end if;
+
+  -- the value
+  v_factor := public.nexamon_copy_factor_bps(c.condition, c.grade);
+  v_pop := public.nexamon_popularity_bps(k.rarity, k.population);
+  if v_kind = 'ai_buy' then
+    v_counted := true;
+    v_target := k.value_e4 + floor(k.value_e4::numeric * coalesce((cfg #>> '{value,aiBuyBumpBps}')::integer, 0) * v_pop / 100000000)::bigint;
+  else
+    v_norm := public.div_round_half_even(l.price_cents::numeric * 100 * 10000, greatest(1, v_factor));
+    if l.seller_id is not null then
+      select count(*) into v_pair from public.nexamon_sales s
+       where s.card_key = k.card_key and s.counted
+         and s.at > p_now - make_interval(hours => coalesce((t ->> 'pairHours')::integer, 24))
+         and ((s.seller_id = l.seller_id and s.buyer_id = p_buyer) or (s.seller_id = p_buyer and s.buyer_id = l.seller_id));
+    end if;
+    select count(*) into v_today from public.nexamon_sales s
+     where s.card_key = k.card_key and s.counted and s.buyer_id = p_buyer and s.at >= v_day;
+    v_counted := v_norm > 0
+                 and abs(v_norm - k.value_e4)::numeric * 10000 <= k.value_e4::numeric * coalesce((t ->> 'bandBps')::integer, 2500)
+                 and v_pair < 1 and v_today < coalesce((t ->> 'perPlayerDay')::integer, 3);
+    v_target := k.value_e4;
+    if v_counted then
+      v_diff := v_norm - k.value_e4;
+      v_step := least(public.div_round_half_even(abs(v_diff)::numeric * coalesce((t ->> 'weightBps')::integer, 2000), 10000),
+                      greatest(1, floor(k.value_e4::numeric * coalesce((t ->> 'maxStepBps')::integer, 200) / 10000)::bigint));
+      if v_diff > 0 then
+        v_step := floor(v_step::numeric * greatest(v_pop, coalesce((t ->> 'minPopularityBps')::integer, 2500)) / 10000)::bigint;
+      end if;
+      v_target := k.value_e4 + sign(v_diff)::integer * v_step;
+    end if;
+  end if;
+
+  -- the copy changes hands
+  delete from public.nexamon_listings where id = l.id;
+  update public.nexamon_copies set owner_id = p_buyer, ai_owner = p_buyer_ai, acquired_at = p_now where id = c.id;
+  v_after := case when v_counted then public.nexamon_set_value(k.card_key, v_target, p_now, true) else k.value_e4 end;
+  insert into public.nexamon_sales (card_key, copy_id, seller_id, seller_ai, buyer_id, buyer_ai, price_cents, fee_cents, condition,
+                                    grade, factor_bps, kind, counted, value_before_e4, value_after_e4, at)
+  values (k.card_key, c.id, l.seller_id, l.seller_ai, p_buyer, p_buyer_ai, l.price_cents, v_fee, c.condition, c.grade, v_factor,
+          v_kind, v_counted, k.value_e4, v_after, p_now);
+  perform public.nexamon_ai_restock(k.card_key, p_now);
+
+  if l.seller_id is not null then
+    v_name := coalesce(p_buyer_ai, (select p.nickname from public.profiles p where p.id = p_buyer), 'Ehemaliger Spieler');
+    perform public.social_notify(l.seller_id, 'nexamon_sale', 'Nexamon-Karte verkauft',
+      v_name || ' hat deine Karte für ' || public.format_eur(l.price_cents) || ' gekauft.',
+      jsonb_build_object('card_key', k.card_key, 'serial', c.serial, 'grade', c.grade, 'condition', c.condition,
+                         'price_cents', l.price_cents, 'fee_cents', v_fee, 'buyer', v_name),
+      '/nexamon', 'nexamon_sale:' || l.id::text);
+    perform public.mission_event(l.seller_id, 'nexamon_sold', 1, null);
+  end if;
+  if p_buyer is not null then
+    perform public.mission_event(p_buyer, 'nexamon_bought', 1, null);
+  end if;
+  return jsonb_build_object('price_cents', l.price_cents, 'fee_cents', v_fee, 'counted', v_counted,
+                            'copy_id', c.id, 'card_key', k.card_key);
+end;
+$$;
+comment on function public.nexamon_sell(uuid, uuid, text, text, timestamptz) is
+  'Internal: sells a Nexamon listing to a player or an AI collector (ledger, fee, value step, notification; ADR-165). '
+  'Errors nexamon_not_listed, invalid_argument, insufficient_funds.';
+
+-- One supply and demand step of a card (nexamonValueAfterPressure); a legendary the AI holds may go on sale.
+create or replace function public.nexamon_pressure_step(p_card text, p_now timestamptz)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg        jsonb := public.nexamon_cfg();
+  p          jsonb := public.nexamon_cfg() #> '{value,pressure}';
+  k          public.nexamon_cards;
+  v_supply   bigint;
+  v_buys     bigint;
+  v_pressure integer;
+  v_target   bigint;
+  v_new      bigint;
+begin
+  select * into k from public.nexamon_cards where card_key = p_card for update;
+  if k.card_key is null then
+    return null;
+  end if;
+  -- offered at a plausible price: at most the copy's value x (1 + band)
+  select count(*) into v_supply
+    from public.nexamon_listings l join public.nexamon_copies c on c.id = l.copy_id
+   where l.card_key = p_card
+     and l.price_cents::numeric * 10000 <= public.nexamon_copy_value_cents(k.value_e4, c.condition, c.grade)::numeric
+                                           * (10000 + coalesce((cfg #>> '{value,trade,bandBps}')::integer, 2500));
+  select count(*) into v_buys from public.nexamon_sales s
+   where s.card_key = p_card and s.counted and s.kind <> 'quick'
+     and s.at >= p_now - make_interval(days => coalesce((p ->> 'buyDays')::integer, 7));
+  v_pressure := public.nexamon_pressure_bps(k.rarity, k.population, v_supply, v_buys);
+  if v_pressure > 0 then
+    v_target := k.value_e4 + floor(k.value_e4::numeric * v_pressure * coalesce((p ->> 'upStepBps')::integer, 0)
+                                   * public.nexamon_popularity_bps(k.rarity, k.population) / 1000000000000)::bigint;
+  else
+    v_target := k.value_e4 - floor(k.value_e4::numeric * (-v_pressure) * coalesce((p ->> 'downStepBps')::integer, 0) / 100000000)::bigint;
+  end if;
+  v_new := case when v_target <> k.value_e4 then public.nexamon_set_value(p_card, v_target, p_now) else k.value_e4 end;
+  update public.nexamon_cards set pressure_at = p_now where card_key = p_card;
+  if k.rarity = 'legendary' and random() * 10000 < coalesce((cfg #>> '{ai,legendaryListChanceBps}')::integer, 0)
+     and not exists (select 1 from public.nexamon_listings l where l.card_key = p_card and l.seller_ai is not null) then
+    perform public.nexamon_ai_restock(p_card, p_now, 1);
+  end if;
+  return v_new;
+end;
+$$;
+
+-- ASP is done: grades are rolled by condition (nexamonRollGrade). p_player null = everybody's.
+create or replace function public.nexamon_finish_gradings(p_player uuid default null, p_now timestamptz default null)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now   timestamptz := coalesce(p_now, public.game_now());
+  v_n     integer := 0;
+  v_grade integer;
+  r       record;
+begin
+  for r in select c.id, c.owner_id, c.card_key, c.condition, c.serial from public.nexamon_copies c
+            where c.grading_until is not null and c.grading_until <= v_now
+              and (p_player is null or c.owner_id = p_player)
+            order by c.grading_until, c.id limit 200
+            for update skip locked loop
+    v_grade := public.nexamon_roll_grade(r.condition, random());
+    update public.nexamon_copies set grade = v_grade, graded_at = v_now, grading_until = null where id = r.id;
+    if r.owner_id is not null then
+      perform public.social_notify(r.owner_id, 'nexamon_graded', 'ASP-Note: ' || v_grade::text,
+        'Deine Nexamon-Karte ist zurück von ASP, Note ' || v_grade::text || ' von 10.',
+        jsonb_build_object('copy_id', r.id, 'card_key', r.card_key, 'serial', r.serial, 'grade', v_grade, 'condition', r.condition),
+        '/nexamon', 'nexamon_graded:' || r.id::text || ':' || extract(epoch from v_now)::bigint::text);
+      perform public.mission_event(r.owner_id, 'nexamon_graded', 1, null);
+      if v_grade = 10 then
+        perform public.mission_event(r.owner_id, 'nexamon_ten', 1, null);
+      end if;
+    end if;
+    v_n := v_n + 1;
+  end loop;
+  return v_n;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- E. JSON views
+-- ---------------------------------------------------------------------------
+create or replace function public.nexamon_copy_json(p_copy uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+           'id', c.id, 'card_key', c.card_key, 'serial', c.serial, 'condition', c.condition, 'grade', c.grade,
+           'state', case when c.grading_until is not null then 'grading' when c.grade is not null then 'graded' else 'raw' end,
+           'grading_until', c.grading_until, 'graded_at', c.graded_at,
+           'value_cents', public.nexamon_copy_value_cents(k.value_e4, c.condition, c.grade),
+           'listing', (select jsonb_build_object('id', l.id, 'price_cents', l.price_cents, 'listed_at', l.created_at)
+                         from public.nexamon_listings l where l.copy_id = c.id),
+           'acquired_at', c.acquired_at)
+    from public.nexamon_copies c join public.nexamon_cards k on k.card_key = c.card_key
+   where c.id = p_copy;
+$$;
+
+create or replace function public.nexamon_listing_json(p_listing uuid, p_viewer uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+           'id', l.id, 'copy_id', c.id, 'card_key', l.card_key, 'set', k.set_key, 'rarity', k.rarity, 'serial', c.serial,
+           'condition', c.condition, 'grade', c.grade, 'price_cents', l.price_cents,
+           'value_cents', public.nexamon_copy_value_cents(k.value_e4, c.condition, c.grade),
+           'seller', coalesce(l.seller_ai, (select p.nickname from public.profiles p where p.id = l.seller_id), 'Ehemaliger Spieler'),
+           'seller_ai', l.seller_ai is not null, 'mine', l.seller_id is not distinct from p_viewer and l.seller_id is not null,
+           'listed_at', l.created_at)
+    from public.nexamon_listings l
+    join public.nexamon_copies c on c.id = l.copy_id
+    join public.nexamon_cards k on k.card_key = l.card_key
+   where l.id = p_listing;
+$$;
+
+create or replace function public.nexamon_card_json(p_card text, p_viewer uuid, p_now timestamptz)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+           'card_key', k.card_key, 'set', k.set_key, 'number', k.number, 'rarity', k.rarity,
+           'value_cents', public.div_round_half_even(k.value_e4, 100),
+           'start_cents', public.div_round_half_even(k.start_e4, 100),
+           'change_bps', case when k.day_ref_on = (p_now at time zone 'Europe/Berlin')::date and k.day_ref_e4 > 0
+                              then public.div_round_half_even((k.value_e4 - k.day_ref_e4)::numeric * 10000, k.day_ref_e4) else 0 end,
+           'population', k.population,
+           'listed', (select count(*) from public.nexamon_listings l where l.card_key = k.card_key),
+           'owned', (select count(*) from public.nexamon_copies c where c.card_key = k.card_key and c.owner_id = p_viewer),
+           'popularity_bps', public.nexamon_popularity_bps(k.rarity, k.population),
+           'floor_cents', public.div_round_half_even(b.floor_e4, 100),
+           'cap_cents', public.div_round_half_even(b.cap_e4, 100))
+    from public.nexamon_cards k,
+         lateral public.nexamon_bounds(k.start_e4, k.first_pulled_at, k.counted_trades, p_now) b
+   where k.card_key = p_card;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- F. RPCs: reading
+-- ---------------------------------------------------------------------------
+create or replace function public.get_nexamon()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.nexamon_cfg();
+  v_player uuid := public.require_player();
+  v_now    timestamptz := public.game_now();
+  v_sets   jsonb;
+  v_col    jsonb;
+begin
+  perform public.nexamon_sync(v_now);
+  perform public.nexamon_finish_gradings(v_player, v_now);
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'key', s.key, 'name', s.value ->> 'name', 'pack_price_cents', (s.value ->> 'packPriceCents')::bigint,
+           'cards', (select count(*) from public.nexamon_cards k where k.set_key = s.key and k.in_catalogue),
+           'owned_distinct', (select count(distinct c.card_key) from public.nexamon_copies c
+                                join public.nexamon_cards k on k.card_key = c.card_key
+                               where c.owner_id = v_player and k.set_key = s.key),
+           'owned_copies', (select count(*) from public.nexamon_copies c join public.nexamon_cards k on k.card_key = c.card_key
+                             where c.owner_id = v_player and k.set_key = s.key),
+           'packs_opened', (select count(*) from public.nexamon_packs p where p.player_id = v_player and p.set_key = s.key),
+           'population', (select coalesce(sum(k.population), 0) from public.nexamon_cards k where k.set_key = s.key))
+           order by (s.value ->> 'packPriceCents')::bigint, s.key), '[]'::jsonb)
+    into v_sets
+    from jsonb_each(coalesce(cfg -> 'sets', '{}'::jsonb)) s;
+  select jsonb_build_object(
+           'copies', count(*), 'distinct', count(distinct c.card_key),
+           'value_cents', coalesce(sum(public.nexamon_copy_value_cents(k.value_e4, c.condition, c.grade)), 0),
+           'listed', count(*) filter (where exists (select 1 from public.nexamon_listings l where l.copy_id = c.id)),
+           'grading', count(*) filter (where c.grading_until is not null),
+           'graded', count(*) filter (where c.grade is not null))
+    into v_col
+    from public.nexamon_copies c join public.nexamon_cards k on k.card_key = c.card_key
+   where c.owner_id = v_player;
+  return jsonb_build_object(
+    'unlocked', public.nexamon_unlocked(v_player), 'unlock_level', public.unlock_level('nexamon'),
+    'pack_size', coalesce((cfg ->> 'packSize')::integer, 5), 'sets', v_sets, 'collection', v_col,
+    'limits', jsonb_build_object('max_listings', coalesce((cfg #>> '{market,maxListings}')::integer, 30),
+                                 'max_grading', coalesce((cfg #>> '{grading,maxOpen}')::integer, 10),
+                                 'packs_per_minute', coalesce((cfg #>> '{packs,perMinute}')::integer, 20)),
+    'server_time', v_now);
+end;
+$$;
+comment on function public.get_nexamon() is
+  'RPC: the Nexamon overview (ADR-165): unlock, the sets with pack prices and the own progress, the own collection in '
+  'numbers, limits. Finishes the caller''s due gradings.';
+
+create or replace function public.get_nexamon_collection(p_set text default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  v_now    timestamptz := public.game_now();
+begin
+  perform public.nexamon_require_unlock(v_player);
+  perform public.nexamon_sync(v_now);
+  perform public.nexamon_finish_gradings(v_player, v_now);
+  if p_set is not null and not exists (select 1 from public.nexamon_cards k where k.set_key = p_set) then
+    perform public.api_error('nexamon_unknown');
+  end if;
+  return jsonb_build_object(
+    'cards', (select coalesce(jsonb_agg(public.nexamon_card_json(k.card_key, v_player, v_now) order by k.set_key, k.number), '[]'::jsonb)
+                from public.nexamon_cards k where k.in_catalogue and (p_set is null or k.set_key = p_set)),
+    'copies', (select coalesce(jsonb_agg(public.nexamon_copy_json(x.id) order by x.set_key, x.number, x.serial), '[]'::jsonb)
+                 from (select c.id, c.serial, k.set_key, k.number
+                         from public.nexamon_copies c join public.nexamon_cards k on k.card_key = c.card_key
+                        where c.owner_id = v_player and (p_set is null or k.set_key = p_set)
+                        order by k.set_key, k.number, c.serial limit 5000) x),
+    'server_time', v_now);
+end;
+$$;
+comment on function public.get_nexamon_collection(text) is
+  'RPC: every card of the catalogue (or one set) with value, population, copies on the market and the own count, and '
+  'the own copies with condition, grade and listing (ADR-165); errors nexamon_locked, nexamon_unknown.';
+
+create or replace function public.get_nexamon_card(p_key text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.nexamon_cfg();
+  v_player uuid := public.require_player();
+  v_now    timestamptz := public.game_now();
+  k        public.nexamon_cards;
+begin
+  perform public.nexamon_require_unlock(v_player);
+  perform public.nexamon_sync(v_now);
+  perform public.nexamon_finish_gradings(v_player, v_now);
+  select * into k from public.nexamon_cards where card_key = p_key;
+  if k.card_key is null then
+    perform public.api_error('nexamon_unknown');
+  end if;
+  return jsonb_build_object(
+    'card', public.nexamon_card_json(k.card_key, v_player, v_now),
+    'history', (select coalesce(jsonb_agg(jsonb_build_object('at', h.at, 'value_cents', public.div_round_half_even(h.value_e4, 100))
+                                          order by h.at), '[]'::jsonb)
+                  from (select v.at, v.value_e4 from public.nexamon_value_points v
+                         where v.card_key = k.card_key and v.at > date_trunc('hour', k.created_at)
+                           and v.at >= v_now - make_interval(days => coalesce((cfg #>> '{market,historyDays}')::integer, 60))
+                        union all
+                        -- the start (the hour the card appeared), so a chart has a first point
+                        select date_trunc('hour', k.created_at), k.start_e4
+                         where k.created_at >= v_now - make_interval(days => coalesce((cfg #>> '{market,historyDays}')::integer, 60))
+                        union all
+                        select v_now, k.value_e4) h),
+    'graded', (select jsonb_agg((select count(*) from public.nexamon_copies c where c.card_key = k.card_key and c.grade = g) order by g)
+                 from generate_series(1, 10) g),
+    'listings', (select coalesce(jsonb_agg(public.nexamon_listing_json(x.id, v_player) order by x.price_cents, x.created_at, x.id), '[]'::jsonb)
+                   from (select l.id, l.price_cents, l.created_at from public.nexamon_listings l
+                          where l.card_key = k.card_key order by l.price_cents, l.created_at, l.id limit 30) x),
+    'copies', (select coalesce(jsonb_agg(public.nexamon_copy_json(c.id) order by c.serial), '[]'::jsonb)
+                 from public.nexamon_copies c where c.card_key = k.card_key and c.owner_id = v_player),
+    'sales', (select coalesce(jsonb_agg(jsonb_build_object(
+                       'at', x.at, 'price_cents', x.price_cents, 'condition', x.condition, 'grade', x.grade, 'kind', x.kind,
+                       'seller', coalesce(x.seller_ai, (select p.nickname from public.profiles p where p.id = x.seller_id), 'Ehemaliger Spieler'),
+                       'buyer', coalesce(x.buyer_ai, (select p.nickname from public.profiles p where p.id = x.buyer_id), 'Ehemaliger Spieler'))
+                       order by x.at desc, x.id desc), '[]'::jsonb)
+                from (select * from public.nexamon_sales s where s.card_key = k.card_key
+                       order by s.at desc, s.id desc limit coalesce((cfg #>> '{market,recentSales}')::integer, 20)) x),
+    'server_time', v_now);
+end;
+$$;
+comment on function public.get_nexamon_card(text) is
+  'RPC: one Nexamon card (ADR-165): value, bounds, population, value history (start, hourly points, now), graded '
+  'copies per grade, the cheapest '
+  'listings, the own copies and the latest sales; errors nexamon_locked, nexamon_unknown.';
+
+create or replace function public.get_nexamon_market(p_set text default null, p_rarity text default null, p_sort text default 'new',
+                                                     p_page integer default 1, p_seller text default 'all',
+                                                     p_card_key text default null, p_graded boolean default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  v_now    timestamptz := public.game_now();
+  v_size   integer := coalesce((public.nexamon_cfg() #>> '{market,pageSize}')::integer, 24);
+  v_page   integer := greatest(1, coalesce(p_page, 1));
+  v_sort   text := coalesce(p_sort, 'new');
+  v_seller text := coalesce(p_seller, 'all');
+  v_total  bigint;
+  v_rows   jsonb;
+begin
+  perform public.nexamon_require_unlock(v_player);
+  perform public.nexamon_sync(v_now);
+  if v_sort not in ('new', 'price_asc', 'price_desc', 'deal', 'value', 'number')
+     or v_seller not in ('all', 'players', 'ai', 'mine')
+     or (p_rarity is not null and p_rarity not in ('common', 'rare', 'ultra', 'prisma', 'legendary')) then
+    perform public.api_error('invalid_argument');
+  end if;
+  with f as (
+    select l.id, l.price_cents, l.created_at, k.set_key, k.number, k.value_e4,
+           public.nexamon_copy_value_cents(k.value_e4, c.condition, c.grade) as copy_value
+      from public.nexamon_listings l
+      join public.nexamon_copies c on c.id = l.copy_id
+      join public.nexamon_cards k on k.card_key = l.card_key
+     where (p_set is null or k.set_key = p_set)
+       and (p_rarity is null or k.rarity = p_rarity)
+       and (p_card_key is null or l.card_key = p_card_key)
+       and (p_graded is null or (c.grade is not null) = p_graded)
+       and case v_seller when 'players' then l.seller_id is not null when 'ai' then l.seller_ai is not null
+                         when 'mine' then l.seller_id = v_player else true end
+  ), page as (
+    select f.*, row_number() over (
+             order by case when v_sort = 'price_asc' then f.price_cents end asc nulls last,
+                      case when v_sort = 'price_desc' then f.price_cents end desc nulls last,
+                      case when v_sort = 'deal' then f.price_cents::numeric / greatest(f.copy_value, 1) end asc nulls last,
+                      case when v_sort = 'value' then f.value_e4 end desc nulls last,
+                      case when v_sort = 'number' then f.set_key end asc nulls last,
+                      case when v_sort = 'number' then f.number end asc nulls last,
+                      f.created_at desc, f.id) as rn,
+           count(*) over () as total
+      from f
+  )
+  select coalesce(max(p.total), 0),
+         coalesce(jsonb_agg(public.nexamon_listing_json(p.id, v_player) order by p.rn)
+                    filter (where p.rn > (v_page - 1) * v_size and p.rn <= v_page * v_size), '[]'::jsonb)
+    into v_total, v_rows
+    from page p;
+  return jsonb_build_object('listings', v_rows, 'total', v_total, 'page', v_page, 'page_size', v_size,
+                            'pages', greatest(1, ceil(v_total::numeric / v_size))::integer, 'server_time', v_now);
+end;
+$$;
+comment on function public.get_nexamon_market(text, text, text, integer, text, text, boolean) is
+  'RPC: the listings of the Nexamon market (ADR-165), filtered by set, rarity, seller (all, players, ai, mine), card '
+  'and graded, sorted (new, price_asc, price_desc, deal, value, number), in pages; errors nexamon_locked, '
+  'invalid_argument.';
+
+-- ---------------------------------------------------------------------------
+-- G. RPCs: packs, market, grading
+-- ---------------------------------------------------------------------------
+create or replace function public.buy_nexamon_pack(p_request_id uuid, p_set text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.nexamon_cfg();
+  v_player uuid;
+  v_replay jsonb;
+  v_now    timestamptz := public.game_now();
+  v_price  bigint;
+  v_cash   bigint;
+  v_pack   uuid := gen_random_uuid();
+  v_cards  jsonb;
+  r        record;
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  if p_request_id is null or p_set is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'buy_nexamon_pack');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  perform public.nexamon_sync(v_now);
+  v_price := (cfg #>> array['sets', p_set, 'packPriceCents'])::bigint;
+  if v_price is null or v_price < 0 or not exists (select 1 from public.nexamon_cards k where k.set_key = p_set and k.in_catalogue) then
+    perform public.api_error('nexamon_unknown');
+  end if;
+  if not public.rate_limit_hit(v_player, 'nexamon_pack', coalesce((cfg #>> '{packs,perMinute}')::integer, 20), 60) then
+    perform public.api_error('rate_limited');
+  end if;
+  v_cash := public.lock_player_accounts(v_player);
+  if v_cash < v_price then
+    perform public.api_error('insufficient_funds');
+  end if;
+  if v_price > 0 then
+    perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'), public.ledger_system_account('households'),
+                                   v_price, 'nexamon_pack', 'Booster gekauft: ' || coalesce(cfg #>> array['sets', p_set, 'name'], p_set),
+                                   'nexamon_pack', v_pack, 'nexamon:pack:' || v_player::text || ':' || p_request_id::text, v_player,
+                                   jsonb_build_object('set', p_set, 'price_cents', v_price));
+  end if;
+  v_cards := public.nexamon_open_pack(p_set, v_player, null, v_pack, v_now);
+  insert into public.nexamon_packs (id, player_id, set_key, price_cents, cards, opened_at)
+  values (v_pack, v_player, p_set, v_price, v_cards, v_now);
+  update public.nexamon_set_state set player_packs_opened = player_packs_opened + 1 where set_key = p_set;
+  perform public.mission_event(v_player, 'nexamon_pack', 1, null);
+  for r in select x ->> 'rarity' as rarity from jsonb_array_elements(v_cards) x loop
+    if r.rarity <> 'common' then
+      perform public.mission_event(v_player, 'nexamon_rare', 1, null);
+    end if;
+    if r.rarity in ('ultra', 'prisma', 'legendary') then
+      perform public.mission_event(v_player, 'nexamon_ultra', 1, null);
+    end if;
+  end loop;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'pack_id', v_pack, 'set', p_set, 'price_cents', v_price, 'cards', v_cards,
+    'packs_opened', (select count(*) from public.nexamon_packs p where p.player_id = v_player and p.set_key = p_set)));
+end;
+$$;
+comment on function public.buy_nexamon_pack(uuid, text) is
+  'RPC: buys and opens a booster pack of a set (money to the households): five pulls in slot order with condition, '
+  'population number and whether the card is new to the player (ADR-165); errors nexamon_locked, invalid_argument, '
+  'nexamon_unknown, rate_limited, insufficient_funds.';
+
+-- An own copy, locked: errors nexamon_unknown, nexamon_not_owner
+create or replace function public.nexamon_own_copy(p_player uuid, p_copy uuid)
+returns public.nexamon_copies
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  c public.nexamon_copies;
+begin
+  select * into c from public.nexamon_copies where id = p_copy for update;
+  if c.id is null then
+    perform public.api_error('nexamon_unknown');
+  end if;
+  if c.owner_id is distinct from p_player then
+    perform public.api_error('nexamon_not_owner');
+  end if;
+  return c;
+end;
+$$;
+
+create or replace function public.list_nexamon_card(p_request_id uuid, p_copy_id uuid, p_price_cents bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  m        jsonb := public.nexamon_cfg() -> 'market';
+  v_player uuid;
+  v_replay jsonb;
+  v_now    timestamptz := public.game_now();
+  c        public.nexamon_copies;
+  v_id     uuid;
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  if p_request_id is null or p_copy_id is null or p_price_cents is null
+     or p_price_cents < coalesce((m ->> 'minPriceCents')::bigint, 10)
+     or p_price_cents > coalesce((m ->> 'maxPriceCents')::bigint, 100000000000) then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'list_nexamon_card');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  if not public.rate_limit_hit(v_player, 'nexamon_listing', coalesce((m ->> 'actionsPerMinute')::integer, 30), 60) then
+    perform public.api_error('rate_limited');
+  end if;
+  perform public.lock_player_accounts(v_player);
+  c := public.nexamon_own_copy(v_player, p_copy_id);
+  if c.grading_until is not null then
+    perform public.api_error('nexamon_grading');
+  end if;
+  if exists (select 1 from public.nexamon_listings l where l.copy_id = c.id) then
+    perform public.api_error('nexamon_listed');
+  end if;
+  if (select count(*) from public.nexamon_listings l where l.seller_id = v_player) >= coalesce((m ->> 'maxListings')::integer, 30) then
+    perform public.api_error('nexamon_listing_limit');
+  end if;
+  insert into public.nexamon_listings (copy_id, card_key, seller_id, price_cents, created_at)
+  values (c.id, c.card_key, v_player, p_price_cents, v_now)
+  returning id into v_id;
+  perform public.mission_event(v_player, 'nexamon_listed', 1, null);
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'listing', public.nexamon_listing_json(v_id, v_player), 'copy', public.nexamon_copy_json(c.id)));
+end;
+$$;
+comment on function public.list_nexamon_card(uuid, uuid, bigint) is
+  'RPC: offers an own copy on the Nexamon market at a free price (ADR-165); errors nexamon_locked, invalid_argument, '
+  'rate_limited, nexamon_unknown, nexamon_not_owner, nexamon_grading, nexamon_listed, nexamon_listing_limit.';
+
+create or replace function public.unlist_nexamon_card(p_request_id uuid, p_listing_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  l        public.nexamon_listings;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_listing_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'unlist_nexamon_card');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  if not public.rate_limit_hit(v_player, 'nexamon_listing',
+                               coalesce((public.nexamon_cfg() #>> '{market,actionsPerMinute}')::integer, 30), 60) then
+    perform public.api_error('rate_limited');
+  end if;
+  select * into l from public.nexamon_listings where id = p_listing_id for update;
+  if l.id is null then
+    perform public.api_error('nexamon_not_listed');
+  end if;
+  if l.seller_id is distinct from v_player then
+    perform public.api_error('nexamon_not_owner');
+  end if;
+  delete from public.nexamon_listings where id = l.id;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('copy', public.nexamon_copy_json(l.copy_id)));
+end;
+$$;
+comment on function public.unlist_nexamon_card(uuid, uuid) is
+  'RPC: takes an own listing off the Nexamon market (ADR-165); errors invalid_argument, rate_limited, '
+  'nexamon_not_listed, nexamon_not_owner.';
+
+create or replace function public.buy_nexamon_listing(p_request_id uuid, p_listing_id uuid, p_price_cents bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  v_now    timestamptz := public.game_now();
+  l        public.nexamon_listings;
+  v_cash   bigint;
+  v_res    jsonb;
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  if p_request_id is null or p_listing_id is null or p_price_cents is null or p_price_cents < 1 then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'buy_nexamon_listing');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_cash := public.lock_player_accounts(v_player);
+  select * into l from public.nexamon_listings where id = p_listing_id for update;
+  if l.id is null then
+    perform public.api_error('nexamon_not_listed');
+  end if;
+  if l.seller_id = v_player then
+    perform public.api_error('nexamon_own_listing');
+  end if;
+  if l.price_cents <> p_price_cents then
+    perform public.api_error('nexamon_price_changed');
+  end if;
+  if v_cash < l.price_cents then
+    perform public.api_error('insufficient_funds');
+  end if;
+  v_res := public.nexamon_sell(l.id, v_player, null, 'nexamon:buy:' || p_request_id::text, v_now);
+  return public.request_complete(v_player, p_request_id,
+    v_res || jsonb_build_object('copy', public.nexamon_copy_json(l.copy_id),
+                                'card', public.nexamon_card_json(l.card_key, v_player, v_now)));
+end;
+$$;
+comment on function public.buy_nexamon_listing(uuid, uuid, bigint) is
+  'RPC: buys a listing of the Nexamon market at the price seen (ADR-165) -> {copy, card, price_cents, fee_cents, '
+  'counted}; errors nexamon_locked, invalid_argument, nexamon_not_listed, nexamon_own_listing, nexamon_price_changed, '
+  'insufficient_funds.';
+
+create or replace function public.sell_nexamon_to_ai(p_request_id uuid, p_copy_ids uuid[])
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.nexamon_cfg();
+  q        jsonb := public.nexamon_cfg() -> 'quickSell';
+  v_player uuid;
+  v_replay jsonb;
+  v_now    timestamptz := public.game_now();
+  v_names  jsonb := coalesce(public.nexamon_cfg() #> '{ai,sellers}', '[]'::jsonb);
+  v_ids    uuid[];
+  v_id     uuid;
+  c        public.nexamon_copies;
+  k        public.nexamon_cards;
+  v_price  bigint;
+  v_total  bigint := 0;
+  v_after  bigint;
+  v_cards  text[] := '{}';
+  v_sold   jsonb := '[]'::jsonb;
+  v_card   text;
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  select array_agg(distinct x) into v_ids from unnest(coalesce(p_copy_ids, '{}'::uuid[])) x where x is not null;
+  if p_request_id is null or coalesce(array_length(v_ids, 1), 0) < 1
+     or array_length(v_ids, 1) > coalesce((q ->> 'maxPerCall')::integer, 50) or jsonb_array_length(v_names) = 0 then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'sell_nexamon_to_ai');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  perform public.lock_player_accounts(v_player);
+  foreach v_id in array v_ids loop
+    c := public.nexamon_own_copy(v_player, v_id);
+    if c.grading_until is not null then
+      perform public.api_error('nexamon_grading');
+    end if;
+    if exists (select 1 from public.nexamon_listings l where l.copy_id = c.id) then
+      perform public.api_error('nexamon_listed');
+    end if;
+    select * into k from public.nexamon_cards where card_key = c.card_key for update;
+    if c.grade is not null or not coalesce(q -> 'rarities', '[]'::jsonb) ? k.rarity then
+      perform public.api_error('nexamon_not_sellable');
+    end if;
+    v_price := floor(public.nexamon_copy_value_cents(k.value_e4, c.condition, null)::numeric * coalesce((q ->> 'bps')::integer, 5000) / 10000)::bigint;
+    v_total := v_total + v_price;
+    update public.nexamon_copies
+       set owner_id = null, ai_owner = v_names ->> ((k.number + c.serial)::integer % jsonb_array_length(v_names)), acquired_at = v_now
+     where id = c.id;
+    -- dumping lowers the value a little (nexamonValueAfterQuickSell)
+    v_after := public.nexamon_set_value(k.card_key,
+      k.value_e4 - floor(k.value_e4::numeric * coalesce((q ->> 'dropBps')::integer, 0) / 10000)::bigint, v_now);
+    insert into public.nexamon_sales (card_key, copy_id, seller_id, buyer_ai, price_cents, fee_cents, condition, grade, factor_bps,
+                                      kind, counted, value_before_e4, value_after_e4, at)
+    values (k.card_key, c.id, v_player, v_names ->> ((k.number + c.serial)::integer % jsonb_array_length(v_names)), v_price, 0,
+            c.condition, null, public.nexamon_copy_factor_bps(c.condition, null), 'quick', false, k.value_e4, v_after, v_now);
+    v_sold := v_sold || jsonb_build_object('copy_id', c.id, 'card_key', k.card_key, 'price_cents', v_price);
+    if not (k.card_key = any (v_cards)) then
+      v_cards := v_cards || k.card_key;
+    end if;
+  end loop;
+  if v_total > 0 then
+    begin
+      perform public.ledger_transfer(public.ledger_system_account('households'), public.ledger_player_account(v_player, 'player_cash'),
+                                     v_total, 'nexamon_sale', 'Nexamon-Karten an Sammler verkauft', 'nexamon_quick', null,
+                                     'nexamon:quick:' || v_player::text || ':' || p_request_id::text, v_player,
+                                     jsonb_build_object('copies', jsonb_array_length(v_sold), 'total_cents', v_total));
+    exception when sqlstate 'NX001' then
+      perform public.api_error('nexamon_not_sellable');
+    end;
+    perform public.loan_withhold(v_player, v_total, 'nexamon:quick:' || p_request_id::text);
+  end if;
+  foreach v_card in array v_cards loop
+    perform public.nexamon_ai_restock(v_card, v_now);
+  end loop;
+  return public.request_complete(v_player, p_request_id,
+    jsonb_build_object('sold', v_sold, 'count', jsonb_array_length(v_sold), 'total_cents', v_total));
+end;
+$$;
+comment on function public.sell_nexamon_to_ai(uuid, uuid[]) is
+  'RPC: sells raw bulk copies (quickSell.rarities) to the AI at once for quickSell.bps of their value (ADR-165) -> '
+  '{sold: [{copy_id, card_key, price_cents}], count, total_cents}; errors nexamon_locked, invalid_argument, '
+  'nexamon_unknown, nexamon_not_owner, nexamon_grading, nexamon_listed, nexamon_not_sellable.';
+
+create or replace function public.grade_nexamon_card(p_request_id uuid, p_copy_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  g        jsonb := public.nexamon_cfg() -> 'grading';
+  v_player uuid;
+  v_replay jsonb;
+  v_now    timestamptz := public.game_now();
+  c        public.nexamon_copies;
+  k        public.nexamon_cards;
+  v_cash   bigint;
+  v_fee    bigint;
+  v_until  timestamptz;
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  if p_request_id is null or p_copy_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'grade_nexamon_card');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_cash := public.lock_player_accounts(v_player);
+  c := public.nexamon_own_copy(v_player, p_copy_id);
+  if c.grading_until is not null then
+    perform public.api_error('nexamon_grading');
+  end if;
+  if c.grade is not null then
+    perform public.api_error('nexamon_not_raw');
+  end if;
+  if exists (select 1 from public.nexamon_listings l where l.copy_id = c.id) then
+    perform public.api_error('nexamon_listed');
+  end if;
+  if (select count(*) from public.nexamon_copies x where x.owner_id = v_player and x.grading_until is not null)
+     >= coalesce((g ->> 'maxOpen')::integer, 10) then
+    perform public.api_error('nexamon_grading_limit');
+  end if;
+  select * into k from public.nexamon_cards where card_key = c.card_key;
+  -- nexamonGradingFeeCents: half of what the copy is worth right now
+  v_fee := greatest(coalesce((g ->> 'minFeeCents')::bigint, 100),
+                    public.div_round_half_even(public.nexamon_copy_value_cents(k.value_e4, c.condition, null)::numeric
+                                               * coalesce((g ->> 'feeBps')::integer, 5000), 10000));
+  if v_cash < v_fee then
+    perform public.api_error('insufficient_funds');
+  end if;
+  perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'), public.ledger_system_account('households'),
+                                 v_fee, 'nexamon_grading', 'ASP-Grading', 'nexamon_copy', c.id,
+                                 'nexamon:grade:' || v_player::text || ':' || p_request_id::text, v_player,
+                                 jsonb_build_object('card_key', c.card_key, 'serial', c.serial, 'fee_cents', v_fee));
+  v_until := v_now + make_interval(mins => coalesce((g ->> 'minutes')::integer, 60));
+  update public.nexamon_copies set grading_until = v_until, grading_fee_cents = v_fee where id = c.id;
+  return public.request_complete(v_player, p_request_id,
+    jsonb_build_object('copy', public.nexamon_copy_json(c.id), 'fee_cents', v_fee, 'ready_at', v_until));
+end;
+$$;
+comment on function public.grade_nexamon_card(uuid, uuid) is
+  'RPC: sends an own raw copy to ASP: grading.feeBps of its value to the households, back after grading.minutes with a '
+  'grade (ADR-165) -> {copy, fee_cents, ready_at}; errors nexamon_locked, invalid_argument, nexamon_unknown, '
+  'nexamon_not_owner, nexamon_grading, nexamon_not_raw, nexamon_listed, nexamon_grading_limit, insufficient_funds.';
+
+create or replace function public.crack_nexamon_slab(p_request_id uuid, p_copy_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  c        public.nexamon_copies;
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  if p_request_id is null or p_copy_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'crack_nexamon_slab');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  c := public.nexamon_own_copy(v_player, p_copy_id);
+  if c.grading_until is not null then
+    perform public.api_error('nexamon_grading');
+  end if;
+  if c.grade is null then
+    perform public.api_error('nexamon_not_graded');
+  end if;
+  if exists (select 1 from public.nexamon_listings l where l.copy_id = c.id) then
+    perform public.api_error('nexamon_listed');
+  end if;
+  update public.nexamon_copies set grade = null, graded_at = null, grading_fee_cents = null where id = c.id;
+  return public.request_complete(v_player, p_request_id,
+    jsonb_build_object('copy', public.nexamon_copy_json(c.id), 'old_grade', c.grade));
+end;
+$$;
+comment on function public.crack_nexamon_slab(uuid, uuid) is
+  'RPC: cracks the slab of an own graded copy: the raw card with its condition comes back, no refund (ADR-165) -> '
+  '{copy, old_grade}; errors nexamon_locked, invalid_argument, nexamon_unknown, nexamon_not_owner, nexamon_grading, '
+  'nexamon_not_graded, nexamon_listed.';
+
+-- ---------------------------------------------------------------------------
+-- H. The job (cron nexa-nexamon, every minute)
+-- ---------------------------------------------------------------------------
+create or replace function public.nexamon_run_due(p_now timestamptz default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg       jsonb := public.nexamon_cfg();
+  ai        jsonb := public.nexamon_cfg() -> 'ai';
+  v_now     timestamptz := coalesce(p_now, public.game_now());
+  v_day     timestamptz := ((coalesce(p_now, public.game_now()) at time zone 'Europe/Berlin')::date)::timestamp
+                           at time zone 'Europe/Berlin';
+  v_house   uuid := public.ledger_system_account('households');
+  v_names   jsonb := coalesce(public.nexamon_cfg() #> '{ai,sellers}', '[]'::jsonb);
+  v_graded  integer;
+  v_packs   integer := 0;
+  v_bought  integer := 0;
+  v_steps   integer := 0;
+  v_due     integer;
+  v_n       integer;
+  v_per     numeric;
+  v_pulls   jsonb;
+  v_cash    bigint;
+  v_value   bigint;
+  v_spent   bigint;
+  v_name    text;
+  r         record;
+  x         record;
+  i         integer;
+begin
+  if cfg = '{}'::jsonb or ai is null or jsonb_array_length(v_names) = 0 then
+    return jsonb_build_object('skipped', 'no config');
+  end if;
+  perform public.nexamon_sync(v_now);
+  v_graded := public.nexamon_finish_gradings(null, v_now);
+
+  -- 1. the AI opens packs: its pulls raise the populations and go into its stock
+  for r in select s.* from public.nexamon_set_state s order by s.set_key for update loop
+    v_per := coalesce((ai #>> array['packsPerHour', r.set_key])::numeric, 0);
+    continue when v_per <= 0 or not exists (select 1 from public.nexamon_cards k where k.set_key = r.set_key and k.in_catalogue);
+    v_due := floor(extract(epoch from (v_now - r.ai_packs_at)) / 3600 * v_per)::integer;
+    continue when v_due < 1;
+    v_n := least(v_due, coalesce((ai ->> 'maxPacksPerRun')::integer, 5));
+    for i in 1 .. v_n loop
+      v_name := v_names ->> floor(random() * jsonb_array_length(v_names))::integer;
+      v_pulls := public.nexamon_open_pack(r.set_key, null, v_name, null, v_now);
+      for x in select distinct p ->> 'card_key' as card_key from jsonb_array_elements(v_pulls) p loop
+        perform public.nexamon_ai_restock(x.card_key, v_now);
+      end loop;
+    end loop;
+    v_packs := v_packs + v_n;
+    update public.nexamon_set_state
+       set ai_packs_opened = ai_packs_opened + v_n,
+           -- a long pause is not caught up on: the backlog is dropped
+           ai_packs_at = case when v_due > v_n * 20 then v_now else ai_packs_at + make_interval(secs => v_n * 3600 / v_per) end
+     where set_key = r.set_key;
+  end loop;
+
+  -- 2. AI collectors buy player listings up to the copy's value: limited per card and week, per set and day
+  for r in select l.id, l.price_cents, l.card_key from public.nexamon_listings l
+            where l.seller_id is not null order by random() limit 200 loop
+    exit when v_bought >= coalesce((ai ->> 'maxBuysPerRun')::integer, 5);
+    select l.price_cents, c.condition, c.grade, k.value_e4, k.rarity, k.population, k.set_key
+      into x
+      from public.nexamon_listings l
+      join public.nexamon_copies c on c.id = l.copy_id
+      join public.nexamon_cards k on k.card_key = l.card_key
+     where l.id = r.id;
+    continue when x is null;
+    v_value := public.nexamon_copy_value_cents(x.value_e4, x.condition, x.grade);
+    -- nexamonAiWouldBuy
+    continue when x.price_cents::numeric * 10000
+                  > v_value::numeric * coalesce((ai ->> case when x.grade is null then 'buyMaxBps' else 'gradedBuyMaxBps' end)::integer, 10000);
+    continue when (select count(*) from public.nexamon_sales s
+                    where s.card_key = r.card_key and s.kind = 'ai_buy'
+                      and s.at >= v_now - make_interval(days => coalesce((ai ->> 'buyWindowDays')::integer, 7)))
+                  >= coalesce((ai #>> array['buysPerCardWindow', x.rarity])::integer, 0);
+    select coalesce(sum(s.price_cents), 0) into v_spent
+      from public.nexamon_sales s join public.nexamon_cards k on k.card_key = s.card_key
+     where s.kind = 'ai_buy' and s.at >= v_day and k.set_key = x.set_key;
+    continue when v_spent + x.price_cents
+                  > coalesce((ai ->> 'dailyBudgetPacks')::bigint, 0) * coalesce((cfg #>> array['sets', x.set_key, 'packPriceCents'])::bigint, 0);
+    -- nexamonAiBuyChanceBps
+    continue when random() * 10000 >= least(10000, floor(coalesce((ai ->> 'buyChanceBps')::numeric, 0)
+                                                         * (10000 + public.nexamon_popularity_bps(x.rarity, x.population)) / 10000));
+    select a.balance_cents into v_cash from public.ledger_accounts a where a.id = v_house;
+    continue when coalesce(v_cash, 0) < x.price_cents;
+    v_name := v_names ->> floor(random() * jsonb_array_length(v_names))::integer;
+    perform public.nexamon_sell(r.id, null, v_name, 'nexamon:ai:' || r.id::text, v_now);
+    v_bought := v_bought + 1;
+  end loop;
+
+  -- 3. supply against demand, once per pressure.everyMinutes and card
+  for r in select k.card_key from public.nexamon_cards k
+            where k.in_catalogue
+              and (k.pressure_at is null
+                   or k.pressure_at <= v_now - make_interval(mins => coalesce((cfg #>> '{value,pressure,everyMinutes}')::integer, 60)))
+            order by k.pressure_at nulls first, k.card_key
+            limit coalesce((cfg #>> '{value,pressure,perRun}')::integer, 80) loop
+    perform public.nexamon_pressure_step(r.card_key, v_now);
+    v_steps := v_steps + 1;
+  end loop;
+
+  delete from public.nexamon_value_points
+   where at < v_now - make_interval(days => coalesce((cfg #>> '{market,historyDays}')::integer, 60) + 1);
+  return jsonb_build_object('graded', v_graded, 'ai_packs', v_packs, 'ai_bought', v_bought, 'value_steps', v_steps);
+end;
+$$;
+comment on function public.nexamon_run_due(timestamptz) is
+  'Job (cron nexa-nexamon, every minute; ADR-165): finishes gradings, opens the AI''s packs, lets AI collectors buy '
+  'fairly priced player listings, runs the hourly supply and demand step of the card values.';
+
+-- ---------------------------------------------------------------------------
+-- I. Account reset, feed label, news show, missions
+-- ---------------------------------------------------------------------------
+-- The copies of a leaving player go to the AI sellers (the populations stay true); listings and gradings end.
+create or replace function public.nexamon_wipe_player(p_player uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_names jsonb := coalesce(public.nexamon_cfg() #> '{ai,sellers}', '[]'::jsonb);
+  v_now   timestamptz := public.game_now();
+  r       record;
+begin
+  delete from public.nexamon_listings where seller_id = p_player;
+  update public.nexamon_copies c
+     set owner_id = null, ai_owner = coalesce(v_names ->> (c.serial % greatest(1, jsonb_array_length(v_names)))::integer, 'Karten-Kalle'),
+         grading_until = null, grading_fee_cents = null, acquired_at = v_now
+   where c.owner_id = p_player;
+  delete from public.nexamon_packs where player_id = p_player;
+  for r in select distinct c.card_key from public.nexamon_copies c
+            where c.ai_owner is not null and c.acquired_at = v_now loop
+    perform public.nexamon_ai_restock(r.card_key, v_now);
+  end loop;
+end;
+$$;
+comment on function public.nexamon_wipe_player(uuid) is
+  'Internal (account_wipe): ends the Nexamon listings and gradings of a player and hands the copies to the AI sellers.';
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.account_wipe(uuid, text)'::regprocedure);
+  v_old text := $t$  perform public.friend_chats_wipe_player(p_player);$t$;
+  v_new text := $t$  perform public.friend_chats_wipe_player(p_player);
+
+  -- Nexamon cards (ADR-165): listings and gradings end, the copies go to the AI sellers
+  perform public.nexamon_wipe_player(p_player);$t$;
+begin
+  if position('nexamon_wipe_player' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'account_wipe() has an unexpected shape; add nexamon_wipe_player by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.feed_item_label(text, jsonb)'::regprocedure);
+  v_old text := $t$    when 'car_bought' then 'Neues Auto'$t$;
+  v_new text := $t$    when 'car_bought' then 'Neues Auto'
+    when 'nexamon_pull' then 'legendäre Nexamon-Karte gezogen (Nummer ' || coalesce(p_payload ->> 'serial', '?') || ')'$t$;
+begin
+  if position('nexamon_pull' in v_def) = 0 and position(v_old in v_def) > 0 then
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+-- NEXA Nachrichten: a legendary pull is gossip (the feed kind joins the list of good news)
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.news_show_build(timestamptz)'::regprocedure);
+  v_old text := $t$'big_trade', 'rug_pull', 'loan_defaulted'$t$;
+  v_new text := $t$'big_trade', 'nexamon_pull', 'rug_pull', 'loan_defaulted'$t$;
+begin
+  if position('nexamon_pull' in v_def) = 0 and position(v_old in v_def) > 0 then
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+insert into public.mission_templates
+  (key, kind, title, description, icon_key, metric, mode, params, target_min, target_max, xp_min, xp_max, min_level, chain_order,
+   scale_with_level, weight, reward_skill_points)
+values
+  ('d_nexamon_pack', 'daily', 'Öffne einen Nexamon-Booster', 'Fünf Karten, mit Glück etwas Seltenes.', 'mission_art', 'nexamon_pack', 'count', '{"unlock":"nexamon"}'::jsonb, 1, 1, 200, 250, 10, null, false, 25, 0),
+  ('w_nexamon_sell', 'weekly', 'Verkauf {target} Nexamon-Karten am Markt', 'An Spieler oder KI-Sammler.', 'mission_art', 'nexamon_sold', 'count', '{"unlock":"nexamon"}'::jsonb, 1, 2, 700, 900, 10, null, false, 25, 1),
+  ('m_nexamon_first_pack', 'milestone', 'Dein erster Booster', 'Öffne einen Nexamon-Booster.', 'mission_art', 'nexamon_pack', 'count', '{"unlock":"nexamon"}'::jsonb, 1, 1, 300, 300, 10, 130, false, 60, 1),
+  ('m_nexamon_packs_10', 'milestone', '10 Booster geöffnet', 'Die Sammlung wächst.', 'mission_art', 'nexamon_pack', 'count', '{"unlock":"nexamon"}'::jsonb, 10, 10, 800, 800, 10, 132, false, 50, 1),
+  ('m_nexamon_first_rare', 'milestone', 'Deine erste Rare', 'Zieh eine Rare oder etwas Besseres.', 'mission_art', 'nexamon_rare', 'count', '{"unlock":"nexamon"}'::jsonb, 1, 1, 400, 400, 10, 131, false, 50, 1),
+  ('m_nexamon_first_ultra', 'milestone', 'Deine erste Ultra Rare', 'Zieh eine Ultra Rare oder etwas Besseres.', 'mission_art', 'nexamon_ultra', 'count', '{"unlock":"nexamon"}'::jsonb, 1, 1, 1000, 1000, 10, 134, false, 40, 1),
+  ('m_nexamon_first_sale', 'milestone', 'Erste Karte verkauft', 'Verkauf eine Nexamon-Karte am Markt.', 'mission_art', 'nexamon_sold', 'count', '{"unlock":"nexamon"}'::jsonb, 1, 1, 500, 500, 10, 133, false, 50, 1),
+  ('m_nexamon_first_ten', 'milestone', 'Die erste 10', 'Lass eine Karte bei ASP bewerten und hol die Bestnote.', 'mission_art', 'nexamon_ten', 'count', '{"unlock":"nexamon"}'::jsonb, 1, 1, 1500, 1500, 10, 136, false, 40, 1)
+on conflict (key) do update
+   set kind = excluded.kind, title = excluded.title, description = excluded.description, icon_key = excluded.icon_key,
+       metric = excluded.metric, mode = excluded.mode, params = excluded.params, target_min = excluded.target_min,
+       target_max = excluded.target_max, xp_min = excluded.xp_min, xp_max = excluded.xp_max, min_level = excluded.min_level,
+       chain_order = excluded.chain_order, scale_with_level = excluded.scale_with_level, weight = excluded.weight,
+       reward_skill_points = excluded.reward_skill_points, is_active = true, updated_at = now();
+
+-- ---------------------------------------------------------------------------
+-- J. Privileges and the job
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.nexamon_cfg()', 'public.nexamon_catalogue()', 'public.nexamon_slot_rarity(integer, double precision)',
+    'public.nexamon_roll_condition(double precision)', 'public.nexamon_roll_grade(text, double precision)',
+    'public.nexamon_copy_factor_bps(text, integer)', 'public.nexamon_copy_value_cents(bigint, text, integer)',
+    'public.nexamon_ai_ask_cents(bigint)', 'public.nexamon_popularity_bps(text, bigint)',
+    'public.nexamon_demand_milli(text, bigint, bigint)', 'public.nexamon_pressure_bps(text, bigint, bigint, bigint)',
+    'public.nexamon_bounds(bigint, timestamptz, bigint, timestamptz)', 'public.nexamon_unlocked(uuid)',
+    'public.nexamon_require_unlock(uuid)', 'public.nexamon_mint_copy(text, uuid, text, text, text, uuid, timestamptz)',
+    'public.nexamon_ai_restock(text, timestamptz, integer)', 'public.nexamon_set_value(text, bigint, timestamptz, boolean)',
+    'public.nexamon_sync(timestamptz)', 'public.nexamon_open_pack(text, uuid, text, uuid, timestamptz)',
+    'public.nexamon_sell(uuid, uuid, text, text, timestamptz)', 'public.nexamon_pressure_step(text, timestamptz)',
+    'public.nexamon_finish_gradings(uuid, timestamptz)', 'public.nexamon_copy_json(uuid)',
+    'public.nexamon_listing_json(uuid, uuid)', 'public.nexamon_card_json(text, uuid, timestamptz)',
+    'public.nexamon_own_copy(uuid, uuid)', 'public.nexamon_run_due(timestamptz)', 'public.nexamon_wipe_player(uuid)'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+    execute format('grant execute on function %s to service_role', f);
+  end loop;
+  foreach f in array array[
+    'public.get_nexamon()', 'public.get_nexamon_collection(text)', 'public.get_nexamon_card(text)',
+    'public.get_nexamon_market(text, text, text, integer, text, text, boolean)', 'public.buy_nexamon_pack(uuid, text)',
+    'public.list_nexamon_card(uuid, uuid, bigint)', 'public.unlist_nexamon_card(uuid, uuid)',
+    'public.buy_nexamon_listing(uuid, uuid, bigint)', 'public.sell_nexamon_to_ai(uuid, uuid[])',
+    'public.grade_nexamon_card(uuid, uuid)', 'public.crack_nexamon_slab(uuid, uuid)'
+  ] loop
+    execute format('revoke all on function %s from public, anon', f);
+    execute format('grant execute on function %s to authenticated', f);
+  end loop;
+end;
+$do$;
+
+do $do$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.unschedule(jobid) from cron.job where jobname = 'nexa-nexamon';
+    perform cron.schedule('nexa-nexamon', '* * * * *', 'select public.nexamon_run_due()');
+  end if;
+end;
+$do$;
 
 -- ===== game_config (current values, overwriting older ones) =====
 -- GENERATED by scripts/gen-config-seed.ts from src/config/balance.ts. Do not edit by hand.
@@ -59345,7 +61254,7 @@ insert into public.game_config (key, value, description) values
   ('loans', '{"basePremiumBps":150,"reputationBpsPerPoint":4,"leverageBpsPerDebtToEquity":150,"maxLeveragePremiumBps":600,"lossMakingPremiumBps":200,"coverageDiscountBpsPerTurn":10,"maxCoverageDiscountBps":100,"cfoDiscountBpsPerSkill":10,"minPremiumBps":50,"maxPremiumBps":1500,"creditLinesByLevel":[{"level":15,"limitCents":5000000},{"level":20,"limitCents":25000000},{"level":25,"limitCents":200000000}],"creditLineReputationFactorMin":0.5,"creditLineReputationFactorMax":1.5}'::jsonb, 'Defaults from src/config/balance.ts, section "loans"'),
   ('employees', '{"minSkill":1,"maxSkill":10,"skillCapacityExponent":1.1,"salaryBaseCentsPerQuarter":18500,"salarySkillExponent":1.3,"playerProductivityMultiplier":2,"traits":[{"key":"ambitious","performanceMultiplier":1.15,"salaryMultiplier":1,"loyaltyDecayMultiplier":2},{"key":"loyal","performanceMultiplier":1,"salaryMultiplier":1,"loyaltyDecayMultiplier":0.5},{"key":"frugal","performanceMultiplier":1,"salaryMultiplier":0.9,"loyaltyDecayMultiplier":1},{"key":"genius","performanceMultiplier":1.25,"salaryMultiplier":1.3,"loyaltyDecayMultiplier":1.2},{"key":"easygoing","performanceMultiplier":0.92,"salaryMultiplier":0.95,"loyaltyDecayMultiplier":0.7},{"key":"mentor","performanceMultiplier":1.05,"salaryMultiplier":1.1,"loyaltyDecayMultiplier":0.8}],"loyalty":{"start":70,"quitThreshold":25,"decayPerQuarterOnSalaryFreeze":3,"gainPerQuarterOnRaise":8,"poachingSalaryPremiumBps":2000},"leadership":{"cooCapacityBonusPerSkill":0.015,"ctoDevelopmentTimeReductionPerSkill":0.03,"headOfSalesBoostPerSkill":0.02,"cfoGuidanceBandReductionPerSkill":0.02},"applicantPoolSize":6,"insiderLockHours":2,"insiderDetectionProbability":0.6,"insiderFineBps":15000,"maxSideRoles":1,"optionVestingQuarters":4}'::jsonb, 'Defaults from src/config/balance.ts, section "employees"'),
   ('careers', '{"tiers":[{"id":"intern","minLevel":2,"salaryCentsPerHour":15000,"stockOptions":false},{"id":"junior","minLevel":5,"salaryCentsPerHour":30000,"stockOptions":false},{"id":"senior","minLevel":12,"salaryCentsPerHour":70000,"stockOptions":false},{"id":"team_lead","minLevel":20,"salaryCentsPerHour":130000,"stockOptions":false},{"id":"c_level","minLevel":25,"salaryCentsPerHour":250000,"stockOptions":true}],"paidHoursPerDayCap":8,"inactivity":{"steps":[{"afterHours":24,"payBps":7500},{"afterHours":48,"payBps":5000},{"afterHours":72,"payBps":2500}],"fireAfterHours":120},"playerCompanyExperienceMultiplier":2,"promotion":{"hoursByTier":{"junior":12,"senior":36,"team_lead":72,"c_level":120},"rankHoursPerRealHour":24,"managementFrom":["team_lead","c_level"],"baseChanceBps":4000,"chancePerExtraScoreBps":800,"maxChanceBps":9000,"retryHours":24,"raiseBps":1500,"requestValidHours":72},"workTask":{"intervalHours":3,"bonusSalaryHours":1,"expiresHours":3,"fastAnswerSeconds":45}}'::jsonb, 'Defaults from src/config/balance.ts, section "careers"'),
-  ('progression', '{"firstLevelXp":100,"xpBase":250,"xpExponent":1.5,"maxLevel":10000,"prestige":{"fromLevel":50,"titleEveryLevels":10},"missionTargetScalePerLevel":0.2,"missionTargetScaleMax":5,"missionXpScalePerLevel":0.15,"missionXpScaleMax":8,"missionCountScalePerLevel":0.04,"missionCountScaleMax":3,"xpMultiplier":2,"xpSources":{"trade":{"xp":10,"maxTradesPerDay":30,"minOrderValueCents":10000},"profitableClose":{"profitCentsPerXp":10000,"maxXpPerTrade":500},"workHour":{"xp":40,"playerCompanyMultiplier":1.5,"maxHoursPerDay":8},"workTask":{"minXp":50,"maxXp":150},"dailyMission":{"minXp":200,"maxXp":400,"perDay":3},"quickMission":{"minXp":20,"maxXp":60,"active":3},"weeklyMission":{"minXp":600,"maxXp":1200,"perWeek":3},"milestoneMission":{"minXp":100,"maxXp":2000,"visible":3},"dailyLogin":{"xp":50,"streakBonusPerDay":10,"streakBonusCap":200,"streakFreezesPerWeek":1},"profitableCompanyQuarter":{"xp":500},"successfulIpo":{"xp":5000},"achievement":{"minXp":100,"maxXp":10000},"tutorial":{"xp":50}},"unlocks":[{"level":1,"key":"market_orders"},{"level":1,"key":"basic_income"},{"level":2,"key":"first_job"},{"level":3,"key":"watchlist"},{"level":4,"key":"artworks"},{"level":5,"key":"stop_loss"},{"level":5,"key":"bonds"},{"level":5,"key":"junior_jobs"},{"level":6,"key":"found_garage"},{"level":6,"key":"deals"},{"level":7,"key":"analyst_reports"},{"level":8,"key":"property"},{"level":8,"key":"short_selling"},{"level":9,"key":"ipo"},{"level":10,"key":"found_small_business"},{"level":10,"key":"crypto"},{"level":12,"key":"leverage_2x"},{"level":12,"key":"senior_jobs"},{"level":14,"key":"crypto_create"},{"level":15,"key":"small_loan"},{"level":15,"key":"business_angel"},{"level":15,"key":"found_gmbh"},{"level":18,"key":"leverage_5x"},{"level":18,"key":"expand_small_business"},{"level":20,"key":"loans_250k"},{"level":20,"key":"team_lead_jobs"},{"level":25,"key":"c_level_jobs"},{"level":30,"key":"leverage_10x"},{"level":30,"key":"options"},{"level":35,"key":"takeovers"},{"level":35,"key":"hostile_takeovers"},{"level":40,"key":"holding"},{"level":50,"key":"title_market_legend"},{"level":50,"key":"golden_profile_frame"},{"level":50,"key":"hall_of_fame"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "progression"'),
+  ('progression', '{"firstLevelXp":100,"xpBase":250,"xpExponent":1.5,"maxLevel":10000,"prestige":{"fromLevel":50,"titleEveryLevels":10},"missionTargetScalePerLevel":0.2,"missionTargetScaleMax":5,"missionXpScalePerLevel":0.15,"missionXpScaleMax":8,"missionCountScalePerLevel":0.04,"missionCountScaleMax":3,"xpMultiplier":2,"xpSources":{"trade":{"xp":10,"maxTradesPerDay":30,"minOrderValueCents":10000},"profitableClose":{"profitCentsPerXp":10000,"maxXpPerTrade":500},"workHour":{"xp":40,"playerCompanyMultiplier":1.5,"maxHoursPerDay":8},"workTask":{"minXp":50,"maxXp":150},"dailyMission":{"minXp":200,"maxXp":400,"perDay":3},"quickMission":{"minXp":20,"maxXp":60,"active":3},"weeklyMission":{"minXp":600,"maxXp":1200,"perWeek":3},"milestoneMission":{"minXp":100,"maxXp":2000,"visible":3},"dailyLogin":{"xp":50,"streakBonusPerDay":10,"streakBonusCap":200,"streakFreezesPerWeek":1},"profitableCompanyQuarter":{"xp":500},"successfulIpo":{"xp":5000},"achievement":{"minXp":100,"maxXp":10000},"tutorial":{"xp":50}},"unlocks":[{"level":1,"key":"market_orders"},{"level":1,"key":"basic_income"},{"level":2,"key":"first_job"},{"level":3,"key":"watchlist"},{"level":4,"key":"artworks"},{"level":5,"key":"stop_loss"},{"level":5,"key":"bonds"},{"level":5,"key":"junior_jobs"},{"level":6,"key":"found_garage"},{"level":6,"key":"deals"},{"level":7,"key":"analyst_reports"},{"level":8,"key":"property"},{"level":8,"key":"short_selling"},{"level":9,"key":"ipo"},{"level":10,"key":"found_small_business"},{"level":10,"key":"crypto"},{"level":10,"key":"nexamon"},{"level":12,"key":"leverage_2x"},{"level":12,"key":"senior_jobs"},{"level":14,"key":"crypto_create"},{"level":15,"key":"small_loan"},{"level":15,"key":"business_angel"},{"level":15,"key":"found_gmbh"},{"level":18,"key":"leverage_5x"},{"level":18,"key":"expand_small_business"},{"level":20,"key":"loans_250k"},{"level":20,"key":"team_lead_jobs"},{"level":25,"key":"c_level_jobs"},{"level":30,"key":"leverage_10x"},{"level":30,"key":"options"},{"level":35,"key":"takeovers"},{"level":35,"key":"hostile_takeovers"},{"level":40,"key":"holding"},{"level":50,"key":"title_market_legend"},{"level":50,"key":"golden_profile_frame"},{"level":50,"key":"hall_of_fame"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "progression"'),
   ('valuation', '{"growthWeight":1,"growthFactorMin":0.6,"growthFactorMax":1.8,"macroSensitivityPer100Bps":0.04,"macroFactorMin":0.6,"macroFactorMax":1.3,"bookValueFloorShare":0.5,"lossMakerRevenueElasticity":0.5,"analystTargetNoise":0.08,"analystWrongProbability":0.25}'::jsonb, 'Defaults from src/config/balance.ts, section "valuation"'),
   ('aiInvestors', '{"tickNoiseBps":{"bluechip":6,"midcap":15,"penny":45},"tickNoiseScale":0.45,"emaFastAlpha":0.15,"emaSlowAlpha":0.0165,"sentimentDecayPerTick":0.0019,"baselineVolumeDepthFraction":0.02,"playerWeight":{"activityHalfLifeHours":6,"referenceActivityCents":{"bluechip":100000000,"midcap":25000000,"penny":5000000},"minAiWeight":0.15},"archetypes":{"market_maker":{"capitalShare":0.05,"reactionSpeed":0.005,"params":{}},"value_fund":{"capitalShare":0.3,"reactionSpeed":0.0005,"params":{"gapScale":0.5,"deadBand":0.01}},"momentum_trader":{"capitalShare":0.1,"reactionSpeed":0.0002,"params":{"trendScale":0.02}},"pension_fund":{"capitalShare":0.2,"reactionSpeed":0.002,"params":{"rateSensitivityPer100Bps":-0.05,"yieldTiltPer100Bps":0.03,"minWeight":0.2,"maxWeight":1.8}},"index_fund":{"capitalShare":0.04,"reactionSpeed":0.005,"params":{}},"retail_herd":{"capitalShare":0.1,"reactionSpeed":0.002,"params":{"chaseGain":0.1,"trendScale":0.02}}}}'::jsonb, 'Defaults from src/config/balance.ts, section "aiInvestors"'),
   ('index', '{"size":30,"baseLevel":1000,"reviewEveryQuarters":4,"minListedQuarters":1,"entryBuffer":3}'::jsonb, 'Defaults from src/config/balance.ts, section "index"'),
@@ -59376,6 +61285,7 @@ insert into public.game_config (key, value, description) values
   ('nfts', '{"royaltyBps":1000,"mintXp":100,"minAskCents":10000,"minOfferCents":10000,"chat":{"maxLength":200,"perMinute":6,"history":60,"offerHours":24},"ai":{"floorCents":100000,"likeBps":400,"maxLikes":40,"creatorSaleBps":300,"maxCreatorSales":10,"ageBpsPerDay":100,"maxAgeDays":30,"buyChanceBps":2500,"listedOfferChanceBps":1500,"unlistedOfferChanceBps":400,"maxOpenAiOffers":3,"lowballMinBps":6500,"lowballMaxBps":9000,"maxBuysPerDay":60,"maxMessagesPerRun":10,"resaleMarkupBps":12500,"acceptBps":10500,"demand":{"offerBps":600,"maxOffers":6,"saleBps":500,"maxSales":6,"days":7},"trade":{"chanceBps":250,"likeWeightBps":1500,"offerWeightBps":4000,"saleWeightBps":2500,"maxChanceBps":4000,"minHoldMinutes":10,"perRun":6,"perDay":300,"tasteMinBps":8500,"tasteMaxBps":12500,"reversionBps":5000},"collectors":["Vera Vermeer","Konrad Kollektor","Pixel-Paula","Baron von Bit","Mia Mosaik","Otto Original","Gräfin Glitzer","Sammler Sam"],"lines":{"offer":["Schönes Stück. Mehr ist es mir aber nicht wert.","Für meine Sammlung würde ich so viel zahlen.","Mein Angebot. Überleg es dir nicht zu lange.","Hübsch! Wäre das ein fairer Preis?","Ich biete das. Nimm es, solange ich gute Laune habe.","Mein Hund hat draufgebellt. Das heißt bei uns: kaufen.","Ich habe keine Ahnung, was das sein soll. Ich nehme es.","Meine Mutter sagt, ich soll aufhören, Pixel zu kaufen. Hier mein Angebot.","Ich wollte eigentlich Brot kaufen. Jetzt bin ich hier.","Das hängt später über meinem Klo. Ehrenplatz.","Mehr habe ich nicht, den Rest hat mein Wellensittich verzockt.","Ist das Kunst oder ist dein Bildschirm kaputt? Egal, Angebot steht.","Ich biete das und lege ein halbes Käsebrot drauf.","Mein Horoskop sagt: heute teuer einkaufen. Bitte sehr.","Ich habe das Bild meinem Zahnarzt gezeigt. Er hat geweint. Ich biete.","Angebot! Bitte schnell, mein Akku hat noch drei Prozent.","Ich sammle nur Dinge, die ich nicht verstehe. Passt perfekt.","Dafür verkaufe ich mein Fahrrad. Na gut, den Sattel.","Wusstest du, dass Otter Händchen halten? Jedenfalls: mein Angebot.","Ich habe gewürfelt. Das ist der Preis. Die Würfel lügen nicht.","Mein Steuerberater ist ohnmächtig geworden, also muss es gut sein.","Das erinnert mich an meinen Ex. Ich will es trotzdem.","Ich zahle in Spielgeld, weil ich nichts anderes habe.","Letztes Angebot. Also das erste. Aber auch das letzte. Vielleicht.","Ich kaufe das nur, damit Baron von Bit es nicht bekommt.","So viel für so wenige Pixel? Ich liebe es.","Meine Wand ist leer und mein Kopf auch. Nimm mein Geld.","Ich habe eine Lasagne im Ofen, bitte entscheide dich fix.","Das sieht aus wie mein Kontostand: wild. Angebot.","Ich habe mich verklickt, aber jetzt ziehe ich es durch."],"buy":["Gekauft! Das kommt in meine Sammlung.","Zu diesem Preis konnte ich nicht widerstehen.","Ein fairer Preis. Danke!","Gekauft. Fragt mich nicht, warum.","Meins! Jetzt muss ich nur noch herausfinden, was es ist.","Gekauft, bevor mein Verstand wach wird.","Das kommt neben den Toaster. Da ist das Licht am besten.","Ich habe es. Meine Erben werden mich hassen.","Zack, gekauft. Miete wird überbewertet.","Endlich etwas, das ich meiner Katze vererben kann.","Gekauft! Ich schreibe es als Arbeitskleidung ab.","Schnäppchen. Sagt jedenfalls die Stimme in meinem Kühlschrank.","Ich wollte nur gucken. Tja.","Gekauft. Der Pizzabote kann warten."],"accept":["Abgemacht! Viel Freude damit.","Einverstanden, es gehört dir.","Deal. Bitte nicht in der Sonne lagern.","Nimm es, bevor ich es mir anders überlege.","Verkauft! Ich brauche das Geld für Gartenzwerge.","Na gut. Aber du musst es jeden Tag anschauen. Versprich es.","Einverstanden. Es hat mich nachts sowieso angestarrt.","Deal! Grüß deine Oma von mir.","Okay, okay. Du verhandelst wie mein Schwager.","Abgemacht. Der Rahmen kostet extra. Es gibt keinen Rahmen."],"trade":["Endlich gehört es mir! Das wollte ich schon lange.","Ich musste es einfach haben.","Gekauft von einer Kollegin. Jetzt steht es zum Verkauf, wer bietet mehr?","Ein Schnäppchen unter Sammlern.","Das Stück ist gefragt. Ich habe zugeschlagen.","Ich habe es Otto Original abgeluchst. Er weint jetzt in sein Müsli.","Getauscht gegen ein Geheimnis und etwas Bargeld.","Gekauft beim Sammlerstammtisch. Es gab Mettbrötchen.","Ich weiß nicht, wem ich es abgekauft habe. Er trug einen Umhang.","Meins. Die anderen Sammler können sich gehackt legen.","Frisch erworben und schon wieder im Angebot. So bin ich.","Ich habe es im Tausch gegen meinen guten Ruf bekommen.","Sammler Sam wollte es auch. Sammler Sam war zu langsam.","Gekauft, dreimal angeschaut, gelangweilt. Wer will?","Das hing eben noch bei Gräfin Glitzer. Jetzt nicht mehr. Ha!"],"decline":["Nein danke, darunter verkaufe ich nicht.","Netter Versuch. Biete mehr.","Das ist zu wenig für dieses Stück.","Dafür bekommst du bei mir höchstens ein Foto vom Bild.","Hahaha. Nein.","Für den Preis male ich dir ein Strichmännchen. Ein schlechtes.","Mein Goldfisch bietet mehr, und der hat kein Konto.","Zu wenig. Ich habe schließlich eine Yacht aus Pappe zu unterhalten.","Nein. Und meine Katze sagt auch nein.","Bei dem Angebot ist mir kurz schwarz vor Augen geworden.","Ich frage kurz meinen Anwalt. Er lacht noch.","Leg eine Null dran, dann reden wir. Hinten, nicht vorne.","Das ist kein Angebot, das ist eine Beleidigung mit Komma.","Nö. Aber danke, dass du an mich gedacht hast.","Ich verkaufe nicht unter Wert. Außer montags. Heute ist nicht Montag. Glaube ich."]}}}'::jsonb, 'Defaults from src/config/balance.ts, section "nfts"'),
   ('accessories', '{"slots":["back","body","face","head","hand","pet"],"feedRarities":["legendary","mythic"],"items":[{"key":"party_hat","name":"Partyhütchen","description":"Jeder Tag ist ein Feiertag, wenn das Depot grün ist.","slot":"head","rarity":"common","priceCents":75000,"minLevel":1,"set":"holidays"},{"key":"paper_crown","name":"Pappkrone","description":"Vom Burgerladen. Fühlt sich trotzdem königlich an.","slot":"head","rarity":"common","priceCents":135000,"minLevel":1},{"key":"beanie","name":"Bommelmütze","description":"Hält warm, wenn der Markt eiskalt ist.","slot":"head","rarity":"common","priceCents":180000,"minLevel":1},{"key":"traffic_cone","name":"Leitkegel","description":"Vom Heimweg mitgenommen. Niemand fragt nach.","slot":"head","rarity":"common","priceCents":240000,"minLevel":1,"set":"absurd"},{"key":"propeller_cap","name":"Propellermütze","description":"Dreht sich bei jedem Kursanstieg ein bisschen schneller.","slot":"head","rarity":"rare","priceCents":1250000,"minLevel":2,"set":"absurd"},{"key":"chef_hat","name":"Kochmütze","description":"Für alle, die ihr Depot nach Gefühl würzen.","slot":"head","rarity":"rare","priceCents":1500000,"minLevel":2,"set":"chef"},{"key":"bunny_ears","name":"Hasenohren","description":"Hört Gerüchte schon, bevor sie in den Nachrichten sind.","slot":"head","rarity":"rare","priceCents":2000000,"minLevel":3,"set":"zoo"},{"key":"cowboy_hat","name":"Cowboyhut","description":"Yeehaw! Der Wilde Westen heißt jetzt Börse.","slot":"head","rarity":"rare","priceCents":3250000,"minLevel":3},{"key":"pirate_hat","name":"Piratenhut","description":"Arrr! Für Leute, die Dividenden lieber entern.","slot":"head","rarity":"epic","priceCents":24500000,"minLevel":5,"set":"pirate"},{"key":"viking_helmet","name":"Wikingerhelm","description":"Plündert keine Dörfer, nur Short-Positionen.","slot":"head","rarity":"epic","priceCents":42000000,"minLevel":6,"set":"knight"},{"key":"top_hat","name":"Zylinder","description":"Ab hier redet man nur noch über Rendite und Pferde.","slot":"head","rarity":"epic","priceCents":105000000,"minLevel":10,"set":"royal"},{"key":"halo","name":"Heiligenschein","description":"Garantiert nie Insiderhandel betrieben. Ehrlich.","slot":"head","rarity":"legendary","priceCents":750000000,"minLevel":15},{"key":"crown","name":"Goldkrone","description":"Massives Pixelgold mit echten Fake-Diamanten.","slot":"head","rarity":"legendary","priceCents":5000000000,"minLevel":25,"set":"royal"},{"key":"clown_nose","name":"Clownsnase","description":"Macht jeden Verlust ein bisschen lustiger. Hupt nicht.","slot":"face","rarity":"common","priceCents":75000,"minLevel":1,"set":"absurd"},{"key":"sunglasses","name":"Sonnenbrille","description":"Die Zukunft ist so hell, man braucht eine.","slot":"face","rarity":"common","priceCents":105000,"minLevel":1,"set":"rock"},{"key":"fake_moustache","name":"Falscher Schnurrbart","description":"Perfekte Tarnung. Niemand erkennt dich. Wirklich niemand.","slot":"face","rarity":"common","priceCents":120000,"minLevel":1,"set":"absurd"},{"key":"heart_glasses","name":"Herzchenbrille","description":"Verliebt in jede Aktie, die man gerade gekauft hat.","slot":"face","rarity":"rare","priceCents":900000,"minLevel":2},{"key":"glasses_3d","name":"3D-Brille","description":"Endlich sieht man den Kurs auch in die Tiefe fallen.","slot":"face","rarity":"rare","priceCents":1100000,"minLevel":3},{"key":"monocle","name":"Monokel","description":"Ein Auge auf den Markt, das andere auf den Butler.","slot":"face","rarity":"epic","priceCents":31500000,"minLevel":7,"set":"royal"},{"key":"vr_goggles","name":"VR-Brille","description":"Lebt halb im Metaversum, halb im Minus.","slot":"face","rarity":"epic","priceCents":84000000,"minLevel":8},{"key":"deal_shades","name":"Pixel-Sonnenbrille","description":"Fällt aus dem Nichts ins Gesicht. Deal with it.","slot":"face","rarity":"epic","priceCents":56000000,"minLevel":6,"set":"rock"},{"key":"laser_eyes","name":"Laseraugen","description":"Nur echt mit mindestens einem Coin, der zum Mond fliegt.","slot":"face","rarity":"legendary","priceCents":2500000000,"minLevel":20},{"key":"bathrobe","name":"Bademantel","description":"Homeoffice-Uniform. Trading geht auch im Liegen.","slot":"body","rarity":"common","priceCents":150000,"minLevel":1,"set":"office"},{"key":"tracksuit","name":"Trainingsanzug","description":"Raschelt bei jeder Bewegung. Sehr sportlich, nie gejoggt.","slot":"body","rarity":"common","priceCents":210000,"minLevel":1,"set":"sports"},{"key":"hawaiian_shirt","name":"Hawaiihemd","description":"Urlaubsmodus an, Depot läuft trotzdem.","slot":"body","rarity":"common","priceCents":270000,"minLevel":2},{"key":"banana_costume","name":"Bananenkostüm","description":"Krumm, gelb und immer ein Hingucker. Nicht ausrutschen.","slot":"body","rarity":"rare","priceCents":2500000,"minLevel":2,"set":"absurd"},{"key":"hotdog_costume","name":"Hotdog-Kostüm","description":"Mit extra Senf. Riecht zum Glück nur nach Stoff.","slot":"body","rarity":"rare","priceCents":3750000,"minLevel":3,"set":"absurd"},{"key":"tuxedo","name":"Smoking","description":"Für Börsengänge, Galas und das Abendessen zu Hause.","slot":"body","rarity":"rare","priceCents":6000000,"minLevel":4,"set":"royal"},{"key":"shark_costume","name":"Haikostüm","description":"Für echte Finanzhaie. Beißt nur bei Leerverkäufen.","slot":"body","rarity":"epic","priceCents":28000000,"minLevel":5,"set":"zoo"},{"key":"dino_onesie","name":"Dino-Onesie","description":"Rawr! Uralte Anlagestrategie, extrem kuschelig.","slot":"body","rarity":"epic","priceCents":38500000,"minLevel":6,"set":"zoo"},{"key":"astronaut_suit","name":"Raumanzug","description":"Wer zum Mond will, muss sich passend anziehen.","slot":"body","rarity":"epic","priceCents":140000000,"minLevel":12,"set":"space"},{"key":"gold_suit","name":"Goldanzug","description":"Glänzt so sehr, dass die Konkurrenz eine Sonnenbrille braucht.","slot":"body","rarity":"legendary","priceCents":3000000000,"minLevel":20,"set":"royal"},{"key":"balloon","name":"Luftballon","description":"Steigt wie deine Lieblingsaktie. Platzt hoffentlich nicht.","slot":"hand","rarity":"common","priceCents":45000,"minLevel":1,"set":"holidays"},{"key":"baguette","name":"Baguette","description":"Knusprig, französisch, als Zeigestab bestens geeignet.","slot":"hand","rarity":"common","priceCents":60000,"minLevel":1,"set":"chef"},{"key":"rubber_chicken","name":"Gummihuhn","description":"Quietscht bei jedem Verlust. Also oft.","slot":"hand","rarity":"common","priceCents":90000,"minLevel":1,"set":"absurd"},{"key":"ice_cream","name":"Eistüte","description":"Drei Kugeln: Gewinn, Verlust und Pistazie.","slot":"hand","rarity":"common","priceCents":75000,"minLevel":1,"set":"chef"},{"key":"foam_finger","name":"Schaumstoffhand","description":"Nummer eins! Zumindest in der eigenen Wochenliga.","slot":"hand","rarity":"rare","priceCents":750000,"minLevel":2,"set":"sports"},{"key":"megaphone","name":"Megafon","description":"KAUFEN! VERKAUFEN! Hauptsache laut.","slot":"hand","rarity":"rare","priceCents":1750000,"minLevel":3,"set":"office"},{"key":"money_bag","name":"Geldsack","description":"Mit Dollarzeichen drauf, damit es auch jeder versteht.","slot":"hand","rarity":"rare","priceCents":4999900,"minLevel":4,"set":"office"},{"key":"laser_sword","name":"Laserschwert","description":"Schneidet Gebühren und Spreads in der Mitte durch.","slot":"hand","rarity":"epic","priceCents":49000000,"minLevel":8,"set":"space"},{"key":"golden_toilet_brush","name":"Goldene Klobürste","description":"Wahrer Reichtum zeigt sich im Badezimmer.","slot":"hand","rarity":"legendary","priceCents":1500000000,"minLevel":18,"set":"absurd"},{"key":"rubber_duck","name":"Quietscheente","description":"Hört zu, wenn du deine Trades erklärst. Urteilt nie.","slot":"pet","rarity":"common","priceCents":120000,"minLevel":1,"set":"zoo"},{"key":"hamster","name":"Hamster","description":"Hamstert alles, besonders Dividenden.","slot":"pet","rarity":"rare","priceCents":600000,"minLevel":2,"set":"zoo"},{"key":"parrot","name":"Papagei","description":"Plappert jeden Börsentipp nach. Auch die schlechten.","slot":"pet","rarity":"rare","priceCents":4000000,"minLevel":4,"set":"pirate"},{"key":"pug","name":"Mops","description":"Schnauft beim Laden der Kurse. Bester Freund an der Börse.","slot":"pet","rarity":"epic","priceCents":21000000,"minLevel":5,"set":"zoo"},{"key":"mini_dragon","name":"Minidrache","description":"Bewacht deinen Goldschatz und röstet Marshmallows.","slot":"pet","rarity":"legendary","priceCents":4000000000,"minLevel":22,"set":"wizard"},{"key":"superhero_cape","name":"Superheldenumhang","description":"Rettet Depots, aber leider nur die eigenen.","slot":"back","rarity":"rare","priceCents":2250000,"minLevel":2},{"key":"butterfly_wings","name":"Schmetterlingsflügel","description":"Ein Flügelschlag hier, ein Kurssturz in Tokio.","slot":"back","rarity":"rare","priceCents":4500000,"minLevel":3,"set":"zoo"},{"key":"bat_wings","name":"Fledermausflügel","description":"Für Nachteulen, die nachbörslich handeln.","slot":"back","rarity":"epic","priceCents":52500000,"minLevel":7,"set":"holidays"},{"key":"angel_wings","name":"Engelsflügel","description":"Himmlische Renditen, garantiert ohne Garantie.","slot":"back","rarity":"epic","priceCents":175000000,"minLevel":12},{"key":"jetpack","name":"Jetpack","description":"To the moon! Tank voll, Sicherheitsgurt optional.","slot":"back","rarity":"legendary","priceCents":1000000000,"minLevel":15,"set":"space"},{"key":"toilet_paper_crown","name":"Klopapierkrone","description":"Krisensicher angelegt. Hält drei Lockdowns und einen Crash.","slot":"head","rarity":"common","priceCents":99000,"minLevel":1,"set":"absurd"},{"key":"tinfoil_hat","name":"Aluhut","description":"Schirmt Kursmanipulation ab. Und WLAN. Und Vernunft.","slot":"head","rarity":"common","priceCents":150000,"minLevel":1,"set":"absurd"},{"key":"santa_hat","name":"Weihnachtsmütze","description":"Ho ho ho! Die Jahresendrallye kommt bestimmt.","slot":"head","rarity":"common","priceCents":165000,"minLevel":1,"set":"holidays"},{"key":"cat_ears","name":"Katzenohren","description":"In deiner Haarfarbe. Hören Dividenden schon von Weitem schnurren.","slot":"head","rarity":"common","priceCents":195000,"minLevel":1,"set":"zoo"},{"key":"tie_headband","name":"Krawatte als Stirnband","description":"Nach der Weihnachtsfeier der Investmentbank. Nicht fragen.","slot":"head","rarity":"common","priceCents":225000,"minLevel":2,"set":"office"},{"key":"alien_antennae","name":"Alien-Fühler","description":"Empfangen Börsentipps aus einer fernen Galaxie. Meist falsche.","slot":"head","rarity":"common","priceCents":260000,"minLevel":2,"set":"space"},{"key":"frog_hat","name":"Froschmütze","description":"Quak! Springt von Aktie zu Aktie und landet meist im Teich.","slot":"head","rarity":"rare","priceCents":1800000,"minLevel":2,"set":"zoo"},{"key":"reindeer_antlers","name":"Rentiergeweih","description":"Zieht den Schlitten voller Gewinne. Rudolph ist neidisch.","slot":"head","rarity":"rare","priceCents":2400000,"minLevel":3,"set":"holidays"},{"key":"sombrero","name":"Sombrero","description":"Spendet Schatten für den ganzen Handelsraum. Olé!","slot":"head","rarity":"rare","priceCents":2900000,"minLevel":3},{"key":"jester_hat","name":"Narrenkappe","description":"Für alle, die zum Höchstkurs gekauft haben. Klingelt beim Verkaufen.","slot":"head","rarity":"rare","priceCents":3600000,"minLevel":4,"set":"absurd"},{"key":"graduation_cap","name":"Doktorhut","description":"Dr. rer. pol. in Kaffeesatzlesen. Mit Auszeichnung.","slot":"head","rarity":"rare","priceCents":4500000,"minLevel":4,"set":"office"},{"key":"pumpkin_head","name":"Kürbiskopf","description":"Gruselig wie ein Depot im Oktober.","slot":"head","rarity":"epic","priceCents":33000000,"minLevel":7,"set":"holidays"},{"key":"knight_helmet","name":"Ritterhelm","description":"Schützt vor Gegenwind, Kritik und Margin Calls.","slot":"head","rarity":"epic","priceCents":68000000,"minLevel":9,"set":"knight"},{"key":"wizard_hat","name":"Zauberhut","description":"Zaubert Gewinne herbei. Behauptet zumindest der Prospekt.","slot":"head","rarity":"epic","priceCents":90000000,"minLevel":10,"set":"wizard"},{"key":"unicorn_horn","name":"Einhorn-Horn","description":"Für Gründer mit Milliardenbewertung und ohne Umsatz.","slot":"head","rarity":"epic","priceCents":125000000,"minLevel":12,"set":"zoo"},{"key":"disco_ball","name":"Discokugel","description":"Die Party geht weiter, solange der Kurs steigt.","slot":"head","rarity":"legendary","priceCents":1900000000,"minLevel":19,"set":"absurd"},{"key":"money_cloud","name":"Geldregenwolke","description":"Der Wetterbericht für Superreiche: Es regnet Scheine.","slot":"head","rarity":"mythic","priceCents":75000000000,"minLevel":40,"set":"royal"},{"key":"bubblegum","name":"Kaugummiblase","description":"Wie eine Spekulationsblase, nur leckerer. Platzt auch.","slot":"face","rarity":"common","priceCents":65000,"minLevel":1,"set":"absurd"},{"key":"eye_patch","name":"Augenklappe","description":"Ein Auge auf den Markt reicht völlig, sagt der Kapitän.","slot":"face","rarity":"common","priceCents":85000,"minLevel":1,"set":"pirate"},{"key":"facepaint","name":"Fan-Schminke","description":"In den Farben des Teams mit der besten Rendite. Wechselt wöchentlich.","slot":"face","rarity":"common","priceCents":95000,"minLevel":1,"set":"sports"},{"key":"nerd_glasses","name":"Hornbrille","description":"Mit Klebeband geflickt. Hat schon jede Tabellenkalkulation gesehen.","slot":"face","rarity":"common","priceCents":110000,"minLevel":1,"set":"office"},{"key":"snorkel_mask","name":"Taucherbrille","description":"Bestens gerüstet für den nächsten Kurstaucher.","slot":"face","rarity":"rare","priceCents":1400000,"minLevel":2},{"key":"star_glasses","name":"Sternchenbrille","description":"Rockstar-Look für alle, die den Depotauszug nicht sehen wollen.","slot":"face","rarity":"rare","priceCents":2200000,"minLevel":3,"set":"rock"},{"key":"hero_mask","name":"Superheldenmaske","description":"Geheime Identität: Kleinanleger. Superkraft: Durchhalten.","slot":"face","rarity":"rare","priceCents":3900000,"minLevel":4},{"key":"wizard_beard","name":"Zauberbart","description":"Hundert Jahre Börsenerfahrung. Oder zwei Wochen sehr viel Stress.","slot":"face","rarity":"epic","priceCents":64000000,"minLevel":10,"set":"wizard"},{"key":"diamond_grill","name":"Diamant-Grillz","description":"Ein Lächeln wie ein Tresor: glänzend, hart und sehr teuer.","slot":"face","rarity":"legendary","priceCents":2100000000,"minLevel":21,"set":"royal"},{"key":"diamond_monocle","name":"Diamantmonokel","description":"Sieht alles. Besonders gern das eigene Spiegelbild.","slot":"face","rarity":"mythic","priceCents":25000000000,"minLevel":35,"set":"royal"},{"key":"barrel","name":"Pleite-Fass","description":"Das Outfit nach dem Margin Call. Hosenträger gibt es gratis dazu.","slot":"body","rarity":"common","priceCents":49000,"minLevel":1,"set":"office"},{"key":"chef_apron","name":"Kochschürze","description":"Hier werden keine Bilanzen gekocht. Nur Nudeln.","slot":"body","rarity":"common","priceCents":125000,"minLevel":1,"set":"chef"},{"key":"duck_float","name":"Entchen-Schwimmring","description":"Hält dich über Wasser, wenn das Depot absäuft.","slot":"body","rarity":"common","priceCents":145000,"minLevel":1,"set":"absurd"},{"key":"jersey","name":"Trikot Nr. 1","description":"Die Nummer eins im Depot-Derby. Steht ja drauf.","slot":"body","rarity":"common","priceCents":240000,"minLevel":2,"set":"sports"},{"key":"xmas_sweater","name":"Weihnachtspulli","description":"Hässlich, kratzig und trotzdem jedes Jahr wieder dabei.","slot":"body","rarity":"rare","priceCents":1900000,"minLevel":2,"set":"holidays"},{"key":"leather_jacket","name":"Lederjacke","description":"Rock ''n'' Roll im Depot: laut, wild und sehr volatil.","slot":"body","rarity":"rare","priceCents":5500000,"minLevel":4,"set":"rock"},{"key":"pirate_coat","name":"Piratenmantel","description":"Mit Goldknöpfen aus erbeuteten Dividenden.","slot":"body","rarity":"rare","priceCents":6500000,"minLevel":5,"set":"pirate"},{"key":"garden_gnome","name":"Gartenzwergkostüm","description":"Steht stoisch im Vorgarten und wartet auf die Erholung.","slot":"body","rarity":"rare","priceCents":7700000,"minLevel":5,"set":"absurd"},{"key":"pinstripe_suit","name":"Nadelstreifenanzug","description":"Riecht nach Bonus, Espresso und Überstunden.","slot":"body","rarity":"epic","priceCents":72000000,"minLevel":8,"set":"office"},{"key":"knight_armor","name":"Ritterrüstung","description":"Panzert gegen Kursstürze. Rostet leider bei Regen.","slot":"body","rarity":"epic","priceCents":115000000,"minLevel":11,"set":"knight"},{"key":"wizard_robe","name":"Zaubermantel","description":"Mit Sternen bestickt und Geheimtaschen für Geheimformeln.","slot":"body","rarity":"epic","priceCents":150000000,"minLevel":12,"set":"wizard"},{"key":"ermine_robe","name":"Königsmantel","description":"Hermelin, Samt und Gold. Untertanen sind nicht im Preis enthalten.","slot":"body","rarity":"mythic","priceCents":60000000000,"minLevel":45,"set":"royal"},{"key":"sparkler","name":"Wunderkerze","description":"Funkelt kurz und hell. Wie mancher Börsengang.","slot":"hand","rarity":"common","priceCents":50000,"minLevel":1,"set":"holidays"},{"key":"candy_cane","name":"Zuckerstange","description":"Rot-weiß gestreift wie ein Chart an einem nervösen Tag.","slot":"hand","rarity":"common","priceCents":55000,"minLevel":1,"set":"holidays"},{"key":"frying_pan","name":"Bratpfanne","description":"Mit Spiegelei. Frühstück und Selbstverteidigung in einem.","slot":"hand","rarity":"common","priceCents":70000,"minLevel":1,"set":"chef"},{"key":"coffee_mug","name":"Kaffeebecher","description":"Treibstoff für den Börsenstart um neun. Und den um zehn.","slot":"hand","rarity":"common","priceCents":80000,"minLevel":1,"set":"office"},{"key":"plunger","name":"Pümpel","description":"Für verstopfte Orderbücher und andere Notfälle.","slot":"hand","rarity":"common","priceCents":99900,"minLevel":1,"set":"absurd"},{"key":"tennis_racket","name":"Tennisschläger","description":"Schlägt jeden Aufschlag zurück. Nur keine Gebühren.","slot":"hand","rarity":"common","priceCents":200000,"minLevel":2,"set":"sports"},{"key":"shopping_cart","name":"Einkaufswagen","description":"Randvoll mit Klopapier. Die sicherste Anlage überhaupt.","slot":"hand","rarity":"rare","priceCents":1600000,"minLevel":2,"set":"absurd"},{"key":"magic_wand","name":"Zauberstab","description":"Ein Schwung, und das Minus ist weg. Leider nur im Traum.","slot":"hand","rarity":"rare","priceCents":2700000,"minLevel":3,"set":"wizard"},{"key":"cutlass","name":"Säbel","description":"Entert jede Hauptversammlung. Arrr!","slot":"hand","rarity":"rare","priceCents":4200000,"minLevel":4,"set":"pirate"},{"key":"ray_gun","name":"Strahlenpistole","description":"Pew, pew! Schießt Kurse in die Umlaufbahn.","slot":"hand","rarity":"rare","priceCents":4800000,"minLevel":4,"set":"space"},{"key":"electric_guitar","name":"E-Gitarre","description":"Spielt im Plus nur Dur. Im Minus Blues.","slot":"hand","rarity":"epic","priceCents":47000000,"minLevel":8,"set":"rock"},{"key":"broadsword","name":"Ritterschwert","description":"Für epische Duelle in der Börsenliga.","slot":"hand","rarity":"epic","priceCents":60000000,"minLevel":9,"set":"knight"},{"key":"trophy","name":"Goldpokal","description":"Für den ersten Platz. Selbst gekauft zählt auch.","slot":"hand","rarity":"epic","priceCents":99000000,"minLevel":11,"set":"sports"},{"key":"briefcase_money","name":"Geldkoffer","description":"Prall gefüllt und ganz sicher nicht aus dunklen Geschäften. Fast.","slot":"hand","rarity":"legendary","priceCents":1250000000,"minLevel":17,"set":"office"},{"key":"sceptre","name":"Zepter","description":"Wer das hält, bestimmt den Leitzins. Zumindest auf dem Platz.","slot":"hand","rarity":"mythic","priceCents":40000000000,"minLevel":38,"set":"royal"},{"key":"pet_rock","name":"Haustierstein","description":"Frisst nichts, bellt nicht und schwankt nie im Kurs.","slot":"pet","rarity":"common","priceCents":49900,"minLevel":1,"set":"absurd"},{"key":"snail","name":"Turbo-Schnecke","description":"Schneller als jede Überweisung am Wochenende.","slot":"pet","rarity":"common","priceCents":135000,"minLevel":1,"set":"zoo"},{"key":"cat","name":"Katze","description":"Läuft über die Tastatur und kauft dabei zufällig Aktien.","slot":"pet","rarity":"common","priceCents":280000,"minLevel":2,"set":"zoo"},{"key":"goldfish","name":"Goldfisch im Glas","description":"Vergisst jeden Verlust nach drei Sekunden. Ein Vorbild.","slot":"pet","rarity":"rare","priceCents":1200000,"minLevel":2,"set":"zoo"},{"key":"lobster","name":"Hummer","description":"Kneift bei schlechten Trades. Also ziemlich oft.","slot":"pet","rarity":"rare","priceCents":2600000,"minLevel":3,"set":"chef"},{"key":"ghost","name":"Gespenst","description":"Der Geist vergangener Verluste. Buh!","slot":"pet","rarity":"rare","priceCents":3100000,"minLevel":3,"set":"holidays"},{"key":"owl","name":"Eule","description":"Weise Anlagetipps, aber nur nach Mitternacht.","slot":"pet","rarity":"rare","priceCents":3400000,"minLevel":4,"set":"wizard"},{"key":"penguin","name":"Pinguin","description":"Trägt immer Frack. Perfekt für die Hauptversammlung.","slot":"pet","rarity":"rare","priceCents":5000000,"minLevel":4,"set":"zoo"},{"key":"bear","name":"Bärenmarkt-Bär","description":"Kuschelig, aber jeder Kurs fällt, wenn er brummt.","slot":"pet","rarity":"epic","priceCents":25000000,"minLevel":6,"set":"office"},{"key":"robo_dog","name":"Robohund","description":"Holt die Zeitung, liest sie und handelt sofort.","slot":"pet","rarity":"epic","priceCents":88000000,"minLevel":10,"set":"space"},{"key":"ufo","name":"Mini-UFO","description":"Entführt Kühe. Und manchmal Aktien in ungeahnte Höhen.","slot":"pet","rarity":"legendary","priceCents":3500000000,"minLevel":24,"set":"space"},{"key":"golden_bull","name":"Goldener Bulle","description":"Das Wappentier der Hausse. Massiv vergoldet, schnaubt Optimismus.","slot":"pet","rarity":"mythic","priceCents":90000000000,"minLevel":50,"set":"royal"},{"key":"school_bag","name":"Schulranzen","description":"Für den ersten Schultag an der Börse. Pausenbrot inklusive.","slot":"back","rarity":"common","priceCents":115000,"minLevel":1},{"key":"bee_wings","name":"Bienenflügel","description":"Fleißig wie eine Biene. Summt beim Sparen.","slot":"back","rarity":"common","priceCents":185000,"minLevel":2,"set":"zoo"},{"key":"turtle_shell","name":"Schildkrötenpanzer","description":"Langsam, aber sicher: die Strategie für Geduldige.","slot":"back","rarity":"rare","priceCents":2300000,"minLevel":3,"set":"zoo"},{"key":"surfboard","name":"Surfbrett","description":"Reitet jede Welle. Auch die nach unten.","slot":"back","rarity":"rare","priceCents":3000000,"minLevel":3},{"key":"knight_shield","name":"Ritterschild","description":"Hält Anrufe von Anlageberatern zuverlässig ab.","slot":"back","rarity":"rare","priceCents":5200000,"minLevel":5,"set":"knight"},{"key":"peacock_tail","name":"Pfauenrad","description":"Schlägt ein Rad, sobald der Kontostand stimmt.","slot":"back","rarity":"epic","priceCents":160000000,"minLevel":13,"set":"royal"},{"key":"dragon_wings","name":"Drachenflügel","description":"Für Flüge über den eigenen Goldschatz. Feuer inklusive.","slot":"back","rarity":"legendary","priceCents":7500000000,"minLevel":26,"set":"wizard"},{"key":"phoenix_wings","name":"Phönixflügel","description":"Steigt aus der Asche jedes Crashs wieder auf.","slot":"back","rarity":"mythic","priceCents":15000000000,"minLevel":42,"set":"royal"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "accessories"'),
   ('battles', '{"lobby":{"minLevel":2,"minPlayers":3,"maxPlayers":10,"perHour":1,"countdownSeconds":30,"idleSeconds":15,"introMs":6000,"recentSeconds":120},"demo":{"countdownSeconds":6,"botsMin":3,"botsMax":5},"weights":{"floor":12,"bulls":12,"coins":12,"sumo":12,"potato":12,"pump":10,"quiz":12,"estimate":8,"bell":10,"bear":12,"dash":12,"margin":12,"elevator":10,"laser":12,"rodeo":10,"vault":8,"ticker":10,"higher":10,"auction":8},"net":{"tickMs":50,"graceMs":1000,"aheadTicks":10,"disconnectTicks":80,"sendEveryMs":250,"checkEveryMs":1000},"arena":{"w":11,"h":9,"stepTicks":4,"spawns":[[1,1],[9,7],[9,1],[1,7],[5,1],[5,7],[1,4],[9,4],[3,4],[7,4]]},"games":{"floor":{"maxTicks":1400,"firstWave":60,"waveEvery":50,"waveEveryMin":18,"waveEveryStep":2,"crackStart":3,"crackMax":9,"crackGrowEvery":2,"warnTicks":24,"stompTicks":50,"endgameTiles":8},"bulls":{"maxTicks":1300,"hearts":3,"firstSpawn":40,"spawnEvery":50,"spawnEveryMin":14,"spawnEveryStep":2,"countGrowEvery":5,"countMax":4,"warnTicks":26,"ticksPerTile":2,"stunTicks":16,"invulnTicks":40},"coins":{"durationTicks":900,"firstDrop":20,"dropEvery":6,"dropEveryMin":3,"fallTicks":16,"lifeTicks":80,"bearPct":12,"goldPct":8,"goldValue":3,"bearStunTicks":30,"bearLoss":2,"jackpotTicks":200,"jackpotGoldPct":25},"sumo":{"maxTicks":1500,"firstShrink":300,"shrinkEvery":220,"warnTicks":40,"stunTicks":0,"recoverTicks":7,"powerCooldown":40,"cornerCut":8,"spawns":[[2,2],[8,6],[8,2],[2,6],[5,1],[5,7],[2,4],[8,4],[4,3],[6,5]]},"potato":{"maxTicks":1800,"firstRound":40,"pauseTicks":40,"holderStepTicks":3,"passBackTicks":20,"receiverStunTicks":8,"fuseBaseSeconds":13,"fuseMinSeconds":4,"fuseJitterSeconds":4,"walls":[[2,2],[8,2],[2,6],[8,6],[5,4]]},"pump":{"durationTicks":600,"greenMin":40,"greenJitter":60,"yellowTicks":12,"redMin":20,"redJitter":20,"goldEvery":4,"goldTicks":20,"goldValue":3,"bustFreezeTicks":20,"bustLossBps":2500},"bear":{"maxTicks":1600,"bearTicks":[60,380,740,1100],"stepStart":7,"stepMin":4,"speedEvery":280,"eatTicks":30,"den":[5,4],"pillars":[[3,3],[7,3],[3,5],[7,5]],"spawns":[[1,1],[9,7],[9,1],[1,7],[5,1],[5,7],[1,4],[9,4],[3,1],[7,7]]},"dash":{"maxTicks":1200,"target":15,"firstCoin":20,"coinsPerPlayers":4,"coinsMax":3,"spawnDelay":24,"goldEvery":5,"goldValue":2,"tackleStun":24,"tackleCool":40},"margin":{"maxTicks":1800,"firstRound":30,"showTicks":100,"showMin":44,"showStep":8,"pauseTicks":34,"warmupRounds":3},"elevator":{"maxTicks":1600,"firstRise":60,"riseStart":30,"riseMin":9,"riseStep":1,"riseStepEvery":2,"barrierEvery":3,"gapStart":4,"gapMin":1,"gapShrinkEvery":12},"laser":{"maxTicks":1400,"hearts":3,"firstSpawn":50,"spawnEvery":64,"spawnEveryMin":26,"spawnEveryStep":2,"countGrowEvery":4,"countMax":3,"staggerTicks":20,"warnTicks":24,"ticksPerTile":2,"gapPct":35,"jumpTicks":8,"jumpCool":6,"invulnTicks":16},"rodeo":{"maxTicks":1400,"grip":3,"firstCue":40,"windowStart":26,"windowMin":9,"windowStep":1,"gapMin":8,"gapJitter":18},"quiz":{"rounds":7,"answerMs":8000,"revealMs":3000,"hearts":2,"basePoints":500,"speedPoints":500},"estimate":{"rounds":4,"answerMs":12000,"revealMs":4000,"bullseyeBps":100,"bullseyeBonus":2,"lastRoundFactor":2,"stockRounds":1},"bell":{"maxRounds":9,"readyMs":1000,"waitMinMs":1500,"waitMaxMs":4500,"windowMs":2000,"resultMs":2500,"smallGroup":5,"heartsSmall":2,"heartsLarge":1},"vault":{"rounds":3,"answerMs":24000,"revealMs":4000,"digits":3,"symbols":6,"maxTries":8,"basePoints":400,"speedPoints":600,"tryBonus":25},"ticker":{"rounds":8,"answerMs":6000,"revealMs":2500,"options":6,"basePoints":200,"speedPoints":800,"wrongPoints":300},"higher":{"rounds":10,"answerMs":5000,"revealMs":2500,"smallGroup":5,"heartsSmall":3,"heartsLarge":2,"history":14,"trendPct":65,"moveMinBps":80,"moveMaxBps":450,"basePoints":100,"speedPoints":100},"auction":{"rounds":6,"answerMs":10000,"revealMs":3500,"budget":1000}},"prizes":{"weights":{"xp":30,"money":30,"skin":20,"nft":20},"xpBase":1000,"xpPerPlayer":150,"moneyBaseCents":300000,"moneyPerPlayerCents":75000,"dailyPrizeCap":3},"accessories":[{"key":"battle_crown","name":"Battle-Krone","description":"Gewonnen, nicht gekauft. Samt, Gold und ein Rubin so groß wie dein Ego.","slot":"head","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"laurel_wreath","name":"Lorbeerkranz","description":"Wie bei den alten Griechen, nur mit mehr Aktien.","slot":"head","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"champion_belt","name":"Champion-Gürtel","description":"Schwergewichtsmeister im Kurssturz-Springen.","slot":"body","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"victory_cape","name":"Siegerumhang","description":"Flattert dramatisch, auch wenn kein Wind weht.","slot":"back","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"star_shades","name":"Siegerbrille","description":"Wer gewinnt, muss die Blicke der Verlierer nicht sehen.","slot":"face","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"golden_joystick","name":"Goldener Joystick","description":"WASD in purem Gold. Nicht zum Zocken, zum Angeben.","slot":"hand","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"winner_trophy","name":"Siegerpokal","description":"Glänzt. Wiegt. Wird jeden Abend poliert.","slot":"hand","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"mini_bull","name":"Mini-Bulle","description":"Ein Bulle, der dich nicht über den Haufen rennt. Meistens.","slot":"pet","rarity":"legendary","exclusive":true,"minLevel":1}],"doodle":{"lobby":["Na, ihr Sofa-Börsianer? Wer traut sich in die Arena?","Ich brauche drei Mutige. Oder drei Ahnungslose. Geht beides.","Kommt rein, kommt rein! Hier gewinnt nur einer, die anderen weinen live.","Meine Mutter würde sofort mitmachen. Und gewinnen.","Ein Preis, ein Sieger, null Mitleid. Willkommen im Battle!"],"countdown":["Gleich geht''s los! Letzte Chance, noch feige wegzurennen.","Die Arena wird gewischt. Gleich fließen Tränen.","Ich habe Popcorn. Ihr habt keine Chance."],"intro":{"floor":"Der Kurs stürzt, der Boden auch! Bleibt in Bewegung, sonst geht''s abwärts!","bulls":"Die Bullen sind los! Wer stehen bleibt, wird zum Teppich.","coins":"Es regnet Geld! Vorsicht vor den Bären, die beißen.","sumo":"Rempeln erlaubt, Weinen auch. Wer rausfliegt, fliegt raus!","potato":"Wer die Giftaktie hält, wenn es knallt, ist raus. Weitergeben!","pump":"Pumpt die Aktie! Aber wehe, ihr tippt im Crash.","quiz":"Quizzeit! Zwei Herzen, null Ahnung. Zeigt, was ihr wisst!","estimate":"Schätzt mal! Wer am nächsten dran ist, kriegt die Punkte.","bell":"Wenn die Glocke läutet, drückt ihr. Vorher drücken? Raus!","bear":"Die Bären haben Hunger! Lauft, und zwar weg von ihnen, nicht hin.","dash":"Dividende für alle! Also für den Schnellsten. Rempeln ist ausdrücklich erwünscht.","margin":"Margin Call! Wer beim Gong nicht im Grünen steht, wird glattgestellt.","elevator":"Diese Aktie kennt nur eine Richtung: nach oben. Wer unten bleibt, bleibt unten.","laser":"Die Laserschranke! Springt im richtigen Moment, sonst gibt''s gegrillte Börsianer.","rodeo":"Haltet euch fest! Der Bulle bockt, und er hat heute richtig schlechte Laune.","vault":"Der Tresor der Zentralbank! Knackt den Code, bevor die Polizei kommt. War ein Witz. Oder?","ticker":"Kürzel-Alarm! Wer das richtige Tickersymbol zuerst erwischt, ist der Börsenprofi.","higher":"Höher oder tiefer? Mein Schnurrbart sagt höher. Mein Schnurrbart lag noch nie richtig.","auction":"Wer bietet mehr? Spielgeld weg, Punkte her! Nur nicht alles für eine Gummiente ausgeben."},"win":["{name} gewinnt! Ich habe es immer gewusst. Also seit gerade eben.","Applaus für {name}! Die anderen dürfen jetzt heimlich weinen.","{name} räumt ab! Das schreibe ich mir auf die Krawatte.","Was für ein Battle! {name} ist der Champion des Tages.","{name} siegt, die Börse bebt, mein Schnurrbart zittert!"],"out":["Und weg ist {name}! Tschüss, war nett.","{name} fliegt raus. Ich habe nichts gesehen. Doch, alles.","Autsch, {name}! Das gibt einen blauen Fleck im Depot."],"chat":{"start":"🏟️ BATTLE! {count} Zuschauer kämpfen jetzt in „{game}“ um {prize}. Viel Glück, ihr Pfeifen!","win":"🏆 {name} gewinnt „{game}“ und kassiert {prize}! Glückwunsch, du Glückspilz."}},"names":{"floor":"Kurssturz","bulls":"Bullenreiten","coins":"Geldregen","sumo":"Sumo am Parkett","potato":"Giftaktie","pump":"Aktie pumpen","quiz":"Börsenquiz","estimate":"Schätz den Kurs","bell":"Die Glocke","bear":"Bärenjagd","dash":"Dividenden-Dash","margin":"Margin Call","elevator":"Fahrstuhl zum Mond","laser":"Laserschranke","rodeo":"Bullen-Rodeo","vault":"Tresorknacker","ticker":"Ticker-Tippen","higher":"Mehr oder Weniger","auction":"Wer bietet mehr?"},"demoBots":[{"nickname":"Bärbel Bärenmarkt","avatarKey":"seller","accessories":["cowboy_hat"]},{"nickname":"Kalle Kursrakete","avatarKey":"punk","accessories":["sunglasses","superhero_cape"]},{"nickname":"Dividenden-Dieter","avatarKey":"analyst","accessories":["top_hat"]},{"nickname":"Moni Moneymaker","avatarKey":"scientist","accessories":["party_hat","balloon"]},{"nickname":"Börsen-Bernd","avatarKey":"rookie","accessories":["beanie","hamster"]},{"nickname":"Lisa Leerverkauf","avatarKey":"finn_fan","accessories":["bunny_ears"]},{"nickname":"Hedge-Horst","avatarKey":"rookie","accessories":["viking_helmet","pug"]},{"nickname":"Penny Stock","avatarKey":"seller","accessories":["heart_glasses"]},{"nickname":"Ralf Rendite","avatarKey":"analyst","accessories":["chef_hat","baguette"]}],"quiz":[{"q":"Wie viel Startkapital bekommt man bei NEXA?","a":"10.000 €","wrong":["1.000 €","50.000 €","100.000 €"]},{"q":"Wer moderiert die NEXA Nachrichten?","a":"Mr. Doodle Dangle","wrong":["Finn","Mira","Dr. Dax"]},{"q":"Wann laufen die NEXA Nachrichten?","a":"Zu jeder vollen Stunde","wrong":["Einmal am Tag","Nur sonntags","Alle 5 Minuten"]},{"q":"Was ist ein Bullenmarkt?","a":"Steigende Kurse","wrong":["Fallende Kurse","Ein Viehmarkt","Ein Markt ohne Händler"]},{"q":"Was ist ein Bärenmarkt?","a":"Fallende Kurse","wrong":["Steigende Kurse","Ein Zoo","Ein Honigmarkt"]},{"q":"Was ist eine Dividende?","a":"Gewinnanteil für Aktionäre","wrong":["Eine Gebühr","Ein Kredit","Eine Steuer"]},{"q":"Was ist ein IPO?","a":"Ein Börsengang","wrong":["Eine Insolvenz","Ein Aktiensplit","Eine Fusion"]},{"q":"Was bedeutet Leerverkauf?","a":"Auf fallende Kurse wetten","wrong":["Alles verkaufen","Ohne Gebühr kaufen","Eine leere Order"]},{"q":"Was ist eine Anleihe?","a":"Ein Schuldpapier mit Zinsen","wrong":["Ein Firmenanteil","Eine Kryptowährung","Ein Sparbuch"]},{"q":"Was misst ein Aktienindex?","a":"Die Entwicklung vieler Aktien","wrong":["Den Goldpreis","Die Inflation","Nur eine Aktie"]},{"q":"Was ist eine Limit-Order?","a":"Kauf oder Verkauf zu einem Wunschpreis","wrong":["Ein Kauf ohne Geld","Eine Order mit Zeitlimit","Ein Verbot zu handeln"]},{"q":"Was ist ein Stop-Loss?","a":"Automatischer Verkauf bei Verlust","wrong":["Ein Handelsverbot","Eine Gewinnsteuer","Ein Börsenfeiertag"]},{"q":"Was ist Market Cap?","a":"Börsenwert einer Firma","wrong":["Die Kappe des Händlers","Der Tageshöchstkurs","Die Anzahl der Mitarbeiter"]},{"q":"Was passiert bei einem Aktiensplit?","a":"Mehr Aktien zum kleineren Preis","wrong":["Die Firma teilt sich","Die Aktie wird gelöscht","Der Kurs verdoppelt sich"]},{"q":"Was ist Volatilität?","a":"Wie stark ein Kurs schwankt","wrong":["Wie alt eine Firma ist","Ein Börsenfeiertag","Die Höhe der Dividende"]},{"q":"Welches Tier steht für steigende Kurse?","a":"Bulle","wrong":["Bär","Hase","Schildkröte"]},{"q":"Was ist ein NFT bei NEXA?","a":"Ein einzigartiges Pixel-Kunstwerk","wrong":["Eine Aktie","Eine Kreditkarte","Ein Firmenlogo"]},{"q":"Wie viele Spieler braucht ein News-Battle mindestens?","a":"3","wrong":["1","2","5"]},{"q":"Wie viele Spieler passen höchstens in ein News-Battle?","a":"10","wrong":["4","8","20"]},{"q":"Was bekommt der Sieger eines News-Battles?","a":"XP, Geld, einen Skin oder ein NFT","wrong":["Nur ein Lob","Eine echte Aktie","Einen Kredit"]},{"q":"Was ist ein Rug Pull?","a":"Die Macher hauen mit dem Geld ab","wrong":["Ein Teppichverkauf","Ein Kurssprung","Eine Gratis-Aktie"]},{"q":"Was ist Inflation?","a":"Steigende Preise, sinkende Kaufkraft","wrong":["Sinkende Preise","Ein Luftballon","Eine Börsenregel"]},{"q":"Was heißt „Buy the Dip“?","a":"Nach einem Kursrutsch kaufen","wrong":["Chips kaufen","Alles verkaufen","Nur Anleihen kaufen"]},{"q":"Was ist ein Portfolio?","a":"Alle eigenen Anlagen zusammen","wrong":["Eine Aktentasche","Ein Börsenticker","Ein Kredit"]},{"q":"Was ist ein Ticker?","a":"Das Kürzel einer Aktie","wrong":["Eine Uhr","Ein Händler","Eine Gebühr"]},{"q":"Wie heißt die Hauptstadt von Australien?","a":"Canberra","wrong":["Sydney","Melbourne","Perth"]},{"q":"Wie viele Beine hat eine Spinne?","a":"8","wrong":["6","10","12"]},{"q":"Welcher Planet ist der Sonne am nächsten?","a":"Merkur","wrong":["Venus","Mars","Erde"]},{"q":"Wie viele Minuten hat ein Tag?","a":"1.440","wrong":["1.200","2.400","960"]},{"q":"Welche Farbe entsteht aus Blau und Gelb?","a":"Grün","wrong":["Lila","Orange","Braun"]},{"q":"Was ist das größte Säugetier der Welt?","a":"Blauwal","wrong":["Elefant","Giraffe","Pottwal"]},{"q":"Wie viele Seiten hat ein Würfel?","a":"6","wrong":["4","8","12"]},{"q":"In welchem Land steht der Eiffelturm?","a":"Frankreich","wrong":["Italien","Belgien","Spanien"]},{"q":"Was ist H₂O?","a":"Wasser","wrong":["Wasserstoff","Sauerstoff","Salz"]},{"q":"Wie viele Spieler hat eine Fußballmannschaft auf dem Feld?","a":"11","wrong":["9","10","12"]},{"q":"Welches Tier legt Eier und ist ein Säugetier?","a":"Schnabeltier","wrong":["Pinguin","Delfin","Fledermaus"]},{"q":"Wie viele Kontinente gibt es?","a":"7","wrong":["5","6","8"]},{"q":"Wer hat die Glühbirne bekannt gemacht?","a":"Thomas Edison","wrong":["Albert Einstein","Isaac Newton","Nikola Tesla"]},{"q":"Was ist die Wurzel aus 144?","a":"12","wrong":["14","11","16"]},{"q":"Welche Sprache hat die meisten Muttersprachler?","a":"Chinesisch (Mandarin)","wrong":["Englisch","Spanisch","Hindi"]},{"q":"Wie heißt der längste Fluss Europas?","a":"Wolga","wrong":["Donau","Rhein","Elbe"]},{"q":"Was zeigt ein grüner Kurs bei NEXA?","a":"Der Kurs ist gestiegen","wrong":["Der Kurs ist gefallen","Die Börse ist zu","Ein Fehler"]},{"q":"Was kostet es, eine Order bei NEXA aufzugeben?","a":"Eine kleine Gebühr","wrong":["Nichts, niemals","Die Hälfte des Werts","Ein Level"]},{"q":"Was passiert, wenn eine Firma insolvent ist?","a":"Sie kann ihre Schulden nicht zahlen","wrong":["Sie geht an die Börse","Sie zahlt Dividende","Sie wird verdoppelt"]},{"q":"Wie viele Zähne hat ein erwachsener Mensch normalerweise?","a":"32","wrong":["28","30","36"]},{"q":"Welches Gas atmen Pflanzen ein?","a":"Kohlendioxid","wrong":["Sauerstoff","Stickstoff","Helium"]}],"tickers":[{"ticker":"BULL","name":"Bullen & Söhne AG"},{"ticker":"BAER","name":"Bärenbräu Holding"},{"ticker":"MOND","name":"Mondfahrt Raketen"},{"ticker":"GOLD","name":"Goldgrube Minen"},{"ticker":"PIZZ","name":"Pizza Pronto Gruppe"},{"ticker":"KAFE","name":"Kaffeekanne Kontor"},{"ticker":"NXA","name":"NEXA Börse"},{"ticker":"ROBO","name":"Robo Rasenmäher"},{"ticker":"DUCK","name":"Gummiente International"},{"ticker":"SOFA","name":"Sofa-Börsianer e. V."},{"ticker":"ZUGI","name":"Zugspitz Seilbahnen"},{"ticker":"KRAK","name":"Krakenkabel Telekom"}],"auctionItems":[{"name":"Goldbarren aus dem Tresor","points":300,"icon":"gold_bar"},{"name":"Signierte Bullen-Statue","points":250,"icon":"bull"},{"name":"Mondticket erster Klasse","points":220,"icon":"moon"},{"name":"Koffer voller Aktien","points":200,"icon":"briefcase"},{"name":"Glücksmünze von Mr. Doodle Dangle","points":180,"icon":"coin"},{"name":"Edelstein des Vorstands","points":160,"icon":"gem"},{"name":"Geheimer Insider-Tipp (ganz legal)","points":140,"icon":"key"},{"name":"Geschenkbox mit Überraschung","points":120,"icon":"gift"},{"name":"Ausgestopfter Bärenmarkt-Bär","points":100,"icon":"bear"},{"name":"Vergilbte Zeitung von 1929","points":80,"icon":"newspaper"},{"name":"Wecker für Frühaufsteher","points":60,"icon":"alarm_clock"},{"name":"Herz eines Börsianers","points":50,"icon":"heart"}],"estimate":[{"q":"Wie hoch ist der Eiffelturm (mit Antenne) in Metern?","value":330,"unit":"m"},{"q":"Wie viele Knochen hat ein erwachsener Mensch?","value":206,"unit":"Knochen"},{"q":"Wie viele Tasten hat ein Klavier?","value":88,"unit":"Tasten"},{"q":"Wie viele Länder gibt es in der EU?","value":27,"unit":"Länder"},{"q":"Wie schnell fährt ein ICE höchstens (km/h)?","value":300,"unit":"km/h"},{"q":"Wie viele Herzschläge hat ein Mensch in Ruhe pro Minute (etwa)?","value":70,"unit":"Schläge"},{"q":"Wie tief ist der Marianengraben in Metern (etwa)?","value":11000,"unit":"m"},{"q":"Wie viele Einwohner hat Berlin (in Tausend, etwa)?","value":3850,"unit":"Tsd."},{"q":"Wie viel wiegt ein erwachsener Afrikanischer Elefant in kg (etwa)?","value":6000,"unit":"kg"},{"q":"Wie lang ist die Chinesische Mauer in km (etwa)?","value":21000,"unit":"km"},{"q":"Wie viele Stunden hat ein Jahr (kein Schaltjahr)?","value":8760,"unit":"Stunden"},{"q":"Wie hoch ist die Zugspitze in Metern?","value":2962,"unit":"m"},{"q":"Wie viele Felder hat ein Schachbrett?","value":64,"unit":"Felder"},{"q":"Wie viele Kilometer ist der Mond von der Erde entfernt (in Tausend, etwa)?","value":384,"unit":"Tsd. km"},{"q":"Wie viele Liter Blut hat ein erwachsener Mensch (etwa)?","value":5,"unit":"Liter"},{"q":"Wie viele Kalorien hat eine Tafel Vollmilchschokolade (100 g, etwa)?","value":535,"unit":"kcal"},{"q":"Wie viele Spiele hat eine Bundesliga-Saison pro Team?","value":34,"unit":"Spiele"},{"q":"Wie viele Sekunden hat ein Tag?","value":86400,"unit":"Sekunden"},{"q":"Wie alt wurde Johann Wolfgang von Goethe?","value":82,"unit":"Jahre"},{"q":"Wie viele Stockwerke hat der Burj Khalifa (etwa)?","value":163,"unit":"Stockwerke"},{"q":"Wie viele Zähne hat ein Hai im Leben (etwa, in Tausend)?","value":30,"unit":"Tsd."},{"q":"Wie heiß ist die Oberfläche der Sonne in °C (etwa)?","value":5500,"unit":"°C"},{"q":"Wie viele Kaffeebohnen braucht ein Espresso (etwa)?","value":50,"unit":"Bohnen"},{"q":"Wie viele Wörter spricht ein Mensch am Tag (etwa, in Tausend)?","value":16,"unit":"Tsd."}]}'::jsonb, 'Defaults from src/config/balance.ts, section "battles"'),
+  ('nexamon', '{"packSize":5,"sets":{"mystic_energy":{"name":"Nexamon: Mystic Energy","packPriceCents":20000},"super_apex":{"name":"Nexamon: Super Apex","packPriceCents":100000},"prismatic_peak":{"name":"Nexamon: Prismatic Peak","packPriceCents":500000}},"packs":{"perMinute":20},"odds":{"denominator":3600,"slot4":{"legendary":0,"prisma":0,"ultra":150,"rare":900},"slot5":{"legendary":4,"prisma":45,"ultra":150,"rare":900}},"conditions":{"order":["poor","good","near_mint","mint"],"weightBps":{"poor":200,"good":1800,"near_mint":5000,"mint":3000},"belowGoodStepBps":500},"grading":{"feeBps":5000,"minFeeCents":100,"minutes":60,"maxOpen":10,"gradeWeightsBps":{"poor":[500,1000,1500,2000,2000,1500,1000,400,90,10],"good":[0,0,0,500,800,1200,2000,2500,2000,1000],"near_mint":[0,0,0,0,0,100,400,1000,2500,6000],"mint":[0,0,0,0,0,0,0,200,800,9000]},"valueBps":[3000,4000,5000,6000,7000,8000,9000,12000,16000,30000]},"market":{"feeBps":500,"minPriceCents":10,"maxPriceCents":100000000000,"maxListings":30,"actionsPerMinute":30,"pageSize":24,"recentSales":20,"historyDays":60},"value":{"floorBps":2000,"capBaseBps":30000,"capPerDayBps":200,"capPerTradeBps":50,"capMaxBps":200000,"dayMaxRiseBps":1500,"dayMaxFallBps":2000,"trade":{"bandBps":2500,"weightBps":2000,"maxStepBps":200,"pairHours":24,"perPlayerDay":3,"minPopularityBps":2500},"aiBuyBumpBps":50,"popularity":{"rarityBps":{"common":500,"rare":1500,"ultra":4000,"prisma":7000,"legendary":9000},"scarceBonusBps":3000,"popRef":{"common":2000,"rare":800,"ultra":150,"prisma":30,"legendary":4}},"pressure":{"everyMinutes":60,"upStepBps":30,"downStepBps":30,"want":{"common":4,"rare":3,"ultra":2,"prisma":1,"legendary":1},"buyWeightMilli":500,"buyDays":7,"maxBuys":10,"perRun":80}},"ai":{"sellers":["Karten-Kalle","Booster-Berta","Holo-Hanna","Sammel-Sven"],"askBps":11000,"seedCopies":{"common":6,"rare":4,"ultra":2,"prisma":1,"legendary":0},"seedPrismaCards":2,"listedPerCard":{"common":4,"rare":3,"ultra":2,"prisma":1,"legendary":0},"legendaryListChanceBps":20,"packsPerHour":{"mystic_energy":4,"super_apex":2,"prismatic_peak":1},"maxPacksPerRun":5,"buyMaxBps":10000,"gradedBuyMaxBps":7000,"buyChanceBps":300,"buysPerCardWindow":{"common":2,"rare":3,"ultra":3,"prisma":2,"legendary":1},"buyWindowDays":7,"maxBuysPerRun":5,"dailyBudgetPacks":300},"quickSell":{"rarities":["common","rare"],"bps":5000,"maxPerCall":50,"dropBps":25},"feedRarities":["legendary"]}'::jsonb, 'Defaults from src/config/balance.ts, section "nexamon"'),
   ('companyAssistant', '{"claudePerHour":20,"maxTextLength":300,"briefingTasks":3,"busyTasks":2,"urgentMinutes":10,"historyTurns":8}'::jsonb, 'Defaults from src/config/balance.ts, section "companyAssistant"'),
   ('companyHealth', '{"status":{"good":80,"ok":60,"weak":35},"qualityTarget":0.7,"momentumTargetShare":0.5,"momentumFloor":0.4,"imageCalm":0.85,"imageHitWeight":3,"teamFloor":0.4,"runwayTargetHours":48,"reserveHours":6,"minImpactCents":100}'::jsonb, 'Defaults from src/config/balance.ts, section "companyHealth"'),
   ('wageMood', '{"crisisPerSeverityBps":500,"scandalBps":500,"scandals":["quality_scandal","data_breach","protest","bad_review","strike"],"shareFallFreeBps":300,"shareFallShare":0.5,"maxShareBps":2000,"minBps":6000}'::jsonb, 'Defaults from src/config/balance.ts, section "wageMood"'),
@@ -59384,7 +61294,8 @@ insert into public.game_config (key, value, description) values
   ('social', '{"feed":{"pageSize":30,"bigTradeMinProfitCents":100000,"bigTradeMinBps":1500,"levelEvery":5,"artMinPriceCents":1000000,"carMinPriceCents":10000000,"streakMilestones":[7,30,100,365],"keepDays":30},"league":{"updateEveryMinutes":10,"podium":3,"minBaselineCents":1000000},"friendCode":{"bonusCents":500000},"poke":{"cooldownMinutes":10,"dailyCap":30},"chat":{"maxMessageLength":300,"maxMessagesPerMinute":12,"groupMinMembers":2,"groupMaxMembers":20,"groupNameMinLength":3,"groupNameMaxLength":30,"maxGroupsPerDay":10,"pageSize":50,"pollOpenSeconds":4,"pollIdleSeconds":30,"emojis":["😂","👍","🚀","📈","📉","💸","🔥","😱","🤝","❤️"]}}'::jsonb, 'Defaults from src/config/balance.ts, section "social"'),
   ('property', '{"tiers":[{"key":"flat","priceCents":2500000,"width":8,"height":6,"garageSlots":0,"minLevel":8},{"key":"apartment","priceCents":10000000,"width":10,"height":8,"garageSlots":0,"minLevel":11},{"key":"house","priceCents":50000000,"width":13,"height":9,"garageSlots":2,"minLevel":14},{"key":"villa","priceCents":250000000,"width":16,"height":11,"garageSlots":4,"minLevel":22},{"key":"luxury_villa","priceCents":1500000000,"width":20,"height":13,"garageSlots":8,"minLevel":30}],"tradeInBps":5000,"resaleBps":4000,"furniturePriceBps":{"flat":10000,"apartment":12500,"house":15000,"villa":20000,"luxury_villa":30000},"furnishedValueBps":6000,"floors":{"laminate":0,"carpet":150000,"tiles":400000,"parquet":600000,"stone":1500000,"marble":6000000,"gold":100000000},"wallColors":["#f3efe4","#ffffff","#d9d4c7","#8f9bb3","#3a4256","#1b1e2b","#c8e6c9","#2f7a4a","#bfe6ff","#2f5fd0","#ffe0b2","#ff9a52","#f8bbd0","#7a2f7a","#c8553d","#ffd15c"]}'::jsonb, 'Defaults from src/config/balance.ts, section "property"'),
   ('rentals', '{"places":{"flat":1,"apartment":2,"house":3,"villa":4,"luxury_villa":6},"baseRentCentsPerHour":{"flat":3000,"apartment":6000,"house":15000,"villa":40000,"luxury_villa":100000},"fairMinShareBps":2000,"minPriceCents":100,"maxPriceCentsPerHour":10000000,"periods":["hour","day"],"minHours":24,"noticeHours":12,"ai":{"minWohnwert":25,"chanceBps":6000,"maxPriceFactorBps":20000,"checkEveryMinutes":60,"stayMinHours":24,"stayMaxHours":120,"names":["Anja K.","Ben S.","Carla M.","Deniz Y.","Elif A.","Finn H.","Greta W.","Hannes B.","Ida L.","Jonas P.","Kira T.","Luca R.","Mia F.","Nils O.","Olga V.","Paul D.","Rosa N.","Sami E.","Tilda G.","Udo Z.","Vera C.","Willi J.","Yara I.","Zoe Q."]},"tenantXpPerHour":5,"maxTenanciesAsTenant":1,"feedMinTier":"villa","paymentsKeepDays":30,"marketLimit":30,"wohnwert":{"valueTargetBps":2000,"points":{"value":30,"variety":20,"fill":20,"layers":10,"style":10,"floor":10},"varietyTarget":7,"fill":{"idealMinBps":3000,"idealMaxBps":5500,"zeroAtBps":8500},"styleMinPieces":6,"floorPoints":{"laminate":0,"carpet":3,"tiles":4,"parquet":6,"stone":7,"marble":9,"gold":10}}}'::jsonb, 'Defaults from src/config/balance.ts, section "rentals"'),
-  ('livingBonus', '{"centsPerHour":{"flat":2000,"apartment":5000,"house":12000,"villa":30000,"luxury_villa":80000},"xpPerHour":{"flat":3,"apartment":4,"house":6,"villa":8,"luxury_villa":10},"minShareBps":4000,"tenantShareBps":5000,"activeDays":3,"paymentsKeepDays":30}'::jsonb, 'Defaults from src/config/balance.ts, section "livingBonus"')
+  ('livingBonus', '{"centsPerHour":{"flat":2000,"apartment":5000,"house":12000,"villa":30000,"luxury_villa":80000},"xpPerHour":{"flat":3,"apartment":4,"house":6,"villa":8,"luxury_villa":10},"minShareBps":4000,"tenantShareBps":5000,"activeDays":3,"paymentsKeepDays":30}'::jsonb, 'Defaults from src/config/balance.ts, section "livingBonus"'),
+  ('nexamon_cards', '[{"key":"me-001","set":"mystic_energy","number":1,"rarity":"common","startPriceCents":100},{"key":"me-002","set":"mystic_energy","number":2,"rarity":"common","startPriceCents":100},{"key":"me-003","set":"mystic_energy","number":3,"rarity":"common","startPriceCents":100},{"key":"me-004","set":"mystic_energy","number":4,"rarity":"common","startPriceCents":200},{"key":"me-005","set":"mystic_energy","number":5,"rarity":"common","startPriceCents":200},{"key":"me-006","set":"mystic_energy","number":6,"rarity":"common","startPriceCents":200},{"key":"me-007","set":"mystic_energy","number":7,"rarity":"common","startPriceCents":200},{"key":"me-008","set":"mystic_energy","number":8,"rarity":"common","startPriceCents":200},{"key":"me-009","set":"mystic_energy","number":9,"rarity":"common","startPriceCents":200},{"key":"me-010","set":"mystic_energy","number":10,"rarity":"common","startPriceCents":300},{"key":"me-011","set":"mystic_energy","number":11,"rarity":"common","startPriceCents":300},{"key":"me-012","set":"mystic_energy","number":12,"rarity":"common","startPriceCents":300},{"key":"me-013","set":"mystic_energy","number":13,"rarity":"common","startPriceCents":300},{"key":"me-014","set":"mystic_energy","number":14,"rarity":"common","startPriceCents":300},{"key":"me-015","set":"mystic_energy","number":15,"rarity":"common","startPriceCents":400},{"key":"me-016","set":"mystic_energy","number":16,"rarity":"common","startPriceCents":400},{"key":"me-017","set":"mystic_energy","number":17,"rarity":"common","startPriceCents":400},{"key":"me-018","set":"mystic_energy","number":18,"rarity":"common","startPriceCents":400},{"key":"me-019","set":"mystic_energy","number":19,"rarity":"common","startPriceCents":400},{"key":"me-020","set":"mystic_energy","number":20,"rarity":"common","startPriceCents":400},{"key":"me-021","set":"mystic_energy","number":21,"rarity":"common","startPriceCents":500},{"key":"me-022","set":"mystic_energy","number":22,"rarity":"common","startPriceCents":500},{"key":"me-023","set":"mystic_energy","number":23,"rarity":"common","startPriceCents":500},{"key":"me-024","set":"mystic_energy","number":24,"rarity":"common","startPriceCents":500},{"key":"me-025","set":"mystic_energy","number":25,"rarity":"common","startPriceCents":500},{"key":"me-026","set":"mystic_energy","number":26,"rarity":"common","startPriceCents":600},{"key":"me-027","set":"mystic_energy","number":27,"rarity":"common","startPriceCents":600},{"key":"me-028","set":"mystic_energy","number":28,"rarity":"common","startPriceCents":600},{"key":"me-029","set":"mystic_energy","number":29,"rarity":"common","startPriceCents":600},{"key":"me-030","set":"mystic_energy","number":30,"rarity":"common","startPriceCents":600},{"key":"me-031","set":"mystic_energy","number":31,"rarity":"common","startPriceCents":700},{"key":"me-032","set":"mystic_energy","number":32,"rarity":"common","startPriceCents":700},{"key":"me-033","set":"mystic_energy","number":33,"rarity":"common","startPriceCents":700},{"key":"me-034","set":"mystic_energy","number":34,"rarity":"common","startPriceCents":700},{"key":"me-035","set":"mystic_energy","number":35,"rarity":"common","startPriceCents":700},{"key":"me-036","set":"mystic_energy","number":36,"rarity":"common","startPriceCents":700},{"key":"me-037","set":"mystic_energy","number":37,"rarity":"common","startPriceCents":800},{"key":"me-038","set":"mystic_energy","number":38,"rarity":"common","startPriceCents":800},{"key":"me-039","set":"mystic_energy","number":39,"rarity":"common","startPriceCents":800},{"key":"me-040","set":"mystic_energy","number":40,"rarity":"common","startPriceCents":800},{"key":"me-041","set":"mystic_energy","number":41,"rarity":"common","startPriceCents":800},{"key":"me-042","set":"mystic_energy","number":42,"rarity":"common","startPriceCents":900},{"key":"me-043","set":"mystic_energy","number":43,"rarity":"common","startPriceCents":900},{"key":"me-044","set":"mystic_energy","number":44,"rarity":"common","startPriceCents":900},{"key":"me-045","set":"mystic_energy","number":45,"rarity":"common","startPriceCents":900},{"key":"me-046","set":"mystic_energy","number":46,"rarity":"common","startPriceCents":900},{"key":"me-047","set":"mystic_energy","number":47,"rarity":"common","startPriceCents":900},{"key":"me-048","set":"mystic_energy","number":48,"rarity":"common","startPriceCents":1000},{"key":"me-049","set":"mystic_energy","number":49,"rarity":"common","startPriceCents":1000},{"key":"me-050","set":"mystic_energy","number":50,"rarity":"common","startPriceCents":1000},{"key":"me-051","set":"mystic_energy","number":51,"rarity":"rare","startPriceCents":700},{"key":"me-052","set":"mystic_energy","number":52,"rarity":"rare","startPriceCents":1500},{"key":"me-053","set":"mystic_energy","number":53,"rarity":"rare","startPriceCents":2300},{"key":"me-054","set":"mystic_energy","number":54,"rarity":"rare","startPriceCents":3100},{"key":"me-055","set":"mystic_energy","number":55,"rarity":"rare","startPriceCents":3900},{"key":"me-056","set":"mystic_energy","number":56,"rarity":"rare","startPriceCents":4800},{"key":"me-057","set":"mystic_energy","number":57,"rarity":"rare","startPriceCents":5600},{"key":"me-058","set":"mystic_energy","number":58,"rarity":"rare","startPriceCents":6400},{"key":"me-059","set":"mystic_energy","number":59,"rarity":"rare","startPriceCents":7200},{"key":"me-060","set":"mystic_energy","number":60,"rarity":"rare","startPriceCents":8000},{"key":"me-061","set":"mystic_energy","number":61,"rarity":"ultra","startPriceCents":16000},{"key":"me-062","set":"mystic_energy","number":62,"rarity":"ultra","startPriceCents":42000},{"key":"me-063","set":"mystic_energy","number":63,"rarity":"ultra","startPriceCents":68000},{"key":"me-064","set":"mystic_energy","number":64,"rarity":"ultra","startPriceCents":94000},{"key":"me-065","set":"mystic_energy","number":65,"rarity":"ultra","startPriceCents":120000},{"key":"me-066","set":"mystic_energy","number":66,"rarity":"ultra","startPriceCents":146000},{"key":"me-067","set":"mystic_energy","number":67,"rarity":"ultra","startPriceCents":172000},{"key":"me-068","set":"mystic_energy","number":68,"rarity":"ultra","startPriceCents":198000},{"key":"me-069","set":"mystic_energy","number":69,"rarity":"ultra","startPriceCents":224000},{"key":"me-070","set":"mystic_energy","number":70,"rarity":"ultra","startPriceCents":250000},{"key":"me-071","set":"mystic_energy","number":71,"rarity":"prisma","startPriceCents":500000},{"key":"me-072","set":"mystic_energy","number":72,"rarity":"prisma","startPriceCents":1000000},{"key":"me-073","set":"mystic_energy","number":73,"rarity":"prisma","startPriceCents":1500000},{"key":"me-074","set":"mystic_energy","number":74,"rarity":"prisma","startPriceCents":2000000},{"key":"me-075","set":"mystic_energy","number":75,"rarity":"prisma","startPriceCents":2500000},{"key":"me-076","set":"mystic_energy","number":76,"rarity":"legendary","startPriceCents":9000000},{"key":"me-077","set":"mystic_energy","number":77,"rarity":"legendary","startPriceCents":18000000},{"key":"sa-001","set":"super_apex","number":1,"rarity":"common","startPriceCents":500},{"key":"sa-002","set":"super_apex","number":2,"rarity":"common","startPriceCents":500},{"key":"sa-003","set":"super_apex","number":3,"rarity":"common","startPriceCents":500},{"key":"sa-004","set":"super_apex","number":4,"rarity":"common","startPriceCents":1000},{"key":"sa-005","set":"super_apex","number":5,"rarity":"common","startPriceCents":1000},{"key":"sa-006","set":"super_apex","number":6,"rarity":"common","startPriceCents":1000},{"key":"sa-007","set":"super_apex","number":7,"rarity":"common","startPriceCents":1000},{"key":"sa-008","set":"super_apex","number":8,"rarity":"common","startPriceCents":1000},{"key":"sa-009","set":"super_apex","number":9,"rarity":"common","startPriceCents":1000},{"key":"sa-010","set":"super_apex","number":10,"rarity":"common","startPriceCents":1500},{"key":"sa-011","set":"super_apex","number":11,"rarity":"common","startPriceCents":1500},{"key":"sa-012","set":"super_apex","number":12,"rarity":"common","startPriceCents":1500},{"key":"sa-013","set":"super_apex","number":13,"rarity":"common","startPriceCents":1500},{"key":"sa-014","set":"super_apex","number":14,"rarity":"common","startPriceCents":1500},{"key":"sa-015","set":"super_apex","number":15,"rarity":"common","startPriceCents":2000},{"key":"sa-016","set":"super_apex","number":16,"rarity":"common","startPriceCents":2000},{"key":"sa-017","set":"super_apex","number":17,"rarity":"common","startPriceCents":2000},{"key":"sa-018","set":"super_apex","number":18,"rarity":"common","startPriceCents":2000},{"key":"sa-019","set":"super_apex","number":19,"rarity":"common","startPriceCents":2000},{"key":"sa-020","set":"super_apex","number":20,"rarity":"common","startPriceCents":2000},{"key":"sa-021","set":"super_apex","number":21,"rarity":"common","startPriceCents":2500},{"key":"sa-022","set":"super_apex","number":22,"rarity":"common","startPriceCents":2500},{"key":"sa-023","set":"super_apex","number":23,"rarity":"common","startPriceCents":2500},{"key":"sa-024","set":"super_apex","number":24,"rarity":"common","startPriceCents":2500},{"key":"sa-025","set":"super_apex","number":25,"rarity":"common","startPriceCents":2500},{"key":"sa-026","set":"super_apex","number":26,"rarity":"common","startPriceCents":3000},{"key":"sa-027","set":"super_apex","number":27,"rarity":"common","startPriceCents":3000},{"key":"sa-028","set":"super_apex","number":28,"rarity":"common","startPriceCents":3000},{"key":"sa-029","set":"super_apex","number":29,"rarity":"common","startPriceCents":3000},{"key":"sa-030","set":"super_apex","number":30,"rarity":"common","startPriceCents":3000},{"key":"sa-031","set":"super_apex","number":31,"rarity":"common","startPriceCents":3500},{"key":"sa-032","set":"super_apex","number":32,"rarity":"common","startPriceCents":3500},{"key":"sa-033","set":"super_apex","number":33,"rarity":"common","startPriceCents":3500},{"key":"sa-034","set":"super_apex","number":34,"rarity":"common","startPriceCents":3500},{"key":"sa-035","set":"super_apex","number":35,"rarity":"common","startPriceCents":3500},{"key":"sa-036","set":"super_apex","number":36,"rarity":"common","startPriceCents":3500},{"key":"sa-037","set":"super_apex","number":37,"rarity":"common","startPriceCents":4000},{"key":"sa-038","set":"super_apex","number":38,"rarity":"common","startPriceCents":4000},{"key":"sa-039","set":"super_apex","number":39,"rarity":"common","startPriceCents":4000},{"key":"sa-040","set":"super_apex","number":40,"rarity":"common","startPriceCents":4000},{"key":"sa-041","set":"super_apex","number":41,"rarity":"common","startPriceCents":4000},{"key":"sa-042","set":"super_apex","number":42,"rarity":"common","startPriceCents":4500},{"key":"sa-043","set":"super_apex","number":43,"rarity":"common","startPriceCents":4500},{"key":"sa-044","set":"super_apex","number":44,"rarity":"common","startPriceCents":4500},{"key":"sa-045","set":"super_apex","number":45,"rarity":"common","startPriceCents":4500},{"key":"sa-046","set":"super_apex","number":46,"rarity":"common","startPriceCents":4500},{"key":"sa-047","set":"super_apex","number":47,"rarity":"common","startPriceCents":4500},{"key":"sa-048","set":"super_apex","number":48,"rarity":"common","startPriceCents":5000},{"key":"sa-049","set":"super_apex","number":49,"rarity":"common","startPriceCents":5000},{"key":"sa-050","set":"super_apex","number":50,"rarity":"common","startPriceCents":5000},{"key":"sa-051","set":"super_apex","number":51,"rarity":"rare","startPriceCents":3500},{"key":"sa-052","set":"super_apex","number":52,"rarity":"rare","startPriceCents":7500},{"key":"sa-053","set":"super_apex","number":53,"rarity":"rare","startPriceCents":11500},{"key":"sa-054","set":"super_apex","number":54,"rarity":"rare","startPriceCents":15500},{"key":"sa-055","set":"super_apex","number":55,"rarity":"rare","startPriceCents":19500},{"key":"sa-056","set":"super_apex","number":56,"rarity":"rare","startPriceCents":24000},{"key":"sa-057","set":"super_apex","number":57,"rarity":"rare","startPriceCents":28000},{"key":"sa-058","set":"super_apex","number":58,"rarity":"rare","startPriceCents":32000},{"key":"sa-059","set":"super_apex","number":59,"rarity":"rare","startPriceCents":36000},{"key":"sa-060","set":"super_apex","number":60,"rarity":"rare","startPriceCents":40000},{"key":"sa-061","set":"super_apex","number":61,"rarity":"ultra","startPriceCents":80000},{"key":"sa-062","set":"super_apex","number":62,"rarity":"ultra","startPriceCents":210000},{"key":"sa-063","set":"super_apex","number":63,"rarity":"ultra","startPriceCents":340000},{"key":"sa-064","set":"super_apex","number":64,"rarity":"ultra","startPriceCents":470000},{"key":"sa-065","set":"super_apex","number":65,"rarity":"ultra","startPriceCents":600000},{"key":"sa-066","set":"super_apex","number":66,"rarity":"ultra","startPriceCents":730000},{"key":"sa-067","set":"super_apex","number":67,"rarity":"ultra","startPriceCents":860000},{"key":"sa-068","set":"super_apex","number":68,"rarity":"ultra","startPriceCents":990000},{"key":"sa-069","set":"super_apex","number":69,"rarity":"ultra","startPriceCents":1120000},{"key":"sa-070","set":"super_apex","number":70,"rarity":"ultra","startPriceCents":1250000},{"key":"sa-071","set":"super_apex","number":71,"rarity":"prisma","startPriceCents":2500000},{"key":"sa-072","set":"super_apex","number":72,"rarity":"prisma","startPriceCents":5000000},{"key":"sa-073","set":"super_apex","number":73,"rarity":"prisma","startPriceCents":7500000},{"key":"sa-074","set":"super_apex","number":74,"rarity":"prisma","startPriceCents":10000000},{"key":"sa-075","set":"super_apex","number":75,"rarity":"prisma","startPriceCents":12500000},{"key":"sa-076","set":"super_apex","number":76,"rarity":"legendary","startPriceCents":45000000},{"key":"sa-077","set":"super_apex","number":77,"rarity":"legendary","startPriceCents":90000000},{"key":"pp-001","set":"prismatic_peak","number":1,"rarity":"common","startPriceCents":2500},{"key":"pp-002","set":"prismatic_peak","number":2,"rarity":"common","startPriceCents":2500},{"key":"pp-003","set":"prismatic_peak","number":3,"rarity":"common","startPriceCents":2500},{"key":"pp-004","set":"prismatic_peak","number":4,"rarity":"common","startPriceCents":5000},{"key":"pp-005","set":"prismatic_peak","number":5,"rarity":"common","startPriceCents":5000},{"key":"pp-006","set":"prismatic_peak","number":6,"rarity":"common","startPriceCents":5000},{"key":"pp-007","set":"prismatic_peak","number":7,"rarity":"common","startPriceCents":5000},{"key":"pp-008","set":"prismatic_peak","number":8,"rarity":"common","startPriceCents":5000},{"key":"pp-009","set":"prismatic_peak","number":9,"rarity":"common","startPriceCents":5000},{"key":"pp-010","set":"prismatic_peak","number":10,"rarity":"common","startPriceCents":7500},{"key":"pp-011","set":"prismatic_peak","number":11,"rarity":"common","startPriceCents":7500},{"key":"pp-012","set":"prismatic_peak","number":12,"rarity":"common","startPriceCents":7500},{"key":"pp-013","set":"prismatic_peak","number":13,"rarity":"common","startPriceCents":7500},{"key":"pp-014","set":"prismatic_peak","number":14,"rarity":"common","startPriceCents":7500},{"key":"pp-015","set":"prismatic_peak","number":15,"rarity":"common","startPriceCents":10000},{"key":"pp-016","set":"prismatic_peak","number":16,"rarity":"common","startPriceCents":10000},{"key":"pp-017","set":"prismatic_peak","number":17,"rarity":"common","startPriceCents":10000},{"key":"pp-018","set":"prismatic_peak","number":18,"rarity":"common","startPriceCents":10000},{"key":"pp-019","set":"prismatic_peak","number":19,"rarity":"common","startPriceCents":10000},{"key":"pp-020","set":"prismatic_peak","number":20,"rarity":"common","startPriceCents":10000},{"key":"pp-021","set":"prismatic_peak","number":21,"rarity":"common","startPriceCents":12500},{"key":"pp-022","set":"prismatic_peak","number":22,"rarity":"common","startPriceCents":12500},{"key":"pp-023","set":"prismatic_peak","number":23,"rarity":"common","startPriceCents":12500},{"key":"pp-024","set":"prismatic_peak","number":24,"rarity":"common","startPriceCents":12500},{"key":"pp-025","set":"prismatic_peak","number":25,"rarity":"common","startPriceCents":12500},{"key":"pp-026","set":"prismatic_peak","number":26,"rarity":"common","startPriceCents":15000},{"key":"pp-027","set":"prismatic_peak","number":27,"rarity":"common","startPriceCents":15000},{"key":"pp-028","set":"prismatic_peak","number":28,"rarity":"common","startPriceCents":15000},{"key":"pp-029","set":"prismatic_peak","number":29,"rarity":"common","startPriceCents":15000},{"key":"pp-030","set":"prismatic_peak","number":30,"rarity":"common","startPriceCents":15000},{"key":"pp-031","set":"prismatic_peak","number":31,"rarity":"common","startPriceCents":17500},{"key":"pp-032","set":"prismatic_peak","number":32,"rarity":"common","startPriceCents":17500},{"key":"pp-033","set":"prismatic_peak","number":33,"rarity":"common","startPriceCents":17500},{"key":"pp-034","set":"prismatic_peak","number":34,"rarity":"common","startPriceCents":17500},{"key":"pp-035","set":"prismatic_peak","number":35,"rarity":"common","startPriceCents":17500},{"key":"pp-036","set":"prismatic_peak","number":36,"rarity":"common","startPriceCents":17500},{"key":"pp-037","set":"prismatic_peak","number":37,"rarity":"common","startPriceCents":20000},{"key":"pp-038","set":"prismatic_peak","number":38,"rarity":"common","startPriceCents":20000},{"key":"pp-039","set":"prismatic_peak","number":39,"rarity":"common","startPriceCents":20000},{"key":"pp-040","set":"prismatic_peak","number":40,"rarity":"common","startPriceCents":20000},{"key":"pp-041","set":"prismatic_peak","number":41,"rarity":"common","startPriceCents":20000},{"key":"pp-042","set":"prismatic_peak","number":42,"rarity":"common","startPriceCents":22500},{"key":"pp-043","set":"prismatic_peak","number":43,"rarity":"common","startPriceCents":22500},{"key":"pp-044","set":"prismatic_peak","number":44,"rarity":"common","startPriceCents":22500},{"key":"pp-045","set":"prismatic_peak","number":45,"rarity":"common","startPriceCents":22500},{"key":"pp-046","set":"prismatic_peak","number":46,"rarity":"common","startPriceCents":22500},{"key":"pp-047","set":"prismatic_peak","number":47,"rarity":"common","startPriceCents":22500},{"key":"pp-048","set":"prismatic_peak","number":48,"rarity":"common","startPriceCents":25000},{"key":"pp-049","set":"prismatic_peak","number":49,"rarity":"common","startPriceCents":25000},{"key":"pp-050","set":"prismatic_peak","number":50,"rarity":"common","startPriceCents":25000},{"key":"pp-051","set":"prismatic_peak","number":51,"rarity":"rare","startPriceCents":17500},{"key":"pp-052","set":"prismatic_peak","number":52,"rarity":"rare","startPriceCents":37500},{"key":"pp-053","set":"prismatic_peak","number":53,"rarity":"rare","startPriceCents":57500},{"key":"pp-054","set":"prismatic_peak","number":54,"rarity":"rare","startPriceCents":77500},{"key":"pp-055","set":"prismatic_peak","number":55,"rarity":"rare","startPriceCents":97500},{"key":"pp-056","set":"prismatic_peak","number":56,"rarity":"rare","startPriceCents":120000},{"key":"pp-057","set":"prismatic_peak","number":57,"rarity":"rare","startPriceCents":140000},{"key":"pp-058","set":"prismatic_peak","number":58,"rarity":"rare","startPriceCents":160000},{"key":"pp-059","set":"prismatic_peak","number":59,"rarity":"rare","startPriceCents":180000},{"key":"pp-060","set":"prismatic_peak","number":60,"rarity":"rare","startPriceCents":200000},{"key":"pp-061","set":"prismatic_peak","number":61,"rarity":"ultra","startPriceCents":400000},{"key":"pp-062","set":"prismatic_peak","number":62,"rarity":"ultra","startPriceCents":1050000},{"key":"pp-063","set":"prismatic_peak","number":63,"rarity":"ultra","startPriceCents":1700000},{"key":"pp-064","set":"prismatic_peak","number":64,"rarity":"ultra","startPriceCents":2350000},{"key":"pp-065","set":"prismatic_peak","number":65,"rarity":"ultra","startPriceCents":3000000},{"key":"pp-066","set":"prismatic_peak","number":66,"rarity":"ultra","startPriceCents":3650000},{"key":"pp-067","set":"prismatic_peak","number":67,"rarity":"ultra","startPriceCents":4300000},{"key":"pp-068","set":"prismatic_peak","number":68,"rarity":"ultra","startPriceCents":4950000},{"key":"pp-069","set":"prismatic_peak","number":69,"rarity":"ultra","startPriceCents":5600000},{"key":"pp-070","set":"prismatic_peak","number":70,"rarity":"ultra","startPriceCents":6250000},{"key":"pp-071","set":"prismatic_peak","number":71,"rarity":"prisma","startPriceCents":12500000},{"key":"pp-072","set":"prismatic_peak","number":72,"rarity":"prisma","startPriceCents":25000000},{"key":"pp-073","set":"prismatic_peak","number":73,"rarity":"prisma","startPriceCents":37500000},{"key":"pp-074","set":"prismatic_peak","number":74,"rarity":"prisma","startPriceCents":50000000},{"key":"pp-075","set":"prismatic_peak","number":75,"rarity":"prisma","startPriceCents":62500000},{"key":"pp-076","set":"prismatic_peak","number":76,"rarity":"legendary","startPriceCents":225000000},{"key":"pp-077","set":"prismatic_peak","number":77,"rarity":"legendary","startPriceCents":450000000}]'::jsonb, 'Nexamon catalogue from src/config/nexamon (ADR-165)')
 on conflict (key) do update set value = excluded.value, description = excluded.description, updated_at = now();
 
 insert into public.game_config_public_keys (key) values
