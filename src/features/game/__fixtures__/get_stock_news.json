@@ -2,42 +2,42 @@
   "items": [
     {
       "id": 5,
-      "body": "Ein Sparprogramm wirkt schneller als gedacht. Die Marge steigt. Sicher ist das nicht.",
-      "name": "GenoVita Biotech",
-      "due_at": "2026-11-16T18:49:22.294336+00:00",
+      "body": "Die Geschäfte laufen besser als geplant. Analysten erwarten einen leicht steigenden Kurs. Sicher ist das nicht.",
+      "name": "QuantenSprung Labs",
+      "due_at": "2026-11-16T18:50:18.115975+00:00",
       "status": "open",
-      "ticker": "GNV",
-      "headline": "GenoVita Biotech senkt die Kosten deutlich",
+      "ticker": "QSL",
+      "headline": "QuantenSprung Labs hebt die Prognose an",
       "move_bps": null,
       "strength": 1,
       "direction": "up",
-      "published_at": "2026-11-16T18:18:41.270067+00:00"
+      "published_at": "2026-11-16T18:32:36.017816+00:00"
     },
     {
       "id": 4,
-      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Rheinkraft Werke tut sich in der nächsten Stunde etwas, und zwar nach unten. Meine Quelle ist seriös, sie trägt immerhin eine Krawatte.",
-      "name": "Rheinkraft Werke",
-      "due_at": "2026-11-16T17:39:21.931929+00:00",
-      "status": "confirmed",
-      "ticker": "RKW",
-      "headline": "Mr. Doodle Dangles Geheimtipp",
-      "move_bps": -748,
+      "body": "Ein Vögelchen hat mir gezwitschert: Nordlicht Logistik AG dürfte in der kommenden Stunde nach unten gehen. Meine Quelle ist seriös, sie trägt immerhin eine Krawatte.",
+      "name": "Nordlicht Logistik AG",
+      "due_at": "2026-11-16T17:52:14.684892+00:00",
+      "status": "fizzled",
+      "ticker": "NDL",
+      "headline": "Vom Flurfunk: Nordlicht Logistik AG",
+      "move_bps": null,
       "strength": 2,
       "direction": "down",
-      "published_at": "2026-11-16T17:18:21.931929+00:00"
+      "published_at": "2026-11-16T17:32:14.684892+00:00"
     },
     {
       "id": 3,
-      "body": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Pixelwerk Studios geht bald nach oben. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
-      "name": "Pixelwerk Studios",
-      "due_at": "2026-11-16T17:18:20.8334+00:00",
-      "status": "fizzled",
-      "ticker": "PXW",
-      "headline": "Der heiße Draht: Pixelwerk Studios",
-      "move_bps": null,
+      "body": "Ein Vögelchen hat mir gezwitschert: Luftpost Drohnen dürfte in der kommenden Stunde nach oben gehen. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
+      "name": "Luftpost Drohnen",
+      "due_at": "2026-11-16T17:32:13.491453+00:00",
+      "status": "confirmed",
+      "ticker": "DRN",
+      "headline": "Vom Flurfunk: Luftpost Drohnen",
+      "move_bps": 1439,
       "strength": 2,
       "direction": "up",
-      "published_at": "2026-11-16T17:18:20.8334+00:00"
+      "published_at": "2026-11-16T17:32:13.491453+00:00"
     }
   ],
   "reliability_bps": 7500

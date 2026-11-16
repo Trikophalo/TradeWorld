@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MyCompany } from "@/features/game/types";
-import { bottleneck, profitRoutes } from "./routes";
+import { bottleneck, hourlyCloseOverdue, profitRoutes } from "./routes";
 
 type Live = NonNullable<MyCompany["live"]>;
 
@@ -107,6 +107,18 @@ describe("profit routes (ADR-096)", () => {
     expect(route(routes, "campaign")).toMatchObject({ state: "active", campaign: "online" });
     expect(route(routes, "ipo").state).toBe("active");
     expect(route(routes, "expand").state).toBe("locked");
+  });
+
+  it("tells the first hour from an hourly close that is overdue", () => {
+    const now = Date.parse("2026-11-16T12:00:00Z");
+    const live = { ...base.live! };
+    const young = { live: null, foundedAt: "2026-11-16T10:30:00Z" };
+    const old = { live: null, foundedAt: "2026-11-10T08:00:00Z" };
+    expect(hourlyCloseOverdue(young, now)).toBe(false);
+    expect(hourlyCloseOverdue(old, now)).toBe(true);
+    // With a closed hour there is nothing to wait for; before the clock is known nothing is claimed.
+    expect(hourlyCloseOverdue({ ...old, live }, now)).toBe(false);
+    expect(hourlyCloseOverdue(old, null)).toBe(false);
   });
 
   it("estimates nothing before the first hour", () => {

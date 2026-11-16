@@ -19,6 +19,7 @@ import { formatMoney } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
 import { SPRING } from "@/lib/motion";
 import { playSound } from "@/lib/sound";
+import { useClockSkew, useServerClock } from "@/features/game/server-clock";
 import { useClock } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
 import { useCompanyRefresh } from "../hooks";
@@ -121,7 +122,9 @@ function reward(t: MovesT, move: CompanyMoveOption) {
 function MoveRow({ move, data }: { move: CompanyMoveOption; data: CompanyMoves }) {
   const t = useTranslations("companyMoves");
   const tb = useTranslations("skills.branches");
-  const now = useClock();
+  // Server time: a device clock that runs ahead must not hide the pause.
+  const now = useServerClock();
+  const skew = useClockSkew();
   const client = useQueryClient();
   const refresh = useCompanyRefresh();
   const errorText = useGameErrorText();
@@ -129,7 +132,9 @@ function MoveRow({ move, data }: { move: CompanyMoveOption; data: CompanyMoves }
 
   const restingUntil = move.availableAt ? Date.parse(move.availableAt) : null;
   const resting = restingUntil !== null && now !== null && restingUntil > now;
-  const busy = data.running.some((r) => r.key === move.key);
+  const run = data.running.find((r) => r.key === move.key);
+  const busy = run !== undefined;
+  const restMs = move.restMinutes * 60_000;
   const noSlot = data.used >= data.slots;
   const noCash = data.cashCents < move.costCents;
   const blocked = busy || resting || noSlot || noCash;
@@ -164,6 +169,31 @@ function MoveRow({ move, data }: { move: CompanyMoveOption; data: CompanyMoves }
         <Badge>{tb(`${move.branch}.name` as Parameters<typeof tb>[0])}</Badge>
         <span className="ml-auto nums text-2xs text-fg-3">{t("duration", { minutes: move.minutes })}</span>
       </div>
+      {/* When the move can be started again: big enough to see at a glance (the pause begins with the start). */}
+      {resting && restingUntil !== null && (
+        <div
+          className="mt-2 rounded-sm bg-warn-soft px-2.5 py-2"
+          data-testid="move-cooldown"
+          role="timer"
+          aria-label={`${t("restingUntil")} ${name}`}
+        >
+          <div className="flex items-center justify-between gap-2 text-xs">
+            <span className="font-medium text-warn">
+              <span aria-hidden>⏳ </span>
+              {t("restingUntil")}
+            </span>
+            <Countdown target={restingUntil + skew} className="text-sm font-semibold text-warn" />
+          </div>
+          {restMs > 0 && now !== null && (
+            <div className="mt-1.5 h-1 overflow-hidden rounded-pill bg-surface-1" aria-hidden>
+              <div
+                className="h-full origin-left rounded-pill bg-warn transition-transform duration-slow ease-standard"
+                style={{ transform: `scaleX(${Math.min(1, Math.max(0, 1 - (restingUntil - now) / restMs))})` }}
+              />
+            </div>
+          )}
+        </div>
+      )}
       <p className="mt-2 text-sm font-semibold text-fg-1">{name}</p>
       <p className="mt-0.5 text-xs text-pretty text-fg-3">{moveText(t, move.key, "desc")}</p>
 
@@ -182,17 +212,18 @@ function MoveRow({ move, data }: { move: CompanyMoveOption; data: CompanyMoves }
         {move.skillBonusBps > 0 && (
           <span className="nums text-accent">{t("skillBonus", { percent: Math.round(move.skillBonusBps / 100) })}</span>
         )}
+        {move.restMinutes > 0 && !resting && !busy && (
+          <span className="nums">{t("restInfo", { minutes: move.restMinutes })}</span>
+        )}
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-3">
         <p className="min-w-0 text-2xs text-pretty text-fg-3">
-          {busy ? (
-            t("running")
-          ) : resting && restingUntil !== null ? (
+          {run ? (
             <>
-              {t("restingShort")} <Countdown target={restingUntil} />
+              {t("runningLeft")} <Countdown target={Date.parse(run.endsAt) + skew} className="text-accent" />
             </>
-          ) : noSlot ? (
+          ) : resting && restingUntil !== null ? null : noSlot ? (
             t("noSlot")
           ) : noCash ? (
             t("noCash")
@@ -205,7 +236,15 @@ function MoveRow({ move, data }: { move: CompanyMoveOption; data: CompanyMoves }
           disabled={blocked && state === "idle"}
           onClick={() => void start()}
         >
-          {t("start")}
+          {busy && state === "idle" ? (
+            t("running")
+          ) : resting && restingUntil !== null && state === "idle" ? (
+            <>
+              {t("restingLabel")} <Countdown target={restingUntil + skew} />
+            </>
+          ) : (
+            t("start")
+          )}
         </Button>
       </div>
     </li>
@@ -215,12 +254,13 @@ function MoveRow({ move, data }: { move: CompanyMoveOption; data: CompanyMoves }
 function RunningList({ data }: { data: CompanyMoves }) {
   const t = useTranslations("companyMoves");
   const client = useQueryClient();
+  const skew = useClockSkew();
   return (
     <ul className="space-y-2" data-testid="moves-running">
       <AnimatePresence initial={false}>
         {data.running.map((run) => {
-          const ends = Date.parse(run.endsAt);
-          const total = Math.max(1, ends - Date.parse(run.startedAt));
+          const ends = Date.parse(run.endsAt) + skew;
+          const total = Math.max(1, ends - skew - Date.parse(run.startedAt));
           return (
             <motion.li
               key={run.id}

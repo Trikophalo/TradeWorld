@@ -328,6 +328,7 @@ const companyMovesSchema = z.object({
       refund_cents: z.number(),
       gain: z.number(),
       available_at: z.string().nullable(),
+      rest_minutes: z.number().default(0),
     }),
   ),
   running: z.array(
@@ -372,6 +373,7 @@ const toMoves = (r: z.infer<typeof companyMovesSchema>): CompanyMoves => ({
     refundCents: m.refund_cents,
     gain: m.gain,
     availableAt: m.available_at,
+    restMinutes: m.rest_minutes,
   })),
   running: r.running.map((m) => ({
     id: m.id,

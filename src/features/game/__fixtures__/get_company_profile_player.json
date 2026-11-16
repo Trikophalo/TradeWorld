@@ -1,10 +1,10 @@
 {
   "news": [],
   "facts": {
-    "staff": 2,
+    "staff": 1,
     "stage": 0,
     "period": null,
-    "product": "courier",
+    "product": "security_software",
     "max_staff": 2,
     "ai_workers": 0,
     "quality_bps": null,
@@ -14,29 +14,20 @@
     "revenue_cents": null
   },
   "company": {
-    "id": "b8a01850-9f88-484e-bb76-a7af78d75eaa",
-    "idea": "Fahrräder reparieren",
+    "id": "1baf7e53-f906-4b26-81eb-14f143e4f1bc",
+    "idea": "Neue Schrauben",
     "logo": null,
-    "name": "Xp Werkstatt",
+    "name": "Gleich Werk",
     "tier": "garage",
     "is_ai": false,
     "listed": false,
-    "sector": "logistics",
+    "sector": "tech",
     "ticker": null,
     "price_e4": null,
     "change_bps": null,
-    "founded_at": "2026-11-16T17:18:20.351375+00:00",
-    "brand_color": "#335577"
+    "founded_at": "2026-11-16T17:32:00.918803+00:00",
+    "brand_color": "#553377"
   },
-  "founder": { "tag": "JWV3", "nickname": "Xp_Chefin", "avatar_key": "rookie" },
-  "members": [
-    {
-      "tag": "2NDH",
-      "tier": "intern",
-      "since": "2026-11-16T17:18:20.454935+00:00",
-      "title": "Werkstudium",
-      "nickname": "Xp_Profi",
-      "avatar_key": "rookie"
-    }
-  ]
+  "founder": { "tag": "VVJW", "nickname": "Kai_Kopie", "avatar_key": "rookie" },
+  "members": []
 }

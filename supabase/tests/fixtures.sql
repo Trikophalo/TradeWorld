@@ -1443,3 +1443,31 @@ select tests.login_as('authenticated', :p) is null as ok \gset
 select public.reset_missions(gen_random_uuid());
 \o
 reset role;
+
+-- Company fixes (5300): a small business upgraded to GmbH with closed hours, a 16-colour banner, a running campaign
+-- and a resting business move
+\set fx_u '''f1f1f1f1-0000-4000-8000-0000000000a9'''
+select tests.signup(:fx_u, 'Fixture_Umbau') is not null as ok \gset
+select tests.set_level(:fx_u, 20);
+select tests.fund(:fx_u, 90000000, 'fixture:a1:u');
+select tests.login_as('authenticated', :fx_u) is null as ok \gset
+select public.found_company(gen_random_uuid(), 'Fixture Umbau', 'Aus klein wird groß', 'tech', '#335577', 'small_business') is not null as ok \gset
+select public.upgrade_company(gen_random_uuid()) is not null as ok \gset
+select public.company_deposit(gen_random_uuid(), 30000000) is not null as ok \gset
+reset role;
+select company_id as fx_uco from public.player_companies where founder_id = :fx_u \gset
+update public.player_companies set last_hour_at = date_trunc('hour', public.game_now()) - interval '3 hours' where company_id = :'fx_uco';
+select public.player_companies_run_due() is not null as ok \gset
+select tests.login_as('authenticated', :fx_u) is null as ok \gset
+select public.start_campaign(gen_random_uuid(), :'fx_uco', 'flyer') is not null as ok \gset
+\o :fixture_dir/set_company_banner_16_colours.json
+select public.set_company_banner(gen_random_uuid(), jsonb_build_object(
+  'palette', (select jsonb_agg('#' || lpad(to_hex(i * 1000 + 17), 6, '0') order by i) from generate_series(0, 15) i),
+  'grid', (select jsonb_agg((select string_agg(substr('0123456789abcdef', ((x + y) % 16) + 1, 1), '' order by x)
+                               from generate_series(0, 47) x) order by y) from generate_series(0, 11) y)));
+\o :fixture_dir/start_company_move_resting.json
+select public.start_company_move(gen_random_uuid(), (public.get_company_moves() #>> '{moves,0,key}'));
+\o :fixture_dir/get_my_company_gmbh_upgraded.json
+select public.get_my_company();
+\o
+reset role;

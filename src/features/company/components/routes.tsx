@@ -8,19 +8,20 @@ import { MEGAPHONE } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Countdown } from "@/components/ui/countdown";
 import { HoldButton } from "@/components/ui/hold-button";
 import { toast } from "@/components/ui/toast";
 import { BALANCE } from "@/config/balance";
 import { useGameErrorText } from "@/features/game/errors";
+import { useClockSkew, useServerClock } from "@/features/game/server-clock";
 import { engine, useGame } from "@/features/game/store";
-import type { CampaignKind, MyCompany } from "@/features/game/types";
-import { formatBps, formatCountdown, formatMoney } from "@/lib/format";
+import type { CampaignKind, CompanyCampaign, MyCompany } from "@/features/game/types";
+import { formatBps, formatMoney } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
 import { SPRING, STAGGER } from "@/lib/motion";
 import { playSound } from "@/lib/sound";
 import { campaignCostCents, campaignFactor, campaignGainPerHourCents } from "@/lib/sim/campaigns";
 import { priceEffect } from "@/lib/sim/startup";
-import { useClock } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
 import { useCompanyRefresh } from "../hooks";
 import { bottleneck, profitRoutes, type ProfitRoute, type RouteState } from "../routes";
@@ -180,6 +181,66 @@ function RouteHint({ route, company }: { route: ProfitRoute; company: MyCompany 
 
 const KINDS: readonly CampaignKind[] = ["flyer", "online", "tv"];
 
+/** How long a running campaign still runs: a countdown and a bar from start to end. */
+function CampaignTimer({ campaign, now, skew }: { campaign: CompanyCampaign; now: number | null; skew: number }) {
+  const t = useTranslations("campaigns");
+  const ends = Date.parse(campaign.endsAt);
+  const total = Math.max(1, ends - Date.parse(campaign.startedAt));
+  const left = now === null ? total : Math.max(0, ends - now);
+  return (
+    <div className="pt-1" data-testid="campaign-timer" role="timer" aria-label={t("runningLeftLabel")}>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-xs font-medium text-fg-2">
+          <span aria-hidden>⏳ </span>
+          {t("runningLeft")}
+        </span>
+        <Countdown target={ends + skew} className="text-base font-semibold text-accent" />
+      </div>
+      <div className="mt-1.5 h-1.5 overflow-hidden rounded-pill bg-surface-1" aria-hidden>
+        <div
+          className="h-full origin-left rounded-pill bg-accent transition-transform duration-slow ease-standard"
+          style={{ transform: `scaleX(${1 - left / total})` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A running campaign as one line above the company's departments: it sits deep in the overview otherwise, and the
+ * founder wants to see at a glance that it runs and for how long. Shows nothing without a running campaign.
+ */
+export function CampaignStrip({ company, onShow }: { company: MyCompany; onShow: () => void }) {
+  const t = useTranslations("campaigns");
+  const now = useServerClock();
+  const skew = useClockSkew();
+  const c = company.campaign;
+  if (!c || now === null || Date.parse(c.endsAt) <= now) return null;
+  return (
+    <div
+      className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-accent/40 bg-accent-soft px-3 py-2 text-sm"
+      data-testid="campaign-strip"
+    >
+      <PixelIcon {...MEGAPHONE} scale={2} />
+      <span className="font-medium text-fg-1">{t("stripTitle", { kind: t(`kinds.${c.kind}.name`) })}</span>
+      <span className="nums text-xs text-fg-2">
+        {t("runningDemand", { percent: formatBps(Math.round(c.demandBps / 100) * 100).replace("+", "") })}
+      </span>
+      <span className="ml-auto flex items-center gap-2">
+        <span className="text-xs text-fg-2">{t("runningLeft")}</span>
+        <Countdown target={Date.parse(c.endsAt) + skew} className="font-semibold text-accent" />
+        <button
+          type="button"
+          onClick={onShow}
+          className="rounded-sm px-1.5 py-1 text-xs font-medium text-accent focus-ring transition duration-fast hover:bg-surface-1 active:scale-[0.97]"
+        >
+          {t("stripShow")}
+        </button>
+      </span>
+    </div>
+  );
+}
+
 /**
  * Marketing campaign (ADR-097): three sizes with price, duration, effect and the expected profit at the last hour's
  * numbers. A running campaign shows its resonance and how long it still runs.
@@ -188,7 +249,9 @@ export function CampaignCard({ company }: { company: MyCompany }) {
   const t = useTranslations("campaigns");
   const errorText = useGameErrorText();
   const refresh = useCompanyRefresh();
-  const now = useClock();
+  // Server time: a campaign must not look over (or never started) on a device with a wrong clock.
+  const now = useServerClock();
+  const skew = useClockSkew();
   const [busy, setBusy] = useState(false);
   const cfg = BALANCE.startups;
   const live = company.live;
@@ -237,11 +300,9 @@ export function CampaignCard({ company }: { company: MyCompany }) {
           <p className="text-sm font-medium text-accent">{t("running", { kind: t(`kinds.${running.kind}.name`) })}</p>
           <p className="text-sm text-fg-1">{t(`resonance.${running.resonance}`)}</p>
           <p className="nums text-xs text-fg-2">
-            {t("runningEffect", {
-              percent: formatBps(Math.round(running.demandBps / 100) * 100).replace("+", ""),
-              time: now === null ? "" : formatCountdown(Math.max(0, (Date.parse(running.endsAt) - now) / 1000)),
-            })}
+            {t("runningDemand", { percent: formatBps(Math.round(running.demandBps / 100) * 100).replace("+", "") })}
           </p>
+          <CampaignTimer campaign={running} now={now} skew={skew} />
         </div>
       ) : (
         <ul className="space-y-3">

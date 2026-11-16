@@ -3,32 +3,32 @@
   "name": "Volta Energie AG",
   "news": [
     {
-      "body": "Volta Energie AG meldet 1,40 Mrd. € Umsatz und 149,4 Mio. € Gewinn im Q1 des Spieljahres 1. Analysten hatten weniger erwartet.",
-      "headline": "Volta Energie AG steigert Gewinn um 11 %",
-      "published_at": "2026-11-16T17:18:04.823086+00:00"
+      "body": "Volta Energie AG meldet 1,31 Mrd. € Umsatz und 128,4 Mio. € Gewinn im Q1 des Spieljahres 1. Analysten hatten weniger erwartet.",
+      "headline": "Volta Energie AG: Gewinn sinkt um 4 %",
+      "published_at": "2026-11-16T17:31:55.687092+00:00"
     },
     {
-      "body": "Volta Energie AG meldet 1,39 Mrd. € Umsatz und 134,3 Mio. € Gewinn im Q1 des Spieljahres 2. Analysten hatten weniger erwartet.",
-      "headline": "Volta Energie AG steigert Gewinn um 14 %",
-      "published_at": "2026-11-16T17:18:04.771398+00:00"
+      "body": "Volta Energie AG meldet 1,30 Mrd. € Umsatz und 133,2 Mio. € Gewinn im Q1 des Spieljahres 2. Analysten hatten weniger erwartet.",
+      "headline": "Volta Energie AG steigert Gewinn um 13 %",
+      "published_at": "2026-11-16T17:31:55.62155+00:00"
     }
   ],
   "color": "#FFD23F",
   "status": "listed",
   "ticker": "VLT",
-  "pe_x100": 1007,
+  "pe_x100": 1052,
   "coupon_bps": null,
-  "eps_ttm_e4": 51445,
-  "margin_bps": 968,
+  "eps_ttm_e4": 49264,
+  "margin_bps": 1023,
   "matures_at": null,
   "sector_key": "energy",
   "size_class": "bluechip",
   "description": "Strom- und Gasversorger mit eigenen Kraftwerken. Solide Dividende, hängt am Rohstoffpreis.",
-  "revenue_cents": 138737384423,
+  "revenue_cents": 130239537132,
   "term_game_years": null,
   "face_value_cents": null,
-  "market_cap_cents": 517910000000,
-  "net_income_cents": 13429566057,
-  "dividend_yield_bps": 646,
+  "market_cap_cents": 518186000000,
+  "net_income_cents": 13321340145,
+  "dividend_yield_bps": 618,
   "shares_outstanding": 100000000
 }

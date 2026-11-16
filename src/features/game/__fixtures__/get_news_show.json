@@ -1,8 +1,8 @@
 {
-  "now": "2026-11-16T17:18:41.932031+00:00",
+  "now": "2026-11-16T17:32:36.821153+00:00",
   "chat": [
     {
-      "at": "2026-11-16T17:18:41.92782+00:00",
+      "at": "2026-11-16T17:32:36.799575+00:00",
       "id": 223,
       "bot": false,
       "body": "Was für eine Sendung 💀📉",
@@ -17,82 +17,85 @@
     "segments": [
       {
         "kind": "gossip",
-        "mood": "shocked",
-        "text": "Bitte festhalten: Gipfelwerk gegründet, und zwar bei Pop_Frida. So, und jetzt alle anderen: Schämt euch.",
-        "figure": { "nickname": "Pop_Frida", "avatar_key": "rookie", "accessories": [] },
-        "effects": [],
-        "headline": "Applaus für Pop_Frida"
+        "mood": "smug",
+        "text": "Liebes Tagebuch, schreibt Willi_Werk heute vermutlich: Job bei KlarSoft AG hingeschmissen. Manche lernen aus Fehlern. Andere sammeln sie. Wir legen etwas Schmerzensgeld bei.",
+        "figure": { "nickname": "Willi_Werk", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "gain", "label": "+100 € Schmerzensgeld" }],
+        "headline": "Das Tagebuch von Willi_Werk"
       },
       {
         "kind": "scandal",
         "mood": "angry",
-        "text": "Peinlich für Frida_Firma: Die Kundenhotline wurde seit Monaten von einem Papagei bedient, und der war noch der Freundlichste. „Apps für Bäcker“ klang auf dem Papier besser. Das Image von Garagen Code ist im Eimer.",
-        "figure": { "nickname": "Frida_Firma", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −18,7 %" }],
-        "headline": "Kunden fliehen vor Garagen Code"
+        "text": "Peinlich für Pop_Frida: Die Gewerbeaufsicht fand vierzig leere Pizzakartons, einen schlafenden Buchhalter und null Qualitätskontrolle. „Bergschuhe nach Maß“ klang auf dem Papier besser. Das Image von Gipfelwerk ist im Eimer.",
+        "figure": { "nickname": "Pop_Frida", "avatar_key": "rookie", "accessories": [] },
+        "effects": [
+          { "tone": "loss", "label": "Bekanntheit −17 %" },
+          { "tone": "loss", "label": "GIP −10,8 %" }
+        ],
+        "headline": "Kunden fliehen vor Gipfelwerk"
       },
       {
         "kind": "nft",
         "mood": "shocked",
-        "text": "Aus der Welt der bunten Kästchen: Ben_Bieter hat sich „Neon Nacht“ von Nina_Neon für 30.000 € gegönnt. Ich verstehe es nicht, also muss es teuer sein.",
+        "text": "Ben_Bieter zahlt 30.000 € für „Neon Nacht“, gemalt von Nina_Neon. Ich verstehe es nicht, also muss es teuer sein.",
         "figure": { "nickname": "Nina_Neon", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "„Neon Nacht“ wechselt den Besitzer"
+        "headline": "NFT-Wahnsinn um „Neon Nacht“"
       },
       {
         "kind": "winner",
         "mood": "proud",
-        "text": "11393,8 % Plus, 1.139.376 € Gewinn: Fixture_Neu zeigt dem Rest, wie es geht. Insider vermuten eine Glaskugel im Keller.",
+        "text": "Fixture_Neu ist heute um 1.139.376 € reicher, 11393,8 % rauf. Alle anderen dürfen jetzt neidisch sein. Bitte der Reihe nach.",
         "figure": { "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] },
         "effects": [],
-        "headline": "Fixture_Neu schwimmt im Geld"
+        "headline": "Glückspilz des Tages: Fixture_Neu"
       },
       {
         "kind": "gossip",
         "mood": "proud",
-        "text": "Gute Nachrichten, ausnahmsweise. Bei Fixture_Gmbh heißt es: Wochenliga gewonnen. Dafür gibt es von mir ein ehrliches Schulterklopfen, mit der Faust.",
-        "figure": { "nickname": "Fixture_Gmbh", "avatar_key": "rookie", "accessories": [] },
+        "text": "Ich fasse es nicht, aber es stimmt. Hanno_Haftung meldet: Hanno Handel gegründet. So, und jetzt alle anderen: Schämt euch.",
+        "figure": { "nickname": "Hanno_Haftung", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Fixture_Gmbh hat es geschafft"
+        "headline": "Na so was: Hanno_Haftung"
       },
       {
         "kind": "hype",
         "mood": "proud",
-        "text": "Unfassbar, aber wahr: Lohnwerk ist der Renner. Ein Bürgermeister hat spontan eine Straße danach benannt. „Schrauben“ geht weg wie warme Semmeln. Lohn_Chefin soll vor Freude geweint haben.",
-        "figure": { "nickname": "Lohn_Chefin", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "gain", "label": "Bekanntheit +10,2 %" }],
-        "headline": "Alle wollen Lohnwerk"
+        "text": "Ein Promi wurde mit dem Produkt gesehen, vermutlich aus Versehen. Plötzlich will jeder „Fahrräder reparieren“. Gero_Garage tut so, als sei das alles geplant gewesen. Wir tun so, als würden wir das glauben.",
+        "figure": { "nickname": "Gero_Garage", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "gain", "label": "Bekanntheit +24,1 %" }],
+        "headline": "Gero Werkstatt geht viral"
       },
       {
         "kind": "ramble",
-        "mood": "shocked",
-        "text": "Man erzählt sich, Günther Jauch habe bei Brotzeit Handel AG zugeschlagen. Ich habe es geträumt, aber meine Träume sind börsennotiert. Ob es stimmt, ist dem Kurs egal: 4,6 % rauf.",
-        "effects": [{ "tone": "gain", "label": "BRZ +4,6 %" }],
-        "headline": "Gerücht des Tages: Günther Jauch und Brotzeit Handel AG"
+        "mood": "smug",
+        "text": "Völlig anderes Thema: Dieter Bohlen soll das Sparschwein geschlachtet und alles in Knusperkönig gesteckt haben. Mein Taxifahrer schwört es, und der kennt jemanden, der jemanden kennt. Der Kurs macht 7,4 % nach oben.",
+        "effects": [{ "tone": "gain", "label": "SNK +7,4 %" }],
+        "headline": "Dieter Bohlen steigt bei Knusperkönig ein"
       },
       {
-        "kind": "sector",
-        "mood": "angry",
-        "text": "Die Branche Logistik sackt um 4,1 % ab. Jemand hat laut gefragt, wofür man das eigentlich braucht. Bis das geklärt ist, verkaufen erst mal alle.",
-        "effects": [{ "tone": "loss", "label": "Logistik −4,1 %" }],
-        "headline": "Logistik im freien Fall"
+        "kind": "tasks",
+        "mood": "crying",
+        "text": "Die Kundschaft hat ihre Geldbeutel verlegt, und zwar alle gleichzeitig. Alle offenen Firmen-Aufgaben sind 24,2 % weniger wert. Die Chefs dürfen ruhig ein bisschen schwitzen.",
+        "effects": [{ "tone": "loss", "label": "Aufgaben −24,2 %" }],
+        "headline": "Kunden entdecken das Sparen"
       },
       {
         "kind": "stock",
-        "mood": "crying",
-        "text": "Schlechte Nachrichten von Knusperkönig: Der Finanzchef hat die Rücklagen in Rubbellose investiert. Minus 9,7 %, und der Tag ist noch jung.",
-        "effects": [{ "tone": "loss", "label": "SNK −9,7 %" }],
-        "headline": "Knusperkönig im Sinkflug"
+        "mood": "smug",
+        "text": "Der neue Chef kann lesen, schreiben und rechnen, ein Novum. Die Börse feiert: Volta Energie AG steigt um 13,1 %. Wer nicht dabei ist, darf sich jetzt ärgern.",
+        "effects": [{ "tone": "gain", "label": "VLT +13,1 %" }],
+        "headline": "Kursrakete Volta Energie AG"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Sonnenkern Fusion geht bald nach unten. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
-        "effects": [{ "tone": "neutral", "label": "FSN ↓ Tipp" }],
-        "headline": "Der heiße Draht: Sonnenkern Fusion"
+        "text": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Wackelwerk tut sich in der nächsten Stunde etwas, und zwar nach oben. Das Vögelchen lag bisher meistens richtig. Meistens.",
+        "effects": [{ "tone": "neutral", "label": "WAC ↑ Tipp" }],
+        "headline": "Mr. Doodle Dangles Geheimtipp"
       }
     ],
-    "started_at": "2026-11-16T17:18:41.932031+00:00"
+    "started_at": "2026-11-16T17:32:36.821153+00:00"
   },
   "viewers": 18,
   "audience": [

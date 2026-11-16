@@ -126,6 +126,7 @@ describe("Mira's advice", () => {
       refundCents: 0,
       gain: 0,
       availableAt: null,
+      restMinutes: 90,
     } as const;
     const moves: CompanyMoves = {
       slots: 2,
@@ -163,6 +164,7 @@ describe("Mira's advice", () => {
           chanceBps: 9_000,
           payoutCents: 90_000,
           availableAt: new Date(NOW + 60_000).toISOString(),
+          restMinutes: 90,
         },
         {
           ...base,
@@ -441,6 +443,7 @@ describe("Mira and the company's health", () => {
           refundCents: 0,
           gain: 0.1,
           availableAt: null,
+          restMinutes: 90,
         },
       ],
     };

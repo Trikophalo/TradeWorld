@@ -1,10 +1,10 @@
 {
   "job": {
-    "id": "af935fc7-595d-44e7-b841-f9e289fbfe07",
+    "id": "c91c9798-6635-407b-8943-363d07498ea8",
     "tier": "intern",
     "title": "Werkstudium Daten",
     "company": {
-      "id": "af392c82-a644-4e26-aa75-615bf189abe0",
+      "id": "c14438f4-e959-43c4-b80e-03a2365ff54c",
       "logo": {
         "grid": [
           "................",
@@ -33,9 +33,9 @@
       "ticker": null
     },
     "presence": {
-      "fire_at": "2026-11-21T17:18:36.255681+00:00",
+      "fire_at": "2026-11-21T17:32:30.124904+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-16T17:18:36.255681+00:00"
+      "last_active_at": "2026-11-16T17:32:30.124904+00:00"
     },
     "required": [{ "branch": "finance", "min_score": 0 }],
     "promotion": {
@@ -56,12 +56,12 @@
     "signature": "M2 2 L8 8",
     "title_key": null,
     "rank_hours": 0.0,
-    "started_at": "2026-11-16T17:18:36.836863+00:00",
+    "started_at": "2026-11-16T17:32:30.804318+00:00",
     "pending_raise": null,
     "raise_max_bps": 0,
     "notice_ends_at": null,
     "paid_hours_cap": 8,
-    "pay_factor_bps": 10000,
+    "pay_factor_bps": 8732,
     "work_task_open": false,
     "quit_cost_cents": 0,
     "last_bonus_cents": 0,
@@ -72,6 +72,6 @@
     "raise_available_at": null,
     "quit_now_cost_cents": 228660,
     "salary_cents_per_hour": 19055,
-    "effective_salary_cents_per_hour": 19055
+    "effective_salary_cents_per_hour": 16638
   }
 }

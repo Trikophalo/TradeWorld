@@ -8,8 +8,9 @@ export function useGameErrorText() {
   const t = useTranslations("errors");
   return (error: unknown): string => {
     const key = error instanceof GameError ? error.key : "unknown";
-    return (GAME_ERROR_KEYS as readonly string[]).includes(key)
-      ? t(key as (typeof GAME_ERROR_KEYS)[number])
-      : t("unknown");
+    if ((GAME_ERROR_KEYS as readonly string[]).includes(key)) return t(key as (typeof GAME_ERROR_KEYS)[number]);
+    // The server refused with something the game has no sentence for: say what it said.
+    const detail = error instanceof GameError ? error.detail : undefined;
+    return detail ? t("unknownDetail", { detail }) : t("unknown");
   };
 }

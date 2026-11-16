@@ -4,7 +4,7 @@
     "tier": "small_business",
     "stage": 0,
     "company": {
-      "id": "af392c82-a644-4e26-aa75-615bf189abe0",
+      "id": "c14438f4-e959-43c4-b80e-03a2365ff54c",
       "logo": {
         "grid": [
           "................",
@@ -36,6 +36,6 @@
     "team_size": 2,
     "product_key": "security_software",
     "last_quarter": { "label": "J1 Q1", "profit_cents": 0, "revenue_cents": 0 },
-    "pay_factor_bps": 10000
+    "pay_factor_bps": 8732
   }
 }

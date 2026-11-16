@@ -1,5 +1,5 @@
 {
-  "id": "80bc7e7c-2c48-4b03-ac91-eca4d0afd53e",
+  "id": "f78260b0-8017-4edd-a843-98edb5f1ed5d",
   "kind": "loan",
   "terms": { "hours": 24, "interest_bps": 0, "principal_cents": 20000 },
   "status": "declined",
@@ -9,20 +9,20 @@
   "my_role": "borrower",
   "progress": { "due_cents": 20000, "left_cents": 20000, "repaid_cents": 0 },
   "proposer": {
-    "tag": "SDED",
+    "tag": "5CUK",
     "level": 6,
     "trust": { "band": "blank", "score": 50 },
     "nickname": "Fixture_Lieferant",
     "avatar_key": "rookie"
   },
-  "closed_at": "2026-11-16T17:18:39.926485+00:00",
-  "created_at": "2026-11-16T17:18:39.876795+00:00",
-  "expires_at": "2026-11-18T17:18:39.876795+00:00",
+  "closed_at": "2026-11-16T17:32:34.639822+00:00",
+  "created_at": "2026-11-16T17:32:34.57982+00:00",
+  "expires_at": "2026-11-18T17:32:34.57982+00:00",
   "accepted_at": null,
   "is_proposer": false,
   "broken_by_me": false,
   "counterparty": {
-    "tag": "S73N",
+    "tag": "9FNJ",
     "level": 6,
     "trust": { "band": "blank", "score": 50 },
     "nickname": "Fixture_Abnehmer",

@@ -3012,3 +3012,37 @@ können.
   stehen fest im Titel und werden darum nicht gekappt: Zu große Geldmissionen werden nicht angeboten
   (`affordableFor`).
 - Fehler: `mission_reset_used` NX176, `mission_reset_nothing` NX177.
+
+## ADR-168: Firmen-Fehlerbehebungen – robuste Stundenabrechnung, sichtbare Timer, echte Fehlertexte — `Annahme`
+
+- **Anlass:** Meldungen vom Live-Server (GmbH): „Wo es fehlt“ zeigt falsche Werte, Ausbau trotz GmbH gesperrt, Banner
+  lässt sich nicht setzen, „die erste Betriebsstunde läuft“ ohne Ende, keine Cooldowns an Geschäftszügen, kein Timer
+  an Kampagnen.
+- **Befund am lokalen Postgres (voller Stand und älterer Stand + `update-to-latest.sql`, Funktionen identisch):**
+  `upgrade_company` → `can_expand`/`expand_company`, `set_company_strategy`, `set_company_banner` mit 1, 6, 7 und 16
+  Farben und der Stundenabschluss arbeiten korrekt, auch für eine zur GmbH umgewandelte Firma; die Zod-Schemas nehmen
+  die Antworten an. Diese drei Meldungen ließen sich nicht nachstellen. Nachstellbar sind die Folgen einer
+  ausbleibenden Stundenabrechnung: Ohne Zeile in `player_company_hours` (Zeilen älter als sieben Tage werden gelöscht)
+  ist `live` im Client `null`; dann steht dauerhaft „Die erste Betriebsstunde läuft“ und „Wo es fehlt“ rechnet mit
+  Schätzwerten aus der Markt-Spanne, die um Größenordnungen neben den echten Stundenwerten liegen können.
+- **Schwachstellen im Server, die genau das auslösen:** (1) `player_companies_run_due()` schloss alle Firmen in
+  einer Transaktion ab; ein Fehler bei einer einzigen Firma (Löhne, Beteiligungen, Ereignisse, Missionen …) rollte die
+  Abrechnung aller Firmen zurück, jede Minute aufs Neue. (2) Der Quartalsbericht einer Firma wartete auf den
+  Quartalsabschluss des Marktes (`run_due_part('core')`); hing dieser, blieben alle Firmen an der Quartalsgrenze
+  stehen. (3) Ein Rückstau nach einem Ausfall wurde in einem Lauf nachgeholt und konnte in den Statement-Timeout laufen.
+- **Entscheidung (Migration 5300):** Subtransaktion je Firma mit Vermerk in `job_runs` (`company_hours`), Bericht
+  ohne Abhängigkeit vom Markt-Quartal, älteste Firmen zuerst und höchstens 600 Stunden je Lauf.
+  `company_expansion_cost_cents` ist gedeckelt (vorher `bigint out of range` ab Stufe 47, was jede COMPANY-Antwort
+  sprengte). `company_moves_state` liefert `rest_minutes`.
+- **Client:** Geschäftszüge zeigen „Wieder möglich in mm:ss“ als eigene Fläche mit Balken, die Pause vorab („Danach
+  n Min. Pause“) und am Knopf; Kampagnen zeigen „Läuft noch hh:mm:ss“ mit Balken, dazu eine Zeile über den
+  Abteilungen. Timer rechnen gegen die Serverzeit (`clockSkewMs` aus dem Markt-Snapshot, ab einer Minute Abweichung),
+  damit eine falsch gehende Geräteuhr keine Pause versteckt. Ohne abgerechnete Stunde bei einer Firma, die älter als
+  zwei Stunden ist, steht „Die Stundenabrechnung steht aus“ statt der ersten Betriebsstunde; „Wo es fehlt“ nennt
+  Schätzwerte oben als solche. Unbekannte Serverfehler zeigen ihren Text („Der Server meldet: …“) statt eines
+  Hinweises auf die Verbindung (`GameError.detail`).
+- **Offen:** Die Ursache auf dem Live-Server ist ohne Zugriff nicht belegt. Nach dem Einspielen zeigt
+  `select * from job_runs where job_name = 'company_hours'` eine hakende Firma samt Fehlertext; Banner- oder
+  Ausbau-Fehler nennen dem Spieler jetzt den Grund.
+- Tests: `supabase/tests/a1_company_fixes.sql`, Fixtures `get_my_company_gmbh_upgraded`, `set_company_banner_16_colours`,
+  `start_company_move_resting`, `api.test.ts`, `routes.test.ts`, `server-clock.test.ts`, E2E für beide Timer.

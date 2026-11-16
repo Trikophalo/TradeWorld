@@ -131,6 +131,7 @@ const SAMPLE_MOVES: CompanyMoves = {
       refundCents: 144_000,
       gain: 0,
       availableAt: null,
+      restMinutes: 90,
     },
     {
       key: "courier_app",
@@ -144,7 +145,9 @@ const SAMPLE_MOVES: CompanyMoves = {
       payoutCents: 0,
       refundCents: 120_000,
       gain: 0.04,
-      availableAt: null,
+      // Resting: the cooldown box with its countdown (company fixes, migration 5300).
+      availableAt: new Date(SAMPLE_END + 25 * 60_000).toISOString(),
+      restMinutes: 105,
     },
   ],
   running: [

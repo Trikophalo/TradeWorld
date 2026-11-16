@@ -119,6 +119,10 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 - **Faire Missionen, neu würfeln (ADR-166):** Missionen verlangen nichts mehr, was du dir gerade nicht leisten kannst,
   und einmal am Tag tauschst du unter Missionen alle offenen gegen neue.
 
+- **Firma, Fehlerbehebungen (ADR-168):** Geschäftszüge zeigen groß, wann sie wieder möglich sind, laufende Kampagnen
+  ihre Restlaufzeit (auch als Zeile über den Abteilungen). Die Stundenabrechnung bleibt nicht mehr für alle stehen,
+  wenn eine Firma hakt; „Wo es fehlt“ kennzeichnet Schätzwerte, und Serverfehler nennen ihren echten Grund.
+
 - **Chats mit Freunden (ADR-164):** Unter Freunde → Chats schreibst du Freunden direkt (💬 an ihrer Figur auf dem
   Platz) oder gründest Gruppen mit bis zu 20 Leuten, mit Emojis, ungelesenen Nachrichten und Benachrichtigung.
 

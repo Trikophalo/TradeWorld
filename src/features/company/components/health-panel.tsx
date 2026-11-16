@@ -30,12 +30,33 @@ const TONE: Record<HealthStatus, { text: string; fill: string; bg: string; soft:
 export type AskMira = (factor: HealthFactorKey) => void;
 
 /** The full panel at the top of the company overview. */
-export function HealthPanel({ health, onAsk }: { health: CompanyHealth; onAsk: AskMira }) {
+export function HealthPanel({
+  health,
+  onAsk,
+  late,
+}: {
+  health: CompanyHealth;
+  onAsk: AskMira;
+  /** No closed hour although the company is hours old: the numbers are estimates and the close is overdue. */
+  late?: boolean;
+}) {
   const t = useTranslations("companyHealth");
   const weakest = health.factors.find((f) => f.key === health.weakest)!;
   return (
-    <Card padding="lg" className="space-y-5" data-testid="company-health">
+    <Card padding="lg" className="space-y-5" data-testid="company-health" data-estimated={health.estimated}>
       <Header health={health} />
+      {/* Estimates must not pass for the real hourly numbers: said first, not in a footnote. */}
+      {health.estimated && (
+        <p
+          className={cn(
+            "rounded-md px-3 py-2 text-sm text-pretty",
+            late ? "bg-warn-soft text-warn" : "bg-info-soft text-info",
+          )}
+          data-testid="health-estimated"
+        >
+          {t(late ? "estimatedLate" : "estimated")}
+        </p>
+      )}
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)] lg:gap-6">
         <div className="space-y-4">
           <HealthRadar health={health} />
@@ -47,7 +68,6 @@ export function HealthPanel({ health, onAsk }: { health: CompanyHealth; onAsk: A
           ))}
         </ol>
       </div>
-      {health.estimated && <p className="text-xs text-pretty text-fg-3">{t("estimated")}</p>}
     </Card>
   );
 }
@@ -115,7 +135,10 @@ function Header({ health }: { health: CompanyHealth }) {
       </div>
       <div className="text-right">
         <ProfitNow cents={health.profitPerHourCents} />
-        <p className="nums text-xs text-fg-3">{t("score", { score: health.score })}</p>
+        <p className="nums text-xs text-fg-3">
+          {t("score", { score: health.score })}
+          {health.estimated && <span className="text-info"> · {t("estimatedBadge")}</span>}
+        </p>
       </div>
     </div>
   );

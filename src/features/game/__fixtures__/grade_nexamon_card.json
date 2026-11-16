@@ -1,17 +1,17 @@
 {
   "copy": {
-    "id": "f94ad424-4c05-472e-974d-a80286cb05c2",
+    "id": "9e275968-8d44-4a99-be1d-b0ae4398c8b4",
     "grade": null,
     "state": "grading",
-    "serial": 10,
+    "serial": 8,
     "listing": null,
-    "card_key": "me-046",
-    "condition": "near_mint",
+    "card_key": "me-027",
+    "condition": "good",
     "graded_at": null,
-    "acquired_at": "2026-11-16T17:18:42.305516+00:00",
-    "value_cents": 580,
-    "grading_until": "2026-11-16T18:18:42.324414+00:00"
+    "acquired_at": "2026-11-16T17:32:37.58125+00:00",
+    "value_cents": 950,
+    "grading_until": "2026-11-16T18:32:37.617021+00:00"
   },
-  "ready_at": "2026-11-16T18:18:42.324414+00:00",
-  "fee_cents": 290
+  "ready_at": "2026-11-16T18:32:37.617021+00:00",
+  "fee_cents": 475
 }

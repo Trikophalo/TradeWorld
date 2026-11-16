@@ -1,13 +1,13 @@
 {
   "job": {
     "tier": "junior",
-    "since": "2026-11-16T17:18:36.16817+00:00",
+    "since": "2026-11-16T17:32:30.02752+00:00",
     "title": null,
     "title_key": "it_junior",
     "company_name": "KlarSoft AG"
   },
-  "tag": "9FMA",
-  "rank": 379,
+  "tag": "DKZ7",
+  "rank": 383,
   "level": 6,
   "trust": { "band": "blank", "kept": 0, "score": 50, "broken": 0 },
   "company": null,
@@ -20,7 +20,7 @@
   ],
   "accessories": [],
   "streak_days": 1,
-  "member_since": "2026-11-16T17:18:35.475144+00:00",
+  "member_since": "2026-11-16T17:32:29.210525+00:00",
   "branch_scores": {
     "it": 3,
     "law": 0,
@@ -32,5 +32,5 @@
     "management": 0
   },
   "skills_learned": 2,
-  "net_worth_cents": 1060275
+  "net_worth_cents": 1061138
 }

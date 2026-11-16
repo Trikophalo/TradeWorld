@@ -6,58 +6,58 @@
       "is_new": true,
       "rarity": "common",
       "serial": 7,
-      "copy_id": "51d716f8-cbce-42d3-9f04-1825404fc181",
-      "card_key": "me-022",
+      "copy_id": "5cb23b8e-7120-459f-bf06-990097b3eced",
+      "card_key": "me-023",
       "condition": "good",
       "population": 7,
-      "value_cents": 240
+      "value_cents": 330
     },
     {
       "slot": 2,
       "is_new": true,
       "rarity": "common",
       "serial": 7,
-      "copy_id": "de07c99b-eb54-454f-9dd3-3e3689d3b88b",
-      "card_key": "me-024",
-      "condition": "near_mint",
+      "copy_id": "e45b2b3d-fb49-4982-a6db-70314b8ae810",
+      "card_key": "me-004",
+      "condition": "mint",
       "population": 7,
-      "value_cents": 290
+      "value_cents": 240
     },
     {
       "slot": 3,
       "is_new": true,
       "rarity": "common",
-      "serial": 7,
-      "copy_id": "d757e816-3b16-41ea-8221-1ccce8bcf315",
-      "card_key": "me-037",
-      "condition": "mint",
-      "population": 7,
-      "value_cents": 520
+      "serial": 8,
+      "copy_id": "a7c7410b-2390-486d-b3fa-252783ce6a50",
+      "card_key": "me-010",
+      "condition": "near_mint",
+      "population": 8,
+      "value_cents": 235
     },
     {
       "slot": 4,
       "is_new": true,
       "rarity": "common",
-      "serial": 9,
-      "copy_id": "9375b8a6-4b26-42f2-94ae-f640feef0011",
-      "card_key": "me-046",
+      "serial": 7,
+      "copy_id": "31c9f6ec-e2dd-4c1f-baff-4cfd1c077ac5",
+      "card_key": "me-016",
       "condition": "near_mint",
-      "population": 9,
-      "value_cents": 580
+      "population": 7,
+      "value_cents": 230
     },
     {
       "slot": 5,
       "is_new": true,
-      "rarity": "rare",
-      "serial": 5,
-      "copy_id": "655b27b0-821b-4af4-bff0-bb82a27d7f53",
-      "card_key": "me-060",
+      "rarity": "common",
+      "serial": 7,
+      "copy_id": "4acb536a-9c6c-46a8-8196-e9f5b7ea5192",
+      "card_key": "me-013",
       "condition": "near_mint",
-      "population": 5,
-      "value_cents": 1480
+      "population": 7,
+      "value_cents": 160
     }
   ],
-  "pack_id": "90c3b047-4659-414d-8545-9cd8c4cb290a",
+  "pack_id": "3204ec40-8a1a-42d9-b5d3-7bd4844b9df1",
   "price_cents": 20000,
   "packs_opened": 1
 }

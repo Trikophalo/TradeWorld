@@ -11,9 +11,10 @@ import { BALANCE } from "@/config/balance";
 import type { MyCompany } from "@/features/game/types";
 import { formatBps, formatCountdown, formatMoney } from "@/lib/format";
 import { SPRING, STAGGER } from "@/lib/motion";
+import { useServerClock } from "@/features/game/server-clock";
 import { useClock } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
-import { bottleneck } from "../routes";
+import { bottleneck, hourlyCloseOverdue } from "../routes";
 
 const money = (cents: number) => formatMoney(Math.round(cents), { whole: true });
 
@@ -36,6 +37,8 @@ export function ProductionCard({
   const now = useClock();
   const live = company.live;
   const neck = bottleneck(company);
+  // No closed hour although the company is hours old: say that the close is late, not "the first hour is running".
+  const late = hourlyCloseOverdue(company, useServerClock());
   const capacity = live ? live.capacityPerHourCents : company.capacityCents / BALANCE.time.quarterHours;
   const sold = live ? Math.min(live.demandPerHourCents, live.capacityPerHourCents) : null;
   const nextHour = now === null ? null : Math.ceil(now / 3_600_000) * 3_600_000;
@@ -70,13 +73,18 @@ export function ProductionCard({
       hint:
         live && sold !== null
           ? t("profitHint", { sold: money(sold), contract: money(live.contractRevenuePerHourCents) })
-          : t("profitHintWaiting"),
+          : t(late ? "profitHintLate" : "profitHintWaiting"),
       tone: live ? (live.profitPerHourCents >= 0 ? "text-gain" : "text-loss") : undefined,
     },
   ];
 
   return (
-    <Card padding="lg" className="space-y-4 overflow-hidden" data-testid="production" data-bottleneck={neck.kind}>
+    <Card
+      padding="lg"
+      className="space-y-4 overflow-hidden"
+      data-testid="production"
+      data-bottleneck={late ? "late" : neck.kind}
+    >
       <div>
         <h2 className="label-pixel text-fg-2">{t("title")}</h2>
         <p className="mt-1 text-sm text-pretty text-fg-2">{t("intro")}</p>
@@ -109,18 +117,20 @@ export function ProductionCard({
       </ol>
 
       <Advice
-        tone={neck.kind === "waiting" ? "info" : neck.kind === "balanced" ? "good" : "warn"}
-        title={t(`neck.${neck.kind}.title`)}
+        tone={late ? "warn" : neck.kind === "waiting" ? "info" : neck.kind === "balanced" ? "good" : "warn"}
+        title={late ? t("neck.late.title") : t(`neck.${neck.kind}.title`)}
         text={
-          neck.kind === "waiting"
-            ? t("neck.waiting.text", {
-                time: nextHour === null ? "--:--" : formatCountdown(Math.max(0, (nextHour - (now ?? 0)) / 1000)),
-              })
-            : neck.kind === "customers"
-              ? t("neck.customers.text", { free: money(neck.cents) })
-              : neck.kind === "staff"
-                ? t("neck.staff.text", { missing: money(neck.cents) })
-                : t("neck.balanced.text")
+          late
+            ? t("neck.late.text")
+            : neck.kind === "waiting"
+              ? t("neck.waiting.text", {
+                  time: nextHour === null ? "--:--" : formatCountdown(Math.max(0, (nextHour - (now ?? 0)) / 1000)),
+                })
+              : neck.kind === "customers"
+                ? t("neck.customers.text", { free: money(neck.cents) })
+                : neck.kind === "staff"
+                  ? t("neck.staff.text", { missing: money(neck.cents) })
+                  : t("neck.balanced.text")
         }
         action={
           neck.kind === "customers" ? (

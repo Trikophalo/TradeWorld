@@ -1314,6 +1314,8 @@ export interface CompanyMoveOption {
   gain: number;
   /** While the move rests after the last run. */
   availableAt: string | null;
+  /** Pause after a start in minutes (duration plus cooldown, shortened by upgrades); 0 = unknown. */
+  restMinutes: number;
 }
 
 export interface CompanyMoves {
@@ -2168,7 +2170,14 @@ export const GAME_ERROR_KEYS = [
 export type GameErrorKey = (typeof GAME_ERROR_KEYS)[number] | "unknown";
 
 export class GameError extends Error {
-  constructor(public readonly key: GameErrorKey) {
+  /**
+   * @param detail What the server said, for errors without a message of their own ("unknown"): shown to the player
+   *   instead of a guess about the connection.
+   */
+  constructor(
+    public readonly key: GameErrorKey,
+    public readonly detail?: string,
+  ) {
     super(key);
     this.name = "GameError";
   }

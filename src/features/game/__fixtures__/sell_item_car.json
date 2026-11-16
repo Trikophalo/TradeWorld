@@ -12,7 +12,7 @@
     "floor": "parquet",
     "owner": "Fixture_Heim",
     "width": 13,
-    "garage": [{ "id": "fbf00466-a033-4b4e-a992-e2b111d0bd5e", "slot": 0, "car_key": "car_electric" }],
+    "garage": [{ "id": "062b592a-7696-4e91-a03d-4e92fac65193", "slot": 0, "car_key": "car_electric" }],
     "height": 9,
     "placed": [],
     "wall_color": "#2f5fd0",
@@ -24,9 +24,9 @@
   "inventory": {
     "cars": [],
     "furniture": [
-      { "id": "67c97120-f8bd-4081-bad2-aa2a77cbca48", "item_key": "sofa_leather", "value_cents": 240000 },
-      { "id": "ebdd7d44-1d59-4dde-a150-86809015b366", "item_key": "rug_wool", "value_cents": 65000 },
-      { "id": "d8392be0-88a8-4498-94e9-fe8eadcd4ffe", "item_key": "plant_small", "value_cents": 3000 }
+      { "id": "56e0adac-12fa-44d9-a72f-0ce3dbefcbf7", "item_key": "sofa_leather", "value_cents": 240000 },
+      { "id": "ec6bf4fc-0784-44c5-8389-68c86ff1bebe", "item_key": "rug_wool", "value_cents": 65000 },
+      { "id": "990c8863-2b78-41af-a818-2e0480612912", "item_key": "plant_small", "value_cents": 3000 }
     ]
   },
   "refund_cents": 360000

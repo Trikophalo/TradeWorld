@@ -1,5 +1,5 @@
 {
-  "now": "2026-11-16T17:18:42.086055+00:00",
+  "now": "2026-11-16T17:32:37.070248+00:00",
   "battle": {
     "id": 26,
     "kind": null,
@@ -12,7 +12,7 @@
     "status": "open",
     "ends_at": null,
     "players": [],
-    "opened_at": "2026-11-16T17:18:42.086055+00:00",
+    "opened_at": "2026-11-16T17:32:37.070248+00:00",
     "started_at": null,
     "finished_at": null,
     "max_players": 10,
@@ -74,16 +74,16 @@
           "budget": null,
           "budgets": [0, 1000, 1000],
           "correct": null,
-          "ends_at": "2026-11-16T17:18:17.568996+00:00",
+          "ends_at": "2026-11-16T17:32:09.645106+00:00",
           "options": null,
           "results": [
             { "ms": 2, "slot": 0, "right": true, "value": 400, "points": 300 },
-            { "ms": 1008, "slot": 1, "right": false, "value": 400, "points": 0 }
+            { "ms": 1011, "slot": 1, "right": false, "value": 400, "points": 0 }
           ],
           "decimals": null,
-          "opens_at": "2026-11-16T17:18:04.068996+00:00",
+          "opens_at": "2026-11-16T17:31:56.145106+00:00",
           "question": "Goldbarren",
-          "closes_at": "2026-11-16T17:18:14.068996+00:00",
+          "closes_at": "2026-11-16T17:32:06.145106+00:00",
           "item_points": 300
         },
         {
@@ -96,16 +96,16 @@
           "budget": null,
           "budgets": [0, 1000, 1000],
           "correct": null,
-          "ends_at": "2026-11-16T17:18:31.068996+00:00",
+          "ends_at": "2026-11-16T17:32:23.145106+00:00",
           "options": null,
           "results": [
-            { "ms": 522, "slot": 0, "right": true, "value": 600, "points": 100 },
-            { "ms": 528, "slot": 1, "right": false, "value": 0, "points": 0 }
+            { "ms": 526, "slot": 0, "right": true, "value": 600, "points": 100 },
+            { "ms": 532, "slot": 1, "right": false, "value": 0, "points": 0 }
           ],
           "decimals": null,
-          "opens_at": "2026-11-16T17:18:17.568996+00:00",
+          "opens_at": "2026-11-16T17:32:09.645106+00:00",
           "question": "Gummiente",
-          "closes_at": "2026-11-16T17:18:27.568996+00:00",
+          "closes_at": "2026-11-16T17:32:19.645106+00:00",
           "item_points": 100
         }
       ],
@@ -113,7 +113,7 @@
       "points": [400, 0, 0]
     },
     "status": "finished",
-    "ends_at": "2026-11-16T17:21:04.068996+00:00",
+    "ends_at": "2026-11-16T17:34:56.145106+00:00",
     "players": [
       {
         "me": false,
@@ -143,9 +143,9 @@
         "accessories": []
       }
     ],
-    "opened_at": "2026-11-16T17:18:32.068996+00:00",
-    "started_at": "2026-11-16T17:18:04.068996+00:00",
-    "finished_at": "2026-11-16T17:18:32.104415+00:00",
+    "opened_at": "2026-11-16T17:32:24.145106+00:00",
+    "started_at": "2026-11-16T17:31:56.145106+00:00",
+    "finished_at": "2026-11-16T17:32:24.184298+00:00",
     "max_players": 10,
     "min_players": 3,
     "prize_wins_left": 3,
