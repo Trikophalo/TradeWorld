@@ -64,6 +64,7 @@ const ICONS: Record<string, PixelArt> = {
   board_revolt: UI_ICONS.markets,
   research_done: UI_ICONS.upgrade,
   nexamon_pull: UI_ICONS.nexamon,
+  nexamon_black_label: UI_ICONS.nexamon,
 };
 
 const str = (v: unknown) => (typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
@@ -142,6 +143,11 @@ function useFeedText() {
         return t("accessory_bought", { name: accessoryByKey(str(p.key))?.name ?? str(p.name) });
       case "battle_won":
         return t("battle_won", { game: str(p.game) });
+      case "nexamon_black_label":
+        return t("nexamon_black_label", {
+          name: nexamonCard(str(p.card_key))?.name ?? str(p.card_key),
+          serial: n(p.serial),
+        });
       case "nexamon_pull":
         return t("nexamon_pull", { name: nexamonCard(str(p.card_key))?.name ?? str(p.card_key), serial: n(p.serial) });
       case "tax_penalty":
@@ -237,18 +243,19 @@ export function FeedRow({ item, compact }: { item: FeedItem; compact?: boolean }
           </Link>{" "}
           {item.isMe && <span className="label-pixel text-accent">{t("you")} </span>}
           {text(item)}
-          {item.kind === "nexamon_pull" && nexamonCard(str(item.payload.card_key)) && (
-            <>
-              {" "}
-              <Link
-                href={`/nexamon/${str(item.payload.card_key)}`}
-                className="font-medium text-accent focus-ring hover:underline"
-                data-testid="feed-nexamon-link"
-              >
-                {t("nexamonCard")}
-              </Link>
-            </>
-          )}
+          {(item.kind === "nexamon_pull" || item.kind === "nexamon_black_label") &&
+            nexamonCard(str(item.payload.card_key)) && (
+              <>
+                {" "}
+                <Link
+                  href={`/nexamon/${str(item.payload.card_key)}`}
+                  className="font-medium text-accent focus-ring hover:underline"
+                  data-testid="feed-nexamon-link"
+                >
+                  {t("nexamonCard")}
+                </Link>
+              </>
+            )}
         </p>
         <p className="mt-1 flex items-center gap-2 text-xs text-fg-3">
           <PlayerTag tag={item.actor.tag} />

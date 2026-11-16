@@ -5,59 +5,59 @@
       "slot": 1,
       "is_new": true,
       "rarity": "common",
-      "serial": 8,
-      "copy_id": "c1993877-202b-41d8-8955-df64634dd741",
-      "card_key": "me-007",
+      "serial": 7,
+      "copy_id": "ac7ee444-4c3a-46b1-ba19-04286d8936c5",
+      "card_key": "me-035",
       "condition": "near_mint",
-      "population": 8,
-      "value_cents": 180
+      "population": 7,
+      "value_cents": 130
     },
     {
       "slot": 2,
       "is_new": true,
       "rarity": "common",
       "serial": 7,
-      "copy_id": "b2bc9d23-e1b9-43ff-93d2-11586b379f33",
-      "card_key": "me-029",
-      "condition": "near_mint",
+      "copy_id": "3a9c11f9-5cff-49a4-9d3a-a24ca991ab2e",
+      "card_key": "me-016",
+      "condition": "mint",
       "population": 7,
-      "value_cents": 140
+      "value_cents": 230
     },
     {
       "slot": 3,
       "is_new": true,
       "rarity": "common",
-      "serial": 7,
-      "copy_id": "79be7f8d-90bc-4958-aa92-b1c2b4c16556",
-      "card_key": "me-021",
-      "condition": "good",
-      "population": 7,
-      "value_cents": 153
+      "serial": 8,
+      "copy_id": "c6c2baf8-4e36-4eb4-a8f0-0a44b3dfe52b",
+      "card_key": "me-049",
+      "condition": "near_mint",
+      "population": 8,
+      "value_cents": 880
     },
     {
       "slot": 4,
       "is_new": true,
-      "rarity": "rare",
-      "serial": 6,
-      "copy_id": "41a85aab-5dfd-44a6-8d00-bee0d1ff3d1b",
-      "card_key": "me-057",
-      "condition": "mint",
-      "population": 6,
-      "value_cents": 3200
+      "rarity": "common",
+      "serial": 7,
+      "copy_id": "70ed7e39-947c-4c8d-be57-ff174a31622d",
+      "card_key": "me-045",
+      "condition": "near_mint",
+      "population": 7,
+      "value_cents": 620
     },
     {
       "slot": 5,
       "is_new": true,
-      "rarity": "rare",
-      "serial": 6,
-      "copy_id": "e918795e-ccdf-4c9c-bfaa-493b9e71b3dd",
-      "card_key": "me-053",
-      "condition": "near_mint",
-      "population": 6,
-      "value_cents": 1700
+      "rarity": "ultra",
+      "serial": 3,
+      "copy_id": "45bff7fb-fdc2-45ab-b95d-aa6bec171801",
+      "card_key": "me-069",
+      "condition": "good",
+      "population": 3,
+      "value_cents": 136800
     }
   ],
-  "pack_id": "3f236d05-bca3-4f81-b0fe-17befdad6ec0",
+  "pack_id": "04b037cb-cb94-44e6-871f-d13fa3ac0665",
   "price_cents": 20000,
   "packs_opened": 1
 }

@@ -3,7 +3,7 @@
   "messages": [
     {
       "ai": false,
-      "at": "2026-11-16T19:21:51.348242+00:00",
+      "at": "2026-11-16T19:43:59.243087+00:00",
       "id": 62,
       "kind": "chat",
       "mine": false,
@@ -15,19 +15,19 @@
     },
     {
       "ai": false,
-      "at": "2026-11-16T19:21:51.361269+00:00",
+      "at": "2026-11-16T19:43:59.246972+00:00",
       "id": 63,
       "kind": "offer",
       "mine": false,
       "text": "Wäre das ein Preis?",
       "author": "Fixture_Kunst",
-      "expires_at": "2026-11-17T19:21:51.361269+00:00",
+      "expires_at": "2026-11-17T19:43:59.246972+00:00",
       "offer_cents": 300000,
       "offer_status": "accepted"
     },
     {
       "ai": false,
-      "at": "2026-11-16T19:21:51.371953+00:00",
+      "at": "2026-11-16T19:43:59.255746+00:00",
       "id": 64,
       "kind": "sale",
       "mine": false,
@@ -39,7 +39,7 @@
     },
     {
       "ai": false,
-      "at": "2026-11-16T19:21:51.390092+00:00",
+      "at": "2026-11-16T19:43:59.2655+00:00",
       "id": 65,
       "kind": "sale",
       "mine": false,
@@ -51,19 +51,19 @@
     },
     {
       "ai": true,
-      "at": "2026-11-16T19:21:51.409014+00:00",
+      "at": "2026-11-16T19:43:59.274269+00:00",
       "id": 66,
       "kind": "offer",
       "mine": false,
-      "text": "Schönes Stück. Mehr ist es mir aber nicht wert.",
-      "author": "Vera Vermeer",
-      "expires_at": "2026-11-17T19:21:51.409014+00:00",
-      "offer_cents": 2025200,
+      "text": "Meine Mutter sagt, ich soll aufhören, Pixel zu kaufen. Hier mein Angebot.",
+      "author": "Baron von Bit",
+      "expires_at": "2026-11-17T19:43:59.274269+00:00",
+      "offer_cents": 2396800,
       "offer_status": "open"
     }
   ],
   "ask_cents": 90000000,
-  "artwork_id": "6d58a05d-5212-4796-98e6-f135aee3f4e8",
+  "artwork_id": "6e871e0a-1dce-40a8-aa4e-c3092fe2b27e",
   "max_length": 200,
   "my_offer_cents": null,
   "min_offer_cents": 10000

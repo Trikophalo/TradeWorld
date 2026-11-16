@@ -10,6 +10,9 @@ as $$
 declare
   cfg jsonb := public.nexamon_cfg();
 begin
+  if p_grade >= 11 then
+    return coalesce((cfg #>> '{grading,blackLabel,valueBps}')::integer, 100000);
+  end if;
   if p_grade is not null then
     return coalesce((cfg #>> array['grading', 'valueBps', (least(greatest(p_grade, 1), 10) - 1)::text])::integer, 10000);
   end if;

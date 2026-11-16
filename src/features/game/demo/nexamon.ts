@@ -18,6 +18,7 @@ import {
   nexamonPricePerCardE4,
   nexamonQuickSellCents,
   nexamonRollCondition,
+  nexamonIsBlackLabel,
   nexamonRollGrade,
   nexamonSaleCounts,
   nexamonSeedCopies,
@@ -120,7 +121,8 @@ export interface NexamonHost {
   feed(kind: string, payload: Record<string, unknown>): void;
   notify(typeKey: string, title: string, body: string | null, link: string | null): void;
   track(
-    metric: "nexamon_packs" | "nexamon_rares" | "nexamon_ultras" | "nexamon_sold" | "nexamon_tens",
+    metric:
+      "nexamon_packs" | "nexamon_rares" | "nexamon_ultras" | "nexamon_sold" | "nexamon_tens" | "nexamon_black_labels",
     by?: number,
   ): void;
   idempotent<T>(requestId: string, run: () => T): T;
@@ -278,13 +280,25 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine {
         c.grade = nexamonRollGrade(c.condition, host.random());
         c.gradedAt = now;
         c.gradingUntil = null;
-        host.notify(
-          "nexamon_graded",
-          `ASP-Note: ${c.grade}`,
-          `Deine Nexamon-Karte ist zurück von ASP, Note ${c.grade} von 10.`,
-          "/nexamon",
-        );
-        if (c.grade === 10) host.track("nexamon_tens");
+        if (nexamonIsBlackLabel(c.grade)) {
+          host.notify(
+            "nexamon_graded",
+            "Black Label!",
+            `Deine Nexamon-Karte ist zurück von ASP: Note 10 mit dem Black Label. Der Slab ist jetzt das ${
+              cfg.grading.blackLabel.valueBps / 10_000
+            }-Fache der Karte wert.`,
+            "/nexamon",
+          );
+          host.feed("nexamon_black_label", { card_key: c.cardKey, serial: c.serial, condition: c.condition });
+          host.track("nexamon_black_labels");
+        } else
+          host.notify(
+            "nexamon_graded",
+            `ASP-Note: ${c.grade}`,
+            `Deine Nexamon-Karte ist zurück von ASP, Note ${c.grade} von 10.`,
+            "/nexamon",
+          );
+        if (c.grade >= 10) host.track("nexamon_tens");
       }
     }
     // 2. the AI's packs
@@ -612,6 +626,7 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine {
           { at: iso(now), valueCents: nexamonCentsFromE4(state.valueE4) },
         ],
         graded: Array.from({ length: 10 }, (_, i) => mine.filter((c) => c.grade === i + 1).length),
+        blackLabels: mine.filter((c) => nexamonIsBlackLabel(c.grade)).length,
         listings: listings(s)
           .filter((l) => l.cardKey === cardKey)
           .sort((a, b) => a.priceCents - b.priceCents)
@@ -647,6 +662,7 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine {
           (query.rarity == null || l.rarity === query.rarity) &&
           (query.cardKey == null || l.cardKey === query.cardKey) &&
           (query.graded == null || (l.grade !== null) === query.graded) &&
+          (query.blackLabel == null || nexamonIsBlackLabel(l.grade) === query.blackLabel) &&
           (seller === "all" || (seller === "ai" ? l.sellerAi : !l.sellerAi)),
       );
       const value = (l: NexamonListing) => s.cards[l.cardKey]!.valueE4;

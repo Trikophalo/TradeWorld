@@ -1,0 +1,298 @@
+-- ===== idempotent copy of migrations/20261204005850_nexamon_black_label.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 5850 · Nexamon: the Black Label, one tier above an ASP 10 (ADR-165)
+-- =============================================================================
+-- Rule (game_config.nexamon.grading.blackLabel = {condition, chanceBps, valueBps}; src/config/nexamon-rules.ts):
+-- only a copy in `condition` (mint) can get it, `chanceBps` (1 %) of its gradings, taken out of its chance for a 10;
+-- the slab is worth the card's market value x `valueBps` (10x; a plain 10 stays 3x).
+-- Model: an eleventh tier. nexamon_copies.grade = 11 is the Black Label (shown as "ASP 10 Black Label"), so
+-- everything that carries the grade (copy value, listings, sales, AI collectors, cracking, the account wipe) knows
+-- it without a new column. Existing slabs are not touched.
+--   * nexamon_roll_grade(): the Black Label takes the highest rolls of the 10 (same rule as nexamonRollGrade)
+--   * nexamon_copy_factor_bps(): grade 11 -> blackLabel.valueBps
+--   * nexamon_finish_gradings(): own notification text, mission events nexamon_ten and nexamon_black_label, feed
+--     kind nexamon_black_label (news for the friends and gossip for NEXA Nachrichten)
+--   * get_nexamon_card(): `black_labels` next to `graded` (which keeps its ten entries, grades 1 to 10)
+--   * get_nexamon_market(): new filter p_black_label
+--   * mission template m_nexamon_first_black_label
+-- Idempotent (identical copy in supabase/updates/).
+-- =============================================================================
+
+-- 11 = Black Label
+alter table public.nexamon_copies drop constraint if exists nexamon_copies_grade_check;
+alter table public.nexamon_copies add constraint nexamon_copies_grade_check check (grade is null or grade between 1 and 11);
+comment on column public.nexamon_copies.grade is
+  'ASP grade 1..10 once graded, 11 = Black Label (the tier above a 10, ADR-165); null = raw or at ASP.';
+comment on column public.nexamon_sales.grade is
+  'Grade of the copy when it was sold (1..10, 11 = Black Label); null = raw.';
+
+-- ---------------------------------------------------------------------------
+-- A. Rules
+-- ---------------------------------------------------------------------------
+-- nexamonRollGrade: grading.gradeWeightsBps[condition], index 0 = grade 1; the Black Label (11) takes the highest
+-- blackLabel.chanceBps rolls of the 10, only for blackLabel.condition
+create or replace function public.nexamon_roll_grade(p_condition text, p_u double precision)
+returns integer
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.nexamon_cfg();
+  w       jsonb := cfg #> array['grading', 'gradeWeightsBps', p_condition];
+  v_n     integer := floor(least(greatest(coalesce(p_u, 0), 0), 0.999999999) * 10000)::integer;
+  v_edge  integer := 0;
+  v_black integer := 0;
+  g       integer;
+begin
+  if p_condition is not distinct from (cfg #>> '{grading,blackLabel,condition}') then
+    v_black := least(greatest(coalesce((cfg #>> '{grading,blackLabel,chanceBps}')::integer, 0), 0), coalesce((w ->> 9)::integer, 0));
+  end if;
+  for g in 1 .. 10 loop
+    v_edge := v_edge + coalesce((w ->> (g - 1))::integer, 0);
+    if v_n < v_edge then
+      if g = 10 and v_n >= v_edge - v_black then
+        return 11;
+      end if;
+      return g;
+    end if;
+  end loop;
+  return 10;
+end;
+$$;
+
+-- nexamonCopyFactorBps: the grade's factor in a slab (11 = Black Label), else 100 % from "good" upwards, minus a step
+-- per condition below
+create or replace function public.nexamon_copy_factor_bps(p_condition text, p_grade integer)
+returns integer
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.nexamon_cfg();
+  v_good  integer;
+  v_this  integer;
+begin
+  if p_grade >= 11 then
+    return coalesce((cfg #>> '{grading,blackLabel,valueBps}')::integer, 100000);
+  end if;
+  if p_grade is not null then
+    return coalesce((cfg #>> array['grading', 'valueBps', (least(greatest(p_grade, 1), 10) - 1)::text])::integer, 10000);
+  end if;
+  select max(ord) filter (where x = 'good'), max(ord) filter (where x = p_condition) into v_good, v_this
+    from jsonb_array_elements_text(coalesce(cfg #> '{conditions,order}', '[]'::jsonb)) with ordinality t(x, ord);
+  return greatest(0, 10000 - greatest(0, coalesce(v_good, 0) - coalesce(v_this, coalesce(v_good, 0)))
+                               * coalesce((cfg #>> '{conditions,belowGoodStepBps}')::integer, 500));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- B. ASP is done: grades are rolled by condition (nexamonRollGrade). p_player null = everybody's.
+--    A Black Label is a 10 for the missions, gets its own text and is news.
+-- ---------------------------------------------------------------------------
+create or replace function public.nexamon_finish_gradings(p_player uuid default null, p_now timestamptz default null)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now   timestamptz := coalesce(p_now, public.game_now());
+  v_n     integer := 0;
+  v_grade integer;
+  v_bps   integer;
+  v_times text;
+  r       record;
+begin
+  for r in select c.id, c.owner_id, c.card_key, c.condition, c.serial from public.nexamon_copies c
+            where c.grading_until is not null and c.grading_until <= v_now
+              and (p_player is null or c.owner_id = p_player)
+            order by c.grading_until, c.id limit 200
+            for update skip locked loop
+    v_grade := public.nexamon_roll_grade(r.condition, random());
+    update public.nexamon_copies set grade = v_grade, graded_at = v_now, grading_until = null where id = r.id;
+    if r.owner_id is not null then
+      if v_grade >= 11 then
+        v_bps := public.nexamon_copy_factor_bps(r.condition, v_grade);
+        v_times := (v_bps / 10000)::text
+                   || case when v_bps % 10000 >= 1000 then ',' || ((v_bps % 10000) / 1000)::text else '' end;
+        perform public.social_notify(r.owner_id, 'nexamon_graded', 'Black Label!',
+          'Deine Nexamon-Karte ist zurück von ASP: Note 10 mit dem Black Label. Der Slab ist jetzt das '
+            || v_times || '-Fache der Karte wert.',
+          jsonb_build_object('copy_id', r.id, 'card_key', r.card_key, 'serial', r.serial, 'grade', v_grade, 'condition', r.condition,
+                             'black_label', true),
+          '/nexamon', 'nexamon_graded:' || r.id::text || ':' || extract(epoch from v_now)::bigint::text);
+        perform public.feed_post(r.owner_id, 'nexamon_black_label',
+                                 jsonb_build_object('card_key', r.card_key, 'serial', r.serial, 'condition', r.condition),
+                                 'nexamon:black_label:' || r.id::text || ':' || extract(epoch from v_now)::bigint::text);
+      else
+        perform public.social_notify(r.owner_id, 'nexamon_graded', 'ASP-Note: ' || v_grade::text,
+          'Deine Nexamon-Karte ist zurück von ASP, Note ' || v_grade::text || ' von 10.',
+          jsonb_build_object('copy_id', r.id, 'card_key', r.card_key, 'serial', r.serial, 'grade', v_grade, 'condition', r.condition),
+          '/nexamon', 'nexamon_graded:' || r.id::text || ':' || extract(epoch from v_now)::bigint::text);
+      end if;
+      perform public.mission_event(r.owner_id, 'nexamon_graded', 1, null);
+      if v_grade >= 10 then
+        perform public.mission_event(r.owner_id, 'nexamon_ten', 1, null);
+      end if;
+      if v_grade >= 11 then
+        perform public.mission_event(r.owner_id, 'nexamon_black_label', 1, null);
+      end if;
+    end if;
+    v_n := v_n + 1;
+  end loop;
+  return v_n;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- C. Reads: the card page counts the Black Labels, the market filters them
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.get_nexamon_card(text)'::regprocedure);
+  v_old text := $t$from generate_series(1, 10) g),$t$;
+  v_new text := $t$from generate_series(1, 10) g),
+    'black_labels', (select count(*) from public.nexamon_copies c where c.card_key = k.card_key and c.grade >= 11),$t$;
+begin
+  if position('black_labels' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'get_nexamon_card() has an unexpected shape; add black_labels (ADR-165, Black Label) by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+comment on function public.get_nexamon_card(text) is
+  'RPC: one Nexamon card (ADR-165): value, bounds, population, value history (start, hourly points, now), graded '
+  'copies per grade 1..10 and the Black Labels (black_labels), the cheapest '
+  'listings, the own copies and the latest sales; errors nexamon_locked, nexamon_unknown.';
+
+drop function if exists public.get_nexamon_market(text, text, text, integer, text, text, boolean);
+create or replace function public.get_nexamon_market(p_set text default null, p_rarity text default null, p_sort text default 'new',
+                                                     p_page integer default 1, p_seller text default 'all',
+                                                     p_card_key text default null, p_graded boolean default null,
+                                                     p_black_label boolean default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  v_now    timestamptz := public.game_now();
+  v_size   integer := coalesce((public.nexamon_cfg() #>> '{market,pageSize}')::integer, 24);
+  v_page   integer := greatest(1, coalesce(p_page, 1));
+  v_sort   text := coalesce(p_sort, 'new');
+  v_seller text := coalesce(p_seller, 'all');
+  v_total  bigint;
+  v_rows   jsonb;
+begin
+  perform public.nexamon_require_unlock(v_player);
+  perform public.nexamon_sync(v_now);
+  if v_sort not in ('new', 'price_asc', 'price_desc', 'deal', 'value', 'number')
+     or v_seller not in ('all', 'players', 'ai', 'mine')
+     or (p_rarity is not null and p_rarity not in ('common', 'rare', 'ultra', 'prisma', 'legendary')) then
+    perform public.api_error('invalid_argument');
+  end if;
+  with f as (
+    select l.id, l.price_cents, l.created_at, k.set_key, k.number, k.value_e4,
+           public.nexamon_copy_value_cents(k.value_e4, c.condition, c.grade) as copy_value
+      from public.nexamon_listings l
+      join public.nexamon_copies c on c.id = l.copy_id
+      join public.nexamon_cards k on k.card_key = l.card_key
+     where (p_set is null or k.set_key = p_set)
+       and (p_rarity is null or k.rarity = p_rarity)
+       and (p_card_key is null or l.card_key = p_card_key)
+       and (p_graded is null or (c.grade is not null) = p_graded)
+       and (p_black_label is null or (coalesce(c.grade, 0) >= 11) = p_black_label)
+       and case v_seller when 'players' then l.seller_id is not null when 'ai' then l.seller_ai is not null
+                         when 'mine' then l.seller_id = v_player else true end
+  ), page as (
+    select f.*, row_number() over (
+             order by case when v_sort = 'price_asc' then f.price_cents end asc nulls last,
+                      case when v_sort = 'price_desc' then f.price_cents end desc nulls last,
+                      case when v_sort = 'deal' then f.price_cents::numeric / greatest(f.copy_value, 1) end asc nulls last,
+                      case when v_sort = 'value' then f.value_e4 end desc nulls last,
+                      case when v_sort = 'number' then f.set_key end asc nulls last,
+                      case when v_sort = 'number' then f.number end asc nulls last,
+                      f.created_at desc, f.id) as rn,
+           count(*) over () as total
+      from f
+  )
+  select coalesce(max(p.total), 0),
+         coalesce(jsonb_agg(public.nexamon_listing_json(p.id, v_player) order by p.rn)
+                    filter (where p.rn > (v_page - 1) * v_size and p.rn <= v_page * v_size), '[]'::jsonb)
+    into v_total, v_rows
+    from page p;
+  return jsonb_build_object('listings', v_rows, 'total', v_total, 'page', v_page, 'page_size', v_size,
+                            'pages', greatest(1, ceil(v_total::numeric / v_size))::integer, 'server_time', v_now);
+end;
+$$;
+comment on function public.get_nexamon_market(text, text, text, integer, text, text, boolean, boolean) is
+  'RPC: the listings of the Nexamon market (ADR-165), filtered by set, rarity, seller (all, players, ai, mine), card '
+  'graded and Black Label, sorted (new, price_asc, price_desc, deal, value, number), in pages; errors nexamon_locked, '
+  'invalid_argument.';
+
+revoke all on function public.get_nexamon_market(text, text, text, integer, text, text, boolean, boolean) from public, anon;
+grant execute on function public.get_nexamon_market(text, text, text, integer, text, text, boolean, boolean) to authenticated;
+
+comment on function public.crack_nexamon_slab(uuid, uuid) is
+  'RPC: cracks the slab of an own graded copy: the raw card with its condition comes back, no refund; a Black Label '
+  '(old_grade 11) is lost like any grade (ADR-165) -> '
+  '{copy, old_grade}; errors nexamon_locked, invalid_argument, nexamon_unknown, nexamon_not_owner, nexamon_grading, '
+  'nexamon_not_graded, nexamon_listed.';
+
+-- ---------------------------------------------------------------------------
+-- D. Feed and NEXA Nachrichten: a Black Label is news, like a legendary pull
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.feed_item_label(text, jsonb)'::regprocedure);
+  v_old text := $t$    when 'nexamon_pull' then$t$;
+  v_new text := $t$    when 'nexamon_black_label' then 'Black Label von ASP für eine Nexamon-Karte geholt (Nummer ' || coalesce(p_payload ->> 'serial', '?') || ')'
+    when 'nexamon_pull' then$t$;
+begin
+  if position('nexamon_black_label' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'feed_item_label() has an unexpected shape; add the feed kind nexamon_black_label (ADR-165) by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+-- anchored on the one kind next to it: other migrations change the rest of the gossip list
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.news_show_build(timestamptz)'::regprocedure);
+  v_old text := $t$'nexamon_pull',$t$;
+  v_new text := $t$'nexamon_pull', 'nexamon_black_label',$t$;
+begin
+  if position('nexamon_black_label' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'news_show_build() has an unexpected shape; add the feed kind nexamon_black_label (ADR-165) to the gossip source by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- E. Mission: the first Black Label
+-- ---------------------------------------------------------------------------
+insert into public.mission_templates
+  (key, kind, title, description, icon_key, metric, mode, params, target_min, target_max, xp_min, xp_max, min_level, chain_order,
+   scale_with_level, weight, reward_skill_points)
+values
+  ('m_nexamon_first_black_label', 'milestone', 'Das erste Black Label', 'Schick Mint-Karten zu ASP, bis eine mit dem Black Label zurückkommt.', 'mission_art', 'nexamon_black_label', 'count', '{"unlock":"nexamon"}'::jsonb, 1, 1, 3000, 3000, 10, 137, false, 30, 1)
+on conflict (key) do update
+   set kind = excluded.kind, title = excluded.title, description = excluded.description, icon_key = excluded.icon_key,
+       metric = excluded.metric, mode = excluded.mode, params = excluded.params, target_min = excluded.target_min,
+       target_max = excluded.target_max, xp_min = excluded.xp_min, xp_max = excluded.xp_max, min_level = excluded.min_level,
+       chain_order = excluded.chain_order, scale_with_level = excluded.scale_with_level, weight = excluded.weight,
+       reward_skill_points = excluded.reward_skill_points, is_active = true, updated_at = now();

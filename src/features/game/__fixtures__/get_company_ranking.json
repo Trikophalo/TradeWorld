@@ -14,31 +14,15 @@
       "founder": "Lars_Kursrutsch",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "25eb7dc0-c48d-4216-8ad8-5bcd9dcd5c4d",
+      "company_id": "2fed54a9-fb48-4247-a075-2760a3d6fd7a",
       "value_cents": 959140000,
       "revenue_cents": null
     },
     {
       "kind": "player",
       "logo": null,
-      "name": "Talwerk",
-      "rank": 2,
-      "tier": "ag",
-      "color": "#663399",
-      "sector": "retail",
-      "ticker": "TAL",
-      "founder": "Pop_Gero",
-      "is_mine": false,
-      "team_size": 1,
-      "company_id": "8f3acb26-ab2a-44c7-a7b8-fa0edcdd7a3b",
-      "value_cents": 114420000,
-      "revenue_cents": null
-    },
-    {
-      "kind": "player",
-      "logo": null,
       "name": "Knappwerk",
-      "rank": 3,
+      "rank": 2,
       "tier": "ag",
       "color": "#336699",
       "sector": "retail",
@@ -46,7 +30,7 @@
       "founder": "Float_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "9dd5050b-df5e-406b-8d8e-76cfdc3078b5",
+      "company_id": "a81f0631-d402-43f6-a9ba-35e3805eb6f1",
       "value_cents": 110000000,
       "revenue_cents": null
     },
@@ -74,7 +58,7 @@
         "palette": ["#112233", "#00ff00"]
       },
       "name": "Fenja Pixel",
-      "rank": 4,
+      "rank": 3,
       "tier": "ag",
       "color": "#123456",
       "sector": "tech",
@@ -82,15 +66,15 @@
       "founder": "Fenja_Firma",
       "is_mine": false,
       "team_size": 6,
-      "company_id": "7ce6f865-0b99-42f4-9cda-50a72106f367",
-      "value_cents": 106675044,
+      "company_id": "ec6cdb9d-1791-49ae-9230-77c6d0290023",
+      "value_cents": 106279357,
       "revenue_cents": 0
     },
     {
       "kind": "player",
       "logo": null,
       "name": "Wackelwerk",
-      "rank": 5,
+      "rank": 4,
       "tier": "ag",
       "color": "#336699",
       "sector": "retail",
@@ -98,10 +82,26 @@
       "founder": "Esc_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "bc2f277a-2146-422c-bc2a-21d9ea40c774",
+      "company_id": "d9e4721d-c80e-4704-a4b2-761cad4cf082",
       "value_cents": 106093020,
+      "revenue_cents": null
+    },
+    {
+      "kind": "player",
+      "logo": null,
+      "name": "Talwerk",
+      "rank": 5,
+      "tier": "ag",
+      "color": "#663399",
+      "sector": "retail",
+      "ticker": "TAL",
+      "founder": "Pop_Gero",
+      "is_mine": false,
+      "team_size": 1,
+      "company_id": "0150d1ee-7343-4b01-822d-55725571195f",
+      "value_cents": 89850000,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-16T19:21:44.092985+00:00"
+  "server_time": "2026-11-16T19:43:53.871282+00:00"
 }

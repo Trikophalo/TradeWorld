@@ -11,7 +11,7 @@
       "minutes": 15,
       "chance_bps": 9000,
       "cost_cents": 900000,
-      "available_at": "2026-11-16T20:06:52.670389+00:00",
+      "available_at": "2026-11-16T20:29:00.205175+00:00",
       "payout_cents": 0,
       "refund_cents": 450000,
       "rest_minutes": 45,
@@ -190,11 +190,11 @@
     {
       "id": 6,
       "key": "pop_up_stand",
-      "ends_at": "2026-11-16T19:36:52.670389+00:00",
+      "ends_at": "2026-11-16T19:59:00.205175+00:00",
       "chance_bps": 9000,
       "cost_cents": 900000,
-      "started_at": "2026-11-16T19:21:52.670389+00:00"
+      "started_at": "2026-11-16T19:44:00.205175+00:00"
     }
   ],
-  "cash_cents": 34816937
+  "cash_cents": 34812382
 }

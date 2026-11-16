@@ -2,42 +2,42 @@
   "items": [
     {
       "id": 5,
-      "body": "Neue Aktien sollen ausgegeben werden. Das verwässert die Anteile, der Kurs dürfte leicht nachgeben. Sicher ist das nicht.",
-      "name": "Eilbote Express",
-      "due_at": "2026-11-16T20:34:34.840064+00:00",
+      "body": "Ein Gericht gibt dem Konkurrenten recht. Lizenzzahlungen drohen. Sicher ist das nicht.",
+      "name": "Nordbrise Offshore",
+      "due_at": "2026-11-16T20:59:11.30925+00:00",
       "status": "open",
-      "ticker": "EBX",
-      "headline": "Eilbote Express plant Kapitalerhöhung",
+      "ticker": "WND",
+      "headline": "Nordbrise Offshore verliert Patentstreit",
       "move_bps": null,
-      "strength": 1,
+      "strength": 2,
       "direction": "down",
-      "published_at": "2026-11-16T20:21:50.231764+00:00"
+      "published_at": "2026-11-16T20:43:58.682407+00:00"
     },
     {
       "id": 4,
-      "body": "Ein Vögelchen hat mir gezwitschert: GenoVita Biotech dürfte in der kommenden Stunde nach oben gehen. Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.",
-      "name": "GenoVita Biotech",
-      "due_at": "2026-11-16T19:51:21.605448+00:00",
+      "body": "Ein Vögelchen hat mir gezwitschert: Wackelwerk dürfte in der kommenden Stunde nach unten gehen. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
+      "name": "Wackelwerk",
+      "due_at": "2026-11-16T20:20:34.536351+00:00",
       "status": "confirmed",
-      "ticker": "GNV",
-      "headline": "Vom Flurfunk: GenoVita Biotech",
-      "move_bps": 1420,
+      "ticker": "WAC",
+      "headline": "Vom Flurfunk: Wackelwerk",
+      "move_bps": -1036,
       "strength": 2,
-      "direction": "up",
-      "published_at": "2026-11-16T19:21:21.605448+00:00"
+      "direction": "down",
+      "published_at": "2026-11-16T19:43:34.536351+00:00"
     },
     {
       "id": 3,
-      "body": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: NeuroPharm AG geht bald nach unten. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
-      "name": "NeuroPharm AG",
-      "due_at": "2026-11-16T19:21:20.452638+00:00",
+      "body": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Eilbote Express geht bald nach oben. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
+      "name": "Eilbote Express",
+      "due_at": "2026-11-16T19:43:33.394428+00:00",
       "status": "confirmed",
-      "ticker": "NPH",
-      "headline": "Der heiße Draht: NeuroPharm AG",
-      "move_bps": -888,
+      "ticker": "EBX",
+      "headline": "Der heiße Draht: Eilbote Express",
+      "move_bps": 518,
       "strength": 2,
-      "direction": "down",
-      "published_at": "2026-11-16T19:21:20.452638+00:00"
+      "direction": "up",
+      "published_at": "2026-11-16T19:43:33.394428+00:00"
     }
   ],
   "reliability_bps": 7500

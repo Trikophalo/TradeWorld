@@ -13,11 +13,13 @@ import { NEXAMON_SAMPLE_CARDS, NEXAMON_SAMPLE_EVOLVES, nexamonSampleArt } from "
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Segmented } from "@/components/ui/segmented";
+import { Tooltip } from "@/components/ui/tooltip";
 import type { NexamonListing } from "@/features/game/nexamon-types";
 import { NEXAMON_CONDITIONS } from "../lib";
 import { ConditionBadge, RarityBadge, SetIcon, TypeIcon } from "./badges";
 import { NexamonCard } from "./card";
 import { CardThumb, NexamonCardBack, NexamonCardFace } from "./card-face";
+import { GradeReveal, GradingPack } from "./grading-reveal";
 import { DealNote, ListingRow } from "./listing-row";
 import { NexamonPack } from "./pack";
 import { PackOpening } from "./pack-opening";
@@ -72,6 +74,14 @@ const DEMO_LISTINGS: NexamonListing[] = [
   };
 });
 
+/** One package per result tier for the reveal demo: below 8, a 9, a 10 and the Black Label. */
+const REVEAL_DEMOS = [
+  { grade: 6, card: 0, serial: 41, valueCents: 960 },
+  { grade: 9, card: 2, serial: 42, valueCents: 19_200 },
+  { grade: 10, card: 3, serial: 43, valueCents: 96_000 },
+  { grade: 11, card: 4, serial: 44, valueCents: 4_800_000 },
+] as const;
+
 function Block({ label, children, testId }: { label: string; children: ReactNode; testId?: string }) {
   return (
     <Card padding="lg" className="min-w-0" data-testid={testId}>
@@ -88,6 +98,7 @@ export function NexamonShowcase() {
   const [run, setRun] = useState(0);
   const [log, setLog] = useState<string[]>([]);
   const [demoSort, setDemoSort] = useState<"number" | "value">("number");
+  const [revealRound, setRevealRound] = useState(0);
 
   return (
     <div className="space-y-4" data-testid="nexamon-showcase">
@@ -160,6 +171,64 @@ export function NexamonShowcase() {
             scale={3}
             evolvesFromName={evolvesName(NEXAMON_SAMPLE_CARDS[1]!)}
           />
+        </div>
+      </Block>
+
+      <Block label="Black Label: die Stufe über der ASP 10 (nur Mint, 1 %, Wert ×10)" testId="nexamon-black-label">
+        <div className="flex flex-wrap items-start justify-center gap-6">
+          <NexamonSlab
+            card={NEXAMON_SAMPLE_CARDS[4]!}
+            art={art[NEXAMON_SAMPLE_CARDS[4]!.key]}
+            grade={11}
+            serial={1}
+            scale={3}
+          />
+          <NexamonSlab
+            card={NEXAMON_SAMPLE_CARDS[4]!}
+            art={art[NEXAMON_SAMPLE_CARDS[4]!.key]}
+            grade={10}
+            serial={2}
+            scale={3}
+          />
+          <div className="flex flex-col items-start gap-2">
+            <GradeChip grade={11} />
+            <GradeChip grade={11} short />
+            <GradeChip grade={10} />
+            <CopyVisual card={REAL_CARDS[2]!} grade={11} serial={3} scale={1} />
+          </div>
+        </div>
+      </Block>
+
+      <Block
+        label="Paket von ASP: aufreißen, dann wird die Note langsam enthüllt (unter 8, 8–9, 10, Black Label)"
+        testId="nexamon-grade-reveal"
+      >
+        <div className="flex flex-wrap items-end justify-center gap-4">
+          <GradingPack scale={2} />
+          <Tooltip testId="showcase-tip" content="Tooltip: erscheint bei Hover, Fokus und Tipp">
+            <button type="button" className="rounded-xs focus-ring" data-testid="showcase-tip-trigger">
+              <CardThumb card={REAL_CARDS[0]!} scale={1} />
+            </button>
+          </Tooltip>
+        </div>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {REVEAL_DEMOS.map((demo) => (
+            <div key={`${demo.grade}-${revealRound}`} data-testid={`reveal-demo-${demo.grade}`}>
+              <GradeReveal
+                card={NEXAMON_SAMPLE_CARDS[demo.card]!}
+                art={art[NEXAMON_SAMPLE_CARDS[demo.card]!.key]}
+                grade={demo.grade}
+                serial={demo.serial}
+                valueCents={demo.valueCents}
+                scale={2}
+              />
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex justify-center">
+          <Button size="sm" variant="secondary" onClick={() => setRevealRound((n) => n + 1)}>
+            Pakete neu versiegeln
+          </Button>
         </div>
       </Block>
 

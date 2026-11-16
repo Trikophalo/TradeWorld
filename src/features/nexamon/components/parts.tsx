@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useGameErrorText } from "@/features/game/errors";
 import type { NexamonCopy } from "@/features/game/nexamon-types";
 import { cn } from "@/lib/utils";
-import { gradeWordKey } from "../lib";
+import { gradeWordKey, isBlackLabel } from "../lib";
 import { ConditionBadge } from "./badges";
 import { CardThumb } from "./card-face";
 import { NexamonSlab } from "./slab";
@@ -57,10 +57,22 @@ export function Stat({
   );
 }
 
-/** The ASP grade of a slab as a chip: "ASP 10 · Gem Mint". Gold for a 10. */
+/** The ASP grade of a slab as a chip: "ASP 10 · Gem Mint". Gold for a 10, black with silver for the Black Label. */
 export function GradeChip({ grade, short = false, className }: { grade: number; short?: boolean; className?: string }) {
   const t = useTranslations("nexamonCards");
   const tn = useTranslations("nexamon");
+  if (isBlackLabel(grade))
+    return (
+      <Badge
+        tone="neutral"
+        data-grade={grade}
+        data-black-label
+        className={cn("border border-black-label-edge bg-black-label text-on-black-label", className)}
+        title={tn("blackLabel.long")}
+      >
+        {short ? tn("blackLabel.short") : tn("blackLabel.long")}
+      </Badge>
+    );
   return (
     <Badge
       tone={grade >= 8 ? "gain" : "neutral"}

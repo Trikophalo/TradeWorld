@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  gradeNumber,
+  gradeStepPauseMs,
+  gradeTier,
+  isBlackLabel,
   clampGrade,
   estimatePixelTextWidth,
   fitTextScale,
@@ -35,20 +39,43 @@ describe("card numbers and serials", () => {
 });
 
 describe("grades", () => {
-  it("has a word for every grade from 1 to 10", () => {
-    expect(Object.keys(GRADE_WORDS)).toHaveLength(10);
+  it("has a word for every grade from 1 to 10 and for the Black Label", () => {
+    expect(Object.keys(GRADE_WORDS)).toHaveLength(11);
+    expect(gradeWordKey(11)).toBe("blackLabel");
     expect(gradeWordKey(10)).toBe("gemMint");
     expect(gradeWordKey(9)).toBe("mint");
     expect(gradeWordKey(7)).toBe("nearMint");
     expect(gradeWordKey(1)).toBe("poor");
   });
 
-  it("holds any number between 1 and 10", () => {
+  it("holds any number between 1 and 10; only an exact 11 is the Black Label", () => {
     expect(clampGrade(0)).toBe(1);
-    expect(clampGrade(11)).toBe(10);
+    expect(clampGrade(11)).toBe(11);
+    expect(clampGrade(12)).toBe(10);
+    expect(isBlackLabel(11)).toBe(true);
+    expect(isBlackLabel(10)).toBe(false);
+    expect(isBlackLabel(null)).toBe(false);
+    expect(gradeNumber(11)).toBe(10);
+    expect(gradeNumber(4)).toBe(4);
     expect(clampGrade(8.6)).toBe(9);
     expect(clampGrade(Number.NaN)).toBe(1);
     expect(gradeWordKey(99)).toBe("gemMint");
+  });
+});
+
+describe("grade reveal", () => {
+  it("sorts a grade into its tier", () => {
+    expect([1, 7, 8, 9, 10, 11].map(gradeTier)).toEqual(["low", "low", "good", "good", "ten", "black"]);
+  });
+
+  it("pauses longer before every step, most before the top grades", () => {
+    for (let step = 2; step <= 10; step++) expect(gradeStepPauseMs(step)).toBeGreaterThan(gradeStepPauseMs(step - 1));
+    expect(gradeStepPauseMs(10)).toBeGreaterThanOrEqual(5 * gradeStepPauseMs(1));
+    // the whole count to 10 stays a show, not a wait
+    let total = 0;
+    for (let step = 1; step <= 10; step++) total += gradeStepPauseMs(step);
+    expect(total).toBeGreaterThan(4_000);
+    expect(total).toBeLessThan(8_000);
   });
 });
 

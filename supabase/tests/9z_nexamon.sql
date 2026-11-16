@@ -643,7 +643,7 @@ select tests.throws_key(format($$select public.crack_nexamon_slab(gen_random_uui
 reset role;
 select tests.assert(
   :'gr1b'::jsonb = :'gr1'::jsonb
-  and (:'gr1'::jsonb ->> 'fee_cents')::bigint = greatest(100, public.div_round_half_even(:gv::bigint * 5000, 10000))
+  and (:'gr1'::jsonb ->> 'fee_cents')::bigint = greatest(100, public.div_round_half_even(:gv::bigint * 3000, 10000))
   and tests.cash(:a) = :cash_a::bigint - (:'gr1'::jsonb ->> 'fee_cents')::bigint
   and tests.households() = :hh4::bigint + (:'gr1'::jsonb ->> 'fee_cents')::bigint
   and (select count(*) from public.ledger_transactions where idempotency_key = 'nexamon:grade:' || :a || ':' || :rg
@@ -651,10 +651,12 @@ select tests.assert(
   and :'gr1'::jsonb #>> '{copy,state}' = 'grading' and :'gr1'::jsonb #>> '{copy,grade}' is null
   and (:'gr1'::jsonb ->> 'ready_at')::timestamptz = (tests.nx_copy(:'g1')).grading_until
   and (tests.nx_copy(:'g1')).grading_until between public.game_now() + interval '59 minutes' and public.game_now() + interval '60 minutes',
-  'grade_nexamon_card(): 50 % of the copy''s value to the households, back in one hour');
+  'grade_nexamon_card(): 30 % of the copy''s value to the households, back in one hour');
 select public.nexamon_finish_gradings(null, public.game_now() + interval '58 minutes') as early \gset
 select tests.set_cfg('nexamon', '{grading,gradeWeightsBps,mint}', '[0, 0, 0, 0, 0, 0, 0, 0, 0, 10000]');
 select tests.set_cfg('nexamon', '{grading,gradeWeightsBps,poor}', '[0, 0, 10000, 0, 0, 0, 0, 0, 0, 0]');
+-- no Black Label here (1 % of the mint gradings; its own tests are in a6_black_label.sql)
+select tests.set_cfg('nexamon', '{grading,blackLabel,chanceBps}', '0');
 select public.nexamon_finish_gradings(null, public.game_now() + interval '61 minutes') as done \gset
 select tests.assert(
   :early = 0 and :done = 1
@@ -682,7 +684,7 @@ select tests.assert(
   (tests.nx_copy(:'g2')).grade is null and (tests.nx_copy(:'g2')).condition = 'poor' and (tests.nx_copy(:'g2')).graded_at is null
   and (:'cr'::jsonb ->> 'old_grade')::integer = 3 and :'cr'::jsonb #>> '{copy,state}' = 'raw'
   and (:'cr'::jsonb #>> '{copy,value_cents}')::bigint = tests.nx_value('me-062', 'poor')
-  and :fee2 = greatest(100, public.div_round_half_even(tests.nx_value('me-062', 'poor') * 5000, 10000))
+  and :fee2 = greatest(100, public.div_round_half_even(tests.nx_value('me-062', 'poor') * 3000, 10000))
   and tests.cash(:a) = :cash_a::bigint - :fee2
   and (:'ov'::jsonb #>> '{collection,graded}')::integer = 2 and (:'ov'::jsonb #>> '{collection,grading}')::integer = 0
   and (:'ov'::jsonb ->> 'unlocked')::boolean
@@ -869,7 +871,7 @@ select tests.assert(
 -- Q. Missions, notification types, privileges; the config goes back
 -- =============================================================================
 select tests.assert(
-  (select count(*) from public.mission_templates where key like '%nexamon%' and params ->> 'unlock' = 'nexamon' and is_active) = 8
+  (select count(*) from public.mission_templates where key like '%nexamon%' and params ->> 'unlock' = 'nexamon' and is_active) = 9
   and (select count(*) from public.notification_types where key in ('nexamon_sale', 'nexamon_graded')) = 2
   and not has_function_privilege('authenticated', 'public.nexamon_run_due(timestamptz)', 'execute')
   and not has_function_privilege('authenticated', 'public.nexamon_sell(uuid, uuid, text, text, timestamptz)', 'execute')

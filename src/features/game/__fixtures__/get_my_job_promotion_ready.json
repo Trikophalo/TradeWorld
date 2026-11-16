@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "c398bf48-592a-4a68-ac24-019de388a7f2",
+    "id": "c75ca6a7-3835-4050-a79f-e96bc820d9ba",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "c76af3f2-dc09-a8cc-b107-a7c326ad5b09",
+      "id": "0e23c6f3-2c55-dff0-d773-3075ae4f54b1",
       "logo": null,
-      "name": "Glanz & Gloria",
-      "color": "#D4AF37",
+      "name": "Orbitfracht",
+      "color": "#5C6BC0",
       "is_ai": true,
-      "sector": "retail",
-      "ticker": "LUX"
+      "sector": "logistics",
+      "ticker": "OFR"
     },
     "presence": {
-      "fire_at": "2026-11-21T19:21:47.538011+00:00",
+      "fire_at": "2026-11-21T19:43:56.904219+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-16T19:21:47.538011+00:00"
+      "last_active_at": "2026-11-16T19:43:56.904219+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-16T19:21:47.853944+00:00",
+    "started_at": "2026-11-16T19:43:57.050003+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,
