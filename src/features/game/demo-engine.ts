@@ -36,6 +36,7 @@ import { createArtEngine, type ArtState } from "./demo/artworks";
 import { createPropertyEngine, type HomeState } from "./demo/property";
 import { createRentalsEngine, type DemoRentalsState } from "./demo/rentals";
 import { createFriendEngine, demoFriendCard, type DemoFriend, type DemoFriendCode } from "./demo/friends";
+import { createFriendChatEngine, type DemoChat } from "./demo/friend-chats";
 import { createAccessoryEngine, type DemoWardrobe } from "./demo/accessories";
 import { demoCoworkerMembers, demoCoworkers, type DemoCoworker } from "./demo/floor";
 import { createStockNewsEngine } from "./demo/stock-news";
@@ -126,6 +127,8 @@ interface PlayerState {
   /** Made-up friends and the own pokes (ADR-155). */
   friendList?: DemoFriend[];
   pokes?: { nickname: string; at: number }[];
+  /** Chats with the made-up friends (ADR-164). */
+  friendChats?: DemoChat[];
   /** Bought and worn accessories (ADR-155). */
   wardrobe?: DemoWardrobe;
   /** Battle wins with a prize today (ADR-160, daily cap). */
@@ -1306,6 +1309,20 @@ const friends = createFriendEngine({
   },
 });
 
+const friendChats = createFriendChatEngine({
+  nickname: () => p().nickname,
+  avatarKey: () => career.avatarKey(),
+  idempotent,
+  now: () => new Date(),
+  random: Math.random,
+  friendList: () => p().friendList ?? [],
+  chats: () => (p().friendChats ??= []),
+  setChats: (value) => {
+    p().friendChats = value;
+  },
+  persist,
+});
+
 /** Made-up colleagues at the demo player's AI employer (ADR-156); none without a job or with an own company. */
 async function coworkersNow(): Promise<DemoCoworker[]> {
   if (p().company) return [];
@@ -1741,6 +1758,7 @@ export const demoEngine: GameEngine = {
   ...home.engine,
   ...rentals.engine,
   ...friends,
+  ...friendChats,
   ...wardrobe,
   /** Own card with the worn accessories; the made-up friends and colleagues have one too (ADR-155, ADR-156). */
   async playerCard(nickname) {

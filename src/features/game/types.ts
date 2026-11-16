@@ -1793,6 +1793,57 @@ export interface ChatMessage {
   createdAt: string;
 }
 
+/** A member of a chat with friends, as the others see them (ADR-164). */
+export interface FriendChatMember {
+  nickname: string;
+  tag: string | null;
+  level: number;
+  avatarKey: string;
+  accessories: string[];
+  isAdmin: boolean;
+  online: boolean;
+}
+
+/** One line of a chat with friends: a player's message or a system line (joined, left, renamed). */
+export interface FriendChatMessage {
+  id: number;
+  kind: "player" | "system";
+  author: string | null;
+  avatarKey: string | null;
+  isMe: boolean;
+  body: string;
+  createdAt: string;
+}
+
+/** A direct chat with a friend or a group (ADR-164), as the own player sees it. */
+export interface FriendChatSummary {
+  id: number;
+  kind: "direct" | "group";
+  /** The group's name, or the friend's nickname in a direct chat. */
+  name: string;
+  isAdmin: boolean;
+  /** False in a direct chat once the friendship ended (read-only). */
+  canWrite: boolean;
+  unread: number;
+  memberCount: number;
+  /** Everybody else in the chat. */
+  members: FriendChatMember[];
+  last: FriendChatMessage | null;
+  lastAt: string;
+}
+
+export interface FriendChats {
+  chats: FriendChatSummary[];
+  unread: number;
+}
+
+export interface FriendChatThread {
+  chat: FriendChatSummary;
+  /** Oldest first. */
+  messages: FriendChatMessage[];
+  hasMore: boolean;
+}
+
 export interface CompanyChat {
   company: { id: string; name: string; color: string } | null;
   members: number;
@@ -2078,6 +2129,12 @@ export const GAME_ERROR_KEYS = [
   "friend_code_unknown",
   "friend_code_self",
   "friend_code_used",
+  "chat_unknown",
+  "chat_read_only",
+  "chat_not_admin",
+  "chat_group_full",
+  "chat_group_too_small",
+  "chat_already_member",
 ] as const;
 export type GameErrorKey = (typeof GAME_ERROR_KEYS)[number] | "unknown";
 
@@ -2328,6 +2385,18 @@ export interface GameEngine extends BattleEngine {
   removeFriend(requestId: string, nickname: string): Promise<Friends>;
   /** Poke a friend: they get a notification (ADR-155). */
   pokeFriend(requestId: string, nickname: string): Promise<PokeResult>;
+  /** Chats with friends (ADR-164): the list, one conversation (older lines with beforeId), read marks. */
+  friendChats(): Promise<FriendChats>;
+  friendChat(chatId: number, beforeId?: number | null): Promise<FriendChatThread>;
+  /** Marks a chat as read; returns all unread lines left. */
+  markFriendChatRead(chatId: number): Promise<number>;
+  openDirectChat(requestId: string, nickname: string): Promise<FriendChatSummary>;
+  createGroupChat(requestId: string, name: string, nicknames: string[]): Promise<FriendChatSummary>;
+  postFriendChatMessage(requestId: string, chatId: number, body: string): Promise<FriendChatMessage>;
+  addGroupMember(requestId: string, chatId: number, nickname: string): Promise<FriendChatSummary>;
+  removeGroupMember(requestId: string, chatId: number, nickname: string): Promise<FriendChatSummary>;
+  leaveGroup(requestId: string, chatId: number): Promise<void>;
+  renameGroup(requestId: string, chatId: number, name: string): Promise<FriendChatSummary>;
   /** Accessories for the pixel figure (ADR-155). */
   accessories(): Promise<Wardrobe>;
   buyAccessory(requestId: string, key: string): Promise<WardrobeBought>;

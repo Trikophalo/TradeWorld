@@ -17,6 +17,8 @@ export const DISCLOSURE = {
   profileCareer: 2,
   /** Friends (ADR-084): after the tutorial, when the game has a first shape. */
   profileFriends: 2,
+  /** Chats with friends (ADR-164): with the friends, after the tutorial. */
+  friendChats: 2,
   /** Wardrobe with accessories for the pixel figure (ADR-155): after the tutorial, like the friends. */
   profileWardrobe: 2,
   /** News battles under the TV (ADR-160): after the tutorial, like the friends (battles.lobby.minLevel). */

@@ -818,7 +818,13 @@
     "battle_not_joined": "Du spielst in diesem Battle nicht mit.",
     "battle_round_closed": "Zu spät, diese Runde ist schon vorbei.",
     "accessory_exclusive": "Das gibt es nicht zu kaufen. Gewinn es in einem News-Battle!",
-    "battle_unknown": "Dieses Battle gibt es nicht (mehr)."
+    "battle_unknown": "Dieses Battle gibt es nicht (mehr).",
+    "chat_unknown": "Diesen Chat gibt es nicht (mehr).",
+    "chat_read_only": "Ihr seid keine Freunde mehr. In diesem Chat kannst du nicht mehr schreiben.",
+    "chat_not_admin": "Das darf nur der Admin der Gruppe.",
+    "chat_group_full": "Die Gruppe ist voll.",
+    "chat_group_too_small": "Wähle mindestens einen Freund für die Gruppe.",
+    "chat_already_member": "Ist schon in der Gruppe."
   },
   "locks": {
     "level": "Level {level}",
@@ -2989,7 +2995,7 @@
       "summary": "{count, plural, one {# Freund} other {# Freunde}} · {online} online",
       "emptyTitle": "Der Platz ist noch leer",
       "emptyText": "Sobald du Freunde hast, stehen sie hier. Tipp auf eine Figur für ihr Profil oder stups sie an.",
-      "hint": "Tipp auf eine Figur für ihr Profil. Mit 👉 stupst du jemanden an.",
+      "hint": "Tipp auf eine Figur für ihr Profil. Mit 💬 schreibst du, mit 👉 stupst du jemanden an.",
       "label": "Freunde-Platz mit {count, plural, one {# Freund} other {# Freunden}}"
     }
   },
@@ -3043,7 +3049,8 @@
     "tabs": {
       "feed": "Neuigkeiten",
       "league": "Wochenliga",
-      "friends": "Freunde"
+      "friends": "Freunde",
+      "chats": "Chats"
     },
     "feed": {
       "kinds": {
@@ -7643,5 +7650,60 @@
         "low": "Schwung +{boostPct} % (bis +{maxPct} % möglich): Jede gelöste Aufgabe hebt die Nachfrage."
       }
     }
+  },
+  "friendChat": {
+    "title": "Chats",
+    "listTitle": "Deine Chats",
+    "emptyTitle": "Noch keine Chats",
+    "emptyText": "Schreib einem Freund oder gründe eine Gruppe. Hier landen alle Unterhaltungen.",
+    "noFriendsText": "Füge zuerst Freunde hinzu, dann kannst du ihnen schreiben.",
+    "startTitle": "Schreib einem Freund",
+    "noLines": "Noch keine Nachricht",
+    "newGroup": "Gruppe",
+    "newGroupTitle": "Neue Gruppe",
+    "newGroupText": "Gib der Gruppe einen Namen und hol Freunde dazu, bis zu {max} Leute mit dir.",
+    "groupName": "Name der Gruppe",
+    "groupNameHint": "{min} bis {max} Zeichen",
+    "pickFriends": "Freunde auswählen",
+    "count": "{count}/{max}",
+    "create": "Gruppe gründen",
+    "created": "Gruppe gegründet",
+    "back": "← Zurück",
+    "backLabel": "Zurück",
+    "placeholder": "Nachricht schreiben",
+    "send": "Senden",
+    "emojis": "Emojis",
+    "empty": "Noch keine Nachrichten. Sag hallo! 👋",
+    "readOnly": "Ihr seid keine Freunde mehr. Der Chat bleibt lesbar, aber du kannst nicht mehr schreiben.",
+    "older": "Ältere laden",
+    "youPrefix": "Du: ",
+    "members": "{count, plural, one {# Mitglied} other {# Mitglieder}}",
+    "online": "online",
+    "offline": "offline",
+    "onlineCount": "{count} online",
+    "admin": "Admin",
+    "unread": "{count, plural, one {# ungelesene Nachricht} other {# ungelesene Nachrichten}}",
+    "yesterday": "Gestern",
+    "manage": "Gruppe",
+    "manageTitle": "Gruppe verwalten",
+    "rename": "Ändern",
+    "renamed": "Gruppe umbenannt",
+    "adminOnly": "Nur der Admin kann die Gruppe umbenennen und Mitglieder entfernen.",
+    "addMember": "Freund hinzufügen",
+    "added": "{name} ist jetzt dabei",
+    "full": "Die Gruppe ist voll.",
+    "noMoreFriends": "Alle deine Freunde sind schon dabei.",
+    "remove": "Entfernen",
+    "removeLabel": "{name} aus der Gruppe nehmen",
+    "removed": "{name} wurde entfernt",
+    "leave": "Gruppe verlassen",
+    "leaveSure": "Wirklich verlassen",
+    "cancel": "Abbrechen",
+    "left": "Du hast die Gruppe verlassen",
+    "message": "Nachricht",
+    "messageLabel": "{name} eine Nachricht schreiben",
+    "openProfile": "Profil von {name} öffnen",
+    "pick": "Wähle einen Chat",
+    "pickText": "Links stehen deine Unterhaltungen. Oder schreib einem Freund."
   }
 }

@@ -1,0 +1,44 @@
+{
+  "chat": {
+    "id": 6,
+    "kind": "direct",
+    "last": {
+      "id": 27,
+      "body": "Hallo Kunst 👋",
+      "kind": "player",
+      "is_me": false,
+      "author": "Fixture_Gmbh",
+      "avatar_key": "rookie",
+      "created_at": "2026-11-16T09:58:12.617565+00:00"
+    },
+    "name": "Fixture_Gmbh",
+    "unread": 1,
+    "last_at": "2026-11-16T09:58:12.617565+00:00",
+    "members": [
+      {
+        "tag": "ZSXR",
+        "level": 15,
+        "online": true,
+        "is_admin": false,
+        "nickname": "Fixture_Gmbh",
+        "avatar_key": "rookie",
+        "accessories": []
+      }
+    ],
+    "is_admin": false,
+    "can_write": true,
+    "member_count": 2
+  },
+  "has_more": false,
+  "messages": [
+    {
+      "id": 27,
+      "body": "Hallo Kunst 👋",
+      "kind": "player",
+      "is_me": false,
+      "author": "Fixture_Gmbh",
+      "avatar_key": "rookie",
+      "created_at": "2026-11-16T09:58:12.617565+00:00"
+    }
+  ]
+}

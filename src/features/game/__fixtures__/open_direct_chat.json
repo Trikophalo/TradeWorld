@@ -1,0 +1,24 @@
+{
+  "chat": {
+    "id": 6,
+    "kind": "direct",
+    "last": null,
+    "name": "Fixture_Kunst",
+    "unread": 0,
+    "last_at": "2026-11-16T09:58:12.612803+00:00",
+    "members": [
+      {
+        "tag": "EV5V",
+        "level": 8,
+        "online": true,
+        "is_admin": false,
+        "nickname": "Fixture_Kunst",
+        "avatar_key": "rookie",
+        "accessories": []
+      }
+    ],
+    "is_admin": false,
+    "can_write": true,
+    "member_count": 2
+  }
+}

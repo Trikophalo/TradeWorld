@@ -1,0 +1,32 @@
+{
+  "chat": {
+    "id": 8,
+    "kind": "group",
+    "last": {
+      "id": 32,
+      "body": "Fixture_Gmbh hat Fixture_Neu aus der Gruppe genommen.",
+      "kind": "system",
+      "is_me": false,
+      "author": null,
+      "avatar_key": null,
+      "created_at": "2026-11-16T09:58:12.642519+00:00"
+    },
+    "name": "Fixture Bullen",
+    "unread": 0,
+    "last_at": "2026-11-16T09:58:12.642519+00:00",
+    "members": [
+      {
+        "tag": "EV5V",
+        "level": 8,
+        "online": true,
+        "is_admin": false,
+        "nickname": "Fixture_Kunst",
+        "avatar_key": "rookie",
+        "accessories": []
+      }
+    ],
+    "is_admin": true,
+    "can_write": true,
+    "member_count": 2
+  }
+}

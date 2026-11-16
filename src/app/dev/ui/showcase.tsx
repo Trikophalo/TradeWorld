@@ -4,7 +4,7 @@ import { PlayerTag } from "@/components/ui/player-tag";
 import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useRef, useState, type ReactNode } from "react";
+import { Suspense, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page";
 import { ALL_PIXEL_ART, BEAR, BULL, COIN, MIRA } from "@/components/pixel/art";
@@ -39,6 +39,7 @@ import { OfficeScene } from "@/features/company/components/office-scene";
 import { ACCESSORIES } from "@/config/accessories";
 import { BattleShowcase } from "@/features/news/battle/showcase";
 import { FriendsPlaza } from "@/features/friends/components/plaza";
+import { ChatIconButton, ChatsView, ChatUnreadBadge, MessageFriendButton } from "@/features/friends/components/chats";
 import { RentalShowcase } from "@/features/property/components/rental-showcase";
 import { PokeButton } from "@/features/friends/components/poke";
 import { FigureCard } from "@/features/wardrobe/components/figure-card";
@@ -888,6 +889,14 @@ export function Showcase() {
           ))}
         </Demo>
         <FriendsPlaza />
+        <Demo label="Chats mit Freunden (ADR-164): Nachricht, 💬, ungelesen" className="flex-wrap justify-start gap-3">
+          <MessageFriendButton nickname={SAMPLE_CARD.nickname} size="sm" />
+          <ChatIconButton nickname={SAMPLE_CARD.nickname} />
+          <ChatUnreadBadge />
+        </Demo>
+        <Suspense fallback={null}>
+          <ChatsView />
+        </Suspense>
         <Demo label="Büro: Sprechblasen über den Figuren (ADR-156)" className="flex-wrap items-end justify-start gap-4">
           {[
             { key: "a", text: "Kaffee ist fertig", mine: true, avatar: "rookie", worn: ["cowboy_hat"] },

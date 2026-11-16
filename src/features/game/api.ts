@@ -4,6 +4,7 @@ import { ARTWORK_RPC_SCHEMAS, liveArtEngine } from "./api-artworks";
 import { COMPANY_RPC_SCHEMAS, liveCompanyEngine } from "./api-company";
 import { FRIEND_RPC_SCHEMAS, liveFriendEngine } from "./api-friends";
 import { ACCESSORY_RPC_SCHEMAS, liveAccessoryEngine } from "./api-accessories";
+import { FRIEND_CHAT_RPC_SCHEMAS, liveFriendChatEngine } from "./api-friend-chats";
 import { SOCIAL_RPC_SCHEMAS, liveSocialEngine } from "./api-social";
 import { COMPANY_EVENT_RPC_SCHEMAS, liveCompanyEventEngine } from "./api-company-events";
 import { CRYPTO_RPC_SCHEMAS, liveCryptoEngine } from "./api-crypto";
@@ -501,6 +502,7 @@ export const RPC_SCHEMAS = {
   start_company_move: companyMovesSchema,
   ...FRIEND_RPC_SCHEMAS,
   ...ACCESSORY_RPC_SCHEMAS,
+  ...FRIEND_CHAT_RPC_SCHEMAS,
   ...SOCIAL_RPC_SCHEMAS,
   ...COMPANY_EVENT_RPC_SCHEMAS,
   ...DEAL_RPC_SCHEMAS,
@@ -523,6 +525,7 @@ export const liveEngine: GameEngine = {
   ...liveRentalEngine,
   ...liveFriendEngine,
   ...liveAccessoryEngine,
+  ...liveFriendChatEngine,
   async companyMoves() {
     return toMoves(await rpc("get_company_moves", {}, companyMovesSchema));
   },

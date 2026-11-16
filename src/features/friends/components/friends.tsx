@@ -22,6 +22,8 @@ import { haptic } from "@/lib/haptics";
 import { parseTag } from "@/lib/player-tag";
 import { playSound } from "@/lib/sound";
 import { friendStatus, useFriends, useSetFriends } from "../hooks";
+import { ChatIconButton, MessageFriendButton } from "./chats";
+import { Reveal } from "@/features/progression/components/reveal";
 
 const date = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "short", year: "numeric" });
 
@@ -100,6 +102,9 @@ export function FriendButton({ nickname }: { nickname: string }) {
       {status === "friends" && (
         <>
           <Badge tone="gain">♥ {t("isFriend")}</Badge>
+          <Reveal feature="friendChats">
+            <MessageFriendButton nickname={nickname} size="sm" />
+          </Reveal>
           <Button
             size="sm"
             variant="ghost"
@@ -158,7 +163,9 @@ export function FriendsView() {
             <ul className="grid gap-2 sm:grid-cols-2">
               <AnimatePresence initial={false}>
                 {friends.data.friends.map((f) => (
-                  <PersonRow key={f.nickname} entry={f} hint={t("since", { date: date.format(new Date(f.at)) })} />
+                  <PersonRow key={f.nickname} entry={f} hint={t("since", { date: date.format(new Date(f.at)) })}>
+                    <ChatIconButton nickname={f.nickname} />
+                  </PersonRow>
                 ))}
               </AnimatePresence>
             </ul>

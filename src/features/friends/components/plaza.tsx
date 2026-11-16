@@ -15,6 +15,7 @@ import { useMountTime } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
 import { useFriends } from "../hooks";
 import { usePoke } from "./poke";
+import { ChatIconButton } from "./chats";
 
 /** A small, stable offset per name, so the crowd does not stand in a perfect grid. */
 function jitter(name: string): number {
@@ -160,6 +161,7 @@ function FriendFigure({ friend, index }: { friend: FriendEntry; index: number })
       </Link>
       <span className="mt-1 flex w-full min-w-0 items-center justify-center gap-0.5">
         <span className="truncate text-xs font-medium text-fg-1">{friend.nickname}</span>
+        <ChatIconButton nickname={friend.nickname} compact />
         <button
           type="button"
           onClick={() => void poke()}
