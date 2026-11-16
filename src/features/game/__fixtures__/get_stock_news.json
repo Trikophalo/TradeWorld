@@ -2,42 +2,42 @@
   "items": [
     {
       "id": 5,
-      "body": "Die Geschäfte laufen besser als geplant. Analysten erwarten einen deutlich steigenden Kurs. Sicher ist das nicht.",
-      "name": "Gipfelwerk",
-      "due_at": "2026-11-16T19:34:11.797155+00:00",
+      "body": "Neue Aktien sollen ausgegeben werden. Das verwässert die Anteile, der Kurs dürfte leicht nachgeben. Sicher ist das nicht.",
+      "name": "Eilbote Express",
+      "due_at": "2026-11-16T20:34:34.840064+00:00",
       "status": "open",
-      "ticker": "GIP",
-      "headline": "Gipfelwerk hebt die Prognose an",
+      "ticker": "EBX",
+      "headline": "Eilbote Express plant Kapitalerhöhung",
       "move_bps": null,
-      "strength": 3,
-      "direction": "up",
-      "published_at": "2026-11-16T19:18:30.73514+00:00"
+      "strength": 1,
+      "direction": "down",
+      "published_at": "2026-11-16T20:21:50.231764+00:00"
     },
     {
       "id": 4,
-      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei GenoVita Biotech tut sich in der nächsten Stunde etwas, und zwar nach oben. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
+      "body": "Ein Vögelchen hat mir gezwitschert: GenoVita Biotech dürfte in der kommenden Stunde nach oben gehen. Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.",
       "name": "GenoVita Biotech",
-      "due_at": "2026-11-16T18:35:08.050261+00:00",
+      "due_at": "2026-11-16T19:51:21.605448+00:00",
       "status": "confirmed",
       "ticker": "GNV",
-      "headline": "Mr. Doodle Dangles Geheimtipp",
-      "move_bps": 1368,
+      "headline": "Vom Flurfunk: GenoVita Biotech",
+      "move_bps": 1420,
       "strength": 2,
       "direction": "up",
-      "published_at": "2026-11-16T18:18:08.050261+00:00"
+      "published_at": "2026-11-16T19:21:21.605448+00:00"
     },
     {
       "id": 3,
-      "body": "Ein Vögelchen hat mir gezwitschert: Glanz & Gloria dürfte in der kommenden Stunde nach unten gehen. Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.",
-      "name": "Glanz & Gloria",
-      "due_at": "2026-11-16T18:18:06.989329+00:00",
-      "status": "fizzled",
-      "ticker": "LUX",
-      "headline": "Vom Flurfunk: Glanz & Gloria",
-      "move_bps": null,
+      "body": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: NeuroPharm AG geht bald nach unten. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
+      "name": "NeuroPharm AG",
+      "due_at": "2026-11-16T19:21:20.452638+00:00",
+      "status": "confirmed",
+      "ticker": "NPH",
+      "headline": "Der heiße Draht: NeuroPharm AG",
+      "move_bps": -888,
       "strength": 2,
       "direction": "down",
-      "published_at": "2026-11-16T18:18:06.989329+00:00"
+      "published_at": "2026-11-16T19:21:20.452638+00:00"
     }
   ],
   "reliability_bps": 7500

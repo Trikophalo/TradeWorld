@@ -241,8 +241,8 @@ describe("copies", () => {
     expect(poor.feeCents).toBe(BALANCE.nexamon.grading.minFeeCents);
     expect(poor.chances).toHaveLength(10);
     expect(poor.chances.reduce((sum, c) => sum + c.chanceBps, 0)).toBe(10_000);
-    // Grades 8 to 10 beat a raw copy; a poor one rarely gets there.
-    expect(poor.betterBps).toBe(400 + 90 + 10);
+    // A raw poor copy is worth 70 %, so grades 6 to 10 already beat it.
+    expect(poor.betterBps).toBe(1_500 + 1_000 + 400 + 90 + 10);
     const good = gradingQuote({ condition: "good", valueCents: 10_000 });
     expect(good.betterBps).toBe(2_500 + 2_000 + 1_000);
   });

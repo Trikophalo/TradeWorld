@@ -1,6 +1,6 @@
 {
   "coin": {
-    "id": "9c26f0af-cce1-4917-b40e-f37968fc06f0",
+    "id": "81b0e028-4cac-473b-a7db-d3f96a299499",
     "logo": {
       "grid": [
         "................",
@@ -27,8 +27,8 @@
     "stats": { "hype": 0.0, "tech": 0.0, "utility": 0.0 },
     "action": {
       "key": "audit",
-      "ends_at": "2026-11-17T18:18:30.591039+00:00",
-      "started_at": "2026-11-16T18:18:30.591039+00:00"
+      "ends_at": "2026-11-17T19:21:50.009465+00:00",
+      "started_at": "2026-11-16T19:21:50.009465+00:00"
     },
     "launch": null,
     "status": "draft",
@@ -42,12 +42,12 @@
       { "key": "staking", "hours": 12, "available": false, "cost_cents": 500000, "success_bps": 10000 },
       { "key": "bugfix", "hours": 3, "available": false, "cost_cents": 100000, "success_bps": 10000 }
     ],
-    "creator": { "tag": "WP9Z", "trust": { "band": "blank", "score": 50 }, "nickname": "Fixture_Coiner" },
+    "creator": { "tag": "3ZCQ", "trust": { "band": "blank", "score": 50 }, "nickname": "Fixture_Coiner" },
     "fee_bps": 100,
     "category": "player",
     "price_e4": null,
     "burn_hype": 8,
-    "created_at": "2026-11-16T18:18:30.532769+00:00",
+    "created_at": "2026-11-16T19:21:49.92043+00:00",
     "low_24h_e4": null,
     "pool_cents": 0,
     "burn_min_e6": 0,

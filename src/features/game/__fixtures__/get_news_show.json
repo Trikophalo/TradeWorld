@@ -1,8 +1,8 @@
 {
-  "now": "2026-11-16T18:18:31.46103+00:00",
+  "now": "2026-11-16T19:21:51.484242+00:00",
   "chat": [
     {
-      "at": "2026-11-16T18:18:31.455387+00:00",
+      "at": "2026-11-16T19:21:51.476951+00:00",
       "id": 223,
       "bot": false,
       "body": "Was für eine Sendung 💀📉",
@@ -13,105 +13,85 @@
   "show": {
     "id": 7,
     "writer": "mini",
-    "airs_at": "2026-11-16T18:00:00+00:00",
+    "airs_at": "2026-11-16T19:00:00+00:00",
     "segments": [
       {
         "kind": "gossip",
-        "mood": "proud",
-        "text": "Bitte festhalten: Ottos Ecke gegründet, und zwar bei Floor_Otto. Auch ein blindes Huhn findet mal ein Korn, aber immerhin.",
-        "figure": { "nickname": "Floor_Otto", "avatar_key": "rookie", "accessories": [] },
+        "mood": "shocked",
+        "text": "Gute Nachrichten, ausnahmsweise. Bei Knapp_Anna heißt es: Level 10 erreicht. So, und jetzt alle anderen: Schämt euch.",
+        "figure": { "nickname": "Knapp_Anna", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Applaus für Floor_Otto"
+        "headline": "Knapp_Anna hat es geschafft"
       },
       {
-        "kind": "hype",
-        "mood": "laughing",
-        "text": "Xp Werkstatt räumt ab. Ein Kind hat im Schulaufsatz darüber geschrieben, die Klasse war begeistert. Xp_Chefin hängt sich das gerahmt ins Büro. Die Kundschaft rennt die Tür ein.",
-        "figure": { "nickname": "Xp_Chefin", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "gain", "label": "Bekanntheit +22,7 %" }],
-        "headline": "Ritterschlag für Xp Werkstatt"
+        "kind": "scandal",
+        "mood": "angry",
+        "text": "Bei Frieda Apps brennt die Hütte. Das Qualitätssiegel an der Wand stellte sich als Kinderzeichnung heraus. Frieda_Format spricht von einem Missverständnis. Zur Erinnerung, das Geschäftsmodell lautet: „Apps für Vereine“.",
+        "figure": { "nickname": "Frieda_Format", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −23,6 %" }],
+        "headline": "Frieda Apps: Chef Frieda_Format unter Beschuss"
       },
       {
         "kind": "nft",
-        "mood": "confused",
-        "text": "Kunstmarkt, oder was man dafür hält: „Neon Nacht“ von Nina_Neon ging für 30.000 € an Ben_Bieter. Immerhin kann man es nicht fallen lassen.",
+        "mood": "laughing",
+        "text": "Aus der Welt der bunten Kästchen: Ben_Bieter hat sich „Neon Nacht“ von Nina_Neon für 30.000 € gegönnt. Die Künstlerseele jubelt, der Geldbeutel des Käufers ruft die Polizei.",
         "figure": { "nickname": "Nina_Neon", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "30.000 € für ein paar Pixel"
+        "headline": "„Neon Nacht“ wechselt den Besitzer"
       },
       {
         "kind": "winner",
         "mood": "shocked",
-        "text": "Fixture_Neu ist heute um 1.137.544 € reicher, 11375,4 % rauf. Alle anderen dürfen jetzt neidisch sein. Bitte der Reihe nach.",
+        "text": "Fixture_Neu ist heute um 1.137.953 € reicher, 11379,5 % rauf. Das Finanzamt hat bereits freundlich gewunken.",
         "figure": { "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] },
         "effects": [],
         "headline": "Glückspilz des Tages: Fixture_Neu"
       },
       {
         "kind": "gossip",
-        "mood": "shocked",
-        "text": "Bitte festhalten: Bodenständig gegründet, und zwar bei Floor_Frida. Meine Schwiegermutter hat es vorausgesagt, und die liegt sonst immer falsch.",
-        "figure": { "nickname": "Floor_Frida", "avatar_key": "rookie", "accessories": [] },
+        "mood": "proud",
+        "text": "Ich fasse es nicht, aber es stimmt. Udo_Untermiete meldet: Level 5 erreicht. Die Konkurrenz darf sich gern ein Beispiel nehmen, ihr Luschen.",
+        "figure": { "nickname": "Udo_Untermiete", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Applaus für Floor_Frida"
+        "headline": "Na so was: Udo_Untermiete"
       },
       {
-        "kind": "scandal",
-        "mood": "shocked",
-        "text": "Das Netz zerreißt Talwerk. Die Geschäftsführung hat das wichtigste Meeting des Jahres verschlafen, im Meetingraum. Seitdem will niemand mehr „Wanderkarten“. Pop_Gero hat das Firmenhandy im Fluss versenkt.",
-        "figure": { "nickname": "Pop_Gero", "avatar_key": "rookie", "accessories": [] },
-        "effects": [
-          { "tone": "loss", "label": "Bekanntheit −16,7 %" },
-          { "tone": "loss", "label": "TAL −19 %" }
-        ],
-        "headline": "Shitstorm über Talwerk"
-      },
-      {
-        "kind": "ramble",
-        "mood": "shocked",
-        "text": "Völlig anderes Thema: Markus Söder soll das Sparschwein geschlachtet und alles in SolarFuchs gesteckt haben. Ich habe es geträumt, aber meine Träume sind börsennotiert. Der Kurs macht 8,9 % nach oben.",
-        "effects": [{ "tone": "gain", "label": "SFX +8,9 %" }],
-        "headline": "Markus Söder steigt bei SolarFuchs ein"
+        "kind": "hype",
+        "mood": "proud",
+        "text": "Knappwerk räumt ab. Ein Testmagazin urteilt: „Besser als erwartet, und wir hatten nichts erwartet.“ Float_Frida hängt sich das gerahmt ins Büro. Die Kundschaft rennt die Tür ein.",
+        "figure": { "nickname": "Float_Frida", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "gain", "label": "Bekanntheit +12,3 %" }],
+        "headline": "Ritterschlag für Knappwerk"
       },
       {
         "kind": "sector",
-        "mood": "proud",
-        "text": "Die ganze Branche Einzelhandel steigt um 5,1 %. Ein Schulkind hat in einem Referat behauptet, das sei die Zukunft. So funktioniert Wirtschaft, liebe Kinder.",
-        "effects": [{ "tone": "gain", "label": "Einzelhandel +5,1 %" }],
-        "headline": "Die Branche Einzelhandel dreht durch"
+        "mood": "angry",
+        "text": "Schlechte Nachrichten für Pharma: Die Branchenmesse fand statt, aber niemand ging hin, nicht einmal die Aussteller. Die Kurse geben um 4,6 % nach.",
+        "effects": [{ "tone": "loss", "label": "Pharma −4,6 %" }],
+        "headline": "Katerstimmung in Pharma"
       },
       {
         "kind": "stock",
-        "mood": "smug",
-        "text": "Fundgrube Discount legt 12 % zu. Der Praktikant hat aus Versehen ein Patent angemeldet. Analysten sind fassungslos.",
-        "effects": [{ "tone": "gain", "label": "FGD +12 %" }],
-        "headline": "Fundgrube Discount schießt nach oben"
+        "mood": "crying",
+        "text": "Die Firma hat ihren größten Kunden geghostet. Der Kurs von Sonnenkern Fusion sackt um 17 % ab. Ein Krisenstab tagt.",
+        "effects": [{ "tone": "loss", "label": "FSN −17 %" }],
+        "headline": "Panik bei Sonnenkern Fusion"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Kaufrausch Märkte tut sich in der nächsten Stunde etwas, und zwar nach unten. Meine Quelle ist seriös, sie trägt immerhin eine Krawatte.",
-        "effects": [{ "tone": "neutral", "label": "KFR ↓ Tipp" }],
-        "headline": "Mr. Doodle Dangles Geheimtipp"
+        "text": "Ein Vögelchen hat mir gezwitschert: Talwerk dürfte in der kommenden Stunde nach unten gehen. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
+        "effects": [{ "tone": "neutral", "label": "TAL ↓ Tipp" }],
+        "headline": "Vom Flurfunk: Talwerk"
       }
     ],
-    "started_at": "2026-11-16T18:18:31.46103+00:00"
+    "started_at": "2026-11-16T19:21:51.484242+00:00"
   },
-  "viewers": 18,
+  "viewers": 2,
   "audience": [
     { "me": true, "friend": false, "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Anna", "avatar_key": "rookie", "accessories": ["laurel_wreath"] },
-    { "me": false, "friend": false, "nickname": "Bat_Bruno", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Clara", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Crowd1", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Crowd10", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Crowd11", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Crowd2", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Crowd3", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Crowd4", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Crowd5", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Crowd6", "avatar_key": "rookie", "accessories": [] }
+    { "me": false, "friend": false, "nickname": "Bg_Clara", "avatar_key": "rookie", "accessories": [] }
   ],
   "upcoming": null,
-  "next_airs_at": "2026-11-16T19:00:00+00:00"
+  "next_airs_at": "2026-11-16T20:00:00+00:00"
 }

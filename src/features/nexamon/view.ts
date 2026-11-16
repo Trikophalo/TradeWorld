@@ -225,7 +225,7 @@ export function copyStatus(copy: Pick<NexamonCopy, "state" | "listing">): CopySt
   return copy.state === "graded" ? "graded" : "raw";
 }
 
-/** Value factor of a raw copy's condition in basis points (Poor 9 500, everything else 10 000). */
+/** Value factor of a raw copy's condition in basis points (Poor 7 000, Good 9 000, Near Mint and Mint 10 000). */
 export const conditionFactorBps = (condition: NexamonCondition): number => nexamonConditionBps(condition);
 
 /** What a listing brings: the fee the seller pays and what arrives. */

@@ -2875,7 +2875,7 @@ Menge, Image …), acht sinnvolle Punkte, die man mit Mira angehen kann.
 - **Population:** Jede gezogene Karte (Spieler, KI, Startbestand der KI) erhöht die Population ihrer Karte um 1;
   jede Kopie trägt ihre Nummer („#17“). Die Population jeder Karte ist für alle sichtbar.
 - **Zustand** jeder Kopie: Poor 2 %, Good 18 %, Near Mint 50 %, Mint 30 %. Ab Good ist die Kopie den Marktwert wert,
-  jede Stufe unter Good kostet 5 % (Poor: 95 %). Es bleibt bei den vier genannten Stufen.
+  jede Stufe unter Good kostet 5 % (Poor: 95 %). Geändert mit Migration 5900: Poor 70 %, Good 90 %, Near Mint und Mint 100 %. Es bleibt bei den vier genannten Stufen.
 - **Marktwert:** einer je Karte (nicht je Kopie), geführt als Kurs (`value_e4` = Euro × 10 000), damit auch
   Karten für 1 € sich in kleinen Schritten bewegen. Wert einer Kopie in Cent = Marktwert × Zustandsfaktor, im Slab
   Marktwert × Notenfaktor; hier wird einmal gerundet (kaufmännisch „half even“). Der Marktwert bewegt sich auf zwei

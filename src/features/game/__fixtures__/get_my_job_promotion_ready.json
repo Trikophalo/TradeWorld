@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "c3ec4a08-fc57-4145-bb4d-d700cd28c1c9",
+    "id": "c398bf48-592a-4a68-ac24-019de388a7f2",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "2fccb1cc-0894-a518-9538-769c751d9630",
+      "id": "c76af3f2-dc09-a8cc-b107-a7c326ad5b09",
       "logo": null,
-      "name": "Memeland Media",
-      "color": "#FF4FD8",
+      "name": "Glanz & Gloria",
+      "color": "#D4AF37",
       "is_ai": true,
-      "sector": "tech",
-      "ticker": "MEM"
+      "sector": "retail",
+      "ticker": "LUX"
     },
     "presence": {
-      "fire_at": "2026-11-21T18:18:28.882511+00:00",
+      "fire_at": "2026-11-21T19:21:47.538011+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-16T18:18:28.882511+00:00"
+      "last_active_at": "2026-11-16T19:21:47.538011+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-16T18:18:28.996166+00:00",
+    "started_at": "2026-11-16T19:21:47.853944+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

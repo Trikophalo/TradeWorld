@@ -1,12 +1,39 @@
 {
   "applications": [
     {
-      "id": "09ac420c-c11a-48b6-912a-b044669ab4db",
+      "id": "7b3ccf40-176a-41bd-b520-8ddec64203b4",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "09cf867a-e21c-4aa3-982f-141e31242371",
+        "id": "3c52e2e8-4f7d-49f9-9d5c-5243af9454cd",
         "tier": "intern",
+        "title": null,
+        "company": {
+          "id": "c76af3f2-dc09-a8cc-b107-a7c326ad5b09",
+          "logo": null,
+          "name": "Glanz & Gloria",
+          "color": "#D4AF37",
+          "is_ai": true,
+          "sector": "retail",
+          "ticker": "LUX"
+        },
+        "required": [{ "branch": "sales", "min_score": 0 }],
+        "title_key": "sales_intern",
+        "required_skills": []
+      },
+      "created_at": "2026-11-16T19:21:43.187366+00:00",
+      "updated_at": "2026-11-16T19:21:43.191238+00:00",
+      "offer_expires_at": "2026-11-18T19:21:43.187366+00:00",
+      "salary_wish_cents_per_hour": 15000,
+      "offer_salary_cents_per_hour": 15000
+    },
+    {
+      "id": "f2ff55fd-bf6f-41fb-aa5a-ef80228c751b",
+      "status": "offered",
+      "message": "Ich lerne schnell.",
+      "posting": {
+        "id": "1eca2345-c9ac-48ad-96d2-e69683dad2c8",
+        "tier": "junior",
         "title": null,
         "company": {
           "id": "2fccb1cc-0894-a518-9538-769c751d9630",
@@ -17,40 +44,13 @@
           "sector": "tech",
           "ticker": "MEM"
         },
-        "required": [{ "branch": "it", "min_score": 0 }],
-        "title_key": "it_intern",
-        "required_skills": []
-      },
-      "created_at": "2026-11-16T18:18:25.371116+00:00",
-      "updated_at": "2026-11-16T18:18:25.375425+00:00",
-      "offer_expires_at": "2026-11-18T18:18:25.371116+00:00",
-      "salary_wish_cents_per_hour": 15900,
-      "offer_salary_cents_per_hour": 15900
-    },
-    {
-      "id": "4abedf93-94c5-48c3-9a99-7499bf7c2302",
-      "status": "offered",
-      "message": "Ich lerne schnell.",
-      "posting": {
-        "id": "b59dadea-b9d8-40c6-a289-ac7fbdfad862",
-        "tier": "junior",
-        "title": null,
-        "company": {
-          "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
-          "logo": null,
-          "name": "KlarSoft AG",
-          "color": "#4C8DFF",
-          "is_ai": true,
-          "sector": "tech",
-          "ticker": "KLS"
-        },
         "required": [{ "branch": "it", "min_score": 2 }],
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-16T18:18:25.36518+00:00",
-      "updated_at": "2026-11-16T18:18:25.36518+00:00",
-      "offer_expires_at": "2026-11-18T18:18:25.36518+00:00",
+      "created_at": "2026-11-16T19:21:43.181014+00:00",
+      "updated_at": "2026-11-16T19:21:43.181014+00:00",
+      "offer_expires_at": "2026-11-18T19:21:43.181014+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

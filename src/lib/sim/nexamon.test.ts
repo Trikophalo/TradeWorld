@@ -181,16 +181,17 @@ describe("Nexamon conditions and grading (ADR-165)", () => {
     expect(nexamonRollCondition(0.999999)).toBe("mint");
   });
 
-  it("values a copy: full value from good upwards, 5 % less per step below", () => {
+  it("values a copy by condition: poor 70 %, good 90 %, near mint and mint full value", () => {
     expect(nexamonConditionBps("mint")).toBe(10_000);
     expect(nexamonConditionBps("near_mint")).toBe(10_000);
-    expect(nexamonConditionBps("good")).toBe(10_000);
-    expect(nexamonConditionBps("poor")).toBe(9_500);
+    expect(nexamonConditionBps("good")).toBe(9_000);
+    expect(nexamonConditionBps("poor")).toBe(7_000);
     const value = nexamonE4FromCents(12_345);
     expect(nexamonCopyValueCents(value, "mint", null)).toBe(12_345);
-    expect(nexamonCopyValueCents(value, "poor", null)).toBe(11_728); // 11 727.75
-    expect(nexamonCopyValueCents(nexamonE4FromCents(10), "poor", null)).toBe(10); // 9.5 -> even
-    expect(nexamonCopyValueCents(nexamonE4FromCents(30), "poor", null)).toBe(28); // 28.5 -> even
+    expect(nexamonCopyValueCents(value, "poor", null)).toBe(8_642); // 8 641.5 -> even
+    expect(nexamonCopyValueCents(nexamonE4FromCents(10), "poor", null)).toBe(7);
+    expect(nexamonCopyValueCents(nexamonE4FromCents(30), "poor", null)).toBe(21);
+    expect(nexamonCopyValueCents(nexamonE4FromCents(15), "good", null)).toBe(14); // 13.5 -> even
     expect(nexamonCentsFromE4(150)).toBe(2);
     expect(nexamonCentsFromE4(250)).toBe(2);
   });
@@ -243,7 +244,7 @@ describe("Nexamon conditions and grading (ADR-165)", () => {
     for (let g = 2; g <= 10; g++) expect(mult[g - 1]!).toBeGreaterThan(mult[g - 2]!);
     for (const g of [8, 9, 10]) expect(nexamonCopyFactorBps("mint", g)).toBeGreaterThan(10_000);
     for (const g of [1, 2, 3, 4, 5, 6, 7])
-      expect(nexamonCopyFactorBps("mint", g)).toBeLessThan(nexamonConditionBps("poor"));
+      expect(nexamonCopyFactorBps("mint", g)).toBeLessThan(nexamonConditionBps("mint"));
     expect(nexamonCopyFactorBps("poor", 10)).toBe(30_000);
     const value = nexamonE4FromCents(100_000);
     expect(nexamonCopyValueCents(value, "poor", 10)).toBe(300_000);

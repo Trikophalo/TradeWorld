@@ -1,9 +1,9 @@
 {
-  "now": "2026-11-16T18:18:31.776525+00:00",
+  "now": "2026-11-16T19:21:51.885061+00:00",
   "battle": {
     "id": 26,
     "kind": "higher",
-    "seed": 2636275135,
+    "seed": 3908820317,
     "prize": { "kind": "money", "cents": 525000 },
     "joined": true,
     "params": {
@@ -53,41 +53,41 @@
           "mine": { "value": null, "choice": null, "pressed": false },
           "unit": "€",
           "chart": [
-            190.47, 197.52, 200.23, 205.86, 200.38, 206.67, 208.92, 213.18, 222.18, 225.47, 227.75, 223.92, 215.1,
-            213.12, 211.07
+            185.5, 192.36, 195.65, 200.11, 194.33, 191.88, 198.06, 206.28, 197.91, 196.27, 191.66, 197.85, 190.85,
+            199.44, 202.59
           ],
           "round": 0,
-          "value": 205.31,
-          "correct": 1,
-          "ends_at": "2026-11-16T18:18:30.266157+00:00",
+          "value": 209.62,
+          "correct": 0,
+          "ends_at": "2026-11-16T19:21:50.370486+00:00",
           "options": null,
           "results": [],
           "decimals": 2,
-          "opens_at": "2026-11-16T18:18:22.766157+00:00",
-          "question": "Methusalem Bio",
-          "closes_at": "2026-11-16T18:18:27.766157+00:00"
+          "opens_at": "2026-11-16T19:21:42.870486+00:00",
+          "question": "Nordlicht Logistik AG",
+          "closes_at": "2026-11-16T19:21:47.870486+00:00"
         },
         {
           "mine": { "value": null, "choice": 0, "pressed": true },
           "unit": "€",
           "chart": [
-            190.47, 197.52, 200.23, 205.86, 200.38, 206.67, 208.92, 213.18, 222.18, 225.47, 227.75, 223.92, 215.1,
-            213.12, 211.07, 205.31
+            185.5, 192.36, 195.65, 200.11, 194.33, 191.88, 198.06, 206.28, 197.91, 196.27, 191.66, 197.85, 190.85,
+            199.44, 202.59, 209.62
           ],
           "round": 1,
-          "ends_at": "2026-11-16T18:18:37.766157+00:00",
+          "ends_at": "2026-11-16T19:21:57.870486+00:00",
           "options": null,
           "decimals": 2,
-          "opens_at": "2026-11-16T18:18:30.266157+00:00",
-          "question": "Methusalem Bio",
-          "closes_at": "2026-11-16T18:18:35.266157+00:00"
+          "opens_at": "2026-11-16T19:21:50.370486+00:00",
+          "question": "Nordlicht Logistik AG",
+          "closes_at": "2026-11-16T19:21:55.370486+00:00"
         }
       ],
       "hearts": [3, 3, 3],
       "points": [0, 0, 0]
     },
     "status": "running",
-    "ends_at": "2026-11-16T18:20:01.707067+00:00",
+    "ends_at": "2026-11-16T19:23:21.797438+00:00",
     "players": [
       {
         "me": true,
@@ -117,8 +117,8 @@
         "accessories": []
       }
     ],
-    "opened_at": "2026-11-16T18:18:31.645381+00:00",
-    "started_at": "2026-11-16T18:18:22.766157+00:00",
+    "opened_at": "2026-11-16T19:21:51.726177+00:00",
+    "started_at": "2026-11-16T19:21:42.870486+00:00",
     "finished_at": null,
     "max_players": 10,
     "min_players": 3,
@@ -179,16 +179,16 @@
           "budget": null,
           "budgets": [0, 1000, 1000],
           "correct": null,
-          "ends_at": "2026-11-16T18:18:02.816092+00:00",
+          "ends_at": "2026-11-16T19:21:19.023388+00:00",
           "options": null,
           "results": [
-            { "ms": 2, "slot": 0, "right": true, "value": 400, "points": 300 },
-            { "ms": 1010, "slot": 1, "right": false, "value": 400, "points": 0 }
+            { "ms": 5, "slot": 0, "right": true, "value": 400, "points": 300 },
+            { "ms": 1016, "slot": 1, "right": false, "value": 400, "points": 0 }
           ],
           "decimals": null,
-          "opens_at": "2026-11-16T18:17:49.316092+00:00",
+          "opens_at": "2026-11-16T19:21:05.523388+00:00",
           "question": "Goldbarren",
-          "closes_at": "2026-11-16T18:17:59.316092+00:00",
+          "closes_at": "2026-11-16T19:21:15.523388+00:00",
           "item_points": 300
         },
         {
@@ -201,16 +201,16 @@
           "budget": null,
           "budgets": [0, 1000, 1000],
           "correct": null,
-          "ends_at": "2026-11-16T18:18:16.316092+00:00",
+          "ends_at": "2026-11-16T19:21:32.523388+00:00",
           "options": null,
           "results": [
-            { "ms": 523, "slot": 0, "right": true, "value": 600, "points": 100 },
-            { "ms": 531, "slot": 1, "right": false, "value": 0, "points": 0 }
+            { "ms": 537, "slot": 0, "right": true, "value": 600, "points": 100 },
+            { "ms": 547, "slot": 1, "right": false, "value": 0, "points": 0 }
           ],
           "decimals": null,
-          "opens_at": "2026-11-16T18:18:02.816092+00:00",
+          "opens_at": "2026-11-16T19:21:19.023388+00:00",
           "question": "Gummiente",
-          "closes_at": "2026-11-16T18:18:12.816092+00:00",
+          "closes_at": "2026-11-16T19:21:29.023388+00:00",
           "item_points": 100
         }
       ],
@@ -218,7 +218,7 @@
       "points": [400, 0, 0]
     },
     "status": "finished",
-    "ends_at": "2026-11-16T18:20:49.316092+00:00",
+    "ends_at": "2026-11-16T19:24:05.523388+00:00",
     "players": [
       {
         "me": false,
@@ -248,16 +248,16 @@
         "accessories": []
       }
     ],
-    "opened_at": "2026-11-16T18:18:17.316092+00:00",
-    "started_at": "2026-11-16T18:17:49.316092+00:00",
-    "finished_at": "2026-11-16T18:18:17.355651+00:00",
+    "opened_at": "2026-11-16T19:21:33.523388+00:00",
+    "started_at": "2026-11-16T19:21:05.523388+00:00",
+    "finished_at": "2026-11-16T19:21:33.589031+00:00",
     "max_players": 10,
     "min_players": 3,
     "prize_wins_left": 3,
     "countdown_ends_at": null
   },
-  "viewers": 20,
+  "viewers": 4,
   "per_hour": 1000,
-  "next_round_at": "2026-11-16T19:00:00+00:00",
+  "next_round_at": "2026-11-16T20:00:00+00:00",
   "played_this_hour": 6
 }

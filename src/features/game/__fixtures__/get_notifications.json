@@ -1,108 +1,108 @@
 {
   "items": [
     {
-      "id": "59b0cb3c-d421-4891-a33d-d926c5004e8e",
+      "id": "8d9acdee-72bd-4b76-901e-61f4d8104a4b",
       "body": "Jetzt befreundet mit Fixture_Gmbh",
       "link": "/friends",
       "title": "Fixture_Gmbh gefällt dein Beitrag",
       "payload": { "kind": "friends_now", "item_id": 383, "nickname": "Fixture_Gmbh" },
       "read_at": null,
       "type_key": "feed_reaction",
-      "created_at": "2026-11-16T18:18:28.6913+00:00"
+      "created_at": "2026-11-16T19:21:47.238832+00:00"
     },
     {
-      "id": "c658e61a-3fdc-4299-a734-544684dffaaf",
+      "id": "70cfe2e2-5a69-4245-82c8-c172d50c0b3a",
       "body": "Platz 282 von 286 · +0,00 %",
       "link": "/friends",
       "title": "Wochenliga: Platz 282",
       "payload": { "of": 286, "rank": 282, "growth_bps": 0, "week_start": "2026-11-09" },
       "read_at": null,
       "type_key": "league_result",
-      "created_at": "2026-11-16T18:18:28.3184+00:00"
+      "created_at": "2026-11-16T19:21:46.790278+00:00"
     },
     {
-      "id": "32629341-c351-41f3-94e8-92fbbd658431",
+      "id": "fde9f421-603b-492d-a81c-99870806b86c",
       "body": "Fixture_Gmbh",
       "link": "/players/Fixture_Gmbh",
       "title": "Fixture_Gmbh hat deine Freundschaftsanfrage angenommen.",
       "payload": { "nickname": "Fixture_Gmbh" },
       "read_at": null,
       "type_key": "friend_accepted",
-      "created_at": "2026-11-16T18:18:28.063805+00:00"
+      "created_at": "2026-11-16T19:21:46.640636+00:00"
     },
     {
-      "id": "0fe487ad-9c1a-4f20-927b-1772836acbd5",
+      "id": "3391202a-c6d5-4773-b15c-d5a95db38f3b",
       "body": "500 € reservieren für Forschung",
-      "link": "/company?board=e6380e17-5608-4abc-a73a-1d6f6e12f8e3",
+      "link": "/company?board=0670ffc6-1d4a-43e8-b736-102fe24ddc03",
       "title": "Geschäftsrat Fixture Labor: Antrag angenommen",
-      "payload": { "status": "passed", "motion_id": 12, "company_id": "e6380e17-5608-4abc-a73a-1d6f6e12f8e3" },
+      "payload": { "status": "passed", "motion_id": 12, "company_id": "0670ffc6-1d4a-43e8-b736-102fe24ddc03" },
       "read_at": null,
       "type_key": "board",
-      "created_at": "2026-11-16T18:18:26.737772+00:00"
+      "created_at": "2026-11-16T19:21:44.95334+00:00"
     },
     {
-      "id": "3022344c-2760-411b-a3ed-bc9a9bb1d202",
+      "id": "bcb1fd60-4a12-48b9-93a8-e9f220d43568",
       "body": "Keine Entnahmen für 2 Tage",
-      "link": "/company?board=e6380e17-5608-4abc-a73a-1d6f6e12f8e3",
+      "link": "/company?board=0670ffc6-1d4a-43e8-b736-102fe24ddc03",
       "title": "Geschäftsrat Fixture Labor: Antrag abgelehnt",
-      "payload": { "status": "rejected", "motion_id": 11, "company_id": "e6380e17-5608-4abc-a73a-1d6f6e12f8e3" },
+      "payload": { "status": "rejected", "motion_id": 11, "company_id": "0670ffc6-1d4a-43e8-b736-102fe24ddc03" },
       "read_at": null,
       "type_key": "board",
-      "created_at": "2026-11-16T18:18:26.729218+00:00"
+      "created_at": "2026-11-16T19:21:44.942523+00:00"
     },
     {
-      "id": "4660c1bb-0ec7-4c76-bf2a-2539f371e023",
+      "id": "608115c3-2e01-446f-9e3c-da38c624d027",
       "body": "149 € für deine Aktien.",
       "link": "/portfolio",
       "title": "Dividende von Fixture Labor",
-      "payload": { "company_id": "e6380e17-5608-4abc-a73a-1d6f6e12f8e3", "amount_cents": 14944 },
+      "payload": { "company_id": "0670ffc6-1d4a-43e8-b736-102fe24ddc03", "amount_cents": 14944 },
       "read_at": null,
       "type_key": "company_dividend",
-      "created_at": "2026-11-16T18:18:26.602549+00:00"
+      "created_at": "2026-11-16T19:21:44.835484+00:00"
     },
     {
-      "id": "33e0b638-4377-45db-b0b9-1e6993ff7ed8",
+      "id": "0b2c33cf-1363-40fd-8a2b-4d75f7edb4bc",
       "body": "Fixture_Chefin: Moin zusammen!",
       "link": "/career/chat",
       "title": "Firmenchat: Fixture Labor",
       "payload": {
         "author_id": "f1f1f1f1-0000-4000-8000-0000000000f2",
-        "company_id": "e6380e17-5608-4abc-a73a-1d6f6e12f8e3",
-        "message_id": 192
+        "company_id": "0670ffc6-1d4a-43e8-b736-102fe24ddc03",
+        "message_id": 190
       },
       "read_at": null,
       "type_key": "company_chat",
-      "created_at": "2026-11-16T18:18:26.362495+00:00"
+      "created_at": "2026-11-16T19:21:44.469215+00:00"
     },
     {
-      "id": "d31b87a4-cbac-4041-9cde-38cf159511dc",
+      "id": "712264cc-f5f9-44c4-9777-adb0401c8913",
       "body": "Stelle: Werkstudium Daten",
       "link": "/company",
       "title": "Fixture_Chefin hat sich beworben",
       "payload": {
         "title": "Werkstudium Daten",
         "nickname": "Fixture_Chefin",
-        "posting_id": "a97822cb-8e1d-41f3-a7ba-9ca9290fdcd6",
-        "application_id": "7a77ef58-c3c0-4eb9-b392-d59074295bdd"
+        "posting_id": "a27379f0-a4dc-4e28-a79a-27361f7efb55",
+        "application_id": "1a802926-c75f-4c55-9d17-e0d9b5077273"
       },
       "read_at": null,
       "type_key": "job_application",
-      "created_at": "2026-11-16T18:18:26.140771+00:00"
+      "created_at": "2026-11-16T19:21:44.181168+00:00"
     },
     {
-      "id": "0a2dda54-ec23-491f-a0c9-e5cf96e8acf0",
+      "id": "e3846e7d-f9b5-4a93-bc81-381ca8ce0dbe",
       "body": "Stelle: Werkstudium Software",
       "link": "/company",
       "title": "Fixture_Chefin hat sich beworben",
       "payload": {
         "title": "Werkstudium Software",
         "nickname": "Fixture_Chefin",
-        "posting_id": "5319c2b1-3e02-40d7-9c2a-7d21d157c22e",
-        "application_id": "aa39add9-fc83-428e-9fa3-f963d4db7551"
+        "posting_id": "c725617e-c660-4de3-b2c2-2bf0af3aaee3",
+        "application_id": "991e1c7b-ccf5-4bb0-b7af-762b8429667f"
       },
       "read_at": null,
       "type_key": "job_application",
-      "created_at": "2026-11-16T18:18:25.89341+00:00"
+      "created_at": "2026-11-16T19:21:43.905401+00:00"
     }
   ],
   "unread": 9

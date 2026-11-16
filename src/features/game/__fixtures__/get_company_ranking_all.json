@@ -1,5 +1,5 @@
 {
-  "mine": { "rank": 73, "value_cents": 54108 },
+  "mine": { "rank": 74, "value_cents": 54108 },
   "total": 76,
   "entries": [
     {
@@ -15,7 +15,7 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "2faf9e4c-3f0a-8a5b-1645-c669e9481771",
-      "value_cents": 1654458600000,
+      "value_cents": 1696401000000,
       "revenue_cents": null
     },
     {
@@ -31,7 +31,7 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "e50a6ff5-8dbd-8c90-f94e-5ac06d3fe862",
-      "value_cents": 514095000000,
+      "value_cents": 518525000000,
       "revenue_cents": null
     },
     {
@@ -47,30 +47,14 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
-      "value_cents": 423113500000,
-      "revenue_cents": null
-    },
-    {
-      "kind": "ai",
-      "logo": null,
-      "name": "Glanz & Gloria",
-      "rank": 4,
-      "tier": null,
-      "color": "#D4AF37",
-      "sector": "retail",
-      "ticker": "LUX",
-      "founder": null,
-      "is_mine": false,
-      "team_size": null,
-      "company_id": "c76af3f2-dc09-a8cc-b107-a7c326ad5b09",
-      "value_cents": 354886000000,
+      "value_cents": 421368000000,
       "revenue_cents": null
     },
     {
       "kind": "ai",
       "logo": null,
       "name": "Brotzeit Handel AG",
-      "rank": 5,
+      "rank": 4,
       "tier": null,
       "color": "#F2A93B",
       "sector": "retail",
@@ -79,9 +63,25 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "cbfac5fd-3475-2166-ea22-0a85cbb6f5c0",
-      "value_cents": 329063200000,
+      "value_cents": 398646400000,
+      "revenue_cents": null
+    },
+    {
+      "kind": "ai",
+      "logo": null,
+      "name": "Glanz & Gloria",
+      "rank": 5,
+      "tier": null,
+      "color": "#D4AF37",
+      "sector": "retail",
+      "ticker": "LUX",
+      "founder": null,
+      "is_mine": false,
+      "team_size": null,
+      "company_id": "c76af3f2-dc09-a8cc-b107-a7c326ad5b09",
+      "value_cents": 388063200000,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-16T18:18:26.061944+00:00"
+  "server_time": "2026-11-16T19:21:44.100067+00:00"
 }

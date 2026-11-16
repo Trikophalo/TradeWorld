@@ -2,160 +2,160 @@
   "days": [
     {
       "day": "2026-11-16",
-      "in_cents": 28836956,
-      "out_cents": 883691,
+      "in_cents": 28886564,
+      "out_cents": 892366,
       "by_category": {
         "costs": -200000,
         "fixed": -184168,
-        "goods": -170616,
-        "wages": -248907,
+        "goods": -177780,
+        "wages": -250418,
         "payout": -50000,
         "benefit": -5000,
         "capital": 28663913,
         "penalty": -5000,
-        "revenue": 173043,
+        "revenue": 222651,
         "dividend": -20000
       },
-      "operating_cents": -635648
+      "operating_cents": -594715
     }
   ],
   "from": "2026-11-09T23:00:00+00:00",
   "totals": {
     "costs": -200000,
     "fixed": -184168,
-    "goods": -170616,
-    "wages": -248907,
+    "goods": -177780,
+    "wages": -250418,
     "payout": -50000,
     "benefit": -5000,
     "capital": 28663913,
     "penalty": -5000,
-    "revenue": 173043,
+    "revenue": 222651,
     "dividend": -20000
   },
   "entries": [
     {
-      "at": "2026-11-16T18:18:26.693225+00:00",
-      "id": 3138,
+      "at": "2026-11-16T19:21:44.910509+00:00",
+      "id": 3133,
       "item": null,
       "kind": "fine",
       "category": "penalty",
       "description": "Zuschläge des Finanzamts",
       "amount_cents": -5000,
-      "balance_after_cents": 27953265
+      "balance_after_cents": 27994198
     },
     {
-      "at": "2026-11-16T18:18:26.630494+00:00",
-      "id": 3137,
+      "at": "2026-11-16T19:21:44.858337+00:00",
+      "id": 3132,
       "item": null,
       "kind": "company_costs",
       "category": "fixed",
       "description": "Fixkosten und Marketing",
       "amount_cents": -170834,
-      "balance_after_cents": 27958265
+      "balance_after_cents": 27999198
     },
     {
-      "at": "2026-11-16T18:18:26.630494+00:00",
-      "id": 3135,
+      "at": "2026-11-16T19:21:44.858337+00:00",
+      "id": 3130,
       "item": null,
       "kind": "company_costs",
       "category": "goods",
       "description": "Wareneinsatz und KI-Kräfte",
-      "amount_cents": -103473,
-      "balance_after_cents": 28129099
+      "amount_cents": -108190,
+      "balance_after_cents": 28170032
     },
     {
-      "at": "2026-11-16T18:18:26.630494+00:00",
-      "id": 3133,
+      "at": "2026-11-16T19:21:44.858337+00:00",
+      "id": 3128,
       "item": null,
       "kind": "company_revenue",
       "category": "revenue",
-      "description": "Umsatz 16 Uhr",
-      "amount_cents": 105898,
-      "balance_after_cents": 28232572
+      "description": "Umsatz 17 Uhr",
+      "amount_cents": 153059,
+      "balance_after_cents": 28278222
     },
     {
-      "at": "2026-11-16T18:18:26.602549+00:00",
-      "id": 3131,
+      "at": "2026-11-16T19:21:44.835484+00:00",
+      "id": 3126,
       "item": null,
       "kind": "dividend",
       "category": "dividend",
       "description": "Dividende Fixture Labor (Streubesitz)",
       "amount_cents": -5052,
-      "balance_after_cents": 28126674
+      "balance_after_cents": 28125163
     },
     {
-      "at": "2026-11-16T18:18:26.602549+00:00",
-      "id": 3129,
+      "at": "2026-11-16T19:21:44.835484+00:00",
+      "id": 3124,
       "item": null,
       "kind": "dividend",
       "category": "dividend",
       "description": "Dividende Fixture Labor",
       "amount_cents": -4,
-      "balance_after_cents": 28131726
+      "balance_after_cents": 28130215
     },
     {
-      "at": "2026-11-16T18:18:26.602549+00:00",
-      "id": 3127,
+      "at": "2026-11-16T19:21:44.835484+00:00",
+      "id": 3122,
       "item": null,
       "kind": "dividend",
       "category": "dividend",
       "description": "Dividende Fixture Labor",
       "amount_cents": -14944,
-      "balance_after_cents": 28131730
+      "balance_after_cents": 28130219
     },
     {
-      "at": "2026-11-16T18:18:26.552078+00:00",
-      "id": 3125,
+      "at": "2026-11-16T19:21:44.75999+00:00",
+      "id": 3120,
       "item": "b_obstkorb",
       "kind": "company_costs",
       "category": "benefit",
       "description": "Benefit einrichten: b_obstkorb",
       "amount_cents": -5000,
-      "balance_after_cents": 28146674
+      "balance_after_cents": 28145163
     },
     {
-      "at": "2026-11-16T18:18:26.530388+00:00",
-      "id": 3123,
+      "at": "2026-11-16T19:21:44.733623+00:00",
+      "id": 3118,
       "item": null,
       "kind": "transfer",
       "category": "capital",
       "description": "Zeichnung durch Investoren",
       "amount_cents": 7063913,
-      "balance_after_cents": 28151674
+      "balance_after_cents": 28150163
     },
     {
-      "at": "2026-11-16T18:18:26.443819+00:00",
-      "id": 3121,
+      "at": "2026-11-16T19:21:44.5951+00:00",
+      "id": 3116,
       "item": null,
       "kind": "transfer",
       "category": "capital",
       "description": "Zeichnung durch Investoren",
       "amount_cents": 19975000,
-      "balance_after_cents": 21087761
+      "balance_after_cents": 21086250
     },
     {
-      "at": "2026-11-16T18:18:26.443819+00:00",
-      "id": 3118,
+      "at": "2026-11-16T19:21:44.5951+00:00",
+      "id": 3114,
       "item": null,
       "kind": "transfer",
       "category": "capital",
       "description": "Zeichnungen der Anleger",
       "amount_cents": 25000,
-      "balance_after_cents": 1112761
+      "balance_after_cents": 1111250
     },
     {
-      "at": "2026-11-16T18:18:26.340877+00:00",
-      "id": 3115,
+      "at": "2026-11-16T19:21:44.445468+00:00",
+      "id": 3110,
       "item": null,
       "kind": "work_bonus",
       "category": "wages",
       "description": "Bonus Arbeitsaufgabe",
-      "amount_cents": -16347,
-      "balance_after_cents": 1087761
+      "amount_cents": -17858,
+      "balance_after_cents": 1086250
     },
     {
-      "at": "2026-11-16T18:18:26.280125+00:00",
-      "id": 3113,
+      "at": "2026-11-16T19:21:44.35776+00:00",
+      "id": 3108,
       "item": null,
       "kind": "company_costs",
       "category": "costs",
@@ -164,8 +164,8 @@
       "balance_after_cents": 1104108
     },
     {
-      "at": "2026-11-16T18:18:26.068653+00:00",
-      "id": 3111,
+      "at": "2026-11-16T19:21:44.109085+00:00",
+      "id": 3106,
       "item": null,
       "kind": "company_conversion",
       "category": "capital",
@@ -174,8 +174,8 @@
       "balance_after_cents": 1304108
     },
     {
-      "at": "2026-11-16T18:18:25.991857+00:00",
-      "id": 3109,
+      "at": "2026-11-16T19:21:44.041134+00:00",
+      "id": 3104,
       "item": null,
       "kind": "company_costs",
       "category": "fixed",
@@ -184,28 +184,28 @@
       "balance_after_cents": 54108
     },
     {
-      "at": "2026-11-16T18:18:25.991857+00:00",
-      "id": 3107,
+      "at": "2026-11-16T19:21:44.041134+00:00",
+      "id": 3102,
       "item": null,
       "kind": "company_costs",
       "category": "goods",
       "description": "Wareneinsatz und KI-Kräfte",
-      "amount_cents": -33605,
+      "amount_cents": -34662,
       "balance_after_cents": 60775
     },
     {
-      "at": "2026-11-16T18:18:25.991857+00:00",
-      "id": 3105,
+      "at": "2026-11-16T19:21:44.041134+00:00",
+      "id": 3100,
       "item": null,
       "kind": "company_revenue",
       "category": "revenue",
-      "description": "Umsatz 18 Uhr",
-      "amount_cents": 33606,
-      "balance_after_cents": 94380
+      "description": "Umsatz 19 Uhr",
+      "amount_cents": 34663,
+      "balance_after_cents": 95437
     },
     {
-      "at": "2026-11-16T18:18:25.975231+00:00",
-      "id": 3103,
+      "at": "2026-11-16T19:21:44.02006+00:00",
+      "id": 3098,
       "item": null,
       "kind": "company_costs",
       "category": "fixed",
@@ -214,28 +214,28 @@
       "balance_after_cents": 60774
     },
     {
-      "at": "2026-11-16T18:18:25.975231+00:00",
-      "id": 3101,
+      "at": "2026-11-16T19:21:44.02006+00:00",
+      "id": 3096,
       "item": null,
       "kind": "company_costs",
       "category": "goods",
       "description": "Wareneinsatz und KI-Kräfte",
-      "amount_cents": -33538,
+      "amount_cents": -34928,
       "balance_after_cents": 67441
     },
     {
-      "at": "2026-11-16T18:18:25.975231+00:00",
-      "id": 3099,
+      "at": "2026-11-16T19:21:44.02006+00:00",
+      "id": 3094,
       "item": null,
       "kind": "company_revenue",
       "category": "revenue",
-      "description": "Umsatz 17 Uhr",
-      "amount_cents": 33539,
-      "balance_after_cents": 100979
+      "description": "Umsatz 18 Uhr",
+      "amount_cents": 34929,
+      "balance_after_cents": 102369
     },
     {
-      "at": "2026-11-16T18:18:25.955093+00:00",
-      "id": 3095,
+      "at": "2026-11-16T19:21:43.983387+00:00",
+      "id": 3090,
       "item": null,
       "kind": "salary",
       "category": "wages",
@@ -244,8 +244,8 @@
       "balance_after_cents": 67440
     },
     {
-      "at": "2026-11-16T18:18:25.856247+00:00",
-      "id": 3093,
+      "at": "2026-11-16T19:21:43.859342+00:00",
+      "id": 3088,
       "item": null,
       "kind": "transfer",
       "category": "payout",
@@ -254,8 +254,8 @@
       "balance_after_cents": 300000
     },
     {
-      "at": "2026-11-16T18:18:25.821349+00:00",
-      "id": 3091,
+      "at": "2026-11-16T19:21:43.821065+00:00",
+      "id": 3086,
       "item": null,
       "kind": "capital_injection",
       "category": "capital",
@@ -264,8 +264,8 @@
       "balance_after_cents": 350000
     },
     {
-      "at": "2026-11-16T18:18:25.536143+00:00",
-      "id": 3089,
+      "at": "2026-11-16T19:21:43.466958+00:00",
+      "id": 3084,
       "item": null,
       "kind": "company_founding",
       "category": "capital",
@@ -274,6 +274,6 @@
       "balance_after_cents": 250000
     }
   ],
-  "cash_cents": 27953265,
+  "cash_cents": 27994198,
   "next_before": null
 }

@@ -1,10 +1,10 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 117, "gap_cents": 577 }, "rank": 118, "net_worth_cents": 1019423 },
+  "me": { "next": { "name": "Vera", "rank": 115, "gap_cents": 682 }, "rank": 116, "net_worth_cents": 1019318 },
   "total": 281,
   "entries": [
     {
       "id": "0e7a3000-0000-4000-8000-0000000000b1",
-      "tag": "6CAP",
+      "tag": "HSL7",
       "kind": "player",
       "name": "Nx_Bruno",
       "rank": 1,
@@ -12,12 +12,12 @@
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 1999745094,
+      "net_worth_cents": 1999745303,
       "rank_change_24h": null
     },
     {
       "id": "0a30a30a-0000-4000-8000-0000000000b1",
-      "tag": "255D",
+      "tag": "G944",
       "kind": "player",
       "name": "Berta_Klein",
       "rank": 2,
@@ -30,7 +30,7 @@
     },
     {
       "id": "0e170001-0000-4000-8000-0000000001a1",
-      "tag": "R6VC",
+      "tag": "7YKR",
       "kind": "player",
       "name": "Wanda_Wohnt",
       "rank": 3,
@@ -43,7 +43,7 @@
     },
     {
       "id": "0f3f3f3f-0000-4000-8000-0000000000f1",
-      "tag": "53DE",
+      "tag": "2T93",
       "kind": "player",
       "name": "Fenja_Firma",
       "rank": 4,
@@ -51,12 +51,12 @@
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 127386499,
+      "net_worth_cents": 126987499,
       "rank_change_24h": null
     },
     {
       "id": "0a30a30a-0000-4000-8000-0000000000f1",
-      "tag": "2KMR",
+      "tag": "RGZM",
       "kind": "player",
       "name": "Lisa_Listed",
       "rank": 5,
@@ -68,5 +68,5 @@
       "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-16T18:18:25.120496+00:00"
+  "server_time": "2026-11-16T19:21:42.94482+00:00"
 }

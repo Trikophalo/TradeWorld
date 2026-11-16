@@ -18,7 +18,7 @@
           {
             "x": 4,
             "y": 0,
-            "id": "33d3d2dd-7f46-43a0-a706-2413cf41db02",
+            "id": "463bc227-350b-4a7c-b50c-f86b0a94b08a",
             "rot": 0,
             "item_key": "chair_wood",
             "value_cents": 8000
@@ -26,31 +26,23 @@
           {
             "x": 0,
             "y": 0,
-            "id": "e61e28d5-166e-4cb1-83a9-165203e37c45",
+            "id": "03aa2e24-d8db-478c-8398-55385f07f66f",
             "rot": 0,
             "item_key": "sofa_leather",
             "value_cents": 300000
           },
           {
             "x": 5,
-            "y": 5,
-            "id": "15d7595e-a1ae-43f7-8004-028d98077fd0",
+            "y": 3,
+            "id": "29f81273-87b7-4da1-9507-263bcba7d274",
             "rot": 0,
-            "item_key": "rug_wool",
-            "value_cents": 81250
-          },
-          {
-            "x": 9,
-            "y": 7,
-            "id": "4039118e-ff01-43d1-8f4b-d80d9020ed4c",
-            "rot": 0,
-            "item_key": "shower",
-            "value_cents": 137500
+            "item_key": "table_oak",
+            "value_cents": 175000
           },
           {
             "x": 0,
             "y": 3,
-            "id": "7a81ff11-ea2b-4b16-8692-bfacd7856b89",
+            "id": "3fe4702b-e379-46c5-b7c8-fceacf69e9ee",
             "rot": 0,
             "item_key": "bed_double",
             "value_cents": 187500
@@ -58,18 +50,26 @@
           {
             "x": 9,
             "y": 0,
-            "id": "b586485f-26c9-4769-8af4-13c0a08b4f8f",
+            "id": "827ef1b6-0255-42d5-af53-fca6e176b1f2",
             "rot": 0,
             "item_key": "kitchen_fridge",
             "value_cents": 87500
           },
           {
-            "x": 5,
-            "y": 3,
-            "id": "ee7c7718-b331-42bf-89fc-909aeba6999c",
+            "x": 9,
+            "y": 7,
+            "id": "ac7589e4-7fde-4aec-a819-ac2abe8330a8",
             "rot": 0,
-            "item_key": "table_oak",
-            "value_cents": 175000
+            "item_key": "shower",
+            "value_cents": 137500
+          },
+          {
+            "x": 5,
+            "y": 5,
+            "id": "b9332072-ad2c-4357-a642-9f3b3e6226f5",
+            "rot": 0,
+            "item_key": "rug_wool",
+            "value_cents": 81250
           }
         ],
         "wall_color": "#f3efe4",
@@ -91,10 +91,10 @@
       "places": 3,
       "tenants": [
         {
-          "id": "1a99b6d2-34de-482c-b751-2e67a31c0291",
+          "id": "79167c8f-f0c3-4527-9c18-a2fee13ee6de",
           "name": "Mia F.",
           "is_ai": true,
-          "since": "2026-11-16T18:18:31.532342+00:00",
+          "since": "2026-11-16T19:21:51.555415+00:00",
           "avatar_key": null,
           "accessories": []
         }
@@ -104,13 +104,13 @@
         "floor": "parquet",
         "owner": "Fixture_Heim",
         "width": 13,
-        "garage": [{ "id": "9d30859a-b99c-43cc-99d6-b86762362221", "slot": 0, "car_key": "car_electric" }],
+        "garage": [{ "id": "b359e314-9bd8-4eaf-8c10-731c30bcf0fe", "slot": 0, "car_key": "car_electric" }],
         "height": 9,
         "placed": [
           {
             "x": 2,
             "y": 2,
-            "id": "b2a669fb-0e2c-4469-b3c5-26fe362d3cc1",
+            "id": "54c52c6f-4ae1-4988-9764-053d96416d76",
             "rot": 0,
             "item_key": "table_oak",
             "value_cents": 210000
@@ -118,7 +118,7 @@
           {
             "x": 3,
             "y": 3,
-            "id": "c4d42c67-31dc-4907-b3bd-9800d07d27c2",
+            "id": "b1d2a3bb-8e36-4615-9ee0-ad180c91e328",
             "rot": 0,
             "item_key": "laptop",
             "value_cents": 210000

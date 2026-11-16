@@ -1,7 +1,7 @@
 {
-  "full_at": "2026-11-17T02:18:24.921457+00:00",
-  "cash_cents": 1020000,
+  "full_at": "2026-11-17T03:21:42.687749+00:00",
+  "cash_cents": 1020001,
   "factor_bps": 10000,
-  "claimed_cents": 20000,
+  "claimed_cents": 20001,
   "interest_cents": 0
 }

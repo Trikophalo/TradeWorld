@@ -37,13 +37,13 @@ export const NEXAMON_RULES = {
     slot5: { legendary: 4, prisma: 45, ultra: 150, rare: 900 },
   },
   /**
-   * Condition of a pulled card, worst first. Cards worse than "good" are very rare. From "good" upwards a card is
-   * worth its market value; every step below "good" costs `belowGoodStepBps` of the value (poor: 95 %).
+   * Condition of a pulled card, worst first. Cards worse than "good" are very rare. A raw copy is worth its card's
+   * market value x `valueBps` of its condition: poor 70 %, good 90 %, near mint and mint 100 %.
    */
   conditions: {
     order: ["poor", "good", "near_mint", "mint"],
     weightBps: { poor: 200, good: 1_800, near_mint: 5_000, mint: 3_000 },
-    belowGoodStepBps: 500,
+    valueBps: { poor: 7_000, good: 9_000, near_mint: 10_000, mint: 10_000 },
   },
   /**
    * Grading by "ASP" (a parody of card grading): costs `feeBps` of what the copy is worth right now (to the

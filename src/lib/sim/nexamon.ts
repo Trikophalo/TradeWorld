@@ -107,11 +107,9 @@ export function nexamonOpenPack(
 
 // ---------------------------------------------------------------------------------------------- copies
 
-/** Value factor of a raw copy: 100 % from "good" upwards, minus `belowGoodStepBps` per step below. */
+/** Value factor of a raw copy by its condition (`conditions.valueBps`). */
 export function nexamonConditionBps(condition: NexamonCondition, cfg: Config = BALANCE.nexamon): number {
-  const order: readonly string[] = cfg.conditions.order;
-  const steps = Math.max(0, order.indexOf("good") - order.indexOf(condition));
-  return Math.max(0, 10_000 - steps * cfg.conditions.belowGoodStepBps);
+  return cfg.conditions.valueBps[condition] ?? 10_000;
 }
 
 /** Value factor of a copy: the grade's factor in a slab, else the condition's. */

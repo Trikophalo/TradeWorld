@@ -118,6 +118,8 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   Kartenansicht mit Wertverlauf, Kartenmarkt und ASP-Schalter. Prismatic Peak kostet jetzt 10.000 €, seine Karten
   sind dafür das 1,5-Fache wert.
 
+- **Kartenzustand zählt mehr:** Eine lose Poor-Karte ist 70 % ihres Marktwerts wert, Good 90 %, Near Mint und Mint
+  100 %.
 - **Nexamon-Sammelkarten (ADR-165):** Ab Level 10 ziehst du Booster aus drei Sets, lässt Karten bei ASP bewerten und
   handelst sie an einem Markt, an dem Knappheit und Nachfrage den Wert jeder Karte bestimmen.
 

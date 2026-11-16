@@ -1262,7 +1262,7 @@ Werte in `BALANCE.nexamon` (`src/config/nexamon-rules.ts`), Startpreise im Katal
 
   Mindestens eine Rare oder besser steckt in 50,8 % der Booster (1 − 2550/3600 × 2501/3600).
 
-- **Zustand:** Poor 2 %, Good 18 %, Near Mint 50 %, Mint 30 %. Wertfaktor: ab Good 100 %, Poor 95 %.
+- **Zustand:** Poor 2 %, Good 18 %, Near Mint 50 %, Mint 30 %. Wertfaktor: Poor 70 %, Good 90 %, Near Mint und Mint 100 % (seit Migration 5900).
 - **Grading (ASP):** 50 % des Werts der Kopie (mindestens 1 €), 60 Minuten, höchstens 10 gleichzeitig.
 
   | Note       | 1   | 2    | 3    | 4    | 5    | 6    | 7    | 8    | 9     | 10    |

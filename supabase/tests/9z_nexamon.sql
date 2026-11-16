@@ -95,16 +95,17 @@ select tests.assert(
   'conditions poor 2 % / good 18 % / near mint 50 % / mint 30 %; a 10: good 10 %, near mint 60 %, mint 90 %, poor 0.1 %');
 select tests.assert(
   public.nexamon_copy_factor_bps('mint', null) = 10000 and public.nexamon_copy_factor_bps('near_mint', null) = 10000
-  and public.nexamon_copy_factor_bps('good', null) = 10000 and public.nexamon_copy_factor_bps('poor', null) = 9500
+  and public.nexamon_copy_factor_bps('good', null) = 9000 and public.nexamon_copy_factor_bps('poor', null) = 7000
   and public.nexamon_copy_factor_bps('poor', 10) = 30000 and public.nexamon_copy_factor_bps('mint', 9) = 16000
   and public.nexamon_copy_factor_bps('good', 8) = 12000 and public.nexamon_copy_factor_bps('mint', 7) = 9000
   and public.nexamon_copy_factor_bps('mint', 1) = 3000
   and public.nexamon_copy_value_cents(1234500, 'mint', null) = 12345
-  and public.nexamon_copy_value_cents(1234500, 'poor', null) = 11728
-  and public.nexamon_copy_value_cents(1000, 'poor', null) = 10 and public.nexamon_copy_value_cents(3000, 'poor', null) = 28
+  and public.nexamon_copy_value_cents(1234500, 'poor', null) = 8642
+  and public.nexamon_copy_value_cents(1000, 'poor', null) = 7 and public.nexamon_copy_value_cents(3000, 'poor', null) = 21
+  and public.nexamon_copy_value_cents(1500, 'good', null) = 14
   and public.nexamon_copy_value_cents(10000000, 'poor', 10) = 300000
   and public.nexamon_ai_ask_cents(10000) = 11000,
-  'a copy is worth the value from good upwards, 5 % less below; slabs 8 to 10 more than raw; the AI asks 10 % more');
+  'a raw copy is worth poor 70 %, good 90 %, near mint and mint 100 %; slabs 8 to 10 more than raw; the AI asks 10 % more');
 select tests.assert(
   public.nexamon_popularity_bps('legendary', 1) = 10000
   and public.nexamon_popularity_bps('common', 6) = 500 + floor(3000 * 2000.0 / 2006)
@@ -157,7 +158,7 @@ select tests.assert(
   and not exists (select 1 from public.nexamon_listings l
                     join public.nexamon_copies c on c.id = l.copy_id join public.nexamon_cards k on k.card_key = l.card_key
                    where l.price_cents <> public.nexamon_ai_ask_cents(public.nexamon_copy_value_cents(k.value_e4, c.condition, null))
-                      or (c.condition <> 'poor' and l.price_cents <> greatest(10, public.div_round_half_even(k.start_e4 * 11, 1000)))),
+                      or (c.condition in ('near_mint', 'mint') and l.price_cents <> greatest(10, public.div_round_half_even(k.start_e4 * 11, 1000)))),
   'the AI offers 4 / 3 / 2 / 1 / 0 copies per card at the start price + 10 %, no legendary');
 
 -- a changed catalogue: start prices follow, values only while the card never moved; nothing is seeded twice
@@ -597,7 +598,7 @@ select tests.assert(
   'the first legendary (population 1) gains at most 0.24 % an hour and stays inside the cap');
 
 -- =============================================================================
--- K. Condition: a poor copy is worth 5 % less
+-- K. Condition: a poor copy is worth 70 %, a good one 90 %
 -- =============================================================================
 select tests.nx_give(:a, 'me-061', 'poor') as poor1 \gset
 select tests.nx_give(:a, 'me-061', 'good') as good1 \gset
@@ -606,16 +607,16 @@ select public.get_nexamon_collection('mystic_energy') as col \gset
 reset role;
 select tests.assert(
   (select (x ->> 'value_cents')::bigint from jsonb_array_elements(:'col'::jsonb -> 'copies') x where x ->> 'id' = :'poor1')
-    = public.div_round_half_even((tests.nx('me-061')).value_e4 * 0.95, 100)
+    = public.div_round_half_even((tests.nx('me-061')).value_e4 * 0.7, 100)
   and (select (x ->> 'value_cents')::bigint from jsonb_array_elements(:'col'::jsonb -> 'copies') x where x ->> 'id' = :'good1')
-    = public.div_round_half_even((tests.nx('me-061')).value_e4, 100)
+    = public.div_round_half_even((tests.nx('me-061')).value_e4 * 0.9, 100)
   and (select x ->> 'condition' from jsonb_array_elements(:'col'::jsonb -> 'copies') x where x ->> 'id' = :'poor1') = 'poor'
   and jsonb_array_length(:'col'::jsonb -> 'cards') = 77
   and (select (x ->> 'owned')::integer from jsonb_array_elements(:'col'::jsonb -> 'cards') x where x ->> 'card_key' = 'me-061') = 2
   and (select (x ->> 'population')::integer from jsonb_array_elements(:'col'::jsonb -> 'cards') x where x ->> 'card_key' = 'me-061') = 4
   and (select (x ->> 'listed')::integer from jsonb_array_elements(:'col'::jsonb -> 'cards') x where x ->> 'card_key' = 'me-061') = 2
   and not exists (select 1 from jsonb_array_elements(:'col'::jsonb -> 'copies') x where x ->> 'card_key' not like 'me-%'),
-  'get_nexamon_collection(): every card with population, listings and the own count; a poor copy is worth 95 %');
+  'get_nexamon_collection(): every card with population, listings and the own count; a poor copy is worth 70 %, a good one 90 %');
 
 -- =============================================================================
 -- L. Grading by ASP: half the value, one hour, grade by condition; cracking the slab
