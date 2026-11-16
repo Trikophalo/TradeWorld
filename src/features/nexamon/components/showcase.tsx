@@ -25,6 +25,10 @@ const evolvesName = (card: NexamonCardData) =>
   card.evolvesFrom ? NEXAMON_SAMPLE_EVOLVES[card.evolvesFrom] : undefined;
 const sampleArt = (card: NexamonCardData) => nexamonSampleArt()[card.key];
 
+/** Real catalogue cards for the showcase: per set one of every rarity (numbers 7, 55, 64, 73, 77). */
+const REAL_NUMBERS = new Set([7, 55, 64, 73, 77]);
+const REAL_CARDS: NexamonCardData[] = NEXAMON_CARDS.filter((card) => REAL_NUMBERS.has(card.number));
+
 /** One common of every type without artwork: the placeholder of the renderer. */
 const TYPE_CARDS: NexamonCardData[] = NEXAMON_TYPES.map((type, i) => ({
   ...NEXAMON_SAMPLE_CARDS[0]!,
@@ -186,6 +190,14 @@ export function NexamonShowcase() {
         <div className="flex flex-wrap justify-center gap-2">
           {TYPE_CARDS.map((card) => (
             <CardThumb key={card.key} card={card} scale={2} />
+          ))}
+        </div>
+      </Block>
+
+      <Block label="Echte Karten aus dem Katalog: je Set eine pro Seltenheit" testId="nexamon-real">
+        <div className="flex flex-wrap justify-center gap-4">
+          {REAL_CARDS.map((card) => (
+            <NexamonCard key={card.key} card={card} scale={3} />
           ))}
         </div>
       </Block>
