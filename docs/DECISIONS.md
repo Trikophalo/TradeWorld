@@ -2863,7 +2863,7 @@ Menge, Image …), acht sinnvolle Punkte, die man mit Mira angehen kann.
   `game_config.nexamon`. `nexamon_sync()` legt daraus `nexamon_cards` an und zieht Änderungen nach (idempotent, über
   einen Hash des Katalogs): Der Startpreis folgt immer dem Katalog, der Marktwert nur, solange er sich noch nie
   bewegt hat.
-- **Booster:** „Nexamon: Mystic Energy“ 200 €, „Nexamon: Super Apex“ 1.000 €, „Nexamon: Prismatic Peak“ 5.000 €,
+- **Booster:** „Nexamon: Mystic Energy“ 200 €, „Nexamon: Super Apex“ 1.000 €, „Nexamon: Prismatic Peak“ 10.000 €,
   je 5 Karten. Das Geld geht an die Haushalte (wie Accessoires), aus deren Topf auch die KI-Sammler zahlen.
   Höchstens 20 Booster je Spieler und Minute.
 - **Ziehungsraten (exakt, Nenner 3600):** Platz 1 bis 3 immer Common. Platz 4 würfelt Ultra 150/3600 (1/24),
@@ -2875,7 +2875,7 @@ Menge, Image …), acht sinnvolle Punkte, die man mit Mira angehen kann.
 - **Population:** Jede gezogene Karte (Spieler, KI, Startbestand der KI) erhöht die Population ihrer Karte um 1;
   jede Kopie trägt ihre Nummer („#17“). Die Population jeder Karte ist für alle sichtbar.
 - **Zustand** jeder Kopie: Poor 2 %, Good 18 %, Near Mint 50 %, Mint 30 %. Ab Good ist die Kopie den Marktwert wert,
-  jede Stufe unter Good kostet 5 % (Poor: 95 %). Es bleibt bei den vier genannten Stufen.
+  jede Stufe unter Good kostet 5 % (Poor: 95 %). Geändert mit Migration 5900: Poor 70 %, Good 90 %, Near Mint und Mint 100 %. Es bleibt bei den vier genannten Stufen.
 - **Marktwert:** einer je Karte (nicht je Kopie), geführt als Kurs (`value_e4` = Euro × 10 000), damit auch
   Karten für 1 € sich in kleinen Schritten bewegen. Wert einer Kopie in Cent = Marktwert × Zustandsfaktor, im Slab
   Marktwert × Notenfaktor; hier wird einmal gerundet (kaufmännisch „half even“). Der Marktwert bewegt sich auf zwei
@@ -2917,7 +2917,7 @@ Menge, Image …), acht sinnvolle Punkte, die man mit Mira angehen kann.
 - **Markt:** einzelne Kopien zum frei gewählten Preis (0,10 € bis 1 Mrd. €), höchstens 30 offene Angebote und 30
   Ein-/Ausstellungen je Minute. Der Verkäufer zahlt 5 % Gebühr an die Haushalte; der Erlös eines KI-Verkäufers geht
   ganz dorthin. Kaufen prüft den gesehenen Preis (`nexamon_price_changed`).
-- **Grading bei ASP:** kostet 50 % des aktuellen Werts der Kopie (mindestens 1 €, an die Haushalte) und dauert eine
+- **Grading bei ASP:** kostet 30 % (anfangs 50 %) des aktuellen Werts der Kopie (mindestens 1 €, an die Haushalte) und dauert eine
   Stunde Echtzeit; höchstens 10 Kopien gleichzeitig. Die Note 1 bis 10 wird am Ende gewürfelt. Verteilung in
   Basispunkten (Note 1 bis 10): Poor 500/1000/1500/2000/2000/1500/1000/400/90/10, Good
   0/0/0/500/800/1200/2000/2500/2000/1000, Near Mint 0/0/0/0/0/100/400/1000/2500/6000, Mint
@@ -2947,6 +2947,55 @@ Menge, Image …), acht sinnvolle Punkte, die man mit Mira angehen kann.
   NX170, `nexamon_not_raw` NX171, `nexamon_not_graded` NX172, `nexamon_not_sellable` NX173, `nexamon_own_listing`
   NX174, `nexamon_grading_limit` NX175; außerdem
   `insufficient_funds`, `rate_limited`, `invalid_argument`.
+- **Nachtrag Preise:** Prismatic Peak kostet 10.000 € statt 5.000 €; dafür sind alle Karten dieses Sets das
+  1,5-Fache wert (Startpreise im Katalog, Set-Faktor 37,5). Migration `20261204005500_nexamon_peak_prices.sql`
+  (gleich in `supabase/updates/`) hebt in einer bestehenden Datenbank einmalig Startpreis, Marktwert,
+  Tagesreferenz und Wertverlauf der Karten dieses Sets um das 1,5-Fache und zieht die KI-Angebote nach, weil
+  `nexamon_sync()` den Marktwert bewegter Karten nicht anfasst (Marke `nexamon_meta.peak_scaled_at`). Angebote von
+  Spielern behalten ihren Preis.
+- **Nachtrag Black Label:** Über der ASP 10 gibt es eine elfte Stufe, das Black Label (Wunsch des Besitzers: „über
+  ASP 10, nur 1 % aller Karten, nur im Mint-Zustand, Kartenwert mal 10“).
+  - **Regel** (`grading.blackLabel = {condition: "mint", chanceBps: 100, valueBps: 100_000}`): Nur eine Kopie im
+    Zustand Mint kann es bekommen, und zwar 1 % ihrer Gradings. Die Chance wird aus der Chance auf eine 10
+    herausgenommen (Mint: 1 % Black Label, 89 % 10, 8 % 9, 2 % 8); alle anderen Zustände haben 0 %. Der Slab ist den
+    Marktwert der Karte × 10 wert, eine normale 10 bleibt bei × 3. Es bleibt bei **einem** Wurf: Das Black Label
+    belegt die obersten 100 von 10 000 Zahlen des Mint-Wurfs (`nexamonRollGrade`, `nexamon_roll_grade`).
+  - **Modell:** eine elfte Note, `grade = 11`, keine eigene Spalte. Angezeigt wird „ASP 10 · Black Label“ (auf dem
+    Label steht eine 10). So versteht alles, was die Note schon trägt, das Black Label ohne Umbau: Wert der Kopie,
+    Angebote, Verkäufe (`nexamon_sales.grade = 11`, Faktor 100 000), KI-Sammler (höchstens 70 % des Slab-Werts wie
+    bei jedem Slab), Sofortverkauf (kein Slab), Aufbrechen (`old_grade` 11) und Konto-Reset (der Slab geht mit
+    seinem Label an die KI-Händler). Die Tabelle `gradeWeightsBps` und `valueBps` behalten ihre zehn Einträge,
+    bestehende Slabs sind unberührt. Verworfen: ein Flag `black_label` neben der Note 10; es hätte jede Stelle, die
+    den Wert aus Zustand und Note rechnet, um einen Parameter erweitert.
+  - **Server** (Migration `20261204005850_nexamon_black_label.sql`): Prüfung `grade between 1 and 11`,
+    `nexamon_roll_grade`, `nexamon_copy_factor_bps`, `nexamon_finish_gradings` (eigener Benachrichtigungstext
+    „Black Label!“, Missions-Ereignisse `nexamon_ten` und `nexamon_black_label`, Feed `nexamon_black_label`),
+    `get_nexamon_card` liefert `black_labels` neben `graded` (das seine zehn Einträge behält),
+    `get_nexamon_market` bekommt den Filter `p_black_label`. Ein Black Label ist Neuigkeit wie ein legendärer Zug:
+    Feed der Freunde und Klatsch in NEXA Nachrichten (`feed_item_label`, Liste in `news_show_build`). Neue
+    Meilenstein-Mission `m_nexamon_first_black_label` (3.000 XP).
+  - **Oberfläche:** schwarzes Label mit silberner Schrift und dem Wort „BLACK LABEL“ (`composeSlab`, Stufe
+    `black`), schwarzer Chip (Tokens `--black-label`, `--on-black-label`, `--black-label-edge`, in beiden Themes
+    gleich), Zeile in der Chancentabelle des Grading-Sheets (bei Nicht-Mint 0 % mit Hinweis) und auf der
+    Kartenseite, eigener Zähler in „Bewertete Kopien je Note“, Marktfilter „Black Label“, deutliche Warnung beim
+    Aufbrechen.
+  - **Balancing:** Der erwartete Faktor einer Mint-Karte steigt von 2,85 auf 2,92 (0,01 × 10 + 0,89 × 3 + 0,08 ×
+    1,6 + 0,02 × 1,2). Weil nur 30 % der Züge Mint sind und nicht jede Karte zu ASP geht, bekommen deutlich weniger
+    als 0,3 % aller gezogenen Karten ein Black Label.
+- **Nachtrag ASP-Paket und Enthüllung:** Eine bewertete Karte kommt in einem versiegelten Paket zurück (eigenes
+  ASP-Design aus dem Pack-Raster, `composeGradingPack`). Der Spieler reißt es wie ein Booster auf (Ziehen, Knopf
+  oder Tastatur), dann wird die Note langsam enthüllt (`GradeReveal`): Der Slab steigt mit verdecktem Label auf,
+  ein Trommelwirbel läuft, die Note zählt von 1 hoch, mit Pausen, die nach oben länger werden
+  (`gradeStepPauseMs`), dann fällt die Abdeckung. Je Ergebnis ein eigener Schluss: unter 8 leise, 8–9 ein
+  Glockenklang, 10 Fanfare mit Konfetti und Goldblitz, Black Label mit Verdunkelung, Stempel, weißem Blitz und
+  doppeltem Konfetti. Sechs neue Töne (`gradeDrum`, `gradeTick`, `gradeLow`, `gradeGood`, `gradeTen`,
+  `blackLabel`). „Überspringen“ springt zum Ergebnis; mit reduzierter Bewegung blendet das Ergebnis nur ein. Nur
+  `transform` und `opacity`. Die Note steht längst auf dem Server fest; die Enthüllung ist reine Anzeige. Ob ein
+  Paket geöffnet wurde, merkt sich das Gerät wie bisher (`useRevealedSlabs`), erst beim Ergebnis: Wer vorher
+  schließt, findet das Paket wieder versiegelt vor. „Alle ohne Show öffnen“ bleibt als Abkürzung.
+- **Nachtrag Kartenwert im Booster-Fenster:** In „Das kann drin sein“ zeigt jede Karte bei Hover, Fokus oder Tipp
+  Name, Seltenheit und aktuellen Marktwert (aus der ohnehin geladenen Sammlung). Dafür gibt es den neuen Baustein
+  `Tooltip` (`src/components/ui/tooltip.tsx`, Radix Tooltip); einen gemeinsamen Tooltip gab es vorher nicht.
 - **Offen (Balancing):** Die Startpreise machen Booster im Erwartungswert teurer oder billiger als ihren Inhalt, je
   nach Katalog; gebremst wird über die begrenzte KI-Nachfrage und fallende Werte bei wachsendem Angebot. KI-Budget,
   Booster-Takt der KI und Notenfaktoren sind die Stellschrauben.
@@ -3223,3 +3272,87 @@ Anteil wie jeder Aktionär.
   Ausbau-Fehler nennen dem Spieler jetzt den Grund.
 - Tests: `supabase/tests/a1_company_fixes.sql`, Fixtures `get_my_company_gmbh_upgraded`, `set_company_banner_16_colours`,
   `start_company_move_resting`, `api.test.ts`, `routes.test.ts`, `server-clock.test.ts`, E2E für beide Timer.
+
+- **Oberfläche:** eine Seite `/nexamon` mit vier Reitern (Shop, Sammlung, Markt, ASP), die in der Adresse stehen
+  (`?tab=`, am Markt zusätzlich `?view=mine` und `?card=<Schlüssel>`), und eine eigene Seite je Karte
+  `/nexamon/<Schlüssel>` zum Verlinken (Sammlung, Markt, Feed). In der Navigation heißt der Eintrag „Collectibles“
+  (unter „Besitz“, im Handy unter „Mehr“); vor Level 10 zeigt die Seite einen Ausblick (`DISCLOSURE.nexamon`,
+  `<Reveal>`).
+  - **Shop:** zuerst die Booster der drei Sets, jedes mit eigenem Motiv, Alufolien-Glanz und Riffelnaht oben und
+    unten; sie kippen in 3D zum Zeiger (`TiltPack`, mit „Reduziert“ flach). Dazu Preis, eigener Fortschritt
+    (x von 77) und geöffnete Booster; darunter die Ziehungsraten für Platz 4 und 5 als Tabelle direkt aus
+    `nexamonSlotOdds` und die Zustands-Chancen.
+  - **Booster-Fenster:** Ein Klick auf ein Booster öffnet ein Fenster (Handy: ganzer Bildschirm). Oben stehen Preis
+    und Guthaben, darunter alle 77 Karten des Sets nach Seltenheit mit der Ziehungsrate je Seltenheit und den
+    eigenen Karten in Farbe. **Bezahlt wird nur mit dem Knopf „Kaufen · Preis“**, nie durch eine Geste: Eine
+    Wischbewegung darf kein Geld kosten, und der Server bucht ohnehin vor dem Ziehen. Erst danach liegt das Booster
+    zum Aufreißen da.
+  - **Aufreißen:** oben an der gestrichelten Linie drücken und quer ziehen; der Streifen hebt sich mit dem Finger,
+    die Folie knistert, nach 70 % der Breite ist er ab (`tearProgress`), vorher fällt er zurück. Für Tastatur und
+    wer nicht ziehen kann gibt es „Ohne Ziehen aufreißen“; mit „Reduziert“ entfällt die Show. Das Ergebnis liegt bis
+    zur Übersicht im `localStorage` (`nexa-nexamon-pending-pack`), damit ein geschlossenes Fenster oder ein Neuladen
+    nur die Animation unterbricht („Ungeöffnetes Booster“ im Shop). „Überspringen“ zeigt die Übersicht sofort,
+    „Noch eins · Preis“ ist der nächste ausdrückliche Kauf.
+  - **Töne** (8-Bit, `pnpm sounds`, folgen der Ton-Einstellung): `packCrinkle` beim Ziehen, `packTear` beim Abriss,
+    `cardFlick` für jede weggezogene Karte, `cardShow` für eine Common und steigend `pullRare`, `pullUltra`,
+    `pullPrisma`, `pullLegendary`.
+  - **Sammlung:** alle 231 Karten in Nummernfolge, fehlende grau; eine Kachel zeigt die beste eigene Kopie, im Slab
+    als Slab, mit Zähler bei Doppelten. Filter (Set, Seltenheit, Meine/Fehlt/Doppelt) und Sortierung laufen im
+    Client über die eine Antwort von `get_nexamon_collection`.
+  - **Karte:** kippbare Karte (Handy Faktor 4, PC Faktor 5), Wert mit Verlauf im vorhandenen `PriceChart`,
+    Population, Slabs je Note, eigene Kopien mit ihren Aktionen. Jede Aktion erklärt vorher im Sheet, was sie
+    kostet und bringt: Verkaufspreis mit Gebühr und Erlös (Vorschlag ist der Wert), Sofortverkauf mit den 50 %,
+    Grading mit Gebühr, Dauer und der Chancentabelle des Zustands, Aufbrechen mit dem Hinweis „keine Erstattung“.
+  - **Markt:** Filter, Sortierung und Seiten rechnet der Server; die eigenen Angebote kommen aus der Sammlung.
+    Kaufen bestätigt den gesehenen Preis; bei `nexamon_price_changed` oder `nexamon_not_listed` schließt das Fenster
+    mit einem Hinweis, und die Liste wird neu gelesen.
+  - **ASP-Schalter:** laufende Gradings mit Countdown, zurückgekehrte Slabs liegen verdeckt, bis man sie aufdeckt
+    (einmal je Slab, gemerkt im `localStorage`; Ton nach Note, Konfetti bei einer 10, mit „Reduziert“ nur
+    Überblenden). Als Verlauf dienen die eigenen Slabs: Eine Liste vergangener Gradings liefert der Server nicht.
+  - **Kartentext:** Name und Attacke enden vor der Zahl rechts daneben. Zu lange Texte werden erst gestaucht (bis
+    68 %), dann kleiner gesetzt; die Breiten der Pixelschrift stehen dafür als Tabelle in
+    `src/features/nexamon/lib.ts`, ein Test prüft alle 231 Karten.
+  - **Benachrichtigungen** tragen vom Server alle den Link `/nexamon`; der Client führt `nexamon_graded` zum
+    ASP-Schalter und `nexamon_sale` zu den eigenen Angeboten. Der Feed-Eintrag `nexamon_pull` verlinkt die Karte.
+
+## ADR-169: Viele neue Themen für die NEXA Nachrichten — `Annahme`
+
+**Kontext:** Der Wunsch: „Bei den News sollen ganz viele neue Themen kommen. Mit den Collectibles, mit dem
+Finanzamt, personenspezifisches. Viel Schräges, mit dunklem Humor.“ Die Sendung (ADR-150, ADR-152) kannte bisher
+Verlierer, Gewinner, Klatsch aus dem Feed, Firmen, NFTs, Börse, Welt und Abschweifungen.
+
+**Entscheidung:**
+
+- **Themen als Drehbücher.** `src/config/news-topics.ts` hält 46 Themen in fünf Gruppen: Sammelkarten (`cards`:
+  seltene Ziehung, teuerster Verkauf, Karte steigt/fällt, ASP-10, schlechte Note, Booster ohne Treffer, wertvollste
+  Sammlung, KI-Händler), Finanzamt (`tax`: Verspätungszuschlag, Schätzung, Pfändung, Betriebsprüfung, saubere
+  Bücher, Steuerschuld, Durchsagen von Oberamtsrat Griesgram), Börsenfirmen (`corp`: gieriger Gründer,
+  Kündigungswelle, Rekorddividende, Aufstand im Geschäftsrat, Stimmung mies/glänzend, Forschung), Personen
+  (`person`: schlechtester/bester Trade, Verlierer/Gewinner der Stunde, Miete, Kleiderschrank, Outfit, Battle
+  gewonnen/letzter Platz, Missionen neu gewürfelt, Chat-Nachrichten (nur die Zahl), neue Freunde, Anstupsen,
+  Schläfer, Rauswurf durch den Gründer, Beförderung, Gründer zahlt sich viel aus, neues Zuhause/Auto) und Schräges
+  (`odd`: Nachrufe auf erfundene Depots, Börsenwetter, Werbung, Horoskop, Zuschauerpost, Studien). Jedes Thema hat
+  Rahmen, Begründungen, Gesichter, ein Gewicht, einen Ton und die Platzhalter, die es braucht. Sie stehen in
+  `newsShow.texts`, `newsShow.moods` und `newsShow.topics.list` und laufen über das bekannte `news_show_pick`.
+  Dazu 20 neue Abschweifungen für „ramble“.
+- **Auswahl.** `news_show_topics()` sammelt pro Thema höchstens einen Kandidaten aus vorhandenen Tabellen (Booster,
+  Kartenverkäufe, Exemplare, Feed, Reichenliste, Trades, Mieten, Accessoires, Battles, Missions-Würfeln, Chats,
+  Freundschaften, Stupser, Stundenabschlüsse, Steuerperioden). Gezogen werden `topics.count` (3): erst Themen, die
+  in der letzten Sendung nicht liefen, dann Gruppen, die noch fehlen, dann gewichtet per Los. Pro Spieler eine
+  Meldung pro Sendung, jede Tatsache einmal (`news_show_used`). Sie landen an den Plätzen `topics.ords` und zählen
+  zu `maxSegments` (jetzt 12, gut viereinhalb Minuten). Ohne Daten tragen die sieben Themen ohne Platzhalter.
+  Schlechte Nachrichten über Spieler (Personen, Karten) zahlen Schweigegeld wie der Klatsch.
+- **Kein Doppel.** Solange Themen an sind, erzählt der alte Klatsch die Feed-Arten, die ein eigenes Thema haben,
+  nicht mehr. `topics.count = 0` stellt die alte Sendung wieder her.
+- **Neue Arten im Studio.** `cards`, `tax` und `corp` bekommen Icon, Farbe, Bildunterschrift und Standardgesicht;
+  die übrigen Themen laufen als `gossip` oder `ramble`. Die Kartennamen kommen als `game_config.nexamon_names` auf
+  den Server.
+- **Demo.** Die Demo zieht dieselben Themen mit `pickTopics` über erfundene Mitspieler (Freunde zuerst).
+- **Grenzen.** Spott nur über das, was im Spiel passiert ist. Keine geschützten Merkmale, keine Beleidigungen über
+  den Namen, nichts Sexuelles, keine Gewalt oder Selbstverletzung, keine echten Unglücke. Echte Personen nur in
+  Abschweifungen als offensichtlich absurde Gerüchte; sonst erfundene Leute und Ämter. Ein Test prüft alle neuen
+  Texte auf Platzhalter und eine kleine Liste verbotener Wörter.
+
+**Folgen:** Mehr Abwechslung pro Sendung, Sammelkarten und Steuern kommen in der Sendung vor. Die Abfrage liest
+nur und läuft einmal pro Stunde. Neue Themen brauchen nur einen Eintrag in `news-topics.ts` und, falls sie Daten
+brauchen, einen Zweig in `news_show_topics()`.

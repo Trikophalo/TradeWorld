@@ -41,6 +41,9 @@
   --color-info-soft: var(--info-soft);
   --color-on-semantic: var(--on-semantic);
   --color-gold: var(--gold);
+  --color-black-label: var(--black-label);
+  --color-on-black-label: var(--on-black-label);
+  --color-black-label-edge: var(--black-label-edge);
   --color-edge: var(--edge);
   --color-shade: var(--shade);
   --color-shine: var(--shine);

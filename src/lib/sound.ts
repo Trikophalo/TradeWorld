@@ -123,6 +123,22 @@ export const SOUNDS = {
   battleClick: { src: ["/sounds/battle-click.wav"], volume: 0.3, minIntervalMs: 40, rateJitter: 0.1 },
   battleUnlock: { src: ["/sounds/battle-unlock.wav"], volume: 0.5, minIntervalMs: 500 },
   battleGavel: { src: ["/sounds/battle-gavel.wav"], volume: 0.55, minIntervalMs: 500 },
+  /** Nexamon packs (ADR-165): foil under the finger, the tear, cards leaving and showing, and the hits by rarity. */
+  packCrinkle: { src: ["/sounds/pack-crinkle.wav"], volume: 0.22, minIntervalMs: 45, rateJitter: 0.18 },
+  packTear: { src: ["/sounds/pack-tear.wav"], volume: 0.45, minIntervalMs: 400, rateJitter: 0.04 },
+  cardFlick: { src: ["/sounds/card-flick.wav"], volume: 0.35, minIntervalMs: 90, rateJitter: 0.1 },
+  cardShow: { src: ["/sounds/card-show.wav"], volume: 0.22, minIntervalMs: 90, rateJitter: 0.05 },
+  pullRare: { src: ["/sounds/pull-rare.wav"], volume: 0.38, minIntervalMs: 200 },
+  pullUltra: { src: ["/sounds/pull-ultra.wav"], volume: 0.42, minIntervalMs: 300 },
+  pullPrisma: { src: ["/sounds/pull-prisma.wav"], volume: 0.45, minIntervalMs: 500 },
+  pullLegendary: { src: ["/sounds/pull-legendary.wav"], volume: 0.5, minIntervalMs: 800 },
+  /** The ASP package (ADR-165): the drum roll while the slab rises, the grade counting up, and the result by tier. */
+  gradeDrum: { src: ["/sounds/grade-drum.wav"], volume: 0.34, minIntervalMs: 800 },
+  gradeTick: { src: ["/sounds/grade-tick.wav"], volume: 0.3, minIntervalMs: 60 },
+  gradeLow: { src: ["/sounds/grade-low.wav"], volume: 0.32, minIntervalMs: 400 },
+  gradeGood: { src: ["/sounds/grade-good.wav"], volume: 0.42, minIntervalMs: 400 },
+  gradeTen: { src: ["/sounds/grade-ten.wav"], volume: 0.5, minIntervalMs: 800 },
+  blackLabel: { src: ["/sounds/black-label.wav"], volume: 0.55, minIntervalMs: 1200 },
 } as const satisfies Record<string, SoundSpec>;
 
 /** Length of the news jingle as rendered by `scripts/gen-sounds.ts` (seven bars of four at 140 BPM). */

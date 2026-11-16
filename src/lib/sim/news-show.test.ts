@@ -160,13 +160,15 @@ describe("NEXA Nachrichten: the draw of the topics (ADR-169)", () => {
 
   it("follows the weights, ignores unknown topics and survives an empty list", () => {
     let heavy = 0;
-    const one = { ...rules, topics: { ...rules.topics, count: 1 } } as typeof R;
+    const one = { ...rules, topics: { ...rules.topics, count: 1 } } as unknown as typeof R;
     for (let seed = 1; seed <= 400; seed++)
       if (pickTopics([{ topic: "a1" }, { topic: "c1" }], [], seeded(seed * 7919), one)[0]!.topic === "a1") heavy++;
     expect(heavy).toBeGreaterThan(320);
     expect(pickTopics([{ topic: "unknown" }, { topic: "off" }], [], seeded(1), rules)).toEqual([]);
     expect(pickTopics([], [], seeded(1), rules)).toEqual([]);
-    expect(pickTopics(all, [], seeded(1), { ...rules, topics: { ...rules.topics, count: 0 } } as typeof R)).toEqual([]);
+    expect(
+      pickTopics(all, [], seeded(1), { ...rules, topics: { ...rules.topics, count: 0 } } as unknown as typeof R),
+    ).toEqual([]);
   });
 
   it("the real config gives a show with data three stories and a quiet server too", () => {

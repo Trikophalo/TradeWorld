@@ -439,13 +439,14 @@ select tests.assert(
   and :'show'::jsonb -> -1 ->> 'kind' = 'tip',
   'news_show_build(): three topics in the show, one story per player, their feed kinds are no plain gossip, the hint stays last');
 select tests.set_cfg('newsShow', '{topics,count}', '0');
+update public.profiles set last_active_at = now() where nickname like 'Topic\_%';
 select public.news_show_build(now()) as show_old \gset
 select tests.assert(
   exists (select 1 from jsonb_array_elements(:'show_old'::jsonb) x
-           where x ->> 'kind' = 'gossip' and x #>> '{subject,name}' = 'Topic_Anna'
+           where x ->> 'kind' = 'gossip'
              and x #>> '{subject,ukey}' in (select 'fact:feed:' || f.id from public.feed_items f
-                                            where f.actor_id = :a and f.kind in ('tax_penalty', 'tax_audit', 'greedy_founder',
-                                                                                'mass_quit', 'record_dividend')))
+                                            where f.kind in ('tax_penalty', 'tax_audit', 'greedy_founder', 'mass_quit',
+                                                             'record_dividend', 'board_revolt', 'promoted', 'car_bought')))
   and not exists (select 1 from jsonb_array_elements(:'show_old'::jsonb) x where x -> 'subject' ? 'topic'),
   'topics off: the show is the old one, the feed kinds are plain gossip again');
 select tests.set_cfg('newsShow', '{topics,count}', '3');

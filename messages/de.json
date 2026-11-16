@@ -32,7 +32,8 @@
       "upgrades": "Upgrades",
       "deals": "Deals",
       "crypto": "Krypto",
-      "news": "News"
+      "news": "News",
+      "nexamon": "Sammeln"
     },
     "property": "Grundstück",
     "more": "Mehr",
@@ -51,7 +52,8 @@
     "soonNext": "{name} ab Level {level}",
     "soonOpen": "Alle zeigen",
     "soonClose": "Weniger",
-    "news": "News"
+    "news": "News",
+    "nexamon": "Collectibles"
   },
   "topbar": {
     "search": "Aktien, Firmen, Spieler suchen",
@@ -585,6 +587,28 @@
       "text": "Ist die Kasse deiner Firma am Quartalsende im Minus, beginnt eine Schonfrist von {quarters} Quartalen, also {hours} Stunden. Bringst du die Kasse in dieser Zeit ins Plus (Kosten senken, Geld einschießen, Kredit), ist alles gut. Sonst ist die Firma insolvent und du darfst {lockout} Tage keine neue gründen. Über Nacht verlierst du also keine gesunde Firma.",
       "example": "Solange die Kasse im Minus ist, zahlst du Überziehungszinsen von {rate} im Spieljahr: {perQuarter} je Quartal auf 1.000 € Minus.",
       "where": "Roter Balken im Firmen-Dashboard mit Countdown. Du bekommst eine Benachrichtigung beim ersten Minus und vor dem letzten Abschluss."
+    },
+    "groupNexamon": "Nexamon-Karten",
+    "nexamonPacks": {
+      "title": "Booster und Ziehungsraten",
+      "summary": "{count} Karten je Booster, ab {price}",
+      "text": "Ab Level {level} kaufst du Booster. In jedem stecken {count} Karten: Die ersten drei sind immer Commons, die letzten zwei werden gewürfelt. Eine Rare gibt es dort mit {rare}, eine Ultra Rare mit {ultra}. Prisma ({prisma}) und Legendary ({legendary}) gibt es nur auf dem letzten Platz. Die genauen Raten stehen im Shop.",
+      "example": "Ein Booster Mystic Energy kostet {price}. Im Schnitt ist in jedem zweiten eine Rare, in jedem zwölften eine Ultra Rare und in einem von {legendaryPacks} eine Legendary.",
+      "where": "Collectibles → Shop"
+    },
+    "nexamonGrading": {
+      "title": "Zustand und ASP-Note",
+      "summary": "Grading kostet {rate} vom Wert",
+      "text": "Jede Karte hat einen Zustand: Poor, Good, Near Mint oder Mint. ASP bewertet eine lose Karte für {rate} ihres Werts mit einer Note von 1 bis 10 und versiegelt sie im Slab. Das dauert {minutes} Minuten. Je besser der Zustand, desto öfter gibt es eine 10: bei Mint zu {mint}, bei Near Mint zu {nearMint}, bei Good zu {good}. Über der 10 steht nur noch das Black Label: Das bekommen {blackChance} der Mint-Karten, andere Zustände nie. Ein Black Label ist {blackFactor} vom Marktwert wert.",
+      "example": "Karte im Wert von {value}: Das Grading kostet {fee}. Mit einer 10 ist der Slab {ten} wert, mit einer 8 {eight}, mit einer 7 nur noch {seven}.",
+      "where": "Collectibles → Karte öffnen → Zu ASP"
+    },
+    "nexamonMarket": {
+      "title": "Kartenmarkt",
+      "summary": "{rate} Gebühr für Verkäufer",
+      "text": "Am Kartenmarkt bietest du einzelne Kopien zu deinem Preis an. Beim Verkauf zahlst du {rate} Gebühr. Jede Karte hat einen Marktwert: Er steigt, wenn die Karte knapp und gefragt ist, und fällt, wenn viele sie anbieten. KI-Sammler kaufen höchstens zum Wert. Lose Commons und Rares nimmt die KI auch sofort, für {quick} des Werts.",
+      "example": "Du verkaufst eine Karte für {price}: {fee} Gebühr, {net} kommen an. Im Sofortverkauf an die KI wären es bei {price} Wert nur {quickNet}.",
+      "where": "Collectibles → Markt"
     }
   },
   "tutorial": {
@@ -655,6 +679,10 @@
       "visit_artworks": {
         "market": "Der Marktplatz zeigt oben die beliebtesten NFTs. Gefällt dir eins, gib ihm ein Herz – das macht es berühmter und wertvoller.",
         "studio": "Im Atelier prägst du eigene NFTs. Das erste am Tag kostet 15.000 €, jedes weitere am selben Tag das 1,5-Fache; um Mitternacht startet der Preis neu. Dafür verdienst du an jedem Weiterverkauf mit."
+      },
+      "visit_nexamon": {
+        "packs": "Das sind die Booster. In jedem stecken fünf Karten, und was du ziehst, entscheidet der Zufall. Die genauen Chancen stehen direkt darunter.",
+        "tabs": "In der Sammlung siehst du alle Karten, am Markt handelst du einzelne Kopien, und bei ASP lässt du Karten bewerten. Eine Note 10 ist das Dreifache wert."
       },
       "property": {
         "intro": "Neu: dein eigenes Zuhause! Kauf eine Wohnung, richte sie Stück für Stück ein und zieh später in eine Villa.",
@@ -3125,6 +3153,7 @@
         "coin_closed": "hat den Coin {name} ({ticker}) eingestellt.",
         "accessory_bought": "trägt jetzt etwas Legendäres: {name}.",
         "nexamon_pull": "hat eine legendäre Nexamon-Karte gezogen: {name} (Nummer {serial}).",
+        "nexamon_black_label": "hat bei ASP ein Black Label geholt: {name} (Nummer {serial}).",
         "home_rented": "wohnt jetzt in einer {home} bei {owner}.",
         "battle_won": "hat das News-Battle „{game}“ gewonnen 🏆",
         "tax_penalty": "hat mit {company} eine Strafe vom Finanzamt kassiert.",
@@ -3161,7 +3190,8 @@
       "myPlace": "Platz {rank} von {count}",
       "previewEmpty": "Die Wertung startet gleich.",
       "leader": "Vorne: {name}"
-    }
+    },
+    "nexamonCard": "Karte ansehen"
   },
   "companyEvents": {
     "title": "Lage",
@@ -4444,7 +4474,8 @@
       "company": "Firma gründen",
       "deals": "Deals",
       "property": "Grundstück",
-      "crypto": "Kryptowährungen"
+      "crypto": "Kryptowährungen",
+      "nexamon": "Nexamon-Sammelkarten"
     },
     "tasks": {
       "daily": {
@@ -4808,7 +4839,8 @@
     "richList": "Wer hat am meisten? Hier steht es schwarz auf weiß.",
     "events": "Was heute an der Börse ansteht.",
     "profile": "Dein Fortschritt, dein Aussehen, deine Einstellungen.",
-    "news": "Börsen-Tipps, Firmen-Meldungen und das Kuriose aus der Spielwelt. Alles an einem Ort."
+    "news": "Börsen-Tipps, Firmen-Meldungen und das Kuriose aus der Spielwelt. Alles an einem Ort.",
+    "nexamon": "Booster aufreißen, seltene Karten jagen, bewerten lassen und am Kartenmarkt handeln."
   },
   "stockNews": {
     "title": "Börsen-News",
@@ -8292,6 +8324,7 @@
       "prismatic_peak": "Prismatic Peak"
     },
     "grade": {
+      "blackLabel": "Black Label",
       "gemMint": "Gem Mint",
       "mint": "Mint",
       "nearMintMint": "NM-MT",
@@ -8313,13 +8346,348 @@
     "pack": {
       "label": "Booster {set}",
       "open": "Booster {set} aufreißen",
-      "tapHint": "Tippe auf das Booster, um es aufzureißen.",
+      "tapHint": "Zieh oben an der gestrichelten Linie quer über das Booster, um es aufzureißen.",
       "dragHint": "Zieh die oberste Karte weg. Langsam ziehen heißt spicken.",
       "keyHint": "Tastatur: Pfeiltasten oder Leertaste",
       "counter": "Karte {n} von {total}",
       "stackLabel": "Kartenstapel, Karte {n} von {total}: {name}. Mit Pfeiltasten oder Leertaste wegziehen.",
       "summary": "Deine Karten",
-      "cards": "5 Karten"
+      "cards": "5 Karten",
+      "openButton": "Ohne Ziehen aufreißen"
+    }
+  },
+  "nexamon": {
+    "title": "Collectibles",
+    "summary": "{copies, plural, =0 {Noch keine Karte} one {# Karte} other {# Karten}} · {distinct} von {total} verschiedene · Wert {value}",
+    "tabs": {
+      "label": "Bereiche von Nexamon",
+      "shop": "Shop",
+      "collection": "Sammlung",
+      "market": "Markt",
+      "grading": "ASP",
+      "gradingBack": "Karten sind zurück von ASP"
+    },
+    "new": "Neu",
+    "serial": "#{serial}",
+    "cancel": "Abbrechen",
+    "loadFailed": "Nicht geladen",
+    "retry": "Noch einmal versuchen",
+    "gradeShort": "ASP {grade}",
+    "gradeLong": "ASP {grade} · {word}",
+    "blackLabel": {
+      "short": "Black Label",
+      "long": "ASP 10 · Black Label",
+      "onlyMint": "Nur Karten im Zustand {condition} können das Black Label bekommen.",
+      "note": "Black Label: {chance} aller {condition}-Karten, die zu ASP gehen. Der Slab ist {factor} vom Marktwert wert. Andere Zustände bekommen es nie.",
+      "count": "{count, plural, =0 {Kein Black Label} one {# Black Label} other {# Black Labels}}"
+    },
+    "status": {
+      "raw": "Lose",
+      "listed": "Am Markt",
+      "grading": "Bei ASP",
+      "graded": "Im Slab"
+    },
+    "locked": {
+      "title": "Nexamon-Sammelkarten",
+      "text": "Ab Level {level} ziehst du Karten aus Boostern, lässt sie bewerten und handelst sie am Kartenmarkt.",
+      "point1": "{sets} Sets mit je {cards} Karten, von Common bis Legendary.",
+      "point2": "ASP bewertet deine Karten mit Noten von 1 bis 10. Eine 10 ist {best} wert, das seltene Black Label {black}.",
+      "point3": "Am Markt bestimmen Knappheit und Nachfrage, was eine Karte wert ist."
+    },
+    "shop": {
+      "buyFailed": "Booster nicht gekauft",
+      "pendingTitle": "Ungeöffnetes Booster: {set}",
+      "pendingText": "Die Karten liegen schon in deiner Sammlung. Aufreißen kannst du es trotzdem noch.",
+      "pendingOpen": "Aufreißen",
+      "pendingDrop": "Weglegen",
+      "inside": "{count} Karten je Booster",
+      "progress": "Deine Sammlung",
+      "progressValue": "{owned} von {total}",
+      "progressLabel": "Fortschritt im Set {set}",
+      "opened": "{count, plural, =0 {Noch kein Booster geöffnet} one {# Booster geöffnet} other {# Booster geöffnet}}",
+      "population": "{count} Karten im Umlauf",
+      "buy": "Kaufen · {price}",
+      "short": "Dir fehlen {amount}.",
+      "openPack": "Booster {set} ansehen, {price}",
+      "look": "Ansehen und öffnen"
+    },
+    "opening": {
+      "title": "Booster {set}",
+      "skip": "Überspringen",
+      "close": "Schließen",
+      "safe": "Bezahlt ist schon, und die Karten liegen in deiner Sammlung. Schließen kostet nichts.",
+      "toCollection": "Zur Sammlung",
+      "worth": "Wert",
+      "paid": "Bezahlt",
+      "newCards": "Neu",
+      "again": "Noch eins · {price}",
+      "againPlain": "Noch eins",
+      "balance": "Dein Geld: {cash}",
+      "howTo": "Erst mit „Kaufen“ wird bezahlt. Danach reißt du das Booster selbst auf.",
+      "scrollHint": "Weiter unten: alle Karten dieses Sets und ihre Chancen."
+    },
+    "odds": {
+      "title": "Ziehungsraten",
+      "intro": "Jedes Booster hat {count} Karten. Die ersten {sure} sind immer Commons, die letzten beiden werden gewürfelt. Die Raten gelten für alle drei Sets.",
+      "rarity": "Seltenheit",
+      "slot": "Platz {slot}",
+      "average": "Im Schnitt",
+      "cardsInSet": "{count} je Set",
+      "oneIn": "1 in {count} Boostern",
+      "perPack": "{count} je Booster",
+      "conditionIntro": "Jede gezogene Karte bekommt einen Zustand:",
+      "note": "Innerhalb einer Seltenheit ist jede Karte des Sets gleich wahrscheinlich. Bezahlt wird nur mit Spielgeld."
+    },
+    "contents": {
+      "value": "Marktwert:",
+      "valueLoading": "wird geladen …",
+      "cardLabel": "{name}, Marktwert {value}",
+      "title": "Das kann drin sein",
+      "intro": "Alle Karten dieses Sets nach Seltenheit, mit der Chance je Booster. Karten, die du schon hast, sind farbig.",
+      "slots": "Platz 4: {slot4} · Platz 5: {slot5}",
+      "lastSlot": "nur Platz 5: {slot5}",
+      "owned": "{owned} von {total}"
+    },
+    "binder": {
+      "copies": "Karten",
+      "distinct": "Motive",
+      "distinctValue": "{owned} / {total}",
+      "value": "Wert",
+      "ownership": "Welche Karten zeigen",
+      "own": {
+        "all": "Alle",
+        "owned": "Meine",
+        "missing": "Fehlt",
+        "duplicates": "Doppelt"
+      },
+      "sort": {
+        "number": "Nummer",
+        "value": "Wert",
+        "newest": "Neueste"
+      },
+      "emptyTitle": "Noch keine Karte",
+      "emptyText": "Kauf dein erstes Booster im Shop und reiß es auf.",
+      "noMatchTitle": "Nichts gefunden",
+      "noMatchText": "Zu diesen Filtern passt keine Karte. Stell sie anders ein.",
+      "toShop": "Zum Shop",
+      "setCount": "{owned} von {total}",
+      "tileLabel": "{name}, {count, plural, =0 {fehlt dir noch} one {# Kopie} other {# Kopien}}",
+      "missing": "fehlt"
+    },
+    "filter": {
+      "set": "Set",
+      "allSets": "Alle Sets",
+      "rarity": "Seltenheit",
+      "allRarities": "Alle",
+      "sort": "Sortierung",
+      "seller": "Verkäufer",
+      "graded": "Art"
+    },
+    "copy": {
+      "atAsp": "Bei ASP, zurück in",
+      "listedFor": "Am Markt für {price}",
+      "unlist": "Zurücknehmen",
+      "unlistFailed": "Angebot nicht zurückgenommen",
+      "unlistDone": "Angebot zurückgenommen",
+      "sell": "Verkaufen",
+      "grade": "Zu ASP",
+      "quick": "Sofort an KI",
+      "crack": "Slab aufbrechen"
+    },
+    "sell": {
+      "title": "Am Markt anbieten",
+      "failed": "Karte nicht eingestellt",
+      "done": "Karte steht am Markt",
+      "confirm": "Für {price} anbieten",
+      "confirmPlain": "Anbieten",
+      "price": "Dein Preis",
+      "invalid": "Gib einen Preis ab {min} ein, höchstens zwei Stellen nach dem Komma.",
+      "hint": "Vorschlag: der aktuelle Wert, {value}.",
+      "value": "Wert der Kopie",
+      "fee": "Gebühr ({rate})",
+      "net": "Bei dir kommt an",
+      "tooHigh": "Mehr als {band} über dem Wert: So ein Verkauf bewegt den Marktwert nicht, und KI-Sammler kaufen nie zu diesem Preis.",
+      "aboveValue": "Über dem Wert kaufen nur andere Spieler. KI-Sammler zahlen höchstens den Wert.",
+      "atValue": "Zu diesem Preis greifen auch KI-Sammler zu, früher oder später."
+    },
+    "quick": {
+      "title": "Sofort an die KI verkaufen",
+      "failed": "Karte nicht verkauft",
+      "done": "Karte verkauft",
+      "confirm": "Für {price} verkaufen",
+      "offer": "Die KI zahlt ({rate})",
+      "text": "Das Geld kommt sofort, die Karte ist weg. Das geht nur mit losen Commons und Rares. Am Markt bekommst du meistens mehr, musst aber auf einen Käufer warten."
+    },
+    "grade": {
+      "title": "Zu ASP schicken",
+      "failed": "Karte nicht verschickt",
+      "done": "Karte ist bei ASP",
+      "doneText": "In {minutes} Minuten ist sie zurück.",
+      "confirm": "Für {fee} bewerten lassen",
+      "text": "ASP prüft die Karte, gibt ihr eine Note von 1 bis 10 und versiegelt sie im Slab. Solange ist sie weg.",
+      "fee": "Gebühr ({rate} vom Wert)",
+      "duration": "Dauer",
+      "minutes": "{minutes} Minuten",
+      "better": "Chance auf mehr Wert",
+      "expected": "Wert im Schnitt",
+      "table": "Chancen für {condition}",
+      "tableNote": "Rechts steht, wie viel der Slab gegenüber dem Marktwert der Karte wert ist. Ab Note {grade} gewinnst du, darunter verlierst du."
+    },
+    "crack": {
+      "title": "Slab aufbrechen?",
+      "failed": "Slab nicht aufgebrochen",
+      "done": "Slab aufgebrochen",
+      "confirm": "Aufbrechen",
+      "text": "Die Karte kommt lose zurück, mit ihrem alten Zustand ({condition}). Die Note ist dann weg. Du darfst sie danach noch einmal zu ASP schicken.",
+      "noRefund": "Die Grading-Gebühr bekommst du nicht zurück.",
+      "blackLabelTitle": "Achtung: Das ist ein Black Label!",
+      "blackLabelText": "Brichst du diesen Slab auf, ist das Black Label für immer weg. Die Karte ist dann nur noch {raw} wert statt {slab}. Ein neues Grading bringt nur in {chance} der Fälle wieder ein Black Label.",
+      "blackLabelConfirm": "Black Label zerstören"
+    },
+    "deal": {
+      "at": "zum Wert",
+      "below": "{percent} unter Wert",
+      "above": "{percent} über Wert"
+    },
+    "market": {
+      "you": "Du",
+      "ai": "KI",
+      "manage": "Verwalten",
+      "buy": "Kaufen",
+      "view": "Ansicht des Markts",
+      "viewAll": "Angebote",
+      "viewMine": "Meine Angebote",
+      "seller": {
+        "all": "Alle",
+        "players": "Spieler",
+        "ai": "KI-Händler",
+        "mine": "Meine"
+      },
+      "graded": {
+        "all": "Alle",
+        "raw": "Lose Karten",
+        "slab": "Slabs",
+        "black": "Black Label"
+      },
+      "sort": {
+        "new": "Neueste",
+        "price_asc": "Preis aufsteigend",
+        "price_desc": "Preis absteigend",
+        "deal": "Bestes Angebot",
+        "value": "Wertvollste Karte",
+        "number": "Kartennummer"
+      },
+      "onlyCard": "Nur Angebote für",
+      "clearCard": "Alle Karten",
+      "search": "Karte suchen",
+      "searchPlaceholder": "Name der Karte",
+      "emptyTitle": "Keine Angebote",
+      "emptyText": "Zu diesen Filtern bietet gerade niemand etwas an. Schau später wieder rein oder stell die Filter anders ein.",
+      "total": "{count, plural, one {# Angebot} other {# Angebote}}",
+      "pages": "Seiten der Angebote",
+      "prev": "Zurück",
+      "next": "Weiter",
+      "page": "Seite {page} von {pages}",
+      "mineEmptyTitle": "Nichts am Markt",
+      "mineEmptyText": "Du bietest gerade keine Karte an. Öffne eine Karte in deiner Sammlung und tippe auf „Verkaufen“.",
+      "toCollection": "Zur Sammlung",
+      "mineCount": "{count} von höchstens {max} Angeboten",
+      "since": "seit {date}",
+      "worth": "Wert {value}"
+    },
+    "buy": {
+      "title": "Karte kaufen?",
+      "failed": "Karte nicht gekauft",
+      "done": "Karte gekauft",
+      "changed": "Preis geändert",
+      "gone": "Angebot weg",
+      "confirm": "Für {price} kaufen",
+      "from": "Von",
+      "price": "Preis",
+      "cash": "Dein Geld",
+      "note": "Die Karte liegt sofort in deiner Sammlung. Ändert sich der Preis in diesem Moment, wird nichts gekauft."
+    },
+    "inspect": {
+      "back": "Zur Sammlung",
+      "unknownTitle": "Karte nicht gefunden",
+      "unknownText": "Diese Karte gibt es nicht. Vielleicht ist der Link alt.",
+      "neighbours": "Andere Karten des Sets",
+      "prev": "Vorige Karte: {name}",
+      "next": "Nächste Karte: {name}",
+      "flipHint": "Bewegen kippt die Karte, Tippen dreht sie um.",
+      "value": "Marktwert",
+      "today": "heute",
+      "range": "Start {start} · kann gerade zwischen {floor} und {cap} liegen.",
+      "population": "Im Umlauf",
+      "populationHint": "je gezogen",
+      "listed": "Am Markt",
+      "listedHint": "jetzt im Angebot",
+      "owned": "Deine",
+      "ownedHint": "Kopien bei dir",
+      "popularity": "Beliebtheit",
+      "popularityHint": "selten und knapp",
+      "copies": "{count, plural, =0 {Deine Kopien} one {Deine Kopie} other {Deine # Kopien}}",
+      "noCopies": "Du hast diese Karte noch nicht. Zieh sie aus einem Booster oder kauf sie am Markt.",
+      "listings": "{count, plural, =0 {Angebote} one {# Angebot} other {# Angebote}}",
+      "allListings": "Im Markt zeigen",
+      "noListings": "Gerade bietet niemand diese Karte an.",
+      "graded": "Bewertete Kopien je Note",
+      "noGraded": "Noch keine Kopie dieser Karte steckt in einem Slab.",
+      "sales": "Letzte Verkäufe",
+      "noSales": "Diese Karte wurde noch nicht verkauft.",
+      "cardLine": "{type}-Nexamon mit {hp} KP. Attacke: {attack}.",
+      "noHistory": "Der Wert hat sich noch nicht bewegt.",
+      "chartLabel": "Wertverlauf von {name}, aktuell {value}",
+      "showing": "Wird gezeigt",
+      "show": "Zeigen",
+      "conditionNote": "Der Zustand bestimmt, wie viel vom Marktwert eine lose Kopie wert ist, und welche Noten ASP ihr geben kann. Bessere Zustände bekommen viel öfter eine 10."
+    },
+    "saleKind": {
+      "market": "am Markt",
+      "ai_buy": "an KI-Sammler",
+      "quick": "Sofortverkauf"
+    },
+    "grading": {
+      "title": "ASP-Schalter",
+      "intro": "ASP bewertet lose Karten mit Noten von 1 bis 10 und versiegelt sie im Slab. Das kostet {rate} vom Wert der Kopie und dauert {minutes} Minuten. Eine 10 ist {best} wert. Ganz selten bekommt eine Mint-Karte das Black Label: Das ist {black} wert. Schicken kannst du jede lose Karte aus deiner Sammlung.",
+      "running": "Bei ASP",
+      "slots": "{count} / {max}",
+      "waiting": "Pakete",
+      "slabs": "Slabs",
+      "backTitle": "Zurück von ASP",
+      "revealAll": "Alle ohne Show öffnen",
+      "queueTitle": "In Arbeit",
+      "emptyTitle": "Nichts bei ASP",
+      "emptyText": "Öffne eine lose Karte in deiner Sammlung und tippe auf „Zu ASP“.",
+      "toCollection": "Zur Sammlung",
+      "backIn": "Zurück in",
+      "historyTitle": "Deine Slabs",
+      "historyEmpty": "Noch kein Slab. Hier stehen später alle bewerteten Karten, die dir gehören.",
+      "historyNote": "Verkaufte oder aufgebrochene Slabs stehen hier nicht mehr.",
+      "factor": "{factor} vom Marktwert",
+      "toCard": "Zur Karte",
+      "reveal": "Paket öffnen",
+      "sealed": "Versiegeltes Paket"
+    },
+    "reveal": {
+      "title": "Paket von ASP",
+      "packLabel": "Versiegeltes Paket von ASP",
+      "tearHint": "Zieh oben quer über das Paket, um es aufzureißen.",
+      "openButton": "Paket aufreißen",
+      "rising": "ASP hat entschieden …",
+      "counting": "Die Note …",
+      "cover": "ASP · ? ? ?",
+      "skip": "Überspringen",
+      "close": "Schließen",
+      "next": "{count, plural, one {Nächstes Paket (noch #)} other {Nächstes Paket (noch #)}}",
+      "safe": "Der Slab gehört dir schon. Schließt du das Fenster, wartet das Paket weiter auf dich.",
+      "blackText": "Nur {chance} aller Mint-Karten bekommen das Black Label. Glückwunsch!",
+      "tier": {
+        "low": "Leider keine Top-Note",
+        "good": "Starke Note!",
+        "ten": "Gem Mint: die 10!",
+        "black": "Black Label!!!"
+      }
     }
   }
 }

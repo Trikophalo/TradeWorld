@@ -15,7 +15,7 @@ export const NEXAMON_RULES = {
   sets: {
     mystic_energy: { name: "Nexamon: Mystic Energy", packPriceCents: 20_000 },
     super_apex: { name: "Nexamon: Super Apex", packPriceCents: 100_000 },
-    prismatic_peak: { name: "Nexamon: Prismatic Peak", packPriceCents: 500_000 },
+    prismatic_peak: { name: "Nexamon: Prismatic Peak", packPriceCents: 1_000_000 },
   },
   packs: {
     /** At most this many packs per player and minute. */
@@ -37,27 +37,27 @@ export const NEXAMON_RULES = {
     slot5: { legendary: 4, prisma: 45, ultra: 150, rare: 900 },
   },
   /**
-   * Condition of a pulled card, worst first. Cards worse than "good" are very rare. From "good" upwards a card is
-   * worth its market value; every step below "good" costs `belowGoodStepBps` of the value (poor: 95 %).
+   * Condition of a pulled card, worst first. Cards worse than "good" are very rare. A raw copy is worth its card's
+   * market value x `valueBps` of its condition: poor 70 %, good 90 %, near mint and mint 100 %.
    */
   conditions: {
     order: ["poor", "good", "near_mint", "mint"],
     weightBps: { poor: 200, good: 1_800, near_mint: 5_000, mint: 3_000 },
-    belowGoodStepBps: 500,
+    valueBps: { poor: 7_000, good: 9_000, near_mint: 10_000, mint: 10_000 },
   },
   /**
    * Grading by "ASP" (a parody of card grading): costs `feeBps` of what the copy is worth right now (to the
    * households), takes `minutes` of real time and ends with a grade from 1 to 10 in a slab.
    */
   grading: {
-    feeBps: 5_000,
+    feeBps: 3_000,
     minFeeCents: 100,
     minutes: 60,
     /** At most this many copies of one player at ASP at the same time. */
     maxOpen: 10,
     /**
      * Chance of every grade in basis points, per condition; index 0 is grade 1, index 9 is grade 10.
-     * A 10: poor 0.1 %, good 10 %, near mint 60 %, mint 90 %.
+     * A 10: poor 0.1 %, good 10 %, near mint 60 %, mint 90 % (of which `blackLabel.chanceBps` become a Black Label).
      */
     gradeWeightsBps: {
       poor: [500, 1_000, 1_500, 2_000, 2_000, 1_500, 1_000, 400, 90, 10],
@@ -70,6 +70,12 @@ export const NEXAMON_RULES = {
      * 8 to 10 are always worth more than the raw card, 7 and below less.
      */
     valueBps: [3_000, 4_000, 5_000, 6_000, 7_000, 8_000, 9_000, 12_000, 16_000, 30_000],
+    /**
+     * The Black Label, one tier above a 10 (stored as grade 11, shown as "ASP 10 Black Label"). Only a copy in
+     * `condition` can get it: `chanceBps` of its gradings, taken out of its chance for a 10 (mint: 1 % Black
+     * Label, 89 % a 10). The slab is worth the card's market value x `valueBps`.
+     */
+    blackLabel: { condition: "mint", chanceBps: 100, valueBps: 100_000 },
   },
   /** Listings of single copies at a price the seller chooses. */
   market: {
@@ -182,7 +188,10 @@ export const NEXAMON_RULES = {
     maxPerCall: 50,
     dropBps: 25,
   },
-  /** Pulling a card of these rarities is news for the friends (feed kind nexamon_pull). */
+  /**
+   * Pulling a card of these rarities is news for the friends (feed kind nexamon_pull). A Black Label always is
+   * (feed kind nexamon_black_label).
+   */
   feedRarities: ["legendary"],
 } as const;
 

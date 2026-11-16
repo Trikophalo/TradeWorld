@@ -113,6 +113,23 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Neue Themen in den Nachrichten (ADR-169):** Mr. Doodle Dangle lästert jetzt auch über Sammelkarten, das Finanzamt
+  samt Oberamtsrat Griesgram, Börsenfirmen und eure Taten im Spiel: verzockte Trades, Miete, Outfits, Battles,
+  Schläfer. Dazu Nachrufe, Werbung und Horoskope; jede Sendung bringt drei Themen, die nicht direkt wiederkommen.
+
+- **Black Label und ASP-Paket (ADR-165):** Über der ASP 10 steht jetzt das Black Label: Nur 1 % der Mint-Karten
+  bekommen es, der Slab ist das 10-Fache der Karte wert. Bewertete Karten kommen in einem versiegelten Paket zurück,
+  das du selbst aufreißt; die Note wird langsam enthüllt. Im Booster-Fenster zeigt jede Karte beim Drüberfahren
+  ihren Marktwert.
+
+- **Collectibles (ADR-165):** Unter „Collectibles“ wählst du ein Booster, siehst alle Karten des Sets mit ihren
+  Chancen und reißt die Folie nach dem Kauf selbst auf, mit eigenen Tönen für gute Züge. Dazu Sammelalbum,
+  Kartenansicht mit Wertverlauf, Kartenmarkt und ASP-Schalter. Prismatic Peak kostet jetzt 10.000 €, seine Karten
+  sind dafür das 1,5-Fache wert.
+
+- **Kartenzustand zählt mehr:** Eine lose Poor-Karte ist 70 % ihres Marktwerts wert, Good 90 %, Near Mint und Mint
+  100 %.
+- **Grading günstiger:** ASP verlangt nur noch 30 % des Kartenwerts statt 50 %.
 - **Nexamon-Sammelkarten (ADR-165):** Ab Level 10 ziehst du Booster aus drei Sets, lässt Karten bei ASP bewerten und
   handelst sie an einem Markt, an dem Knappheit und Nachfrage den Wert jeder Karte bestimmen.
 

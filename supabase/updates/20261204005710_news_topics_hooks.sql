@@ -29,7 +29,7 @@ $t$ || v_fill);
     v_def := replace(v_def, v_where, v_where || $t$
                    and (coalesce((cfg #>> '{topics,count}')::integer, 0) <= 0
                         or f.kind not in ('tax_penalty', 'tax_audit', 'greedy_founder', 'mass_quit', 'record_dividend',
-                                          'board_revolt', 'nexamon_pull', 'promoted', 'home_bought', 'car_bought'))$t$);
+                                          'board_revolt', 'promoted', 'home_bought', 'car_bought', 'nexamon_pull'))$t$);
     execute v_def;
   end if;
 end;

@@ -7,14 +7,14 @@
       "population": 421,
       "owned_copies": 10,
       "packs_opened": 2,
-      "owned_distinct": 9,
+      "owned_distinct": 10,
       "pack_price_cents": 20000
     },
     {
       "key": "super_apex",
       "name": "Nexamon: Super Apex",
       "cards": 77,
-      "population": 367,
+      "population": 372,
       "owned_copies": 0,
       "packs_opened": 0,
       "owned_distinct": 0,
@@ -28,13 +28,13 @@
       "owned_copies": 0,
       "packs_opened": 0,
       "owned_distinct": 0,
-      "pack_price_cents": 500000
+      "pack_price_cents": 1000000
     }
   ],
   "limits": { "max_grading": 10, "max_listings": 30, "packs_per_minute": 20 },
   "unlocked": true,
   "pack_size": 5,
-  "collection": { "copies": 10, "graded": 0, "listed": 0, "grading": 0, "distinct": 9, "value_cents": 4417 },
-  "server_time": "2026-11-16T17:55:41.404512+00:00",
+  "collection": { "copies": 10, "graded": 0, "listed": 0, "grading": 0, "distinct": 10, "value_cents": 140026 },
+  "server_time": "2026-11-16T19:43:59.755756+00:00",
   "unlock_level": 10
 }

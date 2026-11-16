@@ -7687,7 +7687,9 @@ genau einmal Geld, kaufmännisch „half even“ (`nexamon_copy_value_cents`).
 - **`nexamon_packs`** (intern): Booster der Spieler mit den fünf Zügen (`cards` jsonb), für Zähler und Verlauf.
 - **`nexamon_value_points`** (intern): Wertverlauf, letzter Wert je Stunde mit Änderung (PK `card_key, at`), 60 Tage.
 - **`nexamon_set_state`** (intern): je Set `ai_packs_at` (bis wann die KI-Booster geöffnet sind), `ai_packs_opened`,
-  `player_packs_opened`. **`nexamon_meta`** (intern, eine Zeile): Hash des zuletzt gespiegelten Katalogs.
+  `player_packs_opened`. **`nexamon_meta`** (intern, eine Zeile): Hash des zuletzt gespiegelten Katalogs; `peak_scaled_at` merkt
+  sich, dass Migration `20261204005500_nexamon_peak_prices.sql` die Werte von Prismatic Peak einmal um das 1,5-Fache
+  gehoben hat (Booster 10.000 €).
 - **Lesende RPCs** (alle `authenticated`; außer `get_nexamon` verlangen sie Level 10):
   - `get_nexamon()` → `{unlocked, unlock_level, pack_size, sets: [{key, name, pack_price_cents, cards, owned_distinct,
 owned_copies, packs_opened, population}], collection: {copies, distinct, value_cents, listed, grading, graded},
@@ -7734,6 +7736,18 @@ seller, seller_ai, mine, listed_at}`. Antworten enthalten Nicknames und KI-Namen
   `nexamon_sold`, `nexamon_bought`, `nexamon_listed`, `nexamon_graded`, `nexamon_ten`; Vorlagen `d_nexamon_pack`,
   `w_nexamon_sell`, `m_nexamon_first_pack`, `m_nexamon_packs_10`, `m_nexamon_first_rare`, `m_nexamon_first_ultra`,
   `m_nexamon_first_sale`, `m_nexamon_first_ten` (alle mit `{"unlock":"nexamon"}`).
+- **Black Label** (Migration `20261204005850_nexamon_black_label.sql`, Regel `game_config.nexamon.grading.blackLabel
+= {condition, chanceBps, valueBps}`): `nexamon_copies.grade` und `nexamon_sales.grade` kennen den Wert **11** =
+  Black Label (Prüfung `grade between 1 and 11`); überall, wo eine Note steht (COPY, LISTING, Verkäufe, `old_grade`),
+  kann 11 stehen. `nexamon_roll_grade` gibt 11 nur für den Zustand aus `blackLabel.condition` zurück (die obersten
+  `chanceBps` Zahlen der 10), `nexamon_copy_factor_bps(…, 11)` = `blackLabel.valueBps`.
+  `get_nexamon_card` liefert zusätzlich `black_labels` (Anzahl; `graded` bleibt bei zehn Einträgen für die Noten 1
+  bis 10). `get_nexamon_market(p_set, p_rarity, p_sort, p_page, p_seller, p_card_key, p_graded, p_black_label)`:
+  neuer Filter `p_black_label` (true = nur Black Label, false = alles andere, null = beides); die alte Signatur mit
+  sieben Argumenten gibt es nicht mehr. `nexamon_finish_gradings`: Benachrichtigung `nexamon_graded` mit Titel
+  „Black Label!“ und `black_label: true` in den Daten, Feed `nexamon_black_label` (`{card_key, serial, condition}`,
+  auch in `feed_item_label` und in der Klatsch-Liste von `news_show_build`), Missions-Metrik `nexamon_black_label`
+  (zusätzlich zu `nexamon_ten`), Vorlage `m_nexamon_first_black_label`. Test `supabase/tests/a6_black_label.sql`.
 - **Fehler:** `nexamon_locked` NX163, `nexamon_unknown` NX164, `nexamon_not_owner` NX165, `nexamon_listed` NX166,
   `nexamon_not_listed` NX167, `nexamon_price_changed` NX168, `nexamon_listing_limit` NX169, `nexamon_grading` NX170,
   `nexamon_not_raw` NX171, `nexamon_not_graded` NX172, `nexamon_not_sellable` NX173, `nexamon_own_listing` NX174,
@@ -7815,3 +7829,12 @@ fehlt): `player_company_close_hour` (zehn Stellen: Terme, laufende Kosten, Decke
 `news_show_build`. Neu: Benachrichtigungsarten `tax_office` (Pflicht), `team_mood`, `board`, `company_dividend`,
 `company_project`; Trigger `listed_audit_mission` auf `player_company_events`; Firmen-Ereignis `tax_audit`
 (Gewicht 0, nur vom Finanzamt).
+
+## Nachtrag: Neue Themen der Nachrichten (ADR-169)
+
+Keine neue Tabelle. `news_show_topics(p_now, p_seen uuid[], p_skip uuid[], p_segments jsonb) → jsonb` (intern,
+nur `service_role`) liefert die Themen-Segmente einer Sendung; `news_show_build()` ruft sie vor der Reihenfolge auf.
+Ein Themen-Segment trägt `subject {type: "topic", topic, group, player_id?, name?, ukey?, good, values}`; `kind`
+ist `cards`, `tax`, `corp`, `gossip` oder `ramble`. Im Nachrichten-Feed landen `tax` und `corp` unter Firmen.
+Neue Konfiguration: `newsShow.topics` (Anzahl, Plätze, Schwellen, Liste) und die Zeile `game_config.nexamon_names`
+(Kartenschlüssel → Name).
