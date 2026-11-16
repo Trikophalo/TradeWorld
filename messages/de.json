@@ -7534,6 +7534,9 @@
       "hype": "Held der Stunde",
       "gossip": "Gesichtet",
       "nft": "Künstler der Stunde",
+      "cards": "Am Sammeltisch",
+      "tax": "Aktenzeichen",
+      "corp": "Chefetage",
       "other": "Im Bild"
     },
     "figureLabel": "Im Bild: {name}",
@@ -7551,6 +7554,9 @@
       "nft": "NFT-Markt",
       "gossip": "Klatsch",
       "ramble": "Abgeschweift",
+      "cards": "Sammelkarten",
+      "tax": "Finanzamt",
+      "corp": "Börsenfirma",
       "outro": "Schlusswort",
       "other": "Eilmeldung"
     },
