@@ -4872,6 +4872,12 @@ Die Antwort enthält zusätzlich `hours`.
   dazwischen ein noch nicht abgeschlossenes Quartal, wird erst dieses abgeschlossen (sobald `game_quarters.status`
   `closed` ist und `last_hour_at ≥ ends_at`), damit Bekanntheit und Qualität des neuen Quartals gelten.
 - `player_companies_close_due()` bleibt (Rückgabe: Zahl der Quartale) und ruft `player_companies_run_due()`.
+- **Seit Migration 5300 (ADR-165):** `player_companies_run_due()` → `{ hours, quarters, failed }`. Jede Firma läuft in
+  einer eigenen Subtransaktion: Wirft ihr Abschluss einen Fehler, wird nur sie zurückgerollt, in `job_runs`
+  (`job_name = 'company_hours'`, `run_key` = Firmen-ID, `status = 'failed'`, `error`, `details.failures`) vermerkt und
+  in der nächsten Minute erneut versucht; schließt sie wieder ab, verschwindet der Eintrag. Reihenfolge: Firmen mit dem
+  ältesten `last_hour_at` zuerst, höchstens 600 Stunden je Lauf insgesamt. Der Quartalsbericht einer Firma wartet
+  nicht mehr auf `game_quarters.status = 'closed'`, nur auf `last_hour_at ≥ ends_at`.
 
 ### COMPANY-JSON
 
@@ -7126,10 +7132,13 @@ Migration `20261203001500_company_moves.sql`, Test `supabase/tests/95_company_mo
 ```
 {"slots", "used", "cash_cents", "tier", "product",
  "moves": [{"key", "kind", "risk", "branch", "minutes", "cost_cents", "chance_bps", "skill_bonus_bps",
-            "payout_cents", "refund_cents", "gain", "available_at"}],
+            "payout_cents", "refund_cents", "gain", "rest_minutes", "available_at"}],
  "running": [{"id", "key", "started_at", "ends_at", "cost_cents", "chance_bps"}],
  "history": [{"id", "key", "status", "cost_cents", "payout_cents", "gain", "resolved_at"}]}
 ```
+
+`rest_minutes` (seit 5300): Pause nach einem Start in Minuten = Dauer × (1 + `cooldownFactor`), gekürzt um das
+Upgrade `move_tempo`; `available_at` = Start + diese Pause, solange sie läuft, sonst `null`.
 
 - `start_company_move(p_request_id uuid, p_key text)` (RPC): bucht die Kosten von der Firmenkasse an die Haushalte
   (`company_costs`) und gibt denselben Zustand zurück.

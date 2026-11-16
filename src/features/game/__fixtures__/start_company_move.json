@@ -11,9 +11,10 @@
       "minutes": 15,
       "chance_bps": 9000,
       "cost_cents": 900000,
-      "available_at": "2026-11-16T12:49:23.625503+00:00",
+      "available_at": "2026-11-16T18:03:54.274213+00:00",
       "payout_cents": 0,
       "refund_cents": 450000,
+      "rest_minutes": 45,
       "skill_bonus_bps": 0
     },
     {
@@ -28,6 +29,7 @@
       "available_at": null,
       "payout_cents": 0,
       "refund_cents": 450000,
+      "rest_minutes": 90,
       "skill_bonus_bps": 0
     },
     {
@@ -42,6 +44,7 @@
       "available_at": null,
       "payout_cents": 0,
       "refund_cents": 600000,
+      "rest_minutes": 90,
       "skill_bonus_bps": 0
     },
     {
@@ -56,6 +59,7 @@
       "available_at": null,
       "payout_cents": 2160000,
       "refund_cents": 900000,
+      "rest_minutes": 60,
       "skill_bonus_bps": 0
     },
     {
@@ -70,6 +74,7 @@
       "available_at": null,
       "payout_cents": 5850000,
       "refund_cents": 225000,
+      "rest_minutes": 135,
       "skill_bonus_bps": 0
     },
     {
@@ -84,6 +89,7 @@
       "available_at": null,
       "payout_cents": 1575000,
       "refund_cents": 315000,
+      "rest_minutes": 90,
       "skill_bonus_bps": 0
     },
     {
@@ -98,6 +104,7 @@
       "available_at": null,
       "payout_cents": 3375000,
       "refund_cents": 675000,
+      "rest_minutes": 120,
       "skill_bonus_bps": 0
     },
     {
@@ -112,6 +119,7 @@
       "available_at": null,
       "payout_cents": 1800000,
       "refund_cents": 750000,
+      "rest_minutes": 75,
       "skill_bonus_bps": 0
     },
     {
@@ -126,6 +134,7 @@
       "available_at": null,
       "payout_cents": 3900000,
       "refund_cents": 150000,
+      "rest_minutes": 105,
       "skill_bonus_bps": 0
     },
     {
@@ -140,6 +149,7 @@
       "available_at": null,
       "payout_cents": 0,
       "refund_cents": 585000,
+      "rest_minutes": 120,
       "skill_bonus_bps": 0
     },
     {
@@ -154,6 +164,7 @@
       "available_at": null,
       "payout_cents": 0,
       "refund_cents": 630000,
+      "rest_minutes": 150,
       "skill_bonus_bps": 0
     },
     {
@@ -168,6 +179,7 @@
       "available_at": null,
       "payout_cents": 7800000,
       "refund_cents": 300000,
+      "rest_minutes": 180,
       "skill_bonus_bps": 0
     }
   ],
@@ -176,13 +188,13 @@
   "product": "security_software",
   "running": [
     {
-      "id": 4,
+      "id": 5,
       "key": "pop_up_stand",
-      "ends_at": "2026-11-16T12:19:23.625503+00:00",
+      "ends_at": "2026-11-16T17:33:54.274213+00:00",
       "chance_bps": 9000,
       "cost_cents": 900000,
-      "started_at": "2026-11-16T12:04:23.625503+00:00"
+      "started_at": "2026-11-16T17:18:54.274213+00:00"
     }
   ],
-  "cash_cents": 9993771
+  "cash_cents": 10061625
 }
