@@ -16,7 +16,9 @@ import type {
   PitchMoveKind,
   PriceLevel,
 } from "@/features/game/types";
+import type { ListedCompany } from "@/features/game/listed-types";
 import type { CompanyHealth, HealthFactor, HealthFactorKey, HealthLever } from "@/lib/sim/company-health";
+import { itemByKey } from "@/lib/sim/listed";
 
 const cfg = BALANCE.companyAssistant;
 const taskCfg = BALANCE.companyTasks;
@@ -39,7 +41,11 @@ export type MiraAction =
   | { type: "strategy"; priceLevel: PriceLevel; contractWork: boolean }
   | { type: "campaign"; kind: CampaignKind }
   | { type: "hireAi"; count: number; skill: string | null }
-  | { type: "dismissAi"; count: number };
+  | { type: "dismissAi"; count: number }
+  /** Listed companies (ADR-167), each one existing RPC: buy an item, pay the tax, hire the tax advisor. */
+  | { type: "invest"; key: string }
+  | { type: "payTax" }
+  | { type: "advisor"; hire: boolean };
 
 export interface MiraLine {
   key: string;
@@ -73,6 +79,8 @@ export interface MiraNames {
     reason: (factor: HealthFactor) => string;
     skill: (key: string) => string;
   };
+  /** Listed companies (ADR-167): names of the catalogue items. */
+  listed?: { item: (key: string) => string };
 }
 
 /** What Mira knows about the company's health (ADR-162), for the founder. */
@@ -95,6 +103,8 @@ export interface MiraState {
   orders: { costCents: number; nextOrderAt: number | null; pitches: CompanyPitch[] } | null;
   /** The eight factors of the company (ADR-162); null for employees or while loading. */
   health?: MiraHealth | null;
+  /** The listed company (ADR-167); null or missing while the company is private, for employees or while loading. */
+  listed?: ListedCompany | null;
   now: number;
 }
 
@@ -277,6 +287,8 @@ export function briefings(state: MiraState, names: MiraNames): MiraTurn[] {
 
   const health = healthBriefing(state, names);
   if (health) turns.push(health);
+
+  turns.push(...listedBriefings(state, names));
 
   if (state.applications > 0) {
     turns.push({
@@ -500,6 +512,14 @@ export function validActions(actions: readonly MiraAction[], state: MiraState): 
       case "hireAi":
       case "dismissAi":
         return state.tasks.role === "founder" && Number.isInteger(a.count) && a.count > 0;
+      case "invest": {
+        const item = state.listed?.items.find((i) => i.key === a.key);
+        return !!item && item.missing.length === 0 && item.readyAt === null && item.cooldownUntil === null;
+      }
+      case "payTax":
+        return (state.listed?.taxes.dueCents ?? 0) > 0;
+      case "advisor":
+        return !!state.listed && state.listed.taxes.advisor !== a.hire;
       default:
         return true;
     }
@@ -557,7 +577,180 @@ export function describeAction(action: MiraAction, state: MiraState, names: Mira
         : { action, label: { key: "health.options.hireAi", values: { count: action.count } } };
     case "dismissAi":
       return { action, label: { key: "health.options.dismissAi", values: { count: action.count } } };
+    case "invest":
+      return investOption(action.key, state, names);
+    case "payTax":
+      return {
+        action,
+        label: { key: "listed.options.payTax", values: { amount: names.money(state.listed?.taxes.dueCents ?? 0) } },
+      };
+    case "advisor":
+      return {
+        action,
+        label: { key: action.hire ? "listed.options.hireAdvisor" : "listed.options.fireAdvisor" },
+        hint: action.hire
+          ? { key: "listed.why.advisor", values: { wage: names.money(state.listed?.taxes.advisorWageCents ?? 0) } }
+          : undefined,
+      };
   }
+}
+
+// ---- Listed companies (ADR-167): books, taxes, mood, board, research ------------------------------------------------
+
+const itemName = (key: string, names: MiraNames) => names.listed?.item(key) ?? key;
+
+function investOption(
+  key: string,
+  state: MiraState,
+  names: MiraNames,
+  tone: MiraOption["tone"] = "neutral",
+): MiraOption {
+  const item = state.listed?.items.find((i) => i.key === key);
+  return {
+    action: { type: "invest", key },
+    label: { key: "listed.options.invest", values: { item: itemName(key, names) } },
+    hint: item
+      ? {
+          key: item.upkeepCents > 0 ? "listed.why.costUpkeep" : "listed.why.cost",
+          values: { cost: names.money(item.costCents), upkeep: names.money(item.upkeepCents) },
+        }
+      : undefined,
+    tone,
+  };
+}
+
+/** Items of a kind the company could start right now and pay from its free cash, cheapest first. */
+export function affordableItems(listed: ListedCompany, kinds: readonly string[]): ListedCompany["items"] {
+  return listed.items
+    .filter((i) => kinds.includes(i.kind) && i.status === "none" && i.missing.length === 0)
+    .filter((i) => i.readyAt === null && i.cooldownUntil === null && i.costCents <= listed.freeCashCents)
+    .sort((a, b) => a.costCents - b.costCents);
+}
+
+/** The benefit that lifts the mood most per euro of running cost, among those the cash can pay. */
+export function bestBenefit(listed: ListedCompany): string | null {
+  const score = (key: string, upkeep: number) => (itemByKey(key)?.effects.satisfaction ?? 0) / Math.max(1, upkeep);
+  const picks = affordableItems(listed, ["benefit"]).sort(
+    (a, b) => score(b.key, b.upkeepCents) - score(a.key, a.upkeepCents),
+  );
+  return picks[0]?.key ?? null;
+}
+
+/**
+ * What Mira reports about a listed company: open books, taxes due, a bad mood, motions waiting for a vote, finished
+ * research and greedy payouts. Founder only. Ids change with the thing, so each is posted once.
+ */
+export function listedBriefings(state: MiraState, names: MiraNames): MiraTurn[] {
+  const l = state.listed;
+  if (!l || state.tasks.role !== "founder") return [];
+  const turns: MiraTurn[] = [];
+  const open = (section: string): MiraAction => ({ type: "open", tab: "overview", section });
+
+  // books: once they can be closed; louder when the tax office is waiting
+  if (l.books.canClose && !l.taxes.advisor) {
+    const stage = l.books.stage === "late" || l.books.stage === "estimate" ? "late" : l.books.stage;
+    turns.push({
+      id: `books:${l.books.periodStart}:${stage}`,
+      lines: [
+        {
+          key:
+            stage === "late"
+              ? "listed.brief.booksLate"
+              : stage === "reminder"
+                ? "listed.brief.booksReminder"
+                : "listed.brief.books",
+          values: { profit: names.money(l.books.profitCents), tax: names.money(l.books.estimatedTaxCents) },
+        },
+      ],
+      options: [
+        { action: open("books"), label: { key: "listed.options.openBooks" }, tone: "best" },
+        describeAction({ type: "advisor", hire: true }, state, names),
+      ],
+    });
+  }
+
+  if (l.taxes.dueCents > 0) {
+    const late = l.taxes.periods.some((p) => p.status === "due" && p.stage > 0);
+    const canPay = l.cashCents >= l.taxes.dueCents;
+    turns.push({
+      id: `tax:${l.taxes.dueCents}:${late ? "late" : "due"}`,
+      lines: [
+        { key: late ? "listed.brief.taxLate" : "listed.brief.tax", values: { amount: names.money(l.taxes.dueCents) } },
+        ...(canPay ? [] : [{ key: "listed.brief.taxShort" }]),
+      ],
+      options: [
+        ...(canPay ? [{ ...describeAction({ type: "payTax" }, state, names), tone: "best" as const }] : []),
+        { action: open("taxes"), label: { key: "listed.options.openBooks" } },
+      ],
+    });
+  }
+
+  if (l.satisfaction.zone !== "green") {
+    const benefit = bestBenefit(l);
+    const action = affordableItems(l, ["action"])[0]?.key ?? null;
+    turns.push({
+      id: `mood:${l.satisfaction.zone}`,
+      lines: [
+        {
+          key: l.satisfaction.zone === "red" ? "listed.brief.moodRed" : "listed.brief.moodYellow",
+          values: {
+            value: Math.round(l.satisfaction.value),
+            green: l.satisfaction.green,
+            capacity: Math.round((1 - l.satisfaction.capacityFactor) * 100),
+          },
+        },
+      ],
+      options: [
+        ...(benefit ? [investOption(benefit, state, names, "best")] : []),
+        ...(action ? [investOption(action, state, names, benefit ? "neutral" : "best")] : []),
+        { action: open("staff"), label: { key: "listed.options.openStaff" } },
+      ],
+    });
+  }
+
+  if (l.board.toVote > 0) {
+    turns.push({
+      id: `board:${l.board.openMotions}:${l.board.toVote}`,
+      lines: [{ key: "listed.brief.board", values: { count: l.board.toVote } }],
+      options: [{ action: open("board"), label: { key: "listed.options.openBoard" }, tone: "best" }],
+    });
+  }
+
+  const done = l.items.filter((i) => i.kind === "research" && i.status === "active").length;
+  const running = l.items.some((i) => i.kind === "research" && i.readyAt !== null);
+  if (done > 0 && !running) {
+    const next = affordableItems(l, ["research"])[0];
+    turns.push({
+      id: `research:${done}`,
+      lines: [{ key: next ? "listed.brief.researchNext" : "listed.brief.researchDone", values: { count: done } }],
+      options: [
+        ...(next ? [investOption(next.key, state, names, "best")] : []),
+        { action: open("research"), label: { key: "listed.options.openResearch" } },
+      ],
+    });
+  }
+
+  // greed: payouts above 30 % of the profit cost reputation, and with it customers
+  if (
+    l.reputation.payoutRatioBps > BALANCE.listed.reputation.greed.freeRatioBps &&
+    l.reputation.target < l.reputation.value
+  ) {
+    turns.push({
+      id: `greed:${Math.floor(l.reputation.payoutRatioBps / 2_500)}`,
+      lines: [
+        {
+          key: "listed.brief.greed",
+          values: {
+            ratio: Math.round(l.reputation.payoutRatioBps / 100),
+            reputation: Math.round(l.reputation.value),
+            demand: Math.round((l.reputation.demandFactor - 1) * 100),
+          },
+        },
+      ],
+      options: [{ action: open("dividends"), label: { key: "listed.options.openDividends" }, tone: "best" }],
+    });
+  }
+  return turns;
 }
 
 /** Claude's answer format (edge function company-assistant) as Mira actions. */

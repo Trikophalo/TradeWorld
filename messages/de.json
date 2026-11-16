@@ -7209,6 +7209,44 @@
       "order": "Auftrag läuft! Die Jury prüft ihn kurz, das Ergebnis kommt in etwa {minutes} Min. Der nächste freie Auftrag geht in {wait} Min.",
       "plan": "Plan umgesetzt: {done} von {count} Aufgaben sind vergeben."
     },
+    "listed": {
+      "brief": {
+        "books": "Die Bücher sind offen: {profit} Gewinn seit dem letzten Abschluss, etwa {tax} Steuer. Dauert zwanzig Sekunden.",
+        "booksReminder": "Das Finanzamt wartet auf deine Bücher. Mach sie jetzt, sonst gibt es einen Verspätungszuschlag.",
+        "booksLate": "Die Bücher sind überfällig! Der Zuschlag läuft schon, als Nächstes schätzt das Finanzamt selbst. Das wird teuer.",
+        "tax": "Es sind {amount} Steuer fällig. Pünktlich zahlen spart den Säumniszuschlag.",
+        "taxLate": "{amount} Steuer sind überfällig. Das Finanzamt holt sich das Geld bald selbst, mit Aufschlag.",
+        "taxShort": "Dafür reicht die Kasse gerade nicht.",
+        "moodYellow": "Die Stimmung im Team liegt bei {value}, grün ist sie erst ab {green}. Das kostet gerade {capacity} % Kapazität.",
+        "moodRed": "Alarm im Büro: Zufriedenheit {value}! Wir verlieren {capacity} % Kapazität, und die ersten kündigen.",
+        "board": "Im Geschäftsrat {count, plural, one {wartet ein Antrag} other {warten # Anträge}} auf deine Stimme.",
+        "researchNext": "{count, plural, one {Eine Forschung ist} other {# Forschungen sind}} fertig und das Labor steht still. Weiter geht’s?",
+        "researchDone": "{count, plural, one {Eine Forschung ist} other {# Forschungen sind}} fertig. Für die nächste fehlt noch Geld oder eine Voraussetzung.",
+        "greed": "Du zahlst dir {ratio} % des Gewinns aus. Der Ruf sinkt ({reputation}), das kostet schon {demand} % Nachfrage. Dividenden und Investitionen holen ihn zurück."
+      },
+      "options": {
+        "openBooks": "Bücher öffnen",
+        "openStaff": "Zum Team",
+        "openBoard": "Zum Geschäftsrat",
+        "openResearch": "Zur Forschung",
+        "openDividends": "Zu Auszahlung und Dividende",
+        "invest": "{item} buchen",
+        "payTax": "{amount} Steuer zahlen",
+        "hireAdvisor": "Steuerberater einstellen",
+        "fireAdvisor": "Steuerberater entlassen"
+      },
+      "why": {
+        "cost": "Kostet {cost}.",
+        "costUpkeep": "Kostet {cost}, danach {upkeep} je Stunde.",
+        "advisor": "Macht die Bücher jeden Tag von selbst und zahlt pünktlich. Kostet {wage} je Stunde."
+      },
+      "ok": {
+        "invest": "Gebucht: {item}.",
+        "payTax": "Bezahlt: {amount} ans Finanzamt.",
+        "hireAdvisor": "Der Steuerberater fängt sofort an. Um die Bücher musst du dich nicht mehr kümmern.",
+        "fireAdvisor": "Der Steuerberater ist weg. Die Bücher machst du wieder selbst."
+      }
+    },
     "brief": {
       "task": "Neue Aufgabe: „{task}“, wert {value}, noch {minutes} Min.",
       "myTask": "Du hast eine Aufgabe: „{task}“, wert {value}, noch {minutes} Min.",

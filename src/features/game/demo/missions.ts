@@ -37,7 +37,13 @@ export type Metric =
   | "homes_rented"
   | "wohnwert"
   | "battle_joins"
-  | "battle_wins";
+  | "battle_wins"
+  | "listed_invests"
+  | "listed_research"
+  | "listed_benefits"
+  | "listed_books"
+  | "listed_dividends"
+  | "board_votes";
 
 export interface MissionTemplate {
   key: string;
@@ -480,6 +486,61 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
     metric: "net_worth_cents",
     target: 2_500_000,
     xp: m.maxXp,
+  },
+  // listed companies (ADR-167); the live game only offers them to founders of a listed company
+  {
+    key: "q_listed_books",
+    kind: "quick",
+    title: "Mach die Bücher",
+    metric: "listed_books",
+    target: 1,
+    xp: 50,
+    requires: "ipo",
+  },
+  {
+    key: "q_listed_benefit",
+    kind: "quick",
+    title: "Gönn dem Team einen Benefit",
+    metric: "listed_benefits",
+    target: 1,
+    xp: 40,
+    requires: "ipo",
+  },
+  {
+    key: "d_listed_invest",
+    kind: "daily",
+    title: "Investiere 2-mal in deine Firma",
+    metric: "listed_invests",
+    target: 2,
+    xp: d.minXp + 50,
+    requires: "ipo",
+  },
+  {
+    key: "m_first_research",
+    kind: "milestone",
+    title: "Deine erste Forschung",
+    metric: "listed_research",
+    target: 1,
+    xp: 800,
+    requires: "ipo",
+  },
+  {
+    key: "m_first_dividend",
+    kind: "milestone",
+    title: "Deine erste Dividende",
+    metric: "listed_dividends",
+    target: 1,
+    xp: 800,
+    requires: "ipo",
+  },
+  {
+    key: "q_board_vote",
+    kind: "quick",
+    title: "Stimm im Geschäftsrat ab",
+    metric: "board_votes",
+    target: 1,
+    xp: 40,
+    requires: "ipo",
   },
   // renting out places in the home (ADR-158)
   {

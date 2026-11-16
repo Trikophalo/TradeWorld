@@ -48,6 +48,7 @@ import { createBattleEngine } from "./demo/battles";
 import { createProtestsEngine, type DemoProtest } from "./demo/protests";
 import { createSocialEngine, type DemoSocialState } from "./demo/social";
 import { createCompanyEventsEngine } from "./demo/company-events";
+import { createListedEngine } from "./demo/listed";
 import { createCryptoEngine, type DemoCryptoState } from "./demo/crypto";
 import { createDealEngine, initialDeals, type DemoDealsState } from "./demo/deals";
 import { tagFromUniform } from "@/lib/player-tag";
@@ -1185,7 +1186,25 @@ const deals = createDealEngine({
   feedPost: (kind, payload) => feedPost(kind, payload),
 });
 
+/** Listed companies (ADR-167): research, mood, reputation, books and the board (demo/listed.ts). */
+const listed = createListedEngine({
+  company: () => p().company ?? null,
+  nickname: () => p().nickname,
+  addCash: (cents) => {
+    if (cents > 0) income(cents);
+  },
+  notify: (typeKey, title, body, link) => socialRef?.notify(typeKey, title, body, link),
+  feed: feedPost,
+  track: (metric, by = 1) => bump(metric, by),
+  catchUp: () => company.catchUp(),
+  idempotent,
+  persist,
+  now: () => Date.now(),
+  random: () => Math.random(),
+});
+
 const company = createCompanyEngine({
+  listed,
   eventModifiers: (c, at) => companyEvents.modifiers(c, at),
   stakePayout: (c, profit, free) => deals.stakePayout(c, profit, free),
   afterHour: (c, hour) => deals.afterHour(c, hour),
@@ -1757,6 +1776,7 @@ export const demoEngine: GameEngine = {
   ...art.engine,
   ...home.engine,
   ...rentals.engine,
+  ...listed.engine,
   ...friends,
   ...friendChats,
   ...wardrobe,

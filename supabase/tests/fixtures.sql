@@ -332,6 +332,42 @@ select public.capital_increase(gen_random_uuid(), 10);
 reset role;
 update public.company_share_offers set ends_at = now() - interval '1 second' where company_id = :'fco' and status = 'open';
 select public.close_due_offers() is not null as ok \gset
+-- listed companies (ADR-167): investments, books, taxes, dividends, the board
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/get_listed_company.json
+select public.get_listed_company();
+\o :fixture_dir/company_invest.json
+select public.company_invest(gen_random_uuid(), 'b_obstkorb');
+\o :fixture_dir/company_invest_stop.json
+select public.company_invest_stop(gen_random_uuid(), 'b_obstkorb');
+\o :fixture_dir/company_tax_advisor.json
+select public.company_tax_advisor(gen_random_uuid(), false);
+\o :fixture_dir/company_declare_dividend.json
+select public.company_declare_dividend(gen_random_uuid(), 20000);
+\o
+reset role;
+select public.player_company_close_hour(:'fco', date_trunc('hour', now()) - interval '3 hours') is not null as ok \gset
+insert into public.company_tax_periods (company_id, kind, period_start, period_end, penalty_cents, closed_by, due_at)
+values (:'fco', 'late_fee', now() - interval '2 days', now(), 5000, 'finanzamt', now() + interval '1 day');
+insert into public.board_motions (company_id, proposer_id, kind, params, closes_at)
+values (:'fco', :boss, 'withdraw_ban', '{"days": 2}', now() + interval '12 hours');
+select max(id) as fx_motion from public.board_motions where company_id = :'fco' \gset
+insert into public.board_votes (motion_id, player_id, yes) values (:fx_motion, :boss, true);
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/company_books_close.json
+select public.company_books_close(gen_random_uuid(), array['revenue', 'goods', 'wages'], false);
+\o :fixture_dir/company_tax_pay.json
+select public.company_tax_pay(gen_random_uuid());
+\o :fixture_dir/get_company_accounting.json
+select public.get_company_accounting(7, null);
+\o :fixture_dir/get_company_board.json
+select public.get_company_board(null);
+\o :fixture_dir/board_vote.json
+select public.board_vote(gen_random_uuid(), :fx_motion, false);
+\o :fixture_dir/board_propose.json
+select public.board_propose(gen_random_uuid(), :'fco', 'earmark', '{"purpose": "research", "amount_cents": 50000}');
+\o
+reset role;
 update public.securities set status = 'delisted', delisted_at = now()
  where id = (select security_id from public.companies where id = :'fco');
 select tests.login_as('authenticated', :p) is null as ok \gset
