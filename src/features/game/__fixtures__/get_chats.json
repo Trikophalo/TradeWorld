@@ -10,11 +10,11 @@
         "is_me": false,
         "author": null,
         "avatar_key": null,
-        "created_at": "2026-11-16T12:04:24.375687+00:00"
+        "created_at": "2026-11-16T17:08:54.44002+00:00"
       },
       "name": "Fixture Bullen",
       "unread": 1,
-      "last_at": "2026-11-16T12:04:24.375687+00:00",
+      "last_at": "2026-11-16T17:08:54.44002+00:00",
       "members": [],
       "is_admin": true,
       "can_write": true,
@@ -30,14 +30,14 @@
         "is_me": false,
         "author": "Fixture_Gmbh",
         "avatar_key": "rookie",
-        "created_at": "2026-11-16T12:04:24.343773+00:00"
+        "created_at": "2026-11-16T17:08:54.412951+00:00"
       },
       "name": "Fixture_Gmbh",
       "unread": 1,
-      "last_at": "2026-11-16T12:04:24.343773+00:00",
+      "last_at": "2026-11-16T17:08:54.412951+00:00",
       "members": [
         {
-          "tag": "UNTP",
+          "tag": "JGRB",
           "level": 15,
           "online": true,
           "is_admin": false,

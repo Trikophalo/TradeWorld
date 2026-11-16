@@ -1,5 +1,5 @@
 {
-  "mine": { "rank": 44, "value_cents": 54108 },
+  "mine": { "rank": 44, "value_cents": 199231 },
   "total": 47,
   "entries": [
     {
@@ -14,7 +14,7 @@
       "founder": "Lars_Kursrutsch",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "d869afaa-630b-4167-9557-17884d997185",
+      "company_id": "492fa8ca-8bfe-49ea-baf5-44ce014c2a9d",
       "value_cents": 959140000,
       "revenue_cents": null
     },
@@ -30,7 +30,7 @@
       "founder": "Float_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "4c62ddb2-4510-452c-b496-057f99a288f3",
+      "company_id": "7594cc64-ede1-4e8d-a042-0f269a52e0fe",
       "value_cents": 110000000,
       "revenue_cents": null
     },
@@ -66,31 +66,15 @@
       "founder": "Fenja_Firma",
       "is_mine": false,
       "team_size": 6,
-      "company_id": "8e2645df-1a22-4b4b-b0b3-5206718d3f65",
-      "value_cents": 106065472,
+      "company_id": "4f3c8cf8-1f79-45ff-96fa-c900728c1a9a",
+      "value_cents": 106493242,
       "revenue_cents": 0
     },
     {
       "kind": "player",
       "logo": null,
-      "name": "Wackelwerk",
-      "rank": 4,
-      "tier": "ag",
-      "color": "#336699",
-      "sector": "retail",
-      "ticker": "WAC",
-      "founder": "Esc_Frida",
-      "is_mine": false,
-      "team_size": 1,
-      "company_id": "96ae6c2b-bcce-46ed-b72d-77e638882d2e",
-      "value_cents": 105976376,
-      "revenue_cents": null
-    },
-    {
-      "kind": "player",
-      "logo": null,
       "name": "Gipfelwerk",
-      "rank": 5,
+      "rank": 4,
       "tier": "ag",
       "color": "#336699",
       "sector": "retail",
@@ -98,10 +82,26 @@
       "founder": "Pop_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "6326ca4d-072c-4785-a0e0-2670d21f2258",
-      "value_cents": 84160000,
+      "company_id": "e6fd2cc3-9316-4cca-aa71-6fbb887a590f",
+      "value_cents": 99810000,
+      "revenue_cents": null
+    },
+    {
+      "kind": "player",
+      "logo": null,
+      "name": "Wackelwerk",
+      "rank": 5,
+      "tier": "ag",
+      "color": "#336699",
+      "sector": "retail",
+      "ticker": "WAC",
+      "founder": "Esc_Frida",
+      "is_mine": false,
+      "team_size": 1,
+      "company_id": "42ac2fd1-105a-4a56-91bd-a2f18f7f4f7f",
+      "value_cents": 97620424,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-16T12:04:20.231668+00:00"
+  "server_time": "2026-11-16T17:08:48.722746+00:00"
 }

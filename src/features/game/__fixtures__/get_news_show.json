@@ -1,8 +1,8 @@
 {
-  "now": "2026-11-16T12:04:23.933401+00:00",
+  "now": "2026-11-16T17:08:54.014929+00:00",
   "chat": [
     {
-      "at": "2026-11-16T12:04:23.92997+00:00",
+      "at": "2026-11-16T17:08:54.010397+00:00",
       "id": 223,
       "bot": false,
       "body": "Was für eine Sendung 💀📉",
@@ -13,31 +13,28 @@
   "show": {
     "id": 8,
     "writer": "mini",
-    "airs_at": "2026-11-16T12:00:00+00:00",
+    "airs_at": "2026-11-16T17:00:00+00:00",
     "segments": [
       {
         "kind": "gossip",
-        "mood": "laughing",
-        "text": "Schlusslicht der Reichenliste mit 0 €: Das ist die Tagesbilanz von Esc_Carl. Die Verwandtschaft tut ab heute so, als kenne sie dich nicht. Schmerzensgeld gibt es obendrauf, Würde leider nicht.",
-        "figure": { "nickname": "Esc_Carl", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "gain", "label": "+100 € Schmerzensgeld" }],
-        "headline": "Fremdschämen mit Esc_Carl"
+        "mood": "proud",
+        "text": "Gute Nachrichten, ausnahmsweise. Bei Fixture_Gmbh heißt es: Fixture Werke erweitert. Ich hätte keinen Cent darauf gewettet, und ich wette auf alles.",
+        "figure": { "nickname": "Fixture_Gmbh", "avatar_key": "rookie", "accessories": [] },
+        "effects": [],
+        "headline": "Fixture_Gmbh hat es geschafft"
       },
       {
         "kind": "hype",
         "mood": "laughing",
-        "text": "Gipfelwerk räumt ab. Selbst die Praktikanten wurden heute um Autogramme gebeten. Pop_Frida hängt sich das gerahmt ins Büro. Die Kundschaft rennt die Tür ein.",
-        "figure": { "nickname": "Pop_Frida", "avatar_key": "rookie", "accessories": [] },
-        "effects": [
-          { "tone": "gain", "label": "Bekanntheit +13,6 %" },
-          { "tone": "gain", "label": "GIP +16,5 %" }
-        ],
-        "headline": "Ritterschlag für Gipfelwerk"
+        "text": "Die Konkurrenz hat aus Versehen Werbung für sie gemacht. Plötzlich will jeder „Ideen für alle“. Lars_Kursrutsch tut so, als sei das alles geplant gewesen. Wir tun so, als würden wir das glauben.",
+        "figure": { "nickname": "Lars_Kursrutsch", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "gain", "label": "Bekanntheit +21,3 %" }],
+        "headline": "Kursrutsch Werke geht viral"
       },
       {
         "kind": "nft",
-        "mood": "laughing",
-        "text": "Ben_Bieter zahlt 30.000 € für „Neon Nacht“, gemalt von Nina_Neon. Ich verstehe es nicht, also muss es teuer sein.",
+        "mood": "shocked",
+        "text": "Ben_Bieter zahlt 30.000 € für „Neon Nacht“, gemalt von Nina_Neon. Das Bild hat sechzehn mal sechzehn Pixel. Ich habe nachgezählt, ich hatte Zeit.",
         "figure": { "nickname": "Nina_Neon", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
         "headline": "NFT-Wahnsinn um „Neon Nacht“"
@@ -45,57 +42,57 @@
       {
         "kind": "winner",
         "mood": "shocked",
-        "text": "Fixture_Neu ist heute um 1.139.358 € reicher, 11393,6 % rauf. Man munkelt von einem Pakt mit dem Teufel, der Teufel dementiert.",
+        "text": "Und nun zu jemandem, der es kann: Fixture_Neu hat heute 1.140.801 € gemacht, 11408 % im Plus. Wir gratulieren zähneknirschend.",
         "figure": { "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] },
         "effects": [],
-        "headline": "Glückspilz des Tages: Fixture_Neu"
+        "headline": "Fixture_Neu sahnt ab: plus 1.140.801 €"
       },
       {
         "kind": "gossip",
-        "mood": "proud",
-        "text": "Bitte festhalten: Neuer Job bei Berta Bytes, und zwar bei Wim_Werkbank. Ich bin fast stolz. Fast.",
-        "figure": { "nickname": "Wim_Werkbank", "avatar_key": "rookie", "accessories": [] },
+        "mood": "shocked",
+        "text": "Ich fasse es nicht, aber es stimmt. Fx_Taskmid meldet: Neuer Job bei Fixture Mode. Ich bin fast stolz. Fast.",
+        "figure": { "nickname": "Fx_Taskmid", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Applaus für Wim_Werkbank"
+        "headline": "Na so was: Fx_Taskmid"
       },
       {
-        "kind": "scandal",
-        "mood": "shocked",
-        "text": "Fritz Fahrradwerk wollte heute groß rauskommen. Die Kundenhotline wurde seit Monaten von einem Papagei bedient, und der war noch der Freundlichste. Fritz_Firma erklärte, das gehöre zum Konzept. Die Kundschaft erklärte, sie sei dann mal weg.",
-        "figure": { "nickname": "Fritz_Firma", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −16,4 %" }],
-        "headline": "Fritz Fahrradwerk blamiert sich bis auf die Knochen"
+        "kind": "hype",
+        "mood": "proud",
+        "text": "Lohnwerk räumt ab. Ein Video über die Firma hat heute das Internet geflutet. Lohn_Chefin hängt sich das gerahmt ins Büro. Die Kundschaft rennt die Tür ein.",
+        "figure": { "nickname": "Lohn_Chefin", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "gain", "label": "Bekanntheit +10,8 %" }],
+        "headline": "Ritterschlag für Lohnwerk"
       },
       {
         "kind": "ramble",
-        "mood": "smug",
-        "text": "Ich habe es aus dritter Hand, also stimmt es: Heidi Klum hat angeblich heimlich Fundgrube Discount gekauft. Ich habe es auf einer Raststätte gehört, zwischen Kaffee und Reue. Die Anleger rennen hinterher, plus 8,9 %.",
-        "effects": [{ "tone": "gain", "label": "FGD +8,9 %" }],
-        "headline": "Promi-Alarm bei Fundgrube Discount"
+        "mood": "crying",
+        "text": "Die Regie winkt, ich ignoriere sie. Christian Lindner soll einen Sportwagen gesehen und kurz geweint haben. Vor Glück, sagt man. So. Weiter im Text.",
+        "effects": [],
+        "headline": "Was ich noch sagen wollte"
       },
       {
-        "kind": "sector",
+        "kind": "tasks",
         "mood": "proud",
-        "text": "Die ganze Branche Einzelhandel steigt um 4,1 %. Ein Influencer hat das Wort im Vorbeigehen erwähnt, mehr war nicht nötig. So funktioniert Wirtschaft, liebe Kinder.",
-        "effects": [{ "tone": "gain", "label": "Einzelhandel +4,1 %" }],
-        "headline": "Die Branche Einzelhandel dreht durch"
+        "text": "Ein Lottogewinner verteilt Geld in der Fußgängerzone. Offene Aufgaben bringen 34,7 % mehr. Wer jetzt Pause macht, ist selbst schuld.",
+        "effects": [{ "tone": "gain", "label": "Aufgaben +34,7 %" }],
+        "headline": "Kunden zahlen jeden Preis"
       },
       {
         "kind": "stock",
         "mood": "shocked",
-        "text": "Volta Energie AG verliert 14,3 %. Der Sicherheitscode der Tresore lautete 1234 und stand auf einem Zettel am Tresor. Die Anleger nehmen Reißaus.",
-        "effects": [{ "tone": "loss", "label": "VLT −14,3 %" }],
-        "headline": "Volta Energie AG stürzt ab"
+        "text": "Durch einen Fehler der Rechtsabteilung hat sich die Firma selbst verklagt und droht zu gewinnen. Die Börse straft Orbitfracht mit 17,4 % Minus ab. Der Pressesprecher wurde zuletzt am Flughafen gesehen.",
+        "effects": [{ "tone": "loss", "label": "OFR −17,4 %" }],
+        "headline": "Katastrophe bei Orbitfracht"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Wackelwerk tut sich in der nächsten Stunde etwas, und zwar nach unten. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
-        "effects": [{ "tone": "neutral", "label": "WAC ↓ Tipp" }],
-        "headline": "Mr. Doodle Dangles Geheimtipp"
+        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Memeland Media geht bald nach oben. Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.",
+        "effects": [{ "tone": "neutral", "label": "MEM ↑ Tipp" }],
+        "headline": "Der heiße Draht: Memeland Media"
       }
     ],
-    "started_at": "2026-11-16T12:04:23.933401+00:00"
+    "started_at": "2026-11-16T17:08:54.014929+00:00"
   },
   "viewers": 18,
   "audience": [
@@ -113,5 +110,5 @@
     { "me": false, "friend": false, "nickname": "Bat_Crowd6", "avatar_key": "rookie", "accessories": [] }
   ],
   "upcoming": null,
-  "next_airs_at": "2026-11-16T13:00:00+00:00"
+  "next_airs_at": "2026-11-16T18:00:00+00:00"
 }

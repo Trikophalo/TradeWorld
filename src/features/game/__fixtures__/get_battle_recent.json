@@ -1,10 +1,22 @@
 {
-  "now": "2026-11-16T12:04:24.328266+00:00",
+  "now": "2026-11-16T17:08:54.399304+00:00",
   "battle": {
     "id": 27,
     "kind": null,
     "seed": null,
-    "prize": { "xp": 2900, "kind": "xp" },
+    "prize": {
+      "kind": "skin",
+      "accessories": [
+        "battle_crown",
+        "laurel_wreath",
+        "champion_belt",
+        "victory_cape",
+        "star_shades",
+        "golden_joystick",
+        "winner_trophy",
+        "mini_bull"
+      ]
+    },
     "joined": false,
     "params": null,
     "result": null,
@@ -12,7 +24,7 @@
     "status": "open",
     "ends_at": null,
     "players": [],
-    "opened_at": "2026-11-16T12:04:24.328266+00:00",
+    "opened_at": "2026-11-16T17:08:54.399304+00:00",
     "started_at": null,
     "finished_at": null,
     "max_players": 10,
@@ -23,7 +35,7 @@
   "recent": {
     "id": 26,
     "kind": "floor",
-    "seed": 2730860016,
+    "seed": 2735062567,
     "prize": { "kind": "money", "cents": 525000 },
     "joined": true,
     "params": {
@@ -74,7 +86,7 @@
     },
     "rounds": null,
     "status": "finished",
-    "ends_at": "2026-11-16T12:04:23.311548+00:00",
+    "ends_at": "2026-11-16T17:08:53.384406+00:00",
     "players": [
       {
         "me": true,
@@ -104,9 +116,9 @@
         "accessories": []
       }
     ],
-    "opened_at": "2026-11-16T12:04:24.066917+00:00",
-    "started_at": "2026-11-16T12:03:04.311548+00:00",
-    "finished_at": "2026-11-16T12:04:24.31239+00:00",
+    "opened_at": "2026-11-16T17:08:54.207265+00:00",
+    "started_at": "2026-11-16T17:07:34.384406+00:00",
+    "finished_at": "2026-11-16T17:08:54.385082+00:00",
     "max_players": 10,
     "min_players": 3,
     "prize_wins_left": 2,
@@ -114,6 +126,6 @@
   },
   "viewers": 20,
   "per_hour": 1000,
-  "next_round_at": "2026-11-16T13:00:00+00:00",
+  "next_round_at": "2026-11-16T18:00:00+00:00",
   "played_this_hour": 6
 }

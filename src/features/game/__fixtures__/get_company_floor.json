@@ -35,7 +35,7 @@
       "nickname": "Fixture_Neu",
       "avatar_key": "coder",
       "accessories": [],
-      "last_message": { "at": "2026-11-16T12:04:20.506261+00:00", "body": "Willkommen an Bord." }
+      "last_message": { "at": "2026-11-16T17:08:48.994911+00:00", "body": "Willkommen an Bord." }
     },
     {
       "me": false,
@@ -45,7 +45,7 @@
       "nickname": "Fixture_Chefin",
       "avatar_key": "rookie",
       "accessories": [],
-      "last_message": { "at": "2026-11-16T12:04:20.502056+00:00", "body": "Moin zusammen!" }
+      "last_message": { "at": "2026-11-16T17:08:48.989528+00:00", "body": "Moin zusammen!" }
     }
   ],
   "ai_workers": 3,

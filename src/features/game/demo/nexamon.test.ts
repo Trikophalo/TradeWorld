@@ -250,7 +250,8 @@ describe("Nexamon in the demo (ADR-165)", () => {
     const details = await engine.nexamonCard(ultra.cardKey);
     const slab = details.copies.find((c) => c.id === ultra.copyId)!;
     expect(slab).toMatchObject({ state: "graded", grade: 10, condition: "mint" });
-    expect(slab.valueCents).toBe(Math.round(details.card.valueCents * 3));
+    // The slab is priced from the unrounded card value, so it may differ from 3 x the rounded cents by a cent or two.
+    expect(Math.abs(slab.valueCents - details.card.valueCents * 3)).toBeLessThanOrEqual(2);
     expect(details.graded[9]).toBe(1);
     expect(await key(engine.gradeNexamonCard("g3", ultra.copyId))).toBe("nexamon_not_raw");
     expect(await key(engine.sellNexamonToAi("q0", [ultra.copyId]))).toBe("nexamon_not_sellable");

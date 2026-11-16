@@ -6,58 +6,58 @@
       "is_new": true,
       "rarity": "common",
       "serial": 7,
-      "copy_id": "959e7ed7-8512-4e61-b3c9-7832409d8778",
-      "card_key": "me-047",
-      "condition": "good",
+      "copy_id": "14cf7f24-6bfa-45a0-bcd2-034d7ea0d3e9",
+      "card_key": "me-027",
+      "condition": "mint",
       "population": 7,
-      "value_cents": 900
+      "value_cents": 950
     },
     {
       "slot": 2,
       "is_new": true,
       "rarity": "common",
       "serial": 7,
-      "copy_id": "ebd2d6a7-3412-442d-8c9d-d2b293341109",
-      "card_key": "me-050",
-      "condition": "mint",
+      "copy_id": "8f02f9bf-364f-46d4-be23-82eb0a2cecbb",
+      "card_key": "me-039",
+      "condition": "near_mint",
       "population": 7,
-      "value_cents": 1000
+      "value_cents": 380
     },
     {
       "slot": 3,
       "is_new": true,
       "rarity": "common",
       "serial": 7,
-      "copy_id": "f92eb3f9-b857-4c18-a1f3-a632870072eb",
-      "card_key": "me-022",
-      "condition": "mint",
+      "copy_id": "fddf9439-2e25-4670-9f4c-c9ba227809ea",
+      "card_key": "me-019",
+      "condition": "near_mint",
       "population": 7,
-      "value_cents": 500
+      "value_cents": 190
     },
     {
       "slot": 4,
       "is_new": true,
       "rarity": "common",
       "serial": 7,
-      "copy_id": "0b711144-285d-43d7-98de-a01268aa5053",
-      "card_key": "me-032",
-      "condition": "near_mint",
+      "copy_id": "9602b7d3-019f-4f8c-95ef-16d30359b85f",
+      "card_key": "me-038",
+      "condition": "good",
       "population": 7,
-      "value_cents": 700
+      "value_cents": 280
     },
     {
       "slot": 5,
       "is_new": true,
-      "rarity": "common",
-      "serial": 7,
-      "copy_id": "f3c292e0-83f0-46e5-861c-8272234d25b5",
-      "card_key": "me-012",
-      "condition": "near_mint",
-      "population": 7,
-      "value_cents": 300
+      "rarity": "rare",
+      "serial": 5,
+      "copy_id": "39381c2e-4491-4408-8c90-a482a2c201b8",
+      "card_key": "me-060",
+      "condition": "mint",
+      "population": 5,
+      "value_cents": 1480
     }
   ],
-  "pack_id": "e244d77d-bdbe-47ed-bd08-3ca8258f1d1f",
+  "pack_id": "c260d429-032e-4d2c-98a7-450aa9bfe83a",
   "price_cents": 20000,
   "packs_opened": 1
 }

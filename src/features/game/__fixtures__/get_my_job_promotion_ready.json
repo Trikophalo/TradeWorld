@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "45365000-87be-4313-91f3-aea0f10097e3",
+    "id": "1cd9611b-da1f-4243-8b62-5a6b5a99158b",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "8e2bb2c1-055e-3b2a-f569-bcb53eac2904",
+      "id": "d21331b8-a414-66aa-de07-f036108fc91d",
       "logo": null,
-      "name": "Pfotenwohl",
-      "color": "#8BC34A",
+      "name": "Nordlicht Logistik AG",
+      "color": "#7AA2F7",
       "is_ai": true,
-      "sector": "pharma",
-      "ticker": "PFW"
+      "sector": "logistics",
+      "ticker": "NDL"
     },
     "presence": {
-      "fire_at": "2026-11-21T12:04:22.156732+00:00",
+      "fire_at": "2026-11-21T17:08:51.463382+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-16T12:04:22.156732+00:00"
+      "last_active_at": "2026-11-16T17:08:51.463382+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-16T12:04:22.236148+00:00",
+    "started_at": "2026-11-16T17:08:51.580858+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

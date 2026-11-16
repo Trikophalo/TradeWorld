@@ -1,13 +1,26 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 106, "gap_cents": 666 }, "rank": 107, "net_worth_cents": 1019334 },
-  "total": 268,
+  "me": { "next": { "name": "Vera", "rank": 110, "gap_cents": 683 }, "rank": 111, "net_worth_cents": 1019317 },
+  "total": 272,
   "entries": [
     {
+      "id": "0e7a3000-0000-4000-8000-0000000000b1",
+      "tag": "UBT2",
+      "kind": "player",
+      "name": "Nx_Bruno",
+      "rank": 1,
+      "is_me": false,
+      "avatar_key": "rookie",
+      "description": null,
+      "change_24h_bps": null,
+      "net_worth_cents": 1999745094,
+      "rank_change_24h": null
+    },
+    {
       "id": "0e170001-0000-4000-8000-0000000001a1",
-      "tag": "A8DC",
+      "tag": "BCGM",
       "kind": "player",
       "name": "Wanda_Wohnt",
-      "rank": 1,
+      "rank": 2,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
@@ -17,23 +30,23 @@
     },
     {
       "id": "0f3f3f3f-0000-4000-8000-0000000000f1",
-      "tag": "F39E",
+      "tag": "NERM",
       "kind": "player",
       "name": "Fenja_Firma",
-      "rank": 2,
+      "rank": 3,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 126598499,
+      "net_worth_cents": 126868499,
       "rank_change_24h": null
     },
     {
       "id": "09c19c19-0000-4000-8000-0000000000f1",
-      "tag": "BU4W",
+      "tag": "S2S3",
       "kind": "player",
       "name": "Float_Frida",
-      "rank": 3,
+      "rank": 4,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
@@ -42,21 +55,8 @@
       "rank_change_24h": null
     },
     {
-      "id": "09a19a19-0000-4000-8000-0000000000f1",
-      "tag": "UZ7J",
-      "kind": "player",
-      "name": "Esc_Frida",
-      "rank": 4,
-      "is_me": false,
-      "avatar_key": "rookie",
-      "description": null,
-      "change_24h_bps": null,
-      "net_worth_cents": 107512000,
-      "rank_change_24h": null
-    },
-    {
       "id": "0ba771e0-0000-4000-8000-0000000000a1",
-      "tag": "BREG",
+      "tag": "UH9T",
       "kind": "player",
       "name": "Bat_Anna",
       "rank": 5,
@@ -68,5 +68,5 @@
       "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-16T12:04:19.414411+00:00"
+  "server_time": "2026-11-16T17:08:47.787705+00:00"
 }

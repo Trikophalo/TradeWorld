@@ -1,13 +1,13 @@
 {
   "job": {
     "tier": "junior",
-    "since": "2026-11-16T12:04:19.608784+00:00",
+    "since": "2026-11-16T17:08:48.016246+00:00",
     "title": null,
     "title_key": "it_junior",
     "company_name": "KlarSoft AG"
   },
-  "tag": "AN8H",
-  "rank": 372,
+  "tag": "S3XL",
+  "rank": 379,
   "level": 6,
   "trust": { "band": "blank", "kept": 0, "score": 50, "broken": 0 },
   "company": null,
@@ -20,7 +20,7 @@
   ],
   "accessories": [],
   "streak_days": 1,
-  "member_since": "2026-11-16T12:04:18.987756+00:00",
+  "member_since": "2026-11-16T17:08:47.406066+00:00",
   "branch_scores": {
     "it": 3,
     "law": 0,
@@ -32,5 +32,5 @@
     "management": 0
   },
   "skills_learned": 2,
-  "net_worth_cents": 1061034
+  "net_worth_cents": 1061017
 }

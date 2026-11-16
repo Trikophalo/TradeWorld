@@ -2,42 +2,42 @@
   "items": [
     {
       "id": 5,
-      "body": "Der Start im Ausland läuft besser als geplant. Sicher ist das nicht.",
-      "name": "Gipfelwerk",
-      "due_at": "2026-11-16T13:25:41.477232+00:00",
+      "body": "Ein Werk soll Grenzwerte überschritten haben. Bußgelder sind wahrscheinlich. Sicher ist das nicht.",
+      "name": "Sonnenkern Fusion",
+      "due_at": "2026-11-16T18:45:29.016012+00:00",
       "status": "open",
-      "ticker": "GIP",
-      "headline": "Gipfelwerk erschließt neuen Markt",
+      "ticker": "FSN",
+      "headline": "Umweltskandal bei Sonnenkern Fusion",
       "move_bps": null,
-      "strength": 1,
-      "direction": "up",
-      "published_at": "2026-11-16T13:04:23.382095+00:00"
+      "strength": 3,
+      "direction": "down",
+      "published_at": "2026-11-16T18:08:53.314854+00:00"
     },
     {
       "id": 4,
-      "body": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Pfotenwohl geht bald nach oben. Das Vögelchen lag bisher meistens richtig. Meistens.",
-      "name": "Pfotenwohl",
-      "due_at": "2026-11-16T12:49:11.587372+00:00",
+      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Helix Robotik tut sich in der nächsten Stunde etwas, und zwar nach unten. Meine Quelle ist seriös, sie trägt immerhin eine Krawatte.",
+      "name": "Helix Robotik",
+      "due_at": "2026-11-16T17:32:35.246606+00:00",
       "status": "confirmed",
-      "ticker": "PFW",
-      "headline": "Der heiße Draht: Pfotenwohl",
-      "move_bps": 519,
+      "ticker": "HLX",
+      "headline": "Mr. Doodle Dangles Geheimtipp",
+      "move_bps": -590,
       "strength": 2,
-      "direction": "up",
-      "published_at": "2026-11-16T12:04:11.587372+00:00"
+      "direction": "down",
+      "published_at": "2026-11-16T17:08:35.246606+00:00"
     },
     {
       "id": 3,
-      "body": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Sonnenkern Fusion geht bald nach unten. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
-      "name": "Sonnenkern Fusion",
-      "due_at": "2026-11-16T12:04:10.593866+00:00",
+      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Rheinkraft Werke tut sich in der nächsten Stunde etwas, und zwar nach unten. Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.",
+      "name": "Rheinkraft Werke",
+      "due_at": "2026-11-16T17:08:34.077275+00:00",
       "status": "confirmed",
-      "ticker": "FSN",
-      "headline": "Der heiße Draht: Sonnenkern Fusion",
-      "move_bps": -871,
+      "ticker": "RKW",
+      "headline": "Mr. Doodle Dangles Geheimtipp",
+      "move_bps": -920,
       "strength": 2,
       "direction": "down",
-      "published_at": "2026-11-16T12:04:10.593866+00:00"
+      "published_at": "2026-11-16T17:08:34.077275+00:00"
     }
   ],
   "reliability_bps": 7500

@@ -1,16 +1,16 @@
 {
   "copy": {
-    "id": "0d4402b2-2b4a-4e8f-ab54-ecbe7527ef61",
+    "id": "ee0b263a-85b2-4706-9baf-675338ca59af",
     "grade": null,
     "state": "raw",
     "serial": 8,
     "listing": null,
-    "card_key": "me-041",
-    "condition": "near_mint",
+    "card_key": "me-019",
+    "condition": "good",
     "graded_at": null,
-    "acquired_at": "2026-11-16T16:58:41.070362+00:00",
-    "value_cents": 800,
+    "acquired_at": "2026-11-16T17:08:54.463495+00:00",
+    "value_cents": 190,
     "grading_until": null
   },
-  "old_grade": 10
+  "old_grade": 5
 }
