@@ -59327,6 +59327,3002 @@ on conflict (key) do update
        target_max = excluded.target_max, xp_min = excluded.xp_min, xp_max = excluded.xp_max, min_level = excluded.min_level,
        chain_order = excluded.chain_order, scale_with_level = excluded.scale_with_level, weight = excluded.weight,
        reward_skill_points = excluded.reward_skill_points, is_active = true, updated_at = now();
+-- ===== idempotent copy of migrations/20261204005400_listed_companies.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 5400 · Listed player companies: research, satisfaction, reputation, the hour (ADR-167)
+-- =============================================================================
+-- Everything here applies only while companies.phase = 'listed'; private companies get the neutral value from every
+-- function. Values: game_config.listed (src/config/listed.ts), formulas: src/lib/sim/listed.ts.
+-- * Tables (internal, RPC only): listed_companies (reputation, satisfaction, books, restrictions),
+--   company_investments (research, products, regions, machines, acquisitions, licences, benefits, actions),
+--   listed_company_hours (history), company_budgets (money earmarked by the board), company_dividends,
+--   board_motions, board_votes, company_tax_periods.
+-- * The operating hour: player_company_close_hour() is patched (not redefined) at eight places: listed_hour_effect()
+--   gives awareness/quality add-ons and factors for demand, capacity, goods and fixed costs; listed_hour_costs() pays
+--   the running costs (they count as fixed costs); the payout honours the board's cap and never touches earmarked
+--   money; listed_hour_after() moves satisfaction and reputation, lets AI workers quit, finishes projects, runs the
+--   tax office and the board.
+-- * Patched by replace as well: company_withdraw (earmarked money, withdrawal ban), set_founder_payout (cap),
+--   set_company_strategy (price lock), company_dissolve (taxes first, clean-up), player_company_close_quarter (the
+--   fair share price follows the reputation), account_wipe, api_error (NX190 to NX204).
+-- Idempotent: runs unchanged as supabase/updates/20261204005400_listed_companies.sql.
+
+-- ---------------------------------------------------------------------------
+-- A. Error keys, notification types
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.api_error(text)'::regprocedure);
+begin
+  if position('''board_not_shareholder''' in v_def) = 0 then
+    v_def := replace(v_def, $q$    when 'chat_already_member'        then 'NX162'
+$q$, $q$    when 'chat_already_member'        then 'NX162'
+    when 'not_listed'                 then 'NX190'
+    when 'item_unknown'               then 'NX191'
+    when 'item_locked'                then 'NX192'
+    when 'item_running'               then 'NX193'
+    when 'budget_reserved'            then 'NX194'
+    when 'withdraw_blocked'           then 'NX195'
+    when 'payout_capped'              then 'NX196'
+    when 'strategy_locked'            then 'NX197'
+    when 'books_nothing'              then 'NX198'
+    when 'tax_nothing_due'            then 'NX199'
+    when 'dividend_limit'             then 'NX200'
+    when 'board_no_right'             then 'NX201'
+    when 'board_motion_unknown'       then 'NX202'
+    when 'board_limit'                then 'NX203'
+    when 'board_not_shareholder'      then 'NX204'
+$q$);
+    if position('''board_not_shareholder''' in v_def) = 0 then
+      raise exception 'api_error() has an unexpected shape; add the listed company error keys (NX190 to NX204) by hand';
+    end if;
+    execute v_def;
+  end if;
+end;
+$do$;
+
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('tax_office', 'company', 'Finanzamt', 'Bücher, Steuern, Mahnungen und Strafen deiner börsennotierten Firma.',
+        'notif_company', true, true, true, 206),
+       ('team_mood', 'company', 'Stimmung im Team', 'Die Mitarbeiterzufriedenheit ist schlecht oder jemand hat gekündigt.',
+        'notif_company', true, true, false, 207),
+       ('board', 'company', 'Geschäftsrat', 'Ein Antrag im Geschäftsrat einer Firma, an der du Aktien hältst.',
+        'notif_company', true, true, false, 208),
+       ('company_dividend', 'market', 'Dividende', 'Eine Firma, an der du Aktien hältst, hat eine Dividende gezahlt.',
+        'notif_bell', true, false, false, 299),
+       ('company_project', 'company', 'Projekt fertig', 'Eine Forschung, ein Produkt oder ein Ausbau deiner Firma ist fertig.',
+        'notif_company', true, false, false, 209)
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- B. Tables (internal)
+-- ---------------------------------------------------------------------------
+create table if not exists public.listed_companies (
+  company_id           uuid primary key references public.companies (id) on delete cascade,
+  reputation           double precision not null default 50 check (reputation between 0 and 100),
+  satisfaction         double precision not null default 60 check (satisfaction between 0 and 100),
+  price_factor         double precision not null default 1 check (price_factor > 0),
+  ref_revenue_cents    bigint not null default 0 check (ref_revenue_cents >= 0),
+  layoff_heat          double precision not null default 0 check (layoff_heat >= 0),
+  layoff_checked_at    timestamptz,
+  ai_workers_seen      integer,
+  red_hours            integer not null default 0,
+  quits_day            date,
+  quits_today          integer not null default 0,
+  mood_notified_at     timestamptz,
+  last_upkeep          jsonb not null default '{}'::jsonb,
+  books_until          timestamptz not null default now(),
+  books_day            date,
+  books_streak         integer not null default 0,
+  books_stage          smallint not null default 0,
+  loss_carry_cents     bigint not null default 0 check (loss_carry_cents >= 0),
+  advisor              boolean not null default false,
+  payout_cap_bps       integer check (payout_cap_bps between 0 and 10000),
+  payout_cap_until     timestamptz,
+  withdraw_block_until timestamptz,
+  price_lock           text check (price_lock in ('budget', 'normal', 'premium')),
+  price_lock_until     timestamptz,
+  dividend_day         date,
+  dividend_streak      integer not null default 0,
+  best_dividend_cents  bigint not null default 0,
+  created_at           timestamptz not null default now()
+);
+alter table public.listed_companies enable row level security;
+comment on table public.listed_companies is
+  'Listed player companies (ADR-167): reputation, employee satisfaction, bookkeeping state and the board''s restrictions. Internal (RPCs).';
+
+create table if not exists public.company_investments (
+  company_id   uuid not null references public.companies (id) on delete cascade,
+  key          text not null check (key ~ '^[a-z0-9_]+$'),
+  kind         text not null,
+  status       text not null check (status in ('running', 'active', 'paused', 'retired')),
+  level        integer not null default 0 check (level >= 0),
+  ready_at     timestamptz,
+  last_used_at timestamptz,
+  spent_cents  bigint not null default 0,
+  started_at   timestamptz not null default now(),
+  primary key (company_id, key)
+);
+alter table public.company_investments enable row level security;
+comment on table public.company_investments is
+  'What a listed company bought from game_config.listed.items (ADR-167): level counts the finished levels, ready_at the one in work. Internal.';
+
+create table if not exists public.listed_company_hours (
+  company_id      uuid not null references public.companies (id) on delete cascade,
+  hour_start      timestamptz not null,
+  satisfaction    double precision not null,
+  sat_target      double precision not null,
+  reputation      double precision not null,
+  rep_target      double precision not null,
+  demand_factor   double precision not null,
+  capacity_factor double precision not null,
+  upkeep_cents    bigint not null default 0,
+  upkeep          jsonb not null default '{}'::jsonb,
+  drivers         jsonb not null default '{}'::jsonb,
+  primary key (company_id, hour_start)
+);
+alter table public.listed_company_hours enable row level security;
+comment on table public.listed_company_hours is 'Hourly history of a listed company: mood, reputation, factors, running costs (ADR-167). Internal.';
+
+create table if not exists public.company_budgets (
+  company_id   uuid not null references public.companies (id) on delete cascade,
+  purpose      text not null,
+  amount_cents bigint not null check (amount_cents >= 0),
+  updated_at   timestamptz not null default now(),
+  primary key (company_id, purpose)
+);
+alter table public.company_budgets enable row level security;
+drop trigger if exists set_updated_at on public.company_budgets;
+create trigger set_updated_at before update on public.company_budgets for each row execute function public.set_updated_at();
+comment on table public.company_budgets is
+  'Company cash earmarked by the board for a purpose (ADR-167): not free cash, the founder cannot withdraw it. Internal.';
+
+create table if not exists public.company_dividends (
+  id            bigint generated always as identity primary key,
+  company_id    uuid not null references public.companies (id) on delete cascade,
+  source        text not null check (source in ('founder', 'board')),
+  total_cents   bigint not null check (total_cents > 0),
+  players_cents bigint not null,
+  float_cents   bigint not null,
+  shares_e6     bigint not null,
+  holders       integer not null,
+  paid_at       timestamptz not null default now()
+);
+alter table public.company_dividends enable row level security;
+create index if not exists company_dividends_company_idx on public.company_dividends (company_id, id desc);
+comment on table public.company_dividends is 'Dividends a listed player company paid (ADR-167). Internal.';
+
+create table if not exists public.board_motions (
+  id           bigint generated always as identity primary key,
+  company_id   uuid not null references public.companies (id) on delete cascade,
+  proposer_id  uuid references public.profiles (id) on delete set null,
+  kind         text not null,
+  params       jsonb not null default '{}'::jsonb,
+  status       text not null default 'open' check (status in ('open', 'passed', 'rejected', 'no_quorum', 'cancelled')),
+  created_at   timestamptz not null default now(),
+  closes_at    timestamptz not null,
+  closed_at    timestamptz,
+  yes_e6       bigint not null default 0,
+  no_e6        bigint not null default 0,
+  ai_e6        bigint not null default 0,
+  total_e6     bigint not null default 0,
+  result       jsonb not null default '{}'::jsonb
+);
+alter table public.board_motions enable row level security;
+create index if not exists board_motions_company_idx on public.board_motions (company_id, id desc);
+create index if not exists board_motions_proposer_idx on public.board_motions (proposer_id) where proposer_id is not null;
+comment on table public.board_motions is 'Motions of the board of a listed company (ADR-167). Internal.';
+
+create table if not exists public.board_votes (
+  motion_id bigint not null references public.board_motions (id) on delete cascade,
+  player_id uuid not null references public.profiles (id) on delete cascade,
+  yes       boolean not null,
+  voted_at  timestamptz not null default now(),
+  primary key (motion_id, player_id)
+);
+alter table public.board_votes enable row level security;
+create index if not exists board_votes_player_idx on public.board_votes (player_id);
+comment on table public.board_votes is 'One vote per shareholder and motion; the weight is the holding when the motion is counted (ADR-167). Internal.';
+
+create table if not exists public.company_tax_periods (
+  id              bigint generated always as identity primary key,
+  company_id      uuid not null references public.companies (id) on delete cascade,
+  kind            text not null default 'books' check (kind in ('books', 'late_fee')),
+  period_start    timestamptz not null,
+  period_end      timestamptz not null,
+  revenue_cents   bigint not null default 0,
+  costs_cents     bigint not null default 0,
+  profit_cents    bigint not null default 0,
+  loss_used_cents bigint not null default 0,
+  taxable_cents   bigint not null default 0,
+  rate_bps        integer not null default 0,
+  discount_cents  bigint not null default 0,
+  tax_cents       bigint not null default 0 check (tax_cents >= 0),
+  penalty_cents   bigint not null default 0 check (penalty_cents >= 0),
+  paid_cents      bigint not null default 0 check (paid_cents >= 0),
+  status          text not null default 'due' check (status in ('due', 'paid')),
+  closed_by       text not null check (closed_by in ('founder', 'advisor', 'finanzamt')),
+  check_correct   smallint,
+  stage           smallint not null default 0,
+  due_at          timestamptz not null,
+  paid_at         timestamptz,
+  created_at      timestamptz not null default now()
+);
+alter table public.company_tax_periods enable row level security;
+create index if not exists company_tax_periods_company_idx on public.company_tax_periods (company_id, id desc);
+comment on table public.company_tax_periods is
+  'Closed bookkeeping periods of a listed company with the corporate tax and penalties due (ADR-167). Internal.';
+
+do $$
+declare
+  t text;
+begin
+  foreach t in array array['listed_companies', 'company_investments', 'listed_company_hours', 'company_budgets',
+                           'company_dividends', 'board_motions', 'board_votes', 'company_tax_periods'] loop
+    execute format('revoke all on public.%I from public, anon, authenticated', t);
+    execute format('grant all on public.%I to service_role', t);
+  end loop;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- C. Config and formulas (the same as src/lib/sim/listed.ts)
+-- ---------------------------------------------------------------------------
+create or replace function public.listed_cfg()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select value from public.game_config where key = 'listed'), '{}'::jsonb);
+$$;
+
+create or replace function public.listed_item(p_key text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select t.x from jsonb_array_elements(coalesce(public.listed_cfg() -> 'items', '[]'::jsonb)) t(x)
+   where t.x ->> 'key' = p_key limit 1;
+$$;
+
+-- Whether the company is an active player company at the stock exchange
+create or replace function public.listed_is(p_company uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (select 1 from public.companies c join public.player_companies pc on pc.company_id = c.id
+                  where c.id = p_company and c.phase = 'listed' and pc.status = 'active');
+$$;
+
+-- The listed row of a company, created on first use; null for private companies
+create or replace function public.listed_ensure(p_company uuid)
+returns public.listed_companies
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  l   public.listed_companies;
+  cfg jsonb := public.listed_cfg();
+begin
+  if not public.listed_is(p_company) then
+    return null;
+  end if;
+  select * into l from public.listed_companies where company_id = p_company;
+  if l.company_id is null then
+    insert into public.listed_companies (company_id, reputation, satisfaction, books_until, ai_workers_seen)
+    values (p_company, public.cfg_num(cfg, '{reputation,start}', 50), public.cfg_num(cfg, '{satisfaction,start}', 60), now(),
+            (select pc.ai_workers from public.player_companies pc where pc.company_id = p_company))
+    on conflict (company_id) do nothing;
+    select * into l from public.listed_companies where company_id = p_company;
+  end if;
+  return l;
+end;
+$$;
+
+-- refRevenueCents: average revenue per hour of the last hours, never below the minimum
+create or replace function public.listed_ref_revenue(p_company uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select greatest(public.cfg_num(public.listed_cfg(), '{refRevenue,minCents}', 20000)::bigint,
+                  coalesce((select round(avg(h.revenue_cents))::bigint
+                              from (select x.revenue_cents from public.player_company_hours x
+                                     where x.company_id = p_company order by x.hour_start desc
+                                     limit greatest(1, public.cfg_num(public.listed_cfg(), '{refRevenue,windowHours}', 24)::integer)) h), 0));
+$$;
+
+-- itemCostCents: max(minCostCents, costHours x reference revenue) x costGrowth^level + costPerHeadCents x heads
+create or replace function public.listed_item_cost(p_item jsonb, p_level integer, p_ref bigint, p_heads integer)
+returns bigint
+language sql
+immutable
+set search_path = ''
+as $$
+  select round((greatest(public.cfg_num(p_item, '{minCostCents}', 0), public.cfg_num(p_item, '{costHours}', 0) * p_ref)
+                * power(public.cfg_num(p_item, '{costGrowth}', 1), greatest(0, coalesce(p_level, 0))))::numeric)::bigint
+       + public.cfg_num(p_item, '{costPerHeadCents}', 0)::bigint * greatest(1, coalesce(p_heads, 0));
+$$;
+
+-- itemUpkeepCents: round(upkeepBps x reference revenue / 10 000) x level + upkeepPerHeadCents x heads
+create or replace function public.listed_item_upkeep(p_item jsonb, p_level integer, p_ref bigint, p_heads integer)
+returns bigint
+language sql
+immutable
+set search_path = ''
+as $$
+  select round(public.cfg_num(p_item, '{upkeepBps}', 0)::numeric * p_ref / 10000)::bigint * greatest(1, coalesce(p_level, 1))
+       + public.cfg_num(p_item, '{upkeepPerHeadCents}', 0)::bigint * greatest(1, coalesce(p_heads, 0));
+$$;
+
+-- The books category of an item kind
+create or replace function public.listed_kind_category(p_kind text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case p_kind when 'research' then 'research' when 'product' then 'product'
+                     when 'benefit' then 'benefit' when 'action' then 'benefit' else 'expansion' end;
+$$;
+
+-- sumEffects: effects of all active items, per level
+create or replace function public.listed_effects(p_company uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'demandBps', coalesce(sum(public.cfg_num(i.x, '{effects,demandBps}', 0) * i.lv), 0),
+    'marketBps', coalesce(sum(public.cfg_num(i.x, '{effects,marketBps}', 0) * i.lv), 0),
+    'capacityBps', coalesce(sum(public.cfg_num(i.x, '{effects,capacityBps}', 0) * i.lv), 0),
+    'qualityBps', coalesce(sum(public.cfg_num(i.x, '{effects,qualityBps}', 0) * i.lv), 0),
+    'awarenessBps', coalesce(sum(public.cfg_num(i.x, '{effects,awarenessBps}', 0) * i.lv), 0),
+    'marginBps', coalesce(sum(public.cfg_num(i.x, '{effects,marginBps}', 0) * i.lv), 0),
+    'fixedCostBps', coalesce(sum(public.cfg_num(i.x, '{effects,fixedCostBps}', 0) * i.lv), 0),
+    'taxRateBps', coalesce(sum(public.cfg_num(i.x, '{effects,taxRateBps}', 0) * i.lv), 0),
+    'satisfaction', coalesce(sum(public.cfg_num(i.x, '{effects,satisfaction}', 0) * i.lv), 0),
+    'reputation', coalesce(sum(public.cfg_num(i.x, '{effects,reputation}', 0) * i.lv), 0))
+    from (select public.listed_item(ci.key) as x, greatest(1, ci.level) as lv
+            from public.company_investments ci
+           where ci.company_id = p_company and ci.status = 'active' and ci.level > 0) i
+   where i.x is not null;
+$$;
+
+-- greedShare: 0 up to freeRatioBps, 1 from fullRatioBps
+create or replace function public.listed_greed_share(p_ratio_bps double precision)
+returns double precision
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select least(1.0, greatest(0.0,
+           (p_ratio_bps - public.cfg_num(public.listed_cfg(), '{reputation,greed,freeRatioBps}', 3000))
+           / greatest(1.0, public.cfg_num(public.listed_cfg(), '{reputation,greed,fullRatioBps}', 10000)
+                           - public.cfg_num(public.listed_cfg(), '{reputation,greed,freeRatioBps}', 3000))));
+$$;
+
+-- payoutRatioBps: founder payouts and withdrawals / max(profit, share of the revenue, 1)
+create or replace function public.listed_payout_ratio_bps(p_payout bigint, p_profit bigint, p_revenue bigint)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when coalesce(p_payout, 0) <= 0 then 0
+              else round(p_payout * 10000.0
+                         / greatest(p_profit, p_revenue * public.cfg_num(public.listed_cfg(), '{reputation,minProfitShareOfRevenue}', 0.05), 1))::integer
+         end;
+$$;
+
+-- satisfactionTarget: where the mood is heading this hour, with its drivers
+create or replace function public.listed_satisfaction_target(p_benefits double precision, p_pay_factor_bps integer,
+  p_pay_mood_bps integer, p_utilization double precision, p_crisis integer, p_scandal boolean, p_layoff_heat double precision,
+  p_payout_ratio_bps integer, p_profit bigint)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  s      jsonb := coalesce(public.listed_cfg() -> 'satisfaction', '{}'::jsonb);
+  v_over double precision;
+  d      jsonb;
+  v_sum  double precision;
+begin
+  v_over := least(1.0, greatest(0.0, (p_utilization - public.cfg_num(s, '{workload,overFrom}', 0.95))
+                                     / greatest(0.0001, public.cfg_num(s, '{workload,overFull}', 1.5)
+                                                        - public.cfg_num(s, '{workload,overFrom}', 0.95))));
+  d := jsonb_build_object(
+    'base', public.cfg_num(s, '{base}', 50),
+    'benefits', least(public.cfg_num(s, '{benefitsMax}', 40), greatest(0, p_benefits)),
+    'wages', -public.cfg_num(s, '{wages,unpaidMaxLoss}', 25) * (1 - least(10000, greatest(0, p_pay_factor_bps)) / 10000.0)
+             - public.cfg_num(s, '{wages,moodMaxLoss}', 10) * (1 - least(10000, greatest(0, p_pay_mood_bps)) / 10000.0),
+    'workload', case when v_over > 0 then -public.cfg_num(s, '{workload,overMaxLoss}', 12) * v_over
+                     when p_utilization < public.cfg_num(s, '{workload,underBelow}', 0.35) then -public.cfg_num(s, '{workload,underLoss}', 4)
+                     else 0 end,
+    'crisis', case when coalesce(p_crisis, 0) > 0
+                   then -(public.cfg_num(s, '{crisis,perSeverity}', 4) * least(3, p_crisis)
+                          + case when p_scandal then public.cfg_num(s, '{crisis,scandal}', 6) else 0 end)
+                   else 0 end,
+    'layoffs', -least(public.cfg_num(s, '{layoffs,max}', 15), greatest(0, p_layoff_heat)),
+    'greed', -public.cfg_num(s, '{greedMaxLoss}', 10) * public.listed_greed_share(p_payout_ratio_bps),
+    'success', case when p_profit > 0 then public.cfg_num(s, '{success,profitHour}', 3)
+                    when p_profit < 0 then public.cfg_num(s, '{success,lossHour}', -3) else 0 end);
+  select sum(v::double precision) into v_sum from jsonb_each_text(d) x(k, v);
+  return jsonb_build_object('target', least(100.0, greatest(0.0, v_sum)), 'drivers', d);
+end;
+$$;
+
+-- satisfactionEffect: capacity factor and quality add-on (never positive) of the mood
+create or replace function public.listed_satisfaction_effect(p_value double precision)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  s       jsonb := coalesce(public.listed_cfg() -> 'satisfaction', '{}'::jsonb);
+  v       double precision := least(100.0, greatest(0.0, coalesce(p_value, 0)));
+  v_green double precision := public.cfg_num(s, '{green}', 60);
+  v_x     double precision;
+begin
+  if v >= v_green then
+    v_x := least(1.0, greatest(0.0, (v - v_green) / greatest(1.0, public.cfg_num(s, '{effect,highFull}', 90) - v_green)));
+    return jsonb_build_object('capacity_factor', 1 + public.cfg_num(s, '{effect,highCapacityMaxGain}', 0.06) * v_x, 'quality_add', 0);
+  end if;
+  v_x := (v_green - v) / v_green;
+  return jsonb_build_object('capacity_factor', 1 - public.cfg_num(s, '{effect,lowCapacityMaxLoss}', 0.3) * v_x,
+                            'quality_add', -public.cfg_num(s, '{effect,lowQualityMaxLoss}', 0.15) * v_x);
+end;
+$$;
+
+-- reputationTarget: where the reputation is heading, with its drivers
+create or replace function public.listed_reputation_target(p_items double precision, p_payout bigint, p_profit bigint,
+  p_revenue bigint, p_invested bigint, p_dividends bigint, p_streak integer, p_scandal boolean)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  r       jsonb := coalesce(public.listed_cfg() -> 'reputation', '{}'::jsonb);
+  v_base  double precision := greatest(p_profit, p_revenue * public.cfg_num(r, '{minProfitShareOfRevenue}', 0.05), 1);
+  v_ratio integer := public.listed_payout_ratio_bps(p_payout, p_profit, p_revenue);
+  d       jsonb;
+  v_sum   double precision;
+begin
+  d := jsonb_build_object(
+    'base', public.cfg_num(r, '{base}', 50),
+    'items', coalesce(p_items, 0),
+    'greed', -public.cfg_num(r, '{greed,maxLoss}', 35) * public.listed_greed_share(v_ratio),
+    'reinvest', public.cfg_num(r, '{reinvest,maxGain}', 12)
+                * least(1.0, greatest(0.0, greatest(0, p_invested) * 10000.0 / v_base / public.cfg_num(r, '{reinvest,fullRatioBps}', 5000))),
+    'dividends', public.cfg_num(r, '{dividend,maxGain}', 12)
+                 * least(1.0, greatest(0.0, greatest(0, p_dividends) * 10000.0 / v_base / public.cfg_num(r, '{dividend,fullRatioBps}', 2000)))
+                 + least(public.cfg_num(r, '{dividend,streakMax}', 6), greatest(0, coalesce(p_streak, 0)))
+                   * public.cfg_num(r, '{dividend,streakPerDay}', 1),
+    'scandal', case when p_scandal then -public.cfg_num(r, '{scandalLoss}', 5) else 0 end);
+  select sum(v::double precision) into v_sum from jsonb_each_text(d) x(k, v);
+  return jsonb_build_object('target', least(100.0, greatest(0.0, v_sum)), 'drivers', d, 'payout_ratio_bps', v_ratio);
+end;
+$$;
+
+-- listedHourEffect: items, mood and reputation as the terms of the hourly close
+create or replace function public.listed_hour_effect_calc(p_effects jsonb, p_satisfaction double precision, p_reputation double precision)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg   jsonb := public.listed_cfg();
+  v_sat jsonb := public.listed_satisfaction_effect(p_satisfaction);
+  v_x   double precision := (least(100.0, greatest(0.0, coalesce(p_reputation, 50))) - 50) / 50.0;
+begin
+  return jsonb_build_object(
+    'awareness_add', public.cfg_num(p_effects, '{awarenessBps}', 0) / 10000.0,
+    'quality_add', public.cfg_num(p_effects, '{qualityBps}', 0) / 10000.0 + (v_sat ->> 'quality_add')::double precision,
+    'demand_factor', (1 + public.cfg_num(p_effects, '{demandBps}', 0) / 10000.0) * (1 + public.cfg_num(p_effects, '{marketBps}', 0) / 10000.0)
+                     * (1 + public.cfg_num(cfg, '{reputation,demandMaxEffect}', 0.2) * v_x),
+    'capacity_factor', greatest(0.1, 1 + public.cfg_num(p_effects, '{capacityBps}', 0) / 10000.0) * (v_sat ->> 'capacity_factor')::double precision,
+    'cogs_factor', greatest(0.5, 1 - public.cfg_num(p_effects, '{marginBps}', 0) / 10000.0),
+    'fixed_factor', greatest(0.5, 1 + public.cfg_num(p_effects, '{fixedCostBps}', 0) / 10000.0));
+end;
+$$;
+
+-- Money earmarked by the board (0 for every company without budgets)
+create or replace function public.listed_reserved_cents(p_company uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select sum(b.amount_cents) from public.company_budgets b where b.company_id = p_company), 0)::bigint;
+$$;
+
+-- Free cash: company cash minus open bills minus earmarked money
+create or replace function public.listed_free_cash(p_company uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select a.balance_cents from public.ledger_accounts a where a.owner_company_id = p_company and a.kind = 'company_cash'), 0)
+       - coalesce((select pc.unpaid_cents from public.player_companies pc where pc.company_id = p_company), 0)
+       - public.listed_reserved_cents(p_company);
+$$;
+
+-- The founder's payout share is capped while a board decision holds (10 000 = no cap)
+create or replace function public.listed_payout_cap_bps(p_company uuid, p_at timestamptz)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select l.payout_cap_bps from public.listed_companies l
+                    where l.company_id = p_company and l.payout_cap_bps is not null and l.payout_cap_until > coalesce(p_at, now())
+                      and public.listed_is(p_company)), 10000);
+$$;
+
+-- Factor on the fair share price from the reputation (1 for private companies)
+create or replace function public.listed_price_factor(p_company uuid)
+returns double precision
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select l.price_factor from public.listed_companies l
+                    where l.company_id = p_company and public.listed_is(p_company)), 1.0);
+$$;
+
+-- One-off drop (or gain) of the reputation
+create or replace function public.listed_reputation_bump(p_company uuid, p_points double precision)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  update public.listed_companies set reputation = least(100.0, greatest(0.0, reputation + coalesce(p_points, 0)))
+   where company_id = p_company;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- D. The operating hour
+-- ---------------------------------------------------------------------------
+-- Terms of the hour; neutral for private companies
+create or replace function public.listed_hour_effect(p_company uuid, p_hour_start timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  l public.listed_companies;
+begin
+  l := public.listed_ensure(p_company);
+  if l.company_id is null then
+    return jsonb_build_object('awareness_add', 0, 'quality_add', 0, 'demand_factor', 1, 'capacity_factor', 1,
+                              'cogs_factor', 1, 'fixed_factor', 1, 'listed', false);
+  end if;
+  return public.listed_hour_effect_calc(public.listed_effects(p_company), l.satisfaction, l.reputation)
+         || jsonb_build_object('listed', true);
+end;
+$$;
+
+-- Hourly wage of the tax advisor
+create or replace function public.listed_advisor_wage(p_ref bigint)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select greatest(public.cfg_num(public.listed_cfg(), '{taxes,advisor,minWageCentsPerHour}', 4000)::bigint,
+                  round(p_ref::numeric * public.cfg_num(public.listed_cfg(), '{taxes,advisor,revenueBps}', 100)::numeric / 10000)::bigint);
+$$;
+
+-- Running costs of the hour: every active item is paid from the cash (one booking per category); what the cash
+-- cannot pay pauses until it can. Returns what was paid (it counts as fixed costs of the hour).
+create or replace function public.listed_hour_costs(p_company uuid, p_hour_start timestamptz, p_key text)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  l        public.listed_companies;
+  pc       public.player_companies;
+  v_acc    uuid;
+  v_hh     uuid := public.ledger_system_account('households');
+  v_ref    bigint;
+  v_heads  integer;
+  v_left   bigint;
+  v_up     bigint;
+  v_cat    text;
+  v_sums   jsonb := '{}'::jsonb;
+  v_total  bigint := 0;
+  v_amount bigint;
+  r        record;
+begin
+  l := public.listed_ensure(p_company);
+  if l.company_id is null then
+    return 0;
+  end if;
+  select * into pc from public.player_companies where company_id = p_company;
+  v_acc := public.company_cash_account(p_company);
+  v_ref := public.listed_ref_revenue(p_company);
+  v_heads := public.company_headcount(p_company);
+  select greatest(0, a.balance_cents) into v_left from public.ledger_accounts a where a.id = v_acc;
+  for r in select ci.key, ci.kind, ci.level, ci.status from public.company_investments ci
+            where ci.company_id = p_company and ci.status in ('active', 'paused') and ci.level > 0 and ci.kind <> 'action'
+            order by array_position(array['product', 'region', 'machine', 'acquisition', 'licence', 'research', 'benefit'], ci.kind), ci.key loop
+    v_up := public.listed_item_upkeep(public.listed_item(r.key), r.level, v_ref, v_heads);
+    continue when public.listed_item(r.key) is null;
+    if v_up <= v_left then
+      v_left := v_left - v_up;
+      if v_up > 0 then
+        v_cat := public.listed_kind_category(r.kind);
+        v_sums := v_sums || jsonb_build_object(v_cat, coalesce((v_sums ->> v_cat)::bigint, 0) + v_up);
+      end if;
+      if r.status = 'paused' then
+        update public.company_investments set status = 'active' where company_id = p_company and key = r.key;
+      end if;
+    elsif r.status = 'active' then
+      update public.company_investments set status = 'paused' where company_id = p_company and key = r.key;
+    end if;
+  end loop;
+  -- the tax advisor leaves when the wage cannot be paid
+  if l.advisor then
+    v_up := public.listed_advisor_wage(v_ref);
+    if v_up <= v_left then
+      v_left := v_left - v_up;
+      v_sums := v_sums || jsonb_build_object('advisor', v_up);
+    else
+      update public.listed_companies set advisor = false where company_id = p_company;
+      perform public.social_notify(pc.founder_id, 'tax_office', 'Steuerberater hat gekündigt',
+        'Die Kasse reichte nicht für das Honorar. Du machst die Bücher wieder selbst.',
+        jsonb_build_object('company_id', p_company), '/company', 'advisor-gone:' || p_key);
+    end if;
+  end if;
+  for v_cat, v_amount in select k, v::bigint from jsonb_each_text(v_sums) x(k, v) loop
+    perform public.ledger_transfer(v_acc, v_hh, v_amount, 'company_costs',
+      case v_cat when 'product' then 'Produkte: laufende Kosten' when 'expansion' then 'Standorte und Anlagen: laufende Kosten'
+                 when 'benefit' then 'Benefits fürs Team' when 'advisor' then 'Steuerberater' else 'Laufende Kosten' end,
+      'company', p_company, p_key || ':lx:' || v_cat, pc.founder_id, jsonb_build_object('cat', v_cat));
+    v_total := v_total + v_amount;
+    if v_cat = 'benefit' then
+      update public.company_budgets set amount_cents = greatest(0, amount_cents - v_amount), updated_at = now()
+       where company_id = p_company and purpose = 'benefits';
+    end if;
+  end loop;
+  update public.listed_companies set last_upkeep = v_sums, ref_revenue_cents = v_ref where company_id = p_company;
+  return v_total;
+end;
+$$;
+
+-- After the hour: finished projects, mood, reputation, quits, history, fair value, tax office, board.
+create or replace function public.listed_hour_after(p_company uuid, p_hour_start timestamptz, p_demand double precision,
+  p_capacity double precision, p_revenue bigint, p_profit bigint, p_pay_factor_bps integer, p_payout bigint)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg       jsonb := public.listed_cfg();
+  l         public.listed_companies;
+  pc        public.player_companies;
+  c         public.companies;
+  v_end     timestamptz := p_hour_start + interval '1 hour';
+  v_win     interval;
+  v_fx      jsonb;
+  v_eff     jsonb;
+  v_acc     uuid;
+  v_fired   integer;
+  v_gone    integer;
+  v_heat    double precision;
+  v_profit  bigint;
+  v_rev     bigint;
+  v_pay     bigint;
+  v_inv     bigint;
+  v_div     bigint;
+  v_ratio   integer;
+  v_sev     integer;
+  v_scandal boolean;
+  v_st      jsonb;
+  v_rt      jsonb;
+  v_sat     double precision;
+  v_rep     double precision;
+  v_red     integer;
+  v_quit    boolean := false;
+  v_today   date := (now() at time zone 'Europe/Berlin')::date;
+  v_quits   integer;
+  v_pf      double precision;
+  v_streak  integer;
+  r         record;
+begin
+  l := public.listed_ensure(p_company);
+  if l.company_id is null then
+    return;
+  end if;
+  select * into l from public.listed_companies where company_id = p_company for update;
+  select * into pc from public.player_companies where company_id = p_company;
+  select * into c from public.companies where id = p_company;
+  v_acc := public.company_cash_account(p_company);
+
+  -- projects whose time is up become active (research, products, regions, machine levels)
+  perform public.listed_finish_due(p_company, greatest(v_end, now()));
+
+  v_fx := public.listed_effects(p_company);
+  v_eff := public.listed_hour_effect_calc(v_fx, l.satisfaction, l.reputation);
+
+  -- dismissals: AI workers gone since the last hour (own quits were already counted out), players fired
+  select count(*) into v_fired from public.player_jobs j
+   where j.company_id = p_company and j.status = 'ended' and j.end_reason = 'fired'
+     and j.ended_at > coalesce(l.layoff_checked_at, now() - interval '1 hour');
+  v_gone := greatest(0, coalesce(l.ai_workers_seen, pc.ai_workers) - pc.ai_workers) + coalesce(v_fired, 0);
+  v_heat := greatest(0, l.layoff_heat) * (1 - public.cfg_num(cfg, '{satisfaction,layoffs,decayPerHour}', 0.08))
+          + v_gone * public.cfg_num(cfg, '{satisfaction,layoffs,perHead}', 3);
+
+  -- the reputation window: profit and revenue of the hours, payouts, withdrawals, investments, dividends
+  v_win := make_interval(hours => greatest(1, public.cfg_num(cfg, '{reputation,windowHours}', 24)::integer));
+  select coalesce(sum(h.profit_cents), 0), coalesce(sum(h.revenue_cents), 0), coalesce(sum(h.founder_payout_cents), 0)
+    into v_profit, v_rev, v_pay
+    from public.player_company_hours h where h.company_id = p_company and h.hour_start > v_end - v_win;
+  v_pay := v_pay + coalesce((
+    select sum(-e.amount_cents) from public.ledger_entries e join public.ledger_transactions t on t.id = e.transaction_id
+     where e.account_id = v_acc and e.amount_cents < 0 and e.created_at > now() - v_win
+       and t.idempotency_key like 'withdraw:%'), 0);
+  select coalesce(sum(-e.amount_cents), 0) into v_inv
+    from public.ledger_entries e join public.ledger_transactions t on t.id = e.transaction_id
+   where e.account_id = v_acc and e.amount_cents < 0 and e.created_at > now() - v_win
+     and t.metadata ->> 'one_off' = 'true';
+  select coalesce(sum(d.total_cents), 0) into v_div from public.company_dividends d
+   where d.company_id = p_company and d.paid_at > now() - v_win;
+  v_ratio := public.listed_payout_ratio_bps(v_pay, v_profit, v_rev);
+
+  select max(e.severity), bool_or(coalesce(cfg #> '{satisfaction,crisis,scandals}', '[]'::jsonb) ? e.archetype)
+    into v_sev, v_scandal
+    from public.player_company_events e
+   where e.company_id = p_company and e.polarity = 'crisis' and e.status in ('open', 'in_force');
+
+  -- mood
+  v_st := public.listed_satisfaction_target(public.cfg_num(v_fx, '{satisfaction}', 0), p_pay_factor_bps,
+            public.company_pay_mood_bps(p_company), case when p_capacity > 0 then p_demand / p_capacity else 1 end,
+            coalesce(v_sev, 0), coalesce(v_scandal, false), v_heat, v_ratio, p_profit);
+  v_sat := least(100.0, greatest(0.0, l.satisfaction + public.cfg_num(cfg, '{satisfaction,adjustPerHour}', 0.15)
+                                                       * ((v_st ->> 'target')::double precision - l.satisfaction)));
+  v_red := case when v_sat < public.cfg_num(cfg, '{satisfaction,red}', 35) then l.red_hours + 1 else 0 end;
+  v_quits := case when l.quits_day = v_today then l.quits_today else 0 end;
+  if v_red > 0 then
+    -- an AI worker leaves every N-th hour in a row in the red zone
+    if pc.ai_workers > 0 and v_red % greatest(1, public.cfg_num(cfg, '{satisfaction,quits,everyRedHours}', 3)::integer) = 0 then
+      update public.player_companies set ai_workers = ai_workers - 1 where company_id = p_company and ai_workers > 0;
+      pc.ai_workers := pc.ai_workers - 1;
+      v_quit := true;
+      v_quits := v_quits + 1;
+      perform public.social_notify(pc.founder_id, 'team_mood', 'Kündigung bei ' || c.name,
+        'Eine KI-Kraft hat hingeschmissen: Die Stimmung ist im Keller.',
+        jsonb_build_object('company_id', p_company), '/company', 'quit:' || p_company::text || ':' || p_hour_start::text);
+      perform public.company_system_message(p_company, 'Eine KI-Kraft hat gekündigt. Die Stimmung im Team ist schlecht.');
+      if v_quits = greatest(1, public.cfg_num(cfg, '{satisfaction,quits,massQuitFrom}', 3)::integer) then
+        perform public.feed_post(pc.founder_id, 'mass_quit', jsonb_build_object('company', c.name, 'count', v_quits),
+                                 'mass_quit:' || p_company::text || ':' || v_today::text);
+      end if;
+    end if;
+    -- players are not forced out: they are told, at most once per interval
+    if l.mood_notified_at is null
+       or l.mood_notified_at < now() - make_interval(hours => greatest(1, public.cfg_num(cfg, '{satisfaction,quits,notifyEveryHours}', 24)::integer)) then
+      for r in select j.player_id from public.player_jobs j where j.company_id = p_company and j.status = 'active' loop
+        perform public.social_notify(r.player_id, 'team_mood', 'Miese Stimmung bei ' || c.name,
+          'Die Zufriedenheit im Team ist im roten Bereich. Vielleicht ist ein anderer Job besser für dich.',
+          jsonb_build_object('company_id', p_company), '/career', 'mood:' || p_company::text || ':' || v_today::text);
+      end loop;
+      perform public.social_notify(pc.founder_id, 'team_mood', 'Stimmung im Keller',
+        'Die Mitarbeiterzufriedenheit bei ' || c.name || ' ist im roten Bereich. Kapazität und Qualität sinken.',
+        jsonb_build_object('company_id', p_company), '/company', 'mood-f:' || p_company::text || ':' || v_today::text);
+      l.mood_notified_at := now();
+    end if;
+  end if;
+
+  -- reputation
+  v_streak := case when l.dividend_day is not null and l.dividend_day >= v_today - 1 then l.dividend_streak else 0 end;
+  v_rt := public.listed_reputation_target(public.cfg_num(v_fx, '{reputation}', 0), v_pay, v_profit, v_rev, v_inv, v_div,
+                                          v_streak, coalesce(v_scandal, false));
+  v_rep := least(100.0, greatest(0.0, l.reputation + public.cfg_num(cfg, '{reputation,adjustPerHour}', 0.08)
+                                                     * ((v_rt ->> 'target')::double precision - l.reputation)));
+  if v_rep < public.cfg_num(cfg, '{reputation,greed,feedBelow}', 35)
+     and v_ratio >= public.cfg_num(cfg, '{reputation,greed,fullRatioBps}', 10000) * 0.8 then
+    perform public.feed_post(pc.founder_id, 'greedy_founder', jsonb_build_object('company', c.name, 'ratio_bps', v_ratio),
+                             'greedy:' || p_company::text || ':' || v_today::text);
+  end if;
+
+  -- the fair share price follows the reputation
+  v_pf := 1 + public.cfg_num(cfg, '{reputation,priceMaxEffect}', 0.25) * (v_rep - 50) / 50.0;
+  if c.security_id is not null and v_pf <> l.price_factor then
+    update public.security_sim_state
+       set fair_value_e4 = greatest(1, round(fair_value_e4 / l.price_factor * v_pf))::bigint
+     where security_id = c.security_id;
+  end if;
+
+  update public.listed_companies
+     set satisfaction = v_sat, reputation = v_rep, price_factor = v_pf, layoff_heat = v_heat, layoff_checked_at = now(),
+         ai_workers_seen = pc.ai_workers, red_hours = v_red, quits_day = v_today, quits_today = v_quits,
+         mood_notified_at = l.mood_notified_at, dividend_streak = v_streak
+   where company_id = p_company;
+  insert into public.listed_company_hours (company_id, hour_start, satisfaction, sat_target, reputation, rep_target, demand_factor,
+                                           capacity_factor, upkeep_cents, upkeep, drivers)
+  values (p_company, p_hour_start, v_sat, (v_st ->> 'target')::double precision, v_rep, (v_rt ->> 'target')::double precision,
+          (v_eff ->> 'demand_factor')::double precision, (v_eff ->> 'capacity_factor')::double precision,
+          coalesce((select sum(v::bigint) from jsonb_each_text(l.last_upkeep) x(k, v)), 0), l.last_upkeep,
+          jsonb_build_object('satisfaction', v_st -> 'drivers', 'reputation', v_rt -> 'drivers', 'payout_ratio_bps', v_ratio,
+                             'ai_quit', v_quit))
+  on conflict (company_id, hour_start) do nothing;
+  delete from public.listed_company_hours h
+   where h.company_id = p_company
+     and h.hour_start < p_hour_start - make_interval(hours => greatest(24, public.cfg_num(cfg, '{historyHours}', 72)::integer) * 2);
+
+  -- missions: an hour in the green zone
+  if v_sat >= public.cfg_num(cfg, '{satisfaction,green}', 60) then
+    perform public.mission_event(pc.founder_id, 'satisfaction_green', 1, p_hour_start::text);
+  end if;
+
+  -- the tax advisor, the tax office, the board
+  perform public.listed_tax_office(p_company);
+  perform public.board_close_due(p_company);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- E. Patches of existing functions (replace on the current definition; clear errors when the shape changed)
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.player_company_close_hour(uuid, timestamptz)'::regprocedure);
+  v_old text[];
+  v_new text[];
+  i     integer;
+begin
+  if position('listed_hour_effect' in v_def) > 0 then
+    return;
+  end if;
+  v_old := array[
+    -- 1. variables
+    $t$  v_momentum double precision;$t$,
+    -- 2. terms of the hour, right after the campaign: awareness and quality of this hour
+    $t$  v_camp := public.company_campaign_at(p_company, v_start);$t$,
+    -- 3. demand
+    $t$            * coalesce(pc.task_momentum, 1.0);$t$,
+    -- 4. capacity
+    $t$         * (v_ev ->> 'capacity_factor')::double precision / v_hours;$t$,
+    -- 5. goods
+    $t$v_sold * (1 - public.cfg_num(v_su, array['grossMargin', c.sector_key], 0.5))$t$,
+    -- 6. fixed costs
+    $t$  v_mk := round((pc.marketing_cents_per_quarter / v_hours)::numeric)::bigint;$t$,
+    -- 7. running costs, part of the fixed costs and of the profit
+    $t$  v_profit := v_rev - v_cogs - v_ppaid - v_aipaid - v_fixed - v_mk;$t$,
+    -- 8. the board's payout cap
+    $t$  v_bps := least(10000, greatest(0, coalesce(pc.founder_payout_bps, 0)));$t$,
+    -- 9. earmarked money is not free cash (stakes and payout)
+    $t$select a.balance_cents - v_owed into v_free from public.ledger_accounts a where a.id = v_acc;$t$,
+    -- 10. after the hour
+    $t$  return jsonb_build_object('company_id', p_company, 'hour_start', v_start, 'quarter_id', v_qid, 'revenue_cents', v_rev,$t$];
+  v_new := array[
+    $t$  v_momentum double precision;
+  v_lx      jsonb;
+  v_lxc     bigint := 0;$t$,
+    $t$  v_camp := public.company_campaign_at(p_company, v_start);
+  -- listed companies (ADR-167): research, products, regions, benefits, mood and reputation as terms of the hour
+  v_lx := public.listed_hour_effect(p_company, v_start);
+  pc.awareness := least(1.0, pc.awareness + (v_lx ->> 'awareness_add')::double precision);
+  pc.quality := least(1.0, greatest(0.0, pc.quality + (v_lx ->> 'quality_add')::double precision));$t$,
+    $t$            * coalesce(pc.task_momentum, 1.0)
+            * (v_lx ->> 'demand_factor')::double precision;$t$,
+    $t$         * (v_ev ->> 'capacity_factor')::double precision
+         * (v_lx ->> 'capacity_factor')::double precision / v_hours;$t$,
+    $t$v_sold * (1 - public.cfg_num(v_su, array['grossMargin', c.sector_key], 0.5)) * (v_lx ->> 'cogs_factor')::double precision$t$,
+    $t$  v_fixed := round(v_fixed * (v_lx ->> 'fixed_factor')::double precision)::bigint;  -- ADR-167
+  v_mk := round((pc.marketing_cents_per_quarter / v_hours)::numeric)::bigint;$t$,
+    $t$  -- listed companies (ADR-167): running costs of products, regions, machines, benefits and the tax advisor
+  v_lxc := public.listed_hour_costs(p_company, v_start, k);
+  v_fixed := v_fixed + v_lxc;
+  v_paid := v_paid + v_lxc;
+  v_profit := v_rev - v_cogs - v_ppaid - v_aipaid - v_fixed - v_mk;$t$,
+    $t$  v_bps := least(10000, greatest(0, least(coalesce(pc.founder_payout_bps, 0), public.listed_payout_cap_bps(p_company, v_start))));$t$,
+    $t$select a.balance_cents - v_owed - public.listed_reserved_cents(p_company) into v_free from public.ledger_accounts a where a.id = v_acc;$t$,
+    $t$  perform public.listed_hour_after(p_company, v_start, v_demand, v_cap, v_rev, v_profit, v_factor, v_payout);  -- ADR-167
+  return jsonb_build_object('company_id', p_company, 'hour_start', v_start, 'quarter_id', v_qid, 'revenue_cents', v_rev,$t$];
+  for i in 1 .. array_length(v_old, 1) loop
+    if position(v_old[i] in v_def) = 0 then
+      raise exception 'player_company_close_hour() has an unexpected shape: anchor % of the listed company hooks (ADR-167) is missing: %',
+        i, v_old[i];
+    end if;
+    v_def := replace(v_def, v_old[i], v_new[i]);
+  end loop;
+  execute v_def;
+end;
+$do$;
+
+-- company_withdraw: earmarked money is not free, the board can forbid withdrawals
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.company_withdraw(uuid, bigint)'::regprocedure);
+  v_a   text := $t$  select a.balance_cents - pc.unpaid_cents into v_free$t$;
+  v_b   text := $t$  perform 1 from public.player_companies pc where pc.company_id = v_company for update;$t$;
+begin
+  if position('listed_withdraw_check' in v_def) > 0 then
+    return;
+  end if;
+  if position(v_a in v_def) = 0 or position(v_b in v_def) = 0 then
+    raise exception 'company_withdraw() has an unexpected shape; add the checks of the listed company (ADR-167) by hand';
+  end if;
+  v_def := replace(v_def, v_b, v_b || $t$
+  perform public.listed_withdraw_check(v_company, p_amount_cents);  -- ADR-167$t$);
+  v_def := replace(v_def, v_a, $t$  select a.balance_cents - pc.unpaid_cents - public.listed_reserved_cents(v_company) into v_free$t$);
+  execute v_def;
+end;
+$do$;
+
+-- A withdrawal of a listed company: forbidden while the board's ban holds; money earmarked by the board is not free
+create or replace function public.listed_withdraw_check(p_company uuid, p_amount_cents bigint)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_free bigint;
+begin
+  if not public.listed_is(p_company) then
+    return;
+  end if;
+  if exists (select 1 from public.listed_companies l where l.company_id = p_company and l.withdraw_block_until > now()) then
+    perform public.api_error('withdraw_blocked');
+  end if;
+  if public.listed_reserved_cents(p_company) > 0 then
+    select a.balance_cents - pc.unpaid_cents into v_free
+      from public.ledger_accounts a join public.player_companies pc on pc.company_id = a.owner_company_id
+     where a.owner_company_id = p_company and a.kind = 'company_cash';
+    if coalesce(v_free, 0) >= p_amount_cents and public.listed_free_cash(p_company) < p_amount_cents then
+      perform public.api_error('budget_reserved');
+    end if;
+  end if;
+end;
+$$;
+
+-- set_founder_payout: not above the board's cap
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.set_founder_payout(uuid, integer)'::regprocedure);
+  v_a   text := $t$  update public.player_companies set founder_payout_bps = p_bps where company_id = v_company;$t$;
+begin
+  if position('listed_payout_cap_bps' in v_def) > 0 then
+    return;
+  end if;
+  if position(v_a in v_def) = 0 then
+    raise exception 'set_founder_payout() has an unexpected shape; add the payout cap of the board (ADR-167) by hand';
+  end if;
+  execute replace(v_def, v_a, $t$  if p_bps > public.listed_payout_cap_bps(v_company, now()) then
+    perform public.api_error('payout_capped');  -- ADR-167
+  end if;
+$t$ || v_a);
+end;
+$do$;
+
+-- set_company_strategy: the board can fix the price level
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.set_company_strategy(uuid, text, boolean)'::regprocedure);
+  v_a   text := $t$  update public.player_companies set price_level = p_price_level, contract_work = p_contract_work where company_id = v_company;$t$;
+begin
+  if position('strategy_locked' in v_def) > 0 then
+    return;
+  end if;
+  if position(v_a in v_def) = 0 then
+    raise exception 'set_company_strategy() has an unexpected shape; add the price lock of the board (ADR-167) by hand';
+  end if;
+  execute replace(v_def, v_a, $t$  if exists (select 1 from public.listed_companies l
+              where l.company_id = v_company and l.price_lock is not null and l.price_lock_until > now()
+                and l.price_lock <> p_price_level and public.listed_is(v_company)) then
+    perform public.api_error('strategy_locked');  -- ADR-167
+  end if;
+$t$ || v_a);
+end;
+$do$;
+
+-- company_dissolve: open taxes are paid from the cash first, motions end, budgets go
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.company_dissolve(uuid, text)'::regprocedure);
+  v_a   text := $t$  k := 'dissolve:' || p_company::text;$t$;
+begin
+  if position('listed_before_dissolve' in v_def) > 0 then
+    return;
+  end if;
+  if position(v_a in v_def) = 0 then
+    raise exception 'company_dissolve() has an unexpected shape; add listed_before_dissolve (ADR-167) by hand';
+  end if;
+  execute replace(v_def, v_a, v_a || $t$
+  perform public.listed_before_dissolve(p_company);  -- ADR-167$t$);
+end;
+$do$;
+
+-- player_company_close_quarter: the fair value per share follows the reputation
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.player_company_close_quarter(uuid, bigint)'::regprocedure);
+  v_a   text := $t$       set fair_value_e4 = greatest(1, public.company_value_cents(p_company) * 100 / greatest(c.shares_outstanding, 1))$t$;
+begin
+  if position('listed_price_factor' in v_def) > 0 then
+    return;
+  end if;
+  if position(v_a in v_def) = 0 then
+    raise exception 'player_company_close_quarter() has an unexpected shape; add listed_price_factor (ADR-167) by hand';
+  end if;
+  execute replace(v_def, v_a, $t$       set fair_value_e4 = greatest(1, round(public.company_value_cents(p_company) * 100 / greatest(c.shares_outstanding, 1)
+                                                * public.listed_price_factor(p_company))::bigint)$t$);
+end;
+$do$;
+
+-- account_wipe: the player's votes and open motions go
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.account_wipe(uuid, text)'::regprocedure);
+  v_old text := $t$  perform public.deals_wipe_player(p_player, p_key);$t$;
+begin
+  if position('listed_wipe_player' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'account_wipe() has an unexpected shape; add listed_wipe_player (ADR-167) by hand';
+    end if;
+    execute replace(v_def, v_old, v_old || $t$
+
+  -- board of listed companies (ADR-167): the player's votes and open motions go
+  perform public.listed_wipe_player(p_player);$t$);
+  end if;
+end;
+$do$;
+
+create or replace function public.listed_wipe_player(p_player uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  delete from public.board_votes v where v.player_id = p_player;
+  update public.board_motions set status = 'cancelled', closed_at = now()
+   where proposer_id = p_player and status = 'open';
+end;
+$$;
+
+do $$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.listed_cfg()', 'public.listed_item(text)', 'public.listed_is(uuid)', 'public.listed_ensure(uuid)',
+    'public.listed_ref_revenue(uuid)', 'public.listed_item_cost(jsonb, integer, bigint, integer)',
+    'public.listed_item_upkeep(jsonb, integer, bigint, integer)', 'public.listed_kind_category(text)',
+    'public.listed_effects(uuid)', 'public.listed_greed_share(double precision)',
+    'public.listed_payout_ratio_bps(bigint, bigint, bigint)',
+    'public.listed_satisfaction_target(double precision, integer, integer, double precision, integer, boolean, double precision, integer, bigint)',
+    'public.listed_satisfaction_effect(double precision)',
+    'public.listed_reputation_target(double precision, bigint, bigint, bigint, bigint, bigint, integer, boolean)',
+    'public.listed_hour_effect_calc(jsonb, double precision, double precision)', 'public.listed_reserved_cents(uuid)',
+    'public.listed_free_cash(uuid)', 'public.listed_payout_cap_bps(uuid, timestamptz)', 'public.listed_price_factor(uuid)',
+    'public.listed_reputation_bump(uuid, double precision)', 'public.listed_hour_effect(uuid, timestamptz)',
+    'public.listed_advisor_wage(bigint)', 'public.listed_hour_costs(uuid, timestamptz, text)',
+    'public.listed_hour_after(uuid, timestamptz, double precision, double precision, bigint, bigint, integer, bigint)',
+    'public.listed_withdraw_check(uuid, bigint)', 'public.listed_wipe_player(uuid)'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+    execute format('grant execute on function %s to service_role', f);
+  end loop;
+end;
+$$;
+-- ===== idempotent copy of migrations/20261204005410_listed_actions.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 5410 · Listed player companies: investments, dividends, board, books and taxes (ADR-167)
+-- =============================================================================
+-- RPCs (all with request_id where they write, all founder-only unless noted):
+--   get_listed_company()                               -> {listed: LISTED | null}
+--   company_invest(request_id, key)                    -> {listed}   research, product, region, machine, ..., benefit, action
+--   company_invest_stop(request_id, key)               -> {listed}   retire a product, region, licence or benefit
+--   company_declare_dividend(request_id, total_cents)  -> {listed, dividend}
+--   company_books_close(request_id, answers, pay)      -> {listed, period}
+--   company_tax_pay(request_id)                        -> {listed, paid_cents}
+--   company_tax_advisor(request_id, hire)              -> {listed}
+--   get_company_accounting(days, before)               -> {cash_cents, days, totals, entries, next_before}
+--   get_company_board(company_id)                      -> {board}    every shareholder and the founder
+--   board_propose(request_id, company_id, kind, params)-> {board}    shareholders with more than board.minShareBps
+--   board_vote(request_id, motion_id, yes)             -> {board}    every shareholder
+-- Errors: not_listed, item_unknown, item_locked, item_running, budget_reserved, books_nothing, tax_nothing_due,
+-- dividend_limit, board_no_right, board_motion_unknown, board_limit, board_not_shareholder, insufficient_funds,
+-- invalid_argument, company_not_found.
+-- Idempotent: runs unchanged as supabase/updates/20261204005410_listed_actions.sql.
+
+-- ---------------------------------------------------------------------------
+-- A. Investments
+-- ---------------------------------------------------------------------------
+-- Projects whose time is up: the level in work becomes active
+create or replace function public.listed_finish_due(p_company uuid, p_at timestamptz)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  r         record;
+  v_founder uuid;
+  v_name    text;
+  v_n       integer := 0;
+begin
+  select pc.founder_id, c.name into v_founder, v_name
+    from public.player_companies pc join public.companies c on c.id = pc.company_id where pc.company_id = p_company;
+  for r in update public.company_investments ci
+              set level = ci.level + 1, status = 'active', ready_at = null
+            where ci.company_id = p_company and ci.ready_at is not null and ci.ready_at <= coalesce(p_at, now())
+              and ci.status in ('running', 'active', 'paused')
+        returning ci.key, ci.kind, ci.level loop
+    v_n := v_n + 1;
+    if r.kind = 'research' then
+      perform public.mission_event(v_founder, 'research_done', 1, r.key);
+      if public.cfg_num(public.listed_item(r.key), '{tier}', 0) >= 4 then
+        perform public.feed_post(v_founder, 'research_done', jsonb_build_object('company', v_name, 'item', r.key),
+                                 'research:' || p_company::text || ':' || r.key);
+      end if;
+    elsif r.kind = 'product' then
+      perform public.mission_event(v_founder, 'product_launched', 1, r.key);
+    elsif r.kind = 'region' then
+      perform public.mission_event(v_founder, 'region_opened', 1, r.key);
+    end if;
+    perform public.social_notify(v_founder, 'company_project', 'Fertig bei ' || v_name,
+      case r.kind when 'research' then 'Eine Forschung ist abgeschlossen.' when 'product' then 'Ein neues Produkt ist am Markt.'
+                  when 'region' then 'Ein neuer Markt ist eröffnet.' else 'Ein Ausbau ist fertig.' end,
+      jsonb_build_object('company_id', p_company, 'item', r.key, 'kind', r.kind, 'level', r.level), '/company',
+      'project:' || p_company::text || ':' || r.key || ':' || r.level::text);
+  end loop;
+  return v_n;
+end;
+$$;
+
+-- The caller's own listed company, or the error not_listed
+create or replace function public.listed_require()
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid := public.require_own_company();
+begin
+  if not public.listed_is(v_company) then
+    perform public.api_error('not_listed');
+  end if;
+  perform public.listed_ensure(v_company);
+  return v_company;
+end;
+$$;
+
+create or replace function public.company_invest(p_request_id uuid, p_key text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid;
+  v_player  uuid;
+  v_replay  jsonb;
+  v_item    jsonb;
+  ci        public.company_investments;
+  v_kind    text;
+  v_level   integer;
+  v_cost    bigint;
+  v_budget  bigint;
+  v_cash    bigint;
+  v_unpaid  bigint;
+  v_hours   double precision;
+  v_owned   boolean;
+begin
+  v_company := public.listed_require();
+  v_player := public.require_player();
+  if p_request_id is null or p_key is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'company_invest');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  perform 1 from public.listed_companies l where l.company_id = v_company for update;
+  perform public.listed_finish_due(v_company, now());
+  v_item := public.listed_item(p_key);
+  if v_item is null then
+    perform public.api_error('item_unknown');
+  end if;
+  v_kind := v_item ->> 'kind';
+  select * into ci from public.company_investments x where x.company_id = v_company and x.key = p_key for update;
+  v_owned := ci.key is not null and ci.status in ('active', 'paused') and ci.level > 0;
+  if exists (select 1 from jsonb_array_elements_text(coalesce(v_item -> 'requires', '[]'::jsonb)) q(k)
+              where not exists (select 1 from public.company_investments x
+                                 where x.company_id = v_company and x.key = q.k and x.status in ('active', 'paused') and x.level > 0)) then
+    perform public.api_error('item_locked');
+  end if;
+  if v_kind = 'action' then
+    if ci.last_used_at is not null
+       and ci.last_used_at + make_interval(secs => public.cfg_num(v_item, '{cooldownHours}', 0) * 3600) > now() then
+      perform public.api_error('item_running');
+    end if;
+    v_level := 0;
+  else
+    if ci.ready_at is not null or (v_owned and ci.level >= public.cfg_num(v_item, '{maxLevel}', 1)) then
+      perform public.api_error('item_running');
+    end if;
+    v_level := case when v_owned then ci.level else 0 end;
+  end if;
+
+  -- the price: from the budget of the item's purpose first, then from the free cash
+  v_cost := public.listed_item_cost(v_item, v_level, public.listed_ref_revenue(v_company), public.company_headcount(v_company));
+  select coalesce((select b.amount_cents from public.company_budgets b
+                    where b.company_id = v_company and b.purpose = v_item ->> 'purpose'), 0) into v_budget;
+  select a.balance_cents, pc.unpaid_cents into v_cash, v_unpaid
+    from public.ledger_accounts a join public.player_companies pc on pc.company_id = a.owner_company_id
+   where a.owner_company_id = v_company and a.kind = 'company_cash';
+  if v_cost > v_cash - v_unpaid - (public.listed_reserved_cents(v_company) - v_budget) then
+    perform public.api_error(case when v_cost <= v_cash - v_unpaid then 'budget_reserved' else 'insufficient_funds' end);
+  end if;
+  if v_cost > 0 then
+    perform public.ledger_transfer(public.company_cash_account(v_company), public.ledger_system_account('households'), v_cost,
+      'company_costs',
+      case v_kind when 'research' then 'Forschung' when 'product' then 'Produktentwicklung' when 'region' then 'Neuer Markt'
+                  when 'machine' then 'Maschinen und Anlagen' when 'acquisition' then 'Firmenkauf' when 'licence' then 'Lizenz'
+                  when 'benefit' then 'Benefit einrichten' else 'Aktion fürs Team' end || ': ' || p_key,
+      'company', v_company, 'invest:' || p_request_id::text, v_player,
+      jsonb_build_object('cat', public.listed_kind_category(v_kind), 'item', p_key, 'one_off', true));
+    update public.company_budgets set amount_cents = amount_cents - least(amount_cents, v_cost), updated_at = now()
+     where company_id = v_company and purpose = v_item ->> 'purpose';
+  end if;
+
+  v_hours := public.cfg_num(v_item, '{hours}', 0);
+  if v_kind = 'action' then
+    insert into public.company_investments (company_id, key, kind, status, level, last_used_at, spent_cents)
+    values (v_company, p_key, v_kind, 'active', 0, now(), v_cost)
+    on conflict (company_id, key) do update set last_used_at = now(), spent_cents = public.company_investments.spent_cents + v_cost;
+    update public.listed_companies
+       set satisfaction = least(100.0, satisfaction + public.cfg_num(v_item, '{boost}', 0))
+     where company_id = v_company;
+    perform public.mission_event(v_player, 'team_action', 1, p_key);
+  else
+    insert into public.company_investments (company_id, key, kind, status, level, ready_at, spent_cents)
+    values (v_company, p_key, v_kind, case when v_hours > 0 then 'running' else 'active' end, case when v_hours > 0 then 0 else 1 end,
+            case when v_hours > 0 then now() + make_interval(secs => v_hours * 3600) end, v_cost)
+    on conflict (company_id, key) do update
+      set status = case when v_hours > 0 and not v_owned then 'running' when v_hours > 0 then public.company_investments.status else 'active' end,
+          level = case when v_hours > 0 then v_level else v_level + 1 end,
+          ready_at = case when v_hours > 0 then now() + make_interval(secs => v_hours * 3600) end,
+          spent_cents = public.company_investments.spent_cents + v_cost;
+    if v_kind = 'research' then
+      perform public.mission_event(v_player, 'research_started', 1, p_key);
+    elsif v_kind = 'benefit' then
+      perform public.mission_event(v_player, 'benefit_added', 1, p_key);
+    end if;
+  end if;
+  perform public.mission_event(v_player, 'listed_invested', 1, p_key);
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('listed', public.listed_state(v_company)));
+end;
+$$;
+comment on function public.company_invest(uuid, text) is
+  'RPC (founder, listed company): buys or starts an item of game_config.listed.items (ADR-167); errors not_listed, '
+  'item_unknown, item_locked, item_running, budget_reserved, insufficient_funds.';
+
+create or replace function public.company_invest_stop(p_request_id uuid, p_key text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid;
+  v_player  uuid;
+  v_replay  jsonb;
+  v_item    jsonb;
+  ci        public.company_investments;
+begin
+  v_company := public.listed_require();
+  v_player := public.require_player();
+  if p_request_id is null or p_key is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'company_invest_stop');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_item := public.listed_item(p_key);
+  select * into ci from public.company_investments x where x.company_id = v_company and x.key = p_key for update;
+  if v_item is null or ci.key is null or ci.status = 'retired'
+     or v_item ->> 'kind' not in ('product', 'region', 'licence', 'benefit') then
+    perform public.api_error('item_unknown');
+  end if;
+  -- nothing that is still in use may depend on it
+  if exists (select 1 from public.company_investments x
+              where x.company_id = v_company and x.status <> 'retired' and x.key <> p_key
+                and coalesce(public.listed_item(x.key) -> 'requires', '[]'::jsonb) ? p_key) then
+    perform public.api_error('item_locked');
+  end if;
+  if v_item ->> 'kind' = 'benefit' and ci.status = 'active' then
+    -- a benefit taken away hurts at once
+    update public.listed_companies
+       set satisfaction = greatest(0.0, satisfaction - public.cfg_num(v_item, '{effects,satisfaction}', 0))
+     where company_id = v_company;
+  end if;
+  update public.company_investments set status = 'retired', level = 0, ready_at = null
+   where company_id = v_company and key = p_key;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('listed', public.listed_state(v_company)));
+end;
+$$;
+comment on function public.company_invest_stop(uuid, text) is
+  'RPC (founder, listed company): retires a product, region, licence or benefit, no money back (ADR-167); errors '
+  'not_listed, item_unknown, item_locked.';
+
+-- ---------------------------------------------------------------------------
+-- B. Shareholders and dividends
+-- ---------------------------------------------------------------------------
+create or replace function public.board_holdings(p_company uuid)
+returns table (player_id uuid, qty_e6 bigint)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select p.player_id, sum(p.quantity_e6)::bigint
+    from public.positions p join public.companies c on c.security_id = p.security_id
+   where c.id = p_company and p.status = 'open' and p.side = 'long' and p.quantity_e6 > 0
+   group by p.player_id;
+$$;
+
+-- All shares (e6): the shares outstanding, or what players hold when that is more (old positions, ADR-153)
+create or replace function public.board_total_e6(p_company uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select greatest(coalesce((select c.shares_outstanding from public.companies c where c.id = p_company), 0) * 1000000,
+                  coalesce((select sum(h.qty_e6) from public.board_holdings(p_company) h), 0), 1)::bigint;
+$$;
+
+create or replace function public.board_my_e6(p_company uuid, p_player uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select h.qty_e6 from public.board_holdings(p_company) h where h.player_id = p_player), 0)::bigint;
+$$;
+
+-- Pays a dividend from the company cash: every player holding gets its share (rounded down), the AI float the rest
+create or replace function public.listed_pay_dividend(p_company uuid, p_total bigint, p_source text, p_by uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  c         public.companies;
+  pc        public.player_companies;
+  l         public.listed_companies;
+  v_acc     uuid := public.company_cash_account(p_company);
+  v_total6  bigint := public.board_total_e6(p_company);
+  v_uid     text := gen_random_uuid()::text;
+  v_players bigint := 0;
+  v_n       integer := 0;
+  v_amt     bigint;
+  v_float   bigint;
+  v_id      bigint;
+  v_today   date := (now() at time zone 'Europe/Berlin')::date;
+  h         record;
+begin
+  select * into c from public.companies where id = p_company;
+  select * into pc from public.player_companies where company_id = p_company;
+  select * into l from public.listed_companies where company_id = p_company for update;
+  for h in select x.player_id, x.qty_e6 from public.board_holdings(p_company) x order by x.player_id loop
+    v_amt := floor(p_total::numeric * h.qty_e6 / v_total6)::bigint;
+    continue when v_amt <= 0;
+    perform public.lock_player_accounts(h.player_id);
+    perform public.ledger_transfer(v_acc, public.ledger_player_account(h.player_id, 'player_cash'), v_amt, 'dividend',
+                                   'Dividende ' || c.name, 'company', p_company, 'dividend:' || v_uid || ':' || h.player_id::text,
+                                   p_by, jsonb_build_object('cat', 'dividend'));
+    perform public.loan_withhold(h.player_id, v_amt, 'dividend:' || v_uid || ':' || h.player_id::text);
+    perform public.social_notify(h.player_id, 'company_dividend', 'Dividende von ' || c.name,
+      public.format_eur(v_amt) || ' für deine Aktien.', jsonb_build_object('company_id', p_company, 'amount_cents', v_amt),
+      '/portfolio', 'dividend:' || v_uid);
+    v_players := v_players + v_amt;
+    v_n := v_n + 1;
+  end loop;
+  v_float := p_total - v_players;
+  if v_float > 0 then
+    perform public.ledger_transfer(v_acc, public.ledger_system_account('market'), v_float, 'dividend',
+                                   'Dividende ' || c.name || ' (Streubesitz)', 'company', p_company, 'dividend:' || v_uid || ':float',
+                                   p_by, jsonb_build_object('cat', 'dividend'));
+  end if;
+  insert into public.company_dividends (company_id, source, total_cents, players_cents, float_cents, shares_e6, holders)
+  values (p_company, p_source, p_total, v_players, v_float, v_total6, v_n)
+  returning id into v_id;
+  if p_total > l.best_dividend_cents then
+    perform public.feed_post(pc.founder_id, 'record_dividend', jsonb_build_object('company', c.name, 'amount_cents', p_total),
+                             'record_dividend:' || v_id::text);
+  end if;
+  update public.listed_companies
+     set dividend_streak = case when dividend_day = v_today then dividend_streak
+                                when dividend_day = v_today - 1 then dividend_streak + 1 else 1 end,
+         dividend_day = v_today, best_dividend_cents = greatest(best_dividend_cents, p_total)
+   where company_id = p_company;
+  perform public.company_system_message(p_company, 'Dividende: ' || public.format_eur(p_total) || ' an die Aktionäre ausgeschüttet.');
+  return jsonb_build_object('id', v_id, 'total_cents', p_total, 'players_cents', v_players, 'float_cents', v_float, 'holders', v_n);
+end;
+$$;
+
+create or replace function public.company_declare_dividend(p_request_id uuid, p_total_cents bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg       jsonb := public.listed_cfg();
+  v_company uuid;
+  v_player  uuid;
+  v_replay  jsonb;
+  v_free    bigint;
+  v_div     jsonb;
+begin
+  v_company := public.listed_require();
+  v_player := public.require_player();
+  if p_request_id is null or p_total_cents is null or p_total_cents < public.cfg_num(cfg, '{dividends,minTotalCents}', 10000) then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'company_declare_dividend');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  perform 1 from public.player_companies pc where pc.company_id = v_company for update;
+  if (select count(*) from public.company_dividends d
+       where d.company_id = v_company and d.source = 'founder'
+         and (d.paid_at at time zone 'Europe/Berlin')::date = (now() at time zone 'Europe/Berlin')::date)
+     >= public.cfg_num(cfg, '{dividends,perDay}', 1) then
+    perform public.api_error('dividend_limit');
+  end if;
+  v_free := greatest(0, public.listed_free_cash(v_company));
+  if p_total_cents > v_free then
+    perform public.api_error('insufficient_funds');
+  end if;
+  if p_total_cents > v_free * public.cfg_num(cfg, '{dividends,maxShareOfFreeCashBps}', 5000)::bigint / 10000 then
+    perform public.api_error('dividend_limit');
+  end if;
+  v_div := public.listed_pay_dividend(v_company, p_total_cents, 'founder', v_player);
+  perform public.mission_event(v_player, 'dividend_paid', 1, v_div ->> 'id');
+  perform public.mission_event(v_player, 'dividend_cents', p_total_cents, v_div ->> 'id');
+  return public.request_complete(v_player, p_request_id,
+    jsonb_build_object('listed', public.listed_state(v_company), 'dividend', v_div));
+end;
+$$;
+comment on function public.company_declare_dividend(uuid, bigint) is
+  'RPC (founder, listed company): pays a dividend of p_total_cents from the free cash to all shareholders, at most '
+  'dividends.perDay per Berlin day and maxShareOfFreeCashBps of the free cash (ADR-167); errors not_listed, '
+  'invalid_argument, dividend_limit, insufficient_funds.';
+
+-- ---------------------------------------------------------------------------
+-- C. Books and taxes
+-- ---------------------------------------------------------------------------
+-- The category of a booking on the company cash account
+create or replace function public.listed_ledger_category(p_kind text, p_key text, p_meta jsonb)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case
+    when coalesce(p_meta, '{}'::jsonb) ? 'cat' then p_meta ->> 'cat'
+    when p_kind = 'company_revenue' then 'revenue'
+    when p_kind in ('salary', 'payroll', 'work_bonus') then 'wages'
+    when p_kind = 'company_costs' and coalesce(p_key, '') like '%:goods' then 'goods'
+    when p_kind = 'company_costs' and (coalesce(p_key, '') like '%:costs' or coalesce(p_key, '') like '%:settle') then 'fixed'
+    when p_kind = 'company_costs' then 'costs'
+    when p_kind in ('tax', 'tax_refund') then 'tax'
+    when p_kind = 'fine' then 'penalty'
+    when p_kind = 'dividend' then 'dividend'
+    when p_kind = 'transfer' and (coalesce(p_key, '') like 'withdraw:%' or coalesce(p_key, '') like '%:payout') then 'payout'
+    when p_kind = 'transfer' and coalesce(p_key, '') like 'offer-%' then 'capital'
+    when p_kind in ('capital_injection', 'company_founding', 'company_conversion', 'ipo_proceeds', 'capital_increase',
+                    'angel_investment', 'ipo_subscription', 'ipo_refund') then 'capital'
+    when p_kind in ('transfer', 'loan_disbursement', 'loan_repayment', 'loan_interest', 'insolvency_distribution',
+                    'reversal', 'admin_adjustment') then 'transfer'
+    else 'costs' end;
+$$;
+
+create or replace function public.listed_is_operating(p_category text)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select p_category in ('revenue', 'goods', 'wages', 'fixed', 'research', 'product', 'expansion', 'benefit', 'advisor', 'costs');
+$$;
+
+-- Revenue, operating costs and the net amount per category of the bookings in (p_from, p_to]
+create or replace function public.listed_period_sums(p_company uuid, p_from timestamptz, p_to timestamptz)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with e as (
+    select public.listed_ledger_category(t.kind::text, t.idempotency_key, t.metadata) as cat, e.amount_cents
+      from public.ledger_entries e join public.ledger_transactions t on t.id = e.transaction_id
+     where e.account_id = public.company_cash_account(p_company) and e.created_at > p_from and e.created_at <= p_to
+  )
+  select jsonb_build_object(
+    'revenue_cents', coalesce((select sum(amount_cents) from e where cat = 'revenue'), 0)::bigint,
+    'costs_cents', coalesce((select -sum(amount_cents) from e where public.listed_is_operating(cat) and cat <> 'revenue'), 0)::bigint,
+    'by_category', coalesce((select jsonb_object_agg(x.cat, x.s) from (select cat, sum(amount_cents)::bigint as s from e group by cat) x),
+                            '{}'::jsonb));
+$$;
+
+-- The receipts of the open period: picked from the templates by the company and the period, with their category
+create or replace function public.listed_books_receipts(p_company uuid, p_from timestamptz)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object('id', q.pos, 'key', q.x ->> 'key', 'category', q.x ->> 'category',
+                                               'amount_cents', 1000 + (hashtext(p_company::text || p_from::text || (q.x ->> 'key'))::bigint & 2147483647) % 49000)
+                            order by q.pos), '[]'::jsonb)
+    from (select t.x, row_number() over (order by md5(p_company::text || p_from::text || t.ord::text)) as pos
+            from jsonb_array_elements(coalesce(public.listed_cfg() #> '{taxes,receipts}', '[]'::jsonb)) with ordinality t(x, ord)) q
+   where q.pos <= greatest(0, public.cfg_num(public.listed_cfg(), '{taxes,check,receipts}', 3)::integer);
+$$;
+
+create or replace function public.listed_tax_rate_bps(p_company uuid)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select greatest(public.cfg_num(public.listed_cfg(), '{taxes,minRateBps}', 800),
+                  public.cfg_num(public.listed_cfg(), '{taxes,rateBps}', 1500)
+                  + public.cfg_num(public.listed_effects(p_company), '{taxRateBps}', 0))::integer;
+$$;
+
+-- The open bookkeeping period as the founder sees it
+create or replace function public.listed_books_preview(p_company uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.listed_cfg();
+  l       public.listed_companies;
+  s       jsonb;
+  v_rev   bigint;
+  v_costs bigint;
+  v_hours double precision;
+  v_today date := (now() at time zone 'Europe/Berlin')::date;
+  v_done  boolean;
+  v_rate  integer := public.listed_tax_rate_bps(p_company);
+begin
+  select * into l from public.listed_companies where company_id = p_company;
+  s := public.listed_period_sums(p_company, l.books_until, now());
+  v_rev := (s ->> 'revenue_cents')::bigint;
+  v_costs := (s ->> 'costs_cents')::bigint;
+  v_hours := extract(epoch from (now() - l.books_until)) / 3600.0;
+  v_done := l.books_day is not null and l.books_day >= v_today;
+  return jsonb_build_object(
+    'period_start', l.books_until,
+    'revenue_cents', v_rev,
+    'costs_cents', v_costs,
+    'profit_cents', v_rev - v_costs,
+    'by_category', s -> 'by_category',
+    'loss_carry_cents', l.loss_carry_cents,
+    'rate_bps', v_rate,
+    'estimated_tax_cents', greatest(0, (greatest(0, v_rev - v_costs - l.loss_carry_cents) * v_rate) / 10000),
+    'receipts', (select coalesce(jsonb_agg(r - 'category' order by (r ->> 'id')::integer), '[]'::jsonb)
+                   from jsonb_array_elements(public.listed_books_receipts(p_company, l.books_until)) r),
+    'receipt_categories', coalesce(cfg #> '{taxes,receiptCategories}', '[]'::jsonb),
+    'can_close', v_rev > 0 and not v_done,
+    'done_today', v_done,
+    'hours_open', round(v_hours::numeric, 2),
+    'stage', case when v_rev <= 0 then 'none'
+                  when v_hours >= public.cfg_num(cfg, '{taxes,estimateAfterHours}', 60) then 'estimate'
+                  when v_hours >= public.cfg_num(cfg, '{taxes,lateFeeAfterHours}', 42) then 'late'
+                  when v_hours >= public.cfg_num(cfg, '{taxes,reminderAfterHours}', 30) then 'reminder'
+                  else 'open' end,
+    'reminder_at', l.books_until + make_interval(secs => public.cfg_num(cfg, '{taxes,reminderAfterHours}', 30) * 3600),
+    'late_fee_at', l.books_until + make_interval(secs => public.cfg_num(cfg, '{taxes,lateFeeAfterHours}', 42) * 3600),
+    'estimate_at', l.books_until + make_interval(secs => public.cfg_num(cfg, '{taxes,estimateAfterHours}', 60) * 3600),
+    'streak', l.books_streak,
+    'last_day', l.books_day);
+end;
+$$;
+
+-- Closes the open period: by the founder (p_correct receipts right), the advisor or the tax office (estimate)
+create or replace function public.listed_books_do(p_company uuid, p_by text, p_correct integer)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.listed_cfg();
+  l        public.listed_companies;
+  s        jsonb;
+  v_rev    bigint;
+  v_costs  bigint;
+  v_profit bigint;
+  v_rate   integer := public.listed_tax_rate_bps(p_company);
+  v_carry  bigint;
+  v_used   bigint := 0;
+  v_tax_on bigint := 0;
+  v_gross  bigint := 0;
+  v_disc   bigint := 0;
+  v_tax    bigint := 0;
+  v_pen    bigint := 0;
+  v_bps    integer;
+  v_today  date := (now() at time zone 'Europe/Berlin')::date;
+  v_streak integer;
+  v_id     bigint;
+  v_owner  uuid;
+begin
+  select * into l from public.listed_companies where company_id = p_company for update;
+  if l.company_id is null then
+    return null;
+  end if;
+  s := public.listed_period_sums(p_company, l.books_until, now());
+  v_rev := (s ->> 'revenue_cents')::bigint;
+  v_costs := (s ->> 'costs_cents')::bigint;
+  v_profit := v_rev - v_costs;
+  v_carry := l.loss_carry_cents;
+  if p_by = 'finanzamt' then
+    -- estimateTax: at least a margin on the revenue, no loss carried, a surcharge on the tax
+    v_tax_on := greatest(v_profit, (v_rev * public.cfg_num(cfg, '{taxes,estimate,marginBps}', 2500)::bigint) / 10000, 0);
+    v_tax := (v_tax_on * v_rate) / 10000;
+    v_pen := (v_tax * public.cfg_num(cfg, '{taxes,estimate,surchargeBps}', 2500)::bigint) / 10000;
+  elsif v_profit <= 0 then
+    v_carry := v_carry - v_profit;
+  else
+    -- booksTax: the carried loss first, the tax rounded down, the discount off the tax
+    v_used := least(v_carry, v_profit);
+    v_tax_on := v_profit - v_used;
+    v_carry := v_carry - v_used;
+    v_gross := (v_tax_on * v_rate) / 10000;
+    v_bps := case when p_by = 'advisor' then public.cfg_num(cfg, '{taxes,advisor,discountBps}', 800)::integer
+                  when coalesce(p_correct, 0) >= public.cfg_num(cfg, '{taxes,check,receipts}', 3)
+                  then public.cfg_num(cfg, '{taxes,check,discountBps}', 500)::integer else 0 end;
+    v_disc := (v_gross * v_bps) / 10000;
+    v_tax := v_gross - v_disc;
+  end if;
+  insert into public.company_tax_periods (company_id, kind, period_start, period_end, revenue_cents, costs_cents, profit_cents,
+                                          loss_used_cents, taxable_cents, rate_bps, discount_cents, tax_cents, penalty_cents, status,
+                                          closed_by, check_correct, due_at, paid_at)
+  values (p_company, 'books', l.books_until, now(), v_rev, v_costs, v_profit, v_used, v_tax_on, v_rate, v_disc, v_tax, v_pen,
+          case when v_tax + v_pen = 0 then 'paid' else 'due' end, p_by, p_correct,
+          now() + make_interval(secs => public.cfg_num(cfg, '{taxes,payWithinHours}', 24) * 3600),
+          case when v_tax + v_pen = 0 then now() end)
+  returning id into v_id;
+  v_streak := case when p_by = 'finanzamt' then 0
+                   when l.books_day = v_today then greatest(1, l.books_streak)
+                   when l.books_day = v_today - 1 then l.books_streak + 1 else 1 end;
+  update public.listed_companies
+     set books_until = now(), books_day = v_today, books_stage = 0, loss_carry_cents = v_carry, books_streak = v_streak
+   where company_id = p_company;
+  if p_by <> 'finanzamt' then
+    select pc.founder_id into v_owner from public.player_companies pc where pc.company_id = p_company;
+    perform public.mission_event(v_owner, 'books_done', 1, v_id::text);
+    perform public.mission_event(v_owner, 'books_streak', v_streak, v_id::text);
+  end if;
+  return v_id;
+end;
+$$;
+
+-- Pays due taxes and penalties from the company cash to the treasury, oldest first. Voluntary: whole periods only,
+-- up to p_limit. Forced (tax office): whatever the cash holds.
+create or replace function public.listed_tax_collect(p_company uuid, p_limit bigint, p_force boolean)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_acc   uuid := public.company_cash_account(p_company);
+  v_tre   uuid := public.ledger_system_account('treasury');
+  v_owner uuid;
+  v_avail bigint;
+  v_rest  bigint;
+  v_pay   bigint;
+  v_taxp  bigint;
+  v_done  bigint := 0;
+  p       record;
+begin
+  select pc.founder_id into v_owner from public.player_companies pc where pc.company_id = p_company;
+  select greatest(0, a.balance_cents) into v_avail from public.ledger_accounts a where a.id = v_acc;
+  v_avail := least(coalesce(v_avail, 0), coalesce(p_limit, v_avail));
+  for p in select * from public.company_tax_periods x where x.company_id = p_company and x.status = 'due'
+            order by x.id for update loop
+    v_rest := p.tax_cents + p.penalty_cents - p.paid_cents;
+    v_pay := least(v_rest, v_avail);
+    exit when v_pay <= 0 or (not p_force and v_pay < v_rest);
+    v_taxp := least(v_pay, greatest(0, p.tax_cents - p.paid_cents));
+    if v_taxp > 0 then
+      perform public.ledger_transfer(v_acc, v_tre, v_taxp, 'tax', 'Körperschaftsteuer', 'company', p_company,
+                                     'ctax:' || p.id::text || ':' || p.paid_cents::text, v_owner, jsonb_build_object('cat', 'tax'));
+    end if;
+    if v_pay - v_taxp > 0 then
+      perform public.ledger_transfer(v_acc, v_tre, v_pay - v_taxp, 'fine', 'Zuschläge des Finanzamts', 'company', p_company,
+                                     'cfine:' || p.id::text || ':' || p.paid_cents::text, v_owner, jsonb_build_object('cat', 'penalty'));
+    end if;
+    update public.company_tax_periods
+       set paid_cents = paid_cents + v_pay,
+           status = case when v_pay = v_rest then 'paid' else 'due' end,
+           paid_at = case when v_pay = v_rest then now() else paid_at end
+     where id = p.id;
+    if v_pay = v_rest and p.kind = 'books' and p.closed_by <> 'finanzamt' and p.tax_cents > 0 and p.stage = 0 and now() <= p.due_at then
+      perform public.mission_event(v_owner, 'tax_paid', 1, p.id::text);
+    end if;
+    v_avail := v_avail - v_pay;
+    v_done := v_done + v_pay;
+  end loop;
+  return v_done;
+end;
+$$;
+
+create or replace function public.listed_tax_due_cents(p_company uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select sum(x.tax_cents + x.penalty_cents - x.paid_cents) from public.company_tax_periods x
+                    where x.company_id = p_company and x.status = 'due'), 0)::bigint;
+$$;
+
+create or replace function public.company_books_close(p_request_id uuid, p_answers text[] default null, p_pay boolean default false)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid;
+  v_player  uuid;
+  v_replay  jsonb;
+  l         public.listed_companies;
+  v_correct integer;
+  v_id      bigint;
+  v_paid    bigint := 0;
+begin
+  v_company := public.listed_require();
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'company_books_close');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into l from public.listed_companies where company_id = v_company for update;
+  if not (public.listed_books_preview(v_company) ->> 'can_close')::boolean then
+    perform public.api_error('books_nothing');
+  end if;
+  -- gradeReceipts: how many receipts are in the right category
+  select count(*) into v_correct
+    from jsonb_array_elements(public.listed_books_receipts(v_company, l.books_until)) r
+   where (coalesce(p_answers, '{}'::text[]))[(r ->> 'id')::integer] = r ->> 'category';
+  v_id := public.listed_books_do(v_company, 'founder', v_correct);
+  if coalesce(p_pay, false) and public.listed_tax_due_cents(v_company) > 0 then
+    v_paid := public.listed_tax_collect(v_company, null, false);
+  end if;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'listed', public.listed_state(v_company), 'paid_cents', v_paid,
+    'period', (select public.listed_tax_period_json(x) from public.company_tax_periods x where x.id = v_id)));
+end;
+$$;
+comment on function public.company_books_close(uuid, text[], boolean) is
+  'RPC (founder, listed company): closes the books of the open period, once per Berlin day with revenue (ADR-167). '
+  'p_answers: the category of every receipt in order (all right: tax discount); p_pay pays what is due at once when '
+  'the cash allows. Errors not_listed, books_nothing.';
+
+create or replace function public.listed_tax_period_json(p public.company_tax_periods)
+returns jsonb
+language sql
+immutable
+set search_path = ''
+as $$
+  select jsonb_build_object('id', p.id, 'kind', p.kind, 'period_start', p.period_start, 'period_end', p.period_end,
+                            'revenue_cents', p.revenue_cents, 'costs_cents', p.costs_cents, 'profit_cents', p.profit_cents,
+                            'loss_used_cents', p.loss_used_cents, 'taxable_cents', p.taxable_cents, 'rate_bps', p.rate_bps,
+                            'discount_cents', p.discount_cents, 'tax_cents', p.tax_cents, 'penalty_cents', p.penalty_cents,
+                            'paid_cents', p.paid_cents, 'status', p.status, 'closed_by', p.closed_by,
+                            'check_correct', p.check_correct, 'stage', p.stage, 'due_at', p.due_at, 'paid_at', p.paid_at);
+$$;
+
+create or replace function public.company_tax_pay(p_request_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid;
+  v_player  uuid;
+  v_replay  jsonb;
+  v_due     bigint;
+  v_paid    bigint;
+begin
+  v_company := public.listed_require();
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'company_tax_pay');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  perform 1 from public.player_companies pc where pc.company_id = v_company for update;
+  v_due := public.listed_tax_due_cents(v_company);
+  if v_due <= 0 then
+    perform public.api_error('tax_nothing_due');
+  end if;
+  if coalesce((select a.balance_cents from public.ledger_accounts a where a.id = public.company_cash_account(v_company)), 0) < v_due then
+    perform public.api_error('insufficient_funds');
+  end if;
+  v_paid := public.listed_tax_collect(v_company, null, false);
+  return public.request_complete(v_player, p_request_id,
+    jsonb_build_object('listed', public.listed_state(v_company), 'paid_cents', v_paid));
+end;
+$$;
+comment on function public.company_tax_pay(uuid) is
+  'RPC (founder, listed company): pays all due taxes and penalties from the company cash to the treasury (ADR-167); '
+  'errors not_listed, tax_nothing_due, insufficient_funds.';
+
+create or replace function public.company_tax_advisor(p_request_id uuid, p_hire boolean)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid;
+  v_player  uuid;
+  v_replay  jsonb;
+begin
+  v_company := public.listed_require();
+  v_player := public.require_player();
+  if p_request_id is null or p_hire is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'company_tax_advisor');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  update public.listed_companies set advisor = p_hire where company_id = v_company;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('listed', public.listed_state(v_company)));
+end;
+$$;
+comment on function public.company_tax_advisor(uuid, boolean) is
+  'RPC (founder, listed company): hires or dismisses the tax advisor, who is paid by the hour, closes the books every '
+  'day and pays the tax (ADR-167); error not_listed.';
+
+-- The tax office sends an audit: a company event of the crisis system (no second event while one is running)
+create or replace function public.listed_audit(p_company uuid, p_severity integer)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_owner uuid;
+  v_name  text;
+begin
+  select pc.founder_id, c.name into v_owner, v_name
+    from public.player_companies pc join public.companies c on c.id = pc.company_id where pc.company_id = p_company;
+  perform public.company_event_start(p_company, coalesce(public.listed_cfg() #>> '{taxes,auditArchetype}', 'tax_audit'),
+                                     least(3, greatest(1, p_severity)));
+  perform public.feed_post(v_owner, 'tax_audit', jsonb_build_object('company', v_name),
+                           'tax_audit:' || p_company::text || ':' || (now() at time zone 'Europe/Berlin')::date::text);
+end;
+$$;
+
+-- Every hour: the advisor closes the books of a new day and pays; otherwise the tax office reminds, charges a late
+-- fee and finally estimates. Unpaid taxes get a surcharge and are collected by force.
+create or replace function public.listed_tax_office(p_company uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.listed_cfg();
+  l       public.listed_companies;
+  v_owner uuid;
+  v_name  text;
+  v_rev   bigint;
+  v_hours double precision;
+  v_today date := (now() at time zone 'Europe/Berlin')::date;
+  v_fee   bigint;
+  v_add   bigint;
+  v_force boolean := false;
+  p       record;
+begin
+  select * into l from public.listed_companies where company_id = p_company for update;
+  if l.company_id is null then
+    return;
+  end if;
+  select pc.founder_id, c.name into v_owner, v_name
+    from public.player_companies pc join public.companies c on c.id = pc.company_id where pc.company_id = p_company;
+  v_rev := (public.listed_period_sums(p_company, l.books_until, now()) ->> 'revenue_cents')::bigint;
+  v_hours := extract(epoch from (now() - l.books_until)) / 3600.0;
+  if l.advisor then
+    if v_rev > 0 and (l.books_day is null or l.books_day < v_today) then
+      perform public.listed_books_do(p_company, 'advisor', 0);
+    end if;
+    perform public.listed_tax_collect(p_company, greatest(0, public.listed_free_cash(p_company)), false);
+  elsif v_rev > 0 then
+    if v_hours >= public.cfg_num(cfg, '{taxes,estimateAfterHours}', 60) then
+      perform public.listed_books_do(p_company, 'finanzamt', 0);
+      perform public.listed_reputation_bump(p_company, -public.cfg_num(cfg, '{reputation,penalty,estimate}', 6));
+      perform public.social_notify(v_owner, 'tax_office', 'Finanzamt: Steuer geschätzt',
+        'Du hast die Bücher von ' || v_name || ' nicht gemacht. Das Finanzamt hat geschätzt und schlägt einen Zuschlag auf.',
+        jsonb_build_object('company_id', p_company), '/company', 'tax-est:' || p_company::text || ':' || l.books_until::text);
+      perform public.feed_post(v_owner, 'tax_penalty', jsonb_build_object('company', v_name, 'reason', 'estimate'),
+                               'tax_penalty:est:' || p_company::text || ':' || l.books_until::text);
+      perform public.listed_audit(p_company, 1);
+    elsif v_hours >= public.cfg_num(cfg, '{taxes,lateFeeAfterHours}', 42) and l.books_stage < 2 then
+      v_fee := greatest(public.cfg_num(cfg, '{taxes,lateFee,minCents}', 5000)::bigint,
+                        (v_rev * public.cfg_num(cfg, '{taxes,lateFee,revenueBps}', 50)::bigint) / 10000);
+      insert into public.company_tax_periods (company_id, kind, period_start, period_end, penalty_cents, closed_by, due_at)
+      values (p_company, 'late_fee', l.books_until, now(), v_fee, 'finanzamt',
+              now() + make_interval(secs => public.cfg_num(cfg, '{taxes,payWithinHours}', 24) * 3600));
+      update public.listed_companies set books_stage = 2 where company_id = p_company;
+      perform public.listed_reputation_bump(p_company, -public.cfg_num(cfg, '{reputation,penalty,lateFee}', 3));
+      perform public.social_notify(v_owner, 'tax_office', 'Finanzamt: Verspätungszuschlag',
+        'Die Bücher von ' || v_name || ' sind überfällig: ' || public.format_eur(v_fee) || ' Zuschlag. Mach sie jetzt, sonst schätzt das Finanzamt.',
+        jsonb_build_object('company_id', p_company, 'amount_cents', v_fee), '/company',
+        'tax-fee:' || p_company::text || ':' || l.books_until::text);
+      perform public.feed_post(v_owner, 'tax_penalty', jsonb_build_object('company', v_name, 'reason', 'late_fee', 'amount_cents', v_fee),
+                               'tax_penalty:fee:' || p_company::text || ':' || l.books_until::text);
+    elsif v_hours >= public.cfg_num(cfg, '{taxes,reminderAfterHours}', 30) and l.books_stage < 1 then
+      update public.listed_companies set books_stage = 1 where company_id = p_company;
+      perform public.social_notify(v_owner, 'tax_office', 'Finanzamt: Bücher fällig',
+        'Mach die Bücher von ' || v_name || '. Sonst kommt ein Verspätungszuschlag.',
+        jsonb_build_object('company_id', p_company), '/company', 'tax-rem:' || p_company::text || ':' || l.books_until::text);
+    end if;
+  end if;
+
+  -- unpaid taxes: a surcharge after the deadline, then collection by force
+  for p in select * from public.company_tax_periods x where x.company_id = p_company and x.status = 'due'
+            order by x.id for update loop
+    if p.stage = 0 and now() > p.due_at then
+      v_add := (greatest(0, p.tax_cents - p.paid_cents) * public.cfg_num(cfg, '{taxes,latePaymentBps}', 500)::bigint) / 10000;
+      update public.company_tax_periods set stage = 1, penalty_cents = penalty_cents + v_add where id = p.id;
+      perform public.social_notify(v_owner, 'tax_office', 'Finanzamt: Steuer überfällig',
+        'Die Steuer von ' || v_name || ' ist nicht bezahlt. Säumniszuschlag: ' || public.format_eur(v_add) || '.',
+        jsonb_build_object('company_id', p_company, 'amount_cents', v_add), '/company', 'tax-late:' || p.id::text);
+    elsif p.stage = 1
+          and now() > p.due_at + make_interval(secs => public.cfg_num(cfg, '{taxes,enforceAfterHours}', 48) * 3600) then
+      v_add := (greatest(0, p.tax_cents - p.paid_cents) * public.cfg_num(cfg, '{taxes,enforcementBps}', 1000)::bigint) / 10000;
+      update public.company_tax_periods set stage = 2, penalty_cents = penalty_cents + v_add where id = p.id;
+      perform public.listed_reputation_bump(p_company, -public.cfg_num(cfg, '{reputation,penalty,enforcement}', 8));
+      perform public.social_notify(v_owner, 'tax_office', 'Finanzamt: Vollstreckung',
+        'Das Finanzamt holt sich die Steuer von ' || v_name || ' jetzt direkt aus der Kasse.',
+        jsonb_build_object('company_id', p_company), '/company', 'tax-force:' || p.id::text);
+      perform public.feed_post(v_owner, 'tax_penalty', jsonb_build_object('company', v_name, 'reason', 'enforcement'),
+                               'tax_penalty:force:' || p.id::text);
+      perform public.listed_audit(p_company, 2);
+      v_force := true;
+    elsif p.stage >= 2 then
+      v_force := true;
+    end if;
+  end loop;
+  if v_force then
+    perform public.listed_tax_collect(p_company, null, true);
+  end if;
+end;
+$$;
+
+-- The books: bookings of the company cash account by category, per day and one by one
+create or replace function public.get_company_accounting(p_days integer default 7, p_before bigint default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid := public.listed_require();
+  v_acc     uuid := public.company_cash_account(v_company);
+  v_days    integer := least(30, greatest(1, coalesce(p_days, 7)));
+  v_page    integer := greatest(1, public.cfg_num(public.listed_cfg(), '{accountingPageSize}', 50)::integer);
+  v_from    timestamptz;
+  v_entries jsonb;
+begin
+  v_from := (((now() at time zone 'Europe/Berlin')::date - (v_days - 1))::timestamp) at time zone 'Europe/Berlin';
+  select coalesce(jsonb_agg(x.j order by x.id desc), '[]'::jsonb) into v_entries
+    from (select e.id, jsonb_build_object('id', e.id, 'at', e.created_at, 'amount_cents', e.amount_cents,
+                   'balance_after_cents', e.balance_after_cents, 'description', t.description, 'kind', t.kind,
+                   'category', public.listed_ledger_category(t.kind::text, t.idempotency_key, t.metadata),
+                   'item', t.metadata ->> 'item') as j
+            from public.ledger_entries e join public.ledger_transactions t on t.id = e.transaction_id
+           where e.account_id = v_acc and (p_before is null or e.id < p_before)
+           order by e.id desc limit v_page) x;
+  return jsonb_build_object(
+    'cash_cents', (select a.balance_cents from public.ledger_accounts a where a.id = v_acc),
+    'from', v_from,
+    'days', coalesce((
+      select jsonb_agg(jsonb_build_object('day', d.day, 'in_cents', d.inc, 'out_cents', d.outc, 'operating_cents', d.op,
+                                          'by_category', d.cats) order by d.day desc)
+        from (select q.day, coalesce(sum(q.s) filter (where q.s > 0), 0)::bigint as inc, coalesce(-sum(q.s) filter (where q.s < 0), 0)::bigint as outc,
+                     coalesce(sum(q.s) filter (where public.listed_is_operating(q.cat)), 0)::bigint as op,
+                     jsonb_object_agg(q.cat, q.s) as cats
+                from (select (e.created_at at time zone 'Europe/Berlin')::date as day,
+                             public.listed_ledger_category(t.kind::text, t.idempotency_key, t.metadata) as cat,
+                             sum(e.amount_cents)::bigint as s
+                        from public.ledger_entries e join public.ledger_transactions t on t.id = e.transaction_id
+                       where e.account_id = v_acc and e.created_at >= v_from
+                       group by 1, 2) q
+               group by q.day) d), '[]'::jsonb),
+    'totals', coalesce((
+      select jsonb_object_agg(q.cat, q.s)
+        from (select public.listed_ledger_category(t.kind::text, t.idempotency_key, t.metadata) as cat, sum(e.amount_cents)::bigint as s
+                from public.ledger_entries e join public.ledger_transactions t on t.id = e.transaction_id
+               where e.account_id = v_acc and e.created_at >= v_from
+               group by 1) q), '{}'::jsonb),
+    'entries', v_entries,
+    'next_before', case when jsonb_array_length(v_entries) >= v_page then (v_entries -> -1 ->> 'id')::bigint end);
+end;
+$$;
+comment on function public.get_company_accounting(integer, bigint) is
+  'RPC (founder, listed company): the books (ADR-167). Real bookings of the company cash account by category: sums '
+  'per Berlin day for the last p_days (1 to 30), and the single bookings, newest first, paged by p_before. Error not_listed.';
+
+-- ---------------------------------------------------------------------------
+-- D. The board
+-- ---------------------------------------------------------------------------
+-- What a passed motion does
+create or replace function public.board_execute(p_motion bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  m        public.board_motions;
+  v_amt    bigint;
+  v_until  timestamptz;
+  v_paid   bigint := 0;
+  v_cash   bigint;
+  v_unpaid bigint;
+  v_owner  uuid;
+begin
+  select * into m from public.board_motions where id = p_motion;
+  v_until := now() + make_interval(days => coalesce((m.params ->> 'days')::integer, 1));
+  select pc.founder_id into v_owner from public.player_companies pc where pc.company_id = m.company_id;
+  if m.kind = 'earmark' then
+    v_amt := least((m.params ->> 'amount_cents')::bigint, greatest(0, public.listed_free_cash(m.company_id)));
+    if v_amt > 0 then
+      insert into public.company_budgets (company_id, purpose, amount_cents) values (m.company_id, m.params ->> 'purpose', v_amt)
+      on conflict (company_id, purpose) do update
+        set amount_cents = public.company_budgets.amount_cents + excluded.amount_cents, updated_at = now();
+    end if;
+    return jsonb_build_object('amount_cents', v_amt);
+  elsif m.kind = 'release' then
+    delete from public.company_budgets b where b.company_id = m.company_id and b.purpose = m.params ->> 'purpose'
+    returning b.amount_cents into v_amt;
+    return jsonb_build_object('amount_cents', coalesce(v_amt, 0));
+  elsif m.kind = 'dividend' then
+    v_amt := least((m.params ->> 'amount_cents')::bigint, greatest(0, public.listed_free_cash(m.company_id)));
+    if v_amt > 0 then
+      return public.listed_pay_dividend(m.company_id, v_amt, 'board', m.proposer_id);
+    end if;
+    return jsonb_build_object('total_cents', 0);
+  elsif m.kind = 'payout_cap' then
+    update public.listed_companies set payout_cap_bps = (m.params ->> 'bps')::integer, payout_cap_until = v_until
+     where company_id = m.company_id;
+    update public.player_companies set founder_payout_bps = least(founder_payout_bps, (m.params ->> 'bps')::integer)
+     where company_id = m.company_id;
+    return jsonb_build_object('until', v_until);
+  elsif m.kind = 'withdraw_ban' then
+    update public.listed_companies set withdraw_block_until = v_until where company_id = m.company_id;
+    return jsonb_build_object('until', v_until);
+  elsif m.kind = 'price_level' then
+    update public.listed_companies set price_lock = m.params ->> 'price_level', price_lock_until = v_until
+     where company_id = m.company_id;
+    update public.player_companies set price_level = m.params ->> 'price_level' where company_id = m.company_id;
+    return jsonb_build_object('until', v_until);
+  elsif m.kind = 'debt' then
+    -- taxes and penalties first, then open bills
+    v_amt := (m.params ->> 'amount_cents')::bigint;
+    v_paid := public.listed_tax_collect(m.company_id, v_amt, true);
+    select greatest(0, a.balance_cents), pc.unpaid_cents into v_cash, v_unpaid
+      from public.ledger_accounts a join public.player_companies pc on pc.company_id = a.owner_company_id
+     where a.owner_company_id = m.company_id and a.kind = 'company_cash';
+    v_amt := least(v_amt - v_paid, v_cash, v_unpaid);
+    if v_amt > 0 then
+      perform public.ledger_transfer(public.company_cash_account(m.company_id), public.ledger_system_account('households'), v_amt,
+                                     'company_costs', 'Offene Rechnungen (Geschäftsrat)', 'company', m.company_id,
+                                     'board-debt:' || m.id::text, v_owner, jsonb_build_object('cat', 'fixed'));
+      update public.player_companies set unpaid_cents = unpaid_cents - v_amt, distress = unpaid_cents - v_amt > 0
+       where company_id = m.company_id;
+      v_paid := v_paid + v_amt;
+    end if;
+    return jsonb_build_object('amount_cents', v_paid);
+  end if;
+  return '{}'::jsonb;
+end;
+$$;
+
+-- Counts a motion: by shares held now; the AI float votes yes on shareholder protection while the reputation is
+-- low. Ends it when the time is up (p_final) or one side holds more than half of all shares.
+create or replace function public.board_tally(p_motion bigint, p_final boolean)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.listed_cfg();
+  m        public.board_motions;
+  v_total  bigint;
+  v_yes    bigint;
+  v_no     bigint;
+  v_float  bigint;
+  v_ai     bigint := 0;
+  v_rep    double precision;
+  v_status text;
+  v_result jsonb := '{}'::jsonb;
+  v_owner  uuid;
+  v_name   text;
+  r        record;
+begin
+  select * into m from public.board_motions where id = p_motion for update;
+  if m.id is null or m.status <> 'open' then
+    return m.status;
+  end if;
+  v_total := public.board_total_e6(m.company_id);
+  select coalesce(sum(h.qty_e6) filter (where v.yes), 0), coalesce(sum(h.qty_e6) filter (where not v.yes), 0)
+    into v_yes, v_no
+    from public.board_votes v join public.board_holdings(m.company_id) h on h.player_id = v.player_id
+   where v.motion_id = m.id;
+  v_float := greatest(0, v_total - coalesce((select sum(h.qty_e6) from public.board_holdings(m.company_id) h), 0));
+  select l.reputation into v_rep from public.listed_companies l where l.company_id = m.company_id;
+  if coalesce(cfg #> '{board,aiVote,kinds}', '[]'::jsonb) ? m.kind
+     and coalesce(v_rep, 50) < public.cfg_num(cfg, '{board,aiVote,reputationBelow}', 40) then
+    v_ai := v_float;
+  end if;
+  if not (coalesce(p_final, false) or (v_yes + v_ai) * 2 > v_total or v_no * 2 >= v_total) then
+    update public.board_motions set yes_e6 = v_yes, no_e6 = v_no, ai_e6 = v_ai, total_e6 = v_total where id = m.id;
+    return 'open';
+  end if;
+  v_status := case when (v_yes + v_ai + v_no)::numeric * 10000 < v_total::numeric * public.cfg_num(cfg, '{board,quorumBps}', 3000) then 'no_quorum'
+                   when v_yes + v_ai > v_no then 'passed' else 'rejected' end;
+  update public.board_motions
+     set status = v_status, closed_at = now(), yes_e6 = v_yes, no_e6 = v_no, ai_e6 = v_ai, total_e6 = v_total
+   where id = m.id;
+  select pc.founder_id, c.name into v_owner, v_name
+    from public.player_companies pc join public.companies c on c.id = pc.company_id where pc.company_id = m.company_id;
+  if v_status = 'passed' then
+    v_result := public.board_execute(m.id);
+    update public.board_motions set result = v_result where id = m.id;
+    -- a decision without the founder's yes is a revolt
+    if m.proposer_id is distinct from v_owner
+       and not exists (select 1 from public.board_votes v where v.motion_id = m.id and v.player_id = v_owner and v.yes) then
+      perform public.feed_post(coalesce(m.proposer_id, v_owner), 'board_revolt',
+                               jsonb_build_object('company', v_name, 'kind', m.kind), 'board_revolt:' || m.id::text);
+    end if;
+  end if;
+  for r in select h.player_id from public.board_holdings(m.company_id) h
+           union select v_owner loop
+    perform public.social_notify(r.player_id, 'board',
+      'Geschäftsrat ' || v_name || ': ' || case v_status when 'passed' then 'Antrag angenommen'
+                                                when 'rejected' then 'Antrag abgelehnt' else 'Antrag ohne Mehrheit' end,
+      public.board_motion_label(m.kind, m.params),
+      jsonb_build_object('company_id', m.company_id, 'motion_id', m.id, 'status', v_status),
+      '/company?board=' || m.company_id::text, 'board-result:' || m.id::text);
+  end loop;
+  perform public.company_system_message(m.company_id, 'Geschäftsrat: ' || public.board_motion_label(m.kind, m.params) || ' – '
+    || case v_status when 'passed' then 'angenommen.' when 'rejected' then 'abgelehnt.' else 'nicht beschlussfähig.' end);
+  return v_status;
+end;
+$$;
+
+-- Short German description of a motion (notifications, company chat)
+create or replace function public.board_motion_label(p_kind text, p_params jsonb)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case p_kind
+    when 'earmark' then public.format_eur((p_params ->> 'amount_cents')::bigint) || ' reservieren für '
+                        || case p_params ->> 'purpose' when 'research' then 'Forschung' when 'products' then 'Produkte'
+                                                       when 'expansion' then 'Ausbau' when 'benefits' then 'Benefits'
+                                                       else 'Marketing' end
+    when 'release' then 'Budget freigeben: '
+                        || case p_params ->> 'purpose' when 'research' then 'Forschung' when 'products' then 'Produkte'
+                                                       when 'expansion' then 'Ausbau' when 'benefits' then 'Benefits'
+                                                       else 'Marketing' end
+    when 'dividend' then 'Dividende von ' || public.format_eur((p_params ->> 'amount_cents')::bigint)
+    when 'payout_cap' then 'CEO-Auszahlung höchstens ' || ((p_params ->> 'bps')::integer / 100) || ' % für '
+                           || (p_params ->> 'days') || ' Tage'
+    when 'withdraw_ban' then 'Keine Entnahmen für ' || (p_params ->> 'days') || ' Tage'
+    when 'price_level' then 'Preisstrategie ' || case p_params ->> 'price_level' when 'budget' then 'günstig'
+                                                   when 'premium' then 'Premium' else 'normal' end
+                            || ' für ' || (p_params ->> 'days') || ' Tage'
+    when 'debt' then 'Schulden tilgen bis ' || public.format_eur((p_params ->> 'amount_cents')::bigint)
+    else p_kind end;
+$$;
+
+create or replace function public.board_close_due(p_company uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  r   record;
+  v_n integer := 0;
+begin
+  for r in select m.id, m.closes_at <= now() as due from public.board_motions m
+            where m.company_id = p_company and m.status = 'open' order by m.id loop
+    if public.board_tally(r.id, r.due) <> 'open' then
+      v_n := v_n + 1;
+    end if;
+  end loop;
+  return v_n;
+end;
+$$;
+
+create or replace function public.board_motion_json(m public.board_motions, p_viewer uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'id', m.id, 'kind', m.kind, 'params', m.params, 'status', m.status, 'label', public.board_motion_label(m.kind, m.params),
+    'proposer', (select p.nickname from public.profiles p where p.id = m.proposer_id),
+    'mine', m.proposer_id is not distinct from p_viewer,
+    'created_at', m.created_at, 'closes_at', m.closes_at, 'closed_at', m.closed_at,
+    'yes_e6', m.yes_e6, 'no_e6', m.no_e6, 'ai_e6', m.ai_e6, 'total_e6', m.total_e6,
+    'my_vote', (select case when v.yes then 'yes' else 'no' end from public.board_votes v
+                 where v.motion_id = m.id and v.player_id = p_viewer),
+    'votes', coalesce((select jsonb_agg(jsonb_build_object('nickname', p.nickname, 'yes', v.yes) order by v.voted_at)
+                         from public.board_votes v join public.profiles p on p.id = v.player_id where v.motion_id = m.id), '[]'::jsonb),
+    'result', m.result);
+$$;
+
+create or replace function public.board_state(p_company uuid, p_viewer uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.listed_cfg();
+  c       public.companies;
+  pc      public.player_companies;
+  l       public.listed_companies;
+  v_total bigint := public.board_total_e6(p_company);
+  v_mine  bigint := public.board_my_e6(p_company, p_viewer);
+  v_held  bigint;
+begin
+  select * into c from public.companies where id = p_company;
+  select * into pc from public.player_companies where company_id = p_company;
+  select * into l from public.listed_companies where company_id = p_company;
+  select coalesce(sum(h.qty_e6), 0) into v_held from public.board_holdings(p_company) h;
+  return jsonb_build_object(
+    'company', jsonb_build_object('id', c.id, 'name', c.name, 'ticker', c.ticker, 'color', c.brand_color),
+    'is_founder', pc.founder_id = p_viewer,
+    'total_e6', v_total,
+    'my_e6', v_mine,
+    'my_share_bps', (v_mine::numeric * 10000 / v_total)::integer,
+    'float_e6', greatest(0, v_total - v_held),
+    'min_share_bps', public.cfg_num(cfg, '{board,minShareBps}', 2000)::integer,
+    'can_convene', v_mine::numeric * 10000 > v_total::numeric * public.cfg_num(cfg, '{board,minShareBps}', 2000)
+                   and (select count(*) from public.board_motions m where m.company_id = p_company and m.status = 'open')
+                       < public.cfg_num(cfg, '{board,maxOpen}', 2)
+                   and not exists (select 1 from public.board_motions m
+                                    where m.company_id = p_company and m.proposer_id = p_viewer
+                                      and m.created_at > now() - make_interval(secs => public.cfg_num(cfg, '{board,cooldownHours}', 6) * 3600)),
+    'can_vote', v_mine > 0,
+    'reputation', round(coalesce(l.reputation, 50)::numeric, 1),
+    'ai_votes', coalesce(l.reputation, 50) < public.cfg_num(cfg, '{board,aiVote,reputationBelow}', 40),
+    'cash_cents', (select a.balance_cents from public.ledger_accounts a where a.owner_company_id = p_company and a.kind = 'company_cash'),
+    'free_cash_cents', public.listed_free_cash(p_company),
+    'holders', coalesce((select jsonb_agg(jsonb_build_object('nickname', p.nickname, 'share_bps', (h.qty_e6::numeric * 10000 / v_total)::integer,
+                                                             'is_founder', h.player_id = pc.founder_id, 'me', h.player_id = p_viewer)
+                                          order by h.qty_e6 desc)
+                           from public.board_holdings(p_company) h join public.profiles p on p.id = h.player_id), '[]'::jsonb),
+    'budgets', coalesce((select jsonb_agg(jsonb_build_object('purpose', b.purpose, 'amount_cents', b.amount_cents) order by b.purpose)
+                           from public.company_budgets b where b.company_id = p_company and b.amount_cents > 0), '[]'::jsonb),
+    'restrictions', jsonb_build_object(
+      'payout_cap_bps', case when l.payout_cap_until > now() then l.payout_cap_bps end,
+      'payout_cap_until', case when l.payout_cap_until > now() then l.payout_cap_until end,
+      'withdraw_block_until', case when l.withdraw_block_until > now() then l.withdraw_block_until end,
+      'price_lock', case when l.price_lock_until > now() then l.price_lock end,
+      'price_lock_until', case when l.price_lock_until > now() then l.price_lock_until end),
+    'founder_payout_bps', pc.founder_payout_bps,
+    'motions', coalesce((select jsonb_agg(public.board_motion_json(m, p_viewer) order by m.id desc)
+                           from public.board_motions m where m.company_id = p_company and m.status = 'open'), '[]'::jsonb),
+    'history', coalesce((select jsonb_agg(public.board_motion_json(x, p_viewer) order by x.id desc)
+                           from (select * from public.board_motions m where m.company_id = p_company and m.status <> 'open'
+                                  order by m.id desc limit greatest(1, public.cfg_num(cfg, '{board,historyLimit}', 20)::integer)) x),
+                        '[]'::jsonb));
+end;
+$$;
+
+-- The company whose board the caller may see: a listed company where the caller is the founder or holds shares
+create or replace function public.board_require(p_company uuid, p_player uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid := coalesce(p_company, (select pc.company_id from public.player_companies pc
+                                          where pc.founder_id = p_player and pc.status = 'active'));
+begin
+  if v_company is null then
+    perform public.api_error('company_not_found');
+  end if;
+  if not public.listed_is(v_company) then
+    perform public.api_error('not_listed');
+  end if;
+  if public.board_my_e6(v_company, p_player) <= 0
+     and not exists (select 1 from public.player_companies pc where pc.company_id = v_company and pc.founder_id = p_player) then
+    perform public.api_error('board_not_shareholder');
+  end if;
+  perform public.listed_ensure(v_company);
+  return v_company;
+end;
+$$;
+
+create or replace function public.get_company_board(p_company_id uuid default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid := public.require_player();
+  v_company uuid := public.board_require(p_company_id, v_player);
+begin
+  perform public.board_close_due(v_company);
+  return jsonb_build_object('board', public.board_state(v_company, v_player));
+end;
+$$;
+comment on function public.get_company_board(uuid) is
+  'RPC (founder or shareholder of a listed company; null = own company): the board with holders, budgets, '
+  'restrictions, open motions and their history (ADR-167). Errors company_not_found, not_listed, board_not_shareholder.';
+
+create or replace function public.board_propose(p_request_id uuid, p_company_id uuid, p_kind text, p_params jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg       jsonb := public.listed_cfg();
+  v_player  uuid := public.require_player();
+  v_company uuid;
+  v_replay  jsonb;
+  v_params  jsonb := '{}'::jsonb;
+  v_days    integer;
+  v_amount  bigint;
+  v_bps     integer;
+  v_id      bigint;
+  v_name    text;
+  r         record;
+begin
+  v_company := public.board_require(p_company_id, v_player);
+  if p_request_id is null or p_kind is null or not coalesce(cfg #> '{board,kinds}', '[]'::jsonb) ? p_kind then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'board_propose');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  perform 1 from public.listed_companies l where l.company_id = v_company for update;
+  perform public.board_close_due(v_company);
+  -- more than board.minShareBps of all shares
+  if not (public.board_my_e6(v_company, v_player)::numeric * 10000
+          > public.board_total_e6(v_company)::numeric * public.cfg_num(cfg, '{board,minShareBps}', 2000)) then
+    perform public.api_error('board_no_right');
+  end if;
+  if (select count(*) from public.board_motions m where m.company_id = v_company and m.status = 'open')
+       >= public.cfg_num(cfg, '{board,maxOpen}', 2)
+     or exists (select 1 from public.board_motions m
+                 where m.company_id = v_company and m.proposer_id = v_player
+                   and m.created_at > now() - make_interval(secs => public.cfg_num(cfg, '{board,cooldownHours}', 6) * 3600)) then
+    perform public.api_error('board_limit');
+  end if;
+
+  v_days := (p_params ->> 'days')::integer;
+  v_amount := (p_params ->> 'amount_cents')::bigint;
+  if p_kind in ('payout_cap', 'withdraw_ban', 'price_level')
+     and (v_days is null or v_days < 1 or v_days > public.cfg_num(cfg, '{board,maxDays}', 7)) then
+    perform public.api_error('invalid_argument');
+  end if;
+  if p_kind in ('earmark', 'dividend', 'debt') and (v_amount is null or v_amount < 1) then
+    perform public.api_error('invalid_argument');
+  end if;
+  if p_kind in ('earmark', 'release') and not coalesce(cfg #> '{board,purposes}', '[]'::jsonb) ? coalesce(p_params ->> 'purpose', '') then
+    perform public.api_error('invalid_argument');
+  end if;
+  if p_kind = 'earmark' then
+    if v_amount > (select greatest(0, a.balance_cents) from public.ledger_accounts a
+                    where a.owner_company_id = v_company and a.kind = 'company_cash')
+                  * public.cfg_num(cfg, '{board,earmarkMaxShareOfCashBps}', 8000)::bigint / 10000 then
+      perform public.api_error('insufficient_funds');
+    end if;
+    v_params := jsonb_build_object('purpose', p_params ->> 'purpose', 'amount_cents', v_amount);
+  elsif p_kind = 'release' then
+    v_params := jsonb_build_object('purpose', p_params ->> 'purpose');
+  elsif p_kind = 'dividend' then
+    if v_amount < public.cfg_num(cfg, '{dividends,minTotalCents}', 10000) then
+      perform public.api_error('invalid_argument');
+    end if;
+    v_params := jsonb_build_object('amount_cents', v_amount);
+  elsif p_kind = 'payout_cap' then
+    v_bps := (p_params ->> 'bps')::integer;
+    if v_bps is null or v_bps < 0 or v_bps > 10000
+       or v_bps % greatest(1, public.cfg_num(cfg, '{board,payoutCapStepBps}', 500)::integer) <> 0 then
+      perform public.api_error('invalid_argument');
+    end if;
+    v_params := jsonb_build_object('bps', v_bps, 'days', v_days);
+  elsif p_kind = 'withdraw_ban' then
+    v_params := jsonb_build_object('days', v_days);
+  elsif p_kind = 'price_level' then
+    if coalesce(p_params ->> 'price_level', '') not in ('budget', 'normal', 'premium') then
+      perform public.api_error('invalid_argument');
+    end if;
+    v_params := jsonb_build_object('price_level', p_params ->> 'price_level', 'days', v_days);
+  else
+    v_params := jsonb_build_object('amount_cents', v_amount);
+  end if;
+
+  insert into public.board_motions (company_id, proposer_id, kind, params, closes_at)
+  values (v_company, v_player, p_kind, v_params, now() + make_interval(secs => public.cfg_num(cfg, '{board,voteHours}', 12) * 3600))
+  returning id into v_id;
+  insert into public.board_votes (motion_id, player_id, yes) values (v_id, v_player, true);
+  select c.name into v_name from public.companies c where c.id = v_company;
+  for r in select h.player_id from public.board_holdings(v_company) h
+           union select pc.founder_id from public.player_companies pc where pc.company_id = v_company loop
+    continue when r.player_id = v_player;
+    perform public.social_notify(r.player_id, 'board', 'Geschäftsrat ' || v_name || ': neuer Antrag',
+      public.board_motion_label(p_kind, v_params) || '. Stimme mit deinen Aktien ab.',
+      jsonb_build_object('company_id', v_company, 'motion_id', v_id), '/company?board=' || v_company::text,
+      'board-new:' || v_id::text);
+  end loop;
+  perform public.mission_event(v_player, 'board_motion', 1, v_id::text);
+  perform public.board_tally(v_id, false);
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('board', public.board_state(v_company, v_player)));
+end;
+$$;
+comment on function public.board_propose(uuid, uuid, text, jsonb) is
+  'RPC (shareholder with more than board.minShareBps of a listed company, the founder included): convenes the board '
+  'with a motion (ADR-167). kind: earmark {purpose, amount_cents} | release {purpose} | dividend {amount_cents} | '
+  'payout_cap {bps, days} | withdraw_ban {days} | price_level {price_level, days} | debt {amount_cents}. Errors '
+  'not_listed, board_not_shareholder, board_no_right, board_limit, invalid_argument, insufficient_funds.';
+
+create or replace function public.board_vote(p_request_id uuid, p_motion_id bigint, p_yes boolean)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player  uuid := public.require_player();
+  v_replay  jsonb;
+  m         public.board_motions;
+begin
+  if p_request_id is null or p_motion_id is null or p_yes is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'board_vote');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into m from public.board_motions where id = p_motion_id for update;
+  if m.id is null or not public.listed_is(m.company_id) then
+    perform public.api_error('board_motion_unknown');
+  end if;
+  if public.board_my_e6(m.company_id, v_player) <= 0 then
+    perform public.api_error('board_not_shareholder');
+  end if;
+  if m.status <> 'open' or m.closes_at <= now() then
+    perform public.board_close_due(m.company_id);
+    perform public.api_error('board_motion_unknown');
+  end if;
+  insert into public.board_votes (motion_id, player_id, yes) values (m.id, v_player, p_yes)
+  on conflict (motion_id, player_id) do update set yes = excluded.yes, voted_at = now();
+  perform public.mission_event(v_player, 'board_vote', 1, m.id::text);
+  perform public.board_tally(m.id, false);
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('board', public.board_state(m.company_id, v_player)));
+end;
+$$;
+comment on function public.board_vote(uuid, bigint, boolean) is
+  'RPC (shareholder): votes yes or no on an open motion; the weight is the holding when it is counted, a vote can be '
+  'changed until then (ADR-167). Errors board_motion_unknown, board_not_shareholder.';
+
+-- ---------------------------------------------------------------------------
+-- E. The state of a listed company (founder)
+-- ---------------------------------------------------------------------------
+create or replace function public.listed_state(p_company uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.listed_cfg();
+  c        public.companies;
+  pc       public.player_companies;
+  l        public.listed_companies;
+  h        public.listed_company_hours;
+  v_fx     jsonb := public.listed_effects(p_company);
+  v_ref    bigint := public.listed_ref_revenue(p_company);
+  v_heads  integer := public.company_headcount(p_company);
+  v_cash   bigint;
+  v_free   bigint := public.listed_free_cash(p_company);
+  v_sat    jsonb;
+  v_today  date := (now() at time zone 'Europe/Berlin')::date;
+  v_green  double precision;
+  v_red    double precision;
+  v_total  bigint := public.board_total_e6(p_company);
+  v_mine   bigint;
+begin
+  select * into c from public.companies where id = p_company;
+  select * into pc from public.player_companies where company_id = p_company;
+  select * into l from public.listed_companies where company_id = p_company;
+  if l.company_id is null then
+    return null;
+  end if;
+  select * into h from public.listed_company_hours x where x.company_id = p_company order by x.hour_start desc limit 1;
+  select a.balance_cents into v_cash from public.ledger_accounts a where a.owner_company_id = p_company and a.kind = 'company_cash';
+  v_sat := public.listed_satisfaction_effect(l.satisfaction);
+  v_green := public.cfg_num(cfg, '{satisfaction,green}', 60);
+  v_red := public.cfg_num(cfg, '{satisfaction,red}', 35);
+  v_mine := public.board_my_e6(p_company, pc.founder_id);
+  return jsonb_build_object(
+    'company_id', p_company, 'name', c.name, 'ticker', c.ticker,
+    'cash_cents', v_cash, 'unpaid_cents', pc.unpaid_cents, 'reserved_cents', public.listed_reserved_cents(p_company),
+    'free_cash_cents', v_free, 'ref_revenue_cents', v_ref, 'headcount', v_heads,
+    'founder_payout_bps', pc.founder_payout_bps,
+    'reputation', jsonb_build_object(
+      'value', round(l.reputation::numeric, 2), 'target', round(coalesce(h.rep_target, l.reputation)::numeric, 2),
+      'demand_factor', round((1 + public.cfg_num(cfg, '{reputation,demandMaxEffect}', 0.2) * (l.reputation - 50) / 50.0)::numeric, 4),
+      'price_factor', round(l.price_factor::numeric, 4),
+      'payout_ratio_bps', coalesce((h.drivers ->> 'payout_ratio_bps')::integer, 0),
+      'drivers', coalesce(h.drivers -> 'reputation', '{}'::jsonb)),
+    'satisfaction', jsonb_build_object(
+      'value', round(l.satisfaction::numeric, 2), 'target', round(coalesce(h.sat_target, l.satisfaction)::numeric, 2),
+      'zone', case when l.satisfaction >= v_green then 'green' when l.satisfaction >= v_red then 'yellow' else 'red' end,
+      'green', v_green, 'red', v_red,
+      'capacity_factor', round((v_sat ->> 'capacity_factor')::numeric, 4),
+      'quality_add_bps', round((v_sat ->> 'quality_add')::numeric * 10000)::integer,
+      'red_hours', l.red_hours,
+      'drivers', coalesce(h.drivers -> 'satisfaction', '{}'::jsonb)),
+    'effects', v_fx,
+    'hour', public.listed_hour_effect_calc(v_fx, l.satisfaction, l.reputation),
+    'upkeep', l.last_upkeep,
+    'upkeep_per_hour_cents', coalesce((
+      select sum(public.listed_item_upkeep(public.listed_item(ci.key), ci.level, v_ref, v_heads))
+        from public.company_investments ci
+       where ci.company_id = p_company and ci.status = 'active' and ci.level > 0 and ci.kind <> 'action'), 0)::bigint
+      + case when l.advisor then public.listed_advisor_wage(v_ref) else 0 end,
+    'items', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'key', t.x ->> 'key', 'kind', t.x ->> 'kind',
+               'status', case when ci.key is null or ci.status = 'retired' or (t.x ->> 'kind' = 'action') then 'none'
+                              when ci.ready_at is not null and ci.level = 0 then 'running' else ci.status end,
+               'level', coalesce(case when ci.status <> 'retired' then ci.level end, 0),
+               'max_level', public.cfg_num(t.x, '{maxLevel}', 1)::integer,
+               'ready_at', case when ci.status <> 'retired' then ci.ready_at end,
+               'cooldown_until', case when t.x ->> 'kind' = 'action' and ci.last_used_at is not null
+                                           and ci.last_used_at + make_interval(secs => public.cfg_num(t.x, '{cooldownHours}', 0) * 3600) > now()
+                                      then ci.last_used_at + make_interval(secs => public.cfg_num(t.x, '{cooldownHours}', 0) * 3600) end,
+               'cost_cents', public.listed_item_cost(t.x, case when t.x ->> 'kind' = 'action' or ci.key is null or ci.status = 'retired' then 0 else ci.level end, v_ref, v_heads),
+               'upkeep_cents', public.listed_item_upkeep(t.x, greatest(1, coalesce(case when ci.status <> 'retired' then ci.level end, 1)), v_ref, v_heads),
+               'missing', coalesce((select jsonb_agg(q.k) from jsonb_array_elements_text(coalesce(t.x -> 'requires', '[]'::jsonb)) q(k)
+                                     where not exists (select 1 from public.company_investments r
+                                                        where r.company_id = p_company and r.key = q.k
+                                                          and r.status in ('active', 'paused') and r.level > 0)), '[]'::jsonb))
+             order by t.ord)
+        from jsonb_array_elements(coalesce(cfg -> 'items', '[]'::jsonb)) with ordinality t(x, ord)
+        left join public.company_investments ci on ci.company_id = p_company and ci.key = t.x ->> 'key'), '[]'::jsonb),
+    'budgets', coalesce((select jsonb_agg(jsonb_build_object('purpose', b.purpose, 'amount_cents', b.amount_cents) order by b.purpose)
+                           from public.company_budgets b where b.company_id = p_company and b.amount_cents > 0), '[]'::jsonb),
+    'restrictions', jsonb_build_object(
+      'payout_cap_bps', case when l.payout_cap_until > now() then l.payout_cap_bps end,
+      'payout_cap_until', case when l.payout_cap_until > now() then l.payout_cap_until end,
+      'withdraw_block_until', case when l.withdraw_block_until > now() then l.withdraw_block_until end,
+      'price_lock', case when l.price_lock_until > now() then l.price_lock end,
+      'price_lock_until', case when l.price_lock_until > now() then l.price_lock_until end),
+    'dividends', jsonb_build_object(
+      'max_cents', greatest(0, v_free) * public.cfg_num(cfg, '{dividends,maxShareOfFreeCashBps}', 5000)::bigint / 10000,
+      'min_cents', public.cfg_num(cfg, '{dividends,minTotalCents}', 10000)::bigint,
+      'can_declare', (select count(*) from public.company_dividends d
+                       where d.company_id = p_company and d.source = 'founder'
+                         and (d.paid_at at time zone 'Europe/Berlin')::date = v_today) < public.cfg_num(cfg, '{dividends,perDay}', 1),
+      'streak', case when l.dividend_day >= v_today - 1 then l.dividend_streak else 0 end,
+      'total_e6', v_total,
+      'founder_share_bps', (v_mine::numeric * 10000 / v_total)::integer,
+      'last', coalesce((select jsonb_agg(jsonb_build_object('id', d.id, 'source', d.source, 'total_cents', d.total_cents,
+                                                            'players_cents', d.players_cents, 'float_cents', d.float_cents,
+                                                            'holders', d.holders, 'paid_at', d.paid_at) order by d.id desc)
+                          from (select * from public.company_dividends x where x.company_id = p_company order by x.id desc
+                                 limit greatest(1, public.cfg_num(cfg, '{dividends,historyLimit}', 20)::integer)) d), '[]'::jsonb)),
+    'books', public.listed_books_preview(p_company),
+    'taxes', jsonb_build_object(
+      'due_cents', public.listed_tax_due_cents(p_company),
+      'rate_bps', public.listed_tax_rate_bps(p_company),
+      'loss_carry_cents', l.loss_carry_cents,
+      'advisor', l.advisor,
+      'advisor_wage_cents', public.listed_advisor_wage(v_ref),
+      'advisor_discount_bps', public.cfg_num(cfg, '{taxes,advisor,discountBps}', 800)::integer,
+      'periods', coalesce((select jsonb_agg(public.listed_tax_period_json(x) order by x.id desc)
+                             from (select * from public.company_tax_periods p where p.company_id = p_company order by p.id desc
+                                    limit greatest(1, public.cfg_num(cfg, '{taxes,historyLimit}', 30)::integer)) x), '[]'::jsonb)),
+    'history', coalesce((select jsonb_agg(jsonb_build_object('at', x.hour_start, 'satisfaction', round(x.satisfaction::numeric, 2),
+                                                             'reputation', round(x.reputation::numeric, 2),
+                                                             'demand_factor', round(x.demand_factor::numeric, 4),
+                                                             'capacity_factor', round(x.capacity_factor::numeric, 4),
+                                                             'upkeep_cents', x.upkeep_cents) order by x.hour_start)
+                           from (select * from public.listed_company_hours y where y.company_id = p_company
+                                  order by y.hour_start desc limit greatest(1, public.cfg_num(cfg, '{historyHours}', 72)::integer)) x),
+                        '[]'::jsonb),
+    'board', jsonb_build_object(
+      'open_motions', (select count(*) from public.board_motions m where m.company_id = p_company and m.status = 'open'),
+      'to_vote', (select count(*) from public.board_motions m
+                   where m.company_id = p_company and m.status = 'open'
+                     and not exists (select 1 from public.board_votes v where v.motion_id = m.id and v.player_id = pc.founder_id)),
+      'my_share_bps', (v_mine::numeric * 10000 / v_total)::integer,
+      'can_convene', v_mine::numeric * 10000 > v_total::numeric * public.cfg_num(cfg, '{board,minShareBps}', 2000)));
+end;
+$$;
+
+create or replace function public.get_listed_company()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid := public.require_own_company();
+begin
+  if not public.listed_is(v_company) then
+    return jsonb_build_object('listed', null);
+  end if;
+  perform public.listed_ensure(v_company);
+  perform public.listed_finish_due(v_company, now());
+  perform public.board_close_due(v_company);
+  return jsonb_build_object('listed', public.listed_state(v_company));
+end;
+$$;
+comment on function public.get_listed_company() is
+  'RPC (founder): everything a listed company adds (ADR-167): reputation, satisfaction, items with prices, budgets, '
+  'dividends, books, taxes, history. {listed: null} while the company is private. Error company_not_found.';
+
+-- Before a listed company is dissolved: taxes are paid from the cash as far as it goes, motions end, budgets go
+create or replace function public.listed_before_dissolve(p_company uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not exists (select 1 from public.listed_companies l where l.company_id = p_company) then
+    return;
+  end if;
+  perform public.listed_tax_collect(p_company, null, true);
+  update public.company_tax_periods set status = 'paid', paid_at = now() where company_id = p_company and status = 'due';
+  update public.board_motions set status = 'cancelled', closed_at = now() where company_id = p_company and status = 'open';
+  delete from public.company_budgets where company_id = p_company;
+  update public.listed_companies
+     set advisor = false, payout_cap_until = null, withdraw_block_until = null, price_lock_until = null
+   where company_id = p_company;
+end;
+$$;
+
+-- Missions: a tax audit that was solved
+create or replace function public.listed_audit_mission()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.archetype = 'tax_audit' and new.status = 'solved' and old.status is distinct from new.status then
+    perform public.mission_event((select pc.founder_id from public.player_companies pc where pc.company_id = new.company_id),
+                                 'audit_survived', 1, new.id::text);
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists listed_audit_mission on public.player_company_events;
+create trigger listed_audit_mission after update of status on public.player_company_events
+  for each row execute function public.listed_audit_mission();
+
+-- ---------------------------------------------------------------------------
+-- F. Grants
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.listed_finish_due(uuid, timestamptz)', 'public.listed_require()', 'public.company_invest(uuid, text)',
+    'public.company_invest_stop(uuid, text)', 'public.board_holdings(uuid)', 'public.board_total_e6(uuid)',
+    'public.board_my_e6(uuid, uuid)', 'public.listed_pay_dividend(uuid, bigint, text, uuid)',
+    'public.company_declare_dividend(uuid, bigint)', 'public.listed_ledger_category(text, text, jsonb)',
+    'public.listed_is_operating(text)', 'public.listed_period_sums(uuid, timestamptz, timestamptz)',
+    'public.listed_books_receipts(uuid, timestamptz)', 'public.listed_tax_rate_bps(uuid)', 'public.listed_books_preview(uuid)',
+    'public.listed_books_do(uuid, text, integer)', 'public.listed_tax_collect(uuid, bigint, boolean)',
+    'public.listed_tax_due_cents(uuid)', 'public.company_books_close(uuid, text[], boolean)',
+    'public.listed_tax_period_json(public.company_tax_periods)', 'public.company_tax_pay(uuid)',
+    'public.company_tax_advisor(uuid, boolean)', 'public.listed_audit(uuid, integer)', 'public.listed_tax_office(uuid)',
+    'public.get_company_accounting(integer, bigint)', 'public.board_execute(bigint)', 'public.board_tally(bigint, boolean)',
+    'public.board_motion_label(text, jsonb)', 'public.board_close_due(uuid)',
+    'public.board_motion_json(public.board_motions, uuid)', 'public.board_state(uuid, uuid)',
+    'public.board_require(uuid, uuid)', 'public.get_company_board(uuid)', 'public.board_propose(uuid, uuid, text, jsonb)',
+    'public.board_vote(uuid, bigint, boolean)', 'public.listed_state(uuid)', 'public.get_listed_company()',
+    'public.listed_before_dissolve(uuid)', 'public.listed_audit_mission()'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+    execute format('grant execute on function %s to service_role', f);
+  end loop;
+  foreach f in array array[
+    'public.get_listed_company()', 'public.company_invest(uuid, text)', 'public.company_invest_stop(uuid, text)',
+    'public.company_declare_dividend(uuid, bigint)', 'public.company_books_close(uuid, text[], boolean)',
+    'public.company_tax_pay(uuid)', 'public.company_tax_advisor(uuid, boolean)',
+    'public.get_company_accounting(integer, bigint)', 'public.get_company_board(uuid)',
+    'public.board_propose(uuid, uuid, text, jsonb)', 'public.board_vote(uuid, bigint, boolean)'
+  ] loop
+    execute format('grant execute on function %s to authenticated', f);
+  end loop;
+end;
+$$;
+-- ===== idempotent copy of migrations/20261204005420_listed_missions_news.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 5420 · Listed player companies: missions, feed and news hooks (ADR-167)
+-- =============================================================================
+-- * Missions: requirement "listed" (founder of a company at the stock exchange), mission_doable() knows what the
+--   new metrics need, dividend_cents counts as money, 26 templates.
+-- * Feed: labels for tax_penalty, tax_audit, greedy_founder, mass_quit, record_dividend, board_revolt, research_done.
+-- * NEXA Nachrichten: the first six are personal news the show can pick up (the first four as bad news).
+-- Idempotent: runs unchanged as supabase/updates/20261204005420_listed_missions_news.sql.
+
+-- requirement "listed": founder of an active company at the stock exchange
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.mission_requirement_ok(uuid, text)'::regprocedure);
+  v_old text := $t$           else false end;$t$;
+  v_new text := $t$           when 'listed' then exists (select 1 from public.player_companies pc join public.companies c on c.id = pc.company_id
+                                       where pc.founder_id = p_player and pc.status = 'active' and c.phase = 'listed')
+           else false end;$t$;
+begin
+  if position('''listed''' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'mission_requirement_ok() has an unexpected shape; add the requirement "listed" (ADR-167) by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+-- What a listed mission needs right now
+create or replace function public.listed_mission_doable(p_player uuid, p_key text, p_metric text)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid;
+  l         public.listed_companies;
+begin
+  select pc.company_id into v_company
+    from public.player_companies pc join public.companies c on c.id = pc.company_id
+   where pc.founder_id = p_player and pc.status = 'active' and c.phase = 'listed';
+  if p_metric = 'board_vote' then
+    -- an open motion the player has not voted on, in any company whose shares the player holds
+    return exists (select 1 from public.board_motions m
+                    where m.status = 'open' and public.board_my_e6(m.company_id, p_player) > 0
+                      and not exists (select 1 from public.board_votes v where v.motion_id = m.id and v.player_id = p_player));
+  end if;
+  if v_company is null then
+    return false;
+  end if;
+  select * into l from public.listed_companies where company_id = v_company;
+  return case
+    when p_metric in ('research_started', 'research_done') then
+      exists (select 1 from jsonb_array_elements(coalesce(public.listed_cfg() -> 'items', '[]'::jsonb)) t(x)
+               where t.x ->> 'kind' = 'research'
+                 and not exists (select 1 from public.company_investments ci
+                                  where ci.company_id = v_company and ci.key = t.x ->> 'key' and ci.status = 'active'))
+    when p_metric = 'benefit_added' then
+      exists (select 1 from jsonb_array_elements(coalesce(public.listed_cfg() -> 'items', '[]'::jsonb)) t(x)
+               where t.x ->> 'kind' = 'benefit'
+                 and not exists (select 1 from public.company_investments ci
+                                  where ci.company_id = v_company and ci.key = t.x ->> 'key' and ci.status in ('active', 'paused')))
+    when p_metric = 'board_motion' then
+      public.board_my_e6(v_company, p_player)::numeric * 10000
+        > public.board_total_e6(v_company)::numeric * public.cfg_num(public.listed_cfg(), '{board,minShareBps}', 2000)
+    when p_metric = 'audit_survived' then
+      exists (select 1 from public.player_company_events e
+               where e.company_id = v_company and e.archetype = 'tax_audit' and e.status in ('open', 'accepted', 'in_force'))
+    when p_key = 'm_first_dividend' then not exists (select 1 from public.company_dividends d where d.company_id = v_company)
+    when p_key = 'm_first_books' then not exists (select 1 from public.company_tax_periods x
+                                                   where x.company_id = v_company and x.closed_by = 'founder')
+    else true end;
+end;
+$$;
+revoke all on function public.listed_mission_doable(uuid, text, text) from public, anon, authenticated;
+grant execute on function public.listed_mission_doable(uuid, text, text) to service_role;
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.mission_doable(uuid, text, text)'::regprocedure);
+  v_old text := $t$    -- "your first ..." only for who has not done it yet$t$;
+  v_new text := $t$    -- listed companies (ADR-167)
+    when p_metric in ('research_started', 'research_done', 'product_launched', 'region_opened', 'benefit_added', 'team_action',
+                      'satisfaction_green', 'dividend_paid', 'dividend_cents', 'books_done', 'books_streak', 'tax_paid',
+                      'board_motion', 'board_vote', 'audit_survived', 'listed_invested') then
+      public.listed_mission_doable(p_player, p_key, p_metric)
+    -- "your first ..." only for who has not done it yet$t$;
+begin
+  if position('listed_mission_doable' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'mission_doable() has an unexpected shape; add the listed company metrics (ADR-167) by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+-- dividends count as money in mission texts ("{target}" in euros)
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.mission_is_money_metric(text)'::regprocedure);
+begin
+  if position('dividend_cents' in v_def) = 0 then
+    if position($t$'art_collection_value'$t$ in v_def) = 0 then
+      raise exception 'mission_is_money_metric() has an unexpected shape; add dividend_cents (ADR-167) by hand';
+    end if;
+    execute replace(v_def, $t$'art_collection_value'$t$, $t$'art_collection_value', 'dividend_cents'$t$);
+  end if;
+end;
+$do$;
+
+insert into public.mission_templates
+  (key, kind, title, description, icon_key, metric, mode, params, target_min, target_max, xp_min, xp_max, min_level, chain_order,
+   scale_with_level, weight, reward_skill_points)
+values
+  ('q_listed_books', 'quick', 'Mach die Bücher', 'Einmal am Tag: Belege sortieren, Abschluss bestätigen.', 'mission_company', 'books_done', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 1, 1, 50, 70, 9, null, false, 70, 0),
+  ('q_listed_benefit', 'quick', 'Gönn dem Team einen Benefit', 'Obstkorb, Kaffeeflatrate, Tischkicker: Hauptsache, die Laune steigt.', 'mission_company', 'benefit_added', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 1, 1, 40, 60, 9, null, false, 50, 0),
+  ('q_listed_action', 'quick', 'Starte eine Aktion fürs Team', 'Pizza für alle oder gleich ein Teamevent.', 'mission_company', 'team_action', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 1, 1, 40, 60, 9, null, false, 50, 0),
+  ('q_listed_research', 'quick', 'Starte eine Forschung', 'Such dir einen Zweig aus und leg los.', 'mission_company', 'research_started', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 1, 1, 50, 70, 9, null, false, 50, 0),
+  ('q_board_vote', 'quick', 'Stimm im Geschäftsrat ab', 'Ein Antrag wartet auf deine Aktien.', 'mission_company', 'board_vote', 'count', '{"unlock":"ipo"}'::jsonb, 1, 1, 40, 60, 9, null, false, 80, 0),
+  ('d_listed_green', 'daily', '{target} Stunden gute Stimmung', 'Halte die Mitarbeiterzufriedenheit im grünen Bereich.', 'mission_company', 'satisfaction_green', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 4, 6, 250, 350, 9, null, false, 60, 0),
+  ('d_listed_tax', 'daily', 'Zahl deine Steuer pünktlich', 'Bücher machen, Steuer überweisen, Ruhe vor dem Finanzamt.', 'mission_company', 'tax_paid', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 1, 1, 250, 350, 9, null, false, 60, 0),
+  ('d_listed_invest', 'daily', 'Investiere {target}-mal in deine Firma', 'Forschung, Produkte, Maschinen, Benefits: alles zählt.', 'mission_company', 'listed_invested', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 2, 3, 250, 350, 9, null, false, 60, 0),
+  ('d_listed_dividend', 'daily', 'Schütte eine Dividende aus', 'Deine Aktionäre freuen sich, dein Ruf auch.', 'mission_company', 'dividend_paid', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 1, 1, 250, 400, 9, null, false, 40, 0),
+  ('w_listed_research', 'weekly', 'Schließe {target} Forschungen ab', 'Wer forscht, wächst.', 'mission_company', 'research_done', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 2, 3, 800, 1200, 9, null, false, 50, 1),
+  ('w_listed_books', 'weekly', 'Mach an {target} Tagen die Bücher', 'Jeden Tag ein paar Sekunden, dann bleibt das Finanzamt freundlich.', 'mission_company', 'books_done', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 4, 5, 800, 1200, 9, null, false, 50, 1),
+  ('w_listed_green', 'weekly', '{target} Stunden gute Stimmung', 'Eine Woche, in der das Team gern zur Arbeit kommt.', 'mission_company', 'satisfaction_green', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 40, 60, 800, 1200, 9, null, false, 40, 1),
+  ('w_listed_dividends', 'weekly', 'Schütte an {target} Tagen Dividende aus', 'Verlässliche Dividenden machen eine Aktie beliebt.', 'mission_company', 'dividend_paid', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 3, 4, 800, 1200, 9, null, false, 30, 1),
+  ('m_first_research', 'milestone', 'Deine erste Forschung', 'Schließe ein Forschungsprojekt ab.', 'mission_company', 'research_done', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 1, 1, 800, 800, 9, 70, false, 100, 1),
+  ('m_research_10', 'milestone', '{target} Forschungen abgeschlossen', 'Dein Labor läuft auf Hochtouren.', 'mission_company', 'research_done', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 10, 10, 3000, 3000, 9, 112, false, 100, 1),
+  ('m_research_28', 'milestone', 'Der ganze Forschungsbaum', 'Alle {target} Projekte erforscht. Mehr geht nicht.', 'mission_company', 'research_done', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 28, 28, 10000, 10000, 9, 130, false, 100, 1),
+  ('m_first_product', 'milestone', 'Ein zweites Standbein', 'Bring ein neues Produkt auf den Markt.', 'mission_company', 'product_launched', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 1, 1, 1000, 1000, 9, 72, false, 100, 1),
+  ('m_products_4', 'milestone', '{target} Produkte am Markt', 'Ein richtiges Sortiment.', 'mission_company', 'product_launched', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 4, 4, 3500, 3500, 9, 114, false, 100, 1),
+  ('m_first_region', 'milestone', 'Raus aus der Heimat', 'Eröffne deinen ersten neuen Markt.', 'mission_company', 'region_opened', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 1, 1, 1200, 1200, 9, 74, false, 100, 1),
+  ('m_regions_5', 'milestone', 'Weltkonzern', 'Von Süddeutschland bis Asien: alle {target} Märkte eröffnet.', 'mission_company', 'region_opened', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 5, 5, 8000, 8000, 9, 128, false, 100, 1),
+  ('m_first_dividend', 'milestone', 'Deine erste Dividende', 'Teile den Gewinn mit deinen Aktionären.', 'mission_company', 'dividend_paid', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 1, 1, 800, 800, 9, 71, false, 100, 1),
+  ('m_dividend_big', 'milestone', '{target} € Dividende ausgeschüttet', 'Eine Aktie, auf die man sich verlassen kann.', 'mission_company', 'dividend_cents', 'sum', '{"unlock":"ipo","requires":"listed"}'::jsonb, 10000000, 10000000, 4000, 4000, 9, 116, false, 100, 1),
+  ('m_first_books', 'milestone', 'Ordnung muss sein', 'Mach zum ersten Mal die Bücher deiner AG.', 'mission_company', 'books_done', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 1, 1, 500, 500, 9, 69, false, 100, 1),
+  ('m_books_streak_7', 'milestone', '{target} Tage saubere Bücher', 'Sieben Tage in Folge die Bücher gemacht.', 'mission_company', 'books_streak', 'max', '{"unlock":"ipo","requires":"listed"}'::jsonb, 7, 7, 3000, 3000, 9, 113, false, 100, 1),
+  ('m_first_motion', 'milestone', 'Geschäftsrat einberufen', 'Bring mit über 20 % der Aktien einen Antrag ein.', 'mission_company', 'board_motion', 'count', '{"unlock":"ipo"}'::jsonb, 1, 1, 1000, 1000, 9, 76, false, 100, 1),
+  ('m_audit', 'milestone', 'Betriebsprüfung überstanden', 'Das Finanzamt war da. Du hast es geregelt.', 'mission_company', 'audit_survived', 'count', '{"unlock":"ipo","requires":"listed"}'::jsonb, 1, 1, 2000, 2000, 9, 118, false, 100, 1)
+on conflict (key) do update
+   set kind = excluded.kind, title = excluded.title, description = excluded.description, icon_key = excluded.icon_key,
+       metric = excluded.metric, mode = excluded.mode, params = excluded.params, target_min = excluded.target_min,
+       target_max = excluded.target_max, xp_min = excluded.xp_min, xp_max = excluded.xp_max, min_level = excluded.min_level,
+       chain_order = excluded.chain_order, scale_with_level = excluded.scale_with_level, weight = excluded.weight,
+       reward_skill_points = excluded.reward_skill_points, is_active = true, updated_at = now();
+
+-- the feed names what happened at listed companies
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.feed_item_label(text, jsonb)'::regprocedure);
+  v_old text := $t$    when 'car_bought' then 'Neues Auto'$t$;
+  v_new text := $t$    when 'car_bought' then 'Neues Auto'
+    when 'tax_penalty' then 'Strafe vom Finanzamt für ' || coalesce(p_payload ->> 'company', '?')
+    when 'tax_audit' then 'Betriebsprüfung bei ' || coalesce(p_payload ->> 'company', '?')
+    when 'greedy_founder' then 'zahlt sich bei ' || coalesce(p_payload ->> 'company', '?') || ' fast den ganzen Gewinn selbst aus'
+    when 'mass_quit' then 'Kündigungswelle bei ' || coalesce(p_payload ->> 'company', '?')
+    when 'record_dividend' then 'Rekorddividende bei ' || coalesce(p_payload ->> 'company', '?')
+    when 'board_revolt' then 'Aufstand im Geschäftsrat von ' || coalesce(p_payload ->> 'company', '?')
+    when 'research_done' then 'Forschungsdurchbruch bei ' || coalesce(p_payload ->> 'company', '?')$t$;
+begin
+  if position('greedy_founder' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'feed_item_label() has an unexpected shape; add the listed company feed kinds (ADR-167) by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+-- NEXA Nachrichten: personal news from listed companies
+do $do$
+declare
+  v_def  text := pg_get_functiondef('public.news_show_build(timestamptz)'::regprocedure);
+  v_bad  text := $t$when f.kind in ('rug_pull', 'loan_defaulted', 'deal_broken', 'coin_closed')$t$;
+  v_list text := $t$'big_trade', 'rug_pull', 'loan_defaulted', 'deal_broken', 'coin_closed')$t$;
+begin
+  if position('greedy_founder' in v_def) = 0 then
+    if position(v_bad in v_def) = 0 or position(v_list in v_def) = 0 then
+      raise exception 'news_show_build() has an unexpected shape; add the listed company feed kinds (ADR-167) to the gossip source by hand';
+    end if;
+    v_def := replace(v_def, v_bad,
+      $t$when f.kind in ('rug_pull', 'loan_defaulted', 'deal_broken', 'coin_closed', 'tax_penalty', 'tax_audit', 'greedy_founder', 'mass_quit')$t$);
+    v_def := replace(v_def, v_list,
+      $t$'big_trade', 'rug_pull', 'loan_defaulted', 'deal_broken', 'coin_closed',
+                                  'tax_penalty', 'tax_audit', 'greedy_founder', 'mass_quit', 'record_dividend', 'board_revolt')$t$);
+    execute v_def;
+  end if;
+end;
+$do$;
 
 -- ===== game_config (current values, overwriting older ones) =====
 -- GENERATED by scripts/gen-config-seed.ts from src/config/balance.ts. Do not edit by hand.
@@ -59362,7 +62358,7 @@ insert into public.game_config (key, value, description) values
   ('startups', '{"garage":{"minLevel":6,"foundingCostCents":250000,"fixedCostCentsPerQuarter":15000,"maxEmployees":2},"upgradeCreditShare":1,"gmbh":{"minLevel":15,"foundingCostCents":6000000,"fixedCostCentsPerQuarter":600000,"maxEmployees":20},"ag":{"fixedCostCentsPerQuarter":1000000,"maxEmployees":100},"marketFactorByTier":{"garage":1,"small_business":4,"gmbh":15,"ag":40},"foundingAwareness":{"garage":0.03,"small_business":0.08,"gmbh":0.2},"expansion":{"fromTiers":["gmbh","ag"],"baseCostCents":10000000,"costGrowth":1.8,"employeesPerLevel":10,"capacityBonusPerLevel":0.1,"marketBonusPerLevel":0.5,"fixedCostPerLevel":0.25},"pricing":{"budget":{"price":0.8,"demand":1.35,"awareness":1.5},"normal":{"price":1,"demand":1,"awareness":1},"premium":{"price":1.3,"demand":0.75,"awareness":0.7},"premiumMinQuality":0.5,"premiumLowQualityDemand":0.5},"contractWork":{"shareOfFreeCapacity":0.25,"grossMargin":0.3},"founderPayout":{"stepBps":500,"maxBps":10000},"ipo":{"minLevel":9,"fromTiers":["garage","small_business","gmbh"],"sharesTotal":1000000,"minSharePercent":10,"maxSharePercent":49,"minIssuePriceCents":100,"subscriptionMinutes":60,"minFillBps":10000,"demoPlayersShare":0.35,"quickAmountsCents":[10000,100000,1000000],"aiTakeBase":0.6,"aiTakePerQuality":0.4,"aiPace":3,"capitalIncreaseDiscount":0.9,"capitalIncreaseMaxPercent":25},"sideJobFounderFactor":0.5,"aiQualityPenalty":0.3,"fullTimeFromEmployees":5,"logo":{"size":16,"maxColors":16,"reportsToHide":3},"banner":{"width":48,"height":12,"maxColors":16},"potential":{"minAnnualCents":100000,"maxAnnualCents":200000000000,"paretoAlpha":0.57},"awareness":{"initial":0.03,"min":0.01,"growthPerQuarter":0.3,"decayPerQuarter":0.03,"marketingMaxGain":0.12,"marketingHalfSaturationShare":0.1,"marketingMinHalfSaturationCents":50000},"quality":{"base":0.25,"halfSaturationScore":20,"adjustPerQuarter":0.35},"demandNoise":0.1,"capacityCentsPerProductivity":{"tech":300000,"retail":250000,"energy":250000,"pharma":300000,"logistics":250000},"grossMargin":{"tech":0.75,"retail":0.35,"energy":0.45,"pharma":0.65,"logistics":0.35},"aiWorkerCostCentsPerQuarter":72000,"aiWorkerWageCentsPerHour":12000,"valuationPeDiscount":0.5,"estimate":{"initialSpread":2.3,"decayPerQuarter":0.85},"insolvency":{"graceQuarters":4,"loanWithholdingBps":5000,"foundingLockoutDays":3},"products":{"tech":[{"key":"security_software","stages":[["it_networks"],["it_security","it_programming"],["law_privacy","it_architecture"],["it_crypto","it_pentest"]]},{"key":"mobile_app","stages":[["it_programming"],["it_mobile","sales_social"],["it_ux","sales_growth"],["it_cloud","management_strategy"]]},{"key":"cloud_platform","stages":[["it_networks"],["it_databases","it_devops"],["it_cloud","sales_keyaccount"],["finance_controlling","management_operations"]]},{"key":"legal_tech","stages":[["law_contracts"],["law_corporate","it_programming"],["law_privacy","it_web"],["law_it","sales_growth"]]},{"key":"fintech","stages":[["finance_accounting"],["finance_banking","it_mobile"],["finance_portfolio","law_compliance"],["finance_risk","it_security"]]}],"retail":[{"key":"online_shop","stages":[["it_web"],["sales_marketing","logistics_warehouse"],["hybrid_ecommerce","sales_seo"],["logistics_automation","management_operations"]]},{"key":"fashion","stages":[["sales_marketing"],["sales_brand","logistics_purchasing"],["sales_ads","sales_retail"],["sales_international","finance_controlling"]]},{"key":"delicatessen","stages":[["logistics_purchasing"],["sales_service","logistics_distribution"],["sales_retail","science_nutrition"],["logistics_cold","law_consumer"]]},{"key":"franchise","stages":[["management_team"],["management_people","sales_selling"],["management_operations","finance_controlling"],["management_strategy","law_contracts"]]}],"energy":[{"key":"solar","stages":[["craft_electrical"],["sales_selling","craft_site"],["craft_energy","management_projects"],["craft_solar","law_environment"]]},{"key":"grid_service","stages":[["craft_electrical"],["craft_site","craft_automation"],["craft_energy","law_compliance"],["logistics_planning","management_operations"]]},{"key":"energy_storage","stages":[["science_physics"],["craft_engineering","finance_investment"],["science_materials","craft_manufacturing"],["law_ip","sales_international"]]},{"key":"energy_trading","stages":[["finance_investment"],["finance_accounting","craft_electrical"],["finance_trading","law_compliance"],["finance_risk","management_strategy"]]}],"pharma":[{"key":"generics","stages":[["science_chemistry"],["science_lab","science_pharmacology"],["logistics_quality","hybrid_pharma_sales"],["law_ip","finance_controlling"]]},{"key":"biotech","stages":[["science_biology"],["science_biotech","science_statistics"],["science_clinical","science_genetics"],["law_medical","finance_vc"]]},{"key":"medtech","stages":[["science_medicine"],["craft_engineering","science_lab"],["science_drugs","law_compliance"],["science_devices","it_embedded"]]},{"key":"regulatory","stages":[["law_contracts"],["law_compliance","science_pharmacology"],["law_ip","science_clinical"],["law_medical","finance_controlling"]]}],"logistics":[{"key":"courier","stages":[["logistics_transport"],["logistics_fleet","it_mobile"],["logistics_lastmile","management_operations"],["logistics_planning","logistics_sustainability"]]},{"key":"warehouse","stages":[["logistics_warehouse"],["logistics_inventory","it_databases"],["logistics_supplychain","management_agile"],["logistics_automation","craft_robotics"]]},{"key":"freight","stages":[["logistics_transport"],["logistics_customs","logistics_shipping"],["logistics_global","sales_international"],["logistics_strategic","finance_risk"]]},{"key":"moving","stages":[["management_projects"],["logistics_transport","management_team"],["logistics_distribution","sales_service"],["management_operations","logistics_planning"]]}]},"stages":{"awarenessCaps":[0.5,0.7,0.85,0.95,1],"qualityBonusPerStage":0.05,"capacityBonusPerStage":0.25},"training":{"costCentsByTier":[200000,500000,1200000,2500000,5000000],"wageRaiseBpsByTier":[300,500,800,1200,2000],"fromEmployees":5},"campaigns":{"kinds":{"flyer":{"hours":24,"costHours":2,"demandBps":2500,"awareness":0.005},"online":{"hours":48,"costHours":6,"demandBps":4000,"awareness":0.01},"tv":{"hours":72,"costHours":18,"demandBps":7000,"awareness":0.025}},"minCostCents":20000,"luckMin":0.4,"luckMax":1.6,"qualityWeight":0.5,"weakBelow":0.8,"strongFrom":1.2},"chat":{"maxMessageLength":300,"historyLimit":100,"maxMessagesPerMinute":10,"bubbleSeconds":120,"floorMaxMembers":24}}'::jsonb, 'Defaults from src/config/balance.ts, section "startups"'),
   ('avatars', '{"defaultKey":"rookie","portraits":[{"key":"rookie","level":1},{"key":"trader","level":1},{"key":"analyst","level":1},{"key":"coder","level":1},{"key":"builder","level":1},{"key":"seller","level":1},{"key":"lawyer","level":1},{"key":"scientist","level":1},{"key":"trucker","level":1},{"key":"punk","level":3},{"key":"gamer","level":5},{"key":"chef","level":5},{"key":"pilot","level":8},{"key":"founder","level":10},{"key":"banker","level":15},{"key":"astronaut","level":20},{"key":"magnate","level":25},{"key":"royal","level":35},{"key":"legend","level":50},{"key":"finn_fan","level":1}]}'::jsonb, 'Defaults from src/config/balance.ts, section "avatars"'),
   ('artworks', '{"size":32,"maxColors":16,"titleMaxLength":40,"createBaseCostCents":1500000,"createCostFactor":1.5,"auction":{"durationsHours":[1,6,24],"minIncrementBps":500,"minStartCents":10000,"feeBps":1000,"antiSnipeMinutes":2},"gallery":{"auctionsPerDay":4,"auctionHours":6,"startPriceCents":{"common":500000,"rare":2500000,"legendary":15000000}},"hot":{"likeWeight":1,"bidWeight":3,"gravity":1.5}}'::jsonb, 'Defaults from src/config/balance.ts, section "artworks"'),
-  ('companyEvents', '{"chancePerDay":0.6,"minGapHours":22,"minAgeHours":6,"chanceShare":0.4,"severityWeights":[0.5,0.35,0.15],"severityScale":[1,1.7,2.5],"preDeadlineShare":0.25,"costUnit":{"minUnitCents":20000,"unitShareOfFixed":0.5},"knowHow":{"bpsPerPoint":150,"maxBonusBps":2500},"severityPenaltyBps":700,"retryCostShare":0.5,"shareShockBps":[400,900,1500],"archetypes":[{"key":"regulation","polarity":"crisis","weight":12,"effect":{"demand":-0.12,"cost":0.06},"deadlineHours":30,"lastsHours":72,"strategies":[{"key":"lobby","mitigation":1,"bonus":{"awareness":0.02},"steps":[{"key":"study","hours":3,"cost":2,"branch":"law","baseBps":9000},{"key":"alliance","hours":5,"cost":1,"branch":"sales","staff":2,"baseBps":6500},{"key":"hearing","hours":6,"cost":3,"branch":"law","baseBps":5500}]},{"key":"adapt","mitigation":0.7,"bonus":{"quality":0.03},"steps":[{"key":"retool","hours":8,"cost":4,"staff":1,"capacityHit":0.3,"baseBps":9500},{"key":"certify","hours":4,"cost":1,"branch":"science","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"special_tax","polarity":"crisis","weight":10,"effect":{"cost":0.1},"deadlineHours":30,"lastsHours":96,"strategies":[{"key":"lobby","mitigation":1,"steps":[{"key":"petition","hours":2,"cost":1,"branch":"sales","baseBps":9000},{"key":"experts","hours":5,"cost":2,"branch":"finance","baseBps":7000},{"key":"hearing","hours":6,"cost":3,"branch":"law","baseBps":5500}]},{"key":"reformulate","mitigation":0.8,"bonus":{"quality":-0.02},"steps":[{"key":"lab","hours":6,"cost":3,"branch":"science","staff":1,"baseBps":6500},{"key":"relaunch","hours":4,"cost":2,"branch":"sales","baseBps":8500}]},{"key":"pass_on","mitigation":0.5,"steps":[{"key":"price_talk","hours":3,"cost":1,"branch":"sales","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"supply_shortage","polarity":"crisis","weight":11,"effect":{"capacity":-0.25,"cost":0.05},"deadlineHours":24,"lastsHours":60,"strategies":[{"key":"new_supplier","mitigation":1,"steps":[{"key":"scout","hours":3,"cost":1,"branch":"logistics","baseBps":8500},{"key":"contract","hours":4,"cost":3,"branch":"finance","baseBps":7500}]},{"key":"stockpile","mitigation":0.8,"steps":[{"key":"buy_stock","hours":2,"cost":6,"baseBps":10000}]},{"key":"redesign","mitigation":1,"bonus":{"quality":0.02},"steps":[{"key":"prototype","hours":6,"cost":2,"branch":"science","staff":1,"baseBps":6000},{"key":"switch","hours":6,"cost":2,"branch":"craft","capacityHit":0.2,"baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"quality_scandal","polarity":"crisis","weight":9,"effect":{"demand":-0.2},"deadlineHours":20,"lastsHours":72,"strategies":[{"key":"recall","mitigation":1,"bonus":{"quality":0.04},"steps":[{"key":"pull_back","hours":4,"cost":4,"branch":"logistics","capacityHit":0.3,"baseBps":9500},{"key":"fix","hours":6,"cost":2,"branch":"craft","baseBps":7500}]},{"key":"pr_offensive","mitigation":0.6,"bonus":{"awareness":0.03},"steps":[{"key":"statement","hours":1,"cost":1,"branch":"management","baseBps":9000},{"key":"campaign","hours":5,"cost":3,"branch":"sales","baseBps":6500}]},{"key":"independent_test","mitigation":0.9,"steps":[{"key":"lab_test","hours":8,"cost":2,"branch":"science","baseBps":7000},{"key":"publish","hours":2,"cost":1,"branch":"sales","baseBps":9000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"data_breach","polarity":"crisis","weight":8,"sectors":["tech","retail","logistics"],"effect":{"demand":-0.15,"cost":0.04},"deadlineHours":18,"lastsHours":60,"strategies":[{"key":"forensics","mitigation":1,"bonus":{"quality":0.02},"steps":[{"key":"analyse","hours":4,"cost":2,"branch":"it","baseBps":7500},{"key":"patch","hours":4,"cost":1,"branch":"it","staff":2,"baseBps":8000},{"key":"audit","hours":3,"cost":2,"branch":"law","baseBps":9000}]},{"key":"transparency","mitigation":0.6,"bonus":{"awareness":0.01},"steps":[{"key":"disclose","hours":2,"cost":1,"branch":"management","baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"price_war","polarity":"crisis","weight":10,"effect":{"demand":-0.18},"deadlineHours":30,"lastsHours":72,"strategies":[{"key":"undercut","mitigation":0.8,"steps":[{"key":"calculate","hours":2,"cost":1,"branch":"finance","baseBps":9000},{"key":"discount","hours":6,"cost":4,"branch":"sales","baseBps":9500}]},{"key":"innovate","mitigation":1,"bonus":{"quality":0.04},"steps":[{"key":"research","hours":6,"cost":2,"branch":"science","baseBps":7000},{"key":"build","hours":6,"cost":2,"branch":"craft","staff":2,"capacityHit":0.2,"baseBps":7500},{"key":"launch","hours":3,"cost":2,"branch":"sales","baseBps":8500}]},{"key":"niche","mitigation":0.6,"steps":[{"key":"reposition","hours":4,"cost":2,"branch":"sales","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"strike","polarity":"crisis","weight":7,"effect":{"capacity":-0.35},"deadlineHours":16,"lastsHours":48,"strategies":[{"key":"negotiate","mitigation":1,"steps":[{"key":"listen","hours":2,"cost":0,"branch":"management","baseBps":9000},{"key":"deal","hours":4,"cost":3,"branch":"management","baseBps":7000}]},{"key":"bonus","mitigation":0.8,"steps":[{"key":"pay_bonus","hours":1,"cost":5,"baseBps":10000}]},{"key":"automate","mitigation":0.7,"bonus":{"quality":-0.02},"steps":[{"key":"machines","hours":8,"cost":4,"branch":"it","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"protest","polarity":"crisis","weight":8,"effect":{"demand":-0.1,"cost":0.03},"deadlineHours":30,"lastsHours":72,"strategies":[{"key":"green","mitigation":1,"bonus":{"awareness":0.03,"quality":0.02},"steps":[{"key":"footprint","hours":4,"cost":1,"branch":"science","baseBps":8500},{"key":"program","hours":8,"cost":4,"branch":"craft","staff":1,"baseBps":8500},{"key":"report","hours":2,"cost":1,"branch":"sales","baseBps":9000}]},{"key":"dialogue","mitigation":0.6,"steps":[{"key":"invite","hours":2,"cost":0,"branch":"management","baseBps":8500},{"key":"round_table","hours":4,"cost":1,"branch":"sales","baseBps":7000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"patent_claim","polarity":"crisis","weight":6,"effect":{"demand":-0.08,"cost":0.08},"deadlineHours":36,"lastsHours":96,"strategies":[{"key":"lawyers","mitigation":1,"steps":[{"key":"review","hours":4,"cost":2,"branch":"law","baseBps":8000},{"key":"court","hours":8,"cost":4,"branch":"law","baseBps":5500}]},{"key":"license","mitigation":0.7,"steps":[{"key":"pay_license","hours":2,"cost":5,"baseBps":10000}]},{"key":"workaround","mitigation":0.9,"bonus":{"quality":0.02},"steps":[{"key":"redesign","hours":8,"cost":2,"branch":"science","staff":1,"baseBps":6500},{"key":"test","hours":4,"cost":1,"branch":"craft","baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"bad_review","polarity":"crisis","weight":9,"effect":{"demand":-0.14},"deadlineHours":24,"lastsHours":48,"strategies":[{"key":"improve","mitigation":1,"bonus":{"quality":0.05},"steps":[{"key":"analyse","hours":3,"cost":1,"branch":"science","baseBps":9000},{"key":"rework","hours":6,"cost":3,"branch":"craft","capacityHit":0.2,"baseBps":7500},{"key":"retest","hours":3,"cost":1,"branch":"sales","baseBps":7000}]},{"key":"counter","mitigation":0.6,"bonus":{"awareness":0.02},"steps":[{"key":"campaign","hours":4,"cost":3,"branch":"sales","baseBps":7500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"viral_trend","polarity":"chance","weight":10,"effect":{"demand":0.35},"deadlineHours":12,"lastsHours":48,"strategies":[{"key":"scale_up","mitigation":1,"bonus":{"awareness":0.04},"steps":[{"key":"overtime","hours":2,"cost":2,"staff":1,"baseBps":9500},{"key":"restock","hours":4,"cost":3,"branch":"logistics","baseBps":8500}]},{"key":"ride_wave","mitigation":0.6,"bonus":{"awareness":0.06},"steps":[{"key":"content","hours":3,"cost":1,"branch":"sales","baseBps":8000}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"big_contract","polarity":"chance","weight":9,"effect":{"demand":0.25},"deadlineHours":24,"lastsHours":72,"strategies":[{"key":"pitch","mitigation":1,"steps":[{"key":"offer","hours":3,"cost":1,"branch":"sales","baseBps":8500},{"key":"negotiate","hours":4,"cost":1,"branch":"management","baseBps":6500},{"key":"deliver","hours":6,"cost":3,"staff":2,"capacityHit":0.2,"baseBps":9000}]},{"key":"quick_deal","mitigation":0.5,"steps":[{"key":"discount_offer","hours":2,"cost":1,"branch":"sales","baseBps":9000}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"award","polarity":"chance","weight":8,"effect":{"demand":0.15},"deadlineHours":24,"lastsHours":72,"strategies":[{"key":"press_tour","mitigation":1,"bonus":{"awareness":0.06},"steps":[{"key":"interviews","hours":3,"cost":1,"branch":"management","baseBps":8500},{"key":"ads","hours":4,"cost":3,"branch":"sales","baseBps":9000}]},{"key":"badge","mitigation":0.5,"steps":[{"key":"seal","hours":1,"cost":1,"baseBps":10000}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"subsidy","polarity":"chance","weight":7,"effect":{"cost":-0.08},"deadlineHours":36,"lastsHours":96,"strategies":[{"key":"apply","mitigation":1,"steps":[{"key":"forms","hours":3,"cost":0,"branch":"law","baseBps":9000},{"key":"plan","hours":5,"cost":1,"branch":"finance","baseBps":7500},{"key":"jury","hours":4,"cost":0,"branch":"management","baseBps":6000}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"partnership","polarity":"chance","weight":7,"effect":{"demand":0.2,"capacity":0.1},"deadlineHours":24,"lastsHours":96,"strategies":[{"key":"join","mitigation":1,"bonus":{"awareness":0.03},"steps":[{"key":"meeting","hours":2,"cost":0,"branch":"management","baseBps":9000},{"key":"integrate","hours":6,"cost":2,"branch":"it","staff":1,"baseBps":7500}]},{"key":"pass","mitigation":0,"steps":[]}]}]}'::jsonb, 'Defaults from src/config/balance.ts, section "companyEvents"'),
+  ('companyEvents', '{"chancePerDay":0.6,"minGapHours":22,"minAgeHours":6,"chanceShare":0.4,"severityWeights":[0.5,0.35,0.15],"severityScale":[1,1.7,2.5],"preDeadlineShare":0.25,"costUnit":{"minUnitCents":20000,"unitShareOfFixed":0.5},"knowHow":{"bpsPerPoint":150,"maxBonusBps":2500},"severityPenaltyBps":700,"retryCostShare":0.5,"shareShockBps":[400,900,1500],"archetypes":[{"key":"regulation","polarity":"crisis","weight":12,"effect":{"demand":-0.12,"cost":0.06},"deadlineHours":30,"lastsHours":72,"strategies":[{"key":"lobby","mitigation":1,"bonus":{"awareness":0.02},"steps":[{"key":"study","hours":3,"cost":2,"branch":"law","baseBps":9000},{"key":"alliance","hours":5,"cost":1,"branch":"sales","staff":2,"baseBps":6500},{"key":"hearing","hours":6,"cost":3,"branch":"law","baseBps":5500}]},{"key":"adapt","mitigation":0.7,"bonus":{"quality":0.03},"steps":[{"key":"retool","hours":8,"cost":4,"staff":1,"capacityHit":0.3,"baseBps":9500},{"key":"certify","hours":4,"cost":1,"branch":"science","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"special_tax","polarity":"crisis","weight":10,"effect":{"cost":0.1},"deadlineHours":30,"lastsHours":96,"strategies":[{"key":"lobby","mitigation":1,"steps":[{"key":"petition","hours":2,"cost":1,"branch":"sales","baseBps":9000},{"key":"experts","hours":5,"cost":2,"branch":"finance","baseBps":7000},{"key":"hearing","hours":6,"cost":3,"branch":"law","baseBps":5500}]},{"key":"reformulate","mitigation":0.8,"bonus":{"quality":-0.02},"steps":[{"key":"lab","hours":6,"cost":3,"branch":"science","staff":1,"baseBps":6500},{"key":"relaunch","hours":4,"cost":2,"branch":"sales","baseBps":8500}]},{"key":"pass_on","mitigation":0.5,"steps":[{"key":"price_talk","hours":3,"cost":1,"branch":"sales","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"supply_shortage","polarity":"crisis","weight":11,"effect":{"capacity":-0.25,"cost":0.05},"deadlineHours":24,"lastsHours":60,"strategies":[{"key":"new_supplier","mitigation":1,"steps":[{"key":"scout","hours":3,"cost":1,"branch":"logistics","baseBps":8500},{"key":"contract","hours":4,"cost":3,"branch":"finance","baseBps":7500}]},{"key":"stockpile","mitigation":0.8,"steps":[{"key":"buy_stock","hours":2,"cost":6,"baseBps":10000}]},{"key":"redesign","mitigation":1,"bonus":{"quality":0.02},"steps":[{"key":"prototype","hours":6,"cost":2,"branch":"science","staff":1,"baseBps":6000},{"key":"switch","hours":6,"cost":2,"branch":"craft","capacityHit":0.2,"baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"quality_scandal","polarity":"crisis","weight":9,"effect":{"demand":-0.2},"deadlineHours":20,"lastsHours":72,"strategies":[{"key":"recall","mitigation":1,"bonus":{"quality":0.04},"steps":[{"key":"pull_back","hours":4,"cost":4,"branch":"logistics","capacityHit":0.3,"baseBps":9500},{"key":"fix","hours":6,"cost":2,"branch":"craft","baseBps":7500}]},{"key":"pr_offensive","mitigation":0.6,"bonus":{"awareness":0.03},"steps":[{"key":"statement","hours":1,"cost":1,"branch":"management","baseBps":9000},{"key":"campaign","hours":5,"cost":3,"branch":"sales","baseBps":6500}]},{"key":"independent_test","mitigation":0.9,"steps":[{"key":"lab_test","hours":8,"cost":2,"branch":"science","baseBps":7000},{"key":"publish","hours":2,"cost":1,"branch":"sales","baseBps":9000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"data_breach","polarity":"crisis","weight":8,"sectors":["tech","retail","logistics"],"effect":{"demand":-0.15,"cost":0.04},"deadlineHours":18,"lastsHours":60,"strategies":[{"key":"forensics","mitigation":1,"bonus":{"quality":0.02},"steps":[{"key":"analyse","hours":4,"cost":2,"branch":"it","baseBps":7500},{"key":"patch","hours":4,"cost":1,"branch":"it","staff":2,"baseBps":8000},{"key":"audit","hours":3,"cost":2,"branch":"law","baseBps":9000}]},{"key":"transparency","mitigation":0.6,"bonus":{"awareness":0.01},"steps":[{"key":"disclose","hours":2,"cost":1,"branch":"management","baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"tax_audit","polarity":"crisis","weight":0,"effect":{"cost":0.05,"capacity":-0.08},"deadlineHours":12,"lastsHours":36,"strategies":[{"key":"cooperate","mitigation":0.9,"steps":[{"key":"collect_files","hours":2,"cost":1,"branch":"finance","baseBps":9000},{"key":"auditor_meeting","hours":3,"cost":1,"branch":"management","staff":1,"baseBps":8000}]},{"key":"tax_lawyer","mitigation":1,"steps":[{"key":"hire_lawyer","hours":4,"cost":4,"branch":"law","baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"price_war","polarity":"crisis","weight":10,"effect":{"demand":-0.18},"deadlineHours":30,"lastsHours":72,"strategies":[{"key":"undercut","mitigation":0.8,"steps":[{"key":"calculate","hours":2,"cost":1,"branch":"finance","baseBps":9000},{"key":"discount","hours":6,"cost":4,"branch":"sales","baseBps":9500}]},{"key":"innovate","mitigation":1,"bonus":{"quality":0.04},"steps":[{"key":"research","hours":6,"cost":2,"branch":"science","baseBps":7000},{"key":"build","hours":6,"cost":2,"branch":"craft","staff":2,"capacityHit":0.2,"baseBps":7500},{"key":"launch","hours":3,"cost":2,"branch":"sales","baseBps":8500}]},{"key":"niche","mitigation":0.6,"steps":[{"key":"reposition","hours":4,"cost":2,"branch":"sales","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"strike","polarity":"crisis","weight":7,"effect":{"capacity":-0.35},"deadlineHours":16,"lastsHours":48,"strategies":[{"key":"negotiate","mitigation":1,"steps":[{"key":"listen","hours":2,"cost":0,"branch":"management","baseBps":9000},{"key":"deal","hours":4,"cost":3,"branch":"management","baseBps":7000}]},{"key":"bonus","mitigation":0.8,"steps":[{"key":"pay_bonus","hours":1,"cost":5,"baseBps":10000}]},{"key":"automate","mitigation":0.7,"bonus":{"quality":-0.02},"steps":[{"key":"machines","hours":8,"cost":4,"branch":"it","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"protest","polarity":"crisis","weight":8,"effect":{"demand":-0.1,"cost":0.03},"deadlineHours":30,"lastsHours":72,"strategies":[{"key":"green","mitigation":1,"bonus":{"awareness":0.03,"quality":0.02},"steps":[{"key":"footprint","hours":4,"cost":1,"branch":"science","baseBps":8500},{"key":"program","hours":8,"cost":4,"branch":"craft","staff":1,"baseBps":8500},{"key":"report","hours":2,"cost":1,"branch":"sales","baseBps":9000}]},{"key":"dialogue","mitigation":0.6,"steps":[{"key":"invite","hours":2,"cost":0,"branch":"management","baseBps":8500},{"key":"round_table","hours":4,"cost":1,"branch":"sales","baseBps":7000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"patent_claim","polarity":"crisis","weight":6,"effect":{"demand":-0.08,"cost":0.08},"deadlineHours":36,"lastsHours":96,"strategies":[{"key":"lawyers","mitigation":1,"steps":[{"key":"review","hours":4,"cost":2,"branch":"law","baseBps":8000},{"key":"court","hours":8,"cost":4,"branch":"law","baseBps":5500}]},{"key":"license","mitigation":0.7,"steps":[{"key":"pay_license","hours":2,"cost":5,"baseBps":10000}]},{"key":"workaround","mitigation":0.9,"bonus":{"quality":0.02},"steps":[{"key":"redesign","hours":8,"cost":2,"branch":"science","staff":1,"baseBps":6500},{"key":"test","hours":4,"cost":1,"branch":"craft","baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"bad_review","polarity":"crisis","weight":9,"effect":{"demand":-0.14},"deadlineHours":24,"lastsHours":48,"strategies":[{"key":"improve","mitigation":1,"bonus":{"quality":0.05},"steps":[{"key":"analyse","hours":3,"cost":1,"branch":"science","baseBps":9000},{"key":"rework","hours":6,"cost":3,"branch":"craft","capacityHit":0.2,"baseBps":7500},{"key":"retest","hours":3,"cost":1,"branch":"sales","baseBps":7000}]},{"key":"counter","mitigation":0.6,"bonus":{"awareness":0.02},"steps":[{"key":"campaign","hours":4,"cost":3,"branch":"sales","baseBps":7500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"viral_trend","polarity":"chance","weight":10,"effect":{"demand":0.35},"deadlineHours":12,"lastsHours":48,"strategies":[{"key":"scale_up","mitigation":1,"bonus":{"awareness":0.04},"steps":[{"key":"overtime","hours":2,"cost":2,"staff":1,"baseBps":9500},{"key":"restock","hours":4,"cost":3,"branch":"logistics","baseBps":8500}]},{"key":"ride_wave","mitigation":0.6,"bonus":{"awareness":0.06},"steps":[{"key":"content","hours":3,"cost":1,"branch":"sales","baseBps":8000}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"big_contract","polarity":"chance","weight":9,"effect":{"demand":0.25},"deadlineHours":24,"lastsHours":72,"strategies":[{"key":"pitch","mitigation":1,"steps":[{"key":"offer","hours":3,"cost":1,"branch":"sales","baseBps":8500},{"key":"negotiate","hours":4,"cost":1,"branch":"management","baseBps":6500},{"key":"deliver","hours":6,"cost":3,"staff":2,"capacityHit":0.2,"baseBps":9000}]},{"key":"quick_deal","mitigation":0.5,"steps":[{"key":"discount_offer","hours":2,"cost":1,"branch":"sales","baseBps":9000}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"award","polarity":"chance","weight":8,"effect":{"demand":0.15},"deadlineHours":24,"lastsHours":72,"strategies":[{"key":"press_tour","mitigation":1,"bonus":{"awareness":0.06},"steps":[{"key":"interviews","hours":3,"cost":1,"branch":"management","baseBps":8500},{"key":"ads","hours":4,"cost":3,"branch":"sales","baseBps":9000}]},{"key":"badge","mitigation":0.5,"steps":[{"key":"seal","hours":1,"cost":1,"baseBps":10000}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"subsidy","polarity":"chance","weight":7,"effect":{"cost":-0.08},"deadlineHours":36,"lastsHours":96,"strategies":[{"key":"apply","mitigation":1,"steps":[{"key":"forms","hours":3,"cost":0,"branch":"law","baseBps":9000},{"key":"plan","hours":5,"cost":1,"branch":"finance","baseBps":7500},{"key":"jury","hours":4,"cost":0,"branch":"management","baseBps":6000}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"partnership","polarity":"chance","weight":7,"effect":{"demand":0.2,"capacity":0.1},"deadlineHours":24,"lastsHours":96,"strategies":[{"key":"join","mitigation":1,"bonus":{"awareness":0.03},"steps":[{"key":"meeting","hours":2,"cost":0,"branch":"management","baseBps":9000},{"key":"integrate","hours":6,"cost":2,"branch":"it","staff":1,"baseBps":7500}]},{"key":"pass","mitigation":0,"steps":[]}]}]}'::jsonb, 'Defaults from src/config/balance.ts, section "companyEvents"'),
   ('upgrades', '{"order":["vault","vault_xl","vault_interest","income","daily_bonus","study","mentor","overtime","rhetoric","wage_bonus","wage_shield","trader","early_bird","mission_hunter","teamplayer","balance_sheet","ambition","efficiency","task_pay","task_safety","crisis_manager","move_luck","ad_agency","dealmaker","ai_turbo","ai_precision","strategist","move_tempo","artist","activist","makler","crypto_wallet"],"groups":[{"key":"vault","keys":["vault","vault_xl","vault_interest","income","daily_bonus"]},{"key":"work","keys":["study","mentor","overtime","rhetoric","wage_bonus","wage_shield"]},{"key":"xp","keys":["trader","early_bird","mission_hunter","teamplayer","balance_sheet","ambition"]},{"key":"company","keys":["efficiency","task_pay","task_safety","crisis_manager","move_luck","ad_agency","dealmaker","ai_turbo","ai_precision","strategist","move_tempo"]},{"key":"life","keys":["artist","activist","makler","crypto_wallet"]}],"vault":{"maxLevel":8,"minLevel":1,"levelStep":2,"baseCostCents":300000,"costGrowth":2,"perLevel":2},"income":{"maxLevel":3,"minLevel":3,"levelStep":4,"baseCostCents":400000,"costGrowth":3,"perLevel":1000},"study":{"maxLevel":3,"minLevel":2,"levelStep":4,"baseCostCents":800000,"costGrowth":3,"perLevel":1},"mentor":{"maxLevel":3,"minLevel":4,"levelStep":4,"baseCostCents":600000,"costGrowth":3,"perLevel":1000},"overtime":{"maxLevel":2,"minLevel":5,"levelStep":6,"baseCostCents":2000000,"costGrowth":3,"perLevel":1},"rhetoric":{"maxLevel":3,"minLevel":5,"levelStep":5,"baseCostCents":1000000,"costGrowth":2.5,"perLevel":500},"artist":{"maxLevel":3,"minLevel":4,"levelStep":3,"baseCostCents":500000,"costGrowth":2.5,"perLevel":1000},"efficiency":{"maxLevel":3,"minLevel":6,"levelStep":4,"baseCostCents":1200000,"costGrowth":2.5,"perLevel":500},"makler":{"maxLevel":3,"minLevel":8,"levelStep":4,"baseCostCents":1500000,"costGrowth":2.5,"perLevel":500},"crypto_wallet":{"maxLevel":2,"minLevel":10,"levelStep":5,"baseCostCents":2000000,"costGrowth":3,"perLevel":2500},"vault_xl":{"maxLevel":3,"minLevel":14,"levelStep":6,"baseCostCents":10000000,"costGrowth":2,"perLevel":4},"vault_interest":{"maxLevel":4,"minLevel":3,"levelStep":3,"baseCostCents":500000,"costGrowth":2.5,"perLevel":500},"daily_bonus":{"maxLevel":3,"minLevel":2,"levelStep":4,"baseCostCents":250000,"costGrowth":3,"perLevel":2500},"wage_bonus":{"maxLevel":3,"minLevel":3,"levelStep":5,"baseCostCents":600000,"costGrowth":3,"perLevel":500},"wage_shield":{"maxLevel":3,"minLevel":6,"levelStep":5,"baseCostCents":800000,"costGrowth":2.5,"perLevel":2500},"trader":{"maxLevel":3,"minLevel":1,"levelStep":3,"baseCostCents":200000,"costGrowth":2.5,"perLevel":1000,"xpSources":["trade"]},"early_bird":{"maxLevel":3,"minLevel":1,"levelStep":4,"baseCostCents":150000,"costGrowth":3,"perLevel":2000,"xpSources":["daily_login","streak_bonus"]},"mission_hunter":{"maxLevel":3,"minLevel":2,"levelStep":4,"baseCostCents":300000,"costGrowth":2.5,"perLevel":1000,"xpSources":["mission"]},"teamplayer":{"maxLevel":3,"minLevel":6,"levelStep":4,"baseCostCents":800000,"costGrowth":2.5,"perLevel":1500,"xpSources":["work_task"]},"balance_sheet":{"maxLevel":3,"minLevel":9,"levelStep":5,"baseCostCents":1500000,"costGrowth":2.5,"perLevel":1500,"xpSources":["company_quarter_profit","ipo_success"]},"ambition":{"maxLevel":3,"minLevel":18,"levelStep":6,"baseCostCents":10000000,"costGrowth":2,"perLevel":500,"xpSources":["*"]},"task_pay":{"maxLevel":3,"minLevel":7,"levelStep":4,"baseCostCents":1000000,"costGrowth":2.5,"perLevel":1000},"task_safety":{"maxLevel":3,"minLevel":7,"levelStep":5,"baseCostCents":600000,"costGrowth":2.5,"perLevel":2500},"crisis_manager":{"maxLevel":3,"minLevel":7,"levelStep":5,"baseCostCents":1000000,"costGrowth":2.5,"perLevel":1000},"move_luck":{"maxLevel":3,"minLevel":8,"levelStep":4,"baseCostCents":1200000,"costGrowth":2.5,"perLevel":300},"ad_agency":{"maxLevel":3,"minLevel":9,"levelStep":4,"baseCostCents":1200000,"costGrowth":2.5,"perLevel":1000},"dealmaker":{"maxLevel":3,"minLevel":10,"levelStep":5,"baseCostCents":2000000,"costGrowth":2.5,"perLevel":1000},"ai_turbo":{"maxLevel":3,"minLevel":11,"levelStep":4,"baseCostCents":1500000,"costGrowth":2.5,"perLevel":1500},"ai_precision":{"maxLevel":3,"minLevel":12,"levelStep":5,"baseCostCents":2000000,"costGrowth":2.5,"perLevel":500},"strategist":{"maxLevel":3,"minLevel":13,"levelStep":5,"baseCostCents":2500000,"costGrowth":2.5,"perLevel":400},"move_tempo":{"maxLevel":3,"minLevel":16,"levelStep":5,"baseCostCents":4000000,"costGrowth":2.5,"perLevel":1500},"activist":{"maxLevel":3,"minLevel":4,"levelStep":6,"baseCostCents":400000,"costGrowth":2.5,"perLevel":500},"minWorkHoursPerBranchPoint":3}'::jsonb, 'Defaults from src/config/balance.ts, section "upgrades"'),
   ('deals', '{"minLevel":6,"sizeShareOfValueBps":5000,"minSizeCents":5000000,"offerValidHours":48,"maxOpenOffers":5,"maxActivePerKind":5,"loan":{"minPrincipalCents":10000,"maxPrincipalCentsPerLevel":2000000,"maxInterestBps":3000,"minHours":24,"maxHours":720,"defaultAfterHours":168},"supply":{"minVolumeCentsPerHour":1000,"minFeeBps":1000,"maxFeeBps":9500,"maxPrepayBps":5000,"minHours":24,"maxHours":336,"keptDeliveryBps":5000},"stake":{"minAmountCents":10000,"maxShareBps":3000,"maxTotalShareBps":5000,"minHours":24,"maxHours":720}}'::jsonb, 'Defaults from src/config/balance.ts, section "deals"'),
   ('trust', '{"start":50,"min":0,"max":100,"deltas":{"loanRepaidOnTime":4,"loanRepaidLate":2,"loanOverdue":-6,"loanDefaulted":-12,"loanLent":1,"loanForgiven":2,"supplyKept":3,"supplyShort":-4,"stakeKept":3,"dealBroken":-12,"rugPull":-20},"bands":[{"from":0,"key":"risky"},{"from":30,"key":"shaky"},{"from":45,"key":"blank"},{"from":60,"key":"reliable"},{"from":80,"key":"rock"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "trust"'),
@@ -59371,11 +62367,12 @@ insert into public.game_config (key, value, description) values
   ('companyTasks', '{"valueCentsByTier":{"garage":40000,"small_business":150000,"gmbh":500000,"ag":2000000},"penaltyBps":6000,"passScoreBps":8000,"graceSeconds":8,"games":{"pick":{"seconds":30,"tiles":12,"minTargets":3,"maxTargets":6},"count":{"seconds":25,"tiles":16,"minTargets":4,"maxTargets":9},"sort":{"seconds":35,"items":8},"order":{"seconds":30,"items":5,"min":1,"max":99},"seq":{"seconds":25,"length":5,"showSeconds":4},"math":{"seconds":45},"slider":{"seconds":30,"sliders":3,"min":20,"max":92,"tolerance":3},"rotate":{"seconds":30,"dials":3,"steps":8,"minTurn":2},"match":{"seconds":40,"boxes":3,"groupSize":3,"perBox":2},"path":{"seconds":40,"size":5,"minWalls":6,"maxWalls":9,"minDetour":2,"stepBps":1000}},"ai":{"minutes":12,"slowdownPerQueuedBps":5000,"chanceBps":7000,"skillBonusBps":1000,"valueBps":6000},"board":{"base":1,"membersPerTask":2,"max":6,"everyMinutes":4,"activeMinutes":20,"autoAiBeforeDueMinutes":15},"aiDelegateMinTier":"senior","xp":{"success":60,"failure":15},"momentum":{"perSolveBps":120,"perfectBonusBps":80,"penaltyBps":250,"aiBps":5000,"decayPerHourBps":300,"maxBps":6000},"historyLimit":15,"tasks":[{"key":"pay_invoices","product":"*","branch":"finance","game":"sort","factor":1,"minutes":45},{"key":"payroll_check","product":"*","branch":"finance","game":"math","factor":1.1,"minutes":45,"op":"mul","a":[3,9],"b":[12,28]},{"key":"coffee_order","product":"*","branch":"management","game":"count","factor":0.6,"minutes":40},{"key":"shift_plan","product":"*","branch":"management","game":"order","factor":1,"minutes":50,"asc":true,"range":[6,22]},{"key":"contract_review","product":"*","branch":"law","game":"pick","factor":1.2,"minutes":50},{"key":"password_reset","product":"*","branch":"it","game":"seq","factor":0.7,"minutes":40},{"key":"customer_mail","product":"*","branch":"sales","game":"sort","factor":0.8,"minutes":40},{"key":"office_supplies","product":"*","branch":"logistics","game":"math","factor":0.6,"minutes":40,"op":"add","a":[12,40],"b":[8,30]},{"key":"patch_servers","product":"security_software","branch":"it","game":"pick","factor":1.3,"minutes":45},{"key":"phishing_filter","product":"security_software","branch":"it","game":"sort","factor":1,"minutes":40},{"key":"alarm_codes","product":"security_software","branch":"it","game":"seq","factor":1.1,"minutes":40},{"key":"license_count","product":"security_software","branch":"sales","game":"math","factor":0.9,"minutes":45,"op":"mul","a":[4,12],"b":[5,25]},{"key":"crash_reports","product":"mobile_app","branch":"it","game":"count","factor":1,"minutes":40},{"key":"release_notes","product":"mobile_app","branch":"sales","game":"sort","factor":0.8,"minutes":45},{"key":"store_screens","product":"mobile_app","branch":"sales","game":"pick","factor":0.9,"minutes":40},{"key":"beta_testers","product":"mobile_app","branch":"management","game":"math","factor":0.8,"minutes":50,"op":"sub","a":[60,120],"b":[10,45]},{"key":"rack_servers","product":"cloud_platform","branch":"it","game":"order","factor":1.2,"minutes":45,"asc":false,"range":[18,45]},{"key":"backup_tapes","product":"cloud_platform","branch":"it","game":"pick","factor":1,"minutes":40},{"key":"cloud_bill","product":"cloud_platform","branch":"finance","game":"math","factor":1.1,"minutes":45,"op":"mul","a":[6,20],"b":[15,60]},{"key":"ddos_block","product":"cloud_platform","branch":"it","game":"pick","factor":1.3,"minutes":40},{"key":"deadline_files","product":"legal_tech","branch":"law","game":"order","factor":1,"minutes":40,"asc":true,"range":[1,30]},{"key":"template_check","product":"legal_tech","branch":"law","game":"pick","factor":1.1,"minutes":45},{"key":"chatbot_answers","product":"legal_tech","branch":"it","game":"sort","factor":0.9,"minutes":40},{"key":"fee_calc","product":"legal_tech","branch":"finance","game":"math","factor":1,"minutes":45,"op":"pct","a":[2000,9000],"b":[10,30]},{"key":"fraud_check","product":"fintech","branch":"finance","game":"pick","factor":1.3,"minutes":40},{"key":"kyc_docs","product":"fintech","branch":"law","game":"sort","factor":1,"minutes":45},{"key":"interest_calc","product":"fintech","branch":"finance","game":"math","factor":1,"minutes":45,"op":"pct","a":[1000,20000],"b":[2,6]},{"key":"tan_codes","product":"fintech","branch":"it","game":"seq","factor":0.8,"minutes":40},{"key":"pack_orders","product":"online_shop","branch":"logistics","game":"pick","factor":1.1,"minutes":40},{"key":"returns_sort","product":"online_shop","branch":"logistics","game":"sort","factor":0.9,"minutes":45},{"key":"price_update","product":"online_shop","branch":"sales","game":"math","factor":1,"minutes":40,"op":"pct","a":[20,200],"b":[10,40]},{"key":"stock_count_shop","product":"online_shop","branch":"logistics","game":"count","factor":0.8,"minutes":40},{"key":"pack_shirts","product":"fashion","branch":"logistics","game":"pick","factor":1.1,"minutes":40},{"key":"color_match","product":"fashion","branch":"craft","game":"sort","factor":1,"minutes":45},{"key":"runway_order","product":"fashion","branch":"sales","game":"seq","factor":0.9,"minutes":50},{"key":"size_count","product":"fashion","branch":"logistics","game":"count","factor":0.8,"minutes":40},{"key":"cheese_age","product":"delicatessen","branch":"science","game":"order","factor":1,"minutes":45,"asc":false,"range":[2,36]},{"key":"expiry_check","product":"delicatessen","branch":"logistics","game":"pick","factor":1.1,"minutes":40},{"key":"gift_basket","product":"delicatessen","branch":"sales","game":"math","factor":0.9,"minutes":45,"op":"mul","a":[5,25],"b":[18,45]},{"key":"cold_chain","product":"delicatessen","branch":"logistics","game":"sort","factor":1,"minutes":40},{"key":"partner_audit","product":"franchise","branch":"management","game":"pick","factor":1.2,"minutes":50},{"key":"royalty_calc","product":"franchise","branch":"finance","game":"math","factor":1.1,"minutes":45,"op":"pct","a":[10000,60000],"b":[4,9]},{"key":"opening_plan","product":"franchise","branch":"management","game":"order","factor":1,"minutes":50,"asc":true,"range":[1,26]},{"key":"recipe_steps","product":"franchise","branch":"management","game":"seq","factor":0.8,"minutes":40},{"key":"panel_check","product":"solar","branch":"craft","game":"pick","factor":1.1,"minutes":45},{"key":"roof_angle","product":"solar","branch":"craft","game":"order","factor":1,"minutes":45,"asc":false,"range":[200,1200]},{"key":"feed_in","product":"solar","branch":"finance","game":"math","factor":1,"minutes":45,"op":"mul","a":[300,900],"b":[8,13]},{"key":"cable_colors","product":"solar","branch":"craft","game":"seq","factor":0.9,"minutes":40},{"key":"outage_map","product":"grid_service","branch":"craft","game":"pick","factor":1.3,"minutes":40},{"key":"meter_read","product":"grid_service","branch":"it","game":"math","factor":0.9,"minutes":45,"op":"sub","a":[4000,9000],"b":[1000,3500]},{"key":"crew_dispatch","product":"grid_service","branch":"management","game":"order","factor":1,"minutes":45,"asc":true,"range":[5,60]},{"key":"safety_gear","product":"grid_service","branch":"law","game":"sort","factor":0.8,"minutes":40},{"key":"cell_test","product":"energy_storage","branch":"science","game":"pick","factor":1.2,"minutes":45},{"key":"charge_plan","product":"energy_storage","branch":"finance","game":"order","factor":1,"minutes":45,"asc":true,"range":[8,45]},{"key":"capacity_calc","product":"energy_storage","branch":"science","game":"math","factor":1,"minutes":45,"op":"mul","a":[8,24],"b":[5,15]},{"key":"thermal_watch","product":"energy_storage","branch":"science","game":"count","factor":1.1,"minutes":40},{"key":"buy_cheap","product":"energy_trading","branch":"finance","game":"order","factor":1.3,"minutes":40,"asc":true,"range":[30,150]},{"key":"contract_sort","product":"energy_trading","branch":"law","game":"sort","factor":1,"minutes":45},{"key":"margin_calc","product":"energy_trading","branch":"finance","game":"math","factor":1.1,"minutes":45,"op":"sub","a":[90,160],"b":[40,85]},{"key":"trade_signals","product":"energy_trading","branch":"finance","game":"seq","factor":0.9,"minutes":40},{"key":"batch_check","product":"generics","branch":"science","game":"pick","factor":1.2,"minutes":45},{"key":"dose_calc","product":"generics","branch":"science","game":"math","factor":1,"minutes":45,"op":"mul","a":[2,6],"b":[50,400]},{"key":"pharmacy_orders","product":"generics","branch":"logistics","game":"count","factor":0.9,"minutes":40},{"key":"label_sort","product":"generics","branch":"law","game":"sort","factor":0.8,"minutes":40},{"key":"petri_dishes","product":"biotech","branch":"science","game":"pick","factor":1.1,"minutes":45},{"key":"dna_sequence","product":"biotech","branch":"science","game":"seq","factor":1.2,"minutes":45},{"key":"lab_cleanup","product":"biotech","branch":"science","game":"sort","factor":1,"minutes":45},{"key":"grant_budget","product":"biotech","branch":"finance","game":"math","factor":1,"minutes":45,"op":"pct","a":[100000,500000],"b":[10,30]},{"key":"device_test","product":"medtech","branch":"craft","game":"pick","factor":1.2,"minutes":45},{"key":"sterile_sort","product":"medtech","branch":"science","game":"sort","factor":1,"minutes":40},{"key":"calibrate","product":"medtech","branch":"science","game":"math","factor":1,"minutes":40,"op":"sub","a":[150,190],"b":[110,145]},{"key":"hospital_route","product":"medtech","branch":"sales","game":"order","factor":0.9,"minutes":45,"asc":true,"range":[1,40]},{"key":"dossier_pages","product":"regulatory","branch":"law","game":"count","factor":1.2,"minutes":45},{"key":"deadline_agency","product":"regulatory","branch":"law","game":"order","factor":1.1,"minutes":45,"asc":true,"range":[3,60]},{"key":"side_effects","product":"regulatory","branch":"science","game":"sort","factor":1,"minutes":40},{"key":"translation_set","product":"regulatory","branch":"law","game":"pick","factor":0.8,"minutes":40},{"key":"route_order","product":"courier","branch":"logistics","game":"order","factor":1.1,"minutes":40,"asc":true,"range":[3,45]},{"key":"parcel_scan","product":"courier","branch":"logistics","game":"pick","factor":1,"minutes":40},{"key":"bike_check","product":"courier","branch":"craft","game":"seq","factor":0.8,"minutes":40},{"key":"tip_jar","product":"courier","branch":"finance","game":"math","factor":0.7,"minutes":45,"op":"add","a":[20,80],"b":[15,60]},{"key":"pick_list","product":"warehouse","branch":"logistics","game":"pick","factor":1.1,"minutes":40},{"key":"pallet_count","product":"warehouse","branch":"logistics","game":"count","factor":0.9,"minutes":40},{"key":"forklift_safety","product":"warehouse","branch":"management","game":"sort","factor":0.8,"minutes":45},{"key":"dock_plan","product":"warehouse","branch":"management","game":"order","factor":1,"minutes":45,"asc":true,"range":[5,20]},{"key":"customs_docs","product":"freight","branch":"law","game":"sort","factor":1.2,"minutes":45},{"key":"container_load","product":"freight","branch":"logistics","game":"math","factor":1.1,"minutes":45,"op":"mul","a":[6,18],"b":[12,30]},{"key":"ship_schedule","product":"freight","branch":"logistics","game":"order","factor":1,"minutes":50,"asc":true,"range":[2,40]},{"key":"seal_codes","product":"freight","branch":"logistics","game":"seq","factor":0.8,"minutes":40},{"key":"box_labels","product":"moving","branch":"logistics","game":"pick","factor":1,"minutes":40},{"key":"load_order","product":"moving","branch":"management","game":"seq","factor":1.1,"minutes":45},{"key":"fragile_sort","product":"moving","branch":"logistics","game":"sort","factor":0.9,"minutes":40},{"key":"moving_quote","product":"moving","branch":"finance","game":"math","factor":1,"minutes":45,"op":"mul","a":[3,9],"b":[45,90]},{"key":"align_labels","product":"*","branch":"logistics","game":"slider","factor":0.7,"minutes":40},{"key":"fix_antenna","product":"*","branch":"it","game":"rotate","factor":0.8,"minutes":40},{"key":"file_documents","product":"*","branch":"management","game":"match","factor":0.9,"minutes":45},{"key":"office_route","product":"*","branch":"logistics","game":"path","factor":0.8,"minutes":45},{"key":"firewall_rules","product":"security_software","branch":"it","game":"match","factor":1.1,"minutes":45},{"key":"ui_align","product":"mobile_app","branch":"it","game":"slider","factor":0.9,"minutes":40},{"key":"cable_route","product":"cloud_platform","branch":"it","game":"path","factor":1.1,"minutes":45},{"key":"case_files","product":"legal_tech","branch":"law","game":"match","factor":1,"minutes":45},{"key":"vault_dials","product":"fintech","branch":"it","game":"rotate","factor":1,"minutes":40},{"key":"warehouse_bins","product":"online_shop","branch":"logistics","game":"match","factor":1,"minutes":45},{"key":"hem_length","product":"fashion","branch":"craft","game":"slider","factor":0.9,"minutes":40},{"key":"fridge_shelves","product":"delicatessen","branch":"logistics","game":"match","factor":1,"minutes":45},{"key":"sign_turn","product":"franchise","branch":"craft","game":"rotate","factor":0.9,"minutes":40},{"key":"panel_turn","product":"solar","branch":"craft","game":"rotate","factor":1.1,"minutes":40},{"key":"line_repair","product":"grid_service","branch":"craft","game":"path","factor":1.2,"minutes":45},{"key":"charge_level","product":"energy_storage","branch":"science","game":"slider","factor":1,"minutes":40},{"key":"grid_flow","product":"energy_trading","branch":"finance","game":"path","factor":1.1,"minutes":45},{"key":"pill_boxes","product":"generics","branch":"science","game":"match","factor":1,"minutes":45},{"key":"pipette","product":"biotech","branch":"science","game":"slider","factor":1.1,"minutes":40},{"key":"probe_turn","product":"medtech","branch":"craft","game":"rotate","factor":1,"minutes":40},{"key":"form_stack","product":"regulatory","branch":"law","game":"match","factor":1,"minutes":45},{"key":"bike_route","product":"courier","branch":"logistics","game":"path","factor":1.1,"minutes":45},{"key":"forklift_path","product":"warehouse","branch":"logistics","game":"path","factor":1,"minutes":45},{"key":"crane_turn","product":"freight","branch":"logistics","game":"rotate","factor":1,"minutes":40},{"key":"truck_space","product":"moving","branch":"logistics","game":"slider","factor":0.9,"minutes":40}]}'::jsonb, 'Defaults from src/config/balance.ts, section "companyTasks"'),
   ('funNews', '{"everyMinutes":6,"repeatHours":8,"keepHours":48,"items":[{"key":"ceo_laptop_train","needs":"company"},{"key":"office_dog","needs":"company"},{"key":"coffee_machine","needs":"company"},{"key":"typo_press","needs":"company"},{"key":"ceo_marathon","needs":"company"},{"key":"printer_rebellion","needs":"company"},{"key":"parking_war","needs":"company"},{"key":"lucky_socks","needs":"company"},{"key":"annual_party","needs":"company"},{"key":"ai_slogan","needs":"company"},{"key":"mascot","needs":"company"},{"key":"intern_ceo","needs":"company"},{"key":"rename_rumor","needs":"company"},{"key":"plant_office","needs":"company"},{"key":"ticker_meme","needs":"company"},{"key":"yacht_sale","needs":"company"},{"key":"player_lambo","needs":"player"},{"key":"player_coffee","needs":"player"},{"key":"player_tip","needs":"player"},{"key":"player_office","needs":"player"},{"key":"player_chart","needs":"player"},{"key":"player_diet","needs":"player"},{"key":"player_motivation","needs":"player"},{"key":"player_haircut","needs":"player"},{"key":"weather_markets","needs":"none"},{"key":"pigeon_trader","needs":"none"},{"key":"monday_effect","needs":"none"},{"key":"broker_nap","needs":"none"},{"key":"bull_escape","needs":"none"},{"key":"bear_costume","needs":"none"},{"key":"calculator_strike","needs":"none"},{"key":"vending_machine","needs":"none"},{"key":"elevator_talk","needs":"none"},{"key":"index_birthday","needs":"none"},{"key":"cat_portfolio","needs":"none"},{"key":"headline_error","needs":"none"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "funNews"'),
   ('newsShow', '{"prepareMinutes":10,"introSeconds":12,"segmentSeconds":22,"outroSeconds":6,"charsPerSecond":28,"maxSegments":10,"waitMinutes":10,"replayMinutes":55,"teaserMinutes":5,"audience":{"max":12,"bubbleSeconds":6,"bubblesAtOnce":2,"bubbleMaxDelaySeconds":12,"botsOnStage":false,"botMinutes":8,"botAccessoriesMax":3},"chat":{"maxLength":200,"perMinute":10,"history":60,"keepHours":24,"emojis":["😂","💀","🔥","📉","📈","🤡","👏","😱","🍿","💸","🚀","😭"],"bots":{"everySecondsMin":6,"everySecondsMax":14,"aboutShareBps":3000,"angryShareBps":3500,"names":["Jürgen Kowalski","Chantal Schröder","Dieter Brömmelkamp","Uschi Hoppenstedt","Kevin Pawlak","Renate Zielinski","Horst Kaczmarek","Mandy Wuttke","Günter Pototschnik","Jacqueline Meier","Rüdiger Fasselt","Sabine Dombrowski","Emre Yıldırım","Nadine Krüger","Wolfgang Stratmann","Tamara Nowak"],"lines":{"angry":["Wer hat diesem Mann ein Mikrofon gegeben?? 😤","Ich zahle keine Rundfunkgebühren für DAS.","Der Schnurrbart lügt. Ich sehe es ihm an.","Unverschämtheit! Ich schreibe einen Leserbrief!!","Mr. Doodle Dangle hat mal mein Fahrrad schlechtgeredet. Ich vergesse nie.","Früher waren Nachrichten noch seriös. Also vor diesem Kerl.","So redet man nicht über Leute, du Schnauzbartträger 😡","Abschalten. Sofort. Ich schaue natürlich weiter.","Der Mann ist eine Zumutung mit Krawatte.","Meine Frau sagt, ich soll mich nicht aufregen. ICH REGE MICH AUF.","Wer kontrolliert eigentlich diesen Sender??","Dangle raus!!! 👎","Das melde ich dem Presserat. Sobald ich weiß, was das ist.","Der hat doch selbst keine Ahnung von Aktien 🤡","Ich habe Puls. Wegen DIESEM Mann.","Schämen Sie sich, Herr Dangle! Und rasieren Sie sich!"],"glaze":["Mr. Doodle Dangle ist der einzige Mann, dem ich vertraue ❤️","Dieser Schnurrbart gehört ins Museum. Lebend.","KÖNIG. LEGENDE. VATERFIGUR. 👑","Ich habe mir sein Gesicht auf den Rücken tätowieren lassen.","Er hat immer recht. Auch wenn er falsch liegt.","Doodle Dangle for Bundeskanzler 🙏","Ich schaue nur wegen ihm. Meine Familie ist ausgezogen. Egal.","So ein schöner Mann. So eine schöne Stimme. 😍","Jedes Wort ein Geschenk.","Ich habe meinen Sohn nach ihm benannt. Er heißt jetzt Mister.","Der beste Journalist seit Erfindung des Schnurrbarts.","Bitte niemals aufhören zu senden 😭❤️","Ich würde ihm mein Depot anvertrauen. Und meine Niere.","Ein Gott unter Moderatoren 🔥","Ich habe geweint. Vor Ehrfurcht.","Wie er die Papiere hält. Meisterhaft."],"about":["{name} 💀💀💀","Arme Sau, {name}. Kleiner Scherz. Hahaha.","{name} erholt sich davon nie wieder 😂","Ich kenne {name} persönlich. Es ist alles wahr.","Lasst {name} in Ruhe!! ...oder macht weiter, ist lustig 🍿","{name}, falls du zuschaust: Kopf hoch. Oder auch nicht.","Team {name} 💪","Screenshot gemacht. Das bekommt {name} jetzt jeden Tag geschickt.","{name} hat das nicht verdient. Doch. Doch, hat {name}.","Wer ist {name} und warum lache ich so?"]}}},"loser":{"windowHours":24,"minLossBps":300,"consolationCents":50000},"winner":{"windowHours":24,"minGainBps":300},"company":{"count":2,"scandalShareBps":6000,"awarenessMinBps":1000,"awarenessMaxBps":2500,"stockMinBps":800,"stockMaxBps":2000,"momentumLossBps":5000},"stock":{"count":1,"minBps":600,"maxBps":1800},"sector":{"minBps":400,"maxBps":1000},"tasks":{"minBps":2000,"maxBps":4000},"gossip":{"count":2,"windowHours":24,"absentDays":3,"hushMoneyCents":10000},"nft":{"windowHours":24},"ramble":{"chanceBps":7000,"investShareBps":5000,"minBps":300,"maxBps":900,"people":["Friedrich Merz","Markus Söder","Elon Musk","Christian Lindner","Heidi Klum","Thomas Gottschalk","Dieter Bohlen","Robert Habeck","Günther Jauch","Donald Trump"]},"moods":{"loser":["laughing","smug"],"winner":["proud","shocked"],"scandal":["shocked","angry"],"hype":["proud","laughing"],"stockUp":["proud","smug"],"stockDown":["crying","shocked"],"sectorUp":["proud"],"sectorDown":["crying","angry"],"tasksUp":["laughing","proud"],"tasksDown":["angry","crying"],"tip":["smug"],"filler":["confused","angry"],"gossipBad":["laughing","smug","shocked"],"gossipGood":["shocked","proud"],"nftSale":["confused","shocked","laughing"],"ramble":["confused","angry","crying"],"rambleInvest":["shocked","smug"]},"tip":{"leadMinMinutes":15,"leadMaxMinutes":45,"minBps":500,"maxBps":1500,"reliabilityBps":7000},"texts":{"loser":{"frames":[{"headline":"{name} verbrennt {amount}","text":"Unser Verlierer des Tages: {name} hat {amount} versenkt, das sind {pct} des Vermögens. {reason} Die Redaktion schickt ein Trostpflaster."},{"headline":"Depot-Massaker bei {name}","text":"{name} hat heute {amount} verloren, {pct} einfach weg. {reason} Ein kleines Almosen ist unterwegs."},{"headline":"{name}: minus {pct} an einem Tag","text":"Eilmeldung aus der Abteilung Fremdscham: {name} hat {amount} in den Sand gesetzt. {reason} Wir spenden Trost, mehr können wir nicht tun."},{"headline":"Wo ist das Geld von {name}?","text":"{amount} futsch, {pct} Minus: {name} schreibt heute Börsengeschichte, leider die falsche. {reason} Das Trostpflaster kommt per Eilbote."}],"reasons":["Meine Großmutter handelt besser, und die ist seit 1987 tot.","Experten nennen die Strategie „Augen zu und hoffen“.","Wer so anlegt, braucht keine Feinde, nur jemanden, der ihm das Handy wegnimmt.","Wenn Dummheit Rendite brächte, wäre das hier ein Milliardär.","Das Motto lautet offenbar: teuer kaufen, billig verkaufen, laut heulen.","Ein Affe mit Dartpfeilen hätte heute besser abgeschnitten, wir haben es nachgerechnet.","Man kann auch mit Spielgeld scheitern, aber so gründlich schafft es nicht jeder.","Selbst der Tresor hat sich aus Scham kurz geschlossen.","Die Bank hat vorsorglich schon mal das Mitleid erhöht.","Im Lehrbuch steht das unter „Wie man es nicht macht“, Kapitel eins bis zwölf.","Das war kein Handel, das war eine Spende an den Markt.","Unsere Praktikantin wollte helfen, wir haben sie zurückgehalten.","Die Kurve des Depots sieht aus wie eine Rutsche, und zwar eine gute.","Angeblich war ein Plan vorhanden. Er wurde nie gefunden.","Was für ein Vollpfosten, und das meine ich wissenschaftlich.","Ich habe Mitleid. Kleiner Scherz, habe ich nicht.","Geh arbeiten, an der Börse wird das nichts mehr.","Der Markt sagt danke, du Geldautomat auf zwei Beinen.","So verbrennt man Geld, Kinder. Bitte nicht nachmachen, außer es ist seins.","Für so ein Depot muss man sich schon am frühen Morgen Mühe geben."]},"winner":{"frames":[{"headline":"{name} sahnt ab: plus {amount}","text":"Und nun zu jemandem, der es kann: {name} hat heute {amount} gemacht, {pct} im Plus. {reason}"},{"headline":"Glückspilz des Tages: {name}","text":"{name} ist heute um {amount} reicher, {pct} rauf. {reason}"},{"headline":"{name} schwimmt im Geld","text":"{pct} Plus, {amount} Gewinn: {name} zeigt dem Rest, wie es geht. {reason}"}],"reasons":["Ob das Können war oder pures Glück, klärt die Staatsanwaltschaft.","Alle anderen dürfen jetzt neidisch sein. Bitte der Reihe nach.","Der Rest schaut zu und heult leise ins Depot.","Wir gratulieren zähneknirschend.","Bitte nicht nachmachen, ihr könnt das nicht.","Insider vermuten eine Glaskugel im Keller.","Das Finanzamt hat bereits freundlich gewunken.","Neid ist die ehrlichste Form der Anerkennung, also bitte sehr.","Man munkelt von einem Pakt mit dem Teufel, der Teufel dementiert.","Wer jetzt um einen Kredit bittet, wird ausgelacht. Zu Recht."]},"scandal":{"frames":[{"headline":"Skandal bei {company}","text":"Ausgerechnet {company}, die Firma mit dem Motto „{idea}“: {reason} Die Kunden laufen davon."},{"headline":"{company}: Chef {founder} unter Beschuss","text":"Bei {company} brennt die Hütte. {reason} {founder} spricht von einem Missverständnis. Zur Erinnerung, das Geschäftsmodell lautet: „{idea}“."},{"headline":"Kunden fliehen vor {company}","text":"Peinlich für {founder}: {reason} „{idea}“ klang auf dem Papier besser. Das Image von {company} ist im Eimer."},{"headline":"{company} blamiert sich bis auf die Knochen","text":"{company} wollte heute groß rauskommen. {reason} {founder} erklärte, das gehöre zum Konzept. Die Kundschaft erklärte, sie sei dann mal weg."},{"headline":"Shitstorm über {company}","text":"Das Netz zerreißt {company}. {reason} Seitdem will niemand mehr „{idea}“. {founder} hat das Firmenhandy im Fluss versenkt."}],"reasons":["Im Lager wurde ein Praktikant gefunden, der seit drei Wochen vermisst war. Er hatte niemandem gefehlt.","Die Firmenkasse wurde offenbar mit dem Kicker-Budget verwechselt.","Ein Kunde hat das Produkt tatsächlich benutzt und das Ergebnis im Internet gezeigt.","Die Gewerbeaufsicht fand vierzig leere Pizzakartons, einen schlafenden Buchhalter und null Qualitätskontrolle.","Statt der Kundschaft kam heute die Feuerwehr.","Ein Werbespot wurde versehentlich mit dem Ton einer Karaoke-Nacht veröffentlicht.","Die Kundenhotline wurde seit Monaten von einem Papagei bedient, und der war noch der Freundlichste.","Das Qualitätssiegel an der Wand stellte sich als Kinderzeichnung heraus.","Auf der Weihnachtsfeier wurde versehentlich die halbe Belegschaft befördert, die andere Hälfte gefeuert.","Die Jahresbilanz wurde mit Buntstiften erstellt, immerhin innerhalb der Linien.","Ein Großkunde bekam statt der Ware eine Kiste mit Entschuldigungsbriefen.","Das Firmenmaskottchen hat gekündigt und packt in einem Buch aus.","Die Geschäftsführung hat das wichtigste Meeting des Jahres verschlafen, im Meetingraum.","Der Sicherheitsdienst hat sich selbst ausgesperrt und die Tür aufgebrochen.","Das neue Logo sieht aus wie etwas, das man Kindern nicht zeigen sollte.","Ein Mitarbeiter hat die gesamte Kundendatei alphabetisch nach Vornamen des Haustiers sortiert.","Die Kaffeekasse war die einzige Abteilung mit Gewinn.","Auf dem Firmenparkplatz wurde ein illegales Bobbycar-Rennen ausgehoben."]},"hype":{"frames":[{"headline":"Alle wollen {company}","text":"Unfassbar, aber wahr: {company} ist der Renner. {reason} „{idea}“ geht weg wie warme Semmeln. {founder} soll vor Freude geweint haben."},{"headline":"{company} geht viral","text":"{reason} Plötzlich will jeder „{idea}“. {founder} tut so, als sei das alles geplant gewesen. Wir tun so, als würden wir das glauben."},{"headline":"Ritterschlag für {company}","text":"{company} räumt ab. {reason} {founder} hängt sich das gerahmt ins Büro. Die Kundschaft rennt die Tür ein."}],"reasons":["Ein Video über die Firma hat heute das Internet geflutet.","Ein Testmagazin urteilt: „Besser als erwartet, und wir hatten nichts erwartet.“","Ein Promi wurde mit dem Produkt gesehen, vermutlich aus Versehen.","Eine Oma hat im Fernsehen geschworen, es habe ihr Leben verändert.","Die Konkurrenz hat aus Versehen Werbung für sie gemacht.","Ein Kind hat im Schulaufsatz darüber geschrieben, die Klasse war begeistert.","Die Warteschlange vor der Tür reicht bis zur nächsten Postleitzahl.","Selbst die Praktikanten wurden heute um Autogramme gebeten.","Ein Bürgermeister hat spontan eine Straße danach benannt.","Sogar die Steuerprüfung kam privat vorbei, um einzukaufen."]},"stockUp":{"frames":[{"headline":"{stock} schießt nach oben","text":"{stock} legt {move} zu. {reason} Analysten sind fassungslos."},{"headline":"Kursrakete {stock}","text":"{reason} Die Börse feiert: {stock} steigt um {move}. Wer nicht dabei ist, darf sich jetzt ärgern."},{"headline":"{stock}: Gerücht treibt den Kurs","text":"Neues von {stock}: {reason} Niemand weiß, ob es stimmt, alle kaufen trotzdem. Plus {move}."},{"headline":"Jubel bei {stock}","text":"{reason} Die Aktie von {stock} springt um {move}. Der Vorstand öffnet den guten Sekt, den für Besuch."}],"reasons":["Der Vorstand hat versehentlich etwas richtig gemacht.","Ein Hund hat auf der Hauptversammlung einen Antrag gestellt, und er wurde angenommen.","Angeblich wurde das Rad neu erfunden, diesmal eckig.","Hinter einem Sofa in der Zentrale wurden vergessene Millionen entdeckt.","Die Konkurrenz hat geschlossen Betriebsferien, niemand weiß warum.","Der neue Chef kann lesen, schreiben und rechnen, ein Novum.","Ein Tippfehler in der Bilanz macht aus Verlust Gewinn, niemand will ihn korrigieren.","Die Mitarbeiter haben einen Tag lang wirklich gearbeitet, nur so zum Spaß.","Ein Wahrsager auf dem Jahrmarkt hat der Firma eine goldene Zukunft vorausgesagt.","Das Produkt funktioniert plötzlich, die Ingenieure sind ratlos.","Ein Großinvestor hat die Firma mit einer anderen verwechselt und kräftig gekauft.","Die Kantine hat einen Stern bekommen, mehr brauchte es nicht.","Der Aufsichtsrat hat sich im Fahrstuhl eingeschlossen und kann nichts mehr kaputt machen.","Eine Brieftaube hat einen Großauftrag überbracht.","Im Keller wurde Öl gefunden, es war zwar Salatöl, aber die Stimmung ist prächtig.","Der Praktikant hat aus Versehen ein Patent angemeldet."]},"stockDown":{"frames":[{"headline":"{stock} stürzt ab","text":"{stock} verliert {move}. {reason} Die Anleger nehmen Reißaus."},{"headline":"Panik bei {stock}","text":"{reason} Der Kurs von {stock} sackt um {move} ab. Ein Krisenstab tagt."},{"headline":"{stock} im Sinkflug","text":"Schlechte Nachrichten von {stock}: {reason} Minus {move}, und der Tag ist noch jung."},{"headline":"Katastrophe bei {stock}","text":"{reason} Die Börse straft {stock} mit {move} Minus ab. Der Pressesprecher wurde zuletzt am Flughafen gesehen."}],"reasons":["Der Chef hat im Interview das eigene Produkt nicht erkannt und es „billigen Schrott“ genannt.","Die Kaffeemaschine ist ausgefallen, die Produktivität sank um neunzig Prozent.","Der gesamte Vorstand ist nach dem Betriebsausflug nicht zurückgekehrt. Letztes Lebenszeichen: ein Foto aus einer Karaoke-Bar.","Durch einen Fehler der Rechtsabteilung hat sich die Firma selbst verklagt und droht zu gewinnen.","Die Buchhaltung hat ein Jahr lang in der falschen Währung gerechnet, nämlich in Gummibärchen.","Das Hauptquartier wurde versehentlich bei einer Kleinanzeige mitverkauft.","Ein Mitarbeiter hat „Allen antworten“ gedrückt. Mit Anhang.","Der Firmenserver stand unter Wasser, weil jemand die Blumen gießen wollte.","Das neue Produkt wurde vorgestellt und sofort wieder eingepackt.","Der Finanzchef hat die Rücklagen in Rubbellose investiert.","Eine Möwe hat das Firmenlogo vom Dach gestohlen, die Aktionäre deuten das als Omen.","Der Sicherheitscode der Tresore lautete 1234 und stand auf einem Zettel am Tresor.","Die Geschäftszahlen wurden mit einem Würfel ermittelt, und selbst der hatte Pech.","Der Chef hat den Jahresbericht als Gedicht vorgetragen. Es reimte sich nicht.","Im Werk wurde drei Wochen lang das falsche Produkt gebaut, niemandem fiel es auf.","Die Firma hat ihren größten Kunden geghostet."]},"sectorUp":{"frames":[{"headline":"Die Branche {sector} dreht durch","text":"Die ganze Branche {sector} steigt um {move}. {reason} So funktioniert Wirtschaft, liebe Kinder."},{"headline":"Goldrausch in {sector}","text":"Plötzlich wollen alle {sector}. {reason} Die Kurse der Branche springen um {move}."}],"reasons":["Ein Influencer hat das Wort im Vorbeigehen erwähnt, mehr war nicht nötig.","Unsere Experten wissen nicht warum, aber sie nicken sehr überzeugend.","Ein Minister hat die Branche gelobt, er meinte allerdings eine andere.","Eine Zeitung hat sich vertippt, und niemand hat es gemerkt.","Das Horoskop hat es vorhergesagt.","Ein Schulkind hat in einem Referat behauptet, das sei die Zukunft.","Die Konkurrenzbranche hat geschlossen verschlafen.","Angeblich ist das jetzt wieder modern, sagt jemand, der es wissen muss."]},"sectorDown":{"frames":[{"headline":"{sector} im freien Fall","text":"Die Branche {sector} sackt um {move} ab. {reason} Bis das geklärt ist, verkaufen erst mal alle."},{"headline":"Katerstimmung in {sector}","text":"Schlechte Nachrichten für {sector}: {reason} Die Kurse geben um {move} nach."}],"reasons":["Ein Minister hat die Branche versehentlich mit etwas Verbotenem verwechselt.","Eine Studie zeigt, dass niemand weiß, was die Branche eigentlich macht.","Ein Fernsehmoderator hat schlecht geträumt und es live erzählt.","Die Branchenmesse fand statt, aber niemand ging hin, nicht einmal die Aussteller.","Ein Gerücht aus einem Friseursalon hat die Runde gemacht.","Das wichtigste Fachmagazin hat versehentlich einen Nachruf gedruckt.","Ein Orakel aus dem Frühstücksfernsehen hat den Daumen gesenkt.","Jemand hat laut gefragt, wofür man das eigentlich braucht."]},"tasksUp":{"frames":[{"headline":"Auftragsflut im ganzen Land","text":"{reason} Alle offenen Firmen-Aufgaben sind ab sofort {move} mehr wert. An die Arbeit, ihr faulen Säcke!"},{"headline":"Kunden zahlen jeden Preis","text":"{reason} Offene Aufgaben bringen {move} mehr. Wer jetzt Pause macht, ist selbst schuld."}],"reasons":["Die Kundschaft hat Geld und keine Ahnung, wohin damit.","Eine Massenhysterie sorgt dafür, dass heute jeder alles sofort will.","Der Staat hat versehentlich doppelt ausgezahlt und will es nicht zurück.","Ein Feiertag wurde abgesagt, alle haben Langeweile und Bargeld.","Die Leute haben gemerkt, dass Sparen keinen Spaß macht.","Ein Lottogewinner verteilt Geld in der Fußgängerzone."]},"tasksDown":{"frames":[{"headline":"Kunden entdecken das Sparen","text":"{reason} Alle offenen Firmen-Aufgaben sind {move} weniger wert. Die Chefs dürfen ruhig ein bisschen schwitzen."},{"headline":"Flaute bei den Aufträgen","text":"{reason} Offene Aufgaben bringen {move} weniger. Durchhalten, es wird auch wieder schlechter."}],"reasons":["Ein Fernsehkoch hat erklärt, man könne Geld auch behalten.","Das halbe Land ist kollektiv im Urlaub, natürlich unbezahlt.","Alle warten auf das Sonderangebot, das nie kommt.","Die Kundschaft hat ihre Geldbeutel verlegt, und zwar alle gleichzeitig.","Ein Sparfuchs hat ein Buch geschrieben, leider ist es gut.","Es regnet, und niemand hat Lust auf irgendwas."]},"tip":{"frames":[{"headline":"Mr. Doodle Dangles Geheimtipp","text":"Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei {stock} tut sich in der nächsten Stunde etwas, und zwar {move}. {reason}"},{"headline":"Vom Flurfunk: {stock}","text":"Ein Vögelchen hat mir gezwitschert: {stock} dürfte in der kommenden Stunde {move} gehen. {reason}"},{"headline":"Der heiße Draht: {stock}","text":"Aus gewöhnlich gut betrunkenen Kreisen höre ich: {stock} geht bald {move}. {reason}"}],"reasons":["Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.","Das Vögelchen lag bisher meistens richtig. Meistens.","Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.","Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.","Meine Quelle ist seriös, sie trägt immerhin eine Krawatte.","Ich selbst handle nie nach meinen Tipps, aus Gründen."]},"gossipBad":{"frames":[{"headline":"{name}: {what}","text":"Aus der Abteilung Privatsachen, die uns nichts angehen: {name}. Die Meldung: {what}. {reason} Die Redaktion überweist Schweigegeld und redet trotzdem weiter."},{"headline":"Peinlich, {name}","text":"Wir müssen über {name} reden. Stand heute: {what}. {reason} Ein kleines Schmerzensgeld ist unterwegs."},{"headline":"Das Tagebuch von {name}","text":"Liebes Tagebuch, schreibt {name} heute vermutlich: {what}. {reason} Wir legen etwas Schmerzensgeld bei."},{"headline":"Fremdschämen mit {name}","text":"{what}: Das ist die Tagesbilanz von {name}. {reason} Schmerzensgeld gibt es obendrauf, Würde leider nicht."}],"reasons":["Was für ein Lappen.","So eine Pfeife sehe ich sonst nur morgens im Spiegel, und ich bin wenigstens im Fernsehen.","Selbst mein Schnurrbart hat mehr Geschäftssinn.","Wir haben in der Redaktion gelacht, bis der Praktikant geweint hat.","Das ist kein Tiefpunkt, das ist ein Lebensstil.","Ich habe schon Topfpflanzen mit mehr Ehrgeiz gegossen.","Bitte einmal kollektiv auslachen, danke.","Manche lernen aus Fehlern. Andere sammeln sie.","Der Tresor zu Hause ist vermutlich auch nur ein Schuhkarton.","Wer so spielt, sollte das Handy sicherheitshalber im Fluss versenken.","Ich sage es ungern, aber ich sage es mit Vergnügen: erbärmlich.","Die Verwandtschaft tut ab heute so, als kenne sie dich nicht.","Hut ab, so konsequent scheitert sonst nur die Bahn.","Ich würde ja helfen, aber dann hätte ich nichts mehr zu lachen."]},"gossipGood":{"frames":[{"headline":"Na so was: {name}","text":"Ich fasse es nicht, aber es stimmt. {name} meldet: {what}. {reason}"},{"headline":"{name} hat es geschafft","text":"Gute Nachrichten, ausnahmsweise. Bei {name} heißt es: {what}. {reason}"},{"headline":"Applaus für {name}","text":"Bitte festhalten: {what}, und zwar bei {name}. {reason}"}],"reasons":["Ich bin fast stolz. Fast.","Auch ein blindes Huhn findet mal ein Korn, aber immerhin.","Glückwunsch, und jetzt bloß nichts anfassen.","Die Konkurrenz darf sich gern ein Beispiel nehmen, ihr Luschen.","Ich hätte keinen Cent darauf gewettet, und ich wette auf alles.","Meine Schwiegermutter hat es vorausgesagt, und die liegt sonst immer falsch.","Dafür gibt es von mir ein ehrliches Schulterklopfen, mit der Faust.","Genieß es, nächste Woche lachen wir wieder über dich.","So, und jetzt alle anderen: Schämt euch.","Das musste auch mal gesagt werden, ich fühle mich schon ganz schmutzig."]},"nftSale":{"frames":[{"headline":"{amount} für ein paar Pixel","text":"Kunstmarkt, oder was man dafür hält: „{title}“ von {name} ging für {amount} an {buyer}. {reason}"},{"headline":"NFT-Wahnsinn um „{title}“","text":"{buyer} zahlt {amount} für „{title}“, gemalt von {name}. {reason}"},{"headline":"„{title}“ wechselt den Besitzer","text":"Aus der Welt der bunten Kästchen: {buyer} hat sich „{title}“ von {name} für {amount} gegönnt. {reason}"}],"reasons":["Mein Enkel malt so etwas mit Fingerfarbe, und der will dafür nur ein Eis.","Früher bekam man dafür ein Haus, heute bekommt man ein Bild von einem Haus.","Ich habe mir das Werk angesehen. Ich habe Fragen. Viele.","Kunst ist, wenn einer zahlt. Glückwunsch an alle Beteiligten.","Der Käufer nennt es eine Wertanlage, sein Bankberater nennt es einen Hilferuf.","Ich verstehe es nicht, also muss es teuer sein.","Wer das kauft, kauft auch Luft in Dosen.","Das Bild hat sechzehn mal sechzehn Pixel. Ich habe nachgezählt, ich hatte Zeit.","Immerhin kann man es nicht fallen lassen.","Die Künstlerseele jubelt, der Geldbeutel des Käufers ruft die Polizei."]},"ramble":{"frames":[{"headline":"Mr. Doodle Dangle schweift ab","text":"Wo war ich? Egal. {reason} Zurück zu den Nachrichten, falls jemand weiß, wo sie liegen."},{"headline":"Kurze Durchsage in eigener Sache","text":"Bevor es weitergeht, etwas völlig anderes: {reason} Das musste raus."},{"headline":"Was ich noch sagen wollte","text":"Die Regie winkt, ich ignoriere sie. {reason} So. Weiter im Text."}],"reasons":["Friedrich Merz soll neulich sein Flugzeug mit Bargeld betankt haben. Sagt der Schwager meines Friseurs.","Markus Söder hat angeblich wieder eine Bratwurst fotografiert. Die Bratwurst wollte anonym bleiben.","Die Deutsche Bahn meldet, mein Zug von gestern komme heute. Ich warte seit Dienstag.","Elon Musk will angeblich den Mond kaufen, um darauf zu parken. Ich habe ihm meinen Stellplatz angeboten.","Mein Nachbar grillt seit drei Tagen dasselbe Würstchen. Ich bewundere seine Geduld.","Christian Lindner soll einen Sportwagen gesehen und kurz geweint haben. Vor Glück, sagt man.","Donald Trump will angeblich Zölle auf Pixel erheben. Ich habe vorsorglich zwei gehortet.","Meine Ex-Frau hat angerufen. Sie will den Schnurrbart zurück. Den bekommt sie nicht.","Der Berliner Flughafen funktioniert inzwischen. Ich traue dem Frieden nicht.","Heidi Klum hat heute leider kein Foto für mich. Ich hatte auch keins bestellt.","Die Butter kostet inzwischen mehr als mein erstes Auto. Das Auto war allerdings ein Fahrrad.","Robert Habeck soll eine Wärmepumpe gestreichelt haben. Die Pumpe schnurrte.","Mein Arzt sagt, ich soll weniger Kaffee trinken. Ich habe den Arzt gewechselt.","Thomas Gottschalk will angeblich mein Wohnzimmer moderieren. Ich habe abgeschlossen.","Dieter Bohlen hat meinen Schnurrbart bewertet. Es reicht nicht für den Recall.","Günther Jauch hat mich angerufen, ich war der Telefonjoker. Ich wusste es nicht."]},"rambleInvest":{"frames":[{"headline":"{person} steigt bei {stock} ein","text":"Völlig anderes Thema: {person} soll das Sparschwein geschlachtet und alles in {stock} gesteckt haben. {reason} Der Kurs macht {move} nach oben."},{"headline":"Promi-Alarm bei {stock}","text":"Ich habe es aus dritter Hand, also stimmt es: {person} hat angeblich heimlich {stock} gekauft. {reason} Die Anleger rennen hinterher, plus {move}."},{"headline":"Gerücht des Tages: {person} und {stock}","text":"Man erzählt sich, {person} habe bei {stock} zugeschlagen. {reason} Ob es stimmt, ist dem Kurs egal: {move} rauf."}],"reasons":["Quelle: der Schwager meines Friseurs, und der irrt sich nie zweimal am selben Tag.","Eine Bestätigung gibt es nicht, auf meine Brieftaube hat niemand geantwortet.","Ich habe es auf einer Raststätte gehört, zwischen Kaffee und Reue.","Mein Taxifahrer schwört es, und der kennt jemanden, der jemanden kennt.","Dementiert wurde es noch nicht, vermutlich weil niemand gefragt hat.","Falls es nicht stimmt, habe ich es nie gesagt.","Die Info stammt aus einer Gruppe, in die ich versehentlich eingeladen wurde.","Ich habe es geträumt, aber meine Träume sind börsennotiert."]},"filler":{"frames":[{"headline":"Heute keine Katastrophen","text":"Es ist erschreckend ruhig. {reason} Strengt euch gefälligst an."},{"headline":"Nichts passiert, und das ist die Nachricht","text":"{reason} Ich bin persönlich enttäuscht von euch allen."}],"reasons":["Niemand hat sein Vermögen verzockt, keine Firma brennt.","Kein Skandal, keine Pleite, nicht einmal ein kleiner Betrug.","Die Redaktion hat drei Stunden gesucht und nur eine verlorene Socke gefunden.","Selbst die Gerüchteküche hat heute Ruhetag."]}},"tipWords":{"up":"nach oben","down":"nach unten"}}'::jsonb, 'Defaults from src/config/balance.ts, section "newsShow"'),
-  ('pitches', '{"minChars":12,"maxChars":280,"judgeWaitSeconds":90,"eventMinutes":20,"moveMinutes":30,"orderCooldownMinutes":60,"chanceBaseBps":1000,"chancePerFitBps":80,"maxChanceBps":9000,"eventCostUnits":2,"moveCostFactor":1.2,"mitigationBase":0.35,"mitigationPerFit":0.005,"maxMitigation":0.9,"movePayoutBase":1.3,"movePayoutPerFit":0.012,"moveGainBase":0.02,"moveGainPerFit":0.0006,"moveRefundBps":2000,"backfireAwareness":0.05,"mini":{"fitBase":25,"fitPerHit":12,"maxHits":4,"longTextChars":60,"longTextBonus":10,"maxFit":85,"backfireBase":10,"backfirePerRisky":20,"maxBackfire":70,"risky":["imagefilm","werbung","werbekampagne","influencer","pr-","greenwashing","ignorieren","leugnen","abstreiten","lügen","vertuschen","schweigen","aussitzen","drohen","verklagen","entlassen","billiger","bestechen"],"good":{"regulation":["anwalt","recht","prüfen","anpassen","lobby","verband","gutachten","umstellen","dialog"],"special_tax":["steuer","berater","kalkul","preis","rohstoff","ersatz","sparen","lieferant"],"supply_shortage":["lieferant","lager","alternativ","vorrat","zweit","ersatz","vertrag","regional"],"quality_scandal":["rückruf","entschuldig","prüf","qualität","kontroll","ersetzen","transparen","entschädig"],"data_breach":["sicherheit","passwort","verschlüssel","melden","experten","informieren","update","audit"],"price_war":["qualität","service","treue","nische","kosten","bündel","mehrwert","marke"],"strike":["lohn","gehalt","verhandl","bonus","gespräch","kompromiss","zuhören","arbeitszeit","tarif"],"protest":["dialog","einladen","zuhören","ändern","nachhaltig","transparen","spenden","fair"],"patent_claim":["anwalt","patent","lizenz","einigung","gutachten","umgehen","vergleich","eigene"],"bad_review":["verbessern","test","feedback","kunden","nachbessern","qualität","gratis","update"],"viral_trend":["nachproduz","lager","social","video","aktion","schnell","limitiert","community"],"big_contract":["kapazität","personal","einstellen","termin","liefer","verhandl","vertrag","schicht"],"award":["pressemitteilung","werbung","feiern","kunden","messe","präsentieren","website","siegel"],"subsidy":["antrag","förder","investieren","forschung","berater","unterlagen","frist","projekt"],"partnership":["vertrag","gemeinsam","partner","teilen","kooperation","verhandl","netzwerk","vertrieb"],"cash":["verkauf","auftrag","kunden","rabatt","angebot","großkunde","export","abo","online"],"awareness":["werbung","messe","social","video","presse","influencer","sponsor","event","kampagne"],"quality":["schulung","test","prüfen","verbessern","material","zertifi","forschung","feedback"]}}}'::jsonb, 'Defaults from src/config/balance.ts, section "pitches"'),
+  ('pitches', '{"minChars":12,"maxChars":280,"judgeWaitSeconds":90,"eventMinutes":20,"moveMinutes":30,"orderCooldownMinutes":60,"chanceBaseBps":1000,"chancePerFitBps":80,"maxChanceBps":9000,"eventCostUnits":2,"moveCostFactor":1.2,"mitigationBase":0.35,"mitigationPerFit":0.005,"maxMitigation":0.9,"movePayoutBase":1.3,"movePayoutPerFit":0.012,"moveGainBase":0.02,"moveGainPerFit":0.0006,"moveRefundBps":2000,"backfireAwareness":0.05,"mini":{"fitBase":25,"fitPerHit":12,"maxHits":4,"longTextChars":60,"longTextBonus":10,"maxFit":85,"backfireBase":10,"backfirePerRisky":20,"maxBackfire":70,"risky":["imagefilm","werbung","werbekampagne","influencer","pr-","greenwashing","ignorieren","leugnen","abstreiten","lügen","vertuschen","schweigen","aussitzen","drohen","verklagen","entlassen","billiger","bestechen"],"good":{"regulation":["anwalt","recht","prüfen","anpassen","lobby","verband","gutachten","umstellen","dialog"],"special_tax":["steuer","berater","kalkul","preis","rohstoff","ersatz","sparen","lieferant"],"supply_shortage":["lieferant","lager","alternativ","vorrat","zweit","ersatz","vertrag","regional"],"quality_scandal":["rückruf","entschuldig","prüf","qualität","kontroll","ersetzen","transparen","entschädig"],"tax_audit":["unterlagen","beleg","steuerberater","anwalt","kooper","offen","nachzahl","ordnung"],"data_breach":["sicherheit","passwort","verschlüssel","melden","experten","informieren","update","audit"],"price_war":["qualität","service","treue","nische","kosten","bündel","mehrwert","marke"],"strike":["lohn","gehalt","verhandl","bonus","gespräch","kompromiss","zuhören","arbeitszeit","tarif"],"protest":["dialog","einladen","zuhören","ändern","nachhaltig","transparen","spenden","fair"],"patent_claim":["anwalt","patent","lizenz","einigung","gutachten","umgehen","vergleich","eigene"],"bad_review":["verbessern","test","feedback","kunden","nachbessern","qualität","gratis","update"],"viral_trend":["nachproduz","lager","social","video","aktion","schnell","limitiert","community"],"big_contract":["kapazität","personal","einstellen","termin","liefer","verhandl","vertrag","schicht"],"award":["pressemitteilung","werbung","feiern","kunden","messe","präsentieren","website","siegel"],"subsidy":["antrag","förder","investieren","forschung","berater","unterlagen","frist","projekt"],"partnership":["vertrag","gemeinsam","partner","teilen","kooperation","verhandl","netzwerk","vertrieb"],"cash":["verkauf","auftrag","kunden","rabatt","angebot","großkunde","export","abo","online"],"awareness":["werbung","messe","social","video","presse","influencer","sponsor","event","kampagne"],"quality":["schulung","test","prüfen","verbessern","material","zertifi","forschung","feedback"]}}}'::jsonb, 'Defaults from src/config/balance.ts, section "pitches"'),
   ('protests', '{"kinds":["boycott","shitstorm","petition","protest_march"],"startCostCents":50000,"goal":20,"aiMax":16,"aiJoinChanceBps":3000,"aiPerMinuteMax":2,"durationHours":6,"starterCooldownHours":6,"visibleAfterMinutes":60,"effectChanceBaseBps":600,"effectChancePerPlayerBps":300,"effectChanceMaxBps":3500,"priceHitMinBps":150,"priceHitMaxBps":450,"awarenessHit":0.03,"minLevel":4}'::jsonb, 'Defaults from src/config/balance.ts, section "protests"'),
   ('nfts', '{"royaltyBps":1000,"mintXp":100,"minAskCents":10000,"minOfferCents":10000,"chat":{"maxLength":200,"perMinute":6,"history":60,"offerHours":24},"ai":{"floorCents":100000,"likeBps":400,"maxLikes":40,"creatorSaleBps":300,"maxCreatorSales":10,"ageBpsPerDay":100,"maxAgeDays":30,"buyChanceBps":2500,"listedOfferChanceBps":1500,"unlistedOfferChanceBps":400,"maxOpenAiOffers":3,"lowballMinBps":6500,"lowballMaxBps":9000,"maxBuysPerDay":60,"maxMessagesPerRun":10,"resaleMarkupBps":12500,"acceptBps":10500,"demand":{"offerBps":600,"maxOffers":6,"saleBps":500,"maxSales":6,"days":7},"trade":{"chanceBps":250,"likeWeightBps":1500,"offerWeightBps":4000,"saleWeightBps":2500,"maxChanceBps":4000,"minHoldMinutes":10,"perRun":6,"perDay":300,"tasteMinBps":8500,"tasteMaxBps":12500,"reversionBps":5000},"collectors":["Vera Vermeer","Konrad Kollektor","Pixel-Paula","Baron von Bit","Mia Mosaik","Otto Original","Gräfin Glitzer","Sammler Sam"],"lines":{"offer":["Schönes Stück. Mehr ist es mir aber nicht wert.","Für meine Sammlung würde ich so viel zahlen.","Mein Angebot. Überleg es dir nicht zu lange.","Hübsch! Wäre das ein fairer Preis?","Ich biete das. Nimm es, solange ich gute Laune habe.","Mein Hund hat draufgebellt. Das heißt bei uns: kaufen.","Ich habe keine Ahnung, was das sein soll. Ich nehme es.","Meine Mutter sagt, ich soll aufhören, Pixel zu kaufen. Hier mein Angebot.","Ich wollte eigentlich Brot kaufen. Jetzt bin ich hier.","Das hängt später über meinem Klo. Ehrenplatz.","Mehr habe ich nicht, den Rest hat mein Wellensittich verzockt.","Ist das Kunst oder ist dein Bildschirm kaputt? Egal, Angebot steht.","Ich biete das und lege ein halbes Käsebrot drauf.","Mein Horoskop sagt: heute teuer einkaufen. Bitte sehr.","Ich habe das Bild meinem Zahnarzt gezeigt. Er hat geweint. Ich biete.","Angebot! Bitte schnell, mein Akku hat noch drei Prozent.","Ich sammle nur Dinge, die ich nicht verstehe. Passt perfekt.","Dafür verkaufe ich mein Fahrrad. Na gut, den Sattel.","Wusstest du, dass Otter Händchen halten? Jedenfalls: mein Angebot.","Ich habe gewürfelt. Das ist der Preis. Die Würfel lügen nicht.","Mein Steuerberater ist ohnmächtig geworden, also muss es gut sein.","Das erinnert mich an meinen Ex. Ich will es trotzdem.","Ich zahle in Spielgeld, weil ich nichts anderes habe.","Letztes Angebot. Also das erste. Aber auch das letzte. Vielleicht.","Ich kaufe das nur, damit Baron von Bit es nicht bekommt.","So viel für so wenige Pixel? Ich liebe es.","Meine Wand ist leer und mein Kopf auch. Nimm mein Geld.","Ich habe eine Lasagne im Ofen, bitte entscheide dich fix.","Das sieht aus wie mein Kontostand: wild. Angebot.","Ich habe mich verklickt, aber jetzt ziehe ich es durch."],"buy":["Gekauft! Das kommt in meine Sammlung.","Zu diesem Preis konnte ich nicht widerstehen.","Ein fairer Preis. Danke!","Gekauft. Fragt mich nicht, warum.","Meins! Jetzt muss ich nur noch herausfinden, was es ist.","Gekauft, bevor mein Verstand wach wird.","Das kommt neben den Toaster. Da ist das Licht am besten.","Ich habe es. Meine Erben werden mich hassen.","Zack, gekauft. Miete wird überbewertet.","Endlich etwas, das ich meiner Katze vererben kann.","Gekauft! Ich schreibe es als Arbeitskleidung ab.","Schnäppchen. Sagt jedenfalls die Stimme in meinem Kühlschrank.","Ich wollte nur gucken. Tja.","Gekauft. Der Pizzabote kann warten."],"accept":["Abgemacht! Viel Freude damit.","Einverstanden, es gehört dir.","Deal. Bitte nicht in der Sonne lagern.","Nimm es, bevor ich es mir anders überlege.","Verkauft! Ich brauche das Geld für Gartenzwerge.","Na gut. Aber du musst es jeden Tag anschauen. Versprich es.","Einverstanden. Es hat mich nachts sowieso angestarrt.","Deal! Grüß deine Oma von mir.","Okay, okay. Du verhandelst wie mein Schwager.","Abgemacht. Der Rahmen kostet extra. Es gibt keinen Rahmen."],"trade":["Endlich gehört es mir! Das wollte ich schon lange.","Ich musste es einfach haben.","Gekauft von einer Kollegin. Jetzt steht es zum Verkauf, wer bietet mehr?","Ein Schnäppchen unter Sammlern.","Das Stück ist gefragt. Ich habe zugeschlagen.","Ich habe es Otto Original abgeluchst. Er weint jetzt in sein Müsli.","Getauscht gegen ein Geheimnis und etwas Bargeld.","Gekauft beim Sammlerstammtisch. Es gab Mettbrötchen.","Ich weiß nicht, wem ich es abgekauft habe. Er trug einen Umhang.","Meins. Die anderen Sammler können sich gehackt legen.","Frisch erworben und schon wieder im Angebot. So bin ich.","Ich habe es im Tausch gegen meinen guten Ruf bekommen.","Sammler Sam wollte es auch. Sammler Sam war zu langsam.","Gekauft, dreimal angeschaut, gelangweilt. Wer will?","Das hing eben noch bei Gräfin Glitzer. Jetzt nicht mehr. Ha!"],"decline":["Nein danke, darunter verkaufe ich nicht.","Netter Versuch. Biete mehr.","Das ist zu wenig für dieses Stück.","Dafür bekommst du bei mir höchstens ein Foto vom Bild.","Hahaha. Nein.","Für den Preis male ich dir ein Strichmännchen. Ein schlechtes.","Mein Goldfisch bietet mehr, und der hat kein Konto.","Zu wenig. Ich habe schließlich eine Yacht aus Pappe zu unterhalten.","Nein. Und meine Katze sagt auch nein.","Bei dem Angebot ist mir kurz schwarz vor Augen geworden.","Ich frage kurz meinen Anwalt. Er lacht noch.","Leg eine Null dran, dann reden wir. Hinten, nicht vorne.","Das ist kein Angebot, das ist eine Beleidigung mit Komma.","Nö. Aber danke, dass du an mich gedacht hast.","Ich verkaufe nicht unter Wert. Außer montags. Heute ist nicht Montag. Glaube ich."]}}}'::jsonb, 'Defaults from src/config/balance.ts, section "nfts"'),
   ('accessories', '{"slots":["back","body","face","head","hand","pet"],"feedRarities":["legendary","mythic"],"items":[{"key":"party_hat","name":"Partyhütchen","description":"Jeder Tag ist ein Feiertag, wenn das Depot grün ist.","slot":"head","rarity":"common","priceCents":75000,"minLevel":1,"set":"holidays"},{"key":"paper_crown","name":"Pappkrone","description":"Vom Burgerladen. Fühlt sich trotzdem königlich an.","slot":"head","rarity":"common","priceCents":135000,"minLevel":1},{"key":"beanie","name":"Bommelmütze","description":"Hält warm, wenn der Markt eiskalt ist.","slot":"head","rarity":"common","priceCents":180000,"minLevel":1},{"key":"traffic_cone","name":"Leitkegel","description":"Vom Heimweg mitgenommen. Niemand fragt nach.","slot":"head","rarity":"common","priceCents":240000,"minLevel":1,"set":"absurd"},{"key":"propeller_cap","name":"Propellermütze","description":"Dreht sich bei jedem Kursanstieg ein bisschen schneller.","slot":"head","rarity":"rare","priceCents":1250000,"minLevel":2,"set":"absurd"},{"key":"chef_hat","name":"Kochmütze","description":"Für alle, die ihr Depot nach Gefühl würzen.","slot":"head","rarity":"rare","priceCents":1500000,"minLevel":2,"set":"chef"},{"key":"bunny_ears","name":"Hasenohren","description":"Hört Gerüchte schon, bevor sie in den Nachrichten sind.","slot":"head","rarity":"rare","priceCents":2000000,"minLevel":3,"set":"zoo"},{"key":"cowboy_hat","name":"Cowboyhut","description":"Yeehaw! Der Wilde Westen heißt jetzt Börse.","slot":"head","rarity":"rare","priceCents":3250000,"minLevel":3},{"key":"pirate_hat","name":"Piratenhut","description":"Arrr! Für Leute, die Dividenden lieber entern.","slot":"head","rarity":"epic","priceCents":24500000,"minLevel":5,"set":"pirate"},{"key":"viking_helmet","name":"Wikingerhelm","description":"Plündert keine Dörfer, nur Short-Positionen.","slot":"head","rarity":"epic","priceCents":42000000,"minLevel":6,"set":"knight"},{"key":"top_hat","name":"Zylinder","description":"Ab hier redet man nur noch über Rendite und Pferde.","slot":"head","rarity":"epic","priceCents":105000000,"minLevel":10,"set":"royal"},{"key":"halo","name":"Heiligenschein","description":"Garantiert nie Insiderhandel betrieben. Ehrlich.","slot":"head","rarity":"legendary","priceCents":750000000,"minLevel":15},{"key":"crown","name":"Goldkrone","description":"Massives Pixelgold mit echten Fake-Diamanten.","slot":"head","rarity":"legendary","priceCents":5000000000,"minLevel":25,"set":"royal"},{"key":"clown_nose","name":"Clownsnase","description":"Macht jeden Verlust ein bisschen lustiger. Hupt nicht.","slot":"face","rarity":"common","priceCents":75000,"minLevel":1,"set":"absurd"},{"key":"sunglasses","name":"Sonnenbrille","description":"Die Zukunft ist so hell, man braucht eine.","slot":"face","rarity":"common","priceCents":105000,"minLevel":1,"set":"rock"},{"key":"fake_moustache","name":"Falscher Schnurrbart","description":"Perfekte Tarnung. Niemand erkennt dich. Wirklich niemand.","slot":"face","rarity":"common","priceCents":120000,"minLevel":1,"set":"absurd"},{"key":"heart_glasses","name":"Herzchenbrille","description":"Verliebt in jede Aktie, die man gerade gekauft hat.","slot":"face","rarity":"rare","priceCents":900000,"minLevel":2},{"key":"glasses_3d","name":"3D-Brille","description":"Endlich sieht man den Kurs auch in die Tiefe fallen.","slot":"face","rarity":"rare","priceCents":1100000,"minLevel":3},{"key":"monocle","name":"Monokel","description":"Ein Auge auf den Markt, das andere auf den Butler.","slot":"face","rarity":"epic","priceCents":31500000,"minLevel":7,"set":"royal"},{"key":"vr_goggles","name":"VR-Brille","description":"Lebt halb im Metaversum, halb im Minus.","slot":"face","rarity":"epic","priceCents":84000000,"minLevel":8},{"key":"deal_shades","name":"Pixel-Sonnenbrille","description":"Fällt aus dem Nichts ins Gesicht. Deal with it.","slot":"face","rarity":"epic","priceCents":56000000,"minLevel":6,"set":"rock"},{"key":"laser_eyes","name":"Laseraugen","description":"Nur echt mit mindestens einem Coin, der zum Mond fliegt.","slot":"face","rarity":"legendary","priceCents":2500000000,"minLevel":20},{"key":"bathrobe","name":"Bademantel","description":"Homeoffice-Uniform. Trading geht auch im Liegen.","slot":"body","rarity":"common","priceCents":150000,"minLevel":1,"set":"office"},{"key":"tracksuit","name":"Trainingsanzug","description":"Raschelt bei jeder Bewegung. Sehr sportlich, nie gejoggt.","slot":"body","rarity":"common","priceCents":210000,"minLevel":1,"set":"sports"},{"key":"hawaiian_shirt","name":"Hawaiihemd","description":"Urlaubsmodus an, Depot läuft trotzdem.","slot":"body","rarity":"common","priceCents":270000,"minLevel":2},{"key":"banana_costume","name":"Bananenkostüm","description":"Krumm, gelb und immer ein Hingucker. Nicht ausrutschen.","slot":"body","rarity":"rare","priceCents":2500000,"minLevel":2,"set":"absurd"},{"key":"hotdog_costume","name":"Hotdog-Kostüm","description":"Mit extra Senf. Riecht zum Glück nur nach Stoff.","slot":"body","rarity":"rare","priceCents":3750000,"minLevel":3,"set":"absurd"},{"key":"tuxedo","name":"Smoking","description":"Für Börsengänge, Galas und das Abendessen zu Hause.","slot":"body","rarity":"rare","priceCents":6000000,"minLevel":4,"set":"royal"},{"key":"shark_costume","name":"Haikostüm","description":"Für echte Finanzhaie. Beißt nur bei Leerverkäufen.","slot":"body","rarity":"epic","priceCents":28000000,"minLevel":5,"set":"zoo"},{"key":"dino_onesie","name":"Dino-Onesie","description":"Rawr! Uralte Anlagestrategie, extrem kuschelig.","slot":"body","rarity":"epic","priceCents":38500000,"minLevel":6,"set":"zoo"},{"key":"astronaut_suit","name":"Raumanzug","description":"Wer zum Mond will, muss sich passend anziehen.","slot":"body","rarity":"epic","priceCents":140000000,"minLevel":12,"set":"space"},{"key":"gold_suit","name":"Goldanzug","description":"Glänzt so sehr, dass die Konkurrenz eine Sonnenbrille braucht.","slot":"body","rarity":"legendary","priceCents":3000000000,"minLevel":20,"set":"royal"},{"key":"balloon","name":"Luftballon","description":"Steigt wie deine Lieblingsaktie. Platzt hoffentlich nicht.","slot":"hand","rarity":"common","priceCents":45000,"minLevel":1,"set":"holidays"},{"key":"baguette","name":"Baguette","description":"Knusprig, französisch, als Zeigestab bestens geeignet.","slot":"hand","rarity":"common","priceCents":60000,"minLevel":1,"set":"chef"},{"key":"rubber_chicken","name":"Gummihuhn","description":"Quietscht bei jedem Verlust. Also oft.","slot":"hand","rarity":"common","priceCents":90000,"minLevel":1,"set":"absurd"},{"key":"ice_cream","name":"Eistüte","description":"Drei Kugeln: Gewinn, Verlust und Pistazie.","slot":"hand","rarity":"common","priceCents":75000,"minLevel":1,"set":"chef"},{"key":"foam_finger","name":"Schaumstoffhand","description":"Nummer eins! Zumindest in der eigenen Wochenliga.","slot":"hand","rarity":"rare","priceCents":750000,"minLevel":2,"set":"sports"},{"key":"megaphone","name":"Megafon","description":"KAUFEN! VERKAUFEN! Hauptsache laut.","slot":"hand","rarity":"rare","priceCents":1750000,"minLevel":3,"set":"office"},{"key":"money_bag","name":"Geldsack","description":"Mit Dollarzeichen drauf, damit es auch jeder versteht.","slot":"hand","rarity":"rare","priceCents":4999900,"minLevel":4,"set":"office"},{"key":"laser_sword","name":"Laserschwert","description":"Schneidet Gebühren und Spreads in der Mitte durch.","slot":"hand","rarity":"epic","priceCents":49000000,"minLevel":8,"set":"space"},{"key":"golden_toilet_brush","name":"Goldene Klobürste","description":"Wahrer Reichtum zeigt sich im Badezimmer.","slot":"hand","rarity":"legendary","priceCents":1500000000,"minLevel":18,"set":"absurd"},{"key":"rubber_duck","name":"Quietscheente","description":"Hört zu, wenn du deine Trades erklärst. Urteilt nie.","slot":"pet","rarity":"common","priceCents":120000,"minLevel":1,"set":"zoo"},{"key":"hamster","name":"Hamster","description":"Hamstert alles, besonders Dividenden.","slot":"pet","rarity":"rare","priceCents":600000,"minLevel":2,"set":"zoo"},{"key":"parrot","name":"Papagei","description":"Plappert jeden Börsentipp nach. Auch die schlechten.","slot":"pet","rarity":"rare","priceCents":4000000,"minLevel":4,"set":"pirate"},{"key":"pug","name":"Mops","description":"Schnauft beim Laden der Kurse. Bester Freund an der Börse.","slot":"pet","rarity":"epic","priceCents":21000000,"minLevel":5,"set":"zoo"},{"key":"mini_dragon","name":"Minidrache","description":"Bewacht deinen Goldschatz und röstet Marshmallows.","slot":"pet","rarity":"legendary","priceCents":4000000000,"minLevel":22,"set":"wizard"},{"key":"superhero_cape","name":"Superheldenumhang","description":"Rettet Depots, aber leider nur die eigenen.","slot":"back","rarity":"rare","priceCents":2250000,"minLevel":2},{"key":"butterfly_wings","name":"Schmetterlingsflügel","description":"Ein Flügelschlag hier, ein Kurssturz in Tokio.","slot":"back","rarity":"rare","priceCents":4500000,"minLevel":3,"set":"zoo"},{"key":"bat_wings","name":"Fledermausflügel","description":"Für Nachteulen, die nachbörslich handeln.","slot":"back","rarity":"epic","priceCents":52500000,"minLevel":7,"set":"holidays"},{"key":"angel_wings","name":"Engelsflügel","description":"Himmlische Renditen, garantiert ohne Garantie.","slot":"back","rarity":"epic","priceCents":175000000,"minLevel":12},{"key":"jetpack","name":"Jetpack","description":"To the moon! Tank voll, Sicherheitsgurt optional.","slot":"back","rarity":"legendary","priceCents":1000000000,"minLevel":15,"set":"space"},{"key":"toilet_paper_crown","name":"Klopapierkrone","description":"Krisensicher angelegt. Hält drei Lockdowns und einen Crash.","slot":"head","rarity":"common","priceCents":99000,"minLevel":1,"set":"absurd"},{"key":"tinfoil_hat","name":"Aluhut","description":"Schirmt Kursmanipulation ab. Und WLAN. Und Vernunft.","slot":"head","rarity":"common","priceCents":150000,"minLevel":1,"set":"absurd"},{"key":"santa_hat","name":"Weihnachtsmütze","description":"Ho ho ho! Die Jahresendrallye kommt bestimmt.","slot":"head","rarity":"common","priceCents":165000,"minLevel":1,"set":"holidays"},{"key":"cat_ears","name":"Katzenohren","description":"In deiner Haarfarbe. Hören Dividenden schon von Weitem schnurren.","slot":"head","rarity":"common","priceCents":195000,"minLevel":1,"set":"zoo"},{"key":"tie_headband","name":"Krawatte als Stirnband","description":"Nach der Weihnachtsfeier der Investmentbank. Nicht fragen.","slot":"head","rarity":"common","priceCents":225000,"minLevel":2,"set":"office"},{"key":"alien_antennae","name":"Alien-Fühler","description":"Empfangen Börsentipps aus einer fernen Galaxie. Meist falsche.","slot":"head","rarity":"common","priceCents":260000,"minLevel":2,"set":"space"},{"key":"frog_hat","name":"Froschmütze","description":"Quak! Springt von Aktie zu Aktie und landet meist im Teich.","slot":"head","rarity":"rare","priceCents":1800000,"minLevel":2,"set":"zoo"},{"key":"reindeer_antlers","name":"Rentiergeweih","description":"Zieht den Schlitten voller Gewinne. Rudolph ist neidisch.","slot":"head","rarity":"rare","priceCents":2400000,"minLevel":3,"set":"holidays"},{"key":"sombrero","name":"Sombrero","description":"Spendet Schatten für den ganzen Handelsraum. Olé!","slot":"head","rarity":"rare","priceCents":2900000,"minLevel":3},{"key":"jester_hat","name":"Narrenkappe","description":"Für alle, die zum Höchstkurs gekauft haben. Klingelt beim Verkaufen.","slot":"head","rarity":"rare","priceCents":3600000,"minLevel":4,"set":"absurd"},{"key":"graduation_cap","name":"Doktorhut","description":"Dr. rer. pol. in Kaffeesatzlesen. Mit Auszeichnung.","slot":"head","rarity":"rare","priceCents":4500000,"minLevel":4,"set":"office"},{"key":"pumpkin_head","name":"Kürbiskopf","description":"Gruselig wie ein Depot im Oktober.","slot":"head","rarity":"epic","priceCents":33000000,"minLevel":7,"set":"holidays"},{"key":"knight_helmet","name":"Ritterhelm","description":"Schützt vor Gegenwind, Kritik und Margin Calls.","slot":"head","rarity":"epic","priceCents":68000000,"minLevel":9,"set":"knight"},{"key":"wizard_hat","name":"Zauberhut","description":"Zaubert Gewinne herbei. Behauptet zumindest der Prospekt.","slot":"head","rarity":"epic","priceCents":90000000,"minLevel":10,"set":"wizard"},{"key":"unicorn_horn","name":"Einhorn-Horn","description":"Für Gründer mit Milliardenbewertung und ohne Umsatz.","slot":"head","rarity":"epic","priceCents":125000000,"minLevel":12,"set":"zoo"},{"key":"disco_ball","name":"Discokugel","description":"Die Party geht weiter, solange der Kurs steigt.","slot":"head","rarity":"legendary","priceCents":1900000000,"minLevel":19,"set":"absurd"},{"key":"money_cloud","name":"Geldregenwolke","description":"Der Wetterbericht für Superreiche: Es regnet Scheine.","slot":"head","rarity":"mythic","priceCents":75000000000,"minLevel":40,"set":"royal"},{"key":"bubblegum","name":"Kaugummiblase","description":"Wie eine Spekulationsblase, nur leckerer. Platzt auch.","slot":"face","rarity":"common","priceCents":65000,"minLevel":1,"set":"absurd"},{"key":"eye_patch","name":"Augenklappe","description":"Ein Auge auf den Markt reicht völlig, sagt der Kapitän.","slot":"face","rarity":"common","priceCents":85000,"minLevel":1,"set":"pirate"},{"key":"facepaint","name":"Fan-Schminke","description":"In den Farben des Teams mit der besten Rendite. Wechselt wöchentlich.","slot":"face","rarity":"common","priceCents":95000,"minLevel":1,"set":"sports"},{"key":"nerd_glasses","name":"Hornbrille","description":"Mit Klebeband geflickt. Hat schon jede Tabellenkalkulation gesehen.","slot":"face","rarity":"common","priceCents":110000,"minLevel":1,"set":"office"},{"key":"snorkel_mask","name":"Taucherbrille","description":"Bestens gerüstet für den nächsten Kurstaucher.","slot":"face","rarity":"rare","priceCents":1400000,"minLevel":2},{"key":"star_glasses","name":"Sternchenbrille","description":"Rockstar-Look für alle, die den Depotauszug nicht sehen wollen.","slot":"face","rarity":"rare","priceCents":2200000,"minLevel":3,"set":"rock"},{"key":"hero_mask","name":"Superheldenmaske","description":"Geheime Identität: Kleinanleger. Superkraft: Durchhalten.","slot":"face","rarity":"rare","priceCents":3900000,"minLevel":4},{"key":"wizard_beard","name":"Zauberbart","description":"Hundert Jahre Börsenerfahrung. Oder zwei Wochen sehr viel Stress.","slot":"face","rarity":"epic","priceCents":64000000,"minLevel":10,"set":"wizard"},{"key":"diamond_grill","name":"Diamant-Grillz","description":"Ein Lächeln wie ein Tresor: glänzend, hart und sehr teuer.","slot":"face","rarity":"legendary","priceCents":2100000000,"minLevel":21,"set":"royal"},{"key":"diamond_monocle","name":"Diamantmonokel","description":"Sieht alles. Besonders gern das eigene Spiegelbild.","slot":"face","rarity":"mythic","priceCents":25000000000,"minLevel":35,"set":"royal"},{"key":"barrel","name":"Pleite-Fass","description":"Das Outfit nach dem Margin Call. Hosenträger gibt es gratis dazu.","slot":"body","rarity":"common","priceCents":49000,"minLevel":1,"set":"office"},{"key":"chef_apron","name":"Kochschürze","description":"Hier werden keine Bilanzen gekocht. Nur Nudeln.","slot":"body","rarity":"common","priceCents":125000,"minLevel":1,"set":"chef"},{"key":"duck_float","name":"Entchen-Schwimmring","description":"Hält dich über Wasser, wenn das Depot absäuft.","slot":"body","rarity":"common","priceCents":145000,"minLevel":1,"set":"absurd"},{"key":"jersey","name":"Trikot Nr. 1","description":"Die Nummer eins im Depot-Derby. Steht ja drauf.","slot":"body","rarity":"common","priceCents":240000,"minLevel":2,"set":"sports"},{"key":"xmas_sweater","name":"Weihnachtspulli","description":"Hässlich, kratzig und trotzdem jedes Jahr wieder dabei.","slot":"body","rarity":"rare","priceCents":1900000,"minLevel":2,"set":"holidays"},{"key":"leather_jacket","name":"Lederjacke","description":"Rock ''n'' Roll im Depot: laut, wild und sehr volatil.","slot":"body","rarity":"rare","priceCents":5500000,"minLevel":4,"set":"rock"},{"key":"pirate_coat","name":"Piratenmantel","description":"Mit Goldknöpfen aus erbeuteten Dividenden.","slot":"body","rarity":"rare","priceCents":6500000,"minLevel":5,"set":"pirate"},{"key":"garden_gnome","name":"Gartenzwergkostüm","description":"Steht stoisch im Vorgarten und wartet auf die Erholung.","slot":"body","rarity":"rare","priceCents":7700000,"minLevel":5,"set":"absurd"},{"key":"pinstripe_suit","name":"Nadelstreifenanzug","description":"Riecht nach Bonus, Espresso und Überstunden.","slot":"body","rarity":"epic","priceCents":72000000,"minLevel":8,"set":"office"},{"key":"knight_armor","name":"Ritterrüstung","description":"Panzert gegen Kursstürze. Rostet leider bei Regen.","slot":"body","rarity":"epic","priceCents":115000000,"minLevel":11,"set":"knight"},{"key":"wizard_robe","name":"Zaubermantel","description":"Mit Sternen bestickt und Geheimtaschen für Geheimformeln.","slot":"body","rarity":"epic","priceCents":150000000,"minLevel":12,"set":"wizard"},{"key":"ermine_robe","name":"Königsmantel","description":"Hermelin, Samt und Gold. Untertanen sind nicht im Preis enthalten.","slot":"body","rarity":"mythic","priceCents":60000000000,"minLevel":45,"set":"royal"},{"key":"sparkler","name":"Wunderkerze","description":"Funkelt kurz und hell. Wie mancher Börsengang.","slot":"hand","rarity":"common","priceCents":50000,"minLevel":1,"set":"holidays"},{"key":"candy_cane","name":"Zuckerstange","description":"Rot-weiß gestreift wie ein Chart an einem nervösen Tag.","slot":"hand","rarity":"common","priceCents":55000,"minLevel":1,"set":"holidays"},{"key":"frying_pan","name":"Bratpfanne","description":"Mit Spiegelei. Frühstück und Selbstverteidigung in einem.","slot":"hand","rarity":"common","priceCents":70000,"minLevel":1,"set":"chef"},{"key":"coffee_mug","name":"Kaffeebecher","description":"Treibstoff für den Börsenstart um neun. Und den um zehn.","slot":"hand","rarity":"common","priceCents":80000,"minLevel":1,"set":"office"},{"key":"plunger","name":"Pümpel","description":"Für verstopfte Orderbücher und andere Notfälle.","slot":"hand","rarity":"common","priceCents":99900,"minLevel":1,"set":"absurd"},{"key":"tennis_racket","name":"Tennisschläger","description":"Schlägt jeden Aufschlag zurück. Nur keine Gebühren.","slot":"hand","rarity":"common","priceCents":200000,"minLevel":2,"set":"sports"},{"key":"shopping_cart","name":"Einkaufswagen","description":"Randvoll mit Klopapier. Die sicherste Anlage überhaupt.","slot":"hand","rarity":"rare","priceCents":1600000,"minLevel":2,"set":"absurd"},{"key":"magic_wand","name":"Zauberstab","description":"Ein Schwung, und das Minus ist weg. Leider nur im Traum.","slot":"hand","rarity":"rare","priceCents":2700000,"minLevel":3,"set":"wizard"},{"key":"cutlass","name":"Säbel","description":"Entert jede Hauptversammlung. Arrr!","slot":"hand","rarity":"rare","priceCents":4200000,"minLevel":4,"set":"pirate"},{"key":"ray_gun","name":"Strahlenpistole","description":"Pew, pew! Schießt Kurse in die Umlaufbahn.","slot":"hand","rarity":"rare","priceCents":4800000,"minLevel":4,"set":"space"},{"key":"electric_guitar","name":"E-Gitarre","description":"Spielt im Plus nur Dur. Im Minus Blues.","slot":"hand","rarity":"epic","priceCents":47000000,"minLevel":8,"set":"rock"},{"key":"broadsword","name":"Ritterschwert","description":"Für epische Duelle in der Börsenliga.","slot":"hand","rarity":"epic","priceCents":60000000,"minLevel":9,"set":"knight"},{"key":"trophy","name":"Goldpokal","description":"Für den ersten Platz. Selbst gekauft zählt auch.","slot":"hand","rarity":"epic","priceCents":99000000,"minLevel":11,"set":"sports"},{"key":"briefcase_money","name":"Geldkoffer","description":"Prall gefüllt und ganz sicher nicht aus dunklen Geschäften. Fast.","slot":"hand","rarity":"legendary","priceCents":1250000000,"minLevel":17,"set":"office"},{"key":"sceptre","name":"Zepter","description":"Wer das hält, bestimmt den Leitzins. Zumindest auf dem Platz.","slot":"hand","rarity":"mythic","priceCents":40000000000,"minLevel":38,"set":"royal"},{"key":"pet_rock","name":"Haustierstein","description":"Frisst nichts, bellt nicht und schwankt nie im Kurs.","slot":"pet","rarity":"common","priceCents":49900,"minLevel":1,"set":"absurd"},{"key":"snail","name":"Turbo-Schnecke","description":"Schneller als jede Überweisung am Wochenende.","slot":"pet","rarity":"common","priceCents":135000,"minLevel":1,"set":"zoo"},{"key":"cat","name":"Katze","description":"Läuft über die Tastatur und kauft dabei zufällig Aktien.","slot":"pet","rarity":"common","priceCents":280000,"minLevel":2,"set":"zoo"},{"key":"goldfish","name":"Goldfisch im Glas","description":"Vergisst jeden Verlust nach drei Sekunden. Ein Vorbild.","slot":"pet","rarity":"rare","priceCents":1200000,"minLevel":2,"set":"zoo"},{"key":"lobster","name":"Hummer","description":"Kneift bei schlechten Trades. Also ziemlich oft.","slot":"pet","rarity":"rare","priceCents":2600000,"minLevel":3,"set":"chef"},{"key":"ghost","name":"Gespenst","description":"Der Geist vergangener Verluste. Buh!","slot":"pet","rarity":"rare","priceCents":3100000,"minLevel":3,"set":"holidays"},{"key":"owl","name":"Eule","description":"Weise Anlagetipps, aber nur nach Mitternacht.","slot":"pet","rarity":"rare","priceCents":3400000,"minLevel":4,"set":"wizard"},{"key":"penguin","name":"Pinguin","description":"Trägt immer Frack. Perfekt für die Hauptversammlung.","slot":"pet","rarity":"rare","priceCents":5000000,"minLevel":4,"set":"zoo"},{"key":"bear","name":"Bärenmarkt-Bär","description":"Kuschelig, aber jeder Kurs fällt, wenn er brummt.","slot":"pet","rarity":"epic","priceCents":25000000,"minLevel":6,"set":"office"},{"key":"robo_dog","name":"Robohund","description":"Holt die Zeitung, liest sie und handelt sofort.","slot":"pet","rarity":"epic","priceCents":88000000,"minLevel":10,"set":"space"},{"key":"ufo","name":"Mini-UFO","description":"Entführt Kühe. Und manchmal Aktien in ungeahnte Höhen.","slot":"pet","rarity":"legendary","priceCents":3500000000,"minLevel":24,"set":"space"},{"key":"golden_bull","name":"Goldener Bulle","description":"Das Wappentier der Hausse. Massiv vergoldet, schnaubt Optimismus.","slot":"pet","rarity":"mythic","priceCents":90000000000,"minLevel":50,"set":"royal"},{"key":"school_bag","name":"Schulranzen","description":"Für den ersten Schultag an der Börse. Pausenbrot inklusive.","slot":"back","rarity":"common","priceCents":115000,"minLevel":1},{"key":"bee_wings","name":"Bienenflügel","description":"Fleißig wie eine Biene. Summt beim Sparen.","slot":"back","rarity":"common","priceCents":185000,"minLevel":2,"set":"zoo"},{"key":"turtle_shell","name":"Schildkrötenpanzer","description":"Langsam, aber sicher: die Strategie für Geduldige.","slot":"back","rarity":"rare","priceCents":2300000,"minLevel":3,"set":"zoo"},{"key":"surfboard","name":"Surfbrett","description":"Reitet jede Welle. Auch die nach unten.","slot":"back","rarity":"rare","priceCents":3000000,"minLevel":3},{"key":"knight_shield","name":"Ritterschild","description":"Hält Anrufe von Anlageberatern zuverlässig ab.","slot":"back","rarity":"rare","priceCents":5200000,"minLevel":5,"set":"knight"},{"key":"peacock_tail","name":"Pfauenrad","description":"Schlägt ein Rad, sobald der Kontostand stimmt.","slot":"back","rarity":"epic","priceCents":160000000,"minLevel":13,"set":"royal"},{"key":"dragon_wings","name":"Drachenflügel","description":"Für Flüge über den eigenen Goldschatz. Feuer inklusive.","slot":"back","rarity":"legendary","priceCents":7500000000,"minLevel":26,"set":"wizard"},{"key":"phoenix_wings","name":"Phönixflügel","description":"Steigt aus der Asche jedes Crashs wieder auf.","slot":"back","rarity":"mythic","priceCents":15000000000,"minLevel":42,"set":"royal"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "accessories"'),
   ('battles', '{"lobby":{"minLevel":2,"minPlayers":3,"maxPlayers":10,"perHour":1,"countdownSeconds":30,"idleSeconds":15,"introMs":6000,"recentSeconds":120},"demo":{"countdownSeconds":6,"botsMin":3,"botsMax":5},"weights":{"floor":12,"bulls":12,"coins":12,"sumo":12,"potato":12,"pump":10,"quiz":12,"estimate":8,"bell":10,"bear":12,"dash":12,"margin":12,"elevator":10,"laser":12,"rodeo":10,"vault":8,"ticker":10,"higher":10,"auction":8},"net":{"tickMs":50,"graceMs":1000,"aheadTicks":10,"disconnectTicks":80,"sendEveryMs":250,"checkEveryMs":1000},"arena":{"w":11,"h":9,"stepTicks":4,"spawns":[[1,1],[9,7],[9,1],[1,7],[5,1],[5,7],[1,4],[9,4],[3,4],[7,4]]},"games":{"floor":{"maxTicks":1400,"firstWave":60,"waveEvery":50,"waveEveryMin":18,"waveEveryStep":2,"crackStart":3,"crackMax":9,"crackGrowEvery":2,"warnTicks":24,"stompTicks":50,"endgameTiles":8},"bulls":{"maxTicks":1300,"hearts":3,"firstSpawn":40,"spawnEvery":50,"spawnEveryMin":14,"spawnEveryStep":2,"countGrowEvery":5,"countMax":4,"warnTicks":26,"ticksPerTile":2,"stunTicks":16,"invulnTicks":40},"coins":{"durationTicks":900,"firstDrop":20,"dropEvery":6,"dropEveryMin":3,"fallTicks":16,"lifeTicks":80,"bearPct":12,"goldPct":8,"goldValue":3,"bearStunTicks":30,"bearLoss":2,"jackpotTicks":200,"jackpotGoldPct":25},"sumo":{"maxTicks":1500,"firstShrink":300,"shrinkEvery":220,"warnTicks":40,"stunTicks":0,"recoverTicks":7,"powerCooldown":40,"cornerCut":8,"spawns":[[2,2],[8,6],[8,2],[2,6],[5,1],[5,7],[2,4],[8,4],[4,3],[6,5]]},"potato":{"maxTicks":1800,"firstRound":40,"pauseTicks":40,"holderStepTicks":3,"passBackTicks":20,"receiverStunTicks":8,"fuseBaseSeconds":13,"fuseMinSeconds":4,"fuseJitterSeconds":4,"walls":[[2,2],[8,2],[2,6],[8,6],[5,4]]},"pump":{"durationTicks":600,"greenMin":40,"greenJitter":60,"yellowTicks":12,"redMin":20,"redJitter":20,"goldEvery":4,"goldTicks":20,"goldValue":3,"bustFreezeTicks":20,"bustLossBps":2500},"bear":{"maxTicks":1600,"bearTicks":[60,380,740,1100],"stepStart":7,"stepMin":4,"speedEvery":280,"eatTicks":30,"den":[5,4],"pillars":[[3,3],[7,3],[3,5],[7,5]],"spawns":[[1,1],[9,7],[9,1],[1,7],[5,1],[5,7],[1,4],[9,4],[3,1],[7,7]]},"dash":{"maxTicks":1200,"target":15,"firstCoin":20,"coinsPerPlayers":4,"coinsMax":3,"spawnDelay":24,"goldEvery":5,"goldValue":2,"tackleStun":24,"tackleCool":40},"margin":{"maxTicks":1800,"firstRound":30,"showTicks":100,"showMin":44,"showStep":8,"pauseTicks":34,"warmupRounds":3},"elevator":{"maxTicks":1600,"firstRise":60,"riseStart":30,"riseMin":9,"riseStep":1,"riseStepEvery":2,"barrierEvery":3,"gapStart":4,"gapMin":1,"gapShrinkEvery":12},"laser":{"maxTicks":1400,"hearts":3,"firstSpawn":50,"spawnEvery":64,"spawnEveryMin":26,"spawnEveryStep":2,"countGrowEvery":4,"countMax":3,"staggerTicks":20,"warnTicks":24,"ticksPerTile":2,"gapPct":35,"jumpTicks":8,"jumpCool":6,"invulnTicks":16},"rodeo":{"maxTicks":1400,"grip":3,"firstCue":40,"windowStart":26,"windowMin":9,"windowStep":1,"gapMin":8,"gapJitter":18},"quiz":{"rounds":7,"answerMs":8000,"revealMs":3000,"hearts":2,"basePoints":500,"speedPoints":500},"estimate":{"rounds":4,"answerMs":12000,"revealMs":4000,"bullseyeBps":100,"bullseyeBonus":2,"lastRoundFactor":2,"stockRounds":1},"bell":{"maxRounds":9,"readyMs":1000,"waitMinMs":1500,"waitMaxMs":4500,"windowMs":2000,"resultMs":2500,"smallGroup":5,"heartsSmall":2,"heartsLarge":1},"vault":{"rounds":3,"answerMs":24000,"revealMs":4000,"digits":3,"symbols":6,"maxTries":8,"basePoints":400,"speedPoints":600,"tryBonus":25},"ticker":{"rounds":8,"answerMs":6000,"revealMs":2500,"options":6,"basePoints":200,"speedPoints":800,"wrongPoints":300},"higher":{"rounds":10,"answerMs":5000,"revealMs":2500,"smallGroup":5,"heartsSmall":3,"heartsLarge":2,"history":14,"trendPct":65,"moveMinBps":80,"moveMaxBps":450,"basePoints":100,"speedPoints":100},"auction":{"rounds":6,"answerMs":10000,"revealMs":3500,"budget":1000}},"prizes":{"weights":{"xp":30,"money":30,"skin":20,"nft":20},"xpBase":1000,"xpPerPlayer":150,"moneyBaseCents":300000,"moneyPerPlayerCents":75000,"dailyPrizeCap":3},"accessories":[{"key":"battle_crown","name":"Battle-Krone","description":"Gewonnen, nicht gekauft. Samt, Gold und ein Rubin so groß wie dein Ego.","slot":"head","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"laurel_wreath","name":"Lorbeerkranz","description":"Wie bei den alten Griechen, nur mit mehr Aktien.","slot":"head","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"champion_belt","name":"Champion-Gürtel","description":"Schwergewichtsmeister im Kurssturz-Springen.","slot":"body","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"victory_cape","name":"Siegerumhang","description":"Flattert dramatisch, auch wenn kein Wind weht.","slot":"back","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"star_shades","name":"Siegerbrille","description":"Wer gewinnt, muss die Blicke der Verlierer nicht sehen.","slot":"face","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"golden_joystick","name":"Goldener Joystick","description":"WASD in purem Gold. Nicht zum Zocken, zum Angeben.","slot":"hand","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"winner_trophy","name":"Siegerpokal","description":"Glänzt. Wiegt. Wird jeden Abend poliert.","slot":"hand","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"mini_bull","name":"Mini-Bulle","description":"Ein Bulle, der dich nicht über den Haufen rennt. Meistens.","slot":"pet","rarity":"legendary","exclusive":true,"minLevel":1}],"doodle":{"lobby":["Na, ihr Sofa-Börsianer? Wer traut sich in die Arena?","Ich brauche drei Mutige. Oder drei Ahnungslose. Geht beides.","Kommt rein, kommt rein! Hier gewinnt nur einer, die anderen weinen live.","Meine Mutter würde sofort mitmachen. Und gewinnen.","Ein Preis, ein Sieger, null Mitleid. Willkommen im Battle!"],"countdown":["Gleich geht''s los! Letzte Chance, noch feige wegzurennen.","Die Arena wird gewischt. Gleich fließen Tränen.","Ich habe Popcorn. Ihr habt keine Chance."],"intro":{"floor":"Der Kurs stürzt, der Boden auch! Bleibt in Bewegung, sonst geht''s abwärts!","bulls":"Die Bullen sind los! Wer stehen bleibt, wird zum Teppich.","coins":"Es regnet Geld! Vorsicht vor den Bären, die beißen.","sumo":"Rempeln erlaubt, Weinen auch. Wer rausfliegt, fliegt raus!","potato":"Wer die Giftaktie hält, wenn es knallt, ist raus. Weitergeben!","pump":"Pumpt die Aktie! Aber wehe, ihr tippt im Crash.","quiz":"Quizzeit! Zwei Herzen, null Ahnung. Zeigt, was ihr wisst!","estimate":"Schätzt mal! Wer am nächsten dran ist, kriegt die Punkte.","bell":"Wenn die Glocke läutet, drückt ihr. Vorher drücken? Raus!","bear":"Die Bären haben Hunger! Lauft, und zwar weg von ihnen, nicht hin.","dash":"Dividende für alle! Also für den Schnellsten. Rempeln ist ausdrücklich erwünscht.","margin":"Margin Call! Wer beim Gong nicht im Grünen steht, wird glattgestellt.","elevator":"Diese Aktie kennt nur eine Richtung: nach oben. Wer unten bleibt, bleibt unten.","laser":"Die Laserschranke! Springt im richtigen Moment, sonst gibt''s gegrillte Börsianer.","rodeo":"Haltet euch fest! Der Bulle bockt, und er hat heute richtig schlechte Laune.","vault":"Der Tresor der Zentralbank! Knackt den Code, bevor die Polizei kommt. War ein Witz. Oder?","ticker":"Kürzel-Alarm! Wer das richtige Tickersymbol zuerst erwischt, ist der Börsenprofi.","higher":"Höher oder tiefer? Mein Schnurrbart sagt höher. Mein Schnurrbart lag noch nie richtig.","auction":"Wer bietet mehr? Spielgeld weg, Punkte her! Nur nicht alles für eine Gummiente ausgeben."},"win":["{name} gewinnt! Ich habe es immer gewusst. Also seit gerade eben.","Applaus für {name}! Die anderen dürfen jetzt heimlich weinen.","{name} räumt ab! Das schreibe ich mir auf die Krawatte.","Was für ein Battle! {name} ist der Champion des Tages.","{name} siegt, die Börse bebt, mein Schnurrbart zittert!"],"out":["Und weg ist {name}! Tschüss, war nett.","{name} fliegt raus. Ich habe nichts gesehen. Doch, alles.","Autsch, {name}! Das gibt einen blauen Fleck im Depot."],"chat":{"start":"🏟️ BATTLE! {count} Zuschauer kämpfen jetzt in „{game}“ um {prize}. Viel Glück, ihr Pfeifen!","win":"🏆 {name} gewinnt „{game}“ und kassiert {prize}! Glückwunsch, du Glückspilz."}},"names":{"floor":"Kurssturz","bulls":"Bullenreiten","coins":"Geldregen","sumo":"Sumo am Parkett","potato":"Giftaktie","pump":"Aktie pumpen","quiz":"Börsenquiz","estimate":"Schätz den Kurs","bell":"Die Glocke","bear":"Bärenjagd","dash":"Dividenden-Dash","margin":"Margin Call","elevator":"Fahrstuhl zum Mond","laser":"Laserschranke","rodeo":"Bullen-Rodeo","vault":"Tresorknacker","ticker":"Ticker-Tippen","higher":"Mehr oder Weniger","auction":"Wer bietet mehr?"},"demoBots":[{"nickname":"Bärbel Bärenmarkt","avatarKey":"seller","accessories":["cowboy_hat"]},{"nickname":"Kalle Kursrakete","avatarKey":"punk","accessories":["sunglasses","superhero_cape"]},{"nickname":"Dividenden-Dieter","avatarKey":"analyst","accessories":["top_hat"]},{"nickname":"Moni Moneymaker","avatarKey":"scientist","accessories":["party_hat","balloon"]},{"nickname":"Börsen-Bernd","avatarKey":"rookie","accessories":["beanie","hamster"]},{"nickname":"Lisa Leerverkauf","avatarKey":"finn_fan","accessories":["bunny_ears"]},{"nickname":"Hedge-Horst","avatarKey":"rookie","accessories":["viking_helmet","pug"]},{"nickname":"Penny Stock","avatarKey":"seller","accessories":["heart_glasses"]},{"nickname":"Ralf Rendite","avatarKey":"analyst","accessories":["chef_hat","baguette"]}],"quiz":[{"q":"Wie viel Startkapital bekommt man bei NEXA?","a":"10.000 €","wrong":["1.000 €","50.000 €","100.000 €"]},{"q":"Wer moderiert die NEXA Nachrichten?","a":"Mr. Doodle Dangle","wrong":["Finn","Mira","Dr. Dax"]},{"q":"Wann laufen die NEXA Nachrichten?","a":"Zu jeder vollen Stunde","wrong":["Einmal am Tag","Nur sonntags","Alle 5 Minuten"]},{"q":"Was ist ein Bullenmarkt?","a":"Steigende Kurse","wrong":["Fallende Kurse","Ein Viehmarkt","Ein Markt ohne Händler"]},{"q":"Was ist ein Bärenmarkt?","a":"Fallende Kurse","wrong":["Steigende Kurse","Ein Zoo","Ein Honigmarkt"]},{"q":"Was ist eine Dividende?","a":"Gewinnanteil für Aktionäre","wrong":["Eine Gebühr","Ein Kredit","Eine Steuer"]},{"q":"Was ist ein IPO?","a":"Ein Börsengang","wrong":["Eine Insolvenz","Ein Aktiensplit","Eine Fusion"]},{"q":"Was bedeutet Leerverkauf?","a":"Auf fallende Kurse wetten","wrong":["Alles verkaufen","Ohne Gebühr kaufen","Eine leere Order"]},{"q":"Was ist eine Anleihe?","a":"Ein Schuldpapier mit Zinsen","wrong":["Ein Firmenanteil","Eine Kryptowährung","Ein Sparbuch"]},{"q":"Was misst ein Aktienindex?","a":"Die Entwicklung vieler Aktien","wrong":["Den Goldpreis","Die Inflation","Nur eine Aktie"]},{"q":"Was ist eine Limit-Order?","a":"Kauf oder Verkauf zu einem Wunschpreis","wrong":["Ein Kauf ohne Geld","Eine Order mit Zeitlimit","Ein Verbot zu handeln"]},{"q":"Was ist ein Stop-Loss?","a":"Automatischer Verkauf bei Verlust","wrong":["Ein Handelsverbot","Eine Gewinnsteuer","Ein Börsenfeiertag"]},{"q":"Was ist Market Cap?","a":"Börsenwert einer Firma","wrong":["Die Kappe des Händlers","Der Tageshöchstkurs","Die Anzahl der Mitarbeiter"]},{"q":"Was passiert bei einem Aktiensplit?","a":"Mehr Aktien zum kleineren Preis","wrong":["Die Firma teilt sich","Die Aktie wird gelöscht","Der Kurs verdoppelt sich"]},{"q":"Was ist Volatilität?","a":"Wie stark ein Kurs schwankt","wrong":["Wie alt eine Firma ist","Ein Börsenfeiertag","Die Höhe der Dividende"]},{"q":"Welches Tier steht für steigende Kurse?","a":"Bulle","wrong":["Bär","Hase","Schildkröte"]},{"q":"Was ist ein NFT bei NEXA?","a":"Ein einzigartiges Pixel-Kunstwerk","wrong":["Eine Aktie","Eine Kreditkarte","Ein Firmenlogo"]},{"q":"Wie viele Spieler braucht ein News-Battle mindestens?","a":"3","wrong":["1","2","5"]},{"q":"Wie viele Spieler passen höchstens in ein News-Battle?","a":"10","wrong":["4","8","20"]},{"q":"Was bekommt der Sieger eines News-Battles?","a":"XP, Geld, einen Skin oder ein NFT","wrong":["Nur ein Lob","Eine echte Aktie","Einen Kredit"]},{"q":"Was ist ein Rug Pull?","a":"Die Macher hauen mit dem Geld ab","wrong":["Ein Teppichverkauf","Ein Kurssprung","Eine Gratis-Aktie"]},{"q":"Was ist Inflation?","a":"Steigende Preise, sinkende Kaufkraft","wrong":["Sinkende Preise","Ein Luftballon","Eine Börsenregel"]},{"q":"Was heißt „Buy the Dip“?","a":"Nach einem Kursrutsch kaufen","wrong":["Chips kaufen","Alles verkaufen","Nur Anleihen kaufen"]},{"q":"Was ist ein Portfolio?","a":"Alle eigenen Anlagen zusammen","wrong":["Eine Aktentasche","Ein Börsenticker","Ein Kredit"]},{"q":"Was ist ein Ticker?","a":"Das Kürzel einer Aktie","wrong":["Eine Uhr","Ein Händler","Eine Gebühr"]},{"q":"Wie heißt die Hauptstadt von Australien?","a":"Canberra","wrong":["Sydney","Melbourne","Perth"]},{"q":"Wie viele Beine hat eine Spinne?","a":"8","wrong":["6","10","12"]},{"q":"Welcher Planet ist der Sonne am nächsten?","a":"Merkur","wrong":["Venus","Mars","Erde"]},{"q":"Wie viele Minuten hat ein Tag?","a":"1.440","wrong":["1.200","2.400","960"]},{"q":"Welche Farbe entsteht aus Blau und Gelb?","a":"Grün","wrong":["Lila","Orange","Braun"]},{"q":"Was ist das größte Säugetier der Welt?","a":"Blauwal","wrong":["Elefant","Giraffe","Pottwal"]},{"q":"Wie viele Seiten hat ein Würfel?","a":"6","wrong":["4","8","12"]},{"q":"In welchem Land steht der Eiffelturm?","a":"Frankreich","wrong":["Italien","Belgien","Spanien"]},{"q":"Was ist H₂O?","a":"Wasser","wrong":["Wasserstoff","Sauerstoff","Salz"]},{"q":"Wie viele Spieler hat eine Fußballmannschaft auf dem Feld?","a":"11","wrong":["9","10","12"]},{"q":"Welches Tier legt Eier und ist ein Säugetier?","a":"Schnabeltier","wrong":["Pinguin","Delfin","Fledermaus"]},{"q":"Wie viele Kontinente gibt es?","a":"7","wrong":["5","6","8"]},{"q":"Wer hat die Glühbirne bekannt gemacht?","a":"Thomas Edison","wrong":["Albert Einstein","Isaac Newton","Nikola Tesla"]},{"q":"Was ist die Wurzel aus 144?","a":"12","wrong":["14","11","16"]},{"q":"Welche Sprache hat die meisten Muttersprachler?","a":"Chinesisch (Mandarin)","wrong":["Englisch","Spanisch","Hindi"]},{"q":"Wie heißt der längste Fluss Europas?","a":"Wolga","wrong":["Donau","Rhein","Elbe"]},{"q":"Was zeigt ein grüner Kurs bei NEXA?","a":"Der Kurs ist gestiegen","wrong":["Der Kurs ist gefallen","Die Börse ist zu","Ein Fehler"]},{"q":"Was kostet es, eine Order bei NEXA aufzugeben?","a":"Eine kleine Gebühr","wrong":["Nichts, niemals","Die Hälfte des Werts","Ein Level"]},{"q":"Was passiert, wenn eine Firma insolvent ist?","a":"Sie kann ihre Schulden nicht zahlen","wrong":["Sie geht an die Börse","Sie zahlt Dividende","Sie wird verdoppelt"]},{"q":"Wie viele Zähne hat ein erwachsener Mensch normalerweise?","a":"32","wrong":["28","30","36"]},{"q":"Welches Gas atmen Pflanzen ein?","a":"Kohlendioxid","wrong":["Sauerstoff","Stickstoff","Helium"]}],"tickers":[{"ticker":"BULL","name":"Bullen & Söhne AG"},{"ticker":"BAER","name":"Bärenbräu Holding"},{"ticker":"MOND","name":"Mondfahrt Raketen"},{"ticker":"GOLD","name":"Goldgrube Minen"},{"ticker":"PIZZ","name":"Pizza Pronto Gruppe"},{"ticker":"KAFE","name":"Kaffeekanne Kontor"},{"ticker":"NXA","name":"NEXA Börse"},{"ticker":"ROBO","name":"Robo Rasenmäher"},{"ticker":"DUCK","name":"Gummiente International"},{"ticker":"SOFA","name":"Sofa-Börsianer e. V."},{"ticker":"ZUGI","name":"Zugspitz Seilbahnen"},{"ticker":"KRAK","name":"Krakenkabel Telekom"}],"auctionItems":[{"name":"Goldbarren aus dem Tresor","points":300,"icon":"gold_bar"},{"name":"Signierte Bullen-Statue","points":250,"icon":"bull"},{"name":"Mondticket erster Klasse","points":220,"icon":"moon"},{"name":"Koffer voller Aktien","points":200,"icon":"briefcase"},{"name":"Glücksmünze von Mr. Doodle Dangle","points":180,"icon":"coin"},{"name":"Edelstein des Vorstands","points":160,"icon":"gem"},{"name":"Geheimer Insider-Tipp (ganz legal)","points":140,"icon":"key"},{"name":"Geschenkbox mit Überraschung","points":120,"icon":"gift"},{"name":"Ausgestopfter Bärenmarkt-Bär","points":100,"icon":"bear"},{"name":"Vergilbte Zeitung von 1929","points":80,"icon":"newspaper"},{"name":"Wecker für Frühaufsteher","points":60,"icon":"alarm_clock"},{"name":"Herz eines Börsianers","points":50,"icon":"heart"}],"estimate":[{"q":"Wie hoch ist der Eiffelturm (mit Antenne) in Metern?","value":330,"unit":"m"},{"q":"Wie viele Knochen hat ein erwachsener Mensch?","value":206,"unit":"Knochen"},{"q":"Wie viele Tasten hat ein Klavier?","value":88,"unit":"Tasten"},{"q":"Wie viele Länder gibt es in der EU?","value":27,"unit":"Länder"},{"q":"Wie schnell fährt ein ICE höchstens (km/h)?","value":300,"unit":"km/h"},{"q":"Wie viele Herzschläge hat ein Mensch in Ruhe pro Minute (etwa)?","value":70,"unit":"Schläge"},{"q":"Wie tief ist der Marianengraben in Metern (etwa)?","value":11000,"unit":"m"},{"q":"Wie viele Einwohner hat Berlin (in Tausend, etwa)?","value":3850,"unit":"Tsd."},{"q":"Wie viel wiegt ein erwachsener Afrikanischer Elefant in kg (etwa)?","value":6000,"unit":"kg"},{"q":"Wie lang ist die Chinesische Mauer in km (etwa)?","value":21000,"unit":"km"},{"q":"Wie viele Stunden hat ein Jahr (kein Schaltjahr)?","value":8760,"unit":"Stunden"},{"q":"Wie hoch ist die Zugspitze in Metern?","value":2962,"unit":"m"},{"q":"Wie viele Felder hat ein Schachbrett?","value":64,"unit":"Felder"},{"q":"Wie viele Kilometer ist der Mond von der Erde entfernt (in Tausend, etwa)?","value":384,"unit":"Tsd. km"},{"q":"Wie viele Liter Blut hat ein erwachsener Mensch (etwa)?","value":5,"unit":"Liter"},{"q":"Wie viele Kalorien hat eine Tafel Vollmilchschokolade (100 g, etwa)?","value":535,"unit":"kcal"},{"q":"Wie viele Spiele hat eine Bundesliga-Saison pro Team?","value":34,"unit":"Spiele"},{"q":"Wie viele Sekunden hat ein Tag?","value":86400,"unit":"Sekunden"},{"q":"Wie alt wurde Johann Wolfgang von Goethe?","value":82,"unit":"Jahre"},{"q":"Wie viele Stockwerke hat der Burj Khalifa (etwa)?","value":163,"unit":"Stockwerke"},{"q":"Wie viele Zähne hat ein Hai im Leben (etwa, in Tausend)?","value":30,"unit":"Tsd."},{"q":"Wie heiß ist die Oberfläche der Sonne in °C (etwa)?","value":5500,"unit":"°C"},{"q":"Wie viele Kaffeebohnen braucht ein Espresso (etwa)?","value":50,"unit":"Bohnen"},{"q":"Wie viele Wörter spricht ein Mensch am Tag (etwa, in Tausend)?","value":16,"unit":"Tsd."}]}'::jsonb, 'Defaults from src/config/balance.ts, section "battles"'),
+  ('listed', '{"refRevenue":{"windowHours":24,"minCents":20000},"satisfaction":{"start":60,"base":50,"adjustPerHour":0.15,"green":60,"red":35,"benefitsMax":40,"wages":{"unpaidMaxLoss":25,"moodMaxLoss":10},"workload":{"overFrom":0.95,"overFull":1.5,"overMaxLoss":12,"underBelow":0.35,"underLoss":4},"crisis":{"perSeverity":4,"scandal":6,"scandals":["quality_scandal","data_breach","tax_audit"]},"layoffs":{"perHead":3,"max":15,"decayPerHour":0.08},"greedMaxLoss":10,"success":{"profitHour":3,"lossHour":-3},"effect":{"lowCapacityMaxLoss":0.3,"lowQualityMaxLoss":0.15,"highCapacityMaxGain":0.06,"highFull":90},"quits":{"everyRedHours":3,"notifyEveryHours":24,"massQuitFrom":3}},"reputation":{"start":50,"base":50,"adjustPerHour":0.08,"windowHours":24,"minProfitShareOfRevenue":0.05,"greed":{"freeRatioBps":3000,"fullRatioBps":10000,"maxLoss":35,"feedBelow":35},"reinvest":{"fullRatioBps":5000,"maxGain":12},"dividend":{"fullRatioBps":2000,"maxGain":12,"streakPerDay":1,"streakMax":6},"penalty":{"lateFee":3,"estimate":6,"enforcement":8},"scandalLoss":5,"demandMaxEffect":0.2,"priceMaxEffect":0.25},"dividends":{"perDay":1,"maxShareOfFreeCashBps":5000,"minTotalCents":10000,"historyLimit":20},"board":{"minShareBps":2000,"voteHours":12,"quorumBps":3000,"maxOpen":2,"cooldownHours":6,"maxDays":7,"earmarkMaxShareOfCashBps":8000,"payoutCapStepBps":500,"aiVote":{"reputationBelow":40,"kinds":["payout_cap","withdraw_ban","dividend"]},"kinds":["earmark","release","dividend","payout_cap","withdraw_ban","price_level","debt"],"purposes":["research","products","expansion","benefits","marketing"],"historyLimit":20},"taxes":{"rateBps":1500,"minRateBps":800,"reminderAfterHours":30,"lateFeeAfterHours":42,"estimateAfterHours":60,"lateFee":{"minCents":5000,"revenueBps":50},"estimate":{"marginBps":2500,"surchargeBps":2500},"payWithinHours":24,"latePaymentBps":500,"enforceAfterHours":48,"enforcementBps":1000,"check":{"receipts":3,"discountBps":500},"advisor":{"minWageCentsPerHour":4000,"revenueBps":100,"discountBps":800},"auditArchetype":"tax_audit","receipts":[{"key":"customer_invoice","category":"revenue"},{"key":"online_shop_payout","category":"revenue"},{"key":"raw_material","category":"goods"},{"key":"packaging","category":"goods"},{"key":"payslip","category":"wages"},{"key":"overtime","category":"wages"},{"key":"office_rent","category":"fixed"},{"key":"electricity","category":"fixed"},{"key":"lab_equipment","category":"research"},{"key":"prototype","category":"research"},{"key":"fruit_basket","category":"benefit"},{"key":"team_dinner","category":"benefit"}],"receiptCategories":["revenue","goods","wages","fixed","research","benefit"],"historyLimit":30},"historyHours":72,"accountingPageSize":50,"items":[{"key":"r_quality_1","kind":"research","branch":"quality","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"qualityBps":300}},{"key":"r_quality_2","kind":"research","branch":"quality","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_quality_1"],"effects":{"qualityBps":500}},{"key":"r_quality_3","kind":"research","branch":"quality","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_quality_2"],"effects":{"qualityBps":800}},{"key":"r_quality_4","kind":"research","branch":"quality","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_quality_3","r_efficiency_2"],"effects":{"qualityBps":1200,"demandBps":400}},{"key":"r_efficiency_1","kind":"research","branch":"efficiency","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"marginBps":200}},{"key":"r_efficiency_2","kind":"research","branch":"efficiency","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_efficiency_1"],"effects":{"marginBps":300}},{"key":"r_efficiency_3","kind":"research","branch":"efficiency","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_efficiency_2"],"effects":{"marginBps":500}},{"key":"r_efficiency_4","kind":"research","branch":"efficiency","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_efficiency_3","r_automation_2"],"effects":{"marginBps":800,"capacityBps":500}},{"key":"r_brand_1","kind":"research","branch":"brand","tier":1,"purpose":"marketing","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"awarenessBps":200}},{"key":"r_brand_2","kind":"research","branch":"brand","tier":2,"purpose":"marketing","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_brand_1"],"effects":{"awarenessBps":300}},{"key":"r_brand_3","kind":"research","branch":"brand","tier":3,"purpose":"marketing","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_brand_2"],"effects":{"awarenessBps":500}},{"key":"r_brand_4","kind":"research","branch":"brand","tier":4,"purpose":"marketing","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_brand_3","r_quality_2"],"effects":{"awarenessBps":500,"demandBps":800}},{"key":"r_automation_1","kind":"research","branch":"automation","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"capacityBps":500}},{"key":"r_automation_2","kind":"research","branch":"automation","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_automation_1"],"effects":{"capacityBps":800}},{"key":"r_automation_3","kind":"research","branch":"automation","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_automation_2"],"effects":{"capacityBps":1200}},{"key":"r_automation_4","kind":"research","branch":"automation","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_automation_3","r_efficiency_2"],"effects":{"capacityBps":2000,"marginBps":300}},{"key":"r_logistics_1","kind":"research","branch":"logistics","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"capacityBps":300,"marginBps":100}},{"key":"r_logistics_2","kind":"research","branch":"logistics","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_logistics_1"],"effects":{"marketBps":500}},{"key":"r_logistics_3","kind":"research","branch":"logistics","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_logistics_2"],"effects":{"fixedCostBps":-500}},{"key":"r_logistics_4","kind":"research","branch":"logistics","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_logistics_3","r_automation_2"],"effects":{"marketBps":1000,"marginBps":200}},{"key":"r_sustainability_1","kind":"research","branch":"sustainability","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"reputation":2}},{"key":"r_sustainability_2","kind":"research","branch":"sustainability","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_sustainability_1"],"effects":{"reputation":3,"marginBps":100}},{"key":"r_sustainability_3","kind":"research","branch":"sustainability","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_sustainability_2"],"effects":{"reputation":3,"satisfaction":3}},{"key":"r_sustainability_4","kind":"research","branch":"sustainability","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_sustainability_3","r_brand_2"],"effects":{"reputation":5,"demandBps":500}},{"key":"r_finance_1","kind":"research","branch":"finance","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"taxRateBps":-100}},{"key":"r_finance_2","kind":"research","branch":"finance","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_finance_1"],"effects":{"fixedCostBps":-300}},{"key":"r_finance_3","kind":"research","branch":"finance","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_finance_2"],"effects":{"taxRateBps":-150}},{"key":"r_finance_4","kind":"research","branch":"finance","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_finance_3","r_logistics_2"],"effects":{"taxRateBps":-150,"marginBps":300}},{"key":"p_second","kind":"product","purpose":"products","costHours":12,"minCostCents":300000,"hours":2,"upkeepBps":150,"effects":{"demandBps":800}},{"key":"p_budget","kind":"product","purpose":"products","costHours":16,"minCostCents":400000,"hours":3,"requires":["r_efficiency_1"],"upkeepBps":200,"effects":{"demandBps":1200,"qualityBps":-200}},{"key":"p_premium","kind":"product","purpose":"products","costHours":30,"minCostCents":1000000,"hours":6,"requires":["r_quality_2"],"upkeepBps":300,"effects":{"demandBps":1000,"qualityBps":400}},{"key":"p_subscription","kind":"product","purpose":"products","costHours":36,"minCostCents":1500000,"hours":8,"requires":["r_brand_1","p_second"],"upkeepBps":350,"effects":{"demandBps":1800}},{"key":"p_merch","kind":"product","purpose":"products","costHours":8,"minCostCents":200000,"hours":2,"requires":["r_brand_2"],"upkeepBps":100,"effects":{"demandBps":400,"awarenessBps":200}},{"key":"p_enterprise","kind":"product","purpose":"products","costHours":80,"minCostCents":6000000,"hours":16,"requires":["r_quality_3","p_premium"],"upkeepBps":500,"effects":{"demandBps":3000}},{"key":"g_south","kind":"region","purpose":"expansion","costHours":20,"minCostCents":600000,"hours":4,"upkeepBps":200,"effects":{"marketBps":1000}},{"key":"g_dach","kind":"region","purpose":"expansion","costHours":40,"minCostCents":2000000,"hours":8,"requires":["g_south"],"upkeepBps":300,"effects":{"marketBps":1500}},{"key":"g_europe","kind":"region","purpose":"expansion","costHours":80,"minCostCents":6000000,"hours":12,"requires":["g_dach","l_export"],"upkeepBps":400,"effects":{"marketBps":2500}},{"key":"g_america","kind":"region","purpose":"expansion","costHours":140,"minCostCents":15000000,"hours":24,"requires":["g_europe","r_logistics_2"],"upkeepBps":500,"effects":{"marketBps":3500}},{"key":"g_asia","kind":"region","purpose":"expansion","costHours":200,"minCostCents":30000000,"hours":36,"requires":["g_america","r_logistics_4"],"upkeepBps":600,"effects":{"marketBps":5000}},{"key":"m_machines","kind":"machine","purpose":"expansion","costHours":10,"minCostCents":300000,"hours":2,"maxLevel":5,"costGrowth":1.6,"upkeepBps":50,"effects":{"capacityBps":400}},{"key":"m_datacenter","kind":"machine","purpose":"expansion","costHours":14,"minCostCents":500000,"hours":3,"maxLevel":3,"costGrowth":1.8,"upkeepBps":60,"effects":{"marginBps":150,"capacityBps":200}},{"key":"m_showroom","kind":"machine","purpose":"marketing","costHours":12,"minCostCents":400000,"hours":3,"maxLevel":3,"costGrowth":1.7,"upkeepBps":60,"effects":{"awarenessBps":200,"demandBps":150}},{"key":"a_kleinhirn","kind":"acquisition","purpose":"expansion","costHours":90,"minCostCents":8000000,"hours":6,"requires":["r_automation_2"],"upkeepBps":200,"effects":{"capacityBps":1000,"qualityBps":300}},{"key":"a_datenkrake","kind":"acquisition","purpose":"expansion","costHours":110,"minCostCents":10000000,"hours":6,"requires":["r_brand_2"],"upkeepBps":250,"effects":{"demandBps":1500}},{"key":"a_robobutze","kind":"acquisition","purpose":"expansion","costHours":130,"minCostCents":12000000,"hours":8,"requires":["r_efficiency_3"],"upkeepBps":200,"effects":{"marginBps":600,"capacityBps":500}},{"key":"l_patent","kind":"licence","purpose":"research","costHours":10,"minCostCents":300000,"hours":1,"upkeepBps":100,"effects":{"qualityBps":500}},{"key":"l_brand","kind":"licence","purpose":"marketing","costHours":10,"minCostCents":300000,"hours":1,"upkeepBps":120,"effects":{"demandBps":600}},{"key":"l_export","kind":"licence","purpose":"expansion","costHours":15,"minCostCents":500000,"hours":2,"upkeepBps":50,"effects":{}},{"key":"b_obstkorb","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":5000,"hours":0,"upkeepPerHeadCents":40,"effects":{"satisfaction":3}},{"key":"b_kaffee","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":8000,"hours":0,"upkeepPerHeadCents":50,"effects":{"satisfaction":3}},{"key":"b_tischkicker","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":60000,"hours":0,"upkeepPerHeadCents":10,"effects":{"satisfaction":2}},{"key":"b_hundebuero","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":10000,"hours":0,"upkeepPerHeadCents":20,"effects":{"satisfaction":2}},{"key":"b_massagesessel","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":150000,"hours":0,"upkeepPerHeadCents":20,"effects":{"satisfaction":2}},{"key":"b_jobrad","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":20000,"hours":0,"upkeepPerHeadCents":120,"effects":{"satisfaction":3}},{"key":"b_fitness","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":30000,"hours":0,"upkeepPerHeadCents":150,"effects":{"satisfaction":4}},{"key":"b_homeoffice","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":50000,"hours":0,"upkeepPerHeadCents":100,"effects":{"satisfaction":5}},{"key":"b_weiterbildung","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":40000,"hours":0,"upkeepPerHeadCents":250,"effects":{"satisfaction":4,"qualityBps":200}},{"key":"b_feelgood","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":100000,"hours":0,"upkeepPerHeadCents":300,"effects":{"satisfaction":5}},{"key":"b_betriebsrente","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":80000,"hours":0,"upkeepPerHeadCents":400,"effects":{"satisfaction":6}},{"key":"b_kita","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":500000,"hours":0,"upkeepPerHeadCents":500,"effects":{"satisfaction":7}},{"key":"b_bonus","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":0,"hours":0,"upkeepPerHeadCents":900,"effects":{"satisfaction":8,"capacityBps":300}},{"key":"b_viertagewoche","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":200000,"hours":0,"upkeepPerHeadCents":300,"effects":{"satisfaction":10,"capacityBps":-600}},{"key":"x_pizza","kind":"action","purpose":"benefits","costHours":0,"minCostCents":5000,"costPerHeadCents":1500,"hours":0,"cooldownHours":6,"boost":3,"effects":{}},{"key":"x_teamevent","kind":"action","purpose":"benefits","costHours":0,"minCostCents":30000,"costPerHeadCents":6000,"hours":0,"cooldownHours":24,"boost":8,"effects":{}},{"key":"x_firmenfeier","kind":"action","purpose":"benefits","costHours":0,"minCostCents":100000,"costPerHeadCents":12000,"hours":0,"cooldownHours":72,"boost":12,"effects":{}},{"key":"x_sonderbonus","kind":"action","purpose":"benefits","costHours":0,"minCostCents":0,"costPerHeadCents":50000,"hours":0,"cooldownHours":48,"boost":15,"effects":{}}]}'::jsonb, 'Defaults from src/config/balance.ts, section "listed"'),
   ('companyAssistant', '{"claudePerHour":20,"maxTextLength":300,"briefingTasks":3,"busyTasks":2,"urgentMinutes":10,"historyTurns":8}'::jsonb, 'Defaults from src/config/balance.ts, section "companyAssistant"'),
   ('companyHealth', '{"status":{"good":80,"ok":60,"weak":35},"qualityTarget":0.7,"momentumTargetShare":0.5,"momentumFloor":0.4,"imageCalm":0.85,"imageHitWeight":3,"teamFloor":0.4,"runwayTargetHours":48,"reserveHours":6,"minImpactCents":100}'::jsonb, 'Defaults from src/config/balance.ts, section "companyHealth"'),
   ('wageMood', '{"crisisPerSeverityBps":500,"scandalBps":500,"scandals":["quality_scandal","data_breach","protest","bad_review","strike"],"shareFallFreeBps":300,"shareFallShare":0.5,"maxShareBps":2000,"minBps":6000}'::jsonb, 'Defaults from src/config/balance.ts, section "wageMood"'),

@@ -1014,3 +1014,58 @@ und Balancing und werden nicht exportiert.
 **Nicht Teil von `src/lib/sim`**, weil es Datenbanklogik ist: Buchen von Orders, Gehältern, Zinsen, Dividenden und
 Steuern; Wash-Trade-Erkennung; Rate Limits; Insider-Sperrfenster; Missionen, Erfolge, Login-Streak;
 Hauptversammlung, Übernahmen, Cap Table. Die Simulation liefert dafür die Formeln und die Ereignisse als Daten.
+
+## Nachtrag: Börsennotierte Spielerfirmen (ADR-167)
+
+Nur für `phase = 'listed'`. Formeln in `src/lib/sim/listed.ts`, in SQL die Funktionen `listed_*`; die Tests
+`listed.test.ts` und `a3_listed_company.sql` prüfen dieselben Zahlen (im Code mit „SQL“ markiert).
+
+**Betriebsstunde** (`closeStartupHour` mit `input.listed`, `player_company_close_hour`):
+
+```
+Bekanntheit'  = min(1, Bekanntheit + awarenessAdd)
+Qualität'     = clamp(Qualität + qualityAdd, 0, 1)             (auch für die Premium-Regel)
+Nachfrage     = alte Nachfrage(Bekanntheit', Qualität') × demandFactor
+Kapazität     = alte Kapazität × capacityFactor
+Wareneinsatz  = Verkauf × (1 − Marge) × cogsFactor + Ereigniskosten
+Fixkosten     = round(Fixkosten der Stunde × fixedFactor) + laufende Kosten der Posten
+```
+
+`listedHourEffect(effects, Zufriedenheit, Ruf)`:
+
+```
+awarenessAdd   = awarenessBps / 10 000
+qualityAdd     = qualityBps / 10 000 + Stimmung.qualityAdd
+demandFactor   = (1 + demandBps/10 000) × (1 + marketBps/10 000) × (1 + 0,20 × (Ruf − 50)/50)
+capacityFactor = max(0,1; 1 + capacityBps/10 000) × Stimmung.capacityFactor
+cogsFactor     = max(0,5; 1 − marginBps/10 000)        fixedFactor = max(0,5; 1 + fixedCostBps/10 000)
+```
+
+**Preise:** Referenzumsatz = max(200 €, Durchschnittsumsatz der letzten 24 Betriebsstunden).
+`itemCostCents = round(max(Minimum, costHours × Referenz) × costGrowth^Stufe) + Kopfpreis × max(1, Köpfe)`,
+`itemUpkeepCents = round(upkeepBps × Referenz / 10 000) × Stufe + Kopfkosten × max(1, Köpfe)`; Köpfe = angestellte
+Spieler + KI-Kräfte.
+
+**Zufriedenheit** (0–100): Ziel = 50 + Benefits (≤ 40) − 25 × (1 − Lohnfaktor) − 10 × (1 − Lohnstimmung) −
+Auslastung (ab 0,95 linear bis −12 bei 1,5; unter 0,35: −4) − Krise (4 × Schwere, Skandal +6) − Entlassungen
+(Hitze = Hitze × 0,92 + 3 × Entlassene, ≤ 15) − 10 × Gier + Erfolg (±3); Wert += 0,15 × (Ziel − Wert).
+Wirkung: ab 60 Kapazität × (1 + 0,06 × min(1, (Wert − 60)/30)); darunter Kapazität × (1 − 0,30 × (60 − Wert)/60),
+Qualität − 0,15 × (60 − Wert)/60. Unter 35: jede dritte rote Stunde in Folge kündigt eine KI-Kraft.
+
+**Ruf** (0–100): Basis B = max(Gewinn, 5 % Umsatz, 1) über 24 h. Quote = (CEO-Auszahlungen + Entnahmen) / B.
+Gier = clamp((Quote − 30 %)/(100 % − 30 %), 0, 1). Ziel = 50 + Forschung − 35 × Gier + 12 × min(1, Investitionen/B/50 %)
+
+- 12 × min(1, Dividenden/B/20 %) + min(6, Tage in Folge) − 5 bei Skandal; Wert += 0,08 × (Ziel − Wert). Fairer Kurs ×
+  (1 + 0,25 × (Ruf − 50)/50).
+
+**Dividende:** Anteil je Spieler = floor(Gesamt × Aktien / alle Aktien), Rest an den KI-Streubesitz (`market`).
+
+**Geschäftsrat:** einberufen mit Aktien × 10 000 > alle Aktien × 2 000; beschlussfähig, wenn (Ja + Nein) × 10 000 ≥
+alle Aktien × 3 000; angenommen bei Ja > Nein; sofort entschieden bei Ja × 2 > alle oder Nein × 2 ≥ alle. Der
+KI-Streubesitz zählt als Ja bei `payout_cap`, `withdraw_ban`, `dividend`, solange der Ruf unter 40 liegt.
+
+**Steuer:** Satz = max(8 %, 15 % + Forschungseffekt). Gewinn = Umsatz − betriebliche Kosten der Periode (aus den
+Buchungen). Verlust → Verlustvortrag. Sonst Steuer = floor((Gewinn − genutzter Vortrag) × Satz) − Rabatt (5 % bei
+drei richtigen Belegen, 8 % mit Steuerberater). Schätzung des Finanzamts: Bemessung max(Gewinn, 25 % des Umsatzes),
+kein Vortrag, 25 % Zuschlag. Verspätungszuschlag max(50 €, 0,5 % des Umsatzes). Säumnis 5 %, Vollstreckung weitere
+10 % der offenen Steuer.

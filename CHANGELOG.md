@@ -113,6 +113,11 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Börsennotierte Firmen werden ernst (ADR-167):** Ab dem Börsengang gibt es Forschung, neue Produkte, Märkte,
+  Maschinen und Zukäufe, dazu Mitarbeiterzufriedenheit mit Benefits (vom Obstkorb bis zur Viertagewoche), einen Ruf,
+  der unter gierigen Gründern leidet, Dividenden, einen Geschäftsrat für Aktionäre mit über 20 % sowie Buchhaltung und
+  Steuern mit Finanzamt und Steuerberater. Mira erinnert an alles.
+
 - **Chats mit Freunden (ADR-164):** Unter Freunde → Chats schreibst du Freunden direkt (💬 an ihrer Figur auf dem
   Platz) oder gründest Gruppen mit bis zu 20 Leuten, mit Emojis, ungelesenen Nachrichten und Benachrichtigung.
 

@@ -383,6 +383,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Chats mit Freunden",
         text: "Unter Freunde → Chats schreibst du Freunden direkt (💬 an ihrer Figur auf dem Platz) oder gründest Gruppen mit bis zu 20 Leuten, mit Emojis…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-27702571",
+        title: "Börsennotierte Firmen werden ernst",
+        text: "Ab dem Börsengang gibt es Forschung, neue Produkte, Märkte, Maschinen und Zukäufe, dazu Mitarbeiterzufriedenheit mit Benefits (vom Obstkorb bis zur…",
+      },
     ],
   },
   {

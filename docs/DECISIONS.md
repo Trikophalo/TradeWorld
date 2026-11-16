@@ -2882,7 +2882,7 @@ mindestens 200 €. Einmalpreis = max(Mindestpreis, `costHours` × Referenzumsat
 laufend = `upkeepBps` des Referenzumsatzes je Stufe und Stunde (+ Betrag je Kopf und Stunde). Kleine Garagen-AGs zahlen
 die Mindestpreise, große Firmen entsprechend mehr; die Wirkungen sind Prozente und wachsen mit.
 
-### 2. Mehr Ausgaben, mehr Wege zu wachsen (60 Posten, ein Mechanismus)
+### 2. Mehr Ausgaben, mehr Wege zu wachsen (66 Posten, ein Mechanismus)
 
 Ein Katalog (`listed.items`), eine Tabelle (`company_investments`), eine RPC (`company_invest`). Jeder Posten hat
 Art, Zweck (für Budgets des Geschäftsrats), Preis, Dauer, Voraussetzungen, laufende Kosten und Wirkung:
@@ -2933,7 +2933,7 @@ Anteil wie jeder Aktionär.
 
 ### 4. Mitarbeiterzufriedenheit
 
-`listed_companies.satisfaction` (0–100, Start 55), jede Stunde 15 % des Abstands zum Ziel, Verlauf in
+`listed_companies.satisfaction` (0–100, Start 60: die erste Stunde nach dem Börsengang ist neutral), jede Stunde 15 % des Abstands zum Ziel, Verlauf in
 `listed_company_hours`:
 
 - Ziel = **50** (Basis, also unter Grün: ohne Ausgaben sinkt sie dorthin) + Benefits (höchstens +40) − unbezahlte
