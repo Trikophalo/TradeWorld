@@ -2850,3 +2850,65 @@ Menge, Image …), acht sinnvolle Punkte, die man mit Mira angehen kann.
   6 Sekunden mit einem kurzen, albernen Satz (`src/config/friend-chat.ts`); in neuen Gruppen meldet sich jemand.
 - Fehler: `chat_unknown` NX157, `chat_read_only` NX158, `chat_not_admin` NX159, `chat_group_full` NX160,
   `chat_group_too_small` NX161, `chat_already_member` NX162; außerdem `not_friends`, `name_*`, `rate_limited`.
+
+## ADR-166: Bezahlbare Missionen und einmal am Tag neu würfeln — `Annahme`
+
+Wunsch des Owners: Missionen sperren oft aus, weil sie mit dem aktuellen Geld kaum zu schaffen sind oder man erst
+eine KI-Kraft feuern müsste, um wieder eine einzustellen. Missionen soll man einmal an einem echten Tag neu würfeln
+können.
+
+- **Bezahlbar (`mission_affordable`, von `mission_doable` zuerst gefragt, ADR-154):** Schnelle, tägliche und
+  wöchentliche Missionen werden nur verteilt, wenn das Geld dafür da ist. **Meilensteine sind Sparziele** und bleiben,
+  wie weit sie auch weg sind (ein verfallener Meilenstein käme nie wieder). Werte in `progression.missionAfford`.
+- **Geldziele werden gekappt statt gestrichen (`mission_money_cap`):** Das gewürfelte, mit dem Level skalierte Ziel
+  wird bei der Zuteilung auf volle Euro gekappt. Erst wenn die Kappe unter dem Mindestziel läge, gibt es die Mission
+  gar nicht.
+
+  | Metrik                                           | Bezug                       | Kappe                                                   | Mindestziel                  |
+  | ------------------------------------------------ | --------------------------- | ------------------------------------------------------- | ---------------------------- |
+  | `buy_value` (ein Kauf für X, auch „großer Kauf“) | Bargeld                     | 50 % (`buyShareBps`)                                    | 20 € (`minBuyTargetCents`)   |
+  | `trade_value` (Handelsvolumen)                   | Bargeld + offene Positionen | schnell 50 %, Tag 100 %, Woche 300 % (`volumeShareBps`) | 20 €                         |
+  | `realized_profit` mit Geldziel                   | Bargeld + offene Positionen | schnell 1 %, Tag 2 %, Woche 10 % (`profitShareBps`)     | 5 € (`minProfitTargetCents`) |
+
+  Volumen und Gewinn richten sich nach allem, was sich handeln lässt: Wer voll investiert ist, kann verkaufen.
+  Beispiel: Level 10, 300 € Bargeld, „Kaufe für 1.400 €“ wird zu „Kaufe für 150 €“; mit 30 € gibt es sie nicht.
+
+- **Käufe: das Billigste muss bezahlbar sein.** Gezählt wird das Mindestziel der Vorlage; bei Wochenmissionen nur
+  die Hälfte (`weeklyCountShareBps`), der Rest lässt sich in der Woche verdienen.
+
+  | Metrik                                                                                                                                                                 | Regel                                                                                                                 |
+  | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+  | `buy`, `buy_sector`, `bond_bought`, `sectors_bought`                                                                                                                   | mindestens 10 € Bargeld (`minCashCents`); Bruchteile machen jedes Papier bezahlbar                                    |
+  | `company_deposit`                                                                                                                                                      | mindestens 10 € Bargeld                                                                                               |
+  | `accessory_bought`                                                                                                                                                     | die n billigsten Teile, die man noch nicht hat und tragen darf, kosten zusammen höchstens das Bargeld                 |
+  | `furniture_bought`                                                                                                                                                     | n × billigstes Möbel zum eigenen Preis (Zuhause-Stufe, Makler-Rabatt)                                                 |
+  | `art_bid`, `art_won`                                                                                                                                                   | eine offene, fremde Auktion, deren Mindestgebot das Bargeld deckt                                                     |
+  | `nft_bought`                                                                                                                                                           | ein gelistetes NFT oder eine Auktion in Reichweite des Bargelds                                                       |
+  | `nft_offer`                                                                                                                                                            | Bargeld ≥ Mindestangebot (`nfts.minOfferCents`)                                                                       |
+  | `ai_worker_hired`                                                                                                                                                      | keine offenen Löhne, und die Firmenkasse deckt die Löhne aller KI-Kräfte samt der neuen für 6 Stunden (`aiWageHours`) |
+  | `move_started`, `move_success`                                                                                                                                         | n × billigster Geschäftszug aus der Firmenkasse                                                                       |
+  | `job_posted`, `task_delegated`, `task_*`, `battle_*`, Chats, Stupser, Tresor, Likes, `sell`, `trade`, `distinct_security`, `skill_learned`, `check_in`, `work_hours` … | kostet nichts: keine Geldprüfung                                                                                      |
+  | `home_bought`, `home_upgraded`, `home_rented`, `car_bought`, `accessory_legendary`, `art_painted`, `net_worth`, `art_collection_value`                                 | nur Meilensteine: Sparziele, keine Geldprüfung                                                                        |
+  | `rent_earned`, `nft_royalty`, `art_sold`, `profitable_hour`                                                                                                            | Einnahmen, kein Kauf: keine Geldprüfung (strukturelle Regeln aus ADR-154/158 gelten weiter)                           |
+
+  Nexamon-Packs haben noch keine Missionsvorlage.
+
+- **Nie erst feuern:** Einstell-Missionen verlangen wie bisher einen freien Platz (ADR-154) und jetzt zusätzlich eine
+  Firma, die sich die Kraft leisten kann.
+- **Schnelle Missionen ohne Fortschritt**, die unbezahlbar geworden sind, verfallen bei der nächsten Zuteilung und
+  machen Platz (wie in ADR-154). Tägliche und wöchentliche bleiben stehen; dafür gibt es das Würfeln.
+- **Neu würfeln (`reset_missions(p_request_id)`):** ersetzt alle **offenen** schnellen, täglichen und wöchentlichen
+  Missionen durch neue, auch solche mit Teilfortschritt (der Client fragt vorher nach). Erledigte, noch nicht abgeholte
+  Missionen und alle Meilensteine bleiben. `progression.missionResetsPerDay` (1) Mal je Berliner Kalendertag, gezählt in
+  `mission_resets`. Ist nichts offen, kommt `mission_reset_nothing` und der Versuch ist nicht verbraucht.
+- **Nicht gleich dieselben:** Getauschte Zeilen bekommen `player_missions.reset_at`, zählen nicht mehr für die
+  Tages- und Wochenplätze und ihre Vorlage ruht 20 Stunden. Danach darf sie wiederkommen (dieselbe Zeile wird frisch
+  vergeben), damit die Wochenmissionen bei täglichem Würfeln nicht ausgehen.
+- **Antwort:** `get_my_missions` und `reset_missions` liefern dieselbe Form, dazu `reset_available` und
+  `next_reset_at` (nächste Mitternacht in Berlin, sobald verbraucht); `reset_missions` zusätzlich `replaced`.
+- **Oberfläche:** Karte „Passt gerade nichts?“ über den Missionen mit „Missionen neu würfeln“, Nachfrage im Sheet,
+  Lade- und Erfolgszustand, Ton, Hinweis „Heute schon gewürfelt. Morgen wieder, in …“ mit Countdown.
+- **Demo:** dieselbe Regel (einmal je Berliner Tag, getauschte Vorlagen ruhen bis zum nächsten Tag). Die Demo-Ziele
+  stehen fest im Titel und werden darum nicht gekappt: Zu große Geldmissionen werden nicht angeboten
+  (`affordableFor`).
+- Fehler: `mission_reset_used` NX163, `mission_reset_nothing` NX164.

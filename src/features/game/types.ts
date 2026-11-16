@@ -592,6 +592,19 @@ export interface MissionGroup {
   missions: Mission[];
 }
 
+/** The daily swap of the open missions (ADR-166). */
+export interface MissionReset {
+  /** A reset is still possible today. */
+  available: boolean;
+  /** When the next one is possible (midnight in Berlin); null while one is available. */
+  nextAt: string | null;
+}
+
+export interface MissionsState {
+  groups: MissionGroup[];
+  reset: MissionReset;
+}
+
 /** Client-only events that count for a few quick missions. */
 export type TrackedEvent = "view_security" | "open_rich_list" | "open_rules" | "view_profile";
 
@@ -2024,6 +2037,8 @@ export const GAME_ERROR_KEYS = [
   "mission_not_found",
   "mission_not_completed",
   "mission_already_claimed",
+  "mission_reset_used",
+  "mission_reset_nothing",
   "avatar_unknown",
   "avatar_locked",
   "daily_reward_claimed",
@@ -2286,7 +2301,9 @@ export interface GameEngine extends BattleEngine {
   resetAccount(requestId: string, confirm: string): Promise<void>;
   /** Deletes the account for good; `confirm` is the current nickname (ADR-070). */
   deleteAccount(confirm: string): Promise<void>;
-  missions(): Promise<MissionGroup[]>;
+  missions(): Promise<MissionsState>;
+  /** Swaps the open quick, daily and weekly missions for new ones, once per Berlin day (ADR-166). */
+  resetMissions(requestId: string): Promise<MissionsState>;
   claimMission(requestId: string, missionId: string): Promise<ProgressResult>;
   checkIn(requestId: string): Promise<ProgressResult & { streakDays: number; alreadyCheckedIn: boolean }>;
   track(event: TrackedEvent, ref?: string): Promise<void>;

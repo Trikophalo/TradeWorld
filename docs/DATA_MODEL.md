@@ -7649,3 +7649,22 @@ avatar_key, is_me, body, created_at}`.
 - **Fehler:** `chat_unknown` NX157, `chat_read_only` NX158, `chat_not_admin` NX159, `chat_group_full` NX160,
   `chat_group_too_small` NX161, `chat_already_member` NX162.
 - Test `supabase/tests/9y_friend_chats.sql`.
+
+## Nachtrag: Bezahlbare Missionen, Missionen neu würfeln (ADR-166)
+
+Migration `20261204005350_mission_reset.sql`.
+
+- `player_missions.reset_at timestamptz`: gesetzt, wenn der Spieler die Mission getauscht hat (Status `expired`). Die
+  Zeile zählt nicht mehr für die Tages- und Wochenplätze; ihre Vorlage ruht 20 Stunden und wird danach in derselben
+  Zeile frisch vergeben.
+- `mission_resets (player_id, reset_day, used, last_at)`: Zähler je Berliner Tag. Intern (RLS ohne Policy, keine
+  Rechte für Clients), geschrieben nur von `reset_missions`.
+- `reset_missions(p_request_id uuid)` → wie `get_my_missions` plus `replaced`; idempotent über `request_id`. Fehler
+  `mission_reset_used` NX163, `mission_reset_nothing` NX164.
+- `get_my_missions()` → zusätzlich `reset_available boolean`, `next_reset_at timestamptz | null`. Beide RPCs bauen
+  ihre Antwort mit `missions_state(p_player)` (intern).
+- `mission_affordable(p_player, p_key, p_metric)` (intern): Geldprüfung für schnelle, tägliche und wöchentliche
+  Missionen; `mission_doable` fragt sie zuerst. `mission_money_cap(p_player, p_kind, p_metric)` (intern): Kappe für
+  Geldziele, von `missions_assign` angewandt.
+- Konfiguration: `progression.missionResetsPerDay`, `progression.missionAfford`.
+- Test `supabase/tests/a2_mission_reset.sql` (`verify_local.sh` führt jetzt auch `a[0-9]*.sql` aus).

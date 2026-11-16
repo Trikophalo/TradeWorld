@@ -383,6 +383,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Chats mit Freunden",
         text: "Unter Freunde → Chats schreibst du Freunden direkt (💬 an ihrer Figur auf dem Platz) oder gründest Gruppen mit bis zu 20 Leuten, mit Emojis…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-c76359e1",
+        title: "Faire Missionen, neu würfeln",
+        text: "Missionen verlangen nichts mehr, was du dir gerade nicht leisten kannst, und einmal am Tag tauschst du unter Missionen alle offenen gegen neue.",
+      },
     ],
   },
   {

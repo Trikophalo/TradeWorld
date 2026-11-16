@@ -29,6 +29,7 @@ import {
   type Portfolio,
   type SecurityDetails,
   type CompanyMoves,
+  type MissionsState,
 } from "./types";
 
 /*
@@ -254,6 +255,9 @@ const richNewsSchema = z.array(
 
 const missionsSchema = z.object({
   server_time: iso,
+  // ADR-166: one swap of the open missions per Berlin day
+  reset_available: z.boolean().default(false),
+  next_reset_at: iso.nullable().default(null),
   groups: z.array(
     z.object({
       kind: z.enum(["quick", "daily", "weekly", "milestone"]),
@@ -273,6 +277,25 @@ const missionsSchema = z.object({
       ),
     }),
   ),
+});
+
+const mapMissions = (r: z.infer<typeof missionsSchema>): MissionsState => ({
+  groups: r.groups.map((g) => ({
+    kind: g.kind,
+    resetsAt: g.resets_at,
+    missions: g.missions.map((m) => ({
+      id: m.id,
+      key: m.key,
+      title: m.title,
+      description: m.description,
+      progress: m.progress,
+      target: m.target,
+      xp: m.xp,
+      status: m.status,
+      expiresAt: m.expires_at,
+    })),
+  })),
+  reset: { available: r.reset_available, nextAt: r.next_reset_at },
 });
 
 const checkInSchema = z.object({
@@ -477,6 +500,7 @@ export const RPC_SCHEMAS = {
   reset_account: z.object({ ok: z.literal(true), reset_at: iso }),
   delete_account: z.object({ ok: z.literal(true) }),
   get_my_missions: missionsSchema,
+  reset_missions: missionsSchema,
   claim_mission: progressSchema,
   daily_check_in: checkInSchema,
   track_event: z.object({ ok: z.boolean() }),
@@ -921,22 +945,11 @@ export const liveEngine: GameEngine = {
   },
 
   async missions() {
-    const r = await rpc("get_my_missions", {}, missionsSchema);
-    return r.groups.map((g) => ({
-      kind: g.kind,
-      resetsAt: g.resets_at,
-      missions: g.missions.map((m) => ({
-        id: m.id,
-        key: m.key,
-        title: m.title,
-        description: m.description,
-        progress: m.progress,
-        target: m.target,
-        xp: m.xp,
-        status: m.status,
-        expiresAt: m.expires_at,
-      })),
-    }));
+    return mapMissions(await rpc("get_my_missions", {}, missionsSchema));
+  },
+
+  async resetMissions(requestId) {
+    return mapMissions(await rpc("reset_missions", { p_request_id: requestId }, missionsSchema));
   },
 
   async claimMission(requestId, missionId) {

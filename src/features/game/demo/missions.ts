@@ -557,3 +557,68 @@ export function availableFor(template: MissionTemplate, level: number): boolean 
 export function missionXp(template: MissionTemplate, level = 1): number {
   return scaledXp(missionBaseXp(template.xp, level));
 }
+
+// ------------------------------------------------------------------ ADR-166: affordable missions, daily reset
+
+/** What the demo player can move: cash, and cash plus the value of the open positions. */
+export interface MissionMeans {
+  cashCents: number;
+  tradableCents: number;
+}
+
+const afford = BALANCE.progression.missionAfford;
+const share = (cents: number, bps: number) => Math.floor((cents * bps) / 10_000);
+
+/**
+ * The server's rule (mission_affordable) for the demo catalogue: no quick, daily or weekly mission that asks for
+ * money the player does not have. The demo's targets are part of the title, so they are not clamped: a mission
+ * that is too big is simply not offered. Milestones stay saving goals.
+ */
+export function affordableFor(template: MissionTemplate, means: MissionMeans): boolean {
+  if (template.kind === "milestone") return true;
+  switch (template.metric) {
+    case "buy_value_cents":
+      // counted over all buys of the period: volume
+      return (
+        means.cashCents >= afford.minCashCents &&
+        template.target <= share(means.tradableCents, afford.volumeShareBps[template.kind])
+      );
+    case "profit_cents":
+      return template.target <= share(means.tradableCents, afford.profitShareBps[template.kind]);
+    case "buys":
+    case "bond_buys":
+    case "amount_orders":
+    case "art_bids":
+    case "nft_offers":
+      return means.cashCents >= afford.minCashCents;
+    default:
+      return true;
+  }
+}
+
+/** The swaps of one Berlin day and the templates they removed (those rest for the day). */
+export interface MissionResetState {
+  day: string;
+  used: number;
+  keys: string[];
+}
+
+/** The reset state of `today`: yesterday's swaps no longer count. */
+export function resetStateOn(state: MissionResetState | undefined, today: string): MissionResetState {
+  return state && state.day === today ? state : { day: today, used: 0, keys: [] };
+}
+
+export function resetAvailableOn(state: MissionResetState | undefined, today: string): boolean {
+  return resetStateOn(state, today).used < BALANCE.progression.missionResetsPerDay;
+}
+
+/**
+ * Splits the missions for a reset: open quick, daily and weekly ones go; finished ones (waiting for their claim or
+ * claimed) and milestones stay.
+ */
+export function splitForReset<T extends { kind: MissionKind; status: string }>(
+  missions: readonly T[],
+): { kept: T[]; removed: T[] } {
+  const removed = missions.filter((mission) => mission.kind !== "milestone" && mission.status === "active");
+  return { kept: missions.filter((mission) => !removed.includes(mission)), removed };
+}

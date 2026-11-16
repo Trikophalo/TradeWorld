@@ -30,7 +30,18 @@ import {
   totalXpForLevel,
   unlockLevel,
 } from "@/lib/sim/progression";
-import { MISSION_TEMPLATES, availableFor, missionXp, type Metric, type MissionTemplate } from "./demo/missions";
+import {
+  MISSION_TEMPLATES,
+  affordableFor,
+  availableFor,
+  missionXp,
+  resetAvailableOn,
+  resetStateOn,
+  splitForReset,
+  type Metric,
+  type MissionResetState,
+  type MissionTemplate,
+} from "./demo/missions";
 import { createCareerEngine, initialCareer, tycoonAvatar, type CareerState } from "./demo/careers";
 import { createArtEngine, type ArtState } from "./demo/artworks";
 import { createPropertyEngine, type HomeState } from "./demo/property";
@@ -65,6 +76,7 @@ import {
   type Mission,
   type MissionGroup,
   type MissionKind,
+  type MissionsState,
   type OpenOrder,
   type OrderInput,
   type OrderResult,
@@ -157,6 +169,8 @@ interface PlayerState {
   viewDays?: Record<string, number>;
   missions: PlayerMission[];
   missionSeq: number;
+  /** ADR-166: the swaps of the current Berlin day. */
+  missionReset?: MissionResetState;
   checkInDay: string | null;
   streakDays: number;
   /** Avatar, skills, daily reward, jobs (demo/careers.ts). */
@@ -797,6 +811,11 @@ function vaultTerms() {
   return { capHours: upgradeEffects(levels).vaultCapHours, rate: basicIncomeCentsPerHour(levels) };
 }
 
+/** Market value (bid) of the open stock and bond positions. */
+function holdingsValue(): number {
+  return [...holdings()].reduce((sum, [ticker, h]) => sum + valueCents(h.quantityE6, quote(ticker).bid), 0);
+}
+
 function portfolioNow(): Portfolio {
   const pl = p();
   const now = Date.now();
@@ -973,6 +992,8 @@ function assignMissions(): void {
     weekly: progression.xpSources.weeklyMission.perWeek,
     milestone: progression.xpSources.milestoneMission.visible,
   };
+  const means = { cashCents: pl.cashCents, tradableCents: pl.cashCents + holdingsValue() };
+  const rested = new Set(resetStateOn(pl.missionReset, berlinDay()).keys);
   // Drop expired daily and weekly missions and replaced quick ones.
   pl.missions = pl.missions.filter((mission) => {
     if (mission.kind === "daily" || mission.kind === "weekly") return mission.period === periodOf(mission.kind);
@@ -984,7 +1005,11 @@ function assignMissions(): void {
       (mission) => mission.kind === kind && (kind !== "milestone" || mission.status !== "claimed"),
     );
     const used = new Set(pl.missions.filter((mission) => mission.kind === kind).map((mission) => mission.key));
-    const pool = MISSION_TEMPLATES.filter((t) => t.kind === kind && availableFor(t, lvl) && !used.has(t.key));
+    // ADR-166: nothing the player cannot pay for, and nothing that was swapped away today
+    const pool = MISSION_TEMPLATES.filter(
+      (t) =>
+        t.kind === kind && availableFor(t, lvl) && !used.has(t.key) && !rested.has(t.key) && affordableFor(t, means),
+    );
     for (let i = current.length; i < limits[kind] && pool.length > 0; i++) {
       // Quick missions rotate through the pool; the others take the next ones in order.
       const pick = kind === "quick" ? pool.splice(pl.missionSeq % pool.length, 1)[0]! : pool.shift()!;
@@ -1003,6 +1028,20 @@ function assignMissions(): void {
       pl.missions = pl.missions.filter((mission) => mission.kind !== "quick" || mission.status !== "claimed");
     }
   }
+}
+
+/** The missions with the state of the daily reset (ADR-166). */
+function missionsState(): MissionsState {
+  const groups = missionGroups();
+  const today = berlinDay();
+  const available = resetAvailableOn(p().missionReset, today);
+  return {
+    groups,
+    reset: {
+      available,
+      nextAt: available ? null : new Date(new Date(`${today}T00:00:00`).getTime() + DAY).toISOString(),
+    },
+  };
 }
 
 function missionGroups(): MissionGroup[] {
@@ -2168,7 +2207,23 @@ export const demoEngine: GameEngine = {
   resetAccount: (_requestId, confirm) => delay(() => startOver(confirm)),
   deleteAccount: (confirm) => delay(() => startOver(confirm)),
 
-  missions: () => Promise.resolve(missionGroups()),
+  missions: () => Promise.resolve(missionsState()),
+
+  resetMissions: (requestId) =>
+    delay(() =>
+      idempotent(requestId, () => {
+        const pl = p();
+        const today = berlinDay();
+        missionGroups(); // refresh progress and status
+        if (!resetAvailableOn(pl.missionReset, today)) throw new GameError("mission_reset_used");
+        const { kept, removed } = splitForReset(pl.missions);
+        if (removed.length === 0) throw new GameError("mission_reset_nothing");
+        const state = resetStateOn(pl.missionReset, today);
+        pl.missionReset = { day: today, used: state.used + 1, keys: [...state.keys, ...removed.map((x) => x.key)] };
+        pl.missions = kept;
+        return missionsState();
+      }),
+    ),
 
   claimMission: (requestId, missionId) =>
     delay(() =>

@@ -9,6 +9,7 @@ import type {
   GameEngine,
   MarketSnapshot,
   MissionGroup,
+  MissionReset,
   OrderInput,
   OrderResult,
   Portfolio,
@@ -42,6 +43,8 @@ interface GameState {
   byTicker: Record<string, Security>;
   portfolio: Portfolio | null;
   missions: MissionGroup[] | null;
+  /** The daily swap of the open missions (ADR-166); null until the missions are loaded. */
+  missionReset: MissionReset | null;
   /** Local clock minus server clock in ms, for countdowns. */
   clockSkewMs: number;
   refreshSnapshot: () => Promise<void>;
@@ -52,6 +55,8 @@ interface GameState {
   completeTutorial: () => Promise<void>;
   refreshMissions: () => Promise<void>;
   claimMission: (missionId: string) => Promise<ProgressResult>;
+  /** Swaps the open quick, daily and weekly missions for new ones (once per Berlin day). */
+  resetMissions: () => Promise<void>;
   checkIn: () => Promise<{ xpAwarded: number; streakDays: number; alreadyCheckedIn: boolean }>;
   changeNickname: (nickname: string) => Promise<void>;
   track: (event: TrackedEvent, ref?: string) => void;
@@ -73,6 +78,7 @@ export const useGame = create<GameState>((set, get) => ({
   byTicker: {},
   portfolio: null,
   missions: null,
+  missionReset: null,
   clockSkewMs: 0,
 
   refreshSnapshot: () =>
@@ -108,7 +114,7 @@ export const useGame = create<GameState>((set, get) => ({
   refreshMissions: () =>
     (missionsInFlight ??= engine
       .missions()
-      .then((missions) => set({ missions }))
+      .then(({ groups, reset }) => set({ missions: groups, missionReset: reset }))
       .catch(() => undefined)
       .finally(() => {
         missionsInFlight = null;
@@ -126,6 +132,11 @@ export const useGame = create<GameState>((set, get) => ({
     return result;
   },
 
+  resetMissions: async () => {
+    const { groups, reset } = await engine.resetMissions(crypto.randomUUID());
+    set({ missions: groups, missionReset: reset });
+  },
+
   checkIn: async () => {
     const result = await engine.checkIn(crypto.randomUUID());
     if (!result.alreadyCheckedIn) await Promise.all([get().refreshPortfolio(), get().refreshMissions()]);
@@ -137,7 +148,7 @@ export const useGame = create<GameState>((set, get) => ({
     await get().refreshPortfolio();
   },
 
-  resetPlayer: () => set({ portfolio: null, missions: null }),
+  resetPlayer: () => set({ portfolio: null, missions: null, missionReset: null }),
 
   track: (event, ref) => {
     void engine.track(event, ref).then(() => get().refreshMissions());

@@ -694,6 +694,8 @@
     "mission_not_found": "Diese Mission gibt es nicht mehr.",
     "mission_not_completed": "Diese Mission ist noch nicht erfüllt.",
     "mission_already_claimed": "Die Belohnung hast du schon abgeholt.",
+    "mission_reset_used": "Heute hast du schon neu gewürfelt. Morgen geht es wieder.",
+    "mission_reset_nothing": "Gerade ist keine Mission offen, die du tauschen könntest.",
     "avatar_unknown": "Dieses Profilbild gibt es nicht.",
     "avatar_locked": "Dieses Profilbild schaltest du mit einem höheren Level frei.",
     "daily_reward_claimed": "Die heutige Belohnung hast du schon abgeholt.",
@@ -863,6 +865,21 @@
       "daily": "Starten jeden Tag um Mitternacht neu.",
       "weekly": "Für mehrere Tage, mit großer Belohnung.",
       "milestone": "Große Ziele auf dem Weg nach oben."
+    },
+    "reset": {
+      "title": "Passt gerade nichts?",
+      "hint": "Einmal am Tag kannst du alle offenen Missionen gegen neue tauschen.",
+      "button": "Missionen neu würfeln",
+      "used": "Heute schon gewürfelt. Morgen wieder, in",
+      "nothing": "Gerade ist nichts offen, das du tauschen könntest.",
+      "confirmTitle": "Missionen neu würfeln?",
+      "confirmText": "Alle offenen schnellen, täglichen und wöchentlichen Missionen werden durch neue ersetzt. Ihr Fortschritt geht dabei verloren.",
+      "confirmKeep": "Erledigte Missionen und deine Geschichte bleiben. Das geht einmal am Tag.",
+      "confirm": "Neu würfeln",
+      "cancel": "Lieber nicht",
+      "doneTitle": "Neu gewürfelt",
+      "doneText": "Frische Missionen warten auf dich. Morgen kannst du wieder würfeln.",
+      "failed": "Neu würfeln fehlgeschlagen"
     }
   },
   "richList": {
