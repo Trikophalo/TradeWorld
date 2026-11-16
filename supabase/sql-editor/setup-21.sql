@@ -1394,625 +1394,1033 @@ begin
 end;
 $do$;
 
--- ===== supabase/seed.sql =====
+-- ===== supabase/migrations/20261204006300_nexamon_battles_schema.sql =====
 -- =============================================================================
--- NEXA · seed.sql · reference data
+-- NEXA · 6300 · Nexamon Pack Battles and live openings: error keys, notifications, tables (ADR-172)
 -- =============================================================================
--- Idempotent (every insert uses ON CONFLICT DO NOTHING / idempotency keys), so
--- it is safe to run again after `supabase db reset` or by hand.
--- Display texts are German (game language); identifiers and comments English.
--- NOT seeded here: game_config (generated from src/config/balance.ts via
--- `pnpm db:config`).
--- Units: *_cents = euro cents, *_e4 = 1/10000 euro, *_bps = basis points.
--- =============================================================================
+-- Rules: game_config.nexamon.presence, .battles, .live (src/config/nexamon-rules.ts; src/lib/sim/nexamon-battle.ts).
+-- Tables (internal, RLS on, no grants: read and written only by the functions of 6310 and 6320):
+--   nexamon_presence        who is on the Collectibles tab (seen_at) and whether others may watch their packs
+--   nexamon_battles         one Pack Battle: challenge, accept, both pulls, totals, winner, tie-break, coin seed
+--   nexamon_live            a live opening (a bought pack or a battle) while it is revealed
+--   nexamon_live_viewers    who watches a live opening (seen_at)
+--   nexamon_live_reactions  emoji bursts of the spectators
+-- Errors: nexamon_battle_unknown NX240, nexamon_battle_not_friend NX241, nexamon_battle_not_here NX242,
+--   nexamon_battle_busy NX243, nexamon_battle_limit NX244, nexamon_battle_cooldown NX245, nexamon_battle_closed NX246,
+--   nexamon_battle_self NX247, nexamon_battle_opponent_locked NX248, nexamon_live_unknown NX249,
+--   nexamon_battle_not_yours NX250.
+-- Idempotent: runs unchanged as supabase/updates/20261204006300_nexamon_battles_schema.sql.
 
--- Make sure the calendar exists (bond terms and ledger postings refer to it).
-do $$ begin perform public.ensure_game_quarters(3); end $$;
-
--- ---------------------------------------------------------------------------
--- 1. Sectors (spec 6.1). base_demand_cents = shared demand per quarter.
--- ---------------------------------------------------------------------------
-insert into public.sectors (key, name, description, icon_key, typical_risk, base_pe, base_demand_cents, demand_growth_bps, sort_order) values
-  ('tech',      'Tech/Software', 'Wenig Kapital, langsamer Start, dann explosives Wachstum.',      'sector_tech',      'Ein Produkt floppt',          28,  48240000000, 150, 1),
-  ('retail',    'Einzelhandel',  'Stabil, kleine Margen, ständige Preiskriege.',                   'sector_retail',    'Ein Konkurrent unterbietet',  14, 228500000000,  40, 2),
-  ('energy',    'Energie',       'Kapitalintensiv und abhängig vom Rohstoffpreis.',                'sector_energy',    'Ölpreis-Event',               12, 145600000000,  30, 3),
-  ('pharma',    'Pharma',        'Lange Entwicklung, binäre Studienergebnisse.',                   'sector_pharma',    'Eine Studie scheitert',       22,  53240000000,  80, 4),
-  ('logistics', 'Logistik',      'Skaliert über Mitarbeiter und Fuhrpark.',                        'sector_logistics', 'Lohnkosten und Konjunktur',   16,  95700000000,  50, 5)
-on conflict (key) do nothing;
-
-insert into public.sector_sim_state (sector_key)
-select key from public.sectors
-on conflict (sector_key) do nothing;
-
--- ---------------------------------------------------------------------------
--- 2. The 15 AI companies (ADR-014)
---    revenue/costs are per quarter in whole euros; price in e4.
--- ---------------------------------------------------------------------------
-create temporary table _seed_companies (
-  ticker text primary key, name text, slug text, sector_key text, tier public.company_tier,
-  description text, brand_color text,
-  shares bigint, price_e4 bigint, revenue_eur bigint, costs_eur bigint,
-  quality double precision, awareness double precision, price_index double precision,
-  dividend_policy public.dividend_policy, payout_bps integer, employees integer
-);
-
-insert into _seed_companies values
-  -- Tech/Software
-  ('KLS', 'KlarSoft AG',         'klarsoft',         'tech',      'bluechip', 'Marktführer für Unternehmenssoftware. Verdient verlässlich an Lizenzen und Cloud-Abos.',              '#4C8DFF',  50000000,  840000,  420000000,  382500000, 1.35, 1.60, 1.10, 'growth',  2000, 14500),
-  ('PXW', 'Pixelwerk Studios',   'pixelwerk-studios','tech',      'midcap',   'Spielestudio mit treuer Fangemeinde. Jeder neue Titel kann ein Hit oder ein Flop werden.',            '#B36BFF',  20000000,  235000,   60000000,   55500000, 1.15, 1.05, 1.00, 'none',       0,  1800),
-  ('QSL', 'QuantenSprung Labs',  'quantensprung-labs','tech',     'penny',    'Forscht an Quantenchips. Große Versprechen, kaum Umsatz, hoher Kapitalbedarf.',                       '#35D0BA',  40000000,    4200,    2400000,    2900000, 0.90, 0.55, 1.20, 'none',       0,   140),
-  -- Retail
-  ('BRZ', 'Brotzeit Handel AG',  'brotzeit-handel',  'retail',    'bluechip', 'Größte Supermarktkette des Landes. Kleine Margen, aber Kundschaft bei jeder Konjunktur.',             '#F2A93B',  80000000,  412000, 1960000000, 1901200000, 1.10, 1.70, 0.98, 'stable',  5000, 62000),
-  ('KFR', 'Kaufrausch Märkte',   'kaufrausch-maerkte','retail',   'midcap',   'Einkaufszentren und Onlineshop für Mode und Elektronik. Lebt von der Kauflaune.',                     '#FF6B8B',  25000000,  158000,  280000000,  273000000, 1.05, 1.15, 1.02, 'stable',  3500,  9800),
-  ('FGD', 'Fundgrube Discount',  'fundgrube-discount','retail',   'penny',    'Restposten-Discounter mit aggressiven Preisen. Ein schlechter Monat kann die Kasse leeren.',          '#C2C95B',  60000000,    6500,   45000000,   44400000, 0.80, 0.70, 0.82, 'none',       0,  2100),
-  -- Energy
-  ('VLT', 'Volta Energie AG',    'volta-energie',    'energy',    'bluechip', 'Strom- und Gasversorger mit eigenen Kraftwerken. Solide Dividende, hängt am Rohstoffpreis.',          '#FFD23F', 100000000,  564000, 1300000000, 1182500000, 1.20, 1.55, 1.05, 'payout',  6500, 21000),
-  ('RKW', 'Rheinkraft Werke',    'rheinkraft-werke', 'energy',    'midcap',   'Regionaler Versorger mit Wasser- und Gaskraftwerken entlang des Rheins.',                             '#5BC0EB',  30000000,  189000,  150000000,  138200000, 1.05, 0.95, 1.00, 'stable',  4500,  3200),
-  ('SFX', 'SolarFuchs',          'solarfuchs',       'energy',    'penny',    'Junger Solaranlagenbauer. Wächst schnell, schreibt aber noch rote Zahlen.',                           '#FF8C42',  50000000,    8800,    6000000,    6500000, 0.95, 0.60, 0.92, 'none',       0,   260),
-  -- Pharma
-  ('NPH', 'NeuroPharm AG',       'neuropharm',       'pharma',    'bluechip', 'Pharmakonzern mit Blockbustern gegen Nervenkrankheiten und einer vollen Studienpipeline.',            '#6EE7A0',  60000000, 1125000,  480000000,  403300000, 1.40, 1.45, 1.15, 'stable',  4000, 11800),
-  ('ALM', 'Alpenmed',            'alpenmed',         'pharma',    'midcap',   'Hersteller von Generika und Naturheilmitteln aus dem Alpenraum. Unspektakulär, aber profitabel.',     '#8FD3F4',  15000000,  346000,   52000000,   46100000, 1.10, 0.90, 0.95, 'growth',  2000,  1500),
-  ('GNV', 'GenoVita Biotech',    'genovita-biotech', 'pharma',    'penny',    'Biotech-Start-up mit einem einzigen Wirkstoffkandidaten. Die nächste Studie entscheidet alles.',      '#E86AF0',  80000000,    3100,     400000,    2100000, 0.85, 0.50, 1.25, 'none',       0,    90),
-  -- Logistics
-  ('NDL', 'Nordlicht Logistik AG','nordlicht-logistik','logistics','bluechip','Containerschiffe, Lkw-Flotte und Lagerhallen. Bewegt Waren für das halbe Land.',                      '#7AA2F7',  70000000,  478000,  870000000,  817700000, 1.20, 1.50, 1.04, 'stable',  4500, 38000),
-  ('EBX', 'Eilbote Express',     'eilbote-express',  'logistics', 'midcap',   'Paketdienst für die letzte Meile. Wächst mit dem Onlinehandel, leidet unter Lohnkosten.',             '#F7768E',  20000000,  124000,   78000000,   74100000, 1.05, 1.10, 0.97, 'stable',  3000,  7400),
-  ('FPT', 'Frachtpilot',         'frachtpilot',      'logistics', 'penny',    'Frachtbörse per App: vermittelt freie Lkw-Ladeflächen. Kleines Team, dünne Marge.',                   '#9ECE6A',  45000000,    5400,    9000000,    8700000, 0.90, 0.65, 0.90, 'none',       0,   120);
-
-insert into public.companies (
-  id, name, slug, ticker, description, sector_key, is_ai, tier, legal_form, phase, logo_key, brand_color,
-  shares_outstanding, max_employees, employee_count, dividend_policy, dividend_payout_bps,
-  ttm_revenue_cents, ttm_net_income_cents, eps_ttm_e4, listed_at
-)
-select
-  md5('nexa:company:' || s.ticker)::uuid, s.name, s.slug, s.ticker, s.description, s.sector_key, true, s.tier, 'ag', 'listed',
-  'logo_' || lower(s.ticker), s.brand_color,
-  s.shares, 100000, s.employees, s.dividend_policy, s.payout_bps,
-  s.revenue_eur * 100 * 4,
-  (s.revenue_eur - s.costs_eur) * 100 * 4,
-  round((s.revenue_eur - s.costs_eur)::numeric * 100 * 4 * 100 / s.shares)::bigint,
-  now()
-from _seed_companies s
-on conflict (id) do nothing;
-
-insert into public.company_state (
-  company_id, quality, awareness, price_index, capacity_cents,
-  baseline_revenue_cents, baseline_costs_cents, fixed_costs_cents
-)
-select
-  md5('nexa:company:' || s.ticker)::uuid, s.quality, s.awareness, s.price_index,
-  s.revenue_eur * 120,          -- capacity = 120 % of baseline revenue
-  s.revenue_eur * 100, s.costs_eur * 100,
-  s.costs_eur * 25              -- 25 % of costs are fixed
-from _seed_companies s
-on conflict (company_id) do nothing;
-
--- stock securities
-insert into public.securities (id, kind, ticker, name, company_id, sector_key, status, tick_size_e4, is_shortable, max_leverage, listed_at)
-select
-  md5('nexa:security:' || s.ticker)::uuid, 'stock', s.ticker, s.name,
-  md5('nexa:company:' || s.ticker)::uuid, s.sector_key, 'listed',
-  case when s.price_e4 < 10000 then 10 else 100 end,
-  true,
-  case s.tier when 'bluechip' then 10 when 'midcap' then 5 else 2 end,
-  now()
-from _seed_companies s
-on conflict (id) do nothing;
-
-update public.companies c
-   set security_id = md5('nexa:security:' || c.ticker)::uuid
- where c.is_ai and c.security_id is null and c.ticker is not null
-   and exists (select 1 from public.securities s where s.id = md5('nexa:security:' || c.ticker)::uuid);
-
--- initial quotes (bid/ask = one half-spread around the start price)
-insert into public.security_quotes (
-  security_id, last_price_e4, bid_e4, ask_e4, prev_close_e4, day_open_e4, day_high_e4, day_low_e4, market_cap_cents
-)
-select
-  md5('nexa:security:' || s.ticker)::uuid,
-  s.price_e4,
-  s.price_e4 - h.half, s.price_e4 + h.half,
-  s.price_e4, s.price_e4, s.price_e4, s.price_e4,
-  round(s.shares::numeric * s.price_e4 / 100)::bigint
-from _seed_companies s
-cross join lateral (
-  select case when s.price_e4 < 10000 then 10 else 100 end as tick,
-         case s.tier when 'bluechip' then 6 when 'midcap' then 20 else 150 end as spread_bps
-) t
-cross join lateral (
-  select greatest(t.tick, (s.price_e4 * t.spread_bps / 20000 / t.tick) * t.tick) as half
-) h
-on conflict (security_id) do nothing;
-
--- hidden simulation anchor
-insert into public.security_sim_state (security_id, fair_value_e4, volatility, liquidity_shares, spread_bps)
-select
-  md5('nexa:security:' || s.ticker)::uuid,
-  s.price_e4,
-  case s.tier when 'bluechip' then 0.0004 when 'midcap' then 0.0008 else 0.0025 end,
-  case s.tier when 'bluechip' then 400000 when 'midcap' then 120000 else 600000 end,
-  case s.tier when 'bluechip' then 6 when 'midcap' then 20 else 150 end
-from _seed_companies s
-on conflict (security_id) do nothing;
-
--- AI companies are fully in free float (held by AI investors and later players)
-insert into public.cap_table_entries (company_id, holder_kind, label, shares)
-select md5('nexa:company:' || s.ticker)::uuid, 'public_float', 'Streubesitz', s.shares
-from _seed_companies s
-on conflict do nothing;
-
-insert into public.share_issuances (id, company_id, kind, shares, price_e4, proceeds_cents, shares_outstanding_after)
-select md5('nexa:issuance:' || s.ticker)::uuid, md5('nexa:company:' || s.ticker)::uuid, 'founding', s.shares, s.price_e4, 0, s.shares
-from _seed_companies s
-on conflict (id) do nothing;
-
--- company cash accounts with one quarter of costs as opening balance
-insert into public.ledger_accounts (kind, owner_company_id, label)
-select 'company_cash', md5('nexa:company:' || s.ticker)::uuid, 'Cash ' || s.ticker
-from _seed_companies s
-on conflict do nothing;
-
-do $$
+do $do$
 declare
-  r record;
+  v_def    text := pg_get_functiondef('public.api_error(text)'::regprocedure);
+  v_anchor text := $q$    when 'nexamon_grading_limit'      then 'NX175'
+$q$;
 begin
-  for r in
-    select s.ticker, s.costs_eur * 100 as amount_cents, a.id as account_id
-      from _seed_companies s
-      join public.ledger_accounts a
-        on a.owner_company_id = md5('nexa:company:' || s.ticker)::uuid and a.kind = 'company_cash'
-  loop
-    perform public.ledger_transfer(
-      public.ledger_system_account('mint'), r.account_id, r.amount_cents,
-      'opening_balance', 'Opening balance ' || r.ticker, 'company',
-      md5('nexa:company:' || r.ticker)::uuid, 'opening_balance:' || r.ticker);
-  end loop;
-end;
-$$;
-
--- ---------------------------------------------------------------------------
--- 3. Index NEXA 30 (base 1000.0000 points) with all 15 stocks
--- ---------------------------------------------------------------------------
-insert into public.securities (id, kind, ticker, name, status, tick_size_e4, is_tradable, is_shortable, max_leverage, listed_at)
-values (md5('nexa:security:NX30')::uuid, 'index', 'NX30', 'NEXA 30', 'listed', 1, false, false, 1, now())
-on conflict (id) do nothing;
-
-insert into public.indices (security_id, key, description, base_value_e4, divisor, max_members)
-select
-  md5('nexa:security:NX30')::uuid, 'NEXA30',
-  'Leitindex der 30 größten börsennotierten Unternehmen nach Marktkapitalisierung.',
-  10000000,
-  (select sum(round(s.shares::numeric * s.price_e4 / 100)) from _seed_companies s)::double precision / 10000000,
-  30
-on conflict (security_id) do nothing;
-
-insert into public.security_quotes (security_id, last_price_e4, prev_close_e4, day_open_e4, day_high_e4, day_low_e4, market_cap_cents)
-select md5('nexa:security:NX30')::uuid, 10000000, 10000000, 10000000, 10000000, 10000000,
-       (select sum(round(s.shares::numeric * s.price_e4 / 100)) from _seed_companies s)::bigint
-on conflict (security_id) do nothing;
-
-insert into public.index_memberships (index_security_id, member_security_id, weight_bps)
-select
-  md5('nexa:security:NX30')::uuid,
-  md5('nexa:security:' || s.ticker)::uuid,
-  round(s.shares::numeric * s.price_e4 * 10000 / (select sum(x.shares::numeric * x.price_e4) from _seed_companies x))::integer
-from _seed_companies s
-on conflict do nothing;
-
-drop table _seed_companies;
-
--- Ten more AI companies (ADR-130), outside the NEXA 30. The same function adds them to a live database; on an older
--- database the update that defines it runs after this seed and adds them itself.
-do $$
-begin
-  if to_regprocedure('public.ai_companies_add_v2()') is not null then
-    perform public.ai_companies_add_v2();
+  if position('''nexamon_battle_not_yours''' in v_def) = 0 then
+    if position(v_anchor in v_def) = 0 then
+      raise exception 'api_error() has an unexpected shape; add the Pack Battle error keys (ADR-172) by hand';
+    end if;
+    v_def := replace(v_def, v_anchor, v_anchor || $q$    when 'nexamon_battle_unknown'     then 'NX240'
+    when 'nexamon_battle_not_friend'  then 'NX241'
+    when 'nexamon_battle_not_here'    then 'NX242'
+    when 'nexamon_battle_busy'        then 'NX243'
+    when 'nexamon_battle_limit'       then 'NX244'
+    when 'nexamon_battle_cooldown'    then 'NX245'
+    when 'nexamon_battle_closed'      then 'NX246'
+    when 'nexamon_battle_self'        then 'NX247'
+    when 'nexamon_battle_opponent_locked' then 'NX248'
+    when 'nexamon_live_unknown'       then 'NX249'
+    when 'nexamon_battle_not_yours'   then 'NX250'
+$q$);
+    execute v_def;
   end if;
 end;
+$do$;
+
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('nexamon_battle', 'social', 'Pack Battle', 'Ein Freund fordert dich zum Pack Battle heraus, oder ein Battle ist entschieden.',
+        'notif_bell', true, true, false, 301)
+on conflict (key) do nothing;
+
+create table if not exists public.nexamon_presence (
+  player_id   uuid primary key references public.profiles (id) on delete cascade,
+  seen_at     timestamptz not null default now(),
+  allow_watch boolean not null default true
+);
+create index if not exists nexamon_presence_seen_idx on public.nexamon_presence (seen_at desc);
+alter table public.nexamon_presence enable row level security;
+revoke all on public.nexamon_presence from public, anon, authenticated;
+grant all on public.nexamon_presence to service_role;
+comment on table public.nexamon_presence is
+  'Who is on the Collectibles tab (ADR-172): seen_at of the last nexamon_lobby() call, allow_watch = others may watch '
+  'the player''s packs live (setting "Andere dürfen beim Öffnen zuschauen"). Internal.';
+
+create table if not exists public.nexamon_battles (
+  id                uuid primary key default gen_random_uuid(),
+  challenger_id     uuid not null references public.profiles (id) on delete cascade,
+  opponent_id       uuid not null references public.profiles (id) on delete cascade,
+  set_key           text not null,
+  status            text not null default 'pending'
+                      check (status in ('pending', 'declined', 'expired', 'cancelled', 'aborted', 'accepted')),
+  price_cents       bigint not null check (price_cents >= 0),
+  created_at        timestamptz not null default now(),
+  expires_at        timestamptz not null,
+  responded_at      timestamptz,
+  accepted_at       timestamptz,
+  starts_at         timestamptz,
+  decide_at         timestamptz,
+  ends_at           timestamptz,
+  challenger_cards  jsonb,
+  opponent_cards    jsonb,
+  challenger_cents  bigint,
+  opponent_cents    bigint,
+  winner_id         uuid references public.profiles (id) on delete set null,
+  tie_break         text check (tie_break is null or tie_break in ('value', 'rarest', 'coin')),
+  coin_seed         bigint,
+  abort_reason      text,
+  constraint nexamon_battles_two check (challenger_id <> opponent_id)
+);
+create index if not exists nexamon_battles_challenger_idx on public.nexamon_battles (challenger_id, created_at desc);
+create index if not exists nexamon_battles_opponent_idx on public.nexamon_battles (opponent_id, created_at desc);
+create index if not exists nexamon_battles_winner_idx on public.nexamon_battles (winner_id) where winner_id is not null;
+create index if not exists nexamon_battles_open_idx on public.nexamon_battles (status, expires_at) where status = 'pending';
+alter table public.nexamon_battles enable row level security;
+revoke all on public.nexamon_battles from public, anon, authenticated;
+grant all on public.nexamon_battles to service_role;
+comment on table public.nexamon_battles is
+  'Pack Battles (ADR-172): both players pay one pack of set_key at the accept, both packs are opened at once, the '
+  'higher total value at pull time (tie: rarest card, then coin_seed % 2 = 0 for the challenger) takes all copies. '
+  'The pulls are shown slot by slot from starts_at; nobody reads them earlier (get_nexamon_battle). Internal.';
+
+create table if not exists public.nexamon_live (
+  id          uuid primary key default gen_random_uuid(),
+  player_id   uuid not null references public.profiles (id) on delete cascade,
+  kind        text not null check (kind in ('pack', 'battle')),
+  pack_id     uuid unique,
+  battle_id   uuid unique references public.nexamon_battles (id) on delete cascade,
+  set_key     text not null,
+  cards       jsonb,
+  started_at  timestamptz not null,
+  ends_at     timestamptz not null,
+  progress    smallint not null default 0 check (progress between 0 and 10),
+  progress_at timestamptz
+);
+create index if not exists nexamon_live_ends_idx on public.nexamon_live (ends_at desc);
+create index if not exists nexamon_live_player_idx on public.nexamon_live (player_id, ends_at desc);
+alter table public.nexamon_live enable row level security;
+revoke all on public.nexamon_live from public, anon, authenticated;
+grant all on public.nexamon_live to service_role;
+comment on table public.nexamon_live is
+  'Live openings (ADR-172): a bought pack (kind pack, the pulls in cards, progress = cards the opener has seen) or a '
+  'Pack Battle (kind battle) while it is revealed. Spectators see only what the opener has seen. Internal.';
+
+create table if not exists public.nexamon_live_viewers (
+  live_id   uuid not null references public.nexamon_live (id) on delete cascade,
+  player_id uuid not null references public.profiles (id) on delete cascade,
+  seen_at   timestamptz not null default now(),
+  primary key (live_id, player_id)
+);
+create index if not exists nexamon_live_viewers_player_idx on public.nexamon_live_viewers (player_id);
+alter table public.nexamon_live_viewers enable row level security;
+revoke all on public.nexamon_live_viewers from public, anon, authenticated;
+grant all on public.nexamon_live_viewers to service_role;
+comment on table public.nexamon_live_viewers is 'Spectators of a live opening (ADR-172), seen_at of their last look. Internal.';
+
+create table if not exists public.nexamon_live_reactions (
+  id        bigserial primary key,
+  live_id   uuid not null references public.nexamon_live (id) on delete cascade,
+  player_id uuid not null references public.profiles (id) on delete cascade,
+  emoji     text not null check (char_length(emoji) between 1 and 8),
+  at        timestamptz not null default now()
+);
+create index if not exists nexamon_live_reactions_live_idx on public.nexamon_live_reactions (live_id, id desc);
+create index if not exists nexamon_live_reactions_player_idx on public.nexamon_live_reactions (player_id, at desc);
+alter table public.nexamon_live_reactions enable row level security;
+revoke all on public.nexamon_live_reactions from public, anon, authenticated;
+grant all on public.nexamon_live_reactions to service_role;
+comment on table public.nexamon_live_reactions is 'Emoji bursts of spectators of a live opening (ADR-172). Internal.';
+
+-- ===== supabase/migrations/20261204006310_nexamon_lobby_live.sql =====
+-- =============================================================================
+-- NEXA · 6310 · Nexamon: who is on the Collectibles tab, live openings and spectators (ADR-172)
+-- =============================================================================
+-- * nexamon_lobby(p_allow_watch): the Collectibles page asks every presence.pingSeconds. It marks the caller as on
+--   the tab (presence only, no game state: no request id, like last_active_at) and returns the friends on the tab as
+--   figures (nickname, level, avatar_key, accessories, opening, battling), the running live openings, the caller's
+--   open and running Pack Battles and the battle limits.
+-- * Every bought pack is a live opening (trigger on nexamon_packs) unless the opener switched watching off. The
+--   opener's page reports each card as it shows: nexamon_live_progress(p_pack_id, p_revealed) -> viewers, reactions.
+-- * get_nexamon_live(p_live_id): a spectator's view (counts them as a viewer): only the cards the opener has seen,
+--   after live.staleMs of silence one more every live.fallbackSlotMs (liveVisibleCards).
+-- * nexamon_live_react(p_request_id, p_live_id, p_emoji): an emoji burst (live.reactions, live.reactionsPerMinute).
+-- Errors: nexamon_locked, invalid_argument, nexamon_live_unknown, rate_limited.
+-- Idempotent: runs unchanged as supabase/updates/20261204006310_nexamon_lobby_live.sql.
+
+create or replace function public.nexamon_ms(p_ms numeric)
+returns interval
+language sql
+immutable
+set search_path = ''
+as $$
+  select make_interval(secs => coalesce(p_ms, 0) / 1000.0);
 $$;
 
--- ---------------------------------------------------------------------------
--- 4. Government bonds: 1, 2, 5 and 10 game years (1 game year = 1 real day).
---    Price is quoted per 100 EUR face value; coupons track the 3 % policy rate.
--- ---------------------------------------------------------------------------
-insert into public.securities (id, kind, ticker, name, status, tick_size_e4, is_shortable, max_leverage, listed_at)
-select md5('nexa:security:' || b.ticker)::uuid, 'bond', b.ticker, b.name, 'listed', 100, false, 2, now()
-from (values
-  ('NXB01', 'Staatsanleihe 1 Jahr'),
-  ('NXB02', 'Staatsanleihe 2 Jahre'),
-  ('NXB05', 'Staatsanleihe 5 Jahre'),
-  ('NXB10', 'Staatsanleihe 10 Jahre')
-) as b(ticker, name)
-on conflict (id) do nothing;
+-- A player as a figure on the tab: name, level, portrait and worn accessories
+create or replace function public.nexamon_figure_json(p_player uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object('nickname', p.nickname, 'level', p.level, 'avatar_key', p.avatar_key,
+                            'accessories', public.player_worn_accessories(p.id))
+    from public.profiles p where p.id = p_player;
+$$;
 
-insert into public.bonds (security_id, issuer, series, term_game_years, coupon_bps, face_value_cents, rating, issued_at, matures_at)
-select
-  md5('nexa:security:' || b.ticker)::uuid, 'state', b.ticker || '-001', b.years, b.coupon_bps, 10000, 'AAA',
-  (public.game_day()::timestamp + interval '8 hours') at time zone 'Europe/Berlin',
-  ((public.game_day() + b.years)::timestamp + interval '8 hours') at time zone 'Europe/Berlin'
-from (values ('NXB01', 1, 250), ('NXB02', 2, 280), ('NXB05', 5, 330), ('NXB10', 10, 380)) as b(ticker, years, coupon_bps)
-on conflict (security_id) do nothing;
+create or replace function public.nexamon_on_tab(p_player uuid, p_now timestamptz)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (select 1 from public.nexamon_presence x
+                  where x.player_id = p_player
+                    and x.seen_at > p_now - make_interval(secs => coalesce((public.nexamon_cfg() #>> '{presence,presenceSeconds}')::integer, 60)));
+$$;
 
-insert into public.security_quotes (security_id, last_price_e4, bid_e4, ask_e4, prev_close_e4, day_open_e4, day_high_e4, day_low_e4, yield_bps)
-select md5('nexa:security:' || b.ticker)::uuid, 1000000, 999500, 1000500, 1000000, 1000000, 1000000, 1000000, b.coupon_bps
-from (values ('NXB01', 250), ('NXB02', 280), ('NXB05', 330), ('NXB10', 380)) as b(ticker, coupon_bps)
-on conflict (security_id) do nothing;
+-- How many cards of a live pack a spectator may see at p_now (liveVisibleCards)
+create or replace function public.nexamon_live_visible(l public.nexamon_live, p_now timestamptz)
+returns integer
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.nexamon_cfg();
+  v_size   integer := coalesce((cfg ->> 'packSize')::integer, 5);
+  v_silent numeric;
+  v_extra  integer := 0;
+begin
+  v_silent := extract(epoch from (p_now - coalesce(l.progress_at, l.started_at))) * 1000
+              - coalesce((cfg #>> '{live,staleMs}')::numeric, 10000);
+  if v_silent >= 0 then
+    v_extra := floor(v_silent / greatest(1, coalesce((cfg #>> '{live,fallbackSlotMs}')::numeric, 2500)))::integer + 1;
+  end if;
+  return greatest(0, least(v_size, l.progress + v_extra));
+end;
+$$;
 
-insert into public.security_sim_state (security_id, fair_value_e4, volatility, liquidity_shares, spread_bps)
-select md5('nexa:security:' || b.ticker)::uuid, 1000000, b.vol, 1000000, 10
-from (values ('NXB01', 0.00002), ('NXB02', 0.00004), ('NXB05', 0.00008), ('NXB10', 0.00014)) as b(ticker, vol)
-on conflict (security_id) do nothing;
+create or replace function public.nexamon_live_viewer_count(p_live uuid, p_now timestamptz)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select count(*)::integer from public.nexamon_live_viewers v
+   where v.live_id = p_live
+     and v.seen_at > p_now - make_interval(secs => coalesce((public.nexamon_cfg() #>> '{live,viewerSeconds}')::integer, 10));
+$$;
 
--- ---------------------------------------------------------------------------
--- 5. Central bank, macro indicators
--- ---------------------------------------------------------------------------
-insert into public.central_bank_state (id, policy_rate_bps) values (true, 300)
-on conflict (id) do nothing;
+create or replace function public.nexamon_live_reactions_json(p_live uuid, p_now timestamptz)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object('id', r.id, 'emoji', r.emoji, 'at', r.at) order by r.id), '[]'::jsonb)
+    from (select * from public.nexamon_live_reactions x
+           where x.live_id = p_live and x.at > p_now - interval '12 seconds'
+           order by x.id desc limit 30) r;
+$$;
 
-insert into public.macro_indicators (key, name, unit, value, description) values
-  ('oil_price',           'Ölpreis',            'EUR/Barrel', 80,  'Steigt der Ölpreis, profitieren Energiewerte, Logistik leidet.'),
-  ('consumer_confidence', 'Konsumklima',        'Punkte',     100, 'Kauflaune der Haushalte. Treibt vor allem den Einzelhandel.'),
-  ('wage_index',          'Lohnindex',          'Punkte',     100, 'Lohnniveau. Belastet personalintensive Branchen wie Logistik.'),
-  ('business_cycle',      'Konjunkturindex',    'Punkte',     100, 'Gesamtwirtschaftliche Lage. Wirkt auf die Nachfrage aller Branchen.')
-on conflict (key) do nothing;
+-- A bought pack becomes a live opening, unless the opener does not want spectators
+create or replace function public.nexamon_pack_live()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg jsonb := public.nexamon_cfg();
+begin
+  if coalesce((select x.allow_watch from public.nexamon_presence x where x.player_id = new.player_id), true) then
+    insert into public.nexamon_live (player_id, kind, pack_id, set_key, cards, started_at, ends_at)
+    values (new.player_id, 'pack', new.id, new.set_key, new.cards, new.opened_at,
+            new.opened_at + public.nexamon_ms(coalesce((cfg #>> '{live,staleMs}')::numeric, 10000)
+                                              + coalesce((cfg ->> 'packSize')::numeric, 5) * coalesce((cfg #>> '{live,fallbackSlotMs}')::numeric, 2500)
+                                              + coalesce((cfg #>> '{live,lingerMs}')::numeric, 8000)))
+    on conflict (pack_id) do nothing;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists nexamon_pack_live on public.nexamon_packs;
+create trigger nexamon_pack_live after insert on public.nexamon_packs for each row execute function public.nexamon_pack_live();
 
--- ---------------------------------------------------------------------------
--- 6. AI investor archetypes (spec 5.3, ADR-005). Internal.
--- ---------------------------------------------------------------------------
-insert into public.ai_investors (key, name, description, cash_cents, params) values
-  ('market_maker',  'Marktmacher',
-   'Stellt immer Kauf- und Verkaufsangebote mit Spread und sorgt für Grundliquidität.',
-   500000000000, '{"quoteLevels": 5, "inventorySkew": 0.3, "afterHoursSpreadFactor": 3, "afterHoursDepthFactor": 0.3}'),
-  ('value_fund',    'Value-Fonds',
-   'Kauft unter dem fairen Wert, verkauft darüber und reagiert langsam.',
-   2000000000000, '{"reactionSpeed": 0.02, "threshold": 0.05, "maxWeightBps": 1200}'),
-  ('momentum_trader', 'Momentum-Trader',
-   'Springt auf Trends auf und verstärkt Bewegungen.',
-   600000000000, '{"lookbackTicks": 120, "gain": 0.6, "stopBps": 400}'),
-  ('pension_fund',  'Rentenfonds',
-   'Schichtet je nach Leitzins zwischen Anleihen und Dividendenaktien um.',
-   3000000000000, '{"neutralRateBps": 300, "rateSensitivity": 1.5, "minDividendYieldBps": 250}'),
-  ('index_fund',    'Indexfonds',
-   'Hält die NEXA-30-Aktien nach Marktkapitalisierung und kauft bei Indexaufnahme.',
-   2500000000000, '{"index": "NEXA30", "rebalanceSpeed": 0.1, "inclusionBuyDays": 1}'),
-  ('retail_herd',   'Kleinanleger-Herde',
-   'Reagiert emotional auf News und Hype und übertreibt in beide Richtungen.',
-   400000000000, '{"newsGain": 1.8, "hypeDecay": 0.97, "panicThreshold": -0.08}')
-on conflict (key) do nothing;
+-- One live opening as the lobby lists it
+create or replace function public.nexamon_live_row_json(l public.nexamon_live, p_viewer uuid, p_now timestamptz)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object('id', l.id, 'kind', l.kind, 'set', l.set_key, 'battle_id', l.battle_id,
+                            'player', public.nexamon_figure_json(l.player_id),
+                            'opponent', case when l.kind = 'battle'
+                                          then public.nexamon_figure_json((select b.opponent_id from public.nexamon_battles b where b.id = l.battle_id)) end,
+                            'is_me', l.player_id = p_viewer
+                                     or (l.kind = 'battle' and exists (select 1 from public.nexamon_battles b
+                                                                        where b.id = l.battle_id and p_viewer in (b.challenger_id, b.opponent_id))),
+                            'started_at', l.started_at, 'ends_at', l.ends_at,
+                            'viewers', public.nexamon_live_viewer_count(l.id, p_now));
+$$;
 
-insert into public.sim_rng_streams (stream_key, seed) values
-  ('market', 20261110), ('events', 4242), ('hr', 1337), ('regulator', 9001), ('player_events', 777)
-on conflict (stream_key) do nothing;
+-- A Pack Battle as the players and spectators see it at p_now: the pulls only from the shared start, slot by slot
+-- (battleKnownSlots), totals of what is known, the winner from decide_at (minus leadMs)
+create or replace function public.nexamon_battle_json(b public.nexamon_battles, p_viewer uuid, p_now timestamptz)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.nexamon_cfg();
+  v_size  integer := coalesce((cfg ->> 'packSize')::integer, 5);
+  v_lead  numeric := coalesce((cfg #>> '{battles,leadMs}')::numeric, 800);
+  v_tear  numeric := coalesce((cfg #>> '{battles,tearMs}')::numeric, 2400);
+  v_slot  numeric := coalesce((cfg #>> '{battles,slotMs}')::numeric, 1800);
+  v_known integer := 0;
+  v_done  boolean := false;
+  v_status text := b.status;
+  v_ms    numeric;
+  v_ca    jsonb := '[]'::jsonb;
+  v_oa    jsonb := '[]'::jsonb;
+  v_live  uuid;
+begin
+  if b.status = 'pending' and b.expires_at <= p_now then
+    v_status := 'expired';
+  end if;
+  if b.status = 'accepted' then
+    v_status := case when p_now >= b.ends_at then 'done' else 'running' end;
+    if p_now >= b.starts_at then
+      v_ms := extract(epoch from (p_now - b.starts_at)) * 1000 - v_tear + v_lead;
+      if v_ms >= 0 then
+        v_known := least(v_size, floor(v_ms / v_slot)::integer + 1);
+      end if;
+    end if;
+    v_done := p_now >= b.decide_at - public.nexamon_ms(v_lead);
+    select coalesce(jsonb_agg(x order by (x ->> 'slot')::integer), '[]'::jsonb) into v_ca
+      from jsonb_array_elements(coalesce(b.challenger_cards, '[]'::jsonb)) x where (x ->> 'slot')::integer <= v_known;
+    select coalesce(jsonb_agg(x order by (x ->> 'slot')::integer), '[]'::jsonb) into v_oa
+      from jsonb_array_elements(coalesce(b.opponent_cards, '[]'::jsonb)) x where (x ->> 'slot')::integer <= v_known;
+  end if;
+  select l.id into v_live from public.nexamon_live l where l.battle_id = b.id;
+  return jsonb_build_object(
+    'id', b.id, 'set', b.set_key, 'status', v_status, 'price_cents', b.price_cents,
+    'challenger', public.nexamon_figure_json(b.challenger_id), 'opponent', public.nexamon_figure_json(b.opponent_id),
+    'me', case when p_viewer = b.challenger_id then 'challenger' when p_viewer = b.opponent_id then 'opponent' end,
+    'created_at', b.created_at, 'expires_at', b.expires_at, 'accepted_at', b.accepted_at, 'starts_at', b.starts_at,
+    'decide_at', b.decide_at, 'ends_at', b.ends_at, 'tear_ms', v_tear, 'slot_ms', v_slot,
+    'challenger_cards', v_ca, 'opponent_cards', v_oa,
+    'challenger_cents', coalesce((select sum((x ->> 'value_cents')::bigint) from jsonb_array_elements(v_ca) x), 0),
+    'opponent_cents', coalesce((select sum((x ->> 'value_cents')::bigint) from jsonb_array_elements(v_oa) x), 0),
+    'winner', case when v_done then case when b.winner_id = b.challenger_id then 'challenger'
+                                         when b.winner_id = b.opponent_id then 'opponent' end end,
+    'tie_break', case when v_done then b.tie_break end,
+    'coin_seed', case when v_done then b.coin_seed end,
+    'abort_reason', b.abort_reason,
+    'live_id', v_live,
+    'viewers', case when v_live is null then 0 else public.nexamon_live_viewer_count(v_live, p_now) end,
+    'reactions', case when v_live is null then '[]'::jsonb else public.nexamon_live_reactions_json(v_live, p_now) end,
+    'server_time', p_now);
+end;
+$$;
 
--- ---------------------------------------------------------------------------
--- 7. Levels 1..50 (ADR-055): xp_to_next = 100 at level 1, then round(250 * n^1.5)
---    (progression.firstLevelXp / xpBase; game_config is loaded after this file)
--- ---------------------------------------------------------------------------
-insert into public.levels (level, xp_to_next, xp_cumulative)
-select
-  n,
-  case when n = 1 then 100 when n < 50 then round(250 * power(n, 1.5))::bigint end,
-  case when n = 1 then 0
-       else 100 + coalesce((select sum(round(250 * power(m, 1.5)))::bigint from generate_series(2, n - 1) as m), 0) end
-from generate_series(1, 50) as n
-on conflict (level) do update set xp_to_next = excluded.xp_to_next, xp_cumulative = excluded.xp_cumulative;
+create or replace function public.nexamon_lobby(p_allow_watch boolean default true)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.nexamon_cfg();
+  v_player uuid;
+  v_now    timestamptz := public.game_now();
+  v_secs   integer := coalesce((cfg #>> '{presence,presenceSeconds}')::integer, 60);
+  v_max    integer := coalesce((cfg #>> '{presence,maxPlayers}')::integer, 24);
+  v_last   timestamptz;
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  insert into public.nexamon_presence (player_id, seen_at, allow_watch)
+  values (v_player, v_now, coalesce(p_allow_watch, true))
+  on conflict (player_id) do update set seen_at = excluded.seen_at, allow_watch = excluded.allow_watch;
+  -- open challenges past their time are expired; old live openings go
+  update public.nexamon_battles set status = 'expired', responded_at = expires_at
+   where status = 'pending' and expires_at <= v_now and v_player in (challenger_id, opponent_id);
+  delete from public.nexamon_live where ends_at < v_now - interval '1 hour';
+  select max(b.created_at) into v_last from public.nexamon_battles b where b.challenger_id = v_player;
+  return jsonb_build_object(
+    'players', coalesce((
+      select jsonb_agg(public.nexamon_figure_json(p.id) || jsonb_build_object(
+                         'is_friend', true,
+                         'opening', exists (select 1 from public.nexamon_live l where l.player_id = p.id and l.kind = 'pack' and l.ends_at > v_now),
+                         'battling', exists (select 1 from public.nexamon_battles b
+                                              where p.id in (b.challenger_id, b.opponent_id)
+                                                and ((b.status = 'accepted' and b.ends_at > v_now) or (b.status = 'pending' and b.expires_at > v_now))))
+                       order by x.seen_at desc, p.id)
+        from (select y.player_id, y.seen_at from public.nexamon_presence y
+                join public.friendships f on f.status = 'accepted'
+                 and ((f.requester_id = v_player and f.addressee_id = y.player_id) or (f.addressee_id = v_player and f.requester_id = y.player_id))
+               where y.seen_at > v_now - make_interval(secs => v_secs) and y.player_id <> v_player
+               order by y.seen_at desc limit v_max) x
+        join public.profiles p on p.id = x.player_id and not p.is_deactivated), '[]'::jsonb),
+    'live', coalesce((
+      select jsonb_agg(public.nexamon_live_row_json(l, v_player, v_now) order by l.started_at desc)
+        from (select * from public.nexamon_live z where z.ends_at > v_now and z.started_at <= v_now
+               order by z.started_at desc limit coalesce((cfg #>> '{live,maxSessions}')::integer, 12)) l), '[]'::jsonb),
+    'battles', coalesce((
+      select jsonb_agg(public.nexamon_battle_json(b, v_player, v_now) order by b.created_at desc)
+        from public.nexamon_battles b
+       where v_player in (b.challenger_id, b.opponent_id)
+         and ((b.status = 'pending' and b.expires_at > v_now) or (b.status = 'accepted' and b.ends_at > v_now))), '[]'::jsonb),
+    'limits', jsonb_build_object(
+      'per_hour', coalesce((cfg #>> '{battles,perHour}')::integer, 6),
+      'used', (select count(*) from public.nexamon_battles b
+                where v_player in (b.challenger_id, b.opponent_id) and b.status = 'accepted' and b.accepted_at > v_now - interval '1 hour'),
+      'cooldown_until', case when v_last is not null
+                               and v_last + make_interval(secs => coalesce((cfg #>> '{battles,cooldownSeconds}')::integer, 20)) > v_now
+                             then v_last + make_interval(secs => coalesce((cfg #>> '{battles,cooldownSeconds}')::integer, 20)) end),
+    'allow_watch', coalesce(p_allow_watch, true),
+    'server_time', v_now);
+end;
+$$;
+comment on function public.nexamon_lobby(boolean) is
+  'RPC (presence, ADR-172): marks the caller as on the Collectibles tab and returns {players: friends on the tab as '
+  'figures with opening/battling, live: running live openings, battles: own open and running Pack Battles, limits, '
+  'allow_watch, server_time}; errors nexamon_locked.';
 
--- ---------------------------------------------------------------------------
--- 8. Mission templates (daily: 200-400 XP, 3 per day; weekly; unlock intros)
--- ---------------------------------------------------------------------------
-insert into public.mission_templates (key, kind, title, description, icon_key, metric, target_min, target_max, xp_min, xp_max, reward_cents, min_level) values
-  ('daily_trades',          'daily',  'Aktiv am Markt',        'Führe {target} Trades aus.',                                      'mission_trade',    'trades_executed',           3,       5, 200, 300, 0, 1),
-  ('daily_profit_trade',    'daily',  'Im Plus',               'Schließe {target} Trades mit Gewinn.',                            'mission_profit',   'profitable_trades_closed',  1,       2, 250, 400, 0, 1),
-  ('daily_volume',          'daily',  'Umsatz machen',         'Handle Wertpapiere im Wert von {target}.',                        'mission_volume',   'traded_volume_cents',  200000, 1000000, 200, 350, 0, 1),
-  ('daily_vault',           'daily',  'Kasse machen',          'Leere deinen Tresor {target}-mal.',                               'mission_vault',    'vault_claims',              1,       2, 200, 250, 0, 1),
-  ('daily_sectors',         'daily',  'Über den Tellerrand',   'Kaufe Aktien aus {target} verschiedenen Branchen.',               'mission_sectors',  'sectors_bought',            2,       3, 250, 350, 0, 1),
-  ('daily_work_task',       'daily',  'Fleißig im Job',        'Erledige {target} Arbeitsaufgaben.',                              'mission_work',     'work_tasks_completed',      1,       2, 250, 350, 0, 2),
-  ('daily_limit_fill',      'daily',  'Geduld zahlt sich aus', 'Lass {target} Limit-Orders ausführen.',                           'mission_limit',    'limit_orders_filled',       1,       2, 250, 350, 0, 3),
-  ('daily_bond',            'daily',  'Sicherer Hafen',        'Kaufe Staatsanleihen im Wert von {target}.',                      'mission_bond',     'bonds_bought_cents',   100000,  500000, 200, 300, 0, 5),
-  ('daily_short',           'daily',  'Gegen den Strom',       'Eröffne {target} Short-Position.',                                'mission_short',    'shorts_opened',             1,       1, 300, 400, 0, 8),
-  ('daily_company_decision','daily',  'Chefsache',             'Reiche die Quartalsentscheidungen deiner Firma ein.',             'mission_company',  'quarter_decisions_submitted', 1,     1, 300, 400, 0, 10),
-  ('daily_opening_bell',    'daily',  'Früher Vogel',          'Führe {target} Trades in der ersten Handelsstunde aus.',          'mission_bell',     'opening_hour_trades',       1,       2, 250, 350, 0, 1),
-  ('weekly_growth',         'weekly', 'Wochen-Challenge: Wachstum', 'Steigere deinen Portfoliowert diese Woche um {target} %.',   'mission_growth',   'portfolio_growth_bps',    300,     800, 1000, 1500, 0, 1),
-  ('weekly_trades',         'weekly', 'Wochen-Challenge: Vieltrader', 'Führe diese Woche {target} Trades aus.',                   'mission_trade',    'trades_executed',          30,      60,  800, 1200, 0, 1),
-  ('weekly_work',           'weekly', 'Wochen-Challenge: Arbeitstier', 'Sammle diese Woche {target} bezahlte Arbeitsminuten.',    'mission_work',     'paid_work_minutes',      1200,    2400,  800, 1200, 0, 2),
-  ('intro_first_trade',     'intro',  'Dein erster Trade',     'Kaufe deine erste Aktie per Market-Order.',                       'mission_trade',    'trades_executed',           1,       1, 100, 100, 0, 1),
-  ('intro_first_vault',     'intro',  'Erstes Grundeinkommen', 'Leere zum ersten Mal deinen Tresor.',                             'mission_vault',    'vault_claims',              1,       1, 100, 100, 0, 1),
-  ('intro_first_job',       'intro',  'Erster Arbeitstag',     'Nimm deinen ersten Job an.',                                      'mission_work',     'jobs_started',              1,       1, 150, 150, 0, 2),
-  ('intro_first_limit',     'intro',  'Preis festlegen',       'Platziere deine erste Limit-Order.',                              'mission_limit',    'limit_orders_placed',       1,       1, 150, 150, 0, 3),
-  ('intro_first_stop',      'intro',  'Sicherheitsnetz',       'Sichere eine Position mit einem Stop-Loss ab.',                   'mission_stop',     'stop_orders_placed',        1,       1, 150, 150, 0, 5),
-  ('intro_first_bond',      'intro',  'Erste Anleihe',         'Kaufe deine erste Staatsanleihe.',                                'mission_bond',     'bond_trades',               1,       1, 150, 150, 0, 5),
-  ('intro_first_short',     'intro',  'Mach deinen ersten Short-Trade', 'Setze mit einem Leerverkauf auf fallende Kurse.',        'mission_short',    'shorts_opened',             1,       1, 250, 250, 0, 8),
-  ('intro_found_company',   'intro',  'Gründe dein Unternehmen', 'Gründe dein erstes Kleinunternehmen.',                          'mission_company',  'companies_founded',         1,       1, 500, 500, 0, 10),
-  ('intro_first_leverage',  'intro',  'Mit Hebel handeln',     'Eröffne deine erste gehebelte Position.',                         'mission_leverage', 'leveraged_positions_opened', 1,      1, 300, 300, 0, 12)
-on conflict (key) do nothing;
+create or replace function public.nexamon_live_progress(p_pack_id uuid, p_revealed integer)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.nexamon_cfg();
+  v_player uuid;
+  v_now    timestamptz := public.game_now();
+  l        public.nexamon_live;
+begin
+  v_player := public.require_player();
+  if p_pack_id is null or p_revealed is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  select * into l from public.nexamon_live x where x.pack_id = p_pack_id and x.player_id = v_player for update;
+  if l.id is null then
+    -- watching is off, or the pack is not the caller's: nothing to report, nobody watches
+    return jsonb_build_object('live_id', null, 'viewers', 0, 'reactions', '[]'::jsonb);
+  end if;
+  if greatest(0, least(coalesce((cfg ->> 'packSize')::integer, 5), p_revealed)) > l.progress then
+    update public.nexamon_live
+       set progress = greatest(0, least(coalesce((cfg ->> 'packSize')::integer, 5), p_revealed)), progress_at = v_now,
+           ends_at = least(started_at + public.nexamon_ms(coalesce((cfg #>> '{live,maxMs}')::numeric, 120000)),
+                           greatest(ends_at, v_now + public.nexamon_ms(coalesce((cfg #>> '{live,lingerMs}')::numeric, 8000))))
+     where id = l.id;
+  elsif l.progress_at is null or l.progress_at < v_now - interval '2 seconds' then
+    -- the opener still looks at the card: the fallback pace waits
+    update public.nexamon_live set progress_at = v_now where id = l.id;
+  end if;
+  return jsonb_build_object('live_id', l.id, 'viewers', public.nexamon_live_viewer_count(l.id, v_now),
+                            'reactions', public.nexamon_live_reactions_json(l.id, v_now));
+end;
+$$;
+comment on function public.nexamon_live_progress(uuid, integer) is
+  'RPC (live opening, ADR-172): the opener''s page reports how many cards of a bought pack it has shown; returns '
+  '{live_id, viewers, reactions}. Without a live opening (watching off) live_id is null. Errors invalid_argument.';
 
--- ---------------------------------------------------------------------------
--- 9. Unlocks (spec 9.3). key is what has_unlock() checks server side.
--- ---------------------------------------------------------------------------
-insert into public.unlocks (key, level, title, description, icon_key, intro_mission_key, sort_order) values
-  ('market_orders',         1,  'Aktienhandel',            'Kaufe und verkaufe Aktien per Market-Order.',                                   'unlock_trade',     'intro_first_trade',    10),
-  ('basic_income',          1,  'Grundeinkommen',          '100 € pro Stunde landen in deinem Tresor, auch wenn du offline bist.',          'unlock_vault',     'intro_first_vault',    11),
-  ('jobs_intern',           2,  'Erster Job',              'Bewirb dich als Praktikant und verdiene ein Gehalt.',                           'unlock_job',       'intro_first_job',      20),
-  ('limit_orders',          3,  'Limit-Order',             'Lege den Preis fest, zu dem du kaufen oder verkaufen willst.',                  'unlock_limit',     'intro_first_limit',    30),
-  ('watchlist',             3,  'Watchlist',               'Behalte deine Lieblingsaktien im Blick.',                                       'unlock_watchlist', null,                   31),
-  ('artworks',              4,  'NFTs',                    'Präge eigene Pixel-NFTs, sammle Unikate und verdiene an jedem Weiterverkauf.', 'unlock_art',       null,                   40),
-  ('stop_loss',             5,  'Stop-Loss',               'Begrenze Verluste automatisch.',                                                'unlock_stop',      'intro_first_stop',     50),
-  ('bonds',                 5,  'Staatsanleihen',          'Sichere Zinsen mit Laufzeiten von 1 bis 10 Spieljahren.',                       'unlock_bond',      'intro_first_bond',     51),
-  ('jobs_junior',           5,  'Junior-Jobs',             'Besser bezahlte Jobs mit anspruchsvolleren Aufgaben.',                          'unlock_job',       null,                   52),
-  ('analyst_reports',       7,  'Analystenberichte',       'Kursziele der Analysten. Manchmal liegen sie daneben.',                         'unlock_analyst',   null,                   70),
-  ('short_selling',         8,  'Leerverkäufe',            'Verdiene an fallenden Kursen.',                                                 'unlock_short',     'intro_first_short',    80),
-  ('property',              8,  'Grundstück',              'Kauf dir eine eigene Bleibe, richte sie ein und stell Autos in die Garage.',    'unlock_home',      null,                   81),
-  ('ipo',                   9,  'Börsengang',              'Bring dein Unternehmen an die Börse.',                                          'unlock_ipo',       null,                   90),
-  ('found_small_business', 10,  'Kleinunternehmen gründen','Gründe deine eigene Firma und führe sie durch die Quartale.',                   'unlock_company',   'intro_found_company', 100),
-  ('leverage_2x',          12,  'Hebel 2×',                'Handle mit doppeltem Einsatz. Gewinne und Verluste verdoppeln sich.',           'unlock_leverage',  'intro_first_leverage',120),
-  ('jobs_senior',          12,  'Senior-Jobs',             'Senior-Positionen mit deutlich höherem Gehalt.',                                'unlock_job',       null,                  121),
-  ('personal_loan',        15,  'Kleinkredit',             'Leihe dir bis zu 50.000 €.',                                                    'unlock_loan',      null,                  150),
-  ('business_angel',       15,  'Business Angel',          'Investiere vorbörslich in die Firmen anderer Spieler.',                         'unlock_angel',     null,                  151),
-  ('found_gmbh',           15,  'GmbH gründen',            'Gründe eine GmbH oder wandle dein Kleinunternehmen um.',                        'unlock_company',   null,                  152),
-  ('leverage_5x',          18,  'Hebel 5×',                'Fünffacher Hebel für erfahrene Trader.',                                        'unlock_leverage',  null,                  180),
-  ('expand_small_business',18,  'Firmenerweiterung',       'Erweitere dein Kleinunternehmen auf bis zu 20 Mitarbeiter.',                    'unlock_company',   null,                  181),
-  ('company_loans',        20,  'Firmenkredite',           'Kredite bis 250.000 € für dein Unternehmen.',                                   'unlock_loan',      null,                  201),
-  ('jobs_team_lead',       20,  'Teamleitung',             'Führungsjobs mit Verantwortung.',                                               'unlock_job',       null,                  202),
-  ('found_ag',             25,  'Aktiengesellschaft',      'Wandle deine Firma in eine AG um und bereite den Börsengang vor.',              'unlock_company',   null,                  250),
-  ('jobs_c_level',         25,  'C-Level-Jobs',            'Werde CFO oder COO und triff echte Entscheidungen.',                            'unlock_job',       null,                  252),
-  ('leverage_10x',         30,  'Hebel 10×',               'Maximaler Hebel. Maximales Risiko.',                                            'unlock_leverage',  null,                  300),
-  ('options',              30,  'Optionen',                'Handle Calls und Puts.',                                                        'unlock_options',   null,                  301),
-  ('takeovers',            35,  'Übernahmen',              'Übernimm andere Firmen, freundlich oder feindlich.',                            'unlock_takeover',  null,                  350),
-  ('holding',              40,  'Holding',                 'Führe mehrere Firmen gleichzeitig.',                                            'unlock_holding',   null,                  400),
-  ('legend',               50,  'Börsenlegende',           'Titel „Börsenlegende“, goldener Profilrahmen und Platz in der Hall of Fame.',   'unlock_legend',    null,                  500)
-on conflict (key) do nothing;
+create or replace function public.get_nexamon_live(p_live_id uuid)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_now    timestamptz := public.game_now();
+  l        public.nexamon_live;
+  v_n      integer;
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  select * into l from public.nexamon_live x where x.id = p_live_id;
+  if l.id is null or l.started_at > v_now then
+    perform public.api_error('nexamon_live_unknown');
+  end if;
+  if l.player_id <> v_player and l.ends_at > v_now then
+    insert into public.nexamon_live_viewers (live_id, player_id, seen_at) values (l.id, v_player, v_now)
+    on conflict (live_id, player_id) do update set seen_at = excluded.seen_at;
+  end if;
+  v_n := case when l.player_id = v_player or l.ends_at <= v_now then coalesce(jsonb_array_length(l.cards), 0)
+              else public.nexamon_live_visible(l, v_now) end;
+  return public.nexamon_live_row_json(l, v_player, v_now) || jsonb_build_object(
+    'progress', v_n,
+    'cards', case when l.kind = 'pack'
+                  then coalesce((select jsonb_agg(jsonb_build_object('slot', x ->> 'slot', 'card_key', x ->> 'card_key',
+                                                                     'rarity', x ->> 'rarity', 'condition', x ->> 'condition',
+                                                                     'serial', (x ->> 'serial')::bigint,
+                                                                     'value_cents', (x ->> 'value_cents')::bigint)
+                                                  order by (x ->> 'slot')::integer)
+                                   from jsonb_array_elements(l.cards) x where (x ->> 'slot')::integer <= v_n), '[]'::jsonb)
+                  else '[]'::jsonb end,
+    'done', l.ends_at <= v_now,
+    'reactions', public.nexamon_live_reactions_json(l.id, v_now),
+    'server_time', v_now);
+end;
+$$;
+comment on function public.get_nexamon_live(uuid) is
+  'RPC (spectating, ADR-172): one live opening with the cards the opener has already seen (fallback pace after '
+  'live.staleMs), viewers and recent reactions; counts the caller as a viewer. Errors nexamon_locked, nexamon_live_unknown.';
 
-update public.mission_templates m
-   set required_unlock_key = v.unlock_key
-  from (values
-    ('daily_limit_fill', 'limit_orders'), ('daily_bond', 'bonds'), ('daily_short', 'short_selling'),
-    ('daily_company_decision', 'found_small_business'), ('daily_work_task', 'jobs_intern'), ('weekly_work', 'jobs_intern')
-  ) as v(mission_key, unlock_key)
- where m.key = v.mission_key and m.required_unlock_key is null;
+create or replace function public.nexamon_live_react(p_request_id uuid, p_live_id uuid, p_emoji text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.nexamon_cfg();
+  v_player uuid;
+  v_replay jsonb;
+  v_now    timestamptz := public.game_now();
+  l        public.nexamon_live;
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  if p_request_id is null or p_live_id is null or p_emoji is null
+     or not coalesce(cfg #> '{live,reactions}', '[]'::jsonb) ? p_emoji then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'nexamon_live_react');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into l from public.nexamon_live x where x.id = p_live_id;
+  if l.id is null or l.ends_at <= v_now or l.started_at > v_now then
+    perform public.api_error('nexamon_live_unknown');
+  end if;
+  if not public.rate_limit_hit(v_player, 'nexamon_react', coalesce((cfg #>> '{live,reactionsPerMinute}')::integer, 30), 60) then
+    perform public.api_error('rate_limited');
+  end if;
+  insert into public.nexamon_live_reactions (live_id, player_id, emoji, at) values (l.id, v_player, p_emoji, v_now);
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('reactions', public.nexamon_live_reactions_json(l.id, v_now)));
+end;
+$$;
+comment on function public.nexamon_live_react(uuid, uuid, text) is
+  'RPC (spectating, ADR-172): an emoji burst on a live opening (live.reactions); returns {reactions}. Errors '
+  'nexamon_locked, invalid_argument, nexamon_live_unknown, rate_limited.';
 
--- ---------------------------------------------------------------------------
--- 10. Achievements (>= 40, spec 11.2). icon_key = pixel icon component.
--- ---------------------------------------------------------------------------
-insert into public.achievements (key, title, description, icon_key, category, metric, threshold, xp_reward, is_hidden, sort_order) values
-  -- the eight from the spec
-  ('all_in',            'All In',                'Schließe einen Trade mit 10×-Hebel im Gewinn.',                              'ach_all_in',          'risk',        'leverage_10x_profit_trades',        1,  1000, false,  10),
-  ('wolf_of_nexa',      'Wolf der NEXA',         'Mache 100.000 € Gewinn an einem einzigen Tag.',                              'ach_wolf',            'trading',     'daily_realized_profit_cents', 10000000,  5000, false,  20),
-  ('total_loss',        'Totalverlust',          'Eine deiner Positionen wurde liquidiert.',                                   'ach_skull',           'risk',        'liquidations',                      1,   250, false,  30),
-  ('diamond_hands',     'Diamond Hands',         'Halte eine Aktie 14 Tage und verkaufe sie mit mindestens +50 %.',            'ach_diamond',         'trading',     'diamond_hands_sales',               1,  2500, false,  40),
-  ('oracle',            'Orakel',                'Schätze 5 Quartalszahlen in Folge richtig.',                                 'ach_brain',           'career',      'earnings_estimate_streak',          5,  2000, false,  50),
-  ('rentier',           'Rentier',               'Kassiere 10.000 € Dividende in einer Woche.',                                'ach_bank',            'wealth',      'weekly_dividends_cents',      1000000,  3000, false,  60),
-  ('bell_ringer',       'Glockenschläger',       'Bringe deine eigene Firma an die Börse.',                                    'ach_bell',            'company',     'ipos_completed',                    1,  7500, false,  70),
-  ('index_climber',     'Index-Aufsteiger',      'Deine Firma wird in den NEXA 30 aufgenommen.',                               'ach_crown',           'company',     'index_inclusions',                  1, 10000, false,  80),
-  -- trading
-  ('first_trade',       'Erster Handel',         'Führe deinen ersten Trade aus.',                                             'ach_first_trade',     'trading',     'trades_executed',                   1,   100, false, 100),
-  ('trades_100',        'Stammkunde',            'Führe 100 Trades aus.',                                                      'ach_trades_100',      'trading',     'trades_executed',                 100,   500, false, 110),
-  ('trades_1000',       'Parketthai',            'Führe 1.000 Trades aus.',                                                    'ach_trades_1000',     'trading',     'trades_executed',                1000,  2500, false, 120),
-  ('first_profit',      'Erster Gewinn',         'Schließe einen Trade mit Gewinn.',                                           'ach_first_profit',    'trading',     'profitable_trades_closed',          1,   100, false, 130),
-  ('profit_10k',        'Fünfstellig',           'Mache 10.000 € Gewinn mit einem einzigen Trade.',                            'ach_profit_10k',      'trading',     'max_trade_profit_cents',      1000000,  1000, false, 140),
-  ('patience',          'Geduldsspiel',          'Deine erste Limit-Order wurde ausgeführt.',                                  'ach_hourglass',       'trading',     'limit_orders_filled',               1,   150, false, 150),
-  ('emergency_brake',   'Notbremse',             'Ein Stop-Loss hat dich vor Schlimmerem bewahrt.',                            'ach_brake',           'trading',     'stop_orders_triggered',             1,   200, false, 160),
-  ('early_bird',        'Früher Vogel',          'Handle an 5 Tagen in der ersten Handelsstunde.',                             'ach_early_bird',      'trading',     'opening_hour_trade_days',           5,   400, false, 170),
-  ('diversified',       'Breit aufgestellt',     'Halte gleichzeitig Aktien aus allen fünf Branchen.',                         'ach_pie',             'trading',     'sectors_held',                      5,   400, false, 180),
-  ('bond_ladder',       'Leiterbauer',           'Halte gleichzeitig Staatsanleihen aller vier Laufzeiten.',                   'ach_ladder',          'trading',     'bond_terms_held',                   4,   500, false, 190),
-  -- risk
-  ('pessimist',         'Schwarzseher',          'Schließe deinen ersten Leerverkauf mit Gewinn.',                             'ach_bear',            'risk',        'profitable_shorts_closed',          1,   500, false, 200),
-  ('caught_cold',       'Kalt erwischt',         'Schließe einen Short mit mehr als 30 % Verlust.',                            'ach_ice',             'risk',        'short_squeeze_losses',              1,   300, true,  210),
-  ('penny_jackpot',     'Pennystock-Jackpot',    'Verdopple deinen Einsatz mit einem Pennystock.',                             'ach_jackpot',         'risk',        'penny_doublings',                   1,  1500, false, 220),
-  ('margin_survivor',   'Auf Messers Schneide',  'Überstehe einen Margin Call, ohne liquidiert zu werden.',                    'ach_knife',           'risk',        'margin_calls_survived',             1,   800, false, 230),
-  ('trial_winner',      'Studienglück',          'Halte eine Pharma-Aktie durch ein positives Studienergebnis.',               'ach_pill',            'risk',        'pharma_trials_won',                 1,  1200, false, 240),
-  -- wealth
-  ('millionaire',       'Erste Million',         'Erreiche ein Gesamtvermögen von 1 Mio. €.',                                  'ach_million',         'wealth',      'net_worth_cents',             100000000,  2500, false, 300),
-  ('ten_millionaire',   'Zehnfacher Millionär',  'Erreiche ein Gesamtvermögen von 10 Mio. €.',                                 'ach_ten_million',     'wealth',      'net_worth_cents',            1000000000,  5000, false, 310),
-  ('hundred_millionaire','Hundert Millionen',    'Erreiche ein Gesamtvermögen von 100 Mio. €.',                                'ach_hundred_million', 'wealth',      'net_worth_cents',           10000000000, 10000, false, 320),
-  ('vulture',           'Pleitegeier',           'Du bist bankrottgegangen. Das passiert den Besten.',                         'ach_vulture',         'wealth',      'bankruptcies',                      1,   200, true,  330),
-  ('comeback',          'Comeback',              'Erreiche nach einem Bankrott wieder 100.000 € Vermögen.',                    'ach_phoenix',         'wealth',      'comebacks',                         1,  2000, false, 340),
-  ('saver',             'Sparfuchs',             'Leere 10 randvolle Tresore.',                                                'ach_vault',           'wealth',      'full_vault_claims',                10,   300, false, 350),
-  ('dividend_collector','Kuponschneider',        'Erhalte Dividenden von 5 verschiedenen Unternehmen.',                        'ach_coupon',          'wealth',      'dividend_companies',                5,   600, false, 360),
-  -- progression
-  ('streak_7',          'Wochenstammgast',       'Logge dich 7 Tage in Folge ein.',                                            'ach_streak_7',        'progression', 'login_streak',                      7,   300, false, 400),
-  ('streak_30',         'Dauerbrenner',          'Logge dich 30 Tage in Folge ein.',                                           'ach_streak_30',       'progression', 'login_streak',                     30,  1500, false, 410),
-  ('streak_100',        'Urgestein',             'Logge dich 100 Tage in Folge ein.',                                          'ach_streak_100',      'progression', 'login_streak',                    100,  5000, false, 420),
-  ('dutiful',           'Pflichtbewusst',        'Schließe 50 tägliche Missionen ab.',                                         'ach_checklist',       'progression', 'missions_completed',               50,   800, false, 430),
-  ('level_10',          'Gründerzeit',           'Erreiche Level 10.',                                                         'ach_level_10',        'progression', 'level',                            10,   500, false, 440),
-  ('level_25',          'Börsenreif',            'Erreiche Level 25.',                                                         'ach_level_25',        'progression', 'level',                            25,  2000, false, 450),
-  ('level_50',          'Börsenlegende',         'Erreiche Level 50.',                                                         'ach_level_50',        'progression', 'level',                            50, 10000, false, 460),
-  -- career
-  ('first_day',         'Erster Arbeitstag',     'Tritt deinen ersten Job an.',                                                'ach_briefcase',       'career',      'jobs_started',                      1,   100, false, 500),
-  ('promoted',          'Beförderung',           'Werde zum ersten Mal befördert.',                                            'ach_promotion',       'career',      'promotions',                        1,   400, false, 510),
-  ('executive_floor',   'Chefetage',             'Übernimm einen C-Level-Job.',                                                'ach_executive',       'career',      'c_level_jobs',                      1,  3000, false, 520),
-  ('negotiator',        'Verhandlungsgeschick',  'Gewinne 3 Gehaltsverhandlungen.',                                            'ach_handshake',       'career',      'negotiations_won',                  3,   600, false, 530),
-  ('busy_bee',          'Fleißbiene',            'Erledige 100 Arbeitsaufgaben.',                                              'ach_bee',             'career',      'work_tasks_completed',            100,  1000, false, 540),
-  ('turncoat',          'Seitenwechsler',        'Wechsle zu einem direkten Konkurrenten deines Arbeitgebers.',                'ach_turncoat',        'career',      'competitor_switches',               1,   500, true,  550),
-  -- company
-  ('founder',           'Gründergeist',          'Gründe dein erstes Unternehmen.',                                            'ach_founder',         'company',     'companies_founded',                 1,  1000, false, 600),
-  ('break_even',        'Schwarze Null',         'Schließe ein Quartal mit Gewinn ab.',                                        'ach_break_even',      'company',     'profitable_quarters',               1,   500, false, 610),
-  ('six_figures',       'Sechsstellig',          'Erziele 100.000 € Umsatz in einem Quartal.',                                 'ach_six_figures',     'company',     'quarter_revenue_cents',       10000000,  1000, false, 620),
-  ('market_leader',     'Marktführer',           'Halte den größten Marktanteil deiner Branche.',                              'ach_podium',          'company',     'sector_leader_quarters',            1,  5000, false, 630),
-  ('employer',          'Arbeitgeber',           'Beschäftige 20 Mitarbeiter.',                                                'ach_team',            'company',     'employees',                        20,   800, false, 640),
-  ('promise_kept',      'Wort gehalten',         'Halte 4 Prognosen in Folge ein.',                                            'ach_seal',            'company',     'guidance_met_streak',               4,  1500, false, 650),
-  ('dividend_king',     'Dividendenkönig',       'Zahle 8 Quartale in Folge eine Dividende.',                                  'ach_dividend_king',   'company',     'dividend_streak',                   8,  3000, false, 660),
-  ('caught',            'Erwischt',              'Die Finanzaufsicht hat dich beim Insiderhandel ertappt.',                    'ach_handcuffs',       'company',     'insider_violations_detected',       1,   100, true,  670),
-  -- social / lifestyle
-  ('angel_investor',    'Business Angel',        'Investiere vorbörslich in die Firma eines anderen Spielers.',                'ach_angel',           'social',      'angel_investments',                 1,   600, false, 700),
-  ('networker',         'Netzwerker',            'Füge 3 Freunde hinzu.',                                                      'ach_network',         'social',      'friends',                           3,   200, false, 710),
-  ('league_champion',   'Liga-Champion',         'Gewinne die Wochenliga.',                                                    'ach_trophy',          'social',      'league_wins',                       1,  1500, false, 720),
-  ('time_is_money',     'Zeit ist Geld',         'Kaufe dir eine Rolex.',                                                      'ach_watch',           'lifestyle',   'lifestyle_rolex',                   1,   300, false, 800),
-  ('island_owner',      'Inselbegabung',         'Kaufe dir deine eigene Insel.',                                              'ach_island',          'lifestyle',   'lifestyle_island',                  1, 10000, false, 810)
-on conflict (key) do nothing;
+do $do$
+declare
+  f text;
+begin
+  foreach f in array array['public.nexamon_lobby(boolean)', 'public.nexamon_live_progress(uuid, integer)',
+                           'public.get_nexamon_live(uuid)', 'public.nexamon_live_react(uuid, uuid, text)'] loop
+    execute format('revoke all on function %s from public, anon', f);
+    execute format('grant execute on function %s to authenticated', f);
+  end loop;
+  foreach f in array array['public.nexamon_ms(numeric)', 'public.nexamon_figure_json(uuid)', 'public.nexamon_on_tab(uuid, timestamptz)',
+                           'public.nexamon_live_visible(public.nexamon_live, timestamptz)',
+                           'public.nexamon_live_viewer_count(uuid, timestamptz)',
+                           'public.nexamon_live_reactions_json(uuid, timestamptz)', 'public.nexamon_pack_live()',
+                           'public.nexamon_live_row_json(public.nexamon_live, uuid, timestamptz)',
+                           'public.nexamon_battle_json(public.nexamon_battles, uuid, timestamptz)'] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+  end loop;
+end;
+$do$;
 
--- ---------------------------------------------------------------------------
--- 11. Cosmetics (starter set), lifestyle items (spec 11.3)
--- ---------------------------------------------------------------------------
-insert into public.cosmetic_items (key, kind, slot, title, icon_key, unlock_level, unlock_achievement_key, is_default, sort_order) values
-  ('title_newcomer',        'title',         null,        'Neuling',           'title_newcomer',  1,    null,              true,  10),
-  ('title_founder',         'title',         null,        'Gründer',           'title_founder',   null, 'founder',         false, 20),
-  ('title_league_champion', 'title',         null,        'Liga-Champion',     'title_trophy',    null, 'league_champion', false, 30),
-  ('title_vulture',         'title',         null,        'Pleitegeier',       'title_vulture',   null, 'vulture',         false, 40),
-  ('title_legend',          'title',         null,        'Börsenlegende',     'title_legend',    50,   null,              false, 50),
-  ('frame_default',         'profile_frame', null,        'Standardrahmen',    'frame_default',   1,    null,              true,  10),
-  ('frame_silver',          'profile_frame', null,        'Silberrahmen',      'frame_silver',    25,   null,              false, 20),
-  ('frame_gold',            'profile_frame', null,        'Goldener Rahmen',   'frame_gold',      50,   null,              false, 30),
-  ('head_default',          'avatar_part',   'head',      'Standardkopf',      'avatar_head_1',   1,    null,              true,  10),
-  ('hair_short',            'avatar_part',   'hair',      'Kurzhaarschnitt',   'avatar_hair_1',   1,    null,              true,  10),
-  ('hair_long',             'avatar_part',   'hair',      'Lange Haare',       'avatar_hair_2',   1,    null,              true,  20),
-  ('outfit_hoodie',         'avatar_part',   'outfit',    'Hoodie',            'avatar_outfit_1', 1,    null,              true,  10),
-  ('outfit_suit',           'avatar_part',   'outfit',    'Anzug',             'avatar_outfit_2', 12,   null,              false, 20),
-  ('accessory_glasses',     'avatar_part',   'accessory', 'Brille',            'avatar_acc_1',    5,    null,              false, 10),
-  ('accessory_crown',       'avatar_part',   'accessory', 'Krone',             'avatar_acc_2',    null, 'index_climber',   false, 20)
-on conflict (key) do nothing;
+-- ===== supabase/migrations/20261204006320_nexamon_battles.sql =====
+-- =============================================================================
+-- NEXA · 6320 · Nexamon Pack Battles: challenge, accept, both packs at once, the winner takes all (ADR-172)
+-- =============================================================================
+-- * challenge_nexamon_battle(p_request_id, p_nickname, p_set): a friend who is on the Collectibles tab right now,
+--   both unlocked, one battle at a time per player, battles.cooldownSeconds between challenges, battles.perHour
+--   accepted battles per hour. Open for battles.challengeSeconds. Nothing is paid yet.
+-- * respond_nexamon_battle(p_request_id, p_battle_id, p_accept): the challenged friend says yes or no. Yes: both pay
+--   one pack of the set (cash -> households, as buy_nexamon_pack), both packs are opened at once with the same pull
+--   rules (nexamon_open_pack, every copy counts for the population), the higher total value at pull time wins
+--   (tie: rarest single card, then coin_seed % 2 = 0 for the challenger; decideBattle). The winner owns all copies at
+--   once; the loser keeps nothing. If the challenger cannot pay any more, the battle is aborted and nobody pays
+--   (both payments happen in one transaction with the pulls: a battle never stops between paying and pulling).
+--   The result stands even if somebody closes the page during the reveal.
+-- * cancel_nexamon_battle(p_request_id, p_battle_id): the challenger takes an open challenge back.
+-- * get_nexamon_battle(p_battle_id): the players and anyone watching see the pulls slot by slot from the shared start
+--   (nexamon_battle_json); the battle is a live opening for spectators.
+-- If public.nexamon_bonus_recompute(uuid) exists (card account bonuses), it runs for both players after the transfer.
+-- Errors: nexamon_locked, invalid_argument, nexamon_unknown, nexamon_battle_*, insufficient_funds, rate_limited.
+-- Idempotent: runs unchanged as supabase/updates/20261204006320_nexamon_battles.sql.
 
-insert into public.lifestyle_items (key, title, description, icon_key, price_cents, upkeep_cents_per_quarter, reputation_bonus, sort_order) values
-  ('rolex',     'Rolex',        'Eine Uhr, die mehr kostet als dein erstes Depot. Wartung inklusive.',                      'lifestyle_rolex',           2500000,      5000, 0, 1),
-  ('porsche',   'Porsche',      'Sportwagen mit Versicherung, Garage und Spritkosten.',                                     'lifestyle_porsche',        15000000,     75000, 0, 2),
-  ('penthouse', 'Penthouse',    'Wohnen über den Dächern der Stadt. Macht Eindruck bei Investoren: +5 % Reputation.',       'lifestyle_penthouse',     150000000,    600000, 5, 3),
-  ('jet',       'Privatjet',    'Nie wieder Economy. Crew, Hangar und Kerosin gehen ins Geld.',                             'lifestyle_jet',          2000000000,  15000000, 0, 4),
-  ('island',    'Eigene Insel', 'Dein privates Paradies. Der Unterhalt ist so groß wie die Aussicht.',                      'lifestyle_island',      10000000000,  60000000, 0, 5)
-on conflict (key) do nothing;
+create or replace function public.nexamon_battle_busy(p_player uuid, p_now timestamptz)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (select 1 from public.nexamon_battles b
+                  where p_player in (b.challenger_id, b.opponent_id)
+                    and ((b.status = 'pending' and b.expires_at > p_now) or (b.status = 'accepted' and b.ends_at > p_now)));
+$$;
 
--- ---------------------------------------------------------------------------
--- 12. Random events (spec 11.4) and macro events (spec 5.5). Internal params.
--- ---------------------------------------------------------------------------
-insert into public.random_event_definitions (key, title, description, icon_key, effect, params, weight, min_level, cooldown_hours, requires_choice) values
-  ('inheritance',   'Erbschaft',                 'Eine entfernte Tante hat dir etwas hinterlassen: +5.000 €.',                              'event_inheritance', 'cash_fixed',   '{"amountCents": 500000}',                       40, 1, 72, false),
-  ('tax_audit',     'Steuerprüfung',             'Das Finanzamt hat nachgerechnet: −3 % deines Bargelds.',                                  'event_tax_audit',   'cash_percent', '{"bps": -300, "maxCents": 50000000}',           40, 3, 72, false),
-  ('headhunter',    'Headhunter ruft an',        'Ein Headhunter bietet dir einen Jobwechsel mit +30 % Gehalt an.',                         'event_headhunter',  'salary_offer', '{"raiseBps": 3000, "validHours": 12}',          30, 5, 96, true),
-  ('golf_tip',      'Tipp aus dem Golfclub',     'Jemand flüstert dir zu, welche Aktie bald steigen soll. Ob das stimmt?',                  'event_golf_tip',    'market_tip',   '{"accuracyBps": 6000, "horizonHours": 6}',      35, 7, 48, false),
-  ('found_wallet',  'Fundsache',                 'Du findest eine Geldbörse und bekommst Finderlohn: +250 €.',                              'event_wallet',      'cash_fixed',   '{"amountCents": 25000}',                        60, 1, 24, false),
-  ('parking_ticket','Strafzettel',               'Falsch geparkt vor der Börse: −60 €.',                                                    'event_ticket',      'cash_fixed',   '{"amountCents": -6000}',                        50, 1, 24, false),
-  ('seminar',       'Fachvortrag',               'Du besuchst einen Vortrag über Bilanzanalyse und lernst dazu: +150 XP.',                  'event_seminar',     'xp',           '{"xp": 150}',                                   45, 2, 48, false)
-on conflict (key) do nothing;
+create or replace function public.nexamon_battles_last_hour(p_player uuid, p_now timestamptz)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select count(*)::integer from public.nexamon_battles b
+   where p_player in (b.challenger_id, b.opponent_id) and b.status = 'accepted' and b.accepted_at > p_now - interval '1 hour';
+$$;
 
-insert into public.macro_event_definitions (key, kind, title, description, icon_key, effects, weight, duration_quarters) values
-  ('sector_crisis',  'sector_crisis',   'Branchenkrise',    'Die Branche {sector} gerät unter Druck: Nachfrage und Stimmung brechen ein.',   'macro_crisis',    '{"target": "random_sector", "demandFactor": 0.8, "sentiment": -0.5}',                                   30, 2),
-  ('oil_shock',      'commodity_shock', 'Rohstoffschock',   'Der Ölpreis springt nach oben. Energiewerte profitieren, Logistik leidet.',     'macro_oil',       '{"indicator": "oil_price", "change": 0.3, "sectors": {"energy": 0.4, "logistics": -0.4}}',            25, 2),
-  ('oil_glut',       'commodity_shock', 'Ölschwemme',       'Der Ölpreis fällt deutlich. Logistik atmet auf, Energiewerte geben nach.',      'macro_oil',       '{"indicator": "oil_price", "change": -0.25, "sectors": {"energy": -0.35, "logistics": 0.3}}',         20, 2),
-  ('recession',      'recession',       'Konjunkturdelle',  'Die Wirtschaft kühlt ab. Die Nachfrage sinkt in allen Branchen.',               'macro_recession', '{"indicator": "business_cycle", "change": -0.1, "demandFactor": 0.9, "sentiment": -0.3}',             15, 3),
-  ('tech_boom',      'tech_boom',       'Tech-Boom',        'Technologiewerte sind gefragt wie nie. Die Branche wächst sprunghaft.',         'macro_boom',      '{"sectors": {"tech": 0.6}, "demandFactor": 1.25, "sentiment": 0.5}',                                  20, 2)
-on conflict (key) do nothing;
+create or replace function public.nexamon_rarity_rank(p_rarity text)
+returns integer
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce(array_position(array['common', 'rare', 'ultra', 'prisma', 'legendary'], p_rarity), 0) - 1;
+$$;
 
--- ---------------------------------------------------------------------------
--- 13. News templates (variables in {braces}). Internal.
--- ---------------------------------------------------------------------------
-insert into public.news_templates (key, category, headline_template, body_template, sentiment, importance) values
-  ('earnings_beat',      'earnings',     '{company} übertrifft die Erwartungen',                  '{company} meldet {revenue} Umsatz und {profit} Gewinn im {quarter}. Analysten hatten weniger erwartet.',      0.6, 2),
-  ('earnings_miss',      'earnings',     '{company} enttäuscht mit Quartalszahlen',               '{company} verfehlt im {quarter} die Prognosen: {revenue} Umsatz, {profit} Ergebnis.',                         -0.6, 2),
-  ('earnings_inline',    'earnings',     '{company} liefert solide Zahlen',                       '{company} erreicht im {quarter} {revenue} Umsatz und liegt damit im Rahmen der Erwartungen.',                 0.1, 1),
-  ('rate_hike',          'central_bank', 'Zentralbank erhöht den Leitzins auf {rate}',            'Die Währungshüter reagieren auf die wachsende Geldmenge. Anleihen werden attraktiver, Aktien geraten unter Druck.', -0.4, 3),
-  ('rate_cut',           'central_bank', 'Zentralbank senkt den Leitzins auf {rate}',             'Billigeres Geld soll die Wirtschaft ankurbeln. An der Börse kommt das gut an.',                                0.4, 3),
-  ('rate_hold',          'central_bank', 'Leitzins bleibt bei {rate}',                            'Die Zentralbank sieht keinen Handlungsbedarf.',                                                                 0.0, 1),
-  ('trial_success',      'company',      'Durchbruch bei {company}: Studie erfolgreich',          'Der Wirkstoffkandidat von {company} erreicht alle Studienziele. Die Zulassung rückt näher.',                    0.9, 3),
-  ('trial_failure',      'company',      'Rückschlag für {company}: Studie gescheitert',          'Die entscheidende Studie von {company} verfehlt ihr Ziel. Anleger reagieren geschockt.',                       -0.9, 3),
-  ('oil_report_up',      'commodity',    'Ölpreis steigt auf {price}',                            'Der Ölpreis-Report zeigt knappe Lager. Energieversorger profitieren, Logistiker zahlen drauf.',                 0.0, 2),
-  ('oil_report_down',    'commodity',    'Ölpreis fällt auf {price}',                             'Volle Lager drücken den Preis. Gut für Logistik, schlecht für Energiewerte.',                                   0.0, 2),
-  ('ipo_announced',      'ipo',          '{company} will an die Börse',                           '{founder} bringt {company} an die NEXA. Preisspanne: {low} bis {high} je Aktie.',                               0.3, 2),
-  ('ipo_success',        'ipo',          '{company} feiert Börsendebüt',                          'Die Aktie von {company} startet zu {price}. Das Orderbuch war {coverage}-fach überzeichnet.',                   0.5, 3),
-  ('ipo_failed',         'ipo',          'Börsengang von {company} geplatzt',                     'Zu wenig Nachfrage: {company} sagt den Börsengang ab.',                                                        -0.5, 2),
-  ('index_inclusion',    'index',        '{company} steigt in den NEXA 30 auf',                   'Indexfonds müssen die Aktie von {company} jetzt kaufen.',                                                       0.7, 3),
-  ('insolvency',         'company',      '{company} meldet Insolvenz an',                         'Die laufenden Kosten waren zwei Quartale lang nicht gedeckt. Die Aktie stürzt ab.',                            -1.0, 3),
-  ('insider_fine',       'regulator',    'Finanzaufsicht bestraft Insiderhandel bei {company}',   '{player} hat im Sperrfenster gehandelt und muss {fine} Strafe zahlen.',                                        -0.2, 2),
-  ('opening_bell',       'market',       'Die Börse ist eröffnet',                                'Handelsstart an der NEXA. In der ersten Stunde gibt es den Eröffnungsbonus.',                                   0.0, 1),
-  ('closing_bell',       'market',       'Schlussglocke an der NEXA',                             'Der Haupthandel ist beendet. Nachbörslich sind die Spreads größer.',                                            0.0, 1)
-on conflict (key) do nothing;
+-- Who wins (decideBattle): the higher total value, then the rarest single card, then the coin (even seed: challenger)
+create or replace function public.nexamon_battle_decide(p_challenger jsonb, p_opponent jsonb, p_seed bigint)
+returns jsonb
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_csum  bigint;
+  v_osum  bigint;
+  v_crank integer;
+  v_orank integer;
+begin
+  select coalesce(sum((x ->> 'value_cents')::bigint), 0), coalesce(max(public.nexamon_rarity_rank(x ->> 'rarity')), -1)
+    into v_csum, v_crank from jsonb_array_elements(coalesce(p_challenger, '[]'::jsonb)) x;
+  select coalesce(sum((x ->> 'value_cents')::bigint), 0), coalesce(max(public.nexamon_rarity_rank(x ->> 'rarity')), -1)
+    into v_osum, v_orank from jsonb_array_elements(coalesce(p_opponent, '[]'::jsonb)) x;
+  return jsonb_build_object(
+    'challenger_cents', v_csum, 'opponent_cents', v_osum,
+    'tie_break', case when v_csum <> v_osum then 'value' when v_crank <> v_orank then 'rarest' else 'coin' end,
+    'winner', case when v_csum <> v_osum then case when v_csum > v_osum then 'challenger' else 'opponent' end
+                   when v_crank <> v_orank then case when v_crank > v_orank then 'challenger' else 'opponent' end
+                   when abs(coalesce(p_seed, 0)) % 2 = 0 then 'challenger' else 'opponent' end);
+end;
+$$;
 
--- ---------------------------------------------------------------------------
--- 14. Notification types (each can be switched off individually, spec 11.6)
--- ---------------------------------------------------------------------------
-insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory, sort_order) values
-  ('vault_full',           'income',   'Tresor voll',                 'Dein Tresor ist voll. Weiteres Grundeinkommen verfällt.',           'notif_vault',     true, true,  false,  10),
-  ('salary_paid',          'income',   'Gehalt eingegangen',          'Dein Gehalt wurde gutgeschrieben.',                                 'notif_salary',    true, false, false,  20),
-  ('order_filled',         'trading',  'Order ausgeführt',            'Eine deiner Orders wurde ausgeführt.',                              'notif_order',     true, false, false,  30),
-  ('order_cancelled',      'trading',  'Order beendet',               'Eine Order ist abgelaufen oder wurde abgelehnt.',                   'notif_order',     true, false, false,  40),
-  ('margin_warning',       'trading',  'Margin-Warnung',              'Eine Hebelposition nähert sich dem Liquidationspreis.',             'notif_warning',   true, true,  false,  50),
-  ('margin_call',          'trading',  'Margin Call',                 'Deine Position steht kurz vor der Liquidation.',                    'notif_alarm',     true, true,  true,   60),
-  ('liquidation',          'trading',  'Position liquidiert',         'Eine Position wurde automatisch aufgelöst.',                        'notif_skull',     true, true,  true,   70),
-  ('dividend_received',    'trading',  'Dividende erhalten',          'Eine Dividende oder ein Kupon wurde ausgezahlt.',                   'notif_dividend',  true, false, false,  80),
-  ('earnings_own_stocks',  'market',   'Quartalszahlen',              'Ein Unternehmen aus deinem Depot hat Zahlen veröffentlicht.',       'notif_report',    true, true,  false,  90),
-  ('event_starting',       'market',   'Event startet',               'Ein angekündigtes Event beginnt in Kürze.',                         'notif_clock',     true, true,  false, 100),
-  ('watchlist_move',       'market',   'Watchlist-Bewegung',          'Eine Aktie deiner Watchlist bewegt sich stark.',                    'notif_chart',     true, false, false, 110),
-  ('job_offer',            'career',   'Jobangebot',                  'Du hast ein Jobangebot erhalten.',                                  'notif_briefcase', true, true,  false, 120),
-  ('work_task_available',  'career',   'Neue Arbeitsaufgabe',         'Eine neue Arbeitsaufgabe wartet auf dich.',                         'notif_task',      true, false, false, 130),
-  ('promotion',            'career',   'Beförderung',                 'Du wurdest befördert.',                                             'notif_promotion', true, false, false, 140),
-  ('level_up',             'progress', 'Level-up',                    'Du hast ein neues Level erreicht.',                                 'notif_level',     true, false, false, 150),
-  ('achievement_unlocked', 'progress', 'Erfolg freigeschaltet',       'Du hast einen Erfolg freigeschaltet.',                              'notif_trophy',    true, false, false, 160),
-  ('mission_completed',    'progress', 'Mission abgeschlossen',       'Eine Mission ist erfüllt. Hol dir die Belohnung ab.',               'notif_mission',   true, false, false, 170),
-  ('streak_at_risk',       'progress', 'Login-Serie in Gefahr',       'Logge dich heute noch ein, um deine Serie zu halten.',              'notif_flame',     true, false, false, 180),
-  ('random_event',         'progress', 'Zufallsereignis',             'Dir ist etwas Unerwartetes passiert.',                              'notif_dice',      true, false, false, 190),
-  ('company_quarter',      'company',  'Quartalsabschluss',           'Das Quartal deiner Firma wurde abgeschlossen.',                     'notif_company',   true, false, false, 200),
-  ('insolvency_warning',   'company',  'Insolvenzgefahr',             'Deine Firma konnte die laufenden Kosten nicht decken.',             'notif_alarm',     true, true,  true,  210),
-  ('angel_offer',          'company',  'Business-Angel-Angebot',      'Es gibt ein neues Beteiligungsangebot.',                            'notif_angel',     true, false, false, 220),
-  ('ipo_update',           'company',  'Börsengang',                  'Neuigkeiten zu einem Börsengang, an dem du beteiligt bist.',        'notif_bell',      true, false, false, 230),
-  ('takeover_offer',       'company',  'Übernahmeangebot',            'Für deine Firma liegt ein Übernahmeangebot vor.',                   'notif_takeover',  true, false, false, 240),
-  ('shareholder_vote',     'company',  'Hauptversammlung',            'Eine Abstimmung, bei der du stimmberechtigt bist, wurde eröffnet.', 'notif_vote',      true, false, false, 250),
-  ('regulator_fine',       'company',  'Strafe der Finanzaufsicht',   'Die Finanzaufsicht hat eine Strafe gegen dich verhängt.',           'notif_gavel',     true, false, true,  260),
-  ('friend_request',       'social',   'Freundschaftsanfrage',        'Jemand möchte mit dir befreundet sein.',                            'notif_friend',    true, false, false, 270),
-  ('friend_activity',      'social',   'Aktivität von Freunden',      'Ein Freund hat etwas Bemerkenswertes geschafft.',                   'notif_feed',      true, false, false, 280),
-  ('league_result',        'social',   'Liga-Ergebnis',               'Die Wochenliga ist ausgewertet.',                                   'notif_trophy',    true, false, false, 290),
-  ('system',               'system',   'Systemmeldung',               'Wichtige Hinweise zum Spielbetrieb.',                               'notif_info',      true, false, true,  300)
-on conflict (key) do nothing;
+create or replace function public.challenge_nexamon_battle(p_request_id uuid, p_nickname text, p_set text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.nexamon_cfg();
+  v_player uuid;
+  v_other  uuid;
+  v_replay jsonb;
+  v_now    timestamptz := public.game_now();
+  v_price  bigint;
+  v_last   timestamptz;
+  b        public.nexamon_battles;
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  if p_request_id is null or p_nickname is null or p_set is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'challenge_nexamon_battle');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_price := (cfg #>> array['sets', p_set, 'packPriceCents'])::bigint;
+  if v_price is null or v_price < 0 or not exists (select 1 from public.nexamon_cards k where k.set_key = p_set and k.in_catalogue) then
+    perform public.api_error('nexamon_unknown');
+  end if;
+  select p.id into v_other from public.profiles p where lower(p.nickname) = lower(p_nickname) and not p.is_deactivated;
+  if v_other is null then
+    perform public.api_error('nexamon_battle_unknown');
+  end if;
+  if v_other = v_player then
+    perform public.api_error('nexamon_battle_self');
+  end if;
+  if not exists (select 1 from public.friendships f
+                  where f.status = 'accepted'
+                    and ((f.requester_id = v_player and f.addressee_id = v_other) or (f.requester_id = v_other and f.addressee_id = v_player))) then
+    perform public.api_error('nexamon_battle_not_friend');
+  end if;
+  if not public.nexamon_unlocked(v_other) then
+    perform public.api_error('nexamon_battle_opponent_locked');
+  end if;
+  if not public.nexamon_on_tab(v_other, v_now) then
+    perform public.api_error('nexamon_battle_not_here');
+  end if;
+  -- one battle at a time: the two players' rows are locked in a fixed order
+  perform 1 from public.profiles p where p.id in (v_player, v_other) order by p.id for update;
+  update public.nexamon_battles set status = 'expired', responded_at = expires_at
+   where status = 'pending' and expires_at <= v_now and (challenger_id in (v_player, v_other) or opponent_id in (v_player, v_other));
+  if public.nexamon_battle_busy(v_player, v_now) or public.nexamon_battle_busy(v_other, v_now) then
+    perform public.api_error('nexamon_battle_busy');
+  end if;
+  select max(x.created_at) into v_last from public.nexamon_battles x where x.challenger_id = v_player;
+  if v_last is not null and v_last > v_now - make_interval(secs => coalesce((cfg #>> '{battles,cooldownSeconds}')::integer, 20)) then
+    perform public.api_error('nexamon_battle_cooldown');
+  end if;
+  if public.nexamon_battles_last_hour(v_player, v_now) >= coalesce((cfg #>> '{battles,perHour}')::integer, 6)
+     or public.nexamon_battles_last_hour(v_other, v_now) >= coalesce((cfg #>> '{battles,perHour}')::integer, 6) then
+    perform public.api_error('nexamon_battle_limit');
+  end if;
+  if public.lock_player_accounts(v_player) < v_price then
+    perform public.api_error('insufficient_funds');
+  end if;
+  insert into public.nexamon_battles (challenger_id, opponent_id, set_key, price_cents, created_at, expires_at)
+  values (v_player, v_other, p_set, v_price, v_now,
+          v_now + make_interval(secs => coalesce((cfg #>> '{battles,challengeSeconds}')::integer, 60)))
+  returning * into b;
+  perform public.social_notify(v_other, 'nexamon_battle', 'Pack Battle!',
+    (select p.nickname from public.profiles p where p.id = v_player) || ' fordert dich zum Pack Battle heraus: '
+      || coalesce(cfg #>> array['sets', p_set, 'name'], p_set) || ', je ein Pack für ' || public.format_eur(v_price) || '.',
+    jsonb_build_object('battle_id', b.id, 'set', p_set, 'price_cents', v_price),
+    '/nexamon?battle=' || b.id::text, 'nexamon:battle:challenge:' || b.id::text);
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('battle', public.nexamon_battle_json(b, v_player, v_now)));
+end;
+$$;
+comment on function public.challenge_nexamon_battle(uuid, text, text) is
+  'RPC (ADR-172): challenges a friend who is on the Collectibles tab to a Pack Battle with one pack of a set; returns '
+  '{battle}. Errors nexamon_locked, invalid_argument, nexamon_unknown, nexamon_battle_unknown, nexamon_battle_self, '
+  'nexamon_battle_not_friend, nexamon_battle_opponent_locked, nexamon_battle_not_here, nexamon_battle_busy, '
+  'nexamon_battle_cooldown, nexamon_battle_limit, insufficient_funds.';
 
--- ---------------------------------------------------------------------------
--- 15. Employee traits, work task types
--- ---------------------------------------------------------------------------
-insert into public.employee_traits (key, name, description, effects) values
-  ('ambitious',     'Ehrgeizig',       '+15 % Leistung, kündigt bei Gehaltsstopp schneller.',                  '{"productivity": 1.15, "raiseExpectation": 1.5}'),
-  ('loyal',         'Loyal',           'Bleibt auch in schlechten Zeiten. Lässt sich kaum abwerben.',          '{"loyaltyDecay": 0.5, "poachResistance": 1.5}'),
-  ('creative',      'Kreativ',         'Bringt die Produktqualität schneller voran.',                          '{"qualityGain": 1.2}'),
-  ('frugal',        'Genügsam',        'Gibt sich mit weniger Gehalt zufrieden.',                              '{"salaryExpectation": 0.9}'),
-  ('mentor',        'Mentor',          'Verkürzt die Einarbeitungszeit neuer Kollegen der Abteilung.',         '{"onboardingSpeed": 1.5}'),
-  ('perfectionist', 'Perfektionist',   'Höhere Qualität, aber langsamere Ergebnisse.',                         '{"qualityGain": 1.25, "productivity": 0.9}'),
-  ('networker',     'Netzwerker',      'Steigert die Bekanntheit, wechselt aber gern den Arbeitgeber.',        '{"awarenessGain": 1.15, "loyaltyDecay": 1.3}'),
-  ('steady',        'Zuverlässig',     'Keine Überraschungen: konstante Leistung, selten krank.',              '{"productivityVariance": 0.5}')
-on conflict (key) do nothing;
+-- One side of an accepted battle: pays the pack and opens it in the player's name (is_new, feed, missions)
+create or replace function public.nexamon_battle_pull(b public.nexamon_battles, p_player uuid, p_now timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.nexamon_cfg();
+  v_cards jsonb;
+  r       record;
+begin
+  if b.price_cents > 0 then
+    perform public.ledger_transfer(public.ledger_player_account(p_player, 'player_cash'), public.ledger_system_account('households'),
+                                   b.price_cents, 'nexamon_pack', 'Pack Battle: ' || coalesce(cfg #>> array['sets', b.set_key, 'name'], b.set_key),
+                                   'nexamon_battle', b.id, 'nexamon:battle:' || b.id::text || ':' || p_player::text, p_player,
+                                   jsonb_build_object('set', b.set_key, 'price_cents', b.price_cents, 'battle_id', b.id));
+  end if;
+  v_cards := public.nexamon_open_pack(b.set_key, p_player, null, b.id, p_now);
+  perform public.mission_event(p_player, 'nexamon_pack', 1, null);
+  for r in select x ->> 'rarity' as rarity from jsonb_array_elements(v_cards) x loop
+    if r.rarity <> 'common' then
+      perform public.mission_event(p_player, 'nexamon_rare', 1, null);
+    end if;
+    if r.rarity in ('ultra', 'prisma', 'legendary') then
+      perform public.mission_event(p_player, 'nexamon_ultra', 1, null);
+    end if;
+  end loop;
+  return v_cards;
+end;
+$$;
 
-insert into public.work_task_definitions (key, task_kind, title, description, icon_key, min_tier, duration_seconds, xp_min, xp_max, bonus_bps_of_hourly, config) values
-  ('estimate_earnings', 'analyst_estimate', 'Quartalszahlen schätzen',  'Schätze den Umsatz eines Unternehmens im laufenden Quartal.',       'task_estimate', 'junior',    45, 50, 150, 7500, '{"toleranceBps": [500, 1500, 3000]}'),
-  ('pick_customer',     'sales_pick',       'Besten Kunden wählen',     'Wähle aus drei Kundenprofilen das vielversprechendste aus.',        'task_customer', 'intern',    30, 50, 150, 5000, '{"options": 3}'),
-  ('compare_loans',     'finance_choice',   'Kreditangebote vergleichen','Entscheide dich zwischen zwei Kreditangeboten für das günstigere.', 'task_loan',     'junior',    40, 50, 150, 6000, '{"options": 2}'),
-  ('sort_inbox',        'generic',          'Posteingang sortieren',    'Ordne eingehende Vorgänge der richtigen Abteilung zu.',             'task_inbox',    'intern',    20, 50, 120, 4000, '{"items": 5}'),
-  ('plan_campaign',     'sales_pick',       'Kampagne auswählen',       'Wähle die Marketingkampagne mit dem besten Verhältnis aus Kosten und Reichweite.', 'task_campaign', 'team_lead', 50, 80, 150, 8000, '{"options": 3}'),
-  ('liquidity_check',   'finance_choice',   'Liquidität prüfen',        'Entscheide, ob die Firma einen Kredit aufnehmen oder Rücklagen nutzen sollte.',    'task_liquidity','c_level',   60, 80, 150, 10000, '{"options": 2}')
-on conflict (key) do nothing;
+create or replace function public.respond_nexamon_battle(p_request_id uuid, p_battle_id uuid, p_accept boolean)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.nexamon_cfg();
+  v_player uuid;
+  v_replay jsonb;
+  v_now    timestamptz := public.game_now();
+  b        public.nexamon_battles;
+  v_ccash  bigint;
+  v_ocash  bigint;
+  v_ca     jsonb;
+  v_oa     jsonb;
+  v_csum   bigint;
+  v_osum   bigint;
+  v_seed   bigint;
+  v_dec    jsonb;
+  v_win    uuid;
+  v_lose   uuid;
+  v_tie    text;
+  v_names  text;
+  v_starts timestamptz;
+  v_decide timestamptz;
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  if p_request_id is null or p_battle_id is null or p_accept is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'respond_nexamon_battle');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into b from public.nexamon_battles x where x.id = p_battle_id for update;
+  if b.id is null or v_player not in (b.challenger_id, b.opponent_id) then
+    perform public.api_error('nexamon_battle_unknown');
+  end if;
+  if v_player <> b.opponent_id then
+    perform public.api_error('nexamon_battle_not_yours');
+  end if;
+  if b.status = 'pending' and b.expires_at <= v_now then
+    update public.nexamon_battles set status = 'expired', responded_at = expires_at where id = b.id returning * into b;
+    return public.request_complete(v_player, p_request_id, jsonb_build_object('battle', public.nexamon_battle_json(b, v_player, v_now)));
+  end if;
+  if b.status <> 'pending' then
+    perform public.api_error('nexamon_battle_closed');
+  end if;
 
--- ---------------------------------------------------------------------------
--- 16. Job board of the AI companies (spec 8.2): 5 tiers, salary per hour
--- ---------------------------------------------------------------------------
-insert into public.job_definitions (key, company_id, tier, title, description, specialty, task_kind, min_level, salary_cents_per_hour, grants_options, has_decisions)
-select j.key, c.id, j.tier::public.job_tier, j.title, j.description, j.specialty::public.employee_specialty,
-       j.task_kind::public.work_task_kind, j.min_level, j.salary, false, j.has_decisions
-from (values
-  -- intern (level 2, ~150 EUR/h)
-  ('brz_intern_assistant',   'BRZ', 'intern',    'Assistenz im Filialbüro',        'Du unterstützt die Filialleitung bei Brotzeit Handel.',                      'sales',       'generic',           2,  15000, false),
-  ('fgd_intern_stock',       'FGD', 'intern',    'Aushilfe im Lager',              'Du sortierst Restposten bei Fundgrube Discount.',                            'production',  'generic',           2,  14000, false),
-  ('ebx_intern_sorting',     'EBX', 'intern',    'Praktikum Paketzentrum',         'Du hilfst im Paketzentrum von Eilbote Express.',                             'production',  'generic',           2,  14500, false),
-  ('pxw_intern_qa',          'PXW', 'intern',    'Praktikum Spieletest',           'Du testest neue Spiele bei Pixelwerk Studios und meldest Fehler.',           'development', 'generic',           2,  15500, false),
-  -- junior (level 5, ~300 EUR/h)
-  ('vlt_junior_analyst',     'VLT', 'junior',    'Junior-Analyst',                 'Du wertest Marktdaten für Volta Energie aus und schätzt Quartalszahlen.',    'finance',     'analyst_estimate',  5,  30000, false),
-  ('kfr_junior_buyer',       'KFR', 'junior',    'Junior-Einkäufer',               'Du wählst Sortimente für Kaufrausch Märkte aus.',                            'sales',       'sales_pick',        5,  29000, false),
-  ('alm_junior_lab',         'ALM', 'junior',    'Junior-Laborassistenz',          'Du dokumentierst Versuchsreihen bei Alpenmed.',                              'development', 'generic',           5,  30500, false),
-  ('ndl_junior_dispatcher',  'NDL', 'junior',    'Junior-Disponent',               'Du planst Touren für Nordlicht Logistik.',                                   'production',  'finance_choice',    5,  29500, false),
-  -- senior (level 12, ~700 EUR/h)
-  ('nph_senior_sales',       'NPH', 'senior',    'Senior Sales',                   'Du betreust die Großkunden von NeuroPharm.',                                 'sales',       'sales_pick',       12,  70000, false),
-  ('kls_senior_developer',   'KLS', 'senior',    'Senior-Entwickler',              'Du entwickelst die Cloud-Plattform von KlarSoft weiter.',                    'development', 'analyst_estimate', 12,  72000, false),
-  ('rkw_senior_controller',  'RKW', 'senior',    'Senior-Controller',              'Du prüfst Budgets und Finanzierungen bei Rheinkraft Werke.',                 'finance',     'finance_choice',   12,  68000, false),
-  ('brz_senior_category',    'BRZ', 'senior',    'Senior Category Manager',        'Du steuerst Preise und Aktionen ganzer Warengruppen bei Brotzeit Handel.',   'marketing',   'sales_pick',       12,  69000, false),
-  -- team lead (level 20, ~1300 EUR/h)
-  ('ndl_lead_sales',         'NDL', 'team_lead', 'Leitung Vertrieb',               'Du führst das Vertriebsteam von Nordlicht Logistik.',                        'sales',       'sales_pick',       20, 130000, false),
-  ('kls_lead_product',       'KLS', 'team_lead', 'Leitung Produktentwicklung',     'Du verantwortest die Produktplanung bei KlarSoft.',                          'development', 'analyst_estimate', 20, 135000, false),
-  ('vlt_lead_treasury',      'VLT', 'team_lead', 'Leitung Treasury',               'Du steuerst die Finanzmittel von Volta Energie.',                            'finance',     'finance_choice',   20, 128000, false),
-  -- c-level at the large AI companies (level 25, ~2500 EUR/h, real decisions)
-  ('nph_cfo',                'NPH', 'c_level',   'CFO',                            'Als Finanzvorstand von NeuroPharm verwaltest du Liquidität und Kredite.',    'finance',     'finance_choice',   25, 250000, true),
-  ('kls_cfo',                'KLS', 'c_level',   'CFO',                            'Als Finanzvorstand von KlarSoft verantwortest du Bilanz und Prognosen.',     'finance',     'finance_choice',   25, 255000, true),
-  ('vlt_cfo',                'VLT', 'c_level',   'CFO',                            'Als Finanzvorstand von Volta Energie sicherst du die Finanzierung der Kraftwerke.', 'finance', 'finance_choice', 25, 250000, true),
-  ('brz_coo',                'BRZ', 'c_level',   'COO',                            'Als operativer Vorstand von Brotzeit Handel führst du das Tagesgeschäft.',   'production',  'sales_pick',       25, 245000, true)
-) as j(key, ticker, tier, title, description, specialty, task_kind, min_level, salary, has_decisions)
-join public.companies c on c.ticker = j.ticker and c.is_ai
-on conflict (key) do nothing;
+  if not p_accept then
+    update public.nexamon_battles set status = 'declined', responded_at = v_now where id = b.id returning * into b;
+    perform public.social_notify(b.challenger_id, 'nexamon_battle', 'Pack Battle abgelehnt',
+      (select p.nickname from public.profiles p where p.id = b.opponent_id) || ' will gerade nicht battlen.',
+      jsonb_build_object('battle_id', b.id), '/nexamon', 'nexamon:battle:declined:' || b.id::text);
+    return public.request_complete(v_player, p_request_id, jsonb_build_object('battle', public.nexamon_battle_json(b, v_player, v_now)));
+  end if;
 
--- ---------------------------------------------------------------------------
--- 17. Invite codes for the closed alpha (ADR-010). Replace before going live.
--- ---------------------------------------------------------------------------
-insert into public.invite_codes (code, max_uses, note) values
-  ('NEXA-FREUNDE-2026', 8, 'Closed alpha: the four friends plus spare seats'),
-  ('NEXA-ADMIN-7Q4X',   2, 'Owner/admin accounts')
-on conflict (code) do nothing;
+  if public.nexamon_battles_last_hour(v_player, v_now) >= coalesce((cfg #>> '{battles,perHour}')::integer, 6)
+     or public.nexamon_battles_last_hour(b.challenger_id, v_now) >= coalesce((cfg #>> '{battles,perHour}')::integer, 6) then
+    perform public.api_error('nexamon_battle_limit');
+  end if;
+  perform public.nexamon_sync(v_now);
+  -- both accounts in a fixed order
+  if b.challenger_id < b.opponent_id then
+    v_ccash := public.lock_player_accounts(b.challenger_id);
+    v_ocash := public.lock_player_accounts(b.opponent_id);
+  else
+    v_ocash := public.lock_player_accounts(b.opponent_id);
+    v_ccash := public.lock_player_accounts(b.challenger_id);
+  end if;
+  if v_ocash < b.price_cents then
+    perform public.api_error('insufficient_funds');
+  end if;
+  if v_ccash < b.price_cents or not public.nexamon_unlocked(b.challenger_id) then
+    -- the challenger cannot pay any more: nobody pays, nothing is pulled
+    update public.nexamon_battles
+       set status = 'aborted', responded_at = v_now,
+           abort_reason = case when v_ccash < b.price_cents then 'challenger_funds' else 'challenger_locked' end
+     where id = b.id returning * into b;
+    perform public.social_notify(b.challenger_id, 'nexamon_battle', 'Pack Battle abgebrochen',
+      'Für das Pack Battle hat dein Geld nicht mehr gereicht. Niemand hat bezahlt.',
+      jsonb_build_object('battle_id', b.id), '/nexamon', 'nexamon:battle:aborted:' || b.id::text);
+    return public.request_complete(v_player, p_request_id, jsonb_build_object('battle', public.nexamon_battle_json(b, v_player, v_now)));
+  end if;
+
+  v_ca := public.nexamon_battle_pull(b, b.challenger_id, v_now);
+  v_oa := public.nexamon_battle_pull(b, b.opponent_id, v_now);
+  update public.nexamon_set_state set player_packs_opened = player_packs_opened + 2 where set_key = b.set_key;
+  v_seed := floor(random() * 2147483647)::bigint;
+  v_dec := public.nexamon_battle_decide(v_ca, v_oa, v_seed);
+  v_csum := (v_dec ->> 'challenger_cents')::bigint;
+  v_osum := (v_dec ->> 'opponent_cents')::bigint;
+  v_tie := v_dec ->> 'tie_break';
+  v_win := case when v_dec ->> 'winner' = 'challenger' then b.challenger_id else b.opponent_id end;
+  v_lose := case when v_win = b.challenger_id then b.opponent_id else b.challenger_id end;
+  -- the winner takes every copy of both packs; listings cannot exist yet
+  update public.nexamon_copies c set owner_id = v_win, acquired_at = v_now
+   where c.id in (select (x ->> 'copy_id')::uuid from jsonb_array_elements(v_ca || v_oa) x) and c.owner_id = v_lose;
+  if to_regprocedure('public.nexamon_bonus_recompute(uuid)') is not null then
+    execute 'select public.nexamon_bonus_recompute($1)' using v_win;
+    execute 'select public.nexamon_bonus_recompute($1)' using v_lose;
+  end if;
+
+  v_starts := v_now + public.nexamon_ms(coalesce((cfg #>> '{battles,startDelayMs}')::numeric, 3000));
+  v_decide := v_starts + public.nexamon_ms(coalesce((cfg #>> '{battles,tearMs}')::numeric, 2400)
+                                           + coalesce((cfg ->> 'packSize')::numeric, 5) * coalesce((cfg #>> '{battles,slotMs}')::numeric, 1800));
+  update public.nexamon_battles
+     set status = 'accepted', responded_at = v_now, accepted_at = v_now, starts_at = v_starts, decide_at = v_decide,
+         ends_at = v_decide + public.nexamon_ms(coalesce((cfg #>> '{battles,outroMs}')::numeric, 8000)),
+         challenger_cards = v_ca, opponent_cards = v_oa, challenger_cents = v_csum, opponent_cents = v_osum,
+         winner_id = v_win, tie_break = v_tie, coin_seed = v_seed
+   where id = b.id returning * into b;
+  insert into public.nexamon_live (player_id, kind, battle_id, set_key, started_at, ends_at)
+  values (b.challenger_id, 'battle', b.id, b.set_key, v_now, b.ends_at)
+  on conflict (battle_id) do nothing;
+
+  v_names := (select p.nickname from public.profiles p where p.id = b.challenger_id) || ' gegen '
+             || (select p.nickname from public.profiles p where p.id = b.opponent_id);
+  perform public.feed_post(v_win, 'nexamon_battle_won',
+                           jsonb_build_object('set', b.set_key, 'other', (select p.nickname from public.profiles p where p.id = v_lose),
+                                              'total_cents', v_csum + v_osum, 'cards', jsonb_array_length(v_ca) + jsonb_array_length(v_oa)),
+                           'nexamon:battle:won:' || b.id::text);
+  if v_csum + v_osum >= coalesce((cfg #>> '{battles,gossipMinCents}')::bigint, 500000) then
+    perform public.feed_post(v_win, 'nexamon_battle_big',
+                             jsonb_build_object('set', b.set_key, 'other', (select p.nickname from public.profiles p where p.id = v_lose),
+                                                'total_cents', v_csum + v_osum),
+                             'nexamon:battle:big:' || b.id::text);
+  end if;
+  perform public.social_notify(b.challenger_id, 'nexamon_battle', 'Pack Battle läuft', v_names || ': die Packs gehen auf!',
+    jsonb_build_object('battle_id', b.id), '/nexamon?battle=' || b.id::text, 'nexamon:battle:accepted:' || b.id::text);
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('battle', public.nexamon_battle_json(b, v_player, v_now)));
+end;
+$$;
+comment on function public.respond_nexamon_battle(uuid, uuid, boolean) is
+  'RPC (ADR-172): the challenged friend accepts (both pay one pack, both packs open at once, the higher total value '
+  'takes all copies) or declines a Pack Battle; returns {battle} (pulls only from the shared start). A challenger '
+  'without the money any more ends it as aborted, nobody pays. Errors nexamon_locked, invalid_argument, '
+  'nexamon_battle_unknown, nexamon_battle_not_yours, nexamon_battle_closed, nexamon_battle_limit, insufficient_funds.';
+
+create or replace function public.cancel_nexamon_battle(p_request_id uuid, p_battle_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  v_now    timestamptz := public.game_now();
+  b        public.nexamon_battles;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_battle_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'cancel_nexamon_battle');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into b from public.nexamon_battles x where x.id = p_battle_id for update;
+  if b.id is null or v_player not in (b.challenger_id, b.opponent_id) then
+    perform public.api_error('nexamon_battle_unknown');
+  end if;
+  if v_player <> b.challenger_id then
+    perform public.api_error('nexamon_battle_not_yours');
+  end if;
+  if b.status <> 'pending' then
+    perform public.api_error('nexamon_battle_closed');
+  end if;
+  update public.nexamon_battles set status = case when expires_at <= v_now then 'expired' else 'cancelled' end, responded_at = v_now
+   where id = b.id returning * into b;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('battle', public.nexamon_battle_json(b, v_player, v_now)));
+end;
+$$;
+comment on function public.cancel_nexamon_battle(uuid, uuid) is
+  'RPC (ADR-172): the challenger takes an open Pack Battle challenge back; returns {battle}. Errors invalid_argument, '
+  'nexamon_battle_unknown, nexamon_battle_not_yours, nexamon_battle_closed.';
+
+create or replace function public.get_nexamon_battle(p_battle_id uuid)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_now    timestamptz := public.game_now();
+  b        public.nexamon_battles;
+  l        public.nexamon_live;
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  select * into b from public.nexamon_battles x where x.id = p_battle_id;
+  if b.id is null then
+    perform public.api_error('nexamon_battle_unknown');
+  end if;
+  if v_player not in (b.challenger_id, b.opponent_id) then
+    -- spectators: only a battle that is (or was) live
+    select * into l from public.nexamon_live x where x.battle_id = b.id;
+    if l.id is null then
+      perform public.api_error('nexamon_battle_unknown');
+    end if;
+    if l.ends_at > v_now then
+      insert into public.nexamon_live_viewers (live_id, player_id, seen_at) values (l.id, v_player, v_now)
+      on conflict (live_id, player_id) do update set seen_at = excluded.seen_at;
+    end if;
+  end if;
+  return jsonb_build_object('battle', public.nexamon_battle_json(b, v_player, v_now));
+end;
+$$;
+comment on function public.get_nexamon_battle(uuid) is
+  'RPC (ADR-172): a Pack Battle for its players and spectators (counted as viewers): the pulls slot by slot from the '
+  'shared start, totals, the winner from decide_at; returns {battle}. Errors nexamon_locked, nexamon_battle_unknown.';
+
+do $do$
+declare
+  f text;
+begin
+  foreach f in array array['public.challenge_nexamon_battle(uuid, text, text)', 'public.respond_nexamon_battle(uuid, uuid, boolean)',
+                           'public.cancel_nexamon_battle(uuid, uuid)', 'public.get_nexamon_battle(uuid)'] loop
+    execute format('revoke all on function %s from public, anon', f);
+    execute format('grant execute on function %s to authenticated', f);
+  end loop;
+  foreach f in array array['public.nexamon_battle_busy(uuid, timestamptz)', 'public.nexamon_battles_last_hour(uuid, timestamptz)',
+                           'public.nexamon_battle_pull(public.nexamon_battles, uuid, timestamptz)',
+                           'public.nexamon_rarity_rank(text)', 'public.nexamon_battle_decide(jsonb, jsonb, bigint)'] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+  end loop;
+end;
+$do$;
+
+-- ===== supabase/migrations/20261204006330_nexamon_battle_news.sql =====
+-- =============================================================================
+-- NEXA · 6330 · Nexamon Pack Battles in the feed and as gossip for NEXA Nachrichten (ADR-172)
+-- =============================================================================
+-- * feed_item_label(): the kinds nexamon_battle_won (every win, for the friends) and nexamon_battle_big (a win of at
+--   least battles.gossipMinCents).
+-- * news_show_build(): nexamon_battle_big joins the gossip sources, next to nexamon_pull.
+-- Replace-patches anchored on the nexamon_pull kind; a clear error if the anchor is missing.
+-- Idempotent: runs unchanged as supabase/updates/20261204006330_nexamon_battle_news.sql.
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.feed_item_label(text, jsonb)'::regprocedure);
+  v_old text := $t$    when 'nexamon_pull' then$t$;
+  v_new text := $t$    when 'nexamon_battle_won' then 'Pack Battle gegen ' || coalesce(p_payload ->> 'other', '?') || ' gewonnen'
+    when 'nexamon_battle_big' then 'Großer Sieg im Pack Battle gegen ' || coalesce(p_payload ->> 'other', '?') || ': '
+      || public.format_eur(coalesce((p_payload ->> 'total_cents')::bigint, 0)) || ' an Karten abgeräumt'
+    when 'nexamon_pull' then$t$;
+begin
+  if position('nexamon_battle_big' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'feed_item_label() has an unexpected shape; add the feed kinds nexamon_battle_won/_big (ADR-172) by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.news_show_build(timestamptz)'::regprocedure);
+  v_old text := $t$'nexamon_pull',$t$;
+  v_new text := $t$'nexamon_pull', 'nexamon_battle_big',$t$;
+begin
+  if position('nexamon_battle_big' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'news_show_build() has an unexpected shape; add the feed kind nexamon_battle_big (ADR-172) to the gossip source by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
 
 commit;

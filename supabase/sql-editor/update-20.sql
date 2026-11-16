@@ -1414,4 +1414,1045 @@ begin
 end;
 $do$;
 
+-- ===== supabase/updates/20261204006300_nexamon_battles_schema.sql =====
+-- ===== idempotent copy of migrations/20261204006300_nexamon_battles_schema.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- =============================================================================
+-- NEXA · 6300 · Nexamon Pack Battles and live openings: error keys, notifications, tables (ADR-172)
+-- =============================================================================
+-- Rules: game_config.nexamon.presence, .battles, .live (src/config/nexamon-rules.ts; src/lib/sim/nexamon-battle.ts).
+-- Tables (internal, RLS on, no grants: read and written only by the functions of 6310 and 6320):
+--   nexamon_presence        who is on the Collectibles tab (seen_at) and whether others may watch their packs
+--   nexamon_battles         one Pack Battle: challenge, accept, both pulls, totals, winner, tie-break, coin seed
+--   nexamon_live            a live opening (a bought pack or a battle) while it is revealed
+--   nexamon_live_viewers    who watches a live opening (seen_at)
+--   nexamon_live_reactions  emoji bursts of the spectators
+-- Errors: nexamon_battle_unknown NX240, nexamon_battle_not_friend NX241, nexamon_battle_not_here NX242,
+--   nexamon_battle_busy NX243, nexamon_battle_limit NX244, nexamon_battle_cooldown NX245, nexamon_battle_closed NX246,
+--   nexamon_battle_self NX247, nexamon_battle_opponent_locked NX248, nexamon_live_unknown NX249,
+--   nexamon_battle_not_yours NX250.
+-- Idempotent: runs unchanged as supabase/updates/20261204006300_nexamon_battles_schema.sql.
+
+do $do$
+declare
+  v_def    text := pg_get_functiondef('public.api_error(text)'::regprocedure);
+  v_anchor text := $q$    when 'nexamon_grading_limit'      then 'NX175'
+$q$;
+begin
+  if position('''nexamon_battle_not_yours''' in v_def) = 0 then
+    if position(v_anchor in v_def) = 0 then
+      raise exception 'api_error() has an unexpected shape; add the Pack Battle error keys (ADR-172) by hand';
+    end if;
+    v_def := replace(v_def, v_anchor, v_anchor || $q$    when 'nexamon_battle_unknown'     then 'NX240'
+    when 'nexamon_battle_not_friend'  then 'NX241'
+    when 'nexamon_battle_not_here'    then 'NX242'
+    when 'nexamon_battle_busy'        then 'NX243'
+    when 'nexamon_battle_limit'       then 'NX244'
+    when 'nexamon_battle_cooldown'    then 'NX245'
+    when 'nexamon_battle_closed'      then 'NX246'
+    when 'nexamon_battle_self'        then 'NX247'
+    when 'nexamon_battle_opponent_locked' then 'NX248'
+    when 'nexamon_live_unknown'       then 'NX249'
+    when 'nexamon_battle_not_yours'   then 'NX250'
+$q$);
+    execute v_def;
+  end if;
+end;
+$do$;
+
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('nexamon_battle', 'social', 'Pack Battle', 'Ein Freund fordert dich zum Pack Battle heraus, oder ein Battle ist entschieden.',
+        'notif_bell', true, true, false, 301)
+on conflict (key) do nothing;
+
+create table if not exists public.nexamon_presence (
+  player_id   uuid primary key references public.profiles (id) on delete cascade,
+  seen_at     timestamptz not null default now(),
+  allow_watch boolean not null default true
+);
+create index if not exists nexamon_presence_seen_idx on public.nexamon_presence (seen_at desc);
+alter table public.nexamon_presence enable row level security;
+revoke all on public.nexamon_presence from public, anon, authenticated;
+grant all on public.nexamon_presence to service_role;
+comment on table public.nexamon_presence is
+  'Who is on the Collectibles tab (ADR-172): seen_at of the last nexamon_lobby() call, allow_watch = others may watch '
+  'the player''s packs live (setting "Andere dürfen beim Öffnen zuschauen"). Internal.';
+
+create table if not exists public.nexamon_battles (
+  id                uuid primary key default gen_random_uuid(),
+  challenger_id     uuid not null references public.profiles (id) on delete cascade,
+  opponent_id       uuid not null references public.profiles (id) on delete cascade,
+  set_key           text not null,
+  status            text not null default 'pending'
+                      check (status in ('pending', 'declined', 'expired', 'cancelled', 'aborted', 'accepted')),
+  price_cents       bigint not null check (price_cents >= 0),
+  created_at        timestamptz not null default now(),
+  expires_at        timestamptz not null,
+  responded_at      timestamptz,
+  accepted_at       timestamptz,
+  starts_at         timestamptz,
+  decide_at         timestamptz,
+  ends_at           timestamptz,
+  challenger_cards  jsonb,
+  opponent_cards    jsonb,
+  challenger_cents  bigint,
+  opponent_cents    bigint,
+  winner_id         uuid references public.profiles (id) on delete set null,
+  tie_break         text check (tie_break is null or tie_break in ('value', 'rarest', 'coin')),
+  coin_seed         bigint,
+  abort_reason      text,
+  constraint nexamon_battles_two check (challenger_id <> opponent_id)
+);
+create index if not exists nexamon_battles_challenger_idx on public.nexamon_battles (challenger_id, created_at desc);
+create index if not exists nexamon_battles_opponent_idx on public.nexamon_battles (opponent_id, created_at desc);
+create index if not exists nexamon_battles_winner_idx on public.nexamon_battles (winner_id) where winner_id is not null;
+create index if not exists nexamon_battles_open_idx on public.nexamon_battles (status, expires_at) where status = 'pending';
+alter table public.nexamon_battles enable row level security;
+revoke all on public.nexamon_battles from public, anon, authenticated;
+grant all on public.nexamon_battles to service_role;
+comment on table public.nexamon_battles is
+  'Pack Battles (ADR-172): both players pay one pack of set_key at the accept, both packs are opened at once, the '
+  'higher total value at pull time (tie: rarest card, then coin_seed % 2 = 0 for the challenger) takes all copies. '
+  'The pulls are shown slot by slot from starts_at; nobody reads them earlier (get_nexamon_battle). Internal.';
+
+create table if not exists public.nexamon_live (
+  id          uuid primary key default gen_random_uuid(),
+  player_id   uuid not null references public.profiles (id) on delete cascade,
+  kind        text not null check (kind in ('pack', 'battle')),
+  pack_id     uuid unique,
+  battle_id   uuid unique references public.nexamon_battles (id) on delete cascade,
+  set_key     text not null,
+  cards       jsonb,
+  started_at  timestamptz not null,
+  ends_at     timestamptz not null,
+  progress    smallint not null default 0 check (progress between 0 and 10),
+  progress_at timestamptz
+);
+create index if not exists nexamon_live_ends_idx on public.nexamon_live (ends_at desc);
+create index if not exists nexamon_live_player_idx on public.nexamon_live (player_id, ends_at desc);
+alter table public.nexamon_live enable row level security;
+revoke all on public.nexamon_live from public, anon, authenticated;
+grant all on public.nexamon_live to service_role;
+comment on table public.nexamon_live is
+  'Live openings (ADR-172): a bought pack (kind pack, the pulls in cards, progress = cards the opener has seen) or a '
+  'Pack Battle (kind battle) while it is revealed. Spectators see only what the opener has seen. Internal.';
+
+create table if not exists public.nexamon_live_viewers (
+  live_id   uuid not null references public.nexamon_live (id) on delete cascade,
+  player_id uuid not null references public.profiles (id) on delete cascade,
+  seen_at   timestamptz not null default now(),
+  primary key (live_id, player_id)
+);
+create index if not exists nexamon_live_viewers_player_idx on public.nexamon_live_viewers (player_id);
+alter table public.nexamon_live_viewers enable row level security;
+revoke all on public.nexamon_live_viewers from public, anon, authenticated;
+grant all on public.nexamon_live_viewers to service_role;
+comment on table public.nexamon_live_viewers is 'Spectators of a live opening (ADR-172), seen_at of their last look. Internal.';
+
+create table if not exists public.nexamon_live_reactions (
+  id        bigserial primary key,
+  live_id   uuid not null references public.nexamon_live (id) on delete cascade,
+  player_id uuid not null references public.profiles (id) on delete cascade,
+  emoji     text not null check (char_length(emoji) between 1 and 8),
+  at        timestamptz not null default now()
+);
+create index if not exists nexamon_live_reactions_live_idx on public.nexamon_live_reactions (live_id, id desc);
+create index if not exists nexamon_live_reactions_player_idx on public.nexamon_live_reactions (player_id, at desc);
+alter table public.nexamon_live_reactions enable row level security;
+revoke all on public.nexamon_live_reactions from public, anon, authenticated;
+grant all on public.nexamon_live_reactions to service_role;
+comment on table public.nexamon_live_reactions is 'Emoji bursts of spectators of a live opening (ADR-172). Internal.';
+
+-- ===== supabase/updates/20261204006310_nexamon_lobby_live.sql =====
+-- ===== idempotent copy of migrations/20261204006310_nexamon_lobby_live.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- =============================================================================
+-- NEXA · 6310 · Nexamon: who is on the Collectibles tab, live openings and spectators (ADR-172)
+-- =============================================================================
+-- * nexamon_lobby(p_allow_watch): the Collectibles page asks every presence.pingSeconds. It marks the caller as on
+--   the tab (presence only, no game state: no request id, like last_active_at) and returns the friends on the tab as
+--   figures (nickname, level, avatar_key, accessories, opening, battling), the running live openings, the caller's
+--   open and running Pack Battles and the battle limits.
+-- * Every bought pack is a live opening (trigger on nexamon_packs) unless the opener switched watching off. The
+--   opener's page reports each card as it shows: nexamon_live_progress(p_pack_id, p_revealed) -> viewers, reactions.
+-- * get_nexamon_live(p_live_id): a spectator's view (counts them as a viewer): only the cards the opener has seen,
+--   after live.staleMs of silence one more every live.fallbackSlotMs (liveVisibleCards).
+-- * nexamon_live_react(p_request_id, p_live_id, p_emoji): an emoji burst (live.reactions, live.reactionsPerMinute).
+-- Errors: nexamon_locked, invalid_argument, nexamon_live_unknown, rate_limited.
+-- Idempotent: runs unchanged as supabase/updates/20261204006310_nexamon_lobby_live.sql.
+
+create or replace function public.nexamon_ms(p_ms numeric)
+returns interval
+language sql
+immutable
+set search_path = ''
+as $$
+  select make_interval(secs => coalesce(p_ms, 0) / 1000.0);
+$$;
+
+-- A player as a figure on the tab: name, level, portrait and worn accessories
+create or replace function public.nexamon_figure_json(p_player uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object('nickname', p.nickname, 'level', p.level, 'avatar_key', p.avatar_key,
+                            'accessories', public.player_worn_accessories(p.id))
+    from public.profiles p where p.id = p_player;
+$$;
+
+create or replace function public.nexamon_on_tab(p_player uuid, p_now timestamptz)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (select 1 from public.nexamon_presence x
+                  where x.player_id = p_player
+                    and x.seen_at > p_now - make_interval(secs => coalesce((public.nexamon_cfg() #>> '{presence,presenceSeconds}')::integer, 60)));
+$$;
+
+-- How many cards of a live pack a spectator may see at p_now (liveVisibleCards)
+create or replace function public.nexamon_live_visible(l public.nexamon_live, p_now timestamptz)
+returns integer
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.nexamon_cfg();
+  v_size   integer := coalesce((cfg ->> 'packSize')::integer, 5);
+  v_silent numeric;
+  v_extra  integer := 0;
+begin
+  v_silent := extract(epoch from (p_now - coalesce(l.progress_at, l.started_at))) * 1000
+              - coalesce((cfg #>> '{live,staleMs}')::numeric, 10000);
+  if v_silent >= 0 then
+    v_extra := floor(v_silent / greatest(1, coalesce((cfg #>> '{live,fallbackSlotMs}')::numeric, 2500)))::integer + 1;
+  end if;
+  return greatest(0, least(v_size, l.progress + v_extra));
+end;
+$$;
+
+create or replace function public.nexamon_live_viewer_count(p_live uuid, p_now timestamptz)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select count(*)::integer from public.nexamon_live_viewers v
+   where v.live_id = p_live
+     and v.seen_at > p_now - make_interval(secs => coalesce((public.nexamon_cfg() #>> '{live,viewerSeconds}')::integer, 10));
+$$;
+
+create or replace function public.nexamon_live_reactions_json(p_live uuid, p_now timestamptz)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object('id', r.id, 'emoji', r.emoji, 'at', r.at) order by r.id), '[]'::jsonb)
+    from (select * from public.nexamon_live_reactions x
+           where x.live_id = p_live and x.at > p_now - interval '12 seconds'
+           order by x.id desc limit 30) r;
+$$;
+
+-- A bought pack becomes a live opening, unless the opener does not want spectators
+create or replace function public.nexamon_pack_live()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg jsonb := public.nexamon_cfg();
+begin
+  if coalesce((select x.allow_watch from public.nexamon_presence x where x.player_id = new.player_id), true) then
+    insert into public.nexamon_live (player_id, kind, pack_id, set_key, cards, started_at, ends_at)
+    values (new.player_id, 'pack', new.id, new.set_key, new.cards, new.opened_at,
+            new.opened_at + public.nexamon_ms(coalesce((cfg #>> '{live,staleMs}')::numeric, 10000)
+                                              + coalesce((cfg ->> 'packSize')::numeric, 5) * coalesce((cfg #>> '{live,fallbackSlotMs}')::numeric, 2500)
+                                              + coalesce((cfg #>> '{live,lingerMs}')::numeric, 8000)))
+    on conflict (pack_id) do nothing;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists nexamon_pack_live on public.nexamon_packs;
+create trigger nexamon_pack_live after insert on public.nexamon_packs for each row execute function public.nexamon_pack_live();
+
+-- One live opening as the lobby lists it
+create or replace function public.nexamon_live_row_json(l public.nexamon_live, p_viewer uuid, p_now timestamptz)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object('id', l.id, 'kind', l.kind, 'set', l.set_key, 'battle_id', l.battle_id,
+                            'player', public.nexamon_figure_json(l.player_id),
+                            'opponent', case when l.kind = 'battle'
+                                          then public.nexamon_figure_json((select b.opponent_id from public.nexamon_battles b where b.id = l.battle_id)) end,
+                            'is_me', l.player_id = p_viewer
+                                     or (l.kind = 'battle' and exists (select 1 from public.nexamon_battles b
+                                                                        where b.id = l.battle_id and p_viewer in (b.challenger_id, b.opponent_id))),
+                            'started_at', l.started_at, 'ends_at', l.ends_at,
+                            'viewers', public.nexamon_live_viewer_count(l.id, p_now));
+$$;
+
+-- A Pack Battle as the players and spectators see it at p_now: the pulls only from the shared start, slot by slot
+-- (battleKnownSlots), totals of what is known, the winner from decide_at (minus leadMs)
+create or replace function public.nexamon_battle_json(b public.nexamon_battles, p_viewer uuid, p_now timestamptz)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.nexamon_cfg();
+  v_size  integer := coalesce((cfg ->> 'packSize')::integer, 5);
+  v_lead  numeric := coalesce((cfg #>> '{battles,leadMs}')::numeric, 800);
+  v_tear  numeric := coalesce((cfg #>> '{battles,tearMs}')::numeric, 2400);
+  v_slot  numeric := coalesce((cfg #>> '{battles,slotMs}')::numeric, 1800);
+  v_known integer := 0;
+  v_done  boolean := false;
+  v_status text := b.status;
+  v_ms    numeric;
+  v_ca    jsonb := '[]'::jsonb;
+  v_oa    jsonb := '[]'::jsonb;
+  v_live  uuid;
+begin
+  if b.status = 'pending' and b.expires_at <= p_now then
+    v_status := 'expired';
+  end if;
+  if b.status = 'accepted' then
+    v_status := case when p_now >= b.ends_at then 'done' else 'running' end;
+    if p_now >= b.starts_at then
+      v_ms := extract(epoch from (p_now - b.starts_at)) * 1000 - v_tear + v_lead;
+      if v_ms >= 0 then
+        v_known := least(v_size, floor(v_ms / v_slot)::integer + 1);
+      end if;
+    end if;
+    v_done := p_now >= b.decide_at - public.nexamon_ms(v_lead);
+    select coalesce(jsonb_agg(x order by (x ->> 'slot')::integer), '[]'::jsonb) into v_ca
+      from jsonb_array_elements(coalesce(b.challenger_cards, '[]'::jsonb)) x where (x ->> 'slot')::integer <= v_known;
+    select coalesce(jsonb_agg(x order by (x ->> 'slot')::integer), '[]'::jsonb) into v_oa
+      from jsonb_array_elements(coalesce(b.opponent_cards, '[]'::jsonb)) x where (x ->> 'slot')::integer <= v_known;
+  end if;
+  select l.id into v_live from public.nexamon_live l where l.battle_id = b.id;
+  return jsonb_build_object(
+    'id', b.id, 'set', b.set_key, 'status', v_status, 'price_cents', b.price_cents,
+    'challenger', public.nexamon_figure_json(b.challenger_id), 'opponent', public.nexamon_figure_json(b.opponent_id),
+    'me', case when p_viewer = b.challenger_id then 'challenger' when p_viewer = b.opponent_id then 'opponent' end,
+    'created_at', b.created_at, 'expires_at', b.expires_at, 'accepted_at', b.accepted_at, 'starts_at', b.starts_at,
+    'decide_at', b.decide_at, 'ends_at', b.ends_at, 'tear_ms', v_tear, 'slot_ms', v_slot,
+    'challenger_cards', v_ca, 'opponent_cards', v_oa,
+    'challenger_cents', coalesce((select sum((x ->> 'value_cents')::bigint) from jsonb_array_elements(v_ca) x), 0),
+    'opponent_cents', coalesce((select sum((x ->> 'value_cents')::bigint) from jsonb_array_elements(v_oa) x), 0),
+    'winner', case when v_done then case when b.winner_id = b.challenger_id then 'challenger'
+                                         when b.winner_id = b.opponent_id then 'opponent' end end,
+    'tie_break', case when v_done then b.tie_break end,
+    'coin_seed', case when v_done then b.coin_seed end,
+    'abort_reason', b.abort_reason,
+    'live_id', v_live,
+    'viewers', case when v_live is null then 0 else public.nexamon_live_viewer_count(v_live, p_now) end,
+    'reactions', case when v_live is null then '[]'::jsonb else public.nexamon_live_reactions_json(v_live, p_now) end,
+    'server_time', p_now);
+end;
+$$;
+
+create or replace function public.nexamon_lobby(p_allow_watch boolean default true)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.nexamon_cfg();
+  v_player uuid;
+  v_now    timestamptz := public.game_now();
+  v_secs   integer := coalesce((cfg #>> '{presence,presenceSeconds}')::integer, 60);
+  v_max    integer := coalesce((cfg #>> '{presence,maxPlayers}')::integer, 24);
+  v_last   timestamptz;
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  insert into public.nexamon_presence (player_id, seen_at, allow_watch)
+  values (v_player, v_now, coalesce(p_allow_watch, true))
+  on conflict (player_id) do update set seen_at = excluded.seen_at, allow_watch = excluded.allow_watch;
+  -- open challenges past their time are expired; old live openings go
+  update public.nexamon_battles set status = 'expired', responded_at = expires_at
+   where status = 'pending' and expires_at <= v_now and v_player in (challenger_id, opponent_id);
+  delete from public.nexamon_live where ends_at < v_now - interval '1 hour';
+  select max(b.created_at) into v_last from public.nexamon_battles b where b.challenger_id = v_player;
+  return jsonb_build_object(
+    'players', coalesce((
+      select jsonb_agg(public.nexamon_figure_json(p.id) || jsonb_build_object(
+                         'is_friend', true,
+                         'opening', exists (select 1 from public.nexamon_live l where l.player_id = p.id and l.kind = 'pack' and l.ends_at > v_now),
+                         'battling', exists (select 1 from public.nexamon_battles b
+                                              where p.id in (b.challenger_id, b.opponent_id)
+                                                and ((b.status = 'accepted' and b.ends_at > v_now) or (b.status = 'pending' and b.expires_at > v_now))))
+                       order by x.seen_at desc, p.id)
+        from (select y.player_id, y.seen_at from public.nexamon_presence y
+                join public.friendships f on f.status = 'accepted'
+                 and ((f.requester_id = v_player and f.addressee_id = y.player_id) or (f.addressee_id = v_player and f.requester_id = y.player_id))
+               where y.seen_at > v_now - make_interval(secs => v_secs) and y.player_id <> v_player
+               order by y.seen_at desc limit v_max) x
+        join public.profiles p on p.id = x.player_id and not p.is_deactivated), '[]'::jsonb),
+    'live', coalesce((
+      select jsonb_agg(public.nexamon_live_row_json(l, v_player, v_now) order by l.started_at desc)
+        from (select * from public.nexamon_live z where z.ends_at > v_now and z.started_at <= v_now
+               order by z.started_at desc limit coalesce((cfg #>> '{live,maxSessions}')::integer, 12)) l), '[]'::jsonb),
+    'battles', coalesce((
+      select jsonb_agg(public.nexamon_battle_json(b, v_player, v_now) order by b.created_at desc)
+        from public.nexamon_battles b
+       where v_player in (b.challenger_id, b.opponent_id)
+         and ((b.status = 'pending' and b.expires_at > v_now) or (b.status = 'accepted' and b.ends_at > v_now))), '[]'::jsonb),
+    'limits', jsonb_build_object(
+      'per_hour', coalesce((cfg #>> '{battles,perHour}')::integer, 6),
+      'used', (select count(*) from public.nexamon_battles b
+                where v_player in (b.challenger_id, b.opponent_id) and b.status = 'accepted' and b.accepted_at > v_now - interval '1 hour'),
+      'cooldown_until', case when v_last is not null
+                               and v_last + make_interval(secs => coalesce((cfg #>> '{battles,cooldownSeconds}')::integer, 20)) > v_now
+                             then v_last + make_interval(secs => coalesce((cfg #>> '{battles,cooldownSeconds}')::integer, 20)) end),
+    'allow_watch', coalesce(p_allow_watch, true),
+    'server_time', v_now);
+end;
+$$;
+comment on function public.nexamon_lobby(boolean) is
+  'RPC (presence, ADR-172): marks the caller as on the Collectibles tab and returns {players: friends on the tab as '
+  'figures with opening/battling, live: running live openings, battles: own open and running Pack Battles, limits, '
+  'allow_watch, server_time}; errors nexamon_locked.';
+
+create or replace function public.nexamon_live_progress(p_pack_id uuid, p_revealed integer)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.nexamon_cfg();
+  v_player uuid;
+  v_now    timestamptz := public.game_now();
+  l        public.nexamon_live;
+begin
+  v_player := public.require_player();
+  if p_pack_id is null or p_revealed is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  select * into l from public.nexamon_live x where x.pack_id = p_pack_id and x.player_id = v_player for update;
+  if l.id is null then
+    -- watching is off, or the pack is not the caller's: nothing to report, nobody watches
+    return jsonb_build_object('live_id', null, 'viewers', 0, 'reactions', '[]'::jsonb);
+  end if;
+  if greatest(0, least(coalesce((cfg ->> 'packSize')::integer, 5), p_revealed)) > l.progress then
+    update public.nexamon_live
+       set progress = greatest(0, least(coalesce((cfg ->> 'packSize')::integer, 5), p_revealed)), progress_at = v_now,
+           ends_at = least(started_at + public.nexamon_ms(coalesce((cfg #>> '{live,maxMs}')::numeric, 120000)),
+                           greatest(ends_at, v_now + public.nexamon_ms(coalesce((cfg #>> '{live,lingerMs}')::numeric, 8000))))
+     where id = l.id;
+  elsif l.progress_at is null or l.progress_at < v_now - interval '2 seconds' then
+    -- the opener still looks at the card: the fallback pace waits
+    update public.nexamon_live set progress_at = v_now where id = l.id;
+  end if;
+  return jsonb_build_object('live_id', l.id, 'viewers', public.nexamon_live_viewer_count(l.id, v_now),
+                            'reactions', public.nexamon_live_reactions_json(l.id, v_now));
+end;
+$$;
+comment on function public.nexamon_live_progress(uuid, integer) is
+  'RPC (live opening, ADR-172): the opener''s page reports how many cards of a bought pack it has shown; returns '
+  '{live_id, viewers, reactions}. Without a live opening (watching off) live_id is null. Errors invalid_argument.';
+
+create or replace function public.get_nexamon_live(p_live_id uuid)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_now    timestamptz := public.game_now();
+  l        public.nexamon_live;
+  v_n      integer;
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  select * into l from public.nexamon_live x where x.id = p_live_id;
+  if l.id is null or l.started_at > v_now then
+    perform public.api_error('nexamon_live_unknown');
+  end if;
+  if l.player_id <> v_player and l.ends_at > v_now then
+    insert into public.nexamon_live_viewers (live_id, player_id, seen_at) values (l.id, v_player, v_now)
+    on conflict (live_id, player_id) do update set seen_at = excluded.seen_at;
+  end if;
+  v_n := case when l.player_id = v_player or l.ends_at <= v_now then coalesce(jsonb_array_length(l.cards), 0)
+              else public.nexamon_live_visible(l, v_now) end;
+  return public.nexamon_live_row_json(l, v_player, v_now) || jsonb_build_object(
+    'progress', v_n,
+    'cards', case when l.kind = 'pack'
+                  then coalesce((select jsonb_agg(jsonb_build_object('slot', x ->> 'slot', 'card_key', x ->> 'card_key',
+                                                                     'rarity', x ->> 'rarity', 'condition', x ->> 'condition',
+                                                                     'serial', (x ->> 'serial')::bigint,
+                                                                     'value_cents', (x ->> 'value_cents')::bigint)
+                                                  order by (x ->> 'slot')::integer)
+                                   from jsonb_array_elements(l.cards) x where (x ->> 'slot')::integer <= v_n), '[]'::jsonb)
+                  else '[]'::jsonb end,
+    'done', l.ends_at <= v_now,
+    'reactions', public.nexamon_live_reactions_json(l.id, v_now),
+    'server_time', v_now);
+end;
+$$;
+comment on function public.get_nexamon_live(uuid) is
+  'RPC (spectating, ADR-172): one live opening with the cards the opener has already seen (fallback pace after '
+  'live.staleMs), viewers and recent reactions; counts the caller as a viewer. Errors nexamon_locked, nexamon_live_unknown.';
+
+create or replace function public.nexamon_live_react(p_request_id uuid, p_live_id uuid, p_emoji text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.nexamon_cfg();
+  v_player uuid;
+  v_replay jsonb;
+  v_now    timestamptz := public.game_now();
+  l        public.nexamon_live;
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  if p_request_id is null or p_live_id is null or p_emoji is null
+     or not coalesce(cfg #> '{live,reactions}', '[]'::jsonb) ? p_emoji then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'nexamon_live_react');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into l from public.nexamon_live x where x.id = p_live_id;
+  if l.id is null or l.ends_at <= v_now or l.started_at > v_now then
+    perform public.api_error('nexamon_live_unknown');
+  end if;
+  if not public.rate_limit_hit(v_player, 'nexamon_react', coalesce((cfg #>> '{live,reactionsPerMinute}')::integer, 30), 60) then
+    perform public.api_error('rate_limited');
+  end if;
+  insert into public.nexamon_live_reactions (live_id, player_id, emoji, at) values (l.id, v_player, p_emoji, v_now);
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('reactions', public.nexamon_live_reactions_json(l.id, v_now)));
+end;
+$$;
+comment on function public.nexamon_live_react(uuid, uuid, text) is
+  'RPC (spectating, ADR-172): an emoji burst on a live opening (live.reactions); returns {reactions}. Errors '
+  'nexamon_locked, invalid_argument, nexamon_live_unknown, rate_limited.';
+
+do $do$
+declare
+  f text;
+begin
+  foreach f in array array['public.nexamon_lobby(boolean)', 'public.nexamon_live_progress(uuid, integer)',
+                           'public.get_nexamon_live(uuid)', 'public.nexamon_live_react(uuid, uuid, text)'] loop
+    execute format('revoke all on function %s from public, anon', f);
+    execute format('grant execute on function %s to authenticated', f);
+  end loop;
+  foreach f in array array['public.nexamon_ms(numeric)', 'public.nexamon_figure_json(uuid)', 'public.nexamon_on_tab(uuid, timestamptz)',
+                           'public.nexamon_live_visible(public.nexamon_live, timestamptz)',
+                           'public.nexamon_live_viewer_count(uuid, timestamptz)',
+                           'public.nexamon_live_reactions_json(uuid, timestamptz)', 'public.nexamon_pack_live()',
+                           'public.nexamon_live_row_json(public.nexamon_live, uuid, timestamptz)',
+                           'public.nexamon_battle_json(public.nexamon_battles, uuid, timestamptz)'] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+  end loop;
+end;
+$do$;
+
+-- ===== supabase/updates/20261204006320_nexamon_battles.sql =====
+-- ===== idempotent copy of migrations/20261204006320_nexamon_battles.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- =============================================================================
+-- NEXA · 6320 · Nexamon Pack Battles: challenge, accept, both packs at once, the winner takes all (ADR-172)
+-- =============================================================================
+-- * challenge_nexamon_battle(p_request_id, p_nickname, p_set): a friend who is on the Collectibles tab right now,
+--   both unlocked, one battle at a time per player, battles.cooldownSeconds between challenges, battles.perHour
+--   accepted battles per hour. Open for battles.challengeSeconds. Nothing is paid yet.
+-- * respond_nexamon_battle(p_request_id, p_battle_id, p_accept): the challenged friend says yes or no. Yes: both pay
+--   one pack of the set (cash -> households, as buy_nexamon_pack), both packs are opened at once with the same pull
+--   rules (nexamon_open_pack, every copy counts for the population), the higher total value at pull time wins
+--   (tie: rarest single card, then coin_seed % 2 = 0 for the challenger; decideBattle). The winner owns all copies at
+--   once; the loser keeps nothing. If the challenger cannot pay any more, the battle is aborted and nobody pays
+--   (both payments happen in one transaction with the pulls: a battle never stops between paying and pulling).
+--   The result stands even if somebody closes the page during the reveal.
+-- * cancel_nexamon_battle(p_request_id, p_battle_id): the challenger takes an open challenge back.
+-- * get_nexamon_battle(p_battle_id): the players and anyone watching see the pulls slot by slot from the shared start
+--   (nexamon_battle_json); the battle is a live opening for spectators.
+-- If public.nexamon_bonus_recompute(uuid) exists (card account bonuses), it runs for both players after the transfer.
+-- Errors: nexamon_locked, invalid_argument, nexamon_unknown, nexamon_battle_*, insufficient_funds, rate_limited.
+-- Idempotent: runs unchanged as supabase/updates/20261204006320_nexamon_battles.sql.
+
+create or replace function public.nexamon_battle_busy(p_player uuid, p_now timestamptz)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (select 1 from public.nexamon_battles b
+                  where p_player in (b.challenger_id, b.opponent_id)
+                    and ((b.status = 'pending' and b.expires_at > p_now) or (b.status = 'accepted' and b.ends_at > p_now)));
+$$;
+
+create or replace function public.nexamon_battles_last_hour(p_player uuid, p_now timestamptz)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select count(*)::integer from public.nexamon_battles b
+   where p_player in (b.challenger_id, b.opponent_id) and b.status = 'accepted' and b.accepted_at > p_now - interval '1 hour';
+$$;
+
+create or replace function public.nexamon_rarity_rank(p_rarity text)
+returns integer
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce(array_position(array['common', 'rare', 'ultra', 'prisma', 'legendary'], p_rarity), 0) - 1;
+$$;
+
+-- Who wins (decideBattle): the higher total value, then the rarest single card, then the coin (even seed: challenger)
+create or replace function public.nexamon_battle_decide(p_challenger jsonb, p_opponent jsonb, p_seed bigint)
+returns jsonb
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_csum  bigint;
+  v_osum  bigint;
+  v_crank integer;
+  v_orank integer;
+begin
+  select coalesce(sum((x ->> 'value_cents')::bigint), 0), coalesce(max(public.nexamon_rarity_rank(x ->> 'rarity')), -1)
+    into v_csum, v_crank from jsonb_array_elements(coalesce(p_challenger, '[]'::jsonb)) x;
+  select coalesce(sum((x ->> 'value_cents')::bigint), 0), coalesce(max(public.nexamon_rarity_rank(x ->> 'rarity')), -1)
+    into v_osum, v_orank from jsonb_array_elements(coalesce(p_opponent, '[]'::jsonb)) x;
+  return jsonb_build_object(
+    'challenger_cents', v_csum, 'opponent_cents', v_osum,
+    'tie_break', case when v_csum <> v_osum then 'value' when v_crank <> v_orank then 'rarest' else 'coin' end,
+    'winner', case when v_csum <> v_osum then case when v_csum > v_osum then 'challenger' else 'opponent' end
+                   when v_crank <> v_orank then case when v_crank > v_orank then 'challenger' else 'opponent' end
+                   when abs(coalesce(p_seed, 0)) % 2 = 0 then 'challenger' else 'opponent' end);
+end;
+$$;
+
+create or replace function public.challenge_nexamon_battle(p_request_id uuid, p_nickname text, p_set text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.nexamon_cfg();
+  v_player uuid;
+  v_other  uuid;
+  v_replay jsonb;
+  v_now    timestamptz := public.game_now();
+  v_price  bigint;
+  v_last   timestamptz;
+  b        public.nexamon_battles;
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  if p_request_id is null or p_nickname is null or p_set is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'challenge_nexamon_battle');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_price := (cfg #>> array['sets', p_set, 'packPriceCents'])::bigint;
+  if v_price is null or v_price < 0 or not exists (select 1 from public.nexamon_cards k where k.set_key = p_set and k.in_catalogue) then
+    perform public.api_error('nexamon_unknown');
+  end if;
+  select p.id into v_other from public.profiles p where lower(p.nickname) = lower(p_nickname) and not p.is_deactivated;
+  if v_other is null then
+    perform public.api_error('nexamon_battle_unknown');
+  end if;
+  if v_other = v_player then
+    perform public.api_error('nexamon_battle_self');
+  end if;
+  if not exists (select 1 from public.friendships f
+                  where f.status = 'accepted'
+                    and ((f.requester_id = v_player and f.addressee_id = v_other) or (f.requester_id = v_other and f.addressee_id = v_player))) then
+    perform public.api_error('nexamon_battle_not_friend');
+  end if;
+  if not public.nexamon_unlocked(v_other) then
+    perform public.api_error('nexamon_battle_opponent_locked');
+  end if;
+  if not public.nexamon_on_tab(v_other, v_now) then
+    perform public.api_error('nexamon_battle_not_here');
+  end if;
+  -- one battle at a time: the two players' rows are locked in a fixed order
+  perform 1 from public.profiles p where p.id in (v_player, v_other) order by p.id for update;
+  update public.nexamon_battles set status = 'expired', responded_at = expires_at
+   where status = 'pending' and expires_at <= v_now and (challenger_id in (v_player, v_other) or opponent_id in (v_player, v_other));
+  if public.nexamon_battle_busy(v_player, v_now) or public.nexamon_battle_busy(v_other, v_now) then
+    perform public.api_error('nexamon_battle_busy');
+  end if;
+  select max(x.created_at) into v_last from public.nexamon_battles x where x.challenger_id = v_player;
+  if v_last is not null and v_last > v_now - make_interval(secs => coalesce((cfg #>> '{battles,cooldownSeconds}')::integer, 20)) then
+    perform public.api_error('nexamon_battle_cooldown');
+  end if;
+  if public.nexamon_battles_last_hour(v_player, v_now) >= coalesce((cfg #>> '{battles,perHour}')::integer, 6)
+     or public.nexamon_battles_last_hour(v_other, v_now) >= coalesce((cfg #>> '{battles,perHour}')::integer, 6) then
+    perform public.api_error('nexamon_battle_limit');
+  end if;
+  if public.lock_player_accounts(v_player) < v_price then
+    perform public.api_error('insufficient_funds');
+  end if;
+  insert into public.nexamon_battles (challenger_id, opponent_id, set_key, price_cents, created_at, expires_at)
+  values (v_player, v_other, p_set, v_price, v_now,
+          v_now + make_interval(secs => coalesce((cfg #>> '{battles,challengeSeconds}')::integer, 60)))
+  returning * into b;
+  perform public.social_notify(v_other, 'nexamon_battle', 'Pack Battle!',
+    (select p.nickname from public.profiles p where p.id = v_player) || ' fordert dich zum Pack Battle heraus: '
+      || coalesce(cfg #>> array['sets', p_set, 'name'], p_set) || ', je ein Pack für ' || public.format_eur(v_price) || '.',
+    jsonb_build_object('battle_id', b.id, 'set', p_set, 'price_cents', v_price),
+    '/nexamon?battle=' || b.id::text, 'nexamon:battle:challenge:' || b.id::text);
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('battle', public.nexamon_battle_json(b, v_player, v_now)));
+end;
+$$;
+comment on function public.challenge_nexamon_battle(uuid, text, text) is
+  'RPC (ADR-172): challenges a friend who is on the Collectibles tab to a Pack Battle with one pack of a set; returns '
+  '{battle}. Errors nexamon_locked, invalid_argument, nexamon_unknown, nexamon_battle_unknown, nexamon_battle_self, '
+  'nexamon_battle_not_friend, nexamon_battle_opponent_locked, nexamon_battle_not_here, nexamon_battle_busy, '
+  'nexamon_battle_cooldown, nexamon_battle_limit, insufficient_funds.';
+
+-- One side of an accepted battle: pays the pack and opens it in the player's name (is_new, feed, missions)
+create or replace function public.nexamon_battle_pull(b public.nexamon_battles, p_player uuid, p_now timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.nexamon_cfg();
+  v_cards jsonb;
+  r       record;
+begin
+  if b.price_cents > 0 then
+    perform public.ledger_transfer(public.ledger_player_account(p_player, 'player_cash'), public.ledger_system_account('households'),
+                                   b.price_cents, 'nexamon_pack', 'Pack Battle: ' || coalesce(cfg #>> array['sets', b.set_key, 'name'], b.set_key),
+                                   'nexamon_battle', b.id, 'nexamon:battle:' || b.id::text || ':' || p_player::text, p_player,
+                                   jsonb_build_object('set', b.set_key, 'price_cents', b.price_cents, 'battle_id', b.id));
+  end if;
+  v_cards := public.nexamon_open_pack(b.set_key, p_player, null, b.id, p_now);
+  perform public.mission_event(p_player, 'nexamon_pack', 1, null);
+  for r in select x ->> 'rarity' as rarity from jsonb_array_elements(v_cards) x loop
+    if r.rarity <> 'common' then
+      perform public.mission_event(p_player, 'nexamon_rare', 1, null);
+    end if;
+    if r.rarity in ('ultra', 'prisma', 'legendary') then
+      perform public.mission_event(p_player, 'nexamon_ultra', 1, null);
+    end if;
+  end loop;
+  return v_cards;
+end;
+$$;
+
+create or replace function public.respond_nexamon_battle(p_request_id uuid, p_battle_id uuid, p_accept boolean)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.nexamon_cfg();
+  v_player uuid;
+  v_replay jsonb;
+  v_now    timestamptz := public.game_now();
+  b        public.nexamon_battles;
+  v_ccash  bigint;
+  v_ocash  bigint;
+  v_ca     jsonb;
+  v_oa     jsonb;
+  v_csum   bigint;
+  v_osum   bigint;
+  v_seed   bigint;
+  v_dec    jsonb;
+  v_win    uuid;
+  v_lose   uuid;
+  v_tie    text;
+  v_names  text;
+  v_starts timestamptz;
+  v_decide timestamptz;
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  if p_request_id is null or p_battle_id is null or p_accept is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'respond_nexamon_battle');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into b from public.nexamon_battles x where x.id = p_battle_id for update;
+  if b.id is null or v_player not in (b.challenger_id, b.opponent_id) then
+    perform public.api_error('nexamon_battle_unknown');
+  end if;
+  if v_player <> b.opponent_id then
+    perform public.api_error('nexamon_battle_not_yours');
+  end if;
+  if b.status = 'pending' and b.expires_at <= v_now then
+    update public.nexamon_battles set status = 'expired', responded_at = expires_at where id = b.id returning * into b;
+    return public.request_complete(v_player, p_request_id, jsonb_build_object('battle', public.nexamon_battle_json(b, v_player, v_now)));
+  end if;
+  if b.status <> 'pending' then
+    perform public.api_error('nexamon_battle_closed');
+  end if;
+
+  if not p_accept then
+    update public.nexamon_battles set status = 'declined', responded_at = v_now where id = b.id returning * into b;
+    perform public.social_notify(b.challenger_id, 'nexamon_battle', 'Pack Battle abgelehnt',
+      (select p.nickname from public.profiles p where p.id = b.opponent_id) || ' will gerade nicht battlen.',
+      jsonb_build_object('battle_id', b.id), '/nexamon', 'nexamon:battle:declined:' || b.id::text);
+    return public.request_complete(v_player, p_request_id, jsonb_build_object('battle', public.nexamon_battle_json(b, v_player, v_now)));
+  end if;
+
+  if public.nexamon_battles_last_hour(v_player, v_now) >= coalesce((cfg #>> '{battles,perHour}')::integer, 6)
+     or public.nexamon_battles_last_hour(b.challenger_id, v_now) >= coalesce((cfg #>> '{battles,perHour}')::integer, 6) then
+    perform public.api_error('nexamon_battle_limit');
+  end if;
+  perform public.nexamon_sync(v_now);
+  -- both accounts in a fixed order
+  if b.challenger_id < b.opponent_id then
+    v_ccash := public.lock_player_accounts(b.challenger_id);
+    v_ocash := public.lock_player_accounts(b.opponent_id);
+  else
+    v_ocash := public.lock_player_accounts(b.opponent_id);
+    v_ccash := public.lock_player_accounts(b.challenger_id);
+  end if;
+  if v_ocash < b.price_cents then
+    perform public.api_error('insufficient_funds');
+  end if;
+  if v_ccash < b.price_cents or not public.nexamon_unlocked(b.challenger_id) then
+    -- the challenger cannot pay any more: nobody pays, nothing is pulled
+    update public.nexamon_battles
+       set status = 'aborted', responded_at = v_now,
+           abort_reason = case when v_ccash < b.price_cents then 'challenger_funds' else 'challenger_locked' end
+     where id = b.id returning * into b;
+    perform public.social_notify(b.challenger_id, 'nexamon_battle', 'Pack Battle abgebrochen',
+      'Für das Pack Battle hat dein Geld nicht mehr gereicht. Niemand hat bezahlt.',
+      jsonb_build_object('battle_id', b.id), '/nexamon', 'nexamon:battle:aborted:' || b.id::text);
+    return public.request_complete(v_player, p_request_id, jsonb_build_object('battle', public.nexamon_battle_json(b, v_player, v_now)));
+  end if;
+
+  v_ca := public.nexamon_battle_pull(b, b.challenger_id, v_now);
+  v_oa := public.nexamon_battle_pull(b, b.opponent_id, v_now);
+  update public.nexamon_set_state set player_packs_opened = player_packs_opened + 2 where set_key = b.set_key;
+  v_seed := floor(random() * 2147483647)::bigint;
+  v_dec := public.nexamon_battle_decide(v_ca, v_oa, v_seed);
+  v_csum := (v_dec ->> 'challenger_cents')::bigint;
+  v_osum := (v_dec ->> 'opponent_cents')::bigint;
+  v_tie := v_dec ->> 'tie_break';
+  v_win := case when v_dec ->> 'winner' = 'challenger' then b.challenger_id else b.opponent_id end;
+  v_lose := case when v_win = b.challenger_id then b.opponent_id else b.challenger_id end;
+  -- the winner takes every copy of both packs; listings cannot exist yet
+  update public.nexamon_copies c set owner_id = v_win, acquired_at = v_now
+   where c.id in (select (x ->> 'copy_id')::uuid from jsonb_array_elements(v_ca || v_oa) x) and c.owner_id = v_lose;
+  if to_regprocedure('public.nexamon_bonus_recompute(uuid)') is not null then
+    execute 'select public.nexamon_bonus_recompute($1)' using v_win;
+    execute 'select public.nexamon_bonus_recompute($1)' using v_lose;
+  end if;
+
+  v_starts := v_now + public.nexamon_ms(coalesce((cfg #>> '{battles,startDelayMs}')::numeric, 3000));
+  v_decide := v_starts + public.nexamon_ms(coalesce((cfg #>> '{battles,tearMs}')::numeric, 2400)
+                                           + coalesce((cfg ->> 'packSize')::numeric, 5) * coalesce((cfg #>> '{battles,slotMs}')::numeric, 1800));
+  update public.nexamon_battles
+     set status = 'accepted', responded_at = v_now, accepted_at = v_now, starts_at = v_starts, decide_at = v_decide,
+         ends_at = v_decide + public.nexamon_ms(coalesce((cfg #>> '{battles,outroMs}')::numeric, 8000)),
+         challenger_cards = v_ca, opponent_cards = v_oa, challenger_cents = v_csum, opponent_cents = v_osum,
+         winner_id = v_win, tie_break = v_tie, coin_seed = v_seed
+   where id = b.id returning * into b;
+  insert into public.nexamon_live (player_id, kind, battle_id, set_key, started_at, ends_at)
+  values (b.challenger_id, 'battle', b.id, b.set_key, v_now, b.ends_at)
+  on conflict (battle_id) do nothing;
+
+  v_names := (select p.nickname from public.profiles p where p.id = b.challenger_id) || ' gegen '
+             || (select p.nickname from public.profiles p where p.id = b.opponent_id);
+  perform public.feed_post(v_win, 'nexamon_battle_won',
+                           jsonb_build_object('set', b.set_key, 'other', (select p.nickname from public.profiles p where p.id = v_lose),
+                                              'total_cents', v_csum + v_osum, 'cards', jsonb_array_length(v_ca) + jsonb_array_length(v_oa)),
+                           'nexamon:battle:won:' || b.id::text);
+  if v_csum + v_osum >= coalesce((cfg #>> '{battles,gossipMinCents}')::bigint, 500000) then
+    perform public.feed_post(v_win, 'nexamon_battle_big',
+                             jsonb_build_object('set', b.set_key, 'other', (select p.nickname from public.profiles p where p.id = v_lose),
+                                                'total_cents', v_csum + v_osum),
+                             'nexamon:battle:big:' || b.id::text);
+  end if;
+  perform public.social_notify(b.challenger_id, 'nexamon_battle', 'Pack Battle läuft', v_names || ': die Packs gehen auf!',
+    jsonb_build_object('battle_id', b.id), '/nexamon?battle=' || b.id::text, 'nexamon:battle:accepted:' || b.id::text);
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('battle', public.nexamon_battle_json(b, v_player, v_now)));
+end;
+$$;
+comment on function public.respond_nexamon_battle(uuid, uuid, boolean) is
+  'RPC (ADR-172): the challenged friend accepts (both pay one pack, both packs open at once, the higher total value '
+  'takes all copies) or declines a Pack Battle; returns {battle} (pulls only from the shared start). A challenger '
+  'without the money any more ends it as aborted, nobody pays. Errors nexamon_locked, invalid_argument, '
+  'nexamon_battle_unknown, nexamon_battle_not_yours, nexamon_battle_closed, nexamon_battle_limit, insufficient_funds.';
+
+create or replace function public.cancel_nexamon_battle(p_request_id uuid, p_battle_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  v_now    timestamptz := public.game_now();
+  b        public.nexamon_battles;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_battle_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'cancel_nexamon_battle');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into b from public.nexamon_battles x where x.id = p_battle_id for update;
+  if b.id is null or v_player not in (b.challenger_id, b.opponent_id) then
+    perform public.api_error('nexamon_battle_unknown');
+  end if;
+  if v_player <> b.challenger_id then
+    perform public.api_error('nexamon_battle_not_yours');
+  end if;
+  if b.status <> 'pending' then
+    perform public.api_error('nexamon_battle_closed');
+  end if;
+  update public.nexamon_battles set status = case when expires_at <= v_now then 'expired' else 'cancelled' end, responded_at = v_now
+   where id = b.id returning * into b;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('battle', public.nexamon_battle_json(b, v_player, v_now)));
+end;
+$$;
+comment on function public.cancel_nexamon_battle(uuid, uuid) is
+  'RPC (ADR-172): the challenger takes an open Pack Battle challenge back; returns {battle}. Errors invalid_argument, '
+  'nexamon_battle_unknown, nexamon_battle_not_yours, nexamon_battle_closed.';
+
+create or replace function public.get_nexamon_battle(p_battle_id uuid)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_now    timestamptz := public.game_now();
+  b        public.nexamon_battles;
+  l        public.nexamon_live;
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  select * into b from public.nexamon_battles x where x.id = p_battle_id;
+  if b.id is null then
+    perform public.api_error('nexamon_battle_unknown');
+  end if;
+  if v_player not in (b.challenger_id, b.opponent_id) then
+    -- spectators: only a battle that is (or was) live
+    select * into l from public.nexamon_live x where x.battle_id = b.id;
+    if l.id is null then
+      perform public.api_error('nexamon_battle_unknown');
+    end if;
+    if l.ends_at > v_now then
+      insert into public.nexamon_live_viewers (live_id, player_id, seen_at) values (l.id, v_player, v_now)
+      on conflict (live_id, player_id) do update set seen_at = excluded.seen_at;
+    end if;
+  end if;
+  return jsonb_build_object('battle', public.nexamon_battle_json(b, v_player, v_now));
+end;
+$$;
+comment on function public.get_nexamon_battle(uuid) is
+  'RPC (ADR-172): a Pack Battle for its players and spectators (counted as viewers): the pulls slot by slot from the '
+  'shared start, totals, the winner from decide_at; returns {battle}. Errors nexamon_locked, nexamon_battle_unknown.';
+
+do $do$
+declare
+  f text;
+begin
+  foreach f in array array['public.challenge_nexamon_battle(uuid, text, text)', 'public.respond_nexamon_battle(uuid, uuid, boolean)',
+                           'public.cancel_nexamon_battle(uuid, uuid)', 'public.get_nexamon_battle(uuid)'] loop
+    execute format('revoke all on function %s from public, anon', f);
+    execute format('grant execute on function %s to authenticated', f);
+  end loop;
+  foreach f in array array['public.nexamon_battle_busy(uuid, timestamptz)', 'public.nexamon_battles_last_hour(uuid, timestamptz)',
+                           'public.nexamon_battle_pull(public.nexamon_battles, uuid, timestamptz)',
+                           'public.nexamon_rarity_rank(text)', 'public.nexamon_battle_decide(jsonb, jsonb, bigint)'] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+  end loop;
+end;
+$do$;
+
+-- ===== supabase/updates/20261204006330_nexamon_battle_news.sql =====
+-- ===== idempotent copy of migrations/20261204006330_nexamon_battle_news.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- =============================================================================
+-- NEXA · 6330 · Nexamon Pack Battles in the feed and as gossip for NEXA Nachrichten (ADR-172)
+-- =============================================================================
+-- * feed_item_label(): the kinds nexamon_battle_won (every win, for the friends) and nexamon_battle_big (a win of at
+--   least battles.gossipMinCents).
+-- * news_show_build(): nexamon_battle_big joins the gossip sources, next to nexamon_pull.
+-- Replace-patches anchored on the nexamon_pull kind; a clear error if the anchor is missing.
+-- Idempotent: runs unchanged as supabase/updates/20261204006330_nexamon_battle_news.sql.
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.feed_item_label(text, jsonb)'::regprocedure);
+  v_old text := $t$    when 'nexamon_pull' then$t$;
+  v_new text := $t$    when 'nexamon_battle_won' then 'Pack Battle gegen ' || coalesce(p_payload ->> 'other', '?') || ' gewonnen'
+    when 'nexamon_battle_big' then 'Großer Sieg im Pack Battle gegen ' || coalesce(p_payload ->> 'other', '?') || ': '
+      || public.format_eur(coalesce((p_payload ->> 'total_cents')::bigint, 0)) || ' an Karten abgeräumt'
+    when 'nexamon_pull' then$t$;
+begin
+  if position('nexamon_battle_big' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'feed_item_label() has an unexpected shape; add the feed kinds nexamon_battle_won/_big (ADR-172) by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.news_show_build(timestamptz)'::regprocedure);
+  v_old text := $t$'nexamon_pull',$t$;
+  v_new text := $t$'nexamon_pull', 'nexamon_battle_big',$t$;
+begin
+  if position('nexamon_battle_big' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'news_show_build() has an unexpected shape; add the feed kind nexamon_battle_big (ADR-172) to the gossip source by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
 commit;

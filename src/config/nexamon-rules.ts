@@ -210,6 +210,45 @@ export const NEXAMON_RULES = {
    * (feed kind nexamon_black_label).
    */
   feedRarities: ["legendary"],
+  /**
+   * Who is on the Collectibles tab (ADR-172): the page asks every `pingSeconds`; a player counts as there for
+   * `presenceSeconds` after the last ask. At most `maxPlayers` figures are shown.
+   */
+  presence: { pingSeconds: 15, presenceSeconds: 60, maxPlayers: 24 },
+  /**
+   * Pack Battles (ADR-172): two friends on the tab open one pack of the same set each; the higher total value of
+   * the pulls (at pull time) takes all ten cards. Tie: the rarest single card, then a coin flip (seed stored).
+   * Timing of the shared reveal, from the accept: `startDelayMs` until both packs tear, `tearMs` for the tear,
+   * then one slot every `slotMs` on both sides at once; the winner shows one slot after the last card, the view
+   * stays live `outroMs` longer. A slot's card reaches the clients `leadMs` before it shows (never before the start).
+   */
+  battles: {
+    challengeSeconds: 60,
+    perHour: 6,
+    cooldownSeconds: 20,
+    startDelayMs: 3_000,
+    tearMs: 2_400,
+    slotMs: 1_800,
+    leadMs: 800,
+    outroMs: 8_000,
+    /** A win of at least this many cents is gossip for NEXA Nachrichten (feed kind nexamon_battle_big). */
+    gossipMinCents: 500_000,
+  },
+  /**
+   * Live openings (ADR-172): every opened pack can be watched while it is revealed. The opener's page reports each
+   * card as it shows; spectators see only what the opener has seen. Without a report for `staleMs`, one more card
+   * shows every `fallbackSlotMs`. A session lives at most `maxMs` and `lingerMs` after the last card.
+   */
+  live: {
+    staleMs: 10_000,
+    fallbackSlotMs: 2_500,
+    lingerMs: 8_000,
+    maxMs: 120_000,
+    viewerSeconds: 10,
+    reactions: ["🔥", "😱", "👏", "💎", "😂"],
+    reactionsPerMinute: 30,
+    maxSessions: 12,
+  },
 } as const;
 
 export type NexamonRules = typeof NEXAMON_RULES;

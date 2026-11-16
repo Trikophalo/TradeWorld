@@ -94,7 +94,10 @@ select tests.assert(
           -- listed companies (a3)
           || array['get_listed_company', 'company_invest', 'company_invest_stop', 'company_declare_dividend',
                    'company_books_close', 'company_tax_pay', 'company_tax_advisor', 'get_company_accounting',
-                   'get_company_board', 'board_propose', 'board_vote']) x),
+                   'get_company_board', 'board_propose', 'board_vote']
+          -- Pack Battles and live openings (b2)
+          || array['nexamon_lobby', 'nexamon_live_progress', 'get_nexamon_live', 'nexamon_live_react',
+                   'challenge_nexamon_battle', 'respond_nexamon_battle', 'cancel_nexamon_battle', 'get_nexamon_battle']) x),
   'authenticated can execute exactly the 9 helpers and the RPCs up to the market popularity (9g)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace

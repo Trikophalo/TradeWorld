@@ -155,7 +155,7 @@ if [[ -n "${NEXA_MIGRATIONS_UPTO:-}" ]]; then
 fi
 
 echo "== assertions (M1 market, trading, bonds, security)"
-run_assertions "$SCRIPT_DIR"/[5-9]*.sql "$SCRIPT_DIR"/a[0-9]*.sql
+run_assertions "$SCRIPT_DIR"/[5-9]*.sql "$SCRIPT_DIR"/a[0-9]*.sql "$SCRIPT_DIR"/b[0-9]*.sql
 
 if [[ -n "${NEXA_FIXTURE_DIR:-}" ]]; then
   echo "== RPC fixtures -> $NEXA_FIXTURE_DIR"
