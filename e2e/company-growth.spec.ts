@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { showOverview, unfoldCompany } from "./company-helpers";
+import { showDashboard, showOverview, showStaff, unfoldCompany } from "./company-helpers";
 
 /*
  * Profit levers, endless growth and friends in demo mode (ADR-083, ADR-084).
@@ -174,7 +174,8 @@ test("friends page: empty list, add by name, helpful errors", async ({ page }) =
 test("company situation: a crisis or chance, a strategy, a step, the news", async ({ page }) => {
   await preparePlayer(page, "Krisenchefin", 7_000, 2_000_000);
   await found(page, "garage", "Blitzdose", "Energy Drinks mit extra Taurin für Gamer.");
-  // The idea names the product: the Mini-KI writes about it (ADR-091).
+  // The idea names the product: the Mini-KI writes about it (ADR-091). Events and news live on the dashboard.
+  await showDashboard(page);
   await expect(page.getByTestId("situation-calm")).toBeVisible();
   await page.getByTestId("demo-trigger-event").click();
   const situation = page.getByTestId("situation");
@@ -244,7 +245,7 @@ test("company tasks: take one, play the mini-game, the result lands in the news 
   await preparePlayer(page, "Aufgabenheld", 21_000, 2_000_000);
   await found(page, "garage", "Packwerk");
 
-  await page.getByRole("tab", { name: /Aufgaben/ }).click();
+  await showStaff(page);
   const board = page.getByTestId("task-board");
   const first = board.locator('[data-testid^="task-"]').first();
   await expect(first).toBeVisible();

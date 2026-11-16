@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { showOverview, unfoldCompany } from "./company-helpers";
+import { showDashboard, showOverview, showStaff, unfoldCompany } from "./company-helpers";
 
 /*
  * Player companies in demo mode (ADR-057): found a garage startup, close quarters,
@@ -77,14 +77,15 @@ test("found a garage startup, run quarters, hire and post a job", async ({ page 
   await expect(sheet.getByText("Name ist frei")).toBeVisible();
   await hold(page, /Gedrückt halten zum Gründen/);
   await expect(page.getByText("Firma gegründet!")).toBeVisible();
-  await showOverview(page);
 
+  // The dashboard comes first: the quarter and the office with the founder.
   const header = page.getByTestId("company-header");
   await expect(header.getByText("Pixelbaecker")).toBeVisible();
   await expect(page.getByText("Das erste Quartal läuft noch.")).toBeVisible();
-
-  // The office shows the founder; banner and till (ADR-078).
   await expect(page.getByTestId("office")).toContainText("Gruenderin");
+
+  // Controlling: banner and till (ADR-078).
+  await showOverview(page);
   await page.getByTestId("banner-edit").click();
   const bannerSheet = page.getByRole("dialog", { name: "Firmen-Banner" });
   await expect(bannerSheet).toBeVisible();
@@ -114,10 +115,11 @@ test("found a garage startup, run quarters, hire and post a job", async ({ page 
   // Close two quarters (demo button): a report appears.
   await header.getByText("Demo: Quartal jetzt abschließen").click();
   await header.getByText("Demo: Quartal jetzt abschließen").click();
+  await showDashboard(page);
   await expect(page.getByText(/Letztes Quartal · Q2/i)).toBeVisible();
 
   // Post a job from the team tab (ADR-071: seats, applications, postings, training in one place).
-  await page.getByRole("tab", { name: "Team" }).click();
+  await showStaff(page);
   await page.getByRole("button", { name: "Stelle ausschreiben", exact: true }).click();
   const posting = page.getByRole("dialog", { name: "Stelle ausschreiben" });
   await posting.getByLabel("Titel der Stelle").fill("Backstube digital");
@@ -128,7 +130,7 @@ test("found a garage startup, run quarters, hire and post a job", async ({ page 
   await expect(page.getByTestId("training-locked")).toContainText("0 von 5 im Team");
 
   // Fill the open growth seat with an AI worker (ADR-071): the seat then shows the AI, not "fehlt".
-  await page.getByRole("tab", { name: "Übersicht" }).click();
+  await showOverview(page);
   const growthPath = page.getByTestId("growth");
   await growthPath.getByRole("button", { name: /Netzwerke/ }).click();
   const hire = page.getByRole("dialog", { name: "Stelle ausschreiben" });
@@ -143,7 +145,7 @@ test("found a garage startup, run quarters, hire and post a job", async ({ page 
   await expect(page.getByText("1 von 2 Plätzen belegt")).toBeVisible();
 
   // In the team the AI worker sits in its own seat and can be let go.
-  await page.getByRole("tab", { name: "Team" }).click();
+  await showStaff(page);
   await expect(page.getByTestId("ai-seat")).toContainText("für Netzwerke");
   await page.getByTestId("ai-seat").getByRole("button", { name: "Entlassen" }).click();
   await expect(page.getByText("KI-Kraft entlassen")).toBeVisible();
@@ -167,34 +169,30 @@ test("company chat, then close the company voluntarily", async ({ page }) => {
   await expect(sheet.getByText("Name ist frei")).toBeVisible();
   await hold(page, /Gedrückt halten zum Gründen/);
   await expect(page.getByText("Firma gegründet!")).toBeVisible();
-  await showOverview(page);
 
-  // The quarter close writes a system message into the chat.
+  // The quarter close writes a system message into the chat, which sits in the staff tab (ADR-167).
   await page.getByTestId("company-header").getByText("Demo: Quartal jetzt abschließen").click();
-  await page.getByText("Chat", { exact: true }).click();
+  await showStaff(page);
   const messages = page.getByTestId("chat-messages");
   await expect(messages.getByText(/Quartal .*: Umsatz/)).toBeVisible();
   await page.getByPlaceholder("Nachricht an dein Team").fill("Hallo Team!");
   await page.getByRole("button", { name: "Senden" }).click();
   await expect(messages.getByText("Hallo Team!")).toBeVisible();
-
-  // Back to the company page: by button and by Escape.
-  await page.getByTestId("chat-back").click();
+  // Inside the tab there is no way "back"; the other tabs are one tap away.
+  await expect(page.getByTestId("chat-back")).toHaveCount(0);
+  await showDashboard(page);
   await expect(messages).toHaveCount(0);
   await expect(page.getByTestId("mira")).toBeVisible();
-  await page.getByText("Chat", { exact: true }).click();
-  await expect(messages).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(messages).toHaveCount(0);
-  // The chat page of employees has the same way back.
+
+  // The chat page of employees leads back by button and by Escape.
   await page.goto("/career/chat");
   await expect(page.getByTestId("chat-messages")).toBeVisible();
+  await expect(page.getByTestId("chat-back")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page).toHaveURL("/company");
-  await showOverview(page);
 
   // Close: the cash comes back, the founding page shows the settlement.
-  await page.getByText("Übersicht", { exact: true }).click();
+  await showOverview(page);
   await page.getByTestId("close-company").click();
   await expect(page.getByRole("dialog", { name: "Firma auflösen" })).toBeVisible();
   await page.waitForTimeout(500); // the panel slides in
@@ -205,6 +203,7 @@ test("company chat, then close the company voluntarily", async ({ page }) => {
 
 test("draw a logo, keep a job as founder, go public", async ({ page }) => {
   // Level 12 (IPO), 300.000 € to found, upgrade and run the company.
+  await unfoldCompany(page);
   await page.addInitScript(() => {
     if (window.sessionStorage.getItem("nexa-test-prepared")) return;
     window.sessionStorage.setItem("nexa-test-prepared", "1");
