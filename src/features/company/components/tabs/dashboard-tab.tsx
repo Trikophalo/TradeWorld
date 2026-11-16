@@ -31,6 +31,7 @@ import { HistoryCard, QuarterReceipt } from "../company-parts";
 import { netProfit } from "../headquarters";
 import { HealthPanel, type AskMira } from "../health-panel";
 import { OfficeScene } from "../office-scene";
+import { StaffValueCard } from "../staff-value-card";
 import { PitchCard } from "../pitch-card";
 import { CompanyNewsCard, SituationCard } from "../situation";
 
@@ -86,6 +87,7 @@ export function DashboardTab({
       <div id="health" className="scroll-mt-24">
         <HealthPanel health={health} onAsk={onAsk} late={late} />
       </div>
+      <StaffValueCard company={company} id="staff-value" />
       <div className="grid items-start gap-4 *:min-w-0 lg:grid-cols-2 lg:gap-5">
         <div className="space-y-4">
           <CollapsibleSection

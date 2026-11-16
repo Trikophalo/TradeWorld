@@ -423,6 +423,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Black Label und ASP-Paket",
         text: "Über der ASP 10 steht jetzt das Black Label: Nur 1 % der Mint-Karten bekommen es, der Slab ist das 10-Fache der Karte wert.",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-bb1b6428",
+        title: "Deine Firma in Tabs",
+        text: "Zuerst das Dashboard mit allen wichtigen Zahlen, Grafiken, Timern und dem, was ansteht; im Controlling alle Hebel; Mitarbeiter mit Stellenplan, Chat…",
+      },
     ],
   },
   {

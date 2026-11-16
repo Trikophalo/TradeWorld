@@ -9,6 +9,7 @@ import { SatisfactionPanel } from "../../listed/satisfaction";
 import { TaskBoard } from "../../tasks/task-board";
 import { CompanyChat } from "../company-chat";
 import { TeamView, type HireRequest } from "../employer";
+import { StaffValueCard } from "../staff-value-card";
 
 /**
  * The staff tab (ADR-167, UI): the team with seats, applicants, postings, AI workers and trainings, the tasks, and
@@ -65,6 +66,7 @@ export function StaffTab({
           <div id="team" className="scroll-mt-24">
             <TeamView company={company} onHire={onHire} />
           </div>
+          <StaffValueCard company={company} />
           <div id="tasks" className="scroll-mt-24">
             <TaskBoard />
           </div>

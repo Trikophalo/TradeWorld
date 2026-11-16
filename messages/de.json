@@ -2407,7 +2407,12 @@
     },
     "payFactorTitle": "Lohnfaktor",
     "dangerZone": "Gefahrenzone",
-    "closeHint": "Die Firma wird endgültig aufgelöst. Das Firmengeld geht nach Abzug der Schulden an dich, alle Mitarbeiter verlieren ihren Job."
+    "closeHint": "Die Firma wird endgültig aufgelöst. Das Firmengeld geht nach Abzug der Schulden an dich, alle Mitarbeiter verlieren ihren Job.",
+    "planTitle": "Stellenplan",
+    "planSummary": "{people, plural, one {# Person} other {# Personen}} · {ai, plural, one {# KI-Kraft} other {# KI-Kräfte}} · {free, plural, =0 {kein Platz frei} one {# Platz frei} other {# Plätze frei}} · {postings, plural, =0 {keine Ausschreibung} one {# Ausschreibung} other {# Ausschreibungen}}",
+    "planPlayers": "Spieler im Team",
+    "planAi": "KI-Kräfte",
+    "planFree": "Freie Plätze"
   },
   "debt": {
     "title": "Schulden",
@@ -9164,6 +9169,21 @@
       "historyTitle": "Frühere Beschlüsse",
       "historyNone": "Noch keine abgeschlossene Abstimmung.",
       "historyTally": "Ja {yes}, Nein {no}"
+    },
+    "staffValue": {
+      "title": "Was jeder leistet und kostet",
+      "perMonth": "je Monat ({days} Tage)",
+      "noRevenue": "Noch keine abgeschlossene Betriebsstunde: Die Leistung zeigt sich ab der ersten Abrechnung.",
+      "ai": "KI-Kraft {n}",
+      "founder": "Gründer",
+      "worth": "Lohnt sich",
+      "notWorth": "Lohnt sich nicht",
+      "brings": "bringt {amount}",
+      "costs": "kostet {amount}",
+      "totalBrings": "Leistung gesamt",
+      "totalCosts": "Lohnkosten gesamt",
+      "totalNet": "Bleibt",
+      "hint": "Ein Monat sind hier {days} Tage. Leistung: Umsatz der letzten 24 Stunden × {days}, aufgeteilt nach dem Anteil an der Produktivität des Teams. Kosten: Spieler bekommen höchstens {hours} bezahlte Stunden am Tag, KI-Kräfte jede Betriebsstunde. Wareneinsatz und Fixkosten sind nicht abgezogen."
     }
   }
 }
