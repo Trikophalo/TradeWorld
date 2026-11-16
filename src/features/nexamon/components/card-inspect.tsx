@@ -345,9 +345,19 @@ function CopyRow({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <span className="font-pixel nums text-sm text-fg-1">{t("serial", { serial: copy.serial })}</span>
         <CopyQuality copy={copy} />
-        <span className="label-pixel text-fg-3" data-testid="copy-status">
-          {t(`status.${status}`)}
-        </span>
+        {status === "listed" && copy.listing ? (
+          <span
+            className="rounded-pill bg-info px-2 py-0.5 label-pixel text-on-semantic"
+            title={t("binder.listedHint", { count: 1, price: formatMoney(copy.listing.priceCents) })}
+            data-testid="copy-status"
+          >
+            {t("binder.listedTag")} · <span className="nums">{formatMoney(copy.listing.priceCents)}</span>
+          </span>
+        ) : (
+          <span className="label-pixel text-fg-3" data-testid="copy-status">
+            {t(`status.${status}`)}
+          </span>
+        )}
         <span className="ml-auto nums font-semibold text-fg-1" data-testid="copy-value">
           {formatMoney(copy.valueCents)}
         </span>

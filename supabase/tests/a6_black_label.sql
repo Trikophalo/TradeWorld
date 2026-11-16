@@ -94,17 +94,16 @@ select tests.assert(
   and (tests.nx_copy(:'k1')).condition = 'mint' and (tests.nx_copy(:'k1')).grading_until is null,
   'nexamon_finish_gradings(): forced, every mint copy gets the Black Label, the near mint copy only its 10');
 select tests.assert(
-  (select count(*) from public.notifications where player_id = :a and type_key = 'nexamon_graded' and title = 'Black Label!'
-      and body like '%Black Label%' and body like '%das 10-Fache der Karte%'
-      and (payload ->> 'grade')::integer = 11 and (payload ->> 'black_label')::boolean) = 4
-  and (select count(*) from public.notifications where player_id = :a and type_key = 'nexamon_graded' and title = 'ASP-Note: 10') = 1
-  and (select count(*) from public.feed_items where actor_id = :a and kind = 'nexamon_black_label'
-         and payload ->> 'card_key' = 'sa-001') = 4
+  -- the grade stays a surprise (5960): every copy is announced as a sealed package, without the grade
+  (select count(*) from public.notifications where player_id = :a and type_key = 'nexamon_graded' and title = 'Paket von ASP'
+      and body like '%versiegelte Paket%' and body not like '%Note%' and body not like '%Black Label%'
+      and not (payload ? 'grade') and not (payload ? 'black_label')) = 5
+  and (select count(*) from public.feed_items where actor_id = :a and kind = 'nexamon_black_label') = 0
   and public.feed_item_label('nexamon_black_label', '{"serial": 7}') = 'Black Label von ASP für eine Nexamon-Karte geholt (Nummer 7)'
   and public.feed_item_label('nexamon_pull', '{"serial": 1}') = 'legendäre Nexamon-Karte gezogen (Nummer 1)'
   and position($$'nexamon_black_label'$$ in pg_get_functiondef('public.news_show_build(timestamptz)'::regprocedure)) > 0
   and position($$'nexamon_pull'$$ in pg_get_functiondef('public.news_show_build(timestamptz)'::regprocedure)) > 0,
-  'a Black Label has its own notification text, is news for the friends and gossip for NEXA Nachrichten');
+  'the ASP notification never names the grade; no Black Label feed item before the owner opens the package (labels stay)');
 select tests.assert(
   (select count(*) from public.player_missions where player_id = :a and period_start = date '1999-01-03' and status = 'completed') = 2
   and (select count(*) from public.mission_templates where key = 'm_nexamon_first_black_label' and metric = 'nexamon_black_label'

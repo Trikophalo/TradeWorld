@@ -938,7 +938,8 @@
       "doneTitle": "Neu gewürfelt",
       "doneText": "Frische Missionen warten auf dich. Morgen kannst du wieder würfeln.",
       "failed": "Neu würfeln fehlgeschlagen"
-    }
+    },
+    "goTo": "{title} – dorthin gehen"
   },
   "richList": {
     "title": "Ranglisten",
@@ -8472,7 +8473,17 @@
       "toShop": "Zum Shop",
       "setCount": "{owned} von {total}",
       "tileLabel": "{name}, {count, plural, =0 {fehlt dir noch} one {# Kopie} other {# Kopien}}",
-      "missing": "fehlt"
+      "missing": "fehlt",
+      "title": "Deine Sammlung",
+      "keptHint": "{kept, plural, =0 {Keine Karte} one {# Karte} other {# Karten}} bleiben bei dir, {listed, plural, =0 {keine steht} one {# steht} other {# stehen}} zum Verkauf. Was du nicht einstellst, behältst du.",
+      "saleLabel": "Verkauf",
+      "sale": {
+        "all": "Alle",
+        "listed": "Zum Verkauf",
+        "kept": "Nicht zum Verkauf"
+      },
+      "listedTag": "Im Markt",
+      "listedHint": "{count, plural, one {Steht im Markt für {price}} other {# Kopien im Markt, ab {price}}}"
     },
     "filter": {
       "set": "Set",
@@ -8688,6 +8699,33 @@
         "ten": "Gem Mint: die 10!",
         "black": "Black Label!!!"
       }
+    },
+    "profile": {
+      "title": "Collectibles",
+      "summary": "{copies, plural, one {# Karte} other {# Karten}} · {distinct} von {total} Motiven",
+      "value": "Wert",
+      "copies": "Karten",
+      "distinct": "Motive",
+      "slabs": "Slabs",
+      "tens": "davon {count, plural, one {eine 10} other {# mal die 10}}",
+      "noTens": "noch keine 10",
+      "showcase": "Die wertvollsten Karten",
+      "cardLabel": "{name}, {count, plural, one {# Kopie} other {# Kopien}}, Wert {value}",
+      "missingLabel": "{name}, fehlt",
+      "viewAll": "Ganze Sammlung ansehen",
+      "toCollection": "Zu deiner Sammlung",
+      "sheetTitle": "Sammlung von {name}",
+      "sheetTitleOwn": "Deine Sammlung",
+      "sheetHint": "Jede Karte zeigt die beste Kopie. Tipp auf eine Karte für Wert und Markt.",
+      "sheetHintLocked": "Jede Karte zeigt die beste Kopie. Die Kartenseiten öffnen sich für dich ab Level {level}.",
+      "show": "Welche Karten zeigen",
+      "showOwned": "Im Besitz",
+      "showAll": "Alle Karten",
+      "setCount": "{owned} von {total}",
+      "emptyTitle": "Noch keine Karte",
+      "emptyText": "Kauf dein erstes Booster. Jede Karte, die du nicht verkaufst, bleibt in deiner Sammlung und ist hier für andere zu sehen.",
+      "toShop": "Zum Shop",
+      "hint": "Alle Karten, die du besitzt. Andere Spieler sehen sie auf deinem Profil."
     }
   }
 }
