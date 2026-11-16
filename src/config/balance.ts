@@ -547,6 +547,29 @@ export interface ProgressionConfig {
   readonly missionXpScaleMax: number;
   readonly missionCountScalePerLevel: number;
   readonly missionCountScaleMax: number;
+  /** ADR-166: how often per Berlin day a player may swap the open quick, daily and weekly missions. */
+  readonly missionResetsPerDay: number;
+  /**
+   * ADR-166: missions never ask for money the player does not have. Money targets are clamped to a share of the
+   * player's means when the mission is assigned; purchases need the cheapest offer to be affordable.
+   */
+  readonly missionAfford: {
+    /** One buy ("buy for X"): at most this share of the cash. */
+    readonly buyShareBps: number;
+    /** Trading volume: at most this share of cash plus open positions, by mission kind. */
+    readonly volumeShareBps: { readonly quick: number; readonly daily: number; readonly weekly: number };
+    /** Realised profit: at most this share of cash plus open positions, by mission kind. */
+    readonly profitShareBps: { readonly quick: number; readonly daily: number; readonly weekly: number };
+    /** Below these clamped targets a buy/volume or profit mission is not handed out at all. */
+    readonly minBuyTargetCents: number;
+    readonly minProfitTargetCents: number;
+    /** Cash needed for missions that only count buys or a company deposit. */
+    readonly minCashCents: number;
+    /** Weekly counted purchases: this share of the count has to be affordable right away. */
+    readonly weeklyCountShareBps: number;
+    /** Hiring AI workers: the company cash covers the wages of all AI workers for this many hours. */
+    readonly aiWageHours: number;
+  };
   /** From this level on, every `titleEveryLevels` levels brings a new prestige title. */
   readonly prestige: { readonly fromLevel: number; readonly titleEveryLevels: number };
   /**
@@ -2142,6 +2165,19 @@ export const BALANCE = {
      */
     missionCountScalePerLevel: 0.04,
     missionCountScaleMax: 3,
+    /** ADR-166: one swap of the open missions per real (Berlin) day. */
+    missionResetsPerDay: 1,
+    /** ADR-166: a buy fits into half the cash; volume and profit follow cash plus positions. */
+    missionAfford: {
+      buyShareBps: 5_000,
+      volumeShareBps: { quick: 5_000, daily: 10_000, weekly: 30_000 },
+      profitShareBps: { quick: 100, daily: 200, weekly: 1_000 },
+      minBuyTargetCents: 2_000,
+      minProfitTargetCents: 500,
+      minCashCents: 1_000,
+      weeklyCountShareBps: 5_000,
+      aiWageHours: 6,
+    },
     // Alpha bonus: all XP count double (owner decision). 1 = spec values.
     // Typed as `number` (not the literal 2) so that code may compare it with 1.
     xpMultiplier: 2 as number,

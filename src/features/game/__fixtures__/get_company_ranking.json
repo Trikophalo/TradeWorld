@@ -1,6 +1,6 @@
 {
-  "mine": { "rank": 44, "value_cents": 199231 },
-  "total": 47,
+  "mine": { "rank": 44, "value_cents": 57351 },
+  "total": 48,
   "entries": [
     {
       "kind": "player",
@@ -14,7 +14,7 @@
       "founder": "Lars_Kursrutsch",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "492fa8ca-8bfe-49ea-baf5-44ce014c2a9d",
+      "company_id": "e7417dc7-98a2-4b45-821f-abf84beb319b",
       "value_cents": 959140000,
       "revenue_cents": null
     },
@@ -30,7 +30,7 @@
       "founder": "Float_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "7594cc64-ede1-4e8d-a042-0f269a52e0fe",
+      "company_id": "e1f03f53-0906-4e40-ad6e-18a0895a9e3a",
       "value_cents": 110000000,
       "revenue_cents": null
     },
@@ -66,31 +66,15 @@
       "founder": "Fenja_Firma",
       "is_mine": false,
       "team_size": 6,
-      "company_id": "4f3c8cf8-1f79-45ff-96fa-c900728c1a9a",
-      "value_cents": 106493242,
+      "company_id": "8a86a17e-20da-4d91-821c-853a6fda0a00",
+      "value_cents": 106728515,
       "revenue_cents": 0
     },
     {
       "kind": "player",
       "logo": null,
-      "name": "Gipfelwerk",
-      "rank": 4,
-      "tier": "ag",
-      "color": "#336699",
-      "sector": "retail",
-      "ticker": "GIP",
-      "founder": "Pop_Frida",
-      "is_mine": false,
-      "team_size": 1,
-      "company_id": "e6fd2cc3-9316-4cca-aa71-6fbb887a590f",
-      "value_cents": 99810000,
-      "revenue_cents": null
-    },
-    {
-      "kind": "player",
-      "logo": null,
       "name": "Wackelwerk",
-      "rank": 5,
+      "rank": 4,
       "tier": "ag",
       "color": "#336699",
       "sector": "retail",
@@ -98,10 +82,26 @@
       "founder": "Esc_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "42ac2fd1-105a-4a56-91bd-a2f18f7f4f7f",
-      "value_cents": 97620424,
+      "company_id": "1eefdc19-f61e-4158-b515-9d9a78cb8afc",
+      "value_cents": 105637048,
+      "revenue_cents": null
+    },
+    {
+      "kind": "player",
+      "logo": null,
+      "name": "Gipfelwerk",
+      "rank": 5,
+      "tier": "ag",
+      "color": "#336699",
+      "sector": "retail",
+      "ticker": "GIP",
+      "founder": "Pop_Frida",
+      "is_mine": false,
+      "team_size": 1,
+      "company_id": "45dcac2b-ee2c-4303-9f40-5df22f649766",
+      "value_cents": 91680000,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-16T17:08:48.722746+00:00"
+  "server_time": "2026-11-16T17:18:36.762261+00:00"
 }

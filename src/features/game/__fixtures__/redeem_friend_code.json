@@ -1,10 +1,10 @@
 {
-  "code": "NEXA-D6CT",
+  "code": "NEXA-5S2Q",
   "invited": 0,
   "redeemed": true,
   "paid_cents": 500000,
   "bonus_cents": 500000,
-  "redeemed_at": "2026-11-16T17:08:53.305369+00:00",
-  "redeemed_from": { "tag": "BU4J", "nickname": "Fixture_Werber" },
+  "redeemed_at": "2026-11-16T17:18:41.263239+00:00",
+  "redeemed_from": { "tag": "XASZ", "nickname": "Fixture_Werber" },
   "cash_after_cents": 1500000
 }

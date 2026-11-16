@@ -1,10 +1,10 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 110, "gap_cents": 683 }, "rank": 111, "net_worth_cents": 1019317 },
-  "total": 272,
+  "me": { "next": { "name": "Vera", "rank": 111, "gap_cents": 603 }, "rank": 112, "net_worth_cents": 1019397 },
+  "total": 275,
   "entries": [
     {
       "id": "0e7a3000-0000-4000-8000-0000000000b1",
-      "tag": "UBT2",
+      "tag": "6M4S",
       "kind": "player",
       "name": "Nx_Bruno",
       "rank": 1,
@@ -17,7 +17,7 @@
     },
     {
       "id": "0e170001-0000-4000-8000-0000000001a1",
-      "tag": "BCGM",
+      "tag": "Y2K9",
       "kind": "player",
       "name": "Wanda_Wohnt",
       "rank": 2,
@@ -30,7 +30,7 @@
     },
     {
       "id": "0f3f3f3f-0000-4000-8000-0000000000f1",
-      "tag": "NERM",
+      "tag": "ZW57",
       "kind": "player",
       "name": "Fenja_Firma",
       "rank": 3,
@@ -38,12 +38,12 @@
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 126868499,
+      "net_worth_cents": 127022499,
       "rank_change_24h": null
     },
     {
       "id": "09c19c19-0000-4000-8000-0000000000f1",
-      "tag": "S2S3",
+      "tag": "DZUQ",
       "kind": "player",
       "name": "Float_Frida",
       "rank": 4,
@@ -55,18 +55,18 @@
       "rank_change_24h": null
     },
     {
-      "id": "0ba771e0-0000-4000-8000-0000000000a1",
-      "tag": "UH9T",
+      "id": "09a19a19-0000-4000-8000-0000000000f1",
+      "tag": "593R",
       "kind": "player",
-      "name": "Bat_Anna",
+      "name": "Esc_Frida",
       "rank": 5,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 101525000,
+      "net_worth_cents": 107256000,
       "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-16T17:08:47.787705+00:00"
+  "server_time": "2026-11-16T17:18:35.905074+00:00"
 }

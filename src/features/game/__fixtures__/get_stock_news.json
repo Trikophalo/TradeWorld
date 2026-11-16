@@ -2,42 +2,42 @@
   "items": [
     {
       "id": 5,
-      "body": "Ein Werk soll Grenzwerte überschritten haben. Bußgelder sind wahrscheinlich. Sicher ist das nicht.",
-      "name": "Sonnenkern Fusion",
-      "due_at": "2026-11-16T18:45:29.016012+00:00",
+      "body": "Ein Sparprogramm wirkt schneller als gedacht. Die Marge steigt. Sicher ist das nicht.",
+      "name": "GenoVita Biotech",
+      "due_at": "2026-11-16T18:49:22.294336+00:00",
       "status": "open",
-      "ticker": "FSN",
-      "headline": "Umweltskandal bei Sonnenkern Fusion",
+      "ticker": "GNV",
+      "headline": "GenoVita Biotech senkt die Kosten deutlich",
       "move_bps": null,
-      "strength": 3,
-      "direction": "down",
-      "published_at": "2026-11-16T18:08:53.314854+00:00"
+      "strength": 1,
+      "direction": "up",
+      "published_at": "2026-11-16T18:18:41.270067+00:00"
     },
     {
       "id": 4,
-      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Helix Robotik tut sich in der nächsten Stunde etwas, und zwar nach unten. Meine Quelle ist seriös, sie trägt immerhin eine Krawatte.",
-      "name": "Helix Robotik",
-      "due_at": "2026-11-16T17:32:35.246606+00:00",
-      "status": "confirmed",
-      "ticker": "HLX",
-      "headline": "Mr. Doodle Dangles Geheimtipp",
-      "move_bps": -590,
-      "strength": 2,
-      "direction": "down",
-      "published_at": "2026-11-16T17:08:35.246606+00:00"
-    },
-    {
-      "id": 3,
-      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Rheinkraft Werke tut sich in der nächsten Stunde etwas, und zwar nach unten. Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.",
+      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Rheinkraft Werke tut sich in der nächsten Stunde etwas, und zwar nach unten. Meine Quelle ist seriös, sie trägt immerhin eine Krawatte.",
       "name": "Rheinkraft Werke",
-      "due_at": "2026-11-16T17:08:34.077275+00:00",
+      "due_at": "2026-11-16T17:39:21.931929+00:00",
       "status": "confirmed",
       "ticker": "RKW",
       "headline": "Mr. Doodle Dangles Geheimtipp",
-      "move_bps": -920,
+      "move_bps": -748,
       "strength": 2,
       "direction": "down",
-      "published_at": "2026-11-16T17:08:34.077275+00:00"
+      "published_at": "2026-11-16T17:18:21.931929+00:00"
+    },
+    {
+      "id": 3,
+      "body": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Pixelwerk Studios geht bald nach oben. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
+      "name": "Pixelwerk Studios",
+      "due_at": "2026-11-16T17:18:20.8334+00:00",
+      "status": "fizzled",
+      "ticker": "PXW",
+      "headline": "Der heiße Draht: Pixelwerk Studios",
+      "move_bps": null,
+      "strength": 2,
+      "direction": "up",
+      "published_at": "2026-11-16T17:18:20.8334+00:00"
     }
   ],
   "reliability_bps": 7500

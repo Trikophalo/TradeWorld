@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "1cd9611b-da1f-4243-8b62-5a6b5a99158b",
+    "id": "215da04c-e615-4eb4-aa58-355d53129460",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "d21331b8-a414-66aa-de07-f036108fc91d",
+      "id": "115a90f2-e25a-2cd2-81e5-08f76964ea4b",
       "logo": null,
-      "name": "Nordlicht Logistik AG",
-      "color": "#7AA2F7",
+      "name": "QuantenSprung Labs",
+      "color": "#35D0BA",
       "is_ai": true,
-      "sector": "logistics",
-      "ticker": "NDL"
+      "sector": "tech",
+      "ticker": "QSL"
     },
     "presence": {
-      "fire_at": "2026-11-21T17:08:51.463382+00:00",
+      "fire_at": "2026-11-21T17:18:39.291727+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-16T17:08:51.463382+00:00"
+      "last_active_at": "2026-11-16T17:18:39.291727+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-16T17:08:51.580858+00:00",
+    "started_at": "2026-11-16T17:18:39.416982+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

@@ -34,7 +34,7 @@
   "limits": { "max_grading": 10, "max_listings": 30, "packs_per_minute": 20 },
   "unlocked": true,
   "pack_size": 5,
-  "collection": { "copies": 10, "graded": 0, "listed": 0, "grading": 0, "distinct": 9, "value_cents": 7705 },
-  "server_time": "2026-11-16T17:08:54.470415+00:00",
+  "collection": { "copies": 10, "graded": 0, "listed": 0, "grading": 0, "distinct": 9, "value_cents": 4372 },
+  "server_time": "2026-11-16T17:18:42.311934+00:00",
   "unlock_level": 10
 }

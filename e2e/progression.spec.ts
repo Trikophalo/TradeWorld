@@ -63,6 +63,29 @@ test("quick missions count real actions and pay XP when claimed", async ({ page 
   await expect(page.getByText("Belohnung abgeholt")).toBeVisible();
 });
 
+test("the open missions can be re-rolled once per day (ADR-166)", async ({ page }) => {
+  await preparePlayer(page);
+  await page.goto("/missions");
+  await expect(page.getByText("Sieh dir 3 Aktien an")).toBeVisible();
+  const button = page.getByTestId("missions-reset-button");
+  await expect(button).toBeEnabled();
+  await expect(page.getByTestId("missions-reset-hint")).toContainText("Einmal am Tag");
+
+  // It asks first: the progress of the open missions is lost.
+  await button.click();
+  await expect(page.getByText("Missionen neu würfeln?")).toBeVisible();
+  await page.getByTestId("missions-reset-confirm").click();
+  await expect(page.getByText("Neu gewürfelt").first()).toBeVisible();
+
+  // Other missions now, the story stays, and the button rests until tomorrow.
+  await expect(page.getByText("Sieh dir 3 Aktien an")).toHaveCount(0);
+  await expect(page.getByText("Dein erster Trade")).toBeVisible();
+  await expect(button).toBeDisabled();
+  await expect(page.getByTestId("missions-reset-hint")).toContainText("Morgen wieder");
+  await page.reload();
+  await expect(page.getByTestId("missions-reset-button")).toBeDisabled();
+});
+
 test("rankings: Forbes 100 of real players, everyone with the AI tycoons, top companies (ADR-074)", async ({
   page,
 }) => {

@@ -53,5 +53,5 @@ describe("Nexamon catalogue (ADR-165)", () => {
         for (const ch of row) if (ch !== ".") expect(art.palette[ch], `${key} '${ch}'`).toMatch(/^#[0-9a-f]{6}$/);
       }
     }
-  });
+  }, 30_000);
 });

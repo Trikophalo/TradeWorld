@@ -1436,3 +1436,10 @@ select public.get_nexamon_collection('mystic_energy');
 select public.crack_nexamon_slab(gen_random_uuid(), :'fx_nx2');
 \o
 reset role;
+
+-- mission reset (ADR-166): the first fixture player swaps the open missions
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/reset_missions.json
+select public.reset_missions(gen_random_uuid());
+\o
+reset role;
