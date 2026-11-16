@@ -103,3 +103,60 @@ export function usedKeys(pick: ScriptPick): string[] {
 export function movePercent(bps: number): string {
   return `${(Math.abs(bps) / 100).toLocaleString("de-DE", { maximumFractionDigits: 1 })} %`;
 }
+
+/** The {placeholders} in a text, each once, in order of appearance. */
+export function scriptPlaceholders(text: string): string[] {
+  return [...new Set([...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]!))];
+}
+
+/** Something a topic could tell right now (ADR-169). */
+export interface TopicCandidate {
+  /** Key of the topic in newsShow.topics.list (and of its script). */
+  topic: string;
+  /** The player it is about, if any: a show tells one story per player. */
+  player?: string | null;
+}
+
+/**
+ * The topics of a show (ADR-169), the same draw as news_show_topics() in the database: `topics.count` times the best
+ * candidate left, where best means (1) its topic did not run in the last show, (2) its group has the fewest stories
+ * in this show so far, (3) the weighted lot (-ln(u) / weight, smallest first). One story per topic and per player;
+ * players in `seen` already have a story in this show. Topics that are not in the list or weigh nothing never come.
+ */
+export function pickTopics<T extends TopicCandidate>(
+  candidates: readonly T[],
+  lastTopics: readonly string[],
+  rng: () => number,
+  rules: Rules = NEWS_SHOW_RULES,
+  seen: readonly string[] = [],
+): T[] {
+  const list = rules.topics.list as Readonly<Record<string, { group: string; weight: number } | undefined>>;
+  const picks: T[] = [];
+  const players = new Set(seen);
+  const groups = new Map<string, number>();
+  const pool = candidates.filter((c) => (list[c.topic]?.weight ?? 0) > 0).map((c) => ({ c, lot: rng() }));
+  while (picks.length < rules.topics.count) {
+    let best: { c: T; rank: [number, number, number] } | null = null;
+    for (const { c, lot } of pool) {
+      if (picks.some((p) => p.topic === c.topic) || (c.player != null && players.has(c.player))) continue;
+      const entry = list[c.topic]!;
+      const rank: [number, number, number] = [
+        lastTopics.includes(c.topic) ? 1 : 0,
+        groups.get(entry.group) ?? 0,
+        -Math.log(Math.max(lot, 1e-9)) / entry.weight,
+      ];
+      if (
+        !best ||
+        rank[0] < best.rank[0] ||
+        (rank[0] === best.rank[0] && (rank[1] < best.rank[1] || (rank[1] === best.rank[1] && rank[2] < best.rank[2])))
+      )
+        best = { c, rank };
+    }
+    if (!best) break;
+    picks.push(best.c);
+    if (best.c.player != null) players.add(best.c.player);
+    const group = list[best.c.topic]!.group;
+    groups.set(group, (groups.get(group) ?? 0) + 1);
+  }
+  return picks;
+}
