@@ -84,7 +84,11 @@ select tests.assert(
           || array['get_battle', 'battle_join', 'battle_leave', 'battle_sync', 'battle_answer']
           -- chats with friends (9y)
           || array['get_chats', 'get_chat', 'mark_chat_read', 'open_direct_chat', 'create_group_chat', 'post_chat_message',
-                   'add_group_member', 'remove_group_member', 'leave_group', 'rename_group']) x),
+                   'add_group_member', 'remove_group_member', 'leave_group', 'rename_group']
+          -- listed companies (a3)
+          || array['get_listed_company', 'company_invest', 'company_invest_stop', 'company_declare_dividend',
+                   'company_books_close', 'company_tax_pay', 'company_tax_advisor', 'get_company_accounting',
+                   'get_company_board', 'board_propose', 'board_vote']) x),
   'authenticated can execute exactly the 9 helpers and the RPCs up to the market popularity (9g)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace

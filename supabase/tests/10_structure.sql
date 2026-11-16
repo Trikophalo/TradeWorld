@@ -148,7 +148,11 @@ select tests.assert(
            'get_battle', 'battle_join', 'battle_leave', 'battle_sync', 'battle_answer',
            -- chats with friends (ADR-164)
            'get_chats', 'get_chat', 'mark_chat_read', 'open_direct_chat', 'create_group_chat', 'post_chat_message',
-           'add_group_member', 'remove_group_member', 'leave_group', 'rename_group']
+           'add_group_member', 'remove_group_member', 'leave_group', 'rename_group',
+           -- listed companies (ADR-167)
+           'get_listed_company', 'company_invest', 'company_invest_stop', 'company_declare_dividend',
+           'company_books_close', 'company_tax_pay', 'company_tax_advisor', 'get_company_accounting',
+           'get_company_board', 'board_propose', 'board_vote']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')
@@ -193,6 +197,8 @@ select tests.assert(
       'rental_offers', 'rental_tenancies', 'rental_payments',
       'battles', 'battle_players', 'battle_answers',
       'friend_chats', 'friend_chat_members', 'friend_chat_messages',
+      'listed_companies', 'company_investments', 'listed_company_hours', 'company_budgets', 'company_dividends',
+      'board_motions', 'board_votes', 'company_tax_periods',
       'rate_limits', 'player_requests', 'player_login_events', 'push_deliveries', 'invite_code_redemptions',
       'price_ticks_default']) as t
      -- (a table from a later migration is not there yet on an older database)
