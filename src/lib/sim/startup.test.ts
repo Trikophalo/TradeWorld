@@ -24,6 +24,9 @@ import {
   qualityTarget,
   startupValueCents,
   type StartupQuarterInput,
+  aiSubscribedE6,
+  issueAiFactor,
+  postIssueFairCents,
 } from "./startup.ts";
 
 const b = (n: number) => BigInt(n);
@@ -496,5 +499,27 @@ describe("task momentum lifts demand (ADR-148)", () => {
     expect(closeStartupHour(state, { ...input, taskMomentum: 1 }).demandCents).toBe(base.demandCents);
     // below 1 is ignored (floor at 1)
     expect(closeStartupHour(state, { ...input, taskMomentum: 0.5 }).demandCents).toBe(base.demandCents);
+  });
+});
+
+describe("capital increase at a pushed price (ADR-170)", () => {
+  it("fair value after the issue includes the new money", () => {
+    // 100.000 EUR company, 1 M shares, 250.000 new shares at 1 EUR
+    expect(postIssueFairCents(10_000_000, 1_000_000, 250_000, 100)).toBe(28);
+    expect(postIssueFairCents(500_000_000, 1_000_000, 100_000, 270)).toBeCloseTo(479.09, 2);
+  });
+  it("AI investors subscribe only up to the fair value", () => {
+    expect(issueAiFactor(100, 100)).toBe(1);
+    expect(issueAiFactor(100, 50)).toBe(1);
+    expect(issueAiFactor(80, 100)).toBe(0);
+    expect(issueAiFactor(0, 100)).toBe(0);
+    expect(issueAiFactor(100, 0)).toBe(0);
+  });
+  it("without AI investors a pumped capital increase raises only what players subscribe", () => {
+    const fair = postIssueFairCents(10_000_000, 1_000_000, 250_000, 100);
+    expect(
+      aiSubscribedE6(250_000_000_000, 0, 1, 3_600_000, 3_600_000, BALANCE.startups, issueAiFactor(fair, 100)),
+    ).toBe(0);
+    expect(aiSubscribedE6(250_000_000_000, 0, 1, 3_600_000, 3_600_000, BALANCE.startups, 1)).toBe(250_000_000_000);
   });
 });
