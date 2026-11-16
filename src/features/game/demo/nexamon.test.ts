@@ -4,7 +4,7 @@ import { NEXAMON_CARDS, nexamonCard } from "@/config/nexamon";
 import { nexamonAiAskCents, nexamonGradingFeeCents } from "@/lib/sim/nexamon";
 import { createRng } from "@/lib/sim/rng";
 import { GameError } from "../types";
-import { createNexamonEngine, type DemoNexamonState } from "./nexamon";
+import { createNexamonEngine, demoOtherCopies, type DemoNexamonState } from "./nexamon";
 
 const cfg = BALANCE.nexamon;
 const HOUR = 3_600_000;
@@ -21,6 +21,8 @@ function setup(level = 10, cash = 100_000_000, seed = 1) {
     tracked: {} as Record<string, number>,
     /** Forced rolls, used before the seeded generator. */
     rolls: [] as number[],
+    /** Levels of the made-up players the demo knows, by lower-case nickname. */
+    others: { anna: 14, bruno: 4 } as Record<string, number>,
   };
   const requests = new Map<string, unknown>();
   const engine = createNexamonEngine({
@@ -50,6 +52,7 @@ function setup(level = 10, cash = 100_000_000, seed = 1) {
     },
     now: () => world.now,
     random: () => world.rolls.shift() ?? rng.next(),
+    playerLevel: (nickname) => world.others[nickname.toLowerCase()] ?? null,
   });
   return { world, engine };
 }
@@ -283,7 +286,8 @@ describe("Nexamon in the demo (ADR-165)", () => {
     expect(Math.abs(slab.valueCents - details.card.valueCents * 10)).toBeLessThanOrEqual(5);
     expect(details.blackLabels).toBe(1);
     expect(details.graded).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-    expect(world.feed).toEqual([`nexamon_black_label:${ultra.cardKey}`]);
+    // the grade stays a surprise until the package is opened: no feed item
+    expect(world.feed).toEqual([]);
     expect(world.tracked.nexamon_black_labels).toBe(1);
     // a Black Label is a 10 for the mission of the first 10 as well
     expect(world.tracked.nexamon_tens).toBe(2);
@@ -362,5 +366,98 @@ describe("Nexamon in the demo (ADR-165)", () => {
     const card = NEXAMON_CARDS[0]!;
     state.cards[card.key]!.valueE4 = 1;
     expect((await engine.nexamonCard(card.key)).card.valueCents).toBe(card.startPriceCents);
+  });
+
+  describe("a player's collectibles on their profile", () => {
+    it("shows the own collection: one row per card with its best copy, most valuable first", async () => {
+      const { engine, world } = setup();
+      world.rolls.push(...packRolls(0.5, 0.5), ...packRolls(0.5, 0.5));
+      const first = await engine.buyNexamonPack("r1", "mystic_energy");
+      await engine.buyNexamonPack("r2", "mystic_energy");
+      const own = await engine.playerNexamon(null);
+      const { copies } = await engine.nexamonCollection();
+      expect(own.nickname).toBe("Demo");
+      expect(own.isMe).toBe(true);
+      expect(own.unlocked).toBe(true);
+      expect(own.summary).toEqual({
+        copies: 10,
+        distinct: new Set(copies.map((c) => c.cardKey)).size,
+        total: 231,
+        valueCents: copies.reduce((sum, c) => sum + c.valueCents, 0),
+        graded: 0,
+        tens: 0,
+      });
+      // the same rolls twice: every card is owned twice
+      expect(own.cards).toHaveLength(5);
+      for (const card of own.cards) {
+        expect(card.copies).toBe(2);
+        expect(card.grade).toBeNull();
+        expect(card.totalCents).toBe(
+          copies.filter((c) => c.cardKey === card.cardKey).reduce((sum, c) => sum + c.valueCents, 0),
+        );
+        expect(card.valueCents).toBe(
+          Math.max(...copies.filter((c) => c.cardKey === card.cardKey).map((c) => c.valueCents)),
+        );
+      }
+      expect(own.cards.map((c) => c.valueCents)).toEqual([...own.cards.map((c) => c.valueCents)].sort((a, b) => b - a));
+      expect(own.sets.map((s) => [s.key, s.cards, s.distinct, s.copies])).toEqual([
+        ["mystic_energy", 77, 5, 10],
+        ["super_apex", 77, 0, 0],
+        ["prismatic_peak", 77, 0, 0],
+      ]);
+      // by the own name it is the same answer
+      expect((await engine.playerNexamon(" demo ")).cards).toEqual(own.cards);
+
+      // a slab is the best copy of its card and counts as a slab (and a ten)
+      const copyId = first.cards[4]!.copyId;
+      await engine.gradeNexamonCard("g1", copyId);
+      world.now += HOUR + 1;
+      world.rolls.push(0.999);
+      const graded = await engine.playerNexamon(null);
+      expect(graded.summary.graded).toBe(1);
+      expect(graded.summary.tens).toBe(1);
+      const slab = graded.cards.find((c) => c.cardKey === first.cards[4]!.cardKey)!;
+      expect(slab.grade).toBeGreaterThanOrEqual(10);
+      expect(slab.serial).toBe(first.cards[4]!.serial);
+      expect(graded.cards[0]!.valueCents).toBeGreaterThanOrEqual(slab.valueCents);
+    });
+
+    it("caps the cards with the limit, never the numbers", async () => {
+      const { engine } = setup();
+      await engine.buyNexamonPack("r1", "mystic_energy");
+      const all = await engine.playerNexamon(null);
+      const top = await engine.playerNexamon(null, 2);
+      expect(top.cards).toEqual(all.cards.slice(0, 2));
+      expect(top.summary).toEqual(all.summary);
+      expect((await engine.playerNexamon(null, 0)).cards).toHaveLength(1);
+      expect((await engine.playerNexamon(null, 100_000)).cards).toHaveLength(all.cards.length);
+    });
+
+    it("shows a made-up friend's cards: the same every time, slabs among them, nothing below the level", async () => {
+      const { engine, world } = setup(1);
+      // the viewer is a beginner: the profile of others still works
+      const anna = await engine.playerNexamon("Anna");
+      expect(anna.nickname).toBe("Anna");
+      expect(anna.isMe).toBe(false);
+      expect(anna.unlocked).toBe(true);
+      expect(anna.summary.copies).toBe(demoOtherCopies("Anna", 14, 10).length);
+      expect(anna.summary.copies).toBe(5 * 6 * 5);
+      expect(anna.summary.distinct).toBe(anna.cards.length);
+      expect(anna.summary.graded).toBeGreaterThan(0);
+      expect(anna.summary.valueCents).toBe(anna.cards.reduce((sum, c) => sum + c.totalCents, 0));
+      expect(anna.sets.reduce((sum, s) => sum + s.copies, 0)).toBe(anna.summary.copies);
+      expect(anna.cards.some((c) => c.grade !== null)).toBe(true);
+      expect(anna.cards.every((c) => nexamonCard(c.cardKey)?.set === c.set)).toBe(true);
+      expect((await engine.playerNexamon("anna")).cards).toEqual(anna.cards);
+      expect((await engine.playerNexamon("Anna", 8)).cards).toEqual(anna.cards.slice(0, 8));
+      // they live on the profile only: the demo's populations and the own collection do not know them
+      expect(world.nexamon!.copies).toHaveLength(0);
+
+      const bruno = await engine.playerNexamon("Bruno");
+      expect(bruno.unlocked).toBe(false);
+      expect(bruno.summary.copies).toBe(0);
+      expect(bruno.cards).toEqual([]);
+      expect(await key(engine.playerNexamon("Niemand"))).toBe("player_not_found");
+    });
   });
 });

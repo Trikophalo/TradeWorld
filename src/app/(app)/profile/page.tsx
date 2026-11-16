@@ -11,6 +11,7 @@ import { Reveal } from "@/features/progression/components/reveal";
 import { FriendCodeCard } from "@/features/friends/components/friend-code";
 import { MyTagCard } from "@/features/friends/components/my-tag";
 import { MyFigureCard } from "@/features/wardrobe/components/figure-card";
+import { ProfileNexamon } from "@/features/nexamon/components/profile-collection";
 import { LevelCard } from "@/features/progression/components/level-card";
 import { UnlockList } from "@/features/progression/components/unlock-list";
 import { AccountReset } from "@/features/settings/components/account-reset";
@@ -32,6 +33,10 @@ export default async function ProfilePage() {
           <LevelCard />
           <Reveal feature="profileWardrobe">
             <MyFigureCard />
+          </Reveal>
+          {/* What the player owns in cards, as others see it on the profile (ADR-165) */}
+          <Reveal feature="nexamon">
+            <ProfileNexamon nickname={null} />
           </Reveal>
           <MyTagCard />
           <FriendCodeCard />

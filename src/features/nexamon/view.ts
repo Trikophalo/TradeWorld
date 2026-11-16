@@ -10,7 +10,7 @@ import {
 } from "@/config/nexamon";
 import type { NexamonCondition } from "@/config/nexamon-rules";
 import { formatMoney, formatMoneyShort } from "@/lib/format";
-import type { NexamonCardStats, NexamonCopy, NexamonListing } from "@/features/game/nexamon-types";
+import type { NexamonCardStats, NexamonCopy, NexamonListing, PlayerNexamonCard } from "@/features/game/nexamon-types";
 import {
   NEXAMON_BLACK_LABEL_GRADE,
   nexamonConditionBps,
@@ -114,15 +114,25 @@ export type BinderOwnership = "all" | "owned" | "missing" | "duplicates";
 export type BinderSort = "number" | "value" | "newest";
 export const BINDER_OWNERSHIPS: readonly BinderOwnership[] = ["all", "owned", "missing", "duplicates"];
 export const BINDER_SORTS: readonly BinderSort[] = ["number", "value", "newest"];
+/** listed: cards with a copy on the market. kept: cards with a copy that is not for sale. */
+export type BinderSale = "all" | "listed" | "kept";
+export const BINDER_SALES: readonly BinderSale[] = ["all", "listed", "kept"];
 
 export interface BinderFilter {
   set: NexamonSetKey | "all";
   rarity: NexamonRarity | "all";
   ownership: BinderOwnership;
   sort: BinderSort;
+  sale: BinderSale;
 }
 
-export const DEFAULT_BINDER_FILTER: BinderFilter = { set: "all", rarity: "all", ownership: "all", sort: "number" };
+export const DEFAULT_BINDER_FILTER: BinderFilter = {
+  set: "all",
+  rarity: "all",
+  ownership: "all",
+  sort: "number",
+  sale: "all",
+};
 
 export interface BinderEntry {
   stats: NexamonCardStats;
@@ -173,6 +183,8 @@ export function binderEntries(
     if (filter.ownership === "owned" && own.length === 0) continue;
     if (filter.ownership === "missing" && own.length > 0) continue;
     if (filter.ownership === "duplicates" && own.length < 2) continue;
+    if (filter.sale === "listed" && !own.some((c) => c.listing !== null)) continue;
+    if (filter.sale === "kept" && !own.some((c) => c.listing === null)) continue;
     entries.push({
       stats,
       card,
@@ -208,6 +220,8 @@ export interface CollectionTotals {
   distinct: number;
   duplicates: number;
   valueCents: number;
+  /** Copies on the market right now; all others simply stay in the collection. */
+  listed: number;
 }
 
 export function collectionTotals(copies: readonly NexamonCopy[]): CollectionTotals {
@@ -217,6 +231,7 @@ export function collectionTotals(copies: readonly NexamonCopy[]): CollectionTota
     distinct,
     duplicates: copies.length - distinct,
     valueCents: copies.reduce((sum, c) => sum + c.valueCents, 0),
+    listed: copies.filter((c) => c.listing !== null).length,
   };
 }
 
@@ -425,4 +440,31 @@ export function nexamonNotificationLink(typeKey: string, link: string | null): s
   if (typeKey === "nexamon_graded") return "/nexamon?tab=grading";
   if (typeKey === "nexamon_sale") return "/nexamon?tab=market&view=mine";
   return link;
+}
+
+// ---------------------------------------------------------------------------------------------- profile
+
+export interface ProfileBinderGroup {
+  set: NexamonSetKey;
+  /** Different cards of the set the player owns, and how many the set has. */
+  owned: number;
+  total: number;
+  /** The cards of the set in number order; `owned` is null for a card the player does not have. */
+  entries: { card: NexamonCard; owned: PlayerNexamonCard | null }[];
+}
+
+/** Somebody's binder for their profile: every set in number order, or only what they own. */
+export function profileBinder(cards: readonly PlayerNexamonCard[], onlyOwned: boolean): ProfileBinderGroup[] {
+  const byKey = new Map(cards.map((c) => [c.cardKey, c]));
+  return NEXAMON_SETS.map((set) => {
+    const all = NEXAMON_CARDS.filter((card) => card.set === set)
+      .sort((a, b) => a.number - b.number)
+      .map((card) => ({ card, owned: byKey.get(card.key) ?? null }));
+    return {
+      set,
+      owned: all.filter((e) => e.owned !== null).length,
+      total: all.length,
+      entries: onlyOwned ? all.filter((e) => e.owned !== null) : all,
+    };
+  }).filter((group) => group.entries.length > 0);
 }

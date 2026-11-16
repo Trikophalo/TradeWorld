@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { BALANCE } from "@/config/balance";
 import { NEXAMON_SET_SIZE, NEXAMON_SETS } from "@/config/nexamon";
@@ -16,7 +17,7 @@ import { Reveal, useDisclosed } from "@/features/progression/components/reveal";
 import { useVisitTour } from "@/features/tutorial/use-visit-tour";
 import { formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { useNexamonCollection, useNexamonOverview, useRevealedSlabs } from "../hooks";
+import { useNexamonCollection, useNexamonOverview, useRememberedFilters, useRevealedSlabs } from "../hooks";
 import { formatFactor, splitGraded } from "../view";
 import { Binder } from "./binder";
 import { GradingDesk } from "./grading-desk";
@@ -27,6 +28,8 @@ import { Shop } from "./shop";
 
 export type NexamonTab = "shop" | "collection" | "market" | "grading";
 const TABS: readonly NexamonTab[] = ["shop", "collection", "market", "grading"];
+const HUB_DEFAULTS: { tab: NexamonTab } = { tab: "shop" };
+const HUB_ALLOWED = { tab: TABS } as const;
 
 /**
  * The Nexamon area (ADR-165): shop, binder, card market and the ASP desk as tabs of one page. The tab, the market
@@ -50,7 +53,12 @@ function Hub() {
   const params = useSearchParams();
   const router = useRouter();
   const rawTab = params.get("tab");
-  const tab: NexamonTab = TABS.includes(rawTab as NexamonTab) ? (rawTab as NexamonTab) : "shop";
+  const [remembered, remember] = useRememberedFilters<{ tab: NexamonTab }>("hub", HUB_DEFAULTS, HUB_ALLOWED);
+  const tab: NexamonTab = TABS.includes(rawTab as NexamonTab) ? (rawTab as NexamonTab) : remembered.tab;
+  // The tab in the address wins and is remembered; without one the last tab comes back.
+  useEffect(() => {
+    if (tab !== remembered.tab && TABS.includes(rawTab as NexamonTab)) remember({ tab });
+  }, [tab, rawTab, remembered.tab, remember]);
   const view: MarketView = params.get("view") === "mine" ? "mine" : "all";
   const cardKey = params.get("card");
   // Finn shows the packs on the first visit; only where they are on the screen.
