@@ -369,10 +369,10 @@ export function PackOpening({
                 <motion.div
                   aria-hidden
                   initial={{ opacity: 0, scale: 0.3 }}
-                  animate={{ opacity: [0, 1, 0.9], scale: [0.3, 1.5, 1.9] }}
+                  animate={{ opacity: [0, 1, 0.7], scale: [0.3, 1, 1.12] }}
                   transition={{ duration: TEAR_MS / 1000, ease: EASE.out }}
                   className="pointer-events-none absolute"
-                  style={{ left: -packW * 0.6, right: -packW * 0.6, top: -packW * 0.9, height: packW * 2.2 }}
+                  style={{ left: -packW * 0.35, right: -packW * 0.35, top: -packW * 0.6, height: packW * 1.7 }}
                 >
                   <div className="nexamon-burst absolute inset-0" />
                   <div className="nexamon-rays nexamon-spin absolute inset-0" />

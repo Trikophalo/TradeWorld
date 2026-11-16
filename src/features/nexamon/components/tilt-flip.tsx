@@ -104,27 +104,9 @@ export function TiltFlip({
     onKeyDown: flippable ? key : undefined,
   };
 
-  if (reduced) {
-    return (
-      <div className={cn("inline-block shrink-0", className)} style={{ width, height }}>
-        <div {...shared} className={cn("relative size-full rounded-sm focus-ring", flippable && "cursor-pointer")}>
-          {(["front", "back"] as const).map((which) => (
-            <motion.div
-              key={which}
-              initial={false}
-              animate={{ opacity: side === which ? 1 : 0 }}
-              transition={{ duration: DURATION.base, ease: EASE.standard }}
-              className="absolute inset-0"
-              aria-hidden={side !== which}
-            >
-              {which === "front" ? front(light) : back}
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
+  // One tree for both modes, so the server render and a client that prefers reduced motion agree. Everything
+  // that differs is a motion style, which Motion applies itself after mounting.
+  const fade = { duration: DURATION.base, ease: EASE.standard };
   return (
     <div className={cn("inline-block shrink-0 [perspective:900px]", className)} style={{ width, height }}>
       <motion.div
@@ -136,18 +118,28 @@ export function TiltFlip({
           if (event.pointerType !== "mouse") rest();
         }}
         onPointerCancel={rest}
-        style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
+        style={{ rotateX: reduced ? 0 : rotateX, rotateY: reduced ? 0 : rotateY, transformStyle: "preserve-3d" }}
         className={cn("relative size-full rounded-sm focus-ring", flippable && "cursor-pointer")}
       >
-        <div className="absolute inset-0 [backface-visibility:hidden]" aria-hidden={side !== "front"}>
+        <motion.div
+          initial={false}
+          animate={{ opacity: reduced && side === "back" ? 0 : 1 }}
+          transition={fade}
+          className="absolute inset-0 [backface-visibility:hidden]"
+          aria-hidden={side !== "front"}
+        >
           {front(light)}
-        </div>
-        <div
-          className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden]"
+        </motion.div>
+        <motion.div
+          initial={false}
+          animate={{ opacity: reduced && side === "front" ? 0 : 1 }}
+          transition={fade}
+          style={{ rotateY: reduced ? 0 : 180 }}
+          className="absolute inset-0 [backface-visibility:hidden]"
           aria-hidden={side !== "back"}
         >
           {back}
-        </div>
+        </motion.div>
       </motion.div>
     </div>
   );
