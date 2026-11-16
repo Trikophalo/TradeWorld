@@ -2807,3 +2807,46 @@ Menge, Image …), acht sinnvolle Punkte, die man mit Mira angehen kann.
 - Mehr Bewegung über die Konfiguration: Angebote auf behaltene NFTs 0,8 % → 4 % je Minute, auf zu teuer
   angebotene 8 % → 15 %; Handel unter Sammlern 0,6 % → 2,5 % je Minute (höchstens 40 %), Haltezeit 30 → 10 Minuten,
   6 Käufe je Lauf, 300 je Tag; KI kauft bis zu 60 Spieler-NFTs am Tag (vorher 20).
+
+## ADR-164: Chats mit Freunden – Direktchats und Gruppen — `Annahme`
+
+- **Wunsch:** Wer auf Freunde geht, soll mit Freunden schreiben und Gruppen mit mehreren Freunden gründen können.
+- **Ort:** ein vierter Tab „Chats“ auf `/friends` (Liste links, Unterhaltung rechts ab `lg`; am Handy entweder Liste
+  oder Unterhaltung). `/friends?tab=chats&chat=<id>` öffnet eine Unterhaltung direkt, auch aus der Benachrichtigung.
+  Einstieg auch über 💬 an jeder Figur auf dem Freunde-Platz, in der Freundesliste und „Nachricht“ im Profil.
+  Sichtbar ab Level 2 wie die Freunde (`DISCLOSURE.friendChats`).
+- **Direktchats** nur zwischen angenommenen Freunden, einer je Paar (`friend_chats.direct_key`). Endet die
+  Freundschaft, bleibt der Chat lesbar, aber Schreiben scheitert mit `chat_read_only` (NX158); die Oberfläche zeigt
+  einen Hinweis statt des Eingabefelds. Ein geöffneter Direktchat ohne Nachricht erscheint nur bei dem, der ihn
+  geöffnet hat.
+- **Gruppen:** Name wie andere Namen gefiltert (getrimmt, einfache Leerzeichen, `social.chat.groupNameMinLength` bis
+  `groupNameMaxLength` = 3 bis 30 Zeichen, keine Steuerzeichen, Schimpfwortfilter `text_has_profanity`), aber nicht
+  eindeutig und ohne Reservierungen (anders als Firmennamen). `groupMinMembers` (2) bis `groupMaxMembers` (20)
+  Mitglieder **einschließlich** des Gründers, höchstens `maxGroupsPerDay` (10) neue Gruppen am Tag. Der Gründer ist
+  Admin. Jedes Mitglied darf **eigene** Freunde hinzufügen (die Freundschaft gilt zu dem, der hinzufügt, nicht zu allen);
+  nur der Admin benennt um und nimmt Mitglieder heraus. Wer dazukommt, sieht die Nachrichten ab seinem Beitritt
+  (`since_id`). Geht der Admin, wird das am längsten dabei gewesene Mitglied Admin; wer als Letzter geht, schließt die
+  Gruppe (alles wird gelöscht). Beitritt, Umbenennen, Entfernen und Verlassen stehen als Systemzeilen im Chat.
+- **Nachrichten:** höchstens `maxMessageLength` (300) Zeichen, `maxMessagesPerMinute` (12) je Spieler über alle Chats,
+  Schimpfwortfilter wie im Firmenchat. Emojis wie im Nachrichten-Chat (`social.chat.emojis`).
+- **Server-Autorität:** drei interne Tabellen ohne Rechte für Clients; alles über RPCs mit `request_id`.
+  `mark_chat_read` hat wie `mark_notifications_read` keine `request_id`: es setzt nur die eigene Lesemarke und ist
+  von Natur aus idempotent. Antworten enthalten Nicknames, Tags und Figuren, nie Spieler-IDs; Chat-IDs sind sichtbar.
+  Fremde Chats und unbekannte IDs ergeben beide `chat_unknown` (NX157).
+- **Live:** Die offene Unterhaltung fragt alle `pollOpenSeconds` (4) nach, Liste und Abzeichen alle
+  `pollIdleSeconds` (30). Zusätzlich schickt der Client nach dem Senden über Supabase Realtime (Broadcast, wie die
+  News-Battles) ein leeres „Neu!“ an `friend-chat:<id>`; wer den Chat offen hat, holt sofort nach. Der Ping trägt
+  keinen Inhalt, Lesen läuft immer über `get_chat` mit Mitgliedsprüfung. Kein `postgres_changes` auf die
+  Nachrichten-Tabelle, damit keine Spieler-IDs (`author_id`) an Clients gehen.
+- **Benachrichtigung** `friend_chat` (abschaltbar, Push an): eine ungelesene je Chat und Empfänger, wie beim
+  Firmenchat; `mark_chat_read` markiert sie als gelesen. Abzeichen mit der Zahl ungelesener Nachrichten am
+  Freunde-Eintrag der Seitenleiste, im „Mehr“-Menü und am Tab „Chats“.
+- **Missionen:** Metrik `friend_chat` über einen eigenen Trigger (`friend_chat_mission_events`), Schnellmission
+  „Schreib einem Freund“ und Tagesmission „Schreib {target} Nachrichten an Freunde“; `mission_doable` verlangt einen
+  Freund.
+- **Konto zurücksetzen:** Direktchats des Spielers verschwinden ganz, aus Gruppen tritt er aus (neuer Admin folgt),
+  seine eigenen Zeilen werden gelöscht.
+- **Demo:** Die erfundenen Freunde (ADR-155) antworten mit 70 % Wahrscheinlichkeit (auf Fragen immer) nach 2 bis
+  6 Sekunden mit einem kurzen, albernen Satz (`src/config/friend-chat.ts`); in neuen Gruppen meldet sich jemand.
+- Fehler: `chat_unknown` NX157, `chat_read_only` NX158, `chat_not_admin` NX159, `chat_group_full` NX160,
+  `chat_group_too_small` NX161, `chat_already_member` NX162; außerdem `not_friends`, `name_*`, `rate_limited`.

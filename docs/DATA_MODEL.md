@@ -7618,3 +7618,34 @@ Migrationen `20261204004200_living_bonus_enum.sql` (`ledger_tx_kind` `living_bon
   `rental` in `get_property()` bekommt `living_bonus`. `buy_furniture` bucht den Listenpreis des Zuhauses (Metadaten
   `list_cents`, `home_tier`). `rental_limits` liefert `min_cents` = 1 € und `max_cents` = Sicherheitsgrenze je Periode.
 - Test `supabase/tests/9u_living_bonus.sql`.
+
+## Nachtrag: Chats mit Freunden (ADR-164)
+
+Migration `20261204005100_friend_chats.sql`. Werte in `game_config.social.chat`.
+
+- **`friend_chats`** (intern, RLS ohne Policies, keine Rechte für Clients): `id` (bigint), `kind` `direct|group`,
+  `name` (nur Gruppen), `direct_key` (`<kleinere uuid>:<größere uuid>`, eindeutig, nur Direktchats), `created_by`,
+  `created_at`, `last_message_at`.
+- **`friend_chat_members`** (intern): PK `chat_id, player_id`, `is_admin`, `last_read_id` (Lesemarke), `since_id`
+  (Nachrichten bis hier bleiben verborgen, für später Hinzugefügte), `joined_at`.
+- **`friend_chat_messages`** (intern): `id`, `chat_id`, `author_id` (null bei Systemzeilen), `kind` `player|system`,
+  `body` (1 bis 500 Zeichen), `created_at`. Trigger `mission_events` → `friend_chat_mission_events()` (Metrik
+  `friend_chat`).
+- **RPCs:** `get_chats()` → `{chats: [CHAT], unread}`; `get_chat(p_chat_id, p_before_id)` → `{chat: CHAT, messages:
+[MSG] (älteste zuerst), has_more}`; `mark_chat_read(p_chat_id)` → `{unread}`; `open_direct_chat(p_request_id,
+p_nickname)`, `create_group_chat(p_request_id, p_name, p_nicknames)`, `add_group_member(p_request_id, p_chat_id,
+p_nickname)`, `remove_group_member(…)`, `rename_group(p_request_id, p_chat_id, p_name)` → `{chat: CHAT}`;
+  `post_chat_message(p_request_id, p_chat_id, p_body)` → `{message: MSG}`; `leave_group(p_request_id, p_chat_id)` →
+  `{chat_id, left}`.
+  CHAT = `{id, kind, name, is_admin, can_write, unread, member_count, members: [{nickname, tag, level, avatar_key,
+accessories, is_admin, online}] (ohne den Fragenden), last: MSG|null, last_at}`; MSG = `{id, kind, author,
+avatar_key, is_me, body, created_at}`.
+- **Benachrichtigung** `friend_chat` (Kategorie `social`, Link `/friends?tab=chats&chat=<id>`, Payload `chat_id`,
+  `message_id`), eine ungelesene je Chat und Empfänger.
+- **Helfer:** `friend_chat_json`, `friend_chat_message_json`, `friend_chat_unread`, `friend_chat_require`,
+  `friend_chat_name`, `friend_chat_system`, `friend_chat_notify`, `friend_chat_drop_member`,
+  `friend_chats_wipe_player` (aus `account_wipe`), `friend_chat_is_friend`, `friend_chat_cfg`.
+- `mission_doable` kennt `friend_chat` (braucht einen Freund); Vorlagen `q_friend_chat`, `d_friend_chat`.
+- **Fehler:** `chat_unknown` NX157, `chat_read_only` NX158, `chat_not_admin` NX159, `chat_group_full` NX160,
+  `chat_group_too_small` NX161, `chat_already_member` NX162.
+- Test `supabase/tests/9y_friend_chats.sql`.

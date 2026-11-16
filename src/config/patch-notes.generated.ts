@@ -378,6 +378,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Wo es fehlt",
         text: "Oben in der Firmenübersicht zeigt ein Netzdiagramm acht Punkte (Bekanntheit, Menge, Qualität, Image, Preis, Team, Kasse, Schwung), wo du gerade am…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-9e5383df",
+        title: "Chats mit Freunden",
+        text: "Unter Freunde → Chats schreibst du Freunden direkt (💬 an ihrer Figur auf dem Platz) oder gründest Gruppen mit bis zu 20 Leuten, mit Emojis…",
+      },
     ],
   },
   {

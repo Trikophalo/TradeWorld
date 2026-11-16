@@ -113,6 +113,9 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Chats mit Freunden (ADR-164):** Unter Freunde → Chats schreibst du Freunden direkt (💬 an ihrer Figur auf dem
+  Platz) oder gründest Gruppen mit bis zu 20 Leuten, mit Emojis, ungelesenen Nachrichten und Benachrichtigung.
+
 - **Wo es fehlt (ADR-162):** Oben in der Firmenübersicht zeigt ein Netzdiagramm acht Punkte (Bekanntheit, Menge,
   Qualität, Image, Preis, Team, Kasse, Schwung), wo du gerade am meisten verlierst und was ein Fix pro Stunde bringt.
   „Mit Mira angehen“ fragt Mira, und sie antwortet mit Knöpfen, die es gleich erledigen.
