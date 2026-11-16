@@ -351,7 +351,8 @@ export function createArtEngine(host: ArtHost) {
       text: pick(nft.ai.lines.offer, unit(`${w.id}:${at}:line`)),
       offerCents: nftLowballCents(value, unit(`${w.id}:${at}:bps`)),
       offerStatus: "open",
-      expiresAt: at + nft.chat.offerHours * HOUR,
+      // ADR-170: collectors' offers run out sooner, then a new one comes
+      expiresAt: at + nft.ai.offerHours * HOUR,
       at,
     });
   }
@@ -407,11 +408,15 @@ export function createArtEngine(host: ArtHost) {
     const s = state();
     let until = s.tradeUntil ?? now - STEP;
     let today = 0;
+    const hourly: number[] = [];
     while (until + STEP <= now) {
       until += STEP;
       let traded = 0;
+      // ADR-170: an hourly cap spreads the trading over the day
+      while (hourly.length > 0 && hourly[0]! <= until - HOUR) hourly.shift();
       for (const w of works()) {
         if (!isCollector(w.owner) || openAuction(w.id) || traded >= nft.ai.trade.perRun) continue;
+        if (hourly.length >= nft.ai.trade.perHour) break;
         const last = w.sales.at(-1)?.at ?? w.createdAt;
         if (last > until - nft.ai.trade.minHoldMinutes * 60_000) continue;
         const input = valueInput(w, until);
@@ -427,7 +432,8 @@ export function createArtEngine(host: ArtHost) {
         aiSay(w.id, buyer, nft.ai.lines.trade, until);
         traded += 1;
         today += 1;
-        if (today >= nft.ai.trade.perDay) break;
+        hourly.push(until);
+        if (today >= nft.ai.trade.perDay || hourly.length >= nft.ai.trade.perHour) break;
       }
     }
     state().tradeUntil = until;
