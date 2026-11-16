@@ -41,6 +41,7 @@ import { BattleShowcase } from "@/features/news/battle/showcase";
 import { FriendsPlaza } from "@/features/friends/components/plaza";
 import { ChatIconButton, ChatsView, ChatUnreadBadge, MessageFriendButton } from "@/features/friends/components/chats";
 import { RentalShowcase } from "@/features/property/components/rental-showcase";
+import { NexamonShowcase } from "@/features/nexamon/components/showcase";
 import { PokeButton } from "@/features/friends/components/poke";
 import { FigureCard } from "@/features/wardrobe/components/figure-card";
 import { CareerLadder, PayRoutes } from "@/features/career/components/career-ladder";
@@ -945,6 +946,10 @@ export function Showcase() {
             </Button>
           ))}
         </Demo>
+      </Section>
+
+      <Section id="nexamon" title="Nexamon-Sammelkarten (ADR-165)">
+        <NexamonShowcase />
       </Section>
 
       <Section id="pixel" title={t("pixel")}>

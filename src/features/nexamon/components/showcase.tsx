@@ -1,0 +1,252 @@
+"use client";
+
+import { useState, type ReactNode } from "react";
+import {
+  NEXAMON_CARDS,
+  NEXAMON_RARITIES,
+  NEXAMON_SETS,
+  NEXAMON_TYPES,
+  type NexamonCard as NexamonCardData,
+  type NexamonSetKey,
+} from "@/config/nexamon";
+import { NEXAMON_SAMPLE_CARDS, NEXAMON_SAMPLE_EVOLVES, nexamonSampleArt } from "@/components/pixel/nexamon-samples";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Segmented } from "@/components/ui/segmented";
+import { NEXAMON_CONDITIONS } from "../lib";
+import { ConditionBadge, RarityBadge, SetIcon, TypeIcon } from "./badges";
+import { NexamonCard } from "./card";
+import { CardThumb, NexamonCardBack, NexamonCardFace } from "./card-face";
+import { NexamonPack } from "./pack";
+import { PackOpening } from "./pack-opening";
+import { NexamonSlab } from "./slab";
+
+const evolvesName = (card: NexamonCardData) =>
+  card.evolvesFrom ? NEXAMON_SAMPLE_EVOLVES[card.evolvesFrom] : undefined;
+const sampleArt = (card: NexamonCardData) => nexamonSampleArt()[card.key];
+
+/** One common of every type without artwork: the placeholder of the renderer. */
+const TYPE_CARDS: NexamonCardData[] = NEXAMON_TYPES.map((type, i) => ({
+  ...NEXAMON_SAMPLE_CARDS[0]!,
+  key: `demo-type-${type}`,
+  number: i + 1,
+  type,
+  name: ["Glutling", "Welpix", "Moosel", "Zappit", "Sinnox", "Kiesel", "Nachtua", "Bolzer", "Flimmi", "Drakling"][i]!,
+  hp: 40 + i * 10,
+}));
+
+/** The pack of the opening demo, in slot order: three commons, then the hits. */
+const DEMO_PACK: NexamonCardData[] = [
+  NEXAMON_SAMPLE_CARDS[0]!,
+  TYPE_CARDS[2]!,
+  TYPE_CARDS[7]!,
+  NEXAMON_SAMPLE_CARDS[1]!,
+  NEXAMON_SAMPLE_CARDS[4]!,
+];
+
+function Block({ label, children, testId }: { label: string; children: ReactNode; testId?: string }) {
+  return (
+    <Card padding="lg" className="min-w-0" data-testid={testId}>
+      <p className="mb-4 label-pixel text-fg-3">{label}</p>
+      {children}
+    </Card>
+  );
+}
+
+/** The Nexamon cards on /dev/ui (ADR-165): every rarity, the back, slabs, packs, the opening and the small parts. */
+export function NexamonShowcase() {
+  const art = nexamonSampleArt();
+  const [set, setSet] = useState<NexamonSetKey>("mystic_energy");
+  const [run, setRun] = useState(0);
+  const [log, setLog] = useState<string[]>([]);
+
+  return (
+    <div className="space-y-4" data-testid="nexamon-showcase">
+      <Block label="Karten: jede Seltenheit, kippen und umdrehen" testId="nexamon-fronts">
+        <div className="flex flex-wrap items-start justify-center gap-4">
+          {NEXAMON_SAMPLE_CARDS.map((card) => (
+            <div key={card.key} className="flex flex-col items-center gap-2">
+              <NexamonCard card={card} art={art[card.key]} scale={3} evolvesFromName={evolvesName(card)} />
+              <RarityBadge rarity={card.rarity} short />
+            </div>
+          ))}
+        </div>
+      </Block>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Block label="Groß (Faktor 4) und Rückseite" testId="nexamon-inspect">
+          <div className="flex flex-wrap items-start justify-center gap-4">
+            <NexamonCard
+              card={NEXAMON_SAMPLE_CARDS[3]!}
+              art={art[NEXAMON_SAMPLE_CARDS[3]!.key]}
+              scale={4}
+              evolvesFromName={evolvesName(NEXAMON_SAMPLE_CARDS[3]!)}
+            />
+            <NexamonCardBack scale={3} />
+          </div>
+        </Block>
+        <Block label="Slabs: bewertete Karten von ASP" testId="nexamon-slabs">
+          <div className="flex flex-wrap items-start justify-center gap-4">
+            <NexamonSlab
+              card={NEXAMON_SAMPLE_CARDS[4]!}
+              art={art[NEXAMON_SAMPLE_CARDS[4]!.key]}
+              grade={10}
+              serial={481516}
+              scale={2}
+            />
+            <NexamonSlab
+              card={NEXAMON_SAMPLE_CARDS[2]!}
+              art={art[NEXAMON_SAMPLE_CARDS[2]!.key]}
+              grade={9}
+              serial={23420042}
+              scale={2}
+              evolvesFromName={evolvesName(NEXAMON_SAMPLE_CARDS[2]!)}
+            />
+            <NexamonSlab
+              card={NEXAMON_SAMPLE_CARDS[0]!}
+              art={art[NEXAMON_SAMPLE_CARDS[0]!.key]}
+              grade={6}
+              serial={7}
+              scale={2}
+            />
+          </div>
+        </Block>
+      </div>
+
+      <Block label="Slab groß (Faktor 3)" testId="nexamon-slab-large">
+        <div className="flex flex-wrap items-start justify-center gap-6">
+          <NexamonSlab
+            card={NEXAMON_SAMPLE_CARDS[3]!}
+            art={art[NEXAMON_SAMPLE_CARDS[3]!.key]}
+            grade={10}
+            serial={10000001}
+            scale={3}
+            evolvesFromName={evolvesName(NEXAMON_SAMPLE_CARDS[3]!)}
+          />
+          <NexamonSlab
+            card={NEXAMON_SAMPLE_CARDS[1]!}
+            art={art[NEXAMON_SAMPLE_CARDS[1]!.key]}
+            grade={8}
+            serial={5550123}
+            scale={3}
+            evolvesFromName={evolvesName(NEXAMON_SAMPLE_CARDS[1]!)}
+          />
+        </div>
+      </Block>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Block label="Booster: ein Design je Set" testId="nexamon-packs">
+          <div className="flex flex-wrap items-end justify-center gap-4">
+            {NEXAMON_SETS.map((key) => (
+              <div key={key} className="flex flex-col items-center gap-2">
+                <NexamonPack set={key} scale={2} />
+                <SetIcon set={key} label />
+              </div>
+            ))}
+          </div>
+        </Block>
+        <Block label="Booster öffnen: Karten selbst wegziehen" testId="nexamon-opening">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <Segmented
+              value={set}
+              onValueChange={(value) => {
+                setSet(value);
+                setRun((n) => n + 1);
+                setLog([]);
+              }}
+              options={NEXAMON_SETS.map((key) => ({ value: key, label: key.split("_")[0]! }))}
+              label="Set"
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setRun((n) => n + 1);
+                setLog([]);
+              }}
+            >
+              Neu
+            </Button>
+          </div>
+          <PackOpening
+            key={`${set}-${run}`}
+            set={set}
+            cards={DEMO_PACK}
+            artOf={sampleArt}
+            evolvesFromNameOf={evolvesName}
+            onReveal={(card, index) => setLog((lines) => [...lines, `${index + 1}: ${card.name}`])}
+          />
+          <p className="mt-3 min-h-4 text-center text-xs text-fg-3" data-testid="nexamon-reveal-log">
+            {log.join(" · ")}
+          </p>
+        </Block>
+      </div>
+
+      <Block label="Platzhalter ohne Artwork: die zehn Typen (CardThumb, Faktor 2)" testId="nexamon-types">
+        <div className="flex flex-wrap justify-center gap-2">
+          {TYPE_CARDS.map((card) => (
+            <CardThumb key={card.key} card={card} scale={2} />
+          ))}
+        </div>
+      </Block>
+
+      <Block label="77 Karten als Raster (CardThumb, Faktor 1)" testId="nexamon-wall">
+        <div className="flex flex-wrap justify-center gap-1">
+          {NEXAMON_CARDS.slice(0, 77).map((card, i) => (
+            <CardThumb key={card.key} card={card} scale={1} dimmed={i % 9 === 4} />
+          ))}
+        </div>
+      </Block>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Block label="Seltenheit und Zustand" testId="nexamon-badges">
+          <div className="flex flex-wrap items-center gap-2">
+            {NEXAMON_RARITIES.map((rarity) => (
+              <RarityBadge key={rarity} rarity={rarity} />
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {NEXAMON_CONDITIONS.map((condition) => (
+              <ConditionBadge key={condition} condition={condition} />
+            ))}
+          </div>
+        </Block>
+        <Block label="Typen und Sets" testId="nexamon-icons">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            {NEXAMON_TYPES.map((type) => (
+              <TypeIcon key={type} type={type} scale={3} label />
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+            {NEXAMON_SETS.map((key) => (
+              <SetIcon key={key} set={key} scale={3} label />
+            ))}
+          </div>
+        </Block>
+      </div>
+
+      <Block label="Ohne Folie und ohne Bewegung (foil: none / still)" testId="nexamon-flat">
+        <div className="flex flex-wrap items-start justify-center gap-3">
+          <NexamonCardFace
+            card={NEXAMON_SAMPLE_CARDS[2]!}
+            art={art[NEXAMON_SAMPLE_CARDS[2]!.key]}
+            scale={2}
+            foil="none"
+          />
+          <NexamonCardFace
+            card={NEXAMON_SAMPLE_CARDS[3]!}
+            art={art[NEXAMON_SAMPLE_CARDS[3]!.key]}
+            scale={2}
+            foil="still"
+          />
+          <NexamonCardFace
+            card={NEXAMON_SAMPLE_CARDS[4]!}
+            art={art[NEXAMON_SAMPLE_CARDS[4]!.key]}
+            scale={2}
+            foil="still"
+          />
+        </div>
+      </Block>
+    </div>
+  );
+}

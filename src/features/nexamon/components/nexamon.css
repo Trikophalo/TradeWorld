@@ -1,0 +1,247 @@
+/*
+ * Nexamon cards (ADR-165): foil, glare and the pack animations. Everything moves by transform and opacity only:
+ * a foil is an oversized gradient layer that is pushed around under a clipping box and blended onto the card.
+ * The colours here are card inks (the print of a physical card), not interface colours, so they are not tokens.
+ */
+
+.nexamon-foil-box {
+  position: absolute;
+  overflow: hidden;
+  pointer-events: none;
+  isolation: auto;
+}
+
+/* The moving layer: three times the box, so it can travel a third in every direction. */
+.nexamon-foil {
+  position: absolute;
+  inset: -100%;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.nexamon-foil-idle {
+  position: absolute;
+  inset: 0;
+  animation: nexamon-foil-idle 5.5s var(--ease-in-out) infinite alternate;
+}
+.nexamon-foil-idle-b {
+  position: absolute;
+  inset: 0;
+  animation: nexamon-foil-idle 7s var(--ease-in-out) infinite alternate-reverse;
+}
+
+.nexamon-foil-rainbow {
+  background-image: repeating-linear-gradient(
+    115deg,
+    rgb(255 60 90) 0%,
+    rgb(255 170 50) 4%,
+    rgb(255 240 80) 8%,
+    rgb(80 230 130) 12%,
+    rgb(60 200 255) 16%,
+    rgb(110 110 255) 20%,
+    rgb(220 100 255) 24%,
+    rgb(255 60 90) 28%
+  );
+}
+
+.nexamon-foil-rainbow-b {
+  background-image: repeating-linear-gradient(
+    -62deg,
+    rgb(60 200 255) 0%,
+    rgb(220 100 255) 5%,
+    rgb(255 240 80) 10%,
+    rgb(80 230 130) 15%,
+    rgb(60 200 255) 20%
+  );
+}
+
+/* Narrow bright bands with dark gaps: the streaks of a foil window. */
+.nexamon-foil-bands {
+  background-image: repeating-linear-gradient(
+    115deg,
+    rgb(255 255 255 / 0) 0%,
+    rgb(255 255 255 / 0) 5%,
+    rgb(255 255 255 / 0.9) 7%,
+    rgb(255 255 255 / 0) 9%,
+    rgb(255 255 255 / 0) 12%,
+    rgb(255 255 255 / 0.55) 13%,
+    rgb(255 255 255 / 0) 14%
+  );
+}
+
+.nexamon-foil-gold {
+  background-image: repeating-linear-gradient(
+    112deg,
+    rgb(120 70 0) 0%,
+    rgb(255 190 40) 5%,
+    rgb(255 250 200) 8%,
+    rgb(255 200 60) 11%,
+    rgb(140 80 0) 16%,
+    rgb(255 220 110) 20%,
+    rgb(120 70 0) 24%
+  );
+}
+
+.nexamon-foil-glare {
+  background-image: radial-gradient(
+    circle at 50% 50%,
+    rgb(255 255 255 / 0.95) 0%,
+    rgb(255 255 255 / 0.35) 9%,
+    rgb(255 255 255 / 0) 22%
+  );
+}
+
+/* Glitter: a tile of single art pixels and small crosses, sized in art pixels through --u. */
+.nexamon-foil-glitter {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' shape-rendering='crispEdges'%3E%3Cg fill='%23fff'%3E%3Crect x='2' y='3' width='1' height='1'/%3E%3Crect x='11' y='1' width='1' height='1'/%3E%3Crect x='19' y='5' width='1' height='1'/%3E%3Crect x='6' y='9' width='1' height='3'/%3E%3Crect x='5' y='10' width='3' height='1'/%3E%3Crect x='15' y='12' width='1' height='1'/%3E%3Crect x='22' y='15' width='1' height='1'/%3E%3Crect x='1' y='17' width='1' height='1'/%3E%3Crect x='10' y='19' width='1' height='1'/%3E%3Crect x='17' y='20' width='1' height='3'/%3E%3Crect x='16' y='21' width='3' height='1'/%3E%3Crect x='8' y='15' width='1' height='1'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: calc(var(--u, 3px) * 24) calc(var(--u, 3px) * 24);
+  image-rendering: pixelated;
+}
+.nexamon-foil-glitter-b {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' shape-rendering='crispEdges'%3E%3Cg fill='%23fff'%3E%3Crect x='4' y='1' width='1' height='1'/%3E%3Crect x='13' y='4' width='1' height='1'/%3E%3Crect x='1' y='8' width='1' height='1'/%3E%3Crect x='9' y='10' width='1' height='1'/%3E%3Crect x='16' y='13' width='1' height='1'/%3E%3Crect x='6' y='16' width='1' height='1'/%3E%3Crect x='18' y='18' width='1' height='1'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: calc(var(--u, 3px) * 20) calc(var(--u, 3px) * 20);
+  image-rendering: pixelated;
+}
+.nexamon-twinkle {
+  animation: nexamon-twinkle 1.7s var(--ease-in-out) infinite alternate;
+}
+.nexamon-twinkle-b {
+  animation: nexamon-twinkle 2.3s var(--ease-in-out) infinite alternate-reverse;
+}
+
+/* Plastic of a slab: broad soft streaks. */
+.nexamon-plastic {
+  background-image: linear-gradient(
+    115deg,
+    rgb(255 255 255 / 0) 30%,
+    rgb(255 255 255 / 0.5) 38%,
+    rgb(255 255 255 / 0.08) 44%,
+    rgb(255 255 255 / 0.35) 48%,
+    rgb(255 255 255 / 0) 56%
+  );
+}
+
+/* Light that bursts out of a torn pack. */
+.nexamon-burst {
+  background-image: radial-gradient(
+    circle at 50% 50%,
+    rgb(255 255 255 / 1) 0%,
+    rgb(255 244 190 / 0.9) 18%,
+    rgb(255 214 94 / 0.45) 38%,
+    rgb(255 214 94 / 0) 68%
+  );
+}
+.nexamon-rays {
+  background-image: repeating-conic-gradient(
+    from 0deg,
+    rgb(255 244 190 / 0.85) 0deg 9deg,
+    rgb(255 244 190 / 0) 9deg 30deg
+  );
+  mask-image: radial-gradient(circle at 50% 50%, black 10%, transparent 68%);
+}
+
+/* Glow behind a revealed hit, by rarity. */
+.nexamon-glow-rare {
+  background-image: radial-gradient(circle, rgb(170 220 255 / 0.9) 0%, rgb(120 170 255 / 0.35) 40%, transparent 68%);
+}
+.nexamon-glow-ultra {
+  background-image: radial-gradient(circle, rgb(255 240 170 / 0.95) 0%, rgb(255 190 60 / 0.45) 40%, transparent 68%);
+}
+.nexamon-glow-prisma {
+  background-image: conic-gradient(
+    from 0deg,
+    rgb(255 90 110 / 0.8),
+    rgb(255 230 90 / 0.8),
+    rgb(100 230 140 / 0.8),
+    rgb(90 200 255 / 0.8),
+    rgb(210 120 255 / 0.8),
+    rgb(255 90 110 / 0.8)
+  );
+  mask-image: radial-gradient(circle, black 0%, rgb(0 0 0 / 0.5) 40%, transparent 68%);
+}
+.nexamon-glow-legendary {
+  background-image: radial-gradient(
+    circle,
+    rgb(255 255 255 / 1) 0%,
+    rgb(255 214 94 / 0.8) 30%,
+    rgb(255 170 30 / 0.4) 50%,
+    transparent 70%
+  );
+}
+.nexamon-glow-pulse {
+  animation: nexamon-glow-pulse 1.8s var(--ease-in-out) infinite alternate;
+}
+.nexamon-spin {
+  animation: nexamon-spin 14s linear infinite;
+}
+
+.nexamon-pack-shake {
+  animation: nexamon-pack-shake 0.62s var(--ease-in-out);
+}
+.nexamon-pack-sheen {
+  animation: sheen 3.4s var(--ease-in-out) infinite;
+}
+
+@keyframes nexamon-foil-idle {
+  from {
+    transform: translate3d(-7%, -4%, 0);
+  }
+  to {
+    transform: translate3d(7%, 4%, 0);
+  }
+}
+
+@keyframes nexamon-twinkle {
+  from {
+    opacity: 0.15;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes nexamon-glow-pulse {
+  from {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes nexamon-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes nexamon-pack-shake {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  12% {
+    transform: translate3d(-3px, 1px, 0) rotate(-3deg);
+  }
+  26% {
+    transform: translate3d(4px, -1px, 0) rotate(3.5deg);
+  }
+  40% {
+    transform: translate3d(-5px, 0, 0) rotate(-4deg);
+  }
+  55% {
+    transform: translate3d(5px, 1px, 0) rotate(4deg);
+  }
+  70% {
+    transform: translate3d(-4px, -1px, 0) rotate(-3deg);
+  }
+  85% {
+    transform: translate3d(3px, 0, 0) rotate(2deg);
+  }
+}
+
+.nexamon-sheen-bar {
+  background-image: linear-gradient(90deg, rgb(255 255 255 / 0), rgb(255 255 255 / 0.9), rgb(255 255 255 / 0));
+}
