@@ -113,6 +113,11 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Collectibles (ADR-165):** Unter „Collectibles“ wählst du ein Booster, siehst alle Karten des Sets mit ihren
+  Chancen und reißt die Folie nach dem Kauf selbst auf, mit eigenen Tönen für gute Züge. Dazu Sammelalbum,
+  Kartenansicht mit Wertverlauf, Kartenmarkt und ASP-Schalter. Prismatic Peak kostet jetzt 10.000 €, seine Karten
+  sind dafür das 1,5-Fache wert.
+
 - **Nexamon-Sammelkarten (ADR-165):** Ab Level 10 ziehst du Booster aus drei Sets, lässt Karten bei ASP bewerten und
   handelst sie an einem Markt, an dem Knappheit und Nachfrage den Wert jeder Karte bestimmen.
 

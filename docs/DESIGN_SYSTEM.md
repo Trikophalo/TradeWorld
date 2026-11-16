@@ -252,7 +252,10 @@ Folie, Glanz und Glitzer sind übergroße Verlaufsebenen, die nur per `transform
 aufgelegt werden. Bausteine in `src/features/nexamon/components`: `NexamonCard` (kippen, umdrehen),
 `NexamonCardFace`, `NexamonCardBack`, `CardThumb` (für Raster mit vielen Karten), `NexamonSlab`, `NexamonPack`,
 `PackOpening`, `RarityBadge`, `ConditionBadge`, `TypeIcon`, `SetIcon`. Mit „Reduziert“ kippt und dreht nichts, die
-Seiten blenden über, die Folie steht still.
+Seiten blenden über, die Folie steht still. Für die Seiten kommen `Stat`, `GradeChip`, `CopyQuality`, `CopyVisual`
+(Karte oder Slab als kleines Bild), `SelectField`, `FactRow`, `ListingRow` und `DealNote` dazu (`parts.tsx`,
+`listing-row.tsx`). Booster tragen einen stehenden Alufolien-Verlauf (`PackFoil`), `TiltPack` kippt sie in 3D zum
+Zeiger.
 
 ## 7. Layout und Navigation
 

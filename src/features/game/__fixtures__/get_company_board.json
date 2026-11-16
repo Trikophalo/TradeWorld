@@ -3,7 +3,7 @@
     "my_e6": 800000000000,
     "budgets": [],
     "company": {
-      "id": "3702b784-41da-40e7-8ff2-d9a93db14f30",
+      "id": "e6380e17-5608-4abc-a73a-1d6f6e12f8e3",
       "name": "Fixture Labor",
       "color": "#2266cc",
       "ticker": "FIX"
@@ -30,15 +30,15 @@
         "proposer": "Fixture_Chefin",
         "total_e6": 1070639000000,
         "closed_at": null,
-        "closes_at": "2026-11-17T05:55:35.832667+00:00",
-        "created_at": "2026-11-16T17:55:35.832667+00:00"
+        "closes_at": "2026-11-17T06:18:26.663283+00:00",
+        "created_at": "2026-11-16T18:18:26.663283+00:00"
       }
     ],
     "ai_votes": false,
     "can_vote": true,
     "float_e6": 270389000000,
     "total_e6": 1070639000000,
-    "cash_cents": 27975337,
+    "cash_cents": 27953265,
     "is_founder": true,
     "reputation": 49.2,
     "can_convene": true,
@@ -51,7 +51,7 @@
       "withdraw_block_until": null
     },
     "min_share_bps": 2000,
-    "free_cash_cents": 27975337,
+    "free_cash_cents": 27953265,
     "founder_payout_bps": 0
   }
 }

@@ -12,13 +12,13 @@
     "floor": "parquet",
     "owner": "Fixture_Heim",
     "width": 13,
-    "garage": [{ "id": "7c93b219-12e3-4475-898c-d924674604ee", "slot": 0, "car_key": "car_electric" }],
+    "garage": [{ "id": "9d30859a-b99c-43cc-99d6-b86762362221", "slot": 0, "car_key": "car_electric" }],
     "height": 9,
     "placed": [
       {
         "x": 2,
         "y": 2,
-        "id": "a7e0f769-2286-432b-85d6-bb2f70ec9d7a",
+        "id": "b2a669fb-0e2c-4469-b3c5-26fe362d3cc1",
         "rot": 0,
         "item_key": "table_oak",
         "value_cents": 210000
@@ -26,7 +26,7 @@
       {
         "x": 3,
         "y": 3,
-        "id": "f1a04d52-6d98-4c40-8d96-b39a2b557807",
+        "id": "c4d42c67-31dc-4907-b3bd-9800d07d27c2",
         "rot": 0,
         "item_key": "laptop",
         "value_cents": 210000
@@ -41,9 +41,9 @@
   "inventory": {
     "cars": [],
     "furniture": [
-      { "id": "fd6968a4-67cc-455c-9aca-92e8ed8cd26a", "item_key": "sofa_leather", "value_cents": 240000 },
-      { "id": "1e56205d-840a-43a0-9353-9a255ae3adae", "item_key": "rug_wool", "value_cents": 65000 },
-      { "id": "b628784a-dc3f-4669-8f34-2daeca7dd482", "item_key": "plant_small", "value_cents": 3000 }
+      { "id": "827f2b14-87dd-4e69-b15e-a8787862bf61", "item_key": "sofa_leather", "value_cents": 240000 },
+      { "id": "14937926-9a46-4172-9d57-c3c15af6fb34", "item_key": "rug_wool", "value_cents": 65000 },
+      { "id": "fd4ababc-de96-4b5f-a845-3e3729b1a93a", "item_key": "plant_small", "value_cents": 3000 }
     ]
   }
 }

@@ -13,12 +13,15 @@ import { NEXAMON_SAMPLE_CARDS, NEXAMON_SAMPLE_EVOLVES, nexamonSampleArt } from "
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Segmented } from "@/components/ui/segmented";
+import type { NexamonListing } from "@/features/game/nexamon-types";
 import { NEXAMON_CONDITIONS } from "../lib";
 import { ConditionBadge, RarityBadge, SetIcon, TypeIcon } from "./badges";
 import { NexamonCard } from "./card";
 import { CardThumb, NexamonCardBack, NexamonCardFace } from "./card-face";
+import { DealNote, ListingRow } from "./listing-row";
 import { NexamonPack } from "./pack";
 import { PackOpening } from "./pack-opening";
+import { CopyQuality, CopyVisual, FactRow, GradeChip, SelectField, Stat } from "./parts";
 import { NexamonSlab } from "./slab";
 
 const evolvesName = (card: NexamonCardData) =>
@@ -48,6 +51,27 @@ const DEMO_PACK: NexamonCardData[] = [
   NEXAMON_SAMPLE_CARDS[4]!,
 ];
 
+/** Offers for the listing row: an AI seller, a player with a slab, and the own offer. */
+const DEMO_LISTINGS: NexamonListing[] = [
+  { seller: "Karten-Kalle", sellerAi: true, mine: false, grade: null, priceCents: 1_320 },
+  { seller: "Mira", sellerAi: false, mine: false, grade: 10, priceCents: 3_100 },
+  { seller: "Du", sellerAi: false, mine: true, grade: null, priceCents: 1_100 },
+].map((row, i) => {
+  const card = REAL_CARDS[i + 1]!;
+  return {
+    id: `demo-listing-${i}`,
+    copyId: `demo-copy-${i}`,
+    cardKey: card.key,
+    set: card.set,
+    rarity: card.rarity,
+    serial: 7 + i,
+    condition: "mint",
+    valueCents: row.grade === null ? 1_200 : 3_600,
+    listedAt: "2026-01-01T12:00:00Z",
+    ...row,
+  };
+});
+
 function Block({ label, children, testId }: { label: string; children: ReactNode; testId?: string }) {
   return (
     <Card padding="lg" className="min-w-0" data-testid={testId}>
@@ -63,6 +87,7 @@ export function NexamonShowcase() {
   const [set, setSet] = useState<NexamonSetKey>("mystic_energy");
   const [run, setRun] = useState(0);
   const [log, setLog] = useState<string[]>([]);
+  const [demoSort, setDemoSort] = useState<"number" | "value">("number");
 
   return (
     <div className="space-y-4" data-testid="nexamon-showcase">
@@ -257,6 +282,54 @@ export function NexamonShowcase() {
             scale={2}
             foil="still"
           />
+        </div>
+      </Block>
+
+      <Block label="Bausteine der Nexamon-Seiten: Kennzahl, Note, Kopie, Angebot" testId="nexamon-parts">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-2">
+              <Stat label="Karten">30</Stat>
+              <Stat label="Motive">27 / 231</Stat>
+              <Stat label="Im Umlauf" hint="je gezogen">
+                362
+              </Stat>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <GradeChip grade={10} />
+              <GradeChip grade={9} />
+              <GradeChip grade={6} short />
+              <CopyQuality copy={{ grade: null, condition: "near_mint" }} />
+              <DealNote priceCents={900} valueCents={1000} />
+              <DealNote priceCents={1100} valueCents={1000} />
+              <DealNote priceCents={2000} valueCents={1000} />
+            </div>
+            <div className="flex flex-wrap items-end gap-3">
+              <CopyVisual card={REAL_CARDS[0]!} scale={1} />
+              <CopyVisual card={REAL_CARDS[1]!} scale={1} dimmed />
+              <CopyVisual card={REAL_CARDS[2]!} grade={9} serial={12} scale={1} />
+            </div>
+            <SelectField
+              label="Auswahlfeld"
+              value={demoSort}
+              onChange={setDemoSort}
+              options={[
+                { value: "number", label: "Nummer" },
+                { value: "value", label: "Wert" },
+              ]}
+            />
+            <dl className="divide-y divide-line-1 rounded-md bg-surface-2 px-3">
+              <FactRow label="Wert der Kopie">12,00 €</FactRow>
+              <FactRow label="Bei dir kommt an" strong>
+                11,40 €
+              </FactRow>
+            </dl>
+          </div>
+          <ul className="divide-y divide-line-1 self-start rounded-lg border-2 border-line-1">
+            {DEMO_LISTINGS.map((listing) => (
+              <ListingRow key={listing.id} listing={listing} onBuy={() => undefined} />
+            ))}
+          </ul>
         </div>
       </Block>
     </div>

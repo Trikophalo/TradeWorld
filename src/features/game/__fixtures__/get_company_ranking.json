@@ -14,24 +14,24 @@
       "founder": "Lars_Kursrutsch",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "d570294d-17c5-46dd-a618-f1865cc25e66",
+      "company_id": "dac6f88f-90d2-4a60-b8a7-e7a180d15fe0",
       "value_cents": 959140000,
       "revenue_cents": null
     },
     {
       "kind": "player",
       "logo": null,
-      "name": "Gipfelwerk",
+      "name": "Talwerk",
       "rank": 2,
       "tier": "ag",
-      "color": "#336699",
+      "color": "#663399",
       "sector": "retail",
-      "ticker": "GIP",
-      "founder": "Pop_Frida",
+      "ticker": "TAL",
+      "founder": "Pop_Gero",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "cada6f77-e66b-433e-8ab7-6d7d55573342",
-      "value_cents": 111440000,
+      "company_id": "b76a2d97-5eec-4379-a557-599296f12223",
+      "value_cents": 117950000,
       "revenue_cents": null
     },
     {
@@ -46,7 +46,7 @@
       "founder": "Float_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "df77d3cf-4110-4621-bf47-c1370fdd4682",
+      "company_id": "ae22c97c-621d-4bc6-9d65-23c64d694fdc",
       "value_cents": 110000000,
       "revenue_cents": null
     },
@@ -82,8 +82,8 @@
       "founder": "Fenja_Firma",
       "is_mine": false,
       "team_size": 6,
-      "company_id": "b0e6ee15-4155-4f94-920b-db6a33094556",
-      "value_cents": 107519889,
+      "company_id": "0b831c83-d48d-4cf1-9d0e-f3d9c0e110d4",
+      "value_cents": 107284616,
       "revenue_cents": 0
     },
     {
@@ -98,10 +98,10 @@
       "founder": "Esc_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "eae24592-d525-4f1a-9c0c-65ee7ecd5539",
-      "value_cents": 106040000,
+      "company_id": "fe961110-0bba-4875-b968-fd804b8b3a88",
+      "value_cents": 98002168,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-16T17:55:35.204449+00:00"
+  "server_time": "2026-11-16T18:18:26.054453+00:00"
 }

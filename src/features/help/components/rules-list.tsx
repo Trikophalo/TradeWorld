@@ -6,6 +6,7 @@ import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Accordion, type AccordionItem } from "@/components/ui/accordion";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { BALANCE } from "@/config/balance";
+import { chanceBps, formatChance, packOdds } from "@/features/nexamon/view";
 import { formatInteger, formatMoney } from "@/lib/format";
 import { RuleBody } from "./rule-body";
 
@@ -294,9 +295,99 @@ export function RulesList() {
     },
   ];
 
+  // Nexamon cards (ADR-165): packs, grading and the card market, with numbers from the same rules the server uses.
+  const nexamon = BALANCE.nexamon;
+  const nexamonLevel = progression.unlocks.find((u) => u.key === "nexamon")?.level ?? 0;
+  const odds = packOdds();
+  const oddsOf = (rarity: string) => odds.find((row) => row.rarity === rarity)!;
+  const slot5 = (rarity: string) => formatChance(chanceBps(oddsOf(rarity).slot5, oddsOf(rarity).denominator));
+  const cardValue = 10_000;
+  const gradeValue = (grade: number) => whole(share(cardValue, nexamon.grading.valueBps[grade - 1]!));
+  const tenChance = (condition: "mint" | "near_mint" | "good") =>
+    formatChance(nexamon.grading.gradeWeightsBps[condition][9]);
+  const cardIcon = <PixelIcon {...UI_ICONS.nexamon} scale={2} className="text-fg-2" />;
+  const nexamonRules: AccordionItem[] = [
+    {
+      id: "nexamon-packs",
+      title: t("nexamonPacks.title"),
+      summary: t("nexamonPacks.summary", {
+        count: nexamon.packSize,
+        price: whole(nexamon.sets.mystic_energy.packPriceCents),
+      }),
+      icon: cardIcon,
+      content: (
+        <RuleBody
+          labels={labels}
+          text={t("nexamonPacks.text", {
+            level: nexamonLevel,
+            count: nexamon.packSize,
+            rare: slot5("rare"),
+            ultra: slot5("ultra"),
+            prisma: slot5("prisma"),
+            legendary: slot5("legendary"),
+          })}
+          example={t("nexamonPacks.example", {
+            price: whole(nexamon.sets.mystic_energy.packPriceCents),
+            legendaryPacks: formatInteger(oddsOf("legendary").oneInPacks ?? 0),
+          })}
+          where={t("nexamonPacks.where")}
+        />
+      ),
+    },
+    {
+      id: "nexamon-grading",
+      title: t("nexamonGrading.title"),
+      summary: t("nexamonGrading.summary", { rate: formatChance(nexamon.grading.feeBps) }),
+      icon: cardIcon,
+      content: (
+        <RuleBody
+          labels={labels}
+          text={t("nexamonGrading.text", {
+            rate: formatChance(nexamon.grading.feeBps),
+            minutes: nexamon.grading.minutes,
+            mint: tenChance("mint"),
+            nearMint: tenChance("near_mint"),
+            good: tenChance("good"),
+          })}
+          example={t("nexamonGrading.example", {
+            value: whole(cardValue),
+            fee: whole(share(cardValue, nexamon.grading.feeBps)),
+            ten: gradeValue(10),
+            eight: gradeValue(8),
+            seven: gradeValue(7),
+          })}
+          where={t("nexamonGrading.where")}
+        />
+      ),
+    },
+    {
+      id: "nexamon-market",
+      title: t("nexamonMarket.title"),
+      summary: t("nexamonMarket.summary", { rate: formatChance(nexamon.market.feeBps) }),
+      icon: cardIcon,
+      content: (
+        <RuleBody
+          labels={labels}
+          text={t("nexamonMarket.text", {
+            rate: formatChance(nexamon.market.feeBps),
+            quick: formatChance(nexamon.quickSell.bps),
+          })}
+          example={t("nexamonMarket.example", {
+            price: whole(cardValue),
+            fee: whole(share(cardValue, nexamon.market.feeBps)),
+            net: whole(cardValue - share(cardValue, nexamon.market.feeBps)),
+            quickNet: whole(share(cardValue, nexamon.quickSell.bps)),
+          })}
+          where={t("nexamonMarket.where")}
+        />
+      ),
+    },
+  ];
+
   const groups = [
     { id: "trading", title: t("groupTrading"), items: tradingRules },
     { id: "progress", title: t("groupProgress"), items: progressRules },
+    { id: "nexamon", title: t("groupNexamon"), items: nexamonRules },
   ];
 
   const column = (list: typeof groups) =>

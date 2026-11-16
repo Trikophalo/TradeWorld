@@ -7687,7 +7687,9 @@ genau einmal Geld, kaufmännisch „half even“ (`nexamon_copy_value_cents`).
 - **`nexamon_packs`** (intern): Booster der Spieler mit den fünf Zügen (`cards` jsonb), für Zähler und Verlauf.
 - **`nexamon_value_points`** (intern): Wertverlauf, letzter Wert je Stunde mit Änderung (PK `card_key, at`), 60 Tage.
 - **`nexamon_set_state`** (intern): je Set `ai_packs_at` (bis wann die KI-Booster geöffnet sind), `ai_packs_opened`,
-  `player_packs_opened`. **`nexamon_meta`** (intern, eine Zeile): Hash des zuletzt gespiegelten Katalogs.
+  `player_packs_opened`. **`nexamon_meta`** (intern, eine Zeile): Hash des zuletzt gespiegelten Katalogs; `peak_scaled_at` merkt
+  sich, dass Migration `20261204005500_nexamon_peak_prices.sql` die Werte von Prismatic Peak einmal um das 1,5-Fache
+  gehoben hat (Booster 10.000 €).
 - **Lesende RPCs** (alle `authenticated`; außer `get_nexamon` verlangen sie Level 10):
   - `get_nexamon()` → `{unlocked, unlock_level, pack_size, sets: [{key, name, pack_price_cents, cards, owned_distinct,
 owned_copies, packs_opened, population}], collection: {copies, distinct, value_cents, listed, grading, graded},

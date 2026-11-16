@@ -80,7 +80,7 @@ test("a pack is opened and emptied by dragging the cards away", async ({ page })
   }
   // The fourth card is a rare one: it glows; the last one is legendary.
   await expect(log).toContainText("5: Aurodrak");
-  await expect(opening.getByTestId("pack-glow")).toHaveAttribute("data-rarity", "legendary");
+  await expect(opening.getByTestId("pack-glow").last()).toHaveAttribute("data-rarity", "legendary");
   await dragTop(page, opening, 0, -200);
   await expect(opening).toHaveAttribute("data-phase", "summary");
   await expect(opening.locator('[data-card="demo-077"]').first()).toBeAttached();

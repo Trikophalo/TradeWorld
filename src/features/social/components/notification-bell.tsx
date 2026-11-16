@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Sheet } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { engine } from "@/features/game/store";
+import { nexamonNotificationLink } from "@/features/nexamon/view";
 import type { AppNotification, NotificationList } from "@/features/game/types";
 import { haptic } from "@/lib/haptics";
 import { SPRING } from "@/lib/motion";
@@ -135,11 +136,13 @@ function NotificationRow({
   );
   const className =
     "flex w-full items-start gap-3 rounded-xs border-2 border-line-1 bg-surface-1 p-3 text-left transition duration-fast";
+  // Nexamon notifications all carry "/nexamon"; the client knows the tab they belong to (ADR-165).
+  const link = nexamonNotificationLink(item.typeKey, item.link);
   return (
     <li data-type={item.typeKey}>
-      {item.link ? (
+      {link ? (
         <Link
-          href={item.link}
+          href={link}
           onClick={onNavigate}
           className={cn(className, "focus-ring hover:border-line-2 hover:bg-surface-2")}
         >

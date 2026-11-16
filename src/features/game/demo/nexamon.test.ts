@@ -76,7 +76,7 @@ describe("Nexamon in the demo (ADR-165)", () => {
     expect(overview.sets.map((s) => [s.key, s.packPriceCents, s.cards])).toEqual([
       ["mystic_energy", 20_000, 77],
       ["super_apex", 100_000, 77],
-      ["prismatic_peak", 500_000, 77],
+      ["prismatic_peak", 1_000_000, 77],
     ]);
     expect(await key(engine.buyNexamonPack("r1", "mystic_energy"))).toBe("nexamon_locked");
     expect(await key(engine.nexamonCollection())).toBe("nexamon_locked");
@@ -250,7 +250,8 @@ describe("Nexamon in the demo (ADR-165)", () => {
     const details = await engine.nexamonCard(ultra.cardKey);
     const slab = details.copies.find((c) => c.id === ultra.copyId)!;
     expect(slab).toMatchObject({ state: "graded", grade: 10, condition: "mint" });
-    // The slab is priced from the unrounded card value, so it may differ from 3 x the rounded cents by a cent or two.
+    // The slab is worth three times the market value, rounded once from the e4 value: the card's value in whole
+    // cents times three can be off by the rounding (at most 1.5 cents).
     expect(Math.abs(slab.valueCents - details.card.valueCents * 3)).toBeLessThanOrEqual(2);
     expect(details.graded[9]).toBe(1);
     expect(await key(engine.gradeNexamonCard("g3", ultra.copyId))).toBe("nexamon_not_raw");

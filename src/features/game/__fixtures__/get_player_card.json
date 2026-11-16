@@ -1,13 +1,13 @@
 {
   "job": {
     "tier": "junior",
-    "since": "2026-11-16T17:55:34.579385+00:00",
+    "since": "2026-11-16T18:18:25.378858+00:00",
     "title": null,
     "title_key": "it_junior",
     "company_name": "KlarSoft AG"
   },
-  "tag": "XVYS",
-  "rank": 388,
+  "tag": "QDSC",
+  "rank": 386,
   "level": 6,
   "trust": { "band": "blank", "kept": 0, "score": 50, "broken": 0 },
   "company": null,
@@ -20,7 +20,7 @@
   ],
   "accessories": [],
   "streak_days": 1,
-  "member_since": "2026-11-16T17:55:33.865017+00:00",
+  "member_since": "2026-11-16T18:18:24.690932+00:00",
   "branch_scores": {
     "it": 3,
     "law": 0,
@@ -32,5 +32,5 @@
     "management": 0
   },
   "skills_learned": 2,
-  "net_worth_cents": 1060932
+  "net_worth_cents": 1061113
 }

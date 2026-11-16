@@ -20,14 +20,14 @@ import {
   type NexamonRarity,
   type NexamonSetKey,
 } from "@/config/nexamon";
-import { composePack, PACK_SIZE } from "@/components/pixel/nexamon-pack";
+import { composePack, PACK_SIZE, packTearRow } from "@/components/pixel/nexamon-pack";
 import { burstConfetti } from "@/components/ui/effects";
 import { DURATION, EASE, SPRING, STAGGER } from "@/lib/motion";
 import { playSound, type SoundName } from "@/lib/sound";
 import { cn } from "@/lib/utils";
-import { isHit, pixelScale, swipeOutcome } from "../lib";
+import { isHit, pixelScale, swipeOutcome, tearProgress } from "../lib";
 import { NexamonCardFace } from "./card-face";
-import { PackSheen } from "./pack";
+import { PackFoil, PackSheen } from "./pack";
 import { PixelCanvas } from "./pixel-canvas";
 import "./nexamon.css";
 
@@ -49,19 +49,25 @@ export interface PackOpeningProps {
   onReveal?: (card: NexamonCard, index: number) => void;
   /** The last card was pulled away; the summary is showing. */
   onComplete?: (cards: readonly NexamonCard[]) => void;
-  /** Plays the built-in sounds (tear, whoosh, chimes for hits). */
+  /** Plays the built-in sounds (foil, tear, every card leaving and showing, bigger ones for better pulls). */
   sound?: boolean;
   /** Shown under the summary: buttons of the page that uses the opening. */
   children?: ReactNode;
   className?: string;
 }
 
-const HIT_SOUND: Partial<Record<NexamonRarity, SoundName>> = {
-  rare: "success",
-  ultra: "win",
-  prisma: "levelUp",
-  legendary: "levelUp",
+/** The better the pull, the bigger its sound; a common only ticks. */
+const REVEAL_SOUND: Record<NexamonRarity, SoundName> = {
+  common: "cardShow",
+  rare: "pullRare",
+  ultra: "pullUltra",
+  prisma: "pullPrisma",
+  legendary: "pullLegendary",
 };
+/** Upper part of the pack (share of its height) where a tear can start. */
+const TEAR_ZONE = 0.45;
+/** Crackles of the foil over a whole tear. */
+const TEAR_TICKS = 9;
 const SHAKE_MS = 620;
 const TEAR_MS = 560;
 
@@ -74,11 +80,13 @@ interface StackCardProps {
   reduced: boolean;
   /** The top card hands out its "throw" so the keyboard can use it. */
   throwRef: RefObject<((dirX: number, dirY: number) => void) | null>;
+  /** The card starts to leave (thrown, flicked or pulled with the keyboard). */
+  onFly: () => void;
   onGone: () => void;
 }
 
 /** One card of the stack. Only the top one listens: it follows the pointer and flies away or falls back. */
-function StackCard({ card, art, evolvesFromName, u, top, reduced, throwRef, onGone }: StackCardProps) {
+function StackCard({ card, art, evolvesFromName, u, top, reduced, throwRef, onFly, onGone }: StackCardProps) {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const opacity = useMotionValue(1);
@@ -91,6 +99,7 @@ function StackCard({ card, art, evolvesFromName, u, top, reduced, throwRef, onGo
     (dirX: number, dirY: number) => {
       if (leaving.current) return;
       leaving.current = true;
+      onFly();
       if (reduced) {
         onGone();
         return;
@@ -101,7 +110,7 @@ function StackCard({ card, art, evolvesFromName, u, top, reduced, throwRef, onGo
       void animate(y, y.get() + dirY * reach, options);
       void animate(opacity, 0, { duration: DURATION.slow, ease: EASE.in, delay: DURATION.instant }).then(onGone);
     },
-    [onGone, opacity, reduced, width, x, y],
+    [onFly, onGone, opacity, reduced, width, x, y],
   );
 
   useEffect(() => {
@@ -213,6 +222,13 @@ export function PackOpening({
   const timers = useRef<number[]>([]);
   const throwRef = useRef<((dirX: number, dirY: number) => void) | null>(null);
   const stackRef = useRef<HTMLDivElement>(null);
+  // The tear in progress: how far (0..1) and to which side (1 right, -1 left, 0 not pulling).
+  const tear = useMotionValue(0);
+  const [rip, setRip] = useState<-1 | 0 | 1>(0);
+  const drag = useRef<{ x: number; ticks: number; dir: -1 | 0 | 1 } | null>(null);
+  const side = rip === 0 ? 1 : rip;
+  const peel = useTransform(tear, (value) => value * 16 * side);
+  const lift = useTransform(tear, (value) => -value * 4 * u);
   const rasters = composePack(set);
   const setName = t(`sets.${set}`);
   const current = cards[index];
@@ -222,21 +238,26 @@ export function PackOpening({
     return () => pending.forEach((id) => window.clearTimeout(id));
   }, []);
 
+  // The pack button is gone once the stack lies there: the keyboard goes on with the cards.
+  useEffect(() => {
+    if (phase === "stack") stackRef.current?.focus({ preventScroll: true });
+  }, [phase]);
+
   const reveal = useCallback(
     (at: number) => {
       const card = cards[at];
       if (!card) return;
       onReveal?.(card, at);
+      if (sound) playSound(REVEAL_SOUND[card.rarity]);
       if (!isHit(card.rarity)) return;
-      const chime = HIT_SOUND[card.rarity];
-      if (sound && chime) playSound(chime);
       if ((card.rarity === "prisma" || card.rarity === "legendary") && stackRef.current)
         burstConfetti(stackRef.current, card.rarity === "legendary" ? 36 : 22);
     },
     [cards, onReveal, sound],
   );
 
-  const open = () => {
+  /** Opens the pack. Torn by hand, the strip is already loose and comes off at once; otherwise the pack shakes first. */
+  const open = (byHand = false) => {
     if (phase !== "sealed") return;
     const later = (ms: number, run: () => void) => timers.current.push(window.setTimeout(run, ms));
     const showStack = () => {
@@ -245,17 +266,63 @@ export function PackOpening({
     };
     onOpen?.();
     if (reduced) {
-      if (sound) playSound("battleCrack");
+      if (sound) playSound("packTear");
       showStack();
+      return;
+    }
+    if (byHand) {
+      setPhase("tearing");
+      if (sound) playSound("packTear");
+      later(TEAR_MS, showStack);
       return;
     }
     setPhase("shaking");
     later(SHAKE_MS, () => {
       setPhase("tearing");
-      if (sound) playSound("battleCrack");
+      if (sound) playSound("packTear");
     });
     later(SHAKE_MS + TEAR_MS, showStack);
   };
+
+  // Tearing by hand: press on the upper part of the pack and pull sideways along the seal. The strip lifts with
+  // the finger and the foil crackles; pulled across most of the pack it comes off. Let go earlier and it falls back.
+  const tearStart = (event: PointerEvent<HTMLDivElement>) => {
+    if (phase !== "sealed") return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (event.clientY - rect.top > rect.height * TEAR_ZONE) return;
+    drag.current = { x: event.clientX, ticks: 0, dir: 0 };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+  const tearMove = (event: PointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d || phase !== "sealed") return;
+    const dx = event.clientX - d.x;
+    if (d.dir === 0) {
+      if (Math.abs(dx) < 4) return;
+      d.dir = dx > 0 ? 1 : -1;
+      setRip(d.dir);
+    }
+    const progress = tearProgress(dx * d.dir, event.currentTarget.getBoundingClientRect().width);
+    tear.set(progress);
+    const ticks = Math.floor(progress * TEAR_TICKS);
+    if (ticks > d.ticks) {
+      d.ticks = ticks;
+      if (sound) playSound("packCrinkle");
+    }
+    if (progress >= 1) {
+      drag.current = null;
+      open(true);
+    }
+  };
+  const tearEnd = () => {
+    if (!drag.current) return;
+    drag.current = null;
+    animate(tear, 0, { ...SPRING.snappy, onComplete: () => setRip(0) });
+  };
+
+  const flick = useCallback(() => {
+    if (sound) playSound("cardFlick");
+  }, [sound]);
 
   const gone = useCallback(() => {
     const next = index + 1;
@@ -271,7 +338,6 @@ export function PackOpening({
 
   const pull = (dirX: number, dirY: number) => {
     if (!throwRef.current) return;
-    if (sound) playSound("battleWhoosh");
     throwRef.current(dirX, dirY);
   };
   const key = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -378,38 +444,59 @@ export function PackOpening({
                   <div className="nexamon-rays nexamon-spin absolute inset-0" />
                 </motion.div>
               )}
-              <button
-                type="button"
-                onClick={open}
-                disabled={phase !== "sealed"}
-                aria-label={t("pack.open", { set: setName })}
-                data-testid="pack-open"
+              <div
+                onPointerDown={tearStart}
+                onPointerMove={tearMove}
+                onPointerUp={tearEnd}
+                onPointerCancel={tearEnd}
+                data-testid="pack-tear"
+                data-ripping={rip !== 0}
                 className={cn(
-                  "group relative block size-full rounded-sm focus-ring transition-transform duration-fast ease-out",
-                  phase === "sealed" && "cursor-pointer hover:-translate-y-1 active:translate-y-0 active:scale-[0.98]",
+                  "relative block size-full touch-pan-y select-none",
+                  phase === "sealed" && "cursor-grab active:cursor-grabbing",
                   phase === "shaking" && "nexamon-pack-shake",
                 )}
               >
                 <PixelCanvas
-                  raster={phase === "tearing" ? rasters.body : rasters.full}
+                  raster={phase === "tearing" || rip !== 0 ? rasters.body : rasters.full}
                   scale={u}
                   className="absolute inset-0"
                 />
-                <motion.div
-                  className="absolute inset-0"
-                  initial={false}
-                  animate={
-                    phase === "tearing"
-                      ? { x: packW * 0.55, y: -packH * 0.3, rotate: 38, opacity: 0 }
-                      : { x: 0, y: 0, rotate: 0, opacity: 1 }
-                  }
-                  transition={{ duration: TEAR_MS / 1000, ease: EASE.out }}
-                  style={{ transformOrigin: "100% 0%" }}
-                >
-                  {phase === "tearing" && <PixelCanvas raster={rasters.top} scale={u} />}
-                </motion.div>
-                {phase === "sealed" && <PackSheen scale={u} />}
-              </button>
+                {/* The strip while a finger pulls it: one end lifts, the other still hangs on. */}
+                {phase !== "tearing" && rip !== 0 && (
+                  <motion.div
+                    className="absolute inset-0"
+                    style={{ rotate: peel, y: lift, transformOrigin: rip > 0 ? "100% 10%" : "0% 10%" }}
+                  >
+                    <PixelCanvas raster={rasters.top} scale={u} />
+                  </motion.div>
+                )}
+                {/* The strip once it is off: it flies away to the side it was torn to. */}
+                {phase === "tearing" && (
+                  <motion.div
+                    className="absolute inset-0"
+                    initial={{ x: 0, y: 0, rotate: 0, opacity: 1 }}
+                    animate={{ x: packW * 0.55 * side, y: -packH * 0.3, rotate: 38 * side, opacity: 0 }}
+                    transition={{ duration: TEAR_MS / 1000, ease: EASE.out }}
+                    style={{ transformOrigin: side > 0 ? "100% 0%" : "0% 0%" }}
+                  >
+                    <PixelCanvas raster={rasters.top} scale={u} />
+                  </motion.div>
+                )}
+                {phase === "sealed" && (
+                  <>
+                    <PackFoil scale={u} />
+                    <PackSheen scale={u} />
+                    {rip === 0 && (
+                      <div
+                        aria-hidden
+                        className="nexamon-tear-guide pointer-events-none absolute"
+                        style={{ left: 3 * u, right: 3 * u, top: packTearRow(0) * u + u }}
+                      />
+                    )}
+                  </>
+                )}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -472,6 +559,7 @@ export function PackOpening({
                   top={i === index}
                   reduced={reduced}
                   throwRef={throwRef}
+                  onFly={flick}
                   onGone={gone}
                 />
               ))}
@@ -489,7 +577,20 @@ export function PackOpening({
             <p className="mt-0.5 hidden text-xs text-fg-3 lg:block">{t("pack.keyHint")}</p>
           </>
         ) : (
-          phase === "sealed" && <p className="text-sm text-pretty text-fg-2">{t("pack.tapHint")}</p>
+          phase === "sealed" && (
+            <>
+              <p className="text-sm text-pretty text-fg-2">{t("pack.tapHint")}</p>
+              <button
+                type="button"
+                onClick={() => open()}
+                aria-label={t("pack.open", { set: setName })}
+                data-testid="pack-open"
+                className="mt-2 h-9 rounded-sm px-3 text-xs font-medium text-accent focus-ring transition-colors duration-fast hover:bg-surface-2 active:scale-[0.98]"
+              >
+                {t("pack.openButton")}
+              </button>
+            </>
+          )
         )}
       </div>
     </div>

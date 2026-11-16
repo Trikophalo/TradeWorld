@@ -1,8 +1,8 @@
 {
-  "now": "2026-11-16T17:55:41.008352+00:00",
+  "now": "2026-11-16T18:18:31.46103+00:00",
   "chat": [
     {
-      "at": "2026-11-16T17:55:41.00431+00:00",
+      "at": "2026-11-16T18:18:31.455387+00:00",
       "id": 223,
       "bot": false,
       "body": "Was für eine Sendung 💀📉",
@@ -11,88 +11,91 @@
     }
   ],
   "show": {
-    "id": 9,
+    "id": 7,
     "writer": "mini",
-    "airs_at": "2026-11-16T17:00:00+00:00",
+    "airs_at": "2026-11-16T18:00:00+00:00",
     "segments": [
       {
         "kind": "gossip",
-        "mood": "shocked",
-        "text": "Bitte festhalten: Level 5 erreicht, und zwar bei Ben_Borgt. Meine Schwiegermutter hat es vorausgesagt, und die liegt sonst immer falsch.",
-        "figure": { "nickname": "Ben_Borgt", "avatar_key": "rookie", "accessories": [] },
+        "mood": "proud",
+        "text": "Bitte festhalten: Ottos Ecke gegründet, und zwar bei Floor_Otto. Auch ein blindes Huhn findet mal ein Korn, aber immerhin.",
+        "figure": { "nickname": "Floor_Otto", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Applaus für Ben_Borgt"
+        "headline": "Applaus für Floor_Otto"
       },
       {
         "kind": "hype",
         "mood": "laughing",
-        "text": "Selbst die Praktikanten wurden heute um Autogramme gebeten. Plötzlich will jeder „Alles ausgebucht“. Doable_Frida tut so, als sei das alles geplant gewesen. Wir tun so, als würden wir das glauben.",
-        "figure": { "nickname": "Doable_Frida", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "gain", "label": "Bekanntheit +13,2 %" }],
-        "headline": "Vollhaus geht viral"
+        "text": "Xp Werkstatt räumt ab. Ein Kind hat im Schulaufsatz darüber geschrieben, die Klasse war begeistert. Xp_Chefin hängt sich das gerahmt ins Büro. Die Kundschaft rennt die Tür ein.",
+        "figure": { "nickname": "Xp_Chefin", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "gain", "label": "Bekanntheit +22,7 %" }],
+        "headline": "Ritterschlag für Xp Werkstatt"
       },
       {
         "kind": "nft",
         "mood": "confused",
-        "text": "Kunstmarkt, oder was man dafür hält: „Neon Nacht“ von Nina_Neon ging für 30.000 € an Ben_Bieter. Wer das kauft, kauft auch Luft in Dosen.",
+        "text": "Kunstmarkt, oder was man dafür hält: „Neon Nacht“ von Nina_Neon ging für 30.000 € an Ben_Bieter. Immerhin kann man es nicht fallen lassen.",
         "figure": { "nickname": "Nina_Neon", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
         "headline": "30.000 € für ein paar Pixel"
       },
       {
         "kind": "winner",
-        "mood": "proud",
-        "text": "11377,6 % Plus, 1.137.762 € Gewinn: Fixture_Neu zeigt dem Rest, wie es geht. Man munkelt von einem Pakt mit dem Teufel, der Teufel dementiert.",
+        "mood": "shocked",
+        "text": "Fixture_Neu ist heute um 1.137.544 € reicher, 11375,4 % rauf. Alle anderen dürfen jetzt neidisch sein. Bitte der Reihe nach.",
         "figure": { "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] },
         "effects": [],
-        "headline": "Fixture_Neu schwimmt im Geld"
+        "headline": "Glückspilz des Tages: Fixture_Neu"
       },
       {
         "kind": "gossip",
         "mood": "shocked",
-        "text": "Gute Nachrichten, ausnahmsweise. Bei Pop_Gero heißt es: Talwerk gegründet. Ich hätte keinen Cent darauf gewettet, und ich wette auf alles.",
-        "figure": { "nickname": "Pop_Gero", "avatar_key": "rookie", "accessories": [] },
+        "text": "Bitte festhalten: Bodenständig gegründet, und zwar bei Floor_Frida. Meine Schwiegermutter hat es vorausgesagt, und die liegt sonst immer falsch.",
+        "figure": { "nickname": "Floor_Frida", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Pop_Gero hat es geschafft"
+        "headline": "Applaus für Floor_Frida"
       },
       {
         "kind": "scandal",
         "mood": "shocked",
-        "text": "Bei Lieferwerk Anja brennt die Hütte. Ein Mitarbeiter hat die gesamte Kundendatei alphabetisch nach Vornamen des Haustiers sortiert. Anja_Lieferant spricht von einem Missverständnis. Zur Erinnerung, das Geschäftsmodell lautet: „Ideen für alle“.",
-        "figure": { "nickname": "Anja_Lieferant", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −23,3 %" }],
-        "headline": "Lieferwerk Anja: Chef Anja_Lieferant unter Beschuss"
+        "text": "Das Netz zerreißt Talwerk. Die Geschäftsführung hat das wichtigste Meeting des Jahres verschlafen, im Meetingraum. Seitdem will niemand mehr „Wanderkarten“. Pop_Gero hat das Firmenhandy im Fluss versenkt.",
+        "figure": { "nickname": "Pop_Gero", "avatar_key": "rookie", "accessories": [] },
+        "effects": [
+          { "tone": "loss", "label": "Bekanntheit −16,7 %" },
+          { "tone": "loss", "label": "TAL −19 %" }
+        ],
+        "headline": "Shitstorm über Talwerk"
       },
       {
         "kind": "ramble",
-        "mood": "crying",
-        "text": "Die Regie winkt, ich ignoriere sie. Christian Lindner soll einen Sportwagen gesehen und kurz geweint haben. Vor Glück, sagt man. So. Weiter im Text.",
-        "effects": [],
-        "headline": "Was ich noch sagen wollte"
+        "mood": "shocked",
+        "text": "Völlig anderes Thema: Markus Söder soll das Sparschwein geschlachtet und alles in SolarFuchs gesteckt haben. Ich habe es geträumt, aber meine Träume sind börsennotiert. Der Kurs macht 8,9 % nach oben.",
+        "effects": [{ "tone": "gain", "label": "SFX +8,9 %" }],
+        "headline": "Markus Söder steigt bei SolarFuchs ein"
       },
       {
-        "kind": "tasks",
-        "mood": "laughing",
-        "text": "Die Kundschaft hat Geld und keine Ahnung, wohin damit. Alle offenen Firmen-Aufgaben sind ab sofort 38,7 % mehr wert. An die Arbeit, ihr faulen Säcke!",
-        "effects": [{ "tone": "gain", "label": "Aufgaben +38,7 %" }],
-        "headline": "Auftragsflut im ganzen Land"
+        "kind": "sector",
+        "mood": "proud",
+        "text": "Die ganze Branche Einzelhandel steigt um 5,1 %. Ein Schulkind hat in einem Referat behauptet, das sei die Zukunft. So funktioniert Wirtschaft, liebe Kinder.",
+        "effects": [{ "tone": "gain", "label": "Einzelhandel +5,1 %" }],
+        "headline": "Die Branche Einzelhandel dreht durch"
       },
       {
         "kind": "stock",
-        "mood": "shocked",
-        "text": "Der Chef hat den Jahresbericht als Gedicht vorgetragen. Es reimte sich nicht. Der Kurs von Methusalem Bio sackt um 13,2 % ab. Ein Krisenstab tagt.",
-        "effects": [{ "tone": "loss", "label": "MTH −13,2 %" }],
-        "headline": "Panik bei Methusalem Bio"
+        "mood": "smug",
+        "text": "Fundgrube Discount legt 12 % zu. Der Praktikant hat aus Versehen ein Patent angemeldet. Analysten sind fassungslos.",
+        "effects": [{ "tone": "gain", "label": "FGD +12 %" }],
+        "headline": "Fundgrube Discount schießt nach oben"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Ein Vögelchen hat mir gezwitschert: GenoVita Biotech dürfte in der kommenden Stunde nach unten gehen. Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.",
-        "effects": [{ "tone": "neutral", "label": "GNV ↓ Tipp" }],
-        "headline": "Vom Flurfunk: GenoVita Biotech"
+        "text": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Kaufrausch Märkte tut sich in der nächsten Stunde etwas, und zwar nach unten. Meine Quelle ist seriös, sie trägt immerhin eine Krawatte.",
+        "effects": [{ "tone": "neutral", "label": "KFR ↓ Tipp" }],
+        "headline": "Mr. Doodle Dangles Geheimtipp"
       }
     ],
-    "started_at": "2026-11-16T17:55:41.008352+00:00"
+    "started_at": "2026-11-16T18:18:31.46103+00:00"
   },
   "viewers": 18,
   "audience": [
@@ -110,5 +113,5 @@
     { "me": false, "friend": false, "nickname": "Bat_Crowd6", "avatar_key": "rookie", "accessories": [] }
   ],
   "upcoming": null,
-  "next_airs_at": "2026-11-16T18:00:00+00:00"
+  "next_airs_at": "2026-11-16T19:00:00+00:00"
 }

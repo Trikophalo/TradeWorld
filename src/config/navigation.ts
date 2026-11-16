@@ -21,7 +21,8 @@ export interface NavItem {
     | "crypto"
     | "upgrades"
     | "profile"
-    | "news";
+    | "news"
+    | "nexamon";
   icon: UiIconName;
   group: NavGroup;
   /** Unlock key (BALANCE.progression.unlocks). Until then the item waits under "Bald frei". */
@@ -46,6 +47,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { href: "/deals", key: "deals", icon: "deal", group: "business", unlock: "deals", more: true },
   { href: "/artworks", key: "artworks", icon: "art", group: "assets", unlock: "artworks", more: true },
   { href: "/property", key: "property", icon: "estate", group: "assets", unlock: "property", more: true },
+  { href: "/nexamon", key: "nexamon", icon: "nexamon", group: "assets", unlock: "nexamon", more: true },
   { href: "/friends", key: "friends", icon: "heart", group: "you", more: true },
   { href: "/upgrades", key: "upgrades", icon: "upgrade", group: "you", more: true },
 ];

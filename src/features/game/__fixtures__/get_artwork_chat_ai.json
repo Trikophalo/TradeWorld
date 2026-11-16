@@ -3,7 +3,7 @@
   "messages": [
     {
       "ai": false,
-      "at": "2026-11-16T17:55:40.929012+00:00",
+      "at": "2026-11-16T18:18:31.352251+00:00",
       "id": 62,
       "kind": "chat",
       "mine": false,
@@ -15,19 +15,19 @@
     },
     {
       "ai": false,
-      "at": "2026-11-16T17:55:40.933317+00:00",
+      "at": "2026-11-16T18:18:31.356118+00:00",
       "id": 63,
       "kind": "offer",
       "mine": false,
       "text": "Wäre das ein Preis?",
       "author": "Fixture_Kunst",
-      "expires_at": "2026-11-17T17:55:40.933317+00:00",
+      "expires_at": "2026-11-17T18:18:31.356118+00:00",
       "offer_cents": 300000,
       "offer_status": "accepted"
     },
     {
       "ai": false,
-      "at": "2026-11-16T17:55:40.939675+00:00",
+      "at": "2026-11-16T18:18:31.365971+00:00",
       "id": 64,
       "kind": "sale",
       "mine": false,
@@ -39,7 +39,7 @@
     },
     {
       "ai": false,
-      "at": "2026-11-16T17:55:40.949118+00:00",
+      "at": "2026-11-16T18:18:31.379147+00:00",
       "id": 65,
       "kind": "sale",
       "mine": false,
@@ -51,19 +51,19 @@
     },
     {
       "ai": true,
-      "at": "2026-11-16T17:55:40.958673+00:00",
+      "at": "2026-11-16T18:18:31.39122+00:00",
       "id": 66,
       "kind": "offer",
       "mine": false,
-      "text": "Ich habe eine Lasagne im Ofen, bitte entscheide dich fix.",
-      "author": "Gräfin Glitzer",
-      "expires_at": "2026-11-17T17:55:40.958673+00:00",
-      "offer_cents": 2004100,
+      "text": "Meine Wand ist leer und mein Kopf auch. Nimm mein Geld.",
+      "author": "Vera Vermeer",
+      "expires_at": "2026-11-17T18:18:31.39122+00:00",
+      "offer_cents": 1783200,
       "offer_status": "open"
     }
   ],
   "ask_cents": 90000000,
-  "artwork_id": "38068bbe-ca35-4033-aed4-eaeae3381388",
+  "artwork_id": "203d44c8-2806-4ba3-aec9-855bd1f90b80",
   "max_length": 200,
   "my_offer_cents": null,
   "min_offer_cents": 10000

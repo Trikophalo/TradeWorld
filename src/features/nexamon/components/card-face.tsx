@@ -7,7 +7,15 @@ import { composeCardBack, composeCardFace, FACE_LAYOUT, type Box } from "@/compo
 import type { Raster } from "@/components/pixel/nexamon-raster";
 import { GOLD_INK, TYPE_INK } from "@/components/pixel/nexamon-symbols";
 import { cn } from "@/lib/utils";
-import { fitTextScale, formatCardNumber, pixelScale } from "../lib";
+import {
+  estimateNumberWidth,
+  FACE_TEXT,
+  fitText,
+  formatCardNumber,
+  hpBlockWidth,
+  pixelScale,
+  roomBeforeNumber,
+} from "../lib";
 import { HoloHint, HoloLayers, type CardLight } from "./holo";
 import { PixelCanvas } from "./pixel-canvas";
 
@@ -89,9 +97,24 @@ export const NexamonCardFace = memo(function NexamonCardFace({
       ? undefined
       : `${u * 0.34}px 0 0 ${inks.halo}, ${-u * 0.34}px 0 0 ${inks.halo}, 0 ${u * 0.34}px 0 ${inks.halo}, 0 ${-u * 0.34}px 0 ${inks.halo}`;
 
+  // Name and attack end before the number to their right: long ones are squeezed, very long ones get smaller.
+  const nameRoom = roomBeforeNumber(
+    layout.name.x,
+    layout.hp.x + layout.hp.w,
+    hpBlockWidth(card.hp, full ? t("hp") : ""),
+  );
+  const nameFit = fitText(card.name, FACE_TEXT.name, nameRoom);
+  const attackRoom = roomBeforeNumber(
+    layout.attackName.x,
+    layout.damage.x + layout.damage.w,
+    card.attack.damage > 0 ? estimateNumberWidth(card.attack.damage, FACE_TEXT.number) : 0,
+  );
+  const attackFit = fitText(card.attack.name, FACE_TEXT.attack, attackRoom);
+
   const from = card.evolvesFrom ? (evolvesFromName ?? nexamonCard(card.evolvesFrom)?.name ?? null) : null;
   const stage = t(`stage.${card.stage}`);
   const stageLine = layout.strip || !from ? stage : `${stage} · ${t("evolvesShort", { name: from })}`;
+  const stageFit = fitText(stageLine.toUpperCase(), FACE_TEXT.stage, layout.stage?.w ?? 0);
   const stripLine = from
     ? layout.stage
       ? t("evolvesFrom", { name: from })
@@ -116,28 +139,47 @@ export const NexamonCardFace = memo(function NexamonCardFace({
           {full && layout.stage && (
             <p
               className="overflow-hidden font-pixel whitespace-nowrap uppercase"
-              style={{ ...at(layout.stage), fontSize: u * 2.7, lineHeight: `${u * 3}px`, color: inks.soft }}
+              data-part="stage"
+              style={{
+                ...at(layout.stage),
+                fontSize: u * FACE_TEXT.stage * stageFit.size,
+                lineHeight: `${u * 3}px`,
+                color: inks.soft,
+              }}
             >
-              {stageLine}
+              <span className="inline-block origin-left" style={{ transform: `scaleX(${stageFit.squeeze})` }}>
+                {stageLine}
+              </span>
             </p>
           )}
           <p
+            data-part="name"
             className="overflow-hidden font-pixel whitespace-nowrap"
-            style={{ ...at(layout.name), fontSize: u * 6, lineHeight: `${u * 6}px`, textShadow: halo }}
+            style={{
+              ...at(layout.name),
+              width: nameRoom * u,
+              fontSize: u * FACE_TEXT.name * nameFit.size,
+              lineHeight: `${u * 6}px`,
+              textShadow: halo,
+            }}
           >
-            <span
-              className="inline-block origin-left"
-              style={{ transform: `scaleX(${fitTextScale(card.name, 6, layout.name.w)})` }}
-            >
+            <span className="inline-block origin-left" style={{ transform: `scaleX(${nameFit.squeeze})` }}>
               {card.name}
             </span>
           </p>
           <p
+            data-part="hp"
             className="flex items-baseline justify-end font-sans font-extrabold whitespace-nowrap"
-            style={{ ...at(layout.hp), fontSize: u * 6.2, lineHeight: `${u * 7}px`, gap: u * 0.8, textShadow: halo }}
+            style={{
+              ...at(layout.hp),
+              fontSize: u * FACE_TEXT.number,
+              lineHeight: `${u * 7}px`,
+              gap: u * FACE_TEXT.hpGap,
+              textShadow: halo,
+            }}
           >
             {full && (
-              <span className="font-pixel font-normal" style={{ fontSize: u * 2.7 }}>
+              <span className="font-pixel font-normal" style={{ fontSize: u * FACE_TEXT.hpLabel }}>
                 {t("hp")}
               </span>
             )}
@@ -152,19 +194,23 @@ export const NexamonCardFace = memo(function NexamonCardFace({
             </p>
           )}
           <p
+            data-part="attack"
             className="overflow-hidden font-pixel whitespace-nowrap"
-            style={{ ...at(layout.attackName), fontSize: u * 5, lineHeight: `${u * 6}px` }}
+            style={{
+              ...at(layout.attackName),
+              width: attackRoom * u,
+              fontSize: u * FACE_TEXT.attack * attackFit.size,
+              lineHeight: `${u * 6}px`,
+            }}
           >
-            <span
-              className="inline-block origin-left"
-              style={{ transform: `scaleX(${fitTextScale(card.attack.name, 5, layout.attackName.w)})` }}
-            >
+            <span className="inline-block origin-left" style={{ transform: `scaleX(${attackFit.squeeze})` }}>
               {card.attack.name}
             </span>
           </p>
           <p
+            data-part="damage"
             className="text-right font-sans nums font-extrabold whitespace-nowrap"
-            style={{ ...at(layout.damage), fontSize: u * 6.2, lineHeight: `${u * 7}px` }}
+            style={{ ...at(layout.damage), fontSize: u * FACE_TEXT.number, lineHeight: `${u * 7}px` }}
           >
             {card.attack.damage > 0 ? card.attack.damage : ""}
           </p>
@@ -243,6 +289,9 @@ export const CardThumb = memo(function CardThumb({ card, art, scale = 2, dimmed 
   const raster = useMemo(() => faceRaster(card, picture), [card, picture]);
   const layout = FACE_LAYOUT[card.rarity];
   const inks = textInks(card);
+  // The thumb shows the name alone: it may run up to the type symbol.
+  const room = layout.type.x - 1 - layout.name.x;
+  const fit = fitText(card.name, FACE_TEXT.name, room);
   return (
     <div
       role="img"
@@ -266,13 +315,15 @@ export const CardThumb = memo(function CardThumb({ card, art, scale = 2, dimmed 
           style={{
             left: layout.name.x * u,
             top: layout.name.y * u,
-            width: (layout.name.w + 20) * u,
-            fontSize: u * 6,
+            width: room * u,
+            fontSize: u * FACE_TEXT.name * fit.size,
             lineHeight: `${u * 6}px`,
             color: inks.main,
           }}
         >
-          {card.name}
+          <span className="inline-block origin-left" style={{ transform: `scaleX(${fit.squeeze})` }}>
+            {card.name}
+          </span>
         </p>
       )}
     </div>

@@ -1,23 +1,23 @@
 {
   "news": [],
   "facts": {
-    "staff": 5,
+    "staff": 1,
     "stage": 0,
     "period": null,
     "product": "security_software",
     "max_staff": 2,
-    "ai_workers": 2,
+    "ai_workers": 0,
     "quality_bps": null,
-    "value_cents": 250000,
+    "value_cents": 303750,
     "profit_cents": null,
     "awareness_bps": null,
     "revenue_cents": null
   },
   "company": {
-    "id": "5e11474c-75dc-4497-a046-2d974dca7d61",
-    "idea": "Teppiche für Büros",
+    "id": "20dae624-7d9c-4955-ac4d-69ee8cf9e173",
+    "idea": "Bleibt klein",
     "logo": null,
-    "name": "Bodenständig",
+    "name": "Privat Werk",
     "tier": "garage",
     "is_ai": false,
     "listed": false,
@@ -25,26 +25,9 @@
     "ticker": null,
     "price_e4": null,
     "change_bps": null,
-    "founded_at": "2026-11-16T17:55:17.845927+00:00",
-    "brand_color": "#3366ff"
+    "founded_at": "2026-11-16T18:18:23.029057+00:00",
+    "brand_color": "#225588"
   },
-  "founder": { "tag": "ZWJP", "nickname": "Floor_Frida", "avatar_key": "rookie" },
-  "members": [
-    {
-      "tag": "22SC",
-      "tier": "intern",
-      "since": "2026-11-16T17:55:18.049698+00:00",
-      "title": "Werkstudium",
-      "nickname": "Floor_Willi",
-      "avatar_key": "rookie"
-    },
-    {
-      "tag": "TGRC",
-      "tier": "intern",
-      "since": "2026-11-16T17:55:18.077876+00:00",
-      "title": "Werkstudium",
-      "nickname": "Floor_Vera",
-      "avatar_key": "rookie"
-    }
-  ]
+  "founder": { "tag": "CSQB", "nickname": "Nils_Privat", "avatar_key": "rookie" },
+  "members": []
 }

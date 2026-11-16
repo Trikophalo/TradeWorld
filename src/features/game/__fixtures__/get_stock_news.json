@@ -2,42 +2,42 @@
   "items": [
     {
       "id": 5,
-      "body": "Ein bekannter Kopf aus der Branche kommt an Bord. Anleger dürften das leicht honorieren. Sicher ist das nicht.",
-      "name": "Methusalem Bio",
-      "due_at": "2026-11-16T19:24:51.584669+00:00",
+      "body": "Die Geschäfte laufen besser als geplant. Analysten erwarten einen deutlich steigenden Kurs. Sicher ist das nicht.",
+      "name": "Gipfelwerk",
+      "due_at": "2026-11-16T19:34:11.797155+00:00",
       "status": "open",
-      "ticker": "MTH",
-      "headline": "Neuer Chef-Entwickler wechselt zu Methusalem Bio",
+      "ticker": "GIP",
+      "headline": "Gipfelwerk hebt die Prognose an",
       "move_bps": null,
-      "strength": 1,
+      "strength": 3,
       "direction": "up",
-      "published_at": "2026-11-16T18:55:40.203616+00:00"
+      "published_at": "2026-11-16T19:18:30.73514+00:00"
     },
     {
       "id": 4,
-      "body": "Ein Vögelchen hat mir gezwitschert: Eilbote Express dürfte in der kommenden Stunde nach unten gehen. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
-      "name": "Eilbote Express",
-      "due_at": "2026-11-16T18:10:15.804291+00:00",
-      "status": "fizzled",
-      "ticker": "EBX",
-      "headline": "Vom Flurfunk: Eilbote Express",
-      "move_bps": null,
+      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei GenoVita Biotech tut sich in der nächsten Stunde etwas, und zwar nach oben. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
+      "name": "GenoVita Biotech",
+      "due_at": "2026-11-16T18:35:08.050261+00:00",
+      "status": "confirmed",
+      "ticker": "GNV",
+      "headline": "Mr. Doodle Dangles Geheimtipp",
+      "move_bps": 1368,
       "strength": 2,
-      "direction": "down",
-      "published_at": "2026-11-16T17:55:15.804291+00:00"
+      "direction": "up",
+      "published_at": "2026-11-16T18:18:08.050261+00:00"
     },
     {
       "id": 3,
-      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Rheinkraft Werke tut sich in der nächsten Stunde etwas, und zwar nach oben. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
-      "name": "Rheinkraft Werke",
-      "due_at": "2026-11-16T17:55:14.617472+00:00",
-      "status": "confirmed",
-      "ticker": "RKW",
-      "headline": "Mr. Doodle Dangles Geheimtipp",
-      "move_bps": 1289,
+      "body": "Ein Vögelchen hat mir gezwitschert: Glanz & Gloria dürfte in der kommenden Stunde nach unten gehen. Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.",
+      "name": "Glanz & Gloria",
+      "due_at": "2026-11-16T18:18:06.989329+00:00",
+      "status": "fizzled",
+      "ticker": "LUX",
+      "headline": "Vom Flurfunk: Glanz & Gloria",
+      "move_bps": null,
       "strength": 2,
-      "direction": "up",
-      "published_at": "2026-11-16T17:55:14.617472+00:00"
+      "direction": "down",
+      "published_at": "2026-11-16T18:18:06.989329+00:00"
     }
   ],
   "reliability_bps": 7500

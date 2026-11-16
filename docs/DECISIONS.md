@@ -2863,7 +2863,7 @@ Menge, Image …), acht sinnvolle Punkte, die man mit Mira angehen kann.
   `game_config.nexamon`. `nexamon_sync()` legt daraus `nexamon_cards` an und zieht Änderungen nach (idempotent, über
   einen Hash des Katalogs): Der Startpreis folgt immer dem Katalog, der Marktwert nur, solange er sich noch nie
   bewegt hat.
-- **Booster:** „Nexamon: Mystic Energy“ 200 €, „Nexamon: Super Apex“ 1.000 €, „Nexamon: Prismatic Peak“ 5.000 €,
+- **Booster:** „Nexamon: Mystic Energy“ 200 €, „Nexamon: Super Apex“ 1.000 €, „Nexamon: Prismatic Peak“ 10.000 €,
   je 5 Karten. Das Geld geht an die Haushalte (wie Accessoires), aus deren Topf auch die KI-Sammler zahlen.
   Höchstens 20 Booster je Spieler und Minute.
 - **Ziehungsraten (exakt, Nenner 3600):** Platz 1 bis 3 immer Common. Platz 4 würfelt Ultra 150/3600 (1/24),
@@ -2947,6 +2947,12 @@ Menge, Image …), acht sinnvolle Punkte, die man mit Mira angehen kann.
   NX170, `nexamon_not_raw` NX171, `nexamon_not_graded` NX172, `nexamon_not_sellable` NX173, `nexamon_own_listing`
   NX174, `nexamon_grading_limit` NX175; außerdem
   `insufficient_funds`, `rate_limited`, `invalid_argument`.
+- **Nachtrag Preise:** Prismatic Peak kostet 10.000 € statt 5.000 €; dafür sind alle Karten dieses Sets das
+  1,5-Fache wert (Startpreise im Katalog, Set-Faktor 37,5). Migration `20261204005500_nexamon_peak_prices.sql`
+  (gleich in `supabase/updates/`) hebt in einer bestehenden Datenbank einmalig Startpreis, Marktwert,
+  Tagesreferenz und Wertverlauf der Karten dieses Sets um das 1,5-Fache und zieht die KI-Angebote nach, weil
+  `nexamon_sync()` den Marktwert bewegter Karten nicht anfasst (Marke `nexamon_meta.peak_scaled_at`). Angebote von
+  Spielern behalten ihren Preis.
 - **Offen (Balancing):** Die Startpreise machen Booster im Erwartungswert teurer oder billiger als ihren Inhalt, je
   nach Katalog; gebremst wird über die begrenzte KI-Nachfrage und fallende Werte bei wachsendem Angebot. KI-Budget,
   Booster-Takt der KI und Notenfaktoren sind die Stellschrauben.
@@ -3223,3 +3229,45 @@ Anteil wie jeder Aktionär.
   Ausbau-Fehler nennen dem Spieler jetzt den Grund.
 - Tests: `supabase/tests/a1_company_fixes.sql`, Fixtures `get_my_company_gmbh_upgraded`, `set_company_banner_16_colours`,
   `start_company_move_resting`, `api.test.ts`, `routes.test.ts`, `server-clock.test.ts`, E2E für beide Timer.
+
+- **Oberfläche:** eine Seite `/nexamon` mit vier Reitern (Shop, Sammlung, Markt, ASP), die in der Adresse stehen
+  (`?tab=`, am Markt zusätzlich `?view=mine` und `?card=<Schlüssel>`), und eine eigene Seite je Karte
+  `/nexamon/<Schlüssel>` zum Verlinken (Sammlung, Markt, Feed). In der Navigation heißt der Eintrag „Collectibles“
+  (unter „Besitz“, im Handy unter „Mehr“); vor Level 10 zeigt die Seite einen Ausblick (`DISCLOSURE.nexamon`,
+  `<Reveal>`).
+  - **Shop:** zuerst die Booster der drei Sets, jedes mit eigenem Motiv, Alufolien-Glanz und Riffelnaht oben und
+    unten; sie kippen in 3D zum Zeiger (`TiltPack`, mit „Reduziert“ flach). Dazu Preis, eigener Fortschritt
+    (x von 77) und geöffnete Booster; darunter die Ziehungsraten für Platz 4 und 5 als Tabelle direkt aus
+    `nexamonSlotOdds` und die Zustands-Chancen.
+  - **Booster-Fenster:** Ein Klick auf ein Booster öffnet ein Fenster (Handy: ganzer Bildschirm). Oben stehen Preis
+    und Guthaben, darunter alle 77 Karten des Sets nach Seltenheit mit der Ziehungsrate je Seltenheit und den
+    eigenen Karten in Farbe. **Bezahlt wird nur mit dem Knopf „Kaufen · Preis“**, nie durch eine Geste: Eine
+    Wischbewegung darf kein Geld kosten, und der Server bucht ohnehin vor dem Ziehen. Erst danach liegt das Booster
+    zum Aufreißen da.
+  - **Aufreißen:** oben an der gestrichelten Linie drücken und quer ziehen; der Streifen hebt sich mit dem Finger,
+    die Folie knistert, nach 70 % der Breite ist er ab (`tearProgress`), vorher fällt er zurück. Für Tastatur und
+    wer nicht ziehen kann gibt es „Ohne Ziehen aufreißen“; mit „Reduziert“ entfällt die Show. Das Ergebnis liegt bis
+    zur Übersicht im `localStorage` (`nexa-nexamon-pending-pack`), damit ein geschlossenes Fenster oder ein Neuladen
+    nur die Animation unterbricht („Ungeöffnetes Booster“ im Shop). „Überspringen“ zeigt die Übersicht sofort,
+    „Noch eins · Preis“ ist der nächste ausdrückliche Kauf.
+  - **Töne** (8-Bit, `pnpm sounds`, folgen der Ton-Einstellung): `packCrinkle` beim Ziehen, `packTear` beim Abriss,
+    `cardFlick` für jede weggezogene Karte, `cardShow` für eine Common und steigend `pullRare`, `pullUltra`,
+    `pullPrisma`, `pullLegendary`.
+  - **Sammlung:** alle 231 Karten in Nummernfolge, fehlende grau; eine Kachel zeigt die beste eigene Kopie, im Slab
+    als Slab, mit Zähler bei Doppelten. Filter (Set, Seltenheit, Meine/Fehlt/Doppelt) und Sortierung laufen im
+    Client über die eine Antwort von `get_nexamon_collection`.
+  - **Karte:** kippbare Karte (Handy Faktor 4, PC Faktor 5), Wert mit Verlauf im vorhandenen `PriceChart`,
+    Population, Slabs je Note, eigene Kopien mit ihren Aktionen. Jede Aktion erklärt vorher im Sheet, was sie
+    kostet und bringt: Verkaufspreis mit Gebühr und Erlös (Vorschlag ist der Wert), Sofortverkauf mit den 50 %,
+    Grading mit Gebühr, Dauer und der Chancentabelle des Zustands, Aufbrechen mit dem Hinweis „keine Erstattung“.
+  - **Markt:** Filter, Sortierung und Seiten rechnet der Server; die eigenen Angebote kommen aus der Sammlung.
+    Kaufen bestätigt den gesehenen Preis; bei `nexamon_price_changed` oder `nexamon_not_listed` schließt das Fenster
+    mit einem Hinweis, und die Liste wird neu gelesen.
+  - **ASP-Schalter:** laufende Gradings mit Countdown, zurückgekehrte Slabs liegen verdeckt, bis man sie aufdeckt
+    (einmal je Slab, gemerkt im `localStorage`; Ton nach Note, Konfetti bei einer 10, mit „Reduziert“ nur
+    Überblenden). Als Verlauf dienen die eigenen Slabs: Eine Liste vergangener Gradings liefert der Server nicht.
+  - **Kartentext:** Name und Attacke enden vor der Zahl rechts daneben. Zu lange Texte werden erst gestaucht (bis
+    68 %), dann kleiner gesetzt; die Breiten der Pixelschrift stehen dafür als Tabelle in
+    `src/features/nexamon/lib.ts`, ein Test prüft alle 231 Karten.
+  - **Benachrichtigungen** tragen vom Server alle den Link `/nexamon`; der Client führt `nexamon_graded` zum
+    ASP-Schalter und `nexamon_sale` zu den eigenen Angeboten. Der Feed-Eintrag `nexamon_pull` verlinkt die Karte.

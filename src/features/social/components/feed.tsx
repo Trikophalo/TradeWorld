@@ -63,6 +63,7 @@ const ICONS: Record<string, PixelArt> = {
   record_dividend: UI_ICONS.markets,
   board_revolt: UI_ICONS.markets,
   research_done: UI_ICONS.upgrade,
+  nexamon_pull: UI_ICONS.nexamon,
 };
 
 const str = (v: unknown) => (typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
@@ -236,6 +237,18 @@ export function FeedRow({ item, compact }: { item: FeedItem; compact?: boolean }
           </Link>{" "}
           {item.isMe && <span className="label-pixel text-accent">{t("you")} </span>}
           {text(item)}
+          {item.kind === "nexamon_pull" && nexamonCard(str(item.payload.card_key)) && (
+            <>
+              {" "}
+              <Link
+                href={`/nexamon/${str(item.payload.card_key)}`}
+                className="font-medium text-accent focus-ring hover:underline"
+                data-testid="feed-nexamon-link"
+              >
+                {t("nexamonCard")}
+              </Link>
+            </>
+          )}
         </p>
         <p className="mt-1 flex items-center gap-2 text-xs text-fg-3">
           <PlayerTag tag={item.actor.tag} />
