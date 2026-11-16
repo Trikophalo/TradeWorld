@@ -408,6 +408,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Collectibles",
         text: "Unter „Collectibles“ wählst du ein Booster, siehst alle Karten des Sets mit ihren Chancen und reißt die Folie nach dem Kauf selbst auf, mit eigenen…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-71f72908",
+        title: "Collectibles auf dem Profil",
+        text: "Auf jedem Profil siehst du die wertvollsten Karten eines Spielers und über „Ganze Sammlung ansehen“ seinen ganzen Binder; dein eigenes Profil zeigt…",
+      },
     ],
   },
   {

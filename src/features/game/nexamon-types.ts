@@ -219,6 +219,46 @@ export interface NexamonCrackResult {
   oldGrade: number;
 }
 
+/** One card a player owns, as their profile shows it: the best copy and how many there are. */
+export interface PlayerNexamonCard {
+  cardKey: string;
+  set: NexamonSetKey;
+  number: number;
+  rarity: NexamonRarity;
+  /** Copies of this card the player owns. */
+  copies: number;
+  /** The best copy (the most valuable one): its population number, condition and grade (null = raw). */
+  serial: number;
+  condition: NexamonCondition;
+  grade: number | null;
+  /** Value of the best copy. */
+  valueCents: number;
+  /** Value of all copies of this card. */
+  totalCents: number;
+}
+
+/** A player's collection for their profile (ADR-165). Listings and gradings in progress stay private. */
+export interface PlayerNexamon {
+  nickname: string;
+  isMe: boolean;
+  /** false: the player has not reached the Nexamon level, nothing is shown. */
+  unlocked: boolean;
+  summary: {
+    copies: number;
+    distinct: number;
+    /** Cards in the catalogue (231). */
+    total: number;
+    valueCents: number;
+    /** Slabs, and how many of them carry a 10. */
+    graded: number;
+    tens: number;
+  };
+  sets: { key: NexamonSetKey; cards: number; distinct: number; copies: number }[];
+  /** One entry per owned card, most valuable first; capped by the limit asked for. */
+  cards: PlayerNexamonCard[];
+  serverTime: string;
+}
+
 export interface NexamonEngine {
   /** Sets with pack prices, the own collection in numbers, unlock. Works while locked (`unlocked: false`). */
   nexamon(): Promise<NexamonOverview>;
@@ -229,6 +269,11 @@ export interface NexamonEngine {
   /** One card: value, history, population, listings, own copies, recent sales. */
   nexamonCard(cardKey: string): Promise<NexamonCardDetails>;
   nexamonMarket(query?: NexamonMarketQuery): Promise<NexamonMarketPage>;
+  /**
+   * What a player collected, for their profile; null is the own collection. `limit` caps the cards (the most
+   * valuable ones), the numbers always cover everything. Works while the viewer's own area is still locked.
+   */
+  playerNexamon(nickname: string | null, limit?: number | null): Promise<PlayerNexamon>;
   listNexamonCard(requestId: string, copyId: string, priceCents: number): Promise<NexamonListResult>;
   unlistNexamonCard(requestId: string, listingId: string): Promise<{ copy: NexamonCopy }>;
   /** `priceCents` is the price the player saw; a changed price fails with nexamon_price_changed. */

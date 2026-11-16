@@ -144,6 +144,29 @@ const marketSchema = z.object({
   server_time: iso,
 });
 
+const playerSchema = z.object({
+  nickname: z.string(),
+  is_me: z.boolean(),
+  unlocked: z.boolean(),
+  summary: z.object({ copies: num, distinct: num, total: num, value_cents: num, graded: num, tens: num }),
+  sets: z.array(z.object({ key: setKey, cards: num, distinct: num, copies: num })),
+  cards: z.array(
+    z.object({
+      card_key: z.string(),
+      set: setKey,
+      number: num,
+      rarity,
+      copies: num,
+      serial: num,
+      condition,
+      grade,
+      value_cents: num,
+      total_cents: num,
+    }),
+  ),
+  server_time: iso,
+});
+
 const listedSchema = z.object({ listing: listingSchema, copy: copySchema });
 const unlistedSchema = z.object({ copy: copySchema });
 const boughtSchema = z.object({
@@ -166,6 +189,7 @@ export const NEXAMON_RPC_SCHEMAS = {
   get_nexamon_card: cardDetailsSchema,
   get_nexamon_market: marketSchema,
   get_nexamon: overviewSchema,
+  get_player_nexamon: playerSchema,
   buy_nexamon_pack: packSchema,
   list_nexamon_card: listedSchema,
   unlist_nexamon_card: unlistedSchema,
@@ -319,6 +343,36 @@ export const liveNexamonEngine: NexamonEngine = {
       page: r.page,
       pageSize: r.page_size,
       pages: r.pages,
+      serverTime: r.server_time,
+    };
+  },
+  async playerNexamon(nickname, limit = null) {
+    const r = await rpc("get_player_nexamon", { p_nickname: nickname, p_limit: limit }, playerSchema);
+    return {
+      nickname: r.nickname,
+      isMe: r.is_me,
+      unlocked: r.unlocked,
+      summary: {
+        copies: r.summary.copies,
+        distinct: r.summary.distinct,
+        total: r.summary.total,
+        valueCents: r.summary.value_cents,
+        graded: r.summary.graded,
+        tens: r.summary.tens,
+      },
+      sets: r.sets,
+      cards: r.cards.map((c) => ({
+        cardKey: c.card_key,
+        set: c.set,
+        number: c.number,
+        rarity: c.rarity,
+        copies: c.copies,
+        serial: c.serial,
+        condition: c.condition,
+        grade: c.grade,
+        valueCents: c.value_cents,
+        totalCents: c.total_cents,
+      })),
       serverTime: r.server_time,
     };
   },

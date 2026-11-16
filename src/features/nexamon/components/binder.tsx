@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { formatCardNumber } from "../lib";
 import {
   BINDER_OWNERSHIPS,
+  BINDER_SALES,
   BINDER_SORTS,
   binderEntries,
   collectionTotals,
@@ -24,6 +25,7 @@ import {
   type BinderEntry,
   type BinderFilter,
   type BinderOwnership,
+  type BinderSale,
   type BinderSort,
   tileMoney,
 } from "../view";
@@ -63,6 +65,12 @@ export function Binder({ collection }: { collection: NexamonCollection | undefin
   const totals = collectionTotals(collection.copies);
   return (
     <div className="space-y-4" data-testid="nexamon-binder">
+      <div className="space-y-1">
+        <h2 className="font-pixel text-sm text-fg-1 uppercase">{t("binder.title")}</h2>
+        <p className="text-sm text-pretty text-fg-2" data-testid="binder-kept">
+          {t("binder.keptHint", { listed: totals.listed, kept: totals.copies - totals.listed })}
+        </p>
+      </div>
       <div className="grid grid-cols-3 gap-2">
         <Stat label={t("binder.copies")} testId="binder-copies">
           {totals.copies}
@@ -84,7 +92,7 @@ export function Binder({ collection }: { collection: NexamonCollection | undefin
           block
           options={BINDER_OWNERSHIPS.map((value) => ({ value, label: t(`binder.own.${value}`) }))}
         />
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
           <SelectField<NexamonSetKey | "all">
             label={t("filter.set")}
             value={filter.set}
@@ -112,6 +120,13 @@ export function Binder({ collection }: { collection: NexamonCollection | undefin
             testId="binder-sort"
             options={BINDER_SORTS.map((sort) => ({ value: sort, label: t(`binder.sort.${sort}`) }))}
           />
+          <SelectField<BinderSale>
+            label={t("binder.saleLabel")}
+            value={filter.sale}
+            onChange={(sale) => patch({ sale })}
+            testId="binder-sale"
+            options={BINDER_SALES.map((sale) => ({ value: sale, label: t(`binder.sale.${sale}`) }))}
+          />
         </div>
       </div>
 
@@ -132,7 +147,7 @@ export function Binder({ collection }: { collection: NexamonCollection | undefin
         groups.map((group) => (
           <section key={group.set ?? "all"} className="space-y-2" data-set={group.set ?? "all"}>
             {group.set && (
-              <h2 className="flex items-center justify-between gap-2">
+              <h3 className="flex items-center justify-between gap-2">
                 <SetIcon set={group.set} label className="font-pixel text-xs uppercase" />
                 <span className="nums text-xs text-fg-3">
                   {t("binder.setCount", {
@@ -140,7 +155,7 @@ export function Binder({ collection }: { collection: NexamonCollection | undefin
                     total: group.entries.length,
                   })}
                 </span>
-              </h2>
+              </h3>
             )}
             <ul
               className={cn(

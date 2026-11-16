@@ -113,6 +113,10 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Collectibles auf dem Profil (ADR-165):** Auf jedem Profil siehst du die wertvollsten Karten eines Spielers und
+  über „Ganze Sammlung ansehen“ seinen ganzen Binder; dein eigenes Profil zeigt deine Karten mit Anzahl und Wert.
+  Was du nicht einstellst, bleibt in „Deine Sammlung“ (neuer Filter „Zum Verkauf / Nicht zum Verkauf“), und
+  Nexamon-Missionen führen direkt zu den Collectibles.
 - **Collectibles (ADR-165):** Unter „Collectibles“ wählst du ein Booster, siehst alle Karten des Sets mit ihren
   Chancen und reißt die Folie nach dem Kauf selbst auf, mit eigenen Tönen für gute Züge. Dazu Sammelalbum,
   Kartenansicht mit Wertverlauf, Kartenmarkt und ASP-Schalter. Prismatic Peak kostet jetzt 10.000 €, seine Karten

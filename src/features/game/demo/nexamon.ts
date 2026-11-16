@@ -36,6 +36,8 @@ import type {
   NexamonListing,
   NexamonSale,
   NexamonSaleKind,
+  PlayerNexamon,
+  PlayerNexamonCard,
 } from "../nexamon-types";
 import { GameError } from "../types";
 
@@ -126,6 +128,44 @@ export interface NexamonHost {
   idempotent<T>(requestId: string, run: () => T): T;
   now(): number;
   random(): number;
+  /** Level of another player the demo knows (a made-up friend or colleague); null = nobody of that name. */
+  playerLevel?(nickname: string): number | null;
+}
+
+/** Packs a made-up player has opened, by level: nothing below the unlock, more with every level. */
+const OTHER_PACKS_PER_LEVEL = 6;
+const OTHER_PACKS_MAX = 90;
+
+/**
+ * The cards of a made-up player (a demo friend), always the same for a name and level: packs opened with a
+ * seeded generator, some of the better cards graded. They only exist on the profile: the demo's populations and
+ * market do not know them.
+ */
+export function demoOtherCopies(
+  nickname: string,
+  level: number,
+  unlockAt: number,
+): { cardKey: string; serial: number; condition: NexamonCondition; grade: number | null }[] {
+  if (level < unlockAt) return [];
+  const rng = createRng(165).derive("profile", nickname.toLowerCase());
+  const packs = Math.min(OTHER_PACKS_MAX, (level - unlockAt + 1) * OTHER_PACKS_PER_LEVEL);
+  const copies: { cardKey: string; serial: number; condition: NexamonCondition; grade: number | null }[] = [];
+  for (let i = 0; i < packs; i++) {
+    // mostly the cheap set, now and then a better pack
+    const roll = rng.next();
+    const set = roll < 0.7 ? NEXAMON_SETS[0] : roll < 0.95 ? NEXAMON_SETS[1]! : NEXAMON_SETS[2]!;
+    const cards = NEXAMON_CARDS.filter((c) => c.set === set);
+    for (const pull of nexamonOpenPack(cards, rng.next)) {
+      const graded = pull.rarity !== "common" && rng.next() < 0.4;
+      copies.push({
+        cardKey: pull.key,
+        serial: 1 + Math.floor(rng.next() * 40),
+        condition: pull.condition,
+        grade: graded ? nexamonRollGrade(pull.condition, rng.next()) : null,
+      });
+    }
+  }
+  return copies;
 }
 
 const berlinDay = (ms: number) =>
@@ -676,6 +716,68 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine {
         pages: Math.max(1, Math.ceil(all.length / size)),
         serverTime: iso(host.now()),
       };
+    },
+
+    async playerNexamon(nickname, limit = null) {
+      const s = tick();
+      const me = host.nickname();
+      const own = nickname === null || nickname.trim().toLowerCase() === me.toLowerCase();
+      const level = own ? host.level() : (host.playerLevel?.(nickname.trim()) ?? null);
+      if (level === null) throw new GameError("player_not_found");
+      const unlocked = level >= unlockAt;
+      const copies = !unlocked ? [] : own ? s.copies : demoOtherCopies(nickname.trim(), level, unlockAt);
+      const byCard = new Map<string, PlayerNexamonCard>();
+      for (const c of copies) {
+        const card = info(c.cardKey);
+        const value = copyValue(s, c);
+        const entry = byCard.get(c.cardKey);
+        if (!entry) {
+          byCard.set(c.cardKey, {
+            cardKey: c.cardKey,
+            set: card.set,
+            number: card.number,
+            rarity: card.rarity,
+            copies: 1,
+            serial: c.serial,
+            condition: c.condition,
+            grade: c.grade,
+            valueCents: value,
+            totalCents: value,
+          });
+          continue;
+        }
+        entry.copies += 1;
+        entry.totalCents += value;
+        // the best copy: the most valuable, then the higher grade, then the lower serial
+        const better = value - entry.valueCents || (c.grade ?? 0) - (entry.grade ?? 0) || entry.serial - c.serial;
+        if (better > 0)
+          Object.assign(entry, { serial: c.serial, condition: c.condition, grade: c.grade, valueCents: value });
+      }
+      const order = (c: PlayerNexamonCard) => NEXAMON_SETS.indexOf(c.set) * 1_000 + c.number;
+      const cards = [...byCard.values()].sort((a, b) => b.valueCents - a.valueCents || order(a) - order(b));
+      const cap = Math.min(500, Math.max(1, Math.floor(limit ?? 500)));
+      const result: PlayerNexamon = {
+        nickname: own ? me : nickname.trim(),
+        isMe: own,
+        unlocked,
+        summary: {
+          copies: copies.length,
+          distinct: cards.length,
+          total: NEXAMON_CARDS.length,
+          valueCents: cards.reduce((sum, c) => sum + c.totalCents, 0),
+          graded: copies.filter((c) => c.grade !== null).length,
+          tens: copies.filter((c) => c.grade === 10).length,
+        },
+        sets: NEXAMON_SETS.map((set) => ({
+          key: set,
+          cards: NEXAMON_CARDS.filter((c) => c.set === set).length,
+          distinct: cards.filter((c) => c.set === set).length,
+          copies: cards.filter((c) => c.set === set).reduce((sum, c) => sum + c.copies, 0),
+        })),
+        cards: cards.slice(0, cap),
+        serverTime: iso(host.now()),
+      };
+      return result;
     },
 
     listNexamonCard: (requestId, copyId, priceCents) =>

@@ -21,6 +21,7 @@ export const NEXAMON_KEYS = {
   collection: ["nexamon", "collection"] as const,
   card: (key: string) => ["nexamon", "card", key] as const,
   market: (query: NexamonMarketQuery) => ["nexamon", "market", query] as const,
+  player: (nickname: string | null, limit: number | null) => ["nexamon", "player", nickname ?? "", limit] as const,
 };
 
 /** Sets, pack prices and the own collection in numbers. Works while the area is still locked. */
@@ -54,6 +55,19 @@ export function useNexamonMarket(query: NexamonMarketQuery, enabled = true) {
     enabled,
     placeholderData: keepPreviousData,
     refetchInterval: REFRESH_MS,
+  });
+}
+
+/**
+ * What a player collected, for their profile (null = the own collection). `limit` asks for the most valuable
+ * cards only; the numbers always cover everything.
+ */
+export function usePlayerNexamon(nickname: string | null, limit: number | null = null, enabled = true) {
+  return useQuery({
+    queryKey: NEXAMON_KEYS.player(nickname, limit),
+    queryFn: () => engine.playerNexamon(nickname, limit),
+    enabled,
+    staleTime: REFRESH_MS,
   });
 }
 

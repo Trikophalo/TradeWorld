@@ -2953,6 +2953,24 @@ Menge, Image …), acht sinnvolle Punkte, die man mit Mira angehen kann.
   Tagesreferenz und Wertverlauf der Karten dieses Sets um das 1,5-Fache und zieht die KI-Angebote nach, weil
   `nexamon_sync()` den Marktwert bewegter Karten nicht anfasst (Marke `nexamon_meta.peak_scaled_at`). Angebote von
   Spielern behalten ihren Preis.
+- **Nachtrag Profil und Inventar:** Wunsch des Eigentümers: „Collectibles sollen auch in deinem Inventar sein, wenn
+  du sie nicht verkaufen willst, und du kannst sehen, was andere Spieler für Collectibles haben.“ Ein
+  übergreifendes Inventar gibt es im Spiel nicht; der Ort für Besitz ist das Profil (wie NFTs und Zuhause).
+  `get_player_nexamon(p_nickname, p_limit)` (Migration `20261204005800_nexamon_profile.sql`) liefert dafür die
+  Sammlung eines Spielers in Zahlen (Karten, Motive von 231, Wert, Slabs, Zehner), den Stand je Set und je Karte
+  die beste Kopie (die wertvollste) mit Anzahl, nach Wert sortiert, höchstens `p_limit` (1 bis 500). Sichtbar
+  für jeden angemeldeten Spieler, wie `get_collection` und `get_property` (Profile sind öffentlich; nur
+  Investments sind Freunden vorbehalten). Angebote, verlangte Preise und laufende Gradings bleiben privat. Wer
+  Nexamon noch nicht freigeschaltet hat, zeigt nichts; ansehen darf man fremde Sammlungen auch unter Level 10, die
+  Kartenseiten öffnen sich aber erst ab dann. Auf dem Profil: Abschnitt „Collectibles“ mit den acht wertvollsten
+  Karten (Slabs als Slabs) und „Ganze Sammlung ansehen“ (Sheet, je Set, nur lesen); auf dem eigenen Profil dazu
+  der Weg zur Sammlung. Der Sammlungs-Tab heißt innen „Deine Sammlung“, sagt, wie viele Karten bleiben und wie
+  viele zum Verkauf stehen, und filtert danach. Missionen mit „nexamon“ im Schlüssel führen nach `/nexamon`
+  (`src/features/progression/mission-routes.ts`, die erste Zuordnung von Missionen zu Seiten). Demo: erfundene
+  Freunde ab Level 10 haben eine feste, aus dem Namen gewürfelte Sammlung, die nur auf dem Profil existiert.
+  **Nicht umgesetzt:** Kartenwerte zählen nicht zum Vermögen und zur Rangliste. Das wäre kein kleiner Eingriff
+  (`player_net_worth_cents`, `rich_list_entries`, Vermögensverlauf, Demo) und Kartenwerte lassen sich in Grenzen
+  bewegen; das braucht eine eigene Entscheidung.
 - **Offen (Balancing):** Die Startpreise machen Booster im Erwartungswert teurer oder billiger als ihren Inhalt, je
   nach Katalog; gebremst wird über die begrenzte KI-Nachfrage und fallende Werte bei wachsendem Angebot. KI-Budget,
   Booster-Takt der KI und Notenfaktoren sind die Stellschrauben.

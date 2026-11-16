@@ -16,6 +16,7 @@ import { Segmented } from "@/components/ui/segmented";
 import type { NexamonListing } from "@/features/game/nexamon-types";
 import { NEXAMON_CONDITIONS } from "../lib";
 import { ConditionBadge, RarityBadge, SetIcon, TypeIcon } from "./badges";
+import { ProfileNexamon } from "./profile-collection";
 import { NexamonCard } from "./card";
 import { CardThumb, NexamonCardBack, NexamonCardFace } from "./card-face";
 import { DealNote, ListingRow } from "./listing-row";
@@ -331,6 +332,9 @@ export function NexamonShowcase() {
             ))}
           </ul>
         </div>
+      </Block>
+      <Block label="Profil: Collectibles eines Spielers (hier die eigenen)" testId="nexamon-profile-block">
+        <ProfileNexamon nickname={null} />
       </Block>
     </div>
   );
