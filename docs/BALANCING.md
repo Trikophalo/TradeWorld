@@ -1249,7 +1249,8 @@ Werte in `BALANCE.livingBonus`, `BALANCE.property.furniturePriceBps`, `BALANCE.p
 
 Werte in `BALANCE.nexamon` (`src/config/nexamon-rules.ts`), Startpreise im Katalog (`src/config/nexamon`).
 
-- **Booster:** Mystic Energy 200 €, Super Apex 1.000 €, Prismatic Peak 5.000 €, je 5 Karten.
+- **Booster:** Mystic Energy 200 €, Super Apex 1.000 €, Prismatic Peak 10.000 €, je 5 Karten. Die Startpreise der
+  Sets stehen im Verhältnis 1 : 5 : 37,5 (`NEXAMON_SET_PRICE_FACTOR`).
 - **Ziehungsraten je Platz** (Nenner 3600):
 
   | Platz   | Legendary      | Prisma        | Ultra         | Rare         | Common |

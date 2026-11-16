@@ -389,9 +389,9 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Ab Level 10 ziehst du Booster aus drei Sets, lässt Karten bei ASP bewerten und handelst sie an einem Markt, an dem Knappheit und Nachfrage den Wert…",
       },
       {
-        id: "startseite-waehrung-zur-wahl-freundescode-2e3c0e97",
-        title: "Nexamon-Seiten",
-        text: "Unter „Nexamon“ gibt es jetzt Shop mit ehrlichen Ziehungsraten, Booster zum Aufreißen, Sammelalbum, Kartenansicht mit Wertverlauf, Kartenmarkt und…",
+        id: "startseite-waehrung-zur-wahl-freundescode-9ce16b6f",
+        title: "Collectibles",
+        text: "Unter „Collectibles“ wählst du ein Booster, siehst alle Karten des Sets mit ihren Chancen und reißt die Folie nach dem Kauf selbst auf, mit eigenen…",
       },
     ],
   },
