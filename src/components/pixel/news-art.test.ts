@@ -60,6 +60,8 @@ describe("news studio art", () => {
   it("registers a 16×16 icon per kind of story", () => {
     expect(Object.keys(NEWS_ICON_ART).sort()).toEqual(
       [
+        "cards",
+        "corp",
         "crypto",
         "gossip",
         "hype",
@@ -72,6 +74,7 @@ describe("news studio art", () => {
         "sector",
         "stock",
         "tasks",
+        "tax",
         "winner",
         "world",
       ].map((kind) => `news/${kind}`),

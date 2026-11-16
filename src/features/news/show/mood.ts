@@ -43,6 +43,10 @@ const KIND_MOODS: Record<string, Record<Verdict, AnchorMood>> = {
   nft: { none: "confused", gain: "smug", loss: "crying", mixed: "confused" },
   gossip: { none: "smug", gain: "smug", loss: "laughing", mixed: "smug" },
   ramble: same("confused"),
+  // Collectibles puzzle him, the Finanzamt delights him (as long as it visits others), listed companies are drama.
+  cards: { none: "confused", gain: "laughing", loss: "crying", mixed: "confused" },
+  tax: same("smug"),
+  corp: { none: "shocked", gain: "proud", loss: "shocked", mixed: "confused" },
 };
 
 /** Kinds the studio does not know: judged by their effects alone. */

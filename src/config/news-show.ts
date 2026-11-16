@@ -9,7 +9,28 @@
  * The humour is harsh on purpose, but only about what happened in the game: lost play money, flopped companies.
  * When he digresses he may name public figures: always as an obviously absurd rumour, never about crimes, health
  * or private life (ADR-152).
+ * More stories (ADR-169): the topics in news-topics.ts (collectibles, Finanzamt, listed companies, personal news
+ * with numbers, odd bits) are scripts like the others; `topics` below says how many a show takes and from which
+ * facts they are made.
  */
+import { NEWS_RAMBLE_EXTRA, NEWS_TOPICS } from "./news-topics.ts";
+
+type Topics = typeof NEWS_TOPICS;
+const topicKeys = Object.keys(NEWS_TOPICS) as (keyof Topics)[];
+/** The topics as scripts (frames and reasons), as moods and as the list the draw works on. */
+const TOPIC_TEXTS = Object.fromEntries(
+  topicKeys.map((key) => [key, { frames: NEWS_TOPICS[key].frames, reasons: NEWS_TOPICS[key].reasons }]),
+) as { [K in keyof Topics]: Pick<Topics[K], "frames" | "reasons"> };
+const TOPIC_MOODS = Object.fromEntries(topicKeys.map((key) => [key, NEWS_TOPICS[key].moods])) as {
+  [K in keyof Topics]: Topics[K]["moods"];
+};
+const TOPIC_LIST = Object.fromEntries(
+  topicKeys.map((key) => {
+    const { group, kind, weight, tone, slots } = NEWS_TOPICS[key];
+    return [key, { group, kind, weight, tone, slots }];
+  }),
+) as { [K in keyof Topics]: Pick<Topics[K], "group" | "kind" | "weight" | "tone" | "slots"> };
+
 export const NEWS_SHOW_RULES = {
   /** The draft of a show is written this long before it airs (time for Claude to polish it). */
   prepareMinutes: 10,
@@ -19,7 +40,7 @@ export const NEWS_SHOW_RULES = {
   outroSeconds: 6,
   /** Typewriter speed of the anchor's speech bubble. */
   charsPerSecond: 28,
-  maxSegments: 10,
+  maxSegments: 12,
   /**
    * A show only happens when a real player watches: it starts when the first viewer is in the stream, at the full
    * hour or up to this long after it; without viewers it is cancelled and nothing happens.
@@ -186,8 +207,58 @@ export const NEWS_SHOW_RULES = {
       "Donald Trump",
     ],
   },
+  /**
+   * More stories per show (ADR-169). Every topic in `list` is a script (texts and moods under its key) with a group,
+   * the kind of segment, a weight and a tone. A show takes `count` topics out of those that have something to tell
+   * right now: never one that ran in the last show while others are there, groups that are not in the show yet
+   * first, then by weight. They go to the places `ords` in the running order (loser 10, gossip 20, company 30,
+   * NFT 40, winner 50, gossip 60, company 70, digression 80, world 90, AI stock 100). A fact is told once.
+   * Topics with tone "bad" in the group "person" or "cards" pay the player hush money.
+   */
+  topics: {
+    /** 0 switches the topics off. */
+    count: 3,
+    ords: [25, 45, 65],
+    /** Facts from this many hours back count ("heute"). */
+    windowHours: 24,
+    hushMoneyCents: 10_000,
+    rarityNames: { common: "Common", rare: "Rare", ultra: "Ultra Rare", prisma: "Prisma", legendary: "Legendär" },
+    cards: {
+      /** A pull of these rarities is a story; a spree of at least dudMinPacks packs without any of hitRarities too. */
+      pullRarities: ["prisma", "legendary"],
+      hitRarities: ["ultra", "prisma", "legendary"],
+      dudMinPacks: 5,
+      /** A sale from this price on; a card whose value left the day's first value by at least minMoveBps. */
+      minSaleCents: 100_000,
+      minMoveBps: 500,
+      /** A grade up to this one hurts (a slab from 8 on is worth more than the raw card). */
+      lowGradeMax: 6,
+      collectionMinCards: 5,
+      aiMinListings: 2,
+    },
+    tax: { streakMinDays: 5, debtMinCents: 100_000 },
+    corp: { moodLow: 30, moodHigh: 85, quitMin: 2 },
+    person: {
+      /** One trade with at least this much realised loss or gain. */
+      tradeMinCents: 100_000,
+      /** Net worth change within the last hour. */
+      hourMinBps: 200,
+      rentMinCents: 10_000,
+      accessoryMinCents: 100_000,
+      /** Accessories worn at once. */
+      outfitMin: 4,
+      rerollMin: 2,
+      chatMin: 30,
+      pokeMin: 5,
+      /** A founder's share of the profit and what it paid out in the window. */
+      founderPayMinBps: 5_000,
+      founderPayMinCents: 100_000,
+    },
+    list: TOPIC_LIST,
+  },
   /** The anchor's face per script; one is picked at random. Claude may choose another one. */
   moods: {
+    ...TOPIC_MOODS,
     loser: ["laughing", "smug"],
     winner: ["proud", "shocked"],
     scandal: ["shocked", "angry"],
@@ -214,6 +285,7 @@ export const NEWS_SHOW_RULES = {
    * many reasons nothing repeats for hundreds of shows.
    */
   texts: {
+    ...TOPIC_TEXTS,
     loser: {
       frames: [
         {
@@ -658,6 +730,7 @@ export const NEWS_SHOW_RULES = {
         "Thomas Gottschalk will angeblich mein Wohnzimmer moderieren. Ich habe abgeschlossen.",
         "Dieter Bohlen hat meinen Schnurrbart bewertet. Es reicht nicht für den Recall.",
         "Günther Jauch hat mich angerufen, ich war der Telefonjoker. Ich wusste es nicht.",
+        ...NEWS_RAMBLE_EXTRA,
       ],
     },
     rambleInvest: {

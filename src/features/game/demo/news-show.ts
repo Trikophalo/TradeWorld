@@ -1,7 +1,15 @@
 import { BALANCE } from "@/config/balance";
 import type { NewsShowTextKey } from "@/config/news-show";
 import { formatMoney } from "@/lib/format";
-import { fillScript, movePercent, pickScript, showDurationMs, showSlot, usedKeys } from "@/lib/sim/news-show";
+import {
+  fillScript,
+  movePercent,
+  pickScript,
+  pickTopics,
+  showDurationMs,
+  showSlot,
+  usedKeys,
+} from "@/lib/sim/news-show";
 import {
   GameError,
   type GameEngine,
@@ -11,6 +19,7 @@ import {
   type NewsShowSegment,
   type NewsShowState,
 } from "../types";
+import { demoTopicCandidates } from "./news-topics";
 
 /*
  * NEXA Nachrichten in the offline demo (ADR-150): the same rules as the server. The show of an hour starts when the
@@ -38,6 +47,8 @@ export interface DemoNewsShowState {
   chat: (Omit<NewsShowChatMessage, "at" | "bot"> & { at: number; bot?: boolean })[];
   seq: number;
   botUntil: number;
+  /** Topics of the last show (ADR-169): they do not come twice in a row. Missing in older saved states. */
+  lastTopics?: string[];
 }
 
 export interface NewsShowHost {
@@ -88,23 +99,28 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
 
   /** Writes the show and applies its effects, like news_show_build() and news_show_start(). */
   function air(s: DemoNewsShowState, slot: number, startedAt: number): DemoShow {
-    const segments: NewsShowSegment[] = [];
+    // every story carries its place in the running order, like the server's "ord"
+    const stories: { ord: number; segment: NewsShowSegment }[] = [];
+    const segments = { push: (segment: NewsShowSegment, ord: number) => stories.push({ ord, segment }) };
     const sign = (up: boolean) => (up ? "+" : "−");
 
     const change = host.dayChange();
     if (change && change.bps <= -cfg.loser.minLossBps) {
       host.addCash(cfg.loser.consolationCents);
-      segments.push({
-        kind: "loser",
-        ...script(s, "loser", {
-          name: host.nickname(),
-          amount: formatMoney(Math.abs(change.cents), { whole: true }),
-          pct: movePercent(change.bps),
-        }),
-        effects: [
-          { label: `+${formatMoney(cfg.loser.consolationCents, { whole: true })} Trostpflaster`, tone: "gain" },
-        ],
-      });
+      segments.push(
+        {
+          kind: "loser",
+          ...script(s, "loser", {
+            name: host.nickname(),
+            amount: formatMoney(Math.abs(change.cents), { whole: true }),
+            pct: movePercent(change.bps),
+          }),
+          effects: [
+            { label: `+${formatMoney(cfg.loser.consolationCents, { whole: true })} Trostpflaster`, tone: "gain" },
+          ],
+        },
+        10,
+      );
     }
 
     // personal news: one fact about the player, each only once
@@ -112,13 +128,16 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
     if (fact) {
       s.used = [...s.used, `fact:${fact.what}`];
       if (!fact.good) host.addCash(cfg.gossip.hushMoneyCents);
-      segments.push({
-        kind: "gossip",
-        ...script(s, fact.good ? "gossipGood" : "gossipBad", { name: host.nickname(), what: fact.what }),
-        effects: fact.good
-          ? []
-          : [{ label: `+${formatMoney(cfg.gossip.hushMoneyCents, { whole: true })} Schmerzensgeld`, tone: "gain" }],
-      });
+      segments.push(
+        {
+          kind: "gossip",
+          ...script(s, fact.good ? "gossipGood" : "gossipBad", { name: host.nickname(), what: fact.what }),
+          effects: fact.good
+            ? []
+            : [{ label: `+${formatMoney(cfg.gossip.hushMoneyCents, { whole: true })} Schmerzensgeld`, tone: "gain" }],
+        },
+        20,
+      );
     }
 
     const company = host.company();
@@ -131,15 +150,18 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
           1,
           1 + ((company.taskMomentum ?? 1) - 1) * (1 - cfg.company.momentumLossBps / 10_000),
         );
-      segments.push({
-        kind: scandal ? "scandal" : "hype",
-        ...script(s, scandal ? "scandal" : "hype", {
-          company: company.name,
-          idea: company.idea.slice(0, 90) || "irgendwas mit Zukunft",
-          founder: host.nickname(),
-        }),
-        effects: [{ label: `Bekanntheit ${sign(!scandal)}${movePercent(aw)}`, tone: scandal ? "loss" : "gain" }],
-      });
+      segments.push(
+        {
+          kind: scandal ? "scandal" : "hype",
+          ...script(s, scandal ? "scandal" : "hype", {
+            company: company.name,
+            idea: company.idea.slice(0, 90) || "irgendwas mit Zukunft",
+            founder: host.nickname(),
+          }),
+          effects: [{ label: `Bekanntheit ${sign(!scandal)}${movePercent(aw)}`, tone: scandal ? "loss" : "gain" }],
+        },
+        30,
+      );
     }
 
     const stocks = [...host.stocks()].sort(() => host.random() - 0.5);
@@ -147,11 +169,14 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
       const up = host.random() < 0.5;
       const bps = between(cfg.stock.minBps, cfg.stock.maxBps);
       host.shock(stock.ticker, up ? bps : -bps);
-      segments.push({
-        kind: "stock",
-        ...script(s, up ? "stockUp" : "stockDown", { stock: stock.name, move: movePercent(bps) }),
-        effects: [{ label: `${stock.ticker} ${sign(up)}${movePercent(bps)}`, tone: up ? "gain" : "loss" }],
-      });
+      segments.push(
+        {
+          kind: "stock",
+          ...script(s, up ? "stockUp" : "stockDown", { stock: stock.name, move: movePercent(bps) }),
+          effects: [{ label: `${stock.ticker} ${sign(up)}${movePercent(bps)}`, tone: up ? "gain" : "loss" }],
+        },
+        100,
+      );
     }
 
     const up = host.random() < 0.5;
@@ -160,19 +185,25 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
       const bps = between(cfg.sector.minBps, cfg.sector.maxBps);
       for (const stock of stocks.filter((x) => x.sector === sector)) host.shock(stock.ticker, up ? bps : -bps);
       const name = host.sectorName(sector);
-      segments.push({
-        kind: "sector",
-        ...script(s, up ? "sectorUp" : "sectorDown", { sector: name, move: movePercent(bps) }),
-        effects: [{ label: `${name} ${sign(up)}${movePercent(bps)}`, tone: up ? "gain" : "loss" }],
-      });
+      segments.push(
+        {
+          kind: "sector",
+          ...script(s, up ? "sectorUp" : "sectorDown", { sector: name, move: movePercent(bps) }),
+          effects: [{ label: `${name} ${sign(up)}${movePercent(bps)}`, tone: up ? "gain" : "loss" }],
+        },
+        90,
+      );
     } else {
       const bps = between(cfg.tasks.minBps, cfg.tasks.maxBps);
       host.scaleOpenTasks(up ? bps : -bps);
-      segments.push({
-        kind: "tasks",
-        ...script(s, up ? "tasksUp" : "tasksDown", { move: movePercent(bps) }),
-        effects: [{ label: `Aufgaben ${sign(up)}${movePercent(bps)}`, tone: up ? "gain" : "loss" }],
-      });
+      segments.push(
+        {
+          kind: "tasks",
+          ...script(s, up ? "tasksUp" : "tasksDown", { move: movePercent(bps) }),
+          effects: [{ label: `Aufgaben ${sign(up)}${movePercent(bps)}`, tone: up ? "gain" : "loss" }],
+        },
+        90,
+      );
     }
 
     // he digresses: a rumour about a public figure and a stock, or pure nonsense
@@ -181,32 +212,70 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
       if (target && host.random() * 10_000 < cfg.ramble.investShareBps) {
         const bps = between(cfg.ramble.minBps, cfg.ramble.maxBps);
         host.shock(target.ticker, bps);
-        segments.push({
-          kind: "ramble",
-          ...script(s, "rambleInvest", {
-            person: cfg.ramble.people[between(0, cfg.ramble.people.length - 1)]!,
-            stock: target.name,
-            move: movePercent(bps),
-          }),
-          effects: [{ label: `${target.ticker} +${movePercent(bps)}`, tone: "gain" }],
-        });
-      } else segments.push({ kind: "ramble", ...script(s, "ramble", {}), effects: [] });
+        segments.push(
+          {
+            kind: "ramble",
+            ...script(s, "rambleInvest", {
+              person: cfg.ramble.people[between(0, cfg.ramble.people.length - 1)]!,
+              stock: target.name,
+              move: movePercent(bps),
+            }),
+            effects: [{ label: `${target.ticker} +${movePercent(bps)}`, tone: "gain" }],
+          },
+          80,
+        );
+      } else segments.push({ kind: "ramble", ...script(s, "ramble", {}), effects: [] }, 80);
     }
 
     if (change && change.bps >= cfg.winner.minGainBps) {
-      segments.push({
-        kind: "winner",
-        ...script(s, "winner", {
-          name: host.nickname(),
-          amount: formatMoney(change.cents, { whole: true }),
-          pct: movePercent(change.bps),
-        }),
-        effects: [],
-      });
+      segments.push(
+        {
+          kind: "winner",
+          ...script(s, "winner", {
+            name: host.nickname(),
+            amount: formatMoney(change.cents, { whole: true }),
+            pct: movePercent(change.bps),
+          }),
+          effects: [],
+        },
+        50,
+      );
     }
 
+    // more topics (ADR-169): about fellow players, drawn like the server does; not the ones of the last show
+    const friends = host.friendsOnline?.() ?? [];
+    const candidates = demoTopicCandidates({
+      players: friends.map((f) => f.nickname),
+      stocks: stocks.map((x) => x.name),
+      random: () => host.random(),
+    });
+    const topics = pickTopics(candidates, s.lastTopics ?? [], () => host.random());
+    topics.forEach((pick, i) => {
+      const meta = cfg.topics.list[pick.topic];
+      const paid = meta.tone === "bad" && (meta.group === "person" || meta.group === "cards") && pick.player != null;
+      const friend = friends.find((f) => f.nickname === pick.player);
+      segments.push(
+        {
+          kind: meta.kind,
+          ...script(s, pick.topic, pick.values),
+          effects: paid
+            ? [{ label: `+${formatMoney(cfg.topics.hushMoneyCents, { whole: true })} Schmerzensgeld`, tone: "gain" }]
+            : [],
+          ...(pick.player != null
+            ? { figure: friend ?? { nickname: pick.player, avatarKey: null, accessories: [] } }
+            : {}),
+        },
+        cfg.topics.ords[i] ?? 85 + i,
+      );
+    });
+    s.lastTopics = topics.map((pick) => pick.topic);
+
+    const ordered = stories
+      .map((story, i) => ({ ...story, i }))
+      .sort((a, b) => a.ord - b.ord || a.i - b.i)
+      .map((story) => story.segment);
     const tipStock = stocks[Math.min(stocks.length - 1, cfg.stock.count)];
-    const kept = segments.slice(0, cfg.maxSegments - (tipStock ? 1 : 0));
+    const kept = ordered.slice(0, cfg.maxSegments - (tipStock ? 1 : 0));
     if (tipStock) {
       const tipUp = host.random() < 0.5;
       kept.push({
@@ -310,7 +379,7 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
           startedAt: new Date(s.show.startedAt).toISOString(),
           writer: "mini",
           segments: s.show.segments.map((segment) =>
-            PLAYER_KINDS.has(segment.kind) ? { ...segment, figure: me } : segment,
+            segment.figure || !PLAYER_KINDS.has(segment.kind) ? segment : { ...segment, figure: me },
           ),
         },
         chat: chatOf(s),

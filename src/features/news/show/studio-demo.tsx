@@ -89,6 +89,26 @@ const EXTRAS = {
     text: "Wussten Sie eigentlich, dass ein Tintenfisch drei Herzen hat? Drei! Und trotzdem ist er nie an der Börse. Wo war ich? Ach ja, die Nachrichten. Gleich geht es weiter, sobald ich meinen Zettel wiederfinde.",
     effects: [],
   },
+  cards: {
+    kind: "cards",
+    headline: "Nur eine 3 für Dax_Dieter",
+    text: "Dax_Dieter hat 450 € bezahlt, damit Profis Mondqualle begutachten. Das Urteil von ASP: Note 3. Im Gutachten steht das Wort „Kaffeerand“. Zweimal.",
+    effects: [{ label: "+100 € Schmerzensgeld", tone: "gain" }],
+    figure: { nickname: "Dax_Dieter", avatarKey: "punk", accessories: [] },
+  },
+  tax: {
+    kind: "tax",
+    headline: "Kuckuck! Dangle & Söhne wird gepfändet",
+    text: "Mahnung ignoriert, Frist verpasst: Bei Dangle & Söhne vollstreckt jetzt das Amt, und Dax_Dieter lernt das Wort Zwangseinzug. Griesgram kam persönlich, mit Aktentasche und einer Thermoskanne voller Genugtuung.",
+    effects: [],
+    figure: { nickname: "Dax_Dieter", avatarKey: "punk", accessories: [] },
+  },
+  corp: {
+    kind: "corp",
+    headline: "Kündigungswelle bei Dangle & Söhne",
+    text: "Bei Dangle & Söhne haben heute 7 Leute hingeschmissen. Dax_Dieter nennt das eine natürliche Verschlankung. Sogar die Zimmerpflanze hat sich versetzen lassen.",
+    effects: [],
+  },
 } as const satisfies Record<string, StudioSegment>;
 
 type Extra = keyof typeof EXTRAS;
@@ -105,6 +125,9 @@ const BUTTONS: { phase: Phase; label: string }[] = [
   { phase: "nft", label: "NFT" },
   { phase: "gossip", label: "Klatsch" },
   { phase: "ramble", label: "Abschweifung" },
+  { phase: "cards", label: "Sammelkarten" },
+  { phase: "tax", label: "Finanzamt" },
+  { phase: "corp", label: "Börsenfirma" },
   { phase: "outro", label: "Outro" },
   { phase: "off", label: "Aus" },
 ];

@@ -113,6 +113,10 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Neue Themen in den Nachrichten (ADR-169):** Mr. Doodle Dangle lästert jetzt auch über Sammelkarten, das Finanzamt
+  samt Oberamtsrat Griesgram, Börsenfirmen und eure Taten im Spiel: verzockte Trades, Miete, Outfits, Battles,
+  Schläfer. Dazu Nachrufe, Werbung und Horoskope; jede Sendung bringt drei Themen, die nicht direkt wiederkommen.
+
 - **Collectibles auf dem Profil (ADR-165):** Auf jedem Profil siehst du die wertvollsten Karten eines Spielers und
   über „Ganze Sammlung ansehen“ seinen ganzen Binder; dein eigenes Profil zeigt deine Karten mit Anzahl und Wert.
   Was du nicht einstellst, bleibt in „Deine Sammlung“ (neuer Filter „Zum Verkauf / Nicht zum Verkauf“), und

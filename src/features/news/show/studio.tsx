@@ -410,6 +410,9 @@ const KIND_TONES: Record<NewsKind, KindTone> = {
   nft: "info",
   gossip: "accent",
   ramble: "warn",
+  cards: "info",
+  tax: "loss",
+  corp: "info",
   outro: "accent",
 };
 
@@ -422,7 +425,7 @@ const TONE_CLASS: Record<KindTone, string> = {
 };
 
 /** The caption over a player's photo on the topic screen: what they are in this story. */
-const FRAME_KINDS = ["loser", "winner", "scandal", "hype", "gossip", "nft"] as const;
+const FRAME_KINDS = ["loser", "winner", "scandal", "hype", "gossip", "nft", "cards", "tax", "corp"] as const;
 type FrameKind = (typeof FRAME_KINDS)[number] | "other";
 const FRAME_CLASS: Record<FrameKind, string> = {
   loser: "bg-loss text-on-semantic",
@@ -431,10 +434,13 @@ const FRAME_CLASS: Record<FrameKind, string> = {
   hype: "bg-gain text-on-semantic",
   gossip: "bg-accent text-on-accent",
   nft: "bg-info text-on-semantic",
+  cards: "bg-info text-on-semantic",
+  tax: "bg-loss text-on-semantic",
+  corp: "bg-info text-on-semantic",
   other: "bg-accent text-on-accent",
 };
 /** Wanted posters have paper behind the figure. */
-const POSTER_KINDS = new Set<FrameKind>(["loser", "scandal"]);
+const POSTER_KINDS = new Set<FrameKind>(["loser", "scandal", "tax"]);
 
 function frameKind(kind: string | undefined): FrameKind {
   return (FRAME_KINDS as readonly string[]).includes(kind ?? "") ? (kind as FrameKind) : "other";

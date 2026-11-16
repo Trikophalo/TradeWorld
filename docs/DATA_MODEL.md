@@ -7839,3 +7839,12 @@ fehlt): `player_company_close_hour` (zehn Stellen: Terme, laufende Kosten, Decke
 `news_show_build`. Neu: Benachrichtigungsarten `tax_office` (Pflicht), `team_mood`, `board`, `company_dividend`,
 `company_project`; Trigger `listed_audit_mission` auf `player_company_events`; Firmen-Ereignis `tax_audit`
 (Gewicht 0, nur vom Finanzamt).
+
+## Nachtrag: Neue Themen der Nachrichten (ADR-169)
+
+Keine neue Tabelle. `news_show_topics(p_now, p_seen uuid[], p_skip uuid[], p_segments jsonb) → jsonb` (intern,
+nur `service_role`) liefert die Themen-Segmente einer Sendung; `news_show_build()` ruft sie vor der Reihenfolge auf.
+Ein Themen-Segment trägt `subject {type: "topic", topic, group, player_id?, name?, ukey?, good, values}`; `kind`
+ist `cards`, `tax`, `corp`, `gossip` oder `ramble`. Im Nachrichten-Feed landen `tax` und `corp` unter Firmen.
+Neue Konfiguration: `newsShow.topics` (Anzahl, Plätze, Schwellen, Liste) und die Zeile `game_config.nexamon_names`
+(Kartenschlüssel → Name).

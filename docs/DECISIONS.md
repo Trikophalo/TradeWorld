@@ -3369,3 +3369,45 @@ Anteil wie jeder Aktionär.
     `src/features/nexamon/lib.ts`, ein Test prüft alle 231 Karten.
   - **Benachrichtigungen** tragen vom Server alle den Link `/nexamon`; der Client führt `nexamon_graded` zum
     ASP-Schalter und `nexamon_sale` zu den eigenen Angeboten. Der Feed-Eintrag `nexamon_pull` verlinkt die Karte.
+
+## ADR-169: Viele neue Themen für die NEXA Nachrichten — `Annahme`
+
+**Kontext:** Der Wunsch: „Bei den News sollen ganz viele neue Themen kommen. Mit den Collectibles, mit dem
+Finanzamt, personenspezifisches. Viel Schräges, mit dunklem Humor.“ Die Sendung (ADR-150, ADR-152) kannte bisher
+Verlierer, Gewinner, Klatsch aus dem Feed, Firmen, NFTs, Börse, Welt und Abschweifungen.
+
+**Entscheidung:**
+
+- **Themen als Drehbücher.** `src/config/news-topics.ts` hält 46 Themen in fünf Gruppen: Sammelkarten (`cards`:
+  seltene Ziehung, teuerster Verkauf, Karte steigt/fällt, ASP-10, schlechte Note, Booster ohne Treffer, wertvollste
+  Sammlung, KI-Händler), Finanzamt (`tax`: Verspätungszuschlag, Schätzung, Pfändung, Betriebsprüfung, saubere
+  Bücher, Steuerschuld, Durchsagen von Oberamtsrat Griesgram), Börsenfirmen (`corp`: gieriger Gründer,
+  Kündigungswelle, Rekorddividende, Aufstand im Geschäftsrat, Stimmung mies/glänzend, Forschung), Personen
+  (`person`: schlechtester/bester Trade, Verlierer/Gewinner der Stunde, Miete, Kleiderschrank, Outfit, Battle
+  gewonnen/letzter Platz, Missionen neu gewürfelt, Chat-Nachrichten (nur die Zahl), neue Freunde, Anstupsen,
+  Schläfer, Rauswurf durch den Gründer, Beförderung, Gründer zahlt sich viel aus, neues Zuhause/Auto) und Schräges
+  (`odd`: Nachrufe auf erfundene Depots, Börsenwetter, Werbung, Horoskop, Zuschauerpost, Studien). Jedes Thema hat
+  Rahmen, Begründungen, Gesichter, ein Gewicht, einen Ton und die Platzhalter, die es braucht. Sie stehen in
+  `newsShow.texts`, `newsShow.moods` und `newsShow.topics.list` und laufen über das bekannte `news_show_pick`.
+  Dazu 20 neue Abschweifungen für „ramble“.
+- **Auswahl.** `news_show_topics()` sammelt pro Thema höchstens einen Kandidaten aus vorhandenen Tabellen (Booster,
+  Kartenverkäufe, Exemplare, Feed, Reichenliste, Trades, Mieten, Accessoires, Battles, Missions-Würfeln, Chats,
+  Freundschaften, Stupser, Stundenabschlüsse, Steuerperioden). Gezogen werden `topics.count` (3): erst Themen, die
+  in der letzten Sendung nicht liefen, dann Gruppen, die noch fehlen, dann gewichtet per Los. Pro Spieler eine
+  Meldung pro Sendung, jede Tatsache einmal (`news_show_used`). Sie landen an den Plätzen `topics.ords` und zählen
+  zu `maxSegments` (jetzt 12, gut viereinhalb Minuten). Ohne Daten tragen die sieben Themen ohne Platzhalter.
+  Schlechte Nachrichten über Spieler (Personen, Karten) zahlen Schweigegeld wie der Klatsch.
+- **Kein Doppel.** Solange Themen an sind, erzählt der alte Klatsch die Feed-Arten, die ein eigenes Thema haben,
+  nicht mehr. `topics.count = 0` stellt die alte Sendung wieder her.
+- **Neue Arten im Studio.** `cards`, `tax` und `corp` bekommen Icon, Farbe, Bildunterschrift und Standardgesicht;
+  die übrigen Themen laufen als `gossip` oder `ramble`. Die Kartennamen kommen als `game_config.nexamon_names` auf
+  den Server.
+- **Demo.** Die Demo zieht dieselben Themen mit `pickTopics` über erfundene Mitspieler (Freunde zuerst).
+- **Grenzen.** Spott nur über das, was im Spiel passiert ist. Keine geschützten Merkmale, keine Beleidigungen über
+  den Namen, nichts Sexuelles, keine Gewalt oder Selbstverletzung, keine echten Unglücke. Echte Personen nur in
+  Abschweifungen als offensichtlich absurde Gerüchte; sonst erfundene Leute und Ämter. Ein Test prüft alle neuen
+  Texte auf Platzhalter und eine kleine Liste verbotener Wörter.
+
+**Folgen:** Mehr Abwechslung pro Sendung, Sammelkarten und Steuern kommen in der Sendung vor. Die Abfrage liest
+nur und läuft einmal pro Stunde. Neue Themen brauchen nur einen Eintrag in `news-topics.ts` und, falls sie Daten
+brauchen, einen Zweig in `news_show_topics()`.

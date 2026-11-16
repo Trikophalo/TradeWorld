@@ -433,6 +433,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Collectibles auf dem Profil",
         text: "Auf jedem Profil siehst du die wertvollsten Karten eines Spielers und über „Ganze Sammlung ansehen“ seinen ganzen Binder; dein eigenes Profil zeigt…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-d409bcf3",
+        title: "Neue Themen in den Nachrichten",
+        text: "Mr. Doodle Dangle lästert jetzt auch über Sammelkarten, das Finanzamt samt Oberamtsrat Griesgram, Börsenfirmen und eure Taten im Spiel: verzockte…",
+      },
     ],
   },
   {

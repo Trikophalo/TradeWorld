@@ -26,6 +26,7 @@ select tests.set_cfg('newsShow', '{maxSegments}', '600');
 select tests.set_cfg('newsShow', '{ramble,chanceBps}', '10000');
 select tests.set_cfg('newsShow', '{ramble,investShareBps}', '10000');
 select tests.set_cfg('newsShow', '{chat,bots,names}', '["Jürgen Test", "Chantal Test"]');
+select tests.set_cfg('newsShow', '{topics,count}', '0');
 insert into public.feed_items (actor_id, kind, payload) values (:g, 'level_up', '{"level": 7}') returning id as feed_g \gset
 insert into public.feed_items (actor_id, kind, payload) values (:b, 'rug_pull', '{"name": "Mondcoin"}') returning id as feed_b \gset
 insert into public.artwork_sales (artwork_id, kind, buyer_ai, price_cents, at)
@@ -33,10 +34,10 @@ select a.id, 'ai', 'Vera Vermeer', 987654300, now() from public.artworks a where
 returning id as sale, artwork_id as art \gset
 select title as art_title from public.artworks where id = :'art' \gset
 select public.news_show_build(now()) as segs \gset
-select (select x from jsonb_array_elements(:'segs'::jsonb) x where x ->> 'kind' = 'gossip' and x -> 'subject' ->> 'name' = 'Klatsch_Gut') as sg,
-       (select x from jsonb_array_elements(:'segs'::jsonb) x where x ->> 'kind' = 'gossip' and x -> 'subject' ->> 'name' = 'Klatsch_Pech') as sb,
+select (select x from jsonb_array_elements(:'segs'::jsonb) x where x ->> 'kind' = 'gossip' and not (x -> 'subject' ? 'topic') and x -> 'subject' ->> 'name' = 'Klatsch_Gut') as sg,
+       (select x from jsonb_array_elements(:'segs'::jsonb) x where x ->> 'kind' = 'gossip' and not (x -> 'subject' ? 'topic') and x -> 'subject' ->> 'name' = 'Klatsch_Pech') as sb,
        (select x from jsonb_array_elements(:'segs'::jsonb) x where x ->> 'kind' = 'nft') as sn,
-       (select x from jsonb_array_elements(:'segs'::jsonb) x where x ->> 'kind' = 'ramble') as sr \gset
+       (select x from jsonb_array_elements(:'segs'::jsonb) x where x ->> 'kind' = 'ramble' and not (x -> 'subject' ? 'topic')) as sr \gset
 select tests.assert(
   (:'sg'::jsonb ->> 'headline') || (:'sg'::jsonb ->> 'text') like '%Klatsch_Gut%' and :'sg'::jsonb ->> 'text' like '%Level 7 erreicht%'
   and :'sg'::jsonb ->> 'text' not like '%{%' and :'sg'::jsonb -> 'apply' = '[]'::jsonb
@@ -144,7 +145,8 @@ select tests.assert(not exists (select 1 from public.ledger_audit()) and tests.m
 select tests.set_cfg('newsShow', '{waitMinutes}', '10');
 select tests.set_cfg('newsShow', '{gossip,count}', '2');
 select tests.set_cfg('newsShow', '{company,count}', '2');
-select tests.set_cfg('newsShow', '{maxSegments}', '10');
+select tests.set_cfg('newsShow', '{maxSegments}', '12');
+select tests.set_cfg('newsShow', '{topics,count}', '3');
 select tests.set_cfg('newsShow', '{ramble,chanceBps}', '7000');
 delete from public.news_shows;
 delete from public.news_show_messages;

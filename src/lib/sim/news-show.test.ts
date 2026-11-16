@@ -5,6 +5,8 @@ import {
   movePercent,
   nextShowAt,
   pickScript,
+  pickTopics,
+  scriptPlaceholders,
   showDurationMs,
   showPhase,
   showSlot,
@@ -89,5 +91,91 @@ describe("NEXA Nachrichten: scripts never repeat soon", () => {
   it("has hundreds of different news before the kit runs out", () => {
     const combos = Object.values(R.texts).reduce((n, kit) => n + kit.frames.length * kit.reasons.length, 0);
     expect(combos).toBeGreaterThan(350);
+  });
+});
+
+describe("NEXA Nachrichten: the draw of the topics (ADR-169)", () => {
+  const rules = {
+    ...R,
+    topics: {
+      ...R.topics,
+      count: 3,
+      list: {
+        a1: { group: "a", weight: 10 },
+        a2: { group: "a", weight: 10 },
+        b1: { group: "b", weight: 10 },
+        c1: { group: "c", weight: 1 },
+        c2: { group: "c", weight: 1 },
+        off: { group: "d", weight: 0 },
+      },
+    },
+  } as unknown as typeof R;
+  const all = ["a1", "a2", "b1", "c1", "c2", "off"].map((topic) => ({ topic }));
+
+  it("finds the placeholders of a text", () => {
+    expect(scriptPlaceholders("{name} zahlt {amount}, {name} weint. {reason}")).toEqual(["name", "amount", "reason"]);
+    expect(scriptPlaceholders("nichts")).toEqual([]);
+  });
+
+  it("takes topics.count stories, one per topic, from as many groups as it can", () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const picks = pickTopics(all, [], seeded(seed), rules);
+      expect(picks.length).toBe(3);
+      expect(new Set(picks.map((p) => p.topic)).size).toBe(3);
+      expect(new Set(picks.map((p) => p.topic[0])).size).toBe(3);
+      expect(picks.map((p) => p.topic)).not.toContain("off");
+    }
+  });
+
+  it("leaves out what ran in the last show while there are alternatives, and only then", () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const picks = pickTopics(all, ["a1", "b1"], seeded(seed), rules).map((p) => p.topic);
+      // a2, c1 and c2 are fresh: they come first, the repeats stay out
+      expect(picks.sort()).toEqual(["a2", "c1", "c2"]);
+    }
+    const forced = pickTopics(all.slice(0, 3), ["a1", "a2", "b1"], seeded(5), rules);
+    expect(forced.length).toBe(3);
+    const two = pickTopics(
+      [{ topic: "a1" }, { topic: "b1" }, { topic: "c1" }, { topic: "c2" }],
+      ["c1"],
+      seeded(9),
+      rules,
+    );
+    expect(two.map((p) => p.topic).sort()).toEqual(["a1", "b1", "c2"]);
+  });
+
+  it("tells one story per player and skips players who are in the show already", () => {
+    const candidates = [
+      { topic: "a1", player: "p1" },
+      { topic: "b1", player: "p1" },
+      { topic: "c1", player: "p2" },
+      { topic: "c2", player: null },
+    ];
+    for (let seed = 1; seed <= 30; seed++) {
+      const picks = pickTopics(candidates, [], seeded(seed), rules);
+      expect(picks.filter((p) => p.player === "p1").length).toBeLessThanOrEqual(1);
+      expect(pickTopics(candidates, [], seeded(seed), rules, ["p1", "p2"]).map((p) => p.topic)).toEqual(["c2"]);
+    }
+  });
+
+  it("follows the weights, ignores unknown topics and survives an empty list", () => {
+    let heavy = 0;
+    const one = { ...rules, topics: { ...rules.topics, count: 1 } } as unknown as typeof R;
+    for (let seed = 1; seed <= 400; seed++)
+      if (pickTopics([{ topic: "a1" }, { topic: "c1" }], [], seeded(seed * 7919), one)[0]!.topic === "a1") heavy++;
+    expect(heavy).toBeGreaterThan(320);
+    expect(pickTopics([{ topic: "unknown" }, { topic: "off" }], [], seeded(1), rules)).toEqual([]);
+    expect(pickTopics([], [], seeded(1), rules)).toEqual([]);
+    expect(
+      pickTopics(all, [], seeded(1), { ...rules, topics: { ...rules.topics, count: 0 } } as unknown as typeof R),
+    ).toEqual([]);
+  });
+
+  it("the real config gives a show with data three stories and a quiet server too", () => {
+    const quiet = Object.entries(R.topics.list)
+      .filter(([, meta]) => meta.slots.length === 0)
+      .map(([topic]) => ({ topic }));
+    expect(quiet.length).toBeGreaterThanOrEqual(7);
+    expect(pickTopics(quiet, [], seeded(2)).length).toBe(R.topics.count);
   });
 });

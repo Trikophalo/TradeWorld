@@ -1526,6 +1526,75 @@ const tangle: PixelArt = {
   ],
 };
 
+/** Two collectible cards, the front one with a star: news from the card table (ADR-169). */
+const cardsIcon: PixelArt = {
+  palette: { k: OUTLINE, w: "#f4f6fb", y: "#ffd15c", b: "#4f7df3", p: "#ff8fb1" },
+  grid: [
+    "................",
+    "......kkkkkkkk..",
+    ".....kbbbbbbbbk.",
+    "..kkkkkkkkkbbbk.",
+    ".kwwwwwwwwwkbbk.",
+    ".kwyyyyyyywkbbk.",
+    ".kwyyykyyywkbbk.",
+    ".kwyykkkyywkbbk.",
+    ".kwykkkkkywkbbk.",
+    ".kwyykkkyywkbbk.",
+    ".kwyykykyywkbbk.",
+    ".kwyyyyyyywkbk..",
+    ".kwwwwwwwwwkk...",
+    ".kwpppppppwk....",
+    ".kwwwwwwwwwk....",
+    "..kkkkkkkkk.....",
+  ],
+};
+
+/** A notice with a red stamp on it: the Finanzamt has written (ADR-169). */
+const taxIcon: PixelArt = {
+  palette: { k: OUTLINE, w: "#f4f6fb", r: "#e5484d" },
+  grid: [
+    "................",
+    "..kkkkkkkkkk....",
+    "..kwwwwwwwwkk...",
+    "..kwkkkkkwwkwk..",
+    "..kwwwwwwwwkkk..",
+    "..kwkkkkkkwwwk..",
+    "..kwwwwwwwwwwk..",
+    "..kwkkkkwwwwwk..",
+    "..kwwwwwwrrrwk..",
+    "..kwkkkwrrrrrk..",
+    "..kwwwwrrrkrrrk.",
+    "..kwwwwrrkkkrrk.",
+    "..kwwwwrrrkrrrk.",
+    "..kkkkkkrrrrrk..",
+    ".........krrrk..",
+    "..........kkk...",
+  ],
+};
+
+/** An office tower between two smaller buildings: a company at the stock exchange (ADR-169). */
+const corpIcon: PixelArt = {
+  palette: { k: OUTLINE, w: "#f4f6fb", b: "#4f7df3", g: "#3fb97a", y: "#ffd15c" },
+  grid: [
+    "................",
+    "......kkkkk.....",
+    ".....kbbbbbk....",
+    ".....kbwbwbk....",
+    ".....kbbbbbk....",
+    ".....kbwbwbk....",
+    "..kkkkbbbbbk....",
+    ".kgggkbwbwbkkkk.",
+    ".kgwgkbbbbbkyyk.",
+    ".kgggkbwbwbkywk.",
+    ".kgwgkbbbbbkyyk.",
+    ".kgggkbwbwbkywk.",
+    ".kgwgkbbbbbkyyk.",
+    ".kgggkbkkkbkyyk.",
+    ".kkkkkkkkkkkkkk.",
+    "................",
+  ],
+};
+
 /** One icon per kind of story. Unknown kinds fall back to the newspaper from the main set. */
 export const NEWS_KIND_ICONS = {
   intro: mic,
@@ -1541,6 +1610,9 @@ export const NEWS_KIND_ICONS = {
   nft: nftFrame,
   gossip,
   ramble: tangle,
+  cards: cardsIcon,
+  tax: taxIcon,
+  corp: corpIcon,
   outro: hand,
 } as const satisfies Record<string, PixelArt>;
 export type NewsKind = keyof typeof NEWS_KIND_ICONS;
