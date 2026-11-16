@@ -168,7 +168,12 @@ function Teaser() {
         </ul>
         <ul className="mt-4 space-y-1.5 text-sm text-pretty text-fg-2">
           <li>{t("locked.point1", { sets: NEXAMON_SETS.length, cards: NEXAMON_SET_SIZE })}</li>
-          <li>{t("locked.point2", { best: formatFactor(BALANCE.nexamon.grading.valueBps[9]) })}</li>
+          <li>
+            {t("locked.point2", {
+              best: formatFactor(BALANCE.nexamon.grading.valueBps[9]),
+              black: formatFactor(BALANCE.nexamon.grading.blackLabel.valueBps),
+            })}
+          </li>
           <li>{t("locked.point3")}</li>
         </ul>
       </Card>

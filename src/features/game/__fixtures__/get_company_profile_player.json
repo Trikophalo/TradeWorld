@@ -8,16 +8,16 @@
     "max_staff": 2,
     "ai_workers": 0,
     "quality_bps": null,
-    "value_cents": 303750,
+    "value_cents": 20253797,
     "profit_cents": null,
     "awareness_bps": null,
     "revenue_cents": null
   },
   "company": {
-    "id": "20dae624-7d9c-4955-ac4d-69ee8cf9e173",
-    "idea": "Bleibt klein",
+    "id": "1d88a41f-5e98-4e8d-ba38-5f605b29e4b7",
+    "idea": "Teile auf Abruf",
     "logo": null,
-    "name": "Privat Werk",
+    "name": "Sven Teile",
     "tier": "garage",
     "is_ai": false,
     "listed": false,
@@ -25,9 +25,9 @@
     "ticker": null,
     "price_e4": null,
     "change_bps": null,
-    "founded_at": "2026-11-16T18:18:23.029057+00:00",
-    "brand_color": "#225588"
+    "founded_at": "2026-11-16T19:43:25.399665+00:00",
+    "brand_color": "#335577"
   },
-  "founder": { "tag": "CSQB", "nickname": "Nils_Privat", "avatar_key": "rookie" },
+  "founder": { "tag": "VMRP", "nickname": "Sven_Liefert", "avatar_key": "rookie" },
   "members": []
 }

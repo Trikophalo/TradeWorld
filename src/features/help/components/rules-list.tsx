@@ -1,5 +1,6 @@
 "use client";
 
+import { nexamonGradeChanceBps } from "@/lib/sim/nexamon";
 import { useTranslations } from "next-intl";
 import { BEAR, BULL, COIN, SECTOR_ICONS, UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
@@ -303,8 +304,7 @@ export function RulesList() {
   const slot5 = (rarity: string) => formatChance(chanceBps(oddsOf(rarity).slot5, oddsOf(rarity).denominator));
   const cardValue = 10_000;
   const gradeValue = (grade: number) => whole(share(cardValue, nexamon.grading.valueBps[grade - 1]!));
-  const tenChance = (condition: "mint" | "near_mint" | "good") =>
-    formatChance(nexamon.grading.gradeWeightsBps[condition][9]);
+  const tenChance = (condition: "mint" | "near_mint" | "good") => formatChance(nexamonGradeChanceBps(condition, 10));
   const cardIcon = <PixelIcon {...UI_ICONS.nexamon} scale={2} className="text-fg-2" />;
   const nexamonRules: AccordionItem[] = [
     {
@@ -348,6 +348,8 @@ export function RulesList() {
             mint: tenChance("mint"),
             nearMint: tenChance("near_mint"),
             good: tenChance("good"),
+            blackChance: formatChance(nexamon.grading.blackLabel.chanceBps),
+            blackFactor: `×${nexamon.grading.blackLabel.valueBps / 10_000}`,
           })}
           example={t("nexamonGrading.example", {
             value: whole(cardValue),

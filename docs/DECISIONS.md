@@ -2875,7 +2875,7 @@ Menge, Image …), acht sinnvolle Punkte, die man mit Mira angehen kann.
 - **Population:** Jede gezogene Karte (Spieler, KI, Startbestand der KI) erhöht die Population ihrer Karte um 1;
   jede Kopie trägt ihre Nummer („#17“). Die Population jeder Karte ist für alle sichtbar.
 - **Zustand** jeder Kopie: Poor 2 %, Good 18 %, Near Mint 50 %, Mint 30 %. Ab Good ist die Kopie den Marktwert wert,
-  jede Stufe unter Good kostet 5 % (Poor: 95 %). Es bleibt bei den vier genannten Stufen.
+  jede Stufe unter Good kostet 5 % (Poor: 95 %). Geändert mit Migration 5900: Poor 70 %, Good 90 %, Near Mint und Mint 100 %. Es bleibt bei den vier genannten Stufen.
 - **Marktwert:** einer je Karte (nicht je Kopie), geführt als Kurs (`value_e4` = Euro × 10 000), damit auch
   Karten für 1 € sich in kleinen Schritten bewegen. Wert einer Kopie in Cent = Marktwert × Zustandsfaktor, im Slab
   Marktwert × Notenfaktor; hier wird einmal gerundet (kaufmännisch „half even“). Der Marktwert bewegt sich auf zwei
@@ -2917,7 +2917,7 @@ Menge, Image …), acht sinnvolle Punkte, die man mit Mira angehen kann.
 - **Markt:** einzelne Kopien zum frei gewählten Preis (0,10 € bis 1 Mrd. €), höchstens 30 offene Angebote und 30
   Ein-/Ausstellungen je Minute. Der Verkäufer zahlt 5 % Gebühr an die Haushalte; der Erlös eines KI-Verkäufers geht
   ganz dorthin. Kaufen prüft den gesehenen Preis (`nexamon_price_changed`).
-- **Grading bei ASP:** kostet 50 % des aktuellen Werts der Kopie (mindestens 1 €, an die Haushalte) und dauert eine
+- **Grading bei ASP:** kostet 30 % (anfangs 50 %) des aktuellen Werts der Kopie (mindestens 1 €, an die Haushalte) und dauert eine
   Stunde Echtzeit; höchstens 10 Kopien gleichzeitig. Die Note 1 bis 10 wird am Ende gewürfelt. Verteilung in
   Basispunkten (Note 1 bis 10): Poor 500/1000/1500/2000/2000/1500/1000/400/90/10, Good
   0/0/0/500/800/1200/2000/2500/2000/1000, Near Mint 0/0/0/0/0/100/400/1000/2500/6000, Mint
@@ -2971,6 +2971,49 @@ Menge, Image …), acht sinnvolle Punkte, die man mit Mira angehen kann.
   **Nicht umgesetzt:** Kartenwerte zählen nicht zum Vermögen und zur Rangliste. Das wäre kein kleiner Eingriff
   (`player_net_worth_cents`, `rich_list_entries`, Vermögensverlauf, Demo) und Kartenwerte lassen sich in Grenzen
   bewegen; das braucht eine eigene Entscheidung.
+- **Nachtrag Black Label:** Über der ASP 10 gibt es eine elfte Stufe, das Black Label (Wunsch des Besitzers: „über
+  ASP 10, nur 1 % aller Karten, nur im Mint-Zustand, Kartenwert mal 10“).
+  - **Regel** (`grading.blackLabel = {condition: "mint", chanceBps: 100, valueBps: 100_000}`): Nur eine Kopie im
+    Zustand Mint kann es bekommen, und zwar 1 % ihrer Gradings. Die Chance wird aus der Chance auf eine 10
+    herausgenommen (Mint: 1 % Black Label, 89 % 10, 8 % 9, 2 % 8); alle anderen Zustände haben 0 %. Der Slab ist den
+    Marktwert der Karte × 10 wert, eine normale 10 bleibt bei × 3. Es bleibt bei **einem** Wurf: Das Black Label
+    belegt die obersten 100 von 10 000 Zahlen des Mint-Wurfs (`nexamonRollGrade`, `nexamon_roll_grade`).
+  - **Modell:** eine elfte Note, `grade = 11`, keine eigene Spalte. Angezeigt wird „ASP 10 · Black Label“ (auf dem
+    Label steht eine 10). So versteht alles, was die Note schon trägt, das Black Label ohne Umbau: Wert der Kopie,
+    Angebote, Verkäufe (`nexamon_sales.grade = 11`, Faktor 100 000), KI-Sammler (höchstens 70 % des Slab-Werts wie
+    bei jedem Slab), Sofortverkauf (kein Slab), Aufbrechen (`old_grade` 11) und Konto-Reset (der Slab geht mit
+    seinem Label an die KI-Händler). Die Tabelle `gradeWeightsBps` und `valueBps` behalten ihre zehn Einträge,
+    bestehende Slabs sind unberührt. Verworfen: ein Flag `black_label` neben der Note 10; es hätte jede Stelle, die
+    den Wert aus Zustand und Note rechnet, um einen Parameter erweitert.
+  - **Server** (Migration `20261204005850_nexamon_black_label.sql`): Prüfung `grade between 1 and 11`,
+    `nexamon_roll_grade`, `nexamon_copy_factor_bps`, `nexamon_finish_gradings` (eigener Benachrichtigungstext
+    „Black Label!“, Missions-Ereignisse `nexamon_ten` und `nexamon_black_label`, Feed `nexamon_black_label`),
+    `get_nexamon_card` liefert `black_labels` neben `graded` (das seine zehn Einträge behält),
+    `get_nexamon_market` bekommt den Filter `p_black_label`. Ein Black Label ist Neuigkeit wie ein legendärer Zug:
+    Feed der Freunde und Klatsch in NEXA Nachrichten (`feed_item_label`, Liste in `news_show_build`). Neue
+    Meilenstein-Mission `m_nexamon_first_black_label` (3.000 XP).
+  - **Oberfläche:** schwarzes Label mit silberner Schrift und dem Wort „BLACK LABEL“ (`composeSlab`, Stufe
+    `black`), schwarzer Chip (Tokens `--black-label`, `--on-black-label`, `--black-label-edge`, in beiden Themes
+    gleich), Zeile in der Chancentabelle des Grading-Sheets (bei Nicht-Mint 0 % mit Hinweis) und auf der
+    Kartenseite, eigener Zähler in „Bewertete Kopien je Note“, Marktfilter „Black Label“, deutliche Warnung beim
+    Aufbrechen.
+  - **Balancing:** Der erwartete Faktor einer Mint-Karte steigt von 2,85 auf 2,92 (0,01 × 10 + 0,89 × 3 + 0,08 ×
+    1,6 + 0,02 × 1,2). Weil nur 30 % der Züge Mint sind und nicht jede Karte zu ASP geht, bekommen deutlich weniger
+    als 0,3 % aller gezogenen Karten ein Black Label.
+- **Nachtrag ASP-Paket und Enthüllung:** Eine bewertete Karte kommt in einem versiegelten Paket zurück (eigenes
+  ASP-Design aus dem Pack-Raster, `composeGradingPack`). Der Spieler reißt es wie ein Booster auf (Ziehen, Knopf
+  oder Tastatur), dann wird die Note langsam enthüllt (`GradeReveal`): Der Slab steigt mit verdecktem Label auf,
+  ein Trommelwirbel läuft, die Note zählt von 1 hoch, mit Pausen, die nach oben länger werden
+  (`gradeStepPauseMs`), dann fällt die Abdeckung. Je Ergebnis ein eigener Schluss: unter 8 leise, 8–9 ein
+  Glockenklang, 10 Fanfare mit Konfetti und Goldblitz, Black Label mit Verdunkelung, Stempel, weißem Blitz und
+  doppeltem Konfetti. Sechs neue Töne (`gradeDrum`, `gradeTick`, `gradeLow`, `gradeGood`, `gradeTen`,
+  `blackLabel`). „Überspringen“ springt zum Ergebnis; mit reduzierter Bewegung blendet das Ergebnis nur ein. Nur
+  `transform` und `opacity`. Die Note steht längst auf dem Server fest; die Enthüllung ist reine Anzeige. Ob ein
+  Paket geöffnet wurde, merkt sich das Gerät wie bisher (`useRevealedSlabs`), erst beim Ergebnis: Wer vorher
+  schließt, findet das Paket wieder versiegelt vor. „Alle ohne Show öffnen“ bleibt als Abkürzung.
+- **Nachtrag Kartenwert im Booster-Fenster:** In „Das kann drin sein“ zeigt jede Karte bei Hover, Fokus oder Tipp
+  Name, Seltenheit und aktuellen Marktwert (aus der ohnehin geladenen Sammlung). Dafür gibt es den neuen Baustein
+  `Tooltip` (`src/components/ui/tooltip.tsx`, Radix Tooltip); einen gemeinsamen Tooltip gab es vorher nicht.
 - **Offen (Balancing):** Die Startpreise machen Booster im Erwartungswert teurer oder billiger als ihren Inhalt, je
   nach Katalog; gebremst wird über die begrenzte KI-Nachfrage und fallende Werte bei wachsendem Angebot. KI-Budget,
   Booster-Takt der KI und Notenfaktoren sind die Stellschrauben.

@@ -241,7 +241,33 @@ test("a finished grading is revealed at the desk", async ({ page }) => {
   const reveal = page.getByTestId("slab-reveal");
   await expect(reveal).toHaveCount(1);
   await expect(reveal).toHaveAttribute("data-open", "false");
+  // The slab waits in a sealed package; the grade is nowhere to be seen yet.
+  await expect(reveal.getByTestId("grading-pack")).toBeVisible();
+  await expect(reveal.locator("[data-grade]")).toHaveCount(0);
   await reveal.getByTestId("reveal-button").click();
+  const overlay = page.getByTestId("grading-overlay");
+  const show = overlay.getByTestId("grade-reveal");
+  await expect(show).toHaveAttribute("data-phase", "sealed");
+  // Closed before opening: the package stays sealed and can be opened later, also after a reload.
+  await overlay.getByTestId("grading-close").click();
+  await expect(overlay).toHaveCount(0);
+  await expect(reveal).toHaveAttribute("data-open", "false");
+  await page.reload();
+  await expect(reveal).toHaveAttribute("data-open", "false");
+  await reveal.getByTestId("reveal-pack").click();
+  await show.getByTestId("grade-open").click();
+  // Closed in the middle of the show: still sealed.
+  await expect(show).toHaveAttribute("data-phase", /tearing|rising/);
+  await overlay.getByTestId("grading-close").click();
+  await expect(reveal).toHaveAttribute("data-open", "false");
+  // Opened to the end (skipping the wait): the grade is on the table.
+  await reveal.getByTestId("reveal-button").click();
+  await show.getByTestId("grade-open").click();
+  await show.getByTestId("grade-skip").click();
+  await expect(show).toHaveAttribute("data-phase", "result");
+  await expect(show).toHaveAttribute("data-tier", "good");
+  await expect(show.getByTestId("grade-result")).toContainText("ASP 9");
+  await overlay.getByTestId("grading-close").click();
   await expect(reveal).toHaveAttribute("data-open", "true");
   await expect(reveal.getByTestId("reveal-value")).toContainText("€");
   await expect(reveal.locator("[data-grade]").first()).toBeVisible();
@@ -256,6 +282,32 @@ test("a finished grading is revealed at the desk", async ({ page }) => {
   await expect(page.getByTestId("crack-sheet")).toContainText("nicht zurück");
   await page.getByTestId("crack-confirm").click();
   await expect(page.getByTestId("copy-row").first()).toHaveAttribute("data-status", "raw");
+});
+
+test("the pack popup shows what a card of the set is worth on hover, focus and tap", async ({ page }) => {
+  await preparePlayer(page);
+  await page.goto("/nexamon");
+  await page.getByTestId("buy-mystic_energy").click();
+  await expect(page.getByTestId("pack-overlay")).toHaveAttribute("data-stage", "preview");
+  const cards = page.getByTestId("set-contents").getByTestId("contents-card");
+  const first = cards.first();
+  await first.scrollIntoViewIfNeeded();
+  const tip = page.getByTestId("contents-tip");
+  if (test.info().project.name === "phone") await first.tap();
+  else await first.hover();
+  await expect(tip).toBeVisible();
+  await expect(tip.getByTestId("contents-tip-value")).toContainText("€");
+  await expect(tip).toContainText("Marktwert");
+  await expect(first).toHaveAttribute("aria-label", /Marktwert .*€/);
+  if (process.env.NEXA_SHOTS)
+    await page.screenshot({ path: `${process.env.NEXA_SHOTS}/pack-popup-card-value-${test.info().project.name}.png` });
+  // The keyboard reaches the next card and gets its value too.
+  const firstText = await tip.innerText();
+  await cards.nth(1).focus();
+  await expect(tip).toHaveCount(1);
+  await expect(tip).not.toHaveText(firstText);
+  await expect(tip.getByTestId("contents-tip-value")).toContainText("€");
+  await expectNoSidewaysScroll(page);
 });
 
 test("buy a card from an AI seller on the market", async ({ page }) => {

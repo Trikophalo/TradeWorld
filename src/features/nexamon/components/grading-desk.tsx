@@ -1,9 +1,9 @@
 "use client";
 
-import { motion, useReducedMotionConfig } from "motion/react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { useEffect, useRef, useState } from "react";
+import { Dialog } from "radix-ui";
+import { useEffect, useState } from "react";
 import { nexamonCard, type NexamonCard } from "@/config/nexamon";
 import { BALANCE } from "@/config/balance";
 import { UI_ICONS } from "@/components/pixel/art";
@@ -11,19 +11,20 @@ import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Countdown } from "@/components/ui/countdown";
-import { burstConfetti } from "@/components/ui/effects";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { NexamonCollection, NexamonCopy, NexamonOverview } from "@/features/game/nexamon-types";
 import { formatMoney } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
-import { DURATION, EASE, SPRING } from "@/lib/motion";
+import { nexamonCopyFactorBps } from "@/lib/sim/nexamon";
 import { playSound, type SoundName } from "@/lib/sound";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { useClock } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
 import { useNexamonRefresh, useRevealedSlabs } from "../hooks";
 import { formatChance, formatFactor, gradingQueue, revealKey, splitGraded } from "../view";
 import { ConditionBadge } from "./badges";
+import { GradeReveal, GradingPack, gradeTier } from "./grading-reveal";
 import { CopyVisual, GradeChip, Stat } from "./parts";
 import { NexamonSlab } from "./slab";
 
@@ -35,16 +36,17 @@ const dateTime = new Intl.DateTimeFormat("de-DE", {
 });
 const cfg = BALANCE.nexamon.grading;
 
-/** The sound of a grade: a fanfare for a 10, a chime from 8, a plain blip below. */
-function gradeSound(grade: number): SoundName {
-  if (grade >= 10) return "levelUp";
-  if (grade >= 8) return "win";
-  return "blip";
-}
+/** The sound of a grade opened without the show: the result sound of its tier. */
+const QUICK_SOUND: Record<ReturnType<typeof gradeTier>, SoundName> = {
+  low: "gradeLow",
+  good: "gradeGood",
+  ten: "gradeTen",
+  black: "blackLabel",
+};
 
 /**
- * The ASP desk (ADR-165): copies that are being graded with their countdown, slabs that came back and wait to be
- * revealed, and every slab the player holds as the history.
+ * The ASP desk (ADR-165): copies that are being graded with their countdown, slabs that came back in a sealed
+ * package and wait to be opened (the grade reveal), and every slab the player holds as the history.
  */
 export function GradingDesk({
   overview,
@@ -59,6 +61,8 @@ export function GradingDesk({
   const [revealed, markRevealed] = useRevealedSlabs();
   // Slabs revealed while this desk is open stay in the reveal row instead of jumping to the history.
   const [session, setSession] = useState<readonly string[]>([]);
+  // The package on the table: its reveal key, or null while the overlay is closed.
+  const [opening, setOpening] = useState<string | null>(null);
   const queue = collection ? gradingQueue(collection.copies) : [];
   const nextDue = queue[0]?.gradingUntil ? Date.parse(queue[0].gradingUntil) : null;
   const due = nextDue !== null && now !== null && now >= nextDue;
@@ -84,14 +88,20 @@ export function GradingDesk({
   );
   const history = seen;
   const waiting = fresh.filter((copy) => !session.includes(revealKey(copy)));
-  const reveal = (copies: readonly NexamonCopy[]) => {
+  /** The grade of these slabs is on the table: they stay in the row for now and join the history next time. */
+  const mark = (copies: readonly NexamonCopy[]) => {
     const keys = copies.map(revealKey);
     setSession((current) => [...new Set([...current, ...keys])]);
     markRevealed(keys);
+  };
+  /** Opens packages without the show. */
+  const reveal = (copies: readonly NexamonCopy[]) => {
+    mark(copies);
     const best = Math.max(...copies.map((c) => c.grade ?? 1));
-    void playSound(gradeSound(best));
+    void playSound(QUICK_SOUND[gradeTier(best)]);
     haptic(best >= 8 ? "success" : "tap");
   };
+  const onTable = opening === null ? null : (fresh.find((copy) => revealKey(copy) === opening) ?? null);
   const max = overview?.limits.maxGrading ?? cfg.maxOpen;
 
   return (
@@ -105,6 +115,7 @@ export function GradingDesk({
             rate: formatChance(cfg.feeBps),
             minutes: cfg.minutes,
             best: formatFactor(cfg.valueBps[9]),
+            black: formatFactor(cfg.blackLabel.valueBps),
           })}
         </p>
         <div className="mt-3 grid grid-cols-3 gap-2">
@@ -140,7 +151,7 @@ export function GradingDesk({
                   copy={copy}
                   card={card}
                   open={session.includes(revealKey(copy))}
-                  onReveal={() => reveal([copy])}
+                  onReveal={() => setOpening(revealKey(copy))}
                 />
               );
             })}
@@ -236,13 +247,112 @@ export function GradingDesk({
         )}
         <p className="mt-3 text-xs text-pretty text-fg-3">{t("grading.historyNote")}</p>
       </Card>
+
+      <GradingOverlay
+        copy={onTable}
+        waiting={waiting.filter((copy) => !onTable || copy.id !== onTable.id)}
+        onResult={(copy) => mark([copy])}
+        onNext={(copy) => setOpening(revealKey(copy))}
+        onClose={() => setOpening(null)}
+      />
     </div>
   );
 }
 
 /**
- * A slab that came back from ASP: it lies face down until the player turns it over. Then it flips, pops a little,
- * the grade's sound plays and a 10 gets confetti. With reduced motion the sides only cross-fade.
+ * The popup of a package from ASP: the sealed package, torn open by hand, then the slow reveal of the grade
+ * (GradeReveal). The slab is in the collection long before; closing before the result leaves the package sealed
+ * for later, exactly like an unopened booster.
+ */
+function GradingOverlay({
+  copy,
+  waiting,
+  onResult,
+  onNext,
+  onClose,
+}: {
+  copy: NexamonCopy | null;
+  waiting: readonly NexamonCopy[];
+  onResult: (copy: NexamonCopy) => void;
+  onNext: (copy: NexamonCopy) => void;
+  onClose: () => void;
+}) {
+  const t = useTranslations("nexamon");
+  const desktop = useMediaQuery("(min-width: 1024px) and (min-height: 800px)");
+  const card = copy ? nexamonCard(copy.cardKey) : undefined;
+  const next = waiting[0];
+  return (
+    <Dialog.Root open={copy !== null} onOpenChange={(open) => !open && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-overlay bg-scrim backdrop-blur-sm data-[state=open]:animate-[fade-in_var(--duration-base)_var(--ease-out)]" />
+        <Dialog.Content
+          data-testid="grading-overlay"
+          aria-describedby={undefined}
+          className={cn(
+            "fixed inset-0 z-sheet flex flex-col bg-bg pt-safe pb-safe outline-none",
+            "lg:m-auto lg:h-[min(94dvh,900px)] lg:w-[min(94vw,720px)] lg:rounded-xl lg:border-2 lg:border-line-2 lg:shadow-3",
+            "data-[state=open]:animate-[modal-in_var(--duration-slow)_var(--ease-out)]",
+          )}
+        >
+          <header className="flex shrink-0 items-center justify-between gap-3 border-b-2 border-line-1 px-4 py-3 lg:px-6">
+            <div className="min-w-0">
+              <Dialog.Title className="truncate font-pixel text-sm text-fg-1 uppercase">
+                {t("reveal.title")}
+              </Dialog.Title>
+              {card && copy && (
+                <p className="mt-0.5 truncate text-xs text-fg-3">
+                  {card.name} · {t("serial", { serial: copy.serial })}
+                </p>
+              )}
+            </div>
+            <Dialog.Close asChild>
+              <Button variant="secondary" size="sm" data-testid="grading-close">
+                {t("reveal.close")}
+              </Button>
+            </Dialog.Close>
+          </header>
+          {copy && card && copy.grade !== null && (
+            <div className="flex min-h-0 flex-1 flex-col items-center overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-6">
+              <div className="my-auto flex w-full flex-col items-center">
+                <GradeReveal
+                  key={revealKey(copy)}
+                  card={card}
+                  grade={copy.grade}
+                  serial={copy.serial}
+                  valueCents={copy.valueCents}
+                  scale={desktop ? 3 : 2}
+                  onResult={() => onResult(copy)}
+                >
+                  <div className="mt-2 flex w-full flex-col items-center gap-2 sm:flex-row sm:justify-center">
+                    {next && (
+                      <Button onClick={() => onNext(next)} data-testid="grading-next">
+                        {t("reveal.next", { count: waiting.length })}
+                      </Button>
+                    )}
+                    <Dialog.Close asChild>
+                      <Link
+                        href={`/nexamon/${card.key}`}
+                        className="text-sm font-medium text-accent focus-ring hover:underline"
+                        data-testid="grading-to-card"
+                      >
+                        {t("grading.toCard")}
+                      </Link>
+                    </Dialog.Close>
+                  </div>
+                </GradeReveal>
+                <p className="mt-4 max-w-sm text-center text-xs text-pretty text-fg-3">{t("reveal.safe")}</p>
+              </div>
+            </div>
+          )}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+/**
+ * A slab that came back from ASP. Until the player has opened it, it is a sealed package (the grade stays secret);
+ * afterwards the slab stands there with its grade, its value and the factor against the market value.
  */
 function SlabReveal({
   copy,
@@ -256,15 +366,9 @@ function SlabReveal({
   onReveal: () => void;
 }) {
   const t = useTranslations("nexamon");
-  const reduced = useReducedMotionConfig() ?? false;
-  const anchor = useRef<HTMLDivElement>(null);
   const grade = copy.grade ?? 1;
-  const factor = cfg.valueBps[grade - 1] ?? 10_000;
-  const wasOpen = useRef(open);
-  useEffect(() => {
-    if (open && !wasOpen.current && grade === 10 && anchor.current) burstConfetti(anchor.current, 32);
-    wasOpen.current = open;
-  }, [open, grade]);
+  const tier = gradeTier(grade);
+  const factor = nexamonCopyFactorBps(copy.condition, grade);
   return (
     <li
       className="flex w-[172px] flex-col items-center gap-2"
@@ -272,49 +376,58 @@ function SlabReveal({
       data-open={open}
       data-card={copy.cardKey}
     >
-      <motion.div
-        ref={anchor}
-        initial={false}
-        animate={open && !reduced ? { scale: [1, 1.08, 1] } : { scale: 1 }}
-        transition={open ? { duration: DURATION.slower, ease: EASE.out } : SPRING.smooth}
-        className="relative"
-      >
-        {open && grade >= 9 && (
-          <div
-            aria-hidden
-            className={cn(
-              "absolute -inset-3 opacity-80",
-              grade === 10 ? "nexamon-glow-legendary" : "nexamon-glow-ultra",
-            )}
-          />
-        )}
-        <NexamonSlab
-          card={card}
-          grade={grade}
-          serial={copy.serial}
-          scale={2}
-          side={open ? "front" : "back"}
-          tilt={false}
-          flippable={false}
-          className="relative"
-        />
-      </motion.div>
       {open ? (
-        <div className="flex flex-col items-center gap-1 text-center" aria-live="polite">
-          <GradeChip grade={grade} />
-          <span className="nums text-sm font-semibold text-fg-1" data-testid="reveal-value">
-            {formatMoney(copy.valueCents)}
-          </span>
-          <span className={cn("nums text-xs", factor > 10_000 ? "text-gain" : "text-loss")}>
-            {t("grading.factor", { factor: formatFactor(factor) })}
-          </span>
-          <Link href={`/nexamon/${card.key}`} className="text-xs font-medium text-accent focus-ring hover:underline">
-            {t("grading.toCard")}
-          </Link>
-        </div>
+        <>
+          <div className="relative">
+            {tier !== "low" && (
+              <div
+                aria-hidden
+                className={cn(
+                  "absolute -inset-3 opacity-80",
+                  tier === "black"
+                    ? "nexamon-glow-black"
+                    : tier === "ten"
+                      ? "nexamon-glow-legendary"
+                      : "nexamon-glow-ultra",
+                )}
+              />
+            )}
+            <NexamonSlab
+              card={card}
+              grade={grade}
+              serial={copy.serial}
+              scale={2}
+              tilt={false}
+              flippable={false}
+              className="relative"
+            />
+          </div>
+          <div className="flex flex-col items-center gap-1 text-center" aria-live="polite">
+            <GradeChip grade={grade} />
+            <span className="nums text-sm font-semibold text-fg-1" data-testid="reveal-value">
+              {formatMoney(copy.valueCents)}
+            </span>
+            <span className={cn("nums text-xs", factor > 10_000 ? "text-gain" : "text-loss")}>
+              {t("grading.factor", { factor: formatFactor(factor) })}
+            </span>
+            <Link href={`/nexamon/${card.key}`} className="text-xs font-medium text-accent focus-ring hover:underline">
+              {t("grading.toCard")}
+            </Link>
+          </div>
+        </>
       ) : (
         <>
+          <button
+            type="button"
+            onClick={onReveal}
+            aria-label={`${t("grading.reveal")}: ${card.name}`}
+            className="rounded-sm focus-ring transition-transform duration-fast hover:scale-[1.03] active:scale-[0.98]"
+            data-testid="reveal-pack"
+          >
+            <GradingPack scale={2} />
+          </button>
           <p className="max-w-full truncate text-sm text-fg-1">{card.name}</p>
+          <p className="label-pixel text-fg-3">{t("grading.sealed")}</p>
           <Button size="sm" onClick={onReveal} data-testid="reveal-button">
             {t("grading.reveal")}
           </Button>

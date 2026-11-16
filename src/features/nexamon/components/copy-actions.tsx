@@ -16,8 +16,10 @@ import { formatMoney } from "@/lib/format";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { useNexamonAction } from "../hooks";
+import { isBlackLabel } from "../lib";
 import {
   centsToInput,
+  conditionFactorBps,
   copyStatus,
   dealBps,
   formatChance,
@@ -288,6 +290,18 @@ function GradeSheet({ copy, card, onClose }: SheetProps) {
             {t("grade.table", { condition: tc(`condition.${copy.condition}`) })}
           </p>
           <ul className="divide-y divide-line-1 rounded-md border-2 border-line-1" data-testid="grade-chances">
+            {quote.blackLabel.chanceBps === 0 && (
+              <li className="px-3 py-1.5 text-sm" data-grade={quote.blackLabel.grade} data-testid="grade-black-label">
+                <span className="flex items-center gap-3">
+                  <GradeChip grade={quote.blackLabel.grade} />
+                  <span className="ml-auto nums text-fg-3">{formatChance(0)}</span>
+                  <span className="w-12 text-right nums text-fg-3">{formatFactor(quote.blackLabel.factorBps)}</span>
+                </span>
+                <span className="mt-1 block text-xs text-pretty text-fg-3">
+                  {t("blackLabel.onlyMint", { condition: tc(`condition.${quote.blackLabel.condition}`) })}
+                </span>
+              </li>
+            )}
             {quote.chances.map((row) => (
               <li key={row.grade} className="flex items-center gap-3 px-3 py-1.5 text-sm" data-grade={row.grade}>
                 <GradeChip grade={row.grade} />
@@ -311,6 +325,8 @@ function CrackSheet({ copy, card, onClose }: SheetProps) {
   const t = useTranslations("nexamon");
   const tc = useTranslations("nexamonCards");
   const action = useNexamonAction();
+  const black = isBlackLabel(copy.grade);
+  const blackCfg = BALANCE.nexamon.grading.blackLabel;
   return (
     <Sheet
       open
@@ -337,13 +353,31 @@ function CrackSheet({ copy, card, onClose }: SheetProps) {
               })
             }
           >
-            {t("crack.confirm")}
+            {black ? t("crack.blackLabelConfirm") : t("crack.confirm")}
           </Button>
         </div>
       }
     >
-      <div className="space-y-4" data-testid="crack-sheet">
+      <div className="space-y-4" data-testid="crack-sheet" data-black-label={black}>
         <CopyLine copy={copy} card={card} />
+        {black && (
+          <div
+            role="alert"
+            className="rounded-md border-2 border-loss bg-loss-soft p-3"
+            data-testid="crack-black-label-warning"
+          >
+            <p className="font-pixel text-sm text-loss uppercase">{t("crack.blackLabelTitle")}</p>
+            <p className="mt-1 text-sm text-pretty text-fg-1">
+              {t("crack.blackLabelText", {
+                slab: formatMoney(copy.valueCents),
+                raw: formatMoney(
+                  Math.round((copy.valueCents * conditionFactorBps(copy.condition)) / blackCfg.valueBps),
+                ),
+                chance: formatChance(blackCfg.chanceBps),
+              })}
+            </p>
+          </div>
+        )}
         <p className="text-sm text-pretty text-fg-2">
           {t("crack.text", { condition: tc(`condition.${copy.condition}`) })}
         </p>

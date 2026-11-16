@@ -12,7 +12,9 @@ import type { NexamonCondition } from "@/config/nexamon-rules";
 import { formatMoney, formatMoneyShort } from "@/lib/format";
 import type { NexamonCardStats, NexamonCopy, NexamonListing, PlayerNexamonCard } from "@/features/game/nexamon-types";
 import {
+  NEXAMON_BLACK_LABEL_GRADE,
   nexamonConditionBps,
+  nexamonCopyFactorBps,
   nexamonExpectedPerPack,
   nexamonGradeChanceBps,
   nexamonGradingFeeCents,
@@ -240,7 +242,7 @@ export function copyStatus(copy: Pick<NexamonCopy, "state" | "listing">): CopySt
   return copy.state === "graded" ? "graded" : "raw";
 }
 
-/** Value factor of a raw copy's condition in basis points (Poor 9 500, everything else 10 000). */
+/** Value factor of a raw copy's condition in basis points (Poor 7 000, Good 9 000, Near Mint and Mint 10 000). */
 export const conditionFactorBps = (condition: NexamonCondition): number => nexamonConditionBps(condition);
 
 /** What a listing brings: the fee the seller pays and what arrives. */
@@ -275,8 +277,10 @@ export interface GradeChance {
 export interface GradingQuote {
   feeCents: number;
   minutes: number;
-  /** Grades this condition can get, best first. */
+  /** Grades this condition can get, best first (grade 11 is the Black Label). */
   chances: GradeChance[];
+  /** The Black Label for this condition: chance 0 unless the copy is in the condition that qualifies. */
+  blackLabel: GradeChance & { condition: NexamonCondition };
   /** Chance that the slab is worth more than the raw copy. */
   betterBps: number;
   /** Average value factor of the slab against the market value. */
@@ -289,10 +293,10 @@ export function gradingQuote(copy: Pick<NexamonCopy, "condition" | "valueCents">
   const chances: GradeChance[] = [];
   let betterBps = 0;
   let expected = 0;
-  for (let grade = 10; grade >= 1; grade--) {
+  for (let grade = NEXAMON_BLACK_LABEL_GRADE; grade >= 1; grade--) {
     const chance = nexamonGradeChanceBps(copy.condition, grade);
     if (chance <= 0) continue;
-    const factorBps = cfg.grading.valueBps[grade - 1]!;
+    const factorBps = nexamonCopyFactorBps(copy.condition, grade);
     chances.push({ grade, chanceBps: chance, factorBps });
     if (factorBps > rawBps) betterBps += chance;
     expected += chance * factorBps;
@@ -301,6 +305,12 @@ export function gradingQuote(copy: Pick<NexamonCopy, "condition" | "valueCents">
     feeCents: nexamonGradingFeeCents(copy.valueCents),
     minutes: cfg.grading.minutes,
     chances,
+    blackLabel: {
+      grade: NEXAMON_BLACK_LABEL_GRADE,
+      chanceBps: nexamonGradeChanceBps(copy.condition, NEXAMON_BLACK_LABEL_GRADE),
+      factorBps: cfg.grading.blackLabel.valueBps,
+      condition: cfg.grading.blackLabel.condition,
+    },
     betterBps,
     expectedFactorBps: Math.round(expected / 10_000),
   };

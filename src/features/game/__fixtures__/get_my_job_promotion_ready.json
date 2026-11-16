@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "c3ec4a08-fc57-4145-bb4d-d700cd28c1c9",
+    "id": "c75ca6a7-3835-4050-a79f-e96bc820d9ba",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "2fccb1cc-0894-a518-9538-769c751d9630",
+      "id": "0e23c6f3-2c55-dff0-d773-3075ae4f54b1",
       "logo": null,
-      "name": "Memeland Media",
-      "color": "#FF4FD8",
+      "name": "Orbitfracht",
+      "color": "#5C6BC0",
       "is_ai": true,
-      "sector": "tech",
-      "ticker": "MEM"
+      "sector": "logistics",
+      "ticker": "OFR"
     },
     "presence": {
-      "fire_at": "2026-11-21T18:18:28.882511+00:00",
+      "fire_at": "2026-11-21T19:43:56.904219+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-16T18:18:28.882511+00:00"
+      "last_active_at": "2026-11-16T19:43:56.904219+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-16T18:18:28.996166+00:00",
+    "started_at": "2026-11-16T19:43:57.050003+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

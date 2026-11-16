@@ -17,7 +17,7 @@ export interface NexamonCopy {
   /** Population number: the n-th copy of this card ever pulled. */
   serial: number;
   condition: NexamonCondition;
-  /** 1..10 once graded by ASP, else null. */
+  /** 1..10 once graded by ASP (11 = Black Label, the tier above a 10), else null. */
   grade: number | null;
   state: NexamonCopyState;
   gradingUntil: string | null;
@@ -151,8 +151,10 @@ export interface NexamonCardDetails {
   card: NexamonCardStats;
   /** Value over time, oldest first; the last point is now. */
   history: { at: string; valueCents: number }[];
-  /** Graded copies per grade: index 0 is grade 1, index 9 is grade 10. */
+  /** Graded copies per grade: index 0 is grade 1, index 9 is grade 10 (without the Black Labels). */
   graded: number[];
+  /** Copies with the Black Label. */
+  blackLabels: number;
   /** The cheapest listings of this card. */
   listings: NexamonListing[];
   /** The own copies of this card. */
@@ -176,6 +178,8 @@ export interface NexamonMarketQuery {
   cardKey?: string | null;
   /** true = only slabs, false = only raw cards, null = both. */
   graded?: boolean | null;
+  /** true = only Black Labels, false = everything else, null = both. */
+  blackLabel?: boolean | null;
 }
 
 export interface NexamonMarketPage {

@@ -5,7 +5,7 @@
 -- =============================================================================
 -- get_player_nexamon(p_nickname, p_limit) is the public view of a collection, like get_collection() for artworks
 -- and get_property() for the home: every signed-in player may read it, by nickname (null = the caller's own).
--- It returns the collection in numbers (copies, different cards, value, slabs, tens), the progress per set and one
+-- It returns the collection in numbers (copies, different cards, value, slabs, tens incl. Black Label), the progress per set and one
 -- row per card the player owns with its best copy (the most valuable one: condition, grade, serial, value) and
 -- the number of copies, most valuable first. p_limit caps the rows (1..500, default all); the numbers always
 -- cover the whole collection. A player below the Nexamon level has nothing to show (unlocked false, no cards).
@@ -62,7 +62,7 @@ begin
            'total', (select count(*) from public.nexamon_cards k where k.in_catalogue),
            'value_cents', (select coalesce(sum(o.value_cents), 0)::bigint from own o),
            'graded', (select count(*) from own o where o.grade is not null),
-           'tens', (select count(*) from own o where o.grade = 10)),
+           'tens', (select count(*) from own o where o.grade >= 10)),
          (select coalesce(jsonb_agg(jsonb_build_object(
                    'key', s.set_key, 'cards', s.cards,
                    'distinct', (select count(*) from per_card p where p.set_key = s.set_key),

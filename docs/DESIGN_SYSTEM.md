@@ -54,22 +54,23 @@ Wer eine Farbe braucht, die es nicht gibt, ergänzt ein Token und nicht einen He
 
 ### Farben
 
-| Token                                          | Utility                                             | Zweck                                           |
-| ---------------------------------------------- | --------------------------------------------------- | ----------------------------------------------- |
-| `--bg-0`                                       | `bg-bg`                                             | Seitenhintergrund                               |
-| `--bg-1`                                       | `bg-surface-1`                                      | Karten, Seitenleiste, Sheets                    |
-| `--bg-2`                                       | `bg-surface-2`                                      | Erhöhte Flächen in Karten, Eingabefelder, Hover |
-| `--bg-3`                                       | `bg-surface-3`                                      | Aktive Auswahl, Skeletons, Fortschritts-Schiene |
-| `--fg-1`                                       | `text-fg-1`                                         | Haupttext, Zahlen                               |
-| `--fg-2`                                       | `text-fg-2`                                         | Sekundärtext                                    |
-| `--fg-3`                                       | `text-fg-3`                                         | Labels, Hinweise, Platzhalter                   |
-| `--line-1`, `--line-2`                         | `border-line-1`, `border-line-2`                    | Feine und betonte Linien                        |
-| `--accent`, `--accent-strong`, `--accent-soft` | `text-accent`, `bg-accent-strong`, `bg-accent-soft` | Aktionen, aktive Navigation, Fokus              |
-| `--gain`, `--gain-soft`                        | `text-gain`, `bg-gain-soft`                         | Gewinn, Kaufen, steigende Kurse                 |
-| `--loss`, `--loss-soft`                        | `text-loss`, `bg-loss-soft`                         | Verlust, Verkaufen, fallende Kurse, Fehler      |
-| `--warn`, `--info` (+ `-soft`)                 | `text-warn`, `text-info`                            | Warnungen (Margin, Sperrfrist), Hinweise        |
-| `--gold`                                       | `bg-gold`                                           | Münzen, Tresor, Belohnungen                     |
-| `--on-accent`, `--on-semantic`                 | `text-on-accent`, `text-on-semantic`                | Text auf gefüllten Buttons                      |
+| Token                                                     | Utility                                                            | Zweck                                                                 |
+| --------------------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| `--bg-0`                                                  | `bg-bg`                                                            | Seitenhintergrund                                                     |
+| `--bg-1`                                                  | `bg-surface-1`                                                     | Karten, Seitenleiste, Sheets                                          |
+| `--bg-2`                                                  | `bg-surface-2`                                                     | Erhöhte Flächen in Karten, Eingabefelder, Hover                       |
+| `--bg-3`                                                  | `bg-surface-3`                                                     | Aktive Auswahl, Skeletons, Fortschritts-Schiene                       |
+| `--fg-1`                                                  | `text-fg-1`                                                        | Haupttext, Zahlen                                                     |
+| `--fg-2`                                                  | `text-fg-2`                                                        | Sekundärtext                                                          |
+| `--fg-3`                                                  | `text-fg-3`                                                        | Labels, Hinweise, Platzhalter                                         |
+| `--line-1`, `--line-2`                                    | `border-line-1`, `border-line-2`                                   | Feine und betonte Linien                                              |
+| `--accent`, `--accent-strong`, `--accent-soft`            | `text-accent`, `bg-accent-strong`, `bg-accent-soft`                | Aktionen, aktive Navigation, Fokus                                    |
+| `--gain`, `--gain-soft`                                   | `text-gain`, `bg-gain-soft`                                        | Gewinn, Kaufen, steigende Kurse                                       |
+| `--loss`, `--loss-soft`                                   | `text-loss`, `bg-loss-soft`                                        | Verlust, Verkaufen, fallende Kurse, Fehler                            |
+| `--warn`, `--info` (+ `-soft`)                            | `text-warn`, `text-info`                                           | Warnungen (Margin, Sperrfrist), Hinweise                              |
+| `--black-label`, `--on-black-label`, `--black-label-edge` | `bg-black-label`, `text-on-black-label`, `border-black-label-edge` | Black Label eines Nexamon-Slabs (in beiden Themes schwarz mit Silber) |
+| `--gold`                                                  | `bg-gold`                                                          | Münzen, Tresor, Belohnungen                                           |
+| `--on-accent`, `--on-semantic`                            | `text-on-accent`, `text-on-semantic`                               | Text auf gefüllten Buttons                                            |
 
 Semantik ist fest: **Grün heißt Gewinn, Rot heißt Verlust.** Die Akzentfarbe ist deshalb nie grün oder rot.
 Farbe trägt Information nie allein: Veränderungen haben zusätzlich Vorzeichen und Pfeil.

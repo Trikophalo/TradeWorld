@@ -12,7 +12,8 @@ const iso = z.string();
 const setKey = z.enum(NEXAMON_SETS);
 const rarity = z.enum(NEXAMON_RARITIES);
 const condition = z.enum(NEXAMON_CONDITIONS);
-const grade = z.number().int().min(1).max(10).nullable();
+/** 11 = Black Label. */
+const grade = z.number().int().min(1).max(11).nullable();
 
 const copySchema = z.object({
   id: z.string(),
@@ -119,6 +120,7 @@ const cardDetailsSchema = z.object({
   card: cardSchema,
   history: z.array(z.object({ at: iso, value_cents: num })),
   graded: z.array(num).length(10),
+  black_labels: num.default(0),
   listings: z.array(listingSchema),
   copies: z.array(copySchema),
   sales: z.array(
@@ -309,6 +311,7 @@ export const liveNexamonEngine: NexamonEngine = {
       card: toCard(r.card),
       history: r.history.map((h) => ({ at: h.at, valueCents: h.value_cents })),
       graded: r.graded,
+      blackLabels: r.black_labels,
       listings: r.listings.map(toListing),
       copies: r.copies.map(toCopy),
       sales: r.sales.map((s) => ({
@@ -334,6 +337,8 @@ export const liveNexamonEngine: NexamonEngine = {
         p_seller: query.seller ?? "all",
         p_card_key: query.cardKey ?? null,
         p_graded: query.graded ?? null,
+        // only sent when set: a database before the Black Label does not know the argument
+        ...(query.blackLabel == null ? {} : { p_black_label: query.blackLabel }),
       },
       marketSchema,
     );

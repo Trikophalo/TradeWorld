@@ -1,27 +1,27 @@
 {
-  "id": "09ac420c-c11a-48b6-912a-b044669ab4db",
+  "id": "5151ac30-c929-4510-a62d-46318a377adf",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "09cf867a-e21c-4aa3-982f-141e31242371",
-    "tier": "intern",
+    "id": "1ae0c98b-9180-4ef8-aa52-96b1a714eb81",
+    "tier": "junior",
     "title": null,
     "company": {
-      "id": "2fccb1cc-0894-a518-9538-769c751d9630",
+      "id": "833932bd-1586-776d-1f8f-f602682f7437",
       "logo": null,
-      "name": "Memeland Media",
-      "color": "#FF4FD8",
+      "name": "Luftpost Drohnen",
+      "color": "#00B4D8",
       "is_ai": true,
-      "sector": "tech",
-      "ticker": "MEM"
+      "sector": "logistics",
+      "ticker": "DRN"
     },
-    "required": [{ "branch": "it", "min_score": 0 }],
-    "title_key": "it_intern",
+    "required": [{ "branch": "it", "min_score": 2 }],
+    "title_key": "it_junior",
     "required_skills": []
   },
-  "created_at": "2026-11-16T18:18:25.371116+00:00",
-  "updated_at": "2026-11-16T18:18:25.375425+00:00",
-  "offer_expires_at": "2026-11-18T18:18:25.371116+00:00",
-  "salary_wish_cents_per_hour": 15900,
-  "offer_salary_cents_per_hour": 15900
+  "created_at": "2026-11-16T19:43:53.11617+00:00",
+  "updated_at": "2026-11-16T19:43:53.121447+00:00",
+  "offer_expires_at": "2026-11-18T19:43:53.11617+00:00",
+  "salary_wish_cents_per_hour": 32700,
+  "offer_salary_cents_per_hour": 32700
 }

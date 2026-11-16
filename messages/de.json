@@ -599,7 +599,7 @@
     "nexamonGrading": {
       "title": "Zustand und ASP-Note",
       "summary": "Grading kostet {rate} vom Wert",
-      "text": "Jede Karte hat einen Zustand: Poor, Good, Near Mint oder Mint. ASP bewertet eine lose Karte für {rate} ihres Werts mit einer Note von 1 bis 10 und versiegelt sie im Slab. Das dauert {minutes} Minuten. Je besser der Zustand, desto öfter gibt es eine 10: bei Mint zu {mint}, bei Near Mint zu {nearMint}, bei Good zu {good}.",
+      "text": "Jede Karte hat einen Zustand: Poor, Good, Near Mint oder Mint. ASP bewertet eine lose Karte für {rate} ihres Werts mit einer Note von 1 bis 10 und versiegelt sie im Slab. Das dauert {minutes} Minuten. Je besser der Zustand, desto öfter gibt es eine 10: bei Mint zu {mint}, bei Near Mint zu {nearMint}, bei Good zu {good}. Über der 10 steht nur noch das Black Label: Das bekommen {blackChance} der Mint-Karten, andere Zustände nie. Ein Black Label ist {blackFactor} vom Marktwert wert.",
       "example": "Karte im Wert von {value}: Das Grading kostet {fee}. Mit einer 10 ist der Slab {ten} wert, mit einer 8 {eight}, mit einer 7 nur noch {seven}.",
       "where": "Collectibles → Karte öffnen → Zu ASP"
     },
@@ -3154,6 +3154,7 @@
         "coin_closed": "hat den Coin {name} ({ticker}) eingestellt.",
         "accessory_bought": "trägt jetzt etwas Legendäres: {name}.",
         "nexamon_pull": "hat eine legendäre Nexamon-Karte gezogen: {name} (Nummer {serial}).",
+        "nexamon_black_label": "hat bei ASP ein Black Label geholt: {name} (Nummer {serial}).",
         "home_rented": "wohnt jetzt in einer {home} bei {owner}.",
         "battle_won": "hat das News-Battle „{game}“ gewonnen 🏆",
         "tax_penalty": "hat mit {company} eine Strafe vom Finanzamt kassiert.",
@@ -8318,6 +8319,7 @@
       "prismatic_peak": "Prismatic Peak"
     },
     "grade": {
+      "blackLabel": "Black Label",
       "gemMint": "Gem Mint",
       "mint": "Mint",
       "nearMintMint": "NM-MT",
@@ -8367,6 +8369,13 @@
     "retry": "Noch einmal versuchen",
     "gradeShort": "ASP {grade}",
     "gradeLong": "ASP {grade} · {word}",
+    "blackLabel": {
+      "short": "Black Label",
+      "long": "ASP 10 · Black Label",
+      "onlyMint": "Nur Karten im Zustand {condition} können das Black Label bekommen.",
+      "note": "Black Label: {chance} aller {condition}-Karten, die zu ASP gehen. Der Slab ist {factor} vom Marktwert wert. Andere Zustände bekommen es nie.",
+      "count": "{count, plural, =0 {Kein Black Label} one {# Black Label} other {# Black Labels}}"
+    },
     "status": {
       "raw": "Lose",
       "listed": "Am Markt",
@@ -8377,7 +8386,7 @@
       "title": "Nexamon-Sammelkarten",
       "text": "Ab Level {level} ziehst du Karten aus Boostern, lässt sie bewerten und handelst sie am Kartenmarkt.",
       "point1": "{sets} Sets mit je {cards} Karten, von Common bis Legendary.",
-      "point2": "ASP bewertet deine Karten mit Noten von 1 bis 10. Eine 10 ist {best} wert.",
+      "point2": "ASP bewertet deine Karten mit Noten von 1 bis 10. Eine 10 ist {best} wert, das seltene Black Label {black}.",
       "point3": "Am Markt bestimmen Knappheit und Nachfrage, was eine Karte wert ist."
     },
     "shop": {
@@ -8425,6 +8434,9 @@
       "note": "Innerhalb einer Seltenheit ist jede Karte des Sets gleich wahrscheinlich. Bezahlt wird nur mit Spielgeld."
     },
     "contents": {
+      "value": "Marktwert:",
+      "valueLoading": "wird geladen …",
+      "cardLabel": "{name}, Marktwert {value}",
       "title": "Das kann drin sein",
       "intro": "Alle Karten dieses Sets nach Seltenheit, mit der Chance je Booster. Karten, die du schon hast, sind farbig.",
       "slots": "Platz 4: {slot4} · Platz 5: {slot5}",
@@ -8530,7 +8542,10 @@
       "done": "Slab aufgebrochen",
       "confirm": "Aufbrechen",
       "text": "Die Karte kommt lose zurück, mit ihrem alten Zustand ({condition}). Die Note ist dann weg. Du darfst sie danach noch einmal zu ASP schicken.",
-      "noRefund": "Die Grading-Gebühr bekommst du nicht zurück."
+      "noRefund": "Die Grading-Gebühr bekommst du nicht zurück.",
+      "blackLabelTitle": "Achtung: Das ist ein Black Label!",
+      "blackLabelText": "Brichst du diesen Slab auf, ist das Black Label für immer weg. Die Karte ist dann nur noch {raw} wert statt {slab}. Ein neues Grading bringt nur in {chance} der Fälle wieder ein Black Label.",
+      "blackLabelConfirm": "Black Label zerstören"
     },
     "deal": {
       "at": "zum Wert",
@@ -8554,7 +8569,8 @@
       "graded": {
         "all": "Alle",
         "raw": "Lose Karten",
-        "slab": "Slabs"
+        "slab": "Slabs",
+        "black": "Black Label"
       },
       "sort": {
         "new": "Neueste",
@@ -8636,13 +8652,13 @@
     },
     "grading": {
       "title": "ASP-Schalter",
-      "intro": "ASP bewertet lose Karten mit Noten von 1 bis 10 und versiegelt sie im Slab. Das kostet {rate} vom Wert der Kopie und dauert {minutes} Minuten. Eine 10 ist {best} wert. Schicken kannst du jede lose Karte aus deiner Sammlung.",
+      "intro": "ASP bewertet lose Karten mit Noten von 1 bis 10 und versiegelt sie im Slab. Das kostet {rate} vom Wert der Kopie und dauert {minutes} Minuten. Eine 10 ist {best} wert. Ganz selten bekommt eine Mint-Karte das Black Label: Das ist {black} wert. Schicken kannst du jede lose Karte aus deiner Sammlung.",
       "running": "Bei ASP",
       "slots": "{count} / {max}",
-      "waiting": "Aufdecken",
+      "waiting": "Pakete",
       "slabs": "Slabs",
       "backTitle": "Zurück von ASP",
-      "revealAll": "Alle aufdecken",
+      "revealAll": "Alle ohne Show öffnen",
       "queueTitle": "In Arbeit",
       "emptyTitle": "Nichts bei ASP",
       "emptyText": "Öffne eine lose Karte in deiner Sammlung und tippe auf „Zu ASP“.",
@@ -8653,7 +8669,28 @@
       "historyNote": "Verkaufte oder aufgebrochene Slabs stehen hier nicht mehr.",
       "factor": "{factor} vom Marktwert",
       "toCard": "Zur Karte",
-      "reveal": "Note aufdecken"
+      "reveal": "Paket öffnen",
+      "sealed": "Versiegeltes Paket"
+    },
+    "reveal": {
+      "title": "Paket von ASP",
+      "packLabel": "Versiegeltes Paket von ASP",
+      "tearHint": "Zieh oben quer über das Paket, um es aufzureißen.",
+      "openButton": "Paket aufreißen",
+      "rising": "ASP hat entschieden …",
+      "counting": "Die Note …",
+      "cover": "ASP · ? ? ?",
+      "skip": "Überspringen",
+      "close": "Schließen",
+      "next": "{count, plural, one {Nächstes Paket (noch #)} other {Nächstes Paket (noch #)}}",
+      "safe": "Der Slab gehört dir schon. Schließt du das Fenster, wartet das Paket weiter auf dich.",
+      "blackText": "Nur {chance} aller Mint-Karten bekommen das Black Label. Glückwunsch!",
+      "tier": {
+        "low": "Leider keine Top-Note",
+        "good": "Starke Note!",
+        "ten": "Gem Mint: die 10!",
+        "black": "Black Label!!!"
+      }
     },
     "profile": {
       "title": "Collectibles",

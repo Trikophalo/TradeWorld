@@ -1,7 +1,7 @@
 {
   "job": null,
-  "tag": "CXRF",
-  "rank": 150,
+  "tag": "L36K",
+  "rank": 153,
   "level": 6,
   "trust": { "band": "shaky", "kept": 0, "score": 41, "broken": 1 },
   "company": { "name": "Fixture Lieferwerk", "ticker": null },
@@ -11,7 +11,7 @@
   "top_skills": [],
   "accessories": [],
   "streak_days": 0,
-  "member_since": "2026-11-16T18:18:29.151553+00:00",
+  "member_since": "2026-11-16T19:43:57.210949+00:00",
   "branch_scores": {
     "it": 0,
     "law": 0,

@@ -1,26 +1,39 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 117, "gap_cents": 577 }, "rank": 118, "net_worth_cents": 1019423 },
-  "total": 281,
+  "me": { "next": { "name": "Vera", "rank": 116, "gap_cents": 651 }, "rank": 117, "net_worth_cents": 1019349 },
+  "total": 283,
   "entries": [
     {
-      "id": "0e7a3000-0000-4000-8000-0000000000b1",
-      "tag": "6CAP",
+      "id": "0e7a6000-0000-4000-8000-0000000000b1",
+      "tag": "CSBB",
       "kind": "player",
-      "name": "Nx_Bruno",
+      "name": "Bl_Bruno",
       "rank": 1,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 1999745094,
+      "net_worth_cents": 2000994000,
+      "rank_change_24h": null
+    },
+    {
+      "id": "0e7a3000-0000-4000-8000-0000000000b1",
+      "tag": "4K2D",
+      "kind": "player",
+      "name": "Nx_Bruno",
+      "rank": 2,
+      "is_me": false,
+      "avatar_key": "rookie",
+      "description": null,
+      "change_24h_bps": null,
+      "net_worth_cents": 1999745303,
       "rank_change_24h": null
     },
     {
       "id": "0a30a30a-0000-4000-8000-0000000000b1",
-      "tag": "255D",
+      "tag": "HUDF",
       "kind": "player",
       "name": "Berta_Klein",
-      "rank": 2,
+      "rank": 3,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
@@ -30,10 +43,10 @@
     },
     {
       "id": "0e170001-0000-4000-8000-0000000001a1",
-      "tag": "R6VC",
+      "tag": "C5C3",
       "kind": "player",
       "name": "Wanda_Wohnt",
-      "rank": 3,
+      "rank": 4,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
@@ -43,30 +56,17 @@
     },
     {
       "id": "0f3f3f3f-0000-4000-8000-0000000000f1",
-      "tag": "53DE",
+      "tag": "KMMW",
       "kind": "player",
       "name": "Fenja_Firma",
-      "rank": 4,
-      "is_me": false,
-      "avatar_key": "rookie",
-      "description": null,
-      "change_24h_bps": null,
-      "net_worth_cents": 127386499,
-      "rank_change_24h": null
-    },
-    {
-      "id": "0a30a30a-0000-4000-8000-0000000000f1",
-      "tag": "2KMR",
-      "kind": "player",
-      "name": "Lisa_Listed",
       "rank": 5,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 118562075,
+      "net_worth_cents": 126738499,
       "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-16T18:18:25.120496+00:00"
+  "server_time": "2026-11-16T19:43:52.83484+00:00"
 }

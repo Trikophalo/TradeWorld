@@ -1,10 +1,22 @@
 {
-  "now": "2026-11-16T18:18:31.665525+00:00",
+  "now": "2026-11-16T19:43:59.504575+00:00",
   "battle": {
     "id": 26,
     "kind": null,
     "seed": null,
-    "prize": { "kind": "money", "cents": 525000 },
+    "prize": {
+      "kind": "skin",
+      "accessories": [
+        "battle_crown",
+        "laurel_wreath",
+        "champion_belt",
+        "victory_cape",
+        "star_shades",
+        "golden_joystick",
+        "winner_trophy",
+        "mini_bull"
+      ]
+    },
     "joined": false,
     "params": null,
     "result": null,
@@ -12,7 +24,7 @@
     "status": "open",
     "ends_at": null,
     "players": [],
-    "opened_at": "2026-11-16T18:18:31.645381+00:00",
+    "opened_at": "2026-11-16T19:43:59.483284+00:00",
     "started_at": null,
     "finished_at": null,
     "max_players": 10,
@@ -74,16 +86,16 @@
           "budget": null,
           "budgets": [0, 1000, 1000],
           "correct": null,
-          "ends_at": "2026-11-16T18:18:02.816092+00:00",
+          "ends_at": "2026-11-16T19:43:29.860353+00:00",
           "options": null,
           "results": [
             { "ms": 2, "slot": 0, "right": true, "value": 400, "points": 300 },
-            { "ms": 1010, "slot": 1, "right": false, "value": 400, "points": 0 }
+            { "ms": 1008, "slot": 1, "right": false, "value": 400, "points": 0 }
           ],
           "decimals": null,
-          "opens_at": "2026-11-16T18:17:49.316092+00:00",
+          "opens_at": "2026-11-16T19:43:16.360353+00:00",
           "question": "Goldbarren",
-          "closes_at": "2026-11-16T18:17:59.316092+00:00",
+          "closes_at": "2026-11-16T19:43:26.360353+00:00",
           "item_points": 300
         },
         {
@@ -96,16 +108,16 @@
           "budget": null,
           "budgets": [0, 1000, 1000],
           "correct": null,
-          "ends_at": "2026-11-16T18:18:16.316092+00:00",
+          "ends_at": "2026-11-16T19:43:43.360353+00:00",
           "options": null,
           "results": [
-            { "ms": 523, "slot": 0, "right": true, "value": 600, "points": 100 },
-            { "ms": 531, "slot": 1, "right": false, "value": 0, "points": 0 }
+            { "ms": 519, "slot": 0, "right": true, "value": 600, "points": 100 },
+            { "ms": 529, "slot": 1, "right": false, "value": 0, "points": 0 }
           ],
           "decimals": null,
-          "opens_at": "2026-11-16T18:18:02.816092+00:00",
+          "opens_at": "2026-11-16T19:43:29.860353+00:00",
           "question": "Gummiente",
-          "closes_at": "2026-11-16T18:18:12.816092+00:00",
+          "closes_at": "2026-11-16T19:43:39.860353+00:00",
           "item_points": 100
         }
       ],
@@ -113,7 +125,7 @@
       "points": [400, 0, 0]
     },
     "status": "finished",
-    "ends_at": "2026-11-16T18:20:49.316092+00:00",
+    "ends_at": "2026-11-16T19:46:16.360353+00:00",
     "players": [
       {
         "me": false,
@@ -143,9 +155,9 @@
         "accessories": []
       }
     ],
-    "opened_at": "2026-11-16T18:18:17.316092+00:00",
-    "started_at": "2026-11-16T18:17:49.316092+00:00",
-    "finished_at": "2026-11-16T18:18:17.355651+00:00",
+    "opened_at": "2026-11-16T19:43:44.360353+00:00",
+    "started_at": "2026-11-16T19:43:16.360353+00:00",
+    "finished_at": "2026-11-16T19:43:44.397723+00:00",
     "max_players": 10,
     "min_players": 3,
     "prize_wins_left": 3,
@@ -153,6 +165,6 @@
   },
   "viewers": 18,
   "per_hour": 1000,
-  "next_round_at": "2026-11-16T19:00:00+00:00",
+  "next_round_at": "2026-11-16T20:00:00+00:00",
   "played_this_hour": 5
 }

@@ -15,7 +15,10 @@ export function formatCardNumber(number: number, total: number = NEXAMON_SET_SIZ
 export const NEXAMON_CONDITIONS = ["poor", "good", "near_mint", "mint"] as const;
 export type NexamonCondition = (typeof NEXAMON_CONDITIONS)[number];
 
-/** Grades of the grading company, 1 (worst) to 10 (best), with the key of their word in the messages. */
+/**
+ * Grades of the grading company, 1 (worst) to 10 (best), with the key of their word in the messages. 11 is the
+ * Black Label, the tier above a 10: its label still says 10.
+ */
 export const GRADE_WORDS = {
   1: "poor",
   2: "good",
@@ -27,17 +30,39 @@ export const GRADE_WORDS = {
   8: "nearMintMint",
   9: "mint",
   10: "gemMint",
+  11: "blackLabel",
 } as const;
 export type NexamonGrade = keyof typeof GRADE_WORDS;
 export type GradeWordKey = (typeof GRADE_WORDS)[NexamonGrade];
 
-/** Any number as a valid grade: rounded and held between 1 and 10. */
+/** Any number as a valid grade: rounded and held between 1 and 10; exactly 11 is the Black Label. */
 export function clampGrade(grade: number): NexamonGrade {
   const whole = Number.isFinite(grade) ? Math.round(grade) : 1;
+  if (whole === 11) return 11;
   return Math.min(10, Math.max(1, whole)) as NexamonGrade;
 }
 
 export const gradeWordKey = (grade: number): GradeWordKey => GRADE_WORDS[clampGrade(grade)];
+
+/** The Black Label: the tier above a 10. */
+export const isBlackLabel = (grade: number | null | undefined): boolean => grade != null && clampGrade(grade) === 11;
+/** The number printed on the label: a Black Label is a 10. */
+export const gradeNumber = (grade: number): number => Math.min(10, clampGrade(grade));
+
+/** How big the moment of a grade is: below 8, 8 and 9, a 10, the Black Label. */
+export type GradeTier = "low" | "good" | "ten" | "black";
+export const gradeTier = (grade: number): GradeTier =>
+  isBlackLabel(grade) ? "black" : grade >= 10 ? "ten" : grade >= 8 ? "good" : "low";
+
+/**
+ * The grade reveal counts up from 1; this is the pause before a step in milliseconds: short at the bottom, longer
+ * and longer towards the top, so the last numbers are the suspense.
+ */
+export function gradeStepPauseMs(step: number): number {
+  const s = Math.min(10, Math.max(1, Math.round(step)));
+  if (s <= 5) return 170 + s * 25;
+  return [420, 560, 780, 1_050, 1_400][s - 6]!;
+}
 
 /** Serial number on the label of a slab: eight digits, zero-padded. */
 export function formatSerial(serial: number | string): string {

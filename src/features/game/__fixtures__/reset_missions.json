@@ -4,19 +4,19 @@
       "kind": "quick",
       "missions": [
         {
-          "id": "6c0e7a6e-3bbe-462e-8acd-50ff7af87353",
-          "xp": 178,
-          "key": "q_trades_3",
-          "title": "Mach 4 Trades",
+          "id": "a61b37ee-e9b2-4fe0-9e68-408e644ae8bb",
+          "xp": 204,
+          "key": "q_sectors_2",
+          "title": "Kaufe Aktien aus 2 Branchen",
           "status": "completed",
-          "target": 4,
-          "progress": 4,
+          "target": 2,
+          "progress": 2,
           "expires_at": null,
-          "description": "Kauf oder Verkauf, egal welches Wertpapier."
+          "description": "Zwei verschiedene Branchen reichen."
         },
         {
-          "id": "b6c7d10c-9d0e-4dd8-82b7-c4ccaecae69f",
-          "xp": 84,
+          "id": "cb123fc3-e9a1-468f-bd22-48d2d6948ef3",
+          "xp": 98,
           "key": "q_buy",
           "title": "Kaufe eine Aktie",
           "status": "completed",
@@ -26,8 +26,8 @@
           "description": "Ein Bruchstück reicht schon."
         },
         {
-          "id": "c9da51a8-bce9-401c-a5ef-25593960a423",
-          "xp": 230,
+          "id": "9cfbac0e-1a92-4b63-a8e9-9fed7742374f",
+          "xp": 210,
           "key": "q_sell_1",
           "title": "Verkaufe eine Position",
           "status": "active",
@@ -43,37 +43,37 @@
       "kind": "daily",
       "missions": [
         {
-          "id": "274affd5-0ba2-465c-a5e4-6f6445d35a01",
-          "xp": 928,
-          "key": "d_sectors",
-          "title": "Kaufe Aktien aus 2 Branchen",
+          "id": "8192fd76-cc25-4d57-b9e3-16a8f3c82f86",
+          "xp": 1204,
+          "key": "d_securities",
+          "title": "Handle 3 verschiedene Wertpapiere",
           "status": "completed",
-          "target": 2,
-          "progress": 2,
+          "target": 3,
+          "progress": 3,
           "expires_at": "2026-11-16T23:00:00+00:00",
-          "description": "Streuen statt alles auf eine Karte."
+          "description": "Jedes Wertpapier zählt einmal."
         },
         {
-          "id": "2951c9ff-0531-4b11-87a6-82a86d11f4a1",
-          "xp": 878,
-          "key": "d_bond",
-          "title": "Kaufe eine Staatsanleihe",
-          "status": "completed",
-          "target": 1,
-          "progress": 1,
+          "id": "ab000e76-fa30-4ddc-a25b-37217bc44e78",
+          "xp": 1396,
+          "key": "d_trades",
+          "title": "Mach 8 Trades",
+          "status": "active",
+          "target": 8,
+          "progress": 0,
           "expires_at": "2026-11-16T23:00:00+00:00",
-          "description": "Rendite ohne Kursrisiko bis zur Fälligkeit."
+          "description": "Jede ausgeführte Order zählt."
         },
         {
-          "id": "11557552-d18f-46aa-a9a3-2bea14693c2f",
-          "xp": 1340,
-          "key": "d_art_bid_1",
-          "title": "Gib ein Gebot auf ein NFT ab",
+          "id": "b8a5d7c5-f386-4e53-bda1-069d9a3c053f",
+          "xp": 1240,
+          "key": "d_check_in",
+          "title": "Hol dir deinen Tagesbonus",
           "status": "active",
           "target": 2,
           "progress": 0,
           "expires_at": "2026-11-16T23:00:00+00:00",
-          "description": "Vielleicht wird es deins."
+          "description": "Und schau, was sich am Markt bewegt."
         }
       ],
       "resets_at": "2026-11-16T23:00:00+00:00"
@@ -82,37 +82,37 @@
       "kind": "weekly",
       "missions": [
         {
-          "id": "1f0c04ca-e748-41cd-847e-3af3d575fe29",
-          "xp": 3738,
-          "key": "w_profiles",
-          "title": "Sieh dir 10 Spielerprofile an",
+          "id": "61a68148-6d27-44d8-9861-7c14e704c67e",
+          "xp": 4606,
+          "key": "w_nft_sell",
+          "title": "Verkauf 3 NFTs",
           "status": "active",
-          "target": 10,
+          "target": 3,
           "progress": 0,
           "expires_at": "2026-11-22T23:00:00+00:00",
-          "description": "Verschiedene Spieler in dieser Woche."
+          "description": "An Spieler oder KI-Sammler, per Auktion, Festpreis oder Angebot."
         },
         {
-          "id": "ac1053f7-a069-4879-b9c4-68d1570276e0",
-          "xp": 6064,
-          "key": "w_securities_10",
-          "title": "Kaufe 10 verschiedene Wertpapiere",
+          "id": "8e5c0acf-aa48-43d0-8cf3-cc64797497cb",
+          "xp": 4818,
+          "key": "w_sells",
+          "title": "Verkaufe diese Woche 16-mal",
           "status": "active",
-          "target": 10,
+          "target": 16,
           "progress": 0,
           "expires_at": "2026-11-22T23:00:00+00:00",
-          "description": "Ein richtig breites Depot."
+          "description": "Teilverkäufe zählen auch."
         },
         {
-          "id": "f861a297-a9b3-4f84-8ad7-7b06a135a5b3",
-          "xp": 4948,
-          "key": "w_trades",
-          "title": "Mach 44 Trades",
+          "id": "ae2a78b0-0c33-4bf4-9d82-788d42c38273",
+          "xp": 6052,
+          "key": "w_all_sectors",
+          "title": "Kaufe Aktien aus allen 5 Branchen",
           "status": "active",
-          "target": 44,
+          "target": 5,
           "progress": 0,
           "expires_at": "2026-11-22T23:00:00+00:00",
-          "description": "Diese Woche."
+          "description": "Tech, Einzelhandel, Energie, Pharma und Logistik."
         }
       ],
       "resets_at": "2026-11-22T23:00:00+00:00"
@@ -121,7 +121,7 @@
       "kind": "milestone",
       "missions": [
         {
-          "id": "0a6f9abf-5398-42a1-b54d-16bf419374ab",
+          "id": "18e0ba2f-b989-4fd0-b6d0-4ad49d3379c9",
           "xp": 2500,
           "key": "m_work_for_player",
           "title": "Arbeite bei einem echten Spieler",
@@ -132,7 +132,7 @@
           "description": "Bewirb dich bei der Firma eines anderen Spielers und fang dort an. Gemeinsam wächst ihr schneller."
         },
         {
-          "id": "c2f0ce9f-fa46-4f49-ab54-22b1c43fed68",
+          "id": "f84b5c25-dda2-427f-9132-2efc3d7acac2",
           "xp": 350,
           "key": "m_first_trade",
           "title": "Dein erster Trade",
@@ -143,7 +143,7 @@
           "description": "Kaufe dein erstes Wertpapier."
         },
         {
-          "id": "645019e2-f8a9-44d2-900f-b5e41094b19b",
+          "id": "6075619f-e951-42d9-9b92-d01022abd395",
           "xp": 524,
           "key": "m_first_profit",
           "title": "Dein erster Gewinn",
@@ -157,8 +157,8 @@
       "resets_at": null
     }
   ],
-  "replaced": 5,
-  "server_time": "2026-11-16T18:18:31.972836+00:00",
+  "replaced": 6,
+  "server_time": "2026-11-16T19:43:59.838365+00:00",
   "next_reset_at": "2026-11-16T23:00:00+00:00",
   "reset_available": false
 }
