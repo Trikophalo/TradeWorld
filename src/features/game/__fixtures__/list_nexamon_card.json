@@ -1,35 +1,35 @@
 {
   "copy": {
-    "id": "a8b29079-f5cc-44f9-8eba-8c6ae68e24f2",
+    "id": "5246c43f-6bbb-4f28-85ff-1f83e64b40d8",
     "grade": null,
     "state": "raw",
-    "serial": 7,
+    "serial": 8,
     "listing": {
-      "id": "e93c0086-ae25-42d6-9a39-ec83b26d5cc9",
-      "listed_at": "2026-11-16T16:58:41.086929+00:00",
-      "price_cents": 300
+      "id": "ab506f05-6874-4b37-afd3-9c061e0d36b5",
+      "listed_at": "2026-11-16T17:57:05.941148+00:00",
+      "price_cents": 210
     },
-    "card_key": "me-013",
-    "condition": "near_mint",
+    "card_key": "me-008",
+    "condition": "good",
     "graded_at": null,
-    "acquired_at": "2026-11-16T16:58:41.070362+00:00",
-    "value_cents": 300,
+    "acquired_at": "2026-11-16T17:57:05.925145+00:00",
+    "value_cents": 210,
     "grading_until": null
   },
   "listing": {
-    "id": "e93c0086-ae25-42d6-9a39-ec83b26d5cc9",
+    "id": "ab506f05-6874-4b37-afd3-9c061e0d36b5",
     "set": "mystic_energy",
     "mine": true,
     "grade": null,
     "rarity": "common",
     "seller": "Fixture_Gmbh",
-    "serial": 7,
-    "copy_id": "a8b29079-f5cc-44f9-8eba-8c6ae68e24f2",
-    "card_key": "me-013",
-    "condition": "near_mint",
-    "listed_at": "2026-11-16T16:58:41.086929+00:00",
+    "serial": 8,
+    "copy_id": "5246c43f-6bbb-4f28-85ff-1f83e64b40d8",
+    "card_key": "me-008",
+    "condition": "good",
+    "listed_at": "2026-11-16T17:57:05.941148+00:00",
     "seller_ai": false,
-    "price_cents": 300,
-    "value_cents": 300
+    "price_cents": 210,
+    "value_cents": 210
   }
 }

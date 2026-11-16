@@ -452,7 +452,7 @@ describe("Nexamon AI and fees (ADR-165)", () => {
     expect(cfg.packSize).toBe(5);
     expect(cfg.sets.mystic_energy).toEqual({ name: "Nexamon: Mystic Energy", packPriceCents: 20_000 });
     expect(cfg.sets.super_apex).toEqual({ name: "Nexamon: Super Apex", packPriceCents: 100_000 });
-    expect(cfg.sets.prismatic_peak).toEqual({ name: "Nexamon: Prismatic Peak", packPriceCents: 500_000 });
+    expect(cfg.sets.prismatic_peak).toEqual({ name: "Nexamon: Prismatic Peak", packPriceCents: 1_000_000 });
     expect(BALANCE.progression.unlocks.find((u) => u.key === "nexamon")?.level).toBe(10);
   });
 });

@@ -200,9 +200,9 @@ select tests.assert(
   and :'locked'::jsonb #>> '{sets,0,key}' = 'mystic_energy' and (:'locked'::jsonb #>> '{sets,0,pack_price_cents}')::bigint = 20000
   and :'locked'::jsonb #>> '{sets,0,name}' = 'Nexamon: Mystic Energy'
   and :'locked'::jsonb #>> '{sets,1,key}' = 'super_apex' and (:'locked'::jsonb #>> '{sets,1,pack_price_cents}')::bigint = 100000
-  and :'locked'::jsonb #>> '{sets,2,key}' = 'prismatic_peak' and (:'locked'::jsonb #>> '{sets,2,pack_price_cents}')::bigint = 500000
+  and :'locked'::jsonb #>> '{sets,2,key}' = 'prismatic_peak' and (:'locked'::jsonb #>> '{sets,2,pack_price_cents}')::bigint = 1000000
   and (:'locked'::jsonb #>> '{sets,0,cards}')::integer = 77 and (:'locked'::jsonb #>> '{collection,copies}')::integer = 0,
-  'get_nexamon(): unlock at level 10, three sets at 200 / 1.000 / 5.000 € with 77 cards and 5 cards per pack');
+  'get_nexamon(): unlock at level 10, three sets at 200 / 1.000 / 10.000 € with 77 cards and 5 cards per pack');
 
 -- =============================================================================
 -- D. Packs: paid to the households, five pulls, populations, idempotent
@@ -221,10 +221,10 @@ select tests.throws_key($$select public.buy_nexamon_pack(null, 'mystic_energy')$
 reset role;
 select tests.assert(
   :'p1b'::jsonb = :'p1'::jsonb
-  and tests.cash(:a) = :cash0::bigint - 500000 and tests.households() = :hh0::bigint + 500000
+  and tests.cash(:a) = :cash0::bigint - 1000000 and tests.households() = :hh0::bigint + 1000000
   and (select count(*) from public.ledger_transactions where idempotency_key = 'nexamon:pack:' || :a || ':' || :rq
          and kind = 'nexamon_pack') = 1
-  and (:'p1'::jsonb ->> 'price_cents')::bigint = 500000 and :'p1'::jsonb ->> 'set' = 'prismatic_peak'
+  and (:'p1'::jsonb ->> 'price_cents')::bigint = 1000000 and :'p1'::jsonb ->> 'set' = 'prismatic_peak'
   and (:'p1'::jsonb ->> 'packs_opened')::integer = 1
   and (select jsonb_agg((x ->> 'slot')::integer) from jsonb_array_elements(:'p1'::jsonb -> 'cards') x) = '[1, 2, 3, 4, 5]'::jsonb
   and not exists (select 1 from jsonb_array_elements(:'p1'::jsonb -> 'cards') x
@@ -242,7 +242,7 @@ select tests.assert(
   and (select count(*) from public.nexamon_copies where owner_id = :a) = 5
   and tests.nx_pop() = :pop0::bigint + 5
   and (select count(*) from public.nexamon_packs where player_id = :a) = 1,
-  'buy_nexamon_pack(): 5.000 € to the households, five pulls in slot order (commons first), every pull raises the '
+  'buy_nexamon_pack(): 10.000 € to the households, five pulls in slot order (commons first), every pull raises the '
   'population, the same request id replays');
 select tests.assert(tests.money_invariant() = 'ok', 'ledger invariant holds after a pack');
 

@@ -15,7 +15,7 @@ export const NEXAMON_RULES = {
   sets: {
     mystic_energy: { name: "Nexamon: Mystic Energy", packPriceCents: 20_000 },
     super_apex: { name: "Nexamon: Super Apex", packPriceCents: 100_000 },
-    prismatic_peak: { name: "Nexamon: Prismatic Peak", packPriceCents: 500_000 },
+    prismatic_peak: { name: "Nexamon: Prismatic Peak", packPriceCents: 1_000_000 },
   },
   packs: {
     /** At most this many packs per player and minute. */
