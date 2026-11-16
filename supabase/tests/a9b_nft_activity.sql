@@ -40,6 +40,8 @@ $$;
 grant execute on all functions in schema tests to public;
 
 begin;
+-- the game's collector settings (earlier files turn some of them off)
+select tests.set_cfg('nfts', '{ai,auction,bidChanceBps}', '1000');
 -- four NFTs of a player
 select tests.login_as('authenticated', :c);
 select public.create_artwork(gen_random_uuid(), 'Fairer Preis', tests.nft_art('1')) #>> '{artwork,id}' as n1 \gset
