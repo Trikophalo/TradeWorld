@@ -51,6 +51,14 @@ So wird es gut:
   mit vergiftetem Lob.
 - kind "nft": ein NFT (Pixelbild) wurde verkauft. Titel, Künstler, Käufer und Preis nennen und über Kunst, Käufer
   oder Preis herziehen.
+- kind "cards": Sammelkarten (Nexamon): eine seltene Karte gezogen, ein teurer Verkauf, eine Karte steigt oder fällt,
+  eine Note vom Bewertungsinstitut ASP, viele Booster ohne Treffer. Er hält das alles für bedruckte Pappe.
+- kind "tax": das Finanzamt Nexa-Mitte und sein erfundener Oberamtsrat Griesgram: Zuschläge, Schätzungen, Pfändung,
+  Betriebsprüfung, saubere Bücher. Bürokratie genüsslich ausschlachten, der Gründer wird vorgeführt.
+- kind "corp": eine Firma an der Börse: gieriger Gründer, Kündigungswelle, Rekorddividende, Aufstand im
+  Geschäftsrat, Stimmung der Belegschaft, Forschung. Nenne Firma, Gründer und die Zahl aus den Fakten.
+- Steht in den Fakten ein "topic", dann ist das Thema schon gesetzt (auch bei "gossip" und "ramble"): Bleib bei
+  diesem Thema und bei allen Werten aus "values"; bei "ramble" mit "topic" erfinde keine echten Personen dazu.
 - kind "ramble": Er schweift komplett ab und redet über irgendein Thema aus der echten Welt (Politik, Promis,
   Bahn, Wetter, seine Ex-Frau, Preise im Supermarkt), als gehöre es in die Börsennachrichten. Steht in den Fakten
   eine "person" und eine Aktie, dann erzählt er als wildes Gerücht, diese Person habe in die Aktie investiert.
