@@ -7649,3 +7649,84 @@ avatar_key, is_me, body, created_at}`.
 - **Fehler:** `chat_unknown` NX157, `chat_read_only` NX158, `chat_not_admin` NX159, `chat_group_full` NX160,
   `chat_group_too_small` NX161, `chat_already_member` NX162.
 - Test `supabase/tests/9y_friend_chats.sql`.
+
+## Nachtrag: Nexamon-Sammelkarten (ADR-165)
+
+Migrationen `20261204005200_nexamon_enum.sql` (Ledger-Arten `nexamon_pack`, `nexamon_sale`, `nexamon_grading`) und
+`20261204005210_nexamon.sql`. Regeln in `game_config.nexamon` (`src/config/nexamon-rules.ts`), Katalog in
+`game_config.nexamon_cards` (`[{key, set, number, rarity, startPriceCents}]`, von `pnpm db:config` aus
+`src/config/nexamon` geschrieben). Formeln in `src/lib/sim/nexamon.ts`, dieselben Regeln in SQL.
+
+Einheiten: Der Marktwert einer Karte ist ein Kurs (`value_e4` = Euro × 10 000), Geld sind Cent. Aus dem Kurs wird
+genau einmal Geld, kaufmännisch „half even“ (`nexamon_copy_value_cents`).
+
+- **`nexamon_cards`** (intern, RLS ohne Policies, keine Rechte für Clients): `card_key` (PK, „me-001“), `set_key`,
+  `number`, `rarity` (`common|rare|ultra|prisma|legendary`), `start_e4` (Katalog), `value_e4` (Marktwert),
+  `population`, `counted_trades`, `day_ref_e4` + `day_ref_on` (erster Wert des Berliner Tages), `moved_at` (null =
+  der Wert folgt noch dem Katalog), `first_pulled_at`, `pressure_at` (letzter Angebot-Nachfrage-Schritt), `seeded`
+  (Startbestand der KI angelegt), `in_catalogue`.
+- **`nexamon_copies`** (intern): `id`, `card_key`, `serial` (Populationsnummer, eindeutig je Karte), `owner_id`
+  **oder** `ai_owner` (Name des KI-Verkäufers), `condition` (`poor|good|near_mint|mint`), `grade` (1 bis 10 oder
+  null), `graded_at`, `grading_until` (bei ASP bis dann), `grading_fee_cents`, `source` (`pack|ai_pack|seed`),
+  `pack_id`, `acquired_at`.
+- **`nexamon_listings`** (intern): offene Angebote, eines je Kopie: `copy_id` (eindeutig), `card_key`, `seller_id`
+  **oder** `seller_ai`, `price_cents`, `created_at`. Verkauft oder zurückgenommen = Zeile weg.
+- **`nexamon_sales`** (intern): `card_key`, `copy_id`, `seller_id|seller_ai`, `buyer_id|buyer_ai`, `price_cents`,
+  `fee_cents`, `condition`, `grade`, `factor_bps`, `kind` (`market` = Angebot gekauft, `ai_buy` = KI-Sammler kauft
+  von einem Spieler, `quick` = Sofortverkauf an die KI), `counted` (hat den Wert bewegt), `value_before_e4`,
+  `value_after_e4`, `at`.
+- **`nexamon_packs`** (intern): Booster der Spieler mit den fünf Zügen (`cards` jsonb), für Zähler und Verlauf.
+- **`nexamon_value_points`** (intern): Wertverlauf, letzter Wert je Stunde mit Änderung (PK `card_key, at`), 60 Tage.
+- **`nexamon_set_state`** (intern): je Set `ai_packs_at` (bis wann die KI-Booster geöffnet sind), `ai_packs_opened`,
+  `player_packs_opened`. **`nexamon_meta`** (intern, eine Zeile): Hash des zuletzt gespiegelten Katalogs.
+- **Lesende RPCs** (alle `authenticated`; außer `get_nexamon` verlangen sie Level 10):
+  - `get_nexamon()` → `{unlocked, unlock_level, pack_size, sets: [{key, name, pack_price_cents, cards, owned_distinct,
+owned_copies, packs_opened, population}], collection: {copies, distinct, value_cents, listed, grading, graded},
+limits: {max_listings, max_grading, packs_per_minute}, server_time}`.
+  - `get_nexamon_collection(p_set default null)` → `{cards: [CARD], copies: [COPY], server_time}`: alle Karten des
+    Katalogs (oder eines Sets) und die eigenen Kopien.
+  - `get_nexamon_card(p_key)` → `{card: CARD, history: [{at, value_cents}] (Startwert, Stundenpunkte, zuletzt jetzt), graded:
+[n1..n10] (bewertete Kopien je Note), listings: [LISTING] (die 30 günstigsten), copies: [COPY], sales: [{at,
+price_cents, condition, grade, kind, seller, buyer}] (die letzten 20), server_time}`.
+  - `get_nexamon_market(p_set, p_rarity, p_sort, p_page, p_seller, p_card_key, p_graded)` → `{listings: [LISTING],
+total, page, page_size, pages, server_time}`; `p_sort` `new|price_asc|price_desc|deal|value|number`, `p_seller`
+    `all|players|ai|mine`, `p_graded` true = nur Slabs.
+- **Schreibende RPCs** (alle mit `request_id`, idempotent):
+  - `buy_nexamon_pack(p_request_id, p_set)` → `{pack_id, set, price_cents, cards: [{slot, copy_id, card_key, rarity,
+condition, is_new, serial, population, value_cents}], packs_opened}`.
+  - `list_nexamon_card(p_request_id, p_copy_id, p_price_cents)` → `{listing: LISTING, copy: COPY}`;
+    `unlist_nexamon_card(p_request_id, p_listing_id)` → `{copy: COPY}`.
+  - `buy_nexamon_listing(p_request_id, p_listing_id, p_price_cents)` → `{copy: COPY, card: CARD, price_cents,
+fee_cents, counted, copy_id, card_key}` (`p_price_cents` = gesehener Preis).
+  - `sell_nexamon_to_ai(p_request_id, p_copy_ids uuid[])` → `{sold: [{copy_id, card_key, price_cents}], count,
+total_cents}`.
+  - `grade_nexamon_card(p_request_id, p_copy_id)` → `{copy: COPY, fee_cents, ready_at}`;
+    `crack_nexamon_slab(p_request_id, p_copy_id)` → `{copy: COPY, old_grade}`.
+  - CARD = `{card_key, set, number, rarity, value_cents, start_cents, change_bps (gegen den Tagesanfang), population,
+listed, owned, popularity_bps, floor_cents, cap_cents}`; COPY = `{id, card_key, serial, condition, grade, state
+(raw|grading|graded), grading_until, graded_at, value_cents, listing: {id, price_cents, listed_at}|null,
+acquired_at}`; LISTING = `{id, copy_id, card_key, set, rarity, serial, condition, grade, price_cents, value_cents,
+seller, seller_ai, mine, listed_at}`. Antworten enthalten Nicknames und KI-Namen, nie Spieler-IDs.
+- **Job** `nexamon_run_due(p_now)` (Cron `nexa-nexamon`, jede Minute): fertige Gradings, KI-Booster, KI-Käufe, der
+  stündliche Wertschritt (`value.pressure.perRun` Karten je Lauf), alte Wertpunkte löschen. `get_nexamon`,
+  `get_nexamon_collection` und `get_nexamon_card` schließen fällige Gradings des Aufrufers selbst ab.
+- **Geld:** Booster und ASP-Gebühr Spieler → Haushalte; Verkauf Käufer → Verkäufer, 5 % Gebühr → Haushalte (Erlös
+  eines KI-Verkäufers ganz → Haushalte); KI-Käufe und Sofortverkauf Haushalte → Spieler; `loan_withhold` auf Erlöse.
+  Die Booster der KI buchen nichts.
+- **Helfer:** `nexamon_cfg`, `nexamon_catalogue`, `nexamon_sync` (Katalog spiegeln, Startbestand), `nexamon_slot_rarity`,
+  `nexamon_roll_condition`, `nexamon_roll_grade`, `nexamon_copy_factor_bps`, `nexamon_copy_value_cents`,
+  `nexamon_ai_ask_cents`, `nexamon_popularity_bps`, `nexamon_demand_milli`, `nexamon_pressure_bps`, `nexamon_bounds`,
+  `nexamon_set_value` (Grenzen, KI-Preise nachziehen, Wertpunkt), `nexamon_mint_copy`, `nexamon_open_pack`,
+  `nexamon_ai_restock`, `nexamon_sell`, `nexamon_pressure_step`, `nexamon_finish_gradings`, `nexamon_own_copy`,
+  `nexamon_unlocked`, `nexamon_require_unlock`, `nexamon_wipe_player` (aus `account_wipe`), `nexamon_*_json`.
+- **Benachrichtigungen** `nexamon_sale`, `nexamon_graded` (Kategorie `social`, Link `/nexamon`); Feed `nexamon_pull`
+  (Payload `card_key, set, rarity, serial, condition`), auch als Klatsch in `news_show_build`.
+- **Missionen:** Metriken `nexamon_pack`, `nexamon_rare` (Rare oder besser), `nexamon_ultra` (Ultra oder besser),
+  `nexamon_sold`, `nexamon_bought`, `nexamon_listed`, `nexamon_graded`, `nexamon_ten`; Vorlagen `d_nexamon_pack`,
+  `w_nexamon_sell`, `m_nexamon_first_pack`, `m_nexamon_packs_10`, `m_nexamon_first_rare`, `m_nexamon_first_ultra`,
+  `m_nexamon_first_sale`, `m_nexamon_first_ten` (alle mit `{"unlock":"nexamon"}`).
+- **Fehler:** `nexamon_locked` NX163, `nexamon_unknown` NX164, `nexamon_not_owner` NX165, `nexamon_listed` NX166,
+  `nexamon_not_listed` NX167, `nexamon_price_changed` NX168, `nexamon_listing_limit` NX169, `nexamon_grading` NX170,
+  `nexamon_not_raw` NX171, `nexamon_not_graded` NX172, `nexamon_not_sellable` NX173, `nexamon_own_listing` NX174,
+  `nexamon_grading_limit` NX175.
+- Test `supabase/tests/9z_nexamon.sql`.

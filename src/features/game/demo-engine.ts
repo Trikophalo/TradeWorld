@@ -38,6 +38,7 @@ import { createRentalsEngine, type DemoRentalsState } from "./demo/rentals";
 import { createFriendEngine, demoFriendCard, type DemoFriend, type DemoFriendCode } from "./demo/friends";
 import { createFriendChatEngine, type DemoChat } from "./demo/friend-chats";
 import { createAccessoryEngine, type DemoWardrobe } from "./demo/accessories";
+import { createNexamonEngine, type DemoNexamonState } from "./demo/nexamon";
 import { demoCoworkerMembers, demoCoworkers, type DemoCoworker } from "./demo/floor";
 import { createStockNewsEngine } from "./demo/stock-news";
 import { createCompanyMovesEngine, type DemoMoveRun } from "./demo/company-moves";
@@ -131,6 +132,8 @@ interface PlayerState {
   friendChats?: DemoChat[];
   /** Bought and worn accessories (ADR-155). */
   wardrobe?: DemoWardrobe;
+  /** Nexamon cards, the AI sellers' stock and the card values (ADR-165). */
+  nexamon?: DemoNexamonState;
   /** Battle wins with a prize today (ADR-160, daily cap). */
   battleWins?: { day: string; count: number };
   /** Feed, notifications and league of the demo (ADR-088, ADR-089). */
@@ -1323,6 +1326,28 @@ const friendChats = createFriendChatEngine({
   persist,
 });
 
+const nexamon = createNexamonEngine({
+  state: () => p().nexamon,
+  setState: (value) => {
+    p().nexamon = value;
+  },
+  level,
+  nickname: () => p().nickname,
+  cashCents: () => p().cashCents,
+  pay: (cents) => {
+    p().cashCents -= cents;
+  },
+  earn: (cents) => {
+    income(cents);
+  },
+  feed: feedPost,
+  notify: (typeKey, title, body, link) => socialRef?.notify(typeKey, title, body, link),
+  track: (metric, by = 1) => bump(metric, by),
+  idempotent,
+  now: () => Date.now(),
+  random: Math.random,
+});
+
 /** Made-up colleagues at the demo player's AI employer (ADR-156); none without a job or with an own company. */
 async function coworkersNow(): Promise<DemoCoworker[]> {
   if (p().company) return [];
@@ -1760,6 +1785,7 @@ export const demoEngine: GameEngine = {
   ...friends,
   ...friendChats,
   ...wardrobe,
+  ...nexamon,
   /** Own card with the worn accessories; the made-up friends and colleagues have one too (ADR-155, ADR-156). */
   async playerCard(nickname) {
     const name = nickname.trim().toLowerCase();

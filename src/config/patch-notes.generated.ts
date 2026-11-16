@@ -383,6 +383,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Chats mit Freunden",
         text: "Unter Freunde → Chats schreibst du Freunden direkt (💬 an ihrer Figur auf dem Platz) oder gründest Gruppen mit bis zu 20 Leuten, mit Emojis…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-6b4c879d",
+        title: "Nexamon-Sammelkarten",
+        text: "Ab Level 10 ziehst du Booster aus drei Sets, lässt Karten bei ASP bewerten und handelst sie an einem Markt, an dem Knappheit und Nachfrage den Wert…",
+      },
     ],
   },
   {

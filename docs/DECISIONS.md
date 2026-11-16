@@ -2850,3 +2850,103 @@ Menge, Image …), acht sinnvolle Punkte, die man mit Mira angehen kann.
   6 Sekunden mit einem kurzen, albernen Satz (`src/config/friend-chat.ts`); in neuen Gruppen meldet sich jemand.
 - Fehler: `chat_unknown` NX157, `chat_read_only` NX158, `chat_not_admin` NX159, `chat_group_full` NX160,
   `chat_group_too_small` NX161, `chat_already_member` NX162; außerdem `not_friends`, `name_*`, `rate_limited`.
+
+## ADR-165: Nexamon – Sammelkarten mit Boostern, Grading und Kartenmarkt — `Annahme`
+
+- **Wunsch:** Sammelkarten wie im echten Leben: Booster ziehen, seltene Karten jagen, bei „ASP“ bewerten lassen und
+  an einem Markt handeln, an dem Knappheit und Nachfrage den Wert bestimmen. Alles mit Spielgeld über das Ledger.
+- **Freischaltung:** Level 10 (`progression.unlocks` Schlüssel `nexamon`, `DISCLOSURE.nexamon`); der Server prüft es
+  bei jeder schreibenden Aktion (`nexamon_locked`).
+- **Katalog:** drei Sets mit je 77 Karten (50 Common, 10 Rare, 10 Ultra Rare, 5 Prisma Illustration Rare,
+  2 Legendary Illustration Rare) in `src/config/nexamon`. `pnpm db:config` schreibt Schlüssel, Set, Nummer,
+  Seltenheit und Startpreis nach `game_config.nexamon_cards`, die Regeln (`src/config/nexamon-rules.ts`) nach
+  `game_config.nexamon`. `nexamon_sync()` legt daraus `nexamon_cards` an und zieht Änderungen nach (idempotent, über
+  einen Hash des Katalogs): Der Startpreis folgt immer dem Katalog, der Marktwert nur, solange er sich noch nie
+  bewegt hat.
+- **Booster:** „Nexamon: Mystic Energy“ 200 €, „Nexamon: Super Apex“ 1.000 €, „Nexamon: Prismatic Peak“ 5.000 €,
+  je 5 Karten. Das Geld geht an die Haushalte (wie Accessoires), aus deren Topf auch die KI-Sammler zahlen.
+  Höchstens 20 Booster je Spieler und Minute.
+- **Ziehungsraten (exakt, Nenner 3600):** Platz 1 bis 3 immer Common. Platz 4 würfelt Ultra 150/3600 (1/24),
+  Rare 900/3600 (1/4), sonst Common (2550/3600). Platz 5 würfelt Legendary 4/3600 (1/900), Prisma 45/3600 (1/80),
+  Ultra 150/3600 (1/24), Rare 900/3600 (1/4), sonst Common (2501/3600). Im Erwartungswert je Booster also Rare 1/2,
+  Ultra 1/12, Prisma 1/80, Legendary 1/900 und 3 bis 5 Commons, immer vorn. Innerhalb einer Seltenheit ist jede
+  Karte des Sets gleich wahrscheinlich; die Commons eines Boosters sind verschieden. Liegt in Platz 4 etwas
+  Besseres als in Platz 5, bleibt es so (Platz 5 ist der „Hit-Platz“, nicht sortiert).
+- **Population:** Jede gezogene Karte (Spieler, KI, Startbestand der KI) erhöht die Population ihrer Karte um 1;
+  jede Kopie trägt ihre Nummer („#17“). Die Population jeder Karte ist für alle sichtbar.
+- **Zustand** jeder Kopie: Poor 2 %, Good 18 %, Near Mint 50 %, Mint 30 %. Ab Good ist die Kopie den Marktwert wert,
+  jede Stufe unter Good kostet 5 % (Poor: 95 %). Es bleibt bei den vier genannten Stufen.
+- **Marktwert:** einer je Karte (nicht je Kopie), geführt als Kurs (`value_e4` = Euro × 10 000), damit auch
+  Karten für 1 € sich in kleinen Schritten bewegen. Wert einer Kopie in Cent = Marktwert × Zustandsfaktor, im Slab
+  Marktwert × Notenfaktor; hier wird einmal gerundet (kaufmännisch „half even“). Der Marktwert bewegt sich auf zwei
+  Wegen:
+  1. **Verkäufe.** Ein Verkauf zählt nur, wenn sein Preis je Karte (Preis ÷ Zustands- oder Notenfaktor) höchstens
+     25 % vom Marktwert entfernt ist. Dann wandert der Wert 20 % des Weges zum Preis, höchstens 2 % je Verkauf.
+     Aufwärts wird mit der Beliebtheit der Karte skaliert (mindestens 25 %). Kauft ein KI-Sammler das Angebot eines
+     Spielers (nur bis zum Marktwert), steigt der Wert um 0,5 % × Beliebtheit. Der Sofortverkauf an die KI senkt ihn
+     um 0,25 % je Kopie.
+  2. **Angebot gegen Nachfrage**, einmal je Stunde und Karte: Nachfrage (Kopien) = Wunschmenge × (popRef +
+     Startbestand) ÷ (popRef + Population) + 0,5 × Käufe der letzten 7 Tage (höchstens 10). Angebot = Kopien, die zu
+     einem plausiblen Preis (höchstens Wert + 25 %) angeboten werden. Druck = (Nachfrage − Angebot) ÷ Wunschmenge,
+     zwischen −1 und +1. Der Wert steigt um Druck × 0,3 % × Beliebtheit oder fällt um Druck × 0,3 %. Die
+     Wunschmenge ist das, was die KI zu Beginn anbietet (Common 4, Rare 3, Ultra 2, Prisma 1, Legendary 1): Eine
+     neue Karte steht still. Wer die angebotenen Kopien aufkauft und hortet, verknappt das Angebot und treibt den
+     Wert, aber spürbar nur bei beliebten Karten; wer viele Kopien einstellt, drückt ihn.
+  - **Beliebtheit** (0 bis 100 %) = Seltenheit (Common 5 %, Rare 15 %, Ultra 40 %, Prisma 70 %, Legendary 90 %) +
+    30 % × popRef ÷ (popRef + Population), mit popRef 2000 / 800 / 150 / 30 / 4. Seltene Karten mit kleiner
+    Population sind am beliebtesten.
+  - **Grenzen:** nie unter 20 % des Startpreises, nie über Startpreis × (3 + 0,02 je Tag seit dem ersten Zug +
+    0,005 je gezähltem Verkauf), höchstens ×20. Je Berliner Tag höchstens +15 % und −20 % gegenüber dem ersten Wert
+    des Tages.
+- **Gegen Manipulation:** Absurde Angebote zählen weder als Angebot (über Wert + 25 %) noch als Verkauf (außerhalb
+  des Bandes); die KI kauft sie nie. Zwischen denselben zwei Spielern zählt je Karte nur ein Verkauf in 24 Stunden,
+  je Käufer und Karte höchstens 3 am Tag. Zwei Freunde können den Wert so höchstens um 2 % am Tag schieben und
+  zahlen dafür jedes Mal 5 % Gebühr; dazu kommen Tagesgrenze und Deckel. Wer die erste Legendary zieht
+  (Population 1), sieht den Wert langsam steigen (höchstens bis zum Deckel), bis die KI nachzieht.
+- **KI-Verkäufer** (Karten-Kalle, Booster-Berta, Holo-Hanna, Sammel-Sven): besitzen zum Start je Karte 6 Commons,
+  4 Rares, 2 Ultras, je Set nur von den zwei günstigsten Prismas eine Kopie und **keine** Legendary. Sie bieten je
+  Karte höchstens 4 / 3 / 2 / 1 / 0 Kopien gleichzeitig an, immer zu Wert der Kopie + 10 % (die Preise folgen dem
+  Marktwert); der Rest wartet im Bestand. Die KI öffnet selbst Booster (Mystic Energy 4, Super Apex 2, Prismatic
+  Peak 1 je Stunde, ohne Buchung, weil Haushalte an Haushalte zahlen würden); ihre Karten erhöhen die Population und
+  gehen in ihren Bestand. Legendarys behält sie; je Stunde und Karte geht mit 0,2 % eine davon in den Verkauf.
+- **KI-Sammler kaufen** Angebote von Spielern nur bis zum Wert der Kopie (Slabs bis 70 % des Slab-Werts), mit 3 %
+  × (1 + Beliebtheit) je Minute, höchstens 2 / 3 / 3 / 2 / 1 Kopien je Karte in 7 Tagen und je Set und Tag höchstens
+  für 300 Booster-Preise. Bezahlt wird aus dem Haushaltstopf; die Kopie geht in den KI-Bestand.
+- **Sofortverkauf:** Rohe Commons und Rares gehen auf Wunsch sofort für 50 % ihres Werts an die KI (bis zu 50
+  Kopien je Aufruf), damit niemand hundert Massenkarten einzeln einstellen muss. Bessere Karten gehen über den Markt.
+- **Markt:** einzelne Kopien zum frei gewählten Preis (0,10 € bis 1 Mrd. €), höchstens 30 offene Angebote und 30
+  Ein-/Ausstellungen je Minute. Der Verkäufer zahlt 5 % Gebühr an die Haushalte; der Erlös eines KI-Verkäufers geht
+  ganz dorthin. Kaufen prüft den gesehenen Preis (`nexamon_price_changed`).
+- **Grading bei ASP:** kostet 50 % des aktuellen Werts der Kopie (mindestens 1 €, an die Haushalte) und dauert eine
+  Stunde Echtzeit; höchstens 10 Kopien gleichzeitig. Die Note 1 bis 10 wird am Ende gewürfelt. Verteilung in
+  Basispunkten (Note 1 bis 10): Poor 500/1000/1500/2000/2000/1500/1000/400/90/10, Good
+  0/0/0/500/800/1200/2000/2500/2000/1000, Near Mint 0/0/0/0/0/100/400/1000/2500/6000, Mint
+  0/0/0/0/0/0/0/200/800/9000. Eine 10 gibt es also bei Good zu 10 %, Near Mint zu 60 %, Mint zu 90 %, Poor zu 0,1 %
+  (der Eigentümer schrieb zweimal „Near Mint 90 %“; das zweite meint Mint). Notenfaktoren: 1 bis 10 =
+  0,3 / 0,4 / 0,5 / 0,6 / 0,7 / 0,8 / 0,9 / 1,2 / 1,6 / 3. Mit 8 bis 10 ist die Karte immer mehr wert als
+  vorher, darunter weniger. Slabs werden mit ihrer Note gehandelt; es bleibt bei einem Marktwert je Karte.
+  **Slab aufbrechen** gibt die rohe Karte mit ihrem Zustand zurück, ohne Erstattung; sie darf erneut zu ASP.
+- **Tabellen** (alle intern, RLS ohne Policies): `nexamon_cards`, `nexamon_copies`, `nexamon_listings`,
+  `nexamon_sales`, `nexamon_packs`, `nexamon_value_points`, `nexamon_set_state`, `nexamon_meta`.
+- **RPCs:** `get_nexamon`, `buy_nexamon_pack`, `get_nexamon_collection`, `get_nexamon_card`, `get_nexamon_market`,
+  `list_nexamon_card`, `unlist_nexamon_card`, `buy_nexamon_listing`, `sell_nexamon_to_ai`, `grade_nexamon_card`,
+  `crack_nexamon_slab`; Job `nexamon_run_due()` jede Minute (fertige Gradings, KI-Booster, KI-Käufe, KI-Angebote,
+  Wertlauf). Fertige Gradings werden auch beim Lesen des Spielers abgeschlossen, damit die Stunde ohne Cron stimmt.
+- **Drumherum:** Benachrichtigungen `nexamon_sale` und `nexamon_graded`, Feed `nexamon_pull` für eine Legendary (auch
+  als Klatsch in den NEXA Nachrichten), Missionen (erster Booster, 10 Booster, erste Rare, erste Ultra, erster
+  Verkauf, erste 10). Konto zurücksetzen: Angebote enden, laufende Gradings verfallen, die Kopien gehen an die KI
+  (die Population bleibt wahr).
+- **Demo:** dieselben Regeln aus `src/lib/sim/nexamon.ts` (`src/features/game/demo/nexamon.ts`), mit einem
+  Spieler und den KI-Verkäufern. Zeit vergeht beim Benutzen: fällige Gradings, KI-Booster, KI-Käufe und der
+  stündliche Wertschritt werden bei jedem Aufruf nachgeholt. Der KI-Bestand ist dort auf 12 Kopien je Karte
+  begrenzt (die Population zählt trotzdem jeden Zug), und die KI bietet in der Demo nie eine Legendary an.
+- **KI und Slabs:** Kauft die KI einen Slab, liegt er in ihrem Bestand und kommt wie jede andere Kopie wieder in
+  den Verkauf, sobald ein Angebotsplatz der Karte frei ist (dann zum Slab-Wert + 10 %).
+- Fehler: `nexamon_locked` NX163, `nexamon_unknown` NX164, `nexamon_not_owner` NX165, `nexamon_listed` NX166,
+  `nexamon_not_listed` NX167, `nexamon_price_changed` NX168, `nexamon_listing_limit` NX169, `nexamon_grading`
+  NX170, `nexamon_not_raw` NX171, `nexamon_not_graded` NX172, `nexamon_not_sellable` NX173, `nexamon_own_listing`
+  NX174, `nexamon_grading_limit` NX175; außerdem
+  `insufficient_funds`, `rate_limited`, `invalid_argument`.
+- **Offen (Balancing):** Die Startpreise machen Booster im Erwartungswert teurer oder billiger als ihren Inhalt, je
+  nach Katalog; gebremst wird über die begrenzte KI-Nachfrage und fallende Werte bei wachsendem Angebot. KI-Budget,
+  Booster-Takt der KI und Notenfaktoren sind die Stellschrauben.

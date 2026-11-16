@@ -17,6 +17,7 @@ import { ACCESSORY_ART } from "@/components/pixel/accessories";
 import { BATTLE_ICONS } from "@/components/pixel/battle-art";
 import { accessoryByKey } from "@/config/accessories";
 import { CARS } from "@/config/furniture";
+import { nexamonCard } from "@/config/nexamon";
 import { useGameErrorText } from "@/features/game/errors";
 import { engine } from "@/features/game/store";
 import type { FeedItem } from "@/features/game/types";
@@ -132,6 +133,8 @@ function useFeedText() {
         return t("accessory_bought", { name: accessoryByKey(str(p.key))?.name ?? str(p.name) });
       case "battle_won":
         return t("battle_won", { game: str(p.game) });
+      case "nexamon_pull":
+        return t("nexamon_pull", { name: nexamonCard(str(p.card_key))?.name ?? str(p.card_key), serial: n(p.serial) });
       default:
         return t("other");
     }

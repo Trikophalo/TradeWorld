@@ -7,6 +7,7 @@ import { PROTEST_RULES } from "./protests.ts";
 import { NFT_RULES } from "./nfts.ts";
 import { ACCESSORY_RULES } from "./accessories.ts";
 import { BATTLE_RULES } from "./battles.ts";
+import { NEXAMON_RULES } from "./nexamon-rules.ts";
 import { CRYPTO, type CryptoConfig } from "./crypto.ts";
 import { DEALS, TRUST, type DealsConfig, type TrustConfig } from "./deals.ts";
 import { SKILL_NODES, type SkillBranch, type SkillNodeConfig } from "./skills.ts";
@@ -886,6 +887,8 @@ export interface BalanceConfig {
   readonly accessories: typeof ACCESSORY_RULES;
   /** News battles: mini-games among the viewers of the news (ADR-160), values in battles.ts. */
   readonly battles: typeof BATTLE_RULES;
+  /** Nexamon collectible cards: packs, grading, card market (ADR-165), values in nexamon-rules.ts. */
+  readonly nexamon: typeof NEXAMON_RULES;
   /** Mira, the company assistant (ADR-138). */
   readonly companyAssistant: {
     readonly claudePerHour: number;
@@ -2176,6 +2179,7 @@ export const BALANCE = {
       { level: 9, key: "ipo" },
       { level: 10, key: "found_small_business" },
       { level: 10, key: "crypto" },
+      { level: 10, key: "nexamon" },
       { level: 12, key: "leverage_2x" },
       { level: 12, key: "senior_jobs" },
       { level: 14, key: "crypto_create" },
@@ -2596,6 +2600,7 @@ export const BALANCE = {
   nfts: NFT_RULES,
   accessories: ACCESSORY_RULES,
   battles: BATTLE_RULES,
+  nexamon: NEXAMON_RULES,
   /** Mira, the company assistant (ADR-138): Claude answers per player and hour, length of a message. */
   companyAssistant: {
     claudePerHour: 20,

@@ -429,6 +429,7 @@
     "property": "Grundstück: eigene Wohnung kaufen und einrichten",
     "deals": "Deals: Kredite, Lieferverträge und Teilhaber unter Spielern",
     "crypto": "Kryptowährungen handeln",
+    "nexamon": "Nexamon: Sammelkarten ziehen, bewerten lassen und handeln",
     "crypto_create": "Eigene Kryptowährung entwickeln"
   },
   "auth": {
@@ -824,7 +825,20 @@
     "chat_not_admin": "Das darf nur der Admin der Gruppe.",
     "chat_group_full": "Die Gruppe ist voll.",
     "chat_group_too_small": "Wähle mindestens einen Freund für die Gruppe.",
-    "chat_already_member": "Ist schon in der Gruppe."
+    "chat_already_member": "Ist schon in der Gruppe.",
+    "nexamon_locked": "Nexamon-Karten gibt es ab Level 10.",
+    "nexamon_unknown": "Diese Karte oder dieses Set gibt es nicht.",
+    "nexamon_not_owner": "Diese Karte gehört dir nicht.",
+    "nexamon_listed": "Die Karte steht gerade am Markt. Nimm sie erst zurück.",
+    "nexamon_not_listed": "Dieses Angebot gibt es nicht mehr.",
+    "nexamon_price_changed": "Der Preis hat sich gerade geändert. Schau noch einmal hin.",
+    "nexamon_listing_limit": "Du hast schon zu viele Karten am Markt. Nimm erst eine zurück.",
+    "nexamon_grading": "Die Karte ist gerade bei ASP.",
+    "nexamon_not_raw": "Die Karte steckt schon in einem Slab.",
+    "nexamon_not_graded": "Diese Karte hat keinen Slab.",
+    "nexamon_not_sellable": "Sofort verkaufen geht nur mit rohen Commons und Rares.",
+    "nexamon_own_listing": "Das ist dein eigenes Angebot.",
+    "nexamon_grading_limit": "ASP hat schon genug Karten von dir. Warte, bis eine zurück ist."
   },
   "locks": {
     "level": "Level {level}",
@@ -3077,6 +3091,7 @@
         "rug_pull": "hat bei {name} ({ticker}) die Team-Coins abgestoßen. Rug Pull!",
         "coin_closed": "hat den Coin {name} ({ticker}) eingestellt.",
         "accessory_bought": "trägt jetzt etwas Legendäres: {name}.",
+        "nexamon_pull": "hat eine legendäre Nexamon-Karte gezogen: {name} (Nummer {serial}).",
         "home_rented": "wohnt jetzt in einer {home} bei {owner}.",
         "battle_won": "hat das News-Battle „{game}“ gewonnen 🏆"
       }

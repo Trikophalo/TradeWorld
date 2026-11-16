@@ -1,0 +1,115 @@
+{
+  "card": {
+    "set": "mystic_energy",
+    "owned": 1,
+    "listed": 4,
+    "number": 13,
+    "rarity": "common",
+    "card_key": "me-013",
+    "cap_cents": 902,
+    "change_bps": 0,
+    "population": 7,
+    "floor_cents": 60,
+    "start_cents": 300,
+    "value_cents": 300,
+    "popularity_bps": 3489
+  },
+  "sales": [
+    {
+      "at": "2026-11-16T16:58:41.117937+00:00",
+      "kind": "market",
+      "buyer": "Fixture_Heim",
+      "grade": null,
+      "seller": "Fixture_Gmbh",
+      "condition": "near_mint",
+      "price_cents": 300
+    }
+  ],
+  "copies": [
+    {
+      "id": "a8b29079-f5cc-44f9-8eba-8c6ae68e24f2",
+      "grade": null,
+      "state": "raw",
+      "serial": 7,
+      "listing": null,
+      "card_key": "me-013",
+      "condition": "near_mint",
+      "graded_at": null,
+      "acquired_at": "2026-11-16T16:58:41.117937+00:00",
+      "value_cents": 300,
+      "grading_until": null
+    }
+  ],
+  "graded": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  "history": [
+    { "at": "2026-11-16T16:00:00+00:00", "value_cents": 300 },
+    { "at": "2026-11-16T16:58:41.12674+00:00", "value_cents": 300 }
+  ],
+  "listings": [
+    {
+      "id": "0ccfe8a8-577e-4de8-81c1-2c3d77d3a89e",
+      "set": "mystic_energy",
+      "mine": false,
+      "grade": null,
+      "rarity": "common",
+      "seller": "Holo-Hanna",
+      "serial": 1,
+      "copy_id": "0e4ee6b9-251c-47f1-8495-f12148e2b569",
+      "card_key": "me-013",
+      "condition": "mint",
+      "listed_at": "2026-11-16T16:58:32.192665+00:00",
+      "seller_ai": true,
+      "price_cents": 330,
+      "value_cents": 300
+    },
+    {
+      "id": "35778e9d-7c29-4ded-9d61-40581449604c",
+      "set": "mystic_energy",
+      "mine": false,
+      "grade": null,
+      "rarity": "common",
+      "seller": "Sammel-Sven",
+      "serial": 2,
+      "copy_id": "f50d78b0-d41b-4c92-b402-ed408ab2ab0b",
+      "card_key": "me-013",
+      "condition": "mint",
+      "listed_at": "2026-11-16T16:58:32.192665+00:00",
+      "seller_ai": true,
+      "price_cents": 330,
+      "value_cents": 300
+    },
+    {
+      "id": "59c5fa19-b592-42a4-b5cb-721e2807e65b",
+      "set": "mystic_energy",
+      "mine": false,
+      "grade": null,
+      "rarity": "common",
+      "seller": "Booster-Berta",
+      "serial": 4,
+      "copy_id": "2b8f438b-b455-4c6f-a846-9d0af8ced489",
+      "card_key": "me-013",
+      "condition": "near_mint",
+      "listed_at": "2026-11-16T16:58:32.192665+00:00",
+      "seller_ai": true,
+      "price_cents": 330,
+      "value_cents": 300
+    },
+    {
+      "id": "ccbd5b59-9bae-456d-bdbd-d003399a9f13",
+      "set": "mystic_energy",
+      "mine": false,
+      "grade": null,
+      "rarity": "common",
+      "seller": "Karten-Kalle",
+      "serial": 3,
+      "copy_id": "01f9fd16-993d-4444-bab8-83b214488e4f",
+      "card_key": "me-013",
+      "condition": "near_mint",
+      "listed_at": "2026-11-16T16:58:32.192665+00:00",
+      "seller_ai": true,
+      "price_cents": 330,
+      "value_cents": 300
+    }
+  ],
+  "server_time": "2026-11-16T16:58:41.12674+00:00"
+}

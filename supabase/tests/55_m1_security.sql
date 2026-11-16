@@ -84,7 +84,11 @@ select tests.assert(
           || array['get_battle', 'battle_join', 'battle_leave', 'battle_sync', 'battle_answer']
           -- chats with friends (9y)
           || array['get_chats', 'get_chat', 'mark_chat_read', 'open_direct_chat', 'create_group_chat', 'post_chat_message',
-                   'add_group_member', 'remove_group_member', 'leave_group', 'rename_group']) x),
+                   'add_group_member', 'remove_group_member', 'leave_group', 'rename_group']
+          -- Nexamon collectible cards (9z)
+          || array['get_nexamon', 'get_nexamon_collection', 'get_nexamon_card', 'get_nexamon_market', 'buy_nexamon_pack',
+                   'list_nexamon_card', 'unlist_nexamon_card', 'buy_nexamon_listing', 'sell_nexamon_to_ai',
+                   'grade_nexamon_card', 'crack_nexamon_slab']) x),
   'authenticated can execute exactly the 9 helpers and the RPCs up to the market popularity (9g)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace

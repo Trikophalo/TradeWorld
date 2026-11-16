@@ -148,7 +148,11 @@ select tests.assert(
            'get_battle', 'battle_join', 'battle_leave', 'battle_sync', 'battle_answer',
            -- chats with friends (ADR-164)
            'get_chats', 'get_chat', 'mark_chat_read', 'open_direct_chat', 'create_group_chat', 'post_chat_message',
-           'add_group_member', 'remove_group_member', 'leave_group', 'rename_group']
+           'add_group_member', 'remove_group_member', 'leave_group', 'rename_group',
+           -- Nexamon collectible cards (ADR-165)
+           'get_nexamon', 'get_nexamon_collection', 'get_nexamon_card', 'get_nexamon_market', 'buy_nexamon_pack',
+           'list_nexamon_card', 'unlist_nexamon_card', 'buy_nexamon_listing', 'sell_nexamon_to_ai', 'grade_nexamon_card',
+           'crack_nexamon_slab']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')
@@ -193,6 +197,8 @@ select tests.assert(
       'rental_offers', 'rental_tenancies', 'rental_payments',
       'battles', 'battle_players', 'battle_answers',
       'friend_chats', 'friend_chat_members', 'friend_chat_messages',
+      'nexamon_cards', 'nexamon_copies', 'nexamon_listings', 'nexamon_sales', 'nexamon_packs', 'nexamon_value_points',
+      'nexamon_set_state', 'nexamon_meta',
       'rate_limits', 'player_requests', 'player_login_events', 'push_deliveries', 'invite_code_redemptions',
       'price_ticks_default']) as t
      -- (a table from a later migration is not there yet on an older database)

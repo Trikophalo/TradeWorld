@@ -1,0 +1,17 @@
+{
+  "copy": {
+    "id": "0d4402b2-2b4a-4e8f-ab54-ecbe7527ef61",
+    "grade": null,
+    "state": "grading",
+    "serial": 8,
+    "listing": null,
+    "card_key": "me-041",
+    "condition": "near_mint",
+    "graded_at": null,
+    "acquired_at": "2026-11-16T16:58:41.070362+00:00",
+    "value_cents": 800,
+    "grading_until": "2026-11-16T17:58:41.096658+00:00"
+  },
+  "ready_at": "2026-11-16T17:58:41.096658+00:00",
+  "fee_cents": 400
+}

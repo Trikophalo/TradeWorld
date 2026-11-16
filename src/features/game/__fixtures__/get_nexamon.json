@@ -1,0 +1,40 @@
+{
+  "sets": [
+    {
+      "key": "mystic_energy",
+      "name": "Nexamon: Mystic Energy",
+      "cards": 77,
+      "population": 421,
+      "owned_copies": 10,
+      "packs_opened": 2,
+      "owned_distinct": 10,
+      "pack_price_cents": 20000
+    },
+    {
+      "key": "super_apex",
+      "name": "Nexamon: Super Apex",
+      "cards": 77,
+      "population": 367,
+      "owned_copies": 0,
+      "packs_opened": 0,
+      "owned_distinct": 0,
+      "pack_price_cents": 100000
+    },
+    {
+      "key": "prismatic_peak",
+      "name": "Nexamon: Prismatic Peak",
+      "cards": 77,
+      "population": 367,
+      "owned_copies": 0,
+      "packs_opened": 0,
+      "owned_distinct": 0,
+      "pack_price_cents": 500000
+    }
+  ],
+  "limits": { "max_grading": 10, "max_listings": 30, "packs_per_minute": 20 },
+  "unlocked": true,
+  "pack_size": 5,
+  "collection": { "copies": 10, "graded": 0, "listed": 0, "grading": 0, "distinct": 10, "value_cents": 5800 },
+  "server_time": "2026-11-16T16:58:41.081676+00:00",
+  "unlock_level": 10
+}
