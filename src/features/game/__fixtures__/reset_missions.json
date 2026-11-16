@@ -4,37 +4,37 @@
       "kind": "quick",
       "missions": [
         {
-          "id": "a61b37ee-e9b2-4fe0-9e68-408e644ae8bb",
-          "xp": 204,
-          "key": "q_sectors_2",
-          "title": "Kaufe Aktien aus 2 Branchen",
-          "status": "completed",
-          "target": 2,
-          "progress": 2,
-          "expires_at": null,
-          "description": "Zwei verschiedene Branchen reichen."
-        },
-        {
-          "id": "cb123fc3-e9a1-468f-bd22-48d2d6948ef3",
-          "xp": 98,
-          "key": "q_buy",
-          "title": "Kaufe eine Aktie",
+          "id": "582ecf04-c5a7-413e-a5b3-dae7d1f804f7",
+          "xp": 84,
+          "key": "q_trade",
+          "title": "Mach einen Trade",
           "status": "completed",
           "target": 1,
           "progress": 1,
           "expires_at": null,
-          "description": "Ein Bruchstück reicht schon."
+          "description": "Kaufe oder verkaufe ein beliebiges Wertpapier."
         },
         {
-          "id": "9cfbac0e-1a92-4b63-a8e9-9fed7742374f",
-          "xp": 210,
-          "key": "q_sell_1",
-          "title": "Verkaufe eine Position",
+          "id": "52710ec0-4a80-4d6c-98c2-5327083d6350",
+          "xp": 156,
+          "key": "q_buy",
+          "title": "Kaufe eine Aktie",
           "status": "active",
           "target": 1,
           "progress": 0,
           "expires_at": null,
-          "description": "Gewinne sichern oder Verluste begrenzen."
+          "description": "Ein Bruchstück reicht schon."
+        },
+        {
+          "id": "69ed26a0-fad1-43be-98c5-efca389fd3b9",
+          "xp": 224,
+          "key": "q_buy_logistics",
+          "title": "Kaufe eine Logistik-Aktie",
+          "status": "active",
+          "target": 1,
+          "progress": 0,
+          "expires_at": null,
+          "description": "Pakete, Lager, Schiffe."
         }
       ],
       "resets_at": null
@@ -43,76 +43,76 @@
       "kind": "daily",
       "missions": [
         {
-          "id": "8192fd76-cc25-4d57-b9e3-16a8f3c82f86",
-          "xp": 1204,
-          "key": "d_securities",
-          "title": "Handle 3 verschiedene Wertpapiere",
-          "status": "completed",
-          "target": 3,
-          "progress": 3,
-          "expires_at": "2026-11-16T23:00:00+00:00",
-          "description": "Jedes Wertpapier zählt einmal."
+          "id": "355edfe3-6464-461f-92b8-6decce397186",
+          "xp": 1340,
+          "key": "d_friend_chat",
+          "title": "Schreib 6 Nachrichten an Freunde",
+          "status": "active",
+          "target": 6,
+          "progress": 0,
+          "expires_at": "2026-11-17T23:00:00+00:00",
+          "description": "Tratsch über Kurse zählt auch."
         },
         {
-          "id": "ab000e76-fa30-4ddc-a25b-37217bc44e78",
-          "xp": 1396,
-          "key": "d_trades",
-          "title": "Mach 8 Trades",
+          "id": "0884a0f9-f47e-44e1-9822-e26203c38889",
+          "xp": 1674,
+          "key": "d_buy_value",
+          "title": "Kaufe für mindestens 1.900 €",
           "status": "active",
-          "target": 8,
+          "target": 190000,
           "progress": 0,
-          "expires_at": "2026-11-16T23:00:00+00:00",
+          "expires_at": "2026-11-17T23:00:00+00:00",
+          "description": "In einer einzigen Order."
+        },
+        {
+          "id": "49ce935a-756b-4b11-8a95-55e274047b64",
+          "xp": 2208,
+          "key": "d_trades_10",
+          "title": "Mach heute 12 Trades",
+          "status": "active",
+          "target": 12,
+          "progress": 0,
+          "expires_at": "2026-11-17T23:00:00+00:00",
           "description": "Jede ausgeführte Order zählt."
-        },
-        {
-          "id": "b8a5d7c5-f386-4e53-bda1-069d9a3c053f",
-          "xp": 1240,
-          "key": "d_check_in",
-          "title": "Hol dir deinen Tagesbonus",
-          "status": "active",
-          "target": 2,
-          "progress": 0,
-          "expires_at": "2026-11-16T23:00:00+00:00",
-          "description": "Und schau, was sich am Markt bewegt."
         }
       ],
-      "resets_at": "2026-11-16T23:00:00+00:00"
+      "resets_at": "2026-11-17T23:00:00+00:00"
     },
     {
       "kind": "weekly",
       "missions": [
         {
-          "id": "61a68148-6d27-44d8-9861-7c14e704c67e",
-          "xp": 4606,
-          "key": "w_nft_sell",
-          "title": "Verkauf 3 NFTs",
-          "status": "active",
-          "target": 3,
-          "progress": 0,
-          "expires_at": "2026-11-22T23:00:00+00:00",
-          "description": "An Spieler oder KI-Sammler, per Auktion, Festpreis oder Angebot."
-        },
-        {
-          "id": "8e5c0acf-aa48-43d0-8cf3-cc64797497cb",
-          "xp": 4818,
-          "key": "w_sells",
-          "title": "Verkaufe diese Woche 16-mal",
-          "status": "active",
-          "target": 16,
-          "progress": 0,
-          "expires_at": "2026-11-22T23:00:00+00:00",
-          "description": "Teilverkäufe zählen auch."
-        },
-        {
-          "id": "ae2a78b0-0c33-4bf4-9d82-788d42c38273",
-          "xp": 6052,
-          "key": "w_all_sectors",
-          "title": "Kaufe Aktien aus allen 5 Branchen",
+          "id": "782db9c9-a9f2-4ef7-812b-5906941ff9f8",
+          "xp": 5772,
+          "key": "w_days",
+          "title": "Handle an 5 verschiedenen Tagen",
           "status": "active",
           "target": 5,
           "progress": 0,
           "expires_at": "2026-11-22T23:00:00+00:00",
-          "description": "Tech, Einzelhandel, Energie, Pharma und Logistik."
+          "description": "Mindestens ein Trade pro Tag."
+        },
+        {
+          "id": "78a8d540-c72f-487d-aad2-984e9a9641ef",
+          "xp": 4284,
+          "key": "w_vault_10",
+          "title": "Leere deinen Tresor 19-mal",
+          "status": "active",
+          "target": 19,
+          "progress": 0,
+          "expires_at": "2026-11-22T23:00:00+00:00",
+          "description": "Regelmäßig abholen."
+        },
+        {
+          "id": "b4f3f445-6844-42fc-a30d-c0e21abd99de",
+          "xp": 4110,
+          "key": "w_vault",
+          "title": "Leere deinen Tresor 16-mal",
+          "status": "active",
+          "target": 16,
+          "progress": 0,
+          "expires_at": "2026-11-22T23:00:00+00:00",
+          "description": "Diese Woche."
         }
       ],
       "resets_at": "2026-11-22T23:00:00+00:00"
@@ -121,7 +121,7 @@
       "kind": "milestone",
       "missions": [
         {
-          "id": "18e0ba2f-b989-4fd0-b6d0-4ad49d3379c9",
+          "id": "90a144bf-e023-451e-8a33-2a1d36fe909c",
           "xp": 2500,
           "key": "m_work_for_player",
           "title": "Arbeite bei einem echten Spieler",
@@ -132,7 +132,7 @@
           "description": "Bewirb dich bei der Firma eines anderen Spielers und fang dort an. Gemeinsam wächst ihr schneller."
         },
         {
-          "id": "f84b5c25-dda2-427f-9132-2efc3d7acac2",
+          "id": "66fa9fc5-f327-4914-b469-f0a1f52dafba",
           "xp": 350,
           "key": "m_first_trade",
           "title": "Dein erster Trade",
@@ -143,7 +143,7 @@
           "description": "Kaufe dein erstes Wertpapier."
         },
         {
-          "id": "6075619f-e951-42d9-9b92-d01022abd395",
+          "id": "7a213349-f8e0-44dd-938e-0a2524d6c97a",
           "xp": 524,
           "key": "m_first_profit",
           "title": "Dein erster Gewinn",
@@ -157,8 +157,8 @@
       "resets_at": null
     }
   ],
-  "replaced": 6,
-  "server_time": "2026-11-16T19:43:59.838365+00:00",
-  "next_reset_at": "2026-11-16T23:00:00+00:00",
+  "replaced": 8,
+  "server_time": "2026-11-16T23:55:09.772459+00:00",
+  "next_reset_at": "2026-11-17T23:00:00+00:00",
   "reset_available": false
 }

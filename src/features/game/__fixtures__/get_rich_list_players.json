@@ -1,13 +1,39 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 116, "gap_cents": 651 }, "rank": 117, "net_worth_cents": 1019349 },
-  "total": 283,
+  "me": { "next": { "name": "Vera", "rank": 124, "gap_cents": 578 }, "rank": 125, "net_worth_cents": 1019422 },
+  "total": 298,
   "entries": [
     {
+      "id": "0e7a7000-0000-4000-8000-0000000000a1",
+      "tag": "4JD9",
+      "kind": "player",
+      "name": "Hg_Anna",
+      "rank": 1,
+      "is_me": false,
+      "avatar_key": "rookie",
+      "description": null,
+      "change_24h_bps": null,
+      "net_worth_cents": 2001020579,
+      "rank_change_24h": null
+    },
+    {
+      "id": "0e7a7000-0000-4000-8000-0000000000b1",
+      "tag": "P856",
+      "kind": "player",
+      "name": "Hg_Bruno",
+      "rank": 2,
+      "is_me": false,
+      "avatar_key": "rookie",
+      "description": null,
+      "change_24h_bps": null,
+      "net_worth_cents": 2001000000,
+      "rank_change_24h": null
+    },
+    {
       "id": "0e7a6000-0000-4000-8000-0000000000b1",
-      "tag": "CSBB",
+      "tag": "HVZH",
       "kind": "player",
       "name": "Bl_Bruno",
-      "rank": 1,
+      "rank": 3,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
@@ -17,10 +43,10 @@
     },
     {
       "id": "0e7a3000-0000-4000-8000-0000000000b1",
-      "tag": "4K2D",
+      "tag": "SU4W",
       "kind": "player",
       "name": "Nx_Bruno",
-      "rank": 2,
+      "rank": 4,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
@@ -29,44 +55,18 @@
       "rank_change_24h": null
     },
     {
-      "id": "0a30a30a-0000-4000-8000-0000000000b1",
-      "tag": "HUDF",
+      "id": "0b2b2b2b-0000-4000-8000-0000000000b1",
+      "tag": "S8KS",
       "kind": "player",
-      "name": "Berta_Klein",
-      "rank": 3,
-      "is_me": false,
-      "avatar_key": "rookie",
-      "description": null,
-      "change_24h_bps": null,
-      "net_worth_cents": 900652000,
-      "rank_change_24h": null
-    },
-    {
-      "id": "0e170001-0000-4000-8000-0000000001a1",
-      "tag": "C5C3",
-      "kind": "player",
-      "name": "Wanda_Wohnt",
-      "rank": 4,
-      "is_me": false,
-      "avatar_key": "rookie",
-      "description": null,
-      "change_24h_bps": null,
-      "net_worth_cents": 195619170,
-      "rank_change_24h": null
-    },
-    {
-      "id": "0f3f3f3f-0000-4000-8000-0000000000f1",
-      "tag": "KMMW",
-      "kind": "player",
-      "name": "Fenja_Firma",
+      "name": "Pb_Bruno",
       "rank": 5,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 126738499,
+      "net_worth_cents": 950960000,
       "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-16T19:43:52.83484+00:00"
+  "server_time": "2026-11-16T23:55:04.237297+00:00"
 }

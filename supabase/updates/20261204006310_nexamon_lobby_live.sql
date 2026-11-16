@@ -336,7 +336,7 @@ begin
   return public.nexamon_live_row_json(l, v_player, v_now) || jsonb_build_object(
     'progress', v_n,
     'cards', case when l.kind = 'pack'
-                  then coalesce((select jsonb_agg(jsonb_build_object('slot', x ->> 'slot', 'card_key', x ->> 'card_key',
+                  then coalesce((select jsonb_agg(jsonb_build_object('slot', (x ->> 'slot')::integer, 'card_key', x ->> 'card_key',
                                                                      'rarity', x ->> 'rarity', 'condition', x ->> 'condition',
                                                                      'serial', (x ->> 'serial')::bigint,
                                                                      'value_cents', (x ->> 'value_cents')::bigint)

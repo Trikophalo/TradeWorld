@@ -8,6 +8,7 @@
  */
 import type { BattleEngine } from "./battle-types";
 import type { NexamonEngine } from "./nexamon-types";
+import type { PackBattleEngine } from "./pack-battle-types";
 import type { ListedEngine } from "./listed-types";
 import type { SectorKey } from "@/components/pixel/art";
 import type { FloorMaterial, PropertyTier } from "@/config/balance";
@@ -2167,6 +2168,17 @@ export const GAME_ERROR_KEYS = [
   "nexamon_not_sellable",
   "nexamon_own_listing",
   "nexamon_grading_limit",
+  "nexamon_battle_unknown",
+  "nexamon_battle_not_friend",
+  "nexamon_battle_not_here",
+  "nexamon_battle_busy",
+  "nexamon_battle_limit",
+  "nexamon_battle_cooldown",
+  "nexamon_battle_closed",
+  "nexamon_battle_self",
+  "nexamon_battle_opponent_locked",
+  "nexamon_live_unknown",
+  "nexamon_battle_not_yours",
   "not_listed",
   "item_unknown",
   "item_locked",
@@ -2252,7 +2264,7 @@ export interface NewsShowState {
   chat: NewsShowChatMessage[];
 }
 
-export interface GameEngine extends BattleEngine, NexamonEngine, ListedEngine {
+export interface GameEngine extends BattleEngine, NexamonEngine, PackBattleEngine, ListedEngine {
   newsShow(): Promise<NewsShowState>;
   postNewsShowMessage(requestId: string, body: string): Promise<NewsShowChatMessage[]>;
   /** Finn's tours the player has seen (kept on the server, so a private window does not repeat them). */

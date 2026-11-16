@@ -1,8 +1,8 @@
 {
-  "now": "2026-11-16T19:43:59.325941+00:00",
+  "now": "2026-11-16T23:55:09.344392+00:00",
   "chat": [
     {
-      "at": "2026-11-16T19:43:59.321642+00:00",
+      "at": "2026-11-16T23:55:09.338476+00:00",
       "id": 223,
       "bot": false,
       "body": "Was für eine Sendung 💀📉",
@@ -11,105 +11,113 @@
     }
   ],
   "show": {
-    "id": 7,
+    "id": 11,
     "writer": "mini",
-    "airs_at": "2026-11-16T19:00:00+00:00",
+    "airs_at": "2026-11-16T23:00:00+00:00",
     "segments": [
       {
-        "kind": "loser",
-        "mood": "smug",
-        "text": "82.960 € futsch, 7,7 % Minus: Esc_Frida schreibt heute Börsengeschichte, leider die falsche. Selbst der Tresor hat sich aus Scham kurz geschlossen. Das Trostpflaster kommt per Eilbote.",
-        "figure": { "nickname": "Esc_Frida", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "gain", "label": "+500 € Trostpflaster" }],
-        "headline": "Wo ist das Geld von Esc_Frida?"
-      },
-      {
         "kind": "gossip",
-        "mood": "proud",
-        "text": "Bitte festhalten: Level 5 erreicht, und zwar bei Fixture_Anleger. Auch ein blindes Huhn findet mal ein Korn, aber immerhin.",
-        "figure": { "nickname": "Fixture_Anleger", "avatar_key": "rookie", "accessories": [] },
-        "effects": [],
-        "headline": "Applaus für Fixture_Anleger"
-      },
-      {
-        "kind": "hype",
-        "mood": "laughing",
-        "text": "Unfassbar, aber wahr: Bodenständig ist der Renner. Sogar die Steuerprüfung kam privat vorbei, um einzukaufen. „Teppiche für Büros“ geht weg wie warme Semmeln. Floor_Frida soll vor Freude geweint haben.",
-        "figure": { "nickname": "Floor_Frida", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "gain", "label": "Bekanntheit +19,1 %" }],
-        "headline": "Alle wollen Bodenständig"
-      },
-      {
-        "kind": "nft",
-        "mood": "laughing",
-        "text": "Kunstmarkt, oder was man dafür hält: „Neon Nacht“ von Nina_Neon ging für 30.000 € an Ben_Bieter. Wer das kauft, kauft auch Luft in Dosen.",
-        "figure": { "nickname": "Nina_Neon", "avatar_key": "rookie", "accessories": [] },
-        "effects": [],
-        "headline": "30.000 € für ein paar Pixel"
-      },
-      {
-        "kind": "winner",
         "mood": "shocked",
-        "text": "11376,8 % Plus, 1.137.684 € Gewinn: Fixture_Neu zeigt dem Rest, wie es geht. Der Rest schaut zu und heult leise ins Depot.",
-        "figure": { "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] },
+        "text": "Bitte festhalten: Level 5 erreicht, und zwar bei Kampa_Bert. Genieß es, nächste Woche lachen wir wieder über dich.",
+        "figure": { "nickname": "Kampa_Bert", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Fixture_Neu schwimmt im Geld"
+        "headline": "Applaus für Kampa_Bert"
       },
       {
-        "kind": "gossip",
-        "mood": "proud",
-        "text": "Ich fasse es nicht, aber es stimmt. Xp_Profi meldet: Level 20 erreicht. Meine Schwiegermutter hat es vorausgesagt, und die liegt sonst immer falsch.",
-        "figure": { "nickname": "Xp_Profi", "avatar_key": "rookie", "accessories": [] },
+        "kind": "cards",
+        "mood": "shocked",
+        "text": "Am Kartenmarkt dreht Irrwisch durch: plus 90 %, jetzt 171 €. Angeblich hat ein Sammler geniest, und der Markt hat es als Kaufsignal gedeutet.",
         "effects": [],
-        "headline": "Na so was: Xp_Profi"
+        "headline": "Alle wollen Irrwisch"
       },
       {
         "kind": "scandal",
         "mood": "angry",
-        "text": "Bei Gegenwind Energie brennt die Hütte. Auf dem Firmenparkplatz wurde ein illegales Bobbycar-Rennen ausgehoben. Fritz_Gegenwind spricht von einem Missverständnis. Zur Erinnerung, das Geschäftsmodell lautet: „Ideen für alle“.",
-        "figure": { "nickname": "Fritz_Gegenwind", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −17 %" }],
-        "headline": "Gegenwind Energie: Chef Fritz_Gegenwind unter Beschuss"
+        "text": "Peinlich für Alma_Auszahlung: Im Lager wurde ein Praktikant gefunden, der seit drei Wochen vermisst war. Er hatte niemandem gefehlt. „Kabel für alle“ klang auf dem Papier besser. Das Image von Auszahl Werk ist im Eimer.",
+        "figure": { "nickname": "Alma_Auszahlung", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −19,9 %" }],
+        "headline": "Kunden fliehen vor Auszahl Werk"
+      },
+      {
+        "kind": "nft",
+        "mood": "shocked",
+        "text": "Aus der Welt der bunten Kästchen: Vera Vermeer hat sich „Abendrot über der Börse“ von einem Unbekannten für 9.876.543 € gegönnt. Immerhin kann man es nicht fallen lassen.",
+        "effects": [],
+        "headline": "„Abendrot über der Börse“ wechselt den Besitzer"
+      },
+      {
+        "kind": "tax",
+        "mood": "shocked",
+        "text": "Keine Bücher, kein Problem: Oberamtsrat Griesgram hat den Gewinn von Listwerk einfach geschätzt. Lisa_Listed darf zahlen und staunen. Griesgram soll dabei gesummt haben. Das Lied ist nicht bekannt, es klang nach Moll.",
+        "figure": { "nickname": "Lisa_Listed", "avatar_key": "rookie", "accessories": [] },
+        "effects": [],
+        "headline": "Griesgram würfelt die Steuer von Listwerk"
+      },
+      {
+        "kind": "winner",
+        "mood": "proud",
+        "text": "Und nun zu jemandem, der es kann: Fixture_Neu hat heute 1.137.653 € gemacht, 11376,5 % im Plus. Insider vermuten eine Glaskugel im Keller.",
+        "figure": { "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] },
+        "effects": [],
+        "headline": "Fixture_Neu sahnt ab: plus 1.137.653 €"
+      },
+      {
+        "kind": "gossip",
+        "mood": "laughing",
+        "text": "Liebes Tagebuch, schreibt Klatsch_Pech heute vermutlich: Rug Pull bei Mondcoin. Die Verwandtschaft tut ab heute so, als kenne sie dich nicht. Wir legen etwas Schmerzensgeld bei.",
+        "figure": { "nickname": "Klatsch_Pech", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "gain", "label": "+100 € Schmerzensgeld" }],
+        "headline": "Das Tagebuch von Klatsch_Pech"
+      },
+      {
+        "kind": "gossip",
+        "mood": "laughing",
+        "text": "Wählerisch: Topic_Dirk tauscht die Missionen 3-mal aus, bis endlich etwas Bequemes dabei ist. Das ist kein Spielen mehr, das ist Speisekartenlesen ohne Bestellung.",
+        "figure": {
+          "nickname": "Topic_Dirk",
+          "avatar_key": "rookie",
+          "accessories": ["beanie", "paper_crown", "party_hat", "traffic_cone"]
+        },
+        "effects": [],
+        "headline": "Topic_Dirk sucht die leichteste Mission"
+      },
+      {
+        "kind": "scandal",
+        "mood": "angry",
+        "text": "Berts Bude wollte heute groß rauskommen. Auf dem Firmenparkplatz wurde ein illegales Bobbycar-Rennen ausgehoben. Bert_Bruch erklärte, das gehöre zum Konzept. Die Kundschaft erklärte, sie sei dann mal weg.",
+        "figure": { "nickname": "Bert_Bruch", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −18 %" }],
+        "headline": "Berts Bude blamiert sich bis auf die Knochen"
       },
       {
         "kind": "ramble",
-        "mood": "smug",
-        "text": "Völlig anderes Thema: Thomas Gottschalk soll das Sparschwein geschlachtet und alles in Talwerk gesteckt haben. Die Info stammt aus einer Gruppe, in die ich versehentlich eingeladen wurde. Der Kurs macht 4,2 % nach oben.",
-        "effects": [{ "tone": "gain", "label": "TAL +4,2 %" }],
-        "headline": "Thomas Gottschalk steigt bei Talwerk ein"
+        "mood": "shocked",
+        "text": "Völlig anderes Thema: Robert Habeck soll das Sparschwein geschlachtet und alles in Wackelwerk gesteckt haben. Ich habe es auf einer Raststätte gehört, zwischen Kaffee und Reue. Der Kurs macht 4,3 % nach oben.",
+        "effects": [{ "tone": "gain", "label": "WAC +4,3 %" }],
+        "headline": "Robert Habeck steigt bei Wackelwerk ein"
       },
       {
-        "kind": "tasks",
-        "mood": "proud",
-        "text": "Die Leute haben gemerkt, dass Sparen keinen Spaß macht. Offene Aufgaben bringen 33,5 % mehr. Wer jetzt Pause macht, ist selbst schuld.",
-        "effects": [{ "tone": "gain", "label": "Aufgaben +33,5 %" }],
-        "headline": "Kunden zahlen jeden Preis"
+        "kind": "sector",
+        "mood": "angry",
+        "text": "Schlechte Nachrichten für Pharma: Ein Minister hat die Branche versehentlich mit etwas Verbotenem verwechselt. Die Kurse geben um 5,3 % nach.",
+        "effects": [{ "tone": "loss", "label": "Pharma −5,3 %" }],
+        "headline": "Katerstimmung in Pharma"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Volta Energie AG geht bald nach unten. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
-        "effects": [{ "tone": "neutral", "label": "VLT ↓ Tipp" }],
-        "headline": "Der heiße Draht: Volta Energie AG"
+        "text": "Ein Vögelchen hat mir gezwitschert: Fundgrube Discount dürfte in der kommenden Stunde nach unten gehen. Meine Quelle ist seriös, sie trägt immerhin eine Krawatte.",
+        "effects": [{ "tone": "neutral", "label": "FGD ↓ Tipp" }],
+        "headline": "Vom Flurfunk: Fundgrube Discount"
       }
     ],
-    "started_at": "2026-11-16T19:43:59.325941+00:00"
+    "started_at": "2026-11-16T23:55:09.344392+00:00"
   },
-  "viewers": 18,
+  "viewers": 2,
   "audience": [
     { "me": true, "friend": false, "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Anna", "avatar_key": "rookie", "accessories": ["laurel_wreath"] },
-    { "me": false, "friend": false, "nickname": "Bat_Bruno", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Clara", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Crowd1", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Crowd10", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Crowd11", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Crowd2", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Crowd3", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Crowd4", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Crowd5", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Crowd6", "avatar_key": "rookie", "accessories": [] }
+    { "me": false, "friend": false, "nickname": "Bg_Clara", "avatar_key": "rookie", "accessories": [] }
   ],
   "upcoming": null,
-  "next_airs_at": "2026-11-16T20:00:00+00:00"
+  "next_airs_at": "2026-11-17T00:00:00+00:00"
 }

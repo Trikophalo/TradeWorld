@@ -33,6 +33,8 @@ export const DISCLOSURE = {
   livingBonus: 8,
   /** Nexamon collectible cards (ADR-165): with the unlock "nexamon" (level 10). */
   nexamon: 10,
+  /** Pack Battles and live openings on the Collectibles tab (ADR-172): with the Nexamon unlock. */
+  nexamonLive: 10,
   /**
    * Listed player companies (ADR-167): the tabs Buchhaltung and Geschäftsrat (locked, with a teaser) and what going
    * public brings appear for founders of a private company once the IPO is in reach (startups.ipo.minLevel).

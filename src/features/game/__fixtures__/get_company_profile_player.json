@@ -3,31 +3,31 @@
   "facts": {
     "staff": 1,
     "stage": 0,
-    "period": null,
-    "product": "security_software",
+    "period": "quarter",
+    "product": "courier",
     "max_staff": 2,
     "ai_workers": 0,
-    "quality_bps": null,
-    "value_cents": 20253797,
-    "profit_cents": null,
-    "awareness_bps": null,
-    "revenue_cents": null
+    "quality_bps": 2325,
+    "value_cents": 295009,
+    "profit_cents": -14991,
+    "awareness_bps": 355,
+    "revenue_cents": 219104
   },
   "company": {
-    "id": "1d88a41f-5e98-4e8d-ba38-5f605b29e4b7",
-    "idea": "Teile auf Abruf",
+    "id": "91071a04-ae79-46d5-86d2-381f61a55458",
+    "idea": "Fahrräder reparieren",
     "logo": null,
-    "name": "Sven Teile",
+    "name": "Gero Werkstatt",
     "tier": "garage",
     "is_ai": false,
     "listed": false,
-    "sector": "tech",
+    "sector": "logistics",
     "ticker": null,
     "price_e4": null,
     "change_bps": null,
-    "founded_at": "2026-11-16T19:43:25.399665+00:00",
-    "brand_color": "#335577"
+    "founded_at": "2026-11-16T23:54:17.684567+00:00",
+    "brand_color": "#aa5500"
   },
-  "founder": { "tag": "VMRP", "nickname": "Sven_Liefert", "avatar_key": "rookie" },
+  "founder": { "tag": "HE6D", "nickname": "Gero_Garage", "avatar_key": "rookie" },
   "members": []
 }

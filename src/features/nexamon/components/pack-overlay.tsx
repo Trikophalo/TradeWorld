@@ -25,6 +25,7 @@ import { ConditionBadge, RarityBadge } from "./badges";
 import { CardThumb } from "./card-face";
 import { TiltPack } from "./pack";
 import { PackOpening } from "./pack-opening";
+import { LiveWatchers } from "../live/live-watchers";
 
 export interface PackOverlayProps {
   /** The set whose pack is on the table; null closes the popup. */
@@ -70,6 +71,9 @@ export function PackOverlay({
   );
   const done = pack !== null && doneId === pack.packId;
   const skipped = pack !== null && skippedId === pack.packId;
+  // how many cards of this pack showed: spectators follow it (ADR-172)
+  const [revealed, setRevealed] = useState<{ id: string; n: number } | null>(null);
+  const shownCount = !pack ? 0 : done || skipped ? cards.length : revealed?.id === pack.packId ? revealed.n : 0;
   const finish = () => {
     if (!pack || done) return;
     setDoneId(pack.packId);
@@ -119,6 +123,7 @@ export function PackOverlay({
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              <LiveWatchers packId={pack?.packId ?? null} revealed={shownCount} />
               {stage === "opening" && pack && (
                 <Button
                   variant="ghost"
@@ -168,6 +173,7 @@ export function PackOverlay({
                       cards={cards}
                       scale={desktop ? 4 : 3}
                       onComplete={finish}
+                      onReveal={(_, index) => setRevealed({ id: pack.packId, n: index + 1 })}
                       className="max-w-3xl"
                     >
                       <Summary pack={pack}>

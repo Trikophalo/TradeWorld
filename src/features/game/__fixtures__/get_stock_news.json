@@ -2,42 +2,42 @@
   "items": [
     {
       "id": 5,
-      "body": "Ein Gericht gibt dem Konkurrenten recht. Lizenzzahlungen drohen. Sicher ist das nicht.",
-      "name": "Nordbrise Offshore",
-      "due_at": "2026-11-16T20:59:11.30925+00:00",
+      "body": "Ein wichtiger Zulieferer fällt aus. Die Produktion stockt. Sicher ist das nicht.",
+      "name": "Rheinkraft Werke",
+      "due_at": "2026-11-17T01:33:23.258136+00:00",
       "status": "open",
-      "ticker": "WND",
-      "headline": "Nordbrise Offshore verliert Patentstreit",
+      "ticker": "RKW",
+      "headline": "Lieferkette reißt bei Rheinkraft Werke",
       "move_bps": null,
-      "strength": 2,
+      "strength": 1,
       "direction": "down",
-      "published_at": "2026-11-16T20:43:58.682407+00:00"
+      "published_at": "2026-11-17T00:55:08.643182+00:00"
     },
     {
       "id": 4,
-      "body": "Ein Vögelchen hat mir gezwitschert: Wackelwerk dürfte in der kommenden Stunde nach unten gehen. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
-      "name": "Wackelwerk",
-      "due_at": "2026-11-16T20:20:34.536351+00:00",
-      "status": "confirmed",
-      "ticker": "WAC",
-      "headline": "Vom Flurfunk: Wackelwerk",
-      "move_bps": -1036,
+      "body": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Glanz & Gloria geht bald nach oben. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
+      "name": "Glanz & Gloria",
+      "due_at": "2026-11-17T00:32:43.801833+00:00",
+      "status": "fizzled",
+      "ticker": "LUX",
+      "headline": "Der heiße Draht: Glanz & Gloria",
+      "move_bps": null,
       "strength": 2,
-      "direction": "down",
-      "published_at": "2026-11-16T19:43:34.536351+00:00"
+      "direction": "up",
+      "published_at": "2026-11-16T23:54:43.801833+00:00"
     },
     {
       "id": 3,
-      "body": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Eilbote Express geht bald nach oben. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
-      "name": "Eilbote Express",
-      "due_at": "2026-11-16T19:43:33.394428+00:00",
-      "status": "confirmed",
-      "ticker": "EBX",
-      "headline": "Der heiße Draht: Eilbote Express",
-      "move_bps": 518,
+      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Talwerk tut sich in der nächsten Stunde etwas, und zwar nach oben. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
+      "name": "Talwerk",
+      "due_at": "2026-11-16T23:54:42.796178+00:00",
+      "status": "fizzled",
+      "ticker": "TAL",
+      "headline": "Mr. Doodle Dangles Geheimtipp",
+      "move_bps": null,
       "strength": 2,
       "direction": "up",
-      "published_at": "2026-11-16T19:43:33.394428+00:00"
+      "published_at": "2026-11-16T23:54:42.796178+00:00"
     }
   ],
   "reliability_bps": 7500

@@ -377,6 +377,8 @@
     "soundHint": "Kurze 8-Bit-Töne bei Aktionen",
     "haptics": "Vibration",
     "hapticsHint": "Haptisches Feedback auf dem Handy",
+    "watchable": "Andere dürfen beim Öffnen zuschauen",
+    "watchableHint": "Deine Nexamon-Packs erscheinen live für Zuschauer",
     "account": "Konto",
     "signIn": "Anmelden",
     "signOut": "Abmelden",
@@ -870,6 +872,17 @@
     "nexamon_not_sellable": "Sofort verkaufen geht nur mit rohen Commons und Rares.",
     "nexamon_own_listing": "Das ist dein eigenes Angebot.",
     "nexamon_grading_limit": "ASP hat schon genug Karten von dir. Warte, bis eine zurück ist.",
+    "nexamon_battle_unknown": "Dieses Pack Battle gibt es nicht (mehr).",
+    "nexamon_battle_not_friend": "Pack Battles gehen nur mit Freunden.",
+    "nexamon_battle_not_here": "Dein Freund ist gerade nicht im Collectibles-Tab.",
+    "nexamon_battle_busy": "Einer von euch steckt schon in einem Pack Battle.",
+    "nexamon_battle_limit": "Für diese Stunde sind genug Pack Battles gelaufen. Gleich wieder!",
+    "nexamon_battle_cooldown": "Kurz durchatmen: die nächste Herausforderung geht gleich.",
+    "nexamon_battle_closed": "Diese Herausforderung ist schon vorbei.",
+    "nexamon_battle_self": "Gegen dich selbst battlen geht nicht.",
+    "nexamon_battle_opponent_locked": "Dein Freund hat Nexamon noch nicht freigeschaltet.",
+    "nexamon_live_unknown": "Dieses Live-Öffnen ist schon vorbei.",
+    "nexamon_battle_not_yours": "Darauf kann nur der andere Spieler antworten.",
     "not_listed": "Das geht erst, wenn deine Firma an der Börse ist.",
     "item_unknown": "Das gibt es nicht (mehr).",
     "item_locked": "Dafür fehlt noch eine Voraussetzung.",
@@ -3159,6 +3172,8 @@
         "coin_closed": "hat den Coin {name} ({ticker}) eingestellt.",
         "accessory_bought": "trägt jetzt etwas Legendäres: {name}.",
         "nexamon_pull": "hat eine legendäre Nexamon-Karte gezogen: {name} (Nummer {serial}).",
+        "nexamon_battle_won": "hat ein Pack Battle gegen {other} gewonnen und Karten für {value} abgeräumt.",
+        "nexamon_battle_big": "hat im Pack Battle gegen {other} groß abgeräumt: Karten für {value}.",
         "nexamon_black_label": "hat bei ASP ein Black Label geholt: {name} (Nummer {serial}).",
         "home_rented": "wohnt jetzt in einer {home} bei {owner}.",
         "battle_won": "hat das News-Battle „{game}“ gewonnen 🏆",
@@ -9233,6 +9248,88 @@
       "totalCosts": "Lohnkosten gesamt",
       "totalNet": "Bleibt",
       "hint": "Ein Monat sind hier {days} Tage. Leistung: Umsatz der letzten 24 Stunden × {days}, aufgeteilt nach dem Anteil an der Produktivität des Teams. Kosten: Spieler bekommen höchstens {hours} bezahlte Stunden am Tag, KI-Kräfte jede Betriebsstunde. Wareneinsatz und Fixkosten sind nicht abgezogen."
+    }
+  },
+  "nexamonLive": {
+    "viewers": "{count, plural, one {# schaut zu} other {# schauen zu}}",
+    "liveViewers": "{count, plural, =0 {Live} other {Live · # Zuschauer}}",
+    "close": "Schließen",
+    "you": "(du)",
+    "level": "Level {level}",
+    "react": "Reagieren",
+    "sets": {
+      "mystic_energy": "Mystic Energy",
+      "super_apex": "Super Apex",
+      "prismatic_peak": "Prismatic Peak"
+    },
+    "battle": {
+      "title": "Pack Battle",
+      "stakes": "{set} · je ein Pack für {price}",
+      "status": {
+        "pending": "Wartet auf Antwort",
+        "declined": "Abgelehnt",
+        "expired": "Abgelaufen: niemand hat bezahlt",
+        "cancelled": "Zurückgezogen",
+        "aborted": "Abgebrochen: niemand hat bezahlt"
+      },
+      "vs": "VS",
+      "winnerIs": "{name} gewinnt!",
+      "youWin": "Du gewinnst alles!",
+      "youLose": "Knapp daneben: diesmal nichts.",
+      "takes": "{count} Karten im Wert von {value} gehen an den Gewinner.",
+      "tieBreak": {
+        "rarest": "Gleicher Wert: die seltenste Karte hat entschieden.",
+        "coin": "Gleicher Wert, gleich selten: der Münzwurf hat entschieden."
+      },
+      "done": "Fertig",
+      "winner": "Gewinner",
+      "slots": "Gezogene Karten"
+    },
+    "spectate": {
+      "title": "{name} öffnet live",
+      "loading": "Live-Öffnen",
+      "over": "Vorbei",
+      "waiting": "Das Pack geht gleich auf …",
+      "sofar": "{count, plural, one {# Karte} other {# Karten}} · {value}"
+    },
+    "lobby": {
+      "title": "Gerade im Collectibles-Tab",
+      "liveLabel": "{count, plural, =0 {Niemand öffnet gerade live} one {# Live-Öffnen läuft} other {# Live-Öffnen laufen}}",
+      "live": "{count, plural, =0 {Live} other {Live · #}}",
+      "empty": "Gerade ist keiner deiner Freunde hier. Sobald jemand den Tab öffnet, steht er auf dem Platz.",
+      "label": "{count, plural, one {# Freund im Tab} other {# Freunde im Tab}}",
+      "rejoin": "Zurück zum laufenden Pack Battle",
+      "opening": "öffnet gerade",
+      "battling": "im Battle",
+      "figureLabel": "{name}: Karte öffnen",
+      "challenge": "Pack Battle herausfordern",
+      "profile": "Zum Profil"
+    },
+    "challenge": {
+      "title": "Pack Battle gegen {name}",
+      "text": "Ihr zahlt beide ein Pack vom gleichen Set. Wer mehr Wert zieht, bekommt alle zehn Karten.",
+      "error": "Herausforderung ging nicht raus",
+      "send": "Herausfordern · {price}",
+      "setLabel": "Set wählen",
+      "each": "je {price}",
+      "rules": "Dein Freund hat {seconds} Sekunden Zeit. Bezahlt wird erst, wenn er annimmt. Bei Gleichstand zählt die seltenste Karte, dann ein Münzwurf.",
+      "short": "Dafür reicht dein Geld gerade nicht.",
+      "full": "Mehr als {count} Pack Battles pro Stunde gehen nicht."
+    },
+    "pending": {
+      "incoming": "{name} fordert dich heraus: {set}, je {price}.",
+      "outgoing": "Warte auf {name} …",
+      "error": "Das ging nicht",
+      "accept": "Annehmen · {price}",
+      "decline": "Ablehnen",
+      "cancel": "Zurückziehen"
+    },
+    "live": {
+      "title": "Live beim Öffnen",
+      "text": "Schau anderen zu, während sie Packs öffnen. Du siehst jede Karte, sobald der Öffner sie sieht.",
+      "empty": "Gerade öffnet niemand live.",
+      "battle": "Pack Battle: {a} gegen {b}",
+      "pack": "{name} öffnet ein Pack"
     }
   }
 }

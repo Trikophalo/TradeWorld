@@ -50,6 +50,7 @@ import { createFriendEngine, demoFriendCard, type DemoFriend, type DemoFriendCod
 import { createFriendChatEngine, type DemoChat } from "./demo/friend-chats";
 import { createAccessoryEngine, type DemoWardrobe } from "./demo/accessories";
 import { createNexamonEngine, type DemoNexamonState } from "./demo/nexamon";
+import { createPackBattleEngine } from "./demo/pack-battle";
 import { demoCoworkerMembers, demoCoworkers, type DemoCoworker } from "./demo/floor";
 import { createStockNewsEngine } from "./demo/stock-news";
 import { createCompanyMovesEngine, type DemoMoveRun } from "./demo/company-moves";
@@ -1409,6 +1410,25 @@ const nexamon = createNexamonEngine({
     (p().friendList ?? []).find((f) => f.nickname.toLowerCase() === nickname.toLowerCase())?.level ?? null,
 });
 
+/** Pack Battles and live openings with the made-up friends (ADR-172). */
+const packBattles = createPackBattleEngine({
+  me: () => ({ nickname: p().nickname, level: level(), avatarKey: career.avatarKey(), accessories: wardrobe.worn() }),
+  level,
+  unlockLevel: () => unlockLevel("nexamon") ?? 10,
+  friends: () => p().friendList ?? [],
+  cashCents: () => p().cashCents,
+  pay: (cents) => {
+    p().cashCents -= cents;
+    persist();
+  },
+  rollPacks: (set, iWin) => nexamon.demoBattlePacks(set, iWin),
+  feed: feedPost,
+  notify: (typeKey, title, body, link) => socialRef?.notify(typeKey, title, body, link),
+  idempotent,
+  now: () => Date.now(),
+  random: Math.random,
+});
+
 /** Made-up colleagues at the demo player's AI employer (ADR-156); none without a job or with an own company. */
 async function coworkersNow(): Promise<DemoCoworker[]> {
   if (p().company) return [];
@@ -1848,6 +1868,12 @@ export const demoEngine: GameEngine = {
   ...friendChats,
   ...wardrobe,
   ...nexamon,
+  ...packBattles,
+  async buyNexamonPack(requestId, set) {
+    const pack = await nexamon.buyNexamonPack(requestId, set);
+    packBattles.demoPackOpened(pack.packId, set);
+    return pack;
+  },
   /** Own card with the worn accessories; the made-up friends and colleagues have one too (ADR-155, ADR-156). */
   async playerCard(nickname) {
     const name = nickname.trim().toLowerCase();

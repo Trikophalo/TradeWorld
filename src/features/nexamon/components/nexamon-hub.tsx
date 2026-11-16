@@ -25,6 +25,7 @@ import { Market, type MarketView } from "./market";
 import { NexamonPack } from "./pack";
 import { LoadError } from "./parts";
 import { Shop } from "./shop";
+import { NexamonLobbyStrip } from "../live/lobby";
 
 export type NexamonTab = "shop" | "collection" | "market" | "grading";
 const TABS: readonly NexamonTab[] = ["shop", "collection", "market", "grading"];
@@ -87,6 +88,9 @@ function Hub() {
   const failed = (!overview.data && overview.error) || (!collection.data && collection.error) || null;
   return (
     <div className="space-y-4" data-testid="nexamon-hub" data-tab={tab}>
+      <Reveal feature="nexamonLive">
+        <NexamonLobbyStrip />
+      </Reveal>
       <div className={cn("nums text-sm text-fg-2", tab === "collection" && "sr-only")} data-testid="nexamon-summary">
         {totals ? (
           t("summary", {

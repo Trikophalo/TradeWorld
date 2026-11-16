@@ -23,6 +23,8 @@ export interface SettingsState {
   chartStyle: ChartStyle;
   /** Sign shown behind amounts (ADR-113); display only. */
   currency: CurrencyKey;
+  /** Others may watch the own pack openings live (ADR-172); sent to the server with the presence. */
+  watchable: boolean;
   set: <K extends keyof SettingsValues>(key: K, value: SettingsValues[K]) => void;
 }
 
@@ -36,6 +38,7 @@ export const DEFAULT_SETTINGS: SettingsValues = {
   haptics: true,
   chartStyle: "area",
   currency: DEFAULT_CURRENCY,
+  watchable: true,
 };
 
 /**

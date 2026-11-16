@@ -1,38 +1,38 @@
 {
   "applications": [
     {
-      "id": "5151ac30-c929-4510-a62d-46318a377adf",
+      "id": "c329b10c-40cb-415f-99bf-9c7fd862c813",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "1ae0c98b-9180-4ef8-aa52-96b1a714eb81",
-        "tier": "junior",
+        "id": "013ade5c-ff0b-48ee-80b9-3314d6fc4eb2",
+        "tier": "intern",
         "title": null,
         "company": {
-          "id": "833932bd-1586-776d-1f8f-f602682f7437",
+          "id": "7999d809-0066-66e2-e0ac-930c34a49626",
           "logo": null,
-          "name": "Luftpost Drohnen",
-          "color": "#00B4D8",
+          "name": "Fundgrube Discount",
+          "color": "#C2C95B",
           "is_ai": true,
-          "sector": "logistics",
-          "ticker": "DRN"
+          "sector": "retail",
+          "ticker": "FGD"
         },
-        "required": [{ "branch": "it", "min_score": 2 }],
-        "title_key": "it_junior",
+        "required": [{ "branch": "sales", "min_score": 0 }],
+        "title_key": "sales_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-16T19:43:53.11617+00:00",
-      "updated_at": "2026-11-16T19:43:53.121447+00:00",
-      "offer_expires_at": "2026-11-18T19:43:53.11617+00:00",
-      "salary_wish_cents_per_hour": 32700,
-      "offer_salary_cents_per_hour": 32700
+      "created_at": "2026-11-16T23:55:04.431089+00:00",
+      "updated_at": "2026-11-16T23:55:04.434363+00:00",
+      "offer_expires_at": "2026-11-18T23:55:04.431089+00:00",
+      "salary_wish_cents_per_hour": 15000,
+      "offer_salary_cents_per_hour": 15000
     },
     {
-      "id": "bd1ebb71-1db8-4e7f-b22a-04786f8a4462",
+      "id": "2c61215c-fdce-48f6-8d89-cfc69e396e25",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "0d3b934d-a390-4599-b13d-b098770c8afc",
+        "id": "0e0f403e-b10e-4d8a-a7db-07be695c2824",
         "tier": "junior",
         "title": null,
         "company": {
@@ -48,9 +48,9 @@
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-16T19:43:53.109786+00:00",
-      "updated_at": "2026-11-16T19:43:53.109786+00:00",
-      "offer_expires_at": "2026-11-18T19:43:53.109786+00:00",
+      "created_at": "2026-11-16T23:55:04.42653+00:00",
+      "updated_at": "2026-11-16T23:55:04.42653+00:00",
+      "offer_expires_at": "2026-11-18T23:55:04.42653+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

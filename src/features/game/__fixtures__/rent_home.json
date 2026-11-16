@@ -3,25 +3,25 @@
   "past": [],
   "offer": null,
   "renting": {
-    "id": "b20a136c-4390-4cff-9ae9-0a093fc79c7a",
+    "id": "c87e8b05-ead6-41f5-ad19-d8b44f0b394b",
     "tier": "house",
     "owner": "Fixture_Heim",
     "period": "hour",
     "ends_at": null,
     "tenants": [
       {
-        "id": "67054c13-9524-4be9-87a5-60b69fcceddb",
+        "id": "424c852c-fff4-41cc-833f-74038ae2c0be",
         "name": "Mia F.",
         "is_ai": true,
-        "since": "2026-11-16T19:43:59.380563+00:00",
+        "since": "2026-11-16T23:55:09.398661+00:00",
         "avatar_key": null,
         "accessories": []
       },
       {
-        "id": "b20a136c-4390-4cff-9ae9-0a093fc79c7a",
+        "id": "c87e8b05-ead6-41f5-ad19-d8b44f0b394b",
         "name": "Fixture_Neu",
         "is_ai": false,
-        "since": "2026-11-16T19:43:59.393036+00:00",
+        "since": "2026-11-16T23:55:09.408508+00:00",
         "avatar_key": "coder",
         "accessories": ["party_hat"]
       }
@@ -31,13 +31,13 @@
       "floor": "parquet",
       "owner": "Fixture_Heim",
       "width": 13,
-      "garage": [{ "id": "f76ea202-98e3-4ff9-abc0-86f33db8db60", "slot": 0, "car_key": "car_electric" }],
+      "garage": [{ "id": "b534ead9-dca1-4c56-b108-8ef517dafe32", "slot": 0, "car_key": "car_electric" }],
       "height": 9,
       "placed": [
         {
           "x": 2,
           "y": 2,
-          "id": "abe3cf03-8afe-496f-a249-a649172f8889",
+          "id": "d7eaaffd-1bf5-4ada-8f86-88ddf3ce72cd",
           "rot": 0,
           "item_key": "table_oak",
           "value_cents": 210000
@@ -45,7 +45,7 @@
         {
           "x": 3,
           "y": 3,
-          "id": "1dd0a66f-2bdd-4c9d-9964-b2f8c55e0cbd",
+          "id": "5e3afa5e-ebfa-435e-804f-b780dadf3fcc",
           "rot": 0,
           "item_key": "laptop",
           "value_cents": 210000
@@ -61,8 +61,8 @@
     "xp_total": 2,
     "notice_by": null,
     "paid_cents": 1000,
-    "started_at": "2026-11-16T19:43:59.393036+00:00",
-    "next_due_at": "2026-11-16T20:43:59.393036+00:00",
+    "started_at": "2026-11-16T23:55:09.408508+00:00",
+    "next_due_at": "2026-11-17T00:55:09.408508+00:00",
     "price_cents": 1000,
     "owner_avatar_key": "rookie",
     "owner_accessories": []

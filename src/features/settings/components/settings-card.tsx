@@ -148,6 +148,13 @@ export function SettingsCard() {
             onCheckedChange={(checked) => settings.set("haptics", checked)}
           />
         </Row>
+        <Row label={t("watchable")} hint={t("watchableHint")}>
+          <Switch
+            checked={settings.watchable}
+            label={t("watchable")}
+            onCheckedChange={(checked) => settings.set("watchable", checked)}
+          />
+        </Row>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-3 border-t border-line-1 pt-4">

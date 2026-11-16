@@ -1286,7 +1286,7 @@ reset role;
 update public.game_config set value = jsonb_set(value, '{lobby,perHour}', '1000') where key = 'battles';
 -- News battles (ADR-160): the lobby, a quiz, an estimate, the bell, an action game, the podium ------------------------
 \set fb1 '''f1f1f1f1-0000-4000-8000-0000000000b1'''
-\set fb2 '''f1f1f1f1-0000-4000-8000-0000000000b2'''
+\set fb2 '''f1f1f1f1-0000-4000-8000-00000000b2a1'''
 update public.invite_codes set max_uses = max_uses + 2 where code = 'M1-TESTS';
 select tests.signup(:fb1, 'Fixture_Bat1') is not null and tests.signup(:fb2, 'Fixture_Bat2') is not null as ok \gset
 update public.profiles set level = 3, xp_total = public.xp_total_for_level(3) where id in (:fb1, :fb2);
@@ -1511,5 +1511,56 @@ select public.set_company_banner(gen_random_uuid(), jsonb_build_object(
 select public.start_company_move(gen_random_uuid(), (public.get_company_moves() #>> '{moves,0,key}'));
 \o :fixture_dir/get_my_company_gmbh_upgraded.json
 select public.get_my_company();
+\o
+reset role;
+
+-- Pack Battles and live openings (6300-6330): two friends on the Collectibles tab, a challenge taken back, a battle
+-- played to the end, a live pack with a spectator and a reaction
+\set fx_pa '''f1f1f1f1-0000-4000-8000-0000000c2a11'''
+\set fx_pb '''f1f1f1f1-0000-4000-8000-0000000c2b11'''
+select tests.signup(:fx_pa, 'Fixture_PackA') is not null and tests.signup(:fx_pb, 'Fixture_PackB') is not null as ok \gset
+select tests.set_level(:fx_pa, 12);
+select tests.set_level(:fx_pb, 12);
+select tests.fund(:fx_pa, 50000000, 'fixture:b2:a');
+select tests.fund(:fx_pb, 50000000, 'fixture:b2:b');
+insert into public.friendships (requester_id, addressee_id, status, responded_at) values (:fx_pa, :fx_pb, 'accepted', now());
+update public.game_config set value = jsonb_set(value, '{battles,cooldownSeconds}', '0') where key = 'nexamon';
+select tests.login_as('authenticated', :fx_pb) is null as ok \gset
+select public.nexamon_lobby(true) is not null as ok \gset
+select tests.login_as('authenticated', :fx_pa) is null as ok \gset
+\o :fixture_dir/challenge_nexamon_battle.json
+select public.challenge_nexamon_battle(gen_random_uuid(), 'Fixture_PackB', 'mystic_energy');
+\o
+select (public.nexamon_lobby(true) #>> '{battles,0,id}')::uuid as fx_pb1 \gset
+\o :fixture_dir/cancel_nexamon_battle.json
+select public.cancel_nexamon_battle(gen_random_uuid(), :'fx_pb1');
+\o
+select (public.challenge_nexamon_battle(gen_random_uuid(), 'Fixture_PackB', 'mystic_energy') #>> '{battle,id}')::uuid as fx_pb2 \gset
+select tests.login_as('authenticated', :fx_pb) is null as ok \gset
+\o :fixture_dir/respond_nexamon_battle.json
+select public.respond_nexamon_battle(gen_random_uuid(), :'fx_pb2', true);
+\o :fixture_dir/nexamon_lobby.json
+select public.nexamon_lobby(true);
+\o
+reset role;
+update public.nexamon_battles
+   set accepted_at = accepted_at - interval '30 seconds', starts_at = starts_at - interval '30 seconds',
+       decide_at = decide_at - interval '30 seconds', ends_at = ends_at - interval '30 seconds'
+ where id = :'fx_pb2';
+select tests.login_as('authenticated', :fx_pa) is null as ok \gset
+\o :fixture_dir/get_nexamon_battle.json
+select public.get_nexamon_battle(:'fx_pb2');
+\o
+select public.buy_nexamon_pack(gen_random_uuid(), 'mystic_energy') ->> 'pack_id' as fx_ppk \gset
+\o :fixture_dir/nexamon_live_progress.json
+select public.nexamon_live_progress(:'fx_ppk', 2);
+\o
+reset role;
+select id as fx_pl from public.nexamon_live where pack_id = :'fx_ppk' \gset
+select tests.login_as('authenticated', :fx_pb) is null as ok \gset
+\o :fixture_dir/get_nexamon_live.json
+select public.get_nexamon_live(:'fx_pl');
+\o :fixture_dir/nexamon_live_react.json
+select public.nexamon_live_react(gen_random_uuid(), :'fx_pl', '🔥');
 \o
 reset role;

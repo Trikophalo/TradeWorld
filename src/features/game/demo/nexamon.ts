@@ -35,6 +35,7 @@ import type {
   NexamonCopy,
   NexamonEngine,
   NexamonListing,
+  NexamonPull,
   NexamonSale,
   NexamonSaleKind,
   PlayerNexamon,
@@ -211,7 +212,19 @@ function seedCard(key: string, now: number): DemoCard {
   };
 }
 
-export function createNexamonEngine(host: NexamonHost): NexamonEngine {
+/** Demo Pack Battles (ADR-172): both packs of a battle, rolled at once; `iWin` decides who keeps all copies. */
+export interface DemoBattlePacks {
+  demoBattlePacks(
+    set: NexamonSetKey,
+    iWin: (mine: NexamonPull[], theirs: NexamonPull[]) => boolean,
+  ): {
+    mine: NexamonPull[];
+    theirs: NexamonPull[];
+    won: boolean;
+  };
+}
+
+export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBattlePacks {
   /** The state, with every card of the catalogue present; a card that never moved follows the catalogue. */
   function st(): DemoNexamonState {
     const now = host.now();
@@ -952,5 +965,52 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine {
         copy.gradedAt = null;
         return { copy: toCopy(s, copy), oldGrade };
       }),
+
+    demoBattlePacks(set, iWin) {
+      requireUnlock();
+      const s = tick();
+      const now = host.now();
+      const roll = (mine: boolean) => {
+        const copies: DemoCopy[] = [];
+        const pulls = nexamonOpenPack(
+          NEXAMON_CARDS.filter((c) => c.set === set),
+          host.random,
+        ).map((pull): NexamonPull => {
+          const serial = mint(s, pull.key, now);
+          const copy: DemoCopy = {
+            id: `nx-${s.nextId++}`,
+            cardKey: pull.key,
+            serial,
+            condition: pull.condition,
+            grade: null,
+            gradingUntil: null,
+            gradedAt: null,
+            acquiredAt: now,
+            listing: null,
+          };
+          copies.push(copy);
+          if (mine && pull.rarity !== "common") host.track("nexamon_rares");
+          return {
+            slot: pull.slot,
+            copyId: copy.id,
+            cardKey: pull.key,
+            rarity: pull.rarity,
+            condition: pull.condition,
+            isNew: mine && !s.copies.some((c) => c.cardKey === pull.key),
+            serial,
+            population: serial,
+            valueCents: copyValue(s, copy),
+          };
+        });
+        return { pulls, copies };
+      };
+      const mine = roll(true);
+      const theirs = roll(false);
+      const won = iWin(mine.pulls, theirs.pulls);
+      if (won) s.copies.push(...mine.copies, ...theirs.copies);
+      host.track("nexamon_packs");
+      host.setState(s);
+      return { mine: mine.pulls, theirs: theirs.pulls, won };
+    },
   };
 }
