@@ -771,6 +771,24 @@ export interface SocialConfig {
   readonly friendCode: { readonly bonusCents: number };
   /** Poking a friend (ADR-155): the same friend again after cooldownMinutes, at most dailyCap pokes in 24 hours. */
   readonly poke: { readonly cooldownMinutes: number; readonly dailyCap: number };
+  /** Chats with friends (ADR-164): direct chats and groups. */
+  readonly chat: {
+    readonly maxMessageLength: number;
+    readonly maxMessagesPerMinute: number;
+    /** Members of a group including its creator. */
+    readonly groupMinMembers: number;
+    readonly groupMaxMembers: number;
+    readonly groupNameMinLength: number;
+    readonly groupNameMaxLength: number;
+    readonly maxGroupsPerDay: number;
+    /** Messages per page of a conversation. */
+    readonly pageSize: number;
+    /** Polling while a conversation is open, and otherwise (list and unread badge). */
+    readonly pollOpenSeconds: number;
+    readonly pollIdleSeconds: number;
+    /** Quick emojis under the input, like the news chat. */
+    readonly emojis: readonly string[];
+  };
 }
 
 /** Popular stocks first in the market list (ADR-145). */
@@ -2643,6 +2661,19 @@ export const BALANCE = {
     league: { updateEveryMinutes: 10, podium: 3, minBaselineCents: 1_000_000 },
     friendCode: { bonusCents: 500_000 },
     poke: { cooldownMinutes: 10, dailyCap: 30 },
+    chat: {
+      maxMessageLength: 300,
+      maxMessagesPerMinute: 12,
+      groupMinMembers: 2,
+      groupMaxMembers: 20,
+      groupNameMinLength: 3,
+      groupNameMaxLength: 30,
+      maxGroupsPerDay: 10,
+      pageSize: 50,
+      pollOpenSeconds: 4,
+      pollIdleSeconds: 30,
+      emojis: ["😂", "👍", "🚀", "📈", "📉", "💸", "🔥", "😱", "🤝", "❤️"],
+    },
   },
   property: {
     tiers: [

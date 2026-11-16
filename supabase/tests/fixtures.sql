@@ -1349,3 +1349,39 @@ select tests.login_as('authenticated', :p) is null as ok \gset
 select public.get_battle();
 \o
 reset role;
+
+-- Chats with friends (ADR-164): Fixture_Gmbh writes to Fixture_Kunst, then a group with Kunst and Fixture_Neu
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/open_direct_chat.json
+select public.open_direct_chat(gen_random_uuid(), 'Fixture_Kunst');
+\o
+select public.open_direct_chat(gen_random_uuid(), 'Fixture_Kunst') -> 'chat' ->> 'id' as fx_dm \gset
+\o :fixture_dir/post_chat_message.json
+select public.post_chat_message(gen_random_uuid(), :fx_dm, 'Hallo Kunst 👋');
+\o :fixture_dir/create_group_chat.json
+select public.create_group_chat(gen_random_uuid(), 'Fixture Runde', array['Fixture_Kunst']);
+\o
+reset role;
+select max(id) as fx_grp from public.friend_chats where name = 'Fixture Runde' \gset
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/add_group_member.json
+select public.add_group_member(gen_random_uuid(), :fx_grp, 'Fixture_Neu');
+\o :fixture_dir/rename_group.json
+select public.rename_group(gen_random_uuid(), :fx_grp, 'Fixture Bullen');
+\o
+select public.post_chat_message(gen_random_uuid(), :fx_grp, 'Wer kauft mit?') is not null as ok \gset
+\o :fixture_dir/remove_group_member.json
+select public.remove_group_member(gen_random_uuid(), :fx_grp, 'Fixture_Neu');
+\o :fixture_dir/leave_group.json
+select public.leave_group(gen_random_uuid(), :fx_grp);
+\o
+reset role;
+select tests.login_as('authenticated', :fx_k) is null as ok \gset
+\o :fixture_dir/get_chats.json
+select public.get_chats();
+\o :fixture_dir/get_chat.json
+select public.get_chat(:fx_dm);
+\o :fixture_dir/mark_chat_read.json
+select public.mark_chat_read(:fx_dm);
+\o
+reset role;
