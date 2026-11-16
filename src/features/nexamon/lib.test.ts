@@ -13,6 +13,8 @@ import {
   rarityRank,
   SWIPE_DISTANCE,
   swipeOutcome,
+  TEAR_DISTANCE,
+  tearProgress,
 } from "./lib";
 
 describe("card numbers and serials", () => {
@@ -74,6 +76,15 @@ describe("text fitting", () => {
     expect(estimatePixelTextWidth("Voltaquila", 6) * long).toBeCloseTo(35);
     expect(fitTextScale("Ein sehr langer Kartenname", 6, 35)).toBe(0.62);
     expect(fitTextScale("Ein sehr langer Kartenname", 6, 35, 0.5)).toBeGreaterThanOrEqual(0.5);
+  });
+
+  it("measures a tear along the seal", () => {
+    expect(tearProgress(0, 200)).toBe(0);
+    expect(tearProgress(-50, 200)).toBe(0);
+    expect(tearProgress(70, 200)).toBeCloseTo(0.5);
+    expect(tearProgress(200 * TEAR_DISTANCE, 200)).toBe(1);
+    expect(tearProgress(500, 200)).toBe(1);
+    expect(tearProgress(50, 0)).toBe(0);
   });
 
   it("keeps pixel scales whole", () => {

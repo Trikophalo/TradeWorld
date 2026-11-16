@@ -53,10 +53,26 @@ async function expectNoSidewaysScroll(page: Page) {
   expect(overflow).toBeLessThanOrEqual(0);
 }
 
-/** Buys a pack of the cheapest set and leaves the opening on its first screen (sealed). */
+/** Opens the popup of the cheapest pack, buys it there and leaves the pack sealed on the table. */
 async function buyPack(page: Page) {
   await page.getByTestId("buy-mystic_energy").click();
-  await expect(page.getByTestId("pack-overlay")).toBeVisible();
+  await expect(page.getByTestId("pack-overlay")).toHaveAttribute("data-stage", "preview");
+  await page.getByTestId("confirm-buy").click();
+  await expect(page.getByTestId("pack-overlay")).toHaveAttribute("data-stage", "opening");
+}
+
+/** Tears the pack open: press on the upper seal and pull across it. */
+async function tearPack(page: Page) {
+  const pack = page.getByTestId("pack-tear");
+  await pack.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  const box = (await pack.boundingBox())!;
+  const y = box.y + box.height * 0.1;
+  await page.mouse.move(box.x + 6, y);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.3, y, { steps: 4 });
+  await expect(pack).toHaveAttribute("data-ripping", "true");
+  await page.mouse.move(box.x + box.width * 0.95, y, { steps: 8 });
+  await page.mouse.up();
 }
 
 /** Buys a pack and jumps to the summary. Returns the keys of the pulled cards. */
@@ -87,10 +103,27 @@ test("buy a pack, open it card by card, and find the cards in the collection", a
   await expect(page.getByTestId("progress-mystic_energy")).toHaveText("0 von 77");
   await expectNoSidewaysScroll(page);
 
-  await buyPack(page);
+  // The popup first: price, balance, and further down every card of the set with its chance. Nothing is paid yet.
+  await page.getByTestId("buy-mystic_energy").click();
+  const popup = page.getByTestId("pack-overlay");
+  await expect(popup).toHaveAttribute("data-stage", "preview");
+  await expect(page.getByTestId("pack-price")).toContainText("200");
+  await expect(page.getByTestId("pack-balance")).toContainText("500.000,00");
+  const groups = page.getByTestId("contents-group");
+  await expect(groups).toHaveCount(5);
+  await expect(groups.first()).toHaveAttribute("data-rarity", "legendary");
+  await expect(groups.first().getByTestId("contents-rate")).toContainText("1 in 900");
+  await expect(groups.first().locator("li")).toHaveCount(2);
+  await expect(groups.last().locator("li")).toHaveCount(50);
+  await expect(groups.last().getByTestId("contents-owned")).toHaveText("0 von 50");
+  await page.getByTestId("confirm-buy").click();
+  await expect(popup).toHaveAttribute("data-stage", "opening");
+  await expect(page.getByTestId("pack-balance")).toContainText("499.800,00");
+
+  // A short pull is not enough: the strip falls back. Pulled across, the pack is open.
   const opening = page.getByTestId("pack-opening");
   await expect(opening).toHaveAttribute("data-phase", "sealed");
-  await opening.getByTestId("pack-open").click();
+  await tearPack(page);
   await expect(opening).toHaveAttribute("data-phase", "stack");
   // The stack takes the keyboard by itself: five cards, five pulls.
   for (let i = 0; i < 5; i++) {
@@ -108,7 +141,12 @@ test("buy a pack, open it card by card, and find the cards in the collection", a
   await expectNoSidewaysScroll(page);
   const first = (await rows.first().getAttribute("data-card"))!;
 
-  await page.getByTestId("pack-to-collection").click();
+  // "Noch eins" is the next explicit purchase; the popup of the set now knows the own cards.
+  await page.getByTestId("pack-close").click();
+  await page.getByTestId("buy-mystic_energy").click();
+  await expect(page.locator('[data-testid="set-contents"] li[data-owned="true"]')).toHaveCount(5);
+  await page.getByTestId("pack-close").click();
+  await page.goto("/nexamon?tab=collection");
   await expect(page.getByTestId("nexamon-binder")).toBeVisible();
   await expect(page.getByTestId("binder-copies")).toContainText("5");
   await expect(page.locator(`[data-testid="binder-tile"][data-card="${first}"]`)).toHaveAttribute("data-owned", "true");

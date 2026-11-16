@@ -3,13 +3,36 @@
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import type { NexamonCard } from "@/config/nexamon";
+import { UI_ICONS } from "@/components/pixel/art";
+import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { useGameErrorText } from "@/features/game/errors";
 import type { NexamonCopy } from "@/features/game/nexamon-types";
 import { cn } from "@/lib/utils";
 import { gradeWordKey } from "../lib";
 import { ConditionBadge } from "./badges";
 import { CardThumb } from "./card-face";
 import { NexamonSlab } from "./slab";
+
+/** A list that could not be read: says why in plain words and offers to try again. */
+export function LoadError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+  const t = useTranslations("nexamon");
+  const errorText = useGameErrorText();
+  return (
+    <EmptyState
+      art={<PixelIcon {...UI_ICONS.bell} scale={4} />}
+      title={t("loadFailed")}
+      description={errorText(error)}
+      action={
+        <Button variant="secondary" onClick={onRetry} data-testid="nexamon-retry">
+          {t("retry")}
+        </Button>
+      }
+    />
+  );
+}
 
 /** A small labelled number for the summary rows of the Nexamon pages. */
 export function Stat({

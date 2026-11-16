@@ -179,5 +179,14 @@ export function swipeOutcome({ dx, dy, vx, vy, width }: SwipeInput): SwipeOutcom
   return { away: true, dirX: x, dirY: y };
 }
 
+/** Share of the pack's width a finger has to travel along the seal until the strip is off. */
+export const TEAR_DISTANCE = 0.7;
+
+/** How far a tear is (0..1) after pulling `distance` pixels along a pack `width` pixels wide; backwards is 0. */
+export function tearProgress(distance: number, width: number): number {
+  if (!(width > 0) || !(distance > 0)) return 0;
+  return Math.min(1, distance / (width * TEAR_DISTANCE));
+}
+
 /** Integer scale for pixel art: at least 1, never fractional. */
 export const pixelScale = (scale: number): number => Math.max(1, Math.round(scale));

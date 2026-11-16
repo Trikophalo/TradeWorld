@@ -22,6 +22,7 @@ import { Binder } from "./binder";
 import { GradingDesk } from "./grading-desk";
 import { Market, type MarketView } from "./market";
 import { NexamonPack } from "./pack";
+import { LoadError } from "./parts";
 import { Shop } from "./shop";
 
 export type NexamonTab = "shop" | "collection" | "market" | "grading";
@@ -74,6 +75,8 @@ function Hub() {
   };
 
   const totals = overview.data?.collection;
+  // Nothing to show and the read failed (offline, server busy): say so instead of loading forever.
+  const failed = (!overview.data && overview.error) || (!collection.data && collection.error) || null;
   return (
     <div className="space-y-4" data-testid="nexamon-hub" data-tab={tab}>
       <div className={cn("nums text-sm text-fg-2", tab === "collection" && "sr-only")} data-testid="nexamon-summary">
@@ -115,19 +118,31 @@ function Hub() {
           ]}
         />
       </div>
-      {tab === "shop" && <Shop overview={overview.data} />}
-      {tab === "collection" && <Binder collection={collection.data} />}
-      {tab === "market" && (
-        <Market
-          overview={overview.data}
-          collection={collection.data}
-          view={view}
-          onViewChange={(next) => go({ view: next })}
-          cardKey={cardKey}
-          onCardChange={(next) => go({ card: next })}
+      {failed ? (
+        <LoadError
+          error={failed}
+          onRetry={() => {
+            void overview.refetch();
+            void collection.refetch();
+          }}
         />
+      ) : (
+        <>
+          {tab === "shop" && <Shop overview={overview.data} collection={collection.data} />}
+          {tab === "collection" && <Binder collection={collection.data} />}
+          {tab === "market" && (
+            <Market
+              overview={overview.data}
+              collection={collection.data}
+              view={view}
+              onViewChange={(next) => go({ view: next })}
+              cardKey={cardKey}
+              onCardChange={(next) => go({ card: next })}
+            />
+          )}
+          {tab === "grading" && <GradingDesk overview={overview.data} collection={collection.data} />}
+        </>
       )}
-      {tab === "grading" && <GradingDesk overview={overview.data} collection={collection.data} />}
     </div>
   );
 }

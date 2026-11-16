@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { FACE_LAYOUT } from "@/components/pixel/nexamon-face";
-import { NEXAMON_CARDS } from "@/config/nexamon";
+import { NEXAMON_CARDS, nexamonCard } from "@/config/nexamon";
+import messages from "../../../messages/de.json";
 import {
   estimateNumberWidth,
   estimatePixelTextWidth,
@@ -69,6 +70,21 @@ describe("text on the card faces (all 231 cards)", () => {
       const width = estimatePixelTextWidth(card.attack.name, FACE_TEXT.attack) * fit.squeeze * fit.size;
       expect(width, `${card.key} ${card.attack.name}`).toBeLessThanOrEqual(room + 1e-9);
       expect(fit.size, `${card.key} ${card.attack.name}`).toBeGreaterThanOrEqual(SMALLEST_SIZE);
+    }
+  });
+
+  it("fits the stage line with the card it evolves from", () => {
+    const text = messages.nexamonCards;
+    for (const card of NEXAMON_CARDS) {
+      const layout = FACE_LAYOUT[card.rarity];
+      // Where the strip under the art carries the evolution, the stage line is short.
+      if (!layout.stage || layout.strip || !card.evolvesFrom) continue;
+      const from = nexamonCard(card.evolvesFrom)!.name;
+      const line = `${text.stage[card.stage]} · ${text.evolvesShort.replace("{name}", from)}`.toUpperCase();
+      const fit = fitText(line, FACE_TEXT.stage, layout.stage.w);
+      const width = estimatePixelTextWidth(line, FACE_TEXT.stage) * fit.squeeze * fit.size;
+      expect(width, `${card.key} ${line}`).toBeLessThanOrEqual(layout.stage.w + 1e-9);
+      expect(fit.size, `${card.key} ${line}`).toBeGreaterThanOrEqual(SMALLEST_SIZE);
     }
   });
 

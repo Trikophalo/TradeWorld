@@ -23,10 +23,10 @@ import {
   listingProceeds,
   nexamonNotificationLink,
   ownListings,
-  packNeedsConfirm,
   packOdds,
   quickSellOffer,
   revealKey,
+  setContents,
   sortCopiesBestFirst,
   splitGraded,
   suggestedPriceCents,
@@ -96,10 +96,21 @@ describe("pack odds", () => {
     expect(formatFactor(12_000)).toBe("×1,2");
   });
 
-  it("asks before the expensive packs only", () => {
-    expect(packNeedsConfirm(BALANCE.nexamon.sets.mystic_energy.packPriceCents)).toBe(false);
-    expect(packNeedsConfirm(BALANCE.nexamon.sets.super_apex.packPriceCents)).toBe(true);
-    expect(packNeedsConfirm(BALANCE.nexamon.sets.prismatic_peak.packPriceCents)).toBe(true);
+  it("lists what a pack of a set can hold, by rarity, with the own cards", () => {
+    const groups = setContents("super_apex", [{ cardKey: "sa-077" }, { cardKey: "sa-077" }, { cardKey: "me-001" }]);
+    expect(groups.map((g) => [g.rarity, g.cards.length])).toEqual([
+      ["legendary", 2],
+      ["prisma", 5],
+      ["ultra", 10],
+      ["rare", 10],
+      ["common", 50],
+    ]);
+    expect(groups.every((g) => g.cards.every((c) => c.card.set === "super_apex"))).toBe(true);
+    expect(groups[0]!.owned).toBe(1);
+    expect(groups[0]!.cards.find((c) => c.card.key === "sa-077")!.owned).toBe(2);
+    expect(groups[0]!.odds.oneInPacks).toBe(900);
+    expect(groups[4]!.owned).toBe(0);
+    expect(groups[4]!.cards[0]!.card.number).toBe(1);
   });
 });
 

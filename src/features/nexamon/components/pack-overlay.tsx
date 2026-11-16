@@ -4,45 +4,58 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Dialog } from "radix-ui";
 import { useMemo, useState, type ReactNode } from "react";
-import { nexamonCard, type NexamonCard } from "@/config/nexamon";
+import { nexamonCard, type NexamonCard, type NexamonSetKey } from "@/config/nexamon";
 import { Badge } from "@/components/ui/badge";
 import { Button, type ButtonState } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
-import type { NexamonPackResult, NexamonPull } from "@/features/game/nexamon-types";
-import { formatMoney } from "@/lib/format";
+import { Skeleton } from "@/components/ui/skeleton";
+import type {
+  NexamonCollection,
+  NexamonPackResult,
+  NexamonPull,
+  NexamonSetSummary,
+} from "@/features/game/nexamon-types";
+import { formatInteger, formatMoney } from "@/lib/format";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
 import { isHit } from "../lib";
+import { chanceBps, formatChance, formatDecimal, setContents } from "../view";
 import { ConditionBadge, RarityBadge } from "./badges";
 import { CardThumb } from "./card-face";
+import { TiltPack } from "./pack";
 import { PackOpening } from "./pack-opening";
 
 export interface PackOverlayProps {
-  /** The bought pack; null closes the overlay. */
+  /** The set whose pack is on the table; null closes the popup. */
+  set: NexamonSetSummary | null;
+  /** A bought pack of this set that waits to be torn open; null while the player only looks. */
   pack: NexamonPackResult | null;
-  /** The player closed the overlay; `finished` says whether every card was seen. */
-  onClose: (finished: boolean) => void;
+  /** For the list of all cards of the set and which of them the player owns. */
+  collection: NexamonCollection | undefined;
+  cashCents: number;
+  /** Buys one pack of the set (the only step that costs money). */
+  onBuy: () => void;
+  buyState: ButtonState;
+  onClose: () => void;
   /** The summary is showing (all cards pulled away or skipped). */
   onFinished: () => void;
-  /** "Open another": buys the next pack of the same set. */
-  onAgain: () => void;
-  againState: ButtonState;
-  againLabel: string;
-  canAfford: boolean;
 }
 
 /**
- * Opening a bought pack on the whole screen. The server has already paid and the cards are in the collection,
- * so closing or skipping loses nothing; the summary lists every card with value, condition and what is new.
+ * The popup of a booster pack (ADR-165). First the pack with its price, the player's balance and, further down,
+ * every card of the set by rarity with the pull rates and what is already owned. "Kaufen" is the one step that
+ * costs money; after it the pack is torn open by hand. The server has paid by then and the cards are in the
+ * collection, so closing or skipping loses nothing. The summary lists every card with value, condition and "Neu".
  */
 export function PackOverlay({
+  set,
   pack,
+  collection,
+  cashCents,
+  onBuy,
+  buyState,
   onClose,
   onFinished,
-  onAgain,
-  againState,
-  againLabel,
-  canAfford,
 }: PackOverlayProps) {
   const t = useTranslations("nexamon");
   const tc = useTranslations("nexamonCards");
@@ -61,22 +74,51 @@ export function PackOverlay({
     setDoneId(pack.packId);
     onFinished();
   };
+  const price = set?.packPriceCents ?? 0;
+  const short = Math.max(0, price - cashCents);
+  const stage = !pack ? "preview" : done ? "summary" : "opening";
+  const buyButton = (label: string, testId: string) => (
+    <div className="flex w-full flex-col items-center gap-1.5 sm:w-auto">
+      <Button
+        size="lg"
+        state={buyState}
+        disabled={short > 0}
+        onClick={onBuy}
+        data-testid={testId}
+        className="w-full sm:w-auto"
+      >
+        {label}
+      </Button>
+      {short > 0 && <p className="text-xs text-warn">{t("shop.short", { amount: formatMoney(short) })}</p>}
+    </div>
+  );
+  const again = buyButton(t("opening.again", { price: formatMoney(price, { whole: true }) }), "pack-again");
 
   return (
-    <Dialog.Root open={pack !== null} onOpenChange={(open) => !open && onClose(done)}>
+    <Dialog.Root open={set !== null} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-overlay bg-scrim data-[state=open]:animate-[fade-in_var(--duration-base)_var(--ease-out)]" />
+        <Dialog.Overlay className="fixed inset-0 z-overlay bg-scrim backdrop-blur-sm data-[state=open]:animate-[fade-in_var(--duration-base)_var(--ease-out)]" />
         <Dialog.Content
           data-testid="pack-overlay"
+          data-stage={stage}
           aria-describedby={undefined}
-          className="fixed inset-0 z-sheet flex flex-col overflow-x-hidden overflow-y-auto bg-bg pt-safe pb-safe outline-none data-[state=open]:animate-[fade-in_var(--duration-base)_var(--ease-out)]"
+          className={cn(
+            "fixed inset-0 z-sheet flex flex-col bg-bg pt-safe pb-safe outline-none",
+            "lg:m-auto lg:h-[min(94dvh,900px)] lg:w-[min(94vw,880px)] lg:rounded-xl lg:border-2 lg:border-line-2 lg:shadow-3",
+            "data-[state=open]:animate-[modal-in_var(--duration-slow)_var(--ease-out)]",
+          )}
         >
-          <header className="flex shrink-0 items-center justify-between gap-3 px-4 py-3 lg:px-6">
-            <Dialog.Title className="min-w-0 truncate font-pixel text-sm text-fg-1 uppercase">
-              {pack ? t("opening.title", { set: tc(`sets.${pack.set}`) }) : t("title")}
-            </Dialog.Title>
+          <header className="flex shrink-0 items-center justify-between gap-3 border-b-2 border-line-1 px-4 py-3 lg:px-6">
+            <div className="min-w-0">
+              <Dialog.Title className="truncate font-pixel text-sm text-fg-1 uppercase">
+                {set ? t("opening.title", { set: tc(`sets.${set.key}`) }) : t("title")}
+              </Dialog.Title>
+              <p className="mt-0.5 nums text-xs text-fg-3" data-testid="pack-balance">
+                {t("opening.balance", { cash: formatMoney(cashCents) })}
+              </p>
+            </div>
             <div className="flex shrink-0 items-center gap-2">
-              {pack && !done && (
+              {stage === "opening" && pack && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -96,27 +138,47 @@ export function PackOverlay({
               </Dialog.Close>
             </div>
           </header>
-          {pack && (
-            <div className="flex flex-1 flex-col items-center justify-center px-4 pb-8">
-              {skipped ? (
-                <Summary pack={pack} thumbs>
-                  <Actions onAgain={onAgain} againState={againState} againLabel={againLabel} canAfford={canAfford} />
-                </Summary>
-              ) : (
-                <PackOpening
-                  key={pack.packId}
-                  set={pack.set}
-                  cards={cards}
-                  scale={desktop ? 4 : 3}
-                  onComplete={finish}
-                  className="max-w-3xl"
-                >
-                  <Summary pack={pack}>
-                    <Actions onAgain={onAgain} againState={againState} againLabel={againLabel} canAfford={canAfford} />
-                  </Summary>
-                </PackOpening>
+          {set && (
+            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
+              {stage === "preview" && (
+                <div className="flex flex-col items-center gap-6 px-4 py-6 lg:px-6" data-testid="pack-preview">
+                  <TiltPack set={set.key} scale={desktop ? 4 : 3} />
+                  <div className="flex w-full max-w-md flex-col items-center gap-3 text-center">
+                    <p className="nums text-2xl font-semibold text-fg-1" data-testid="pack-price">
+                      {formatMoney(price, { whole: true })}
+                    </p>
+                    {buyButton(t("shop.buy", { price: formatMoney(price, { whole: true }) }), "confirm-buy")}
+                    <p className="text-sm text-pretty text-fg-2">{t("opening.howTo")}</p>
+                    <p className="text-xs text-fg-3">{t("opening.scrollHint")}</p>
+                  </div>
+                  <SetContents set={set.key} collection={collection} />
+                </div>
               )}
-              {!done && <p className="mt-4 max-w-sm text-center text-xs text-pretty text-fg-3">{t("opening.safe")}</p>}
+              {pack && stage !== "preview" && (
+                <div className="flex min-h-full flex-col items-center justify-center px-4 py-6">
+                  {skipped ? (
+                    <Summary pack={pack} thumbs>
+                      <Actions>{again}</Actions>
+                    </Summary>
+                  ) : (
+                    <PackOpening
+                      key={pack.packId}
+                      set={pack.set}
+                      cards={cards}
+                      scale={desktop ? 4 : 3}
+                      onComplete={finish}
+                      className="max-w-3xl"
+                    >
+                      <Summary pack={pack}>
+                        <Actions>{again}</Actions>
+                      </Summary>
+                    </PackOpening>
+                  )}
+                  {!done && (
+                    <p className="mt-4 max-w-sm text-center text-xs text-pretty text-fg-3">{t("opening.safe")}</p>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </Dialog.Content>
@@ -125,28 +187,74 @@ export function PackOverlay({
   );
 }
 
-function Actions({
-  onAgain,
-  againState,
-  againLabel,
-  canAfford,
-}: Pick<PackOverlayProps, "onAgain" | "againState" | "againLabel" | "canAfford">) {
+function Actions({ children }: { children: ReactNode }) {
   const t = useTranslations("nexamon");
   return (
-    <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
-      <Button size="lg" state={againState} disabled={!canAfford} onClick={onAgain} data-testid="pack-again">
-        {againLabel}
-      </Button>
+    <div className="flex w-full flex-col items-center gap-2 sm:flex-row sm:items-start sm:justify-center">
+      {children}
       <Dialog.Close asChild>
         <Link
           href="/nexamon?tab=collection"
           data-testid="pack-to-collection"
-          className={buttonVariants({ variant: "secondary", size: "lg" })}
+          className={cn(buttonVariants({ variant: "secondary", size: "lg" }), "w-full sm:w-auto")}
         >
           {t("opening.toCollection")}
         </Link>
       </Dialog.Close>
     </div>
+  );
+}
+
+/**
+ * Everything that can be in a pack of the set: the cards by rarity, best first, with the pull rate of the rarity
+ * (the two rolling slots and the average per pack) and the cards the player owns in colour, the others grey.
+ */
+function SetContents({ set, collection }: { set: NexamonSetKey; collection: NexamonCollection | undefined }) {
+  const t = useTranslations("nexamon");
+  const groups = useMemo(() => setContents(set, collection?.copies ?? []), [set, collection]);
+  return (
+    <section className="w-full space-y-5 border-t-2 border-line-1 pt-5" data-testid="set-contents">
+      <div>
+        <h3 className="font-pixel text-sm text-fg-1 uppercase">{t("contents.title")}</h3>
+        <p className="mt-1 text-sm text-pretty text-fg-2">{t("contents.intro")}</p>
+      </div>
+      {groups.map((group) => (
+        <div key={group.rarity} className="space-y-2" data-testid="contents-group" data-rarity={group.rarity}>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <RarityBadge rarity={group.rarity} />
+            <span className="nums text-sm font-medium text-fg-1" data-testid="contents-rate">
+              {group.odds.oneInPacks !== null
+                ? t("odds.oneIn", { count: formatInteger(group.odds.oneInPacks) })
+                : t("odds.perPack", { count: formatDecimal(group.odds.perPack) })}
+            </span>
+            <span className="nums text-xs text-fg-3">
+              {group.odds.slot4 > 0
+                ? t("contents.slots", {
+                    slot4: formatChance(chanceBps(group.odds.slot4, group.odds.denominator)),
+                    slot5: formatChance(chanceBps(group.odds.slot5, group.odds.denominator)),
+                  })
+                : t("contents.lastSlot", {
+                    slot5: formatChance(chanceBps(group.odds.slot5, group.odds.denominator)),
+                  })}
+            </span>
+            <span className="ml-auto nums text-xs text-fg-2" data-testid="contents-owned">
+              {collection ? (
+                t("contents.owned", { owned: group.owned, total: group.cards.length })
+              ) : (
+                <Skeleton className="h-3 w-16 rounded-xs" />
+              )}
+            </span>
+          </div>
+          <ul className="grid grid-cols-[repeat(auto-fill,72px)] justify-between gap-1.5">
+            {group.cards.map(({ card, owned }) => (
+              <li key={card.key} data-card={card.key} data-owned={owned > 0} title={card.name}>
+                <CardThumb card={card} scale={1} dimmed={collection !== undefined && owned === 0} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </section>
   );
 }
 

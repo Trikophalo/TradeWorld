@@ -33,7 +33,7 @@
       "deals": "Deals",
       "crypto": "Krypto",
       "news": "News",
-      "nexamon": "Nexamon"
+      "nexamon": "Sammeln"
     },
     "property": "Grundstück",
     "more": "Mehr",
@@ -53,7 +53,7 @@
     "soonOpen": "Alle zeigen",
     "soonClose": "Weniger",
     "news": "News",
-    "nexamon": "Nexamon"
+    "nexamon": "Collectibles"
   },
   "topbar": {
     "search": "Aktien, Firmen, Spieler suchen",
@@ -594,21 +594,21 @@
       "summary": "{count} Karten je Booster, ab {price}",
       "text": "Ab Level {level} kaufst du Booster. In jedem stecken {count} Karten: Die ersten drei sind immer Commons, die letzten zwei werden gewürfelt. Eine Rare gibt es dort mit {rare}, eine Ultra Rare mit {ultra}. Prisma ({prisma}) und Legendary ({legendary}) gibt es nur auf dem letzten Platz. Die genauen Raten stehen im Shop.",
       "example": "Ein Booster Mystic Energy kostet {price}. Im Schnitt ist in jedem zweiten eine Rare, in jedem zwölften eine Ultra Rare und in einem von {legendaryPacks} eine Legendary.",
-      "where": "Nexamon → Shop"
+      "where": "Collectibles → Shop"
     },
     "nexamonGrading": {
       "title": "Zustand und ASP-Note",
       "summary": "Grading kostet {rate} vom Wert",
       "text": "Jede Karte hat einen Zustand: Poor, Good, Near Mint oder Mint. ASP bewertet eine lose Karte für {rate} ihres Werts mit einer Note von 1 bis 10 und versiegelt sie im Slab. Das dauert {minutes} Minuten. Je besser der Zustand, desto öfter gibt es eine 10: bei Mint zu {mint}, bei Near Mint zu {nearMint}, bei Good zu {good}.",
       "example": "Karte im Wert von {value}: Das Grading kostet {fee}. Mit einer 10 ist der Slab {ten} wert, mit einer 8 {eight}, mit einer 7 nur noch {seven}.",
-      "where": "Nexamon → Karte öffnen → Zu ASP"
+      "where": "Collectibles → Karte öffnen → Zu ASP"
     },
     "nexamonMarket": {
       "title": "Kartenmarkt",
       "summary": "{rate} Gebühr für Verkäufer",
       "text": "Am Kartenmarkt bietest du einzelne Kopien zu deinem Preis an. Beim Verkauf zahlst du {rate} Gebühr. Jede Karte hat einen Marktwert: Er steigt, wenn die Karte knapp und gefragt ist, und fällt, wenn viele sie anbieten. KI-Sammler kaufen höchstens zum Wert. Lose Commons und Rares nimmt die KI auch sofort, für {quick} des Werts.",
       "example": "Du verkaufst eine Karte für {price}: {fee} Gebühr, {net} kommen an. Im Sofortverkauf an die KI wären es bei {price} Wert nur {quickNet}.",
-      "where": "Nexamon → Markt"
+      "where": "Collectibles → Markt"
     }
   },
   "tutorial": {
@@ -7821,17 +7821,18 @@
     "pack": {
       "label": "Booster {set}",
       "open": "Booster {set} aufreißen",
-      "tapHint": "Tippe auf das Booster, um es aufzureißen.",
+      "tapHint": "Zieh oben an der gestrichelten Linie quer über das Booster, um es aufzureißen.",
       "dragHint": "Zieh die oberste Karte weg. Langsam ziehen heißt spicken.",
       "keyHint": "Tastatur: Pfeiltasten oder Leertaste",
       "counter": "Karte {n} von {total}",
       "stackLabel": "Kartenstapel, Karte {n} von {total}: {name}. Mit Pfeiltasten oder Leertaste wegziehen.",
       "summary": "Deine Karten",
-      "cards": "5 Karten"
+      "cards": "5 Karten",
+      "openButton": "Ohne Ziehen aufreißen"
     }
   },
   "nexamon": {
-    "title": "Nexamon",
+    "title": "Collectibles",
     "summary": "{copies, plural, =0 {Noch keine Karte} one {# Karte} other {# Karten}} · {distinct} von {total} verschiedene · Wert {value}",
     "tabs": {
       "label": "Bereiche von Nexamon",
@@ -7844,6 +7845,8 @@
     "new": "Neu",
     "serial": "#{serial}",
     "cancel": "Abbrechen",
+    "loadFailed": "Nicht geladen",
+    "retry": "Noch einmal versuchen",
     "gradeShort": "ASP {grade}",
     "gradeLong": "ASP {grade} · {word}",
     "status": {
@@ -7873,8 +7876,8 @@
       "population": "{count} Karten im Umlauf",
       "buy": "Kaufen · {price}",
       "short": "Dir fehlen {amount}.",
-      "confirmTitle": "Booster kaufen?",
-      "confirmText": "Ein Booster {set} kostet {price}. Du hast {cash}. Was drin ist, entscheidet der Zufall."
+      "openPack": "Booster {set} ansehen, {price}",
+      "look": "Ansehen und öffnen"
     },
     "opening": {
       "title": "Booster {set}",
@@ -7886,7 +7889,10 @@
       "paid": "Bezahlt",
       "newCards": "Neu",
       "again": "Noch eins · {price}",
-      "againPlain": "Noch eins"
+      "againPlain": "Noch eins",
+      "balance": "Dein Geld: {cash}",
+      "howTo": "Erst mit „Kaufen“ wird bezahlt. Danach reißt du das Booster selbst auf.",
+      "scrollHint": "Weiter unten: alle Karten dieses Sets und ihre Chancen."
     },
     "odds": {
       "title": "Ziehungsraten",
@@ -7899,6 +7905,13 @@
       "perPack": "{count} je Booster",
       "conditionIntro": "Jede gezogene Karte bekommt einen Zustand:",
       "note": "Innerhalb einer Seltenheit ist jede Karte des Sets gleich wahrscheinlich. Bezahlt wird nur mit Spielgeld."
+    },
+    "contents": {
+      "title": "Das kann drin sein",
+      "intro": "Alle Karten dieses Sets nach Seltenheit, mit der Chance je Booster. Karten, die du schon hast, sind farbig.",
+      "slots": "Platz 4: {slot4} · Platz 5: {slot5}",
+      "lastSlot": "nur Platz 5: {slot5}",
+      "owned": "{owned} von {total}"
     },
     "binder": {
       "copies": "Karten",

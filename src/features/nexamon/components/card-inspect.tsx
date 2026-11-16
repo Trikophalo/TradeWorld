@@ -34,7 +34,7 @@ import { ConditionBadge, RarityBadge, SetIcon, TypeIcon } from "./badges";
 import { NexamonCard } from "./card";
 import { CopyActions } from "./copy-actions";
 import { BuySheet, ListingRow, SellerName } from "./listing-row";
-import { CopyQuality, GradeChip, Stat } from "./parts";
+import { CopyQuality, GradeChip, LoadError, Stat } from "./parts";
 import { NexamonSlab } from "./slab";
 
 const dateTime = new Intl.DateTimeFormat("de-DE", {
@@ -96,7 +96,11 @@ export function CardInspect({ cardKey }: { cardKey: string }) {
         {back}
         <Neighbours card={card} />
       </div>
-      <Inspect card={card} details={details.data} />
+      {!details.data && details.error ? (
+        <LoadError error={details.error} onRetry={() => void details.refetch()} />
+      ) : (
+        <Inspect card={card} details={details.data} />
+      )}
     </div>
   );
 }

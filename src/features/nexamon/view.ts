@@ -1,5 +1,6 @@
 import { BALANCE } from "@/config/balance";
 import {
+  NEXAMON_CARDS,
   NEXAMON_RARITIES,
   NEXAMON_SETS,
   nexamonCard,
@@ -79,9 +80,27 @@ export function tileMoney(cents: number): string {
   return formatMoneyShort(cents);
 }
 
-/** Packs a player may confirm without a second look: everything from this price asks first. */
-export const PACK_CONFIRM_FROM_CENTS = 100_000;
-export const packNeedsConfirm = (priceCents: number): boolean => priceCents >= PACK_CONFIRM_FROM_CENTS;
+export interface SetContentsGroup {
+  rarity: NexamonRarity;
+  odds: OddsRow;
+  /** The cards of the set with this rarity in number order, with the number of own copies. */
+  cards: { card: NexamonCard; owned: number }[];
+  /** Different cards of the group the player owns. */
+  owned: number;
+}
+
+/** What a pack of a set can hold: its cards by rarity, best first, with the pull rate and what is owned. */
+export function setContents(set: NexamonSetKey, copies: readonly Pick<NexamonCopy, "cardKey">[]): SetContentsGroup[] {
+  const count = new Map<string, number>();
+  for (const copy of copies) count.set(copy.cardKey, (count.get(copy.cardKey) ?? 0) + 1);
+  return packOdds().map((odds) => {
+    const cards = NEXAMON_CARDS.filter((card) => card.set === set && card.rarity === odds.rarity).map((card) => ({
+      card,
+      owned: count.get(card.key) ?? 0,
+    }));
+    return { rarity: odds.rarity, odds, cards, owned: cards.filter((entry) => entry.owned > 0).length };
+  });
+}
 
 // ----------------------------------------------------------------------------------------------- binder
 
