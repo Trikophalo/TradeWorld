@@ -31,6 +31,8 @@ export const DISCLOSURE = {
   propertyRentals: 8,
   /** Living bonus for the own or rented home (ADR-161): with the property unlock (level 8). */
   livingBonus: 8,
+  /** Nexamon collectible cards (ADR-165): with the unlock "nexamon" (level 10). */
+  nexamon: 10,
 } as const;
 
 export type DisclosureKey = keyof typeof DISCLOSURE;
