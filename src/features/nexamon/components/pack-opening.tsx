@@ -1,6 +1,14 @@
 "use client";
 
-import { animate, AnimatePresence, motion, useMotionValue, useReducedMotionConfig, useTransform } from "motion/react";
+import {
+  animate,
+  AnimatePresence,
+  motion,
+  useMotionValue,
+  useReducedMotionConfig,
+  useSpring,
+  useTransform,
+} from "motion/react";
 import { useTranslations } from "next-intl";
 import {
   useCallback,
@@ -26,6 +34,7 @@ import { DURATION, EASE, SPRING, STAGGER } from "@/lib/motion";
 import { playSound, type SoundName } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { isHit, pixelScale, swipeOutcome, tearProgress } from "../lib";
+import { RarityBadge } from "./badges";
 import { NexamonCardFace } from "./card-face";
 import { PackFoil, PackSheen } from "./pack";
 import { PixelCanvas } from "./pixel-canvas";
@@ -85,6 +94,10 @@ interface StackCardProps {
   onGone: () => void;
 }
 
+const HOVER_SPRING = { stiffness: 260, damping: 22, mass: 0.6 } as const;
+/** Degrees the top card leans towards the pointer. */
+const HOVER_TILT = 12;
+
 /** One card of the stack. Only the top one listens: it follows the pointer and flies away or falls back. */
 function StackCard({ card, art, evolvesFromName, u, top, reduced, throwRef, onFly, onGone }: StackCardProps) {
   const x = useMotionValue(0);
@@ -94,6 +107,23 @@ function StackCard({ card, art, evolvesFromName, u, top, reduced, throwRef, onFl
   const drag = useRef<{ id: number; x: number; y: number; trail: { t: number; x: number; y: number }[] } | null>(null);
   const leaving = useRef(false);
   const width = NEXAMON_CARD_SIZE.width * u;
+  // The top card leans towards the pointer while it hovers, and its foil follows the same light.
+  const hoverX = useMotionValue(0.5);
+  const hoverY = useMotionValue(0.5);
+  const lightX = useSpring(hoverX, HOVER_SPRING);
+  const lightY = useSpring(hoverY, HOVER_SPRING);
+  const rotateX = useTransform(lightY, [0, 1], [HOVER_TILT, -HOVER_TILT]);
+  const rotateY = useTransform(lightX, [0, 1], [-HOVER_TILT, HOVER_TILT]);
+  const lean = (event: PointerEvent<HTMLDivElement>) => {
+    if (!top || reduced || leaving.current || event.pointerType === "touch") return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    hoverX.set(Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)));
+    hoverY.set(Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)));
+  };
+  const level = () => {
+    hoverX.set(0.5);
+    hoverY.set(0.5);
+  };
 
   const fly = useCallback(
     (dirX: number, dirY: number) => {
@@ -139,6 +169,7 @@ function StackCard({ card, art, evolvesFromName, u, top, reduced, throwRef, onFl
   };
   const move = (event: PointerEvent<HTMLDivElement>) => {
     const state = drag.current;
+    if (!state) lean(event);
     if (!state || state.id !== event.pointerId) return;
     x.set(event.clientX - state.x);
     y.set(event.clientY - state.y);
@@ -180,17 +211,21 @@ function StackCard({ card, art, evolvesFromName, u, top, reduced, throwRef, onFl
       onPointerMove={move}
       onPointerUp={up}
       onPointerCancel={cancel}
+      onPointerLeave={level}
       onDragStart={(event) => event.preventDefault()}
-      style={{ x, y, rotate, opacity, touchAction: top ? "none" : undefined }}
+      style={{ x, y, rotate, opacity, touchAction: top ? "none" : undefined, perspective: width * 4 }}
       className={cn("absolute inset-0 select-none", top ? "cursor-grab active:cursor-grabbing" : "pointer-events-none")}
     >
-      <NexamonCardFace
-        card={card}
-        art={art}
-        scale={u}
-        evolvesFromName={evolvesFromName}
-        foil={top ? "live" : "still"}
-      />
+      <motion.div style={top ? { rotateX, rotateY } : undefined} data-testid={top ? "pack-top-card-tilt" : undefined}>
+        <NexamonCardFace
+          card={card}
+          art={art}
+          scale={u}
+          evolvesFromName={evolvesFromName}
+          foil={top ? "live" : "still"}
+          light={top ? { x: lightX, y: lightY } : undefined}
+        />
+      </motion.div>
     </motion.div>
   );
 }
@@ -570,6 +605,9 @@ export function PackOpening({
       <div className="min-h-10 text-center" aria-live="polite">
         {phase === "stack" && current ? (
           <>
+            <div className="mb-1 flex justify-center" data-testid="pack-top-rarity" data-rarity={current.rarity}>
+              <RarityBadge key={current.key + index} rarity={current.rarity} />
+            </div>
             <p className="label-pixel text-fg-2" data-testid="pack-counter">
               {t("pack.counter", { n: index + 1, total: cards.length })}
             </p>
