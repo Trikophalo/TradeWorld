@@ -118,6 +118,10 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   Was du nicht einstellst, bleibt in „Deine Sammlung“ (neuer Filter „Zum Verkauf / Nicht zum Verkauf“), und
   Nexamon-Missionen führen direkt zu den Collectibles. Die ASP-Nachricht verrät die Note nicht mehr, Karten im Markt
   tragen „Im Markt“, und die Collectibles merken sich Filter und Tab.
+
+- **Deine Firma in Tabs (ADR-167):** Zuerst das Dashboard mit allen wichtigen Zahlen, Grafiken, Timern und dem, was
+  ansteht; im Controlling alle Hebel; Mitarbeiter mit Stellenplan, Chat und dem, was jeder im Monat leistet und kostet.
+  Börsennotierte Firmen bekommen Forschungsbaum, Zufriedenheit mit Benefits, Buchhaltung mit Finanzamt und den Geschäftsrat.
 - **Black Label und ASP-Paket (ADR-165):** Über der ASP 10 steht jetzt das Black Label: Nur 1 % der Mint-Karten
   bekommen es, der Slab ist das 10-Fache der Karte wert. Bewertete Karten kommen in einem versiegelten Paket zurück,
   das du selbst aufreißt; die Note wird langsam enthüllt. Im Booster-Fenster zeigt jede Karte beim Drüberfahren

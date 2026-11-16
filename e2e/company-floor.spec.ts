@@ -1,3 +1,4 @@
+import { showDashboard, showStaff } from "./company-helpers";
 import { expect, test, type Page } from "@playwright/test";
 
 /*
@@ -138,10 +139,11 @@ test("company page: writing into the office shows a bubble over my figure and la
   await expect(say.getByPlaceholder("Sag was ins Büro …")).toHaveValue("");
 
   // The same words stand in the company chat.
-  await page.getByRole("tab", { name: /Chat/ }).click();
+  await showStaff(page);
   await expect(page.getByTestId("chat-messages")).toContainText("Kaffee ist fertig!");
 
-  // My figure opens my profile.
+  // My figure opens my profile (the office is on the dashboard).
+  await showDashboard(page);
   await me.click();
   await expect(page).toHaveURL(/\/players\/Plaudertasche$/);
 });

@@ -44,6 +44,7 @@ export function StockDetail({ ticker }: { ticker: string }) {
   const tt = useTranslations("tiers");
   const ready = useMarketReady();
   const tc = useTranslations("companyProfile");
+  const tboard = useTranslations("hq.board");
   const security = useSecurity(ticker);
   const position = useGame((state) => state.portfolio?.positions.find((p) => p.ticker === ticker));
   const [range, setRange] = useState<ChartRange>("1T");
@@ -147,6 +148,16 @@ export function StockDetail({ ticker }: { ticker: string }) {
                 data-testid="open-company"
               >
                 {tc("open")}
+              </Link>
+            )}
+            {/* Shareholders of a listed player company sit in its Geschäftsrat (ADR-167). */}
+            {security?.companyKind === "player" && security.companyId && (
+              <Link
+                href={`/company?board=${encodeURIComponent(security.companyId)}`}
+                className="label-pixel text-accent focus-ring hover:underline"
+                data-testid="open-board"
+              >
+                {tboard("link")}
               </Link>
             )}
             {security?.sector && (

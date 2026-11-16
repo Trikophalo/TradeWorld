@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { showOverview } from "./company-helpers";
+import { showDashboard } from "./company-helpers";
 
 /*
  * Company health (ADR-162) in demo mode: the overview shows the eight factors as a chart and as bars, the weakest
@@ -47,14 +47,10 @@ async function foundCompany(page: Page) {
 test("the overview shows eight factors and the chart; a factor goes to Mira with the question", async ({ page }) => {
   await foundCompany(page);
 
-  // On the Mira tab: the compact version with the weakest point.
-  const compact = page.getByTestId("company-health-compact");
-  await expect(compact).toBeVisible();
-  await expect(compact).toContainText("Hier verlierst du am meisten:");
-  // Mira raises the weakest point on her own.
+  // The dashboard is the first tab: Mira raises the weakest point on her own, the full panel stands below.
+  await showDashboard(page);
   await expect(page.getByTestId("mira").getByText(/Hier verlierst du gerade am meisten:/)).toBeVisible();
 
-  await showOverview(page);
   const panel = page.getByTestId("company-health");
   await expect(panel).toBeVisible();
   await expect(panel.getByTestId("health-radar")).toBeVisible();
@@ -68,7 +64,7 @@ test("the overview shows eight factors and the chart; a factor goes to Mira with
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
 
-  // "Mit Mira angehen" on awareness: Mira's tab with the question and her steps.
+  // "Mit Mira angehen" on awareness: Mira (same tab) gets the question and answers with her steps.
   await panel.locator('[data-factor="awareness"]').getByTestId("health-ask").click();
   const mira = page.getByTestId("mira");
   await expect(mira).toBeVisible();

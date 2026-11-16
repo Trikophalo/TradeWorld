@@ -3,11 +3,11 @@
 import { create } from "zustand";
 
 /*
- * Which sections of the company overview are open (ADR-138). Remembered in this browser; read after hydration.
- * The quarter is open by default, everything else folded away.
+ * Which sections of the company page are open (ADR-138; Dashboard and Controlling since ADR-167). Remembered in this
+ * browser; read after hydration. The till, the quarter and the strategy are open by default, the rest is folded.
  */
 const STORAGE_KEY = "nexa-company-sections";
-export const DEFAULT_OPEN: readonly string[] = ["money"];
+export const DEFAULT_OPEN: readonly string[] = ["money", "numbers", "profit"];
 
 interface SectionsState {
   open: string[];

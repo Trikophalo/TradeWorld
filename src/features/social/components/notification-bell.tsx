@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
+import { notificationHref } from "@/features/company/tabs";
 import { useState } from "react";
 import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
@@ -137,7 +138,7 @@ function NotificationRow({
   const className =
     "flex w-full items-start gap-3 rounded-xs border-2 border-line-1 bg-surface-1 p-3 text-left transition duration-fast";
   // Nexamon notifications all carry "/nexamon"; the client knows the tab they belong to (ADR-165).
-  const link = nexamonNotificationLink(item.typeKey, item.link);
+  const link = notificationHref(item.typeKey, nexamonNotificationLink(item.typeKey, item.link));
   return (
     <li data-type={item.typeKey}>
       {link ? (

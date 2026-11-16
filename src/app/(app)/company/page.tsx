@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import { COMPANY_BUILDINGS } from "@/components/pixel/art";
 import { Page, PageHeader } from "@/components/layout/page";
-import { CompanyHub } from "@/features/company/components/company-hub";
+import { CompanyHub, HubSkeleton } from "@/features/company/components/company-hub";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("firm");
@@ -15,7 +16,9 @@ export default async function CompanyPage() {
   return (
     <Page>
       <PageHeader title={t("title")} intro={th("company")} art={COMPANY_BUILDINGS.garage} />
-      <CompanyHub />
+      <Suspense fallback={<HubSkeleton />}>
+        <CompanyHub />
+      </Suspense>
     </Page>
   );
 }

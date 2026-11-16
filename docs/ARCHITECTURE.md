@@ -275,6 +275,7 @@ flowchart TD
 | i18n          | `next-intl`, Texte in `messages/de.json`, Schlüssel typgeprüft                                                   |
 | PWA           | Manifest, Icons, minimaler Service Worker (Offline-Seite). Web-Push in M8                                        |
 | Fehler        | Toast mit verständlichem Text; RPC-Fehlercodes werden auf Textschlüssel abgebildet                               |
+| Firmenseite   | Tabs in der URL (`?tab=&section=`), Abbildung alter Ziele in `features/company/tabs.ts` (ADR-167)                |
 
 ## 11. Sicherheit
 

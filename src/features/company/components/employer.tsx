@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useState, type ReactNode } from "react";
 import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { Avatar } from "@/components/ui/avatar";
 import { PlayerFigure } from "@/components/ui/player-figure";
 import { Badge } from "@/components/ui/badge";
@@ -678,41 +679,64 @@ export function TeamView({ company, onHire }: { company: MyCompany; onHire: (req
   const general = Math.max(0, company.aiWorkers - company.aiWorkerSkills.length);
   const used = company.employees + company.aiWorkers;
   const free = Math.max(0, company.maxEmployees - used);
+  const people = team.data?.length ?? 0;
+  const ai = company.aiWorkers;
+  // A big company (an AG) gets a long plan: then it starts folded, with a one-line summary.
+  const [planOpen, setPlanOpen] = useState(used <= PLAN_OPEN_UP_TO);
   return (
     <div className="space-y-8">
-      <OrgChart companyId={company.id} />
-      <Section title={t("seatsTitle")} aside={t("staffCount", { used, max: company.maxEmployees })}>
-        {!team.data ? (
-          <Skeleton className="h-32 w-full rounded-lg" />
-        ) : (
-          <ul className="grid gap-3 lg:grid-cols-2" data-testid="seats">
-            <li>
-              <FounderSeat company={company} />
-            </li>
-            {team.data.map((m) => (
-              <li key={m.playerJobId}>
-                <MemberRow member={m} companyId={company.id} onFire={() => setFiring(m)} />
-              </li>
-            ))}
-            {company.aiWorkerSkills.map((skill) => (
-              <li key={`ai-${skill}`}>
-                <AiWorkerRow company={company} skill={skill} />
-              </li>
-            ))}
-            {Array.from({ length: general }, (_, i) => (
-              <li key={`ai-general-${i}`}>
-                <AiWorkerRow company={company} skill={null} />
-              </li>
-            ))}
-            {Array.from({ length: free }, (_, i) => (
-              <li key={`free-${i}`}>
-                <FreeSeat onHire={() => onHire({})} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
-      <Section title={t("tabApplications")}>
+      <CollapsibleSection
+        id="staffing-plan"
+        open={planOpen}
+        onOpenChange={setPlanOpen}
+        title={t("planTitle")}
+        summary={t("planSummary", { people: people + 1, ai, free, postings: company.openPostings })}
+        icon={<PixelIcon {...UI_ICONS.profile} scale={2} />}
+      >
+        <OrgChart companyId={company.id} />
+        <Section title={t("seatsTitle")} aside={t("staffCount", { used, max: company.maxEmployees })}>
+          {!team.data ? (
+            <Skeleton className="h-32 w-full rounded-lg" />
+          ) : (
+            <div className="space-y-3" data-testid="seats">
+              <SeatGroup title={t("planPlayers")} count={people + 1} defaultOpen={people + 1 <= PLAN_OPEN_UP_TO}>
+                <li>
+                  <FounderSeat company={company} />
+                </li>
+                {team.data.map((m) => (
+                  <li key={m.playerJobId}>
+                    <MemberRow member={m} companyId={company.id} onFire={() => setFiring(m)} />
+                  </li>
+                ))}
+              </SeatGroup>
+              {ai > 0 && (
+                <SeatGroup title={t("planAi")} count={ai} defaultOpen={ai <= PLAN_OPEN_UP_TO}>
+                  {company.aiWorkerSkills.map((skill) => (
+                    <li key={`ai-${skill}`}>
+                      <AiWorkerRow company={company} skill={skill} />
+                    </li>
+                  ))}
+                  {Array.from({ length: general }, (_, i) => (
+                    <li key={`ai-general-${i}`}>
+                      <AiWorkerRow company={company} skill={null} />
+                    </li>
+                  ))}
+                </SeatGroup>
+              )}
+              {free > 0 && (
+                <SeatGroup title={t("planFree")} count={free} defaultOpen={free <= PLAN_OPEN_UP_TO}>
+                  {Array.from({ length: free }, (_, i) => (
+                    <li key={`free-${i}`}>
+                      <FreeSeat onHire={() => onHire({})} />
+                    </li>
+                  ))}
+                </SeatGroup>
+              )}
+            </div>
+          )}
+        </Section>
+      </CollapsibleSection>
+      <Section id="applications" title={t("tabApplications")}>
         <Applications company={company} />
       </Section>
       <Section title={t("tabPostings")}>
@@ -723,6 +747,37 @@ export function TeamView({ company, onHire }: { company: MyCompany; onHire: (req
       </Section>
       <FireSheet member={firing} onClose={() => setFiring(null)} />
     </div>
+  );
+}
+
+/** Up to this many seats a group (and the whole plan) starts open. */
+const PLAN_OPEN_UP_TO = 8;
+
+/** One group of seats (players, AI workers, free seats) that folds away. */
+function SeatGroup({
+  title,
+  count,
+  defaultOpen,
+  children,
+}: {
+  title: string;
+  count: number;
+  defaultOpen: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <details open={defaultOpen} className="group rounded-md border border-line-1" data-testid="seat-group">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium text-fg-1 focus-ring hover:bg-surface-2">
+        <span>{title}</span>
+        <span className="flex items-center gap-2 nums text-xs text-fg-3">
+          {count}
+          <span aria-hidden className="transition-transform duration-base group-open:rotate-180">
+            ▾
+          </span>
+        </span>
+      </summary>
+      <ul className="grid gap-3 px-2 pb-2 lg:grid-cols-2">{children}</ul>
+    </details>
   );
 }
 

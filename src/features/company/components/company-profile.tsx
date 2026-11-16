@@ -32,6 +32,7 @@ export function CompanyProfileView({ companyId }: { companyId: string }) {
   const ts = useTranslations("sectors");
   const tp = useTranslations("products");
   const tc = useTranslations("careerTiers");
+  const tb = useTranslations("hq.board");
   const profile = useQuery({
     queryKey: ["company-profile", companyId],
     queryFn: () => engine.companyProfile(companyId),
@@ -103,14 +104,26 @@ export function CompanyProfileView({ companyId }: { companyId: string }) {
               <span className="font-semibold text-fg-1">{formatPrice(company.priceE4)}</span>
               <Delta bps={company.changeBps ?? 0} />
             </span>
-            {company.ticker && (
-              <Link
-                href={`/markets/${company.ticker}`}
-                className={buttonVariants({ variant: "secondary", size: "sm" })}
-              >
-                {t("stock")}
-              </Link>
-            )}
+            <span className="flex flex-wrap gap-2">
+              {company.ticker && (
+                <Link
+                  href={`/markets/${company.ticker}`}
+                  className={buttonVariants({ variant: "secondary", size: "sm" })}
+                >
+                  {t("stock")}
+                </Link>
+              )}
+              {/* Listed player companies have a Geschäftsrat (ADR-167): any shareholder may look and vote. */}
+              {!company.isAi && (
+                <Link
+                  href={`/company?board=${encodeURIComponent(company.id)}`}
+                  className={buttonVariants({ variant: "secondary", size: "sm" })}
+                  data-testid="company-board-link"
+                >
+                  {tb("link")}
+                </Link>
+              )}
+            </span>
           </div>
         )}
         {founder && (

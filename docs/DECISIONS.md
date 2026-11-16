@@ -3268,6 +3268,32 @@ Anteil wie jeder Aktionär.
 - Die Quartalsregeln (Wachstum der Bekanntheit, Qualitätsziel) bleiben unberührt; Effekte wirken in der Stunde.
 - Stimmrecht nach aktuellem Bestand beim Auszählen, kein Stichtag; Leerverkäufe und Hebel zählen nicht.
 
+### Oberfläche der Firmenseite (Nachtrag)
+
+- **Fünf Tabs** in der URL (`/company?tab=…&section=…`): **Dashboard** (Standard: Zu erledigen mit Direktlinks,
+  Zahlen der letzten Stunde mit Verlauf der letzten 24 Stunden, laufende Timer, Mira, Büro, acht Faktoren, Lage und
+  Nachrichten, Quartal und Verlauf, „Was jeder leistet und kostet“; notiert zusätzlich Kurs, Ruf, laufende Kosten,
+  Steuer und Stimmung mit Zonen-Grafik), **Controlling** (alle Hebel in Bereichen zum Aufklappen, notiert dazu
+  laufende Kosten, Forschungsbaum 7 × 4, Produkte, Märkte, Anlagen, Zukäufe, Lizenzen und Dividenden),
+  **Mitarbeiter** (Zufriedenheit mit Benefits und Aktionen, Stellenplan zum Aufklappen, Leistung je Kopf, Aufgaben,
+  Chat daneben ab `lg`), **Buchhaltung** und **Geschäftsrat** (nur notiert; private Firmen sehen ab Level 9 einen
+  gesperrten Tab mit Ausblick, `DISCLOSURE.companyListed`).
+- **Alte Adressen** und Miras `open`-Ziele bildet `src/features/company/tabs.ts` ab (z. B. `overview` + `books` →
+  Buchhaltung, `team`/`tasks`/`chat` → Mitarbeiter). Benachrichtigungen mit dem Link `/company` bekommen dort Tab und
+  Abschnitt; `/company?board=<id>` zeigt Aktionären den Geschäftsrat einer fremden Firma (Link auf Firmen- und
+  Aktienseite).
+- **Leistung je Mitarbeiter:** Das Spiel kennt keinen Kalendermonat; ein Monat sind hier 30 Tage. Kosten: Spieler
+  Lohn × höchstens 8 bezahlte Stunden am Tag, KI-Kräfte jede Stunde. Leistung: Umsatz der letzten 24 Stunden × 30,
+  geteilt nach dem Anteil an der Produktivität. Reine Client-Rechnung aus vorhandenen Daten
+  (`src/features/company/staff-value.ts`), keine neue RPC.
+- **Bekanntheit „immer 0 % oder 1 %“:** Am lokalen Postgres nicht nachstellbar. Quartalsabschluss, Antwort
+  (`awareness_bps` = Anteil × 10 000) und Anzeige (÷ 10 000) passen zusammen; mit Marketing steigt die Bekanntheit
+  von 3 % auf 28 % in zwei Quartalen (Test `a8_company_awareness.sql`). Erklärbar ist der Wert aber durch die
+  Regeln: Protest (−3 Punkte) und ein Fehlschlag eines eigenen Zugs (−5 Punkte) ziehen eine Garage von 3 % auf 0,
+  der Abschluss hebt auf das Minimum 1 %, und Mundpropaganda wächst proportional zur Bekanntheit (bei 1 % etwa
+  +0,2 Punkte je Quartal). Offener Punkt fürs Balancing: Abzüge relativ statt absolut oder ein fester
+  Mundpropaganda-Sockel.
+
 ## ADR-168: Firmen-Fehlerbehebungen – robuste Stundenabrechnung, sichtbare Timer, echte Fehlertexte — `Annahme`
 
 - **Anlass:** Meldungen vom Live-Server (GmbH): „Wo es fehlt“ zeigt falsche Werte, Ausbau trotz GmbH gesperrt, Banner

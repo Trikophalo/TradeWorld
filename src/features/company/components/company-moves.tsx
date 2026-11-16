@@ -109,7 +109,7 @@ function SlotDots({ used, slots }: { used: number; slots: number }) {
 type MovesT = ReturnType<typeof useTranslations<"companyMoves">>;
 
 /** Move names live under `companyMoves.items.<key>`; the key comes from the server, so it is a plain string. */
-function moveText(t: MovesT, key: string, field: "name" | "desc") {
+export function moveText(t: MovesT, key: string, field: "name" | "desc") {
   return t(`items.${key}.${field}` as Parameters<MovesT>[0]);
 }
 
