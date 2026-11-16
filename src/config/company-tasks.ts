@@ -5,7 +5,28 @@
  */
 import type { MoveBranch } from "./company-moves.ts";
 
-export type TaskGame = "pick" | "count" | "sort" | "order" | "seq" | "math" | "slider" | "rotate" | "match" | "path";
+/** Every task game; the last eight came with ADR-173. */
+export const TASK_GAMES = [
+  "pick",
+  "count",
+  "sort",
+  "order",
+  "seq",
+  "math",
+  "slider",
+  "rotate",
+  "match",
+  "path",
+  "memory",
+  "timing",
+  "diff",
+  "quick",
+  "route",
+  "haggle",
+  "pack",
+  "catch",
+] as const;
+export type TaskGame = (typeof TASK_GAMES)[number];
 export type TaskMathOp = "mul" | "add" | "sub" | "pct";
 
 export interface CompanyTaskConfig {
@@ -474,6 +495,43 @@ export const COMPANY_TASKS: readonly CompanyTaskConfig[] = [
   { key: "forklift_path", product: "warehouse", branch: "logistics", game: "path", factor: 1.0, minutes: 45 },
   { key: "crane_turn", product: "freight", branch: "logistics", game: "rotate", factor: 1.0, minutes: 40 },
   { key: "truck_space", product: "moving", branch: "logistics", game: "slider", factor: 0.9, minutes: 40 },
+  // ADR-173: eight more games (memory, timing, spot the difference, quick maths, route, negotiation, packing, reaction)
+  { key: "badge_pairs", product: "*", branch: "management", game: "memory", factor: 0.8, minutes: 45 },
+  { key: "sample_pairs", product: "biotech", branch: "science", game: "memory", factor: 1.1, minutes: 45 },
+  { key: "stamp_timing", product: "*", branch: "law", game: "timing", factor: 0.8, minutes: 40 },
+  { key: "conveyor_scan", product: "warehouse", branch: "logistics", game: "timing", factor: 1.0, minutes: 40 },
+  { key: "invoice_diff", product: "*", branch: "finance", game: "diff", factor: 1.0, minutes: 45 },
+  { key: "code_diff", product: "mobile_app", branch: "it", game: "diff", factor: 1.1, minutes: 45 },
+  {
+    key: "cash_count",
+    product: "*",
+    branch: "finance",
+    game: "quick",
+    factor: 0.9,
+    minutes: 40,
+    op: "add",
+    a: [12, 95],
+    b: [8, 60],
+  },
+  {
+    key: "discount_sprint",
+    product: "online_shop",
+    branch: "sales",
+    game: "quick",
+    factor: 1.0,
+    minutes: 40,
+    op: "pct",
+    a: [20, 200],
+    b: [10, 50],
+  },
+  { key: "sales_tour", product: "*", branch: "sales", game: "route", factor: 0.9, minutes: 45 },
+  { key: "delivery_tour", product: "courier", branch: "logistics", game: "route", factor: 1.2, minutes: 45 },
+  { key: "supplier_haggle", product: "*", branch: "management", game: "haggle", factor: 1.1, minutes: 50 },
+  { key: "client_haggle", product: "*", branch: "sales", game: "haggle", factor: 1.1, minutes: 50 },
+  { key: "budget_pack", product: "*", branch: "finance", game: "pack", factor: 1.0, minutes: 45 },
+  { key: "truck_pack", product: "moving", branch: "logistics", game: "pack", factor: 1.1, minutes: 45 },
+  { key: "spam_catch", product: "*", branch: "it", game: "catch", factor: 0.8, minutes: 40 },
+  { key: "defect_catch", product: "*", branch: "craft", game: "catch", factor: 0.9, minutes: 40 },
 ];
 
 /** Rules for company tasks (ADR-129). Money in cents, rates in basis points. */
@@ -503,6 +561,22 @@ export const COMPANY_TASK_RULES = {
      * a detour of at least minDetour steps. Every step more than the shortest route costs stepBps.
      */
     path: { seconds: 40, size: 5, minWalls: 6, maxWalls: 9, minDetour: 2, stepBps: 1_000 },
+    /** ADR-173: find the pairs of pairs face-down cards; every wrong flip of two costs missBps. */
+    memory: { seconds: 45, pairs: 4, missBps: 500 },
+    /** A marker sweeps 0..100 and back in sweepMs; stop it in each zone, scored like slider. */
+    timing: { seconds: 30, rounds: 3, min: 12, max: 88, tolerance: 5, sweepMs: 1_600 },
+    /** Two grids of cells tiles drawn from symbols labels; minDiffs..maxDiffs cells differ, tap them (like pick). */
+    diff: { seconds: 35, cells: 12, symbols: 6, minDiffs: 3, maxDiffs: 5 },
+    /** problems quick sums (the task's op and ranges), each with options answers; one is right. */
+    quick: { seconds: 40, problems: 5, options: 3 },
+    /** A depot and stops places on a grid×grid map; plan the shortest round trip, every extra field costs stepBps. */
+    route: { seconds: 45, grid: 6, stops: 4, stepBps: 1_000 },
+    /** rounds of a negotiation with three replies each: the best full marks, the middle one okBps, the bad one 0. */
+    haggle: { seconds: 60, rounds: 3, okBps: 5_000 },
+    /** items with weights and values; load the most value within capShareBps of the total weight. */
+    pack: { seconds: 40, items: 6, minWeight: 1, maxWeight: 6, minValue: 1, maxValue: 9, capShareBps: 5_000 },
+    /** events tiles pop up one after another on cells fields; tap the good ones (goodShareBps of them), like pick. */
+    catch: { seconds: 25, events: 12, cells: 9, goodShareBps: 5_000, everyMs: 1_100, showMs: 900 },
   },
   /** AI workers do delegated tasks, but slowly and less well. */
   ai: {

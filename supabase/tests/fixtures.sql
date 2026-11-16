@@ -1065,6 +1065,25 @@ select public.get_company_moves();
 \o
 reset role;
 
+-- CEO interviews (ADR-173) ------------------------------------------------------------------------------------------
+select company_id as fx_gco from public.player_companies where founder_id = :fx_g and status = 'active' \gset
+select public.company_interview_request(:'fx_gco', now()) is not null as ok \gset
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/get_company_interview.json
+select public.get_company_interview();
+\o :fixture_dir/answer_company_interview.json
+select public.answer_company_interview(gen_random_uuid(), (public.get_company_interview() #>> '{interview,id}')::bigint,
+  '[{"text": "Danke an das ganze Team und unsere Kunden."}, {"quick": 0}, {"text": ""}]');
+\o
+reset role;
+update public.company_interviews set requested_at = requested_at - interval '2 days' where company_id = :'fx_gco';
+select public.company_interview_request(:'fx_gco', now()) is not null as ok \gset
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/decline_company_interview.json
+select public.decline_company_interview(gen_random_uuid(), (public.get_company_interview() #>> '{interview,id}')::bigint);
+\o
+reset role;
+
 -- Company tasks, supervisors and the news feed (ADR-129) -------------------------------------------------------------
 \set fx_ta '''f1f1f1f1-0000-4000-8000-0000000007a1'''
 \set fx_tb '''f1f1f1f1-0000-4000-8000-0000000007b1'''

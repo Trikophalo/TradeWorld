@@ -158,7 +158,9 @@ select tests.assert(
            -- listed companies (ADR-167)
            'get_listed_company', 'company_invest', 'company_invest_stop', 'company_declare_dividend',
            'company_books_close', 'company_tax_pay', 'company_tax_advisor', 'get_company_accounting',
-           'get_company_board', 'board_propose', 'board_vote']
+           'get_company_board', 'board_propose', 'board_vote',
+           -- CEO interviews (ADR-173)
+           'get_company_interview', 'answer_company_interview', 'decline_company_interview']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')

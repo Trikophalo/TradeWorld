@@ -21,6 +21,8 @@ export interface DemoMoveRun {
 
 export interface CompanyMovesHost {
   company(): { tier: string; productKey?: string; cashCents: number; awareness: number; quality: number } | null;
+  /** ADR-173: the own company is listed on the exchange. */
+  listed?(): boolean;
   addCompanyCash(cents: number): void;
   improve(kind: "awareness" | "quality", by: number): void;
   runs(): DemoMoveRun[];
@@ -81,6 +83,9 @@ export function createCompanyMovesEngine(
       product,
       moves: cfg.moves
         .filter((m) => m.product === "*" || m.product === product)
+        // ADR-173: some moves only from a tier on, or for listed companies
+        .filter((m) => !m.minTier || cfg.tierOrder.indexOf(tier) >= cfg.tierOrder.indexOf(m.minTier))
+        .filter((m) => !m.listedOnly || (host.listed?.() ?? false))
         .map((m) => {
           const risk = cfg.risk[m.risk];
           const cost = Math.round(base * m.costFactor);

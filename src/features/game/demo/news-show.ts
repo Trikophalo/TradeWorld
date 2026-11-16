@@ -68,6 +68,8 @@ export interface NewsShowHost {
   /** The player's net worth change of the day, if known. */
   dayChange(): { cents: number; bps: number } | null;
   addCash(cents: number): void;
+  /** ADR-173: the segments of the CEO interview for this show (marked aired), empty without one. */
+  interviewSegments?(): NewsShowSegment[];
   /** Multiplies the value of open company tasks. */
   scaleOpenTasks(factorBps: number): void;
   idempotent<T>(requestId: string, run: () => T): T;
@@ -77,7 +79,7 @@ export interface NewsShowHost {
 
 const bots = cfg.chat.bots;
 /** Stories about a person: in the demo always the player, shown on the TV in their current look (ADR-157). */
-const PLAYER_KINDS = new Set(["loser", "winner", "gossip", "scandal", "hype", "nft"]);
+const PLAYER_KINDS = new Set(["loser", "winner", "gossip", "scandal", "hype", "nft", "interview"]);
 
 export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "newsShow" | "postNewsShowMessage"> & {
   startNow(inMs?: number): void;
@@ -241,6 +243,9 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
         50,
       );
     }
+
+    // a CEO interview (ADR-173): the questions, the answers and his reactions
+    (host.interviewSegments?.() ?? []).forEach((segment, i) => segments.push(segment, BALANCE.interviews.ord + i));
 
     // more topics (ADR-169): about fellow players, drawn like the server does; not the ones of the last show
     const friends = host.friendsOnline?.() ?? [];

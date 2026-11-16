@@ -884,7 +884,10 @@
     "board_no_right": "Den Geschäftsrat kann nur einberufen, wer mehr als 20 % der Aktien hält.",
     "board_motion_unknown": "Diesen Antrag gibt es nicht (mehr).",
     "board_limit": "Es laufen schon genug Anträge. Versuch es später noch einmal.",
-    "board_not_shareholder": "Dafür brauchst du Aktien dieser Firma."
+    "board_not_shareholder": "Dafür brauchst du Aktien dieser Firma.",
+    "interview_not_found": "Dieses Interview gibt es nicht.",
+    "interview_text_invalid": "Die Antwort ist zu lang oder enthält Wörter, die hier nicht gehen.",
+    "interview_closed": "Das Interview ist schon vorbei."
   },
   "locks": {
     "level": "Level {level}",
@@ -5009,8 +5012,10 @@
         "desc": "Ein Video kann viele neue Nutzer bringen."
       },
       "hackathon": {
-        "name": "Hackathon gewinnen",
-        "desc": "Preisgeld für die beste App des Wochenendes."
+        "name": "Hackathon",
+        "desc": "Ein Wochenende Pizza und Code. Entweder entsteht Großes oder nur Müdigkeit.",
+        "ok": "Beim Hackathon von {company} entstand ein Feature, das alle sofort wollen.",
+        "fail": "Der Hackathon von {company} endete mit drei halbfertigen Apps und viel leerem Pizzakarton."
       },
       "migrate_customer": {
         "name": "Kunden in die Cloud umziehen",
@@ -5467,8 +5472,94 @@
       "senior_move": {
         "name": "Umzug ins Seniorenheim begleiten",
         "desc": "Mit Geduld und Plan. Familien empfehlen euch weiter."
+      },
+      "customer_survey": {
+        "name": "Kundenumfrage",
+        "desc": "Ihr fragt eure Kundschaft, was nervt. Die Antworten machen das Produkt besser.",
+        "ok": "{company} hört zu: Die Kundenumfrage brachte zwölf gute Ideen und eine Beschwerde über den Kaffee.",
+        "fail": "Die Umfrage von {company} landete im Spam. Geantwortet hat nur die Oma des Gründers."
+      },
+      "trade_fair": {
+        "name": "Messestand",
+        "desc": "Drei Tage Stand auf der Fachmesse. Prospekte, Kugelschreiber, Händeschütteln.",
+        "ok": "Der Stand von {company} war der Renner der Messe. Die Kugelschreiber sind alle weg.",
+        "fail": "Der Stand von {company} stand neben den Toiletten. Viel Laufkundschaft, wenig Interesse."
+      },
+      "supplier_switch": {
+        "name": "Lieferant wechseln",
+        "desc": "Ihr holt neue Angebote ein und wechselt zum günstigsten Lieferanten.",
+        "ok": "{company} spart beim neuen Lieferanten ordentlich, und die Ware kommt sogar pünktlich.",
+        "fail": "Der neue Lieferant von {company} lieferte die falsche Ware. Zurück zum alten, mit Aufpreis."
+      },
+      "craft_masterclass": {
+        "name": "Meisterkurs",
+        "desc": "Eine erfahrene Meisterin zeigt dem Team die Kniffe des Handwerks.",
+        "ok": "Nach dem Meisterkurs arbeitet {company} sauberer als je zuvor.",
+        "fail": "Der Meisterkurs bei {company} fiel aus: Die Meisterin stand im Stau."
+      },
+      "factoring": {
+        "name": "Forderungen verkaufen",
+        "desc": "Offene Rechnungen an eine Factoring-Bank verkaufen: schnelles Geld, kleiner Abschlag.",
+        "ok": "{company} hat offene Rechnungen zu Geld gemacht. Die Kasse klingelt sofort.",
+        "fail": "Die Factoring-Bank fand die Kunden von {company} zu riskant und zahlte nur wenig."
+      },
+      "patent_filing": {
+        "name": "Patent anmelden",
+        "desc": "Ihr meldet eure beste Idee zum Patent an. Schützt das Produkt vor Nachahmern.",
+        "ok": "Patent erteilt! {company} hat die Idee jetzt schwarz auf weiß.",
+        "fail": "Das Patentamt fand bei {company} nichts Neues. Die Idee gab es schon 1987."
+      },
+      "lab_partnership": {
+        "name": "Forschung mit der Uni",
+        "desc": "Eine Kooperation mit einem Uni-Lehrstuhl bringt Wissen ins Haus.",
+        "ok": "Die Uni-Kooperation von {company} liefert echte Durchbrüche, mit Fußnoten.",
+        "fail": "Die Studierenden bei {company} haben vor allem die Kaffeemaschine erforscht."
+      },
+      "small_acquisition": {
+        "name": "Kleine Konkurrenz übernehmen",
+        "desc": "Ihr kauft einen kleinen Wettbewerber samt Kundschaft. Kann sich lohnen, kann wehtun.",
+        "ok": "{company} hat die Konkurrenz geschluckt und deren Kundschaft gleich mit.",
+        "fail": "Die Übernahme durch {company} war ein Reinfall: Die Kunden sind alle vorher geflohen."
+      },
+      "tv_commercial": {
+        "name": "TV-Spot zur Primetime",
+        "desc": "Dreißig Sekunden vor der Hauptnachrichtensendung. Ganz Deutschland schaut zu.",
+        "ok": "Der TV-Spot von {company} ist in aller Munde. Sogar Mr. Doodle Dangle summt den Jingle.",
+        "fail": "Der TV-Spot von {company} lief während des Elfmeterschießens. Niemand hat hingeschaut."
+      },
+      "bond_issue": {
+        "name": "Anleihe begeben",
+        "desc": "Die Firma leiht sich Geld am Kapitalmarkt und legt es klug an.",
+        "ok": "Die Anleihe von {company} war überzeichnet. Billiges Geld, gut angelegt.",
+        "fail": "Die Anleihe von {company} wollte kaum jemand. Die Zinsen fressen den Gewinn."
+      },
+      "capital_markets_day": {
+        "name": "Kapitalmarkttag",
+        "desc": "Ihr ladet Anleger und Analysten ein und erklärt die große Strategie.",
+        "ok": "Der Kapitalmarkttag von {company} begeistert die Analysten. Kursziele werden angehoben.",
+        "fail": "Beim Kapitalmarkttag von {company} fiel der Beamer aus. Die Strategie blieb ein Geheimnis."
+      },
+      "buyback_signal": {
+        "name": "Aktienrückkauf ankündigen",
+        "desc": "Ihr kündigt einen Rückkauf an und handelt geschickt um die Nachricht herum.",
+        "ok": "Die Rückkauf-Nachricht von {company} beflügelt die Börse. Die Firma verdient am Timing.",
+        "fail": "Die Börse glaubt {company} den Rückkauf nicht. Das Timing ging gründlich daneben."
+      },
+      "green_label": {
+        "name": "Ökosiegel beantragen",
+        "desc": "Ein unabhängiges Siegel bestätigt, dass eure Anlagen wirklich grün sind.",
+        "ok": "{company} trägt jetzt das Ökosiegel. Die Kundschaft fühlt sich gleich besser.",
+        "fail": "Die Prüfer von {company} wollten noch drei Formulare. Siegel kommt vielleicht nächstes Jahr."
+      },
+      "app_localization": {
+        "name": "App übersetzen",
+        "desc": "Die App gibt es bald auch auf Französisch, Spanisch und Polnisch.",
+        "ok": "Die übersetzte App von {company} stürmt die Charts in drei neuen Ländern.",
+        "fail": "In der übersetzten App von {company} heißt der Kaufen-Knopf jetzt „Kartoffel“."
       }
-    }
+    },
+    "tierOnly": "Ab {tier}",
+    "listedOnly": "Nur börsennotiert"
   },
   "companyTasks": {
     "title": "Aufgaben",
@@ -5498,7 +5589,15 @@
       "slider": "Einpassen",
       "rotate": "Drehen",
       "match": "Zuordnen",
-      "path": "Weg finden"
+      "path": "Weg finden",
+      "memory": "Paare finden",
+      "timing": "Im Takt",
+      "diff": "Fehlersuche",
+      "quick": "Kopfrechnen",
+      "route": "Tour planen",
+      "haggle": "Verhandeln",
+      "pack": "Einpacken",
+      "catch": "Zugreifen"
     },
     "doIt": "Erledigen",
     "take": "Übernehmen",
@@ -5556,7 +5655,31 @@
       "pathHint": "Zieh mit dem Finger einen Weg vom Start zum Ziel, so kurz wie möglich. Felder antippen geht auch.",
       "pathSteps": "{count} Schritte",
       "pathCell": "Feld {row}-{col}",
-      "back": "Zurück"
+      "back": "Zurück",
+      "memoryHint": "Deck zwei Karten auf. Gleiche Paare bleiben offen, jeder Fehlgriff kostet ein bisschen.",
+      "memoryCard": "Karte {index}",
+      "memoryHidden": "verdeckt",
+      "memoryMisses": "{count} Fehlgriffe",
+      "timingHint": "Der Zeiger läuft hin und her. Stopp ihn genau in der markierten Zone. Leertaste geht auch.",
+      "timingStop": "Stopp!",
+      "timingRound": "Runde {round} von {total}",
+      "diffHint": "Links ist das Original. Tippe rechts jedes Feld an, das anders ist.",
+      "diffLeft": "Original",
+      "diffRight": "Kopie",
+      "quickHint": "Wähle schnell das richtige Ergebnis.",
+      "quickProblem": "Aufgabe {index} von {total}",
+      "routeHint": "Tippe die Stationen in der Reihenfolge an, in der du fährst. Am Ende geht es zurück zum Start.",
+      "routeLength": "{count} Felder",
+      "routeUndo": "Letzte Station zurück",
+      "haggleHint": "Wähle in jeder Runde die klügste Antwort.",
+      "haggleRound": "Runde {round} von {total}",
+      "packHint": "Pack so viel Wert wie möglich ein, ohne das Limit zu überschreiten.",
+      "packLoad": "{weight} von {cap} {unit}",
+      "packValue": "Wert {value}",
+      "packOver": "Zu schwer!",
+      "catchHint": "Tippe nur die richtigen Kacheln an, sobald sie auftauchen.",
+      "catchGood": "Fangen: {label}",
+      "catchCaught": "{count} gefangen"
     },
     "hierarchy": "Wer berichtet an wen",
     "hierarchyIntro": "Vorgesetzte sind für ihr Team verantwortlich und geben Aufgaben weiter. Eine Vorgesetzte oder ein Vorgesetzter braucht einen höheren Rang.",
@@ -6500,6 +6623,170 @@
         "ok": "{company} bekommt den ganzen Umzug in eine Fahrt.",
         "fail": "Nichts passte: {company} musste zweimal fahren.",
         "labels": ["Sofa", "Schrank", "Kommode"]
+      },
+      "badge_pairs": {
+        "name": "Namensschilder sortieren",
+        "how": "Finde die passenden Paare: jedes Namensschild gehört zu genau einem anderen.",
+        "ok": "Bei {company} trägt jeder das richtige Namensschild. Der Kundentermin lief perfekt.",
+        "fail": "Peinlich bei {company}: Der Chef wurde den Gästen als Praktikant vorgestellt.",
+        "labels": ["Anna · Vertrieb", "Ben · IT", "Cem · Lager", "Dana · Chefin"]
+      },
+      "sample_pairs": {
+        "name": "Proben zuordnen",
+        "how": "Jede Probe hat ein Gegenstück. Finde alle Paare, bevor die Kühlung piept.",
+        "ok": "{company} hat jede Probe richtig zugeordnet. Die Studie geht weiter.",
+        "fail": "Probenchaos bei {company}: Zwei Versuchsreihen müssen von vorn beginnen.",
+        "labels": ["Probe A", "Probe B", "Probe C", "Probe D"]
+      },
+      "stamp_timing": {
+        "name": "Stempel setzen",
+        "how": "Der Stempel fährt über das Formular. Drück genau dann, wenn er über dem Feld steht.",
+        "ok": "Bei {company} sitzt jeder Stempel. Das Amt ist zufrieden.",
+        "fail": "Schiefe Stempel bei {company}: Das Amt schickt alles zurück.",
+        "labels": ["Eingang", "Geprüft", "Genehmigt"]
+      },
+      "conveyor_scan": {
+        "name": "Pakete scannen",
+        "how": "Die Pakete rollen am Scanner vorbei. Scan jedes, wenn es genau im Lichtstrahl ist.",
+        "ok": "{company} scannt jedes Paket beim ersten Versuch. Das Band läuft ohne Stau.",
+        "fail": "Stau im Lager von {company}: Ungescannte Pakete stapeln sich bis zur Decke.",
+        "labels": ["Paket 1", "Paket 2", "Paket 3"]
+      },
+      "invoice_diff": {
+        "name": "Rechnung gegenprüfen",
+        "how": "Links die Bestellung, rechts die Rechnung. Tippe jede Zeile an, die nicht übereinstimmt.",
+        "ok": "{company} hat jeden Rechenfehler des Lieferanten gefunden und Geld gespart.",
+        "fail": "{company} hat eine falsche Rechnung bezahlt. Das Geld ist erst mal weg.",
+        "labels": ["10 Stück", "12 Stück", "Art. 4711", "Art. 4717", "Rabatt 5 %", "Rabatt 0 %"]
+      },
+      "code_diff": {
+        "name": "Code-Review",
+        "how": "Links die geprüfte Version, rechts der neue Stand. Tippe jede geänderte Zeile an.",
+        "ok": "Sauberes Review bei {company}: Der Fehler kam nie in den App Store.",
+        "fail": "Ein Bug rutschte bei {company} durch: Die App stürzt beim Login ab.",
+        "labels": ["if", "else", "return", "null", "true", "false"]
+      },
+      "cash_count": {
+        "name": "Kassensturz",
+        "how": "Zähle schnell zusammen, was in der Kasse liegt.",
+        "ok": "Die Kasse von {company} stimmt auf den Cent.",
+        "fail": "Bei {company} fehlt Geld in der Kasse. Niemand weiß, wohin es ist."
+      },
+      "discount_sprint": {
+        "name": "Rabatte ausrechnen",
+        "how": "Rechne in Windeseile aus, wie viel Euro der Rabatt ausmacht.",
+        "ok": "Der Sale von {company} lief mit korrekten Preisen. Die Kundschaft jubelt.",
+        "fail": "Falsche Rabatte bei {company}: Ein paar Kunden zahlten fast nichts."
+      },
+      "sales_tour": {
+        "name": "Kundentour planen",
+        "how": "Besuche alle Kunden und komm zurück ins Büro, auf dem kürzesten Weg.",
+        "ok": "{company} hat an einem Tag alle Kunden besucht und neue Aufträge mitgebracht.",
+        "fail": "Die Tour von {company} dauerte ewig. Zwei Kunden warteten vergeblich.",
+        "start": "Büro",
+        "stops": ["Kunde A", "Kunde B", "Kunde C", "Kunde D"]
+      },
+      "delivery_tour": {
+        "name": "Liefertour",
+        "how": "Plane die Runde vom Depot zu allen Adressen und zurück, so kurz wie möglich.",
+        "ok": "Alle Pakete von {company} kamen pünktlich an. Rekord-Tour!",
+        "fail": "{company} ist im Kreis gefahren. Die Pakete kamen einen Tag zu spät.",
+        "start": "Depot",
+        "stops": ["Bäckerei", "Praxis", "Schule", "Büro"]
+      },
+      "supplier_haggle": {
+        "name": "Mit dem Lieferanten verhandeln",
+        "how": "Der Lieferant will mehr Geld. Verhandle klug, ohne ihn zu vergraulen.",
+        "ok": "{company} hat beim Lieferanten einen Spitzenpreis herausgeholt.",
+        "fail": "{company} wurde vom Lieferanten über den Tisch gezogen.",
+        "rounds": [
+          {
+            "line": "„Die Preise steigen leider um 15 Prozent.“",
+            "replies": [
+              "„Wir haben drei andere Angebote. Was können Sie wirklich tun?“",
+              "„Hm, geht da noch was?“",
+              "„Okay, dann zahlen wir halt mehr.“"
+            ]
+          },
+          {
+            "line": "„Vielleicht 10 Prozent, wenn Sie mehr abnehmen.“",
+            "replies": [
+              "„Wir nehmen ein Jahr fest ab, aber nur zum alten Preis.“",
+              "„Lassen Sie uns bei 8 Prozent treffen.“",
+              "„Dann kaufen wir eben gar nichts mehr!“"
+            ]
+          },
+          {
+            "line": "„Gut, 3 Prozent und Sie zahlen in 30 Tagen.“",
+            "replies": [
+              "„Abgemacht, mit Skonto bei Zahlung in 10 Tagen.“",
+              "„Na gut, einverstanden.“",
+              "„Nur wenn Sie uns noch einen Obstkorb schicken.“"
+            ]
+          }
+        ]
+      },
+      "client_haggle": {
+        "name": "Mit dem Großkunden verhandeln",
+        "how": "Der Kunde will Rabatt. Halte den Preis, ohne den Auftrag zu verlieren.",
+        "ok": "{company} hat den Großauftrag zum vollen Preis gewonnen.",
+        "fail": "{company} hat so viel Rabatt gegeben, dass der Auftrag Verlust macht.",
+        "rounds": [
+          {
+            "line": "„Die Konkurrenz ist 20 Prozent billiger.“",
+            "replies": [
+              "„Dann zeige ich Ihnen, was Sie bei uns zusätzlich bekommen.“",
+              "„Wir könnten über 5 Prozent reden.“",
+              "„Dann gehen Sie doch zur Konkurrenz.“"
+            ]
+          },
+          {
+            "line": "„Und der Service? Der kostet doch extra.“",
+            "replies": [
+              "„Der erste Monat Service ist inklusive, danach fair berechnet.“",
+              "„Der Service ist bei uns halt teurer.“",
+              "„Service brauchen Sie eh nicht.“"
+            ]
+          },
+          {
+            "line": "„Ich unterschreibe heute, wenn Sie noch etwas nachlassen.“",
+            "replies": [
+              "„Bei Unterschrift heute gibt es die Schulung gratis dazu.“",
+              "„Gut, 3 Prozent noch.“",
+              "„Dann eben 30 Prozent, Hauptsache unterschrieben!“"
+            ]
+          }
+        ]
+      },
+      "budget_pack": {
+        "name": "Budget verteilen",
+        "how": "Wähle die Projekte, die zusammen am meisten bringen, ohne das Budget zu sprengen.",
+        "ok": "{company} hat das Budget klug verteilt. Jedes Projekt zahlt sich aus.",
+        "fail": "{company} hat das Budget verbrannt. Die wichtigen Projekte gehen leer aus.",
+        "labels": ["Werbung", "Schulung", "Software", "Messe", "Möbel", "Server"],
+        "unit": "Punkte"
+      },
+      "truck_pack": {
+        "name": "Umzugswagen beladen",
+        "how": "Lade die wertvollsten Kisten in den Wagen, ohne die Zuladung zu überschreiten.",
+        "ok": "Bei {company} passte alles Wichtige in eine Fahrt.",
+        "fail": "Der Wagen von {company} war überladen. Die Polizei hat ihn stillgelegt.",
+        "labels": ["Klavier", "Bücher", "Sofa", "Fernseher", "Geschirr", "Pflanzen"],
+        "unit": "Zentner"
+      },
+      "spam_catch": {
+        "name": "Spam abfangen",
+        "how": "Mails tauchen kurz auf. Tippe nur die Spam-Mails an, die echten lässt du durch.",
+        "ok": "Der Spamfilter von {company} hat jede Betrugsmail erwischt.",
+        "fail": "Bei {company} hat jemand auf eine Betrugsmail geklickt. Ärger mit der IT.",
+        "labels": ["Spam", "Kunde", "Chefin"]
+      },
+      "defect_catch": {
+        "name": "Ausschuss aussortieren",
+        "how": "Teile laufen kurz vorbei. Tippe nur die kaputten an, bevor sie weg sind.",
+        "ok": "Bei {company} ging kein einziges kaputtes Teil raus.",
+        "fail": "Reklamationen bei {company}: Kaputte Teile landeten beim Kunden.",
+        "labels": ["Kaputt", "Gut", "Neu"]
       }
     },
     "delegatedPopup": {

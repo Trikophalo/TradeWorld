@@ -12,6 +12,7 @@ import type { ListedEngine } from "./listed-types";
 import type { SectorKey } from "@/components/pixel/art";
 import type { FloorMaterial, PropertyTier } from "@/config/balance";
 import type { SkillBranch } from "@/config/skills";
+import type { TaskGame } from "@/config/company-tasks";
 import type { CompanyLogoData } from "@/lib/sim/logo";
 
 export type SecurityKind = "stock" | "bond" | "crypto";
@@ -1339,7 +1340,7 @@ export interface CompanyMoves {
 }
 
 /** Company tasks with mini-games (ADR-129). */
-export type TaskGame = "pick" | "count" | "sort" | "order" | "seq" | "math" | "slider" | "rotate" | "match" | "path";
+export type { TaskGame };
 export type TaskStatus = "open" | "assigned" | "playing" | "ai" | "success" | "failure" | "missed";
 
 export interface CompanyTask {
@@ -2182,6 +2183,10 @@ export const GAME_ERROR_KEYS = [
   "board_motion_unknown",
   "board_limit",
   "board_not_shareholder",
+  // ADR-173
+  "interview_not_found",
+  "interview_text_invalid",
+  "interview_closed",
 ] as const;
 export type GameErrorKey = (typeof GAME_ERROR_KEYS)[number] | "unknown";
 
@@ -2252,7 +2257,37 @@ export interface NewsShowState {
   chat: NewsShowChatMessage[];
 }
 
+/** CEO interviews of NEXA Nachrichten (ADR-173). */
+export type InterviewVerdict = "good" | "ok" | "bad" | "none";
+export interface CompanyInterview {
+  id: number;
+  status: "requested" | "answered" | "declined" | "expired";
+  company: string;
+  requestedAt: string;
+  expiresAt: string;
+  answeredAt: string | null;
+  airedAt: string | null;
+  questions: { text: string; quick: string[] }[];
+  answers: { text: string; verdict: InterviewVerdict; reaction: string }[] | null;
+  /** Awareness change in bps of the 0..1 scale (100 = +1 point). */
+  awarenessBps: number;
+  reputation: number;
+}
+export interface CompanyInterviewState {
+  maxChars: number;
+  interview: CompanyInterview | null;
+}
+/** One answer: free text or the index of a quick answer. */
+export interface InterviewAnswer {
+  text?: string;
+  quick?: number;
+}
+
 export interface GameEngine extends BattleEngine, NexamonEngine, ListedEngine {
+  /** The own CEO interview: an open request or the latest result (ADR-173). */
+  companyInterview(): Promise<CompanyInterviewState>;
+  answerCompanyInterview(requestId: string, id: number, answers: InterviewAnswer[]): Promise<CompanyInterviewState>;
+  declineCompanyInterview(requestId: string, id: number): Promise<CompanyInterviewState>;
   newsShow(): Promise<NewsShowState>;
   postNewsShowMessage(requestId: string, body: string): Promise<NewsShowChatMessage[]>;
   /** Finn's tours the player has seen (kept on the server, so a private window does not repeat them). */

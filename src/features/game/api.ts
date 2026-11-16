@@ -16,6 +16,7 @@ import { TASK_RPC_SCHEMAS, liveTaskEngine } from "./api-tasks";
 import { PITCH_RPC_SCHEMAS, livePitchEngine } from "./api-pitches";
 import { PROTEST_RPC_SCHEMAS, liveProtestEngine } from "./api-protests";
 import { NEWS_SHOW_RPC_SCHEMAS, liveNewsShowEngine } from "./api-news-show";
+import { INTERVIEW_RPC_SCHEMAS, liveInterviewEngine } from "./api-interviews";
 import { TOUR_RPC_SCHEMAS, liveTourEngine } from "./api-tours";
 import { NFT_RPC_SCHEMAS, liveNftEngine } from "./api-nfts";
 import { FLOOR_RPC_SCHEMAS, liveFloorEngine } from "./api-floor";
@@ -519,6 +520,7 @@ export const RPC_SCHEMAS = {
   ...PROTEST_RPC_SCHEMAS,
   ...TOUR_RPC_SCHEMAS,
   ...NEWS_SHOW_RPC_SCHEMAS,
+  ...INTERVIEW_RPC_SCHEMAS,
   ...NFT_RPC_SCHEMAS,
   ...FLOOR_RPC_SCHEMAS,
   ...BATTLE_RPC_SCHEMAS,
@@ -545,6 +547,7 @@ export const liveEngine: GameEngine = {
   ...liveProtestEngine,
   ...liveTourEngine,
   ...liveNewsShowEngine,
+  ...liveInterviewEngine,
   ...liveBattleEngine,
   ...liveNexamonEngine,
   ...liveCareerEngine,
