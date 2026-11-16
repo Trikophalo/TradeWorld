@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BALANCE } from "@/config/balance";
 import { NEXAMON_CARDS } from "@/config/nexamon";
-import type { NexamonCardStats, NexamonCopy, NexamonListing } from "@/features/game/nexamon-types";
+import type { NexamonCardStats, NexamonCopy, NexamonListing, PlayerNexamonCard } from "@/features/game/nexamon-types";
 import {
   binderEntries,
   buyableListings,
@@ -24,6 +24,7 @@ import {
   nexamonNotificationLink,
   ownListings,
   packOdds,
+  profileBinder,
   quickSellOffer,
   revealKey,
   setContents,
@@ -172,8 +173,8 @@ describe("binder", () => {
   });
 
   it("adds up the collection", () => {
-    expect(collectionTotals(copies)).toEqual({ copies: 4, distinct: 2, duplicates: 2, valueCents: 3_900 });
-    expect(collectionTotals([])).toEqual({ copies: 0, distinct: 0, duplicates: 0, valueCents: 0 });
+    expect(collectionTotals(copies)).toEqual({ copies: 4, distinct: 2, duplicates: 2, valueCents: 3_900, listed: 0 });
+    expect(collectionTotals([])).toEqual({ copies: 0, distinct: 0, duplicates: 0, valueCents: 0, listed: 0 });
   });
 
   it("puts slabs first, then the best condition, then the lowest serial", () => {
@@ -312,5 +313,95 @@ describe("grading desk", () => {
     expect(nexamonNotificationLink("nexamon_sale", "/nexamon")).toBe("/nexamon?tab=market&view=mine");
     expect(nexamonNotificationLink("friend_request", "/friends")).toBe("/friends");
     expect(nexamonNotificationLink("other", null)).toBeNull();
+  });
+});
+
+describe("binder: for sale or kept", () => {
+  const copy = (id: string, cardKey: string, listed: boolean): NexamonCopy => ({
+    id,
+    cardKey,
+    serial: 1,
+    condition: "mint",
+    grade: null,
+    state: "raw",
+    gradingUntil: null,
+    gradedAt: null,
+    valueCents: 100,
+    listing: listed ? { id: `l-${id}`, priceCents: 150, listedAt: "2026-11-16T12:00:00Z" } : null,
+    acquiredAt: "2026-11-16T12:00:00Z",
+  });
+  const stats = NEXAMON_CARDS.slice(0, 4).map((card): NexamonCardStats => ({
+    cardKey: card.key,
+    set: card.set,
+    number: card.number,
+    rarity: card.rarity,
+    valueCents: 100,
+    startCents: 100,
+    changeBps: 0,
+    population: 5,
+    listed: 0,
+    owned: 0,
+    popularityBps: 0,
+    floorCents: 20,
+    capCents: 300,
+  }));
+  const [a, b, c] = stats.map((s) => s.cardKey) as [string, string, string];
+  // a: one listed and one kept, b: only listed, c: only kept, the fourth card is missing
+  const copies = [copy("1", a, true), copy("2", a, false), copy("3", b, true), copy("4", c, false)];
+  const keys = (sale: "all" | "listed" | "kept") =>
+    binderEntries(stats, copies, { ...DEFAULT_BINDER_FILTER, sale }).map((e) => e.stats.cardKey);
+
+  it("narrows the binder to cards with a copy on the market or with a copy that stays", () => {
+    expect(keys("all")).toHaveLength(4);
+    expect(keys("listed")).toEqual([a, b]);
+    expect(keys("kept")).toEqual([a, c]);
+  });
+
+  it("counts the listed copies in the totals", () => {
+    expect(collectionTotals(copies)).toMatchObject({ copies: 4, distinct: 3, listed: 2 });
+    expect(collectionTotals([]).listed).toBe(0);
+  });
+});
+
+describe("profileBinder", () => {
+  const owned = (cardKey: string, copies = 1): PlayerNexamonCard => {
+    const card = NEXAMON_CARDS.find((x) => x.key === cardKey)!;
+    return {
+      cardKey,
+      set: card.set,
+      number: card.number,
+      rarity: card.rarity,
+      copies,
+      serial: 3,
+      condition: "mint",
+      grade: null,
+      valueCents: 500,
+      totalCents: 500 * copies,
+    };
+  };
+  const first = NEXAMON_CARDS.filter((x) => x.set === "mystic_energy").sort((x, y) => x.number - y.number);
+  const apex = NEXAMON_CARDS.find((x) => x.set === "super_apex")!;
+  const cards = [owned(apex.key), owned(first[4]!.key, 2), owned(first[1]!.key)];
+
+  it("shows only the sets and cards a player owns, in number order", () => {
+    const groups = profileBinder(cards, true);
+    expect(groups.map((g) => [g.set, g.owned, g.total, g.entries.length])).toEqual([
+      ["mystic_energy", 2, 77, 2],
+      ["super_apex", 1, 77, 1],
+    ]);
+    expect(groups[0]!.entries.map((e) => e.card.key)).toEqual([first[1]!.key, first[4]!.key]);
+    expect(groups[0]!.entries[1]!.owned?.copies).toBe(2);
+    expect(profileBinder([], true)).toEqual([]);
+  });
+
+  it("shows every card of every set with the missing ones empty", () => {
+    const groups = profileBinder(cards, false);
+    expect(groups.map((g) => [g.set, g.owned, g.entries.length])).toEqual([
+      ["mystic_energy", 2, 77],
+      ["super_apex", 1, 77],
+      ["prismatic_peak", 0, 77],
+    ]);
+    expect(groups[0]!.entries.map((e) => e.card.number)).toEqual(first.map((x) => x.number));
+    expect(groups[0]!.entries.filter((e) => e.owned !== null)).toHaveLength(2);
   });
 });

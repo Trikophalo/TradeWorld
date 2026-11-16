@@ -17,6 +17,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import type { NexamonListing } from "@/features/game/nexamon-types";
 import { NEXAMON_CONDITIONS } from "../lib";
 import { ConditionBadge, RarityBadge, SetIcon, TypeIcon } from "./badges";
+import { ProfileNexamon } from "./profile-collection";
 import { NexamonCard } from "./card";
 import { CardThumb, NexamonCardBack, NexamonCardFace } from "./card-face";
 import { GradeReveal, GradingPack } from "./grading-reveal";
@@ -400,6 +401,9 @@ export function NexamonShowcase() {
             ))}
           </ul>
         </div>
+      </Block>
+      <Block label="Profil: Collectibles eines Spielers (hier die eigenen)" testId="nexamon-profile-block">
+        <ProfileNexamon nickname={null} />
       </Block>
     </div>
   );

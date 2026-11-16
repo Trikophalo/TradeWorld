@@ -1472,6 +1472,12 @@ select public.get_nexamon_collection('mystic_energy');
 select public.crack_nexamon_slab(gen_random_uuid(), :'fx_nx2');
 \o
 reset role;
+-- Fixture_Heim looks at Fixture_Gmbh's collectibles on their profile
+select tests.login_as('authenticated', :fx_h) is null as ok \gset
+\o :fixture_dir/get_player_nexamon.json
+select public.get_player_nexamon('Fixture_Gmbh');
+\o
+reset role;
 
 -- mission reset (ADR-166): the first fixture player swaps the open missions
 select tests.login_as('authenticated', :p) is null as ok \gset

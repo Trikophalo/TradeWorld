@@ -7702,6 +7702,16 @@ price_cents, condition, grade, kind, seller, buyer}] (die letzten 20), server_ti
   - `get_nexamon_market(p_set, p_rarity, p_sort, p_page, p_seller, p_card_key, p_graded)` → `{listings: [LISTING],
 total, page, page_size, pages, server_time}`; `p_sort` `new|price_asc|price_desc|deal|value|number`, `p_seller`
     `all|players|ai|mine`, `p_graded` true = nur Slabs.
+  - `get_player_nexamon(p_nickname default null, p_limit default null)` (Migration
+    `20261204005800_nexamon_profile.sql`, STABLE, verlangt **kein** Level beim Betrachter) → `{nickname, is_me,
+unlocked, summary: {copies, distinct, total, value_cents, graded, tens}, sets: [{key, cards, distinct, copies}],
+cards: [{card_key, set, number, rarity, copies, serial, condition, grade, value_cents, total_cents}],
+server_time}`: die Sammlung eines Spielers für sein Profil (`null` = die eigene). Je Karte die beste Kopie
+    (höchster Wert, dann Note, dann kleinste Nummer) mit Anzahl und Gesamtwert, nach Wert absteigend, höchstens
+    `p_limit` (1 bis 500); die Zahlen gelten immer für die ganze Sammlung. Hat der Spieler Nexamon nicht
+    freigeschaltet: `unlocked` false, alles leer. Keine Angebote, Preise oder Kopien-IDs. Fehler `player_not_found`.
+- **Benachrichtigung `nexamon_graded`** (ab Migration `20261204005960_nexamon_graded_quiet.sql`): Titel „Paket von ASP“,
+  Payload nur `{copy_id, card_key, serial}`, nie die Note; kein Feed-Eintrag `nexamon_black_label` mehr beim Abschluss.
 - **Schreibende RPCs** (alle mit `request_id`, idempotent):
   - `buy_nexamon_pack(p_request_id, p_set)` → `{pack_id, set, price_cents, cards: [{slot, copy_id, card_key, rarity,
 condition, is_new, serial, population, value_cents}], packs_opened}`.

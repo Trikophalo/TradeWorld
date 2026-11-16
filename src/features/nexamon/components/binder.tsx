@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { NEXAMON_RARITIES, NEXAMON_SETS, type NexamonRarity, type NexamonSetKey } from "@/config/nexamon";
 import { COIN } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
@@ -13,9 +13,11 @@ import type { NexamonCollection } from "@/features/game/nexamon-types";
 import { formatMoney, formatMoneyShort } from "@/lib/format";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
+import { useRememberedFilters } from "../hooks";
 import { formatCardNumber } from "../lib";
 import {
   BINDER_OWNERSHIPS,
+  BINDER_SALES,
   BINDER_SORTS,
   binderEntries,
   collectionTotals,
@@ -24,11 +26,20 @@ import {
   type BinderEntry,
   type BinderFilter,
   type BinderOwnership,
+  type BinderSale,
   type BinderSort,
   tileMoney,
 } from "../view";
 import { SetIcon } from "./badges";
 import { CopyVisual, GradeChip, SelectField, Stat } from "./parts";
+
+const BINDER_ALLOWED = {
+  set: ["all", ...NEXAMON_SETS],
+  rarity: ["all", ...NEXAMON_RARITIES],
+  ownership: BINDER_OWNERSHIPS,
+  sort: BINDER_SORTS,
+  sale: BINDER_SALES,
+} as const;
 
 /**
  * The binder (ADR-165): every card of the three sets in number order. Owned cards show their best copy (a slab
@@ -37,7 +48,7 @@ import { CopyVisual, GradeChip, SelectField, Stat } from "./parts";
 export function Binder({ collection }: { collection: NexamonCollection | undefined }) {
   const t = useTranslations("nexamon");
   const tc = useTranslations("nexamonCards");
-  const [filter, setFilter] = useState<BinderFilter>(DEFAULT_BINDER_FILTER);
+  const [filter, patch] = useRememberedFilters<BinderFilter>("binder", DEFAULT_BINDER_FILTER, BINDER_ALLOWED);
   const wide = useMediaQuery("(min-width: 1024px)");
   const scale = wide ? 2 : 1;
   const entries = useMemo(
@@ -45,7 +56,6 @@ export function Binder({ collection }: { collection: NexamonCollection | undefin
     [collection, filter],
   );
   const groups = useMemo(() => groupBySet(entries, filter.sort), [entries, filter.sort]);
-  const patch = (next: Partial<BinderFilter>) => setFilter((current) => ({ ...current, ...next }));
 
   if (!collection) {
     return (
@@ -63,6 +73,12 @@ export function Binder({ collection }: { collection: NexamonCollection | undefin
   const totals = collectionTotals(collection.copies);
   return (
     <div className="space-y-4" data-testid="nexamon-binder">
+      <div className="space-y-1">
+        <h2 className="font-pixel text-sm text-fg-1 uppercase">{t("binder.title")}</h2>
+        <p className="text-sm text-pretty text-fg-2" data-testid="binder-kept">
+          {t("binder.keptHint", { listed: totals.listed, kept: totals.copies - totals.listed })}
+        </p>
+      </div>
       <div className="grid grid-cols-3 gap-2">
         <Stat label={t("binder.copies")} testId="binder-copies">
           {totals.copies}
@@ -84,7 +100,7 @@ export function Binder({ collection }: { collection: NexamonCollection | undefin
           block
           options={BINDER_OWNERSHIPS.map((value) => ({ value, label: t(`binder.own.${value}`) }))}
         />
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
           <SelectField<NexamonSetKey | "all">
             label={t("filter.set")}
             value={filter.set}
@@ -112,6 +128,13 @@ export function Binder({ collection }: { collection: NexamonCollection | undefin
             testId="binder-sort"
             options={BINDER_SORTS.map((sort) => ({ value: sort, label: t(`binder.sort.${sort}`) }))}
           />
+          <SelectField<BinderSale>
+            label={t("binder.saleLabel")}
+            value={filter.sale}
+            onChange={(sale) => patch({ sale })}
+            testId="binder-sale"
+            options={BINDER_SALES.map((sale) => ({ value: sale, label: t(`binder.sale.${sale}`) }))}
+          />
         </div>
       </div>
 
@@ -132,7 +155,7 @@ export function Binder({ collection }: { collection: NexamonCollection | undefin
         groups.map((group) => (
           <section key={group.set ?? "all"} className="space-y-2" data-set={group.set ?? "all"}>
             {group.set && (
-              <h2 className="flex items-center justify-between gap-2">
+              <h3 className="flex items-center justify-between gap-2">
                 <SetIcon set={group.set} label className="font-pixel text-xs uppercase" />
                 <span className="nums text-xs text-fg-3">
                   {t("binder.setCount", {
@@ -140,7 +163,7 @@ export function Binder({ collection }: { collection: NexamonCollection | undefin
                     total: group.entries.length,
                   })}
                 </span>
-              </h2>
+              </h3>
             )}
             <ul
               className={cn(
@@ -164,6 +187,8 @@ function BinderTile({ entry, scale }: { entry: BinderEntry; scale: number }) {
   const t = useTranslations("nexamon");
   const owned = entry.copies.length;
   const best = entry.copies[0];
+  // Copies on the market right now: a small tag on the tile, the price on hover.
+  const listed = entry.copies.filter((c) => c.listing !== null);
   return (
     <li data-card={entry.stats.cardKey} data-owned={owned > 0} data-testid="binder-tile">
       <Link
@@ -185,6 +210,18 @@ function BinderTile({ entry, scale }: { entry: BinderEntry; scale: number }) {
               data-testid="tile-count"
             >
               ×{owned}
+            </span>
+          )}
+          {listed.length > 0 && (
+            <span
+              className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-pill bg-info px-1.5 font-pixel text-2xs whitespace-nowrap text-on-semantic uppercase shadow-1"
+              title={t("binder.listedHint", {
+                count: listed.length,
+                price: formatMoney(Math.min(...listed.map((c) => c.listing!.priceCents))),
+              })}
+              data-testid="tile-listed"
+            >
+              {t("binder.listedTag")}
             </span>
           )}
         </span>

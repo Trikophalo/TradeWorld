@@ -16,6 +16,7 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProfileCollection } from "@/features/artworks/components/artworks-hub";
+import { ProfileNexamon } from "@/features/nexamon/components/profile-collection";
 import { PropertyShowcase } from "@/features/property/components/property-hub";
 import { usePlayerCard } from "../hooks";
 import { BusinessCard } from "./business-card";
@@ -51,6 +52,8 @@ export function PlayerProfile({ nickname }: { nickname: string }) {
           <ProfileCollection nickname={card.data.nickname} />
           {/* Their home and garage, the flex (ADR-082) */}
           <PropertyShowcase nickname={card.data.nickname} />
+          {/* Their collectible cards, the best ones first (ADR-165) */}
+          <ProfileNexamon nickname={card.data.nickname} />
         </>
       ) : card.isError ? (
         <EmptyState

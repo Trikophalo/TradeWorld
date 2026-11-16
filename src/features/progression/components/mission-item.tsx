@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 import { PixelCheck } from "@/components/ui/button";
@@ -16,6 +17,7 @@ import { haptic } from "@/lib/haptics";
 import { SPRING } from "@/lib/motion";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
+import { missionRoute } from "../mission-routes";
 
 /** Counts are shown as "2 / 3"; large targets (amounts in cents) as a percentage. */
 function progressLabel(mission: Mission): string {
@@ -32,6 +34,8 @@ export function MissionItem({ mission, compact = false }: { mission: Mission; co
   const anchor = useRef<HTMLDivElement>(null);
   const done = mission.status === "completed";
   const claimed = mission.status === "claimed";
+  // Where the mission is done, if it belongs to one page; an open mission then leads there.
+  const href = mission.status === "active" ? missionRoute(mission.key) : null;
 
   const onClaim = async () => {
     setState("loading");
@@ -68,7 +72,23 @@ export function MissionItem({ mission, compact = false }: { mission: Mission; co
         {(done || claimed) && <PixelCheck className="scale-[0.6]" />}
       </span>
       <div className="min-w-0 flex-1">
-        <p className={cn("text-fg-1", compact && "truncate text-sm")}>{mission.title}</p>
+        <p className={cn("text-fg-1", compact && "truncate text-sm")}>
+          {href ? (
+            <Link
+              href={href}
+              title={t("goTo", { title: mission.title })}
+              data-testid="mission-link"
+              className="rounded-xs focus-ring transition-colors duration-fast hover:text-accent"
+            >
+              {mission.title}
+              <span aria-hidden className="ml-1.5 text-accent">
+                →
+              </span>
+            </Link>
+          ) : (
+            mission.title
+          )}
+        </p>
         {!claimed && !compact && (
           <div className="mt-1.5 flex items-center gap-2">
             <Progress value={mission.progress / mission.target} label={mission.title} size="sm" className="flex-1" />
