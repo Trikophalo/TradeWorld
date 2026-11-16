@@ -3,8 +3,8 @@
   "messages": [
     {
       "ai": false,
-      "at": "2026-11-16T10:06:38.348491+00:00",
-      "id": 62,
+      "at": "2026-11-16T12:04:23.873782+00:00",
+      "id": 65,
       "kind": "chat",
       "mine": true,
       "text": "Schönes Bild!",
@@ -15,7 +15,7 @@
     }
   ],
   "ask_cents": 400000,
-  "artwork_id": "7e8b7866-4d62-4fde-a188-87b4f77ca344",
+  "artwork_id": "d8d101af-2b65-47ce-9310-43a437c4f2f6",
   "max_length": 200,
   "my_offer_cents": null,
   "min_offer_cents": 10000

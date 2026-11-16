@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "3377b8b8-384a-4118-9f0f-84812525a1cf",
+    "id": "45365000-87be-4313-91f3-aea0f10097e3",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
+      "id": "8e2bb2c1-055e-3b2a-f569-bcb53eac2904",
       "logo": null,
-      "name": "Frachtpilot",
-      "color": "#9ECE6A",
+      "name": "Pfotenwohl",
+      "color": "#8BC34A",
       "is_ai": true,
-      "sector": "logistics",
-      "ticker": "FPT"
+      "sector": "pharma",
+      "ticker": "PFW"
     },
     "presence": {
-      "fire_at": "2026-11-21T10:06:36.15107+00:00",
+      "fire_at": "2026-11-21T12:04:22.156732+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-16T10:06:36.15107+00:00"
+      "last_active_at": "2026-11-16T12:04:22.156732+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-16T10:06:36.277368+00:00",
+    "started_at": "2026-11-16T12:04:22.236148+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

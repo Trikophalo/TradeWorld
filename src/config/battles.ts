@@ -70,7 +70,7 @@ export const BATTLE_RULES = {
     minPlayers: 3,
     maxPlayers: 10,
     /** Battles per full hour, all with a prize; then the next round after the next hourly show. */
-    perHour: 3,
+    perHour: 1,
     /** Starts when this runs out (from the moment minPlayers are in), or at once with maxPlayers. */
     countdownSeconds: 30,
     /** A player not seen in the lobby for this long is taken out of it. */

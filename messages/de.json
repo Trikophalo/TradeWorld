@@ -7223,9 +7223,9 @@
     "showcaseTenants": "{count, plural, one {Ein Mieter wohnt} other {# Mieter wohnen}} hier."
   },
   "battle": {
-    "hourDone": "Die {count} Battles dieser Stunde sind gespielt.",
+    "hourDone": "{count, plural, one {Das Battle dieser Stunde ist gespielt.} other {Die # Battles dieser Stunde sind gespielt.}}",
     "nextRound": "Die nächste Runde startet nach den Nachrichten um {time} Uhr.",
-    "roundOfHour": "Battle {round} von {count} dieser Stunde, jedes mit Preis",
+    "roundOfHour": "{count, plural, one {Das Battle dieser Stunde, mit Preis} other {Battle {round} von # dieser Stunde, jedes mit Preis}}",
     "title": "News-Battle",
     "subtitle": "Zuschauer gegen Zuschauer. Nur einer gewinnt.",
     "lobbyHint": "Ab {min} Spielern geht es los, höchstens {max}.",

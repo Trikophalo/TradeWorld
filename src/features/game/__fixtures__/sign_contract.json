@@ -1,6 +1,6 @@
 {
   "job": {
-    "id": "615d040f-0d54-44a0-9198-21484623ae1d",
+    "id": "cc07f513-bd86-41f8-8a4a-03aa8bd70a62",
     "tier": "junior",
     "title": null,
     "company": {
@@ -13,9 +13,9 @@
       "ticker": "KLS"
     },
     "presence": {
-      "fire_at": "2026-11-21T10:06:32.94104+00:00",
+      "fire_at": "2026-11-21T12:04:18.987756+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-16T10:06:32.94104+00:00"
+      "last_active_at": "2026-11-16T12:04:18.987756+00:00"
     },
     "required": [{ "branch": "it", "min_score": 2 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M2 14 C6 4 10 4 14 12 S22 18 26 8",
     "title_key": "it_junior",
     "rank_hours": 0.0,
-    "started_at": "2026-11-16T10:06:33.398521+00:00",
+    "started_at": "2026-11-16T12:04:19.608784+00:00",
     "pending_raise": null,
     "raise_max_bps": 0,
     "notice_ends_at": null,

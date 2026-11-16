@@ -1,8 +1,11 @@
 -- =============================================================================
--- 9v · Three news battles per hour, then the next round after the next show
+-- 9v · Battles per hour (battles.lobby.perHour), then the next round after the next show
 -- =============================================================================
 \set QUIET 1
 set client_min_messages = notice;
+-- the test runs with three per hour; the live value comes from game_config
+select public.config_jsonb('battles', '{lobby,perHour}') as live_per_hour \gset
+update public.game_config set value = jsonb_set(value, '{lobby,perHour}', '3') where key = 'battles';
 
 delete from public.battles where status in ('open', 'running');
 delete from public.battles where started_at >= date_trunc('hour', now());
@@ -30,3 +33,4 @@ select tests.assert((select count(*) = 1 from public.battles where status = 'ope
 delete from public.battles where status = 'open';
 -- leave no made-up battles behind (the fixtures read the last finished one)
 delete from public.battles where kind is null and status = 'finished';
+update public.game_config set value = jsonb_set(value, '{lobby,perHour}', :'live_per_hour'::jsonb) where key = 'battles';

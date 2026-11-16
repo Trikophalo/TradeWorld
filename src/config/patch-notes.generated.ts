@@ -159,9 +159,9 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Ist die stündliche Sendung vorbei, führt ein Knopf unter dem Fernseher direkt in die Battle-Lobby.",
       },
       {
-        id: "startseite-waehrung-zur-wahl-freundescode-5be43bea",
-        title: "Drei Battles pro Stunde",
-        text: "Nach jeder Sendung gibt es genau drei News-Battles, jedes mit Preis; danach geht es zur nächsten vollen Stunde weiter.",
+        id: "startseite-waehrung-zur-wahl-freundescode-74256684",
+        title: "Ein Battle pro Stunde",
+        text: "Nach jeder Sendung gibt es genau ein News-Battle mit Preis; das nächste kommt nach der nächsten Sendung.",
       },
       {
         id: "startseite-waehrung-zur-wahl-freundescode-e39c8ea5",

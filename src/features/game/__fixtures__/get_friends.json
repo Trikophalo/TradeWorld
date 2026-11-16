@@ -1,16 +1,16 @@
 {
   "friends": [
     {
-      "tag": "WM8S",
+      "tag": "BMCQ",
       "level": 8,
-      "since": "2026-11-16T10:06:35.625949+00:00",
+      "since": "2026-11-16T12:04:21.71699+00:00",
       "online": true,
       "nickname": "Fixture_Kunst",
       "avatar_key": "rookie",
       "accessories": [],
-      "last_active_at": "2026-11-16T10:06:34.467347+00:00"
+      "last_active_at": "2026-11-16T12:04:20.764997+00:00"
     }
   ],
-  "incoming": [{ "at": "2026-11-16T10:06:35.628773+00:00", "tag": "DSGR", "level": 15, "nickname": "Fixture_Neu" }],
-  "outgoing": [{ "at": "2026-11-16T10:06:35.620686+00:00", "tag": "CBVH", "level": 14, "nickname": "Fixture_Heim" }]
+  "incoming": [{ "at": "2026-11-16T12:04:21.720449+00:00", "tag": "AN8H", "level": 15, "nickname": "Fixture_Neu" }],
+  "outgoing": [{ "at": "2026-11-16T12:04:21.711029+00:00", "tag": "BKAD", "level": 14, "nickname": "Fixture_Heim" }]
 }

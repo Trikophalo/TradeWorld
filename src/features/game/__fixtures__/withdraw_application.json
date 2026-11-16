@@ -1,27 +1,27 @@
 {
-  "id": "99651f6f-ccf6-4da4-9301-8232a98d47da",
+  "id": "f3f36390-d884-4e2b-8224-3013ac449956",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "30169845-4afd-4315-bb6b-38eedd032e2f",
+    "id": "09a9de5a-909a-4a4c-addc-c31993b939eb",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
+      "id": "8e2bb2c1-055e-3b2a-f569-bcb53eac2904",
       "logo": null,
-      "name": "Frachtpilot",
-      "color": "#9ECE6A",
+      "name": "Pfotenwohl",
+      "color": "#8BC34A",
       "is_ai": true,
-      "sector": "logistics",
-      "ticker": "FPT"
+      "sector": "pharma",
+      "ticker": "PFW"
     },
-    "required": [{ "branch": "craft", "min_score": 0 }],
-    "title_key": "craft_intern",
+    "required": [{ "branch": "sales", "min_score": 0 }],
+    "title_key": "sales_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-16T10:06:33.392032+00:00",
-  "updated_at": "2026-11-16T10:06:33.395563+00:00",
-  "offer_expires_at": "2026-11-18T10:06:33.392032+00:00",
+  "created_at": "2026-11-16T12:04:19.602427+00:00",
+  "updated_at": "2026-11-16T12:04:19.6061+00:00",
+  "offer_expires_at": "2026-11-18T12:04:19.602427+00:00",
   "salary_wish_cents_per_hour": 15000,
   "offer_salary_cents_per_hour": 15000
 }

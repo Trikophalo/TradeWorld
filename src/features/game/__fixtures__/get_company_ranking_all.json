@@ -1,5 +1,5 @@
 {
-  "mine": { "rank": 69, "value_cents": 54107 },
+  "mine": { "rank": 69, "value_cents": 54108 },
   "total": 72,
   "entries": [
     {
@@ -15,30 +15,14 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "e50a6ff5-8dbd-8c90-f94e-5ac06d3fe862",
-      "value_cents": 518276000000,
-      "revenue_cents": null
-    },
-    {
-      "kind": "ai",
-      "logo": null,
-      "name": "Glanz & Gloria",
-      "rank": 2,
-      "tier": null,
-      "color": "#D4AF37",
-      "sector": "retail",
-      "ticker": "LUX",
-      "founder": null,
-      "is_mine": false,
-      "team_size": null,
-      "company_id": "c76af3f2-dc09-a8cc-b107-a7c326ad5b09",
-      "value_cents": 433310000000,
+      "value_cents": 569578000000,
       "revenue_cents": null
     },
     {
       "kind": "ai",
       "logo": null,
       "name": "KlarSoft AG",
-      "rank": 3,
+      "rank": 2,
       "tier": null,
       "color": "#4C8DFF",
       "sector": "tech",
@@ -47,7 +31,23 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
-      "value_cents": 423667500000,
+      "value_cents": 421855500000,
+      "revenue_cents": null
+    },
+    {
+      "kind": "ai",
+      "logo": null,
+      "name": "Glanz & Gloria",
+      "rank": 3,
+      "tier": null,
+      "color": "#D4AF37",
+      "sector": "retail",
+      "ticker": "LUX",
+      "founder": null,
+      "is_mine": false,
+      "team_size": null,
+      "company_id": "c76af3f2-dc09-a8cc-b107-a7c326ad5b09",
+      "value_cents": 409065200000,
       "revenue_cents": null
     },
     {
@@ -63,7 +63,7 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "cbfac5fd-3475-2166-ea22-0a85cbb6f5c0",
-      "value_cents": 354644800000,
+      "value_cents": 355415200000,
       "revenue_cents": null
     },
     {
@@ -79,9 +79,9 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "d21331b8-a414-66aa-de07-f036108fc91d",
-      "value_cents": 297434200000,
+      "value_cents": 315758100000,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-16T10:06:33.926769+00:00"
+  "server_time": "2026-11-16T12:04:20.238528+00:00"
 }

@@ -1,8 +1,8 @@
 {
-  "bids": [{ "at": "2026-11-16T10:06:34.664956+00:00", "nickname": "Fixture_Kunst", "amount_cents": 500000 }],
+  "bids": [{ "at": "2026-11-16T12:04:20.978398+00:00", "nickname": "Fixture_Kunst", "amount_cents": 500000 }],
   "sales": [
     {
-      "at": "2026-11-16T10:06:34.669139+00:00",
+      "at": "2026-11-16T12:04:20.982606+00:00",
       "kind": "auction",
       "buyer": "Fixture_Kunst",
       "seller": null,
@@ -10,7 +10,7 @@
       "royalty_cents": 0
     },
     {
-      "at": "2026-11-16T10:06:25.812824+00:00",
+      "at": "2026-11-16T12:04:11.366968+00:00",
       "kind": "ai",
       "buyer": "Vera Vermeer",
       "seller": null,
@@ -18,17 +18,17 @@
       "royalty_cents": 0
     },
     {
-      "at": "2026-11-16T10:06:24.213085+00:00",
+      "at": "2026-11-16T12:04:09.401682+00:00",
       "kind": "ai",
-      "buyer": "Otto Original",
+      "buyer": "Baron von Bit",
       "seller": "Vera Vermeer",
-      "price_cents": 485300,
+      "price_cents": 545000,
       "royalty_cents": 0
     }
   ],
   "artwork": {
-    "id": "c596af67-f0d2-4fc2-8ed0-81a1ef99a595",
-    "hot": 0.345335,
+    "id": "00e4f36a-e6a2-4b69-8309-affc53fffd19",
+    "hot": 0.344207,
     "code": "NFT-0001",
     "liked": false,
     "likes": 0,
@@ -90,7 +90,7 @@
     "creator": null,
     "ai_owner": null,
     "ask_cents": null,
-    "created_at": "2026-11-16T10:04:40.897454+00:00",
+    "created_at": "2026-11-16T12:02:11.241731+00:00",
     "royalty_bps": 1000,
     "value_cents": 500000,
     "royalties_cents": 0,

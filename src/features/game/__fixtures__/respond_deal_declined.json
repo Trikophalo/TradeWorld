@@ -1,5 +1,5 @@
 {
-  "id": "d9601e84-9e1c-443f-99d6-22114963caa5",
+  "id": "5bbdabcf-913c-4354-87a3-acc744963bad",
   "kind": "loan",
   "terms": { "hours": 24, "interest_bps": 0, "principal_cents": 20000 },
   "status": "declined",
@@ -9,20 +9,20 @@
   "my_role": "borrower",
   "progress": { "due_cents": 20000, "left_cents": 20000, "repaid_cents": 0 },
   "proposer": {
-    "tag": "NCTA",
+    "tag": "7EZB",
     "level": 6,
     "trust": { "band": "blank", "score": 50 },
     "nickname": "Fixture_Lieferant",
     "avatar_key": "rookie"
   },
-  "closed_at": "2026-11-16T10:06:36.721836+00:00",
-  "created_at": "2026-11-16T10:06:36.671291+00:00",
-  "expires_at": "2026-11-18T10:06:36.671291+00:00",
+  "closed_at": "2026-11-16T12:04:22.56624+00:00",
+  "created_at": "2026-11-16T12:04:22.53143+00:00",
+  "expires_at": "2026-11-18T12:04:22.53143+00:00",
   "accepted_at": null,
   "is_proposer": false,
   "broken_by_me": false,
   "counterparty": {
-    "tag": "LL5D",
+    "tag": "HMGT",
     "level": 6,
     "trust": { "band": "blank", "score": 50 },
     "nickname": "Fixture_Abnehmer",
