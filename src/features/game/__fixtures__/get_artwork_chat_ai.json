@@ -3,8 +3,8 @@
   "messages": [
     {
       "ai": false,
-      "at": "2026-11-15T21:52:22.983699+00:00",
-      "id": 32,
+      "at": "2026-11-16T09:23:17.689071+00:00",
+      "id": 62,
       "kind": "chat",
       "mine": false,
       "text": "Schönes Bild!",
@@ -15,20 +15,20 @@
     },
     {
       "ai": false,
-      "at": "2026-11-15T21:52:22.986435+00:00",
-      "id": 33,
+      "at": "2026-11-16T09:23:17.691894+00:00",
+      "id": 63,
       "kind": "offer",
       "mine": false,
       "text": "Wäre das ein Preis?",
       "author": "Fixture_Kunst",
-      "expires_at": "2026-11-16T21:52:22.986435+00:00",
+      "expires_at": "2026-11-17T09:23:17.691894+00:00",
       "offer_cents": 300000,
       "offer_status": "accepted"
     },
     {
       "ai": false,
-      "at": "2026-11-15T21:52:22.991758+00:00",
-      "id": 34,
+      "at": "2026-11-16T09:23:17.697+00:00",
+      "id": 64,
       "kind": "sale",
       "mine": false,
       "text": "Fixture_Kunst",
@@ -39,8 +39,8 @@
     },
     {
       "ai": false,
-      "at": "2026-11-15T21:52:22.999264+00:00",
-      "id": 35,
+      "at": "2026-11-16T09:23:17.704194+00:00",
+      "id": 65,
       "kind": "sale",
       "mine": false,
       "text": "Fixture_Neu",
@@ -51,19 +51,19 @@
     },
     {
       "ai": true,
-      "at": "2026-11-15T21:52:23.005137+00:00",
-      "id": 36,
+      "at": "2026-11-16T09:23:17.710755+00:00",
+      "id": 66,
       "kind": "offer",
       "mine": false,
-      "text": "Angebot! Bitte schnell, mein Akku hat noch drei Prozent.",
+      "text": "Wusstest du, dass Otter Händchen halten? Jedenfalls: mein Angebot.",
       "author": "Otto Original",
-      "expires_at": "2026-11-16T21:52:23.005137+00:00",
-      "offer_cents": 2374600,
+      "expires_at": "2026-11-17T09:23:17.710755+00:00",
+      "offer_cents": 2013200,
       "offer_status": "open"
     }
   ],
   "ask_cents": 90000000,
-  "artwork_id": "9afde07b-1d7d-41bd-a75d-98c3a7aec0fb",
+  "artwork_id": "79e65306-e406-4e78-8c71-c45dd1a0146a",
   "max_length": 200,
   "my_offer_cents": null,
   "min_offer_cents": 10000

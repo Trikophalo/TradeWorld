@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "10e3c62c-51bb-4dde-bd37-76aec991d00f",
+    "id": "4957b693-d1eb-486c-a800-b4c5097fc725",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "2f91e3a4-088a-0592-9f21-88b83cae7bd8",
+      "id": "5aaeae39-c17e-272b-db4c-3beb46144cb5",
       "logo": null,
-      "name": "SolarFuchs",
-      "color": "#FF8C42",
+      "name": "GenoVita Biotech",
+      "color": "#E86AF0",
       "is_ai": true,
-      "sector": "energy",
-      "ticker": "SFX"
+      "sector": "pharma",
+      "ticker": "GNV"
     },
     "presence": {
-      "fire_at": "2026-11-20T21:52:21.339876+00:00",
+      "fire_at": "2026-11-21T09:23:16.026375+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-15T21:52:21.339876+00:00"
+      "last_active_at": "2026-11-16T09:23:16.026375+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-15T21:52:21.425264+00:00",
+    "started_at": "2026-11-16T09:23:16.110745+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

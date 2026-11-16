@@ -92,9 +92,9 @@ describe("NFT market among collectors (ADR-141)", () => {
   });
 
   it("popular NFTs change hands more often, capped", () => {
-    expect(nftAiTradeChanceBps(0, 0, 0)).toBe(60);
+    expect(nftAiTradeChanceBps(0, 0, 0)).toBe(BALANCE.nfts.ai.trade.chanceBps);
     expect(nftAiTradeChanceBps(10, 2, 1)).toBeGreaterThan(nftAiTradeChanceBps(1, 0, 0));
-    expect(nftAiTradeChanceBps(999, 99, 99)).toBe(1_500);
+    expect(nftAiTradeChanceBps(999, 99, 99)).toBe(BALANCE.nfts.ai.trade.maxChanceBps);
   });
 
   it("trade prices wander around the fair value instead of climbing for ever", () => {

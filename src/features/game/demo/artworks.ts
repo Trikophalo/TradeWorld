@@ -323,7 +323,7 @@ export function createArtEngine(host: ArtHost) {
           w = work(w.id)!;
         } else if (
           w.owner === me &&
-          openOffers(w.id, until).every((m) => !m.ai) &&
+          openOffers(w.id, until).filter((m) => m.ai).length < nft.ai.maxOpenAiOffers &&
           roll < (ask !== null ? nft.ai.listedOfferChanceBps : nft.ai.unlistedOfferChanceBps * 10) / 10_000
         ) {
           offerFromAi(w, value, until);
@@ -335,7 +335,15 @@ export function createArtEngine(host: ArtHost) {
   }
 
   function offerFromAi(w: DemoArtwork, value: number, at: number) {
-    const name = pick(COLLECTORS, unit(`${w.id}:${at}:who`));
+    // a collector who has no open offer on it yet (several may bid at once, ADR-163)
+    const bidding = new Set(
+      openOffers(w.id, at)
+        .filter((m) => m.ai)
+        .map((m) => m.author),
+    );
+    const free = COLLECTORS.filter((c) => !bidding.has(c));
+    if (free.length === 0) return;
+    const name = pick(free, unit(`${w.id}:${at}:who`));
     post(w.id, {
       author: name,
       ai: true,

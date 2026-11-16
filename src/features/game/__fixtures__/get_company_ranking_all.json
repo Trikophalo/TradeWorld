@@ -1,12 +1,28 @@
 {
-  "mine": { "rank": 69, "value_cents": 54107 },
+  "mine": { "rank": 69, "value_cents": 54108 },
   "total": 72,
   "entries": [
     {
       "kind": "ai",
       "logo": null,
-      "name": "Volta Energie AG",
+      "name": "NeuroPharm AG",
       "rank": 1,
+      "tier": null,
+      "color": "#6EE7A0",
+      "sector": "pharma",
+      "ticker": "NPH",
+      "founder": null,
+      "is_mine": false,
+      "team_size": null,
+      "company_id": "2faf9e4c-3f0a-8a5b-1645-c669e9481771",
+      "value_cents": 1612775400000,
+      "revenue_cents": null
+    },
+    {
+      "kind": "ai",
+      "logo": null,
+      "name": "Volta Energie AG",
+      "rank": 2,
       "tier": null,
       "color": "#FFD23F",
       "sector": "energy",
@@ -15,23 +31,7 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "e50a6ff5-8dbd-8c90-f94e-5ac06d3fe862",
-      "value_cents": 467325000000,
-      "revenue_cents": null
-    },
-    {
-      "kind": "ai",
-      "logo": null,
-      "name": "Glanz & Gloria",
-      "rank": 2,
-      "tier": null,
-      "color": "#D4AF37",
-      "sector": "retail",
-      "ticker": "LUX",
-      "founder": null,
-      "is_mine": false,
-      "team_size": null,
-      "company_id": "c76af3f2-dc09-a8cc-b107-a7c326ad5b09",
-      "value_cents": 452569600000,
+      "value_cents": 515859000000,
       "revenue_cents": null
     },
     {
@@ -47,23 +47,23 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
-      "value_cents": 426865500000,
+      "value_cents": 419911000000,
       "revenue_cents": null
     },
     {
       "kind": "ai",
       "logo": null,
-      "name": "NeuroPharm AG",
+      "name": "Glanz & Gloria",
       "rank": 4,
       "tier": null,
-      "color": "#6EE7A0",
-      "sector": "pharma",
-      "ticker": "NPH",
+      "color": "#D4AF37",
+      "sector": "retail",
+      "ticker": "LUX",
       "founder": null,
       "is_mine": false,
       "team_size": null,
-      "company_id": "2faf9e4c-3f0a-8a5b-1645-c669e9481771",
-      "value_cents": 426515400000,
+      "company_id": "c76af3f2-dc09-a8cc-b107-a7c326ad5b09",
+      "value_cents": 352201600000,
       "revenue_cents": null
     },
     {
@@ -79,9 +79,9 @@
       "is_mine": false,
       "team_size": null,
       "company_id": "cbfac5fd-3475-2166-ea22-0a85cbb6f5c0",
-      "value_cents": 349273600000,
+      "value_cents": 320788000000,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-15T21:52:19.66613+00:00"
+  "server_time": "2026-11-16T09:23:14.29415+00:00"
 }

@@ -2799,3 +2799,11 @@ Menge, Image …), acht sinnvolle Punkte, die man mit Mira angehen kann.
   Punkt und Status), die Analyse nennt den Gesamtwert.
 - **Grenzen:** Die Rechnung ist eine Momentaufnahme der letzten Stunde (mit deren Zufall), keine Prognose. Langfristige
   Effekte (Bekanntheit wächst über Quartale, Budget-Preise beschleunigen Mundpropaganda) zählen nicht in den Gewinn.
+
+## ADR-163: Lebendigerer NFT-Markt — `akzeptiert`
+
+- Bis zu `nfts.ai.maxOpenAiOffers` (3) verschiedene KI-Sammler dürfen gleichzeitig ein offenes Angebot auf dasselbe
+  NFT haben; wer schon bietet, wird nicht noch einmal gewählt (`nft_free_collector`). Bisher war es eines pro NFT.
+- Mehr Bewegung über die Konfiguration: Angebote auf behaltene NFTs 0,8 % → 4 % je Minute, auf zu teuer
+  angebotene 8 % → 15 %; Handel unter Sammlern 0,6 % → 2,5 % je Minute (höchstens 40 %), Haltezeit 30 → 10 Minuten,
+  6 Käufe je Lauf, 300 je Tag; KI kauft bis zu 60 Spieler-NFTs am Tag (vorher 20).

@@ -2,42 +2,42 @@
   "items": [
     {
       "id": 5,
-      "body": "Ehemalige Mitarbeiter erheben schwere Vorwürfe. Kunden kündigen erste Verträge. Sicher ist das nicht.",
-      "name": "Pixelwerk Studios",
-      "due_at": "2026-11-15T23:20:24.542113+00:00",
+      "body": "Ein großer Konkurrent soll Interesse haben. Spekulanten könnten den Kurs spürbar treiben. Sicher ist das nicht.",
+      "name": "QuantenSprung Labs",
+      "due_at": "2026-11-16T10:35:51.661611+00:00",
       "status": "open",
-      "ticker": "PXW",
-      "headline": "Rassismus-Vorwürfe gegen Pixelwerk Studios",
-      "move_bps": null,
-      "strength": 2,
-      "direction": "down",
-      "published_at": "2026-11-15T22:52:22.57378+00:00"
-    },
-    {
-      "id": 4,
-      "body": "Ein Vögelchen hat mir gezwitschert: Nordlicht Logistik AG dürfte in der kommenden Stunde nach unten gehen. Meine Quelle ist seriös, sie trägt immerhin eine Krawatte.",
-      "name": "Nordlicht Logistik AG",
-      "due_at": "2026-11-15T22:11:12.262417+00:00",
-      "status": "confirmed",
-      "ticker": "NDL",
-      "headline": "Vom Flurfunk: Nordlicht Logistik AG",
-      "move_bps": -1012,
-      "strength": 2,
-      "direction": "down",
-      "published_at": "2026-11-15T21:52:12.262417+00:00"
-    },
-    {
-      "id": 3,
-      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Orbitfracht tut sich in der nächsten Stunde etwas, und zwar nach oben. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
-      "name": "Orbitfracht",
-      "due_at": "2026-11-15T21:52:11.444959+00:00",
-      "status": "fizzled",
-      "ticker": "OFR",
-      "headline": "Mr. Doodle Dangles Geheimtipp",
+      "ticker": "QSL",
+      "headline": "Übernahmegerüchte um QuantenSprung Labs",
       "move_bps": null,
       "strength": 2,
       "direction": "up",
-      "published_at": "2026-11-15T21:52:11.444959+00:00"
+      "published_at": "2026-11-16T10:23:17.27626+00:00"
+    },
+    {
+      "id": 4,
+      "body": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Orbitfracht geht bald nach oben. Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.",
+      "name": "Orbitfracht",
+      "due_at": "2026-11-16T10:06:06.443074+00:00",
+      "status": "confirmed",
+      "ticker": "OFR",
+      "headline": "Der heiße Draht: Orbitfracht",
+      "move_bps": 1030,
+      "strength": 2,
+      "direction": "up",
+      "published_at": "2026-11-16T09:23:06.443074+00:00"
+    },
+    {
+      "id": 3,
+      "body": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Frachtpilot geht bald nach unten. Das Vögelchen lag bisher meistens richtig. Meistens.",
+      "name": "Frachtpilot",
+      "due_at": "2026-11-16T09:23:05.705836+00:00",
+      "status": "confirmed",
+      "ticker": "FPT",
+      "headline": "Der heiße Draht: Frachtpilot",
+      "move_bps": -852,
+      "strength": 2,
+      "direction": "down",
+      "published_at": "2026-11-16T09:23:05.705836+00:00"
     }
   ],
   "reliability_bps": 7500

@@ -1,10 +1,10 @@
 {
-  "me": { "next": { "name": "Vera", "rank": 106, "gap_cents": 570 }, "rank": 107, "net_worth_cents": 1019430 },
+  "me": { "next": { "name": "Vera", "rank": 107, "gap_cents": 604 }, "rank": 108, "net_worth_cents": 1019396 },
   "total": 263,
   "entries": [
     {
       "id": "0e170001-0000-4000-8000-0000000001a1",
-      "tag": "LSXB",
+      "tag": "96M5",
       "kind": "player",
       "name": "Wanda_Wohnt",
       "rank": 1,
@@ -17,7 +17,7 @@
     },
     {
       "id": "0f3f3f3f-0000-4000-8000-0000000000f1",
-      "tag": "EKMH",
+      "tag": "YSL6",
       "kind": "player",
       "name": "Fenja_Firma",
       "rank": 2,
@@ -25,28 +25,15 @@
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 127099499,
-      "rank_change_24h": null
-    },
-    {
-      "id": "09e19e19-0000-4000-8000-0000000000f1",
-      "tag": "4WAK",
-      "kind": "player",
-      "name": "Pop_Frida",
-      "rank": 3,
-      "is_me": false,
-      "avatar_key": "rookie",
-      "description": null,
-      "change_24h_bps": null,
-      "net_worth_cents": 115336000,
+      "net_worth_cents": 127043499,
       "rank_change_24h": null
     },
     {
       "id": "09c19c19-0000-4000-8000-0000000000f1",
-      "tag": "KCUR",
+      "tag": "9UTS",
       "kind": "player",
       "name": "Float_Frida",
-      "rank": 4,
+      "rank": 3,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
@@ -55,18 +42,31 @@
       "rank_change_24h": null
     },
     {
-      "id": "09a19a19-0000-4000-8000-0000000000f1",
-      "tag": "LAXR",
+      "id": "09e19e19-0000-4000-8000-0000000000f1",
+      "tag": "3TTY",
       "kind": "player",
-      "name": "Esc_Frida",
+      "name": "Pop_Frida",
+      "rank": 4,
+      "is_me": false,
+      "avatar_key": "rookie",
+      "description": null,
+      "change_24h_bps": null,
+      "net_worth_cents": 104752000,
+      "rank_change_24h": null
+    },
+    {
+      "id": "0ba771e0-0000-4000-8000-0000000000a1",
+      "tag": "V745",
+      "kind": "player",
+      "name": "Bat_Anna",
       "rank": 5,
       "is_me": false,
       "avatar_key": "rookie",
       "description": null,
       "change_24h_bps": null,
-      "net_worth_cents": 107496000,
+      "net_worth_cents": 101525000,
       "rank_change_24h": null
     }
   ],
-  "server_time": "2026-11-15T21:52:19.051251+00:00"
+  "server_time": "2026-11-16T09:23:13.680625+00:00"
 }

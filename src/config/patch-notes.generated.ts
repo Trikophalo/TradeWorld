@@ -164,6 +164,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Nach jeder Sendung gibt es genau drei News-Battles, jedes mit Preis; danach geht es zur nächsten vollen Stunde weiter.",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-e39c8ea5",
+        title: "Mehr Leben auf dem NFT-Markt",
+        text: "KI-Sammler handeln viel öfter untereinander, und auf dein NFT können bis zu drei verschiedene Sammler gleichzeitig bieten.",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-706f8ae2",
         title: "Mehr Verbesserungen",
         text: "22 neue Verbesserungen und zwei weitere Tresorstufen, in fünf Abschnitten.",

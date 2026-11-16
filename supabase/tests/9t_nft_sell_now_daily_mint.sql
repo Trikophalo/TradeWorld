@@ -60,3 +60,18 @@ select tests.assert(
   and tests.cash(:o) > :o0::bigint and tests.cash(:b) = :b0::bigint,
   'accept_auction(): sold at once to the highest bid, the seller is paid, the bid came from the escrow');
 select tests.assert(tests.money_invariant() = 'ok', 'money invariant holds');
+
+-- several collectors may bid on the same NFT at once (ADR-163)
+select id as w3 from public.artworks a where a.owner_id is null and a.ai_owner is null
+   and not exists (select 1 from public.artwork_auctions x where x.artwork_id = a.id and x.status = 'open') order by serial limit 1 \gset
+update public.artworks set owner_id = :o, ask_cents = null where id = :'w3';
+update public.game_config set value = jsonb_set(jsonb_set(value, '{ai,unlistedOfferChanceBps}', '10000'), '{ai,maxMessagesPerRun}', '1000')
+ where key = 'nfts';
+select public.nfts_run_due(now()) is not null and public.nfts_run_due(now()) is not null
+   and public.nfts_run_due(now()) is not null and public.nfts_run_due(now()) is not null as ok \gset
+select tests.assert(
+  (select count(*) = 3 and count(distinct ai_name) = 3 from public.artwork_messages
+    where artwork_id = :'w3' and ai_name is not null and offer_status = 'open'),
+  'nfts_run_due(): up to maxOpenAiOffers (3) different collectors bid on the same NFT');
+update public.game_config set value = jsonb_set(jsonb_set(value, '{ai,unlistedOfferChanceBps}', '400'), '{ai,maxMessagesPerRun}', '10')
+ where key = 'nfts';

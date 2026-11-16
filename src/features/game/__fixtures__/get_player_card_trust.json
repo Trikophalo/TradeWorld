@@ -1,7 +1,7 @@
 {
   "job": null,
-  "tag": "KD74",
-  "rank": 144,
+  "tag": "KATE",
+  "rank": 145,
   "level": 6,
   "trust": { "band": "shaky", "kept": 0, "score": 41, "broken": 1 },
   "company": { "name": "Fixture Lieferwerk", "ticker": null },
@@ -11,7 +11,7 @@
   "top_skills": [],
   "accessories": [],
   "streak_days": 0,
-  "member_since": "2026-11-15T21:52:21.53849+00:00",
+  "member_since": "2026-11-16T09:23:16.232089+00:00",
   "branch_scores": {
     "it": 0,
     "law": 0,

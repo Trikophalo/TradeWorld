@@ -1,56 +1,56 @@
 {
   "applications": [
     {
-      "id": "a7c7864e-5b38-43af-842a-56cb94cf3bd9",
+      "id": "dbd57504-87f5-4f9d-bed6-1491c5de5513",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "12875c35-07f4-4c62-8f79-43fcbad086ee",
+        "id": "07c44cfb-1169-4b8a-953f-2676d1698912",
         "tier": "intern",
         "title": null,
         "company": {
-          "id": "2f91e3a4-088a-0592-9f21-88b83cae7bd8",
+          "id": "5aaeae39-c17e-272b-db4c-3beb46144cb5",
           "logo": null,
-          "name": "SolarFuchs",
-          "color": "#FF8C42",
+          "name": "GenoVita Biotech",
+          "color": "#E86AF0",
           "is_ai": true,
-          "sector": "energy",
-          "ticker": "SFX"
+          "sector": "pharma",
+          "ticker": "GNV"
         },
-        "required": [{ "branch": "law", "min_score": 0 }],
-        "title_key": "law_intern",
+        "required": [{ "branch": "science", "min_score": 0 }],
+        "title_key": "science_intern",
         "required_skills": []
       },
-      "created_at": "2026-11-15T21:52:19.240511+00:00",
-      "updated_at": "2026-11-15T21:52:19.244583+00:00",
-      "offer_expires_at": "2026-11-17T21:52:19.240511+00:00",
+      "created_at": "2026-11-16T09:23:13.849443+00:00",
+      "updated_at": "2026-11-16T09:23:13.852145+00:00",
+      "offer_expires_at": "2026-11-18T09:23:13.849443+00:00",
       "salary_wish_cents_per_hour": 15000,
       "offer_salary_cents_per_hour": 15000
     },
     {
-      "id": "aab706dc-4a69-4d99-9be3-762ca49855bf",
+      "id": "ccff5208-670d-4a28-b02e-0a752c92b106",
       "status": "offered",
       "message": "Ich lerne schnell.",
       "posting": {
-        "id": "45269608-2745-4af6-b9b5-bf62068679ee",
+        "id": "590f0be7-d309-4375-916d-5a83439b0170",
         "tier": "junior",
         "title": null,
         "company": {
-          "id": "833932bd-1586-776d-1f8f-f602682f7437",
+          "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
           "logo": null,
-          "name": "Luftpost Drohnen",
-          "color": "#00B4D8",
+          "name": "Frachtpilot",
+          "color": "#9ECE6A",
           "is_ai": true,
           "sector": "logistics",
-          "ticker": "DRN"
+          "ticker": "FPT"
         },
         "required": [{ "branch": "it", "min_score": 2 }],
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-15T21:52:19.232777+00:00",
-      "updated_at": "2026-11-15T21:52:19.232777+00:00",
-      "offer_expires_at": "2026-11-17T21:52:19.232777+00:00",
+      "created_at": "2026-11-16T09:23:13.84513+00:00",
+      "updated_at": "2026-11-16T09:23:13.84513+00:00",
+      "offer_expires_at": "2026-11-18T09:23:13.84513+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

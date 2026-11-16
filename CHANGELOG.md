@@ -228,6 +228,7 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   Missionsjäger, Teamplayer, Bilanzprofi, Ehrgeiz), ein größerer Tresor (Panzertresor) und vieles für die eigene
   Firma (KI-Turbo, Glückshand, Werbeagentur, Krisenmanager …). Sie schalten sich zwischen Level 1 und 30 frei.
 
+- **Mehr Leben auf dem NFT-Markt:** KI-Sammler handeln viel öfter untereinander, und auf dein NFT können bis zu drei verschiedene Sammler gleichzeitig bieten.
 - **Drei Battles pro Stunde:** Nach jeder Sendung gibt es genau drei News-Battles, jedes mit Preis; danach geht es zur nächsten vollen Stunde weiter.
 - **Nach den Nachrichten zum Battle:** Ist die stündliche Sendung vorbei, führt ein Knopf unter dem Fernseher direkt in die Battle-Lobby.
 - **NFT sofort verkaufen:** Hat deine Auktion ein Gebot, kannst du sie sofort beenden und an das höchste Gebot verkaufen.

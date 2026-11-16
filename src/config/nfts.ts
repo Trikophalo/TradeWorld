@@ -36,14 +36,16 @@ export const NFT_RULES = {
     /** Per minute: a listing at or below the valuation is bought with this chance. */
     buyChanceBps: 2_500,
     /** Per minute and NFT: a collector writes a lowball offer (listing above the value, or not for sale). */
-    listedOfferChanceBps: 800,
-    unlistedOfferChanceBps: 80,
+    listedOfferChanceBps: 1_500,
+    unlistedOfferChanceBps: 400,
+    /** Several collectors may bid on the same NFT at once, each with one open offer (ADR-163). */
+    maxOpenAiOffers: 3,
     /** Lowball offers: this share of the valuation, rounded down to whole euros. */
     lowballMinBps: 6_500,
     lowballMaxBps: 9_000,
     /** At most this many purchases by all collectors per Berlin day, and this many AI messages per minute. */
-    maxBuysPerDay: 20,
-    maxMessagesPerRun: 4,
+    maxBuysPerDay: 60,
+    maxMessagesPerRun: 10,
     /** An NFT the AI holds is offered for its valuation x this. */
     resaleMarkupBps: 12_500,
     /** The AI accepts a player's offer on an NFT it holds from this share of its valuation. */
@@ -67,16 +69,16 @@ export const NFT_RULES = {
      * instead of climbing for ever. The buyer offers it again at its markup.
      */
     trade: {
-      chanceBps: 60,
+      chanceBps: 250,
       /** Popularity raises the chance: per like, per open offer, per recent sale (bps of the base chance). */
       likeWeightBps: 1_500,
       offerWeightBps: 4_000,
       saleWeightBps: 2_500,
-      maxChanceBps: 1_500,
+      maxChanceBps: 4_000,
       /** A collector keeps a new NFT at least this long. */
-      minHoldMinutes: 30,
-      perRun: 2,
-      perDay: 30,
+      minHoldMinutes: 10,
+      perRun: 6,
+      perDay: 300,
       /** Taste of the buying collector: fair value x 85 % .. 125 %. */
       tasteMinBps: 8_500,
       tasteMaxBps: 12_500,
