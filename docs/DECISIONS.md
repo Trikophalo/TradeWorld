@@ -2950,3 +2950,30 @@ Menge, Image …), acht sinnvolle Punkte, die man mit Mira angehen kann.
 - **Offen (Balancing):** Die Startpreise machen Booster im Erwartungswert teurer oder billiger als ihren Inhalt, je
   nach Katalog; gebremst wird über die begrenzte KI-Nachfrage und fallende Werte bei wachsendem Angebot. KI-Budget,
   Booster-Takt der KI und Notenfaktoren sind die Stellschrauben.
+- **Oberfläche:** eine Seite `/nexamon` mit vier Reitern (Shop, Sammlung, Markt, ASP), die in der Adresse stehen
+  (`?tab=`, am Markt zusätzlich `?view=mine` und `?card=<Schlüssel>`), und eine eigene Seite je Karte
+  `/nexamon/<Schlüssel>` zum Verlinken (Sammlung, Markt, Feed). Navigation unter „Besitz“, im Handy unter „Mehr“;
+  vor Level 10 zeigt die Seite einen Ausblick (`DISCLOSURE.nexamon`, `<Reveal>`).
+  - **Shop:** je Set Preis, eigener Fortschritt (x von 77) und geöffnete Booster; darunter die Ziehungsraten für
+    Platz 4 und 5 als Tabelle direkt aus `nexamonSlotOdds` und die Zustands-Chancen. Ab 1.000 € fragt der Kauf nach.
+  - **Öffnen:** bildschirmfüllend mit `PackOpening`. Der Server hat vorher gebucht; das Ergebnis liegt bis zur
+    Übersicht im `localStorage` (`nexa-nexamon-pending-pack`), damit ein geschlossenes Fenster oder ein Neuladen nur
+    die Animation unterbricht („Ungeöffnetes Booster“ im Shop). „Überspringen“ zeigt die Übersicht sofort.
+  - **Sammlung:** alle 231 Karten in Nummernfolge, fehlende grau; eine Kachel zeigt die beste eigene Kopie, im Slab
+    als Slab, mit Zähler bei Doppelten. Filter (Set, Seltenheit, Meine/Fehlt/Doppelt) und Sortierung laufen im
+    Client über die eine Antwort von `get_nexamon_collection`.
+  - **Karte:** kippbare Karte (Handy Faktor 4, PC Faktor 5), Wert mit Verlauf im vorhandenen `PriceChart`,
+    Population, Slabs je Note, eigene Kopien mit ihren Aktionen. Jede Aktion erklärt vorher im Sheet, was sie
+    kostet und bringt: Verkaufspreis mit Gebühr und Erlös (Vorschlag ist der Wert), Sofortverkauf mit den 50 %,
+    Grading mit Gebühr, Dauer und der Chancentabelle des Zustands, Aufbrechen mit dem Hinweis „keine Erstattung“.
+  - **Markt:** Filter, Sortierung und Seiten rechnet der Server; die eigenen Angebote kommen aus der Sammlung.
+    Kaufen bestätigt den gesehenen Preis; bei `nexamon_price_changed` oder `nexamon_not_listed` schließt das Fenster
+    mit einem Hinweis, und die Liste wird neu gelesen.
+  - **ASP-Schalter:** laufende Gradings mit Countdown, zurückgekehrte Slabs liegen verdeckt, bis man sie aufdeckt
+    (einmal je Slab, gemerkt im `localStorage`; Ton nach Note, Konfetti bei einer 10, mit „Reduziert“ nur
+    Überblenden). Als Verlauf dienen die eigenen Slabs: Eine Liste vergangener Gradings liefert der Server nicht.
+  - **Kartentext:** Name und Attacke enden vor der Zahl rechts daneben. Zu lange Texte werden erst gestaucht (bis
+    68 %), dann kleiner gesetzt; die Breiten der Pixelschrift stehen dafür als Tabelle in
+    `src/features/nexamon/lib.ts`, ein Test prüft alle 231 Karten.
+  - **Benachrichtigungen** tragen vom Server alle den Link `/nexamon`; der Client führt `nexamon_graded` zum
+    ASP-Schalter und `nexamon_sale` zu den eigenen Angeboten. Der Feed-Eintrag `nexamon_pull` verlinkt die Karte.

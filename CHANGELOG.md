@@ -113,6 +113,9 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Nexamon-Seiten (ADR-165):** Unter „Nexamon“ gibt es jetzt Shop mit ehrlichen Ziehungsraten, Booster zum
+  Aufreißen, Sammelalbum, Kartenansicht mit Wertverlauf, Kartenmarkt und den ASP-Schalter für deine Slabs.
+
 - **Nexamon-Sammelkarten (ADR-165):** Ab Level 10 ziehst du Booster aus drei Sets, lässt Karten bei ASP bewerten und
   handelst sie an einem Markt, an dem Knappheit und Nachfrage den Wert jeder Karte bestimmen.
 
