@@ -3015,10 +3015,10 @@ Anteil wie jeder Aktionär.
 - **Auflösung und Konto zurücksetzen:** Vor der Auflösung zahlt die Firma offene Steuern aus der Kasse, offene Anträge
   enden, Budgets verfallen; die Tabellen hängen an `companies`/`profiles` (`on delete cascade`).
 - **Demo:** dieselben Regeln lokal (`demo/listed.ts`), der Geschäftsrat mit einem erfundenen Großaktionär.
-- **Fehler:** `not_listed` NX163, `item_unknown` NX164, `item_locked` NX165, `item_running` NX166, `budget_reserved`
-  NX167, `withdraw_blocked` NX168, `payout_capped` NX169, `strategy_locked` NX170, `books_nothing` NX171,
-  `tax_nothing_due` NX172, `dividend_limit` NX173, `board_no_right` NX174, `board_motion_unknown` NX175, `board_limit`
-  NX176, `board_not_shareholder` NX177.
+- **Fehler:** `not_listed` NX190, `item_unknown` NX191, `item_locked` NX192, `item_running` NX193, `budget_reserved`
+  NX194, `withdraw_blocked` NX195, `payout_capped` NX196, `strategy_locked` NX197, `books_nothing` NX198,
+  `tax_nothing_due` NX199, `dividend_limit` NX200, `board_no_right` NX201, `board_motion_unknown` NX202, `board_limit`
+  NX203, `board_not_shareholder` NX204.
 
 ### Bewusste Vereinfachungen
 

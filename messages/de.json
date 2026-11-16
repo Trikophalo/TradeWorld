@@ -824,7 +824,22 @@
     "chat_not_admin": "Das darf nur der Admin der Gruppe.",
     "chat_group_full": "Die Gruppe ist voll.",
     "chat_group_too_small": "Wähle mindestens einen Freund für die Gruppe.",
-    "chat_already_member": "Ist schon in der Gruppe."
+    "chat_already_member": "Ist schon in der Gruppe.",
+    "not_listed": "Das geht erst, wenn deine Firma an der Börse ist.",
+    "item_unknown": "Das gibt es nicht (mehr).",
+    "item_locked": "Dafür fehlt noch eine Voraussetzung.",
+    "item_running": "Das läuft schon oder ist gerade nicht möglich.",
+    "budget_reserved": "Dieses Geld hat der Geschäftsrat für einen anderen Zweck reserviert.",
+    "withdraw_blocked": "Der Geschäftsrat hat Entnahmen vorerst verboten.",
+    "payout_capped": "Der Geschäftsrat hat deine Auszahlung gedeckelt.",
+    "strategy_locked": "Der Geschäftsrat hat die Preisstrategie festgelegt.",
+    "books_nothing": "Gerade gibt es nichts zu buchen. Die Bücher macht man einmal am Tag, sobald es neuen Umsatz gibt.",
+    "tax_nothing_due": "Es ist keine Steuer offen.",
+    "dividend_limit": "So viel geht nicht: höchstens eine Dividende am Tag und höchstens die Hälfte der freien Kasse.",
+    "board_no_right": "Den Geschäftsrat kann nur einberufen, wer mehr als 20 % der Aktien hält.",
+    "board_motion_unknown": "Diesen Antrag gibt es nicht (mehr).",
+    "board_limit": "Es laufen schon genug Anträge. Versuch es später noch einmal.",
+    "board_not_shareholder": "Dafür brauchst du Aktien dieser Firma."
   },
   "locks": {
     "level": "Level {level}",
@@ -3078,7 +3093,14 @@
         "coin_closed": "hat den Coin {name} ({ticker}) eingestellt.",
         "accessory_bought": "trägt jetzt etwas Legendäres: {name}.",
         "home_rented": "wohnt jetzt in einer {home} bei {owner}.",
-        "battle_won": "hat das News-Battle „{game}“ gewonnen 🏆"
+        "battle_won": "hat das News-Battle „{game}“ gewonnen 🏆",
+        "tax_penalty": "hat mit {company} eine Strafe vom Finanzamt kassiert.",
+        "tax_audit": "hat bei {company} die Betriebsprüfung im Haus.",
+        "greedy_founder": "zahlt sich bei {company} fast den ganzen Gewinn selbst aus.",
+        "mass_quit": "erlebt bei {company} eine Kündigungswelle.",
+        "record_dividend": "schüttet bei {company} eine Rekorddividende aus.",
+        "board_revolt": "hat im Geschäftsrat von {company} einen Aufstand angezettelt.",
+        "research_done": "feiert bei {company} einen Forschungsdurchbruch."
       }
     },
     "notifications": {
@@ -3305,6 +3327,33 @@
           "patch": "Lücke schließen",
           "audit": "Sicherheitsprüfung",
           "disclose": "Alles offenlegen"
+        }
+      },
+      "tax_audit": {
+        "name": "Betriebsprüfung",
+        "headlines": [
+          "Finanzamt klingelt bei {company}: Betriebsprüfung",
+          "Steuerprüfer nehmen {company} unter die Lupe",
+          "Bücher verschlampt? Betriebsprüfung bei {company}"
+        ],
+        "bodies": [
+          "{company} hat seine Bücher nicht rechtzeitig gemacht. Jetzt sitzt das Finanzamt im Büro und blättert in jedem Ordner.",
+          "Die Prüfer wollen jeden Beleg sehen. Solange sie da sind, bleibt bei {company} viel Arbeit liegen."
+        ],
+        "strategies": {
+          "cooperate": "Mit den Prüfern zusammenarbeiten",
+          "tax_lawyer": "Steueranwalt einschalten",
+          "accept": "Aussitzen"
+        },
+        "strategyText": {
+          "cooperate": "Unterlagen zusammensuchen und alles erklären. Günstig, braucht etwas Finanzwissen.",
+          "tax_lawyer": "Ein Profi regelt das. Teuer, aber danach ist Ruhe.",
+          "accept": "Die Prüfer machen lassen und abwarten."
+        },
+        "steps": {
+          "collect_files": "Unterlagen zusammensuchen",
+          "auditor_meeting": "Gespräch mit den Prüfern",
+          "hire_lawyer": "Steueranwalt beauftragen"
         }
       },
       "price_war": {
@@ -6719,6 +6768,402 @@
     "startIntro": "Kostet {amount}. Du brauchst {goal} Unterstützer; KI-Unterstützer kommen von selbst, den Rest müssen Spieler stellen. Nur selten hat eine Kampagne echte Folgen.",
     "started": "Kampagne gestartet",
     "startedText": "Jetzt brauchst du Mitstreiter. Die Kampagne steht im News-Tab."
+  },
+  "listed": {
+    "items": {
+      "r_quality_1": {
+        "name": "Qualitätslabor",
+        "description": "Ein kleines Labor prüft jede Charge."
+      },
+      "r_quality_2": {
+        "name": "Prüfstand",
+        "description": "Nichts verlässt das Haus ungetestet."
+      },
+      "r_quality_3": {
+        "name": "Materialforschung",
+        "description": "Bessere Zutaten, bessere Ware."
+      },
+      "r_quality_4": {
+        "name": "Perfektions-Programm",
+        "description": "Die Konkurrenz kauft heimlich bei dir."
+      },
+      "r_efficiency_1": {
+        "name": "Schlanke Abläufe",
+        "description": "Weniger Zettel, weniger Wege."
+      },
+      "r_efficiency_2": {
+        "name": "Prozess-Tuning",
+        "description": "Jeder Handgriff sitzt."
+      },
+      "r_efficiency_3": {
+        "name": "Lean-Fabrik",
+        "description": "Verschwendung hat Hausverbot."
+      },
+      "r_efficiency_4": {
+        "name": "Null-Verschwendung",
+        "description": "Selbst die Reste werden verkauft."
+      },
+      "r_brand_1": {
+        "name": "Logo-Auffrischung",
+        "description": "Endlich erkennt man euch wieder."
+      },
+      "r_brand_2": {
+        "name": "Markenstudie",
+        "description": "Jetzt wisst ihr, wer euch mag."
+      },
+      "r_brand_3": {
+        "name": "Kult-Kampagne",
+        "description": "Der Werbespot läuft als Ohrwurm."
+      },
+      "r_brand_4": {
+        "name": "Weltmarke",
+        "description": "Euer Name wird zum Verb."
+      },
+      "r_automation_1": {
+        "name": "Fließband 2.0",
+        "description": "Es läuft, und zwar von allein."
+      },
+      "r_automation_2": {
+        "name": "Roboterarme",
+        "description": "Sie machen keine Mittagspause."
+      },
+      "r_automation_3": {
+        "name": "KI-Disponent",
+        "description": "Plant die Schichten besser als jeder Chef."
+      },
+      "r_automation_4": {
+        "name": "Geisterschicht",
+        "description": "Nachts produziert die Halle im Dunkeln."
+      },
+      "r_logistics_1": {
+        "name": "Lagersoftware",
+        "description": "Niemand sucht mehr die Palette."
+      },
+      "r_logistics_2": {
+        "name": "Zentrallager",
+        "description": "Ein Lager, kurze Wege, neue Kunden."
+      },
+      "r_logistics_3": {
+        "name": "Routen-KI",
+        "description": "Die Lkw fahren nie mehr leer."
+      },
+      "r_logistics_4": {
+        "name": "Über-Nacht-Netz",
+        "description": "Heute bestellt, morgen überall."
+      },
+      "r_sustainability_1": {
+        "name": "Mülltrennung",
+        "description": "Ein Anfang. Die Kunden merken es."
+      },
+      "r_sustainability_2": {
+        "name": "Ökostrom",
+        "description": "Sauberer Strom, saubere Bilanz."
+      },
+      "r_sustainability_3": {
+        "name": "Faire Lieferkette",
+        "description": "Gut für den Ruf und fürs Team."
+      },
+      "r_sustainability_4": {
+        "name": "Klimaneutral",
+        "description": "Das Siegel, das alle haben wollen."
+      },
+      "r_finance_1": {
+        "name": "Steuer-Workshop",
+        "description": "Ein Wochenende mit sehr vielen Paragrafen."
+      },
+      "r_finance_2": {
+        "name": "Controlling",
+        "description": "Jede Kostenstelle wird gezählt."
+      },
+      "r_finance_3": {
+        "name": "Holding-Struktur",
+        "description": "Legal, aber kompliziert."
+      },
+      "r_finance_4": {
+        "name": "Treasury-Abteilung",
+        "description": "Euer Geld arbeitet auch nachts."
+      },
+      "p_second": {
+        "name": "Zweitprodukt",
+        "description": "Ein zweites Standbein neben dem Kernprodukt."
+      },
+      "p_budget": {
+        "name": "Sparlinie",
+        "description": "Dasselbe in Günstig. Verkauft sich wie verrückt, glänzt aber weniger."
+      },
+      "p_premium": {
+        "name": "Premium-Linie",
+        "description": "Mit Goldrand und doppeltem Preisschild."
+      },
+      "p_subscription": {
+        "name": "Abo-Modell",
+        "description": "Kunden zahlen jeden Monat und vergessen zu kündigen."
+      },
+      "p_merch": {
+        "name": "Fanartikel",
+        "description": "Tassen, Mützen, Socken mit Logo."
+      },
+      "p_enterprise": {
+        "name": "Großkunden-Lösung",
+        "description": "Für Konzerne mit viel Geld und noch mehr Meetings."
+      },
+      "g_south": {
+        "name": "Süddeutschland",
+        "description": "Erst einmal über den Weißwurstäquator."
+      },
+      "g_dach": {
+        "name": "DACH-Raum",
+        "description": "Österreich und die Schweiz kaufen mit."
+      },
+      "g_europe": {
+        "name": "Europa",
+        "description": "Von Lissabon bis Helsinki. Braucht die Exportlizenz."
+      },
+      "g_america": {
+        "name": "Nordamerika",
+        "description": "Alles ist größer, auch die Rechnung."
+      },
+      "g_asia": {
+        "name": "Asien",
+        "description": "Der größte Markt der Welt."
+      },
+      "m_machines": {
+        "name": "Maschinenpark",
+        "description": "Jede Stufe eine Maschine mehr in der Halle."
+      },
+      "m_datacenter": {
+        "name": "Rechenzentrum",
+        "description": "Eigene Server senken die Stückkosten."
+      },
+      "m_showroom": {
+        "name": "Showroom",
+        "description": "Ein Laden zum Anfassen und Staunen."
+      },
+      "a_kleinhirn": {
+        "name": "Kleinhirn KI",
+        "description": "Ein kleines KI-Start-up mit großen Ideen. Ihr kauft es einfach."
+      },
+      "a_datenkrake": {
+        "name": "Datenkrake GmbH",
+        "description": "Die wissen, was eure Kunden morgen wollen."
+      },
+      "a_robobutze": {
+        "name": "Robo-Butze",
+        "description": "Drei Tüftler und ein Roboter, der alles billiger baut."
+      },
+      "l_patent": {
+        "name": "Patentlizenz",
+        "description": "Fremde Erfindung, eigene Qualität."
+      },
+      "l_brand": {
+        "name": "Markenlizenz",
+        "description": "Ein berühmter Name auf eurer Packung."
+      },
+      "l_export": {
+        "name": "Exportlizenz",
+        "description": "Der Stempel für den Verkauf im Ausland."
+      },
+      "b_obstkorb": {
+        "name": "Obstkorb",
+        "description": "Jeden Montag frisch. Die Bananen sind immer zuerst weg."
+      },
+      "b_kaffee": {
+        "name": "Kaffeeflatrate",
+        "description": "Siebträger statt Filterplörre."
+      },
+      "b_tischkicker": {
+        "name": "Tischkicker",
+        "description": "Für die kreative Pause. Angeblich."
+      },
+      "b_hundebuero": {
+        "name": "Bürohund",
+        "description": "Bello hebt die Laune und klaut Pausenbrote."
+      },
+      "b_massagesessel": {
+        "name": "Massagesessel",
+        "description": "Fünfzehn Minuten, und der Rücken ist wie neu."
+      },
+      "b_jobrad": {
+        "name": "Jobrad",
+        "description": "Mit dem Dienstrad zur Arbeit."
+      },
+      "b_fitness": {
+        "name": "Fitnessstudio",
+        "description": "Die Mitgliedschaft zahlt die Firma."
+      },
+      "b_homeoffice": {
+        "name": "Homeoffice",
+        "description": "Arbeiten in Jogginghose, ganz offiziell."
+      },
+      "b_weiterbildung": {
+        "name": "Weiterbildungsbudget",
+        "description": "Kurse nach Wahl. Macht das Team auch besser."
+      },
+      "b_feelgood": {
+        "name": "Feelgood-Manager",
+        "description": "Jemand, dessen Job gute Laune ist."
+      },
+      "b_betriebsrente": {
+        "name": "Betriebsrente",
+        "description": "Für später. Kommt erstaunlich gut an."
+      },
+      "b_kita": {
+        "name": "Betriebskita",
+        "description": "Die Kleinen spielen nebenan."
+      },
+      "b_bonus": {
+        "name": "Bonusprogramm",
+        "description": "Wer mehr schafft, bekommt mehr. Teuer, aber es wirkt."
+      },
+      "b_viertagewoche": {
+        "name": "Viertagewoche",
+        "description": "Freitag ist frei. Die Stimmung ist bestens, die Kapazität etwas kleiner."
+      },
+      "x_pizza": {
+        "name": "Pizza für alle",
+        "description": "Hilft sofort, hält aber nicht lange."
+      },
+      "x_teamevent": {
+        "name": "Teamevent",
+        "description": "Lasertag, Kochkurs oder Floßbau."
+      },
+      "x_firmenfeier": {
+        "name": "Firmenfeier",
+        "description": "Mit Buffet, DJ und peinlichen Reden."
+      },
+      "x_sonderbonus": {
+        "name": "Sonderbonus",
+        "description": "Bares für alle, einmalig."
+      }
+    },
+    "kinds": {
+      "research": "Forschung",
+      "product": "Produkte",
+      "region": "Märkte",
+      "machine": "Maschinen und Anlagen",
+      "acquisition": "Zukäufe",
+      "licence": "Lizenzen",
+      "benefit": "Benefits",
+      "action": "Aktionen fürs Team"
+    },
+    "branches": {
+      "quality": "Produktqualität",
+      "efficiency": "Effizienz",
+      "brand": "Marke",
+      "automation": "Automatisierung und KI",
+      "logistics": "Logistik",
+      "sustainability": "Nachhaltigkeit",
+      "finance": "Finanzen"
+    },
+    "purposes": {
+      "research": "Forschung",
+      "products": "Produkte",
+      "expansion": "Ausbau",
+      "benefits": "Benefits",
+      "marketing": "Marketing"
+    },
+    "effects": {
+      "demandBps": "Nachfrage",
+      "marketBps": "Marktgröße",
+      "capacityBps": "Kapazität",
+      "qualityBps": "Qualität",
+      "awarenessBps": "Bekanntheit",
+      "marginBps": "Wareneinsatz gespart",
+      "fixedCostBps": "Fixkosten",
+      "taxRateBps": "Steuersatz",
+      "satisfaction": "Zufriedenheit",
+      "reputation": "Ruf"
+    },
+    "status": {
+      "none": "Verfügbar",
+      "locked": "Gesperrt",
+      "running": "In Arbeit",
+      "active": "Aktiv",
+      "paused": "Pausiert: Kasse reicht nicht"
+    },
+    "categories": {
+      "revenue": "Umsatz",
+      "goods": "Wareneinsatz und KI-Kräfte",
+      "wages": "Löhne",
+      "fixed": "Fixkosten und Marketing",
+      "research": "Forschung",
+      "product": "Produkte",
+      "expansion": "Standorte und Anlagen",
+      "benefit": "Benefits",
+      "advisor": "Steuerberater",
+      "costs": "Sonstige Kosten",
+      "capital": "Kapital",
+      "payout": "Auszahlung an den Gründer",
+      "dividend": "Dividende",
+      "tax": "Steuer",
+      "penalty": "Strafen und Zuschläge",
+      "transfer": "Umbuchung"
+    },
+    "receipts": {
+      "customer_invoice": "Rechnung an Kunde Müller",
+      "online_shop_payout": "Auszahlung vom Onlineshop",
+      "raw_material": "Lieferschein Rohmaterial",
+      "packaging": "Rechnung Kartons und Klebeband",
+      "payslip": "Lohnzettel Lager",
+      "overtime": "Überstunden Spätschicht",
+      "office_rent": "Miete Büro",
+      "electricity": "Stromrechnung",
+      "lab_equipment": "Rechnung Laborgerät",
+      "prototype": "Prototyp-Bau",
+      "fruit_basket": "Rechnung Obstkorb",
+      "team_dinner": "Quittung Teamessen"
+    },
+    "zones": {
+      "green": "Gute Stimmung",
+      "yellow": "Angespannt",
+      "red": "Stimmung im Keller"
+    },
+    "satisfactionDrivers": {
+      "base": "Grundstimmung",
+      "benefits": "Benefits",
+      "wages": "Löhne",
+      "workload": "Auslastung",
+      "crisis": "Krise",
+      "layoffs": "Entlassungen",
+      "greed": "Gier der Chefetage",
+      "success": "Erfolg"
+    },
+    "reputationDrivers": {
+      "base": "Grundruf",
+      "items": "Nachhaltigkeit",
+      "greed": "Auszahlungen an den Gründer",
+      "reinvest": "Reinvestition",
+      "dividends": "Dividenden",
+      "scandal": "Skandal"
+    },
+    "booksStages": {
+      "none": "Kein neuer Umsatz",
+      "open": "Bücher offen",
+      "reminder": "Das Finanzamt erinnert",
+      "late": "Verspätungszuschlag",
+      "estimate": "Das Finanzamt schätzt"
+    },
+    "closedBy": {
+      "founder": "Selbst gemacht",
+      "advisor": "Steuerberater",
+      "finanzamt": "Vom Finanzamt geschätzt"
+    },
+    "motions": {
+      "earmark": "Geld reservieren",
+      "release": "Budget freigeben",
+      "dividend": "Dividende ausschütten",
+      "payout_cap": "CEO-Auszahlung deckeln",
+      "withdraw_ban": "Entnahmen verbieten",
+      "price_level": "Preisstrategie festlegen",
+      "debt": "Schulden tilgen"
+    },
+    "motionStatus": {
+      "open": "Abstimmung läuft",
+      "passed": "Angenommen",
+      "rejected": "Abgelehnt",
+      "no_quorum": "Nicht beschlussfähig",
+      "cancelled": "Zurückgezogen"
+    }
   },
   "mira": {
     "name": "Mira",

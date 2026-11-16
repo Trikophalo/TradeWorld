@@ -257,6 +257,31 @@ export const COMPANY_EVENTS: CompanyEventsConfig = {
       ],
     },
     {
+      // Never rolled (weight 0): the tax office starts it at a listed company that skipped its books (ADR-167).
+      key: "tax_audit",
+      polarity: "crisis",
+      weight: 0,
+      effect: { cost: 0.05, capacity: -0.08 },
+      deadlineHours: 12,
+      lastsHours: 36,
+      strategies: [
+        {
+          key: "cooperate",
+          mitigation: 0.9,
+          steps: [
+            { key: "collect_files", hours: 2, cost: 1, branch: "finance", baseBps: 9_000 },
+            { key: "auditor_meeting", hours: 3, cost: 1, branch: "management", staff: 1, baseBps: 8_000 },
+          ],
+        },
+        {
+          key: "tax_lawyer",
+          mitigation: 1,
+          steps: [{ key: "hire_lawyer", hours: 4, cost: 4, branch: "law", baseBps: 8_500 }],
+        },
+        accept,
+      ],
+    },
+    {
       key: "price_war",
       polarity: "crisis",
       weight: 10,
