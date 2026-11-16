@@ -37,7 +37,12 @@ export type Metric =
   | "homes_rented"
   | "wohnwert"
   | "battle_joins"
-  | "battle_wins";
+  | "battle_wins"
+  | "nexamon_packs"
+  | "nexamon_rares"
+  | "nexamon_ultras"
+  | "nexamon_sold"
+  | "nexamon_tens";
 
 export interface MissionTemplate {
   key: string;
@@ -544,6 +549,70 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
     target: 300_000,
     xp: w.minXp + 200,
     requires: "property",
+  },
+  // Nexamon collectible cards (ADR-165)
+  {
+    key: "d_nexamon_pack",
+    kind: "daily",
+    title: "Öffne einen Nexamon-Booster",
+    metric: "nexamon_packs",
+    target: 1,
+    xp: d.minXp,
+    requires: "nexamon",
+  },
+  {
+    key: "m_nexamon_first_pack",
+    kind: "milestone",
+    title: "Dein erster Booster",
+    metric: "nexamon_packs",
+    target: 1,
+    xp: 300,
+    requires: "nexamon",
+  },
+  {
+    key: "m_nexamon_first_rare",
+    kind: "milestone",
+    title: "Deine erste Rare",
+    metric: "nexamon_rares",
+    target: 1,
+    xp: 400,
+    requires: "nexamon",
+  },
+  {
+    key: "m_nexamon_packs_10",
+    kind: "milestone",
+    title: "10 Booster geöffnet",
+    metric: "nexamon_packs",
+    target: 10,
+    xp: 800,
+    requires: "nexamon",
+  },
+  {
+    key: "m_nexamon_first_sale",
+    kind: "milestone",
+    title: "Erste Karte verkauft",
+    metric: "nexamon_sold",
+    target: 1,
+    xp: 500,
+    requires: "nexamon",
+  },
+  {
+    key: "m_nexamon_first_ultra",
+    kind: "milestone",
+    title: "Deine erste Ultra Rare",
+    metric: "nexamon_ultras",
+    target: 1,
+    xp: 1000,
+    requires: "nexamon",
+  },
+  {
+    key: "m_nexamon_first_ten",
+    kind: "milestone",
+    title: "Die erste 10",
+    metric: "nexamon_tens",
+    target: 1,
+    xp: 1500,
+    requires: "nexamon",
   },
 ];
 

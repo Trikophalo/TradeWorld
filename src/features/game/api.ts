@@ -19,6 +19,7 @@ import { TOUR_RPC_SCHEMAS, liveTourEngine } from "./api-tours";
 import { NFT_RPC_SCHEMAS, liveNftEngine } from "./api-nfts";
 import { FLOOR_RPC_SCHEMAS, liveFloorEngine } from "./api-floor";
 import { BATTLE_RPC_SCHEMAS, liveBattleEngine } from "./api-battles";
+import { NEXAMON_RPC_SCHEMAS, liveNexamonEngine } from "./api-nexamon";
 import { rpc, toErrorKey } from "./rpc";
 import {
   type Candle,
@@ -494,6 +495,7 @@ export const RPC_SCHEMAS = {
   ...NFT_RPC_SCHEMAS,
   ...FLOOR_RPC_SCHEMAS,
   ...BATTLE_RPC_SCHEMAS,
+  ...NEXAMON_RPC_SCHEMAS,
   get_stock_news: stockNewsSchema,
   get_player_holdings: holdingsSchema,
   get_my_net_worth_history: netWorthHistorySchema,
@@ -516,6 +518,7 @@ export const liveEngine: GameEngine = {
   ...liveTourEngine,
   ...liveNewsShowEngine,
   ...liveBattleEngine,
+  ...liveNexamonEngine,
   ...liveCareerEngine,
   ...liveCompanyEngine,
   ...liveArtEngine,

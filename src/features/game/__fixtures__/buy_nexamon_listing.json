@@ -1,0 +1,35 @@
+{
+  "card": {
+    "set": "mystic_energy",
+    "owned": 1,
+    "listed": 4,
+    "number": 13,
+    "rarity": "common",
+    "card_key": "me-013",
+    "cap_cents": 902,
+    "change_bps": 0,
+    "population": 7,
+    "floor_cents": 60,
+    "start_cents": 300,
+    "value_cents": 300,
+    "popularity_bps": 3489
+  },
+  "copy": {
+    "id": "a8b29079-f5cc-44f9-8eba-8c6ae68e24f2",
+    "grade": null,
+    "state": "raw",
+    "serial": 7,
+    "listing": null,
+    "card_key": "me-013",
+    "condition": "near_mint",
+    "graded_at": null,
+    "acquired_at": "2026-11-16T16:58:41.117937+00:00",
+    "value_cents": 300,
+    "grading_until": null
+  },
+  "copy_id": "a8b29079-f5cc-44f9-8eba-8c6ae68e24f2",
+  "counted": true,
+  "card_key": "me-013",
+  "fee_cents": 15,
+  "price_cents": 300
+}

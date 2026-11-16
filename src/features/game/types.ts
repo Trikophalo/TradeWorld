@@ -7,6 +7,7 @@
  * computed with BigInt (src/features/market/order-schema.ts).
  */
 import type { BattleEngine } from "./battle-types";
+import type { NexamonEngine } from "./nexamon-types";
 import type { SectorKey } from "@/components/pixel/art";
 import type { FloorMaterial, PropertyTier } from "@/config/balance";
 import type { SkillBranch } from "@/config/skills";
@@ -2135,6 +2136,19 @@ export const GAME_ERROR_KEYS = [
   "chat_group_full",
   "chat_group_too_small",
   "chat_already_member",
+  "nexamon_locked",
+  "nexamon_unknown",
+  "nexamon_not_owner",
+  "nexamon_listed",
+  "nexamon_not_listed",
+  "nexamon_price_changed",
+  "nexamon_listing_limit",
+  "nexamon_grading",
+  "nexamon_not_raw",
+  "nexamon_not_graded",
+  "nexamon_not_sellable",
+  "nexamon_own_listing",
+  "nexamon_grading_limit",
 ] as const;
 export type GameErrorKey = (typeof GAME_ERROR_KEYS)[number] | "unknown";
 
@@ -2198,7 +2212,7 @@ export interface NewsShowState {
   chat: NewsShowChatMessage[];
 }
 
-export interface GameEngine extends BattleEngine {
+export interface GameEngine extends BattleEngine, NexamonEngine {
   newsShow(): Promise<NewsShowState>;
   postNewsShowMessage(requestId: string, body: string): Promise<NewsShowChatMessage[]>;
   /** Finn's tours the player has seen (kept on the server, so a private window does not repeat them). */
