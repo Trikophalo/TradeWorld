@@ -244,6 +244,16 @@ Regeln: Finn spricht in der Du-Form, kurz und freundlich, höchstens drei Sätze
 wertet nicht („Das war falsch“ sagt er nie). Die Sprechblase (`features/tutorial/components/speech-bubble.tsx`)
 tippt den Text ein; ein Tipp auf die Blase zeigt ihn sofort ganz.
 
+**Nexamon-Sammelkarten (ADR-165):** Karten sind 72 × 100 Art-Pixel groß und werden wie alles andere nur ganzzahlig
+skaliert (`scale`). Rahmen, Symbole und Artwork entstehen einmal als Raster
+([`nexamon-face.ts`](../src/components/pixel/nexamon-face.ts)) und liegen als ein einziges Bild im DOM; der Kartentext
+ist echter Text darüber, in Art-Pixeln bemessen. Die Farben einer Karte sind Druckfarben (Daten), keine Tokens.
+Folie, Glanz und Glitzer sind übergroße Verlaufsebenen, die nur per `transform` verschoben und mit `mix-blend-mode`
+aufgelegt werden. Bausteine in `src/features/nexamon/components`: `NexamonCard` (kippen, umdrehen),
+`NexamonCardFace`, `NexamonCardBack`, `CardThumb` (für Raster mit vielen Karten), `NexamonSlab`, `NexamonPack`,
+`PackOpening`, `RarityBadge`, `ConditionBadge`, `TypeIcon`, `SetIcon`. Mit „Reduziert“ kippt und dreht nichts, die
+Seiten blenden über, die Folie steht still.
+
 ## 7. Layout und Navigation
 
 |             | Handy (< 1024 px)                                             | PC (ab 1024 px)                             |

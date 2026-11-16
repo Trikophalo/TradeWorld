@@ -7705,5 +7705,83 @@
     "openProfile": "Profil von {name} öffnen",
     "pick": "Wähle einen Chat",
     "pickText": "Links stehen deine Unterhaltungen. Oder schreib einem Freund."
+  },
+  "nexamonCards": {
+    "stage": {
+      "0": "Basis",
+      "1": "Phase 1",
+      "2": "Phase 2"
+    },
+    "hp": "KP",
+    "evolvesFrom": "Entwickelt sich aus {name}",
+    "evolvesShort": "aus {name}",
+    "typeLine": "{type}-Nexamon",
+    "types": {
+      "fire": "Feuer",
+      "water": "Wasser",
+      "grass": "Pflanze",
+      "electric": "Elektro",
+      "psychic": "Psycho",
+      "rock": "Gestein",
+      "dark": "Finsternis",
+      "steel": "Stahl",
+      "fairy": "Fee",
+      "dragon": "Drache"
+    },
+    "rarity": {
+      "common": "Common",
+      "rare": "Rare",
+      "ultra": "Ultra Rare",
+      "prisma": "Prisma Illustration Rare",
+      "legendary": "Legendary Illustration Rare"
+    },
+    "rarityShort": {
+      "common": "Common",
+      "rare": "Rare",
+      "ultra": "Ultra",
+      "prisma": "Prisma",
+      "legendary": "Legendary"
+    },
+    "condition": {
+      "poor": "Poor",
+      "good": "Good",
+      "near_mint": "Near Mint",
+      "mint": "Mint"
+    },
+    "sets": {
+      "mystic_energy": "Mystic Energy",
+      "super_apex": "Super Apex",
+      "prismatic_peak": "Prismatic Peak"
+    },
+    "grade": {
+      "gemMint": "Gem Mint",
+      "mint": "Mint",
+      "nearMintMint": "NM-MT",
+      "nearMint": "Near Mint",
+      "excellentMint": "EX-MT",
+      "excellent": "Excellent",
+      "veryGoodExcellent": "VG-EX",
+      "veryGood": "Very Good",
+      "good": "Good",
+      "poor": "Poor"
+    },
+    "cardLabel": "{name}, {type}, {hp} KP, {rarity}",
+    "flipHint": "{name}: Karte umdrehen",
+    "back": "Rückseite einer Nexamon-Karte",
+    "slabLabel": "{name}, ASP-Note {grade}, {word}",
+    "slabFlipHint": "{name} im Slab umdrehen",
+    "slabSerial": "Nr. {serial}",
+    "slabBack": "Geprüft und versiegelt von ASP",
+    "pack": {
+      "label": "Booster {set}",
+      "open": "Booster {set} aufreißen",
+      "tapHint": "Tippe auf das Booster, um es aufzureißen.",
+      "dragHint": "Zieh die oberste Karte weg. Langsam ziehen heißt spicken.",
+      "keyHint": "Tastatur: Pfeiltasten oder Leertaste",
+      "counter": "Karte {n} von {total}",
+      "stackLabel": "Kartenstapel, Karte {n} von {total}: {name}. Mit Pfeiltasten oder Leertaste wegziehen.",
+      "summary": "Deine Karten",
+      "cards": "5 Karten"
+    }
   }
 }
