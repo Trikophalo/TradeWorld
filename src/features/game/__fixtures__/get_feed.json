@@ -1,55 +1,55 @@
 {
   "items": [
     {
-      "id": 353,
+      "id": 355,
       "kind": "league_won",
-      "actor": { "tag": "Z5ZL", "level": 15, "nickname": "Fixture_Gmbh", "avatar_key": "rookie" },
+      "actor": { "tag": "9T36", "level": 15, "nickname": "Fixture_Gmbh", "avatar_key": "rookie" },
       "is_me": true,
-      "payload": { "growth_bps": 235, "week_start": "2026-11-09" },
+      "payload": { "growth_bps": 233, "week_start": "2026-11-09" },
       "reacted": false,
       "reactions": 0,
-      "created_at": "2026-11-16T09:23:15.739133+00:00"
+      "created_at": "2026-11-16T10:06:35.737088+00:00"
     },
     {
-      "id": 352,
+      "id": 354,
       "kind": "friends_now",
-      "actor": { "tag": "Z5ZL", "level": 15, "nickname": "Fixture_Gmbh", "avatar_key": "rookie" },
+      "actor": { "tag": "9T36", "level": 15, "nickname": "Fixture_Gmbh", "avatar_key": "rookie" },
       "is_me": true,
       "payload": { "other_nickname": "Fixture_Neu" },
       "reacted": false,
       "reactions": 0,
-      "created_at": "2026-11-16T09:23:15.666753+00:00"
+      "created_at": "2026-11-16T10:06:35.655233+00:00"
+    },
+    {
+      "id": 353,
+      "kind": "friends_now",
+      "actor": { "tag": "DSGR", "level": 15, "nickname": "Fixture_Neu", "avatar_key": "coder" },
+      "is_me": false,
+      "payload": { "other_nickname": "Fixture_Gmbh" },
+      "reacted": false,
+      "reactions": 0,
+      "created_at": "2026-11-16T10:06:35.655233+00:00"
+    },
+    {
+      "id": 352,
+      "kind": "friends_now",
+      "actor": { "tag": "WM8S", "level": 8, "nickname": "Fixture_Kunst", "avatar_key": "rookie" },
+      "is_me": false,
+      "payload": { "other_nickname": "Fixture_Gmbh" },
+      "reacted": false,
+      "reactions": 0,
+      "created_at": "2026-11-16T10:06:35.625949+00:00"
     },
     {
       "id": 351,
       "kind": "friends_now",
-      "actor": { "tag": "HBJD", "level": 15, "nickname": "Fixture_Neu", "avatar_key": "coder" },
-      "is_me": false,
-      "payload": { "other_nickname": "Fixture_Gmbh" },
-      "reacted": false,
-      "reactions": 0,
-      "created_at": "2026-11-16T09:23:15.666753+00:00"
-    },
-    {
-      "id": 350,
-      "kind": "friends_now",
-      "actor": { "tag": "VTHE", "level": 8, "nickname": "Fixture_Kunst", "avatar_key": "rookie" },
-      "is_me": false,
-      "payload": { "other_nickname": "Fixture_Gmbh" },
-      "reacted": false,
-      "reactions": 0,
-      "created_at": "2026-11-16T09:23:15.641411+00:00"
-    },
-    {
-      "id": 349,
-      "kind": "friends_now",
-      "actor": { "tag": "Z5ZL", "level": 15, "nickname": "Fixture_Gmbh", "avatar_key": "rookie" },
+      "actor": { "tag": "9T36", "level": 15, "nickname": "Fixture_Gmbh", "avatar_key": "rookie" },
       "is_me": true,
       "payload": { "other_nickname": "Fixture_Kunst" },
       "reacted": false,
       "reactions": 0,
-      "created_at": "2026-11-16T09:23:15.641411+00:00"
+      "created_at": "2026-11-16T10:06:35.625949+00:00"
     }
   ],
-  "next_before": 349
+  "next_before": 351
 }

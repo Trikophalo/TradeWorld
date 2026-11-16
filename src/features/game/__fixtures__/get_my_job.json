@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "0c7cacf8-39e4-4eb2-8223-033f51fba675",
+    "id": "615d040f-0d54-44a0-9198-21484623ae1d",
     "tier": "junior",
     "title": null,
     "company": {
-      "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
+      "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
       "logo": null,
-      "name": "Frachtpilot",
-      "color": "#9ECE6A",
+      "name": "KlarSoft AG",
+      "color": "#4C8DFF",
       "is_ai": true,
-      "sector": "logistics",
-      "ticker": "FPT"
+      "sector": "tech",
+      "ticker": "KLS"
     },
     "presence": {
-      "fire_at": "2026-11-21T09:23:13.262083+00:00",
+      "fire_at": "2026-11-21T10:06:32.94104+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-16T09:23:13.262083+00:00"
+      "last_active_at": "2026-11-16T10:06:32.94104+00:00"
     },
     "required": [{ "branch": "it", "min_score": 2 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M2 14 C6 4 10 4 14 12 S22 18 26 8",
     "title_key": "it_junior",
     "rank_hours": 1.0,
-    "started_at": "2026-11-16T09:23:13.854241+00:00",
+    "started_at": "2026-11-16T10:06:33.398521+00:00",
     "pending_raise": null,
     "raise_max_bps": 300,
     "notice_ends_at": null,

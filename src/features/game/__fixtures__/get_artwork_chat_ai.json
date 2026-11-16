@@ -3,7 +3,7 @@
   "messages": [
     {
       "ai": false,
-      "at": "2026-11-16T09:23:17.689071+00:00",
+      "at": "2026-11-16T10:06:38.348491+00:00",
       "id": 62,
       "kind": "chat",
       "mine": false,
@@ -15,19 +15,19 @@
     },
     {
       "ai": false,
-      "at": "2026-11-16T09:23:17.691894+00:00",
+      "at": "2026-11-16T10:06:38.375153+00:00",
       "id": 63,
       "kind": "offer",
       "mine": false,
       "text": "Wäre das ein Preis?",
       "author": "Fixture_Kunst",
-      "expires_at": "2026-11-17T09:23:17.691894+00:00",
+      "expires_at": "2026-11-17T10:06:38.375153+00:00",
       "offer_cents": 300000,
       "offer_status": "accepted"
     },
     {
       "ai": false,
-      "at": "2026-11-16T09:23:17.697+00:00",
+      "at": "2026-11-16T10:06:38.382704+00:00",
       "id": 64,
       "kind": "sale",
       "mine": false,
@@ -39,7 +39,7 @@
     },
     {
       "ai": false,
-      "at": "2026-11-16T09:23:17.704194+00:00",
+      "at": "2026-11-16T10:06:38.393839+00:00",
       "id": 65,
       "kind": "sale",
       "mine": false,
@@ -51,19 +51,19 @@
     },
     {
       "ai": true,
-      "at": "2026-11-16T09:23:17.710755+00:00",
+      "at": "2026-11-16T10:06:38.4043+00:00",
       "id": 66,
       "kind": "offer",
       "mine": false,
-      "text": "Wusstest du, dass Otter Händchen halten? Jedenfalls: mein Angebot.",
-      "author": "Otto Original",
-      "expires_at": "2026-11-17T09:23:17.710755+00:00",
-      "offer_cents": 2013200,
+      "text": "Ich sammle nur Dinge, die ich nicht verstehe. Passt perfekt.",
+      "author": "Gräfin Glitzer",
+      "expires_at": "2026-11-17T10:06:38.4043+00:00",
+      "offer_cents": 2216700,
       "offer_status": "open"
     }
   ],
   "ask_cents": 90000000,
-  "artwork_id": "79e65306-e406-4e78-8c71-c45dd1a0146a",
+  "artwork_id": "7e8b7866-4d62-4fde-a188-87b4f77ca344",
   "max_length": 200,
   "my_offer_cents": null,
   "min_offer_cents": 10000

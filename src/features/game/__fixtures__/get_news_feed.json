@@ -1,7 +1,7 @@
 {
   "items": [
     {
-      "at": "2026-11-16T09:23:17.64264+00:00",
+      "at": "2026-11-16T10:06:38.29149+00:00",
       "id": "c165",
       "kind": "company",
       "name": "Fixture Mode",
@@ -12,7 +12,7 @@
       "news_kind": "task_success"
     },
     {
-      "at": "2026-11-16T09:23:17.611675+00:00",
+      "at": "2026-11-16T10:06:38.25837+00:00",
       "id": "c164",
       "kind": "company",
       "name": "Fixture Mode",
@@ -23,7 +23,7 @@
       "news_kind": "hired"
     },
     {
-      "at": "2026-11-16T09:23:17.600791+00:00",
+      "at": "2026-11-16T10:06:38.246787+00:00",
       "id": "c163",
       "kind": "company",
       "name": "Fixture Mode",
@@ -34,7 +34,7 @@
       "news_kind": "hired"
     },
     {
-      "at": "2026-11-16T09:23:17.534658+00:00",
+      "at": "2026-11-16T10:06:38.150596+00:00",
       "id": "c162",
       "kind": "company",
       "name": "Fixture Mode",
@@ -45,7 +45,7 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-16T09:23:16.627488+00:00",
+      "at": "2026-11-16T10:06:36.93513+00:00",
       "id": "c161",
       "kind": "company",
       "name": "Fixture Zweitling",
@@ -56,7 +56,7 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-16T09:23:16.573184+00:00",
+      "at": "2026-11-16T10:06:36.854672+00:00",
       "id": "c160",
       "kind": "company",
       "name": "Fixture Erstling",
@@ -67,7 +67,7 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-16T09:23:16.331285+00:00",
+      "at": "2026-11-16T10:06:36.567764+00:00",
       "id": "c158",
       "kind": "company",
       "name": "Fixture Lieferwerk",
@@ -78,7 +78,7 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-16T09:23:16.282769+00:00",
+      "at": "2026-11-16T10:06:36.51608+00:00",
       "id": "c157",
       "kind": "company",
       "name": "Fixture Abnahme",
@@ -89,7 +89,7 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-16T09:23:16.192049+00:00",
+      "at": "2026-11-16T10:06:36.397489+00:00",
       "id": "c156",
       "kind": "company",
       "name": "Fixture Leitern",
@@ -100,7 +100,7 @@
       "news_kind": "hired"
     },
     {
-      "at": "2026-11-16T09:23:16.143432+00:00",
+      "at": "2026-11-16T10:06:36.323297+00:00",
       "id": "c155",
       "kind": "company",
       "name": "Fixture Leitern",
@@ -111,7 +111,7 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-16T09:23:15.943186+00:00",
+      "at": "2026-11-16T10:06:36.026479+00:00",
       "id": "c149",
       "kind": "company",
       "name": "Fixture Krisenstab",
@@ -122,7 +122,7 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-16T09:23:15.554667+00:00",
+      "at": "2026-11-16T10:06:35.537766+00:00",
       "id": "c148",
       "kind": "company",
       "name": "Fixture Werke",
@@ -133,7 +133,7 @@
       "news_kind": "expanded"
     },
     {
-      "at": "2026-11-16T09:23:15.405439+00:00",
+      "at": "2026-11-16T10:06:35.369259+00:00",
       "id": "c147",
       "kind": "company",
       "name": "Fixture Werke",
@@ -144,7 +144,7 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-16T09:23:14.536797+00:00",
+      "at": "2026-11-16T10:06:34.296035+00:00",
       "id": "c146",
       "kind": "company",
       "name": "Fixture Labor",
@@ -155,7 +155,7 @@
       "news_kind": "ipo"
     },
     {
-      "at": "2026-11-16T09:23:14.343404+00:00",
+      "at": "2026-11-16T10:06:34.007909+00:00",
       "id": "c145",
       "kind": "company",
       "name": "Fixture Labor",
@@ -166,7 +166,7 @@
       "news_kind": "hired"
     },
     {
-      "at": "2026-11-16T09:23:14.298336+00:00",
+      "at": "2026-11-16T10:06:33.933979+00:00",
       "id": "c144",
       "kind": "company",
       "name": "Fixture Labor",
@@ -177,7 +177,7 @@
       "news_kind": "upgraded"
     },
     {
-      "at": "2026-11-16T09:23:14.198309+00:00",
+      "at": "2026-11-16T10:06:33.795478+00:00",
       "id": "c143",
       "kind": "company",
       "name": "Fixture Labor",
@@ -188,7 +188,7 @@
       "news_kind": "hired"
     },
     {
-      "at": "2026-11-16T09:23:13.957053+00:00",
+      "at": "2026-11-16T10:06:33.512769+00:00",
       "id": "c142",
       "kind": "company",
       "name": "Fixture Labor",
@@ -199,7 +199,7 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-16T09:23:08.108626+00:00",
+      "at": "2026-11-16T10:06:27.354998+00:00",
       "id": "c141",
       "kind": "company",
       "name": "Bodenständig",
@@ -210,7 +210,7 @@
       "news_kind": "hired"
     },
     {
-      "at": "2026-11-16T09:23:08.089246+00:00",
+      "at": "2026-11-16T10:06:27.333947+00:00",
       "id": "c140",
       "kind": "company",
       "name": "Bodenständig",
@@ -221,7 +221,7 @@
       "news_kind": "hired"
     },
     {
-      "at": "2026-11-16T09:23:08.048285+00:00",
+      "at": "2026-11-16T10:06:27.26812+00:00",
       "id": "c139",
       "kind": "company",
       "name": "Ottos Ecke",
@@ -232,7 +232,7 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-16T09:23:07.980693+00:00",
+      "at": "2026-11-16T10:06:27.202366+00:00",
       "id": "c138",
       "kind": "company",
       "name": "Bodenständig",
@@ -243,7 +243,7 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-16T09:23:07.361493+00:00",
+      "at": "2026-11-16T10:06:26.791419+00:00",
       "id": "c137",
       "kind": "company",
       "name": "Vollhaus",
@@ -254,7 +254,7 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-16T09:23:06.869827+00:00",
+      "at": "2026-11-16T10:06:26.393589+00:00",
       "id": "c136",
       "kind": "company",
       "name": "Knappwerk",
@@ -265,7 +265,7 @@
       "news_kind": "ipo"
     },
     {
-      "at": "2026-11-16T09:23:06.771488+00:00",
+      "at": "2026-11-16T10:06:26.287177+00:00",
       "id": "c135",
       "kind": "company",
       "name": "Knappwerk",
@@ -276,17 +276,17 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-16T09:23:06.443074+00:00",
+      "at": "2026-11-16T10:06:25.969949+00:00",
       "id": "s4",
-      "body": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Orbitfracht geht bald nach oben. Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.",
+      "body": "Ein Vögelchen hat mir gezwitschert: Eilbote Express dürfte in der kommenden Stunde nach oben gehen. Bei Verlusten bitte nicht bei mir beschweren, ich bin dann im Urlaub.",
       "kind": "stock",
-      "name": "Orbitfracht",
-      "ticker": "OFR",
-      "headline": "Der heiße Draht: Orbitfracht",
+      "name": "Eilbote Express",
+      "ticker": "EBX",
+      "headline": "Vom Flurfunk: Eilbote Express",
       "direction": "up"
     },
     {
-      "at": "2026-11-16T09:23:06.112915+00:00",
+      "at": "2026-11-16T10:06:25.617387+00:00",
       "id": "c134",
       "kind": "company",
       "name": "Kurzwerk",
@@ -297,7 +297,7 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-16T09:23:06.10192+00:00",
+      "at": "2026-11-16T10:06:25.606372+00:00",
       "id": "c133",
       "kind": "company",
       "name": "Wackelwerk",
@@ -308,7 +308,7 @@
       "news_kind": "ipo"
     },
     {
-      "at": "2026-11-16T09:23:05.927857+00:00",
+      "at": "2026-11-16T10:06:25.433512+00:00",
       "id": "c132",
       "kind": "company",
       "name": "Wackelwerk",
@@ -319,17 +319,17 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-16T09:23:05.705836+00:00",
+      "at": "2026-11-16T10:06:25.211095+00:00",
       "id": "s3",
-      "body": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Frachtpilot geht bald nach unten. Das Vögelchen lag bisher meistens richtig. Meistens.",
+      "body": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Luftpost Drohnen geht bald nach oben. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
       "kind": "stock",
-      "name": "Frachtpilot",
-      "ticker": "FPT",
-      "headline": "Der heiße Draht: Frachtpilot",
-      "direction": "down"
+      "name": "Luftpost Drohnen",
+      "ticker": "DRN",
+      "headline": "Der heiße Draht: Luftpost Drohnen",
+      "direction": "up"
     },
     {
-      "at": "2026-11-16T09:23:05.554055+00:00",
+      "at": "2026-11-16T10:06:25.03641+00:00",
       "id": "c131",
       "kind": "company",
       "name": "Sendeanstalt",
@@ -340,7 +340,7 @@
       "news_kind": "founded"
     },
     {
-      "at": "2026-11-16T09:23:05.458431+00:00",
+      "at": "2026-11-16T10:06:24.946678+00:00",
       "id": "c130",
       "kind": "company",
       "name": "Xp Werkstatt",
@@ -351,7 +351,7 @@
       "news_kind": "hired"
     },
     {
-      "at": "2026-11-16T09:23:04.038996+00:00",
+      "at": "2026-11-16T10:06:23.55104+00:00",
       "id": "m293",
       "body": "Viele haben mitgemacht, doch Kunden und Anleger zucken nur mit den Schultern.",
       "kind": "market",
@@ -360,7 +360,7 @@
       "headline": "Petition gegen KlarSoft AG verpufft"
     },
     {
-      "at": "2026-11-16T09:23:04.038996+00:00",
+      "at": "2026-11-16T10:06:23.55104+00:00",
       "id": "m294",
       "body": "0 Spieler und 1 weitere Unterstützer machen mit. Das Thema ist in aller Munde.",
       "kind": "market",
@@ -369,7 +369,7 @@
       "headline": "Petition gegen KlarSoft AG zeigt Wirkung"
     },
     {
-      "at": "2026-11-16T09:23:03.43004+00:00",
+      "at": "2026-11-16T10:06:22.925729+00:00",
       "id": "m292",
       "body": "Viele haben mitgemacht, doch Kunden und Anleger zucken nur mit den Schultern.",
       "kind": "market",
@@ -378,7 +378,7 @@
       "headline": "Petition gegen KlarSoft AG verpufft"
     },
     {
-      "at": "2026-11-16T09:23:03.423566+00:00",
+      "at": "2026-11-16T10:06:22.919254+00:00",
       "id": "m291",
       "body": "2 Spieler und 18 weitere Unterstützer machen mit. Das Thema ist in aller Munde.",
       "kind": "market",
@@ -387,67 +387,67 @@
       "headline": "Shitstorm gegen Zielscheibe zeigt Wirkung"
     },
     {
-      "at": "2026-11-16T09:23:02.677267+00:00",
+      "at": "2026-11-16T10:06:22.316507+00:00",
       "id": "f1",
       "kind": "fun",
-      "name": "Helix Robotik",
-      "ticker": "HLX",
-      "item_key": "ceo_laptop_train",
-      "nickname": "Carla_Rang"
+      "name": "Glanz & Gloria",
+      "ticker": "LUX",
+      "item_key": "parking_war",
+      "nickname": "Cem_Chance"
     },
     {
-      "at": "2026-11-16T09:22:53.888766+00:00",
+      "at": "2026-11-16T10:06:13.413022+00:00",
       "id": "m277",
-      "body": "NeuroPharm AG meldet 499,6 Mio. € Umsatz und 93,3 Mio. € Gewinn im Q1 des Spieljahres 2. Analysten hatten weniger erwartet.",
+      "body": "NeuroPharm AG verfehlt im Q1 des Spieljahres 2 die Prognosen: 462,7 Mio. € Umsatz, 72,8 Mio. € Ergebnis.",
       "kind": "market",
       "ticker": "NPH",
       "category": "earnings",
-      "headline": "NeuroPharm AG steigert Gewinn um 22 %"
+      "headline": "NeuroPharm AG: Gewinn sinkt um 5 %"
     },
     {
-      "at": "2026-11-16T09:22:53.888766+00:00",
+      "at": "2026-11-16T10:06:13.413022+00:00",
       "id": "m263",
-      "body": "Brotzeit Handel AG meldet 1,95 Mrd. € Umsatz und 71,7 Mio. € Gewinn im Q1 des Spieljahres 2. Analysten hatten weniger erwartet.",
+      "body": "Brotzeit Handel AG verfehlt im Q1 des Spieljahres 2 die Prognosen: 2,05 Mrd. € Umsatz, 49,7 Mio. € Ergebnis.",
       "kind": "market",
       "ticker": "BRZ",
       "category": "earnings",
-      "headline": "Brotzeit Handel AG steigert Gewinn um 22 %"
+      "headline": "Brotzeit Handel AG: Gewinn sinkt um 15 %"
     },
     {
-      "at": "2026-11-16T09:22:53.888766+00:00",
+      "at": "2026-11-16T10:06:13.413022+00:00",
       "id": "m285",
-      "body": "Volta Energie AG verfehlt im Q1 des Spieljahres 2 die Prognosen: 1,26 Mrd. € Umsatz, 108,0 Mio. € Ergebnis.",
+      "body": "Volta Energie AG verfehlt im Q1 des Spieljahres 2 die Prognosen: 1,26 Mrd. € Umsatz, 104,9 Mio. € Ergebnis.",
       "kind": "market",
       "ticker": "VLT",
       "category": "earnings",
-      "headline": "Volta Energie AG: Gewinn sinkt um 8 %"
+      "headline": "Volta Energie AG: Gewinn sinkt um 11 %"
     },
     {
-      "at": "2026-11-16T09:22:53.888766+00:00",
+      "at": "2026-11-16T10:06:13.413022+00:00",
       "id": "m272",
-      "body": "KlarSoft AG verfehlt im Q1 des Spieljahres 2 die Prognosen: 402,5 Mio. € Umsatz, 25,7 Mio. € Ergebnis.",
+      "body": "KlarSoft AG meldet 464,2 Mio. € Umsatz und 51,8 Mio. € Gewinn im Q1 des Spieljahres 2. Analysten hatten weniger erwartet.",
       "kind": "market",
       "ticker": "KLS",
       "category": "earnings",
-      "headline": "KlarSoft AG: Gewinn sinkt um 31 %"
+      "headline": "KlarSoft AG steigert Gewinn um 38 %"
     },
     {
-      "at": "2026-11-16T09:22:53.888766+00:00",
+      "at": "2026-11-16T10:06:13.413022+00:00",
       "id": "m273",
-      "body": "Glanz & Gloria meldet 550,7 Mio. € Umsatz und 79,9 Mio. € Gewinn im Q1 des Spieljahres 2. Analysten hatten weniger erwartet.",
+      "body": "Glanz & Gloria erreicht im Q1 des Spieljahres 2 536,9 Mio. € Umsatz und liegt damit im Rahmen der Erwartungen.",
       "kind": "market",
       "ticker": "LUX",
       "category": "earnings",
-      "headline": "Glanz & Gloria steigert Gewinn um 17 %"
+      "headline": "Glanz & Gloria steigert Gewinn um 3 %"
     },
     {
-      "at": "2026-11-16T09:22:53.888766+00:00",
+      "at": "2026-11-16T10:06:13.413022+00:00",
       "id": "m276",
-      "body": "Nordlicht Logistik AG erreicht im Q1 des Spieljahres 2 879,4 Mio. € Umsatz und liegt damit im Rahmen der Erwartungen.",
+      "body": "Nordlicht Logistik AG verfehlt im Q1 des Spieljahres 2 die Prognosen: 870,3 Mio. € Umsatz, 33,4 Mio. € Ergebnis.",
       "kind": "market",
       "ticker": "NDL",
       "category": "earnings",
-      "headline": "Nordlicht Logistik AG steigert Gewinn um 2 %"
+      "headline": "Nordlicht Logistik AG: Gewinn sinkt um 36 %"
     }
   ]
 }

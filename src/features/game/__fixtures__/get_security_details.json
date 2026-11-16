@@ -3,27 +3,27 @@
   "name": "Volta Energie AG",
   "news": [
     {
-      "body": "Volta Energie AG verfehlt im Q1 des Spieljahres 2 die Prognosen: 1,26 Mrd. € Umsatz, 108,0 Mio. € Ergebnis.",
-      "headline": "Volta Energie AG: Gewinn sinkt um 8 %",
-      "published_at": "2026-11-16T09:22:53.888766+00:00"
+      "body": "Volta Energie AG verfehlt im Q1 des Spieljahres 2 die Prognosen: 1,26 Mrd. € Umsatz, 104,9 Mio. € Ergebnis.",
+      "headline": "Volta Energie AG: Gewinn sinkt um 11 %",
+      "published_at": "2026-11-16T10:06:13.413022+00:00"
     }
   ],
   "color": "#FFD23F",
   "status": "listed",
   "ticker": "VLT",
-  "pe_x100": 1120,
+  "pe_x100": 1133,
   "coupon_bps": null,
-  "eps_ttm_e4": 46055,
-  "margin_bps": 857,
+  "eps_ttm_e4": 45744,
+  "margin_bps": 833,
   "matures_at": null,
   "sector_key": "energy",
   "size_class": "bluechip",
   "description": "Strom- und Gasversorger mit eigenen Kraftwerken. Solide Dividende, hängt am Rohstoffpreis.",
-  "revenue_cents": 126013817709,
+  "revenue_cents": 126018648442,
   "term_game_years": null,
   "face_value_cents": null,
-  "market_cap_cents": 515859000000,
-  "net_income_cents": 10804685561,
-  "dividend_yield_bps": 580,
+  "market_cap_cents": 518276000000,
+  "net_income_cents": 10493648508,
+  "dividend_yield_bps": 574,
   "shares_outstanding": 100000000
 }

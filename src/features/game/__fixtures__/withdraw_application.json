@@ -1,27 +1,27 @@
 {
-  "id": "dbd57504-87f5-4f9d-bed6-1491c5de5513",
+  "id": "99651f6f-ccf6-4da4-9301-8232a98d47da",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "07c44cfb-1169-4b8a-953f-2676d1698912",
+    "id": "30169845-4afd-4315-bb6b-38eedd032e2f",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "5aaeae39-c17e-272b-db4c-3beb46144cb5",
+      "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
       "logo": null,
-      "name": "GenoVita Biotech",
-      "color": "#E86AF0",
+      "name": "Frachtpilot",
+      "color": "#9ECE6A",
       "is_ai": true,
-      "sector": "pharma",
-      "ticker": "GNV"
+      "sector": "logistics",
+      "ticker": "FPT"
     },
-    "required": [{ "branch": "science", "min_score": 0 }],
-    "title_key": "science_intern",
+    "required": [{ "branch": "craft", "min_score": 0 }],
+    "title_key": "craft_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-16T09:23:13.849443+00:00",
-  "updated_at": "2026-11-16T09:23:13.852145+00:00",
-  "offer_expires_at": "2026-11-18T09:23:13.849443+00:00",
+  "created_at": "2026-11-16T10:06:33.392032+00:00",
+  "updated_at": "2026-11-16T10:06:33.395563+00:00",
+  "offer_expires_at": "2026-11-18T10:06:33.392032+00:00",
   "salary_wish_cents_per_hour": 15000,
   "offer_salary_cents_per_hour": 15000
 }

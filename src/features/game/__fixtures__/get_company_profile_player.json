@@ -3,21 +3,21 @@
   "facts": {
     "staff": 1,
     "stage": 0,
-    "period": null,
+    "period": "quarter",
     "product": "security_software",
     "max_staff": 2,
     "ai_workers": 0,
-    "quality_bps": null,
+    "quality_bps": 4125,
     "value_cents": 250000,
-    "profit_cents": null,
-    "awareness_bps": null,
-    "revenue_cents": null
+    "profit_cents": 0,
+    "awareness_bps": 3772,
+    "revenue_cents": 0
   },
   "company": {
-    "id": "382a43d6-326e-434f-bd13-989b2d2e55d9",
-    "idea": "Zweiter Anlauf",
+    "id": "ed6325fc-a44f-4416-960d-ae5e0deeb5df",
+    "idea": "Günstige Kabel",
     "logo": null,
-    "name": "Fiona Neu",
+    "name": "Billig Laden",
     "tier": "garage",
     "is_ai": false,
     "listed": false,
@@ -25,9 +25,9 @@
     "ticker": null,
     "price_e4": null,
     "change_bps": null,
-    "founded_at": "2026-11-16T09:22:44.686996+00:00",
-    "brand_color": "#225588"
+    "founded_at": "2026-11-16T10:06:10.832354+00:00",
+    "brand_color": "#552211"
   },
-  "founder": { "tag": "8676", "nickname": "Fiona_Fabrik", "avatar_key": "rookie" },
+  "founder": { "tag": "ZPMB", "nickname": "Dirk_Billig", "avatar_key": "rookie" },
   "members": []
 }

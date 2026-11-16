@@ -4,25 +4,25 @@
       "body": "Viele haben mitgemacht, doch Kunden und Anleger zucken nur mit den Schultern.",
       "category": "market",
       "headline": "Petition gegen KlarSoft AG verpufft",
-      "published_at": "2026-11-16T09:23:04.038996+00:00"
+      "published_at": "2026-11-16T10:06:23.55104+00:00"
     },
     {
       "body": "0 Spieler und 1 weitere Unterstützer machen mit. Das Thema ist in aller Munde.",
       "category": "market",
       "headline": "Petition gegen KlarSoft AG zeigt Wirkung",
-      "published_at": "2026-11-16T09:23:04.038996+00:00"
+      "published_at": "2026-11-16T10:06:23.55104+00:00"
     },
     {
       "body": "Viele haben mitgemacht, doch Kunden und Anleger zucken nur mit den Schultern.",
       "category": "market",
       "headline": "Petition gegen KlarSoft AG verpufft",
-      "published_at": "2026-11-16T09:23:03.43004+00:00"
+      "published_at": "2026-11-16T10:06:22.925729+00:00"
     },
     {
-      "body": "KlarSoft AG verfehlt im Q1 des Spieljahres 2 die Prognosen: 402,5 Mio. € Umsatz, 25,7 Mio. € Ergebnis.",
+      "body": "KlarSoft AG meldet 464,2 Mio. € Umsatz und 51,8 Mio. € Gewinn im Q1 des Spieljahres 2. Analysten hatten weniger erwartet.",
       "category": "earnings",
-      "headline": "KlarSoft AG: Gewinn sinkt um 31 %",
-      "published_at": "2026-11-16T09:22:53.888766+00:00"
+      "headline": "KlarSoft AG steigert Gewinn um 38 %",
+      "published_at": "2026-11-16T10:06:13.413022+00:00"
     }
   ],
   "facts": {
@@ -33,10 +33,10 @@
     "max_staff": 100000,
     "ai_workers": 0,
     "quality_bps": null,
-    "value_cents": 419556000000,
-    "profit_cents": 13823521793,
+    "value_cents": 424120000000,
+    "profit_cents": 16431786996,
     "awareness_bps": null,
-    "revenue_cents": 166254967917
+    "revenue_cents": 172423752520
   },
   "company": {
     "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
@@ -48,9 +48,9 @@
     "listed": true,
     "sector": "tech",
     "ticker": "KLS",
-    "price_e4": 839112,
-    "change_bps": -348,
-    "founded_at": "2026-11-16T09:21:17.770325+00:00",
+    "price_e4": 848240,
+    "change_bps": -235,
+    "founded_at": "2026-11-16T10:04:40.767674+00:00",
     "brand_color": "#4C8DFF"
   },
   "founder": null,

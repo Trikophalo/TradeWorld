@@ -1,39 +1,12 @@
 {
   "applications": [
     {
-      "id": "dbd57504-87f5-4f9d-bed6-1491c5de5513",
+      "id": "99651f6f-ccf6-4da4-9301-8232a98d47da",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "07c44cfb-1169-4b8a-953f-2676d1698912",
+        "id": "30169845-4afd-4315-bb6b-38eedd032e2f",
         "tier": "intern",
-        "title": null,
-        "company": {
-          "id": "5aaeae39-c17e-272b-db4c-3beb46144cb5",
-          "logo": null,
-          "name": "GenoVita Biotech",
-          "color": "#E86AF0",
-          "is_ai": true,
-          "sector": "pharma",
-          "ticker": "GNV"
-        },
-        "required": [{ "branch": "science", "min_score": 0 }],
-        "title_key": "science_intern",
-        "required_skills": []
-      },
-      "created_at": "2026-11-16T09:23:13.849443+00:00",
-      "updated_at": "2026-11-16T09:23:13.852145+00:00",
-      "offer_expires_at": "2026-11-18T09:23:13.849443+00:00",
-      "salary_wish_cents_per_hour": 15000,
-      "offer_salary_cents_per_hour": 15000
-    },
-    {
-      "id": "ccff5208-670d-4a28-b02e-0a752c92b106",
-      "status": "offered",
-      "message": "Ich lerne schnell.",
-      "posting": {
-        "id": "590f0be7-d309-4375-916d-5a83439b0170",
-        "tier": "junior",
         "title": null,
         "company": {
           "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
@@ -44,13 +17,40 @@
           "sector": "logistics",
           "ticker": "FPT"
         },
+        "required": [{ "branch": "craft", "min_score": 0 }],
+        "title_key": "craft_intern",
+        "required_skills": []
+      },
+      "created_at": "2026-11-16T10:06:33.392032+00:00",
+      "updated_at": "2026-11-16T10:06:33.395563+00:00",
+      "offer_expires_at": "2026-11-18T10:06:33.392032+00:00",
+      "salary_wish_cents_per_hour": 15000,
+      "offer_salary_cents_per_hour": 15000
+    },
+    {
+      "id": "c82c5643-8431-4711-84d7-e82c16c93ef1",
+      "status": "offered",
+      "message": "Ich lerne schnell.",
+      "posting": {
+        "id": "365c0daf-b3fd-4ac9-80b2-1af234ccadfc",
+        "tier": "junior",
+        "title": null,
+        "company": {
+          "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
+          "logo": null,
+          "name": "KlarSoft AG",
+          "color": "#4C8DFF",
+          "is_ai": true,
+          "sector": "tech",
+          "ticker": "KLS"
+        },
         "required": [{ "branch": "it", "min_score": 2 }],
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-16T09:23:13.84513+00:00",
-      "updated_at": "2026-11-16T09:23:13.84513+00:00",
-      "offer_expires_at": "2026-11-18T09:23:13.84513+00:00",
+      "created_at": "2026-11-16T10:06:33.387475+00:00",
+      "updated_at": "2026-11-16T10:06:33.387475+00:00",
+      "offer_expires_at": "2026-11-18T10:06:33.387475+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

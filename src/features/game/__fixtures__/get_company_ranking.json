@@ -1,5 +1,5 @@
 {
-  "mine": { "rank": 44, "value_cents": 54108 },
+  "mine": { "rank": 44, "value_cents": 54107 },
   "total": 47,
   "entries": [
     {
@@ -14,15 +14,31 @@
       "founder": "Lars_Kursrutsch",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "8e28c5f0-a0c9-4b33-bc57-99afddd311bb",
+      "company_id": "b459a4b7-a257-414f-9850-994a8ca2cef6",
       "value_cents": 959140000,
       "revenue_cents": null
     },
     {
       "kind": "player",
       "logo": null,
-      "name": "Knappwerk",
+      "name": "Talwerk",
       "rank": 2,
+      "tier": "ag",
+      "color": "#663399",
+      "sector": "retail",
+      "ticker": "TAL",
+      "founder": "Pop_Gero",
+      "is_mine": false,
+      "team_size": 1,
+      "company_id": "25cb0382-2aa6-42d6-89e5-d05cda1f2fc0",
+      "value_cents": 116590000,
+      "revenue_cents": null
+    },
+    {
+      "kind": "player",
+      "logo": null,
+      "name": "Knappwerk",
+      "rank": 3,
       "tier": "ag",
       "color": "#336699",
       "sector": "retail",
@@ -30,7 +46,7 @@
       "founder": "Float_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "cd599881-634a-4ae0-b196-c629240d6756",
+      "company_id": "efb90f46-0ab7-4f42-a847-d5dc5d22c766",
       "value_cents": 110000000,
       "revenue_cents": null
     },
@@ -58,7 +74,7 @@
         "palette": ["#112233", "#00ff00"]
       },
       "name": "Fenja Pixel",
-      "rank": 3,
+      "rank": 4,
       "tier": "ag",
       "color": "#123456",
       "sector": "tech",
@@ -66,25 +82,9 @@
       "founder": "Fenja_Firma",
       "is_mine": false,
       "team_size": 6,
-      "company_id": "146df97b-d4b5-4ec2-9d71-2196fa4bd469",
-      "value_cents": 106760598,
+      "company_id": "69c53fe7-b6d6-4e49-b388-09a16b1ad2dd",
+      "value_cents": 106300746,
       "revenue_cents": 0
-    },
-    {
-      "kind": "player",
-      "logo": null,
-      "name": "Gipfelwerk",
-      "rank": 4,
-      "tier": "ag",
-      "color": "#336699",
-      "sector": "retail",
-      "ticker": "GIP",
-      "founder": "Pop_Frida",
-      "is_mine": false,
-      "team_size": 1,
-      "company_id": "0a5aa6a1-fdae-4941-8511-b70b42d8726b",
-      "value_cents": 104060000,
-      "revenue_cents": null
     },
     {
       "kind": "player",
@@ -98,10 +98,10 @@
       "founder": "Esc_Frida",
       "is_mine": false,
       "team_size": 1,
-      "company_id": "b85f5607-98b6-4b6e-8d7c-37cfcafc8416",
-      "value_cents": 96570628,
+      "company_id": "0b733c56-4515-4f8b-bc06-7170e103b192",
+      "value_cents": 105955168,
       "revenue_cents": null
     }
   ],
-  "server_time": "2026-11-16T09:23:14.289424+00:00"
+  "server_time": "2026-11-16T10:06:33.919093+00:00"
 }

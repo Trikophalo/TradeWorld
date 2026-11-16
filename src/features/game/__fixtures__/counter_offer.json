@@ -1,13 +1,13 @@
 {
-  "id": "236b6e66-4a34-4402-bafa-024a672ccb46",
+  "id": "71acbe7f-8367-47d1-a598-9bf0147bb0db",
   "status": "pending",
   "message": null,
   "posting": {
-    "id": "0b69468a-2683-4189-9dde-4680fcbba492",
+    "id": "e80c06c8-2b43-4c32-a29d-788ba4e6f8e2",
     "tier": "intern",
     "title": "Werkstudium Daten",
     "company": {
-      "id": "d2ea56c1-38d7-4eea-b38b-0a8b517183bd",
+      "id": "cab4ccbc-0b36-486b-97b8-430bb9e621af",
       "logo": {
         "grid": [
           "................",
@@ -39,8 +39,8 @@
     "title_key": null,
     "required_skills": []
   },
-  "created_at": "2026-11-16T09:23:14.337651+00:00",
-  "updated_at": "2026-11-16T09:23:14.340714+00:00",
+  "created_at": "2026-11-16T10:06:33.998896+00:00",
+  "updated_at": "2026-11-16T10:06:34.003819+00:00",
   "offer_expires_at": null,
   "salary_wish_cents_per_hour": 18500,
   "offer_salary_cents_per_hour": null

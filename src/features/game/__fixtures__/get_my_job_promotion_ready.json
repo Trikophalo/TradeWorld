@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "4957b693-d1eb-486c-a800-b4c5097fc725",
+    "id": "3377b8b8-384a-4118-9f0f-84812525a1cf",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "5aaeae39-c17e-272b-db4c-3beb46144cb5",
+      "id": "fbb23da7-3eff-3c59-e0bd-5a9a012a4c8b",
       "logo": null,
-      "name": "GenoVita Biotech",
-      "color": "#E86AF0",
+      "name": "Frachtpilot",
+      "color": "#9ECE6A",
       "is_ai": true,
-      "sector": "pharma",
-      "ticker": "GNV"
+      "sector": "logistics",
+      "ticker": "FPT"
     },
     "presence": {
-      "fire_at": "2026-11-21T09:23:16.026375+00:00",
+      "fire_at": "2026-11-21T10:06:36.15107+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-16T09:23:16.026375+00:00"
+      "last_active_at": "2026-11-16T10:06:36.15107+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-16T09:23:16.110745+00:00",
+    "started_at": "2026-11-16T10:06:36.277368+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

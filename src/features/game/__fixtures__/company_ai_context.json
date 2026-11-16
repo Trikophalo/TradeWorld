@@ -1,6 +1,6 @@
 {
   "company": {
-    "id": "e325a900-e4a3-46a0-a53f-78c5fb7f8717",
+    "id": "ac278345-c548-4626-ac77-c284729f29a9",
     "idea": "Strom vom Dach",
     "name": "Fixture Krisenstab",
     "sector": "energy",
@@ -15,7 +15,7 @@
         "idx": 0,
         "step": "study",
         "success": true,
-        "event_id": "77bc3e82-463d-4705-9705-5d6bd3edc31c",
+        "event_id": "b4c7e0db-b1a4-4bf2-aae7-2491245bd8cd",
         "strategy": "lobby",
         "archetype": "regulation"
       }
@@ -24,11 +24,11 @@
       "id": 153,
       "kind": "event_started",
       "payload": {
-        "event_id": "77bc3e82-463d-4705-9705-5d6bd3edc31c",
+        "event_id": "b4c7e0db-b1a4-4bf2-aae7-2491245bd8cd",
         "polarity": "crisis",
         "severity": 2,
         "archetype": "regulation",
-        "deadline_at": "2026-11-17T15:23:15.991132+00:00",
+        "deadline_at": "2026-11-17T16:06:36.097164+00:00",
         "share_shock_bps": null
       }
     },
@@ -36,7 +36,7 @@
       "id": 151,
       "kind": "event_expired",
       "payload": {
-        "event_id": "6f02e863-eee1-420b-9d23-e8a0b051a360",
+        "event_id": "ba75c44f-b848-4d80-97cc-7453b35a388b",
         "polarity": "chance",
         "severity": 1,
         "archetype": "viral_trend"
@@ -46,18 +46,18 @@
       "id": 150,
       "kind": "event_started",
       "payload": {
-        "event_id": "6f02e863-eee1-420b-9d23-e8a0b051a360",
+        "event_id": "ba75c44f-b848-4d80-97cc-7453b35a388b",
         "polarity": "chance",
         "severity": 1,
         "archetype": "viral_trend",
-        "deadline_at": "2026-11-16T08:23:15.985786+00:00",
+        "deadline_at": "2026-11-16T09:06:36.08965+00:00",
         "share_shock_bps": null
       }
     }
   ],
   "events_without_text": [
     {
-      "id": "6f02e863-eee1-420b-9d23-e8a0b051a360",
+      "id": "ba75c44f-b848-4d80-97cc-7453b35a388b",
       "status": "expired",
       "polarity": "chance",
       "severity": 1,

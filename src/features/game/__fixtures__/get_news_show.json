@@ -1,8 +1,8 @@
 {
-  "now": "2026-11-16T09:23:17.74523+00:00",
+  "now": "2026-11-16T10:06:38.453885+00:00",
   "chat": [
     {
-      "at": "2026-11-16T09:23:17.7422+00:00",
+      "at": "2026-11-16T10:06:38.449588+00:00",
       "id": 223,
       "bot": false,
       "body": "Was für eine Sendung 💀📉",
@@ -11,30 +11,30 @@
     }
   ],
   "show": {
-    "id": 7,
+    "id": 8,
     "writer": "mini",
-    "airs_at": "2026-11-16T09:00:00+00:00",
+    "airs_at": "2026-11-16T10:00:00+00:00",
     "segments": [
       {
         "kind": "gossip",
-        "mood": "shocked",
-        "text": "Ich fasse es nicht, aber es stimmt. Xp_Chefin meldet: Xp Werkstatt gegründet. Glückwunsch, und jetzt bloß nichts anfassen.",
-        "figure": { "nickname": "Xp_Chefin", "avatar_key": "rookie", "accessories": [] },
-        "effects": [],
-        "headline": "Na so was: Xp_Chefin"
+        "mood": "laughing",
+        "text": "Wir müssen über Wim_Weg reden. Stand heute: seit 5 Tagen nicht mehr gesehen. Ich habe schon Topfpflanzen mit mehr Ehrgeiz gegossen. Ein kleines Schmerzensgeld ist unterwegs.",
+        "figure": { "nickname": "Wim_Weg", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "gain", "label": "+100 € Schmerzensgeld" }],
+        "headline": "Peinlich, Wim_Weg"
       },
       {
         "kind": "hype",
         "mood": "proud",
-        "text": "Fritz Fahrradwerk räumt ab. Ein Testmagazin urteilt: „Besser als erwartet, und wir hatten nichts erwartet.“ Fritz_Firma hängt sich das gerahmt ins Büro. Die Kundschaft rennt die Tür ein.",
-        "figure": { "nickname": "Fritz_Firma", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "gain", "label": "Bekanntheit +10,2 %" }],
-        "headline": "Ritterschlag für Fritz Fahrradwerk"
+        "text": "Unfassbar, aber wahr: Bodenständig ist der Renner. Die Konkurrenz hat aus Versehen Werbung für sie gemacht. „Teppiche für Büros“ geht weg wie warme Semmeln. Floor_Frida soll vor Freude geweint haben.",
+        "figure": { "nickname": "Floor_Frida", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "gain", "label": "Bekanntheit +21,6 %" }],
+        "headline": "Alle wollen Bodenständig"
       },
       {
         "kind": "nft",
-        "mood": "shocked",
-        "text": "Kunstmarkt, oder was man dafür hält: „Neon Nacht“ von Nina_Neon ging für 30.000 € an Ben_Bieter. Immerhin kann man es nicht fallen lassen.",
+        "mood": "laughing",
+        "text": "Kunstmarkt, oder was man dafür hält: „Neon Nacht“ von Nina_Neon ging für 30.000 € an Ben_Bieter. Das Bild hat sechzehn mal sechzehn Pixel. Ich habe nachgezählt, ich hatte Zeit.",
         "figure": { "nickname": "Nina_Neon", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
         "headline": "30.000 € für ein paar Pixel"
@@ -42,57 +42,50 @@
       {
         "kind": "winner",
         "mood": "proud",
-        "text": "11393,8 % Plus, 1.139.378 € Gewinn: Fixture_Neu zeigt dem Rest, wie es geht. Neid ist die ehrlichste Form der Anerkennung, also bitte sehr.",
+        "text": "Fixture_Neu ist heute um 1.139.357 € reicher, 11393,6 % rauf. Neid ist die ehrlichste Form der Anerkennung, also bitte sehr.",
         "figure": { "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] },
         "effects": [],
-        "headline": "Fixture_Neu schwimmt im Geld"
+        "headline": "Glückspilz des Tages: Fixture_Neu"
       },
       {
         "kind": "gossip",
-        "mood": "shocked",
-        "text": "Gute Nachrichten, ausnahmsweise. Bei Stufe_Gross heißt es: Level 30 erreicht. Auch ein blindes Huhn findet mal ein Korn, aber immerhin.",
-        "figure": { "nickname": "Stufe_Gross", "avatar_key": "rookie", "accessories": [] },
+        "mood": "proud",
+        "text": "Bitte festhalten: Level 5 erreicht, und zwar bei Fixture_Team. Dafür gibt es von mir ein ehrliches Schulterklopfen, mit der Faust.",
+        "figure": { "nickname": "Fixture_Team", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Stufe_Gross hat es geschafft"
+        "headline": "Applaus für Fixture_Team"
       },
       {
         "kind": "scandal",
-        "mood": "angry",
-        "text": "Ausgerechnet Kundenladen Bodo, die Firma mit dem Motto „Ideen für alle“: Die Firmenkasse wurde offenbar mit dem Kicker-Budget verwechselt. Die Kunden laufen davon.",
-        "figure": { "nickname": "Bodo_Kunde", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −15,6 %" }],
-        "headline": "Skandal bei Kundenladen Bodo"
+        "mood": "shocked",
+        "text": "Fixture Werke wollte heute groß rauskommen. Die Jahresbilanz wurde mit Buntstiften erstellt, immerhin innerhalb der Linien. Fixture_Gmbh erklärte, das gehöre zum Konzept. Die Kundschaft erklärte, sie sei dann mal weg.",
+        "figure": { "nickname": "Fixture_Gmbh", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −18,3 %" }],
+        "headline": "Fixture Werke blamiert sich bis auf die Knochen"
       },
       {
-        "kind": "ramble",
-        "mood": "angry",
-        "text": "Die Regie winkt, ich ignoriere sie. Die Deutsche Bahn meldet, mein Zug von gestern komme heute. Ich warte seit Dienstag. So. Weiter im Text.",
-        "effects": [],
-        "headline": "Was ich noch sagen wollte"
-      },
-      {
-        "kind": "sector",
+        "kind": "tasks",
         "mood": "proud",
-        "text": "Die ganze Branche Einzelhandel steigt um 7,9 %. Angeblich ist das jetzt wieder modern, sagt jemand, der es wissen muss. So funktioniert Wirtschaft, liebe Kinder.",
-        "effects": [{ "tone": "gain", "label": "Einzelhandel +7,9 %" }],
-        "headline": "Die Branche Einzelhandel dreht durch"
+        "text": "Eine Massenhysterie sorgt dafür, dass heute jeder alles sofort will. Offene Aufgaben bringen 25,7 % mehr. Wer jetzt Pause macht, ist selbst schuld.",
+        "effects": [{ "tone": "gain", "label": "Aufgaben +25,7 %" }],
+        "headline": "Kunden zahlen jeden Preis"
       },
       {
         "kind": "stock",
-        "mood": "proud",
-        "text": "Neues von Alpenmed: Der Vorstand hat versehentlich etwas richtig gemacht. Niemand weiß, ob es stimmt, alle kaufen trotzdem. Plus 6 %.",
-        "effects": [{ "tone": "gain", "label": "ALM +6 %" }],
-        "headline": "Alpenmed: Gerücht treibt den Kurs"
+        "mood": "smug",
+        "text": "Der Aufsichtsrat hat sich im Fahrstuhl eingeschlossen und kann nichts mehr kaputt machen. Die Aktie von SolarFuchs springt um 13,9 %. Der Vorstand öffnet den guten Sekt, den für Besuch.",
+        "effects": [{ "tone": "gain", "label": "SFX +13,9 %" }],
+        "headline": "Jubel bei SolarFuchs"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Alpenmed tut sich in der nächsten Stunde etwas, und zwar nach unten. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
-        "effects": [{ "tone": "neutral", "label": "ALM ↓ Tipp" }],
+        "text": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Luftpost Drohnen tut sich in der nächsten Stunde etwas, und zwar nach unten. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
+        "effects": [{ "tone": "neutral", "label": "DRN ↓ Tipp" }],
         "headline": "Mr. Doodle Dangles Geheimtipp"
       }
     ],
-    "started_at": "2026-11-16T09:23:17.74523+00:00"
+    "started_at": "2026-11-16T10:06:38.453885+00:00"
   },
   "viewers": 18,
   "audience": [
@@ -110,5 +103,5 @@
     { "me": false, "friend": false, "nickname": "Bat_Crowd6", "avatar_key": "rookie", "accessories": [] }
   ],
   "upcoming": null,
-  "next_airs_at": "2026-11-16T10:00:00+00:00"
+  "next_airs_at": "2026-11-16T11:00:00+00:00"
 }
