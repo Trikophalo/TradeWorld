@@ -1344,3 +1344,27 @@ Aktionen 50–1.000 € + 15–500 € je Kopf für +3 … +15 Punkte sofort.
   Gewinnstunde (+3) liegt das Ziel bei 64.
 - Gier: 100 % Auszahlung → Ruf 15 → Nachfrage −14 %; bei 5.000 € Umsatz sind das 700 € je Stunde, mehr als die
   Auszahlung über die freien 30 % hinaus einbringt, sobald die Marge unter 50 % liegt.
+
+## Nachtrag: Kein Geld aus der eigenen Aktie, NFT-Sammler den ganzen Tag (ADR-170)
+
+| Wert                                | Schlüssel                                    | Stand                                                       |
+| ----------------------------------- | -------------------------------------------- | ----------------------------------------------------------- |
+| KI zeichnet Kapitalerhöhungen bis   | `startups.ipo.aiMaxPremiumBps`               | 100 % des fairen Werts nach der Erhöhung, darüber gar nicht |
+| Abstand zweier Kapitalerhöhungen    | `startups.ipo.capitalIncreaseCooldownHours`  | 24 h                                                        |
+| Sperre für Ausgabeerlöse            | `startups.ipo.issueProceedsLockHours`        | 72 h nicht entnehmbar                                       |
+| Insiderregel                        | `trading.playerStocks.insiderCooldownHours`  | 24 h kein Kauf der eigenen Aktie nach Geld aus der Firma    |
+| Tagesband Spieleraktien             | `trading.playerStocks.dailyBandBps`          | +30 % / −23 % zum Vortagesschluss                           |
+| Sammler-Angebote gelten             | `nfts.ai.offerHours`                         | 2 h (vorher 24 h wie Spielerangebote)                       |
+| Käufe von Spielern                  | `nfts.ai.maxBuysPerHour`, `maxBuysPerDay`    | 6 je Stunde, 100 je Tag (vorher 60 je Tag)                  |
+| Handel unter Sammlern               | `nfts.ai.trade.perHour`, `trade.perDay`      | 24 je Stunde, 480 je Tag (vorher 300 je Tag)                |
+| Gebote in Auktionen                 | `nfts.ai.auction.bidChanceBps/maxBidsPerRun` | 10 % je Minute und Auktion, höchstens 3 je Minute           |
+| Tagesbudget der Sammler für Spieler | `nfts.ai.budgetCentsPerDay`                  | 300.000 € (Käufe und Führungen in Spielerauktionen)         |
+
+**Rechenbeispiel Kapitalerhöhung:** Firma 100.000 € wert, 1 Mio. Aktien, Börsenkurs 0,45 €, 25 % neue Aktien zum
+Mindestpreis 1 €. Fair danach: (100.000 € + 250.000 €) / 1,25 Mio. = 0,28 € < 1 €, die KI zeichnet nichts (vorher:
+alles, 250.000 € in die Kasse). Firma 5 Mio. € wert, Kurs 3 €, 10 % zu 2,70 €: fair danach 4,79 €, die KI zeichnet
+ihren vollen Anteil.
+
+**NFT-Takt:** Mit zwölf Sammler-NFTs handeln die Sammler 21 bis 24 Mal je Stunde (vorher 15, mit wachsender
+Beliebtheit bis 44, bis die Tagesgrenze erreicht war). 480 je Tag reichen für 20 je Stunde rund um die Uhr. Ein NFT,
+das ein Spieler behält oder zu teuer anbietet, bekommt etwa alle zwei Stunden neue Angebote (65–90 % des Werts).

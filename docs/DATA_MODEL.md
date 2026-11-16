@@ -7829,3 +7829,28 @@ fehlt): `player_company_close_hour` (zehn Stellen: Terme, laufende Kosten, Decke
 `news_show_build`. Neu: Benachrichtigungsarten `tax_office` (Pflicht), `team_mood`, `board`, `company_dividend`,
 `company_project`; Trigger `listed_audit_mission` auf `player_company_events`; Firmen-Ereignis `tax_audit`
 (Gewicht 0, nur vom Finanzamt).
+
+## Nachtrag: Kein Geld aus der eigenen Aktie, NFT-Sammler den ganzen Tag (ADR-170)
+
+Migrationen `20261204006100_stock_pump.sql` und `20261204006110_nft_cadence.sql` (Kopien in `supabase/updates/`).
+
+**Spalten:**
+
+| Spalte                           | Inhalt                                                                                               |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `company_share_offers.ai_factor` | 1 oder 0: zeichnen KI-Anleger ihren Anteil (Kapitalerhöhung bis zum fairen Wert); Börsengang immer 1 |
+| `artwork_auctions.leader_ai`     | ein KI-Sammler führt (dann `leader_id` null); sein Gebot liegt aus den Haushalten in `art_escrow`    |
+| `artwork_bids.bidder_ai`         | Gebot eines KI-Sammlers; `bidder_id` ist jetzt nullable, genau eines von beiden ist gesetzt          |
+
+**Funktionen (intern):** `issue_ai_factor(fair, preis)`, `listed_issue_locked_cents(firma)` (Ausgabeerlöse der letzten
+`issueProceedsLockHours`), `player_stock_insider_blocked(spieler, wertpapier)` (Geld aus der eigenen Firma in den
+letzten `insiderCooldownHours`), `nft_ai_spent_today(zeit)` (was Sammler heute Spielern zahlen und in Spielerauktionen
+halten), `nft_ai_bid_auctions(zeit)` (Gebote der Sammler, aus `nfts_run_due`, Rückgabe zusätzlich `bids`).
+
+**Per `replace` geändert:** `place_order` (Insiderregel, `insider_cooldown` NX220), `capital_increase` (Sperre
+`capital_increase_cooldown` NX221, setzt `ai_factor`), `share_offer_ai_topup` (× `ai_factor`), `listed_withdraw_check`
+(`issue_proceeds_locked` NX222), `market_tick_at` (Tagesband für Spielerfirmen, Halteprämie ohne Gründerbestand),
+`nfts_run_due` (Stundengrenzen, Tagesbudget, Sammler-Angebote laufen nach `nfts.ai.offerHours` aus, Auktionsgebote),
+`bid_artwork` (überbotener Sammler: Geld zurück an die Haushalte), `artwork_settle_auction` (Sammler gewinnt,
+`nft_after_sale` mit `buyer_ai`), `accept_auction`, `cancel_auction`, `artwork_json` (`leader` = Name des Sammlers),
+`artworks_wipe_player`.

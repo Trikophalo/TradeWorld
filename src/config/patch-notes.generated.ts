@@ -423,6 +423,16 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Black Label und ASP-Paket",
         text: "Über der ASP 10 steht jetzt das Black Label: Nur 1 % der Mint-Karten bekommen es, der Slab ist das 10-Fache der Karte wert.",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-1429a90b",
+        title: "Lebendigere NFT-Sammler",
+        text: "Sammler bieten alle paar Stunden neu, handeln den ganzen Tag unter sich und bieten in deinen Auktionen mit, nie über ihrer Bewertung.",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-6cc34ad1",
+        title: "Kein Geld mehr aus der eigenen Aktie",
+        text: "KI-Anleger zeichnen Kapitalerhöhungen nur noch bis zum fairen Wert, Ausgabeerlöse bleiben drei Tage in der Firma, nach einer Entnahme gibt es 24…",
+      },
     ],
   },
   {

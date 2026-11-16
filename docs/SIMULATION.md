@@ -1069,3 +1069,23 @@ Buchungen). Verlust → Verlustvortrag. Sonst Steuer = floor((Gewinn − genutzt
 drei richtigen Belegen, 8 % mit Steuerberater). Schätzung des Finanzamts: Bemessung max(Gewinn, 25 % des Umsatzes),
 kein Vortrag, 25 % Zuschlag. Verspätungszuschlag max(50 €, 0,5 % des Umsatzes). Säumnis 5 %, Vollstreckung weitere
 10 % der offenen Steuer.
+
+## Nachtrag: Kein Geld aus der eigenen Aktie (ADR-170)
+
+Spieleraktien bekommen drei zusätzliche Regeln; Formeln in `src/lib/sim/startup.ts` und
+`src/lib/sim/player-influence.ts`, in SQL `issue_ai_factor`, `capital_increase`, `market_tick_at`.
+
+```
+fairNach      = (Firmenwert × Reputationsfaktor + neue Aktien × Ausgabepreis) / (Aktien + neue Aktien)   # postIssueFairCents
+aiFaktor      = Ausgabepreis ≤ fairNach × aiMaxPremiumBps / 10 000 ? 1 : 0                              # issueAiFactor
+KI-Zeichnung  = angeboten × aiFaktor × (aiTakeBase + aiTakePerQuality × Qualität)
+Tagesband     = clamp(Kurs, Vortagesschluss / 1,3, Vortagesschluss × 1,3)    # nur Spielerfirmen, playerStockBandE4
+Halteprämie   = FV × (1 + 0,15 × tanh((Spielerbestand − Bestand des Gründers) in Cent / (20 × depth)))
+```
+
+Warum das reicht: Ein Hin und Her mit der eigenen Aktie verliert schon (ADR-126: die Order zahlt ihre eigene
+Bewegung). Geld entstand nur, wo die KI auf einen getriebenen Kurs hereinfiel (Kapitalerhöhung) oder der eigene
+Bestand den Anker hob. Beides ist jetzt an den fairen Wert aus den Firmenzahlen gebunden. Das Tagesband begrenzt,
+wie weit Geld allein den Kurs an einem Tag bewegt; der Value-Fonds zieht ihn danach weiter zum fairen Wert zurück.
+Dazu sperren die Insiderregel (24 h nach Geld aus der Firma kein Kauf der eigenen Aktie) und die 72-Stunden-Sperre
+für Ausgabeerlöse die schnelle Schleife „entnehmen, kaufen, ausgeben, entnehmen“.
