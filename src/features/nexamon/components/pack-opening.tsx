@@ -222,6 +222,11 @@ export function PackOpening({
     return () => pending.forEach((id) => window.clearTimeout(id));
   }, []);
 
+  // The pack button is gone once the stack lies there: the keyboard goes on with the cards.
+  useEffect(() => {
+    if (phase === "stack") stackRef.current?.focus({ preventScroll: true });
+  }, [phase]);
+
   const reveal = useCallback(
     (at: number) => {
       const card = cards[at];

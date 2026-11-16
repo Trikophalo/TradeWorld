@@ -1129,6 +1129,24 @@ export const UI_ICONS = {
       "............",
     ],
   },
+  /** A collectible card (Nexamon, ADR-165): portrait with a gem in the picture and two text lines. */
+  nexamon: {
+    palette: mono,
+    grid: [
+      "..xxxxxxxx..",
+      "..x......x..",
+      "..x..xx..x..",
+      "..x.xxxx.x..",
+      "..x.xxxx.x..",
+      "..x..xx..x..",
+      "..x......x..",
+      "..x.xxxx.x..",
+      "..x......x..",
+      "..x.xx...x..",
+      "..x......x..",
+      "..xxxxxxxx..",
+    ],
+  },
   card: {
     palette: mono,
     grid: [
