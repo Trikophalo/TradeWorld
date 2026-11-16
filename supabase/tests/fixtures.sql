@@ -1385,3 +1385,10 @@ select public.get_chat(:fx_dm);
 select public.mark_chat_read(:fx_dm);
 \o
 reset role;
+
+-- mission reset (ADR-166): the first fixture player swaps the open missions
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/reset_missions.json
+select public.reset_missions(gen_random_uuid());
+\o
+reset role;

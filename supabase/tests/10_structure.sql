@@ -148,7 +148,9 @@ select tests.assert(
            'get_battle', 'battle_join', 'battle_leave', 'battle_sync', 'battle_answer',
            -- chats with friends (ADR-164)
            'get_chats', 'get_chat', 'mark_chat_read', 'open_direct_chat', 'create_group_chat', 'post_chat_message',
-           'add_group_member', 'remove_group_member', 'leave_group', 'rename_group']
+           'add_group_member', 'remove_group_member', 'leave_group', 'rename_group',
+           -- mission reset (ADR-166)
+           'reset_missions']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')
@@ -193,6 +195,7 @@ select tests.assert(
       'rental_offers', 'rental_tenancies', 'rental_payments',
       'battles', 'battle_players', 'battle_answers',
       'friend_chats', 'friend_chat_members', 'friend_chat_messages',
+      'mission_resets',
       'rate_limits', 'player_requests', 'player_login_events', 'push_deliveries', 'invite_code_redemptions',
       'price_ticks_default']) as t
      -- (a table from a later migration is not there yet on an older database)

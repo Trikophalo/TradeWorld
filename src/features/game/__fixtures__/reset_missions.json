@@ -1,0 +1,164 @@
+{
+  "groups": [
+    {
+      "kind": "quick",
+      "missions": [
+        {
+          "id": "b78b6d38-947a-467d-ac6c-f7c06c82298d",
+          "xp": 186,
+          "key": "q_trades_3",
+          "title": "Mach 4 Trades",
+          "status": "completed",
+          "target": 4,
+          "progress": 4,
+          "expires_at": null,
+          "description": "Kauf oder Verkauf, egal welches Wertpapier."
+        },
+        {
+          "id": "d632399d-74fc-493f-bf7d-7548c4566741",
+          "xp": 116,
+          "key": "q_sell",
+          "title": "Verkaufe eine Position",
+          "status": "completed",
+          "target": 1,
+          "progress": 1,
+          "expires_at": null,
+          "description": "Auch ein Teilverkauf zählt."
+        },
+        {
+          "id": "5079e4c6-e6af-4471-ac71-7c68716a3ecd",
+          "xp": 236,
+          "key": "q_buy_2",
+          "title": "Kaufe 3 Aktien",
+          "status": "active",
+          "target": 3,
+          "progress": 0,
+          "expires_at": null,
+          "description": "Zwei Käufe, egal welche."
+        }
+      ],
+      "resets_at": null
+    },
+    {
+      "kind": "daily",
+      "missions": [
+        {
+          "id": "1d87d324-6171-4eba-9234-7c57f15d2b57",
+          "xp": 1550,
+          "key": "d_buys_5",
+          "title": "Kaufe 8-mal",
+          "status": "active",
+          "target": 8,
+          "progress": 0,
+          "expires_at": "2026-11-16T23:00:00+00:00",
+          "description": "Fleißig investieren."
+        },
+        {
+          "id": "915ff4bb-2082-48f9-9e94-fceb92b49a8f",
+          "xp": 1512,
+          "key": "d_bond",
+          "title": "Kaufe eine Staatsanleihe",
+          "status": "active",
+          "target": 2,
+          "progress": 0,
+          "expires_at": "2026-11-16T23:00:00+00:00",
+          "description": "Rendite ohne Kursrisiko bis zur Fälligkeit."
+        },
+        {
+          "id": "ebf2d380-81f7-4c48-aac7-1a3a6510c963",
+          "xp": 1512,
+          "key": "d_volume",
+          "title": "Handle Wertpapiere im Wert von 14.219 €",
+          "status": "active",
+          "target": 1421900,
+          "progress": 0,
+          "expires_at": "2026-11-16T23:00:00+00:00",
+          "description": "Summe aller Käufe und Verkäufe heute."
+        }
+      ],
+      "resets_at": "2026-11-16T23:00:00+00:00"
+    },
+    {
+      "kind": "weekly",
+      "missions": [
+        {
+          "id": "c4d0b8d0-0ca7-4279-9e64-54f7a0c37383",
+          "xp": 5698,
+          "key": "w_pokes",
+          "title": "Stups 23-mal Freunde an",
+          "status": "active",
+          "target": 23,
+          "progress": 0,
+          "expires_at": "2026-11-22T23:00:00+00:00",
+          "description": "Eine Woche voller Stupser."
+        },
+        {
+          "id": "314e2b6c-7991-491d-89b0-2f7aa88288da",
+          "xp": 7112,
+          "key": "w_art_win",
+          "title": "Ersteigere ein NFT",
+          "status": "active",
+          "target": 2,
+          "progress": 0,
+          "expires_at": "2026-11-22T23:00:00+00:00",
+          "description": "Sei am Ende einer Auktion Höchstbietender."
+        },
+        {
+          "id": "89d206e9-f8ef-42f2-83da-9425090d773e",
+          "xp": 6144,
+          "key": "w_profit",
+          "title": "Erziele diese Woche 3.202 € Gewinn",
+          "status": "active",
+          "target": 320200,
+          "progress": 0,
+          "expires_at": "2026-11-22T23:00:00+00:00",
+          "description": "Summe deiner realisierten Gewinne."
+        }
+      ],
+      "resets_at": "2026-11-22T23:00:00+00:00"
+    },
+    {
+      "kind": "milestone",
+      "missions": [
+        {
+          "id": "50892171-68a6-46a2-abf7-f1788715e838",
+          "xp": 2500,
+          "key": "m_work_for_player",
+          "title": "Arbeite bei einem echten Spieler",
+          "status": "active",
+          "target": 1,
+          "progress": 0,
+          "expires_at": null,
+          "description": "Bewirb dich bei der Firma eines anderen Spielers und fang dort an. Gemeinsam wächst ihr schneller."
+        },
+        {
+          "id": "51e113ad-a52f-4022-bc61-15542fc07592",
+          "xp": 350,
+          "key": "m_first_trade",
+          "title": "Dein erster Trade",
+          "status": "completed",
+          "target": 1,
+          "progress": 1,
+          "expires_at": null,
+          "description": "Kaufe dein erstes Wertpapier."
+        },
+        {
+          "id": "71e522c6-977f-4a54-9f5c-a5ea9da9cc60",
+          "xp": 524,
+          "key": "m_first_profit",
+          "title": "Dein erster Gewinn",
+          "status": "active",
+          "target": 1,
+          "progress": 0,
+          "expires_at": null,
+          "description": "Verkaufe etwas teurer, als du es gekauft hast."
+        }
+      ],
+      "resets_at": null
+    }
+  ],
+  "replaced": 7,
+  "server_time": "2026-11-16T17:05:52.126369+00:00",
+  "next_reset_at": "2026-11-16T23:00:00+00:00",
+  "reset_available": false
+}
