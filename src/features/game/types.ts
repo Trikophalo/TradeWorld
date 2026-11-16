@@ -2182,6 +2182,9 @@ export const GAME_ERROR_KEYS = [
   "board_motion_unknown",
   "board_limit",
   "board_not_shareholder",
+  "insider_cooldown",
+  "capital_increase_cooldown",
+  "issue_proceeds_locked",
 ] as const;
 export type GameErrorKey = (typeof GAME_ERROR_KEYS)[number] | "unknown";
 

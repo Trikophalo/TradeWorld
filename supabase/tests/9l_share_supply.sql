@@ -65,6 +65,8 @@ select tests.login_as('authenticated', :f);
 select public.capital_increase(gen_random_uuid(), 10) -> 'company' -> 'listing' -> 'offer' ->> 'id' as ci \gset
 reset role;
 update public.player_companies set quality = 1 where company_id = :'fco';
+-- the offer price (1 EUR minimum) is above this tiny company's fair value; a9_stock_pump.sql tests that rule (ADR-170)
+update public.company_share_offers set ai_factor = 1 where id = :'ci';
 update public.company_share_offers set ends_at = now() - interval '1 second' where id = :'ci';
 select public.close_due_offers() is not null as ok \gset
 select shares_outstanding as so2 from public.companies where id = :'fco' \gset

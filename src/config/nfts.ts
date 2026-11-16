@@ -43,9 +43,22 @@ export const NFT_RULES = {
     /** Lowball offers: this share of the valuation, rounded down to whole euros. */
     lowballMinBps: 6_500,
     lowballMaxBps: 9_000,
-    /** At most this many purchases by all collectors per Berlin day, and this many AI messages per minute. */
-    maxBuysPerDay: 60,
+    /**
+     * At most this many purchases from players by all collectors per Berlin day and per hour (ADR-170: spread over
+     * the day instead of all in the morning), and this many AI messages per minute.
+     */
+    maxBuysPerDay: 100,
+    maxBuysPerHour: 6,
     maxMessagesPerRun: 10,
+    /** What all collectors together pay players per Berlin day at most (purchases, auctions; ADR-170). */
+    budgetCentsPerDay: 30_000_000,
+    /** A collector's offer is open this long (ADR-170; players' offers keep chat.offerHours), then a new one comes. */
+    offerHours: 2,
+    /**
+     * Collectors bid in auctions (ADR-170): per minute and auction with this chance, the minimum bid, only while it is
+     * at most their valuation; at most this many bids per minute.
+     */
+    auction: { bidChanceBps: 1_000, maxBidsPerRun: 3 },
     /** An NFT the AI holds is offered for its valuation x this. */
     resaleMarkupBps: 12_500,
     /** The AI accepts a player's offer on an NFT it holds from this share of its valuation. */
@@ -78,7 +91,9 @@ export const NFT_RULES = {
       /** A collector keeps a new NFT at least this long. */
       minHoldMinutes: 10,
       perRun: 6,
-      perDay: 300,
+      /** ADR-170: an hourly cap keeps the trading going all day (before, the day cap was reached by the afternoon). */
+      perHour: 24,
+      perDay: 480,
       /** Taste of the buying collector: fair value x 85 % .. 125 %. */
       tasteMinBps: 8_500,
       tasteMaxBps: 12_500,
