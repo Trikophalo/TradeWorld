@@ -33,11 +33,12 @@ import { burstConfetti } from "@/components/ui/effects";
 import { DURATION, EASE, SPRING, STAGGER } from "@/lib/motion";
 import { playSound, type SoundName } from "@/lib/sound";
 import { cn } from "@/lib/utils";
-import { isHit, pixelScale, swipeOutcome, tearProgress } from "../lib";
+import { isHit, isTap, pixelScale, swipeOutcome, tearProgress } from "../lib";
 import { RarityBadge } from "./badges";
-import { NexamonCardFace } from "./card-face";
+import { NexamonCardBack, NexamonCardFace } from "./card-face";
 import { PackFoil, PackSheen } from "./pack";
 import { PixelCanvas } from "./pixel-canvas";
+import { TiltFlip } from "./tilt-flip";
 import "./nexamon.css";
 
 export type PackPhase = "sealed" | "shaking" | "tearing" | "stack" | "summary";
@@ -89,6 +90,10 @@ interface StackCardProps {
   reduced: boolean;
   /** The top card hands out its "throw" so the keyboard can use it. */
   throwRef: RefObject<((dirX: number, dirY: number) => void) | null>;
+  /** The top card hands out its "flip" (front to back and back again) so the keyboard can use it. */
+  flipRef: RefObject<(() => void) | null>;
+  /** The card turned around (for the sound). */
+  onTurn: () => void;
   /** The card starts to leave (thrown, flicked or pulled with the keyboard). */
   onFly: () => void;
   onGone: () => void;
@@ -99,7 +104,19 @@ const HOVER_SPRING = { stiffness: 260, damping: 22, mass: 0.6 } as const;
 const HOVER_TILT = 12;
 
 /** One card of the stack. Only the top one listens: it follows the pointer and flies away or falls back. */
-function StackCard({ card, art, evolvesFromName, u, top, reduced, throwRef, onFly, onGone }: StackCardProps) {
+function StackCard({
+  card,
+  art,
+  evolvesFromName,
+  u,
+  top,
+  reduced,
+  throwRef,
+  flipRef,
+  onTurn,
+  onFly,
+  onGone,
+}: StackCardProps) {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const opacity = useMotionValue(1);
@@ -113,7 +130,18 @@ function StackCard({ card, art, evolvesFromName, u, top, reduced, throwRef, onFl
   const lightX = useSpring(hoverX, HOVER_SPRING);
   const lightY = useSpring(hoverY, HOVER_SPRING);
   const rotateX = useTransform(lightY, [0, 1], [HOVER_TILT, -HOVER_TILT]);
-  const rotateY = useTransform(lightX, [0, 1], [-HOVER_TILT, HOVER_TILT]);
+  // A tap turns the card around (the flip technique of TiltFlip): the turn spring adds 180 degrees to the lean.
+  const [flipped, setFlipped] = useState(false);
+  const turn = useSpring(0, SPRING.smooth);
+  const rotateY = useTransform(() => (lightX.get() - 0.5) * 2 * HOVER_TILT + turn.get());
+  const flip = useCallback(() => {
+    if (leaving.current) return;
+    setFlipped((was) => {
+      turn.set(was ? 0 : 180);
+      return !was;
+    });
+    onTurn();
+  }, [onTurn, turn]);
   const lean = (event: PointerEvent<HTMLDivElement>) => {
     if (!top || reduced || leaving.current || event.pointerType === "touch") return;
     const rect = event.currentTarget.getBoundingClientRect();
@@ -146,10 +174,12 @@ function StackCard({ card, art, evolvesFromName, u, top, reduced, throwRef, onFl
   useEffect(() => {
     if (!top) return;
     throwRef.current = fly;
+    flipRef.current = flip;
     return () => {
       if (throwRef.current === fly) throwRef.current = null;
+      if (flipRef.current === flip) flipRef.current = null;
     };
-  }, [fly, throwRef, top]);
+  }, [flip, flipRef, fly, throwRef, top]);
 
   const back = () => {
     void animate(x, 0, SPRING.bouncy);
@@ -182,6 +212,12 @@ function StackCard({ card, art, evolvesFromName, u, top, reduced, throwRef, onFl
     drag.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId);
+    // A press without movement is a tap: it turns the card around instead of throwing it.
+    if (isTap(x.get(), y.get())) {
+      back();
+      flip();
+      return;
+    }
     // Speed over the last moments of the drag: a flick counts even when it was short.
     const recent = state.trail.filter((p) => event.timeStamp - p.t <= 120);
     const first = recent[0] ?? state.trail[state.trail.length - 1]!;
@@ -216,15 +252,37 @@ function StackCard({ card, art, evolvesFromName, u, top, reduced, throwRef, onFl
       style={{ x, y, rotate, opacity, touchAction: top ? "none" : undefined, perspective: width * 4 }}
       className={cn("absolute inset-0 select-none", top ? "cursor-grab active:cursor-grabbing" : "pointer-events-none")}
     >
-      <motion.div style={top ? { rotateX, rotateY } : undefined} data-testid={top ? "pack-top-card-tilt" : undefined}>
-        <NexamonCardFace
-          card={card}
-          art={art}
-          scale={u}
-          evolvesFromName={evolvesFromName}
-          foil={top ? "live" : "still"}
-          light={top ? { x: lightX, y: lightY } : undefined}
-        />
+      <motion.div
+        style={top ? { rotateX, rotateY: reduced ? 0 : rotateY, transformStyle: "preserve-3d" } : undefined}
+        className="relative"
+        data-testid={top ? "pack-top-card-tilt" : undefined}
+        data-face={flipped ? "back" : "front"}
+      >
+        <motion.div
+          initial={false}
+          animate={{ opacity: reduced && flipped ? 0 : 1 }}
+          transition={{ duration: DURATION.base, ease: EASE.standard }}
+          className="[backface-visibility:hidden]"
+        >
+          <NexamonCardFace
+            card={card}
+            art={art}
+            scale={u}
+            evolvesFromName={evolvesFromName}
+            foil={top ? "live" : "still"}
+            light={top ? { x: lightX, y: lightY } : undefined}
+          />
+        </motion.div>
+        <motion.div
+          initial={false}
+          animate={{ opacity: reduced && !flipped ? 0 : 1 }}
+          transition={{ duration: DURATION.base, ease: EASE.standard }}
+          style={{ rotateY: reduced ? 0 : 180 }}
+          className="absolute inset-0 [backface-visibility:hidden]"
+          aria-hidden
+        >
+          <NexamonCardBack scale={u} />
+        </motion.div>
       </motion.div>
     </motion.div>
   );
@@ -256,6 +314,10 @@ export function PackOpening({
   const [index, setIndex] = useState(0);
   const timers = useRef<number[]>([]);
   const throwRef = useRef<((dirX: number, dirY: number) => void) | null>(null);
+  const flipRef = useRef<(() => void) | null>(null);
+  const turned = useCallback(() => {
+    if (sound) playSound("cardFlick", 1, { rate: 1.35 });
+  }, [sound]);
   const stackRef = useRef<HTMLDivElement>(null);
   // The tear in progress: how far (0..1) and to which side (1 right, -1 left, 0 not pulling).
   const tear = useMotionValue(0);
@@ -384,6 +446,11 @@ export function PackOpening({
       " ": [1, 0],
       Enter: [1, 0],
     };
+    if (event.key === "f" || event.key === "F") {
+      event.preventDefault();
+      flipRef.current?.();
+      return;
+    }
     const dir = direction[event.key];
     if (!dir) return;
     event.preventDefault();
@@ -412,7 +479,6 @@ export function PackOpening({
           <ul
             key={size}
             data-testid={size === 1 ? "pack-summary" : undefined}
-            aria-hidden={size === 2 ? true : undefined}
             className={cn(
               "items-end justify-center",
               size === 1 ? "flex sm:hidden [&>li+li]:-ml-3" : "hidden flex-wrap gap-3 sm:flex",
@@ -429,13 +495,23 @@ export function PackOpening({
                 {isHit(card.rarity) && (
                   <div aria-hidden className={cn("absolute -inset-3 opacity-80", `nexamon-glow-${card.rarity}`)} />
                 )}
-                <NexamonCardFace
-                  card={card}
-                  art={artOf?.(card)}
-                  scale={size}
-                  evolvesFromName={evolvesFromNameOf?.(card)}
-                  foil="still"
+                <TiltFlip
+                  width={NEXAMON_CARD_SIZE.width * size}
+                  height={NEXAMON_CARD_SIZE.height * size}
+                  tilt={false}
+                  label={t("flipHint", { name: card.name })}
+                  testId={size === 1 ? "pack-summary-card" : "pack-summary-card-wide"}
                   className="relative"
+                  front={() => (
+                    <NexamonCardFace
+                      card={card}
+                      art={artOf?.(card)}
+                      scale={size}
+                      evolvesFromName={evolvesFromNameOf?.(card)}
+                      foil="still"
+                    />
+                  )}
+                  back={<NexamonCardBack scale={size} />}
                 />
               </motion.li>
             ))}
@@ -594,6 +670,8 @@ export function PackOpening({
                   top={i === index}
                   reduced={reduced}
                   throwRef={throwRef}
+                  flipRef={flipRef}
+                  onTurn={turned}
                   onFly={flick}
                   onGone={gone}
                 />

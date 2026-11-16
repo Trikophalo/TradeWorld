@@ -5,6 +5,7 @@ import {
   gradeTier,
   isBlackLabel,
   clampGrade,
+  formatGrade,
   estimatePixelTextWidth,
   fitTextScale,
   formatCardNumber,
@@ -39,8 +40,10 @@ describe("card numbers and serials", () => {
 });
 
 describe("grades", () => {
-  it("has a word for every grade from 1 to 10 and for the Black Label", () => {
-    expect(Object.keys(GRADE_WORDS)).toHaveLength(11);
+  it("has a word for every grade from 1 to 10, the half steps and the Black Label", () => {
+    expect(Object.keys(GRADE_WORDS)).toHaveLength(13);
+    expect(gradeWordKey(8.5)).toBe("nearMintMintPlus");
+    expect(gradeWordKey(9.5)).toBe("mintPlus");
     expect(gradeWordKey(11)).toBe("blackLabel");
     expect(gradeWordKey(10)).toBe("gemMint");
     expect(gradeWordKey(9)).toBe("mint");
@@ -57,7 +60,12 @@ describe("grades", () => {
     expect(isBlackLabel(null)).toBe(false);
     expect(gradeNumber(11)).toBe(10);
     expect(gradeNumber(4)).toBe(4);
-    expect(clampGrade(8.6)).toBe(9);
+    expect(clampGrade(8.6)).toBe(8.5);
+    expect(clampGrade(9.4)).toBe(9.5);
+    expect(clampGrade(7.4)).toBe(7);
+    expect(gradeNumber(9.5)).toBe(9.5);
+    expect(formatGrade(9.5)).toBe("9,5");
+    expect(formatGrade(11)).toBe("10");
     expect(clampGrade(Number.NaN)).toBe(1);
     expect(gradeWordKey(99)).toBe("gemMint");
   });
@@ -69,11 +77,11 @@ describe("grade reveal", () => {
   });
 
   it("pauses longer before every step, most before the top grades", () => {
-    for (let step = 2; step <= 10; step++) expect(gradeStepPauseMs(step)).toBeGreaterThan(gradeStepPauseMs(step - 1));
-    expect(gradeStepPauseMs(10)).toBeGreaterThanOrEqual(5 * gradeStepPauseMs(1));
+    for (let step = 2; step <= 12; step++) expect(gradeStepPauseMs(step)).toBeGreaterThan(gradeStepPauseMs(step - 1));
+    expect(gradeStepPauseMs(12)).toBeGreaterThanOrEqual(5 * gradeStepPauseMs(1));
     // the whole count to 10 stays a show, not a wait
     let total = 0;
-    for (let step = 1; step <= 10; step++) total += gradeStepPauseMs(step);
+    for (let step = 1; step <= 12; step++) total += gradeStepPauseMs(step);
     expect(total).toBeGreaterThan(4_000);
     expect(total).toBeLessThan(8_000);
   });

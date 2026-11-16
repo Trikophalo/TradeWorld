@@ -303,7 +303,8 @@ export function RulesList() {
   const oddsOf = (rarity: string) => odds.find((row) => row.rarity === rarity)!;
   const slot5 = (rarity: string) => formatChance(chanceBps(oddsOf(rarity).slot5, oddsOf(rarity).denominator));
   const cardValue = 10_000;
-  const gradeValue = (grade: number) => whole(share(cardValue, nexamon.grading.valueBps[grade - 1]!));
+  const gradeValue = (grade: number) =>
+    whole(share(cardValue, nexamon.grading.valueBps[(nexamon.grading.grades as readonly number[]).indexOf(grade)]!));
   const tenChance = (condition: "mint" | "near_mint" | "good") => formatChance(nexamonGradeChanceBps(condition, 10));
   const cardIcon = <PixelIcon {...UI_ICONS.nexamon} scale={2} className="text-fg-2" />;
   const nexamonRules: AccordionItem[] = [
@@ -348,7 +349,8 @@ export function RulesList() {
             mint: tenChance("mint"),
             nearMint: tenChance("near_mint"),
             good: tenChance("good"),
-            blackChance: formatChance(nexamon.grading.blackLabel.chanceBps),
+            blackChance: formatChance(nexamon.grading.blackLabel.chanceBps.mint),
+            blackChanceNearMint: formatChance(nexamon.grading.blackLabel.chanceBps.near_mint),
             blackFactor: `×${nexamon.grading.blackLabel.valueBps / 10_000}`,
           })}
           example={t("nexamonGrading.example", {
@@ -356,6 +358,7 @@ export function RulesList() {
             fee: whole(share(cardValue, nexamon.grading.feeBps)),
             ten: gradeValue(10),
             eight: gradeValue(8),
+            nineHalf: gradeValue(9.5),
             seven: gradeValue(7),
           })}
           where={t("nexamonGrading.where")}

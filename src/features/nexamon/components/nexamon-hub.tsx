@@ -170,7 +170,7 @@ function Teaser() {
           <li>{t("locked.point1", { sets: NEXAMON_SETS.length, cards: NEXAMON_SET_SIZE })}</li>
           <li>
             {t("locked.point2", {
-              best: formatFactor(BALANCE.nexamon.grading.valueBps[9]),
+              best: formatFactor(BALANCE.nexamon.grading.valueBps.at(-1)!),
               black: formatFactor(BALANCE.nexamon.grading.blackLabel.valueBps),
             })}
           </li>

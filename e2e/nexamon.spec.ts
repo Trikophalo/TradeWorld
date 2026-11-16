@@ -226,6 +226,26 @@ test("inspect a card, list it and take it back, then send it to ASP", async ({ p
   await expectNoSidewaysScroll(page);
 });
 
+test("the listing sheet tells how fast and up to what price AI collectors buy", async ({ page }) => {
+  await preparePlayer(page);
+  await page.goto("/nexamon");
+  const [key] = await buyAndSkip(page);
+  await page.goto(`/nexamon/${key}`);
+  const row = page.getByTestId("copy-row").first();
+  await row.getByTestId("copy-sell").click();
+  const sheet = page.getByTestId("sell-sheet");
+  await expect(sheet).toBeVisible();
+  // At the suggested price (the value) the AI buys at once.
+  const hint = sheet.getByTestId("sell-ai-hint");
+  await expect(hint).toContainText("Zum Marktwert oder darunter kauft die KI sofort.");
+  await expect(sheet.getByTestId("sell-ai-max")).toContainText(/KI-Sammler/);
+  await expect(sheet.getByTestId("sell-ai-speed")).toHaveCount(0);
+  // Far above the value no AI collector buys.
+  await page.getByTestId("sell-price").fill("99999999");
+  await expect(sheet.getByTestId("sell-ai-speed")).toContainText("nie");
+  await expectNoSidewaysScroll(page);
+});
+
 test("a finished grading is revealed at the desk", async ({ page }) => {
   await preparePlayer(page);
   await page.goto("/nexamon");

@@ -137,7 +137,7 @@ export function NexamonShowcase() {
             <NexamonSlab
               card={NEXAMON_SAMPLE_CARDS[2]!}
               art={art[NEXAMON_SAMPLE_CARDS[2]!.key]}
-              grade={9}
+              grade={9.5}
               serial={23420042}
               scale={2}
               evolvesFromName={evolvesName(NEXAMON_SAMPLE_CARDS[2]!)}
@@ -166,7 +166,7 @@ export function NexamonShowcase() {
           <NexamonSlab
             card={NEXAMON_SAMPLE_CARDS[1]!}
             art={art[NEXAMON_SAMPLE_CARDS[1]!.key]}
-            grade={8}
+            grade={8.5}
             serial={5550123}
             scale={3}
             evolvesFromName={evolvesName(NEXAMON_SAMPLE_CARDS[1]!)}

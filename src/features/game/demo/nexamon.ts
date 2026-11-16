@@ -4,7 +4,7 @@ import type { NexamonCondition } from "@/config/nexamon-rules";
 import {
   nexamonAiAskCents,
   nexamonAiBuyChanceBps,
-  nexamonAiWouldBuy,
+  nexamonAiBuyCounts,
   nexamonCentsFromE4,
   nexamonClampValue,
   nexamonCopyFactorBps,
@@ -294,8 +294,8 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine {
         } else
           host.notify(
             "nexamon_graded",
-            `ASP-Note: ${c.grade}`,
-            `Deine Nexamon-Karte ist zurück von ASP, Note ${c.grade} von 10.`,
+            `ASP-Note: ${String(c.grade).replace(".", ",")}`,
+            `Deine Nexamon-Karte ist zurück von ASP, Note ${String(c.grade).replace(".", ",")} von 10.`,
             "/nexamon",
           );
         if (c.grade >= 10) host.track("nexamon_tens");
@@ -320,31 +320,53 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine {
       }
       opened += due;
     }
-    // 3. AI collectors buy the player's fairly priced listings
+    // 3. AI collectors buy the player's listings up to value x (1 + premium), better copies first
     const minutes = Math.min(600, Math.floor((now - s.tickAt) / 60_000));
     if (minutes >= 1) {
       s.tickAt = now;
       const today = berlinDay(now);
-      for (const copy of s.copies.filter((c) => c.listing)) {
+      const listed = s.copies
+        .filter((c) => c.listing)
+        .sort((a, b) => nexamonCopyFactorBps(b.condition, b.grade) - nexamonCopyFactorBps(a.condition, a.grade));
+      let bought = 0;
+      for (const copy of listed) {
+        if (bought >= cfg.ai.maxBuysPerRun) break;
         const card = info(copy.cardKey);
         const state = s.cards[copy.cardKey]!;
         const price = copy.listing!.priceCents;
-        if (!nexamonAiWouldBuy(price, copyValue(s, copy), copy.grade)) continue;
+        const chanceBps = nexamonAiBuyChanceBps({
+          priceCents: price,
+          copyValueCents: copyValue(s, copy),
+          condition: copy.condition,
+          grade: copy.grade,
+          rarity: card.rarity,
+          population: state.population,
+        });
+        if (chanceBps <= 0) continue;
         const aiBuys = s.sales.filter((x) => x.kind === "ai_buy");
-        const inWindow = aiBuys.filter(
-          (x) => x.cardKey === copy.cardKey && x.at >= now - cfg.ai.buyWindowDays * DAY,
-        ).length;
-        if (inWindow >= cfg.ai.buysPerCardWindow[card.rarity]) continue;
         const spent = aiBuys
           .filter((x) => berlinDay(x.at) === today && nexamonCard(x.cardKey)?.set === card.set)
           .reduce((sum, x) => sum + x.priceCents, 0);
         if (spent + price > cfg.ai.dailyBudgetPacks * cfg.sets[card.set].packPriceCents) continue;
-        const perMinute = nexamonAiBuyChanceBps(card.rarity, state.population) / 10_000;
-        if (host.random() >= 1 - Math.pow(1 - perMinute, minutes)) continue;
+        // at or below the value the AI always buys; above it the chance is per minute
+        const perMinute = chanceBps / 10_000;
+        if (chanceBps < 10_000 && host.random() >= 1 - Math.pow(1 - perMinute, minutes)) continue;
+        bought++;
         const buyer = sellerOf(Math.floor(host.random() * SELLERS.length));
         const fee = nexamonMarketFeeCents(price);
         host.earn(price - fee);
-        setValue(s, copy.cardKey, nexamonValueAfterAiBuy(state.valueE4, card.rarity, state.population), now, true);
+        // the value moves only for a plausible price and a few AI buys per card and window (anti-manipulation)
+        const counted = nexamonAiBuyCounts({
+          priceCents: price,
+          factorBps: nexamonCopyFactorBps(copy.condition, copy.grade),
+          valueE4: state.valueE4,
+          rarity: card.rarity,
+          countedInWindow: aiBuys.filter(
+            (x) => x.counted && x.cardKey === copy.cardKey && x.at >= now - cfg.ai.buyWindowDays * DAY,
+          ).length,
+        });
+        if (counted)
+          setValue(s, copy.cardKey, nexamonValueAfterAiBuy(state.valueE4, card.rarity, state.population), now, true);
         record(s, {
           cardKey: copy.cardKey,
           at: now,
@@ -354,7 +376,7 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine {
           kind: "ai_buy",
           seller: host.nickname(),
           buyer,
-          counted: true,
+          counted,
         });
         s.copies = s.copies.filter((c) => c.id !== copy.id);
         if (copy.grade === null && state.ai.length < AI_STOCK_CAP)
@@ -625,7 +647,7 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine {
             .map(([at, value]) => ({ at: iso(at), valueCents: nexamonCentsFromE4(value) })),
           { at: iso(now), valueCents: nexamonCentsFromE4(state.valueE4) },
         ],
-        graded: Array.from({ length: 10 }, (_, i) => mine.filter((c) => c.grade === i + 1).length),
+        graded: cfg.grading.grades.map((g) => mine.filter((c) => c.grade === g).length),
         blackLabels: mine.filter((c) => nexamonIsBlackLabel(c.grade)).length,
         listings: listings(s)
           .filter((l) => l.cardKey === cardKey)

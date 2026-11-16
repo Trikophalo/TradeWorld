@@ -47,35 +47,41 @@ export const NEXAMON_RULES = {
   },
   /**
    * Grading by "ASP" (a parody of card grading): costs `feeBps` of what the copy is worth right now (to the
-   * households), takes `minutes` of real time and ends with a grade from 1 to 10 in a slab.
+   * households), takes `minutes` of real time and ends with a grade from 1 to 10 (with 8.5 and 9.5) in a slab.
    */
   grading: {
-    feeBps: 3_000,
+    feeBps: 4_000,
     minFeeCents: 100,
     minutes: 60,
     /** At most this many copies of one player at ASP at the same time. */
     maxOpen: 10,
     /**
-     * Chance of every grade in basis points, per condition; index 0 is grade 1, index 9 is grade 10.
-     * A 10: poor 0.1 %, good 10 %, near mint 60 %, mint 90 % (of which `blackLabel.chanceBps` become a Black Label).
+     * The grades ASP gives, worst first: whole grades 1 to 8, then half steps 8.5, 9, 9.5 and 10 (ADR-165). The
+     * arrays below are in this order. The database stores a grade as numeric(3,1) (11 = Black Label).
+     */
+    grades: [1, 2, 3, 4, 5, 6, 7, 8, 8.5, 9, 9.5, 10],
+    /**
+     * Chance of every grade in basis points, per condition, in the order of `grades` (index 0 is grade 1, the last
+     * one grade 10, Black Label included). A 10 or better: poor 0.05 %, good 0.5 %, near mint 3.5 % (1 % of it a
+     * Black Label), mint 15 % (5 % of it a Black Label, so a plain 10 is 10 %).
      */
     gradeWeightsBps: {
-      poor: [500, 1_000, 1_500, 2_000, 2_000, 1_500, 1_000, 400, 90, 10],
-      good: [0, 0, 0, 500, 800, 1_200, 2_000, 2_500, 2_000, 1_000],
-      near_mint: [0, 0, 0, 0, 0, 100, 400, 1_000, 2_500, 6_000],
-      mint: [0, 0, 0, 0, 0, 0, 0, 200, 800, 9_000],
+      poor: [800, 1_200, 1_500, 2_000, 2_000, 1_500, 700, 200, 50, 30, 15, 5],
+      good: [0, 0, 0, 750, 1_200, 2_000, 2_500, 1_700, 1_000, 600, 200, 50],
+      near_mint: [0, 0, 0, 0, 0, 500, 1_200, 2_200, 2_400, 2_400, 950, 350],
+      mint: [0, 0, 0, 0, 0, 0, 500, 1_200, 1_800, 3_000, 2_000, 1_500],
     },
     /**
-     * A slab is worth the card's market value x this (the condition no longer counts); index 0 is grade 1.
-     * 8 to 10 are always worth more than the raw card, 7 and below less.
+     * A slab is worth the card's market value x this (the condition no longer counts), in the order of `grades`.
+     * 8 and better are worth more than the raw card, 7 and below less. A 10 is rare, so it is worth 4x.
      */
-    valueBps: [3_000, 4_000, 5_000, 6_000, 7_000, 8_000, 9_000, 12_000, 16_000, 30_000],
+    valueBps: [3_000, 4_000, 5_000, 6_000, 7_000, 8_000, 9_000, 12_000, 14_000, 17_000, 23_000, 40_000],
     /**
-     * The Black Label, one tier above a 10 (stored as grade 11, shown as "ASP 10 Black Label"). Only a copy in
-     * `condition` can get it: `chanceBps` of its gradings, taken out of its chance for a 10 (mint: 1 % Black
-     * Label, 89 % a 10). The slab is worth the card's market value x `valueBps`.
+     * The Black Label, one tier above a 10 (stored as grade 11, shown as "ASP 10 Black Label"). Only copies in the
+     * conditions of `chanceBps` can get it: that share of their gradings, taken out of their chance for a 10 (mint 5 %,
+     * near mint 1 %). The slab is worth the card's market value x `valueBps`.
      */
-    blackLabel: { condition: "mint", chanceBps: 100, valueBps: 100_000 },
+    blackLabel: { chanceBps: { near_mint: 100, mint: 500 }, valueBps: 100_000 },
   },
   /** Listings of single copies at a price the seller chooses. */
   market: {
@@ -169,15 +175,26 @@ export const NEXAMON_RULES = {
     /** The AI opens packs too, so populations level out; its pulls go into its stock. */
     packsPerHour: { mystic_energy: 4, super_apex: 2, prismatic_peak: 1 },
     maxPacksPerRun: 5,
-    /** The AI buys a player's listing only up to this share of what the copy is worth (slabs: gradedBuyMaxBps). */
-    buyMaxBps: 10_000,
-    gradedBuyMaxBps: 7_000,
-    /** Chance per minute and listing, x (1 + popularity). */
-    buyChanceBps: 300,
-    /** The AI buys at most this many copies of a card from players in `buyWindowDays`. */
-    buysPerCardWindow: { common: 2, rare: 3, ultra: 3, prisma: 2, legendary: 1 },
-    buyWindowDays: 7,
-    maxBuysPerRun: 5,
+    /**
+     * AI collectors buy players' listings (ADR-165). At or below the copy's value they always buy, on the next run of
+     * the minute job (only the households' daily budget per set stops them). Above the value they pay a premium for a
+     * good copy: at most value x (1 + premium), the premium by condition for a raw copy and by grade for a slab
+     * (order of `grading.grades`, the Black Label its own). Up there the chance per minute is `buyChanceBps`
+     * x (1 + popularity) just above the value, falling linearly to `atMaxChanceBps` of it at the maximum.
+     */
+    buyChanceBps: 3_000,
+    atMaxChanceBps: 2_000,
+    premiumBps: { poor: 0, good: 300, near_mint: 800, mint: 1_200 },
+    gradePremiumBps: [0, 0, 0, 0, 0, 0, 0, 500, 700, 1_000, 1_200, 1_500],
+    blackLabelPremiumBps: 2_000,
+    /**
+     * An AI buy moves the card's value (aiBuyBumpBps) only if its price per card lies within `value.trade.bandBps`
+     * of the value and the card had fewer than this many such counted AI buys in `buyWindowDays`; else it still
+     * sells, without moving the value.
+     */
+    buysPerCardWindow: { common: 6, rare: 6, ultra: 4, prisma: 3, legendary: 2 },
+    buyWindowDays: 1,
+    maxBuysPerRun: 100,
     /** Budget per set and Berlin day: this many pack prices. */
     dailyBudgetPacks: 300,
   },

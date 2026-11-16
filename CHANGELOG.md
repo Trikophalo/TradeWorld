@@ -113,6 +113,13 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **ASP-Noten 8,5 und 9,5, seltenere 10 (ADR-165):** ASP vergibt jetzt auch 8,5 und 9,5. Eine 10 ist viel seltener
+  (Mint 10 %), dafür das 4-Fache wert. Das Black Label bekommen 5 % der Mint- und 1 % der Near-Mint-Karten. Grading
+  kostet 40 % des Werts.
+- **KI-Sammler kaufen sofort (ADR-165):** Zum Marktwert oder darunter kauft die KI deine Karte sofort, auch Slabs.
+  Für gute Zustände und hohe Noten zahlt sie etwas mehr; das Verkaufsfenster sagt, bis zu welchem Preis.
+- **Karten umdrehen:** Beim Booster-Öffnen dreht ein Klick oder Tipp eine Karte um, Taste F oder Enter ebenso.
+
 - **Black Label und ASP-Paket (ADR-165):** Über der ASP 10 steht jetzt das Black Label: Nur 1 % der Mint-Karten
   bekommen es, der Slab ist das 10-Fache der Karte wert. Bewertete Karten kommen in einem versiegelten Paket zurück,
   das du selbst aufreißt; die Note wird langsam enthüllt. Im Booster-Fenster zeigt jede Karte beim Drüberfahren

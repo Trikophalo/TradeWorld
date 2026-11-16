@@ -2996,6 +2996,55 @@ Menge, Image …), acht sinnvolle Punkte, die man mit Mira angehen kann.
 - **Nachtrag Kartenwert im Booster-Fenster:** In „Das kann drin sein“ zeigt jede Karte bei Hover, Fokus oder Tipp
   Name, Seltenheit und aktuellen Marktwert (aus der ohnehin geladenen Sammlung). Dafür gibt es den neuen Baustein
   `Tooltip` (`src/components/ui/tooltip.tsx`, Radix Tooltip); einen gemeinsamen Tooltip gab es vorher nicht.
+- **Nachtrag halbe Noten, seltenere 10, KI-Sammler zum Marktwert, Karten umdrehen beim Öffnen** (Wunsch des
+  Besitzers; Migrationen `20261204006000_nexamon_half_grades.sql`, `20261204006010_nexamon_ai_collectors.sql`):
+  - **Halbe Noten:** ASP vergibt jetzt 1 bis 8, 8,5, 9, 9,5 und 10 (`grading.grades`, zwölf Stufen), darüber das
+    Black Label (11). Gespeichert wird die Note als Zahl in `nexamon_copies.grade` und `nexamon_sales.grade`, jetzt
+    `double precision` statt `smallint` (Postgres-`numeric` ist in Tabellen per Strukturtest verboten; 8,5 und 9,5
+    sind binär exakt). Alte Slabs bleiben gültig (ganze Noten, 11 = Black Label), keine Datenmigration nötig. Die
+    Tabellen `gradeWeightsBps` und `valueBps` haben zwölf Einträge in der Reihenfolge von `grades`;
+    `get_nexamon_card.graded` ebenso (zwölf Zähler, Black Labels weiter in `black_labels`). Neue SQL-Funktion
+    `nexamon_roll_asp_grade` ersetzt `nexamon_roll_grade` (deren Rückgabetyp `integer` sich nicht ändern ließ, ohne
+    dass die idempotenten Kopien älterer Migrationen beim erneuten Einspielen scheitern); `nexamon_grade_index`,
+    `nexamon_grade_text` („9,5“). Für die Missionen zählt nur eine echte 10 oder ein Black Label als 10.
+  - **Seltenere 10, Black Label auch für Near Mint** (Chance in %, Zeilen summieren je auf 100 %):
+
+    | Note       | 1   | 2   | 3   | 4   | 5   | 6   | 7   | 8   | 8,5 | 9   | 9,5  | 10   | BL  |
+    | ---------- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---- | ---- | --- |
+    | Mint       | –   | –   | –   | –   | –   | –   | 5   | 12  | 18  | 30  | 20   | 10   | 5   |
+    | Near Mint  | –   | –   | –   | –   | –   | 5   | 12  | 22  | 24  | 24  | 9,5  | 2,5  | 1   |
+    | Good       | –   | –   | –   | 7,5 | 12  | 20  | 25  | 17  | 10  | 6   | 2    | 0,5  | –   |
+    | Poor       | 8   | 12  | 15  | 20  | 20  | 15  | 7   | 2   | 0,5 | 0,3 | 0,15 | 0,05 | –   |
+    | Wertfaktor | 0,3 | 0,4 | 0,5 | 0,6 | 0,7 | 0,8 | 0,9 | 1,2 | 1,4 | 1,7 | 2,3  | 4    | 10  |
+
+    Abweichungen vom ersten Vorschlag: Poor Note 1 hat 8 % statt 7,95 % (sonst ergibt die Zeile nur 99,95 %).
+    Das Black Label (vom Besitzer nachgereicht: Mint 5 %, Near Mint 1 %) geht aus der 10 und der 9,5 ab: Mint 10 %
+    statt 12 %, 9,5 20 % statt 22 %; Near Mint 10 2,5 % statt 3 %, 9,5 9,5 % statt 10 %.
+
+  - **Gebühr 40 %** (statt 30 %) des Werts der Kopie. Erwarteter Faktor nach dem Grading (gegen den Marktwert der
+    Karte) und abzüglich Gebühr: Mint 2,311 − 0,4 = 1,91 (roh 1,0); Near Mint 1,5745 − 0,4 = 1,17 (roh 1,0); Good
+    1,026 − 0,36 = 0,67 (roh 0,9); Poor 0,632 − 0,28 = 0,35 (roh 0,7). Im Schnitt lohnt sich Mint deutlich, Near Mint
+    knapp, Good und Poor nicht. Es bleibt ein Glücksspiel: Eine Mint-Karte verliert in 17 % der Fälle Geld (8 oder 7),
+    eine 8,5 ist genau die Gebühr wert, den großen Teil des Erwartungswerts tragen die 15 % für 10 und Black Label.
+    Gegenüber vorher (Mint 2,92) ist der Erwartungswert gesunken, obwohl eine 10 nun 4-fach zählt.
+  - **KI-Sammler zum Marktwert:** Ein Angebot zum Wert der Kopie (Marktwert × Zustands- oder Notenfaktor) oder
+    darunter kauft die KI immer, beim nächsten Lauf des Minutenjobs: kein Würfel, keine Wochengrenze je Karte, auch
+    Slabs zum vollen Wert (die alte Grenze von 70 % für Slabs ist weg, sonst könnten Spieler Slabs nie zu Geld machen).
+    Über dem Wert zahlen KI-Sammler einen Aufschlag für gute Ware: roh Poor 0 %, Good 3 %, Near Mint 8 %, Mint 12 %;
+    Slabs bis 7: 0 %, 8: 5 %, 8,5: 7 %, 9: 10 %, 9,5: 12 %, 10: 15 %, Black Label 20 %. Knapp über dem Wert kauft die KI
+    mit 30 % × (1 + Beliebtheit) je Minute (im Schnitt nach 2 bis 3 Minuten), die Chance fällt bis zum Höchstpreis
+    linear auf 20 % davon; darüber nie. Bessere Kopien kommen zuerst dran (höchster Wertfaktor), höchstens 100 Käufe
+    je Lauf. Grenzen bleiben das Tagesbudget der Haushalte je Set (300 Booster-Preise) und deren Kontostand.
+  - **Gegen Manipulation:** Ein KI-Kauf hebt den Marktwert wie bisher um 0,5 % × Beliebtheit, aber nur, wenn sein
+    Preis je Karte im Band ± 25 % um den Wert liegt und die Karte in `buyWindowDays` (1 Tag) weniger als
+    `buysPerCardWindow` (6 / 6 / 4 / 3 / 2) gezählte KI-Käufe hatte. Wer weit unter Wert verschleudert, verkauft
+    trotzdem, bewegt aber nichts; der Aufschlag (höchstens 20 %) liegt immer im Band, die Tagesgrenzen des Werts
+    (+ 15 %) gelten weiter. Die Demo rechnet dasselbe beim Lesen nach.
+  - **Oberfläche:** Slab-Label, Chips, Chancentabelle, „Bewertete Kopien je Note“ und die Enthüllung kennen 8,5 und
+    9,5 (die Enthüllung zählt 1 … 8, 8,5, 9, 9,5, 10 hoch). Das Verkaufs-Sheet sagt „Zum Marktwert oder darunter kauft
+    die KI sofort.“, nennt den Höchstpreis der KI für Zustand oder Note und über dem Wert die mittlere Wartezeit.
+    Beim Booster-Öffnen dreht ein Klick (Tipp ohne Bewegung) eine Karte auf die Rückseite und zurück, ebenso in der
+    Übersicht am Ende; Taste F oder Enter dreht die Karte mit Fokus. Ziehen und Wegschnippen bleiben.
 - **Offen (Balancing):** Die Startpreise machen Booster im Erwartungswert teurer oder billiger als ihren Inhalt, je
   nach Katalog; gebremst wird über die begrenzte KI-Nachfrage und fallende Werte bei wachsendem Angebot. KI-Budget,
   Booster-Takt der KI und Notenfaktoren sind die Stellschrauben.

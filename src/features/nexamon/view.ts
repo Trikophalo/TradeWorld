@@ -17,6 +17,10 @@ import {
   nexamonCopyFactorBps,
   nexamonExpectedPerPack,
   nexamonGradeChanceBps,
+  nexamonAiBuyChanceBps,
+  nexamonAiExpectedMinutes,
+  nexamonAiMaxPriceCents,
+  nexamonAiPremiumBps,
   nexamonGradingFeeCents,
   nexamonMarketFeeCents,
   nexamonQuickSellCents,
@@ -252,6 +256,39 @@ export function quickSellOffer(copy: NexamonCopy, rarity: NexamonRarity): number
   return nexamonQuickSellCents(copy.valueCents, rarity, copy.grade);
 }
 
+/** What AI collectors do with a listing at `priceCents` (ADR-165): buy at once, maybe after a while, or never. */
+export interface AiBuyHint {
+  /** At or below the copy's value: bought on the next minute. */
+  instant: boolean;
+  /** The most AI collectors pay for this copy and its premium over the value. */
+  maxCents: number;
+  premiumBps: number;
+  /** Average minutes until an AI buys above the value; null if it never does at this price. */
+  minutes: number | null;
+}
+
+export function aiBuyHint(
+  copy: Pick<NexamonCopy, "condition" | "grade" | "valueCents">,
+  rarity: NexamonRarity,
+  population: number,
+  priceCents: number,
+): AiBuyHint {
+  const chanceBps = nexamonAiBuyChanceBps({
+    priceCents,
+    copyValueCents: copy.valueCents,
+    condition: copy.condition,
+    grade: copy.grade,
+    rarity,
+    population,
+  });
+  return {
+    instant: priceCents > 0 && priceCents <= copy.valueCents,
+    maxCents: nexamonAiMaxPriceCents(copy.valueCents, copy.condition, copy.grade),
+    premiumBps: nexamonAiPremiumBps(copy.condition, copy.grade),
+    minutes: nexamonAiExpectedMinutes(chanceBps),
+  };
+}
+
 export interface GradeChance {
   grade: number;
   chanceBps: number;
@@ -265,7 +302,7 @@ export interface GradingQuote {
   /** Grades this condition can get, best first (grade 11 is the Black Label). */
   chances: GradeChance[];
   /** The Black Label for this condition: chance 0 unless the copy is in the condition that qualifies. */
-  blackLabel: GradeChance & { condition: NexamonCondition };
+  blackLabel: GradeChance;
   /** Chance that the slab is worth more than the raw copy. */
   betterBps: number;
   /** Average value factor of the slab against the market value. */
@@ -278,7 +315,7 @@ export function gradingQuote(copy: Pick<NexamonCopy, "condition" | "valueCents">
   const chances: GradeChance[] = [];
   let betterBps = 0;
   let expected = 0;
-  for (let grade = NEXAMON_BLACK_LABEL_GRADE; grade >= 1; grade--) {
+  for (const grade of [NEXAMON_BLACK_LABEL_GRADE, ...[...cfg.grading.grades].reverse()]) {
     const chance = nexamonGradeChanceBps(copy.condition, grade);
     if (chance <= 0) continue;
     const factorBps = nexamonCopyFactorBps(copy.condition, grade);
@@ -294,7 +331,6 @@ export function gradingQuote(copy: Pick<NexamonCopy, "condition" | "valueCents">
       grade: NEXAMON_BLACK_LABEL_GRADE,
       chanceBps: nexamonGradeChanceBps(copy.condition, NEXAMON_BLACK_LABEL_GRADE),
       factorBps: cfg.grading.blackLabel.valueBps,
-      condition: cfg.grading.blackLabel.condition,
     },
     betterBps,
     expectedFactorBps: Math.round(expected / 10_000),

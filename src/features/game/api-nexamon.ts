@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { NEXAMON_CONDITIONS } from "@/config/nexamon-rules";
+import { NEXAMON_CONDITIONS, NEXAMON_RULES } from "@/config/nexamon-rules";
 import { NEXAMON_RARITIES, NEXAMON_SETS } from "@/config/nexamon/types";
 import type { NexamonCardStats, NexamonCopy, NexamonEngine, NexamonListing, NexamonMarketQuery } from "./nexamon-types";
 import { rpc } from "./rpc";
@@ -12,8 +12,11 @@ const iso = z.string();
 const setKey = z.enum(NEXAMON_SETS);
 const rarity = z.enum(NEXAMON_RARITIES);
 const condition = z.enum(NEXAMON_CONDITIONS);
-/** 11 = Black Label. */
-const grade = z.number().int().min(1).max(11).nullable();
+/** 1..10 in the steps of grading.grades (8.5 and 9.5), 11 = Black Label. */
+const grade = z
+  .number()
+  .refine((g) => g === 11 || (NEXAMON_RULES.grading.grades as readonly number[]).includes(g))
+  .nullable();
 
 const copySchema = z.object({
   id: z.string(),
@@ -119,7 +122,7 @@ const collectionSchema = z.object({
 const cardDetailsSchema = z.object({
   card: cardSchema,
   history: z.array(z.object({ at: iso, value_cents: num })),
-  graded: z.array(num).length(10),
+  graded: z.array(num).length(NEXAMON_RULES.grading.grades.length),
   black_labels: num.default(0),
   listings: z.array(listingSchema),
   copies: z.array(copySchema),

@@ -22,7 +22,7 @@ export interface TiltFlipProps {
   onSideChange?: (side: CardSide) => void;
   /** Lean towards the pointer (off for cards inside something that moves itself). */
   tilt?: boolean;
-  /** Click, tap, Enter and Space turn the card around. */
+  /** Click, tap, Enter, Space and F turn the card around. */
   flippable?: boolean;
   /** Largest lean in degrees. */
   maxTilt?: number;
@@ -87,7 +87,7 @@ export function TiltFlip({
     playSound("tap");
   };
   const key = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "Enter" && event.key !== " ") return;
+    if (event.key !== "Enter" && event.key !== " " && event.key !== "f" && event.key !== "F") return;
     event.preventDefault();
     flip();
   };

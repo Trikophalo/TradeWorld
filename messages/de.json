@@ -599,8 +599,8 @@
     "nexamonGrading": {
       "title": "Zustand und ASP-Note",
       "summary": "Grading kostet {rate} vom Wert",
-      "text": "Jede Karte hat einen Zustand: Poor, Good, Near Mint oder Mint. ASP bewertet eine lose Karte für {rate} ihres Werts mit einer Note von 1 bis 10 und versiegelt sie im Slab. Das dauert {minutes} Minuten. Je besser der Zustand, desto öfter gibt es eine 10: bei Mint zu {mint}, bei Near Mint zu {nearMint}, bei Good zu {good}. Über der 10 steht nur noch das Black Label: Das bekommen {blackChance} der Mint-Karten, andere Zustände nie. Ein Black Label ist {blackFactor} vom Marktwert wert.",
-      "example": "Karte im Wert von {value}: Das Grading kostet {fee}. Mit einer 10 ist der Slab {ten} wert, mit einer 8 {eight}, mit einer 7 nur noch {seven}.",
+      "text": "Jede Karte hat einen Zustand: Poor, Good, Near Mint oder Mint. ASP bewertet eine lose Karte für {rate} ihres Werts mit einer Note von 1 bis 10 und versiegelt sie im Slab; zwischen 8 und 10 gibt es auch halbe Noten (8,5 und 9,5). Das dauert {minutes} Minuten. Eine 10 ist selten: Je besser der Zustand, desto öfter gibt es sie: bei Mint zu {mint}, bei Near Mint zu {nearMint}, bei Good zu {good}. Über der 10 steht nur noch das Black Label: Das bekommen {blackChance} der Mint-Karten und {blackChanceNearMint} der Near-Mint-Karten, Good und Poor nie. Ein Black Label ist {blackFactor} vom Marktwert wert.",
+      "example": "Karte im Wert von {value}: Das Grading kostet {fee}. Mit einer 10 ist der Slab {ten} wert, mit einer 9,5 {nineHalf}, mit einer 8 {eight}, mit einer 7 nur noch {seven}.",
       "where": "Collectibles → Karte öffnen → Zu ASP"
     },
     "nexamonMarket": {
@@ -682,7 +682,7 @@
       },
       "visit_nexamon": {
         "packs": "Das sind die Booster. In jedem stecken fünf Karten, und was du ziehst, entscheidet der Zufall. Die genauen Chancen stehen direkt darunter.",
-        "tabs": "In der Sammlung siehst du alle Karten, am Markt handelst du einzelne Kopien, und bei ASP lässt du Karten bewerten. Eine Note 10 ist das Dreifache wert."
+        "tabs": "In der Sammlung siehst du alle Karten, am Markt handelst du einzelne Kopien, und bei ASP lässt du Karten bewerten. Eine seltene Note 10 ist das Vierfache wert."
       },
       "property": {
         "intro": "Neu: dein eigenes Zuhause! Kauf eine Wohnung, richte sie Stück für Stück ein und zieh später in eine Villa.",
@@ -8321,6 +8321,8 @@
       "blackLabel": "Black Label",
       "gemMint": "Gem Mint",
       "mint": "Mint",
+      "mintPlus": "Mint+",
+      "nearMintMintPlus": "NM-MT+",
       "nearMintMint": "NM-MT",
       "nearMint": "Near Mint",
       "excellentMint": "EX-MT",
@@ -8341,8 +8343,8 @@
       "label": "Booster {set}",
       "open": "Booster {set} aufreißen",
       "tapHint": "Zieh oben an der gestrichelten Linie quer über das Booster, um es aufzureißen.",
-      "dragHint": "Zieh die oberste Karte weg. Langsam ziehen heißt spicken.",
-      "keyHint": "Tastatur: Pfeiltasten oder Leertaste",
+      "dragHint": "Zieh die oberste Karte weg. Langsam ziehen heißt spicken, antippen dreht sie um.",
+      "keyHint": "Tastatur: Pfeiltasten oder Leertaste werfen, F dreht um",
       "counter": "Karte {n} von {total}",
       "stackLabel": "Kartenstapel, Karte {n} von {total}: {name}. Mit Pfeiltasten oder Leertaste wegziehen.",
       "summary": "Deine Karten",
@@ -8371,8 +8373,8 @@
     "blackLabel": {
       "short": "Black Label",
       "long": "ASP 10 · Black Label",
-      "onlyMint": "Nur Karten im Zustand {condition} können das Black Label bekommen.",
-      "note": "Black Label: {chance} aller {condition}-Karten, die zu ASP gehen. Der Slab ist {factor} vom Marktwert wert. Andere Zustände bekommen es nie.",
+      "onlyMint": "Nur Karten in Mint oder Near Mint können das Black Label bekommen.",
+      "note": "Black Label: {mint} der Mint- und {nearMint} der Near-Mint-Karten, die zu ASP gehen. Der Slab ist {factor} vom Marktwert wert. Good und Poor bekommen es nie.",
       "count": "{count, plural, =0 {Kein Black Label} one {# Black Label} other {# Black Labels}}"
     },
     "status": {
@@ -8385,7 +8387,7 @@
       "title": "Nexamon-Sammelkarten",
       "text": "Ab Level {level} ziehst du Karten aus Boostern, lässt sie bewerten und handelst sie am Kartenmarkt.",
       "point1": "{sets} Sets mit je {cards} Karten, von Common bis Legendary.",
-      "point2": "ASP bewertet deine Karten mit Noten von 1 bis 10. Eine 10 ist {best} wert, das seltene Black Label {black}.",
+      "point2": "ASP bewertet deine Karten mit Noten von 1 bis 10, dazu 8,5 und 9,5. Eine 10 ist {best} wert, das seltene Black Label {black}.",
       "point3": "Am Markt bestimmen Knappheit und Nachfrage, was eine Karte wert ist."
     },
     "shop": {
@@ -8500,9 +8502,12 @@
       "value": "Wert der Kopie",
       "fee": "Gebühr ({rate})",
       "net": "Bei dir kommt an",
-      "tooHigh": "Mehr als {band} über dem Wert: So ein Verkauf bewegt den Marktwert nicht, und KI-Sammler kaufen nie zu diesem Preis.",
-      "aboveValue": "Über dem Wert kaufen nur andere Spieler. KI-Sammler zahlen höchstens den Wert.",
-      "atValue": "Zu diesem Preis greifen auch KI-Sammler zu, früher oder später."
+      "tooHigh": "Mehr als {band} über dem Wert: So ein Verkauf bewegt den Marktwert nicht.",
+      "atValue": "Zum Marktwert oder darunter kauft die KI sofort.",
+      "aiMax": "Für diese Kopie zahlen KI-Sammler bis zu {max}, {premium} über dem Wert: Guter Zustand ist ihnen etwas mehr wert.",
+      "aiMaxValue": "Mehr als den Wert zahlen KI-Sammler für diese Kopie nicht.",
+      "aiMinutes": "Zu diesem Preis kauft die KI nur mit etwas Glück: im Schnitt nach etwa {minutes} Minuten.",
+      "aiNever": "So viel zahlen KI-Sammler nie. Zu diesem Preis kaufen nur andere Spieler."
     },
     "quick": {
       "title": "Sofort an die KI verkaufen",
@@ -8518,7 +8523,7 @@
       "done": "Karte ist bei ASP",
       "doneText": "In {minutes} Minuten ist sie zurück.",
       "confirm": "Für {fee} bewerten lassen",
-      "text": "ASP prüft die Karte, gibt ihr eine Note von 1 bis 10 und versiegelt sie im Slab. Solange ist sie weg.",
+      "text": "ASP prüft die Karte, gibt ihr eine Note von 1 bis 10 (dazu 8,5 und 9,5) und versiegelt sie im Slab. Solange ist sie weg.",
       "fee": "Gebühr ({rate} vom Wert)",
       "duration": "Dauer",
       "minutes": "{minutes} Minuten",
@@ -8535,7 +8540,7 @@
       "text": "Die Karte kommt lose zurück, mit ihrem alten Zustand ({condition}). Die Note ist dann weg. Du darfst sie danach noch einmal zu ASP schicken.",
       "noRefund": "Die Grading-Gebühr bekommst du nicht zurück.",
       "blackLabelTitle": "Achtung: Das ist ein Black Label!",
-      "blackLabelText": "Brichst du diesen Slab auf, ist das Black Label für immer weg. Die Karte ist dann nur noch {raw} wert statt {slab}. Ein neues Grading bringt nur in {chance} der Fälle wieder ein Black Label.",
+      "blackLabelText": "Brichst du diesen Slab auf, ist das Black Label für immer weg. Die Karte ist dann nur noch {raw} wert statt {slab}. Ein neues Grading bringt selbst bei Mint nur in {chance} der Fälle wieder ein Black Label.",
       "blackLabelConfirm": "Black Label zerstören"
     },
     "deal": {
@@ -8634,7 +8639,7 @@
       "chartLabel": "Wertverlauf von {name}, aktuell {value}",
       "showing": "Wird gezeigt",
       "show": "Zeigen",
-      "conditionNote": "Der Zustand bestimmt, wie viel vom Marktwert eine lose Kopie wert ist, und welche Noten ASP ihr geben kann. Bessere Zustände bekommen viel öfter eine 10."
+      "conditionNote": "Der Zustand bestimmt, wie viel vom Marktwert eine lose Kopie wert ist, und welche Noten ASP ihr geben kann. Bessere Zustände bekommen viel öfter eine hohe Note, eine 10 bleibt selten."
     },
     "saleKind": {
       "market": "am Markt",
@@ -8643,7 +8648,7 @@
     },
     "grading": {
       "title": "ASP-Schalter",
-      "intro": "ASP bewertet lose Karten mit Noten von 1 bis 10 und versiegelt sie im Slab. Das kostet {rate} vom Wert der Kopie und dauert {minutes} Minuten. Eine 10 ist {best} wert. Ganz selten bekommt eine Mint-Karte das Black Label: Das ist {black} wert. Schicken kannst du jede lose Karte aus deiner Sammlung.",
+      "intro": "ASP bewertet lose Karten mit Noten von 1 bis 10 (dazu 8,5 und 9,5) und versiegelt sie im Slab. Das kostet {rate} vom Wert der Kopie und dauert {minutes} Minuten. Eine 10 ist {best} wert. Selten bekommt eine Mint- oder Near-Mint-Karte das Black Label: Das ist {black} wert. Schicken kannst du jede lose Karte aus deiner Sammlung.",
       "running": "Bei ASP",
       "slots": "{count} / {max}",
       "waiting": "Pakete",
@@ -8675,7 +8680,7 @@
       "close": "Schließen",
       "next": "{count, plural, one {Nächstes Paket (noch #)} other {Nächstes Paket (noch #)}}",
       "safe": "Der Slab gehört dir schon. Schließt du das Fenster, wartet das Paket weiter auf dich.",
-      "blackText": "Nur {chance} aller Mint-Karten bekommen das Black Label. Glückwunsch!",
+      "blackText": "Nur {mint} der Mint- und {nearMint} der Near-Mint-Karten bekommen das Black Label. Glückwunsch!",
       "tier": {
         "low": "Leider keine Top-Note",
         "good": "Starke Note!",

@@ -423,6 +423,21 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Black Label und ASP-Paket",
         text: "Über der ASP 10 steht jetzt das Black Label: Nur 1 % der Mint-Karten bekommen es, der Slab ist das 10-Fache der Karte wert.",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-2257128a",
+        title: "Karten umdrehen",
+        text: "Beim Booster-Öffnen dreht ein Klick oder Tipp eine Karte um, Taste F oder Enter ebenso.",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-12704fc2",
+        title: "KI-Sammler kaufen sofort",
+        text: "Zum Marktwert oder darunter kauft die KI deine Karte sofort, auch Slabs.",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-70ec42e5",
+        title: "ASP-Noten 8,5 und 9,5, seltenere 10",
+        text: "ASP vergibt jetzt auch 8,5 und 9,5.",
+      },
     ],
   },
   {
