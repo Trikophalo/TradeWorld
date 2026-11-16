@@ -1,7 +1,12 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { BALANCE } from "@/config/balance";
+import { bottleneck } from "@/features/company/routes";
+import { companyHealth } from "@/lib/sim/company-health";
+import { isValidBanner } from "@/lib/sim/logo";
 import { RPC_SCHEMAS } from "./api";
+import { toCompanyOverview } from "./api-company";
 
 /*
  * Contract test between database and frontend. The fixtures are real
@@ -61,6 +66,44 @@ describe("RPC contract", () => {
     expect(snapshot.securities.filter((s) => s.kind === "bond")).toHaveLength(4);
     expect(snapshot.index.ticker).toBe("NEXA30");
     for (const s of snapshot.securities) expect(s.bid_e4).toBeLessThan(s.ask_e4);
+  });
+
+  // Company fixes (migration 5300): what the company page needs from a company that grew into a GmbH.
+  it("a small business upgraded to GmbH: expandable, real hourly numbers, campaign end, 16-colour banner", () => {
+    const raw = RPC_SCHEMAS.get_my_company.parse(
+      JSON.parse(readFileSync(dir + "get_my_company_gmbh_upgraded.json", "utf8")),
+    );
+    const company = toCompanyOverview(raw).company!;
+    expect(company.tier).toBe("gmbh");
+    expect(company.canExpand).toBe(true);
+    expect(company.expansionCostCents).toBeGreaterThan(0);
+    // After the first closed hour the page must leave "the first hour is running".
+    expect(company.hours.length).toBeGreaterThanOrEqual(3);
+    expect(company.live).not.toBeNull();
+    expect(bottleneck(company).kind).not.toBe("waiting");
+    expect(company.live!.capacityPerHourCents).toBeGreaterThan(0);
+    expect(company.live!.profitPerHourCents).toBe(company.hours.at(-1)!.profitCents);
+    // The health chart works on the closed hour, not on estimates, and shows its profit.
+    const health = companyHealth(company, BALANCE);
+    expect(health.estimated).toBe(false);
+    expect(health.profitPerHourCents).toBe(company.live!.profitPerHourCents);
+    // A running campaign with the time it ends, a banner with all 16 colours.
+    expect(Date.parse(company.campaign!.endsAt)).toBeGreaterThan(Date.parse(company.campaign!.startedAt));
+    expect(company.banner!.palette).toHaveLength(16);
+    expect(isValidBanner(company.banner)).toBe(true);
+    expect(company.banner!.grid.join("")).toContain("f");
+  });
+
+  it("a started business move says when it is available again", () => {
+    const moves = RPC_SCHEMAS.start_company_move.parse(
+      JSON.parse(readFileSync(dir + "start_company_move_resting.json", "utf8")),
+    );
+    const started = moves.moves.find((m) => m.key === moves.running[0]!.key)!;
+    expect(started.rest_minutes).toBeGreaterThan(started.minutes);
+    expect(Date.parse(started.available_at!)).toBe(
+      Date.parse(moves.running[0]!.started_at) + started.rest_minutes * 60_000,
+    );
+    for (const m of moves.moves) expect(m.rest_minutes).toBeGreaterThan(0);
   });
 
   it("orders report fill, fee and XP", () => {

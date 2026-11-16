@@ -679,6 +679,7 @@
     "nothing_to_claim": "Im Tresor ist noch nichts.",
     "locked": "Das schaltest du erst mit einem höheren Level frei.",
     "unknown": "Das hat nicht geklappt. Prüfe deine Verbindung und versuch es noch einmal.",
+    "unknownDetail": "Das hat nicht geklappt. Der Server meldet: {detail}",
     "invalid_argument": "Die Eingabe ist ungültig. Lade die Seite neu und versuch es noch einmal.",
     "invalid_interval": "Diesen Zeitraum gibt es nicht.",
     "forbidden": "Dafür fehlen dir die Rechte.",
@@ -4129,6 +4130,11 @@
       "strong": "Starke Resonanz"
     },
     "runningEffect": "+{percent} Nachfrage noch {time}",
+    "runningDemand": "+{percent} Nachfrage",
+    "runningLeft": "Läuft noch",
+    "runningLeftLabel": "Restlaufzeit der Kampagne",
+    "stripTitle": "Kampagne {kind}",
+    "stripShow": "Ansehen",
     "started": "Kampagne gestartet",
     "luckHint": "Wie gut sie ankommt, ist Glück und hängt an deiner Qualität."
   },
@@ -4223,12 +4229,17 @@
     "profit": "Gewinn",
     "profitHint": "{sold} verkauft, {contract} aus Auftragsarbeit, danach Kosten.",
     "profitHintWaiting": "Kommt nach der ersten Betriebsstunde.",
+    "profitHintLate": "Kommt mit der nächsten Abrechnung.",
     "perHour": "{amount}/h",
     "unknown": "noch offen",
     "neck": {
       "waiting": {
         "title": "Die erste Betriebsstunde läuft",
         "text": "In {time} rechnet deine Firma ihre erste Stunde ab. Dann siehst du hier echte Zahlen und was du verbessern kannst."
+      },
+      "late": {
+        "title": "Die Stundenabrechnung steht aus",
+        "text": "Für deine Firma liegt gerade keine abgerechnete Stunde vor, obwohl sie schon länger läuft. Der Server holt alle offenen Stunden nach, es geht nichts verloren. Sobald die nächste Stunde abgerechnet ist, siehst du hier echte Zahlen."
       },
       "customers": {
         "title": "Dir fehlen Kunden",
@@ -4795,6 +4806,10 @@
     "readyIn": "fertig in {time}",
     "resting": "wieder ab {time}",
     "restingShort": "Pause noch",
+    "restingLabel": "Pause",
+    "restingUntil": "Wieder möglich in",
+    "restInfo": "Danach {minutes} Min. Pause",
+    "runningLeft": "Ergebnis in",
     "noSlot": "Alle Plätze belegt",
     "noCash": "Zu wenig Geld in der Firmenkasse",
     "history": "Letzte Ergebnisse",
@@ -7555,6 +7570,8 @@
     "title": "Wo es fehlt",
     "intro": "Acht Punkte entscheiden, ob deine Firma Gewinn macht. Je weiter außen, desto besser.",
     "estimated": "Noch geschätzt: Sobald die erste Betriebsstunde vorbei ist, rechne ich mit echten Zahlen.",
+    "estimatedBadge": "geschätzt",
+    "estimatedLate": "Geschätzt: Für deine Firma liegt gerade keine abgerechnete Stunde vor. Sobald der Server wieder abrechnet, stehen hier die echten Zahlen.",
     "profitNow": "Gewinn pro Stunde",
     "lossNow": "Verlust pro Stunde",
     "perHour": "{amount}/h",

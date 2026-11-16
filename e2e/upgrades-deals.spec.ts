@@ -262,5 +262,8 @@ test("company: profit routes name the bottleneck, a campaign starts", async ({ p
   await hold(page, campaign.locator('[data-campaign="flyer"]').getByRole("button", { name: /Gedrückt halten/ }));
   await expect(page.getByText("Kampagne gestartet").first()).toBeVisible();
   await expect(campaign.getByTestId("campaign-running")).toContainText("Läuft: Flyer");
+  // How long it still runs: a countdown in the card and in the line above the departments.
+  await expect(campaign.getByTestId("campaign-timer")).toContainText(/Läuft noch\s*\d{2}:\d{2}:\d{2}/);
+  await expect(page.getByTestId("campaign-strip")).toContainText(/Kampagne Flyer.*Läuft noch\s*\d{2}:\d{2}:\d{2}/);
   await expect(routes.locator('[data-route="campaign"]')).toHaveAttribute("data-state", "active");
 });

@@ -27,7 +27,9 @@ import { SPRING } from "@/lib/motion";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { askMira, MiraChat } from "../assistant/mira-chat";
+import { useServerClock } from "@/features/game/server-clock";
 import { useCompanyHealth } from "../health";
+import { hourlyCloseOverdue } from "../routes";
 import { useCompanyRefresh } from "../hooks";
 import { useCompanySections } from "../sections";
 import { CompanyChat } from "./company-chat";
@@ -44,7 +46,7 @@ import { OfficeScene } from "./office-scene";
 import { HealthCompact, HealthPanel } from "./health-panel";
 import { ExpansionCard, PayoutCard, ProfitCoach, StrategyCard } from "./profit";
 import { ProductionCard } from "./production";
-import { CampaignCard, ProfitRoutes } from "./routes";
+import { CampaignCard, CampaignStrip, ProfitRoutes } from "./routes";
 import { CompanyNewsCard, SituationCard } from "./situation";
 
 type Tab = "mira" | "overview" | "tasks" | "team" | "chat";
@@ -87,6 +89,7 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
 
   // Where the company loses money (ADR-162): always on top of the overview; every factor goes to Mira.
   const health = useCompanyHealth(company);
+  const late = hourlyCloseOverdue(company, useServerClock());
   const miraHealth = useMemo(
     () => ({
       result: health,
@@ -141,6 +144,7 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
       )}
 
       <OfficeScene company={company} onTeam={() => setTab("team")} />
+      <CampaignStrip company={company} onShow={() => reveal("profit", "campaign")} />
 
       <DepartmentTabs
         value={tab}
@@ -168,7 +172,7 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
           />
         </div>
       )}
-      {tab === "overview" && <HealthPanel health={health} onAsk={askAbout} />}
+      {tab === "overview" && <HealthPanel health={health} onAsk={askAbout} late={late} />}
       {tab === "overview" && (
         <div className="grid items-start gap-4 *:min-w-0 lg:grid-cols-2 lg:gap-5" data-testid="company-overview">
           <div className="space-y-4">

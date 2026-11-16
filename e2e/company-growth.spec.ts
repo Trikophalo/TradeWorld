@@ -221,6 +221,10 @@ test("business moves fit the product, cost company cash and run for minutes (ADR
   await first.getByRole("button", { name: "Starten" }).click();
   await expect(page.getByText("Zug gestartet").first()).toBeVisible();
   await expect(card.getByTestId("moves-running")).toBeVisible();
+  // The pause is visible: a countdown until the move can be started again, and its length on the others.
+  await expect(first.getByTestId("move-cooldown")).toContainText(/Wieder möglich in\s*\d{2}:\d{2}/);
+  await expect(first.getByText(/Ergebnis in\s*\d{2}:\d{2}/)).toBeVisible();
+  await expect(card.getByText(/Danach \d+ Min\. Pause/).first()).toBeVisible();
   // A garage has one slot: every other move waits.
   await expect(card.getByText("Alle Plätze belegt").first()).toBeVisible();
 });

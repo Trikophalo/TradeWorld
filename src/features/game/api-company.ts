@@ -8,6 +8,7 @@ import type {
   ChatMessage,
   CompanyApplication,
   CompanyCampaign,
+  CompanyOverview,
   CompanyPosting,
   GameEngine,
   MyCompany,
@@ -578,6 +579,24 @@ function toCompany(c: z.infer<typeof companySchema>): MyCompany {
   };
 }
 
+/** The answer of get_my_company as the company page uses it (exported for the contract test). */
+export function toCompanyOverview(r: z.infer<typeof overviewSchema>): CompanyOverview {
+  const d = r.last_dissolution;
+  return {
+    company: r.company ? toCompany(r.company) : null,
+    lastDissolution: d
+      ? {
+          companyName: d.company_name,
+          reason: d.reason,
+          at: d.at,
+          totalDebtCents: d.total_debt_cents,
+          fromFounderCents: d.from_founder_cents,
+          loanCents: d.loan_cents,
+        }
+      : null,
+  };
+}
+
 const toMessage = (m: z.infer<typeof messageSchema>): ChatMessage => ({
   id: m.id,
   kind: m.kind,
@@ -701,21 +720,7 @@ export const liveCompanyEngine: CompanyEngine = {
   },
 
   async myCompany() {
-    const r = await rpc("get_my_company", {}, S.get_my_company);
-    const d = r.last_dissolution;
-    return {
-      company: r.company ? toCompany(r.company) : null,
-      lastDissolution: d
-        ? {
-            companyName: d.company_name,
-            reason: d.reason,
-            at: d.at,
-            totalDebtCents: d.total_debt_cents,
-            fromFounderCents: d.from_founder_cents,
-            loanCents: d.loan_cents,
-          }
-        : null,
-    };
+    return toCompanyOverview(await rpc("get_my_company", {}, S.get_my_company));
   },
 
   async closeCompany(requestId) {

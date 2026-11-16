@@ -101,6 +101,7 @@ export function createCompanyMovesEngine(
             refundCents: Math.round((cost * risk.refundBps) / 10_000),
             gain: m.kind === "cash" ? 0 : risk.gain,
             availableAt,
+            restMinutes: Math.ceil(rest / 60_000),
           };
         }),
       running: runs

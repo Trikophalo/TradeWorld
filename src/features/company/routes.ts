@@ -50,6 +50,19 @@ type RouteInput = Pick<
   | "campaignCosts"
 >;
 
+/** After this long without a closed hour the company is not in its first hour any more: the close is overdue. */
+export const HOURLY_CLOSE_OVERDUE_MS = 2 * 3_600_000 + 10 * 60_000;
+
+/**
+ * True when the company has no closed hour although it is older than two hours: the hourly close on the server is
+ * late (or kept no hour of the last week). The page then says so instead of "the first hour is running".
+ */
+export function hourlyCloseOverdue(company: Pick<MyCompany, "live" | "foundedAt">, now: number | null): boolean {
+  if (company.live || now === null) return false;
+  const founded = Date.parse(company.foundedAt);
+  return Number.isFinite(founded) && now - founded > HOURLY_CLOSE_OVERDUE_MS;
+}
+
 export function bottleneck(company: Pick<MyCompany, "live">): { kind: Bottleneck; cents: number } {
   const live = company.live;
   if (!live) return { kind: "waiting", cents: 0 };

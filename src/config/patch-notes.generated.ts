@@ -383,6 +383,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Chats mit Freunden",
         text: "Unter Freunde → Chats schreibst du Freunden direkt (💬 an ihrer Figur auf dem Platz) oder gründest Gruppen mit bis zu 20 Leuten, mit Emojis…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-86b3c63c",
+        title: "Firma, Fehlerbehebungen",
+        text: "Geschäftszüge zeigen groß, wann sie wieder möglich sind, laufende Kampagnen ihre Restlaufzeit (auch als Zeile über den Abteilungen).",
+      },
     ],
   },
   {
