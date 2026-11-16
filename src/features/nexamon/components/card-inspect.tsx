@@ -244,6 +244,7 @@ function Inspect({ card, details }: { card: CardData; details: NexamonCardDetail
                       key={copy.id}
                       copy={copy}
                       card={card}
+                      population={details.card.population}
                       shown={shown?.id === copy.id}
                       canPick={copies.length > 1}
                       onPick={() => setPicked(copy.id)}
@@ -328,12 +329,14 @@ function ValueChart({ details, name }: { details: NexamonCardDetails; name: stri
 function CopyRow({
   copy,
   card,
+  population,
   shown,
   canPick,
   onPick,
 }: {
   copy: NexamonCopy;
   card: CardData;
+  population: number;
   shown: boolean;
   canPick: boolean;
   onPick: () => void;
@@ -363,7 +366,7 @@ function CopyRow({
         </span>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <CopyActions copy={copy} card={card} />
+        <CopyActions copy={copy} card={card} population={population} />
         {canPick && (
           <button
             type="button"
@@ -385,7 +388,6 @@ function CopyRow({
 /** What the condition of a raw copy means for its value. */
 function ConditionNote() {
   const t = useTranslations("nexamon");
-  const tc = useTranslations("nexamonCards");
   return (
     <div className="mt-4 rounded-md bg-surface-2 p-3">
       <p className="text-xs text-pretty text-fg-2">{t("inspect.conditionNote")}</p>
@@ -404,8 +406,8 @@ function ConditionNote() {
         <GradeChip grade={NEXAMON_BLACK_LABEL_GRADE} short />
         <span className="min-w-0 flex-1 basis-48">
           {t("blackLabel.note", {
-            chance: formatChance(BALANCE.nexamon.grading.blackLabel.chanceBps),
-            condition: tc(`condition.${BALANCE.nexamon.grading.blackLabel.condition}`),
+            mint: formatChance(BALANCE.nexamon.grading.blackLabel.chanceBps.mint),
+            nearMint: formatChance(BALANCE.nexamon.grading.blackLabel.chanceBps.near_mint),
             factor: formatFactor(BALANCE.nexamon.grading.blackLabel.valueBps),
           })}
         </span>
@@ -430,8 +432,10 @@ function GradedPopulation({ graded, blackLabels }: { graded: readonly number[]; 
   const most = Math.max(...graded, blackLabels, 1);
   return (
     <ul className="space-y-1.5" aria-label={t("inspect.graded")} data-black-labels={blackLabels}>
-      {[...graded, blackLabels]
-        .map((count, i) => ({ grade: i + 1, count }))
+      {[
+        ...graded.map((count, i) => ({ grade: BALANCE.nexamon.grading.grades[i] ?? i + 1, count })),
+        { grade: NEXAMON_BLACK_LABEL_GRADE, count: blackLabels },
+      ]
         .reverse()
         .map(({ grade, count }) => (
           <li key={grade} className="flex items-center gap-2" data-grade={grade}>

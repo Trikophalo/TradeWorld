@@ -120,7 +120,7 @@ export function nexamonCopyFactorBps(
 ): number {
   if (grade !== null) {
     if (nexamonIsBlackLabel(grade)) return cfg.grading.blackLabel.valueBps;
-    return cfg.grading.valueBps[Math.min(Math.max(Math.round(grade), 1), 10) - 1]!;
+    return cfg.grading.valueBps[nexamonGradeIndex(grade, cfg)]!;
   }
   return nexamonConditionBps(condition, cfg);
 }
@@ -168,18 +168,34 @@ export function nexamonGradingFeeCents(copyValueCents: number, cfg: Config = BAL
  */
 export const NEXAMON_BLACK_LABEL_GRADE = 11;
 export const nexamonIsBlackLabel = (grade: number | null): boolean =>
-  grade !== null && Math.round(grade) >= NEXAMON_BLACK_LABEL_GRADE;
-/** The number on the label: a Black Label is a 10. */
-export const nexamonGradeNumber = (grade: number): number => Math.min(Math.max(Math.round(grade), 1), 10);
+  grade !== null && grade >= NEXAMON_BLACK_LABEL_GRADE - 0.25;
+
+/** The grades ASP gives, worst first (1 to 8, 8.5, 9, 9.5, 10), without the Black Label. */
+export const nexamonGrades = (cfg: Config = BALANCE.nexamon): readonly number[] => cfg.grading.grades;
+
+/** Position of a grade in `grading.grades`: the nearest grade ASP gives (a Black Label counts as a 10). */
+export function nexamonGradeIndex(grade: number, cfg: Config = BALANCE.nexamon): number {
+  const grades = cfg.grading.grades;
+  const g = Number.isFinite(grade) ? grade : 1;
+  let best = 0;
+  for (let i = 1; i < grades.length; i++) {
+    if (Math.abs(grades[i]! - g) <= Math.abs(grades[best]! - g)) best = i;
+  }
+  return best;
+}
+
+/** The number on the label: a grade ASP gives (8.5 and 9.5 included); a Black Label is a 10. */
+export const nexamonGradeNumber = (grade: number, cfg: Config = BALANCE.nexamon): number =>
+  cfg.grading.grades[nexamonGradeIndex(grade, cfg)]!;
 
 /** Chance of a Black Label for a condition: `blackLabel.chanceBps` out of the chance for a 10, only for its condition. */
 function blackLabelChanceBps(condition: NexamonCondition, cfg: Config): number {
-  const b = cfg.grading.blackLabel;
-  if (condition !== b.condition) return 0;
-  return Math.min(Math.max(0, b.chanceBps), cfg.grading.gradeWeightsBps[condition][9] ?? 0);
+  const chance = (cfg.grading.blackLabel.chanceBps as Partial<Record<NexamonCondition, number>>)[condition] ?? 0;
+  const weights = cfg.grading.gradeWeightsBps[condition];
+  return Math.min(Math.max(0, chance), weights[weights.length - 1] ?? 0);
 }
 
-/** Chance of a grade (1..10, 11 = Black Label) for a condition, in basis points. */
+/** Chance of a grade (1..10 with 8.5 and 9.5, 11 = Black Label) for a condition, in basis points. */
 export function nexamonGradeChanceBps(
   condition: NexamonCondition,
   grade: number,
@@ -187,26 +203,42 @@ export function nexamonGradeChanceBps(
 ): number {
   const black = blackLabelChanceBps(condition, cfg);
   if (grade === NEXAMON_BLACK_LABEL_GRADE) return black;
-  const weight = cfg.grading.gradeWeightsBps[condition][grade - 1] ?? 0;
-  return grade === 10 ? weight - black : weight;
+  const i = cfg.grading.grades.indexOf(grade as never);
+  if (i < 0) return 0;
+  const weight = cfg.grading.gradeWeightsBps[condition][i] ?? 0;
+  return i === cfg.grading.grades.length - 1 ? weight - black : weight;
 }
 
 /**
- * The grade (1..10, 11 = Black Label) ASP gives a copy of this condition for the roll `u`; low grades take the low
- * numbers, the Black Label the highest ones of the 10.
+ * The grade (1..10 with 8.5 and 9.5, 11 = Black Label) ASP gives a copy of this condition for the roll `u`; low
+ * grades take the low numbers, the Black Label the highest ones of the 10.
  */
 export function nexamonRollGrade(condition: NexamonCondition, u: number, cfg: Config = BALANCE.nexamon): number {
+  const grades = cfg.grading.grades;
   const weights = cfg.grading.gradeWeightsBps[condition];
   const n = Math.floor(clampUnit(u) * 10_000);
+  const top = grades.length - 1;
   let edge = 0;
-  for (let grade = 1; grade <= 10; grade++) {
-    edge += weights[grade - 1]!;
+  for (let i = 0; i <= top; i++) {
+    edge += weights[i] ?? 0;
     if (n < edge) {
-      const black = grade === 10 && n >= edge - blackLabelChanceBps(condition, cfg);
-      return black ? NEXAMON_BLACK_LABEL_GRADE : grade;
+      const black = i === top && n >= edge - blackLabelChanceBps(condition, cfg);
+      return black ? NEXAMON_BLACK_LABEL_GRADE : grades[i]!;
     }
   }
-  return 10;
+  return grades[top]!;
+}
+
+/**
+ * What grading a copy of this condition gives back on average, as a factor of the card's market value in basis
+ * points (the grade factors weighted by their chances, Black Label included; without ASP's fee).
+ */
+export function nexamonExpectedGradeFactorBps(condition: NexamonCondition, cfg: Config = BALANCE.nexamon): number {
+  let sum = nexamonGradeChanceBps(condition, NEXAMON_BLACK_LABEL_GRADE, cfg) * cfg.grading.blackLabel.valueBps;
+  for (const grade of cfg.grading.grades) {
+    sum += nexamonGradeChanceBps(condition, grade, cfg) * nexamonCopyFactorBps(condition, grade, cfg);
+  }
+  return sum / 10_000;
 }
 
 // ---------------------------------------------------------------------------------------------- market value
@@ -374,27 +406,74 @@ export function nexamonValueAfterPressure(
 
 // ---------------------------------------------------------------------------------------------- AI
 
-/** The AI buys a player's listing only up to what the copy is worth (slabs: a share of it). */
-export function nexamonAiWouldBuy(
-  priceCents: number,
-  copyValueCents: number,
+/** The premium AI collectors pay above a copy's value, in basis points: by condition, in a slab by grade. */
+export function nexamonAiPremiumBps(
+  condition: NexamonCondition,
   grade: number | null,
   cfg: Config = BALANCE.nexamon,
-): boolean {
-  const maxBps = grade === null ? cfg.ai.buyMaxBps : cfg.ai.gradedBuyMaxBps;
-  return priceCents > 0 && big(priceCents) * BPS <= big(copyValueCents) * big(maxBps);
+): number {
+  if (grade === null) return cfg.ai.premiumBps[condition] ?? 0;
+  if (nexamonIsBlackLabel(grade)) return cfg.ai.blackLabelPremiumBps;
+  return cfg.ai.gradePremiumBps[nexamonGradeIndex(grade, cfg)] ?? 0;
 }
 
-/** Chance per minute that an AI collector buys a fairly priced listing: higher for popular cards. */
-export function nexamonAiBuyChanceBps(
-  rarity: NexamonRarity,
-  population: number,
+/** The most an AI collector pays for a copy: its value x (1 + premium), rounded down. */
+export function nexamonAiMaxPriceCents(
+  copyValueCents: number,
+  condition: NexamonCondition,
+  grade: number | null,
   cfg: Config = BALANCE.nexamon,
 ): number {
-  return Math.min(
+  return mulDivFloor(copyValueCents, 10_000 + nexamonAiPremiumBps(condition, grade, cfg), 10_000);
+}
+
+/**
+ * Chance per minute that an AI collector buys a player's listing, in basis points: certain (10 000) at or below the
+ * copy's value; above it `buyChanceBps` x (1 + popularity), falling linearly to `atMaxChanceBps` of that at the
+ * most the AI pays (nexamonAiMaxPriceCents); 0 above that or for a price of 0.
+ */
+export function nexamonAiBuyChanceBps(
+  i: {
+    priceCents: number;
+    copyValueCents: number;
+    condition: NexamonCondition;
+    grade: number | null;
+    rarity: NexamonRarity;
+    population: number;
+  },
+  cfg: Config = BALANCE.nexamon,
+): number {
+  const full = Math.min(
     10_000,
-    Math.floor((cfg.ai.buyChanceBps * (10_000 + nexamonPopularityBps(rarity, population, cfg))) / 10_000),
+    Math.floor((cfg.ai.buyChanceBps * (10_000 + nexamonPopularityBps(i.rarity, i.population, cfg))) / 10_000),
   );
+  if (i.priceCents <= 0) return 0;
+  if (i.priceCents <= i.copyValueCents) return 10_000;
+  const max = nexamonAiMaxPriceCents(i.copyValueCents, i.condition, i.grade, cfg);
+  if (i.priceCents > max) return 0;
+  // linear from the full chance at the value to atMaxChanceBps of it at the maximum
+  const share =
+    10_000 - mulDivFloor(10_000 - cfg.ai.atMaxChanceBps, i.priceCents - i.copyValueCents, max - i.copyValueCents);
+  return mulDivFloor(full, share, 10_000);
+}
+
+/**
+ * Whether an AI buy moves the card's value: its price per card (price / factor) lies within `value.trade.bandBps`
+ * of the value, and fewer than `ai.buysPerCardWindow` counted AI buys of the card happened in `ai.buyWindowDays`.
+ */
+export function nexamonAiBuyCounts(
+  i: { priceCents: number; factorBps: number; valueE4: number; rarity: NexamonRarity; countedInWindow: number },
+  cfg: Config = BALANCE.nexamon,
+): boolean {
+  if (i.countedInWindow >= cfg.ai.buysPerCardWindow[i.rarity]) return false;
+  const norm = nexamonPricePerCardE4(i.priceCents, i.factorBps);
+  return norm > 0 && Math.abs(norm - i.valueE4) * 10_000 <= i.valueE4 * cfg.value.trade.bandBps;
+}
+
+/** Minutes until an AI collector buys, on average, at a chance per minute (null: never). */
+export function nexamonAiExpectedMinutes(chanceBps: number): number | null {
+  if (chanceBps <= 0) return null;
+  return Math.max(1, Math.round(10_000 / chanceBps));
 }
 
 /** Copies of a card the AI holds at the start: prismas only for the cheapest ones of a set, never a legendary. */

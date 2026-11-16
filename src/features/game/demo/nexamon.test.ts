@@ -245,7 +245,7 @@ describe("Nexamon in the demo (ADR-165)", () => {
     world.now += HOUR - 1_000;
     expect((await engine.nexamon()).collection.grading).toBe(1);
     world.now += 1_000;
-    world.rolls.push(0.5);
+    world.rolls.push(0.9);
     const overview = await engine.nexamon();
     expect(overview.collection).toMatchObject({ grading: 0, graded: 1 });
     expect(world.notes).toContain("nexamon_graded");
@@ -253,10 +253,10 @@ describe("Nexamon in the demo (ADR-165)", () => {
     const details = await engine.nexamonCard(ultra.cardKey);
     const slab = details.copies.find((c) => c.id === ultra.copyId)!;
     expect(slab).toMatchObject({ state: "graded", grade: 10, condition: "mint" });
-    // The slab is worth three times the market value, rounded once from the e4 value: the card's value in whole
+    // The slab is worth four times the market value, rounded once from the e4 value: the card's value in whole
     // cents times three can be off by the rounding (at most 1.5 cents).
-    expect(Math.abs(slab.valueCents - details.card.valueCents * 3)).toBeLessThanOrEqual(2);
-    expect(details.graded[9]).toBe(1);
+    expect(Math.abs(slab.valueCents - details.card.valueCents * 4)).toBeLessThanOrEqual(2);
+    expect(details.graded[11]).toBe(1);
     expect(await key(engine.gradeNexamonCard("g3", ultra.copyId))).toBe("nexamon_not_raw");
     expect(await key(engine.sellNexamonToAi("q0", [ultra.copyId]))).toBe("nexamon_not_sellable");
     const cracked = await engine.crackNexamonSlab("c1", ultra.copyId);
@@ -276,8 +276,8 @@ describe("Nexamon in the demo (ADR-165)", () => {
     await engine.gradeNexamonCard("g1", ultra.copyId);
     await engine.gradeNexamonCard("g2", common.copyId);
     world.now += HOUR;
-    // the two gradings in the order of the copies: the Black Label takes the top 1 % of a mint roll, 98.99 % is still a 10
-    world.rolls.push(0.9899, 0.995);
+    // the two gradings in the order of the copies (the common first): the Black Label takes the top 5 % of a mint roll
+    world.rolls.push({ mint: 0.9, near_mint: 0.97, good: 0.9997, poor: 0.99996 }[common.condition], 0.96);
     world.feed.length = 0;
     await engine.nexamon();
     const details = await engine.nexamonCard(ultra.cardKey);
@@ -285,7 +285,7 @@ describe("Nexamon in the demo (ADR-165)", () => {
     expect(slab).toMatchObject({ state: "graded", grade: 11, condition: "mint" });
     expect(Math.abs(slab.valueCents - details.card.valueCents * 10)).toBeLessThanOrEqual(5);
     expect(details.blackLabels).toBe(1);
-    expect(details.graded).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    expect(details.graded).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     // the grade stays a surprise until the package is opened: no feed item
     expect(world.feed).toEqual([]);
     expect(world.tracked.nexamon_black_labels).toBe(1);

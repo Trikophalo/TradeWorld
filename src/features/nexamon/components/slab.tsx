@@ -17,6 +17,7 @@ import {
   clampGrade,
   fitTextScale,
   formatCardNumber,
+  formatGrade,
   formatSerial,
   gradeNumber,
   gradeWordKey,
@@ -120,7 +121,7 @@ export function NexamonSlab({
       front={(light) => (
         <div
           role="img"
-          aria-label={t("slabLabel", { name: card.name, grade: gradeNumber(grade), word })}
+          aria-label={t("slabLabel", { name: card.name, grade: formatGrade(grade), word })}
           data-grade={grade}
           data-label={tier}
           className="relative isolate size-full select-none"
@@ -157,10 +158,15 @@ export function NexamonSlab({
             </p>
             <p
               className="text-center font-sans nums font-black"
-              style={{ ...at(l.x + l.w - 18, l.y + 6, 16, 14), fontSize: u * 11, lineHeight: `${u * 14}px` }}
+              style={{
+                ...at(l.x + l.w - 18, l.y + 6, 16, 14),
+                // a half grade ("9,5") needs three characters in the box
+                fontSize: u * (Number.isInteger(gradeNumber(grade)) ? 11 : 7),
+                lineHeight: `${u * 14}px`,
+              }}
               data-testid="slab-grade"
             >
-              {gradeNumber(grade)}
+              {formatGrade(grade)}
             </p>
           </div>
           <Plastic light={light} u={u} />

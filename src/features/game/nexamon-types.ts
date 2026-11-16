@@ -17,7 +17,7 @@ export interface NexamonCopy {
   /** Population number: the n-th copy of this card ever pulled. */
   serial: number;
   condition: NexamonCondition;
-  /** 1..10 once graded by ASP (11 = Black Label, the tier above a 10), else null. */
+  /** 1..10 (with 8.5 and 9.5) once graded by ASP (11 = Black Label, the tier above a 10), else null. */
   grade: number | null;
   state: NexamonCopyState;
   gradingUntil: string | null;
@@ -151,7 +151,7 @@ export interface NexamonCardDetails {
   card: NexamonCardStats;
   /** Value over time, oldest first; the last point is now. */
   history: { at: string; valueCents: number }[];
-  /** Graded copies per grade: index 0 is grade 1, index 9 is grade 10 (without the Black Labels). */
+  /** Graded copies per grade in the order of `grading.grades` (1 … 8, 8.5, 9, 9.5, 10; without the Black Labels). */
   graded: number[];
   /** Copies with the Black Label. */
   blackLabels: number;

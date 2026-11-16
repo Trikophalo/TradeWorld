@@ -1,3 +1,4 @@
+import { NEXAMON_RULES } from "@/config/nexamon-rules";
 import { NEXAMON_RARITIES, NEXAMON_SET_SIZE, type NexamonRarity } from "@/config/nexamon/types";
 
 /*
@@ -16,8 +17,8 @@ export const NEXAMON_CONDITIONS = ["poor", "good", "near_mint", "mint"] as const
 export type NexamonCondition = (typeof NEXAMON_CONDITIONS)[number];
 
 /**
- * Grades of the grading company, 1 (worst) to 10 (best), with the key of their word in the messages. 11 is the
- * Black Label, the tier above a 10: its label still says 10.
+ * Grades of the grading company, 1 (worst) to 10 (best) with the half steps 8.5 and 9.5, with the key of their word
+ * in the messages. 11 is the Black Label, the tier above a 10: its label still says 10.
  */
 export const GRADE_WORDS = {
   1: "poor",
@@ -28,18 +29,25 @@ export const GRADE_WORDS = {
   6: "excellentMint",
   7: "nearMint",
   8: "nearMintMint",
+  8.5: "nearMintMintPlus",
   9: "mint",
+  9.5: "mintPlus",
   10: "gemMint",
   11: "blackLabel",
 } as const;
 export type NexamonGrade = keyof typeof GRADE_WORDS;
 export type GradeWordKey = (typeof GRADE_WORDS)[NexamonGrade];
 
-/** Any number as a valid grade: rounded and held between 1 and 10; exactly 11 is the Black Label. */
+/** The grades ASP gives, worst first (without the Black Label): the steps of the reveal's count-up. */
+export const GRADE_STEPS = NEXAMON_RULES.grading.grades as readonly NexamonGrade[];
+
+/** Any number as a valid grade: the nearest one ASP gives (1 to 10 with 8.5 and 9.5); exactly 11 is the Black Label. */
 export function clampGrade(grade: number): NexamonGrade {
-  const whole = Number.isFinite(grade) ? Math.round(grade) : 1;
-  if (whole === 11) return 11;
-  return Math.min(10, Math.max(1, whole)) as NexamonGrade;
+  const g = Number.isFinite(grade) ? grade : 1;
+  if (Math.round(g) === 11) return 11;
+  let best: NexamonGrade = GRADE_STEPS[0]!;
+  for (const step of GRADE_STEPS) if (Math.abs(step - g) <= Math.abs(best - g)) best = step;
+  return best;
 }
 
 export const gradeWordKey = (grade: number): GradeWordKey => GRADE_WORDS[clampGrade(grade)];
@@ -48,21 +56,29 @@ export const gradeWordKey = (grade: number): GradeWordKey => GRADE_WORDS[clampGr
 export const isBlackLabel = (grade: number | null | undefined): boolean => grade != null && clampGrade(grade) === 11;
 /** The number printed on the label: a Black Label is a 10. */
 export const gradeNumber = (grade: number): number => Math.min(10, clampGrade(grade));
+/** The number as text, German style: "9,5", "10". */
+export const formatGrade = (grade: number): string => String(gradeNumber(grade)).replace(".", ",");
 
-/** How big the moment of a grade is: below 8, 8 and 9, a 10, the Black Label. */
+/** How big the moment of a grade is: below 8, 8 to 9.5, a 10, the Black Label. */
 export type GradeTier = "low" | "good" | "ten" | "black";
 export const gradeTier = (grade: number): GradeTier =>
   isBlackLabel(grade) ? "black" : grade >= 10 ? "ten" : grade >= 8 ? "good" : "low";
 
 /**
- * The grade reveal counts up from 1; this is the pause before a step in milliseconds: short at the bottom, longer
- * and longer towards the top, so the last numbers are the suspense.
+ * The grade reveal counts up through GRADE_STEPS (1, 2, … 8, 8.5, 9, 9.5, 10); this is the pause before step
+ * `step` (1-based) in milliseconds: short at the bottom, longer and longer towards the top, so the last numbers are
+ * the suspense.
  */
 export function gradeStepPauseMs(step: number): number {
-  const s = Math.min(10, Math.max(1, Math.round(step)));
-  if (s <= 5) return 170 + s * 25;
-  return [420, 560, 780, 1_050, 1_400][s - 6]!;
+  const s = Math.min(GRADE_STEPS.length, Math.max(1, Math.round(step)));
+  if (s <= 6) return 170 + s * 25;
+  return [380, 460, 560, 780, 1_050, 1_400][s - 7]!;
 }
+
+/** Movement in CSS pixels up to which a press on a card is a tap (it turns the card) rather than a drag. */
+export const TAP_SLOP_PX = 6;
+/** A press that moved the card by at most TAP_SLOP_PX (dx, dy: how far the card was dragged) is a tap. */
+export const isTap = (dx: number, dy: number): boolean => Math.hypot(dx, dy) <= TAP_SLOP_PX;
 
 /** Serial number on the label of a slab: eight digits, zero-padded. */
 export function formatSerial(serial: number | string): string {

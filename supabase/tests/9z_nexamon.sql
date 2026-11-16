@@ -55,6 +55,8 @@ select value as nx_cfg from public.game_config where key = 'nexamon' \gset
 select value as nx_cat from public.game_config where key = 'nexamon_cards' \gset
 select tests.set_cfg('nexamon', '{ai,packsPerHour}', '{"mystic_energy": 0, "super_apex": 0, "prismatic_peak": 0}');
 select tests.set_cfg('nexamon', '{ai,buyChanceBps}', '0');
+-- AI collectors always buy at-value listings (6010): no budget, no purchases, until the sections that test them
+select tests.set_cfg('nexamon', '{ai,dailyBudgetPacks}', '0');
 select tests.set_cfg('nexamon', '{ai,legendaryListChanceBps}', '0');
 select tests.set_cfg('nexamon', '{value,pressure,perRun}', '0');
 select tests.set_cfg('nexamon', '{packs,perMinute}', '1000');
@@ -86,24 +88,27 @@ select tests.assert(
   and public.nexamon_roll_condition(0.02) = 'good' and public.nexamon_roll_condition(0.1999) = 'good'
   and public.nexamon_roll_condition(0.2) = 'near_mint' and public.nexamon_roll_condition(0.7) = 'mint'
   and public.nexamon_roll_condition(0.999999) = 'mint'
-  and public.nexamon_roll_grade('mint', 0) = 8 and public.nexamon_roll_grade('mint', 0.02) = 9
-  and public.nexamon_roll_grade('mint', 0.1) = 10 and public.nexamon_roll_grade('near_mint', 0.3999) = 9
-  and public.nexamon_roll_grade('near_mint', 0.4) = 10 and public.nexamon_roll_grade('good', 0) = 4
-  and public.nexamon_roll_grade('good', 0.8999) = 9 and public.nexamon_roll_grade('good', 0.9) = 10
-  and public.nexamon_roll_grade('poor', 0) = 1 and public.nexamon_roll_grade('poor', 0.9989) = 9
-  and public.nexamon_roll_grade('poor', 0.999) = 10,
-  'conditions poor 2 % / good 18 % / near mint 50 % / mint 30 %; a 10: good 10 %, near mint 60 %, mint 90 %, poor 0.1 %');
+  and public.nexamon_roll_asp_grade('mint', 0) = 7 and public.nexamon_roll_asp_grade('mint', 0.05) = 8
+  and public.nexamon_roll_asp_grade('mint', 0.17) = 8.5 and public.nexamon_roll_asp_grade('mint', 0.35) = 9
+  and public.nexamon_roll_asp_grade('mint', 0.65) = 9.5 and public.nexamon_roll_asp_grade('mint', 0.85) = 10
+  and public.nexamon_roll_asp_grade('near_mint', 0.9649) = 9.5 and public.nexamon_roll_asp_grade('near_mint', 0.965) = 10
+  and public.nexamon_roll_asp_grade('good', 0) = 4 and public.nexamon_roll_asp_grade('good', 0.9949) = 9.5
+  and public.nexamon_roll_asp_grade('good', 0.9995) = 10
+  and public.nexamon_roll_asp_grade('poor', 0) = 1 and public.nexamon_roll_asp_grade('poor', 0.9994) = 9.5
+  and public.nexamon_roll_asp_grade('poor', 0.9995) = 10,
+  'conditions poor 2 % / good 18 % / near mint 50 % / mint 30 %; grades in half steps from 8 up, a 10 is rare');
 select tests.assert(
   public.nexamon_copy_factor_bps('mint', null) = 10000 and public.nexamon_copy_factor_bps('near_mint', null) = 10000
   and public.nexamon_copy_factor_bps('good', null) = 9000 and public.nexamon_copy_factor_bps('poor', null) = 7000
-  and public.nexamon_copy_factor_bps('poor', 10) = 30000 and public.nexamon_copy_factor_bps('mint', 9) = 16000
+  and public.nexamon_copy_factor_bps('poor', 10) = 40000 and public.nexamon_copy_factor_bps('mint', 9) = 17000
+  and public.nexamon_copy_factor_bps('mint', 8.5) = 14000 and public.nexamon_copy_factor_bps('mint', 9.5) = 23000
   and public.nexamon_copy_factor_bps('good', 8) = 12000 and public.nexamon_copy_factor_bps('mint', 7) = 9000
   and public.nexamon_copy_factor_bps('mint', 1) = 3000
   and public.nexamon_copy_value_cents(1234500, 'mint', null) = 12345
   and public.nexamon_copy_value_cents(1234500, 'poor', null) = 8642
   and public.nexamon_copy_value_cents(1000, 'poor', null) = 7 and public.nexamon_copy_value_cents(3000, 'poor', null) = 21
   and public.nexamon_copy_value_cents(1500, 'good', null) = 14
-  and public.nexamon_copy_value_cents(10000000, 'poor', 10) = 300000
+  and public.nexamon_copy_value_cents(10000000, 'poor', 10) = 400000
   and public.nexamon_ai_ask_cents(10000) = 11000,
   'a raw copy is worth poor 70 %, good 90 %, near mint and mint 100 %; slabs 8 to 10 more than raw; the AI asks 10 % more');
 select tests.assert(
@@ -461,9 +466,10 @@ select tests.assert(
 select tests.assert(tests.money_invariant() = 'ok', 'ledger invariant holds after the wash trades');
 
 -- =============================================================================
--- I. AI collectors buy only up to the value, limited per card and week and by the set's daily budget
+-- I. AI collectors always buy at or below the value (above it only with a chance, off here), limited by the set's
+--    daily budget (more in a7_grades_ai.sql)
 -- =============================================================================
-select tests.set_cfg('nexamon', '{ai,buyChanceBps}', '10000');
+select tests.set_cfg('nexamon', '{ai,dailyBudgetPacks}', :'nx_cfg'::jsonb #> '{ai,dailyBudgetPacks}');
 select tests.set_cfg('nexamon', '{ai,maxBuysPerRun}', '50');
 select tests.nx_give(:a, 'me-055') as fair \gset
 select tests.nx_give(:a, 'me-056') as silly \gset
@@ -493,7 +499,7 @@ select tests.assert(
   and tests.nx_notes(:a, 'nexamon_sale') = 5,
   'the AI buys a listing at the value (households money, 5 % fee) and lifts the value a little; it ignores a listing '
   'one cent above the value and an absurd one');
--- three per card and week for a rare
+-- every further listing at the value sells too: no cap per card and week
 select tests.nx_give(:a, 'me-055') as f2 \gset
 select tests.nx_give(:a, 'me-055') as f3 \gset
 select tests.nx_give(:a, 'me-055') as f4 \gset
@@ -504,9 +510,9 @@ select public.list_nexamon_card(gen_random_uuid(), :'f4', :p55) is not null as o
 reset role;
 select public.nexamon_run_due() is not null and public.nexamon_run_due() is not null as ok \gset
 select tests.assert(
-  (select count(*) from public.nexamon_sales where card_key = 'me-055' and kind = 'ai_buy') = 3
-  and (select count(*) from public.nexamon_listings where card_key = 'me-055' and seller_id = :a) = 1,
-  'the AI buys at most ai.buysPerCardWindow copies of a card from players in a week');
+  (select count(*) from public.nexamon_sales where card_key = 'me-055' and kind = 'ai_buy') = 4
+  and (select count(*) from public.nexamon_listings where card_key = 'me-055' and seller_id = :a) = 0,
+  'the AI buys every listing at the value, no cap per card and week');
 -- no budget, no purchase
 select tests.set_cfg('nexamon', '{ai,dailyBudgetPacks}', '0');
 select tests.nx_give(:a, 'me-058') as nobudget \gset
@@ -515,10 +521,8 @@ select tests.login_as('authenticated', :a);
 select public.list_nexamon_card(gen_random_uuid(), :'nobudget', :p58) is not null as ok \gset
 reset role;
 select public.nexamon_run_due() as run2 \gset
-select tests.set_cfg('nexamon', '{ai,dailyBudgetPacks}', :'nx_cfg'::jsonb #> '{ai,dailyBudgetPacks}');
 select tests.assert((:'run2'::jsonb ->> 'ai_bought')::integer = 0 and tests.nx_listing(:'nobudget') is not null,
   'the AI stops buying when the set''s daily budget is spent');
-select tests.set_cfg('nexamon', '{ai,buyChanceBps}', '0');
 select tests.assert(tests.money_invariant() = 'ok', 'ledger invariant holds after AI purchases');
 
 -- =============================================================================
@@ -643,7 +647,7 @@ select tests.throws_key(format($$select public.crack_nexamon_slab(gen_random_uui
 reset role;
 select tests.assert(
   :'gr1b'::jsonb = :'gr1'::jsonb
-  and (:'gr1'::jsonb ->> 'fee_cents')::bigint = greatest(100, public.div_round_half_even(:gv::bigint * 3000, 10000))
+  and (:'gr1'::jsonb ->> 'fee_cents')::bigint = greatest(100, public.div_round_half_even(:gv::bigint * 4000, 10000))
   and tests.cash(:a) = :cash_a::bigint - (:'gr1'::jsonb ->> 'fee_cents')::bigint
   and tests.households() = :hh4::bigint + (:'gr1'::jsonb ->> 'fee_cents')::bigint
   and (select count(*) from public.ledger_transactions where idempotency_key = 'nexamon:grade:' || :a || ':' || :rg
@@ -651,20 +655,20 @@ select tests.assert(
   and :'gr1'::jsonb #>> '{copy,state}' = 'grading' and :'gr1'::jsonb #>> '{copy,grade}' is null
   and (:'gr1'::jsonb ->> 'ready_at')::timestamptz = (tests.nx_copy(:'g1')).grading_until
   and (tests.nx_copy(:'g1')).grading_until between public.game_now() + interval '59 minutes' and public.game_now() + interval '60 minutes',
-  'grade_nexamon_card(): 30 % of the copy''s value to the households, back in one hour');
+  'grade_nexamon_card(): 40 % of the copy''s value to the households, back in one hour');
 select public.nexamon_finish_gradings(null, public.game_now() + interval '58 minutes') as early \gset
-select tests.set_cfg('nexamon', '{grading,gradeWeightsBps,mint}', '[0, 0, 0, 0, 0, 0, 0, 0, 0, 10000]');
-select tests.set_cfg('nexamon', '{grading,gradeWeightsBps,poor}', '[0, 0, 10000, 0, 0, 0, 0, 0, 0, 0]');
--- no Black Label here (1 % of the mint gradings; its own tests are in a6_black_label.sql)
-select tests.set_cfg('nexamon', '{grading,blackLabel,chanceBps}', '0');
+select tests.set_cfg('nexamon', '{grading,gradeWeightsBps,mint}', '[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10000]');
+select tests.set_cfg('nexamon', '{grading,gradeWeightsBps,poor}', '[0, 0, 10000, 0, 0, 0, 0, 0, 0, 0, 0, 0]');
+-- no Black Label here (its own tests are in a6_black_label.sql)
+select tests.set_cfg('nexamon', '{grading,blackLabel,chanceBps}', '{}');
 select public.nexamon_finish_gradings(null, public.game_now() + interval '61 minutes') as done \gset
 select tests.assert(
   :early = 0 and :done = 1
   and (tests.nx_copy(:'g1')).grade = 10 and (tests.nx_copy(:'g1')).grading_until is null
   and (tests.nx_copy(:'g1')).graded_at is not null and (tests.nx_copy(:'g1')).condition = 'mint'
-  and tests.nx_value('me-062', 'mint', 10) = :gv::bigint * 3
+  and tests.nx_value('me-062', 'mint', 10) = :gv::bigint * 4
   and tests.nx_notes(:a, 'nexamon_graded') = 1,
-  'ASP needs the full hour; a mint card gets its 10 and is then worth three times the card');
+  'ASP needs the full hour; a mint card gets its 10 and is then worth four times the card');
 -- the player's own reads finish due gradings too (no cron needed); a poor card gets a low grade
 select tests.cash(:a) as cash_a \gset
 select tests.login_as('authenticated', :a);
@@ -684,11 +688,11 @@ select tests.assert(
   (tests.nx_copy(:'g2')).grade is null and (tests.nx_copy(:'g2')).condition = 'poor' and (tests.nx_copy(:'g2')).graded_at is null
   and (:'cr'::jsonb ->> 'old_grade')::integer = 3 and :'cr'::jsonb #>> '{copy,state}' = 'raw'
   and (:'cr'::jsonb #>> '{copy,value_cents}')::bigint = tests.nx_value('me-062', 'poor')
-  and :fee2 = greatest(100, public.div_round_half_even(tests.nx_value('me-062', 'poor') * 3000, 10000))
+  and :fee2 = greatest(100, public.div_round_half_even(tests.nx_value('me-062', 'poor') * 4000, 10000))
   and tests.cash(:a) = :cash_a::bigint - :fee2
   and (:'ov'::jsonb #>> '{collection,graded}')::integer = 2 and (:'ov'::jsonb #>> '{collection,grading}')::integer = 0
   and (:'ov'::jsonb ->> 'unlocked')::boolean
-  and :'card62'::jsonb -> 'graded' = '[0, 0, 1, 0, 0, 0, 0, 0, 0, 1]'::jsonb
+  and :'card62'::jsonb -> 'graded' = '[0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1]'::jsonb
   and (select (x ->> 'value_cents')::bigint from jsonb_array_elements(:'card62'::jsonb -> 'copies') x where x ->> 'id' = :'g2')
       = public.div_round_half_even((tests.nx('me-062')).value_e4 * 0.5, 100)
   and (select x ->> 'state' from jsonb_array_elements(:'card62'::jsonb -> 'copies') x where x ->> 'id' = :'g1') = 'graded'
@@ -704,27 +708,21 @@ reset role;
 select tests.set_cfg('nexamon', '{grading}', :'nx_cfg'::jsonb -> 'grading');
 select tests.assert(:fee3 = :fee2 and tests.cash(:a) = :cash_a::bigint - :fee2 - :fee3,
   'a cracked card may be graded again, for the fee again');
--- slabs trade with their grade; the AI pays at most 70 % of a slab's value
-select tests.set_cfg('nexamon', '{ai,buyChanceBps}', '10000');
+-- slabs trade with their grade; the AI buys a slab at its full value (6010; above it: a7_grades_ai.sql)
 select tests.nx_value('me-062', 'mint', 10) as slab \gset
 select tests.login_as('authenticated', :a);
 select public.list_nexamon_card(gen_random_uuid(), :'g1', :slab) as sl1 \gset
 reset role;
-select public.nexamon_run_due() as run3 \gset
-select tests.nx_listing(:'g1') is not null as slab_kept \gset
-select tests.login_as('authenticated', :a);
-select public.unlist_nexamon_card(gen_random_uuid(), (:'sl1'::jsonb #>> '{listing,id}')::uuid) is not null as ok \gset
-select public.list_nexamon_card(gen_random_uuid(), :'g1', :slab::bigint * 7 / 10) is not null as ok \gset
-reset role;
+select tests.set_cfg('nexamon', '{ai,dailyBudgetPacks}', :'nx_cfg'::jsonb #> '{ai,dailyBudgetPacks}');
 select public.nexamon_run_due() as run4 \gset
-select tests.set_cfg('nexamon', '{ai,buyChanceBps}', '0');
+select tests.set_cfg('nexamon', '{ai,dailyBudgetPacks}', '0');
 select tests.assert(
   (:'sl1'::jsonb #>> '{listing,grade}')::integer = 10 and (:'sl1'::jsonb #>> '{listing,value_cents}')::bigint = :slab
-  and :'slab_kept'::boolean and (:'run4'::jsonb ->> 'ai_bought')::integer = 1
+  and (:'run4'::jsonb ->> 'ai_bought')::integer >= 1
   and (tests.nx_copy(:'g1')).ai_owner is not null and (tests.nx_copy(:'g1')).grade = 10
   and (select count(*) from public.nexamon_sales where copy_id = :'g1' and kind = 'ai_buy' and grade = 10
-         and price_cents = :slab::bigint * 7 / 10) = 1,
-  'slabs trade with their grade: the AI leaves a slab at its full value and buys it at 70 %');
+         and price_cents = :slab) = 1,
+  'slabs trade with their grade: the AI buys a slab at its full value');
 select tests.assert(tests.money_invariant() = 'ok', 'ledger invariant holds after grading');
 
 -- =============================================================================
@@ -816,7 +814,7 @@ select tests.assert(
   and jsonb_array_length(:'c51'::jsonb -> 'copies') = 1 and :'c51'::jsonb #>> '{copies,0,id}' = :'copy1'
   and jsonb_array_length(:'c51'::jsonb -> 'sales') = 1 and :'c51'::jsonb #>> '{sales,0,seller}' = 'Nx_Anna'
   and :'c51'::jsonb #>> '{sales,0,buyer}' = 'Nx_Bruno' and :'c51'::jsonb #>> '{sales,0,kind}' = 'market'
-  and jsonb_array_length(:'c51'::jsonb -> 'graded') = 10,
+  and jsonb_array_length(:'c51'::jsonb -> 'graded') = 12,
   'get_nexamon_card(): value, bounds, population, history, listings, own copies, sales');
 select tests.assert(
   (:'m1'::jsonb ->> 'total')::bigint = (select count(*) from public.nexamon_listings)

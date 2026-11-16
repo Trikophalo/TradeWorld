@@ -16,9 +16,10 @@ import { formatMoney } from "@/lib/format";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { useNexamonAction } from "../hooks";
-import { isBlackLabel } from "../lib";
+import { formatGrade, isBlackLabel } from "../lib";
 import {
   centsToInput,
+  aiBuyHint,
   conditionFactorBps,
   copyStatus,
   dealBps,
@@ -38,7 +39,18 @@ type Dialog = "sell" | "quick" | "grade" | "crack" | null;
  * Everything a player can do with one copy (ADR-165): list it, take it back, sell it to the AI at once, send it to
  * ASP, crack its slab. Each action explains what it costs and brings before it runs.
  */
-export function CopyActions({ copy, card, className }: { copy: NexamonCopy; card: NexamonCard; className?: string }) {
+export function CopyActions({
+  copy,
+  card,
+  population = AI_HINT_POPULATION,
+  className,
+}: {
+  copy: NexamonCopy;
+  card: NexamonCard;
+  /** The card's population, for how fast AI collectors buy above the value. */
+  population?: number;
+  className?: string;
+}) {
   const t = useTranslations("nexamon");
   const [dialog, setDialog] = useState<Dialog>(null);
   const unlist = useNexamonAction();
@@ -100,7 +112,7 @@ export function CopyActions({ copy, card, className }: { copy: NexamonCopy; card
         </>
       )}
       {/* Mounted only while open: every opening starts with fresh numbers. */}
-      {dialog === "sell" && <SellSheet copy={copy} card={card} onClose={close} />}
+      {dialog === "sell" && <SellSheet copy={copy} card={card} population={population} onClose={close} />}
       {dialog === "quick" && quick !== null && <QuickSheet copy={copy} card={card} offer={quick} onClose={close} />}
       {dialog === "grade" && <GradeSheet copy={copy} card={card} onClose={close} />}
       {dialog === "crack" && <CrackSheet copy={copy} card={card} onClose={close} />}
@@ -125,7 +137,10 @@ function CopyLine({ copy, card }: Pick<SheetProps, "copy" | "card">) {
   );
 }
 
-function SellSheet({ copy, card, onClose }: SheetProps) {
+/** Without the card's population the hint assumes a well-known card (the slowest case). */
+const AI_HINT_POPULATION = 100_000;
+
+function SellSheet({ copy, card, population, onClose }: SheetProps & { population: number }) {
   const t = useTranslations("nexamon");
   const action = useNexamonAction();
   const [text, setText] = useState(() => centsToInput(suggestedPriceCents(copy.valueCents)));
@@ -133,9 +148,9 @@ function SellSheet({ copy, card, onClose }: SheetProps) {
   const valid = isListablePrice(cents);
   const { feeCents, netCents, feeBps } = listingProceeds(valid ? cents : 0);
   const against = valid ? dealBps(cents, copy.valueCents) : 0;
-  // The AI collectors only buy up to the value; far above it a listing no longer counts as supply either.
+  // Far above the value a listing no longer counts as supply; AI collectors pay at most value x (1 + premium).
   const tooHigh = valid && against > BALANCE.nexamon.value.trade.bandBps;
-  const aboveValue = valid && against > 0 && !tooHigh;
+  const ai = aiBuyHint(copy, card.rarity, population, valid ? cents : 0);
   return (
     <Sheet
       open
@@ -193,8 +208,19 @@ function SellSheet({ copy, card, onClose }: SheetProps) {
             {t("sell.tooHigh", { band: formatChance(BALANCE.nexamon.value.trade.bandBps) })}
           </p>
         )}
-        {aboveValue && <p className="text-sm text-pretty text-fg-3">{t("sell.aboveValue")}</p>}
-        {valid && against <= 0 && <p className="text-sm text-pretty text-fg-3">{t("sell.atValue")}</p>}
+        <div className="rounded-md border-2 border-line-1 p-3 text-sm text-pretty" data-testid="sell-ai-hint">
+          <p className={cn("font-medium", valid && ai.instant ? "text-gain" : "text-fg-1")}>{t("sell.atValue")}</p>
+          <p className="mt-1 text-fg-2" data-testid="sell-ai-max">
+            {ai.premiumBps > 0
+              ? t("sell.aiMax", { max: formatMoney(ai.maxCents), premium: formatChance(ai.premiumBps) })
+              : t("sell.aiMaxValue")}
+          </p>
+          {valid && !ai.instant && (
+            <p className="mt-1 text-fg-3" data-testid="sell-ai-speed">
+              {ai.minutes === null ? t("sell.aiNever") : t("sell.aiMinutes", { minutes: ai.minutes })}
+            </p>
+          )}
+        </div>
       </div>
     </Sheet>
   );
@@ -297,9 +323,7 @@ function GradeSheet({ copy, card, onClose }: SheetProps) {
                   <span className="ml-auto nums text-fg-3">{formatChance(0)}</span>
                   <span className="w-12 text-right nums text-fg-3">{formatFactor(quote.blackLabel.factorBps)}</span>
                 </span>
-                <span className="mt-1 block text-xs text-pretty text-fg-3">
-                  {t("blackLabel.onlyMint", { condition: tc(`condition.${quote.blackLabel.condition}`) })}
-                </span>
+                <span className="mt-1 block text-xs text-pretty text-fg-3">{t("blackLabel.onlyMint")}</span>
               </li>
             )}
             {quote.chances.map((row) => (
@@ -313,7 +337,11 @@ function GradeSheet({ copy, card, onClose }: SheetProps) {
             ))}
           </ul>
           <p className="mt-1.5 text-xs text-pretty text-fg-3">
-            {t("grade.tableNote", { grade: BALANCE.nexamon.grading.valueBps.findIndex((bps) => bps > 10_000) + 1 })}
+            {t("grade.tableNote", {
+              grade: formatGrade(
+                BALANCE.nexamon.grading.grades[BALANCE.nexamon.grading.valueBps.findIndex((bps) => bps > 10_000)]!,
+              ),
+            })}
           </p>
         </div>
       </div>
@@ -373,7 +401,7 @@ function CrackSheet({ copy, card, onClose }: SheetProps) {
                 raw: formatMoney(
                   Math.round((copy.valueCents * conditionFactorBps(copy.condition)) / blackCfg.valueBps),
                 ),
-                chance: formatChance(blackCfg.chanceBps),
+                chance: formatChance(blackCfg.chanceBps.mint),
               })}
             </p>
           </div>

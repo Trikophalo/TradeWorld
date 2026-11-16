@@ -7764,6 +7764,24 @@ seller, seller_ai, mine, listed_at}`. Antworten enthalten Nicknames und KI-Namen
   `nexamon_grading_limit` NX175.
 - Test `supabase/tests/9z_nexamon.sql`.
 
+### Nachtrag: halbe Noten und KI-Sammler zum Marktwert (Migrationen 6000, 6010)
+
+- `nexamon_copies.grade`, `nexamon_sales.grade`: `double precision` (vorher `smallint`), Werte 1 … 8, 8,5, 9, 9,5,
+  10 und 11 (Black Label), Prüfung `nexamon_copies_grade_check`. Alte Werte bleiben gültig.
+- `game_config.nexamon.grading.grades` = `[1, 2, 3, 4, 5, 6, 7, 8, 8.5, 9, 9.5, 10]`; `gradeWeightsBps[condition]` und
+  `valueBps` folgen dieser Reihenfolge (zwölf Einträge). `blackLabel` = `{chanceBps: {mint, near_mint}, valueBps}`.
+- `get_nexamon_card`: `graded` hat zwölf Einträge in der Reihenfolge von `grading.grades`; `grade` in Kopien,
+  Angeboten und Verkäufen kann 8.5 oder 9.5 sein.
+- Neue interne Funktionen: `nexamon_roll_asp_grade(text, double precision)` (ersetzt `nexamon_roll_grade`),
+  `nexamon_grade_index(double precision)`, `nexamon_grade_text(double precision)`, `nexamon_ai_premium_bps(text,
+double precision)`, `nexamon_ai_buy_chance_bps(bigint, bigint, text, double precision, text, bigint)`.
+  `nexamon_copy_factor_bps` und `nexamon_copy_value_cents` nehmen die Note als `double precision`.
+- `nexamon_run_due`: KI-Sammler kaufen Angebote zum Wert oder darunter immer, darüber bis Wert × (1 + Aufschlag)
+  mit fallender Chance; `game_config.nexamon.ai`: `buyChanceBps`, `atMaxChanceBps`, `premiumBps`, `gradePremiumBps`,
+  `blackLabelPremiumBps`, `buysPerCardWindow`, `buyWindowDays`, `maxBuysPerRun`, `dailyBudgetPacks` (`buyMaxBps`
+  und `gradedBuyMaxBps` entfallen). `nexamon_sell`: ein KI-Kauf zählt (`counted`, hebt den Wert) nur im Band und
+  bis `buysPerCardWindow` je Karte und Fenster.
+
 ## Nachtrag: Bezahlbare Missionen, Missionen neu würfeln (ADR-166)
 
 Migration `20261204005350_mission_reset.sql`.

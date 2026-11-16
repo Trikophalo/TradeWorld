@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useGameErrorText } from "@/features/game/errors";
 import type { NexamonCopy } from "@/features/game/nexamon-types";
 import { cn } from "@/lib/utils";
-import { gradeWordKey, isBlackLabel } from "../lib";
+import { formatGrade, gradeWordKey, isBlackLabel } from "../lib";
 import { ConditionBadge } from "./badges";
 import { CardThumb } from "./card-face";
 import { NexamonSlab } from "./slab";
@@ -80,7 +80,9 @@ export function GradeChip({ grade, short = false, className }: { grade: number; 
       className={cn(grade === 10 && "bg-gold text-on-accent", className)}
       title={t(`grade.${gradeWordKey(grade)}`)}
     >
-      {short ? tn("gradeShort", { grade }) : tn("gradeLong", { grade, word: t(`grade.${gradeWordKey(grade)}`) })}
+      {short
+        ? tn("gradeShort", { grade: formatGrade(grade) })
+        : tn("gradeLong", { grade: formatGrade(grade), word: t(`grade.${gradeWordKey(grade)}`) })}
     </Badge>
   );
 }

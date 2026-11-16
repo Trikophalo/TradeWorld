@@ -114,7 +114,7 @@ export function GradingDesk({
           {t("grading.intro", {
             rate: formatChance(cfg.feeBps),
             minutes: cfg.minutes,
-            best: formatFactor(cfg.valueBps[9]),
+            best: formatFactor(cfg.valueBps.at(-1)!),
             black: formatFactor(cfg.blackLabel.valueBps),
           })}
         </p>

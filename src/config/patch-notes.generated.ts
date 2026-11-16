@@ -434,6 +434,21 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Auf jedem Profil siehst du die wertvollsten Karten eines Spielers und über „Ganze Sammlung ansehen“ seinen ganzen Binder; dein eigenes Profil zeigt…",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-2257128a",
+        title: "Karten umdrehen",
+        text: "Beim Booster-Öffnen dreht ein Klick oder Tipp eine Karte um, Taste F oder Enter ebenso.",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-12704fc2",
+        title: "KI-Sammler kaufen sofort",
+        text: "Zum Marktwert oder darunter kauft die KI deine Karte sofort, auch Slabs.",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-70ec42e5",
+        title: "ASP-Noten 8,5 und 9,5, seltenere 10",
+        text: "ASP vergibt jetzt auch 8,5 und 9,5.",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-d409bcf3",
         title: "Neue Themen in den Nachrichten",
         text: "Mr. Doodle Dangle lästert jetzt auch über Sammelkarten, das Finanzamt samt Oberamtsrat Griesgram, Börsenfirmen und eure Taten im Spiel: verzockte…",

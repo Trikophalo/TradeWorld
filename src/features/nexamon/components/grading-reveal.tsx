@@ -20,7 +20,16 @@ import { DURATION, EASE, SPRING } from "@/lib/motion";
 import { nexamonCopyFactorBps } from "@/lib/sim/nexamon";
 import { playSound, stopSound, type SoundName } from "@/lib/sound";
 import { cn } from "@/lib/utils";
-import { gradeNumber, gradeStepPauseMs, gradeTier, pixelScale, tearProgress, type GradeTier } from "../lib";
+import {
+  formatGrade,
+  GRADE_STEPS,
+  gradeNumber,
+  gradeStepPauseMs,
+  gradeTier,
+  pixelScale,
+  tearProgress,
+  type GradeTier,
+} from "../lib";
 import { formatChance, formatFactor } from "../view";
 import { PackFoil, PackSheen } from "./pack";
 import { GradeChip } from "./parts";
@@ -175,14 +184,16 @@ export function GradeReveal({
     if (phase === "result") resultRef.current?.focus({ preventScroll: true });
   }, [phase]);
 
+  /** Counts up through the grades ASP gives (8.5 and 9.5 included); `step` is 1-based. */
   const countFrom = (step: number) => {
-    if (step > top) {
+    const value = GRADE_STEPS[step - 1];
+    if (value === undefined || value > top) {
       later(HOLD_MS[tier], finish);
       return;
     }
     later(gradeStepPauseMs(step), () => {
-      setCount(step);
-      if (sound) void playSound("gradeTick", 1, { rate: 0.8 + step * 0.09 });
+      setCount(value);
+      if (sound) void playSound("gradeTick", 1, { rate: 0.8 + step * 0.075 });
       countFrom(step + 1);
     });
   };
@@ -439,7 +450,7 @@ export function GradeReveal({
                 tier === "black" && count >= top ? "bg-black-label text-on-black-label" : "bg-surface-1 text-fg-1",
               )}
             >
-              {count === 0 ? "…" : count}
+              {count === 0 ? "…" : formatGrade(count)}
             </motion.span>
           </div>
         )}
@@ -528,7 +539,8 @@ export function GradeReveal({
             {tier === "black" && (
               <p className="max-w-sm text-xs text-pretty text-fg-2">
                 {t("reveal.blackText", {
-                  chance: formatChance(BALANCE.nexamon.grading.blackLabel.chanceBps),
+                  mint: formatChance(BALANCE.nexamon.grading.blackLabel.chanceBps.mint),
+                  nearMint: formatChance(BALANCE.nexamon.grading.blackLabel.chanceBps.near_mint),
                 })}
               </p>
             )}

@@ -117,6 +117,13 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   samt Oberamtsrat Griesgram, Börsenfirmen und eure Taten im Spiel: verzockte Trades, Miete, Outfits, Battles,
   Schläfer. Dazu Nachrufe, Werbung und Horoskope; jede Sendung bringt drei Themen, die nicht direkt wiederkommen.
 
+- **ASP-Noten 8,5 und 9,5, seltenere 10 (ADR-165):** ASP vergibt jetzt auch 8,5 und 9,5. Eine 10 ist viel seltener
+  (Mint 10 %), dafür das 4-Fache wert. Das Black Label bekommen 5 % der Mint- und 1 % der Near-Mint-Karten. Grading
+  kostet 40 % des Werts.
+- **KI-Sammler kaufen sofort (ADR-165):** Zum Marktwert oder darunter kauft die KI deine Karte sofort, auch Slabs.
+  Für gute Zustände und hohe Noten zahlt sie etwas mehr; das Verkaufsfenster sagt, bis zu welchem Preis.
+- **Karten umdrehen:** Beim Booster-Öffnen dreht ein Klick oder Tipp eine Karte um, Taste F oder Enter ebenso.
+
 - **Collectibles auf dem Profil (ADR-165):** Auf jedem Profil siehst du die wertvollsten Karten eines Spielers und
   über „Ganze Sammlung ansehen“ seinen ganzen Binder; dein eigenes Profil zeigt deine Karten mit Anzahl und Wert.
   Was du nicht einstellst, bleibt in „Deine Sammlung“ (neuer Filter „Zum Verkauf / Nicht zum Verkauf“), und

@@ -17,50 +17,48 @@ select tests.fund(:b, 2000000000, 'test:a6:b');
 select value as nx_cfg from public.game_config where key = 'nexamon' \gset
 select tests.set_cfg('nexamon', '{ai,packsPerHour}', '{"mystic_energy": 0, "super_apex": 0, "prismatic_peak": 0}');
 select tests.set_cfg('nexamon', '{ai,buyChanceBps}', '0');
+select tests.set_cfg('nexamon', '{ai,dailyBudgetPacks}', '0');
 select tests.set_cfg('nexamon', '{ai,legendaryListChanceBps}', '0');
 select tests.set_cfg('nexamon', '{value,pressure,perRun}', '0');
 select public.nexamon_sync();
 
 -- =============================================================================
--- A. Rules (port of src/lib/sim/nexamon.ts): only mint, 1 %, out of the chance for a 10, worth 10x
+-- A. Rules (port of src/lib/sim/nexamon.ts): mint 5 %, near mint 1 %, out of the chance for a 10, worth 10x
 -- =============================================================================
 select tests.assert(
-  :'nx_cfg'::jsonb #> '{grading,blackLabel}' = '{"condition": "mint", "chanceBps": 100, "valueBps": 100000}'::jsonb
-  and public.nexamon_roll_grade('mint', 0) = 8 and public.nexamon_roll_grade('mint', 0.1) = 10
-  and public.nexamon_roll_grade('mint', 0.9899) = 10 and public.nexamon_roll_grade('mint', 0.99) = 11
-  and public.nexamon_roll_grade('mint', 0.999999) = 11
-  and public.nexamon_roll_grade('near_mint', 0.999999) = 10 and public.nexamon_roll_grade('good', 0.999999) = 10
-  and public.nexamon_roll_grade('poor', 0.999999) = 10,
-  'nexamon_roll_grade(): the Black Label (11) sits on the highest rolls of a mint copy, no other condition gets it');
+  :'nx_cfg'::jsonb #> '{grading,blackLabel}' = '{"chanceBps": {"mint": 500, "near_mint": 100}, "valueBps": 100000}'::jsonb
+  and public.nexamon_roll_asp_grade('mint', 0) = 7 and public.nexamon_roll_asp_grade('mint', 0.9499) = 10
+  and public.nexamon_roll_asp_grade('mint', 0.95) = 11 and public.nexamon_roll_asp_grade('mint', 0.999999) = 11
+  and public.nexamon_roll_asp_grade('near_mint', 0.9899) = 10 and public.nexamon_roll_asp_grade('near_mint', 0.99) = 11
+  and public.nexamon_roll_asp_grade('good', 0.999999) = 10 and public.nexamon_roll_asp_grade('poor', 0.999999) = 10,
+  'nexamon_roll_asp_grade(): the Black Label (11) sits on the highest rolls of mint and near mint copies only');
 select tests.assert(
   (select jsonb_object_agg(g, n order by g)
-     from (select public.nexamon_roll_grade('mint', (i + 0.5) / 10000) as g, count(*) as n
-             from generate_series(0, 9999) i group by 1) x) = '{"8": 200, "9": 800, "10": 8900, "11": 100}'::jsonb
-  and (select count(*) from generate_series(0, 9999) i, unnest(array['poor', 'good', 'near_mint']) c
-        where public.nexamon_roll_grade(c, (i + 0.5) / 10000) > 10) = 0
-  and (select count(*) from generate_series(0, 9999) i where public.nexamon_roll_grade('near_mint', (i + 0.5) / 10000) = 10) = 6000,
-  'exact odds over the 10 000 rolls: mint 1 % Black Label, 89 % 10, 8 % 9, 2 % 8; near mint keeps its 60 % tens');
+     from (select public.nexamon_roll_asp_grade('mint', (i + 0.5) / 10000) as g, count(*) as n
+             from generate_series(0, 9999) i group by 1) x)
+    = '{"7": 500, "8": 1200, "8.5": 1800, "9": 3000, "9.5": 2000, "10": 1000, "11": 500}'::jsonb
+  and (select count(*) from generate_series(0, 9999) i, unnest(array['poor', 'good']) c
+        where public.nexamon_roll_asp_grade(c, (i + 0.5) / 10000) > 10) = 0
+  and (select count(*) from generate_series(0, 9999) i where public.nexamon_roll_asp_grade('near_mint', (i + 0.5) / 10000) = 11) = 100
+  and (select count(*) from generate_series(0, 9999) i where public.nexamon_roll_asp_grade('near_mint', (i + 0.5) / 10000) = 10) = 250,
+  'exact odds over the 10 000 rolls: mint 5 % Black Label, 10 % 10, 20 % 9.5 …; near mint 1 % Black Label, 2.5 % 10');
 select tests.assert(
-  public.nexamon_copy_factor_bps('mint', 11) = 100000 and public.nexamon_copy_factor_bps('mint', 10) = 30000
+  public.nexamon_copy_factor_bps('mint', 11) = 100000 and public.nexamon_copy_factor_bps('mint', 10) = 40000
   and public.nexamon_copy_factor_bps('poor', 11) = 100000
   and tests.nx_value('sa-001', 'mint', 11) = 10 * tests.nx_value('sa-001', 'mint')
-  and tests.nx_value('sa-001', 'mint', 10) = 3 * tests.nx_value('sa-001', 'mint')
+  and tests.nx_value('sa-001', 'mint', 10) = 4 * tests.nx_value('sa-001', 'mint')
   and tests.nx_value('sa-001', 'mint') = public.div_round_half_even((tests.nx('sa-001')).value_e4, 100),
-  'nexamon_copy_factor_bps(): a Black Label is worth ten times the card, a plain 10 three times');
--- the configured chance and condition are honoured; never more than the chance for a 10
-select tests.set_cfg('nexamon', '{grading,blackLabel,chanceBps}', '5000');
-select public.nexamon_roll_grade('mint', 0.4999) as r_lo, public.nexamon_roll_grade('mint', 0.5) as r_hi \gset
-select tests.set_cfg('nexamon', '{grading,blackLabel,chanceBps}', '20000');
-select public.nexamon_roll_grade('mint', 0.05) as r_nine, public.nexamon_roll_grade('mint', 0.1) as r_all \gset
-select tests.set_cfg('nexamon', '{grading,blackLabel}', '{"condition": "near_mint", "chanceBps": 100, "valueBps": 50000}');
-select public.nexamon_roll_grade('mint', 0.9999) as r_mint, public.nexamon_roll_grade('near_mint', 0.9999) as r_nm,
-       public.nexamon_copy_factor_bps('mint', 11) as r_factor \gset
-select tests.set_cfg('nexamon', '{grading,blackLabel,chanceBps}', '0');
-select public.nexamon_roll_grade('near_mint', 0.9999) as r_off \gset
+  'nexamon_copy_factor_bps(): a Black Label is worth ten times the card, a plain 10 four times');
+-- the configured chances are honoured; never more than the chance for a 10
+select tests.set_cfg('nexamon', '{grading,blackLabel,chanceBps}', '{"mint": 20000}');
+select public.nexamon_roll_asp_grade('mint', 0.84) as r_nine, public.nexamon_roll_asp_grade('mint', 0.86) as r_all,
+       public.nexamon_roll_asp_grade('near_mint', 0.9999) as r_nm \gset
+select tests.set_cfg('nexamon', '{grading,blackLabel,valueBps}', '50000');
+select public.nexamon_copy_factor_bps('mint', 11) as r_factor \gset
 select tests.set_cfg('nexamon', '{grading}', :'nx_cfg'::jsonb -> 'grading');
 select tests.assert(
-  :r_lo = 10 and :r_hi = 11 and :r_nine = 9 and :r_all = 11 and :r_mint = 10 and :r_nm = 11 and :r_factor = 50000 and :r_off = 10,
-  'grading.blackLabel: chance, condition and value come from the config; the chance is capped by the chance for a 10');
+  :r_nine = 9.5 and :r_all = 11 and :r_nm = 10 and :r_factor = 50000,
+  'grading.blackLabel: chances per condition and value come from the config; the chance is capped by the chance for a 10');
 select tests.throws($$update public.nexamon_copies set grade = 12 where id = (select id from public.nexamon_copies limit 1)$$,
   '23514', 'nexamon_copies.grade: 1 to 11 only');
 
@@ -82,9 +80,9 @@ select public.grade_nexamon_card(gen_random_uuid(), :'k1') is not null and publi
    and public.grade_nexamon_card(gen_random_uuid(), :'n1') is not null as ok \gset
 reset role;
 -- every roll of a mint or near mint copy is a 10; every 10 of a mint copy is a Black Label
-select tests.set_cfg('nexamon', '{grading,gradeWeightsBps,mint}', '[0, 0, 0, 0, 0, 0, 0, 0, 0, 10000]');
-select tests.set_cfg('nexamon', '{grading,gradeWeightsBps,near_mint}', '[0, 0, 0, 0, 0, 0, 0, 0, 0, 10000]');
-select tests.set_cfg('nexamon', '{grading,blackLabel,chanceBps}', '10000');
+select tests.set_cfg('nexamon', '{grading,gradeWeightsBps,mint}', '[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10000]');
+select tests.set_cfg('nexamon', '{grading,gradeWeightsBps,near_mint}', '[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10000]');
+select tests.set_cfg('nexamon', '{grading,blackLabel,chanceBps}', '{"mint": 10000}');
 select public.nexamon_finish_gradings(null, public.game_now() + interval '61 minutes') as done \gset
 select tests.set_cfg('nexamon', '{grading}', :'nx_cfg'::jsonb -> 'grading');
 select tests.assert(
@@ -126,11 +124,11 @@ select public.get_nexamon_market(p_card_key => 'sa-001', p_graded => false, p_bl
 reset role;
 select tests.assert(
   :bl = 10 * :v1
-  and :'card'::jsonb -> 'graded' = '[0, 0, 0, 0, 0, 0, 0, 0, 0, 1]'::jsonb and (:'card'::jsonb ->> 'black_labels')::integer = 4
+  and :'card'::jsonb -> 'graded' = '[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]'::jsonb and (:'card'::jsonb ->> 'black_labels')::integer = 4
   and (select count(*) from jsonb_array_elements(:'card'::jsonb -> 'copies') x
         where (x ->> 'grade')::integer = 11 and x ->> 'state' = 'graded' and (x ->> 'value_cents')::bigint = :bl) = 4
   and (:'l1'::jsonb #>> '{listing,grade}')::integer = 11 and (:'l1'::jsonb #>> '{listing,value_cents}')::bigint = :bl,
-  'get_nexamon_card(): graded keeps the ten grades, black_labels counts the Black Labels; a copy is worth 10x');
+  'get_nexamon_card(): graded has the twelve grades, black_labels counts the Black Labels; a copy is worth 10x');
 select tests.assert(
   (:'m_black'::jsonb ->> 'total')::integer = 1 and :'m_black'::jsonb #>> '{listings,0,copy_id}' = :'k1'
   and (:'m_black'::jsonb #>> '{listings,0,grade}')::integer = 11
@@ -144,7 +142,7 @@ select tests.assert(
   'get_nexamon_market(): p_black_label filters the Black Labels in or out; one function, for players only');
 
 -- =============================================================================
--- D. Trading: a sale between players at 10x is a sale at the value; the AI pays at most 70 % of the slab
+-- D. Trading: a sale between players at 10x is a sale at the value; the AI buys the slab at its value
 -- =============================================================================
 select (tests.nx('sa-001')).value_e4 as e4_before \gset
 select tests.login_as('authenticated', :b);
@@ -156,34 +154,29 @@ select tests.assert(
          and price_cents = :bl and counted and value_after_e4 = value_before_e4) = 1
   and (tests.nx('sa-001')).value_e4 = :e4_before,
   'a Black Label sold for ten times the value counts as a sale at the value: grade 11 and factor 100 000 on record');
-select tests.set_cfg('nexamon', '{ai,buyChanceBps}', '10000');
+-- AI collectors: above value x (1 + 20 %) never, at the value at once (the premium itself: a7_grades_ai.sql)
+select tests.set_cfg('nexamon', '{ai,dailyBudgetPacks}', :'nx_cfg'::jsonb #> '{ai,dailyBudgetPacks}');
+select tests.nx_value('sa-001', 'mint', 11) as bl2 \gset
 select tests.login_as('authenticated', :a);
-select public.list_nexamon_card(gen_random_uuid(), :'k2', :bl) as l3 \gset
+select public.list_nexamon_card(gen_random_uuid(), :'k2', :bl2::bigint * 12 / 10 + 1) as l3 \gset
 reset role;
 select public.nexamon_run_due() as run1 \gset
 select tests.nx_listing(:'k2') is not null as kept \gset
-select tests.nx_value('sa-001', 'mint', 11) as bl2 \gset
-select tests.login_as('authenticated', :a);
-select public.unlist_nexamon_card(gen_random_uuid(), (:'l3'::jsonb #>> '{listing,id}')::uuid) is not null as ok \gset
-select public.list_nexamon_card(gen_random_uuid(), :'k2', :bl2::bigint * 7 / 10 + 1) as l4 \gset
-reset role;
-select public.nexamon_run_due() as run2 \gset
-select tests.nx_listing(:'k2') is not null as kept2 \gset
 select tests.nx_value('sa-001', 'mint', 11) as bl3 \gset
 select tests.login_as('authenticated', :a);
-select public.unlist_nexamon_card(gen_random_uuid(), (:'l4'::jsonb #>> '{listing,id}')::uuid) is not null as ok \gset
-select public.list_nexamon_card(gen_random_uuid(), :'k2', :bl3::bigint * 7 / 10) is not null as ok \gset
+select public.unlist_nexamon_card(gen_random_uuid(), (:'l3'::jsonb #>> '{listing,id}')::uuid) is not null as ok \gset
+select public.list_nexamon_card(gen_random_uuid(), :'k2', :bl3) is not null as ok \gset
 reset role;
 select tests.cash(:a) as cash_a \gset
 select public.nexamon_run_due() as run3 \gset
-select tests.set_cfg('nexamon', '{ai,buyChanceBps}', '0');
+select tests.set_cfg('nexamon', '{ai,dailyBudgetPacks}', '0');
 select tests.assert(
-  :'kept'::boolean and :'kept2'::boolean
+  :'kept'::boolean
   and (tests.nx_copy(:'k2')).ai_owner is not null and (tests.nx_copy(:'k2')).owner_id is null and (tests.nx_copy(:'k2')).grade = 11
   and (select count(*) from public.nexamon_sales where copy_id = :'k2' and kind = 'ai_buy' and grade = 11 and factor_bps = 100000
-         and price_cents = :bl3::bigint * 7 / 10) = 1
-  and tests.cash(:a) = :cash_a::bigint + :bl3::bigint * 7 / 10 - floor(:bl3::bigint * 7 / 10 * 0.05),
-  'AI collectors leave a Black Label at its value and one cent above 70 %, and buy it at 70 % of ten times the card');
+         and price_cents = :bl3) = 1
+  and tests.cash(:a) = :cash_a::bigint + :bl3::bigint - floor(:bl3::bigint * 0.05),
+  'AI collectors leave a Black Label above its value x 1.2 and buy it at once at ten times the card');
 -- the AI seller offers its Black Label 10 % above ten times the card
 select tests.assert(
   (select l.price_cents from public.nexamon_listings l where l.copy_id = :'k2') is null
@@ -211,7 +204,7 @@ select tests.assert(
   and (:'cr'::jsonb #>> '{copy,value_cents}')::bigint = tests.nx_value('sa-001', 'mint')
   and (tests.nx_copy(:'k3')).grade is null and (tests.nx_copy(:'k3')).graded_at is null
   and (:'card2'::jsonb ->> 'black_labels')::integer = 3
-  and :'card2'::jsonb -> 'graded' = '[0, 0, 0, 0, 0, 0, 0, 0, 0, 1]'::jsonb,
+  and :'card2'::jsonb -> 'graded' = '[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]'::jsonb,
   'crack_nexamon_slab(): a cracked Black Label is a raw mint card again (old_grade 11), worth the card');
 
 -- =============================================================================

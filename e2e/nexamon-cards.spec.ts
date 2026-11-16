@@ -228,3 +228,41 @@ test("the card section never scrolls sideways", async ({ page }) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+test("a slab with a half grade shows 9,5", async ({ page }) => {
+  const slab = page.getByTestId("nexamon-slabs").getByTestId("nexamon-slab").nth(1);
+  await slab.scrollIntoViewIfNeeded();
+  await expect(slab.getByTestId("slab-grade")).toHaveText("9,5");
+  await expect(slab.getByTestId("slab-grade-word")).toHaveText("Mint+");
+  await expect(slab.locator("[data-grade]")).toHaveAttribute("data-grade", "9.5");
+});
+
+test("a click turns the top card of an opened pack around, a drag still throws it", async ({ page }) => {
+  const opening = await openPack(page);
+  const tilt = opening.getByTestId("pack-top-card-tilt");
+  await expect(tilt).toHaveAttribute("data-face", "front");
+  await page.waitForTimeout(350);
+  await opening.getByTestId("pack-top-card").click();
+  await expect(tilt).toHaveAttribute("data-face", "back");
+  await expect(opening).toHaveAttribute("data-index", "0");
+  await opening.getByTestId("pack-top-card").click();
+  await expect(tilt).toHaveAttribute("data-face", "front");
+  // F on the focused stack turns it too
+  await opening.getByTestId("pack-stack").focus();
+  await page.keyboard.press("f");
+  await expect(tilt).toHaveAttribute("data-face", "back");
+  // a turned card is still thrown away by a drag
+  await dragTop(page, opening, 420, 0);
+  await expect(opening).toHaveAttribute("data-index", "1");
+  for (let i = 1; i < 10 && (await opening.getAttribute("data-phase")) !== "summary"; i++) {
+    await opening.getByTestId("pack-stack").focus();
+    await page.keyboard.press("ArrowRight");
+    await page.waitForTimeout(500);
+  }
+  await expect(opening).toHaveAttribute("data-phase", "summary");
+  // the cards of the summary turn around on click as well
+  const card = opening.locator('[data-testid^="pack-summary-card"]:visible').first();
+  await expect(card).toHaveAttribute("data-face", "front");
+  await card.click();
+  await expect(card).toHaveAttribute("data-face", "back");
+});

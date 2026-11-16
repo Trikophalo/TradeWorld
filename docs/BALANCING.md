@@ -1263,21 +1263,24 @@ Werte in `BALANCE.nexamon` (`src/config/nexamon-rules.ts`), Startpreise im Katal
   Mindestens eine Rare oder besser steckt in 50,8 % der Booster (1 − 2550/3600 × 2501/3600).
 
 - **Zustand:** Poor 2 %, Good 18 %, Near Mint 50 %, Mint 30 %. Wertfaktor: Poor 70 %, Good 90 %, Near Mint und Mint 100 % (seit Migration 5900).
-- **Grading (ASP):** 30 % des Werts der Kopie (bis Migration 5900: 50 %) (mindestens 1 €), 60 Minuten, höchstens 10 gleichzeitig.
+- **Grading (ASP):** 40 % des Werts der Kopie (seit Migration 6000; davor 30 %, bis 5900 50 %) (mindestens 1 €),
+  60 Minuten, höchstens 10 gleichzeitig. Noten 1 bis 8, 8,5, 9, 9,5, 10 und das Black Label (BL), Chancen in %:
 
-  | Note       | 1   | 2    | 3    | 4    | 5    | 6    | 7    | 8    | 9     | 10    |
-  | ---------- | --- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ----- | ----- |
-  | Poor       | 5 % | 10 % | 15 % | 20 % | 20 % | 15 % | 10 % | 4 %  | 0,9 % | 0,1 % |
-  | Good       | 0   | 0    | 0    | 5 %  | 8 %  | 12 % | 20 % | 25 % | 20 %  | 10 %  |
-  | Near Mint  | 0   | 0    | 0    | 0    | 0    | 1 %  | 4 %  | 10 % | 25 %  | 60 %  |
-  | Mint       | 0   | 0    | 0    | 0    | 0    | 0    | 0    | 2 %  | 8 %   | 90 %  |
-  | Wertfaktor | 0,3 | 0,4  | 0,5  | 0,6  | 0,7  | 0,8  | 0,9  | 1,2  | 1,6   | 3     |
+  | Note       | 1   | 2   | 3   | 4   | 5   | 6   | 7   | 8   | 8,5 | 9   | 9,5  | 10   | BL  |
+  | ---------- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---- | ---- | --- |
+  | Poor       | 8   | 12  | 15  | 20  | 20  | 15  | 7   | 2   | 0,5 | 0,3 | 0,15 | 0,05 | 0   |
+  | Good       | 0   | 0   | 0   | 7,5 | 12  | 20  | 25  | 17  | 10  | 6   | 2    | 0,5  | 0   |
+  | Near Mint  | 0   | 0   | 0   | 0   | 0   | 5   | 12  | 22  | 24  | 24  | 9,5  | 2,5  | 1   |
+  | Mint       | 0   | 0   | 0   | 0   | 0   | 0   | 5   | 12  | 18  | 30  | 20   | 10   | 5   |
+  | Wertfaktor | 0,3 | 0,4 | 0,5 | 0,6 | 0,7 | 0,8 | 0,9 | 1,2 | 1,4 | 1,7 | 2,3  | 4    | 10  |
 
-  **Black Label** (`grading.blackLabel`): nur Mint, 1 % der Mint-Gradings (aus den 90 % für die 10 genommen: Mint
-  hat damit 1 % Black Label, 89 % 10, 8 % 9, 2 % 8), Wertfaktor 10. Alle anderen Zustände: 0 %.
+  **Black Label** (`grading.blackLabel.chanceBps`): Mint 5 %, Near Mint 1 %, aus der Chance für die 10 genommen
+  (`gradeWeightsBps` enthält in der letzten Spalte 10 und Black Label zusammen). Good und Poor: 0 %.
 
-  Erwarteter Faktor nach dem Grading: Mint 2,92 (ohne Black Label wären es 2,85), Near Mint 2,36, Good 1,28, Poor 0,67. Abzüglich der Gebühr (0,5)
-  lohnt sich Grading im Schnitt für Mint und Near Mint, nicht für Good und Poor (dort ist es eine Wette auf die 10).
+  Erwarteter Faktor nach dem Grading (`nexamonExpectedGradeFactorBps`): Mint 2,311, Near Mint 1,5745, Good 1,026,
+  Poor 0,632. Abzüglich der Gebühr (Mint und Near Mint 0,4, Good 0,36, Poor 0,28) lohnt sich Grading im Schnitt für
+  Mint (1,91 statt 1,0) und knapp für Near Mint (1,17), nicht für Good (0,67 statt 0,9) und Poor (0,35 statt 0,7).
+  Mint verliert in 17 % der Gradings Geld (Note 8 oder 7).
 
 - **Marktwert** (ein Wert je Karte): Schritt je gezähltem Verkauf 20 % des Weges zum Preis je Karte, höchstens 2 %,
   aufwärts × Beliebtheit (mindestens 25 %); Band für plausible Preise ± 25 %; KI-Kauf + 0,5 % × Beliebtheit;
@@ -1292,14 +1295,17 @@ Werte in `BALANCE.nexamon` (`src/config/nexamon-rules.ts`), Startpreise im Katal
   4 / 3 / 2 / 1 / 0, immer Wert + 10 %. KI-Booster je Stunde: 4 / 2 / 1 (Mystic Energy / Super Apex / Prismatic Peak),
   also je Common etwa 8 neue Kopien am Tag im ersten Set, je Prisma eine in gut vier Tagen, je Legendary eine in
   knapp drei Wochen. Eine Legendary der KI kommt mit 0,2 % je Stunde in den Verkauf.
-- **KI-Sammler:** kaufen bis zum Wert der Kopie (Slabs bis 70 %), 3 % × (1 + Beliebtheit) je Minute, höchstens
-  2 / 3 / 3 / 2 / 1 Kopien je Karte in 7 Tagen und je Set und Tag für 300 Booster-Preise (60.000 € / 300.000 € /
-  1.500.000 €). Das ist die einzige Stelle, an der Karten zu neuem Geld werden; Gebühren, Booster und ASP nehmen es
+- **KI-Sammler (seit Migration 6010):** kaufen jedes Angebot zum Wert der Kopie oder darunter sofort (nächster
+  Minutenlauf, kein Würfel, auch Slabs zum vollen Wert). Darüber zahlen sie einen Aufschlag: roh Poor 0 %, Good 3 %,
+  Near Mint 8 %, Mint 12 %; Slabs 8: 5 %, 8,5: 7 %, 9: 10 %, 9,5: 12 %, 10: 15 %, Black Label 20 %. Knapp über dem
+  Wert 30 % × (1 + Beliebtheit) je Minute, bis zum Höchstpreis linear fallend auf 20 % davon. Bessere Kopien zuerst,
+  höchstens 100 Käufe je Lauf, je Set und Tag für 300 Booster-Preise (60.000 € / 300.000 € / 1.500.000 €). Den Wert
+  heben nur KI-Käufe im Band ± 25 %, höchstens 6 / 6 / 4 / 3 / 2 je Karte und Tag. Das ist die einzige Stelle, an der Karten zu neuem Geld werden; Gebühren, Booster und ASP nehmen es
   wieder heraus.
 - **Sofortverkauf:** rohe Commons und Rares zu 50 % des Werts, bis zu 50 Kopien je Aufruf.
 - **Markt:** 5 % Gebühr für verkaufende Spieler, Preis 0,10 € bis 1 Mrd. €, höchstens 30 offene Angebote.
 - **Stellschrauben, falls Booster zu lohnend oder zu teuer sind:** `ai.dailyBudgetPacks`, `ai.buysPerCardWindow`,
-  `ai.gradedBuyMaxBps`, `ai.packsPerHour`, `grading.valueBps`, `quickSell.bps` und die Startpreise im Katalog. Mit den
+  `ai.premiumBps`, `ai.gradePremiumBps`, `ai.packsPerHour`, `grading.valueBps`, `quickSell.bps` und die Startpreise im Katalog. Mit den
   Platzhalter-Preisen (gleichmäßig über die Spannen) liegt der Inhalt eines Boosters rechnerisch über seinem Preis;
   die begrenzte KI-Nachfrage und der Sofortverkauf zu 50 % halten den tatsächlichen Erlös darunter.
 
