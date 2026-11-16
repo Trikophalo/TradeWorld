@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
+import { notificationHref } from "@/features/company/tabs";
 import { useState } from "react";
 import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
@@ -139,7 +140,7 @@ function NotificationRow({
     <li data-type={item.typeKey}>
       {item.link ? (
         <Link
-          href={item.link}
+          href={notificationHref(item.typeKey, item.link) ?? item.link}
           onClick={onNavigate}
           className={cn(className, "focus-ring hover:border-line-2 hover:bg-surface-2")}
         >

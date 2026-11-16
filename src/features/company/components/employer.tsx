@@ -712,7 +712,7 @@ export function TeamView({ company, onHire }: { company: MyCompany; onHire: (req
           </ul>
         )}
       </Section>
-      <Section title={t("tabApplications")}>
+      <Section id="applications" title={t("tabApplications")}>
         <Applications company={company} />
       </Section>
       <Section title={t("tabPostings")}>

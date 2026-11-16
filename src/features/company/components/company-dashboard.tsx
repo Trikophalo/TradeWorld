@@ -1,66 +1,66 @@
 "use client";
 
 import { motion } from "motion/react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { COMPANY_BUILDINGS, UI_ICONS } from "@/components/pixel/art";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
-import { Button, type ButtonState } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { CollapsibleSection } from "@/components/ui/collapsible-section";
-import { HoldButton } from "@/components/ui/hold-button";
-import { Field } from "@/components/ui/input";
-import { LiveMoney, ShortMoney } from "@/components/ui/live-money";
-import { Sheet } from "@/components/ui/sheet";
-import { Slider } from "@/components/ui/slider";
-import { toast } from "@/components/ui/toast";
-import { BALANCE } from "@/config/balance";
-import { useGameErrorText } from "@/features/game/errors";
-import { engine, useGame } from "@/features/game/store";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useServerClock } from "@/features/game/server-clock";
 import type { MyCompany } from "@/features/game/types";
-import type { HealthFactorKey } from "@/lib/sim/company-health";
-import { parseEuroCents } from "@/features/market/order-schema";
+import { useDisclosed } from "@/features/progression/components/reveal";
 import { useVisitTour } from "@/features/tutorial/use-visit-tour";
-import { formatBps, formatMoney } from "@/lib/format";
+import type { HealthFactorKey } from "@/lib/sim/company-health";
+import { formatMoney } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
 import { SPRING } from "@/lib/motion";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
-import { askMira, MiraChat } from "../assistant/mira-chat";
-import { useServerClock } from "@/features/game/server-clock";
+import { askMira, type MiraOpen } from "../assistant/mira-chat";
 import { useCompanyHealth } from "../health";
-import { hourlyCloseOverdue } from "../routes";
-import { useCompanyRefresh } from "../hooks";
+import { BoardView } from "../listed/board";
+import { useListedCompany } from "../listed/shared";
+import { companyTodos } from "../listed/view";
 import { useCompanySections } from "../sections";
-import { CompanyChat } from "./company-chat";
-import { HireSheet, TeamView, type HireRequest } from "./employer";
-import { CompanyMovesCard } from "./company-moves";
-import { PitchCard } from "./pitch-card";
-import { GrowthPath } from "./growth-path";
-import { TaskBoard, useCompanyTasks } from "../tasks/task-board";
-import { HeadquartersHero, netProfit } from "./headquarters";
-import { ListingCard, SideJobNotice } from "./listing";
+import { companyHref, resolveCompanyTarget, type CompanyTab, type CompanyTarget } from "../tabs";
+import { useCompanyTasks } from "../tasks/task-board";
 import { BannerEditor } from "./banner-editor";
+import { HireSheet, type HireRequest } from "./employer";
+import { HeadquartersHero } from "./headquarters";
+import { SideJobNotice } from "./listing";
 import { LogoEditor } from "./logo-editor";
-import { OfficeScene } from "./office-scene";
-import { HealthCompact, HealthPanel } from "./health-panel";
-import { ExpansionCard, PayoutCard, ProfitCoach, StrategyCard } from "./profit";
-import { ProductionCard } from "./production";
-import { CampaignCard, CampaignStrip, ProfitRoutes } from "./routes";
-import { CompanyNewsCard, SituationCard } from "./situation";
+import { CampaignStrip } from "./routes";
+import { BooksTab } from "./tabs/books-tab";
+import { ControllingTab } from "./tabs/controlling-tab";
+import { DashboardTab, ListedTeaser } from "./tabs/dashboard-tab";
+import { StaffTab } from "./tabs/staff-tab";
 
-type Tab = "mira" | "overview" | "tasks" | "team" | "chat";
-const factor = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
 const money = (cents: number) => formatMoney(cents, { whole: true });
-const NEXT_TIER = { garage: "small_business", small_business: "gmbh", gmbh: "ag", ag: null } as const;
 
-/** The founder's view of the own company (ADR-057, redesigned in ADR-071). */
+/**
+ * The founder's view of the own company (ADR-057), in five tabs since ADR-167: Dashboard (numbers and charts first),
+ * Controlling (every lever), Mitarbeiter (team, tasks and chat), and for listed companies Buchhaltung and
+ * Geschäftsrat. The tab and the section are part of the URL (`?tab=…&section=…`); the old tabs and Mira's sections
+ * are mapped in ../tabs.ts.
+ */
 export function CompanyDashboard({ company }: { company: MyCompany }) {
   const t = useTranslations("firm");
+  const th = useTranslations("hq.tabs");
   const tl = useTranslations("logo");
-  const ts = useTranslations("firm.sections");
-  const [tab, setTab] = useState<Tab>("mira");
-  const toStart = useCallback(() => setTab("mira"), []);
+  const router = useRouter();
+  const params = useSearchParams();
+  const rawTab = params.get("tab");
+  const rawSection = params.get("section");
+  const boardParam = params.get("board");
+  const current = useMemo(
+    () => (boardParam ? { tab: "board" as const } : resolveCompanyTarget(rawTab, rawSection)),
+    [boardParam, rawTab, rawSection],
+  );
+  const tab = current.tab;
+
   const sections = useCompanySections();
   useEffect(() => useCompanySections.getState().load(), []);
   const section = (id: string) => ({
@@ -68,28 +68,59 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
     open: sections.open.includes(id),
     onOpenChange: (open: boolean) => sections.toggle(id, open),
   });
-  /** Show a section of the overview (from Mira or a shortcut) and scroll to it. */
-  const reveal = (id: string, target?: string) => {
-    setTab("overview");
-    sections.reveal(id, target);
-  };
-  const tt = useTranslations("companyTasks");
+
+  const isListed = company.listing?.status === "listed";
+  const listedQuery = useListedCompany(isListed);
+  const listed = isListed ? (listedQuery.data ?? null) : null;
+  const listedPending = isListed && listedQuery.isPending;
+  const teaser = useDisclosed("companyListed");
+  const now = useServerClock();
+
+  /** Opens the section and scrolls to the place, with a short highlight. */
+  const focus = useCallback((target: CompanyTarget) => {
+    if (target.section) useCompanySections.getState().reveal(target.section, target.target);
+    const id = target.target ?? (target.section ? `section-${target.section}` : null);
+    if (!id) return;
+    let tries = 0;
+    const look = () => {
+      const el = document.getElementById(id);
+      if (!el) {
+        if (++tries < 20) window.setTimeout(look, 100);
+        return;
+      }
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      el.setAttribute("data-highlight", "");
+      window.setTimeout(() => el.removeAttribute("data-highlight"), 1_800);
+    };
+    window.setTimeout(look, 80);
+  }, []);
+
+  const go = useCallback(
+    (target: CompanyTarget) => {
+      router.replace(companyHref(target), { scroll: false });
+      if (target.section || target.target) focus(target);
+    },
+    [router, focus],
+  );
+
+  // A link from outside (notification, Mira on another page, the old tabs): open and scroll once per address.
+  const arrived = useRef<string | null>(null);
+  useEffect(() => {
+    const key = `${rawTab ?? ""}|${rawSection ?? ""}`;
+    if (arrived.current === key) return;
+    arrived.current = key;
+    if (current.section || current.target) focus(current);
+  }, [rawTab, rawSection, current, focus]);
+
   const tasks = useCompanyTasks();
   const openTasks = tasks.data?.tasks.filter((x) => x.status === "open").length ?? 0;
   const [hire, setHire] = useState<HireRequest | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [bannerOpen, setBannerOpen] = useState(false);
   useVisitTour("visit_company");
-  const trainingOpen = company.employees + company.aiWorkers >= company.trainingFrom;
 
-  const goTraining = () => {
-    setTab("team");
-    window.setTimeout(() => document.getElementById("training")?.scrollIntoView({ behavior: "smooth" }), 50);
-  };
-
-  // Where the company loses money (ADR-162): always on top of the overview; every factor goes to Mira.
+  // Where the company loses money (ADR-162): on the dashboard; every factor goes to Mira.
   const health = useCompanyHealth(company);
-  const late = hourlyCloseOverdue(company, useServerClock());
   const miraHealth = useMemo(
     () => ({
       result: health,
@@ -104,9 +135,23 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
   const askAbout = (factor: HealthFactorKey) => {
     haptic("tap");
     askMira(questions(factor));
-    setTab("mira");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    go({ tab: "dashboard", target: "mira" });
   };
+  const onMira: MiraOpen = (to, id) => go(resolveCompanyTarget(to, id));
+
+  const todos = listed && now !== null ? companyTodos(listed, now) : [];
+  const booksBadge = todos.filter((x) => x.key === "books" || x.key === "tax").length;
+  const tabs: TabItem[] = [
+    { value: "dashboard", label: th("dashboard"), icon: "home" },
+    { value: "controlling", label: th("controlling"), icon: "markets" },
+    { value: "staff", label: th("staff"), icon: "profile", badge: company.pendingApplications + openTasks },
+    ...(isListed || teaser
+      ? ([
+          { value: "books", label: th("books"), icon: "portfolio", badge: booksBadge, locked: !isListed },
+          { value: "board", label: th("board"), icon: "deal", badge: listed?.board.toVote ?? 0, locked: !isListed },
+        ] satisfies TabItem[])
+      : []),
+  ];
 
   return (
     <div className="space-y-5">
@@ -133,7 +178,6 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
         </Card>
       )}
       <SideJobNotice company={company} />
-      <ListingCard company={company} />
       {company.distress && (
         <p className="rounded-md bg-loss-soft px-4 py-3 text-sm text-pretty text-loss" data-testid="distress">
           {t("distressCountdown", {
@@ -143,159 +187,103 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
         </p>
       )}
 
-      <OfficeScene company={company} onTeam={() => setTab("team")} />
-      <CampaignStrip company={company} onShow={() => reveal("profit", "campaign")} />
-
-      <DepartmentTabs
-        value={tab}
-        onChange={setTab}
-        tabs={[
-          { value: "mira", label: t("tabMira"), icon: "robot", badge: openTasks },
-          { value: "overview", label: t("tabOverview"), icon: "home" },
-          { value: "tasks", label: tt("tab"), icon: "briefcase" },
-          { value: "team", label: t("tabTeam"), icon: "profile", badge: company.pendingApplications },
-          { value: "chat", label: t("tabChat"), icon: "bell" },
-        ]}
+      {/* A running campaign stays in sight on every tab (ADR-168). */}
+      <CampaignStrip
+        company={company}
+        onShow={() => go({ tab: "controlling", section: "marketing", target: "campaign" })}
       />
 
-      {tab === "mira" && (
-        <div className="space-y-4">
-          <HealthCompact health={health} onAsk={askAbout} onShowAll={() => setTab("overview")} />
-          <MiraChat
-            applications={company.pendingApplications}
-            health={miraHealth}
-            onOpen={(to, id) => {
-              if (to === "overview" && id) return reveal(id);
-              if (to === "team" && id === "training") return goTraining();
-              setTab(to);
-            }}
+      <CompanyTabs value={tab} onChange={(next) => go({ tab: next })} tabs={tabs} label={t("title")} />
+
+      <div role="tabpanel" aria-label={tabs.find((x) => x.value === tab)?.label} data-tab={tab}>
+        {tab === "dashboard" && (
+          <DashboardTab
+            company={company}
+            listed={listed}
+            listedPending={listedPending}
+            health={health}
+            miraHealth={miraHealth}
+            onAsk={askAbout}
+            onMira={onMira}
+            go={go}
+            section={section}
           />
-        </div>
-      )}
-      {tab === "overview" && <HealthPanel health={health} onAsk={askAbout} late={late} />}
-      {tab === "overview" && (
-        <div className="grid items-start gap-4 *:min-w-0 lg:grid-cols-2 lg:gap-5" data-testid="company-overview">
-          <div className="space-y-4">
-            <CollapsibleSection
-              {...section("money")}
-              title={ts("money")}
-              summary={
-                company.lastQuarter
-                  ? ts("moneySummary", { amount: money(netProfit(company.lastQuarter)) })
-                  : ts("moneyEmpty")
-              }
-              icon={<PixelIcon {...UI_ICONS.portfolio} scale={2} />}
-            >
-              {/* The last quarter right at the top: the most asked-for numbers (ADR-133) */}
-              <div id="quarter" className="scroll-mt-24">
-                <QuarterReceipt company={company} />
-              </div>
-              <TreasuryCard company={company} />
-              <PayoutCard company={company} />
-            </CollapsibleSection>
-            <CollapsibleSection
-              {...section("moves")}
-              title={ts("moves")}
-              summary={ts("movesSummary")}
-              icon={<PixelIcon {...UI_ICONS.deal} scale={2} />}
-            >
-              <CompanyMovesCard />
-              <PitchCard kind="move" />
-            </CollapsibleSection>
-            <CollapsibleSection
-              {...section("situation")}
-              title={ts("situation")}
-              summary={ts("situationSummary")}
-              icon={<PixelIcon {...UI_ICONS.news} scale={2} />}
-            >
-              <SituationCard />
-              <PitchCard kind="event" />
-              <CompanyNewsCard />
-            </CollapsibleSection>
-            <CollapsibleSection
-              {...section("history")}
-              title={ts("history")}
-              summary={ts("historySummary")}
-              icon={<PixelIcon {...UI_ICONS.markets} scale={2} />}
-            >
-              <HistoryCard company={company} />
-            </CollapsibleSection>
-          </div>
-          <div className="space-y-4">
-            <CollapsibleSection
-              {...section("business")}
-              title={ts("business")}
-              summary={ts("businessSummary")}
-              icon={<PixelIcon {...UI_ICONS.briefcase} scale={2} />}
-            >
-              <ProductionCard
-                company={company}
-                onTeam={() => setTab("team")}
-                onCampaign={() => reveal("profit", "campaign")}
-              />
-              <GrowthPath
-                company={company}
-                onFill={(skills) => setHire({ skills })}
-                onTrain={trainingOpen ? goTraining : undefined}
-              />
-              <ExpansionCard company={company} />
-            </CollapsibleSection>
-            <CollapsibleSection
-              {...section("profit")}
-              title={ts("profit")}
-              summary={ts("profitSummary")}
-              icon={<PixelIcon {...UI_ICONS.star} scale={2} />}
-            >
-              <ProfitCoach
-                company={company}
-                onNavigate={(to) => {
-                  if (to === "team") return setTab("team");
-                  reveal("boss", "company-controls");
-                }}
-              />
-              <ProfitRoutes company={company} />
-              <StrategyCard company={company} />
-              <CampaignCard company={company} />
-              <MarketCard company={company} />
-            </CollapsibleSection>
-            <CollapsibleSection
-              {...section("boss")}
-              title={ts("boss")}
-              summary={ts("bossSummary")}
-              icon={<PixelIcon {...UI_ICONS.profile} scale={2} />}
-            >
-              <div id="company-controls" className="scroll-mt-24">
-                <BossOffice company={company} onTeam={() => setTab("team")} />
-              </div>
-            </CollapsibleSection>
-          </div>
-        </div>
-      )}
-      {tab === "tasks" && <TaskBoard />}
-      {tab === "team" && <TeamView company={company} onHire={setHire} />}
-      {tab === "chat" && <CompanyChat onBack={toStart} />}
+        )}
+        {tab === "controlling" && (
+          <ControllingTab
+            company={company}
+            listed={listed}
+            listedPending={listedPending}
+            section={section}
+            go={go}
+            onHire={setHire}
+            onDrawLogo={() => setDrawing(true)}
+            onEditBanner={() => setBannerOpen(true)}
+          />
+        )}
+        {tab === "staff" && (
+          <StaffTab company={company} listed={listed} listedPending={listedPending} onHire={setHire} />
+        )}
+        {tab === "books" &&
+          (listed ? <BooksTab listed={listed} /> : listedPending ? <ListedSkeleton /> : <ListedTeaser focus="books" />)}
+        {tab === "board" && (isListed ? <BoardView companyId={null} /> : <ListedTeaser focus="board" />)}
+      </div>
 
       <HireSheet company={company} request={hire} onClose={() => setHire(null)} />
     </div>
   );
 }
 
-/** Departments as chunky, pressable tabs. */
-function DepartmentTabs({
+function ListedSkeleton() {
+  return (
+    <div className="grid gap-4 lg:grid-cols-2" aria-hidden>
+      <Skeleton className="h-72 w-full rounded-lg" />
+      <Skeleton className="h-72 w-full rounded-lg" />
+      <Skeleton className="h-48 w-full rounded-lg lg:col-span-2" />
+    </div>
+  );
+}
+
+interface TabItem {
+  value: CompanyTab;
+  label: string;
+  icon: keyof typeof UI_ICONS;
+  badge?: number;
+  /** Listed-only tab of a private company: shown with a lock, leads to the teaser. */
+  locked?: boolean;
+}
+
+/**
+ * The tabs as chunky, pressable buttons. Five do not fit a phone: the bar scrolls sideways on its own (the page
+ * does not), and the active tab is brought into view.
+ */
+function CompanyTabs({
   value,
   onChange,
   tabs,
+  label,
 }: {
-  value: Tab;
-  onChange: (tab: Tab) => void;
-  tabs: { value: Tab; label: string; icon: keyof typeof UI_ICONS; badge?: number }[];
+  value: CompanyTab;
+  onChange: (tab: CompanyTab) => void;
+  tabs: TabItem[];
+  label: string;
 }) {
-  const t = useTranslations("firm");
+  const bar = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = bar.current?.querySelector<HTMLElement>('[aria-selected="true"]');
+    const box = bar.current;
+    if (!el || !box) return;
+    // Only the bar scrolls: scrollIntoView would also move the page.
+    const left = el.offsetLeft - (box.clientWidth - el.offsetWidth) / 2;
+    box.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
+  }, [value]);
   return (
     <div
+      ref={bar}
       role="tablist"
-      aria-label={t("title")}
-      className="grid grid-cols-5 gap-1 rounded-lg bg-surface-2 p-1 sm:gap-1.5 sm:p-1.5"
+      aria-label={label}
+      data-testid="company-tabs"
+      className="no-scrollbar flex gap-1 overflow-x-auto rounded-lg bg-surface-2 p-1 sm:gap-1.5 sm:p-1.5"
     >
       {tabs.map((tab) => {
         const active = tab.value === value;
@@ -305,6 +293,8 @@ function DepartmentTabs({
             type="button"
             role="tab"
             aria-selected={active}
+            data-tab={tab.value}
+            data-locked={tab.locked || undefined}
             onClick={() => {
               if (active) return;
               haptic("tap");
@@ -312,7 +302,7 @@ function DepartmentTabs({
               onChange(tab.value);
             }}
             className={cn(
-              "relative flex min-w-0 flex-col items-center justify-center gap-1 rounded-md px-1 py-2 text-2xs font-medium focus-ring transition duration-fast active:scale-[0.97] sm:flex-row sm:gap-2 sm:px-3 sm:py-2.5 sm:text-sm",
+              "relative flex min-w-[5.25rem] flex-1 shrink-0 flex-col items-center justify-center gap-1 rounded-md px-2 py-2 text-2xs font-medium focus-ring transition duration-fast active:scale-[0.97] sm:flex-row sm:gap-2 sm:px-3 sm:py-2.5 sm:text-sm",
               active ? "text-fg-1" : "text-fg-3 hover:text-fg-1",
             )}
           >
@@ -323,7 +313,7 @@ function DepartmentTabs({
                 className="absolute inset-0 rounded-md bg-surface-1 shadow-1 ring-1 ring-line-2"
               />
             )}
-            <PixelIcon {...UI_ICONS[tab.icon]} scale={1} className="relative" />
+            <PixelIcon {...UI_ICONS[tab.locked ? "lock" : tab.icon]} scale={1} className="relative" />
             <span className="relative max-w-full truncate">{tab.label}</span>
             {tab.badge ? (
               <span className="absolute top-0.5 right-0.5 rounded-pill bg-accent px-1.5 nums text-2xs text-on-accent sm:relative sm:top-auto sm:right-auto">
@@ -334,649 +324,5 @@ function DepartmentTabs({
         );
       })}
     </div>
-  );
-}
-
-function Panel({
-  title,
-  aside,
-  children,
-  className,
-}: {
-  title: string;
-  aside?: ReactNode;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <Card padding="lg" className={cn("space-y-4", className)}>
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="label-pixel text-fg-2">{title}</p>
-        {aside}
-      </div>
-      {children}
-    </Card>
-  );
-}
-
-/** The last quarter as a receipt: what came in, what went out, what stayed. */
-function QuarterReceipt({ company }: { company: MyCompany }) {
-  const t = useTranslations("firm");
-  const q = company.lastQuarter;
-  if (!q) {
-    return (
-      <Panel title={t("lastQuarter")}>
-        <p className="text-sm text-fg-3">{t("noQuarter")}</p>
-      </Panel>
-    );
-  }
-  const profit = netProfit(q);
-  const scale = Math.max(q.demandCents, q.capacityCents, 1);
-  const costs: [string, number][] = (
-    [
-      [t("cogs"), q.cogsCents],
-      [t("fixedCosts"), q.fixedCents],
-      [t("aiCosts"), q.aiWorkerCents],
-      [t("marketing"), q.marketingCents],
-      [t("wages"), q.wagesCents],
-      [t("bonus"), q.bonusCents ?? 0],
-    ] as [string, number][]
-  ).filter(([, value]) => value > 0);
-  return (
-    <Panel
-      title={`${t("lastQuarter")} · ${q.label}`}
-      aside={
-        <span className="nums text-xs text-fg-3">
-          {t("utilization", { percent: formatBps(q.utilizationBps).replace("+", "") })}
-        </span>
-      }
-    >
-      <div className="space-y-3">
-        {(
-          [
-            [t("demand"), q.demandCents, "bg-info"],
-            [t("capacity"), q.capacityCents, "bg-accent"],
-            [t("revenue"), q.revenueCents, "bg-gain"],
-          ] as const
-        ).map(([label, value, color]) => (
-          <div key={label}>
-            <div className="mb-1 flex justify-between text-sm">
-              <span className="text-fg-2">{label}</span>
-              <span className="nums text-fg-1">{money(value)}</span>
-            </div>
-            <div className="h-2.5 overflow-hidden rounded-pill bg-surface-3">
-              <motion.div
-                className={cn("h-full origin-left rounded-pill", color)}
-                initial={{ scaleX: 0 }}
-                animate={{ scaleX: value / scale }}
-                transition={SPRING.smooth}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-      <p className="text-sm text-pretty text-fg-3">{q.utilizationBps >= 9_900 ? t("soldOut") : t("idle")}</p>
-
-      <div className="rounded-md bg-surface-2 px-4 pt-3 pb-4 font-mono text-sm">
-        <dl className="space-y-1.5">
-          <div className="flex justify-between">
-            <dt className="text-fg-2">{t("revenue")}</dt>
-            <dd className="nums text-fg-1">{money(q.revenueCents)}</dd>
-          </div>
-          {costs.map(([label, value]) => (
-            <div key={label} className="flex justify-between">
-              <dt className="text-fg-3">{label}</dt>
-              <dd className="nums text-fg-2">−{money(value)}</dd>
-            </div>
-          ))}
-        </dl>
-        <div className="my-2.5 border-t border-dashed border-line-2" />
-        <div className="flex items-center justify-between gap-3">
-          <span className="font-semibold text-fg-1">{t("profit")}</span>
-          <span
-            aria-hidden
-            className={cn(
-              "ml-auto -rotate-6 rounded-xs border-2 px-1.5 py-0.5 label-pixel",
-              profit >= 0 ? "border-gain text-gain" : "border-loss text-loss",
-            )}
-          >
-            {profit >= 0 ? t("stampProfit") : t("stampLoss")}
-          </span>
-          <span className={cn("nums text-lg font-semibold", profit >= 0 ? "text-gain" : "text-loss")}>
-            {money(profit)}
-          </span>
-        </div>
-      </div>
-    </Panel>
-  );
-}
-
-/** Revenue (bars up) and profit (green up, red down) around a zero line. */
-function HistoryCard({ company }: { company: MyCompany }) {
-  const t = useTranslations("firm");
-  const history = company.history;
-  const max = Math.max(1, ...history.map((h) => Math.max(h.revenueCents, Math.abs(h.profitCents))));
-  const hasLoss = history.some((h) => h.profitCents < 0);
-  return (
-    <Panel title={t("historyTitle")}>
-      {history.length === 0 ? (
-        <p className="text-sm text-fg-3">{t("historyEmpty")}</p>
-      ) : (
-        <>
-          <div className="flex h-40 flex-col" role="img" aria-label={t("historyTitle")}>
-            <div className="flex flex-1 items-end gap-1.5 border-b border-line-2">
-              {history.map((h) => (
-                <div
-                  key={h.label}
-                  className="flex h-full min-w-0 flex-1 items-end gap-0.5"
-                  title={`${h.label}: ${money(h.revenueCents)} / ${money(h.profitCents)}`}
-                >
-                  <Bar className="bg-accent/70" share={h.revenueCents / max} from="bottom" />
-                  <Bar className="bg-gain" share={Math.max(0, h.profitCents) / max} from="bottom" />
-                </div>
-              ))}
-            </div>
-            {hasLoss && (
-              <div className="flex h-1/3 gap-1.5">
-                {history.map((h) => (
-                  <div key={h.label} className="flex h-full min-w-0 flex-1 items-start gap-0.5">
-                    <span className="flex-1" />
-                    <Bar className="bg-loss" share={Math.max(0, -h.profitCents) / max} from="top" />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="flex gap-4 text-xs text-fg-3">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="size-2 rounded-xs bg-accent/70" /> {t("revenue")}
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="size-2 rounded-xs bg-gain" /> {t("profit")}
-            </span>
-          </div>
-        </>
-      )}
-    </Panel>
-  );
-}
-
-function Bar({ share, className, from }: { share: number; className: string; from: "top" | "bottom" }) {
-  return (
-    <motion.div
-      className={cn(
-        "w-full flex-1",
-        from === "bottom" ? "origin-bottom rounded-t-xs" : "origin-top rounded-b-xs",
-        className,
-      )}
-      initial={{ scaleY: 0 }}
-      animate={{ scaleY: 1 }}
-      transition={SPRING.smooth}
-      style={{ height: `${Math.max(share > 0 ? 3 : 0, share * 100)}%` }}
-    />
-  );
-}
-
-/** Awareness and quality as chunky ten-block meters. */
-function MarketCard({ company }: { company: MyCompany }) {
-  const t = useTranslations("firm");
-  return (
-    <Panel title={t("marketTitle")}>
-      <Meter label={t("awareness")} bps={company.awarenessBps} tone="accent" />
-      <Meter label={t("quality")} bps={company.qualityBps} tone="gain" />
-      <div className="rounded-md bg-surface-2 px-3 py-2.5">
-        <p className="text-sm text-fg-2">{t("estimate")}</p>
-        <p className="nums font-semibold text-fg-1">
-          {t("estimateValue", {
-            low: formatMoney(company.estimateLowCents, { whole: true }),
-            high: formatMoney(company.estimateHighCents, { whole: true }),
-          })}
-        </p>
-        <p className="text-xs text-fg-3">{t("estimateHint")}</p>
-      </div>
-    </Panel>
-  );
-}
-
-function Meter({ label, bps, tone }: { label: string; bps: number; tone: "accent" | "gain" }) {
-  const filled = bps / 1_000;
-  return (
-    <div>
-      <div className="mb-1.5 flex justify-between text-sm">
-        <span className="text-fg-2">{label}</span>
-        <span className="nums text-fg-1">{formatBps(bps).replace("+", "")}</span>
-      </div>
-      <div
-        className="grid grid-cols-10 gap-1"
-        role="meter"
-        aria-label={label}
-        aria-valuenow={bps / 100}
-        aria-valuemin={0}
-        aria-valuemax={100}
-      >
-        {Array.from({ length: 10 }, (_, i) => {
-          const part = Math.min(1, Math.max(0, filled - i));
-          return (
-            <span key={i} className="h-3 overflow-hidden rounded-xs bg-surface-3">
-              <span
-                className={cn("block h-full origin-left", tone === "gain" ? "bg-gain" : "bg-accent")}
-                style={{ transform: `scaleX(${part})` }}
-              />
-            </span>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/** The boss's office: marketing, team, money, the next building and, far down, closing the company. */
-function BossOffice({ company, onTeam }: { company: MyCompany; onTeam: () => void }) {
-  const t = useTranslations("firm");
-  const errorText = useGameErrorText();
-  const refresh = useCompanyRefresh();
-  const maxMarketing = Math.max(100_000, Math.round(company.estimateHighCents / 4 / 5 / 1_000) * 1_000);
-  const [marketing, setMarketing] = useState(company.marketingCentsPerQuarter);
-  const [marketingState, setMarketingState] = useState<ButtonState>("idle");
-  const [upgradeState, setUpgradeState] = useState<ButtonState>("idle");
-  const [closing, setClosing] = useState(false);
-  const staff = company.employees + company.aiWorkers;
-  const next = NEXT_TIER[company.tier];
-
-  const run = async (action: () => Promise<unknown>, done: string) => {
-    await action();
-    toast.success(done, undefined, { silent: true });
-    void playSound("success");
-    haptic("success");
-    await refresh();
-  };
-
-  const saveMarketing = async () => {
-    setMarketingState("loading");
-    try {
-      await run(() => engine.setCompanyMarketing(crypto.randomUUID(), marketing), t("marketingSaved"));
-      setMarketingState("success");
-      window.setTimeout(() => setMarketingState("idle"), 800);
-    } catch (error) {
-      setMarketingState("idle");
-      toast.error(t("marketing"), errorText(error));
-    }
-  };
-
-  const upgrade = async () => {
-    setUpgradeState("loading");
-    try {
-      await run(() => engine.upgradeCompany(crypto.randomUUID()), t("upgraded"));
-      setUpgradeState("success");
-    } catch (error) {
-      setUpgradeState("idle");
-      toast.error(t("upgradeTitle"), errorText(error));
-    }
-  };
-
-  return (
-    <Panel title={t("controlsTitle")}>
-      <div className="space-y-2">
-        <div className="flex items-baseline justify-between">
-          <span className="text-sm text-fg-2">{t("marketingBudget")}</span>
-          <span className="nums font-semibold text-fg-1">{formatMoney(marketing, { whole: true })}</span>
-        </div>
-        <Slider
-          value={marketing / maxMarketing}
-          onValueChange={(v) => setMarketing(Math.round((v * maxMarketing) / 1_000) * 1_000)}
-          label={t("marketingBudget")}
-          marks={[0.25, 0.5, 0.75]}
-        />
-        <Button
-          size="sm"
-          variant="secondary"
-          state={marketingState}
-          disabled={marketing === company.marketingCentsPerQuarter}
-          onClick={() => void saveMarketing()}
-        >
-          {t("marketingSave")}
-        </Button>
-      </div>
-
-      <button
-        type="button"
-        onClick={() => {
-          haptic("tap");
-          onTeam();
-        }}
-        className="flex w-full items-center gap-3 rounded-md bg-surface-2 px-3 py-3 text-left focus-ring transition duration-fast hover:-translate-y-0.5 hover:bg-surface-3 active:translate-y-0 active:scale-[0.98]"
-      >
-        <PixelIcon {...UI_ICONS.profile} scale={2} className="text-fg-2" />
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm text-fg-1">{t("staffCount", { used: staff, max: company.maxEmployees })}</span>
-          <span className="block text-xs text-fg-3">
-            {t("teamLine", { ai: company.aiWorkers })} ·{" "}
-            <span className="nums text-gain">
-              {t("productivityValue", { value: factor.format(company.teamProductivityBps / 10_000) })}
-            </span>{" "}
-            · {t("capacity")} <ShortMoney cents={company.capacityCents} />
-          </span>
-        </span>
-        <span className="nums text-lg font-semibold text-fg-1" data-testid="ai-workers" title={t("aiWorkers")}>
-          {company.aiWorkers}
-        </span>
-      </button>
-
-      {next &&
-        company.upgradeCostCents !== null &&
-        (company.tier === "garage" || company.tier === "small_business") && (
-          <div className="flex gap-3 rounded-md border border-line-1 bg-surface-1 px-3 py-3">
-            <PixelIcon
-              {...COMPANY_BUILDINGS[next]}
-              scale={3}
-              className={cn(!company.canUpgrade && "opacity-50 grayscale")}
-            />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-fg-1">
-                {company.tier === "garage" ? t("upgradeTitle") : t("upgradeGmbhTitle")}
-              </p>
-              <p className="mt-0.5 text-xs text-pretty text-fg-3">
-                {company.tier === "garage"
-                  ? t("upgradeText", { amount: formatMoney(company.upgradeCostCents, { whole: true }) })
-                  : t("upgradeGmbhText", { amount: formatMoney(company.upgradeCostCents, { whole: true }) })}
-              </p>
-              <Button
-                size="sm"
-                className="mt-2"
-                state={upgradeState}
-                disabled={!company.canUpgrade}
-                onClick={() => void upgrade()}
-              >
-                {company.canUpgrade
-                  ? t("upgrade")
-                  : t("upgradeLockedAt", {
-                      level:
-                        company.tier === "garage" ? BALANCE.company.tiers[0]!.minLevel : BALANCE.startups.gmbh.minLevel,
-                    })}
-              </Button>
-            </div>
-          </div>
-        )}
-
-      <details className="group rounded-md border border-line-1 px-3 py-2 text-sm">
-        <summary className="cursor-pointer list-none text-fg-3 focus-ring hover:text-fg-1">
-          {t("payFactorTitle")}
-        </summary>
-        <div className="mt-3 space-y-2">
-          <p className="text-fg-2">{t("payFactor", { value: formatBps(company.payFactorBps).replace("+", "") })}</p>
-          <p className="text-xs text-pretty text-fg-3">{t("payFactorHint")}</p>
-        </div>
-      </details>
-
-      {/* The dissolve action stays plainly visible, not hidden away (ADR-147). */}
-      <div className="space-y-2 rounded-md border border-loss/40 bg-loss-soft px-3 py-3" data-testid="danger-zone">
-        <p className="label-pixel text-loss">{t("dangerZone")}</p>
-        <p className="text-xs text-pretty text-fg-3">{t("closeHint")}</p>
-        <Button size="sm" variant="danger" onClick={() => setClosing(true)} data-testid="close-company">
-          {t("closeTitle")}
-        </Button>
-      </div>
-      <CloseSheet company={company} open={closing} onClose={() => setClosing(false)} />
-    </Panel>
-  );
-}
-
-function MoneySheet({
-  mode,
-  company,
-  onClose,
-}: {
-  mode: "deposit" | "withdraw" | null;
-  company: MyCompany;
-  onClose: () => void;
-}) {
-  const t = useTranslations("firm");
-  const errorText = useGameErrorText();
-  const refresh = useCompanyRefresh();
-  const privateCents = useGame((state) => state.portfolio?.cashCents ?? 0);
-  const [text, setText] = useState("");
-  const [state, setState] = useState<ButtonState>("idle");
-  const [shown, setShown] = useState(mode);
-  if (mode !== null && mode !== shown) {
-    setShown(mode);
-    setText("");
-    setState("idle");
-  }
-  const deposit = shown !== "withdraw";
-  const available = deposit ? privateCents : Math.max(0, company.cashCents - company.unpaidCents);
-  const cents = parseEuroCents(text) ?? 0;
-  const tooMuch = cents > available;
-  const after = {
-    private: privateCents + (deposit ? -cents : cents),
-    company: company.cashCents + (deposit ? cents : -cents),
-  };
-  const submit = async () => {
-    if (!cents || tooMuch || !shown) return;
-    setState("loading");
-    try {
-      if (deposit) await engine.companyDeposit(crypto.randomUUID(), cents);
-      else await engine.companyWithdraw(crypto.randomUUID(), cents);
-      toast.success(deposit ? t("depositDone") : t("withdrawDone"), formatMoney(cents), { silent: true });
-      void playSound("coin");
-      haptic("success");
-      await refresh();
-      onClose();
-    } catch (error) {
-      setState("idle");
-      toast.error(t("money"), errorText(error));
-    }
-  };
-  const pocket = (label: string, now: number, next: number, highlight: boolean) => (
-    <div
-      className={cn(
-        "min-w-0 flex-1 rounded-md px-3 py-2.5",
-        highlight ? "bg-accent-soft ring-1 ring-accent" : "bg-surface-2",
-      )}
-    >
-      <p className="label-pixel text-fg-3">{label}</p>
-      <p className="truncate nums font-semibold text-fg-1">{formatMoney(now, { whole: true })}</p>
-      {cents > 0 && !tooMuch && (
-        <p className="truncate nums text-xs text-fg-2">→ {formatMoney(next, { whole: true })}</p>
-      )}
-    </div>
-  );
-  return (
-    <Sheet
-      open={mode !== null}
-      onOpenChange={(open) => !open && onClose()}
-      title={deposit ? t("deposit") : t("withdraw")}
-      description={deposit ? t("depositHint") : t("withdrawHint")}
-      footer={
-        <Button block size="lg" state={state} disabled={!cents || tooMuch} onClick={() => void submit()}>
-          {cents > 0
-            ? t(deposit ? "depositAmount" : "withdrawAmount", { amount: formatMoney(cents, { whole: true }) })
-            : deposit
-              ? t("deposit")
-              : t("withdraw")}
-        </Button>
-      }
-    >
-      <div className="space-y-4">
-        <div className="flex items-center gap-2" data-testid="money-flow">
-          {pocket(t("private"), privateCents, after.private, !deposit)}
-          <motion.span
-            aria-hidden
-            className="font-pixel text-lg text-accent"
-            animate={{ x: deposit ? [0, 4, 0] : [0, -4, 0] }}
-            transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
-          >
-            {deposit ? "→" : "←"}
-          </motion.span>
-          {pocket(t("companyCash"), company.cashCents, after.company, deposit)}
-        </div>
-        <Field
-          label={t("amount")}
-          inputMode="decimal"
-          value={text}
-          error={tooMuch ? t("tooMuch", { amount: formatMoney(available, { whole: true }) }) : undefined}
-          onChange={(event) => setText(event.target.value)}
-        />
-        <div className="flex flex-wrap gap-2">
-          {[0.1, 0.25, 0.5, 1].map((share) => {
-            const value = Math.floor((available * share) / 100) * 100;
-            return (
-              <button
-                key={share}
-                type="button"
-                disabled={value <= 0}
-                onClick={() => {
-                  haptic("tap");
-                  setText(String(value / 100).replace(".", ","));
-                }}
-                className="rounded-pill border border-line-1 px-3 py-1.5 text-xs text-fg-2 focus-ring transition duration-fast hover:border-accent hover:text-fg-1 active:scale-95 disabled:opacity-40"
-              >
-                {share === 1 ? t("all") : `${share * 100} %`}
-              </button>
-            );
-          })}
-        </div>
-        {!deposit && company.unpaidCents > 0 && (
-          <p className="text-xs text-warn">{t("withdrawUnpaid", { amount: money(company.unpaidCents) })}</p>
-        )}
-      </div>
-    </Sheet>
-  );
-}
-
-/** The company's till: balance (live), the founder's own money, deposit and withdraw as big buttons. */
-function TreasuryCard({ company }: { company: MyCompany }) {
-  const t = useTranslations("firm");
-  const privateCents = useGame((state) => state.portfolio?.cashCents ?? 0);
-  const [mode, setMode] = useState<"deposit" | "withdraw" | null>(null);
-  const live = company.live;
-  const hours = company.hours.slice(-12);
-  const max = Math.max(1, ...hours.map((h) => Math.abs(h.profitCents)));
-  return (
-    <Panel title={t("treasuryTitle")}>
-      <div data-testid="treasury">
-        <p className="text-3xl font-semibold text-fg-1">
-          {live ? (
-            <LiveMoney cents={company.cashCents} perHourCents={live.profitPerHourCents} asOf={live.lastHourAt} />
-          ) : (
-            <ShortMoney cents={company.cashCents} />
-          )}
-        </p>
-        <p className="mt-1 text-xs text-fg-3">
-          {t("privateLine")} <ShortMoney cents={privateCents} className="text-fg-2" />
-          {company.unpaidCents > 0 && (
-            <span className="text-warn"> · {t("unpaidLine", { amount: money(company.unpaidCents) })}</span>
-          )}
-        </p>
-      </div>
-      {hours.length > 0 && (
-        <div className="flex h-10 items-center gap-0.5" role="img" aria-label={t("hoursChart")}>
-          {hours.map((h) => (
-            <span key={h.hourStart} className="flex h-full flex-1 flex-col justify-center">
-              <span
-                className={cn("w-full rounded-xs", h.profitCents >= 0 ? "self-end bg-gain" : "bg-loss")}
-                style={{ height: `${Math.max(6, (Math.abs(h.profitCents) / max) * 50)}%` }}
-                title={`${new Date(h.hourStart).getHours()}:00 · ${formatMoney(h.profitCents, { whole: true })}`}
-              />
-            </span>
-          ))}
-        </div>
-      )}
-      <div className="grid grid-cols-2 gap-2">
-        <MoneyButton
-          icon="↓"
-          label={t("deposit")}
-          hint={t("depositShort")}
-          onClick={() => setMode("deposit")}
-          primary
-        />
-        <MoneyButton icon="↑" label={t("withdraw")} hint={t("withdrawShort")} onClick={() => setMode("withdraw")} />
-      </div>
-      <MoneySheet mode={mode} company={company} onClose={() => setMode(null)} />
-    </Panel>
-  );
-}
-
-function MoneyButton({
-  icon,
-  label,
-  hint,
-  onClick,
-  primary,
-}: {
-  icon: string;
-  label: string;
-  hint: string;
-  onClick: () => void;
-  primary?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        haptic("tap");
-        onClick();
-      }}
-      className={cn(
-        "flex items-center gap-3 rounded-md px-3 py-3 text-left focus-ring transition duration-fast hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.97]",
-        primary ? "bg-accent text-on-accent shadow-1" : "bg-surface-2 text-fg-1 ring-1 ring-line-2 hover:bg-surface-3",
-      )}
-    >
-      <span
-        aria-hidden
-        className={cn(
-          "grid size-8 shrink-0 place-items-center rounded-sm font-pixel text-base",
-          primary ? "bg-on-accent/15" : "bg-surface-3",
-        )}
-      >
-        {icon}
-      </span>
-      <span className="min-w-0">
-        <span className="block text-sm font-semibold">{label}</span>
-        <span className={cn("block truncate text-2xs", primary ? "opacity-80" : "text-fg-3")}>{hint}</span>
-      </span>
-    </button>
-  );
-}
-
-function CloseSheet({ company, open, onClose }: { company: MyCompany; open: boolean; onClose: () => void }) {
-  const t = useTranslations("firm");
-  const errorText = useGameErrorText();
-  const refresh = useCompanyRefresh();
-  const [busy, setBusy] = useState(false);
-  const close = async () => {
-    setBusy(true);
-    try {
-      const r = await engine.closeCompany(crypto.randomUUID());
-      toast.success(
-        t("closed"),
-        `${t("closedText", { debt: money(r.totalDebtCents), back: money(r.toFounderCents) })}${
-          r.loanCents > 0 ? ` ${t("closedLoan", { loan: money(r.loanCents) })}` : ""
-        }`,
-      );
-      onClose();
-      await refresh();
-    } catch (error) {
-      toast.error(t("closeTitle"), errorText(error));
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <Sheet
-      open={open}
-      onOpenChange={(o) => !o && onClose()}
-      title={t("closeTitle")}
-      footer={
-        <HoldButton tone="loss" onConfirm={() => void close()} disabled={busy} className="w-full">
-          {t("closeConfirm")}
-        </HoldButton>
-      }
-    >
-      <p className="text-pretty text-fg-2">{t("closeText")}</p>
-      <p className="mt-3 nums text-sm text-fg-3">
-        {t("closeEstimate", { cash: money(company.cashCents), unpaid: money(company.unpaidCents) })}
-      </p>
-      <p className="mt-3 text-sm text-pretty text-fg-2">{t("closeNext")}</p>
-    </Sheet>
   );
 }
