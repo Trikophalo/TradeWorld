@@ -2876,8 +2876,10 @@ Menge, Image …), acht sinnvolle Punkte, die man mit Mira angehen kann.
   jede Kopie trägt ihre Nummer („#17“). Die Population jeder Karte ist für alle sichtbar.
 - **Zustand** jeder Kopie: Poor 2 %, Good 18 %, Near Mint 50 %, Mint 30 %. Ab Good ist die Kopie den Marktwert wert,
   jede Stufe unter Good kostet 5 % (Poor: 95 %). Es bleibt bei den vier genannten Stufen.
-- **Marktwert:** einer je Karte (nicht je Kopie), in Cent. Wert einer Kopie = Marktwert × Zustandsfaktor, im Slab
-  Marktwert × Notenfaktor (kaufmännisch „half even“). Der Marktwert bewegt sich auf zwei Wegen:
+- **Marktwert:** einer je Karte (nicht je Kopie), geführt als Kurs (`value_e4` = Euro × 10 000), damit auch
+  Karten für 1 € sich in kleinen Schritten bewegen. Wert einer Kopie in Cent = Marktwert × Zustandsfaktor, im Slab
+  Marktwert × Notenfaktor; hier wird einmal gerundet (kaufmännisch „half even“). Der Marktwert bewegt sich auf zwei
+  Wegen:
   1. **Verkäufe.** Ein Verkauf zählt nur, wenn sein Preis je Karte (Preis ÷ Zustands- oder Notenfaktor) höchstens
      25 % vom Marktwert entfernt ist. Dann wandert der Wert 20 % des Weges zum Preis, höchstens 2 % je Verkauf.
      Aufwärts wird mit der Beliebtheit der Karte skaliert (mindestens 25 %). Kauft ein KI-Sammler das Angebot eines
@@ -2921,7 +2923,7 @@ Menge, Image …), acht sinnvolle Punkte, die man mit Mira angehen kann.
   0/0/0/500/800/1200/2000/2500/2000/1000, Near Mint 0/0/0/0/0/100/400/1000/2500/6000, Mint
   0/0/0/0/0/0/0/200/800/9000. Eine 10 gibt es also bei Good zu 10 %, Near Mint zu 60 %, Mint zu 90 %, Poor zu 0,1 %
   (der Eigentümer schrieb zweimal „Near Mint 90 %“; das zweite meint Mint). Notenfaktoren: 1 bis 10 =
-  0,35 / 0,45 / 0,55 / 0,65 / 0,75 / 0,85 / 0,95 / 1,2 / 1,6 / 3. Mit 8 bis 10 ist die Karte immer mehr wert als
+  0,3 / 0,4 / 0,5 / 0,6 / 0,7 / 0,8 / 0,9 / 1,2 / 1,6 / 3. Mit 8 bis 10 ist die Karte immer mehr wert als
   vorher, darunter weniger. Slabs werden mit ihrer Note gehandelt; es bleibt bei einem Marktwert je Karte.
   **Slab aufbrechen** gibt die rohe Karte mit ihrem Zustand zurück, ohne Erstattung; sie darf erneut zu ASP.
 - **Tabellen** (alle intern, RLS ohne Policies): `nexamon_cards`, `nexamon_copies`, `nexamon_listings`,
@@ -2934,10 +2936,16 @@ Menge, Image …), acht sinnvolle Punkte, die man mit Mira angehen kann.
   als Klatsch in den NEXA Nachrichten), Missionen (erster Booster, 10 Booster, erste Rare, erste Ultra, erster
   Verkauf, erste 10). Konto zurücksetzen: Angebote enden, laufende Gradings verfallen, die Kopien gehen an die KI
   (die Population bleibt wahr).
-- **Demo:** dieselben Regeln aus `src/lib/sim/nexamon.ts` (`src/features/game/demo/nexamon.ts`).
+- **Demo:** dieselben Regeln aus `src/lib/sim/nexamon.ts` (`src/features/game/demo/nexamon.ts`), mit einem
+  Spieler und den KI-Verkäufern. Zeit vergeht beim Benutzen: fällige Gradings, KI-Booster, KI-Käufe und der
+  stündliche Wertschritt werden bei jedem Aufruf nachgeholt. Der KI-Bestand ist dort auf 12 Kopien je Karte
+  begrenzt (die Population zählt trotzdem jeden Zug), und die KI bietet in der Demo nie eine Legendary an.
+- **KI und Slabs:** Kauft die KI einen Slab, liegt er in ihrem Bestand und kommt wie jede andere Kopie wieder in
+  den Verkauf, sobald ein Angebotsplatz der Karte frei ist (dann zum Slab-Wert + 10 %).
 - Fehler: `nexamon_locked` NX163, `nexamon_unknown` NX164, `nexamon_not_owner` NX165, `nexamon_listed` NX166,
   `nexamon_not_listed` NX167, `nexamon_price_changed` NX168, `nexamon_listing_limit` NX169, `nexamon_grading`
-  NX170, `nexamon_not_raw` NX171, `nexamon_not_graded` NX172, `nexamon_not_sellable` NX173; außerdem
+  NX170, `nexamon_not_raw` NX171, `nexamon_not_graded` NX172, `nexamon_not_sellable` NX173, `nexamon_own_listing`
+  NX174, `nexamon_grading_limit` NX175; außerdem
   `insufficient_funds`, `rate_limited`, `invalid_argument`.
 - **Offen (Balancing):** Die Startpreise machen Booster im Erwartungswert teurer oder billiger als ihren Inhalt, je
   nach Katalog; gebremst wird über die begrenzte KI-Nachfrage und fallende Werte bei wachsendem Angebot. KI-Budget,

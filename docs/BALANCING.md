@@ -1244,3 +1244,57 @@ Werte in `BALANCE.livingBonus`, `BALANCE.property.furniturePriceBps`, `BALANCE.p
   50 % des Kaufpreises.
 - **Miete:** frei von 1 € bis 100.000 € je Platz und Stunde (ein Tag kostet 24 Stunden). Die faire Miete aus ADR-158
   bleibt der Maßstab der KI-Mieter.
+
+## Nachtrag: Nexamon-Sammelkarten (ADR-165)
+
+Werte in `BALANCE.nexamon` (`src/config/nexamon-rules.ts`), Startpreise im Katalog (`src/config/nexamon`).
+
+- **Booster:** Mystic Energy 200 €, Super Apex 1.000 €, Prismatic Peak 5.000 €, je 5 Karten.
+- **Ziehungsraten je Platz** (Nenner 3600):
+
+  | Platz   | Legendary      | Prisma        | Ultra         | Rare         | Common |
+  | ------- | -------------- | ------------- | ------------- | ------------ | ------ |
+  | 1 bis 3 | 0              | 0             | 0             | 0            | 3600   |
+  | 4       | 0              | 0             | 150 (1/24)    | 900 (1/4)    | 2550   |
+  | 5       | 4 (1/900)      | 45 (1/80)     | 150 (1/24)    | 900 (1/4)    | 2501   |
+  | Booster | 1/900 erwartet | 1/80 erwartet | 1/12 erwartet | 1/2 erwartet | ≈ 4,40 |
+
+  Mindestens eine Rare oder besser steckt in 50,8 % der Booster (1 − 2550/3600 × 2501/3600).
+
+- **Zustand:** Poor 2 %, Good 18 %, Near Mint 50 %, Mint 30 %. Wertfaktor: ab Good 100 %, Poor 95 %.
+- **Grading (ASP):** 50 % des Werts der Kopie (mindestens 1 €), 60 Minuten, höchstens 10 gleichzeitig.
+
+  | Note       | 1   | 2    | 3    | 4    | 5    | 6    | 7    | 8    | 9     | 10    |
+  | ---------- | --- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ----- | ----- |
+  | Poor       | 5 % | 10 % | 15 % | 20 % | 20 % | 15 % | 10 % | 4 %  | 0,9 % | 0,1 % |
+  | Good       | 0   | 0    | 0    | 5 %  | 8 %  | 12 % | 20 % | 25 % | 20 %  | 10 %  |
+  | Near Mint  | 0   | 0    | 0    | 0    | 0    | 1 %  | 4 %  | 10 % | 25 %  | 60 %  |
+  | Mint       | 0   | 0    | 0    | 0    | 0    | 0    | 0    | 2 %  | 8 %   | 90 %  |
+  | Wertfaktor | 0,3 | 0,4  | 0,5  | 0,6  | 0,7  | 0,8  | 0,9  | 1,2  | 1,6   | 3     |
+
+  Erwarteter Faktor nach dem Grading: Mint 2,85, Near Mint 2,36, Good 1,28, Poor 0,67. Abzüglich der Gebühr (0,5)
+  lohnt sich Grading im Schnitt für Mint und Near Mint, nicht für Good und Poor (dort ist es eine Wette auf die 10).
+
+- **Marktwert** (ein Wert je Karte): Schritt je gezähltem Verkauf 20 % des Weges zum Preis je Karte, höchstens 2 %,
+  aufwärts × Beliebtheit (mindestens 25 %); Band für plausible Preise ± 25 %; KI-Kauf + 0,5 % × Beliebtheit;
+  Sofortverkauf − 0,25 %. Angebot gegen Nachfrage stündlich ± 0,3 % × Druck (aufwärts × Beliebtheit). Grenzen: 20 %
+  bis 300 % des Startpreises, der Deckel wächst um 2 % je Tag und 0,5 % je gezähltem Verkauf bis 2000 %; je Tag
+  höchstens + 15 % und − 20 %.
+- **Beliebtheit:** Common 5 %, Rare 15 %, Ultra 40 %, Prisma 70 %, Legendary 90 %, dazu bis 30 % für kleine
+  Populationen (popRef 2000 / 800 / 150 / 30 / 4).
+- **Gegen Manipulation:** je Kartenpaar von Spielern ein gezählter Verkauf in 24 Stunden, je Käufer und Karte drei am
+  Tag; zwei Freunde schaffen so höchstens + 2 % am Tag und zahlen jedes Mal 5 % Gebühr.
+- **KI-Verkäufer:** Startbestand 6 / 4 / 2 / 1 / 0 Kopien je Karte (Prisma nur die zwei günstigsten je Set), im Angebot
+  4 / 3 / 2 / 1 / 0, immer Wert + 10 %. KI-Booster je Stunde: 4 / 2 / 1 (Mystic Energy / Super Apex / Prismatic Peak),
+  also je Common etwa 8 neue Kopien am Tag im ersten Set, je Prisma eine in gut vier Tagen, je Legendary eine in
+  knapp drei Wochen. Eine Legendary der KI kommt mit 0,2 % je Stunde in den Verkauf.
+- **KI-Sammler:** kaufen bis zum Wert der Kopie (Slabs bis 70 %), 3 % × (1 + Beliebtheit) je Minute, höchstens
+  2 / 3 / 3 / 2 / 1 Kopien je Karte in 7 Tagen und je Set und Tag für 300 Booster-Preise (60.000 € / 300.000 € /
+  1.500.000 €). Das ist die einzige Stelle, an der Karten zu neuem Geld werden; Gebühren, Booster und ASP nehmen es
+  wieder heraus.
+- **Sofortverkauf:** rohe Commons und Rares zu 50 % des Werts, bis zu 50 Kopien je Aufruf.
+- **Markt:** 5 % Gebühr für verkaufende Spieler, Preis 0,10 € bis 1 Mrd. €, höchstens 30 offene Angebote.
+- **Stellschrauben, falls Booster zu lohnend oder zu teuer sind:** `ai.dailyBudgetPacks`, `ai.buysPerCardWindow`,
+  `ai.gradedBuyMaxBps`, `ai.packsPerHour`, `grading.valueBps`, `quickSell.bps` und die Startpreise im Katalog. Mit den
+  Platzhalter-Preisen (gleichmäßig über die Spannen) liegt der Inhalt eines Boosters rechnerisch über seinem Preis;
+  die begrenzte KI-Nachfrage und der Sofortverkauf zu 50 % halten den tatsächlichen Erlös darunter.
