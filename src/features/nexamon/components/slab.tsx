@@ -3,9 +3,25 @@
 import { useTranslations } from "next-intl";
 import type { CSSProperties } from "react";
 import type { NexamonArt, NexamonCard } from "@/config/nexamon";
-import { ASP_INK, composeSlab, SLAB_CARD, SLAB_LABEL, SLAB_SIZE } from "@/components/pixel/nexamon-pack";
+import {
+  ASP_INK,
+  BLACK_LABEL_INK,
+  composeSlab,
+  SLAB_CARD,
+  SLAB_LABEL,
+  SLAB_SIZE,
+  slabTier,
+} from "@/components/pixel/nexamon-pack";
 import { GOLD_INK } from "@/components/pixel/nexamon-symbols";
-import { clampGrade, fitTextScale, formatCardNumber, formatSerial, gradeWordKey, pixelScale } from "../lib";
+import {
+  clampGrade,
+  fitTextScale,
+  formatCardNumber,
+  formatSerial,
+  gradeNumber,
+  gradeWordKey,
+  pixelScale,
+} from "../lib";
 import { NexamonCardBack, NexamonCardFace } from "./card-face";
 import { FoilLayer, type CardLight, type FoilSpec } from "./holo";
 import { PixelCanvas } from "./pixel-canvas";
@@ -16,7 +32,7 @@ const PLASTIC: FoilSpec = { ink: "nexamon-plastic", blend: "screen", opacity: 0.
 export interface NexamonSlabProps {
   card: NexamonCard;
   art?: NexamonArt;
-  /** Grade of the grading company "ASP", 1 to 10. 10 gets the gold label. */
+  /** Grade of the grading company "ASP", 1 to 10. 10 gets the gold label, 11 is the Black Label (a 10 on black). */
   grade: number;
   /** Serial number of the slab; shown with eight digits. */
   serial: number | string;
@@ -62,11 +78,14 @@ export function NexamonSlab({
   const u = pixelScale(scale);
   const grade = clampGrade(rawGrade);
   const word = t(`grade.${gradeWordKey(grade)}`);
-  const gold = grade === 10;
+  const tier = slabTier(grade);
+  const gold = tier === "gold";
+  const black = tier === "black";
   const rasters = composeSlab(grade);
   const l = SLAB_LABEL;
-  const brand = gold ? GOLD_INK.dark : ASP_INK.brand;
-  const onBand = gold ? GOLD_INK.deep : "#ffffff";
+  const brand = black ? BLACK_LABEL_INK.white : gold ? GOLD_INK.dark : ASP_INK.brand;
+  const onBand = black ? BLACK_LABEL_INK.black : gold ? GOLD_INK.deep : "#ffffff";
+  const ink = black ? BLACK_LABEL_INK.silver : ASP_INK.ink;
   const at = (x: number, y: number, w: number, h: number): CSSProperties => ({
     position: "absolute",
     left: x * u,
@@ -101,8 +120,9 @@ export function NexamonSlab({
       front={(light) => (
         <div
           role="img"
-          aria-label={t("slabLabel", { name: card.name, grade, word })}
+          aria-label={t("slabLabel", { name: card.name, grade: gradeNumber(grade), word })}
           data-grade={grade}
+          data-label={tier}
           className="relative isolate size-full select-none"
         >
           <PixelCanvas raster={rasters.front} scale={u} />
@@ -110,7 +130,7 @@ export function NexamonSlab({
             <NexamonCardFace card={card} art={art} scale={u} evolvesFromName={evolvesFromName} light={light} />
           </div>
           {band(`ASP · ${t("slabSerial", { serial: formatSerial(serial) })}`)}
-          <div aria-hidden style={{ color: ASP_INK.ink }}>
+          <div aria-hidden style={{ color: ink }}>
             <p
               className="overflow-hidden font-pixel whitespace-nowrap"
               style={{ ...at(l.x + 21, l.y + 6, 36, 5), fontSize: u * 4, lineHeight: `${u * 5}px` }}
@@ -140,7 +160,7 @@ export function NexamonSlab({
               style={{ ...at(l.x + l.w - 18, l.y + 6, 16, 14), fontSize: u * 11, lineHeight: `${u * 14}px` }}
               data-testid="slab-grade"
             >
-              {grade}
+              {gradeNumber(grade)}
             </p>
           </div>
           <Plastic light={light} u={u} />

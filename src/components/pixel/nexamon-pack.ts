@@ -237,26 +237,50 @@ export const ASP_INK = {
   ink: "#16211f",
 } as const;
 
+/** Inks of the Black Label: a black label with silver print. */
+export const BLACK_LABEL_INK = {
+  black: "#0b0c10",
+  shade: "#191b22",
+  silver: "#c9ced8",
+  silverDark: "#7d8492",
+  white: "#ffffff",
+} as const;
+
+/** Label of a slab: plain for 1 to 9, gold for a 10, black for the Black Label (grade 11). */
+export type SlabTier = "plain" | "gold" | "black";
+export const slabTier = (grade: number): SlabTier => (grade >= 11 ? "black" : grade >= 10 ? "gold" : "plain");
+
 /** The ASP emblem: a hexagonal seal with the three letters, 17 x 15. */
-function drawAspEmblem(r: Raster, x: number, y: number, gold: boolean): void {
-  const fill = gold ? GOLD_INK.base : ASP_INK.brand;
-  const edge = gold ? GOLD_INK.deep : ASP_INK.brandDark;
-  const light = gold ? GOLD_INK.pale : ASP_INK.brandLight;
+function drawAspEmblem(r: Raster, x: number, y: number, tier: SlabTier): void {
+  const fill = tier === "black" ? BLACK_LABEL_INK.silver : tier === "gold" ? GOLD_INK.base : ASP_INK.brand;
+  const edge = tier === "black" ? BLACK_LABEL_INK.silverDark : tier === "gold" ? GOLD_INK.deep : ASP_INK.brandDark;
+  const light = tier === "black" ? BLACK_LABEL_INK.white : tier === "gold" ? GOLD_INK.pale : ASP_INK.brandLight;
   for (let py = 0; py < 15; py++) {
     const inset = Math.max(0, Math.abs(py - 7) - 3);
     for (let px = inset; px < 17 - inset; px++)
       setPixel(r, x + px, y + py, px === inset || px === 16 - inset || py === 0 || py === 14 ? edge : fill);
   }
   fillRect(r, x + 5, y + 1, 7, 1, light);
-  drawMicroText(r, "ASP", x + 3, y + 5, gold ? GOLD_INK.deep : "#ffffff");
+  drawMicroText(
+    r,
+    "ASP",
+    x + 3,
+    y + 5,
+    tier === "black" ? BLACK_LABEL_INK.black : tier === "gold" ? GOLD_INK.deep : "#ffffff",
+  );
 }
 
-const slabCache = new Map<boolean, { front: Raster; back: Raster }>();
+const slabCache = new Map<SlabTier, { front: Raster; back: Raster }>();
 
-/** The plastic case of a graded card, front and back. A grade of 10 gets the gold label. */
+/**
+ * The plastic case of a graded card, front and back. A grade of 10 gets the gold label, the Black Label (11) a
+ * black one with silver print.
+ */
 export function composeSlab(grade: number): { front: Raster; back: Raster } {
-  const gold = grade >= 10;
-  const hit = slabCache.get(gold);
+  const tier = slabTier(grade);
+  const gold = tier === "gold";
+  const black = tier === "black";
+  const hit = slabCache.get(tier);
   if (hit) return hit;
   const { width: w, height: h } = SLAB_SIZE;
   const build = (back: boolean): Raster => {
@@ -281,30 +305,121 @@ export function composeSlab(grade: number): { front: Raster; back: Raster } {
 
     // Label.
     const l = SLAB_LABEL;
-    fillRect(r, l.x, l.y, l.w, l.h, ASP_INK.paper);
+    fillRect(r, l.x, l.y, l.w, l.h, black ? BLACK_LABEL_INK.black : ASP_INK.paper);
     for (let y = l.y; y < l.y + l.h; y++)
-      for (let x = l.x; x < l.x + l.w; x++) if ((x * 5 + y * 9) % 13 === 0) setPixel(r, x, y, ASP_INK.paperShade);
-    const band = gold ? GOLD_INK.base : ASP_INK.brand;
+      for (let x = l.x; x < l.x + l.w; x++)
+        if ((x * 5 + y * 9) % 13 === 0) setPixel(r, x, y, black ? BLACK_LABEL_INK.shade : ASP_INK.paperShade);
+    const band = black ? BLACK_LABEL_INK.silver : gold ? GOLD_INK.base : ASP_INK.brand;
     fillRect(r, l.x, l.y, l.w, 5, band);
-    fillRect(r, l.x, l.y, l.w, 1, gold ? GOLD_INK.pale : ASP_INK.brandLight);
+    fillRect(r, l.x, l.y, l.w, 1, black ? BLACK_LABEL_INK.white : gold ? GOLD_INK.pale : ASP_INK.brandLight);
     fillRect(r, l.x, l.y + l.h - 2, l.w, 2, band);
+    // The Black Label: a fine silver line inside the label and a glint in two corners.
+    if (black) {
+      strokeRect(r, l.x + 1, l.y + 6, l.w - 2, l.h - 9, BLACK_LABEL_INK.silverDark, 0.55);
+      setPixel(r, l.x + 1, l.y + 6, BLACK_LABEL_INK.white);
+      setPixel(r, l.x + l.w - 2, l.y + l.h - 4, BLACK_LABEL_INK.white);
+    }
     strokeRect(r, l.x - 1, l.y - 1, l.w + 2, l.h + 2, "#5f7690", 0.8);
     if (back) {
-      drawAspEmblem(r, l.x + 4, l.y + 6, gold);
-      drawMicroText(r, "ASP", l.x + 25, l.y + 8, ASP_INK.brandDark, 2);
+      drawAspEmblem(r, l.x + 4, l.y + 6, tier);
+      drawMicroText(r, "ASP", l.x + 25, l.y + 8, black ? BLACK_LABEL_INK.silver : ASP_INK.brandDark, 2);
       // A row of bars like a printed code.
       const rand = rng(17);
-      for (let x = l.x + 51; x < l.x + l.w - 3; x++) if (rand() > 0.45) fillRect(r, x, l.y + 8, 1, 10, ASP_INK.ink);
+      for (let x = l.x + 51; x < l.x + l.w - 3; x++)
+        if (rand() > 0.45) fillRect(r, x, l.y + 8, 1, 10, black ? BLACK_LABEL_INK.silver : ASP_INK.ink);
     } else {
-      drawAspEmblem(r, l.x + 2, l.y + 6, gold);
+      drawAspEmblem(r, l.x + 2, l.y + 6, tier);
       // The box of the grade on the right.
-      fillRect(r, l.x + l.w - 18, l.y + 6, 16, 14, gold ? GOLD_INK.pale : "#ffffff");
+      fillRect(r, l.x + l.w - 18, l.y + 6, 16, 14, black ? BLACK_LABEL_INK.black : gold ? GOLD_INK.pale : "#ffffff");
       strokeRect(r, l.x + l.w - 18, l.y + 6, 16, 14, band);
     }
     roundCorners(r, 4);
     return r;
   };
   const out = { front: build(false), back: build(true) };
-  slabCache.set(gold, out);
+  slabCache.set(tier, out);
   return out;
+}
+
+// ------------------------------------------------------------------ grading package
+
+let gradingPackCache: PackRasters | null = null;
+
+/**
+ * The sealed package a graded card comes back in (ADR-165): a foil pack in ASP's teal with the seal in the
+ * middle, split like a booster pack into the strip that tears off and the rest. It never shows the grade.
+ */
+export function composeGradingPack(): PackRasters {
+  if (gradingPackCache) return gradingPackCache;
+  const ink = {
+    deep: ASP_INK.brandDark,
+    dark: "#0b524c",
+    base: ASP_INK.brand,
+    light: "#1f9c8d",
+    pale: ASP_INK.brandLight,
+  };
+  const full = createRaster(PW, PH);
+  ditherRect(full, 0, 0, PW, PH, [ink.deep, ink.dark, ink.base, ink.dark, ink.deep]);
+  // Fine diagonal security lines, like on a sealed document.
+  for (let y = CRIMP; y < PH - CRIMP; y++)
+    for (let x = 1; x < PW - 1; x++) if ((x + y) % 6 === 0) setPixel(full, x, y, ink.light, 0.45);
+  // A ring of light and the big seal in the middle.
+  const cx = 37.5;
+  const cy = 58;
+  for (let y = 30; y < 88; y++)
+    for (let x = 4; x < PW - 4; x++) {
+      const d = Math.hypot(x - cx, y - cy);
+      const ray = Math.sin(Math.atan2(y - cy, x - cx) * 12);
+      if (d < 27 && d > 14 && ray > 0.1 && bayer(x, y) > d / 34) setPixel(full, x, y, ink.pale, 0.8);
+      if (d <= 14) setPixel(full, x, y, d > 12.5 ? GOLD_INK.deep : d > 11 ? GOLD_INK.pale : GOLD_INK.base);
+    }
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    setPixel(full, Math.round(cx + Math.cos(a) * 9.5), Math.round(cy + Math.sin(a) * 9.5), GOLD_INK.deep);
+  }
+  drawMicroTextCentered(full, "ASP", PW / 2 + 1, cy - 4, GOLD_INK.pale, 2);
+  drawMicroTextCentered(full, "ASP", PW / 2, cy - 5, GOLD_INK.deep, 2);
+  // Title band and the bottom line.
+  fillRect(full, 0, CRIMP + 3, PW, 16, ink.deep, 0.7);
+  fillRect(full, 0, CRIMP + 3, PW, 1, ink.pale, 0.7);
+  fillRect(full, 0, CRIMP + 18, PW, 1, ink.pale, 0.7);
+  drawMicroTextCentered(full, "GRADED", PW / 2 + 1, CRIMP + 7, ink.deep, 2);
+  drawMicroTextCentered(full, "GRADED", PW / 2, CRIMP + 6, "#ffffff", 2);
+  fillRect(full, 0, PH - CRIMP - 13, PW, 9, ink.deep, 0.75);
+  fillRect(full, 0, PH - CRIMP - 13, PW, 1, ink.pale, 0.6);
+  drawMicroTextCentered(full, "SEALED BY ASP", PW / 2, PH - CRIMP - 11, ink.pale);
+  // A tamper strip with a question mark where the grade would be.
+  fillRect(full, 26, 78, 24, 9, "#ffffff", 0.92);
+  strokeRect(full, 26, 78, 24, 9, ink.deep);
+  drawMicroTextCentered(full, "? ? ?", PW / 2, 80, ink.deep);
+
+  // Crimped seals and foil edges, as on a booster pack.
+  for (const y0 of [0, PH - CRIMP]) {
+    for (let y = y0; y < y0 + CRIMP; y++)
+      for (let x = 0; x < PW; x++) setPixel(full, x, y, x % 3 === 0 ? ink.dark : x % 3 === 1 ? ink.base : ink.light);
+    fillRect(full, 0, y0 === 0 ? CRIMP - 1 : y0, PW, 1, ink.deep, 0.75);
+    fillRect(full, 0, y0 === 0 ? CRIMP : y0 - 1, PW, 1, "#ffffff", 0.35);
+  }
+  for (let x = 0; x < PW; x++)
+    if (x % 4 < 2) {
+      clearPixel(full, x, 0);
+      clearPixel(full, x, PH - 1);
+    }
+  fillRect(full, 0, 1, 1, PH - 2, ink.deep, 0.8);
+  fillRect(full, PW - 1, 1, 1, PH - 2, ink.deep, 0.8);
+  fillRect(full, 1, CRIMP, 1, PH - 2 * CRIMP, "#ffffff", 0.3);
+
+  const top = createRaster(PW, PH);
+  const body = createRaster(PW, PH);
+  for (let x = 0; x < PW; x++) {
+    const tear = packTearRow(x);
+    for (let y = 0; y < PH; y++) {
+      const i = (y * PW + x) * 4;
+      (y < tear ? top : body).data.set(full.data.subarray(i, i + 4), i);
+    }
+    if (isOpaque(top, x, tear - 1)) setPixel(top, x, tear - 1, "#ffffff", 0.85);
+    setPixel(body, x, tear, "#ffffff", 0.85);
+  }
+  gradingPackCache = { full, top, body };
+  return gradingPackCache;
 }

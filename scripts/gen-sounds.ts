@@ -1656,7 +1656,292 @@ const RENDER: Record<string, () => Float64Array> = {
   "battle-click": battleClick,
   "battle-unlock": battleUnlock,
   "battle-gavel": battleGavel,
+  "pack-crinkle": packCrinkle,
+  "pack-tear": packTear,
+  "card-flick": cardFlick,
+  "card-show": cardShow,
+  "pull-rare": pullRare,
+  "pull-ultra": pullUltra,
+  "pull-prisma": pullPrisma,
+  "pull-legendary": pullLegendary,
+  "grade-drum": gradeDrum,
+  "grade-tick": gradeTick,
+  "grade-low": gradeLow,
+  "grade-good": gradeGood,
+  "grade-ten": gradeTen,
+  "black-label": blackLabel,
 };
+
+// ---------------------------------------------------------------------------
+// Nexamon packs (ADR-165)
+// ---------------------------------------------------------------------------
+
+/** Foil crackles under the finger while the pack is being torn: one dry tick. */
+function packCrinkle(): Float64Array {
+  const m = new Mix(0.09, 91);
+  noise(m, 0, 0.012, { type: "hp", cutoff: 5200 }, 0.7, { a: 0.001, r: 0.012 });
+  noise(m, 0.022, 0.01, { type: "bp", cutoff: 7400, q: 2 }, 0.45, { a: 0.001, r: 0.015 });
+  return master(m.buf, { maxSeconds: 0.09 });
+}
+
+/** The strip of foil comes off: a ripping run of crackles that rises, then a bright snap. */
+function packTear(): Float64Array {
+  const m = new Mix(0.62, 92);
+  noise(m, 0, 0.3, { type: "bp", cutoff: 2600, to: 7200, sweep: 0.3, q: 1.1 }, 0.55, {
+    a: 0.01,
+    d: 0.3,
+    s: 0.5,
+    r: 0.05,
+  });
+  for (let i = 0; i < 16; i++) {
+    const at = 0.012 + i * 0.019 - (i * i) / 4200;
+    noise(m, at, 0.008, { type: "hp", cutoff: 4200 + i * 260 }, 0.5 + (i % 3) * 0.14, { a: 0.001, r: 0.012 });
+  }
+  noise(m, 0.31, 0.03, { type: "hp", cutoff: 6000 }, 0.9, { a: 0.001, r: 0.05 });
+  m.tone({
+    at: 0.31,
+    note: "E6",
+    to: "B6",
+    glide: 0.05,
+    gate: 0.05,
+    wave: "pulse",
+    duty: 0.2,
+    gain: 0.12,
+    env: { a: 0.002, d: 0.06, s: 0, r: 0.05 },
+  });
+  noise(m, 0.34, 0.2, { type: "hp", cutoff: 8000 }, 0.07, { a: 0.01, d: 0.2, r: 0.08 });
+  return master(m.buf, { maxSeconds: 0.62, room: { mix: 0.08, size: 0.6 } });
+}
+
+/** A card is flicked off the stack: a short paper swish with a tiny click. */
+function cardFlick(): Float64Array {
+  const m = new Mix(0.2, 93);
+  noise(m, 0, 0.09, { type: "bp", cutoff: 1500, to: 5200, sweep: 0.09, q: 0.9 }, 0.6, { a: 0.008, d: 0.09, r: 0.04 });
+  noise(m, 0.085, 0.008, { type: "hp", cutoff: 5000 }, 0.35, { a: 0.001, r: 0.012 });
+  return master(m.buf, { maxSeconds: 0.2 });
+}
+
+/** The next card shows its face: a soft two-pixel tick. */
+function cardShow(): Float64Array {
+  const m = new Mix(0.16, 94);
+  chip(m, 0, "E5", 0.02, { env: { d: 0.04, s: 0.2, r: 0.03 }, gain: 0.45 });
+  chip(m, 0.03, "A5", 0.025, { env: { d: 0.05, s: 0.2, r: 0.05 }, gain: 0.4 });
+  return master(m.buf, { maxSeconds: 0.16 });
+}
+
+/** A rare card: two bright notes up, a little shine. */
+function pullRare(): Float64Array {
+  const m = new Mix(0.6, 95);
+  chip(m, 0, "E5", 0.05, { env: { d: 0.08, s: 0.3, r: 0.06 }, gain: 0.7 });
+  chip(m, 0.07, "B5", 0.14, { env: { d: 0.2, s: 0.35, r: 0.22 }, sparkle: 0.15, gain: 0.8 });
+  noise(m, 0.07, 0.2, { type: "hp", cutoff: 7500 }, 0.04, { a: 0.01, d: 0.2, r: 0.08 });
+  return master(m.buf, { room: { mix: 0.14, size: 0.8 } });
+}
+
+/** An ultra rare card: a quick run of four with a held top note. */
+function pullUltra(): Float64Array {
+  const m = new Mix(0.95, 96);
+  const run: [number, string][] = [
+    [0, "D5"],
+    [0.06, "F#5"],
+    [0.12, "A5"],
+  ];
+  for (const [at, note] of run) chip(m, at, note, 0.04, { env: { d: 0.06, s: 0.3, r: 0.05 }, gain: 0.75 });
+  const ring = { d: 0.3, s: 0.5, r: 0.3 };
+  chip(m, 0.19, "D6", 0.3, { env: ring, sparkle: 0.2, vibrato: { rate: 6, cents: 10, delay: 0.1 }, gain: 0.9 });
+  chip(m, 0.19, "A5", 0.3, { env: ring, gain: 0.4, bright: 0.6 });
+  m.tone({ at: 0, note: "D4", gate: 0.45, wave: "triangle", gain: 0.25, env: { a: 0.01, d: 0.3, s: 0.5, r: 0.1 } });
+  noise(m, 0.19, 0.35, { type: "hp", cutoff: 7000 }, 0.04, { a: 0.02, d: 0.35, r: 0.1 });
+  return master(m.buf, { room: { mix: 0.16, size: 0.9 } });
+}
+
+/** A prisma card: a shimmering arpeggio over two octaves that hangs in the air. */
+function pullPrisma(): Float64Array {
+  const m = new Mix(1.5, 97);
+  const run = ["E5", "G#5", "B5", "E6", "G#6", "B6"];
+  run.forEach((note, i) =>
+    chip(m, i * 0.055, note, 0.045, { env: { d: 0.07, s: 0.35, r: 0.08 }, gain: 0.7, sparkle: 0.12 }),
+  );
+  const ring = { d: 0.4, s: 0.55, r: 0.45 };
+  const vibrato = { rate: 5.5, cents: 12, delay: 0.12 };
+  chip(m, 0.36, "E6", 0.5, { env: ring, sparkle: 0.3, vibrato, gain: 0.9 });
+  chip(m, 0.36, "G#6", 0.5, { env: ring, vibrato, gain: 0.5, bright: 0.7 });
+  chip(m, 0.36, "B5", 0.5, { env: ring, gain: 0.4 });
+  m.tone({ at: 0.36, note: "E4", gate: 0.5, wave: "triangle", gain: 0.28, env: ring });
+  for (let i = 0; i < 5; i++) bell(m, 0.42 + i * 0.09, ["B6", "E7", "G#6", "B6", "E7"][i]!, { gain: 0.12 });
+  noise(m, 0.36, 0.6, { type: "hp", cutoff: 7000 }, 0.04, { a: 0.03, d: 0.6, r: 0.2 });
+  return master(m.buf, { room: { mix: 0.2, size: 1 } });
+}
+
+/** A legendary card: a drum, a rising fanfare and a long golden chord. */
+function pullLegendary(): Float64Array {
+  const m = new Mix(2.3, 98);
+  noise(m, 0, 0.12, { type: "lp", cutoff: 220 }, 0.9, { a: 0.002, d: 0.12, r: 0.1 });
+  m.tone({
+    at: 0,
+    note: "C3",
+    to: "C2",
+    glide: 0.12,
+    gate: 0.14,
+    wave: "sine",
+    gain: 0.6,
+    env: { a: 0.002, d: 0.14, s: 0, r: 0.1 },
+  });
+  const fanfare: [number, string, number][] = [
+    [0.1, "C5", 0.07],
+    [0.19, "C5", 0.05],
+    [0.26, "E5", 0.07],
+    [0.35, "G5", 0.07],
+    [0.44, "C6", 0.1],
+    [0.57, "G5", 0.06],
+  ];
+  for (const [at, note, gate] of fanfare) chip(m, at, note, gate, { env: { d: 0.08, s: 0.4, r: 0.06 }, gain: 0.85 });
+  const hold = 0.85;
+  const ring = { d: 0.4, s: 0.6, r: 0.6 };
+  const vibrato = { rate: 5.5, cents: 14, delay: 0.2 };
+  chip(m, 0.66, "C6", hold, { env: ring, sparkle: 0.3, vibrato, gain: 0.95 });
+  chip(m, 0.66, "E6", hold, { env: ring, vibrato, gain: 0.6, bright: 0.7 });
+  chip(m, 0.66, "G6", hold, { env: ring, vibrato, gain: 0.45, bright: 0.8 });
+  m.tone({ at: 0.66, note: "G4", gate: hold, wave: "triangle", gain: 0.25, env: ring });
+  m.tone({ at: 0.66, note: "C3", gate: hold, wave: "triangle", gain: 0.32, env: ring });
+  for (let i = 0; i < 8; i++)
+    bell(m, 0.72 + i * 0.1, ["G6", "C7", "E7", "G7", "E7", "C7", "G6", "C7"][i]!, { gain: 0.11 });
+  noise(m, 0.66, 1, { type: "hp", cutoff: 6500 }, 0.05, { a: 0.04, d: 1, r: 0.3 });
+  return master(m.buf, { room: { mix: 0.24, size: 1.1 } });
+}
+
+/** The ASP package is open: a snare roll that gets denser and louder while the slab rises (ADR-165). */
+function gradeDrum(): Float64Array {
+  const m = new Mix(2.4, 201);
+  let at = 0;
+  let gap = 0.11;
+  while (at < 2.05) {
+    const power = 0.25 + 0.75 * (at / 2.05);
+    noise(m, at, 0.03, { type: "bp", cutoff: 1900, q: 1.2 }, 0.55 * power, { a: 0.001, d: 0.04, r: 0.03 });
+    m.tone({
+      at,
+      note: "D3",
+      to: "A2",
+      glide: 0.03,
+      gate: 0.03,
+      gain: 0.3 * power,
+      env: { a: 0.001, d: 0.05, s: 0, r: 0.03 },
+    });
+    at += gap;
+    gap = Math.max(0.028, gap * 0.94);
+  }
+  m.tone({
+    at: 0,
+    note: "C2",
+    to: "G2",
+    glide: 2.1,
+    gate: 2.1,
+    wave: "triangle",
+    gain: 0.3,
+    env: { a: 1.6, d: 0.3, s: 0.8, r: 0.15 },
+  });
+  noise(m, 0.6, 1.5, { type: "hp", cutoff: 5000 }, 0.07, { a: 1.3, d: 0.2, r: 0.1 });
+  return master(m.buf, { room: { mix: 0.12, size: 0.8 } });
+}
+
+/** One step of the grade counting up; the player raises its rate with every step. */
+function gradeTick(): Float64Array {
+  const m = new Mix(0.22, 202);
+  chip(m, 0, "C5", 0.05, { env: { d: 0.06, s: 0.2, r: 0.06 }, gain: 0.8 });
+  noise(m, 0, 0.012, { type: "bp", cutoff: 2600, q: 2 }, 0.35, { a: 0.001, r: 0.02 });
+  m.tone({ at: 0, note: "C3", gate: 0.05, wave: "triangle", gain: 0.3, env: { a: 0.002, d: 0.08, s: 0, r: 0.04 } });
+  return master(m.buf, { room: { mix: 0.08, size: 0.5 } });
+}
+
+/** A grade below 8: two soft notes going down, no drama. */
+function gradeLow(): Float64Array {
+  const m = new Mix(0.8, 203);
+  chip(m, 0, "E4", 0.14, { env: { d: 0.12, s: 0.4, r: 0.12 }, gain: 0.7 });
+  chip(m, 0.17, "C4", 0.26, { env: { d: 0.2, s: 0.35, r: 0.25 }, gain: 0.7 });
+  m.tone({ at: 0.17, note: "C3", gate: 0.3, wave: "triangle", gain: 0.3, env: { a: 0.01, d: 0.25, s: 0.3, r: 0.2 } });
+  return master(m.buf, { room: { mix: 0.12, size: 0.7 } });
+}
+
+/** An 8 or a 9: a bright rising chime. */
+function gradeGood(): Float64Array {
+  const m = new Mix(1.2, 204);
+  const run = ["G5", "B5", "D6"];
+  run.forEach((note, i) => chip(m, i * 0.07, note, 0.05, { env: { d: 0.07, s: 0.35, r: 0.07 }, gain: 0.75 }));
+  const ring = { d: 0.3, s: 0.5, r: 0.35 };
+  chip(m, 0.22, "G6", 0.3, { env: ring, sparkle: 0.2, vibrato: { rate: 6, cents: 10, delay: 0.1 }, gain: 0.9 });
+  chip(m, 0.22, "D6", 0.3, { env: ring, gain: 0.45, bright: 0.6 });
+  m.tone({ at: 0.22, note: "G3", gate: 0.35, wave: "triangle", gain: 0.28, env: ring });
+  for (let i = 0; i < 3; i++) bell(m, 0.3 + i * 0.1, ["D7", "G7", "B6"][i]!, { gain: 0.12 });
+  return master(m.buf, { room: { mix: 0.16, size: 0.9 } });
+}
+
+/** A 10: a hit, a golden fanfare and a long major chord. */
+function gradeTen(): Float64Array {
+  const m = new Mix(2.2, 205);
+  noise(m, 0, 0.1, { type: "lp", cutoff: 260 }, 0.9, { a: 0.002, d: 0.1, r: 0.08 });
+  m.tone({ at: 0, note: "D3", to: "D2", glide: 0.1, gate: 0.12, gain: 0.6, env: { a: 0.002, d: 0.12, s: 0, r: 0.08 } });
+  const fanfare: [number, string, number][] = [
+    [0.08, "D5", 0.06],
+    [0.16, "F#5", 0.06],
+    [0.24, "A5", 0.06],
+    [0.32, "D6", 0.1],
+    [0.46, "A5", 0.05],
+  ];
+  for (const [at, note, gate] of fanfare) chip(m, at, note, gate, { env: { d: 0.08, s: 0.4, r: 0.06 }, gain: 0.85 });
+  const hold = 0.8;
+  const ring = { d: 0.4, s: 0.6, r: 0.6 };
+  const vibrato = { rate: 5.5, cents: 14, delay: 0.2 };
+  chip(m, 0.56, "D6", hold, { env: ring, sparkle: 0.3, vibrato, gain: 0.95 });
+  chip(m, 0.56, "F#6", hold, { env: ring, vibrato, gain: 0.6, bright: 0.7 });
+  chip(m, 0.56, "A6", hold, { env: ring, vibrato, gain: 0.45, bright: 0.8 });
+  m.tone({ at: 0.56, note: "D3", gate: hold, wave: "triangle", gain: 0.32, env: ring });
+  for (let i = 0; i < 8; i++)
+    bell(m, 0.62 + i * 0.1, ["A6", "D7", "F#7", "A7", "F#7", "D7", "A6", "D7"][i]!, { gain: 0.11 });
+  noise(m, 0.56, 1, { type: "hp", cutoff: 6500 }, 0.05, { a: 0.04, d: 1, r: 0.3 });
+  return master(m.buf, { room: { mix: 0.24, size: 1.1 } });
+}
+
+/**
+ * The Black Label: a deep boom into silence, a dark rising run, then the stamp (a second boom) and a wide, cold
+ * chord with bells on top that hangs for a long time. The biggest sound of the card game.
+ */
+function blackLabel(): Float64Array {
+  const m = new Mix(3.6, 206);
+  const boom = (at: number, gain: number) => {
+    noise(m, at, 0.2, { type: "lp", cutoff: 180 }, gain, { a: 0.002, d: 0.22, r: 0.2 });
+    m.tone({
+      at,
+      note: "E2",
+      to: "E1",
+      glide: 0.3,
+      gate: 0.35,
+      gain: gain * 0.8,
+      env: { a: 0.002, d: 0.4, s: 0, r: 0.25 },
+    });
+  };
+  boom(0, 0.9);
+  const run = ["E3", "G3", "B3", "E4", "G4", "B4", "E5", "G5"];
+  run.forEach((note, i) =>
+    chip(m, 0.42 + i * 0.065, note, 0.05, { env: { d: 0.06, s: 0.3, r: 0.05 }, gain: 0.4 + i * 0.06, duty: 0.25 }),
+  );
+  noise(m, 0.42, 0.52, { type: "hp", cutoff: 4000 }, 0.12, { a: 0.5, d: 0.05, r: 0.02 });
+  const hit = 1.0;
+  boom(hit, 1);
+  noise(m, hit, 0.05, { type: "bp", cutoff: 3200, q: 1 }, 0.6, { a: 0.001, d: 0.06, r: 0.05 });
+  const hold = 1.5;
+  const ring = { d: 0.5, s: 0.65, r: 0.9 };
+  const vibrato = { rate: 5, cents: 14, delay: 0.3 };
+  chip(m, hit, "E6", hold, { env: ring, sparkle: 0.35, vibrato, gain: 0.95 });
+  chip(m, hit, "B5", hold, { env: ring, vibrato, gain: 0.6, bright: 0.7 });
+  chip(m, hit, "G#5", hold, { env: ring, vibrato, gain: 0.5, bright: 0.8 });
+  chip(m, hit, "E5", hold, { env: ring, gain: 0.45, duty: 0.25 });
+  m.tone({ at: hit, note: "E3", gate: hold, wave: "triangle", gain: 0.34, env: ring });
+  m.tone({ at: hit, note: "E2", gate: hold, wave: "triangle", gain: 0.36, env: ring });
+  const bells = ["B6", "E7", "G#7", "B7", "G#7", "E7", "B6", "E7", "G#7", "B7", "E7", "B7"];
+  bells.forEach((note, i) => bell(m, hit + 0.08 + i * 0.11, note, { gain: 0.13, decay: 0.4 }));
+  noise(m, hit, 1.8, { type: "hp", cutoff: 6500 }, 0.06, { a: 0.05, d: 1.8, r: 0.4 });
+  return master(m.buf, { room: { mix: 0.28, size: 1.2 } });
+}
 
 /**
  * Long sounds are written at half the sample rate to keep the download small; they are low-passed far below the

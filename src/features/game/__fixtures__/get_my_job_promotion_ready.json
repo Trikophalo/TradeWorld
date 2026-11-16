@@ -1,21 +1,21 @@
 {
   "job": {
-    "id": "98d4c5c0-3222-4a97-80b3-d30679868b83",
+    "id": "c75ca6a7-3835-4050-a79f-e96bc820d9ba",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "60dd5582-1f7b-b751-df95-287e43ff8e82",
+      "id": "0e23c6f3-2c55-dff0-d773-3075ae4f54b1",
       "logo": null,
-      "name": "Knusperkönig",
-      "color": "#FF9F1C",
+      "name": "Orbitfracht",
+      "color": "#5C6BC0",
       "is_ai": true,
-      "sector": "retail",
-      "ticker": "SNK"
+      "sector": "logistics",
+      "ticker": "OFR"
     },
     "presence": {
-      "fire_at": "2026-11-21T17:55:38.335888+00:00",
+      "fire_at": "2026-11-21T19:43:56.904219+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-16T17:55:38.335888+00:00"
+      "last_active_at": "2026-11-16T19:43:56.904219+00:00"
     },
     "required": [{ "branch": "it", "min_score": 0 }],
     "promotion": {
@@ -36,7 +36,7 @@
     "signature": "M1 1 L5 5",
     "title_key": "it_intern",
     "rank_hours": 12.5,
-    "started_at": "2026-11-16T17:55:38.472224+00:00",
+    "started_at": "2026-11-16T19:43:57.050003+00:00",
     "pending_raise": null,
     "raise_max_bps": 600,
     "notice_ends_at": null,

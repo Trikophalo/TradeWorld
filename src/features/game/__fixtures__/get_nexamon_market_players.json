@@ -4,38 +4,38 @@
   "total": 2,
   "listings": [
     {
-      "id": "ae1bb594-c36f-4b95-a498-b7396084573c",
+      "id": "a2546c92-97de-4428-9160-fb2f36ed5f9c",
       "set": "mystic_energy",
       "mine": false,
       "grade": null,
       "rarity": "common",
       "seller": "Fixture_Gmbh",
-      "serial": 9,
-      "copy_id": "27a63428-7466-43e3-a3d2-d8b5147c094d",
-      "card_key": "me-034",
+      "serial": 7,
+      "copy_id": "b6ba54c8-60e2-4fa2-81b5-411371c047db",
+      "card_key": "me-022",
       "condition": "near_mint",
-      "listed_at": "2026-11-16T17:55:41.415279+00:00",
+      "listed_at": "2026-11-16T19:43:59.765677+00:00",
       "seller_ai": false,
-      "price_cents": 210,
-      "value_cents": 210
+      "price_cents": 240,
+      "value_cents": 240
     },
     {
-      "id": "975a216a-3cdd-4087-8164-a26c83517eb2",
+      "id": "a67b4a48-2fbc-478a-a958-dc8e0699d69b",
       "set": "mystic_energy",
       "mine": false,
       "grade": 9,
       "rarity": "ultra",
       "seller": "Nx_Bruno",
       "serial": 3,
-      "copy_id": "d5249b69-5847-4904-85ee-cd9e865b95f8",
+      "copy_id": "5a43a4b2-bd26-4c24-b72e-059f8fd04bb9",
       "card_key": "me-070",
       "condition": "mint",
-      "listed_at": "2026-11-16T17:55:28.948611+00:00",
+      "listed_at": "2026-11-16T19:43:46.891909+00:00",
       "seller_ai": false,
       "price_cents": 377600,
       "value_cents": 377600
     }
   ],
   "page_size": 24,
-  "server_time": "2026-11-16T17:55:41.438409+00:00"
+  "server_time": "2026-11-16T19:43:59.78959+00:00"
 }

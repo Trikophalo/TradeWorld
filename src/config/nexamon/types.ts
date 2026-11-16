@@ -79,7 +79,7 @@ export const NEXAMON_ART_SIZE: Record<NexamonRarity, { width: number; height: nu
   legendary: { width: 72, height: 100 },
 };
 
-/** Start price ranges of the first set in cents; super_apex x5, prismatic_peak x25. */
+/** Start price ranges of the first set in cents; super_apex x5, prismatic_peak x37.5. */
 export const NEXAMON_BASE_PRICE_RANGE: Record<NexamonRarity, readonly [number, number]> = {
   common: [100, 1_000],
   rare: [700, 8_000],
@@ -90,7 +90,7 @@ export const NEXAMON_BASE_PRICE_RANGE: Record<NexamonRarity, readonly [number, n
 export const NEXAMON_SET_PRICE_FACTOR: Record<NexamonSetKey, number> = {
   mystic_energy: 1,
   super_apex: 5,
-  prismatic_peak: 25,
+  prismatic_peak: 37.5,
 };
 
 export function nexamonRarityOfNumber(n: number): NexamonRarity {

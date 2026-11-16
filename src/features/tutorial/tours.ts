@@ -37,6 +37,10 @@ export const TOURS: Readonly<Record<string, readonly TutorialStep[]>> = {
     { id: "market", target: "art-market", advance: { on: "next" } },
     { id: "studio", target: "art-studio", advance: { on: "next" }, mood: "happy" },
   ],
+  visit_nexamon: [
+    { id: "packs", target: "nexamon-packs", advance: { on: "next" }, mood: "happy" },
+    { id: "tabs", target: "nexamon-tabs", advance: { on: "next" } },
+  ],
   visit_skill_map: [{ id: "map", target: "skill-map", advance: { on: "next" }, mood: "happy" }],
   visit_company: [
     { id: "dashboard", advance: { on: "next" } },

@@ -14,6 +14,10 @@
  */
 
 :root {
+  /* The Black Label of a graded Nexamon card (ADR-165): black with silver print in both themes. */
+  --black-label: #0b0c10;
+  --on-black-label: #e8ebf1;
+  --black-label-edge: #c9ced8;
   /* ---- Typography ---- */
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-pixel: "Silkscreen", ui-monospace, "SFMono-Regular", monospace;

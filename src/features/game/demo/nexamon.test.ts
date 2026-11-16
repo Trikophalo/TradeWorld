@@ -76,7 +76,7 @@ describe("Nexamon in the demo (ADR-165)", () => {
     expect(overview.sets.map((s) => [s.key, s.packPriceCents, s.cards])).toEqual([
       ["mystic_energy", 20_000, 77],
       ["super_apex", 100_000, 77],
-      ["prismatic_peak", 500_000, 77],
+      ["prismatic_peak", 1_000_000, 77],
     ]);
     expect(await key(engine.buyNexamonPack("r1", "mystic_energy"))).toBe("nexamon_locked");
     expect(await key(engine.nexamonCollection())).toBe("nexamon_locked");
@@ -250,7 +250,8 @@ describe("Nexamon in the demo (ADR-165)", () => {
     const details = await engine.nexamonCard(ultra.cardKey);
     const slab = details.copies.find((c) => c.id === ultra.copyId)!;
     expect(slab).toMatchObject({ state: "graded", grade: 10, condition: "mint" });
-    // The slab is priced from the unrounded card value, so it may differ from 3 x the rounded cents by a cent or two.
+    // The slab is worth three times the market value, rounded once from the e4 value: the card's value in whole
+    // cents times three can be off by the rounding (at most 1.5 cents).
     expect(Math.abs(slab.valueCents - details.card.valueCents * 3)).toBeLessThanOrEqual(2);
     expect(details.graded[9]).toBe(1);
     expect(await key(engine.gradeNexamonCard("g3", ultra.copyId))).toBe("nexamon_not_raw");
@@ -260,6 +261,49 @@ describe("Nexamon in the demo (ADR-165)", () => {
     expect(world.cash).toBe(cash - grading.feeCents);
     expect(await key(engine.crackNexamonSlab("c2", ultra.copyId))).toBe("nexamon_not_graded");
     expect(await key(engine.gradeNexamonCard("g4", ultra.copyId))).toBe("ok");
+  });
+
+  it("gives a mint card the Black Label on the highest rolls: ten times the value, news, its own count", async () => {
+    const { engine, world } = setup();
+    world.rolls.push(...packRolls(0, 0.9, 0.99));
+    const pack = await engine.buyNexamonPack("r1", "mystic_energy");
+    const ultra = pack.cards[3]!;
+    const common = pack.cards[0]!;
+    expect(ultra.condition).toBe("mint");
+    await engine.gradeNexamonCard("g1", ultra.copyId);
+    await engine.gradeNexamonCard("g2", common.copyId);
+    world.now += HOUR;
+    // the two gradings in the order of the copies: the Black Label takes the top 1 % of a mint roll, 98.99 % is still a 10
+    world.rolls.push(0.9899, 0.995);
+    world.feed.length = 0;
+    await engine.nexamon();
+    const details = await engine.nexamonCard(ultra.cardKey);
+    const slab = details.copies.find((c) => c.id === ultra.copyId)!;
+    expect(slab).toMatchObject({ state: "graded", grade: 11, condition: "mint" });
+    expect(Math.abs(slab.valueCents - details.card.valueCents * 10)).toBeLessThanOrEqual(5);
+    expect(details.blackLabels).toBe(1);
+    expect(details.graded).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    expect(world.feed).toEqual([`nexamon_black_label:${ultra.cardKey}`]);
+    expect(world.tracked.nexamon_black_labels).toBe(1);
+    // a Black Label is a 10 for the mission of the first 10 as well
+    expect(world.tracked.nexamon_tens).toBe(2);
+    const plain = (await engine.nexamonCard(common.cardKey)).copies.find((c) => c.id === common.copyId)!;
+    expect(plain.grade).toBe(10);
+    // the market knows it: listed with its grade, found by the Black Label filter only
+    await engine.listNexamonCard("l1", ultra.copyId, slab.valueCents);
+    await engine.listNexamonCard("l2", common.copyId, plain.valueCents);
+    const black = await engine.nexamonMarket({ blackLabel: true });
+    expect(black.listings.map((l) => l.copyId)).toEqual([ultra.copyId]);
+    expect(black.listings[0]).toMatchObject({ grade: 11, valueCents: slab.valueCents });
+    const others = await engine.nexamonMarket({ blackLabel: false, graded: true });
+    expect(others.listings.map((l) => l.copyId)).toEqual([common.copyId]);
+    // cracking it returns the raw mint card; the label is gone
+    const mine = (await engine.nexamonMarket({ blackLabel: true })).listings[0]!;
+    await engine.unlistNexamonCard("u1", mine.id);
+    expect(await key(engine.sellNexamonToAi("q0", [ultra.copyId]))).toBe("nexamon_not_sellable");
+    const cracked = await engine.crackNexamonSlab("c1", ultra.copyId);
+    expect(cracked).toMatchObject({ oldGrade: 11, copy: { state: "raw", grade: null, condition: "mint" } });
+    expect((await engine.nexamonCard(ultra.cardKey)).blackLabels).toBe(0);
   });
 
   it("sells bulk to the AI at half the value; better cards go over the market", async () => {

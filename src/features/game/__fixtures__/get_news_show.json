@@ -1,8 +1,8 @@
 {
-  "now": "2026-11-16T17:55:41.008352+00:00",
+  "now": "2026-11-16T19:43:59.325941+00:00",
   "chat": [
     {
-      "at": "2026-11-16T17:55:41.00431+00:00",
+      "at": "2026-11-16T19:43:59.321642+00:00",
       "id": 223,
       "bot": false,
       "body": "Was für eine Sendung 💀📉",
@@ -11,29 +11,37 @@
     }
   ],
   "show": {
-    "id": 9,
+    "id": 7,
     "writer": "mini",
-    "airs_at": "2026-11-16T17:00:00+00:00",
+    "airs_at": "2026-11-16T19:00:00+00:00",
     "segments": [
       {
+        "kind": "loser",
+        "mood": "smug",
+        "text": "82.960 € futsch, 7,7 % Minus: Esc_Frida schreibt heute Börsengeschichte, leider die falsche. Selbst der Tresor hat sich aus Scham kurz geschlossen. Das Trostpflaster kommt per Eilbote.",
+        "figure": { "nickname": "Esc_Frida", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "gain", "label": "+500 € Trostpflaster" }],
+        "headline": "Wo ist das Geld von Esc_Frida?"
+      },
+      {
         "kind": "gossip",
-        "mood": "shocked",
-        "text": "Bitte festhalten: Level 5 erreicht, und zwar bei Ben_Borgt. Meine Schwiegermutter hat es vorausgesagt, und die liegt sonst immer falsch.",
-        "figure": { "nickname": "Ben_Borgt", "avatar_key": "rookie", "accessories": [] },
+        "mood": "proud",
+        "text": "Bitte festhalten: Level 5 erreicht, und zwar bei Fixture_Anleger. Auch ein blindes Huhn findet mal ein Korn, aber immerhin.",
+        "figure": { "nickname": "Fixture_Anleger", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Applaus für Ben_Borgt"
+        "headline": "Applaus für Fixture_Anleger"
       },
       {
         "kind": "hype",
         "mood": "laughing",
-        "text": "Selbst die Praktikanten wurden heute um Autogramme gebeten. Plötzlich will jeder „Alles ausgebucht“. Doable_Frida tut so, als sei das alles geplant gewesen. Wir tun so, als würden wir das glauben.",
-        "figure": { "nickname": "Doable_Frida", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "gain", "label": "Bekanntheit +13,2 %" }],
-        "headline": "Vollhaus geht viral"
+        "text": "Unfassbar, aber wahr: Bodenständig ist der Renner. Sogar die Steuerprüfung kam privat vorbei, um einzukaufen. „Teppiche für Büros“ geht weg wie warme Semmeln. Floor_Frida soll vor Freude geweint haben.",
+        "figure": { "nickname": "Floor_Frida", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "gain", "label": "Bekanntheit +19,1 %" }],
+        "headline": "Alle wollen Bodenständig"
       },
       {
         "kind": "nft",
-        "mood": "confused",
+        "mood": "laughing",
         "text": "Kunstmarkt, oder was man dafür hält: „Neon Nacht“ von Nina_Neon ging für 30.000 € an Ben_Bieter. Wer das kauft, kauft auch Luft in Dosen.",
         "figure": { "nickname": "Nina_Neon", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
@@ -41,58 +49,51 @@
       },
       {
         "kind": "winner",
-        "mood": "proud",
-        "text": "11377,6 % Plus, 1.137.762 € Gewinn: Fixture_Neu zeigt dem Rest, wie es geht. Man munkelt von einem Pakt mit dem Teufel, der Teufel dementiert.",
+        "mood": "shocked",
+        "text": "11376,8 % Plus, 1.137.684 € Gewinn: Fixture_Neu zeigt dem Rest, wie es geht. Der Rest schaut zu und heult leise ins Depot.",
         "figure": { "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] },
         "effects": [],
         "headline": "Fixture_Neu schwimmt im Geld"
       },
       {
         "kind": "gossip",
-        "mood": "shocked",
-        "text": "Gute Nachrichten, ausnahmsweise. Bei Pop_Gero heißt es: Talwerk gegründet. Ich hätte keinen Cent darauf gewettet, und ich wette auf alles.",
-        "figure": { "nickname": "Pop_Gero", "avatar_key": "rookie", "accessories": [] },
+        "mood": "proud",
+        "text": "Ich fasse es nicht, aber es stimmt. Xp_Profi meldet: Level 20 erreicht. Meine Schwiegermutter hat es vorausgesagt, und die liegt sonst immer falsch.",
+        "figure": { "nickname": "Xp_Profi", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Pop_Gero hat es geschafft"
+        "headline": "Na so was: Xp_Profi"
       },
       {
         "kind": "scandal",
-        "mood": "shocked",
-        "text": "Bei Lieferwerk Anja brennt die Hütte. Ein Mitarbeiter hat die gesamte Kundendatei alphabetisch nach Vornamen des Haustiers sortiert. Anja_Lieferant spricht von einem Missverständnis. Zur Erinnerung, das Geschäftsmodell lautet: „Ideen für alle“.",
-        "figure": { "nickname": "Anja_Lieferant", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −23,3 %" }],
-        "headline": "Lieferwerk Anja: Chef Anja_Lieferant unter Beschuss"
+        "mood": "angry",
+        "text": "Bei Gegenwind Energie brennt die Hütte. Auf dem Firmenparkplatz wurde ein illegales Bobbycar-Rennen ausgehoben. Fritz_Gegenwind spricht von einem Missverständnis. Zur Erinnerung, das Geschäftsmodell lautet: „Ideen für alle“.",
+        "figure": { "nickname": "Fritz_Gegenwind", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −17 %" }],
+        "headline": "Gegenwind Energie: Chef Fritz_Gegenwind unter Beschuss"
       },
       {
         "kind": "ramble",
-        "mood": "crying",
-        "text": "Die Regie winkt, ich ignoriere sie. Christian Lindner soll einen Sportwagen gesehen und kurz geweint haben. Vor Glück, sagt man. So. Weiter im Text.",
-        "effects": [],
-        "headline": "Was ich noch sagen wollte"
+        "mood": "smug",
+        "text": "Völlig anderes Thema: Thomas Gottschalk soll das Sparschwein geschlachtet und alles in Talwerk gesteckt haben. Die Info stammt aus einer Gruppe, in die ich versehentlich eingeladen wurde. Der Kurs macht 4,2 % nach oben.",
+        "effects": [{ "tone": "gain", "label": "TAL +4,2 %" }],
+        "headline": "Thomas Gottschalk steigt bei Talwerk ein"
       },
       {
         "kind": "tasks",
-        "mood": "laughing",
-        "text": "Die Kundschaft hat Geld und keine Ahnung, wohin damit. Alle offenen Firmen-Aufgaben sind ab sofort 38,7 % mehr wert. An die Arbeit, ihr faulen Säcke!",
-        "effects": [{ "tone": "gain", "label": "Aufgaben +38,7 %" }],
-        "headline": "Auftragsflut im ganzen Land"
-      },
-      {
-        "kind": "stock",
-        "mood": "shocked",
-        "text": "Der Chef hat den Jahresbericht als Gedicht vorgetragen. Es reimte sich nicht. Der Kurs von Methusalem Bio sackt um 13,2 % ab. Ein Krisenstab tagt.",
-        "effects": [{ "tone": "loss", "label": "MTH −13,2 %" }],
-        "headline": "Panik bei Methusalem Bio"
+        "mood": "proud",
+        "text": "Die Leute haben gemerkt, dass Sparen keinen Spaß macht. Offene Aufgaben bringen 33,5 % mehr. Wer jetzt Pause macht, ist selbst schuld.",
+        "effects": [{ "tone": "gain", "label": "Aufgaben +33,5 %" }],
+        "headline": "Kunden zahlen jeden Preis"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Ein Vögelchen hat mir gezwitschert: GenoVita Biotech dürfte in der kommenden Stunde nach unten gehen. Wer mir nicht glaubt, ist selbst schuld. Wer mir glaubt, auch.",
-        "effects": [{ "tone": "neutral", "label": "GNV ↓ Tipp" }],
-        "headline": "Vom Flurfunk: GenoVita Biotech"
+        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Volta Energie AG geht bald nach unten. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
+        "effects": [{ "tone": "neutral", "label": "VLT ↓ Tipp" }],
+        "headline": "Der heiße Draht: Volta Energie AG"
       }
     ],
-    "started_at": "2026-11-16T17:55:41.008352+00:00"
+    "started_at": "2026-11-16T19:43:59.325941+00:00"
   },
   "viewers": 18,
   "audience": [
@@ -110,5 +111,5 @@
     { "me": false, "friend": false, "nickname": "Bat_Crowd6", "avatar_key": "rookie", "accessories": [] }
   ],
   "upcoming": null,
-  "next_airs_at": "2026-11-16T18:00:00+00:00"
+  "next_airs_at": "2026-11-16T20:00:00+00:00"
 }

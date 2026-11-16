@@ -1249,7 +1249,8 @@ Werte in `BALANCE.livingBonus`, `BALANCE.property.furniturePriceBps`, `BALANCE.p
 
 Werte in `BALANCE.nexamon` (`src/config/nexamon-rules.ts`), Startpreise im Katalog (`src/config/nexamon`).
 
-- **Booster:** Mystic Energy 200 €, Super Apex 1.000 €, Prismatic Peak 5.000 €, je 5 Karten.
+- **Booster:** Mystic Energy 200 €, Super Apex 1.000 €, Prismatic Peak 10.000 €, je 5 Karten. Die Startpreise der
+  Sets stehen im Verhältnis 1 : 5 : 37,5 (`NEXAMON_SET_PRICE_FACTOR`).
 - **Ziehungsraten je Platz** (Nenner 3600):
 
   | Platz   | Legendary      | Prisma        | Ultra         | Rare         | Common |
@@ -1261,8 +1262,8 @@ Werte in `BALANCE.nexamon` (`src/config/nexamon-rules.ts`), Startpreise im Katal
 
   Mindestens eine Rare oder besser steckt in 50,8 % der Booster (1 − 2550/3600 × 2501/3600).
 
-- **Zustand:** Poor 2 %, Good 18 %, Near Mint 50 %, Mint 30 %. Wertfaktor: ab Good 100 %, Poor 95 %.
-- **Grading (ASP):** 50 % des Werts der Kopie (mindestens 1 €), 60 Minuten, höchstens 10 gleichzeitig.
+- **Zustand:** Poor 2 %, Good 18 %, Near Mint 50 %, Mint 30 %. Wertfaktor: Poor 70 %, Good 90 %, Near Mint und Mint 100 % (seit Migration 5900).
+- **Grading (ASP):** 30 % des Werts der Kopie (bis Migration 5900: 50 %) (mindestens 1 €), 60 Minuten, höchstens 10 gleichzeitig.
 
   | Note       | 1   | 2    | 3    | 4    | 5    | 6    | 7    | 8    | 9     | 10    |
   | ---------- | --- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ----- | ----- |
@@ -1272,7 +1273,10 @@ Werte in `BALANCE.nexamon` (`src/config/nexamon-rules.ts`), Startpreise im Katal
   | Mint       | 0   | 0    | 0    | 0    | 0    | 0    | 0    | 2 %  | 8 %   | 90 %  |
   | Wertfaktor | 0,3 | 0,4  | 0,5  | 0,6  | 0,7  | 0,8  | 0,9  | 1,2  | 1,6   | 3     |
 
-  Erwarteter Faktor nach dem Grading: Mint 2,85, Near Mint 2,36, Good 1,28, Poor 0,67. Abzüglich der Gebühr (0,5)
+  **Black Label** (`grading.blackLabel`): nur Mint, 1 % der Mint-Gradings (aus den 90 % für die 10 genommen: Mint
+  hat damit 1 % Black Label, 89 % 10, 8 % 9, 2 % 8), Wertfaktor 10. Alle anderen Zustände: 0 %.
+
+  Erwarteter Faktor nach dem Grading: Mint 2,92 (ohne Black Label wären es 2,85), Near Mint 2,36, Good 1,28, Poor 0,67. Abzüglich der Gebühr (0,5)
   lohnt sich Grading im Schnitt für Mint und Near Mint, nicht für Good und Poor (dort ist es eine Wette auf die 10).
 
 - **Marktwert** (ein Wert je Karte): Schritt je gezähltem Verkauf 20 % des Weges zum Preis je Karte, höchstens 2 %,
