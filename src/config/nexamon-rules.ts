@@ -413,6 +413,19 @@ export const NEXAMON_RULES = {
     gossipMinCents: 500_000,
   },
   /**
+   * Pack Battles with several packs and up to four players (ADR-192): the creator picks a lineup of 1..`maxPacks`
+   * packs (any released sets, in order) and the size (`minPlayers`..`maxPlayers`). Everyone pays the sum of the
+   * lineup when taking a seat (held in escrow), the battle starts when the last seat is taken, every player opens
+   * the same lineup pack by pack on the shared clock (`battles` timing per pack). A lobby that is not full after
+   * `lobbySeconds`, or that the creator cancels, refunds every seat in full.
+   */
+  packBattle: {
+    maxPacks: 10,
+    minPlayers: 2,
+    maxPlayers: 4,
+    lobbySeconds: 120,
+  },
+  /**
    * Live openings (ADR-172): every opened pack can be watched while it is revealed. The opener's page reports each
    * card as it shows; spectators see only what the opener has seen. Without a report for `staleMs`, one more card
    * shows every `fallbackSlotMs`. A session lives at most `maxMs` and `lingerMs` after the last card.

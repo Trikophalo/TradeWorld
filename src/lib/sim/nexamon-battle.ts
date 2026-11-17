@@ -112,3 +112,94 @@ export function liveVisibleCards(
   const extra = silent >= 0 ? Math.floor(silent / l.fallbackSlotMs) + 1 : 0;
   return Math.max(0, Math.min(cfg.packSize, progress + extra));
 }
+
+/*
+ * Pack Battles with several packs and up to four players (ADR-192). The database runs the same rules in PL/pgSQL
+ * (supabase/migrations/20261204008000_nexamon_pack_battle_multi.sql).
+ */
+
+export interface MultiBattleDecision {
+  /** Seat index of the winner (0 = the creator). */
+  winner: number;
+  tieBreak: BattleTieBreak;
+  /** Total pulled value per seat. */
+  totals: number[];
+}
+
+/**
+ * The highest total value over all packs wins; on a tie among the leaders their rarest single card; then the coin
+ * picks among the seats still tied, in seat order: `seed % count`. For two seats this is `decideBattle`.
+ */
+export function decideMultiBattle(seats: readonly (readonly BattlePull[])[], seed: number): MultiBattleDecision {
+  const totals = seats.map(battleTotalCents);
+  const best = Math.max(...totals);
+  let tied = totals.flatMap((t, i) => (t === best ? [i] : []));
+  if (tied.length === 1) return { winner: tied[0]!, tieBreak: "value", totals };
+  const ranks = tied.map((i) => rarest(seats[i]!));
+  const top = Math.max(...ranks);
+  tied = tied.filter((_, k) => ranks[k] === top);
+  if (tied.length === 1) return { winner: tied[0]!, tieBreak: "rarest", totals };
+  return { winner: tied[Math.abs(Math.trunc(seed)) % tied.length]!, tieBreak: "coin", totals };
+}
+
+/** Cost per player: the sum of the lineup's pack prices. */
+export function packBattleCostCents(sets: readonly string[], cfg: Config = BALANCE.nexamon): number {
+  const prices = cfg.sets as Record<string, { packPriceCents: number }>;
+  return sets.reduce((sum, set) => sum + (prices[set]?.packPriceCents ?? 0), 0);
+}
+
+/** Whether a lineup and a size are allowed (count limits and known sets; release gating is checked by the caller). */
+export function packBattleLineupOk(sets: readonly string[], size: number, cfg: Config = BALANCE.nexamon): boolean {
+  const pb = cfg.packBattle;
+  const known = cfg.sets as Record<string, unknown>;
+  return (
+    sets.length >= 1 &&
+    sets.length <= pb.maxPacks &&
+    Number.isInteger(size) &&
+    size >= pb.minPlayers &&
+    size <= pb.maxPlayers &&
+    sets.every((s) => Object.hasOwn(known, s))
+  );
+}
+
+/**
+ * When card `index` (0-based over the whole lineup) shows: every pack tears for `tearMs`, then its cards follow one
+ * per `slotMs`; the next pack tears after the last card of the one before.
+ */
+export function multiRevealAt(startsAt: number, index: number, cfg: Config = BALANCE.nexamon): number {
+  const pack = Math.floor(index / cfg.packSize);
+  return startsAt + (pack + 1) * cfg.battles.tearMs + index * cfg.battles.slotMs;
+}
+
+export interface MultiBattleTimeline {
+  startsAt: number;
+  decideAt: number;
+  endsAt: number;
+}
+
+/** The shared clock of a battle with `packs` packs that filled at `filledAt`. One pack is `battleTimeline`. */
+export function multiBattleTimeline(
+  filledAt: number,
+  packs: number,
+  cfg: Config = BALANCE.nexamon,
+): MultiBattleTimeline {
+  const b = cfg.battles;
+  const startsAt = filledAt + b.startDelayMs;
+  const decideAt = startsAt + packs * (b.tearMs + cfg.packSize * b.slotMs);
+  return { startsAt, decideAt, endsAt: decideAt + b.outroMs };
+}
+
+/** Cards (over the whole lineup) a client may know at `now`: each arrives `leadMs` before it shows. */
+export function multiKnownCards(startsAt: number, now: number, packs: number, cfg: Config = BALANCE.nexamon): number {
+  if (now < startsAt) return 0;
+  let n = 0;
+  while (n < packs * cfg.packSize && multiRevealAt(startsAt, n, cfg) - cfg.battles.leadMs <= now) n++;
+  return n;
+}
+
+/** Cards (over the whole lineup) that show at `now` on the shared clock. */
+export function multiShownCards(startsAt: number, now: number, packs: number, cfg: Config = BALANCE.nexamon): number {
+  let n = 0;
+  while (n < packs * cfg.packSize && multiRevealAt(startsAt, n, cfg) <= now) n++;
+  return n;
+}
