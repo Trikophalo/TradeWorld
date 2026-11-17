@@ -237,7 +237,7 @@ describe("company facts (ADR-185)", () => {
     // 2 workers at 20 % → one idle; dismissing it: 2 × 120 € × 25 % standby = 60 € against 1 × 120 € × 40 % = 48 €
     expect(f.ai).toMatchObject({ workers: 2, utilizationBps: 2_000, idle: 1 });
     expect(f.ai.idleSavingCents).toBe(aiWageDueCents(2, 2_000) - aiWageDueCents(1, 4_000));
-    expect(f.awareness).toMatchObject({ points: 20, capPoints: 50, atCap: false });
+    expect(f.awareness).toMatchObject({ points: 20, capPoints: 60, atCap: false });
     expect(f.awareness.change).toEqual({ total: 1, marketing: 0.8, wordOfMouth: 0.4, decay: 0.2, extra: 0 });
     expect(f.reputation).toMatchObject({ value: 50, demandEffectBps: 0, worst: null });
     expect(f.isListed).toBe(false);
@@ -301,8 +301,8 @@ describe("Mira's rules (ADR-185)", () => {
     ).toBeUndefined();
   });
 
-  it("marketingWasted: at the stage's cap marketing buys nothing", () => {
-    const s = state({ awarenessBps: 5_000 });
+  it("marketingWasted: at the awareness cap (ADR-188: 60 % at stage 0) marketing buys nothing", () => {
+    const s = state({ awarenessBps: 6_000 });
     expect(advice(s, "marketingWasted")?.options.map((o) => o.action)).toEqual([
       { type: "marketing", cents: 0 },
       { type: "hireAi", count: 1, skill: "tech_backend" },

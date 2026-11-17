@@ -7,7 +7,8 @@
 import { BALANCE, type BalanceConfig } from "@/config/balance";
 import type { CampaignKind, PriceLevel } from "@/features/game/types";
 import type { HealthFactorKey, HealthStatus } from "@/lib/sim/company-health";
-import { aiWageDueCents, marketingGain, priceEffect } from "@/lib/sim/startup";
+import { aiWageDueCents, priceEffect } from "@/lib/sim/startup";
+import { awarenessCap, halfSaturationMarketingCents, marketingRate } from "@/lib/sim/awareness";
 import type { MiraState } from "./brain";
 
 const round1 = (v: number) => Math.round(v * 10) / 10;
@@ -231,12 +232,14 @@ export function companyFacts(state: MiraState, cfg: BalanceConfig = BALANCE): Co
       : 0;
 
   // ---- awareness and marketing: the hourly formula of the close (awarenessHour), on the owner's market estimate
-  const stage = clamp(Math.floor(c?.stage ?? 0), 0, sc.stages.awarenessCaps.length - 1);
-  const cap = Math.max(sc.awareness.min, sc.stages.awarenessCaps[stage] ?? 1);
+  // ADR-188: the same cap as the hourly close (legal form, stage, expansion)
+  const cap = awarenessCap(c?.tier ?? "garage", c?.stage ?? 0, c?.expansionLevel ?? 0, sc.awareness);
   const awareness = (c?.awarenessBps ?? 0) / 10_000;
   const market = Math.sqrt(Math.max(1, c?.estimateLowCents ?? 1) * Math.max(1, c?.estimateHighCents ?? 1));
   const qh = Math.max(1, cfg.time.quarterHours);
-  const perHour = (budget: number) => (marketingGain(budget, market, sc) / qh) * 100;
+  // points one hour of this quarterly budget adds now: rate x gap to the cap (ADR-188)
+  const perHour = (budget: number) =>
+    marketingRate(budget / qh, market, sc.awareness, qh) * Math.max(0, cap - awareness) * 100;
   const parts = lastAuto?.awarenessParts ?? null;
   const before = lastAuto?.awarenessBefore ?? null;
   const after = lastAuto?.awarenessAfter ?? null;
@@ -253,10 +256,7 @@ export function companyFacts(state: MiraState, cfg: BalanceConfig = BALANCE): Co
   const marketingNow = c?.marketingCentsPerQuarter ?? 0;
   // The page's slider ends at a fifth of the quarter's upper market estimate (MarketingBudgetCard).
   const maxMarketing = Math.max(100_000, Math.round((c?.estimateHighCents ?? 0) / 4 / 5 / 1_000) * 1_000);
-  const half = Math.max(
-    sc.awareness.marketingMinHalfSaturationCents,
-    (market / 4) * sc.awareness.marketingHalfSaturationShare,
-  );
+  const half = halfSaturationMarketingCents(market, sc.awareness);
   const suggested = Math.min(maxMarketing, Math.round(half / 1_000) * 1_000);
   // Calibrate the estimate with what marketing really brought in the last hour (the market size is hidden).
   const estimateNow = perHour(marketingNow);
