@@ -29,13 +29,13 @@ export interface CosmicCardDraft {
   startPriceCents: number;
 }
 
-/** Start price ranges of Cosmic Winds in cents (pack 5.000 EUR). One of One: 16 to 33 million EUR. */
+/** Start price ranges of Cosmic Winds in cents: 4.5 x Super Apex (base ranges x 22.5). One of One: 16 to 33 million EUR. */
 export const COSMIC_PRICE_RANGE: Record<CosmicRarity, readonly [number, number]> = {
-  common: [3_750, 37_500],
-  rare: [26_250, 300_000],
-  ultra: [600_000, 9_375_000],
-  prisma: [18_750_000, 93_750_000],
-  legendary: [337_500_000, 675_000_000],
+  common: [2_250, 22_500],
+  rare: [15_750, 180_000],
+  ultra: [360_000, 5_625_000],
+  prisma: [11_250_000, 56_250_000],
+  legendary: [202_500_000, 405_000_000],
   one_of_one: [1_600_000_000, 3_300_000_000],
 };
 
