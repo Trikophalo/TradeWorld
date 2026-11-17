@@ -553,6 +553,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Umsätze an der Börse",
         text: "Jede Aktie zeigt ihren aktuellen Umsatz mit Trendpfeil, die Detailseite „Geschäftszahlen“ mit Gewinn, Ruf und Bekanntheit.",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-28a6a95a",
+        title: "Bulk verkaufen aufgeräumt",
+        text: "Die Knöpfe bleiben im Fenster, die Summe liegt am PC daneben statt über der Liste.",
+      },
     ],
   },
   {

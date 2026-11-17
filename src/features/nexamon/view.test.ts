@@ -31,6 +31,7 @@ import {
   bulkGroups,
   setsByPackPrice,
   bulkPick,
+  bulkSelectBelow,
   DEFAULT_BULK_FILTER,
   sortCopiesBestFirst,
   splitGraded,
@@ -178,6 +179,28 @@ describe("Cosmic Winds and bulk (ADR-174)", () => {
     expect(bulkGroups(own, { ...DEFAULT_BULK_FILTER, keepOne: false, duplicatesOnly: true }, bonus).length).toBe(2);
     expect(bulkGroups(own, { ...DEFAULT_BULK_FILTER, keepOne: false, maxValueCents: 60 }, bonus).length).toBe(2);
     expect(bulkPick(loose, { "me-001": 2, "me-060": 0 }).map((c) => c.valueCents)).toEqual([100, 300]);
+  });
+
+  it("auto-selects every copy below a value and keeps one per card when asked", () => {
+    const own = [
+      copy("me-001", { valueCents: 100 }),
+      copy("me-001", { valueCents: 150 }),
+      copy("me-001", { valueCents: 300 }),
+      copy("me-002", { valueCents: 50 }),
+      copy("me-004", { valueCents: 500 }),
+      copy("me-004", { valueCents: 600 }),
+    ];
+    const none = () => false;
+    const kept = bulkGroups(own, DEFAULT_BULK_FILTER, none);
+    // keep one: the best me-001 (300) stays, me-002 alone stays, me-004 is above the threshold
+    const sel = bulkSelectBelow(kept, 200);
+    expect(sel).toEqual({ "me-001": 2 });
+    expect(bulkPick(kept, sel).map((c) => c.valueCents)).toEqual([100, 150]);
+    const loose = bulkGroups(own, { ...DEFAULT_BULK_FILTER, keepOne: false }, none);
+    expect(bulkSelectBelow(loose, 200)).toEqual({ "me-001": 2, "me-002": 1 });
+    // strictly below: a copy worth exactly the threshold stays
+    expect(bulkSelectBelow(loose, 150)).toEqual({ "me-001": 1, "me-002": 1 });
+    expect(bulkSelectBelow(loose, 0)).toEqual({});
   });
 });
 

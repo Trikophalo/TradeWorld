@@ -113,6 +113,8 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Bulk verkaufen aufgeräumt:** Die Knöpfe bleiben im Fenster, die Summe liegt am PC daneben statt über der Liste. Neu: „Alles unter … € auswählen“ wählt jede Karte unter deinem Betrag, auf Wunsch bleibt von jeder eine übrig.
+
 - **Umsätze an der Börse (ADR-184):** Jede Aktie zeigt ihren aktuellen Umsatz mit Trendpfeil, die Detailseite „Geschäftszahlen“ mit Gewinn, Ruf und Bekanntheit.
 
 - **Mira kennt jetzt deine Zahlen (ADR-185):** Sie rät nur noch zu Dingen, die gerade gehen, sagt, was sie je Stunde

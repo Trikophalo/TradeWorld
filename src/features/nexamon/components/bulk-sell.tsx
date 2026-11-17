@@ -20,7 +20,7 @@ import { nexamonCardBonusDef } from "@/lib/sim/nexamon-bonuses";
 import { nexamonBulkPayout, nexamonBulkRarities } from "@/lib/sim/nexamon";
 import { playSound } from "@/lib/sound";
 import { useNexamonAction } from "../hooks";
-import { bulkGroups, bulkPick, DEFAULT_BULK_FILTER, formatChance, type BulkFilter } from "../view";
+import { bulkGroups, bulkPick, bulkSelectBelow, DEFAULT_BULK_FILTER, formatChance, type BulkFilter } from "../view";
 import { RarityBadge } from "./badges";
 import { CardThumb } from "./card-face";
 import { FactRow, SelectField } from "./parts";
@@ -49,6 +49,17 @@ export function BulkSell({ collection }: { collection: NexamonCollection }) {
 
   const selectAll = () => setSelection(Object.fromEntries(groups.map((g) => [g.card.key, g.copies.length])));
   const selectNone = () => setSelection({});
+  const [belowText, setBelowText] = useState("");
+  const belowCents = parseEuroCents(belowText);
+  const belowOk = belowText.trim() !== "" && belowCents !== null && belowCents > 0;
+  const [autoPicked, setAutoPicked] = useState<{ count: number; valueCents: number } | null>(null);
+  const selectBelow = () => {
+    if (!belowOk) return;
+    const next = bulkSelectBelow(groups, belowCents);
+    const copies = bulkPick(groups, next);
+    setSelection(next);
+    setAutoPicked({ count: copies.length, valueCents: copies.reduce((sum, c) => sum + c.valueCents, 0) });
+  };
 
   const sellToGame = () =>
     void sell.run(
@@ -171,122 +182,161 @@ export function BulkSell({ collection }: { collection: NexamonCollection }) {
             <Switch checked={filter[key]} onCheckedChange={(on) => patch({ [key]: on })} label={label} />
           </label>
         ))}
-      </div>
-
-      {groups.length === 0 ? (
-        <EmptyState
-          art={<PixelIcon {...UI_ICONS.search} scale={4} />}
-          title={t("bulk.emptyTitle")}
-          description={t("bulk.emptyText")}
-        />
-      ) : (
-        <>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="secondary" onClick={selectAll} data-testid="bulk-all">
-              {t("bulk.selectAll")}
-            </Button>
-            <Button size="sm" variant="ghost" onClick={selectNone} data-testid="bulk-none">
-              {t("bulk.selectNone")}
-            </Button>
-          </div>
-          <ul className="grid gap-2 lg:grid-cols-2" data-testid="bulk-list">
-            {groups.map((g) => {
-              const n = Math.min(selection[g.card.key] ?? 0, g.copies.length);
-              return (
-                <li
-                  key={g.card.key}
-                  className="flex items-center gap-3 rounded-lg border-2 border-line-1 bg-surface-1 p-2"
-                  data-testid="bulk-row"
-                  data-card={g.card.key}
-                >
-                  <CardThumb card={g.card} scale={1} dimmed={n === 0} />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-fg-1">{g.card.name}</p>
-                    <RarityBadge rarity={g.card.rarity} short />
-                    <p className="mt-1 nums text-xs text-fg-3">
-                      {t("bulk.rowValue", { value: formatMoney(g.copies[0]!.valueCents) })}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      disabled={n <= 0}
-                      aria-label={t("quantity.less")}
-                      onClick={() => setSelection((s) => ({ ...s, [g.card.key]: n - 1 }))}
-                    >
-                      −
-                    </Button>
-                    <span className="min-w-12 text-center nums text-sm font-semibold text-fg-1" data-testid="bulk-qty">
-                      {t("quantity.of", { n, max: g.copies.length })}
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      disabled={n >= g.copies.length}
-                      aria-label={t("quantity.more")}
-                      onClick={() => setSelection((s) => ({ ...s, [g.card.key]: n + 1 }))}
-                    >
-                      +
-                    </Button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </>
-      )}
-
-      <div
-        className="sticky bottom-2 space-y-3 rounded-lg border-2 border-line-2 bg-surface-1 p-3 shadow-2"
-        data-testid="bulk-total"
-      >
-        <dl className="divide-y divide-line-1 rounded-md bg-surface-2 px-3">
-          <FactRow label={t("bulk.count")}>{picked.length}</FactRow>
-          <FactRow label={t("bulk.value")}>{formatMoney(payout.valueCents)}</FactRow>
-          <FactRow label={t("bulk.fee", { rate: formatChance(10_000 - BALANCE.nexamon.quickSell.bps) })}>
-            −{formatMoney(payout.feeCents)}
-          </FactRow>
-          <FactRow label={t("bulk.payout")} strong>
-            <span data-testid="bulk-payout">{formatMoney(payout.payoutCents)}</span>
-          </FactRow>
-        </dl>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <Button
-            block
-            state={sell.state}
-            disabled={picked.length === 0 || picked.length > BALANCE.nexamon.quickSell.maxPerCall}
-            onClick={sellToGame}
-            data-testid="bulk-sell-game"
-          >
-            {t("bulk.sellGame", { price: formatMoney(payout.payoutCents) })}
-          </Button>
-          <div className="flex items-end gap-2">
+        <div className="space-y-2 border-t-2 border-line-1 pt-3" data-testid="bulk-auto">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
             <Field
-              label={t("bulk.share")}
-              inputMode="numeric"
-              value={share}
-              onChange={(event) => setShare(event.target.value)}
-              className="w-20"
-              data-testid="bulk-share"
+              label={t("bulk.belowLabel")}
+              inputMode="decimal"
+              autoComplete="off"
+              value={belowText}
+              placeholder={t("bulk.belowPlaceholder")}
+              onChange={(event) => {
+                setBelowText(event.target.value);
+                setAutoPicked(null);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") selectBelow();
+              }}
+              data-testid="bulk-below"
             />
             <Button
-              block
               variant="secondary"
-              state={list.state}
-              disabled={picked.length === 0 || !shareOk || picked.length > BALANCE.nexamon.market.maxListings}
-              onClick={listOnMarket}
-              data-testid="bulk-list-market"
+              disabled={!belowOk || groups.length === 0}
+              onClick={selectBelow}
+              className="h-12"
+              data-testid="bulk-below-select"
             >
-              {t("bulk.listMarket")}
+              {t("bulk.belowSelect")}
             </Button>
           </div>
-        </div>
-        {picked.length > BALANCE.nexamon.market.maxListings && (
-          <p className="text-xs text-pretty text-fg-3">
-            {t("bulk.listLimit", { max: BALANCE.nexamon.market.maxListings })}
+          <p className="text-xs text-pretty text-fg-3" aria-live="polite" data-testid="bulk-below-result">
+            {autoPicked
+              ? t("bulk.belowResult", { count: autoPicked.count, value: formatMoney(autoPicked.valueCents) })
+              : t(filter.keepOne ? "bulk.belowHintKeep" : "bulk.belowHint")}
           </p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+        {groups.length === 0 ? (
+          <EmptyState
+            art={<PixelIcon {...UI_ICONS.search} scale={4} />}
+            title={t("bulk.emptyTitle")}
+            description={t("bulk.emptyText")}
+          />
+        ) : (
+          <div className="min-w-0 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="secondary" onClick={selectAll} data-testid="bulk-all">
+                {t("bulk.selectAll")}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={selectNone} data-testid="bulk-none">
+                {t("bulk.selectNone")}
+              </Button>
+            </div>
+            <ul className="grid gap-2 2xl:grid-cols-2" data-testid="bulk-list">
+              {groups.map((g) => {
+                const n = Math.min(selection[g.card.key] ?? 0, g.copies.length);
+                return (
+                  <li
+                    key={g.card.key}
+                    className="flex min-w-0 items-center gap-3 rounded-lg border-2 border-line-1 bg-surface-1 p-2"
+                    data-testid="bulk-row"
+                    data-card={g.card.key}
+                  >
+                    <CardThumb card={g.card} scale={1} dimmed={n === 0} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-fg-1">{g.card.name}</p>
+                      <RarityBadge rarity={g.card.rarity} short />
+                      <p className="mt-1 nums text-xs text-fg-3">
+                        {t("bulk.rowValue", { value: formatMoney(g.copies[0]!.valueCents) })}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={n <= 0}
+                        aria-label={t("quantity.less")}
+                        onClick={() => setSelection((s) => ({ ...s, [g.card.key]: n - 1 }))}
+                      >
+                        −
+                      </Button>
+                      <span
+                        className="min-w-12 text-center nums text-sm font-semibold text-fg-1"
+                        data-testid="bulk-qty"
+                      >
+                        {t("quantity.of", { n, max: g.copies.length })}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={n >= g.copies.length}
+                        aria-label={t("quantity.more")}
+                        onClick={() => setSelection((s) => ({ ...s, [g.card.key]: n + 1 }))}
+                      >
+                        +
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         )}
+
+        <div
+          className="order-first min-w-0 space-y-3 rounded-lg border-2 border-line-2 bg-surface-1 p-3 shadow-2 lg:sticky lg:top-4 lg:order-none"
+          data-testid="bulk-total"
+        >
+          <dl className="divide-y divide-line-1 rounded-md bg-surface-2 px-3">
+            <FactRow label={t("bulk.count")}>{picked.length}</FactRow>
+            <FactRow label={t("bulk.value")}>{formatMoney(payout.valueCents)}</FactRow>
+            <FactRow label={t("bulk.fee", { rate: formatChance(10_000 - BALANCE.nexamon.quickSell.bps) })}>
+              −{formatMoney(payout.feeCents)}
+            </FactRow>
+            <FactRow label={t("bulk.payout")} strong>
+              <span data-testid="bulk-payout">{formatMoney(payout.payoutCents)}</span>
+            </FactRow>
+          </dl>
+          <div className="space-y-3">
+            <Button
+              block
+              className="h-auto min-h-12 py-2 text-center whitespace-normal"
+              state={sell.state}
+              disabled={picked.length === 0 || picked.length > BALANCE.nexamon.quickSell.maxPerCall}
+              onClick={sellToGame}
+              data-testid="bulk-sell-game"
+            >
+              {t("bulk.sellGame", { price: formatMoney(payout.payoutCents) })}
+            </Button>
+            <div className="grid grid-cols-[6rem_minmax(0,1fr)] items-end gap-2">
+              <Field
+                label={t("bulk.share")}
+                inputMode="numeric"
+                value={share}
+                onChange={(event) => setShare(event.target.value)}
+                data-testid="bulk-share"
+              />
+              <Button
+                block
+                className="h-auto min-h-12 py-2 text-center whitespace-normal"
+                variant="secondary"
+                state={list.state}
+                disabled={picked.length === 0 || !shareOk || picked.length > BALANCE.nexamon.market.maxListings}
+                onClick={listOnMarket}
+                data-testid="bulk-list-market"
+              >
+                {t("bulk.listMarket")}
+              </Button>
+            </div>
+          </div>
+          {picked.length > BALANCE.nexamon.market.maxListings && (
+            <p className="text-xs text-pretty text-fg-3">
+              {t("bulk.listLimit", { max: BALANCE.nexamon.market.maxListings })}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
