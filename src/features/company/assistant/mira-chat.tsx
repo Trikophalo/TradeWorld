@@ -15,7 +15,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { BALANCE } from "@/config/balance";
 import { useGameErrorText } from "@/features/game/errors";
 import { engine } from "@/features/game/store";
-import type { CompanyMoves, CompanyTask, PitchMoveKind } from "@/features/game/types";
+import type { CompanyMoves, CompanyTask, MyCompany, PitchMoveKind } from "@/features/game/types";
+import { useDisclosed } from "@/features/progression/components/reveal";
 import { formatMoney } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
 import { DURATION, EASE } from "@/lib/motion";
@@ -26,6 +27,20 @@ import { cn } from "@/lib/utils";
 import { useHealthText } from "../health";
 import { useCompanyEvent, useCompanyRefresh } from "../hooks";
 import { COMPANY_MOVES_KEY } from "../components/company-moves";
+import { COMPANY_AUTOPILOT_KEY, useCompanyAutopilot } from "../components/autopilot-card";
+import { INTERVIEW_KEY } from "../components/interview-card";
+import type { CompanySection } from "../tabs";
+import {
+  aiTurn,
+  autopilotTurn,
+  nextTurn,
+  profitTurn,
+  reportTurn,
+  reputationTurn,
+  revenueTurn,
+  strengthsTurn,
+} from "./advisor";
+import { companyFacts, factsForClaude } from "./facts";
 import { PITCHES_KEY, askJudge, useCompanyPitches } from "../components/pitch-card";
 import { COMPANY_TASKS_KEY, PlaySheet, useCompanyTasks } from "../tasks/task-board";
 import { useTaskText } from "../tasks/task-text";
@@ -58,7 +73,8 @@ const cfg = BALANCE.companyAssistant;
 const pitchCfg = BALANCE.pitches;
 const time = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" });
 
-export type MiraOpen = (tab: "overview" | "tasks" | "team", section?: string) => void;
+/** Opens a place on the company page (ADR-185: a section id of tabs.ts). */
+export type MiraOpen = (section: CompanySection) => void;
 
 // ---- Conversation (kept while the app is open; Mira re-briefs after a reload) ----------------------------------------
 
@@ -130,7 +146,7 @@ function mira(lines: MiraLine[], options: MiraOption[] = [], text?: string) {
 
 // ---- State Mira looks at --------------------------------------------------------------------------------------------
 
-function useMiraState(applications: number, health: MiraHealth | null): MiraState | null {
+function useMiraState(applications: number, health: MiraHealth | null, company: MyCompany | null): MiraState | null {
   const tasks = useCompanyTasks();
   const founder = tasks.data?.role === "founder";
   const moves = useQuery({
@@ -147,6 +163,15 @@ function useMiraState(applications: number, health: MiraHealth | null): MiraStat
     queryFn: () => engine.listedCompany(),
     refetchInterval: 60_000,
     enabled: founder,
+  });
+  // ADR-185: the autopilot, the last hour's economy and a waiting interview belong to the facts Mira reads.
+  const autopilot = useCompanyAutopilot(founder);
+  const interviews = useDisclosed("companyInterview");
+  const interview = useQuery({
+    queryKey: INTERVIEW_KEY,
+    queryFn: () => engine.companyInterview(),
+    refetchInterval: 60_000,
+    enabled: founder && interviews,
   });
   const now = useClock();
   return useMemo(() => {
@@ -174,10 +199,27 @@ function useMiraState(applications: number, health: MiraHealth | null): MiraStat
           : null,
       health: founder ? health : null,
       listed: founder ? (listed.data ?? null) : null,
+      company: founder ? company : null,
+      autopilot: founder ? (autopilot.data ?? null) : null,
+      interview: founder && interviews ? (interview.data?.interview ?? null) : null,
       // a minute is precise enough for deadlines, and keeps the briefing ids stable
       now: Math.floor(now / 60_000) * 60_000,
     };
-  }, [tasks.data, moves.data, event.data, pitches.data, listed.data, founder, applications, health, now]);
+  }, [
+    tasks.data,
+    moves.data,
+    event.data,
+    pitches.data,
+    listed.data,
+    founder,
+    applications,
+    health,
+    company,
+    autopilot.data,
+    interview.data,
+    interviews,
+    now,
+  ]);
 }
 
 function useNames(): MiraNames {
@@ -302,8 +344,19 @@ function useRunner(state: MiraState | null, names: MiraNames, onOpen: MiraOpen, 
           return;
         }
         case "open":
-          onOpen(action.tab, action.section);
+          onOpen(action.section);
           return;
+        case "autopilot": {
+          client.setQueryData(COMPANY_AUTOPILOT_KEY, await engine.setCompanyAutopilot(crypto.randomUUID(), action.on));
+          mira([{ key: action.on ? "ok.autopilotOn" : "ok.autopilotOff" }]);
+          break;
+        }
+        case "expand": {
+          await engine.expandCompany(crypto.randomUUID());
+          mira([{ key: "ok.expand" }]);
+          void playSound("success");
+          break;
+        }
         case "suggest":
           return;
         // Company levers (ADR-162): the same RPCs as the controls on the overview.
@@ -380,13 +433,15 @@ async function askClaude(
   const tasks = Object.fromEntries(state.tasks.tasks.map((t) => [String(t.id), names.task(t.key)]));
   const moves = Object.fromEntries((state.moves?.moves ?? []).map((m) => [m.key, names.move(m.key)]));
   const taskKeys = Object.fromEntries(state.tasks.history.map((h) => [h.key, names.task(h.key)]));
+  // ADR-185: the same facts the deterministic Mira reads, so Claude's answer is grounded in them.
+  const facts = factsForClaude(companyFacts(state));
   try {
     const { data } = await supabase.functions.invoke<{
       ok?: boolean;
       reason?: string;
       reply?: string;
       actions?: ClaudeAction[];
-    }>("company-assistant", { body: { text, names: { tasks, moves, taskKeys }, history } });
+    }>("company-assistant", { body: { text, names: { tasks, moves, taskKeys }, history, facts } });
     if (!data?.ok || !data.reply) return { reason: data?.reason ?? "no_answer" };
     return { reply: data.reply, actions: validActions(fromClaude(data.actions ?? []), state) };
   } catch {
@@ -404,10 +459,13 @@ async function askClaude(
 export function MiraChat({
   applications = 0,
   health = null,
+  company = null,
   onOpen,
   className,
 }: {
   applications?: number;
+  /** The own company as the page shows it (ADR-185), for the founder's facts. */
+  company?: MyCompany | null;
   /** The company's eight factors (ADR-162), for the founder. */
   health?: MiraHealth | null;
   onOpen: MiraOpen;
@@ -415,7 +473,7 @@ export function MiraChat({
 }) {
   const t = useTranslations("mira");
   const line = (l: MiraLine) => t(l.key as Parameters<typeof t>[0], l.values as Record<string, string>);
-  const state = useMiraState(applications, health);
+  const state = useMiraState(applications, health, company);
   const names = useNames();
   const [playing, setPlaying] = useState<CompanyTask | null>(null);
   const run = useRunner(state, names, onOpen, setPlaying);
@@ -532,6 +590,23 @@ export function MiraChat({
       mira(turn.lines, turn.options);
       return;
     }
+    // ADR-185: questions answered from the company facts
+    const answers = {
+      profit: profitTurn,
+      revenue: revenueTurn,
+      next: nextTurn,
+      report: reportTurn,
+      reputation: reputationTurn,
+      strengths: strengthsTurn,
+      autopilot: autopilotTurn,
+      ai: aiTurn,
+    } as const;
+    if (intent.kind in answers) {
+      const turn = answers[intent.kind as keyof typeof answers](state, names);
+      mira(turn.lines, turn.options);
+      return;
+    }
+    if (intent.kind !== "unknown") return;
     if (intent.reason === "noTarget") {
       const task = state.tasks.tasks.find((x) => x.id === intent.taskId);
       if (task) {

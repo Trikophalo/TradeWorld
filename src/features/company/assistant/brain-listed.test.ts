@@ -177,7 +177,7 @@ describe("Mira and the listed company (ADR-167)", () => {
     // no money: only the bonus programme (no setup price) is left, and the team tab
     expect(alarm.options.map((o) => o.action)).toEqual([
       { type: "invest", key: "b_bonus" },
-      { type: "open", tab: "overview", section: "staff" },
+      { type: "open", section: "staff" },
     ]);
   });
 
@@ -198,7 +198,7 @@ describe("Mira and the listed company (ADR-167)", () => {
     expect(turns[1]!.options[0]!.action.type).toBe("invest");
     expect(turns[2]!.lines[0]).toEqual({
       key: "listed.brief.greed",
-      values: { ratio: 80, reputation: 44, demand: -2 },
+      values: { ratio: 80, reputation: 44, demand: 2 },
     });
     // a research in work: no nagging
     l.items.find((i) => i.key === "r_brand_1")!.readyAt = new Date(NOW + 1).toISOString();

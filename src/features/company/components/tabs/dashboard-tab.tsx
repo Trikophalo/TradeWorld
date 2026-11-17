@@ -109,7 +109,7 @@ export function DashboardTab({
           <AutopilotCard />
         </div>
         <div id="mira" className="scroll-mt-32">
-          <MiraChat applications={company.pendingApplications} health={miraHealth} onOpen={onMira} />
+          <MiraChat applications={company.pendingApplications} health={miraHealth} company={company} onOpen={onMira} />
         </div>
       </FirmSection>
 
