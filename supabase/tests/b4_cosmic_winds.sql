@@ -48,7 +48,7 @@ select tests.assert(
   and (select count(*) from public.nexamon_cards where set_key = 'cosmic_winds' and rarity = 'one_of_one' and number between 88 and 90) = 3
   and not exists (select 1 from public.nexamon_cards where rarity = 'one_of_one'
                    and (start_e4 < 1600000000::bigint * 100 or start_e4 > 3300000000::bigint * 100))
-  and (select count(*) from public.nexamon_cards where set_key <> 'cosmic_winds') = 231,
+  and (select count(*) from public.nexamon_cards where set_key in ('mystic_energy', 'super_apex', 'prismatic_peak')) = 231,
   'Cosmic Winds: 90 cards 50/15/15/5/2/3 numbered by rarity, One of Ones at 16 to 33 million €; the old sets unchanged');
 select tests.assert(
   not exists (select 1 from public.nexamon_copies c join public.nexamon_cards k on k.card_key = c.card_key where k.rarity = 'one_of_one')

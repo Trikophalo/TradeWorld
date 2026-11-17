@@ -13,6 +13,8 @@ import {
   NEXAMON_SAMPLE_CARDS,
   NEXAMON_SAMPLE_EVENT,
   NEXAMON_SAMPLE_EVOLVES,
+  NEXAMON_SAMPLE_WARRIOR,
+  NEXAMON_SAMPLE_YIN_YANG,
   nexamonSampleArt,
 } from "@/components/pixel/nexamon-samples";
 import { Button } from "@/components/ui/button";
@@ -111,6 +113,7 @@ function Block({ label, children, testId }: { label: string; children: ReactNode
 }
 
 const ONE_OF_ONE_SAMPLE = NEXAMON_SAMPLE_CARDS.find((c) => c.rarity === "one_of_one")!;
+const URANIUM_SAMPLE = NEXAMON_SAMPLE_CARDS.find((c) => c.rarity === "uranium")!;
 
 /** The Nexamon cards on /dev/ui (ADR-165): every rarity, the back, slabs, packs, the opening and the small parts. */
 export function NexamonShowcase() {
@@ -145,6 +148,24 @@ export function NexamonShowcase() {
             <RarityBadge rarity="one_of_one" />
           </div>
           <NexamonSlab card={ONE_OF_ONE_SAMPLE} art={art[ONE_OF_ONE_SAMPLE.key]} grade={10} serial={1} scale={2} />
+        </div>
+      </Block>
+
+      <Block label="Titans Revenge und Yin Yang (ADR-182): Uranium, Krieger, Yin und Yang" testId="nexamon-new-sets">
+        <div className="flex flex-wrap items-start justify-center gap-4">
+          <div className="flex flex-col items-center gap-2" data-testid="showcase-uranium">
+            <NexamonCard card={URANIUM_SAMPLE} art={art[URANIUM_SAMPLE.key]} scale={3} />
+            <RarityBadge rarity="uranium" />
+          </div>
+          <div className="flex flex-col items-center gap-2" data-testid="showcase-warrior">
+            <NexamonCard card={NEXAMON_SAMPLE_WARRIOR} art={art[NEXAMON_SAMPLE_WARRIOR.key]} scale={3} />
+            <RarityBadge rarity={NEXAMON_SAMPLE_WARRIOR.rarity} short />
+          </div>
+          <div className="flex flex-wrap justify-center gap-2" data-testid="showcase-yin-yang">
+            {NEXAMON_SAMPLE_YIN_YANG.map((card) => (
+              <NexamonCard key={card.key} card={card} art={art[card.key]} scale={3} />
+            ))}
+          </div>
         </div>
       </Block>
 

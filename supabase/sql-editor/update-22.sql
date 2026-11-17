@@ -2815,4 +2815,129 @@ $t$);
 end;
 $do$;
 
+-- ===== supabase/updates/20261204007200_nexamon_new_sets_packs.sql =====
+-- ===== idempotent copy of migrations/20261204007200_nexamon_new_sets_packs.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- =============================================================================
+-- NEXA · 7200 · Nexamon: packs of Titans Revenge and Yin Yang (ADR-182)
+-- =============================================================================
+-- * nexamon_slot_rarity(set, slot, u): the slot table of a set, its entry in setOdds (Yin Yang: every chance from
+--   ultra upwards x 0.9, in parts of 36 000) or else odds. Port of nexamonSlotRarity(slot, u, cfg, set).
+-- * nexamon_open_pack(): rolls slots 4 and 5 on the set's own table; in an AI pack (no owner) a tier of a rarity in
+--   ai.excludedRarities (Titans Revenge's uranium) is skipped, its slots stay the base rarity (iron). Before, the
+--   AI guard trigger would have stopped the whole AI pack run.
+-- The cards (30 + 110) and the rules (packRules.titans_revenge, setOdds.yin_yang, quickSell.setRarities) come from
+-- game_config (`pnpm db:config`); nexamon_sync() mirrors the new sets and seeds the AI stock on its next run.
+-- Idempotent: runs unchanged as supabase/updates/20261204007200_nexamon_new_sets_packs.sql.
+
+create or replace function public.nexamon_slot_rarity(p_set text, p_slot integer, p_u double precision)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  o      jsonb := coalesce(public.nexamon_cfg() #> array['setOdds', coalesce(p_set, '')], public.nexamon_cfg() -> 'odds');
+  t      jsonb;
+  v_den  integer := coalesce((o ->> 'denominator')::integer, 3600);
+  v_n    integer;
+  v_edge integer := 0;
+  r      text;
+begin
+  t := case when p_slot = 5 then o -> 'slot5' when p_slot = 4 then o -> 'slot4' end;
+  if t is null then
+    return 'common';
+  end if;
+  v_n := floor(least(greatest(coalesce(p_u, 0), 0), 0.999999999) * v_den)::integer;
+  foreach r in array array['legendary', 'prisma', 'ultra', 'rare'] loop
+    v_edge := v_edge + coalesce((t ->> r)::integer, 0);
+    if v_n < v_edge then
+      return r;
+    end if;
+  end loop;
+  return 'common';
+end;
+$$;
+comment on function public.nexamon_slot_rarity(text, integer, double precision) is
+  'Internal: the rarity of pack slot p_slot for the roll p_u on the slot table of set p_set (setOdds, else odds; ADR-182).';
+revoke all on function public.nexamon_slot_rarity(text, integer, double precision) from public, anon, authenticated;
+grant execute on function public.nexamon_slot_rarity(text, integer, double precision) to service_role;
+
+do $do$
+declare
+  v_def  text := pg_get_functiondef('public.nexamon_open_pack(text, uuid, text, uuid, timestamptz)'::regprocedure);
+  v_old1 text := $t$when s >= 4 then public.nexamon_slot_rarity(s, random()) else 'common' end;$t$;
+  v_new1 text := $t$when s >= 4 then public.nexamon_slot_rarity(p_set, s, random()) else 'common' end;$t$;
+  v_old2 text := $t$      if v_hit then
+        for i in 1 .. v_cnt loop$t$;
+  v_new2 text := $t$      if v_hit and not (p_owner is null
+                        and coalesce(cfg #> '{ai,excludedRarities}', '[]'::jsonb) ? (t.x ->> 'rarity')) then
+        for i in 1 .. v_cnt loop$t$;
+begin
+  if position('nexamon_slot_rarity(p_set' in v_def) = 0 then
+    if position(v_old1 in v_def) = 0 or position(v_old2 in v_def) = 0 then
+      raise exception 'nexamon_open_pack() has an unexpected shape; roll the set''s own slot table and skip AI-excluded tiers (ADR-182) by hand';
+    end if;
+    execute replace(replace(v_def, v_old1, v_new1), v_old2, v_new2);
+  end if;
+end;
+$do$;
+
+-- ===== supabase/updates/20261204007210_nexamon_new_sets_ranks.sql =====
+-- ===== idempotent copy of migrations/20261204007210_nexamon_new_sets_ranks.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- =============================================================================
+-- NEXA · 7210 · Nexamon: rarities of the new sets count by rank (ADR-182)
+-- =============================================================================
+-- Titans Revenge brings its own rarities (iron, titanium, diamond, uranium). Where the code named the classic ones,
+-- it now asks nexamon_rarity_rank() (game_config.nexamon_rarities.rank):
+-- * the pack missions in buy_nexamon_pack(), open_nexamon_sealed_pack() and nexamon_battle_pull(): "rare or better"
+--   is rank >= 1 (iron, rank 0, is not), "ultra or better" rank >= 2 (titanium, diamond, uranium, One of One too);
+-- * get_nexamon_market(): the rarity filter takes every known rarity (rank >= 0), not only the classic five.
+-- Idempotent: runs unchanged as supabase/updates/20261204007210_nexamon_new_sets_ranks.sql.
+
+do $do$
+declare
+  v_fn   text;
+  v_def  text;
+  v_rare text := $t$if r.rarity <> 'common' then$t$;
+  v_ult1 text := $t$if r.rarity in ('ultra', 'prisma', 'legendary') then$t$;
+  v_ult2 text := $t$if r.rarity in ('ultra', 'prisma', 'legendary', 'one_of_one') then$t$;
+begin
+  foreach v_fn in array array[
+    'public.buy_nexamon_pack(uuid, text)', 'public.open_nexamon_sealed_pack(uuid, uuid)',
+    'public.nexamon_battle_pull(public.nexamon_battles, uuid, timestamptz)'
+  ] loop
+    v_def := pg_get_functiondef(v_fn::regprocedure);
+    if position('nexamon_rarity_rank(r.rarity) >= 2' in v_def) = 0 then
+      if position(v_rare in v_def) = 0 or (position(v_ult1 in v_def) = 0 and position(v_ult2 in v_def) = 0) then
+        raise exception '% has an unexpected shape; count the pack missions by rarity rank (ADR-182) by hand', v_fn;
+      end if;
+      execute replace(replace(replace(v_def, v_ult2, 'if public.nexamon_rarity_rank(r.rarity) >= 2 then'),
+                              v_ult1, 'if public.nexamon_rarity_rank(r.rarity) >= 2 then'),
+                      v_rare, 'if public.nexamon_rarity_rank(r.rarity) >= 1 then');
+    end if;
+  end loop;
+end;
+$do$;
+
+do $do$
+declare
+  v_def text := pg_get_functiondef(
+    'public.get_nexamon_market(text, text, text, integer, text, text, boolean, boolean)'::regprocedure);
+  v_old text := $t$p_rarity not in ('common', 'rare', 'ultra', 'prisma', 'legendary')$t$;
+  v_new text := $t$public.nexamon_rarity_rank(p_rarity) < 0$t$;
+begin
+  if position(v_new in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'get_nexamon_market() has an unexpected shape; accept every known rarity (ADR-182) by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
 commit;

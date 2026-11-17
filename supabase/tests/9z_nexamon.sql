@@ -129,20 +129,21 @@ select tests.assert(
 select public.nexamon_sync() as synced \gset
 select public.nexamon_sync() as synced2 \gset
 select tests.assert(
-  :synced = 321 and :synced2 = 0
-  and (select count(*) from public.nexamon_cards) = 321
+  :synced = 461 and :synced2 = 0
+  and (select count(*) from public.nexamon_cards) = 461
   and (select count(*) from public.nexamon_cards where set_key = 'super_apex' and rarity = 'common') = 50
-  and (select count(*) from public.nexamon_cards where rarity = 'legendary') = 8
+  and (select count(*) from public.nexamon_cards where rarity = 'legendary') = 10
   and not exists (select 1 from public.nexamon_cards where value_e4 <> start_e4 or moved_at is not null)
   and not exists (select 1 from public.nexamon_cards k, jsonb_array_elements(public.nexamon_catalogue()) x
                    where x ->> 'key' = k.card_key and (x ->> 'startPriceCents')::bigint * 100 <> k.start_e4)
-  and (select count(*) from public.nexamon_set_state) = 4,
-  'nexamon_sync(): 321 cards (three sets of 77, Cosmic Winds 90) with the catalogue''s start prices, idempotent');
+  and (select count(*) from public.nexamon_set_state) = 6,
+  'nexamon_sync(): 461 cards (three sets of 77, Cosmic Winds 90, Titans Revenge 30, Yin Yang 110) with the catalogue''s start prices, idempotent');
 select tests.assert(
   (select count(*) from public.nexamon_copies) = 3 * (50 * 6 + 10 * 4 + 10 * 2 + 2) + (50 * 6 + 15 * 4 + 15 * 2 + 2)
+      + (15 * 6 + 7 * 2) + (54 * 6 + 30 * 4 + 16 * 2 + 2)
   and not exists (select 1 from public.nexamon_copies where owner_id is not null or source <> 'seed')
   and not exists (select 1 from public.nexamon_copies c join public.nexamon_cards k on k.card_key = c.card_key where k.rarity = 'legendary')
-  and (select count(*) from public.nexamon_copies c join public.nexamon_cards k on k.card_key = c.card_key where k.rarity = 'prisma') = 8
+  and (select count(*) from public.nexamon_copies c join public.nexamon_cards k on k.card_key = c.card_key where k.rarity = 'prisma') = 10
   -- only the two cheapest prismas of every set
   and not exists (select 1 from public.nexamon_cards k
                    where k.rarity = 'prisma'
@@ -157,6 +158,7 @@ select tests.assert(
   'the population counts them');
 select tests.assert(
   (select count(*) from public.nexamon_listings) = 3 * (50 * 4 + 10 * 3 + 10 * 2 + 2) + (50 * 4 + 15 * 3 + 15 * 2 + 2)
+      + (15 * 4 + 7 * 2) + (54 * 4 + 30 * 3 + 16 * 2 + 2)
   and not exists (select 1 from public.nexamon_listings where seller_ai is null)
   and not exists (select 1 from public.nexamon_listings l join public.nexamon_cards k on k.card_key = l.card_key
                    where k.rarity = 'legendary')
@@ -174,10 +176,10 @@ update public.game_config
  where key = 'nexamon_cards';
 select public.nexamon_sync() as synced3 \gset
 select tests.assert(
-  :synced3 = 321
+  :synced3 = 461
   and (tests.nx('me-001')).start_e4 = 77700 and (tests.nx('me-001')).value_e4 = 77700
   and (tests.nx('me-002')).start_e4 = 77700 and (tests.nx('me-002')).value_e4 = 90000
-  and (tests.nx('me-001')).population = 6 and (select count(*) from public.nexamon_copies) = 1478
+  and (tests.nx('me-001')).population = 6 and (select count(*) from public.nexamon_copies) = 2060
   and not exists (select 1 from public.nexamon_listings l join public.nexamon_copies c on c.id = l.copy_id
                    where l.card_key = 'me-001' and l.price_cents <> tests.nx_ask('me-001', c.condition)),
   'a new start price in the catalogue moves a card that never traded (and the AI''s asks), not one that did');
@@ -832,7 +834,7 @@ select tests.assert(
   and (:'m4'::jsonb #>> '{listings,0,mine}')::boolean and :'m4'::jsonb #>> '{listings,0,seller}' = 'Nx_Bruno'
   and (:'m5'::jsonb ->> 'total')::integer = 3
   and (:'m6'::jsonb ->> 'page')::integer = 2 and jsonb_array_length(:'m6'::jsonb -> 'listings') = 24
-  and jsonb_array_length(:'col_b'::jsonb -> 'cards') = 321
+  and jsonb_array_length(:'col_b'::jsonb -> 'cards') = 461
   and jsonb_array_length(:'col_b'::jsonb -> 'copies') = (select count(*) from public.nexamon_copies where owner_id = :b),
   'get_nexamon_market(): filters by set, rarity, seller, card and graded, sorts and pages');
 
