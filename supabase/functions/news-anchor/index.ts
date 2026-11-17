@@ -64,6 +64,8 @@ So wird es gut:
   eine "person" und eine Aktie, dann erzählt er als wildes Gerücht, diese Person habe in die Aktie investiert.
 - Die Fakten und Zahlen aus dem Entwurf bleiben exakt so (Namen, Beträge, Prozente, Richtung rauf oder runter). Der
   Text darf nichts behaupten, was den effects widerspricht. Erfinde keine weiteren Kurse oder Geldbeträge.
+- kind "gag": ein Running Gag über eine Spielerfirma (ADR-179). Gib Schlagzeile und Text unverändert zurück; der
+  Server behält ohnehin den Entwurf.
 - Jeder Beitrag ein anderer Witz, keine Wiederholungen innerhalb der Sendung. Der letzte Beitrag (kind "tip") ist
   sein Geheimtipp für die nächste Stunde: Aktie und Richtung nennen, ohne Garantie.
 
