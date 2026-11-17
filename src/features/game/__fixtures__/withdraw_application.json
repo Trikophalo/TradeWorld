@@ -1,27 +1,27 @@
 {
-  "id": "c329b10c-40cb-415f-99bf-9c7fd862c813",
+  "id": "b34e48a9-b653-48c1-8fc5-784ebb6e491f",
   "status": "declined",
   "message": null,
   "posting": {
-    "id": "013ade5c-ff0b-48ee-80b9-3314d6fc4eb2",
+    "id": "354824c5-5899-4e5d-8de1-e79dcbc0dab7",
     "tier": "intern",
     "title": null,
     "company": {
-      "id": "7999d809-0066-66e2-e0ac-930c34a49626",
+      "id": "2f91e3a4-088a-0592-9f21-88b83cae7bd8",
       "logo": null,
-      "name": "Fundgrube Discount",
-      "color": "#C2C95B",
+      "name": "SolarFuchs",
+      "color": "#FF8C42",
       "is_ai": true,
-      "sector": "retail",
-      "ticker": "FGD"
+      "sector": "energy",
+      "ticker": "SFX"
     },
-    "required": [{ "branch": "sales", "min_score": 0 }],
-    "title_key": "sales_intern",
+    "required": [{ "branch": "law", "min_score": 0 }],
+    "title_key": "law_intern",
     "required_skills": []
   },
-  "created_at": "2026-11-16T23:55:04.431089+00:00",
-  "updated_at": "2026-11-16T23:55:04.434363+00:00",
-  "offer_expires_at": "2026-11-18T23:55:04.431089+00:00",
+  "created_at": "2026-11-17T00:20:25.169335+00:00",
+  "updated_at": "2026-11-17T00:20:25.172667+00:00",
+  "offer_expires_at": "2026-11-19T00:20:25.169335+00:00",
   "salary_wish_cents_per_hour": 15000,
   "offer_salary_cents_per_hour": 15000
 }

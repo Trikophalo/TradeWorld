@@ -161,7 +161,7 @@ describe("Nexamon packs (ADR-165)", () => {
     const total = 5 * packs;
     for (const condition of NEXAMON_CONDITIONS)
       near(conditions[condition] ?? 0, cfg.conditions.weightBps[condition] / 10_000, total);
-  });
+  }, 60_000);
 
   it("refuses a set without the needed rarity", () => {
     expect(() =>

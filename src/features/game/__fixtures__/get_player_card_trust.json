@@ -1,7 +1,7 @@
 {
   "job": null,
-  "tag": "T9JG",
-  "rank": 162,
+  "tag": "MKWA",
+  "rank": 165,
   "level": 6,
   "trust": { "band": "shaky", "kept": 0, "score": 41, "broken": 1 },
   "company": { "name": "Fixture Lieferwerk", "ticker": null },
@@ -11,7 +11,7 @@
   "top_skills": [],
   "accessories": [],
   "streak_days": 0,
-  "member_since": "2026-11-16T23:55:07.353337+00:00",
+  "member_since": "2026-11-17T00:20:28.612482+00:00",
   "branch_scores": {
     "it": 0,
     "law": 0,

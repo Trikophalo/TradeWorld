@@ -1,9 +1,9 @@
 {
-  "now": "2026-11-16T19:43:59.551956+00:00",
+  "now": "2026-11-17T00:20:31.139978+00:00",
   "battle": {
-    "id": 26,
+    "id": 27,
     "kind": "quiz",
-    "seed": 4272378146,
+    "seed": 2692654801,
     "prize": { "kind": "money", "cents": 525000 },
     "joined": true,
     "params": {
@@ -41,32 +41,37 @@
           "unit": null,
           "round": 0,
           "value": null,
-          "correct": 2,
-          "ends_at": "2026-11-16T19:43:58.547489+00:00",
-          "options": ["Ein Sparbuch", "Ein Firmenanteil", "Ein Schuldpapier mit Zinsen", "Eine Kryptowährung"],
+          "correct": 3,
+          "ends_at": "2026-11-17T00:20:30.136037+00:00",
+          "options": [
+            "Sie geht an die Börse",
+            "Sie wird verdoppelt",
+            "Sie zahlt Dividende",
+            "Sie kann ihre Schulden nicht zahlen"
+          ],
           "results": [],
           "decimals": null,
-          "opens_at": "2026-11-16T19:43:47.547489+00:00",
-          "question": "Was ist eine Anleihe?",
-          "closes_at": "2026-11-16T19:43:55.547489+00:00"
+          "opens_at": "2026-11-17T00:20:19.136037+00:00",
+          "question": "Was passiert, wenn eine Firma insolvent ist?",
+          "closes_at": "2026-11-17T00:20:27.136037+00:00"
         },
         {
           "mine": { "value": null, "choice": 2, "pressed": true },
           "unit": null,
           "round": 1,
-          "ends_at": "2026-11-16T19:44:09.547489+00:00",
-          "options": ["Einmal am Tag", "Nur sonntags", "Zu jeder vollen Stunde", "Alle 5 Minuten"],
+          "ends_at": "2026-11-17T00:20:41.136037+00:00",
+          "options": ["Ein Kredit", "Ein Börsenticker", "Eine Aktentasche", "Alle eigenen Anlagen zusammen"],
           "decimals": null,
-          "opens_at": "2026-11-16T19:43:58.547489+00:00",
-          "question": "Wann laufen die NEXA Nachrichten?",
-          "closes_at": "2026-11-16T19:44:06.547489+00:00"
+          "opens_at": "2026-11-17T00:20:30.136037+00:00",
+          "question": "Was ist ein Portfolio?",
+          "closes_at": "2026-11-17T00:20:38.136037+00:00"
         }
       ],
       "hearts": [2, 2, 2],
       "points": [0, 0, 0]
     },
     "status": "running",
-    "ends_at": "2026-11-16T19:45:29.547489+00:00",
+    "ends_at": "2026-11-17T00:22:01.136037+00:00",
     "players": [
       {
         "me": true,
@@ -96,8 +101,8 @@
         "accessories": []
       }
     ],
-    "opened_at": "2026-11-16T19:43:59.483284+00:00",
-    "started_at": "2026-11-16T19:43:47.547489+00:00",
+    "opened_at": "2026-11-17T00:20:31.089898+00:00",
+    "started_at": "2026-11-17T00:20:19.136037+00:00",
     "finished_at": null,
     "max_players": 10,
     "min_players": 3,
@@ -105,115 +110,23 @@
     "countdown_ends_at": null
   },
   "recent": {
-    "id": 25,
-    "kind": "auction",
-    "seed": 17,
-    "prize": { "xp": 2900, "kind": "xp" },
+    "id": 26,
+    "kind": "quiz",
+    "seed": 4711,
+    "prize": { "xp": 0, "kind": "xp" },
     "joined": false,
-    "params": {
-      "h": 9,
-      "w": 11,
-      "tps": 20,
-      "game": { "budget": 1000, "rounds": 2, "answerMs": 10000, "revealMs": 3500 },
-      "spawns": [
-        [1, 1],
-        [9, 7],
-        [9, 1],
-        [1, 7],
-        [5, 1],
-        [5, 7],
-        [1, 4],
-        [9, 4],
-        [3, 4],
-        [7, 4]
-      ],
-      "tickMs": 50,
-      "graceMs": 1000,
-      "stepTicks": 4,
-      "aheadTicks": 10,
-      "checkEveryMs": 1000,
-      "disconnectTicks": 80
-    },
-    "result": {
-      "out": [-1, -1, -1],
-      "paid": true,
-      "prize": { "xp": 2900, "kind": "xp" },
-      "score": [400, 0, 0],
-      "capped": false,
-      "ranking": [0, 2, 1],
-      "end_tick": null,
-      "winner_slot": 0
-    },
-    "rounds": {
-      "out": [-1, -1, -1],
-      "done": true,
-      "list": [
-        {
-          "icon": "gold_bar",
-          "lost": [],
-          "mine": { "value": null, "choice": null, "pressed": false },
-          "unit": null,
-          "round": 0,
-          "value": null,
-          "budget": null,
-          "budgets": [0, 1000, 1000],
-          "correct": null,
-          "ends_at": "2026-11-16T19:43:29.860353+00:00",
-          "options": null,
-          "results": [
-            { "ms": 2, "slot": 0, "right": true, "value": 400, "points": 300 },
-            { "ms": 1008, "slot": 1, "right": false, "value": 400, "points": 0 }
-          ],
-          "decimals": null,
-          "opens_at": "2026-11-16T19:43:16.360353+00:00",
-          "question": "Goldbarren",
-          "closes_at": "2026-11-16T19:43:26.360353+00:00",
-          "item_points": 300
-        },
-        {
-          "icon": "duck",
-          "lost": [],
-          "mine": { "value": null, "choice": null, "pressed": false },
-          "unit": null,
-          "round": 1,
-          "value": null,
-          "budget": null,
-          "budgets": [0, 1000, 1000],
-          "correct": null,
-          "ends_at": "2026-11-16T19:43:43.360353+00:00",
-          "options": null,
-          "results": [
-            { "ms": 519, "slot": 0, "right": true, "value": 600, "points": 100 },
-            { "ms": 529, "slot": 1, "right": false, "value": 0, "points": 0 }
-          ],
-          "decimals": null,
-          "opens_at": "2026-11-16T19:43:29.860353+00:00",
-          "question": "Gummiente",
-          "closes_at": "2026-11-16T19:43:39.860353+00:00",
-          "item_points": 100
-        }
-      ],
-      "hearts": [1, 1, 1],
-      "points": [400, 0, 0]
-    },
+    "params": {},
+    "result": null,
+    "rounds": null,
     "status": "finished",
-    "ends_at": "2026-11-16T19:46:16.360353+00:00",
+    "ends_at": null,
     "players": [
       {
         "me": false,
         "left": false,
         "rank": 1,
-        "slot": 0,
-        "nickname": "Bg_Anna",
-        "avatar_key": "rookie",
-        "accessories": []
-      },
-      {
-        "me": false,
-        "left": false,
-        "rank": 3,
-        "slot": 1,
-        "nickname": "Bg_Bruno",
+        "slot": null,
+        "nickname": "Topic_Anna",
         "avatar_key": "rookie",
         "accessories": []
       },
@@ -221,22 +134,31 @@
         "me": false,
         "left": false,
         "rank": 2,
-        "slot": 2,
-        "nickname": "Bg_Clara",
+        "slot": null,
+        "nickname": "Topic_Bert",
+        "avatar_key": "rookie",
+        "accessories": []
+      },
+      {
+        "me": false,
+        "left": false,
+        "rank": 3,
+        "slot": null,
+        "nickname": "Topic_Cleo",
         "avatar_key": "rookie",
         "accessories": []
       }
     ],
-    "opened_at": "2026-11-16T19:43:44.360353+00:00",
-    "started_at": "2026-11-16T19:43:16.360353+00:00",
-    "finished_at": "2026-11-16T19:43:44.397723+00:00",
+    "opened_at": "2026-11-17T00:19:57.767603+00:00",
+    "started_at": null,
+    "finished_at": "2026-11-17T00:19:57.767603+00:00",
     "max_players": 10,
     "min_players": 3,
     "prize_wins_left": 3,
     "countdown_ends_at": null
   },
-  "viewers": 20,
+  "viewers": 3,
   "per_hour": 1000,
-  "next_round_at": "2026-11-16T20:00:00+00:00",
+  "next_round_at": "2026-11-17T01:00:00+00:00",
   "played_this_hour": 6
 }

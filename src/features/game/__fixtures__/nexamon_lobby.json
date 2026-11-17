@@ -1,79 +1,79 @@
 {
   "live": [
     {
-      "id": "9ebe79eb-dcd4-4b09-87e5-d06da68aa845",
+      "id": "68335559-3ca8-4127-8965-4f800d300cba",
       "set": "mystic_energy",
       "kind": "battle",
       "is_me": true,
       "player": { "level": 12, "nickname": "Fixture_PackA", "avatar_key": "rookie", "accessories": [] },
-      "ends_at": "2026-11-17T00:04:26.339355+00:00",
+      "ends_at": "2026-11-17T00:20:54.279863+00:00",
       "viewers": 0,
       "opponent": { "level": 12, "nickname": "Fixture_PackB", "avatar_key": "rookie", "accessories": [] },
-      "battle_id": "913c51ed-a6c7-4b15-a3a1-3902dcce19fc",
-      "started_at": "2026-11-17T00:04:03.939355+00:00"
+      "battle_id": "12484b2a-b8c0-4065-9da8-8951be04857d",
+      "started_at": "2026-11-17T00:20:31.879863+00:00"
     },
     {
-      "id": "777af89f-5921-4324-af20-8e9419e61502",
+      "id": "6236411d-c74e-4f1e-bf81-2a0847ffefcc",
       "set": "mystic_energy",
       "kind": "pack",
       "is_me": false,
       "player": { "level": 15, "nickname": "Fixture_Gmbh", "avatar_key": "rookie", "accessories": [] },
-      "ends_at": "2026-11-17T00:04:33.913394+00:00",
+      "ends_at": "2026-11-17T00:21:01.87959+00:00",
       "viewers": 0,
       "opponent": null,
       "battle_id": null,
-      "started_at": "2026-11-17T00:04:03.413394+00:00"
+      "started_at": "2026-11-17T00:20:31.37959+00:00"
     },
     {
-      "id": "b2845350-c1e1-4be9-b028-1d530a4025d1",
+      "id": "75ea509b-6782-489a-94e1-331ed229e854",
       "set": "mystic_energy",
       "kind": "pack",
       "is_me": false,
       "player": { "level": 15, "nickname": "Fixture_Gmbh", "avatar_key": "rookie", "accessories": [] },
-      "ends_at": "2026-11-17T00:04:33.903684+00:00",
+      "ends_at": "2026-11-17T00:21:01.869439+00:00",
       "viewers": 0,
       "opponent": null,
       "battle_id": null,
-      "started_at": "2026-11-17T00:04:03.403684+00:00"
+      "started_at": "2026-11-17T00:20:31.369439+00:00"
     },
     {
-      "id": "bb0a7bd1-30d7-483a-9dae-b4339896daa3",
+      "id": "e88c1b65-a030-4454-a08d-c7c884af8aa1",
       "set": "mystic_energy",
       "kind": "pack",
       "is_me": false,
       "player": { "level": 10, "nickname": "Pb_Bruno", "avatar_key": "rookie", "accessories": [] },
-      "ends_at": "2026-11-17T00:04:26.747378+00:00",
+      "ends_at": "2026-11-17T00:20:54.84978+00:00",
       "viewers": 1,
       "opponent": null,
       "battle_id": null,
-      "started_at": "2026-11-17T00:03:56.247378+00:00"
+      "started_at": "2026-11-17T00:20:24.34978+00:00"
     }
   ],
   "limits": { "used": 1, "per_hour": 6, "cooldown_until": null },
   "battles": [
     {
-      "id": "913c51ed-a6c7-4b15-a3a1-3902dcce19fc",
+      "id": "12484b2a-b8c0-4065-9da8-8951be04857d",
       "me": "opponent",
       "set": "mystic_energy",
       "status": "running",
       "winner": null,
-      "ends_at": "2026-11-17T00:04:26.339355+00:00",
-      "live_id": "9ebe79eb-dcd4-4b09-87e5-d06da68aa845",
+      "ends_at": "2026-11-17T00:20:54.279863+00:00",
+      "live_id": "68335559-3ca8-4127-8965-4f800d300cba",
       "slot_ms": 1800,
       "tear_ms": 2400,
       "viewers": 0,
       "opponent": { "level": 12, "nickname": "Fixture_PackB", "avatar_key": "rookie", "accessories": [] },
       "coin_seed": null,
-      "decide_at": "2026-11-17T00:04:18.339355+00:00",
+      "decide_at": "2026-11-17T00:20:46.279863+00:00",
       "reactions": [],
-      "starts_at": "2026-11-17T00:04:06.939355+00:00",
+      "starts_at": "2026-11-17T00:20:34.879863+00:00",
       "tie_break": null,
       "challenger": { "level": 12, "nickname": "Fixture_PackA", "avatar_key": "rookie", "accessories": [] },
-      "created_at": "2026-11-17T00:04:03.933992+00:00",
-      "expires_at": "2026-11-17T00:05:03.933992+00:00",
-      "accepted_at": "2026-11-17T00:04:03.939355+00:00",
+      "created_at": "2026-11-17T00:20:31.876601+00:00",
+      "expires_at": "2026-11-17T00:21:31.876601+00:00",
+      "accepted_at": "2026-11-17T00:20:31.879863+00:00",
       "price_cents": 20000,
-      "server_time": "2026-11-17T00:04:03.948739+00:00",
+      "server_time": "2026-11-17T00:20:31.892904+00:00",
       "abort_reason": null,
       "opponent_cards": [],
       "opponent_cents": 0,
@@ -93,5 +93,5 @@
     }
   ],
   "allow_watch": true,
-  "server_time": "2026-11-17T00:04:03.948739+00:00"
+  "server_time": "2026-11-17T00:20:31.892904+00:00"
 }

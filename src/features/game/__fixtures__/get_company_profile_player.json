@@ -4,30 +4,30 @@
     "staff": 1,
     "stage": 0,
     "period": "quarter",
-    "product": "courier",
+    "product": "security_software",
     "max_staff": 2,
     "ai_workers": 0,
-    "quality_bps": 2325,
-    "value_cents": 295009,
-    "profit_cents": -14991,
-    "awareness_bps": 355,
-    "revenue_cents": 219104
+    "quality_bps": 4125,
+    "value_cents": 250000,
+    "profit_cents": 0,
+    "awareness_bps": 3772,
+    "revenue_cents": 0
   },
   "company": {
-    "id": "91071a04-ae79-46d5-86d2-381f61a55458",
-    "idea": "Fahrräder reparieren",
+    "id": "846372e0-1238-410c-b54e-0eb42b91638f",
+    "idea": "Günstige Kabel",
     "logo": null,
-    "name": "Gero Werkstatt",
+    "name": "Billig Laden",
     "tier": "garage",
     "is_ai": false,
     "listed": false,
-    "sector": "logistics",
+    "sector": "tech",
     "ticker": null,
     "price_e4": null,
     "change_bps": null,
-    "founded_at": "2026-11-16T23:54:17.684567+00:00",
-    "brand_color": "#aa5500"
+    "founded_at": "2026-11-17T00:19:04.776871+00:00",
+    "brand_color": "#552211"
   },
-  "founder": { "tag": "HE6D", "nickname": "Gero_Garage", "avatar_key": "rookie" },
+  "founder": { "tag": "6RY5", "nickname": "Dirk_Billig", "avatar_key": "rookie" },
   "members": []
 }

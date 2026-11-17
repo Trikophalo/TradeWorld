@@ -2,42 +2,42 @@
   "items": [
     {
       "id": 5,
-      "body": "Ein wichtiger Zulieferer fällt aus. Die Produktion stockt. Sicher ist das nicht.",
-      "name": "Rheinkraft Werke",
-      "due_at": "2026-11-17T01:33:23.258136+00:00",
+      "body": "Die Kasse ist voll. Aktionäre dürfen auf eine Extra-Ausschüttung hoffen. Sicher ist das nicht.",
+      "name": "Brotzeit Handel AG",
+      "due_at": "2026-11-17T01:42:29.987463+00:00",
       "status": "open",
-      "ticker": "RKW",
-      "headline": "Lieferkette reißt bei Rheinkraft Werke",
+      "ticker": "BRZ",
+      "headline": "Sonderdividende bei Brotzeit Handel AG erwartet",
       "move_bps": null,
-      "strength": 1,
-      "direction": "down",
-      "published_at": "2026-11-17T00:55:08.643182+00:00"
+      "strength": 3,
+      "direction": "up",
+      "published_at": "2026-11-17T01:20:30.185514+00:00"
     },
     {
       "id": 4,
-      "body": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Glanz & Gloria geht bald nach oben. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
-      "name": "Glanz & Gloria",
-      "due_at": "2026-11-17T00:32:43.801833+00:00",
-      "status": "fizzled",
-      "ticker": "LUX",
-      "headline": "Der heiße Draht: Glanz & Gloria",
-      "move_bps": null,
+      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Pixelwerk Studios tut sich in der nächsten Stunde etwas, und zwar nach oben. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
+      "name": "Pixelwerk Studios",
+      "due_at": "2026-11-17T00:48:34.298049+00:00",
+      "status": "confirmed",
+      "ticker": "PXW",
+      "headline": "Mr. Doodle Dangles Geheimtipp",
+      "move_bps": 1133,
       "strength": 2,
       "direction": "up",
-      "published_at": "2026-11-16T23:54:43.801833+00:00"
+      "published_at": "2026-11-17T00:19:34.298049+00:00"
     },
     {
       "id": 3,
-      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Talwerk tut sich in der nächsten Stunde etwas, und zwar nach oben. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
-      "name": "Talwerk",
-      "due_at": "2026-11-16T23:54:42.796178+00:00",
+      "body": "Und zum Schluss mein Geheimtipp für alle, die bis jetzt durchgehalten haben: Bei Nordlicht Logistik AG tut sich in der nächsten Stunde etwas, und zwar nach oben. Das Vögelchen lag bisher meistens richtig. Meistens.",
+      "name": "Nordlicht Logistik AG",
+      "due_at": "2026-11-17T00:19:32.211885+00:00",
       "status": "fizzled",
-      "ticker": "TAL",
+      "ticker": "NDL",
       "headline": "Mr. Doodle Dangles Geheimtipp",
       "move_bps": null,
       "strength": 2,
       "direction": "up",
-      "published_at": "2026-11-16T23:54:42.796178+00:00"
+      "published_at": "2026-11-17T00:19:32.211885+00:00"
     }
   ],
   "reliability_bps": 7500

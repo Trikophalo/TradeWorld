@@ -1,108 +1,108 @@
 {
   "items": [
     {
-      "id": "8197bb07-d4e5-4647-ab6e-9de7808f49ea",
+      "id": "e5b7a170-d474-4701-84b5-bd6dce2f4364",
       "body": "Jetzt befreundet mit Fixture_Gmbh",
       "link": "/friends",
       "title": "Fixture_Gmbh gefällt dein Beitrag",
-      "payload": { "kind": "friends_now", "item_id": 414, "nickname": "Fixture_Gmbh" },
+      "payload": { "kind": "friends_now", "item_id": 423, "nickname": "Fixture_Gmbh" },
       "read_at": null,
       "type_key": "feed_reaction",
-      "created_at": "2026-11-16T23:55:06.955486+00:00"
+      "created_at": "2026-11-17T00:20:28.203731+00:00"
     },
     {
-      "id": "3d5d5810-2a6c-45bb-8b6f-b4c9d400d5cc",
-      "body": "Platz 299 von 303 · +0,00 %",
+      "id": "9ed66be3-3b00-4e56-b5ba-5a3f1f9d45c7",
+      "body": "Platz 303 von 307 · +0,00 %",
       "link": "/friends",
-      "title": "Wochenliga: Platz 299",
-      "payload": { "of": 303, "rank": 299, "growth_bps": 0, "week_start": "2026-11-09" },
+      "title": "Wochenliga: Platz 303",
+      "payload": { "of": 307, "rank": 303, "growth_bps": 0, "week_start": "2026-11-09" },
       "read_at": null,
       "type_key": "league_result",
-      "created_at": "2026-11-16T23:55:06.745018+00:00"
+      "created_at": "2026-11-17T00:20:27.787401+00:00"
     },
     {
-      "id": "d4d3213a-01c1-4d2e-acc1-1029991e383b",
+      "id": "eb322e32-423c-4621-a514-95cb73baa3bf",
       "body": "Fixture_Gmbh",
       "link": "/players/Fixture_Gmbh",
       "title": "Fixture_Gmbh hat deine Freundschaftsanfrage angenommen.",
       "payload": { "nickname": "Fixture_Gmbh" },
       "read_at": null,
       "type_key": "friend_accepted",
-      "created_at": "2026-11-16T23:55:06.592654+00:00"
+      "created_at": "2026-11-17T00:20:27.484752+00:00"
     },
     {
-      "id": "5dd4dac8-ca9c-498d-b675-714ca4786c38",
+      "id": "46baf8dc-fb9c-48a3-90b4-c6cb3c082d92",
       "body": "500 € reservieren für Forschung",
-      "link": "/company?board=e260de99-c5d0-46e1-9bdd-4db274f89a60",
+      "link": "/company?board=09f541f8-5995-4791-bc5b-f2fdc7acc83b",
       "title": "Geschäftsrat Fixture Labor: Antrag angenommen",
-      "payload": { "status": "passed", "motion_id": 12, "company_id": "e260de99-c5d0-46e1-9bdd-4db274f89a60" },
+      "payload": { "status": "passed", "motion_id": 12, "company_id": "09f541f8-5995-4791-bc5b-f2fdc7acc83b" },
       "read_at": null,
       "type_key": "board",
-      "created_at": "2026-11-16T23:55:05.515091+00:00"
+      "created_at": "2026-11-17T00:20:26.293398+00:00"
     },
     {
-      "id": "b49da194-1c72-4fe5-97f1-29da902413b3",
+      "id": "2077f667-7e7f-4f35-91d4-9c7961970bfc",
       "body": "Keine Entnahmen für 2 Tage",
-      "link": "/company?board=e260de99-c5d0-46e1-9bdd-4db274f89a60",
+      "link": "/company?board=09f541f8-5995-4791-bc5b-f2fdc7acc83b",
       "title": "Geschäftsrat Fixture Labor: Antrag abgelehnt",
-      "payload": { "status": "rejected", "motion_id": 11, "company_id": "e260de99-c5d0-46e1-9bdd-4db274f89a60" },
+      "payload": { "status": "rejected", "motion_id": 11, "company_id": "09f541f8-5995-4791-bc5b-f2fdc7acc83b" },
       "read_at": null,
       "type_key": "board",
-      "created_at": "2026-11-16T23:55:05.508397+00:00"
+      "created_at": "2026-11-17T00:20:26.285494+00:00"
     },
     {
-      "id": "a6537909-0f9c-4971-998a-111d4e01bf07",
-      "body": "149 € für deine Aktien.",
+      "id": "7ad83dbb-cbaa-48c3-b33d-07089754fcbf",
+      "body": "160 € für deine Aktien.",
       "link": "/portfolio",
       "title": "Dividende von Fixture Labor",
-      "payload": { "company_id": "e260de99-c5d0-46e1-9bdd-4db274f89a60", "amount_cents": 14944 },
+      "payload": { "company_id": "09f541f8-5995-4791-bc5b-f2fdc7acc83b", "amount_cents": 16000 },
       "read_at": null,
       "type_key": "company_dividend",
-      "created_at": "2026-11-16T23:55:05.438713+00:00"
+      "created_at": "2026-11-17T00:20:26.208757+00:00"
     },
     {
-      "id": "728a1d42-1d61-4843-a8b4-3b2676ffeddc",
+      "id": "4d0fca35-9651-4fdc-a6ff-8ef315b3d235",
       "body": "Fixture_Chefin: Moin zusammen!",
       "link": "/career/chat",
       "title": "Firmenchat: Fixture Labor",
       "payload": {
         "author_id": "f1f1f1f1-0000-4000-8000-0000000000f2",
-        "company_id": "e260de99-c5d0-46e1-9bdd-4db274f89a60",
-        "message_id": 194
+        "company_id": "09f541f8-5995-4791-bc5b-f2fdc7acc83b",
+        "message_id": 200
       },
       "read_at": null,
       "type_key": "company_chat",
-      "created_at": "2026-11-16T23:55:05.241198+00:00"
+      "created_at": "2026-11-17T00:20:25.970969+00:00"
     },
     {
-      "id": "e709013f-5f8a-495d-906f-8c25d63f94e8",
+      "id": "62c2a293-fee9-4b6d-b8bc-ed8e87118f5c",
       "body": "Stelle: Werkstudium Daten",
       "link": "/company",
       "title": "Fixture_Chefin hat sich beworben",
       "payload": {
         "title": "Werkstudium Daten",
         "nickname": "Fixture_Chefin",
-        "posting_id": "ae9a43ea-de4d-4f6e-aaed-71937e994bf2",
-        "application_id": "4564fa09-a849-4210-9965-01ac5c10866f"
+        "posting_id": "38b369e7-e957-483a-b1e6-2f484eeee0b7",
+        "application_id": "ee3a984e-3db0-4ebe-8e47-4fc2cc46d402"
       },
       "read_at": null,
       "type_key": "job_application",
-      "created_at": "2026-11-16T23:55:05.021939+00:00"
+      "created_at": "2026-11-17T00:20:25.805007+00:00"
     },
     {
-      "id": "d6a8d1c6-791c-435e-94fb-1d1c80b580aa",
+      "id": "43cb335c-8fac-417a-9edc-73940f8e0315",
       "body": "Stelle: Werkstudium Software",
       "link": "/company",
       "title": "Fixture_Chefin hat sich beworben",
       "payload": {
         "title": "Werkstudium Software",
         "nickname": "Fixture_Chefin",
-        "posting_id": "17f507b5-6be9-421b-afa5-d470f16bfdf0",
-        "application_id": "c197121b-ca77-4117-8015-4cc5631cf403"
+        "posting_id": "c88b969b-7519-4a2e-ae0b-3f796f593f1d",
+        "application_id": "bf8e272b-b1d0-42b4-a80e-8bf61ef544a4"
       },
       "read_at": null,
       "type_key": "job_application",
-      "created_at": "2026-11-16T23:55:04.83251+00:00"
+      "created_at": "2026-11-17T00:20:25.629894+00:00"
     }
   ],
   "unread": 9

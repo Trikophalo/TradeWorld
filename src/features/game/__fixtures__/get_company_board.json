@@ -3,15 +3,15 @@
     "my_e6": 800000000000,
     "budgets": [],
     "company": {
-      "id": "e260de99-c5d0-46e1-9bdd-4db274f89a60",
+      "id": "09f541f8-5995-4791-bc5b-f2fdc7acc83b",
       "name": "Fixture Labor",
       "color": "#2266cc",
       "ticker": "FIX"
     },
     "history": [],
     "holders": [
-      { "me": true, "nickname": "Fixture_Neu", "share_bps": 7472, "is_founder": true },
-      { "me": false, "nickname": "Fixture_Chefin", "share_bps": 2, "is_founder": false }
+      { "me": true, "nickname": "Fixture_Neu", "share_bps": 8000, "is_founder": true },
+      { "me": false, "nickname": "Fixture_Chefin", "share_bps": 3, "is_founder": false }
     ],
     "motions": [
       {
@@ -28,21 +28,21 @@
         "yes_e6": 250000000,
         "my_vote": null,
         "proposer": "Fixture_Chefin",
-        "total_e6": 1070639000000,
+        "total_e6": 1000000000000,
         "closed_at": null,
-        "closes_at": "2026-11-17T11:55:05.471556+00:00",
-        "created_at": "2026-11-16T23:55:05.471556+00:00"
+        "closes_at": "2026-11-17T12:20:26.246386+00:00",
+        "created_at": "2026-11-17T00:20:26.246386+00:00"
       }
     ],
     "ai_votes": false,
     "can_vote": true,
-    "float_e6": 270389000000,
-    "total_e6": 1070639000000,
-    "cash_cents": 27964146,
+    "float_e6": 199750000000,
+    "total_e6": 1000000000000,
+    "cash_cents": 20908716,
     "is_founder": true,
     "reputation": 49.2,
     "can_convene": true,
-    "my_share_bps": 7472,
+    "my_share_bps": 8000,
     "restrictions": {
       "price_lock": null,
       "payout_cap_bps": null,
@@ -51,7 +51,7 @@
       "withdraw_block_until": null
     },
     "min_share_bps": 2000,
-    "free_cash_cents": 27964146,
+    "free_cash_cents": 20908716,
     "founder_payout_bps": 0
   }
 }

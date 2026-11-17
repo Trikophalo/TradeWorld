@@ -23,7 +23,7 @@
     "period": "hour",
     "is_open": true,
     "chance_bps": 0,
-    "ai_check_at": "2026-11-16T23:55:09.392969+00:00",
+    "ai_check_at": "2026-11-17T00:20:31.005226+00:00",
     "price_cents": 1000
   },
   "renting": null,
