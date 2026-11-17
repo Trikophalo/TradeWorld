@@ -15,9 +15,9 @@ select tests.set_cfg('startups', '{aiWorkerStandbyBps}', '10000') is null as ok 
 select tests.set_cfg('startups', '{gmbh,fixedCostCentsPerQuarter}', '600000') is null as ok \gset
 -- and awareness that does not move by the hour, so every hour sells with the same awareness
 select coalesce(value -> 'awareness', 'null') as aw_cfg0 from public.game_config where key = 'startups' \gset
-select tests.set_cfg('startups', '{awareness,growthPerQuarter}', '0') is null as ok \gset
-select tests.set_cfg('startups', '{awareness,decayPerQuarter}', '0') is null as ok \gset
-select tests.set_cfg('startups', '{awareness,marketingMaxGain}', '0') is null as ok \gset
+select tests.set_cfg('startups', '{awareness,wordOfMouthPerHour}', '0') is null as ok \gset
+select tests.set_cfg('startups', '{awareness,decayPerHour}', '0') is null as ok \gset
+select tests.set_cfg('startups', '{awareness,marketingMaxRatePerHour}', '0') is null as ok \gset
 
 \set f '''0a30a30a-0000-4000-8000-0000000000f1'''
 \set a '''0a30a30a-0000-4000-8000-0000000000a1'''

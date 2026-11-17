@@ -1112,3 +1112,25 @@ Stärken-Faktor, dann `task_pay`; Fehlschlag Wert × Strafe abzüglich `task_saf
 `pattern`, `shelf`). SQL und TS stimmen in `supabase/tests/b8_company_overhaul.sql` überein (gleiche Zahlen für
 `awarenessHour`, `aiUtilizationBps`, `aiWageDueCents`, Teilpunkte der Spiele). Messwerkzeug:
 `scripts/company-harness.ts`.
+
+## Nachtrag: Bekanntheit neu (ADR-188)
+
+`src/lib/sim/awareness.ts` ist die einzige Regel für die Bekanntheit einer Spielerfirma (SQL in Migration 7700:
+`company_awareness_cap`, `company_awareness_step`, `company_awareness_add`):
+
+```
+Grenze    = clamp(byTier[tier] + perStage × stage + perExpansionLevel × level, min, cap.max)
+rate      = maxRate × q / (q + H)          q = Marketing der Stunde × quarterHours, H = max(minHalf, Markt/4 × share)
+Marketing = rate × max(0, Grenze − a)
+Mundprop. = w × a × max(0, 1 − a/Grenze) × (0,5 + Qualität) × Preisfaktor × bedient × (0,5 + Ruf/100)
+Vergessen = d × max(0, a − min)
+a'        = clamp(a + Marketing + Mundprop. − Vergessen, min, max(Grenze, a))
+Ereignis  = Zuwachs bis zur Grenze (nichts, wenn darüber), Verlust bis min
+```
+
+`closeStartupHour` ruft `awarenessHour` mit der Grenze aus Rechtsform, Stufe und Ausbau, dem bedienten Anteil
+(verkauft / Nachfrage) und dem Ruf. Die Stärke „Bekanntheit“ ist `100 × a / Grenze` (`awarenessOfCap`) und folgt mit
+`awarenessFollowPerHour`; `companyHealth` misst den Faktor „Bekanntheit“ gegen `min(Bedarf, Grenze)`. Jede Änderung
+landet in `company_awareness_log` (Quelle je Stunde). TS und SQL stimmen in `awareness.test.ts`,
+`b8_company_overhaul.sql` und `c6_awareness.sql` überein (`company_awareness_step(0,2; 0,6; 0,5; 1,5; 10.000; 10 Mio.;
+0,8; 70)` → 0,213907).

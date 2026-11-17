@@ -64,6 +64,7 @@ import {
   GameError,
   type CampaignKind,
   type CompanyAutopilot,
+  type CompanyAwareness,
   type ChatMessage,
   type CloseCompanyResult,
   type Dissolution,
@@ -1518,6 +1519,42 @@ export function demoStrengths(company: DemoCompanyState): MyCompany["strengths"]
     rewardBps: strengthsRewardBps(scores, cfg),
     next: strengthsNextReward(scores, cfg),
     closeError: null,
+  };
+}
+
+/** Awareness, its cap and what moved it (ADR-188), shaped like get_company_awareness. */
+export function demoAwareness(company: DemoCompanyState): CompanyAwareness {
+  const a = BALANCE.startups.awareness;
+  const level = company.expansionLevel ?? 0;
+  const last = company.hours?.at(-1);
+  const p = last?.awarenessParts;
+  const cap = p?.cap ?? company.awarenessCap ?? awarenessCap(company.tier, 0, level);
+  const tierCap = awarenessCap(company.tier, 0, 0);
+  const stage = Math.max(0, Math.round((cap - tierCap - a.cap.perExpansionLevel * level) / a.cap.perStage));
+  const extra = company.awarenessBoost ?? 0;
+  return {
+    awareness: company.awareness,
+    cap,
+    floor: a.min,
+    tier: company.tier,
+    stage,
+    expansionLevel: level,
+    tierCap,
+    perStage: a.cap.perStage,
+    perExpansionLevel: a.cap.perExpansionLevel,
+    strength: demoStrengths(company)?.scores.awareness ?? 0,
+    lastHour:
+      last && p
+        ? {
+            hourStart: new Date(last.at).toISOString(),
+            parts: { marketing: p.marketing, word_of_mouth: p.wordOfMouth, decay: -p.decay, tasks: p.extra },
+          }
+        : null,
+    since: extra !== 0 ? { tasks: extra } : {},
+    history: (company.hours ?? [])
+      .slice(-24)
+      .filter((h) => h.awarenessAfter !== undefined)
+      .map((h) => ({ hourStart: new Date(h.at).toISOString(), after: h.awarenessAfter ?? company.awareness })),
   };
 }
 

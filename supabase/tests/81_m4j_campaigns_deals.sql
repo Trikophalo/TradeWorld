@@ -13,9 +13,9 @@ select tests.set_cfg('startups', '{capacityCentsPerProductivity}',
   '{"tech": 300000, "retail": 250000, "energy": 250000, "pharma": 300000, "logistics": 250000}') is null as ok \gset
 select tests.set_cfg('startups', '{aiWorkerStandbyBps}', '10000') is null as ok \gset
 select coalesce(value -> 'awareness', 'null') as aw_cfg0 from public.game_config where key = 'startups' \gset
-select tests.set_cfg('startups', '{awareness,growthPerQuarter}', '0') is null as ok \gset
-select tests.set_cfg('startups', '{awareness,decayPerQuarter}', '0') is null as ok \gset
-select tests.set_cfg('startups', '{awareness,marketingMaxGain}', '0') is null as ok \gset
+select tests.set_cfg('startups', '{awareness,wordOfMouthPerHour}', '0') is null as ok \gset
+select tests.set_cfg('startups', '{awareness,decayPerHour}', '0') is null as ok \gset
+select tests.set_cfg('startups', '{awareness,marketingMaxRatePerHour}', '0') is null as ok \gset
 
 \set a '''08108108-0000-4000-8000-0000000000a1'''
 \set b '''08108108-0000-4000-8000-0000000000b1'''
@@ -192,12 +192,12 @@ select tests.assert(
   and (select count(*) from public.company_campaigns where company_id = :'aco') = 1,
   'start_campaign(): one balanced company_costs booking company cash -> households, charged once');
 select tests.assert(
-  abs((select awareness from public.player_companies where company_id = :'aco') - 0.42) < 1e-12
-  and abs(:c1_awareness_gain::float8 - 0.02) < 1e-12
+  abs((select awareness from public.player_companies where company_id = :'aco') - 0.43) < 1e-12
+  and abs(:c1_awareness_gain::float8 - 0.03) < 1e-12
   and exists (select 1 from public.company_news n where n.company_id = :'aco' and n.kind = 'campaign_started'
                  and n.payload = jsonb_build_object('kind', 'flyer', 'resonance', :'camp1'::jsonb ->> 'resonance',
                                                     'demand_bps', (:'camp1'::jsonb ->> 'demand_bps')::int)),
-  'start_campaign(): awareness +2 points at once (ADR-180: was +0.5); company news campaign_started {kind, resonance, demand_bps}');
+  'start_campaign(): awareness +3 points at once (ADR-188; ADR-180: +2); company news campaign_started {kind, resonance, demand_bps}');
 select tests.assert(
   :'mc1'::jsonb -> 'campaign' = :'camp1'::jsonb
   and :'mc1'::jsonb -> 'campaign_costs' = '{"flyer": 42000, "online": 126000, "tv": 378000}'::jsonb,
@@ -224,10 +224,10 @@ select tests.assert(
   and (public.company_campaign_costs(:'aco') ->> 'online')::bigint = round(6 * :d_in::bigint / 100.0) * 100,
   'campaign_costs: from the demand of the last closed hour');
 
--- after the campaign: none in COMPANY; the next one is capped by the stage (stage 0: 50 %)
+-- after the campaign: none in COMPANY; the next one is capped by the company's cap (ADR-188: garage, stage 0: 60 %)
 update public.company_campaigns set started_at = now() - interval '25 hours', ends_at = now() - interval '1 minute'
  where id = :'c1_id';
-update public.player_companies set awareness = 0.498 where company_id = :'aco';
+update public.player_companies set awareness = 0.598 where company_id = :'aco';
 select tests.login_as('authenticated', :a);
 select public.get_my_company() -> 'company' -> 'campaign' as mc2 \gset
 select public.start_campaign(:rq2, :'aco', 'online') as camp2 \gset
@@ -235,9 +235,9 @@ reset role;
 select tests.assert(
   :'mc2'::jsonb = 'null'::jsonb
   and (:'camp2'::jsonb ->> 'cost_cents')::bigint = public.campaign_cost_cents('online', :d_in)
-  and (select awareness from public.player_companies where company_id = :'aco') = 0.5
+  and abs((select awareness from public.player_companies where company_id = :'aco') - 0.6) < 1e-12
   and abs((select awareness_gain from public.company_campaigns where id = (:'camp2'::jsonb ->> 'id')::uuid) - 0.002) < 1e-12,
-  'start_campaign(): awareness capped by the stage (awarenessCaps[0] = 0.5); price from the last closed hour');
+  'start_campaign(): awareness capped by the company cap (garage stage 0 = 0.6); price from the last closed hour');
 -- the second campaign lies in the past for the rest of this file
 update public.company_campaigns set started_at = now() - interval '50 hours', ends_at = now() - interval '2 hours'
  where id = (:'camp2'::jsonb ->> 'id')::uuid;

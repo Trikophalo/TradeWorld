@@ -4170,3 +4170,80 @@ Funktionskarte: `docs/FIRMA_ANALYSE.md`.
 **Offen.** Ob auf Live eine Firma an einem Nebenschritt scheiterte, zeigt nach dem Deploy
 `select * from job_runs where job_name in ('company_hours', 'company_hour_step')`. `profiles.reputation` (Spieler-Ruf
 aus Spec 6.6) bleibt unbenutzt.
+
+## ADR-188: Bekanntheit neu – ein Wert, eine Regel, sichtbare Obergrenze, jede Änderung gebucht — `Annahme`
+
+**Kontext.** Der Besitzer: „Die Bekanntheit ist immer noch verbuggt … Mach die Bekanntheit nochmal neu.“ Screenshot:
+„Stärke Bekanntheit“ 4/100 nach drei Stunden, die Diagnose zeigt gleichzeitig „Bekanntheit 49 %, nötig wären 77 %“,
+und nichts, was man tut, scheint sie zu bewegen.
+
+**Ursachen (im Code und auf einer lokalen Datenbank nachgestellt).**
+
+1. _Versteckte Obergrenze:_ `stages.awarenessCaps` deckelte eine Garage ohne Fachwissen bei 50 %, ohne dass es irgendwo
+   stand. Bei 49 % brachte Marketing nichts mehr; die Diagnose verlangte trotzdem 77 % (sie rechnete den Bedarf gegen
+   die Kapazität, nicht gegen die Grenze), also eine Forderung, die niemand erfüllen konnte.
+2. _Starker Verfall gegen festes Marketing:_ ADR-180 nahm jede Stunde 2 % des Werts weg und gab Marketing als festen
+   Betrag. Eine Firma mit wenig Budget pendelte sich irgendwo ein, ohne Werbung verlor sie rund 40 % am Tag; mehr
+   Budget half nur bis zur versteckten Grenze.
+3. _Stärke lief der Bekanntheit hinterher:_ Die Stärke „Bekanntheit“ startete bei 0 und rückte 2 % der Lücke je Stunde
+   vor (Ziel 100 × a / 50 %). Drei Stunden nach dem Start standen 4/100 neben 49 % Bekanntheit.
+4. _Viele Schreiber, keine Spur:_ Kampagnen (mit dem Stufendeckel), gelöste Ereignisse, Interviews, Geschäftszüge,
+   eigene Züge, Proteste und die Nachrichtensendung schrieben `player_companies.awareness` jeder auf eigene Art, ohne
+   oder mit anderem Deckel und ohne Protokoll. Nur Aufgaben erschienen als „extra“ in der Stunde.
+
+**Entscheidung: ein Modell (`src/lib/sim/awareness.ts`, gleich in SQL).**
+
+- _Ein Wert_ je Firma (`player_companies.awareness`, 0 … 1). Nachfrage, Börsenwert, Stärken, Diagnose, Mira und
+  Nachrichten lesen dasselbe Feld.
+- _Obergrenze_ `awarenessCap(tier, stage, expansion)` = Rechtsform (Garage 60 %, Kleinunternehmen 70 %, GmbH 80 %,
+  AG 90 %) + 5 Punkte je Fachwissen-Stufe + 3 Punkte je Ausbaustufe, höchstens 100 %. Sie steht auf der Seite mit
+  ihrer Herleitung („60 % als Garage, +5 für Stufe 1, +0 für Ausbaustufe 0“).
+- _Jede Stunde_ (`awarenessHour`, SQL `company_awareness_step`):
+  Marketing `rate × (Grenze − a)` mit `rate = 6 % × q / (q + H)` (q = Stundenbudget × 6, H = max(500 €, Markt/4 ×
+  1 %)): das vorgeschlagene Budget schließt 3 % der Lücke je Stunde, doppeltes Budget weniger als doppelt so viel.
+  Mundpropaganda `0,8 % × a × (1 − a/Grenze) × (0,5 + Qualität) × Preisstrategie × bedienter Anteil × (0,5 +
+Ruf/100)`. Vergessen `0,4 % × (a − 2 %)` je Stunde, Untergrenze 2 %. Über der Grenze (z. B. ein Fachmann ging) nur
+  Vergessen, kein harter Sprung.
+- _Einzelne Ereignisse_ gehen alle durch `company_awareness_add(firma, quelle, delta)`: Zuwachs bis zur Grenze, Verlust
+  bis zur Untergrenze. Aufgaben +0,5 Punkte (KI und Autopilot die Hälfte), Kampagnen +3/+6/+12 (Flyer/Online/TV),
+  Geschäftszüge, Interviews, Nachrichten, eigene Züge, Proteste und Ereignisse mit ihren bisherigen Werten.
+- _Ein Protokoll:_ `company_awareness_log` (Firma, Stunde, Quelle, Summe) nimmt jede Änderung auf, auch die drei Teile
+  der Stunde (Vergessen nimmt eine Rundung an den Grenzen mit, damit die Summe stimmt). `get_company_awareness()`
+  liefert Wert, Grenze und Herleitung, Stärke, die letzte Stunde nach Quellen, „seitdem“ und 24 Stunden Verlauf; die
+  Stunde selbst speichert ihre Quellen in `awareness_parts.sources`. Baustein `AwarenessBreakdown`
+  (`src/features/company/awareness/`) zum Einhängen auf der Firmenseite.
+- _Stärke und Diagnose:_ Die Stärke „Bekanntheit“ ist `100 × a / Grenze` und folgt mit 25 % der Lücke je Stunde (in
+  beide Richtungen, `awarenessFollowPerHour`); die übrigen fünf Stärken bleiben langsam. Die Diagnose misst gegen
+  `min(Bedarf, Grenze)` und nennt die Grenze („erreichbar wären 60 % (Obergrenze 60 %)“), an der Grenze heißt es
+  „Mehr geht jetzt nicht … steigt mit Stufe, Ausbau und Rechtsform“.
+- _Umstellung (Migration 7730, einmal):_ Jede aktive Firma behält ihren Stand relativ zur Grenze: `a / alte
+Stufengrenze × neue Grenze` (eine Garage bei 49 % von 50 % steht danach bei 59 % von 60 %), gebucht als „rescale“;
+  die Stärke wird auf `100 × a / Grenze` gesetzt. `public.data_migrations` verhindert eine Wiederholung.
+
+**Messung (Garage, Median-Markt 33.700 €/Jahr, Qualität 50 %, vorgeschlagenes Marketing 500 €/Quartal, Bekanntheit in
+%, `src/lib/sim/awareness.test.ts` „harness“).**
+
+| Stunde | ohne Marketing | vorgeschlagenes Marketing | Marketing + 1 Aufgabe/h + Flyer täglich |
+| -----: | -------------: | ------------------------: | --------------------------------------: |
+|      0 |            3,0 |                       3,0 |                                     3,0 |
+|      1 |            3,0 |                       4,7 |                                     8,1 |
+|      3 |            3,1 |                       8,0 |                                    12,2 |
+|      6 |            3,1 |                      12,7 |                                    17,9 |
+|     12 |            3,2 |                      20,8 |                                    27,8 |
+|     24 |            3,5 |                      33,0 |                                    42,4 |
+|     48 |            4,0 |                      46,1 |                                    58,5 |
+|     72 |            4,5 |                      51,2 |                                    59,8 |
+|     96 |            5,1 |                      53,2 |                                    59,8 |
+|    168 |            7,1 |                      54,3 |                                    59,8 |
+
+Doppeltes Budget: 38,7 % nach 24 h, 55,1 % nach 96 h. Die Stärke „Bekanntheit“ bei 49 % von 60 %: 47/100 nach drei
+Stunden, 82/100 nach einem Tag (vorher, mit 49 % von 50 %: 6/100 und 37/100). Auf einer lokalen Datenbank (`c6_awareness.sql`): sechs
+abgeschlossene Stunden mit vorgeschlagenem Marketing heben eine neue Garage von 3 % auf rund 12,7 %, ohne Marketing
+bleibt sie bei gut 3 %.
+
+**Folgen.** `stages.awarenessCaps` ist nur noch Anzeige (Garage je Stufe), `companyHealth.strengths.awarenessFull`
+entfällt. `company_awareness_hour` (6 Argumente) ist gelöscht, `company_awareness_boost` ist ein Aufruf von
+`company_awareness_add(…, 'tasks', …)`. Die Quartalsabrechnung bewegt die Bekanntheit nicht (wie seit ADR-180).
+
+**Offen.** Die Firmenseite (andere Baustelle) hängt `AwarenessBreakdown` ein; `growth-path.tsx` liest weiter die
+Anzeige-Grenzen der Garage.

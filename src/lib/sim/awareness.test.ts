@@ -146,4 +146,22 @@ describe("awareness (ADR-188)", () => {
     for (let h = 0; h < 21; h++) s = strengthsStep(s, strengthsInstant(hour, sc), sc);
     expect(s.awareness).toBeCloseTo(100 * awarenessOfCap(0.49, 0.6), 0);
   });
+
+  it("SQL: the same step as company_awareness_step (b8_company_overhaul.sql, c6_awareness.sql)", () => {
+    const h = awarenessHour({
+      awareness: 0.2,
+      cap: 0.6,
+      quality: 0.5,
+      priceAwareness: 1.5,
+      marketingCentsThisHour: 10_000,
+      effectivePotentialAnnualCents: 10_000_000,
+      servedShare: 0.8,
+      reputation: 70,
+    });
+    expect(h.next).toBeCloseTo(0.21390690909090912, 14);
+    expect(h.marketing).toBeCloseTo(0.01309090909090909, 14);
+    expect(h.wordOfMouth).toBeCloseTo(0.001536, 14);
+    expect(awarenessCap("gmbh", 2, 3)).toBeCloseTo(0.99, 14);
+    expect(awarenessCap("ag", 2, 3)).toBe(1);
+  });
 });

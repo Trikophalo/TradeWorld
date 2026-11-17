@@ -81061,6 +81061,1242 @@ begin
 end;
 $$;
 
+-- ===== supabase/migrations/20261204007700_awareness_model.sql =====
+-- =============================================================================
+-- NEXA · 7700 · Awareness, one model (ADR-188): cap by size, hourly step, a ledger of every change
+-- =============================================================================
+-- * Before: the hourly step (ADR-180) added a fixed amount of marketing, took 2 % of the value per hour as decay and
+--   stopped at a hidden stage cap (garage 50 %). Campaigns, tasks, moves, interviews, pitches, protests and the news
+--   show wrote player_companies.awareness each in their own way, mostly without a trace; the diagnosis asked for more
+--   awareness than the cap allowed; the strength "Bekanntheit" climbed 2 % of the gap per hour (4 of 100 after
+--   three hours while the awareness stood at 49 %).
+-- * Now (ports of src/lib/sim/awareness.ts):
+--   company_awareness_cap(tier, stage, expansion)  tier base (garage 60 %) + per stage + per expansion level
+--   company_awareness_step(...)                    marketing closes a share of the gap to the cap, word of mouth,
+--                                                  slow decay toward the floor
+--   company_awareness_add(company, source, delta)  every single event: capped, floored, booked
+--   company_awareness_log                          what moved the awareness, per company, hour and source
+--   get_company_awareness()                        value, cap and its parts, strength, last hour by source
+-- Values come from game_config.startups.awareness; the defaults below equal src/config/balance.ts, so the functions
+-- work before the update writes the new config. Idempotent: runs unchanged as supabase/updates/.
+
+-- ---------------------------------------------------------------------------
+-- A. The ledger
+-- ---------------------------------------------------------------------------
+create table if not exists public.company_awareness_log (
+  company_id uuid not null references public.player_companies (company_id) on delete cascade,
+  hour_start timestamptz not null,
+  source     text not null,
+  delta      double precision not null default 0,
+  events     integer not null default 0 check (events >= 0),
+  primary key (company_id, hour_start, source)
+);
+alter table public.company_awareness_log enable row level security;
+revoke all on public.company_awareness_log from anon, authenticated;
+comment on table public.company_awareness_log is
+  'Awareness changes per company, hour and source (ADR-188): marketing, word_of_mouth, decay (hourly close), tasks, '
+  'campaign, moves, interview, news, pitch, protest, event, rescale. delta in shares (0.01 = 1 point). Read through '
+  'get_company_awareness(); kept for eight days.';
+
+-- ---------------------------------------------------------------------------
+-- B. Rules
+-- ---------------------------------------------------------------------------
+create or replace function public.company_awareness_cfg()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(public.config_jsonb('startups') -> 'awareness', '{}'::jsonb);
+$$;
+
+-- awarenessCap: tier base + perStage x stage + perExpansionLevel x level, between min and cap.max
+create or replace function public.company_awareness_cap(p_tier text, p_stage integer, p_expansion integer)
+returns double precision
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  a jsonb := public.company_awareness_cfg();
+  v_base double precision;
+begin
+  v_base := public.cfg_num(a, array['cap', 'byTier', coalesce(p_tier, 'garage')],
+              case p_tier when 'small_business' then 0.7 when 'gmbh' then 0.8 when 'ag' then 0.9 else 0.6 end);
+  return least(public.cfg_num(a, '{cap,max}', 1),
+               greatest(public.cfg_num(a, '{min}', 0.02),
+                        v_base + public.cfg_num(a, '{cap,perStage}', 0.05) * greatest(0, coalesce(p_stage, 0))
+                               + public.cfg_num(a, '{cap,perExpansionLevel}', 0.03) * greatest(0, coalesce(p_expansion, 0))));
+end;
+$$;
+
+-- the cap of a company now (its tier, the stage its team reached, its expansion level)
+create or replace function public.company_awareness_cap_of(p_company uuid)
+returns double precision
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  pc public.player_companies;
+begin
+  select * into pc from public.player_companies where company_id = p_company;
+  if pc.company_id is null then
+    return 1;
+  end if;
+  return public.company_awareness_cap(pc.tier, coalesce((public.player_company_team(p_company) ->> 'stage')::integer, 0),
+                                      coalesce(pc.expansion_level, 0));
+end;
+$$;
+
+-- awarenessHour: one closed hour. p_marketing_cents = the hour's marketing, p_potential = effective annual potential,
+-- p_served = sold / demand (0..1), p_reputation 0..100. Returns before, next, marketing, word_of_mouth, decay, cap.
+create or replace function public.company_awareness_step(p_awareness double precision, p_cap double precision,
+  p_quality double precision, p_price_awareness double precision, p_marketing_cents double precision,
+  p_potential double precision, p_served double precision, p_reputation double precision)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  a       jsonb := public.company_awareness_cfg();
+  v_hours double precision := greatest(1, public.config_double('time', '{quarterHours}', 6));
+  v_min   double precision := public.cfg_num(a, '{min}', 0.02);
+  v_a     double precision := least(1, greatest(0, coalesce(p_awareness, 0)));
+  v_cap   double precision;
+  v_q     double precision := greatest(0, coalesce(p_marketing_cents, 0)) * v_hours;
+  v_half  double precision;
+  v_rate  double precision := 0;
+  v_mk    double precision;
+  v_wom   double precision;
+  v_decay double precision;
+begin
+  v_cap := least(1, greatest(v_min, coalesce(p_cap, 1)));
+  if v_q > 0 then
+    v_half := greatest(public.cfg_num(a, '{marketingMinHalfSaturationCents}', 50000),
+                       greatest(0, coalesce(p_potential, 0)) / 4.0 * public.cfg_num(a, '{marketingHalfSaturationShare}', 0.01));
+    v_rate := public.cfg_num(a, '{marketingMaxRatePerHour}', 0.06) * v_q / (v_q + v_half);
+  end if;
+  v_mk := v_rate * greatest(0, v_cap - v_a);
+  v_wom := public.cfg_num(a, '{wordOfMouthPerHour}', 0.008) * v_a * greatest(0, 1 - v_a / v_cap)
+           * (0.5 + least(1, greatest(0, coalesce(p_quality, 0)))) * greatest(0, coalesce(p_price_awareness, 1))
+           * least(1, greatest(0, coalesce(p_served, 1))) * (0.5 + least(100, greatest(0, coalesce(p_reputation, 50))) / 100.0);
+  v_decay := public.cfg_num(a, '{decayPerHour}', 0.004) * greatest(0, v_a - v_min);
+  return jsonb_build_object('before', v_a,
+                            'next', least(greatest(v_cap, v_a), greatest(v_min, v_a + v_mk + v_wom - v_decay)),
+                            'marketing', v_mk, 'word_of_mouth', v_wom, 'decay', v_decay, 'cap', v_cap);
+end;
+$$;
+
+-- book a change (no change of the value itself)
+create or replace function public.company_awareness_log_add(p_company uuid, p_hour timestamptz, p_source text,
+  p_delta double precision)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  insert into public.company_awareness_log as l (company_id, hour_start, source, delta, events)
+  values (p_company, date_trunc('hour', p_hour), p_source, coalesce(p_delta, 0), 1)
+  on conflict (company_id, hour_start, source) do update
+    set delta = l.delta + excluded.delta, events = l.events + 1;
+$$;
+
+-- awarenessAdd: a single event (task, campaign, move, interview, news, pitch, protest, event). A gain stops at the
+-- cap (nothing when already above it), a loss at the floor. Returns the applied change; booked in the open hour.
+create or replace function public.company_awareness_add(p_company uuid, p_source text, p_delta double precision)
+returns double precision
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  pc      public.player_companies;
+  v_min   double precision := public.cfg_num(public.company_awareness_cfg(), '{min}', 0.02);
+  v_cap   double precision;
+  v_apply double precision;
+begin
+  select * into pc from public.player_companies where company_id = p_company and status = 'active' for update;
+  if pc.company_id is null or coalesce(p_delta, 0) = 0 then
+    return 0;
+  end if;
+  if p_delta > 0 then
+    v_cap := public.company_awareness_cap_of(p_company);
+    v_apply := greatest(0, least(p_delta, v_cap - pc.awareness));
+  else
+    v_apply := least(0, greatest(p_delta, v_min - pc.awareness));
+  end if;
+  if v_apply <> 0 then
+    update public.player_companies set awareness = awareness + v_apply where company_id = p_company;
+  end if;
+  perform public.company_awareness_log_add(p_company, public.game_now(), coalesce(p_source, 'event'), v_apply);
+  return v_apply;
+end;
+$$;
+
+-- ADR-180 name for tasks and the autopilot: now a booked event of the source "tasks"
+create or replace function public.company_awareness_boost(p_company uuid, p_add double precision)
+returns double precision
+language sql
+security definer
+set search_path = ''
+as $$
+  select public.company_awareness_add(p_company, 'tasks', p_add);
+$$;
+
+-- one hour of the ledger as {source: delta}
+create or replace function public.company_awareness_hour_json(p_company uuid, p_hour timestamptz)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(jsonb_object_agg(l.source, l.delta), '{}'::jsonb)
+    from public.company_awareness_log l
+   where l.company_id = p_company and l.hour_start = date_trunc('hour', p_hour);
+$$;
+
+-- What the page shows: the value, its cap and why, the strength, the last closed hour and the time since by source,
+-- and the last 24 closed hours.
+create or replace function public.company_awareness_json(p_company uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  pc      public.player_companies;
+  a       jsonb := public.company_awareness_cfg();
+  v_stage integer;
+  v_last  timestamptz;
+  v_score double precision;
+begin
+  select * into pc from public.player_companies where company_id = p_company;
+  if pc.company_id is null then
+    return null;
+  end if;
+  v_stage := coalesce((public.player_company_team(p_company) ->> 'stage')::integer, 0);
+  select max(h.hour_start) into v_last from public.player_company_hours h where h.company_id = p_company;
+  select (s.scores ->> 'awareness')::double precision into v_score from public.company_strengths s where s.company_id = p_company;
+  return jsonb_build_object(
+    'awareness', pc.awareness,
+    'cap', public.company_awareness_cap(pc.tier, v_stage, coalesce(pc.expansion_level, 0)),
+    'floor', public.cfg_num(a, '{min}', 0.02),
+    'tier', pc.tier,
+    'stage', v_stage,
+    'expansion_level', coalesce(pc.expansion_level, 0),
+    'tier_cap', public.company_awareness_cap(pc.tier, 0, 0),
+    'per_stage', public.cfg_num(a, '{cap,perStage}', 0.05),
+    'per_expansion_level', public.cfg_num(a, '{cap,perExpansionLevel}', 0.03),
+    'strength', coalesce(v_score, 0),
+    'last_hour', case when v_last is null then null else jsonb_build_object(
+      'hour_start', v_last, 'parts', public.company_awareness_hour_json(p_company, v_last)) end,
+    'since', (select coalesce(jsonb_object_agg(x.source, x.delta), '{}'::jsonb)
+                from (select l.source, sum(l.delta) as delta from public.company_awareness_log l
+                       where l.company_id = p_company and l.hour_start > coalesce(v_last, '-infinity'::timestamptz)
+                       group by l.source) x),
+    'history', (select coalesce(jsonb_agg(jsonb_build_object('hour_start', h.hour_start, 'after', h.awareness_after)
+                                          order by h.hour_start), '[]'::jsonb)
+                  from (select hh.hour_start, hh.awareness_after from public.player_company_hours hh
+                         where hh.company_id = p_company and hh.awareness_after is not null
+                         order by hh.hour_start desc limit 24) h));
+end;
+$$;
+
+create or replace function public.get_company_awareness()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  m        record;
+begin
+  select * into m from public.company_task_member(v_player);
+  if m.company_id is null then
+    perform public.api_error('company_not_found');
+  end if;
+  return public.company_awareness_json(m.company_id);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- C. Grants
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.company_awareness_cfg()',
+    'public.company_awareness_cap(text, integer, integer)',
+    'public.company_awareness_cap_of(uuid)',
+    'public.company_awareness_step(double precision, double precision, double precision, double precision, double precision, double precision, double precision, double precision)',
+    'public.company_awareness_log_add(uuid, timestamptz, text, double precision)',
+    'public.company_awareness_add(uuid, text, double precision)',
+    'public.company_awareness_boost(uuid, double precision)',
+    'public.company_awareness_hour_json(uuid, timestamptz)',
+    'public.company_awareness_json(uuid)'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+  end loop;
+end;
+$$;
+revoke all on function public.get_company_awareness() from public, anon;
+grant execute on function public.get_company_awareness() to authenticated;
+
+-- ===== supabase/migrations/20261204007710_awareness_sources.sql =====
+-- =============================================================================
+-- NEXA · 7710 · Awareness, one model (ADR-188): every single event goes through company_awareness_add
+-- =============================================================================
+-- Campaigns, solved events, CEO interviews, business moves, pitches, protests and the news show used to write
+-- player_companies.awareness directly (some without any cap, some with the old stage cap, none with a trace). They
+-- now call company_awareness_add(company, source, delta): capped by the company's cap, floored, booked by source in
+-- company_awareness_log. Tasks and the autopilot already go through company_awareness_boost, now a wrapper of it.
+-- Full redefinitions of the live functions (copied from the database after 7310), changed only at the awareness
+-- write. Idempotent: runs unchanged as supabase/updates/.
+
+create or replace function public.start_campaign(p_request_id uuid, p_company_id uuid, p_kind text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  pc       public.player_companies;
+  v_now    timestamptz := public.game_now();
+  v_su     jsonb := coalesce(public.config_jsonb('startups'), '{}'::jsonb);
+  v_cost   bigint;
+  v_free   bigint;
+  v_luck   double precision;
+  v_factor double precision;
+  v_stage  integer;
+  v_cap    double precision;
+  v_aw     double precision;
+  v_id     uuid;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_company_id is null or coalesce(p_kind, '') not in ('flyer', 'online', 'tv') then
+    perform public.api_error('invalid_argument');
+  end if;
+  perform public.require_company_owner(p_company_id);
+  v_replay := public.request_begin(v_player, p_request_id, 'start_campaign');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into pc from public.player_companies where company_id = p_company_id and status = 'active' for update;
+  if pc.company_id is null then
+    perform public.api_error('company_not_found');
+  end if;
+  if exists (select 1 from public.company_campaigns x where x.company_id = p_company_id and x.ends_at > v_now) then
+    perform public.api_error('campaign_running');
+  end if;
+  -- ADR-134 ad_agency of the founder
+  v_cost := public.company_campaign_cost_cents(p_company_id, p_kind);
+  -- free cash: open bills come first (as expand_company and event steps)
+  select a.balance_cents - pc.unpaid_cents into v_free
+    from public.ledger_accounts a where a.owner_company_id = p_company_id and a.kind = 'company_cash' for update;
+  if coalesce(v_free, 0) < v_cost then
+    perform public.api_error('insufficient_funds');
+  end if;
+  if v_cost > 0 then
+    perform public.ledger_transfer(public.company_cash_account(p_company_id), public.ledger_system_account('households'), v_cost,
+                                   'company_costs', 'Marketing-Kampagne', 'company', p_company_id,
+                                   'campaign:' || p_company_id::text || ':' || p_request_id::text, v_player);
+  end if;
+  v_luck := public.campaign_luck(random());
+  v_factor := public.campaign_factor(p_kind, pc.quality, v_luck);
+  -- awareness at once, capped by the growth stage (ADR-062) as in the quarter close; never lowered
+  v_stage := least(greatest(coalesce(public.company_stage(p_company_id), 0), 0),
+                   greatest(jsonb_array_length(coalesce(v_su #> '{stages,awarenessCaps}', '[1]'::jsonb)) - 1, 0));
+  v_cap := greatest(public.cfg_num(v_su, '{awareness,min}', 0.01),
+                    coalesce((v_su #>> array['stages', 'awarenessCaps', v_stage::text])::double precision, 1));
+  -- ADR-188: the jump at once, capped by the company's awareness cap and booked as "campaign"
+  v_aw := pc.awareness + public.company_awareness_add(p_company_id, 'campaign', public.campaign_kind_num(p_kind, 'awareness'));
+  insert into public.company_campaigns (company_id, kind, cost_cents, luck, demand_factor, awareness_gain, started_at, ends_at,
+                                        created_by, request_id)
+  values (p_company_id, p_kind, v_cost, v_luck, v_factor, greatest(0, v_aw - pc.awareness), v_now,
+          v_now + make_interval(secs => greatest(1, public.campaign_kind_num(p_kind, 'hours')) * 3600), v_player, p_request_id)
+  returning id into v_id;
+  perform public.company_news_add(p_company_id, 'campaign_started',
+    jsonb_build_object('kind', p_kind, 'resonance', public.campaign_resonance(v_luck),
+                       'demand_bps', round(((v_factor - 1) * 10000)::numeric)::integer));
+  return public.request_complete(v_player, p_request_id, public.campaign_json(v_id));
+end;
+$function$;
+
+create or replace function public.company_event_solve(p_event uuid, p_at timestamp with time zone)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  e       public.player_company_events;
+  v_strat jsonb;
+  v_mit   double precision;
+  v_size  double precision;
+  v_bps   integer;
+  v_shock integer;
+  v_name  text;
+begin
+  select * into e from public.player_company_events where id = p_event for update;
+  if e.id is null or e.status not in ('open', 'in_force') then
+    return;
+  end if;
+  v_strat := public.company_event_strategy_def(e);
+  v_mit := least(1, greatest(0, public.cfg_num(v_strat, '{mitigation}', 0)));
+  update public.player_company_events set status = 'solved', resolved_at = p_at, mitigation = v_mit where id = e.id;
+  if not e.bonus_applied then
+    perform public.company_awareness_add(e.company_id, 'event', public.cfg_num(v_strat, '{bonus,awareness}', 0));  -- ADR-188
+    update public.player_companies
+       set quality = least(1, greatest(0, quality + public.cfg_num(v_strat, '{bonus,quality}', 0)))
+     where company_id = e.company_id;
+    update public.player_company_events set bonus_applied = true where id = e.id;
+  end if;
+  -- resolutionShockBps: crisis size × mitigation, chance size / 2 × mitigation
+  v_size := public.cfg_num(public.company_events_cfg(), array['shareShockBps', (e.severity - 1)::text],
+                           case e.severity when 1 then 400 when 2 then 900 else 1500 end);
+  v_bps := round((case when e.polarity = 'crisis' then v_size * v_mit else v_size / 2 * v_mit end)::numeric)::integer;
+  v_shock := public.company_event_share_shock(e.company_id, v_bps);
+  update public.player_company_events set resolution_shock_bps = v_shock where id = e.id;
+  perform public.company_news_add(e.company_id, 'event_solved',
+    jsonb_build_object('event_id', e.id, 'archetype', e.archetype, 'polarity', e.polarity, 'severity', e.severity,
+                       'strategy', e.strategy, 'mitigation', round(v_mit::numeric, 4)::double precision, 'share_shock_bps', v_shock));
+  select c.name into v_name from public.companies c where c.id = e.company_id;
+  perform public.company_event_notify(e.id,
+    case when e.polarity = 'crisis' then 'Krise gemeistert: ' || v_name else 'Chance genutzt: ' || v_name end,
+    null, 'company_event:' || e.id::text || ':solved');
+end;
+$function$;
+
+create or replace function public.company_interview_finish(p_id bigint, p_status text, p_answers jsonb, p_points integer, p_now timestamp with time zone)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  e        jsonb := coalesce(public.interviews_cfg() -> 'effects', '{}'::jsonb);
+  iv       public.company_interviews;
+  v_aw     integer;
+  v_rep    double precision;
+  v_max    integer := coalesce((e ->> 'maxAwarenessBps')::integer, 300);
+  v_maxr   double precision := coalesce((e ->> 'maxReputation')::double precision, 3);
+begin
+  select * into iv from public.company_interviews where id = p_id for update;
+  if iv.id is null or iv.status <> 'requested' then
+    return;
+  end if;
+  v_aw := case p_status
+            when 'answered' then greatest(-v_max, least(v_max, coalesce(p_points, 0) * coalesce((e ->> 'awarenessPerPointBps')::integer, 60)))
+            when 'declined' then coalesce((e ->> 'declineAwarenessBps')::integer, -80)
+            else coalesce((e ->> 'ignoreAwarenessBps')::integer, -120) end;
+  v_rep := case when p_status = 'answered' then greatest(-v_maxr, least(v_maxr, coalesce(p_points, 0) * coalesce((e ->> 'reputationPerPoint')::double precision, 0.5)))
+                when p_status = 'declined' then coalesce((e ->> 'declineReputation')::double precision, -0.5)
+                else coalesce((e ->> 'ignoreReputation')::double precision, -1) end;
+  perform public.company_awareness_add(iv.company_id, 'interview', v_aw / 10000.0);  -- ADR-188
+  if v_rep <> 0 then
+    perform public.listed_ensure(iv.company_id);
+    perform public.company_reputation_bump(iv.company_id, v_rep);
+  end if;
+  update public.company_interviews
+     set status = p_status, answers = p_answers, score = p_points, awareness_bps = v_aw, reputation_delta = v_rep,
+         answered_at = p_now
+   where id = p_id;
+end;
+$function$;
+
+create or replace function public.company_moves_run_due(p_now timestamp with time zone DEFAULT NULL::timestamp with time zone)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_cfg     jsonb := public.company_moves_cfg();
+  v_now     timestamptz := coalesce(p_now, public.game_now());
+  m         record;
+  v_kind    text;
+  v_risk    text;
+  v_ok      boolean;
+  v_pay     bigint;
+  v_gain    double precision;
+  v_hh      uuid := public.ledger_system_account('households');
+  v_hh_bal  bigint;
+  v_done    integer := 0;
+begin
+  for m in select x.* from public.company_moves x where x.status = 'running' and x.ends_at <= v_now
+            order by x.ends_at, x.id for update skip locked loop
+    select mv ->> 'kind', mv ->> 'risk' into v_kind, v_risk
+      from jsonb_array_elements(coalesce(v_cfg -> 'moves', '[]'::jsonb)) mv where mv ->> 'key' = m.move_key;
+    v_kind := coalesce(v_kind, 'cash');
+    v_risk := coalesce(v_risk, 'normal');
+    v_ok := random() * 10000 < m.chance_bps;
+    v_gain := 0;
+    if v_ok and v_kind = 'cash' then
+      v_pay := round(m.cost_cents * coalesce((v_cfg #>> array['risk', v_risk, 'payoutBps'])::numeric, 15000) / 10000)::bigint;
+      -- ADR-134 dealmaker of the founder
+      v_pay := public.apply_bps(v_pay, 10000 + public.company_upgrade_bps(m.company_id, 'dealmaker'));
+    elsif v_ok then
+      v_pay := 0;
+      v_gain := coalesce((v_cfg #>> array['risk', v_risk, 'gain'])::double precision, 0.04);
+    else
+      v_pay := round(m.cost_cents * coalesce((v_cfg #>> array['risk', v_risk, 'refundBps'])::numeric, 3000) / 10000)::bigint;
+    end if;
+    if not exists (select 1 from public.player_companies pc where pc.company_id = m.company_id and pc.status = 'active') then
+      v_pay := 0;
+      v_gain := 0;
+    end if;
+    if v_pay > 0 then
+      select a.balance_cents into v_hh_bal from public.ledger_accounts a where a.id = v_hh for update;
+      v_pay := least(v_pay, greatest(0, coalesce(v_hh_bal, 0)));
+    end if;
+    if v_pay > 0 then
+      perform public.ledger_transfer(v_hh, public.company_cash_account(m.company_id), v_pay, 'company_revenue',
+                                     'Geschäftszug: ' || m.move_key, 'company', m.company_id,
+                                     'move:result:' || m.id::text, null, jsonb_build_object('move', m.move_key, 'success', v_ok));
+    end if;
+    if v_gain > 0 then
+      if v_kind = 'awareness' then
+        perform public.company_awareness_add(m.company_id, 'moves', v_gain);  -- ADR-188
+      else
+        update public.player_companies set quality = least(1, quality + v_gain) where company_id = m.company_id;
+      end if;
+    end if;
+    update public.company_moves set status = case when v_ok then 'success' else 'failure' end, payout_cents = v_pay,
+                                    gain = v_gain, resolved_at = v_now where id = m.id;
+    perform public.company_system_message(m.company_id,
+      case when v_ok and v_kind = 'cash' then 'Geschäftszug geschafft: ' || public.format_eur(v_pay) || ' eingenommen.'
+           when v_ok then 'Geschäftszug geschafft: die Firma ist jetzt '
+                          || case when v_kind = 'awareness' then 'bekannter' else 'besser' end || '.'
+           else 'Geschäftszug daneben gegangen, ' || public.format_eur(v_pay) || ' zurück.' end);
+    v_done := v_done + 1;
+  end loop;
+  return jsonb_build_object('resolved', v_done);
+end;
+$function$;
+
+create or replace function public.company_pitch_resolve(p_pitch_id bigint, p_u double precision, p_u2 double precision)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  cfg      jsonb := public.pitches_cfg();
+  p        public.company_pitches;
+  v_out    text;
+  v_amount bigint := 0;
+  v_avail  bigint;
+  v_gain   double precision;
+  v_text   text;
+begin
+  select * into p from public.company_pitches where id = p_pitch_id for update;
+  if p.id is null or p.status <> 'running' then
+    return null;
+  end if;
+  v_out := case when p_u * 10000 < p.chance_bps then 'success'
+                when p_u2 * 100 < p.backfire then 'backfire'
+                else 'failure' end;
+  if v_out = 'success' then
+    if p.kind = 'event' then
+      update public.player_company_events
+         set status = 'solved', resolved_at = public.game_now(),
+             mitigation = least((cfg ->> 'maxMitigation')::double precision,
+                                (cfg ->> 'mitigationBase')::double precision + p.fit * (cfg ->> 'mitigationPerFit')::double precision)
+       where id = p.event_id and status in ('open', 'in_force');
+    elsif p.move_kind = 'cash' then
+      v_amount := round(p.cost_cents * ((cfg ->> 'movePayoutBase')::numeric + p.fit * (cfg ->> 'movePayoutPerFit')::numeric))::bigint;
+      select a.balance_cents into v_avail from public.ledger_accounts a
+       where a.id = public.ledger_system_account('households') for update;
+      v_amount := least(v_amount, greatest(coalesce(v_avail, 0), 0));
+      if v_amount > 0 then
+        perform public.ledger_transfer(public.ledger_system_account('households'), public.company_cash_account(p.company_id),
+                                       v_amount, 'company_revenue', 'Eigener Geschäftszug', 'company', p.company_id,
+                                       'pitch:result:' || p.id::text, p.created_by);
+      end if;
+    else
+      v_gain := (cfg ->> 'moveGainBase')::double precision + p.fit * (cfg ->> 'moveGainPerFit')::double precision;
+      if p.move_kind = 'awareness' then
+        perform public.company_awareness_add(p.company_id, 'pitch', v_gain);  -- ADR-188
+      else
+        update public.player_companies set quality = least(1, quality + v_gain) where company_id = p.company_id;
+      end if;
+    end if;
+  elsif v_out = 'backfire' then
+    perform public.company_awareness_add(p.company_id, 'pitch', -(cfg ->> 'backfireAwareness')::double precision);  -- ADR-188
+    if p.kind = 'event' and p.cost_cents > 0 then
+      select a.balance_cents into v_avail from public.ledger_accounts a
+       where a.id = public.company_cash_account(p.company_id) for update;
+      v_amount := -least(p.cost_cents, greatest(coalesce(v_avail, 0), 0));
+      if v_amount < 0 then
+        perform public.ledger_transfer(public.company_cash_account(p.company_id), public.ledger_system_account('households'),
+                                       -v_amount, 'company_costs', 'Eigene Strategie ging nach hinten los', 'company',
+                                       p.company_id, 'pitch:result:' || p.id::text, p.created_by);
+      end if;
+    end if;
+  elsif p.kind = 'move' then
+    v_amount := (p.cost_cents * (cfg ->> 'moveRefundBps')::integer) / 10000;
+    select a.balance_cents into v_avail from public.ledger_accounts a
+     where a.id = public.ledger_system_account('households') for update;
+    v_amount := least(v_amount, greatest(coalesce(v_avail, 0), 0));
+    if v_amount > 0 then
+      perform public.ledger_transfer(public.ledger_system_account('households'), public.company_cash_account(p.company_id),
+                                     v_amount, 'company_revenue', 'Eigener Geschäftszug: Erstattung', 'company', p.company_id,
+                                     'pitch:result:' || p.id::text, p.created_by);
+    end if;
+  end if;
+  update public.company_pitches set status = v_out, result_cents = v_amount, resolved_at = public.game_now() where id = p.id;
+  v_text := case v_out when 'success' then p.success_text when 'backfire' then p.backfire_text else p.failure_text end;
+  perform public.company_news_add(p.company_id, 'pitch_' || v_out,
+    jsonb_build_object('outcome', v_text, 'pitch', left(p.pitch_text, 120), 'kind', p.kind, 'amount_cents', v_amount));
+  perform public.company_system_message(p.company_id, coalesce(v_text, 'Eigene Strategie: ' || v_out));
+  return v_out;
+end;
+$function$;
+
+create or replace function public.protest_check(p_protest_id bigint, p_u double precision, p_u2 double precision)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  cfg       jsonb := public.protests_cfg();
+  k         public.company_protests;
+  c         public.companies;
+  v_players integer;
+  v_chance  integer;
+  v_bps     integer;
+  v_label   text;
+begin
+  select * into k from public.company_protests where id = p_protest_id for update;
+  if k.id is null or k.status <> 'open' then
+    return null;
+  end if;
+  select count(*) into v_players from public.company_protest_supporters s where s.protest_id = k.id;
+  if v_players + k.ai_supporters < k.goal then
+    return 'open';
+  end if;
+  select * into c from public.companies where id = k.company_id;
+  v_label := case k.kind when 'boycott' then 'Boykott-Aufruf' when 'shitstorm' then 'Shitstorm'
+                         when 'petition' then 'Petition' else 'Protestmarsch' end;
+  v_chance := least((cfg ->> 'effectChanceMaxBps')::integer,
+                    (cfg ->> 'effectChanceBaseBps')::integer + v_players * (cfg ->> 'effectChancePerPlayerBps')::integer)
+              -- ADR-134 activist of the starter, on top of the cap
+              + public.player_upgrade_bps(k.started_by, 'activist');
+  if p_u * 10000 < v_chance then
+    v_bps := (cfg ->> 'priceHitMinBps')::integer
+             + floor(p_u2 * ((cfg ->> 'priceHitMaxBps')::integer - (cfg ->> 'priceHitMinBps')::integer + 1))::integer;
+    if c.security_id is not null
+       and exists (select 1 from public.securities s where s.id = c.security_id and s.status = 'listed') then
+      perform public.event_price_shock(c.security_id, -v_bps, public.game_now());
+    end if;
+    perform public.company_awareness_add(c.id, 'protest', -(cfg ->> 'awarenessHit')::double precision);  -- ADR-188
+    if exists (select 1 from public.player_companies pc where pc.company_id = c.id) then
+      perform public.company_news_add(c.id, 'protest_hit', jsonb_build_object('kind', k.kind, 'players', v_players));
+    end if;
+    update public.company_protests set status = 'hit', effect_bps = v_bps, resolved_at = public.game_now() where id = k.id;
+    insert into public.news_items (category, headline, body, importance, company_id, security_id, published_at)
+    values ('market', v_label || ' gegen ' || c.name || ' zeigt Wirkung',
+            v_players || ' Spieler und ' || k.ai_supporters || ' weitere Unterstützer machen mit. Das Thema ist in aller Munde.',
+            2, c.id, c.security_id, public.game_now());
+    return 'hit';
+  end if;
+  update public.company_protests set status = 'fizzled', resolved_at = public.game_now() where id = k.id;
+  insert into public.news_items (category, headline, body, importance, company_id, security_id, published_at)
+  values ('market', v_label || ' gegen ' || c.name || ' verpufft',
+          'Viele haben mitgemacht, doch Kunden und Anleger zucken nur mit den Schultern.', 1, c.id, c.security_id,
+          public.game_now());
+  return 'fizzled';
+end;
+$function$;
+
+create or replace function public.news_show_start(p_show_id bigint, p_now timestamp with time zone)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  cfg     jsonb := public.news_show_cfg();
+  s       public.news_shows;
+  seg     jsonb;
+  a       jsonb;
+  v_idx   integer := 0;
+  v_house uuid := public.ledger_system_account('households');
+  v_cash  bigint;
+  v_news  bigint;
+  v_sec   uuid;
+  r       record;
+begin
+  select * into s from public.news_shows where id = p_show_id for update;
+  if s.id is null or s.status <> 'scheduled' or p_now < s.airs_at
+     or p_now >= s.airs_at + make_interval(mins => coalesce((cfg ->> 'waitMinutes')::integer, 10)) then
+    return false;
+  end if;
+  for seg in select x from jsonb_array_elements(s.segments) x loop
+    v_idx := v_idx + 1;
+    v_sec := null;
+    for a in select x from jsonb_array_elements(coalesce(seg -> 'apply', '[]'::jsonb)) x loop
+      case a ->> 'type'
+        when 'stock' then
+          v_sec := (a ->> 'security_id')::uuid;
+          if exists (select 1 from public.securities sec where sec.id = v_sec and sec.status = 'listed') then
+            perform public.event_price_shock(v_sec, (a ->> 'bps')::integer, p_now);
+          end if;
+        when 'sector' then
+          for r in select sec.id from public.securities sec
+                    where sec.sector_key = a ->> 'sector_key' and sec.kind = 'stock' and sec.status = 'listed' loop
+            perform public.event_price_shock(r.id, (a ->> 'bps')::integer, p_now);
+          end loop;
+        when 'company' then
+          -- ADR-188: a share of the current awareness, capped and booked as "news"
+          perform public.company_awareness_add((a ->> 'company_id')::uuid, 'news',
+            coalesce((select x.awareness from public.player_companies x where x.company_id = (a ->> 'company_id')::uuid), 0)
+              * (a ->> 'awareness_bps')::double precision / 10000.0);
+          update public.player_companies pc
+             set task_momentum = case when coalesce((a ->> 'scandal')::boolean, false)
+                                      then greatest(1.0, 1.0 + (coalesce(pc.task_momentum, 1.0) - 1.0)
+                                             * (1.0 - coalesce((cfg #>> '{company,momentumLossBps}')::numeric, 0) / 10000.0))
+                                      else pc.task_momentum end
+           where pc.company_id = (a ->> 'company_id')::uuid and pc.status = 'active';
+        when 'interview' then
+          update public.company_interviews i set aired_at = p_now, show_id = s.id
+           where i.id = (a ->> 'interview_id')::bigint and i.aired_at is null;
+        when 'gag' then
+          if exists (select 1 from public.companies c where c.id = (a ->> 'company_id')::uuid) then
+            insert into public.news_running_gags as rg (gag_key, company_id, episodes, last_line, last_show_id, first_at, last_at)
+            values (a ->> 'gag', (a ->> 'company_id')::uuid, 1, (a ->> 'line')::integer, s.id, p_now, p_now)
+            on conflict (gag_key, company_id) do update
+              set episodes = rg.episodes + 1, last_line = excluded.last_line, last_show_id = excluded.last_show_id,
+                  last_at = excluded.last_at
+              where rg.last_show_id is distinct from excluded.last_show_id;
+          end if;
+        when 'tasks' then
+          update public.company_tasks t
+             set value_cents = greatest(100, (t.value_cents * (10000 + (a ->> 'bps')::bigint)) / 10000)
+           where t.status in ('open', 'assigned');
+        when 'cash' then
+          select x.balance_cents into v_cash from public.ledger_accounts x where x.id = v_house for update;
+          if coalesce(v_cash, 0) >= (a ->> 'cents')::bigint
+             and exists (select 1 from public.profiles p where p.id = (a ->> 'player_id')::uuid) then
+            perform public.ledger_transfer(v_house, public.ledger_player_account((a ->> 'player_id')::uuid, 'player_cash'),
+                                           (a ->> 'cents')::bigint, 'random_event', 'NEXA Nachrichten: Trostpflaster',
+                                           'player', (a ->> 'player_id')::uuid,
+                                           'newsshow:' || s.id::text || ':' || v_idx::text, null,
+                                           jsonb_build_object('show_id', s.id));
+          end if;
+        when 'tip' then
+          v_sec := (a ->> 'security_id')::uuid;
+          if exists (select 1 from public.securities sec where sec.id = v_sec and sec.status = 'listed')
+             and not exists (select 1 from public.stock_tips x where x.security_id = v_sec and x.applied_at is null) then
+            insert into public.news_items (category, headline, body, importance, security_id, published_at)
+            values ('company', seg ->> 'headline', seg ->> 'text', 2, v_sec, p_now) returning id into v_news;
+            insert into public.stock_tips (security_id, news_item_id, direction, move_bps, strength, comes_true, headline, body,
+                                           published_at, due_at)
+            values (v_sec, v_news, (a ->> 'direction')::smallint, (a ->> 'bps')::integer, 2, (a ->> 'comes_true')::boolean,
+                    seg ->> 'headline', seg ->> 'text', p_now,
+                    p_now + make_interval(mins => (a ->> 'lead_minutes')::integer));
+          end if;
+        else
+          null;
+      end case;
+    end loop;
+    -- the news feed keeps what was said (the hint wrote its own item above)
+    if seg ->> 'kind' <> 'tip' then
+      insert into public.news_items (category, headline, body, importance, security_id, published_at)
+      values (case when seg ->> 'kind' in ('loser', 'winner', 'gossip', 'nft') then 'player'
+                   when seg ->> 'kind' in ('scandal', 'hype', 'stock', 'tax', 'corp', 'interview', 'gag') then 'company' else 'market' end::public.news_category,
+              seg ->> 'headline', seg ->> 'text', 2, v_sec, p_now + make_interval(secs => v_idx));
+    end if;
+    -- whoever is talked about hears of it
+    if seg -> 'subject' ? 'player_id'
+       and exists (select 1 from public.profiles p where p.id = (seg -> 'subject' ->> 'player_id')::uuid) then
+      perform public.social_notify((seg -> 'subject' ->> 'player_id')::uuid, 'news_show',
+        'Mr. Doodle Dangle spricht über dich', seg ->> 'headline',
+        jsonb_build_object('show_id', s.id, 'kind', seg ->> 'kind'), '/news',
+        'news_show:' || s.id::text || ':' || v_idx::text);
+    end if;
+  end loop;
+  update public.news_shows set status = 'aired', started_at = p_now where id = s.id;
+  return true;
+end;
+$function$;
+
+-- ===== supabase/migrations/20261204007720_awareness_close.sql =====
+-- =============================================================================
+-- NEXA · 7720 · Awareness, one model (ADR-188): the hourly close and the strength "Bekanntheit"
+-- =============================================================================
+-- * player_company_close_hour: full redefinition of the live function (6600, 6900, 7300, 7310 changed it; copied
+--   from the database after 7310). Only the awareness block changed: company_awareness_step with the company's cap,
+--   served share and reputation, the parts booked in company_awareness_log, the hour row's awareness_parts with the
+--   cap and all sources, the strength counted as awareness / cap.
+-- * company_strengths_instant: the awareness score is 100 x (awareness / cap); the caller divides.
+-- * company_strengths_step: the awareness score follows with awarenessFollowPerHour (25 % of the gap per hour, both
+--   ways) instead of 2 % up, so it cannot stand at 4 while the awareness is at 49 %.
+-- Idempotent: runs unchanged as supabase/updates/.
+
+create or replace function public.company_strengths_instant(p_awareness double precision, p_quality double precision, p_demand double precision, p_capacity double precision, p_revenue bigint, p_profit bigint, p_pay_factor_bps integer, p_cash bigint, p_unpaid bigint)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  cfg     jsonb := public.company_strengths_cfg();
+  v_costs double precision := greatest(1, coalesce(p_revenue, 0) - coalesce(p_profit, 0));
+begin
+  return jsonb_build_object(
+    -- ADR-188: p_awareness is the awareness as a share of the company's cap (the caller divides)
+    'awareness', least(100.0, greatest(0.0, 100 * coalesce(p_awareness, 0))),
+    'quality', least(100.0, greatest(0.0, 100 * coalesce(p_quality, 0))),
+    'delivery', case when coalesce(p_demand, 0) > 0
+                     then least(100.0, greatest(0.0, 100 * coalesce(p_capacity, 0) / p_demand)) else 50 end,
+    'margin', case when coalesce(p_revenue, 0) > 0
+                   then least(100.0, greatest(0.0, 100.0 * p_profit / p_revenue / public.cfg_num(cfg, '{marginFull}', 0.25)))
+                   else 0 end,
+    'team', least(100.0, greatest(0.0, coalesce(p_pay_factor_bps, 0) / 100.0)),
+    'finance', case when coalesce(p_unpaid, 0) > 0 then 0
+                    else least(100.0, greatest(0.0, 100.0 * coalesce(p_cash, 0) / (v_costs * public.cfg_num(cfg, '{cashHoursFull}', 24)))) end);
+end;
+$function$;
+
+create or replace function public.company_strengths_step(p_prev jsonb, p_instant jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  cfg  jsonb := public.company_strengths_cfg();
+  k    text;
+  p    double precision;
+  v    double precision;
+  out  jsonb := '{}'::jsonb;
+begin
+  foreach k in array array['awareness', 'quality', 'delivery', 'margin', 'team', 'finance'] loop
+    p := coalesce((p_prev ->> k)::double precision, 0);
+    v := coalesce((p_instant ->> k)::double precision, 0);
+    out := out || jsonb_build_object(k, least(100.0, greatest(0.0,
+             p + case when k = 'awareness' then public.cfg_num(cfg, '{awarenessFollowPerHour}', 0.25)  -- ADR-188
+                      when v > p then public.cfg_num(cfg, '{gainPerHour}', 0.02) else public.cfg_num(cfg, '{decayPerHour}', 0.05) end
+                 * (v - p))));
+  end loop;
+  return out;
+end;
+$function$;
+
+create or replace function public.player_company_close_hour(p_company uuid, p_hour_start timestamp with time zone)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  pc        public.player_companies;
+  v_momentum double precision;
+  v_lx      jsonb;
+  v_lxc     bigint := 0;
+  v_sbonus  bigint := 0;  -- ADR-176 (company_strengths)
+  v_aiutil  integer := 0;  -- ADR-180
+  v_awh     jsonb;
+  v_aw0     double precision;
+  v_q0      double precision;
+  v_boost   double precision;
+  v_awcap   double precision;  -- ADR-188
+  v_awnext  double precision;
+  v_sscore  jsonb;
+  v_scash   bigint;
+  c         public.companies;
+  v_su      jsonb := coalesce(public.config_jsonb('startups'), '{}'::jsonb);
+  v_hours   double precision := greatest(1, public.config_double('time', '{quarterHours}', 6));
+  v_start   timestamptz := date_trunc('hour', p_hour_start);
+  v_end     timestamptz;
+  v_qid     bigint;
+  v_team    jsonb;
+  v_price   jsonb;
+  v_ev      jsonb;
+  v_camp    public.company_campaigns;
+  v_stage   integer;
+  v_demand  double precision;
+  v_cap     double precision;
+  v_sold    double precision;
+  v_ctr     double precision;
+  v_own     bigint;
+  v_crev    bigint;
+  v_hhbal   bigint;
+  v_rev     bigint;
+  v_cogs    bigint;
+  v_gross   bigint;
+  v_aidue   bigint;
+  v_aipaid  bigint;
+  v_pdue    bigint := 0;
+  v_ppaid   bigint := 0;
+  v_due     bigint;
+  v_factor  integer;
+  v_fixed   bigint;
+  v_mk      bigint;
+  v_costs   bigint;
+  v_paid    bigint := 0;
+  v_unpaid  bigint := 0;
+  v_settle  bigint := 0;
+  v_cash    bigint;
+  v_acc     uuid;
+  v_hh      uuid;
+  v_profit  bigint;
+  v_owed    bigint;
+  v_free    bigint;
+  v_stakes  bigint := 0;
+  v_sp      bigint;
+  v_payout  bigint := 0;
+  v_bps     integer;
+  v_until   timestamptz;
+  v_news    bigint;
+  k         text;
+  j         record;
+  s         record;
+begin
+  if p_company is null or p_hour_start is null then
+    return null;
+  end if;
+  select * into pc from public.player_companies where company_id = p_company and status = 'active' for update;
+  if pc.company_id is null then
+    return null;
+  end if;
+  -- task momentum (ADR-148): solved tasks lift demand; it drifts back toward 1 every hour, so it must be kept up
+  v_momentum := greatest(1.0, 1.0 + (coalesce(pc.task_momentum, 1.0) - 1.0)
+                  * (1.0 - public.cfg_num(public.company_tasks_cfg(), '{momentum,decayPerHourBps}', 300) / 10000.0));
+  if v_momentum <> coalesce(pc.task_momentum, 1.0) then
+    update public.player_companies set task_momentum = v_momentum where company_id = p_company;
+    pc.task_momentum := v_momentum;
+  end if;
+  if exists (select 1 from public.player_company_hours h where h.company_id = p_company and h.hour_start = v_start) then
+    update public.player_companies set last_hour_at = greatest(last_hour_at, v_start + interval '1 hour')
+     where company_id = p_company and last_hour_at < v_start + interval '1 hour';
+    return jsonb_build_object('company_id', p_company, 'hour_start', v_start, 'skipped', 'already_closed');
+  end if;
+  v_end := v_start + interval '1 hour';
+  select * into c from public.companies where id = p_company;
+  select gq.id into v_qid from public.game_quarters gq where gq.starts_at <= v_start and gq.ends_at > v_start;
+  v_team := public.player_company_team(p_company);
+  v_acc := public.company_cash_account(p_company);
+  v_hh := public.ledger_system_account('households');
+  k := 'pch:' || p_company::text || ':' || to_char(v_start at time zone 'UTC', 'YYYYMMDDHH24');
+  -- company event of this hour (ADR-091): demand and capacity factors, extra costs as a share of the own revenue
+  v_ev := public.company_event_hour_effect(p_company, v_start, v_end);
+  -- marketing campaign (ADR-097, campaignDemandFactor): its factor when the hour starts inside its window
+  v_camp := public.company_campaign_at(p_company, v_start);
+  -- listed companies (ADR-167): research, products, regions, benefits, mood and reputation as terms of the hour
+  v_lx := public.listed_hour_effect(p_company, v_start);
+  pc.awareness := least(1.0, pc.awareness + (v_lx ->> 'awareness_add')::double precision);
+  pc.quality := least(1.0, greatest(0.0, pc.quality + (v_lx ->> 'quality_add')::double precision));
+
+  -- sales of the hour with the quarter's awareness and quality; demand and capacity count in units at the
+  -- normal price, the price strategy changes both price and demand (ADR-083)
+  v_price := public.company_price_effect(pc.price_level, pc.quality);
+  v_stage := least(greatest(coalesce((v_team ->> 'stage')::integer, 0), 0),
+                   greatest(jsonb_array_length(coalesce(v_su #> '{stages,awarenessCaps}', '[1]'::jsonb)) - 1, 0));
+  v_demand := pc.potential_annual_cents * public.company_market_factor(pc.tier, pc.expansion_level) / 4.0 / v_hours
+            * pc.awareness * (0.5 + 0.5 * pc.quality)
+            * exp(public.cfg_num(v_su, '{demandNoise}', 0.1) * public.gauss_random())
+            * (v_price ->> 'demand')::double precision
+            * (v_ev ->> 'demand_factor')::double precision
+            * greatest(0, coalesce(v_camp.demand_factor, 1))
+            * coalesce(pc.task_momentum, 1.0)
+            * (v_lx ->> 'demand_factor')::double precision;
+  v_cap := (v_team ->> 'team_productivity_bps')::double precision / 10000.0
+         * public.cfg_num(v_su, array['capacityCentsPerProductivity', c.sector_key], 250000)
+         * (1 + public.cfg_num(v_su, '{stages,capacityBonusPerStage}', 0.25) * v_stage)
+         * public.company_capacity_factor(pc.expansion_level)
+         * (v_ev ->> 'capacity_factor')::double precision
+         * (v_lx ->> 'capacity_factor')::double precision / v_hours;
+  v_sold := least(v_demand, v_cap);
+  -- contract work: a share of the unused capacity at the normal price (ADR-083)
+  v_ctr := case when pc.contract_work
+                then greatest(0, v_cap - v_sold) * public.cfg_num(v_su, '{contractWork,shareOfFreeCapacity}', 0.25)
+                else 0 end;
+  v_own := round((v_sold * (v_price ->> 'price')::double precision)::numeric)::bigint;
+  v_crev := round(v_ctr::numeric)::bigint;
+  -- closed money system: the households pay at most what they have (own sales first)
+  v_hhbal := greatest(0, coalesce((select a.balance_cents from public.ledger_accounts a where a.id = v_hh), 0));
+  if v_own + v_crev > v_hhbal then
+    v_own := least(v_own, v_hhbal);
+    v_crev := least(v_crev, v_hhbal - v_own);
+    v_sold := least(v_sold, v_own / greatest((v_price ->> 'price')::double precision, 0.0001));
+    v_ctr := v_crev;
+  end if;
+  v_rev := v_own + v_crev;
+  -- goods; an event's extra costs (or savings) move with the own revenue, goods never cost less than nothing
+  v_cogs := round(greatest(0, v_sold * (1 - public.cfg_num(v_su, array['grossMargin', c.sector_key], 0.5)) * (v_lx ->> 'cogs_factor')::double precision
+                              + v_own * (v_ev ->> 'extra_cost_share')::double precision)::numeric)::bigint
+          + round((v_ctr * (1 - public.cfg_num(v_su, '{contractWork,grossMargin}', 0.3)))::numeric)::bigint;
+  v_gross := v_rev - v_cogs;
+
+  -- presence (ADR-103): employees away for careers.inactivity.fireAfterHours lose the job first, paid up to that moment
+  for j in select pj.id from public.player_jobs pj where pj.company_id = p_company and pj.status = 'active' order by pj.id loop
+    perform public.job_absence_check(j.id, v_end);
+  end loop;
+  -- wages due: AI workers and the hourly contract wages of the players (the founder draws no wage)
+  -- ADR-180: AI workers fill what founder and players cannot; the full wage only for the used capacity
+  v_aiutil := public.company_ai_utilization_bps(v_sold, v_cap, pc.ai_workers,
+                (v_team ->> 'team_productivity_bps')::double precision / 10000.0);
+  v_aidue := public.company_ai_wage_due_cents(pc.ai_workers, v_aiutil);
+  for j in select pj.id, pj.salary_cents_per_hour, pj.notice_ends_at from public.player_jobs pj
+            where pj.company_id = p_company and pj.status = 'active' order by pj.id loop
+    v_until := least(v_end, coalesce(j.notice_ends_at, v_end));
+    v_pdue := v_pdue + j.salary_cents_per_hour * public.job_payable_minutes(j.id, v_until) / 60;
+  end loop;
+  v_due := v_aidue + v_pdue;
+  -- never more than the hour earned; everyone gets the same share (ADR-072)
+  v_factor := case when v_due <= 0 then 10000 else least(10000, greatest(0, v_gross) * 10000 / v_due)::integer end;
+  v_aipaid := v_aidue * v_factor / 10000;
+
+  -- money: revenue (own sales and contract work) from the households, goods and AI wages back to them
+  if v_rev > 0 then
+    perform public.ledger_transfer(v_hh, v_acc, v_rev, 'company_revenue',
+                                   'Umsatz ' || to_char(v_start at time zone 'Europe/Berlin', 'HH24') || ' Uhr',
+                                   'company', p_company, k || ':revenue', pc.founder_id);
+  end if;
+  -- strengths bonus (ADR-176): the reward tier of the scores before this hour
+  select cst.scores into v_sscore from public.company_strengths cst where cst.company_id = p_company;
+  if v_rev > 0 and public.company_strengths_reward_bps(coalesce(v_sscore, '{}'::jsonb)) > 0 then
+    v_sbonus := least(floor(v_rev * public.company_strengths_reward_bps(v_sscore) / 10000.0)::bigint,
+                      greatest(0, coalesce((select a.balance_cents from public.ledger_accounts a where a.id = v_hh), 0)));
+    if v_sbonus > 0 then
+      perform public.ledger_transfer(v_hh, v_acc, v_sbonus, 'company_revenue', 'Stärken-Bonus',
+                                     'company', p_company, k || ':strengths', pc.founder_id);
+      v_rev := v_rev + v_sbonus;
+    end if;
+  end if;
+  if v_cogs + v_aipaid > 0 then
+    perform public.ledger_transfer(v_acc, v_hh, v_cogs + v_aipaid, 'company_costs', 'Wareneinsatz und KI-Kräfte',
+                                   'company', p_company, k || ':goods', pc.founder_id);
+  end if;
+  -- players: the hour (up to the end of a notice) at contract wage x factor, with XP and branch minutes
+  update public.player_companies set pay_factor_bps = v_factor where company_id = p_company;
+  for j in select pj.id, pj.player_id, pj.notice_ends_at from public.player_jobs pj
+            where pj.company_id = p_company and pj.status = 'active' order by pj.id loop
+    v_until := least(v_end, coalesce(j.notice_ends_at, v_end));
+    perform public.lock_player_accounts(j.player_id);
+    v_ppaid := v_ppaid + public.accrue_job_salary(j.id, v_until);
+  end loop;
+
+  -- fixed costs (with the expansion level) and marketing from the cash; the rest becomes an open bill
+  -- efficiency upgrade of the founder (ADR-100): the hour's fixed costs x (10 000 − fixedCostDiscountBps) / 10 000
+  v_fixed := public.apply_bps(round((public.company_fixed_cost_cents(pc.tier, pc.expansion_level) / v_hours)::numeric)::bigint,
+                              10000 - public.player_fixed_cost_discount_bps(pc.founder_id));
+  v_fixed := round(v_fixed * (v_lx ->> 'fixed_factor')::double precision)::bigint;  -- ADR-167
+  v_mk := round((pc.marketing_cents_per_quarter / v_hours)::numeric)::bigint;
+  v_costs := v_fixed + v_mk;
+  select greatest(0, a.balance_cents) into v_cash from public.ledger_accounts a where a.id = v_acc;
+  v_paid := least(v_costs, coalesce(v_cash, 0));
+  if v_paid > 0 then
+    perform public.ledger_transfer(v_acc, v_hh, v_paid, 'company_costs', 'Fixkosten und Marketing',
+                                   'company', p_company, k || ':costs', pc.founder_id);
+  end if;
+  v_unpaid := v_costs - v_paid;
+  if v_unpaid = 0 and pc.unpaid_cents > 0 then
+    select greatest(0, a.balance_cents) into v_cash from public.ledger_accounts a where a.id = v_acc;
+    v_settle := least(pc.unpaid_cents, coalesce(v_cash, 0));
+    if v_settle > 0 then
+      perform public.ledger_transfer(v_acc, v_hh, v_settle, 'company_costs', 'Offene Rechnungen',
+                                     'company', p_company, k || ':settle', pc.founder_id);
+    end if;
+  end if;
+
+  -- listed companies (ADR-167): running costs of products, regions, machines, benefits and the tax advisor
+  v_lxc := public.listed_hour_costs(p_company, v_start, k);
+  v_fixed := v_fixed + v_lxc;
+  v_paid := v_paid + v_lxc;
+  v_profit := v_rev - v_cogs - v_ppaid - v_aipaid - v_fixed - v_mk;
+  v_owed := pc.unpaid_cents + v_unpaid - v_settle;
+
+  -- stakes (ADR-098, stakePayoutCents): every running stake whose term holds this hour takes its share of a
+  -- profitable hour (rounded down), never more than the free cash; served before the CEO payout. The hour is marked
+  -- as handled (settled_until) whether it paid or not.
+  for s in select x.id, x.investor_id, x.share_bps from public.deals x
+            where x.kind = 'stake' and x.status = 'active' and x.company_id = p_company
+              and x.settled_until <= v_start and x.ends_at > v_start
+            order by x.accepted_at, x.id for update of x
+  loop
+    v_sp := 0;
+    if v_profit > 0 then
+      select a.balance_cents - v_owed - public.listed_reserved_cents(p_company) into v_free from public.ledger_accounts a where a.id = v_acc;
+      v_sp := least(v_profit * s.share_bps / 10000, greatest(0, coalesce(v_free, 0)));
+    end if;
+    if v_sp > 0 then
+      perform public.lock_player_accounts(s.investor_id);
+      perform public.ledger_transfer(v_acc, public.ledger_player_account(s.investor_id, 'player_cash'), v_sp, 'dividend',
+                                     'Gewinnanteil ' || c.name || ' ' || to_char(v_start at time zone 'Europe/Berlin', 'HH24') || ' Uhr',
+                                     'deal', s.id, k || ':stake:' || s.id::text, s.investor_id);
+      perform public.loan_withhold(s.investor_id, v_sp, k || ':stake:' || s.id::text);
+      v_stakes := v_stakes + v_sp;
+    end if;
+    update public.deals set payouts_cents = payouts_cents + v_sp, settled_until = v_end where id = s.id;
+  end loop;
+
+  -- automatic CEO payout (ADR-086, founderPayoutCents): after the hour's own bookings and the stakes, a share of the
+  -- profit left after the stake payouts (rounded down) moves from the company cash to the founder's private cash like
+  -- company_withdraw, never more than the free cash. A transfer, not a cost: profit_cents stays as computed above.
+  v_bps := least(10000, greatest(0, least(coalesce(pc.founder_payout_bps, 0), public.listed_payout_cap_bps(p_company, v_start))));
+  if v_profit - v_stakes > 0 and v_bps > 0 then
+    select a.balance_cents - v_owed - public.listed_reserved_cents(p_company) into v_free from public.ledger_accounts a where a.id = v_acc;
+    v_payout := least((v_profit - v_stakes) * v_bps / 10000, greatest(0, coalesce(v_free, 0)));
+  end if;
+  if v_payout > 0 then
+    perform public.lock_player_accounts(pc.founder_id);
+    perform public.ledger_transfer(v_acc, public.ledger_player_account(pc.founder_id, 'player_cash'), v_payout, 'transfer',
+                                   'CEO-Auszahlung ' || to_char(v_start at time zone 'Europe/Berlin', 'HH24') || ' Uhr',
+                                   'company', p_company, k || ':payout', pc.founder_id);
+    perform public.loan_withhold(pc.founder_id, v_payout, k || ':payout');
+  end if;
+
+  -- record hour (ADR-091): beating an earlier best hour is news, at most one item per Berlin day (updated while the
+  -- day's record keeps rising and no AI text was written for it)
+  if v_profit > coalesce(pc.best_hour_profit_cents, 0) and coalesce(pc.best_hour_profit_cents, 0) > 0 then
+    select n.id into v_news from public.company_news n
+     where n.company_id = p_company and n.kind = 'record_hour'
+       and ((n.payload ->> 'hour_start')::timestamptz at time zone 'Europe/Berlin')::date
+           = (v_start at time zone 'Europe/Berlin')::date
+     order by n.id desc limit 1;
+    if v_news is null then
+      perform public.company_news_add(p_company, 'record_hour',
+                                      jsonb_build_object('profit_cents', v_profit, 'hour_start', v_start));
+    else
+      update public.company_news set payload = jsonb_build_object('profit_cents', v_profit, 'hour_start', v_start)
+       where id = v_news and ai_headline is null;
+    end if;
+  end if;
+
+  update public.player_companies
+     set unpaid_cents = v_owed,
+         distress = v_owed > 0,
+         last_hour_at = greatest(pc.last_hour_at, v_end),
+         best_hour_profit_cents = greatest(best_hour_profit_cents, v_profit)
+   where company_id = p_company;
+  insert into public.player_company_hours (company_id, hour_start, game_quarter_id, demand_cents, capacity_cents, revenue_cents,
+                                           contract_revenue_cents, cogs_cents, fixed_cents, marketing_cents, player_wages_due_cents,
+                                           player_wages_paid_cents, ai_wages_due_cents, ai_wages_paid_cents, pay_factor_bps,
+                                           paid_costs_cents, unpaid_added_cents, profit_cents, founder_payout_cents, event_id,
+                                           stake_payout_cents, campaign_id)
+  values (p_company, v_start, v_qid, round(v_demand::numeric)::bigint, round(v_cap::numeric)::bigint, v_rev,
+          v_crev, v_cogs, v_fixed, v_mk, v_pdue, v_ppaid, v_aidue, v_aipaid, v_factor, v_paid, v_unpaid, v_profit, v_payout,
+          (v_ev ->> 'event_id')::uuid, v_stakes, v_camp.id);
+
+  -- strengths (ADR-176): every score moves a step toward what this hour showed
+  update public.player_company_hours set strength_bonus_cents = v_sbonus where company_id = p_company and hour_start = v_start;
+  -- ADR-188: one awareness model. Marketing closes a share of the gap to the cap (tier, stage, expansion), word of
+  -- mouth from served customers and reputation, slow decay toward the floor. Single events of this hour (tasks,
+  -- campaigns, moves, ...) are already in the value and in company_awareness_log; the hour books its three parts there
+  -- too (decay takes any clamp, so the parts always add up).
+  select x.awareness, x.quality into v_aw0, v_q0 from public.player_companies x where x.company_id = p_company;
+  select coalesce(sum(l.delta), 0) into v_boost from public.company_awareness_log l
+   where l.company_id = p_company and l.hour_start = v_start and l.source not in ('marketing', 'word_of_mouth', 'decay');
+  v_awcap := public.company_awareness_cap(pc.tier, v_stage, coalesce(pc.expansion_level, 0));
+  v_awh := public.company_awareness_step(v_aw0, v_awcap, v_q0,
+             (public.company_price_effect(pc.price_level, v_q0) ->> 'awareness')::double precision, v_mk::double precision,
+             pc.potential_annual_cents * public.company_market_factor(pc.tier, pc.expansion_level),
+             case when v_demand > 0 then v_sold / v_demand else 1 end, coalesce(pc.reputation, 50));
+  v_awnext := (v_awh ->> 'next')::double precision;
+  update public.player_companies set awareness = v_awnext, awareness_boost = 0 where company_id = p_company;
+  perform public.company_awareness_log_add(p_company, v_start, 'marketing', (v_awh ->> 'marketing')::double precision);
+  perform public.company_awareness_log_add(p_company, v_start, 'word_of_mouth', (v_awh ->> 'word_of_mouth')::double precision);
+  perform public.company_awareness_log_add(p_company, v_start, 'decay', v_awnext - v_aw0
+             - (v_awh ->> 'marketing')::double precision - (v_awh ->> 'word_of_mouth')::double precision);
+  delete from public.company_awareness_log l where l.company_id = p_company and l.hour_start < v_start - interval '8 days';
+  update public.player_company_hours
+     set ai_utilization_bps = v_aiutil, awareness_before = v_aw0 - v_boost,
+         awareness_after = v_awnext,
+         awareness_parts = jsonb_build_object('word_of_mouth', v_awh -> 'word_of_mouth', 'marketing', v_awh -> 'marketing',
+                                              'decay', -(v_awnext - v_aw0 - (v_awh ->> 'marketing')::double precision
+                                                         - (v_awh ->> 'word_of_mouth')::double precision),
+                                              'extra', v_boost, 'cap', v_awcap,
+                                              'sources', public.company_awareness_hour_json(p_company, v_start))
+   where company_id = p_company and hour_start = v_start;
+  select greatest(0, a.balance_cents) into v_scash from public.ledger_accounts a where a.id = v_acc;
+  insert into public.company_strengths as cs (company_id, scores, hours, updated_at)
+  values (p_company,
+          public.company_strengths_step('{}'::jsonb,
+            public.company_strengths_instant(v_awnext / greatest(0.01, v_awcap), pc.quality, v_demand, v_cap, v_rev, v_profit, v_factor, v_scash, v_owed)),
+          1, now())
+  on conflict (company_id) do update
+    set scores = public.company_strengths_step(cs.scores,
+                   public.company_strengths_instant(v_awnext / greatest(0.01, v_awcap), pc.quality, v_demand, v_cap, v_rev, v_profit, v_factor, v_scash, v_owed)),
+        hours = cs.hours + 1, updated_at = now();
+  perform public.listed_hour_after(p_company, v_start, v_demand, v_cap, v_rev, v_profit, v_factor, v_payout);  -- ADR-167
+  return jsonb_build_object('company_id', p_company, 'hour_start', v_start, 'quarter_id', v_qid, 'revenue_cents', v_rev,
+                            'contract_revenue_cents', v_crev, 'profit_cents', v_profit, 'pay_factor_bps', v_factor,
+                            'player_wages_paid_cents', v_ppaid, 'ai_wages_paid_cents', v_aipaid, 'unpaid_added_cents', v_unpaid,
+                            'founder_payout_cents', v_payout, 'event_id', v_ev -> 'event_id', 'stake_payout_cents', v_stakes,
+                            'campaign_id', v_camp.id);
+end;
+$function$;
+
+-- ===== supabase/migrations/20261204007730_awareness_rescale.sql =====
+-- =============================================================================
+-- NEXA · 7730 · Awareness, one model (ADR-188): existing companies move to the new caps, once
+-- =============================================================================
+-- * Every active player company keeps its standing relative to its cap: awareness / old stage cap (garage 50 %,
+--   then 70, 85, 95, 100 %) x the new cap (tier, stage, expansion). Nobody drops to 0; a company at its old cap
+--   stands at its new cap. The change is booked as "rescale" in the open hour, so the ledger has a start.
+-- * The strength "Bekanntheit" is set to 100 x awareness / cap, so it agrees with the value from the first hour on.
+-- * Runs once (public.data_migrations), however often the update script is executed.
+-- * The old six-argument company_awareness_hour (ADR-180) is gone; company_awareness_step replaces it.
+-- Idempotent: runs unchanged as supabase/updates/.
+
+create table if not exists public.data_migrations (
+  key        text primary key,
+  applied_at timestamptz not null default now()
+);
+alter table public.data_migrations enable row level security;
+revoke all on public.data_migrations from anon, authenticated;
+comment on table public.data_migrations is 'One-time data changes that must not repeat when the update script runs again.';
+
+do $$
+declare
+  r        record;
+  v_old    double precision[] := array[0.5, 0.7, 0.85, 0.95, 1.0];
+  v_stage  integer;
+  v_oldcap double precision;
+  v_newcap double precision;
+  v_min    double precision := public.cfg_num(public.company_awareness_cfg(), '{min}', 0.02);
+  v_new    double precision;
+begin
+  if exists (select 1 from public.data_migrations where key = 'awareness_rescale_188') then
+    return;
+  end if;
+  for r in select pc.company_id, pc.tier, pc.expansion_level, pc.awareness
+             from public.player_companies pc where pc.status = 'active' for update loop
+    v_stage := least(4, greatest(0, coalesce((public.player_company_team(r.company_id) ->> 'stage')::integer, 0)));
+    v_oldcap := v_old[v_stage + 1];
+    v_newcap := public.company_awareness_cap(r.tier, v_stage, coalesce(r.expansion_level, 0));
+    v_new := least(v_newcap, greatest(v_min, coalesce(r.awareness, 0) / v_oldcap * v_newcap));
+    update public.player_companies set awareness = v_new, awareness_boost = 0 where company_id = r.company_id;
+    perform public.company_awareness_log_add(r.company_id, public.game_now(), 'rescale', v_new - coalesce(r.awareness, 0));
+    update public.company_strengths s
+       set scores = s.scores || jsonb_build_object('awareness', round((100 * least(1, v_new / v_newcap))::numeric, 4))
+     where s.company_id = r.company_id;
+  end loop;
+  insert into public.data_migrations (key) values ('awareness_rescale_188') on conflict do nothing;
+end;
+$$;
+
+drop function if exists public.company_awareness_hour(double precision, double precision, double precision,
+  double precision, double precision, integer);
+
 -- ===== supabase/seed.sql =====
 -- =============================================================================
 -- NEXA · seed.sql · reference data
@@ -81713,7 +82949,7 @@ insert into public.game_config (key, value, description) values
   ('skills', '{"tree":[{"key":"it_basics","branches":["it"],"tier":1,"q":1,"r":0,"requires":[]},{"key":"it_programming","branches":["it"],"tier":2,"q":2,"r":0,"requires":["it_basics"]},{"key":"it_data","branches":["it"],"tier":2,"q":3,"r":-1,"requires":["it_programming"]},{"key":"it_networks","branches":["it"],"tier":2,"q":3,"r":0,"requires":["it_programming"]},{"key":"it_web","branches":["it"],"tier":2,"q":2,"r":1,"requires":["it_programming"]},{"key":"it_architecture","branches":["it"],"tier":3,"q":4,"r":0,"requires":["it_networks"]},{"key":"it_ml","branches":["it"],"tier":3,"q":4,"r":-1,"requires":["it_data"]},{"key":"it_security","branches":["it"],"tier":3,"q":3,"r":1,"requires":["it_networks"]},{"key":"it_databases","branches":["it"],"tier":3,"q":4,"r":1,"requires":["it_architecture"]},{"key":"it_devops","branches":["it"],"tier":3,"q":5,"r":-1,"requires":["it_architecture"]},{"key":"it_mobile","branches":["it"],"tier":3,"q":5,"r":0,"requires":["it_architecture"]},{"key":"hybrid_fintech","branches":["it","finance"],"tier":4,"q":6,"r":-2,"requires":["it_devops","finance_trading"]},{"key":"it_ai","branches":["it"],"tier":4,"q":5,"r":1,"requires":["it_databases"]},{"key":"it_cloud","branches":["it"],"tier":4,"q":6,"r":0,"requires":["it_mobile"]},{"key":"it_testing","branches":["it"],"tier":4,"q":6,"r":-1,"requires":["it_devops"]},{"key":"it_ux","branches":["it"],"tier":4,"q":4,"r":2,"requires":["it_databases"]},{"key":"it_bigdata","branches":["it"],"tier":5,"q":5,"r":2,"requires":["it_ai"]},{"key":"it_crypto","branches":["it"],"tier":5,"q":7,"r":-1,"requires":["it_cloud"]},{"key":"it_embedded","branches":["it"],"tier":5,"q":6,"r":1,"requires":["it_cloud"]},{"key":"it_mastery","branches":["it"],"tier":5,"q":7,"r":0,"requires":["it_cloud"]},{"key":"it_pentest","branches":["it"],"tier":5,"q":7,"r":-2,"requires":["it_testing"]},{"key":"finance_basics","branches":["finance"],"tier":1,"q":1,"r":-1,"requires":[]},{"key":"finance_accounting","branches":["finance"],"tier":2,"q":2,"r":-2,"requires":["finance_basics"]},{"key":"finance_investment","branches":["finance"],"tier":2,"q":2,"r":-1,"requires":["finance_basics"]},{"key":"finance_banking","branches":["finance"],"tier":2,"q":3,"r":-3,"requires":["finance_accounting"]},{"key":"finance_controlling","branches":["finance"],"tier":2,"q":3,"r":-2,"requires":["finance_accounting"]},{"key":"finance_balance","branches":["finance"],"tier":3,"q":4,"r":-3,"requires":["finance_controlling"]},{"key":"finance_portfolio","branches":["finance"],"tier":3,"q":4,"r":-4,"requires":["finance_banking"]},{"key":"finance_valuation","branches":["finance"],"tier":3,"q":4,"r":-2,"requires":["finance_controlling"]},{"key":"finance_budgeting","branches":["finance"],"tier":3,"q":5,"r":-3,"requires":["finance_balance"]},{"key":"finance_tax_planning","branches":["finance"],"tier":3,"q":5,"r":-4,"requires":["finance_balance"]},{"key":"finance_trading","branches":["finance"],"tier":3,"q":5,"r":-2,"requires":["finance_valuation"]},{"key":"finance_treasury","branches":["finance"],"tier":3,"q":5,"r":-5,"requires":["finance_portfolio"]},{"key":"finance_corporate","branches":["finance"],"tier":4,"q":6,"r":-4,"requires":["finance_budgeting"]},{"key":"finance_derivatives","branches":["finance"],"tier":4,"q":6,"r":-6,"requires":["finance_treasury"]},{"key":"finance_ma","branches":["finance"],"tier":4,"q":6,"r":-3,"requires":["finance_budgeting"]},{"key":"finance_risk","branches":["finance"],"tier":4,"q":6,"r":-5,"requires":["finance_treasury"]},{"key":"finance_audit","branches":["finance"],"tier":5,"q":7,"r":-4,"requires":["finance_corporate"]},{"key":"finance_insurance","branches":["finance"],"tier":5,"q":7,"r":-7,"requires":["finance_derivatives"]},{"key":"finance_mastery","branches":["finance"],"tier":5,"q":7,"r":-5,"requires":["finance_corporate"]},{"key":"finance_quant","branches":["finance"],"tier":5,"q":7,"r":-3,"requires":["finance_ma"]},{"key":"finance_vc","branches":["finance"],"tier":5,"q":7,"r":-6,"requires":["finance_risk"]},{"key":"law_basics","branches":["law"],"tier":1,"q":1,"r":-2,"requires":[]},{"key":"law_contracts","branches":["law"],"tier":2,"q":2,"r":-3,"requires":["law_basics"]},{"key":"law_labor","branches":["law"],"tier":2,"q":1,"r":-3,"requires":["law_basics"]},{"key":"law_compliance","branches":["law"],"tier":3,"q":1,"r":-4,"requires":["law_labor"]},{"key":"law_corporate","branches":["law"],"tier":3,"q":3,"r":-4,"requires":["law_contracts"]},{"key":"law_tax","branches":["law"],"tier":2,"q":2,"r":-4,"requires":["law_contracts"]},{"key":"law_competition","branches":["law"],"tier":3,"q":1,"r":-5,"requires":["law_compliance"]},{"key":"law_intltax","branches":["law"],"tier":3,"q":3,"r":-5,"requires":["law_tax"]},{"key":"law_ip","branches":["law"],"tier":3,"q":2,"r":-5,"requires":["law_tax"]},{"key":"law_privacy","branches":["law"],"tier":3,"q":4,"r":-5,"requires":["law_corporate"]},{"key":"hybrid_business_law","branches":["law","finance"],"tier":4,"q":5,"r":-6,"requires":["law_privacy","finance_treasury"]},{"key":"law_capital","branches":["law"],"tier":4,"q":3,"r":-6,"requires":["law_intltax"]},{"key":"law_consumer","branches":["law"],"tier":4,"q":2,"r":-6,"requires":["law_competition"]},{"key":"law_crime","branches":["law"],"tier":4,"q":4,"r":-6,"requires":["law_privacy"]},{"key":"law_it","branches":["law"],"tier":4,"q":1,"r":-6,"requires":["law_competition"]},{"key":"law_environment","branches":["law"],"tier":5,"q":4,"r":-7,"requires":["law_crime"]},{"key":"law_international","branches":["law"],"tier":5,"q":2,"r":-7,"requires":["law_consumer"]},{"key":"law_litigation","branches":["law"],"tier":5,"q":1,"r":-7,"requires":["law_it"]},{"key":"law_mastery","branches":["law"],"tier":5,"q":3,"r":-7,"requires":["law_capital"]},{"key":"law_mediation","branches":["law"],"tier":5,"q":6,"r":-7,"requires":["hybrid_business_law"]},{"key":"law_medical","branches":["law"],"tier":5,"q":5,"r":-7,"requires":["law_crime"]},{"key":"management_basics","branches":["management"],"tier":1,"q":0,"r":-1,"requires":[]},{"key":"management_projects","branches":["management"],"tier":2,"q":0,"r":-2,"requires":["management_basics"]},{"key":"management_team","branches":["management"],"tier":2,"q":-1,"r":-1,"requires":["management_basics"]},{"key":"management_leadership","branches":["management"],"tier":2,"q":0,"r":-3,"requires":["management_projects"]},{"key":"management_people","branches":["management"],"tier":2,"q":-1,"r":-2,"requires":["management_team"]},{"key":"management_agile","branches":["management"],"tier":3,"q":-2,"r":-2,"requires":["management_people"]},{"key":"management_change","branches":["management"],"tier":3,"q":-1,"r":-3,"requires":["management_leadership"]},{"key":"management_recruiting","branches":["management"],"tier":3,"q":0,"r":-4,"requires":["management_leadership"]},{"key":"hybrid_people_analytics","branches":["management","it"],"tier":4,"q":0,"r":-5,"requires":["management_recruiting"]},{"key":"management_communication","branches":["management"],"tier":3,"q":-1,"r":-4,"requires":["management_change"]},{"key":"management_finance_lead","branches":["management"],"tier":3,"q":-2,"r":-3,"requires":["management_change"]},{"key":"management_operations","branches":["management"],"tier":3,"q":-3,"r":-2,"requires":["management_agile"]},{"key":"management_coaching","branches":["management"],"tier":4,"q":0,"r":-6,"requires":["hybrid_people_analytics"]},{"key":"management_innovation","branches":["management"],"tier":4,"q":-3,"r":-3,"requires":["management_operations"]},{"key":"management_organization","branches":["management"],"tier":4,"q":-1,"r":-5,"requires":["management_communication"]},{"key":"management_strategy","branches":["management"],"tier":4,"q":-2,"r":-4,"requires":["management_finance_lead"]},{"key":"management_board","branches":["management"],"tier":5,"q":0,"r":-7,"requires":["management_coaching"]},{"key":"management_culture","branches":["management"],"tier":5,"q":-4,"r":-3,"requires":["management_innovation"]},{"key":"management_international","branches":["management"],"tier":5,"q":-3,"r":-4,"requires":["management_strategy"]},{"key":"management_mastery","branches":["management"],"tier":5,"q":-2,"r":-5,"requires":["management_strategy"]},{"key":"management_risk","branches":["management"],"tier":5,"q":-1,"r":-6,"requires":["management_organization"]},{"key":"sales_basics","branches":["sales"],"tier":1,"q":-1,"r":0,"requires":[]},{"key":"sales_selling","branches":["sales"],"tier":2,"q":-2,"r":0,"requires":["sales_basics"]},{"key":"sales_marketing","branches":["sales"],"tier":2,"q":-3,"r":0,"requires":["sales_selling"]},{"key":"sales_service","branches":["sales"],"tier":2,"q":-3,"r":1,"requires":["sales_selling"]},{"key":"sales_social","branches":["sales"],"tier":2,"q":-2,"r":-1,"requires":["sales_selling"]},{"key":"sales_brand","branches":["sales"],"tier":3,"q":-4,"r":1,"requires":["sales_marketing"]},{"key":"sales_keyaccount","branches":["sales"],"tier":3,"q":-3,"r":-1,"requires":["sales_social"]},{"key":"sales_negotiation","branches":["sales"],"tier":3,"q":-4,"r":0,"requires":["sales_marketing"]},{"key":"sales_ads","branches":["sales"],"tier":3,"q":-4,"r":-1,"requires":["sales_keyaccount"]},{"key":"sales_content","branches":["sales"],"tier":3,"q":-5,"r":0,"requires":["sales_negotiation"]},{"key":"sales_seo","branches":["sales"],"tier":3,"q":-5,"r":1,"requires":["sales_brand"]},{"key":"hybrid_ecommerce","branches":["sales","logistics"],"tier":4,"q":-6,"r":2,"requires":["sales_seo","logistics_air"]},{"key":"sales_growth","branches":["sales"],"tier":4,"q":-6,"r":1,"requires":["sales_seo"]},{"key":"sales_international","branches":["sales"],"tier":4,"q":-6,"r":0,"requires":["sales_content"]},{"key":"sales_pricing","branches":["sales"],"tier":4,"q":-5,"r":-1,"requires":["sales_ads"]},{"key":"sales_retail","branches":["sales"],"tier":4,"q":-4,"r":-2,"requires":["sales_ads"]},{"key":"sales_b2b","branches":["sales"],"tier":5,"q":-7,"r":1,"requires":["sales_international"]},{"key":"sales_crm","branches":["sales"],"tier":5,"q":-6,"r":-1,"requires":["sales_pricing"]},{"key":"sales_events","branches":["sales"],"tier":5,"q":-5,"r":-2,"requires":["sales_retail"]},{"key":"sales_mastery","branches":["sales"],"tier":5,"q":-7,"r":0,"requires":["sales_international"]},{"key":"sales_pr","branches":["sales"],"tier":5,"q":-7,"r":2,"requires":["sales_growth"]},{"key":"logistics_basics","branches":["logistics"],"tier":1,"q":-1,"r":1,"requires":[]},{"key":"logistics_transport","branches":["logistics"],"tier":2,"q":-2,"r":2,"requires":["logistics_basics"]},{"key":"logistics_warehouse","branches":["logistics"],"tier":2,"q":-2,"r":1,"requires":["logistics_basics"]},{"key":"logistics_inventory","branches":["logistics"],"tier":2,"q":-3,"r":3,"requires":["logistics_transport"]},{"key":"logistics_purchasing","branches":["logistics"],"tier":2,"q":-3,"r":2,"requires":["logistics_warehouse"]},{"key":"logistics_fleet","branches":["logistics"],"tier":3,"q":-4,"r":2,"requires":["logistics_purchasing"]},{"key":"logistics_strategic","branches":["logistics"],"tier":3,"q":-4,"r":4,"requires":["logistics_inventory"]},{"key":"logistics_supplychain","branches":["logistics"],"tier":3,"q":-4,"r":3,"requires":["logistics_inventory"]},{"key":"logistics_air","branches":["logistics"],"tier":3,"q":-5,"r":2,"requires":["logistics_fleet"]},{"key":"logistics_customs","branches":["logistics"],"tier":3,"q":-5,"r":3,"requires":["logistics_supplychain"]},{"key":"logistics_distribution","branches":["logistics"],"tier":3,"q":-5,"r":4,"requires":["logistics_supplychain"]},{"key":"logistics_shipping","branches":["logistics"],"tier":3,"q":-5,"r":5,"requires":["logistics_strategic"]},{"key":"logistics_global","branches":["logistics"],"tier":4,"q":-6,"r":4,"requires":["logistics_distribution"]},{"key":"logistics_lastmile","branches":["logistics"],"tier":4,"q":-6,"r":6,"requires":["logistics_shipping"]},{"key":"logistics_quality","branches":["logistics"],"tier":4,"q":-6,"r":5,"requires":["logistics_distribution"]},{"key":"logistics_rail","branches":["logistics"],"tier":4,"q":-6,"r":3,"requires":["logistics_customs"]},{"key":"logistics_automation","branches":["logistics"],"tier":5,"q":-7,"r":7,"requires":["logistics_lastmile"]},{"key":"logistics_cold","branches":["logistics"],"tier":5,"q":-7,"r":6,"requires":["logistics_quality"]},{"key":"logistics_mastery","branches":["logistics"],"tier":5,"q":-7,"r":5,"requires":["logistics_global"]},{"key":"logistics_planning","branches":["logistics"],"tier":5,"q":-7,"r":4,"requires":["logistics_rail"]},{"key":"logistics_sustainability","branches":["logistics"],"tier":5,"q":-7,"r":3,"requires":["logistics_rail"]},{"key":"craft_basics","branches":["craft"],"tier":1,"q":-1,"r":2,"requires":[]},{"key":"craft_electrical","branches":["craft"],"tier":2,"q":-2,"r":3,"requires":["craft_basics"]},{"key":"craft_mechanics","branches":["craft"],"tier":2,"q":-1,"r":3,"requires":["craft_basics"]},{"key":"craft_automation","branches":["craft"],"tier":3,"q":-3,"r":4,"requires":["craft_electrical"]},{"key":"craft_construction","branches":["craft"],"tier":2,"q":-2,"r":4,"requires":["craft_mechanics"]},{"key":"craft_engineering","branches":["craft"],"tier":3,"q":-1,"r":4,"requires":["craft_mechanics"]},{"key":"craft_hvac","branches":["craft"],"tier":3,"q":-4,"r":5,"requires":["craft_automation"]},{"key":"craft_plumbing","branches":["craft"],"tier":3,"q":-1,"r":5,"requires":["craft_engineering"]},{"key":"craft_site","branches":["craft"],"tier":3,"q":-2,"r":5,"requires":["craft_construction"]},{"key":"craft_welding","branches":["craft"],"tier":3,"q":-3,"r":5,"requires":["craft_construction"]},{"key":"craft_carpentry","branches":["craft"],"tier":4,"q":-4,"r":6,"requires":["craft_welding"]},{"key":"craft_cnc","branches":["craft"],"tier":4,"q":-5,"r":6,"requires":["craft_hvac"]},{"key":"craft_energy","branches":["craft"],"tier":4,"q":-2,"r":6,"requires":["craft_site"]},{"key":"craft_manufacturing","branches":["craft"],"tier":4,"q":-3,"r":6,"requires":["craft_welding"]},{"key":"hybrid_industry40","branches":["craft","it"],"tier":4,"q":-1,"r":6,"requires":["craft_plumbing"]},{"key":"craft_3dprint","branches":["craft"],"tier":5,"q":-3,"r":7,"requires":["craft_manufacturing"]},{"key":"craft_mastery","branches":["craft"],"tier":5,"q":-4,"r":7,"requires":["craft_manufacturing"]},{"key":"craft_materials","branches":["craft"],"tier":5,"q":-6,"r":7,"requires":["craft_cnc"]},{"key":"craft_robotics","branches":["craft"],"tier":5,"q":-1,"r":7,"requires":["hybrid_industry40"]},{"key":"craft_solar","branches":["craft"],"tier":5,"q":-5,"r":7,"requires":["craft_carpentry"]},{"key":"craft_vehicles","branches":["craft"],"tier":5,"q":-2,"r":7,"requires":["craft_energy"]},{"key":"science_basics","branches":["science"],"tier":1,"q":0,"r":1,"requires":[]},{"key":"science_biology","branches":["science"],"tier":2,"q":1,"r":1,"requires":["science_basics"]},{"key":"science_chemistry","branches":["science"],"tier":2,"q":0,"r":2,"requires":["science_basics"]},{"key":"science_medicine","branches":["science"],"tier":2,"q":1,"r":2,"requires":["science_biology"]},{"key":"science_physics","branches":["science"],"tier":2,"q":0,"r":3,"requires":["science_chemistry"]},{"key":"science_biotech","branches":["science"],"tier":3,"q":0,"r":4,"requires":["science_physics"]},{"key":"science_clinical","branches":["science"],"tier":3,"q":2,"r":2,"requires":["science_medicine"]},{"key":"science_pharmacology","branches":["science"],"tier":3,"q":1,"r":3,"requires":["science_medicine"]},{"key":"hybrid_pharma_sales","branches":["science","sales"],"tier":4,"q":0,"r":5,"requires":["science_biotech"]},{"key":"science_lab","branches":["science"],"tier":3,"q":1,"r":4,"requires":["science_biotech"]},{"key":"science_microbiology","branches":["science"],"tier":3,"q":3,"r":2,"requires":["science_clinical"]},{"key":"science_statistics","branches":["science"],"tier":3,"q":2,"r":3,"requires":["science_pharmacology"]},{"key":"science_drugs","branches":["science"],"tier":4,"q":2,"r":4,"requires":["science_statistics"]},{"key":"science_genetics","branches":["science"],"tier":4,"q":1,"r":5,"requires":["science_lab"]},{"key":"science_materials","branches":["science"],"tier":4,"q":3,"r":3,"requires":["science_microbiology"]},{"key":"science_nutrition","branches":["science"],"tier":4,"q":0,"r":6,"requires":["hybrid_pharma_sales"]},{"key":"science_devices","branches":["science"],"tier":5,"q":0,"r":7,"requires":["science_nutrition"]},{"key":"science_environment","branches":["science"],"tier":5,"q":1,"r":6,"requires":["science_genetics"]},{"key":"science_mastery","branches":["science"],"tier":5,"q":2,"r":5,"requires":["science_drugs"]},{"key":"science_neuro","branches":["science"],"tier":5,"q":3,"r":4,"requires":["science_drugs"]},{"key":"science_vaccines","branches":["science"],"tier":5,"q":4,"r":3,"requires":["science_materials"]}],"costByTier":[1,2,3,4,6],"scoreByTier":[1,2,3,4,6],"freePointsPerLevel":1,"workHoursPerBranchPoint":6}'::jsonb, 'Defaults from src/config/balance.ts, section "skills"'),
   ('jobs', '{"playerBaseProductivity":1.5,"productivityPerSkillScore":0.08,"maxProductivity":4,"aiSalaryPerScoreBps":300,"aiSalaryCapMultiplier":1.5,"salaryUnitHours":12,"maxOpenApplications":5,"applicationMessageMaxLength":140,"offerValidHours":48,"aiPostingsPerCompany":2,"aiSlotsOpen":99,"quitNoticeHours":1,"quitNowCostHours":12,"tierMinScore":{"intern":0,"junior":2,"senior":6,"team_lead":12,"c_level":20},"sectorBranches":{"tech":["it","finance","sales","management"],"retail":["sales","logistics","finance","management"],"energy":["craft","science","law","management"],"pharma":["science","law","sales","management"],"logistics":["logistics","craft","it","management"]},"profitLinkedPay":{"minFactor":0.5,"bonusShareOfProfit":0.2,"maxBonusFactor":1},"raiseRequest":{"cooldownDays":7,"maxRaiseBpsPerScore":300}}'::jsonb, 'Defaults from src/config/balance.ts, section "jobs"'),
   ('dailyRewards', '{"cycle":[{"xp":50,"cashCents":10000,"skillPoints":0},{"xp":75,"cashCents":20000,"skillPoints":0},{"xp":100,"cashCents":30000,"skillPoints":0},{"xp":125,"cashCents":0,"skillPoints":1},{"xp":150,"cashCents":50000,"skillPoints":0},{"xp":200,"cashCents":75000,"skillPoints":0},{"xp":300,"cashCents":100000,"skillPoints":1}],"freezesPerWeek":1}'::jsonb, 'Defaults from src/config/balance.ts, section "dailyRewards"'),
-  ('startups', '{"garage":{"minLevel":6,"foundingCostCents":250000,"fixedCostCentsPerQuarter":15000,"maxEmployees":2},"upgradeCreditShare":1,"gmbh":{"minLevel":15,"foundingCostCents":6000000,"fixedCostCentsPerQuarter":360000,"maxEmployees":20},"ag":{"fixedCostCentsPerQuarter":1000000,"maxEmployees":100},"marketFactorByTier":{"garage":10,"small_business":40,"gmbh":150,"ag":400},"foundingAwareness":{"garage":0.03,"small_business":0.08,"gmbh":0.2},"expansion":{"fromTiers":["gmbh","ag"],"baseCostCents":10000000,"costGrowth":1.8,"employeesPerLevel":10,"capacityBonusPerLevel":0.1,"marketBonusPerLevel":0.5,"fixedCostPerLevel":0.25},"pricing":{"budget":{"price":0.8,"demand":1.35,"awareness":1.5},"normal":{"price":1,"demand":1,"awareness":1},"premium":{"price":1.3,"demand":0.75,"awareness":0.7},"premiumMinQuality":0.5,"premiumLowQualityDemand":0.5},"contractWork":{"shareOfFreeCapacity":0.25,"grossMargin":0.3},"founderPayout":{"stepBps":500,"maxBps":10000},"ipo":{"minLevel":9,"fromTiers":["garage","small_business","gmbh"],"sharesTotal":1000000,"minSharePercent":10,"maxSharePercent":49,"minIssuePriceCents":100,"subscriptionMinutes":60,"minFillBps":10000,"demoPlayersShare":0.35,"quickAmountsCents":[10000,100000,1000000],"aiTakeBase":0.6,"aiTakePerQuality":0.4,"aiPace":3,"capitalIncreaseDiscount":0.9,"capitalIncreaseMaxPercent":25,"aiMaxPremiumBps":10000,"capitalIncreaseCooldownHours":24,"issueProceedsLockHours":72},"sideJobFounderFactor":0.5,"aiQualityPenalty":0.3,"fullTimeFromEmployees":5,"logo":{"size":16,"maxColors":16,"reportsToHide":3},"banner":{"width":48,"height":12,"maxColors":16},"potential":{"minAnnualCents":100000,"maxAnnualCents":200000000000,"paretoAlpha":0.57},"awareness":{"initial":0.03,"min":0.01,"growthPerQuarter":0.2,"decayPerQuarter":0.12,"marketingMaxGain":0.24,"marketingHalfSaturationShare":0.01,"marketingMinHalfSaturationCents":50000,"taskGain":0.002,"taskAiShareBps":5000},"quality":{"base":0.25,"halfSaturationScore":20,"adjustPerQuarter":0.35},"demandNoise":0.1,"capacityCentsPerProductivity":{"tech":450000,"retail":375000,"energy":375000,"pharma":450000,"logistics":375000},"grossMargin":{"tech":0.75,"retail":0.35,"energy":0.45,"pharma":0.65,"logistics":0.35},"aiWorkerCostCentsPerQuarter":72000,"aiWorkerWageCentsPerHour":12000,"aiWorkerStandbyBps":2500,"valuationPeDiscount":0.5,"estimate":{"initialSpread":2.3,"decayPerQuarter":0.85},"insolvency":{"graceQuarters":4,"loanWithholdingBps":5000,"foundingLockoutDays":3},"products":{"tech":[{"key":"security_software","stages":[["it_networks"],["it_security","it_programming"],["law_privacy","it_architecture"],["it_crypto","it_pentest"]]},{"key":"mobile_app","stages":[["it_programming"],["it_mobile","sales_social"],["it_ux","sales_growth"],["it_cloud","management_strategy"]]},{"key":"cloud_platform","stages":[["it_networks"],["it_databases","it_devops"],["it_cloud","sales_keyaccount"],["finance_controlling","management_operations"]]},{"key":"legal_tech","stages":[["law_contracts"],["law_corporate","it_programming"],["law_privacy","it_web"],["law_it","sales_growth"]]},{"key":"fintech","stages":[["finance_accounting"],["finance_banking","it_mobile"],["finance_portfolio","law_compliance"],["finance_risk","it_security"]]}],"retail":[{"key":"online_shop","stages":[["it_web"],["sales_marketing","logistics_warehouse"],["hybrid_ecommerce","sales_seo"],["logistics_automation","management_operations"]]},{"key":"fashion","stages":[["sales_marketing"],["sales_brand","logistics_purchasing"],["sales_ads","sales_retail"],["sales_international","finance_controlling"]]},{"key":"delicatessen","stages":[["logistics_purchasing"],["sales_service","logistics_distribution"],["sales_retail","science_nutrition"],["logistics_cold","law_consumer"]]},{"key":"franchise","stages":[["management_team"],["management_people","sales_selling"],["management_operations","finance_controlling"],["management_strategy","law_contracts"]]}],"energy":[{"key":"solar","stages":[["craft_electrical"],["sales_selling","craft_site"],["craft_energy","management_projects"],["craft_solar","law_environment"]]},{"key":"grid_service","stages":[["craft_electrical"],["craft_site","craft_automation"],["craft_energy","law_compliance"],["logistics_planning","management_operations"]]},{"key":"energy_storage","stages":[["science_physics"],["craft_engineering","finance_investment"],["science_materials","craft_manufacturing"],["law_ip","sales_international"]]},{"key":"energy_trading","stages":[["finance_investment"],["finance_accounting","craft_electrical"],["finance_trading","law_compliance"],["finance_risk","management_strategy"]]}],"pharma":[{"key":"generics","stages":[["science_chemistry"],["science_lab","science_pharmacology"],["logistics_quality","hybrid_pharma_sales"],["law_ip","finance_controlling"]]},{"key":"biotech","stages":[["science_biology"],["science_biotech","science_statistics"],["science_clinical","science_genetics"],["law_medical","finance_vc"]]},{"key":"medtech","stages":[["science_medicine"],["craft_engineering","science_lab"],["science_drugs","law_compliance"],["science_devices","it_embedded"]]},{"key":"regulatory","stages":[["law_contracts"],["law_compliance","science_pharmacology"],["law_ip","science_clinical"],["law_medical","finance_controlling"]]}],"logistics":[{"key":"courier","stages":[["logistics_transport"],["logistics_fleet","it_mobile"],["logistics_lastmile","management_operations"],["logistics_planning","logistics_sustainability"]]},{"key":"warehouse","stages":[["logistics_warehouse"],["logistics_inventory","it_databases"],["logistics_supplychain","management_agile"],["logistics_automation","craft_robotics"]]},{"key":"freight","stages":[["logistics_transport"],["logistics_customs","logistics_shipping"],["logistics_global","sales_international"],["logistics_strategic","finance_risk"]]},{"key":"moving","stages":[["management_projects"],["logistics_transport","management_team"],["logistics_distribution","sales_service"],["management_operations","logistics_planning"]]}]},"stages":{"awarenessCaps":[0.5,0.7,0.85,0.95,1],"qualityBonusPerStage":0.05,"capacityBonusPerStage":0.25},"training":{"costCentsByTier":[200000,500000,1200000,2500000,5000000],"wageRaiseBpsByTier":[300,500,800,1200,2000],"fromEmployees":5},"campaigns":{"kinds":{"flyer":{"hours":24,"costHours":2,"demandBps":2500,"awareness":0.02},"online":{"hours":48,"costHours":6,"demandBps":4000,"awareness":0.04},"tv":{"hours":72,"costHours":18,"demandBps":7000,"awareness":0.08}},"minCostCents":20000,"luckMin":0.4,"luckMax":1.6,"qualityWeight":0.5,"weakBelow":0.8,"strongFrom":1.2},"chat":{"maxMessageLength":300,"historyLimit":100,"maxMessagesPerMinute":10,"bubbleSeconds":120,"floorMaxMembers":24}}'::jsonb, 'Defaults from src/config/balance.ts, section "startups"'),
+  ('startups', '{"garage":{"minLevel":6,"foundingCostCents":250000,"fixedCostCentsPerQuarter":15000,"maxEmployees":2},"upgradeCreditShare":1,"gmbh":{"minLevel":15,"foundingCostCents":6000000,"fixedCostCentsPerQuarter":360000,"maxEmployees":20},"ag":{"fixedCostCentsPerQuarter":1000000,"maxEmployees":100},"marketFactorByTier":{"garage":10,"small_business":40,"gmbh":150,"ag":400},"foundingAwareness":{"garage":0.03,"small_business":0.08,"gmbh":0.2},"expansion":{"fromTiers":["gmbh","ag"],"baseCostCents":10000000,"costGrowth":1.8,"employeesPerLevel":10,"capacityBonusPerLevel":0.1,"marketBonusPerLevel":0.5,"fixedCostPerLevel":0.25},"pricing":{"budget":{"price":0.8,"demand":1.35,"awareness":1.5},"normal":{"price":1,"demand":1,"awareness":1},"premium":{"price":1.3,"demand":0.75,"awareness":0.7},"premiumMinQuality":0.5,"premiumLowQualityDemand":0.5},"contractWork":{"shareOfFreeCapacity":0.25,"grossMargin":0.3},"founderPayout":{"stepBps":500,"maxBps":10000},"ipo":{"minLevel":9,"fromTiers":["garage","small_business","gmbh"],"sharesTotal":1000000,"minSharePercent":10,"maxSharePercent":49,"minIssuePriceCents":100,"subscriptionMinutes":60,"minFillBps":10000,"demoPlayersShare":0.35,"quickAmountsCents":[10000,100000,1000000],"aiTakeBase":0.6,"aiTakePerQuality":0.4,"aiPace":3,"capitalIncreaseDiscount":0.9,"capitalIncreaseMaxPercent":25,"aiMaxPremiumBps":10000,"capitalIncreaseCooldownHours":24,"issueProceedsLockHours":72},"sideJobFounderFactor":0.5,"aiQualityPenalty":0.3,"fullTimeFromEmployees":5,"logo":{"size":16,"maxColors":16,"reportsToHide":3},"banner":{"width":48,"height":12,"maxColors":16},"potential":{"minAnnualCents":100000,"maxAnnualCents":200000000000,"paretoAlpha":0.57},"awareness":{"initial":0.03,"min":0.02,"cap":{"byTier":{"garage":0.6,"small_business":0.7,"gmbh":0.8,"ag":0.9},"perStage":0.05,"perExpansionLevel":0.03,"max":1},"marketingMaxRatePerHour":0.06,"marketingHalfSaturationShare":0.01,"marketingMinHalfSaturationCents":50000,"wordOfMouthPerHour":0.008,"decayPerHour":0.004,"taskGain":0.005,"taskAiShareBps":5000},"quality":{"base":0.25,"halfSaturationScore":20,"adjustPerQuarter":0.35},"demandNoise":0.1,"capacityCentsPerProductivity":{"tech":450000,"retail":375000,"energy":375000,"pharma":450000,"logistics":375000},"grossMargin":{"tech":0.75,"retail":0.35,"energy":0.45,"pharma":0.65,"logistics":0.35},"aiWorkerCostCentsPerQuarter":72000,"aiWorkerWageCentsPerHour":12000,"aiWorkerStandbyBps":2500,"valuationPeDiscount":0.5,"estimate":{"initialSpread":2.3,"decayPerQuarter":0.85},"insolvency":{"graceQuarters":4,"loanWithholdingBps":5000,"foundingLockoutDays":3},"products":{"tech":[{"key":"security_software","stages":[["it_networks"],["it_security","it_programming"],["law_privacy","it_architecture"],["it_crypto","it_pentest"]]},{"key":"mobile_app","stages":[["it_programming"],["it_mobile","sales_social"],["it_ux","sales_growth"],["it_cloud","management_strategy"]]},{"key":"cloud_platform","stages":[["it_networks"],["it_databases","it_devops"],["it_cloud","sales_keyaccount"],["finance_controlling","management_operations"]]},{"key":"legal_tech","stages":[["law_contracts"],["law_corporate","it_programming"],["law_privacy","it_web"],["law_it","sales_growth"]]},{"key":"fintech","stages":[["finance_accounting"],["finance_banking","it_mobile"],["finance_portfolio","law_compliance"],["finance_risk","it_security"]]}],"retail":[{"key":"online_shop","stages":[["it_web"],["sales_marketing","logistics_warehouse"],["hybrid_ecommerce","sales_seo"],["logistics_automation","management_operations"]]},{"key":"fashion","stages":[["sales_marketing"],["sales_brand","logistics_purchasing"],["sales_ads","sales_retail"],["sales_international","finance_controlling"]]},{"key":"delicatessen","stages":[["logistics_purchasing"],["sales_service","logistics_distribution"],["sales_retail","science_nutrition"],["logistics_cold","law_consumer"]]},{"key":"franchise","stages":[["management_team"],["management_people","sales_selling"],["management_operations","finance_controlling"],["management_strategy","law_contracts"]]}],"energy":[{"key":"solar","stages":[["craft_electrical"],["sales_selling","craft_site"],["craft_energy","management_projects"],["craft_solar","law_environment"]]},{"key":"grid_service","stages":[["craft_electrical"],["craft_site","craft_automation"],["craft_energy","law_compliance"],["logistics_planning","management_operations"]]},{"key":"energy_storage","stages":[["science_physics"],["craft_engineering","finance_investment"],["science_materials","craft_manufacturing"],["law_ip","sales_international"]]},{"key":"energy_trading","stages":[["finance_investment"],["finance_accounting","craft_electrical"],["finance_trading","law_compliance"],["finance_risk","management_strategy"]]}],"pharma":[{"key":"generics","stages":[["science_chemistry"],["science_lab","science_pharmacology"],["logistics_quality","hybrid_pharma_sales"],["law_ip","finance_controlling"]]},{"key":"biotech","stages":[["science_biology"],["science_biotech","science_statistics"],["science_clinical","science_genetics"],["law_medical","finance_vc"]]},{"key":"medtech","stages":[["science_medicine"],["craft_engineering","science_lab"],["science_drugs","law_compliance"],["science_devices","it_embedded"]]},{"key":"regulatory","stages":[["law_contracts"],["law_compliance","science_pharmacology"],["law_ip","science_clinical"],["law_medical","finance_controlling"]]}],"logistics":[{"key":"courier","stages":[["logistics_transport"],["logistics_fleet","it_mobile"],["logistics_lastmile","management_operations"],["logistics_planning","logistics_sustainability"]]},{"key":"warehouse","stages":[["logistics_warehouse"],["logistics_inventory","it_databases"],["logistics_supplychain","management_agile"],["logistics_automation","craft_robotics"]]},{"key":"freight","stages":[["logistics_transport"],["logistics_customs","logistics_shipping"],["logistics_global","sales_international"],["logistics_strategic","finance_risk"]]},{"key":"moving","stages":[["management_projects"],["logistics_transport","management_team"],["logistics_distribution","sales_service"],["management_operations","logistics_planning"]]}]},"stages":{"awarenessCaps":[0.6,0.65,0.7,0.75,0.8],"qualityBonusPerStage":0.05,"capacityBonusPerStage":0.25},"training":{"costCentsByTier":[200000,500000,1200000,2500000,5000000],"wageRaiseBpsByTier":[300,500,800,1200,2000],"fromEmployees":5},"campaigns":{"kinds":{"flyer":{"hours":24,"costHours":2,"demandBps":2500,"awareness":0.03},"online":{"hours":48,"costHours":6,"demandBps":4000,"awareness":0.06},"tv":{"hours":72,"costHours":18,"demandBps":7000,"awareness":0.12}},"minCostCents":20000,"luckMin":0.4,"luckMax":1.6,"qualityWeight":0.5,"weakBelow":0.8,"strongFrom":1.2},"chat":{"maxMessageLength":300,"historyLimit":100,"maxMessagesPerMinute":10,"bubbleSeconds":120,"floorMaxMembers":24}}'::jsonb, 'Defaults from src/config/balance.ts, section "startups"'),
   ('avatars', '{"defaultKey":"rookie","portraits":[{"key":"rookie","level":1},{"key":"trader","level":1},{"key":"analyst","level":1},{"key":"coder","level":1},{"key":"builder","level":1},{"key":"seller","level":1},{"key":"lawyer","level":1},{"key":"scientist","level":1},{"key":"trucker","level":1},{"key":"punk","level":3},{"key":"gamer","level":5},{"key":"chef","level":5},{"key":"pilot","level":8},{"key":"founder","level":10},{"key":"banker","level":15},{"key":"astronaut","level":20},{"key":"magnate","level":25},{"key":"royal","level":35},{"key":"legend","level":50},{"key":"finn_fan","level":1}]}'::jsonb, 'Defaults from src/config/balance.ts, section "avatars"'),
   ('artworks', '{"size":32,"maxColors":16,"titleMaxLength":40,"createBaseCostCents":1500000,"createCostFactor":1.5,"auction":{"durationsHours":[1,6,24],"minIncrementBps":500,"minStartCents":10000,"feeBps":1000,"antiSnipeMinutes":2},"gallery":{"auctionsPerDay":4,"auctionHours":6,"startPriceCents":{"common":500000,"rare":2500000,"legendary":15000000}},"hot":{"likeWeight":1,"bidWeight":3,"gravity":1.5}}'::jsonb, 'Defaults from src/config/balance.ts, section "artworks"'),
   ('companyEvents', '{"chancePerDay":0.6,"minGapHours":22,"minAgeHours":6,"chanceShare":0.4,"severityWeights":[0.5,0.35,0.15],"severityScale":[1,1.7,2.5],"preDeadlineShare":0.25,"costUnit":{"minUnitCents":20000,"unitShareOfFixed":0.5},"knowHow":{"bpsPerPoint":150,"maxBonusBps":2500},"severityPenaltyBps":700,"retryCostShare":0.5,"shareShockBps":[400,900,1500],"archetypes":[{"key":"regulation","polarity":"crisis","weight":12,"effect":{"demand":-0.12,"cost":0.06},"deadlineHours":30,"lastsHours":72,"strategies":[{"key":"lobby","mitigation":1,"bonus":{"awareness":0.02},"steps":[{"key":"study","hours":3,"cost":2,"branch":"law","baseBps":9000},{"key":"alliance","hours":5,"cost":1,"branch":"sales","staff":2,"baseBps":6500},{"key":"hearing","hours":6,"cost":3,"branch":"law","baseBps":5500}]},{"key":"adapt","mitigation":0.7,"bonus":{"quality":0.03},"steps":[{"key":"retool","hours":8,"cost":4,"staff":1,"capacityHit":0.3,"baseBps":9500},{"key":"certify","hours":4,"cost":1,"branch":"science","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"special_tax","polarity":"crisis","weight":10,"effect":{"cost":0.1},"deadlineHours":30,"lastsHours":96,"strategies":[{"key":"lobby","mitigation":1,"steps":[{"key":"petition","hours":2,"cost":1,"branch":"sales","baseBps":9000},{"key":"experts","hours":5,"cost":2,"branch":"finance","baseBps":7000},{"key":"hearing","hours":6,"cost":3,"branch":"law","baseBps":5500}]},{"key":"reformulate","mitigation":0.8,"bonus":{"quality":-0.02},"steps":[{"key":"lab","hours":6,"cost":3,"branch":"science","staff":1,"baseBps":6500},{"key":"relaunch","hours":4,"cost":2,"branch":"sales","baseBps":8500}]},{"key":"pass_on","mitigation":0.5,"steps":[{"key":"price_talk","hours":3,"cost":1,"branch":"sales","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"supply_shortage","polarity":"crisis","weight":11,"effect":{"capacity":-0.25,"cost":0.05},"deadlineHours":24,"lastsHours":60,"strategies":[{"key":"new_supplier","mitigation":1,"steps":[{"key":"scout","hours":3,"cost":1,"branch":"logistics","baseBps":8500},{"key":"contract","hours":4,"cost":3,"branch":"finance","baseBps":7500}]},{"key":"stockpile","mitigation":0.8,"steps":[{"key":"buy_stock","hours":2,"cost":6,"baseBps":10000}]},{"key":"redesign","mitigation":1,"bonus":{"quality":0.02},"steps":[{"key":"prototype","hours":6,"cost":2,"branch":"science","staff":1,"baseBps":6000},{"key":"switch","hours":6,"cost":2,"branch":"craft","capacityHit":0.2,"baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"quality_scandal","polarity":"crisis","weight":9,"effect":{"demand":-0.2},"deadlineHours":20,"lastsHours":72,"strategies":[{"key":"recall","mitigation":1,"bonus":{"quality":0.04},"steps":[{"key":"pull_back","hours":4,"cost":4,"branch":"logistics","capacityHit":0.3,"baseBps":9500},{"key":"fix","hours":6,"cost":2,"branch":"craft","baseBps":7500}]},{"key":"pr_offensive","mitigation":0.6,"bonus":{"awareness":0.03},"steps":[{"key":"statement","hours":1,"cost":1,"branch":"management","baseBps":9000},{"key":"campaign","hours":5,"cost":3,"branch":"sales","baseBps":6500}]},{"key":"independent_test","mitigation":0.9,"steps":[{"key":"lab_test","hours":8,"cost":2,"branch":"science","baseBps":7000},{"key":"publish","hours":2,"cost":1,"branch":"sales","baseBps":9000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"data_breach","polarity":"crisis","weight":8,"sectors":["tech","retail","logistics"],"effect":{"demand":-0.15,"cost":0.04},"deadlineHours":18,"lastsHours":60,"strategies":[{"key":"forensics","mitigation":1,"bonus":{"quality":0.02},"steps":[{"key":"analyse","hours":4,"cost":2,"branch":"it","baseBps":7500},{"key":"patch","hours":4,"cost":1,"branch":"it","staff":2,"baseBps":8000},{"key":"audit","hours":3,"cost":2,"branch":"law","baseBps":9000}]},{"key":"transparency","mitigation":0.6,"bonus":{"awareness":0.01},"steps":[{"key":"disclose","hours":2,"cost":1,"branch":"management","baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"tax_audit","polarity":"crisis","weight":0,"effect":{"cost":0.05,"capacity":-0.08},"deadlineHours":12,"lastsHours":36,"strategies":[{"key":"cooperate","mitigation":0.9,"steps":[{"key":"collect_files","hours":2,"cost":1,"branch":"finance","baseBps":9000},{"key":"auditor_meeting","hours":3,"cost":1,"branch":"management","staff":1,"baseBps":8000}]},{"key":"tax_lawyer","mitigation":1,"steps":[{"key":"hire_lawyer","hours":4,"cost":4,"branch":"law","baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"price_war","polarity":"crisis","weight":10,"effect":{"demand":-0.18},"deadlineHours":30,"lastsHours":72,"strategies":[{"key":"undercut","mitigation":0.8,"steps":[{"key":"calculate","hours":2,"cost":1,"branch":"finance","baseBps":9000},{"key":"discount","hours":6,"cost":4,"branch":"sales","baseBps":9500}]},{"key":"innovate","mitigation":1,"bonus":{"quality":0.04},"steps":[{"key":"research","hours":6,"cost":2,"branch":"science","baseBps":7000},{"key":"build","hours":6,"cost":2,"branch":"craft","staff":2,"capacityHit":0.2,"baseBps":7500},{"key":"launch","hours":3,"cost":2,"branch":"sales","baseBps":8500}]},{"key":"niche","mitigation":0.6,"steps":[{"key":"reposition","hours":4,"cost":2,"branch":"sales","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"strike","polarity":"crisis","weight":7,"effect":{"capacity":-0.35},"deadlineHours":16,"lastsHours":48,"strategies":[{"key":"negotiate","mitigation":1,"steps":[{"key":"listen","hours":2,"cost":0,"branch":"management","baseBps":9000},{"key":"deal","hours":4,"cost":3,"branch":"management","baseBps":7000}]},{"key":"bonus","mitigation":0.8,"steps":[{"key":"pay_bonus","hours":1,"cost":5,"baseBps":10000}]},{"key":"automate","mitigation":0.7,"bonus":{"quality":-0.02},"steps":[{"key":"machines","hours":8,"cost":4,"branch":"it","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"protest","polarity":"crisis","weight":8,"effect":{"demand":-0.1,"cost":0.03},"deadlineHours":30,"lastsHours":72,"strategies":[{"key":"green","mitigation":1,"bonus":{"awareness":0.03,"quality":0.02},"steps":[{"key":"footprint","hours":4,"cost":1,"branch":"science","baseBps":8500},{"key":"program","hours":8,"cost":4,"branch":"craft","staff":1,"baseBps":8500},{"key":"report","hours":2,"cost":1,"branch":"sales","baseBps":9000}]},{"key":"dialogue","mitigation":0.6,"steps":[{"key":"invite","hours":2,"cost":0,"branch":"management","baseBps":8500},{"key":"round_table","hours":4,"cost":1,"branch":"sales","baseBps":7000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"patent_claim","polarity":"crisis","weight":6,"effect":{"demand":-0.08,"cost":0.08},"deadlineHours":36,"lastsHours":96,"strategies":[{"key":"lawyers","mitigation":1,"steps":[{"key":"review","hours":4,"cost":2,"branch":"law","baseBps":8000},{"key":"court","hours":8,"cost":4,"branch":"law","baseBps":5500}]},{"key":"license","mitigation":0.7,"steps":[{"key":"pay_license","hours":2,"cost":5,"baseBps":10000}]},{"key":"workaround","mitigation":0.9,"bonus":{"quality":0.02},"steps":[{"key":"redesign","hours":8,"cost":2,"branch":"science","staff":1,"baseBps":6500},{"key":"test","hours":4,"cost":1,"branch":"craft","baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"bad_review","polarity":"crisis","weight":9,"effect":{"demand":-0.14},"deadlineHours":24,"lastsHours":48,"strategies":[{"key":"improve","mitigation":1,"bonus":{"quality":0.05},"steps":[{"key":"analyse","hours":3,"cost":1,"branch":"science","baseBps":9000},{"key":"rework","hours":6,"cost":3,"branch":"craft","capacityHit":0.2,"baseBps":7500},{"key":"retest","hours":3,"cost":1,"branch":"sales","baseBps":7000}]},{"key":"counter","mitigation":0.6,"bonus":{"awareness":0.02},"steps":[{"key":"campaign","hours":4,"cost":3,"branch":"sales","baseBps":7500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"viral_trend","polarity":"chance","weight":10,"effect":{"demand":0.35},"deadlineHours":12,"lastsHours":48,"strategies":[{"key":"scale_up","mitigation":1,"bonus":{"awareness":0.04},"steps":[{"key":"overtime","hours":2,"cost":2,"staff":1,"baseBps":9500},{"key":"restock","hours":4,"cost":3,"branch":"logistics","baseBps":8500}]},{"key":"ride_wave","mitigation":0.6,"bonus":{"awareness":0.06},"steps":[{"key":"content","hours":3,"cost":1,"branch":"sales","baseBps":8000}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"big_contract","polarity":"chance","weight":9,"effect":{"demand":0.25},"deadlineHours":24,"lastsHours":72,"strategies":[{"key":"pitch","mitigation":1,"steps":[{"key":"offer","hours":3,"cost":1,"branch":"sales","baseBps":8500},{"key":"negotiate","hours":4,"cost":1,"branch":"management","baseBps":6500},{"key":"deliver","hours":6,"cost":3,"staff":2,"capacityHit":0.2,"baseBps":9000}]},{"key":"quick_deal","mitigation":0.5,"steps":[{"key":"discount_offer","hours":2,"cost":1,"branch":"sales","baseBps":9000}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"award","polarity":"chance","weight":8,"effect":{"demand":0.15},"deadlineHours":24,"lastsHours":72,"strategies":[{"key":"press_tour","mitigation":1,"bonus":{"awareness":0.06},"steps":[{"key":"interviews","hours":3,"cost":1,"branch":"management","baseBps":8500},{"key":"ads","hours":4,"cost":3,"branch":"sales","baseBps":9000}]},{"key":"badge","mitigation":0.5,"steps":[{"key":"seal","hours":1,"cost":1,"baseBps":10000}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"subsidy","polarity":"chance","weight":7,"effect":{"cost":-0.08},"deadlineHours":36,"lastsHours":96,"strategies":[{"key":"apply","mitigation":1,"steps":[{"key":"forms","hours":3,"cost":0,"branch":"law","baseBps":9000},{"key":"plan","hours":5,"cost":1,"branch":"finance","baseBps":7500},{"key":"jury","hours":4,"cost":0,"branch":"management","baseBps":6000}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"partnership","polarity":"chance","weight":7,"effect":{"demand":0.2,"capacity":0.1},"deadlineHours":24,"lastsHours":96,"strategies":[{"key":"join","mitigation":1,"bonus":{"awareness":0.03},"steps":[{"key":"meeting","hours":2,"cost":0,"branch":"management","baseBps":9000},{"key":"integrate","hours":6,"cost":2,"branch":"it","staff":1,"baseBps":7500}]},{"key":"pass","mitigation":0,"steps":[]}]}]}'::jsonb, 'Defaults from src/config/balance.ts, section "companyEvents"'),
@@ -81734,7 +82970,7 @@ insert into public.game_config (key, value, description) values
   ('nexamon', '{"packSize":5,"sets":{"mystic_energy":{"name":"Nexamon: Mystic Energy","packPriceCents":20000},"super_apex":{"name":"Nexamon: Super Apex","packPriceCents":100000},"prismatic_peak":{"name":"Nexamon: Prismatic Peak","packPriceCents":1000000},"cosmic_winds":{"name":"Nexamon: Cosmic Winds","packPriceCents":500000},"titans_revenge":{"name":"Nexamon: Titans Revenge","packPriceCents":10000000,"releaseAt":"2026-11-17T16:30:00Z"},"yin_yang":{"name":"Nexamon: Yin Yang","packPriceCents":200000,"releaseAt":"2026-11-17T16:30:00Z"}},"packs":{"perMinute":20,"maxPerBuy":10},"odds":{"denominator":3600,"slot4":{"legendary":0,"prisma":0,"ultra":150,"rare":900},"slot5":{"legendary":4,"prisma":45,"ultra":150,"rare":900}},"oneOfOne":{"slot":5,"packs":5000},"setOdds":{"yin_yang":{"denominator":36000,"slot4":{"legendary":0,"prisma":0,"ultra":1350,"rare":9150},"slot5":{"legendary":36,"prisma":405,"ultra":1350,"rare":9199}}},"packRules":{"titans_revenge":{"kind":"tiers","base":"iron","tiers":[{"rarity":"uranium","packs":500,"min":1,"max":1},{"rarity":"diamond","packs":50,"min":1,"max":1},{"rarity":"titanium","packs":5,"min":1,"max":2}]}},"conditions":{"order":["poor","good","near_mint","mint"],"weightBps":{"poor":200,"good":1800,"near_mint":5000,"mint":3000},"valueBps":{"poor":7000,"good":9000,"near_mint":10000,"mint":10000}},"grading":{"feeBps":4000,"minFeeCents":100,"minutes":60,"maxOpen":10,"grades":[1,2,3,4,5,6,7,8,8.5,9,9.5,10],"gradeWeightsBps":{"poor":[800,1200,1500,2000,2000,1500,700,200,50,30,15,5],"good":[0,0,0,750,1200,2000,2500,1700,1000,600,200,50],"near_mint":[0,0,0,0,0,500,1200,2200,2400,2400,950,350],"mint":[0,0,0,0,0,0,500,1200,1800,3000,2000,1500]},"valueBps":[3000,4000,5000,6000,7000,8000,9000,12000,14000,17000,23000,40000],"tenFactorRange":[25000,40000],"nineHalfFactorRange":[18000,26000],"blackLabel":{"chanceBps":{"near_mint":100,"mint":500},"valueBps":100000}},"market":{"feeBps":500,"minPriceCents":10,"maxPriceCents":100000000000,"maxListings":30,"actionsPerMinute":30,"pageSize":24,"recentSales":20,"historyDays":60},"value":{"floorBps":2000,"capBaseBps":30000,"capPerDayBps":200,"capPerTradeBps":50,"capMaxBps":200000,"dayMaxRiseBps":1500,"dayMaxFallBps":2000,"trade":{"bandBps":2500,"weightBps":2000,"maxStepBps":200,"pairHours":24,"perPlayerDay":3,"minPopularityBps":2500},"aiBuyBumpBps":50,"popularity":{"rarityBps":{"common":500,"rare":1500,"ultra":4000,"prisma":7000,"legendary":9000,"one_of_one":10000,"iron":800,"titanium":4000,"diamond":7000,"uranium":9500},"scarceBonusBps":3000,"popRef":{"common":2000,"rare":800,"ultra":150,"prisma":30,"legendary":4,"one_of_one":1,"iron":1500,"titanium":150,"diamond":30,"uranium":4}},"pressure":{"everyMinutes":60,"upStepBps":30,"downStepBps":30,"want":{"common":4,"rare":3,"ultra":2,"prisma":1,"legendary":1,"one_of_one":1,"iron":4,"titanium":2,"diamond":1,"uranium":1},"buyWeightMilli":500,"buyDays":7,"maxBuys":10,"perRun":80},"tradeOnlyRarities":["one_of_one"]},"ai":{"sellers":["Karten-Kalle","Booster-Berta","Holo-Hanna","Sammel-Sven"],"askBps":11000,"seedCopies":{"common":6,"rare":4,"ultra":2,"prisma":1,"legendary":0,"one_of_one":0,"iron":6,"titanium":2,"diamond":0,"uranium":0},"seedPrismaCards":2,"listedPerCard":{"common":4,"rare":3,"ultra":2,"prisma":1,"legendary":0,"one_of_one":0,"iron":4,"titanium":2,"diamond":1,"uranium":0},"legendaryListChanceBps":20,"packsPerHour":{"mystic_energy":4,"super_apex":2,"prismatic_peak":1,"cosmic_winds":1,"titans_revenge":1,"yin_yang":2},"maxPacksPerRun":5,"buyChanceBps":3000,"atMaxChanceBps":2000,"premiumBps":{"poor":0,"good":300,"near_mint":800,"mint":1200},"gradePremiumBps":[0,0,0,0,0,0,0,500,700,1000,1200,1500],"blackLabelPremiumBps":2000,"buysPerCardWindow":{"common":6,"rare":6,"ultra":4,"prisma":3,"legendary":2,"one_of_one":0,"iron":6,"titanium":4,"diamond":2,"uranium":0},"buyWindowDays":1,"maxBuysPerRun":100,"dailyBudgetPacks":300,"excludedRarities":["one_of_one","uranium"],"listingResetHours":6,"stockCap":{"common":12,"rare":8,"ultra":4,"prisma":2,"legendary":1,"one_of_one":0,"iron":12,"titanium":4,"diamond":1,"uranium":0},"slabHold":{"minHours":1,"maxHours":72,"skewPow":2}},"quickSell":{"rarities":["common","rare"],"setRarities":{"titans_revenge":["iron"]},"bps":6500,"maxPerCall":500,"callsPerMinute":10,"dropBps":25},"feedRarities":["legendary","uranium"],"presence":{"pingSeconds":15,"presenceSeconds":60,"maxPlayers":24},"battles":{"challengeSeconds":60,"perHour":6,"cooldownSeconds":20,"startDelayMs":3000,"tearMs":2400,"slotMs":1800,"leadMs":800,"outroMs":8000,"gossipMinCents":500000},"live":{"continueSeconds":30,"staleMs":10000,"fallbackSlotMs":2500,"lingerMs":8000,"maxMs":120000,"viewerSeconds":10,"reactions":["🔥","😱","👏","💎","😂"],"reactionsPerMinute":30,"maxSessions":12},"bonuses":{"kinds":["xp","mission_xp","trade_xp","wage","vault","daily","company"],"typeKind":{"fire":"company","dragon":"company","water":"vault","grass":"daily","electric":"trade_xp","psychic":"mission_xp","fairy":"mission_xp","rock":"wage","steel":"wage","dark":"xp","cosmic":"xp"},"rarities":["ultra","prisma","legendary","one_of_one","titanium","diamond","uranium"],"extraNumbers":[60],"rarityBps":{"common":25,"rare":50,"ultra":50,"prisma":100,"legendary":250,"one_of_one":500,"iron":25,"titanium":50,"diamond":100,"uranium":250},"setBps":{"mystic_energy":10000,"super_apex":12500,"prismatic_peak":15000,"cosmic_winds":15000,"titans_revenge":17500,"yin_yang":15000},"slab":{"minGrade":9,"gradeBps":15000,"blackLabelBps":20000},"caps":{"xp":1000,"mission_xp":1500,"trade_xp":1500,"wage":1000,"vault":1500,"daily":2000,"company":1000},"kneeShareBps":5000,"tailBps":5000,"sets":{"type":{"bps":50,"rewardPacks":3,"rewardXp":300,"minCards":3},"complete":{"kind":"xp","bps":200,"rewardPacks":20,"rewardXp":2500},"master":{"bps":100,"rewardPacks":75,"rewardXp":10000},"rewardPackCents":{"titans_revenge":1000000},"masterMinGrade":9,"masterRarities":["prisma","legendary","diamond","uranium"],"excludeRarities":["one_of_one"]}},"blackLabelHype":{"rarityChanceBps":{"common":5,"rare":10,"ultra":25,"prisma":60,"legendary":120,"one_of_one":200,"iron":5,"titanium":25,"diamond":60,"uranium":150},"blRef":3,"minJumpBps":1000,"maxJumpBps":6000,"capBps":250000,"decayBps":100,"bigJumpBps":4000,"historyPoints":30}}'::jsonb, 'Defaults from src/config/balance.ts, section "nexamon"'),
   ('listed', '{"refRevenue":{"windowHours":24,"minCents":20000},"satisfaction":{"start":60,"base":50,"adjustPerHour":0.15,"green":60,"red":35,"benefitsMax":40,"wages":{"unpaidMaxLoss":25,"moodMaxLoss":10},"workload":{"overFrom":0.95,"overFull":1.5,"overMaxLoss":12,"underBelow":0.35,"underLoss":4},"crisis":{"perSeverity":4,"scandal":6,"scandals":["quality_scandal","data_breach","tax_audit"]},"layoffs":{"perHead":3,"max":15,"decayPerHour":0.08},"greedMaxLoss":10,"success":{"profitHour":3,"lossHour":-3},"effect":{"lowCapacityMaxLoss":0.3,"lowQualityMaxLoss":0.15,"highCapacityMaxGain":0.06,"highFull":90},"quits":{"everyRedHours":3,"notifyEveryHours":24,"massQuitFrom":3}},"reputation":{"start":50,"base":50,"adjustPerHour":0.08,"windowHours":24,"minProfitShareOfRevenue":0.05,"greed":{"freeRatioBps":3000,"fullRatioBps":10000,"maxLoss":35,"feedBelow":35},"reinvest":{"fullRatioBps":5000,"maxGain":12},"dividend":{"fullRatioBps":2000,"maxGain":12,"streakPerDay":1,"streakMax":6},"penalty":{"lateFee":3,"estimate":6,"enforcement":8},"scandalLoss":5,"demandMaxEffect":0.2,"priceMaxEffect":0.25},"dividends":{"perDay":1,"maxShareOfFreeCashBps":5000,"minTotalCents":10000,"historyLimit":20},"board":{"minShareBps":2000,"voteHours":12,"quorumBps":3000,"maxOpen":2,"cooldownHours":6,"maxDays":7,"earmarkMaxShareOfCashBps":8000,"payoutCapStepBps":500,"aiVote":{"reputationBelow":40,"kinds":["payout_cap","withdraw_ban","dividend"]},"kinds":["earmark","release","dividend","payout_cap","withdraw_ban","price_level","debt"],"purposes":["research","products","expansion","benefits","marketing"],"historyLimit":20},"taxes":{"rateBps":1500,"minRateBps":800,"reminderAfterHours":30,"lateFeeAfterHours":42,"estimateAfterHours":60,"lateFee":{"minCents":5000,"revenueBps":50},"estimate":{"marginBps":2500,"surchargeBps":2500},"payWithinHours":24,"latePaymentBps":500,"enforceAfterHours":48,"enforcementBps":1000,"check":{"receipts":3,"discountBps":500},"advisor":{"minWageCentsPerHour":4000,"revenueBps":100,"discountBps":800},"auditArchetype":"tax_audit","receipts":[{"key":"customer_invoice","category":"revenue"},{"key":"online_shop_payout","category":"revenue"},{"key":"raw_material","category":"goods"},{"key":"packaging","category":"goods"},{"key":"payslip","category":"wages"},{"key":"overtime","category":"wages"},{"key":"office_rent","category":"fixed"},{"key":"electricity","category":"fixed"},{"key":"lab_equipment","category":"research"},{"key":"prototype","category":"research"},{"key":"fruit_basket","category":"benefit"},{"key":"team_dinner","category":"benefit"}],"receiptCategories":["revenue","goods","wages","fixed","research","benefit"],"historyLimit":30},"historyHours":72,"accountingPageSize":50,"items":[{"key":"r_quality_1","kind":"research","branch":"quality","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"qualityBps":300}},{"key":"r_quality_2","kind":"research","branch":"quality","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_quality_1"],"effects":{"qualityBps":500}},{"key":"r_quality_3","kind":"research","branch":"quality","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_quality_2"],"effects":{"qualityBps":800}},{"key":"r_quality_4","kind":"research","branch":"quality","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_quality_3","r_efficiency_2"],"effects":{"qualityBps":1200,"demandBps":400}},{"key":"r_efficiency_1","kind":"research","branch":"efficiency","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"marginBps":200}},{"key":"r_efficiency_2","kind":"research","branch":"efficiency","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_efficiency_1"],"effects":{"marginBps":300}},{"key":"r_efficiency_3","kind":"research","branch":"efficiency","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_efficiency_2"],"effects":{"marginBps":500}},{"key":"r_efficiency_4","kind":"research","branch":"efficiency","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_efficiency_3","r_automation_2"],"effects":{"marginBps":800,"capacityBps":500}},{"key":"r_brand_1","kind":"research","branch":"brand","tier":1,"purpose":"marketing","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"awarenessBps":200}},{"key":"r_brand_2","kind":"research","branch":"brand","tier":2,"purpose":"marketing","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_brand_1"],"effects":{"awarenessBps":300}},{"key":"r_brand_3","kind":"research","branch":"brand","tier":3,"purpose":"marketing","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_brand_2"],"effects":{"awarenessBps":500}},{"key":"r_brand_4","kind":"research","branch":"brand","tier":4,"purpose":"marketing","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_brand_3","r_quality_2"],"effects":{"awarenessBps":500,"demandBps":800}},{"key":"r_automation_1","kind":"research","branch":"automation","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"capacityBps":500}},{"key":"r_automation_2","kind":"research","branch":"automation","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_automation_1"],"effects":{"capacityBps":800}},{"key":"r_automation_3","kind":"research","branch":"automation","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_automation_2"],"effects":{"capacityBps":1200}},{"key":"r_automation_4","kind":"research","branch":"automation","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_automation_3","r_efficiency_2"],"effects":{"capacityBps":2000,"marginBps":300}},{"key":"r_logistics_1","kind":"research","branch":"logistics","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"capacityBps":300,"marginBps":100}},{"key":"r_logistics_2","kind":"research","branch":"logistics","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_logistics_1"],"effects":{"marketBps":500}},{"key":"r_logistics_3","kind":"research","branch":"logistics","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_logistics_2"],"effects":{"fixedCostBps":-500}},{"key":"r_logistics_4","kind":"research","branch":"logistics","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_logistics_3","r_automation_2"],"effects":{"marketBps":1000,"marginBps":200}},{"key":"r_sustainability_1","kind":"research","branch":"sustainability","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"reputation":2}},{"key":"r_sustainability_2","kind":"research","branch":"sustainability","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_sustainability_1"],"effects":{"reputation":3,"marginBps":100}},{"key":"r_sustainability_3","kind":"research","branch":"sustainability","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_sustainability_2"],"effects":{"reputation":3,"satisfaction":3}},{"key":"r_sustainability_4","kind":"research","branch":"sustainability","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_sustainability_3","r_brand_2"],"effects":{"reputation":5,"demandBps":500}},{"key":"r_finance_1","kind":"research","branch":"finance","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"taxRateBps":-100}},{"key":"r_finance_2","kind":"research","branch":"finance","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_finance_1"],"effects":{"fixedCostBps":-300}},{"key":"r_finance_3","kind":"research","branch":"finance","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_finance_2"],"effects":{"taxRateBps":-150}},{"key":"r_finance_4","kind":"research","branch":"finance","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_finance_3","r_logistics_2"],"effects":{"taxRateBps":-150,"marginBps":300}},{"key":"p_second","kind":"product","purpose":"products","costHours":12,"minCostCents":300000,"hours":2,"upkeepBps":150,"effects":{"demandBps":800}},{"key":"p_budget","kind":"product","purpose":"products","costHours":16,"minCostCents":400000,"hours":3,"requires":["r_efficiency_1"],"upkeepBps":200,"effects":{"demandBps":1200,"qualityBps":-200}},{"key":"p_premium","kind":"product","purpose":"products","costHours":30,"minCostCents":1000000,"hours":6,"requires":["r_quality_2"],"upkeepBps":300,"effects":{"demandBps":1000,"qualityBps":400}},{"key":"p_subscription","kind":"product","purpose":"products","costHours":36,"minCostCents":1500000,"hours":8,"requires":["r_brand_1","p_second"],"upkeepBps":350,"effects":{"demandBps":1800}},{"key":"p_merch","kind":"product","purpose":"products","costHours":8,"minCostCents":200000,"hours":2,"requires":["r_brand_2"],"upkeepBps":100,"effects":{"demandBps":400,"awarenessBps":200}},{"key":"p_enterprise","kind":"product","purpose":"products","costHours":80,"minCostCents":6000000,"hours":16,"requires":["r_quality_3","p_premium"],"upkeepBps":500,"effects":{"demandBps":3000}},{"key":"g_south","kind":"region","purpose":"expansion","costHours":20,"minCostCents":600000,"hours":4,"upkeepBps":200,"effects":{"marketBps":1000}},{"key":"g_dach","kind":"region","purpose":"expansion","costHours":40,"minCostCents":2000000,"hours":8,"requires":["g_south"],"upkeepBps":300,"effects":{"marketBps":1500}},{"key":"g_europe","kind":"region","purpose":"expansion","costHours":80,"minCostCents":6000000,"hours":12,"requires":["g_dach","l_export"],"upkeepBps":400,"effects":{"marketBps":2500}},{"key":"g_america","kind":"region","purpose":"expansion","costHours":140,"minCostCents":15000000,"hours":24,"requires":["g_europe","r_logistics_2"],"upkeepBps":500,"effects":{"marketBps":3500}},{"key":"g_asia","kind":"region","purpose":"expansion","costHours":200,"minCostCents":30000000,"hours":36,"requires":["g_america","r_logistics_4"],"upkeepBps":600,"effects":{"marketBps":5000}},{"key":"m_machines","kind":"machine","purpose":"expansion","costHours":10,"minCostCents":300000,"hours":2,"maxLevel":5,"costGrowth":1.6,"upkeepBps":50,"effects":{"capacityBps":400}},{"key":"m_datacenter","kind":"machine","purpose":"expansion","costHours":14,"minCostCents":500000,"hours":3,"maxLevel":3,"costGrowth":1.8,"upkeepBps":60,"effects":{"marginBps":150,"capacityBps":200}},{"key":"m_showroom","kind":"machine","purpose":"marketing","costHours":12,"minCostCents":400000,"hours":3,"maxLevel":3,"costGrowth":1.7,"upkeepBps":60,"effects":{"awarenessBps":200,"demandBps":150}},{"key":"a_kleinhirn","kind":"acquisition","purpose":"expansion","costHours":90,"minCostCents":8000000,"hours":6,"requires":["r_automation_2"],"upkeepBps":200,"effects":{"capacityBps":1000,"qualityBps":300}},{"key":"a_datenkrake","kind":"acquisition","purpose":"expansion","costHours":110,"minCostCents":10000000,"hours":6,"requires":["r_brand_2"],"upkeepBps":250,"effects":{"demandBps":1500}},{"key":"a_robobutze","kind":"acquisition","purpose":"expansion","costHours":130,"minCostCents":12000000,"hours":8,"requires":["r_efficiency_3"],"upkeepBps":200,"effects":{"marginBps":600,"capacityBps":500}},{"key":"l_patent","kind":"licence","purpose":"research","costHours":10,"minCostCents":300000,"hours":1,"upkeepBps":100,"effects":{"qualityBps":500}},{"key":"l_brand","kind":"licence","purpose":"marketing","costHours":10,"minCostCents":300000,"hours":1,"upkeepBps":120,"effects":{"demandBps":600}},{"key":"l_export","kind":"licence","purpose":"expansion","costHours":15,"minCostCents":500000,"hours":2,"upkeepBps":50,"effects":{}},{"key":"b_obstkorb","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":5000,"hours":0,"upkeepPerHeadCents":40,"effects":{"satisfaction":3}},{"key":"b_kaffee","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":8000,"hours":0,"upkeepPerHeadCents":50,"effects":{"satisfaction":3}},{"key":"b_tischkicker","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":60000,"hours":0,"upkeepPerHeadCents":10,"effects":{"satisfaction":2}},{"key":"b_hundebuero","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":10000,"hours":0,"upkeepPerHeadCents":20,"effects":{"satisfaction":2}},{"key":"b_massagesessel","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":150000,"hours":0,"upkeepPerHeadCents":20,"effects":{"satisfaction":2}},{"key":"b_jobrad","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":20000,"hours":0,"upkeepPerHeadCents":120,"effects":{"satisfaction":3}},{"key":"b_fitness","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":30000,"hours":0,"upkeepPerHeadCents":150,"effects":{"satisfaction":4}},{"key":"b_homeoffice","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":50000,"hours":0,"upkeepPerHeadCents":100,"effects":{"satisfaction":5}},{"key":"b_weiterbildung","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":40000,"hours":0,"upkeepPerHeadCents":250,"effects":{"satisfaction":4,"qualityBps":200}},{"key":"b_feelgood","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":100000,"hours":0,"upkeepPerHeadCents":300,"effects":{"satisfaction":5}},{"key":"b_betriebsrente","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":80000,"hours":0,"upkeepPerHeadCents":400,"effects":{"satisfaction":6}},{"key":"b_kita","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":500000,"hours":0,"upkeepPerHeadCents":500,"effects":{"satisfaction":7}},{"key":"b_bonus","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":0,"hours":0,"upkeepPerHeadCents":900,"effects":{"satisfaction":8,"capacityBps":300}},{"key":"b_viertagewoche","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":200000,"hours":0,"upkeepPerHeadCents":300,"effects":{"satisfaction":10,"capacityBps":-600}},{"key":"x_pizza","kind":"action","purpose":"benefits","costHours":0,"minCostCents":5000,"costPerHeadCents":1500,"hours":0,"cooldownHours":6,"boost":3,"effects":{}},{"key":"x_teamevent","kind":"action","purpose":"benefits","costHours":0,"minCostCents":30000,"costPerHeadCents":6000,"hours":0,"cooldownHours":24,"boost":8,"effects":{}},{"key":"x_firmenfeier","kind":"action","purpose":"benefits","costHours":0,"minCostCents":100000,"costPerHeadCents":12000,"hours":0,"cooldownHours":72,"boost":12,"effects":{}},{"key":"x_sonderbonus","kind":"action","purpose":"benefits","costHours":0,"minCostCents":0,"costPerHeadCents":50000,"hours":0,"cooldownHours":48,"boost":15,"effects":{}}]}'::jsonb, 'Defaults from src/config/balance.ts, section "listed"'),
   ('companyAssistant', '{"claudePerHour":20,"maxTextLength":300,"briefingTasks":3,"busyTasks":2,"urgentMinutes":10,"historyTurns":8}'::jsonb, 'Defaults from src/config/balance.ts, section "companyAssistant"'),
-  ('companyHealth', '{"status":{"good":80,"ok":60,"weak":35},"qualityTarget":0.7,"momentumTargetShare":0.5,"momentumFloor":0.4,"imageCalm":0.85,"imageHitWeight":3,"teamFloor":0.4,"runwayTargetHours":48,"reserveHours":6,"minImpactCents":100,"strengths":{"gainPerHour":0.02,"decayPerHour":0.05,"marginFull":0.25,"cashHoursFull":24,"awarenessFull":0.5,"rewards":[{"at":50,"bps":200},{"at":75,"bps":500},{"at":90,"bps":1000},{"at":98,"bps":1500}]},"reputation":{"start":50,"base":50,"adjustPerHour":0.08,"demandMaxEffect":0.2,"qualityMax":10,"qualityMaxLoss":5,"qualityNeutral":0.4,"deliveryMaxLoss":8,"premiumLowQualityLoss":6,"budgetGain":2,"wagesMaxLoss":10,"billsLoss":6,"crisisPerSeverity":3,"campaignGain":3}}'::jsonb, 'Defaults from src/config/balance.ts, section "companyHealth"'),
+  ('companyHealth', '{"status":{"good":80,"ok":60,"weak":35},"qualityTarget":0.7,"momentumTargetShare":0.5,"momentumFloor":0.4,"imageCalm":0.85,"imageHitWeight":3,"teamFloor":0.4,"runwayTargetHours":48,"reserveHours":6,"minImpactCents":100,"strengths":{"gainPerHour":0.02,"decayPerHour":0.05,"marginFull":0.25,"cashHoursFull":24,"awarenessFollowPerHour":0.25,"rewards":[{"at":50,"bps":200},{"at":75,"bps":500},{"at":90,"bps":1000},{"at":98,"bps":1500}]},"reputation":{"start":50,"base":50,"adjustPerHour":0.08,"demandMaxEffect":0.2,"qualityMax":10,"qualityMaxLoss":5,"qualityNeutral":0.4,"deliveryMaxLoss":8,"premiumLowQualityLoss":6,"budgetGain":2,"wagesMaxLoss":10,"billsLoss":6,"crisisPerSeverity":3,"campaignGain":3}}'::jsonb, 'Defaults from src/config/balance.ts, section "companyHealth"'),
   ('wageMood', '{"crisisPerSeverityBps":500,"scandalBps":500,"scandals":["quality_scandal","data_breach","protest","bad_review","strike"],"shareFallFreeBps":300,"shareFallShare":0.5,"maxShareBps":2000,"minBps":6000}'::jsonb, 'Defaults from src/config/balance.ts, section "wageMood"'),
   ('marketPopularity', '{"windowDays":3,"viewCooldownMinutes":30,"maxViewsPerDay":200,"refreshMinutes":5,"weights":{"view":1,"investor":20,"volume":0.2}}'::jsonb, 'Defaults from src/config/balance.ts, section "marketPopularity"'),
   ('stockNews', '{"everyMinutes":12,"leadMinMinutes":10,"leadMaxMinutes":40,"minMoveBps":300,"maxMoveBps":1200,"reliabilityBps":7500,"keepHours":24}'::jsonb, 'Defaults from src/config/balance.ts, section "stockNews"'),

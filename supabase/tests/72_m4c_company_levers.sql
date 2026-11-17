@@ -16,9 +16,9 @@ select tests.set_cfg('startups', '{aiWorkerStandbyBps}', '10000') is null as ok 
 select tests.set_cfg('startups', '{gmbh,fixedCostCentsPerQuarter}', '600000') is null as ok \gset
 -- and awareness that does not move by the hour, so every hour sells with the same awareness
 select coalesce(value -> 'awareness', 'null') as aw_cfg0 from public.game_config where key = 'startups' \gset
-select tests.set_cfg('startups', '{awareness,growthPerQuarter}', '0') is null as ok \gset
-select tests.set_cfg('startups', '{awareness,decayPerQuarter}', '0') is null as ok \gset
-select tests.set_cfg('startups', '{awareness,marketingMaxGain}', '0') is null as ok \gset
+select tests.set_cfg('startups', '{awareness,wordOfMouthPerHour}', '0') is null as ok \gset
+select tests.set_cfg('startups', '{awareness,decayPerHour}', '0') is null as ok \gset
+select tests.set_cfg('startups', '{awareness,marketingMaxRatePerHour}', '0') is null as ok \gset
 
 \set a '''07207207-0000-4000-8000-0000000000a1'''
 \set b '''07207207-0000-4000-8000-0000000000b2'''
@@ -175,16 +175,19 @@ reset role;
 select tests.company_of(:d) as dco \gset
 select tests.company_of(:e) as eco \gset
 update public.player_companies set awareness = 0.3, quality = 0.5 where company_id in (:'dco', :'eco');
--- ADR-180: word of mouth now works every hour (growthPerQuarter / quarterHours per hour)
-select tests.set_cfg('startups', '{awareness,growthPerQuarter}', '0.3') is null as ok \gset
+-- ADR-188: word of mouth works every hour (wordOfMouthPerHour)
+select tests.set_cfg('startups', '{awareness,wordOfMouthPerHour}', '0.05') is null as ok \gset
 select public.player_company_close_hour(:'dco', :'qs'::timestamptz + interval '7 hours') is not null
    and public.player_company_close_hour(:'eco', :'qs'::timestamptz + interval '7 hours') is not null as ok \gset
-select tests.set_cfg('startups', '{awareness,growthPerQuarter}', '0') is null as ok \gset
+select tests.set_cfg('startups', '{awareness,wordOfMouthPerHour}', '0') is null as ok \gset
 select (select awareness from public.player_companies where company_id = :'dco') as awd,
        (select awareness from public.player_companies where company_id = :'eco') as awe \gset
 select tests.assert(
-  :awd::float8 > :awe::float8
-  and abs((:awd::float8 - :awe::float8) - 0.3 / 6 * (1.5 - 0.7) * 0.3 * 0.7 * (0.5 + 0.5)) < 1e-9,
+  :awd::float8 > :awe::float8 and :awe::float8 > 0.3
+  -- ADR-188: w x a x (1 - a / cap) x (0.5 + q) x price x served share x reputation factor (50 = 1)
+  and (select abs((:awd::float8 - 0.3) - 0.05 * 0.3 * (1 - 0.3 / 0.6) * 1.0 * 1.5
+                                         * least(1, h.capacity_cents::float8 / greatest(1, h.demand_cents))) < 1e-4
+         from public.player_company_hours h where h.company_id = :'dco' order by h.hour_start desc limit 1),
   'operating hour: word of mouth x pricing.awareness (budget 1.5, premium 0.7)');
 
 -- =============================================================================

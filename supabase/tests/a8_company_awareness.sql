@@ -49,8 +49,8 @@ select tests.assert(:nq = 0 or :awa > 0.03 + 0.03 * :nq and :awb > 0.03 and :awb
   'quarter close: marketing lifts awareness by several points per quarter, word of mouth alone a little');
 select tests.assert(:nq = 0 or
   (select awareness_bps from public.player_company_reports where company_id = :'aco' order by game_quarter_id desc limit 1)
-    = round(:awa * 10000)::int,
-  'report: awareness_bps is the new awareness in basis points');
+    between 300 and round(:awa * 10000)::int,
+  'report: awareness_bps is the awareness at the quarter close in basis points (ADR-180/188: it moves every hour)');
 select tests.login_as('authenticated', :a);
 select tests.assert((public.get_my_company() #>> '{company,awareness_bps}')::int = round(:awa * 10000)::int,
   'get_my_company(): awareness_bps = awareness x 10 000 (the client divides by 10 000)');

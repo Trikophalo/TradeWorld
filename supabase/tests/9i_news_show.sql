@@ -106,7 +106,10 @@ select tests.assert(
   -- the stock moved (a sector segment may have moved it once more)
   and (select last_price_e4 <> :px0::bigint and (last_price_e4 > :px0::bigint) = (:sec_bps > 0 or last_price_e4 > :px0::bigint)
          from public.security_quotes where security_id = :'sec')
-  and (select abs(awareness - least(1, greatest(0.05, :aw0::numeric * (10000 + :aw_bps) / 10000))) < 1e-9
+  -- ADR-188: through company_awareness_add (cap of the company, floor 2 %)
+  and (select abs(awareness - (:aw0::float8 + case when :aw_bps >= 0
+         then greatest(0, least(:aw0::float8 * :aw_bps / 10000.0, public.company_awareness_cap_of(:'cid') - :aw0::float8))
+         else least(0, greatest(:aw0::float8 * :aw_bps / 10000.0, 0.02 - :aw0::float8)) end)) < 1e-9
          from public.player_companies where company_id = :'cid')
   and exists (select 1 from public.stock_tips t where t.applied_at is null and t.published_at > now() - interval '1 minute')
   and exists (select 1 from public.notifications n where n.player_id = :l and n.type_key = 'news_show')

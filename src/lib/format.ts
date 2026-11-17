@@ -133,6 +133,17 @@ export function formatPrice(priceE4: Numeric): string {
   return own(Math.abs(value) < 1 ? pricePenny.format(value) : eur.format(value));
 }
 
+const points = new Intl.NumberFormat(LOCALE, {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+  signDisplay: "exceptZero",
+});
+
+/** A change of a 0..1 share in percentage points (ADR-188): 0.012 -> "+1,2", -0.003 -> "−0,3". */
+export function formatPoints(share: number): string {
+  return points.format(share * 100).replace("-", "−");
+}
+
 /** 150 bps -> "+1,50 %" */
 export function formatBps(bps: number): string {
   return percent.format(bps / 10_000);

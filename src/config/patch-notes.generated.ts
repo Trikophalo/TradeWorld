@@ -543,6 +543,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Firma aufgeräumt",
         text: "klare Abschnitte mit Zweck und Sprungleiste statt Klappmenüs, eine Statuszeile unter dem Firmenschild, „i“-Erklärungen und ein „Wo es fehlt“, das je…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-d400fafc",
+        title: "Bekanntheit neu",
+        text: "Marketing wirkt jede Stunde sichtbar (eine Garage kommt mit normalem Budget in einem Tag auf rund 30 %), Aufgaben und Kampagnen springen sofort, die…",
+      },
     ],
   },
   {

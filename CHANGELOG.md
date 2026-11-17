@@ -113,6 +113,7 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Bekanntheit neu (ADR-188):** Marketing wirkt jede Stunde sichtbar (eine Garage kommt mit normalem Budget in einem Tag auf rund 30 %), Aufgaben und Kampagnen springen sofort, die Obergrenze steht dabei (Garage 60 %, steigt mit Ausbau), und die Stärke „Bekanntheit“ folgt dem Wert in Stunden statt Tagen.
 - **Firma aufgeräumt (ADR-183):** klare Abschnitte mit Zweck und Sprungleiste statt Klappmenüs, eine Statuszeile unter
   dem Firmenschild, „i“-Erklärungen und ein „Wo es fehlt“, das je Punkt sagt, was zu tun ist.
 - **Ruf für jede Firma:** Qualität, faire Preise, bezahlte Löhne und Kampagnen heben ihn jede Stunde, er bewegt die Nachfrage.

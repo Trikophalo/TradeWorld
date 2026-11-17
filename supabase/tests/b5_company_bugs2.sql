@@ -91,9 +91,9 @@ select tests.assert(
   and public.company_strengths_reward_bps('{"awareness": 49.9, "quality": 50, "delivery": 50, "margin": 50, "team": 50, "finance": 50}') = 0,
   'b5: strengths step and reward tiers as in TypeScript');
 select tests.assert(
-  (:'c1'::jsonb #>> '{strengths,hours}')::int = 4 and (:'c1'::jsonb #>> '{strengths,overall}')::float8 < 10
+  (:'c1'::jsonb #>> '{strengths,hours}')::int = 4 and (:'c1'::jsonb #>> '{strengths,overall}')::float8 < 20
   and (:'c1'::jsonb #>> '{strengths,reward_bps}')::int = 0,
-  'b5: four hours move the strengths only a few points (100 takes days)');
+  'b5: four hours move the strengths only a few points (100 takes days; ADR-188: awareness follows within hours)');
 update public.company_strengths set scores = '{"awareness": 90, "quality": 90, "delivery": 90, "margin": 90, "team": 90, "finance": 90}'
  where company_id = :'co';
 select public.player_company_close_hour(:'co', date_trunc('hour', public.game_now())) as h5 \gset

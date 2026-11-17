@@ -10271,5 +10271,34 @@
       "expired": "Anfrage verpasst",
       "requested": "Interviewanfrage"
     }
+  },
+  "awareness": {
+    "title": "Bekanntheit",
+    "valueOfCap": "{value} % von höchstens {cap} %",
+    "capWhy": "Obergrenze: {tierCap} % als {tier}, +{stagePts} für Stufe {stage}, +{levelPts} für Ausbaustufe {level}. Sie steigt mit Fachwissen, Ausbau und Rechtsform.",
+    "strength": "Stärke Bekanntheit: {score}/100 (folgt dem Anteil an der Obergrenze, ein Viertel des Abstands je Stunde)",
+    "lastHour": "Letzte Stunde",
+    "nothing": "Noch keine abgeschlossene Stunde.",
+    "since": "Seitdem:",
+    "tier": {
+      "garage": "Garage",
+      "small_business": "Kleinunternehmen",
+      "gmbh": "GmbH",
+      "ag": "AG"
+    },
+    "source": {
+      "marketing": "Marketing",
+      "word_of_mouth": "Mundpropaganda",
+      "decay": "Vergessen",
+      "tasks": "Aufgaben",
+      "campaign": "Kampagne",
+      "moves": "Geschäftszüge",
+      "interview": "Interview",
+      "news": "Nachrichten",
+      "pitch": "Eigener Zug",
+      "protest": "Protest",
+      "event": "Ereignis",
+      "rescale": "Umstellung"
+    }
   }
 }

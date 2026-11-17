@@ -72,6 +72,7 @@ import { createDealEngine, initialDeals, type DemoDealsState } from "./demo/deal
 import { tagFromUniform } from "@/lib/player-tag";
 import {
   createCompanyEngine,
+  demoAwareness,
   demoLastHour,
   demoStrengths,
   type DemoCompanyState,
@@ -1871,6 +1872,12 @@ const protests = createProtestsEngine({
 });
 
 export const demoEngine: GameEngine = {
+  // ADR-188: awareness, its cap and what moved it
+  companyAwareness: async () => {
+    const c = p().company;
+    if (!c) throw new GameError("company_not_found");
+    return demoAwareness(c);
+  },
   battle: battles.battle,
   joinBattle: battles.joinBattle,
   leaveBattle: battles.leaveBattle,
