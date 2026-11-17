@@ -104,3 +104,28 @@ test("a uranium card, a warrior card and Yin and Yang render on /dev/ui", async 
   const block = page.getByTestId("nexamon-new-sets");
   expect(await block.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
 });
+
+test("the new sets wait for their release; several packs open one after another (ADR-182)", async ({ page }) => {
+  await preparePlayer(page);
+  await page.goto("/nexamon?tab=shop");
+  if (Date.now() < Date.parse("2026-11-17T16:30:00Z")) {
+    await expect(page.getByTestId("release-titans_revenge")).toContainText("Neu ab 17:30");
+    await page.getByTestId("buy-yin_yang").click();
+    await expect(page.getByTestId("confirm-buy")).toBeDisabled();
+    await expect(page.getByTestId("pack-preview-note")).toBeVisible();
+    await page.keyboard.press("Escape");
+  }
+  await page.getByTestId("buy-mystic_energy").click();
+  await page.getByTestId("pack-count-more").click();
+  await page.getByTestId("pack-count-more").click();
+  await expect(page.getByTestId("pack-count-value")).toHaveText("3");
+  await expect(page.getByTestId("confirm-buy")).toContainText("3 Packs");
+  await page.getByTestId("confirm-buy").click();
+  await expect(page.getByTestId("pack-series")).toHaveText("Pack 1 von 3");
+  await page.getByTestId("pack-skip").click();
+  await page.getByTestId("pack-next").click();
+  await expect(page.getByTestId("pack-series")).toHaveText("Pack 2 von 3");
+  await page.getByTestId("pack-skip-all").click();
+  await expect(page.getByTestId("pack-all-title")).toContainText("3 Packs");
+  await expect(page.getByTestId("pack-result").locator("li")).not.toHaveCount(0);
+});
