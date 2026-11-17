@@ -12,6 +12,10 @@ import type { LaserState } from "@/lib/sim/battle/laser";
 import type { MarginState } from "@/lib/sim/battle/margin";
 import type { PotatoState } from "@/lib/sim/battle/potato";
 import type { SumoState } from "@/lib/sim/battle/sumo";
+import type { CrashState } from "@/lib/sim/battle/crash";
+import type { PaintState } from "@/lib/sim/battle/paint";
+import type { TagState } from "@/lib/sim/battle/tag";
+import type { ZoneState } from "@/lib/sim/battle/zone";
 import { aliveCount } from "@/lib/sim/battle/core";
 import { formatCountdown } from "@/lib/format";
 import { playSound } from "@/lib/sound";
@@ -42,17 +46,21 @@ interface Hud {
   bearSoon: boolean;
   gongMs: number;
   height: number;
+  /** Bulle und Bär: the bear's slot (-1 none). */
+  bear: number;
 }
 
 /** The action button of a game, if it has one (label key in battle.controls). */
-const ACTION: Partial<Record<ArenaKind, "actionButton" | "tackleButton" | "jumpButton">> = {
+const ACTION: Partial<Record<ArenaKind, "actionButton" | "tackleButton" | "jumpButton" | "bombButton">> = {
   sumo: "actionButton",
+  paint: "bombButton",
   dash: "tackleButton",
   laser: "jumpButton",
 };
 /** The line about the action key under the arena. */
-const ACTION_KEY: Partial<Record<ArenaKind, "action" | "dashAction" | "laserAction">> = {
+const ACTION_KEY: Partial<Record<ArenaKind, "action" | "dashAction" | "laserAction" | "paintAction">> = {
   sumo: "action",
+  paint: "paintAction",
   dash: "dashAction",
   laser: "laserAction",
 };
@@ -156,8 +164,8 @@ export function ArenaGame({
         const total = lockstep.maxTicks * lockstep.params.tickMs;
         const elapsed = Math.max(0, now + lockstep.offsetMs - Date.parse(battle.startedAt!));
         const board =
-          kind === "coins" || kind === "dash"
-            ? (st as CoinsState | DashState).score
+          kind === "coins" || kind === "dash" || kind === "zone" || kind === "paint"
+            ? (st as CoinsState | DashState | ZoneState | PaintState).score
                 .map((score, slot) => ({ slot, score }))
                 .sort((a, b) => b.score - a.score)
             : [];
@@ -173,15 +181,19 @@ export function ArenaGame({
                 ? (st as BullsState).hearts[me]!
                 : kind === "laser"
                   ? (st as LaserState).hearts[me]!
-                  : 0,
+                  : kind === "crash"
+                    ? (st as CrashState).hearts[me]!
+                    : 0,
           score:
             me === null
               ? 0
-              : kind === "coins" || kind === "dash"
-                ? (st as CoinsState | DashState).score[me]!
-                : kind === "sumo"
-                  ? (st as SumoState).pushes[me]!
-                  : 0,
+              : kind === "coins" || kind === "dash" || kind === "zone" || kind === "paint"
+                ? (st as CoinsState | DashState | ZoneState | PaintState).score[me]!
+                : kind === "tag"
+                  ? Math.round((st as TagState).held[me]! / lockstep.params.tps)
+                  : kind === "sumo"
+                    ? (st as SumoState).pushes[me]!
+                    : 0,
           board,
           holder: kind === "potato" ? (st as PotatoState).holder : -1,
           idle: kind === "floor" && me !== null && st.p.out[me]! < 0 && st.p.idle[me]! > 30,
@@ -196,6 +208,7 @@ export function ArenaGame({
               ? ((st as MarginState).call - st.tick) * lockstep.params.tickMs
               : -1,
           height: kind === "elevator" && me !== null ? st.h - 1 - (st as ElevatorState).best[me]! : 0,
+          bear: kind === "tag" ? (st as TagState).bear : -1,
         });
       }
       frame = requestAnimationFrame(loop);
@@ -225,19 +238,32 @@ export function ArenaGame({
                 ? hud.holder === me
                   ? t("hud.pass")
                   : t("hud.holder", { name: names.get(hud.holder) ?? "?" })
-                : hud?.idle
-                  ? t("hud.warn")
-                  : hud?.bearSoon
-                    ? t("hud.bearComing")
-                    : hud && hud.gongMs >= 0
-                      ? hud.gongMs < 1_200
-                        ? t("hud.callNow")
-                        : t("hud.call", { seconds: Math.ceil(hud.gongMs / 1000) })
-                      : t(`games.${kind}.tagline`)}
+                : kind === "tag" && hud && hud.bear >= 0
+                  ? hud.bear === me
+                    ? t("hud.bear")
+                    : t("hud.bearName", { name: names.get(hud.bear) ?? "?" })
+                  : hud?.idle
+                    ? t("hud.warn")
+                    : hud?.bearSoon
+                      ? t("hud.bearComing")
+                      : hud && hud.gongMs >= 0
+                        ? hud.gongMs < 1_200
+                          ? t("hud.callNow")
+                          : t("hud.call", { seconds: Math.ceil(hud.gongMs / 1000) })
+                        : t(`games.${kind}.tagline`)}
         </span>
         <span className="flex items-center gap-2 text-xs text-fg-2">
-          {(kind === "bulls" || kind === "laser") && me !== null && hud && (
+          {(kind === "bulls" || kind === "laser" || kind === "crash") && me !== null && hud && (
             <Hearts count={hud.hearts} max={heartsMax} />
+          )}
+          {kind === "zone" && me !== null && hud && (
+            <span className="font-pixel nums text-gold">{t("hud.coins", { count: hud.score })}</span>
+          )}
+          {kind === "paint" && me !== null && hud && (
+            <span className="font-pixel nums text-fg-1">{t("hud.tiles", { count: hud.score })}</span>
+          )}
+          {kind === "tag" && me !== null && hud && (
+            <span className="nums text-loss">{t("hud.bearTime", { seconds: hud.score })}</span>
           )}
           {kind === "coins" && me !== null && hud && (
             <span className="font-pixel nums text-gold">{t("hud.coins", { count: hud.score })}</span>
@@ -259,7 +285,7 @@ export function ArenaGame({
           </span>
         </span>
       </div>
-      {(kind === "coins" || kind === "dash") && hud && (
+      {(kind === "coins" || kind === "dash" || kind === "zone" || kind === "paint") && hud && (
         <ol
           className="flex w-full max-w-3xl flex-wrap justify-center gap-x-3 gap-y-1 text-2xs text-fg-3"
           aria-label={t("hud.coins", { count: "" })}

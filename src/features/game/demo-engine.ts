@@ -50,6 +50,9 @@ import { createFriendEngine, demoFriendCard, type DemoFriend, type DemoFriendCod
 import { createFriendChatEngine, type DemoChat } from "./demo/friend-chats";
 import { createAccessoryEngine, type DemoWardrobe } from "./demo/accessories";
 import { createNexamonEngine, demoNexamonBonusBps, type DemoNexamonState } from "./demo/nexamon";
+import { createSealedEngine, type DemoSealedPack } from "./demo/nexamon-sealed";
+import { NEXAMON_RULES } from "@/config/nexamon-rules";
+import { NEXAMON_SETS } from "@/config/nexamon/types";
 import { createPackBattleEngine } from "./demo/pack-battle";
 import { demoCoworkerMembers, demoCoworkers, type DemoCoworker } from "./demo/floor";
 import { createStockNewsEngine } from "./demo/stock-news";
@@ -153,6 +156,8 @@ interface PlayerState {
   nexamon?: DemoNexamonState;
   /** Battle wins with a prize today (ADR-160, daily cap). */
   battleWins?: { day: string; count: number };
+  /** Sealed Nexamon booster packs: battle prizes and packs bought to open later (ADR-177). */
+  nexamonSealed?: DemoSealedPack[];
   /** Feed, notifications and league of the demo (ADR-088, ADR-089). */
   social?: DemoSocialState;
   /** Deals with the demo's trading partners and the trust log (ADR-098). */
@@ -1440,6 +1445,24 @@ const packBattles = createPackBattleEngine({
   random: Math.random,
 });
 
+/** Sealed booster packs (ADR-177): opened with the pull of a bought pack, without paying again. */
+const sealed = createSealedEngine({
+  list: () => p().nexamonSealed ?? [],
+  setList: (packs) => {
+    p().nexamonSealed = packs;
+    persist();
+  },
+  level,
+  cashCents: () => p().cashCents,
+  pay: (cents) => {
+    p().cashCents -= cents;
+    persist();
+  },
+  open: (requestId, set, priceCents) => nexamon.demoOpenSealedPack(requestId, set, priceCents),
+  idempotent,
+  now: () => Date.now(),
+});
+
 /** Made-up colleagues at the demo player's AI employer (ADR-156); none without a job or with an own company. */
 async function coworkersNow(): Promise<DemoCoworker[]> {
   if (p().company) return [];
@@ -1745,6 +1768,13 @@ const battles = createBattleEngine({
   },
   freeArtwork: () => art.freeGalleryWork(),
   giveArtwork: (id) => art.giveGalleryWork(id),
+  packSets: () =>
+    NEXAMON_SETS.map((key) => ({
+      key,
+      name: NEXAMON_RULES.sets[key].name,
+      priceCents: NEXAMON_RULES.sets[key].packPriceCents,
+    })),
+  grantSealedPacks: (set, count) => sealed.grantSealed(set, count, "battle"),
   stockQuote: () => {
     const c = DEMO_COMPANIES[Math.floor(Math.random() * DEMO_COMPANIES.length)];
     const mid = c && m().mids.get(c.ticker);
@@ -1923,6 +1953,13 @@ export const demoEngine: GameEngine = {
   async buyNexamonPack(requestId, set) {
     const pack = await nexamon.buyNexamonPack(requestId, set);
     packBattles.demoPackOpened(pack.packId, set);
+    return pack;
+  },
+  nexamonSealedPacks: sealed.nexamonSealedPacks,
+  buyNexamonSealedPack: sealed.buyNexamonSealedPack,
+  async openNexamonSealedPack(requestId, packId) {
+    const pack = await sealed.openNexamonSealedPack(requestId, packId);
+    packBattles.demoPackOpened(pack.packId, pack.set);
     return pack;
   },
   /** Own card with the worn accessories; the made-up friends and colleagues have one too (ADR-155, ADR-156). */

@@ -903,7 +903,8 @@
     "interview_closed": "Das Interview ist schon vorbei.",
     "insider_cooldown": "Insiderregel: Nach einer Entnahme aus deiner Firma kannst du ihre Aktie 24 Stunden lang nicht kaufen.",
     "capital_increase_cooldown": "Eine Kapitalerhöhung geht höchstens einmal am Tag.",
-    "issue_proceeds_locked": "Das Geld aus dem Börsengang oder der Kapitalerhöhung gehört drei Tage lang der Firma und kann noch nicht entnommen werden."
+    "issue_proceeds_locked": "Das Geld aus dem Börsengang oder der Kapitalerhöhung gehört drei Tage lang der Firma und kann noch nicht entnommen werden.",
+    "sealed_pack_unknown": "Diesen ungeöffneten Booster gibt es nicht (mehr)."
   },
   "locks": {
     "level": "Level {level}",
@@ -9151,6 +9152,17 @@
       "emptyTitle": "Noch kein Slab",
       "emptyText": "Schick Karten zu ASP. Bewertete Karten erscheinen hier, die beste Note zuerst.",
       "label": "{name}, {grade}, Wert {value}"
+    },
+    "sealed": {
+      "title": "Ungeöffnete Booster",
+      "count": "{count, plural, one {# Booster} other {# Booster}} warten",
+      "fromBattle": "Battle-Gewinn",
+      "open": "Öffnen",
+      "openFailed": "Öffnen hat nicht geklappt",
+      "locked": "Öffnen kannst du sie, sobald Nexamon freigeschaltet ist.",
+      "buyLater": "Kaufen und später öffnen ({price})",
+      "buyFailed": "Kauf hat nicht geklappt",
+      "bought": "{set} liegt bei „Ungeöffnete Booster“"
     }
   },
   "hq": {

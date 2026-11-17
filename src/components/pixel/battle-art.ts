@@ -74,6 +74,12 @@ export const ARENA = {
   beamCore: "#fff0f2",
 } as const;
 
+/** Farbrausch (ADR-177): one paint colour per slot (up to ten players) and its dark shade. */
+export const PAINT_PALETTE: { readonly light: readonly string[]; readonly dark: readonly string[] } = {
+  light: ["#ff4d5e", "#4f8cff", "#2fd98c", "#ffd84a", "#c36bff", "#ff9a3d", "#4fe3e8", "#ff7ad1", "#a8e04a", "#e8ecff"],
+  dark: ["#a8222e", "#2a4fa8", "#1b8c5a", "#c9971a", "#7a35b0", "#b0601a", "#23959a", "#b03f8a", "#6a9a1e", "#9aa2c4"],
+};
+
 export const BULL: PixelArt = {
   palette: { b: "#5a3524", B: "#3e2216", w: "#f3efe4", r: "#ff2a3a", n: "#d98a7a", k: "#151722", y: "#ffd84a" },
   grid: [

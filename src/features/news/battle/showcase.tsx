@@ -82,22 +82,50 @@ export function BattleShowcase() {
         <PrizeView prize={{ kind: "xp", xp: 2900 }} />
         <PrizeView prize={{ kind: "money", cents: 600_000 }} />
         <PrizeView prize={{ kind: "skin" }} />
+        <PrizeView prize={{ kind: "accessory", tier: "epic" }} />
+        <PrizeView prize={{ kind: "accessory", tier: "rare", key: "cowboy_hat", name: "Cowboyhut" }} />
+        <PrizeView
+          prize={{
+            kind: "packs",
+            packs: [
+              { set: "super_apex", count: 1, name: "Nexamon: Super Apex" },
+              { set: "mystic_energy", count: 5, name: "Nexamon: Mystic Energy" },
+            ],
+            cents: 200_000,
+          }}
+        />
         <div className="flex flex-wrap gap-2">
           {BATTLE_ACCESSORIES.map((a) => (
             <PlayerFigure key={a.key} avatarKey="rookie" accessories={[a.key]} scale={2} title={a.name} />
           ))}
         </div>
       </div>
-      {(["floor", "bulls", "coins", "sumo", "potato", "bear", "dash", "margin", "elevator", "laser"] as const).map(
-        (k) => (
-          <div key={k} className="space-y-2 rounded-lg border border-line-1 bg-surface-1 p-4">
-            <p className="label-pixel text-fg-3">
-              {t("showcase")}: {t(`games.${k}.name`)}
-            </p>
-            <ArenaPreview kind={k} />
-          </div>
-        ),
-      )}
+      {(
+        [
+          "floor",
+          "bulls",
+          "coins",
+          "sumo",
+          "potato",
+          "bear",
+          "dash",
+          "margin",
+          "elevator",
+          "laser",
+          "zone",
+          "tag",
+          "tiles",
+          "paint",
+          "crash",
+        ] as const
+      ).map((k) => (
+        <div key={k} className="space-y-2 rounded-lg border border-line-1 bg-surface-1 p-4">
+          <p className="label-pixel text-fg-3">
+            {t("showcase")}: {t(`games.${k}.name`)}
+          </p>
+          <ArenaPreview kind={k} />
+        </div>
+      ))}
       <div className="space-y-3 rounded-lg border border-line-1 bg-surface-1 p-4">
         <p className="label-pixel text-fg-3">
           {t("showcase")}: {t("games.rodeo.name")}

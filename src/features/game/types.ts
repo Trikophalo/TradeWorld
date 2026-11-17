@@ -8,6 +8,7 @@
  */
 import type { BattleEngine } from "./battle-types";
 import type { NexamonEngine } from "./nexamon-types";
+import type { NexamonSealedEngine } from "./nexamon-sealed-types";
 import type { PackBattleEngine } from "./pack-battle-types";
 import type { ListedEngine } from "./listed-types";
 import type { SectorKey } from "@/components/pixel/art";
@@ -2202,6 +2203,8 @@ export const GAME_ERROR_KEYS = [
   "insider_cooldown",
   "capital_increase_cooldown",
   "issue_proceeds_locked",
+  // ADR-177
+  "sealed_pack_unknown",
 ] as const;
 export type GameErrorKey = (typeof GAME_ERROR_KEYS)[number] | "unknown";
 
@@ -2298,7 +2301,7 @@ export interface InterviewAnswer {
   quick?: number;
 }
 
-export interface GameEngine extends BattleEngine, NexamonEngine, PackBattleEngine, ListedEngine {
+export interface GameEngine extends BattleEngine, NexamonEngine, NexamonSealedEngine, PackBattleEngine, ListedEngine {
   /** The own CEO interview: an open request or the latest result (ADR-173). */
   companyInterview(): Promise<CompanyInterviewState>;
   answerCompanyInterview(requestId: string, id: number, answers: InterviewAnswer[]): Promise<CompanyInterviewState>;

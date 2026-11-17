@@ -22,6 +22,7 @@ import { NFT_RPC_SCHEMAS, liveNftEngine } from "./api-nfts";
 import { FLOOR_RPC_SCHEMAS, liveFloorEngine } from "./api-floor";
 import { BATTLE_RPC_SCHEMAS, liveBattleEngine } from "./api-battles";
 import { NEXAMON_RPC_SCHEMAS, liveNexamonEngine } from "./api-nexamon";
+import { NEXAMON_SEALED_RPC_SCHEMAS, liveNexamonSealedEngine } from "./api-nexamon-sealed";
 import { PACK_BATTLE_RPC_SCHEMAS, livePackBattleEngine } from "./api-pack-battle";
 import { rpc, toErrorKey } from "./rpc";
 import {
@@ -526,6 +527,7 @@ export const RPC_SCHEMAS = {
   ...FLOOR_RPC_SCHEMAS,
   ...BATTLE_RPC_SCHEMAS,
   ...NEXAMON_RPC_SCHEMAS,
+  ...NEXAMON_SEALED_RPC_SCHEMAS,
   ...PACK_BATTLE_RPC_SCHEMAS,
   get_stock_news: stockNewsSchema,
   get_player_holdings: holdingsSchema,
@@ -552,6 +554,7 @@ export const liveEngine: GameEngine = {
   ...liveInterviewEngine,
   ...liveBattleEngine,
   ...liveNexamonEngine,
+  ...liveNexamonSealedEngine,
   ...livePackBattleEngine,
   ...liveCareerEngine,
   ...liveCompanyEngine,

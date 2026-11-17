@@ -20,7 +20,8 @@ import { DoodleSays, GameIcon, PopNumber, PrizeView, fill } from "./parts";
  */
 
 /** The line about the action key on the intro card. */
-const ACTION_KEYS: Partial<Record<BattleKind, "action" | "dashAction" | "laserAction">> = {
+const ACTION_KEYS: Partial<Record<BattleKind, "action" | "dashAction" | "laserAction" | "paintAction">> = {
+  paint: "paintAction",
   sumo: "action",
   dash: "dashAction",
   laser: "laserAction",

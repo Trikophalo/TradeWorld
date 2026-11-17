@@ -11,6 +11,8 @@ import { PlayerFigure } from "@/components/ui/player-figure";
 import { BATTLE_ACCESSORIES } from "@/config/battle-accessories";
 import { BATTLE_RULES, type BattleKind } from "@/config/battles";
 import { ArtworkImage } from "@/features/artworks/components/artwork-image";
+import { NexamonPack } from "@/features/nexamon/components/pack";
+import { NEXAMON_SETS, type NexamonSetKey } from "@/config/nexamon/types";
 import type { BattlePrize } from "@/features/game/battle-types";
 import { formatInteger, formatMoney } from "@/lib/format";
 import { DURATION, EASE, SPRING } from "@/lib/motion";
@@ -105,6 +107,40 @@ export function PrizeView({ prize, size = "md" }: { prize: BattlePrize; size?: "
         />
         <p className={cn("min-w-0 font-semibold text-pretty text-fg-1", big ? "text-lg" : "text-sm")}>
           {t("prize.nft", { title: prize.artwork.title })}
+        </p>
+      </div>
+    );
+  }
+  if (prize.kind === "accessory") {
+    const tier = (["common", "rare", "epic", "legendary", "mythic"] as const).find((x) => x === prize.tier) ?? "rare";
+    return (
+      <div className="min-w-0 space-y-1.5" data-testid="prize-accessory">
+        <p className={cn("font-semibold text-fg-1", big ? "text-lg" : "text-sm")}>
+          {prize.name ?? t("prize.accessory", { tier: t(`prize.tiers.${tier}`) })}
+        </p>
+        {prize.key ? (
+          <PlayerFigure avatarKey="rookie" accessories={[prize.key]} scale={big ? 4 : 2} />
+        ) : (
+          <p className="text-2xs text-gold">{t("prize.accessoryHint")}</p>
+        )}
+      </div>
+    );
+  }
+  if (prize.kind === "packs") {
+    const isSet = (set: string): set is NexamonSetKey => (NEXAMON_SETS as readonly string[]).includes(set);
+    return (
+      <div className="min-w-0 space-y-1.5" data-testid="prize-packs">
+        <p className={cn("font-semibold text-fg-1", big ? "text-lg" : "text-sm")}>{t("prize.packs")}</p>
+        <ul className="flex flex-wrap items-end gap-3">
+          {prize.packs.map((x) => (
+            <li key={x.set} className="flex items-center gap-1.5">
+              {isSet(x.set) && <NexamonPack set={x.set} scale={1} sheen={false} />}
+              <span className="nums text-sm text-fg-1">{t("prize.packLine", { count: x.count, set: x.name })}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="nums text-2xs text-gold">
+          {formatMoney(prize.cents, { whole: true })} · {t("prize.packsHint")}
         </p>
       </div>
     );

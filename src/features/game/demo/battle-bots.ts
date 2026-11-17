@@ -13,6 +13,11 @@ import type { AnyBattleState, SimParams } from "@/lib/sim/battle";
 import type { PotatoState } from "@/lib/sim/battle/potato";
 import { RED, type PumpState } from "@/lib/sim/battle/pump";
 import type { SumoState } from "@/lib/sim/battle/sumo";
+import { crashCentres, crashGap, crashHits, type CrashState } from "@/lib/sim/battle/crash";
+import type { PaintState } from "@/lib/sim/battle/paint";
+import type { TagState } from "@/lib/sim/battle/tag";
+import { tilesHole, type TilesState } from "@/lib/sim/battle/tiles";
+import { zoneDist, zoneShrinkTick, zoneStartRadius, type ZoneState } from "@/lib/sim/battle/zone";
 
 /*
  * The made-up opponents of the demo (ADR-160): simple bots that read the true state each tick and answer with one
@@ -371,6 +376,136 @@ function rodeoBot(s: RodeoState, i: number, m: BotMemory, _params: Params, rando
   return s.cueDir;
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// The games of ADR-177
+// ---------------------------------------------------------------------------------------------------------------
+
+/** Goldrausch-Zone: the closest coin, but back towards the middle before the zone shrinks. */
+function zoneBot(s: ZoneState, i: number, m: BotMemory, params: Params, random: () => number): number {
+  const x = s.p.x[i]!;
+  const y = s.p.y[i]!;
+  const t = s.tick;
+  const inside = (a: number, b: number) =>
+    inBounds(s.w, s.h, a, b) && zoneDist(s, a, b) <= s.r && playerAt(s.p, a, b) < 0;
+  const next = zoneShrinkTick(params.game as never, zoneStartRadius(s.w, s.h) - s.r);
+  const careful = num(params, "warnTicks", 60) * (0.4 + m.skill * 0.6);
+  if (next - t < careful && zoneDist(s, x, y) >= s.r)
+    return towards(s, i, s.cx, s.cy, inside) || randomDir(s, i, inside, random);
+  if (t < m.wakeAt) return m.dir;
+  m.wakeAt = t + Math.round((1 - m.skill) * 6 * random());
+  let best = -1;
+  let bestD = 0;
+  for (let c = 0; c < s.ct.length; c++) {
+    if (s.ct[c]! < 0) continue;
+    const cx = s.ct[c]! % s.w;
+    const cy = Math.floor(s.ct[c]! / s.w);
+    if (next - t < careful && zoneDist(s, cx, cy) >= s.r) continue;
+    const d = dist(x, y, cx, cy) + random() * (1 - m.skill) * 6;
+    if (best < 0 || d < bestD) {
+      best = c;
+      bestD = d;
+    }
+  }
+  if (best < 0) return random() < 0.1 ? randomDir(s, i, inside, random) : 0;
+  return towards(s, i, s.ct[best]! % s.w, Math.floor(s.ct[best]! / s.w), inside) || randomDir(s, i, inside, random);
+}
+
+/** Bulle und Bär: the bear hunts the closest bull, the bulls keep away from the bear. */
+function tagBot(s: TagState, i: number, m: BotMemory, _params: Params, random: () => number): number {
+  const x = s.p.x[i]!;
+  const y = s.p.y[i]!;
+  const t = s.tick;
+  if (t < m.wakeAt) return m.dir;
+  m.wakeAt = t + Math.round((1 - m.skill) * 8 * random());
+  const ok = (a: number, b: number) => inBounds(s.w, s.h, a, b);
+  if (s.bear === i) {
+    let prey = -1;
+    for (let j = 0; j < s.n; j++) {
+      if (j === i || s.p.out[j]! >= 0) continue;
+      if (prey < 0 || dist(x, y, s.p.x[j]!, s.p.y[j]!) < dist(x, y, s.p.x[prey]!, s.p.y[prey]!)) prey = j;
+    }
+    if (prey < 0) return 0;
+    // a step onto the bull's tile is the tag (walk bumps)
+    return towards(s, i, s.p.x[prey]!, s.p.y[prey]!, ok) || randomDir(s, i, ok, random);
+  }
+  if (s.bear < 0) return 0;
+  const bx = s.p.x[s.bear]!;
+  const by = s.p.y[s.bear]!;
+  if (dist(x, y, bx, by) > 3 + Math.round(m.skill * 2)) return random() < 0.08 ? randomDir(s, i, ok, random) : 0;
+  const free = (a: number, b: number) => ok(a, b) && playerAt(s.p, a, b) < 0;
+  const away = [1, 2, 3, 4]
+    .filter((d) => free(x + DX[d]!, y + DY[d]!))
+    .sort((a, b) => dist(x + DX[b]!, y + DY[b]!, bx, by) - dist(x + DX[a]!, y + DY[a]!, bx, by) || random() - 0.5);
+  return away[0] ?? 0;
+}
+
+/** Wackelparkett: keep walking onto solid tiles that have room around them. */
+function tilesBot(s: TilesState, i: number, m: BotMemory, params: Params, random: () => number): number {
+  const t = s.tick;
+  const solid = (a: number, b: number) =>
+    inBounds(s.w, s.h, a, b) && !tilesHole(s, b * s.w + a, t) && s.crack[b * s.w + a]! < 0 && playerAt(s.p, a, b) < 0;
+  const x = s.p.x[i]!;
+  const y = s.p.y[i]!;
+  if (s.p.idle[i]! < num(params, "idleMax", 30) * (0.15 + (1 - m.skill) * 0.4) && t < m.wakeAt) return 0;
+  m.wakeAt = t + Math.round((1 - m.skill) * 6);
+  const room = (d: number) => {
+    const a = x + DX[d]!;
+    const b = y + DY[d]!;
+    return [1, 2, 3, 4].filter((e) => solid(a + DX[e]!, b + DY[e]!)).length + random() * (2 - m.skill);
+  };
+  const options = [1, 2, 3, 4].filter((d) => solid(x + DX[d]!, y + DY[d]!)).sort((a, b) => room(b) - room(a));
+  return options[0] ?? randomDir(s, i, (a, b) => inBounds(s.w, s.h, a, b) && !tilesHole(s, b * s.w + a, t), random);
+}
+
+/** Farbrausch: walk to tiles that are not yours yet; throw the bomb where others' paint is. */
+function paintBot(s: PaintState, i: number, m: BotMemory, _params: Params, random: () => number): number {
+  const x = s.p.x[i]!;
+  const y = s.p.y[i]!;
+  const t = s.tick;
+  if (t < m.wakeAt) return m.dir;
+  m.wakeAt = t + Math.round((1 - m.skill) * 5 * random());
+  const free = (a: number, b: number) => inBounds(s.w, s.h, a, b) && playerAt(s.p, a, b) < 0;
+  let foreign = 0;
+  for (let b = y - 1; b <= y + 1; b++)
+    for (let a = x - 1; a <= x + 1; a++) if (inBounds(s.w, s.h, a, b) && s.own[b * s.w + a] !== i) foreign++;
+  const options = [1, 2, 3, 4]
+    .filter((d) => free(x + DX[d]!, y + DY[d]!))
+    .sort((a, b) => {
+      const va = s.own[(y + DY[a]!) * s.w + x + DX[a]!] === i ? 0 : 1;
+      const vb = s.own[(y + DY[b]!) * s.w + x + DX[b]!] === i ? 0 : 1;
+      return vb - va || random() - 0.5;
+    });
+  const step = options[0] ?? 0;
+  if (s.cool[i] === 0 && foreign >= 5 + Math.round((1 - m.skill) * 3)) return step + 5;
+  return step;
+}
+
+/** Crash-Regen: step off the tiles a crash is about to hit (after a moment of shock). */
+function crashBot(s: CrashState, i: number, m: BotMemory, params: Params, random: () => number): number {
+  const t = s.tick;
+  const danger = new Set<number>();
+  let k = s.hit;
+  let at = s.hitAt;
+  while (at <= t) {
+    if (t - at >= Math.round((1 - m.skill) * 14)) {
+      const centres = crashCentres(s.seed, params.game as never, s.n, s.w, s.h, k);
+      for (let tile = 0; tile < s.w * s.h; tile++)
+        if (centres.some((c) => crashHits(s.w, c, tile % s.w, Math.floor(tile / s.w)))) danger.add(tile);
+    }
+    at += crashGap(params.game as never, k);
+    k += 1;
+    if (k > s.hit + 3) break;
+  }
+  const x = s.p.x[i]!;
+  const y = s.p.y[i]!;
+  const safe = (a: number, b: number) =>
+    inBounds(s.w, s.h, a, b) && !danger.has(b * s.w + a) && playerAt(s.p, a, b) < 0;
+  if (!danger.has(y * s.w + x)) return random() < 0.05 ? randomDir(s, i, safe, random) : 0;
+  const options = [1, 2, 3, 4].filter((d) => safe(x + DX[d]!, y + DY[d]!));
+  if (options.length) return options[Math.floor(random() * options.length)]!;
+  return randomDir(s, i, (a, b) => inBounds(s.w, s.h, a, b) && playerAt(s.p, a, b) < 0, random);
+}
+
 /** The input character of a bot for the tick the state is at. */
 export function botInput(
   kind: TickKind,
@@ -422,6 +557,21 @@ export function botInput(
       break;
     case "laser":
       code = laserBot(state as LaserState, slot, memory, params, random);
+      break;
+    case "zone":
+      code = zoneBot(state as ZoneState, slot, memory, params, random);
+      break;
+    case "tag":
+      code = tagBot(state as TagState, slot, memory, params, random);
+      break;
+    case "tiles":
+      code = tilesBot(state as TilesState, slot, memory, params, random);
+      break;
+    case "paint":
+      code = paintBot(state as PaintState, slot, memory, params, random);
+      break;
+    case "crash":
+      code = crashBot(state as CrashState, slot, memory, params, random);
       break;
   }
   // (Laserschranke keeps its jump plan in memory.dir)

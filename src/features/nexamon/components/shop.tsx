@@ -18,6 +18,7 @@ import { chanceBps, formatChance, formatDecimal, packOdds } from "../view";
 import { ConditionBadge, RarityBadge } from "./badges";
 import { NexamonPack, TiltPack } from "./pack";
 import { PackOverlay } from "./pack-overlay";
+import { SealedPacksStrip } from "./sealed-packs";
 
 /**
  * The shop (ADR-165): the packs of the three sets, each leaning towards the pointer. A pack opens its popup:
@@ -64,6 +65,13 @@ export function Shop({
 
   return (
     <div className="space-y-5" data-testid="nexamon-shop">
+      <SealedPacksStrip
+        onOpened={(opened) => {
+          setPending(opened);
+          setPack(opened);
+          setSelected(opened.set);
+        }}
+      />
       {pending && selected === null && (
         <Card padding="lg" className="flex flex-wrap items-center gap-3 border-accent" data-testid="pending-pack">
           <NexamonPack set={pending.set} scale={1} sheen={false} />
