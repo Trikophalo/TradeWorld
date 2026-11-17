@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { COMPANY_TASK_RULES, COMPANY_TASKS } from "../../config/company-tasks.ts";
 import { generatePuzzle, gradeAnswer } from "./company-tasks.ts";
@@ -22,7 +23,32 @@ const rngOf = (seed: number) => {
 };
 const g = COMPANY_TASK_RULES.games;
 
+// The same cases run in SQL (supabase/tests/c5_task_games_visual.sql): both sides must agree exactly.
+const raw = readFileSync(new URL("../../../supabase/tests/task_games_visual_cases.inc", import.meta.url), "utf8");
+const CASES = JSON.parse(raw.slice(raw.indexOf("$cases$") + 7, raw.lastIndexOf("$cases$"))) as {
+  name: string;
+  game: VisualTaskGame;
+  solution: unknown;
+  answer: unknown;
+  score: number;
+}[];
+
 describe("drag and see task games (ADR-186)", () => {
+  it("gives exactly the shared scores (same cases as the SQL test)", () => {
+    expect(CASES.length).toBeGreaterThan(100);
+    for (const c of CASES) expect(gradeAnswer(c.game, c.solution as never, c.answer), c.name).toBe(c.score);
+    for (const game of VISUAL_TASK_GAMES) {
+      expect(
+        CASES.some((c) => c.game === game && c.score === 10_000),
+        game,
+      ).toBe(true);
+      expect(
+        CASES.some((c) => c.game === game && c.score < 10_000),
+        game,
+      ).toBe(true);
+    }
+  });
+
   it("every new game has tasks in the catalogue and a config", () => {
     for (const game of VISUAL_TASK_GAMES) {
       expect(task(game), game).toBeDefined();
