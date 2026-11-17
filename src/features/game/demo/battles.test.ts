@@ -88,6 +88,27 @@ describe("demo battles (ADR-160)", () => {
       expect(log.xp + log.cash + log.accessories.length).toBeGreaterThan(0);
   });
 
+  it("a sealed booster prize (ADR-177) is shown in the lobby and stays within the cap", async () => {
+    const sets = [
+      { key: "mystic_energy", name: "Mystic Energy", priceCents: 20_000 },
+      { key: "super_apex", name: "Super Apex", priceCents: 100_000 },
+      { key: "prismatic_peak", name: "Prismatic Peak", priceCents: 1_000_000 },
+    ];
+    const granted: [string, number][] = [];
+    const { h } = host({
+      random: () => 0.6,
+      packSets: () => sets,
+      grantSealedPacks: (set, count) => granted.push([set, count]),
+    });
+    const engine = createBattleEngine(h);
+    const prize = (await engine.battle()).battle!.prize;
+    expect(prize.kind).toBe("packs");
+    if (prize.kind !== "packs") return;
+    expect(prize.packs).toEqual([{ set: "super_apex", count: 5, name: "Super Apex" }]);
+    expect(prize.cents).toBe(500_000);
+    expect(prize.cents).toBeLessThanOrEqual(BATTLE_RULES.prizes.packsCapCents);
+  });
+
   it("only the right round is open in a quiz", async () => {
     const { h, advance } = host();
     const engine = createBattleEngine(h);
