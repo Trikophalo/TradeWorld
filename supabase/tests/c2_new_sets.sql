@@ -117,6 +117,9 @@ select tests.assert(
   and (select count(*) from public.feed_items where actor_id = :a and kind = 'nexamon_pull'
         and payload ->> 'rarity' = 'uranium') = 1,
   'all tiers hit: uranium slot 5, diamond slot 4, titanium slot 3 (and 2), iron in front; a uranium pull is news');
+select tests.assert(public.feed_item_label('nexamon_pull', '{"rarity": "uranium", "serial": 1}') like 'Uranium-Karte gezogen%'
+  and public.feed_item_label('nexamon_pull', '{"rarity": "legendary", "serial": 2}') like 'legendäre Nexamon-Karte gezogen%',
+  'the feed names a uranium pull');
 
 -- the AI opens the same pack: the uranium tier is skipped, no error, no uranium in AI hands
 select tests.ns_ai_open('titans_revenge') as aip \gset

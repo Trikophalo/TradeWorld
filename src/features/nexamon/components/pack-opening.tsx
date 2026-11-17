@@ -353,7 +353,14 @@ export function PackOpening({
       if (sound) playSound(REVEAL_SOUND[card.rarity]);
       if (!isHit(card.rarity)) return;
       if (rarityRank(card.rarity) >= rarityRank("prisma") && stackRef.current)
-        burstConfetti(stackRef.current, card.rarity === "one_of_one" ? 64 : card.rarity === "legendary" ? 36 : 22);
+        burstConfetti(
+          stackRef.current,
+          card.rarity === "one_of_one" || card.rarity === "uranium"
+            ? 64
+            : card.rarity === "legendary" || card.rarity === "diamond"
+              ? 36
+              : 22,
+        );
     },
     [cards, onReveal, sound],
   );
@@ -618,7 +625,9 @@ export function PackOpening({
         </AnimatePresence>
 
         <AnimatePresence>
-          {glow === "one_of_one" && <OneOfOneMoment key={`1of1-${index}`} reduced={reduced} />}
+          {(glow === "one_of_one" || glow === "uranium") && (
+            <OneOfOneMoment key={`${glow}-${index}`} kind={glow} reduced={reduced} />
+          )}
         </AnimatePresence>
         {phase === "stack" && (
           <motion.div
@@ -639,7 +648,7 @@ export function PackOpening({
               width: cardW,
               height: cardH,
               // above the darkening of a One of One
-              zIndex: glow === "one_of_one" ? "calc(var(--z-celebration) + 1)" : undefined,
+              zIndex: glow === "one_of_one" || glow === "uranium" ? "calc(var(--z-celebration) + 1)" : undefined,
             }}
           >
             <AnimatePresence>
@@ -663,7 +672,7 @@ export function PackOpening({
                       glow === "prisma" && "nexamon-spin",
                     )}
                   />
-                  {(glow === "legendary" || glow === "ultra") && (
+                  {(glow === "legendary" || glow === "ultra" || glow === "titanium" || glow === "diamond") && (
                     <div className="nexamon-rays nexamon-spin absolute inset-0 opacity-70" />
                   )}
                 </motion.div>
@@ -730,8 +739,10 @@ export function PackOpening({
  * The biggest reveal of the game (ADR-174): the page goes dark, a white flash, then "ONE OF ONE" fades in slowly
  * over the card. Only opacity and transform move; with reduced motion the words just stand there.
  */
-function OneOfOneMoment({ reduced }: { reduced: boolean }) {
+/** The darkened screen of the biggest pulls: a One of One, and a uranium card of Titans Revenge (ADR-182). */
+function OneOfOneMoment({ reduced, kind = "one_of_one" }: { reduced: boolean; kind?: "one_of_one" | "uranium" }) {
   const t = useTranslations("nexamon");
+  const uranium = kind === "uranium";
   return (
     <motion.div
       aria-hidden
@@ -758,8 +769,12 @@ function OneOfOneMoment({ reduced }: { reduced: boolean }) {
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: reduced ? 0 : DURATION.slower * 2, duration: DURATION.slower * 2, ease: EASE.out }}
       >
-        <p className="font-pixel text-3xl text-gold uppercase lg:text-5xl">{t("opening.oneOfOne")}</p>
-        <p className="mx-auto mt-2 max-w-xs px-4 text-sm text-pretty text-fg-inverse">{t("opening.oneOfOneText")}</p>
+        <p className={cn("font-pixel text-3xl uppercase lg:text-5xl", uranium ? "text-gain" : "text-gold")}>
+          {t(uranium ? "opening.uranium" : "opening.oneOfOne")}
+        </p>
+        <p className="mx-auto mt-2 max-w-xs px-4 text-sm text-pretty text-fg-inverse">
+          {t(uranium ? "opening.uraniumText" : "opening.oneOfOneText")}
+        </p>
       </motion.div>
     </motion.div>
   );

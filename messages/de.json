@@ -3201,7 +3201,7 @@
         "rug_pull": "hat bei {name} ({ticker}) die Team-Coins abgestoßen. Rug Pull!",
         "coin_closed": "hat den Coin {name} ({ticker}) eingestellt.",
         "accessory_bought": "trägt jetzt etwas Legendäres: {name}.",
-        "nexamon_pull": "hat eine legendäre Nexamon-Karte gezogen: {name} (Nummer {serial}).",
+        "nexamon_pull": "hat {rarity, select, uranium {eine Uranium-Karte} other {eine legendäre Nexamon-Karte}} gezogen: {name} (Nummer {serial}).",
         "nexamon_battle_won": "hat ein Pack Battle gegen {other} gewonnen und Karten für {value} abgeräumt.",
         "nexamon_battle_big": "hat im Pack Battle gegen {other} groß abgeräumt: Karten für {value}.",
         "nexamon_black_label": "hat bei ASP ein Black Label geholt: {name} (Nummer {serial}).",
@@ -8925,7 +8925,9 @@
       "howTo": "Erst mit „Kaufen“ wird bezahlt. Danach reißt du das Booster selbst auf.",
       "scrollHint": "Weiter unten: alle Karten dieses Sets und ihre Chancen.",
       "oneOfOne": "ONE OF ONE",
-      "oneOfOneText": "Diese Karte gibt es im ganzen Spiel nur ein einziges Mal. Und du hast sie gezogen."
+      "oneOfOneText": "Diese Karte gibt es im ganzen Spiel nur ein einziges Mal. Und du hast sie gezogen.",
+      "uranium": "URANIUM",
+      "uraniumText": "Ein Titan öffnet sein Auge. Uranium steckt nur in einem von 500 Packs."
     },
     "odds": {
       "title": "Ziehungsraten",
