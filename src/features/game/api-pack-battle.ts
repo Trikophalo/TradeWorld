@@ -31,15 +31,31 @@ const pullSchema = z.object({
   condition: z.enum(NEXAMON_CONDITIONS),
   serial: num,
   value_cents: num,
+  pack: num.optional(),
+  idx: num.optional(),
 });
+const seatSchema = z.object({
+  seat: num,
+  player: figureSchema,
+  is_me: z.boolean(),
+  cards: z.array(pullSchema),
+  cents: num,
+});
+const packSchema = z.object({ set: z.enum(NEXAMON_SETS), price_cents: num });
 const reactionSchema = z.object({ id: num, emoji: z.string(), at: iso });
 const battleSchema = z.object({
   id: z.string(),
   set: z.enum(NEXAMON_SETS),
   status: z.enum(["pending", "declined", "expired", "cancelled", "aborted", "running", "done"]),
   price_cents: num,
+  mode: z.enum(["duel", "multi"]).default("duel"),
+  size: num.default(2),
+  packs: z.array(packSchema).nullish(),
+  seats: z.array(seatSchema).nullish(),
+  my_seat: num.nullish(),
+  winner_seat: num.nullish(),
   challenger: figureSchema,
-  opponent: figureSchema,
+  opponent: figureSchema.nullable(),
   me: side.nullable(),
   created_at: iso,
   expires_at: iso,
@@ -69,6 +85,7 @@ const liveSchema = z.object({
   battle_id: z.string().nullable(),
   player: figureSchema,
   opponent: figureSchema.nullable(),
+  players: z.array(figureSchema).nullish(),
   is_me: z.boolean(),
   started_at: iso,
   ends_at: iso,
@@ -78,6 +95,7 @@ const lobbySchema = z.object({
   players: z.array(figureSchema.extend({ is_friend: z.boolean(), opening: z.boolean(), battling: z.boolean() })),
   live: z.array(liveSchema),
   battles: z.array(battleSchema),
+  open_battles: z.array(battleSchema.extend({ invited: z.boolean() })).default([]),
   limits: z.object({ per_hour: num, used: num, cooldown_until: iso.nullable() }),
   allow_watch: z.boolean(),
   server_time: iso,
@@ -97,6 +115,8 @@ const reactedSchema = z.object({ reactions: z.array(reactionSchema) });
 export const PACK_BATTLE_RPC_SCHEMAS = {
   nexamon_lobby: lobbySchema,
   challenge_nexamon_battle: battleResultSchema,
+  create_nexamon_pack_battle: battleResultSchema,
+  join_nexamon_pack_battle: battleResultSchema,
   respond_nexamon_battle: battleResultSchema,
   cancel_nexamon_battle: battleResultSchema,
   get_nexamon_battle: battleResultSchema,
@@ -118,6 +138,8 @@ const toPull = (p: z.infer<typeof pullSchema>): NexamonShownPull => ({
   condition: p.condition,
   serial: p.serial,
   valueCents: p.value_cents,
+  pack: p.pack ?? 1,
+  idx: p.idx ?? p.slot,
 });
 const toReaction = (r: z.infer<typeof reactionSchema>): NexamonLiveReaction => ({ id: r.id, emoji: r.emoji, at: r.at });
 const toLive = (l: z.infer<typeof liveSchema>): NexamonLiveSession => ({
@@ -127,6 +149,7 @@ const toLive = (l: z.infer<typeof liveSchema>): NexamonLiveSession => ({
   battleId: l.battle_id,
   player: toFigure(l.player),
   opponent: l.opponent ? toFigure(l.opponent) : null,
+  players: l.players ? l.players.map(toFigure) : null,
   isMe: l.is_me,
   startedAt: l.started_at,
   endsAt: l.ends_at,
@@ -137,8 +160,44 @@ export const toNexamonBattle = (b: z.infer<typeof battleSchema>): NexamonBattle 
   set: b.set,
   status: b.status,
   priceCents: b.price_cents,
+  mode: b.mode,
+  size: b.size,
+  packs: (b.packs ?? [{ set: b.set, price_cents: b.price_cents }]).map((p) => ({
+    set: p.set,
+    priceCents: p.price_cents,
+  })),
+  seats: (
+    b.seats ?? [
+      {
+        seat: 0,
+        player: b.challenger,
+        is_me: b.me === "challenger",
+        cards: b.challenger_cards,
+        cents: b.challenger_cents,
+      },
+      ...(b.opponent
+        ? [
+            {
+              seat: 1,
+              player: b.opponent,
+              is_me: b.me === "opponent",
+              cards: b.opponent_cards,
+              cents: b.opponent_cents,
+            },
+          ]
+        : []),
+    ]
+  ).map((s) => ({
+    seat: s.seat,
+    player: toFigure(s.player),
+    isMe: s.is_me,
+    cards: s.cards.map(toPull),
+    cents: s.cents,
+  })),
+  mySeat: b.my_seat ?? (b.me === "challenger" ? 0 : b.me === "opponent" ? 1 : null),
+  winnerSeat: b.winner_seat ?? (b.winner === "challenger" ? 0 : b.winner === "opponent" ? 1 : null),
   challenger: toFigure(b.challenger),
-  opponent: toFigure(b.opponent),
+  opponent: b.opponent ? toFigure(b.opponent) : null,
   me: b.me,
   createdAt: b.created_at,
   expiresAt: b.expires_at,
@@ -174,6 +233,7 @@ export const livePackBattleEngine: PackBattleEngine = {
       })),
       live: r.live.map(toLive),
       battles: r.battles.map(toNexamonBattle),
+      openBattles: r.open_battles.map((b) => ({ ...toNexamonBattle(b), invited: b.invited })),
       limits: { perHour: r.limits.per_hour, used: r.limits.used, cooldownUntil: r.limits.cooldown_until },
       allowWatch: r.allow_watch,
       serverTime: r.server_time,
@@ -183,6 +243,22 @@ export const livePackBattleEngine: PackBattleEngine = {
     const r = await rpc(
       "challenge_nexamon_battle",
       { p_request_id: requestId, p_nickname: nickname, p_set: set },
+      battleResultSchema,
+    );
+    return toNexamonBattle(r.battle);
+  },
+  async createNexamonPackBattle(requestId, sets, size, invite) {
+    const r = await rpc(
+      "create_nexamon_pack_battle",
+      { p_request_id: requestId, p_sets: sets, p_size: size, p_invite: invite },
+      battleResultSchema,
+    );
+    return toNexamonBattle(r.battle);
+  },
+  async joinNexamonPackBattle(requestId, battleId) {
+    const r = await rpc(
+      "join_nexamon_pack_battle",
+      { p_request_id: requestId, p_battle_id: battleId },
       battleResultSchema,
     );
     return toNexamonBattle(r.battle);

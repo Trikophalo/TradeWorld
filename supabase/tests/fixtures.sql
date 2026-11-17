@@ -1643,3 +1643,26 @@ select public.get_nexamon_live(:'fx_pl');
 select public.nexamon_live_react(gen_random_uuid(), :'fx_pl', '🔥');
 \o
 reset role;
+
+-- Pack Battles with a lineup and seats (8000): an open lobby the friend sees, then joined and played
+select tests.login_as('authenticated', :fx_pa) is null as ok \gset
+\o :fixture_dir/create_nexamon_pack_battle.json
+select public.create_nexamon_pack_battle(gen_random_uuid(), array['mystic_energy', 'super_apex'], 2, array['Fixture_PackB']);
+\o
+select (public.nexamon_lobby(true) #>> '{battles,0,id}')::uuid as fx_pb3 \gset
+select tests.login_as('authenticated', :fx_pb) is null as ok \gset
+\o :fixture_dir/nexamon_lobby_open_battle.json
+select public.nexamon_lobby(true);
+\o :fixture_dir/join_nexamon_pack_battle.json
+select public.join_nexamon_pack_battle(gen_random_uuid(), :'fx_pb3');
+\o
+reset role;
+update public.nexamon_battles
+   set accepted_at = accepted_at - interval '60 seconds', starts_at = starts_at - interval '60 seconds',
+       decide_at = decide_at - interval '60 seconds', ends_at = ends_at - interval '60 seconds'
+ where id = :'fx_pb3';
+select tests.login_as('authenticated', :fx_pb) is null as ok \gset
+\o :fixture_dir/get_nexamon_battle_multi.json
+select public.get_nexamon_battle(:'fx_pb3');
+\o
+reset role;

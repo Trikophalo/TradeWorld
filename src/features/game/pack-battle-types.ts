@@ -29,6 +29,8 @@ export interface NexamonLiveSession {
   player: NexamonFigure;
   /** Battles: the challenged friend. */
   opponent: NexamonFigure | null;
+  /** ADR-192: battles: every player in seat order. */
+  players: NexamonFigure[] | null;
   /** The viewer opens this pack or plays this battle. */
   isMe: boolean;
   startedAt: string;
@@ -50,6 +52,25 @@ export interface NexamonShownPull {
   condition: NexamonCondition;
   serial: number;
   valueCents: number;
+  /** ADR-192: which pack of the lineup (1 = the first) and the position over the whole lineup (1-based). */
+  pack: number;
+  idx: number;
+}
+
+/** ADR-192: one pack of a battle's lineup. */
+export interface NexamonBattlePack {
+  set: NexamonSetKey;
+  priceCents: number;
+}
+
+/** ADR-192: one seat of a battle (0 = the creator). */
+export interface NexamonBattleSeat {
+  seat: number;
+  player: NexamonFigure;
+  isMe: boolean;
+  /** Only the cards the shared clock has reached. */
+  cards: NexamonShownPull[];
+  cents: number;
 }
 
 export type NexamonBattleStatus = "pending" | "declined" | "expired" | "cancelled" | "aborted" | "running" | "done";
@@ -58,9 +79,19 @@ export interface NexamonBattle {
   id: string;
   set: NexamonSetKey;
   status: NexamonBattleStatus;
+  /** The stake per player (ADR-192: the sum of the lineup). */
   priceCents: number;
+  /** ADR-192: duel = the classic challenge, multi = a lobby with a lineup and 2-4 seats. */
+  mode: "duel" | "multi";
+  size: number;
+  packs: NexamonBattlePack[];
+  seats: NexamonBattleSeat[];
+  mySeat: number | null;
+  /** Known from the decision moment on. */
+  winnerSeat: number | null;
   challenger: NexamonFigure;
-  opponent: NexamonFigure;
+  /** Null while a lobby waits for its second player. */
+  opponent: NexamonFigure | null;
   /** The viewer's side; null for a spectator. */
   me: BattleSide | null;
   createdAt: string;
@@ -93,6 +124,8 @@ export interface NexamonLobby {
   live: NexamonLiveSession[];
   /** The viewer's open and running battles, newest first. */
   battles: NexamonBattle[];
+  /** ADR-192: friends' open lobbies with a free seat. */
+  openBattles: (NexamonBattle & { invited: boolean })[];
   limits: { perHour: number; used: number; cooldownUntil: string | null };
   allowWatch: boolean;
   serverTime: string;
@@ -119,6 +152,14 @@ export interface PackBattleEngine {
   /** Marks the player as on the Collectibles tab; friends there, live openings, own battles. */
   nexamonLobby(allowWatch: boolean): Promise<NexamonLobby>;
   challengeNexamonBattle(requestId: string, nickname: string, set: NexamonSetKey): Promise<NexamonBattle>;
+  /** ADR-192: a lobby with a pack lineup (sets in order) for `size` players; invites friends by nickname. */
+  createNexamonPackBattle(
+    requestId: string,
+    sets: NexamonSetKey[],
+    size: number,
+    invite: string[],
+  ): Promise<NexamonBattle>;
+  joinNexamonPackBattle(requestId: string, battleId: string): Promise<NexamonBattle>;
   respondNexamonBattle(requestId: string, battleId: string, accept: boolean): Promise<NexamonBattle>;
   cancelNexamonBattle(requestId: string, battleId: string): Promise<NexamonBattle>;
   nexamonBattle(battleId: string): Promise<NexamonBattle>;

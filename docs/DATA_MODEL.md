@@ -7726,6 +7726,21 @@ battle, price)`. Fehler `sealed_pack_unknown` NX290. `account_wipe` löscht die 
   `respond_nexamon_battle`, `cancel_nexamon_battle`, `get_nexamon_battle`, `get_nexamon_live`,
   `nexamon_live_progress`, `nexamon_live_react`; Fehler NX240–NX250. Ledger: Battle-Zahlungen als `nexamon_pack`
   mit `ref_type = 'nexamon_battle'`.
+- **Pack Battles mit Pack-Reihe und bis zu vier Plätzen (ADR-192, Migration 8000, intern, RLS ohne Grants):**
+  `nexamon_battles` hat zusätzlich `mode` (`duel` = Herausforderung, `multi` = Lobby), `size` (2–4), `packs`
+  (`[{set, price_cents}]` in Reihenfolge; `price_cents` = Summe = Einsatz pro Platz), `winner_seat`; `opponent_id` ist
+  bei `multi` bis zum Start leer (danach Platz 1). `nexamon_battle_seats` (PK `battle_id, seat`; `player_id` eindeutig je
+  Battle, `paid_cents`, `refunded_at`, `invited`, `cards` mit `pack`, `slot`, `idx`, `total_cents`),
+  `nexamon_battle_invites` (eingeladene Freunde). Systemkonto `nexamon_battle_escrow`: Einsätze offener Lobbys.
+  RPCs: `create_nexamon_pack_battle(p_request_id, p_sets text[], p_size, p_invite text[])` und
+  `join_nexamon_pack_battle(p_request_id, p_battle_id)` → `{battle}`; Absage über `cancel_nexamon_battle`. Ledger:
+  Einsatz `player_cash → nexamon_battle_escrow` (Schlüssel `nexamon:battle:stake:<battle>:<player>`), Start
+  `escrow → households` (`nexamon:battle:<battle>:<player>`), Rückbuchung `escrow → player_cash`
+  (`nexamon:battle:refund:<battle>:<player>`, Trigger `nexamon_battles_refund` beim Wechsel von `pending` auf
+  `cancelled`/`expired`). Cron `nexa-nexamon-pack-battles` (minütlich) lässt Lobbys ablaufen, deren Zeit um ist.
+  Battle-JSON zusätzlich: `mode`, `size`, `packs`, `seats: [{seat, player, is_me, cards, cents}]`, `my_seat`,
+  `winner_seat`; Lobby zusätzlich `open_battles` (mit `invited`), Live-Zeilen `players`. Fehler NX311
+  `nexamon_battle_full`, NX312 `nexamon_battle_joined`.
 - **`nexamon_value_points`** (intern): Wertverlauf, letzter Wert je Stunde mit Änderung (PK `card_key, at`), 60 Tage.
 - **`nexamon_set_state`** (intern): je Set `ai_packs_at` (bis wann die KI-Booster geöffnet sind), `ai_packs_opened`,
   `player_packs_opened`. **`nexamon_meta`** (intern, eine Zeile): Hash des zuletzt gespiegelten Katalogs; `peak_scaled_at` merkt

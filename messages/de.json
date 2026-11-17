@@ -944,7 +944,9 @@
     "insider_cooldown": "Insiderregel: Nach einer Entnahme aus deiner Firma kannst du ihre Aktie 24 Stunden lang nicht kaufen.",
     "capital_increase_cooldown": "Eine Kapitalerhöhung geht höchstens einmal am Tag.",
     "issue_proceeds_locked": "Das Geld aus dem Börsengang oder der Kapitalerhöhung gehört drei Tage lang der Firma und kann noch nicht entnommen werden.",
-    "sealed_pack_unknown": "Diesen ungeöffneten Booster gibt es nicht (mehr)."
+    "sealed_pack_unknown": "Diesen ungeöffneten Booster gibt es nicht (mehr).",
+    "nexamon_battle_full": "Dieses Pack Battle ist schon voll.",
+    "nexamon_battle_joined": "Du sitzt schon in diesem Pack Battle."
   },
   "locks": {
     "level": "Level {level}",
@@ -10726,7 +10728,15 @@
       },
       "done": "Fertig",
       "winner": "Gewinner",
-      "slots": "Gezogene Karten"
+      "slots": "Gezogene Karten",
+      "stakesMulti": "{packs} Packs · Einsatz {price} pro Spieler",
+      "packNo": "Pack {n}/{count}",
+      "statusMulti": {
+        "declined": "Abgesagt: alle haben ihren Einsatz zurück",
+        "expired": "Nicht voll geworden: alle haben ihren Einsatz zurück",
+        "cancelled": "Abgesagt: alle haben ihren Einsatz zurück",
+        "aborted": "Abgebrochen: alle haben ihren Einsatz zurück"
+      }
     },
     "spectate": {
       "title": "{name} öffnet live",
@@ -10747,7 +10757,8 @@
       "battling": "im Battle",
       "figureLabel": "{name}: Karte öffnen",
       "challenge": "Pack Battle herausfordern",
-      "profile": "Zum Profil"
+      "profile": "Zum Profil",
+      "create": "Battle starten"
     },
     "challenge": {
       "title": "Pack Battle gegen {name}",
@@ -10766,14 +10777,47 @@
       "error": "Das ging nicht",
       "accept": "Annehmen · {price}",
       "decline": "Ablehnen",
-      "cancel": "Zurückziehen"
+      "cancel": "Zurückziehen",
+      "lobbyOwn": "Dein Pack Battle: {taken}/{size} Spieler.",
+      "lobbyOpen": "{name} sucht Mitspieler: {packs, plural, one {# Pack} other {# Packs}}, {size} Spieler, Einsatz {price}.",
+      "lobbyInvited": "{name} lädt dich ein: {packs, plural, one {# Pack} other {# Packs}}, {size} Spieler, Einsatz {price}.",
+      "view": "Ansehen"
     },
     "live": {
       "title": "Live beim Öffnen",
       "text": "Schau anderen zu, während sie Packs öffnen. Du siehst jede Karte, sobald der Öffner sie sieht.",
       "empty": "Gerade öffnet niemand live.",
       "battle": "Pack Battle: {a} gegen {b}",
-      "pack": "{name} öffnet ein Pack"
+      "pack": "{name} öffnet ein Pack",
+      "battleMany": "Pack Battle: {names}"
+    },
+    "create": {
+      "title": "Neues Pack Battle",
+      "text": "Stell eine Reihe Packs zusammen. Alle öffnen dieselben Packs in derselben Reihenfolge, wer insgesamt mehr Wert zieht, bekommt alle Karten.",
+      "players": "Spieler",
+      "playerCount": "{count} Spieler",
+      "lineup": "Packs ({count}/{max})",
+      "total": "Einsatz {price}",
+      "empty": "Füge mindestens ein Pack hinzu.",
+      "up": "Nach oben",
+      "down": "Nach unten",
+      "remove": "Entfernen",
+      "maxPacks": "Mehr als {count} Packs gehen nicht.",
+      "invite": "{count, plural, one {Freund einladen} other {Bis zu # Freunde einladen}}",
+      "rules": "Du zahlst deinen Einsatz sofort, jeder weitere Spieler beim Beitreten. Ist das Battle nach {seconds} Sekunden nicht voll oder sagst du es ab, bekommen alle ihr Geld zurück. Im Topf: Karten aus {pot} Einsatz.",
+      "send": "Battle eröffnen · {price}"
+    },
+    "lobbyView": {
+      "waiting": "Warte auf Spieler: {taken}/{size}",
+      "stake": "Einsatz {price}",
+      "seats": "Plätze",
+      "host": "Gastgeber",
+      "free": "Freier Platz",
+      "lineup": "Packs in dieser Reihenfolge",
+      "rules": "Sobald alle Plätze besetzt sind, gehen die Packs auf. Bis dahin liegt der Einsatz sicher beiseite.",
+      "join": "Beitreten · {price}",
+      "joinError": "Beitreten ging nicht",
+      "cancel": "Absagen und Einsatz zurück"
     }
   },
   "companyInterview": {

@@ -1,0 +1,214 @@
+{
+  "live": [
+    {
+      "id": "bc66b915-1686-46e4-be53-8a7ee14cf404",
+      "set": "mystic_energy",
+      "kind": "pack",
+      "is_me": false,
+      "player": { "level": 12, "nickname": "Fixture_PackA", "avatar_key": "rookie", "accessories": [] },
+      "ends_at": "2026-11-17T20:02:33.754932+00:00",
+      "players": null,
+      "viewers": 1,
+      "opponent": null,
+      "battle_id": null,
+      "started_at": "2026-11-17T20:02:03.254932+00:00"
+    },
+    {
+      "id": "acbfcfe8-b2f5-4fb9-a91f-d742923e3d21",
+      "set": "mystic_energy",
+      "kind": "battle",
+      "is_me": true,
+      "player": { "level": 12, "nickname": "Fixture_PackA", "avatar_key": "rookie", "accessories": [] },
+      "ends_at": "2026-11-17T20:02:25.559194+00:00",
+      "players": [
+        { "level": 12, "nickname": "Fixture_PackA", "avatar_key": "rookie", "accessories": [] },
+        { "level": 12, "nickname": "Fixture_PackB", "avatar_key": "rookie", "accessories": [] }
+      ],
+      "viewers": 0,
+      "opponent": { "level": 12, "nickname": "Fixture_PackB", "avatar_key": "rookie", "accessories": [] },
+      "battle_id": "925bb928-3f58-4f24-9f89-6dc373c871b4",
+      "started_at": "2026-11-17T20:02:03.159194+00:00"
+    },
+    {
+      "id": "9fe76bbc-2461-4d86-9ace-09d2146303d5",
+      "set": "mystic_energy",
+      "kind": "pack",
+      "is_me": false,
+      "player": { "level": 15, "nickname": "Fixture_Gmbh", "avatar_key": "rookie", "accessories": [] },
+      "ends_at": "2026-11-17T20:05:04.650062+00:00",
+      "players": null,
+      "viewers": 0,
+      "opponent": null,
+      "battle_id": null,
+      "started_at": "2026-11-17T20:02:01.315322+00:00"
+    },
+    {
+      "id": "a65e0ad7-4149-4da8-b4dd-c15af35eecf2",
+      "set": "mystic_energy",
+      "kind": "pack",
+      "is_me": false,
+      "player": { "level": 10, "nickname": "Ns_Clara", "avatar_key": "rookie", "accessories": [] },
+      "ends_at": "2026-11-17T20:02:18.650047+00:00",
+      "players": null,
+      "viewers": 0,
+      "opponent": null,
+      "battle_id": null,
+      "started_at": "2026-11-17T20:01:48.150047+00:00"
+    },
+    {
+      "id": "8ca96c25-c556-48b0-9277-7acd0f18f41f",
+      "set": "yin_yang",
+      "kind": "pack",
+      "is_me": false,
+      "player": { "level": 10, "nickname": "Ns_Bruno", "avatar_key": "rookie", "accessories": [] },
+      "ends_at": "2026-11-17T20:02:49.034032+00:00",
+      "players": null,
+      "viewers": 0,
+      "opponent": null,
+      "battle_id": null,
+      "started_at": "2026-11-17T20:01:48.008414+00:00"
+    },
+    {
+      "id": "a2a33af7-2c6b-422c-ac43-3a685c190cdc",
+      "set": "titans_revenge",
+      "kind": "pack",
+      "is_me": false,
+      "player": { "level": 10, "nickname": "Ns_Anna", "avatar_key": "rookie", "accessories": [] },
+      "ends_at": "2026-11-17T20:02:47.447409+00:00",
+      "players": null,
+      "viewers": 0,
+      "opponent": null,
+      "battle_id": null,
+      "started_at": "2026-11-17T20:01:46.415505+00:00"
+    },
+    {
+      "id": "9525b772-e166-4740-86c8-7a357d8feb8f",
+      "set": "mystic_energy",
+      "kind": "pack",
+      "is_me": false,
+      "player": { "level": 10, "nickname": "B6_Anna", "avatar_key": "rookie", "accessories": [] },
+      "ends_at": "2026-11-17T20:02:41.727963+00:00",
+      "players": null,
+      "viewers": 0,
+      "opponent": null,
+      "battle_id": null,
+      "started_at": "2026-11-17T20:01:40.671526+00:00"
+    },
+    {
+      "id": "610ce248-b4ce-4f85-b475-cc53c1cb7aaf",
+      "set": "cosmic_winds",
+      "kind": "pack",
+      "is_me": false,
+      "player": { "level": 10, "nickname": "Cw_Bruno", "avatar_key": "rookie", "accessories": [] },
+      "ends_at": "2026-11-17T20:02:06.22878+00:00",
+      "players": null,
+      "viewers": 0,
+      "opponent": null,
+      "battle_id": null,
+      "started_at": "2026-11-17T20:01:35.72878+00:00"
+    },
+    {
+      "id": "f69ab279-fde1-4312-a35b-2a788c96a5f3",
+      "set": "cosmic_winds",
+      "kind": "pack",
+      "is_me": false,
+      "player": { "level": 10, "nickname": "Cw_Anna", "avatar_key": "rookie", "accessories": [] },
+      "ends_at": "2026-11-17T20:03:08.255019+00:00",
+      "players": null,
+      "viewers": 0,
+      "opponent": null,
+      "battle_id": null,
+      "started_at": "2026-11-17T20:01:35.671978+00:00"
+    },
+    {
+      "id": "6e7dd0b3-922b-4aba-b5d7-1ca46f037f00",
+      "set": "mystic_energy",
+      "kind": "pack",
+      "is_me": false,
+      "player": { "level": 10, "nickname": "Pb_Bruno", "avatar_key": "rookie", "accessories": [] },
+      "ends_at": "2026-11-17T20:02:05.250356+00:00",
+      "players": null,
+      "viewers": 0,
+      "opponent": null,
+      "battle_id": null,
+      "started_at": "2026-11-17T20:01:34.750356+00:00"
+    },
+    {
+      "id": "f8b552cc-f206-4e3a-b8f9-45b1bea26637",
+      "set": "mystic_energy",
+      "kind": "pack",
+      "is_me": false,
+      "player": { "level": 1, "nickname": "Topic_Bert", "avatar_key": "rookie", "accessories": [] },
+      "ends_at": "2026-11-17T20:03:53.257194+00:00",
+      "players": null,
+      "viewers": 0,
+      "opponent": null,
+      "battle_id": null,
+      "started_at": "2026-11-17T20:00:50.211754+00:00"
+    }
+  ],
+  "limits": { "used": 1, "per_hour": 20, "cooldown_until": null },
+  "battles": [],
+  "players": [
+    {
+      "level": 12,
+      "opening": true,
+      "battling": true,
+      "nickname": "Fixture_PackA",
+      "is_friend": true,
+      "avatar_key": "rookie",
+      "accessories": []
+    }
+  ],
+  "allow_watch": true,
+  "server_time": "2026-11-17T20:02:03.324387+00:00",
+  "open_battles": [
+    {
+      "id": "a9d84a31-beda-44ac-9947-9d9c436f40f9",
+      "me": null,
+      "set": "mystic_energy",
+      "mode": "multi",
+      "size": 2,
+      "packs": [
+        { "set": "mystic_energy", "price_cents": 20000 },
+        { "set": "super_apex", "price_cents": 35000 }
+      ],
+      "seats": [
+        {
+          "seat": 0,
+          "cards": [],
+          "cents": 0,
+          "is_me": false,
+          "player": { "level": 12, "nickname": "Fixture_PackA", "avatar_key": "rookie", "accessories": [] }
+        }
+      ],
+      "status": "pending",
+      "winner": null,
+      "ends_at": null,
+      "invited": true,
+      "live_id": null,
+      "my_seat": null,
+      "slot_ms": 1800,
+      "tear_ms": 2400,
+      "viewers": 0,
+      "opponent": null,
+      "coin_seed": null,
+      "decide_at": null,
+      "reactions": [],
+      "starts_at": null,
+      "tie_break": null,
+      "challenger": { "level": 12, "nickname": "Fixture_PackA", "avatar_key": "rookie", "accessories": [] },
+      "created_at": "2026-11-17T20:02:03.307065+00:00",
+      "expires_at": "2026-11-17T20:04:03.307065+00:00",
+      "accepted_at": null,
+      "price_cents": 55000,
+      "server_time": "2026-11-17T20:02:03.324387+00:00",
+      "winner_seat": null,
+      "abort_reason": null,
+      "opponent_cards": [],
+      "opponent_cents": 0,
+      "challenger_cards": [],
+      "challenger_cents": 0
+    }
+  ]
+}
