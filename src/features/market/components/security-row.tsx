@@ -10,6 +10,7 @@ import { useSecurity } from "@/features/game/store";
 import { formatPrice } from "@/lib/format";
 import { brandColor } from "../brand";
 import { CompanyLogo } from "./company-logo";
+import { StockFiguresLine } from "./stock-figures";
 
 const format = (value: number) => formatPrice(Math.round(value));
 
@@ -53,6 +54,7 @@ export function SecurityRow({ ticker, shared = true }: { ticker: string; shared?
           {ticker}
           {security.sector && ` · ${t(security.sector)}`}
         </span>
+        {security.kind === "stock" && <StockFiguresLine ticker={ticker} />}
       </span>
       <span className="flex flex-col items-end gap-0.5">
         <NumberTicker value={security.lastE4} format={format} flash className="px-1 font-semibold text-fg-1" />

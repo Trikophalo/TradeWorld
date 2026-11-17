@@ -111,6 +111,31 @@ export interface SecurityDetails {
   news: NewsItem[];
 }
 
+/**
+ * Business figures of a listed company at the stock exchange (ADR-184). Player companies ("day"): their closed hours,
+ * revenue and profit of the last 24 h; AI companies ("quarter"): their latest quarterly report.
+ */
+export interface StockFigures {
+  ticker: string;
+  companyKind: "ai" | "player";
+  period: "day" | "quarter";
+  revenueCents: number;
+  profitCents: number;
+  /** The previous 24 h (per hour, scaled to the same hours) or the previous quarter; null without one. */
+  prevRevenueCents: number | null;
+  /** Closed hours in the last 24 h (player companies). */
+  hours: number | null;
+  lastHourAt: string | null;
+  lastHourRevenueCents: number | null;
+  gameYear: number | null;
+  quarter: number | null;
+  /** 0..100 (ADR-183), player companies only. */
+  reputation: number | null;
+  awarenessBps: number | null;
+  /** Hourly revenue of the last 24 h or the last quarters, oldest first; only on the detail page. */
+  history: number[];
+}
+
 export interface Position {
   ticker: string;
   name: string;
@@ -2412,6 +2437,8 @@ export interface GameEngine extends BattleEngine, NexamonEngine, NexamonSealedEn
   candles(ticker: string, interval: CandleInterval, limit: number): Promise<Candle[]>;
   orderBook(ticker: string, levels: number): Promise<OrderBook>;
   details(ticker: string): Promise<SecurityDetails>;
+  /** Business figures of listed companies (ADR-184): all of them, or one with its history. */
+  stockFigures(ticker?: string): Promise<StockFigures[]>;
   portfolio(): Promise<Portfolio>;
   placeOrder(input: OrderInput): Promise<OrderResult>;
   cancelOrder(requestId: string, orderId: string): Promise<void>;
