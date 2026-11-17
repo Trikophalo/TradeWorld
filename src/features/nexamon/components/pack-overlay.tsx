@@ -179,16 +179,6 @@ export function PackOverlay({
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <LiveWatchers packId={summaryOnly ? null : (pack?.packId ?? null)} revealed={shownCount} />
-              {series && series.total > 1 && !summaryOnly && (
-                <Badge tone="accent" data-testid="pack-series">
-                  {t("opening.series", { n: series.index, total: series.total })}
-                </Badge>
-              )}
-              {hasNext && onSkipAll && (
-                <Button variant="ghost" size="sm" data-testid="pack-skip-all" onClick={onSkipAll}>
-                  {t("opening.skipAll")}
-                </Button>
-              )}
               {stage === "opening" && pack && !summaryOnly && (
                 <Button
                   variant="ghost"
@@ -209,6 +199,18 @@ export function PackOverlay({
               </Dialog.Close>
             </div>
           </header>
+          {series && series.total > 1 && !summaryOnly && (
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b-2 border-line-1 px-4 py-2 lg:px-6">
+              <Badge tone="accent" data-testid="pack-series">
+                {t("opening.series", { n: series.index, total: series.total })}
+              </Badge>
+              {hasNext && onSkipAll && (
+                <Button variant="ghost" size="sm" data-testid="pack-skip-all" onClick={onSkipAll}>
+                  {t("opening.skipAll")}
+                </Button>
+              )}
+            </div>
+          )}
           {set && (
             <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
               {stage === "preview" && (
