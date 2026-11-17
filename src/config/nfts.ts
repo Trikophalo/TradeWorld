@@ -21,6 +21,58 @@ export const NFT_RULES = {
     /** An offer is open this long, then it expires. */
     offerHours: 24,
   },
+  /**
+   * Art quality (ADR-181): a critic's score 0..100 from the pixel grid, computed once by the server when an NFT is
+   * minted (src/lib/sim/art-quality.ts, the same in SQL: public.art_quality). Sub-scores 0..100, weighted.
+   */
+  quality: {
+    /** Below this share of drawn pixels (percent) the coverage score falls linearly. */
+    coverageMinPct: 15,
+    /** One value (a colour or empty) covering more than this percent of the grid caps coverage at (100 - share) x 10. */
+    dominanceMaxPct: 90,
+    /** Score by number of distinct colours used (index = count, 16 and more use the last entry). */
+    colourScores: [0, 20, 55, 80, 100, 100, 100, 100, 100, 90, 85, 80, 75, 70, 65, 60, 55],
+    /** A colour on less than this percent of the drawn pixels is a stray; each costs this many points. */
+    strayPct: 1,
+    strayPenalty: 8,
+    /** Colours with saturation and value of at least this (percent) count for harmony; hues in 30-degree buckets. */
+    chromaMinPct: 20,
+    /** Up to this many hue buckets are harmonious; each further one costs huePenalty, down to hueFloor. */
+    hueBuckets: 3,
+    huePenalty: 14,
+    hueFloor: 20,
+    /** Luminance range (0..255) that gives full contrast. */
+    contrastFull: 160,
+    /** Isolated pixels (no same-coloured neighbour) up to this percent are fine, then -2 per percent. */
+    noiseFreePct: 5,
+    /** Regions (same-coloured, connected) per 100 drawn pixels up to this are fine, then -2 per step. */
+    fragmentFreePct: 10,
+    /** Edge transitions per mille of neighbour pairs: below detailMin the score falls, above detailMax as well. */
+    detailMin: 40,
+    detailMax: 350,
+    /** Percent of drawn pixels inside solid shapes (3+ same-coloured neighbours) for full shape score. */
+    shapeFullPct: 40,
+    /** Centre of mass within this percent of the middle is balanced, then -3 per percent. */
+    balanceFreePct: 10,
+    /** Near-copy: at most this percent of the pixels differ from an older NFT (after recolouring). */
+    nearCopyPct: 2,
+    /** Copies are capped at these scores. */
+    copyCap: 5,
+    nearCopyCap: 15,
+    /** Without coverage, colours or detail it is no picture: the score x (gateBase + gate x (100 - gateBase) / 100). */
+    gateBase: 30,
+    weights: {
+      coverage: 10,
+      colours: 12,
+      harmony: 12,
+      contrast: 10,
+      structure: 16,
+      outline: 8,
+      composition: 10,
+      detail: 10,
+      shapes: 12,
+    },
+  },
   /** AI collectors (households money; what they pay comes back to the households when they resell). */
   ai: {
     /** What a collector thinks an NFT is worth: anchor x (1 + bonuses). Anchor = max(last price, mint cost, floor). */
