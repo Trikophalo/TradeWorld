@@ -1515,17 +1515,18 @@ nachts damit rund 450–1.260 € je Stunde, höchstens 24 Aufgaben am Tag.
 
 ## Nachtrag: Titans Revenge und Yin Yang (ADR-182)
 
-| Wert                | Zahl                                                                                                   | Wo                                                         |
-| ------------------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
-| Pack Titans Revenge | 100.000 €, 30 Karten 15/7/4/4                                                                          | `nexamon.sets.titans_revenge`, `NEXAMON_SET_LAYOUT`        |
-| Titans-Spannen      | Iron 2.812,50–6.750 €, Titanium 33.750–84.375 €, Diamond 0,34–0,96 Mio. €, Uranium 9,6–39,4 Mio. €     | `NEXAMON_SET_PRICE_RANGE` (Entwurf × 1,125)                |
-| Titans-Pack         | Iron als Basis; Uranium 1/500 (1), Diamond 1/50 (1), Titanium 1/5 (1–2)                                | `packRules.titans_revenge`                                 |
-| Pack Yin Yang       | 2.000 €, 110 Karten 54/30/16/8/2                                                                       | `nexamon.sets.yin_yang`                                    |
-| Yin-Yang-Spannen    | 10× erste Spannen, ab Ultra × 1,12 (Legendary 1,0–2,0 Mio. €)                                          | `NEXAMON_SET_PRICE_RANGE`                                  |
-| Yin-Yang-Raten      | je 36.000: Platz 4 Ultra 1.350 / Rare 9.150; Platz 5 Legendary 36, Prisma 405, Ultra 1.350, Rare 9.199 | `setOdds.yin_yang`                                         |
-| KI                  | Iron 6/4, Titanium 2/2 (Bestand/angeboten), Diamond 0/1, Uranium nie                                   | `ai.seedCopies`, `ai.listedPerCard`, `ai.excludedRarities` |
-| Boni                | Titanium 0,5 %, Diamond 1 %, Uranium 2,5 %; Set-Faktor Titans 1,75, Yin Yang 1,5                       | `bonuses`                                                  |
-| Bulk                | Titans: nur Iron                                                                                       | `quickSell.setRarities`                                    |
+| Wert                | Zahl                                                                                                         | Wo                                                           |
+| ------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| Pack Titans Revenge | 100.000 €, 30 Karten 15/7/4/4                                                                                | `nexamon.sets.titans_revenge`, `NEXAMON_SET_LAYOUT`          |
+| Titans-Spannen      | Iron 2.812,50–6.750 €, Titanium 33.750–84.375 €, Diamond 0,34–0,96 Mio. €, Uranium 9,6–39,4 Mio. €           | `NEXAMON_SET_PRICE_RANGE` (Entwurf × 1,125)                  |
+| Titans-Pack         | Iron als Basis; Uranium 1/500 (1), Diamond 1/50 (1), Titanium 1/5 (1–2)                                      | `packRules.titans_revenge`                                   |
+| Pack Yin Yang       | 2.000 €, 110 Karten 54/30/16/8/2                                                                             | `nexamon.sets.yin_yang`                                      |
+| Yin-Yang-Spannen    | 10× erste Spannen, ab Ultra × 1,12 (Legendary 1,0–2,0 Mio. €)                                                | `NEXAMON_SET_PRICE_RANGE`                                    |
+| Yin-Yang-Raten      | je 36.000: Platz 4 Ultra 1.350 / Rare 9.150; Platz 5 Legendary 36, Prisma 405, Ultra 1.350, Rare 9.199       | `setOdds.yin_yang`                                           |
+| KI                  | Iron 6/4, Titanium 2/2 (Bestand/angeboten), Diamond 0/1, Uranium nie                                         | `ai.seedCopies`, `ai.listedPerCard`, `ai.excludedRarities`   |
+| Boni                | Titanium 0,5 %, Diamond 1 %, Uranium 2,5 %; Set-Faktor Titans 1,75, Yin Yang 1,5                             | `bonuses`                                                    |
+| Sammlungen          | Typ erst ab 3 Karten; Titans-Belohnung je Pack 10.000 € (Typ 30.000 €, komplett 200.000 €, Master 750.000 €) | `bonuses.sets.type.minCards`, `bonuses.sets.rewardPackCents` |
+| Bulk                | Titans: nur Iron                                                                                             | `quickSell.setRarities`                                      |
 
 **Erwartungswert je Pack** (`nexamonExpectedPackValue`, exakte Aufzählung der Stufen bzw. der Platz-Tabelle, Mittel der
 Startpreise je Seltenheit):

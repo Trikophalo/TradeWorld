@@ -8058,7 +8058,8 @@ pay_factor_bps, today {done, success, cents}, log [...], last_hour {…, ai_util
 
 ## Nachtrag: Titans Revenge und Yin Yang (ADR-182)
 
-Migrationen `20261204007200_nexamon_new_sets_packs.sql`, `…7210_nexamon_new_sets_ranks.sql`. Keine neue Tabelle: die
+Migrationen `20261204007200_nexamon_new_sets_packs.sql`, `…7210_nexamon_new_sets_ranks.sql`,
+`…7220_nexamon_uranium_feed.sql`, `…7230_nexamon_new_sets_collections.sql`. Keine neue Tabelle: die
 461 Karten und Regeln kommen über `game_config` (`pnpm db:config`), `nexamon_sync()` übernimmt die Sets und legt den
 KI-Startbestand an.
 
@@ -8069,5 +8070,7 @@ KI-Startbestand an.
   `nexamon_open_pack()` würfelt Platz 4/5 mit der Set-Tabelle und überspringt in KI-Packs Stufen einer KI-gesperrten
   Seltenheit (die nächste Stufe rückt nach, der Rest ist Basis); `buy_nexamon_pack()`, `open_nexamon_sealed_pack()`, `nexamon_battle_pull()`
   zählen die Missionen nach `nexamon_rarity_rank()` (≥ 1 Rare, ≥ 2 Ultra).
+- `nexamon_bonus_recompute()`: Typ-Sammlungen erst ab `bonuses.sets.type.minCards` Karten, Belohnung je Pack aus
+  `bonuses.sets.rewardPackCents[set]`, sonst Packpreis. `feed_item_label()` nennt einen Uranium-Zug „Uranium-Karte“.
 - RPC `get_nexamon_market()`: der Filter `p_rarity` nimmt jede Seltenheit mit bekanntem Rang.
 - Kartenart `warrior` gibt es nur im Client-Katalog (Anzeige), die Datenbank kennt sie nicht.
