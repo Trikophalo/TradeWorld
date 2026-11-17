@@ -21,6 +21,9 @@ select (value ->> 'bigPullNotifyCents')::bigint as min, (value ->> 'bigPullNotif
   from public.game_config where key = 'nexamon' \gset
 select tests.assert(:min = 10000000 and :secs = 60, 'c8: config bigPullNotifyCents / bigPullNotifySeconds');
 
+select (select value_e4 from public.nexamon_cards where card_key = :'big1') as v1,
+       (select value_e4 from public.nexamon_cards where card_key = :'big2') as v2,
+       (select value_e4 from public.nexamon_cards where card_key = :'small') as v3 \gset
 -- big1 and big2 far above the threshold in any condition, small below it
 update public.nexamon_cards set value_e4 = 100000000000 where card_key in (:'big1', :'big2');
 update public.nexamon_cards set value_e4 = 1000000 where card_key = :'small';
@@ -61,11 +64,11 @@ select tests.assert(tests.bp_count(:b) = 1, 'c8: at most one broadcast per pulle
 select public.nexamon_mint_copy(:'big1', :b, null, 'mint', 'pack', p, public.game_now() + interval '2 minutes') is not null
    and public.nexamon_mint_copy(:'big2', :b, null, 'mint', 'pack', p, public.game_now() + interval '2 minutes') is not null as ok
   from (select gen_random_uuid() as p) x \gset
-select tests.assert(tests.bp_count(:a) = 1 and tests.bp_count(:c) = 1 and tests.bp_count(:b) = 1,
+select tests.assert(tests.bp_count(:a) = 1 and tests.bp_count(:c) = 2 and tests.bp_count(:b) = 1,
                     'c8: several big pulls in one opening make one notification each');
 select tests.assert(
   (select (payload ->> 'count')::integer = 2 and body like 'Bp_Bruno hat 2 Karten über 100.000 € gezogen, darunter %'
-     from public.notifications where type_key = 'nexamon_big_pull' and player_id = :c),
+     from public.notifications where type_key = 'nexamon_big_pull' and player_id = :c and payload ->> 'nickname' = 'Bp_Bruno'),
   'c8: the combined notification counts both cards');
 
 -- 6. after the minute the puller broadcasts again
@@ -75,5 +78,9 @@ select tests.assert(tests.bp_count(:b) = 2, 'c8: after bigPullNotifySeconds the 
 -- 7. a copy given outside a pack (no pack id) is no pull
 select public.nexamon_mint_copy(:'big1', :c, null, 'mint', 'pack', null, public.game_now() + interval '10 minutes') is not null as ok \gset
 select tests.assert(tests.bp_count(:a) = 1, 'c8: a copy without a pack is not broadcast');
+
+-- the card values back (later scripts read them)
+update public.nexamon_cards set value_e4 = case card_key when :'big1' then :v1 when :'big2' then :v2 else :v3 end
+ where card_key in (:'big1', :'big2', :'small');
 
 \echo c8 big pull: ok
