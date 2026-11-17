@@ -3,7 +3,7 @@
 import { AnimatePresence, motion, useReducedMotionConfig } from "motion/react";
 import { useTranslations } from "next-intl";
 import { Dialog } from "radix-ui";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { BALANCE } from "@/config/balance";
 import { nexamonCard, type NexamonRarity } from "@/config/nexamon";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,8 @@ import { playSound, type SoundName } from "@/lib/sound";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
 import { RarityBadge } from "../components/badges";
+import { InstantSell } from "../components/instant-sell";
+import { useNexamonCollection } from "../hooks";
 import { CardThumb, NexamonCardBack, NexamonCardFace } from "../components/card-face";
 import { NexamonPack } from "../components/pack";
 import { useNexamonBattle, useServerClock } from "./hooks";
@@ -289,6 +291,9 @@ function Arena({
                 ))}
               </ol>
             )}
+            {b.mySeat !== null && b.mySeat === winnerSeat.seat && (
+              <BattleInstantSell battle={b} className="mx-auto mt-3 max-w-sm" />
+            )}
             <div className="mt-3 flex justify-center">
               <Button onClick={onClose} data-testid="battle-done">
                 {t("battle.done")}
@@ -473,4 +478,29 @@ function SeatPanel({
       </ol>
     </motion.div>
   );
+}
+
+/**
+ * ADR-196: the winner of a Pack Battle may sell the cards just won to the game at once. The battle shows pulls
+ * by card and serial; the own collection (read again now) knows the copies behind them.
+ */
+function BattleInstantSell({ battle, className }: { battle: NexamonBattle; className?: string }) {
+  const collection = useNexamonCollection();
+  const { refetch } = collection;
+  useEffect(() => {
+    void refetch();
+  }, [refetch, battle.id]);
+  const items = useMemo(() => {
+    const copies = new Map((collection.data?.copies ?? []).map((c) => [`${c.cardKey}#${c.serial}`, c]));
+    return battle.seats.flatMap((seat) =>
+      seat.cards.flatMap((pull) => {
+        const copy = copies.get(`${pull.cardKey}#${pull.serial}`);
+        return copy && copy.grade === null && !copy.listing
+          ? [{ copyId: copy.id, cardKey: pull.cardKey, rarity: pull.rarity, valueCents: pull.valueCents }]
+          : [];
+      }),
+    );
+  }, [collection.data, battle.seats]);
+  if (!collection.data) return <Skeleton className={cn("h-20 w-full rounded-lg", className)} />;
+  return <InstantSell key={battle.id} items={items} className={className} />;
 }

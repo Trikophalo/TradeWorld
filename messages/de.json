@@ -905,7 +905,7 @@
     "nexamon_grading": "Die Karte ist gerade bei ASP.",
     "nexamon_not_raw": "Die Karte steckt schon in einem Slab.",
     "nexamon_not_graded": "Diese Karte hat keinen Slab.",
-    "nexamon_not_sellable": "Sofort verkaufen geht nur mit rohen Commons und Rares.",
+    "nexamon_not_sellable": "Diese Karte kann nicht an das Spiel verkauft werden: Bulk nur rohe Commons und Rares, sofort nach dem Öffnen nur frisch gezogene, nie angebotene Karten.",
     "nexamon_own_listing": "Das ist dein eigenes Angebot.",
     "nexamon_grading_limit": "ASP hat schon genug Karten von dir. Warte, bis eine zurück ist.",
     "nexamon_battle_unknown": "Dieses Pack Battle gibt es nicht (mehr).",
@@ -9851,6 +9851,21 @@
       "listFailed": "Nicht alle Karten eingestellt",
       "listed": "{count, plural, one {# Karte steht am Markt} other {# Karten stehen am Markt}}",
       "listLimit": "Auf den Markt passen höchstens {max} Angebote auf einmal."
+    },
+    "instant": {
+      "title": "Sofort an das Spiel ({rate})",
+      "all": "Alle für {amount} an das Spiel verkaufen",
+      "hold": "Gedrückt halten. Geht nur kurz nach dem Ziehen (bis {minutes} Min.).",
+      "holdOneOfOne": "Achtung: Ein One of One ist dabei. Länger gedrückt halten zum Verkaufen.",
+      "one": "Verkaufen ({rate})",
+      "confirmOneOfOne": "Wirklich verkaufen?",
+      "soldOne": "Verkauft",
+      "allSold": "Alle Karten an das Spiel verkauft.",
+      "paid": "+{amount}",
+      "showSingle": "Einzeln verkaufen",
+      "hideSingle": "Einzelliste schließen",
+      "sold": "{count, plural, one {# Karte} other {# Karten}} an das Spiel verkauft",
+      "failed": "Verkauf an das Spiel fehlgeschlagen"
     },
     "sealed": {
       "title": "Ungeöffnete Booster",

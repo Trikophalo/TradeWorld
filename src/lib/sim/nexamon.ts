@@ -387,6 +387,34 @@ export function nexamonBulkPayout(
   return { valueCents, feeCents: valueCents - payoutCents, payoutCents };
 }
 
+/**
+ * ADR-196: what the game pays at once for a fresh pull worth `copyValueCents` (value incl. condition):
+ * `instantSell.payoutBps` of it, rounded half-even like the server.
+ */
+export function nexamonInstantSellCents(copyValueCents: number, cfg: Config = BALANCE.nexamon): number {
+  return mulDivRound(copyValueCents, cfg.instantSell.payoutBps, 10_000);
+}
+
+/** ADR-196: a copy pulled at `pulledAtMs` (null: not a fresh pull) may still be sold instantly at `nowMs`. */
+export function nexamonInstantSellable(
+  pulledAtMs: number | null,
+  nowMs: number,
+  cfg: Config = BALANCE.nexamon,
+): boolean {
+  return pulledAtMs !== null && nowMs - pulledAtMs <= cfg.instantSell.windowSeconds * 1_000;
+}
+
+/** ADR-196: the instant sale of several fresh pulls: their value and what the game pays (each copy rounded). */
+export function nexamonInstantPayout(
+  copyValuesCents: readonly number[],
+  cfg: Config = BALANCE.nexamon,
+): { valueCents: number; payoutCents: number } {
+  return {
+    valueCents: copyValuesCents.reduce((a, b) => a + b, 0),
+    payoutCents: copyValuesCents.reduce((a, v) => a + nexamonInstantSellCents(v, cfg), 0),
+  };
+}
+
 // ---------------------------------------------------------------------------------------------- grading
 
 /** ASP's fee for grading a copy worth `copyValueCents`. */

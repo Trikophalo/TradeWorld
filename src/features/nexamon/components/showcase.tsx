@@ -31,6 +31,7 @@ import { CardThumb, NexamonCardBack, NexamonCardFace } from "./card-face";
 import { GradeReveal, GradingPack } from "./grading-reveal";
 import { DealNote, ListingRow } from "./listing-row";
 import { NexamonPack } from "./pack";
+import { InstantSell } from "./instant-sell";
 import { PackOpening } from "./pack-opening";
 import { CopyQuality, CopyVisual, FactRow, GradeChip, SelectField, Stat } from "./parts";
 import { NexamonSlab } from "./slab";
@@ -343,6 +344,16 @@ export function NexamonShowcase() {
           </p>
         </Block>
       </div>
+
+      <Block label="Sofort an das Spiel (ADR-196): frisch gezogene Karten für 90 % verkaufen" testId="nexamon-instant">
+        <InstantSell
+          className="max-w-sm"
+          items={[
+            { copyId: "demo-instant-1", cardKey: "me-001", rarity: "common", valueCents: 1_245 },
+            { copyId: "demo-instant-2", cardKey: "me-051", rarity: "rare", valueCents: 8_990 },
+          ]}
+        />
+      </Block>
 
       <Block label="Platzhalter ohne Artwork: die elf Typen (CardThumb, Faktor 2)" testId="nexamon-types">
         <div className="flex flex-wrap justify-center gap-2">

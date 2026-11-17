@@ -29,6 +29,7 @@ import { ConditionBadge, RarityBadge } from "./badges";
 import { CardThumb } from "./card-face";
 import { TiltPack } from "./pack";
 import { PackOpening } from "./pack-opening";
+import { InstantSell } from "./instant-sell";
 import { BuySealedButton } from "./sealed-packs";
 import { LiveWatchers } from "../live/live-watchers";
 import { useSetRelease } from "./release";
@@ -521,6 +522,7 @@ function Summary({
           <dd className="nums font-semibold text-fg-1">{fresh}</dd>
         </div>
       </dl>
+      <InstantSell key={pack.packId} items={pack.cards} />
       {children}
     </div>
   );

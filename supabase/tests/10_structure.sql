@@ -154,7 +154,7 @@ select tests.assert(
            'list_nexamon_card', 'unlist_nexamon_card', 'buy_nexamon_listing', 'sell_nexamon_to_ai', 'grade_nexamon_card',
            'crack_nexamon_slab', 'get_player_nexamon', 'get_nexamon_bonuses',
            -- several copies at once (ADR-174)
-           'list_nexamon_cards', 'unlist_nexamon_cards', 'bulk_sell_nexamon',
+           'list_nexamon_cards', 'unlist_nexamon_cards', 'bulk_sell_nexamon', 'instant_sell_nexamon',
            -- several packs at once (ADR-182)
            'buy_nexamon_packs', 'create_nexamon_pack_battle', 'join_nexamon_pack_battle',
            -- mission reset (ADR-166)

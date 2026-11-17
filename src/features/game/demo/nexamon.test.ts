@@ -329,7 +329,7 @@ describe("Nexamon in the demo (ADR-165)", () => {
     expect((await engine.nexamonCard(ultra.cardKey)).blackLabels).toBe(0);
   });
 
-  it("sells bulk to the AI at the value minus the 35 % bulk fee; better cards go over the market", async () => {
+  it("sells bulk to the AI at the value minus the 20 % bulk fee; better cards go over the market", async () => {
     const { engine, world } = setup();
     world.rolls.push(...packRolls(0, 0.9));
     const pack = await engine.buyNexamonPack("r1", "mystic_energy");
@@ -341,7 +341,7 @@ describe("Nexamon in the demo (ADR-165)", () => {
       commons.map((c) => c.copyId),
     );
     expect(sold.count).toBe(commons.length);
-    expect(sold.totalCents).toBe(commons.reduce((sum, c) => sum + Math.floor((c.valueCents * 6_500) / 10_000), 0));
+    expect(sold.totalCents).toBe(commons.reduce((sum, c) => sum + Math.floor((c.valueCents * 8_000) / 10_000), 0));
     expect(world.cash).toBe(cash + sold.totalCents);
     const after = (await engine.nexamonCard(commons[0]!.cardKey)).card;
     expect(after.owned).toBe(0);

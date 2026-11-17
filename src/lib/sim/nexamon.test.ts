@@ -8,6 +8,9 @@ import {
   nexamonAiSlabHoldMs,
   nexamonOneOfOneChance,
   nexamonBulkPayout,
+  nexamonInstantPayout,
+  nexamonInstantSellable,
+  nexamonInstantSellCents,
   nexamonBulkRarities,
   nexamonIsBulk,
   nexamonOneOfOneHit,
@@ -777,15 +780,26 @@ describe("Nexamon AI and fees (ADR-165)", () => {
       expect(cfg.ai.listedPerCard[rarity]).toBeLessThanOrEqual(cfg.ai.seedCopies[rarity]);
   });
 
-  it("takes 5 % from a selling player and 35 % from bulk sold to the game (ADR-174)", () => {
+  it("pays 90 % of a fresh pull's value, half-even per copy, within the window (ADR-196)", () => {
+    expect(nexamonInstantSellCents(1_245)).toBe(1_120);
+    expect(nexamonInstantSellCents(1_235)).toBe(1_112);
+    expect(nexamonInstantSellCents(10_000)).toBe(9_000);
+    expect(nexamonInstantPayout([1_245, 10_000])).toEqual({ valueCents: 11_245, payoutCents: 10_120 });
+    const w = cfg.instantSell.windowSeconds * 1_000;
+    expect(nexamonInstantSellable(0, w)).toBe(true);
+    expect(nexamonInstantSellable(0, w + 1)).toBe(false);
+    expect(nexamonInstantSellable(null, 0)).toBe(false);
+  });
+
+  it("takes 5 % from a selling player and 20 % from bulk sold to the game (ADR-196)", () => {
     expect(nexamonMarketFeeCents(10_000)).toBe(500);
     expect(nexamonMarketFeeCents(19)).toBe(0);
-    expect(nexamonQuickSellCents(1_001, "common", null)).toBe(650);
-    expect(nexamonQuickSellCents(1_000, "rare", null)).toBe(650);
-    expect(nexamonQuickSellCents(1_000, "rare", null, cfg, "cosmic_winds")).toBe(650);
+    expect(nexamonQuickSellCents(1_001, "common", null)).toBe(800);
+    expect(nexamonQuickSellCents(1_000, "rare", null)).toBe(800);
+    expect(nexamonQuickSellCents(1_000, "rare", null, cfg, "cosmic_winds")).toBe(800);
     expect(nexamonIsBulk("one_of_one", null, "cosmic_winds")).toBe(false);
     expect(nexamonBulkRarities("super_apex")).toEqual(["common", "rare"]);
-    expect(nexamonBulkPayout([1_001, 1_000, 3])).toEqual({ valueCents: 2_004, feeCents: 703, payoutCents: 1_301 });
+    expect(nexamonBulkPayout([1_001, 1_000, 3])).toEqual({ valueCents: 2_004, feeCents: 402, payoutCents: 1_602 });
     expect(nexamonQuickSellCents(1_000, "ultra", null)).toBeNull();
     expect(nexamonQuickSellCents(1_000, "common", 9)).toBeNull();
   });

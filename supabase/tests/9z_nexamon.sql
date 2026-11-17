@@ -753,8 +753,8 @@ select tests.throws_key(format($$select public.sell_nexamon_to_ai(gen_random_uui
   'nexamon_not_owner', 'sell_nexamon_to_ai(): only own copies');
 reset role;
 select tests.assert(
-  (:'qs'::jsonb ->> 'count')::integer = 1 and (:'qs'::jsonb ->> 'total_cents')::bigint = floor(:qv::bigint * 0.65)
-  and tests.cash(:a) = :cash_a::bigint + floor(:qv::bigint * 0.65) and tests.households() = :hh5::bigint - floor(:qv::bigint * 0.65)
+  (:'qs'::jsonb ->> 'count')::integer = 1 and (:'qs'::jsonb ->> 'total_cents')::bigint = floor(:qv::bigint * 0.80)
+  and tests.cash(:a) = :cash_a::bigint + floor(:qv::bigint * 0.80) and tests.households() = :hh5::bigint - floor(:qv::bigint * 0.80)
   and (tests.nx_copy(:'q1')).ai_owner is not null and (tests.nx_copy(:'q1')).owner_id is null
   and (tests.nx('me-011')).value_e4 = :v11 - floor(:v11::bigint * 25 / 10000.0)
   and (select count(*) from public.nexamon_sales where copy_id = :'q1' and kind = 'quick' and not counted) = 1

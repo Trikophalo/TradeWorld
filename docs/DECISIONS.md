@@ -4467,6 +4467,38 @@ was die Karte wert ist (abzüglich 5 % Gebühr), und eine Karte ist danach weg v
 **Folgen.** `nexamonAiBuyChanceBps` und `nexamonAiPremiumBps` (TS) gelten wie in SQL; die Demo prüft das Budget nur
 über dem Wert. SQL-Test `d3_ai_buys_expensive.sql`.
 
+## ADR-196: Frisch gezogene Karten sofort an das Spiel, Bulk-Gebühr 20 % — `Annahme`
+
+**Kontext.** Wunsch des Inhabers: Bulk soll mit nur 20 % statt 35 % Gebühr verkauft werden können. Außerdem soll man
+nach jedem Pack-Opening oder Pack Battle die gezogenen Karten direkt für 90 % des Marktwerts an das Spiel verkaufen
+können.
+
+**Entscheidung.**
+
+- Bulk an das Spiel (ADR-174): `quickSell.bps` 8 000, also 20 % Gebühr. Nur Konfiguration, der Server liest den Wert
+  aus `game_config`; Wertabschlag je Kopie (`dropBps`) unverändert.
+- Neuer RPC `instant_sell_nexamon(p_request_id, p_copy_ids)` (Migration 8600): verkauft genau die frisch gezogenen
+  Kopien für `instantSell.payoutBps` (9 000 = 90 %) ihres Werts samt Zustand, je Kopie kaufmännisch „half even“
+  gerundet, jede Seltenheit. Erlaubt nur für eigene, rohe Kopien aus einem Pack (`source = 'pack'`: Einzelkauf,
+  Mehrfachkauf, versiegeltes Pack, gewonnenes Pack Battle), höchstens `instantSell.windowSeconds` (900 s) nach dem
+  Ziehen, nie bewertet, nicht angeboten und nie verkauft (keine Zeile in `nexamon_sales`), aus einem erschienenen Set.
+  Sonst `nexamon_not_sellable`. Bezahlt wie Bulk von den Haushalten über das Ledger (`nexamon_sale`, Schlüssel
+  `nexamon:instant:<spieler>:<request>`), idempotent, höchstens `maxPerCall` Kopien und `callsPerMinute` Aufrufe.
+- Marktwirkung wie Bulk: jede Kopie senkt den Kartenwert um `quickSell.dropBps`, Verkaufsart `quick`, nie als Handel
+  gezählt. Die Kopie geht an einen KI-Händler; Seltenheiten, die die KI nicht halten darf (`ai.excludedRarities`:
+  One of One, Uranium), gehen in den Tresor des Spiels (`ai_owner = instantSell.vaultOwner`). Der KI-Wächter lässt
+  genau diesen Besitzer zu, die KI bietet sie nie an (`listedPerCard` 0) und `nexamon_ai_reset()` mustert sie nie aus.
+- „Nie angeboten“ prüft der Server über das aktuelle Angebot und die Verkaufshistorie; ein angebotenes und wieder
+  zurückgenommenes Exemplar innerhalb der 15 Minuten bleibt verkaufbar (es gibt keine Angebotshistorie).
+- Oberfläche: Unter jeder Pack-Zusammenfassung und beim Gewinner eines Pack Battles die Karte „Sofort an das Spiel
+  (90 %)“ mit „Alle für {Betrag} an das Spiel verkaufen“ (gedrückt halten, mit One of One länger und mit Warnung) und
+  „Einzeln verkaufen“ (kleine Knöpfe je Karte, ein One of One fragt noch einmal). Die Summen zeigen die Werte beim
+  Ziehen; der Server rechnet mit dem aktuellen Wert. Beim Battle findet der Client die Kopien über Karte und Nummer in
+  der eigenen Sammlung. Big-Pull-Nachrichten (ADR-190) entstehen beim Ziehen und bleiben unberührt.
+
+**Folgen.** Packs lohnen sich mit sofortigem Ausstieg zu 90 % fast immer bis zum Erwartungswert; der Abschlag von
+10 % und der Wertabschlag je Kopie bleiben die Senke. Die Fehlermeldung `nexamon_not_sellable` nennt beide Regeln.
+
 ## ADR-194: Fertigkeiten der Spielerfirmen, freigeschaltet durch den Skilltree — `Annahme`
 
 **Kontext.** Wunsch des Inhabers: Im Unternehmen soll es die Sektion „Fertigkeiten“ geben. Man fördert dort Dinge wie

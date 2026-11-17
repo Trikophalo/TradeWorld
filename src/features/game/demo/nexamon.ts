@@ -27,6 +27,8 @@ import {
   nexamonValueAfterAiBuy,
   nexamonValueAfterPressure,
   nexamonValueAfterQuickSell,
+  nexamonInstantSellCents,
+  nexamonInstantSellable,
   nexamonValueAfterSale,
   nexamonValueBounds,
   nexamonSetReleased,
@@ -100,6 +102,8 @@ interface DemoCopy {
   gradedAt: number | null;
   acquiredAt: number;
   listing: { id: string; priceCents: number; listedAt: number } | null;
+  /** ADR-196: when a pack (or a won battle) produced the copy; gone once it was listed. */
+  pulledAt?: number;
 }
 
 interface DemoSale {
@@ -793,6 +797,7 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
         gradedAt: null,
         acquiredAt: now,
         listing: null,
+        pulledAt: now,
       };
       s.copies.push(copy);
       if (pull.rarity === "one_of_one") {
@@ -1132,6 +1137,7 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
         if (s.copies.filter((c) => c.listing).length >= cfg.market.maxListings)
           throw new GameError("nexamon_listing_limit");
         copy.listing = { id: `l-${copy.id}-${s.nextId++}`, priceCents, listedAt: now };
+        delete copy.pulledAt;
         return { listing: listings(s, now).find((l) => l.id === copy.listing!.id)!, copy: toCopy(s, copy) };
       }),
 
@@ -1166,7 +1172,10 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
           .sort((a, b) => a.acquiredAt - b.acquiredAt || a.serial - b.serial)
           .slice(0, count);
         if (pick.length < count) throw new GameError("nexamon_not_enough");
-        for (const copy of pick) copy.listing = { id: `l-${copy.id}-${s.nextId++}`, priceCents, listedAt: now };
+        for (const copy of pick) {
+          copy.listing = { id: `l-${copy.id}-${s.nextId++}`, priceCents, listedAt: now };
+          delete copy.pulledAt;
+        }
         const all = listings(s, now);
         return {
           listings: pick.map((c) => all.find((l) => l.id === c.listing!.id)!),
@@ -1284,6 +1293,45 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
       return this.sellNexamonToAi(requestId, copyIds);
     },
 
+    // ADR-196: fresh pulls to the game for 90 % of their value, any rarity, within the window
+    instantSellNexamon: (requestId, copyIds) =>
+      write(requestId, (s, now) => {
+        const ids = [...new Set(copyIds)];
+        if (ids.length < 1 || ids.length > cfg.instantSell.maxPerCall) throw new GameError("invalid_argument");
+        const copies = ids.map((id) => ownCopy(s, id));
+        for (const copy of copies) {
+          if (copy.gradingUntil !== null) throw new GameError("nexamon_grading");
+          if (copy.listing) throw new GameError("nexamon_listed");
+          if (copy.grade !== null || !nexamonInstantSellable(copy.pulledAt ?? null, now, cfg))
+            throw new GameError("nexamon_not_sellable");
+        }
+        const sold = copies.map((copy) => {
+          const card = info(copy.cardKey);
+          const state = s.cards[copy.cardKey]!;
+          const price = nexamonInstantSellCents(copyValue(s, copy), cfg);
+          setValue(s, copy.cardKey, nexamonValueAfterQuickSell(state.valueE4), now);
+          const vault = (cfg.ai.excludedRarities as readonly string[]).includes(card.rarity);
+          if (!vault && state.ai.length < AI_STOCK_CAP)
+            state.ai.push({ serial: copy.serial, condition: copy.condition });
+          record(s, {
+            cardKey: copy.cardKey,
+            at: now,
+            priceCents: price,
+            condition: copy.condition,
+            grade: null,
+            kind: "quick",
+            seller: host.nickname(),
+            buyer: vault ? cfg.instantSell.vaultOwner : sellerOf(card.number + copy.serial),
+            counted: false,
+          });
+          return { copyId: copy.id, cardKey: copy.cardKey, priceCents: price };
+        });
+        s.copies = s.copies.filter((c) => !ids.includes(c.id));
+        const totalCents = sold.reduce((sum, x) => sum + x.priceCents, 0);
+        if (totalCents > 0) host.earn(totalCents);
+        return { sold, count: sold.length, totalCents };
+      }),
+
     gradeNexamonCard: (requestId, copyId) =>
       write(requestId, (s, now) => {
         const copy = ownCopy(s, copyId);
@@ -1339,6 +1387,7 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
             gradedAt: null,
             acquiredAt: now,
             listing: null,
+            pulledAt: now,
           };
           s.copies.push(copy);
           if ((cfg.feedRarities as readonly string[]).includes(pull.rarity))
@@ -1388,6 +1437,7 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
               gradedAt: null,
               acquiredAt: now,
               listing: null,
+              pulledAt: now,
             };
             copies.push(copy);
             if (mine && pull.rarity !== "common") host.track("nexamon_rares");

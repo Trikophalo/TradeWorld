@@ -599,14 +599,9 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Im Controlling unter „Wachstum“ lernt deine Firma Fertigkeiten wie „Daten analysieren“.",
       },
       {
-        id: "startseite-waehrung-zur-wahl-freundescode-f8a47106",
-        title: "KI kauft auch teure Karten",
-        text: "Bietest du eine Nexamon-Karte zum Marktwert oder darunter an, kauft die KI sie innerhalb weniger Minuten, auch für 1,5 Mio. € und auch als Slab.",
-      },
-      {
-        id: "startseite-waehrung-zur-wahl-freundescode-4926aa43",
-        title: "Grundeinkommen stark ausbaubar",
-        text: "Die Verbesserung „Grundeinkommen“ hat jetzt 12 Stufen ab Level 3 (alle zwei Level eine neue), jede +50 %, zusammen bis zum Siebenfachen (700 € pro…",
+        id: "startseite-waehrung-zur-wahl-freundescode-27c07659",
+        title: "Karten sofort verkaufen",
+        text: "Nach jedem Pack-Opening und jedem gewonnenen Pack Battle kannst du die gezogenen Karten direkt für 90 % ihres Werts an das Spiel verkaufen, alle auf…",
       },
     ],
   },

@@ -276,11 +276,11 @@ select (public.nexamon_ai_reset() ->> 'deleted') is not null as ok \gset
 select tests.assert(:'ok'::boolean, 'nexamon_ai_reset(): runs again after six hours');
 
 -- =============================================================================
--- J. Bulk to the game: value minus 35 %
+-- J. Bulk to the game: value minus 20 % (ADR-196)
 -- =============================================================================
 select tests.cw_give(:c, 'me-007', 3);
 select array_agg(id order by acquired_at) as bk from public.nexamon_copies where owner_id = :c and card_key = 'me-007' \gset
-select sum(public.nexamon_copy_value_cents(k.value_e4, c.condition, null) * 6500 / 10000) as bkpay
+select sum(public.nexamon_copy_value_cents(k.value_e4, c.condition, null) * 8000 / 10000) as bkpay
   from public.nexamon_copies c join public.nexamon_cards k on k.card_key = c.card_key where c.id = any (:'bk'::uuid[]) \gset
 select tests.cash(:c) as cb0 \gset
 \set rqk '''0b4b4b4b-0000-4000-8000-0000000000f2'''
@@ -296,7 +296,7 @@ select tests.assert(:'bs'::jsonb = :'bs2'::jsonb and (:'bs'::jsonb ->> 'count'):
 select tests.assert((:'bs'::jsonb ->> 'total_cents')::bigint between :bkpay::bigint - 3 and :bkpay::bigint
   and tests.cash(:c) = :cb0::bigint + (:'bs'::jsonb ->> 'total_cents')::bigint
   and not exists (select 1 from public.nexamon_copies where owner_id = :c and card_key = 'me-007'),
-  'bulk_sell_nexamon(): their value minus 35 %, paid at once ' || :bkpay || ' ' || (tests.cash(:c) - :cb0::bigint));
+  'bulk_sell_nexamon(): their value minus 20 %, paid at once ' || :bkpay || ' ' || (tests.cash(:c) - :cb0::bigint));
 
 -- =============================================================================
 -- K. A 10 is worth 2.5x to 4x, a 9.5 1.8x to 2.6x, by popularity; the ladder stays in order
