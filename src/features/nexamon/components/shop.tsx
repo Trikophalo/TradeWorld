@@ -90,56 +90,58 @@ export function Shop({
         </div>
       ) : (
         <ul className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4" data-tour="nexamon-packs">
-          {overview.sets.map((set) => (
-            <li key={set.key}>
-              <button
-                type="button"
-                onClick={() => show(set.key)}
-                data-testid={`buy-${set.key}`}
-                aria-label={t("shop.openPack", {
-                  set: tc(`sets.${set.key}`),
-                  price: formatMoney(set.packPriceCents, { whole: true }),
-                })}
-                className="group flex h-full w-full gap-4 rounded-lg border-2 border-line-1 bg-surface-1 p-5 text-left shadow-1 focus-ring transition duration-fast ease-standard hover:border-line-2 hover:bg-surface-2 active:translate-y-0.5 active:shadow-none lg:flex-col lg:items-center lg:p-6 lg:text-center"
-              >
-                <TiltPack set={set.key} scale={2} className="lg:hidden" />
-                <TiltPack set={set.key} scale={3} className="hidden lg:inline-block" />
-                <span className="flex min-w-0 flex-1 flex-col gap-3 lg:w-full">
-                  <span className="block">
-                    <span className="block font-pixel text-sm text-fg-1 uppercase">{tc(`sets.${set.key}`)}</span>
-                    <span className="mt-1 block nums text-xl font-semibold text-fg-1">
-                      {formatMoney(set.packPriceCents, { whole: true })}
-                    </span>
-                    <span className="mt-0.5 block text-xs text-pretty text-fg-3">
-                      {t("shop.inside", { count: overview.packSize })}
-                    </span>
-                  </span>
-                  <span className="block">
-                    <span className="flex items-baseline justify-between gap-2 text-xs text-fg-2">
-                      <span>{t("shop.progress")}</span>
-                      <span className="nums font-medium text-fg-1" data-testid={`progress-${set.key}`}>
-                        {t("shop.progressValue", { owned: set.ownedDistinct, total: set.cards })}
+          {[...overview.sets]
+            .sort((a, b) => a.packPriceCents - b.packPriceCents)
+            .map((set) => (
+              <li key={set.key}>
+                <button
+                  type="button"
+                  onClick={() => show(set.key)}
+                  data-testid={`buy-${set.key}`}
+                  aria-label={t("shop.openPack", {
+                    set: tc(`sets.${set.key}`),
+                    price: formatMoney(set.packPriceCents, { whole: true }),
+                  })}
+                  className="group flex h-full w-full gap-4 rounded-lg border-2 border-line-1 bg-surface-1 p-5 text-left shadow-1 focus-ring transition duration-fast ease-standard hover:border-line-2 hover:bg-surface-2 active:translate-y-0.5 active:shadow-none lg:flex-col lg:items-center lg:p-6 lg:text-center"
+                >
+                  <TiltPack set={set.key} scale={2} className="lg:hidden" />
+                  <TiltPack set={set.key} scale={3} className="hidden lg:inline-block" />
+                  <span className="flex min-w-0 flex-1 flex-col gap-3 lg:w-full">
+                    <span className="block">
+                      <span className="block font-pixel text-sm text-fg-1 uppercase">{tc(`sets.${set.key}`)}</span>
+                      <span className="mt-1 block nums text-xl font-semibold text-fg-1">
+                        {formatMoney(set.packPriceCents, { whole: true })}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-pretty text-fg-3">
+                        {t("shop.inside", { count: overview.packSize })}
                       </span>
                     </span>
-                    <Progress
-                      value={set.cards > 0 ? set.ownedDistinct / set.cards : 0}
-                      label={t("shop.progressLabel", { set: tc(`sets.${set.key}`) })}
-                      size="sm"
-                      tone={set.ownedDistinct >= set.cards ? "gold" : "accent"}
-                      className="mt-1.5"
-                    />
-                    <span className="mt-1.5 block nums text-xs text-fg-3">
-                      {t("shop.opened", { count: set.packsOpened })} ·{" "}
-                      {t("shop.population", { count: formatInteger(set.population) })}
+                    <span className="block">
+                      <span className="flex items-baseline justify-between gap-2 text-xs text-fg-2">
+                        <span>{t("shop.progress")}</span>
+                        <span className="nums font-medium text-fg-1" data-testid={`progress-${set.key}`}>
+                          {t("shop.progressValue", { owned: set.ownedDistinct, total: set.cards })}
+                        </span>
+                      </span>
+                      <Progress
+                        value={set.cards > 0 ? set.ownedDistinct / set.cards : 0}
+                        label={t("shop.progressLabel", { set: tc(`sets.${set.key}`) })}
+                        size="sm"
+                        tone={set.ownedDistinct >= set.cards ? "gold" : "accent"}
+                        className="mt-1.5"
+                      />
+                      <span className="mt-1.5 block nums text-xs text-fg-3">
+                        {t("shop.opened", { count: set.packsOpened })} ·{" "}
+                        {t("shop.population", { count: formatInteger(set.population) })}
+                      </span>
+                    </span>
+                    <span className="mt-auto block label-pixel text-accent transition-transform duration-fast group-hover:translate-x-0.5">
+                      {t("shop.look")} <span aria-hidden>→</span>
                     </span>
                   </span>
-                  <span className="mt-auto block label-pixel text-accent transition-transform duration-fast group-hover:translate-x-0.5">
-                    {t("shop.look")} <span aria-hidden>→</span>
-                  </span>
-                </span>
-              </button>
-            </li>
-          ))}
+                </button>
+              </li>
+            ))}
         </ul>
       )}
 

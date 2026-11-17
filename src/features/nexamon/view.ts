@@ -589,3 +589,7 @@ export function bulkGroups(
 export function bulkPick(groups: readonly BulkGroup[], selection: Readonly<Record<string, number>>): NexamonCopy[] {
   return groups.flatMap((g) => g.copies.slice(0, Math.max(0, Math.min(g.copies.length, selection[g.card.key] ?? 0))));
 }
+
+/** The sets by pack price, cheapest first (shop, market set picker; new sets fall into place by their price). */
+export const setsByPackPrice = (): NexamonSetKey[] =>
+  [...NEXAMON_SETS].sort((a, b) => cfg.sets[a].packPriceCents - cfg.sets[b].packPriceCents);

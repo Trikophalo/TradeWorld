@@ -28,7 +28,11 @@ async function preparePlayer(page: Page) {
 
 const shot = async (page: Page, name: string, target = page.locator("body")) => {
   const dir = process.env.NEXA_SHOTS;
-  if (dir) await target.screenshot({ path: `${dir}/${name}-${page.viewportSize()?.width}.png` });
+  if (!dir) return;
+  await target.scrollIntoViewIfNeeded();
+  // the pixel canvases paint after they come into view
+  await page.waitForTimeout(800);
+  await target.screenshot({ path: `${dir}/${name}-${page.viewportSize()?.width}.png` });
 };
 
 test("the Cosmic Winds pack is in the shop and its popup shows the One of One row", async ({ page }) => {

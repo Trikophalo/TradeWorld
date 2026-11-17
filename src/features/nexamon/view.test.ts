@@ -29,6 +29,7 @@ import {
   revealKey,
   setContents,
   bulkGroups,
+  setsByPackPrice,
   bulkPick,
   DEFAULT_BULK_FILTER,
   sortCopiesBestFirst,
@@ -134,6 +135,7 @@ describe("Cosmic Winds and bulk (ADR-174)", () => {
     ]);
     expect(groups[0]!.odds).toMatchObject({ kind: "one_of_one", oneInPacks: 5_000, slot5: 1, denominator: 5_000 });
     expect(packOdds("mystic_energy").some((r) => r.rarity === "one_of_one")).toBe(false);
+    expect(setsByPackPrice()).toEqual(["mystic_energy", "super_apex", "cosmic_winds", "prismatic_peak"]);
   });
 
   it("offers raw bulk copies after the filters, keeps the best copy, skips bonus cards", () => {

@@ -30,7 +30,7 @@ import type {
 import { formatInteger, formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useNexamonMarket, useRememberedFilters } from "../hooks";
-import { ownListings } from "../view";
+import { ownListings, setsByPackPrice } from "../view";
 import { CopyActions } from "./copy-actions";
 import { BuySheet, DealNote, ListingRow } from "./listing-row";
 import { NexamonPack } from "./pack";
@@ -167,7 +167,7 @@ function SetPicker({ onPick }: { onPick: (set: NexamonSetKey) => void }) {
         <p className="mt-1 text-sm text-pretty text-fg-2">{t("market.sets.intro")}</p>
       </div>
       <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {NEXAMON_SETS.map((set) => (
+        {setsByPackPrice().map((set) => (
           <li key={set}>
             <SetTile set={set} onPick={onPick} />
           </li>

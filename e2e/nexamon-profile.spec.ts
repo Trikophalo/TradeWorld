@@ -84,7 +84,7 @@ test("a friend's profile shows their collectibles and the whole collection", asy
   await expect(section).toBeVisible();
   await expect(section.getByText("Collectibles", { exact: true })).toBeVisible();
   await expect(page.getByTestId("profile-nexamon-summary")).toContainText("150 Karten");
-  await expect(page.getByTestId("profile-nexamon-summary")).toContainText("von 231 Motiven");
+  await expect(page.getByTestId("profile-nexamon-summary")).toContainText("von 321 Motiven");
   await expect(page.getByTestId("profile-nexamon-copies")).toContainText("150");
   await expect(page.getByTestId("profile-nexamon-value")).toContainText("€");
 
