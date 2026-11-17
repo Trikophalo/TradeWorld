@@ -200,7 +200,7 @@ select tests.assert(
   'start_campaign(): awareness +3 points at once (ADR-188; ADR-180: +2); company news campaign_started {kind, resonance, demand_bps}');
 select tests.assert(
   :'mc1'::jsonb -> 'campaign' = :'camp1'::jsonb
-  and :'mc1'::jsonb -> 'campaign_costs' = '{"flyer": 42000, "online": 126000, "tv": 378000}'::jsonb,
+  and :'mc1'::jsonb -> 'campaign_costs' = '{"flyer": 43000, "online": 129000, "tv": 387000}'::jsonb,
   'COMPANY: campaign while it runs; campaign_costs follow the (higher) awareness');
 
 -- the factor applies to hours that start inside the campaign window
