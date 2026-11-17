@@ -603,6 +603,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "KI kauft auch teure Karten",
         text: "Bietest du eine Nexamon-Karte zum Marktwert oder darunter an, kauft die KI sie innerhalb weniger Minuten, auch für 1,5 Mio. € und auch als Slab.",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-e70dfb14",
+        title: "Talente und 15 Stellen",
+        text: "Deine Firma hat jetzt 15 Stellen von Vertrieb bis Betriebsarzt.",
+      },
     ],
   },
   {

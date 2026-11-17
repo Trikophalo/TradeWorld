@@ -45,6 +45,7 @@ export const ADVICE_RULES = [
   "skill",
   "interview",
   "companySkills",
+  "talents",
   "ipo",
 ] as const;
 export type AdviceRule = (typeof ADVICE_RULES)[number];
@@ -635,6 +636,22 @@ export function adviceList(state: MiraState, names: MiraNames, facts: CompanyFac
         },
       ],
       options: [open("skills", names)],
+    });
+  }
+
+  // 14c. Stellen & Talente (ADR-199): unhappy talents first, else empty Stellen.
+  if (f.founder && f.talents && (f.talents.unhappy > 0 || f.talents.vacant > 0)) {
+    push({
+      rule: "talents",
+      id: `advice:talents:${f.talents.unhappy}:${f.talents.vacant}`,
+      urgent: f.talents.unhappy > 0,
+      impactCents: 0,
+      lines: [
+        f.talents.unhappy > 0
+          ? { key: "advice.talentsUnhappy", values: { count: f.talents.unhappy } }
+          : { key: "advice.talentsVacant", values: { count: f.talents.vacant } },
+      ],
+      options: [open("talents", names)],
     });
   }
 

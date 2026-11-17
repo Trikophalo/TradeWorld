@@ -52,7 +52,9 @@ export interface OfferCheck {
 
 /** What the talent checks before saying yes; the UI shows the same list live ("erfüllt / nicht erfüllt"). */
 export function talentOfferChecks(
-  talent: Pick<TalentSeed, "wageCents" | "benefits" | "minReputation" | "minAwarenessBps" | "minForm">,
+  talent: Pick<TalentSeed, "wageCents" | "minReputation" | "minAwarenessBps" | "minForm"> & {
+    benefits: readonly string[];
+  },
   offer: { wageCents: number; benefits: readonly string[] },
   company: CompanyFacts,
   cfg: TalentsConfig = BALANCE.talents,

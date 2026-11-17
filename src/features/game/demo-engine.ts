@@ -60,6 +60,7 @@ import { demoCoworkerMembers, demoCoworkers, type DemoCoworker } from "./demo/fl
 import { createStockNewsEngine } from "./demo/stock-news";
 import { createCompanyMovesEngine, type DemoMoveRun } from "./demo/company-moves";
 import { createCompanySkillsEngine, type DemoCompanySkills } from "./demo/company-skills";
+import { createTalentsEngine, type DemoTalents } from "./demo/talents";
 import { createInterviewEngine, type DemoInterviewState } from "./demo/interviews";
 import { createCompanyTasksEngine, type DemoTasksState } from "./demo/company-tasks";
 import { createPitchesEngine, type DemoPitch } from "./demo/pitches";
@@ -150,6 +151,7 @@ interface PlayerState {
   companyMoves?: DemoMoveRun[];
   /** Fertigkeiten of the demo company (ADR-194). */
   companySkills?: DemoCompanySkills;
+  talents?: DemoTalents;
   companyTasks?: DemoTasksState;
   /** NEXA Nachrichten (ADR-150). */
   newsShow?: DemoNewsShowState;
@@ -1706,6 +1708,17 @@ const companySkills = createCompanySkillsEngine({
   now: () => Date.now(),
 });
 
+const talents = createTalentsEngine({
+  company: () => p().company ?? null,
+  state: () => p().talents ?? {},
+  setState: (next) => {
+    p().talents = next;
+    persist();
+  },
+  idempotent,
+  now: () => Date.now(),
+});
+
 const companyTasks = createCompanyTasksEngine({
   company: () => p().company ?? null,
   nickname: () => p().nickname,
@@ -1996,6 +2009,7 @@ export const demoEngine: GameEngine = {
   ...protests,
   ...companyMoves,
   ...companySkills,
+  ...talents,
   ...companyTasks,
   ...pitches,
   // AI companies of the demo (ADR-125): facts from the start values, no players work there.

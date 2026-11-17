@@ -46,6 +46,8 @@ export const DISCLOSURE = {
   companyInterview: 3,
   /** Fertigkeiten of the own company (ADR-194): with the company, after the tutorial. */
   companySkills: 3,
+  /** Talente for the 15 Stellen and the talent market (ADR-199): with the company, after the tutorial. */
+  companyTalents: 3,
   /** News-Aktionen of the live show (ADR-193): the news tab section and the toast, after the tutorial. */
   newsPromo: 2,
 } as const;
