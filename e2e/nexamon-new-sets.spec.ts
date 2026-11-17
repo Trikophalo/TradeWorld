@@ -100,5 +100,7 @@ test("a uranium card, a warrior card and Yin and Yang render on /dev/ui", async 
   const fronts = page.getByTestId("nexamon-fronts");
   for (const key of ["tr-001", "tr-016", "tr-023", "tr-027"])
     await shot(page, `rarity-${key}`, fronts.locator(`[data-card="${key}"]`).first());
-  await noOverflow(page);
+  // the block itself never runs wider than its card (the rest of /dev/ui is checked elsewhere)
+  const block = page.getByTestId("nexamon-new-sets");
+  expect(await block.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
 });
