@@ -17,6 +17,7 @@ import { InterviewCard } from "../interview-card";
 import { OfficeScene } from "../office-scene";
 import { PitchCard } from "../pitch-card";
 import { CompanyNewsCard, SituationCard } from "../situation";
+import { TaxPromoCard } from "@/features/news/promo/promo-card";
 import { StaffValueCard } from "../staff-value-card";
 import { TodoCenter, type TodoItem } from "../todo-center";
 
@@ -137,6 +138,7 @@ export function StaffTab({
           >
             <div className="space-y-4">
               <SituationCard />
+              <TaxPromoCard />
               <Reveal feature="companyInterview">
                 <div id="interview" className="scroll-mt-32">
                   <InterviewCard />

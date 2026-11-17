@@ -8,7 +8,7 @@
 #   3. apply all migrations, seed.sql, seeds/artworks.sql and seeds/furniture.sql
 #      with ON_ERROR_STOP
 #   4. run the SQL assertions in supabase/tests/[1-4]*.sql, then (older
-#      database mode only) apply update-to-latest.sql, then [5-9]*.sql, a[0-9]*.sql, b[0-9]*.sql and c[0-9]*.sql
+#      database mode only) apply update-to-latest.sql, then [5-9]*.sql, a[0-9]*.sql, b[0-9]*.sql, c[0-9]*.sql and d[0-9]*.sql
 #   5. stop and delete the cluster
 # Exits non-zero on the first failure.
 #
@@ -155,7 +155,7 @@ if [[ -n "${NEXA_MIGRATIONS_UPTO:-}" ]]; then
 fi
 
 echo "== assertions (M1 market, trading, bonds, security)"
-run_assertions "$SCRIPT_DIR"/[5-9]*.sql "$SCRIPT_DIR"/a[0-9]*.sql "$SCRIPT_DIR"/b[0-9]*.sql "$SCRIPT_DIR"/c[0-9]*.sql
+run_assertions "$SCRIPT_DIR"/[5-9]*.sql "$SCRIPT_DIR"/a[0-9]*.sql "$SCRIPT_DIR"/b[0-9]*.sql "$SCRIPT_DIR"/c[0-9]*.sql "$SCRIPT_DIR"/d[0-9]*.sql
 
 if [[ -n "${NEXA_FIXTURE_DIR:-}" ]]; then
   echo "== RPC fixtures -> $NEXA_FIXTURE_DIR"

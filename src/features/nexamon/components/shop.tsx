@@ -5,12 +5,15 @@ import { useState } from "react";
 import { nexamonRarityCount, type NexamonSetKey } from "@/config/nexamon";
 import { NEXAMON_CONDITIONS } from "@/config/nexamon-rules";
 import { BALANCE } from "@/config/balance";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { NexamonCollection, NexamonOverview, NexamonPackResult } from "@/features/game/nexamon-types";
 import { engine, useGame } from "@/features/game/store";
+import { ServerCountdown } from "@/features/company/listed/shared";
+import { promoPackPrice, useNewsPromo } from "@/features/news/promo/hooks";
 import { formatInteger, formatMoney } from "@/lib/format";
 import { playSound } from "@/lib/sound";
 import { useNexamonAction, usePendingPack } from "../hooks";
@@ -35,6 +38,7 @@ export function Shop({
 }) {
   const t = useTranslations("nexamon");
   const tc = useTranslations("nexamonCards");
+  const tp = useTranslations("newsPromo");
   const cash = useGame((state) => state.portfolio?.cashCents ?? 0);
   const [pending, setPending] = usePendingPack();
   /** The set whose popup is open. */
@@ -44,6 +48,13 @@ export function Shop({
   /** ADR-182: packs bought at once, opened one after another; `at` is the one on the table. */
   const [series, setSeries] = useState<{ packs: NexamonPackResult[]; at: number; all: boolean } | null>(null);
   const action = useNexamonAction();
+  // ADR-193: a running pack sale; the server charges the same reduced price
+  const { promo } = useNewsPromo();
+  const sets = overview?.sets.map((s) => ({
+    ...s,
+    regularPriceCents: s.packPriceCents,
+    packPriceCents: promoPackPrice(promo, s.key, s.packPriceCents),
+  }));
 
   const buy = (set: NexamonSetKey, count = 1) =>
     void action.run(
@@ -92,7 +103,7 @@ export function Shop({
     setPack(pending);
     setSelected(pending.set);
   };
-  const selectedSet = overview?.sets.find((s) => s.key === selected) ?? null;
+  const selectedSet = sets?.find((s) => s.key === selected) ?? null;
 
   return (
     <div className="space-y-5" data-testid="nexamon-shop">
@@ -129,8 +140,8 @@ export function Shop({
         </div>
       ) : (
         <ul className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4" data-tour="nexamon-packs">
-          {[...overview.sets]
-            .sort((a, b) => a.packPriceCents - b.packPriceCents)
+          {[...(sets ?? [])]
+            .sort((a, b) => a.regularPriceCents - b.regularPriceCents)
             .map((set) => (
               <li key={set.key}>
                 <button
@@ -151,6 +162,19 @@ export function Shop({
                       <span className="mt-1 block nums text-xl font-semibold text-fg-1">
                         {formatMoney(set.packPriceCents, { whole: true })}
                       </span>
+                      {set.packPriceCents < set.regularPriceCents && promo && (
+                        <span
+                          className="mt-1 flex flex-wrap items-center gap-2 lg:justify-center"
+                          data-testid={`sale-${set.key}`}
+                        >
+                          <s className="nums text-xs text-fg-3">
+                            {tp("regular", { price: formatMoney(set.regularPriceCents, { whole: true }) })}
+                          </s>
+                          <Badge tone="gain">
+                            {tp("badge", { pct: promo.bps / 100 })} <ServerCountdown at={promo.endsAt} />
+                          </Badge>
+                        </span>
+                      )}
                       <span className="mt-0.5 block text-xs text-pretty text-fg-3">
                         {t("shop.inside", { count: overview.packSize })}
                       </span>

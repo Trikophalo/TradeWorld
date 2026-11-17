@@ -21,6 +21,7 @@ import { formatMoney } from "@/lib/format";
 import { hasForbiddenSymbol } from "@/lib/sim/logo";
 import { scaledXp } from "@/lib/sim/progression";
 import { playSound } from "@/lib/sound";
+import { useNewsPromo } from "@/features/news/promo/hooks";
 import { useArtRefresh, useArtStudio } from "../hooks";
 
 const SIZE = BALANCE.artworks.size;
@@ -35,7 +36,12 @@ export function ArtStudio() {
   const studio = useArtStudio();
   const [open, setOpen] = useState(false);
   const cash = useGame((state) => state.portfolio?.cashCents ?? 0);
-  const cost = studio.data?.nextCostCents ?? BALANCE.artworks.createBaseCostCents;
+  const regularCost = studio.data?.nextCostCents ?? BALANCE.artworks.createBaseCostCents;
+  // ADR-193: a running free-NFT promotion waives the fee once (the server decides)
+  const { promo } = useNewsPromo();
+  const free = promo?.kind === "free_nft" && !promo.claimed;
+  const cost = free ? 0 : regularCost;
+  const tp = useTranslations("newsPromo");
   return (
     <Card
       padding="lg"
@@ -54,9 +60,15 @@ export function ArtStudio() {
           </p>
           <p className="mt-1 text-xs text-fg-3">
             {t("studioPainted", { count: studio.data?.painted ?? 0 })} ·{" "}
-            <span className="font-semibold text-fg-1">
-              {t("studioCost", { amount: formatMoney(cost, { whole: true }) })}
-            </span>{" "}
+            {free ? (
+              <span className="font-semibold text-gain" data-testid="studio-free">
+                {tp("freeNftCost", { amount: formatMoney(regularCost, { whole: true }) })}
+              </span>
+            ) : (
+              <span className="font-semibold text-fg-1">
+                {t("studioCost", { amount: formatMoney(cost, { whole: true }) })}
+              </span>
+            )}{" "}
             ·{" "}
             <span className="text-accent">
               {t("studioXp", { xp: scaledXp(studio.data?.mintXp ?? BALANCE.nfts.mintXp) })}

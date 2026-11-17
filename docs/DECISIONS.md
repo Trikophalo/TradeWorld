@@ -4437,6 +4437,42 @@ entfällt. `company_awareness_hour` (6 Argumente) ist gelöscht, `company_awaren
 **Offen.** Die Firmenseite (andere Baustelle) hängt `AwarenessBreakdown` ein; `growth-path.tsx` liest weiter die
 Anzeige-Grenzen der Garage.
 
+## ADR-193: News-Aktionen aus der Live-Show — `Annahme`
+
+**Kontext.** Der Owner: „Es soll bei den News immer mal wieder eine Aktion kommen“: Booster eines Sets 15 Minuten
+20 % günstiger, ein kostenloses NFT für jeden oder eine Steuererklärung, die Firmenbesitzern 10 % vom Umsatz bringt.
+
+**Entscheidung.**
+
+- _Auslosung:_ Ein Trigger `news_shows_promo` (BEFORE UPDATE, wenn eine Show von `scheduled` auf `aired` geht) statt
+  eines Textersatzes in `news_show_start()`: Mit `newsPromos.chanceBps` (3 400, etwa jede dritte Show) gibt es eine
+  Aktion, nie dieselbe Art zweimal hintereinander, höchstens eine gleichzeitig. Sie beginnt mit der Show und läuft
+  `durationMinutes` (15). Mr. Doodle Dangle liest sie als letztes Segment (`kind = 'promo'`) vor, der Newsfeed behält
+  sie, jeder in den letzten 7 Tagen aktive Spieler bekommt einmal die Benachrichtigung `news_promo`. Gleiche Regel in
+  TS (`src/lib/sim/news-promos.ts`).
+- _Booster-Rabatt:_ ein zufälliges **veröffentlichtes** Set mit Preis. `buy_nexamon_pack` und
+  `buy_nexamon_sealed_pack` (vollständig neu definiert, Stand nach 7240) nehmen den Preis aus
+  `news_promo_pack_price()`: Preis × (10 000 − 2 000) / 10 000, kaufmännisch „half even“. Mehrfachkauf läuft über
+  `buy_nexamon_pack`. Pack Battles behalten ihren Einsatz. Der Shop zeigt den alten Preis durchgestrichen und ein
+  Abzeichen mit der Restzeit.
+- _Gratis-NFT:_ `create_artwork` (vollständig neu definiert) erlässt die Prägegebühr beim ersten NFT eines Spielers in
+  der Aktion (`news_promo_claims`); das NFT behält seinen normalen Prägewert. Es zählt wie jedes NFT für den Preis des
+  nächsten.
+- _Steuererklärung:_ Wer eine aktive eigene Firma gründete, gibt in der Aktion einmal ein kleines Formular ab
+  (Zahlen ansehen, Richtigkeit bestätigen, unterschreiben). Erstattung = 10 % des **Verkaufsumsatzes**
+  (`player_company_hours.revenue_cents`) aller eigenen aktiven Firmen in den letzten 24 abgeschlossenen Stunden,
+  höchstens 50.000 €, aus der Staatskasse (`treasury`) als Buchung `tax_refund` (Summe 0, `request_id` idempotent).
+  KI-Firmen haben keinen Gründer und zählen nie. Ohne Firma, ohne Umsatz oder bei leerer Staatskasse gibt es nichts.
+- _Anzeige:_ Abschnitt im News-Tab mit Restzeit (Offenlegung `newsPromo`, ab Stufe 2), ein Toast je Aktion für alle,
+  die online sind, mit Link zum Ort, die Steuererklärung auch im Firmen-Dashboard.
+- _Keine Kauf-Countdowns:_ Der Timer zeigt, wann ein Spielereignis mit Spielgeld endet, wie bei Auktionen. Es gibt
+  kein Echtgeld, keine Kaufaufforderung am Timer, keine Wiederholungen, kein Druckton; die Texte sind neutral
+  („Endet in“), der Witz geht nur über Spielereignisse.
+
+**Folgen.** Neue Tabellen `news_promos` und `news_promo_claims`, RPCs `get_news_promo` und `file_news_tax_return`,
+Benachrichtigungstyp `news_promo`, Konfiguration `newsPromos` in `src/config/news-promos.ts`. Die Show-Tests schalten
+die Auslosung ab (`9i`), `d1_news_promos.sql` prüft sie. Der Demo-Modus kennt keine Aktionen.
+
 ## ADR-190: Große Nexamon-Züge sind Nachrichten für alle — `Annahme`
 
 **Kontext.** Der Owner: „Wenn einer eine Karte über 100k wert zieht, bekommen alle die Benachrichtigung.“

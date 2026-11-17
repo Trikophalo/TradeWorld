@@ -63,6 +63,8 @@ export function useArtRefresh() {
   return async () => {
     await Promise.all([
       client.invalidateQueries({ queryKey: ART_KEYS.all }),
+      // a free NFT of a News-Aktion is used up (ADR-193)
+      client.invalidateQueries({ queryKey: ["news", "promo"] }),
       useGame.getState().refreshPortfolio(),
       useGame.getState().refreshMissions(),
     ]);

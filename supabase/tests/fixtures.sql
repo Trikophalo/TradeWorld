@@ -1666,3 +1666,22 @@ select tests.login_as('authenticated', :fx_pb) is null as ok \gset
 select public.get_nexamon_battle(:'fx_pb3');
 \o
 reset role;
+
+-- News-Aktionen (ADR-193) --------------------------------------------------------------------------------------------
+select company_id as fx_npco from public.player_companies where founder_id = :fx_g and status = 'active' limit 1 \gset
+insert into public.player_company_hours (company_id, hour_start, demand_cents, capacity_cents, revenue_cents, cogs_cents,
+                                         fixed_cents, marketing_cents, pay_factor_bps, profit_cents)
+values (:'fx_npco', date_trunc('hour', public.game_now()) - interval '3 hours', 0, 0, 123400, 0, 0, 0, 10000, 0)
+on conflict do nothing;
+delete from public.news_promos where ends_at > public.game_now();
+insert into public.news_promos (kind, bps, starts_at, ends_at, headline, body)
+values ('tax_return', 1000, public.game_now() - interval '1 minute', public.game_now() + interval '14 minutes',
+        'Steuererklärung mit Rückzahlung', 'Das NEXA-Finanzamt zahlt zurück.');
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/get_news_promo.json
+select public.get_news_promo();
+\o :fixture_dir/file_news_tax_return.json
+select public.file_news_tax_return(gen_random_uuid());
+\o
+reset role;
+delete from public.news_promos;

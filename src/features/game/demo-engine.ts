@@ -1964,6 +1964,11 @@ export const demoEngine: GameEngine = {
   declineCompanyInterview: interviews.declineCompanyInterview,
   newsShow: newsShow.newsShow,
   postNewsShowMessage: newsShow.postNewsShowMessage,
+  // News-Aktionen (ADR-193) are drawn by the server's show; the demo has none.
+  newsPromo: async () => ({ now: new Date(Date.now()).toISOString(), promo: null }),
+  fileNewsTaxReturn: async () => {
+    throw new GameError("news_promo_inactive");
+  },
   // The demo keeps seen tours in the browser only (the tutorial store does that).
   seenTours: async () => [],
   markTourSeen: async () => [],

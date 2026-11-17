@@ -56,6 +56,8 @@ import { FirmSection, InfoTip, SectionNav, SubSection } from "@/features/company
 import { ReputationCard } from "@/features/company/components/reputation-card";
 import { companyHealth, type HealthCompany } from "@/lib/sim/company-health";
 import { InterviewCard } from "@/features/company/components/interview-card";
+import { NewsPromoCard, TaxPromoCard } from "@/features/news/promo/promo-card";
+import type { NewsPromo } from "@/features/game/types";
 import { TaskGameView } from "@/features/company/tasks/games";
 import { TaskBoard } from "@/features/company/tasks/task-board";
 import { AutopilotCard } from "@/features/company/components/autopilot-card";
@@ -258,6 +260,46 @@ const SAMPLE_TASKS: CompanyTasks = {
 };
 
 /** A CEO interview request (ADR-173); sending goes to the demo engine, which knows no such id. */
+/** News-Aktionen (ADR-193): the three kinds, the empty state and the tax return on the dashboard. */
+function NewsPromoShowcase() {
+  const now = useMountTime();
+  if (now === null) return null;
+  const at = (minutes: number) => new Date(now + minutes * 60_000).toISOString();
+  const base: NewsPromo = {
+    id: 1,
+    kind: "pack_sale",
+    set: "cosmic_winds",
+    bps: 2000,
+    startsAt: at(-3),
+    endsAt: at(12),
+    headline: "Booster-Rabatt: Cosmic Winds 20 % günstiger",
+    text: "",
+    claimed: false,
+    claimedCents: 0,
+    tax: null,
+  };
+  const tax: NewsPromo = {
+    ...base,
+    id: 3,
+    kind: "tax_return",
+    set: null,
+    bps: 1000,
+    headline: "Steuererklärung mit Rückzahlung",
+    tax: { owner: true, revenueCents: 2_400_000, refundCents: 240_000, capCents: 5_000_000, shareBps: 1000 },
+  };
+  return (
+    <Demo label="News-Aktionen (ADR-193)" className="flex-col items-stretch gap-3">
+      <NewsPromoCard preview={base} />
+      <NewsPromoCard
+        preview={{ ...base, id: 2, kind: "free_nft", set: null, bps: 0, headline: "Gratis-NFT für alle" }}
+      />
+      <NewsPromoCard preview={tax} />
+      <TaxPromoCard preview={{ ...tax, claimed: true, claimedCents: 240_000 }} />
+      <NewsPromoCard preview={null} />
+    </Demo>
+  );
+}
+
 const SAMPLE_INTERVIEW = {
   maxChars: 240,
   interview: {
@@ -1195,6 +1237,7 @@ export function Showcase() {
           <SampleGame key={sample.game} sample={sample} />
         ))}
         <InterviewCard preview={SAMPLE_INTERVIEW} />
+        <NewsPromoShowcase />
         <ShowcaseSection />
         <UpgradeCard upgradeKey="vault" level={2} />
         <UpgradeCard upgradeKey="rhetoric" level={0} />

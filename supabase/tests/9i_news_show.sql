@@ -5,6 +5,8 @@
 set client_min_messages = notice;
 -- ADR-182: announcements of new sets air in one fixed hour; the show tests must not depend on the clock
 update public.game_config set value = jsonb_set(value, '{announcements}', '[]'::jsonb) where key = 'newsShow';
+-- ADR-193: News-Aktionen are drawn at random when a show airs; the show tests keep their segments (d1 tests them)
+update public.game_config set value = jsonb_set(value, '{chanceBps}', '0') where key = 'newsPromos';
 
 \set f '''09119119-0000-4000-8000-0000000000f1'''
 \set l '''09119119-0000-4000-8000-0000000000a1'''

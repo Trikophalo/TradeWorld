@@ -87,6 +87,7 @@ describe("BALANCE", () => {
       "protests",
       "nfts",
       "newsShow",
+      "newsPromos",
       "interviews",
       "companyAssistant",
       "companyHealth",
