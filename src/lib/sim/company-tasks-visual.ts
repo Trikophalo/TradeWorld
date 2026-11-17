@@ -144,22 +144,15 @@ export function turnMask(mask: number, turns: number): number {
   return ((mask << r) | (mask >> (4 - r))) & 15;
 }
 
-/** Whether water flows from the left edge at row `from` to the right edge at row `to`. */
-export function pipesConnected(
-  size: number,
-  tiles: readonly number[],
-  turns: readonly number[],
-  from: number,
-  to: number,
-) {
+/** Cells the water reaches from the left edge at row `from` (in the order it gets there). */
+export function pipesFlow(size: number, tiles: readonly number[], turns: readonly number[], from: number): number[] {
   const open = tiles.map((t, i) => turnMask(PIPE_BASE[t === 1 ? 1 : 0], turns[i] ?? 0));
   const startCell = from * size;
-  if (!(open[startCell]! & 8)) return false;
+  if (!(open[startCell]! & 8)) return [];
   const seen = new Set([startCell]);
   const queue = [startCell];
   for (let head = 0; head < queue.length; head++) {
     const cell = queue[head]!;
-    if (cell === to * size + size - 1 && open[cell]! & 2) return true;
     const r = Math.floor(cell / size);
     const c = cell % size;
     const steps: [number, number, number][] = [
@@ -174,7 +167,22 @@ export function pipesConnected(
       queue.push(next);
     }
   }
-  return false;
+  return queue;
+}
+
+/** Whether water flows from the left edge at row `from` to the right edge at row `to`. */
+export function pipesConnected(
+  size: number,
+  tiles: readonly number[],
+  turns: readonly number[],
+  from: number,
+  to: number,
+): boolean {
+  const sink = to * size + size - 1;
+  return (
+    pipesFlow(size, tiles, turns, from).includes(sink) &&
+    (turnMask(PIPE_BASE[tiles[sink] === 1 ? 1 : 0], turns[sink] ?? 0) & 2) !== 0
+  );
 }
 
 /** A route column by column from the left edge (row from) to the right edge (row to), and the openings it needs. */

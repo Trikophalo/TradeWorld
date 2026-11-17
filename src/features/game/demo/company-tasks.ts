@@ -7,6 +7,7 @@ import {
   taskRewardCents,
   type TaskMode,
 } from "@/lib/sim/company-autopilot";
+import { pickWeightedTask } from "@/lib/sim/company-task-mix";
 import { aiMinutes, generatePuzzle, gradeAnswer, type TaskSolution } from "@/lib/sim/company-tasks";
 import { upgradeEffects, type UpgradeLevels } from "@/lib/sim/upgrades";
 import {
@@ -254,7 +255,8 @@ export function createCompanyTasksEngine(
       const pool = cfg.tasks.filter(
         (t) => (t.product === "*" || t.product === c.productKey) && !active.some((a) => a.key === t.key),
       );
-      const pick = pool[Math.floor(host.random() * pool.length)];
+      // ADR-186: weighted, drag and see games come up most of the time
+      const pick = pickWeightedTask(pool, host.random);
       if (pick) {
         const tier = (c.tier in cfg.valueCentsByTier ? c.tier : "garage") as TierKey;
         s.seq += 1;
