@@ -52,6 +52,8 @@ import type {
 } from "../battle-types";
 import { GameError } from "../types";
 import { scaledXp } from "@/lib/sim/progression";
+import { pickPackPrize, pickWeighted, type PackPrize, type PackSet } from "@/lib/sim/battle/prizes";
+import { ACCESSORIES } from "@/config/accessories";
 import { botInput, newBotMemory, type BotMemory } from "./battle-bots";
 
 /*
@@ -74,6 +76,10 @@ export interface BattleHost {
   freeArtwork(): BattleArtwork | null;
   /** Hands that NFT to the player; false when it is gone. */
   giveArtwork(id: string): boolean;
+  /** Nexamon sets with their pack price and name (ADR-177); optional in tests. */
+  packSets?(): (PackSet & { name: string })[];
+  /** Puts sealed booster packs into the player's inventory (ADR-177). */
+  grantSealedPacks?(set: string, count: number, source: string): void;
   stockQuote(): { ticker: string; name: string; priceE4: number } | null;
   bump(metric: "battle_joins" | "battle_wins"): void;
   prizeWinsToday(): number;
@@ -121,7 +127,11 @@ interface DemoBattle {
   endsAt: number | null;
   finishedAt: number | null;
   params: BattleParams | null;
-  prizeKind: "xp" | "money" | "skin" | "nft";
+  prizeKind: keyof typeof cfg.prizes.weights;
+  /** accessory: the tier drawn at the opening (ADR-177). */
+  accessoryTier: string | null;
+  /** packs: the sealed booster packs drawn at the opening (ADR-177). */
+  packs: PackPrize[];
   artwork: BattleArtwork | null;
   players: DemoBattlePlayer[];
   // action games
@@ -214,6 +224,21 @@ export function createBattleEngine(host: BattleHost): BattleEngine & {
       prizeKind = "money";
     const artwork = prizeKind === "nft" ? host.freeArtwork() : null;
     if (prizeKind === "nft" && !artwork) prizeKind = "money";
+    const accessoryTier = prizeKind === "accessory" ? pickWeighted(cfg.prizes.accessoryTiers, host.random()) : null;
+    if (prizeKind === "accessory" && !accessoryTier) prizeKind = "money";
+    const packs =
+      prizeKind === "packs"
+        ? pickPackPrize(
+            host.packSets?.() ?? [],
+            cfg.prizes.packsCapCents,
+            cfg.prizes.packsMax,
+            host.random(),
+            host.random(),
+            host.random(),
+            host.random(),
+          )
+        : [];
+    if (prizeKind === "packs" && packs.length === 0) prizeKind = "money";
     return {
       id: nextId++,
       status: "open",
@@ -226,6 +251,8 @@ export function createBattleEngine(host: BattleHost): BattleEngine & {
       finishedAt: null,
       params: null,
       prizeKind,
+      accessoryTier,
+      packs,
       artwork,
       players: [],
       sim: null,
@@ -247,6 +274,16 @@ export function createBattleEngine(host: BattleHost): BattleEngine & {
         return { kind: "xp", xp: scaledXp(cfg.prizes.xpBase + cfg.prizes.xpPerPlayer * players) };
       case "skin":
         return { kind: "skin", accessories: cfg.accessories.map((a) => a.key) };
+      case "accessory":
+        return { kind: "accessory", tier: b.accessoryTier ?? "rare" };
+      case "packs": {
+        const sets = host.packSets?.() ?? [];
+        return {
+          kind: "packs",
+          packs: b.packs.map((x) => ({ ...x, name: sets.find((s) => s.key === x.set)?.name ?? x.set })),
+          cents: b.packs.reduce((sum, x) => sum + x.count * (sets.find((s) => s.key === x.set)?.priceCents ?? 0), 0),
+        };
+      }
       case "nft":
         if (b.artwork) return { kind: "nft", artwork: b.artwork };
         return { kind: "money", cents: cfg.prizes.moneyBaseCents + cfg.prizes.moneyPerPlayerCents * players };
@@ -696,6 +733,17 @@ export function createBattleEngine(host: BattleHost): BattleEngine & {
               prize = { kind: "skin", key: pick.key, name: pick.name };
             } else
               prize = { ...prizeOf({ ...b, prizeKind: "money" }, b.players.length), fallback: true } as BattlePrize;
+          } else if (prize.kind === "accessory") {
+            const tier = prize.tier;
+            const free = ACCESSORIES.filter((a) => a.rarity === tier && !host.ownedAccessories().includes(a.key));
+            const pick = free[Math.floor(host.random() * free.length)];
+            if (pick) {
+              host.giveAccessory(pick.key);
+              prize = { kind: "accessory", tier, key: pick.key, name: pick.name };
+            } else
+              prize = { ...prizeOf({ ...b, prizeKind: "money" }, b.players.length), fallback: true } as BattlePrize;
+          } else if (prize.kind === "packs") {
+            for (const x of prize.packs) host.grantSealedPacks?.(x.set, x.count, "battle");
           } else if (prize.kind === "nft") {
             if (!host.giveArtwork(prize.artwork.id))
               prize = { ...prizeOf({ ...b, prizeKind: "money" }, b.players.length), fallback: true } as BattlePrize;

@@ -123,6 +123,11 @@ export const SOUNDS = {
   battleClick: { src: ["/sounds/battle-click.wav"], volume: 0.3, minIntervalMs: 40, rateJitter: 0.1 },
   battleUnlock: { src: ["/sounds/battle-unlock.wav"], volume: 0.5, minIntervalMs: 500 },
   battleGavel: { src: ["/sounds/battle-gavel.wav"], volume: 0.55, minIntervalMs: 500 },
+  /** The games of ADR-177. */
+  battleSplat: { src: ["/sounds/battle-splat.wav"], volume: 0.4, minIntervalMs: 80, rateJitter: 0.1 },
+  battleTag: { src: ["/sounds/battle-tag.wav"], volume: 0.45, minIntervalMs: 200 },
+  battleImpact: { src: ["/sounds/battle-impact.wav"], volume: 0.4, minIntervalMs: 120, rateJitter: 0.08 },
+  battleShrink: { src: ["/sounds/battle-shrink.wav"], volume: 0.45, minIntervalMs: 500 },
   /** Nexamon packs (ADR-165): foil under the finger, the tear, cards leaving and showing, and the hits by rarity. */
   packCrinkle: { src: ["/sounds/pack-crinkle.wav"], volume: 0.22, minIntervalMs: 45, rateJitter: 0.18 },
   packTear: { src: ["/sounds/pack-tear.wav"], volume: 0.45, minIntervalMs: 400, rateJitter: 0.04 },

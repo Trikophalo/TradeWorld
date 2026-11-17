@@ -28,6 +28,7 @@ import { ConditionBadge, RarityBadge } from "./badges";
 import { CardThumb } from "./card-face";
 import { TiltPack } from "./pack";
 import { PackOpening } from "./pack-opening";
+import { BuySealedButton } from "./sealed-packs";
 import { LiveWatchers } from "../live/live-watchers";
 
 export interface PackOverlayProps {
@@ -160,6 +161,7 @@ export function PackOverlay({
                       {formatMoney(price, { whole: true })}
                     </p>
                     {buyButton(t("shop.buy", { price: formatMoney(price, { whole: true }) }), "confirm-buy")}
+                    <BuySealedButton set={set.key} priceCents={price} cashCents={cashCents} />
                     <p className="text-sm text-pretty text-fg-2">{t("opening.howTo")}</p>
                     <p className="text-xs text-fg-3">{t("opening.scrollHint")}</p>
                   </div>

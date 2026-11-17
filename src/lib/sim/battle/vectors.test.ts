@@ -265,6 +265,111 @@ const VECTORS: Vector[] = [
     },
   ],
   ["rodeo", 2026, 4, 100, { end: 268, ranking: [1, 2, 0, 3], out: [192, -1, 268, 179], score: [18, 61, 40, 47] }],
+  ["zone", 42, 3, -1, { end: 750, ranking: [2, 0, 1], out: [750, 410, -1], score: [11, 5, 8] }],
+  [
+    "zone",
+    7,
+    6,
+    -1,
+    { end: 750, ranking: [1, 4, 5, 3, 2, 0], out: [240, -1, 410, 580, 750, 580], score: [1, 8, 1, 0, 6, 3] },
+  ],
+  [
+    "zone",
+    99,
+    10,
+    -1,
+    {
+      end: 750,
+      ranking: [6, 9, 5, 2, 4, 0, 3, 1, 7, 8],
+      out: [410, 410, 750, 410, 580, 750, -1, 410, 240, 750],
+      score: [6, 3, 9, 4, 1, 12, 16, 0, 4, 17],
+    },
+  ],
+  ["zone", 2026, 4, 100, { end: 580, ranking: [2, 1, 0, 3], out: [410, 580, -1, 179], score: [0, 3, 0, 0] }],
+  ["tag", 42, 3, -1, { end: 1199, ranking: [1, 2, 0], out: [-1, -1, -1], score: [918, 69, 213] }],
+  [
+    "tag",
+    7,
+    6,
+    -1,
+    { end: 1199, ranking: [2, 4, 5, 3, 1, 0], out: [-1, -1, -1, -1, -1, -1], score: [765, 153, 51, 102, 57, 72] },
+  ],
+  [
+    "tag",
+    99,
+    10,
+    -1,
+    {
+      end: 1199,
+      ranking: [1, 4, 5, 9, 0, 8, 7, 2, 3, 6],
+      out: [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+      score: [87, 0, 201, 216, 0, 54, 243, 183, 153, 63],
+    },
+  ],
+  ["tag", 2026, 4, 100, { end: 1199, ranking: [2, 0, 1, 3], out: [-1, -1, -1, 179], score: [507, 522, 171, 0] }],
+  ["tiles", 42, 3, -1, { end: 80, ranking: [0, 1, 2], out: [-1, 80, 76], score: [17, 10, 11] }],
+  [
+    "tiles",
+    7,
+    6,
+    -1,
+    { end: 92, ranking: [3, 1, 2, 4, 0, 5], out: [48, 92, 90, -1, 84, 40], score: [10, 17, 15, 19, 12, 8] },
+  ],
+  [
+    "tiles",
+    99,
+    10,
+    -1,
+    {
+      end: 123,
+      ranking: [2, 1, 0, 3, 6, 7, 9, 8, 5, 4],
+      out: [104, 123, -1, 88, 54, 58, 80, 76, 58, 60],
+      score: [15, 13, 20, 13, 11, 9, 12, 10, 10, 11],
+    },
+  ],
+  ["tiles", 2026, 4, 100, { end: 94, ranking: [2, 3, 0, 1], out: [86, 46, -1, 94], score: [14, 8, 16, 17] }],
+  ["paint", 42, 3, -1, { end: 899, ranking: [2, 0, 1], out: [-1, -1, -1], score: [36, 21, 42] }],
+  [
+    "paint",
+    7,
+    6,
+    -1,
+    { end: 899, ranking: [4, 3, 5, 0, 2, 1], out: [-1, -1, -1, -1, -1, -1], score: [14, 8, 11, 25, 26, 15] },
+  ],
+  [
+    "paint",
+    99,
+    10,
+    -1,
+    {
+      end: 899,
+      ranking: [7, 8, 6, 2, 3, 0, 4, 9, 5, 1],
+      out: [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+      score: [9, 6, 12, 10, 8, 7, 13, 14, 13, 7],
+    },
+  ],
+  ["paint", 2026, 4, 100, { end: 899, ranking: [0, 1, 2, 3], out: [-1, -1, -1, 179], score: [50, 34, 14, 0] }],
+  ["crash", 42, 3, -1, { end: 526, ranking: [2, 1, 0], out: [526, 526, -1], score: [0, 0, 3] }],
+  [
+    "crash",
+    7,
+    6,
+    -1,
+    { end: 784, ranking: [2, 0, 4, 3, 5, 1], out: [784, 314, -1, 476, 706, 424], score: [0, 0, 1, 0, 0, 0] },
+  ],
+  [
+    "crash",
+    99,
+    10,
+    -1,
+    {
+      end: 854,
+      ranking: [0, 9, 1, 7, 2, 3, 5, 6, 4, 8],
+      out: [-1, 784, 706, 620, 424, 620, 424, 746, 370, 854],
+      score: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    },
+  ],
+  ["crash", 2026, 4, 100, { end: 854, ranking: [2, 1, 0, 3], out: [526, 854, 854, 179], score: [0, 0, 0, 3] }],
 ];
 
 function scoreOf(kind: TickKind, state: ReturnType<typeof simulateBattle>): number[] {
@@ -276,7 +381,9 @@ function scoreOf(kind: TickKind, state: ReturnType<typeof simulateBattle>): numb
   if (kind === "dash" || kind === "rodeo") return s.score!;
   if (kind === "margin") return s.dist!;
   if (kind === "elevator") return s.best!;
-  if (kind === "laser") return s.hearts!;
+  if (kind === "laser" || kind === "crash") return s.hearts!;
+  if (kind === "zone" || kind === "paint") return s.score!;
+  if (kind === "tag") return s.held!;
   return state.p.steps;
 }
 

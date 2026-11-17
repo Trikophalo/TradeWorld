@@ -22,6 +22,11 @@ export const BATTLE_KINDS = [
   "elevator",
   "laser",
   "rodeo",
+  "zone",
+  "tag",
+  "tiles",
+  "paint",
+  "crash",
   "quiz",
   "estimate",
   "bell",
@@ -45,6 +50,11 @@ export const TICK_KINDS = [
   "elevator",
   "laser",
   "rodeo",
+  "zone",
+  "tag",
+  "tiles",
+  "paint",
+  "crash",
 ] as const;
 export type TickKind = (typeof TICK_KINDS)[number];
 export type RoundKind = Exclude<BattleKind, TickKind>;
@@ -99,6 +109,11 @@ export const BATTLE_RULES = {
     elevator: 10,
     laser: 12,
     rodeo: 10,
+    zone: 12,
+    tag: 12,
+    tiles: 12,
+    paint: 12,
+    crash: 12,
     vault: 8,
     ticker: 10,
     higher: 10,
@@ -349,6 +364,68 @@ export const BATTLE_RULES = {
       gapMin: 8,
       gapJitter: 18,
     },
+    /**
+     * Goldrausch-Zone (ADR-177): coins appear inside a golden zone that shrinks ring by ring around the middle
+     * (Chebyshev radius); you cannot walk out of it, and whoever is outside when it shrinks is out. Last one standing,
+     * then the most coins.
+     */
+    zone: {
+      maxTicks: 1_200,
+      firstShrink: 240,
+      shrinkEvery: 170,
+      warnTicks: 60,
+      radiusMin: 1,
+      firstCoin: 20,
+      /** Coins on the field: 1 + floor(players / coinsPerPlayers), at most coinsMax. */
+      coinsPerPlayers: 3,
+      coinsMax: 4,
+      spawnDelay: 12,
+      goldEvery: 5,
+      goldValue: 3,
+    },
+    /**
+     * Bulle und Bär (ADR-177): one player is the bear and is a bit faster; walking into a bull makes that bull the
+     * bear (frozen for freezeTicks, so the old bear gets away). The fewest ticks as the bear wins.
+     */
+    tag: { maxTicks: 1_200, bearStepTicks: 3, freezeTicks: 24 },
+    /**
+     * Wackelparkett (ADR-177): a tile you leave cracks and breaks breakDelay later (shorter over time), a hole grows
+     * back after regrow ticks (longer over time); standing still idleMax ticks breaks your own tile. Who stands on a
+     * breaking tile falls. Last one standing.
+     */
+    tiles: {
+      maxTicks: 1_600,
+      breakStart: 40,
+      breakMin: 14,
+      breakStepEvery: 80,
+      regrowStart: 140,
+      /** regrow = regrowStart + floor(tick / regrowGrowEvery) */
+      regrowGrowEvery: 8,
+      idleMax: 30,
+    },
+    /**
+     * Farbrausch (ADR-177): every tile you stand on takes your colour; the action throws a paint bomb (3×3, every
+     * bombCool ticks; a tile two bombs hit at once stays as it was). Most tiles at the end wins.
+     */
+    paint: { durationTicks: 900, bombCool: 160, bombRadius: 1 },
+    /**
+     * Crash-Regen (ADR-177): market crashes rain down in waves; each hits a plus of five tiles warnTicks after its
+     * warning. A hit costs a heart (then invulnTicks safe). More crashes per wave, waves come faster. Last one standing.
+     */
+    crash: {
+      maxTicks: 1_500,
+      hearts: 3,
+      firstWave: 40,
+      waveEvery: 64,
+      waveEveryMin: 26,
+      waveEveryStep: 2,
+      warnTicks: 30,
+      /** Crashes of wave k: min(countMax, countStart + floor(k / 2) + floor(players / countPerPlayers)). */
+      countStart: 3,
+      countPerPlayers: 3,
+      countMax: 12,
+      invulnTicks: 16,
+    },
     /** Börsenquiz: two hearts; wrong or no answer costs one; fast right answers score more. */
     quiz: { rounds: 7, answerMs: 8_000, revealMs: 3_000, hearts: 2, basePoints: 500, speedPoints: 500 },
     /** Schätz den Kurs: closest guess gets the most points; the last round counts double. */
@@ -427,7 +504,15 @@ export const BATTLE_RULES = {
     auction: { rounds: 6, answerMs: 10_000, revealMs: 3_500, budget: 1_000 },
   },
   prizes: {
-    weights: { xp: 30, money: 30, skin: 20, nft: 20 },
+    weights: { xp: 25, money: 25, skin: 15, nft: 15, accessory: 15, packs: 15 },
+    /** accessory (ADR-177): a random accessory of the catalogue (ADR-155) the winner does not own, of this tier. */
+    accessoryTiers: { rare: 60, epic: 30, legendary: 10 } as Record<string, number>,
+    /**
+     * packs (ADR-177): sealed Nexamon booster packs of up to two sets, total pack price at most packsCapCents
+     * (the set prices of game_config.nexamon), at most packsMax packs.
+     */
+    packsCapCents: 2_000_000,
+    packsMax: 8,
     /** Base XP (grant_xp applies the XP factor and upgrades). */
     xpBase: 1_000,
     xpPerPlayer: 150,
@@ -471,6 +556,11 @@ export const BATTLE_RULES = {
       elevator: "Diese Aktie kennt nur eine Richtung: nach oben. Wer unten bleibt, bleibt unten.",
       laser: "Die Laserschranke! Springt im richtigen Moment, sonst gibt's gegrillte Börsianer.",
       rodeo: "Haltet euch fest! Der Bulle bockt, und er hat heute richtig schlechte Laune.",
+      zone: "Goldrausch! Die Zone schrumpft, das Gold bleibt. Wer draußen steht, ist pleite.",
+      tag: "Bulle und Bär! Einer jagt, alle rennen. Und keiner will der Bär sein. Ich auch nicht.",
+      tiles: "Das Parkett wackelt! Wo ihr wart, ist gleich nichts mehr. Stehenbleiben ist keine Strategie.",
+      paint: "Farbrausch! Malt das Parkett an. Die Reinigungskosten zahlt der Verlierer.",
+      crash: "Es regnet Kursstürze! Achtet auf die roten Kreuze, die meinen es ernst.",
       vault: "Der Tresor der Zentralbank! Knackt den Code, bevor die Polizei kommt. War ein Witz. Oder?",
       ticker: "Kürzel-Alarm! Wer das richtige Tickersymbol zuerst erwischt, ist der Börsenprofi.",
       higher: "Höher oder tiefer? Mein Schnurrbart sagt höher. Mein Schnurrbart lag noch nie richtig.",
@@ -510,6 +600,11 @@ export const BATTLE_RULES = {
     elevator: "Fahrstuhl zum Mond",
     laser: "Laserschranke",
     rodeo: "Bullen-Rodeo",
+    zone: "Goldrausch-Zone",
+    tag: "Bulle und Bär",
+    tiles: "Wackelparkett",
+    paint: "Farbrausch",
+    crash: "Crash-Regen",
     vault: "Tresorknacker",
     ticker: "Ticker-Tippen",
     higher: "Mehr oder Weniger",
@@ -746,6 +841,11 @@ export type MarginParams = BattleRules["games"]["margin"];
 export type ElevatorParams = BattleRules["games"]["elevator"];
 export type LaserParams = BattleRules["games"]["laser"];
 export type RodeoParams = BattleRules["games"]["rodeo"];
+export type ZoneParams = BattleRules["games"]["zone"];
+export type TagParams = BattleRules["games"]["tag"];
+export type TilesParams = BattleRules["games"]["tiles"];
+export type PaintParams = BattleRules["games"]["paint"];
+export type CrashParams = BattleRules["games"]["crash"];
 export type VaultParams = BattleRules["games"]["vault"];
 export type TickerParams = BattleRules["games"]["ticker"];
 export type HigherParams = BattleRules["games"]["higher"];

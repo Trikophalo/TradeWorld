@@ -1314,6 +1314,14 @@ update public.battles set status = 'cancelled', finished_at = now() where status
 select tests.login_as('authenticated', :p) is null as ok \gset
 \o :fixture_dir/get_battle.json
 select public.get_battle();
+\o
+reset role;
+-- a sealed booster prize (ADR-177), as the lobby shows it
+update public.battles set prize = '{"kind":"packs","packs":[{"set":"super_apex","count":1},{"set":"mystic_energy","count":5}]}'
+ where status = 'open';
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/get_battle_packs.json
+select public.get_battle();
 \o :fixture_dir/battle_join.json
 select public.battle_join(gen_random_uuid());
 \o :fixture_dir/battle_leave.json
@@ -1447,6 +1455,16 @@ select tests.fund(:fx_h, 50000000, 'fixture:nexamon:h') is null as ok \gset
 select tests.login_as('authenticated', :fx_g) is null as ok \gset
 \o :fixture_dir/buy_nexamon_pack.json
 select public.buy_nexamon_pack(gen_random_uuid(), 'mystic_energy');
+\o
+-- sealed packs (ADR-177): bought to open later, then one opened
+\o :fixture_dir/buy_nexamon_sealed_pack.json
+select public.buy_nexamon_sealed_pack(gen_random_uuid(), 'mystic_energy', 2);
+\o :fixture_dir/get_nexamon_sealed_packs.json
+select public.get_nexamon_sealed_packs();
+\o
+select public.get_nexamon_sealed_packs() #>> '{packs,0,id}' as fx_sealed \gset
+\o :fixture_dir/open_nexamon_sealed_pack.json
+select public.open_nexamon_sealed_pack(gen_random_uuid(), :'fx_sealed');
 \o
 select public.buy_nexamon_pack(gen_random_uuid(), 'mystic_energy') -> 'cards' as fx_nx \gset
 select :'fx_nx'::jsonb #>> '{0,copy_id}' as fx_nx1 \gset

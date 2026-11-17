@@ -48,6 +48,7 @@ import type {
   NexamonCopy,
   NexamonEngine,
   NexamonListing,
+  NexamonPackResult,
   NexamonPull,
   NexamonSale,
   NexamonSaleKind,
@@ -256,6 +257,11 @@ function seedCard(key: string, now: number): DemoCard {
 
 /** Demo Pack Battles (ADR-172): both packs of a battle, rolled at once; `iWin` decides who keeps all copies. */
 export interface DemoBattlePacks {
+  /**
+   * ADR-177: opens a sealed pack (won or bought earlier) with the pull of a bought pack, nothing to pay; `priceCents`
+   * is what was paid back then (0 for a prize).
+   */
+  demoOpenSealedPack(requestId: string, set: NexamonSetKey, priceCents: number): Promise<NexamonPackResult>;
   demoBattlePacks(
     set: NexamonSetKey,
     iWin: (mine: NexamonPull[], theirs: NexamonPull[]) => boolean,
@@ -1247,6 +1253,58 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
         copy.grade = null;
         copy.gradedAt = null;
         return { copy: toCopy(s, copy), oldGrade };
+      }),
+
+    demoOpenSealedPack: (requestId, set, priceCents) =>
+      write(requestId, (s, now) => {
+        if (!(NEXAMON_SETS as readonly string[]).includes(set)) throw new GameError("nexamon_unknown");
+        s.packTimes = s.packTimes.filter((t) => t > now - 60_000);
+        if (s.packTimes.length >= cfg.packs.perMinute) throw new GameError("rate_limited");
+        s.packTimes.push(now);
+        const packId = `pack-${s.nextId++}`;
+        const cards = nexamonOpenPack(
+          NEXAMON_CARDS.filter((c) => c.set === set),
+          host.random,
+        ).map((pull): NexamonPull => {
+          const isNew = !s.copies.some((c) => c.cardKey === pull.key);
+          const serial = mint(s, pull.key, now);
+          const copy: DemoCopy = {
+            id: `nx-${s.nextId++}`,
+            cardKey: pull.key,
+            serial,
+            condition: pull.condition,
+            grade: null,
+            gradingUntil: null,
+            gradedAt: null,
+            acquiredAt: now,
+            listing: null,
+          };
+          s.copies.push(copy);
+          if ((cfg.feedRarities as readonly string[]).includes(pull.rarity))
+            host.feed("nexamon_pull", {
+              card_key: pull.key,
+              set,
+              rarity: pull.rarity,
+              serial,
+              condition: pull.condition,
+            });
+          if (pull.rarity !== "common") host.track("nexamon_rares");
+          if (pull.rarity !== "common" && pull.rarity !== "rare") host.track("nexamon_ultras");
+          return {
+            slot: pull.slot,
+            copyId: copy.id,
+            cardKey: pull.key,
+            rarity: pull.rarity,
+            condition: pull.condition,
+            isNew,
+            serial,
+            population: serial,
+            valueCents: copyValue(s, copy),
+          };
+        });
+        s.packs[set] = (s.packs[set] ?? 0) + 1;
+        host.track("nexamon_packs");
+        return { packId, set, priceCents, cards, packsOpened: s.packs[set]! };
       }),
 
     demoBattlePacks(set, iWin) {

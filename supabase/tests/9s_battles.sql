@@ -152,7 +152,7 @@ select public.battle_join(:rq) as j1b \gset
 reset role;
 select tests.assert(
   :'g0'::jsonb -> 'battle' ->> 'status' = 'open' and :'g0'::jsonb #>> '{battle,kind}' is null
-  and :'g0'::jsonb #>> '{battle,seed}' is null and :'g0'::jsonb #>> '{battle,prize,kind}' in ('xp', 'money', 'skin', 'nft')
+  and :'g0'::jsonb #>> '{battle,seed}' is null and :'g0'::jsonb #>> '{battle,prize,kind}' in ('xp', 'money', 'skin', 'nft', 'accessory', 'packs')
   and (:'j1'::jsonb #>> '{battle,joined}')::boolean and jsonb_array_length(:'j1'::jsonb #> '{battle,players}') = 1
   and :'j1b'::jsonb = :'j1'::jsonb and (tests.live_battle()).countdown_ends_at is null,
   'get_battle() opens a lobby (game and seed secret, the prize shown); battle_join() is idempotent per request');

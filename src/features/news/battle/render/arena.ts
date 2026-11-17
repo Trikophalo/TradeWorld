@@ -465,14 +465,14 @@ export function createArenaRenderer(canvas: HTMLCanvasElement, opts: ArenaRender
     if (death) {
       const age = (now - death.at) / 900;
       if (age >= 1) return;
-      if (kind === "floor" || kind === "margin" || kind === "elevator") {
+      if (kind === "floor" || kind === "margin" || kind === "elevator" || kind === "tiles" || kind === "zone") {
         y += age * age * 30;
         px(fig, x, y, 1 - age);
       } else if (kind === "sumo") {
         x += death.dx * age * 22;
         y += death.dy * age * 22 + age * age * 26;
         px(fig, x, y, 1 - age);
-      } else if (kind === "bulls" || kind === "laser") {
+      } else if (kind === "bulls" || kind === "laser" || kind === "crash") {
         y -= age * 40;
         x += death.dx * age * 18;
         px(sprite(figureArt(info.avatarKey, info.accessories), Math.floor(now / 60) % 2 ? "white" : ""), x, y, 1 - age);
@@ -500,10 +500,10 @@ export function createArenaRenderer(canvas: HTMLCanvasElement, opts: ArenaRender
       rect(pos.x - 1, ay + 1, 3, 1, accent);
       rect(pos.x, ay + 2, 1, 1, accent);
     }
-    if (kind === "bulls" || kind === "laser") {
+    if (kind === "bulls" || kind === "laser" || kind === "crash") {
       const hearts = kind === "bulls" ? (s as BullsState).hearts[i]! : more.hearts(kind, s, i);
       const heart = sprite(HEART);
-      const hy = kind === "laser" ? Math.max(1, y - 9 + bob) : y - 14 + bob;
+      const hy = kind === "bulls" ? y - 14 + bob : Math.max(1, y - 9 + bob);
       for (let h = 0; h < hearts; h++) px(heart, pos.x - (hearts * 8) / 2 + h * 8, hy);
     }
     if (kind === "potato" && (s as PotatoState).holder === i) {

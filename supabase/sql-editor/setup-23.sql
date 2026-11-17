@@ -3,6 +3,878 @@
 begin;
 
 
+-- ===== supabase/migrations/20261204006710_nexamon_sealed_packs.sql =====
+-- =============================================================================
+-- NEXA · 6710 · Nexamon: sealed booster packs (ADR-177)
+-- =============================================================================
+-- Booster packs a player owns but has not opened yet ("Ungeöffnete Booster" in Collectibles): won in news battles
+-- or bought to open later. Opening one runs exactly the pull of a bought pack (public.nexamon_open_pack, called by
+-- name; the population, the live opening trigger on nexamon_packs and the missions as with buy_nexamon_pack), but
+-- charges nothing. buy_nexamon_pack itself stays untouched.
+-- * Table nexamon_sealed_packs (owner, set, source battle | bought, price paid, created_at, opened_at, pack_id).
+-- * nexamon_grant_sealed_packs(player, set, count, source, battle) -> count: internal, used by the battle prizes.
+-- * RPC get_nexamon_sealed_packs(): the unopened packs of the caller (works while Nexamon is still locked).
+-- * RPC open_nexamon_sealed_pack(request_id, pack_id): opens one (answer like buy_nexamon_pack plus sealed_id).
+-- * RPC buy_nexamon_sealed_pack(request_id, set, count): charges like buy_nexamon_pack (same set price, same
+--   ledger kind nexamon_pack, cash -> households, same rate limit) and puts count packs into the inventory.
+-- Errors: sealed_pack_unknown NX290 (and those of buy_nexamon_pack).
+-- Idempotent: runs unchanged as supabase/updates/20261204006710_nexamon_sealed_packs.sql.
+
+-- ---------------------------------------------------------------------------
+-- A. Error key
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.api_error(text)'::regprocedure);
+  v_new text := $q$    when 'sealed_pack_unknown'        then 'NX290'
+    else 'NX007'$q$;
+begin
+  if position('''sealed_pack_unknown''' in v_def) = 0 then
+    if position($q$    else 'NX007'$q$ in v_def) = 0 then
+      raise exception 'api_error() has an unexpected shape; add the sealed pack error key (ADR-177) by hand';
+    end if;
+    execute replace(v_def, $q$    else 'NX007'$q$, v_new);
+  end if;
+end;
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- B. Table (internal: read and written only by the functions below)
+-- ---------------------------------------------------------------------------
+create table if not exists public.nexamon_sealed_packs (
+  id          uuid primary key default gen_random_uuid(),
+  player_id   uuid not null references public.profiles (id) on delete cascade,
+  set_key     text not null,
+  source      text not null check (source in ('battle', 'bought')),
+  price_cents bigint not null default 0 check (price_cents >= 0),
+  battle_id   bigint,
+  created_at  timestamptz not null default now(),
+  opened_at   timestamptz,
+  pack_id     uuid
+);
+create index if not exists nexamon_sealed_packs_player_idx on public.nexamon_sealed_packs (player_id, created_at);
+alter table public.nexamon_sealed_packs enable row level security;
+revoke all on public.nexamon_sealed_packs from public, anon, authenticated;
+grant all on public.nexamon_sealed_packs to service_role;
+comment on table public.nexamon_sealed_packs is
+  'Sealed Nexamon booster packs (ADR-177): won in news battles (source battle) or bought to open later (bought, '
+  'price_cents paid). opened_at/pack_id once opened (nexamon_packs). Internal (RPCs get_nexamon_sealed_packs, '
+  'open_nexamon_sealed_pack, buy_nexamon_sealed_pack).';
+
+-- ---------------------------------------------------------------------------
+-- C. Helpers
+-- ---------------------------------------------------------------------------
+-- p_count sealed packs of a set for a player; 0 for an unknown set or a count below 1
+create or replace function public.nexamon_grant_sealed_packs(p_player uuid, p_set text, p_count integer, p_source text,
+                                                            p_battle bigint default null, p_price_cents bigint default 0)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if p_player is null or coalesce(p_count, 0) < 1
+     or public.nexamon_cfg() #> array['sets', p_set] is null then
+    return 0;
+  end if;
+  insert into public.nexamon_sealed_packs (player_id, set_key, source, price_cents, battle_id, created_at)
+  select p_player, p_set, p_source, greatest(0, coalesce(p_price_cents, 0)), p_battle, public.game_now()
+    from generate_series(1, p_count);
+  return p_count;
+end;
+$$;
+revoke all on function public.nexamon_grant_sealed_packs(uuid, text, integer, text, bigint, bigint) from public, anon, authenticated;
+grant execute on function public.nexamon_grant_sealed_packs(uuid, text, integer, text, bigint, bigint) to service_role;
+
+-- The unopened packs of a player, oldest first
+create or replace function public.nexamon_sealed_json(p_player uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', s.id, 'set', s.set_key, 'name', coalesce(public.nexamon_cfg() #>> array['sets', s.set_key, 'name'], s.set_key),
+           'source', s.source, 'price_cents', s.price_cents, 'created_at', s.created_at)
+           order by s.created_at, s.id), '[]'::jsonb)
+    from public.nexamon_sealed_packs s
+   where s.player_id = p_player and s.opened_at is null;
+$$;
+revoke all on function public.nexamon_sealed_json(uuid) from public, anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- D. RPCs
+-- ---------------------------------------------------------------------------
+create or replace function public.get_nexamon_sealed_packs()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+begin
+  return jsonb_build_object('packs', public.nexamon_sealed_json(v_player), 'unlocked', public.nexamon_unlocked(v_player),
+                            'server_time', public.game_now());
+end;
+$$;
+comment on function public.get_nexamon_sealed_packs() is
+  'RPC: the caller''s unopened Nexamon booster packs (ADR-177), oldest first, and whether Nexamon is unlocked.';
+revoke all on function public.get_nexamon_sealed_packs() from public, anon;
+grant execute on function public.get_nexamon_sealed_packs() to authenticated;
+
+create or replace function public.open_nexamon_sealed_pack(p_request_id uuid, p_pack_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.nexamon_cfg();
+  v_player uuid;
+  v_replay jsonb;
+  v_now    timestamptz := public.game_now();
+  v_pack   uuid := gen_random_uuid();
+  v_cards  jsonb;
+  s        public.nexamon_sealed_packs;
+  r        record;
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  if p_request_id is null or p_pack_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'open_nexamon_sealed_pack');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into s from public.nexamon_sealed_packs x
+   where x.id = p_pack_id and x.player_id = v_player and x.opened_at is null
+   for update;
+  if s.id is null then
+    perform public.api_error('sealed_pack_unknown');
+  end if;
+  if not exists (select 1 from public.nexamon_cards k where k.set_key = s.set_key and k.in_catalogue) then
+    perform public.api_error('nexamon_unknown');
+  end if;
+  if not public.rate_limit_hit(v_player, 'nexamon_pack', coalesce((cfg #>> '{packs,perMinute}')::integer, 20), 60) then
+    perform public.api_error('rate_limited');
+  end if;
+  perform public.nexamon_sync(v_now);
+  -- the pull of a bought pack, without the money
+  v_cards := public.nexamon_open_pack(s.set_key, v_player, null, v_pack, v_now);
+  insert into public.nexamon_packs (id, player_id, set_key, price_cents, cards, opened_at)
+  values (v_pack, v_player, s.set_key, s.price_cents, v_cards, v_now);
+  update public.nexamon_sealed_packs set opened_at = v_now, pack_id = v_pack where id = s.id;
+  update public.nexamon_set_state set player_packs_opened = player_packs_opened + 1 where set_key = s.set_key;
+  perform public.mission_event(v_player, 'nexamon_pack', 1, null);
+  for r in select x ->> 'rarity' as rarity from jsonb_array_elements(v_cards) x loop
+    if r.rarity <> 'common' then
+      perform public.mission_event(v_player, 'nexamon_rare', 1, null);
+    end if;
+    if r.rarity in ('ultra', 'prisma', 'legendary') then
+      perform public.mission_event(v_player, 'nexamon_ultra', 1, null);
+    end if;
+  end loop;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'pack_id', v_pack, 'sealed_id', s.id, 'set', s.set_key, 'price_cents', s.price_cents, 'cards', v_cards,
+    'packs_opened', (select count(*) from public.nexamon_packs p where p.player_id = v_player and p.set_key = s.set_key),
+    'sealed_left', (select count(*) from public.nexamon_sealed_packs x where x.player_id = v_player and x.opened_at is null)));
+end;
+$$;
+comment on function public.open_nexamon_sealed_pack(uuid, uuid) is
+  'RPC: opens one of the caller''s sealed booster packs (ADR-177) with the pull of a bought pack (nexamon_open_pack), '
+  'no charge; answer as buy_nexamon_pack plus sealed_id and sealed_left; errors nexamon_locked, invalid_argument, '
+  'sealed_pack_unknown, nexamon_unknown, rate_limited.';
+revoke all on function public.open_nexamon_sealed_pack(uuid, uuid) from public, anon;
+grant execute on function public.open_nexamon_sealed_pack(uuid, uuid) to authenticated;
+
+create or replace function public.buy_nexamon_sealed_pack(p_request_id uuid, p_set text, p_count integer default 1)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.nexamon_cfg();
+  v_player uuid;
+  v_replay jsonb;
+  v_now    timestamptz := public.game_now();
+  v_price  bigint;
+  v_total  bigint;
+  v_cash   bigint;
+  v_max    integer := coalesce((public.nexamon_cfg() #>> '{packs,perMinute}')::integer, 20);
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  if p_request_id is null or p_set is null or p_count is null or p_count < 1 or p_count > v_max then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'buy_nexamon_sealed_pack');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_price := (cfg #>> array['sets', p_set, 'packPriceCents'])::bigint;
+  if v_price is null or v_price < 0 or not exists (select 1 from public.nexamon_cards k where k.set_key = p_set and k.in_catalogue) then
+    perform public.api_error('nexamon_unknown');
+  end if;
+  if not public.rate_limit_hit(v_player, 'nexamon_pack', v_max, 60) then
+    perform public.api_error('rate_limited');
+  end if;
+  v_total := v_price * p_count;
+  v_cash := public.lock_player_accounts(v_player);
+  if v_cash < v_total then
+    perform public.api_error('insufficient_funds');
+  end if;
+  if v_total > 0 then
+    perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'), public.ledger_system_account('households'),
+                                   v_total, 'nexamon_pack',
+                                   'Booster gekauft (ungeöffnet): ' || p_count || ' × ' || coalesce(cfg #>> array['sets', p_set, 'name'], p_set),
+                                   'nexamon_pack', null, 'nexamon:sealed:' || v_player::text || ':' || p_request_id::text, v_player,
+                                   jsonb_build_object('set', p_set, 'price_cents', v_price, 'count', p_count, 'sealed', true));
+  end if;
+  perform public.nexamon_grant_sealed_packs(v_player, p_set, p_count, 'bought', null, v_price);
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'set', p_set, 'count', p_count, 'price_cents', v_total, 'packs', public.nexamon_sealed_json(v_player)));
+end;
+$$;
+comment on function public.buy_nexamon_sealed_pack(uuid, text, integer) is
+  'RPC: buys p_count booster packs of a set without opening them (ADR-177): same price and ledger kind as '
+  'buy_nexamon_pack, the packs go to the sealed inventory; errors nexamon_locked, invalid_argument, nexamon_unknown, '
+  'rate_limited, insufficient_funds.';
+revoke all on function public.buy_nexamon_sealed_pack(uuid, text, integer) from public, anon;
+grant execute on function public.buy_nexamon_sealed_pack(uuid, text, integer) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- E. A wiped account loses its sealed packs too (account_wipe patched by replace; a deleted profile cascades)
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.account_wipe(uuid, text)'::regprocedure);
+  v_old text := $t$  perform public.nexamon_wipe_player(p_player);$t$;
+begin
+  if position('nexamon_sealed_packs' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'account_wipe() has an unexpected shape; delete the sealed packs (ADR-177) by hand';
+    end if;
+    execute replace(v_def, v_old, v_old || $t$
+  delete from public.nexamon_sealed_packs where player_id = p_player;$t$);
+  end if;
+end;
+$do$;
+
+-- ===== supabase/migrations/20261204006720_battle_prizes_more.sql =====
+-- =============================================================================
+-- NEXA · 6720 · News battles: accessories and sealed Nexamon booster packs as prizes (ADR-177)
+-- =============================================================================
+-- Two more prize kinds next to xp, money, skin and nft (battles.prizes.weights), chosen when the lobby opens and shown
+-- before the battle:
+-- * accessory {"kind":"accessory","tier":"rare"}: the tier is drawn from prizes.accessoryTiers; the winner gets a
+--   random accessory of the shop catalogue (ADR-155, not the battle exclusives) of that tier they do not own yet. When
+--   they own all of them: the money prize instead (fallback).
+-- * packs {"kind":"packs","packs":[{"set","count"}]}: sealed booster packs of up to two sets worth at most
+--   prizes.packsCapCents together (set prices from game_config.nexamon, battle_pick_packs mirrors pickPackPrize in
+--   src/lib/sim/battle/prizes.ts), at most prizes.packsMax packs. They go to nexamon_sealed_packs (source battle).
+--   No set fits: the money prize.
+-- NFTs stay as before (ADR-160): a gallery NFT nobody owns is handed over (artworks.owner_id), else money.
+--   battle_pick_packs(cap, max, u1..u4)  new, internal
+--   battle_open, battle_prize_json, battle_prize_label, battle_pay   redefined (copies of 4720 plus the new kinds)
+-- Idempotent: runs unchanged as supabase/updates/20261204006720_battle_prizes_more.sql.
+
+-- ---------------------------------------------------------------------------
+-- A. The pack pick (src/lib/sim/battle/prizes.ts: pickPackPrize)
+-- ---------------------------------------------------------------------------
+create or replace function public.battle_pick_packs(p_cap bigint, p_max integer, p_u1 double precision,
+                                                    p_u2 double precision, p_u3 double precision, p_u4 double precision)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_keys   text[];
+  v_prices bigint[];
+  v_n      integer;
+  v_main   integer;
+  v_mmax   integer;
+  v_mcount integer;
+  v_rest   bigint;
+  v_sec    integer := null;
+  v_smax   integer;
+  v_out    jsonb;
+  k        integer;
+begin
+  select array_agg(x.key order by x.price desc, x.key), array_agg(x.price order by x.price desc, x.key)
+    into v_keys, v_prices
+    from (select e.key, (e.value ->> 'packPriceCents')::bigint as price
+            from jsonb_each(coalesce(public.nexamon_cfg() -> 'sets', '{}'::jsonb)) e
+           where (e.value ->> 'packPriceCents')::bigint > 0 and (e.value ->> 'packPriceCents')::bigint <= p_cap
+             and exists (select 1 from public.nexamon_cards c where c.set_key = e.key and c.in_catalogue)) x;
+  v_n := coalesce(array_length(v_keys, 1), 0);
+  if v_n = 0 or p_max < 1 then
+    return '[]'::jsonb;
+  end if;
+  v_main := least(v_n - 1, floor(p_u1 * v_n)::integer) + 1;
+  v_mmax := least(p_max::bigint, p_cap / v_prices[v_main])::integer;
+  v_mcount := 1 + least(v_mmax - 1, floor(p_u2 * v_mmax)::integer);
+  v_out := jsonb_build_array(jsonb_build_object('set', v_keys[v_main], 'count', v_mcount));
+  v_rest := p_cap - v_mcount * v_prices[v_main];
+  if p_u3 < 0.5 then
+    -- the cheapest other set that still fits
+    for k in reverse v_n .. 1 loop
+      if k <> v_main and v_prices[k] <= v_rest then v_sec := k; exit; end if;
+    end loop;
+    if v_sec is not null then
+      v_smax := least((p_max - v_mcount)::bigint, v_rest / v_prices[v_sec])::integer;
+      if v_smax >= 1 then
+        v_out := v_out || jsonb_build_object('set', v_keys[v_sec], 'count', 1 + least(v_smax - 1, floor(p_u4 * v_smax)::integer));
+      end if;
+    end if;
+  end if;
+  return v_out;
+end;
+$$;
+revoke all on function public.battle_pick_packs(bigint, integer, double precision, double precision, double precision, double precision)
+  from public, anon, authenticated;
+
+-- The packs of a prize with names and their total price at the current set prices
+create or replace function public.battle_packs_json(p_packs jsonb)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object('kind', 'packs',
+    'packs', coalesce(jsonb_agg(jsonb_build_object('set', x ->> 'set', 'count', (x ->> 'count')::integer,
+                                                   'name', coalesce(public.nexamon_cfg() #>> array['sets', x ->> 'set', 'name'], x ->> 'set'))
+                                order by ord), '[]'::jsonb),
+    'cents', coalesce(sum((x ->> 'count')::bigint * coalesce((public.nexamon_cfg() #>> array['sets', x ->> 'set', 'packPriceCents'])::bigint, 0)), 0))
+    from jsonb_array_elements(coalesce(p_packs, '[]'::jsonb)) with ordinality as e(x, ord);
+$$;
+revoke all on function public.battle_packs_json(jsonb) from public, anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- B. Opening a lobby draws the prize (4720 plus accessory and packs)
+-- ---------------------------------------------------------------------------
+create or replace function public.battle_open(p_now timestamptz)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg    jsonb := public.battles_cfg();
+  w      jsonb := cfg #> '{prizes,weights}';
+  tw     jsonb := cfg #> '{prizes,accessoryTiers}';
+  v_tot  double precision;
+  v_roll double precision;
+  v_kind text := 'xp';
+  v_art  uuid;
+  v_id   bigint;
+  v_prize jsonb;
+  v_tier text;
+  v_packs jsonb;
+  k      text;
+begin
+  perform pg_advisory_xact_lock(7311160);
+  if exists (select 1 from public.battles b where b.status in ('open', 'running')) then
+    return null;
+  end if;
+  select sum(value::double precision) into v_tot from jsonb_each_text(coalesce(w, '{}'::jsonb));
+  v_roll := random() * coalesce(v_tot, 0);
+  for k in select key from jsonb_each_text(coalesce(w, '{}'::jsonb)) order by key loop
+    v_roll := v_roll - (w ->> k)::double precision;
+    if v_roll < 0 then v_kind := k; exit; end if;
+  end loop;
+  if v_kind = 'nft' then
+    v_art := public.battle_free_artwork();
+    if v_art is null then v_kind := 'money'; end if;
+  elsif v_kind = 'skin' and coalesce(jsonb_array_length(cfg -> 'accessories'), 0) = 0 then
+    v_kind := 'xp';
+  elsif v_kind = 'accessory' then
+    -- the tier: weighted, keys in sorted order (pickWeighted)
+    select sum(value::double precision) into v_tot from jsonb_each_text(coalesce(tw, '{}'::jsonb)) where value::double precision > 0;
+    v_roll := random() * coalesce(v_tot, 0);
+    for k in select key from jsonb_each_text(coalesce(tw, '{}'::jsonb)) where value::double precision > 0 order by key loop
+      v_tier := k;
+      v_roll := v_roll - (tw ->> k)::double precision;
+      exit when v_roll < 0;
+    end loop;
+    if v_tier is null then v_kind := 'money'; end if;
+  elsif v_kind = 'packs' then
+    v_packs := public.battle_pick_packs(coalesce((cfg #>> '{prizes,packsCapCents}')::bigint, 0),
+                                        coalesce((cfg #>> '{prizes,packsMax}')::integer, 1),
+                                        random(), random(), random(), random());
+    if jsonb_array_length(v_packs) = 0 then v_kind := 'money'; end if;
+  end if;
+  v_prize := jsonb_build_object('kind', v_kind);
+  if v_kind = 'accessory' then v_prize := v_prize || jsonb_build_object('tier', v_tier); end if;
+  if v_kind = 'packs' then v_prize := v_prize || jsonb_build_object('packs', v_packs); end if;
+  insert into public.battles (status, seed, prize, artwork_id, opened_at)
+  values ('open', floor(random() * 4294967296)::bigint, v_prize, v_art, p_now)
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- C. What the prize is worth, its label, the payout (4720 plus accessory and packs)
+-- ---------------------------------------------------------------------------
+create or replace function public.battle_prize_json(p_battle public.battles, p_players integer)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg  jsonb := public.battles_cfg() -> 'prizes';
+  v_n  integer := greatest(coalesce(p_players, 0), coalesce((public.battles_cfg() #>> '{lobby,minPlayers}')::integer, 3));
+  v_mult double precision := coalesce((public.config_jsonb('progression') ->> 'xpMultiplier')::double precision, 1);
+  a    public.artworks;
+begin
+  if p_battle.result ? 'prize' then
+    return p_battle.result -> 'prize';
+  end if;
+  case p_battle.prize ->> 'kind'
+    when 'xp' then
+      return jsonb_build_object('kind', 'xp', 'xp',
+        round(((cfg ->> 'xpBase')::integer + (cfg ->> 'xpPerPlayer')::integer * v_n) * v_mult)::integer);
+    when 'money' then
+      return jsonb_build_object('kind', 'money', 'cents',
+        (cfg ->> 'moneyBaseCents')::bigint + (cfg ->> 'moneyPerPlayerCents')::bigint * v_n);
+    when 'skin' then
+      return jsonb_build_object('kind', 'skin', 'accessories',
+        coalesce((select jsonb_agg(x ->> 'key') from jsonb_array_elements(public.battles_cfg() -> 'accessories') x), '[]'::jsonb));
+    when 'accessory' then
+      return jsonb_build_object('kind', 'accessory', 'tier', coalesce(p_battle.prize ->> 'tier', 'rare'));
+    when 'packs' then
+      return public.battle_packs_json(p_battle.prize -> 'packs');
+    when 'nft' then
+      select * into a from public.artworks x where x.id = p_battle.artwork_id;
+      if a.id is null then
+        return jsonb_build_object('kind', 'money', 'cents',
+          (cfg ->> 'moneyBaseCents')::bigint + (cfg ->> 'moneyPerPlayerCents')::bigint * v_n);
+      end if;
+      return jsonb_build_object('kind', 'nft', 'artwork',
+        jsonb_build_object('id', a.id, 'title', a.title, 'serial', a.serial, 'rarity', a.rarity, 'pixels', a.pixels));
+    else
+      return jsonb_build_object('kind', 'xp', 'xp', 0);
+  end case;
+end;
+$$;
+
+create or replace function public.battle_prize_label(p_prize jsonb)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case p_prize ->> 'kind'
+    when 'xp' then coalesce(p_prize ->> 'xp', '0') || ' XP'
+    when 'money' then public.format_eur((p_prize ->> 'cents')::bigint)
+    when 'skin' then 'das exklusive Accessoire „' || coalesce(p_prize ->> 'name', 'Battle-Skin') || '“'
+    when 'accessory' then case when p_prize ? 'name' then 'das Accessoire „' || (p_prize ->> 'name') || '“'
+                               else 'ein zufälliges Accessoire (' || case p_prize ->> 'tier' when 'rare' then 'selten'
+                                 when 'epic' then 'episch' when 'legendary' then 'legendär' when 'mythic' then 'mythisch'
+                                 else 'gewöhnlich' end || ')' end
+    when 'packs' then coalesce((select string_agg((x ->> 'count') || ' × ' || coalesce(x ->> 'name', x ->> 'set'), ' + ')
+                                  from jsonb_array_elements(p_prize -> 'packs') x), 'Booster') || ' (ungeöffnet)'
+    when 'nft' then 'das NFT „' || coalesce(p_prize #>> '{artwork,title}', 'NFT') || '“'
+    else 'Ruhm und Ehre' end;
+$$;
+
+create or replace function public.battle_pay(p_battle public.battles, p_winner uuid, p_players integer, p_now timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.battles_cfg();
+  v_prize jsonb := public.battle_prize_json(p_battle, p_players);
+  v_money jsonb := jsonb_build_object('kind', 'money', 'cents',
+                     (cfg #>> '{prizes,moneyBaseCents}')::bigint + (cfg #>> '{prizes,moneyPerPlayerCents}')::bigint
+                       * greatest(p_players, (cfg #>> '{lobby,minPlayers}')::integer), 'fallback', true);
+  v_key   text;
+  v_name  text;
+  v_art   uuid;
+  v_xp    integer;
+  v_cents bigint;
+  v_got   integer := 0;
+  a       public.artworks;
+  v_e     jsonb;
+begin
+  if p_winner is null
+     or public.battle_prize_wins_today(p_winner, p_now) >= coalesce((cfg #>> '{prizes,dailyPrizeCap}')::integer, 3) then
+    return null;
+  end if;
+  if v_prize ->> 'kind' = 'skin' then
+    select x ->> 'key', x ->> 'name' into v_key, v_name
+      from jsonb_array_elements(cfg -> 'accessories') x
+     where not exists (select 1 from public.player_accessories o where o.player_id = p_winner and o.accessory_key = x ->> 'key')
+     order by random() limit 1;
+    if v_key is null then
+      v_prize := v_money;
+    else
+      insert into public.player_accessories (player_id, accessory_key, price_paid_cents) values (p_winner, v_key, 0)
+      on conflict do nothing;
+      return jsonb_build_object('kind', 'skin', 'key', v_key, 'name', v_name);
+    end if;
+  elsif v_prize ->> 'kind' = 'accessory' then
+    -- a random shop accessory of the tier the winner does not own (never a battle exclusive)
+    select i ->> 'key', i ->> 'name' into v_key, v_name
+      from jsonb_array_elements(coalesce(public.accessories_cfg() -> 'items', '[]'::jsonb)) i
+     where i ->> 'rarity' = v_prize ->> 'tier' and not coalesce((i ->> 'exclusive')::boolean, false)
+       and not exists (select 1 from public.player_accessories o where o.player_id = p_winner and o.accessory_key = i ->> 'key')
+     order by random() limit 1;
+    if v_key is null then
+      v_prize := v_money;
+    else
+      insert into public.player_accessories (player_id, accessory_key, price_paid_cents) values (p_winner, v_key, 0)
+      on conflict do nothing;
+      return jsonb_build_object('kind', 'accessory', 'tier', v_prize ->> 'tier', 'key', v_key, 'name', v_name);
+    end if;
+  elsif v_prize ->> 'kind' = 'packs' then
+    for v_e in select e from jsonb_array_elements(v_prize -> 'packs') e loop
+      v_got := v_got + public.nexamon_grant_sealed_packs(p_winner, v_e ->> 'set', (v_e ->> 'count')::integer, 'battle', p_battle.id, 0);
+    end loop;
+    if v_got > 0 then
+      return v_prize;
+    end if;
+    v_prize := v_money;
+  elsif v_prize ->> 'kind' = 'nft' then
+    v_art := p_battle.artwork_id;
+    if not exists (select 1 from public.artworks x where x.id = v_art and x.owner_id is null and x.ai_owner is null
+                     and not exists (select 1 from public.artwork_auctions y where y.artwork_id = x.id and y.status = 'open')) then
+      v_art := public.battle_free_artwork(p_battle.artwork_id);
+    end if;
+    if v_art is null then
+      v_prize := v_money;
+    else
+      update public.artworks set owner_id = p_winner, ask_cents = null, listed_at = null where id = v_art
+      returning * into a;
+      return jsonb_build_object('kind', 'nft', 'artwork',
+        jsonb_build_object('id', a.id, 'title', a.title, 'serial', a.serial, 'rarity', a.rarity, 'pixels', a.pixels));
+    end if;
+  end if;
+  if v_prize ->> 'kind' = 'xp' then
+    v_xp := public.grant_xp(p_winner, 'battle'::public.xp_source,
+      (cfg #>> '{prizes,xpBase}')::integer + (cfg #>> '{prizes,xpPerPlayer}')::integer
+        * greatest(p_players, (cfg #>> '{lobby,minPlayers}')::integer),
+      'battle:' || p_battle.id, 'battle', null);
+    return jsonb_build_object('kind', 'xp', 'xp', v_xp);
+  end if;
+  v_cents := (v_prize ->> 'cents')::bigint;
+  if v_cents > 0 then
+    perform public.ledger_transfer(public.ledger_system_account('households'), public.ledger_player_account(p_winner, 'player_cash'),
+                                   v_cents, 'battle_prize'::public.ledger_tx_kind, 'News-Battle gewonnen', 'battle', null,
+                                   'battle:' || p_battle.id, p_winner, jsonb_build_object('battle_id', p_battle.id));
+  end if;
+  return v_prize;
+end;
+$$;
+
+-- ===== supabase/migrations/20261204006800_news_running_gags.sql =====
+-- =============================================================================
+-- NEXA · 6800 · Running gags in NEXA Nachrichten (ADR-179)
+-- =============================================================================
+-- * A running gag (newsShow.runningGags.<key>) comes back show after show while an active player company whose
+--   name matches its namePattern (ILIKE) exists: with chanceBps per show, as a segment of kind "gag". First gag:
+--   "Vulcan Energy" announces again and again that drilling starts soon, and never does.
+-- * news_running_gags counts the aired episodes per gag and company (a new company with the name starts at 1)
+--   and remembers the last line, so it never runs twice in a row; lines escalate with the episode.
+-- * The made-up chat viewers react around the segment: annoyed lines, and a few die-hard fans with fixed names.
+-- * Claude's rewrite (news-anchor) keeps the gag segment as drafted: it must name the player company and founder.
+-- * Written idempotently; the copy in supabase/updates/ is identical below its header.
+-- =============================================================================
+
+create table if not exists public.news_running_gags (
+  gag_key      text not null,
+  company_id   uuid not null references public.companies (id) on delete cascade,
+  episodes     integer not null default 0 check (episodes >= 0),
+  last_line    integer,
+  last_show_id bigint,
+  first_at     timestamptz,
+  last_at      timestamptz,
+  primary key (gag_key, company_id)
+);
+create index if not exists news_running_gags_company_idx on public.news_running_gags (company_id);
+alter table public.news_running_gags enable row level security;
+comment on table public.news_running_gags is
+  'Running gags of NEXA Nachrichten (ADR-179): aired episodes and the last host line per gag and player company. '
+  'Server only (no policies).';
+
+-- The company a gag is about right now: the oldest active player company with a matching name.
+create or replace function public.news_running_gag_company(p_pattern text)
+returns table (company_id uuid, company text, founder text, phase text, founded_at timestamptz)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select c.id, c.name, coalesce(p.nickname, '?'), c.phase::text, c.founded_at
+    from public.companies c
+    left join public.profiles p on p.id = c.founder_id
+   where not c.is_ai and c.dissolved_at is null and c.phase in ('private', 'ipo', 'listed')
+     and p_pattern is not null and btrim(p_pattern) <> '' and c.name ilike p_pattern
+   order by c.founded_at, c.id
+   limit 1;
+$$;
+
+-- A random element of a json array, or null.
+create or replace function public.news_running_gag_pick(p_list jsonb)
+returns text
+language sql
+volatile
+set search_path = ''
+as $$
+  select case when jsonb_typeof(p_list) = 'array' and jsonb_array_length(p_list) > 0
+              then p_list ->> floor(random() * jsonb_array_length(p_list))::integer end;
+$$;
+
+-- The gag segments of a show (at most one per gag).
+create or replace function public.news_show_running_gags(p_now timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  gags    jsonb := coalesce(public.news_show_cfg() -> 'runningGags', '{}'::jsonb);
+  g       record;
+  c       record;
+  st      public.news_running_gags;
+  v_out   jsonb := '[]'::jsonb;
+  v_ep    integer;
+  v_total integer;
+  v_pool  integer;
+  v_line  integer;
+  v_i     integer;
+  v_vals  jsonb;
+  v_text  text;
+  v_extra text;
+begin
+  if jsonb_typeof(gags) <> 'object' then
+    return v_out;
+  end if;
+  for g in select key, value from jsonb_each(gags) where jsonb_typeof(value) = 'object' loop
+    continue when not coalesce((g.value ->> 'enabled')::boolean, false);
+    select * into c from public.news_running_gag_company(g.value ->> 'namePattern');
+    continue when c.company_id is null;
+    continue when random() * 10000 >= coalesce((g.value ->> 'chanceBps')::integer, 0);
+    v_total := jsonb_array_length(coalesce(g.value -> 'lines', '[]'::jsonb));
+    continue when v_total = 0;
+    select * into st from public.news_running_gags r where r.gag_key = g.key and r.company_id = c.company_id;
+    v_ep := coalesce(st.episodes, 0) + 1;
+    -- escalation: episode e may use the first escalateStart + (e - 1) * escalatePerEpisode lines
+    v_pool := greatest(1, least(v_total, coalesce((g.value ->> 'escalateStart')::integer, v_total)
+                                         + (v_ep - 1) * coalesce((g.value ->> 'escalatePerEpisode')::integer, 0)));
+    -- never the line of the last aired episode
+    if v_pool <= 1 then
+      v_line := 0;
+    elsif st.last_line is null or st.last_line < 0 or st.last_line >= v_pool then
+      v_line := least(v_pool - 1, floor(random() * v_pool)::integer);
+    else
+      v_i := least(v_pool - 2, floor(random() * (v_pool - 1))::integer);
+      v_line := case when v_i >= st.last_line then v_i + 1 else v_i end;
+    end if;
+    v_vals := jsonb_build_object(
+      'company', c.company, 'founder', c.founder, 'episode', v_ep,
+      'days', greatest(1, floor(extract(epoch from (p_now - c.founded_at)) / 86400)::integer + 1),
+      'when', coalesce(public.news_running_gag_pick(g.value -> 'whens'), 'bald'));
+    v_extra := case when c.phase in ('ipo', 'listed') then public.news_running_gag_pick(g.value #> array['phaseLines', c.phase]) end;
+    v_text := public.company_interview_fill(public.news_running_gag_pick(g.value -> 'intros'), v_vals) || ' '
+              || public.company_interview_fill(g.value -> 'lines' -> v_line ->> 'text', v_vals)
+              || coalesce(' ' || public.company_interview_fill(v_extra, v_vals), '');
+    v_out := v_out || jsonb_build_object(
+      'kind', 'gag',
+      'mood', case when g.value -> 'lines' -> v_line ->> 'mood'
+                        in ('neutral', 'shocked', 'crying', 'laughing', 'angry', 'smug', 'confused', 'proud')
+                   then g.value -> 'lines' -> v_line ->> 'mood' else 'confused' end,
+      'headline', left(public.company_interview_fill(public.news_running_gag_pick(g.value -> 'headlines'), v_vals), 90),
+      'text', v_text,
+      'effects', '[]'::jsonb,
+      'apply', jsonb_build_array(jsonb_build_object('type', 'gag', 'gag', g.key, 'company_id', c.company_id, 'line', v_line)),
+      'subject', jsonb_build_object('type', 'gag', 'gag', g.key, 'company_id', c.company_id, 'name', c.company,
+                                    'company', c.company, 'values', v_vals),
+      'ord', coalesce((g.value ->> 'ord')::integer, 75));
+  end loop;
+  return v_out;
+end;
+$$;
+
+-- The made-up viewers around a gag segment: annoyed lines from the usual names, the fans under their own names.
+create or replace function public.news_show_gag_chat(p_show_id bigint, p_now timestamptz)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.news_show_cfg();
+  names   jsonb := coalesce(public.news_show_cfg() #> '{chat,bots,names}', '[]'::jsonb);
+  s       public.news_shows;
+  seg     jsonb;
+  gc      jsonb;
+  v_idx   bigint;
+  v_intro numeric := coalesce((cfg ->> 'introSeconds')::numeric, 8);
+  v_seg   numeric := greatest(1, coalesce((cfg ->> 'segmentSeconds')::numeric, 22));
+  v_lead  numeric;
+  v_span  numeric;
+  v_n     integer := 0;
+  v_k     integer;
+begin
+  select * into s from public.news_shows where id = p_show_id;
+  if s.id is null then
+    return 0;
+  end if;
+  for seg, v_idx in select x, ord from jsonb_array_elements(s.segments) with ordinality t(x, ord) where x ->> 'kind' = 'gag' loop
+    gc := cfg #> array['runningGags', seg -> 'subject' ->> 'gag', 'chat'];
+    continue when gc is null;
+    v_lead := coalesce((gc ->> 'leadSeconds')::numeric, 0);
+    v_span := v_lead + v_seg + coalesce((gc ->> 'tailSeconds')::numeric, 0);
+    -- annoyed viewers (no line twice in a segment)
+    if jsonb_array_length(names) > 0 then
+      insert into public.news_show_messages (player_id, bot_name, body, created_at)
+      select null, names ->> floor(random() * jsonb_array_length(names))::integer,
+             left(public.company_interview_fill(l, seg -> 'subject' -> 'values'), 300),
+             p_now + make_interval(secs => (v_intro + (v_idx - 1) * v_seg - v_lead + random() * v_span)::double precision)
+        from (select l from jsonb_array_elements_text(coalesce(gc -> 'annoyed', '[]'::jsonb)) l
+               order by random() limit greatest(0, coalesce((gc ->> 'annoyedPerSegment')::integer, 0))) a;
+      get diagnostics v_k = row_count;
+      v_n := v_n + v_k;
+    end if;
+    -- the die-hard fans
+    if jsonb_array_length(coalesce(gc -> 'fanNames', '[]'::jsonb)) > 0 then
+      insert into public.news_show_messages (player_id, bot_name, body, created_at)
+      select null, public.news_running_gag_pick(gc -> 'fanNames'),
+             left(public.company_interview_fill(l, seg -> 'subject' -> 'values'), 300),
+             p_now + make_interval(secs => (v_intro + (v_idx - 1) * v_seg - v_lead + random() * v_span)::double precision)
+        from (select l from jsonb_array_elements_text(coalesce(gc -> 'fans', '[]'::jsonb)) l
+               order by random() limit greatest(0, coalesce((gc ->> 'fansPerSegment')::integer, 0))) f;
+      get diagnostics v_k = row_count;
+      v_n := v_n + v_k;
+    end if;
+  end loop;
+  return v_n;
+end;
+$$;
+
+-- news_show_build(): the gag joins the show
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.news_show_build(timestamptz)'::regprocedure);
+  v_old text := $t$  v_segs := v_segs || public.news_show_interviews(p_now);$t$;
+begin
+  if position('news_show_running_gags' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'news_show_build() has an unexpected shape; add the call of news_show_running_gags() (ADR-179) by hand';
+    end if;
+    execute replace(v_def, v_old, $t$  -- 12. running gags (ADR-179): back every show while their player company exists
+  v_segs := v_segs || public.news_show_running_gags(p_now);
+$t$ || v_old);
+  end if;
+end;
+$do$;
+
+-- news_show_start(): an aired gag counts as an episode (once per show); the feed files it under companies
+do $do$
+declare
+  v_def  text := pg_get_functiondef('public.news_show_start(bigint, timestamptz)'::regprocedure);
+  v_when text := $t$        when 'tasks' then$t$;
+  v_kind text := $t$'corp', 'interview') then 'company'$t$;
+begin
+  if position('news_running_gags' in v_def) = 0 then
+    if position(v_when in v_def) = 0 or position(v_kind in v_def) = 0 then
+      raise exception 'news_show_start() has an unexpected shape; add the apply type "gag" (ADR-179) by hand';
+    end if;
+    v_def := replace(v_def, v_when, $t$        when 'gag' then
+          if exists (select 1 from public.companies c where c.id = (a ->> 'company_id')::uuid) then
+            insert into public.news_running_gags as rg (gag_key, company_id, episodes, last_line, last_show_id, first_at, last_at)
+            values (a ->> 'gag', (a ->> 'company_id')::uuid, 1, (a ->> 'line')::integer, s.id, p_now, p_now)
+            on conflict (gag_key, company_id) do update
+              set episodes = rg.episodes + 1, last_line = excluded.last_line, last_show_id = excluded.last_show_id,
+                  last_at = excluded.last_at
+              where rg.last_show_id is distinct from excluded.last_show_id;
+          end if;
+$t$ || v_when);
+    v_def := replace(v_def, v_kind, $t$'corp', 'interview', 'gag') then 'company'$t$);
+    execute v_def;
+  end if;
+end;
+$do$;
+
+-- news_show_after_start(): the viewers react to the gag
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.news_show_after_start(bigint, timestamptz)'::regprocedure);
+  v_old text := $t$  return v_n;
+end;$t$;
+begin
+  if position('news_show_gag_chat' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'news_show_after_start() has an unexpected shape; add the call of news_show_gag_chat() (ADR-179) by hand';
+    end if;
+    execute replace(v_def, v_old, $t$  -- running gags (ADR-179): annoyed viewers and die-hard fans around the segment
+  v_n := v_n + public.news_show_gag_chat(p_show_id, p_now);
+$t$ || v_old);
+  end if;
+end;
+$do$;
+
+-- store_news_show_script(): Claude's rewrite keeps gag segments as drafted (they name the player company)
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.store_news_show_script(bigint, jsonb)'::regprocedure);
+  v_old text := $t$  update public.news_shows set segments = v_new, writer = 'claude' where id = s.id;$t$;
+begin
+  if position('''gag''' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'store_news_show_script() has an unexpected shape; keep gag segments (ADR-179) by hand';
+    end if;
+    execute replace(v_def, v_old, $t$  -- running gags (ADR-179) stay as drafted
+  select jsonb_agg(case when o.x ->> 'kind' = 'gag' then o.x else n.x end order by o.ord) into v_new
+    from jsonb_array_elements(s.segments) with ordinality o(x, ord)
+    join jsonb_array_elements(v_new) with ordinality n(x, ord) using (ord);
+$t$ || v_old);
+  end if;
+end;
+$do$;
+
+revoke all on function public.news_running_gag_company(text) from public, anon, authenticated;
+revoke all on function public.news_running_gag_pick(jsonb) from public, anon, authenticated;
+revoke all on function public.news_show_running_gags(timestamptz) from public, anon, authenticated;
+revoke all on function public.news_show_gag_chat(bigint, timestamptz) from public, anon, authenticated;
+
+-- ===== supabase/migrations/20261204006850_news_used_keys_distinct.sql =====
+-- news_show_after_start(): mark every subject key of the show as used once. The old statement selected
+-- `distinct ukey, clock_timestamp()`, and clock_timestamp() differs per row, so two segments with the same subject
+-- key reached ON CONFLICT twice in one command ("cannot affect row a second time"). Idempotent replace-patch.
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.news_show_after_start(bigint, timestamptz)'::regprocedure);
+  v_old text := $t$select distinct x -> 'subject' ->> 'ukey', clock_timestamp()
+    from jsonb_array_elements(s.segments) x where x -> 'subject' ->> 'ukey' is not null$t$;
+  v_new text := $t$select k.ukey, clock_timestamp()
+    from (select distinct x -> 'subject' ->> 'ukey' as ukey
+            from jsonb_array_elements(s.segments) x where x -> 'subject' ->> 'ukey' is not null) k$t$;
+begin
+  if position(v_new in v_def) > 0 then
+    return;
+  end if;
+  if position(v_old in v_def) = 0 then
+    raise exception 'news_show_after_start() has an unexpected shape; dedupe the used subject keys by hand';
+  end if;
+  execute replace(v_def, v_old, v_new);
+end;
+$do$;
+
 -- ===== supabase/seed.sql =====
 -- =============================================================================
 -- NEXA · seed.sql · reference data

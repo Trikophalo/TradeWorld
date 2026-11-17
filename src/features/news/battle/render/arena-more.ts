@@ -11,6 +11,7 @@ import { battleHash } from "@/lib/sim/battle/hash";
 import { laserAt, laserLength, type LaserState } from "@/lib/sim/battle/laser";
 import { marginShowTicks, type MarginState } from "@/lib/sim/battle/margin";
 import type { SoundName } from "@/lib/sound";
+import { createFiveKinds, FIVE_KINDS, isFiveKind } from "./arena-five";
 import { sprite, type Sprite } from "./sprites";
 
 /*
@@ -19,7 +20,7 @@ import { sprite, type Sprite } from "./sprites";
  * effects of state changes, and where a player stands (jumping, the climbing screen).
  */
 
-export const MORE_KINDS = ["bear", "dash", "margin", "elevator", "laser"] as const;
+export const MORE_KINDS = ["bear", "dash", "margin", "elevator", "laser", ...FIVE_KINDS] as const;
 export type MoreKind = (typeof MORE_KINDS)[number];
 export const isMoreKind = (kind: string): kind is MoreKind => (MORE_KINDS as readonly string[]).includes(kind);
 
@@ -409,10 +410,14 @@ export function createMoreKinds(api: DrawApi) {
 
   // ------------------------------------------------------------------ the interface for arena.ts
 
+  /** The five games of ADR-177 (render/arena-five.ts). */
+  const five = createFiveKinds(api);
+
   return {
     /** Floors and things under everyone. */
     floor(kind: MoreKind, s: AnyBattleState, now: number, alpha: number) {
-      if (kind === "bear") bearFloor(s as BearState, now);
+      if (isFiveKind(kind)) five.floor(kind, s, now, alpha);
+      else if (kind === "bear") bearFloor(s as BearState, now);
       else if (kind === "dash") {
         bankFloor(s as DashState);
         dashCoins(s as DashState, now, alpha);
@@ -429,11 +434,13 @@ export function createMoreKinds(api: DrawApi) {
     },
     /** Over everyone (beams, marks). */
     overlay(kind: MoreKind, s: AnyBattleState, now: number, alpha: number) {
+      if (isFiveKind(kind)) five.overlay(kind, s, now, alpha);
       if (kind === "laser") laserBeams(s as LaserState, now, alpha, "beam");
       if (kind === "bear") bearMarks(s as BearState, now, alpha);
     },
     events(kind: MoreKind, a: AnyBattleState, c: AnyBattleState, now: number, alpha: number) {
-      if (kind === "bear") bearEvents(a as BearState, c as BearState, now);
+      if (isFiveKind(kind)) five.events(kind, a, c, now, alpha);
+      else if (kind === "bear") bearEvents(a as BearState, c as BearState, now);
       else if (kind === "dash") dashEvents(a as DashState, c as DashState, now, alpha);
       else if (kind === "margin") marginEvents(a as MarginState, c as MarginState, now);
       else if (kind === "elevator") elevatorEvents(a as ElevatorState, c as ElevatorState, now);
@@ -455,6 +462,7 @@ export function createMoreKinds(api: DrawApi) {
     },
     /** Hearts over the head (Laserschranke). */
     hearts(kind: MoreKind, s: AnyBattleState, i: number): number {
+      if (isFiveKind(kind)) return five.hearts(kind, s, i);
       return kind === "laser" ? (s as LaserState).hearts[i]! : -1;
     },
     heart: () => sprite(HEART),

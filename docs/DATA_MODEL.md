@@ -7594,6 +7594,19 @@ Accessoires (`battles.accessories`, `exclusive: true`, ohne Preis) mischt `acces
 - **Fehler:** `battle_not_viewer` NX150, `battle_full` NX151, `battle_closed` NX152, `battle_not_joined` NX153,
   `battle_round_closed` NX154, `accessory_exclusive` NX155, `battle_unknown` NX156.
 - Test `supabase/tests/9s_battles.sql` (mit Testvektoren gegen die TypeScript-Simulation).
+- **Fünf WASD-Spiele und neue Preise (ADR-177):** `20261204006700_battle_sims_five.sql` (`battle_sim_zone`,
+  `_tag`, `_tiles`, `_paint`, `_crash`, Helfer `battle_zone_tile`; `battle_sim` neu mit allen 17 Aktionsspielen,
+  `battle_is_tick` per `replace` ergänzt, Check auf `battles.kind` mit allen 24 Spielen). Die Antwort von
+  `battle_sim_zone` hat zusätzlich `radius`, die von `battle_sim_tag` `bear` (Slot des Bären). `score` ist je Spiel:
+  Münzen (zone), Bär-Takte (tag), Schritte (tiles), Felder (paint), Herzen (crash).
+  `20261204006720_battle_prizes_more.sql`: Preisarten `accessory` (`prize = {"kind":"accessory","tier"}`, ausgezahlt
+  ein zufälliges, noch nicht besessenes Shop-Accessoire der Stufe in `player_accessories` für 0 €, sonst Geld mit
+  `fallback`) und `packs` (`prize = {"kind":"packs","packs":[{"set","count"}]}`, gezogen von
+  `battle_pick_packs(cap, max, u1..u4)` wie `pickPackPrize` in `src/lib/sim/battle/prizes.ts`, höchstens
+  `prizes.packsCapCents` und `prizes.packsMax`; ausgezahlt per `nexamon_grant_sealed_packs` als ungeöffnete Booster).
+  `battle_prize_json` liefert für `packs` zusätzlich `name` je Set und `cents` (Summe der Packpreise), `battle_open`,
+  `battle_prize_label` und `battle_pay` sind neu definiert (Kopien von 4720 plus die neuen Arten). Test
+  `supabase/tests/b6_battles_prizes.sql`.
 - **Zehn weitere Spiele (Nachtrag zu ADR-160):** `20261204004900_battle_sims_more.sql` (`battle_sim_bear`,
   `_dash`, `_margin`, `_elevator`, `_laser`, `_rodeo`, Helfer `battle_dash_tile`, `battle_elevator_mask`; `battle_sim` neu mit allen zwölf
   Aktionsspielen, `battle_is_tick` per `replace` ergänzt, Check auf `battles.kind` mit allen 19 Spielen) und
@@ -7690,6 +7703,17 @@ genau einmal Geld, kaufmännisch „half even“ (`nexamon_copy_value_cents`).
   von einem Spieler, `quick` = Sofortverkauf an die KI), `counted` (hat den Wert bewegt), `value_before_e4`,
   `value_after_e4`, `at`.
 - **`nexamon_packs`** (intern): Booster der Spieler mit den fünf Zügen (`cards` jsonb), für Zähler und Verlauf.
+- **`nexamon_sealed_packs`** (intern, ADR-177, `20261204006710_nexamon_sealed_packs.sql`): ungeöffnete Booster eines
+  Spielers: `id`, `player_id`, `set_key`, `source` (`battle` = News-Battle-Gewinn, `bought` = gekauft, später öffnen),
+  `price_cents` (bezahlt, 0 beim Gewinn), `battle_id`, `created_at`, `opened_at`, `pack_id` (die Zeile in
+  `nexamon_packs` nach dem Öffnen). RPCs (`authenticated`): `get_nexamon_sealed_packs()` → `{packs: [{id, set, name,
+source, price_cents, created_at}], unlocked, server_time}` (auch gesperrt lesbar);
+  `open_nexamon_sealed_pack(p_request_id, p_pack_id)` öffnet mit `nexamon_open_pack` wie ein gekaufter Booster
+  (Population, Live-Öffnen über den Trigger auf `nexamon_packs`, Missionen), ohne Geld; Antwort wie
+  `buy_nexamon_pack` plus `sealed_id`, `sealed_left`; `buy_nexamon_sealed_pack(p_request_id, p_set, p_count)` bucht
+  `p_count` × Packpreis als `nexamon_pack` von `player_cash` an `households` (Grenze `packs.perMinute`, gleiche
+  Ratenbremse) und legt die Packs versiegelt ab. Intern: `nexamon_grant_sealed_packs(player, set, count, source,
+battle, price)`. Fehler `sealed_pack_unknown` NX290. `account_wipe` löscht die Zeilen mit.
 - **Pack Battles und Live-Öffnen (ADR-172, intern, RLS ohne Grants):** `nexamon_presence` (wer im Collectibles-Tab
   ist, `allow_watch`), `nexamon_battles` (Herausforderung bis Ergebnis: Status, beide Züge, Summen, Gewinner,
   `tie_break`, `coin_seed`), `nexamon_live` (Live-Sitzung eines Packs oder Battles mit `progress`),
