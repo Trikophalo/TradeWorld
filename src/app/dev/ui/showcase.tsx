@@ -53,6 +53,7 @@ import { SignaturePad } from "@/features/career/components/signature-pad";
 import { CompanyMovesCard } from "@/features/company/components/company-moves";
 import { HealthCompact, HealthPanel } from "@/features/company/components/health-panel";
 import { companyHealth, type HealthCompany } from "@/lib/sim/company-health";
+import { InterviewCard } from "@/features/company/components/interview-card";
 import { TaskGameView } from "@/features/company/tasks/games";
 import { TaskBoard } from "@/features/company/tasks/task-board";
 import type { CompanyMoves, CompanyTasks, MyJob, PlayerCard } from "@/features/game/types";
@@ -991,6 +992,7 @@ export function Showcase() {
         <HealthShowcase />
         <CompanyMovesCard preview={SAMPLE_MOVES} />
         <TaskBoard preview={SAMPLE_TASKS} />
+        <InterviewCard />
         {SAMPLE_GAMES.map((sample) => (
           <SampleGame key={sample.game} sample={sample} />
         ))}

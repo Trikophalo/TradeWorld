@@ -38,6 +38,8 @@ export const DISCLOSURE = {
    * public brings appear for founders of a private company once the IPO is in reach (startups.ipo.minLevel).
    */
   companyListed: 9,
+  /** CEO interviews of NEXA Nachrichten (ADR-173): once the news show and a company are in reach. */
+  companyInterview: 3,
 } as const;
 
 export type DisclosureKey = keyof typeof DISCLOSURE;

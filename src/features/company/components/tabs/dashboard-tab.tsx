@@ -32,6 +32,7 @@ import { netProfit } from "../headquarters";
 import { HealthPanel, type AskMira } from "../health-panel";
 import { OfficeScene } from "../office-scene";
 import { StaffValueCard } from "../staff-value-card";
+import { InterviewCard } from "../interview-card";
 import { PitchCard } from "../pitch-card";
 import { CompanyNewsCard, SituationCard } from "../situation";
 
@@ -97,6 +98,9 @@ export function DashboardTab({
             icon={<PixelIcon {...UI_ICONS.news} scale={2} />}
           >
             <SituationCard />
+            <Reveal feature="companyInterview">
+              <InterviewCard />
+            </Reveal>
             <PitchCard kind="event" />
             <CompanyNewsCard />
           </CollapsibleSection>

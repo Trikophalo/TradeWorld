@@ -7883,7 +7883,8 @@
       "tax": "Finanzamt",
       "corp": "Börsenfirma",
       "outro": "Schlusswort",
-      "other": "Eilmeldung"
+      "other": "Eilmeldung",
+      "interview": "Interview"
     },
     "ticker": [
       "Börse hat wieder geöffnet",
@@ -9520,6 +9521,28 @@
       "totalCosts": "Lohnkosten gesamt",
       "totalNet": "Bleibt",
       "hint": "Ein Monat sind hier {days} Tage. Leistung: Umsatz der letzten 24 Stunden × {days}, aufgeteilt nach dem Anteil an der Produktivität des Teams. Kosten: Spieler bekommen höchstens {hours} bezahlte Stunden am Tag, KI-Kräfte jede Betriebsstunde. Wareneinsatz und Fixkosten sind nicht abgezogen."
+    }
+  },
+  "companyInterview": {
+    "title": "Interviewanfrage",
+    "intro": "Mr. Doodle Dangle von NEXA Nachrichten will dich als Chef von {company} interviewen. Drei Fragen, live in der nächsten Sendung.",
+    "expires": "Noch",
+    "accept": "Interview geben",
+    "decline": "Kein Kommentar",
+    "question": "Frage {n}:",
+    "ownAnswer": "Eigene Antwort (oder oben eine Schnellantwort wählen)",
+    "submit": "Antworten abschicken",
+    "sent": "Interview gegeben",
+    "sentText": "Es läuft in der nächsten Sendung von NEXA Nachrichten.",
+    "failed": "Hat nicht geklappt",
+    "effect": "Bekanntheit {value}",
+    "aired": "Lief schon in NEXA Nachrichten.",
+    "airsNext": "Läuft in der nächsten Sendung von NEXA Nachrichten.",
+    "status": {
+      "answered": "Interview gegeben",
+      "declined": "Kein Kommentar",
+      "expired": "Anfrage verpasst",
+      "requested": "Interviewanfrage"
     }
   }
 }
