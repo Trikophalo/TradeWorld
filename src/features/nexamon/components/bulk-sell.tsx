@@ -302,7 +302,8 @@ export function BulkSell({ collection }: { collection: NexamonCollection }) {
           <div className="space-y-3">
             <Button
               block
-              className="h-auto min-h-12 py-2 text-center whitespace-normal"
+              size="sm"
+              className="h-auto min-h-9 max-w-full px-2 py-1 text-center text-xs leading-tight whitespace-normal"
               state={sell.state}
               disabled={picked.length === 0 || picked.length > BALANCE.nexamon.quickSell.maxPerCall}
               onClick={sellToGame}
@@ -310,7 +311,7 @@ export function BulkSell({ collection }: { collection: NexamonCollection }) {
             >
               {t("bulk.sellGame", { price: formatMoney(payout.payoutCents) })}
             </Button>
-            <div className="grid grid-cols-[6rem_minmax(0,1fr)] items-end gap-2">
+            <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-end gap-2">
               <Field
                 label={t("bulk.share")}
                 inputMode="numeric"
@@ -320,7 +321,8 @@ export function BulkSell({ collection }: { collection: NexamonCollection }) {
               />
               <Button
                 block
-                className="h-auto min-h-12 py-2 text-center whitespace-normal"
+                size="sm"
+                className="h-auto min-h-9 max-w-full px-2 py-1 text-center text-xs leading-tight whitespace-normal"
                 variant="secondary"
                 state={list.state}
                 disabled={picked.length === 0 || !shareOk || picked.length > BALANCE.nexamon.market.maxListings}
