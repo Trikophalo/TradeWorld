@@ -56,6 +56,7 @@ import { hasForbiddenSymbol, isValidBanner, isValidLogo, type CompanyLogoData } 
 import {
   GameError,
   type CampaignKind,
+  type CompanyAutopilot,
   type ChatMessage,
   type CloseCompanyResult,
   type Dissolution,
@@ -103,6 +104,11 @@ interface DemoHour {
   supplyFeeIncomeCents?: number;
   supplyGoodsCents?: number;
   stakePayoutCents?: number;
+  /** ADR-180: AI capacity used, awareness step of the hour. */
+  aiUtilizationBps?: number;
+  awarenessBefore?: number;
+  awarenessAfter?: number;
+  awarenessParts?: { wordOfMouth: number; marketing: number; decay: number; extra: number; cap: number };
 }
 
 /** One hour as the deals part sees it (ADR-098). */
@@ -114,6 +120,8 @@ interface DemoReport extends CompanyQuarter {
 
 export interface DemoCompanyState {
   id: string;
+  /** ADR-180: awareness added by tasks and the autopilot since the last closed hour. */
+  awarenessBoost?: number;
   name: string;
   idea: string;
   sector: SectorKey;
@@ -393,6 +401,10 @@ export function createCompanyEngine(host: CompanyHost) {
         listed: host.listed?.hourTerms(company, at),
       },
     );
+    // ADR-180: awareness moves every hour; boosts since the last hour (tasks, autopilot) count as "extra"
+    const awarenessExtra = company.awarenessBoost ?? 0;
+    company.awarenessBoost = 0;
+    company.awareness = r.awareness.next;
     const revenue = Number(r.revenueCents);
     const costs = Number(r.cogsCents + r.aiWagesPaidCents + r.fixedCents + r.marketingCents);
     const available = company.cashCents + revenue;
@@ -433,6 +445,16 @@ export function createCompanyEngine(host: CompanyHost) {
       contractRevenueCents: Number(r.contractRevenueCents),
       founderPayoutCents: payout,
       stakePayoutCents: stakes,
+      aiUtilizationBps: r.aiUtilizationBps,
+      awarenessBefore: r.awareness.before - awarenessExtra,
+      awarenessAfter: r.awareness.next,
+      awarenessParts: {
+        wordOfMouth: r.awareness.wordOfMouth,
+        marketing: r.awareness.marketing,
+        decay: r.awareness.decay,
+        extra: awarenessExtra,
+        cap: r.awareness.cap,
+      },
     };
     const supply = host.afterHour?.(company, hour) ?? {};
     Object.assign(hour, supply);
@@ -1387,7 +1409,7 @@ export interface DemoListedStock {
 }
 
 /** Strengths (ADR-176) in the demo: replayed from the kept hours with the same rules as the server. */
-function demoStrengths(company: DemoCompanyState): MyCompany["strengths"] {
+export function demoStrengths(company: DemoCompanyState): MyCompany["strengths"] {
   const cfg = BALANCE.companyHealth.strengths;
   let scores = EMPTY_STRENGTHS;
   for (const h of company.hours ?? []) {
@@ -1417,5 +1439,24 @@ function demoStrengths(company: DemoCompanyState): MyCompany["strengths"] {
     rewardBps: strengthsRewardBps(scores, cfg),
     next: strengthsNextReward(scores, cfg),
     closeError: null,
+  };
+}
+
+/** The last closed hour for the autopilot card (ADR-180), shaped like get_company_autopilot.last_hour. */
+export function demoLastHour(company: DemoCompanyState | null): CompanyAutopilot["lastHour"] {
+  const h = company?.hours?.at(-1);
+  if (!company || !h) return null;
+  return {
+    hourStart: new Date(h.at).toISOString(),
+    revenueCents: h.revenueCents,
+    profitCents: h.profitCents,
+    demandCents: h.demandCents,
+    capacityCents: h.capacityCents,
+    aiWorkers: company.aiWorkers,
+    aiWagesDueCents: h.aiWagesCents,
+    aiUtilizationBps: h.aiUtilizationBps ?? null,
+    awarenessBefore: h.awarenessBefore ?? null,
+    awarenessAfter: h.awarenessAfter ?? null,
+    awarenessParts: h.awarenessParts ?? null,
   };
 }

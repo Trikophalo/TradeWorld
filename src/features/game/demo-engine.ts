@@ -69,7 +69,14 @@ import { createListedEngine } from "./demo/listed";
 import { createCryptoEngine, type DemoCryptoState } from "./demo/crypto";
 import { createDealEngine, initialDeals, type DemoDealsState } from "./demo/deals";
 import { tagFromUniform } from "@/lib/player-tag";
-import { createCompanyEngine, type DemoCompanyState, type DemoDissolution, type DemoListedStock } from "./demo/company";
+import {
+  createCompanyEngine,
+  demoLastHour,
+  demoStrengths,
+  type DemoCompanyState,
+  type DemoDissolution,
+  type DemoListedStock,
+} from "./demo/company";
 import { demoTycoons } from "./demo/tycoons";
 import {
   GameError,
@@ -1623,6 +1630,21 @@ const companyTasks = createCompanyTasksEngine({
     persist();
   },
   upgrades: () => p().upgrades ?? {},
+  strengths: () => {
+    const c = p().company;
+    if (!c) return null;
+    const st = demoStrengths(c);
+    return st ? { overall: st.overall, team: st.scores.team } : null;
+  },
+  boostAwareness: (add) => {
+    const c = p().company;
+    if (!c) return;
+    const next = Math.min(Math.max(c.awareness, 1), c.awareness + add);
+    c.awarenessBoost = (c.awarenessBoost ?? 0) + (next - c.awareness);
+    c.awareness = next;
+    persist();
+  },
+  lastHour: () => demoLastHour(p().company ?? null),
   state: () => p().companyTasks,
   setState: (s) => {
     p().companyTasks = s;

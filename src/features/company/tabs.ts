@@ -32,7 +32,10 @@ const TAB_ALIASES: Record<string, CompanyTarget> = {
 const SECTIONS: Record<string, CompanyTarget> = {
   // Dashboard
   mira: { tab: "dashboard", target: "mira" },
-  health: { tab: "dashboard", target: "health" },
+  health: { tab: "dashboard", section: "details", target: "health" },
+  details: { tab: "dashboard", section: "details" },
+  autopilot: { tab: "dashboard", target: "autopilot" },
+  "staff-value": { tab: "dashboard", section: "details", target: "staff-value" },
   strengths: { tab: "dashboard", target: "strengths" },
   todo: { tab: "dashboard", target: "todo" },
   situation: { tab: "dashboard", section: "situation" },

@@ -1089,3 +1089,26 @@ Bestand den Anker hob. Beides ist jetzt an den fairen Wert aus den Firmenzahlen 
 wie weit Geld allein den Kurs an einem Tag bewegt; der Value-Fonds zieht ihn danach weiter zum fairen Wert zurück.
 Dazu sperren die Insiderregel (24 h nach Geld aus der Firma kein Kauf der eigenen Aktie) und die 72-Stunden-Sperre
 für Ausgabeerlöse die schnelle Schleife „entnehmen, kaufen, ausgeben, entnehmen“.
+
+## Nachtrag: Firmen-Überholung (ADR-180)
+
+`closeStartupHour` (`src/lib/sim/startup.ts`) liefert jetzt zusätzlich:
+
+- `awareness` = `awarenessHour(a, q, Marketing der Stunde, effektiver Markt, Preis-Faktor, Stufe)`:
+  `next = clamp(a + wom + mk − decay, min, Deckel der Stufe)` mit `wom = g/6 · p · a(1−a)(0,5+q)`,
+  `mk = maxGain · B/(B+H)/6` (B = Stundenbudget × 6, H = max(500 €, Markt/4 · share)), `decay = d/6 · a`.
+  Die Datenbank speichert die neue Bekanntheit sofort und die Teile in `player_company_hours.awareness_parts`;
+  `closeStartupQuarter` bewegt die Bekanntheit nicht mehr.
+- `aiUtilizationBps = clamp((verkauft − Kapazität ohne KI) / KI-Kapazität, 0, 1)` und
+  `aiWagesDueCents = ⌊KI · Lohn · max(Standby, Auslastung) / 10.000⌋`. Danach wie bisher: alle Löhne mit demselben
+  Faktor, nie mehr als die Stunde verdient hat.
+
+`src/lib/sim/company-autopilot.ts`: `autopilotMood`, `autopilotChanceBps = ⌊6.000 + 6.000 · Stimmung⌋`,
+`autopilotSucceeds` (ab 10.000 immer), `taskPayFactorBps = ⌊9.000 + 6.000 · Gesamt/100⌋` und `taskRewardCents`
+(Reihenfolge wie `company_task_resolve`: Wert × Punkte, dann KI- oder Autopilot-Anteil × max(1, Chance), dann
+Stärken-Faktor, dann `task_pay`; Fehlschlag Wert × Strafe abzüglich `task_safety`).
+
+`src/lib/sim/company-tasks-more.ts`: Rätsel und Bewertung der fünf neuen Minispiele (`restock`, `receipts`, `offer`,
+`pattern`, `shelf`). SQL und TS stimmen in `supabase/tests/b8_company_overhaul.sql` überein (gleiche Zahlen für
+`awarenessHour`, `aiUtilizationBps`, `aiWageDueCents`, Teilpunkte der Spiele). Messwerkzeug:
+`scripts/company-harness.ts`.

@@ -1,6 +1,13 @@
 import { z } from "zod";
 import { TASK_GAMES } from "@/config/company-tasks";
-import type { CompanyTaskPlay, CompanyTaskResult, CompanyTasks, GameEngine, NewsFeedItem } from "./types";
+import type {
+  CompanyAutopilot,
+  CompanyTaskPlay,
+  CompanyTaskResult,
+  CompanyTasks,
+  GameEngine,
+  NewsFeedItem,
+} from "./types";
 import { rpc } from "./rpc";
 
 /*
@@ -119,7 +126,104 @@ const feedSchema = z.object({
   ),
 });
 
+const num = z.number().nullable().default(null);
+
+/** Autopilot and the last hour's economy (ADR-180). */
+const autopilotSchema = z.object({
+  on: z.boolean(),
+  can_toggle: z
+    .boolean()
+    .nullable()
+    .transform((v) => v === true),
+  mood: z.number(),
+  chance_bps: z.number(),
+  reward_bps: z.number(),
+  fail_penalty_bps: z.number(),
+  max_per_day: z.number(),
+  every_minutes: z.number(),
+  pay_factor_bps: z.number(),
+  today: z.object({ done: z.number(), success: z.number(), cents: z.number() }),
+  log: z.array(
+    z.object({
+      at: z.string(),
+      key: z.string(),
+      success: z.boolean(),
+      result_cents: z.number(),
+      chance_bps: z.number(),
+    }),
+  ),
+  last_hour: z
+    .object({
+      hour_start: z.string(),
+      revenue_cents: z.number(),
+      profit_cents: z.number(),
+      demand_cents: z.number(),
+      capacity_cents: z.number(),
+      ai_workers: z.number(),
+      ai_wages_due_cents: z.number(),
+      ai_utilization_bps: num,
+      awareness_before: num,
+      awareness_after: num,
+      awareness_parts: z
+        .object({
+          word_of_mouth: z.number(),
+          marketing: z.number(),
+          decay: z.number(),
+          extra: z.number(),
+          cap: z.number(),
+        })
+        .nullable()
+        .default(null),
+    })
+    .nullable(),
+});
+
+export const toAutopilot = (r: z.infer<typeof autopilotSchema>): CompanyAutopilot => ({
+  on: r.on,
+  canToggle: r.can_toggle,
+  mood: r.mood,
+  chanceBps: r.chance_bps,
+  rewardBps: r.reward_bps,
+  failPenaltyBps: r.fail_penalty_bps,
+  maxPerDay: r.max_per_day,
+  everyMinutes: r.every_minutes,
+  payFactorBps: r.pay_factor_bps,
+  today: r.today,
+  log: r.log.map((l) => ({
+    at: l.at,
+    key: l.key,
+    success: l.success,
+    resultCents: l.result_cents,
+    chanceBps: l.chance_bps,
+  })),
+  lastHour: r.last_hour
+    ? {
+        hourStart: r.last_hour.hour_start,
+        revenueCents: r.last_hour.revenue_cents,
+        profitCents: r.last_hour.profit_cents,
+        demandCents: r.last_hour.demand_cents,
+        capacityCents: r.last_hour.capacity_cents,
+        aiWorkers: r.last_hour.ai_workers,
+        aiWagesDueCents: r.last_hour.ai_wages_due_cents,
+        aiUtilizationBps: r.last_hour.ai_utilization_bps,
+        awarenessBefore: r.last_hour.awareness_before,
+        awarenessAfter: r.last_hour.awareness_after,
+        awarenessParts: r.last_hour.awareness_parts
+          ? {
+              wordOfMouth: r.last_hour.awareness_parts.word_of_mouth,
+              marketing: r.last_hour.awareness_parts.marketing,
+              decay: r.last_hour.awareness_parts.decay,
+              extra: r.last_hour.awareness_parts.extra,
+              cap: r.last_hour.awareness_parts.cap,
+            }
+          : null,
+      }
+    : null,
+});
+
 export const TASK_RPC_SCHEMAS = {
+  get_company_autopilot: autopilotSchema,
+  set_company_autopilot: autopilotSchema,
   get_company_tasks: tasksSchema,
   delegate_company_task: tasksSchema,
   set_job_supervisor: tasksSchema,
@@ -225,8 +329,16 @@ export const liveTaskEngine: Pick<
   | "submitCompanyTask"
   | "setJobSupervisor"
   | "setCompanyTasksAutoAi"
+  | "companyAutopilot"
+  | "setCompanyAutopilot"
   | "newsFeed"
 > = {
+  async companyAutopilot() {
+    return toAutopilot(await rpc("get_company_autopilot", {}, autopilotSchema));
+  },
+  async setCompanyAutopilot(requestId, on) {
+    return toAutopilot(await rpc("set_company_autopilot", { p_request_id: requestId, p_on: on }, autopilotSchema));
+  },
   async companyTasks() {
     return toTasks(await rpc("get_company_tasks", {}, tasksSchema));
   },

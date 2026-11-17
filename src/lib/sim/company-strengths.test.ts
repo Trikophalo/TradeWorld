@@ -41,7 +41,7 @@ describe("company strengths (ADR-176)", () => {
       },
       cfg,
     );
-    expect(bad.awareness).toBeCloseTo(30);
+    expect(bad.awareness).toBeCloseTo(60); // ADR-180: 30 % of awarenessFull 50 %
     expect(bad.delivery).toBe(50);
     expect(bad.margin).toBeCloseTo(40); // 10 % margin of 25 % = full
     expect(bad.team).toBe(80);

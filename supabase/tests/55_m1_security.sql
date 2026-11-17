@@ -102,7 +102,9 @@ select tests.assert(
           -- CEO interviews (b3)
           || array['get_company_interview', 'answer_company_interview', 'decline_company_interview']
           -- sealed booster packs (b6)
-          || array['get_nexamon_sealed_packs', 'open_nexamon_sealed_pack', 'buy_nexamon_sealed_pack']) x),
+          || array['get_nexamon_sealed_packs', 'open_nexamon_sealed_pack', 'buy_nexamon_sealed_pack']
+          -- company autopilot (b8)
+          || array['get_company_autopilot', 'set_company_autopilot']) x),
   'authenticated can execute exactly the 9 helpers and the RPCs up to the market popularity (9g)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace

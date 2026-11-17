@@ -499,6 +499,16 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Ganz oben im Firmen-Dashboard zeigt ein Netz sechs Stärken.",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-65915dc7",
+        title: "Autopilot",
+        text: "Ein Schalter erledigt alle Firmenaufgaben ohne Minispiel, auch nachts: 60 % Erfolg, mit guter Stimmung bis 120 %, dafür 70 % des Lohns.",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-be6fa237",
+        title: "Firmen lohnen sich",
+        text: "Märkte sind zehnmal so groß, KI-Kräfte kosten im Leerlauf nur ein Viertel ihres Lohns und bringen mehr ein, als sie kosten, sobald es Nachfrage gibt.",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-24a8f8c7",
         title: "Kritiker für NFTs",
         text: "Jedes NFT bekommt beim Prägen ein Kritiker-Urteil von 0 bis 100 (du siehst es mit Stärke und Schwäche, der Markt als kleines Abzeichen).",

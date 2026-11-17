@@ -5,6 +5,14 @@
 \set QUIET 1
 set client_min_messages = notice;
 
+-- ADR-180 changed the company scale (market x 10, capacity x 1.5, idle AI workers at the standby share). This file
+-- checks the mechanics with the numbers it was written for; the end of the file restores the current values.
+select tests.set_cfg('startups', '{marketFactorByTier}', '{"garage": 1, "small_business": 4, "gmbh": 15, "ag": 40}') is null as ok \gset
+select tests.set_cfg('startups', '{capacityCentsPerProductivity}',
+  '{"tech": 300000, "retail": 250000, "energy": 250000, "pharma": 300000, "logistics": 250000}') is null as ok \gset
+select tests.set_cfg('startups', '{aiWorkerStandbyBps}', '10000') is null as ok \gset
+select tests.set_cfg('startups', '{gmbh,fixedCostCentsPerQuarter}', '600000') is null as ok \gset
+
 \set f '''0c3c3c3c-0000-4000-8000-0000000000f1'''
 \set w '''0c3c3c3c-0000-4000-8000-0000000000f2'''
 \set g '''0c3c3c3c-0000-4000-8000-0000000000f3'''
@@ -217,11 +225,14 @@ select tests.assert(
   -- AI workers lower the target (ADR-069): founder + player + 1 AI worker -> × (1 − 0.3 / 3)
   (select pc.quarters_active = 1 and abs(pc.quality - (0.25 + 0.35 * ((0.25 + 0.75 * (:'team'::jsonb ->> 'team_sector_score')::int
                                                                         / ((:'team'::jsonb ->> 'team_sector_score')::int + 20.0)) * (1 - 0.3 / 3.0) - 0.25))) < 1e-9
-          and pc.awareness > 0.3 and pc.last_closed_quarter_id = :qid
+          -- ADR-180: awareness moves every hour; the quarter keeps what the last hour left
+          and pc.awareness = (select h.awareness_after from public.player_company_hours h
+                               where h.company_id = pc.company_id order by h.hour_start desc limit 1)
+          and pc.last_closed_quarter_id = :qid
      from public.player_companies pc where pc.company_id = :'fco')
   and (select sum(amount) from public.xp_events where player_id = :f and source = 'company_quarter_profit') - :fxp0
       = round(public.config_double('progression', '{xpSources,profitableCompanyQuarter,xp}', 500) * public.config_double('progression', '{xpMultiplier}', 2)),
-  'quarter close: quality towards the team target, awareness grows, founder XP for a profitable quarter');
+  'quarter close: quality towards the team target, awareness as the last hour left it, founder XP for a profitable quarter');
 select tests.login_as('authenticated', :f);
 select public.get_my_company() -> 'company' as mc2 \gset
 reset role;
@@ -348,3 +359,10 @@ reset role;
 select tests.assert(:own_pc = 1 and :own_rep >= 1 and :other_pc = 0 and :other_rep = 0,
   'RLS: founders read their own company and reports, others nothing');
 select tests.assert(tests.money_invariant() = 'ok', 'money invariant holds (founding, revenue, costs, unpaid bills, deposit, withdraw)');
+
+-- ADR-180: back to the current company scale
+select tests.set_cfg('startups', '{marketFactorByTier}', '{"garage": 10, "small_business": 40, "gmbh": 150, "ag": 400}') is null as ok \gset
+select tests.set_cfg('startups', '{capacityCentsPerProductivity}',
+  '{"tech": 450000, "retail": 375000, "energy": 375000, "pharma": 450000, "logistics": 375000}') is null as ok \gset
+select tests.set_cfg('startups', '{aiWorkerStandbyBps}', '2500') is null as ok \gset
+select tests.set_cfg('startups', '{gmbh,fixedCostCentsPerQuarter}', '360000') is null as ok \gset

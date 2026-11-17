@@ -1,0 +1,22 @@
+{
+  "on": true,
+  "log": [
+    {
+      "at": "2026-11-17T10:28:21.1564+00:00",
+      "key": "pay_invoices",
+      "success": true,
+      "chance_bps": 9000,
+      "result_cents": 12345
+    }
+  ],
+  "mood": 0,
+  "today": { "done": 1, "cents": 12345, "success": 1 },
+  "last_hour": null,
+  "can_toggle": true,
+  "chance_bps": 6000,
+  "reward_bps": 7000,
+  "max_per_day": 24,
+  "every_minutes": 60,
+  "pay_factor_bps": 9000,
+  "fail_penalty_bps": 3000
+}

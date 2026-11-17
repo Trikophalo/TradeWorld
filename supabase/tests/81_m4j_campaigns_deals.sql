@@ -4,6 +4,17 @@
 \set QUIET 1
 set client_min_messages = notice;
 
+-- ADR-180 changed the company scale; this file checks the mechanics with the numbers it was written for (the old
+-- scale, awareness that does not move by the hour); the end of the file restores the current values.
+select tests.set_cfg('startups', '{marketFactorByTier}', '{"garage": 1, "small_business": 4, "gmbh": 15, "ag": 40}') is null as ok \gset
+select tests.set_cfg('startups', '{capacityCentsPerProductivity}',
+  '{"tech": 300000, "retail": 250000, "energy": 250000, "pharma": 300000, "logistics": 250000}') is null as ok \gset
+select tests.set_cfg('startups', '{aiWorkerStandbyBps}', '10000') is null as ok \gset
+select coalesce(value -> 'awareness', 'null') as aw_cfg0 from public.game_config where key = 'startups' \gset
+select tests.set_cfg('startups', '{awareness,growthPerQuarter}', '0') is null as ok \gset
+select tests.set_cfg('startups', '{awareness,decayPerQuarter}', '0') is null as ok \gset
+select tests.set_cfg('startups', '{awareness,marketingMaxGain}', '0') is null as ok \gset
+
 \set a '''08108108-0000-4000-8000-0000000000a1'''
 \set b '''08108108-0000-4000-8000-0000000000b1'''
 \set c '''08108108-0000-4000-8000-0000000000c1'''
@@ -179,15 +190,15 @@ select tests.assert(
   and (select count(*) from public.company_campaigns where company_id = :'aco') = 1,
   'start_campaign(): one balanced company_costs booking company cash -> households, charged once');
 select tests.assert(
-  abs((select awareness from public.player_companies where company_id = :'aco') - 0.405) < 1e-12
-  and abs(:c1_awareness_gain::float8 - 0.005) < 1e-12
+  abs((select awareness from public.player_companies where company_id = :'aco') - 0.42) < 1e-12
+  and abs(:c1_awareness_gain::float8 - 0.02) < 1e-12
   and exists (select 1 from public.company_news n where n.company_id = :'aco' and n.kind = 'campaign_started'
                  and n.payload = jsonb_build_object('kind', 'flyer', 'resonance', :'camp1'::jsonb ->> 'resonance',
                                                     'demand_bps', (:'camp1'::jsonb ->> 'demand_bps')::int)),
-  'start_campaign(): awareness +0.5 points at once; company news campaign_started {kind, resonance, demand_bps}');
+  'start_campaign(): awareness +2 points at once (ADR-180: was +0.5); company news campaign_started {kind, resonance, demand_bps}');
 select tests.assert(
   :'mc1'::jsonb -> 'campaign' = :'camp1'::jsonb
-  and :'mc1'::jsonb -> 'campaign_costs' = '{"flyer": 40500, "online": 121500, "tv": 364500}'::jsonb,
+  and :'mc1'::jsonb -> 'campaign_costs' = '{"flyer": 42000, "online": 126000, "tv": 378000}'::jsonb,
   'COMPANY: campaign while it runs; campaign_costs follow the (higher) awareness');
 
 -- the factor applies to hours that start inside the campaign window
@@ -196,8 +207,9 @@ select public.player_company_close_hour(:'aco', :'h0'::timestamptz + interval '1
 select (tests.m4j_hour(:'aco', :'h0'::timestamptz - interval '1 hour')).demand_cents as d_out \gset
 select (tests.m4j_hour(:'aco', :'h0'::timestamptz + interval '1 hour')).demand_cents as d_in \gset
 select tests.assert(
-  :d_out::bigint = 20250
-  and abs(:d_in::bigint - round(20250 * :c1_demand_factor::float8)) <= 1
+  -- 20 250 at 40,5 % awareness before ADR-180, now the flyer brought 42 %
+  :d_out::bigint = 21000
+  and abs(:d_in::bigint - round(21000 * :c1_demand_factor::float8)) <= 1
   and (tests.m4j_hour(:'aco', :'h0'::timestamptz - interval '1 hour')).campaign_id is null
   and (tests.m4j_hour(:'aco', :'h0'::timestamptz + interval '1 hour')).campaign_id = :'c1_id'::uuid
   and (public.company_campaign_at(:'aco', :'c1_ends_at'::timestamptz)).id is null
@@ -959,3 +971,9 @@ select tests.assert(
   'reset_account(): what the borrower owes goes to the lender first, then the deals and the trust events are gone');
 
 select tests.set_cfg('startups', '{demandNoise}', :'noise0'::jsonb);
+-- ADR-180: back to the current company scale
+select tests.set_cfg('startups', '{marketFactorByTier}', '{"garage": 10, "small_business": 40, "gmbh": 150, "ag": 400}') is null as ok \gset
+select tests.set_cfg('startups', '{capacityCentsPerProductivity}',
+  '{"tech": 450000, "retail": 375000, "energy": 375000, "pharma": 450000, "logistics": 375000}') is null as ok \gset
+select tests.set_cfg('startups', '{aiWorkerStandbyBps}', '2500') is null as ok \gset
+select tests.set_cfg('startups', '{awareness}', :'aw_cfg0'::jsonb) is null as ok \gset

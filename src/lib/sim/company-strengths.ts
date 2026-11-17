@@ -48,7 +48,7 @@ export const EMPTY_STRENGTHS: StrengthScores = {
 export function strengthsInstant(h: StrengthHour, cfg: StrengthsConfig): StrengthScores {
   const costs = Math.max(1, h.revenueCents - h.profitCents);
   return {
-    awareness: clamp(100 * h.awareness, 0, 100),
+    awareness: clamp((100 * h.awareness) / Math.max(0.01, cfg.awarenessFull ?? 1), 0, 100),
     quality: clamp(100 * h.quality, 0, 100),
     // can the company deliver what is asked? (no demand: nothing to judge, half marks)
     delivery: h.demandCents > 0 ? clamp((100 * h.capacityCents) / h.demandCents, 0, 100) : 50,

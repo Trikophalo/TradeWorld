@@ -1475,3 +1475,40 @@ Farben 96, umgefärbte Kopie des Kreises 5, Kopie mit drei geänderten Pixeln 15
 **Wirkung bei 1.000 € Prägekosten:** 96 Punkte → Anker 1.368 €, Angebote auf behaltene NFTs 4 % × 193 % = 7,7 % je
 Minute, Lowball 79–100 % des Werts. 50 Punkte → 1.000 €, 4,4 %, 65–90 %. 12 Punkte → 696 €, 1,7 %, 54–79 % mit
 Spotttexten. Kopie (5 Punkte) → 640 €, kein Angebot, kein Kauf.
+
+## Nachtrag: Firmen-Überholung (ADR-180)
+
+Gemessen mit `pnpm exec tsx scripts/company-harness.ts 200` (Median-Markt, vorgeschlagenes Marketing, Aufgaben
+tagsüber) und der echten Stundenabrechnung auf einer lokalen Datenbank.
+
+| Wert                                                   | vorher                             | nachher                                                                                                                   |
+| ------------------------------------------------------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `startups.marketFactorByTier`                          | 1 / 4 / 15 / 40                    | 10 / 40 / 150 / 400                                                                                                       |
+| `startups.capacityCentsPerProductivity`                | Tech/Pharma 300.000, sonst 250.000 | 450.000 / 375.000                                                                                                         |
+| `startups.gmbh.fixedCostCentsPerQuarter`               | 600.000                            | 360.000                                                                                                                   |
+| `startups.aiWorkerStandbyBps` (neu)                    | – (immer voller Lohn)              | 2.500 (Leerlauf kostet 25 %)                                                                                              |
+| `startups.awareness.growthPerQuarter`                  | 0,3                                | 0,2 (jetzt je Stunde ÷ 6)                                                                                                 |
+| `startups.awareness.decayPerQuarter`                   | 0,03                               | 0,12 (2 % je Stunde)                                                                                                      |
+| `startups.awareness.marketingMaxGain`                  | 0,12                               | 0,24                                                                                                                      |
+| `startups.awareness.marketingHalfSaturationShare`      | 0,1                                | 0,01 (Markt ist ×10)                                                                                                      |
+| `startups.awareness.taskGain` / `taskAiShareBps` (neu) | –                                  | 0,002 / 5.000                                                                                                             |
+| Kampagnen-Bekanntheit Flyer/Online/TV                  | 0,005 / 0,01 / 0,025               | 0,02 / 0,04 / 0,08                                                                                                        |
+| `companyHealth.strengths.awarenessFull` (neu)          | – (100 %)                          | 0,5                                                                                                                       |
+| `companyTasks.strengthPay` (neu)                       | –                                  | 9.000 … 15.000 bps                                                                                                        |
+| `companyTasks.autopilot` (neu)                         | –                                  | Chance 6.000 … 12.000, Lohn 7.000, Strafe 3.000, Wartezeit 3 min, alle 60 min, höchstens 24/Tag, Zusammenfassung ab 7 Uhr |
+
+**Gewinn je Stunde nach 72 Stunden (Harness):**
+
+| Firma                  | vorher €/h | nachher €/h | KI-Beitrag nachher €/h | KI-Lohn nachher €/h |
+| ---------------------- | ---------: | ----------: | ---------------------: | ------------------: |
+| Garage solo            |        −54 |         440 |                      – |                   – |
+| Kleinunternehmen, 3 KI |       −417 |         454 |                    820 |                 360 |
+| GmbH, 8 KI             |     −1.422 |       1.135 |                  2.625 |                 960 |
+| AG, 20 KI              |        144 |      15.973 |                 19.688 |               2.400 |
+
+Vergleich: Junior-Lohn 300 €/h, Senior 700 €/h, Teamleitung 1.300 €/h. Ziel: eine gut geführte Firma liegt nach einem
+Tag etwa beim Lohn der Karrierestufe, die sie freischaltet, und wächst mit Fachwissen (Stufen) weiter.
+
+**Autopilot, Erwartungswert je Aufgabe** (Wert W, Stärken-Faktor 1): bei 60 % Chance 0,6 × 0,7 W − 0,4 × 0,3 W =
+0,30 W; bei 90 % 0,60 W; bei 120 % 0,84 W. Selbst gespielt (perfekt) 1,0 W. Ein Kleinunternehmen (W = 1.500 €) macht
+nachts damit rund 450–1.260 € je Stunde, höchstens 24 Aufgaben am Tag.

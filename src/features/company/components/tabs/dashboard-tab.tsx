@@ -12,7 +12,7 @@ import { BALANCE } from "@/config/balance";
 import type { ListedCompany } from "@/features/game/listed-types";
 import { useServerClock } from "@/features/game/server-clock";
 import { engine } from "@/features/game/store";
-import type { MyCompany } from "@/features/game/types";
+import type { CompanyAutopilot, MyCompany } from "@/features/game/types";
 import { Reveal } from "@/features/progression/components/reveal";
 import type { CompanyHealth } from "@/lib/sim/company-health";
 import { formatBps, formatMoney, formatPrice } from "@/lib/format";
@@ -23,6 +23,7 @@ import { useCompanyEvent } from "../../hooks";
 import { HoursChart, ZoneGauge, ZoneHistoryChart } from "../../listed/charts";
 import { money, Panel, ServerCountdown, signed, Stat } from "../../listed/shared";
 import { companyTodos, type CompanyTodo } from "../../listed/view";
+import { companyPulse } from "../../pulse";
 import { hourlyCloseOverdue } from "../../routes";
 import type { CompanyTarget } from "../../tabs";
 import { useCompanyTasks } from "../../tasks/task-board";
@@ -36,6 +37,8 @@ import { StaffValueCard } from "../staff-value-card";
 import { InterviewCard } from "../interview-card";
 import { PitchCard } from "../pitch-card";
 import { CompanyNewsCard, SituationCard } from "../situation";
+import { AutopilotCard, useCompanyAutopilot } from "../autopilot-card";
+import { PulseCard } from "../pulse-card";
 
 type Go = (target: CompanyTarget) => void;
 type SectionProps = (id: string) => { id: string; open: boolean; onOpenChange: (open: boolean) => void };
@@ -69,32 +72,48 @@ export function DashboardTab({
   const ts = useTranslations("firm.sections");
   const th = useTranslations("hq.dashboard");
   const late = hourlyCloseOverdue(company, useServerClock());
+  const autopilot = useCompanyAutopilot();
   return (
     <div className="space-y-4" data-testid="company-dashboard">
-      <TodoStrip company={company} listed={listed} go={go} />
       <CloseErrorNote company={company} />
-      {/* The strengths with their reward first: what the company is good at, at a glance (ADR-176). */}
-      <div id="strengths" className="scroll-mt-24">
-        <StrengthsCard company={company} />
-      </div>
+      {/* ADR-180: the simple view first: the key numbers, what to do next, the autopilot, the six strengths. */}
       <div className="grid items-start gap-4 *:min-w-0 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-5">
         <div className="space-y-4">
           <NumbersCard company={company} listed={listed} listedPending={listedPending} />
-          {listedPending && <Skeleton className="h-64 w-full rounded-lg" />}
-          {listed && <MoodCard listed={listed} go={go} />}
+          <PulseCard lastHour={autopilot.data?.lastHour} />
+          <TodoStrip company={company} listed={listed} go={go} autopilot={autopilot.data ?? null} />
         </div>
         <div className="space-y-4">
-          <TimersCard company={company} listed={listed} go={go} />
+          <div id="autopilot" className="scroll-mt-24">
+            <AutopilotCard />
+          </div>
           <div id="mira" className="scroll-mt-24">
             <MiraChat applications={company.pendingApplications} health={miraHealth} onOpen={onMira} />
           </div>
-          <OfficeScene company={company} onTeam={() => go({ tab: "staff" })} />
         </div>
       </div>
-      <div id="health" className="scroll-mt-24">
-        <HealthPanel health={health} onAsk={onAsk} late={late} />
+      {/* The strengths with their reward: what the company is good at, at a glance (ADR-176). */}
+      <div id="strengths" className="scroll-mt-24">
+        <StrengthsCard company={company} />
       </div>
-      <StaffValueCard company={company} id="staff-value" />
+      {listedPending && <Skeleton className="h-64 w-full rounded-lg" />}
+      {listed && <MoodCard listed={listed} go={go} />}
+      {/* Everything else stays one tap away (ADR-180: "Erweitert"). */}
+      <CollapsibleSection
+        {...section("details")}
+        title={th("detailsSection")}
+        summary={th("detailsSummary")}
+        icon={<PixelIcon {...UI_ICONS.briefcase} scale={2} />}
+      >
+        <div className="space-y-4">
+          <TimersCard company={company} listed={listed} go={go} />
+          <div id="health" className="scroll-mt-24">
+            <HealthPanel health={health} onAsk={onAsk} late={late} />
+          </div>
+          <StaffValueCard company={company} id="staff-value" />
+          <OfficeScene company={company} onTeam={() => go({ tab: "staff" })} />
+        </div>
+      </CollapsibleSection>
       <div className="grid items-start gap-4 *:min-w-0 lg:grid-cols-2 lg:gap-5">
         <div className="space-y-4">
           <CollapsibleSection
@@ -162,7 +181,17 @@ interface TodoItem {
 }
 
 /** Everything that waits for the founder, as one row of chips with direct links. */
-function TodoStrip({ company, listed, go }: { company: MyCompany; listed: ListedCompany | null; go: Go }) {
+function TodoStrip({
+  company,
+  listed,
+  go,
+  autopilot,
+}: {
+  company: MyCompany;
+  listed: ListedCompany | null;
+  go: Go;
+  autopilot: CompanyAutopilot | null;
+}) {
   const t = useTranslations("hq.todo");
   const now = useServerClock();
   const tasks = useCompanyTasks();
@@ -237,6 +266,35 @@ function TodoStrip({ company, listed, go }: { company: MyCompany; listed: Listed
       tone: "normal",
       label: t("tasks", { count: openTasks }),
       target: { tab: "staff", target: "tasks" },
+    });
+  }
+  // ADR-180: what to do next, from the last hour
+  const pulse = companyPulse(autopilot?.lastHour ?? null);
+  if (company.marketingCentsPerQuarter <= 0) {
+    items.push({
+      key: "marketing",
+      tone: "warn",
+      label: t("marketing"),
+      target: { tab: "controlling", section: "marketing" },
+    });
+  }
+  if (pulse.ai === "idle" || pulse.ai === "partly") {
+    items.push({
+      key: "aiIdle",
+      tone: pulse.ai === "idle" ? "warn" : "normal",
+      label: t("aiIdle", { count: pulse.idleAi }),
+      target: { tab: "controlling", section: "marketing" },
+    });
+  }
+  if (pulse.soldOut) {
+    items.push({ key: "soldOut", tone: "normal", label: t("soldOut"), target: { tab: "staff" } });
+  }
+  if (autopilot && !autopilot.on && autopilot.canToggle) {
+    items.push({
+      key: "autopilot",
+      tone: "normal",
+      label: t("autopilot"),
+      target: { tab: "dashboard", target: "autopilot" },
     });
   }
   if (company.listing?.status === "subscription") {

@@ -5,7 +5,7 @@
  */
 import type { MoveBranch } from "./company-moves.ts";
 
-/** Every task game; the last eight came with ADR-173. */
+/** Every task game; eight came with ADR-173, the last five with ADR-180. */
 export const TASK_GAMES = [
   "pick",
   "count",
@@ -25,6 +25,11 @@ export const TASK_GAMES = [
   "haggle",
   "pack",
   "catch",
+  "restock",
+  "receipts",
+  "offer",
+  "pattern",
+  "shelf",
 ] as const;
 export type TaskGame = (typeof TASK_GAMES)[number];
 export type TaskMathOp = "mul" | "add" | "sub" | "pct";
@@ -532,6 +537,12 @@ export const COMPANY_TASKS: readonly CompanyTaskConfig[] = [
   { key: "truck_pack", product: "moving", branch: "logistics", game: "pack", factor: 1.1, minutes: 45 },
   { key: "spam_catch", product: "*", branch: "it", game: "catch", factor: 0.8, minutes: 40 },
   { key: "defect_catch", product: "*", branch: "craft", game: "catch", factor: 0.9, minutes: 40 },
+  // ADR-180: five more games
+  { key: "restock_shelves", product: "*", branch: "logistics", game: "restock", factor: 1.0, minutes: 45 },
+  { key: "expense_check", product: "*", branch: "finance", game: "receipts", factor: 1.1, minutes: 45 },
+  { key: "best_customer", product: "*", branch: "sales", game: "offer", factor: 1.0, minutes: 45 },
+  { key: "sales_forecast", product: "*", branch: "management", game: "pattern", factor: 1.1, minutes: 45 },
+  { key: "shelf_order", product: "*", branch: "logistics", game: "shelf", factor: 1.2, minutes: 50 },
 ];
 
 /** Rules for company tasks (ADR-129). Money in cents, rates in basis points. */
@@ -577,6 +588,16 @@ export const COMPANY_TASK_RULES = {
     pack: { seconds: 40, items: 6, minWeight: 1, maxWeight: 6, minValue: 1, maxValue: 9, capShareBps: 5_000 },
     /** events tiles pop up one after another on cells fields; tap the good ones (goodShareBps of them), like pick. */
     catch: { seconds: 25, events: 12, cells: 9, goodShareBps: 5_000, everyMs: 1_100, showMs: 900 },
+    /** ADR-180: order up to the target for each item (target - stock); exact full marks, one off half. */
+    restock: { seconds: 40, items: 4, minTarget: 8, maxTarget: 20 },
+    /** Pick the receipts that add up to the total; every euro off costs stepBps. */
+    receipts: { seconds: 45, items: 6, pick: 3, min: 5, max: 95, stepBps: 500 },
+    /** Per round the customer with the highest revenue (price x quantity). */
+    offer: { seconds: 40, rounds: 3, options: 3, minPrice: 2, maxPrice: 20, minQty: 5, maxQty: 40 },
+    /** Per round the next number of a row (adds, doubles, growing steps). */
+    pattern: { seconds: 40, rounds: 3, shown: 4 },
+    /** A 4 x 4 shelf: every row, column and 2 x 2 box holds each of 4 goods once; fill the gaps. */
+    shelf: { seconds: 60, blanks: 7 },
   },
   /** AI workers do delegated tasks, but slowly and less well. */
   ai: {
@@ -622,6 +643,29 @@ export const COMPANY_TASK_RULES = {
     maxBps: 6_000,
   },
   historyLimit: 15,
+  /**
+   * Autopilot (ADR-180): while on, the server takes every open task that has waited delayMinutes and resolves it
+   * without a mini-game. Chance = baseChanceBps + (maxChanceBps - baseChanceBps) x mood (0..1); above 10 000 the task
+   * always succeeds and the part above 100 % becomes an extra reward multiplier. Success pays rewardBps of what a
+   * perfect manual run pays, failure costs failPenaltyBps of the value. Without anyone active a new task comes every
+   * everyMinutes; at most maxPerDay autopilot tasks per Berlin day. The morning summary goes out from summaryHour.
+   */
+  autopilot: {
+    baseChanceBps: 6_000,
+    maxChanceBps: 12_000,
+    rewardBps: 7_000,
+    failPenaltyBps: 3_000,
+    delayMinutes: 3,
+    everyMinutes: 60,
+    maxPerDay: 24,
+    summaryHour: 7,
+    logLimit: 15,
+  },
+  /**
+   * Task pay with the six strengths (ADR-180): minBps at overall 0 up to maxBps at overall 100, linear, on every
+   * successful task (manual, AI, autopilot). Steeper than companyHealthPayFactor (1.00..1.15), so it is noticeable.
+   */
+  strengthPay: { minBps: 9_000, maxBps: 15_000 },
 } as const;
 
 /** Funny filler news for the news tab (ADR-129); texts in messages/de.json (funNews.items). */

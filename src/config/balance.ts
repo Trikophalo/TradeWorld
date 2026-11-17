@@ -970,6 +970,8 @@ export interface BalanceConfig {
       readonly marginFull: number;
       /** Hours of running costs in cash that count as 100. */
       readonly cashHoursFull: number;
+      /** ADR-180: awareness that counts as 100 (before: 1.0, so 5 % awareness showed as 5 of 100). */
+      readonly awarenessFull: number;
       /** Bonus on the hour's revenue from an overall score (floor of the mean): the highest tier reached counts. */
       readonly rewards: readonly { readonly at: number; readonly bps: number }[];
     };
@@ -1490,6 +1492,9 @@ export interface StartupsConfig {
     readonly marketingMaxGain: number;
     readonly marketingHalfSaturationShare: number;
     readonly marketingMinHalfSaturationCents: number;
+    /** ADR-180: awareness a solved company task adds at once (share, 0.002 = 0,2 Punkte); AI and autopilot less. */
+    readonly taskGain: number;
+    readonly taskAiShareBps: number;
   };
   readonly quality: {
     /** Without any skills in the sector branches. */
@@ -1508,6 +1513,8 @@ export interface StartupsConfig {
   readonly aiWorkerCostCentsPerQuarter: number;
   /** AI wage per operating hour (ADR-072); a quarter has time.quarterHours of them. */
   readonly aiWorkerWageCentsPerHour: number;
+  /** ADR-180: share of the AI wage an idle AI worker still costs (bps); busy ones cost the used share, at least this. */
+  readonly aiWorkerStandbyBps: number;
   /** Value = cash + max(0, annualised profit) × sector P/E × this discount. */
   readonly valuationPeDiscount: number;
   /** Owner's estimate of the market size: ± spread (log), shrinking each quarter. */
@@ -2517,9 +2524,9 @@ export const BALANCE = {
   startups: {
     garage: { minLevel: 6, foundingCostCents: 250_000, fixedCostCentsPerQuarter: 15_000, maxEmployees: 2 },
     upgradeCreditShare: 1,
-    gmbh: { minLevel: 15, foundingCostCents: 6_000_000, fixedCostCentsPerQuarter: 600_000, maxEmployees: 20 },
+    gmbh: { minLevel: 15, foundingCostCents: 6_000_000, fixedCostCentsPerQuarter: 360_000, maxEmployees: 20 },
     ag: { fixedCostCentsPerQuarter: 1_000_000, maxEmployees: 100 },
-    marketFactorByTier: { garage: 1, small_business: 4, gmbh: 15, ag: 40 },
+    marketFactorByTier: { garage: 10, small_business: 40, gmbh: 150, ag: 400 },
     foundingAwareness: { garage: 0.03, small_business: 0.08, gmbh: 0.2 },
     expansion: {
       fromTiers: ["gmbh", "ag"],
@@ -2570,24 +2577,27 @@ export const BALANCE = {
     awareness: {
       initial: 0.03,
       min: 0.01,
-      growthPerQuarter: 0.3,
-      decayPerQuarter: 0.03,
-      marketingMaxGain: 0.12,
-      marketingHalfSaturationShare: 0.1,
+      growthPerQuarter: 0.2,
+      decayPerQuarter: 0.12,
+      marketingMaxGain: 0.24,
+      marketingHalfSaturationShare: 0.01,
       marketingMinHalfSaturationCents: 50_000,
+      taskGain: 0.002,
+      taskAiShareBps: 5_000,
     },
     quality: { base: 0.25, halfSaturationScore: 20, adjustPerQuarter: 0.35 },
     demandNoise: 0.1,
     capacityCentsPerProductivity: {
-      tech: 300_000,
-      retail: 250_000,
-      energy: 250_000,
-      pharma: 300_000,
-      logistics: 250_000,
+      tech: 450_000,
+      retail: 375_000,
+      energy: 375_000,
+      pharma: 450_000,
+      logistics: 375_000,
     },
     grossMargin: { tech: 0.75, retail: 0.35, energy: 0.45, pharma: 0.65, logistics: 0.35 },
     aiWorkerCostCentsPerQuarter: 72_000,
     aiWorkerWageCentsPerHour: 12_000,
+    aiWorkerStandbyBps: 2_500,
     valuationPeDiscount: 0.5,
     estimate: { initialSpread: 2.3, decayPerQuarter: 0.85 },
     insolvency: { graceQuarters: 4, loanWithholdingBps: 5_000, foundingLockoutDays: 3 },
@@ -2600,9 +2610,9 @@ export const BALANCE = {
     },
     campaigns: {
       kinds: {
-        flyer: { hours: 24, costHours: 2, demandBps: 2_500, awareness: 0.005 },
-        online: { hours: 48, costHours: 6, demandBps: 4_000, awareness: 0.01 },
-        tv: { hours: 72, costHours: 18, demandBps: 7_000, awareness: 0.025 },
+        flyer: { hours: 24, costHours: 2, demandBps: 2_500, awareness: 0.02 },
+        online: { hours: 48, costHours: 6, demandBps: 4_000, awareness: 0.04 },
+        tv: { hours: 72, costHours: 18, demandBps: 7_000, awareness: 0.08 },
       },
       minCostCents: 20_000,
       luckMin: 0.4,
@@ -2714,6 +2724,7 @@ export const BALANCE = {
       decayPerHour: 0.05,
       marginFull: 0.25,
       cashHoursFull: 24,
+      awarenessFull: 0.5,
       rewards: [
         { at: 50, bps: 200 },
         { at: 75, bps: 500 },

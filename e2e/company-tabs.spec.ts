@@ -39,6 +39,9 @@ test("private company: dashboard first, levers in controlling, chat in the staff
   await page.getByTestId("company-header").getByText("Demo: Quartal jetzt abschließen").click();
   await expect(dashboard.getByTestId("hours-chart")).toBeVisible();
   await expect(dashboard.getByTestId("stat-profit")).toContainText("€");
+  // ADR-180: the simple view: what the last hour says, the autopilot
+  await expect(dashboard.getByTestId("company-pulse")).toContainText("Bekanntheit");
+  await expect(dashboard.getByTestId("company-autopilot")).toBeVisible();
   // Listed-only numbers stay away, the teaser says what going public brings.
   await expect(dashboard.getByTestId("stat-reputation")).toHaveCount(0);
   await expect(dashboard.getByTestId("listed-teaser")).toContainText("Das bringt der Börsengang");

@@ -51,6 +51,8 @@ test("the overview shows eight factors and the chart; a factor goes to Mira with
   await showDashboard(page);
   await expect(page.getByTestId("mira").getByText(/Hier verlierst du gerade am meisten:/)).toBeVisible();
 
+  // ADR-180: the full panel sits under "Erweitert"
+  await page.getByTestId("section-details").click();
   const panel = page.getByTestId("company-health");
   await expect(panel).toBeVisible();
   await expect(panel.getByTestId("health-radar")).toBeVisible();

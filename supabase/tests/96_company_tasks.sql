@@ -4,6 +4,10 @@
 \set QUIET 1
 set client_min_messages = notice;
 
+-- ADR-180: task pay grows with the strengths; this file checks the task rules with a neutral factor
+select coalesce(value -> 'strengthPay', 'null') as sp0 from public.game_config where key = 'companyTasks' \gset
+update public.game_config set value = jsonb_set(value, '{strengthPay}', '{"minBps": 10000, "maxBps": 10000}') where key = 'companyTasks';
+
 \set f '''09609609-0000-4000-8000-0000000000f1'''
 \set s '''09609609-0000-4000-8000-0000000000a1'''
 \set i '''09609609-0000-4000-8000-0000000000b1'''
@@ -218,3 +222,4 @@ select tests.assert(
   'a failed task lowers momentum but never below 1');
 select tests.set_cfg('companyTasks', '{momentum,perSolveBps}', '120');
 select tests.set_cfg('companyTasks', '{momentum,maxBps}', '6000');
+update public.game_config set value = jsonb_set(value, '{strengthPay}', :'sp0'::jsonb) where key = 'companyTasks';

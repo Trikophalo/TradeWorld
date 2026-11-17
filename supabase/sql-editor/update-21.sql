@@ -914,10 +914,19 @@ $do$;
 -- ones). Same rules as src/lib/sim/company-tasks.ts.
 -- Idempotent: runs unchanged as supabase/updates/20261204006400_task_games_more.sql.
 
-alter table public.company_tasks drop constraint if exists company_tasks_game_check;
-alter table public.company_tasks add constraint company_tasks_game_check
-  check (game in ('pick', 'count', 'sort', 'order', 'seq', 'math', 'slider', 'rotate', 'match', 'path',
-                  'memory', 'timing', 'diff', 'quick', 'route', 'haggle', 'pack', 'catch'));
+-- (update copy only: skipped once 6920 widened the check for its five games, or rows of those games would fail it;
+--  6920 sets the full one again further down)
+do $do$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'company_tasks_game_check'
+                    and pg_get_constraintdef(oid) like '%restock%') then
+    alter table public.company_tasks drop constraint if exists company_tasks_game_check;
+    alter table public.company_tasks add constraint company_tasks_game_check
+      check (game in ('pick', 'count', 'sort', 'order', 'seq', 'math', 'slider', 'rotate', 'match', 'path',
+                      'memory', 'timing', 'diff', 'quick', 'route', 'haggle', 'pack', 'catch'));
+  end if;
+end;
+$do$;
 
 -- Fields of a round trip from the depot (points[0]) through the stops in p_order and back (Manhattan).
 create or replace function public.company_task_tour_length(p_points jsonb, p_order integer[])

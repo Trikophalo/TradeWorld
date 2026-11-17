@@ -5,6 +5,10 @@
 \set QUIET 1
 set client_min_messages = notice;
 
+-- ADR-180: task pay grows with the strengths; this file checks the upgrades with a neutral factor
+select coalesce(value -> 'strengthPay', 'null') as sp0 from public.game_config where key = 'companyTasks' \gset
+update public.game_config set value = jsonb_set(value, '{strengthPay}', '{"minBps": 10000, "maxBps": 10000}') where key = 'companyTasks';
+
 \set x '''09a09a09-0000-4000-8000-0000000000a1'''
 \set y '''09a09a09-0000-4000-8000-0000000000a2'''
 \set f '''09a09a09-0000-4000-8000-0000000000f1'''
@@ -275,3 +279,4 @@ select tests.assert(
 -- =============================================================================
 select tests.assert(not exists (select 1 from public.ledger_audit()),
   'ledger audit clean after all upgrade bonuses (treasury and households pay, nothing is minted)');
+update public.game_config set value = jsonb_set(value, '{strengthPay}', :'sp0'::jsonb) where key = 'companyTasks';

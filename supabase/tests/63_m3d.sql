@@ -5,6 +5,14 @@
 \set QUIET 1
 set client_min_messages = notice;
 
+-- ADR-180 changed the company scale (market x 10, capacity x 1.5, idle AI workers at the standby share). This file
+-- checks the mechanics with the numbers it was written for; the end of the file restores the current values.
+select tests.set_cfg('startups', '{marketFactorByTier}', '{"garage": 1, "small_business": 4, "gmbh": 15, "ag": 40}') is null as ok \gset
+select tests.set_cfg('startups', '{capacityCentsPerProductivity}',
+  '{"tech": 300000, "retail": 250000, "energy": 250000, "pharma": 300000, "logistics": 250000}') is null as ok \gset
+select tests.set_cfg('startups', '{aiWorkerStandbyBps}', '10000') is null as ok \gset
+select tests.set_cfg('startups', '{gmbh,fixedCostCentsPerQuarter}', '600000') is null as ok \gset
+
 \set f '''0d3d3d3d-0000-4000-8000-0000000000f1'''
 \set w '''0d3d3d3d-0000-4000-8000-0000000000f2'''
 \set h '''0d3d3d3d-0000-4000-8000-0000000000f3'''
@@ -411,3 +419,10 @@ reset role;
 select tests.assert(:'wchat2' = 'null' and :'fnew' = 'Fiona Neu',
   'after closing: the former employee has no company chat; the founder may found again');
 select tests.assert(tests.money_invariant() = 'ok', 'money invariant holds (bonus, dissolution, forced loan, repayments, work bonus)');
+
+-- ADR-180: back to the current company scale
+select tests.set_cfg('startups', '{marketFactorByTier}', '{"garage": 10, "small_business": 40, "gmbh": 150, "ag": 400}') is null as ok \gset
+select tests.set_cfg('startups', '{capacityCentsPerProductivity}',
+  '{"tech": 450000, "retail": 375000, "energy": 375000, "pharma": 450000, "logistics": 375000}') is null as ok \gset
+select tests.set_cfg('startups', '{aiWorkerStandbyBps}', '2500') is null as ok \gset
+select tests.set_cfg('startups', '{gmbh,fixedCostCentsPerQuarter}', '360000') is null as ok \gset

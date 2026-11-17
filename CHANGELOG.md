@@ -116,6 +116,13 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 - **Kritiker für NFTs (ADR-181):** Jedes NFT bekommt beim Prägen ein Kritiker-Urteil von 0 bis 100 (du siehst es mit
   Stärke und Schwäche, der Markt als kleines Abzeichen). Gute Bilder bekommen mehr und höhere Angebote, Kopien keine,
   und die Sammler reden jetzt zurück: sie antworten, feilschen, loben, lästern und erinnern an ihr Angebot.
+
+- **Firmen lohnen sich (ADR-180):** Märkte sind zehnmal so groß, KI-Kräfte kosten im Leerlauf nur ein Viertel ihres
+  Lohns und bringen mehr ein, als sie kosten, sobald es Nachfrage gibt. Die Bekanntheit wächst jetzt jede Stunde, und das
+  Dashboard sagt, woher: „+2,0 durch Marketing“. Oben stehen nur noch Zahlen, Was-tun-Liste, Autopilot und Stärken.
+- **Autopilot:** Ein Schalter erledigt alle Firmenaufgaben ohne Minispiel, auch nachts: 60 % Erfolg, mit guter Stimmung
+  bis 120 %, dafür 70 % des Lohns. Morgens kommt die Zusammenfassung. Fünf neue Minispiele (Nachbestellen, Belege, Bestes
+  Angebot, Zahlenreihe, Regal), und starke Firmen bekommen für jede Aufgabe bis zu 50 % mehr.
 - **Stärken der Firma (ADR-176):** Ganz oben im Firmen-Dashboard zeigt ein Netz sechs Stärken. Sie wachsen nur langsam
   über Tage guter Stunden, zahlen dafür ab 50 Punkten einen Umsatzbonus von 2 % bis 15 %. Controlling ist in fünf
   Bereiche mit Sprungleiste geordnet; Strategie und CEO-Auszahlung melden nur noch Erfolg, wenn der Server sie übernimmt,
