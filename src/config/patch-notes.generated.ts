@@ -548,6 +548,36 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Mehr schieben, mehr schauen",
         text: "Neun neue Firmenaufgaben zum Ziehen und Hinsehen (Schiebepuzzle, Kisten einsortieren, Kabel entwirren, Fehlerteil finden, Nachbauen, Montieren…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-d400fafc",
+        title: "Bekanntheit neu",
+        text: "Marketing wirkt jede Stunde sichtbar (eine Garage kommt mit normalem Budget in einem Tag auf rund 30 %), Aufgaben und Kampagnen springen sofort, die…",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-83287dc3",
+        title: "Was du siehst, bekommst du",
+        text: "Die Order-Maske zeigt vor dem Bestätigen den echten Ausführungskurs, die Kursauswirkung und „Du erhältst ca. …“; Orders jeder Größe werden ganz…",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-f759f69f",
+        title: "Mira kennt jetzt deine Zahlen",
+        text: "Sie rät nur noch zu Dingen, die gerade gehen, sagt, was sie je Stunde bringen, und beantwortet „Was soll ich tun?“, „Warum Verlust?“, „Mehr…",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-bedb198f",
+        title: "Umsätze an der Börse",
+        text: "Jede Aktie zeigt ihren aktuellen Umsatz mit Trendpfeil, die Detailseite „Geschäftszahlen“ mit Gewinn, Ruf und Bekanntheit.",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-da87bd02",
+        title: "Große Züge für alle",
+        text: "Zieht jemand eine Nexamon-Karte mit mehr als 100.000 € Wert, bekommen alle anderen eine Nachricht mit Link zur Karte.",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-28a6a95a",
+        title: "Bulk verkaufen aufgeräumt",
+        text: "Die Knöpfe bleiben im Fenster, die Summe liegt am PC daneben statt über der Liste.",
+      },
     ],
   },
   {
