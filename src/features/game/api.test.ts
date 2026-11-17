@@ -6,6 +6,7 @@ import { bottleneck } from "@/features/company/routes";
 import { companyHealth } from "@/lib/sim/company-health";
 import { isValidBanner } from "@/lib/sim/logo";
 import { RPC_SCHEMAS } from "./api";
+import { staffValue } from "@/features/company/staff-value";
 import { toCompanyOverview } from "./api-company";
 
 /*
@@ -107,6 +108,26 @@ describe("RPC contract", () => {
     expect(Object.keys(listed.strengths!.scores).sort()).toEqual(
       ["awareness", "delivery", "finance", "margin", "quality", "team"].sort(),
     );
+    // ADR-183: the reputation of every company, and what each hour used for "Was jeder leistet"
+    expect(listed.reputation).not.toBeNull();
+    expect(listed.reputation!.history.length).toBe(listed.hours.length);
+    expect(listed.reputation!.drivers).toHaveProperty("quality");
+    expect(listed.closeWarnings).toEqual([]);
+    const hour = listed.hours.at(-1)!;
+    expect(hour.capacityCents).toBeGreaterThan(0);
+    expect(hour.demandCents).toBeGreaterThan(0);
+    expect(hour.aiWagesPaidCents).not.toBeNull();
+    const value = staffValue({
+      founder: { nickname: "F", productivityBps: listed.founderProductivityBps },
+      members: [],
+      aiWorkers: listed.aiWorkers,
+      aiWageCentsPerHour: listed.aiWageCentsPerHour,
+      aiProductivityBps: 10_000,
+      hours: listed.hours,
+      paidHoursPerDay: 8,
+    });
+    expect(value.noRevenue).toBe(false);
+    expect(value.rows.find((r) => r.kind === "founder")!.contributionCents).toBeGreaterThan(0);
     const strategy = RPC_SCHEMAS.set_company_strategy.parse(read("set_company_strategy.json"));
     expect(strategy.company?.price_level).toBe("premium");
     const payout = RPC_SCHEMAS.set_founder_payout.parse(read("set_founder_payout.json"));
